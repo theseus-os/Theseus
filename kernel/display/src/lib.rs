@@ -140,6 +140,7 @@ impl Display for VirtualFrameBuffer {
     fn fill_rectangle(&mut self, start_x:usize, start_y:usize, width:usize, height:usize, color:u32){
         let mut x = start_x;
         let mut y = start_y;
+        
 
         let (buffer_width, buffer_height) = self.get_size();
         let index = self.get_index_fn();
@@ -152,7 +153,8 @@ impl Display for VirtualFrameBuffer {
 
         let buffer = self.buffer();
 
-        loop {
+          trace!("{} {} {}",width, height, buffer.len());
+      loop {
             if x == end_x {
                 y += 1;
                 if y == end_y {

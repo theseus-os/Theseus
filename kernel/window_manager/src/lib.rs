@@ -46,6 +46,7 @@ use display::Display;
 use event_types::Event;
 use alloc::string::{String, ToString};
 
+
 pub mod displayable;
 
 use displayable::text_display::TextDisplay;
@@ -55,7 +56,7 @@ static WINDOW_ALLOCATOR: Once<Mutex<WindowAllocator>> = Once::new();
 const WINDOW_ACTIVE_COLOR:u32 = 0xFFFFFF;
 const WINDOW_INACTIVE_COLOR:u32 = 0x343C37;
 const SCREEN_BACKGROUND_COLOR:u32 = 0x000000;
-static VFRAME_BUFFER:Once<Mutex<Arc<VirtualFrameBuffer>>> = Once::new();
+static VFRAME_BUFFER:Once<Arc<Mutex<VirtualFrameBuffer>>> = Once::new();
 
 /// 10 pixel gap between windows 
 pub const GAP_SIZE: usize = 10;
@@ -139,9 +140,11 @@ impl WindowAllocator{
     fn allocate(&mut self, x:usize, y:usize, width:usize, height:usize) -> Result<WindowObj, &'static str>{
         let (buffer_width, buffer_height) = get_screen_size()?;
         
+        trace!("Wenqiu: screen size {}", buffer_width);
+
         let vfb = VirtualFrameBuffer::new(0, 0, buffer_width, buffer_height)?;
         VFRAME_BUFFER.call_once(||{
-            Mutex::new(vfb)
+            vfb
         });
         /*{
             let mut drawer = frame_buffer::FRAME_DRAWER.lock();
@@ -194,7 +197,7 @@ impl WindowAllocator{
             inner_lock.draw_border(get_border_color(true))?;
         }
         
-        // inactive all other windows and active the new one
+       // inactive all other windows and active the new one
         for item in self.allocated.iter_mut(){
             let ref_opt = item.upgrade();
             if let Some(reference) = ref_opt {
@@ -406,8 +409,7 @@ impl WindowObj{
             Some(buffer) => { buffer },
             None => {return Err("The virtual frame buffer is not initialized");}
         };
-        try!(Arc::get_mut(&mut buffer.lock()).ok_or("Fail to get the virtual frame buffer"))
-            .draw_pixel(x + inner.x + 1, y + inner.y + 1, color);
+        buffer.lock().draw_pixel(x + inner.x + 1, y + inner.y + 1, color);
         Ok(())
     }
 
@@ -426,8 +428,7 @@ impl WindowObj{
             },
             None => { return Err("Fail to get the virtual frame buffer"); }
         };
-        try!(Arc::get_mut(&mut buffer.lock()).ok_or("Fail to get the virtual frame buffer"))
-            .draw_line((start_x + inner.x + 1) as i32, (start_y + inner.y + 1) as i32, 
+        buffer.lock().draw_line((start_x + inner.x + 1) as i32, (start_y + inner.y + 1) as i32, 
             (end_x + inner.x + 1) as i32, (end_y + inner.y + 1) as i32, color);
         Ok(())
        
@@ -445,10 +446,9 @@ impl WindowObj{
             Some(buffer) => { buffer },
             None => { return Err("Fail to get the virtual frame buffer")}
         };
-        try!(Arc::get_mut(&mut buffer.lock()).ok_or("Fail to get the virtual frame buffer"))
-            .draw_rectangle(x + inner.x + 1, y + inner.y + 1, width, height, 
+        buffer.lock().draw_rectangle(x + inner.x + 1, y + inner.y + 1, width, height, 
                 color);
-        Ok(())
+        frame_buffer::flush(&buffer)
     }
 
     /// Requires that a str slice that will exactly fit the frame buffer
@@ -563,10 +563,14 @@ impl WindowInner {
     fn clean(&self) -> Result<(), &'static str>{
         let buffer = match VFRAME_BUFFER.try(){
             Some(buffer) => { buffer },
-            None => {return Err("Fail to get the virtual frame buffer")}
+            None => {return Err("The virtual frame buffer is not initialized") }
         };
-        try!(Arc::get_mut(&mut buffer.lock()).ok_or("Fail to get the virtual frame buffer"))
-            .fill_rectangle(self.x + self.margin, self.y + self.margin,
+
+        trace!{"Wenqiu {:?}", buffer.lock().get_size()};
+        
+        //trace!{"{:?}", buffer.lock().buffer()};
+        
+        buffer.lock().fill_rectangle(self.x + self.margin, self.y + self.margin,
                 self.width - 2 * self.margin, self.height - 2 * self.margin, SCREEN_BACKGROUND_COLOR);
         Ok(())
     }
@@ -577,9 +581,8 @@ impl WindowInner {
             Some(buffer) => { buffer },
             None => { return Err("Fail to get the virtual frame buffer") }
         };
-        try!(Arc::get_mut(&mut buffer.lock()).ok_or("Fail to get the virtual frame buffer"))
-            .draw_rectangle(self.x, self.y, self.width, self.height, color);
-        Ok(())
+        buffer.lock().draw_rectangle(self.x, self.y, self.width, self.height, color);
+        frame_buffer::flush(&buffer)
     }
 
     /// adjust the size of a window
