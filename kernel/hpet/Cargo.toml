@@ -22,3 +22,6 @@ path = "../memory"
 
 [dependencies.sdt]
 path = "../sdt"
+
+[dependencies.acpi_table]
+path = "../acpi_table"
