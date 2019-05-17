@@ -1,7 +1,9 @@
 extern crate tsc;
 use super::font::{CHARACTER_HEIGHT, CHARACTER_WIDTH, FONT_PIXEL};
 use super::{Mutex, Box};
-use super::{PhysicalFrameBuffer, get_buffer_ref};
+use super::{VirtualFrameBuffer};
+use alloc::vec::{Vec};
+use alloc::sync::{Arc};
 
 use self::tsc::{tsc_ticks, TscTicks};
 
@@ -28,20 +30,20 @@ pub enum DisplayPosition {
 /// An instance of a frame text buffer which can be displayed to the screen.
 pub struct FrameTextBuffer {
     pub cursor:Mutex<Cursor>,
-    pub buffer:PhysicalFrameBuffer
+    pub vbuffer:Arc<VirtualFrameBuffer>
 }
 
 impl FrameTextBuffer {
-    pub fn new() -> Result<FrameTextBuffer, &'static str> {
-        let buffer_ref = get_buffer_ref()?;
+    pub fn new(x:usize, y:usize, width:usize, height:usize) -> Result<FrameTextBuffer, &'static str> {
+        let vbf = VirtualFrameBuffer::new(x, y, width, height)?;
         Ok(FrameTextBuffer {
             cursor:Mutex::new(Cursor::new(0, 0, true)),
-            buffer: buffer_ref
+            vbuffer: vbf
         })
     }
     
     ///print a string by bytes
-    pub fn print_by_bytes(&self, x:usize, y:usize, width:usize, height:usize, 
+    pub fn print_by_bytes(&mut self, x:usize, y:usize, width:usize, height:usize, 
         slice: &str, font_color:u32, bg_color:u32) -> Result<(), &'static str> {
     
         let mut curr_line = 0;
@@ -53,7 +55,7 @@ impl FrameTextBuffer {
         
 
         //let mut fb = frame_buffer::FRAME_BUFFER.lock();
-        let index = { self.buffer.get_index_fn() };
+        let index = { self.vbuffer.get_index_fn() };
         
         for byte in slice.bytes() {
             if byte == b'\n' {
@@ -62,7 +64,7 @@ impl FrameTextBuffer {
                     y + curr_line * CHARACTER_HEIGHT,
                     x + width, 
                     y + (curr_line + 1 )* CHARACTER_HEIGHT, 
-                    bg_color, &index);
+                    bg_color, &index)?;
                 //cursor_pos += buffer_width - curr_column;
                 curr_column = 0;
                 curr_line += 1;
@@ -78,7 +80,7 @@ impl FrameTextBuffer {
                     }
                 }
                 self.print_byte(byte, font_color, bg_color, x, y, 
-                    curr_line, curr_column, &index);
+                    curr_line, curr_column, &index)?;
                 curr_column += 1;
                 //cursor_pos += 1;
             }
@@ -90,18 +92,19 @@ impl FrameTextBuffer {
             y + curr_line * CHARACTER_HEIGHT,
             x + width, 
             y + (curr_line + 1 )* CHARACTER_HEIGHT, 
-            bg_color, &index);
+            bg_color, &index)?;
 
         // Fill the blank of remaining lines
         self.fill_blank ( 
             x, y + (curr_line + 1 )* CHARACTER_HEIGHT, x + width, y + height, 
-            bg_color, &index);
+            bg_color, &index)?;
 
         Ok(())
     }
 
-    fn print_byte (&self, byte:u8, font_color:u32, bg_color:u32,
-            left:usize, top:usize, line:usize, column:usize, index:&Box<Fn(usize, usize)->usize>) {
+    fn print_byte (&mut self, byte:u8, font_color:u32, bg_color:u32,
+            left:usize, top:usize, line:usize, column:usize, index:&Box<Fn(usize, usize)->usize>) 
+            -> Result<(),&'static str> {
         let x = left + column * CHARACTER_WIDTH;
         let y = top + line * CHARACTER_HEIGHT;
         let mut i = 0;
@@ -109,7 +112,8 @@ impl FrameTextBuffer {
 
         let fonts = FONT_PIXEL.lock();
    
-        let mut buffer = self.buffer.buffer_ref.lock();
+        let mut buffer = try!(Arc::get_mut(&mut self.vbuffer).ok_or("Fail to get the virtual framebuffer"))
+            .buffer();
         loop {
             let mask:u32 = fonts[byte as usize][i][j];
             buffer[index(x + j, y + i)] = font_color & mask | bg_color & (!mask);
@@ -117,28 +121,29 @@ impl FrameTextBuffer {
             if j == CHARACTER_WIDTH {
                 i += 1;
                 if i == CHARACTER_HEIGHT {
-                    break;
+                    return Ok(());
                 }
                 j = 0;
             }
         }
     }
 
-    fn fill_blank(&self, left:usize, top:usize, right:usize,
-             bottom:usize, color:u32, index:&Box<Fn(usize, usize)->usize>){
+    fn fill_blank(&mut self, left:usize, top:usize, right:usize,
+             bottom:usize, color:u32, index:&Box<Fn(usize, usize)->usize>) -> Result<(),&'static str>{
         let mut x = left;
         let mut y = top;
         if left > right || top > bottom {
-            return
+            return Ok(())
         }
-        let mut buffer = self.buffer.buffer_ref.lock();
+        let mut buffer = try!(Arc::get_mut(&mut self.vbuffer).ok_or("Fail to get the virtual framebuffer"))
+            .buffer();
         loop {
             if x == right {
                 y += 1;
                 x = left;
             }
             if y == bottom {
-                break;
+                return Ok(());
             }
             buffer[index(x, y)] = color;
             x += 1;

@@ -23,11 +23,11 @@ use memory::{FRAME_ALLOCATOR, Frame, PageTable, PhysicalAddress,
     get_kernel_mmi_ref};
 use core::ops::DerefMut;
 use alloc::boxed::Box;
-use alloc::sync::Arc;
+use alloc::sync::{Arc, Weak};
+use alloc::vec::Vec;
 
 
-static FRAME_BUFFER: Once<Buffer> = Once::new();
-
+static COMPOSITOR:Once<Mutex<Compositor>> = Once::new();
 
 const PIXEL_BYTES:usize = 4;
 
@@ -90,13 +90,13 @@ pub fn init() -> Result<(), &'static str > {
 
             let mut buffer = BoxRefMut::new(Box::new(mapped_frame_buffer)).
                 try_map_mut(|mp| mp.as_slice_mut(0, buffer_width * buffer_height))?;
-            let buffer_ref = Arc::new(Mutex::new(buffer));
-            FRAME_BUFFER.call_once(|| 
-                Buffer {
+            COMPOSITOR.call_once(|| 
+                Mutex::new(Compositor {
                     width:buffer_width,
                     height:buffer_height,
-                    buffer_ref: buffer_ref
-                }
+                    buffer: buffer,
+                    frames: Vec::new(),
+                })
             );
 
             Ok(())
@@ -107,96 +107,113 @@ pub fn init() -> Result<(), &'static str > {
     }
 }
 
-pub struct Buffer {
+pub struct Compositor {
     width:usize,
     height:usize,
-    buffer_ref:Arc<Mutex<BoxRefMut<MappedPages, [u32]>>>,
+    buffer:BoxRefMut<MappedPages, [u32]>,
+    frames:Vec<DisplayFrame>
 }
 
-pub struct PhysicalFrameBuffer{
-    width:usize, 
-    height:usize,
-    pub buffer_ref:Arc<Mutex<BoxRefMut<MappedPages, [u32]>>>,
-}
-
-impl PhysicalFrameBuffer {
-        // set the graphic mode information of the buffer
-    // fn set_mode_info(&mut self, width:usize, height:usize, pages:MappedPages) {
-    //     self.width = width;
-    //     self.height = height;
-    //     self.pages = Some(pages);
-    // }
-
-    /// Get the resolution of the screen
-    pub fn get_resolution(&self) -> (usize, usize) {
+impl Compositor {
+    fn get_resolution(&self) -> (usize, usize){
         (self.width, self.height)
     }
 
-    // Check if a point is in the screen
+    fn add_frame(&mut self, frame:DisplayFrame) {
+        self.frames.push(frame);
+    }
+}
+
+pub struct DisplayFrame {
+    x:usize,
+    y:usize,
+    vframebuffer:Weak<VirtualFrameBuffer>,
+}
+
+pub struct VirtualFrameBuffer {
+    width:usize,
+    height:usize,
+    buffer:Vec<u32>
+}
+
+impl VirtualFrameBuffer {
+    pub fn new(x:usize, y:usize, width:usize, height:usize) -> Result<Arc<VirtualFrameBuffer>, &'static str>{
+        let buffer:Vec<u32> = Vec::with_capacity(width*height);
+        let vf = VirtualFrameBuffer {
+            width:width,
+            height:height,
+            buffer:buffer
+        };
+        let vf_ref = Arc::new(vf);
+        let vf_weak = Arc::downgrade(&vf_ref);
+
+        let frame = DisplayFrame {
+            x:x,
+            y:y,
+            vframebuffer:vf_weak
+        };
+        let mut compositor = try!(COMPOSITOR.try().ok_or("Fail to get the compositor")).lock();
+        
+        compositor.add_frame(frame);
+
+        Ok(vf_ref)
+    }
+
+    pub fn buffer(&mut self) -> &mut Vec<u32> {
+        return &mut self.buffer
+    }
+
+    //get the resolution of the screen
+    pub fn get_size(&self) -> (usize, usize) {
+        (self.width, self.height)
+    }
+
+    pub fn get_index_fn(&self) -> Box<Fn(usize, usize)->usize>{
+         let width = self.width;
+         Box::new(move |x:usize, y:usize| y * width + x )
+    }
+
     pub fn check_in_range(&self, x:usize, y:usize)  -> bool {
         x < self.width && y < self.height
     }
-
-    // fn draw(&mut self, index:usize, color:u32) -> Result<(), &'static str>{
-        
-    //     // match self.pages {
-    //     //     Some(ref mut pages) => {
-    //     //         let buffer = match (pages.as_slice_mut(0, self.width*self.height)) {
-    //     //             Ok( bf) => { bf },
-    //     //             Err(_) => { error!("Fail to transmute buffer"); return; }
-    //     //         };
-    //     //         buffer[index] = color;
-    //     //     },
-    //     //     None => { error!("Fail to get buffer") }
-    //     // }
-    //     let mut fb = try!(FRAME_BUFFER.try().ok_or("Fail to get access to the framebuffer")).lock();
-    //     fb.buffer_ref[index] = color;
-    //     Ok(())
-    // }
-
-    // return the framebuffer
-    // pub fn buffer(&mut self) -> Result<&mut[u32], &'static str> {
-    //     match self.pages {
-    //         Some(ref mut pages) => {
-    //             let buffer = try!(pages.as_slice_mut(0, self.width*self.height));
-    //             return Ok(buffer);
-    //         },
-    //         None => { return Err("no allocated pages in framebuffer") }
-    //     }
-    // }
-
-    // get the index computation function according to the width of the buffer
-    // call it to get the index function before locking the buffer
-    pub fn get_index_fn(&self) -> Box<Fn(usize, usize)->usize>{
-        let width = self.width;
-        Box::new(move |x:usize, y:usize| y * width + x )
-    }
-
 }
 
-pub fn get_buffer_ref() ->  Result<PhysicalFrameBuffer, &'static str> {
-    let mut fb = try!(FRAME_BUFFER.try().ok_or("Fail to get access to the framebuffer"));
-    let (width, height) = (fb.width, fb.height);
-//    let buffer_ref = fb.buffer.deref_mut();
-    Ok(PhysicalFrameBuffer{
-        width:width,
-        height:height,
-        buffer_ref:Arc::clone(&fb.buffer_ref),
-    })
-}
+// impl PhysicalFrameBuffer {
+//         // set the graphic mode information of the buffer
+//     // fn set_mode_info(&mut self, width:usize, height:usize, pages:MappedPages) {
+//     //     self.width = width;
+//     //     self.height = height;
+//     //     self.pages = Some(pages);
+//     // }
 
+//     /// Get the resolution of the screen
+//     pub fn get_resolution(&self) -> (usize, usize) {
+//         (self.width, self.height)
+//     }
 
-pub fn draw_in_buffer(index:usize, color:u32,  buffer:&mut[u32]) {
-    buffer[index] = color;
-}
+//     // Check if a point is in the screen
+//     pub fn check_in_range(&self, x:usize, y:usize)  -> bool {
+//         x < self.width && y < self.height
+//     }
+
+//     pub fn get_index_fn(&self) -> Box<Fn(usize, usize)->usize>{
+//         let width = self.width;
+//         Box::new(move |x:usize, y:usize| y * width + x )
+//     }
+
+// }
+
+// pub fn draw_in_buffer(index:usize, color:u32,  buffer:&mut[u32]) {
+//     buffer[index] = color;
+// }
 
 pub fn get_resolution() -> Result<(usize, usize), &'static str> {
-    let framebuffer = try!(FRAME_BUFFER.try().ok_or("Fail to get the physical frame buffer"));
-    Ok((framebuffer.width, framebuffer.height))
+    let compositor = try!(COMPOSITOR.try().ok_or("Fail to get the physical frame buffer"));
+    Ok(compositor.lock().get_resolution())
 }
 
 
-// Check if a point is in the screen
-pub fn check_in_range(x:usize, y:usize, width:usize, height:usize)  -> bool {
-    x < width && y < height
-}
+// // Check if a point is in the screen
+// pub fn check_in_range(x:usize, y:usize, width:usize, height:usize)  -> bool {
+//     x < width && y < height
+// }

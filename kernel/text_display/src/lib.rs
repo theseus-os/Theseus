@@ -26,7 +26,7 @@ impl TextDisplay
 
     /// Function to set a cursor on the display at an (x,y) position. 
     /// set_cursor() should accept coordinates within those specified by get_dimensions() and display to window
-    pub fn set_cursor(&mut self, line: u16, column: u16, reset:bool){
+    pub fn set_cursor(&self, line: u16, column: u16, reset:bool){
 
     } 
     /// Take the cursor off the display
@@ -34,7 +34,7 @@ impl TextDisplay
 
     }
     /// Display the cursor and let it blinks
-    pub fn cursor_blink(&mut self){
+    pub fn cursor_blink(&self){
 
     }
 

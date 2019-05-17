@@ -41,7 +41,8 @@ use core::ops::Deref;
 use dfqueue::{DFQueue,DFQueueConsumer,DFQueueProducer};
 use alloc::sync::{Arc, Weak};
 use display::text_buffer::{FrameTextBuffer};
-use display::VirtualFrameBuffer;
+use display::{VirtualFrameBuffer};
+use display::Display;
 use event_types::Event;
 use alloc::string::{String, ToString};
 
@@ -54,7 +55,7 @@ static WINDOW_ALLOCATOR: Once<Mutex<WindowAllocator>> = Once::new();
 const WINDOW_ACTIVE_COLOR:u32 = 0xFFFFFF;
 const WINDOW_INACTIVE_COLOR:u32 = 0x343C37;
 const SCREEN_BACKGROUND_COLOR:u32 = 0x000000;
-static VFRAME_BUFFER:Once<Mutex<VirtualFrameBuffer>> = Once::new();
+static VFRAME_BUFFER:Once<Mutex<Arc<VirtualFrameBuffer>>> = Once::new();
 
 /// 10 pixel gap between windows 
 pub const GAP_SIZE: usize = 10;
@@ -113,7 +114,7 @@ fn get_border_color(active:bool) -> u32 {
 /// switch the active window. Active the next window in the list based on the order they are created
 pub fn switch() -> Result<(), &'static str> {
     let mut allocator = try!(WINDOW_ALLOCATOR.try().ok_or("The window allocator is not initialized")).lock();
-    allocator.switch();
+    allocator.switch()?;
     Ok(())
 }
 
@@ -122,8 +123,8 @@ pub fn delete(window:WindowObj) -> Result<(), &'static str> {
     let mut allocator = try!(WINDOW_ALLOCATOR.try().ok_or("The window allocator is not initialized")).lock();
     // Switches to a new active window and sets 
     // the active pointer field of the window allocator to the new active window
-    allocator.switch(); 
-    allocator.delete(&(window.inner));
+    allocator.switch()?; 
+    allocator.delete(&(window.inner))?;
     Ok(())
 }
 
@@ -189,15 +190,15 @@ impl WindowAllocator{
         // draw the window
         {
             let inner_lock = inner_ref.lock();
-            inner_lock.clean();
-            inner_lock.draw_border(get_border_color(true));
+            inner_lock.clean()?;
+            inner_lock.draw_border(get_border_color(true))?;
         }
         
         // inactive all other windows and active the new one
         for item in self.allocated.iter_mut(){
             let ref_opt = item.upgrade();
             if let Some(reference) = ref_opt {
-                reference.lock().active(false);
+                reference.lock().active(false)?;
             }
         }
         let weak_ref = Arc::downgrade(&inner_ref);
@@ -217,7 +218,7 @@ impl WindowAllocator{
 
     /// Switches to the next active window in the window allocator list
     /// This function returns the index of the previously active window in the window_allocator.allocated vector
-    fn switch(&mut self) -> usize {
+    fn switch(&mut self) -> Result<usize, &'static str> {
         let mut flag = false;
         let mut i = 0;
         let mut prev_active = 0;
@@ -226,12 +227,12 @@ impl WindowAllocator{
             if let Some(window) = reference {
                 let mut window = window.lock();
                 if flag {
-                    (*window).active(true);
+                    (*window).active(true)?;
                     self.active = item.clone(); // clones the weak pointer to put in the active field
                     flag = false;
                     self.active = item.clone();
                 } else if window.active {
-                    (*window).active(false);
+                    (*window).active(false)?;
                     prev_active = i;
                     flag = true;
                 }
@@ -243,17 +244,17 @@ impl WindowAllocator{
                 let reference = item.upgrade();
                 if let Some(window) = reference {
                     let mut window = window.lock();
-                    (*window).active(true);
+                    (*window).active(true)?;
                     self.active = item.clone(); // clones the weak pointer to put into the active field
                     break;
                 }
             }
         }
 
-        return prev_active;
+        return Ok(prev_active);
     }
 
-    fn delete(&mut self, inner:&Arc<Mutex<WindowInner>>){
+    fn delete(&mut self, inner:&Arc<Mutex<WindowInner>>) -> Result<(), &'static str> {
         let mut i = 0;
         let len = self.allocated.len();
         for item in self.allocated.iter(){
@@ -277,8 +278,9 @@ impl WindowAllocator{
         }
 
         let inner_lock = inner.lock();
-        inner_lock.clean();
-        inner_lock.draw_border(SCREEN_BACKGROUND_COLOR);
+        inner_lock.clean()?;
+        inner_lock.draw_border(SCREEN_BACKGROUND_COLOR)?;
+        Ok(())
     }
 
     fn check_overlap(&mut self, inner:&Arc<Mutex<WindowInner>>, x:usize, y:usize, width:usize, height:usize) -> bool {
@@ -332,9 +334,10 @@ pub struct WindowObj {
 impl WindowObj{
 
     // clean the content of the window
-    fn clean(&self) {
+    fn clean(&self) -> Result<(), &'static str> {
         let inner = self.inner.lock();
-        inner.clean();
+        inner.clean()?;
+        Ok(())
     }
 
     /// Returns the dimensions of this window,
@@ -394,51 +397,58 @@ impl WindowObj{
     }
 
     /// draw a pixel in a window
-    pub fn draw_pixel(&self, x:usize, y:usize, color:u32){
+    pub fn draw_pixel(&self, x:usize, y:usize, color:u32) -> Result<(), &'static str>{
         let inner = self.inner.lock();
         if x >= inner.width - 2 || y >= inner.height - 2 {
-            return;
+            return Ok(());
         }
         let buffer = match VFRAME_BUFFER.try(){
             Some(buffer) => { buffer },
-            None => {error!("Fail to get the virtual frame buffer"); return;}
+            None => {return Err("The virtual frame buffer is not initialized");}
         };
-        buffer.lock().draw_pixel(x + inner.x + 1, y + inner.y + 1, color);
+        try!(Arc::get_mut(&mut buffer.lock()).ok_or("Fail to get the virtual frame buffer"))
+            .draw_pixel(x + inner.x + 1, y + inner.y + 1, color);
+        Ok(())
     }
 
     /// draw a line in a window
-    pub fn draw_line(&self, start_x:usize, start_y:usize, end_x:usize, end_y:usize, color:u32){
+    pub fn draw_line(&self, start_x:usize, start_y:usize, end_x:usize, end_y:usize, color:u32) -> Result<(), &'static str> {
         let inner = self.inner.lock();
         if start_x > inner.width - 2
             || start_y > inner.height - 2
             || end_x > inner.width - 2
             || end_y > inner.height - 2 {
-            return;
+            return Ok(());
         }
         let buffer = match VFRAME_BUFFER.try(){
             Some(buffer) => { 
                 buffer
             },
-            None => {error!("Fail to get the virtual frame buffer"); return;}
+            None => { return Err("Fail to get the virtual frame buffer"); }
         };
-        buffer.lock().draw_line((start_x + inner.x + 1) as i32, (start_y + inner.y + 1) as i32, 
+        try!(Arc::get_mut(&mut buffer.lock()).ok_or("Fail to get the virtual frame buffer"))
+            .draw_line((start_x + inner.x + 1) as i32, (start_y + inner.y + 1) as i32, 
             (end_x + inner.x + 1) as i32, (end_y + inner.y + 1) as i32, color);
+        Ok(())
        
     }
 
     /// draw a square in a window
-    pub fn draw_rectangle(&self, x:usize, y:usize, width:usize, height:usize, color:u32){
+    pub fn draw_rectangle(&self, x:usize, y:usize, width:usize, height:usize, color:u32) 
+        -> Result<(), &'static str> {
         let inner = self.inner.lock();
         if x + width > inner.width - 2
             || y + height > inner.height - 2 {
-            return;
+            return Ok(());
         }
         let buffer = match VFRAME_BUFFER.try(){
             Some(buffer) => { buffer },
-            None => {error!("Fail to get the virtual frame buffer"); return;}
+            None => { return Err("Fail to get the virtual frame buffer")}
         };
-        buffer.lock().draw_rectangle(x + inner.x + 1, y + inner.y + 1, width, height, 
-            color);
+        try!(Arc::get_mut(&mut buffer.lock()).ok_or("Fail to get the virtual frame buffer"))
+            .draw_rectangle(x + inner.x + 1, y + inner.y + 1, width, height, 
+                color);
+        Ok(())
     }
 
     /// Requires that a str slice that will exactly fit the frame buffer
@@ -543,39 +553,45 @@ impl WindowInner {
     }
 
     // active or inactive a window
-    fn active(&mut self, active:bool){
+    fn active(&mut self, active:bool) -> Result<(), &'static str> {
         self.active = active;
-        self.draw_border(get_border_color(active));
+        self.draw_border(get_border_color(active))?;
+        Ok(())
     }
 
     // clean the content of a window
-    fn clean(&self) {
+    fn clean(&self) -> Result<(), &'static str>{
         let buffer = match VFRAME_BUFFER.try(){
             Some(buffer) => { buffer },
-            None => {error!("Fail to get the virtual frame buffer"); return;}
+            None => {return Err("Fail to get the virtual frame buffer")}
         };
-        buffer.lock().fill_rectangle(self.x + self.margin, self.y + self.margin,
-            self.width - 2 * self.margin, self.height - 2 * self.margin, SCREEN_BACKGROUND_COLOR);
+        try!(Arc::get_mut(&mut buffer.lock()).ok_or("Fail to get the virtual frame buffer"))
+            .fill_rectangle(self.x + self.margin, self.y + self.margin,
+                self.width - 2 * self.margin, self.height - 2 * self.margin, SCREEN_BACKGROUND_COLOR);
+        Ok(())
     }
 
     // draw the border of the window
-    fn draw_border(&self, color:u32) {
+    fn draw_border(&self, color:u32) -> Result<(), &'static str> {
         let buffer = match VFRAME_BUFFER.try(){
             Some(buffer) => { buffer },
-            None => {error!("Fail to get the virtual frame buffer"); return;}
+            None => { return Err("Fail to get the virtual frame buffer") }
         };
-        buffer.lock().draw_rectangle(self.x, self.y, self.width, self.height, color);           }
+        try!(Arc::get_mut(&mut buffer.lock()).ok_or("Fail to get the virtual frame buffer"))
+            .draw_rectangle(self.x, self.y, self.width, self.height, color);
+        Ok(())
+    }
 
     /// adjust the size of a window
     fn resize(&mut self, x:usize, y:usize, width:usize, height:usize) -> Result<(usize, usize), &'static str> {
-        self.draw_border(SCREEN_BACKGROUND_COLOR);
-        self.clean();
+        self.draw_border(SCREEN_BACKGROUND_COLOR)?;
+        self.clean()?;
         let percent = ((width-self.margin)*100/(self.width-self.margin), (height-self.margin)*100/(self.height-self.margin));
         self.x = x;
         self.y = y;
         self.width = width;
         self.height = height; 
-        self.draw_border(get_border_color(self.active));
+        self.draw_border(get_border_color(self.active))?;
         Ok(percent)
     }
 

@@ -665,7 +665,8 @@ impl Terminal {
         }
 
         if let Some(text_display) = self.window.get_displayable(display_name){
-            text_display.set_cursor(&(self.window), new_y as u16, new_x as u16, FONT_COLOR, true);
+            text_display.set_cursor(&(self.window), new_y as u16, new_x as u16, 
+                FONT_COLOR, true)?;
         } else {
             return Err("faild to get the text displayable component")
         }
@@ -1046,7 +1047,7 @@ fn terminal_loop(mut terminal: Terminal) -> Result<(), &'static str> {
     loop {
         // Handle cursor blink
         if let Some(text_display) = terminal.window.get_displayable(&display_name){
-            text_display.cursor_blink(&(terminal.window), FONT_COLOR, BACKGROUND_COLOR);
+            text_display.cursor_blink(&(terminal.window), FONT_COLOR, BACKGROUND_COLOR)?;
         }
 
         // Handles events from the print queue. The queue is "empty" is peek() returns None
