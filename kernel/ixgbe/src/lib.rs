@@ -196,7 +196,7 @@ impl NetworkInterfaceCard for IxgbeNic {
             // debug!("tx desc status: {}", self.tx_descs[old_cur as usize].status.read());
         }  //bit 0 should be set when done
         
-        debug!("Packet is sent!");  
+        // debug!("Packet is sent!");  
         Ok(())
     }
 

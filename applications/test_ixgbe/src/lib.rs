@@ -45,9 +45,9 @@ const DEFAULT_DESTINATION_PORT: u16 = 8090;
 #[no_mangle]
 pub fn main(args: Vec<String>) -> isize {
 
-    let data: [u8; 200] = [0;200];
+    let data: [u8; 4096] = [0;4096];
 
-    let res = send_results(&data, 200);
+    let res = send_results(&data, 4096);
     // test_nic_ixgbe_driver(None);  
     // let mut opts = Options::new();
     // opts.optopt ("d", "destination", "specify the IP address (and optionally, the port) of the update server", "IP_ADDR[:PORT]");

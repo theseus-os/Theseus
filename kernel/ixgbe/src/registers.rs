@@ -155,7 +155,10 @@ pub struct IntelIxgbeRegisters {
     _padding0:                      [u8; 4],                // 0x4 - 0x7
     
     pub status:                     ReadOnly<u32>,          // 0x8
-    _padding1:                      [u8; 2036],             // 0xC - 0x7FF
+    _padding1:                      [u8; 28],               // 0xC - 0x27
+
+    pub i2cctl:                     Volatile<u32>,          // 0x28
+    _padding1_2:                    [u8; 2004],             // 0x2C - 0x7FF
 
     pub eicr:                       Volatile<u32>,          // 0x800
     _padding2:                      [u8; 4],                // 0x804 - 0x807
