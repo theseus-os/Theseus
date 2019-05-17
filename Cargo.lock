@@ -8,6 +8,7 @@ dependencies = [
  "acpi_table_handler 0.1.0",
  "ap_start 0.1.0",
  "apic 0.1.0",
+ "fadt 0.1.0",
  "hpet 0.1.0",
  "ioapic 0.1.0",
  "irq_safety 0.1.1 (git+https://github.com/kevinaboos/irq_safety)",
@@ -15,7 +16,6 @@ dependencies = [
  "lazy_static 1.2.0 (registry+https://github.com/rust-lang/crates.io-index)",
  "log 0.3.9 (registry+https://github.com/rust-lang/crates.io-index)",
  "memory 0.1.0",
- "owning_ref 0.4.0 (git+https://github.com/kevinaboos/owning-ref-rs)",
  "pause 0.1.0",
  "pic 0.1.0",
  "pit_clock 0.1.0",
@@ -40,6 +40,8 @@ name = "acpi_table_handler"
 version = "0.1.0"
 dependencies = [
  "acpi_table 0.1.0",
+ "fadt 0.1.0",
+ "hpet 0.1.0",
  "log 0.3.9 (registry+https://github.com/rust-lang/crates.io-index)",
  "memory 0.1.0",
  "rsdt 0.1.0",
@@ -441,6 +443,15 @@ dependencies = [
 ]
 
 [[package]]
+name = "fadt"
+version = "0.1.0"
+dependencies = [
+ "acpi_table 0.1.0",
+ "memory 0.1.0",
+ "sdt 0.1.0",
+]
+
+[[package]]
 name = "frame_buffer"
 version = "0.1.0"
 dependencies = [
@@ -566,6 +577,7 @@ dependencies = [
 name = "hpet"
 version = "0.1.0"
 dependencies = [
+ "acpi_table 0.1.0",
  "kernel_config 0.1.0",
  "log 0.3.9 (registry+https://github.com/rust-lang/crates.io-index)",
  "memory 0.1.0",
@@ -1287,7 +1299,6 @@ version = "0.1.0"
 dependencies = [
  "acpi_table 0.1.0",
  "memory 0.1.0",
- "owning_ref 0.4.0 (git+https://github.com/kevinaboos/owning-ref-rs)",
  "sdt 0.1.0",
 ]
 

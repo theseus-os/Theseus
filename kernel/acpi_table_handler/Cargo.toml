@@ -17,3 +17,9 @@ path = "../acpi_table"
 
 [dependencies.rsdt]
 path = "../rsdt"
+
+[dependencies.fadt]
+path = "../fadt"
+
+[dependencies.hpet]
+path = "../hpet"
