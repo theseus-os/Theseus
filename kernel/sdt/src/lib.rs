@@ -23,6 +23,19 @@ pub struct Sdt {
   pub creator_revision: u32
 }
 
+
+/// A struct used to describe the position and layout of registers
+/// related to ACPI tables.
+#[repr(packed)]
+#[derive(Clone, Copy, Debug)]
+pub struct GenericAddressStructure {
+    pub address_space: u8,
+    pub bit_width: u8,
+    pub bit_offset: u8,
+    pub access_size: u8,
+    pub phys_addr: u64,
+}
+
 impl Sdt {
     /// Get the address of this tables data
     pub fn data_address(&self) -> usize {

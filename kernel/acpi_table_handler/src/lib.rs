@@ -11,8 +11,8 @@ extern crate memory;
 extern crate acpi_table;
 
 extern crate rsdt;
-// extern crate fadt;
-// extern crate hpet;
+extern crate fadt;
+extern crate hpet;
 // extern crate madt;
 
 
@@ -38,10 +38,13 @@ pub fn acpi_table_handler(
 ) -> Result<(), &'static str> {
 
     match &signature {
-        b"RSDT" | b"XSDT" => rsdt::handle(acpi_tables, signature, length, phys_addr),
+        rsdt::RSDT_SIGNATURE | rsdt::XSDT_SIGNATURE => rsdt::handle(acpi_tables, signature, length, phys_addr),
+        fadt::FADT_SIGNATURE =>                        fadt::handle(acpi_tables, signature, length, phys_addr),
+        hpet::HPET_SIGNATURE =>                        hpet::handle(acpi_tables, signature, length, phys_addr),
         _ => {
-            error!("Found unsupported ACPI table {:?}", core::str::from_utf8(&signature).unwrap_or("Unknown"));
-            Err("Found unsupported ACPI table signature")
+            warn!("Skipping unsupported ACPI table {:?}", core::str::from_utf8(&signature).unwrap_or("Unknown"));
+            Ok(())
+            // Err("Found unsupported ACPI table signature")
         }
     }
 }

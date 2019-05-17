@@ -1,8 +1,8 @@
 [package]
-name = "rsdt"
+name = "fadt"
 version = "0.1.0"
 authors = ["Kevin Boos <kevinaboos@gmail.com>"]
-description = "Support for ACPI RSDT and XSDT"
+description = "Support for ACPI FADT"
 build = "../../build.rs"
 
 

@@ -11,7 +11,6 @@
 #[macro_use] extern crate lazy_static;
 #[macro_use] extern crate alloc;
 extern crate volatile;
-extern crate owning_ref;
 extern crate irq_safety; 
 extern crate spin;
 extern crate memory;
@@ -28,6 +27,7 @@ extern crate acpi_table_handler;
 extern crate sdt;
 extern crate rsdp;
 extern crate rsdt;
+extern crate fadt;
 
 
 
@@ -35,21 +35,17 @@ extern crate rsdt;
 use alloc::collections::BTreeMap;
 use alloc::string::String;
 use alloc::vec::Vec;
-use alloc::boxed::Box;
 use core::ops::DerefMut;
 use spin::{Mutex, RwLock};
-use memory::{PageTable, allocate_pages, MappedPages, PhysicalMemoryArea, VirtualAddress, PhysicalAddress, Frame, FrameIter, EntryFlags, FRAME_ALLOCATOR};
-use owning_ref::BoxRef;
+use memory::{PageTable, allocate_pages, MappedPages, VirtualAddress, PhysicalAddress, Frame, EntryFlags, FRAME_ALLOCATOR};
 use rsdp::Rsdp;
 
-pub use self::fadt::Fadt;
 pub use self::madt::Madt;
 use acpi_table::AcpiTables;
 use acpi_table_handler::acpi_table_handler;
 use sdt::Sdt;
 
 
-mod fadt;
 pub mod madt;
 
 
@@ -60,17 +56,6 @@ lazy_static! {
     /// which contains the MappedPages and location of all discovered ACPI tables.
     static ref ACPI_TABLES: Mutex<AcpiTables> = Mutex::new(AcpiTables::default());
 }
-
-
-
-/// The larger container that holds all data structure obtained from the ACPI table.
-pub struct Acpi {
-    pub fadt: RwLock<Option<Fadt>>,
-}
-
-static ACPI_TABLE: Acpi = Acpi {
-    fadt: RwLock::new(None),
-};
 
 
 lazy_static! {
@@ -166,18 +151,33 @@ pub fn init(page_table: &mut PageTable) -> Result<madt::MadtIter, &'static str> 
     debug!("RXSDT is located in Frame {:#X}", rsdt_phys_addr);
 
     // Now, we get the actual RSDT/XSDT
-    let mut acpi_tables = ACPI_TABLES.lock();
-    let (sdt_signature, sdt_total_length) = acpi_tables.map_new_table(rsdt_phys_addr, page_table)?;
-    acpi_table_handler(&mut acpi_tables, sdt_signature, sdt_total_length, rsdt_phys_addr)?;
-    let rxsdt = rsdt::RsdtXsdt::get(&acpi_tables).ok_or("couldn't get RSDT or XSDT from ACPI tables")?;
+    {
+        let mut acpi_tables = ACPI_TABLES.lock();
+        let (sdt_signature, sdt_total_length) = acpi_tables.map_new_table(rsdt_phys_addr, page_table)?;
+        acpi_table_handler(&mut acpi_tables, sdt_signature, sdt_total_length, rsdt_phys_addr)?;
+    }
+    let sdt_addresses: Vec<PhysicalAddress> = {
+        let acpi_tables = ACPI_TABLES.lock();
+        let rxsdt = rsdt::RsdtXsdt::get(&acpi_tables).ok_or("couldn't get RSDT or XSDT from ACPI tables")?;
+        rxsdt.addresses().collect()
+    };
 
     // The RSDT/XSDT tells us where all of the rest of the ACPI tables exist.
-    for (i, sdt_paddr) in rxsdt.addresses().enumerate() {
-        debug!("RXSDT[{}]: {:#X}", i, sdt_paddr);
-        get_and_map_sdt(sdt_paddr, page_table)?;
+    {
+        let mut acpi_tables = ACPI_TABLES.lock();
+        for sdt_paddr in sdt_addresses.clone() {
+            debug!("RXSDT entry: {:#X}", sdt_paddr);
+            let (sdt_signature, sdt_total_length) = acpi_tables.map_new_table(sdt_paddr, page_table)?;
+            acpi_table_handler(&mut acpi_tables, sdt_signature, sdt_total_length, sdt_paddr)?;
+        }
     }
 
-    for sdt_paddr in rxsdt.addresses() {
+
+    ////////////////////////////////////////////
+    ////////////// old stuff below
+    ////////////////////////////////////////////
+    for sdt_paddr in sdt_addresses {
+        get_and_map_sdt(sdt_paddr, page_table)?;
         let sdt_vaddr: VirtualAddress = {
             if let Some(page) = ACPI_TABLE_MAPPED_PAGES.lock().get(&Frame::containing_address(sdt_paddr)) {
                 page.start_address() + sdt_paddr.frame_offset()
@@ -195,22 +195,23 @@ pub fn init(page_table: &mut PageTable) -> Result<madt::MadtIter, &'static str> 
         }
     }
 
-    // FADT is mandatory
-    Fadt::init(page_table)?;
+    // FADT is mandatory, and contains the address of the DSDT
+    {
+        let acpi_tables = ACPI_TABLES.lock();
+        let fadt = fadt::Fadt::get(&acpi_tables).ok_or("The required FADT APIC table wasn't found (signature 'FACP')")?;
+        debug!("DSDT physical address: {:#X}", fadt.dsdt);
+        // here: do something with the DSDT here, when needed.
+    }
     
     // HPET is optional
-    let hpet_result = {
-        let hpet_sdt = find_matching_sdts("HPET");
-        if hpet_sdt.len() == 1 {
-            hpet::init(hpet_sdt[0], page_table)
-        }
-        else {
-            Err("unable to find HPET SDT")
+    {
+        let acpi_tables = ACPI_TABLES.lock();
+        if let Some(hpet_table) = hpet::HpetAcpiTable::get(&acpi_tables) {
+            hpet_table.init_hpet(page_table)?;
+        } else {
+            warn!("This machine has no HPET.");
         }
     };
-    if let Err(_e) = hpet_result {
-        warn!("This machine has no HPET.");
-    }
     
 
     // MADT is mandatory
