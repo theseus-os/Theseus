@@ -1,0 +1,48 @@
+[package]
+authors = ["Kevin Boos <kevinaboos@gmail.com>"]
+name = "multicore_bringup"
+description = "Support for bringing up other CPU cores (APs) from the main core (BSP)"
+version = "0.1.0"
+build = "../../build.rs"
+
+[dependencies]
+spin = "0.4.10"
+volatile = "0.2.5"
+
+[dependencies.log]
+default-features = false
+version = "0.3.7"
+
+[dependencies.irq_safety]
+git = "https://github.com/kevinaboos/irq_safety"
+
+[dependencies.memory]
+path = "../memory"
+
+[dependencies.kernel_config]
+path = "../kernel_config"
+
+[dependencies.pit_clock]
+path = "../pit_clock"
+
+[dependencies.mod_mgmt]
+path = "../mod_mgmt"
+
+[dependencies.acpi]
+path = "../acpi"
+
+[dependencies.apic]
+path = "../apic"
+
+[dependencies.ap_start]
+path = "../ap_start"
+
+[dependencies.madt]
+path = "../madt"
+
+[dependencies.pause]
+path = "../pause"
+
+
+[lib]
+crate-type = ["rlib"]

@@ -656,6 +656,12 @@ impl FrameIter {
         }
     }
 
+    /// Returns whether this `FrameIter` is empty, 
+    /// meaning that its Iterator will always yield `None`.
+    pub fn is_empty(&self) -> bool {
+        self.start > self.end
+    }
+
     /// Create a duplicate of this `FrameIter`. 
     /// We do this instead of implementing/deriving the Clone trait
     /// because we want to prevent Rust from cloning `FrameIter`s implicitly.
@@ -696,6 +702,14 @@ impl FrameIter {
 
     /// Returns a new, separate `FrameIter` that is extended to include the given `Frame`. 
     pub fn to_extended(&self, frame_to_include: Frame) -> FrameIter {
+        // if the current FrameIter was empty, return a new FrameIter containing only the given frame_to_include
+        if self.is_empty() {
+            return FrameIter {
+                start: frame_to_include.clone(),
+                end: frame_to_include,
+            };
+        }
+
         let start = core::cmp::min(&self.start, &frame_to_include);
         let end   = core::cmp::max(&self.end,   &frame_to_include);
         FrameIter {

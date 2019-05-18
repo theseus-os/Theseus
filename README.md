@@ -29,7 +29,7 @@ Additionally, If you're on WSL, you'll need to do the following:
   * Install a C compiler and linker toolchain, such as `gcc`.
 
 If you're on Mac OS, do the following:
-  * Install [MacPorts](https://www.macports.org/install.php).
+  * Install [MacPorts](https://www.macports.org/install.php) and [HomeBrew](https://brew.sh/).
   * run the MacOS build setup script: `./scripts/mac_os_build_setup.sh`
 
 
