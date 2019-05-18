@@ -23,3 +23,6 @@ path = "../fadt"
 
 [dependencies.hpet]
 path = "../hpet"
+
+[dependencies.madt]
+path = "../madt"
