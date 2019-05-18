@@ -23,6 +23,7 @@ pub type AcpiSignature = [u8; 4];
 
 /// A record that tracks where an ACPI Table exists in memory,
 /// given in terms of offsets into the `AcpiTables`'s `MappedPages`.
+#[derive(Debug)]
 pub struct TableLocation {
     /// The offset of the statically-sized part of the table,
     /// which is the entire table if there is no dynamically-sized component.
@@ -202,6 +203,12 @@ impl AcpiTables {
         let loc = self.tables.get(signature).ok_or("couldn't find ACPI table with matching signature")?;
         let (offset, len) = loc.slice_offset_and_length.ok_or("specified ACPI table has no dynamically-sized part")?;
         self.mapped_pages.as_slice_mut(offset, len)
+    }
+
+    /// Returns an immutable reference to the underlying `MappedPages` that covers the ACPI tables.
+    /// To access the ACPI tables, use the table's `get()` function, e.g., `Fadt::get(...)` instead of this function.
+    pub fn mapping(&self) -> &MappedPages {
+        &self.mapped_pages
     }
 }
 

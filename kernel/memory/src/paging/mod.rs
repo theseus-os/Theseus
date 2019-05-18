@@ -311,7 +311,6 @@ impl PageTable {
         }
 
         let current_table_after_switch = PageTable::from_current();
-        debug!("PageTable::switch(): NEW TABLE: {:?} (should be same as current: {:?})", new_table, current_table_after_switch);
         current_table_after_switch
     }
 

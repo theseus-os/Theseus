@@ -40,15 +40,15 @@ const DEFAULT_GATEWAY_IP: [u8; 4] = [10, 0, 2, 2]; // the default QEMU user-slir
 
 
 /// This is for early-stage initialization of things like VGA, ACPI, (IO)APIC, etc.
-pub fn early_init(kernel_mmi: &mut MemoryManagementInfo) -> Result<acpi::madt::MadtIter, &'static str> {
+pub fn early_init(kernel_mmi: &mut MemoryManagementInfo) -> Result<(), &'static str> {
     // first, init the local apic info
     apic::init(&mut kernel_mmi.page_table)?;
     
     // then init/parse the ACPI tables to fill in the APIC details, among other things
     // this returns an iterator over the "APIC" (MADT) tables, which we use to boot AP cores
-    let madt_iter = acpi::init(&mut kernel_mmi.page_table)?;
+    acpi::init(&mut kernel_mmi.page_table)?;
 
-    Ok(madt_iter)
+    Ok(())
 }
 
 

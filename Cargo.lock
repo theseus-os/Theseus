@@ -15,13 +15,13 @@ dependencies = [
  "kernel_config 0.1.0",
  "lazy_static 1.2.0 (registry+https://github.com/rust-lang/crates.io-index)",
  "log 0.3.9 (registry+https://github.com/rust-lang/crates.io-index)",
+ "madt 0.1.0",
  "memory 0.1.0",
  "pause 0.1.0",
  "pic 0.1.0",
  "pit_clock 0.1.0",
  "rsdp 0.1.0",
  "rsdt 0.1.0",
- "sdt 0.1.0",
  "spin 0.4.10 (registry+https://github.com/rust-lang/crates.io-index)",
  "volatile 0.2.5 (registry+https://github.com/rust-lang/crates.io-index)",
 ]
@@ -43,6 +43,7 @@ dependencies = [
  "fadt 0.1.0",
  "hpet 0.1.0",
  "log 0.3.9 (registry+https://github.com/rust-lang/crates.io-index)",
+ "madt 0.1.0",
  "memory 0.1.0",
  "rsdt 0.1.0",
 ]
@@ -180,6 +181,7 @@ dependencies = [
  "logger 0.1.0",
  "memory 0.1.0",
  "mod_mgmt 0.1.0",
+ "multicore_bringup 0.1.0",
  "network_manager 0.1.0",
  "ota_update_client 0.1.0",
  "pause 0.1.0",
@@ -455,11 +457,11 @@ dependencies = [
 name = "frame_buffer"
 version = "0.1.0"
 dependencies = [
- "acpi 0.1.0",
  "kernel_config 0.1.0",
  "lazy_static 1.2.0 (registry+https://github.com/rust-lang/crates.io-index)",
  "log 0.3.9 (registry+https://github.com/rust-lang/crates.io-index)",
  "memory 0.1.0",
+ "multicore_bringup 0.1.0",
  "serial_port 0.1.0",
  "spin 0.4.10 (registry+https://github.com/rust-lang/crates.io-index)",
  "state_store 0.1.0",
@@ -781,6 +783,20 @@ dependencies = [
 ]
 
 [[package]]
+name = "madt"
+version = "0.1.0"
+dependencies = [
+ "acpi_table 0.1.0",
+ "apic 0.1.0",
+ "ioapic 0.1.0",
+ "irq_safety 0.1.1 (git+https://github.com/kevinaboos/irq_safety)",
+ "log 0.3.9 (registry+https://github.com/rust-lang/crates.io-index)",
+ "memory 0.1.0",
+ "pic 0.1.0",
+ "sdt 0.1.0",
+]
+
+[[package]]
 name = "managed"
 version = "0.7.1"
 source = "registry+https://github.com/rust-lang/crates.io-index"
@@ -892,6 +908,25 @@ version = "0.7.1"
 source = "registry+https://github.com/rust-lang/crates.io-index"
 dependencies = [
  "bitflags 1.0.4 (registry+https://github.com/rust-lang/crates.io-index)",
+]
+
+[[package]]
+name = "multicore_bringup"
+version = "0.1.0"
+dependencies = [
+ "acpi 0.1.0",
+ "ap_start 0.1.0",
+ "apic 0.1.0",
+ "irq_safety 0.1.1 (git+https://github.com/kevinaboos/irq_safety)",
+ "kernel_config 0.1.0",
+ "log 0.3.9 (registry+https://github.com/rust-lang/crates.io-index)",
+ "madt 0.1.0",
+ "memory 0.1.0",
+ "mod_mgmt 0.1.0",
+ "pause 0.1.0",
+ "pit_clock 0.1.0",
+ "spin 0.4.10 (registry+https://github.com/rust-lang/crates.io-index)",
+ "volatile 0.2.5 (registry+https://github.com/rust-lang/crates.io-index)",
 ]
 
 [[package]]

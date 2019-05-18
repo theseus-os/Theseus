@@ -48,9 +48,6 @@ path = "../acpi_table"
 [dependencies.acpi_table_handler]
 path = "../acpi_table_handler"
 
-[dependencies.sdt]
-path = "../sdt"
-
 [dependencies.rsdp]
 path = "../rsdp"
 
@@ -59,6 +56,9 @@ path = "../rsdt"
 
 [dependencies.fadt]
 path = "../fadt"
+
+[dependencies.madt]
+path = "../madt"
 
 [dependencies.hpet]
 path = "../hpet"
