@@ -360,6 +360,9 @@ impl WindowObj{
             !inner.check_in_content(inner.x + inner.margin + x + width, inner.y + inner.margin + y) ||
             !inner.check_in_content(inner.x + inner.margin + x, inner.y + inner.margin + y + height) ||
             !inner.check_in_content(inner.x + inner.margin + x + width, inner.y + inner.margin + y + height) {
+            trace!("Wenqiu fit {} {}", inner.width, inner.height);
+            trace!("Wenqiu fit {} {}", width, width);
+
             return Err("The displayable does not fit the window size.");
         } 
         

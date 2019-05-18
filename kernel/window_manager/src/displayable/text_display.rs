@@ -14,7 +14,7 @@ pub struct TextDisplay {
 impl TextDisplay
 {
     pub fn new(name:&str, width:usize, height:usize) -> Result <TextDisplay, &'static str> {
-        let (width, height) = frame_buffer::get_resolution()?;
+        //let (width, height) = frame_buffer::get_resolution()?;
         let tf = FrameTextBuffer::new(0, 0, width, height)?;
         Ok(TextDisplay{
             name:String::from(name),
@@ -28,8 +28,11 @@ impl TextDisplay
     pub fn display_string(&self, window:&WindowObj, slice:&str, font_color:u32, bg_color:u32) -> Result<(), &'static str>{       
         match self.get_display_pos(window) {
             Ok((x, y)) => {
-                return self.textbuffer.print_by_bytes(x, y, self.width, self.height,
-                    slice, font_color, bg_color);
+                trace!("Wenqiu print by bytes");
+                // Do not need  x, y
+                self.textbuffer.print_by_bytes(0, 0, self.width, self.height,
+                    slice, font_color, bg_color)?;
+                return frame_buffer::flush(&self.textbuffer.vbuffer);
             },
             Err(err) => {return Err(err);}
         }

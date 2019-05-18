@@ -548,6 +548,7 @@ impl Terminal {
 
     /// Updates the text display by taking a string index and displaying as much as it starting from the passed string index (i.e. starts from the top of the display and goes down)
     fn update_display_forwards(&mut self, display_name:&str, start_idx: usize) -> Result<(), &'static str> {
+                trace!("Wenqiu display string");
         self.scroll_start_idx = start_idx;
         let result= self.calc_end_idx(start_idx, display_name); 
         let end_idx = match result {
@@ -582,6 +583,7 @@ impl Terminal {
 
         if let Some(slice) = result {
             if let Some(text_display) = self.window.get_displayable(display_name){
+                trace!("WEnqiu displat");
                 text_display.display_string(&(self.window), slice, FONT_COLOR, BACKGROUND_COLOR)?;
                 self.absolute_cursor_pos = cursor_pos;          
             } else {
@@ -998,7 +1000,8 @@ impl Terminal {
         let start_idx = self.scroll_start_idx;
         // handling display refreshing errors here so that we don't clog the main loop of the terminal
         if self.is_scroll_end {
-            let buffer_len = self.scrollback_buffer.len();
+                 trace!("Wenqiu display end");
+           let buffer_len = self.scrollback_buffer.len();
             match self.update_display_backwards(display_name, buffer_len) {
                 Ok(_) => { }
                 Err(err) => {error!("could not update display backwards: {}", err); return}
@@ -1008,6 +1011,7 @@ impl Terminal {
                 Err(err) => {error!("could not update cursor: {}", err); return}
             }
         } else {
+                trace!("Wenqiu display up");
             match self.update_display_forwards(display_name, start_idx) {
                 Ok(_) => { }
                 Err(err) => {error!("could not update display forwards: {}", err); return}
@@ -1035,15 +1039,21 @@ fn terminal_loop(mut terminal: Terminal) -> Result<(), &'static str> {
     let display_name = terminal.display_name.clone();
     { 
         let (width, height) = terminal.window.dimensions();
-        let width  = width/2  - 2*window_manager::WINDOW_MARGIN;
+        trace!("Wenqiu: new display {} {}", width, height);
+
+        let width  = width  - 2*window_manager::WINDOW_MARGIN;
         let height = height - 2*window_manager::WINDOW_MARGIN;
         let text_display = TextDisplay::new(&display_name, width, height)?;
+        trace!("Wenqiu: new display {} {}", width, height);
+        trace!("Wenqiu: new display {:?}", text_display.get_size());
+
         match terminal.window.add_displayable(&display_name, 0, 0, text_display) {
                 Ok(_) => { }
                 Err(err) => {return Err(err);}
         };
     }
     terminal.refresh_display(&display_name);
+    trace!("Wenqiu: new display");
     loop {
         // Handle cursor blink
         if let Some(text_display) = terminal.window.get_displayable(&display_name){

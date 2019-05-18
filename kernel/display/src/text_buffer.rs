@@ -53,11 +53,14 @@ impl FrameTextBuffer {
         let buffer_width = width/CHARACTER_WIDTH;
         let buffer_height = height/CHARACTER_HEIGHT;
         
-        let vbuffer = self.vbuffer.lock();
+        //let vbuffer = self.vbuffer.lock();
 
         //let mut fb = frame_buffer::FRAME_BUFFER.lock();
-        let index = { vbuffer.get_index_fn() };
-        
+        let index = { self.vbuffer.lock().get_index_fn() };
+         trace!("Wenqiu flush text");
+        let mut vbuffer = self.vbuffer.lock();
+        let mut buffer = vbuffer.buffer();
+       
         for byte in slice.bytes() {
             if byte == b'\n' {
                 self.fill_blank ( 
@@ -65,7 +68,7 @@ impl FrameTextBuffer {
                     y + curr_line * CHARACTER_HEIGHT,
                     x + width, 
                     y + (curr_line + 1 )* CHARACTER_HEIGHT, 
-                    bg_color, &index)?;
+                    bg_color, &index, buffer)?;
                 //cursor_pos += buffer_width - curr_column;
                 curr_column = 0;
                 curr_line += 1;
@@ -81,7 +84,7 @@ impl FrameTextBuffer {
                     }
                 }
                 self.print_byte(byte, font_color, bg_color, x, y, 
-                    curr_line, curr_column, &index)?;
+                    curr_line, curr_column, &index, buffer)?;
                 curr_column += 1;
                 //cursor_pos += 1;
             }
@@ -93,18 +96,19 @@ impl FrameTextBuffer {
             y + curr_line * CHARACTER_HEIGHT,
             x + width, 
             y + (curr_line + 1 )* CHARACTER_HEIGHT, 
-            bg_color, &index)?;
+            bg_color, &index, buffer)?;
 
         // Fill the blank of remaining lines
         self.fill_blank ( 
             x, y + (curr_line + 1 )* CHARACTER_HEIGHT, x + width, y + height, 
-            bg_color, &index)?;
+            bg_color, &index, buffer)?;
 
         Ok(())
     }
 
     fn print_byte (&self, byte:u8, font_color:u32, bg_color:u32,
-            left:usize, top:usize, line:usize, column:usize, index:&Box<Fn(usize, usize)->usize>) 
+            left:usize, top:usize, line:usize, column:usize, index:&Box<Fn(usize, usize)->usize>,
+            buffer:&mut Vec<u32>) 
             -> Result<(),&'static str> {
         let x = left + column * CHARACTER_WIDTH;
         let y = top + line * CHARACTER_HEIGHT;
@@ -113,8 +117,9 @@ impl FrameTextBuffer {
 
         let fonts = FONT_PIXEL.lock();
    
-        let mut vbuffer = self.vbuffer.lock();
-        let mut buffer = vbuffer.buffer();
+ //       let mut vbuffer = self.vbuffer.lock();
+//        let mut buffer = vbuffer.buffer();
+        trace!("Wenqiu buffer?");
         loop {
             let mask:u32 = fonts[byte as usize][i][j];
             buffer[index(x + j, y + i)] = font_color & mask | bg_color & (!mask);
@@ -127,18 +132,22 @@ impl FrameTextBuffer {
                 j = 0;
             }
         }
+                trace!("Wenqiu buffer?");
+
     }
 
     fn fill_blank(&self, left:usize, top:usize, right:usize,
-             bottom:usize, color:u32, index:&Box<Fn(usize, usize)->usize>) -> Result<(),&'static str>{
+             bottom:usize, color:u32, index:&Box<Fn(usize, usize)->usize>, buffer:&mut Vec<u32>) -> Result<(),&'static str>{
         let mut x = left;
         let mut y = top;
         if left > right || top > bottom {
             return Ok(())
         }
+        trace!("Wenqiu flush text {} {} {} {}", left, top, right, bottom);
+        trace!("{} {}", buffer.len(), index(right, bottom));
 
-        let mut vbuffer = self.vbuffer.lock();
-        let mut buffer = vbuffer.buffer();
+        // let mut vbuffer = self.vbuffer.lock();
+        // let mut buffer = vbuffer.buffer();
         loop {
             if x == right {
                 y += 1;

@@ -127,37 +127,34 @@ impl Compositor {
     fn flush(&mut self, vfb:&Arc<Mutex<VirtualFrameBuffer>>) {
         let mut x = 0;
         let mut y = 0;
-        let mut valid = false;
-        self.buffer[3000] = 0xffff00;
-       for item in self.frames.iter() {
+        
+        trace!("WEnqiu valid false" );        
+        for item in self.frames.iter() {
             let reference = item.vframebuffer.upgrade();
             if let Some(vfb_rf) = reference {
                 if Arc::ptr_eq(&vfb_rf, &vfb) {
                     x = item.x;
                     y = item.y;
-                    valid = true;
-                    break;
+                    self.buffer_copy(x, y, vfb);
+                    return;
                 }
             }
         }
 
-        trace!("Wenqiu: {}", valid);
-        if valid {
-            self.buffer_copy(x, y, vfb);
-        }
         
     }
 
     fn buffer_copy(&mut self, x:usize, y:usize, vfb:&Arc<Mutex<VirtualFrameBuffer>>) {
-        let dest_buffer = vfb.lock();
-        
-        for i in 0..dest_buffer.height {
+        let src_buffer = vfb.lock();
+        trace!("Wenqiu: ciou");
+       
+        for i in 0..src_buffer.height {
             let dest_start = self.width * ( i + y ) + x;
-            let dest_end = dest_start + dest_buffer.width;
-            let src_start = dest_buffer.width * i;
-            let src_end = src_start + dest_buffer.width;
+            let dest_end = dest_start + src_buffer.width;
+            let src_start = src_buffer.width * i;
+            let src_end = src_start + src_buffer.width;
             self.buffer[dest_start..dest_end].copy_from_slice(
-                &(dest_buffer.buffer[src_start..src_end])
+                &(src_buffer.buffer[src_start..src_end])
             );
         }
     }
@@ -195,6 +192,7 @@ impl VirtualFrameBuffer {
         let mut compositor = try!(COMPOSITOR.try().ok_or("Fail to get the compositor")).lock();
         
         compositor.add_frame(frame);
+        trace!("Wenqiu add frame");
 
         Ok(vf_ref)
     }
