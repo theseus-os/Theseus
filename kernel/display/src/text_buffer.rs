@@ -64,7 +64,6 @@ impl TextVFrameBuffer {
 
         //let mut fb = frame_buffer::FRAME_BUFFER.lock();
         let index = { self.vbuffer.lock().get_index_fn() };
-         trace!("Wenqiu flush text");
         let mut vbuffer = self.vbuffer.lock();
         let mut buffer = vbuffer.buffer();
        
@@ -126,7 +125,6 @@ impl TextVFrameBuffer {
    
  //       let mut vbuffer = self.vbuffer.lock();
 //        let mut buffer = vbuffer.buffer();
-        trace!("Wenqiu buffer?");
         loop {
             let mask:u32 = fonts[byte as usize][i][j];
             buffer[index(x + j, y + i)] = font_color & mask | bg_color & (!mask);
@@ -139,7 +137,6 @@ impl TextVFrameBuffer {
                 j = 0;
             }
         }
-                trace!("Wenqiu buffer?");
 
     }
 
@@ -150,8 +147,6 @@ impl TextVFrameBuffer {
         if left > right || top > bottom {
             return Ok(())
         }
-        trace!("Wenqiu flush text {} {} {} {}", left, top, right, bottom);
-        trace!("{} {}", buffer.len(), index(right, bottom));
 
         // let mut vbuffer = self.vbuffer.lock();
         // let mut buffer = vbuffer.buffer();

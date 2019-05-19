@@ -28,7 +28,6 @@ impl TextDisplay
     pub fn display_string(&self, window:&WindowObj, slice:&str, font_color:u32, bg_color:u32) -> Result<(), &'static str>{       
         match self.get_display_pos(window) {
             Ok((x, y)) => {
-                trace!("Wenqiu print by bytes");
                 // Do not need  x, y
                 self.textbuffer.print_by_bytes(0, 0, self.width, self.height,
                     slice, font_color, bg_color)?;

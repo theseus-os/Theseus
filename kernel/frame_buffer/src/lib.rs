@@ -126,12 +126,10 @@ impl Compositor {
     
     fn display(&mut self, vfb:&Arc<Mutex<VirtualFrameBuffer>>) {
 
-        trace!("WEnqiu valid false" );        
         for item in self.frames.iter() {
             let reference = item.vframebuffer.upgrade();
             if let Some(vfb_rf) = reference {
                 if Arc::ptr_eq(&vfb_rf, &vfb) {
-                    trace!("Wenqiu frame buffer location {} {}", item.x, item.y);
                     self.buffer_copy(item.x, item.y, vfb);
                     return;
                 }
@@ -143,7 +141,6 @@ impl Compositor {
 
     fn get_position(&mut self, vfb:&Arc<Mutex<VirtualFrameBuffer>>) -> Result<(usize, usize), &'static str>{
 
-        trace!("WEnqiu valid false" );        
         for item in self.frames.iter() {
             let reference = item.vframebuffer.upgrade();
             if let Some(vfb_rf) = reference {
@@ -269,7 +266,6 @@ pub fn get_resolution() -> Result<(usize, usize), &'static str> {
 }
 
 pub fn display(vfb:&Arc<Mutex<VirtualFrameBuffer>>) -> Result<(), &'static str>{
-        trace!("WEnqiu flush");
     let compositor = try!(COMPOSITOR.try().ok_or("Fail to get the physical frame buffer"));
     compositor.lock().display(vfb);
     Ok(())

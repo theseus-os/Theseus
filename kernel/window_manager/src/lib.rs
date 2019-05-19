@@ -140,7 +140,6 @@ impl WindowAllocator{
     fn allocate(&mut self, x:usize, y:usize, width:usize, height:usize) -> Result<WindowObj, &'static str>{
         let (buffer_width, buffer_height) = get_screen_size()?;
         
-        trace!("Wenqiu: screen size {}", buffer_width);
 
         let vfb = VirtualFrameBuffer::new(buffer_width, buffer_height)?;
 
@@ -363,8 +362,6 @@ impl WindowObj{
             !inner.check_in_content(inner.x + inner.margin + x + width, inner.y + inner.margin + y) ||
             !inner.check_in_content(inner.x + inner.margin + x, inner.y + inner.margin + y + height) ||
             !inner.check_in_content(inner.x + inner.margin + x + width, inner.y + inner.margin + y + height) {
-            trace!("Wenqiu fit {} {}", inner.width, inner.height);
-            trace!("Wenqiu fit {} {}", width, width);
 
             return Err("The displayable does not fit the window size.");
         } 
@@ -573,10 +570,7 @@ impl WindowInner {
             None => {return Err("The virtual frame buffer is not initialized") }
         };
 
-        trace!{"Wenqiu {:?}", buffer.lock().get_size()};
-        
-        //trace!{"{:?}", buffer.lock().buffer()};
-        
+                
         buffer.lock().fill_rectangle(self.x + self.margin, self.y + self.margin,
                 self.width - 2 * self.margin, self.height - 2 * self.margin, SCREEN_BACKGROUND_COLOR);
         Ok(())
