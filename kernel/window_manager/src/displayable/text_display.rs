@@ -1,5 +1,5 @@
 
-use super::super::{FrameTextBuffer, WindowObj, display, Arc, VFRAME_BUFFER, Display, Mutex};
+use super::super::{TextVFrameBuffer, WindowObj, display, Arc, VFRAME_BUFFER, Display, Mutex};
 use super::super::{String};
 use display::font::{CHARACTER_WIDTH, CHARACTER_HEIGHT};
 
@@ -8,14 +8,14 @@ pub struct TextDisplay {
     name:String,
     width:usize,
     height:usize,
-    textbuffer:FrameTextBuffer,
+    textbuffer:TextVFrameBuffer,
 }
 
 impl TextDisplay
 {
     pub fn new(name:&str, width:usize, height:usize) -> Result <TextDisplay, &'static str> {
         //let (width, height) = frame_buffer::get_resolution()?;
-        let tf = FrameTextBuffer::new(0, 0, width, height)?;
+        let tf = TextVFrameBuffer::new(width, height)?;
         Ok(TextDisplay{
             name:String::from(name),
             width:width,
@@ -32,7 +32,7 @@ impl TextDisplay
                 // Do not need  x, y
                 self.textbuffer.print_by_bytes(0, 0, self.width, self.height,
                     slice, font_color, bg_color)?;
-                return frame_buffer::flush(&self.textbuffer.vbuffer);
+                return frame_buffer::display(&self.textbuffer.vbuffer);
             },
             Err(err) => {return Err(err);}
         }
@@ -109,6 +109,10 @@ impl TextDisplay
             Ok(display_pos) => {return Ok((content_pos.0 + display_pos.0, content_pos.1 + display_pos.1));}
             Err(err) => {return Err(err);}
         }       
+    }
+
+    pub fn buffer(&self) -> &TextVFrameBuffer {
+        &self.textbuffer
     }
 }
 

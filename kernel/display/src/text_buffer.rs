@@ -28,18 +28,25 @@ pub enum DisplayPosition {
 //const BLANK_LINE: Line = [b' '; BUFFER_WIDTH];
 
 /// An instance of a frame text buffer which can be displayed to the screen.
-pub struct FrameTextBuffer {
+pub struct TextVFrameBuffer {
     pub cursor:Mutex<Cursor>,
     pub vbuffer:Arc<Mutex<VirtualFrameBuffer>>
 }
 
-impl FrameTextBuffer {
-    pub fn new(x:usize, y:usize, width:usize, height:usize) -> Result<FrameTextBuffer, &'static str> {
-        let vbf = VirtualFrameBuffer::new(x, y, width, height)?;
-        Ok(FrameTextBuffer {
+impl TextVFrameBuffer {
+    pub fn new(width:usize, height:usize) -> Result<TextVFrameBuffer, &'static str> {
+        let vfb = VirtualFrameBuffer::new(width, height)?;
+
+        let vfb_ref = Arc::new(Mutex::new(vfb));
+        //frame_buffer::map(x, y, vfb)?;
+        Ok(TextVFrameBuffer {
             cursor:Mutex::new(Cursor::new(0, 0, true)),
-            vbuffer: vbf
+            vbuffer: vfb_ref
         })
+    }
+
+    pub fn map(&self, x:usize, y:usize) -> Result<(), &'static str>{
+        frame_buffer::map_ref(x, y, &self.vbuffer)
     }
     
     ///print a string by bytes

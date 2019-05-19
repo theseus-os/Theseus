@@ -124,18 +124,15 @@ impl Compositor {
     }
 
     
-    fn flush(&mut self, vfb:&Arc<Mutex<VirtualFrameBuffer>>) {
-        let mut x = 0;
-        let mut y = 0;
-        
+    fn display(&mut self, vfb:&Arc<Mutex<VirtualFrameBuffer>>) {
+
         trace!("WEnqiu valid false" );        
         for item in self.frames.iter() {
             let reference = item.vframebuffer.upgrade();
             if let Some(vfb_rf) = reference {
                 if Arc::ptr_eq(&vfb_rf, &vfb) {
-                    x = item.x;
-                    y = item.y;
-                    self.buffer_copy(x, y, vfb);
+                    trace!("Wenqiu frame buffer location {} {}", item.x, item.y);
+                    self.buffer_copy(item.x, item.y, vfb);
                     return;
                 }
             }
@@ -144,15 +141,30 @@ impl Compositor {
         
     }
 
+    fn get_position(&mut self, vfb:&Arc<Mutex<VirtualFrameBuffer>>) -> Result<(usize, usize), &'static str>{
+
+        trace!("WEnqiu valid false" );        
+        for item in self.frames.iter() {
+            let reference = item.vframebuffer.upgrade();
+            if let Some(vfb_rf) = reference {
+                if Arc::ptr_eq(&vfb_rf, &vfb) {
+                    return Ok((item.x, item.y));
+                }
+            }
+        }
+
+        Err("The virtual framebuffer hasn't been mapped")        
+    }
+
     fn buffer_copy(&mut self, x:usize, y:usize, vfb:&Arc<Mutex<VirtualFrameBuffer>>) {
         let src_buffer = vfb.lock();
-        trace!("Wenqiu: ciou");
        
         for i in 0..src_buffer.height {
             let dest_start = self.width * ( i + y ) + x;
             let dest_end = dest_start + src_buffer.width;
             let src_start = src_buffer.width * i;
             let src_end = src_start + src_buffer.width;
+
             self.buffer[dest_start..dest_end].copy_from_slice(
                 &(src_buffer.buffer[src_start..src_end])
             );
@@ -173,28 +185,14 @@ pub struct VirtualFrameBuffer {
 }
 
 impl VirtualFrameBuffer {
-    pub fn new(x:usize, y:usize, width:usize, height:usize) -> Result<Arc<Mutex<VirtualFrameBuffer>>, &'static str>{
+    pub fn new(width:usize, height:usize) -> Result<VirtualFrameBuffer, &'static str>{
         let buffer = vec![0;width * height];
-        trace!("Wenqiu {} {}", width*height, buffer.len());
         let vf = VirtualFrameBuffer {
             width:width,
             height:height,
             buffer:buffer
         };
-        let vf_ref = Arc::new(Mutex::new(vf));
-        let vf_weak = Arc::downgrade(&vf_ref);
-
-        let frame = DisplayFrame {
-            x:x,
-            y:y,
-            vframebuffer:vf_weak
-        };
-        let mut compositor = try!(COMPOSITOR.try().ok_or("Fail to get the compositor")).lock();
-        
-        compositor.add_frame(frame);
-        trace!("Wenqiu add frame");
-
-        Ok(vf_ref)
+        Ok(vf)
     }
 
     pub fn buffer(&mut self) -> &mut Vec<u32> {
@@ -215,6 +213,7 @@ impl VirtualFrameBuffer {
         x < self.width && y < self.height
     }
 }
+
 
 // impl PhysicalFrameBuffer {
 //         // set the graphic mode information of the buffer
@@ -245,18 +244,42 @@ impl VirtualFrameBuffer {
 //     buffer[index] = color;
 // }
 
+pub fn map(x:usize, y:usize, vf:VirtualFrameBuffer) -> Result<Arc<Mutex<VirtualFrameBuffer>>, &'static str>{
+    let vf_ref = Arc::new(Mutex::new(vf));
+    map_ref(x, y, &vf_ref)?;
+    Ok(vf_ref)
+}
+
+pub fn map_ref(x:usize, y:usize, vf_ref:&Arc<Mutex<VirtualFrameBuffer>>) -> Result<(), &'static str>{
+    let vf_weak = Arc::downgrade(vf_ref);
+    let frame = DisplayFrame {
+        x:x,
+        y:y,
+        vframebuffer:vf_weak
+    };
+    let mut compositor = try!(COMPOSITOR.try().ok_or("Fail to get the compositor")).lock();
+    
+    compositor.add_frame(frame);
+    Ok(())
+}
+
 pub fn get_resolution() -> Result<(usize, usize), &'static str> {
     let compositor = try!(COMPOSITOR.try().ok_or("Fail to get the physical frame buffer"));
     Ok(compositor.lock().get_resolution())
 }
 
-pub fn flush(vfb:&Arc<Mutex<VirtualFrameBuffer>>) -> Result<(), &'static str>{
+pub fn display(vfb:&Arc<Mutex<VirtualFrameBuffer>>) -> Result<(), &'static str>{
         trace!("WEnqiu flush");
     let compositor = try!(COMPOSITOR.try().ok_or("Fail to get the physical frame buffer"));
-    compositor.lock().flush(vfb);
+    compositor.lock().display(vfb);
     Ok(())
 }
 
+
+pub fn get_position(vfb:&Arc<Mutex<VirtualFrameBuffer>>) ->  Result<(usize, usize), &'static str> {
+    let compositor = try!(COMPOSITOR.try().ok_or("Fail to get the physical frame buffer"));
+    compositor.lock().get_position(vfb)
+}
 // // Check if a point is in the screen
 // pub fn check_in_range(x:usize, y:usize, width:usize, height:usize)  -> bool {
 //     x < width && y < height

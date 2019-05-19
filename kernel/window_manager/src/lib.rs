@@ -40,7 +40,7 @@ use alloc::collections::{VecDeque, BTreeMap};
 use core::ops::Deref;
 use dfqueue::{DFQueue,DFQueueConsumer,DFQueueProducer};
 use alloc::sync::{Arc, Weak};
-use display::text_buffer::{FrameTextBuffer};
+use display::text_buffer::{TextVFrameBuffer};
 use display::{VirtualFrameBuffer};
 use display::Display;
 use event_types::Event;
@@ -142,9 +142,11 @@ impl WindowAllocator{
         
         trace!("Wenqiu: screen size {}", buffer_width);
 
-        let vfb = VirtualFrameBuffer::new(0, 0, buffer_width, buffer_height)?;
+        let vfb = VirtualFrameBuffer::new(buffer_width, buffer_height)?;
+
+        let vfb_ref = frame_buffer::map(0, 0, vfb)?;
         VFRAME_BUFFER.call_once(||{
-            vfb
+            vfb_ref
         });
         /*{
             let mut drawer = frame_buffer::FRAME_DRAWER.lock();
@@ -352,10 +354,11 @@ impl WindowObj{
 
     ///Add a new displayable structure to the window
     ///We check if the displayable is in the window. But we do not check if it is overlapped with others
-    pub fn add_displayable(&mut self, key: &str, x:usize, y:usize, displayable:TextDisplay) -> Result<(), &'static str>{
+    pub fn add_displayable(&mut self, key: &str, x:usize, y:usize, displayable:TextDisplay) -> Result<(), &'static str>{        
         let key = key.to_string();
         let (width, height) = displayable.get_size();
         let inner = self.inner.lock();
+
         if !inner.check_in_content(inner.x + inner.margin + x, inner.y + inner.margin + y) ||
             !inner.check_in_content(inner.x + inner.margin + x + width, inner.y + inner.margin + y) ||
             !inner.check_in_content(inner.x + inner.margin + x, inner.y + inner.margin + y + height) ||
@@ -365,7 +368,8 @@ impl WindowObj{
 
             return Err("The displayable does not fit the window size.");
         } 
-        
+
+        displayable.buffer().map(inner.x + inner.margin + x, inner.y + inner.margin + y)?;
         let component = Component {
             x:x,
             y:y,
@@ -451,7 +455,7 @@ impl WindowObj{
         };
         buffer.lock().draw_rectangle(x + inner.x + 1, y + inner.y + 1, width, height, 
                 color);
-        frame_buffer::flush(&buffer)
+        frame_buffer::display(&buffer)
     }
 
     /// Requires that a str slice that will exactly fit the frame buffer
@@ -585,7 +589,7 @@ impl WindowInner {
             None => { return Err("Fail to get the virtual frame buffer") }
         };
         buffer.lock().draw_rectangle(self.x, self.y, self.width, self.height, color);
-        frame_buffer::flush(&buffer)
+        frame_buffer::display(&buffer)
     }
 
     /// adjust the size of a window
