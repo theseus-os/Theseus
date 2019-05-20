@@ -343,7 +343,6 @@ version = "0.1.0"
 dependencies = [
  "acpi 0.1.0",
  "frame_buffer 0.1.0",
- "frame_buffer_3d 0.1.0",
  "lazy_static 1.2.0 (registry+https://github.com/rust-lang/crates.io-index)",
  "log 0.3.9 (registry+https://github.com/rust-lang/crates.io-index)",
  "memory 0.1.0",
@@ -362,7 +361,6 @@ version = "0.1.0"
 dependencies = [
  "acpi 0.1.0",
  "frame_buffer 0.1.0",
- "frame_buffer_3d 0.1.0",
  "lazy_static 1.2.0 (registry+https://github.com/rust-lang/crates.io-index)",
  "log 0.3.9 (registry+https://github.com/rust-lang/crates.io-index)",
  "memory 0.1.0",
@@ -399,12 +397,34 @@ dependencies = [
 ]
 
 [[package]]
+name = "display_swap"
+version = "0.1.0"
+dependencies = [
+ "acpi 0.1.0",
+ "dfqueue 0.1.0",
+ "display 0.1.0",
+ "frame_buffer 0.1.0",
+ "fs_node 0.1.0",
+ "irq_safety 0.1.1 (git+https://github.com/kevinaboos/irq_safety)",
+ "keycodes_ascii 0.1.0",
+ "lazy_static 0.2.11 (registry+https://github.com/rust-lang/crates.io-index)",
+ "log 0.3.9 (registry+https://github.com/rust-lang/crates.io-index)",
+ "memory 0.1.0",
+ "mod_mgmt 0.1.0",
+ "path 0.1.0",
+ "print 0.1.0",
+ "spin 0.4.10 (registry+https://github.com/rust-lang/crates.io-index)",
+ "terminal_print 0.1.0",
+ "volatile 0.1.0 (registry+https://github.com/rust-lang/crates.io-index)",
+ "window_manager 0.1.0",
+]
+
+[[package]]
 name = "display_text"
 version = "0.1.0"
 dependencies = [
  "acpi 0.1.0",
  "frame_buffer 0.1.0",
- "frame_buffer_3d 0.1.0",
  "lazy_static 1.2.0 (registry+https://github.com/rust-lang/crates.io-index)",
  "log 0.3.9 (registry+https://github.com/rust-lang/crates.io-index)",
  "memory 0.1.0",

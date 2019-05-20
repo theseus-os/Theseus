@@ -24,7 +24,7 @@ use core::ops::DerefMut;
 use alloc::boxed::Box;
 use alloc::sync::Arc;
 
-use frame_buffer::{VirtualFrameBuffer};
+pub use frame_buffer::{VirtualFrameBuffer};
 
 const PIXEL_BYTES:usize = 4;
 

@@ -45,9 +45,6 @@ path = "../../kernel/print"
 [dependencies.window_manager]
 path = "../../kernel/window_manager"
 
-#[dependencies.frame_buffer_3d]
-#path = "../frame_buffer_3d"
-
 [dependencies.memory]
 path = "../../kernel/memory"
 

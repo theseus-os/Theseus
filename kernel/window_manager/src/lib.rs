@@ -42,7 +42,7 @@ use core::ops::Deref;
 use dfqueue::{DFQueue,DFQueueConsumer,DFQueueProducer};
 use alloc::sync::{Arc, Weak};
 use display_text::{TextVFrameBuffer};
-use frame_buffer::{VirtualFrameBuffer};
+use display::{VirtualFrameBuffer};
 use display::Display;
 use event_types::Event;
 use alloc::string::{String, ToString};
