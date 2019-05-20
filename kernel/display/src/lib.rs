@@ -165,18 +165,22 @@ impl Display for VirtualFrameBuffer {
 
 }
 
+///draw a pixel at (x, y) with color
 pub fn draw_pixel(vf:&Arc<Mutex<VirtualFrameBuffer>>, x:usize, y:usize, color:u32){
     vf.lock().draw_pixel(x, y, color);
 }
 
+///draw a line from (start_x, start_y) to (end_x, end_y) with color
 pub fn draw_line(vf:&Arc<Mutex<VirtualFrameBuffer>>, start_x:i32, start_y:i32, end_x:i32, end_y:i32, color:u32){
     vf.lock().draw_line(start_x, start_y, end_x, end_y, color);
 }
 
+///draw a rectangle at (start_x, start_y) with color
 pub fn draw_rectangle(vf:&Arc<Mutex<VirtualFrameBuffer>>, start_x:usize, start_y:usize, width:usize, height:usize, color:u32){
     vf.lock().draw_rectangle(start_x, start_y, width, height, color);
 }
 
+///fill a rectangle at (start_x, start_y) with color
 pub fn fill_rectangle(vf:&Arc<Mutex<VirtualFrameBuffer>>, start_x:usize, start_y:usize, width:usize, height:usize, color:u32){
     vf.lock().fill_rectangle(start_x, start_y, width, height, color);
 }

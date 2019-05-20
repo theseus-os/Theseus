@@ -107,7 +107,7 @@ pub fn init() -> Result<(), &'static str > {
     }
 }
 
-pub struct Compositor {
+struct Compositor {
     width:usize,
     height:usize,
     buffer:BoxRefMut<MappedPages, [u32]>,
@@ -169,12 +169,13 @@ impl Compositor {
     }
 }
 
-pub struct DisplayFrame {
+struct DisplayFrame {
     x:usize,
     y:usize,
     vframebuffer:Weak<Mutex<VirtualFrameBuffer>>,
 }
 
+///The virtual frame buffer struct. It contains the size of the buffer and a buffer array
 pub struct VirtualFrameBuffer {
     width:usize,
     height:usize,
@@ -182,6 +183,7 @@ pub struct VirtualFrameBuffer {
 }
 
 impl VirtualFrameBuffer {
+    ///return a new virtual frame buffer with specified size
     pub fn new(width:usize, height:usize) -> Result<VirtualFrameBuffer, &'static str>{
         let buffer = vec![0;width * height];
         let vf = VirtualFrameBuffer {
@@ -192,61 +194,36 @@ impl VirtualFrameBuffer {
         Ok(vf)
     }
 
+    ///return a reference to the buffer array
     pub fn buffer(&mut self) -> &mut Vec<u32> {
         return &mut self.buffer
     }
 
-    //get the resolution of the screen
+    ///get the resolution of the screen
     pub fn get_size(&self) -> (usize, usize) {
         (self.width, self.height)
     }
 
+    ///get a function to compute the index of a pixel in the buffer array. The returned function is (x:usize, y:usize) -> index:usize
     pub fn get_index_fn(&self) -> Box<Fn(usize, usize)->usize>{
          let width = self.width;
          Box::new(move |x:usize, y:usize| y * width + x )
     }
 
+    ///check if a pixel is within the virtual framebuffer
     pub fn check_in_range(&self, x:usize, y:usize)  -> bool {
         x < self.width && y < self.height
     }
 }
 
-
-// impl PhysicalFrameBuffer {
-//         // set the graphic mode information of the buffer
-//     // fn set_mode_info(&mut self, width:usize, height:usize, pages:MappedPages) {
-//     //     self.width = width;
-//     //     self.height = height;
-//     //     self.pages = Some(pages);
-//     // }
-
-//     /// Get the resolution of the screen
-//     pub fn get_resolution(&self) -> (usize, usize) {
-//         (self.width, self.height)
-//     }
-
-//     // Check if a point is in the screen
-//     pub fn check_in_range(&self, x:usize, y:usize)  -> bool {
-//         x < self.width && y < self.height
-//     }
-
-//     pub fn get_index_fn(&self) -> Box<Fn(usize, usize)->usize>{
-//         let width = self.width;
-//         Box::new(move |x:usize, y:usize| y * width + x )
-//     }
-
-// }
-
-// pub fn draw_in_buffer(index:usize, color:u32,  buffer:&mut[u32]) {
-//     buffer[index] = color;
-// }
-
+///map a virtual framebuffer to the final framebuffer at (x, y)
 pub fn map(x:usize, y:usize, vf:VirtualFrameBuffer) -> Result<Arc<Mutex<VirtualFrameBuffer>>, &'static str>{
     let vf_ref = Arc::new(Mutex::new(vf));
     map_ref(x, y, &vf_ref)?;
     Ok(vf_ref)
 }
 
+///map a reference to a virtual framebuffer to the final framebuffer at (x, y)
 pub fn map_ref(x:usize, y:usize, vf_ref:&Arc<Mutex<VirtualFrameBuffer>>) -> Result<(), &'static str>{
     let vf_weak = Arc::downgrade(vf_ref);
     let frame = DisplayFrame {
@@ -260,23 +237,21 @@ pub fn map_ref(x:usize, y:usize, vf_ref:&Arc<Mutex<VirtualFrameBuffer>>) -> Resu
     Ok(())
 }
 
+///get the resolution of the final framebuffer
 pub fn get_resolution() -> Result<(usize, usize), &'static str> {
     let compositor = try!(COMPOSITOR.try().ok_or("Fail to get the physical frame buffer"));
     Ok(compositor.lock().get_resolution())
 }
 
+///display the content of a virtual frame buffer
 pub fn display(vfb:&Arc<Mutex<VirtualFrameBuffer>>) -> Result<(), &'static str>{
     let compositor = try!(COMPOSITOR.try().ok_or("Fail to get the physical frame buffer"));
     compositor.lock().display(vfb);
     Ok(())
 }
 
-
+///the the position of a mapped virtual frame buffer
 pub fn get_position(vfb:&Arc<Mutex<VirtualFrameBuffer>>) ->  Result<(usize, usize), &'static str> {
     let compositor = try!(COMPOSITOR.try().ok_or("Fail to get the physical frame buffer"));
     compositor.lock().get_position(vfb)
 }
-// // Check if a point is in the screen
-// pub fn check_in_range(x:usize, y:usize, width:usize, height:usize)  -> bool {
-//     x < width && y < height
-// }
