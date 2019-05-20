@@ -29,58 +29,56 @@ pub use frame_buffer::{VirtualFrameBuffer};
 
 const COLOR_BITS:usize = 24;
 
-// #[cfg(framebuffer3d)]
-// const COLOR_BITS:usize = 24;
-
-// The drawer is responsible for drawing/printing to the screen
-
-
 pub trait Display {
-    ///draw a pixel at (x, y)
+    ///draw a 2D pixel at (x, y)
     fn draw_pixel(&mut self, x:usize, y:usize, color:u32);
-    ///draw a pixel at (x, y) with depth z
+    ///draw a 3D pixel at (x, y) with depth z. A pixel with a larger z will overlap others
     fn draw_pixel_3d(&mut self, x:usize, y:usize, z:u8, color:u32);
-    ///draw a line from (start_x, start_y) to (end_x, end_y) 
+    ///draw a 2D line from (start_x, start_y) to (end_x, end_y) 
     fn draw_line(&mut self, start_x:i32, start_y:i32, end_x:i32, end_y:i32, color:u32);
-    ///draw a line from (start_x, start_y) to (end_x, end_y) with depth z
+    ///draw a 3D line from (start_x, start_y) to (end_x, end_y) with depth z. A pixel with a larger z will overlap others
     fn draw_line_3d(&mut self, start_x:i32, start_y:i32, end_x:i32, end_y:i32, z:u8, color:u32);
-    ///draw a rectangle at (start_x, start_y) 
+    ///draw a 2D rectangle at (start_x, start_y) 
     fn draw_rectangle(&mut self, start_x:usize, start_y:usize, width:usize, height:usize, color:u32);
-    ///draw a rectangle at (start_x, start_y) with depth z
+    ///draw a 3D rectangle at (start_x, start_y) with depth z. A pixel with a larger z will overlap others
     fn draw_rectangle_3d(&mut self, start_x:usize, start_y:usize, width:usize, height:usize, z:u8, color:u32);
-    ///fill a rectangle at (start_x, start_y)
+    ///fill a 2D rectangle at (start_x, start_y)
     fn fill_rectangle(&mut self, start_x:usize, start_y:usize, width:usize, height:usize, color:u32);
-    ///fill a rectangle at (start_x, start_y) with depth z
+    ///fill a 3D rectangle at (start_x, start_y) with depth z. A pixel with a larger z will overlap others
     fn fill_rectangle_3d(&mut self, start_x:usize, start_y:usize, width:usize, height:usize, z:u8, color:u32);
 }
 
 impl Display for VirtualFrameBuffer {
+    //draw a 2D pixel at (x, y)
     fn draw_pixel(&mut self, x:usize, y:usize, color:u32) {
         self.draw_pixel_3d(x, y, 0, color);
     }
 
+    //draw a 3D pixel at (x, y) with depth z
     fn draw_pixel_3d(&mut self, x:usize, y:usize, z:u8, color:u32) {
-        //let buffer = self.physical_buffer.deref();
         let index = self.get_index_fn();
         if self.check_in_range(x, y) {
             write_to(self.buffer(), index(x, y), z, color);
-        }
-        
+        }        
     }
 
+    //draw a 2D line from (start_x, start_y) to (end_x, end_y) 
     fn draw_line(&mut self, start_x:i32, start_y:i32, end_x:i32, end_y:i32, color:u32){
         self.draw_line_3d(start_x, start_y, end_x, end_y, 0, color);
     }
 
+    //draw a 3D line from (start_x, start_y) to (end_x, end_y) with depth z
     fn draw_line_3d(&mut self, start_x:i32, start_y:i32, end_x:i32, end_y:i32, z:u8, color:u32){
         let width:i32 = end_x-start_x;
         let height:i32 = end_y-start_y;
         
         let index = self.get_index_fn();
 
+        //compare the x distance and y distance. Increase/Decrease the longer one at every step.
         if width.abs() > height.abs() {
             let mut y;
             let mut x = start_x;
+            //if the end_x is larger than start_x, increase x. Otherwise decrease it.
             let step = if width > 0 {1} else {-1};
 
             loop {
@@ -111,20 +109,23 @@ impl Display for VirtualFrameBuffer {
 
     }
 
+    //draw a 2D rectangle at (start_x, start_y) 
     fn draw_rectangle(&mut self, start_x:usize, start_y:usize, width:usize, height:usize, color:u32){
         self.draw_rectangle_3d(start_x, start_y, width, height, 0, color);
     }
 
+    //draw a 3D rectangle at (start_x, start_y) with depth z 
     fn draw_rectangle_3d(&mut self, start_x:usize, start_y:usize, width:usize, height:usize, z:u8, color:u32){
         let index = self.get_index_fn();
         let (buffer_width, buffer_height) = self.get_size();
 
-        let end_x:usize = {if start_x + width < buffer_width 
-            { start_x + width} 
-            else { buffer_width }};
-        let end_y:usize = {if start_y + height < buffer_height 
-            { start_y + height } 
-            else { buffer_height }};
+        let end_x:usize = {
+            if start_x + width < buffer_width { start_x + width} 
+            else { buffer_width }
+        };
+        let end_y:usize = {if start_y + height < buffer_height { start_y + height } 
+            else { buffer_height }
+        };
 
         let mut x = start_x;
         let buffer = self.buffer();
@@ -149,10 +150,12 @@ impl Display for VirtualFrameBuffer {
         }
     }
 
+    //fill a 2D rectangle at (start_x, start_y) 
     fn fill_rectangle(&mut self, start_x:usize, start_y:usize, width:usize, height:usize, color:u32){
         self.fill_rectangle_3d(start_x, start_y, width, height, 0, color);
     }
 
+    //draw a 3D rectangle at (start_x, start_y) with depth z 
     fn fill_rectangle_3d(&mut self, start_x:usize, start_y:usize, width:usize, height:usize, z:u8, color:u32){
         let mut x = start_x;
         let mut y = start_y;
@@ -160,16 +163,18 @@ impl Display for VirtualFrameBuffer {
 
         let (buffer_width, buffer_height) = self.get_size();
         let index = self.get_index_fn();
-        let end_x:usize = {if start_x + width < buffer_width 
-            { start_x + width } 
-            else { buffer_width }};
-        let end_y:usize = {if start_y + height < buffer_height 
-            { start_y + height } 
-            else { buffer_height }};  
+        let end_x:usize = {
+            if start_x + width < buffer_width { start_x + width } 
+            else { buffer_width }
+        };
+        let end_y:usize = {
+            if start_y + height < buffer_height { start_y + height } 
+            else { buffer_height }
+        };  
 
         let buffer = self.buffer();
 
-      loop {
+        loop {
             if x == end_x {
                 y += 1;
                 if y == end_y {
@@ -185,6 +190,7 @@ impl Display for VirtualFrameBuffer {
 
 }
 
+//write a 3D pixel to a buffer. A pixel with a larger z will overlap current pixel with a smaller z
 fn write_to(buffer:&mut Vec<u32>, index:usize, z:u8, color:u32) {
     if (buffer[index] >> COLOR_BITS) <= z as u32 {
         buffer[index] = color;
