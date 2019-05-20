@@ -1,4 +1,4 @@
-//! This crate is a frame buffer for display on the screen in 2D mode
+//! This crate is to display in a virtual frame buffer in 2D mode
 
 #![no_std]
 #![feature(const_fn)]
@@ -25,20 +25,20 @@ use core::ops::DerefMut;
 use alloc::boxed::Box;
 use alloc::sync::Arc;
 
-pub use frame_buffer::{VirtualFrameBuffer};
+use frame_buffer::{VirtualFrameBuffer};
 
 const PIXEL_BYTES:usize = 4;
 
-// #[cfg(framebuffer3d)]
-// const COLOR_BITS:usize = 24;
 
-// The drawer is responsible for drawing/printing to the screen
-
-
+///This trait is to display graphs in a virtual frame buffer
 pub trait Display {
+    ///draw a pixel at (x, y) with color
     fn draw_pixel(&mut self, x:usize, y:usize, color:u32);
+    ///draw a line from (start_x, start_y) to (end_x, end_y) with color
     fn draw_line(&mut self, start_x:i32, start_y:i32, end_x:i32, end_y:i32, color:u32);
+    ///draw a rectangle at (start_x, start_y) with color
     fn draw_rectangle(&mut self, start_x:usize, start_y:usize, width:usize, height:usize, color:u32);
+    ///fill a rectangle at (start_x, start_y) with color
     fn fill_rectangle(&mut self, start_x:usize, start_y:usize, width:usize, height:usize, color:u32);
 }
 

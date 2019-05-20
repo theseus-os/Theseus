@@ -15,6 +15,7 @@ use core::ops::DerefMut;
 
 use tsc::{tsc_ticks, TscTicks};
 
+///The default font file
 pub mod font;
 
 /// Specifies where we want to scroll the display, and by how much
@@ -33,17 +34,17 @@ pub enum DisplayPosition {
 }
 
 
-//type Line = [u8; BUFFER_WIDTH];
 
-//const BLANK_LINE: Line = [b' '; BUFFER_WIDTH];
-
-/// An instance of a frame text buffer which can be displayed to the screen.
+/// An instance of a text virtual frame buffer which can be displayed to the screen.
 pub struct TextVFrameBuffer {
+    ///The cursor in the text frame buffer
     pub cursor:Mutex<Cursor>,
+    ///The virtual frame buffer to be displayed in
     pub vbuffer:Arc<Mutex<VirtualFrameBuffer>>
 }
 
 impl TextVFrameBuffer {
+    ///create a new text virtual frame buffer
     pub fn new(width:usize, height:usize) -> Result<TextVFrameBuffer, &'static str> {
         let vfb = VirtualFrameBuffer::new(width, height)?;
 
@@ -55,6 +56,7 @@ impl TextVFrameBuffer {
         })
     }
 
+    ///map the text virtual frame buffer to the final frame buffer at (x, y)
     pub fn map(&self, x:usize, y:usize) -> Result<(), &'static str>{
         frame_buffer::map_ref(x, y, &self.vbuffer)
     }
@@ -238,6 +240,7 @@ impl Cursor {
         false
     }
 
+    ///The the fields of the cursor object
     pub fn get_info(&self) -> (usize, usize, bool) {
         (self.line, self.column, self.show)
     }

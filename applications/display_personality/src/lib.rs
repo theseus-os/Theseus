@@ -1,3 +1,5 @@
+//!This application display in 3d and 2D modes with personality
+
 #![no_std]
 #![feature(alloc)]
 
@@ -10,8 +12,10 @@ extern crate spin;
 extern crate mod_mgmt;
 extern crate memory;
 extern crate fs_node;
+extern crate frame_buffer;
 
-use display::{VirtualFrameBuffer, Display};
+use display::{Display};
+use frame_buffer::VirtualFrameBuffer;
 use alloc::vec::Vec;
 use alloc::string::String;
 use alloc::sync::Arc;
@@ -23,7 +27,6 @@ use core::ops::DerefMut;
 use fs_node::FileOrDir; 
 
 type FillRectangleFun = fn(&Arc<Mutex<VirtualFrameBuffer>>, usize, usize, usize, usize, u32);
-
 
 #[no_mangle]
 pub fn main(_args: Vec<String>) -> isize {
