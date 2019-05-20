@@ -1,0 +1,14 @@
+
+Found proper rust compiler version, proceeding with build...
+
+
+Found proper xargo version, proceeding with build...
+
+
+=================== BUILDING ALL CRATES ===================
+	 TARGET: "x86_64-theseus"
+	 KERNEL_PREFIX: "k#"
+	 APP_PREFIX: "a#"
+	 THESEUS_CONFIG: ""
+RUST_TARGET_PATH="/home/yuwenqiu/wenqiu/home/yuwenqiu/Thesus/display/Theseus/cfg" RUSTFLAGS="--emit=obj -C debuginfo=2 -C code-model=large -C relocation-model=static -D unused-must-use -Z merge-functions=disabled" xargo build  --release   --all --target x86_64-theseus
+Makefile:180: recipe for target 'cargo' failed
