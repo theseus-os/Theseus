@@ -1,4 +1,4 @@
-//! This crate is a frame buffer for display on the screen in 2D mode
+//! This crate is a frame buffer. It implements a compositor to display multiple virtual frame buffers in the final frame buffer
 
 #![no_std]
 #![feature(const_fn)]
@@ -243,14 +243,14 @@ pub fn get_resolution() -> Result<(usize, usize), &'static str> {
     Ok(compositor.lock().get_resolution())
 }
 
-///display the content of a virtual frame buffer
+///display the content of a virtual frame buffer to the final frame buffer
 pub fn display(vfb:&Arc<Mutex<VirtualFrameBuffer>>) -> Result<(), &'static str>{
     let compositor = try!(COMPOSITOR.try().ok_or("Fail to get the physical frame buffer"));
     compositor.lock().display(vfb);
     Ok(())
 }
 
-///the the position of a mapped virtual frame buffer
+///get the position of a mapped virtual frame buffer
 pub fn get_position(vfb:&Arc<Mutex<VirtualFrameBuffer>>) ->  Result<(usize, usize), &'static str> {
     let compositor = try!(COMPOSITOR.try().ok_or("Fail to get the physical frame buffer"));
     compositor.lock().get_position(vfb)
