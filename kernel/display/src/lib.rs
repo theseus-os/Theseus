@@ -14,7 +14,6 @@ extern crate memory;
 #[macro_use] extern crate log;
 extern crate util;
 extern crate alloc;
-extern crate frame_buffer_3d;
 extern crate frame_buffer;
 
 use spin::{Mutex};
