@@ -1,7 +1,7 @@
 
-use super::super::{TextVFrameBuffer, WindowObj, display, Arc, VFRAME_BUFFER, Display, Mutex};
+use super::super::{TextVFrameBuffer, WindowObj, display_text, Arc, VFRAME_BUFFER, Display, Mutex};
 use super::super::{String};
-use display::font::{CHARACTER_WIDTH, CHARACTER_HEIGHT};
+use display_text::font::{CHARACTER_WIDTH, CHARACTER_HEIGHT};
 
 /// A displayable component for text display
 pub struct TextDisplay {

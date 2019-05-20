@@ -140,7 +140,7 @@ dependencies = [
  "apic 0.1.0",
  "device_manager 0.1.0",
  "dfqueue 0.1.0",
- "display 0.1.0",
+ "display_text 0.1.0",
  "e1000 0.1.0",
  "event_types 0.1.0",
  "exceptions_full 0.1.0",
@@ -375,6 +375,25 @@ dependencies = [
  "spin 0.4.10 (registry+https://github.com/rust-lang/crates.io-index)",
  "volatile 0.1.0 (registry+https://github.com/rust-lang/crates.io-index)",
  "window_manager 0.1.0",
+]
+
+[[package]]
+name = "display_text"
+version = "0.1.0"
+dependencies = [
+ "acpi 0.1.0",
+ "frame_buffer 0.1.0",
+ "frame_buffer_3d 0.1.0",
+ "lazy_static 1.2.0 (registry+https://github.com/rust-lang/crates.io-index)",
+ "log 0.3.9 (registry+https://github.com/rust-lang/crates.io-index)",
+ "memory 0.1.0",
+ "serial_port 0.1.0",
+ "spin 0.4.10 (registry+https://github.com/rust-lang/crates.io-index)",
+ "state_store 0.1.0",
+ "tsc 0.1.0",
+ "util 0.1.0",
+ "vga_buffer 0.1.0",
+ "volatile 0.2.5 (registry+https://github.com/rust-lang/crates.io-index)",
 ]
 
 [[package]]
@@ -1841,6 +1860,7 @@ dependencies = [
  "acpi 0.1.0",
  "dfqueue 0.1.0",
  "display 0.1.0",
+ "display_text 0.1.0",
  "event_types 0.1.0",
  "frame_buffer 0.1.0",
  "irq_safety 0.1.1 (git+https://github.com/kevinaboos/irq_safety)",

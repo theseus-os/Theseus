@@ -26,11 +26,6 @@ use alloc::boxed::Box;
 
 pub use frame_buffer::{VirtualFrameBuffer};
 
-//The buffer for text printing
-pub mod text_buffer;
-//The font for text printing
-pub mod font;
-
 const PIXEL_BYTES:usize = 4;
 
 // #[cfg(framebuffer3d)]
@@ -153,7 +148,6 @@ impl Display for VirtualFrameBuffer {
 
         let buffer = self.buffer();
 
-          trace!("{} {} {}",width, height, buffer.len());
       loop {
             if x == end_x {
                 y += 1;
