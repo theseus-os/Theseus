@@ -25,16 +25,10 @@ impl TextDisplay
     }
 
     /// takes in a str slice and display as much as it can to the text area
-    pub fn display_string(&self, window:&WindowObj, slice:&str, font_color:u32, bg_color:u32) -> Result<(), &'static str>{       
-        //match self.get_display_pos(window) {
-        //    Ok((x, y)) => {
-                // Do not need  x, y
-                self.textbuffer.print_by_bytes(0, 0, self.width, self.height,
-                    slice, font_color, bg_color)?;
-                return frame_buffer::display(&self.textbuffer.vbuffer);
-        //     },
-        //     Err(err) => {return Err(err);}
-        // }
+    pub fn display_string(&self, slice:&str, font_color:u32, bg_color:u32) -> Result<(), &'static str>{       
+        self.textbuffer.print_by_bytes(0, 0, self.width, self.height,
+            slice, font_color, bg_color)?;
+        return frame_buffer::display(&self.textbuffer.vbuffer);
     }
 
     /// Gets the dimensions of the text area to display

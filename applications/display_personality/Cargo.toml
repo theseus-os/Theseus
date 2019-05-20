@@ -41,12 +41,11 @@ path = "../../kernel/frame_buffer"
 [dependencies.print]
 path = "../../kernel/print"
 
+[dependencies.memory]
+path = "../../kernel/memory"
 
 [dependencies.window_manager]
 path = "../../kernel/window_manager"
-
-[dependencies.memory]
-path = "../../kernel/memory"
 
 [dependencies.mod_mgmt]
 path = "../../kernel/mod_mgmt"
@@ -56,9 +55,6 @@ path = "../../kernel/acpi"
 
 [dependencies.display]
 path = "../../kernel/display"
-
-[dependencies.path]
-path = "../../kernel/path"
 
 [dependencies.terminal_print]
 path = "../terminal_print"

@@ -2,12 +2,12 @@
 
 #![no_std]
 #![feature(alloc)]
+#[warn(stable_features)] 
 
 extern crate display;
-#[macro_use] extern crate alloc;
+extern crate alloc;
 #[macro_use] extern crate log;
 #[macro_use] extern crate terminal_print;
-extern crate path;
 extern crate spin;
 extern crate mod_mgmt;
 extern crate memory;
@@ -20,10 +20,7 @@ use alloc::vec::Vec;
 use alloc::string::String;
 use alloc::sync::Arc;
 use mod_mgmt::{CrateNamespace, get_default_namespace, get_namespaces_directory, NamespaceDirectorySet};
-use memory::{get_kernel_mmi_ref, MappedPages};
-use spin::{Once, Mutex};
-use path::Path;
-use core::ops::DerefMut;
+use spin::{Mutex};
 use fs_node::FileOrDir; 
 
 type FillRectangleFun = fn(&Arc<Mutex<VirtualFrameBuffer>>, usize, usize, usize, usize, u32);
@@ -32,7 +29,10 @@ type FillRectangleFun = fn(&Arc<Mutex<VirtualFrameBuffer>>, usize, usize, usize,
 pub fn main(_args: Vec<String>) -> isize {
     let vf = match VirtualFrameBuffer::new(200,700){
         Ok(vf) => {vf},
-        Err(err) => {return 1},
+        Err(err) => {
+            println!("{}", err);
+            return -1
+        },
     };
 
 
