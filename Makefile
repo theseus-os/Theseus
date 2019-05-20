@@ -304,8 +304,8 @@ simd_personality_avx: build_avx build
 display_personality: build
 	@mkdir -p $(GRUB_ISOFILES)/boot/grub
 	@cp $(nano_core_binary) $(GRUB_ISOFILES)/boot/kernel.bin
-	@mkdir -p $(GRUB_ISOFILES)/namespaces/frame_buffer
-	@cp  $(OBJECT_FILES_BUILD_DIR)/k#frame_buffer_3d-* $(GRUB_ISOFILES)/namespaces/frame_buffer
+	@mkdir -p $(GRUB_ISOFILES)/namespaces/display
+	@cp  $(OBJECT_FILES_BUILD_DIR)/k#display_3d-* $(GRUB_ISOFILES)/namespaces/display
 # autogenerate the grub.cfg file
 	cargo run --manifest-path tools/grub_cfg_generation/Cargo.toml -- $(GRUB_ISOFILES)/modules/ -o $(GRUB_ISOFILES)/boot/grub/grub.cfg
 	@/usr/bin/grub-mkrescue -o $(iso) $(GRUB_ISOFILES)  2> /dev/null

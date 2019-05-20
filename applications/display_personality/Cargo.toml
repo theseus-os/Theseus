@@ -63,6 +63,12 @@ path = "../../kernel/display"
 [dependencies.path]
 path = "../../kernel/path"
 
+[dependencies.terminal_print]
+path = "../terminal_print"
+
+[dependencies.fs_node]
+path = "../../kernel/fs_node"
+
 # [build]
 # rustflags = ["-C", "prefer-dynamic", "-C", "panic=abort"]
 
