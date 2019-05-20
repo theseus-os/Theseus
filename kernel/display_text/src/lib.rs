@@ -44,12 +44,10 @@ pub struct TextVFrameBuffer {
 }
 
 impl TextVFrameBuffer {
-    ///create a new text virtual frame buffer
+    ///create a new text virtual frame buffer. The owner of a frame buffer can write a text to it. But it will not display on the screen until it is mapped to the final framebuffer and call the frame_buffer:display() function
     pub fn new(width:usize, height:usize) -> Result<TextVFrameBuffer, &'static str> {
         let vfb = VirtualFrameBuffer::new(width, height)?;
-
         let vfb_ref = Arc::new(Mutex::new(vfb));
-        //frame_buffer::map(x, y, vfb)?;
         Ok(TextVFrameBuffer {
             cursor:Mutex::new(Cursor::new(0, 0, true)),
             vbuffer: vfb_ref
@@ -61,33 +59,28 @@ impl TextVFrameBuffer {
         frame_buffer::map_ref(x, y, &self.vbuffer)
     }
     
-    ///print a string by bytes
+    ///print a string by bytes at (x, y) within an area of (width, height) of the virtual text frame buffer
     pub fn print_by_bytes(&self, x:usize, y:usize, width:usize, height:usize, 
         slice: &str, font_color:u32, bg_color:u32) -> Result<(), &'static str> {
     
         let mut curr_line = 0;
         let mut curr_column = 0;
-        //let mut cursor_pos = 0;
 
         let buffer_width = width/CHARACTER_WIDTH;
         let buffer_height = height/CHARACTER_HEIGHT;
         
-        //let vbuffer = self.vbuffer.lock();
-
-        //let mut fb = frame_buffer::FRAME_BUFFER.lock();
         let index = { self.vbuffer.lock().get_index_fn() };
         let mut vbuffer = self.vbuffer.lock();
-        let mut buffer = vbuffer.buffer();
+        let buffer = vbuffer.buffer();
        
         for byte in slice.bytes() {
-            if byte == b'\n' {
+            if byte == b'\n' {//fill the remaining blank of current line and go to the next line
                 self.fill_blank ( 
                     x + curr_column * CHARACTER_WIDTH,
                     y + curr_line * CHARACTER_HEIGHT,
                     x + width, 
                     y + (curr_line + 1 )* CHARACTER_HEIGHT, 
                     bg_color, &index, buffer)?;
-                //cursor_pos += buffer_width - curr_column;
                 curr_column = 0;
                 curr_line += 1;
                 if curr_line == buffer_height {
@@ -104,7 +97,6 @@ impl TextVFrameBuffer {
                 self.print_byte(byte, font_color, bg_color, x, y, 
                     curr_line, curr_column, &index, buffer)?;
                 curr_column += 1;
-                //cursor_pos += 1;
             }
         }
 
@@ -124,6 +116,7 @@ impl TextVFrameBuffer {
         Ok(())
     }
 
+    //print a byte to the text buffer at (line, column). (left, top) specify the margin of the text area. index is the function to calculate the index of every pixel. The virtual frame buffer calls its get_index() method to get the function.
     fn print_byte (&self, byte:u8, font_color:u32, bg_color:u32,
             left:usize, top:usize, line:usize, column:usize, index:&Box<Fn(usize, usize)->usize>,
             buffer:&mut Vec<u32>) 
@@ -135,8 +128,6 @@ impl TextVFrameBuffer {
 
         let fonts = FONT_PIXEL.lock();
    
- //       let mut vbuffer = self.vbuffer.lock();
-//        let mut buffer = vbuffer.buffer();
         loop {
             let mask:u32 = fonts[byte as usize][i][j];
             buffer[index(x + j, y + i)] = font_color & mask | bg_color & (!mask);
@@ -152,6 +143,7 @@ impl TextVFrameBuffer {
 
     }
 
+    //Fill a blank (left, top, right, bottom) with the color. index is the function to calculate the index of every pixel. The virtual frame buffer calls its get_index() method to get the function.
     fn fill_blank(&self, left:usize, top:usize, right:usize,
              bottom:usize, color:u32, index:&Box<Fn(usize, usize)->usize>, buffer:&mut Vec<u32>) -> Result<(),&'static str>{
         let mut x = left;
@@ -160,8 +152,6 @@ impl TextVFrameBuffer {
             return Ok(())
         }
 
-        // let mut vbuffer = self.vbuffer.lock();
-        // let mut buffer = vbuffer.buffer();
         loop {
             if x == right {
                 y += 1;

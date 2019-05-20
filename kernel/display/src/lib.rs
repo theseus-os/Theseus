@@ -26,9 +26,6 @@ use alloc::sync::Arc;
 
 pub use frame_buffer::{VirtualFrameBuffer};
 
-const PIXEL_BYTES:usize = 4;
-
-
 ///This trait is to display graphs in a virtual frame buffer
 pub trait Display {
     ///draw a pixel at (x, y) with color
@@ -109,7 +106,7 @@ impl Display for VirtualFrameBuffer {
         };
 
         let mut x = start_x;
-        let mut buffer = self.buffer();
+        let buffer = self.buffer();
 
         //Consider to use slice copy to increase the performance
         loop {

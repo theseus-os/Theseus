@@ -1,4 +1,4 @@
-//! This crate is a frame buffer. It implements a compositor to display multiple virtual frame buffers in the final frame buffer
+//! This crate is a frame buffer. It implements a compositor to composite multiple virtual frame buffers and display in the final frame buffer
 
 #![no_std]
 #![feature(const_fn)]
@@ -26,13 +26,11 @@ use alloc::boxed::Box;
 use alloc::sync::{Arc, Weak};
 use alloc::vec::Vec;
 
-
+//The compositor instance
 static COMPOSITOR:Once<Mutex<Compositor>> = Once::new();
 
+//Every pixel is of u32 type
 const PIXEL_BYTES:usize = 4;
-
-// #[cfg(framebuffer3d)]
-// const COLOR_BITS:usize = 24;
 
 /// Init the frame buffer. Allocate a block of memory and map it to the frame buffer frames.
 pub fn init() -> Result<(), &'static str > {
@@ -65,6 +63,7 @@ pub fn init() -> Result<(), &'static str > {
     
     match kernel_page_table {
         &mut PageTable::Active(ref mut active_table) => {
+            //Map the physical frame buffer memory
             let pages = match allocate_pages_by_bytes(vesa_display_phys_size) {
                 Some(pages) => { pages },
                 None => { return Err("frame_buffer::init() couldn't allocate pages."); }
@@ -85,11 +84,11 @@ pub fn init() -> Result<(), &'static str > {
                 allocator.deref_mut())
             );
 
-            // let mut hpet = BoxRefMut::new(Box::new(hpet_page))
-            //     .try_map_mut(|mp| mp.as_type_mut::<Hpet>(address_page_offset(phys_addr.value())))?;
-
-            let mut buffer = BoxRefMut::new(Box::new(mapped_frame_buffer)).
+            //Create a reference to the mapped frame buffer pages as slice
+            let buffer = BoxRefMut::new(Box::new(mapped_frame_buffer)).
                 try_map_mut(|mp| mp.as_slice_mut(0, buffer_width * buffer_height))?;
+
+            //Initialize the compositor
             COMPOSITOR.call_once(|| 
                 Mutex::new(Compositor {
                     width:buffer_width,
@@ -107,6 +106,21 @@ pub fn init() -> Result<(), &'static str > {
     }
 }
 
+///The virtual frame buffer struct. It contains the size of the buffer and a buffer array
+pub struct VirtualFrameBuffer {
+    width:usize,
+    height:usize,
+    buffer:Vec<u32>
+}
+
+//The displayable frame struct. It contains a reference to a virtual frame buffer and the postion of the buffer
+struct DisplayFrame {
+    x:usize,
+    y:usize,
+    vframebuffer:Weak<Mutex<VirtualFrameBuffer>>,
+}
+
+//The compositor structure. It contains the information of the final frame buffer and a list of frames
 struct Compositor {
     width:usize,
     height:usize,
@@ -115,17 +129,19 @@ struct Compositor {
 }
 
 impl Compositor {
+    //Get the resolution of the final frame buffer
     fn get_resolution(&self) -> (usize, usize){
         (self.width, self.height)
     }
 
+    //Add a displayable frame to the compositor
     fn add_frame(&mut self, frame:DisplayFrame) {
         self.frames.push(frame);
     }
 
-    
+    //Display a displayable frame 
     fn display(&mut self, vfb:&Arc<Mutex<VirtualFrameBuffer>>) {
-
+        //Check if the virtul frame buffer is in the mapped frame list
         for item in self.frames.iter() {
             let reference = item.vframebuffer.upgrade();
             if let Some(vfb_rf) = reference {
@@ -134,11 +150,10 @@ impl Compositor {
                     return;
                 }
             }
-        }
-
-        
+        }        
     }
 
+    //Get the position of a mapped virtual frame buffer
     fn get_position(&mut self, vfb:&Arc<Mutex<VirtualFrameBuffer>>) -> Result<(usize, usize), &'static str>{
 
         for item in self.frames.iter() {
@@ -153,6 +168,7 @@ impl Compositor {
         Err("The virtual framebuffer hasn't been mapped")        
     }
 
+    //Copy the content of a virtual frame buffer to the final frame buffer
     fn buffer_copy(&mut self, x:usize, y:usize, vfb:&Arc<Mutex<VirtualFrameBuffer>>) {
         let src_buffer = vfb.lock();
        
@@ -169,18 +185,6 @@ impl Compositor {
     }
 }
 
-struct DisplayFrame {
-    x:usize,
-    y:usize,
-    vframebuffer:Weak<Mutex<VirtualFrameBuffer>>,
-}
-
-///The virtual frame buffer struct. It contains the size of the buffer and a buffer array
-pub struct VirtualFrameBuffer {
-    width:usize,
-    height:usize,
-    buffer:Vec<u32>
-}
 
 impl VirtualFrameBuffer {
     ///return a new virtual frame buffer with specified size
@@ -194,12 +198,12 @@ impl VirtualFrameBuffer {
         Ok(vf)
     }
 
-    ///return a reference to the buffer array
+    ///return the buffer array
     pub fn buffer(&mut self) -> &mut Vec<u32> {
         return &mut self.buffer
     }
 
-    ///get the resolution of the screen
+    ///get the size of the virtual frame buffer
     pub fn get_size(&self) -> (usize, usize) {
         (self.width, self.height)
     }

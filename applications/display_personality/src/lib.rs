@@ -79,7 +79,7 @@ fn personality(vf: &mut Arc<Mutex<VirtualFrameBuffer>>) -> Result<(), &'static s
 
 	//Get display functions in the 3D namespace
 	let display_3d_file = namespace_3d.get_kernel_file_starting_with("display_3d-")
-		.ok_or_else(|| "couldn't find a single 'simd_test' object file in simd_personality")?;
+		.ok_or_else(|| "couldn't find a single 'display_3d' object file in simd_personality")?;
 	namespace_3d.enable_fuzzy_symbol_matching();
 	namespace_3d.load_kernel_crate(&display_3d_file, Some(backup_namespace), &kernel_mmi_ref, false)?;
 	namespace_3d.disable_fuzzy_symbol_matching();
