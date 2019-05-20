@@ -44,9 +44,6 @@ path = "../task"
 [dependencies.memory]
 path  = "../memory"
 
-[dependencies.text_display]
-path = "../text_display"
-
 [dependencies.frame_buffer]
 path = "../frame_buffer"
 
