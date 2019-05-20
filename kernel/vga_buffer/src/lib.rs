@@ -11,14 +11,12 @@ extern crate port_io;
 extern crate serial_port;
 extern crate spin;
 extern crate volatile;
-extern crate text_display;
 
 //#[macro_use] extern crate log;
 
 
 // Andrew: refernece note below
 
-//use text_display::TextDisplay;
 use core::fmt;
 use core::ptr::Unique;
 //use core::mem;

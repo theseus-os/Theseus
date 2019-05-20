@@ -1856,7 +1856,6 @@ dependencies = [
  "port_io 0.2.1",
  "serial_port 0.1.0",
  "spin 0.4.10 (registry+https://github.com/rust-lang/crates.io-index)",
- "text_display 0.1.0",
  "volatile 0.2.5 (registry+https://github.com/rust-lang/crates.io-index)",
 ]
 
