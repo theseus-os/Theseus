@@ -24,6 +24,7 @@ use memory::{FRAME_ALLOCATOR, Frame, PageTable, PhysicalAddress,
 use core::ops::DerefMut;
 use alloc::boxed::Box;
 use alloc::vec::{Vec};
+use alloc::sync::Arc;
 
 pub use frame_buffer::{VirtualFrameBuffer};
 
@@ -181,4 +182,20 @@ fn write_to(buffer:&mut Vec<u32>, index:usize, z:u8, color:u32) {
     if (buffer[index] >> COLOR_BITS) <= z as u32 {
         buffer[index] = color;
     }
+}
+
+pub fn draw_pixel(vf:&Arc<Mutex<VirtualFrameBuffer>>, x:usize, y:usize, color:u32){
+    vf.lock().draw_pixel(x, y, color);
+}
+
+pub fn draw_line(vf:&Arc<Mutex<VirtualFrameBuffer>>, start_x:i32, start_y:i32, end_x:i32, end_y:i32, color:u32){
+    vf.lock().draw_line(start_x, start_y, end_x, end_y, color);
+}
+
+pub fn draw_rectangle(vf:&Arc<Mutex<VirtualFrameBuffer>>, start_x:usize, start_y:usize, width:usize, height:usize, color:u32){
+    vf.lock().draw_rectangle(start_x, start_y, width, height, color);
+}
+
+pub fn fill_rectangle(vf:&Arc<Mutex<VirtualFrameBuffer>>, start_x:usize, start_y:usize, width:usize, height:usize, color:u32){
+    vf.lock().fill_rectangle(start_x, start_y, width, height, color);
 }
