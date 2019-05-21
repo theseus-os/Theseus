@@ -30,7 +30,7 @@
 //! * `dbus`: Simple dbus-like IPC support for Theseus (incomplete).
 //! * `device_manager`: Code for handling the sequence required to initialize each driver.
 //! * `display`:Display graphs in a virual frame buffer.
-//! * `display`:Display graphs in a virual frame buffer.
+//! * `display_3d`:Display graphs in a virual frame buffer in 3D mode.
 //! * `display_text`:Print text in a virual frame buffer.
 //! * `e1000`: Support for the e1000 NIC and driver.
 //! * `exceptions_early`: Early exception handlers that do nothing but print an error and hang.

@@ -664,8 +664,8 @@ impl Terminal {
         }
 
         if let Some(text_display) = self.window.get_displayable(display_name){
-            text_display.set_cursor(&(self.window), new_y as u16, new_x as u16, 
-                FONT_COLOR, true)?;
+            //text_display.set_cursor(&(self.window), new_y as u16, new_x as u16, 
+            //    FONT_COLOR, true)?;
         } else {
             return Err("faild to get the text displayable component")
         }
@@ -997,7 +997,7 @@ impl Terminal {
         let start_idx = self.scroll_start_idx;
         // handling display refreshing errors here so that we don't clog the main loop of the terminal
         if self.is_scroll_end {
-           let buffer_len = self.scrollback_buffer.len();
+            let buffer_len = self.scrollback_buffer.len();
             match self.update_display_backwards(display_name, buffer_len) {
                 Ok(_) => { }
                 Err(err) => {error!("could not update display backwards: {}", err); return}
@@ -1048,7 +1048,7 @@ fn terminal_loop(mut terminal: Terminal) -> Result<(), &'static str> {
     loop {
         // Handle cursor blink
         if let Some(text_display) = terminal.window.get_displayable(&display_name){
-            text_display.cursor_blink(&(terminal.window), FONT_COLOR, BACKGROUND_COLOR)?;
+            //text_display.cursor_blink(&(terminal.window), FONT_COLOR, BACKGROUND_COLOR)?;
         }
 
         // Handles events from the print queue. The queue is "empty" is peek() returns None
