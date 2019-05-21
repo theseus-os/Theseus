@@ -355,7 +355,7 @@ dependencies = [
  "ata_pio 0.1.0",
  "dfqueue 0.1.0",
  "e1000 0.1.0",
- "e1000_smoltcp_device 0.1.0",
+ "ethernet_smoltcp_device 0.1.0",
  "event_types 0.1.0",
  "keyboard 0.1.0",
  "log 0.3.9 (registry+https://github.com/rust-lang/crates.io-index)",
@@ -408,7 +408,19 @@ dependencies = [
 ]
 
 [[package]]
-name = "e1000_smoltcp_device"
+name = "either"
+version = "1.5.0"
+source = "registry+https://github.com/rust-lang/crates.io-index"
+
+[[package]]
+name = "environment"
+version = "0.1.0"
+dependencies = [
+ "fs_node 0.1.0",
+]
+
+[[package]]
+name = "ethernet_smoltcp_device"
 version = "0.1.0"
 dependencies = [
  "irq_safety 0.1.1 (git+https://github.com/kevinaboos/irq_safety)",
@@ -420,18 +432,6 @@ dependencies = [
  "owning_ref 0.4.0 (git+https://github.com/kevinaboos/owning-ref-rs)",
  "smoltcp 0.5.0 (registry+https://github.com/rust-lang/crates.io-index)",
  "spin 0.4.10 (registry+https://github.com/rust-lang/crates.io-index)",
-]
-
-[[package]]
-name = "either"
-version = "1.5.0"
-source = "registry+https://github.com/rust-lang/crates.io-index"
-
-[[package]]
-name = "environment"
-version = "0.1.0"
-dependencies = [
- "fs_node 0.1.0",
 ]
 
 [[package]]
@@ -628,6 +628,7 @@ dependencies = [
  "percent-encoding 1.0.2",
  "smoltcp 0.5.0 (registry+https://github.com/rust-lang/crates.io-index)",
  "spin 0.4.10 (registry+https://github.com/rust-lang/crates.io-index)",
+ "tcp_client 0.1.0",
 ]
 
 [[package]]
@@ -1065,6 +1066,7 @@ dependencies = [
  "smoltcp 0.5.0 (registry+https://github.com/rust-lang/crates.io-index)",
  "spawn 0.1.0",
  "task 0.1.0",
+ "tcp_client 0.1.0",
 ]
 
 [[package]]

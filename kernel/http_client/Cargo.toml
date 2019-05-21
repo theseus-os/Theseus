@@ -32,3 +32,6 @@ features = [
     "proto-ipv4", "proto-igmp", "proto-ipv6", "proto-dhcpv4",
     "socket-raw", "socket-udp", "socket-tcp", "socket-icmp", 
 ]
+
+[dependencies.tcp_client]
+path = "../tcp_client"

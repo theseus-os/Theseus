@@ -1,14 +1,12 @@
 [package]
-authors = ["Ramla Ijaz <ijazramla@gmail.com>"]
 name = "tcp_client"
-description = "Functions for sending data over a tcp connection. Used to send experiment results."
+authors = ["Ramla-I <ijazramla@gmail.com>"]
+description = "helper functions to establish and use a tcp connection with a smoltcp device"
 version = "0.1.0"
 build = "../../build.rs"
 
 [dependencies]
 spin = "0.4.10"
-httparse = { version = "1.3.3", default-features = false }
-libm = "0.1.2"
 
 [dependencies.log]
 default-features = false
@@ -20,9 +18,6 @@ path = "../network_manager"
 [dependencies.hpet]
 path = "../hpet"
 
-[dependencies.percent-encoding]
-path = "../../libs/percent_encoding"
-
 [dependencies.smoltcp]
 version = "0.5.0"
 default-features = false
@@ -33,7 +28,6 @@ features = [
     "socket-raw", "socket-udp", "socket-tcp", "socket-icmp", 
 ]
 
-[dependencies.rand]
-version = "0.6"
-default-features = false 
-features = [ "alloc" ]
+
+[lib]
+crate-type = ["rlib"]
