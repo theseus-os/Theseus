@@ -23,9 +23,6 @@ path = "../state_store"
 default-features = false
 version = "0.3.7"
 
-[dependencies.memory]
-path = "../memory"
-
 [dependencies.util]
 path = "../../libs/util"
 

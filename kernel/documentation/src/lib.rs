@@ -32,10 +32,10 @@
 //! * `display`:Display graphs in a virual frame buffer.
 //! * `display`:Display graphs in a virual frame buffer.
 //! * `display_text`:Print text in a virual frame buffer.
-//! * `frame_buffer`:Create virtual frame buffer and map them to the final frame buffer. Display the contents of a virtual frame buffer
 //! * `e1000`: Support for the e1000 NIC and driver.
 //! * `exceptions_early`: Early exception handlers that do nothing but print an error and hang.
 //! * `exceptions_full`: Exception handlers that are more fully-featured, i.e., kills tasks on an exception.
+//! * `frame_buffer`:Create virtual frame buffer and map them to the final frame buffer. Display the contents of a virtual frame buffer
 //! * `fs_node`: defines the traits for File and Directory. These files and directories mimic that of a standard unix virtual filesystem
 //! * `gdt`: GDT (Global Descriptor Table) support (x86 only) for Theseus.
 //! * `interrupts`: Interrupt configuration and handlers for Theseus. 

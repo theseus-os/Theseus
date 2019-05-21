@@ -10,18 +10,12 @@ extern crate acpi;
 
 extern crate volatile;
 extern crate serial_port;
-extern crate memory;
 #[macro_use] extern crate log;
 extern crate util;
 extern crate alloc;
 extern crate frame_buffer;
 
 use spin::{Mutex};
-use memory::{FRAME_ALLOCATOR, Frame, PageTable, PhysicalAddress, 
-    EntryFlags, allocate_pages_by_bytes, MappedPages, MemoryManagementInfo,
-    get_kernel_mmi_ref};
-use core::ops::DerefMut;
-use alloc::boxed::Box;
 use alloc::sync::Arc;
 
 pub use frame_buffer::{VirtualFrameBuffer};

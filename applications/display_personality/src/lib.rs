@@ -1,7 +1,6 @@
 //!This application display in 3d and 2D modes with personality
 
 #![no_std]
-#![feature(alloc)]
 #[warn(stable_features)] 
 
 extern crate display;
