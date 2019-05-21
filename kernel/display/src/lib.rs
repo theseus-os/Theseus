@@ -43,8 +43,8 @@ impl Display for VirtualFrameBuffer {
 
     //draw a line from (start_x, start_y) to (end_x, end_y) with color
     fn draw_line(&mut self, start_x:i32, start_y:i32, end_x:i32, end_y:i32, color:u32){
-        let width:i32 = end_x-start_x;
-        let height:i32 = end_y-start_y;
+        let width:i32 = end_x - start_x;
+        let height:i32 = end_y - start_y;
         
         let index = self.get_index_fn();
 
