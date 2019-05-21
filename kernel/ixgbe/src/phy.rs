@@ -18,53 +18,58 @@
 // SCL = 
 // SCD = 
 
+use super::registers::{IntelIxgbeRegisters, SWSM_SMBI, SWSM_SWESMBI, SW_FW_SYNC_FW_MAC, SW_FW_SYNC_SMBITS_FW, SW_FW_SYNC_SMBITS_MASK, SW_FW_SYNC_SMBITS_SW,SW_FW_SYNC_SW_MAC};
+use hpet::get_hpet;
+
+
 ///device address
-const I2C_EEPROM_DEV_ADDR: u8	=0xA0;
+const I2C_EEPROM_DEV_ADDR: u8 = 0xA0;
+const I2C_EEPROM_DEV_ADDR2: u8 =  0xA2;
 
 /// byte offsets
-const SFF_IDENTIFIER: u8 = 0x0
-const SFF_1GBE_COMP_CODES: u8 =	0x6;
-const SFF_10GBE_COMP_CODES: u8 = 0x3;
-const SFF_CABLE_TECHNOLOGY: u8 =	0x8;
+pub const SFF_IDENTIFIER: u8 = 0x0;
+pub const SFF_1GBE_COMP_CODES: u8 =	0x6;
+pub const SFF_10GBE_COMP_CODES: u8 = 0x3;
+pub const SFF_CABLE_TECHNOLOGY: u8 =	0x8;
 
 /// values at byte offsets
 const SFF_IDENTIFIER_SFP: u8 = 	0x3;
 
 //I2C commands
-const I2C_READ = u8 = 1;
-const I2C_WRITE = u8 = 0;
+const I2C_READ: u8 = 1;
+const I2C_WRITE: u8 = 0;
 
 // bit offsets for Data and Clk in I2CCTL register
-const IXGBE_I2C_CLK_IN: u8 = 1 << 0;
-const IXGBE_I2C_CLK_OUT: u8 = 1 << 1;
-const IXGBE_I2C_DATA_IN: u8 = 1 << 2;
-const IXGBE_I2C_DATA_OUT: u8 = 1 << 3;
+const IXGBE_I2C_CLK_IN: u32 = 1 << 0;
+const IXGBE_I2C_CLK_OUT: u32 = 1 << 1;
+const IXGBE_I2C_DATA_IN: u32 = 1 << 2;
+const IXGBE_I2C_DATA_OUT: u32 = 1 << 3;
 
 //wait times in uS for standard I2C operation
 /// clock frequency (kHz) in standard I2C mode
-const I2C_F_SCL: u8 = 100;
+const I2C_F_SCL: u32 = 100;
 /// Hold time (repeated START condition)
-const I2C_T_HD_START: u8 = 4;
+const I2C_T_HD_START: u32 = 4;
 /// Low period of the SCL clock
-const I2C_T_LOW: u8 = 5; //actually 4.7
+const I2C_T_LOW: u32 = 5; //actually 4.7
 /// High period of the SCL clock
-const I2C_T_HIGH: u8 = 4;
+const I2C_T_HIGH: u32 = 4;
 /// Set up time for a repeated Start condition
-const I2C_T_SU_START: u8 = 5; // actually 4.7
+const I2C_T_SU_START: u32 = 5; // actually 4.7
 /// Data hold time
-const I2C_T_HD_DATA: u8 = 5;
+const I2C_T_HD_DATA: u32 = 5;
 /// Data set up time
-const I2C_T_SU_DATA: u8 = 1; // actually 250ns
+const I2C_T_SU_DATA: u32 = 1; // actually 250ns
 /// Rise time of both SCA and SDA signals
-const I2C_T_RISE: u8 = 1; // actually 1000 ns
+const I2C_T_RISE: u32 = 1; // actually 1000 ns
 /// Fall time of both SCA and SDA signals
-const I2C_T_FALL:u8 = 1; //actually 300 ns
+const I2C_T_FALL:u32 = 1; //actually 300 ns
 //set up time for Stop condition
-const I2C_T_STU_STOP: u8 = 4;  
+const I2C_T_SU_STOP: u32 = 4;  
 // bus free time between a start and stop condition
-const I2C_T_BUF:u8 = 5; // actually 4.7
+const I2C_T_BUF:u32 = 5; // actually 4.7
 
-const I2C_CLOCK_STRETCHING_TIMEOUT: u8 = 500;
+const I2C_CLOCK_STRETCHING_TIMEOUT: u16 = 500;
 
 const SUCCESS: bool = true;
 const FAIL: bool = false;
@@ -75,53 +80,111 @@ const FAIL: bool = false;
 
 /// Reads 8 bit EEPROM word over I2C interface
 /// byte_offset: EEPROM address to read from
-fn read_i2c_eeprom(regs: &mut IntelIxgbeRegisters, byte_offset: u8) -> u8 {
+pub fn read_i2c_eeprom(regs: &mut IntelIxgbeRegisters, byte_offset: u8) -> Result<u8, &'static str> {
+    let max_retry = 10;
+    let mut data = 0;
 
-    // acquire sw/fw semaphore
+    let val = regs.i2cctl.read();
+    debug!("{}", val);
 
-    //start of frame
-    i2c_start(&mut regs);
+    regs.i2cctl.write(val & 0);
 
-    //device address and write indication
-    let status = clock_out_i2c_byte(&mut regs, IXGBE_I2C_EEPROM_DEV_ADDR & !(IXGBE_I2C_WRITE));
-    let status = get_i2c_ack(&mut regs);
+    let val = regs.i2cctl.read();
+    debug!("{}", val);
+    
 
-    //byte offset 
-    let status = clock_out_i2c_byte(&mut regs, byte_offset);
-    let status = get_i2c_ack(&mut regs);
-    
-    i2c_start(&mut regs);
-    
-    //device address and read indication
-    let status = clock_out_i2c_byte(&mut regs, IXGBE_I2C_EEPROM_DEV_ADDR | IXGBE_I2C_READ);
-    let status = get_i2c_ack(&mut regs);
+    for _ in 0..max_retry {
+        // acquire sw/fw semaphore
+        acquire_semaphore(regs)?;
+        debug!("Semaphore acquired");
 
-    
-    // get data
-    let data = clock_in_i2c_byte(&mut regs, byte_offset);
-    
-    //send NACK
-    let status = send_i2c_ack(&mut regs);
-    
-    //end of frame
-    ixgbe_i2c_stop(&mut regs);
+        // start of frame
+        let res = i2c_start(regs);
+        if res.is_err() {
+            debug!("i2c didnt start");
+            let _ = i2c_bus_clear(regs);
+            continue;
+        }
+        debug!("i2c started");
+        // break;
+
+        //device address and write indication
+        let res = clock_out_i2c_byte(regs, I2C_EEPROM_DEV_ADDR2 & !(I2C_WRITE));
+        if res.is_err() {
+            debug!("failed to send dev address");
+            let _ = i2c_bus_clear(regs);
+            continue;
+        }
+        debug!("sent dev address");
+
+        let res = get_i2c_ack(regs);
+        if res.is_err() {
+            debug!("failed to receive ack");
+            let _ = i2c_bus_clear(regs);
+            continue;
+        }
+        debug!("sent dev address and received ack");
+
+        // //byte offset 
+        // let _ = clock_out_i2c_byte(regs, byte_offset);
+        // let _ = get_i2c_ack(regs);
+        // debug!("sent byte offset and received ack");
+        
+        // let _ = i2c_start(regs);
+        // debug!("i2c started");
+        
+        // //device address and read indication
+        // let _ = clock_out_i2c_byte(regs, I2C_EEPROM_DEV_ADDR | I2C_READ);
+        // let _ = get_i2c_ack(regs);
+        // debug!("sent dev address and received ack");
+            
+        // // get data
+        // data = clock_in_i2c_byte(regs);
+        // debug!("received data");
+        
+        // //send NACK
+        // let _ = send_i2c_nack(regs);
+        // debug!("sent ack");
+        
+        // //end of frame
+        // let _ = i2c_stop(regs);
+        // debug!("sent stop");
+    }
 
     //release semaphore
-    data
+    Ok(data)
 }
 
+fn i2c_bus_clear(regs: &mut IntelIxgbeRegisters) -> Result<(), &'static str>{
+    i2c_start(regs)?;
+
+    // let i2cctl_val = regs.i2cctl.read();
+    set_i2c_data(regs, true)?;
+
+    for i in 0..=9 {
+        raise_i2c_clk(regs);
+        let _ = pit_clock::pit_wait(I2C_T_HIGH);
+        lower_i2c_clk(regs);
+        let _ = pit_clock::pit_wait(I2C_T_LOW);
+    }
+
+    i2c_start(regs)?;
+    i2c_stop(regs)?;
+
+    Ok(())
+}
 /// switch SDA from high to low, then the SCL from high to loq
-fn i2c_start(regs: &mut IntelIxgbeRegisters) {
+fn i2c_start(regs: &mut IntelIxgbeRegisters) -> Result<(), &'static str>{
 
     //SCL and SDA are both high at the start
-    set_i2c_data(regs, true);
+    set_i2c_data(regs, true)?;
     raise_i2c_clk(regs);
 
     // setup time for start condition (4.7us)
     let _ =pit_clock::pit_wait(I2C_T_SU_START);
 
     // SDA is shifted to low
-    set_i2c_data(regs, false);
+    set_i2c_data(regs, false)?;
 
     // hold time for start condition (4us)
     let _ =pit_clock::pit_wait(I2C_T_HD_START);
@@ -130,22 +193,25 @@ fn i2c_start(regs: &mut IntelIxgbeRegisters) {
 
     // minimum low period of the clock (4.7 us)
     let _ =pit_clock::pit_wait(I2C_T_LOW);
+    Ok(())
 }
 
 
 //switch SCL to high then SDA to high
-fn i2c_stop (regs: &mut IntelIxgbeRegisters) {
+fn i2c_stop (regs: &mut IntelIxgbeRegisters) -> Result <(), &'static str>{
     //starts with data low and clock high
-    set_i2c_data(regs, false);
+    set_i2c_data(regs, false)?;
     raise_i2c_clk(regs);
 
     // setup time for stop condition (4us)
     let _ =pit_clock::pit_wait(I2C_T_SU_STOP);
 
-    set_i2c_data(regs, true);
+    set_i2c_data(regs, true)?;
 
     // bus free time between stop and start (4.7 us)
     let _ =pit_clock::pit_wait(I2C_T_BUF);    
+
+    Ok(())
 }
 
 fn clock_in_i2c_byte(regs: &mut IntelIxgbeRegisters) -> u8 {
@@ -164,17 +230,23 @@ fn bool_to_u8(b: bool) -> u8 {
     else { 0 }
 }
 
+fn u8_to_bool(val: u8) -> bool {
+    if val == 1 { true }
+    else { false }
+}
+
 // change SDA to required bit then change clock from high to low
 fn clock_out_i2c_byte (regs: &mut IntelIxgbeRegisters, data: u8) -> Result< (), &'static str> {
 
     for i in (0..=7).rev() {
-        let bit = (data >> i) & 0x1;
+        let bit = u8_to_bool((data >> i) & 0x1);
         clock_out_i2c_bit(regs, bit)?;
     }
 
     // release SDA line by setting high
     let i2cctl_val = regs.i2cctl.read() | IXGBE_I2C_DATA_OUT;
     regs.i2cctl.write(i2cctl_val); 
+    regs.i2cctl.read();
 
     Ok(())
 }
@@ -189,8 +261,9 @@ fn get_i2c_ack (regs: &mut IntelIxgbeRegisters) -> Result <(), &'static str> {
     let _ =pit_clock::pit_wait(I2C_T_HIGH);
 
     // poll for ACK - a transition from 1 to 0
-    for i in 0..timeout {
-        let ack = get_i2c_data(regs);
+    let mut ack = false;
+    for _ in 0..timeout {
+        ack = get_i2c_data(regs);
         if !ack {
             break;
         }
@@ -203,7 +276,7 @@ fn get_i2c_ack (regs: &mut IntelIxgbeRegisters) -> Result <(), &'static str> {
 
     if ack {
         warn!("Ixgbe phy: ACK not received");
-        Err("Ixgbe phy: ACK not received")
+        return Err("Ixgbe phy: ACK not received");
     }
 
     Ok(())    
@@ -217,14 +290,14 @@ fn send_i2c_nack(regs: &mut IntelIxgbeRegisters) -> Result<(), &'static str> {
 }
 
 fn clock_in_i2c_bit(regs: &mut IntelIxgbeRegisters) -> bool {
-    raise_i2c_clk(&regs);
+    raise_i2c_clk(regs);
 
     // Minimum high period of clock is 4us
     let _ =pit_clock::pit_wait(I2C_T_HIGH);
 
     let data = get_i2c_data(regs);
 
-    lower_i2c_clk(&regs);
+    lower_i2c_clk(regs);
 
     // Minimum low period of clock is 4.7us
     let _ =pit_clock::pit_wait(I2C_T_LOW);
@@ -233,6 +306,7 @@ fn clock_in_i2c_bit(regs: &mut IntelIxgbeRegisters) -> bool {
 }
 
 fn clock_out_i2c_bit(regs: &mut IntelIxgbeRegisters, value: bool) -> Result<(), &'static str> {
+    debug!("bit:{}", value);
     let status = set_i2c_data(regs, value)?;
     
     raise_i2c_clk(regs);
@@ -250,53 +324,60 @@ fn clock_out_i2c_bit(regs: &mut IntelIxgbeRegisters, value: bool) -> Result<(), 
 }
 
 fn set_i2c_data(regs: &mut IntelIxgbeRegisters, value: bool) -> Result<(), &'static str> {
+    let val = regs.i2cctl.read();
+    // debug!("set i2c data: {}", val);
+    
     let i2cctl_val = 
         if value {
-            regs.i22ctl.read() | IXGBE_I2C_DATA_OUT
+            regs.i2cctl.read() | IXGBE_I2C_DATA_OUT
         }
         else {
-            regs.i22ctl.read() & !IXGBE_I2C_DATA_OUT
+            regs.i2cctl.read() & !IXGBE_I2C_DATA_OUT
         };
 
+    // debug!("set i2c data val before write: {}", i2cctl_val);
     regs.i2cctl.write(i2cctl_val);
-
+    regs.i2cctl.read(); //inserted to give time
     // Data rise/fall (1000ns/300ns) and set-up time (250ns)
     let _ =pit_clock::pit_wait(I2C_T_RISE + I2C_T_FALL + I2C_T_SU_DATA);
 
     // can't check if data was sent correctly if value was 0
     if value == false {
-        Ok(())
+        return Ok(());
     }
 
     //check if data was sent correctly
     if value != get_i2c_data(regs) {
         warn!("Ixgbe phy:: data not sent!");
-        Err("Ixgbe phy:: data not sent!")
+        return Err("Ixgbe phy:: data not sent!");
     }
     
     Ok(())
 }
 
 fn get_i2c_data(regs: &mut IntelIxgbeRegisters) -> bool {
-    let i2cctl_val = regs.i22ctl.read();
+    // debug!("get i2c data");
 
+    let i2cctl_val = regs.i2cctl.read();
+    // debug!("i2c data: {}", i2cctl_val);
     // data is 1
     if i2cctl_val & IXGBE_I2C_DATA_IN == IXGBE_I2C_DATA_IN {
-        true
+        return true;
     }
     // data is 0
     else {
-        false
+        return false;
     }
 }
 
 fn raise_i2c_clk(regs: &mut IntelIxgbeRegisters) {
+    // debug!("raised i2c clock");
     let timeout = I2C_CLOCK_STRETCHING_TIMEOUT;
 
     for i in 0..timeout{
         let val = regs.i2cctl.read();
-        regs.i2cctl.write(val | IXGBE_I2C_CLK_OUT));
-
+        regs.i2cctl.write(val | IXGBE_I2C_CLK_OUT);
+        regs.i2cctl.read(); //extra time
         // SCL rise time (1000ns)
         let _ =pit_clock::pit_wait(I2C_T_RISE);
 
@@ -308,10 +389,106 @@ fn raise_i2c_clk(regs: &mut IntelIxgbeRegisters) {
 }
 
 fn lower_i2c_clk(regs: &mut IntelIxgbeRegisters) {
+    // debug!("lowered i2c clock");
 
     let val = regs.i2cctl.read();
     regs.i2cctl.write(val & !IXGBE_I2C_CLK_OUT);
+    regs.i2cctl.read(); //extra time
 
     // SCL fall time (300ns)
     let _ =pit_clock::pit_wait(I2C_T_FALL);
 }
+
+/// acquires semaphore to synchronize between software and firmware (section 10.5.4)
+    /// used for autoc and autoc2 registers
+    fn acquire_semaphore(regs: &mut IntelIxgbeRegisters) -> Result<bool, &'static str> {
+
+        // check that some other sofware is not using the semaphore
+        // 1. poll SWSM.SMBI bit until reads as 0 or 10ms timer expires
+        let start = get_hpet().as_ref().ok_or("couldn't get HPET timer")?.get_counter();
+        let period_fs: u64 = get_hpet().as_ref().ok_or("couldn't get HPET timer")?.counter_period_femtoseconds() as u64;
+        let fs_per_ms: u64 = 1_000_000_000_000;
+        let mut timer_expired_smbi = false;
+        let mut smbi_bit = 1;
+        while smbi_bit != 0 {
+            smbi_bit = regs.swsm.read() & SWSM_SMBI;
+            let end = get_hpet().as_ref().ok_or("couldn't get HPET timer")?.get_counter();
+
+            if (end-start) * period_fs / fs_per_ms == 10 {
+                timer_expired_smbi = true;
+                break;
+            }
+        } 
+        // now, hardware will auto write 1 to the SMBI bit
+
+        // check that firmware is not using the semaphore
+        // 1. write to SWESMBI bit
+        let set_swesmbi = regs.swsm.read() | SWSM_SWESMBI; // set bit 1 to 1
+        regs.swsm.write(set_swesmbi);
+
+        // 2. poll SWSM.SWESMBI bit until reads as 1 or 3s timer expires
+        let start = get_hpet().as_ref().ok_or("couldn't get HPET timer")?.get_counter();
+        let mut swesmbi_bit = 0;
+        let mut timer_expired_swesmbi = false;
+        while swesmbi_bit == 0 {
+            swesmbi_bit = (regs.swsm.read() & SWSM_SWESMBI) >> 1;
+            let end = get_hpet().as_ref().ok_or("couldn't get HPET timer")?.get_counter();
+
+            if (end-start) * period_fs / fs_per_ms == 3000 {
+                timer_expired_swesmbi = true;
+                break;
+            }
+        } 
+
+        // software takes control of the requested resource
+        // 1. read firmware and software bits of sw_fw_sync register 
+        let mut sw_fw_sync_smbits = regs.sw_fw_sync.read() & SW_FW_SYNC_SMBITS_MASK;
+        let sw_mac = (sw_fw_sync_smbits & SW_FW_SYNC_SW_MAC) >> 3;
+        let fw_mac = (sw_fw_sync_smbits & SW_FW_SYNC_FW_MAC) >> 8;
+
+        // clear sw sempahore bits if sw malfunction
+        if timer_expired_smbi {
+            sw_fw_sync_smbits &= !(SW_FW_SYNC_SMBITS_SW);
+        }
+
+        // clear fw semaphore bits if fw malfunction
+        if timer_expired_swesmbi {
+            sw_fw_sync_smbits &= !(SW_FW_SYNC_SMBITS_FW);
+        }
+
+        regs.sw_fw_sync.write(sw_fw_sync_smbits);
+
+        // check if semaphore bits for the resource are cleared
+        // then resources are available
+        if (sw_mac == 0) && (fw_mac == 0) {
+            //claim the sw resource by setting the bit
+            let sw_fw_sync = regs.sw_fw_sync.read() & SW_FW_SYNC_SW_MAC;
+            regs.sw_fw_sync.write(sw_fw_sync);
+
+            //clear bits in the swsm register
+            let swsm = regs.swsm.read() & !(SWSM_SMBI) & !(SWSM_SWESMBI);
+            regs.swsm.write(swsm);
+
+            return Ok(true);
+        }
+
+        //resource is not available
+        else {
+            //clear bits in the swsm register
+            let swsm = regs.swsm.read() & !(SWSM_SMBI) & !(SWSM_SWESMBI);
+            regs.swsm.write(swsm);
+
+            Ok(false)
+        }
+    }
+
+    fn release_semaphore(regs: &mut IntelIxgbeRegisters) -> Result<(), &'static str> {
+        // clear bit of released resource
+        let sw_fw_sync = regs.sw_fw_sync.read() & !(SW_FW_SYNC_SW_MAC);
+        regs.sw_fw_sync.write(sw_fw_sync);
+
+        // release semaphore
+        let swsm = regs.swsm.read() & !(SWSM_SMBI) & !(SWSM_SWESMBI);
+
+        Ok(())
+    }

@@ -29,6 +29,7 @@ extern crate rand;
 pub mod test_ixgbe_driver;
 pub mod descriptors;
 pub mod registers;
+pub mod phy;
 
 use core::ptr::{read_volatile, write_volatile};
 use core::ops::DerefMut;
@@ -52,6 +53,7 @@ use acpi::get_hpet;
 use network_interface_card::{NetworkInterfaceCard, TransmitBuffer, ReceiveBuffer, ReceivedFrame};
 use owning_ref::BoxRefMut;
 use server_info::SOCKET_1_LAPICS;
+use phy::{read_i2c_eeprom, SFF_IDENTIFIER, SFF_10GBE_COMP_CODES, SFF_1GBE_COMP_CODES, SFF_CABLE_TECHNOLOGY};
 
 
 const DEBUG: bool = true;
@@ -247,6 +249,16 @@ impl IxgbeNic{
         Self::start_link(&mut mapped_registers)?;
 
         let mac_addr_hardware = Self::read_mac_address_from_nic(&mut mapped_registers);
+
+        //
+        let a = read_i2c_eeprom(&mut mapped_registers, SFF_IDENTIFIER)?;
+        debug!("SF present: {}", a);
+
+        // let b = read_i2c_eeprom(&mut mapped_registers, SFF_10GBE_COMP_CODES)?;
+        // let c = read_i2c_eeprom(&mut mapped_registers, SFF_1GBE_COMP_CODES)?;
+        // let d = read_i2c_eeprom(&mut mapped_registers, SFF_CABLE_TECHNOLOGY)?;
+
+        // debug!("SF present: {}, 10 GB code: {}, 1 gb code: {}, cable technology: {}",a,b,c,d);
 
         //Enable Interrupts
         // pci_enable_msi(ixgbe_pci_dev)?;

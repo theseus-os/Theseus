@@ -63,6 +63,11 @@ pub fn init(keyboard_producer: DFQueueProducer<Event>) -> Result<(), &'static st
     if let Some(pci_dev_82599) = get_pci_device_vd(ixgbe::registers::INTEL_VEND, ixgbe::registers::INTEL_82599) {
         debug!("82599 Device found: {:?}", pci_dev_82599);
         let ixgbe_nic_ref = ixgbe::IxgbeNic::init(pci_dev_82599)?;
+
+        // if ixgbe_nic_ref.is_err() {
+        //     warn!("i2c failed");
+        // }
+        
         let static_ip = IpCidr::from_str(DEFAULT_LOCAL_IP).map_err(|_e| "couldn't parse 'DEFAULT_LOCAL_IP' address")?;
         let gateway_ip = Ipv4Address::from_bytes(&DEFAULT_GATEWAY_IP);
         let ixgbe_iface = smoltcp_device::TheseusNetworkInterface::new(ixgbe_nic_ref, Some(static_ip), Some(gateway_ip))?;
