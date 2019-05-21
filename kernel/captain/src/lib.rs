@@ -159,7 +159,7 @@ pub fn init(
     // create a SIMD personality
     #[cfg(simd_personality)]
     {
-        let simd_ext = task::SimdExt::AVX;
+        let simd_ext = task::SimdExt::SSE;
         warn!("SIMD_PERSONALITY FEATURE ENABLED, creating a new personality with {:?}!", simd_ext);
         spawn::KernelTaskBuilder::new(simd_personality::setup_simd_personality, simd_ext)
             .name(alloc::string::String::from("setup_simd_personality"))

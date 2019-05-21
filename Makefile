@@ -493,7 +493,7 @@ endif
 
 ifeq ($(host),yes)
 	## KVM acceleration is required when using the host cpu model
-	QEMU_FLAGS += -cpu host -enable-kvm
+	QEMU_FLAGS += -cpu host -accel kvm
 else
 	QEMU_FLAGS += -cpu Broadwell
 endif
