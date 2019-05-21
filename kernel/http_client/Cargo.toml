@@ -33,5 +33,5 @@ features = [
     "socket-raw", "socket-udp", "socket-tcp", "socket-icmp", 
 ]
 
-[dependencies.tcp_client]
-path = "../tcp_client"
+[dependencies.smoltcp_helper]
+path = "../smoltcp_helper"

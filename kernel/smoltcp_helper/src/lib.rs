@@ -71,13 +71,13 @@ pub fn connect(
     startup_time: u64,
 ) -> Result<(), &'static str> {
     if sockets.get::<TcpSocket>(tcp_handle).is_open() {
-        return Err("tcp_client: when connecting socket, it was already open...");
+        return Err("smoltcp_helper: when connecting socket, it was already open...");
     }
 
     let timeout_millis = 3000; // 3 second timeout
     let start = hpet_ticks!();
     
-    debug!("tcp_client: connecting from {}:{} to {} ...",
+    debug!("smoltcp_helper: connecting from {}:{} to {} ...",
         iface.lock().ip_addrs().get(0).map(|ip| format!("{}", ip)).unwrap_or_else(|| format!("ERROR")), 
         local_port, 
         remote_endpoint,
@@ -86,8 +86,8 @@ pub fn connect(
     let _packet_io_occurred = poll_iface(&iface, sockets, startup_time)?;
 
     sockets.get::<TcpSocket>(tcp_handle).connect(remote_endpoint, local_port).map_err(|_e| {
-        error!("tcp_client: failed to connect socket, error: {:?}", _e);
-        "tcp_client: failed to connect socket"
+        error!("smoltcp_helper: failed to connect socket, error: {:?}", _e);
+        "smoltcp_helper: failed to connect socket"
     })?;
 
     loop {
@@ -101,12 +101,12 @@ pub fn connect(
 
         // check to make sure we haven't timed out
         if millis_since(start)? > timeout_millis {
-            error!("tcp_client: failed to connect to socket, timed out after {} ms", timeout_millis);
-            return Err("tcp_client: failed to connect to socket, timed out.");
+            error!("smoltcp_helper: failed to connect to socket, timed out after {} ms", timeout_millis);
+            return Err("smoltcp_helper: failed to connect to socket, timed out.");
         }
     }
 
-    debug!("tcp_client: connected!  (took {} ms)", millis_since(start)?);
+    debug!("smoltcp_helper: connected!  (took {} ms)", millis_since(start)?);
     Ok(())
 }
 
@@ -120,7 +120,7 @@ pub fn poll_iface(iface: &NetworkInterfaceRef, sockets: &mut SocketSet, startup_
     let packets_were_sent_or_received = match iface.lock().poll(sockets, Instant::from_millis(timestamp)) {
         Ok(b) => b,
         Err(err) => {
-            warn!("tcp_client: poll error: {}", err);
+            warn!("smoltcp_helper: poll error: {}", err);
             false
         }
     };

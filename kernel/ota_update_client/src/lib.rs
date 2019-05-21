@@ -17,7 +17,7 @@ extern crate percent_encoding;
 extern crate rand;
 extern crate http_client;
 extern crate itertools;
-#[macro_use] extern crate tcp_client;
+#[macro_use] extern crate smoltcp_helper;
 
 
 use core::str;
@@ -41,7 +41,7 @@ use rand::{
     rngs::SmallRng
 };
 use http_client::{HttpResponse, ConnectedTcpSocket, send_request, check_http_request};
-use tcp_client::{STARTING_FREE_PORT, connect, millis_since, poll_iface};
+use smoltcp_helper::{STARTING_FREE_PORT, connect, millis_since, poll_iface};
 
 /// The IP address of the update server.
 // const DEFAULT_DESTINATION_IP_ADDR: [u8; 4] = [168, 7, 138, 84]; // the static IP of `kevin.recg.rice.edu`

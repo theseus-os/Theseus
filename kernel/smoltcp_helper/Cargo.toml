@@ -1,5 +1,5 @@
 [package]
-name = "tcp_client"
+name = "smoltcp_helper"
 authors = ["Ramla-I <ijazramla@gmail.com>"]
 description = "helper functions to establish and use a tcp connection with a smoltcp device"
 version = "0.1.0"

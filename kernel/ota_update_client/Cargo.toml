@@ -55,5 +55,5 @@ version = "0.6"
 default-features = false 
 features = [ "alloc" ]
 
-[dependencies.tcp_client]
-path = "../tcp_client"
+[dependencies.smoltcp_helper]
+path = "../smoltcp_helper"

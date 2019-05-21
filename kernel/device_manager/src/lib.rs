@@ -28,12 +28,12 @@ use core::str::FromStr;
 
 
 /// A randomly chosen IP address that must be outside of the DHCP range.. // TODO FIXME: use DHCP to acquire IP
-const DEFAULT_LOCAL_IP: &'static str = "192.168.0.101/24"; // the default QEMU user-slirp network gives IP addresses of "10.0.2.*"
+const DEFAULT_LOCAL_IP: &'static str = "10.0.2.15/24"; // the default QEMU user-slirp network gives IP addresses of "10.0.2.*"
 // const DEFAULT_LOCAL_IP: &'static str = "192.168.1.252/24"; // home router reserved IP
 // const DEFAULT_LOCAL_IP: &'static str = "10.42.0.91/24"; // rice net IP
 
 /// Standard home router address. // TODO FIXME: use DHCP to acquire gateway IP
-const DEFAULT_GATEWAY_IP: [u8; 4] = [192, 168, 0, 1]; // the default QEMU user-slirp networking gateway IP
+const DEFAULT_GATEWAY_IP: [u8; 4] = [10, 0, 2, 2]; // the default QEMU user-slirp networking gateway IP
 // const DEFAULT_GATEWAY_IP: [u8; 4] = [192, 168, 1, 1]; // the default gateway for our TAP-based bridge
 // const DEFAULT_GATEWAY_IP: [u8; 4] = [10, 42, 0, 1]; // rice net gateway ip
 
@@ -62,12 +62,7 @@ pub fn init(keyboard_producer: DFQueueProducer<Event>) -> Result<(), &'static st
 
     if let Some(pci_dev_82599) = get_pci_device_vd(ixgbe::registers::INTEL_VEND, ixgbe::registers::INTEL_82599) {
         debug!("82599 Device found: {:?}", pci_dev_82599);
-        let ixgbe_nic_ref = ixgbe::IxgbeNic::init(pci_dev_82599)?;
-
-        // if ixgbe_nic_ref.is_err() {
-        //     warn!("i2c failed");
-        // }
-        
+        let ixgbe_nic_ref = ixgbe::IxgbeNic::init(pci_dev_82599)?;      
         let static_ip = IpCidr::from_str(DEFAULT_LOCAL_IP).map_err(|_e| "couldn't parse 'DEFAULT_LOCAL_IP' address")?;
         let gateway_ip = Ipv4Address::from_bytes(&DEFAULT_GATEWAY_IP);
         let ixgbe_iface = smoltcp_device::TheseusNetworkInterface::new(ixgbe_nic_ref, Some(static_ip), Some(gateway_ip))?;

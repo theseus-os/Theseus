@@ -145,6 +145,7 @@ pub fn init_handlers_apic() {
         // idt[0x2D].set_handler_fn(irq_0x2D_handler);
         // idt[0x2E].set_handler_fn(irq_0x2E_handler);
         // idt[0x2F].set_handler_fn(irq_0x2F_handler);
+<<<<<<< 44000e6de0e574557186cdbfc529ea07694a4121
 
         // idt[0x3B].set_handler_fn(nic_handler);
         idt[0x30].set_handler_fn(apic_irq_0x30_handler);
@@ -156,6 +157,20 @@ pub fn init_handlers_apic() {
         idt[0x35].set_handler_fn(apic_irq_0x35_handler);
         idt[0x36].set_handler_fn(apic_irq_0x36_handler);
         idt[0x37].set_handler_fn(apic_irq_0x37_handler);
+=======
+        
+        // Set the above used interrupts to false
+        available_interrupts[0x20] = false;
+        available_interrupts[0x21] = false;
+        available_interrupts[0x22] = false;
+        available_interrupts[0x24] = false;
+        available_interrupts[0x26] = false;
+        available_interrupts[0x27] = false;
+        available_interrupts[0x2C] = false;
+        available_interrupts[apic::APIC_SPURIOUS_INTERRUPT_VECTOR as usize] = false;
+        available_interrupts[tlb_shootdown::TLB_SHOOTDOWN_IPI_IRQ as usize] = false;
+        available_interrupts[0x32] = false; // Just for the server, the keyboard switch seems to use this interrupt
+>>>>>>> removed changes not related to ixgbe
 
         idt[apic::APIC_SPURIOUS_INTERRUPT_VECTOR as usize].set_handler_fn(apic_spurious_interrupt_handler); 
         idt[tlb_shootdown::TLB_SHOOTDOWN_IPI_IRQ as usize].set_handler_fn(ipi_handler);
@@ -591,6 +606,7 @@ extern "x86-interrupt" fn ipi_handler(_stack_frame: &mut ExceptionStackFrame) {
     eoi(None);
 }
 
+<<<<<<< 44000e6de0e574557186cdbfc529ea07694a4121
 /// 0x30
 extern "x86-interrupt" fn apic_irq_0x30_handler(_stack_frame: &mut ExceptionStackFrame) {
 
@@ -657,6 +673,8 @@ extern "x86-interrupt" fn apic_irq_0x37_handler(_stack_frame: &mut ExceptionStac
     eoi(Some(0x37));
 }
 
+=======
+>>>>>>> removed changes not related to ixgbe
 
 
 

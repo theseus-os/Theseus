@@ -39,7 +39,6 @@ extern crate interrupts;
 extern crate acpi;
 extern crate device_manager;
 extern crate e1000;
-extern crate ixgbe;
 extern crate window_manager;
 extern crate scheduler;
 extern crate frame_buffer;
@@ -159,7 +158,7 @@ pub fn init(
     // create a SIMD personality
     #[cfg(simd_personality)]
     {
-        let simd_ext = task::SimdExt::AVX;
+        let simd_ext = task::SimdExt::SSE;
         warn!("SIMD_PERSONALITY FEATURE ENABLED, creating a new personality with {:?}!", simd_ext);
         spawn::KernelTaskBuilder::new(simd_personality::setup_simd_personality, simd_ext)
             .name(alloc::string::String::from("setup_simd_personality"))
@@ -172,13 +171,7 @@ pub fn init(
     scheduler::schedule();
     // NOTE: DO NOT PUT ANY CODE BELOW THIS POINT, AS IT SHOULD NEVER RUN!
     // (unless there are no other tasks available to run on the BSP core, which never happens)
-    
-    // if *(driver_init::NIC_82599_PRESENT.try().unwrap_or(&false)) == true {
-    //     use ixgbe::cause_interrupt;
-    //     KernelTaskBuilder::new(cause_interrupt, None)
-    //         .name(String::from("cause interrupt"))
-    //         .spawn()?;
-    // }
+
 
     loop { 
         spin_loop_hint();

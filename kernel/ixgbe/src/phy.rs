@@ -161,7 +161,7 @@ fn i2c_bus_clear(regs: &mut IntelIxgbeRegisters) -> Result<(), &'static str>{
     // let i2cctl_val = regs.i2cctl.read();
     set_i2c_data(regs, true)?;
 
-    for i in 0..=9 {
+    for _ in 0..=9 {
         raise_i2c_clk(regs);
         let _ = pit_clock::pit_wait(I2C_T_HIGH);
         lower_i2c_clk(regs);

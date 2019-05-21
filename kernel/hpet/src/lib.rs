@@ -45,14 +45,6 @@ pub fn get_hpet_mut() -> Option<RwLockWriteGuard<'static, BoxRefMut<MappedPages,
     HPET.try().map(|h| h.write())
 }
 
-/// A simple macro to get the current HPET clock ticks.
-#[macro_export]
-macro_rules! hpet_ticks {
-    () => {
-        get_hpet().as_ref().ok_or("coudln't get HPET timer")?.get_counter()
-    };
-}
-
 
 /// A structure that offers access to HPET through its I/O registers, 
 /// specified by the format here: <https://wiki.osdev.org/HPET#HPET_registers>.

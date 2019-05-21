@@ -37,6 +37,3 @@ features = [ "alloc" ]
 
 [dependencies.hpet]
 path = "../../kernel/hpet"
-
-[dependencies.tcp_client]
-path = "../../kernel/tcp_client"

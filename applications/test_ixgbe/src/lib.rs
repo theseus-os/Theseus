@@ -13,11 +13,11 @@ extern crate network_manager;
 extern crate rand;
 #[macro_use] extern crate hpet;
 extern crate spin;
-extern crate tcp_client;
 
 use alloc::vec::Vec;
 use alloc::string::String;
 use getopts::{Matches, Options};
+use ixgbe::rx_poll_mq;
 use ixgbe::test_ixgbe_driver::test_nic_ixgbe_driver;
 use smoltcp::{
     wire::{IpAddress, Ipv4Address, IpEndpoint},
@@ -35,108 +35,12 @@ use hpet::get_hpet;
 use core::str::FromStr;
 use core::convert::TryInto;
 use spin::Once;
-use tcp_client::send_results;
-
-const DEFAULT_DESTINATION_IP_ADDR: [u8; 4] = [11, 11, 11, 13]; // the IP of the host machine when running on QEMU.
-
-/// The TCP port on the update server that listens for update requests 
-const DEFAULT_DESTINATION_PORT: u16 = 8090;
 
 #[no_mangle]
 pub fn main(args: Vec<String>) -> isize {
+    test_nic_ixgbe_driver(None);
 
-    let data: [u8; 4096] = [0;4096];
-
-    let res = send_results(&data, 4096);
-    // test_nic_ixgbe_driver(None);  
-    // let mut opts = Options::new();
-    // opts.optopt ("d", "destination", "specify the IP address (and optionally, the port) of the update server", "IP_ADDR[:PORT]");
-
-    // let matches = match opts.parse(&args) {
-    //     Ok(m) => m,
-    //     Err(_f) => {
-    //         println!("{}", _f);
-    //         // print_usage(opts);
-    //         return -1; 
-    //     }
-    // };
-
-    // let mut remote_endpoint = match rmain(matches) {
-    //     Ok(b) => b,
-    //     Err(err) => {
-    //         println!("Couldn't create endpoint");
-    //         return -1;
-    //     }
-    // };
-
-    // let iface = match get_default_iface() {
-    //     Ok(b) => b,
-    //     Err(err) => {
-    //         println!("No interface!");
-    //         return -1;
-    //     }
-    // };
-
-    // let startup_time = get_hpet().as_ref().ok_or("coudln't get HPET timer").unwrap().get_counter();
-    // let mut rng = SmallRng::seed_from_u64(startup_time);
-    // let rng_upper_bound = u16::max_value() - STARTING_FREE_PORT;
-
-    // let mut local_port = STARTING_FREE_PORT + (rng.next_u32() as u16 % rng_upper_bound);
-    // let mut tcp_rx_buffer = TcpSocketBuffer::new(vec![0; 4096]);
-    // let mut tcp_tx_buffer = TcpSocketBuffer::new(vec![0; 4096]);
-    // let mut tcp_socket = TcpSocket::new(tcp_rx_buffer, tcp_tx_buffer);
-    // let mut sockets = SocketSet::new(Vec::with_capacity(1));
-    // let mut tcp_handle = sockets.add(tcp_socket);
-
-    // {
-    //     let mut socket = sockets.get::<TcpSocket>(tcp_handle);
-    //     let res = match socket.connect(remote_endpoint, local_port) {
-    //         Ok(b) => b,
-    //         Err(err) => {
-    //             println!("Failed to connect to socket");
-    //             return -1;
-    //         }
-    //     };
-    // }
-
-    // let mut tcp_active = false;
-
-    // loop {
-    //     let timestamp = match timestamp(startup_time) {
-    //         Ok(b) => b,
-    //         Err(err) => {
-    //             println!("timestamp error: {}", err);
-    //             return -1;
-    //         }
-    //     };
-
-    //     match iface.lock().poll(&mut sockets, Instant::from_millis(timestamp)) {
-    //             Ok(_) => {},
-    //             Err(e) => {
-    //                 println!("poll error: {}", e);
-    //                 // return -1;
-    //             }
-    //     }
-    //     {
-    //         let mut socket = sockets.get::<TcpSocket>(tcp_handle);
-    //         if socket.is_active() && !tcp_active {
-    //             println!("connected");
-    //         } 
-    //         else if !socket.is_active() && tcp_active {
-    //             println!("disconnected");
-    //             break;
-    //         }
-
-    //         tcp_active = socket.is_active();
-
-    //         if socket.can_send() {
-    //             let data: [u8; 1000] = [20; 1000];
-    //             let res = socket.send_slice(&data[..]).unwrap();
-
-    //             println!("bytes sent {}", res);
-    //         }
-    //     }
-    // }
+    let _ = rx_poll_mq(None);
 
     0
 }

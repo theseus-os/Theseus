@@ -59,6 +59,12 @@ version = "0.6"
 default-features = false 
 features = [ "alloc" ]
 
+[dependencies.hpet]
+path = "../hpet"
+
+[dependencies.runqueue]
+path = "../runqueue"
+
 [lib]
 crate-type = ["rlib"] # "lib" does the same thing I think
 

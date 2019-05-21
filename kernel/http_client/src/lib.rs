@@ -11,7 +11,7 @@ extern crate network_manager;
 extern crate spin;
 extern crate hpet;
 extern crate httparse;
-#[macro_use] extern crate tcp_client;
+#[macro_use] extern crate smoltcp_helper;
 
 use core::convert::TryInto;
 use core::str;
@@ -24,7 +24,7 @@ use smoltcp::{
     time::Instant
 };
 use network_manager::{NetworkInterfaceRef};
-use tcp_client::{millis_since, poll_iface};
+use smoltcp_helper::{millis_since, poll_iface};
 
 /// The states that implement the finite state machine for 
 /// sending and receiving the HTTP request and response, respectively.
