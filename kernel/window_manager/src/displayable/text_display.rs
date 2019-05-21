@@ -1,6 +1,6 @@
 
-use super::super::{TextVFrameBuffer, WindowObj, VFRAME_BUFFER, Display};
-use super::super::{String};
+use super::super::{Print, WindowObj, VirtualFrameBuffer, VFRAME_BUFFER, Display};
+use super::super::{String, Mutex, Arc};
 use display_text::font::{CHARACTER_WIDTH, CHARACTER_HEIGHT};
 
 /// A displayable component for text display
@@ -8,27 +8,27 @@ pub struct TextDisplay {
     name:String,
     width:usize,
     height:usize,
-    textbuffer:TextVFrameBuffer,
+    textbuffer:Arc<Mutex<VirtualFrameBuffer>>,
 }
 
 impl TextDisplay
 {
     pub fn new(name:&str, width:usize, height:usize) -> Result <TextDisplay, &'static str> {
         //let (width, height) = frame_buffer::get_resolution()?;
-        let tf = TextVFrameBuffer::new(width, height)?;
+        let vf = VirtualFrameBuffer::new(width, height)?;
         Ok(TextDisplay{
             name:String::from(name),
             width:width,
             height:height,
-            textbuffer:tf,
+            textbuffer:Arc::new(Mutex::new(vf)),
         })
     }
 
     /// takes in a str slice and display as much as it can to the text area
     pub fn display_string(&self, slice:&str, font_color:u32, bg_color:u32) -> Result<(), &'static str>{       
-        self.textbuffer.print_by_bytes(0, 0, self.width, self.height,
+        self.textbuffer.lock().print_by_bytes(0, 0, self.width, self.height,
             slice, font_color, bg_color)?;
-        return frame_buffer::display(&self.textbuffer.vbuffer);
+        return frame_buffer::display(&self.textbuffer);
     }
 
     /// Gets the dimensions of the text area to display
@@ -49,49 +49,49 @@ impl TextDisplay
 
     /// Function to set a cursor on the display at a position. 
     pub fn set_cursor(&self, window:&WindowObj, line: u16, column: u16, color:u32, reset:bool) -> Result<(), &'static str>{
-        let mut cursor = self.textbuffer.cursor.lock();
-        cursor.enable();
-        cursor.update(line as usize, column as usize, reset);
-        match self.get_display_pos(window) {
-            Ok((x, y)) => {
-                match VFRAME_BUFFER.try(){
-                    Some(buffer) =>  buffer.lock().fill_rectangle(x + (column as usize) * CHARACTER_WIDTH, 
-                            y + (line as usize) * CHARACTER_HEIGHT, 
-                            CHARACTER_WIDTH, CHARACTER_HEIGHT, color),
-                    None => { return Err("Fail to get the virtual frame buffer")}
-                }
-            },
-            Err(err) => { return Err( err);}
-        }
+        // let mut cursor = self.textbuffer.cursor.lock();
+        // cursor.enable();
+        // cursor.update(line as usize, column as usize, reset);
+        // match self.get_display_pos(window) {
+        //     Ok((x, y)) => {
+        //         match VFRAME_BUFFER.try(){
+        //             Some(buffer) =>  buffer.lock().fill_rectangle(x + (column as usize) * CHARACTER_WIDTH, 
+        //                     y + (line as usize) * CHARACTER_HEIGHT, 
+        //                     CHARACTER_WIDTH, CHARACTER_HEIGHT, color),
+        //             None => { return Err("Fail to get the virtual frame buffer")}
+        //         }
+        //     },
+        //     Err(err) => { return Err( err);}
+        // }
         Ok(())   
     } 
 
     /// Take the cursor off the display
     pub fn disable_cursor(&self){
-        let mut cursor = self.textbuffer.cursor.lock();
-        cursor.disable();
+        // let mut cursor = self.textbuffer.cursor.lock();
+        // cursor.disable();
     }
 
     /// Display the cursor and let it blinks. Called in a loop
     pub fn cursor_blink(&self, window:&WindowObj, font_color:u32, bg_color:u32) -> Result<(), &'static str>{
-        let mut cursor = self.textbuffer.cursor.lock();
-        if cursor.blink() {
-            let (line, column, show) = cursor.get_info();
-            match self.get_display_pos(window) {
-                Ok((x, y)) => {
-                    let color = if show { font_color } else { bg_color };
-                    match VFRAME_BUFFER.try(){
-                        Some(buffer) => { buffer.lock().fill_rectangle(x + (column as usize) * CHARACTER_WIDTH, 
-                                y + (line as usize) * CHARACTER_HEIGHT, 
-                                CHARACTER_WIDTH, CHARACTER_HEIGHT, color) 
-                            },
-                        None => {return Err("Fail to get the virtual frame buffer")}
-                    }
+        // let mut cursor = self.textbuffer.cursor.lock();
+        // if cursor.blink() {
+        //     let (line, column, show) = cursor.get_info();
+        //     match self.get_display_pos(window) {
+        //         Ok((x, y)) => {
+        //             let color = if show { font_color } else { bg_color };
+        //             match VFRAME_BUFFER.try(){
+        //                 Some(buffer) => { buffer.lock().fill_rectangle(x + (column as usize) * CHARACTER_WIDTH, 
+        //                         y + (line as usize) * CHARACTER_HEIGHT, 
+        //                         CHARACTER_WIDTH, CHARACTER_HEIGHT, color) 
+        //                     },
+        //                 None => {return Err("Fail to get the virtual frame buffer")}
+        //             }
 
-                },
-                Err(e) => { return Err(e) }
-            }                
-        }
+        //         },
+        //         Err(e) => { return Err(e) }
+        //     }                
+        // }
         Ok(())
     }
 
@@ -104,7 +104,7 @@ impl TextDisplay
         }       
     }
 
-    pub fn buffer(&self) -> &TextVFrameBuffer {
+    pub fn buffer(&self) -> &Arc<Mutex<VirtualFrameBuffer>> {
         &self.textbuffer
     }
 }

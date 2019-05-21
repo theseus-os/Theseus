@@ -41,7 +41,7 @@ use alloc::collections::{VecDeque, BTreeMap};
 use core::ops::Deref;
 use dfqueue::{DFQueue,DFQueueConsumer,DFQueueProducer};
 use alloc::sync::{Arc, Weak};
-use display_text::{TextVFrameBuffer};
+use display_text::{Print};
 use display::{VirtualFrameBuffer};
 use display::Display;
 use event_types::Event;
@@ -367,7 +367,7 @@ impl WindowObj{
             return Err("The displayable does not fit the window size.");
         } 
 
-        displayable.buffer().map(inner.x + inner.margin + x, inner.y + inner.margin + y)?;
+        frame_buffer::map_ref(inner.x + inner.margin + x, inner.y + inner.margin + y, displayable.buffer())?;
         let component = Component {
             x:x,
             y:y,

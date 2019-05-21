@@ -36,31 +36,31 @@ pub enum DisplayPosition {
 
 
 /// An instance of a text virtual frame buffer which can be displayed to the screen.
-pub struct TextVFrameBuffer {
-    ///The cursor in the text frame buffer
-    pub cursor:Mutex<Cursor>,
-    ///The virtual frame buffer to be displayed in
-    pub vbuffer:Arc<Mutex<VirtualFrameBuffer>>
+// pub struct TextVFrameBuffer {
+//     //The cursor in the text frame buffer
+//     //pub cursor:Mutex<Cursor>, Cursor should belong to the terminal
+//     ///The virtual frame buffer to be displayed in
+//     pub vbuffer:Arc<Mutex<VirtualFrameBuffer>>
+// }
+
+
+///This trait is to print text in a virtual frame buffer
+pub trait Print {
+    ///print a string by bytes at (x, y) within an area of (width, height) of the virtual text frame buffer
+    fn print_by_bytes(&mut self, x:usize, y:usize, width:usize, height:usize, 
+        slice: &str, font_color:u32, bg_color:u32) -> Result<(), &'static str>;
+    ///print a byte to the text buffer at (line, column). (left, top) specify the margin of the text area. index is the function to calculate the index of every pixel. The virtual frame buffer calls its get_index() method to get the function.
+    fn print_byte (&mut self, byte:u8, font_color:u32, bg_color:u32,
+            left:usize, top:usize, line:usize, column:usize, index:&Box<Fn(usize, usize)->usize>) 
+            -> Result<(),&'static str>;
+    ///Fill a blank (left, top, right, bottom) with the color. index is the function to calculate the index of every pixel. The virtual frame buffer calls its get_index() method to get the function.
+    fn fill_blank(&mut self, left:usize, top:usize, right:usize,
+             bottom:usize, color:u32, index:&Box<Fn(usize, usize)->usize>) -> Result<(),&'static str>;
 }
 
-impl TextVFrameBuffer {
-    ///create a new text virtual frame buffer. The owner of a frame buffer can write a text to it. But it will not display on the screen until it is mapped to the final framebuffer and call the frame_buffer:display() function
-    pub fn new(width:usize, height:usize) -> Result<TextVFrameBuffer, &'static str> {
-        let vfb = VirtualFrameBuffer::new(width, height)?;
-        let vfb_ref = Arc::new(Mutex::new(vfb));
-        Ok(TextVFrameBuffer {
-            cursor:Mutex::new(Cursor::new(0, 0, true)),
-            vbuffer: vfb_ref
-        })
-    }
-
-    ///map the text virtual frame buffer to the final frame buffer at (x, y)
-    pub fn map(&self, x:usize, y:usize) -> Result<(), &'static str>{
-        frame_buffer::map_ref(x, y, &self.vbuffer)
-    }
-    
+impl Print for VirtualFrameBuffer {
     ///print a string by bytes at (x, y) within an area of (width, height) of the virtual text frame buffer
-    pub fn print_by_bytes(&self, x:usize, y:usize, width:usize, height:usize, 
+    fn print_by_bytes(&mut self, x:usize, y:usize, width:usize, height:usize, 
         slice: &str, font_color:u32, bg_color:u32) -> Result<(), &'static str> {
     
         let mut curr_line = 0;
@@ -69,9 +69,7 @@ impl TextVFrameBuffer {
         let buffer_width = width/CHARACTER_WIDTH;
         let buffer_height = height/CHARACTER_HEIGHT;
         
-        let index = { self.vbuffer.lock().get_index_fn() };
-        let mut vbuffer = self.vbuffer.lock();
-        let buffer = vbuffer.buffer();
+        let index = self.get_index_fn();
        
         for byte in slice.bytes() {
             if byte == b'\n' {//fill the remaining blank of current line and go to the next line
@@ -80,7 +78,7 @@ impl TextVFrameBuffer {
                     y + curr_line * CHARACTER_HEIGHT,
                     x + width, 
                     y + (curr_line + 1 )* CHARACTER_HEIGHT, 
-                    bg_color, &index, buffer)?;
+                    bg_color, &index)?;
                 curr_column = 0;
                 curr_line += 1;
                 if curr_line == buffer_height {
@@ -95,7 +93,7 @@ impl TextVFrameBuffer {
                     }
                 }
                 self.print_byte(byte, font_color, bg_color, x, y, 
-                    curr_line, curr_column, &index, buffer)?;
+                    curr_line, curr_column, &index)?;
                 curr_column += 1;
             }
         }
@@ -106,20 +104,19 @@ impl TextVFrameBuffer {
             y + curr_line * CHARACTER_HEIGHT,
             x + width, 
             y + (curr_line + 1 )* CHARACTER_HEIGHT, 
-            bg_color, &index, buffer)?;
+            bg_color, &index)?;
 
         // Fill the blank of remaining lines
         self.fill_blank ( 
             x, y + (curr_line + 1 )* CHARACTER_HEIGHT, x + width, y + height, 
-            bg_color, &index, buffer)?;
+            bg_color, &index)?;
 
         Ok(())
     }
 
     //print a byte to the text buffer at (line, column). (left, top) specify the margin of the text area. index is the function to calculate the index of every pixel. The virtual frame buffer calls its get_index() method to get the function.
-    fn print_byte (&self, byte:u8, font_color:u32, bg_color:u32,
-            left:usize, top:usize, line:usize, column:usize, index:&Box<Fn(usize, usize)->usize>,
-            buffer:&mut Vec<u32>) 
+    fn print_byte (&mut self, byte:u8, font_color:u32, bg_color:u32,
+            left:usize, top:usize, line:usize, column:usize, index:&Box<Fn(usize, usize)->usize>) 
             -> Result<(),&'static str> {
         let x = left + column * CHARACTER_WIDTH;
         let y = top + line * CHARACTER_HEIGHT;
@@ -128,6 +125,7 @@ impl TextVFrameBuffer {
 
         let fonts = FONT_PIXEL.lock();
    
+        let buffer = self.buffer();
         loop {
             let mask:u32 = fonts[byte as usize][i][j];
             buffer[index(x + j, y + i)] = font_color & mask | bg_color & (!mask);
@@ -144,14 +142,15 @@ impl TextVFrameBuffer {
     }
 
     //Fill a blank (left, top, right, bottom) with the color. index is the function to calculate the index of every pixel. The virtual frame buffer calls its get_index() method to get the function.
-    fn fill_blank(&self, left:usize, top:usize, right:usize,
-             bottom:usize, color:u32, index:&Box<Fn(usize, usize)->usize>, buffer:&mut Vec<u32>) -> Result<(),&'static str>{
+    fn fill_blank(&mut self, left:usize, top:usize, right:usize,
+             bottom:usize, color:u32, index:&Box<Fn(usize, usize)->usize>) -> Result<(),&'static str>{
         let mut x = left;
         let mut y = top;
         if left > right || top > bottom {
             return Ok(())
         }
 
+        let buffer = self.buffer();
         loop {
             if x == right {
                 y += 1;
@@ -167,6 +166,7 @@ impl TextVFrameBuffer {
     
 }
 
+///Dropped   code. Cursor should belong to the terminal
 ///A cursor struct. It contains the position of a cursor, whether it is enabled, 
 ///the frequency it blinks, the last time it blinks, and the current blink state show/hidden
 pub struct Cursor {
