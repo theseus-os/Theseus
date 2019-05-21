@@ -1,4 +1,4 @@
-//! This crate implements an interface/glue layer between our e1000 driver
+//! This crate implements an interface/glue layer between our ethernet drivers
 //! and the smoltcp network stack.
 #![no_std]
 
@@ -30,13 +30,13 @@ use network_manager::NetworkInterface;
 const DEFAULT_MTU: usize = 1500;
 
 
-/// A struct that implements the `NetworkInterface` trait for an e1000 NIC. 
+/// A struct that implements the `NetworkInterface` trait for a NIC. 
 /// There should be one instance of this struct per interface, i.e., an Ethernet port on the NIC.
-pub struct E1000NetworkInterface<N: NetworkInterfaceCard + 'static> {
-    pub iface: EthernetInterface<'static, 'static, 'static, E1000Device<N>>,
+pub struct EthernetNetworkInterface<N: NetworkInterfaceCard + 'static> {
+    pub iface: EthernetInterface<'static, 'static, 'static, EthernetDevice<N>>,
 }
 
-impl<N: NetworkInterfaceCard + 'static> NetworkInterface for E1000NetworkInterface<N> { 
+impl<N: NetworkInterfaceCard + 'static> NetworkInterface for EthernetNetworkInterface<N> { 
     fn ethernet_addr(&self) -> EthernetAddress {
         self.iface.ethernet_addr()
     }
@@ -66,8 +66,8 @@ impl<N: NetworkInterfaceCard + 'static> NetworkInterface for E1000NetworkInterfa
     }
 }
 
-impl<N: NetworkInterfaceCard + 'static> E1000NetworkInterface<N> {
-    /// Creates a new instance of an e1000 network interface, which can be used for handling sockets. 
+impl<N: NetworkInterfaceCard + 'static> EthernetNetworkInterface<N> {
+    /// Creates a new instance of an ethernet network interface, which can be used for handling sockets. 
     /// 
     /// Arguments: 
     /// * `nic`:  a reference to an initialized Ethernet NIC, which must implement the `NetworkInterfaceCard` trait.
@@ -81,7 +81,7 @@ impl<N: NetworkInterfaceCard + 'static> E1000NetworkInterface<N> {
         nic: &'static MutexIrqSafe<N>,
         static_ip: Option<IpCidr>,
         gateway_ip: Option<G>,
-    ) -> Result<E1000NetworkInterface<N>, &'static str> 
+    ) -> Result<EthernetNetworkInterface<N>, &'static str> 
     {
         // here, we have to create the iface for the first time because it didn't yet exist
         let static_ip = static_ip.ok_or("static_ip is currently required because we do not yet support DHCP")?;
@@ -96,11 +96,11 @@ impl<N: NetworkInterfaceCard + 'static> E1000NetworkInterface<N> {
             }
         };
         res.map_err(|_e| {
-            error!("e1000_smoltcp_device(): couldn't set default gateway IP address: {:?}", _e);
+            error!("ethernet_smoltcp_device(): couldn't set default gateway IP address: {:?}", _e);
             "couldn't set default gateway IP address"
         })?;
 
-        let device = E1000Device::new(nic);
+        let device = EthernetDevice::new(nic);
         let hardware_mac_addr = EthernetAddress(nic.lock().mac_address());
         // When creating an EthernetInterface, only the `ethernet_addr` and `neighbor_cache` are required.
         let iface = EthernetInterfaceBuilder::new(device)
@@ -111,7 +111,7 @@ impl<N: NetworkInterfaceCard + 'static> E1000NetworkInterface<N> {
             .finalize();
 
         Ok(
-            E1000NetworkInterface { iface }
+            EthernetNetworkInterface { iface }
         )
     }
 
@@ -119,25 +119,25 @@ impl<N: NetworkInterfaceCard + 'static> E1000NetworkInterface<N> {
 
 
 /// An implementation of smoltcp's `Device` trait, which enables smoltcp
-/// to use our existing e1000 ethernet driver.
-/// An instance of this `E1000Device` can be used in smoltcp's `EthernetInterface`.
-pub struct E1000Device<N: NetworkInterfaceCard + 'static> { 
+/// to use our existing ethernet driver.
+/// An instance of this `EthernetDevice` can be used in smoltcp's `EthernetInterface`.
+pub struct EthernetDevice<N: NetworkInterfaceCard + 'static> { 
     nic_ref: &'static MutexIrqSafe<N>,
 }
-impl<N: NetworkInterfaceCard + 'static> E1000Device<N> {
-    /// Create a new instance of the `E1000Device`.
-    pub fn new(nic_ref: &'static MutexIrqSafe<N>) -> E1000Device<N> {
-        E1000Device {
+impl<N: NetworkInterfaceCard + 'static> EthernetDevice<N> {
+    /// Create a new instance of the `EthernetDevice`.
+    pub fn new(nic_ref: &'static MutexIrqSafe<N>) -> EthernetDevice<N> {
+        EthernetDevice {
             nic_ref: nic_ref,
         }
     }
 }
 
 
-/// To connect the e1000 driver to smoltcp, 
+/// To connect the ethernet driver to smoltcp, 
 /// we implement transmit and receive callbacks
-/// that allow smoltcp to interact with the e1000 NIC.
-impl<'d, N: NetworkInterfaceCard + 'static> smoltcp::phy::Device<'d> for E1000Device<N> {
+/// that allow smoltcp to interact with the NIC.
+impl<'d, N: NetworkInterfaceCard + 'static> smoltcp::phy::Device<'d> for EthernetDevice<N> {
 
     /// The buffer type returned by the receive callback.
     type RxToken = RxToken;
@@ -158,23 +158,23 @@ impl<'d, N: NetworkInterfaceCard + 'static> smoltcp::phy::Device<'d> for E1000De
         let received_frame = {
             let mut nic = self.nic_ref.lock();
             nic.poll_receive().map_err(|_e| {
-                error!("E1000Device::receive(): error returned from poll_receive(): {}", _e);
+                error!("EthernetDevice::receive(): error returned from poll_receive(): {}", _e);
                 _e
             }).ok()?;
             nic.get_received_frame()?
         };
 
-        // debug!("E1000Device::receive(): got E1000 frame, consists of {} ReceiveBuffers.", received_frame.0.len());
+        // debug!("EthernetDevice::receive(): got Ethernet frame, consists of {} ReceiveBuffers.", received_frame.0.len());
         // TODO FIXME: add support for handling a frame that consists of multiple ReceiveBuffers
         if received_frame.0.len() > 1 {
-            error!("E1000Device::receive(): WARNING: E1000 frame consists of {} ReceiveBuffers, we currently only handle a single-buffer frame, so this may not work correctly!",  received_frame.0.len());
+            error!("EthernetDevice::receive(): WARNING: Ethernet frame consists of {} ReceiveBuffers, we currently only handle a single-buffer frame, so this may not work correctly!",  received_frame.0.len());
         }
 
         let first_buf_len = received_frame.0[0].length;
         let rxbuf_byte_slice = BoxRef::new(Box::new(received_frame))
             .try_map(|rxframe| rxframe.0[0].as_slice::<u8>(0, first_buf_len as usize))
             .map_err(|e| {
-                error!("E1000Device::receive(): couldn't convert receive buffer of length {} into byte slice, error {:?}", first_buf_len, e);
+                error!("EthernetDevice::receive(): couldn't convert receive buffer of length {} into byte slice, error {:?}", first_buf_len, e);
                 e
             })
             .ok()?;
@@ -214,20 +214,20 @@ impl<N: NetworkInterfaceCard + 'static> smoltcp::phy::TxToken for TxToken<N> {
         // with the requested `length` (or one at least that big) and then return it. 
         // Because we can dynamically allocate transmit buffers, we just do that here.
         if len > (u16::max_value() as usize) {
-            error!("E1000Device::transmit(): requested tx buffer size {} exceeds the max size of u16!", len);
+            error!("EthernetDevice::transmit(): requested tx buffer size {} exceeds the max size of u16!", len);
             return Err(smoltcp::Error::Exhausted)
         }
 
-        // debug!("E1000Device::transmit(): creating new TransmitBuffer of {} bytes, timestamp: {}", len, _timestamp);
+        // debug!("EthernetDevice::transmit(): creating new TransmitBuffer of {} bytes, timestamp: {}", len, _timestamp);
         // create a new TransmitBuffer, cast it as a slice of bytes, call the passed `f` closure, and then send it!
         let mut txbuf = TransmitBuffer::new(len as u16).map_err(|e| {
-            error!("E1000Device::transmit(): couldn't allocate TransmitBuffer of length {}, error {:?}", len, e);
+            error!("EthernetDevice::transmit(): couldn't allocate TransmitBuffer of length {}, error {:?}", len, e);
             smoltcp::Error::Exhausted
         })?;
 
         let closure_retval = {
             let txbuf_byte_slice = txbuf.as_slice_mut::<u8>(0, len).map_err(|e| {
-                error!("E1000Device::transmit(): couldn't convert TransmitBuffer of length {} into byte slice, error {:?}", len, e);
+                error!("EthernetDevice::transmit(): couldn't convert TransmitBuffer of length {} into byte slice, error {:?}", len, e);
                 smoltcp::Error::Exhausted
             })?;
             f(txbuf_byte_slice)?
@@ -235,7 +235,7 @@ impl<N: NetworkInterfaceCard + 'static> smoltcp::phy::TxToken for TxToken<N> {
         self.nic_ref.lock()
             .send_packet(txbuf)
             .map_err(|e| {
-                error!("E1000Device::transmit(): error sending Ethernet packet: {:?}", e);
+                error!("EthernetDevice::transmit(): error sending Ethernet packet: {:?}", e);
                 smoltcp::Error::Exhausted
             })?;
         

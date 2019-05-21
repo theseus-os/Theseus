@@ -14,7 +14,7 @@ extern crate keyboard;
 extern crate pci;
 extern crate mouse;
 extern crate network_manager;
-extern crate e1000_smoltcp_device;
+extern crate ethernet_smoltcp_device;
 extern crate smoltcp;
 
 
@@ -67,7 +67,7 @@ pub fn init(keyboard_producer: DFQueueProducer<Event>) -> Result<(), &'static st
         let e1000_nic_ref = e1000::E1000Nic::init(e1000_pci_dev)?;
         let static_ip = IpCidr::from_str(DEFAULT_LOCAL_IP).map_err(|_e| "couldn't parse 'DEFAULT_LOCAL_IP' address")?;
         let gateway_ip = Ipv4Address::from_bytes(&DEFAULT_GATEWAY_IP);
-        let e1000_iface = e1000_smoltcp_device::E1000NetworkInterface::new(e1000_nic_ref, Some(static_ip), Some(gateway_ip))?;
+        let e1000_iface = ethernet_smoltcp_device::EthernetNetworkInterface::new(e1000_nic_ref, Some(static_ip), Some(gateway_ip))?;
         network_manager::NETWORK_INTERFACES.lock().push(Arc::new(Mutex::new(e1000_iface)));
     }
     else {

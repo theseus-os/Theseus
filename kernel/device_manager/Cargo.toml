@@ -45,8 +45,8 @@ path = "../mouse"
 [dependencies.network_manager]
 path = "../network_manager"
 
-[dependencies.e1000_smoltcp_device]
-path = "../e1000_smoltcp_device"
+[dependencies.ethernet_smoltcp_device]
+path = "../ethernet_smoltcp_device"
 
 [dependencies.smoltcp]
 version = "0.5.0"
