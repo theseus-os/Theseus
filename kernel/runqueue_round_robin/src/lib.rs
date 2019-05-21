@@ -4,7 +4,6 @@
 //! 
 
 #![no_std]
-#![feature(alloc)]
 
 extern crate alloc;
 #[macro_use] extern crate lazy_static;
@@ -43,6 +42,12 @@ pub struct RoundRobinTaskRef{
     context_switches: u32,
 }
 
+// impl Drop for RoundRobinTaskRef {
+//     fn drop(&mut self) {
+//         warn!("DROPPING RoundRobinTaskRef with taskref {:?}", self.taskref);
+//     }
+// }
+
 impl Deref for RoundRobinTaskRef {
     type Target = TaskRef;
     fn deref(&self) -> &TaskRef {
@@ -80,7 +85,7 @@ impl RoundRobinTaskRef {
 lazy_static! {
     /// There is one runqueue per core, each core only accesses its own private runqueue
     /// and allows the scheduler to select a task from that runqueue to schedule in.
-    static ref RUNQUEUES: AtomicMap<u8, RwLockIrqSafe<RunQueue>> = AtomicMap::new();
+    pub static ref RUNQUEUES: AtomicMap<u8, RwLockIrqSafe<RunQueue>> = AtomicMap::new();
 }
 
 /// A list of references to `Task`s (`RoundRobinTaskRef`s). 
@@ -93,6 +98,11 @@ pub struct RunQueue {
     core: u8,
     queue: VecDeque<RoundRobinTaskRef>,
 }
+// impl Drop for RunQueue {
+//     fn drop(&mut self) {
+//         warn!("DROPPING Round Robing Runqueue for core {}", self.core);
+//     }
+// }
 
 impl Deref for RunQueue {
     type Target = VecDeque<RoundRobinTaskRef>;
@@ -112,10 +122,12 @@ impl RunQueue {
     /// Moves the `TaskRef` at the given index into this `RunQueue` to the end (back) of this `RunQueue`,
     /// and returns a cloned reference to that `TaskRef`.
     pub fn move_to_end(&mut self, index: usize) -> Option<TaskRef> {
-        self.remove(index).map(|taskref| {
-            self.push_back(taskref.clone());
-            taskref
-        }).map(|m| m.taskref)
+        self.remove(index)
+            .map(|rr_taskref| {
+                let taskref = rr_taskref.taskref.clone();
+                self.push_back(rr_taskref);
+                taskref
+            })
     }
 
     /// Returns an iterator over all `TaskRef`s in this `RunQueue`.
@@ -125,7 +137,7 @@ impl RunQueue {
    
     /// Creates a new `RunQueue` for the given core, which is an `apic_id`.
     pub fn init(which_core: u8) -> Result<(), &'static str> {
-        trace!("Created runqueue for core {}", which_core);
+        trace!("Created runqueue (round robin) for core {}", which_core);
         let new_rq = RwLockIrqSafe::new(RunQueue {
             core: which_core,
             queue: VecDeque::new(),
@@ -207,7 +219,7 @@ impl RunQueue {
             task.lock_mut().on_runqueue = Some(self.core);
         }
 
-        debug!("Adding task to runqueue {}, {:?}", self.core, task);
+        debug!("Adding task to runqueue_round_robin {}, {:?}", self.core, task);
         let round_robin_taskref = RoundRobinTaskRef::new(task);
         self.push_back(round_robin_taskref);
         
@@ -226,7 +238,7 @@ impl RunQueue {
 
     /// The internal function that actually removes the task from the runqueue.
     fn remove_internal(&mut self, task: &TaskRef) -> Result<(), &'static str> {
-        // debug!("Removing task from runqueue {}, {:?}", self.core, task);
+        debug!("Removing task from runqueue_round_robin {}, {:?}", self.core, task);
         self.retain(|x| &x.taskref != task);
 
         #[cfg(single_simd_task_optimization)]

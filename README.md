@@ -11,53 +11,50 @@ More details are provided in Theseus's [documentation](#Documentation).
 ## Building Theseus
 
 Currently, we support building and running Theseus on the following host OSes:
- * Linux distributions, 64-bit, preferably Debian-based like Ubuntu.
- * Windows using the Windows Subsystem for Linux (WSL), Ubuntu version.
- * Mac OS X is not currently supported officially, but it should be possible. 
-
+ * Linux, 64-bit Debian-based distributions like Ubuntu, tested on Ubuntu 16.04 and 18.04.
+ * Windows, using the Windows Subsystem for Linux (WSL), tested on the Ubuntu version.
+ * MacOS, tested on version High Sierra (10.13), but likely works on others. 
 
 
 ### Setting up the build environment
-First, update your system's package list:    
-`sudo apt-get update`.   
 
-You will need to install the following packages:  
-`sudo apt-get install nasm grub-pc-bin mtools xorriso qemu`   
+If on Linux or WSL, do the following:
+  * Update your system's package list: `sudo apt-get update`.     
+  * Install the following packages: `sudo apt-get install nasm pkg-config grub-pc-bin mtools xorriso qemu`     
 
-If you're on Windows using WSL, you'll need to do the following:
+Additionally, If you're on WSL, you'll need to do the following:
   * Install an X Server for Windows; we suggest using [Xming](https://sourceforge.net/projects/xming/).
   * Set an X display, by running `export DISPLAY=:0`. You'll need to do this each time you open up a new WSL terminal, so it's best to add it to your .bashrc file. You can do that with `echo "export DISPLAY=:0" >> ~/.bashrc`.
   * If you get this error: `Could not initialize SDL(No available video device) - exiting`, then make sure that your X Server is running before running `make run`, and that you have set the `DISPLAY` environment variable above.
   * Install a C compiler and linker toolchain, such as `gcc`.
 
-When you first check out the project, don't forget to checkout all the submodule repositories too:    
-`git submodule update --init --recursive`
+If you're on Mac OS, do the following:
+  * Install [MacPorts](https://www.macports.org/install.php) and [HomeBrew](https://brew.sh/).
+  * run the MacOS build setup script: `./scripts/mac_os_build_setup.sh`
+
 
 
 ### Installing Rust
-
 Install the current Rust compiler and toolchain by following the [setup instructions here](https://www.rust-lang.org/en-US/install.html), which is basically just this command:   
 `curl https://sh.rustup.rs -sSf | sh`
 
-Because OS development requires many language features that Rust considers to be unstable, you must use a nightly compiler. You can accomplish this with:   
-`rustup default nightly`
-
-Since we're cross compiling for a custom target triple (the Theseus platform), we need to install the Rust source code:   
-`rustup component add rust-src`
-
 We also need to install Xargo, a drop-in replacement wrapper for Cargo that makes cross-compiling easier:    
-`cargo install --vers 0.3.10 xargo`
+`cargo install --vers 0.3.13 xargo`
+
 
 
 ### Building and Running
+When you first check out the project, don't forget to checkout all the submodule repositories too:    
+`git submodule update --init --recursive`
+
 To build and run Theseus in QEMU, simply run:   
 `make run`
 
 Run `make help` to see other make targets. 
 
 
-### Note: Rust compiler versions
-Because we use the Rust nightly compiler (not stable), the Theseus Makefile checks to make sure that you're using the same version of Rust that we are. We were inspired to add this safety check when we failed to build other Rust projects put out there on Github because they used an earlier version of the nightly Rust compiler than what we had installed on our systems. To avoid this undiagnosable problem, we force you to use the latest version of `rustc` that is known to properly build Theseus. This version is upgraded as often as possible to align with the latest Rust nightly, but this is a best-effort policy.
+#### Note: Rust compiler versions
+Because we use the Rust nightly compiler (not stable), the Theseus Makefile checks to make sure that you're using the same version of Rust that we are. We were inspired to add this safety check when we failed to build other Rust projects put out there on Github because they used an earlier version of the nightly Rust compiler than what we had installed on our systems. To avoid this undiagnosable problem, we force you to use a specific version of `rustc` that is known to properly build Theseus. This version is upgraded as often as possible to align with the latest Rust nightly, but this is a best-effort policy.
 
 So, if you see a build error about the improper version of `rustc`, follow the instructions printed out at the end of the error message.     
 

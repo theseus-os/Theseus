@@ -1,5 +1,4 @@
 #![no_std]
-#![feature(alloc)]
 
 
 extern crate alloc;
@@ -16,7 +15,7 @@ use core::ops::DerefMut;
 use alloc::boxed::Box;
 use spin::{Mutex, MutexGuard};
 use volatile::{Volatile, WriteOnly};
-use memory::{FRAME_ALLOCATOR, Frame, ActivePageTable, PhysicalAddress, EntryFlags, allocate_pages, MappedPages};
+use memory::{FRAME_ALLOCATOR, Frame, PageTable, PhysicalAddress, EntryFlags, allocate_pages, MappedPages};
 use atomic_linked_list::atomic_map::AtomicMap;
 use owning_ref::BoxRefMut;
 
@@ -76,29 +75,30 @@ pub struct IoApic {
 }
 
 impl IoApic {
-    /// Creates a new IoApic struct from the given `id`, `PhysicalAddress`, and `gsi_base`.
-    pub fn new(active_table: &mut ActivePageTable, id: u8, phys_addr: PhysicalAddress, gsi_base: u32) -> Result<IoApic, &'static str> {
-
-        let ioapic_mapped_page = {
-    		let new_page = try!(allocate_pages(1).ok_or("IoApic::new(): couldn't allocate_pages!"));
-            let frame = Frame::range_inclusive(Frame::containing_address(phys_addr), Frame::containing_address(phys_addr));
-			let mut fa = try!(FRAME_ALLOCATOR.try().ok_or("Couldn't get frame allocator")).lock();
-            try!(active_table.map_allocated_pages_to(new_page, frame, 
-                EntryFlags::PRESENT | EntryFlags::WRITABLE | EntryFlags::NO_CACHE | EntryFlags::NO_EXECUTE, 
-                fa.deref_mut())
-            )
-        };
+    /// Creates a new IoApic struct from the given `id`, `PhysicalAddress`, and `gsi_base`,
+    /// and then adds it to the system-wide list of all IOAPICs.
+    pub fn new(page_table: &mut PageTable, id: u8, phys_addr: PhysicalAddress, gsi_base: u32) -> Result<(), &'static str> {
+        let new_page = allocate_pages(1).ok_or("IoApic::new(): couldn't allocate_pages!")?;
+        let frame = Frame::range_inclusive(Frame::containing_address(phys_addr), Frame::containing_address(phys_addr));
+        let fa = FRAME_ALLOCATOR.try().ok_or("Couldn't get frame allocator")?;
+        let ioapic_mapped_page = page_table.map_allocated_pages_to(
+            new_page,
+            frame, 
+            EntryFlags::PRESENT | EntryFlags::WRITABLE | EntryFlags::NO_CACHE | EntryFlags::NO_EXECUTE, 
+            fa.lock().deref_mut(),
+        )?;
 
         let ioapic_regs = BoxRefMut::new(Box::new(ioapic_mapped_page)).try_map_mut(|mp| mp.as_type_mut::<IoApicRegisters>(0))?;
-        
         let ioapic = IoApic {
             regs: ioapic_regs,
 			id: id,
             _phys_addr: phys_addr,
             gsi_base: gsi_base,
 		};
-		debug!("Created new IoApic, id: {}, gsi_base: {}, phys_addr: {:#X}", id, gsi_base, phys_addr); 
-        Ok(ioapic)
+
+        debug!("Created new IoApic, id: {}, gsi_base: {}, phys_addr: {:#X}", id, gsi_base, phys_addr);
+        IOAPICS.insert(id, Mutex::new(ioapic));
+        Ok(())
     }
 
     /// Returns whether this IoApic handles the given `irq_num`, i.e.,

@@ -1,5 +1,4 @@
 #![no_std]
-#![feature(alloc)]
 
 extern crate task;
 #[macro_use] extern crate terminal_print;
@@ -56,7 +55,7 @@ pub fn main(args: Vec<String>) -> isize {
 
     // navigate to the filepath specified by first argument
     match path.get(&curr_wd) {
-        Ok(file_dir_enum) => {
+        Some(file_dir_enum) => {
             match file_dir_enum {
                 FileOrDir::Dir(dir) => {
                     print_children(&dir);
@@ -68,8 +67,8 @@ pub fn main(args: Vec<String>) -> isize {
                 }
             }
         },
-        Err(err) => {
-            println!("Path error: {}", err); 
+        _ => {
+            println!("Couldn't find path: {}", path); 
             return -1;
         }
     };

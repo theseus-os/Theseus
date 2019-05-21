@@ -1,5 +1,4 @@
 #![no_std]
-#![feature(alloc)]
 #[macro_use] extern crate terminal_print;
 // #[macro_use] extern crate log;
 
@@ -55,14 +54,14 @@ pub fn main(args: Vec<String>) -> isize {
     
     // navigate to the filepath specified by first argument
     match path.get(&curr_wr) {
-        Ok(file_dir_enum) => { 
+        Some(file_dir_enum) => { 
             match file_dir_enum {
                 FileOrDir::Dir(directory) => {
                     println!("{:?} is a directory, cannot 'cat' non-files.", directory.lock().get_name());
                     return -1;
                 }
                 FileOrDir::File(file) => {
-                    let mut file_locked = file.lock();
+                    let file_locked = file.lock();
                     let file_size = file_locked.size();
                     let mut string_slice_as_bytes = vec![0; file_size];
                     
@@ -83,10 +82,9 @@ pub fn main(args: Vec<String>) -> isize {
                     println!("{}", read_string);
                 }
             }
-
         },
-        Err(err) => {
-            println!("get call failed in cat because: {}", err);
+        _ => {
+            println!("Couldn't find file at path {}", path);
             return -1;
         }
     };

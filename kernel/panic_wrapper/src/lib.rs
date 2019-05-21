@@ -4,9 +4,8 @@
 //! (although it does require alloc types like String).
 //! 
 #![no_std]
-#![feature(alloc)]
 
-#[macro_use] extern crate alloc;
+extern crate alloc;
 #[macro_use] extern crate log;
 extern crate memory;
 extern crate apic;
@@ -44,7 +43,7 @@ pub fn panic_wrapper(panic_info: &PanicInfo) -> Result<(), &'static str> {
     }
     else {
         error!("PANIC was unhandled in task \"{}\" on core {:?} at {}", curr_task_name, apic_id, panic_info);
-        memory::stack_trace();
+        // memory::stack_trace();
     }
 
     if !curr_task.lock().is_an_idle_task {

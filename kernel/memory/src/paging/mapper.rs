@@ -7,9 +7,9 @@
 // option. This file may not be copied, modified, or distributed
 // except according to those terms.
 
-use core::ptr::Unique;
-use core::ops::DerefMut;
 use core::mem;
+use core::ops::DerefMut;
+use core::ptr::Unique;
 use core::slice;
 use x86_64;
 use {BROADCAST_TLB_SHOOTDOWN_FUNC, VirtualAddress, PhysicalAddress, FRAME_ALLOCATOR, FrameIter, Page, Frame, FrameAllocator, AllocatedPages}; 
@@ -18,19 +18,23 @@ use paging::entry::EntryFlags;
 use paging::table::{P4, Table, Level4};
 use kernel_config::memory::{ENTRIES_PER_PAGE_TABLE, PAGE_SIZE, TEMPORARY_PAGE_VIRT_ADDR};
 use alloc::vec::Vec;
+use type_name;
 
 pub struct Mapper {
     p4: Unique<Table<Level4>>,
+    /// The Frame contaning the top-level P4 page table.
     pub target_p4: Frame,
 }
 
 impl Mapper {
-    pub fn new() -> Mapper {
-        unsafe {
-            Mapper { 
-                p4: Unique::new_unchecked(P4),
-                target_p4: get_current_p4(),
-            }
+    pub fn from_current() -> Mapper {
+        Self::with_p4_frame(get_current_p4())
+    }
+
+    pub fn with_p4_frame(p4: Frame) -> Mapper {
+        Mapper { 
+            p4: Unique::new(P4).unwrap(), // cannot panic because we know the P4 value is valid
+            target_p4: p4,
         }
     }
 
@@ -74,16 +78,15 @@ impl Mapper {
         }
     }
 
-    /// translates a VirtualAddress to a PhysicalAddress
+    /// Translates a `VirtualAddress` to a `PhysicalAddress` by walking the page tables.
     pub fn translate(&self, virtual_address: VirtualAddress) -> Option<PhysicalAddress> {
-        let offset = virtual_address % PAGE_SIZE;
         // get the frame number of the page containing the given virtual address,
-        // and then the corresponding physical address is that PFN*sizeof(Page) + offset
-        self.translate_page(Page::containing_address(virtual_address)).map(|frame| {
-            frame.number * PAGE_SIZE + offset
-        })
+        // and then the corresponding physical address is that page frame number * page size + offset
+        self.translate_page(Page::containing_address(virtual_address))
+            .map(|frame| frame.start_address() + virtual_address.page_offset())
     }
 
+    /// Translates a virtual memory `Page` to a physical memory `Frame` by walking the page tables.
     pub fn translate_page(&self, page: Page) -> Option<Frame> {
         let p3 = self.p4().next_table(page.p4_index());
 
@@ -135,9 +138,9 @@ impl Mapper {
         for page in pages.clone() {
             let frame = try!(allocator.allocate_frame().ok_or("Mapper::internal_map(): couldn't allocate new frame, out of memory!"));
 
-            let mut p3 = self.p4_mut().next_table_create(page.p4_index(), top_level_flags, allocator);
-            let mut p2 = p3.next_table_create(page.p3_index(), top_level_flags, allocator);
-            let mut p1 = p2.next_table_create(page.p2_index(), top_level_flags, allocator);
+            let p3 = self.p4_mut().next_table_create(page.p4_index(), top_level_flags, allocator);
+            let p2 = p3.next_table_create(page.p3_index(), top_level_flags, allocator);
+            let p1 = p2.next_table_create(page.p2_index(), top_level_flags, allocator);
 
             if !p1[page.p1_index()].is_unused() {
                 error!("Mapper::internal_map(): page {:#x} -> frame {:#X}, page was already in use!", page.start_address(), frame.start_address());
@@ -176,9 +179,9 @@ impl Mapper {
         // iterate over pages and frames in lockstep
         for (page, frame) in pages.clone().zip(frames) {
 
-            let mut p3 = self.p4_mut().next_table_create(page.p4_index(), top_level_flags, allocator);
-            let mut p2 = p3.next_table_create(page.p3_index(), top_level_flags, allocator);
-            let mut p1 = p2.next_table_create(page.p2_index(), top_level_flags, allocator);
+            let p3 = self.p4_mut().next_table_create(page.p4_index(), top_level_flags, allocator);
+            let p2 = p3.next_table_create(page.p3_index(), top_level_flags, allocator);
+            let p1 = p2.next_table_create(page.p2_index(), top_level_flags, allocator);
 
             if !p1[page.p1_index()].is_unused() {
                 error!("map_to() page {:#x} -> frame {:#X}, page was already in use!", page.start_address(), frame.start_address());
@@ -281,7 +284,7 @@ const TEMPORARY_PAGE_FRAME: usize = TEMPORARY_PAGE_VIRT_ADDR & !(PAGE_SIZE - 1);
 /// while that Mutex's lock is held. 
 #[derive(Debug)]
 pub struct MappedPages {
-    /// The P4 Frame of the page table that this MappedPages was originally mapped into. 
+    /// The Frame containing the top-level P4 page table that this MappedPages was originally mapped into. 
     page_table_p4: Frame,
     /// The actual range of pages contained by this mapping
     pages: PageIter,
@@ -338,7 +341,7 @@ impl MappedPages {
     pub fn offset_of_address(&self, vaddr: VirtualAddress) -> Option<usize> {
         let start = self.pages.start_address();
         if (vaddr >= start) && (vaddr <= start + self.size_in_bytes()) {
-            Some(vaddr - start)
+            Some(vaddr.value() - start.value())
         }
         else {
             None
@@ -542,8 +545,8 @@ impl MappedPages {
             p1[page.p1_index()].set(frame, new_flags | EntryFlags::PRESENT);
 
             let vaddr = page.start_address();
-            x86_64::instructions::tlb::flush(x86_64::VirtualAddress(vaddr));
-            if broadcast_tlb_shootdown.is_some() && vaddr != TEMPORARY_PAGE_FRAME {
+            x86_64::instructions::tlb::flush(x86_64::VirtualAddress(vaddr.value()));
+            if broadcast_tlb_shootdown.is_some() && vaddr.value() != TEMPORARY_PAGE_FRAME {
                 vaddrs.push(vaddr);
             }
         }
@@ -582,8 +585,8 @@ impl MappedPages {
             p1[page.p1_index()].set_unused();
 
             let vaddr = page.start_address();
-            x86_64::instructions::tlb::flush(x86_64::VirtualAddress(page.start_address()));
-            if broadcast_tlb_shootdown.is_some() && vaddr != TEMPORARY_PAGE_FRAME {
+            x86_64::instructions::tlb::flush(x86_64::VirtualAddress(page.start_address().value()));
+            if broadcast_tlb_shootdown.is_some() && vaddr.value() != TEMPORARY_PAGE_FRAME {
                 vaddrs.push(vaddr);
             }
             
@@ -599,7 +602,7 @@ impl MappedPages {
     }
 
 
-    /// Reinterprets this `MappedPages`'s underyling memory region as a struct of the given type,
+    /// Reinterprets this `MappedPages`'s underlying memory region as a struct of the given type,
     /// i.e., overlays a struct on top of this mapped memory region. 
     /// 
     /// # Arguments
@@ -613,8 +616,7 @@ impl MappedPages {
         let size = mem::size_of::<T>();
         if false {
             debug!("MappedPages::as_type(): requested type {} with size {} at offset {}, MappedPages size {}!",
-                // SAFE: just for debugging
-                unsafe { ::core::intrinsics::type_name::<T>() }, 
+                type_name::get::<T>(),
                 size, offset, self.size_in_bytes()
             );
         }
@@ -623,9 +625,8 @@ impl MappedPages {
         let end = offset + size;
         if end > self.size_in_bytes() {
             error!("MappedPages::as_type(): requested type {} with size {} at offset {}, which is too large for MappedPages of size {}!",
-                    // SAFE: just for debugging
-                    unsafe { ::core::intrinsics::type_name::<T>() }, 
-                    size, offset, self.size_in_bytes()
+                type_name::get::<T>(),
+                size, offset, self.size_in_bytes()
             );
             return Err("requested type and offset would not fit within the MappedPages bounds");
         }
@@ -646,8 +647,7 @@ impl MappedPages {
         let size = mem::size_of::<T>();
         if false {
             debug!("MappedPages::as_type_mut(): requested type {} with size {} at offset {}, MappedPages size {}!",
-                // SAFE: just for debugging
-                unsafe { ::core::intrinsics::type_name::<T>() }, 
+                type_name::get::<T>(),
                 size, offset, self.size_in_bytes()
             );
         }
@@ -655,9 +655,8 @@ impl MappedPages {
         // check flags to make sure mutability is allowed (otherwise a page fault would occur on a write)
         if !self.flags.is_writable() {
             error!("MappedPages::as_type_mut(): requested type {} with size {} at offset {}, but MappedPages weren't writable (flags: {:?})",
-                    // SAFE: just for debugging
-                    unsafe { ::core::intrinsics::type_name::<T>() }, 
-                    size, offset, self.flags
+                type_name::get::<T>(),
+                size, offset, self.flags
             );
             return Err("as_type_mut(): MappedPages were not writable");
         }
@@ -666,9 +665,8 @@ impl MappedPages {
         let end = offset + size;
         if end > self.size_in_bytes() {
             error!("MappedPages::as_type_mut(): requested type {} with size {} at offset {}, which is too large for MappedPages of size {}!",
-                    // SAFE: just for debugging
-                    unsafe { ::core::intrinsics::type_name::<T>() }, 
-                    size, offset, self.size_in_bytes()
+                type_name::get::<T>(),
+                size, offset, self.size_in_bytes()
             );
             return Err("requested type and offset would not fit within the MappedPages bounds");
         }
@@ -682,7 +680,7 @@ impl MappedPages {
     }
 
 
-    /// Reinterprets this `MappedPages`'s underyling memory region as a slice of any type.
+    /// Reinterprets this `MappedPages`'s underlying memory region as a slice of any type.
     /// 
     /// # Arguments
     /// * `byte_offset`: the offset (in number of bytes) into the memory region at which the slice should start.
@@ -693,15 +691,11 @@ impl MappedPages {
     /// with a lifetime dependent upon the lifetime of this `MappedPages` object.
     /// This ensures safety by guaranteeing that the returned slice 
     /// cannot be used after this `MappedPages` object is dropped and unmapped.
-    /// 
-    /// Note: it'd be great to merge this into [`as_type()`][#method.as_type], but I cannot figure out how to 
-    ///       specify the length of a slice in its static type definition notation, e.g., `&[u8; size]`.
     pub fn as_slice<T>(&self, byte_offset: usize, length: usize) -> Result<&[T], &'static str> {
         let size_in_bytes = mem::size_of::<T>() * length;
         if false {
             debug!("MappedPages::as_slice(): requested slice of type {} with length {} (total size {}) at byte_offset {}, MappedPages size {}!",
-                // SAFE: just for debugging
-                unsafe { ::core::intrinsics::type_name::<T>() }, 
+                type_name::get::<T>(),
                 length, size_in_bytes, byte_offset, self.size_in_bytes()
             );
         }
@@ -710,16 +704,15 @@ impl MappedPages {
         let end = byte_offset + (length * mem::size_of::<T>());
         if end > self.size_in_bytes() {
             error!("MappedPages::as_slice(): requested slice of type {} with length {} (total size {}) at byte_offset {}, which is too large for MappedPages of size {}!",
-                    // SAFE: just for debugging
-                    unsafe { ::core::intrinsics::type_name::<T>() }, 
-                    length, size_in_bytes, byte_offset, self.size_in_bytes()
+                type_name::get::<T>(),
+                length, size_in_bytes, byte_offset, self.size_in_bytes()
             );
             return Err("requested slice length and offset would not fit within the MappedPages bounds");
         }
 
         // SAFE: we guarantee the size and lifetime are within that of this MappedPages object
         let slc: &[T] = unsafe {
-            slice::from_raw_parts((self.pages.start_address() + byte_offset) as *const T, length)
+            slice::from_raw_parts((self.pages.start_address().value() + byte_offset) as *const T, length)
         };
 
         Ok(slc)
@@ -733,8 +726,7 @@ impl MappedPages {
         let size_in_bytes = mem::size_of::<T>() * length;
         if false {
             debug!("MappedPages::as_slice_mut(): requested slice of type {} with length {} (total size {}) at byte_offset {}, MappedPages size {}!",
-                // SAFE: just for debugging
-                unsafe { ::core::intrinsics::type_name::<T>() }, 
+                type_name::get::<T>(), 
                 length, size_in_bytes, byte_offset, self.size_in_bytes()
             );
         }
@@ -742,9 +734,8 @@ impl MappedPages {
         // check flags to make sure mutability is allowed (otherwise a page fault would occur on a write)
         if !self.flags.is_writable() {
             error!("MappedPages::as_slice_mut(): requested mutable slice of type {} with length {} (total size {}) at byte_offset {}, but MappedPages weren't writable (flags: {:?}",
-                    // SAFE: just for debugging
-                    unsafe { ::core::intrinsics::type_name::<T>() }, 
-                    length, size_in_bytes, byte_offset, self.flags
+                type_name::get::<T>(),
+                length, size_in_bytes, byte_offset, self.flags
             );
             return Err("as_slice_mut(): MappedPages were not writable");
         }
@@ -753,25 +744,31 @@ impl MappedPages {
         let end = byte_offset + (length * mem::size_of::<T>());
         if end > self.size_in_bytes() {
             error!("MappedPages::as_slice_mut(): requested mutable slice of type {} with length {} (total size {}) at byte_offset {}, which is too large for MappedPages of size {}!",
-                    // SAFE: just for debugging
-                    unsafe { ::core::intrinsics::type_name::<T>() }, 
-                    length, size_in_bytes, byte_offset, self.size_in_bytes()
+                type_name::get::<T>(),
+                length, size_in_bytes, byte_offset, self.size_in_bytes()
             );
             return Err("requested slice length and offset would not fit within the MappedPages bounds");
         }
 
         // SAFE: we guarantee the size and lifetime are within that of this MappedPages object
         let slc: &mut [T] = unsafe {
-            slice::from_raw_parts_mut((self.pages.start_address() + byte_offset) as *mut T, length)
+            slice::from_raw_parts_mut((self.pages.start_address().value() + byte_offset) as *mut T, length)
         };
 
         Ok(slc)
     }
 
 
-    /// TODO FIXME finish this.
+    /// Reinterprets this `MappedPages`'s underlying memory region as an executable function with any signature.
     /// 
-    /// TODO FIXME: best case would be to have an integrated function that checks with the mod_mgmt crate 
+    /// # Arguments
+    /// * `offset`: the offset (in number of bytes) into the memory region at which the function starts.
+    /// * `space`: a hack to satisfy the borrow checker's lifetime requirements.
+    /// 
+    /// Returns a reference to the function that is formed from the underlying memory region,
+    /// with a lifetime dependent upon the lifetime of the given `space` object. 
+    ///
+    /// TODO FIXME: ideally, we'd have an integrated function that checks with the mod_mgmt crate 
     /// to see if the size of the function can fit (not just the size of the function POINTER, which will basically always fit)
     /// within the bounds of this `MappedPages` object;
     /// this integrated function would be based on the given string name of the function, like "task::this::foo",
@@ -780,7 +777,8 @@ impl MappedPages {
     /// We have to accept space for the function pointer to exist, because it cannot live in this function's stack. 
     /// It has to live in stack of the function that invokes the actual returned function reference,
     /// otherwise there would be a lifetime issue and a guaranteed page fault. 
-    /// So, the `space` arg is a hack to ensure lifetimes; we don't care about the actual value of `space`, as the value will be overwritten,
+    /// So, the `space` arg is a hack to ensure lifetimes;
+    /// we don't care about the actual value of `space`, as the value will be overwritten,
     /// and it doesn't matter both before and after the call to this `as_func()`.
     /// 
     /// The generic `F` parameter is the function type signature itself, e.g., `fn(String) -> u8`.
@@ -800,24 +798,31 @@ impl MappedPages {
         let size = mem::size_of::<F>();
         if true {
             debug!("MappedPages::as_func(): requested {} with size {} at offset {}, MappedPages size {}!",
-                // SAFE: just for debugging
-                unsafe { ::core::intrinsics::type_name::<F>() }, 
+                type_name::get::<F>(),
                 size, offset, self.size_in_bytes()
             );
+        }
+
+        // check flags to make sure these pages are executable (otherwise a page fault would occur when this func is called)
+        if !self.flags.is_executable() {
+            error!("MappedPages::as_func(): requested {}, but MappedPages weren't executable (flags: {:?})",
+                type_name::get::<F>(),
+                self.flags
+            );
+            return Err("as_func(): MappedPages were not executable");
         }
 
         // check that size of the type F fits within the size of the mapping
         let end = offset + size;
         if end > self.size_in_bytes() {
             error!("MappedPages::as_func(): requested type {} with size {} at offset {}, which is too large for MappedPages of size {}!",
-                    // SAFE: just for debugging
-                    unsafe { ::core::intrinsics::type_name::<F>() }, 
-                    size, offset, self.size_in_bytes()
+                type_name::get::<F>(),
+                size, offset, self.size_in_bytes()
             );
             return Err("requested type and offset would not fit within the MappedPages bounds");
         }
 
-        *space = self.pages.start_address() + offset; 
+        *space = self.pages.start_address().value() + offset; 
 
         // SAFE: we guarantee the size and lifetime are within that of this MappedPages object
         let t: &'a F = unsafe {
@@ -847,14 +852,14 @@ impl Drop for MappedPages {
         if self.size_in_pages() == 0 { return; }
         
         // skip logging temp page unmapping, since it's the most common
-        if self.pages.start != Page::containing_address(TEMPORARY_PAGE_VIRT_ADDR) {
-            trace!("MappedPages::drop(): unmapping MappedPages start: {:?} to end: {:?}", self.pages.start, self.pages.end);
-        }
+        // if self.pages.start != Page::containing_address(TEMPORARY_PAGE_VIRT_ADDR) {
+        //     trace!("MappedPages::drop(): unmapping MappedPages start: {:?} to end: {:?}", self.pages.start, self.pages.end);
+        // }
 
         // TODO FIXME: could add "is_kernel" field to MappedPages struct to check whether this is a kernel mapping.
         // TODO FIXME: if it was a kernel mapping, then we don't need to do this P4 value check (it could be unmapped on any page table)
         
-        let mut mapper = Mapper::new();
+        let mut mapper = Mapper::from_current();
         if mapper.target_p4 != self.page_table_p4 {
             error!("BUG: MappedPages::drop(): {:?}\n    current P4 {:?} must equal original P4 {:?}, \
                 cannot unmap MappedPages from a different page table than they were originally mapped to!",

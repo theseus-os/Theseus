@@ -8,7 +8,7 @@
 //! *Note: this printing crate only supports single-task child applications
 
 #![no_std]
-#![feature(alloc)]
+#![feature(asm)]
 
 #[macro_use] extern crate alloc;
 #[macro_use] extern crate lazy_static;
@@ -18,7 +18,6 @@ extern crate dfqueue;
 extern crate event_types;
 extern crate spin;
 
-use core::sync::atomic::spin_loop_hint;
 use event_types::Event;
 use dfqueue::DFQueueProducer;
 use alloc::collections::BTreeMap;
@@ -43,9 +42,9 @@ macro_rules! print {
     });
 }
 
-/// Maps the child application's task ID to its parent terminal print_producer to track parent-child relationships between
-/// applications so that applications can print to the correct terminal
 lazy_static! {
+    /// Maps the child application's task ID to its parent terminal print_producer to track parent-child relationships between
+    /// applications so that applications can print to the correct terminal
     static ref TERMINAL_PRINT_PRODUCERS: Mutex<BTreeMap<usize, DFQueueProducer<Event>>> = Mutex::new(BTreeMap::new());
 }
 
@@ -94,6 +93,5 @@ pub fn main(_args: Vec<String>) -> isize {
         if let Some(my_task) = task::get_my_current_task() {
             my_task.lock_mut().runstate = task::RunState::Blocked;
         }
-        spin_loop_hint();
     }
 }

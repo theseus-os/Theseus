@@ -9,13 +9,27 @@ include cfg/Config.mk
 
 all: iso
 
+## test for Windows Subsystem for Linux (Linux on Windows)
+IS_WSL = $(shell grep -s 'Microsoft' /proc/version)
+
+
+## Tool names/locations for cross-compiling on Mac OS (darwin)
+## Note that the GRUB_CROSS variable must match the build output of "scripts/mac_os_build_setup.sh"
+UNAME = $(shell uname -s)
+ifeq ($(UNAME),Darwin)
+	CROSS = x86_64-elf-
+	GRUB_CROSS = "$(HOME)"/theseus_tools_opt/bin/
+endif
+GRUB_MKRESCUE = $(GRUB_CROSS)grub-mkrescue
+	
+
 
 ###################################################################################################
 ### For ensuring that the host computer has the proper version of the Rust compiler
 ###################################################################################################
 
-RUSTC_CURRENT_SUPPORTED_VERSION := rustc 1.34.0-nightly (633d75ac1 2019-02-21)
-RUSTC_CURRENT_INSTALL_VERSION := nightly-2019-02-22
+RUSTC_CURRENT_SUPPORTED_VERSION := rustc 1.36.0-nightly (08bfe1612 2019-05-02)
+RUSTC_CURRENT_INSTALL_VERSION := nightly-2019-05-03
 RUSTC_OUTPUT=$(shell rustc --version)
 
 check_rustc: 	
@@ -139,7 +153,7 @@ $(iso): build check_captain
 	@cp $(nano_core_binary) $(GRUB_ISOFILES)/boot/kernel.bin
 # autogenerate the grub.cfg file
 	cargo run --manifest-path $(ROOT_DIR)/tools/grub_cfg_generation/Cargo.toml -- $(GRUB_ISOFILES)/modules/ -o $(GRUB_ISOFILES)/boot/grub/grub.cfg
-	@grub-mkrescue -o $(iso) $(GRUB_ISOFILES)  2> /dev/null
+	$(GRUB_MKRESCUE) -o $(iso) $(GRUB_ISOFILES)  2> /dev/null
 
 
 ### Convenience target for building the ISO	using the above target
@@ -151,7 +165,7 @@ iso: $(iso)
 build: $(nano_core_binary)
 ## Copy all object files into the main build directory and prepend the kernel prefix.
 ## All object files include those from the target/ directory, and the core, alloc, and compiler_builtins libraries
-	@for f in ./target/$(TARGET)/$(BUILD_MODE)/deps/*.o $(HOME)/.xargo/lib/rustlib/$(TARGET)/lib/*.o; do \
+	@for f in ./target/$(TARGET)/$(BUILD_MODE)/deps/*.o "$(HOME)"/.xargo/lib/rustlib/$(TARGET)/lib/*.o; do \
 		cp -vf  $${f}  $(OBJECT_FILES_BUILD_DIR)/`basename $${f} | sed -n -e 's/\(.*\)/$(KERNEL_PREFIX)\1/p'`   2> /dev/null ; \
 	done
 ## In the above loop, we gave all object files the kernel prefix, so we need to rename the application object files with the proper app prefix.
@@ -159,7 +173,7 @@ build: $(nano_core_binary)
 ## if we ever want to give applications specific versioning semantics (based on those hashes, like with kernel crates)
 	@for app in $(APP_CRATES) ; do  \
 		mv  $(OBJECT_FILES_BUILD_DIR)/$(KERNEL_PREFIX)$${app}-*.o  $(OBJECT_FILES_BUILD_DIR)/$(APP_PREFIX)$${app}.o ; \
-		strip --strip-debug  $(OBJECT_FILES_BUILD_DIR)/$(APP_PREFIX)$${app}.o ; \
+		$(CROSS)strip --strip-debug  $(OBJECT_FILES_BUILD_DIR)/$(APP_PREFIX)$${app}.o ; \
 	done
 
 
@@ -204,10 +218,10 @@ $(nano_core_binary): cargo $(nano_core_static_lib) $(assembly_object_files) $(li
 	@mkdir -p $(BUILD_DIR)
 	@mkdir -p $(NANO_CORE_BUILD_DIR)
 	@mkdir -p $(OBJECT_FILES_BUILD_DIR)
-	@ld -n -T $(linker_script) -o $(nano_core_binary) $(assembly_object_files) $(nano_core_static_lib)
+	$(CROSS)ld -n -T $(linker_script) -o $(nano_core_binary) $(assembly_object_files) $(nano_core_static_lib)
 ## run "readelf" on the nano_core binary, remove LOCAL and WEAK symbols from the ELF file, and then demangle it, and then output to a sym file
 	@cargo run --manifest-path $(ROOT_DIR)/tools/demangle_readelf_file/Cargo.toml \
-		<(readelf -S -s -W $(nano_core_binary) | sed '/LOCAL  /d;/WEAK   /d') \
+		<($(CROSS)readelf -S -s -W $(nano_core_binary) | sed '/LOCAL  /d;/WEAK   /d') \
 		>  $(OBJECT_FILES_BUILD_DIR)/$(KERNEL_PREFIX)nano_core.sym
 	@echo -n -e '\0' >> $(OBJECT_FILES_BUILD_DIR)/$(KERNEL_PREFIX)nano_core.sym
 
@@ -265,7 +279,7 @@ simd_personality_sse: build_sse build
 	@cp $(nano_core_binary) $(GRUB_ISOFILES)/boot/kernel.bin
 ## autogenerate the grub.cfg file
 	cargo run --manifest-path $(ROOT_DIR)/tools/grub_cfg_generation/Cargo.toml -- $(GRUB_ISOFILES)/modules/ -o $(GRUB_ISOFILES)/boot/grub/grub.cfg
-	@grub-mkrescue -o $(iso) $(GRUB_ISOFILES)  2> /dev/null
+	@$(GRUB_MKRESCUE) -o $(iso) $(GRUB_ISOFILES)  2> /dev/null
 ## run it in QEMU
 	qemu-system-x86_64 $(QEMU_FLAGS)
 
@@ -286,7 +300,7 @@ simd_personality_avx: build_avx build
 	@cp $(nano_core_binary) $(GRUB_ISOFILES)/boot/kernel.bin
 ## autogenerate the grub.cfg file
 	cargo run --manifest-path $(ROOT_DIR)/tools/grub_cfg_generation/Cargo.toml -- $(GRUB_ISOFILES)/modules/ -o $(GRUB_ISOFILES)/boot/grub/grub.cfg
-	@grub-mkrescue -o $(iso) $(GRUB_ISOFILES)  2> /dev/null
+	@$(GRUB_MKRESCUE) -o $(iso) $(GRUB_ISOFILES)  2> /dev/null
 ## run it in QEMU
 	qemu-system-x86_64 $(QEMU_FLAGS)
 
@@ -325,12 +339,13 @@ build_server: preserve_old_modules iso
 		bash scripts/build_server.sh
 
 preserve_old_modules:
-	@cp -r $(OBJECT_FILES_BUILD_DIR) $(OBJECT_FILES_BUILD_DIR)_old
+	@mv $(OBJECT_FILES_BUILD_DIR) $(OBJECT_FILES_BUILD_DIR)_old
+	cargo clean
 
 
 
 ## The top-level (root) documentation file
-DOC_ROOT := "$(ROOT_DIR)/build/doc/___Theseus_Crates___/index.html"
+DOC_ROOT := $(ROOT_DIR)/build/doc/___Theseus_Crates___/index.html
 
 ## Builds Theseus's documentation.
 ## The entire project is built as normal using the "cargo doc" command.
@@ -341,7 +356,6 @@ doc: check_rustc
 	@rm -rf build/doc
 	@cp -rf target/doc ./build/
 	@echo -e "\n\nDocumentation is now available in the build/doc directory."
-	@echo -e "You can also run 'make view-doc' to view it."
 
 docs: doc
 
@@ -349,7 +363,14 @@ docs: doc
 ## Opens the documentation root in the system's default browser. 
 ## the "powershell" command is used on Windows Subsystem for Linux
 view-doc: doc
-	@xdg-open $(DOC_ROOT) > /dev/null 2>&1 || powershell.exe -c $(DOC_ROOT) &
+	@echo -e "Opening documentation index file in your browser..."
+ifneq ($(IS_WSL), )
+## building on WSL
+	@powershell.exe -c $(DOC_ROOT) &
+else
+## building on regular Linux or macOS
+	@xdg-open $(DOC_ROOT) > /dev/null 2>&1 || open $(DOC_ROOT) &
+endif
 
 view-docs: view-doc
 
@@ -358,7 +379,7 @@ view-docs: view-doc
 clean:
 	cargo clean
 	@rm -rf build
-	@$(MAKE) -C userspace clean
+#@$(MAKE) -C userspace clean
 	
 
 
@@ -478,9 +499,10 @@ else
 endif
 
 ## Currently, kvm by itself can cause problems, but it works with the "host" option (above).
-# ifeq ($(kvm),yes)
-# 	QEMU_FLAGS += -accel kvm
-# endif
+ifeq ($(kvm),yes)
+	$(error Error: the 'kvm=yes' option is currently broken. Use 'host=yes' instead.")
+	# QEMU_FLAGS += -accel kvm
+endif
 
 
 
@@ -531,28 +553,22 @@ bochs: $(iso)
 
 
 
-IS_WSL = $(shell grep 'Microsoft' /proc/version)
+USB_DRIVES = $(shell lsblk -O | grep -i usb | awk '{print $$2}' | grep --color=never '[^0-9]$$')
 
 ### Checks that the supplied usb device (for usage with the boot/pxe targets).
 ### Note: this is bypassed on WSL, because WSL doesn't support raw device files yet.
 check_usb:
-## on WSL, we bypass the check for USB, because burning the ISO to USB must be done with a Windows app
+## on WSL, we bypass the check for USB, because burning the ISO to USB must be done with a Windows app.
 ifeq ($(IS_WSL), ) ## if we're not on WSL...
-ifneq (,$(findstring sd, $(usb))) ## if the specified USB device properly contained "sd"...
-ifeq ("$(wildcard /dev/$(usb))", "") ## if a non-existent "/dev/sd*" drive was specified...
-	@echo -e "\nError: you specified usb drive /dev/$(usb), which does not exist.\n"
-	@exit 1
-endif 
-else 
-## if the specified USB device didn't contain "sd", then it wasn't a proper removable block device.
-	@echo -e "\nError: you need to specify a usb drive, e.g., \"sdc\"."
+## now we need to check that the user has specified a USB drive that actually exists, not a partition of a USB drive.
+ifeq (,$(findstring $(usb),$(USB_DRIVES)))
+	@echo -e "\nError: please specify a USB drive that exists, e.g., \"sdc\" (not a partition like \"sdc1\")."
 	@echo -e "For example, run the following command:"
 	@echo -e "   make boot usb=sdc\n"
-	@echo -e "The following usb drives are currently attached to this system:"
-	@lsblk -O | grep -i usb | awk '{print $$2}' | grep --color=never '[^0-9]$$'  # must escape '$' in makefile with '$$'
+	@echo -e "The following USB drives are currently attached to this system:\n$(USB_DRIVES)"
 	@echo ""
 	@exit 1
-endif  ## end of checking for "sd"
+endif  ## end of checking that the 'usb' variable is a USB drive that exists
 endif  ## end of checking for WSL
 
 

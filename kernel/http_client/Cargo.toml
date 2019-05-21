@@ -17,8 +17,8 @@ version = "0.3.7"
 [dependencies.network_manager]
 path = "../network_manager"
 
-[dependencies.acpi]
-path = "../acpi"
+[dependencies.hpet]
+path = "../hpet"
 
 [dependencies.percent-encoding]
 path = "../../libs/percent_encoding"

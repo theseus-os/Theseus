@@ -1,8 +1,7 @@
 #![no_std]
-#![feature(alloc)]
 /// This crate contains all the necessary functions for navigating the virtual filesystem / obtaining specific
 /// directories via the Path struct 
-#[macro_use] extern crate log;
+// #[macro_use] extern crate log;
 #[macro_use] extern crate alloc;
 extern crate spin;
 extern crate fs_node;
@@ -53,6 +52,13 @@ impl From<String> for Path {
     }
 }
 
+impl From<Path> for String {
+    #[inline]
+    fn from(path: Path) -> String {
+        path.path
+    }
+}
+
 impl Path {
     /// Creates a new `Path` from the given String.
     pub fn new(path: String) -> Self {
@@ -66,14 +72,21 @@ impl Path {
             .filter(|&x| x != "")
     }
 
+    /// Returns a reverse iterator over the components of this `Path`,
+    /// split by the path delimiter `"/"`.
+    pub fn rcomponents<'a>(&'a self) -> impl Iterator<Item = &'a str> {
+        self.path.rsplit(PATH_DELIMITER)
+            .filter(|&x| x != "")
+    }
+
     /// Returns just the file name, i.e., the trailling component of the path.
     /// # Examples
-    /// `"/path/to/me/file.a"` -> "file.a"
-    /// `"me/file.a"` -> "file.a"
+    /// `"/path/to/my/file.a"` -> "file.a"
+    /// `"my/file.a"` -> "file.a"
     /// `"file.a"` -> "file.a"
     pub fn basename<'a>(&'a self) -> &'a str {
-        self.components()
-            .last()
+        self.rcomponents()
+            .next()
             .unwrap_or_else(|| &self.path)
     }
 
@@ -91,12 +104,14 @@ impl Path {
     /// then the last one will be treated as the extension. 
     pub fn extension<'a>(&'a self) -> Option<&'a str> {
         self.basename()
-            .split(EXTENSION_DELIMITER)
+            .rsplit(EXTENSION_DELIMITER)
             .filter(|&x| x != "")
-            .last()
+            .next()
     }
 
     /// Returns a canonical and absolute form of the current path (i.e. the path of the working directory)
+    /// TODO: FIXME:  this doesn't work if the `current_path` is absolute.
+    #[allow(dead_code)]
     fn canonicalize(&self, current_path: &Path) -> Path {
         let mut new_components = Vec::new();
         // Push the components of the working directory to the components of the new path
@@ -177,8 +192,8 @@ impl Path {
 
     /// Returns the file or directory specified by the given path, 
     /// which can either be absolute, or relative from the given the current working directory 
-    pub fn get(&self, starting_dir: &DirRef) -> Result<FileOrDir, &'static str> {
-        let current_path = { Path::new(starting_dir.lock().get_absolute_path()) };
+    pub fn get(&self, starting_dir: &DirRef) -> Option<FileOrDir> {
+        // let current_path = { Path::new(starting_dir.lock().get_absolute_path()) };
         let mut curr_dir = {
             if self.is_absolute() {
                 Arc::clone(root::get_root())
@@ -195,33 +210,30 @@ impl Path {
                 }
                 ".." => {
                     // navigate to parent directory
-                    let parent_dir = curr_dir.lock().get_parent_dir().map_err(|_e| {
-                        error!("Path::get(): failed to move up to parent dir, path {}", current_path);
-                        "failed to move up to parent dir"
-                    })?;
+                    let parent_dir = curr_dir.lock().get_parent_dir()?;
                     curr_dir = parent_dir;
                 }
                 cmpnt => {
                     // navigate to child directory, or return the child file
                     let child_dir = match curr_dir.lock().get(cmpnt) {
-                        Some(FileOrDir::File(f)) => return Ok(FileOrDir::File(f)),
+                        Some(FileOrDir::File(f)) => return Some(FileOrDir::File(f)),
                         Some(FileOrDir::Dir(d)) => d,
-                        None => return Err("file or directory not found"),
+                        None => return None,
                     };
                     curr_dir = child_dir;
                 }
             }
         }
-        Ok(FileOrDir::Dir(curr_dir))
+        Some(FileOrDir::Dir(curr_dir))
     }
 
 
     /// Returns the file or directory specified by the given absolute path
-    pub fn get_absolute(path: &Path) -> Result<FileOrDir, &'static str> {
+    pub fn get_absolute(path: &Path) -> Option<FileOrDir> {
         if path.is_absolute() {
             path.get(root::get_root())
         } else {
-            Err("given path was not absolute")
+            None
         }
     }
 }

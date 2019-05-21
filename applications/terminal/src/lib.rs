@@ -6,7 +6,6 @@
 //! keypresses, resize, print events, etc. 
 
 #![no_std]
-#![feature(alloc)]
 extern crate frame_buffer;
 extern crate keycodes_ascii;
 extern crate spin;
@@ -44,9 +43,9 @@ use environment::Environment;
 use spin::Mutex;
 use fs_node::FileOrDir;
 
-pub const FONT_COLOR:u32 = 0x93ee90;
-pub const BACKGROUND_COLOR:u32 = 0x000000;
-pub const APPLICATIONS_NAMESPACE_PATH: &'static str = "/namespaces/default/application";
+pub const FONT_COLOR: u32 = 0x93ee90;
+pub const BACKGROUND_COLOR: u32 = 0x000000;
+pub const APPLICATIONS_NAMESPACE_PATH: &'static str = "/namespaces/default/applications";
 
 
 /// A main function that calls terminal::new() and waits for the terminal loop to exit before returning an exit value
@@ -84,18 +83,28 @@ enum ScrollError {
     OffEndBound
 }
 
-// Error type for errors when attempting to run an application from the terminal. 
+/// Errors when attempting to invoke an application from the terminal. 
 enum AppErr {
     /// The command does not match the name of any existing application in the 
     /// application namespace directory. 
     NotFound(String),
-    /// The terminal could not obtain the application namespace due to a filesystem error. 
+    /// The terminal could not find the application namespace due to a filesystem error. 
     NamespaceErr,
-    /// The terminal could not spawn/run the application due to an error originating in 
-    /// the spawn crate. 
+    /// The terminal could not spawn a new task to run the new application.
+    /// Includes the String error returned from the task spawn function.
     SpawnErr(String)
 }
 
+
+/// Terminal Structure that allows multiple terminals to be individually run.
+/// There are now two queues that constitute the event-driven terminal architecture
+/// 1) The terminal print queue that handles printing from external applications
+///     - Consumer is the main terminal loop
+///     - Producers are any external application trying to print to the terminal's stdout
+/// 
+/// 2) The input queue (in the window manager) that handles keypresses and resize events
+///     - Consumer is the main terminal loop
+///     - Producer is the window manager. Window manager is responsible for enqueuing keyevents into the active application
 struct Terminal {
     /// The terminal's own window
     window: window_manager::WindowObj,
@@ -141,16 +150,6 @@ struct Terminal {
     env: Arc<Mutex<Environment>>
 }
 
-
-/// Terminal Structure that allows multiple terminals to be individually run.
-/// There are now two queues that constitute the event-driven terminal architecture
-/// 1) The terminal print queue that handles printing from external applications
-///     - Consumer is the main terminal loop
-///     - Producers are any external application trying to print to the terminal's stdout
-/// 
-/// 2) The input queue (in the window manager) that handles keypresses and resize events
-///     - Consumer is the main terminal loop
-///     - Producer is the window manager. Window manager is responsible for enqueuing keyevents into the active application
 impl Terminal {
     /// ref num: usize => unique integer number to the terminal that corresponds to its tab number
     pub fn new() -> Result<TaskRef, &'static str> {
@@ -759,20 +758,19 @@ impl Terminal {
                         let task_id = {new_task_ref.lock().id};
                         self.current_task_ref = Some(new_task_ref);
                         terminal_print::add_child(task_id, self.print_producer.obtain_producer())?; // adds the terminal's print producer to the terminal print crate
-                    } Err(AppErr::NotFound(command)) => {
-                        self.print_to_terminal(format!("\ncommand not found: {}\n", command))?;
+                    }
+                    Err(err) => {
+                        let err_msg = match err {
+                            AppErr::NotFound(command) => format!("\n{:?} command not found.\n", command),
+                            AppErr::NamespaceErr      => format!("\nFailed to find directory of application executables.\n"),
+                            AppErr::SpawnErr(e)       => format!("\nFailed to spawn new task to run command. Error: {}.\n", e),
+                        };
+                        self.print_to_terminal(err_msg)?;
                         self.redisplay_prompt();
                         self.cmdline.clear();
                         self.left_shift = 0;
                         self.correct_prompt_position = true;
                         return Ok(());
-                    } Err(_) => {
-                        self.print_to_terminal("\nrunning command on new thread failed\n".to_string())?;
-                        self.redisplay_prompt();
-                        self.cmdline.clear();
-                        self.left_shift = 0;
-                        self.correct_prompt_position = true;
-                        return Ok(())
                     }
                 }
             }
@@ -968,12 +966,12 @@ impl Terminal {
     fn eval_cmdline(&mut self) -> Result<TaskRef, AppErr> {
         // Parse the cmdline
         let mut args: Vec<String> = self.cmdline.split_whitespace().map(|s| s.to_string()).collect();
-        let command = args.remove(0).to_string(); 
+        let command = args.remove(0);
 
 	    // Check that the application actually exists
         let app_path = Path::new(APPLICATIONS_NAMESPACE_PATH.to_string());
         let app_list = match app_path.get(root::get_root()) {
-            Ok(FileOrDir::Dir(app_dir)) => {app_dir.lock().list()},
+            Some(FileOrDir::Dir(app_dir)) => {app_dir.lock().list()},
             _ => return Err(AppErr::NamespaceErr)
         };
         let mut executable = command.clone();

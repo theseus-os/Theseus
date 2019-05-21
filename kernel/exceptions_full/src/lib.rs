@@ -7,8 +7,9 @@ extern crate x86_64;
 extern crate task;
 extern crate runqueue;
 extern crate apic;
+extern crate tlb_shootdown;
 extern crate pmu_x86;
-#[macro_use] extern crate log;
+// #[macro_use] extern crate log;
 #[macro_use] extern crate vga_buffer; // for println_raw!()
 #[macro_use] extern crate print; // for regular println!()
 
@@ -110,19 +111,15 @@ extern "x86-interrupt" fn nmi_handler(stack_frame: &mut ExceptionStackFrame) {
     
     // sampling interrupt handler: increments a counter, records the IP for the sample, and resets the hardware counter 
     if rdmsr(IA32_PERF_GLOBAL_STAUS) != 0 {
-        // println_both!("what value is in the status register {:x}", rdmsr(IA32_PERF_GLOBAL_STAUS));
-        unsafe { wrmsr(IA32_PERF_GLOBAL_OVF_CTRL, 0); }
-        // println_both!("what value is in the status register after clear: {:x}", rdmsr(IA32_PERF_GLOBAL_STAUS));
-
         pmu_x86::handle_sample(stack_frame);
         expected_nmi = true;
     }
 
     // currently we're using NMIs to send TLB shootdown IPIs
-    let vaddrs = apic::TLB_SHOOTDOWN_IPI_VIRTUAL_ADDRESSES.read();
+    let vaddrs = tlb_shootdown::TLB_SHOOTDOWN_IPI_VIRTUAL_ADDRESSES.read();
     if !vaddrs.is_empty() {
         // trace!("nmi_handler (AP {})", apic::get_my_apic_id().unwrap_or(0xFF));
-        apic::handle_tlb_shootdown_ipi(&vaddrs);
+        tlb_shootdown::handle_tlb_shootdown_ipi(&vaddrs);
         expected_nmi = true;
     }
 

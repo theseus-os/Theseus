@@ -1,5 +1,4 @@
 #![no_std]
-#![feature(alloc)]
 
 extern crate alloc;
 #[macro_use] extern crate log;
@@ -111,7 +110,7 @@ impl DerefMut for ReceiveBuffer {
 }
 impl Drop for ReceiveBuffer {
     fn drop(&mut self) {
-        trace!("ReceiveBuffer::drop(): length: {:5}, phys_addr: {:#X}, vaddr: {:#X}", self.length,  self.phys_addr, self.mp.start_address());
+        // trace!("ReceiveBuffer::drop(): length: {:5}, phys_addr: {:#X}, vaddr: {:#X}", self.length,  self.phys_addr, self.mp.start_address());
 
         // We need to return this ReceiveBuffer to its memory pool. We use a clever trick here:
         // Since we cannot move this receive buffer out of `self` because it's borrowed, 

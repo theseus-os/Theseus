@@ -3,7 +3,6 @@
 
 
 #![no_std]
-#![feature(alloc)]
 #![feature(slice_concat_ext)]
 
 #[macro_use] extern crate alloc;
@@ -13,21 +12,20 @@ extern crate itertools;
 extern crate getopts;
 extern crate memory;
 extern crate mod_mgmt;
-extern crate acpi;
+extern crate hpet;
 extern crate task;
 extern crate path;
 extern crate fs_node;
 
-use core::ops::DerefMut;
 use alloc::{
     string::{String, ToString},
     vec::Vec,
     sync::Arc,
     slice::SliceConcatExt,
 };
-use getopts::Options;
-use mod_mgmt::SwapRequest;
-use acpi::get_hpet;
+use getopts::{Options, Matches};
+use mod_mgmt::{SwapRequest, NamespaceDirectorySet};
+use hpet::get_hpet;
 use path::Path;
 use fs_node::{FileOrDir, FsNode, DirRef};
 
@@ -37,7 +35,8 @@ pub fn main(args: Vec<String>) -> isize {
     let mut opts = Options::new();
     opts.optflag("h", "help", "print this help menu");
     opts.optflag("v", "verbose", "enable verbose logging of crate swapping actions");
-    opts.optopt("k", "kernel-crates", "specify the absolute path of the directory where new kernel crates will be loaded from", "PATH");
+    opts.optopt("d", "directory-crates", "the absolute path of the base directory where new crates will be loaded from", "PATH");
+    opts.optmulti("t", "state-transfer", "the fully-qualified symbol names of state transfer functions, to be run in the order given", "SYMBOL");
 
     let matches = match opts.parse(&args) {
         Ok(m) => m,
@@ -53,55 +52,55 @@ pub fn main(args: Vec<String>) -> isize {
         return 0;
     }
 
-    let taskref = match task::get_my_current_task() {
-        Some(t) => t,
-        None => {
-            println!("failed to get current task");
-            return -1;
+    match rmain(matches) {
+        Ok(_) => 0,
+        Err(e) => {
+            println!("Error: {}", e); 
+            -1
         }
-    };
+    }
+}
+
+
+fn rmain(matches: Matches) -> Result<(), String> {
+
+    let taskref = task::get_my_current_task()
+        .ok_or_else(|| format!("failed to get current task"))?;
+
     let curr_dir = {
         let locked_task = taskref.lock();
         let curr_env = locked_task.env.lock();
         Arc::clone(&curr_env.working_dir)
     };
 
-    let kernel_crates_dir = if let Some(path) = matches.opt_str("k") {
+    let override_namespace_crate_dirs = if let Some(path) = matches.opt_str("d") {
         let path = Path::new(path);
-        match Path::get_absolute(&path) {
-            Ok(FileOrDir::Dir(dir)) => Some(dir),
-            _ => {
-                println!("Error: could not find specified kernel crate directory: {}.", path);
-                return -1;
-            }
-        }
+        let base_dir = match path.get(&curr_dir) {
+            Some(FileOrDir::Dir(dir)) => dir,
+            _ => return Err(format!("Error: could not find specified namespace crate directory: {}.", path)),
+        };
+        Some(NamespaceDirectorySet::from_existing_base_dir(base_dir).map_err(|e| e.to_string())?)
     } else {
         None
     };
 
     let verbose = matches.opt_present("v");
+    let state_transfer_functions = matches.opt_strs("t");
 
-    let matches = matches.free.join(" ");
-    println!("matches: {}", matches);
+    let free_args = matches.free.join(" ");
+    println!("arguments: {}", free_args);
 
-    let tuples = match parse_input_tuples(&matches) {
-        Ok(t)  => t,
-        Err(e) => {
-            println!("Error: {}", e);
-            print_usage(opts);
-            return -1;
-        }
-    };
+    let tuples = parse_input_tuples(&free_args)?;
     println!("tuples: {:?}", tuples);
+        
 
-
-    match swap_modules(tuples, &curr_dir, kernel_crates_dir, verbose) {
-        Ok(_) => 0,
-        Err(e) => {
-            println!("Error: {}", e);
-            -1
-        }
-    }
+    swap_modules(
+        tuples, 
+        &curr_dir, 
+        override_namespace_crate_dirs,
+        state_transfer_functions,
+        verbose
+    )
 }
 
 
@@ -153,7 +152,8 @@ fn parse_input_tuples<'a>(args: &'a str) -> Result<Vec<(&'a str, &'a str, bool)>
 fn swap_modules(
     tuples: Vec<(&str, &str, bool)>, 
     curr_dir: &DirRef, 
-    kernel_crates_dir: Option<DirRef>, 
+    override_namespace_crate_dirs: Option<NamespaceDirectorySet>, 
+    state_transfer_functions: Vec<String>,
     verbose_log: bool
 ) -> Result<(), String> {
     let namespace = mod_mgmt::get_default_namespace().ok_or("Couldn't get default crate namespace")?;
@@ -168,9 +168,9 @@ fn swap_modules(
 
             // 2) check that the new crate file exists. It could be a regular path, or a prefix for a file in the namespace's kernel dir
             let new_crate_abs_path = match Path::new(String::from(n)).get(curr_dir) {
-                Ok(FileOrDir::File(f)) => Ok(Path::new(f.lock().get_absolute_path())),
+                Some(FileOrDir::File(f)) => Ok(Path::new(f.lock().get_absolute_path())),
                 _ => namespace.get_kernel_file_starting_with(n)
-                        .and_then(|p| p.get(namespace.kernel_directory()).map(|f_or_d| Path::new(f_or_d.get_absolute_path())).ok())
+                        .and_then(|p| p.get(namespace.dirs().kernel_directory()).map(|f_or_d| Path::new(f_or_d.get_absolute_path())))
                         .ok_or_else(|| format!("Couldn't find new kernel crate file {:?}.", n))
             }?;
             mods.push(
@@ -182,14 +182,14 @@ fn swap_modules(
     };
 
     let kernel_mmi_ref = memory::get_kernel_mmi_ref().ok_or_else(|| "couldn't get kernel_mmi_ref".to_string())?;
-    let mut kernel_mmi = kernel_mmi_ref.lock();
     
     let start = get_hpet().as_ref().ok_or("couldn't get HPET timer")?.get_counter();
 
     let swap_result = namespace.swap_crates(
         swap_requests, 
-        kernel_crates_dir,
-        kernel_mmi.deref_mut(), 
+        override_namespace_crate_dirs,
+        state_transfer_functions,
+        &kernel_mmi_ref,
         verbose_log
     );
     

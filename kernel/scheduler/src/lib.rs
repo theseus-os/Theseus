@@ -1,5 +1,4 @@
 #![no_std]
-#![feature(alloc)]
 
 extern crate alloc;
 #[macro_use] extern crate log;
@@ -79,9 +78,9 @@ pub fn schedule() -> bool {
 /// Changes the priority of the given task with the given priority level.
 /// Priority values must be between 40 (maximum priority) and 0 (minimum prriority).
 /// This function returns an error when a scheduler without priority is loaded. 
-pub fn set_priority(task: &TaskRef, priority: u8) -> Result<(), &'static str> {
+pub fn set_priority(_task: &TaskRef, _priority: u8) -> Result<(), &'static str> {
     #[cfg(priority_scheduler)] {
-        scheduler_priority::set_priority(task, priority)
+        scheduler_priority::set_priority(_task, _priority)
     }
     #[cfg(not(priority_scheduler))] {
         Err("no scheduler that uses task priority is currently loaded")
@@ -90,9 +89,9 @@ pub fn set_priority(task: &TaskRef, priority: u8) -> Result<(), &'static str> {
 
 /// Returns the priority of a given task.
 /// This function returns None when a scheduler without priority is loaded.
-pub fn get_priority(task: &TaskRef) -> Option<u8> {
+pub fn get_priority(_task: &TaskRef) -> Option<u8> {
     #[cfg(priority_scheduler)] {
-        scheduler_priority::get_priority(task)
+        scheduler_priority::get_priority(_task)
     }
     #[cfg(not(priority_scheduler))] {
         //Err("no scheduler that uses task priority is currently loaded")

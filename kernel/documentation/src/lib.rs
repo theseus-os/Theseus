@@ -27,7 +27,6 @@
 //! * `captain`: The main driver of Theseus. Controls the loading and initialization of all subsystems and other crates.
 //! * `input_event_manager`: Handles input events from the keyboard and routes them to the correct application. ** Being phased out by window manager
 //! * `event_types`: A temporary way to move the input_event_manager typedefs out of the input_event_manager crate.
-//! * `dbus`: Simple dbus-like IPC support for Theseus (incomplete).
 //! * `device_manager`: Code for handling the sequence required to initialize each driver.
 //! * `e1000`: Support for the e1000 NIC and driver.
 //! * `exceptions_early`: Early exception handlers that do nothing but print an error and hang.
@@ -53,7 +52,6 @@
 //! * `scheduler`: The scheduler and runqueue management.
 //! * `serial_port`: simple driver for writing to the serial_port, used mostly for debugging.
 //! * `spawn`: Functions and wrappers for spawning new Tasks, both kernel threads and userspace processes.
-//! * `syscall`: Initializes the system call support, and provides basic handling and dispatching of syscalls in Theseus.
 //! * `task`: Task types and structure definitions, a Task is a thread of execution.
 //! * `text_display` : Defines a trait for anything that can display text to the screen
 //! * `tsc`: TSC (TimeStamp Counter) support for performance counters on x86. Basically a wrapper around rdtsc.

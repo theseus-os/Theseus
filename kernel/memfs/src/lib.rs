@@ -1,11 +1,10 @@
 #![no_std]
-#![feature(alloc)]
 
 //! This crate contains an implementation of an in-memory filesystem backed by MappedPages from the memory crate
 //! This crate allocates memory at page-size granularity, so it's inefficient with memory when creating small files
 //! Currently, the read and write operations of the RamFile follows the interface of the std::io read/write operations of the Rust standard library
 
-#[macro_use] extern crate log;
+// #[macro_use] extern crate log;
 extern crate alloc;
 extern crate spin;
 extern crate fs_node;
@@ -17,10 +16,9 @@ extern crate irq_safety;
 use core::ops::DerefMut;
 use alloc::string::String;
 use fs_node::{DirRef, WeakDirRef, File, FsNode};
-use memory::{MappedPages, get_kernel_mmi_ref, allocate_pages_by_bytes, PageTable, FRAME_ALLOCATOR, EntryFlags};
+use memory::{MappedPages, get_kernel_mmi_ref, allocate_pages_by_bytes, FRAME_ALLOCATOR, EntryFlags};
 use alloc::sync::Arc;
 use spin::Mutex;
-use alloc::boxed::Box;
 use fs_node::{FileOrDir, FileRef};
 
 /// The struct that represents a file in memory that is backed by MappedPages
@@ -51,7 +49,7 @@ impl MemFile {
             mp: mapped_pages, 
             parent: Arc::downgrade(parent), 
         };
-        let file_ref = Arc::new(Mutex::new(Box::new(memfile) as Box<File + Send>));
+        let file_ref = Arc::new(Mutex::new(memfile)) as Arc<Mutex<File + Send>>;
         parent.lock().insert(FileOrDir::File(file_ref.clone()))?; // adds the newly created file to the tree
         Ok(file_ref)
     }
@@ -101,38 +99,33 @@ impl File for MemFile {
             
             let kernel_mmi_ref = get_kernel_mmi_ref().ok_or("KERNEL_MMI was not yet initialized!")?;
 			let mut kernel_mmi = kernel_mmi_ref.lock();
-            if let PageTable::Active(ref mut active_table) = kernel_mmi.page_table {
-                let mut allocator = try!(FRAME_ALLOCATOR.try().ok_or("Couldn't get Frame Allocator"));
-                let pages = allocate_pages_by_bytes(end).ok_or("could not allocate pages")?;
-                let mut new_mapped_pages = active_table.map_allocated_pages(pages, prev_flags, allocator.lock().deref_mut())?;            
-                
-                // first, we need to copy over the bytes from the previous mapped pages
-                {
-                    // this copies bytes to min(the write offset, all the bytes of the existing mapped pages)
-                    let copy_limit;
-                    // The write does not overlap with existing content, so we copy all existing content
-                    if offset > self.size { 
-                        copy_limit = self.size;
-                    } else { // Otherwise, we only copy up to where the overlap begins
-                        copy_limit = offset;
-                    }
-                    let existing_bytes = self.mp.as_slice(0, copy_limit)?;
-                    let mut copy_slice = new_mapped_pages.as_slice_mut::<u8>(0, copy_limit)?;
-                    copy_slice.copy_from_slice(existing_bytes);
-                } 
-                
-                // second, we write the new content into the reallocated mapped pages
-                {
-                    let mut dest_slice = new_mapped_pages.as_slice_mut::<u8>(offset, buffer.len())?;
-                    dest_slice.copy_from_slice(buffer); // writes the desired contents into the correct area in the mapped page
+            let allocator = try!(FRAME_ALLOCATOR.try().ok_or("Couldn't get Frame Allocator"));
+            let pages = allocate_pages_by_bytes(end).ok_or("could not allocate pages")?;
+            let mut new_mapped_pages = kernel_mmi.page_table.map_allocated_pages(pages, prev_flags, allocator.lock().deref_mut())?;            
+            
+            // first, we need to copy over the bytes from the previous mapped pages
+            {
+                // this copies bytes to min(the write offset, all the bytes of the existing mapped pages)
+                let copy_limit;
+                // The write does not overlap with existing content, so we copy all existing content
+                if offset > self.size { 
+                    copy_limit = self.size;
+                } else { // Otherwise, we only copy up to where the overlap begins
+                    copy_limit = offset;
                 }
-                self.mp = new_mapped_pages;
-                self.size = end;
-                Ok(buffer.len())
+                let existing_bytes = self.mp.as_slice(0, copy_limit)?;
+                let copy_slice = new_mapped_pages.as_slice_mut::<u8>(0, copy_limit)?;
+                copy_slice.copy_from_slice(existing_bytes);
+            } 
+            
+            // second, we write the new content into the reallocated mapped pages
+            {
+                let dest_slice = new_mapped_pages.as_slice_mut::<u8>(offset, buffer.len())?;
+                dest_slice.copy_from_slice(buffer); // writes the desired contents into the correct area in the mapped page
             }
-            else {
-                Err("could not get active table")
-            }
+            self.mp = new_mapped_pages;
+            self.size = end;
+            Ok(buffer.len())
         }
     }
 
@@ -152,9 +145,12 @@ impl FsNode for MemFile {
         self.name.clone()
     }
     
-    /// Returns a pointer to the parent if it exists
-    fn get_parent_dir(&self) -> Result<DirRef, &'static str> {
-        self.parent.upgrade().ok_or("couldn't upgrade parent")
+    fn get_parent_dir(&self) -> Option<DirRef> {
+        self.parent.upgrade()
+    }
+
+    fn set_parent_dir(&mut self, new_parent: WeakDirRef) {
+        self.parent = new_parent;
     }
 }
 

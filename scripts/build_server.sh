@@ -63,10 +63,14 @@ cd $NEW_DIR/
 ls *.o > $NEW_DIR/listing.txt
 
 
-### if the directory of old modules was optionally provided, create a diff file in the new update dir
+### If the directory of old modules was optionally provided, create a diff file in the new update dir.
+### If a state transfer function was specified, then append it to the end of the diff
 if [ -d $OLD_MODULES_DIR ] ; then 
   # DIFF_FILE=$(readlink -e $DIFF_FILE)
 	cargo run --manifest-path $TOOLS_DIR/diff_crates/Cargo.toml -- $OLD_MODULES_DIR  $NEW_MODULES_DIR  >  $NEW_DIR/diff.txt
+if [ ! -z $STATE_TRANSFER ] ; then
+  echo "@$STATE_TRANSFER" >>  $NEW_DIR/diff.txt
+fi
 fi
 
 
@@ -83,5 +87,5 @@ done
 ### Start up the actual HTTP server (after killing off any existing identical web server)
 WEBSERVER_CMD="python -m SimpleHTTPServer 8090"
 pkill -f "$WEBSERVER_CMD" || true
-echo "Starting simple HTTP server at root dir $HTTP_ROOT with new dir $NEW_DIR_NAME"
+echo "Starting simple HTTP server at \"$HTTP_ROOT\" with new update \"$NEW_DIR_NAME\""
 cd $HTTP_ROOT && $($WEBSERVER_CMD) > /dev/null  2>&1  &

@@ -21,8 +21,8 @@ git = "https://github.com/kevinaboos/irq_safety"
 [dependencies.network_manager]
 path = "../network_manager"
 
-[dependencies.acpi]
-path = "../acpi"
+[dependencies.hpet]
+path = "../hpet"
 
 [dependencies.spawn]
 path = "../spawn"
@@ -35,6 +35,10 @@ path = "../http_client"
 
 [dependencies.percent-encoding]
 path = "../../libs/percent_encoding"
+
+[dependencies.itertools]
+version = "0.7.9"
+default-features = false
 
 [dependencies.smoltcp]
 version = "0.5.0"

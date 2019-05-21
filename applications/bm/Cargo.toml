@@ -21,8 +21,8 @@ path = "../terminal_print"
 [dependencies.task]
 path = "../../kernel/task"
 
-[dependencies.acpi]
-path = "../../kernel/acpi"
+[dependencies.hpet]
+path = "../../kernel/hpet"
 
 [dependencies.apic]
 path = "../../kernel/apic"
@@ -36,10 +36,13 @@ path = "../../kernel/path"
 [dependencies.runqueue]
 path = "../../kernel/runqueue"
 
-[dependencies.memfs]
-path = "../../kernel/memfs"
+[dependencies.heapfile]
+path = "../../kernel/heapfile"
 # [dependencies.application_main_fn]
 # path = "../../compiler_plugins"
 
 [dependencies.fs_node]
 path = "../../kernel/fs_node"
+
+[dependencies.scheduler]
+path = "../../kernel/scheduler"

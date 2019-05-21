@@ -56,13 +56,13 @@ impl AllocatedPages {
 //     }
 // }
 
-impl Drop for AllocatedPages {
-    fn drop(&mut self) {
-        if let Err(_) = deallocate_pages(self) {
-			error!("AllocatedPages::drop(): error deallocating pages");
-		}
-    }
-}
+// impl Drop for AllocatedPages {
+//     fn drop(&mut self) {
+//         if let Err(_) = deallocate_pages(self) {
+// 			error!("AllocatedPages::drop(): error deallocating pages");
+// 		}
+//     }
+// }
 
 
 
@@ -73,7 +73,7 @@ lazy_static!{
 		// and goes until the end of the kernel free text section
 		let initial_chunk: Chunk = Chunk {
 			allocated: false,
-			start_page: Page::containing_address(KERNEL_TEXT_START),
+			start_page: Page::containing_address(VirtualAddress::new_canonical(KERNEL_TEXT_START)),
 			size_in_pages: KERNEL_TEXT_MAX_SIZE / PAGE_SIZE,
 		};
 		let mut list: LinkedList<Chunk> = LinkedList::new();
@@ -155,6 +155,7 @@ pub fn allocate_pages(num_pages: usize) -> Option<AllocatedPages> {
 }
 
 
+#[allow(dead_code)]
 fn deallocate_pages(_pages: &mut AllocatedPages) -> Result<(), ()> {
 	trace!("Virtual Address Allocator: deallocate_pages is not yet implemented, trying to dealloc: {:?}", _pages);
 	Ok(())

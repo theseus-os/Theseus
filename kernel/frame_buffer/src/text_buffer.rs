@@ -1,6 +1,6 @@
 extern crate tsc;
 use super::font::{CHARACTER_HEIGHT, CHARACTER_WIDTH, FONT_PIXEL};
-use super::{Mutex, FRAME_DRAWER, DerefMut, Box};
+use super::{Mutex, FRAME_DRAWER, Box};
 
 use self::tsc::{tsc_ticks, TscTicks};
 

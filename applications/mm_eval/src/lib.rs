@@ -3,7 +3,6 @@
 //! with a standard memory mapping implementation based on `VirtualMemoryArea`s.
 
 #![no_std]
-#![feature(alloc)]
 
 extern crate alloc;
 #[macro_use] extern crate cfg_if;
@@ -11,7 +10,7 @@ extern crate alloc;
 extern crate log;
 extern crate memory;
 extern crate getopts;
-extern crate acpi;
+extern crate hpet;
 extern crate kernel_config;
 extern crate tsc;
 
@@ -27,7 +26,7 @@ if #[cfg(mapper_spillful)] {
 
 use core::ops::DerefMut;
 use getopts::{Matches, Options};
-use acpi::get_hpet;
+use hpet::get_hpet;
 use kernel_config::memory::PAGE_SIZE;
 
 
@@ -288,8 +287,8 @@ pub fn main(args: Vec<String>) -> isize {
 
 pub fn rmain(matches: &Matches, opts: &Options) -> Result<(), &'static str> {
 
-    let mut mapper_normal   = unsafe { Mapper::new() };
-    let mut mapper_spillful = unsafe { MapperSpillful::new() };
+    let mut mapper_normal   = Mapper::from_current();
+    let mut mapper_spillful = MapperSpillful::new();
 
     let start_vaddr = 0xFFFF_FA00_0000_0000; // the start of the 500th P4 (PML4) entry
 

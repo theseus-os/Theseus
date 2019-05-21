@@ -1,5 +1,4 @@
 #![no_std]
-#![feature(alloc)]
 #[macro_use] extern crate alloc;
 #[macro_use] extern crate terminal_print;
 
@@ -57,18 +56,18 @@ pub fn main(args: Vec<String>) -> isize {
             RunState::Exited(_)  => "Exited",
             RunState::Reaped     => "Reaped",
         };
-        let cpu = task.running_on_cpu.map(|cpu| format!("{}", cpu)).unwrap_or(String::from("-"));
-        let pinned = &task.pinned_core.map(|pin| format!("{}", pin)).unwrap_or(String::from("-"));
+        let cpu = task.running_on_cpu.map(|cpu| format!("{}", cpu)).unwrap_or_else(|| String::from("-"));
+        let pinned = &task.pinned_core.map(|pin| format!("{}", pin)).unwrap_or_else(|| String::from("-"));
         let task_type = if task.is_an_idle_task {"I"}
             else if task.is_application() {"A"}
             else {" "} ;     
-        let priority = scheduler::get_priority(&taskref).map(|priority| format!("{}", priority)).unwrap_or(String::from("-"));
         if matches.opt_present("b") {
             task_string.push_str(&format!("{0:<5}  {1}\n", id, name));
         }
         else {
 
             #[cfg(priority_scheduler)] {
+                let priority = scheduler::get_priority(&taskref).map(|priority| format!("{}", priority)).unwrap_or_else(|| String::from("-"));
                 task_string.push_str(
                     &format!("{0:<5}  {1:<10}  {2:<4}  {3:<4}  {4:<5}  {5:<10}  {6}\n", 
                     id, runstate, cpu, pinned, task_type, priority, name)

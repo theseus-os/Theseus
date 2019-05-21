@@ -2,8 +2,6 @@
 //! 
 
 #![no_std]
-#![feature(alloc)]
-#![feature(try_from)]
 #![feature(slice_concat_ext)]
 
 #[macro_use] extern crate log;
@@ -11,9 +9,8 @@ extern crate alloc;
 extern crate smoltcp;
 extern crate network_manager;
 extern crate spin;
-extern crate acpi;
+extern crate hpet;
 extern crate httparse;
-extern crate percent_encoding;
 
 
 use core::convert::TryInto;
@@ -21,25 +18,12 @@ use core::str;
 use alloc::vec::Vec;
 use alloc::string::String;
 use spin::Once;
-use acpi::get_hpet;
+use hpet::get_hpet;
 use smoltcp::{
     socket::{SocketSet, TcpSocket, SocketHandle},
     time::Instant
 };
-use percent_encoding::{DEFAULT_ENCODE_SET, utf8_percent_encode};
 use network_manager::{NetworkInterfaceRef};
-
-
-/// The IP address of the update server.
-/// This is currently the static IP of `kevin.recg.rice.edu`.
-const DEFAULT_DESTINATION_IP_ADDR: [u8; 4] = [168, 7, 138, 84];
-
-/// The TCP port on the update server that listens for update requests 
-const DEFAULT_DESTINATION_PORT: u16 = 8090;
-
-/// The starting number for freely-available (non-reserved) standard TCP/UDP ports.
-const STARTING_FREE_PORT: u16 = 49152;
-
 
 
 /// The states that implement the finite state machine for 

@@ -22,6 +22,9 @@ path = "../print"
 [dependencies.apic]
 path = "../apic"
 
+[dependencies.tlb_shootdown]
+path = "../tlb_shootdown"
+
 [dependencies.task]
 path = "../task"
 
