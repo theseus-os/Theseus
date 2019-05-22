@@ -28,7 +28,7 @@ APP_PREFIX    ?= a\#
 BUILD_MODE ?= release
 
 ifeq ($(BUILD_MODE), release)
-	CARGO_OPTIONS += --release
+	CARGOFLAGS += --release
 endif
 
 
@@ -51,3 +51,9 @@ RUSTFLAGS += -D unused-must-use
 RUSTFLAGS += -Z merge-functions=disabled
 # RUSTFLAGS += -Z merge-functions=trampolines
 
+## This prevents monomorphized instances of generic functions from being shared across crates.
+## It vastly simplifies the procedure of finding missing symbols in the crate loader,
+## because we know that instances of generic functions will not be found in another crate
+## besides the current crate or the crate that defines the function.
+## As far as I can tell, this does not have a significant impact on object code size or performance.
+RUSTFLAGS += -Z share-generics=no

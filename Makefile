@@ -185,7 +185,7 @@ cargo: check_rustc check_xargo
 	@echo -e "\t KERNEL_PREFIX: \"$(KERNEL_PREFIX)\""
 	@echo -e "\t APP_PREFIX: \"$(APP_PREFIX)\""
 	@echo -e "\t THESEUS_CONFIG: \"$(THESEUS_CONFIG)\""
-	RUST_TARGET_PATH="$(CFG_DIR)" RUSTFLAGS="$(RUSTFLAGS)" xargo build  $(CARGO_OPTIONS)  $(RUST_FEATURES) --all --target $(TARGET)
+	RUST_TARGET_PATH="$(CFG_DIR)" RUSTFLAGS="$(RUSTFLAGS)" xargo build  $(CARGOFLAGS)  $(RUST_FEATURES) --all --target $(TARGET)
 
 ## We tried using the "xargo rustc" command here instead of "xargo build" to avoid xargo unnecessarily rebuilding core/alloc crates,
 ## But it doesn't really seem to work (it's not the cause of xargo rebuilding everything).
@@ -196,7 +196,7 @@ cargo: check_rustc check_xargo
 # 		echo -e "\n========= BUILDING KERNEL CRATE $${kd} ==========\n" ; \
 # 		RUST_TARGET_PATH="$(CFG_DIR)" RUSTFLAGS="$(RUSTFLAGS)" \
 # 			xargo rustc \
-# 			$(CARGO_OPTIONS) \
+# 			$(CARGOFLAGS) \
 # 			$(RUST_FEATURES) \
 # 			--target $(TARGET) ; \
 # 		cd .. ; \
@@ -205,7 +205,7 @@ cargo: check_rustc check_xargo
 # 	cd $${app} ; \
 # 	RUST_TARGET_PATH="$(CFG_DIR)" RUSTFLAGS="$(RUSTFLAGS)" \
 # 		xargo rustc \
-# 		$(CARGO_OPTIONS) \
+# 		$(CARGOFLAGS) \
 # 		--target $(TARGET) \
 # 		-- \
 # 		$(COMPILER_LINTS) ; \
@@ -259,7 +259,7 @@ userspace:
 #
 # ## Builds our custom lints in the compiler plugins directory so we can use them here
 # compiler_plugins:
-# 	@cd $(COMPILER_PLUGINS_DIR) && cargo build $(CARGO_OPTIONS)
+# 	@cd $(COMPILER_PLUGINS_DIR) && cargo build $(CARGOFLAGS)
 
 
 
@@ -499,7 +499,7 @@ endif
 
 ## Currently, kvm by itself can cause problems, but it works with the "host" option (above).
 ifeq ($(kvm),yes)
-	$(error Error: the 'kvm=yes' option is currently broken. Use 'host=yes' instead.")
+$(error Error: the 'kvm=yes' option is currently broken. Use 'host=yes' instead")
 	# QEMU_FLAGS += -accel kvm
 endif
 
