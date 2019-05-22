@@ -94,15 +94,17 @@ impl Add<usize> for Page {
     type Output = Page;
 
     fn add(self, rhs: usize) -> Page {
-        assert!(self.number < MAX_PAGE_NUMBER, "Page addition error, cannot go above MAX_PAGE_NUMBER 0x000FFFFFFFFFFFFF!");
-        Page { number: self.number + rhs }
+        // cannot exceed max page number
+        Page {
+            number: core::cmp::min(MAX_PAGE_NUMBER, self.number.saturating_add(rhs)),
+        }
     }
 }
 
 impl AddAssign<usize> for Page {
     fn add_assign(&mut self, rhs: usize) {
         *self = Page {
-            number: self.number + rhs,
+            number: core::cmp::min(MAX_PAGE_NUMBER, self.number.saturating_add(rhs)),
         };
     }
 }
@@ -111,15 +113,14 @@ impl Sub<usize> for Page {
     type Output = Page;
 
     fn sub(self, rhs: usize) -> Page {
-        assert!(self.number > 0, "Page subtraction error, cannot go below zero!");
-        Page { number: self.number - rhs }
+        Page { number: self.number.saturating_sub(rhs) }
     }
 }
 
 impl SubAssign<usize> for Page {
     fn sub_assign(&mut self, rhs: usize) {
         *self = Page {
-            number: self.number - rhs,
+            number: self.number.saturating_sub(rhs),
         };
     }
 }
@@ -169,7 +170,7 @@ impl PageIter {
     /// This is instant, because it doesn't need to iterate over each entry, unlike normal iterators.
     pub fn size_in_pages(&self) -> usize {
         // add 1 because it's an inclusive range
-        self.end.number - self.start.number + 1 
+        self.end.number + 1 - self.start.number
     }
 }
 
@@ -540,20 +541,20 @@ pub fn init(allocator_mutex: &MutexIrqSafe<AreaFrameAllocator>, boot_info: &mult
             // VGA text mode only goes from 0xB_8000 - 0XC_0000
             const VGA_DISPLAY_PHYS_START: usize = 0xA_0000;
             const VGA_DISPLAY_PHYS_END: usize = 0xC_0000;
+            const VGA_SIZE_IN_BYTES: usize = VGA_DISPLAY_PHYS_END - VGA_DISPLAY_PHYS_START;
             let vga_display_virt_addr = VirtualAddress::new_canonical(VGA_DISPLAY_PHYS_START + KERNEL_OFFSET);
-            let size_in_bytes: usize = VGA_DISPLAY_PHYS_END - VGA_DISPLAY_PHYS_START;
             let vga_display_flags = EntryFlags::PRESENT | EntryFlags::WRITABLE | EntryFlags::GLOBAL | EntryFlags::NO_CACHE;
             higher_half_mapped_pages[index] = Some( try!( mapper.map_frames(
-                Frame::range_inclusive_addr(PhysicalAddress::new(VGA_DISPLAY_PHYS_START)?, size_in_bytes), 
+                Frame::range_inclusive_addr(PhysicalAddress::new(VGA_DISPLAY_PHYS_START)?, VGA_SIZE_IN_BYTES), 
                 Page::containing_address(vga_display_virt_addr), 
                 vga_display_flags,
                 allocator.deref_mut())
             ));
-            vmas[index] = VirtualMemoryArea::new(vga_display_virt_addr, size_in_bytes, vga_display_flags, "Kernel VGA Display Memory");
+            vmas[index] = VirtualMemoryArea::new(vga_display_virt_addr, VGA_SIZE_IN_BYTES, vga_display_flags, "Kernel VGA Display Memory");
             debug!("mapped kernel section: vga_buffer at addr: {:?}", vmas[index]);
             // also do an identity mapping for APs that need it while booting
             identity_mapped_pages[index] = Some( try!( mapper.map_frames(
-                Frame::range_inclusive_addr(PhysicalAddress::new(VGA_DISPLAY_PHYS_START)?, size_in_bytes), 
+                Frame::range_inclusive_addr(PhysicalAddress::new(VGA_DISPLAY_PHYS_START)?, VGA_SIZE_IN_BYTES), 
                 Page::containing_address(VirtualAddress::new_canonical(VGA_DISPLAY_PHYS_START)), 
                 vga_display_flags, allocator.deref_mut())
             ));
