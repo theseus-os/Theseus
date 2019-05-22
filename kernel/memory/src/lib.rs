@@ -106,13 +106,13 @@ impl Add<usize> for VirtualAddress {
     type Output = VirtualAddress;
 
     fn add(self, rhs: usize) -> VirtualAddress {
-        VirtualAddress(self.0 + rhs)
+        VirtualAddress::new_canonical(self.0.saturating_add(rhs))
     }
 }
 
 impl AddAssign<usize> for VirtualAddress {
     fn add_assign(&mut self, rhs: usize) {
-        *self = VirtualAddress(self.0 + rhs);
+        *self = VirtualAddress::new_canonical(self.0.saturating_add(rhs));
     }
 }
 
@@ -120,13 +120,13 @@ impl Sub<usize> for VirtualAddress {
     type Output = VirtualAddress;
 
     fn sub(self, rhs: usize) -> VirtualAddress {
-        VirtualAddress(self.0 - rhs)
+        VirtualAddress::new_canonical(self.0.saturating_sub(rhs))
     }
 }
 
 impl SubAssign<usize> for VirtualAddress {
     fn sub_assign(&mut self, rhs: usize) {
-        *self = VirtualAddress(self.0 - rhs);
+        *self = VirtualAddress::new_canonical(self.0.saturating_sub(rhs));
     }
 }
 
@@ -191,13 +191,13 @@ impl Add<usize> for PhysicalAddress {
     type Output = PhysicalAddress;
 
     fn add(self, rhs: usize) -> PhysicalAddress {
-        PhysicalAddress(self.0 + rhs)
+        PhysicalAddress::new_canonical(self.0.saturating_add(rhs))
     }
 }
 
 impl AddAssign<usize> for PhysicalAddress {
     fn add_assign(&mut self, rhs: usize) {
-        *self = PhysicalAddress(self.0 + rhs);
+        *self = PhysicalAddress::new_canonical(self.0.saturating_add(rhs));
     }
 }
 
@@ -205,13 +205,13 @@ impl Sub<usize> for PhysicalAddress {
     type Output = PhysicalAddress;
 
     fn sub(self, rhs: usize) -> PhysicalAddress {
-        PhysicalAddress(self.0 - rhs)
+        PhysicalAddress::new_canonical(self.0.saturating_sub(rhs))
     }
 }
 
 impl SubAssign<usize> for PhysicalAddress {
     fn sub_assign(&mut self, rhs: usize) {
-        *self = PhysicalAddress(self.0 - rhs);
+        *self = PhysicalAddress::new_canonical(self.0.saturating_sub(rhs));
     }
 }
 
@@ -605,15 +605,17 @@ impl Add<usize> for Frame {
     type Output = Frame;
 
     fn add(self, rhs: usize) -> Frame {
-        assert!(self.number < MAX_PAGE_NUMBER, "Frame addition error, cannot go above MAX_PAGE_NUMBER 0x000F_FFFF_FFFF_FFFF!");
-        Frame { number: self.number + rhs }
+        // cannot exceed max page number (which is also max frame number)
+        Frame {
+            number: core::cmp::min(MAX_PAGE_NUMBER, self.number.saturating_add(rhs)),
+        }
     }
 }
 
 impl AddAssign<usize> for Frame {
     fn add_assign(&mut self, rhs: usize) {
         *self = Frame {
-            number: self.number + rhs,
+            number: core::cmp::min(MAX_PAGE_NUMBER, self.number.saturating_add(rhs)),
         };
     }
 }
@@ -622,15 +624,14 @@ impl Sub<usize> for Frame {
     type Output = Frame;
 
     fn sub(self, rhs: usize) -> Frame {
-        assert!(self.number > 0, "Frame subtraction error, cannot go below zero!");
-        Frame { number: self.number - rhs }
+        Frame { number: self.number.saturating_sub(rhs) }
     }
 }
 
 impl SubAssign<usize> for Frame {
     fn sub_assign(&mut self, rhs: usize) {
         *self = Frame {
-            number: self.number - rhs,
+            number: self.number.saturating_sub(rhs),
         };
     }
 }
@@ -677,7 +678,7 @@ impl FrameIter {
     /// This is instant, because it doesn't need to iterate over each entry, unlike normal iterators.
     pub fn size_in_frames(&self) -> usize {
         // add 1 because it's an inclusive range
-        self.end.number - self.start.number + 1 
+        self.end.number + 1 - self.start.number
     }
 
     /// Whether this `FrameIter` contains the given `Frame`.
