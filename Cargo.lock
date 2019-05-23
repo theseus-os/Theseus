@@ -283,6 +283,13 @@ dependencies = [
 ]
 
 [[package]]
+name = "crate_name_utils"
+version = "0.1.0"
+dependencies = [
+ "itertools 0.7.11 (registry+https://github.com/rust-lang/crates.io-index)",
+]
+
+[[package]]
 name = "date"
 version = "0.1.0"
 dependencies = [
@@ -298,6 +305,7 @@ version = "0.1.0"
 name = "deps"
 version = "0.1.0"
 dependencies = [
+ "crate_name_utils 0.1.0",
  "getopts 0.2.18 (git+https://github.com/kevinaboos/getopts)",
  "itertools 0.7.11 (registry+https://github.com/rust-lang/crates.io-index)",
  "memory 0.1.0",
@@ -863,6 +871,7 @@ name = "mod_mgmt"
 version = "0.1.0"
 dependencies = [
  "cow_arc 0.1.0",
+ "crate_name_utils 0.1.0",
  "fs_node 0.1.0",
  "goblin 0.0.19 (registry+https://github.com/rust-lang/crates.io-index)",
  "hashbrown 0.1.8 (registry+https://github.com/rust-lang/crates.io-index)",
