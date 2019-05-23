@@ -40,6 +40,9 @@ path = "../kernel_config"
 default-features = false
 version = "0.3.7"
 
+[dependencies.crate_name_utils]
+path = "../crate_name_utils"
+
 [dependencies.memory]
 path = "../memory"
 
