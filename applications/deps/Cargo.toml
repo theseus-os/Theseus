@@ -16,6 +16,9 @@ default-features = false
 [dependencies.terminal_print]
 path = "../terminal_print"
 
+[dependencies.crate_name_utils]
+path = "../../kernel/crate_name_utils"
+
 [dependencies.mod_mgmt]
 path = "../../kernel/mod_mgmt"
 

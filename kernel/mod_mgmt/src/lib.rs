@@ -12,6 +12,7 @@ extern crate multiboot2;
 extern crate kernel_config;
 extern crate goblin;
 extern crate util;
+extern crate crate_name_utils;
 extern crate rustc_demangle;
 extern crate owning_ref;
 extern crate cow_arc;
@@ -53,6 +54,7 @@ use fs_node::{FileOrDir, File, FileRef, DirRef};
 use vfs_node::VFSDirectory;
 use path::Path;
 use memfs::MemFile;
+use crate_name_utils::{get_containing_crate_name, replace_containing_crate_name};
 
 
 pub mod elf_executable;
@@ -2178,28 +2180,34 @@ impl CrateNamespace {
             }
         }
 
-        // If we couldn't get the symbol, then we attempt to load the kernel crate containing that symbol.
-        // We are only able to do this for mangled symbols that have a leading crate name, such as "my_crate::foo". 
+        // As a final attempt, we try to load the kernel crate(s) containing the missing symbol.
+        // We are only able to do this for mangled symbols that contain a crate name, such as "my_crate::foo". 
         // If "foo()" was marked no_mangle, then we don't know which crate to load because there is no "my_crate::" before it.
-        if let Some(crate_dependency_name) = get_containing_crate_name(demangled_full_symbol) {
-            #[cfg(not(loscd_eval))]
-            info!("Symbol \"{}\" not initially found, attempting to load its containing crate {:?}", 
-                demangled_full_symbol, crate_dependency_name);
+        // There are multiple potential containing crates, so we try to load each one to find the missing symbol.
+        for crate_dependency_name in get_containing_crate_name(demangled_full_symbol) {
             let crate_dependency_name = format!("{}-", crate_dependency_name);
  
             // Try to find and load the missing crate object file from this namespace's directory set,
             // (or from the backup namespace's directory set).
             if let Some(dependency_crate_file_path) = self.get_kernel_file_starting_with(&crate_dependency_name)
                 .or_else(|| backup_namespace.and_then(|backup| backup.get_kernel_file_starting_with(&crate_dependency_name)))
-            {
+            {   
+                // Check to make sure this crate is not already loaded into this namespace.
+                if self.crate_tree.lock().contains_key_str(dependency_crate_file_path.file_stem()) {
+                    // trace!("(skipping already-loaded crate {:?})", dependency_crate_file_path);
+                    continue;
+                }
+                #[cfg(not(loscd_eval))]
+                info!("Symbol \"{}\" not initially found, attempting to load crate {:?} that may contain it.", 
+                    demangled_full_symbol, crate_dependency_name);
+
                 if let Ok(_num_new_syms) = self.load_kernel_crate(&dependency_crate_file_path, backup_namespace, kernel_mmi_ref, verbose_log) {
                     // try again to find the missing symbol, now that we've loaded the missing crate
                     if let Some(sec) = self.get_symbol_internal(demangled_full_symbol) {
                         return sec;
-                    }
-                    else {
-                        error!("Symbol \"{}\" not found, even after loading its containing crate \"{}\". Is that symbol actually in the crate?", 
-                            demangled_full_symbol, crate_dependency_name);                                                        
+                    } else {
+                        trace!("Loaded symbol's (\"{}\") containing crate {:?}, but still couldn't find the symbol.", 
+                            demangled_full_symbol, dependency_crate_file_path);
                     }
                 }
                 else {
@@ -2208,7 +2216,7 @@ impl CrateNamespace {
                 }
             }
             else {
-                error!("Couldn't find a single containing crate for symbol \"{}\" (tried looking up crate {:?}).", 
+                warn!("Couldn't find a single containing crate for symbol \"{}\" (tried looking up crate {:?}).", 
                     demangled_full_symbol, crate_dependency_name);
             }
         }
@@ -2323,70 +2331,6 @@ impl CrateNamespace {
     }
 
 }
-
-
-/// Crate names must be only alphanumeric characters, an underscore, or a dash. 
-/// See: <https://www.reddit.com/r/rust/comments/4rlom7/what_characters_are_allowed_in_a_crate_name/>
-fn is_valid_crate_name_char(c: char) -> bool {
-    char::is_alphanumeric(c) || 
-    c == '_' || 
-    c == '-'
-}
-
-/// Parses the given symbol string to try to find the contained parent crate
-/// that contains the symbol. 
-/// If the parent crate cannot be determined (e.g., a `no_mangle` symbol),
-/// then the input string is returned unchanged.
-/// # Examples
-/// ```
-/// <*const T as core::fmt::Debug>::fmt   -->  core 
-/// <alloc::boxed::Box<T>>::into_unique   -->  alloc
-/// keyboard::init                        -->  keyboard
-/// ```
-pub fn get_containing_crate_name<'a>(demangled_full_symbol: &'a str) -> Option<&'a str> {
-    demangled_full_symbol.split("::").next().and_then(|s| {
-        // Get the last word right before the first "::"
-        s.rsplit(|c| !is_valid_crate_name_char(c))
-            .next() // the first element of the iterator (last element before the "::")
-    })
-}
-
-
-/// Similar to [`get_containing_crate_name()`](#method.get_containing_crate_name),
-/// but replaces the parent crate name with the given `new_crate_name`, 
-/// if it can be found, and if the parent crate name matches the `old_crate_name`. 
-/// If the parent crate name can be found but does not match the expected `old_crate_name`,
-/// then None is returned.
-/// 
-/// This creates an entirely new String rather than performing an in-place replacement, 
-/// because the `new_crate_name` might be a different length than the original crate name.
-/// # Examples
-/// `keyboard::init  -->  keyboard_new::init`
-fn replace_containing_crate_name<'a>(demangled_full_symbol: &'a str, old_crate_name: &str, new_crate_name: &str) -> Option<String> {
-    // debug!("replace_containing_crate_name(dfs: {:?}, old: {:?}, new: {:?})", demangled_full_symbol, old_crate_name, new_crate_name);
-    demangled_full_symbol.match_indices("::").next().and_then(|(index_of_first_double_colon, _substr)| {
-        // Get the last word right before the first "::"
-        demangled_full_symbol.get(.. index_of_first_double_colon).and_then(|substr| {
-            // debug!("  replace_containing_crate_name(\"{}\"): substr: \"{}\" at index {}", demangled_full_symbol, substr, index_of_first_double_colon);
-            let start_idx = substr.rmatch_indices(|c| !is_valid_crate_name_char(c))
-                .next() // the first element right before the crate name starts
-                .map(|(index_right_before_parent_crate_name, _substr)| { index_right_before_parent_crate_name + 1 }) // advance to the actual start 
-                .unwrap_or(0); // if we didn't find any match, it means that everything since the beginning of the string was a valid char part of the parent_crate_name 
-
-            demangled_full_symbol.get(start_idx .. index_of_first_double_colon)
-                .filter(|&parent_crate_name| { parent_crate_name == old_crate_name })
-                .and_then(|_parent_crate_name| {
-                    // debug!("    replace_containing_crate_name(\"{}\"): parent_crate_name: \"{}\" at index [{}-{})", demangled_full_symbol, _parent_crate_name, start_idx, index_of_first_double_colon);
-                    demangled_full_symbol.get(.. start_idx).and_then(|before_crate_name| {
-                        demangled_full_symbol.get(index_of_first_double_colon ..).map(|after_crate_name| {
-                            format!("{}{}{}", before_crate_name, new_crate_name, after_crate_name)
-                        })
-                    })
-            })
-        })
-    })
-}
-
 
 
 /// A convenience wrapper for a set of the three possible types of `MappedPages`
