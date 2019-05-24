@@ -2,6 +2,7 @@ use super::paging::*;
 use super::{PAGE_SIZE, FrameAllocator, VirtualAddress, VirtualMemoryArea};
 use super::Mapper;
 
+#[derive(Debug)]
 pub struct StackAllocator {
     pub range: PageIter,
     pub usermode: bool,
