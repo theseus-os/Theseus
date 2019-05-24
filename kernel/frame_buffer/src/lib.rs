@@ -169,11 +169,11 @@ pub struct FrameBufferToDraw {
 //     Ok(())
 // }
 struct FrameCompositor {
-    // This compositor does not need any state
+    //Cache of updated framebuffers
 }
 
 impl Compositor for FrameCompositor {
-    fn display(final_buffer:&mut FrameBuffer, bufferlist:Vec<&FrameBufferToDraw>) {
+    fn compose(final_buffer:&mut FrameBuffer, bufferlist:Vec<&FrameBufferToDraw>) {
         //Check if the virtul frame buffer is in the mapped frame list
         for src in bufferlist {
             for i in 0..src.framebuffer.height {
@@ -193,5 +193,5 @@ impl Compositor for FrameCompositor {
 
 //The compositor structure. It contains the information of the final frame buffer and a list of frames
 trait Compositor {
-    fn display(final_buffer:&mut FrameBuffer, bufferlist:Vec<&FrameBufferToDraw>);
+    fn compose(final_buffer:&mut FrameBuffer, bufferlist:Vec<&FrameBufferToDraw>);
 }
