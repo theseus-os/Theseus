@@ -69,7 +69,7 @@ macro_rules! try_exit {
             $crate::shutdown(format_args!("{}", err_msg));
         }
     });
-    ($expr:expr,) => (try!($expr));
+    // ($expr:expr,) => (try!($expr));
 }
 
 
@@ -129,14 +129,25 @@ pub extern "C" fn nano_core_start(multiboot_information_virtual_address: usize) 
     // init memory management: set up stack with guard page, heap, kernel text/data mappings, etc
     let (kernel_mmi_ref, text_mapped_pages, rodata_mapped_pages, data_mapped_pages, identity_mapped_pages) = try_exit!(memory::init(&boot_info));
     println_raw!("nano_core_start(): initialized memory subsystem."); 
+    // After this point, we must "forget" all of the above mapped_pages instances if an error occurs,
+    // because they will be auto-unmapped upon a returned error, causing all execution to stop. 
+    // (at least until we transfer ownership of them to the `parse_nano_core` function below.)
 
-    // now that we have virtual memory, including a heap, we can create basic things like state_store
     state_store::init();
     trace!("state_store initialized.");
     println_raw!("nano_core_start(): initialized state store.");     
 
     // initialize the module management subsystem, so we can create the default crate namespace
-    let default_namespace = try_exit!(mod_mgmt::init(&boot_info, kernel_mmi_ref.lock().deref_mut()));
+    let default_namespace = match mod_mgmt::init(&boot_info, kernel_mmi_ref.lock().deref_mut()) {
+        Ok(namespace) => namespace,
+        Err(err) => { 
+            core::mem::forget(text_mapped_pages);
+            core::mem::forget(rodata_mapped_pages);
+            core::mem::forget(data_mapped_pages);
+            core::mem::forget(identity_mapped_pages);
+            shutdown(format_args!("{}", err));
+        }
+    };
     println_raw!("nano_core_start(): initialized crate namespace subsystem."); 
 
     // Parse the nano_core crate (the code we're already running) since we need it to load and run applications.
