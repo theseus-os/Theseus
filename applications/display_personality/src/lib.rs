@@ -14,7 +14,7 @@ extern crate fs_node;
 extern crate frame_buffer;
 
 use display::{Display};
-use frame_buffer::VirtualFrameBuffer;
+use frame_buffer::FrameBuffer;
 use alloc::vec::Vec;
 use alloc::string::String;
 use alloc::sync::Arc;
@@ -22,11 +22,11 @@ use mod_mgmt::{CrateNamespace, get_default_namespace, get_namespaces_directory, 
 use spin::{Mutex};
 use fs_node::FileOrDir; 
 
-type FillRectangleFun = fn(&Arc<Mutex<VirtualFrameBuffer>>, usize, usize, usize, usize, u32);
+type FillRectangleFun = fn(&Arc<Mutex<FrameBuffer>>, usize, usize, usize, usize, u32);
 
 #[no_mangle]
 pub fn main(_args: Vec<String>) -> isize {
-    let vf = match VirtualFrameBuffer::new(200,700){
+    let vf = match FrameBuffer::new(200,700, None){
         Ok(vf) => {vf},
         Err(err) => {
             println!("{}", err);
@@ -56,7 +56,7 @@ pub fn main(_args: Vec<String>) -> isize {
     }
 }
 
-fn personality(vf: &mut Arc<Mutex<VirtualFrameBuffer>>) -> Result<(), &'static str> {
+fn personality(vf: &mut Arc<Mutex<FrameBuffer>>) -> Result<(), &'static str> {
     let kernel_mmi_ref = memory::get_kernel_mmi_ref().ok_or_else(|| "couldn't get kernel mmi")?;
 	let backup_namespace = get_default_namespace().ok_or("default crate namespace wasn't yet initialized")?;
 

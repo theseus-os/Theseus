@@ -1,5 +1,5 @@
 
-use super::super::{Print, WindowObj, VirtualFrameBuffer, VFRAME_BUFFER, Display};
+use super::super::{Print, WindowObj, FrameBuffer, VFRAME_BUFFER, Display};
 use super::super::{String, Mutex, Arc};
 use display_text::font::{CHARACTER_WIDTH, CHARACTER_HEIGHT};
 
@@ -8,14 +8,14 @@ pub struct TextDisplay {
     name:String,
     width:usize,
     height:usize,
-    textbuffer:Arc<Mutex<VirtualFrameBuffer>>,
+    textbuffer:Arc<Mutex<FrameBuffer>>,
 }
 
 impl TextDisplay
 {
     pub fn new(name:&str, width:usize, height:usize) -> Result <TextDisplay, &'static str> {
         //let (width, height) = frame_buffer::get_resolution()?;
-        let vf = VirtualFrameBuffer::new(width, height)?;
+        let vf = FrameBuffer::new(width, height, None)?;
         Ok(TextDisplay{
             name:String::from(name),
             width:width,
@@ -104,7 +104,7 @@ impl TextDisplay
         }       
     }
 
-    pub fn buffer(&self) -> &Arc<Mutex<VirtualFrameBuffer>> {
+    pub fn buffer(&self) -> &Arc<Mutex<FrameBuffer>> {
         &self.textbuffer
     }
 }

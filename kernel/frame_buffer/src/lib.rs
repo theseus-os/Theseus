@@ -19,7 +19,7 @@ extern crate owning_ref;
 use owning_ref::BoxRefMut;
 use spin::{Mutex, Once};
 use memory::{FRAME_ALLOCATOR, Frame, PageTable, PhysicalAddress, 
-    EntryFlags, allocate_pages_by_bytes, MappedPages, MemoryManagementInfo,
+    EntryFlags, MappedPages, MemoryManagementInfo,
     get_kernel_mmi_ref};
 use core::ops::DerefMut;
 use alloc::boxed::Box;
@@ -27,7 +27,7 @@ use alloc::sync::{Arc, Weak};
 use alloc::vec::Vec;
 
 //The compositor instance
-static COMPOSITOR:Once<Mutex<Compositor>> = Once::new();
+static FINAL_FRAME_BUFFER:Once<Mutex<FrameBuffer>> = Once::new();
 
 //Every pixel is of u32 type
 const PIXEL_BYTES:usize = 4;
@@ -48,158 +48,93 @@ pub fn init() -> Result<(), &'static str > {
         vesa_display_phys_start = PhysicalAddress::new(graphic_info.physical_address as usize)?;
         buffer_width = graphic_info.width as usize;
         buffer_height = graphic_info.height as usize;
-        vesa_display_phys_size= buffer_width * buffer_height * PIXEL_BYTES;
     };
 
-    // get a reference to the kernel's memory mapping information
-    let kernel_mmi_ref = get_kernel_mmi_ref().expect("KERNEL_MMI was not yet initialized!");
-    let mut kernel_mmi_locked = kernel_mmi_ref.lock();
+ 
 
-    // destructure the kernel's MMI so we can access its page table
-    let MemoryManagementInfo { 
-        page_table: ref mut kernel_page_table, 
-        .. // don't need to access other stuff in kernel_mmi
-    } = *kernel_mmi_locked;
+    let framebuffer = FrameBuffer::new(buffer_width, buffer_height, Some(vesa_display_phys_start))?;
+
+    //Initialize the compositor
+    FINAL_FRAME_BUFFER.call_once(|| {
+        Mutex::new(framebuffer)}
+    );
     
-    match kernel_page_table {
-        &mut PageTable::Active(ref mut active_table) => {
-            //Map the physical frame buffer memory
-            let pages = match allocate_pages_by_bytes(vesa_display_phys_size) {
-                Some(pages) => { pages },
-                None => { return Err("frame_buffer::init() couldn't allocate pages."); }
-            };
-            
-            let vesa_display_flags = EntryFlags::PRESENT | EntryFlags::WRITABLE | EntryFlags::GLOBAL | EntryFlags::NO_CACHE;
-            let allocator_mutex = FRAME_ALLOCATOR.try();
-            match allocator_mutex {
-                Some(_) => { },
-                None => { return Err("framebuffer::init() couldn't get frame allocator"); }
-            }
-
-            let mut allocator = try!(allocator_mutex.ok_or("allocate frame buffer")).lock();
-            let mapped_frame_buffer = try!(active_table.map_allocated_pages_to(
-                pages, 
-                Frame::range_inclusive_addr(vesa_display_phys_start, vesa_display_phys_size), 
-                vesa_display_flags, 
-                allocator.deref_mut())
-            );
-
-            //Create a reference to the mapped frame buffer pages as slice
-            let buffer = BoxRefMut::new(Box::new(mapped_frame_buffer)).
-                try_map_mut(|mp| mp.as_slice_mut(0, buffer_width * buffer_height))?;
-
-            //Initialize the compositor
-            COMPOSITOR.call_once(|| 
-                Mutex::new(Compositor {
-                    width:buffer_width,
-                    height:buffer_height,
-                    buffer: buffer,
-                    frames: Vec::new(),
-                })
-            );
-
-            Ok(())
-        }
-        _ => { 
-            return Err("framebuffer::init() Couldn't get kernel's active_table");
-        }
-    }
+    Ok(())
 }
 
 ///The virtual frame buffer struct. It contains the size of the buffer and a buffer array
-pub struct VirtualFrameBuffer {
+pub struct FrameBuffer {
     width:usize,
     height:usize,
-    buffer:Vec<u32>
+    buffer:BoxRefMut<MappedPages, [u32]>
 }
 
-//The displayable frame struct. It contains a reference to a virtual frame buffer and the postion of the buffer
-struct DisplayFrame {
-    x:usize,
-    y:usize,
-    vframebuffer:Weak<Mutex<VirtualFrameBuffer>>,
-}
-
-//The compositor structure. It contains the information of the final frame buffer and a list of frames
-struct Compositor {
-    width:usize,
-    height:usize,
-    buffer:BoxRefMut<MappedPages, [u32]>,
-    frames:Vec<DisplayFrame>
-}
-
-impl Compositor {
-    //Get the resolution of the final frame buffer
-    fn get_resolution(&self) -> (usize, usize){
-        (self.width, self.height)
-    }
-
-    //Add a displayable frame to the compositor
-    fn add_frame(&mut self, frame:DisplayFrame) {
-        self.frames.push(frame);
-    }
-
-    //Display a displayable frame 
-    fn display(&mut self, vfb:&Arc<Mutex<VirtualFrameBuffer>>) {
-        //Check if the virtul frame buffer is in the mapped frame list
-        for item in self.frames.iter() {
-            let reference = item.vframebuffer.upgrade();
-            if let Some(vfb_rf) = reference {
-                if Arc::ptr_eq(&vfb_rf, &vfb) {
-                    self.buffer_copy(item.x, item.y, vfb);
-                    return;
-                }
-            }
-        }        
-    }
-
-    //Get the position of a mapped virtual frame buffer
-    fn get_position(&mut self, vfb:&Arc<Mutex<VirtualFrameBuffer>>) -> Result<(usize, usize), &'static str>{
-
-        for item in self.frames.iter() {
-            let reference = item.vframebuffer.upgrade();
-            if let Some(vfb_rf) = reference {
-                if Arc::ptr_eq(&vfb_rf, &vfb) {
-                    return Ok((item.x, item.y));
-                }
-            }
-        }
-
-        Err("The virtual framebuffer hasn't been mapped")        
-    }
-
-    //Copy the content of a virtual frame buffer to the final frame buffer
-    fn buffer_copy(&mut self, x:usize, y:usize, vfb:&Arc<Mutex<VirtualFrameBuffer>>) {
-        let src_buffer = vfb.lock();
-       
-        for i in 0..src_buffer.height {
-            let dest_start = self.width * ( i + y ) + x;
-            let dest_end = dest_start + src_buffer.width;
-            let src_start = src_buffer.width * i;
-            let src_end = src_start + src_buffer.width;
-
-            self.buffer[dest_start..dest_end].copy_from_slice(
-                &(src_buffer.buffer[src_start..src_end])
-            );
-        }
-    }
-}
-
-
-impl VirtualFrameBuffer {
+impl FrameBuffer {
     ///return a new virtual frame buffer with specified size
-    pub fn new(width:usize, height:usize) -> Result<VirtualFrameBuffer, &'static str>{
-        let buffer = vec![0;width * height];
-        let vf = VirtualFrameBuffer {
-            width:width,
-            height:height,
-            buffer:buffer
-        };
-        Ok(vf)
+    pub fn new(width:usize, height:usize, physical_address:Option<PhysicalAddress>) -> Result<FrameBuffer, &'static str>{
+   // get a reference to the kernel's memory mapping information
+        let kernel_mmi_ref = get_kernel_mmi_ref().expect("KERNEL_MMI was not yet initialized!");
+        let mut kernel_mmi_locked = kernel_mmi_ref.lock();
+
+        // destructure the kernel's MMI so we can access its page table
+        let MemoryManagementInfo { 
+            page_table: ref mut kernel_page_table, 
+            .. // don't need to access other stuff in kernel_mmi
+        } = *kernel_mmi_locked;
+
+        let size = width * height * PIXEL_BYTES;
+
+        match kernel_page_table {
+            &mut PageTable::Active(ref mut active_table) => {
+                //Map the physical frame buffer memory
+                let pages = match memory::allocate_pages_by_bytes(size) {
+                    Some(pages) => { pages },
+                    None => { return Err("FrameBuffer::new() couldn't allocate pages."); }
+                };
+                
+                let allocator_mutex = FRAME_ALLOCATOR.try();
+                match allocator_mutex {
+                    Some(_) => { },
+                    None => { return Err("FrameBuffer::new() couldn't get frame allocator"); }
+                }
+
+                let mut allocator = try!(allocator_mutex.ok_or("allocate frame buffer")).lock();
+                let vesa_display_flags:EntryFlags = EntryFlags::PRESENT | EntryFlags::WRITABLE | EntryFlags::GLOBAL | EntryFlags::NO_CACHE;
+                let mapped_frame_buffer = if let Some(address) = physical_address {                
+                    try!(active_table.map_allocated_pages_to(
+                        pages, 
+                        Frame::range_inclusive_addr(address, size), 
+                        vesa_display_flags, 
+                        allocator.deref_mut())
+                    )
+                } else {
+                    try!(active_table.map_allocated_pages(
+                        pages, 
+                        vesa_display_flags, 
+                        allocator.deref_mut())
+                    )
+                };
+
+                //Create a reference to the mapped frame buffer pages as slice
+                let buffer = BoxRefMut::new(Box::new(mapped_frame_buffer)).
+                    try_map_mut(|mp| mp.as_slice_mut(0, width * height))?;
+            
+                return Ok(FrameBuffer{
+                    width:width,
+                    height:height,
+                    buffer:buffer
+                });             
+            },
+            _ => { 
+                return Err("FrameBuffer::new()  Couldn't get kernel's active_table");
+            }
+
+        }
     }
 
+ 
     ///return the buffer array
-    pub fn buffer(&mut self) -> &mut Vec<u32> {
+    pub fn buffer(&mut self) -> &mut BoxRefMut<MappedPages, [u32]> {
         return &mut self.buffer
     }
 
@@ -220,42 +155,43 @@ impl VirtualFrameBuffer {
     }
 }
 
-///map a virtual framebuffer to the final framebuffer at (x, y)
-pub fn map(x:usize, y:usize, vf:VirtualFrameBuffer) -> Result<Arc<Mutex<VirtualFrameBuffer>>, &'static str>{
-    let vf_ref = Arc::new(Mutex::new(vf));
-    map_ref(x, y, &vf_ref)?;
-    Ok(vf_ref)
+///The virtual frame buffer struct. It contains the size of the buffer and a buffer array
+pub struct FrameBufferToDraw {
+    x:usize,
+    y:usize,
+    framebuffer:FrameBuffer
 }
 
-///map a reference to a virtual framebuffer to the final framebuffer at (x, y)
-pub fn map_ref(x:usize, y:usize, vf_ref:&Arc<Mutex<VirtualFrameBuffer>>) -> Result<(), &'static str>{
-    let vf_weak = Arc::downgrade(vf_ref);
-    let frame = DisplayFrame {
-        x:x,
-        y:y,
-        vframebuffer:vf_weak
-    };
-    let mut compositor = try!(COMPOSITOR.try().ok_or("Fail to get the compositor")).lock();
-    
-    compositor.add_frame(frame);
-    Ok(())
+// ///display the content of a virtual frame buffer to the final frame buffer
+// pub fn display(vfb:&Arc<Mutex<FrameBuffer>>) -> Result<(), &'static str>{
+//     let compositor = try!(COMPOSITOR.try().ok_or("Fail to get the physical frame buffer"));
+//     compositor.lock().display(vfb);
+//     Ok(())
+// }
+struct FrameCompositor {
+    // This compositor does not need any state
 }
 
-///get the resolution of the final framebuffer
-pub fn get_resolution() -> Result<(usize, usize), &'static str> {
-    let compositor = try!(COMPOSITOR.try().ok_or("Fail to get the physical frame buffer"));
-    Ok(compositor.lock().get_resolution())
+impl Compositor for FrameCompositor {
+    fn display(final_buffer:&mut FrameBuffer, bufferlist:Vec<&FrameBufferToDraw>) {
+        //Check if the virtul frame buffer is in the mapped frame list
+        for src in bufferlist {
+            for i in 0..src.framebuffer.height {
+                let dest_start = final_buffer.width * ( i + src.y ) + src.x;
+                let dest_end = dest_start + src.framebuffer.width;
+                let src_start = src.framebuffer.width * i;
+                let src_end = src_start + src.framebuffer.width;
+
+                final_buffer.buffer[dest_start..dest_end].copy_from_slice(
+                    &(src.framebuffer.buffer[src_start..src_end])
+                );
+            }
+        }
+    }
+
 }
 
-///display the content of a virtual frame buffer to the final frame buffer
-pub fn display(vfb:&Arc<Mutex<VirtualFrameBuffer>>) -> Result<(), &'static str>{
-    let compositor = try!(COMPOSITOR.try().ok_or("Fail to get the physical frame buffer"));
-    compositor.lock().display(vfb);
-    Ok(())
-}
-
-///get the position of a mapped virtual frame buffer
-pub fn get_position(vfb:&Arc<Mutex<VirtualFrameBuffer>>) ->  Result<(usize, usize), &'static str> {
-    let compositor = try!(COMPOSITOR.try().ok_or("Fail to get the physical frame buffer"));
-    compositor.lock().get_position(vfb)
+//The compositor structure. It contains the information of the final frame buffer and a list of frames
+trait Compositor {
+    fn display(final_buffer:&mut FrameBuffer, bufferlist:Vec<&FrameBufferToDraw>);
 }

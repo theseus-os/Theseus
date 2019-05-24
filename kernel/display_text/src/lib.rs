@@ -6,7 +6,7 @@ extern crate spin;
 extern crate frame_buffer;
 
 use self::font::{CHARACTER_HEIGHT, CHARACTER_WIDTH, FONT_PIXEL};
-use frame_buffer::{VirtualFrameBuffer};
+use frame_buffer::{FrameBuffer};
 use alloc::vec::{Vec};
 use alloc::sync::{Arc};
 use alloc::boxed::Box;
@@ -40,7 +40,7 @@ pub enum DisplayPosition {
 //     //The cursor in the text frame buffer
 //     //pub cursor:Mutex<Cursor>, Cursor should belong to the terminal
 //     ///The virtual frame buffer to be displayed in
-//     pub vbuffer:Arc<Mutex<VirtualFrameBuffer>>
+//     pub vbuffer:Arc<Mutex<FrameBuffer>>
 // }
 
 
@@ -58,7 +58,7 @@ pub trait Print {
              bottom:usize, color:u32, index:&Box<Fn(usize, usize)->usize>) -> Result<(),&'static str>;
 }
 
-impl Print for VirtualFrameBuffer {
+impl Print for FrameBuffer {
     ///print a string by bytes at (x, y) within an area of (width, height) of the virtual text frame buffer
     fn print_by_bytes(&mut self, x:usize, y:usize, width:usize, height:usize, 
         slice: &str, font_color:u32, bg_color:u32) -> Result<(), &'static str> {

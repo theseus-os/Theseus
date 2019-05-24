@@ -42,7 +42,7 @@ use core::ops::Deref;
 use dfqueue::{DFQueue,DFQueueConsumer,DFQueueProducer};
 use alloc::sync::{Arc, Weak};
 use display_text::{Print};
-use display::{VirtualFrameBuffer};
+use display::{FrameBuffer};
 use display::Display;
 use event_types::Event;
 use alloc::string::{String, ToString};
@@ -57,7 +57,7 @@ static WINDOW_ALLOCATOR: Once<Mutex<WindowAllocator>> = Once::new();
 const WINDOW_ACTIVE_COLOR:u32 = 0xFFFFFF;
 const WINDOW_INACTIVE_COLOR:u32 = 0x343C37;
 const SCREEN_BACKGROUND_COLOR:u32 = 0x000000;
-static VFRAME_BUFFER:Once<Arc<Mutex<VirtualFrameBuffer>>> = Once::new();
+static VFRAME_BUFFER:Once<Arc<Mutex<FrameBuffer>>> = Once::new();
 
 /// 10 pixel gap between windows 
 pub const GAP_SIZE: usize = 10;
@@ -142,7 +142,7 @@ impl WindowAllocator{
         let (buffer_width, buffer_height) = get_screen_size()?;
         
 
-        let vfb = VirtualFrameBuffer::new(buffer_width, buffer_height)?;
+        let vfb = FrameBuffer::new(buffer_width, buffer_height, None)?;
 
         let vfb_ref = frame_buffer::map(0, 0, vfb)?;
         VFRAME_BUFFER.call_once(||{

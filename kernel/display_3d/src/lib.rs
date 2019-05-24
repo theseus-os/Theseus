@@ -19,7 +19,7 @@ use spin::{Mutex};
 use alloc::vec::{Vec};
 use alloc::sync::Arc;
 
-pub use frame_buffer::{VirtualFrameBuffer};
+pub use frame_buffer::{FrameBuffer};
 
 const COLOR_BITS:usize = 24;
 
@@ -42,7 +42,7 @@ pub trait Display {
     fn fill_rectangle_3d(&mut self, start_x:usize, start_y:usize, width:usize, height:usize, z:u8, color:u32);
 }
 
-impl Display for VirtualFrameBuffer {
+impl Display for FrameBuffer {
     //draw a 2D pixel at (x, y)
     fn draw_pixel(&mut self, x:usize, y:usize, color:u32) {
         self.draw_pixel_3d(x, y, 0, color);
@@ -185,28 +185,28 @@ impl Display for VirtualFrameBuffer {
 }
 
 //write a 3D pixel to a buffer. A pixel with a larger z will overlap current pixel with a smaller z
-fn write_to(buffer:&mut Vec<u32>, index:usize, z:u8, color:u32) {
+fn write_to(buffer:&mut BoxRefMut<MappedPages, [u32]>, index:usize, z:u8, color:u32) {
     if (buffer[index] >> COLOR_BITS) <= z as u32 {
         buffer[index] = color;
     }
 }
 
 ///draw a pixel at (x, y)
-pub fn draw_pixel(vf:&Arc<Mutex<VirtualFrameBuffer>>, x:usize, y:usize, color:u32){
+pub fn draw_pixel(vf:&Arc<Mutex<FrameBuffer>>, x:usize, y:usize, color:u32){
     vf.lock().draw_pixel(x, y, color);
 }
 
 ///draw a line from (start_x, start_y) to (end_x, end_y) with color
-pub fn draw_line(vf:&Arc<Mutex<VirtualFrameBuffer>>, start_x:i32, start_y:i32, end_x:i32, end_y:i32, color:u32){
+pub fn draw_line(vf:&Arc<Mutex<FrameBuffer>>, start_x:i32, start_y:i32, end_x:i32, end_y:i32, color:u32){
     vf.lock().draw_line(start_x, start_y, end_x, end_y, color);
 }
 
 ///draw a rectangle at (start_x, start_y) with color
-pub fn draw_rectangle(vf:&Arc<Mutex<VirtualFrameBuffer>>, start_x:usize, start_y:usize, width:usize, height:usize, color:u32){
+pub fn draw_rectangle(vf:&Arc<Mutex<FrameBuffer>>, start_x:usize, start_y:usize, width:usize, height:usize, color:u32){
     vf.lock().draw_rectangle(start_x, start_y, width, height, color);
 }
 
 ///fill a rectangle at (start_x, start_y) with color
-pub fn fill_rectangle(vf:&Arc<Mutex<VirtualFrameBuffer>>, start_x:usize, start_y:usize, width:usize, height:usize, color:u32){
+pub fn fill_rectangle(vf:&Arc<Mutex<FrameBuffer>>, start_x:usize, start_y:usize, width:usize, height:usize, color:u32){
     vf.lock().fill_rectangle(start_x, start_y, width, height, color);
 }
