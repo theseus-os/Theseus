@@ -25,6 +25,23 @@ extern crate heap_irq_safe;
 extern crate bit_field;
 extern crate type_name;
 
+/// Just like Rust's `try!()` macro, 
+/// but forgets the given `obj`s to prevent them from being dropped,
+/// as they would normally be upon return of an Error using `try!()`.
+/// This must come BEFORE the below modules in order for them to be able to use it.
+macro_rules! try_forget {
+    ($expr:expr, $($obj:expr),*) => (match $expr {
+        Ok(val) => val,
+        Err(err) => {
+            $(
+                core::mem::forget($obj);
+            )*
+            return Err(err);
+        }
+    });
+}
+
+
 mod area_frame_allocator;
 mod paging;
 mod stack_allocator;
@@ -254,6 +271,7 @@ pub type MmiRef = Arc<MutexIrqSafe<MemoryManagementInfo>>;
 
 /// This holds all the information for a `Task`'s memory mappings and address space
 /// (this is basically the equivalent of Linux's mm_struct)
+#[derive(Debug)]
 pub struct MemoryManagementInfo {
     /// the PageTable that should be switched to when this Task is switched to.
     pub page_table: PageTable,
@@ -521,18 +539,28 @@ pub fn init(boot_info: &BootInformation)
 
 
     // Initialize paging (create a new page table), which also initializes the kernel heap.
-    let (page_table, kernel_vmas, text_mapped_pages, rodata_mapped_pages, data_mapped_pages, higher_half_mapped_pages, identity_mapped_pages) = try!(
-        paging::init(frame_allocator_mutex, &boot_info)
-    );
+
+    let (
+        page_table,
+        kernel_vmas,
+        text_mapped_pages,
+        rodata_mapped_pages,
+        data_mapped_pages,
+        higher_half_mapped_pages,
+        identity_mapped_pages,
+    ) = paging::init(frame_allocator_mutex, &boot_info)?;
+
     // HERE: heap is initialized! Can now use alloc types.
+    // After this point, we must "forget" all of the above mapped_pages instances if an error occurs,
+    // because they will be auto-unmapped from the new page table upon return, causing all execution to stop.   
 
     debug!("Done with paging::init()!, page_table: {:?}", page_table);
 
     
     // init the kernel stack allocator, a singleton
     let kernel_stack_allocator = {
-        let stack_alloc_start = Page::containing_address(VirtualAddress::new(KERNEL_STACK_ALLOCATOR_BOTTOM)?); 
-        let stack_alloc_end = Page::containing_address(VirtualAddress::new(KERNEL_STACK_ALLOCATOR_TOP_ADDR)?);
+        let stack_alloc_start = Page::containing_address(VirtualAddress::new_canonical(KERNEL_STACK_ALLOCATOR_BOTTOM)); 
+        let stack_alloc_end = Page::containing_address(VirtualAddress::new_canonical(KERNEL_STACK_ALLOCATOR_TOP_ADDR));
         let stack_alloc_range = Page::range_inclusive(stack_alloc_start, stack_alloc_end);
         stack_allocator::StackAllocator::new(stack_alloc_range, false)
     };

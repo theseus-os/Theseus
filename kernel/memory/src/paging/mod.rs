@@ -599,24 +599,34 @@ pub fn init(allocator_mutex: &MutexIrqSafe<AreaFrameAllocator>, boot_info: &mult
     debug!("switching to new page table {:?}", new_table);
     let mut new_page_table = page_table.switch(&new_table); 
     // here, new_page_table and new_table should be identical
-    debug!("switched to new page table {:?}.", new_page_table);           
+    debug!("switched to new page table {:?}.", new_page_table); 
+
+    // After this point, we must "forget" all of the above mapped_pages instances if an error occurs,
+    // because they will be auto-unmapped from the new page table upon return, causing all execution to stop.          
 
 
     // We must map the heap memory here, before it can initialized! 
     let (heap_mapped_pages, heap_vma) = {
         let mut allocator = allocator_mutex.lock();
 
-        let pages = Page::range_inclusive_addr(VirtualAddress::new(KERNEL_HEAP_START)?, KERNEL_HEAP_INITIAL_SIZE);
+        let pages = Page::range_inclusive_addr(VirtualAddress::new_canonical(KERNEL_HEAP_START), KERNEL_HEAP_INITIAL_SIZE);
         let heap_flags = paging::EntryFlags::WRITABLE;
-        let heap_vma: VirtualMemoryArea = VirtualMemoryArea::new(VirtualAddress::new(KERNEL_HEAP_START)?, KERNEL_HEAP_INITIAL_SIZE, heap_flags, "Kernel Heap");
-        let heap_mp = new_page_table.map_pages(pages, heap_flags, allocator.deref_mut())?;
+        let heap_vma: VirtualMemoryArea = VirtualMemoryArea::new(VirtualAddress::new_canonical(KERNEL_HEAP_START), KERNEL_HEAP_INITIAL_SIZE, heap_flags, "Kernel Heap");
+        let heap_mp = try_forget!(
+            new_page_table.map_pages(pages, heap_flags, allocator.deref_mut())
+                .map_err(|e| {
+                    error!("Failed to map kernel heap memory pages, {} bytes starting at virtual address {:#X}. Error: {:?}", KERNEL_HEAP_INITIAL_SIZE, KERNEL_HEAP_START, e);
+                    "Failed to map the kernel heap memory. Perhaps the KERNEL_HEAP_INITIAL_SIZE exceeds the size of the system's physical memory?"
+                }),
+            text_mapped_pages, rodata_mapped_pages, data_mapped_pages, higher_half_mapped_pages, identity_mapped_pages
+        );
         heap_irq_safe::init(KERNEL_HEAP_START, KERNEL_HEAP_INITIAL_SIZE);
         
         allocator.alloc_ready(); // heap is ready
         (heap_mp, heap_vma)
     };
 
-    debug!("mapped and inited the heap, VMA: {:?}", heap_vma);
+    debug!("mapped and initialized the heap, VMA: {:?}", heap_vma);
     // HERE: now the heap is set up, we can use dynamically-allocated types like Vecs
 
     let mut kernel_vmas: Vec<VirtualMemoryArea> = vmas.to_vec();
