@@ -21,7 +21,7 @@
 
 extern crate spin;
 extern crate irq_safety;
-extern crate alloc;
+#[macro_use] extern crate alloc;
 extern crate dfqueue;
 extern crate keycodes_ascii;
 extern crate display;
@@ -42,8 +42,8 @@ use core::ops::Deref;
 use dfqueue::{DFQueue,DFQueueConsumer,DFQueueProducer};
 use alloc::sync::{Arc, Weak};
 use display_text::{Print};
-use display::{FrameBuffer};
 use display::Display;
+use frame_buffer::{FrameCompositor, Compositor, FrameBuffer};
 use event_types::Event;
 use alloc::string::{String, ToString};
 
@@ -73,7 +73,7 @@ struct WindowAllocator {
 /// Applications call this function to request a new window object with a default size (mostly fills screen with GAP_SIZE around all borders)
 /// If the caller a specific window size, it should call new_window()
 pub fn new_default_window() -> Result<WindowObj, &'static str> {
-    let (window_width, window_height) = get_screen_size()?;
+    let (window_width, window_height) = frame_buffer::get_screen_size()?;
     match new_window(GAP_SIZE, GAP_SIZE, window_width - 2* GAP_SIZE, window_height - 2* GAP_SIZE) {
         Ok(new_window) => {return Ok(new_window)}
         Err(err) => {return Err(err)}
@@ -131,24 +131,16 @@ pub fn delete(window:WindowObj) -> Result<(), &'static str> {
 }
 
 /// Returns the width and height (in pixels) of the screen 
-pub fn get_screen_size() -> Result<(usize, usize), &'static str> {
-    frame_buffer::get_resolution()
-}
+// pub fn get_screen_size() -> Result<(usize, usize), &'static str> {
+//     frame_buffer::get_resolution()
+// }
 
 impl WindowAllocator{
     
     // Allocate a new window and return it
     fn allocate(&mut self, x:usize, y:usize, width:usize, height:usize) -> Result<WindowObj, &'static str>{
-        let (buffer_width, buffer_height) = get_screen_size()?;
-        
 
-        let vfb = FrameBuffer::new(buffer_width, buffer_height, None)?;
-
-        let vfb_ref = frame_buffer::map(0, 0, vfb)?;
-        VFRAME_BUFFER.call_once(||{
-            vfb_ref
-        });
-        /*{
+       /*{
             let mut drawer = frame_buffer::FRAME_DRAWER.lock();
                 let index = frame_buffer::get_index_fn(drawer.width);
 
@@ -160,20 +152,23 @@ impl WindowAllocator{
                 buffer[index(0,0)] = 0x777777;
         }*/
 
-//        let (buffer_width, buffer_height) = DRAWER.get_resolution();
+//        let (screen_width, screen_height) = DRAWER.get_resolution();
         if width < 2 * WINDOW_MARGIN || height < 2 * WINDOW_MARGIN {
             return Err("Window size must be greater than the margin");
         }
 
-        if x + width >= buffer_width
-       || y + height >= buffer_height {
-            return Err("Requested area extends the screen size");
-        }
+    //Window size can exceeds the boundray of the screen
+    //     if x + width >= buffer_width
+    //    || y + height >= buffer_height {
+    //         return Err("Requested area exceeds the screen size");
+    //     }
 
         let consumer = DFQueue::new().into_consumer();
         let producer = consumer.obtain_producer();
 
         //new_window = ||{WindowObj{x:x,y:y,width:width,height:height,active:true}};
+        
+        let framebuffer = FrameBuffer::new(width, height, None)?;
 
         let inner = WindowInner{
             x:x,
@@ -183,6 +178,7 @@ impl WindowAllocator{
             active:true,
             margin:WINDOW_MARGIN,
             key_producer:producer,
+            framebuffer:framebuffer,
         };
 
         let inner_ref = Arc::new(Mutex::new(inner));
@@ -367,7 +363,6 @@ impl WindowObj{
             return Err("The displayable does not fit the window size.");
         } 
 
-        frame_buffer::map_ref(inner.x + inner.margin + x, inner.y + inner.margin + y, displayable.buffer())?;
         let component = Component {
             x:x,
             y:y,
@@ -451,9 +446,11 @@ impl WindowObj{
             Some(buffer) => { buffer },
             None => { return Err("Fail to get the virtual frame buffer")}
         };
-        buffer.lock().draw_rectangle(x + inner.x + 1, y + inner.y + 1, width, height, 
+        buffer.lock().draw_rectangle(inner.margin + x, inner.margin + y, width, height, 
                 color);
-        frame_buffer::display(&buffer)
+        FrameCompositor::compose(
+            vec![(&inner.framebuffer, inner.x, inner.y)]
+        )
     }
 
     /// Requires that a str slice that will exactly fit the frame buffer
@@ -528,6 +525,8 @@ struct WindowInner {
     margin: usize,
     /// the producer accepting a key event
     key_producer: DFQueueProducer<Event>,
+    /// the framebuffer owned by the window
+    framebuffer:FrameBuffer,
 }
 
 impl WindowInner {
@@ -583,8 +582,11 @@ impl WindowInner {
             Some(buffer) => { buffer },
             None => { return Err("Fail to get the virtual frame buffer") }
         };
-        buffer.lock().draw_rectangle(self.x, self.y, self.width, self.height, color);
-        frame_buffer::display(&buffer)
+        buffer.lock().draw_rectangle(0, 0, self.width, self.height, color);
+        FrameCompositor::compose(
+            vec![(&self.framebuffer, self.x, self.y)]
+
+        )
     }
 
     /// adjust the size of a window

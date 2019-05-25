@@ -155,12 +155,12 @@ impl FrameBuffer {
     }
 }
 
-///The virtual frame buffer struct. It contains the size of the buffer and a buffer array
-pub struct FrameBufferToDraw {
-    x:usize,
-    y:usize,
-    framebuffer:FrameBuffer
-}
+// ///The virtual frame buffer struct. It contains the size of the buffer and a buffer array
+// pub struct FrameBufferToDraw {
+//     x:usize,
+//     y:usize,
+//     framebuffer:&FrameBuffer
+// }
 
 // ///display the content of a virtual frame buffer to the final frame buffer
 // pub fn display(vfb:&Arc<Mutex<FrameBuffer>>) -> Result<(), &'static str>{
@@ -168,30 +168,40 @@ pub struct FrameBufferToDraw {
 //     compositor.lock().display(vfb);
 //     Ok(())
 // }
-struct FrameCompositor {
+pub struct FrameCompositor {
     //Cache of updated framebuffers
 }
 
 impl Compositor for FrameCompositor {
-    fn compose(final_buffer:&mut FrameBuffer, bufferlist:Vec<&FrameBufferToDraw>) {
+    fn compose(bufferlist:Vec<(&FrameBuffer, usize, usize)>) -> Result<(), &'static str> {
+
+        let mut final_buffer = FINAL_FRAME_BUFFER.try().ok_or("FrameCopositor fails to get the final frame buffer")?.lock();
         //Check if the virtul frame buffer is in the mapped frame list
-        for src in bufferlist {
-            for i in 0..src.framebuffer.height {
-                let dest_start = final_buffer.width * ( i + src.y ) + src.x;
-                let dest_end = dest_start + src.framebuffer.width;
-                let src_start = src.framebuffer.width * i;
-                let src_end = src_start + src.framebuffer.width;
+        for (src, x_src, y_src) in bufferlist {
+            for i in 0..src.height {
+                let dest_start = final_buffer.width * ( i + y_src ) + x_src;
+                let dest_end = dest_start + src.width;
+                let src_start = src.width * i;
+                let src_end = src_start + src.width;
 
                 final_buffer.buffer[dest_start..dest_end].copy_from_slice(
-                    &(src.framebuffer.buffer[src_start..src_end])
+                    &(src.buffer[src_start..src_end])
                 );
             }
         }
+
+        Ok(())
     }
 
 }
 
 //The compositor structure. It contains the information of the final frame buffer and a list of frames
-trait Compositor {
-    fn compose(final_buffer:&mut FrameBuffer, bufferlist:Vec<&FrameBufferToDraw>);
+pub trait Compositor {
+    fn compose(bufferlist:Vec<(&FrameBuffer, usize, usize)>) -> Result<(), &'static str>;
+}
+
+pub fn get_screen_size() -> Result<(usize, usize), &'static str> {
+    let final_buffer = FINAL_FRAME_BUFFER.try().
+        ok_or("FrameCopositor fails to get the final frame buffer")?.lock();
+    Ok((final_buffer.width, final_buffer.height))
 }

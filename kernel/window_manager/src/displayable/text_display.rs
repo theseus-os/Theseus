@@ -2,6 +2,7 @@
 use super::super::{Print, WindowObj, FrameBuffer, VFRAME_BUFFER, Display};
 use super::super::{String, Mutex, Arc};
 use display_text::font::{CHARACTER_WIDTH, CHARACTER_HEIGHT};
+use core::ops::DerefMut;
 
 /// A displayable component for text display
 pub struct TextDisplay {
@@ -25,10 +26,9 @@ impl TextDisplay
     }
 
     /// takes in a str slice and display as much as it can to the text area
-    pub fn display_string(&self, slice:&str, font_color:u32, bg_color:u32) -> Result<(), &'static str>{       
-        self.textbuffer.lock().print_by_bytes(0, 0, self.width, self.height,
-            slice, font_color, bg_color)?;
-        return frame_buffer::display(&self.textbuffer);
+    pub fn display_string(&self, buffer:&mut FrameBuffer, slice:&str, x:usize, y:usize, font_color:u32, bg_color:u32) -> Result<(), &'static str>{       
+        buffer.print_by_bytes(x, y, self.width, self.height,
+            slice, font_color, bg_color)
     }
 
     /// Gets the dimensions of the text area to display
