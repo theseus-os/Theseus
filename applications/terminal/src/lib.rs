@@ -41,6 +41,7 @@ use task::{TaskRef, ExitValue, KillReason};
 use environment::Environment;
 use spin::Mutex;
 use fs_node::FileOrDir;
+use core::ops::{DerefMut};
 
 pub const FONT_COLOR: u32 = 0x93ee90;
 pub const BACKGROUND_COLOR: u32 = 0x000000;
@@ -560,8 +561,11 @@ impl Terminal {
         };
         let result  = self.scrollback_buffer.get(start_idx..=end_idx); // =end_idx includes the end index in the slice
         if let Some(slice) = result {
-            if let Some(text_display) = self.window.get_displayable(display_name){
-                text_display.display_string(slice, FONT_COLOR, BACKGROUND_COLOR)?;
+
+            if let Some(text_display) = self.window.get_displayable(display_name) {
+                let (x, y) = self.window.get_displayable_position(display_name)?;
+                let mut buffer = self.window.framebuffer.lock();
+                text_display.display_string(buffer.deref_mut(), slice, x, y, FONT_COLOR, BACKGROUND_COLOR)?
             } else {
                 return Err("faild to get the text displayable component")
             }
@@ -581,7 +585,9 @@ impl Terminal {
 
         if let Some(slice) = result {
             if let Some(text_display) = self.window.get_displayable(display_name){
-                text_display.display_string(slice, FONT_COLOR, BACKGROUND_COLOR)?;
+                let (x, y) = self.window.get_displayable_position(display_name)?;
+                let mut buffer = self.window.framebuffer.lock();
+                text_display.display_string(buffer.deref_mut(), slice, x, y, FONT_COLOR, BACKGROUND_COLOR)?;
                 self.absolute_cursor_pos = cursor_pos;          
             } else {
                 return Err("faild to get the text displayable component")

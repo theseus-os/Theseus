@@ -9,7 +9,6 @@ pub struct TextDisplay {
     name:String,
     width:usize,
     height:usize,
-    textbuffer:Arc<Mutex<FrameBuffer>>,
 }
 
 impl TextDisplay
@@ -21,7 +20,6 @@ impl TextDisplay
             name:String::from(name),
             width:width,
             height:height,
-            textbuffer:Arc::new(Mutex::new(vf)),
         })
     }
 
@@ -104,8 +102,5 @@ impl TextDisplay
         }       
     }
 
-    pub fn buffer(&self) -> &Arc<Mutex<FrameBuffer>> {
-        &self.textbuffer
-    }
 }
 

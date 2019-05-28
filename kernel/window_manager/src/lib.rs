@@ -38,7 +38,7 @@ extern crate frame_buffer;
 
 use spin::{Once, Mutex};
 use alloc::collections::{VecDeque, BTreeMap};
-use core::ops::Deref;
+use core::ops::{Deref, DerefMut};
 use dfqueue::{DFQueue,DFQueueConsumer,DFQueueProducer};
 use alloc::sync::{Arc, Weak};
 use display_text::{Print};
@@ -139,6 +139,13 @@ impl WindowAllocator{
     
     // Allocate a new window and return it
     fn allocate(&mut self, x:usize, y:usize, width:usize, height:usize) -> Result<WindowObj, &'static str>{
+        let (width, height) = frame_buffer::get_screen_size()?;
+
+        let vframebuffer = FrameBuffer::new(width, height, None)?;
+
+        VFRAME_BUFFER.call_once(|| {
+            Arc::new(Mutex::new(vframebuffer))
+        });
 
        /*{
             let mut drawer = frame_buffer::FRAME_DRAWER.lock();
@@ -178,7 +185,6 @@ impl WindowAllocator{
             active:true,
             margin:WINDOW_MARGIN,
             key_producer:producer,
-            framebuffer:framebuffer,
         };
 
         let inner_ref = Arc::new(Mutex::new(inner));
@@ -212,6 +218,7 @@ impl WindowAllocator{
             //text_buffer:FrameTextBuffer::new(),
             consumer:consumer,
             components:BTreeMap::new(),
+            framebuffer:Mutex::new(framebuffer),
         }; 
 
         Ok(window)    
@@ -329,6 +336,8 @@ pub struct WindowObj {
     //text_buffer:FrameTextBuffer,
     consumer:DFQueueConsumer<Event>,
     components:BTreeMap<String, Component>,
+    /// the framebuffer owned by the window
+    pub framebuffer:Mutex<FrameBuffer>,
 }
 
 
@@ -393,24 +402,23 @@ impl WindowObj{
         };
     }
 
-    ///Get the content position of the displayable excluding border and padding
+    ///Get the content position of the window excluding border and padding
     pub fn get_content_position(&self) -> (usize, usize) {
         let inner = self.inner.lock();
         (inner.x + inner.margin, inner.y + inner.margin)
     }
 
     /// draw a pixel in a window
-    pub fn draw_pixel(&self, x:usize, y:usize, color:u32) -> Result<(), &'static str>{
+    pub fn draw_pixel(&self, x:usize, y:usize, color:u32) -> Result<(), &'static str> {
         let inner = self.inner.lock();
         if x >= inner.width - 2 || y >= inner.height - 2 {
             return Ok(());
         }
-        let buffer = match VFRAME_BUFFER.try(){
-            Some(buffer) => { buffer },
-            None => {return Err("The virtual frame buffer is not initialized");}
-        };
-        buffer.lock().draw_pixel(x + inner.x + 1, y + inner.y + 1, color);
-        Ok(())
+        let mut buffer = self.framebuffer.lock();
+        buffer.draw_pixel(x + inner.margin, y + inner.margin, color);
+        FrameCompositor::compose(
+            vec![(buffer.deref_mut(), inner.x, inner.y)]
+        )
     }
 
     /// draw a line in a window
@@ -422,16 +430,12 @@ impl WindowObj{
             || end_y > inner.height - 2 {
             return Ok(());
         }
-        let buffer = match VFRAME_BUFFER.try(){
-            Some(buffer) => { 
-                buffer
-            },
-            None => { return Err("Fail to get the virtual frame buffer"); }
-        };
-        buffer.lock().draw_line((start_x + inner.x + 1) as i32, (start_y + inner.y + 1) as i32, 
+        let mut buffer = self.framebuffer.lock();
+        buffer.draw_line((start_x + inner.x + 1) as i32, (start_y + inner.y + 1) as i32, 
             (end_x + inner.x + 1) as i32, (end_y + inner.y + 1) as i32, color);
-        Ok(())
-       
+        FrameCompositor::compose(
+            vec![(buffer.deref_mut(), inner.x, inner.y)]
+        )
     }
 
     /// draw a square in a window
@@ -442,14 +446,12 @@ impl WindowObj{
             || y + height > inner.height - 2 {
             return Ok(());
         }
-        let buffer = match VFRAME_BUFFER.try(){
-            Some(buffer) => { buffer },
-            None => { return Err("Fail to get the virtual frame buffer")}
-        };
-        buffer.lock().draw_rectangle(inner.margin + x, inner.margin + y, width, height, 
+        let mut buffer = self.framebuffer.lock();
+
+        buffer.draw_rectangle(inner.margin + x, inner.margin + y, width, height, 
                 color);
         FrameCompositor::compose(
-            vec![(&inner.framebuffer, inner.x, inner.y)]
+            vec![(buffer.deref_mut(), inner.x, inner.y)]
         )
     }
 
@@ -525,8 +527,6 @@ struct WindowInner {
     margin: usize,
     /// the producer accepting a key event
     key_producer: DFQueueProducer<Event>,
-    /// the framebuffer owned by the window
-    framebuffer:FrameBuffer,
 }
 
 impl WindowInner {
@@ -568,9 +568,7 @@ impl WindowInner {
         let buffer = match VFRAME_BUFFER.try(){
             Some(buffer) => { buffer },
             None => {return Err("The virtual frame buffer is not initialized") }
-        };
-
-                
+        };                
         buffer.lock().fill_rectangle(self.x + self.margin, self.y + self.margin,
                 self.width - 2 * self.margin, self.height - 2 * self.margin, SCREEN_BACKGROUND_COLOR);
         Ok(())
@@ -578,14 +576,15 @@ impl WindowInner {
 
     // draw the border of the window
     fn draw_border(&self, color:u32) -> Result<(), &'static str> {
-        let buffer = match VFRAME_BUFFER.try(){
+        let buffer_ref = match VFRAME_BUFFER.try(){
             Some(buffer) => { buffer },
             None => { return Err("Fail to get the virtual frame buffer") }
         };
-        buffer.lock().draw_rectangle(0, 0, self.width, self.height, color);
+        let mut buffer_lock = buffer_ref.lock();
+        let buffer = buffer_lock.deref_mut();
+        buffer.draw_rectangle(0, 0, self.width, self.height, color);
         FrameCompositor::compose(
-            vec![(&self.framebuffer, self.x, self.y)]
-
+            vec![(buffer, self.x, self.y)]
         )
     }
 

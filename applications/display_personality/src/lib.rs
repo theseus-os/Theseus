@@ -35,25 +35,27 @@ pub fn main(_args: Vec<String>) -> isize {
     };
 
 
-    let mut vf = frame_buffer::map(700, 100, vf).unwrap();
-    vf.lock().fill_rectangle(0,100,100,100, 0xff);
+    //let mut vf = frame_buffer::map(700, 100, vf).unwrap();
+    //vf.lock().fill_rectangle(0,100,100,100, 0xff);
     
-    match frame_buffer::display(&vf) {
-        Ok(_) => {},
-        Err(err) => {
-            println!("{}", err);
-            return -1;
-        }
-    }
+    // match frame_buffer::display(&vf) {
+    //     Ok(_) => {},
+    //     Err(err) => {
+    //         println!("{}", err);
+    //         return -1;
+    //     }
+    // }
 
     //Display two rectangles in two modes with personality
-    match personality(&mut vf) {
-        Ok(_) => {return 0},
-        Err(err) => {
-            println!("{}", err);
-            return -1;
-        }
-    }
+    // match personality(&mut vf) {
+    //     Ok(_) => {return 0},
+    //     Err(err) => {
+    //         println!("{}", err);
+    //         return -1;
+    //     }
+    // }
+
+	return 0;
 }
 
 fn personality(vf: &mut Arc<Mutex<FrameBuffer>>) -> Result<(), &'static str> {
@@ -106,10 +108,10 @@ fn personality(vf: &mut Arc<Mutex<FrameBuffer>>) -> Result<(), &'static str> {
 
 	//Display in both modes
     fill_rectangle_3d(vf, 0,300,100,100, 0xffff00);
-    frame_buffer::display(&vf)?;
+    //frame_buffer::display(&vf)?;
 
     fill_rectangle_2d(vf, 0,500,100,100, 0x00ff00);
-    frame_buffer::display(&vf)?;
+    //frame_buffer::display(&vf)?;
   
 
     Ok(())
