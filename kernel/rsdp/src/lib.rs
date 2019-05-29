@@ -8,7 +8,7 @@ extern crate owning_ref;
 
 use core::ops::DerefMut;
 use core::mem;
-use memory::{PageTable, MappedPages, Frame, FRAME_ALLOCATOR, PhysicalAddress, allocate_pages_by_bytes, EntryFlags};
+use memory::{PageTable, MappedPages, Frame, FrameRange, FRAME_ALLOCATOR, PhysicalAddress, allocate_pages_by_bytes, EntryFlags};
 use owning_ref::BoxRef;
 use alloc::boxed::Box;
 
@@ -45,7 +45,7 @@ impl Rsdp {
     pub fn get_rsdp(page_table: &mut PageTable) -> Result<BoxRef<MappedPages, Rsdp>, &'static str> {
         let size: usize = RSDP_SEARCH_END - RSDP_SEARCH_START;
         let pages = allocate_pages_by_bytes(size).ok_or("couldn't allocate pages")?;
-        let search_range = Frame::range_inclusive(
+        let search_range = FrameRange::new(
             Frame::containing_address(PhysicalAddress::new_canonical(RSDP_SEARCH_START)),
             Frame::containing_address(PhysicalAddress::new_canonical(RSDP_SEARCH_END))
         );

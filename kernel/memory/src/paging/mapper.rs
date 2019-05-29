@@ -12,7 +12,7 @@ use core::ops::DerefMut;
 use core::ptr::Unique;
 use core::slice;
 use x86_64;
-use {BROADCAST_TLB_SHOOTDOWN_FUNC, VirtualAddress, PhysicalAddress, FRAME_ALLOCATOR, FrameIter, Page, Frame, FrameAllocator, AllocatedPages}; 
+use {BROADCAST_TLB_SHOOTDOWN_FUNC, VirtualAddress, PhysicalAddress, FRAME_ALLOCATOR, FrameRange, Page, Frame, FrameAllocator, AllocatedPages}; 
 use paging::{PageRange, get_current_p4};
 use paging::entry::EntryFlags;
 use paging::table::{P4, Table, Level4};
@@ -159,7 +159,7 @@ impl Mapper {
     }
 
     /// the internal function that actually does all of the mapping from pages to frames.
-    fn internal_map_to<A>(&mut self, pages: PageRange, frames: FrameIter, flags: EntryFlags, allocator: &mut A)
+    fn internal_map_to<A>(&mut self, pages: PageRange, frames: FrameRange, flags: EntryFlags, allocator: &mut A)
         -> Result<MappedPages, &'static str>
         where A: FrameAllocator
     {
@@ -205,7 +205,7 @@ impl Mapper {
         -> Result<MappedPages, &'static str>
         where A: FrameAllocator
     {
-        self.internal_map_to(PageRange::new(page, page), Frame::range_inclusive(frame.clone(), frame), flags, allocator)
+        self.internal_map_to(PageRange::new(page, page), FrameRange::new(frame.clone(), frame), flags, allocator)
     }
 
     /// maps the given Page to a randomly selected (newly allocated) Frame
@@ -226,18 +226,18 @@ impl Mapper {
 
 
     /// maps the given contiguous range of Frames `frame_range` to contiguous `Page`s starting at `start_page`
-    pub fn map_frames<A>(&mut self, frames: FrameIter, start_page: Page, flags: EntryFlags, allocator: &mut A)
+    pub fn map_frames<A>(&mut self, frames: FrameRange, start_page: Page, flags: EntryFlags, allocator: &mut A)
         -> Result<MappedPages, &'static str>
         where A: FrameAllocator
     {
-        let iter_size = frames.clone().count() - 1; // -1 because it's inclusive
-        self.internal_map_to(PageRange::new(start_page, start_page + iter_size), frames, flags, allocator)
+        let end_page = start_page - 1 + frames.size_in_frames(); // -1 because it's an inclusive range
+        self.internal_map_to(PageRange::new(start_page, end_page), frames, flags, allocator)
     }
 
 
     /// maps the given `AllocatedPages` to the given actual frames.
     /// Consumes the given `AllocatedPages` and returns a `MappedPages` object which contains that `AllocatedPages` object.
-    pub fn map_allocated_pages_to<A>(&mut self, allocated_pages: AllocatedPages, frames: FrameIter, flags: EntryFlags, allocator: &mut A)
+    pub fn map_allocated_pages_to<A>(&mut self, allocated_pages: AllocatedPages, frames: FrameRange, flags: EntryFlags, allocator: &mut A)
         -> Result<MappedPages, &'static str>
         where A: FrameAllocator
     {

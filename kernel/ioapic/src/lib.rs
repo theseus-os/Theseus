@@ -15,7 +15,7 @@ use core::ops::DerefMut;
 use alloc::boxed::Box;
 use spin::{Mutex, MutexGuard};
 use volatile::{Volatile, WriteOnly};
-use memory::{FRAME_ALLOCATOR, Frame, PageTable, PhysicalAddress, EntryFlags, allocate_pages, MappedPages};
+use memory::{FRAME_ALLOCATOR, Frame, FrameRange, PageTable, PhysicalAddress, EntryFlags, allocate_pages, MappedPages};
 use atomic_linked_list::atomic_map::AtomicMap;
 use owning_ref::BoxRefMut;
 
@@ -79,7 +79,7 @@ impl IoApic {
     /// and then adds it to the system-wide list of all IOAPICs.
     pub fn new(page_table: &mut PageTable, id: u8, phys_addr: PhysicalAddress, gsi_base: u32) -> Result<(), &'static str> {
         let new_page = allocate_pages(1).ok_or("IoApic::new(): couldn't allocate_pages!")?;
-        let frame = Frame::range_inclusive(Frame::containing_address(phys_addr), Frame::containing_address(phys_addr));
+        let frame = FrameRange::new(Frame::containing_address(phys_addr), Frame::containing_address(phys_addr));
         let fa = FRAME_ALLOCATOR.try().ok_or("Couldn't get frame allocator")?;
         let ioapic_mapped_page = page_table.map_allocated_pages_to(
             new_page,

@@ -431,7 +431,7 @@ pub fn spawn_userspace(path: Path, name: Option<String>) -> Result<TaskRef, &'st
             let temp_module_mapping = {
                 let mut allocator = allocator_mutex.lock();
                 kernel_mmi_locked.page_table.map_allocated_pages_to(
-                    new_pages, Frame::range_inclusive_addr(module.start_address(), module.size()), 
+                    new_pages, FrameRange::from_phys_addr(module.start_address(), module.size()), 
                     EntryFlags::PRESENT, allocator.deref_mut()
                 )?
             };
@@ -462,7 +462,7 @@ pub fn spawn_userspace(path: Path, name: Option<String>) -> Result<TaskRef, &'st
                 let mapped_pages = {
                     let mut allocator = allocator_mutex.lock();
                     mapper.map_frames(
-                        Frame::range_inclusive_addr(module.start_address() + prog.offset, prog.vma.size()), 
+                        FrameRange::from_phys_addr(module.start_address() + prog.offset, prog.vma.size()), 
                         Page::containing_address(prog.vma.start_address()),
                         new_flags, allocator.deref_mut()
                     )?

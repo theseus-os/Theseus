@@ -7,7 +7,7 @@
 // option. This file may not be copied, modified, or distributed
 // except according to those terms.
 
-use super::{Frame, FrameAllocator, FrameIter, PhysicalAddress, PhysicalMemoryArea};
+use super::{Frame, FrameAllocator, FrameRange, PhysicalAddress, PhysicalMemoryArea};
 use alloc::vec::Vec;
 use kernel_config::memory::PAGE_SIZE;
 
@@ -181,7 +181,7 @@ impl AreaFrameAllocator {
 
 impl FrameAllocator for AreaFrameAllocator {
 
-    fn allocate_frames(&mut self, num_frames: usize) -> Option<FrameIter> {
+    fn allocate_frames(&mut self, num_frames: usize) -> Option<FrameRange> {
         // this is just a shitty way to get contiguous frames, since right now it's really easy to get them
         // it wastes the frames that are allocated 
 
@@ -208,8 +208,8 @@ impl FrameAllocator for AreaFrameAllocator {
             }
 
             // here, we have allocated enough frames, and checked that they're all contiguous
-            let last_frame = first_frame.clone() + num_frames - 1; // -1 because FrameIter is inclusive
-            return Some(Frame::range_inclusive(first_frame, last_frame));
+            let last_frame = first_frame.clone() + num_frames - 1; // -1 because FrameRange is inclusive
+            return Some(FrameRange::new(first_frame, last_frame));
         }
 
         error!("Error: AreaFrameAllocator::allocate_frames(): couldn't allocate {} contiguous frames, out of memory!", num_frames);

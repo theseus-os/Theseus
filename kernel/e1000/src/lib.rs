@@ -32,7 +32,7 @@ use alloc::collections::VecDeque;
 use irq_safety::MutexIrqSafe;
 use volatile::{Volatile, ReadOnly};
 use alloc::boxed::Box;
-use memory::{get_kernel_mmi_ref, FRAME_ALLOCATOR, PhysicalAddress, Frame, EntryFlags, allocate_pages_by_bytes, MappedPages, PhysicalMemoryArea, create_contiguous_mapping};
+use memory::{get_kernel_mmi_ref, FRAME_ALLOCATOR, PhysicalAddress, FrameRange, EntryFlags, allocate_pages_by_bytes, MappedPages, PhysicalMemoryArea, create_contiguous_mapping};
 use pci::{PciDevice, pci_read_32, pci_read_8, pci_write, pci_set_command_bus_master_bit};
 use kernel_config::memory::PAGE_SIZE;
 use owning_ref::BoxRefMut;
@@ -409,7 +409,7 @@ impl E1000Nic {
 
         // set up virtual pages and physical frames to be mapped
         let pages_nic = allocate_pages_by_bytes(mem_size_in_bytes).ok_or("e1000::mem_map(): couldn't allocated virtual page!")?;
-        let frames_nic = Frame::range_inclusive_addr(mem_base, mem_size_in_bytes);
+        let frames_nic = FrameRange::from_phys_addr(mem_base, mem_size_in_bytes);
         let flags = EntryFlags::PRESENT | EntryFlags::WRITABLE | EntryFlags::NO_CACHE | EntryFlags::NO_EXECUTE;
 
         let kernel_mmi_ref = get_kernel_mmi_ref().ok_or("e1000:mem_map KERNEL_MMI was not yet initialized!")?;
