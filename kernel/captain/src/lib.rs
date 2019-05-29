@@ -20,6 +20,7 @@
 #![feature(asm)]
 #![feature(core_intrinsics)]
 
+
 extern crate alloc;
 #[macro_use] extern crate log;
 
@@ -171,7 +172,7 @@ pub fn init(
     scheduler::schedule();
     // NOTE: DO NOT PUT ANY CODE BELOW THIS POINT, AS IT SHOULD NEVER RUN!
     // (unless there are no other tasks available to run on the BSP core, which never happens)
-
+    
 
     loop { 
         spin_loop_hint();

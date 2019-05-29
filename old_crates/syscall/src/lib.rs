@@ -180,7 +180,7 @@ fn enable_syscall_sysret(syscall_stack_pointer: VirtualAddress) {
     let gs_data_ptr = Box::into_raw(Box::new(gs_data)) as u64; // puts it on the kernel heap, and prevents it from being dropped
     unsafe { wrmsr(IA32_KERNEL_GS_BASE, gs_data_ptr); }
     unsafe { wrmsr(IA32_GS_BASE, gs_data_ptr); }
-    //debug!("Set KERNEL_GS_BASE and GS_BASE to include a kernel stack at {:#x}", syscall_stack_pointer);
+    debug!("Set KERNEL_GS_BASE and GS_BASE to include a kernel stack at {:#x}", syscall_stack_pointer);
     
     // set a kernelspace entry point for the syscall instruction from userspace
     unsafe { wrmsr(IA32_LSTAR, syscall_handler as u64); }
@@ -192,7 +192,7 @@ fn enable_syscall_sysret(syscall_stack_pointer: VirtualAddress) {
     let kernel_cs = get_segment_selector(AvailableSegmentSelector::KernelCode).0;
     let star_val: u32 = ((user_cs as u32) << 16) | (kernel_cs as u32); // this is what's recommended
     unsafe { wrmsr(IA32_STAR, (star_val as u64) << 32); }   //  [63:48] User CS, [47:32] Kernel CS
-    //debug!("Set IA32_STAR to {:#x}", star_val);
+    debug!("Set IA32_STAR to {:#x}", star_val);
 
     // set up flags upon kernelspace entry into syscall_handler
     let rflags_interrupt_bitmask = 0x200;

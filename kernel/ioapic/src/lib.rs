@@ -108,7 +108,7 @@ impl IoApic {
         (irq_num < (self.gsi_base + INTERRUPT_ENTRIES_PER_IOAPIC))
     }
 
-    pub fn read_reg(&mut self, register_index: u32) -> u32 {
+    fn read_reg(&mut self, register_index: u32) -> u32 {
         // to read from an IoApic reg, we first write which register we want to read from,
         // then we read the value from it in the next register
         self.regs.register_index.write(register_index);
