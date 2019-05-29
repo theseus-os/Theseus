@@ -8,6 +8,7 @@
 #![feature(ptr_internals)]
 #![feature(core_intrinsics)]
 #![feature(unboxed_closures)]
+#![feature(step_trait, range_is_empty)]
 
 extern crate spin;
 extern crate multiboot2;
@@ -52,10 +53,14 @@ pub use self::paging::*;
 pub use self::stack_allocator::{StackAllocator, Stack};
 
 
+use core::{
+    ops::{RangeInclusive, Deref, DerefMut},
+    iter::Step,
+    mem,
+};
 use multiboot2::BootInformation;
 use spin::Once;
 use irq_safety::MutexIrqSafe;
-use core::ops::DerefMut;
 use alloc::vec::Vec;
 use alloc::sync::Arc;
 use kernel_config::memory::{PAGE_SIZE, MAX_PAGE_NUMBER, KERNEL_OFFSET, KERNEL_HEAP_START, KERNEL_HEAP_INITIAL_SIZE, KERNEL_STACK_ALLOCATOR_BOTTOM, KERNEL_STACK_ALLOCATOR_TOP_ADDR};
@@ -261,7 +266,7 @@ pub fn allocate_frame() -> Option<Frame> {
 
 
 /// Convenience method for allocating several contiguous Frames.
-pub fn allocate_frames(num_frames: usize) -> Option<FrameIter> {
+pub fn allocate_frames(num_frames: usize) -> Option<FrameRange> {
     FRAME_ALLOCATOR.try().and_then(|fa| fa.lock().allocate_frames(num_frames))
 }
 
@@ -404,16 +409,16 @@ impl VirtualMemoryArea {
     }
 
     /// Get an iterator that covers all the pages in this VirtualMemoryArea
-    pub fn pages(&self) -> PageIter {
+    pub fn pages(&self) -> PageRange {
 
         // check that the end_page won't be invalid
         if (self.start.value() + self.size) < 1 {
-            return PageIter::empty();
+            return PageRange::empty();
         }
         
         let start_page = Page::containing_address(self.start);
         let end_page = Page::containing_address(self.start + self.size - 1);
-        Page::range_inclusive(start_page, end_page)
+        PageRange::new(start_page, end_page)
     }
 }
 
@@ -561,7 +566,7 @@ pub fn init(boot_info: &BootInformation)
     let kernel_stack_allocator = {
         let stack_alloc_start = Page::containing_address(VirtualAddress::new_canonical(KERNEL_STACK_ALLOCATOR_BOTTOM)); 
         let stack_alloc_end = Page::containing_address(VirtualAddress::new_canonical(KERNEL_STACK_ALLOCATOR_TOP_ADDR));
-        let stack_alloc_range = Page::range_inclusive(stack_alloc_start, stack_alloc_end);
+        let stack_alloc_range = PageRange::new(stack_alloc_start, stack_alloc_end);
         stack_allocator::StackAllocator::new(stack_alloc_range, false)
     };
 
@@ -582,14 +587,9 @@ pub fn init(boot_info: &BootInformation)
 
 
 
-/// A `Frame` is a chunk of **physical** memory, similar to how a `Page` is a chunk of **virtual** memory. 
-/// Frames do not implement Clone or Copy because they cannot be safely duplicated 
-/// (you cannot simply "copy" a region of physical memory...).
-/// A `Frame` is the sole owner of the region of physical memory that it covers, 
-/// i.e., there will never be two `Frame` objects that point to the same physical memory chunk. 
-/// 
-/// **Note**: DO NOT implement Copy or Clone for this type.
-#[derive(PartialEq, Eq, PartialOrd, Ord)]
+/// A `Frame` is a chunk of **physical** memory, 
+/// similar to how a `Page` is a chunk of **virtual** memory. 
+#[derive(Clone, Copy, PartialEq, Eq, PartialOrd, Ord)]
 pub struct Frame {
     number: usize,
 }
@@ -600,31 +600,14 @@ impl fmt::Debug for Frame {
 }
 
 impl Frame {
-	/// returns the Frame containing the given physical address
+	/// Returns the `Frame` containing the given `PhysicalAddress`.
     pub fn containing_address(phys_addr: PhysicalAddress) -> Frame {
         Frame { number: phys_addr.value() / PAGE_SIZE }
     }
 
+    /// Returns the `PhysicalAddress` at the start of this `Frame`.
     pub fn start_address(&self) -> PhysicalAddress {
         PhysicalAddress::new_canonical(self.number * PAGE_SIZE)
-    }
-
-    pub fn clone(&self) -> Frame {
-        Frame { number: self.number }
-    }
-
-    pub fn range_inclusive(start: Frame, end: Frame) -> FrameIter {
-        FrameIter {
-            start: start,
-            end: end,
-        }
-    }
-
-    pub fn range_inclusive_addr(phys_addr: PhysicalAddress, size_in_bytes: usize) -> FrameIter {
-        FrameIter {
-            start: Frame::containing_address(phys_addr),
-            end: Frame::containing_address(phys_addr + size_in_bytes - 1),
-        }
     }
 }
 
@@ -664,41 +647,63 @@ impl SubAssign<usize> for Frame {
     }
 }
 
-/// An inclusive series of contiguous physical memory frames.
-#[derive(Debug)]
-pub struct FrameIter {
-    pub start: Frame,
-    pub end: Frame,
+// Implementing these functions allow `Frame` to be in an `Iterator`.
+impl Step for Frame {
+    #[inline]
+    fn steps_between(start: &Frame, end: &Frame) -> Option<usize> {
+        Step::steps_between(&start.number, &end.number)
+    }
+    #[inline]
+    fn replace_one(&mut self) -> Self {
+        mem::replace(self, Frame { number: 1 })
+    }
+    #[inline]
+    fn replace_zero(&mut self) -> Self {
+        mem::replace(self, Frame { number: 0 })
+    }
+    #[inline]
+    fn add_one(&self) -> Self {
+        Add::add(*self, 1)
+    }
+    #[inline]
+    fn sub_one(&self) -> Self {
+        Sub::sub(*self, 1)
+    }
+    #[inline]
+    fn add_usize(&self, n: usize) -> Option<Frame> {
+        Some(*self + n)
+    }
 }
 
-impl FrameIter {
-    /// Returns the PhysicalAddress of the starting `Frame` in this `FrameIter`.
+
+/// A range of `Frame`s that are contiguous in physical memory.
+#[derive(Debug, Clone)]
+pub struct FrameRange(RangeInclusive<Frame>);
+
+impl FrameRange {
+    /// Creates a new range of `Frame`s that spans from `start` to `end`,
+    /// both inclusive bounds.
+    pub fn new(start: Frame, end: Frame) -> FrameRange {
+        FrameRange(RangeInclusive::new(start, end))
+    }
+
+    /// Creates a FrameRange that will always yield `None`.
+    pub fn empty() -> FrameRange {
+        FrameRange::new(Frame { number: 1 }, Frame { number: 0 })
+    }
+    
+    /// A convenience method for creating a new `FrameRange` 
+    /// that spans all `Frame`s from the given physical address 
+    /// to an end bound based on the given size.
+    pub fn from_phys_addr(starting_virt_addr: PhysicalAddress, size_in_bytes: usize) -> FrameRange {
+        let start_frame = Frame::containing_address(starting_virt_addr);
+        let end_frame = Frame::containing_address(starting_virt_addr + size_in_bytes - 1);
+        FrameRange::new(start_frame, end_frame)
+    }
+
+    /// Returns the `PhysicalAddress` of the starting `Frame` in this `FrameRange`.
     pub fn start_address(&self) -> PhysicalAddress {
-        self.start.start_address()
-    }
-
-    /// Returns a `FrameIter` that will always yield `None`.
-    pub fn empty() -> FrameIter {
-        FrameIter {
-            start: Frame { number: 1 },
-            end: Frame { number: 0 },
-        }
-    }
-
-    /// Returns whether this `FrameIter` is empty, 
-    /// meaning that its Iterator will always yield `None`.
-    pub fn is_empty(&self) -> bool {
-        self.start > self.end
-    }
-
-    /// Create a duplicate of this `FrameIter`. 
-    /// We do this instead of implementing/deriving the Clone trait
-    /// because we want to prevent Rust from cloning `FrameIter`s implicitly.
-    pub fn clone(&self) -> FrameIter {
-        FrameIter {
-            start: self.start.clone(),
-            end: self.end.clone(),
-        }
+        self.0.start().start_address()
     }
 
     /// Returns the number of `Frame`s covered by this iterator. 
@@ -706,21 +711,16 @@ impl FrameIter {
     /// This is instant, because it doesn't need to iterate over each entry, unlike normal iterators.
     pub fn size_in_frames(&self) -> usize {
         // add 1 because it's an inclusive range
-        self.end.number + 1 - self.start.number
+        self.0.end().number + 1 - self.0.start().number
     }
 
-    /// Whether this `FrameIter` contains the given `Frame`.
-    pub fn contains(&self, frame: &Frame) -> bool {
-        frame >= &self.start && frame <= &self.end
-    }
-
-    /// Whether this `FrameIter` contains the given `PhysicalAddress`.
+    /// Whether this `FrameRange` contains the given `PhysicalAddress`.
     pub fn contains_phys_addr(&self, phys_addr: PhysicalAddress) -> bool {
-        self.contains(&Frame::containing_address(phys_addr))
+        self.0.contains(&Frame::containing_address(phys_addr))
     }
 
-    /// Returns the offset of the given `PhysicalAddress` within this `FrameIter`,
-    /// i.e., the difference between `phys_addr` and `self.
+    /// Returns the offset of the given `PhysicalAddress` within this `FrameRange`,
+    /// i.e., the difference between `phys_addr` and `self.start()`.
     pub fn offset_from_start(&self, phys_addr: PhysicalAddress) -> Option<usize> {
         if self.contains_phys_addr(phys_addr) {
             Some(phys_addr.value() - self.start_address().value())
@@ -729,42 +729,44 @@ impl FrameIter {
         }
     }
 
-    /// Returns a new, separate `FrameIter` that is extended to include the given `Frame`. 
-    pub fn to_extended(&self, frame_to_include: Frame) -> FrameIter {
-        // if the current FrameIter was empty, return a new FrameIter containing only the given frame_to_include
+    /// Returns a new, separate `FrameRange` that is extended to include the given `Frame`. 
+    pub fn to_extended(&self, frame_to_include: Frame) -> FrameRange {
+        // if the current FrameRange was empty, return a new FrameRange containing only the given frame_to_include
         if self.is_empty() {
-            return FrameIter {
-                start: frame_to_include.clone(),
-                end: frame_to_include,
-            };
+            return FrameRange::new(frame_to_include.clone(), frame_to_include);
         }
 
-        let start = core::cmp::min(&self.start, &frame_to_include);
-        let end   = core::cmp::max(&self.end,   &frame_to_include);
-        FrameIter {
-            start: start.clone(),
-            end: end.clone()
-        }
+        let start = core::cmp::min(self.0.start(), &frame_to_include);
+        let end   = core::cmp::max(self.0.end(),   &frame_to_include);
+        FrameRange::new(start.clone(), end.clone())
     }
 }
 
-impl Iterator for FrameIter {
+impl Deref for FrameRange {
+    type Target = RangeInclusive<Frame>;
+    fn deref(&self) -> &RangeInclusive<Frame> {
+        &self.0
+    }
+}
+impl DerefMut for FrameRange {
+    fn deref_mut(&mut self) -> &mut RangeInclusive<Frame> {
+        &mut self.0
+    }
+}
+
+impl IntoIterator for FrameRange {
     type Item = Frame;
+    type IntoIter = RangeInclusive<Frame>;
 
-    fn next(&mut self) -> Option<Frame> {
-        if self.start <= self.end {
-            let frame = self.start.clone();
-            self.start.number += 1;
-            Some(frame)
-        } else {
-            None
-        }
+    fn into_iter(self) -> Self::IntoIter {
+        self.0
     }
 }
+
 
 pub trait FrameAllocator {
     fn allocate_frame(&mut self) -> Option<Frame>;
-    fn allocate_frames(&mut self, num_frames: usize) -> Option<FrameIter>;
+    fn allocate_frames(&mut self, num_frames: usize) -> Option<FrameRange>;
     fn deallocate_frame(&mut self, frame: Frame);
     /// Call this when a heap is set up, and the `alloc` types can be used.
     fn alloc_ready(&mut self);

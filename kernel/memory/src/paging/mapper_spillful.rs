@@ -90,7 +90,7 @@ impl MapperSpillful {
         top_level_flags.set(EntryFlags::NO_EXECUTE, false);
         // top_level_flags.set(EntryFlags::WRITABLE, true); // is the same true for the WRITABLE bit?
 
-        for page in Page::range_inclusive_addr(vaddr, size).clone() {
+        for page in PageRange::from_virt_addr(vaddr, size).clone() {
             let frame = allocator.allocate_frame().ok_or("MapperSpillful::map() -- out of memory trying to alloc frame")?;
             let mut p3 = self.p4_mut().next_table_create(page.p4_index(), top_level_flags, allocator);
             let mut p2 = p3.next_table_create(page.p3_index(), top_level_flags, allocator);
@@ -127,7 +127,7 @@ impl MapperSpillful {
             return Ok(());
         }
 
-        let pages = Page::range_inclusive_addr(vma.start_address(), vma.size());
+        let pages = PageRange::from_virt_addr(vma.start_address(), vma.size());
 
         let broadcast_tlb_shootdown = BROADCAST_TLB_SHOOTDOWN_FUNC.try();
         let mut vaddrs: Vec<VirtualAddress> = if broadcast_tlb_shootdown.is_some() {
@@ -183,7 +183,7 @@ impl MapperSpillful {
             let vma = vma.ok_or("couldn't find corresponding VMA")?;
             
             (
-                Page::range_inclusive_addr(vma.start_address(), vma.size()),
+                PageRange::from_virt_addr(vma.start_address(), vma.size()),
                 vma_index.ok_or("couldn't find corresponding VMA")?
             )
         };

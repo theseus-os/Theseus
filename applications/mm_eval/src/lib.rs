@@ -66,7 +66,7 @@ fn create_mappings(
             match mapper {
                 MapperType::Normal(ref mut mapper) => {
                     let mp = mapper.map_pages(
-                        Page::range_inclusive_addr(vaddr, size_in_bytes),
+                        PageRange::from_virt_addr(vaddr, size_in_bytes),
                         EntryFlags::WRITABLE | EntryFlags::PRESENT,
                         frame_allocator
                     )?;

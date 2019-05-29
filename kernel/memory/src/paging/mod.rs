@@ -23,7 +23,11 @@ pub use self::mapper::*;
 pub use self::virtual_address_allocator::*;
 
 
-use core::ops::{Add, AddAssign, Sub, SubAssign, Deref, DerefMut};
+use core::{
+    ops::{RangeInclusive, Add, AddAssign, Sub, SubAssign, Deref, DerefMut},
+    mem,
+    iter::Step,
+};
 use multiboot2;
 use super::*;
 
@@ -52,41 +56,31 @@ impl Page {
         Page { number: virt_addr.value() / PAGE_SIZE }
     }
 
-	/// Returns the VirtualAddress as the start of this Page
+	/// Returns the `VirtualAddress` as the start of this `Page`.
     pub fn start_address(&self) -> VirtualAddress {
         VirtualAddress(self.number * PAGE_SIZE)
     }
 
-	/// returns the 9-bit part of this page's virtual address that is the index into the P4 page table entries list
+	/// Returns the 9-bit part of this page's virtual address that is the index into the P4 page table entries list.
     fn p4_index(&self) -> usize {
         (self.number >> 27) & 0x1FF
     }
 
-    /// returns the 9-bit part of this page's virtual address that is the index into the P3 page table entries list
+    /// Returns the 9-bit part of this page's virtual address that is the index into the P3 page table entries list.
     fn p3_index(&self) -> usize {
         (self.number >> 18) & 0x1FF
     }
 
-    /// returns the 9-bit part of this page's virtual address that is the index into the P2 page table entries list
+    /// Returns the 9-bit part of this page's virtual address that is the index into the P2 page table entries list.
     fn p2_index(&self) -> usize {
         (self.number >> 9) & 0x1FF
     }
 
-    /// returns the 9-bit part of this page's virtual address that is the index into the P2 page table entries list.
-    /// using this returned usize value as an index into the P1 entries list will give you the final PTE, 
-    /// from which you can extract the physical address using pointed_frame()
+    /// Returns the 9-bit part of this page's virtual address that is the index into the P2 page table entries list.
+    /// Using this returned `usize` value as an index into the P1 entries list will give you the final PTE, 
+    /// from which you can extract the mapped `Frame` (or its physical address) using `pointed_frame()`.
     fn p1_index(&self) -> usize {
         (self.number >> 0) & 0x1FF
-    }
-
-    pub fn range_inclusive(start: Page, end: Page) -> PageIter {
-        PageIter::new(start, end)
-    }
-
-    pub fn range_inclusive_addr(virt_addr: VirtualAddress, size_in_bytes: usize) -> PageIter {
-        let start_page = Page::containing_address(virt_addr);
-        let end_page = Page::containing_address(virt_addr + size_in_bytes - 1);
-        PageIter::new(start_page, end_page)
     }
 }
 
@@ -125,66 +119,108 @@ impl SubAssign<usize> for Page {
     }
 }
 
-
-/// An iterator over a range of contiguous pages,
-/// from `start` to `end`, both inclusive.
-#[derive(Debug)]
-pub struct PageIter {
-    pub start: Page,
-    pub end: Page,
-    pub current: Page,
+// Implementing these functions allow `Page` to be in an `Iterator`.
+impl Step for Page {
+    #[inline]
+    fn steps_between(start: &Page, end: &Page) -> Option<usize> {
+        Step::steps_between(&start.number, &end.number)
+    }
+    #[inline]
+    fn replace_one(&mut self) -> Self {
+        mem::replace(self, Page { number: 1 })
+    }
+    #[inline]
+    fn replace_zero(&mut self) -> Self {
+        mem::replace(self, Page { number: 0 })
+    }
+    #[inline]
+    fn add_one(&self) -> Self {
+        Add::add(*self, 1)
+    }
+    #[inline]
+    fn sub_one(&self) -> Self {
+        Sub::sub(*self, 1)
+    }
+    #[inline]
+    fn add_usize(&self, n: usize) -> Option<Page> {
+        Some(*self + n)
+    }
 }
 
-impl PageIter {
-    /// Same as `Page::range_inclusive(start, end)`.
-    pub fn new(start: Page, end: Page) -> PageIter {
-        PageIter {
-            start: start,
-            end: end,
-            current: start, // start at the beginning
-        }
+
+
+/// A range of `Page`s that are contiguous in virtual memory.
+#[derive(Debug, Clone)]
+pub struct PageRange(RangeInclusive<Page>);
+
+impl PageRange {
+    /// Creates a new range of `Page`s that spans from `start` to `end`,
+    /// both inclusive bounds.
+    pub fn new(start: Page, end: Page) -> PageRange {
+        PageRange(RangeInclusive::new(start, end))
     }
 
-    /// Returns a PageIter that will always yield `None`.
-    pub fn empty() -> PageIter {
-        PageIter::new(Page { number: 1 }, Page { number: 0 })
+    /// Creates a PageRange that will always yield `None`.
+    pub fn empty() -> PageRange {
+        PageRange::new(Page { number: 1 }, Page { number: 0 })
+    }
+    
+    /// A convenience method for creating a new `PageRange` 
+    /// that spans all `Page`s from the given virtual address 
+    /// to an end bound based on the given size.
+    pub fn from_virt_addr(starting_virt_addr: VirtualAddress, size_in_bytes: usize) -> PageRange {
+        let start_page = Page::containing_address(starting_virt_addr);
+        let end_page = Page::containing_address(starting_virt_addr + size_in_bytes - 1);
+        PageRange::new(start_page, end_page)
     }
 
-    /// Create a duplicate of this PageIter. 
-    /// We do this instead of implementing/deriving the Clone trait
-    /// because we want to prevent Rust from cloning `PageIter`s implicitly.
-    pub fn clone(&self) -> PageIter {
-        PageIter {
-            start: self.start,
-            end: self.end,
-            current: self.current,
-        }
-    }
-
+    /// Returns the `VirtualAddress` of the starting `Page` in this `PageRange`.
     pub fn start_address(&self) -> VirtualAddress {
-        self.start.start_address()
+        self.0.start().start_address()
     }
 
-    /// Returns the number of pages covered by this iterator. 
+    /// Returns the number of `Page`s covered by this iterator. 
     /// Use this instead of the Iterator trait's `count()` method.
     /// This is instant, because it doesn't need to iterate over each entry, unlike normal iterators.
     pub fn size_in_pages(&self) -> usize {
         // add 1 because it's an inclusive range
-        self.end.number + 1 - self.start.number
+        self.0.end().number + 1 - self.0.start().number
     }
-}
 
-impl Iterator for PageIter {
-    type Item = Page;
+    /// Whether this `PageRange` contains the given `VirtualAddress`.
+    pub fn contains_virt_addr(&self, virt_addr: VirtualAddress) -> bool {
+        self.0.contains(&Page::containing_address(virt_addr))
+    }
 
-    fn next(&mut self) -> Option<Page> {
-        if self.current <= self.end {
-            let page = self.current;
-            self.current.number += 1;
-            Some(page)
+    /// Returns the offset of the given `VirtualAddress` within this `PageRange`,
+    /// i.e., the difference between `virt_addr` and `self.start()`.
+    pub fn offset_from_start(&self, virt_addr: VirtualAddress) -> Option<usize> {
+        if self.contains_virt_addr(virt_addr) {
+            Some(virt_addr.value() - self.start_address().value())
         } else {
             None
         }
+    }
+}
+
+impl Deref for PageRange {
+    type Target = RangeInclusive<Page>;
+    fn deref(&self) -> &RangeInclusive<Page> {
+        &self.0
+    }
+}
+impl DerefMut for PageRange {
+    fn deref_mut(&mut self) -> &mut RangeInclusive<Page> {
+        &mut self.0
+    }
+}
+
+impl IntoIterator for PageRange {
+    type Item = Page;
+    type IntoIter = RangeInclusive<Page>;
+
+    fn into_iter(self) -> Self::IntoIter {
+        self.0
     }
 }
 
@@ -495,7 +531,7 @@ pub fn init(allocator_mutex: &MutexIrqSafe<AreaFrameAllocator>, boot_info: &mult
                 // we will unmap these later before we start booting to userspace processes
                 identity_mapped_pages[index] = Some(
                     mapper.map_frames(
-                        Frame::range_inclusive_addr(start_phys_addr, section.size() as usize), 
+                        FrameRange::from_phys_addr(start_phys_addr, section.size() as usize), 
                         Page::containing_address(start_virt_addr - KERNEL_OFFSET), 
                         flags,
                         allocator.deref_mut()
@@ -522,17 +558,17 @@ pub fn init(allocator_mutex: &MutexIrqSafe<AreaFrameAllocator>, boot_info: &mult
 
             // now we map the 5 main sections into 3 groups according to flags
             text_mapped_pages = Some( try!( mapper.map_frames(
-                Frame::range_inclusive_addr(text_start_phys, text_end_phys.value() - text_start_phys.value()), 
+                FrameRange::from_phys_addr(text_start_phys, text_end_phys.value() - text_start_phys.value()), 
                 Page::containing_address(text_start_virt), 
                 text_flags, allocator.deref_mut())
             ));
             rodata_mapped_pages = Some( try!( mapper.map_frames(
-                Frame::range_inclusive_addr(rodata_start_phys, rodata_end_phys.value() - rodata_start_phys.value()), 
+                FrameRange::from_phys_addr(rodata_start_phys, rodata_end_phys.value() - rodata_start_phys.value()), 
                 Page::containing_address(rodata_start_virt), 
                 rodata_flags, allocator.deref_mut())
             ));
             data_mapped_pages = Some( try!( mapper.map_frames(
-                Frame::range_inclusive_addr(data_start_phys, data_end_phys.value() - data_start_phys.value()),
+                FrameRange::from_phys_addr(data_start_phys, data_end_phys.value() - data_start_phys.value()),
                 Page::containing_address(data_start_virt), 
                 data_flags, allocator.deref_mut())
             ));
@@ -545,7 +581,7 @@ pub fn init(allocator_mutex: &MutexIrqSafe<AreaFrameAllocator>, boot_info: &mult
             let vga_display_virt_addr = VirtualAddress::new_canonical(VGA_DISPLAY_PHYS_START + KERNEL_OFFSET);
             let vga_display_flags = EntryFlags::PRESENT | EntryFlags::WRITABLE | EntryFlags::GLOBAL | EntryFlags::NO_CACHE;
             higher_half_mapped_pages[index] = Some( try!( mapper.map_frames(
-                Frame::range_inclusive_addr(PhysicalAddress::new(VGA_DISPLAY_PHYS_START)?, VGA_SIZE_IN_BYTES), 
+                FrameRange::from_phys_addr(PhysicalAddress::new(VGA_DISPLAY_PHYS_START)?, VGA_SIZE_IN_BYTES), 
                 Page::containing_address(vga_display_virt_addr), 
                 vga_display_flags,
                 allocator.deref_mut())
@@ -554,7 +590,7 @@ pub fn init(allocator_mutex: &MutexIrqSafe<AreaFrameAllocator>, boot_info: &mult
             debug!("mapped kernel section: vga_buffer at addr: {:?}", vmas[index]);
             // also do an identity mapping for APs that need it while booting
             identity_mapped_pages[index] = Some( try!( mapper.map_frames(
-                Frame::range_inclusive_addr(PhysicalAddress::new(VGA_DISPLAY_PHYS_START)?, VGA_SIZE_IN_BYTES), 
+                FrameRange::from_phys_addr(PhysicalAddress::new(VGA_DISPLAY_PHYS_START)?, VGA_SIZE_IN_BYTES), 
                 Page::containing_address(VirtualAddress::new_canonical(VGA_DISPLAY_PHYS_START)), 
                 vga_display_flags, allocator.deref_mut())
             ));
@@ -562,10 +598,10 @@ pub fn init(allocator_mutex: &MutexIrqSafe<AreaFrameAllocator>, boot_info: &mult
             
 
             // map the multiboot boot_info at the same address it previously was, so we can continue to access boot_info 
-            let boot_info_pages  = Page::range_inclusive_addr(boot_info_start_vaddr, boot_info_size);
-            let boot_info_frames = Frame::range_inclusive_addr(boot_info_start_paddr, boot_info_size);
+            let boot_info_pages  = PageRange::from_virt_addr(boot_info_start_vaddr, boot_info_size);
+            let boot_info_frames = FrameRange::from_phys_addr(boot_info_start_paddr, boot_info_size);
             vmas[index] = VirtualMemoryArea::new(boot_info_start_vaddr, boot_info_size, EntryFlags::PRESENT | EntryFlags::GLOBAL, "Kernel Multiboot Info");
-            for (page, frame) in boot_info_pages.zip(boot_info_frames) {
+            for (page, frame) in boot_info_pages.into_iter().zip(boot_info_frames) {
                 // we must do it page-by-page to make sure that a page hasn't already been mapped
                 if mapper.translate_page(page).is_some() {
                     // skip pages that are already mapped
@@ -609,7 +645,7 @@ pub fn init(allocator_mutex: &MutexIrqSafe<AreaFrameAllocator>, boot_info: &mult
     let (heap_mapped_pages, heap_vma) = {
         let mut allocator = allocator_mutex.lock();
 
-        let pages = Page::range_inclusive_addr(VirtualAddress::new_canonical(KERNEL_HEAP_START), KERNEL_HEAP_INITIAL_SIZE);
+        let pages = PageRange::from_virt_addr(VirtualAddress::new_canonical(KERNEL_HEAP_START), KERNEL_HEAP_INITIAL_SIZE);
         let heap_flags = paging::EntryFlags::WRITABLE;
         let heap_vma: VirtualMemoryArea = VirtualMemoryArea::new(VirtualAddress::new_canonical(KERNEL_HEAP_START), KERNEL_HEAP_INITIAL_SIZE, heap_flags, "Kernel Heap");
         let heap_mp = try_forget!(

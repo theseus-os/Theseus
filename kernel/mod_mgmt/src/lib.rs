@@ -43,7 +43,7 @@ use xmas_elf::{
 use goblin::elf::reloc::*;
 
 use util::round_up_power_of_two;
-use memory::{MmiRef, FRAME_ALLOCATOR, MemoryManagementInfo, Frame, VirtualAddress, PhysicalAddress, MappedPages, EntryFlags, allocate_pages_by_bytes};
+use memory::{MmiRef, FRAME_ALLOCATOR, MemoryManagementInfo, FrameRange, VirtualAddress, PhysicalAddress, MappedPages, EntryFlags, allocate_pages_by_bytes};
 use multiboot2::BootInformation;
 use metadata::{StrongCrateRef, WeakSectionRef};
 use cow_arc::CowArc;
@@ -152,7 +152,7 @@ fn parse_bootloader_modules_into_files(
 
     for m in boot_info.module_tags() {
         let size_in_bytes = (m.end_address() - m.start_address()) as usize;
-        let frames = Frame::range_inclusive_addr(PhysicalAddress::new(m.start_address() as usize)?, size_in_bytes);
+        let frames = FrameRange::from_phys_addr(PhysicalAddress::new(m.start_address() as usize)?, size_in_bytes);
         let (crate_type, prefix, file_name) = CrateType::from_module_name(m.name())?;
         let prefix = if prefix == "" { DEFAULT_NAMESPACE_NAME } else { prefix };
         let name = String::from(file_name);

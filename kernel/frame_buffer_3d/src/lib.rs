@@ -20,7 +20,7 @@ extern crate alloc;
 use core::ptr::Unique;
 use spin::{Mutex, Once};
 use alloc::vec::Vec;
-use memory::{FRAME_ALLOCATOR, Frame, VirtualAddress, PhysicalAddress, 
+use memory::{FRAME_ALLOCATOR, FrameRange, VirtualAddress, PhysicalAddress, 
     EntryFlags, allocate_pages_by_bytes, MappedPages, get_kernel_mmi_ref};
 use core::ops::DerefMut;
 
@@ -56,7 +56,7 @@ pub fn init() -> Result<(), &'static str > {
     FRAME_DRAWER.lock().init_frame_buffer(pages.start_address())?;
     let mapped_frame_buffer = kernel_mmi_locked.page_table.map_allocated_pages_to(
         pages, 
-        Frame::range_inclusive_addr(PhysicalAddress::new_canonical(VESA_DISPLAY_PHYS_START), VESA_DISPLAY_PHYS_SIZE), 
+        FrameRange::from_phys_addr(PhysicalAddress::new_canonical(VESA_DISPLAY_PHYS_START), VESA_DISPLAY_PHYS_SIZE), 
         vesa_display_flags, 
         allocator.lock().deref_mut()
     )?;
