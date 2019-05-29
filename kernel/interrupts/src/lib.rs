@@ -34,7 +34,7 @@ extern crate tlb_shootdown;
 
 
 use ps2::handle_mouse_packet;
-use x86_64::structures::idt::{LockedIdt, ExceptionStackFrame, HandlerFunc};
+use x86_64::structures::idt::{LockedIdt, ExceptionStackFrame, HandlerFunc, IdtEntry};
 use spin::Once;
 //use port_io::Port;
 // use drivers::ata_pio;
@@ -44,6 +44,7 @@ use core::sync::atomic::{AtomicUsize, AtomicBool, Ordering};
 use memory::VirtualAddress;
 use apic::{INTERRUPT_CHIP, InterruptChip, get_my_apic_id};
 use pic::PIC_MASTER_OFFSET;
+
 
 
 
@@ -64,7 +65,7 @@ pub fn init(double_fault_stack_top_unusable: VirtualAddress, privilege_stack_top
     -> Result<&'static LockedIdt, &'static str> 
 {
     let bsp_id = try!(apic::get_bsp_id().ok_or("couldn't get BSP's id"));
-    //info!("Setting up TSS & GDT for BSP (id {})", bsp_id);
+    info!("Setting up TSS & GDT for BSP (id {})", bsp_id);
     gdt::create_tss_gdt(bsp_id, double_fault_stack_top_unusable, privilege_stack_top_unusable);
 
     // initialize early exception handlers
@@ -86,9 +87,9 @@ pub fn init(double_fault_stack_top_unusable: VirtualAddress, privilege_stack_top
 
     // try to load our new IDT    
     {
-        //info!("trying to load IDT for BSP...");
+        info!("trying to load IDT for BSP...");
         IDT.load();
-        //info!("loaded IDT for BSP.");
+        info!("loaded IDT for BSP.");
     }
 
     Ok(&IDT)
@@ -101,13 +102,13 @@ pub fn init_ap(apic_id: u8,
                double_fault_stack_top_unusable: VirtualAddress, 
                privilege_stack_top_unusable: VirtualAddress)
                -> Result<&'static LockedIdt, &'static str> {
-    //info!("Setting up TSS & GDT for AP {}", apic_id);
+    info!("Setting up TSS & GDT for AP {}", apic_id);
     gdt::create_tss_gdt(apic_id, double_fault_stack_top_unusable, privilege_stack_top_unusable);
 
     // We've already created the IDT initially (currently all APs share the BSP's IDT),
     // so we only need to re-load it here for each AP.
     IDT.load();
-    //info!("loaded IDT for AP {}.", apic_id);
+    info!("loaded IDT for AP {}.", apic_id);
     Ok(&IDT)
 }
 
@@ -128,15 +129,15 @@ pub fn init_handlers_apic() {
             idt[i].set_handler_fn(apic_unimplemented_interrupt_handler);
         }
 
-        idt[0x20].set_handler_fn(pit_timer_handler); 
-        idt[0x21].set_handler_fn(ps2_keyboard_handler); 
-        idt[0x22].set_handler_fn(lapic_timer_handler); 
+        idt[0x20].set_handler_fn(pit_timer_handler);
+        idt[0x21].set_handler_fn(ps2_keyboard_handler);
+        idt[0x22].set_handler_fn(lapic_timer_handler);
         // idt[0x23].set_handler_fn(irq_0x23_handler);
-        idt[0x24].set_handler_fn(com1_serial_handler); 
+        idt[0x24].set_handler_fn(com1_serial_handler);
         // idt[0x25].set_handler_fn(irq_0x25_handler);
-        idt[0x26].set_handler_fn(apic_irq_0x26_handler); 
-        idt[0x27].set_handler_fn(spurious_interrupt_handler); 
-
+        idt[0x26].set_handler_fn(apic_irq_0x26_handler);
+        idt[0x27].set_handler_fn(spurious_interrupt_handler);
+        
         // idt[0x28].set_handler_fn(irq_0x28_handler);
         // idt[0x29].set_handler_fn(nic_handler); // for Bochs
         // idt[0x2A].set_handler_fn(irq_0x2A_handler);
@@ -145,33 +146,7 @@ pub fn init_handlers_apic() {
         // idt[0x2D].set_handler_fn(irq_0x2D_handler);
         // idt[0x2E].set_handler_fn(irq_0x2E_handler);
         // idt[0x2F].set_handler_fn(irq_0x2F_handler);
-<<<<<<< 44000e6de0e574557186cdbfc529ea07694a4121
-
-        // idt[0x3B].set_handler_fn(nic_handler);
-        idt[0x30].set_handler_fn(apic_irq_0x30_handler);
-        idt[0x31].set_handler_fn(apic_irq_0x31_handler);
-        idt[0x32].set_handler_fn(apic_irq_0x32_handler);
-        idt[0x33].set_handler_fn(apic_irq_0x33_handler);
-
-        idt[0x34].set_handler_fn(apic_irq_0x34_handler);
-        idt[0x35].set_handler_fn(apic_irq_0x35_handler);
-        idt[0x36].set_handler_fn(apic_irq_0x36_handler);
-        idt[0x37].set_handler_fn(apic_irq_0x37_handler);
-=======
         
-        // Set the above used interrupts to false
-        available_interrupts[0x20] = false;
-        available_interrupts[0x21] = false;
-        available_interrupts[0x22] = false;
-        available_interrupts[0x24] = false;
-        available_interrupts[0x26] = false;
-        available_interrupts[0x27] = false;
-        available_interrupts[0x2C] = false;
-        available_interrupts[apic::APIC_SPURIOUS_INTERRUPT_VECTOR as usize] = false;
-        available_interrupts[tlb_shootdown::TLB_SHOOTDOWN_IPI_IRQ as usize] = false;
-        available_interrupts[0x32] = false; // Just for the server, the keyboard switch seems to use this interrupt
->>>>>>> removed changes not related to ixgbe
-
         idt[apic::APIC_SPURIOUS_INTERRUPT_VECTOR as usize].set_handler_fn(apic_spurious_interrupt_handler); 
         idt[tlb_shootdown::TLB_SHOOTDOWN_IPI_IRQ as usize].set_handler_fn(ipi_handler);
     }
@@ -230,11 +205,19 @@ pub fn init_handlers_pic() {
 }
 
 /// Register an interrupt and supply the interrupt handler 
-pub fn register_interrupt(interrupt_no : u8, func: HandlerFunc) {
+pub fn register_interrupt(interrupt_num : u8, func: HandlerFunc) {
     let mut idt = IDT.lock();
-    idt[interrupt_no as usize].set_handler_fn(func);
+    idt[interrupt_num as usize].set_handler_fn(func);
 } 
 
+/// Retreive an unused interrupt number and set the handler function for that entry
+/// 
+pub fn register_msi_interrupt(func: HandlerFunc) -> Result<u8, &'static str> {
+    let mut idt = IDT.lock();
+    let interrupt_num = idt.interrupts.iter().position(|&r| r == IdtEntry::missing()).ok_or("register_msi_interrupt: No available interrupts")?;
+    idt[interrupt_num as usize].set_handler_fn(func);
+    Ok(interrupt_num)
+}
 
 /// Send an end of interrupt signal, which works for all types of interrupt chips (APIC, x2apic, PIC)
 /// irq arg is only used for PIC
@@ -602,79 +585,9 @@ extern "x86-interrupt" fn irq_0x2F_handler(_stack_frame: &mut ExceptionStackFram
 
 
 extern "x86-interrupt" fn ipi_handler(_stack_frame: &mut ExceptionStackFrame) {
-    debug!("In ipi handler");
     eoi(None);
 }
 
-<<<<<<< 44000e6de0e574557186cdbfc529ea07694a4121
-/// 0x30
-extern "x86-interrupt" fn apic_irq_0x30_handler(_stack_frame: &mut ExceptionStackFrame) {
-
-    debug!("In handler 0x30");
-
-    eoi(Some(0x30));
-}
-
-/// 0x31
-extern "x86-interrupt" fn apic_irq_0x31_handler(_stack_frame: &mut ExceptionStackFrame) {
-
-    debug!("In handler 0x31");
-
-    eoi(Some(0x31));
-}
-
-/// 0x32
-extern "x86-interrupt" fn apic_irq_0x32_handler(_stack_frame: &mut ExceptionStackFrame) {
-
-    debug!("In handler 0x32");
-
-    eoi(Some(0x32));
-}
-
-/// 0x33
-extern "x86-interrupt" fn apic_irq_0x33_handler(_stack_frame: &mut ExceptionStackFrame) {
-
-    debug!("In handler 0x33");
-
-    eoi(Some(0x33));
-}
-
-/// 0x34
-extern "x86-interrupt" fn apic_irq_0x34_handler(_stack_frame: &mut ExceptionStackFrame) {
-
-    debug!("In handler 0x34");
-
-    eoi(Some(0x34));
-}
-
-/// 0x35
-extern "x86-interrupt" fn apic_irq_0x35_handler(_stack_frame: &mut ExceptionStackFrame) {
-
-    debug!("In handler 0x35");
-
-    eoi(Some(0x35));
-}
-
-/// 0x36
-extern "x86-interrupt" fn apic_irq_0x36_handler(_stack_frame: &mut ExceptionStackFrame) {
-
-    debug!("In handler 0x36");
-
-    eoi(Some(0x36));
-}
-
-/// 0x37
-extern "x86-interrupt" fn apic_irq_0x37_handler(_stack_frame: &mut ExceptionStackFrame) {
-
-    let apic_id = get_my_apic_id();
-
-    debug!("In handler 0x37 on core: {}", apic_id.unwrap());
-
-    eoi(Some(0x37));
-}
-
-=======
->>>>>>> removed changes not related to ixgbe
 
 
 

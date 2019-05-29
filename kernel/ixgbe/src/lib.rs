@@ -26,6 +26,7 @@ extern crate owning_ref;
 extern crate rand;
 extern crate hpet;
 extern crate runqueue;
+extern crate idt;
 
 pub mod test_ixgbe_driver;
 pub mod descriptors;
@@ -58,6 +59,7 @@ use rand::{
     rngs::SmallRng
 };
 use runqueue::get_least_busy_core;
+use idt::HandlerFunc;
 
 /* Default configuration at time of initialization of NIC */
 const INTERRUPT_ENABLE:                     bool    = false;
@@ -988,7 +990,7 @@ impl IxgbeNic{
     }
 
     /// enable interrupts for msi-x mode
-    fn enable_msix_interrupts(regs: &mut IntelIxgbeRegisters, vector_table: &mut MsixVectorTable) -> Result<[u8; NUM_MSI_VEC_ENABLED], &'static str> {
+    fn enable_msix_interrupts(regs: &mut IntelIxgbeRegisters, vector_table: &mut MsixVectorTable, interrupt_handlers: &[HandlerFunc]) -> Result<[u8; NUM_MSI_VEC_ENABLED], &'static str> {
         // set IVAR reg for 16 Rx queues
         // each IVAR registeres controls 2 RX and 2 TX queues
         let no_queues: usize = 16;
@@ -1021,13 +1023,13 @@ impl IxgbeNic{
         debug!("EICR: {:#X}", val);
 
         for i in 0..NUM_MSI_VEC_ENABLED {
-            //find interrupt number for this msi vector
-            interrupt_nums[i] = get_unused_interrupt().ok_or("Ixgbe: No available interrupt!")?;
+            register_msi_interrupt(interrupt_handlers[i])?;
         }
 
         // Register interrupts
         // TODO: find a cleaner way
-        register_interrupt(interrupt_nums[0] as u8, ixgbe_handler_0);
+        // register_interrupt(interrupt_nums[0] as u8, ixgbe_handler_0);
+
         // retrieve rx descriptors to know which cpu to send the interrupt to
         let rxq = get_ixgbe_rx_queues().ok_or("ixgbe: rx descriptors not initialized")?;
 
