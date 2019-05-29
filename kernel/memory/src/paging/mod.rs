@@ -23,7 +23,11 @@ pub use self::mapper::*;
 pub use self::virtual_address_allocator::*;
 
 
-use core::ops::{Add, AddAssign, Sub, SubAssign, Deref, DerefMut};
+use core::{
+    ops::{RangeInclusive, Add, AddAssign, Sub, SubAssign, Deref, DerefMut},
+    mem,
+    iter::Step,
+};
 use multiboot2;
 use super::*;
 
@@ -78,16 +82,6 @@ impl Page {
     fn p1_index(&self) -> usize {
         (self.number >> 0) & 0x1FF
     }
-
-    pub fn range_inclusive(start: Page, end: Page) -> PageIter {
-        PageIter::new(start, end)
-    }
-
-    pub fn range_inclusive_addr(virt_addr: VirtualAddress, size_in_bytes: usize) -> PageIter {
-        let start_page = Page::containing_address(virt_addr);
-        let end_page = Page::containing_address(virt_addr + size_in_bytes - 1);
-        PageIter::new(start_page, end_page)
-    }
 }
 
 impl Add<usize> for Page {
@@ -126,43 +120,34 @@ impl SubAssign<usize> for Page {
 }
 
 
-/// An iterator over a range of contiguous pages,
-/// from `start` to `end`, both inclusive.
-#[derive(Debug)]
-pub struct PageIter {
-    pub start: Page,
-    pub end: Page,
-    pub current: Page,
-}
+/// A range of `Page`s that are contiguous in virtual memory
+#[derive(Debug, Clone)]
+pub struct PageRange(RangeInclusive<Page>);
 
-impl PageIter {
-    /// Same as `Page::range_inclusive(start, end)`.
-    pub fn new(start: Page, end: Page) -> PageIter {
-        PageIter {
-            start: start,
-            end: end,
-            current: start, // start at the beginning
-        }
+impl PageRange {
+    /// Creates a new range of `Pages` that spans from `start` to `end`,
+    /// both inclusive bounds.
+    pub fn new(start: Page, end: Page) -> PageRange {
+        PageRange(RangeInclusive::new(start, end))
     }
 
-    /// Returns a PageIter that will always yield `None`.
-    pub fn empty() -> PageIter {
-        PageIter::new(Page { number: 1 }, Page { number: 0 })
+    /// Creates a PageRange that will always yield `None`.
+    pub fn empty() -> PageRange {
+        PageRange::new(Page { number: 1 }, Page { number: 0 })
+    }
+    
+    /// A convenience method for creating a new `PageRange` 
+    /// that spans all `Page`s from the given virtual address 
+    /// to an end bound based on the given size.
+    pub fn from_virt_addr(starting_virt_addr: VirtualAddress, size_in_bytes: usize) -> PageRange {
+        let start_page = Page::containing_address(starting_virt_addr);
+        let end_page = Page::containing_address(starting_virt_addr + size_in_bytes - 1);
+        PageRange::new(start_page, end_page)
     }
 
-    /// Create a duplicate of this PageIter. 
-    /// We do this instead of implementing/deriving the Clone trait
-    /// because we want to prevent Rust from cloning `PageIter`s implicitly.
-    pub fn clone(&self) -> PageIter {
-        PageIter {
-            start: self.start,
-            end: self.end,
-            current: self.current,
-        }
-    }
-
+    /// Returns the `VirtualAddress` of the starting `Page` in this `PageRange`.
     pub fn start_address(&self) -> VirtualAddress {
-        self.start.start_address()
+        self.0.start().start_address()
     }
 
     /// Returns the number of pages covered by this iterator. 
@@ -170,23 +155,58 @@ impl PageIter {
     /// This is instant, because it doesn't need to iterate over each entry, unlike normal iterators.
     pub fn size_in_pages(&self) -> usize {
         // add 1 because it's an inclusive range
-        self.end.number + 1 - self.start.number
+        self.0.end().number + 1 - self.0.start().number
     }
 }
 
-impl Iterator for PageIter {
+impl Deref for PageRange {
+    type Target = RangeInclusive<Page>;
+    fn deref(&self) -> &RangeInclusive<Page> {
+        &self.0
+    }
+}
+impl DerefMut for PageRange {
+    fn deref_mut(&mut self) -> &mut RangeInclusive<Page> {
+        &mut self.0
+    }
+}
+
+impl IntoIterator for PageRange {
     type Item = Page;
+    type IntoIter = RangeInclusive<Page>;
 
-    fn next(&mut self) -> Option<Page> {
-        if self.current <= self.end {
-            let page = self.current;
-            self.current.number += 1;
-            Some(page)
-        } else {
-            None
-        }
+    fn into_iter(self) -> Self::IntoIter {
+        self.0
     }
 }
+
+impl Step for Page {
+    #[inline]
+    fn steps_between(start: &Page, end: &Page) -> Option<usize> {
+        Step::steps_between(&start.number, &end.number)
+    }
+    #[inline]
+    fn replace_one(&mut self) -> Self {
+        mem::replace(self, Page { number: 1 })
+    }
+    #[inline]
+    fn replace_zero(&mut self) -> Self {
+        mem::replace(self, Page { number: 0 })
+    }
+    #[inline]
+    fn add_one(&self) -> Self {
+        Add::add(*self, 1)
+    }
+    #[inline]
+    fn sub_one(&self) -> Self {
+        Sub::sub(*self, 1)
+    }
+    #[inline]
+    fn add_usize(&self, n: usize) -> Option<Page> {
+        Some(*self + n)
+    }
+}
+
 
 
 /// A root (P4) page table.
@@ -562,10 +582,10 @@ pub fn init(allocator_mutex: &MutexIrqSafe<AreaFrameAllocator>, boot_info: &mult
             
 
             // map the multiboot boot_info at the same address it previously was, so we can continue to access boot_info 
-            let boot_info_pages  = Page::range_inclusive_addr(boot_info_start_vaddr, boot_info_size);
+            let boot_info_pages  = PageRange::from_virt_addr(boot_info_start_vaddr, boot_info_size);
             let boot_info_frames = Frame::range_inclusive_addr(boot_info_start_paddr, boot_info_size);
             vmas[index] = VirtualMemoryArea::new(boot_info_start_vaddr, boot_info_size, EntryFlags::PRESENT | EntryFlags::GLOBAL, "Kernel Multiboot Info");
-            for (page, frame) in boot_info_pages.zip(boot_info_frames) {
+            for (page, frame) in boot_info_pages.into_iter().zip(boot_info_frames) {
                 // we must do it page-by-page to make sure that a page hasn't already been mapped
                 if mapper.translate_page(page).is_some() {
                     // skip pages that are already mapped
@@ -609,7 +629,7 @@ pub fn init(allocator_mutex: &MutexIrqSafe<AreaFrameAllocator>, boot_info: &mult
     let (heap_mapped_pages, heap_vma) = {
         let mut allocator = allocator_mutex.lock();
 
-        let pages = Page::range_inclusive_addr(VirtualAddress::new_canonical(KERNEL_HEAP_START), KERNEL_HEAP_INITIAL_SIZE);
+        let pages = PageRange::from_virt_addr(VirtualAddress::new_canonical(KERNEL_HEAP_START), KERNEL_HEAP_INITIAL_SIZE);
         let heap_flags = paging::EntryFlags::WRITABLE;
         let heap_vma: VirtualMemoryArea = VirtualMemoryArea::new(VirtualAddress::new_canonical(KERNEL_HEAP_START), KERNEL_HEAP_INITIAL_SIZE, heap_flags, "Kernel Heap");
         let heap_mp = try_forget!(

@@ -61,7 +61,7 @@ use alloc::{
 use pause::spin_loop_hint;
 
 use irq_safety::{MutexIrqSafe, MutexIrqSafeGuardRef, MutexIrqSafeGuardRefMut, interrupts_enabled};
-use memory::{Stack, MappedPages, Page, EntryFlags, MemoryManagementInfo, VirtualAddress};
+use memory::{Stack, MappedPages, PageRange, EntryFlags, MemoryManagementInfo, VirtualAddress};
 use atomic_linked_list::atomic_map::AtomicMap;
 use tss::tss_set_rsp0;
 use mod_mgmt::metadata::StrongCrateRef;
@@ -852,7 +852,7 @@ pub fn create_idle_task(
             stack_top, 
             stack_bottom, 
             MappedPages::from_existing(
-                Page::range_inclusive_addr(stack_bottom, stack_top.value() - stack_bottom.value()),
+                PageRange::from_virt_addr(stack_bottom, stack_top.value() - stack_bottom.value()),
                 EntryFlags::WRITABLE | EntryFlags::PRESENT
             ),
         )

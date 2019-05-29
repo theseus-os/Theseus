@@ -13,7 +13,7 @@ use core::ptr::Unique;
 use core::slice;
 use x86_64;
 use {BROADCAST_TLB_SHOOTDOWN_FUNC, VirtualAddress, PhysicalAddress, FRAME_ALLOCATOR, FrameIter, Page, Frame, FrameAllocator, AllocatedPages}; 
-use paging::{PageIter, get_current_p4};
+use paging::{PageRange, get_current_p4};
 use paging::entry::EntryFlags;
 use paging::table::{P4, Table, Level4};
 use kernel_config::memory::{ENTRIES_PER_PAGE_TABLE, PAGE_SIZE, TEMPORARY_PAGE_VIRT_ADDR};
@@ -126,7 +126,7 @@ impl Mapper {
 
 
     /// the internal function that actually does the mapping, if frames were NOT provided.
-    fn internal_map<A>(&mut self, pages: PageIter, flags: EntryFlags, allocator: &mut A)
+    fn internal_map<A>(&mut self, pages: PageRange, flags: EntryFlags, allocator: &mut A)
         -> Result<MappedPages, &'static str>
         where A: FrameAllocator
     {
@@ -159,7 +159,7 @@ impl Mapper {
     }
 
     /// the internal function that actually does all of the mapping from pages to frames.
-    fn internal_map_to<A>(&mut self, pages: PageIter, frames: FrameIter, flags: EntryFlags, allocator: &mut A)
+    fn internal_map_to<A>(&mut self, pages: PageRange, frames: FrameIter, flags: EntryFlags, allocator: &mut A)
         -> Result<MappedPages, &'static str>
         where A: FrameAllocator
     {
@@ -168,8 +168,8 @@ impl Mapper {
         top_level_flags.set(EntryFlags::NO_EXECUTE, false);
         // top_level_flags.set(EntryFlags::WRITABLE, true); // is the same true for the WRITABLE bit?
 
-        let pages_count = pages.clone().count();
-        let frames_count = frames.clone().count();
+        let pages_count = pages.size_in_pages();
+        let frames_count = frames.size_in_frames();
         if pages_count != frames_count {
             error!("map_to_internal(): page count {} must equal frame count {}!", pages_count, frames_count);
             return Err("map_to_internal(): page count must equal frame count");
@@ -177,7 +177,7 @@ impl Mapper {
             
 
         // iterate over pages and frames in lockstep
-        for (page, frame) in pages.clone().zip(frames) {
+        for (page, frame) in pages.clone().into_iter().zip(frames) {
 
             let p3 = self.p4_mut().next_table_create(page.p4_index(), top_level_flags, allocator);
             let p2 = p3.next_table_create(page.p3_index(), top_level_flags, allocator);
@@ -205,7 +205,7 @@ impl Mapper {
         -> Result<MappedPages, &'static str>
         where A: FrameAllocator
     {
-        self.internal_map_to(Page::range_inclusive(page, page), Frame::range_inclusive(frame.clone(), frame), flags, allocator)
+        self.internal_map_to(PageRange::new(page, page), Frame::range_inclusive(frame.clone(), frame), flags, allocator)
     }
 
     /// maps the given Page to a randomly selected (newly allocated) Frame
@@ -213,11 +213,11 @@ impl Mapper {
         -> Result<MappedPages, &'static str>
         where A: FrameAllocator
     {
-        self.internal_map(Page::range_inclusive(page, page), flags, allocator)
+        self.internal_map(PageRange::new(page, page), flags, allocator)
     }
 
     /// maps the given `Page`s to a randomly selected (newly allocated) Frame
-    pub fn map_pages<A>(&mut self, pages: PageIter, flags: EntryFlags, allocator: &mut A)
+    pub fn map_pages<A>(&mut self, pages: PageRange, flags: EntryFlags, allocator: &mut A)
         -> Result<MappedPages, &'static str>
         where A: FrameAllocator
     {
@@ -231,7 +231,7 @@ impl Mapper {
         where A: FrameAllocator
     {
         let iter_size = frames.clone().count() - 1; // -1 because it's inclusive
-        self.internal_map_to(Page::range_inclusive(start_page, start_page + iter_size), frames, flags, allocator)
+        self.internal_map_to(PageRange::new(start_page, start_page + iter_size), frames, flags, allocator)
     }
 
 
@@ -287,7 +287,7 @@ pub struct MappedPages {
     /// The Frame containing the top-level P4 page table that this MappedPages was originally mapped into. 
     page_table_p4: Frame,
     /// The actual range of pages contained by this mapping
-    pages: PageIter,
+    pages: PageRange,
     /// The AllocatedPages that were covered by this mapping. 
     /// If Some, it means the pages were allocated by the virtual_address_allocator
     /// and should be deallocated. 
@@ -304,7 +304,7 @@ impl MappedPages {
     pub fn empty() -> MappedPages {
         MappedPages {
             page_table_p4: get_current_p4(),
-            pages: PageIter::empty(),
+            pages: PageRange::empty(),
             allocated: None,
             flags: Default::default(),
         }
@@ -371,7 +371,7 @@ impl MappedPages {
     /// Useful for creating idle task Stacks, for example. 
     // TODO FIXME: remove this function, it's dangerous!!
     #[deprecated]
-    pub fn from_existing(already_mapped_pages: PageIter, flags: EntryFlags) -> MappedPages {
+    pub fn from_existing(already_mapped_pages: PageRange, flags: EntryFlags) -> MappedPages {
         MappedPages {
             page_table_p4: get_current_p4(),
             pages: already_mapped_pages,
@@ -417,7 +417,7 @@ impl MappedPages {
             _ => return Err(("BUG: couldn't get the first MappedPages element", mappings)),
         };
 
-        let mut previous_end: Page = first_pages.end; // start at the end of the first mapping
+        let mut previous_end: Page = first_pages.end().clone(); // start at the end of the first mapping
 
         // first, we need to double check that everything is contiguous and the flags and p4 Frame are the same.
         let mut err: Option<&'static str> = None;
@@ -434,9 +434,9 @@ impl MappedPages {
                 err = Some("mappings were mapped with different flags");
                 break;
             }
-            if mp.pages.start != previous_end + 1 {
+            if mp.pages.start().clone() != previous_end + 1 {
                 error!("MappedPages::merge(): mappings weren't contiguous in virtual memory: one ends at {:?} and the next starts at {:?}",
-                    previous_end, mp.pages.start);
+                    previous_end, mp.pages.start());
                 err = Some("mappings were not contiguous in virtual memory");
                 break;
             } 
@@ -445,7 +445,7 @@ impl MappedPages {
                 err = Some("some mappings were mapped to AllocatedPages, while others were not");
                 break;
             }
-            previous_end = mp.pages.end.clone();
+            previous_end = mp.pages.end().clone();
         }
         if let Some(e) = err {
             return Err((e, mappings));
@@ -457,7 +457,7 @@ impl MappedPages {
             // to ensure the existing mappings don't run their drop handler and unmap those pages
             mem::forget(mp); 
         }
-        let new_page_range = Page::range_inclusive(first_pages.start, previous_end);
+        let new_page_range = PageRange::new(first_pages.start().clone(), previous_end);
         let new_alloc_pages = if has_allocated {
             Some(AllocatedPages{
                 pages: new_page_range.clone()

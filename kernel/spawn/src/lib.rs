@@ -416,7 +416,7 @@ pub fn spawn_userspace(path: Path, name: Option<String>) -> Result<TaskRef, &'st
             use memory::StackAllocator;
             let stack_alloc_start = Page::containing_address(USER_STACK_ALLOCATOR_BOTTOM); 
             let stack_alloc_end = Page::containing_address(USER_STACK_ALLOCATOR_TOP_ADDR);
-            let stack_alloc_range = Page::range_inclusive(stack_alloc_start, stack_alloc_end);
+            let stack_alloc_range = PageRange::new(stack_alloc_start, stack_alloc_end);
             StackAllocator::new(stack_alloc_range, true) // true means it's for userspace
         };
 

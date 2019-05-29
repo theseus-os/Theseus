@@ -8,6 +8,7 @@
 #![feature(ptr_internals)]
 #![feature(core_intrinsics)]
 #![feature(unboxed_closures)]
+#![feature(step_trait)]
 
 extern crate spin;
 extern crate multiboot2;
@@ -404,16 +405,16 @@ impl VirtualMemoryArea {
     }
 
     /// Get an iterator that covers all the pages in this VirtualMemoryArea
-    pub fn pages(&self) -> PageIter {
+    pub fn pages(&self) -> PageRange {
 
         // check that the end_page won't be invalid
         if (self.start.value() + self.size) < 1 {
-            return PageIter::empty();
+            return PageRange::empty();
         }
         
         let start_page = Page::containing_address(self.start);
         let end_page = Page::containing_address(self.start + self.size - 1);
-        Page::range_inclusive(start_page, end_page)
+        PageRange::new(start_page, end_page)
     }
 }
 
@@ -561,7 +562,7 @@ pub fn init(boot_info: &BootInformation)
     let kernel_stack_allocator = {
         let stack_alloc_start = Page::containing_address(VirtualAddress::new_canonical(KERNEL_STACK_ALLOCATOR_BOTTOM)); 
         let stack_alloc_end = Page::containing_address(VirtualAddress::new_canonical(KERNEL_STACK_ALLOCATOR_TOP_ADDR));
-        let stack_alloc_range = Page::range_inclusive(stack_alloc_start, stack_alloc_end);
+        let stack_alloc_range = PageRange::new(stack_alloc_start, stack_alloc_end);
         stack_allocator::StackAllocator::new(stack_alloc_range, false)
     };
 
