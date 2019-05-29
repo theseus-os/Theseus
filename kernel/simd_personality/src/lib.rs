@@ -51,12 +51,6 @@
 #![no_std]
 #![feature(compiler_builtins_lib)]
 
-#[cfg(simd_personality)]
-#[macro_use] extern crate alloc;
-#[cfg(not(simd_personality))] 
-extern crate alloc;
-
-
 // NOTE: the `cfg_if` macro makes the entire file dependent upon the `simd_personality` config.
 #[macro_use] extern crate cfg_if;
 cfg_if! { if #[cfg(simd_personality)] {
@@ -73,20 +67,19 @@ extern crate compiler_builtins as _compiler_builtins;
 
 
 #[macro_use] extern crate log;
+#[macro_use] extern crate alloc;
 extern crate memory;
 extern crate mod_mgmt;
 extern crate task;
 extern crate spawn;
 extern crate apic;
 extern crate fs_node;
-extern crate path;
 
 
 use alloc::string::String;
 use mod_mgmt::{CrateNamespace, get_default_namespace, get_namespaces_directory, NamespaceDirectorySet};
 use spawn::KernelTaskBuilder;
 use fs_node::FileOrDir; 
-use path::Path;
 use task::SimdExt;
 
 
