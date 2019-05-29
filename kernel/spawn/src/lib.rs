@@ -22,21 +22,34 @@ extern crate path;
 extern crate type_name;
 
 
-use core::mem;
-use core::marker::PhantomData;
-use core::ops::DerefMut;
-use core::sync::atomic::{Ordering, AtomicBool, compiler_fence};
-use alloc::vec::Vec;
-use alloc::string::String;
-use alloc::sync::Arc;
-use alloc::boxed::Box;
+use core::{
+    mem,
+    marker::PhantomData,
+    sync::atomic::{Ordering, AtomicBool, compiler_fence},
+};
+use alloc::{
+    vec::Vec,
+    string::String,
+    sync::Arc,
+    boxed::Box,
+};
 use irq_safety::{MutexIrqSafe, hold_interrupts, enable_interrupts, interrupts_enabled};
-use memory::{get_kernel_mmi_ref, PageTable, MappedPages, Stack, MemoryManagementInfo, Page, VirtualAddress, FRAME_ALLOCATOR, VirtualMemoryArea, FrameAllocator, allocate_pages_by_bytes, TemporaryPage, EntryFlags, Frame};
-use kernel_config::memory::{KERNEL_STACK_SIZE_IN_PAGES, USER_STACK_ALLOCATOR_BOTTOM, USER_STACK_ALLOCATOR_TOP_ADDR};
+use memory::{get_kernel_mmi_ref, Stack, MemoryManagementInfo, VirtualAddress};
+use kernel_config::memory::KERNEL_STACK_SIZE_IN_PAGES;
 use task::{Task, TaskRef, get_my_current_task, RunState, TASKLIST, TASK_SWITCH_LOCKS};
-#[cfg(simd_personality)] use task::SimdExt;
-use gdt::{AvailableSegmentSelector, get_segment_selector};
 use path::Path;
+
+#[cfg(spawn_userspace)]
+use core::ops::DerefMut;
+#[cfg(spawn_userspace)]
+use memory::{PageTable, MappedPages, Page, FRAME_ALLOCATOR, VirtualMemoryArea, FrameAllocator, allocate_pages_by_bytes, TemporaryPage, EntryFlags, Frame};
+#[cfg(spawn_userspace)]
+use kernel_config::memory::{USER_STACK_ALLOCATOR_BOTTOM, USER_STACK_ALLOCATOR_TOP_ADDR};
+#[cfg(spawn_userspace)]
+use gdt::{AvailableSegmentSelector, get_segment_selector};
+
+#[cfg(simd_personality)]
+use task::SimdExt;
 
 
 /// Initializes tasking for the given AP core, including creating a runqueue for it
@@ -600,6 +613,7 @@ fn task_wrapper<F, A, R>() -> !
 }
 
 
+#[cfg(spawn_userspace)]
 /// this is invoked by the kernel component of a new userspace task 
 /// (using its kernel stack) and jumps to userspace using its userspace stack.
 fn userspace_wrapper() -> ! {
@@ -630,6 +644,7 @@ fn userspace_wrapper() -> ! {
 
 
 
+#[cfg(spawn_userspace)]
 /// Transitions the currently-running Task from kernel space to userspace.
 /// Thus, it should be called from a userspace-ready task wrapper, i.e., `userspace_wrapper()`. 
 /// Unsafe because both the stack_ptr and the function_ptr must be valid!

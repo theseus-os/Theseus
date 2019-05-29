@@ -17,20 +17,14 @@
 
 #![no_std]
 
-
-#[cfg(loadable)] 
-#[macro_use] extern crate alloc;
-#[cfg(not(loadable))] 
-extern crate alloc;
-
 #[macro_use] extern crate log;
+extern crate alloc;
 extern crate rlibc; // basic memset/memcpy libc functions
 extern crate spin;
 extern crate multiboot2;
 extern crate x86_64;
 extern crate kernel_config; // our configuration options, just a set of const definitions.
 extern crate irq_safety; // for irq-safe locking and interrupt utilities
-
 
 extern crate logger;
 extern crate state_store;
