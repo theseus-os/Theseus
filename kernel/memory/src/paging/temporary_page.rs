@@ -7,7 +7,7 @@
 // option. This file may not be copied, modified, or distributed
 // except according to those terms.
 
-use {FrameIter};
+use {FrameRange};
 use paging::{PageTable, MappedPages};
 use super::table::{Table, Level1};
 use super::{Page, Frame, FrameAllocator, VirtualAddress};
@@ -92,7 +92,7 @@ impl FrameAllocator for TinyAllocator {
     }
 
     
-    fn allocate_frames(&mut self, _num_frames: usize) -> Option<FrameIter> {
+    fn allocate_frames(&mut self, _num_frames: usize) -> Option<FrameRange> {
         unimplemented!();
     }
 

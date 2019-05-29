@@ -32,7 +32,7 @@ use alloc::{
 use spin::Mutex;
 use volatile::Volatile;
 use irq_safety::MutexIrqSafe;
-use memory::{VirtualAddress, PhysicalAddress, MappedPages, Page, Frame, EntryFlags, MemoryManagementInfo, FRAME_ALLOCATOR, Stack};
+use memory::{VirtualAddress, PhysicalAddress, MappedPages, Page, Frame, FrameRange, EntryFlags, MemoryManagementInfo, FRAME_ALLOCATOR, Stack};
 use kernel_config::memory::{PAGE_SIZE, PAGE_SHIFT};
 use apic::{LocalApic, get_lapics, get_my_apic_id, has_x2apic, get_bsp_id};
 use ap_start::{kstart_ap, AP_READY_FLAG};
@@ -96,7 +96,7 @@ pub fn handle_ap_cores(
         let trampoline_page   = Page::containing_address(VirtualAddress::new_canonical(TRAMPOLINE));
         let trampoline_frame  = Frame::containing_address(PhysicalAddress::new_canonical(TRAMPOLINE));
         let ap_startup_page   = Page::containing_address(VirtualAddress::new_canonical(AP_STARTUP));
-        let ap_startup_frames = Frame::range_inclusive_addr(PhysicalAddress::new_canonical(AP_STARTUP), ap_startup_size_in_bytes);
+        let ap_startup_frames = FrameRange::from_phys_addr(PhysicalAddress::new_canonical(AP_STARTUP), ap_startup_size_in_bytes);
 
         let mut allocator = FRAME_ALLOCATOR.try().ok_or("Couldn't get FRAME ALLOCATOR")?.lock();
         

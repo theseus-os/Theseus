@@ -4,14 +4,14 @@ use super::Mapper;
 
 #[derive(Debug)]
 pub struct StackAllocator {
-    pub range: PageIter,
+    pub range: PageRange,
     pub usermode: bool,
 }
 
 impl StackAllocator {
     /// Create a new `StackAllocator` that allocates random frames
     /// and maps them to the given range of `Page`s.
-    pub fn new(range: PageIter, usermode: bool) -> StackAllocator {
+    pub fn new(range: PageRange, usermode: bool) -> StackAllocator {
         StackAllocator { 
             range: range, 
             usermode: usermode,
@@ -58,7 +58,7 @@ impl StackAllocator {
 
                 // map stack pages to physical frames
                 // but don't map the guard page, that should be left unmapped
-                let stack_pages = match page_table.map_pages(Page::range_inclusive(start, end), flags, frame_allocator) {
+                let stack_pages = match page_table.map_pages(PageRange::new(start, end), flags, frame_allocator) {
                     Ok(pages) => pages,
                     Err(e) => {
                         error!("alloc_stack(): couldn't map_pages for the new Stack, error: {}", e);

@@ -3,7 +3,7 @@
 //! The minimum unit of allocation is a single page. 
 
 use kernel_config::memory::{KERNEL_TEXT_START, KERNEL_TEXT_MAX_SIZE, PAGE_SIZE};
-use super::{VirtualAddress, Page, PageIter};
+use super::{VirtualAddress, Page, PageRange};
 use spin::Mutex;
 use alloc::collections::LinkedList;
 
@@ -21,7 +21,7 @@ impl Chunk {
 		// subtract one because it's an inclusive range
 		let end_page = self.start_page + self.size_in_pages - 1;
 		AllocatedPages {
-			pages: Page::range_inclusive(self.start_page, end_page),							
+			pages: PageRange::new(self.start_page, end_page),							
 		}
 	}
 }
@@ -34,7 +34,7 @@ impl Chunk {
 /// See `MappedPages` struct for a similar object that unmaps pages when dropped.
 #[derive(Debug)]
 pub struct AllocatedPages {
-	pub pages: PageIter,
+	pub pages: PageRange,
 }
 
 impl AllocatedPages {
@@ -49,9 +49,9 @@ impl AllocatedPages {
 }
 // use core::ops::Deref;
 // impl Deref for AllocatedPages {
-//     type Target = PageIter;
+//     type Target = PageRange;
 
-//     fn deref(&self) -> &PageIter {
+//     fn deref(&self) -> &PageRange {
 //         &self.pages
 //     }
 // }

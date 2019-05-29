@@ -18,7 +18,7 @@ extern crate alloc;
 
 
 use spin::{Mutex};
-use memory::{FRAME_ALLOCATOR, Frame, PhysicalAddress, 
+use memory::{FRAME_ALLOCATOR, FrameRange, PhysicalAddress, 
     EntryFlags, allocate_pages_by_bytes, MappedPages, get_kernel_mmi_ref};
 use core::ops::DerefMut;
 use alloc::boxed::Box;
@@ -60,7 +60,7 @@ pub fn init() -> Result<(), &'static str > {
     let allocator = FRAME_ALLOCATOR.try().ok_or("Couldn't get frame allocator")?;
     let mapped_frame_buffer = kernel_mmi_locked.page_table.map_allocated_pages_to(
         pages, 
-        Frame::range_inclusive_addr(VESA_DISPLAY_PHYS_START, VESA_DISPLAY_PHYS_SIZE), 
+        FrameRange::from_phys_addr(VESA_DISPLAY_PHYS_START, VESA_DISPLAY_PHYS_SIZE), 
         vesa_display_flags, 
         allocator.lock().deref_mut()
     )?;

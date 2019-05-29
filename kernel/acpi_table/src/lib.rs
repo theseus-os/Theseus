@@ -14,7 +14,7 @@ extern crate sdt;
 
 use core::ops::DerefMut;
 use alloc::collections::BTreeMap;
-use memory::{MappedPages, allocate_pages, PageTable, EntryFlags, PhysicalAddress, Frame, FrameIter, FRAME_ALLOCATOR, PhysicalMemoryArea};
+use memory::{MappedPages, allocate_pages, PageTable, EntryFlags, PhysicalAddress, Frame, FrameRange, FRAME_ALLOCATOR, PhysicalMemoryArea};
 use sdt::Sdt;
 
 /// All ACPI tables are identified by a 4-byte signature,
@@ -43,7 +43,7 @@ pub struct AcpiTables {
     mapped_pages: MappedPages,
     /// The physical memory frames that hold the ACPI tables,
     /// and are thus covered by the `mapped_pages`.
-    frames: FrameIter,
+    frames: FrameRange,
     /// The location of all ACPI tables in memory.
     /// This is a mapping from ACPI table signature to the location in the `mapped_pages` object
     /// where the corresponding table is located.
@@ -90,7 +90,7 @@ impl AcpiTables {
         };
         let last_frame_of_table = Frame::containing_address(sdt_phys_addr + sdt_length);
         if !self.frames.contains(&last_frame_of_table) {
-            trace!("AcpiTables::map_new_table(): SDT's length requires mapping frames {:#X} to {:#X}", self.frames.end.start_address(), last_frame_of_table.start_address());
+            trace!("AcpiTables::map_new_table(): SDT's length requires mapping frames {:#X} to {:#X}", self.frames.end().start_address(), last_frame_of_table.start_address());
             let new_frames = self.frames.to_extended(last_frame_of_table);
             let new_pages = allocate_pages(new_frames.size_in_frames()).ok_or("couldn't allocate_pages")?;
             let new_mapped_pages = page_table.map_allocated_pages_to(
@@ -115,14 +115,14 @@ impl AcpiTables {
         Ok((sdt_signature, sdt_length))
     }
 
-    /// Adjusts the offsets for all tables based on the new `MappedPages` and the new `FrameIter`.
+    /// Adjusts the offsets for all tables based on the new `MappedPages` and the new `FrameRange`.
     /// This object's (self) `frames` and `mappped_pages` will be replaced with the given items.
-    fn adjust_mapping_offsets(&mut self, new_frames: FrameIter, new_mapped_pages: MappedPages) {
+    fn adjust_mapping_offsets(&mut self, new_frames: FrameRange, new_mapped_pages: MappedPages) {
         // The basic idea here is that if we mapped new frames to the beginning of the mapped pages, 
         // then all of the table offsets will be wrong and need to be adjusted. 
         // To fix them, we simply add the number of bytes in the new frames that were prepended to the memory region.
         // For example, if two frames were added, then we need to add (2 * frame size) = 8192 to each offset.
-        if new_frames.start < self.frames.start {
+        if new_frames.start() < self.frames.start() {
             let diff = self.frames.start_address().value() - new_frames.start_address().value();
             warn!("Adjusting mapping offsets +{}", diff);
             for mut loc in self.tables.values_mut() {
@@ -216,7 +216,7 @@ impl Default for AcpiTables {
     fn default() -> AcpiTables {
         AcpiTables {
             mapped_pages: MappedPages::empty(),
-            frames: FrameIter::empty(),
+            frames: FrameRange::empty(),
             tables: BTreeMap::new(),
         }
     }
