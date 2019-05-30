@@ -43,7 +43,7 @@ use dfqueue::{DFQueue,DFQueueConsumer,DFQueueProducer};
 use alloc::sync::{Arc, Weak};
 use display_text::{Print};
 use display::Display;
-use frame_buffer::{FrameCompositor, Compositor, FrameBuffer};
+use frame_buffer::{FrameCompositor, Compositor, FrameBuffer, display::graph};
 use event_types::Event;
 use alloc::string::{String, ToString};
 
@@ -177,7 +177,7 @@ impl WindowAllocator{
 
         //new_window = ||{WindowObj{x:x,y:y,width:width,height:height,active:true}};
         
-        let framebuffer = FrameBuffer::new(width, height, None)?;
+        let framebuffer = FrameBuffer::new(width - 2 * WINDOW_MARGIN, height - 2 * WINDOW_MARGIN, None)?;
         let inner = WindowInner{
             x:x,
             y:y,
@@ -348,22 +348,22 @@ impl WindowObj{
 
     // clean the content of a window
     fn clean(&mut self) -> Result<(), &'static str>{
-        trace!("Wenqiu {} {}", 3, 4);
-        let ((x, y), (width, height), margin) = { 
+        let ((x, y), (width, height)) = { 
             let inner = self.inner.lock();
-            (inner.get_location(), inner.get_size(), inner.get_margin())};
-        self.fill_rectangle(margin, margin, width - 2 * margin, height - 2 * margin, SCREEN_BACKGROUND_COLOR)?;
+            (inner.get_content_location(), inner.get_content_size())
+        };
+        self.fill_rectangle(0, 0, width, height, SCREEN_BACKGROUND_COLOR)?;
         FrameCompositor::compose(
             vec![(&mut self.framebuffer, x, y)]
         )
     }
 
 
-    /// Returns the dimensions of this window,
+    /// Returns the content dimensions of this window,
     /// as a tuple of `(width, height)`.
     pub fn dimensions(&self) -> (usize, usize) {
         let inner_locked = self.inner.lock();
-        (inner_locked.width, inner_locked.height)
+        inner_locked.get_content_size()
     }
 
     ///Add a new displayable structure to the window
@@ -477,10 +477,13 @@ impl WindowObj{
     }
 
     pub fn display_string(&mut self, display_name:&str, slice:&str, font_color:u32, bg_color:u32) -> Result<(), &'static str> {
-        let (x, y) = self.get_displayable_position(display_name)?;
+        let (display_x, display_y) = self.get_displayable_position(display_name)?;
         let (width, height) = self.get_displayable(display_name).ok_or("The displayable does not exist")?.get_size();
-        self.framebuffer.print_by_bytes(x, y, width, height, slice, font_color, bg_color)?;
-        Ok(())
+        self.framebuffer.print_by_bytes(display_x, display_y, width, height, slice, font_color, bg_color)?;
+        let (window_x, window_y) = { self.inner.lock().get_content_location() };
+        FrameCompositor::compose(
+            vec![(&mut self.framebuffer, window_x, window_y)]
+        )
     }
 
     /// Requires that a str slice that will exactly fit the frame buffer
@@ -634,16 +637,12 @@ impl WindowInner {
         Ok(percent)
     }
 
-    fn get_size(&self) -> (usize, usize) {
-        (self.width, self.height)
+    fn get_content_size(&self) -> (usize, usize) {
+        (self.width - 2 * self.margin, self.height - 2 * self.margin)
     }
 
-    fn get_location(&self) -> (usize, usize) {
-        (self.x, self.y)
-    }
-
-    fn get_margin(&self) -> usize {
-        self.margin
+    fn get_content_location(&self) -> (usize, usize) {
+        (self.x + self.margin, self.y + self.margin)
     }
 
 }
