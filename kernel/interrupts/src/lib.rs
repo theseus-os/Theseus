@@ -225,10 +225,10 @@ pub fn register_msi_interrupt(func: HandlerFunc) -> Result<u8, &'static str> {
     let mut idt = IDT.lock();
 
     /// try to find an unused interrupt 
-    let interrupt_num = (*idt).find_free_entry(apic_unimplemented_interrupt_handler)?;
-    idt[interrupt_num as usize].set_handler_fn(func);
+    let interrupt_num = (*idt).find_free_entry(apic_unimplemented_interrupt_handler).ok_or("register_msi_interrupt: no available interrupt")?;
+    idt[interrupt_num].set_handler_fn(func);
     
-    Ok(interrupt_num)
+    Ok(interrupt_num as u8)
 } 
 
 /// Return an interrupt by setting the handler function back to the default version
@@ -593,4 +593,3 @@ extern "x86-interrupt" fn ipi_handler(_stack_frame: &mut ExceptionStackFrame) {
 
     eoi(None);
 }
-
