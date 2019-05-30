@@ -57,6 +57,7 @@ static WINDOW_ALLOCATOR: Once<Mutex<WindowAllocator>> = Once::new();
 const WINDOW_ACTIVE_COLOR:u32 = 0xFFFFFF;
 const WINDOW_INACTIVE_COLOR:u32 = 0x343C37;
 const SCREEN_BACKGROUND_COLOR:u32 = 0x000000;
+const BORDER_WIDTH:usize = 1;
 static VFRAME_BUFFER:Once<Arc<Mutex<FrameBuffer>>> = Once::new();
 
 /// 10 pixel gap between windows 
@@ -91,8 +92,8 @@ pub fn new_window<'a>(x:usize, y:usize, width:usize, height:usize) -> Result<Win
             active:Weak::new(),
         })
     });
-
-    allocator.lock().allocate(x,y,width,height)
+    trace!("Wenqiu {} {} {} {}", x, y, width, height);
+    allocator.lock().allocate(x, y, width, height)
 }
 
 /// Puts an input event into the active window (i.e. a keypress event, resize event, etc.)
@@ -139,13 +140,14 @@ impl WindowAllocator{
     
     // Allocate a new window and return it
     fn allocate(&mut self, x:usize, y:usize, width:usize, height:usize) -> Result<WindowObj, &'static str>{
-        let (width, height) = frame_buffer::get_screen_size()?;
-
-        let vframebuffer = FrameBuffer::new(width, height, None)?;
-
-        VFRAME_BUFFER.call_once(|| {
-            Arc::new(Mutex::new(vframebuffer))
-        });
+        
+        {
+            let (screen_width, screen_height) = frame_buffer::get_screen_size()?;
+            let vframebuffer = FrameBuffer::new(screen_width, screen_height, None)?;
+            VFRAME_BUFFER.call_once(|| {
+                Arc::new(Mutex::new(vframebuffer))
+            });
+        }
 
        /*{
             let mut drawer = frame_buffer::FRAME_DRAWER.lock();
@@ -176,7 +178,6 @@ impl WindowAllocator{
         //new_window = ||{WindowObj{x:x,y:y,width:width,height:height,active:true}};
         
         let framebuffer = FrameBuffer::new(width, height, None)?;
-
         let inner = WindowInner{
             x:x,
             y:y,
@@ -194,11 +195,12 @@ impl WindowAllocator{
             return Err("Request area is already allocated");
         }
 
-        // draw the window
+        // draw the window border
+
         {
-            let inner_lock = inner_ref.lock();
-            inner_lock.clean()?;
-            inner_lock.draw_border(get_border_color(true))?;
+            let inner = inner_ref.lock();
+            inner.draw_border(get_border_color(true))?;
+            inner.clean()?
         }
         
        // inactive all other windows and active the new one
@@ -218,10 +220,10 @@ impl WindowAllocator{
             //text_buffer:FrameTextBuffer::new(),
             consumer:consumer,
             components:BTreeMap::new(),
-            framebuffer:Mutex::new(framebuffer),
+            framebuffer:framebuffer,
         }; 
 
-        Ok(window)    
+        Ok(window)  
     }
 
     /// Switches to the next active window in the window allocator list
@@ -243,7 +245,8 @@ impl WindowAllocator{
                     (*window).active(false)?;
                     prev_active = i;
                     flag = true;
-                }
+   
+             }
                 i += 1;
             }
         }
@@ -285,9 +288,8 @@ impl WindowAllocator{
             self.allocated.remove(i);
         }
 
-        let inner_lock = inner.lock();
-        inner_lock.clean()?;
-        inner_lock.draw_border(SCREEN_BACKGROUND_COLOR)?;
+        inner.lock().draw_border(SCREEN_BACKGROUND_COLOR)?;
+
         Ok(())
     }
 
@@ -331,24 +333,31 @@ impl WindowAllocator{
 }
 
 /// a window object
+//TODO Wenqiu: drop function
 pub struct WindowObj {
     inner:Arc<Mutex<WindowInner>>,
     //text_buffer:FrameTextBuffer,
     consumer:DFQueueConsumer<Event>,
     components:BTreeMap<String, Component>,
     /// the framebuffer owned by the window
-    pub framebuffer:Mutex<FrameBuffer>,
+    pub framebuffer:FrameBuffer,
 }
 
 
 impl WindowObj{
 
-    // clean the content of the window
-    fn clean(&self) -> Result<(), &'static str> {
-        let inner = self.inner.lock();
-        inner.clean()?;
-        Ok(())
+    // clean the content of a window
+    fn clean(&mut self) -> Result<(), &'static str>{
+        trace!("Wenqiu {} {}", 3, 4);
+        let ((x, y), (width, height), margin) = { 
+            let inner = self.inner.lock();
+            (inner.get_location(), inner.get_size(), inner.get_margin())};
+        self.fill_rectangle(margin, margin, width - 2 * margin, height - 2 * margin, SCREEN_BACKGROUND_COLOR)?;
+        FrameCompositor::compose(
+            vec![(&mut self.framebuffer, x, y)]
+        )
     }
+
 
     /// Returns the dimensions of this window,
     /// as a tuple of `(width, height)`.
@@ -409,20 +418,19 @@ impl WindowObj{
     }
 
     /// draw a pixel in a window
-    pub fn draw_pixel(&self, x:usize, y:usize, color:u32) -> Result<(), &'static str> {
+    pub fn draw_pixel(&mut self, x:usize, y:usize, color:u32) -> Result<(), &'static str> {
         let inner = self.inner.lock();
         if x >= inner.width - 2 || y >= inner.height - 2 {
             return Ok(());
         }
-        let mut buffer = self.framebuffer.lock();
-        buffer.draw_pixel(x + inner.margin, y + inner.margin, color);
+        self.framebuffer.draw_pixel(x + inner.margin, y + inner.margin, color);
         FrameCompositor::compose(
-            vec![(buffer.deref_mut(), inner.x, inner.y)]
+            vec![(&self.framebuffer, inner.x, inner.y)]
         )
     }
 
     /// draw a line in a window
-    pub fn draw_line(&self, start_x:usize, start_y:usize, end_x:usize, end_y:usize, color:u32) -> Result<(), &'static str> {
+    pub fn draw_line(&mut self, start_x:usize, start_y:usize, end_x:usize, end_y:usize, color:u32) -> Result<(), &'static str> {
         let inner = self.inner.lock();
         if start_x > inner.width - 2
             || start_y > inner.height - 2
@@ -430,29 +438,49 @@ impl WindowObj{
             || end_y > inner.height - 2 {
             return Ok(());
         }
-        let mut buffer = self.framebuffer.lock();
-        buffer.draw_line((start_x + inner.x + 1) as i32, (start_y + inner.y + 1) as i32, 
+        self.framebuffer.draw_line((start_x + inner.x + 1) as i32, (start_y + inner.y + 1) as i32, 
             (end_x + inner.x + 1) as i32, (end_y + inner.y + 1) as i32, color);
         FrameCompositor::compose(
-            vec![(buffer.deref_mut(), inner.x, inner.y)]
+            vec![(&self.framebuffer, inner.x, inner.y)]
         )
     }
 
-    /// draw a square in a window
-    pub fn draw_rectangle(&self, x:usize, y:usize, width:usize, height:usize, color:u32) 
+    /// draw a rectangle in a window
+    pub fn draw_rectangle(&mut self, x:usize, y:usize, width:usize, height:usize, color:u32) 
         -> Result<(), &'static str> {
         let inner = self.inner.lock();
         if x + width > inner.width - 2
             || y + height > inner.height - 2 {
             return Ok(());
         }
-        let mut buffer = self.framebuffer.lock();
 
-        buffer.draw_rectangle(inner.margin + x, inner.margin + y, width, height, 
+        frame_buffer::display::graph::fill_rectangle(&mut self.framebuffer, inner.margin + x, inner.margin + y, width, height, 
                 color);
         FrameCompositor::compose(
-            vec![(buffer.deref_mut(), inner.x, inner.y)]
+            vec![(&self.framebuffer, inner.x, inner.y)]
         )
+    }
+
+    /// fill a rectangle in a window
+    pub fn fill_rectangle(&mut self, x:usize, y:usize, width:usize, height:usize, color:u32) 
+        -> Result<(), &'static str> {
+        let inner = self.inner.lock();
+        // if x + width > inner.width - 2
+        //     || y + height > inner.height - 2 {
+        //     return Ok(());
+        // }
+        frame_buffer::display::graph::fill_rectangle(&mut self.framebuffer, inner.margin + x, inner.margin + y, width, height, 
+                color);
+        FrameCompositor::compose(
+            vec![(&self.framebuffer, inner.x, inner.y)]
+        )
+    }
+
+    pub fn display_string(&mut self, display_name:&str, slice:&str, font_color:u32, bg_color:u32) -> Result<(), &'static str> {
+        let (x, y) = self.get_displayable_position(display_name)?;
+        let (width, height) = self.get_displayable(display_name).ok_or("The displayable does not exist")?.get_size();
+        self.framebuffer.print_by_bytes(x, y, width, height, slice, font_color, bg_color)?;
+        Ok(())
     }
 
     /// Requires that a str slice that will exactly fit the frame buffer
@@ -473,6 +501,7 @@ impl WindowObj{
     */
 
     // @Andrew
+    //Wenqiu TODO: remap the frame buffer
     pub fn resize(&mut self, x:usize, y:usize, width:usize, height:usize) -> Result<(), &'static str>{
         { // checks for overlap
             let inner = self.inner.clone();
@@ -483,6 +512,7 @@ impl WindowObj{
             }
         }
         
+        self.clean()?;
         let mut inner = self.inner.lock();
         match inner.resize(x, y, width, height) {
             Ok(percent) => {
@@ -530,6 +560,20 @@ struct WindowInner {
 }
 
 impl WindowInner {
+    fn clean(&self) -> Result<(), &'static str> {
+        trace!("Wenqiu {} {}", 3, 4);
+        let buffer_ref = match VFRAME_BUFFER.try(){
+            Some(buffer) => { buffer },
+            None => { return Err("Fail to get the virtual frame buffer") }
+        };
+        let mut buffer_lock = buffer_ref.lock();
+        let buffer = buffer_lock.deref_mut();
+        frame_buffer::display::graph::draw_rectangle(buffer, self.x + BORDER_WIDTH, self.x + BORDER_WIDTH,
+            self.width - 2 * BORDER_WIDTH, self.height - 2 * BORDER_WIDTH, SCREEN_BACKGROUND_COLOR);
+        FrameCompositor::compose(
+            vec![(buffer, 0, 0)]
+        )
+    }
 
     //check if the window is overlapped with any existing window
     fn is_overlapped(&self, x:usize, y:usize, width:usize, height:usize) -> bool {
@@ -563,35 +607,24 @@ impl WindowInner {
         Ok(())
     }
 
-    // clean the content of a window
-    fn clean(&self) -> Result<(), &'static str>{
-        let buffer = match VFRAME_BUFFER.try(){
-            Some(buffer) => { buffer },
-            None => {return Err("The virtual frame buffer is not initialized") }
-        };                
-        buffer.lock().fill_rectangle(self.x + self.margin, self.y + self.margin,
-                self.width - 2 * self.margin, self.height - 2 * self.margin, SCREEN_BACKGROUND_COLOR);
-        Ok(())
-    }
-
     // draw the border of the window
     fn draw_border(&self, color:u32) -> Result<(), &'static str> {
+        trace!("Wenqiu {} {}", 3, 4);
         let buffer_ref = match VFRAME_BUFFER.try(){
             Some(buffer) => { buffer },
             None => { return Err("Fail to get the virtual frame buffer") }
         };
         let mut buffer_lock = buffer_ref.lock();
         let buffer = buffer_lock.deref_mut();
-        buffer.draw_rectangle(0, 0, self.width, self.height, color);
+        frame_buffer::display::graph::draw_rectangle(buffer, self.x, self.y, self.width, self.height, color);
         FrameCompositor::compose(
-            vec![(buffer, self.x, self.y)]
+            vec![(buffer, 0, 0)]
         )
     }
 
     /// adjust the size of a window
     fn resize(&mut self, x:usize, y:usize, width:usize, height:usize) -> Result<(usize, usize), &'static str> {
         self.draw_border(SCREEN_BACKGROUND_COLOR)?;
-        self.clean()?;
         let percent = ((width-self.margin)*100/(self.width-self.margin), (height-self.margin)*100/(self.height-self.margin));
         self.x = x;
         self.y = y;
@@ -599,6 +632,18 @@ impl WindowInner {
         self.height = height; 
         self.draw_border(get_border_color(self.active))?;
         Ok(percent)
+    }
+
+    fn get_size(&self) -> (usize, usize) {
+        (self.width, self.height)
+    }
+
+    fn get_location(&self) -> (usize, usize) {
+        (self.x, self.y)
+    }
+
+    fn get_margin(&self) -> usize {
+        self.margin
     }
 
 }

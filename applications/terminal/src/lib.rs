@@ -161,6 +161,7 @@ impl Terminal {
         // Sets up the kernel to print to this terminal instance
         print::set_default_print_output(terminal_print_producer.obtain_producer()); 
 
+        trace!("Wenqiu: new a terminal");
         // Requests a new window object from the window manager
         let window_object = match window_manager::new_default_window() {
             Ok(window_object) => window_object,
@@ -561,14 +562,7 @@ impl Terminal {
         };
         let result  = self.scrollback_buffer.get(start_idx..=end_idx); // =end_idx includes the end index in the slice
         if let Some(slice) = result {
-
-            if let Some(text_display) = self.window.get_displayable(display_name) {
-                let (x, y) = self.window.get_displayable_position(display_name)?;
-                let mut buffer = self.window.framebuffer.lock();
-                text_display.display_string(buffer.deref_mut(), slice, x, y, FONT_COLOR, BACKGROUND_COLOR)?
-            } else {
-                return Err("faild to get the text displayable component")
-            }
+            self.window.display_string(display_name, slice, FONT_COLOR, BACKGROUND_COLOR)?;
         } else {
             return Err("could not get slice of scrollback buffer string");
         }
@@ -584,14 +578,7 @@ impl Terminal {
         let result = self.scrollback_buffer.get(start_idx..end_idx);
 
         if let Some(slice) = result {
-            if let Some(text_display) = self.window.get_displayable(display_name){
-                let (x, y) = self.window.get_displayable_position(display_name)?;
-                let mut buffer = self.window.framebuffer.lock();
-                text_display.display_string(buffer.deref_mut(), slice, x, y, FONT_COLOR, BACKGROUND_COLOR)?;
-                self.absolute_cursor_pos = cursor_pos;          
-            } else {
-                return Err("faild to get the text displayable component")
-            }
+            self.window.display_string(display_name, slice, FONT_COLOR, BACKGROUND_COLOR)?;
         } else {
             return Err("could not get slice of scrollback buffer string");
         }

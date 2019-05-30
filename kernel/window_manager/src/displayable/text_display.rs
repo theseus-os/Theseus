@@ -23,11 +23,11 @@ impl TextDisplay
         })
     }
 
-    /// takes in a str slice and display as much as it can to the text area
-    pub fn display_string(&self, buffer:&mut FrameBuffer, slice:&str, x:usize, y:usize, font_color:u32, bg_color:u32) -> Result<(), &'static str>{       
-        buffer.print_by_bytes(x, y, self.width, self.height,
-            slice, font_color, bg_color)
-    }
+    // /// takes in a str slice and display as much as it can to the text area
+    // pub fn display_string(&self, buffer:&mut FrameBuffer, slice:&str, x:usize, y:usize, font_color:u32, bg_color:u32) -> Result<(), &'static str>{       
+    //     buffer.print_by_bytes(x, y, self.width, self.height,
+    //         slice, font_color, bg_color)
+    // }
 
     /// Gets the dimensions of the text area to display
     pub fn get_dimensions(&self) -> (usize, usize){

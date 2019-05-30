@@ -28,8 +28,8 @@ pub trait Display {
     fn draw_line(&mut self, start_x:i32, start_y:i32, end_x:i32, end_y:i32, color:u32);
     ///draw a rectangle at (start_x, start_y) with color
     fn draw_rectangle(&mut self, start_x:usize, start_y:usize, width:usize, height:usize, color:u32);
-    ///fill a rectangle at (start_x, start_y) with color
-    fn fill_rectangle(&mut self, start_x:usize, start_y:usize, width:usize, height:usize, color:u32);
+//    ///fill a rectangle at (start_x, start_y) with color
+//    fn fill_rectangle(&mut self, start_x:usize, start_y:usize, width:usize, height:usize, color:u32);
 }
 
 impl Display for FrameBuffer {
@@ -124,7 +124,7 @@ impl Display for FrameBuffer {
     }
 
     //fill a rectangle at (start_x, start_y) with color
-    fn fill_rectangle(&mut self, start_x:usize, start_y:usize, width:usize, height:usize, color:u32){
+/*    fn fill_rectangle(&mut self, start_x:usize, start_y:usize, width:usize, height:usize, color:u32){
         let mut x = start_x;
         let mut y = start_y;
         
@@ -142,7 +142,6 @@ impl Display for FrameBuffer {
         }; 
 
         let buffer = self.buffer();
-
         loop {
             if x == end_x {
                 y += 1;
@@ -155,7 +154,7 @@ impl Display for FrameBuffer {
             buffer[index(x, y)] = color;
             x += 1;
         }
-    }
+    }*/
 
 }
 
@@ -174,7 +173,7 @@ pub fn draw_rectangle(vf:&Arc<Mutex<FrameBuffer>>, start_x:usize, start_y:usize,
     vf.lock().draw_rectangle(start_x, start_y, width, height, color);
 }
 
-///fill a rectangle at (start_x, start_y) with color
-pub fn fill_rectangle(vf:&Arc<Mutex<FrameBuffer>>, start_x:usize, start_y:usize, width:usize, height:usize, color:u32){
-    vf.lock().fill_rectangle(start_x, start_y, width, height, color);
-}
+/////fill a rectangle at (start_x, start_y) with color
+// pub fn fill_rectangle(vf:&Arc<Mutex<FrameBuffer>>, start_x:usize, start_y:usize, width:usize, height:usize, color:u32){
+//     vf.lock().fill_rectangle(start_x, start_y, width, height, color);
+// }

@@ -26,6 +26,7 @@ use alloc::boxed::Box;
 use alloc::sync::{Arc, Weak};
 use alloc::vec::Vec;
 
+pub mod display;
 //The compositor instance
 static FINAL_FRAME_BUFFER:Once<Mutex<FrameBuffer>> = Once::new();
 
