@@ -203,12 +203,51 @@ pub fn init_handlers_pic() {
     // IDT.lock()[0x28].set_handler_fn(rtc_handler.unwrap());
 }
 
-/// Register an interrupt and supply the interrupt handler 
-pub fn register_interrupt(interrupt_no : u8, func: HandlerFunc) {
+/// Register an interrupt handler for the given interrupt number
+/// fails if the interrupt number is already in use 
+pub fn register_interrupt(interrupt_num : u8, func: HandlerFunc) -> Result<(), &'static str> {
     let mut idt = IDT.lock();
-    idt[interrupt_no as usize].set_handler_fn(func);
+
+    // checks if the handler stored is the default apic handler which signifies that the interrupt hasn't been used yet
+    if idt[interrupt_num as usize].check_handler_equality(apic_unimplemented_interrupt_handler) {
+        idt[interrupt_num as usize].set_handler_fn(func);
+        Ok(())
+    }
+    else {
+        error!("register_interrupt: the requested interrupt is not available");
+        Err("register_interrupt: the requested interrupt is not available")
+    }
 } 
 
+/// Request an interrupt number from the OS and set its handler function
+/// fails if there is no unused interrupt number
+pub fn register_msi_interrupt(func: HandlerFunc) -> Result<u8, &'static str> {
+    let mut idt = IDT.lock();
+
+    /// try to find an unused interrupt 
+    let interrupt_num = (*idt).find_free_entry(apic_unimplemented_interrupt_handler)?;
+    idt[interrupt_num as usize].set_handler_fn(func);
+    
+    Ok(interrupt_num)
+} 
+
+/// Return an interrupt by setting the handler function back to the default version
+/// the application provides the previous interrupt handler as a safety check
+/// fails if the current handler and the provided handler do not match
+pub fn deregister_interrupt(interrupt_num: u8, func: HandlerFunc) -> Result<(), &'static str> {
+    let mut idt = IDT.lock();
+
+    // check if the handler stored is the same as the one provided
+    // this is to make sure no other application can deregister your interrupt
+    if idt[interrupt_num as usize].check_handler_equality(func) {
+        idt[interrupt_num as usize].set_handler_fn(apic_unimplemented_interrupt_handler);
+        Ok(())
+    }
+    else {
+        error!("deregister_interrupt: Cannot free interrupt due to incorrect handler function");
+        Err("deregister_interrupt: Cannot free interrupt due to incorrect handler function")
+    }
+}
 
 /// Send an end of interrupt signal, which works for all types of interrupt chips (APIC, x2apic, PIC)
 /// irq arg is only used for PIC
@@ -350,7 +389,7 @@ extern "x86-interrupt" fn apic_spurious_interrupt_handler(_stack_frame: &mut Exc
     eoi(None);
 }
 
-extern "x86-interrupt" fn apic_unimplemented_interrupt_handler(_stack_frame: &mut ExceptionStackFrame) {
+pub extern "x86-interrupt" fn apic_unimplemented_interrupt_handler(_stack_frame: &mut ExceptionStackFrame) {
     println_raw!("APIC UNIMPLEMENTED IRQ!!!");
 
     if let Some(lapic_ref) = apic::get_my_apic() {
@@ -554,3 +593,4 @@ extern "x86-interrupt" fn ipi_handler(_stack_frame: &mut ExceptionStackFrame) {
 
     eoi(None);
 }
+

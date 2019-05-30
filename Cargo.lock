@@ -1726,6 +1726,16 @@ dependencies = [
 ]
 
 [[package]]
+name = "test_interrupt"
+version = "0.1.0"
+dependencies = [
+ "getopts 0.2.18 (git+https://github.com/kevinaboos/getopts)",
+ "interrupts 0.1.0",
+ "terminal_print 0.1.0",
+ "x86_64 0.1.2",
+]
+
+[[package]]
 name = "test_panic"
 version = "0.1.0"
 dependencies = [
