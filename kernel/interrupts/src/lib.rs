@@ -203,8 +203,12 @@ pub fn init_handlers_pic() {
     // IDT.lock()[0x28].set_handler_fn(rtc_handler.unwrap());
 }
 
-/// Register an interrupt handler for the given interrupt number
+/// Registers an interrupt handler
 /// fails if the interrupt number is already in use 
+/// 
+/// # Arguments 
+/// * 'interrupt_num' - the interrupt that is being requested
+/// * 'func' - the handler to be registered for 'interrupt_num'
 pub fn register_interrupt(interrupt_num : u8, func: HandlerFunc) -> Result<(), &'static str> {
     let mut idt = IDT.lock();
 
@@ -219,8 +223,11 @@ pub fn register_interrupt(interrupt_num : u8, func: HandlerFunc) -> Result<(), &
     }
 } 
 
-/// Request an interrupt number from the OS and set its handler function
+/// Returns an interrupt number assigned by the OS and sets its handler function
 /// fails if there is no unused interrupt number
+/// 
+/// # Arguments
+/// * 'func' - the handler for the assigned interrupt number
 pub fn register_msi_interrupt(func: HandlerFunc) -> Result<u8, &'static str> {
     let mut idt = IDT.lock();
 
@@ -231,9 +238,13 @@ pub fn register_msi_interrupt(func: HandlerFunc) -> Result<u8, &'static str> {
     Ok(interrupt_num as u8)
 } 
 
-/// Return an interrupt by setting the handler function back to the default version
-/// the application provides the previous interrupt handler as a safety check
-/// fails if the current handler and the provided handler do not match
+/// Returns an interrupt to the system by setting the handler to the default function
+/// the application provides the current interrupt handler as a safety check
+/// fails if the current handler and 'func' do not match
+/// 
+/// # Arguments
+/// * 'interrupt_num' - the interrupt that needs to be deregistered
+/// * 'func' - the handler that should currently be stored for 'interrupt_num'
 pub fn deregister_interrupt(interrupt_num: u8, func: HandlerFunc) -> Result<(), &'static str> {
     let mut idt = IDT.lock();
 
