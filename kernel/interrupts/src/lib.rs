@@ -389,7 +389,7 @@ extern "x86-interrupt" fn apic_spurious_interrupt_handler(_stack_frame: &mut Exc
     eoi(None);
 }
 
-pub extern "x86-interrupt" fn apic_unimplemented_interrupt_handler(_stack_frame: &mut ExceptionStackFrame) {
+extern "x86-interrupt" fn apic_unimplemented_interrupt_handler(_stack_frame: &mut ExceptionStackFrame) {
     println_raw!("APIC UNIMPLEMENTED IRQ!!!");
 
     if let Some(lapic_ref) = apic::get_my_apic() {
