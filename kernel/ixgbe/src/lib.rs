@@ -176,19 +176,7 @@ pub struct RxQueueInfo {
     received_frames: VecDeque<ReceivedFrame>,
     /// the cpu which this queue is mapped to 
     /// this in itself guarantee anything but we use this value when setting the cpu id for interrupts and DCA
-    cpu_id : u8
-}
-
-impl RxQueueInfo {
-    /// set the cpu affinity for the rx queue
-    pub fn set_cpu_id(&mut self, id: u8) {
-        self.cpu_id = id;
-    }
-
-    /// find the cpu affinity of this queue
-    pub fn get_cpu_id(&self) -> u8 {
-        self.cpu_id
-    }
+    cpu_id: u8,
 }
 
 /// A struct to store the tx descriptor queues for the ixgbe nic
@@ -990,15 +978,24 @@ impl IxgbeNic{
     }
 
     /// enable interrupts for msi-x mode
-    fn enable_msix_interrupts(regs: &mut IntelIxgbeRegisters, vector_table: &mut MsixVectorTable, interrupt_handlers: &[HandlerFunc]) -> Result<[u8; NUM_MSI_VEC_ENABLED], &'static str> {
-        // set IVAR reg for 16 Rx queues
-        // each IVAR registeres controls 2 RX and 2 TX queues
-        let no_queues: usize = 16;
+    /// currently all the msi vectors are for packet reception, one msi vector per queue
+    fn enable_msix_interrupts(regs: &mut IntelIxgbeRegisters, vector_table: &mut MsixVectorTable) -> Result<[u8; NUM_MSI_VEC_ENABLED], &'static str> {
+        // set IVAR reg to enable interrupts for different queues
+        // each IVAR register controls 2 RX and 2 TX queues
+        let num_queues: usize = IXGBE_NUM_RX_QUEUES;
         let queues_per_ivar_reg: usize = 2;
-        let enable_interrupt_rx = 0x00800080;
-        for queue in 0..(no_queues / queues_per_ivar_reg) {
-            let int_enable = enable_interrupt_rx | (queue*2) | ((queue*2 + 1) << 16);
-            regs.ivar.reg[queue].write(int_enable as u32); 
+        let enable_interrupt_rx = 0x0080;
+        for queue in 0..no_queues {
+            let int_enable = 
+                // an even number queue which means we'll write to the lower 16 bits
+                if queue % queues_per_ivar_reg == 0 {
+                    enable_interrupt_rx | queue
+                }
+                // otherwise we'll write to the upper 16 bits
+                else {
+                    (enable_interrupt_rx | queue) << 16
+                }
+            regs.ivar.reg[queue / queues_per_ivar_reg].write(int_enable as u32); 
             debug!("IVAR: {:#X}", regs.ivar.reg[queue].read());
         }
         
@@ -1008,23 +1005,25 @@ impl IxgbeNic{
         debug!("GPIE: {:#X}", regs.gpie.read());
 
         //set eims to enable required interrupt
-        regs.eims.write(0xFFFF); // Rx 0
+        regs.eims.write(0xFFFF); 
         debug!("EIMS: {:#X}", regs.eims.read());
 
         //enable auto-clear of interrupts 
         regs.eiac.write(0xFFFF);
 
-        // set itnerrupt throttling
-        //self.write_command(REG_EITR, 0x8000_00C8); // Rx0
-        // debug!("EITR: {:#X}", regs.eitr.reg[queue_num].read());
-
         //clears eicr by writing 1 to clear old interrupt causes?
         let val = regs.eicr.read();
         debug!("EICR: {:#X}", val);
 
-        for i in 0..NUM_MSI_VEC_ENABLED {
-            register_msi_interrupt(interrupt_handlers[i])?;
-        }
+        // set the throttling time for each interrupt
+        // minimum interrupt interval specified in 2us units
+        // for i in 0..NUM_MSI_VEC_ENABLED {
+        //     regs.eitr.reg[i].write(1 << 3);
+        // }
+
+        // for i in 0..NUM_MSI_VEC_ENABLED {
+        //     register_msi_interrupt(interrupt_handlers[i])?;
+        // }
 
         // Register interrupts
         // TODO: find a cleaner way
@@ -1039,6 +1038,8 @@ impl IxgbeNic{
             // we assume that the number of msi vectors are <= the number of rx queues
             let cpu = rxq.queue[i].lock().cpu_id;
             let core_id = cpu as u32;
+            // set the interrupt number for this queue
+            rxq.queue[i].lock().interrupt_num = interrupt_nums[i];
             //allocate an interrupt to msix vector
             vector_table.msi_vector[i].vector_control.write(0);
             let lower_addr = vector_table.msi_vector[i].msg_lower_addr.read();
@@ -1184,7 +1185,7 @@ fn rx_interrupt_handler(queue_num: u8) -> u8 {
 
 /// The interrupt handler for rx queue 0
 extern "x86-interrupt" fn ixgbe_handler_0(_stack_frame: &mut ExceptionStackFrame) {
-    eoi(Some(rx_interrupt_handler(0)));
+    eoi(Some(rx_interrupt_handler()));
 }
 
 
