@@ -43,7 +43,7 @@ use dfqueue::{DFQueue,DFQueueConsumer,DFQueueProducer};
 use alloc::sync::{Arc, Weak};
 use display_text::{Print};
 use display::Display;
-use frame_buffer::{FrameCompositor, Compositor, FrameBuffer, display::graph};
+use frame_buffer::{FrameCompositor, Compositor, FrameBuffer, display::graph_drawer};
 use event_types::Event;
 use alloc::string::{String, ToString};
 
@@ -199,8 +199,8 @@ impl WindowAllocator{
 
         {
             let inner = inner_ref.lock();
+            inner.clean()?;
             inner.draw_border(get_border_color(true))?;
-            inner.clean()?
         }
         
        // inactive all other windows and active the new one
@@ -423,7 +423,7 @@ impl WindowObj{
         if x >= inner.width - 2 || y >= inner.height - 2 {
             return Ok(());
         }
-        self.framebuffer.draw_pixel(x + inner.margin, y + inner.margin, color);
+        graph_drawer::draw_pixel(&mut self.framebuffer, x + inner.margin, y + inner.margin, color);
         FrameCompositor::compose(
             vec![(&self.framebuffer, inner.x, inner.y)]
         )
@@ -438,10 +438,11 @@ impl WindowObj{
             || end_y > inner.height - 2 {
             return Ok(());
         }
-        self.framebuffer.draw_line((start_x + inner.x + 1) as i32, (start_y + inner.y + 1) as i32, 
+        graph_drawer::draw_line(&mut self.framebuffer, start_x as i32, start_y as i32, 
             (end_x + inner.x + 1) as i32, (end_y + inner.y + 1) as i32, color);
+        let (x, y) = inner.get_content_location();
         FrameCompositor::compose(
-            vec![(&self.framebuffer, inner.x, inner.y)]
+            vec![(&self.framebuffer, x, y)]
         )
     }
 
@@ -454,13 +455,13 @@ impl WindowObj{
             return Ok(());
         }
 
-        frame_buffer::display::graph::fill_rectangle(&mut self.framebuffer, inner.margin + x, inner.margin + y, width, height, 
+        graph_drawer::fill_rectangle(&mut self.framebuffer, inner.margin + x, inner.margin + y, width, height, 
                 color);
         FrameCompositor::compose(
             vec![(&self.framebuffer, inner.x, inner.y)]
         )
     }
-
+//TODO Wenqiu: check every draw function: how to compute x y width height
     /// fill a rectangle in a window
     pub fn fill_rectangle(&mut self, x:usize, y:usize, width:usize, height:usize, color:u32) 
         -> Result<(), &'static str> {
@@ -469,7 +470,7 @@ impl WindowObj{
         //     || y + height > inner.height - 2 {
         //     return Ok(());
         // }
-        frame_buffer::display::graph::fill_rectangle(&mut self.framebuffer, inner.margin + x, inner.margin + y, width, height, 
+        graph_drawer::fill_rectangle(&mut self.framebuffer, inner.margin + x, inner.margin + y, width, height, 
                 color);
         FrameCompositor::compose(
             vec![(&self.framebuffer, inner.x, inner.y)]
@@ -571,8 +572,8 @@ impl WindowInner {
         };
         let mut buffer_lock = buffer_ref.lock();
         let buffer = buffer_lock.deref_mut();
-        frame_buffer::display::graph::draw_rectangle(buffer, self.x + BORDER_WIDTH, self.x + BORDER_WIDTH,
-            self.width - 2 * BORDER_WIDTH, self.height - 2 * BORDER_WIDTH, SCREEN_BACKGROUND_COLOR);
+        graph_drawer::draw_rectangle(buffer, self.x, self.y,
+            self.width, self.height, SCREEN_BACKGROUND_COLOR);
         FrameCompositor::compose(
             vec![(buffer, 0, 0)]
         )
@@ -612,14 +613,13 @@ impl WindowInner {
 
     // draw the border of the window
     fn draw_border(&self, color:u32) -> Result<(), &'static str> {
-        trace!("Wenqiu {} {}", 3, 4);
         let buffer_ref = match VFRAME_BUFFER.try(){
             Some(buffer) => { buffer },
             None => { return Err("Fail to get the virtual frame buffer") }
         };
         let mut buffer_lock = buffer_ref.lock();
         let buffer = buffer_lock.deref_mut();
-        frame_buffer::display::graph::draw_rectangle(buffer, self.x, self.y, self.width, self.height, color);
+        graph_drawer::draw_rectangle(buffer, self.x, self.y, self.width, self.height, color);
         FrameCompositor::compose(
             vec![(buffer, 0, 0)]
         )
