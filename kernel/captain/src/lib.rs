@@ -47,6 +47,7 @@ extern crate window_manager;
 extern crate scheduler;
 extern crate frame_buffer;
 extern crate display_text;
+extern crate font;
 #[cfg(mirror_log_to_vga)] #[macro_use] extern crate print;
 extern crate input_event_manager;
 #[cfg(test_network)] extern crate exceptions_full;
@@ -144,7 +145,7 @@ pub fn init(
     }
 
     // init font
-    let rs = display_text::font::init();
+    let rs = font::init();
     match rs {
         Ok(_) => {
             trace!("font initialized successfully.");

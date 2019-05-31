@@ -1,7 +1,9 @@
 
-use super::super::{Print, WindowObj, FrameBuffer, Display};
+extern crate font;
+
+use super::super::{WindowObj, FrameBuffer};
 use super::super::{String, Mutex, Arc};
-use display_text::font::{CHARACTER_WIDTH, CHARACTER_HEIGHT};
+use self::font::{CHARACTER_WIDTH, CHARACTER_HEIGHT};
 use core::ops::DerefMut;
 
 /// A displayable component for text display

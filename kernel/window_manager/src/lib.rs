@@ -41,9 +41,8 @@ use alloc::collections::{VecDeque, BTreeMap};
 use core::ops::{Deref, DerefMut};
 use dfqueue::{DFQueue,DFQueueConsumer,DFQueueProducer};
 use alloc::sync::{Arc, Weak};
-use display_text::{Print};
-use display::Display;
-use frame_buffer::{FrameCompositor, Compositor, FrameBuffer, display::graph_drawer};
+use frame_buffer::{FrameCompositor, Compositor, FrameBuffer};
+use frame_buffer::display::{graph_drawer, text_printer};
 use event_types::Event;
 use alloc::string::{String, ToString};
 
@@ -61,8 +60,8 @@ const BORDER_WIDTH:usize = 1;
 static SCREEN_FRAME_BUFFER:Once<Arc<Mutex<FrameBuffer>>> = Once::new();
 
 /// 10 pixel gap between windows 
-pub const GAP_SIZE: usize = 10;
-pub const WINDOW_MARGIN: usize = 2;
+pub const WINDOW_MARGIN: usize = 10;
+pub const WINDOW_PADDING: usize = 2;
 
 pub struct WindowAllocator {
     allocated: VecDeque<Weak<Mutex<WindowInner>>>, 
@@ -71,11 +70,11 @@ pub struct WindowAllocator {
     active: Weak<Mutex<WindowInner>>, 
 }
 
-/// Applications call this function to request a new window object with a default size (mostly fills screen with GAP_SIZE around all borders)
+/// Applications call this function to request a new window object with a default size (mostly fills screen with WINDOW_MARGIN around all borders)
 /// If the caller a specific window size, it should call new_window()
 pub fn new_default_window() -> Result<WindowObj, &'static str> {
     let (window_width, window_height) = frame_buffer::get_screen_size()?;
-    match new_window(GAP_SIZE, GAP_SIZE, window_width - 2* GAP_SIZE, window_height - 2* GAP_SIZE) {
+    match new_window(WINDOW_MARGIN, WINDOW_MARGIN, window_width - 2* WINDOW_MARGIN, window_height - 2* WINDOW_MARGIN) {
         Ok(new_window) => {return Ok(new_window)}
         Err(err) => {return Err(err)}
     }
@@ -139,8 +138,8 @@ impl WindowAllocator{
     // Allocate a new window and return it
     pub fn allocate(&mut self, x:usize, y:usize, width:usize, height:usize) -> Result<WindowObj, &'static str>{
         // Check the size of the window
-        if width < 2 * WINDOW_MARGIN || height < 2 * WINDOW_MARGIN {
-            return Err("Window size must be greater than the margin");
+        if width < 2 * WINDOW_PADDING || height < 2 * WINDOW_PADDING {
+            return Err("Window size must be greater than the padding");
         }
 
         // Init the key input producer and consumer
@@ -148,14 +147,14 @@ impl WindowAllocator{
         let producer = consumer.obtain_producer();
         
         // Init the frame buffer of the window
-        let framebuffer = FrameBuffer::new(width - 2 * WINDOW_MARGIN, height - 2 * WINDOW_MARGIN, None)?;
+        let framebuffer = FrameBuffer::new(width - 2 * WINDOW_PADDING, height - 2 * WINDOW_PADDING, None)?;
         let inner = WindowInner{
             x:x,
             y:y,
             width:width,
             height:height,
             active:true,
-            margin:WINDOW_MARGIN,
+            padding:WINDOW_PADDING,
             key_producer:producer,
         };
 
@@ -319,7 +318,7 @@ impl WindowObj{
     fn clean(&mut self) -> Result<(), &'static str>{
         let ((x, y), (width, height)) = { 
             let inner = self.inner.lock();
-            (inner.get_content_location(), inner.get_content_size())
+            (inner.get_content_position(), inner.get_content_size())
         };
         self.fill_rectangle(0, 0, width, height, SCREEN_BACKGROUND_COLOR)?;
         FrameCompositor::compose(
@@ -341,11 +340,8 @@ impl WindowObj{
         let (width, height) = displayable.get_size();
         let inner = self.inner.lock();
 
-        if !inner.check_in_content(x, y) ||
-            !inner.check_in_content(x + width, y) ||
-            !inner.check_in_content(x, y + height) ||
-            !inner.check_in_content(x + width, y + height) {
-
+        if !inner.check_in_content(x, y) || !inner.check_in_content(x + width, y)
+            ||!inner.check_in_content(x, y + height) || !inner.check_in_content(x + width, y + height) {
             return Err("The displayable does not fit the window size.");
         } 
 
@@ -366,8 +362,8 @@ impl WindowObj{
     pub fn get_displayable(&self, key:&str) -> Option<&TextDisplay> {
         let opt = self.components.get(key);
         match opt {
-            None => {return None},
-            Some(component) => {return Some(component.get_displayable());},
+            None => { return None },
+            Some(component) => { return Some(component.get_displayable()); },
         };
     }
 
@@ -381,34 +377,26 @@ impl WindowObj{
 
     ///Get the content position of the window excluding border and padding
     pub fn get_content_position(&self) -> (usize, usize) {
-        let inner = self.inner.lock();
-        (inner.x + inner.margin, inner.y + inner.margin)
+        self.inner.lock().get_content_position()
     }
 
     /// draw a pixel in a window
     pub fn draw_pixel(&mut self, x:usize, y:usize, color:u32) -> Result<(), &'static str> {
         let inner = self.inner.lock();
-        if x >= inner.width - 2 || y >= inner.height - 2 {
-            return Ok(());
-        }
-        graph_drawer::draw_pixel(&mut self.framebuffer, x + inner.margin, y + inner.margin, color);
+        graph_drawer::draw_pixel(&mut self.framebuffer, x + inner.padding, y + inner.padding, color);
+        
+        let (x, y) = inner.get_content_position();
         FrameCompositor::compose(
-            vec![(&self.framebuffer, inner.x, inner.y)]
+            vec![(&self.framebuffer, x, y)]
         )
     }
 
     /// draw a line in a window
     pub fn draw_line(&mut self, start_x:usize, start_y:usize, end_x:usize, end_y:usize, color:u32) -> Result<(), &'static str> {
         let inner = self.inner.lock();
-        if start_x > inner.width - 2
-            || start_y > inner.height - 2
-            || end_x > inner.width - 2
-            || end_y > inner.height - 2 {
-            return Ok(());
-        }
         graph_drawer::draw_line(&mut self.framebuffer, start_x as i32, start_y as i32, 
             (end_x + inner.x + 1) as i32, (end_y + inner.y + 1) as i32, color);
-        let (x, y) = inner.get_content_location();
+        let (x, y) = inner.get_content_position();
         FrameCompositor::compose(
             vec![(&self.framebuffer, x, y)]
         )
@@ -418,18 +406,14 @@ impl WindowObj{
     pub fn draw_rectangle(&mut self, x:usize, y:usize, width:usize, height:usize, color:u32) 
         -> Result<(), &'static str> {
         let inner = self.inner.lock();
-        if x + width > inner.width - 2
-            || y + height > inner.height - 2 {
-            return Ok(());
-        }
-
-        graph_drawer::fill_rectangle(&mut self.framebuffer, inner.margin + x, inner.margin + y, width, height, 
+        graph_drawer::fill_rectangle(&mut self.framebuffer, inner.padding + x, inner.padding + y, width, height, 
                 color);
+        let (x, y) = inner.get_content_position();
         FrameCompositor::compose(
-            vec![(&self.framebuffer, inner.x, inner.y)]
+            vec![(&self.framebuffer, x, y)]
         )
     }
-//TODO Wenqiu: check every draw function: how to compute x y width height
+    //TODO Wenqiu: check every draw function: how to compute x y width height
     /// fill a rectangle in a window
     pub fn fill_rectangle(&mut self, x:usize, y:usize, width:usize, height:usize, color:u32) 
         -> Result<(), &'static str> {
@@ -438,18 +422,20 @@ impl WindowObj{
         //     || y + height > inner.height - 2 {
         //     return Ok(());
         // }
-        graph_drawer::fill_rectangle(&mut self.framebuffer, inner.margin + x, inner.margin + y, width, height, 
+        graph_drawer::fill_rectangle(&mut self.framebuffer, inner.padding + x, inner.padding + y, width, height, 
                 color);
+        let (x, y) = inner.get_content_position();
         FrameCompositor::compose(
-            vec![(&self.framebuffer, inner.x, inner.y)]
+            vec![(&self.framebuffer, x, y)]
         )
     }
 
     pub fn display_string(&mut self, display_name:&str, slice:&str, font_color:u32, bg_color:u32) -> Result<(), &'static str> {
         let (display_x, display_y) = self.get_displayable_position(display_name)?;
         let (width, height) = self.get_displayable(display_name).ok_or("The displayable does not exist")?.get_size();
-        self.framebuffer.print_by_bytes(display_x, display_y, width, height, slice, font_color, bg_color)?;
-        let (window_x, window_y) = { self.inner.lock().get_content_location() };
+        
+        text_printer::print_by_bytes(&mut self.framebuffer, display_x, display_y, width, height, slice, font_color, bg_color)?;
+        let (window_x, window_y) = { self.inner.lock().get_content_position() };
         FrameCompositor::compose(
             vec![(&mut self.framebuffer, window_x, window_y)]
         )
@@ -460,8 +446,8 @@ impl WindowObj{
     /// Print every byte and fill the blank with background color
     /*pub fn display_&str(&mut self, slice: &str) -> Result<(), &'static str> {
         let inner = self.inner.lock();
-        self.text_buffer.print_by_bytes(inner.x + inner.margin, inner.y + inner.margin, 
-            inner.width - 2 * inner.margin, inner.height - 2 * inner.margin, 
+        self.text_buffer.print_by_bytes(inner.x + inner.padding, inner.y + inner.padding, 
+            inner.width - 2 * inner.padding, inner.height - 2 * inner.padding, 
             slice)
     }*/
     
@@ -548,7 +534,7 @@ struct WindowInner {
     /// whether the window is active
     active: bool,
     /// a consumer of key input events to the window
-    margin: usize,
+    padding: usize,
     /// the producer accepting a key event
     key_producer: DFQueueProducer<Event>,
 }
@@ -587,9 +573,9 @@ impl WindowInner {
                 && y>=self.y && y<=self.y+self.height;
     }
 
-    // check if the pixel is within the window exluding the border and margin
+    // check if the pixel is within the window exluding the border and padding
     fn check_in_content(&self, x:usize, y:usize) -> bool {        
-        return x <= self.width - 2 * self.margin && y <= self.height - 2 * self.margin;
+        return x <= self.width - 2 * self.padding && y <= self.height - 2 * self.padding;
     }
 
     // active or inactive a window
@@ -616,7 +602,7 @@ impl WindowInner {
     /// adjust the size of a window
     fn resize(&mut self, x:usize, y:usize, width:usize, height:usize) -> Result<(usize, usize), &'static str> {
         self.draw_border(SCREEN_BACKGROUND_COLOR)?;
-        let percent = ((width-self.margin)*100/(self.width-self.margin), (height-self.margin)*100/(self.height-self.margin));
+        let percent = ((width-self.padding)*100/(self.width-self.padding), (height-self.padding)*100/(self.height-self.padding));
         self.x = x;
         self.y = y;
         self.width = width;
@@ -626,11 +612,11 @@ impl WindowInner {
     }
 
     fn get_content_size(&self) -> (usize, usize) {
-        (self.width - 2 * self.margin, self.height - 2 * self.margin)
+        (self.width - 2 * self.padding, self.height - 2 * self.padding)
     }
 
-    fn get_content_location(&self) -> (usize, usize) {
-        (self.x + self.margin, self.y + self.margin)
+    fn get_content_position(&self) -> (usize, usize) {
+        (self.x + self.padding, self.y + self.padding)
     }
 
 }
@@ -663,18 +649,18 @@ pub fn adjust_window_after_deletion() -> Result<(), &'static str> {
     let mut allocator = try!(WINDOW_ALLOCATOR.try().ok_or("The window allocator is not initialized")).lock();
     let num_windows = allocator.deref_mut().allocated.len();
     // one gap between each window and one gap between the edge windows and the frame buffer boundary
-    let window_height = (frame_buffer::FRAME_BUFFER_HEIGHT - GAP_SIZE * (num_windows + 1))/(num_windows); 
-    let window_width = frame_buffer::FRAME_BUFFER_WIDTH - 2 * GAP_SIZE; // fill the width of the screen with a slight gap at the boundaries
-    let mut height_index = GAP_SIZE; // start resizing the windows after the first gap 
+    let window_height = (frame_buffer::FRAME_BUFFER_HEIGHT - WINDOW_MARGIN * (num_windows + 1))/(num_windows); 
+    let window_width = frame_buffer::FRAME_BUFFER_WIDTH - 2 * WINDOW_MARGIN; // fill the width of the screen with a slight gap at the boundaries
+    let mut height_index = WINDOW_MARGIN; // start resizing the windows after the first gap 
 
     // Resizes the windows vertically
     for window_inner_ref in allocator.deref_mut().allocated.iter_mut() {
         let strong_window_ptr = window_inner_ref.upgrade();
         if let Some(window_inner_ptr) = strong_window_ptr {
             let mut locked_window_ptr = window_inner_ptr.lock();
-            locked_window_ptr.resize(GAP_SIZE, height_index, window_width, window_height)?;
+            locked_window_ptr.resize(WINDOW_MARGIN, height_index, window_width, window_height)?;
             locked_window_ptr.key_producer.enqueue(Event::DisplayEvent); // refreshes display after resize
-            height_index += window_height + GAP_SIZE; // advance to the height index of the next window
+            height_index += window_height + WINDOW_MARGIN; // advance to the height index of the next window
         }
     }
     Ok(())
@@ -683,9 +669,9 @@ pub fn adjust_windows_before_addition() -> Result<(usize, usize, usize), &'stati
     let mut allocator = try!(WINDOW_ALLOCATOR.try().ok_or("The window allocator is not initialized")).lock();
     let num_windows = allocator.deref_mut().allocated.len();
     // one gap between each window and one gap between the edge windows and the frame buffer boundary
-    let window_height = (display::FRAME_BUFFER_HEIGHT - GAP_SIZE * (num_windows + 2))/(num_windows + 1); 
-    let window_width = frame_buffer::FRAME_BUFFER_WIDTH - 2 * GAP_SIZE; // refreshes display after resize
-    let mut height_index = GAP_SIZE; // start resizing the windows after the first gap 
+    let window_height = (display::FRAME_BUFFER_HEIGHT - WINDOW_MARGIN * (num_windows + 2))/(num_windows + 1); 
+    let window_width = frame_buffer::FRAME_BUFFER_WIDTH - 2 * WINDOW_MARGIN; // refreshes display after resize
+    let mut height_index = WINDOW_MARGIN; // start resizing the windows after the first gap 
 
     if num_windows >=1  {
         // Resizes the windows vertically
@@ -693,9 +679,9 @@ pub fn adjust_windows_before_addition() -> Result<(usize, usize, usize), &'stati
             let strong_ptr = window_inner_ref.upgrade();
             if let Some(window_inner_ptr) = strong_ptr {
                 let mut locked_window_ptr = window_inner_ptr.lock();
-                locked_window_ptr.resize(GAP_SIZE, height_index, window_width, window_height)?;
+                locked_window_ptr.resize(WINDOW_MARGIN, height_index, window_width, window_height)?;
                 locked_window_ptr.key_producer.enqueue(Event::DisplayEvent); // refreshes window after  
-                height_index += window_height + GAP_SIZE; // advance to the height index of the next window
+                height_index += window_height + WINDOW_MARGIN; // advance to the height index of the next window
             }
         }
     }

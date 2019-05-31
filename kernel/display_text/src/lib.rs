@@ -5,7 +5,6 @@ extern crate alloc;
 extern crate spin;
 extern crate frame_buffer;
 
-use self::font::{CHARACTER_HEIGHT, CHARACTER_WIDTH, FONT_PIXEL};
 use frame_buffer::{FrameBuffer};
 use alloc::vec::{Vec};
 use alloc::sync::{Arc};
@@ -16,7 +15,6 @@ use core::ops::DerefMut;
 use tsc::{tsc_ticks, TscTicks};
 
 ///The default font file
-pub mod font;
 
 /// Specifies where we want to scroll the display, and by how much
 #[derive(Debug)]
@@ -44,127 +42,7 @@ pub enum DisplayPosition {
 // }
 
 
-///This trait is to print text in a virtual frame buffer
-pub trait Print {
-    ///print a string by bytes at (x, y) within an area of (width, height) of the virtual text frame buffer
-    fn print_by_bytes(&mut self, x:usize, y:usize, width:usize, height:usize, 
-        slice: &str, font_color:u32, bg_color:u32) -> Result<(), &'static str>;
-    ///print a byte to the text buffer at (line, column). (left, top) specify the margin of the text area. index is the function to calculate the index of every pixel. The virtual frame buffer calls its get_index() method to get the function.
-    fn print_byte (&mut self, byte:u8, font_color:u32, bg_color:u32,
-            left:usize, top:usize, line:usize, column:usize, index:&Box<Fn(usize, usize)->usize>) 
-            -> Result<(),&'static str>;
-    ///Fill a blank (left, top, right, bottom) with the color. index is the function to calculate the index of every pixel. The virtual frame buffer calls its get_index() method to get the function.
-    fn fill_blank(&mut self, left:usize, top:usize, right:usize,
-             bottom:usize, color:u32, index:&Box<Fn(usize, usize)->usize>) -> Result<(),&'static str>;
-}
 
-impl Print for FrameBuffer {
-    ///print a string by bytes at (x, y) within an area of (width, height) of the virtual text frame buffer
-    fn print_by_bytes(&mut self, x:usize, y:usize, width:usize, height:usize, 
-        slice: &str, font_color:u32, bg_color:u32) -> Result<(), &'static str> {
-    
-        let mut curr_line = 0;
-        let mut curr_column = 0;
-
-        let buffer_width = width/CHARACTER_WIDTH;
-        let buffer_height = height/CHARACTER_HEIGHT;
-        
-        let index = self.get_index_fn();
-       
-        for byte in slice.bytes() {
-            if byte == b'\n' {//fill the remaining blank of current line and go to the next line
-                self.fill_blank ( 
-                    x + curr_column * CHARACTER_WIDTH,
-                    y + curr_line * CHARACTER_HEIGHT,
-                    x + width, 
-                    y + (curr_line + 1 )* CHARACTER_HEIGHT, 
-                    bg_color, &index)?;
-                curr_column = 0;
-                curr_line += 1;
-                if curr_line == buffer_height {
-                    break;
-                }
-            } else {
-                if curr_column == buffer_width {
-                    curr_column = 0;
-                    curr_line += 1;
-                    if curr_line == buffer_height {
-                        break;
-                    }
-                }
-                self.print_byte(byte, font_color, bg_color, x, y, 
-                    curr_line, curr_column, &index)?;
-                curr_column += 1;
-            }
-        }
-
-        // Fill the blank of the last line
-        self.fill_blank ( 
-            x + curr_column * CHARACTER_WIDTH,
-            y + curr_line * CHARACTER_HEIGHT,
-            x + width, 
-            y + (curr_line + 1 )* CHARACTER_HEIGHT, 
-            bg_color, &index)?;
-
-        // Fill the blank of remaining lines
-        self.fill_blank ( 
-            x, y + (curr_line + 1 )* CHARACTER_HEIGHT, x + width, y + height, 
-            bg_color, &index)?;
-
-        Ok(())
-    }
-
-    //print a byte to the text buffer at (line, column). (left, top) specify the margin of the text area. index is the function to calculate the index of every pixel. The virtual frame buffer calls its get_index() method to get the function.
-    fn print_byte (&mut self, byte:u8, font_color:u32, bg_color:u32,
-            left:usize, top:usize, line:usize, column:usize, index:&Box<Fn(usize, usize)->usize>) 
-            -> Result<(),&'static str> {
-        let x = left + column * CHARACTER_WIDTH;
-        let y = top + line * CHARACTER_HEIGHT;
-        let mut i = 0;
-        let mut j = 0;
-
-        let fonts = FONT_PIXEL.lock();
-   
-        let buffer = self.buffer();
-        loop {
-            let mask:u32 = fonts[byte as usize][i][j];
-            buffer[index(x + j, y + i)] = font_color & mask | bg_color & (!mask);
-            j += 1;
-            if j == CHARACTER_WIDTH {
-                i += 1;
-                if i == CHARACTER_HEIGHT {
-                    return Ok(());
-                }
-                j = 0;
-            }
-        }
-
-    }
-
-    //Fill a blank (left, top, right, bottom) with the color. index is the function to calculate the index of every pixel. The virtual frame buffer calls its get_index() method to get the function.
-    fn fill_blank(&mut self, left:usize, top:usize, right:usize,
-             bottom:usize, color:u32, index:&Box<Fn(usize, usize)->usize>) -> Result<(),&'static str>{
-        let mut x = left;
-        let mut y = top;
-        if left > right || top > bottom {
-            return Ok(())
-        }
-
-        let buffer = self.buffer();
-        loop {
-            if x == right {
-                y += 1;
-                x = left;
-            }
-            if y == bottom {
-                return Ok(());
-            }
-            buffer[index(x, y)] = color;
-            x += 1;
-        }
-    }
-    
-}
 
 ///Dropped   code. Cursor should belong to the terminal
 ///A cursor struct. It contains the position of a cursor, whether it is enabled, 

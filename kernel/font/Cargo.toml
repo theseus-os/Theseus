@@ -1,5 +1,5 @@
 [package]
-name = "frame_buffer"
+name = "font"
 version = "0.1.0"
 authors = ["Wenqiu Yu <yuwenqiuj@gmail.com>"]
 build = "../../build.rs"
@@ -7,7 +7,7 @@ build = "../../build.rs"
 [dependencies]
 spin = "0.4.10"
 volatile = "0.2.5"
-owning_ref = { git = "https://github.com/kevinaboos/owning-ref-rs" }
+
 
 [dependencies.lazy_static]
 features = ["spin_no_std", "nightly"]
@@ -35,11 +35,7 @@ path = "../acpi"
 [dependencies.tsc]
 path = "../tsc"
 
-[dependencies.vga_buffer]
-path = "../vga_buffer"
 
-[dependencies.font]
-path = "../font"
 
 # [build]
 # rustflags = ["-C", "prefer-dynamic", "-C", "panic=abort"]

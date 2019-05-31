@@ -1,4 +1,8 @@
-use super::{Mutex, DerefMut};
+#![no_std]
+extern crate spin;
+
+use spin::{Mutex};
+use core::ops::DerefMut;
 
 ///The width of a character
 pub const CHARACTER_WIDTH:usize = 9;

@@ -93,6 +93,9 @@ path = "../network_manager"
 [dependencies.ota_update_client]
 path = "../ota_update_client"
 
+[dependencies.font]
+path = "../font"
+
 ## This should be dependent upon 'cfg(simd_personality)',
 ## but it cannot be because of https://github.com/rust-lang/cargo/issues/5499.
 ## Therefore, it has to be unconditionally included.

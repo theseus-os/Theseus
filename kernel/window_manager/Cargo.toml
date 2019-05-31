@@ -57,7 +57,8 @@ path = "../spawn"
 [dependencies.pit_clock]
 path = "../pit_clock"
 
-
+[dependencies.font]
+path = "../font"
 
 # [build]
 # rustflags = ["-C", "prefer-dynamic", "-C", "panic=abort"]
