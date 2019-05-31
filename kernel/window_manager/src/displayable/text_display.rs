@@ -1,5 +1,5 @@
 
-use super::super::{Print, WindowObj, FrameBuffer, VFRAME_BUFFER, Display};
+use super::super::{Print, WindowObj, FrameBuffer, Display};
 use super::super::{String, Mutex, Arc};
 use display_text::font::{CHARACTER_WIDTH, CHARACTER_HEIGHT};
 use core::ops::DerefMut;

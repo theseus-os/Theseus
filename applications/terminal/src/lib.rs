@@ -1085,7 +1085,8 @@ fn terminal_loop(mut terminal: Terminal) -> Result<(), &'static str> {
             // Returns from the main loop so that the terminal object is dropped
             Event::ExitEvent => {
                 trace!("exited terminal");
-                window_manager::delete(terminal.window)?;
+                //The delete function is invoked in window.drop() automatically
+                //window_manager::delete(terminal.window)?;
                 return Ok(());
             }
 

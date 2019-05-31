@@ -53,18 +53,18 @@ pub mod displayable;
 use displayable::text_display::TextDisplay;
 
 
-static WINDOW_ALLOCATOR: Once<Mutex<WindowAllocator>> = Once::new();
+pub static WINDOW_ALLOCATOR: Once<Mutex<WindowAllocator>> = Once::new();
 const WINDOW_ACTIVE_COLOR:u32 = 0xFFFFFF;
 const WINDOW_INACTIVE_COLOR:u32 = 0x343C37;
 const SCREEN_BACKGROUND_COLOR:u32 = 0x000000;
 const BORDER_WIDTH:usize = 1;
-static VFRAME_BUFFER:Once<Arc<Mutex<FrameBuffer>>> = Once::new();
+static SCREEN_FRAME_BUFFER:Once<Arc<Mutex<FrameBuffer>>> = Once::new();
 
 /// 10 pixel gap between windows 
 pub const GAP_SIZE: usize = 10;
 pub const WINDOW_MARGIN: usize = 2;
 
-struct WindowAllocator {
+pub struct WindowAllocator {
     allocated: VecDeque<Weak<Mutex<WindowInner>>>, 
     // a weak pointer directly to the active WindowInner so we don't have to search for the active window when we need it quickly
     // this weak pointer is set in the WindowAllocator's switch(), delete(), and allocate() functions
@@ -85,14 +85,22 @@ pub fn new_default_window() -> Result<WindowObj, &'static str> {
 /// Params x,y specify the (x,y) coordinates of the top left corner of the window
 /// Params width and height specify dimenions of new window in pixels
 pub fn new_window<'a>(x:usize, y:usize, width:usize, height:usize) -> Result<WindowObj, &'static str>{
-
     let allocator: &Mutex<WindowAllocator> = WINDOW_ALLOCATOR.call_once(|| {
         Mutex::new(WindowAllocator{
             allocated:VecDeque::new(),
             active:Weak::new(),
         })
     });
-    trace!("Wenqiu {} {} {} {}", x, y, width, height);
+    
+    // Init the frame buffer of the window manager            
+    {
+        let (screen_width, screen_height) = frame_buffer::get_screen_size()?;
+        let framebuffer = FrameBuffer::new(screen_width, screen_height, None)?;
+        SCREEN_FRAME_BUFFER.call_once(|| {
+            Arc::new(Mutex::new(framebuffer))
+        });
+    }
+
     allocator.lock().allocate(x, y, width, height)
 }
 
@@ -115,68 +123,31 @@ fn get_border_color(active:bool) -> u32 {
 
 
 /// switch the active window. Active the next window in the list based on the order they are created
-pub fn switch() -> Result<(), &'static str> {
-    let mut allocator = try!(WINDOW_ALLOCATOR.try().ok_or("The window allocator is not initialized")).lock();
-    allocator.switch()?;
-    Ok(())
-}
+// pub fn switch() -> Result<(), &'static str> {
+//     let mut allocator = try!(WINDOW_ALLOCATOR.try().ok_or("The window allocator is not initialized")).lock();
+//     allocator.schedule()?;
+//     Ok(())
+// }
 
-/// delete a window object
-pub fn delete(window:WindowObj) -> Result<(), &'static str> {
-    let mut allocator = try!(WINDOW_ALLOCATOR.try().ok_or("The window allocator is not initialized")).lock();
-    // Switches to a new active window and sets 
-    // the active pointer field of the window allocator to the new active window
-    allocator.switch()?; 
-    allocator.delete(&(window.inner))?;
-    Ok(())
-}
 
 /// Returns the width and height (in pixels) of the screen 
 // pub fn get_screen_size() -> Result<(usize, usize), &'static str> {
 //     frame_buffer::get_resolution()
 // }
 
-impl WindowAllocator{
-    
+impl WindowAllocator{    
     // Allocate a new window and return it
-    fn allocate(&mut self, x:usize, y:usize, width:usize, height:usize) -> Result<WindowObj, &'static str>{
-        
-        {
-            let (screen_width, screen_height) = frame_buffer::get_screen_size()?;
-            let vframebuffer = FrameBuffer::new(screen_width, screen_height, None)?;
-            VFRAME_BUFFER.call_once(|| {
-                Arc::new(Mutex::new(vframebuffer))
-            });
-        }
-
-       /*{
-            let mut drawer = frame_buffer::FRAME_DRAWER.lock();
-                let index = frame_buffer::get_index_fn(drawer.width);
-
-                let buffer;
-                match drawer.buffer() {
-                    Ok(rs) => {buffer = rs;},
-                    Err(err) => {return Err(err);},
-                }
-                buffer[index(0,0)] = 0x777777;
-        }*/
-
-//        let (screen_width, screen_height) = DRAWER.get_resolution();
+    pub fn allocate(&mut self, x:usize, y:usize, width:usize, height:usize) -> Result<WindowObj, &'static str>{
+        // Check the size of the window
         if width < 2 * WINDOW_MARGIN || height < 2 * WINDOW_MARGIN {
             return Err("Window size must be greater than the margin");
         }
 
-    //Window size can exceeds the boundray of the screen
-    //     if x + width >= buffer_width
-    //    || y + height >= buffer_height {
-    //         return Err("Requested area exceeds the screen size");
-    //     }
-
+        // Init the key input producer and consumer
         let consumer = DFQueue::new().into_consumer();
         let producer = consumer.obtain_producer();
-
-        //new_window = ||{WindowObj{x:x,y:y,width:width,height:height,active:true}};
         
+        // Init the frame buffer of the window
         let framebuffer = FrameBuffer::new(width - 2 * WINDOW_MARGIN, height - 2 * WINDOW_MARGIN, None)?;
         let inner = WindowInner{
             x:x,
@@ -188,22 +159,21 @@ impl WindowAllocator{
             key_producer:producer,
         };
 
+        // Check if the window overlaps with others
         let inner_ref = Arc::new(Mutex::new(inner));
-
         let overlapped = self.check_overlap(&inner_ref, x, y, width, height);       
         if overlapped  {
             return Err("Request area is already allocated");
         }
 
-        // draw the window border
-
+        // Init a void window content
         {
             let inner = inner_ref.lock();
             inner.clean()?;
             inner.draw_border(get_border_color(true))?;
         }
         
-       // inactive all other windows and active the new one
+        // inactive all other windows and active the new one
         for item in self.allocated.iter_mut(){
             let ref_opt = item.upgrade();
             if let Some(reference) = ref_opt {
@@ -214,7 +184,7 @@ impl WindowAllocator{
         self.active = weak_ref.clone();
         self.allocated.push_back(weak_ref);
 
-        // new the window
+        // create the window
         let window: WindowObj = WindowObj{
             inner:inner_ref,
             //text_buffer:FrameTextBuffer::new(),
@@ -228,7 +198,7 @@ impl WindowAllocator{
 
     /// Switches to the next active window in the window allocator list
     /// This function returns the index of the previously active window in the window_allocator.allocated vector
-    fn switch(&mut self) -> Result<usize, &'static str> {
+    pub fn schedule(&mut self) -> Result<usize, &'static str> {
         let mut flag = false;
         let mut i = 0;
         let mut prev_active = 0;
@@ -288,7 +258,7 @@ impl WindowAllocator{
             self.allocated.remove(i);
         }
 
-        inner.lock().draw_border(SCREEN_BACKGROUND_COLOR)?;
+        inner.lock().clean()?;
 
         Ok(())
     }
@@ -340,12 +310,11 @@ pub struct WindowObj {
     consumer:DFQueueConsumer<Event>,
     components:BTreeMap<String, Component>,
     /// the framebuffer owned by the window
-    pub framebuffer:FrameBuffer,
+    framebuffer:FrameBuffer,
 }
 
 
 impl WindowObj{
-
     // clean the content of a window
     fn clean(&mut self) -> Result<(), &'static str>{
         let ((x, y), (width, height)) = { 
@@ -357,7 +326,6 @@ impl WindowObj{
             vec![(&mut self.framebuffer, x, y)]
         )
     }
-
 
     /// Returns the content dimensions of this window,
     /// as a tuple of `(width, height)`.
@@ -373,10 +341,10 @@ impl WindowObj{
         let (width, height) = displayable.get_size();
         let inner = self.inner.lock();
 
-        if !inner.check_in_content(inner.x + inner.margin + x, inner.y + inner.margin + y) ||
-            !inner.check_in_content(inner.x + inner.margin + x + width, inner.y + inner.margin + y) ||
-            !inner.check_in_content(inner.x + inner.margin + x, inner.y + inner.margin + y + height) ||
-            !inner.check_in_content(inner.x + inner.margin + x + width, inner.y + inner.margin + y + height) {
+        if !inner.check_in_content(x, y) ||
+            !inner.check_in_content(x + width, y) ||
+            !inner.check_in_content(x, y + height) ||
+            !inner.check_in_content(x + width, y + height) {
 
             return Err("The displayable does not fit the window size.");
         } 
@@ -546,6 +514,28 @@ impl WindowObj{
 
 }
 
+/// delete a window object
+impl Drop for WindowObj {
+    fn drop(&mut self) {
+        let mut allocator = match WINDOW_ALLOCATOR.try() {
+            Some(allocator) => { allocator },
+            None => { error!("The window allocator is not initialized"); return }
+        }.lock();
+        // Switches to a new active window and sets 
+        // the active pointer field of the window allocator to the new active window
+        match allocator.schedule() {
+            Ok(_) => {}
+            Err(err) => { error!("Fail to schedule to the next window: {}", err) }
+        }; 
+        
+        match allocator.delete(&(self.inner)) {
+            Ok(()) => {}
+            Err(err) => { error!("Fail to delete the window from the window manager: {}", err) }
+        }
+    }
+}
+
+
 struct WindowInner {
     /// the upper left x-coordinate of the window
     x: usize,
@@ -565,8 +555,7 @@ struct WindowInner {
 
 impl WindowInner {
     fn clean(&self) -> Result<(), &'static str> {
-        trace!("Wenqiu {} {}", 3, 4);
-        let buffer_ref = match VFRAME_BUFFER.try(){
+        let buffer_ref = match SCREEN_FRAME_BUFFER.try(){
             Some(buffer) => { buffer },
             None => { return Err("Fail to get the virtual frame buffer") }
         };
@@ -600,8 +589,7 @@ impl WindowInner {
 
     // check if the pixel is within the window exluding the border and margin
     fn check_in_content(&self, x:usize, y:usize) -> bool {        
-        return x>= self.x+self.margin && x <= self.x+self.width-self.margin 
-                && y>=self.y+self.margin && y<=self.y+self.height-self.margin;
+        return x <= self.width - 2 * self.margin && y <= self.height - 2 * self.margin;
     }
 
     // active or inactive a window
@@ -613,7 +601,7 @@ impl WindowInner {
 
     // draw the border of the window
     fn draw_border(&self, color:u32) -> Result<(), &'static str> {
-        let buffer_ref = match VFRAME_BUFFER.try(){
+        let buffer_ref = match SCREEN_FRAME_BUFFER.try(){
             Some(buffer) => { buffer },
             None => { return Err("Fail to get the virtual frame buffer") }
         };
