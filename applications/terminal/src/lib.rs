@@ -163,11 +163,11 @@ impl Terminal {
 
         trace!("Wenqiu: new a terminal");
         // Requests a new window object from the window manager
-        let window_object = match window_manager::new_default_window() {
+        let mut window_object = match window_manager::new_default_window() {
             Ok(window_object) => window_object,
             Err(err) => {debug!("new window returned err"); return Err(err)}
         };
-        
+
         let root = root::get_root();
         
         let env = Environment {

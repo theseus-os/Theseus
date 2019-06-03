@@ -302,7 +302,6 @@ impl WindowAllocator{
 }
 
 /// a window object
-//TODO Wenqiu: drop function
 pub struct WindowObj {
     inner:Arc<Mutex<WindowInner>>,
     //text_buffer:FrameTextBuffer,
@@ -370,8 +369,8 @@ impl WindowObj{
     pub fn get_displayable_position(&self, key:&str) -> Result<(usize, usize), &'static str> {
         let opt = self.components.get(key);
         match opt {
-            None => {return Err("No such displayable");},
-            Some(component) => {return Ok(component.get_position());},
+            None => { return Err("No such displayable"); },
+            Some(component) => { return Ok(component.get_position()); },
         };
     }
 
@@ -382,51 +381,42 @@ impl WindowObj{
 
     /// draw a pixel in a window
     pub fn draw_pixel(&mut self, x:usize, y:usize, color:u32) -> Result<(), &'static str> {
-        let inner = self.inner.lock();
-        graph_drawer::draw_pixel(&mut self.framebuffer, x + inner.padding, y + inner.padding, color);
-        
-        let (x, y) = inner.get_content_position();
+        graph_drawer::draw_pixel(&mut self.framebuffer, x, y, color);
+        let (content_x, content_y) = self.inner.lock().get_content_position();
         FrameCompositor::compose(
-            vec![(&self.framebuffer, x, y)]
+            vec![(&self.framebuffer, content_x, content_y)]
         )
     }
 
     /// draw a line in a window
     pub fn draw_line(&mut self, start_x:usize, start_y:usize, end_x:usize, end_y:usize, color:u32) -> Result<(), &'static str> {
-        let inner = self.inner.lock();
         graph_drawer::draw_line(&mut self.framebuffer, start_x as i32, start_y as i32, 
-            (end_x + inner.x + 1) as i32, (end_y + inner.y + 1) as i32, color);
-        let (x, y) = inner.get_content_position();
+            end_x as i32, end_y as i32, color);
+        let (content_x, content_y) = self.inner.lock().get_content_position();
         FrameCompositor::compose(
-            vec![(&self.framebuffer, x, y)]
+            vec![(&self.framebuffer, content_x, content_y)]
         )
     }
 
     /// draw a rectangle in a window
     pub fn draw_rectangle(&mut self, x:usize, y:usize, width:usize, height:usize, color:u32) 
         -> Result<(), &'static str> {
-        let inner = self.inner.lock();
-        graph_drawer::fill_rectangle(&mut self.framebuffer, inner.padding + x, inner.padding + y, width, height, 
+        graph_drawer::draw_rectangle(&mut self.framebuffer, x, y, width, height, 
                 color);
-        let (x, y) = inner.get_content_position();
+        let (content_x, content_y) = self.inner.lock().get_content_position();
         FrameCompositor::compose(
-            vec![(&self.framebuffer, x, y)]
+            vec![(&self.framebuffer, content_x, content_y)]
         )
     }
-    //TODO Wenqiu: check every draw function: how to compute x y width height
+
     /// fill a rectangle in a window
     pub fn fill_rectangle(&mut self, x:usize, y:usize, width:usize, height:usize, color:u32) 
         -> Result<(), &'static str> {
-        let inner = self.inner.lock();
-        // if x + width > inner.width - 2
-        //     || y + height > inner.height - 2 {
-        //     return Ok(());
-        // }
-        graph_drawer::fill_rectangle(&mut self.framebuffer, inner.padding + x, inner.padding + y, width, height, 
+        graph_drawer::fill_rectangle(&mut self.framebuffer, x, y, width, height, 
                 color);
-        let (x, y) = inner.get_content_position();
+        let (content_x, content_y) = self.inner.lock().get_content_position();
         FrameCompositor::compose(
-            vec![(&self.framebuffer, x, y)]
+            vec![(&self.framebuffer, content_x, content_y)]
         )
     }
 
@@ -440,23 +430,6 @@ impl WindowObj{
             vec![(&mut self.framebuffer, window_x, window_y)]
         )
     }
-
-    /// Requires that a str slice that will exactly fit the frame buffer
-    /// The calculation is done inside the console crate by the print_by_bytes function and associated methods
-    /// Print every byte and fill the blank with background color
-    /*pub fn display_&str(&mut self, slice: &str) -> Result<(), &'static str> {
-        let inner = self.inner.lock();
-        self.text_buffer.print_by_bytes(inner.x + inner.padding, inner.y + inner.padding, 
-            inner.width - 2 * inner.padding, inner.height - 2 * inner.padding, 
-            slice)
-    }*/
-    
-    /*
-    pub fn draw_border(&self) -> (usize, usize, usize){
-        let inner = self.inner.lock();
-        inner.draw_border(get_border_color(inner.active))
-    }
-    */
 
     // @Andrew
     //Wenqiu TODO: remap the frame buffer
@@ -540,6 +513,7 @@ struct WindowInner {
 }
 
 impl WindowInner {
+    //clean the window on the screen including the border and padding
     fn clean(&self) -> Result<(), &'static str> {
         let buffer_ref = match SCREEN_FRAME_BUFFER.try(){
             Some(buffer) => { buffer },
@@ -556,21 +530,14 @@ impl WindowInner {
 
     //check if the window is overlapped with any existing window
     fn is_overlapped(&self, x:usize, y:usize, width:usize, height:usize) -> bool {
-        if self.check_in_area(x, y)
-            {return true;}
-        if self.check_in_area(x, y+height)
-            {return true;}
-        if self.check_in_area(x+width, y)
-            {return true;}
-        if self.check_in_area(x+width, y+height)
-            {return true;}
-        false        
+        return self.check_in_area(x, y) && self.check_in_area(x, y + height) 
+            && self.check_in_area(x + width, y) && self.check_in_area(x + width, y + height)
     } 
 
     // check if the pixel is within the window
     fn check_in_area(&self, x:usize, y:usize) -> bool {        
-        return x>= self.x && x <= self.x+self.width 
-                && y>=self.y && y<=self.y+self.height;
+        return x >= self.x && x <= self.x + self.width 
+                && y >= self.y && y <= self.y + self.height;
     }
 
     // check if the pixel is within the window exluding the border and padding
@@ -581,7 +548,7 @@ impl WindowInner {
     // active or inactive a window
     fn active(&mut self, active:bool) -> Result<(), &'static str> {
         self.active = active;
-        self.draw_border(get_border_color(active))?;
+        self.draw_border(WINDOW_ACTIVE_COLOR)?;
         Ok(())
     }
 
