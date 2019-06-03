@@ -60,6 +60,9 @@ path = "../pit_clock"
 [dependencies.font]
 path = "../font"
 
+[dependencies.tsc]
+path = "../tsc"
+
 # [build]
 # rustflags = ["-C", "prefer-dynamic", "-C", "panic=abort"]
 

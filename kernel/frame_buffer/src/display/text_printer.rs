@@ -1,7 +1,7 @@
 extern crate font;
 
 use super::write_to;
-use super::super::{FrameBuffer, Box, MappedPages, BoxRefMut};
+use super::super::{FrameBuffer, Box, MappedPages, BoxRefMut, hpet};
 use self::font::*;
 
 ///print a string by bytes at (x, y) within an area of (width, height) of the virtual text frame buffer
@@ -53,7 +53,7 @@ pub fn print_by_bytes(mut framebuffer:&mut FrameBuffer, x:usize, y:usize, width:
     //     y + (curr_line + 1 )* CHARACTER_HEIGHT, 
     //     bg_color, &index)?;
 
-    // // Fill the blank of remaining lines
+    // Fill the blank of remaining lines
     // fill_blank(&mut buffer, 
     //     x, y + (curr_line + 1 )* CHARACTER_HEIGHT, x + width, y + height, 
     //     bg_color, &index)?;
@@ -90,20 +90,16 @@ fn print_byte(buffer:&mut BoxRefMut<MappedPages, [u32]>, byte:u8, font_color:u32
 //Fill a blank (left, top, right, bottom) with the color. index is the function to calculate the index of every pixel. The virtual frame buffer calls its get_index() method to get the function.
 fn fill_blank(buffer:&mut BoxRefMut<MappedPages, [u32]>, left:usize, top:usize, right:usize,
             bottom:usize, color:u32, index:&Box<Fn(usize, usize)->usize>) -> Result<(),&'static str>{
-    let mut x = left;
-    let mut y = top;
-    if left > right || top > bottom {
+    if left >= right || top >= bottom {
         return Ok(())
     }
-
     let fill = vec![color; right - left];
+    let mut y = top;
     loop {
         if y == bottom {
             return Ok(());
         }
-        let start = index(left, y);
-        let end = index(right, y);
-        buffer[start..end].copy_from_slice(&fill);
+        buffer[index(left, y)..index(right, y)].copy_from_slice(&fill);
         y += 1;
     }
 }

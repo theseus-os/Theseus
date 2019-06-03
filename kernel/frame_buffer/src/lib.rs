@@ -15,6 +15,7 @@ extern crate memory;
 extern crate util;
 #[macro_use] extern crate alloc;
 extern crate owning_ref;
+extern crate hpet;
 
 use owning_ref::BoxRefMut;
 use spin::{Mutex, Once};

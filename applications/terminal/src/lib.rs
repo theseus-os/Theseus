@@ -34,7 +34,7 @@ use alloc::string::{String, ToString};
 use alloc::vec::Vec;
 use alloc::sync::Arc;
 use dfqueue::{DFQueue, DFQueueConsumer, DFQueueProducer};
-use window_manager::displayable::text_display::TextDisplay;
+use window_manager::displayable::text_display::{TextDisplay, Cursor};
 use spawn::{ApplicationTaskBuilder, KernelTaskBuilder};
 use path::Path;
 use task::{TaskRef, ExitValue, KillReason};
@@ -139,6 +139,8 @@ struct Terminal {
     /// Indicates the rightmost position of the cursor ON THE text display, NOT IN THE SCROLLBACK BUFFER (i.e. one more than the position of the last non_whitespace character
     /// being displayed on the text display)
     absolute_cursor_pos: usize,
+    /// The cursor object owned by the terminal. It contains the current blinking states of the cursor
+    cursor: Cursor,
     /// Variable that tracks how far left the cursor is from the maximum rightmost position (above)
     /// absolute_cursor_pos - left shift will be the position on the text display where the cursor will be displayed
     left_shift: usize,
@@ -161,7 +163,6 @@ impl Terminal {
         // Sets up the kernel to print to this terminal instance
         print::set_default_print_output(terminal_print_producer.obtain_producer()); 
 
-        trace!("Wenqiu: new a terminal");
         // Requests a new window object from the window manager
         let mut window_object = match window_manager::new_default_window() {
             Ok(window_object) => window_object,
@@ -191,7 +192,8 @@ impl Terminal {
             scrollback_buffer: String::new(),
             scroll_start_idx: 0,
             is_scroll_end: true,
-            absolute_cursor_pos: 0, 
+            absolute_cursor_pos: 0,
+            cursor: Cursor::new(),
             left_shift: 0,
             print_consumer: terminal_print_consumer,
             print_producer: terminal_print_producer,
@@ -579,6 +581,7 @@ impl Terminal {
 
         if let Some(slice) = result {
             self.window.display_string(display_name, slice, FONT_COLOR, BACKGROUND_COLOR)?;
+            self.absolute_cursor_pos = cursor_pos;
         } else {
             return Err("could not get slice of scrollback buffer string");
         }
@@ -644,24 +647,9 @@ impl Terminal {
     
 
     /// Updates the cursor to a new position and refreshes display
-    fn cursor_handler(&mut self, display_name:&str) -> Result<(), &'static str> { 
-        let buffer_width = self.get_displayable_dimensions(display_name).0;
-        let mut new_x = self.absolute_cursor_pos %buffer_width;
-        let mut new_y = self.absolute_cursor_pos /buffer_width;
-        // adjusts to the correct position relative to the max rightmost absolute cursor position
-        if new_x >= self.left_shift  {
-            new_x -= self.left_shift;
-        } else {
-            new_x = buffer_width  + new_x - self.left_shift;
-            new_y -=1;
-        }
-
-        if let Some(text_display) = self.window.get_displayable(display_name){
-            //text_display.set_cursor(&(self.window), new_y as u16, new_x as u16, 
-            //    FONT_COLOR, true)?;
-        } else {
-            return Err("faild to get the text displayable component")
-        }
+    fn display_cursor(&mut self, display_name:&str) -> Result<(), &'static str> { 
+        self.window.display_cursor(&self.cursor, display_name, self.absolute_cursor_pos, 
+            self.left_shift, FONT_COLOR, BACKGROUND_COLOR)?;
         return Ok(());
     }
 
@@ -704,10 +692,8 @@ impl Terminal {
             if self.cmdline.len() == 0 || self.cmdline.len() - self.left_shift == 0 { 
                 return Ok(());
             } else {
-                // Subtraction by accounts for 0-indexing
-                if let Some(text_display) = self.window.get_displayable(display_name){
-                    text_display.disable_cursor();
-                }
+                self.cursor.disable();
+                self.display_cursor(display_name)?;
                 let remove_idx: usize =  self.cmdline.len() - self.left_shift -1;
                 self.cmdline.remove(remove_idx);
                 self.pop_from_stdin(true);
@@ -995,7 +981,7 @@ impl Terminal {
                 Ok(_) => { }
                 Err(err) => {error!("could not update display backwards: {}", err); return}
             }
-            match self.cursor_handler(display_name) {
+            match self.display_cursor(display_name) {
                 Ok(_) => { }
                 Err(err) => {error!("could not update cursor: {}", err); return}
             }
@@ -1040,9 +1026,8 @@ fn terminal_loop(mut terminal: Terminal) -> Result<(), &'static str> {
     terminal.refresh_display(&display_name);
     loop {
         // Handle cursor blink
-        if let Some(text_display) = terminal.window.get_displayable(&display_name){
-            //text_display.cursor_blink(&(terminal.window), FONT_COLOR, BACKGROUND_COLOR)?;
-        }
+        terminal.cursor.blink();
+        terminal.display_cursor(&display_name)?;
 
         // Handles events from the print queue. The queue is "empty" is peek() returns None
         // If it is empty, it passes over this conditional

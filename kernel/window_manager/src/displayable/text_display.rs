@@ -1,10 +1,10 @@
 
-extern crate font;
 
-use super::super::{WindowObj, FrameBuffer};
+use super::super::{WindowObj, FrameBuffer, tsc_ticks, TscTicks};
 use super::super::{String, Mutex, Arc};
-use self::font::{CHARACTER_WIDTH, CHARACTER_HEIGHT};
+use super::super::{CHARACTER_WIDTH, CHARACTER_HEIGHT};
 use core::ops::DerefMut;
+const DEFAULT_CURSOR_FREQ:u64 = 400000000;
 
 /// A displayable component for text display
 pub struct TextDisplay {
@@ -104,5 +104,69 @@ impl TextDisplay
         }       
     }
 
+}
+
+
+///Dropped   code. Cursor should belong to the terminal
+///A cursor struct. It contains the position of a cursor, whether it is enabled, 
+///the frequency it blinks, the last time it blinks, and the current blink state show/hidden
+pub struct Cursor {
+    enabled:bool,
+    freq:u64,
+    time:TscTicks,
+    show:bool,
+}
+
+impl Cursor {
+    ///create a new cursor struct
+    pub fn new() -> Cursor {
+        Cursor {
+            enabled:true,
+            freq:DEFAULT_CURSOR_FREQ,
+            time:tsc_ticks(),
+            show:true,
+        }
+    }
+
+    ///update the cursor position
+    pub fn update(&mut self, reset:bool) {
+        if reset {
+            self.show = true;
+            self.time = tsc_ticks();
+        }      
+    }
+
+    ///enable a cursor
+    pub fn enable(&mut self) {
+        self.enabled = true;
+        self.time = tsc_ticks();
+        self.show = true;
+    }
+
+    ///disable a cursor
+    pub fn disable(&mut self) {
+        self.enabled = false;
+     }
+
+    ///change the blink state show/hidden of a cursor. The terminal calls this function in a loop
+    pub fn blink(&mut self) -> bool{
+        if self.enabled {
+            let time = tsc_ticks();
+            if let Some(duration) = time.sub(&(self.time)) {
+                if let Some(ns) = duration.to_ns() {
+                    if ns >= self.freq {
+                        self.time = time;
+                        self.show = !self.show;
+                        return true;
+                    }
+                }
+            }
+        }
+        false
+    }
+
+    pub fn show(&self) -> bool {
+        self.enabled && self.show
+    }
 }
 

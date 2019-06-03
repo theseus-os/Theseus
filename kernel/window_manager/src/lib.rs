@@ -29,12 +29,15 @@ extern crate display_text;
 extern crate event_types;
 extern crate spawn;
 extern crate pit_clock;
+extern crate tsc;
+
 
 #[macro_use] extern crate log;
 //#[macro_use] extern crate util;
 
 extern crate acpi;
 extern crate frame_buffer;
+extern crate font;
 
 use spin::{Once, Mutex};
 use alloc::collections::{VecDeque, BTreeMap};
@@ -45,11 +48,12 @@ use frame_buffer::{FrameCompositor, Compositor, FrameBuffer};
 use frame_buffer::display::{graph_drawer, text_printer};
 use event_types::Event;
 use alloc::string::{String, ToString};
-
+use tsc::{tsc_ticks, TscTicks};
+use font::{CHARACTER_HEIGHT, CHARACTER_WIDTH};
 
 pub mod displayable;
 
-use displayable::text_display::TextDisplay;
+use displayable::text_display::{TextDisplay, Cursor};
 
 
 pub static WINDOW_ALLOCATOR: Once<Mutex<WindowAllocator>> = Once::new();
@@ -429,6 +433,28 @@ impl WindowObj{
         FrameCompositor::compose(
             vec![(&mut self.framebuffer, window_x, window_y)]
         )
+    }
+
+    pub fn display_cursor(&mut self, cursor:&Cursor, display_name:&str, position:usize, leftshift:usize, font_color:u32, bg_color:u32) -> Result<(), &'static str> {
+        let (text_buffer_width, text_buffer_height) = match self.get_displayable(display_name) {
+            Some(text_display) => { text_display.get_dimensions() },
+            None => { return Err("The displayable does not exist") }
+        };
+        
+        let mut column = position % text_buffer_width;
+        let mut line = position / text_buffer_width;
+        // adjusts to the correct position relative to the max rightmost absolute cursor position
+        if column >= leftshift  {
+            column -= leftshift;
+        } else {
+            column = text_buffer_width + column - leftshift;
+            line -=1;
+        }
+        if line < text_buffer_height {
+            let color = if cursor.show() { font_color } else { bg_color };
+            self.fill_rectangle(column * CHARACTER_WIDTH, line * CHARACTER_HEIGHT, CHARACTER_WIDTH, CHARACTER_HEIGHT, color)?;
+        }
+        Ok(())
     }
 
     // @Andrew

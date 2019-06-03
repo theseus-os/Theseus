@@ -41,6 +41,9 @@ path = "../vga_buffer"
 [dependencies.font]
 path = "../font"
 
+[dependencies.hpet]
+path = "../hpet"
+
 # [build]
 # rustflags = ["-C", "prefer-dynamic", "-C", "panic=abort"]
 

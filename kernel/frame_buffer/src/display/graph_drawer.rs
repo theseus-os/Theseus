@@ -108,22 +108,16 @@ pub fn fill_rectangle(framebuffer:&mut FrameBuffer, start_x:usize, start_y:usize
         if start_y + height < buffer_height { start_y + height } 
         else { buffer_height }
     }; 
-    trace!("Wenqiu frame buffer {:?}", (buffer_width, buffer_height));
-    trace!("Wenqiu, {} {} {} {}", start_x, start_y, width, height);
-    trace!("Wenqiu, end size {} {}", end_x, end_y);
 
     let buffer = framebuffer.buffer();
 
+    let fill = vec![color; end_x - start_x];
+    let mut y = start_y;
     loop {
-        if x == end_x {
-            y += 1;
-            if y == end_y {
-                break;
-            }
-            x = start_x;
+        if y == end_y {
+            return;
         }
-
-        buffer[index(x, y)] = color;
-        x += 1;
+        buffer[index(start_x, y)..index(end_x, y)].copy_from_slice(&fill);
+        y += 1;
     }
 }
