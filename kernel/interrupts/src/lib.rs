@@ -213,7 +213,7 @@ pub fn register_interrupt(interrupt_num : u8, func: HandlerFunc) -> Result<(), &
     let mut idt = IDT.lock();
 
     // checks if the handler stored is the default apic handler which signifies that the interrupt hasn't been used yet
-    if idt[interrupt_num as usize].check_handler_equality(apic_unimplemented_interrupt_handler) {
+    if idt[interrupt_num as usize].handler_eq(apic_unimplemented_interrupt_handler) {
         idt[interrupt_num as usize].set_handler_fn(func);
         Ok(())
     }
@@ -250,7 +250,7 @@ pub fn deregister_interrupt(interrupt_num: u8, func: HandlerFunc) -> Result<(), 
 
     // check if the handler stored is the same as the one provided
     // this is to make sure no other application can deregister your interrupt
-    if idt[interrupt_num as usize].check_handler_equality(func) {
+    if idt[interrupt_num as usize].handler_eq(func) {
         idt[interrupt_num as usize].set_handler_fn(apic_unimplemented_interrupt_handler);
         Ok(())
     }
