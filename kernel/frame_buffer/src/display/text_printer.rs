@@ -1,7 +1,7 @@
 extern crate font;
 
 use super::write_to;
-use super::super::{FrameBuffer, Box, MappedPages, BoxRefMut, hpet};
+use super::super::{FrameBuffer, Box, MappedPages, BoxRefMut};
 use self::font::*;
 
 ///print a string by bytes at (x, y) within an area of (width, height) of the virtual text frame buffer
@@ -17,11 +17,7 @@ pub fn print_by_bytes(mut framebuffer:&mut FrameBuffer, x:usize, y:usize, width:
     let index = framebuffer.get_index_fn();
 
     let mut buffer = framebuffer.buffer();
-    
-    let hpet_ref = hpet::get_hpet();
-    let hpet_ref = hpet_ref.as_ref().unwrap();
-    let start = hpet_ref.get_counter();
-    
+        
     for byte in slice.bytes() {
         if byte == b'\n' {//fill the remaining blank of current line and go to the next line
             fill_blank(&mut buffer,
@@ -49,25 +45,24 @@ pub fn print_by_bytes(mut framebuffer:&mut FrameBuffer, x:usize, y:usize, width:
         }
     }
     
-    //Fill the blank of the last line
-    fill_blank(&mut buffer,
-        x + curr_column * CHARACTER_WIDTH,
-        y + curr_line * CHARACTER_HEIGHT,
-        x + width, 
-        y + (curr_line + 1 )* CHARACTER_HEIGHT, 
-        bg_color, &index)?;
+    // //Fill the blank of the last line
+    // fill_blank(&mut buffer,
+    //     x + curr_column * CHARACTER_WIDTH,
+    //     y + curr_line * CHARACTER_HEIGHT,
+    //     x + width, 
+    //     y + (curr_line + 1 )* CHARACTER_HEIGHT, 
+    //     bg_color, &index)?;
 
     // // Fill the blank of remaining lines
     // fill_blank(&mut buffer, 
     //     x, y + (curr_line + 1 )* CHARACTER_HEIGHT, x + width, y + height, 
     //     bg_color, &index)?;
-    // let end = hpet_ref.get_counter();
 
     Ok(())
 }
 
 //print a byte to the text buffer at (line, column). (left, top) specify the padding of the text area. index is the function to calculate the index of every pixel. The virtual frame buffer calls its get_index() method to get the function.
-fn print_byte (buffer:&mut BoxRefMut<MappedPages, [u32]>, byte:u8, font_color:u32, bg_color:u32,
+fn print_byte(buffer:&mut BoxRefMut<MappedPages, [u32]>, byte:u8, font_color:u32, bg_color:u32,
         left:usize, top:usize, line:usize, column:usize, index:&Box<Fn(usize, usize)->usize>) 
         -> Result<(),&'static str> {
     let x = left + column * CHARACTER_WIDTH;
@@ -101,15 +96,14 @@ fn fill_blank(buffer:&mut BoxRefMut<MappedPages, [u32]>, left:usize, top:usize, 
         return Ok(())
     }
 
+    let fill = vec![color; right - left];
     loop {
-        if x == right {
-            y += 1;
-            x = left;
-        }
         if y == bottom {
             return Ok(());
         }
-        buffer[index(x, y)] = color;
-        x += 1;
+        let start = index(left, y);
+        let end = index(right, y);
+        buffer[start..end].copy_from_slice(&fill);
+        y += 1;
     }
 }
