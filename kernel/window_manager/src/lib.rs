@@ -29,11 +29,7 @@ extern crate event_types;
 extern crate spawn;
 extern crate pit_clock;
 extern crate tsc;
-
-
 #[macro_use] extern crate log;
-//#[macro_use] extern crate util;
-
 extern crate acpi;
 extern crate frame_buffer;
 extern crate font;
@@ -44,7 +40,6 @@ use core::ops::{Deref, DerefMut};
 use dfqueue::{DFQueue,DFQueueConsumer,DFQueueProducer};
 use alloc::sync::{Arc, Weak};
 use frame_buffer::{FrameCompositor, Compositor, FrameBuffer};
-use frame_buffer::display::{graph_drawer, text_printer};
 use event_types::Event;
 use alloc::string::{String, ToString};
 use tsc::{tsc_ticks, TscTicks};
@@ -384,7 +379,7 @@ impl WindowObj{
 
     /// draw a pixel in a window
     pub fn draw_pixel(&mut self, x:usize, y:usize, color:u32) -> Result<(), &'static str> {
-        graph_drawer::draw_pixel(&mut self.framebuffer, x, y, color);
+        display::draw_pixel(&mut self.framebuffer, x, y, color);
         let (content_x, content_y) = self.inner.lock().get_content_position();
         FrameCompositor::compose(
             vec![(&self.framebuffer, content_x, content_y)]
@@ -393,7 +388,7 @@ impl WindowObj{
 
     /// draw a line in a window
     pub fn draw_line(&mut self, start_x:usize, start_y:usize, end_x:usize, end_y:usize, color:u32) -> Result<(), &'static str> {
-        graph_drawer::draw_line(&mut self.framebuffer, start_x as i32, start_y as i32, 
+        display::draw_line(&mut self.framebuffer, start_x as i32, start_y as i32, 
             end_x as i32, end_y as i32, color);
         let (content_x, content_y) = self.inner.lock().get_content_position();
         FrameCompositor::compose(
@@ -404,7 +399,7 @@ impl WindowObj{
     /// draw a rectangle in a window
     pub fn draw_rectangle(&mut self, x:usize, y:usize, width:usize, height:usize, color:u32) 
         -> Result<(), &'static str> {
-        graph_drawer::draw_rectangle(&mut self.framebuffer, x, y, width, height, 
+        display::draw_rectangle(&mut self.framebuffer, x, y, width, height, 
                 color);
         let (content_x, content_y) = self.inner.lock().get_content_position();
         FrameCompositor::compose(
@@ -415,7 +410,7 @@ impl WindowObj{
     /// fill a rectangle in a window
     pub fn fill_rectangle(&mut self, x:usize, y:usize, width:usize, height:usize, color:u32) 
         -> Result<(), &'static str> {
-        graph_drawer::fill_rectangle(&mut self.framebuffer, x, y, width, height, 
+        display::fill_rectangle(&mut self.framebuffer, x, y, width, height, 
                 color);
         let (content_x, content_y) = self.inner.lock().get_content_position();
         FrameCompositor::compose(
@@ -427,7 +422,7 @@ impl WindowObj{
         let (display_x, display_y) = self.get_displayable_position(display_name)?;
         let (width, height) = self.get_displayable(display_name).ok_or("The displayable does not exist")?.get_size();
         
-        text_printer::print_by_bytes(&mut self.framebuffer, display_x, display_y, width, height, slice, font_color, bg_color)?;
+        display::print_by_bytes(&mut self.framebuffer, display_x, display_y, width, height, slice, font_color, bg_color)?;
         let (window_x, window_y) = { self.inner.lock().get_content_position() };
         FrameCompositor::compose(
             vec![(&mut self.framebuffer, window_x, window_y)]
@@ -546,7 +541,7 @@ impl WindowInner {
         };
         let mut buffer_lock = buffer_ref.lock();
         let buffer = buffer_lock.deref_mut();
-        graph_drawer::draw_rectangle(buffer, self.x, self.y,
+        display::draw_rectangle(buffer, self.x, self.y,
             self.width, self.height, SCREEN_BACKGROUND_COLOR);
         FrameCompositor::compose(
             vec![(buffer, 0, 0)]
@@ -585,7 +580,7 @@ impl WindowInner {
         };
         let mut buffer_lock = buffer_ref.lock();
         let buffer = buffer_lock.deref_mut();
-        graph_drawer::draw_rectangle(buffer, self.x, self.y, self.width, self.height, color);
+        display::draw_rectangle(buffer, self.x, self.y, self.width, self.height, color);
         FrameCompositor::compose(
             vec![(buffer, 0, 0)]
         )

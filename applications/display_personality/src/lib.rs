@@ -13,7 +13,6 @@ extern crate memory;
 extern crate fs_node;
 extern crate frame_buffer;
 
-use display::{Display};
 use frame_buffer::FrameBuffer;
 use alloc::vec::Vec;
 use alloc::string::String;
