@@ -7,7 +7,7 @@ build = "../../build.rs"
 [dependencies]
 spin = "0.4.10"
 volatile = "0.2.5"
-
+owning_ref = { git = "https://github.com/kevinaboos/owning-ref-rs" }
 
 [dependencies.lazy_static]
 features = ["spin_no_std", "nightly"]
@@ -29,6 +29,9 @@ path = "../../libs/util"
 [dependencies.acpi]
 path = "../acpi"
 
+[dependencies.memory]
+path = "../memory"
+
 [dependencies.tsc]
 path = "../tsc"
 
@@ -37,6 +40,9 @@ path = "../vga_buffer"
 
 [dependencies.frame_buffer]
 path = "../frame_buffer"
+
+[dependencies.font]
+path = "../font"
 
 # [build]
 # rustflags = ["-C", "prefer-dynamic", "-C", "panic=abort"]
