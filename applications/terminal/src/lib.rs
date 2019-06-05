@@ -6,15 +6,13 @@
 //! keypresses, resize, print events, etc. 
 
 #![no_std]
-extern crate frame_buffer;
+
 extern crate keycodes_ascii;
 extern crate spin;
 extern crate dfqueue;
-extern crate mod_mgmt;
 extern crate spawn;
 extern crate task;
 extern crate runqueue;
-extern crate memory;
 extern crate event_types; 
 extern crate window_manager;
 extern crate fs_node;
@@ -41,7 +39,6 @@ use task::{TaskRef, ExitValue, KillReason};
 use environment::Environment;
 use spin::Mutex;
 use fs_node::FileOrDir;
-use core::ops::{DerefMut};
 
 pub const FONT_COLOR: u32 = 0x93ee90;
 pub const BACKGROUND_COLOR: u32 = 0x000000;
@@ -164,7 +161,7 @@ impl Terminal {
         print::set_default_print_output(terminal_print_producer.obtain_producer()); 
 
         // Requests a new window object from the window manager
-        let mut window_object = match window_manager::new_default_window() {
+        let window_object = match window_manager::new_default_window() {
             Ok(window_object) => window_object,
             Err(err) => {debug!("new window returned err"); return Err(err)}
         };
@@ -644,14 +641,6 @@ impl Terminal {
         }
         return Ok(());
     }
-    
-
-    /// Updates the cursor to a new position and refreshes display
-    fn display_cursor(&mut self, display_name:&str) -> Result<(), &'static str> { 
-        // self.window.display_cursor(&self.cursor, display_name, self.absolute_cursor_pos, 
-        //     self.left_shift, FONT_COLOR, BACKGROUND_COLOR)?;
-         return Ok(());
-    }
 
     /// Called whenever the main loop consumes an input event off the DFQueue to handle a key event
     pub fn handle_key_event(&mut self, keyevent: KeyEvent, display_name:&str) -> Result<(), &'static str> {       
@@ -707,9 +696,7 @@ impl Terminal {
                 return Ok(());
             } else {
                 // Subtraction by accounts for 0-indexing
-                if let Some(text_display) = self.window.get_displayable(display_name){
-                    text_display.disable_cursor();
-                }
+                self.cursor.disable();
                 let remove_idx: usize =  self.cmdline.len() - self.left_shift;
                 // we're moving the cursor one position to the right relative to the end of the input string
                 self.cmdline.remove(remove_idx);
@@ -764,9 +751,7 @@ impl Terminal {
             if self.scroll_start_idx != 0 {
                 self.is_scroll_end = false;
                 self.scroll_start_idx = 0; // takes us up to the start of the page
-                if let Some(text_display) = self.window.get_displayable(display_name){
-                    text_display.disable_cursor();
-                }            
+                self.cursor.disable();
             }
             return Ok(());
         }
@@ -781,9 +766,7 @@ impl Terminal {
         if keyevent.modifiers.control && keyevent.modifiers.shift && keyevent.keycode == Keycode::Up  {
             if self.scroll_start_idx != 0 {
                 self.scroll_up_one_line(display_name);
-                if let Some(text_display) = self.window.get_displayable(display_name){
-                    text_display.disable_cursor();
-                }
+                self.cursor.disable();
             }
             return Ok(());
         }
@@ -800,9 +783,7 @@ impl Terminal {
             }
             self.page_up(display_name);
             self.is_scroll_end = false;
-            if let Some(text_display) = self.window.get_displayable(display_name){
-                text_display.disable_cursor();
-            }
+            self.cursor.disable();
             return Ok(());
         }
 
@@ -1016,7 +997,7 @@ fn terminal_loop(mut terminal: Terminal) -> Result<(), &'static str> {
 
         let width  = width  - 2*window_manager::WINDOW_PADDING;
         let height = height - 2*window_manager::WINDOW_PADDING;
-        let text_display = TextDisplay::new(&display_name, width, height)?;
+        let text_display = TextDisplay::new(width, height)?;
 
         match terminal.window.add_displayable(&display_name, 0, 0, text_display) {
                 Ok(_) => { }

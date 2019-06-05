@@ -10,9 +10,8 @@ extern crate acpi;
 extern crate volatile;
 extern crate serial_port;
 extern crate memory;
-#[macro_use] extern crate log;
 extern crate util;
-#[macro_use] extern crate alloc;
+extern crate alloc;
 extern crate owning_ref;
 extern crate hpet;
 
@@ -23,7 +22,6 @@ use memory::{FRAME_ALLOCATOR, Frame, PageTable, PhysicalAddress,
     get_kernel_mmi_ref};
 use core::ops::DerefMut;
 use alloc::boxed::Box;
-use alloc::sync::{Arc, Weak};
 use alloc::vec::Vec;
 
 //The compositor instance
@@ -36,7 +34,6 @@ const PIXEL_BYTES:usize = 4;
 pub fn init() -> Result<(), &'static str > {
     //Get the graphic mode information
     let vesa_display_phys_start:PhysicalAddress;
-    let vesa_display_phys_size: usize;
     let buffer_width:usize;
     let buffer_height:usize;
     {

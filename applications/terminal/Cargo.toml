@@ -34,15 +34,6 @@ path = "../../kernel/task"
 [dependencies.runqueue]
 path = "../../kernel/runqueue"
 
-[dependencies.memory]
-path  = "../../kernel/memory"
-
-[dependencies.mod_mgmt]
-path = "../../kernel/mod_mgmt"
-
-[dependencies.frame_buffer]
-path = "../../kernel/frame_buffer"
-
 [dependencies.window_manager]
 path = "../../kernel/window_manager"
 

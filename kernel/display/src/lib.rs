@@ -2,14 +2,11 @@
 
 extern crate owning_ref;
 extern crate memory;
-#[macro_use] extern crate alloc;
+extern crate alloc;
 extern crate frame_buffer;
 extern crate font;
 
-use owning_ref::{BoxRefMut};
-use memory::MappedPages;
 use alloc::vec;
-use alloc::boxed::Box;
 use font::{CHARACTER_HEIGHT, CHARACTER_WIDTH, FONT_PIXEL};
 use frame_buffer::FrameBuffer;
 
@@ -74,7 +71,6 @@ pub fn draw_rectangle(mut framebuffer:&mut FrameBuffer, start_x:usize, start_y:u
     };
 
     let mut x = start_x;
-    let mut buffer = framebuffer.buffer();
     loop {
         if x == end_x {
             break;
@@ -108,7 +104,6 @@ pub fn fill_rectangle(mut framebuffer:&mut FrameBuffer, start_x:usize, start_y:u
         else { buffer_height }
     }; 
 
-    let fill = vec![color; end_x - start_x];
     let mut x = start_x;
     let mut y = start_y;
     loop {

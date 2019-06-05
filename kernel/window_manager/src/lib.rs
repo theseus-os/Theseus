@@ -59,7 +59,6 @@ pub const WINDOW_PADDING: usize = 2;
 const WINDOW_ACTIVE_COLOR:u32 = 0xFFFFFF;
 const WINDOW_INACTIVE_COLOR:u32 = 0x343C37;
 const SCREEN_BACKGROUND_COLOR:u32 = 0x000000;
-const BORDER_WIDTH:usize = 1;
 
 pub struct WindowAllocator {
     allocated: VecDeque<Weak<Mutex<WindowInner>>>, 
