@@ -1,7 +1,5 @@
 #![no_std]
 
-extern crate owning_ref;
-extern crate memory;
 extern crate alloc;
 extern crate frame_buffer;
 extern crate font;

@@ -16,21 +16,14 @@
 //! The WINDOW_ALLOCATOR is used by the WindowManager itself to track and modify the existing windows
 
 #![no_std]
-#![feature(const_fn)]
-#![feature(asm)]
 
 extern crate spin;
-extern crate irq_safety;
 #[macro_use] extern crate alloc;
 extern crate dfqueue;
-extern crate keycodes_ascii;
 extern crate display;
 extern crate event_types;
-extern crate spawn;
-extern crate pit_clock;
 extern crate tsc;
 #[macro_use] extern crate log;
-extern crate acpi;
 extern crate frame_buffer;
 extern crate font;
 

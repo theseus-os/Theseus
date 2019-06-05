@@ -6,47 +6,16 @@ build = "../../build.rs"
 
 [dependencies]
 spin = "0.4.10"
-volatile = "0.2.5"
 owning_ref = { git = "https://github.com/kevinaboos/owning-ref-rs" }
-
-[dependencies.lazy_static]
-features = ["spin_no_std", "nightly"]
-version = "1.2.0"
-
-[dependencies.serial_port]
-path = "../serial_port"
-
-[dependencies.state_store]
-path = "../state_store"
-
-[dependencies.log]
-default-features = false
-version = "0.3.7"
 
 [dependencies.memory]
 path = "../memory"
 
-[dependencies.util]
-path = "../../libs/util"
-
 [dependencies.acpi]
 path = "../acpi"
 
-[dependencies.tsc]
-path = "../tsc"
-
-[dependencies.vga_buffer]
-path = "../vga_buffer"
-
-[dependencies.font]
-path = "../font"
-
-[dependencies.hpet]
-path = "../hpet"
-
 # [build]
 # rustflags = ["-C", "prefer-dynamic", "-C", "panic=abort"]
-
 
 [lib]
 crate-type = ["rlib"]

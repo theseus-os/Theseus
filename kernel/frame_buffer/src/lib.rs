@@ -1,19 +1,12 @@
 //! This crate is a frame buffer. It implements a compositor to composite multiple virtual frame buffers and display in the final frame buffer
 
 #![no_std]
-#![feature(const_fn)]
-#![feature(ptr_internals)]
-#![feature(asm)]
 
 extern crate spin;
 extern crate acpi;
-extern crate volatile;
-extern crate serial_port;
 extern crate memory;
-extern crate util;
 extern crate alloc;
 extern crate owning_ref;
-extern crate hpet;
 
 use owning_ref::BoxRefMut;
 use spin::{Mutex, Once};
