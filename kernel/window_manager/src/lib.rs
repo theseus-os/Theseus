@@ -25,7 +25,6 @@ extern crate irq_safety;
 extern crate dfqueue;
 extern crate keycodes_ascii;
 extern crate display;
-extern crate display_text;
 extern crate event_types;
 extern crate spawn;
 extern crate pit_clock;

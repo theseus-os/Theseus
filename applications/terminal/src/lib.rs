@@ -648,9 +648,9 @@ impl Terminal {
 
     /// Updates the cursor to a new position and refreshes display
     fn display_cursor(&mut self, display_name:&str) -> Result<(), &'static str> { 
-        self.window.display_cursor(&self.cursor, display_name, self.absolute_cursor_pos, 
-            self.left_shift, FONT_COLOR, BACKGROUND_COLOR)?;
-        return Ok(());
+        // self.window.display_cursor(&self.cursor, display_name, self.absolute_cursor_pos, 
+        //     self.left_shift, FONT_COLOR, BACKGROUND_COLOR)?;
+         return Ok(());
     }
 
     /// Called whenever the main loop consumes an input event off the DFQueue to handle a key event
@@ -693,7 +693,7 @@ impl Terminal {
                 return Ok(());
             } else {
                 self.cursor.disable();
-                self.display_cursor(display_name)?;
+                //self.display_cursor(display_name)?;
                 let remove_idx: usize =  self.cmdline.len() - self.left_shift -1;
                 self.cmdline.remove(remove_idx);
                 self.pop_from_stdin(true);
@@ -981,10 +981,10 @@ impl Terminal {
                 Ok(_) => { }
                 Err(err) => {error!("could not update display backwards: {}", err); return}
             }
-            match self.display_cursor(display_name) {
-                Ok(_) => { }
-                Err(err) => {error!("could not update cursor: {}", err); return}
-            }
+            // match self.display_cursor(display_name) {
+            //     Ok(_) => { }
+            //     Err(err) => {error!("could not update cursor: {}", err); return}
+            // }
         } else {
             match self.update_display_forwards(display_name, start_idx) {
                 Ok(_) => { }
@@ -1026,8 +1026,8 @@ fn terminal_loop(mut terminal: Terminal) -> Result<(), &'static str> {
     terminal.refresh_display(&display_name);
     loop {
         // Handle cursor blink
-        terminal.cursor.blink();
-        terminal.display_cursor(&display_name)?;
+        // terminal.cursor.blink();
+        // terminal.display_cursor(&display_name)?;
 
         // Handles events from the print queue. The queue is "empty" is peek() returns None
         // If it is empty, it passes over this conditional

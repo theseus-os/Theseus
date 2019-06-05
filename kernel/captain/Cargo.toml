@@ -27,9 +27,6 @@ path = "../logger"
 [dependencies.vga_buffer]
 path = "../vga_buffer"
 
-[dependencies.display_text]
-path = "../display_text"
-
 [dependencies.frame_buffer]
 path = "../frame_buffer"
 
