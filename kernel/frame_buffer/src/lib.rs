@@ -7,7 +7,6 @@
 
 extern crate spin;
 extern crate acpi;
-
 extern crate volatile;
 extern crate serial_port;
 extern crate memory;
@@ -35,7 +34,6 @@ const PIXEL_BYTES:usize = 4;
 
 /// Init the frame buffer. Allocate a block of memory and map it to the frame buffer frames.
 pub fn init() -> Result<(), &'static str > {
-    
     //Get the graphic mode information
     let vesa_display_phys_start:PhysicalAddress;
     let vesa_display_phys_size: usize;
@@ -51,11 +49,8 @@ pub fn init() -> Result<(), &'static str > {
         buffer_height = graphic_info.height as usize;
     };
 
- 
-
-    let framebuffer = FrameBuffer::new(buffer_width, buffer_height, Some(vesa_display_phys_start))?;
-
     //Initialize the compositor
+    let framebuffer = FrameBuffer::new(buffer_width, buffer_height, Some(vesa_display_phys_start))?;
     FINAL_FRAME_BUFFER.call_once(|| {
         Mutex::new(framebuffer)}
     );
@@ -73,7 +68,7 @@ pub struct FrameBuffer {
 impl FrameBuffer {
     ///return a new virtual frame buffer with specified size
     pub fn new(width:usize, height:usize, physical_address:Option<PhysicalAddress>) -> Result<FrameBuffer, &'static str>{
-   // get a reference to the kernel's memory mapping information
+    // get a reference to the kernel's memory mapping information
         let kernel_mmi_ref = get_kernel_mmi_ref().expect("KERNEL_MMI was not yet initialized!");
         let mut kernel_mmi_locked = kernel_mmi_ref.lock();
 
@@ -82,7 +77,6 @@ impl FrameBuffer {
             page_table: ref mut kernel_page_table, 
             .. // don't need to access other stuff in kernel_mmi
         } = *kernel_mmi_locked;
-
         let size = width * height * PIXEL_BYTES;
 
         match kernel_page_table {
@@ -129,11 +123,9 @@ impl FrameBuffer {
             _ => { 
                 return Err("FrameBuffer::new()  Couldn't get kernel's active_table");
             }
-
         }
     }
 
- 
     ///return the buffer array
     pub fn buffer(&mut self) -> &mut BoxRefMut<MappedPages, [u32]> {
         return &mut self.buffer
@@ -144,10 +136,14 @@ impl FrameBuffer {
         (self.width, self.height)
     }
 
-    ///get a function to compute the index of a pixel in the buffer array. The returned function is (x:usize, y:usize) -> index:usize
-    pub fn get_index_fn(&self) -> Box<Fn(usize, usize)->usize>{
-         let width = self.width;
-         Box::new(move |x:usize, y:usize| y * width + x )
+    // ///get a function to compute the index of a pixel in the buffer array. The returned function is (x:usize, y:usize) -> index:usize
+    // pub fn get_index_fn(&self) -> Box<Fn(usize, usize)->usize>{
+    //     let width = self.width;
+    //     Box::new(move |x:usize, y:usize| y * width + x )
+    // }
+
+    pub fn index(&self, x:usize, y:usize) -> usize {
+        y * width + x
     }
 
     ///check if a pixel is within the virtual framebuffer
@@ -156,27 +152,14 @@ impl FrameBuffer {
     }
 }
 
-// ///The virtual frame buffer struct. It contains the size of the buffer and a buffer array
-// pub struct FrameBufferToDraw {
-//     x:usize,
-//     y:usize,
-//     framebuffer:&FrameBuffer
-// }
-
-// ///display the content of a virtual frame buffer to the final frame buffer
-// pub fn display(vfb:&Arc<Mutex<FrameBuffer>>) -> Result<(), &'static str>{
-//     let compositor = try!(COMPOSITOR.try().ok_or("Fail to get the physical frame buffer"));
-//     compositor.lock().display(vfb);
-//     Ok(())
-// }
 pub struct FrameCompositor {
     //Cache of updated framebuffers
 }
 
 impl Compositor for FrameCompositor {
     fn compose(bufferlist:Vec<(&FrameBuffer, usize, usize)>) -> Result<(), &'static str> {
-
         let mut final_buffer = FINAL_FRAME_BUFFER.try().ok_or("FrameCopositor fails to get the final frame buffer")?.lock();
+
         //Check if the virtul frame buffer is in the mapped frame list
         for (src, x_src, y_src) in bufferlist {
             for i in 0..src.height {
@@ -193,7 +176,6 @@ impl Compositor for FrameCompositor {
 
         Ok(())
     }
-
 }
 
 //The compositor structure. It contains the information of the final frame buffer and a list of frames

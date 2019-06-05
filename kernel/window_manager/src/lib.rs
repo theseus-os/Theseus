@@ -34,6 +34,8 @@ extern crate acpi;
 extern crate frame_buffer;
 extern crate font;
 
+pub mod displayable;
+
 use spin::{Once, Mutex};
 use alloc::collections::{VecDeque, BTreeMap};
 use core::ops::{Deref, DerefMut};
@@ -44,22 +46,20 @@ use event_types::Event;
 use alloc::string::{String, ToString};
 use tsc::{tsc_ticks, TscTicks};
 use font::{CHARACTER_HEIGHT, CHARACTER_WIDTH};
-
-pub mod displayable;
-
 use displayable::text_display::{TextDisplay, Cursor};
 
-
 pub static WINDOW_ALLOCATOR: Once<Mutex<WindowAllocator>> = Once::new();
-const WINDOW_ACTIVE_COLOR:u32 = 0xFFFFFF;
-const WINDOW_INACTIVE_COLOR:u32 = 0x343C37;
-const SCREEN_BACKGROUND_COLOR:u32 = 0x000000;
-const BORDER_WIDTH:usize = 1;
 static SCREEN_FRAME_BUFFER:Once<Arc<Mutex<FrameBuffer>>> = Once::new();
 
 /// 10 pixel gap between windows 
 pub const WINDOW_MARGIN: usize = 10;
+/// 2 pixel padding within a window
 pub const WINDOW_PADDING: usize = 2;
+
+const WINDOW_ACTIVE_COLOR:u32 = 0xFFFFFF;
+const WINDOW_INACTIVE_COLOR:u32 = 0x343C37;
+const SCREEN_BACKGROUND_COLOR:u32 = 0x000000;
+const BORDER_WIDTH:usize = 1;
 
 pub struct WindowAllocator {
     allocated: VecDeque<Weak<Mutex<WindowInner>>>, 
@@ -108,7 +108,6 @@ pub fn send_event_to_active(event: Event) -> Result<(), &'static str>{
     allocator.send_event(event)
 }
 
-
 // Gets the border color specified by the window manager
 fn get_border_color(active:bool) -> u32 {
     if active {
@@ -117,20 +116,6 @@ fn get_border_color(active:bool) -> u32 {
         WINDOW_INACTIVE_COLOR
     }
 }
-
-
-/// switch the active window. Active the next window in the list based on the order they are created
-// pub fn switch() -> Result<(), &'static str> {
-//     let mut allocator = try!(WINDOW_ALLOCATOR.try().ok_or("The window allocator is not initialized")).lock();
-//     allocator.schedule()?;
-//     Ok(())
-// }
-
-
-/// Returns the width and height (in pixels) of the screen 
-// pub fn get_screen_size() -> Result<(usize, usize), &'static str> {
-//     frame_buffer::get_resolution()
-// }
 
 impl WindowAllocator{    
     // Allocate a new window and return it
@@ -287,7 +272,7 @@ impl WindowAllocator{
         false
     }
     
-    /// enqueues the key event into the active window
+    // enqueues the key event into the active window
     fn send_event(&mut self, event:Event) -> Result<(), &'static str> {
         let reference = self.active.upgrade(); // grabs a pointer to the active WindowInner
         if let Some(window) = reference {
@@ -308,7 +293,6 @@ pub struct WindowObj {
     /// the framebuffer owned by the window
     framebuffer:FrameBuffer,
 }
-
 
 impl WindowObj{
     // clean the content of a window
@@ -452,9 +436,9 @@ impl WindowObj{
     }
 
     // @Andrew
-    //Wenqiu TODO: remap the frame buffer
     pub fn resize(&mut self, x:usize, y:usize, width:usize, height:usize) -> Result<(), &'static str>{
-        { // checks for overlap
+        // checks for overlap
+        {
             let inner = self.inner.clone();
             let mut allocator = try!(WINDOW_ALLOCATOR.try().ok_or("The window allocator is not initialized")).lock();
             match allocator.check_overlap(&inner, x,y,width,height) {
@@ -490,7 +474,6 @@ impl WindowObj{
             None
         }
     }
-
 }
 
 /// delete a window object
@@ -513,7 +496,6 @@ impl Drop for WindowObj {
         }
     }
 }
-
 
 struct WindowInner {
     /// the upper left x-coordinate of the window
@@ -598,10 +580,12 @@ impl WindowInner {
         Ok(percent)
     }
 
+    // get the size of content without padding
     fn get_content_size(&self) -> (usize, usize) {
         (self.width - 2 * self.padding, self.height - 2 * self.padding)
     }
 
+    // get the position of content without padding
     fn get_content_position(&self) -> (usize, usize) {
         (self.x + self.padding, self.y + self.padding)
     }

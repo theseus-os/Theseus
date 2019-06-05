@@ -17,9 +17,8 @@ const COLOR_BITS:u32 = 24;
 
 ///draw a pixel
 pub fn draw_pixel(framebuffer:&mut FrameBuffer, x:usize, y:usize, color:u32){    
-    let index = framebuffer.get_index_fn();
     if framebuffer.check_in_range(x, y) {
-        write_to(&mut framebuffer.buffer(), index(x, y), color);
+        write_to(&mut framebuffer.buffer(), framebuffer.index(x, y), color);
     }
 }
 
@@ -27,17 +26,14 @@ pub fn draw_pixel(framebuffer:&mut FrameBuffer, x:usize, y:usize, color:u32){
 pub fn draw_line(framebuffer:&mut FrameBuffer, start_x:i32, start_y:i32, end_x:i32, end_y:i32, color:u32){
     let width:i32 = end_x - start_x;
     let height:i32 = end_y - start_y;
-    
-    let index = framebuffer.get_index_fn();
 
     //compare the x distance and y distance. Increase/Decrease the longer one at every step.
     if width.abs() > height.abs() {
         let mut y;
         let mut x = start_x;
 
-        //if the end_x is larger than start_x, increase x. Otherwise decrease it.
+        //if the end_x is larger than start_x, increase x in the loop. Otherwise decrease it.
         let step = if width > 0 { 1 } else { -1 };
-
         loop {
             if x == end_x {
                 break;
@@ -63,7 +59,6 @@ pub fn draw_line(framebuffer:&mut FrameBuffer, start_x:i32, start_y:i32, end_x:i
             y += step;   
         }
     }
-
 }
 
 //draw a rectangle at (start_x, start_y) with color
@@ -75,7 +70,6 @@ pub fn draw_rectangle(framebuffer:&mut FrameBuffer, start_x:usize, start_y:usize
         if start_x + width < buffer_width { start_x + width } 
         else { buffer_width }
     };
-
     let end_y:usize = {
         if start_y + height < buffer_height { start_y + height } 
         else { buffer_height }
@@ -83,8 +77,6 @@ pub fn draw_rectangle(framebuffer:&mut FrameBuffer, start_x:usize, start_y:usize
 
     let mut x = start_x;
     let buffer = framebuffer.buffer();
-
-    //Consider to use slice copy to increase the performance
     loop {
         if x == end_x {
             break;
@@ -107,17 +99,13 @@ pub fn draw_rectangle(framebuffer:&mut FrameBuffer, start_x:usize, start_y:usize
 
 //fill a rectangle at (start_x, start_y) with color
 pub fn fill_rectangle(framebuffer:&mut FrameBuffer, start_x:usize, start_y:usize, width:usize, height:usize, color:u32){
-    let mut x = start_x;
-    let mut y = start_y;
-    
-
     let (buffer_width, buffer_height) = framebuffer.get_size();
     let index = framebuffer.get_index_fn();
+    
     let end_x:usize = {
         if start_x + width < buffer_width { start_x + width } 
         else { buffer_width }
     };
-
     let end_y:usize = {
         if start_y + height < buffer_height { start_y + height } 
         else { buffer_height }
@@ -126,6 +114,7 @@ pub fn fill_rectangle(framebuffer:&mut FrameBuffer, start_x:usize, start_y:usize
     let buffer = framebuffer.buffer();
 
     let fill = vec![color; end_x - start_x];
+    let mut x = start_x;
     let mut y = start_y;
     loop {
         if y == end_y {
@@ -139,19 +128,16 @@ pub fn fill_rectangle(framebuffer:&mut FrameBuffer, start_x:usize, start_y:usize
 ///print a string by bytes at (x, y) within an area of (width, height) of the virtual text frame buffer
 pub fn print_by_bytes(mut framebuffer:&mut FrameBuffer, x:usize, y:usize, width:usize, height:usize, 
     slice: &str, font_color:u32, bg_color:u32) -> Result<(), &'static str> {
-
-    let mut curr_line = 0;
-    let mut curr_column = 0;
-
     let buffer_width = width/CHARACTER_WIDTH;
     let buffer_height = height/CHARACTER_HEIGHT;
-    
     let index = framebuffer.get_index_fn();
 
     let mut buffer = framebuffer.buffer();
-        
+    let mut curr_line = 0;
+    let mut curr_column = 0;        
     for byte in slice.bytes() {
-        if byte == b'\n' {//fill the remaining blank of current line and go to the next line
+        if byte == b'\n' {
+            //fill the remaining blank of current line and go to the next line
             fill_blank(&mut buffer,
                 x + curr_column * CHARACTER_WIDTH,
                 y + curr_line * CHARACTER_HEIGHT,
@@ -199,11 +185,10 @@ fn print_byte(buffer:&mut BoxRefMut<MappedPages, [u32]>, byte:u8, font_color:u32
         -> Result<(),&'static str> {
     let x = left + column * CHARACTER_WIDTH;
     let y = top + line * CHARACTER_HEIGHT;
-    let mut i = 0;
-    let mut j = 0;
-
     let fonts = FONT_PIXEL.lock();
 
+    let mut i = 0;
+    let mut j = 0;
     loop {
         let mask:u32 = fonts[byte as usize][i][j];
         buffer[index(x + j, y + i)] = font_color & mask | bg_color & (!mask);
@@ -216,7 +201,6 @@ fn print_byte(buffer:&mut BoxRefMut<MappedPages, [u32]>, byte:u8, font_color:u32
             j = 0;
         }
     }
-
 }
 
 //Fill a blank (left, top, right, bottom) with the color. index is the function to calculate the index of every pixel. The virtual frame buffer calls its get_index() method to get the function.
@@ -225,6 +209,7 @@ fn fill_blank(buffer:&mut BoxRefMut<MappedPages, [u32]>, left:usize, top:usize, 
     if left >= right || top >= bottom {
         return Ok(())
     }
+
     let fill = vec![color; right - left];
     let mut y = top;
     loop {
@@ -236,13 +221,12 @@ fn fill_blank(buffer:&mut BoxRefMut<MappedPages, [u32]>, left:usize, top:usize, 
     }
 }
 
+fn write_to(buffer:&mut BoxRefMut<MappedPages, [u32]>, index:usize, color:u32) {
+    buffer[index] = color;
+}
 
 fn write_to_3d(buffer:&mut BoxRefMut<MappedPages, [u32]>, index:usize, z:u8, color:u32) {
     if (buffer[index] >> COLOR_BITS) <= z as u32 {
         buffer[index] = color;
     }
-}
-
-fn write_to(buffer:&mut BoxRefMut<MappedPages, [u32]>, index:usize, color:u32) {
-    buffer[index] = color;
 }
