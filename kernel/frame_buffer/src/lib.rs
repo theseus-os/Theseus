@@ -143,7 +143,7 @@ impl FrameBuffer {
     // }
 
     pub fn index(&self, x:usize, y:usize) -> usize {
-        y * width + x
+        y * self.width + x
     }
 
     ///check if a pixel is within the virtual framebuffer
