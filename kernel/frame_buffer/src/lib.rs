@@ -21,16 +21,16 @@ use alloc::vec::Vec;
 
 pub type Pixel = u32;
 
-//The final framebuffer instance
+// The final framebuffer instance
 static FINAL_FRAME_BUFFER:Once<Mutex<FrameBuffer>> = Once::new();
 
-//Every pixel is of u32 type
+// Every pixel is of u32 type
 const PIXEL_BYTES:usize = 4;
 
-///Init the final frame buffer. 
-///Allocate a block of memory and map it to the physical framebuffer frames.
+/// Init the final frame buffer. 
+/// Allocate a block of memory and map it to the physical framebuffer frames.
 pub fn init() -> Result<(), &'static str > {
-    //Get the graphic mode information
+    // Get the graphic mode information
     let vesa_display_phys_start:PhysicalAddress;
     let buffer_width:usize;
     let buffer_height:usize;
@@ -44,7 +44,7 @@ pub fn init() -> Result<(), &'static str > {
         buffer_height = graphic_info.height as usize;
     };
 
-    //Initialize the final framebuffer
+    // Initialize the final framebuffer
     let framebuffer = FrameBuffer::new(buffer_width, buffer_height, Some(vesa_display_phys_start))?;
     FINAL_FRAME_BUFFER.call_once(|| {
         Mutex::new(framebuffer)}
@@ -53,7 +53,7 @@ pub fn init() -> Result<(), &'static str > {
     Ok(())
 }
 
-///The virtual frame buffer struct. It contains the size of the buffer and a buffer array
+/// The virtual frame buffer struct. It contains the size of the buffer and a buffer array
 pub struct FrameBuffer {
     width:usize,
     height:usize,
@@ -61,9 +61,9 @@ pub struct FrameBuffer {
 }
 
 impl FrameBuffer {
-    ///Create a new virtual frame buffer with specified size
-    ///If the physical_address is provided, map the framebuffer to the physical_address.
-    ///If it is None, allocate a block of memory and map the framebuffer to it
+    /// Create a new virtual frame buffer with specified size
+    /// If the physical_address is provided, map the framebuffer to the physical_address.
+    /// If it is None, allocate a block of memory and map the framebuffer to it
     pub fn new(width:usize, height:usize, physical_address:Option<PhysicalAddress>) -> Result<FrameBuffer, &'static str>{       
         // get a reference to the kernel's memory mapping information
         let kernel_mmi_ref = get_kernel_mmi_ref().expect("KERNEL_MMI was not yet initialized!");
@@ -107,7 +107,7 @@ impl FrameBuffer {
                     )
                 };
 
-                //Create a reference to the mapped frame buffer pages as slice
+                // Create a reference to the mapped frame buffer pages as slice
                 let buffer = BoxRefMut::new(Box::new(mapped_frame_buffer)).
                     try_map_mut(|mp| mp.as_slice_mut(0, width * height))?;
             
@@ -123,12 +123,12 @@ impl FrameBuffer {
         }
     }
 
-    ///return a reference to the buffer
+    /// return a reference to the buffer
     pub fn buffer(&mut self) -> &mut BoxRefMut<MappedPages, [Pixel]> {
         return &mut self.buffer
     }
 
-    ///get the size of the frame buffer. Return (width, height).
+    /// get the size of the frame buffer. Return (width, height).
     pub fn get_size(&self) -> (usize, usize) {
         (self.width, self.height)
     }
@@ -139,29 +139,29 @@ impl FrameBuffer {
     //     Box::new(move |x:usize, y:usize| y * width + x )
     // }
 
-    ///compute the index of pixel (x, y) in the buffer array
+    /// compute the index of pixel (x, y) in the buffer array
     pub fn index(&self, x:usize, y:usize) -> usize {
         y * self.width + x
     }
 
-    ///check if a pixel (x,y) is within the framebuffer
+    /// check if a pixel (x,y) is within the framebuffer
     pub fn check_in_range(&self, x:usize, y:usize)  -> bool {
         x < self.width && y < self.height
     }
 }
 
-///The framebuffer compositor structure. It will hold the cache of updated framebuffers for better performance.
-///Only framebuffers that have not changed will be redisplayed in the final framebuffer 
+/// The framebuffer compositor structure. It will hold the cache of updated framebuffers for better performance.
+/// Only framebuffers that have not changed will be redisplayed in the final framebuffer 
 pub struct FrameCompositor {
     //Cache of updated framebuffers
 }
 
 impl Compositor for FrameCompositor {
-    //compose a list of framebuffers to the final framebuffer. Every item in the list is a reference to a framebuffer with its position
+    /// compose a list of framebuffers to the final framebuffer. Every item in the list is a reference to a framebuffer with its position
     fn compose(bufferlist:Vec<(&FrameBuffer, usize, usize)>) -> Result<(), &'static str> {
         let mut final_buffer = FINAL_FRAME_BUFFER.try().ok_or("FrameCopositor fails to get the final frame buffer")?.lock();
 
-        //Check if the virtul frame buffer is in the mapped frame list
+        // Check if the virtul frame buffer is in the mapped frame list
         for (src, x_src, y_src) in bufferlist {
             for i in 0..src.height {
                 let dest_start = final_buffer.width * ( i + y_src ) + x_src;
@@ -179,13 +179,13 @@ impl Compositor for FrameCompositor {
     }
 }
 
-///The compositor trait.
-///* function compose composes a list of buffers to a single buffer
+/// The compositor trait.
+///* It composes a list of buffers to a single buffer
 pub trait Compositor {
     fn compose(bufferlist:Vec<(&FrameBuffer, usize, usize)>) -> Result<(), &'static str>;
 }
 
-///Get the size of the final framebuffer. Return (width, height)
+/// Get the size of the final framebuffer. Return (width, height)
 pub fn get_screen_size() -> Result<(usize, usize), &'static str> {
     let final_buffer = FINAL_FRAME_BUFFER.try().
         ok_or("FrameCopositor fails to get the final frame buffer")?.lock();
