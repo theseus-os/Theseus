@@ -2,6 +2,7 @@
 name = "window_manager"
 version = "0.1.0"
 authors = ["Wenqiu Yu <yuwenqiuj@gmail.com>"]
+description = "allocate new windows and manage a list of existing windows"
 build = "../../build.rs"
 
 [dependencies]
