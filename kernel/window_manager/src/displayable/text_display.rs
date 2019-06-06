@@ -9,6 +9,7 @@ pub struct TextDisplay {
 
 impl TextDisplay
 {
+    /// create a new displayable of size (width, height)
     pub fn new(width:usize, height:usize) -> Result <TextDisplay, &'static str> {
         Ok(TextDisplay{
             width:width,
@@ -24,25 +25,23 @@ impl TextDisplay
 
     /// Gets the dimensions of the text area to display
     pub fn get_dimensions(&self) -> (usize, usize){
-        (self.width/CHARACTER_WIDTH, self.height/CHARACTER_HEIGHT)
+        (self.width / CHARACTER_WIDTH, self.height / CHARACTER_HEIGHT)
     }
 
-    ///Gets the size of the text area
+    /// Gets the size of the text area
     pub fn get_size(&self) -> (usize, usize) {
         (self.width, self.height)
     }
 
-    ///resize the text displayable area
+    /// resize the text displayable area
     pub fn resize(&mut self, width:usize, height:usize) {
         self.width = width;
         self.height = height;
     }
 }
 
-
-///Dropped   code. Cursor should belong to the terminal
-///A cursor struct. It contains the position of a cursor, whether it is enabled, 
-///the frequency it blinks, the last time it blinks, and the current blink state show/hidden
+/// A cursor struct. It contains whether it is enabled, 
+/// the frequency it blinks, the last time it blinks, and the current blink state show/hidden
 pub struct Cursor {
     enabled:bool,
     freq:u64,
@@ -51,7 +50,7 @@ pub struct Cursor {
 }
 
 impl Cursor {
-    ///create a new cursor struct
+    /// create a new cursor struct
     pub fn new() -> Cursor {
         Cursor {
             enabled:true,
@@ -61,27 +60,24 @@ impl Cursor {
         }
     }
 
-    ///update the cursor position
-    pub fn update(&mut self, reset:bool) {
-        if reset {
-            self.show = true;
-            self.time = tsc_ticks();
-        }      
+    /// reset the cursor
+    pub fn reset(&mut self) {
+        self.show = true;
+        self.time = tsc_ticks();
     }
 
-    ///enable a cursor
+    /// enable a cursor
     pub fn enable(&mut self) {
         self.enabled = true;
-        self.time = tsc_ticks();
-        self.show = true;
+        self.reset();
     }
 
-    ///disable a cursor
+    /// disable a cursor
     pub fn disable(&mut self) {
         self.enabled = false;
-     }
+    }
 
-    ///change the blink state show/hidden of a cursor. The terminal calls this function in a loop
+    /// change the blink state show/hidden of a cursor. The terminal calls this function in a loop
     pub fn blink(&mut self) -> bool{
         if self.enabled {
             let time = tsc_ticks();
@@ -98,6 +94,7 @@ impl Cursor {
         false
     }
 
+    /// check if the cursor should be displayed
     pub fn show(&self) -> bool {
         self.enabled && self.show
     }

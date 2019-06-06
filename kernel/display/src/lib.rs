@@ -1,3 +1,7 @@
+//! This crate contains a series of basic draw functions to draw graphs in a framebuffer
+//! Displayables invoke these basic functions to draw more compilicated graphs in a framebuffer
+//! A framebuffer should be passed to the framebuffer compositor to display on the screen
+
 #![no_std]
 
 extern crate alloc;
@@ -6,18 +10,22 @@ extern crate font;
 
 use alloc::vec;
 use font::{CHARACTER_HEIGHT, CHARACTER_WIDTH, FONT_PIXEL};
-use frame_buffer::FrameBuffer;
+use frame_buffer::{FrameBuffer, Pixel};
 
+//An  RGB color is represented by a 24-bit integer
 const COLOR_BITS:u32 = 24;
 
-///draw a pixel
+///Draw a pixel in a framebuffer.
+///The pixel is drawed at position (x, y) of the framebuffer with color
 pub fn draw_pixel(mut framebuffer:&mut FrameBuffer, x:usize, y:usize, color:u32){    
     if framebuffer.check_in_range(x, y) {
         write_to(&mut framebuffer, x, y, color);
     }
 }
 
-///draw a line from (start_x, start_y) to (end_x, end_y) with color
+///Draw a line in a framebuffer.
+///The start point of the line is(start_x, start_y) and the end point is (end_x, end_y)
+///The part extending the boundary of the framebuffer will be ignored.
 pub fn draw_line(mut framebuffer:&mut FrameBuffer, start_x:i32, start_y:i32, end_x:i32, end_y:i32, color:u32){
     let width:i32 = end_x - start_x;
     let height:i32 = end_y - start_y;
@@ -56,7 +64,9 @@ pub fn draw_line(mut framebuffer:&mut FrameBuffer, start_x:i32, start_y:i32, end
     }
 }
 
-//draw a rectangle at (start_x, start_y) with color
+///Draw a rectangle in a framebuffer.
+///The left top point of the rectangle is (start_x, start_y).
+///The part extending the boundary of the framebuffer will be ignored.
 pub fn draw_rectangle(mut framebuffer:&mut FrameBuffer, start_x:usize, start_y:usize, width:usize, height:usize, color:u32){
     let (buffer_width, buffer_height) = framebuffer.get_size();
     let end_x:usize = { 
@@ -89,7 +99,9 @@ pub fn draw_rectangle(mut framebuffer:&mut FrameBuffer, start_x:usize, start_y:u
     }
 }
 
-//fill a rectangle at (start_x, start_y) with color
+///Fill a rectangle in a framebuffer with color.
+///The left top point of the rectangle is (start_x, start_y).
+///The part extending the boundary of the framebuffer will be ignored.
 pub fn fill_rectangle(mut framebuffer:&mut FrameBuffer, start_x:usize, start_y:usize, width:usize, height:usize, color:u32){
     let (buffer_width, buffer_height) = framebuffer.get_size();
    
@@ -120,7 +132,9 @@ pub fn fill_rectangle(mut framebuffer:&mut FrameBuffer, start_x:usize, start_y:u
     }
 }
 
-///print a string by bytes at (x, y) within an area of (width, height) of the virtual text frame buffer
+///Print a string in a framebuffer.
+///The string is printed at position (x, y) of the framebuffer. 
+//It is printed within an area specified by (width, height). The part extending the area will be ignored.
 pub fn print_by_bytes(mut framebuffer:&mut FrameBuffer, x:usize, y:usize, width:usize, height:usize, 
     slice: &str, font_color:u32, bg_color:u32) -> Result<(), &'static str> {
     let buffer_width = width/CHARACTER_WIDTH;
@@ -143,6 +157,7 @@ pub fn print_by_bytes(mut framebuffer:&mut FrameBuffer, x:usize, y:usize, width:
                 break;
             }
         } else {
+            //print the next character
             if curr_column == buffer_width {
                 curr_column = 0;
                 curr_line += 1;
@@ -172,7 +187,8 @@ pub fn print_by_bytes(mut framebuffer:&mut FrameBuffer, x:usize, y:usize, width:
     Ok(())
 }
 
-//print a byte to the text buffer at (line, column). (left, top) specify the padding of the text area. index is the function to calculate the index of every pixel. The virtual frame buffer calls its get_index() method to get the function.
+//print a byte to the framebuffer buffer at (line, column) in the text area. 
+//(left, top) specifies the location of the text area in the framebuffer. 
 fn print_byte(framebuffer:&mut FrameBuffer, byte:u8, font_color:u32, bg_color:u32,
         left:usize, top:usize, line:usize, column:usize) 
         -> Result<(),&'static str> {
@@ -197,7 +213,7 @@ fn print_byte(framebuffer:&mut FrameBuffer, byte:u8, font_color:u32, bg_color:u3
     }
 }
 
-//Fill a blank (left, top, right, bottom) with the color. index is the function to calculate the index of every pixel. The virtual frame buffer calls its get_index() method to get the function.
+//Fill a blank text area (left, top, right, bottom) with the backgroung color.
 fn fill_blank(framebuffer:&mut FrameBuffer, left:usize, top:usize, right:usize,
             bottom:usize, color:u32) -> Result<(),&'static str>{
     if left >= right || top >= bottom {
@@ -217,12 +233,14 @@ fn fill_blank(framebuffer:&mut FrameBuffer, left:usize, top:usize, right:usize,
     }
 }
 
-fn write_to(framebuffer:&mut FrameBuffer, x:usize, y:usize, color:u32) {
+//write a pixel to a framebuffer directly
+fn write_to(framebuffer:&mut FrameBuffer, x:usize, y:usize, color:Pixel) {
     let index = framebuffer.index(x, y);
     framebuffer.buffer()[index] = color;
 }
 
-fn write_to_3d(framebuffer:&mut FrameBuffer, x:usize, y:usize, z:u8, color:u32) {
+//write a 3d pizel to a framebuffer
+fn write_to_3d(framebuffer:&mut FrameBuffer, x:usize, y:usize, z:u8, color:Pixel) {
     let index = framebuffer.index(x, y);
     let buffer = framebuffer.buffer();
     if (buffer[index] >> COLOR_BITS) <= z as u32 {

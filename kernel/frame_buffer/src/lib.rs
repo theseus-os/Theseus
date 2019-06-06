@@ -1,4 +1,6 @@
-//! This crate is a frame buffer. It implements a compositor to composite multiple virtual frame buffers and display in the final frame buffer
+//! This crate is a frame buffer manager. 
+//! * It defines a FrameBuffer structure and creates new framebuffers for applications
+//! * It defines a compositor and owns a final framebuffer which is mapped to the physical framebuffer. The compositor will composite a sequence of framebuffers and display them in the final framebuffer
 
 #![no_std]
 
@@ -17,13 +19,16 @@ use core::ops::DerefMut;
 use alloc::boxed::Box;
 use alloc::vec::Vec;
 
-//The compositor instance
+pub type Pixel = u32;
+
+//The final framebuffer instance
 static FINAL_FRAME_BUFFER:Once<Mutex<FrameBuffer>> = Once::new();
 
 //Every pixel is of u32 type
 const PIXEL_BYTES:usize = 4;
 
-/// Init the frame buffer. Allocate a block of memory and map it to the frame buffer frames.
+///Init the final frame buffer. 
+///Allocate a block of memory and map it to the physical framebuffer frames.
 pub fn init() -> Result<(), &'static str > {
     //Get the graphic mode information
     let vesa_display_phys_start:PhysicalAddress;
@@ -39,7 +44,7 @@ pub fn init() -> Result<(), &'static str > {
         buffer_height = graphic_info.height as usize;
     };
 
-    //Initialize the compositor
+    //Initialize the final framebuffer
     let framebuffer = FrameBuffer::new(buffer_width, buffer_height, Some(vesa_display_phys_start))?;
     FINAL_FRAME_BUFFER.call_once(|| {
         Mutex::new(framebuffer)}
@@ -52,13 +57,15 @@ pub fn init() -> Result<(), &'static str > {
 pub struct FrameBuffer {
     width:usize,
     height:usize,
-    buffer:BoxRefMut<MappedPages, [u32]>
+    buffer:BoxRefMut<MappedPages, [Pixel]>
 }
 
 impl FrameBuffer {
-    ///return a new virtual frame buffer with specified size
-    pub fn new(width:usize, height:usize, physical_address:Option<PhysicalAddress>) -> Result<FrameBuffer, &'static str>{
-    // get a reference to the kernel's memory mapping information
+    ///Create a new virtual frame buffer with specified size
+    ///If the physical_address is provided, map the framebuffer to the physical_address.
+    ///If it is None, allocate a block of memory and map the framebuffer to it
+    pub fn new(width:usize, height:usize, physical_address:Option<PhysicalAddress>) -> Result<FrameBuffer, &'static str>{       
+        // get a reference to the kernel's memory mapping information
         let kernel_mmi_ref = get_kernel_mmi_ref().expect("KERNEL_MMI was not yet initialized!");
         let mut kernel_mmi_locked = kernel_mmi_ref.lock();
 
@@ -116,12 +123,12 @@ impl FrameBuffer {
         }
     }
 
-    ///return the buffer array
-    pub fn buffer(&mut self) -> &mut BoxRefMut<MappedPages, [u32]> {
+    ///return a reference to the buffer
+    pub fn buffer(&mut self) -> &mut BoxRefMut<MappedPages, [Pixel]> {
         return &mut self.buffer
     }
 
-    ///get the size of the virtual frame buffer
+    ///get the size of the frame buffer. Return (width, height).
     pub fn get_size(&self) -> (usize, usize) {
         (self.width, self.height)
     }
@@ -132,21 +139,25 @@ impl FrameBuffer {
     //     Box::new(move |x:usize, y:usize| y * width + x )
     // }
 
+    ///compute the index of pixel (x, y) in the buffer array
     pub fn index(&self, x:usize, y:usize) -> usize {
         y * self.width + x
     }
 
-    ///check if a pixel is within the virtual framebuffer
+    ///check if a pixel (x,y) is within the framebuffer
     pub fn check_in_range(&self, x:usize, y:usize)  -> bool {
         x < self.width && y < self.height
     }
 }
 
+///The framebuffer compositor structure. It will hold the cache of updated framebuffers for better performance.
+///Only framebuffers that have not changed will be redisplayed in the final framebuffer 
 pub struct FrameCompositor {
     //Cache of updated framebuffers
 }
 
 impl Compositor for FrameCompositor {
+    //compose a list of framebuffers to the final framebuffer. Every item in the list is a reference to a framebuffer with its position
     fn compose(bufferlist:Vec<(&FrameBuffer, usize, usize)>) -> Result<(), &'static str> {
         let mut final_buffer = FINAL_FRAME_BUFFER.try().ok_or("FrameCopositor fails to get the final frame buffer")?.lock();
 
@@ -168,11 +179,13 @@ impl Compositor for FrameCompositor {
     }
 }
 
-//The compositor structure. It contains the information of the final frame buffer and a list of frames
+///The compositor trait.
+///* function compose composes a list of buffers to a single buffer
 pub trait Compositor {
     fn compose(bufferlist:Vec<(&FrameBuffer, usize, usize)>) -> Result<(), &'static str>;
 }
 
+///Get the size of the final framebuffer. Return (width, height)
 pub fn get_screen_size() -> Result<(usize, usize), &'static str> {
     let final_buffer = FINAL_FRAME_BUFFER.try().
         ok_or("FrameCopositor fails to get the final frame buffer")?.lock();

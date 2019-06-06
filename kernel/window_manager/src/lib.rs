@@ -27,8 +27,6 @@ extern crate tsc;
 extern crate frame_buffer;
 extern crate font;
 
-pub mod displayable;
-
 use spin::{Once, Mutex};
 use alloc::collections::{VecDeque, BTreeMap};
 use core::ops::{Deref, DerefMut};
@@ -41,18 +39,30 @@ use tsc::{tsc_ticks, TscTicks};
 use font::{CHARACTER_HEIGHT, CHARACTER_WIDTH};
 use displayable::text_display::{TextDisplay, Cursor};
 
+/// a module to manage displayables
+pub mod displayable;
+
+/// The window allocator. It creates new windows and manages a window list
 pub static WINDOW_ALLOCATOR: Once<Mutex<WindowAllocator>> = Once::new();
+
+// A framebuffer owned by the window manager. 
+// This framebuffer is responsible for display borders. Windows owned by applications cannot get access to their borders. 
+// All the display behaviors of borders are controled by the window manager
 static SCREEN_FRAME_BUFFER:Once<Arc<Mutex<FrameBuffer>>> = Once::new();
 
-/// 10 pixel gap between windows 
-pub const WINDOW_MARGIN: usize = 10;
-/// 2 pixel padding within a window
-pub const WINDOW_PADDING: usize = 2;
-
+// 10 pixel gap between windows 
+const WINDOW_MARGIN: usize = 10;
+// 2 pixel padding within a window
+const WINDOW_PADDING: usize = 2;
+// The border color of an active window 
 const WINDOW_ACTIVE_COLOR:u32 = 0xFFFFFF;
+// The border color of an inactive window
 const WINDOW_INACTIVE_COLOR:u32 = 0x343C37;
+// The background color of the screen
 const SCREEN_BACKGROUND_COLOR:u32 = 0x000000;
 
+/// The window allocator.
+/// It contains a list of allocated window and a reference to the active window
 pub struct WindowAllocator {
     allocated: VecDeque<Weak<Mutex<WindowInner>>>, 
     // a weak pointer directly to the active WindowInner so we don't have to search for the active window when we need it quickly
@@ -100,7 +110,7 @@ pub fn send_event_to_active(event: Event) -> Result<(), &'static str>{
     allocator.send_event(event)
 }
 
-// Gets the border color specified by the window manager
+// Gets the border color according to the active state
 fn get_border_color(active:bool) -> u32 {
     if active {
         WINDOW_ACTIVE_COLOR
@@ -110,7 +120,7 @@ fn get_border_color(active:bool) -> u32 {
 }
 
 impl WindowAllocator{    
-    // Allocate a new window and return it
+    /// Allocate a new window and return it
     pub fn allocate(&mut self, x:usize, y:usize, width:usize, height:usize) -> Result<WindowObj, &'static str>{
         // Check the size of the window
         if width < 2 * WINDOW_PADDING || height < 2 * WINDOW_PADDING {
@@ -209,6 +219,7 @@ impl WindowAllocator{
         return Ok(prev_active);
     }
 
+    // delete a window
     fn delete(&mut self, inner:&Arc<Mutex<WindowInner>>) -> Result<(), &'static str> {
         let mut i = 0;
         let len = self.allocated.len();
@@ -237,6 +248,7 @@ impl WindowAllocator{
         Ok(())
     }
 
+    // check if an area specified by (x, y, width, height) overlaps with an existing window
     fn check_overlap(&mut self, inner:&Arc<Mutex<WindowInner>>, x:usize, y:usize, width:usize, height:usize) -> bool {
         let mut len = self.allocated.len();
         let mut i = 0;
@@ -276,7 +288,8 @@ impl WindowAllocator{
 
 }
 
-/// a window object
+/// A window contains a reference to its inner reference owned by the window manager,
+/// a consumer of inputs, a list of displayables and a framebuffer
 pub struct WindowObj {
     inner:Arc<Mutex<WindowInner>>,
     //text_buffer:FrameTextBuffer,
@@ -300,14 +313,14 @@ impl WindowObj{
     }
 
     /// Returns the content dimensions of this window,
-    /// as a tuple of `(width, height)`.
+    /// as a tuple of `(width, height)`. It does not include the padding
     pub fn dimensions(&self) -> (usize, usize) {
         let inner_locked = self.inner.lock();
         inner_locked.get_content_size()
     }
 
-    ///Add a new displayable structure to the window
-    ///We check if the displayable is in the window. But we do not check if it is overlapped with others
+    /// Add a new displayable structure to the window
+    /// We check if the displayable is in the window. But we do not check if it is overlapped with others
     pub fn add_displayable(&mut self, key: &str, x:usize, y:usize, displayable:TextDisplay) -> Result<(), &'static str>{        
         let key = key.to_string();
         let (width, height) = displayable.get_size();
@@ -328,18 +341,21 @@ impl WindowObj{
         Ok(())
     }
 
-    pub fn remove_displayable(&mut self, key:&str){
-        self.components.remove(key);
+    /// Remove a displayable according to its name
+    pub fn remove_displayable(&mut self, name:&str){
+        self.components.remove(name);
     }
 
-    pub fn get_displayable(&self, key:&str) -> Option<&TextDisplay> {
-        let opt = self.components.get(key);
+    /// Get a displayable of the name
+    pub fn get_displayable(&self, name:&str) -> Option<&TextDisplay> {
+        let opt = self.components.get(name);
         match opt {
             None => { return None },
             Some(component) => { return Some(component.get_displayable()); },
         };
     }
 
+    /// Get the position of a displayable in the window
     pub fn get_displayable_position(&self, key:&str) -> Result<(usize, usize), &'static str> {
         let opt = self.components.get(key);
         match opt {
@@ -394,6 +410,7 @@ impl WindowObj{
         )
     }
 
+    /// print a string in the window with a text displayable.
     pub fn display_string(&mut self, display_name:&str, slice:&str, font_color:u32, bg_color:u32) -> Result<(), &'static str> {
         let (display_x, display_y) = self.get_displayable_position(display_name)?;
         let (width, height) = self.get_displayable(display_name).ok_or("The displayable does not exist")?.get_size();
@@ -405,6 +422,7 @@ impl WindowObj{
         )
     }
 
+    /// display a cursor in the window with a text displayable. position is the absolute position of the cursor
     pub fn display_cursor(&mut self, cursor:&Cursor, display_name:&str, position:usize, leftshift:usize, font_color:u32, bg_color:u32) -> Result<(), &'static str> {
         let (text_buffer_width, text_buffer_height) = match self.get_displayable(display_name) {
             Some(text_display) => { text_display.get_dimensions() },
@@ -428,6 +446,7 @@ impl WindowObj{
     }
 
     // @Andrew
+    /// resize a window as (width, height) at (x, y)
     pub fn resize(&mut self, x:usize, y:usize, width:usize, height:usize) -> Result<(), &'static str>{
         // checks for overlap
         {
@@ -468,13 +487,14 @@ impl WindowObj{
     }
 }
 
-/// delete a window object
+/// delete the reference of a window in the manager when the window is dropped
 impl Drop for WindowObj {
     fn drop(&mut self) {
         let mut allocator = match WINDOW_ALLOCATOR.try() {
             Some(allocator) => { allocator },
             None => { error!("The window allocator is not initialized"); return }
         }.lock();
+
         // Switches to a new active window and sets 
         // the active pointer field of the window allocator to the new active window
         match allocator.schedule() {
@@ -489,6 +509,7 @@ impl Drop for WindowObj {
     }
 }
 
+// The structure is owned by the window manager. It contains the information of a window but under the control of the manager
 struct WindowInner {
     /// the upper left x-coordinate of the window
     x: usize,
@@ -560,7 +581,7 @@ impl WindowInner {
         )
     }
 
-    /// adjust the size of a window
+    // adjust the size of a window
     fn resize(&mut self, x:usize, y:usize, width:usize, height:usize) -> Result<(usize, usize), &'static str> {
         self.draw_border(SCREEN_BACKGROUND_COLOR)?;
         let percent = ((width-self.padding)*100/(self.width-self.padding), (height-self.padding)*100/(self.height-self.padding));
@@ -584,6 +605,7 @@ impl WindowInner {
 
 }
 
+// a component contains a displayable and its position
 struct Component {
     x:usize,
     y:usize,
@@ -591,14 +613,17 @@ struct Component {
 }
 
 impl Component {
+    /// get the displayable
     pub fn get_displayable(&self) -> &TextDisplay {
         return &(self.displayable)
     }
 
+    /// get the position of the displayable
     pub fn get_position(&self) -> (usize, usize) {
         (self.x, self.y)
     }
 
+    // resize the displayable
     fn resize(&mut self, x:usize, y:usize, width:usize, height:usize) {
         self.x = x;
         self.y = y;
