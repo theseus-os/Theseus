@@ -16,13 +16,14 @@ extern crate mouse;
 extern crate network_manager;
 extern crate ethernet_smoltcp_device;
 extern crate smoltcp;
+extern crate ixgbe;
 
 use alloc::sync::Arc;
 use spin::Mutex;
 use dfqueue::DFQueueProducer;
 use event_types::Event;
 use memory::MemoryManagementInfo;
-use pci::get_pci_device_vd;
+use pci::{PciDevice, get_pci_device_vd};
 use smoltcp::wire::{IpCidr, Ipv4Address};
 use core::str::FromStr;
 
@@ -56,7 +57,7 @@ pub fn init(keyboard_producer: DFQueueProducer<Event>) -> Result<(), &'static st
     mouse::init();
 
     
-    for dev in pci::pci_device_iter() {
+    /* for dev in pci::pci_device_iter() {
         debug!("Found pci device: {:?}", dev);
     } */
 
@@ -65,7 +66,7 @@ pub fn init(keyboard_producer: DFQueueProducer<Event>) -> Result<(), &'static st
         let ixgbe_nic_ref = ixgbe::IxgbeNic::init(pci_dev_82599)?;      
         let static_ip = IpCidr::from_str(DEFAULT_LOCAL_IP).map_err(|_e| "couldn't parse 'DEFAULT_LOCAL_IP' address")?;
         let gateway_ip = Ipv4Address::from_bytes(&DEFAULT_GATEWAY_IP);
-        let ixgbe_iface = smoltcp_device::TheseusNetworkInterface::new(ixgbe_nic_ref, Some(static_ip), Some(gateway_ip))?;
+        let ixgbe_iface = ethernet_smoltcp_device::EthernetNetworkInterface::new(ixgbe_nic_ref, Some(static_ip), Some(gateway_ip))?;
         network_manager::NETWORK_INTERFACES.lock().push(Arc::new(Mutex::new(ixgbe_iface)));
     }
     else {
@@ -108,4 +109,14 @@ pub fn init(keyboard_producer: DFQueueProducer<Event>) -> Result<(), &'static st
     */
     Ok(())
 
+}
+
+/// An initialization function for a Pci Device
+pub type PciDevInitFunc = fn(&PciDevice) -> Result<(), &'static str>;
+
+fn init_pci_dev(vendor_id: u16, device_id: u16, init_func: PciDevInitFunc) -> Result<(), &'static str> {
+    let pci_dev = get_pci_device_vd(vendor_id, device_id).ok_or("device_manager::init_pci_dev : device not found")?;
+    init_func(pci_dev)?;
+
+    Ok(())
 }

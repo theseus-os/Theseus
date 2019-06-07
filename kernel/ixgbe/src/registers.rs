@@ -1,3 +1,4 @@
+use volatile::{Volatile, ReadOnly, WriteOnly};
 
 /// Vendor ID for Intel
 pub const INTEL_VEND:                   u16 = 0x8086;  

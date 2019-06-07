@@ -20,6 +20,7 @@ extern crate pic;
 extern crate x86_64;
 extern crate mpmc;
 extern crate network_interface_card;
+extern crate intel_ethernet;
 
 pub mod test_e1000_driver;
 mod regs;
@@ -39,7 +40,7 @@ use owning_ref::BoxRefMut;
 use interrupts::{eoi,register_interrupt};
 use x86_64::structures::idt::{ExceptionStackFrame};
 use network_interface_card::{NetworkInterfaceCard, TransmitBuffer, ReceiveBuffer, ReceivedFrame};
-
+use intel_ethernet::descriptors::{LegacyTxDesc, LegacyRxDesc};
 
 pub const INTEL_VEND:           u16 = 0x8086;  // Vendor ID for Intel 
 pub const E1000_DEV:            u16 = 0x100E;  // Device ID for the e1000 Qemu, Bochs, and VirtualBox emmulated NICs
@@ -91,72 +92,6 @@ lazy_static! {
 /// This should be a const, but Rust doesn't yet allow constants for the bitflags type
 fn nic_mapping_flags() -> EntryFlags {
     EntryFlags::PRESENT | EntryFlags::WRITABLE | EntryFlags::NO_CACHE | EntryFlags::NO_EXECUTE
-}
-
-
-
-/// This struct is an E1000 Receive Descriptor as defined by the e1000 spec.
-/// There is one instance of this struct per receive buffer.
-#[repr(C, packed)]
-pub struct E1000RxDesc {
-    /// The starting physical address of the receive buffer
-    phys_addr:   Volatile<u64>,
-    /// Length of the receive buffer in bytes
-    length:      ReadOnly<u16>,
-    checksum:    ReadOnly<u16>,
-    status:      Volatile<u8>,
-    errors:      ReadOnly<u8>,
-    special:     ReadOnly<u16>,
-}
-impl E1000RxDesc {
-    /// Initializes a receive descriptor by clearing its status 
-    /// and setting the descriptor's physical address.
-    fn init(&mut self, rx_buf_paddr: PhysicalAddress) {
-        self.phys_addr.write(rx_buf_paddr.value() as u64);
-        self.status.write(0);
-    }
-}
-
-impl fmt::Debug for E1000RxDesc {
-    fn fmt(&self, f: &mut fmt::Formatter) -> fmt::Result {
-        write!(f, "{{phys_addr: {:#X}, length: {:#X}, checksum: {:#X}, status: {:#X}, errors: {:#X}, special: {:#X}}}",
-            self.phys_addr.read(), self.length.read(), self.checksum.read(), self.status.read(), self.errors.read(), self.special.read())
-    }
-}
-
-
-/// This struct is an E1000 Transmit Descriptor as defined by the e1000 spec.
-/// There is one instance of this struct per buffer to be transmitted.
-#[repr(C, packed)]
-pub struct E1000TxDesc {
-    /// The starting physical address of the transmit buffer
-    phys_addr:   Volatile<u64>,
-    /// Length of the transmit buffer in bytes
-    length:      Volatile<u16>,
-    cso:         Volatile<u8>,
-    cmd:         Volatile<u8>,
-    status:      Volatile<u8>,
-    css:         Volatile<u8>,
-    special:     Volatile<u16>,
-}
-impl E1000TxDesc {
-    /// Initializes a transmit descriptor by clearing all of its values.
-    fn init(&mut self) {
-        self.phys_addr.write(0);
-        self.length.write(0);
-        self.cso.write(0);
-        self.cmd.write(0);
-        self.status.write(0);
-        self.css.write(0);
-        self.special.write(0);
-    }
-}
-
-impl fmt::Debug for E1000TxDesc {
-    fn fmt(&self, f: &mut fmt::Formatter) -> fmt::Result {
-        write!(f, "{{phys_addr: {:#X}, length: {:#X}, cso: {:#X}, cmd: {:#X}, status: {:#X}, css: {:#X}, special: {:#X}}}",
-            self.phys_addr.read(), self.length.read(), self.cso.read(), self.cmd.read(), self.status.read(), self.css.read(), self.special.read())
-    }
 }
 
 
@@ -236,9 +171,9 @@ pub struct E1000Nic {
     /// The optional spoofed MAC address to use in place of `mac_hardware` when transmitting.  
     mac_spoofed: Option<[u8; 6]>,
     /// Receive Descriptors
-    rx_descs: BoxRefMut<MappedPages, [E1000RxDesc]>, 
+    rx_descs: BoxRefMut<MappedPages, [LegacyRxDesc]>, 
     /// Transmit Descriptors 
-    tx_descs: BoxRefMut<MappedPages, [E1000TxDesc]>, 
+    tx_descs: BoxRefMut<MappedPages, [LegacyTxDesc]>, 
     /// Current rx descriptor index
     rx_cur: u16,      
     /// Current tx descriptor index
@@ -488,17 +423,17 @@ impl E1000Nic {
 
     /// Initialize the array of receive descriptors and their corresponding receive buffers,
     /// and returns a tuple including both of them.
-    fn rx_init(regs: &mut IntelE1000Registers) -> Result<(BoxRefMut<MappedPages, [E1000RxDesc]>, Vec<ReceiveBuffer>), &'static str> {
+    fn rx_init(regs: &mut IntelE1000Registers) -> Result<(BoxRefMut<MappedPages, [LegacyRxDesc]>, Vec<ReceiveBuffer>), &'static str> {
         Self::init_rx_buf_pool(RX_BUFFER_POOL_SIZE)?;
 
-        let size_in_bytes_of_all_rx_descs = E1000_NUM_RX_DESC * core::mem::size_of::<E1000RxDesc>();
+        let size_in_bytes_of_all_rx_descs = E1000_NUM_RX_DESC * core::mem::size_of::<LegacyRxDesc>();
 
         // Rx descriptors must be 16 byte-aligned, which is satisfied below because it's aligned to a page boundary.
         let (rx_descs_mapped_pages, rx_descs_starting_phys_addr) = create_contiguous_mapping(size_in_bytes_of_all_rx_descs, nic_mapping_flags())?;
 
         // cast our physically-contiguous MappedPages into a slice of receive descriptors
         let mut rx_descs = BoxRefMut::new(Box::new(rx_descs_mapped_pages))
-            .try_map_mut(|mp| mp.as_slice_mut::<E1000RxDesc>(0, E1000_NUM_RX_DESC))?;
+            .try_map_mut(|mp| mp.as_slice_mut::<LegacyRxDesc>(0, E1000_NUM_RX_DESC))?;
 
         // now that we've created the rx descriptors, we can fill them in with initial values
         let mut rx_bufs_in_use: Vec<ReceiveBuffer> = Vec::with_capacity(E1000_NUM_RX_DESC);
@@ -544,15 +479,15 @@ impl E1000Nic {
     }           
     
     /// Initialize the array of tramsmit descriptors and return them.
-    fn tx_init(regs: &mut IntelE1000Registers) -> Result<BoxRefMut<MappedPages, [E1000TxDesc]>, &'static str> {
-        let size_in_bytes_of_all_tx_descs = E1000_NUM_TX_DESC * core::mem::size_of::<E1000TxDesc>();
+    fn tx_init(regs: &mut IntelE1000Registers) -> Result<BoxRefMut<MappedPages, [LegacyTxDesc]>, &'static str> {
+        let size_in_bytes_of_all_tx_descs = E1000_NUM_TX_DESC * core::mem::size_of::<LegacyTxDesc>();
 
         // Tx descriptors must be 16 byte-aligned, which is satisfied below because it's aligned to a page boundary.
         let (tx_descs_mapped_pages, tx_descs_starting_phys_addr) = create_contiguous_mapping(size_in_bytes_of_all_tx_descs, nic_mapping_flags())?;
 
         // cast our physically-contiguous MappedPages into a slice of transmit descriptors
         let mut tx_descs = BoxRefMut::new(Box::new(tx_descs_mapped_pages))
-            .try_map_mut(|mp| mp.as_slice_mut::<E1000TxDesc>(0, E1000_NUM_TX_DESC))?;
+            .try_map_mut(|mp| mp.as_slice_mut::<LegacyTxDesc>(0, E1000_NUM_TX_DESC))?;
 
         // now that we've created the tx descriptors, we can fill them in with initial values
         for td in tx_descs.iter_mut() {

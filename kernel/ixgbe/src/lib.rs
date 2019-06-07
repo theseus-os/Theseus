@@ -26,10 +26,9 @@ extern crate owning_ref;
 extern crate rand;
 extern crate hpet;
 extern crate runqueue;
-extern crate idt;
+extern crate intel_ethernet;
 
 pub mod test_ixgbe_driver;
-pub mod descriptors;
 pub mod registers;
 pub mod phy;
 
@@ -40,10 +39,9 @@ use alloc::vec::Vec;
 use alloc::collections::VecDeque;
 use irq_safety::MutexIrqSafe;
 use alloc::boxed::Box;
-use memory::{get_kernel_mmi_ref,FRAME_ALLOCATOR, PhysicalAddress, VirtualAddress, Frame, EntryFlags, MappedPages, PhysicalMemoryArea, allocate_pages_by_bytes, create_contiguous_mapping};
+use memory::{get_kernel_mmi_ref,FRAME_ALLOCATOR, PhysicalAddress, VirtualAddress, FrameRange, EntryFlags, MappedPages, PhysicalMemoryArea, allocate_pages_by_bytes, create_contiguous_mapping};
 use pci::{PciDevice,pci_read_32, pci_write, pci_set_command_bus_master_bit,pci_set_interrupt_disable_bit, PCI_BAR0, pci_enable_msix, pci_config_space, MSIX_CAPABILITY};
 use kernel_config::memory::PAGE_SIZE;
-use descriptors::*;
 use registers::*;
 use bit_field::BitField;
 use interrupts::{eoi,register_interrupt};
@@ -59,7 +57,7 @@ use rand::{
     rngs::SmallRng
 };
 use runqueue::get_least_busy_core;
-use idt::HandlerFunc;
+use intel_ethernet::descriptors::*;
 
 /* Default configuration at time of initialization of NIC */
 const INTERRUPT_ENABLE:                     bool    = false;
@@ -263,8 +261,7 @@ impl NetworkInterfaceCard for IxgbeNic {
 }
 
 /// functions that setup the NIC struct and handle the sending and receiving of packets
-impl IxgbeNic{
-
+impl IxgbeNic {
     /// store required values from the devices PCI config space
     pub fn init(ixgbe_pci_dev: &PciDevice) -> Result<&'static MutexIrqSafe<IxgbeNic>, &'static str> {
 
@@ -275,7 +272,7 @@ impl IxgbeNic{
         let io_base = ixgbe_pci_dev.bars[0] & !1;   
 
         // memory mapped base address
-        let mem_base = (ixgbe_pci_dev.bars[0] as usize) & !3; //TODO: hard coded for 32 bit, need to make conditional      
+        let mem_base = PhysicalAddress::new(ixgbe_pci_dev.bars[0] as usize & !3)?; //TODO: hard coded for 32 bit, need to make conditional      
 
         // map the IntelIxgbeRegisters struct to the address found from the pci space
         let (mut mapped_registers, mem_base_v) = Self::mem_map(ixgbe_pci_dev, mem_base)?;
@@ -420,7 +417,7 @@ impl IxgbeNic{
 
         // set up virtual pages and physical frames to be mapped
         let pages_nic = allocate_pages_by_bytes(mem_size_in_bytes).ok_or("ixgbe::mem_map(): couldn't allocated virtual page!")?;
-        let frames_nic = Frame::range_inclusive_addr(mem_base, mem_size_in_bytes - PAGE_SIZE + 1); //TODO: check why we need to add 1
+        let frames_nic = FrameRange::from_phys_addr(mem_base, mem_size_in_bytes - PAGE_SIZE + 1); //TODO: check why we need to add 1
         let flags = EntryFlags::PRESENT | EntryFlags::WRITABLE | EntryFlags::NO_CACHE | EntryFlags::NO_EXECUTE;
 
         debug!("Ixgbe: memory base: {:#X}, memory size: {}", mem_base, mem_size_in_bytes);
@@ -455,17 +452,20 @@ impl IxgbeNic{
         // inform the frame allocator that the physical frames where the PCI config space for the nic exists
         // is now off-limits and should not be touched
         {
-            let nic_area = PhysicalMemoryArea::new(mem_base as usize, mem_size_in_bytes as usize, 1, 0); // TODO: FIXME:  use proper acpi number 
+            let nic_area = PhysicalMemoryArea::new(mem_base, mem_size_in_bytes as usize, 1, 0); // TODO: FIXME:  use proper acpi number 
             FRAME_ALLOCATOR.try().ok_or("ixgbe: Couldn't get FRAME ALLOCATOR")?.lock().add_area(nic_area, false)?;
         }
 
         // set up virtual pages and physical frames to be mapped
         let pages_nic = allocate_pages_by_bytes(mem_size_in_bytes).ok_or("ixgbe::mem_map_msix(): couldn't allocated virtual page!")?;
-        let frames_nic = Frame::range_inclusive_addr(mem_base as usize, mem_size_in_bytes);
+        let frames_nic = FrameRange::from_phys_addr(mem_base, mem_size_in_bytes);
         let flags = EntryFlags::PRESENT | EntryFlags::WRITABLE | EntryFlags::NO_CACHE | EntryFlags::NO_EXECUTE;
 
         let kernel_mmi_ref = get_kernel_mmi_ref().ok_or("ixgbe:mem_map_msix KERNEL_MMI was not yet initialized!")?;
         let mut kernel_mmi = kernel_mmi_ref.lock();
+        let mut fa = FRAME_ALLOCATOR.try().ok_or("ixgbe::mem_map_msix(): couldn't get FRAME_ALLOCATOR")?.lock();
+        let nic_mapped_page = kernel_mmi.page_table.map_allocated_pages_to(pages_nic, frames_nic, flags, fa.deref_mut())?;
+        let vector_table = BoxRefMut::new(Box::new(nic_mapped_page)).try_map_mut(|mp| mp.as_type_mut::<MsixVectorTable>(0))?;
 
         Ok(vector_table)
     }
@@ -510,19 +510,23 @@ impl IxgbeNic{
 
     /// acquires semaphore to synchronize between software and firmware (10.5.4)
     fn acquire_semaphore(regs: &mut IntelIxgbeRegisters) -> Result<bool, &'static str> {
+        // femtoseconds per millisecond
+        const FS_PER_MS: u64 = 1_000_000_000_000;
+        let hpet = get_hpet();
+        let hpet_ref = hpet.as_ref().ok_or("ixgbe::acquire_semaphore: couldn't get HPET timer")?;
+        let period_fs: u64 = hpet_ref.counter_period_femtoseconds() as u64;        
 
         // check that some other sofware is not using the semaphore
         // 1. poll SWSM.SMBI bit until reads as 0 or 10ms timer expires
-        let start = get_hpet().as_ref().ok_or("couldn't get HPET timer")?.get_counter();
-        let period_fs: u64 = get_hpet().as_ref().ok_or("couldn't get HPET timer")?.counter_period_femtoseconds() as u64;
-        let fs_per_ms: u64 = 1_000_000_000_000;
+        let start = hpet_ref.get_counter();
         let mut timer_expired_smbi = false;
         let mut smbi_bit = 1;
         while smbi_bit != 0 {
             smbi_bit = regs.swsm.read() & SWSM_SMBI;
-            let end = get_hpet().as_ref().ok_or("couldn't get HPET timer")?.get_counter();
+            let end = hpet_ref.get_counter();
 
-            if (end-start) * period_fs / fs_per_ms == 10 {
+            let expiration_time = 10;
+            if (end-start) * period_fs / FS_PER_MS == expiration_time {
                 timer_expired_smbi = true;
                 break;
             }
@@ -535,14 +539,15 @@ impl IxgbeNic{
         regs.swsm.write(set_swesmbi);
 
         // 2. poll SWSM.SWESMBI bit until reads as 1 or 3s timer expires
-        let start = get_hpet().as_ref().ok_or("couldn't get HPET timer")?.get_counter();
+        let start = hpet_ref.get_counter();
         let mut swesmbi_bit = 0;
         let mut timer_expired_swesmbi = false;
         while swesmbi_bit == 0 {
             swesmbi_bit = (regs.swsm.read() & SWSM_SWESMBI) >> 1;
-            let end = get_hpet().as_ref().ok_or("couldn't get HPET timer")?.get_counter();
+            let end = hpet_ref.get_counter();
 
-            if (end-start) * period_fs / fs_per_ms == 3000 {
+            let expiration_time = 3000;
+            if (end-start) * period_fs / FS_PER_MS == expiration_time {
                 timer_expired_swesmbi = true;
                 break;
             }
@@ -551,8 +556,10 @@ impl IxgbeNic{
         // software takes control of the requested resource
         // 1. read firmware and software bits of sw_fw_sync register 
         let mut sw_fw_sync_smbits = regs.sw_fw_sync.read() & SW_FW_SYNC_SMBITS_MASK;
-        let sw_mac = (sw_fw_sync_smbits & SW_FW_SYNC_SW_MAC) >> 3;
-        let fw_mac = (sw_fw_sync_smbits & SW_FW_SYNC_FW_MAC) >> 8;
+        let sw_sync_shift = 3;
+        let fw_sync_shift = 8;
+        let sw_mac = (sw_fw_sync_smbits & SW_FW_SYNC_SW_MAC) >> sw_sync_shift;
+        let fw_mac = (sw_fw_sync_smbits & SW_FW_SYNC_FW_MAC) >> fw_sync_shift;
 
         // clear sw sempahore bits if sw malfunction
         if timer_expired_smbi {
@@ -603,7 +610,6 @@ impl IxgbeNic{
     }
 
     /// software reset of NIC to get it running
-    /// TODO: Replace all magic numbers
     fn start_link (mut regs: &mut IntelIxgbeRegisters) -> Result<(), &'static str>{
         //disable interrupts: write to EIMC registers, 1 in b30-b0, b31 is reserved
         regs.eimc.write(DISABLE_INTERRUPTS);
@@ -614,7 +620,8 @@ impl IxgbeNic{
         regs.ctrl.write(val|CTRL_RST|CTRL_LRST);
 
         //wait 10 ms
-        let _ =pit_clock::pit_wait(10000);
+        let wait_time = 10_000;
+        let _ =pit_clock::pit_wait(wait_time);
 
         //disable flow control.. write 0 TO FCTTV, FCRTL, FCRTH, FCRTV and FCCFG
         for i in 0..3 {
@@ -646,7 +653,7 @@ impl IxgbeNic{
 
         while Self::acquire_semaphore(&mut regs)? {
             //wait 10 ms
-            let _ =pit_clock::pit_wait(10000);
+            let _ =pit_clock::pit_wait(wait_time);
         }
         debug!("IXGBE: Semaphore acquired!");
 
@@ -714,12 +721,12 @@ impl IxgbeNic{
                 rx_bufs_in_use.push(rx_buf); 
 
 
-                rd.init(paddr_buf.value() as u64, 0); 
+                rd.init(paddr_buf.value() as u64, None); 
             }
 
             debug!("ixgbe::rx_init(): phys_addr of rx_desc: {:#X}", rx_descs_starting_phys_addr);
-            let rx_desc_phys_addr_lower  = rx_descs_starting_phys_addr as u32;
-            let rx_desc_phys_addr_higher = (rx_descs_starting_phys_addr >> 32) as u32;
+            let rx_desc_phys_addr_lower  = rx_descs_starting_phys_addr.value() as u32;
+            let rx_desc_phys_addr_higher = (rx_descs_starting_phys_addr.value() >> 32) as u32;
 
             // choose which set of rx queue registers needs to be accessed for this queue
             // because rx registers are divided into 2 sets of 64 queues in memory
@@ -911,8 +918,8 @@ impl IxgbeNic{
         }
 
         debug!("ixgbe::tx_init(): phys_addr of tx_desc: {:#X}", tx_descs_starting_phys_addr);
-        let tx_desc_phys_addr_lower  = tx_descs_starting_phys_addr as u32;
-        let tx_desc_phys_addr_higher = (tx_descs_starting_phys_addr >> 32) as u32;
+        let tx_desc_phys_addr_lower  = tx_descs_starting_phys_addr.value() as u32;
+        let tx_desc_phys_addr_higher = (tx_descs_starting_phys_addr.value() >> 32) as u32;
         
         // TODO: Setting queue to 0 because we're only using one queue for transmission
         // Can change this to enable multiple tx queues
@@ -947,45 +954,15 @@ impl IxgbeNic{
         Ok(vec![tx_descs])
     }  
 
-    /// enable legacy interrupts
-    /// TODO: change all magic numbers and update for multiple queues
-    /// not used anymore in favor of msi-x interrupts
-    fn enable_legacy_interrupts(regs: &mut IntelIxgbeRegisters) {
-        let queue_num = 0;
-        //set IVAR reg for each queue used
-        regs.ivar.reg[queue_num].write(0x81808180); // for rxq 0
-        debug!("IVAR: {:#X}", regs.ivar.reg[queue_num].read());
-        
-        //enable clear on read of EICR
-        let val = regs.gpie.read();
-        regs.gpie.write((val & 0xFFFFFFDF) | 0x40); //bit 5
-        //self.write_command(REG_GPIE, 0x46); //bit 5
-        debug!("GPIE: {:#X}", regs.gpie.read());
-
-        // self.write_command(REG_EIAM, 0xFFFF); // Rx0
-        // debug!("EIAM: {:#X}", self.read_command(REG_EIAM));
-
-        //set eims to enable required interrupt
-        regs.eims.write(0xFFFF); // Rx 0
-        debug!("EIMS: {:#X}", regs.eims.read());
-
-        //self.write_command(REG_EITR, 0x8000_00C8); // Rx0
-        debug!("EITR: {:#X}", regs.eitr.reg[queue_num].read());
-
-        //clears eicr by writing 1 to clear old interrupt causes?
-        let val = regs.eicr.read();
-        debug!("EICR: {:#X}", val);
-    }
-
     /// enable interrupts for msi-x mode
     /// currently all the msi vectors are for packet reception, one msi vector per queue
     fn enable_msix_interrupts(regs: &mut IntelIxgbeRegisters, vector_table: &mut MsixVectorTable) -> Result<[u8; NUM_MSI_VEC_ENABLED], &'static str> {
         // set IVAR reg to enable interrupts for different queues
         // each IVAR register controls 2 RX and 2 TX queues
-        let num_queues: usize = IXGBE_NUM_RX_QUEUES;
-        let queues_per_ivar_reg: usize = 2;
+        let num_queues = IXGBE_NUM_RX_QUEUES as usize;
+        let queues_per_ivar_reg = 2;
         let enable_interrupt_rx = 0x0080;
-        for queue in 0..no_queues {
+        for queue in 0..num_queues {
             let int_enable = 
                 // an even number queue which means we'll write to the lower 16 bits
                 if queue % queues_per_ivar_reg == 0 {
@@ -994,7 +971,7 @@ impl IxgbeNic{
                 // otherwise we'll write to the upper 16 bits
                 else {
                     (enable_interrupt_rx | queue) << 16
-                }
+                };
             regs.ivar.reg[queue / queues_per_ivar_reg].write(int_enable as u32); 
             debug!("IVAR: {:#X}", regs.ivar.reg[queue].read());
         }
@@ -1029,24 +1006,26 @@ impl IxgbeNic{
         // TODO: find a cleaner way
         // register_interrupt(interrupt_nums[0] as u8, ixgbe_handler_0);
 
-        // retrieve rx descriptors to know which cpu to send the interrupt to
-        let rxq = get_ixgbe_rx_queues().ok_or("ixgbe: rx descriptors not initialized")?;
+        // // retrieve rx descriptors to know which cpu to send the interrupt to
+        // let rxq = get_ixgbe_rx_queues().ok_or("ixgbe: rx descriptors not initialized")?;
 
-        // Initialize msi vectors
-        for i in 0..NUM_MSI_VEC_ENABLED{
-            // find core to redirect interrupt to
-            // we assume that the number of msi vectors are <= the number of rx queues
-            let cpu = rxq.queue[i].lock().cpu_id;
-            let core_id = cpu as u32;
-            // set the interrupt number for this queue
-            rxq.queue[i].lock().interrupt_num = interrupt_nums[i];
-            //allocate an interrupt to msix vector
-            vector_table.msi_vector[i].vector_control.write(0);
-            let lower_addr = vector_table.msi_vector[i].msg_lower_addr.read();
-            vector_table.msi_vector[i].msg_lower_addr.write((lower_addr & !0xFF0) | 0xFEE << 20 | core_id << 12); 
-            vector_table.msi_vector[i].msg_data.write(interrupt_nums[i] as u32);
-            debug!("Created MSI vector: control: {}, core: {}, int: {}", vector_table.msi_vector[i].vector_control.read(), core_id, interrupt_nums[i]);
-        }
+        // // Initialize msi vectors
+        // for i in 0..NUM_MSI_VEC_ENABLED{
+        //     // find core to redirect interrupt to
+        //     // we assume that the number of msi vectors are <= the number of rx queues
+        //     let cpu = rxq.queue[i].lock().cpu_id;
+        //     let core_id = cpu as u32;
+        //     // set the interrupt number for this queue
+        //     rxq.queue[i].lock().interrupt_num = interrupt_nums[i];
+        //     //allocate an interrupt to msix vector
+        //     vector_table.msi_vector[i].vector_control.write(0);
+        //     let lower_addr = vector_table.msi_vector[i].msg_lower_addr.read();
+        //     vector_table.msi_vector[i].msg_lower_addr.write((lower_addr & !0xFF0) | 0xFEE << 20 | core_id << 12); 
+        //     vector_table.msi_vector[i].msg_data.write(interrupt_nums[i] as u32);
+        //     debug!("Created MSI vector: control: {}, core: {}, int: {}", vector_table.msi_vector[i].vector_control.read(), core_id, interrupt_nums[i]);
+        // }
+
+        Ok([0; NUM_MSI_VEC_ENABLED])
     }
 
     // reads status and clears interrupt
@@ -1119,8 +1098,8 @@ impl IxgbeNic{
             };
 
             // actually tell the NIC about the new receive buffer, and that it's ready for use now
-            q.rx_descs[rx_cur].set_packet_buffer_address(new_receive_buf.phys_addr.value() as u64);
-            q.rx_descs[rx_cur].set_header_buffer_address(0);
+            q.rx_descs[rx_cur].packet_buffer_address.write(new_receive_buf.phys_addr.value() as u64);
+            q.rx_descs[rx_cur].header_buffer_address.write(0);
 
             // Swap in the new receive buffer at the index corresponding to this current rx_desc's receive buffer,
             // getting back the receive buffer that is part of the received ethernet frame
@@ -1185,7 +1164,7 @@ fn rx_interrupt_handler(queue_num: u8) -> u8 {
 
 /// The interrupt handler for rx queue 0
 extern "x86-interrupt" fn ixgbe_handler_0(_stack_frame: &mut ExceptionStackFrame) {
-    eoi(Some(rx_interrupt_handler()));
+    eoi(Some(rx_interrupt_handler(0)));
 }
 
 

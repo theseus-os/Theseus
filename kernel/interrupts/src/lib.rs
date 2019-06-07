@@ -210,15 +210,6 @@ pub fn register_interrupt(interrupt_num : u8, func: HandlerFunc) {
     idt[interrupt_num as usize].set_handler_fn(func);
 } 
 
-/// Retreive an unused interrupt number and set the handler function for that entry
-/// 
-pub fn register_msi_interrupt(func: HandlerFunc) -> Result<u8, &'static str> {
-    let mut idt = IDT.lock();
-    let interrupt_num = idt.interrupts.iter().position(|&r| r == IdtEntry::missing()).ok_or("register_msi_interrupt: No available interrupts")?;
-    idt[interrupt_num as usize].set_handler_fn(func);
-    Ok(interrupt_num)
-}
-
 /// Send an end of interrupt signal, which works for all types of interrupt chips (APIC, x2apic, PIC)
 /// irq arg is only used for PIC
 pub fn eoi(irq: Option<u8>) {
