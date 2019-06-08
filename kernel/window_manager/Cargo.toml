@@ -19,8 +19,11 @@ version = "0.1.0"
 [dependencies.frame_buffer]
 path = "../frame_buffer"
 
-[dependencies.display]
-path = "../display"
+[dependencies.frame_buffer_drawer]
+path = "../frame_buffer_drawer"
+
+[dependencies.frame_buffer_printer]
+path = "../frame_buffer_printer"
 
 [dependencies.event_types]
 path = "../event_types"
