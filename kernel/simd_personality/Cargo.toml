@@ -7,7 +7,6 @@ build = "../../build.rs"
 
 [dependencies]
 cfg-if = "0.1.6"
-# features = [ "no-lang-items", "mem"]
 
 [dependencies.pit_clock]
 path = "../pit_clock"
@@ -33,9 +32,6 @@ path = "../mod_mgmt"
 
 [dependencies.fs_node]
 path = "../fs_node"
-
-[dependencies.path]
-path = "../path"
 
 # [target.'cfg(target_feature = "sse2")'.dependencies.compiler_builtins]
 # git = "https://github.com/rust-lang-nursery/compiler-builtins"
