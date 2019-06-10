@@ -15,3 +15,6 @@ version = "0.3.7"
 
 [dependencies.memory]
 path = "../memory"
+
+[dependencies.network_interface_card]
+path = "../network_interface_card"
