@@ -250,6 +250,8 @@ impl WindowAllocator{
         Ok(())
     }
 
+
+    // return a reference to the next window of current active window
     fn next_window(&mut self) -> Option<Arc<Mutex<WindowInner>>> {
         let mut current_active = false;
         for item in self.allocated.iter_mut(){
@@ -621,6 +623,7 @@ impl Component {
     }
 }
 
+/// select the next window in the list and set it as active. set current active window and inactive
 pub fn schedule() -> Result<(), &'static str>{
     let mut allocator = try!(WINDOW_ALLOCATOR.try().ok_or("The window allocator is not initialized")).lock();
     let next_window = match allocator.next_window() {
@@ -632,7 +635,7 @@ pub fn schedule() -> Result<(), &'static str>{
         let mut current = window.lock();
         (*current).active(false)?;
     }
-    
+
     let mut next = next_window.lock();
     (*next).active(true)?;
     allocator.active = Arc::downgrade(&next_window);
