@@ -183,45 +183,6 @@ impl WindowAllocator{
         Ok(window)  
     }
 
-    /// Switches to the next active window in the window allocator list
-    /// This function returns the index of the previously active window in the window_allocator.allocated vector
-    pub fn schedule(&mut self) -> Result<usize, &'static str> {
-        let mut flag = false;
-        let mut i = 0;
-        let mut prev_active = 0;
-        for item in self.allocated.iter_mut(){
-            let reference = item.upgrade();
-            if let Some(window) = reference {
-                let mut window = window.lock();
-                if flag {
-                    (*window).active(true)?;
-                    self.active = item.clone(); // clones the weak pointer to put in the active field
-                    flag = false;
-                    self.active = item.clone();
-                } else if window.active {
-                    (*window).active(false)?;
-                    prev_active = i;
-                    flag = true;
-   
-             }
-                i += 1;
-            }
-        }
-        if flag {
-            for item in self.allocated.iter_mut(){
-                let reference = item.upgrade();
-                if let Some(window) = reference {
-                    let mut window = window.lock();
-                    (*window).active(true)?;
-                    self.active = item.clone(); // clones the weak pointer to put into the active field
-                    break;
-                }
-            }
-        }
-
-        return Ok(prev_active);
-    }
-
     // delete a window
     fn delete(&mut self, inner:&Arc<Mutex<WindowInner>>) -> Result<(), &'static str> {
         let mut i = 0;
@@ -288,6 +249,32 @@ impl WindowAllocator{
         }
         Ok(())
     }
+
+    fn next_window(&mut self) -> Option<Arc<Mutex<WindowInner>>> {
+        let mut current_active = false;
+        for item in self.allocated.iter_mut(){
+            let reference = item.upgrade();
+            if let Some(window) = reference {
+                if window.lock().active {
+                    current_active = true;
+                } else if current_active {
+                    return Some(window)
+                }
+            }
+        }
+
+        if current_active {
+            for item in self.allocated.iter_mut(){
+                let reference = item.upgrade();
+                if let Some(window) = reference {
+                    return Some(window)
+                }
+            }
+        }
+
+        None
+    }
+
 
 }
 
@@ -500,7 +487,7 @@ impl Drop for WindowObj {
 
         // Switches to a new active window and sets 
         // the active pointer field of the window allocator to the new active window
-        match allocator.schedule() {
+        match schedule() {
             Ok(_) => {}
             Err(err) => { error!("Fail to schedule to the next window: {}", err) }
         }; 
@@ -632,6 +619,25 @@ impl Component {
         self.y = y;
         self.displayable.resize(width, height);
     }
+}
+
+pub fn schedule() -> Result<(), &'static str>{
+    let mut allocator = try!(WINDOW_ALLOCATOR.try().ok_or("The window allocator is not initialized")).lock();
+    let next_window = match allocator.next_window() {
+        Some(window) => { window }
+        None => { return Ok(()) } //do nothing if current active window is the only window
+    };
+    
+    if let Some(window) = allocator.active.upgrade() {
+        let mut current = window.lock();
+        (*current).active(false)?;
+    }
+    
+    let mut next = next_window.lock();
+    (*next).active(true)?;
+    allocator.active = Arc::downgrade(&next_window);
+
+    Ok(())
 }
 
 /*  Following two functions can be used to systematically resize windows forcibly

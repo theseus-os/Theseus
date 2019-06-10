@@ -94,8 +94,7 @@ fn input_event_loop(consumer:DFQueueConsumer<Event>) -> Result<(), &'static str>
 
                 // Switches between terminal windows
                 if key_input.modifiers.alt && key_input.keycode == Keycode::Tab && key_input.action == KeyAction::Pressed {
-                    let mut allocator = try!(window_manager::WINDOW_ALLOCATOR.try().ok_or("The window allocator is not initialized")).lock();
-                    allocator.schedule()?;
+                    window_manager::schedule()?;
                     meta_keypress = true;
                     event.mark_completed();
 
