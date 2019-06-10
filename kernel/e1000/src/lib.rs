@@ -40,7 +40,10 @@ use owning_ref::BoxRefMut;
 use interrupts::{eoi,register_interrupt};
 use x86_64::structures::idt::{ExceptionStackFrame};
 use network_interface_card::{NetworkInterfaceCard, TransmitBuffer, ReceiveBuffer, ReceivedFrame};
-use intel_ethernet::descriptors::{LegacyTxDesc, LegacyRxDesc};
+use intel_ethernet::{
+    NicInit,
+    descriptors::{LegacyTxDesc, LegacyRxDesc}
+};
 
 pub const INTEL_VEND:           u16 = 0x8086;  // Vendor ID for Intel 
 pub const E1000_DEV:            u16 = 0x100E;  // Device ID for the e1000 Qemu, Bochs, and VirtualBox emmulated NICs
@@ -85,15 +88,6 @@ lazy_static! {
     /// and temporarily given to higher layers in the networking stack.
     static ref RX_BUFFER_POOL: mpmc::Queue<ReceiveBuffer> = mpmc::Queue::with_capacity(RX_BUFFER_POOL_SIZE);
 }
-
-
-
-/// The mapping flags used for pages that the NIC will map.
-/// This should be a const, but Rust doesn't yet allow constants for the bitflags type
-fn nic_mapping_flags() -> EntryFlags {
-    EntryFlags::PRESENT | EntryFlags::WRITABLE | EntryFlags::NO_CACHE | EntryFlags::NO_EXECUTE
-}
-
 
 ///struct to hold mapping of registers
 #[repr(C)]
@@ -192,7 +186,7 @@ pub struct E1000Nic {
 }
 
 
-
+impl NicInit for E1000Nic {}
 
 impl NetworkInterfaceCard for E1000Nic {
 
@@ -306,27 +300,6 @@ impl E1000Nic {
         Ok(nic_ref)
     }
     
-    ///find out amount of space needed for device's registers
-    fn determine_mem_size(dev: &PciDevice) -> u32 {
-        // Here's what we do: 
-        // 1) read pci reg
-        // 2) bitwise not and add 1 because ....
-        pci_write(dev.bus, dev.slot, dev.func, PCI_BAR0, 0xFFFF_FFFF);
-        let mut mem_size = pci_read_32(dev.bus, dev.slot, dev.func, PCI_BAR0);
-        //debug!("mem_size_read: {:x}", mem_size);
-        mem_size = mem_size & 0xFFFF_FFF0; //mask info bits
-        mem_size = !(mem_size); //bitwise not
-        //debug!("mem_size_read_not: {:x}", mem_size);
-        mem_size = mem_size +1; // add 1
-        //debug!("mem_size: {}", mem_size);
-        pci_write(dev.bus, dev.slot, dev.func, PCI_BAR0, dev.bars[0]); //restore original value
-        //check that value is restored
-        let bar0 = pci_read_32(dev.bus, dev.slot, dev.func, PCI_BAR0);
-        debug!("original bar0: {:#X}", bar0);
-        mem_size
-    }
-
-
     /// allocates memory for the NIC, starting address and size taken from the PCI BAR0
     fn mem_map(dev: &PciDevice, mem_base: PhysicalAddress) -> Result<BoxRefMut<MappedPages, IntelE1000Registers>, &'static str> {
         // set the bust mastering bit for this PciDevice, which allows it to use DMA
@@ -361,7 +334,7 @@ impl E1000Nic {
     fn init_rx_buf_pool(num_rx_buffers: usize) -> Result<(), &'static str> {
         let length = E1000_RX_BUFFER_SIZE_IN_BYTES;
         for _i in 0..num_rx_buffers {
-            let (mp, phys_addr) = create_contiguous_mapping(length as usize, nic_mapping_flags())?; 
+            let (mp, phys_addr) = create_contiguous_mapping(length as usize, Self::nic_mapping_flags())?; 
             let rx_buf = ReceiveBuffer::new(mp, phys_addr, length, &RX_BUFFER_POOL);
             if RX_BUFFER_POOL.push(rx_buf).is_err() {
                 // if the queue is full, it returns an Err containing the object trying to be pushed
@@ -429,7 +402,7 @@ impl E1000Nic {
         let size_in_bytes_of_all_rx_descs = E1000_NUM_RX_DESC * core::mem::size_of::<LegacyRxDesc>();
 
         // Rx descriptors must be 16 byte-aligned, which is satisfied below because it's aligned to a page boundary.
-        let (rx_descs_mapped_pages, rx_descs_starting_phys_addr) = create_contiguous_mapping(size_in_bytes_of_all_rx_descs, nic_mapping_flags())?;
+        let (rx_descs_mapped_pages, rx_descs_starting_phys_addr) = create_contiguous_mapping(size_in_bytes_of_all_rx_descs, Self::nic_mapping_flags())?;
 
         // cast our physically-contiguous MappedPages into a slice of receive descriptors
         let mut rx_descs = BoxRefMut::new(Box::new(rx_descs_mapped_pages))
@@ -442,7 +415,7 @@ impl E1000Nic {
             let rx_buf = RX_BUFFER_POOL.pop()
                 .ok_or("Couldn't obtain a ReceiveBuffer from the pool")
                 .or_else(|_e| {
-                    create_contiguous_mapping(E1000_RX_BUFFER_SIZE_IN_BYTES as usize, nic_mapping_flags())
+                    create_contiguous_mapping(E1000_RX_BUFFER_SIZE_IN_BYTES as usize, Self::nic_mapping_flags())
                         .map(|(buf_mapped, buf_paddr)| 
                             ReceiveBuffer::new(buf_mapped, buf_paddr, E1000_RX_BUFFER_SIZE_IN_BYTES, &RX_BUFFER_POOL)
                         )
@@ -483,7 +456,7 @@ impl E1000Nic {
         let size_in_bytes_of_all_tx_descs = E1000_NUM_TX_DESC * core::mem::size_of::<LegacyTxDesc>();
 
         // Tx descriptors must be 16 byte-aligned, which is satisfied below because it's aligned to a page boundary.
-        let (tx_descs_mapped_pages, tx_descs_starting_phys_addr) = create_contiguous_mapping(size_in_bytes_of_all_tx_descs, nic_mapping_flags())?;
+        let (tx_descs_mapped_pages, tx_descs_starting_phys_addr) = create_contiguous_mapping(size_in_bytes_of_all_tx_descs, Self::nic_mapping_flags())?;
 
         // cast our physically-contiguous MappedPages into a slice of transmit descriptors
         let mut tx_descs = BoxRefMut::new(Box::new(tx_descs_mapped_pages))
@@ -576,7 +549,7 @@ impl E1000Nic {
                     warn!("e1000 RX BUF POOL WAS EMPTY.... reallocating! This means that no task is consuming the accumulated received ethernet frames.");
                     // if the pool was empty, then we allocate a new receive buffer
                     let len = E1000_RX_BUFFER_SIZE_IN_BYTES;
-                    let (mp, phys_addr) = create_contiguous_mapping(len as usize, nic_mapping_flags())?;
+                    let (mp, phys_addr) = create_contiguous_mapping(len as usize, Self::nic_mapping_flags())?;
                     ReceiveBuffer::new(mp, phys_addr, len, &RX_BUFFER_POOL)
                 }
             };

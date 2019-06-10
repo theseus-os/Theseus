@@ -195,6 +195,7 @@ pub struct IntelIxgbeRegisters {
     _padding36:                         [u8; 61320],            // 0x11078 - 0x1FFFF
 } //128 KB
 
+
 /// Set of 4 32-bit registers
 #[repr(C)]
 pub struct RegisterArray4 {

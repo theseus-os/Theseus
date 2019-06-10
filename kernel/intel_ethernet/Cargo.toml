@@ -8,6 +8,7 @@ edition = "2018"
 [dependencies]
 volatile = "0.2.5"
 bit_field = "0.7.0"
+spin = "0.4.5"
 
 [dependencies.log]
 default-features = false
@@ -18,3 +19,12 @@ path = "../memory"
 
 [dependencies.network_interface_card]
 path = "../network_interface_card"
+
+[dependencies.pci]
+path = "../pci"
+
+[dependencies.mpmc]
+path = "../../libs/mpmc"
+
+[lib]
+crate-type = ["rlib"]

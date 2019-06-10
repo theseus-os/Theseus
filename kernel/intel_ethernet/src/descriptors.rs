@@ -10,6 +10,11 @@ pub enum DescriptorType {
     Advanced,
 }
 
+pub trait RxDescriptor {
+    fn status(&self) -> u64;
+    fn length(&self) -> u64;
+}
+
 /// This struct is a Legacy Receive Descriptor. 
 /// There is one instance of this struct per receive buffer. 
 #[repr(C)]
@@ -22,6 +27,16 @@ pub struct LegacyRxDesc {
     pub status:     Volatile<u8>,
     pub errors:     ReadOnly<u8>,
     pub special:    ReadOnly<u16>,
+}
+
+impl RxDescriptor for LegacyRxDesc {
+    fn status(&self) -> u64 {
+        self.status.read() as u64
+    }
+
+    fn length(&self) -> u64 {
+        self.length.read() as u64
+    }
 }
 
 impl LegacyRxDesc {
@@ -108,6 +123,16 @@ pub struct AdvancedReceiveDescriptor {
     /// the starting physcal address of the receive buffer for the header
     /// this field will only be used if header splitting is enabled    
     pub header_buffer_address:  Volatile<u64>,
+}
+
+impl RxDescriptor for AdvancedReceiveDescriptor {
+    fn status(&self) -> u64 {
+        self.get_ext_status() as u64
+    }
+
+    fn length(&self) -> u64 {
+        self.get_pkt_len() as u64
+    }
 }
 
 impl AdvancedReceiveDescriptor {

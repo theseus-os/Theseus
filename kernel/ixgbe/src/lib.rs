@@ -55,7 +55,10 @@ use rand::{
     rngs::SmallRng
 };
 use runqueue::get_least_busy_core;
-use intel_ethernet::descriptors::*;
+use intel_ethernet::{
+    NicInit,
+    descriptors::*,
+};
 
 /* Default configuration at time of initialization of NIC */
 const INTERRUPT_ENABLE:                     bool    = false;
@@ -112,38 +115,31 @@ lazy_static! {
     static ref RX_BUFFER_POOL: mpmc::Queue<ReceiveBuffer> = mpmc::Queue::with_capacity(RX_BUFFER_POOL_SIZE);
 }
 
-/// The mapping flags used for pages that the NIC will map.
-/// This should be a const, but Rust doesn't yet allow constants for the bitflags type
-/// TODO: This function is a repeat from the e1000, we need to consolidate common functions
-fn nic_mapping_flags() -> EntryFlags {
-    EntryFlags::PRESENT | EntryFlags::WRITABLE | EntryFlags::NO_CACHE | EntryFlags::NO_EXECUTE
-}
-
 /// A struct representing an ixgbe network interface card
 pub struct IxgbeNic {
     /// Type of BAR0
     bar_type: u8,
-    /// IO Base Address     
-    io_base: u32,
     /// MMIO Base Address     
     mem_base: PhysicalAddress,
     /// MMIO Base virtual address
     mem_base_v: VirtualAddress,   
     /// A flag indicating if eeprom exists
     eeprom_exists: bool,
-    /// interrupt number for each msi vector
+    /// Interrupt number for each msi vector
     interrupt_num: Option<[u8; NUM_MSI_VEC_ENABLED]>,
     /// The actual MAC address burnt into the hardware  
     mac_hardware: [u8;6],       
     /// The optional spoofed MAC address to use in place of `mac_hardware` when transmitting.  
     mac_spoofed: Option<[u8; 6]>,
-    /// memory-mapped control registers
+    /// Memory-mapped control registers
     regs: BoxRefMut<MappedPages, IntelIxgbeRegisters>,
-    /// memory-mapped msi-x vector table
+    /// Memory-mapped msi-x vector table
     msix_vector_table: BoxRefMut<MappedPages, MsixVectorTable>,
-    /// array to store the L3/L4 5-tuple filters numbers, and which have been used
-    /// there are 128 such filters available
+    /// Array to store which L3/L4 5-tuple filters have been used.
+    /// There are 128 such filters available.
     l34_5_tuple_filters: [bool; 128],
+    /// The Rx queue that ethernet frames will be retrieved from in the next cycle 
+    cur_rx_queue: u8,
 }
 
 /// A struct to store the rx descriptor queues for the ixgbe nic
@@ -197,6 +193,7 @@ pub struct TxQueueInfo {
     cpu_id : u8
 }
 
+impl NicInit for IxgbeNic {}
 
 impl NetworkInterfaceCard for IxgbeNic {
 
@@ -206,49 +203,40 @@ impl NetworkInterfaceCard for IxgbeNic {
         let mut txq = get_ixgbe_tx_queues().ok_or("ixgbe: tx descriptors not initialized")?.queue[qid].lock();
         let cur = txq.tx_cur as usize;
 
-        // get the tx descriptor that will be used to send this packet
+        // Get the tx descriptor that will be used to send this packet
         txq.tx_descs[cur].send(transmit_buffer);  
-
-        // update the tx_cur value to point to the next descriptor
-        let old_cur = cur;
-        txq.tx_cur = ((cur + 1) % IXGBE_NUM_TX_DESC) as u16;
-
-        // debug!("TDH {}", self.regs.tx_regs.tx_queue[0].tdh.read());
-        // debug!("TDT!{}", self.regs.tx_regs.tx_queue[0].tdt.read());
-
-        // update the tdt register with the new tail
-        self.regs.tx_regs.tx_queue[qid].tdt.write(txq.tx_cur as u32);   
         
-        // // debug!("TDH {}", self.regs.tx_regs.tx_queue[0].tdh.read());
-        // // debug!("TDT!{}", self.regs.tx_regs.tx_queue[0].tdt.read());
-        // // debug!("post-write, tx_descs[{}] = {:?}", old_cur, self.tx_descs[old_cur as usize]);
-        // // debug!("Value of tx descriptor address: {:x}",self.tx_descs[old_cur as usize].phys_addr.read());
-        // // debug!("Waiting for packet to send!");
+        // update the tdt register and tx_cur 
+        Self::update_tdt(&mut txq.tx_cur, IXGBE_NUM_TX_DESC as u16, &mut self.regs.tx_regs.tx_queue[qid].tdt);
         
-        // Wait for descriptor done bit to be set which indicates that the packet has been sent
+        // Wait for the packet to be sent
         txq.tx_descs[cur].wait_for_packet_tx();
         
         // debug!("Packet is sent!");  
         Ok(())
     }
 
-    // TODO: should iterate through all the queues for received frames
     fn get_received_frame(&mut self) -> Option<ReceivedFrame> {
-        // acquire the rx queue structures. The default queue is 0.
-        let qid = 0;
+        // the rx queue to retrieve ethernet frames from 
+        let qid = self.cur_rx_queue as usize;
+        // acquire the rx queue structure. 
         let mut rxq = match get_ixgbe_rx_queues() {
-            Some(rx) => rx.queue[0].lock(),
+            Some(rx) => rx.queue[qid].lock(),
             None => return None
         };
-
+        // Update the current rx queue so that the next time, another queue will be used in this function.
+        // This way frames from all queues will be retrieved in round robin order 
+        self.cur_rx_queue = (qid as u8 + 1) % IXGBE_NUM_RX_QUEUES;
+        // return one frame from the queue's received frames
         rxq.received_frames.pop_front()
     }
 
-    // TODO: should iterate through all the queues to accept incoming frames
     fn poll_receive(&mut self) -> Result<(), &'static str> {
-        // acquire the rx queue structures. The default queue is 0.
-        let qid = 0;
-        self.handle_receive(qid)
+        // Iterate through all the rx queues and collect their received frames
+        for qid in 0..IXGBE_NUM_RX_QUEUES {
+            self.handle_receive(qid)?;
+        }
+        Ok(())
     }
 
     fn mac_address(&self) -> [u8; 6] {
@@ -261,17 +249,22 @@ impl IxgbeNic {
     /// store required values from the devices PCI config space
     pub fn init(ixgbe_pci_dev: &PciDevice) -> Result<&'static MutexIrqSafe<IxgbeNic>, &'static str> {
 
+        let bar0 = ixgbe_pci_dev.bars[0];
         // Determine the type from the base address register
-        let bar_type = (ixgbe_pci_dev.bars[0] as u8) & 0x01;    
+        let bar_type = (bar0 as u8) & 0x01;    
+        let mem_mapped = 0;
 
-        // IO Base Address
-        let io_base = ixgbe_pci_dev.bars[0] & !1;   
+        // If the base address is not memory mapped then exit
+        if bar_type != mem_mapped {
+            error!("ixgbe::init: BAR0 is of I/O type");
+            return Err("ixgbe::init: BAR0 is of I/O type")
+        }
 
-        // memory mapped base address
-        let mem_base = PhysicalAddress::new(ixgbe_pci_dev.bars[0] as usize & !3)?; //TODO: hard coded for 32 bit, need to make conditional      
+        // 16-byte aligned memory mapped base address
+        let mem_base =  Self::determine_mem_base(ixgbe_pci_dev)?;
 
         // map the IntelIxgbeRegisters struct to the address found from the pci space
-        let (mut mapped_registers, mem_base_v) = Self::mem_map(ixgbe_pci_dev, mem_base)?;
+        let (mut mapped_registers, mem_base_v) = Self::mapped_reg(ixgbe_pci_dev, mem_base)?;
 
         // map the msi-x vector table to an address found from the pci space
         let mut vector_table = Self::mem_map_msix(ixgbe_pci_dev)?;
@@ -348,7 +341,6 @@ impl IxgbeNic {
 
         let ixgbe_nic = IxgbeNic {
             bar_type: bar_type,
-            io_base: io_base,
             mem_base: mem_base,
             mem_base_v: mem_base_v,
             eeprom_exists: false,
@@ -357,119 +349,44 @@ impl IxgbeNic {
             mac_spoofed: None,
             regs: mapped_registers,
             msix_vector_table: vector_table,
-            l34_5_tuple_filters: [false; 128]
+            l34_5_tuple_filters: [false; 128],
+            cur_rx_queue: 0,
         };
 
         let nic_ref = IXGBE_NIC.call_once(|| MutexIrqSafe::new(ixgbe_nic));
         Ok(nic_ref)       
     }
 
-    ///find out amount of space needed for device's registers
-    fn determine_mem_size(dev: &PciDevice) -> u32 {
-        // Here's what we do: 
-        // 1) read pci reg
-        // 2) bitwise not and add 1 because ....
-        pci_write(dev.bus, dev.slot, dev.func, PCI_BAR0, 0xFFFF_FFFF);
-        let mut mem_size = pci_read_32(dev.bus, dev.slot, dev.func, PCI_BAR0);
-        //debug!("mem_size_read: {:x}", mem_size);
-        mem_size = mem_size & 0xFFFF_FFF0; //mask info bits
-        mem_size = !(mem_size); //bitwise not
-        //debug!("mem_size_read_not: {:x}", mem_size);
-        mem_size = mem_size +1; // add 1
-        //debug!("mem_size: {}", mem_size);
-        pci_write(dev.bus, dev.slot, dev.func, PCI_BAR0, dev.bars[0]); //restore original value
-        //check that value is restored
-        let bar0 = pci_read_32(dev.bus, dev.slot, dev.func, PCI_BAR0);
-        debug!("original bar0: {:#X}", bar0);
-        mem_size
-    }
-
-    /// allocates memory for the NIC, starting address and size taken from the PCI BAR0
-    pub fn mem_map (dev: &PciDevice, mem_base: PhysicalAddress) -> Result<(BoxRefMut<MappedPages, IntelIxgbeRegisters>, VirtualAddress), &'static str> {
-        // set the bus mastering bit for this PciDevice, which allows it to use DMA
-        pci_set_command_bus_master_bit(dev);
-
-        //find out amount of space needed
-        let mem_size_in_bytes = IxgbeNic::determine_mem_size(dev) as usize;
-
-        // inform the frame allocator that the physical frames where the PCI config space for the nic exists
-        // is now off-limits and should not be touched
-        {
-            let nic_area = PhysicalMemoryArea::new(mem_base, mem_size_in_bytes as usize, 1, 0); 
-            FRAME_ALLOCATOR.try().ok_or("ixgbe: Couldn't get FRAME ALLOCATOR")?.lock().add_area(nic_area, false)?;
-        }
-
-        // set up virtual pages and physical frames to be mapped
-        let pages_nic = allocate_pages_by_bytes(mem_size_in_bytes).ok_or("ixgbe::mem_map(): couldn't allocated virtual page!")?;
-        let frames_nic = FrameRange::from_phys_addr(mem_base, mem_size_in_bytes - PAGE_SIZE + 1); //TODO: check why we need to add 1
-        let flags = EntryFlags::PRESENT | EntryFlags::WRITABLE | EntryFlags::NO_CACHE | EntryFlags::NO_EXECUTE;
-
-        debug!("Ixgbe: memory base: {:#X}, memory size: {}", mem_base, mem_size_in_bytes);
-
-        let kernel_mmi_ref = get_kernel_mmi_ref().ok_or("ixgbe:mem_map KERNEL_MMI was not yet initialized!")?;
-        let mut kernel_mmi = kernel_mmi_ref.lock();
-        let mut fa = FRAME_ALLOCATOR.try().ok_or("ixgbe::mem_map(): couldn't get FRAME_ALLOCATOR")?.lock();
-        let nic_mapped_page = kernel_mmi.page_table.map_allocated_pages_to(pages_nic, frames_nic, flags, fa.deref_mut())?;
+    /// Returns the memory mapped registers of the nic
+    pub fn mapped_reg (dev: &PciDevice, mem_base: PhysicalAddress) -> Result<(BoxRefMut<MappedPages, IntelIxgbeRegisters>, VirtualAddress), &'static str> {
+        let nic_mapped_page = Self::mem_map_reg(dev, mem_base)?;
         let mem_base_v = nic_mapped_page.start_address();
         let regs = BoxRefMut::new(Box::new(nic_mapped_page)).try_map_mut(|mp| mp.as_type_mut::<IntelIxgbeRegisters>(0))?;
             
         debug!("Ixgbe status register: {:#X}", regs.status.read());
         Ok((regs, mem_base_v))
-
     }
 
+    /// Returns the memory mapped msix vector table
     pub fn mem_map_msix(dev: &PciDevice) -> Result<BoxRefMut<MappedPages, MsixVectorTable>, &'static str> {
         // retreive the address in the pci config space for the msi-x capability
         let cap_addr = try!(pci_config_space(dev, MSIX_CAPABILITY).ok_or("ixgbe: device not have MSI-X capability"));
-
-
+        // find the BAR used for msi-x
         let vector_table_offset = 4;
         let table_offset = pci_read_32(dev.bus, dev.slot, dev.func, cap_addr + vector_table_offset);
         let bar = table_offset & 0x7;
         let offset = table_offset >> 3;
-
+        // find the memory base address and size of the area for the vector table
         let mem_base = PhysicalAddress::new((dev.bars[bar as usize] + offset) as usize)?;
         let mem_size_in_bytes = core::mem::size_of::<MsixVectorEntry>() * IXGBE_MAX_MSIX_VECTORS;
 
         debug!("msi-x vector table bar: {}, base_address: {:#X} and size: {} bytes", bar, mem_base, mem_size_in_bytes);
 
-        // inform the frame allocator that the physical frames where the PCI config space for the nic exists
-        // is now off-limits and should not be touched
-        {
-            let nic_area = PhysicalMemoryArea::new(mem_base, mem_size_in_bytes as usize, 1, 0); // TODO: FIXME:  use proper acpi number 
-            FRAME_ALLOCATOR.try().ok_or("ixgbe: Couldn't get FRAME ALLOCATOR")?.lock().add_area(nic_area, false)?;
-        }
-
-        // set up virtual pages and physical frames to be mapped
-        let pages_nic = allocate_pages_by_bytes(mem_size_in_bytes).ok_or("ixgbe::mem_map_msix(): couldn't allocated virtual page!")?;
-        let frames_nic = FrameRange::from_phys_addr(mem_base, mem_size_in_bytes);
-        let flags = EntryFlags::PRESENT | EntryFlags::WRITABLE | EntryFlags::NO_CACHE | EntryFlags::NO_EXECUTE;
-
-        let kernel_mmi_ref = get_kernel_mmi_ref().ok_or("ixgbe:mem_map_msix KERNEL_MMI was not yet initialized!")?;
-        let mut kernel_mmi = kernel_mmi_ref.lock();
-        let mut fa = FRAME_ALLOCATOR.try().ok_or("ixgbe::mem_map_msix(): couldn't get FRAME_ALLOCATOR")?.lock();
-        let nic_mapped_page = kernel_mmi.page_table.map_allocated_pages_to(pages_nic, frames_nic, flags, fa.deref_mut())?;
-        let vector_table = BoxRefMut::new(Box::new(nic_mapped_page)).try_map_mut(|mp| mp.as_type_mut::<MsixVectorTable>(0))?;
+        let msix_mapped_pages = Self::mem_map(mem_base, mem_size_in_bytes)?;
+        let vector_table = BoxRefMut::new(Box::new(msix_mapped_pages)).try_map_mut(|mp| mp.as_type_mut::<MsixVectorTable>(0))?;
 
         Ok(vector_table)
     }
-
-
-    fn init_rx_buf_pool(num_rx_buffers: usize) -> Result<(), &'static str> {
-        let length = IXGBE_RX_BUFFER_SIZE_IN_BYTES;
-        for _i in 0..num_rx_buffers {
-            let (mp, phys_addr) = create_contiguous_mapping(length as usize, nic_mapping_flags())?; 
-            let rx_buf = ReceiveBuffer::new(mp, phys_addr, length, &RX_BUFFER_POOL);
-            if RX_BUFFER_POOL.push(rx_buf).is_err() {
-                // if the queue is full, it returns an Err containing the object trying to be pushed
-                error!("ixgbe::init_rx_buf_pool(): rx buffer pool is full, cannot add rx buffer {}!", _i);
-                return Err("ixgbe rx buffer pool is full");
-            };
-        }
-
-        Ok(())
-    }
-
 
     pub fn spoof_mac(&mut self, spoofed_mac_addr: [u8; 6]) {
         self.mac_spoofed = Some(spoofed_mac_addr);
@@ -673,7 +590,7 @@ impl IxgbeNic {
     /// Initialize the array of receive descriptors and their corresponding receive buffers,
     /// and returns a tuple including both of them for all rx queues in use.
     pub fn rx_init(regs: &mut IntelIxgbeRegisters) -> Result<(Vec<BoxRefMut<MappedPages, [AdvancedReceiveDescriptor]>>, Vec<Vec<ReceiveBuffer>>), &'static str>  {
-        Self::init_rx_buf_pool(RX_BUFFER_POOL_SIZE)?;
+        Self::init_rx_buf_pool(RX_BUFFER_POOL_SIZE, IXGBE_RX_BUFFER_SIZE_IN_BYTES, &RX_BUFFER_POOL)?;
 
         let size_in_bytes_of_all_rx_descs_per_queue = IXGBE_NUM_RX_DESC * core::mem::size_of::<AdvancedReceiveDescriptor>();
 
@@ -682,7 +599,7 @@ impl IxgbeNic {
         
         for queue in 0..IXGBE_NUM_RX_QUEUES {
             // Rx descriptors must be 128 byte-aligned, which is satisfied below because it's aligned to a page boundary.
-            let (rx_descs_mapped_pages, rx_descs_starting_phys_addr) = create_contiguous_mapping(size_in_bytes_of_all_rx_descs_per_queue, nic_mapping_flags())?;
+            let (rx_descs_mapped_pages, rx_descs_starting_phys_addr) = create_contiguous_mapping(size_in_bytes_of_all_rx_descs_per_queue, Self::nic_mapping_flags())?;
 
             // cast our physically-contiguous MappedPages into a slice of receive descriptors
             let mut rx_descs = BoxRefMut::new(Box::new(rx_descs_mapped_pages))
@@ -696,7 +613,7 @@ impl IxgbeNic {
                 let rx_buf = RX_BUFFER_POOL.pop()
                     .ok_or("Couldn't obtain a ReceiveBuffer from the pool")
                     .or_else(|_e| {
-                        create_contiguous_mapping(IXGBE_RX_BUFFER_SIZE_IN_BYTES as usize, nic_mapping_flags())
+                        create_contiguous_mapping(IXGBE_RX_BUFFER_SIZE_IN_BYTES as usize, Self::nic_mapping_flags())
                             .map(|(buf_mapped, buf_paddr)| 
                                 ReceiveBuffer::new(buf_mapped, buf_paddr, IXGBE_RX_BUFFER_SIZE_IN_BYTES, &RX_BUFFER_POOL)
                             )
@@ -890,7 +807,7 @@ impl IxgbeNic {
         let size_in_bytes_of_all_tx_descs = IXGBE_NUM_TX_DESC * core::mem::size_of::<LegacyTxDesc>();
         
         // Tx descriptors must be 128 byte-aligned, which is satisfied below because it's aligned to a page boundary.
-        let (tx_descs_mapped_pages, tx_descs_starting_phys_addr) = create_contiguous_mapping(size_in_bytes_of_all_tx_descs, nic_mapping_flags())?;
+        let (tx_descs_mapped_pages, tx_descs_starting_phys_addr) = create_contiguous_mapping(size_in_bytes_of_all_tx_descs, Self::nic_mapping_flags())?;
 
         // cast our physically-contiguous MappedPages into a slice of transmit descriptors
         let mut tx_descs = BoxRefMut::new(Box::new(tx_descs_mapped_pages))
@@ -1076,7 +993,7 @@ impl IxgbeNic {
                     warn!("IXGBE RX BUF POOL WAS EMPTY.... reallocating! This means that no task is consuming the accumulated received ethernet frames.");
                     // if the pool was empty, then we allocate a new receive buffer
                     let len = IXGBE_RX_BUFFER_SIZE_IN_BYTES;
-                    let (mp, phys_addr) = create_contiguous_mapping(len as usize, nic_mapping_flags())?;
+                    let (mp, phys_addr) = create_contiguous_mapping(len as usize, Self::nic_mapping_flags())?;
                     ReceiveBuffer::new(mp, phys_addr, len, &RX_BUFFER_POOL)
                 }
             };

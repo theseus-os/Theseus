@@ -4,11 +4,13 @@ extern crate alloc;
 #[macro_use] extern crate log;
 extern crate memory;
 extern crate mpmc;
+extern crate volatile;
+
 
 use core::ops::{Deref, DerefMut};
 use alloc::vec::Vec;
 use memory::{create_contiguous_mapping, PhysicalAddress, EntryFlags, MappedPages};
-
+use volatile::Volatile;
 
 
 /// A trait that defines the necessary minimum functions that all network interface card (NIC) drivers
@@ -17,6 +19,20 @@ pub trait NetworkInterfaceCard {
     /// Sends a packet contained in the given `transmit_buffer` out through this NetworkInterfaceCard. 
     /// Blocks until the packet has been successfully sent by the networking card hardware.
     fn send_packet(&mut self, transmit_buffer: TransmitBuffer) -> Result<(), &'static str>;
+
+    /// Helper function for sending a packet, updates the current tx descriptor number and the tdt register.
+    /// 
+    /// # Arguments:
+    /// - `tx_cur`: the value which stores the next free descriptor to be used
+    /// - `max_tx_desc`: the number of tx descriptors in the queue
+    /// - `tdt': transmit descriptor tail register
+    fn update_tdt(tx_cur: &mut u16, max_tx_desc: u16, tdt: &mut Volatile<u32>) {
+        // update the tx_cur value to hold the next free descriptor
+        *tx_cur = (*tx_cur + 1) % max_tx_desc;
+        // update the tdt register by 1 so that it know the previous descriptor has been used
+        // and has a packet to be sent
+        tdt.write(*tx_cur as u32);
+    }
 
     /// Returns the earliest `ReceivedFrame`, which is essentially a list of `ReceiveBuffer`s 
     /// that each contain an individual piece of the frame.
