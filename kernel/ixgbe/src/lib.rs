@@ -30,7 +30,6 @@ extern crate intel_ethernet;
 
 pub mod test_ixgbe_driver;
 pub mod registers;
-pub mod phy;
 
 use core::ptr::{read_volatile, write_volatile};
 use core::ops::DerefMut;
@@ -285,18 +284,6 @@ impl IxgbeNic {
 
         // store the mac address of this device
         let mac_addr_hardware = Self::read_mac_address_from_nic(&mut mapped_registers);
-
-        // retrieve information from the PHY
-        { 
-            // let a = read_i2c_eeprom(&mut mapped_registers, SFF_IDENTIFIER)?;
-            // debug!("SF present: {}", a);
-
-            // let b = read_i2c_eeprom(&mut mapped_registers, SFF_10GBE_COMP_CODES)?;
-            // let c = read_i2c_eeprom(&mut mapped_registers, SFF_1GBE_COMP_CODES)?;
-            // let d = read_i2c_eeprom(&mut mapped_registers, SFF_CABLE_TECHNOLOGY)?;
-
-            // debug!("SF present: {}, 10 GB code: {}, 1 gb code: {}, cable technology: {}",a,b,c,d);
-        }
 
         // create the rx desc queues and their packet buffers
         let (mut rx_descs, mut rx_buffers) = Self::rx_init(&mut mapped_registers)?;
