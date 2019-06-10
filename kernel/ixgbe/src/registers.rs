@@ -323,7 +323,7 @@ pub struct RegisterArrayRx {
 pub const AUTOC_LMS_CLEAR:              u32 = 0x0000_E000; 
 pub const AUTOC_LMS_1_GB:               u32 = 0x0000_E000;
 pub const AUTOC_LMS_10_GBE_P:           u32 = 1 << 13;
-pub const AUTOC_LMS_10_GBE_S:           u32 = 3 << 13
+pub const AUTOC_LMS_10_GBE_S:           u32 = 3 << 13;
 pub const AUTOC_FLU:                    u32 = 1;
 pub const AUTOC_LMS:                    u32 = 6<<13; //KX/KX4//KR
 pub const AUTOC_RESTART_AN:             u32 = 1<<12;

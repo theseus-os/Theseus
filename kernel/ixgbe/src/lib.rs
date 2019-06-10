@@ -49,7 +49,6 @@ use apic::get_my_apic_id;
 use hpet::get_hpet;
 use network_interface_card::{NetworkInterfaceCard, TransmitBuffer, ReceiveBuffer, ReceivedFrame};
 use owning_ref::BoxRefMut;
-use phy::{read_i2c_eeprom, SFF_IDENTIFIER, SFF_10GBE_COMP_CODES, SFF_1GBE_COMP_CODES, SFF_CABLE_TECHNOLOGY};
 use rand::{
     SeedableRng,
     RngCore,
@@ -202,34 +201,32 @@ pub struct TxQueueInfo {
 impl NetworkInterfaceCard for IxgbeNic {
 
     fn send_packet(&mut self, transmit_buffer: TransmitBuffer) -> Result<(), &'static str>{
-        // acquire the tx queue structures. The default queue is 0.
+        // acquire the tx queue structure. The default queue is 0 since we haven't enabled multiple transmit queues.
         let qid = 0;
         let mut txq = get_ixgbe_tx_queues().ok_or("ixgbe: tx descriptors not initialized")?.queue[qid].lock();
-        let tx_cur = txq.tx_cur as usize;
+        let cur = txq.tx_cur as usize;
 
-        txq.tx_descs[tx_cur].phys_addr.write(transmit_buffer.phys_addr.value() as u64);
-        txq.tx_descs[tx_cur].length.write(transmit_buffer.length);
-        txq.tx_descs[tx_cur].cmd.write((CMD_EOP | CMD_IFCS | CMD_RPS | CMD_RS) as u8); 
-        txq.tx_descs[tx_cur].status.write(0);
+        // get the tx descriptor that will be used to send this packet
+        txq.tx_descs[cur].send(transmit_buffer);  
 
-        let old_cur = txq.tx_cur;
-        txq.tx_cur = (txq.tx_cur + 1) % (IXGBE_NUM_TX_DESC as u16);
+        // update the tx_cur value to point to the next descriptor
+        let old_cur = cur;
+        txq.tx_cur = ((cur + 1) % IXGBE_NUM_TX_DESC) as u16;
 
         // debug!("TDH {}", self.regs.tx_regs.tx_queue[0].tdh.read());
         // debug!("TDT!{}", self.regs.tx_regs.tx_queue[0].tdt.read());
 
+        // update the tdt register with the new tail
         self.regs.tx_regs.tx_queue[qid].tdt.write(txq.tx_cur as u32);   
         
-        // debug!("TDH {}", self.regs.tx_regs.tx_queue[0].tdh.read());
-        // debug!("TDT!{}", self.regs.tx_regs.tx_queue[0].tdt.read());
-        // debug!("post-write, tx_descs[{}] = {:?}", old_cur, self.tx_descs[old_cur as usize]);
-        // debug!("Value of tx descriptor address: {:x}",self.tx_descs[old_cur as usize].phys_addr.read());
-        // debug!("Waiting for packet to send!");
+        // // debug!("TDH {}", self.regs.tx_regs.tx_queue[0].tdh.read());
+        // // debug!("TDT!{}", self.regs.tx_regs.tx_queue[0].tdt.read());
+        // // debug!("post-write, tx_descs[{}] = {:?}", old_cur, self.tx_descs[old_cur as usize]);
+        // // debug!("Value of tx descriptor address: {:x}",self.tx_descs[old_cur as usize].phys_addr.read());
+        // // debug!("Waiting for packet to send!");
         
         // Wait for descriptor done bit to be set which indicates that the packet has been sent
-        while (txq.tx_descs[old_cur as usize].status.read() & TX_DD) == 0 {
-            // debug!("tx desc status: {}", self.tx_descs[old_cur as usize].status.read());
-        }   //bit 0 should be set when done
+        txq.tx_descs[cur].wait_for_packet_tx();
         
         // debug!("Packet is sent!");  
         Ok(())

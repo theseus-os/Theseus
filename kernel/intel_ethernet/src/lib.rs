@@ -4,6 +4,7 @@
 extern crate bit_field;
 extern crate volatile;
 extern crate memory;
+extern crate network_interface_card;
 
 pub mod descriptors;
 
