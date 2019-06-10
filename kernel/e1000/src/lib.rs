@@ -280,7 +280,7 @@ impl E1000Nic {
         //e1000_nc.clear_statistics();
         
         Self::enable_interrupts(&mut mapped_registers);
-        register_interrupt(interrupt_num, e1000_handler);
+        register_interrupt(interrupt_num, e1000_handler)?;
 
         let (rx_descs, rx_buffers) = Self::rx_init(&mut mapped_registers)?;
         let tx_descs = Self::tx_init(&mut mapped_registers)?;
