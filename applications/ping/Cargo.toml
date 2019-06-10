@@ -10,9 +10,8 @@ path = "../terminal_print"
 
 [dependencies]
 byteorder = { version = "1.0", default-features = false }
-httparse = { version = "1.3.3", default-features = false }
-libc = { version = "0.2.18", optional = true }
 getopts = "0.2.18"
+
 
 [dependencies.log]
 default-features = false
