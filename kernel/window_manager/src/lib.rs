@@ -294,14 +294,9 @@ pub struct WindowObj {
 impl WindowObj{
     // clean the content of a window
     fn clean(&mut self) -> Result<(), &'static str>{
-        let ((x, y), (width, height)) = { 
-            let inner = self.inner.lock();
-            (inner.get_content_position(), inner.get_content_size())
-        };
-        self.fill_rectangle(0, 0, width, height, SCREEN_BACKGROUND_COLOR)?;
-        FrameCompositor::compose(
-            vec![(&mut self.framebuffer, x, y)]
-        )
+        let (width, height) = self.inner.lock().get_content_size();
+        fill_rectangle(&mut self.framebuffer, 0, 0, width, height, SCREEN_BACKGROUND_COLOR);
+        self.render()
     }
 
     /// Returns the content dimensions of this window,
@@ -361,57 +356,60 @@ impl WindowObj{
         self.inner.lock().get_content_position()
     }
 
-    /// draw a pixel in a window
-    pub fn draw_pixel(&mut self, x:usize, y:usize, color:u32) -> Result<(), &'static str> {
-        draw_pixel(&mut self.framebuffer, x, y, color);
-        let (content_x, content_y) = self.inner.lock().get_content_position();
-        FrameCompositor::compose(
-            vec![(&self.framebuffer, content_x, content_y)]
-        )
-    }
+    // /// draw a pixel in a window
+    // pub fn draw_pixel(&mut self, x:usize, y:usize, color:u32) -> Result<(), &'static str> {
+    //     draw_pixel(&mut self.framebuffer, x, y, color);
+    //     let (content_x, content_y) = self.inner.lock().get_content_position();
+    //     FrameCompositor::compose(
+    //         vec![(&self.framebuffer, content_x, content_y)]
+    //     )
+    // }
 
-    /// draw a line in a window
-    pub fn draw_line(&mut self, start_x:usize, start_y:usize, end_x:usize, end_y:usize, color:u32) -> Result<(), &'static str> {
-        draw_line(&mut self.framebuffer, start_x as i32, start_y as i32, 
-            end_x as i32, end_y as i32, color);
-        let (content_x, content_y) = self.inner.lock().get_content_position();
-        FrameCompositor::compose(
-            vec![(&self.framebuffer, content_x, content_y)]
-        )
-    }
+    // /// draw a line in a window
+    // pub fn draw_line(&mut self, start_x:usize, start_y:usize, end_x:usize, end_y:usize, color:u32) -> Result<(), &'static str> {
+    //     draw_line(&mut self.framebuffer, start_x as i32, start_y as i32, 
+    //         end_x as i32, end_y as i32, color);
+    //     let (content_x, content_y) = self.inner.lock().get_content_position();
+    //     FrameCompositor::compose(
+    //         vec![(&self.framebuffer, content_x, content_y)]
+    //     )
+    // }
 
-    /// draw a rectangle in a window
-    pub fn draw_rectangle(&mut self, x:usize, y:usize, width:usize, height:usize, color:u32) 
-        -> Result<(), &'static str> {
-        draw_rectangle(&mut self.framebuffer, x, y, width, height, 
-                color);
-        let (content_x, content_y) = self.inner.lock().get_content_position();
-        FrameCompositor::compose(
-            vec![(&self.framebuffer, content_x, content_y)]
-        )
-    }
+    // /// draw a rectangle in a window
+    // pub fn draw_rectangle(&mut self, x:usize, y:usize, width:usize, height:usize, color:u32) 
+    //     -> Result<(), &'static str> {
+    //     draw_rectangle(&mut self.framebuffer, x, y, width, height, 
+    //             color);
+    //     let (content_x, content_y) = self.inner.lock().get_content_position();
+    //     FrameCompositor::compose(
+    //         vec![(&self.framebuffer, content_x, content_y)]
+    //     )
+    // }
 
-    /// fill a rectangle in a window
-    pub fn fill_rectangle(&mut self, x:usize, y:usize, width:usize, height:usize, color:u32) 
-        -> Result<(), &'static str> {
-        fill_rectangle(&mut self.framebuffer, x, y, width, height, 
-                color);
-        let (content_x, content_y) = self.inner.lock().get_content_position();
+    // /// fill a rectangle in a window
+    // pub fn fill_rectangle(&mut self, x:usize, y:usize, width:usize, height:usize, color:u32) 
+    //     -> Result<(), &'static str> {
+    //     fill_rectangle(&mut self.framebuffer, x, y, width, height, 
+    //             color);
+    //     let (content_x, content_y) = self.inner.lock().get_content_position();
+    //     FrameCompositor::compose(
+    //         vec![(&self.framebuffer, content_x, content_y)]
+    //     )
+    // }
+
+    pub fn render(&mut self) -> Result<(), &'static str>{
+        let (window_x, window_y) = { self.inner.lock().get_content_position() };
         FrameCompositor::compose(
-            vec![(&self.framebuffer, content_x, content_y)]
+            vec![(&mut self.framebuffer, window_x, window_y)]
         )
     }
 
     /// print a string in the window with a text displayable.
     pub fn display_string(&mut self, display_name:&str, slice:&str, font_color:u32, bg_color:u32) -> Result<(), &'static str> {
         let (display_x, display_y) = self.get_displayable_position(display_name)?;
-        let (width, height) = self.get_displayable(display_name).ok_or("The displayable does not exist")?.get_size();
-        
+        let (width, height) = self.get_displayable(display_name).ok_or("The displayable does not exist")?.get_size();        
         print_by_bytes(&mut self.framebuffer, display_x, display_y, width, height, slice, font_color, bg_color)?;
-        let (window_x, window_y) = { self.inner.lock().get_content_position() };
-        FrameCompositor::compose(
-            vec![(&mut self.framebuffer, window_x, window_y)]
-        )
+        self.render()
     }
 
     /// display a cursor in the window with a text displayable. position is the absolute position of the cursor
@@ -432,7 +430,8 @@ impl WindowObj{
         }
         if line < text_buffer_height {
             let color = if cursor.show() { font_color } else { bg_color };
-            self.fill_rectangle(column * CHARACTER_WIDTH, line * CHARACTER_HEIGHT, CHARACTER_WIDTH, CHARACTER_HEIGHT, color)?;
+            fill_rectangle(&mut self.framebuffer, column * CHARACTER_WIDTH, line * CHARACTER_HEIGHT, CHARACTER_WIDTH, CHARACTER_HEIGHT, color);
+            self.render()?;
         }
         Ok(())
     }
@@ -528,8 +527,7 @@ impl WindowInner {
         };
         let mut buffer_lock = buffer_ref.lock();
         let buffer = buffer_lock.deref_mut();
-        draw_rectangle(buffer, self.x, self.y,
-            self.width, self.height, SCREEN_BACKGROUND_COLOR);
+        draw_rectangle(buffer, self.x, self.y, self.width, self.height, SCREEN_BACKGROUND_COLOR);
         FrameCompositor::compose(
             vec![(buffer, 0, 0)]
         )
