@@ -17,14 +17,14 @@ extern crate spin;
 use alloc::vec::Vec;
 use alloc::string::String;
 use getopts::{Matches, Options};
-use ixgbe::rx_poll_mq;
+// use ixgbe::rx_poll_mq;
 use ixgbe::test_ixgbe_driver::test_nic_ixgbe_driver;
 
 #[no_mangle]
 pub fn main(args: Vec<String>) -> isize {
     test_nic_ixgbe_driver(None);
 
-    let _ = rx_poll_mq(None);
+    // let _ = rx_poll_mq(None);
 
     0
 }

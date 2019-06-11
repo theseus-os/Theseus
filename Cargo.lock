@@ -372,7 +372,6 @@ name = "e1000"
 version = "0.1.0"
 dependencies = [
  "apic 0.1.0",
- "intel_ethernet 0.1.0",
  "interrupts 0.1.0",
  "irq_safety 0.1.1 (git+https://github.com/kevinaboos/irq_safety)",
  "kernel_config 0.1.0",
@@ -640,20 +639,6 @@ dependencies = [
 ]
 
 [[package]]
-name = "intel_ethernet"
-version = "0.1.0"
-dependencies = [
- "bit_field 0.7.0 (registry+https://github.com/rust-lang/crates.io-index)",
- "log 0.3.9 (registry+https://github.com/rust-lang/crates.io-index)",
- "memory 0.1.0",
- "mpmc 0.1.6-pre",
- "network_interface_card 0.1.0",
- "pci 0.1.0",
- "spin 0.4.10 (registry+https://github.com/rust-lang/crates.io-index)",
- "volatile 0.2.5 (registry+https://github.com/rust-lang/crates.io-index)",
-]
-
-[[package]]
 name = "interrupts"
 version = "0.1.0"
 dependencies = [
@@ -719,7 +704,6 @@ dependencies = [
  "apic 0.1.0",
  "bit_field 0.7.0 (registry+https://github.com/rust-lang/crates.io-index)",
  "hpet 0.1.0",
- "intel_ethernet 0.1.0",
  "interrupts 0.1.0",
  "irq_safety 0.1.1 (git+https://github.com/kevinaboos/irq_safety)",
  "kernel_config 0.1.0",
@@ -1009,10 +993,13 @@ dependencies = [
 name = "network_interface_card"
 version = "0.1.0"
 dependencies = [
+ "bit_field 0.7.0 (registry+https://github.com/rust-lang/crates.io-index)",
  "lazy_static 1.2.0 (registry+https://github.com/rust-lang/crates.io-index)",
  "log 0.3.9 (registry+https://github.com/rust-lang/crates.io-index)",
  "memory 0.1.0",
  "mpmc 0.1.6-pre",
+ "owning_ref 0.4.0 (git+https://github.com/kevinaboos/owning-ref-rs)",
+ "pci 0.1.0",
  "spin 0.4.10 (registry+https://github.com/rust-lang/crates.io-index)",
  "volatile 0.2.5 (registry+https://github.com/rust-lang/crates.io-index)",
  "x86_64 0.1.2",

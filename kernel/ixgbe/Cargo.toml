@@ -65,8 +65,6 @@ path = "../hpet"
 [dependencies.runqueue]
 path = "../runqueue"
 
-[dependencies.intel_ethernet]
-path = "../intel_ethernet"
 
 [lib]
 crate-type = ["rlib"] # "lib" does the same thing I think
