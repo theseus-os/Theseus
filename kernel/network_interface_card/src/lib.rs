@@ -20,7 +20,7 @@ use volatile::Volatile;
 use owning_ref::BoxRefMut;
 
 pub mod intel_ethernet;
-use intel_ethernet::{RxDescriptor, NicInit};
+use intel_ethernet::{RxDescriptor, TxDescriptor, NicInit};
 
 /// The mapping flags used for pages that the NIC will map.
 /// This should be a const, but Rust doesn't yet allow constants for the bitflags type
@@ -35,18 +35,23 @@ pub trait NetworkInterfaceCard {
     /// Blocks until the packet has been successfully sent by the networking card hardware.
     fn send_packet(&mut self, transmit_buffer: TransmitBuffer) -> Result<(), &'static str>;
 
-    /// Helper function for sending a packet, updates the current tx descriptor number and the tdt register.
+    /// Helper function for sending a packet, updates the current tx descriptor and the tdt register.
     /// 
     /// # Arguments:
     /// - `tx_cur`: the value which stores the next free descriptor to be used
     /// - `max_tx_desc`: the number of tx descriptors in the queue
+    /// - `tx_descs`: the queue of tx descriptors
     /// - `tdt`: transmit descriptor tail register
-    fn update_tdt(tx_cur: &mut u16, max_tx_desc: u16, tdt: &mut Volatile<u32>) {
+    fn send<T: TxDescriptor>(tx_cur: &mut u16, max_tx_desc: u16, tx_descs: &mut BoxRefMut<MappedPages, [T]>, tdt: &mut Volatile<u32>, transmit_buffer: TransmitBuffer) {
+        tx_descs[*tx_cur as usize].send(transmit_buffer);  
         // update the tx_cur value to hold the next free descriptor
+        let old_cur = *tx_cur;
         *tx_cur = (*tx_cur + 1) % max_tx_desc;
         // update the tdt register by 1 so that it know the previous descriptor has been used
         // and has a packet to be sent
         tdt.write(*tx_cur as u32);
+        // Wait for the packet to be sent
+        tx_descs[old_cur as usize].wait_for_packet_tx();
     }
 
     /// Returns the earliest `ReceivedFrame`, which is essentially a list of `ReceiveBuffer`s 
@@ -62,12 +67,7 @@ pub trait NetworkInterfaceCard {
         rx_buffer_size: u16, rx_bufs_in_use: &mut Vec<ReceiveBuffer>, received_frames: &mut VecDeque<ReceivedFrame>, rdt: &mut Volatile<u32>) -> Result<(), &'static str> {
 
         let mut cur = *rx_cur as usize;
-
-        if !rx_descs[cur].descriptor_done() {
-            // debug!("ixgbe::handle_receive: no packets_received");
-            return Ok(());
-        }
-        
+       
         let mut receive_buffers_in_frame: Vec<ReceiveBuffer> = Vec::new();
         let mut total_packet_length: u16 = 0;
 
@@ -76,7 +76,7 @@ pub trait NetworkInterfaceCard {
             // get information about the current receive buffer
             let length = rx_descs[cur].length();
             total_packet_length += length as u16;
-
+            debug!("collect_packets: received descriptor of length {}", length);
             // Now that we are "removing" the current receive buffer from the list of receive buffers that the NIC can use,
             // (because we're saving it for higher layers to use),
             // we need to obtain a new `ReceiveBuffer` and set it up such that the NIC will use it for future receivals.
@@ -92,7 +92,7 @@ pub trait NetworkInterfaceCard {
             };
 
             // actually tell the NIC about the new receive buffer, and that it's ready for use now
-            rx_descs[cur].init(new_receive_buf.phys_addr);
+            rx_descs[cur].set_packet_address(new_receive_buf.phys_addr);
 
             // Swap in the new receive buffer at the index corresponding to this current rx_desc's receive buffer,
             // getting back the receive buffer that is part of the received ethernet frame
@@ -108,6 +108,7 @@ pub trait NetworkInterfaceCard {
             if rx_descs[cur].end_of_packet() {
                 let buffers = core::mem::replace(&mut receive_buffers_in_frame, Vec::new());
                 received_frames.push_back(ReceivedFrame(buffers));
+                rx_descs[cur].reset_status();
             } else {
                 warn!("ixgbe: Received multi-rxbuffer frame, this scenario not fully tested!");
             }

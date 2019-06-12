@@ -20,6 +20,8 @@ pub trait RxDescriptor {
     /// # Arguments: 
     /// * `packet_buffer_address`: the starting physical address of the receive buffer
     fn init(&mut self, packet_buffer_address: PhysicalAddress);
+    fn set_packet_address(&mut self, packet_buffer_address: PhysicalAddress);
+    fn reset_status(&mut self);
     fn descriptor_done(&self) -> bool;
     fn end_of_packet(&self) -> bool;
     fn length(&self) -> u64;
@@ -110,6 +112,14 @@ impl RxDescriptor for LegacyRxDesc {
         self.status.write(0);
     }
 
+    fn set_packet_address(&mut self, packet_buffer_address: PhysicalAddress) {
+        self.phys_addr.write(packet_buffer_address.value() as u64);
+    }
+
+    fn reset_status(&mut self) {
+        self.status.write(0);
+    }
+
     fn descriptor_done(&self) -> bool {
         (self.status.read() & RX_STATUS_DD) == RX_STATUS_DD
     }
@@ -152,11 +162,20 @@ impl RxDescriptor for AdvancedRxDesc {
         self.header_buffer_address.write(0);
     }
 
+    fn set_packet_address(&mut self, packet_buffer_address: PhysicalAddress) {
+        self.packet_buffer_address.write(packet_buffer_address.value() as u64);
+    }
+
+    fn reset_status(&mut self) {
+        self.header_buffer_address.write(0);
+    }
+
     fn descriptor_done(&self) -> bool{
         (self.get_ext_status() & RX_STATUS_DD as u64) == RX_STATUS_DD as u64
     }
 
     fn end_of_packet(&self) -> bool {
+        debug!("end of pakcket: {}", self.get_ext_status());
         (self.get_ext_status() & RX_STATUS_EOP as u64) == RX_STATUS_EOP as u64        
     }
 

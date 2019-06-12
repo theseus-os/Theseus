@@ -309,7 +309,7 @@ pub struct RegistersRx {
     pub rdt:                            Volatile<u32>,          // 0x1018
     _padding1:                          [u8;12],                // 0x101C - 0x1027
 
-    /// Recive Descriptor Control
+    /// Receive Descriptor Control
     pub rxdctl:                         Volatile<u32>,          // 0x1028
     _padding2:                          [u8;20],                // 0x102C - 0x103F                                            
 } //size 0x40
@@ -333,11 +333,11 @@ pub const AUTOC_10G_PMA_PMD_P:          u32 = 1 << 7;
 pub const AUTOC2_10G_PMA_PMD_S_CLEAR:   u32 = 0x0003_0000; //clear bits 16 and 17 
 pub const AUTOC2_10G_PMA_PMD_S_SFI:     u32 = 1 << 17;
 
-///CTRL commands
+// CTRL commands
 pub const CTRL_LRST:                    u32 = (1<<3); 
 pub const CTRL_RST:                     u32 = (1<<26);
 
-///semaphore commands
+// semaphore commands
 pub const SWSM_SMBI:                    u32 = 1 << 0;
 pub const SWSM_SWESMBI:                 u32 = 1 << 1;
 pub const SW_FW_SYNC_SMBITS_MASK:       u32 = 0x3FF;
@@ -346,7 +346,7 @@ pub const SW_FW_SYNC_SMBITS_FW:         u32 = 0x3E0;
 pub const SW_FW_SYNC_SW_MAC:            u32 = 1 << 3;
 pub const SW_FW_SYNC_FW_MAC:            u32 = 1 << 8;
 
-/// RCTL commands
+// RCTL commands
 pub const BSIZEPACKET_8K:               u32 = 8;
 pub const BSIZEHEADER_256B:             u32 = 4;
 pub const DESCTYPE_LEG:                 u32 = 0;
@@ -407,7 +407,7 @@ pub const L34TIMIR_LLI_ENABLE:          u32 = 1 << 20;
 pub const L34TIMIR_RX_Q_SHIFT:          u32 = 21;
 
  
-/// Buffer Sizes
+// Buffer Sizes
 pub const RCTL_BSIZE_256:               u32 = (3 << 16);
 pub const RCTL_BSIZE_512:               u32 = (2 << 16);
 pub const RCTL_BSIZE_1024:              u32 = (1 << 16);
@@ -415,19 +415,9 @@ pub const RCTL_BSIZE_2048:              u32 = (0 << 16);
 pub const RCTL_BSIZE_4096:              u32 = ((3 << 16) | (1 << 25));
 pub const RCTL_BSIZE_8192:              u32 = ((2 << 16) | (1 << 25));
 pub const RCTL_BSIZE_16384:             u32 = ((1 << 16) | (1 << 25));
+  
  
- 
-/// Transmit Command
-pub const CMD_EOP:                      u32 = (1 << 0);     // End of Packet
-pub const CMD_IFCS:                     u32 = (1 << 1);     // Insert FCS
-pub const CMD_IC:                       u32 = (1 << 2);     // Insert Checksum
-pub const CMD_RS:                       u32 = (1 << 3);     // Report Status
-pub const CMD_RPS:                      u32 = (1 << 4);     // Report Packet Sent
-pub const CMD_VLE:                      u32 = (1 << 6);     // VLAN Packet Enable
-pub const CMD_IDE:                      u32 = (1 << 7);     // Interrupt Delay Enable
- 
- 
-/// TCTL commands
+// TCTL commands
 pub const TX_Q_ENABLE:                  bool = true;
 pub const TE:                           u32  = 1;           //Transmit Enable
 pub const TCTL_EN:                      u32 = (1 << 1);     // Transmit Enable
@@ -441,7 +431,18 @@ pub const TSTA_EC:                      u32 = (1 << 1);     // Excess Collisions
 pub const TSTA_LC:                      u32 = (1 << 2);     // Late Collision
 pub const LSTA_TU:                      u32 = (1 << 3);     // Transmit Underrun
 
+/* Interrupt Register Commands */
 pub const DISABLE_INTERRUPTS:           u32 = 0x7FFFFFFF; 
+/// MSI-X Mode
+pub const GPIE_MULTIPLE_MSIX:           u32 = 1 << 4;
+/// EICS Immediate Interrupt Enable
+pub const GPIE_EIMEN:                   u32 = 1 << 6;
+/// Should be set in MSIX mode and cleared in legacy/msi mode
+pub const GPIE_PBA_SUPPORT:             u32 = 1 << 31;
+/// Each bit enables auto clear of the corresponding RTxQ bit in the EICR register following interrupt assertion
+pub const EIAC_RTXQ_AUTO_CLEAR:         u32 = 0xFFFF;
+pub const EITR_ITR_INTERVAL_SHIFT:      u32 = 3;
+
 
 /// The number of msi vectors this device can have. 
 /// It can be set from PCI space, but we took the value from the data sheet.
@@ -468,3 +469,12 @@ pub struct MsixVectorEntry {
     /// The control portion which contains the interrupt mask bit.
     pub vector_control:         Volatile<u32>,
 }
+
+/// A constant which indicates the region that is reserved for interrupt messages
+pub const MSIX_INTERRUPT_REGION:    u32 = 0xFEE << 20;
+/// the location in the lower address register where teh destination core id is written
+pub const MSIX_DEST_ID_SHIFT:       u32 = 12;
+/// the bits in the lower address register that need to be cleared and set
+pub const MSIX_ADDRESS_BITS:        u32 = 0xFFFF_FFF0;
+/// clear the vector control field to unmask the interrupt
+pub const MSIX_UNMASK_INT:          u32 = 0;

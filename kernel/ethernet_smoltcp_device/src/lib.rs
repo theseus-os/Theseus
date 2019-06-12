@@ -12,19 +12,24 @@ extern crate owning_ref;
 extern crate network_manager;
 
 
-use alloc::boxed::Box;
-use alloc::collections::BTreeMap;
+use alloc::{
+    boxed::Box,
+    collections::BTreeMap,
+    sync::Arc
+};
 use irq_safety::MutexIrqSafe;
 use smoltcp::{
     socket::SocketSet,
     time::Instant,
     phy::DeviceCapabilities,
-    wire::{EthernetAddress, IpAddress, IpCidr},
+    wire::{EthernetAddress, IpAddress, IpCidr, Ipv4Address},
     iface::{EthernetInterface, EthernetInterfaceBuilder, NeighborCache, Routes},
 };
 use network_interface_card::{NetworkInterfaceCard, TransmitBuffer, ReceivedFrame};
 use owning_ref::BoxRef;
-use network_manager::NetworkInterface;
+use network_manager::{NetworkInterface, NETWORK_INTERFACES};
+use core::str::FromStr;
+use spin::Mutex;
 
 /// standard MTU for ethernet cards
 const DEFAULT_MTU: usize = 9000;
@@ -66,7 +71,7 @@ impl<N: NetworkInterfaceCard + 'static> NetworkInterface for EthernetNetworkInte
     }
 }
 
-impl<N: NetworkInterfaceCard + 'static> EthernetNetworkInterface<N> {
+impl<N: NetworkInterfaceCard + 'static + Send> EthernetNetworkInterface<N> {
     /// Creates a new instance of an ethernet network interface, which can be used for handling sockets. 
     /// 
     /// Arguments: 
@@ -115,6 +120,14 @@ impl<N: NetworkInterfaceCard + 'static> EthernetNetworkInterface<N> {
         )
     }
 
+    /// Calls the function to create a new network interface and adds it to the global list of network interfaces
+    pub fn add_network_interface(nic_ref: &'static MutexIrqSafe<N>, static_ip_address: &str, gateway_ip_address: &[u8]) -> Result<(), &'static str> {  
+        let static_ip = IpCidr::from_str(static_ip_address).map_err(|_e| "couldn't parse static_ip_address address")?;
+        let gateway_ip = Ipv4Address::from_bytes(gateway_ip_address);
+        let ethernet_iface = Self::new(nic_ref, Some(static_ip), Some(gateway_ip))?;
+        NETWORK_INTERFACES.lock().push(Arc::new(Mutex::new(ethernet_iface)));
+        Ok(())
+    }
 }
 
 

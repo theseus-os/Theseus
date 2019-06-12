@@ -61,17 +61,22 @@ pub fn init(keyboard_producer: DFQueueProducer<Event>) -> Result<(), &'static st
         debug!("Found pci device: {:?}", dev);
     } */
 
-    if let Some(pci_dev_82599) = get_pci_device_vd(ixgbe::registers::INTEL_VEND, ixgbe::registers::INTEL_82599) {
-        debug!("82599 Device found: {:?}", pci_dev_82599);
-        let ixgbe_nic_ref = ixgbe::IxgbeNic::init(pci_dev_82599)?;      
-        let static_ip = IpCidr::from_str(DEFAULT_LOCAL_IP).map_err(|_e| "couldn't parse 'DEFAULT_LOCAL_IP' address")?;
-        let gateway_ip = Ipv4Address::from_bytes(&DEFAULT_GATEWAY_IP);
-        let ixgbe_iface = ethernet_smoltcp_device::EthernetNetworkInterface::new(ixgbe_nic_ref, Some(static_ip), Some(gateway_ip))?;
-        network_manager::NETWORK_INTERFACES.lock().push(Arc::new(Mutex::new(ixgbe_iface)));
-    }
-    else {
-        warn!("No 82599 device found on this system.");
-    }
+    init_pci_dev(ixgbe::registers::INTEL_VEND, ixgbe::registers::INTEL_82599, ixgbe::IxgbeNic::init)?;
+    let nic_ref = ixgbe::get_ixgbe_nic().ok_or("device_manager::init: ixgbe nic hasn't been initialized")?;
+    ethernet_smoltcp_device::EthernetNetworkInterface::add_network_interface(nic_ref, DEFAULT_LOCAL_IP, &DEFAULT_GATEWAY_IP)?;
+    
+    // if let Some(pci_dev_82599) = get_pci_device_vd(ixgbe::registers::INTEL_VEND, ixgbe::registers::INTEL_82599) {
+    //     debug!("82599 Device found: {:?}", pci_dev_82599);
+    //     let ixgbe_nic_ref = ixgbe::IxgbeNic::init(pci_dev_82599)?;      
+    //     let static_ip = IpCidr::from_str(DEFAULT_LOCAL_IP).map_err(|_e| "couldn't parse 'DEFAULT_LOCAL_IP' address")?;
+    //     let gateway_ip = Ipv4Address::from_bytes(&DEFAULT_GATEWAY_IP);
+    //     let ixgbe_iface = ethernet_smoltcp_device::EthernetNetworkInterface::new(ixgbe_nic_ref, Some(static_ip), Some(gateway_ip))?;
+    //     network_manager::NETWORK_INTERFACES.lock().push(Arc::new(Mutex::new(ixgbe_iface)));
+    // }
+    // else {
+    //     warn!("No 82599 device found on this system.");
+    // }
+
     if let Some(e1000_pci_dev) = get_pci_device_vd(e1000::INTEL_VEND, e1000::E1000_DEV) {
         debug!("e1000 PCI device found: {:?}", e1000_pci_dev);
         let e1000_nic_ref = e1000::E1000Nic::init(e1000_pci_dev)?;
@@ -115,8 +120,7 @@ pub fn init(keyboard_producer: DFQueueProducer<Event>) -> Result<(), &'static st
 pub type PciDevInitFunc = fn(&PciDevice) -> Result<(), &'static str>;
 
 fn init_pci_dev(vendor_id: u16, device_id: u16, init_func: PciDevInitFunc) -> Result<(), &'static str> {
-    let pci_dev = get_pci_device_vd(vendor_id, device_id).ok_or("device_manager::init_pci_dev : device not found")?;
+    let pci_dev = get_pci_device_vd(vendor_id, device_id).ok_or("device_manager::init_pci_dev: device not found")?;
     init_func(pci_dev)?;
-
     Ok(())
 }
