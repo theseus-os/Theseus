@@ -1131,6 +1131,23 @@ dependencies = [
 ]
 
 [[package]]
+name = "ping"
+version = "0.1.0"
+dependencies = [
+ "byteorder 1.2.7 (registry+https://github.com/rust-lang/crates.io-index)",
+ "getopts 0.2.18 (git+https://github.com/kevinaboos/getopts)",
+ "hashbrown 0.1.8 (registry+https://github.com/rust-lang/crates.io-index)",
+ "hpet 0.1.0",
+ "http_client 0.1.0",
+ "log 0.3.9 (registry+https://github.com/rust-lang/crates.io-index)",
+ "network_manager 0.1.0",
+ "ota_update_client 0.1.0",
+ "smoltcp 0.5.0 (registry+https://github.com/rust-lang/crates.io-index)",
+ "terminal_print 0.1.0",
+ "upd 0.1.0",
+]
+
+[[package]]
 name = "pit_clock"
 version = "0.1.0"
 dependencies = [
