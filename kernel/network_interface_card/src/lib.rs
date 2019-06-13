@@ -9,6 +9,7 @@ extern crate bit_field;
 extern crate pci;
 extern crate spin;
 extern crate owning_ref;
+extern crate irq_safety;
 
 use core::ops::{Deref, DerefMut};
 use alloc::{
@@ -20,7 +21,7 @@ use volatile::Volatile;
 use owning_ref::BoxRefMut;
 
 pub mod intel_ethernet;
-use intel_ethernet::{RxDescriptor, TxDescriptor, NicInit};
+use intel_ethernet::{RxDescriptor, TxDescriptor, NicInit, RxQueueInfo, TxQueueInfo};
 
 /// The mapping flags used for pages that the NIC will map.
 /// This should be a const, but Rust doesn't yet allow constants for the bitflags type
@@ -35,46 +36,51 @@ pub trait NetworkInterfaceCard {
     /// Blocks until the packet has been successfully sent by the networking card hardware.
     fn send_packet(&mut self, transmit_buffer: TransmitBuffer) -> Result<(), &'static str>;
 
-    /// Helper function for sending a packet, updates the current tx descriptor and the tdt register.
+    /// Sends a packet on the specified transmit queue
     /// 
     /// # Arguments:
-    /// - `tx_cur`: the value which stores the next free descriptor to be used
-    /// - `max_tx_desc`: the number of tx descriptors in the queue
-    /// - `tx_descs`: the queue of tx descriptors
-    /// - `tdt`: transmit descriptor tail register
-    fn send<T: TxDescriptor>(tx_cur: &mut u16, max_tx_desc: u16, tx_descs: &mut BoxRefMut<MappedPages, [T]>, tdt: &mut Volatile<u32>, transmit_buffer: TransmitBuffer) {
-        tx_descs[*tx_cur as usize].send(transmit_buffer);  
+    /// * `txq`: transmit queue 
+    /// * `max_tx_desc`: number of tx descriptors in the queue
+    /// * `tdt`: transmit descriptor tail register
+    /// * `transmit_buffer`: buffer containing the packet to be sent
+    fn send_on_queue<T: TxDescriptor>(txq: &mut TxQueueInfo<T>, max_tx_desc: u16, tdt: &mut Volatile<u32>, transmit_buffer: TransmitBuffer) {
+        txq.tx_descs[txq.tx_cur as usize].send(transmit_buffer);  
         // update the tx_cur value to hold the next free descriptor
-        let old_cur = *tx_cur;
-        *tx_cur = (*tx_cur + 1) % max_tx_desc;
-        // update the tdt register by 1 so that it know the previous descriptor has been used
+        let old_cur = txq.tx_cur;
+        txq.tx_cur = (txq.tx_cur + 1) % max_tx_desc;
+        // update the tdt register by 1 so that it knows the previous descriptor has been used
         // and has a packet to be sent
-        tdt.write(*tx_cur as u32);
+        tdt.write(txq.tx_cur as u32);
         // Wait for the packet to be sent
-        tx_descs[old_cur as usize].wait_for_packet_tx();
+        txq.tx_descs[old_cur as usize].wait_for_packet_tx();
     }
 
     /// Returns the earliest `ReceivedFrame`, which is essentially a list of `ReceiveBuffer`s 
     /// that each contain an individual piece of the frame.
     fn get_received_frame(&mut self) -> Option<ReceivedFrame>;
 
-    /// Poll the NIC for recieved frames. 
+    /// Poll the NIC for received frames. 
     /// Can be used as an alternative to interrupts, or as a supplement to interrupts.
-    fn poll_receive(&mut self) -> Result<(), &'static str>;
+    fn poll_receive(&self) -> Result<(), &'static str>;
 
-    /// retrieves the ethernet frames for 1 queue
-    fn collect_packets<T: RxDescriptor>(rx_cur: &mut u16, rx_descs: &mut BoxRefMut<MappedPages, [T]>, num_descs: u16, rx_buffer_pool: &'static mpmc::Queue<ReceiveBuffer>, 
-        rx_buffer_size: u16, rx_bufs_in_use: &mut Vec<ReceiveBuffer>, received_frames: &mut VecDeque<ReceivedFrame>, rdt: &mut Volatile<u32>) -> Result<(), &'static str> {
+    /// Retrieves the ethernet frames from one queue
+    /// 
+    /// # Arguments
+    /// * `rxq`: receive queue to collect frames from 
+    /// * `num_descs`: number of descriptors in the queue
+    /// * `rx_buffer_pool`: pool which contains the receive buffers
+    /// * `rx_buffer_size`: size of buffers in the 'rx_buffer_pool' in bytes
+    fn collect_from_queue<T: RxDescriptor>(rxq: &mut RxQueueInfo<T>, num_descs: u16, rx_buffer_pool: &'static mpmc::Queue<ReceiveBuffer>, rx_buffer_size: u16) -> Result<(), &'static str> {
 
-        let mut cur = *rx_cur as usize;
+        let mut cur = rxq.rx_cur as usize;
        
         let mut receive_buffers_in_frame: Vec<ReceiveBuffer> = Vec::new();
         let mut total_packet_length: u16 = 0;
 
         //print status of all packets until EoP
-        while rx_descs[cur].descriptor_done() {
+        while rxq.rx_descs[cur].descriptor_done() {
             // get information about the current receive buffer
-            let length = rx_descs[cur].length();
+            let length = rxq.rx_descs[cur].length();
             total_packet_length += length as u16;
             debug!("collect_packets: received descriptor of length {}", length);
             // Now that we are "removing" the current receive buffer from the list of receive buffers that the NIC can use,
@@ -92,28 +98,27 @@ pub trait NetworkInterfaceCard {
             };
 
             // actually tell the NIC about the new receive buffer, and that it's ready for use now
-            rx_descs[cur].set_packet_address(new_receive_buf.phys_addr);
+            rxq.rx_descs[cur].set_packet_address(new_receive_buf.phys_addr);
 
             // Swap in the new receive buffer at the index corresponding to this current rx_desc's receive buffer,
             // getting back the receive buffer that is part of the received ethernet frame
-            rx_bufs_in_use.push(new_receive_buf);
-            let mut current_rx_buf = rx_bufs_in_use.swap_remove(cur); 
+            rxq.rx_bufs_in_use.push(new_receive_buf);
+            let mut current_rx_buf = rxq.rx_bufs_in_use.swap_remove(cur); 
             current_rx_buf.length = length as u16; // set the ReceiveBuffer's length to the size of the actual packet received
             receive_buffers_in_frame.push(current_rx_buf);
 
             // move on to the next receive buffer to see if it's ready for us to take
-            *rx_cur = (cur as u16 + 1) % num_descs;
-            rdt.write(cur as u32); 
+            rxq.rx_cur = (cur as u16 + 1) % num_descs;
+            rxq.update_rdt(cur as u32); 
 
-            if rx_descs[cur].end_of_packet() {
+            if rxq.rx_descs[cur].end_of_packet() {
                 let buffers = core::mem::replace(&mut receive_buffers_in_frame, Vec::new());
-                received_frames.push_back(ReceivedFrame(buffers));
-                rx_descs[cur].reset_status();
+                rxq.received_frames.push_back(ReceivedFrame(buffers));
             } else {
                 warn!("ixgbe: Received multi-rxbuffer frame, this scenario not fully tested!");
             }
-
-            cur = *rx_cur as usize;
+            rxq.rx_descs[cur].reset_status();
+            cur = rxq.rx_cur as usize;
         }
 
         Ok(())
@@ -124,6 +129,8 @@ pub trait NetworkInterfaceCard {
     /// otherwise it will return the regular MAC address defined by the NIC hardware.
     fn mac_address(&self) -> [u8; 6];
 }
+
+
 
 
 /// A buffer that stores a packet to be transmitted through the NIC

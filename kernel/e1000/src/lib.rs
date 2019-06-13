@@ -20,6 +20,7 @@ extern crate pic;
 extern crate x86_64;
 extern crate mpmc;
 extern crate network_interface_card;
+extern crate apic;
 
 pub mod test_e1000_driver;
 mod regs;
@@ -29,10 +30,10 @@ use core::ops::DerefMut;
 use spin::Once; 
 use alloc::vec::Vec;
 use alloc::collections::VecDeque;
-use irq_safety::MutexIrqSafe;
+use irq_safety::{RwLockIrqSafe, MutexIrqSafe};
 use volatile::{Volatile, ReadOnly};
 use alloc::boxed::Box;
-use memory::{get_kernel_mmi_ref, FRAME_ALLOCATOR, PhysicalAddress, FrameRange, EntryFlags, allocate_pages_by_bytes, MappedPages, PhysicalMemoryArea, create_contiguous_mapping};
+use memory::{get_kernel_mmi_ref, FRAME_ALLOCATOR, PhysicalAddress, VirtualAddress, FrameRange, EntryFlags, allocate_pages_by_bytes, MappedPages, PhysicalMemoryArea, create_contiguous_mapping};
 use pci::{PciDevice, pci_read_32, pci_read_8, pci_write, pci_set_command_bus_master_bit};
 use kernel_config::memory::PAGE_SIZE;
 use owning_ref::BoxRefMut;
@@ -40,8 +41,10 @@ use interrupts::{eoi,register_interrupt};
 use x86_64::structures::idt::{ExceptionStackFrame};
 use network_interface_card::{
     {NetworkInterfaceCard, TransmitBuffer, ReceiveBuffer, ReceivedFrame, nic_mapping_flags},
-    intel_ethernet::{NicInit, LegacyRxDesc, LegacyTxDesc, TxDescriptor, RxDescriptor},
+    intel_ethernet::{NicInit, LegacyRxDesc, LegacyTxDesc, TxDescriptor, RxDescriptor, RxQueueInfo, TxQueueInfo},
 };
+use apic::get_my_apic_id;
+use regs:: REG_RXDESCTAIL;
 
 pub const INTEL_VEND:           u16 = 0x8086;  // Vendor ID for Intel 
 pub const E1000_DEV:            u16 = 0x100E;  // Device ID for the e1000 Qemu, Bochs, and VirtualBox emmulated NICs
@@ -54,14 +57,6 @@ const E1000_NUM_TX_DESC:        usize = 8;
 /// Currently, each receive buffer is a single page.
 const E1000_RX_BUFFER_SIZE_IN_BYTES:     u16 = PAGE_SIZE as u16;
 
-/// Rx Status: End of Packet
-pub const RX_EOP:               u8 =  1 << 1;
-/// Rx Status: Descriptor done
-pub const RX_DD:                u8 =  1 << 0;
-
-/// Tx Status: Descriptor done
-pub const TX_DD:                u8 =  1 << 0;
-
 /// Interrupt type: Link Status Change
 pub const INT_LSC:              u32 = 0x04;
 /// Interrupt type: Receive Timer Interrupt
@@ -71,11 +66,11 @@ pub const INT_RX:               u32 = 0x80;
 /// The single instance of the E1000 NIC.
 /// TODO: in the future, we should support multiple NICs all stored elsewhere,
 /// e.g., on the PCI bus or somewhere else.
-static E1000_NIC: Once<MutexIrqSafe<E1000Nic>> = Once::new();
+static E1000_NIC: Once<RwLockIrqSafe<E1000Nic>> = Once::new();
 
-/// Returns a reference to the E1000Nic wrapped in a MutexIrqSafe,
+/// Returns a reference to the E1000Nic wrapped in a RwLockIrqSafe,
 /// if it exists and has been initialized.
-pub fn get_e1000_nic() -> Option<&'static MutexIrqSafe<E1000Nic>> {
+pub fn get_e1000_nic() -> Option<&'static RwLockIrqSafe<E1000Nic>> {
     E1000_NIC.try()
 }
 
@@ -150,37 +145,20 @@ pub struct IntelE1000Registers {
 pub struct E1000Nic {
     /// Type of BAR0
     bar_type: u8,
-    /// IO Base Address     
-    io_base: u32,
     /// MMIO Base Address
-    mem_base: PhysicalAddress,   
-    /// A flag indicating if eeprom exists
-    eeprom_exists: bool,
+    mem_base: PhysicalAddress,
     ///interrupt number
     interrupt_num: u8,
     /// The actual MAC address burnt into the hardware of this E1000 NIC.
     mac_hardware: [u8; 6],
     /// The optional spoofed MAC address to use in place of `mac_hardware` when transmitting.  
     mac_spoofed: Option<[u8; 6]>,
-    /// Receive Descriptors
-    rx_descs: BoxRefMut<MappedPages, [LegacyRxDesc]>, 
-    /// Transmit Descriptors 
-    tx_descs: BoxRefMut<MappedPages, [LegacyTxDesc]>, 
-    /// Current rx descriptor index
-    rx_cur: u16,      
-    /// Current tx descriptor index
-    tx_cur: u16,
-    /// The list of rx buffers, in which the index in the vector corresponds to the index in `rx_descs`.
-    /// For example, `rx_bufs_in_use[2]` is the receive buffer that will be used when `rx_descs[2]` is the current rx descriptor (rx_cur = 2).
-    rx_bufs_in_use: Vec<ReceiveBuffer>,
+    /// Receive queue with descriptors
+    rx_queue: MutexIrqSafe<RxQueueInfo<LegacyRxDesc>>,
+    /// Transmit queue with descriptors
+    tx_queue: MutexIrqSafe<TxQueueInfo<LegacyTxDesc>>,     
     /// memory-mapped control registers
     regs: BoxRefMut<MappedPages, IntelE1000Registers>,
-    /// The queue of received Ethernet frames, ready for consumption by a higher layer.
-    /// Just like a regular FIFO queue, newly-received frames are pushed onto the back
-    /// and frames are popped off of the front.
-    /// Each frame is represented by a Vec<ReceiveBuffer>, because a single frame can span multiple receive buffers.
-    /// TODO: improve this? probably not the best cleanest way to expose received frames to higher layers
-    received_frames: VecDeque<ReceivedFrame>,
 }
 
 
@@ -189,52 +167,16 @@ impl NicInit for E1000Nic {}
 impl NetworkInterfaceCard for E1000Nic {
 
     fn send_packet(&mut self, transmit_buffer: TransmitBuffer) -> Result<(), &'static str> {
-        
-        self.tx_descs[self.tx_cur as usize].phys_addr.write(transmit_buffer.phys_addr.value() as u64);
-        self.tx_descs[self.tx_cur as usize].length.write(transmit_buffer.length);
-        self.tx_descs[self.tx_cur as usize].cmd.write((regs::CMD_EOP | regs::CMD_IFCS | regs::CMD_RPS | regs::CMD_RS ) as u8);
-        self.tx_descs[self.tx_cur as usize].status.write(0);
-
-        let old_cur: u8 = self.tx_cur as u8;
-        self.tx_cur = (self.tx_cur + 1) % (E1000_NUM_TX_DESC as u16);
-        
-
-        // debug!("THD {}", self.regs.tdh.read());
-        // debug!("TDT!{}", self.regs.tdt.read());
-
-        self.regs.tdt.write(self.tx_cur as u32);   
-    
-        // debug!("THD {}", self.regs.tdh.read());
-        // debug!("TDT!{}", self.regs.tdt.read());
-        // debug!("post-write, tx_descs[{}] = {:?}", old_cur, self.tx_descs[old_cur as usize]);
-        // debug!("Value of tx descriptor address: {:x}", self.tx_descs[old_cur as usize].phys_addr);
-        // debug!("Waiting for packet to send!");
-        
-        while (self.tx_descs[old_cur as usize].status.read() & TX_DD) == 0 {
-            //debug!("THD {}",self.read_command(REG_TXDESCHEAD));
-            //debug!("status register: {}",self.tx_descs[old_cur as usize].status);
-        }
-        //bit 0 should be set when done
-
-        // debug!("Sent tx buffer [{}]: length: {}, paddr: {:#X}, vaddr: {:#X}", 
-        //     old_cur, transmit_buffer.length, transmit_buffer.phys_addr, transmit_buffer.mp.start_address()
-        // );  
-
+        Self::send_on_queue(&mut self.tx_queue.lock(), E1000_NUM_TX_DESC as u16, &mut self.regs.tdt, transmit_buffer);
         Ok(())
     }
 
     fn get_received_frame(&mut self) -> Option<ReceivedFrame> {
-        self.received_frames.pop_front()
+        self.rx_queue.lock().received_frames.pop_front()
     }
 
-    fn poll_receive(&mut self) -> Result<(), &'static str> {
-        // check if the NIC has received a new frame that we need to handle
-        if (self.rx_descs[self.rx_cur as usize].status.read() & RX_DD) != 0 {
-            self.handle_receive()
-        } else {
-            // else, no new frames
-            Ok(())
-        }
+    fn poll_receive(&self) -> Result<(), &'static str> {
+        Self::collect_from_queue(&mut self.rx_queue.lock(), E1000_NUM_RX_DESC as u16, &RX_BUFFER_POOL, E1000_RX_BUFFER_SIZE_IN_BYTES)        
     }
 
     fn mac_address(&self) -> [u8; 6] {
@@ -247,7 +189,7 @@ impl NetworkInterfaceCard for E1000Nic {
 /// functions that setup the NIC struct and handle the sending and receiving of packets
 impl E1000Nic {
     /// Initializes the new E1000 network interface card that is connected as the given PciDevice.
-    pub fn init(e1000_pci_dev: &PciDevice) -> Result<&'static MutexIrqSafe<E1000Nic>, &'static str> {
+    pub fn init(e1000_pci_dev: &PciDevice) -> Result<(), &'static str> {
         use pic::PIC_MASTER_OFFSET;
 
         //debug!("e1000_nc bar_type: {0}, mem_base: {1}, io_base: {2}", e1000_nc.bar_type, e1000_nc.mem_base, e1000_nc.io_base);
@@ -256,14 +198,21 @@ impl E1000Nic {
         let interrupt_num = pci_read_8(e1000_pci_dev.bus, e1000_pci_dev.slot, e1000_pci_dev.func, PCI_INTERRUPT_LINE) + PIC_MASTER_OFFSET;
         debug!("e1000 IRQ number: {}", interrupt_num);
 
-        // Type of BAR0
-        let bar_type = (e1000_pci_dev.bars[0] as u8) & 0x01;    
-        // IO Base Address
-        let io_base = e1000_pci_dev.bars[0] & !1;     
-        // memory mapped base address
-        let mem_base = PhysicalAddress::new((e1000_pci_dev.bars[0] as usize) & !3)?; //hard coded for 32 bit, need to make conditional 
+        let bar0 = e1000_pci_dev.bars[0];
+        // Determine the type from the base address register
+        let bar_type = (bar0 as u8) & 0x01;    
+        let mem_mapped = 0;
 
-        let mut mapped_registers = Self::mem_map(e1000_pci_dev, mem_base)?;
+        // If the base address is not memory mapped then exit
+        if bar_type != mem_mapped {
+            error!("e1000::init(): BAR0 is of I/O type");
+            return Err("e1000::init(): BAR0 is of I/O type")
+        }
+  
+        // memory mapped base address
+        let mem_base = Self::determine_mem_base(e1000_pci_dev)?;
+
+        let (mut mapped_registers, mem_base_v) = Self::mapped_reg(e1000_pci_dev, mem_base)?;
         
         Self::start_link(&mut mapped_registers);
         
@@ -274,74 +223,51 @@ impl E1000Nic {
         Self::enable_interrupts(&mut mapped_registers);
         register_interrupt(interrupt_num, e1000_handler)?;
 
+        // initialize the buffer pool
+        Self::init_rx_buf_pool(RX_BUFFER_POOL_SIZE, E1000_RX_BUFFER_SIZE_IN_BYTES, &RX_BUFFER_POOL)?;
+
         let (rx_descs, rx_buffers) = Self::rx_init(&mut mapped_registers)?;
+        let rxq = RxQueueInfo {
+            id: 0,
+            rx_descs: rx_descs,
+            rx_cur: 0,
+            rx_bufs_in_use: rx_buffers,
+            received_frames: VecDeque::new(),
+            // here the cpu id is irrelevant because there's no DCA or MSI 
+            cpu_id: get_my_apic_id().ok_or("E1000::init(): couldn't get my apic id")?,
+            rdt_addr: VirtualAddress::new(mem_base_v.value() + REG_RXDESCTAIL as usize)?,
+        };
+
         let tx_descs = Self::tx_init(&mut mapped_registers)?;
+        let txq = TxQueueInfo {
+            id: 0,
+            tx_descs: tx_descs,
+            tx_cur: 0,
+            cpu_id: get_my_apic_id().ok_or("E1000::init(): couldn't get my apic id")?,
+        };
 
         let e1000_nic = E1000Nic {
             bar_type: bar_type,
-            io_base: io_base,
             mem_base: mem_base,
-            eeprom_exists: false,
             interrupt_num: interrupt_num,
             mac_hardware: mac_addr_hardware,
             mac_spoofed: None,
-            rx_descs: rx_descs,
-            tx_descs: tx_descs,
-            rx_cur: 0,
-            tx_cur: 0,
-            rx_bufs_in_use: rx_buffers,
+            rx_queue: MutexIrqSafe::new(rxq),
+            tx_queue: MutexIrqSafe::new(txq),
             regs: mapped_registers,
-            received_frames: VecDeque::new(),
         };
         
-        let nic_ref = E1000_NIC.call_once(|| MutexIrqSafe::new(e1000_nic));
-        Ok(nic_ref)
+        let nic_ref = E1000_NIC.call_once(|| RwLockIrqSafe::new(e1000_nic));
+        Ok(())
     }
     
     /// allocates memory for the NIC, starting address and size taken from the PCI BAR0
-    fn mem_map(dev: &PciDevice, mem_base: PhysicalAddress) -> Result<BoxRefMut<MappedPages, IntelE1000Registers>, &'static str> {
-        // set the bust mastering bit for this PciDevice, which allows it to use DMA
-        pci_set_command_bus_master_bit(dev);
-
-        // find out amount of space needed
-        let mem_size_in_bytes = E1000Nic::determine_mem_size(dev) as usize;
-
-        // inform the frame allocator that the physical frames where the PCI config space for the nic exists
-        // is now off-limits and should not be touched
-        {
-            let nic_area = PhysicalMemoryArea::new(mem_base, mem_size_in_bytes as usize, 1, 0); // TODO: FIXME:  use proper acpi number 
-            FRAME_ALLOCATOR.try().ok_or("e1000: Couldn't get FRAME ALLOCATOR")?.lock().add_area(nic_area, false)?;
-        }
-
-        // set up virtual pages and physical frames to be mapped
-        let pages_nic = allocate_pages_by_bytes(mem_size_in_bytes).ok_or("e1000::mem_map(): couldn't allocated virtual page!")?;
-        let frames_nic = FrameRange::from_phys_addr(mem_base, mem_size_in_bytes);
-        let flags = EntryFlags::PRESENT | EntryFlags::WRITABLE | EntryFlags::NO_CACHE | EntryFlags::NO_EXECUTE;
-
-        let kernel_mmi_ref = get_kernel_mmi_ref().ok_or("e1000:mem_map KERNEL_MMI was not yet initialized!")?;
-        let mut kernel_mmi = kernel_mmi_ref.lock();
-        let mut fa = FRAME_ALLOCATOR.try().ok_or("e1000::mem_map(): couldn't get FRAME_ALLOCATOR")?.lock();
-        let nic_mapped_page = kernel_mmi.page_table.map_allocated_pages_to(pages_nic, frames_nic, flags, fa.deref_mut())?;
+    fn mapped_reg(dev: &PciDevice, mem_base: PhysicalAddress) -> Result<(BoxRefMut<MappedPages, IntelE1000Registers>, VirtualAddress), &'static str> {
+        let nic_mapped_page = Self::mem_map_reg(dev, mem_base)?;
+        let mem_base_v = nic_mapped_page.start_address();
         let regs = BoxRefMut::new(Box::new(nic_mapped_page)).try_map_mut(|mp| mp.as_type_mut::<IntelE1000Registers>(0))?;
             
-        debug!("E1000 status register: {:#X}", regs.status.read());
-        Ok(regs)
-    }
-
-
-    fn init_rx_buf_pool(num_rx_buffers: usize) -> Result<(), &'static str> {
-        let length = E1000_RX_BUFFER_SIZE_IN_BYTES;
-        for _i in 0..num_rx_buffers {
-            let (mp, phys_addr) = create_contiguous_mapping(length as usize, nic_mapping_flags())?; 
-            let rx_buf = ReceiveBuffer::new(mp, phys_addr, length, &RX_BUFFER_POOL);
-            if RX_BUFFER_POOL.push(rx_buf).is_err() {
-                // if the queue is full, it returns an Err containing the object trying to be pushed
-                error!("e1000::init_rx_buf_pool(): rx buffer pool is full, cannot add rx buffer {}!", _i);
-                return Err("e1000 rx buffer pool is full");
-            };
-        }
-
-        Ok(())
+        Ok((regs, mem_base_v))
     }
 
     pub fn spoof_mac(&mut self, spoofed_mac_addr: [u8; 6]) {
@@ -395,46 +321,10 @@ impl E1000Nic {
     /// Initialize the array of receive descriptors and their corresponding receive buffers,
     /// and returns a tuple including both of them.
     fn rx_init(regs: &mut IntelE1000Registers) -> Result<(BoxRefMut<MappedPages, [LegacyRxDesc]>, Vec<ReceiveBuffer>), &'static str> {
-        Self::init_rx_buf_pool(RX_BUFFER_POOL_SIZE)?;
-
-        let size_in_bytes_of_all_rx_descs = E1000_NUM_RX_DESC * core::mem::size_of::<LegacyRxDesc>();
-
-        // Rx descriptors must be 16 byte-aligned, which is satisfied below because it's aligned to a page boundary.
-        let (rx_descs_mapped_pages, rx_descs_starting_phys_addr) = create_contiguous_mapping(size_in_bytes_of_all_rx_descs, nic_mapping_flags())?;
-
-        // cast our physically-contiguous MappedPages into a slice of receive descriptors
-        let mut rx_descs = BoxRefMut::new(Box::new(rx_descs_mapped_pages))
-            .try_map_mut(|mp| mp.as_slice_mut::<LegacyRxDesc>(0, E1000_NUM_RX_DESC))?;
-
-        // now that we've created the rx descriptors, we can fill them in with initial values
-        let mut rx_bufs_in_use: Vec<ReceiveBuffer> = Vec::with_capacity(E1000_NUM_RX_DESC);
-        for rd in rx_descs.iter_mut() {
-            // obtain or create a receive buffer for each rx_desc
-            let rx_buf = RX_BUFFER_POOL.pop()
-                .ok_or("Couldn't obtain a ReceiveBuffer from the pool")
-                .or_else(|_e| {
-                    create_contiguous_mapping(E1000_RX_BUFFER_SIZE_IN_BYTES as usize, nic_mapping_flags())
-                        .map(|(buf_mapped, buf_paddr)| 
-                            ReceiveBuffer::new(buf_mapped, buf_paddr, E1000_RX_BUFFER_SIZE_IN_BYTES, &RX_BUFFER_POOL)
-                        )
-                })?;
-            let paddr = rx_buf.phys_addr;
-            rx_bufs_in_use.push(rx_buf);
-            rd.init(paddr);
-        }
-        
-        debug!("e1000::rx_init(): phys_addr of rx_desc: {:#X}", rx_descs_starting_phys_addr);
-        let rx_desc_phys_addr_lower  = rx_descs_starting_phys_addr.value() as u32;
-        let rx_desc_phys_addr_higher = (rx_descs_starting_phys_addr.value() >> 32) as u32;
-        
-        // write the physical address of the rx descs array
-        regs.rdbal.write(rx_desc_phys_addr_lower);
-        regs.rdbah.write(rx_desc_phys_addr_higher);
-        // write the length (in total bytes) of the rx descs array
-        regs.rdlen.write(size_in_bytes_of_all_rx_descs as u32);
-        
-        // Write the head index (the first receive descriptor)
-        regs.rdh.write(0);
+        // get the queue of rx descriptors and its corresponding rx buffers
+        let (rx_descs, rx_bufs_in_use) = Self::init_rx_queue(E1000_NUM_RX_DESC, &RX_BUFFER_POOL, E1000_RX_BUFFER_SIZE_IN_BYTES as usize, &mut regs.rdbal, 
+                                        &mut regs.rdbah, &mut regs.rdlen, &mut regs.rdh, &mut regs.rdt)?;          
+            
         // Write the tail index.
         // Note that the e1000 SDM states that we should set the RDT (tail index) to the index *beyond* the last receive descriptor, 
         // so if you have 8 rx descs, you will set it to 8. 
@@ -451,34 +341,8 @@ impl E1000Nic {
     
     /// Initialize the array of tramsmit descriptors and return them.
     fn tx_init(regs: &mut IntelE1000Registers) -> Result<BoxRefMut<MappedPages, [LegacyTxDesc]>, &'static str> {
-        let size_in_bytes_of_all_tx_descs = E1000_NUM_TX_DESC * core::mem::size_of::<LegacyTxDesc>();
-
-        // Tx descriptors must be 16 byte-aligned, which is satisfied below because it's aligned to a page boundary.
-        let (tx_descs_mapped_pages, tx_descs_starting_phys_addr) = create_contiguous_mapping(size_in_bytes_of_all_tx_descs, nic_mapping_flags())?;
-
-        // cast our physically-contiguous MappedPages into a slice of transmit descriptors
-        let mut tx_descs = BoxRefMut::new(Box::new(tx_descs_mapped_pages))
-            .try_map_mut(|mp| mp.as_slice_mut::<LegacyTxDesc>(0, E1000_NUM_TX_DESC))?;
-
-        // now that we've created the tx descriptors, we can fill them in with initial values
-        for td in tx_descs.iter_mut() {
-            td.init();
-        }
-
-        debug!("e1000::tx_init(): phys_addr of tx_desc: {:#X}", tx_descs_starting_phys_addr);
-        let tx_desc_phys_addr_lower  = tx_descs_starting_phys_addr.value() as u32;
-        let tx_desc_phys_addr_higher = (tx_descs_starting_phys_addr.value() >> 32) as u32;
-
-        // write the physical address of the rx descs array
-        regs.tdbal.write(tx_desc_phys_addr_lower);        
-        regs.tdbah.write(tx_desc_phys_addr_higher);
+        let tx_descs = Self::init_tx_queue(E1000_NUM_TX_DESC, &mut regs.tdbal, &mut regs.tdbah, &mut regs.tdlen, &mut regs.tdh, &mut regs.tdt)?;
         
-        // write the length (in total bytes) of the rx descs array
-        regs.tdlen.write(size_in_bytes_of_all_tx_descs as u32);
-        
-        // write the head index and the tail index (both 0 initially because there are no tx requests yet)
-        regs.tdh.write(0);
-        regs.tdt.write(0);
         regs.tctl.write(regs::TCTL_EN | regs::TCTL_PSP);
 
         Ok(tx_descs)
@@ -501,85 +365,8 @@ impl E1000Nic {
     /// Handle the receipt of an Ethernet frame. 
     /// This should be invoked whenever the NIC has a new received frame that is ready to be handled,
     /// either in a polling fashion or from a receive interrupt handler.
-    fn handle_receive(&mut self) -> Result<(), &'static str> {
-        let mut receive_buffers_in_frame: Vec<ReceiveBuffer> = Vec::new();
-        let mut _total_packet_length: u16 = 0;
-
-        // The main idea here is to go through all of the receive buffers that the NIC has populated,
-        // and collect all of them into a single ethernet frame, i.e., a `ReceivedFrame`.
-        // We go through each receive buffer and remove it from the list of buffers in use,
-        // but then we need to replace that receive buffer with a new one that can be filled by the NIC
-        // the next time it receives a piece of a frame. 
-        
-        // debug!("handle_receive(): rx_cur {}, head: {}, tail: {}\n\t[{:#X}, {:#X}, {:#X}, {:#X}, {:#X}, {:#X}, {:#X}, {:#X}]", 
-        //     self.rx_cur, self.regs.rdh.read(), self.regs.rdt.read(),
-        //     self.rx_descs[0].status.read(), 
-        //     self.rx_descs[1].status.read(), 
-        //     self.rx_descs[2].status.read(), 
-        //     self.rx_descs[3].status.read(), 
-        //     self.rx_descs[4].status.read(), 
-        //     self.rx_descs[5].status.read(), 
-        //     self.rx_descs[6].status.read(), 
-        //     self.rx_descs[7].status.read(), 
-        // );
-
-
-        while (self.rx_descs[self.rx_cur as usize].status.read() & RX_DD) == RX_DD {
-            // get information about the current receive buffer
-            let length = self.rx_descs[self.rx_cur as usize].length.read();
-            let status = self.rx_descs[self.rx_cur as usize].status.read();
-            // debug!("e1000: received rx buffer [{}]: length: {}, status: {:#X}", self.rx_cur, length, status);
-
-            // //print rx_buf
-            // let length = self.rx_descs[self.rx_cur as usize].length;
-            // let rx_buf = self.rx_bufs_in_use[self.rx_cur as usize].start_address() as *const u8;
-            // //print rx_buf of length bytes
-            // debug!("rx_buf {}: ", self.rx_cur);
-
-            _total_packet_length += length;
-
-            // Now that we are "removing" the current receive buffer from the list of receive buffers that the NIC can use,
-            // (because we're saving it for higher layers to use),
-            // we need to obtain a new `ReceiveBuffer` and set it up such that the NIC will use it for future receivals.
-            let new_receive_buf = match RX_BUFFER_POOL.pop() {
-                Some(rx_buf) => rx_buf,
-                None => {
-                    warn!("e1000 RX BUF POOL WAS EMPTY.... reallocating! This means that no task is consuming the accumulated received ethernet frames.");
-                    // if the pool was empty, then we allocate a new receive buffer
-                    let len = E1000_RX_BUFFER_SIZE_IN_BYTES;
-                    let (mp, phys_addr) = create_contiguous_mapping(len as usize, nic_mapping_flags())?;
-                    ReceiveBuffer::new(mp, phys_addr, len, &RX_BUFFER_POOL)
-                }
-            };
-
-            // actually tell the NIC about the new receive buffer, and that it's ready for use now
-            self.rx_descs[self.rx_cur as usize].phys_addr.write(new_receive_buf.phys_addr.value() as u64);
-            self.rx_descs[self.rx_cur as usize].status.write(0);
-
-            // Swap in the new receive buffer at the index corresponding to this current rx_desc's receive buffer,
-            // getting back the receive buffer that is part of the received ethernet frame
-            self.rx_bufs_in_use.push(new_receive_buf);
-            let mut current_rx_buf = self.rx_bufs_in_use.swap_remove(self.rx_cur as usize); 
-            current_rx_buf.length = length; // set the ReceiveBuffer's length to the size of the actual packet received
-            receive_buffers_in_frame.push(current_rx_buf);
-            
-            // move on to the next receive buffer to see if it's ready for us to take
-            let old_cur = self.rx_cur as u32;
-            self.rx_cur = (self.rx_cur + 1) % E1000_NUM_RX_DESC as u16;
-            // debug!("writing rx buffer tail: old_cur {} -> rx_cur {}  (head: {}, tail: {})", old_cur, self.rx_cur, self.regs.rdh.read(), self.regs.rdt.read());
-            self.regs.rdt.write(old_cur);
-
-            // check if this rx buffer is the last piece of the frame (EOP)
-            if (status & RX_EOP) == RX_EOP {
-                // if so, then package it up as a received frame
-                let buffers = core::mem::replace(&mut receive_buffers_in_frame, Vec::new());
-                self.received_frames.push_back(ReceivedFrame(buffers));
-            } else {
-                warn!("e1000: Received multi-rxbuffer frame, this scenario not fully tested!");
-            }
-        }
-
-        Ok(())
+    fn handle_receive(&self) -> Result<(), &'static str> {
+        Self::collect_from_queue(&mut self.rx_queue.lock(), E1000_NUM_RX_DESC as u16, &RX_BUFFER_POOL, E1000_RX_BUFFER_SIZE_IN_BYTES)        
     }
 
 
@@ -613,7 +400,7 @@ impl E1000Nic {
 
 extern "x86-interrupt" fn e1000_handler(_stack_frame: &mut ExceptionStackFrame) {
     if let Some(ref e1000_nic_ref) = E1000_NIC.try() {
-        let mut e1000_nic = e1000_nic_ref.lock();
+        let mut e1000_nic = e1000_nic_ref.write();
         if let Err(e) = e1000_nic.handle_interrupt() {
             error!("e1000_handler(): error handling interrupt: {:?}", e);
         }

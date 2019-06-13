@@ -30,5 +30,8 @@ path = "../../libs/mpmc"
 [dependencies.pci]
 path = "../pci"
 
+[dependencies.irq_safety]
+git = "https://github.com/kevinaboos/irq_safety"
+
 [lib]
 crate-type = ["rlib"]

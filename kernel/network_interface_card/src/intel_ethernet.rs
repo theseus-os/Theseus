@@ -1,7 +1,7 @@
 use bit_field::BitField;
 use volatile::{Volatile, ReadOnly};
 use core::ops::DerefMut;
-use memory::{EntryFlags, get_frame_allocator, PhysicalMemoryArea, FrameRange, PhysicalAddress, allocate_pages_by_bytes, get_kernel_mmi_ref, MappedPages, create_contiguous_mapping};
+use memory::{EntryFlags, get_frame_allocator, PhysicalMemoryArea, FrameRange, PhysicalAddress, VirtualAddress, allocate_pages_by_bytes, get_kernel_mmi_ref, MappedPages, create_contiguous_mapping};
 use pci::{pci_read_32, pci_write, PCI_BAR0, PciDevice, pci_set_command_bus_master_bit};
 use spin::Once;
 use alloc::{
@@ -9,24 +9,41 @@ use alloc::{
     boxed::Box,
 };
 use owning_ref::BoxRefMut;
+use core::ptr::write_volatile;
+use alloc::collections::VecDeque;
+use irq_safety::MutexIrqSafe;
 
+use super::{TransmitBuffer, ReceiveBuffer, nic_mapping_flags, ReceivedFrame};
 
-use super::{TransmitBuffer, ReceiveBuffer, nic_mapping_flags};
-
+/// A trait for functionalities that all receive descriptors must support
 pub trait RxDescriptor {
     /// Initializes a receive descriptor by clearing its status 
     /// and setting the descriptor's physical address.
     /// 
-    /// # Arguments: 
-    /// * `packet_buffer_address`: the starting physical address of the receive buffer
+    /// # Arguments
+    /// * `packet_buffer_address`: the starting physical address of the receive buffer.
     fn init(&mut self, packet_buffer_address: PhysicalAddress);
+
+    /// Updates the descriptor's physical address.
+    /// 
+    /// # Arguments
+    /// * `packet_buffer_address`: the starting physical address of the receive buffer.
     fn set_packet_address(&mut self, packet_buffer_address: PhysicalAddress);
+
+    /// Clears the status bits of the descriptor.
     fn reset_status(&mut self);
+
+    /// Returns true if the descriptor has a received packet copied to its buffer.
     fn descriptor_done(&self) -> bool;
+
+    /// Returns true if the descriptor's packet buffer is the last in a frame.
     fn end_of_packet(&self) -> bool;
+
+    /// The length of the packet in the descriptor's packet buffer.
     fn length(&self) -> u64;
 }
 
+/// A trait for functionalities that all transmit descriptors must support.
 pub trait TxDescriptor {
     /// Initializes a transmit descriptor by clearing all of its values.
     fn init(&mut self);
@@ -34,28 +51,33 @@ pub trait TxDescriptor {
     /// Updates the transmit descriptor to send the packet.
     /// 
     /// # Arguments
-    /// - `transmit_buffer`: the buffer which contains the packet to be sent. We assume that one transmit descriptor will be used to send one packet.
+    /// * `transmit_buffer`: the buffer which contains the packet to be sent. We assume that one transmit descriptor will be used to send one packet.
     fn send(&mut self, transmit_buffer: TransmitBuffer);
 
-    /// Polls the Descriptor Done bit to see if the packet has been sent.
+    /// Polls the Descriptor Done bit until the packet has been sent.
     fn wait_for_packet_tx(&self);
 }
 
 
 
 /// This struct is a Legacy Transmit Descriptor. 
-/// There is one instance of this struct per buffer to be transmitted. 
+/// There is one instance of this struct per transmit buffer. 
 #[repr(C,packed)]
 pub struct LegacyTxDesc {
     /// The starting physical address of the transmit buffer
     pub phys_addr:  Volatile<u64>,
     /// Length of the transmit buffer in bytes
     pub length:     Volatile<u16>,
+    /// Checksum offset: where to insert the checksum from the start of the packet if enabled
     pub cso:        Volatile<u8>,
+    /// Command bits
     pub cmd:        Volatile<u8>,
+    /// Status bits
     pub status:     Volatile<u8>,
+    /// Checksum start: where to begin computing the checksum, if enabled
     pub css:        Volatile<u8>,
-    pub special :   Volatile<u16>,
+    /// Vlan tags 
+    pub vlan :   Volatile<u16>,
 }
 
 impl TxDescriptor for LegacyTxDesc {
@@ -66,7 +88,7 @@ impl TxDescriptor for LegacyTxDesc {
         self.cmd.write(0);
         self.status.write(0);
         self.css.write(0);
-        self.special.write(0);
+        self.vlan.write(0);
     }
 
     fn send(&mut self, transmit_buffer: TransmitBuffer) {
@@ -86,7 +108,7 @@ impl TxDescriptor for LegacyTxDesc {
 impl fmt::Debug for LegacyTxDesc {
     fn fmt(&self, f: &mut fmt::Formatter) -> fmt::Result {
             write!(f, "{{addr: {:#X}, length: {}, cso: {}, cmd: {}, status: {}, css: {}, special: {}}}",
-                    self.phys_addr.read(), self.length.read(), self.cso.read(), self.cmd.read(), self.status.read(), self.css.read(), self.special.read())
+                    self.phys_addr.read(), self.length.read(), self.cso.read(), self.cmd.read(), self.status.read(), self.css.read(), self.vlan.read())
     }
 }
 
@@ -100,10 +122,14 @@ pub struct LegacyRxDesc {
     pub phys_addr:  Volatile<u64>,      
     /// Length of the receive buffer in bytes
     pub length:     ReadOnly<u16>,
+    /// Checksum value of the packet after the IP header till the end 
     pub checksum:   ReadOnly<u16>,
+    /// Status bits which tell if the descriptor has been used
     pub status:     Volatile<u8>,
+    /// Receive errors
     pub errors:     ReadOnly<u8>,
-    pub special:    ReadOnly<u16>,
+    /// Vlan tags
+    pub vlan:       ReadOnly<u16>,
 }
 
 impl RxDescriptor for LegacyRxDesc {
@@ -137,21 +163,21 @@ use core::fmt;
 impl fmt::Debug for LegacyRxDesc {
     fn fmt(&self, f: &mut fmt::Formatter) -> fmt::Result {
             write!(f, "{{addr: {:#X}, length: {}, checksum: {}, status: {}, errors: {}, special: {}}}",
-                    self.phys_addr.read(), self.length.read(), self.checksum.read(), self.status.read(), self.errors.read(), self.special.read())
+                    self.phys_addr.read(), self.length.read(), self.checksum.read(), self.status.read(), self.errors.read(), self.vlan.read())
     }
 }
 
 
-/// Advanced Receive Descriptor used in the ixgbe driver (section 7.1.6 of 82599 datasheet). 
-/// It has 2 modes: Read and Write Back. There is one receive descriptor per receive buffer that can be converted between these 2 modes. 
-/// Read contains the addresses that the driver writes.  
+/// Advanced Receive Descriptor used in the ixgbe driver (section 7.1.6 of 82599 datasheet).
+/// It has 2 modes: Read and Write Back. There is one receive descriptor per receive buffer that can be converted between these 2 modes.
+/// Read contains the addresses that the driver writes.
 /// Write Back contains information the hardware writes on receiving a packet.
 #[repr(C)]
 pub struct AdvancedRxDesc {
-    /// the starting physcal address of the receive buffer for the packet
+    /// Starting physcal address of the receive buffer for the packet
     pub packet_buffer_address:  Volatile<u64>,
-    /// the starting physcal address of the receive buffer for the header
-    /// this field will only be used if header splitting is enabled    
+    /// Starting physcal address of the receive buffer for the header.
+    /// This field will only be used if header splitting is enabled    
     pub header_buffer_address:  Volatile<u64>,
 }
 
@@ -175,7 +201,6 @@ impl RxDescriptor for AdvancedRxDesc {
     }
 
     fn end_of_packet(&self) -> bool {
-        debug!("end of pakcket: {}", self.get_ext_status());
         (self.get_ext_status() & RX_STATUS_EOP as u64) == RX_STATUS_EOP as u64        
     }
 
@@ -186,68 +211,68 @@ impl RxDescriptor for AdvancedRxDesc {
 
 impl AdvancedRxDesc {
 
-    /// Write Back mode function for the Advanced Receive Descriptor
-    /// returns the packet type that was used for the Receive Side Scaling hash function
+    /// Write Back mode function for the Advanced Receive Descriptor.
+    /// Returns the packet type that was used for the Receive Side Scaling hash function.
     pub fn get_rss_type(&self) -> u64{
         self.packet_buffer_address.read().get_bits(0..3) 
     }
 
-    /// Write Back mode function for the Advanced Receive Descriptor
-    /// returns the packet type identified by the hardware
+    /// Write Back mode function for the Advanced Receive Descriptor.
+    /// Returns the packet type as identified by the hardware.
     pub fn get_packet_type(&self) -> u64{
         self.packet_buffer_address.read().get_bits(4..16) 
     }
 
-    /// Write Back mode function for the Advanced Receive Descriptor
-    /// returns the number of Receive Side Coalesced packets that start in this descriptor
+    /// Write Back mode function for the Advanced Receive Descriptor.
+    /// Returns the number of Receive Side Coalesced packets that start in this descriptor.
     pub fn get_rsccnt(&self) -> u64{
         self.packet_buffer_address.read().get_bits(17..20) 
     }
 
-    /// Write Back mode function for the Advanced Receive Descriptor
-    /// returns the size of the packet header in bytes
+    /// Write Back mode function for the Advanced Receive Descriptor.
+    /// Returns the size of the packet header in bytes.
     pub fn get_hdr_len(&self) -> u64{
         self.packet_buffer_address.read().get_bits(21..30) 
     }
 
-    /// Write Back mode function for the Advanced Receive Descriptor
-    /// when set to 1b, indicates that the hardware has found the length of the header
+    /// Write Back mode function for the Advanced Receive Descriptor.
+    /// When set to 1b, indicates that the hardware has found the length of the header.
     pub fn get_sph(&self) -> bool{
         self.packet_buffer_address.read().get_bit(31) 
     }
 
-    /// Write Back mode function for the Advanced Receive Descriptor
-    /// Returns the Receive Side Scaling hash 
+    /// Write Back mode function for the Advanced Receive Descriptor.
+    /// Returns the Receive Side Scaling hash.
     pub fn get_rss_hash(&self) -> u64{
         self.packet_buffer_address.read().get_bits(32..63) 
     }
 
-    /// Write Back mode function for the Advanced Receive Descriptor
-    /// Returns the Flow Director Filter ID if the packet matches a filter 
+    /// Write Back mode function for the Advanced Receive Descriptor.
+    /// Returns the Flow Director Filter ID if the packet matches a filter.
     pub fn get_fdf_id(&self) -> u64{
         self.packet_buffer_address.read().get_bits(32..63) 
     }
 
-    /// Write Back mode function for the Advanced Receive Descriptor
+    /// Write Back mode function for the Advanced Receive Descriptor.
     /// Status information indicates whether a descriptor has been used 
     /// and whether the buffer is the last one for a packet
     pub fn get_ext_status(&self) -> u64{
         self.header_buffer_address.read().get_bits(0..19) 
     }
     
-    /// Write Back mode function for the Advanced Receive Descriptor
-    /// returns errors reported by hardware for different packet types
+    /// Write Back mode function for the Advanced Receive Descriptor.
+    /// Returns errors reported by hardware for different packet types
     pub fn get_ext_error(&self) -> u64{
         self.header_buffer_address.read().get_bits(20..31) 
     }
     
-    /// Write Back mode function for the Advanced Receive Descriptor
+    /// Write Back mode function for the Advanced Receive Descriptor.
     /// Returns the number of bytes posted to the packet buffer
     pub fn get_pkt_len(&self) -> u64{
         self.header_buffer_address.read().get_bits(32..47) 
     }
     
-    /// Write Back mode function for the Advanced Receive Descriptor
+    /// Write Back mode function for the Advanced Receive Descriptor.
     /// If the vlan header is stripped from the packet, then the 16 bits of the VLAN tag are posted here
     pub fn get_vlan_tag(&self) -> u64{
         self.header_buffer_address.read().get_bits(48..63) 
@@ -262,7 +287,7 @@ impl fmt::Debug for AdvancedRxDesc {
 }
 
 
-/* Legacy transmit descriptor bits */
+// Transmit descriptor bits
 /// Tx Command: End of Packet
 pub const TX_CMD_EOP:                      u8 = (1 << 0);     
 /// Tx Command: Insert FCS
@@ -280,7 +305,7 @@ pub const TX_CMD_IDE:                      u8 = (1 << 7);
 /// Tx Status: descriptor Done
 pub const TX_STATUS_DD:                    u8 = 1 << 0;
 
-/* Receive descriptor bits */
+// Receive descriptor bits 
 /// Rx Status: Descriptor Done
 pub const RX_STATUS_DD:                    u8 = 1 << 0;
 /// Rx Status: End of Packet
@@ -288,33 +313,108 @@ pub const RX_STATUS_EOP:                   u8 = 1 << 1;
 
 
 
+/// A struct to store the Rx descriptor queues for a nic.
+pub struct RxQueues<T: RxDescriptor>{
+    /// A vec of all the Rx descriptor queues
+    pub queue: Vec<MutexIrqSafe<RxQueueInfo<T>>>,
+    /// The number of Rx descriptor queues
+    pub num_queues: u8
+}
+
+/// A struct that holds all information for one receive queue.
+/// There should be one such object per queue
+pub struct RxQueueInfo<T: RxDescriptor> {
+    /// The number of the queue, stored here for our convenience.
+    /// It should match its index in the `queue` field of the RxQueues struct
+    pub id: u8,
+    /// Receive descriptors
+    pub rx_descs: BoxRefMut<MappedPages, [T]>,
+    /// Current receive descriptor index
+    pub rx_cur: u16,
+    /// The list of rx buffers, in which the index in the vector corresponds to the index in `rx_descs`.
+    /// For example, `rx_bufs_in_use[2]` is the receive buffer that will be used when `rx_descs[2]` is the current rx descriptor (rx_cur = 2).
+    pub rx_bufs_in_use: Vec<ReceiveBuffer>,
+    /// The queue of received Ethernet frames, ready for consumption by a higher layer.
+    /// Just like a regular FIFO queue, newly-received frames are pushed onto the back
+    /// and frames are popped off of the front.
+    /// Each frame is represented by a Vec<ReceiveBuffer>, because a single frame can span multiple receive buffers.
+    /// TODO: improve this? probably not the best cleanest way to expose received frames to higher layers   
+    pub received_frames: VecDeque<ReceivedFrame>,
+    /// The cpu which this queue is mapped to. 
+    /// This in itself doesn't guarantee anything, but we use this value when setting the cpu id for interrupts and DCA.
+    pub cpu_id: u8,
+    /// The address where the rdt register is located for this queue
+    pub rdt_addr: VirtualAddress,
+}
+
+impl<T: RxDescriptor> RxQueueInfo<T> {
+    /// Updates the queue tail descriptor in the rdt register
+    pub fn update_rdt(&self, val: u32) {
+        unsafe { write_volatile((self.rdt_addr.value()) as *mut u32, val) }
+    }
+}
+
+
+
+/// A struct to store the Tx descriptor queues for a nic.
+pub struct TxQueues<T: TxDescriptor> {
+    /// A vec of all the Tx descriptor queues 
+    pub queue: Vec<MutexIrqSafe<TxQueueInfo<T>>>,
+    /// The number of Tx descriptor queues 
+    pub num_queues: u8
+}
+
+/// A struct that holds all information for a transmit queue. 
+/// There should be one such object per queue.
+pub struct TxQueueInfo<T: TxDescriptor> {
+    /// The number of the queue, stored here for our convenience.
+    /// It should match its index in the `queue` field of the TxQueues struct
+    pub id: u8,
+    /// Transmit descriptors 
+    pub tx_descs: BoxRefMut<MappedPages, [T]>,
+    /// Current transmit descriptor index
+    pub tx_cur: u16,
+    /// The cpu which this queue is mapped to. 
+    /// This in itself doesn't guarantee anything but we use this value when setting the cpu id for interrupts and DCA.
+    pub cpu_id : u8
+}
+
+
+
+
 /// Trait which contains functions for the NIC initialization procedure
 pub trait NicInit {
 
-    /// Returns the base address for the memory mapped registers
+    /// Returns the base address for the memory mapped registers from Base Address Register 0.
+    /// 
+    /// # Arguments
+    /// * `dev`: the pci device we need to find the base address for
     fn determine_mem_base(dev: &PciDevice) -> Result<PhysicalAddress, &'static str> {
-        // 64 bit address space
+        // value in the BAR which means a 64-bit address space
         let address_64 = 2;
         let bar0 = dev.bars[0];
-        // 16-byte aligned memory mapped base address
+
+        // memory mapped base address
         let mem_base = 
             // retrieve bits 1-2 to determine address space size
             if (bar0 >> 1) & 3 == address_64 { 
                 // a 64-bit address so need to access BAR1 for the upper 32 bits
                 let bar1 = dev.bars[1];
+                // clear out the bottom 4 bits because it's a 16-byte aligned address
                 PhysicalAddress::new((bar0 & !15) as usize | ((bar1 as usize) << 32))?
             }
             else {
+                // clear out the bottom 4 bits because it's a 16-byte aligned address
                 PhysicalAddress::new(bar0 as usize & !15)?
             };  
         
-        debug!("mem_base: {:#X}", mem_base);
-
         Ok(mem_base)
     }
 
     /// Find out amount of space needed for device's registers
-    /// TODO: Should this be placed in another crate? More generic than just a NIC function
+    /// 
+    /// # Arguments
+    /// * `dev`: the pci device we need to find the memory size for
     fn determine_mem_size(dev: &PciDevice) -> u32 {
         // Here's what we do: 
         // 1) read pci reg
@@ -330,11 +430,14 @@ pub trait NicInit {
         pci_write(dev.bus, dev.slot, dev.func, PCI_BAR0, dev.bars[0]); //restore original value
         //check that value is restored
         let bar0 = pci_read_32(dev.bus, dev.slot, dev.func, PCI_BAR0);
-        debug!("original bar0: {:#X}", bar0);
+        // debug!("original bar0: {:#X}", bar0);
         mem_size
     }
 
-    /// Allocates memory for the NIC registers, starting address and size taken from the PCI BAR0
+    /// Allocates memory for the NIC registers
+    /// # Arguments 
+    /// * `dev`: the pci device 
+    /// * `mem_base`: the starting physical address of the device's memory mapped registers
     fn mem_map_reg(dev: &PciDevice, mem_base: PhysicalAddress) -> Result<MappedPages, &'static str> {
         // set the bus mastering bit for this PciDevice, which allows it to use DMA
         pci_set_command_bus_master_bit(dev);
@@ -345,30 +448,40 @@ pub trait NicInit {
         Self::mem_map(mem_base, mem_size_in_bytes)
     }
 
-    /// Allocates memory for the NIC
+    /// Helper function to allocate memory
+    /// 
+    /// # Arguments
+    /// * `mem_base`: the starting physical address of the region that need to be allocated
+    /// * `mem_size_in_bytes`: the size of the region that needs to be allocated 
     fn mem_map(mem_base: PhysicalAddress, mem_size_in_bytes: usize) -> Result<MappedPages, &'static str> {
-        // inform the frame allocator that the physical frames where the PCI config space for the nic exists
+        // inform the frame allocator that the physical frames where memory area for the nic exists
         // is now off-limits and should not be touched
         {
             let nic_area = PhysicalMemoryArea::new(mem_base, mem_size_in_bytes as usize, 1, 0); 
-            get_frame_allocator().ok_or("ixgbe: Couldn't get FRAME ALLOCATOR")?.lock().add_area(nic_area, false)?;
+            get_frame_allocator().ok_or("NicInit::mem_map(): Couldn't get FRAME ALLOCATOR")?.lock().add_area(nic_area, false)?;
         }
 
         // set up virtual pages and physical frames to be mapped
-        let pages_nic = allocate_pages_by_bytes(mem_size_in_bytes).ok_or("ixgbe::mem_map(): couldn't allocated virtual page!")?;
+        let pages_nic = allocate_pages_by_bytes(mem_size_in_bytes).ok_or("NicInit::mem_map(): couldn't allocated virtual page!")?;
         let frames_nic = FrameRange::from_phys_addr(mem_base, mem_size_in_bytes);
         let flags = nic_mapping_flags();
 
-        debug!("Ixgbe: memory base: {:#X}, memory size: {}", mem_base, mem_size_in_bytes);
+        // debug!("NicInit: memory base: {:#X}, memory size: {}", mem_base, mem_size_in_bytes);
 
-        let kernel_mmi_ref = get_kernel_mmi_ref().ok_or("ixgbe:mem_map KERNEL_MMI was not yet initialized!")?;
+        let kernel_mmi_ref = get_kernel_mmi_ref().ok_or("NicInit::mem_map(): KERNEL_MMI was not yet initialized!")?;
         let mut kernel_mmi = kernel_mmi_ref.lock();
-        let mut fa = get_frame_allocator().ok_or("ixgbe::mem_map(): couldn't get FRAME_ALLOCATOR")?.lock();
+        let mut fa = get_frame_allocator().ok_or("NicInit::mem_map(): couldn't get FRAME_ALLOCATOR")?.lock();
         let nic_mapped_page = kernel_mmi.page_table.map_allocated_pages_to(pages_nic, frames_nic, flags, fa.deref_mut())?;
 
         Ok(nic_mapped_page)
     }
 
+    /// Initialize the receive buffer pool from where receive buffers are taken and returned
+    /// 
+    /// # Arguments
+    /// * `num_rx_buffers`: the amount of buffers that are initially added to the pool 
+    /// * `buffer_size`: the size of the receive buffers in bytes
+    /// * `rx_buffer_pool: the buffer pool to initialize
     fn init_rx_buf_pool(num_rx_buffers: usize, buffer_size: u16, rx_buffer_pool: &'static mpmc::Queue<ReceiveBuffer>) -> Result<(), &'static str> {
         let length = buffer_size;
         for _i in 0..num_rx_buffers {
@@ -384,6 +497,17 @@ pub trait NicInit {
         Ok(())
     }
 
+    /// Steps to create and initialize a receive descriptor queue
+    /// 
+    /// # Arguments
+    /// * `num_desc`: number of descriptors in the queue
+    /// * `rx_buffer_pool`: the pool from which to take receive buffers
+    /// * `buffer_size`: the size of each buffer in the pool
+    /// * `rdbal`: register which stores the lower 32 bits of the buffer physical address
+    /// * `rdbah`: register which stores the higher 32 bits of the buffer physical address
+    /// * `rdlen`: register which stores the length of the queue in bytes
+    /// * `rdh`: register which stores the descriptor at the head of the queue
+    /// * `rdt`: register which stores the descriptor at the tail of the queue
     fn init_rx_queue<T: RxDescriptor>(num_desc: usize, rx_buffer_pool: &'static mpmc::Queue<ReceiveBuffer>, buffer_size: usize,
         rdbal: &mut Volatile<u32>, rdbah: &mut Volatile<u32>, rdlen: &mut Volatile<u32>, rdh: &mut Volatile<u32>, rdt: &mut Volatile<u32>) 
         -> Result<(BoxRefMut<MappedPages, [T]>, Vec<ReceiveBuffer>), &'static str> {
@@ -434,6 +558,15 @@ pub trait NicInit {
         Ok((rx_descs, rx_bufs_in_use))        
     }
 
+    /// Steps to create and initialize a transmit descriptor queue
+    /// 
+    /// # Arguments
+    /// * `num_desc`: number of descriptors in the queue
+    /// * `tdbal`: register which stores the lower 32 bits of the buffer physical address
+    /// * `tdbah`: register which stores the higher 32 bits of the buffer physical address
+    /// * `tdlen`: register which stores the length of the queue in bytes
+    /// * `tdh`: register which stores the descriptor at the head of the queue
+    /// * `tdt`: register which stores the descriptor at the tail of the queue
     fn init_tx_queue<T: TxDescriptor>(num_desc: usize, tdbal: &mut Volatile<u32>, tdbah: &mut Volatile<u32>, tdlen: &mut Volatile<u32>, tdh: &mut Volatile<u32>, tdt: &mut Volatile<u32>) 
         -> Result<BoxRefMut<MappedPages, [T]>, &'static str> {
 
@@ -455,11 +588,11 @@ pub trait NicInit {
         let tx_desc_phys_addr_lower  = tx_descs_starting_phys_addr.value() as u32;
         let tx_desc_phys_addr_higher = (tx_descs_starting_phys_addr.value() >> 32) as u32;
 
-        // write the physical address of the rx descs array
+        // write the physical address of the tx descs array
         tdbal.write(tx_desc_phys_addr_lower); 
         tdbah.write(tx_desc_phys_addr_higher); 
 
-        // write the length (in total bytes) of the rx descs array
+        // write the length (in total bytes) of the tx descs array
         tdlen.write(size_in_bytes_of_all_tx_descs as u32);               
         
         // write the head index and the tail index (both 0 initially because there are no tx requests yet)

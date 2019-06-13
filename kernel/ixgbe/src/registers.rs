@@ -6,7 +6,7 @@ pub const INTEL_VEND:                   u16 = 0x8086;
 /// Device ID for the 82599ES, used to identify the device from the PCI space
 pub const INTEL_82599:                  u16 = 0x10FB;  
 
-/// The memory mapped registers of the 82599 device
+/// The memory mapped registers of the 82599ES device
 #[repr(C)]
 pub struct IntelIxgbeRegisters {
     /// Device Control Register
@@ -276,13 +276,13 @@ pub struct RegistersTx {
 
     /// Transmit Descriptor Completion Write Back Address High
     pub tdwbah:                         Volatile<u32>,          // 0x603C
-} //size 0x40
+} // 64B
 
 /// Set of registers for 128 transmit descriptor queues
 #[repr(C)]
 pub struct RegisterArrayTx {
     pub tx_queue:                       [RegistersTx; 128],
-}
+} // 8KiB
 
 /// Set of registers associated with one receive descriptor queue
 #[repr(C)]
@@ -312,13 +312,21 @@ pub struct RegistersRx {
     /// Receive Descriptor Control
     pub rxdctl:                         Volatile<u32>,          // 0x1028
     _padding2:                          [u8;20],                // 0x102C - 0x103F                                            
-} //size 0x40
+} // 64B
 
 /// Set of registers for 64 receive descriptor queues
 #[repr(C)]
 pub struct RegisterArrayRx {
     pub rx_queue:                       [RegistersRx; 64],
-}
+} // 4KiB
+
+/// Offset where the RDT register starts for the first 64 queues
+pub const RDT_1:                        usize = 0x1018;
+/// Offset where the RDT register starts for the second set of 64 queues
+pub const RDT_2:                        usize = 0xD018;
+/// Number of bytes between consecutive RDT registers
+pub const RDT_DIST:                     usize = 0x40;
+
 
 // Link set up commands
 pub const AUTOC_LMS_CLEAR:              u32 = 0x0000_E000; 
@@ -431,7 +439,7 @@ pub const TSTA_EC:                      u32 = (1 << 1);     // Excess Collisions
 pub const TSTA_LC:                      u32 = (1 << 2);     // Late Collision
 pub const LSTA_TU:                      u32 = (1 << 3);     // Transmit Underrun
 
-/* Interrupt Register Commands */
+// Interrupt Register Commands 
 pub const DISABLE_INTERRUPTS:           u32 = 0x7FFFFFFF; 
 /// MSI-X Mode
 pub const GPIE_MULTIPLE_MSIX:           u32 = 1 << 4;
@@ -441,14 +449,16 @@ pub const GPIE_EIMEN:                   u32 = 1 << 6;
 pub const GPIE_PBA_SUPPORT:             u32 = 1 << 31;
 /// Each bit enables auto clear of the corresponding RTxQ bit in the EICR register following interrupt assertion
 pub const EIAC_RTXQ_AUTO_CLEAR:         u32 = 0xFFFF;
+/// Bit position where the throttling interval is written
 pub const EITR_ITR_INTERVAL_SHIFT:      u32 = 3;
+/// Enables the corresponding interrupt in the EICR register by setting the bit
+pub const EIMS_INTERRUPT_ENABLE:        u32 = 1;
 
-
-/// The number of msi vectors this device can have. 
+/// The number of msi-x vectors this device can have. 
 /// It can be set from PCI space, but we took the value from the data sheet.
 pub const IXGBE_MAX_MSIX_VECTORS:     usize = 64;
 
-/// Table that contains MSI Vector entries. 
+/// Table that contains msi-x vector entries. 
 /// It is mapped to a physical memory region specified by the BAR from the PCI space.
 #[repr(C)]
 pub struct MsixVectorTable {
@@ -456,11 +466,11 @@ pub struct MsixVectorTable {
 }
 
 /// A single Message Signaled Interrupt entry.
-/// It contains the interrupt number for this vector and the core this interrupt is sent to.
+/// It contains the interrupt number for this vector and the core this interrupt is redirected to.
 #[repr(C)]
 pub struct MsixVectorEntry {
     /// The lower portion of the address for the memory write transaction.
-    /// This part contains the apic id which the interrupt will be sent to.
+    /// This part contains the apic id which the interrupt will be redirected to.
     pub msg_lower_addr:         Volatile<u32>,
     /// The upper portion of the address for the memory write transaction.
     pub msg_upper_addr:         Volatile<u32>,
@@ -472,9 +482,9 @@ pub struct MsixVectorEntry {
 
 /// A constant which indicates the region that is reserved for interrupt messages
 pub const MSIX_INTERRUPT_REGION:    u32 = 0xFEE << 20;
-/// the location in the lower address register where teh destination core id is written
+/// The location in the lower address register where the destination core id is written
 pub const MSIX_DEST_ID_SHIFT:       u32 = 12;
-/// the bits in the lower address register that need to be cleared and set
+/// The bits in the lower address register that need to be cleared and set
 pub const MSIX_ADDRESS_BITS:        u32 = 0xFFFF_FFF0;
-/// clear the vector control field to unmask the interrupt
+/// Clear the vector control field to unmask the interrupt
 pub const MSIX_UNMASK_INT:          u32 = 0;

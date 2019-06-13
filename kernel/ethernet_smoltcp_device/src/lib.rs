@@ -17,7 +17,7 @@ use alloc::{
     collections::BTreeMap,
     sync::Arc
 };
-use irq_safety::MutexIrqSafe;
+use irq_safety::RwLockIrqSafe;
 use smoltcp::{
     socket::SocketSet,
     time::Instant,
@@ -71,7 +71,7 @@ impl<N: NetworkInterfaceCard + 'static> NetworkInterface for EthernetNetworkInte
     }
 }
 
-impl<N: NetworkInterfaceCard + 'static + Send> EthernetNetworkInterface<N> {
+impl<N: NetworkInterfaceCard + 'static + Send + Sync> EthernetNetworkInterface<N> {
     /// Creates a new instance of an ethernet network interface, which can be used for handling sockets. 
     /// 
     /// Arguments: 
@@ -83,7 +83,7 @@ impl<N: NetworkInterfaceCard + 'static + Send> EthernetNetworkInterface<N> {
     /// Currently, `static_ip` and `gateway_ip` are required because we don't yet support DHCP.
     /// 
     pub fn new<G: Into<IpAddress>>(
-        nic: &'static MutexIrqSafe<N>,
+        nic: &'static RwLockIrqSafe<N>,
         static_ip: Option<IpCidr>,
         gateway_ip: Option<G>,
     ) -> Result<EthernetNetworkInterface<N>, &'static str> 
@@ -106,7 +106,7 @@ impl<N: NetworkInterfaceCard + 'static + Send> EthernetNetworkInterface<N> {
         })?;
 
         let device = EthernetDevice::new(nic);
-        let hardware_mac_addr = EthernetAddress(nic.lock().mac_address());
+        let hardware_mac_addr = EthernetAddress(nic.read().mac_address());
         // When creating an EthernetInterface, only the `ethernet_addr` and `neighbor_cache` are required.
         let iface = EthernetInterfaceBuilder::new(device)
             .ethernet_addr(hardware_mac_addr)
@@ -120,9 +120,16 @@ impl<N: NetworkInterfaceCard + 'static + Send> EthernetNetworkInterface<N> {
         )
     }
 
-    /// Calls the function to create a new network interface and adds it to the global list of network interfaces
-    pub fn add_network_interface(nic_ref: &'static MutexIrqSafe<N>, static_ip_address: &str, gateway_ip_address: &[u8]) -> Result<(), &'static str> {  
-        let static_ip = IpCidr::from_str(static_ip_address).map_err(|_e| "couldn't parse static_ip_address address")?;
+    /// Creates a new ethernet network interface
+    /// and adds it to the global list of network interfaces.
+    /// The static and gateway ips are provided because DHCP is not enabled.
+    /// 
+    /// # Arguments
+    /// * `nic_ref`: ethernet device to add to our network interfaces
+    /// * `static_ip_address`: ip address to be assigned to this interface
+    /// * `gateway_ip_address`: gateway ip for this interface
+    pub fn add_network_interface(nic_ref: &'static RwLockIrqSafe<N>, static_ip_address: &str, gateway_ip_address: &[u8]) -> Result<(), &'static str> {  
+        let static_ip = IpCidr::from_str(static_ip_address).map_err(|_e| "couldn't parse static_ip_address")?;
         let gateway_ip = Ipv4Address::from_bytes(gateway_ip_address);
         let ethernet_iface = Self::new(nic_ref, Some(static_ip), Some(gateway_ip))?;
         NETWORK_INTERFACES.lock().push(Arc::new(Mutex::new(ethernet_iface)));
@@ -135,11 +142,11 @@ impl<N: NetworkInterfaceCard + 'static + Send> EthernetNetworkInterface<N> {
 /// to use our existing ethernet driver.
 /// An instance of this `EthernetDevice` can be used in smoltcp's `EthernetInterface`.
 pub struct EthernetDevice<N: NetworkInterfaceCard + 'static> { 
-    nic_ref: &'static MutexIrqSafe<N>,
+    nic_ref: &'static RwLockIrqSafe<N>,
 }
 impl<N: NetworkInterfaceCard + 'static> EthernetDevice<N> {
     /// Create a new instance of the `EthernetDevice`.
-    pub fn new(nic_ref: &'static MutexIrqSafe<N>) -> EthernetDevice<N> {
+    pub fn new(nic_ref: &'static RwLockIrqSafe<N>) -> EthernetDevice<N> {
         EthernetDevice {
             nic_ref: nic_ref,
         }
@@ -169,7 +176,7 @@ impl<'d, N: NetworkInterfaceCard + 'static> smoltcp::phy::Device<'d> for Etherne
         // take ownership of it and return it inside of an RxToken.
         // Otherwise, if no new packets have arrived, return None.
         let received_frame = {
-            let mut nic = self.nic_ref.lock();
+            let mut nic = self.nic_ref.write();
             nic.poll_receive().map_err(|_e| {
                 error!("EthernetDevice::receive(): error returned from poll_receive(): {}", _e);
                 _e
@@ -217,7 +224,7 @@ impl<'d, N: NetworkInterfaceCard + 'static> smoltcp::phy::Device<'d> for Etherne
 /// The transmit token type used by smoltcp, which contains only a reference to the relevant NIC 
 /// because the actual transmit buffer is allocated lazily only when it needs to be consumed.
 pub struct TxToken<N: NetworkInterfaceCard + 'static> {
-    nic_ref: &'static MutexIrqSafe<N>,
+    nic_ref: &'static RwLockIrqSafe<N>,
 }
 impl<N: NetworkInterfaceCard + 'static> smoltcp::phy::TxToken for TxToken<N> {
     fn consume<R, F>(self, _timestamp: Instant, len: usize, f: F) -> smoltcp::Result<R>
@@ -245,7 +252,7 @@ impl<N: NetworkInterfaceCard + 'static> smoltcp::phy::TxToken for TxToken<N> {
             })?;
             f(txbuf_byte_slice)?
         };
-        self.nic_ref.lock()
+        self.nic_ref.write()
             .send_packet(txbuf)
             .map_err(|e| {
                 error!("EthernetDevice::transmit(): error sending Ethernet packet: {:?}", e);

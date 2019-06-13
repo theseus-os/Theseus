@@ -8,7 +8,7 @@ const REG_RXDESCLO:             u32 = 0x2800;
 const REG_RXDESCHI:             u32 = 0x2804;
 const REG_RXDESCLEN:            u32 = 0x2808;
 const REG_RXDESCHEAD:           u32 = 0x2810;
-const REG_RXDESCTAIL:           u32 = 0x2818;
+pub const REG_RXDESCTAIL:           u32 = 0x2818;
 
 const REG_TCTRL:                u32 = 0x0400;
 const REG_TXDESCLO:             u32 = 0x3800;

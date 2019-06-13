@@ -49,6 +49,5 @@ path = "../../libs/mpmc"
 path = "../network_interface_card"
 
 
-
 [lib]
 crate-type = ["rlib"]

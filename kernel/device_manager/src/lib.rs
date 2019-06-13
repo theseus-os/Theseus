@@ -61,31 +61,23 @@ pub fn init(keyboard_producer: DFQueueProducer<Event>) -> Result<(), &'static st
         debug!("Found pci device: {:?}", dev);
     } */
 
-    init_pci_dev(ixgbe::registers::INTEL_VEND, ixgbe::registers::INTEL_82599, ixgbe::IxgbeNic::init)?;
-    let nic_ref = ixgbe::get_ixgbe_nic().ok_or("device_manager::init: ixgbe nic hasn't been initialized")?;
-    ethernet_smoltcp_device::EthernetNetworkInterface::add_network_interface(nic_ref, DEFAULT_LOCAL_IP, &DEFAULT_GATEWAY_IP)?;
+    // intialize the 82599 NIC if present and add it to the list of network interfaces
+    match init_pci_dev(ixgbe::registers::INTEL_VEND, ixgbe::registers::INTEL_82599, ixgbe::IxgbeNic::init) {
+        Ok(()) => {
+            let nic_ref = ixgbe::get_ixgbe_nic().ok_or("device_manager::init(): ixgbe nic hasn't been initialized")?;
+            ethernet_smoltcp_device::EthernetNetworkInterface::add_network_interface(nic_ref, DEFAULT_LOCAL_IP, &DEFAULT_GATEWAY_IP)?;
+        },
+        Err(e) => warn!("Ixgbe device not found"),
+    };
     
-    // if let Some(pci_dev_82599) = get_pci_device_vd(ixgbe::registers::INTEL_VEND, ixgbe::registers::INTEL_82599) {
-    //     debug!("82599 Device found: {:?}", pci_dev_82599);
-    //     let ixgbe_nic_ref = ixgbe::IxgbeNic::init(pci_dev_82599)?;      
-    //     let static_ip = IpCidr::from_str(DEFAULT_LOCAL_IP).map_err(|_e| "couldn't parse 'DEFAULT_LOCAL_IP' address")?;
-    //     let gateway_ip = Ipv4Address::from_bytes(&DEFAULT_GATEWAY_IP);
-    //     let ixgbe_iface = ethernet_smoltcp_device::EthernetNetworkInterface::new(ixgbe_nic_ref, Some(static_ip), Some(gateway_ip))?;
-    //     network_manager::NETWORK_INTERFACES.lock().push(Arc::new(Mutex::new(ixgbe_iface)));
-    // }
-    // else {
-    //     warn!("No 82599 device found on this system.");
-    // }
-
-    if let Some(e1000_pci_dev) = get_pci_device_vd(e1000::INTEL_VEND, e1000::E1000_DEV) {
-        debug!("e1000 PCI device found: {:?}", e1000_pci_dev);
-        let e1000_nic_ref = e1000::E1000Nic::init(e1000_pci_dev)?;
-        let static_ip = IpCidr::from_str(DEFAULT_LOCAL_IP).map_err(|_e| "couldn't parse 'DEFAULT_LOCAL_IP' address")?;
-        let gateway_ip = Ipv4Address::from_bytes(&DEFAULT_GATEWAY_IP);
-        let e1000_iface = ethernet_smoltcp_device::EthernetNetworkInterface::new(e1000_nic_ref, Some(static_ip), Some(gateway_ip))?;
-        network_manager::NETWORK_INTERFACES.lock().push(Arc::new(Mutex::new(e1000_iface)));
-    }
-    
+    // intialize the E1000 NIC if present and add it to the list of network interfaces
+    match init_pci_dev(e1000::INTEL_VEND, e1000::E1000_DEV, e1000::E1000Nic::init) {
+        Ok(()) => {
+            let nic_ref = e1000::get_e1000_nic().ok_or("device_manager::init(): e1000 nic hasn't been initialized")?;
+            ethernet_smoltcp_device::EthernetNetworkInterface::add_network_interface(nic_ref, DEFAULT_LOCAL_IP, &DEFAULT_GATEWAY_IP)?;
+        },
+        Err(e) => warn!("E1000 device not found"),
+    };
 
     // testing ata pio read, write, and IDENTIFY functionality, example of uses, can be deleted 
     /*
@@ -116,9 +108,15 @@ pub fn init(keyboard_producer: DFQueueProducer<Event>) -> Result<(), &'static st
 
 }
 
-/// An initialization function for a Pci Device
+/// Function type for a pci device initialization procedure
 pub type PciDevInitFunc = fn(&PciDevice) -> Result<(), &'static str>;
 
+/// Finds the pci device and initializes it.
+/// 
+/// # Arguments
+/// * `vendor_id`: pci vendor id of device
+/// * `device_id`: pci device id of device
+/// * `init_func`: initialization function for the pci device
 fn init_pci_dev(vendor_id: u16, device_id: u16, init_func: PciDevInitFunc) -> Result<(), &'static str> {
     let pci_dev = get_pci_device_vd(vendor_id, device_id).ok_or("device_manager::init_pci_dev: device not found")?;
     init_func(pci_dev)?;
