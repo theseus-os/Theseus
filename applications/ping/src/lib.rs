@@ -13,7 +13,7 @@ extern crate smoltcp;
 extern crate network_manager;
 extern crate byteorder;
 extern crate hpet;
-extern crate http_client;
+extern crate smoltcp_helper;
 extern crate hashbrown;
 extern crate ota_update_client;
 extern crate getopts;
@@ -32,7 +32,7 @@ use smoltcp::{
 };
 use network_manager::{NetworkInterfaceRef, NETWORK_INTERFACES};
 use byteorder::{ByteOrder, NetworkEndian};
-use http_client::{millis_since, poll_iface};
+use smoltcp_helper::{millis_since, poll_iface};
 
 
 macro_rules! hpet_ticks {
@@ -145,7 +145,7 @@ fn get_default_iface() -> Result<NetworkInterfaceRef, String> {
 
 // Retrieves the echo reply contained in the recieve buffer and prints data pertaining to the packet
 fn get_icmp_pong (waiting_queue: &mut HashMap<u16, i64>, times: &mut Vec<i64>, mut total_time: i64, 
-    repr: Icmpv4Repr, mut recieved: u16, remote_addr: IpAddress, timestamp: i64)  {
+    repr: Icmpv4Repr, received: &mut u16, remote_addr: IpAddress, timestamp: i64)  {
     
     if let Icmpv4Repr::EchoReply { seq_no, data, ..} = repr {
         if let Some(_) = waiting_queue.get(&seq_no) {
@@ -156,7 +156,7 @@ fn get_icmp_pong (waiting_queue: &mut HashMap<u16, i64>, times: &mut Vec<i64>, m
                         timestamp - packet_timestamp_ms);
             
             waiting_queue.remove(&seq_no);
-            recieved += 1;
+            *received += 1;
             times.push((timestamp - packet_timestamp_ms) as i64);
             total_time += timestamp - packet_timestamp_ms;
         }
@@ -194,7 +194,7 @@ fn ping(address: IpAddress, count: usize, interval: i64, timeout: i64, verbose: 
     };
     
     let mut seq_no = 0;
-    let received = 0;
+    let mut received = 0;
     let total_time = 0;
     let mut echo_payload = [0xffu8; 40];
 
@@ -281,7 +281,7 @@ fn ping(address: IpAddress, count: usize, interval: i64, timeout: i64, verbose: 
                 }; 
                 
         
-                get_icmp_pong(&mut waiting_queue, &mut times, total_time, icmp_repr, received, remote_addr, timestamp);
+                get_icmp_pong(&mut waiting_queue, &mut times, total_time, icmp_repr, &mut received, remote_addr, timestamp);
                 if verbose {
                     println!("buffer length: {}", icmp_repr.buffer_len());
                     println!("checking checksum of packet, should be above 0: {:?}", icmp_packet.checksum());
