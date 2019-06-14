@@ -481,8 +481,8 @@ pub trait NicInit {
             let rx_buf = ReceiveBuffer::new(mp, phys_addr, length, rx_buffer_pool);
             if rx_buffer_pool.push(rx_buf).is_err() {
                 // if the queue is full, it returns an Err containing the object trying to be pushed
-                error!("ixgbe::init_rx_buf_pool(): rx buffer pool is full, cannot add rx buffer {}!", _i);
-                return Err("ixgbe rx buffer pool is full");
+                error!("intel_ethernet::init_rx_buf_pool(): rx buffer pool is full, cannot add rx buffer {}!", _i);
+                return Err("nic rx buffer pool is full");
             };
         }
 
@@ -532,7 +532,7 @@ pub trait NicInit {
             rd.init(paddr_buf); 
         }
 
-        debug!("ixgbe::rx_init(): phys_addr of rx_desc: {:#X}", rx_descs_starting_phys_addr);
+        debug!("intel_ethernet::init_rx_queue(): phys_addr of rx_desc: {:#X}", rx_descs_starting_phys_addr);
         let rx_desc_phys_addr_lower  = rx_descs_starting_phys_addr.value() as u32;
         let rx_desc_phys_addr_higher = (rx_descs_starting_phys_addr.value() >> 32) as u32;
         
@@ -576,7 +576,7 @@ pub trait NicInit {
             td.init();
         }
 
-        debug!("ixgbe::tx_init(): phys_addr of tx_desc: {:#X}", tx_descs_starting_phys_addr);
+        debug!("intel_ethernet::init_tx_queue(): phys_addr of tx_desc: {:#X}", tx_descs_starting_phys_addr);
         let tx_desc_phys_addr_lower  = tx_descs_starting_phys_addr.value() as u32;
         let tx_desc_phys_addr_higher = (tx_descs_starting_phys_addr.value() >> 32) as u32;
 

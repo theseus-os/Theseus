@@ -32,7 +32,7 @@ use core::str::FromStr;
 use spin::Mutex;
 
 /// standard MTU for ethernet cards
-const DEFAULT_MTU: usize = 9000;
+const DEFAULT_MTU: usize = 1500;
 
 
 /// A struct that implements the `NetworkInterface` trait for a NIC. 

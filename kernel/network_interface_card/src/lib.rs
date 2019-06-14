@@ -89,7 +89,7 @@ pub trait NetworkInterfaceCard {
             let new_receive_buf = match rx_buffer_pool.pop() {
                 Some(rx_buf) => rx_buf,
                 None => {
-                    warn!("IXGBE RX BUF POOL WAS EMPTY.... reallocating! This means that no task is consuming the accumulated received ethernet frames.");
+                    warn!("NIC RX BUF POOL WAS EMPTY.... reallocating! This means that no task is consuming the accumulated received ethernet frames.");
                     // if the pool was empty, then we allocate a new receive buffer
                     let len = rx_buffer_size;
                     let (mp, phys_addr) = create_contiguous_mapping(len as usize, nic_mapping_flags())?;
@@ -115,7 +115,7 @@ pub trait NetworkInterfaceCard {
                 let buffers = core::mem::replace(&mut receive_buffers_in_frame, Vec::new());
                 rxq.received_frames.push_back(ReceivedFrame(buffers));
             } else {
-                warn!("ixgbe: Received multi-rxbuffer frame, this scenario not fully tested!");
+                warn!("NIC::collect_from_queue(): Received multi-rxbuffer frame, this scenario not fully tested!");
             }
             rxq.rx_descs[cur].reset_status();
             cur = rxq.rx_cur as usize;

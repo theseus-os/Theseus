@@ -34,7 +34,7 @@ extern crate tlb_shootdown;
 
 
 use ps2::handle_mouse_packet;
-use x86_64::structures::idt::{LockedIdt, ExceptionStackFrame, HandlerFunc, IdtEntry};
+use x86_64::structures::idt::{LockedIdt, ExceptionStackFrame, HandlerFunc};
 use spin::Once;
 //use port_io::Port;
 // use drivers::ata_pio;
@@ -42,10 +42,10 @@ use kernel_config::time::{CONFIG_PIT_FREQUENCY_HZ}; //, CONFIG_RTC_FREQUENCY_HZ}
 // use rtc;
 use core::sync::atomic::{AtomicUsize, AtomicBool, Ordering};
 use memory::VirtualAddress;
-use apic::{INTERRUPT_CHIP, InterruptChip, get_my_apic_id};
+use apic::{INTERRUPT_CHIP, InterruptChip};
 use pic::PIC_MASTER_OFFSET;
 
-
+// use drivers::e1000;
 
 
 /// The single system-wide IDT
@@ -136,17 +136,17 @@ pub fn init_handlers_apic() {
         idt[0x24].set_handler_fn(com1_serial_handler);
         // idt[0x25].set_handler_fn(irq_0x25_handler);
         idt[0x26].set_handler_fn(apic_irq_0x26_handler);
-        idt[0x27].set_handler_fn(spurious_interrupt_handler);
-        
+        idt[0x27].set_handler_fn(spurious_interrupt_handler); 
+
         // idt[0x28].set_handler_fn(irq_0x28_handler);
-        // idt[0x29].set_handler_fn(nic_handler); // for Bochs
+        idt[0x29].set_handler_fn(nic_handler); // for Bochs
         // idt[0x2A].set_handler_fn(irq_0x2A_handler);
-        // idt[0x2B].set_handler_fn(nic_handler);
+        idt[0x2B].set_handler_fn(nic_handler);
         idt[0x2C].set_handler_fn(ps2_mouse_handler);
         // idt[0x2D].set_handler_fn(irq_0x2D_handler);
         // idt[0x2E].set_handler_fn(irq_0x2E_handler);
         // idt[0x2F].set_handler_fn(irq_0x2F_handler);
-        
+
         idt[apic::APIC_SPURIOUS_INTERRUPT_VECTOR as usize].set_handler_fn(apic_spurious_interrupt_handler); 
         idt[tlb_shootdown::TLB_SHOOTDOWN_IPI_IRQ as usize].set_handler_fn(ipi_handler);
     }
@@ -182,13 +182,12 @@ pub fn init_handlers_pic() {
         idt[0x29].set_handler_fn(irq_0x29_handler); 
         idt[0x2A].set_handler_fn(irq_0x2A_handler); 
         //idt[0x2B].set_handler_fn(irq_0x2B_handler);
-        // idt[0x2B].set_handler_fn(nic_handler); 
+        idt[0x2B].set_handler_fn(nic_handler); 
         idt[0x2C].set_handler_fn(ps2_mouse_handler);
         idt[0x2D].set_handler_fn(irq_0x2D_handler); 
 
         idt[0x2E].set_handler_fn(primary_ata);
         // 0x2F missing right now
-        // idt[0x3B].set_handler_fn(nic_handler);
 
     }
 
@@ -279,7 +278,7 @@ pub fn eoi(irq: Option<u8>) {
 /// 0x20
 extern "x86-interrupt" fn pit_timer_handler(_stack_frame: &mut ExceptionStackFrame) {
     pit_clock::handle_timer_interrupt();
-    debug!("In handler 0x20");
+
 	eoi(Some(PIC_MASTER_OFFSET));
 }
 
@@ -289,8 +288,6 @@ static EXTENDED_SCANCODE: AtomicBool = AtomicBool::new(false);
 
 /// 0x21
 extern "x86-interrupt" fn ps2_keyboard_handler(_stack_frame: &mut ExceptionStackFrame) {
-    // debug!("Keyboard irq handler, APIC {}", get_my_apic_id().unwrap_or(0xFF));
-    // return;
 
     let indicator = ps2::ps2_status_register();
 
@@ -336,7 +333,7 @@ extern "x86-interrupt" fn ps2_keyboard_handler(_stack_frame: &mut ExceptionStack
 
 /// 0x2C
 extern "x86-interrupt" fn ps2_mouse_handler(_stack_frame: &mut ExceptionStackFrame) {
-    // debug!("In handler 0x2C");
+
     let indicator = ps2::ps2_status_register();
 
     // whether there is any data on the port 0x60
@@ -360,16 +357,9 @@ extern "x86-interrupt" fn ps2_mouse_handler(_stack_frame: &mut ExceptionStackFra
     eoi(Some(PIC_MASTER_OFFSET + 0xc));
 }
 
-
 pub static APIC_TIMER_TICKS: AtomicUsize = AtomicUsize::new(0);
-
-pub fn get_timer(_:()) {
-    debug!("APIC timer on core: {} = {}", apic::get_my_apic_id().unwrap_or(0xFF), APIC_TIMER_TICKS.load(Ordering::Relaxed));
-}
 /// 0x22
 extern "x86-interrupt" fn lapic_timer_handler(_stack_frame: &mut ExceptionStackFrame) {
-
-    // debug!("In handler 0x22 on core {}", apic::get_my_apic_id().unwrap_or(0xFF));
     let _ticks = APIC_TIMER_TICKS.fetch_add(1, Ordering::Relaxed);
     // info!(" ({}) APIC TIMER HANDLER! TICKS = {}", apic::get_my_apic_id().unwrap_or(0xFF), _ticks);
     
@@ -399,13 +389,12 @@ extern "x86-interrupt" fn apic_irq_0x26_handler(_stack_frame: &mut ExceptionStac
 /// 0x2B
 extern "x86-interrupt" fn nic_handler(_stack_frame: &mut ExceptionStackFrame) {
     debug!("nic handler called");
-    // ixgbe::ixgbe_handler();
+    // e1000::e1000_handler();
 	eoi(Some(0x2B));
 }
 
 
 extern "x86-interrupt" fn apic_spurious_interrupt_handler(_stack_frame: &mut ExceptionStackFrame) {
-    debug!("In spurious interrupt handler");
     warn!("APIC SPURIOUS INTERRUPT HANDLER!");
 
     eoi(None);
@@ -413,7 +402,6 @@ extern "x86-interrupt" fn apic_spurious_interrupt_handler(_stack_frame: &mut Exc
 
 extern "x86-interrupt" fn apic_unimplemented_interrupt_handler(_stack_frame: &mut ExceptionStackFrame) {
     println_raw!("APIC UNIMPLEMENTED IRQ!!!");
-    debug!("APIC UNIMPLEMENTED IRQ!!!");
 
     if let Some(lapic_ref) = apic::get_my_apic() {
         let lapic = lapic_ref.read();
@@ -421,17 +409,12 @@ extern "x86-interrupt" fn apic_unimplemented_interrupt_handler(_stack_frame: &mu
         let irr = lapic.get_irr();
         println_raw!("APIC ISR: {:#x} {:#x} {:#x} {:#x}, {:#x} {:#x} {:#x} {:#x} \nIRR: {:#x} {:#x} {:#x} {:#x},{:#x} {:#x} {:#x} {:#x}", 
                          isr.0, isr.1, isr.2, isr.3, isr.4, isr.5, isr.6, isr.7, irr.0, irr.1, irr.2, irr.3, irr.4, irr.5, irr.6, irr.7);
-        debug!("APIC ISR: {:#x} {:#x} {:#x} {:#x}, {:#x} {:#x} {:#x} {:#x} \nIRR: {:#x} {:#x} {:#x} {:#x},{:#x} {:#x} {:#x} {:#x}", 
-                         isr.0, isr.1, isr.2, isr.3, isr.4, isr.5, isr.6, isr.7, irr.0, irr.1, irr.2, irr.3, irr.4, irr.5, irr.6, irr.7);    
     }
     else {
         println_raw!("apic_unimplemented_interrupt_handler: couldn't get my apic.");
-        debug!("apic_unimplemented_interrupt_handler: couldn't get my apic.");
     }
 
-    loop {
-        debug!("In loop");
-    }
+    loop { }
 
     // eoi(None);
 }
@@ -485,7 +468,7 @@ extern "x86-interrupt" fn spurious_interrupt_handler(_stack_frame: &mut Exceptio
 
 //0x2e
 extern "x86-interrupt" fn primary_ata(_stack_frame:&mut ExceptionStackFrame ) {
-    debug!("In hnadler 0x2e");
+
     // ata_pio::handle_primary_interrupt();
 
     eoi(Some(PIC_MASTER_OFFSET + 0xe));
@@ -493,8 +476,6 @@ extern "x86-interrupt" fn primary_ata(_stack_frame:&mut ExceptionStackFrame ) {
 
 
 extern "x86-interrupt" fn unimplemented_interrupt_handler(_stack_frame: &mut ExceptionStackFrame) {
-
-    debug!("unimplemented_interrupt_handler");
     let irq_regs = PIC.try().map(|pic| pic.read_isr_irr());    
     println_raw!("UNIMPLEMENTED IRQ!!! {:?}", irq_regs);
 
@@ -511,7 +492,6 @@ extern "x86-interrupt" fn irq_0x22_handler(_stack_frame: &mut ExceptionStackFram
 }
 
 extern "x86-interrupt" fn irq_0x23_handler(_stack_frame: &mut ExceptionStackFrame) {
-    debug!("In handler 0x23");
     let irq_regs = PIC.try().map(|pic| pic.read_isr_irr());  
 	println_raw!("\nCaught 0x23 interrupt: {:#?}", _stack_frame);
     println_raw!("IrqRegs: {:?}", irq_regs);
@@ -528,7 +508,6 @@ extern "x86-interrupt" fn irq_0x24_handler(_stack_frame: &mut ExceptionStackFram
 }
 
 extern "x86-interrupt" fn irq_0x25_handler(_stack_frame: &mut ExceptionStackFrame) {
-    debug!("In handler 0x25");
 	let irq_regs = PIC.try().map(|pic| pic.read_isr_irr());  
     println_raw!("\nCaught 0x25 interrupt: {:#?}", _stack_frame);
     println_raw!("IrqRegs: {:?}", irq_regs);
@@ -538,7 +517,6 @@ extern "x86-interrupt" fn irq_0x25_handler(_stack_frame: &mut ExceptionStackFram
 
 
 extern "x86-interrupt" fn irq_0x26_handler(_stack_frame: &mut ExceptionStackFrame) {
-    debug!("In handler 0x26");
 	let irq_regs = PIC.try().map(|pic| pic.read_isr_irr());  
     println_raw!("\nCaught 0x26 interrupt: {:#?}", _stack_frame);
     println_raw!("IrqRegs: {:?}", irq_regs);
@@ -556,7 +534,6 @@ extern "x86-interrupt" fn irq_0x27_handler(_stack_frame: &mut ExceptionStackFram
 
 
 extern "x86-interrupt" fn irq_0x28_handler(_stack_frame: &mut ExceptionStackFrame) {
-    debug!("In handler 0x28");
 	let irq_regs = PIC.try().map(|pic| pic.read_isr_irr());  
     println_raw!("\nCaught 0x28 interrupt: {:#?}", _stack_frame);
     println_raw!("IrqRegs: {:?}", irq_regs);
@@ -566,7 +543,6 @@ extern "x86-interrupt" fn irq_0x28_handler(_stack_frame: &mut ExceptionStackFram
 
 
 extern "x86-interrupt" fn irq_0x29_handler(_stack_frame: &mut ExceptionStackFrame) {
-    debug!("In handler 0x29");
 	let irq_regs = PIC.try().map(|pic| pic.read_isr_irr());  
     println_raw!("\nCaught 0x29 interrupt: {:#?}", _stack_frame);
     println_raw!("IrqRegs: {:?}", irq_regs);
@@ -577,7 +553,6 @@ extern "x86-interrupt" fn irq_0x29_handler(_stack_frame: &mut ExceptionStackFram
 
 #[allow(non_snake_case)]
 extern "x86-interrupt" fn irq_0x2A_handler(_stack_frame: &mut ExceptionStackFrame) {
-    debug!("In 0x2A handler");
 	let irq_regs = PIC.try().map(|pic| pic.read_isr_irr());  
     println_raw!("\nCaught 0x2A interrupt: {:#?}", _stack_frame);
     println_raw!("IrqRegs: {:?}", irq_regs);
@@ -598,7 +573,6 @@ extern "x86-interrupt" fn irq_0x2B_handler(_stack_frame: &mut ExceptionStackFram
 
 #[allow(non_snake_case)]
 extern "x86-interrupt" fn irq_0x2D_handler(_stack_frame: &mut ExceptionStackFrame) {
-    debug!("In hnadler 0x2D");
 	let irq_regs = PIC.try().map(|pic| pic.read_isr_irr());  
     println_raw!("\nCaught 0x2D interrupt: {:#?}", _stack_frame);
     println_raw!("IrqRegs: {:?}", irq_regs);
@@ -627,10 +601,6 @@ extern "x86-interrupt" fn irq_0x2F_handler(_stack_frame: &mut ExceptionStackFram
 
 
 extern "x86-interrupt" fn ipi_handler(_stack_frame: &mut ExceptionStackFrame) {
+
     eoi(None);
 }
-
-
-
-
-
