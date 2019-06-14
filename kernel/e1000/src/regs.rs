@@ -15,7 +15,7 @@ const REG_TXDESCLO:             u32 = 0x3800;
 const REG_TXDESCHI:             u32 = 0x3804;
 const REG_TXDESCLEN:            u32 = 0x3808;
 const REG_TXDESCHEAD:           u32 = 0x3810;
-const REG_TXDESCTAIL:           u32 = 0x3818;
+pub const REG_TXDESCTAIL:           u32 = 0x3818;
 
 const REG_RDTR:                 u32 = 0x2820;      // RX Delay Timer Register
 const REG_RXDCTL:               u32 = 0x3828;      // RX Descriptor Control

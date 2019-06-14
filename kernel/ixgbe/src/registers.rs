@@ -326,7 +326,10 @@ pub const RDT_1:                        usize = 0x1018;
 pub const RDT_2:                        usize = 0xD018;
 /// Number of bytes between consecutive RDT registers
 pub const RDT_DIST:                     usize = 0x40;
-
+/// Offset where the RDT register starts for the first 64 queues
+pub const TDT:                          usize = 0x6018;
+/// Number of bytes between consecutive TDT registers
+pub const TDT_DIST:                     usize = 0x40;
 
 // Link set up commands
 pub const AUTOC_LMS_CLEAR:              u32 = 0x0000_E000; 

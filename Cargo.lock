@@ -1793,13 +1793,8 @@ name = "test_ixgbe"
 version = "0.1.0"
 dependencies = [
  "getopts 0.2.18 (git+https://github.com/kevinaboos/getopts)",
- "hpet 0.1.0",
  "ixgbe 0.1.0",
- "network_manager 0.1.0",
- "ota_update_client 0.1.0",
  "print 0.1.0",
- "rand 0.6.1 (registry+https://github.com/rust-lang/crates.io-index)",
- "smoltcp 0.5.0 (registry+https://github.com/rust-lang/crates.io-index)",
  "spin 0.4.10 (registry+https://github.com/rust-lang/crates.io-index)",
 ]
 

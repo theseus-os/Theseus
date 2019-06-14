@@ -21,13 +21,13 @@ pub trait RxDescriptor {
     /// and setting the descriptor's physical address.
     /// 
     /// # Arguments
-    /// * `packet_buffer_address`: the starting physical address of the receive buffer.
+    /// * `packet_buffer_address`: starting physical address of the receive buffer.
     fn init(&mut self, packet_buffer_address: PhysicalAddress);
 
     /// Updates the descriptor's physical address.
     /// 
     /// # Arguments
-    /// * `packet_buffer_address`: the starting physical address of the receive buffer.
+    /// * `packet_buffer_address`: starting physical address of the receive buffer.
     fn set_packet_address(&mut self, packet_buffer_address: PhysicalAddress);
 
     /// Clears the status bits of the descriptor.
@@ -51,7 +51,7 @@ pub trait TxDescriptor {
     /// Updates the transmit descriptor to send the packet.
     /// 
     /// # Arguments
-    /// * `transmit_buffer`: the buffer which contains the packet to be sent. We assume that one transmit descriptor will be used to send one packet.
+    /// * `transmit_buffer`: buffer which contains the packet to be sent. We assume that one transmit descriptor will be used to send one packet.
     fn send(&mut self, transmit_buffer: TransmitBuffer);
 
     /// Polls the Descriptor Done bit until the packet has been sent.
@@ -313,17 +313,9 @@ pub const RX_STATUS_EOP:                   u8 = 1 << 1;
 
 
 
-/// A struct to store the Rx descriptor queues for a nic.
-pub struct RxQueues<T: RxDescriptor>{
-    /// A vec of all the Rx descriptor queues
-    pub queue: Vec<MutexIrqSafe<RxQueueInfo<T>>>,
-    /// The number of Rx descriptor queues
-    pub num_queues: u8
-}
-
 /// A struct that holds all information for one receive queue.
 /// There should be one such object per queue
-pub struct RxQueueInfo<T: RxDescriptor> {
+pub struct RxQueue<T: RxDescriptor> {
     /// The number of the queue, stored here for our convenience.
     /// It should match its index in the `queue` field of the RxQueues struct
     pub id: u8,
@@ -347,7 +339,7 @@ pub struct RxQueueInfo<T: RxDescriptor> {
     pub rdt_addr: VirtualAddress,
 }
 
-impl<T: RxDescriptor> RxQueueInfo<T> {
+impl<T: RxDescriptor> RxQueue<T> {
     /// Updates the queue tail descriptor in the rdt register
     pub fn update_rdt(&self, val: u32) {
         unsafe { write_volatile((self.rdt_addr.value()) as *mut u32, val) }
@@ -356,17 +348,9 @@ impl<T: RxDescriptor> RxQueueInfo<T> {
 
 
 
-/// A struct to store the Tx descriptor queues for a nic.
-pub struct TxQueues<T: TxDescriptor> {
-    /// A vec of all the Tx descriptor queues 
-    pub queue: Vec<MutexIrqSafe<TxQueueInfo<T>>>,
-    /// The number of Tx descriptor queues 
-    pub num_queues: u8
-}
-
 /// A struct that holds all information for a transmit queue. 
 /// There should be one such object per queue.
-pub struct TxQueueInfo<T: TxDescriptor> {
+pub struct TxQueue<T: TxDescriptor> {
     /// The number of the queue, stored here for our convenience.
     /// It should match its index in the `queue` field of the TxQueues struct
     pub id: u8,
@@ -376,9 +360,17 @@ pub struct TxQueueInfo<T: TxDescriptor> {
     pub tx_cur: u16,
     /// The cpu which this queue is mapped to. 
     /// This in itself doesn't guarantee anything but we use this value when setting the cpu id for interrupts and DCA.
-    pub cpu_id : u8
+    pub cpu_id : u8,
+    /// The address where the tdt register is located for this queue
+    pub tdt_addr: VirtualAddress,
 }
 
+impl<T: TxDescriptor> TxQueue<T> {
+    /// Updates the queue tail descriptor in the rdt register
+    pub fn update_tdt(&self, val: u32) {
+        unsafe { write_volatile((self.tdt_addr.value()) as *mut u32, val) }
+    }
+}
 
 
 
@@ -388,7 +380,7 @@ pub trait NicInit {
     /// Returns the base address for the memory mapped registers from Base Address Register 0.
     /// 
     /// # Arguments
-    /// * `dev`: the pci device we need to find the base address for
+    /// * `dev`: pci device we need to find the base address for
     fn determine_mem_base(dev: &PciDevice) -> Result<PhysicalAddress, &'static str> {
         // value in the BAR which means a 64-bit address space
         let address_64 = 2;
@@ -414,7 +406,7 @@ pub trait NicInit {
     /// Find out amount of space needed for device's registers
     /// 
     /// # Arguments
-    /// * `dev`: the pci device we need to find the memory size for
+    /// * `dev`: pci device we need to find the memory size for
     fn determine_mem_size(dev: &PciDevice) -> u32 {
         // Here's what we do: 
         // 1) read pci reg
@@ -436,8 +428,8 @@ pub trait NicInit {
 
     /// Allocates memory for the NIC registers
     /// # Arguments 
-    /// * `dev`: the pci device 
-    /// * `mem_base`: the starting physical address of the device's memory mapped registers
+    /// * `dev`: reference to pci device 
+    /// * `mem_base`: starting physical address of the device's memory mapped registers
     fn mem_map_reg(dev: &PciDevice, mem_base: PhysicalAddress) -> Result<MappedPages, &'static str> {
         // set the bus mastering bit for this PciDevice, which allows it to use DMA
         pci_set_command_bus_master_bit(dev);
@@ -451,8 +443,8 @@ pub trait NicInit {
     /// Helper function to allocate memory
     /// 
     /// # Arguments
-    /// * `mem_base`: the starting physical address of the region that need to be allocated
-    /// * `mem_size_in_bytes`: the size of the region that needs to be allocated 
+    /// * `mem_base`: starting physical address of the region that need to be allocated
+    /// * `mem_size_in_bytes`: size of the region that needs to be allocated 
     fn mem_map(mem_base: PhysicalAddress, mem_size_in_bytes: usize) -> Result<MappedPages, &'static str> {
         // inform the frame allocator that the physical frames where memory area for the nic exists
         // is now off-limits and should not be touched
@@ -479,9 +471,9 @@ pub trait NicInit {
     /// Initialize the receive buffer pool from where receive buffers are taken and returned
     /// 
     /// # Arguments
-    /// * `num_rx_buffers`: the amount of buffers that are initially added to the pool 
-    /// * `buffer_size`: the size of the receive buffers in bytes
-    /// * `rx_buffer_pool: the buffer pool to initialize
+    /// * `num_rx_buffers`: number of buffers that are initially added to the pool 
+    /// * `buffer_size`: size of the receive buffers in bytes
+    /// * `rx_buffer_pool: buffer pool to initialize
     fn init_rx_buf_pool(num_rx_buffers: usize, buffer_size: u16, rx_buffer_pool: &'static mpmc::Queue<ReceiveBuffer>) -> Result<(), &'static str> {
         let length = buffer_size;
         for _i in 0..num_rx_buffers {
@@ -501,8 +493,8 @@ pub trait NicInit {
     /// 
     /// # Arguments
     /// * `num_desc`: number of descriptors in the queue
-    /// * `rx_buffer_pool`: the pool from which to take receive buffers
-    /// * `buffer_size`: the size of each buffer in the pool
+    /// * `rx_buffer_pool`: tpool from which to take receive buffers
+    /// * `buffer_size`: size of each buffer in the pool
     /// * `rdbal`: register which stores the lower 32 bits of the buffer physical address
     /// * `rdbah`: register which stores the higher 32 bits of the buffer physical address
     /// * `rdlen`: register which stores the length of the queue in bytes

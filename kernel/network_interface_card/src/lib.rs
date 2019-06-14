@@ -21,7 +21,7 @@ use volatile::Volatile;
 use owning_ref::BoxRefMut;
 
 pub mod intel_ethernet;
-use intel_ethernet::{RxDescriptor, TxDescriptor, NicInit, RxQueueInfo, TxQueueInfo};
+use intel_ethernet::{RxDescriptor, TxDescriptor, NicInit, RxQueue, TxQueue};
 
 /// The mapping flags used for pages that the NIC will map.
 /// This should be a const, but Rust doesn't yet allow constants for the bitflags type
@@ -34,23 +34,22 @@ pub fn nic_mapping_flags() -> EntryFlags {
 pub trait NetworkInterfaceCard {
     /// Sends a packet contained in the given `transmit_buffer` out through this NetworkInterfaceCard. 
     /// Blocks until the packet has been successfully sent by the networking card hardware.
-    fn send_packet(&mut self, transmit_buffer: TransmitBuffer) -> Result<(), &'static str>;
+    fn send_packet(&self, transmit_buffer: TransmitBuffer) -> Result<(), &'static str>;
 
     /// Sends a packet on the specified transmit queue
     /// 
     /// # Arguments:
     /// * `txq`: transmit queue 
     /// * `max_tx_desc`: number of tx descriptors in the queue
-    /// * `tdt`: transmit descriptor tail register
     /// * `transmit_buffer`: buffer containing the packet to be sent
-    fn send_on_queue<T: TxDescriptor>(txq: &mut TxQueueInfo<T>, max_tx_desc: u16, tdt: &mut Volatile<u32>, transmit_buffer: TransmitBuffer) {
+    fn send_on_queue<T: TxDescriptor>(txq: &mut TxQueue<T>, max_tx_desc: u16, transmit_buffer: TransmitBuffer) {
         txq.tx_descs[txq.tx_cur as usize].send(transmit_buffer);  
         // update the tx_cur value to hold the next free descriptor
         let old_cur = txq.tx_cur;
         txq.tx_cur = (txq.tx_cur + 1) % max_tx_desc;
         // update the tdt register by 1 so that it knows the previous descriptor has been used
         // and has a packet to be sent
-        tdt.write(txq.tx_cur as u32);
+        txq.update_tdt(txq.tx_cur as u32);
         // Wait for the packet to be sent
         txq.tx_descs[old_cur as usize].wait_for_packet_tx();
     }
@@ -70,7 +69,7 @@ pub trait NetworkInterfaceCard {
     /// * `num_descs`: number of descriptors in the queue
     /// * `rx_buffer_pool`: pool which contains the receive buffers
     /// * `rx_buffer_size`: size of buffers in the 'rx_buffer_pool' in bytes
-    fn collect_from_queue<T: RxDescriptor>(rxq: &mut RxQueueInfo<T>, num_descs: u16, rx_buffer_pool: &'static mpmc::Queue<ReceiveBuffer>, rx_buffer_size: u16) -> Result<(), &'static str> {
+    fn collect_from_queue<T: RxDescriptor>(rxq: &mut RxQueue<T>, num_descs: u16, rx_buffer_pool: &'static mpmc::Queue<ReceiveBuffer>, rx_buffer_size: u16) -> Result<(), &'static str> {
 
         let mut cur = rxq.rx_cur as usize;
        
@@ -82,7 +81,8 @@ pub trait NetworkInterfaceCard {
             // get information about the current receive buffer
             let length = rxq.rx_descs[cur].length();
             total_packet_length += length as u16;
-            debug!("collect_packets: received descriptor of length {}", length);
+            // debug!("collect_from_queue: received descriptor of length {}", length);
+            
             // Now that we are "removing" the current receive buffer from the list of receive buffers that the NIC can use,
             // (because we're saving it for higher layers to use),
             // we need to obtain a new `ReceiveBuffer` and set it up such that the NIC will use it for future receivals.

@@ -18,14 +18,10 @@ extern crate ethernet_smoltcp_device;
 extern crate smoltcp;
 extern crate ixgbe;
 
-use alloc::sync::Arc;
-use spin::Mutex;
 use dfqueue::DFQueueProducer;
 use event_types::Event;
 use memory::MemoryManagementInfo;
 use pci::{PciDevice, get_pci_device_vd};
-use smoltcp::wire::{IpCidr, Ipv4Address};
-use core::str::FromStr;
 
 
 /// A randomly chosen IP address that must be outside of the DHCP range.. // TODO FIXME: use DHCP to acquire IP
@@ -64,10 +60,11 @@ pub fn init(keyboard_producer: DFQueueProducer<Event>) -> Result<(), &'static st
     // intialize the 82599 NIC if present and add it to the list of network interfaces
     match init_pci_dev(ixgbe::registers::INTEL_VEND, ixgbe::registers::INTEL_82599, ixgbe::IxgbeNic::init) {
         Ok(()) => {
+            let gateway_ip = [192,168,0,1];
             let nic_ref = ixgbe::get_ixgbe_nic().ok_or("device_manager::init(): ixgbe nic hasn't been initialized")?;
-            ethernet_smoltcp_device::EthernetNetworkInterface::add_network_interface(nic_ref, DEFAULT_LOCAL_IP, &DEFAULT_GATEWAY_IP)?;
+            ethernet_smoltcp_device::EthernetNetworkInterface::add_network_interface(nic_ref, "192.168.0.101/24", &gateway_ip)?;
         },
-        Err(e) => warn!("Ixgbe device not found"),
+        Err(_e) => warn!("Ixgbe device not found"),
     };
     
     // intialize the E1000 NIC if present and add it to the list of network interfaces
@@ -76,7 +73,7 @@ pub fn init(keyboard_producer: DFQueueProducer<Event>) -> Result<(), &'static st
             let nic_ref = e1000::get_e1000_nic().ok_or("device_manager::init(): e1000 nic hasn't been initialized")?;
             ethernet_smoltcp_device::EthernetNetworkInterface::add_network_interface(nic_ref, DEFAULT_LOCAL_IP, &DEFAULT_GATEWAY_IP)?;
         },
-        Err(e) => warn!("E1000 device not found"),
+        Err(_e) => warn!("E1000 device not found"),
     };
 
     // testing ata pio read, write, and IDENTIFY functionality, example of uses, can be deleted 

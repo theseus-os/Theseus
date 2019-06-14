@@ -25,26 +25,25 @@ extern crate apic;
 pub mod test_e1000_driver;
 mod regs;
 
-use core::fmt;
-use core::ops::DerefMut;
+
 use spin::Once; 
 use alloc::vec::Vec;
 use alloc::collections::VecDeque;
 use irq_safety::{RwLockIrqSafe, MutexIrqSafe};
 use volatile::{Volatile, ReadOnly};
 use alloc::boxed::Box;
-use memory::{get_kernel_mmi_ref, FRAME_ALLOCATOR, PhysicalAddress, VirtualAddress, FrameRange, EntryFlags, allocate_pages_by_bytes, MappedPages, PhysicalMemoryArea, create_contiguous_mapping};
-use pci::{PciDevice, pci_read_32, pci_read_8, pci_write, pci_set_command_bus_master_bit};
+use memory::{PhysicalAddress, VirtualAddress, MappedPages};
+use pci::{PciDevice, pci_read_8};
 use kernel_config::memory::PAGE_SIZE;
 use owning_ref::BoxRefMut;
 use interrupts::{eoi,register_interrupt};
 use x86_64::structures::idt::{ExceptionStackFrame};
 use network_interface_card::{
-    {NetworkInterfaceCard, TransmitBuffer, ReceiveBuffer, ReceivedFrame, nic_mapping_flags},
-    intel_ethernet::{NicInit, LegacyRxDesc, LegacyTxDesc, TxDescriptor, RxDescriptor, RxQueueInfo, TxQueueInfo},
+    {NetworkInterfaceCard, TransmitBuffer, ReceiveBuffer, ReceivedFrame},
+    intel_ethernet::{NicInit, LegacyRxDesc, LegacyTxDesc, RxQueue, TxQueue},
 };
 use apic::get_my_apic_id;
-use regs:: REG_RXDESCTAIL;
+use regs:: {REG_RXDESCTAIL, REG_TXDESCTAIL};
 
 pub const INTEL_VEND:           u16 = 0x8086;  // Vendor ID for Intel 
 pub const E1000_DEV:            u16 = 0x100E;  // Device ID for the e1000 Qemu, Bochs, and VirtualBox emmulated NICs
@@ -154,9 +153,9 @@ pub struct E1000Nic {
     /// The optional spoofed MAC address to use in place of `mac_hardware` when transmitting.  
     mac_spoofed: Option<[u8; 6]>,
     /// Receive queue with descriptors
-    rx_queue: MutexIrqSafe<RxQueueInfo<LegacyRxDesc>>,
+    rx_queue: MutexIrqSafe<RxQueue<LegacyRxDesc>>,
     /// Transmit queue with descriptors
-    tx_queue: MutexIrqSafe<TxQueueInfo<LegacyTxDesc>>,     
+    tx_queue: MutexIrqSafe<TxQueue<LegacyTxDesc>>,     
     /// memory-mapped control registers
     regs: BoxRefMut<MappedPages, IntelE1000Registers>,
 }
@@ -166,8 +165,8 @@ impl NicInit for E1000Nic {}
 
 impl NetworkInterfaceCard for E1000Nic {
 
-    fn send_packet(&mut self, transmit_buffer: TransmitBuffer) -> Result<(), &'static str> {
-        Self::send_on_queue(&mut self.tx_queue.lock(), E1000_NUM_TX_DESC as u16, &mut self.regs.tdt, transmit_buffer);
+    fn send_packet(&self, transmit_buffer: TransmitBuffer) -> Result<(), &'static str> {
+        Self::send_on_queue(&mut self.tx_queue.lock(), E1000_NUM_TX_DESC as u16, transmit_buffer);
         Ok(())
     }
 
@@ -227,7 +226,7 @@ impl E1000Nic {
         Self::init_rx_buf_pool(RX_BUFFER_POOL_SIZE, E1000_RX_BUFFER_SIZE_IN_BYTES, &RX_BUFFER_POOL)?;
 
         let (rx_descs, rx_buffers) = Self::rx_init(&mut mapped_registers)?;
-        let rxq = RxQueueInfo {
+        let rxq = RxQueue {
             id: 0,
             rx_descs: rx_descs,
             rx_cur: 0,
@@ -239,11 +238,12 @@ impl E1000Nic {
         };
 
         let tx_descs = Self::tx_init(&mut mapped_registers)?;
-        let txq = TxQueueInfo {
+        let txq = TxQueue {
             id: 0,
             tx_descs: tx_descs,
             tx_cur: 0,
             cpu_id: get_my_apic_id().ok_or("E1000::init(): couldn't get my apic id")?,
+            tdt_addr: VirtualAddress::new(mem_base_v.value() + REG_TXDESCTAIL as usize)?,
         };
 
         let e1000_nic = E1000Nic {

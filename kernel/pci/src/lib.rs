@@ -139,7 +139,7 @@ pub fn pci_set_interrupt_disable_bit(bus: u16, slot: u16, func: u16) {
     }
 }
 
-/// Explore the pci config space and return address of capability
+/// Explores the pci config space and returns address of requested capability, if present
 pub fn pci_config_space(dev_pci: &PciDevice, capability_pci: u16) -> Option<u16> {
     debug!("PCI command: {:#X}", pci_read_16(dev_pci.bus, dev_pci.slot, dev_pci.func, PCI_COMMAND));
 
@@ -181,11 +181,13 @@ pub fn pci_enable_msi(dev_pci: &PciDevice) -> Result<(), &'static str> {
 
     let cap_addr = try!(pci_config_space(dev_pci, MSI_CAPABILITY).ok_or("Device not MSI capable"));
 
-    //write to MSI Addr... Intel Arch SDM, vol3, 10.11, TODO: need to add dest id as an argument
+    // write to MSI Addr... Intel Arch SDM, vol3, 10.11
+    // 119 is the core we want to forward these interrupts to
     pci_write(dev_pci.bus, dev_pci.slot, dev_pci.func, cap_addr+4, 0x0FEE<<20 | 119<<12);
     // pci_write(dev_pci.bus, dev_pci.slot, dev_pci.func, cap_addr+4, 0x0FEE<<20);
 
-    //write to MSI data, TODO: should add this as a function arg, vector num
+    // write to MSI data, 
+    // 0x30 is the interrupt number we're assigning to this msi
     pci_write(dev_pci.bus, dev_pci.slot, dev_pci.func, cap_addr+12, 0x30);
 
     //enable MSI in ctrl

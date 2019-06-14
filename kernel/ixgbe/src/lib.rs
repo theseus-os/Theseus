@@ -30,25 +30,21 @@ extern crate runqueue;
 pub mod test_ixgbe_driver;
 pub mod registers;
 
-use core::ptr::{read_volatile, write_volatile};
-use core::ops::DerefMut;
 use spin::Once;
 use alloc::vec::Vec;
 use alloc::collections::VecDeque;
 use irq_safety::{MutexIrqSafe, RwLockIrqSafe};
 use alloc::boxed::Box;
-use memory::{get_kernel_mmi_ref,FRAME_ALLOCATOR, PhysicalAddress, VirtualAddress, FrameRange, EntryFlags, MappedPages, PhysicalMemoryArea, allocate_pages_by_bytes, create_contiguous_mapping};
-use pci::{PciDevice,pci_read_32, pci_write, pci_set_command_bus_master_bit,pci_set_interrupt_disable_bit, PCI_BAR0, pci_enable_msix, pci_config_space, MSIX_CAPABILITY};
-use kernel_config::memory::PAGE_SIZE;
+use memory::{PhysicalAddress, VirtualAddress, MappedPages};
+use pci::{PciDevice, pci_read_32, pci_set_interrupt_disable_bit, pci_enable_msix, pci_config_space, MSIX_CAPABILITY};
 use registers::*;
 use bit_field::BitField;
 use interrupts::{eoi,register_msi_interrupt};
 use x86_64::structures::idt::{ExceptionStackFrame, HandlerFunc};
-use apic::get_my_apic_id;
 use hpet::get_hpet;
 use network_interface_card::{
-    {NetworkInterfaceCard, TransmitBuffer, ReceiveBuffer, ReceivedFrame, nic_mapping_flags},
-    intel_ethernet::{NicInit, AdvancedRxDesc, LegacyTxDesc, TxDescriptor, RxDescriptor, RxQueueInfo, RxQueues, TxQueueInfo, TxQueues},
+    {NetworkInterfaceCard, TransmitBuffer, ReceiveBuffer, ReceivedFrame},
+    intel_ethernet::{NicInit, AdvancedRxDesc, LegacyTxDesc, TxDescriptor, RxDescriptor, RxQueue, TxQueue},
 };
 use owning_ref::BoxRefMut;
 use rand::{
@@ -70,10 +66,10 @@ const IXGBE_10GB_LINK:                      bool    = true;
 /// If link uses 1GB SFP modules
 const IXGBE_1GB_LINK:                       bool    = !(IXGBE_10GB_LINK);
 /// The number of receive descriptors per queue
-const IXGBE_NUM_RX_DESC:                    usize   = 1024;
+const IXGBE_NUM_RX_DESC:                    usize   = 256;
 /// The number of transmit descriptors per queue
 const IXGBE_NUM_TX_DESC:                    usize   = 8;
-/// If receive side scaling, where incoming packets are sent to different queues depending on a hash, is enabled.
+/// If receive side scaling (where incoming packets are sent to different queues depending on a hash) is enabled.
 const RSS_ENABLE:                           bool    = false;
 /// If the 5-tuple L3/L4 filters to send packets to different queues are enabled.
 const FILTER_ENABLE:                        bool    = false;
@@ -86,35 +82,20 @@ const IXGBE_NUM_RX_QUEUES:                  u8      = 1;
 const IXGBE_NUM_TX_QUEUES:                  u8      = 1;
 /// Size of the Rx packet buffers
 const IXGBE_RX_BUFFER_SIZE_IN_BYTES:        u16     = 8192;
-/// Size of the Rx header buffers
-const IXGBE_RX_HEADER_SIZE_IN_BYTES:        u16     = 256;
 
 
 /// The single instance of the 82599 NIC.
 pub static IXGBE_NIC: Once<RwLockIrqSafe<IxgbeNic>> = Once::new();
-/// The single instance of Rx Descriptor Queues for the NIC.
-pub static IXGBE_RX_QUEUES: Once<RxQueues<AdvancedRxDesc>> = Once::new();
-/// The single instance of Tx Descriptor Queues for the NIC.
-pub static IXGBE_TX_QUEUES: Once<TxQueues<LegacyTxDesc>> = Once::new();
 
-/// Returns a reference to the IxgbeNic wrapped in a MutexIrqSafe,
+/// Returns a reference to the IxgbeNic wrapped in a RwLockIrqSafe,
 /// if it exists and has been initialized.
 pub fn get_ixgbe_nic() -> Option<&'static RwLockIrqSafe<IxgbeNic>> {
     IXGBE_NIC.try()
 }
 
-/// Returns a reference to the Rx descriptor queues
-pub fn get_ixgbe_rx_queues() -> Option<&'static RxQueues<AdvancedRxDesc>> {
-    IXGBE_RX_QUEUES.try()
-}
-
-/// Returns a reference to the Tx descriptor queues
-pub fn get_ixgbe_tx_queues() -> Option<&'static TxQueues<LegacyTxDesc>> {
-    IXGBE_TX_QUEUES.try()
-}
 
 /// How many ReceiveBuffers are preallocated for this driver to use. 
-const RX_BUFFER_POOL_SIZE:                  usize = IXGBE_NUM_RX_QUEUES as usize * IXGBE_NUM_RX_DESC; 
+const RX_BUFFER_POOL_SIZE:                  usize = IXGBE_NUM_RX_QUEUES as usize * IXGBE_NUM_RX_DESC * 2; 
 
 lazy_static! {
     /// The pool of pre-allocated receive buffers that are used by the IXGBE NIC
@@ -146,6 +127,14 @@ pub struct IxgbeNic {
     l34_5_tuple_filters: [bool; 128],
     /// The Rx queue that ethernet frames will be retrieved from in the next cycle 
     cur_rx_queue: u8,
+    /// The number of rx queues enabled
+    num_rx_queues: u8,
+    /// Vector of all the rx queues
+    rx_queues: Vec<MutexIrqSafe<RxQueue<AdvancedRxDesc>>>,
+    /// The number of tx queues enabled
+    num_tx_queues: u8,
+    /// Vector of all the tx queues
+    tx_queues: Vec<MutexIrqSafe<TxQueue<LegacyTxDesc>>>
 }
 
 
@@ -156,11 +145,11 @@ impl NicInit for IxgbeNic {}
 // A trait which contains common functionalities for a NIC
 impl NetworkInterfaceCard for IxgbeNic {
 
-    fn send_packet(&mut self, transmit_buffer: TransmitBuffer) -> Result<(), &'static str>{
+    fn send_packet(&self, transmit_buffer: TransmitBuffer) -> Result<(), &'static str>{
         // the default queue is 0 since we haven't enabled multiple transmit queues.
         let qid = 0;
         // acquire the tx queue structure.
-        let mut txq = get_ixgbe_tx_queues().ok_or("ixgbe: tx descriptors not initialized")?.queue[qid].lock();
+        let mut txq = self.tx_queues[qid].lock();
         self.handle_transmit(&mut txq, transmit_buffer)?;
 
         Ok(())
@@ -171,10 +160,7 @@ impl NetworkInterfaceCard for IxgbeNic {
         // the rx queue to retrieve ethernet frames from 
         let qid = self.cur_rx_queue as usize;
         // acquire the rx queue structure. 
-        let mut rxq = match get_ixgbe_rx_queues() {
-            Some(rx) => rx.queue[qid].lock(),
-            None => return None
-        };
+        let mut rxq =self.rx_queues[qid].lock();
         // update the current rx queue so that in the next cycle, frames will be returned from the next queue.
         // this way frames from all queues will be retrieved in round robin order.
         self.cur_rx_queue = (qid as u8 + 1) % IXGBE_NUM_RX_QUEUES;
@@ -184,7 +170,7 @@ impl NetworkInterfaceCard for IxgbeNic {
 
     fn poll_receive(&self) -> Result<(), &'static str> {
         // iterate through all the rx queues and collect their received frames
-        for rxq in &(get_ixgbe_rx_queues().ok_or("ixgbe: rx descriptors not initalized")?.queue) {
+        for rxq in &self.rx_queues {
             self.handle_receive(&mut rxq.lock())?;
         }
         Ok(())
@@ -195,9 +181,9 @@ impl NetworkInterfaceCard for IxgbeNic {
     }
 }
 
-/// functions that setup the NIC struct and handle the sending and receiving of packets
+// Functions that setup the NIC struct and handle the sending and receiving of packets
 impl IxgbeNic {
-    /// store required values from the device's PCI config space,
+    /// Store required values from the device's PCI config space,
     /// and initialize different features of the nic.
     pub fn init(ixgbe_pci_dev: &PciDevice) -> Result<(), &'static str> {
 
@@ -232,11 +218,13 @@ impl IxgbeNic {
 
         // create the rx desc queues and their packet buffers
         let (mut rx_descs, mut rx_buffers) = Self::rx_init(&mut mapped_registers)?;
-        // create rx queue info struct for each rx_desc queue
+        // create the vec of rx queues
         let mut rx_queues = Vec::new();
         let mut id = 0;
         while !rx_descs.is_empty() {
             let cpu_id = get_least_busy_core().ok_or("ixgbe::init: No core available")?;
+
+            // find the offset in the memory mapped registers that this queue's rdt register is at
             let (rdt_offset, qid) =
                 if id < 64 {
                     (RDT_1, id)
@@ -245,7 +233,7 @@ impl IxgbeNic {
                     (RDT_2, id-64)
                 };
 
-            let rx_queue = RxQueueInfo {
+            let rx_queue = RxQueue {
                 id: id,
                 rx_descs: rx_descs.remove(0),
                 rx_cur: 0,
@@ -257,35 +245,25 @@ impl IxgbeNic {
             rx_queues.push(MutexIrqSafe::new(rx_queue));
             id += 1;
         }
-        // consolidate all the rx queues into one struct and store
-        let ixgbe_rx_queues = RxQueues {
-                                    queue: rx_queues,
-                                    num_queues: IXGBE_NUM_RX_QUEUES
-                                };
-        IXGBE_RX_QUEUES.call_once(|| ixgbe_rx_queues);
+
 
         // create the tx descriptor queues
         let mut tx_descs = Self::tx_init(&mut mapped_registers)?;
-        // create tx queue info struct for each tx_desc queue
+        // create the vec of tx queues
         let mut tx_queues = Vec::new();
         let mut id = 0;
         while !tx_descs.is_empty() {
             let cpu_id = get_least_busy_core().ok_or("ixgbe::init: No core available")?;
-            let tx_queue = TxQueueInfo {
+            let tx_queue = TxQueue {
                 id: id,
                 tx_descs: tx_descs.remove(0),
                 tx_cur: 0,
                 cpu_id : cpu_id,
+                tdt_addr: VirtualAddress::new(mem_base_v.value() + TDT + (id as usize * TDT_DIST))?,
             };
             tx_queues.push(MutexIrqSafe::new(tx_queue));
             id += 1;
         }
-        // consolidate all the tx queues into one struct and store
-        let ixgbe_tx_queues = TxQueues {
-                                    queue: tx_queues,
-                                    num_queues: IXGBE_NUM_TX_QUEUES
-                                };
-        IXGBE_TX_QUEUES.call_once(|| ixgbe_tx_queues);
 
        
         // enable msi-x interrupts if required and return the assigned interrupt numbers
@@ -296,7 +274,7 @@ impl IxgbeNic {
                 let interrupt_handlers: [HandlerFunc; NUM_MSI_VEC_ENABLED as usize] = [ixgbe_handler_0];
                 pci_enable_msix(ixgbe_pci_dev)?;
                 pci_set_interrupt_disable_bit(ixgbe_pci_dev.bus, ixgbe_pci_dev.slot, ixgbe_pci_dev.func);
-                Some(Self::enable_msix_interrupts(&mut mapped_registers, &mut vector_table, &interrupt_handlers)?)
+                Some(Self::enable_msix_interrupts(&mut mapped_registers, &mut rx_queues, &mut vector_table, &interrupt_handlers)?)
             }
             else {
                 None
@@ -318,6 +296,10 @@ impl IxgbeNic {
             msix_vector_table: vector_table,
             l34_5_tuple_filters: [false; 128],
             cur_rx_queue: 0,
+            num_rx_queues: IXGBE_NUM_RX_QUEUES,
+            rx_queues: rx_queues,
+            num_tx_queues: IXGBE_NUM_TX_QUEUES,
+            tx_queues: tx_queues
         };
 
         IXGBE_NIC.call_once(|| RwLockIrqSafe::new(ixgbe_nic));
@@ -529,10 +511,10 @@ impl IxgbeNic {
 
         //setup PHY and the link 
         if IXGBE_10GB_LINK {
-            let mut val = regs.autoc.read();
+            let val = regs.autoc.read();
             regs.autoc.write(val | AUTOC_LMS_10_GBE_S); // value should be 0xC09C_6004
 
-            let mut val = regs.autoc2.read();
+            let val = regs.autoc2.read();
             regs.autoc2.write(val | AUTOC2_10G_PMA_PMD_S_SFI); // value should be 0xA_0000
         }
         else {
@@ -647,54 +629,19 @@ impl IxgbeNic {
 
         Ok(())
     }
-    
- 
-    /// Enables Direct Cache Access for the device
-    /// TODO: need to see if to allow DCA from this device, the identification number has to be programmed into the chipset register
-    fn enable_dca(regs: &mut IntelIxgbeRegisters) -> Result<(), &'static str> {
-        // Enable DCA tagging, which writes the cpu id to the PCIe Transaction Layer Packets (TLP)
-        // There are 2 version of DCA that are mentioned, legacy and 1.0
-        // We always enable 1.0 since 1. currently haven't found additional info online and 2. the linux driver always enables 1.0 
-        regs.dca_ctrl.write(DCA_MODE_2 | DCA_ENABLE);
-        Self::enable_rx_dca(regs)  
-    }
 
-    /// Sets up DCA for the rx queues that have been enabled
-    /// you can optionally choose to have the descriptor, header and payload copied to the cache for each received packet
-    fn enable_rx_dca(regs: &mut IntelIxgbeRegisters) -> Result<(), &'static str>{
-        let rxq = get_ixgbe_rx_queues().ok_or("ixgbe: rx descriptors not initialized")?;
-        let num_queues_enabled = rxq.num_queues as usize;
-
-        for i in 0..num_queues_enabled {
-            // retrieve the dca rx control register depending on the queue number
-            // there are 64 contiguous queues at 2 different places in memory
-            let rxctrl =  
-                if i < 64 {
-                    &mut regs.rx_regs1.rx_queue[i].dca_rxctrl
-                }
-                else {
-                    &mut regs.rx_regs2.rx_queue[i-64].dca_rxctrl                    
-                };
-            
-            // the cpu id will tell which cache the data will need to be written to
-            let cpu_id = rxq.queue[i].lock().cpu_id as u32;
-            
-            // currently allowing only write of rx descriptors to cache since packet payloads are very large
-            // A note from linux ixgbe driver: 
-            // " We can enable relaxed ordering for reads, but not writes when
-            //   DCA is enabled.  This is due to a known issue in some chipsets
-            //   which will cause the DCA tag to be cleared."
-            rxctrl.write(RX_DESC_DCA_ENABLE | RX_DESC_R_RELAX_ORDER_EN | (cpu_id << DCA_CPUID_SHIFT));
-        }
-        Ok(())
-    }
-
-    /// sets the L3/L4 5-tuple filter which can do an exact match of the packets with the filter and send to chosen rx queue (7.1.2.5)
-    /// takes as input: source and destination ip addresses (only ipv4), source and destination TCP/UDP/SCTP ports and protocol  
-    /// for the protocol : tcp = 0, udp = 1, sctp = 2, other = 3
-    /// the priority can be from 0 (lowest) to 7 (highest)
-    /// There are up to 128 such filters, if you need more than will have to enable Flow Director filters
-    fn set_5_tuple_filter(&mut self, source_ip: [u8;4], dest_ip: [u8;4], source_port: u16, dest_port: u16, protocol: u8, priority: u8, rx_queue: u8) -> Result<(), &'static str> {
+    /// Sets the L3/L4 5-tuple filter which can do an exact match of the packet's header with the filter and send to chosen rx queue (7.1.2.5).
+    /// There are up to 128 such filters. If more are needed, will have to enable Flow Director filters.
+    /// 
+    /// # Argument
+    /// * `source_ip`: ipv4 source address
+    /// * `dest_ip`: ipv4 destination address
+    /// * `source_port`: TCP/UDP/SCTP source port
+    /// * `dest_port`: TCP/UDP/SCTP destination port
+    /// * `protocol`: tcp = 0, udp = 1, sctp = 2, other = 3
+    /// * `priority`: priority relative to other filters, can be from 0 (lowest) to 7 (highest)
+    /// * `qid`: number of the queue to forward packet to
+    fn set_5_tuple_filter(&mut self, source_ip: [u8;4], dest_ip: [u8;4], source_port: u16, dest_port: u16, protocol: u8, priority: u8, qid: u8) -> Result<(), &'static str> {
   
         let enabled_filters = &mut self.l34_5_tuple_filters;
 
@@ -715,7 +662,10 @@ impl IxgbeNic {
         self.regs.ftqf.reg[filter_num].write(filter_protocol | filter_priority | FTQF_Q_ENABLE);
 
         //set the rx queue that the packets for this filter should be sent to
-        self.regs.l34timir.reg[filter_num].write(L34TIMIR_BYPASS_SIZE_CHECK | L34TIMIR_RESERVED | ((rx_queue as u32) << L34TIMIR_RX_Q_SHIFT));
+        self.regs.l34timir.reg[filter_num].write(L34TIMIR_BYPASS_SIZE_CHECK | L34TIMIR_RESERVED | ((qid as u32) << L34TIMIR_RX_Q_SHIFT));
+
+        //mark the filter as used
+        enabled_filters[filter_num] = true;
 
         Ok(())
     }
@@ -749,7 +699,7 @@ impl IxgbeNic {
 
     /// Enable MSI-X interrupts.
     /// Currently all the msi vectors are for packet reception, one msi vector per receive queue.
-    fn enable_msix_interrupts(regs: &mut IntelIxgbeRegisters, vector_table: &mut MsixVectorTable, interrupt_handlers: &[HandlerFunc]) -> Result<[u8; NUM_MSI_VEC_ENABLED as usize], &'static str> {
+    fn enable_msix_interrupts(regs: &mut IntelIxgbeRegisters, rxq: &mut Vec<MutexIrqSafe<RxQueue<AdvancedRxDesc>>>, vector_table: &mut MsixVectorTable, interrupt_handlers: &[HandlerFunc]) -> Result<[u8; NUM_MSI_VEC_ENABLED as usize], &'static str> {
         // set IVAR reg to enable interrupts for different queues
         // each IVAR register controls 2 RX and 2 TX queues
         let num_queues = IXGBE_NUM_RX_QUEUES as usize;
@@ -777,9 +727,9 @@ impl IxgbeNic {
 
         // set eims bits to enable required interrupt
         // the lower 16 bits are for the 16 receive queue interrupts
-        let val = 0;
+        let mut val = 0;
         for i in 0..NUM_MSI_VEC_ENABLED {
-            let val = val | (EIMS_INTERRUPT_ENABLE << i);
+            val = val | (EIMS_INTERRUPT_ENABLE << i);
         }
         regs.eims.write(val); 
         // debug!("EIMS: {:#X}", regs.eims.read());
@@ -788,7 +738,7 @@ impl IxgbeNic {
         regs.eiac.write(EIAC_RTXQ_AUTO_CLEAR);
 
         //clear eicr 
-        let val = regs.eicr.read();
+        let _val = regs.eicr.read();
         // debug!("EICR: {:#X}", val);
 
         // set the throttling time for each interrupt
@@ -799,8 +749,6 @@ impl IxgbeNic {
         }
 
         let mut interrupt_nums = [0; NUM_MSI_VEC_ENABLED as usize];
-        // retrieve rx descriptors to know which cpu to send the interrupt to
-        let rxq = get_ixgbe_rx_queues().ok_or("ixgbe: rx descriptors not initialized")?;
 
         // Initialize msi vectors
         for i in 0..NUM_MSI_VEC_ENABLED as usize{ 
@@ -809,7 +757,7 @@ impl IxgbeNic {
 
             // find core to redirect interrupt to
             // we assume that the number of msi vectors are equal to the number of rx queues
-            let core_id = rxq.queue[i].lock().cpu_id as u32;
+            let core_id = rxq[i].lock().cpu_id as u32;
             // unmask the interrupt
             vector_table.msi_vector[i].vector_control.write(MSIX_UNMASK_INT);
             let lower_addr = vector_table.msi_vector[i].msg_lower_addr.read();
@@ -823,34 +771,29 @@ impl IxgbeNic {
         Ok(interrupt_nums)
     }
 
-    /// reads status and clears interrupt
+    /// Reads status and clears interrupt
     fn clear_interrupt_status(&self) -> u32 {
         self.regs.eicr.read()
     }
 
     /// Returns all the receive buffers in one packet,
     /// called for individual queues
-    pub fn handle_receive<T: RxDescriptor>(&self, mut rxq: &mut RxQueueInfo<T>) -> Result<(), &'static str> {
+    pub fn handle_receive<T: RxDescriptor>(&self, mut rxq: &mut RxQueue<T>) -> Result<(), &'static str> {
         Self::collect_from_queue::<T>(&mut rxq, IXGBE_NUM_RX_DESC as u16, &RX_BUFFER_POOL, IXGBE_RX_BUFFER_SIZE_IN_BYTES)
     }   
     
-    /// transmits a packet on the given tx queue
-    fn handle_transmit<T:TxDescriptor>(&mut self, mut txq: &mut TxQueueInfo<T>, transmit_buffer: TransmitBuffer) -> Result<(), &'static str> {
-        let qid = txq.id as usize;
-        // update the descriptors and tdt register
-        Self::send_on_queue::<T>(&mut txq, IXGBE_NUM_TX_DESC as u16, &mut self.regs.tx_regs.tx_queue[qid].tdt, transmit_buffer);
+    /// Transmits a packet on the given tx queue
+    fn handle_transmit<T:TxDescriptor>(&self, mut txq: &mut TxQueue<T>, transmit_buffer: TransmitBuffer) -> Result<(), &'static str> {
+        Self::send_on_queue::<T>(&mut txq, IXGBE_NUM_TX_DESC as u16, transmit_buffer);
         Ok(())
     }
 
+    /// Collects all the packets for a given queue on a rx interrupt
     fn handle_rx_interrupt(&self, qid: u8) {
-        if let Some(ref rxqs) = get_ixgbe_rx_queues() {
-            let mut rxq = rxqs.queue[qid as usize].lock();
-            if let Err(e) = self.handle_receive(&mut rxq) {
-                error!("handle_rx_interrupt(): error handling interrupt: {:?}", e);
-            }
-        } else {
-            error!("BUG: handle_rx_interrupt(): Ixgbe Rx descriptors haven't been initialized!");
-        };      
+        let mut rxq = self.rx_queues[qid as usize].lock();
+        if let Err(e) = self.handle_receive(&mut rxq) {
+            error!("handle_rx_interrupt(): error handling interrupt: {:?}", e);
+        }    
     }
 
 }
@@ -862,18 +805,18 @@ pub fn rx_poll_mq(_: Option<u64>) -> Result<(), &'static str> {
     let nic_ref = get_ixgbe_nic().ok_or("ixgbe nic not initialized")?.read();
     loop {
         for qid in 0..IXGBE_NUM_RX_QUEUES {
-            let mut rxq = get_ixgbe_rx_queues().ok_or("ixgbe: rx descriptors not initalized")?.queue[qid as usize].lock();
+            let mut rxq = nic_ref.rx_queues[qid as usize].lock();
             nic_ref.handle_receive(&mut rxq)?;
         }        
     }
 }
 
-/// A generic interrupt handler that can be used for packet reception interrupts for any queue
+/// A generic interrupt handler that can be used for packet reception interrupts for any queue.
+/// It returns the interrupt number for the rx queue 'qid'.
 fn rx_interrupt_handler(qid: u8) -> Option<u8> {
-
     let interrupt_num = 
         if let Some(ref ixgbe_nic_ref) = IXGBE_NIC.try() {
-            let mut ixgbe_nic = ixgbe_nic_ref.read();
+            let ixgbe_nic = ixgbe_nic_ref.read();
             ixgbe_nic.handle_rx_interrupt(qid);
             // this handler will only be registered if interrupts are enabled
             // so we can use unwrap() in this case
