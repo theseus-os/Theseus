@@ -259,17 +259,6 @@ pub fn get_kernel_mmi_ref() -> Option<Arc<MutexIrqSafe<MemoryManagementInfo>>> {
 /// The one and only frame allocator, a singleton. 
 pub static FRAME_ALLOCATOR: Once<MutexIrqSafe<AreaFrameAllocator>> = Once::new();
 
-/// Helper function to get the frame allocator. 
-/// Added here because directly accessing FRAME_ALLOCATOR.try() was giving compiler errors
-/// e.g 
-/// ```
-/// let mut fa = FRAME_ALLOCATOR.try().ok_or("ixgbe::mem_map(): couldn't get FRAME_ALLOCATOR")?.lock();
-/// ```
-/// Error: expected identifier, found reserved keyword `try`
-pub fn get_frame_allocator() -> Option<&'static MutexIrqSafe<AreaFrameAllocator>> {
-    FRAME_ALLOCATOR.try()
-}
-
 /// Convenience method for allocating a new Frame.
 pub fn allocate_frame() -> Option<Frame> {
     FRAME_ALLOCATOR.try().and_then(|fa| fa.lock().allocate_frame())

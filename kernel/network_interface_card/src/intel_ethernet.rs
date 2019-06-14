@@ -1,7 +1,7 @@
 use bit_field::BitField;
 use volatile::{Volatile, ReadOnly};
 use core::ops::DerefMut;
-use memory::{EntryFlags, get_frame_allocator, PhysicalMemoryArea, FrameRange, PhysicalAddress, VirtualAddress, allocate_pages_by_bytes, get_kernel_mmi_ref, MappedPages, create_contiguous_mapping};
+use memory::{FRAME_ALLOCATOR, EntryFlags, PhysicalMemoryArea, FrameRange, PhysicalAddress, VirtualAddress, allocate_pages_by_bytes, get_kernel_mmi_ref, MappedPages, create_contiguous_mapping};
 use pci::{pci_read_32, pci_write, PCI_BAR0, PciDevice, pci_set_command_bus_master_bit};
 use spin::Once;
 use alloc::{
@@ -450,7 +450,7 @@ pub trait NicInit {
         // is now off-limits and should not be touched
         {
             let nic_area = PhysicalMemoryArea::new(mem_base, mem_size_in_bytes as usize, 1, 0); 
-            get_frame_allocator().ok_or("NicInit::mem_map(): Couldn't get FRAME ALLOCATOR")?.lock().add_area(nic_area, false)?;
+            FRAME_ALLOCATOR.try().ok_or("NicInit::mem_map(): Couldn't get FRAME ALLOCATOR")?.lock().add_area(nic_area, false)?;
         }
 
         // set up virtual pages and physical frames to be mapped
@@ -462,7 +462,7 @@ pub trait NicInit {
 
         let kernel_mmi_ref = get_kernel_mmi_ref().ok_or("NicInit::mem_map(): KERNEL_MMI was not yet initialized!")?;
         let mut kernel_mmi = kernel_mmi_ref.lock();
-        let mut fa = get_frame_allocator().ok_or("NicInit::mem_map(): couldn't get FRAME_ALLOCATOR")?.lock();
+        let mut fa = FRAME_ALLOCATOR.try().ok_or("NicInit::mem_map(): Couldn't get FRAME ALLOCATOR")?.lock();
         let nic_mapped_page = kernel_mmi.page_table.map_allocated_pages_to(pages_nic, frames_nic, flags, fa.deref_mut())?;
 
         Ok(nic_mapped_page)
@@ -532,7 +532,7 @@ pub trait NicInit {
             rd.init(paddr_buf); 
         }
 
-        debug!("intel_ethernet::init_rx_queue(): phys_addr of rx_desc: {:#X}", rx_descs_starting_phys_addr);
+        // debug!("intel_ethernet::init_rx_queue(): phys_addr of rx_desc: {:#X}", rx_descs_starting_phys_addr);
         let rx_desc_phys_addr_lower  = rx_descs_starting_phys_addr.value() as u32;
         let rx_desc_phys_addr_higher = (rx_descs_starting_phys_addr.value() >> 32) as u32;
         
@@ -576,7 +576,7 @@ pub trait NicInit {
             td.init();
         }
 
-        debug!("intel_ethernet::init_tx_queue(): phys_addr of tx_desc: {:#X}", tx_descs_starting_phys_addr);
+        // debug!("intel_ethernet::init_tx_queue(): phys_addr of tx_desc: {:#X}", tx_descs_starting_phys_addr);
         let tx_desc_phys_addr_lower  = tx_descs_starting_phys_addr.value() as u32;
         let tx_desc_phys_addr_higher = (tx_descs_starting_phys_addr.value() >> 32) as u32;
 

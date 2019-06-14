@@ -139,9 +139,9 @@ pub fn init_handlers_apic() {
         idt[0x27].set_handler_fn(spurious_interrupt_handler); 
 
         // idt[0x28].set_handler_fn(irq_0x28_handler);
-        idt[0x29].set_handler_fn(nic_handler); // for Bochs
+        // idt[0x29].set_handler_fn(nic_handler); // for Bochs
         // idt[0x2A].set_handler_fn(irq_0x2A_handler);
-        idt[0x2B].set_handler_fn(nic_handler);
+        // idt[0x2B].set_handler_fn(nic_handler);
         idt[0x2C].set_handler_fn(ps2_mouse_handler);
         // idt[0x2D].set_handler_fn(irq_0x2D_handler);
         // idt[0x2E].set_handler_fn(irq_0x2E_handler);
