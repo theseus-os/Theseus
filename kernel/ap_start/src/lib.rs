@@ -34,7 +34,7 @@ pub fn kstart_ap(processor_id: u8, apic_id: u8,
                  nmi_lint: u8, nmi_flags: u16) -> ! 
 {
     info!("Booted AP: proc: {}, apic: {}, stack: {:#X} to {:#X}, nmi_lint: {}, nmi_flags: {:#X}", 
-           processor_id, apic_id, stack_start, stack_end, nmi_lint, nmi_flags); 
+           processor_id, apic_id, stack_start, stack_end, nmi_lint, nmi_flags);
 
 
     // set a flag telling the BSP that this AP has entered Rust code
