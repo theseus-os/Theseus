@@ -397,6 +397,7 @@ impl WindowObj{
     //     )
     // }
 
+    /// Display the content in the framebuffer of the window on the screen
     pub fn render(&mut self) -> Result<(), &'static str>{
         let (window_x, window_y) = { self.inner.lock().get_content_position() };
         FrameCompositor::compose(
@@ -502,19 +503,19 @@ impl Drop for WindowObj {
 
 // The structure is owned by the window manager. It contains the information of a window but under the control of the manager
 struct WindowInner {
-    /// the upper left x-coordinate of the window
+    // the upper left x-coordinate of the window
     x: usize,
-    /// the upper left y-coordinate of the window
+    // the upper left y-coordinate of the window
     y: usize,
-    /// the width of the window
+    // the width of the window
     width: usize,
-    /// the height of the window
+    // the height of the window
     height: usize,
-    /// whether the window is active
+    // whether the window is active
     active: bool,
-    /// a consumer of key input events to the window
+    // a consumer of key input events to the window
     padding: usize,
-    /// the producer accepting a key event
+    // the producer accepting a key event
     key_producer: DFQueueProducer<Event>,
 }
 
@@ -603,13 +604,13 @@ struct Component {
 }
 
 impl Component {
-    /// get the displayable
-    pub fn get_displayable(&self) -> &TextDisplay {
+    // get the displayable
+    fn get_displayable(&self) -> &TextDisplay {
         return &(self.displayable)
     }
 
-    /// get the position of the displayable
-    pub fn get_position(&self) -> (usize, usize) {
+    // get the position of the displayable
+    fn get_position(&self) -> (usize, usize) {
         (self.x, self.y)
     }
 
@@ -628,12 +629,14 @@ pub fn schedule() -> Result<(), &'static str>{
         Some(window) => { window }
         None => { return Ok(()) } //do nothing if current active window is the only window
     };
-    
+
+    // set current window as inactive    
     if let Some(window) = allocator.active.upgrade() {
         let mut current = window.lock();
         (*current).active(false)?;
     }
 
+    // set next window as active
     let mut next = next_window.lock();
     (*next).active(true)?;
     allocator.active = Arc::downgrade(&next_window);
