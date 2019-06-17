@@ -27,6 +27,8 @@ extern crate frame_buffer;
 extern crate frame_buffer_drawer;
 extern crate frame_buffer_printer;
 extern crate font;
+#[macro_use] extern crate lazy_static;
+
 
 use spin::{Once, Mutex};
 use alloc::collections::{VecDeque, BTreeMap};
@@ -45,8 +47,15 @@ use displayable::text_display::{TextDisplay, Cursor};
 /// a module to manage displayables
 pub mod displayable;
 
-/// The window allocator. It creates new windows and manages a window list
-pub static WINDOW_ALLOCATOR: Once<Mutex<WindowAllocator>> = Once::new();
+lazy_static! {
+    /// The list of all Tasks in the system.
+    static ref WINDOWLIST: Mutex<WindowList> = Mutex::new(
+        WindowList{
+            list:VecDeque::new(),
+            active:Weak::new(),
+        }
+    );
+}
 
 // A framebuffer owned by the window manager. 
 // This framebuffer is responsible for display borders. Windows owned by applications cannot get access to their borders. 
@@ -58,19 +67,29 @@ const WINDOW_MARGIN: usize = 10;
 // 2 pixel padding within a window
 const WINDOW_PADDING: usize = 2;
 // The border color of an active window 
-const WINDOW_ACTIVE_COLOR:u32 = 0xFFFFFF;
+const WINDOW_ACTIVE_COLOR: u32 = 0xFFFFFF;
 // The border color of an inactive window
-const WINDOW_INACTIVE_COLOR:u32 = 0x343C37;
+const WINDOW_INACTIVE_COLOR: u32 = 0x343C37;
 // The background color of the screen
-const SCREEN_BACKGROUND_COLOR:u32 = 0x000000;
+const SCREEN_BACKGROUND_COLOR: u32 = 0x000000;
 
+//Wenqiu
 /// The window allocator.
 /// It contains a list of allocated window and a reference to the active window
-pub struct WindowAllocator {
-    allocated: VecDeque<Weak<Mutex<WindowInner>>>, 
+struct WindowList {
+    list: VecDeque<Weak<Mutex<WindowInner>>>, 
     // a weak pointer directly to the active WindowInner so we don't have to search for the active window when we need it quickly
     // this weak pointer is set in the WindowAllocator's switch(), delete(), and allocate() functions
     active: Weak<Mutex<WindowInner>>, 
+}
+
+pub fn init() -> Result<(), &'static str> {
+    let (screen_width, screen_height) = frame_buffer::get_screen_size()?;
+    let framebuffer = FrameBuffer::new(screen_width, screen_height, None)?;
+    SCREEN_FRAME_BUFFER.call_once(|| {
+        Arc::new(Mutex::new(framebuffer))
+    });
+    Ok(())
 }
 
 /// Applications call this function to request a new window object with a default size (mostly fills screen with WINDOW_MARGIN around all borders)
@@ -87,30 +106,70 @@ pub fn new_default_window() -> Result<WindowObj, &'static str> {
 /// Params x,y specify the (x,y) coordinates of the top left corner of the window
 /// Params width and height specify dimenions of new window in pixels
 pub fn new_window<'a>(x:usize, y:usize, width:usize, height:usize) -> Result<WindowObj, &'static str>{
-    let allocator: &Mutex<WindowAllocator> = WINDOW_ALLOCATOR.call_once(|| {
-        Mutex::new(WindowAllocator{
-            allocated:VecDeque::new(),
-            active:Weak::new(),
-        })
-    });
-    
-    // Init the frame buffer of the window manager            
-    {
-        let (screen_width, screen_height) = frame_buffer::get_screen_size()?;
-        let framebuffer = FrameBuffer::new(screen_width, screen_height, None)?;
-        SCREEN_FRAME_BUFFER.call_once(|| {
-            Arc::new(Mutex::new(framebuffer))
-        });
+    // Check the size of the window
+    if width < 2 * WINDOW_PADDING || height < 2 * WINDOW_PADDING {
+        return Err("Window size must be greater than the padding");
     }
 
-    allocator.lock().allocate(x, y, width, height)
+    // Init the key input producer and consumer
+    let consumer = DFQueue::new().into_consumer();
+    let producer = consumer.obtain_producer();
+    
+    // Init the frame buffer of the window
+    let framebuffer = FrameBuffer::new(width - 2 * WINDOW_PADDING, height - 2 * WINDOW_PADDING, None)?;
+    let inner = WindowInner{
+        x:x,
+        y:y,
+        width:width,
+        height:height,
+        active:true,
+        padding:WINDOW_PADDING,
+        key_producer:producer,
+    };
+
+    // // Check if the window overlaps with others
+    // let inner_ref = Arc::new(Mutex::new(inner));
+    // let overlapped = self.check_overlap(&inner_ref, x, y, width, height);       
+    // if overlapped  {
+    //     return Err("Request area is already allocated");
+    // }
+    
+    let inner_ref = Arc::new(Mutex::new(inner));
+
+    WINDOWLIST.lock().add(&inner_ref);
+    
+    // active the void window content
+    {
+        let mut inner = inner_ref.lock();
+
+        // TODO WENQIU: use render
+        inner.clean()?;
+        inner.active(true)?;
+        //inner.draw_border(get_border_color(true))?;
+    }
+
+    // create the window
+    let window: WindowObj = WindowObj{
+        inner:inner_ref,
+        //text_buffer:FrameTextBuffer::new(),
+        consumer:consumer,
+        components:BTreeMap::new(),
+        framebuffer:framebuffer,
+    }; 
+
+    Ok(window)
 }
 
 /// Puts an input event into the active window (i.e. a keypress event, resize event, etc.)
 /// If the caller wants to put an event into a specific window, use put_event_into_app()
 pub fn send_event_to_active(event: Event) -> Result<(), &'static str>{    
-    let mut allocator = try!(WINDOW_ALLOCATOR.try().ok_or("The window allocator is not initialized")).lock();
-    allocator.send_event(event)
+    let window_list = WINDOWLIST.lock();
+    let active_ref = window_list.active.upgrade(); // grabs a pointer to the active WindowInner
+    if let Some(window) = active_ref {
+        let window = window.lock();
+        window.key_producer.enqueue(event);
+    }
+    Ok(())
 }
 
 // Gets the border color according to the active state
@@ -122,72 +181,28 @@ fn get_border_color(active:bool) -> u32 {
     }
 }
 
-impl WindowAllocator{    
-    /// Allocate a new window and return it
-    pub fn allocate(&mut self, x:usize, y:usize, width:usize, height:usize) -> Result<WindowObj, &'static str>{
-        // Check the size of the window
-        if width < 2 * WINDOW_PADDING || height < 2 * WINDOW_PADDING {
-            return Err("Window size must be greater than the padding");
-        }
+impl WindowList{
+    // add a new window to the list
+    fn add(&mut self, inner_ref:&Arc<Mutex<WindowInner>>) {
+        // // inactive all other windows and active the new one
+        // for item in self.list.iter_mut(){
+        //     let ref_opt = item.upgrade();
+        //     if let Some(reference) = ref_opt {
+        //         reference.lock().active(false)?;
+        //     }
+        // }
 
-        // Init the key input producer and consumer
-        let consumer = DFQueue::new().into_consumer();
-        let producer = consumer.obtain_producer();
-        
-        // Init the frame buffer of the window
-        let framebuffer = FrameBuffer::new(width - 2 * WINDOW_PADDING, height - 2 * WINDOW_PADDING, None)?;
-        let inner = WindowInner{
-            x:x,
-            y:y,
-            width:width,
-            height:height,
-            active:true,
-            padding:WINDOW_PADDING,
-            key_producer:producer,
-        };
-
-        // Check if the window overlaps with others
-        let inner_ref = Arc::new(Mutex::new(inner));
-        let overlapped = self.check_overlap(&inner_ref, x, y, width, height);       
-        if overlapped  {
-            return Err("Request area is already allocated");
-        }
-
-        // Init a void window content
-        {
-            let inner = inner_ref.lock();
-            inner.clean()?;
-            inner.draw_border(get_border_color(true))?;
-        }
-        
-        // inactive all other windows and active the new one
-        for item in self.allocated.iter_mut(){
-            let ref_opt = item.upgrade();
-            if let Some(reference) = ref_opt {
-                reference.lock().active(false)?;
-            }
-        }
+        // Add a reference of the new window to the window list
         let weak_ref = Arc::downgrade(&inner_ref);
-        self.active = weak_ref.clone();
-        self.allocated.push_back(weak_ref);
-
-        // create the window
-        let window: WindowObj = WindowObj{
-            inner:inner_ref,
-            //text_buffer:FrameTextBuffer::new(),
-            consumer:consumer,
-            components:BTreeMap::new(),
-            framebuffer:framebuffer,
-        }; 
-
-        Ok(window)  
+        // window_list.active = weak_ref.clone();
+        self.list.push_back(weak_ref);
     }
 
     // delete a window
     fn delete(&mut self, inner:&Arc<Mutex<WindowInner>>) -> Result<(), &'static str> {
         let mut i = 0;
-        let len = self.allocated.len();
-        for item in self.allocated.iter(){
+        let len = self.list.len();
+        for item in self.list.iter(){
             let reference = item.upgrade();
             if let Some(inner_ptr) = reference {
                 if Arc::ptr_eq(&(inner_ptr), inner) {
@@ -198,13 +213,13 @@ impl WindowAllocator{
         }
         if i < len {
             {
-                let window_ref = &self.allocated[i];
+                let window_ref = &self.list[i];
                 let window = window_ref.upgrade();
                 if let Some(window) = window {
                     window.lock().key_producer.enqueue(Event::ExitEvent);
                 }
             }
-            self.allocated.remove(i);
+            self.list.remove(i);
         }
 
         inner.lock().clean()?;
@@ -212,49 +227,39 @@ impl WindowAllocator{
         Ok(())
     }
 
-    // check if an area specified by (x, y, width, height) overlaps with an existing window
-    fn check_overlap(&mut self, inner:&Arc<Mutex<WindowInner>>, x:usize, y:usize, width:usize, height:usize) -> bool {
-        let mut len = self.allocated.len();
-        let mut i = 0;
-        while i < len {
-            {   
-                let mut void = false;
-                if let Some(reference) = self.allocated.get(i) {
-                    if let Some(allocated_ref) = reference.upgrade() {
-                        if !Arc::ptr_eq(&allocated_ref, inner) {
-                            if allocated_ref.lock().is_overlapped(x, y, width, height) {
-                                return true;
-                            }
-                        }
-                        i += 1;
-                    } else {
-                        void = true;
-                    }
-                }
-                if void {
-                    self.allocated.remove(i);
-                    len -= 1;
-                }
-            }
-        }
-        false
-    }
-    
-    // enqueues the key event into the active window
-    fn send_event(&mut self, event:Event) -> Result<(), &'static str> {
-        let reference = self.active.upgrade(); // grabs a pointer to the active WindowInner
-        if let Some(window) = reference {
-            let window = window.lock();
-            window.key_producer.enqueue(event);
-        }
-        Ok(())
-    }
+    // // check if an area specified by (x, y, width, height) overlaps with an existing window
+    // fn check_overlap(&mut self, inner:&Arc<Mutex<WindowInner>>, x:usize, y:usize, width:usize, height:usize) -> bool {
+    //     let mut len = self.allocated.len();
+    //     let mut i = 0;
+    //     while i < len {
+    //         {   
+    //             let mut void = false;
+    //             if let Some(reference) = self.allocated.get(i) {
+    //                 if let Some(allocated_ref) = reference.upgrade() {
+    //                     if !Arc::ptr_eq(&allocated_ref, inner) {
+    //                         if allocated_ref.lock().is_overlapped(x, y, width, height) {
+    //                             return true;
+    //                         }
+    //                     }
+    //                     i += 1;
+    //                 } else {
+    //                     void = true;
+    //                 }
+    //             }
+    //             if void {
+    //                 self.list.remove(i);
+    //                 len -= 1;
+    //             }
+    //         }
+    //     }
+    //     false
+    // }
 
 
     // return a reference to the next window of current active window
-    fn next_window(&mut self) -> Option<Arc<Mutex<WindowInner>>> {
+    fn next(&mut self) -> Option<Arc<Mutex<WindowInner>>> {
         let mut current_active = false;
-        for item in self.allocated.iter_mut(){
+        for item in self.list.iter_mut(){
             let reference = item.upgrade();
             if let Some(window) = reference {
                 if window.lock().active {
@@ -266,7 +271,7 @@ impl WindowAllocator{
         }
 
         if current_active {
-            for item in self.allocated.iter_mut(){
+            for item in self.list.iter_mut(){
                 let reference = item.upgrade();
                 if let Some(window) = reference {
                     return Some(window)
@@ -441,14 +446,14 @@ impl WindowObj{
     /// resize a window as (width, height) at (x, y)
     pub fn resize(&mut self, x:usize, y:usize, width:usize, height:usize) -> Result<(), &'static str>{
         // checks for overlap
-        {
-            let inner = self.inner.clone();
-            let mut allocator = try!(WINDOW_ALLOCATOR.try().ok_or("The window allocator is not initialized")).lock();
-            match allocator.check_overlap(&inner, x,y,width,height) {
-                true => {return Err("cannot resize because requested resize will cause overlap")}
-                false => { }
-            }
-        }
+        // {
+        //     let inner = self.inner.clone();
+        //     let mut allocator = try!(WINDOW_ALLOCATOR.try().ok_or("The window allocator is not initialized")).lock();
+        //     match allocator.check_overlap(&inner, x,y,width,height) {
+        //         true => {return Err("cannot resize because requested resize will cause overlap")}
+        //         false => { }
+        //     }
+        // }
         
         self.clean()?;
         let mut inner = self.inner.lock();
@@ -482,10 +487,7 @@ impl WindowObj{
 /// delete the reference of a window in the manager when the window is dropped
 impl Drop for WindowObj {
     fn drop(&mut self) {
-        let mut allocator = match WINDOW_ALLOCATOR.try() {
-            Some(allocator) => { allocator },
-            None => { error!("The window allocator is not initialized"); return }
-        }.lock();
+        let mut window_list = WINDOWLIST.lock();
 
         // Switches to a new active window and sets 
         // the active pointer field of the window allocator to the new active window
@@ -494,7 +496,7 @@ impl Drop for WindowObj {
             Err(err) => { error!("Fail to schedule to the next window: {}", err) }
         }; 
         
-        match allocator.delete(&(self.inner)) {
+        match window_list.delete(&(self.inner)) {
             Ok(()) => {}
             Err(err) => { error!("Fail to delete the window from the window manager: {}", err) }
         }
@@ -624,14 +626,14 @@ impl Component {
 
 /// select the next window in the list and set it as active. set current active window and inactive
 pub fn schedule() -> Result<(), &'static str>{
-    let mut allocator = try!(WINDOW_ALLOCATOR.try().ok_or("The window allocator is not initialized")).lock();
-    let next_window = match allocator.next_window() {
+    let mut window_list = WINDOWLIST.lock();
+    let next_window = match window_list.next() {
         Some(window) => { window }
         None => { return Ok(()) } //do nothing if current active window is the only window
     };
 
     // set current window as inactive    
-    if let Some(window) = allocator.active.upgrade() {
+    if let Some(window) = window_list.active.upgrade() {
         let mut current = window.lock();
         (*current).active(false)?;
     }
@@ -639,7 +641,7 @@ pub fn schedule() -> Result<(), &'static str>{
     // set next window as active
     let mut next = next_window.lock();
     (*next).active(true)?;
-    allocator.active = Arc::downgrade(&next_window);
+    window_list.active = Arc::downgrade(&next_window);
 
     Ok(())
 }

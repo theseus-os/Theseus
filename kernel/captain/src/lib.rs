@@ -131,7 +131,7 @@ pub fn init(
     let ap_count = acpi::madt::handle_ap_cores(madt_iter, kernel_mmi_ref.clone(), ap_start_realmode_begin, ap_start_realmode_end)?;
     info!("Finished handling and booting up all {} AP cores.", ap_count);
 
-    // //init frame_buffer
+    // init frame_buffer
     let rs = frame_buffer::init();
     match rs {
         Ok(_) => {
@@ -151,6 +151,18 @@ pub fn init(
         }
         Err(err) => { 
             println_raw!("captain::init(): failed to initialize font");
+            return Err(err);
+        }
+    }
+
+    // init window manager
+    let rs = window_manager::init();
+    match rs {
+        Ok(_) => {
+            trace!("window manager initialized successfully.");
+        }
+        Err(err) => { 
+            println_raw!("captain::init(): failed to initialize window manager");
             return Err(err);
         }
     }
