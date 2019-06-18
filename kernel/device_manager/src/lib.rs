@@ -16,7 +16,6 @@ extern crate mouse;
 extern crate network_manager;
 extern crate ethernet_smoltcp_device;
 extern crate smoltcp;
-extern crate ixgbe;
 
 use dfqueue::DFQueueProducer;
 use event_types::Event;
@@ -56,16 +55,6 @@ pub fn init(keyboard_producer: DFQueueProducer<Event>) -> Result<(), &'static st
     /* for dev in pci::pci_device_iter() {
         debug!("Found pci device: {:?}", dev);
     } */
-
-    // intialize the 82599 NIC if present and add it to the list of network interfaces
-    match init_pci_dev(ixgbe::registers::INTEL_VEND, ixgbe::registers::INTEL_82599, ixgbe::IxgbeNic::init) {
-        Ok(()) => {
-            let gateway_ip = [192,168,0,1];
-            let nic_ref = ixgbe::get_ixgbe_nic().ok_or("device_manager::init(): ixgbe nic hasn't been initialized")?;
-            ethernet_smoltcp_device::EthernetNetworkInterface::add_network_interface(nic_ref, "192.168.0.101/24", &gateway_ip)?;
-        },
-        Err(_e) => warn!("Ixgbe device not found"),
-    };
     
     // intialize the E1000 NIC if present and add it to the list of network interfaces
     match init_pci_dev(e1000::INTEL_VEND, e1000::E1000_DEV, e1000::E1000Nic::init) {

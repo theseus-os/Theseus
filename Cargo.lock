@@ -337,7 +337,6 @@ dependencies = [
  "e1000 0.1.0",
  "ethernet_smoltcp_device 0.1.0",
  "event_types 0.1.0",
- "ixgbe 0.1.0",
  "keyboard 0.1.0",
  "log 0.3.9 (registry+https://github.com/rust-lang/crates.io-index)",
  "memory 0.1.0",
@@ -694,33 +693,6 @@ version = "0.7.11"
 source = "registry+https://github.com/rust-lang/crates.io-index"
 dependencies = [
  "either 1.5.0 (registry+https://github.com/rust-lang/crates.io-index)",
-]
-
-[[package]]
-name = "ixgbe"
-version = "0.1.0"
-dependencies = [
- "acpi 0.1.0",
- "apic 0.1.0",
- "bit_field 0.7.0 (registry+https://github.com/rust-lang/crates.io-index)",
- "hpet 0.1.0",
- "interrupts 0.1.0",
- "irq_safety 0.1.1 (git+https://github.com/kevinaboos/irq_safety)",
- "kernel_config 0.1.0",
- "lazy_static 1.2.0 (registry+https://github.com/rust-lang/crates.io-index)",
- "log 0.3.9 (registry+https://github.com/rust-lang/crates.io-index)",
- "memory 0.1.0",
- "mpmc 0.1.6-pre",
- "network_interface_card 0.1.0",
- "owning_ref 0.4.0 (git+https://github.com/kevinaboos/owning-ref-rs)",
- "pci 0.1.0",
- "pic 0.1.0",
- "pit_clock 0.1.0",
- "rand 0.6.1 (registry+https://github.com/rust-lang/crates.io-index)",
- "runqueue 0.1.0",
- "spin 0.4.10 (registry+https://github.com/rust-lang/crates.io-index)",
- "volatile 0.2.5 (registry+https://github.com/rust-lang/crates.io-index)",
- "x86_64 0.1.2",
 ]
 
 [[package]]
@@ -1786,16 +1758,6 @@ dependencies = [
  "memory 0.1.0",
  "root 0.1.0",
  "terminal_print 0.1.0",
-]
-
-[[package]]
-name = "test_ixgbe"
-version = "0.1.0"
-dependencies = [
- "getopts 0.2.18 (git+https://github.com/kevinaboos/getopts)",
- "ixgbe 0.1.0",
- "print 0.1.0",
- "spin 0.4.10 (registry+https://github.com/rust-lang/crates.io-index)",
 ]
 
 [[package]]

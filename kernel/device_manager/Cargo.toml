@@ -58,8 +58,5 @@ features = [
     "socket-raw", "socket-udp", "socket-tcp", "socket-icmp", 
 ]
 
-[dependencies.ixgbe]
-path = "../ixgbe"
-
 [lib]
 crate-type = ["rlib"]
