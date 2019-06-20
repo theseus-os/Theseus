@@ -131,16 +131,15 @@ pub fn new_window<'a>(x:usize, y:usize, width:usize, height:usize) -> Result<Win
     
     let inner_ref = Arc::new(Mutex::new(inner));
 
-    WINDOWLIST.lock().add(&inner_ref);
+    let mut window_list = WINDOWLIST.lock();
+    window_list.add(&inner_ref);
     
     // active the void window content
     {
         let mut inner = inner_ref.lock();
-
-        // TODO WENQIU: use render
         inner.clean()?;
         inner.active(true)?;
-        //inner.draw_border(get_border_color(true))?;
+        window_list.active = Arc::downgrade(&inner_ref); 
     }
 
     // create the window
@@ -537,11 +536,11 @@ impl WindowInner {
             && self.check_in_area(x + width, y) && self.check_in_area(x + width, y + height)
     } 
 
-    // check if the pixel is within the window
-    fn check_in_area(&self, x:usize, y:usize) -> bool {        
-        return x >= self.x && x <= self.x + self.width 
-                && y >= self.y && y <= self.y + self.height;
-    }
+    // // check if the pixel is within the window
+    // fn check_in_area(&self, x:usize, y:usize) -> bool {        
+    //     return x >= self.x && x <= self.x + self.width 
+    //             && y >= self.y && y <= self.y + self.height;
+    // }
 
     // check if the pixel is within the window exluding the border and padding
     fn check_in_content(&self, x:usize, y:usize) -> bool {        
