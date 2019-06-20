@@ -80,8 +80,8 @@ fn main(args: Vec<String>) -> isize {
                     Err(e) => {
                          println!("Ping initialization failed: {}.", e);
                         -1
-        }
-    }
+                    }
+                }
                 
             }
             _ => { 
