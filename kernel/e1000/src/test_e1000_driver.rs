@@ -74,6 +74,6 @@ pub fn dhcp_request_packet() -> Result<(), &'static str> {
         let buffer: &mut [u8] = transmit_buffer.as_slice_mut(0, 314)?;
         buffer.copy_from_slice(&packet);
     }
-    let mut e1000_nc = E1000_NIC.try().ok_or("e1000 NIC hasn't been initialized yet")?.write();
+    let mut e1000_nc = E1000_NIC.try().ok_or("e1000 NIC hasn't been initialized yet")?.lock();
     e1000_nc.send_packet(transmit_buffer)
 }

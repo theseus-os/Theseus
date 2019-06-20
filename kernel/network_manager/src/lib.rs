@@ -18,6 +18,7 @@ use smoltcp::{
 };
 
 
+
 lazy_static! {
     /// A list of all of the available and initialized network interfaces that exist on this system.
     pub static ref NETWORK_INTERFACES: Mutex<Vec<NetworkInterfaceRef>> = Mutex::new(Vec::new());
@@ -57,3 +58,9 @@ pub trait NetworkInterface {
 /// A trait object wrapped in an Arc and Mutex that allows 
 /// arbitrary network interfaces to be shared in a thread-safe manner.
 pub type NetworkInterfaceRef = Arc<Mutex<NetworkInterface + Send>>;
+
+/// Add a Nic to the global list of network interfaces.
+/// The Nic must implement the NetworkInterface trait.
+pub fn add_to_network_interfaces<T: NetworkInterface + 'static + Send> (iface: T) {
+    NETWORK_INTERFACES.lock().push(Arc::new(Mutex::new(iface)));
+}

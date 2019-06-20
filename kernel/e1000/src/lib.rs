@@ -65,11 +65,11 @@ pub const INT_RX:               u32 = 0x80;
 /// The single instance of the E1000 NIC.
 /// TODO: in the future, we should support multiple NICs all stored elsewhere,
 /// e.g., on the PCI bus or somewhere else.
-static E1000_NIC: Once<RwLockIrqSafe<E1000Nic>> = Once::new();
+static E1000_NIC: Once<MutexIrqSafe<E1000Nic>> = Once::new();
 
 /// Returns a reference to the E1000Nic wrapped in a RwLockIrqSafe,
 /// if it exists and has been initialized.
-pub fn get_e1000_nic() -> Option<&'static RwLockIrqSafe<E1000Nic>> {
+pub fn get_e1000_nic() -> Option<&'static MutexIrqSafe<E1000Nic>> {
     E1000_NIC.try()
 }
 
@@ -153,9 +153,9 @@ pub struct E1000Nic {
     /// The optional spoofed MAC address to use in place of `mac_hardware` when transmitting.  
     mac_spoofed: Option<[u8; 6]>,
     /// Receive queue with descriptors
-    rx_queue: MutexIrqSafe<RxQueue<LegacyRxDesc>>,
+    rx_queue: RxQueue<LegacyRxDesc>,
     /// Transmit queue with descriptors
-    tx_queue: MutexIrqSafe<TxQueue<LegacyTxDesc>>,     
+    tx_queue: TxQueue<LegacyTxDesc>,     
     /// memory-mapped control registers
     regs: BoxRefMut<MappedPages, IntelE1000Registers>,
 }
@@ -165,17 +165,17 @@ impl NicInit for E1000Nic {}
 
 impl NetworkInterfaceCard for E1000Nic {
 
-    fn send_packet(&self, transmit_buffer: TransmitBuffer) -> Result<(), &'static str> {
-        Self::send_on_queue(&mut self.tx_queue.lock(), E1000_NUM_TX_DESC as u16, transmit_buffer);
+    fn send_packet(&mut self, transmit_buffer: TransmitBuffer) -> Result<(), &'static str> {
+        Self::send_on_queue(&mut self.tx_queue, E1000_NUM_TX_DESC as u16, transmit_buffer);
         Ok(())
     }
 
     fn get_received_frame(&mut self) -> Option<ReceivedFrame> {
-        self.rx_queue.lock().received_frames.pop_front()
+        self.rx_queue.received_frames.pop_front()
     }
 
-    fn poll_receive(&self) -> Result<(), &'static str> {
-        Self::collect_from_queue(&mut self.rx_queue.lock(), E1000_NUM_RX_DESC as u16, &RX_BUFFER_POOL, E1000_RX_BUFFER_SIZE_IN_BYTES)        
+    fn poll_receive(&mut self) -> Result<(), &'static str> {
+        Self::collect_from_queue(&mut self.rx_queue, E1000_NUM_RX_DESC as u16, &RX_BUFFER_POOL, E1000_RX_BUFFER_SIZE_IN_BYTES)        
     }
 
     fn mac_address(&self) -> [u8; 6] {
@@ -252,12 +252,12 @@ impl E1000Nic {
             interrupt_num: interrupt_num,
             mac_hardware: mac_addr_hardware,
             mac_spoofed: None,
-            rx_queue: MutexIrqSafe::new(rxq),
-            tx_queue: MutexIrqSafe::new(txq),
+            rx_queue: rxq,
+            tx_queue: txq,
             regs: mapped_registers,
         };
         
-        let nic_ref = E1000_NIC.call_once(|| RwLockIrqSafe::new(e1000_nic));
+        let nic_ref = E1000_NIC.call_once(|| MutexIrqSafe::new(e1000_nic));
         Ok(())
     }
     
@@ -365,8 +365,8 @@ impl E1000Nic {
     /// Handle the receipt of an Ethernet frame. 
     /// This should be invoked whenever the NIC has a new received frame that is ready to be handled,
     /// either in a polling fashion or from a receive interrupt handler.
-    fn handle_receive(&self) -> Result<(), &'static str> {
-        Self::collect_from_queue(&mut self.rx_queue.lock(), E1000_NUM_RX_DESC as u16, &RX_BUFFER_POOL, E1000_RX_BUFFER_SIZE_IN_BYTES)        
+    fn handle_receive(&mut self) -> Result<(), &'static str> {
+        Self::collect_from_queue(&mut self.rx_queue, E1000_NUM_RX_DESC as u16, &RX_BUFFER_POOL, E1000_RX_BUFFER_SIZE_IN_BYTES)        
     }
 
 
@@ -400,7 +400,7 @@ impl E1000Nic {
 
 extern "x86-interrupt" fn e1000_handler(_stack_frame: &mut ExceptionStackFrame) {
     if let Some(ref e1000_nic_ref) = E1000_NIC.try() {
-        let mut e1000_nic = e1000_nic_ref.write();
+        let mut e1000_nic = e1000_nic_ref.lock();
         if let Err(e) = e1000_nic.handle_interrupt() {
             error!("e1000_handler(): error handling interrupt: {:?}", e);
         }

@@ -1,4 +1,5 @@
 #![no_std]
+#![feature(trait_alias)]
 
 #[macro_use] extern crate log;
 extern crate alloc;
@@ -21,7 +22,8 @@ use dfqueue::DFQueueProducer;
 use event_types::Event;
 use memory::MemoryManagementInfo;
 use pci::{PciDevice, get_pci_device_vd};
-
+use ethernet_smoltcp_device::EthernetNetworkInterface;
+use network_manager::add_to_network_interfaces;
 
 /// A randomly chosen IP address that must be outside of the DHCP range.. // TODO FIXME: use DHCP to acquire IP
 const DEFAULT_LOCAL_IP: &'static str = "10.0.2.15/24"; // the default QEMU user-slirp network gives IP addresses of "10.0.2.*"
@@ -57,10 +59,11 @@ pub fn init(keyboard_producer: DFQueueProducer<Event>) -> Result<(), &'static st
     } */
     
     // intialize the E1000 NIC if present and add it to the list of network interfaces
-    match init_pci_dev(e1000::INTEL_VEND, e1000::E1000_DEV, e1000::E1000Nic::init) {
+    match init_pci_dev(e1000::INTEL_VEND, e1000::E1000_DEV, &e1000::E1000Nic::init) {
         Ok(()) => {
             let nic_ref = e1000::get_e1000_nic().ok_or("device_manager::init(): e1000 nic hasn't been initialized")?;
-            ethernet_smoltcp_device::EthernetNetworkInterface::add_network_interface(nic_ref, DEFAULT_LOCAL_IP, &DEFAULT_GATEWAY_IP)?;
+            let e1000_interface = EthernetNetworkInterface::new_ipv4_interface(nic_ref, DEFAULT_LOCAL_IP, &DEFAULT_GATEWAY_IP)?;
+            add_to_network_interfaces(e1000_interface);
         },
         Err(_e) => warn!("E1000 device not found"),
     };
@@ -94,8 +97,8 @@ pub fn init(keyboard_producer: DFQueueProducer<Event>) -> Result<(), &'static st
 
 }
 
-/// Function type for a pci device initialization procedure
-pub type PciDevInitFunc = fn(&PciDevice) -> Result<(), &'static str>;
+/// Trait for all pci device initialization procedures
+pub trait PciDevInitFunc = Fn(&PciDevice) -> Result<(), &'static str>;
 
 /// Finds the pci device and initializes it.
 /// 
@@ -103,7 +106,7 @@ pub type PciDevInitFunc = fn(&PciDevice) -> Result<(), &'static str>;
 /// * `vendor_id`: pci vendor id of device
 /// * `device_id`: pci device id of device
 /// * `init_func`: initialization function for the pci device
-fn init_pci_dev(vendor_id: u16, device_id: u16, init_func: PciDevInitFunc) -> Result<(), &'static str> {
+fn init_pci_dev<f: PciDevInitFunc> (vendor_id: u16, device_id: u16, init_func: &f) -> Result<(), &'static str> {
     let pci_dev = get_pci_device_vd(vendor_id, device_id).ok_or("device_manager::init_pci_dev: device not found")?;
     init_func(pci_dev)?;
     Ok(())

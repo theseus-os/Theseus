@@ -34,7 +34,7 @@ pub fn nic_mapping_flags() -> EntryFlags {
 pub trait NetworkInterfaceCard {
     /// Sends a packet contained in the given `transmit_buffer` out through this NetworkInterfaceCard. 
     /// Blocks until the packet has been successfully sent by the networking card hardware.
-    fn send_packet(&self, transmit_buffer: TransmitBuffer) -> Result<(), &'static str>;
+    fn send_packet(&mut self, transmit_buffer: TransmitBuffer) -> Result<(), &'static str>;
 
     /// Sends a packet on the specified transmit queue
     /// 
@@ -60,7 +60,7 @@ pub trait NetworkInterfaceCard {
 
     /// Poll the NIC for received frames. 
     /// Can be used as an alternative to interrupts, or as a supplement to interrupts.
-    fn poll_receive(&self) -> Result<(), &'static str>;
+    fn poll_receive(&mut self) -> Result<(), &'static str>;
 
     /// Retrieves the ethernet frames from one queue
     /// 
