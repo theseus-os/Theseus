@@ -67,22 +67,29 @@ fn main(args: Vec<String>) -> isize {
 
     if matches.opt_present("h") {
         return print_usage(&opts);
-        return 0;
     }
 
-    let mut ping_address = IpAddress::Unspecified;
+    // let mut ping_address = IpAddress::Unspecified;
 
     if matches.free.len() != 0 {
         match IpAddress::from_str(&matches.free[0]) {
             Ok(address) => {
-                ping_address = address;
+                let ping_address = address;
+                let result = rmain(&matches, opts, ping_address);
+                match result {
+                    Ok(_) => { 0 }
+                    Err(e) => {
+                         println!("Ping initialization failed: {}.", e);
+                        -1
+        }
+    }
                 
             }
             _ => { 
                 println!("Invalid argument {}, not a valid adress", matches.free[0]); 
                 return -1;
             },
-        };  
+        }  
     
     }
 
@@ -91,15 +98,9 @@ fn main(args: Vec<String>) -> isize {
         return 0;
     }
     
-    let result = rmain(&matches, opts, ping_address);
     
-    match result {
-        Ok(_) => { 0 }
-        Err(e) => {
-            println!("Ping initialization failed: {}.", e);
-            -1
-        }
-    }
+    
+    
 }
 
 pub fn rmain(matches: &Matches, _opts: Options, address: IpAddress) -> Result<(), &'static str> {
@@ -144,8 +145,8 @@ fn get_default_iface() -> Result<NetworkInterfaceRef, String> {
 }
 
 // Retrieves the echo reply contained in the recieve buffer and prints data pertaining to the packet
-fn get_icmp_pong (waiting_queue: &mut HashMap<u16, i64>, times: &mut Vec<i64>, mut total_time: i64, 
-    repr: Icmpv4Repr, mut recieved: u16, remote_addr: IpAddress, timestamp: i64)  {
+fn get_icmp_pong (waiting_queue: &mut HashMap<u16, i64>, times: &mut Vec<i64>, total_time: &mut i64, 
+    repr: Icmpv4Repr, recieved: &mut u16, remote_addr: IpAddress, timestamp: i64)  {
     
     if let Icmpv4Repr::EchoReply { seq_no, data, ..} = repr {
         if let Some(_) = waiting_queue.get(&seq_no) {
@@ -156,9 +157,9 @@ fn get_icmp_pong (waiting_queue: &mut HashMap<u16, i64>, times: &mut Vec<i64>, m
                         timestamp - packet_timestamp_ms);
             
             waiting_queue.remove(&seq_no);
-            recieved += 1;
+            *recieved += 1;
             times.push((timestamp - packet_timestamp_ms) as i64);
-            total_time += timestamp - packet_timestamp_ms;
+            *total_time += timestamp - packet_timestamp_ms;
         }
     } 
 }
@@ -194,8 +195,8 @@ fn ping(address: IpAddress, count: usize, interval: i64, timeout: i64, verbose: 
     };
     
     let mut seq_no = 0;
-    let received = 0;
-    let total_time = 0;
+    let mut received: u16 = 0;
+    let mut total_time = 0;
     let mut echo_payload = [0xffu8; 40];
 
     // Designate no checksum capabilities 
@@ -281,7 +282,7 @@ fn ping(address: IpAddress, count: usize, interval: i64, timeout: i64, verbose: 
                 }; 
                 
         
-                get_icmp_pong(&mut waiting_queue, &mut times, total_time, icmp_repr, received, remote_addr, timestamp);
+                get_icmp_pong(&mut waiting_queue, &mut times, &mut total_time, icmp_repr, &mut received, remote_addr, timestamp);
                 if verbose {
                     println!("buffer length: {}", icmp_repr.buffer_len());
                     println!("checking checksum of packet, should be above 0: {:?}", icmp_packet.checksum());
