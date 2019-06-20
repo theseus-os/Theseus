@@ -69,7 +69,6 @@ fn main(args: Vec<String>) -> isize {
         return print_usage(&opts);
     }
 
-    // let mut ping_address = IpAddress::Unspecified;
 
     if matches.free.len() != 0 {
         match IpAddress::from_str(&matches.free[0]) {
