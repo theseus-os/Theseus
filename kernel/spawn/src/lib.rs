@@ -37,6 +37,7 @@ use irq_safety::{MutexIrqSafe, hold_interrupts, enable_interrupts, interrupts_en
 use memory::{get_kernel_mmi_ref, Stack, MemoryManagementInfo, VirtualAddress};
 use kernel_config::memory::KERNEL_STACK_SIZE_IN_PAGES;
 use task::{Task, TaskRef, get_my_current_task, RunState, TASKLIST, TASK_SWITCH_LOCKS};
+use mod_mgmt::metadata::StrongCrateRef;
 use path::Path;
 
 #[cfg(spawn_userspace)]
@@ -134,8 +135,12 @@ impl<F, A, R> KernelTaskBuilder<F, A, R>
     /// Finishes this `KernelTaskBuilder` and spawns a new kernel task in the same address space as the current task. 
     /// This merely makes the new task Runnable, it does not switch to it immediately. That will happen on the next scheduler invocation.
     #[inline(never)]
-    pub fn spawn(self) -> Result<TaskRef, &'static str> 
-    {
+    pub fn spawn(self) -> Result<TaskRef, &'static str> {
+        self.spawn_internal(None)
+    }
+
+    /// The internal spawn routine for both regular kernel Tasks and application Tasks.
+    fn spawn_internal(self, app_crate: Option<StrongCrateRef>) -> Result<TaskRef, &'static str> {
         let mut new_task = Task::new();
         new_task.name = self.name.unwrap_or_else(|| String::from( 
             // if a Task name wasn't provided, then just use the function's name
@@ -145,6 +150,8 @@ impl<F, A, R> KernelTaskBuilder<F, A, R>
         #[cfg(simd_personality)] {  
             new_task.simd = self.simd;
         }
+
+        new_task.app_crate = app_crate;
 
         // the new kernel thread uses the same kernel address space
         new_task.mmi = Some( try!(get_kernel_mmi_ref().ok_or("KERNEL_MMI was not initialized!!")) );
@@ -294,10 +301,7 @@ impl ApplicationTaskBuilder {
         #[cfg(simd_personality)]
         let ktb = ktb.simd(self.simd);
 
-        let app_task = ktb.spawn()?;
-        app_task.lock_mut().app_crate = Some(app_crate_ref);
-
-        Ok(app_task)
+        ktb.spawn_internal(Some(app_crate_ref))
     }
 
 }
