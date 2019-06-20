@@ -31,8 +31,8 @@ path = "../event_types"
 [dependencies.font]
 path = "../font"
 
-[dependencies.tsc]
-path = "../tsc"
+[dependencies.displayable]
+path = "displayable"
 
 [dependencies.lazy_static]
 features = ["spin_no_std", "nightly"]

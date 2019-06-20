@@ -21,14 +21,13 @@ extern crate spin;
 #[macro_use] extern crate alloc;
 extern crate dfqueue;
 extern crate event_types;
-extern crate tsc;
 #[macro_use] extern crate log;
 extern crate frame_buffer;
 extern crate frame_buffer_drawer;
 extern crate frame_buffer_printer;
-extern crate font;
 #[macro_use] extern crate lazy_static;
-
+extern crate displayable;
+extern crate font;
 
 use spin::{Once, Mutex};
 use alloc::collections::{VecDeque, BTreeMap};
@@ -40,12 +39,8 @@ use frame_buffer_drawer::*;
 use frame_buffer_printer::print_by_bytes;
 use event_types::Event;
 use alloc::string::{String, ToString};
-use tsc::{tsc_ticks, TscTicks};
+use displayable::{TextDisplay, Cursor};
 use font::{CHARACTER_HEIGHT, CHARACTER_WIDTH};
-use displayable::text_display::{TextDisplay, Cursor};
-
-/// a module to manage displayables
-pub mod displayable;
 
 lazy_static! {
     /// The list of all Tasks in the system.

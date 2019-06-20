@@ -22,6 +22,7 @@ extern crate root;
 extern crate terminal_print;
 extern crate print;
 extern crate environment;
+extern crate displayable;
 
 #[macro_use] extern crate alloc;
 #[macro_use] extern crate log;
@@ -32,7 +33,7 @@ use alloc::string::{String, ToString};
 use alloc::vec::Vec;
 use alloc::sync::Arc;
 use dfqueue::{DFQueue, DFQueueConsumer, DFQueueProducer};
-use window_manager::displayable::text_display::{TextDisplay, Cursor};
+use displayable::{TextDisplay, Cursor};
 use spawn::{ApplicationTaskBuilder, KernelTaskBuilder};
 use path::Path;
 use task::{TaskRef, ExitValue, KillReason};

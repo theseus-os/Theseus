@@ -56,6 +56,9 @@ path = "../../kernel/root"
 [dependencies.path]
 path = "../../kernel/path"
 
+[dependencies.displayable]
+path = "../../kernel/window_manager/displayable"
+
 [lib]
 crate-type = ["rlib"]
 
