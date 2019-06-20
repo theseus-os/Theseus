@@ -6,19 +6,19 @@
 
 extern crate alloc;
 extern crate frame_buffer;
-extern crate frame_buffer_writer;
+extern crate frame_buffer_pixel_drawer;
 extern crate font;
 
 use alloc::vec;
 use font::{CHARACTER_HEIGHT, CHARACTER_WIDTH, FONT_PIXEL};
 use frame_buffer::{FrameBuffer, Pixel};
-use frame_buffer_writer::write_to;
+use frame_buffer_pixel_drawer::draw_pixel;
 
 /// Draw a pixel in a framebuffer.
 /// The pixel is drawed at position (x, y) of the framebuffer with color
-pub fn draw_pixel(mut framebuffer: &mut FrameBuffer, x: usize, y: usize, color: u32){    
+pub fn draw_point(mut framebuffer: &mut FrameBuffer, x: usize, y: usize, color: u32){    
     if framebuffer.check_in_range(x, y) {
-        write_to(&mut framebuffer, x, y, color);
+        draw_pixel(&mut framebuffer, x, y, color);
     }
 }
 
@@ -42,7 +42,7 @@ pub fn draw_line(mut framebuffer: &mut FrameBuffer, start_x: i32, start_y: i32, 
             }          
             y = (x - start_x) * height / width + start_y;
             if framebuffer.check_in_range(x as usize, y as usize) {
-                write_to(&mut framebuffer, x as usize, y as usize, color);
+                draw_pixel(&mut framebuffer, x as usize, y as usize, color);
             }
             x += step;
         }
@@ -56,7 +56,7 @@ pub fn draw_line(mut framebuffer: &mut FrameBuffer, start_x: i32, start_y: i32, 
             }
             x = (y - start_y) * width / height + start_x;
             if { framebuffer.check_in_range(x as usize,y as usize) }{
-                write_to(&mut framebuffer, x as usize, y as usize, color);
+                draw_pixel(&mut framebuffer, x as usize, y as usize, color);
             }
             y += step;   
         }
@@ -82,8 +82,8 @@ pub fn draw_rectangle(mut framebuffer: &mut FrameBuffer, start_x: usize, start_y
         if x == end_x {
             break;
         }
-        write_to(&mut framebuffer, x as usize, start_y as usize, color);
-        write_to(&mut framebuffer, x as usize, end_y - 1 as usize, color);
+        draw_pixel(&mut framebuffer, x as usize, start_y as usize, color);
+        draw_pixel(&mut framebuffer, x as usize, end_y - 1 as usize, color);
         x += 1;
     }
 
@@ -92,8 +92,8 @@ pub fn draw_rectangle(mut framebuffer: &mut FrameBuffer, start_x: usize, start_y
         if y == end_y {
             break;
         }
-        write_to(&mut framebuffer, start_x as usize, y as usize, color);
-        write_to(&mut framebuffer, end_x - 1 as usize, y as usize, color);
+        draw_pixel(&mut framebuffer, start_x as usize, y as usize, color);
+        draw_pixel(&mut framebuffer, end_x - 1 as usize, y as usize, color);
         y += 1;
     }
 }
@@ -117,7 +117,7 @@ pub fn fill_rectangle(mut framebuffer: &mut FrameBuffer, start_x: usize, start_y
     let mut y = start_y;
     loop {
         loop {
-            write_to(&mut framebuffer, x as usize, y as usize, color);
+            draw_pixel(&mut framebuffer, x as usize, y as usize, color);
             x += 1;
             if x == end_x {
                 break;

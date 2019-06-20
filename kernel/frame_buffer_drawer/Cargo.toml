@@ -8,8 +8,8 @@ build = "../../build.rs"
 [dependencies.frame_buffer]
 path = "../frame_buffer"
 
-[dependencies.frame_buffer_writer]
-path = "../frame_buffer_writer"
+[dependencies.frame_buffer_pixel_drawer]
+path = "../frame_buffer_pixel_drawer"
 
 [dependencies.font]
 path = "../font"

@@ -1,7 +1,7 @@
 //! This crate defines text displayable
 //! A text displayable profiles a block of text to be displayed on the screen. It specifies the width and height of the text block.
 //! This crate also defines a Cursor structure. The structure specifies the size and blink frequency and implement the blink method.
-//! The owner of a framebuffer can use a text displayable to display a string on the screen. It can also use a text displayable to display a cursor and let it blink.
+//! The owner of a framebuffer can use a text displayable to display a string in the framebuffer. It can also use a text displayable to display a cursor and let it blink.
 
 #![no_std]
 
@@ -14,6 +14,7 @@ use font::{CHARACTER_HEIGHT, CHARACTER_WIDTH};
 const DEFAULT_CURSOR_FREQ:u64 = 400000000;
 
 /// A displayable component for text display
+/// The owner of a framebuffer can use this text displayable to display a string. The displayable specifies the size of the text block to be displayable in the framebuffer
 pub struct TextDisplay {
     width: usize,
     height: usize,

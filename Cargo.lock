@@ -487,7 +487,14 @@ version = "0.1.0"
 dependencies = [
  "font 0.1.0",
  "frame_buffer 0.1.0",
- "frame_buffer_writer 0.1.0",
+ "frame_buffer_pixel_drawer 0.1.0",
+]
+
+[[package]]
+name = "frame_buffer_pixel_drawer"
+version = "0.1.0"
+dependencies = [
+ "frame_buffer 0.1.0",
 ]
 
 [[package]]
@@ -495,13 +502,6 @@ name = "frame_buffer_printer"
 version = "0.1.0"
 dependencies = [
  "font 0.1.0",
- "frame_buffer 0.1.0",
-]
-
-[[package]]
-name = "frame_buffer_writer"
-version = "0.1.0"
-dependencies = [
  "frame_buffer 0.1.0",
 ]
 
