@@ -46,8 +46,8 @@ lazy_static! {
     /// The list of all Tasks in the system.
     static ref WINDOWLIST: Mutex<WindowList> = Mutex::new(
         WindowList{
-            list:VecDeque::new(),
-            active:Weak::new(),
+            list: VecDeque::new(),
+            active: Weak::new(),
         }
     );
 }
@@ -55,7 +55,7 @@ lazy_static! {
 // A framebuffer owned by the window manager. 
 // This framebuffer is responsible for display borders. Windows owned by applications cannot get access to their borders. 
 // All the display behaviors of borders are controled by the window manager
-static SCREEN_FRAME_BUFFER:Once<Arc<Mutex<FrameBuffer>>> = Once::new();
+static SCREEN_FRAME_BUFFER: Once<Arc<Mutex<FrameBuffer>>> = Once::new();
 
 // 10 pixel gap between windows 
 const WINDOW_MARGIN: usize = 10;
@@ -100,7 +100,7 @@ pub fn new_default_window() -> Result<WindowObj, &'static str> {
 /// Lets the caller specify the dimensions of the new window and returns a new window
 /// Params x,y specify the (x,y) coordinates of the top left corner of the window
 /// Params width and height specify dimenions of new window in pixels
-pub fn new_window<'a>(x:usize, y:usize, width:usize, height:usize) -> Result<WindowObj, &'static str>{
+pub fn new_window<'a>(x: usize, y: usize, width: usize, height: usize) -> Result<WindowObj, &'static str>{
     // Check the size of the window
     if width < 2 * WINDOW_PADDING || height < 2 * WINDOW_PADDING {
         return Err("Window size must be greater than the padding");
@@ -113,13 +113,13 @@ pub fn new_window<'a>(x:usize, y:usize, width:usize, height:usize) -> Result<Win
     // Init the frame buffer of the window
     let framebuffer = FrameBuffer::new(width - 2 * WINDOW_PADDING, height - 2 * WINDOW_PADDING, None)?;
     let inner = WindowInner{
-        x:x,
-        y:y,
-        width:width,
-        height:height,
-        active:true,
-        padding:WINDOW_PADDING,
-        key_producer:producer,
+        x: x,
+        y: y,
+        width: width,
+        height: height,
+        active: true,
+        padding: WINDOW_PADDING,
+        key_producer: producer,
     };
 
     // // Check if the window overlaps with others
@@ -144,11 +144,11 @@ pub fn new_window<'a>(x:usize, y:usize, width:usize, height:usize) -> Result<Win
 
     // create the window
     let window: WindowObj = WindowObj{
-        inner:inner_ref,
+        inner: inner_ref,
         //text_buffer:FrameTextBuffer::new(),
-        consumer:consumer,
-        components:BTreeMap::new(),
-        framebuffer:framebuffer,
+        consumer: consumer,
+        components: BTreeMap::new(),
+        framebuffer: framebuffer,
     }; 
 
     Ok(window)
@@ -167,7 +167,7 @@ pub fn send_event_to_active(event: Event) -> Result<(), &'static str>{
 }
 
 // Gets the border color according to the active state
-fn get_border_color(active:bool) -> u32 {
+fn get_border_color(active: bool) -> u32 {
     if active {
         WINDOW_ACTIVE_COLOR
     } else {
@@ -177,7 +177,7 @@ fn get_border_color(active:bool) -> u32 {
 
 impl WindowList{
     // add a new window to the list
-    fn add(&mut self, inner_ref:&Arc<Mutex<WindowInner>>) {
+    fn add(&mut self, inner_ref: &Arc<Mutex<WindowInner>>) {
         // // inactive all other windows and active the new one
         // for item in self.list.iter_mut(){
         //     let ref_opt = item.upgrade();
@@ -193,7 +193,7 @@ impl WindowList{
     }
 
     // delete a window
-    fn delete(&mut self, inner:&Arc<Mutex<WindowInner>>) -> Result<(), &'static str> {
+    fn delete(&mut self, inner: &Arc<Mutex<WindowInner>>) -> Result<(), &'static str> {
         let mut i = 0;
         let len = self.list.len();
         for item in self.list.iter(){
@@ -282,12 +282,12 @@ impl WindowList{
 /// A window contains a reference to its inner reference owned by the window manager,
 /// a consumer of inputs, a list of displayables and a framebuffer
 pub struct WindowObj {
-    inner:Arc<Mutex<WindowInner>>,
+    inner: Arc<Mutex<WindowInner>>,
     //text_buffer:FrameTextBuffer,
-    consumer:DFQueueConsumer<Event>,
-    components:BTreeMap<String, Component>,
+    consumer: DFQueueConsumer<Event>,
+    components: BTreeMap<String, Component>,
     /// the framebuffer owned by the window
-    framebuffer:FrameBuffer,
+    framebuffer: FrameBuffer,
 }
 
 impl WindowObj{
@@ -307,7 +307,7 @@ impl WindowObj{
 
     /// Add a new displayable structure to the window
     /// We check if the displayable is in the window. But we do not check if it is overlapped with others
-    pub fn add_displayable(&mut self, key: &str, x:usize, y:usize, displayable:TextDisplay) -> Result<(), &'static str>{        
+    pub fn add_displayable(&mut self, key: &str, x: usize, y: usize, displayable: TextDisplay) -> Result<(), &'static str>{        
         let key = key.to_string();
         let (width, height) = displayable.get_size();
         let inner = self.inner.lock();
@@ -318,9 +318,9 @@ impl WindowObj{
         } 
 
         let component = Component {
-            x:x,
-            y:y,
-            displayable:displayable,
+            x: x,
+            y: y,
+            displayable: displayable,
         };
 
         self.components.insert(key, component);
@@ -328,12 +328,12 @@ impl WindowObj{
     }
 
     /// Remove a displayable according to its name
-    pub fn remove_displayable(&mut self, name:&str){
+    pub fn remove_displayable(&mut self, name: &str){
         self.components.remove(name);
     }
 
     /// Get a displayable of the name
-    pub fn get_displayable(&self, name:&str) -> Option<&TextDisplay> {
+    pub fn get_displayable(&self, name: &str) -> Option<&TextDisplay> {
         let opt = self.components.get(name);
         match opt {
             None => { return None },
@@ -342,7 +342,7 @@ impl WindowObj{
     }
 
     /// Get the position of a displayable in the window
-    pub fn get_displayable_position(&self, key:&str) -> Result<(usize, usize), &'static str> {
+    pub fn get_displayable_position(&self, key: &str) -> Result<(usize, usize), &'static str> {
         let opt = self.components.get(key);
         match opt {
             None => { return Err("No such displayable"); },
@@ -405,7 +405,7 @@ impl WindowObj{
     }
 
     /// print a string in the window with a text displayable.
-    pub fn display_string(&mut self, display_name:&str, slice:&str, font_color:u32, bg_color:u32) -> Result<(), &'static str> {
+    pub fn display_string(&mut self, display_name: &str, slice: &str, font_color: u32, bg_color: u32) -> Result<(), &'static str> {
         let (display_x, display_y) = self.get_displayable_position(display_name)?;
         let (width, height) = self.get_displayable(display_name).ok_or("The displayable does not exist")?.get_size();        
         print_by_bytes(&mut self.framebuffer, display_x, display_y, width, height, slice, font_color, bg_color)?;
@@ -413,7 +413,7 @@ impl WindowObj{
     }
 
     /// display a cursor in the window with a text displayable. position is the absolute position of the cursor
-    pub fn display_cursor(&mut self, cursor:&Cursor, display_name:&str, position:usize, leftshift:usize, font_color:u32, bg_color:u32) -> Result<(), &'static str> {
+    pub fn display_cursor(&mut self, cursor: &Cursor, display_name: &str, position: usize, leftshift: usize, font_color: u32, bg_color: u32) -> Result<(), &'static str> {
         let (text_buffer_width, text_buffer_height) = match self.get_displayable(display_name) {
             Some(text_display) => { text_display.get_dimensions() },
             None => { return Err("The displayable does not exist") }
@@ -438,7 +438,7 @@ impl WindowObj{
 
     // @Andrew
     /// resize a window as (width, height) at (x, y)
-    pub fn resize(&mut self, x:usize, y:usize, width:usize, height:usize) -> Result<(), &'static str>{
+    pub fn resize(&mut self, x: usize, y: usize, width: usize, height: usize) -> Result<(), &'static str>{
         // checks for overlap
         // {
         //     let inner = self.inner.clone();
@@ -485,7 +485,7 @@ impl Drop for WindowObj {
 
         // Switches to a new active window and sets 
         // the active pointer field of the window allocator to the new active window
-        match schedule() {
+        match switch_to_next() {
             Ok(_) => {}
             Err(err) => { error!("Fail to schedule to the next window: {}", err) }
         }; 
@@ -530,11 +530,11 @@ impl WindowInner {
         )
     }
 
-    //check if the window is overlapped with any existing window
-    fn is_overlapped(&self, x:usize, y:usize, width:usize, height:usize) -> bool {
-        return self.check_in_area(x, y) && self.check_in_area(x, y + height) 
-            && self.check_in_area(x + width, y) && self.check_in_area(x + width, y + height)
-    } 
+    // //check if the window is overlapped with any existing window
+    // fn is_overlapped(&self, x:usize, y:usize, width:usize, height:usize) -> bool {
+    //     return self.check_in_area(x, y) && self.check_in_area(x, y + height) 
+    //         && self.check_in_area(x + width, y) && self.check_in_area(x + width, y + height)
+    // } 
 
     // // check if the pixel is within the window
     // fn check_in_area(&self, x:usize, y:usize) -> bool {        
@@ -543,19 +543,19 @@ impl WindowInner {
     // }
 
     // check if the pixel is within the window exluding the border and padding
-    fn check_in_content(&self, x:usize, y:usize) -> bool {        
+    fn check_in_content(&self, x: usize, y: usize) -> bool {        
         return x <= self.width - 2 * self.padding && y <= self.height - 2 * self.padding;
     }
 
     // active or inactive a window
-    fn active(&mut self, active:bool) -> Result<(), &'static str> {
+    fn active(&mut self, active: bool) -> Result<(), &'static str> {
         self.active = active;
         self.draw_border(WINDOW_ACTIVE_COLOR)?;
         Ok(())
     }
 
     // draw the border of the window
-    fn draw_border(&self, color:u32) -> Result<(), &'static str> {
+    fn draw_border(&self, color: u32) -> Result<(), &'static str> {
         let buffer_ref = match SCREEN_FRAME_BUFFER.try(){
             Some(buffer) => { buffer },
             None => { return Err("Fail to get the virtual frame buffer") }
@@ -569,7 +569,7 @@ impl WindowInner {
     }
 
     // adjust the size of a window
-    fn resize(&mut self, x:usize, y:usize, width:usize, height:usize) -> Result<(usize, usize), &'static str> {
+    fn resize(&mut self, x: usize, y: usize, width: usize, height: usize) -> Result<(usize, usize), &'static str> {
         self.draw_border(SCREEN_BACKGROUND_COLOR)?;
         let percent = ((width-self.padding)*100/(self.width-self.padding), (height-self.padding)*100/(self.height-self.padding));
         self.x = x;
@@ -594,9 +594,9 @@ impl WindowInner {
 
 // a component contains a displayable and its position
 struct Component {
-    x:usize,
-    y:usize,
-    displayable:TextDisplay,
+    x: usize,
+    y: usize,
+    displayable: TextDisplay,
 }
 
 impl Component {
@@ -611,7 +611,7 @@ impl Component {
     }
 
     // resize the displayable
-    fn resize(&mut self, x:usize, y:usize, width:usize, height:usize) {
+    fn resize(&mut self, x: usize, y: usize, width: usize, height: usize) {
         self.x = x;
         self.y = y;
         self.displayable.resize(width, height);
@@ -619,7 +619,7 @@ impl Component {
 }
 
 /// select the next window in the list and set it as active. set current active window and inactive
-pub fn schedule() -> Result<(), &'static str>{
+pub fn switch_to_next() -> Result<(), &'static str>{
     let mut window_list = WINDOWLIST.lock();
     let next_window = match window_list.next() {
         Some(window) => { window }

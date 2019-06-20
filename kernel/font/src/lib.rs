@@ -9,7 +9,7 @@ pub const CHARACTER_WIDTH:usize = 9;
 ///The height of a character
 pub const CHARACTER_HEIGHT:usize = 16;
 ///The bit graph array of characters
-const FONT_BASIC:[[u8;CHARACTER_HEIGHT];256] = [
+const FONT_BASIC: [[u8;CHARACTER_HEIGHT];256] = [
      [0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00],
      [0x00, 0x00, 0x7E, 0x81, 0xA5, 0x81, 0x81, 0xBD, 0x99, 0x81, 0x81, 0x7E, 0x00, 0x00, 0x00, 0x00],
      [0x00, 0x00, 0x7E, 0xFF, 0xDB, 0xFF, 0xFF, 0xC3, 0xE7, 0xFF, 0xFF, 0x7E, 0x00, 0x00, 0x00, 0x00],
@@ -270,7 +270,7 @@ const FONT_BASIC:[[u8;CHARACTER_HEIGHT];256] = [
 
 ///The font mask array.
 ///FONT_PIXEL[ascii][y][x] = 0xFFFFFFFF/0x00000000 in which ascii is the ascii code of a character, and (x, y) represents its coordinate
-pub static FONT_PIXEL:Mutex<[[[u32;CHARACTER_WIDTH];CHARACTER_HEIGHT];256]> = Mutex::new([[[0;CHARACTER_WIDTH];CHARACTER_HEIGHT];256]);
+pub static FONT_PIXEL: Mutex<[[[u32;CHARACTER_WIDTH];CHARACTER_HEIGHT];256]> = Mutex::new([[[0;CHARACTER_WIDTH];CHARACTER_HEIGHT];256]);
 
 ///init the font mask array
 pub fn init()-> Result<(), &'static str> {

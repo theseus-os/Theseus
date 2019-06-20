@@ -15,17 +15,17 @@ const DEFAULT_CURSOR_FREQ:u64 = 400000000;
 
 /// A displayable component for text display
 pub struct TextDisplay {
-    width:usize,
-    height:usize,
+    width: usize,
+    height: usize,
 }
 
 impl TextDisplay
 {
     /// create a new displayable of size (width, height)
-    pub fn new(width:usize, height:usize) -> Result <TextDisplay, &'static str> {
+    pub fn new(width: usize, height: usize) -> Result <TextDisplay, &'static str> {
         Ok(TextDisplay{
-            width:width,
-            height:height,
+            width: width,
+            height: height,
         })
     }
 
@@ -46,7 +46,7 @@ impl TextDisplay
     }
 
     /// resize the text displayable area
-    pub fn resize(&mut self, width:usize, height:usize) {
+    pub fn resize(&mut self, width: usize, height: usize) {
         self.width = width;
         self.height = height;
     }
@@ -55,20 +55,20 @@ impl TextDisplay
 /// A cursor struct. It contains whether it is enabled, 
 /// the frequency it blinks, the last time it blinks, and the current blink state show/hidden
 pub struct Cursor {
-    enabled:bool,
-    freq:u64,
-    time:TscTicks,
-    show:bool,
+    enabled: bool,
+    freq: u64,
+    time: TscTicks,
+    show: bool,
 }
 
 impl Cursor {
     /// create a new cursor struct
     pub fn new() -> Cursor {
         Cursor {
-            enabled:true,
-            freq:DEFAULT_CURSOR_FREQ,
-            time:tsc_ticks(),
-            show:true,
+            enabled: true,
+            freq: DEFAULT_CURSOR_FREQ,
+            time: tsc_ticks(),
+            show: true,
         }
     }
 

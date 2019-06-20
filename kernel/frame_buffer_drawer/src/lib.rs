@@ -16,7 +16,7 @@ use frame_buffer_writer::write_to;
 
 /// Draw a pixel in a framebuffer.
 /// The pixel is drawed at position (x, y) of the framebuffer with color
-pub fn draw_pixel(mut framebuffer:&mut FrameBuffer, x:usize, y:usize, color:u32){    
+pub fn draw_pixel(mut framebuffer: &mut FrameBuffer, x: usize, y: usize, color: u32){    
     if framebuffer.check_in_range(x, y) {
         write_to(&mut framebuffer, x, y, color);
     }
@@ -25,9 +25,9 @@ pub fn draw_pixel(mut framebuffer:&mut FrameBuffer, x:usize, y:usize, color:u32)
 /// Draw a line in a framebuffer.
 /// The start point of the line is(start_x, start_y) and the end point is (end_x, end_y)
 /// The part extending the boundary of the framebuffer will be ignored.
-pub fn draw_line(mut framebuffer:&mut FrameBuffer, start_x:i32, start_y:i32, end_x:i32, end_y:i32, color:u32){
-    let width:i32 = end_x - start_x;
-    let height:i32 = end_y - start_y;
+pub fn draw_line(mut framebuffer: &mut FrameBuffer, start_x: i32, start_y: i32, end_x: i32, end_y: i32, color: u32){
+    let width: i32 = end_x - start_x;
+    let height: i32 = end_y - start_y;
 
     // compare the x distance and y distance. Increase/Decrease the longer one at every step.
     if width.abs() > height.abs() {
@@ -66,13 +66,13 @@ pub fn draw_line(mut framebuffer:&mut FrameBuffer, start_x:i32, start_y:i32, end
 /// Draw a rectangle in a framebuffer.
 /// The left top point of the rectangle is (start_x, start_y).
 /// The part extending the boundary of the framebuffer will be ignored.
-pub fn draw_rectangle(mut framebuffer:&mut FrameBuffer, start_x:usize, start_y:usize, width:usize, height:usize, color:u32){
+pub fn draw_rectangle(mut framebuffer: &mut FrameBuffer, start_x: usize, start_y: usize, width: usize, height: usize, color: u32){
     let (buffer_width, buffer_height) = framebuffer.get_size();
-    let end_x:usize = { 
+    let end_x: usize = { 
         if start_x + width < buffer_width { start_x + width } 
         else { buffer_width }
     };
-    let end_y:usize = {
+    let end_y: usize = {
         if start_y + height < buffer_height { start_y + height } 
         else { buffer_height }
     };
@@ -101,14 +101,14 @@ pub fn draw_rectangle(mut framebuffer:&mut FrameBuffer, start_x:usize, start_y:u
 ///Fill a rectangle in a framebuffer with color.
 ///The left top point of the rectangle is (start_x, start_y).
 ///The part extending the boundary of the framebuffer will be ignored.
-pub fn fill_rectangle(mut framebuffer:&mut FrameBuffer, start_x:usize, start_y:usize, width:usize, height:usize, color:u32){
+pub fn fill_rectangle(mut framebuffer: &mut FrameBuffer, start_x: usize, start_y: usize, width: usize, height: usize, color: u32){
     let (buffer_width, buffer_height) = framebuffer.get_size();
    
-    let end_x:usize = {
+    let end_x: usize = {
         if start_x + width < buffer_width { start_x + width } 
         else { buffer_width }
     };
-    let end_y:usize = {
+    let end_y: usize = {
         if start_y + height < buffer_height { start_y + height } 
         else { buffer_height }
     }; 
@@ -134,8 +134,8 @@ pub fn fill_rectangle(mut framebuffer:&mut FrameBuffer, start_x:usize, start_y:u
 /// Print a string in a framebuffer.
 /// The string is printed at position (x, y) of the framebuffer. 
 // It is printed within an area specified by (width, height). The part extending the area will be ignored.
-pub fn print_by_bytes(mut framebuffer:&mut FrameBuffer, x:usize, y:usize, width:usize, height:usize, 
-    slice: &str, font_color:u32, bg_color:u32) -> Result<(), &'static str> {
+pub fn print_by_bytes(mut framebuffer: &mut FrameBuffer, x: usize, y: usize, width: usize, height: usize, 
+    slice: &str, font_color: u32, bg_color: u32) -> Result<(), &'static str> {
     let buffer_width = width/CHARACTER_WIDTH;
     let buffer_height = height/CHARACTER_HEIGHT;
 
@@ -188,8 +188,8 @@ pub fn print_by_bytes(mut framebuffer:&mut FrameBuffer, x:usize, y:usize, width:
 
 // print a byte to the framebuffer buffer at (line, column) in the text area. 
 // (left, top) specifies the location of the text area in the framebuffer. 
-fn print_byte(framebuffer:&mut FrameBuffer, byte:u8, font_color:u32, bg_color:u32,
-        left:usize, top:usize, line:usize, column:usize) 
+fn print_byte(framebuffer:&mut FrameBuffer, byte: u8, font_color: u32, bg_color: u32,
+        left: usize, top: usize, line: usize, column: usize) 
         -> Result<(),&'static str> {
     let x = left + column * CHARACTER_WIDTH;
     let y = top + line * CHARACTER_HEIGHT;
@@ -198,7 +198,7 @@ fn print_byte(framebuffer:&mut FrameBuffer, byte:u8, font_color:u32, bg_color:u3
     let mut i = 0;
     let mut j = 0;
     loop {
-        let mask:u32 = fonts[byte as usize][i][j];
+        let mask: u32 = fonts[byte as usize][i][j];
         let index = framebuffer.index(x + j, y + i);
         framebuffer.buffer()[index] = font_color & mask | bg_color & (!mask);
         j += 1;
@@ -213,8 +213,8 @@ fn print_byte(framebuffer:&mut FrameBuffer, byte:u8, font_color:u32, bg_color:u3
 }
 
 // Fill a blank text area (left, top, right, bottom) with the backgroung color.
-fn fill_blank(framebuffer:&mut FrameBuffer, left:usize, top:usize, right:usize,
-            bottom:usize, color:u32) -> Result<(),&'static str>{
+fn fill_blank(framebuffer: &mut FrameBuffer, left: usize, top: usize, right: usize,
+            bottom: usize, color: u32) -> Result<(),&'static str>{
     if left >= right || top >= bottom {
         return Ok(())
     }

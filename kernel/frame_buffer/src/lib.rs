@@ -22,18 +22,18 @@ use alloc::vec::Vec;
 pub type Pixel = u32;
 
 // The final framebuffer instance
-static FINAL_FRAME_BUFFER:Once<Mutex<FrameBuffer>> = Once::new();
+static FINAL_FRAME_BUFFER: Once<Mutex<FrameBuffer>> = Once::new();
 
 // Every pixel is of u32 type
-const PIXEL_BYTES:usize = 4;
+const PIXEL_BYTES: usize = 4;
 
 /// Init the final frame buffer. 
 /// Allocate a block of memory and map it to the physical framebuffer frames.
 pub fn init() -> Result<(), &'static str > {
     // Get the graphic mode information
-    let vesa_display_phys_start:PhysicalAddress;
-    let buffer_width:usize;
-    let buffer_height:usize;
+    let vesa_display_phys_start: PhysicalAddress;
+    let buffer_width: usize;
+    let buffer_height: usize;
     {
         let graphic_info = acpi::madt::GRAPHIC_INFO.lock();
         if graphic_info.physical_address == 0 {
@@ -55,16 +55,16 @@ pub fn init() -> Result<(), &'static str > {
 
 /// The virtual frame buffer struct. It contains the size of the buffer and a buffer array
 pub struct FrameBuffer {
-    width:usize,
-    height:usize,
-    buffer:BoxRefMut<MappedPages, [Pixel]>
+    width: usize,
+    height: usize,
+    buffer: BoxRefMut<MappedPages, [Pixel]>
 }
 
 impl FrameBuffer {
     /// Create a new virtual frame buffer with specified size
     /// If the physical_address is provided, map the framebuffer to the physical_address.
     /// If it is None, allocate a block of memory and map the framebuffer to it
-    pub fn new(width:usize, height:usize, physical_address:Option<PhysicalAddress>) -> Result<FrameBuffer, &'static str>{       
+    pub fn new(width: usize, height: usize, physical_address: Option<PhysicalAddress>) -> Result<FrameBuffer, &'static str>{       
         // get a reference to the kernel's memory mapping information
         let kernel_mmi_ref = get_kernel_mmi_ref().expect("KERNEL_MMI was not yet initialized!");
         let mut kernel_mmi_locked = kernel_mmi_ref.lock();
@@ -91,7 +91,7 @@ impl FrameBuffer {
                 }
 
                 let mut allocator = try!(allocator_mutex.ok_or("allocate frame buffer")).lock();
-                let vesa_display_flags:EntryFlags = EntryFlags::PRESENT | EntryFlags::WRITABLE | EntryFlags::GLOBAL | EntryFlags::NO_CACHE;
+                let vesa_display_flags: EntryFlags = EntryFlags::PRESENT | EntryFlags::WRITABLE | EntryFlags::GLOBAL | EntryFlags::NO_CACHE;
                 let mapped_frame_buffer = if let Some(address) = physical_address {                
                     try!(active_table.map_allocated_pages_to(
                         pages, 
@@ -112,9 +112,9 @@ impl FrameBuffer {
                     try_map_mut(|mp| mp.as_slice_mut(0, width * height))?;
             
                 return Ok(FrameBuffer{
-                    width:width,
-                    height:height,
-                    buffer:buffer
+                    width: width,
+                    height: height,
+                    buffer: buffer
                 });             
             },
             _ => { 
@@ -140,12 +140,12 @@ impl FrameBuffer {
     // }
 
     /// compute the index of pixel (x, y) in the buffer array
-    pub fn index(&self, x:usize, y:usize) -> usize {
+    pub fn index(&self, x: usize, y: usize) -> usize {
         y * self.width + x
     }
 
     /// check if a pixel (x,y) is within the framebuffer
-    pub fn check_in_range(&self, x:usize, y:usize)  -> bool {
+    pub fn check_in_range(&self, x: usize, y: usize)  -> bool {
         x < self.width && y < self.height
     }
 }
@@ -158,7 +158,7 @@ pub struct FrameCompositor {
 
 impl Compositor for FrameCompositor {
     /// compose a list of framebuffers to the final framebuffer. Every item in the list is a reference to a framebuffer with its position
-    fn compose(bufferlist:Vec<(&FrameBuffer, usize, usize)>) -> Result<(), &'static str> {
+    fn compose(bufferlist: Vec<(&FrameBuffer, usize, usize)>) -> Result<(), &'static str> {
         let mut final_buffer = FINAL_FRAME_BUFFER.try().ok_or("FrameCopositor fails to get the final frame buffer")?.lock();
 
         // Check if the virtul frame buffer is in the mapped frame list
@@ -182,7 +182,7 @@ impl Compositor for FrameCompositor {
 /// The compositor trait.
 ///* It composes a list of buffers to a single buffer
 pub trait Compositor {
-    fn compose(bufferlist:Vec<(&FrameBuffer, usize, usize)>) -> Result<(), &'static str>;
+    fn compose(bufferlist: Vec<(&FrameBuffer, usize, usize)>) -> Result<(), &'static str>;
 }
 
 /// Get the size of the final framebuffer. Return (width, height)
