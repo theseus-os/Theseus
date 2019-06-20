@@ -310,8 +310,7 @@ impl MappedPages {
         }
     }
 
-	/// Returns the start address of the first page. 
-    #[deprecated]
+	/// Returns the `VirtualAddress` at the start of the first `Page` in this `MappedPages`.
 	pub fn start_address(&self) -> VirtualAddress {
 		self.pages.start_address()
 	}
