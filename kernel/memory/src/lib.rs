@@ -8,6 +8,7 @@
 #![feature(ptr_internals)]
 #![feature(core_intrinsics)]
 #![feature(unboxed_closures)]
+#![feature(step_trait, range_is_empty)]
 
 extern crate spin;
 extern crate multiboot2;
@@ -23,6 +24,24 @@ extern crate x86_64;
 extern crate heap_irq_safe;
 #[macro_use] extern crate derive_more;
 extern crate bit_field;
+extern crate type_name;
+
+/// Just like Rust's `try!()` macro, 
+/// but forgets the given `obj`s to prevent them from being dropped,
+/// as they would normally be upon return of an Error using `try!()`.
+/// This must come BEFORE the below modules in order for them to be able to use it.
+macro_rules! try_forget {
+    ($expr:expr, $($obj:expr),*) => (match $expr {
+        Ok(val) => val,
+        Err(err) => {
+            $(
+                core::mem::forget($obj);
+            )*
+            return Err(err);
+        }
+    });
+}
+
 
 mod area_frame_allocator;
 mod paging;
@@ -34,17 +53,21 @@ pub use self::paging::*;
 pub use self::stack_allocator::{StackAllocator, Stack};
 
 
+use core::{
+    ops::{RangeInclusive, Deref, DerefMut},
+    iter::Step,
+    mem,
+};
 use multiboot2::BootInformation;
 use spin::Once;
 use irq_safety::MutexIrqSafe;
-use core::ops::DerefMut;
 use alloc::vec::Vec;
 use alloc::sync::Arc;
 use kernel_config::memory::{PAGE_SIZE, MAX_PAGE_NUMBER, KERNEL_OFFSET, KERNEL_HEAP_START, KERNEL_HEAP_INITIAL_SIZE, KERNEL_STACK_ALLOCATOR_BOTTOM, KERNEL_STACK_ALLOCATOR_TOP_ADDR};
 use bit_field::BitField;
 
 
-/// A virtual memory address, which is a `usize`.
+/// A virtual memory address, which is a `usize` under the hood.
 #[derive(
     Clone, Copy, PartialEq, Eq, PartialOrd, Ord, Hash, Default,
     Debug, Display, Binary, Octal, LowerHex, UpperHex,
@@ -85,6 +108,14 @@ impl VirtualAddress {
     pub fn value(&self) -> usize {
         self.0
     }
+
+    /// Returns the offset that this VirtualAddress specifies into its containing memory Page.
+    /// 
+    /// For example, if the PAGE_SIZE is 4KiB, then this will return 
+    /// the least significant 12 bits (12:0] of this VirtualAddress.
+    pub fn page_offset(&self) -> usize {
+        self.0 & (PAGE_SIZE - 1)
+    }
 }
 
 impl core::fmt::Pointer for VirtualAddress {
@@ -97,13 +128,13 @@ impl Add<usize> for VirtualAddress {
     type Output = VirtualAddress;
 
     fn add(self, rhs: usize) -> VirtualAddress {
-        VirtualAddress(self.0 + rhs)
+        VirtualAddress::new_canonical(self.0.saturating_add(rhs))
     }
 }
 
 impl AddAssign<usize> for VirtualAddress {
     fn add_assign(&mut self, rhs: usize) {
-        *self = VirtualAddress(self.0 + rhs);
+        *self = VirtualAddress::new_canonical(self.0.saturating_add(rhs));
     }
 }
 
@@ -111,13 +142,13 @@ impl Sub<usize> for VirtualAddress {
     type Output = VirtualAddress;
 
     fn sub(self, rhs: usize) -> VirtualAddress {
-        VirtualAddress(self.0 - rhs)
+        VirtualAddress::new_canonical(self.0.saturating_sub(rhs))
     }
 }
 
 impl SubAssign<usize> for VirtualAddress {
     fn sub_assign(&mut self, rhs: usize) {
-        *self = VirtualAddress(self.0 - rhs);
+        *self = VirtualAddress::new_canonical(self.0.saturating_sub(rhs));
     }
 }
 
@@ -129,7 +160,7 @@ impl From<VirtualAddress> for usize {
 }
 
 
-/// A physical memory address, which is a `usize`.
+/// A physical memory address, which is a `usize` under the hood.
 #[derive(
     Clone, Copy, PartialEq, Eq, PartialOrd, Ord, Hash, Default,
     Debug, Display, Binary, Octal, LowerHex, UpperHex,
@@ -168,6 +199,13 @@ impl PhysicalAddress {
         PhysicalAddress(0)
     }
 
+    /// Returns the offset that this PhysicalAddress specifies into its containing memory Frame.
+    /// 
+    /// For example, if the PAGE_SIZE is 4KiB, then this will return 
+    /// the least significant 12 bits (12:0] of this PhysicalAddress.
+    pub fn frame_offset(&self) -> usize {
+        self.0 & (PAGE_SIZE - 1)
+    }
 }
 
 
@@ -175,13 +213,13 @@ impl Add<usize> for PhysicalAddress {
     type Output = PhysicalAddress;
 
     fn add(self, rhs: usize) -> PhysicalAddress {
-        PhysicalAddress(self.0 + rhs)
+        PhysicalAddress::new_canonical(self.0.saturating_add(rhs))
     }
 }
 
 impl AddAssign<usize> for PhysicalAddress {
     fn add_assign(&mut self, rhs: usize) {
-        *self = PhysicalAddress(self.0 + rhs);
+        *self = PhysicalAddress::new_canonical(self.0.saturating_add(rhs));
     }
 }
 
@@ -189,13 +227,13 @@ impl Sub<usize> for PhysicalAddress {
     type Output = PhysicalAddress;
 
     fn sub(self, rhs: usize) -> PhysicalAddress {
-        PhysicalAddress(self.0 - rhs)
+        PhysicalAddress::new_canonical(self.0.saturating_sub(rhs))
     }
 }
 
 impl SubAssign<usize> for PhysicalAddress {
     fn sub_assign(&mut self, rhs: usize) {
-        *self = PhysicalAddress(self.0 - rhs);
+        *self = PhysicalAddress::new_canonical(self.0.saturating_sub(rhs));
     }
 }
 
@@ -228,7 +266,7 @@ pub fn allocate_frame() -> Option<Frame> {
 
 
 /// Convenience method for allocating several contiguous Frames.
-pub fn allocate_frames(num_frames: usize) -> Option<FrameIter> {
+pub fn allocate_frames(num_frames: usize) -> Option<FrameRange> {
     FRAME_ALLOCATOR.try().and_then(|fa| fa.lock().allocate_frames(num_frames))
 }
 
@@ -238,8 +276,9 @@ pub type MmiRef = Arc<MutexIrqSafe<MemoryManagementInfo>>;
 
 /// This holds all the information for a `Task`'s memory mappings and address space
 /// (this is basically the equivalent of Linux's mm_struct)
+#[derive(Debug)]
 pub struct MemoryManagementInfo {
-    /// the PageTable enum (Active or Inactive depending on whether the Task is running) 
+    /// the PageTable that should be switched to when this Task is switched to.
     pub page_table: PageTable,
     
     /// the list of virtual memory areas mapped currently in this Task's address space
@@ -256,32 +295,22 @@ pub struct MemoryManagementInfo {
 
 impl MemoryManagementInfo {
 
-    pub fn set_page_table(&mut self, pgtbl: PageTable) {
-        self.page_table = pgtbl;
-    }
-
-
     /// Allocates a new stack in the currently-running Task's address space.
-    /// The task that called this must be currently running! 
-    /// This checks to make sure that this struct's page_table is an ActivePageTable.
     /// Also, this adds the newly-allocated stack to this struct's `vmas` vector. 
     /// Whether this is a kernelspace or userspace stack is determined by how this MMI's stack_allocator was initialized.
+    /// 
+    /// # Important Note
+    /// You cannot call this to allocate a stack in a different `MemoryManagementInfo`/`PageTable` than the one you're currently running. 
+    /// It will only work for allocating a stack in the currently-running MMI.
     pub fn alloc_stack(&mut self, size_in_pages: usize) -> Option<Stack> {
         let &mut MemoryManagementInfo { ref mut page_table, ref mut vmas, ref mut stack_allocator, .. } = self;
     
-        if let PageTable::Active(ref mut active_table) = page_table {
-            if let Some( (stack, stack_vma) ) = FRAME_ALLOCATOR.try().and_then(|fa| stack_allocator.alloc_stack(active_table, fa.lock().deref_mut(), size_in_pages)) {
-                vmas.push(stack_vma);
-                Some(stack)
-            }
-            else {
-                error!("MemoryManagementInfo::alloc_stack: failed to allocate stack of {} pages!", size_in_pages);
-                None
-            }
+        if let Some( (stack, stack_vma) ) = FRAME_ALLOCATOR.try().and_then(|fa| stack_allocator.alloc_stack(page_table, fa.lock().deref_mut(), size_in_pages)) {
+            vmas.push(stack_vma);
+            Some(stack)
         }
         else {
-            error!("MemoryManagementInfo::alloc_stack: page_table wasn't an ActivePageTable! \
-                    You must not call alloc_stack on an MMI page table that isn't currently the ActivePageTable.");
+            error!("MemoryManagementInfo::alloc_stack: failed to allocate stack of {} pages!", size_in_pages);
             None
         }
     }
@@ -302,19 +331,14 @@ pub fn create_contiguous_mapping(size_in_bytes: usize, flags: EntryFlags) -> Res
     let kernel_mmi_ref = get_kernel_mmi_ref().ok_or("create_contiguous_mapping(): KERNEL_MMI was not yet initialized!")?;
     let mut kernel_mmi = kernel_mmi_ref.lock();
 
-    if let PageTable::Active(ref mut active_table) = kernel_mmi.page_table {
-        let mut frame_allocator = FRAME_ALLOCATOR.try()
-            .ok_or("create_contiguous_mapping(): couldnt get FRAME_ALLOCATOR")?
-            .lock();
-        let frames = frame_allocator.allocate_frames(allocated_pages.size_in_pages())
-            .ok_or("create_contiguous_mapping(): couldnt allocate a new frame")?;
-        let starting_phys_addr = frames.start_address();
-        let mp = active_table.map_allocated_pages_to(allocated_pages, frames, flags, frame_allocator.deref_mut())?;
-        Ok((mp, starting_phys_addr))
-    } 
-    else {
-        return Err("create_contiguous_mapping(): Couldn't get kernel's active_table");
-    }
+    let mut frame_allocator = FRAME_ALLOCATOR.try()
+        .ok_or("create_contiguous_mapping(): couldnt get FRAME_ALLOCATOR")?
+        .lock();
+    let frames = frame_allocator.allocate_frames(allocated_pages.size_in_pages())
+        .ok_or("create_contiguous_mapping(): couldnt allocate a new frame")?;
+    let starting_phys_addr = frames.start_address();
+    let mp = kernel_mmi.page_table.map_allocated_pages_to(allocated_pages, frames, flags, frame_allocator.deref_mut())?;
+    Ok((mp, starting_phys_addr))
 }
 
 
@@ -385,16 +409,16 @@ impl VirtualMemoryArea {
     }
 
     /// Get an iterator that covers all the pages in this VirtualMemoryArea
-    pub fn pages(&self) -> PageIter {
+    pub fn pages(&self) -> PageRange {
 
         // check that the end_page won't be invalid
         if (self.start.value() + self.size) < 1 {
-            return PageIter::empty();
+            return PageRange::empty();
         }
         
         let start_page = Page::containing_address(self.start);
         let end_page = Page::containing_address(self.start + self.size - 1);
-        Page::range_inclusive(start_page, end_page)
+        PageRange::new(start_page, end_page)
     }
 }
 
@@ -424,9 +448,6 @@ pub fn set_broadcast_tlb_shootdown_cb(func: fn(Vec<VirtualAddress>)) {
 pub fn init(boot_info: &BootInformation) 
     -> Result<(Arc<MutexIrqSafe<MemoryManagementInfo>>, MappedPages, MappedPages, MappedPages, Vec<MappedPages>), &'static str> 
 {
-    // let rsdt_phys_addr = boot_info.acpi_old_tag().and_then(|acpi| acpi.get_rsdp().map(|rsdp| rsdp.rsdt_phys_addr()));
-    // debug!("rsdt_phys_addr: {:#X}", if let Some(pa) = rsdt_phys_addr { pa } else { 0 });
-    
     let memory_map_tag = boot_info.memory_map_tag().ok_or("Memory map tag not found")?;
     let elf_sections_tag = boot_info.elf_sections_tag().ok_or("Elf sections tag not found")?;
 
@@ -523,26 +544,35 @@ pub fn init(boot_info: &BootInformation)
 
 
     // Initialize paging (create a new page table), which also initializes the kernel heap.
-    let (active_table, kernel_vmas, text_mapped_pages, rodata_mapped_pages, data_mapped_pages, higher_half_mapped_pages, identity_mapped_pages) = try!(
-        paging::init(frame_allocator_mutex, &boot_info)
-    );
-    // HERE: heap is initialized! Can now use alloc types.
 
-    debug!("Done with paging::init()!, active_table: {:?}", active_table);
-    // print_early!("Done with paging::init()!, active_table: {:?}\n", active_table);
+    let (
+        page_table,
+        kernel_vmas,
+        text_mapped_pages,
+        rodata_mapped_pages,
+        data_mapped_pages,
+        higher_half_mapped_pages,
+        identity_mapped_pages,
+    ) = paging::init(frame_allocator_mutex, &boot_info)?;
+
+    // HERE: heap is initialized! Can now use alloc types.
+    // After this point, we must "forget" all of the above mapped_pages instances if an error occurs,
+    // because they will be auto-unmapped from the new page table upon return, causing all execution to stop.   
+
+    debug!("Done with paging::init()!, page_table: {:?}", page_table);
 
     
     // init the kernel stack allocator, a singleton
     let kernel_stack_allocator = {
-        let stack_alloc_start = Page::containing_address(VirtualAddress::new(KERNEL_STACK_ALLOCATOR_BOTTOM)?); 
-        let stack_alloc_end = Page::containing_address(VirtualAddress::new(KERNEL_STACK_ALLOCATOR_TOP_ADDR)?);
-        let stack_alloc_range = Page::range_inclusive(stack_alloc_start, stack_alloc_end);
+        let stack_alloc_start = Page::containing_address(VirtualAddress::new_canonical(KERNEL_STACK_ALLOCATOR_BOTTOM)); 
+        let stack_alloc_end = Page::containing_address(VirtualAddress::new_canonical(KERNEL_STACK_ALLOCATOR_TOP_ADDR));
+        let stack_alloc_range = PageRange::new(stack_alloc_start, stack_alloc_end);
         stack_allocator::StackAllocator::new(stack_alloc_range, false)
     };
 
     // return the kernel's memory info 
     let kernel_mmi = MemoryManagementInfo {
-        page_table: PageTable::Active(active_table),
+        page_table: page_table,
         vmas: kernel_vmas,
         extra_mapped_pages: higher_half_mapped_pages,
         stack_allocator: kernel_stack_allocator, 
@@ -557,14 +587,9 @@ pub fn init(boot_info: &BootInformation)
 
 
 
-/// A `Frame` is a chunk of **physical** memory, similar to how a `Page` is a chunk of **virtual** memory. 
-/// Frames do not implement Clone or Copy because they cannot be safely duplicated 
-/// (you cannot simply "copy" a region of physical memory...).
-/// A `Frame` is the sole owner of the region of physical memory that it covers, 
-/// i.e., there will never be two `Frame` objects that point to the same physical memory chunk. 
-/// 
-/// **Note**: DO NOT implement Copy or Clone for this type.
-#[derive(PartialEq, Eq, PartialOrd, Ord)]
+/// A `Frame` is a chunk of **physical** memory, 
+/// similar to how a `Page` is a chunk of **virtual** memory. 
+#[derive(Clone, Copy, PartialEq, Eq, PartialOrd, Ord)]
 pub struct Frame {
     number: usize,
 }
@@ -575,31 +600,14 @@ impl fmt::Debug for Frame {
 }
 
 impl Frame {
-	/// returns the Frame containing the given physical address
+	/// Returns the `Frame` containing the given `PhysicalAddress`.
     pub fn containing_address(phys_addr: PhysicalAddress) -> Frame {
         Frame { number: phys_addr.value() / PAGE_SIZE }
     }
 
+    /// Returns the `PhysicalAddress` at the start of this `Frame`.
     pub fn start_address(&self) -> PhysicalAddress {
         PhysicalAddress::new_canonical(self.number * PAGE_SIZE)
-    }
-
-    pub fn clone(&self) -> Frame {
-        Frame { number: self.number }
-    }
-
-    pub fn range_inclusive(start: Frame, end: Frame) -> FrameIter {
-        FrameIter {
-            start: start,
-            end: end,
-        }
-    }
-
-    pub fn range_inclusive_addr(phys_addr: PhysicalAddress, size_in_bytes: usize) -> FrameIter {
-        FrameIter {
-            start: Frame::containing_address(phys_addr),
-            end: Frame::containing_address(phys_addr + size_in_bytes - 1),
-        }
     }
 }
 
@@ -608,15 +616,17 @@ impl Add<usize> for Frame {
     type Output = Frame;
 
     fn add(self, rhs: usize) -> Frame {
-        assert!(self.number < MAX_PAGE_NUMBER, "Frame addition error, cannot go above MAX_PAGE_NUMBER 0x000F_FFFF_FFFF_FFFF!");
-        Frame { number: self.number + rhs }
+        // cannot exceed max page number (which is also max frame number)
+        Frame {
+            number: core::cmp::min(MAX_PAGE_NUMBER, self.number.saturating_add(rhs)),
+        }
     }
 }
 
 impl AddAssign<usize> for Frame {
     fn add_assign(&mut self, rhs: usize) {
         *self = Frame {
-            number: self.number + rhs,
+            number: core::cmp::min(MAX_PAGE_NUMBER, self.number.saturating_add(rhs)),
         };
     }
 }
@@ -625,58 +635,138 @@ impl Sub<usize> for Frame {
     type Output = Frame;
 
     fn sub(self, rhs: usize) -> Frame {
-        assert!(self.number > 0, "Frame subtraction error, cannot go below zero!");
-        Frame { number: self.number - rhs }
+        Frame { number: self.number.saturating_sub(rhs) }
     }
 }
 
 impl SubAssign<usize> for Frame {
     fn sub_assign(&mut self, rhs: usize) {
         *self = Frame {
-            number: self.number - rhs,
+            number: self.number.saturating_sub(rhs),
         };
     }
 }
 
-#[derive(Debug)]
-pub struct FrameIter {
-    pub start: Frame,
-    pub end: Frame,
+// Implementing these functions allow `Frame` to be in an `Iterator`.
+impl Step for Frame {
+    #[inline]
+    fn steps_between(start: &Frame, end: &Frame) -> Option<usize> {
+        Step::steps_between(&start.number, &end.number)
+    }
+    #[inline]
+    fn replace_one(&mut self) -> Self {
+        mem::replace(self, Frame { number: 1 })
+    }
+    #[inline]
+    fn replace_zero(&mut self) -> Self {
+        mem::replace(self, Frame { number: 0 })
+    }
+    #[inline]
+    fn add_one(&self) -> Self {
+        Add::add(*self, 1)
+    }
+    #[inline]
+    fn sub_one(&self) -> Self {
+        Sub::sub(*self, 1)
+    }
+    #[inline]
+    fn add_usize(&self, n: usize) -> Option<Frame> {
+        Some(*self + n)
+    }
 }
 
-impl FrameIter {
+
+/// A range of `Frame`s that are contiguous in physical memory.
+#[derive(Debug, Clone)]
+pub struct FrameRange(RangeInclusive<Frame>);
+
+impl FrameRange {
+    /// Creates a new range of `Frame`s that spans from `start` to `end`,
+    /// both inclusive bounds.
+    pub fn new(start: Frame, end: Frame) -> FrameRange {
+        FrameRange(RangeInclusive::new(start, end))
+    }
+
+    /// Creates a FrameRange that will always yield `None`.
+    pub fn empty() -> FrameRange {
+        FrameRange::new(Frame { number: 1 }, Frame { number: 0 })
+    }
+    
+    /// A convenience method for creating a new `FrameRange` 
+    /// that spans all `Frame`s from the given physical address 
+    /// to an end bound based on the given size.
+    pub fn from_phys_addr(starting_virt_addr: PhysicalAddress, size_in_bytes: usize) -> FrameRange {
+        let start_frame = Frame::containing_address(starting_virt_addr);
+        let end_frame = Frame::containing_address(starting_virt_addr + size_in_bytes - 1);
+        FrameRange::new(start_frame, end_frame)
+    }
+
+    /// Returns the `PhysicalAddress` of the starting `Frame` in this `FrameRange`.
     pub fn start_address(&self) -> PhysicalAddress {
-        self.start.start_address()
+        self.0.start().start_address()
     }
 
-    /// Create a duplicate of this FrameIter. 
-    /// We do this instead of implementing/deriving the Clone trait
-    /// because we want to prevent Rust from cloning `FrameIter`s implicitly.
-    pub fn clone(&self) -> FrameIter {
-        FrameIter {
-            start: self.start.clone(),
-            end: self.end.clone(),
-        }
+    /// Returns the number of `Frame`s covered by this iterator. 
+    /// Use this instead of the Iterator trait's `count()` method.
+    /// This is instant, because it doesn't need to iterate over each entry, unlike normal iterators.
+    pub fn size_in_frames(&self) -> usize {
+        // add 1 because it's an inclusive range
+        self.0.end().number + 1 - self.0.start().number
     }
-}
 
-impl Iterator for FrameIter {
-    type Item = Frame;
+    /// Whether this `FrameRange` contains the given `PhysicalAddress`.
+    pub fn contains_phys_addr(&self, phys_addr: PhysicalAddress) -> bool {
+        self.0.contains(&Frame::containing_address(phys_addr))
+    }
 
-    fn next(&mut self) -> Option<Frame> {
-        if self.start <= self.end {
-            let frame = self.start.clone();
-            self.start.number += 1;
-            Some(frame)
+    /// Returns the offset of the given `PhysicalAddress` within this `FrameRange`,
+    /// i.e., the difference between `phys_addr` and `self.start()`.
+    pub fn offset_from_start(&self, phys_addr: PhysicalAddress) -> Option<usize> {
+        if self.contains_phys_addr(phys_addr) {
+            Some(phys_addr.value() - self.start_address().value())
         } else {
             None
         }
     }
+
+    /// Returns a new, separate `FrameRange` that is extended to include the given `Frame`. 
+    pub fn to_extended(&self, frame_to_include: Frame) -> FrameRange {
+        // if the current FrameRange was empty, return a new FrameRange containing only the given frame_to_include
+        if self.is_empty() {
+            return FrameRange::new(frame_to_include.clone(), frame_to_include);
+        }
+
+        let start = core::cmp::min(self.0.start(), &frame_to_include);
+        let end   = core::cmp::max(self.0.end(),   &frame_to_include);
+        FrameRange::new(start.clone(), end.clone())
+    }
 }
+
+impl Deref for FrameRange {
+    type Target = RangeInclusive<Frame>;
+    fn deref(&self) -> &RangeInclusive<Frame> {
+        &self.0
+    }
+}
+impl DerefMut for FrameRange {
+    fn deref_mut(&mut self) -> &mut RangeInclusive<Frame> {
+        &mut self.0
+    }
+}
+
+impl IntoIterator for FrameRange {
+    type Item = Frame;
+    type IntoIter = RangeInclusive<Frame>;
+
+    fn into_iter(self) -> Self::IntoIter {
+        self.0
+    }
+}
+
 
 pub trait FrameAllocator {
     fn allocate_frame(&mut self) -> Option<Frame>;
-    fn allocate_frames(&mut self, num_frames: usize) -> Option<FrameIter>;
+    fn allocate_frames(&mut self, num_frames: usize) -> Option<FrameRange>;
     fn deallocate_frame(&mut self, frame: Frame);
     /// Call this when a heap is set up, and the `alloc` types can be used.
     fn alloc_ready(&mut self);

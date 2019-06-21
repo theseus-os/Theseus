@@ -9,6 +9,9 @@ include cfg/Config.mk
 
 all: iso
 
+## test for Windows Subsystem for Linux (Linux on Windows)
+IS_WSL = $(shell grep -s 'Microsoft' /proc/version)
+
 
 ## Tool names/locations for cross-compiling on Mac OS (darwin)
 ## Note that the GRUB_CROSS variable must match the build output of "scripts/mac_os_build_setup.sh"
@@ -182,7 +185,7 @@ cargo: check_rustc check_xargo
 	@echo -e "\t KERNEL_PREFIX: \"$(KERNEL_PREFIX)\""
 	@echo -e "\t APP_PREFIX: \"$(APP_PREFIX)\""
 	@echo -e "\t THESEUS_CONFIG: \"$(THESEUS_CONFIG)\""
-	RUST_TARGET_PATH="$(CFG_DIR)" RUSTFLAGS="$(RUSTFLAGS)" xargo build  $(CARGO_OPTIONS)  $(RUST_FEATURES) --all --target $(TARGET)
+	RUST_TARGET_PATH="$(CFG_DIR)" RUSTFLAGS="$(RUSTFLAGS)" xargo build  $(CARGOFLAGS)  $(RUST_FEATURES) --all --target $(TARGET)
 
 ## We tried using the "xargo rustc" command here instead of "xargo build" to avoid xargo unnecessarily rebuilding core/alloc crates,
 ## But it doesn't really seem to work (it's not the cause of xargo rebuilding everything).
@@ -193,7 +196,7 @@ cargo: check_rustc check_xargo
 # 		echo -e "\n========= BUILDING KERNEL CRATE $${kd} ==========\n" ; \
 # 		RUST_TARGET_PATH="$(CFG_DIR)" RUSTFLAGS="$(RUSTFLAGS)" \
 # 			xargo rustc \
-# 			$(CARGO_OPTIONS) \
+# 			$(CARGOFLAGS) \
 # 			$(RUST_FEATURES) \
 # 			--target $(TARGET) ; \
 # 		cd .. ; \
@@ -202,7 +205,7 @@ cargo: check_rustc check_xargo
 # 	cd $${app} ; \
 # 	RUST_TARGET_PATH="$(CFG_DIR)" RUSTFLAGS="$(RUSTFLAGS)" \
 # 		xargo rustc \
-# 		$(CARGO_OPTIONS) \
+# 		$(CARGOFLAGS) \
 # 		--target $(TARGET) \
 # 		-- \
 # 		$(COMPILER_LINTS) ; \
@@ -256,7 +259,7 @@ userspace:
 #
 # ## Builds our custom lints in the compiler plugins directory so we can use them here
 # compiler_plugins:
-# 	@cd $(COMPILER_PLUGINS_DIR) && cargo build $(CARGO_OPTIONS)
+# 	@cd $(COMPILER_PLUGINS_DIR) && cargo build $(CARGOFLAGS)
 
 
 
@@ -341,7 +344,7 @@ preserve_old_modules:
 
 
 ## The top-level (root) documentation file
-DOC_ROOT := "$(ROOT_DIR)/build/doc/___Theseus_Crates___/index.html"
+DOC_ROOT := $(ROOT_DIR)/build/doc/___Theseus_Crates___/index.html
 
 ## Builds Theseus's documentation.
 ## The entire project is built as normal using the "cargo doc" command.
@@ -352,7 +355,6 @@ doc: check_rustc
 	@rm -rf build/doc
 	@cp -rf target/doc ./build/
 	@echo -e "\n\nDocumentation is now available in the build/doc directory."
-	@echo -e "You can also run 'make view-doc' to view it."
 
 docs: doc
 
@@ -360,7 +362,14 @@ docs: doc
 ## Opens the documentation root in the system's default browser. 
 ## the "powershell" command is used on Windows Subsystem for Linux
 view-doc: doc
-	@xdg-open $(DOC_ROOT) > /dev/null 2>&1 || powershell.exe -c $(DOC_ROOT) &
+	@echo -e "Opening documentation index file in your browser..."
+ifneq ($(IS_WSL), )
+## building on WSL
+	@powershell.exe -c $(DOC_ROOT) &
+else
+## building on regular Linux or macOS
+	@xdg-open $(DOC_ROOT) > /dev/null 2>&1 || open $(DOC_ROOT) &
+endif
 
 view-docs: view-doc
 
@@ -369,7 +378,7 @@ view-docs: view-doc
 clean:
 	cargo clean
 	@rm -rf build
-	@$(MAKE) -C userspace clean
+#@$(MAKE) -C userspace clean
 	
 
 
@@ -490,7 +499,7 @@ endif
 
 ## Currently, kvm by itself can cause problems, but it works with the "host" option (above).
 ifeq ($(kvm),yes)
-	$(error Error: the 'kvm=yes' option is currently broken. Use 'host=yes' instead.")
+$(error Error: the 'kvm=yes' option is currently broken. Use 'host=yes' instead")
 	# QEMU_FLAGS += -accel kvm
 endif
 
@@ -543,7 +552,6 @@ bochs: $(iso)
 
 
 
-IS_WSL = $(shell grep -s 'Microsoft' /proc/version)
 USB_DRIVES = $(shell lsblk -O | grep -i usb | awk '{print $$2}' | grep --color=never '[^0-9]$$')
 
 ### Checks that the supplied usb device (for usage with the boot/pxe targets).

@@ -18,13 +18,6 @@ path = "../serial_port"
 [dependencies.kernel_config]
 path = "../kernel_config"
 
-[dependencies.port_io]
-path = "../../libs/port_io"
-
-[dependencies.log]
-default-features = false
-version = "0.3.7"
-
 [dependencies.event_types]
 path = "../event_types"
 

@@ -1,5 +1,9 @@
 #![no_std]
 
+// The entire crate is only built if both `simd_personality` and `sse2` are enabled.
+#[macro_use] extern crate cfg_if;
+cfg_if! { if #[cfg(all(simd_personality, target_feature = "sse2"))] {
+
 #[macro_use] extern crate log;
 // extern crate pit_clock;
 extern crate packed_simd;
@@ -72,3 +76,5 @@ pub fn test_short(_: ()) {
 fn add (a: f64x4, b: f64x4) -> f64x4 {
     a + b
 }
+
+}} // end of cfg_if block

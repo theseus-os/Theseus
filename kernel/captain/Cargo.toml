@@ -24,9 +24,6 @@ path = "../kernel_config"
 [dependencies.logger]
 path = "../logger"
 
-[dependencies.vga_buffer]
-path = "../vga_buffer"
-
 [dependencies.frame_buffer]
 path = "../frame_buffer"
 
@@ -57,14 +54,14 @@ path = "../spawn"
 [dependencies.tsc]
 path = "../tsc"
 
-[dependencies.syscall]
-path = "../syscall"
-
 [dependencies.interrupts]
 path = "../interrupts"
 
 [dependencies.acpi]
 path = "../acpi"
+
+[dependencies.multicore_bringup]
+path = "../multicore_bringup"
 
 [dependencies.device_manager]
 path = "../device_manager"
@@ -101,6 +98,9 @@ path = "../simd_personality"
 
 [dependencies.task_fs]
 path = "../task_fs"
+
+[dependencies.pause]
+path = "../pause"
 
 [lib]
 crate-type = ["rlib"]

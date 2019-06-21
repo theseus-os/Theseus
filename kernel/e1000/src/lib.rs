@@ -32,7 +32,7 @@ use alloc::collections::VecDeque;
 use irq_safety::MutexIrqSafe;
 use volatile::{Volatile, ReadOnly};
 use alloc::boxed::Box;
-use memory::{get_kernel_mmi_ref, FRAME_ALLOCATOR, PhysicalAddress, Frame, PageTable, EntryFlags, allocate_pages_by_bytes, MappedPages, PhysicalMemoryArea, create_contiguous_mapping};
+use memory::{get_kernel_mmi_ref, FRAME_ALLOCATOR, PhysicalAddress, FrameRange, EntryFlags, allocate_pages_by_bytes, MappedPages, PhysicalMemoryArea, create_contiguous_mapping};
 use pci::{PciDevice, pci_read_32, pci_read_8, pci_write, pci_set_command_bus_master_bit};
 use kernel_config::memory::PAGE_SIZE;
 use owning_ref::BoxRefMut;
@@ -345,7 +345,7 @@ impl E1000Nic {
         //e1000_nc.clear_statistics();
         
         Self::enable_interrupts(&mut mapped_registers);
-        register_interrupt(interrupt_num, e1000_handler);
+        register_interrupt(interrupt_num, e1000_handler)?;
 
         let (rx_descs, rx_buffers) = Self::rx_init(&mut mapped_registers)?;
         let tx_descs = Self::tx_init(&mut mapped_registers)?;
@@ -409,21 +409,14 @@ impl E1000Nic {
 
         // set up virtual pages and physical frames to be mapped
         let pages_nic = allocate_pages_by_bytes(mem_size_in_bytes).ok_or("e1000::mem_map(): couldn't allocated virtual page!")?;
-        let frames_nic = Frame::range_inclusive_addr(mem_base, mem_size_in_bytes);
+        let frames_nic = FrameRange::from_phys_addr(mem_base, mem_size_in_bytes);
         let flags = EntryFlags::PRESENT | EntryFlags::WRITABLE | EntryFlags::NO_CACHE | EntryFlags::NO_EXECUTE;
 
         let kernel_mmi_ref = get_kernel_mmi_ref().ok_or("e1000:mem_map KERNEL_MMI was not yet initialized!")?;
         let mut kernel_mmi = kernel_mmi_ref.lock();
-
-        let regs = if let PageTable::Active(ref mut active_table) = kernel_mmi.page_table {
-            let mut fa = FRAME_ALLOCATOR.try().ok_or("e1000::mem_map(): couldn't get FRAME_ALLOCATOR")?.lock();
-            let nic_mapped_page = active_table.map_allocated_pages_to(pages_nic, frames_nic, flags, fa.deref_mut())?;
-            
-            BoxRefMut::new(Box::new(nic_mapped_page))
-                .try_map_mut(|mp| mp.as_type_mut::<IntelE1000Registers>(0))?
-        } else {
-            return Err("e1000:mem_map Couldn't get kernel's active_table");
-        };
+        let mut fa = FRAME_ALLOCATOR.try().ok_or("e1000::mem_map(): couldn't get FRAME_ALLOCATOR")?.lock();
+        let nic_mapped_page = kernel_mmi.page_table.map_allocated_pages_to(pages_nic, frames_nic, flags, fa.deref_mut())?;
+        let regs = BoxRefMut::new(Box::new(nic_mapped_page)).try_map_mut(|mp| mp.as_type_mut::<IntelE1000Registers>(0))?;
             
         debug!("E1000 status register: {:#X}", regs.status.read());
         Ok(regs)
@@ -636,12 +629,6 @@ impl E1000Nic {
             // let rx_buf = self.rx_bufs_in_use[self.rx_cur as usize].start_address() as *const u8;
             // //print rx_buf of length bytes
             // debug!("rx_buf {}: ", self.rx_cur);
-
-            // for i in 0..length {
-            //     let points_at = unsafe{ *rx_buf.offset(i as isize ) };
-            //     //debug!("{}",points_at);
-            //     debug!("{:x}",points_at);
-            // }  
 
             _total_packet_length += length;
 

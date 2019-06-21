@@ -12,8 +12,11 @@ owning_ref = { git = "https://github.com/kevinaboos/owning-ref-rs" }
 [dependencies.memory]
 path = "../memory"
 
-[dependencies.acpi]
-path = "../acpi"
+[dependencies.util]
+path = "../../libs/util"
+
+[dependencies.multicore_bringup]
+path = "../multicore_bringup"
 
 [dependencies.log]
 default-features = false

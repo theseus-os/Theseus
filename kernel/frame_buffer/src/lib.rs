@@ -4,7 +4,11 @@
 #![no_std]
 
 extern crate spin;
-extern crate acpi;
+extern crate multicore_bringup;
+
+extern crate volatile;
+extern crate serial_port;
+extern crate kernel_config;
 extern crate memory;
 extern crate alloc;
 extern crate owning_ref;
@@ -15,6 +19,11 @@ use spin::{Mutex, Once};
 use memory::{FRAME_ALLOCATOR, Frame, PageTable, PhysicalAddress, 
     EntryFlags, MappedPages, MemoryManagementInfo,
     get_kernel_mmi_ref};
+
+
+use spin::{Mutex};
+use memory::{FRAME_ALLOCATOR, FrameRange, PhysicalAddress, 
+    EntryFlags, allocate_pages_by_bytes, MappedPages, get_kernel_mmi_ref};
 use core::ops::DerefMut;
 use alloc::boxed::Box;
 
@@ -29,13 +38,14 @@ const PIXEL_BYTES: usize = 4;
 
 /// Init the final frame buffer. 
 /// Allocate a block of memory and map it to the physical framebuffer frames.
+/// Init the frame buffer. Allocate a block of memory and map it to the frame buffer frames.
 pub fn init() -> Result<(), &'static str > {
     // Get the graphic mode information
     let vesa_display_phys_start: PhysicalAddress;
     let buffer_width: usize;
     let buffer_height: usize;
     {
-        let graphic_info = acpi::madt::GRAPHIC_INFO.lock();
+        let graphic_info = multicore_bringup::GRAPHIC_INFO.lock();
         if graphic_info.physical_address == 0 {
             return Err("Fail to get graphic mode infomation!");
         }

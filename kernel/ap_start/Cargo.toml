@@ -22,9 +22,6 @@ path = "../memory"
 [dependencies.interrupts]
 path = "../interrupts"
 
-[dependencies.syscall]
-path = "../syscall"
-
 [dependencies.scheduler]
 path = "../scheduler"
 
@@ -39,6 +36,9 @@ path = "../apic"
 
 [dependencies.tlb_shootdown]
 path = "../tlb_shootdown"
+
+[dependencies.pause]
+path = "../pause"
 
 
 [lib]

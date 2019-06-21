@@ -39,6 +39,10 @@ fn panic_entry_point(info: &PanicInfo) -> ! {
     let kernel_mmi_ref = memory::get_kernel_mmi_ref();  
     let res = if kernel_mmi_ref.is_some() {
         // proceed with calling the panic_wrapper, but don't shutdown with try_exit() if errors occur here
+        #[cfg(not(loadable))]
+        {
+            panic_wrapper::panic_wrapper(info)
+        }
         #[cfg(loadable)]
         {
             type PanicWrapperFunc = fn(&PanicInfo) -> Result<(), &'static str>;
@@ -58,10 +62,6 @@ fn panic_entry_point(info: &PanicInfo) -> ! {
                     .and_then(|func| func(info)) // actually call the function
             })
         }
-        #[cfg(not(loadable))]
-        {
-            panic_wrapper::panic_wrapper(info)
-        }
     }
     else {
         Err("memory subsystem not yet initialized, cannot call panic_wrapper because it requires alloc types")
@@ -73,7 +73,7 @@ fn panic_entry_point(info: &PanicInfo) -> ! {
         error!("PANIC: {}", info);
     }
 
-    // if we failed to handle the panic, there's not really much we can do about it
+    // If we failed to handle the panic, there's not really much we can do about it,
     // other than just let the thread spin endlessly (which doesn't hurt correctness but is inefficient). 
     // But in general, the thread should be killed by the default panic handler, so it shouldn't reach here.
     // Only panics early on in the initialization process will get here, meaning that the OS will basically stop.
@@ -110,8 +110,7 @@ pub extern "C" fn _Unwind_Resume() -> ! {
 #[alloc_error_handler]
 #[cfg(not(test))]
 fn oom(_layout: core::alloc::Layout) -> ! {
-    // basic early panic printing with no dependencies
-    println_raw!("\nOOM: {:?}", _layout);
-    error!("OOM: {:?}", _layout);
+    println_raw!("\nOut of Heap Memory! requested allocation: {:?}", _layout);
+    error!("Out of Heap Memory! requested allocation: {:?}", _layout);
     loop {}
 }

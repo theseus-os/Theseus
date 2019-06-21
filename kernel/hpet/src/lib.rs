@@ -8,21 +8,21 @@ extern crate kernel_config;
 extern crate memory;
 extern crate volatile;
 extern crate sdt;
+extern crate acpi_table;
 extern crate spin;
 extern crate owning_ref;
 
-use core::{mem, ptr};
 use core::ops::DerefMut;
 use volatile::{Volatile, ReadOnly};
 use owning_ref::BoxRefMut;
-use kernel_config::memory::address_page_offset;
 use alloc::boxed::Box;
-use spin::{RwLock, RwLockReadGuard, RwLockWriteGuard};
-use memory::{MappedPages, allocate_pages, FRAME_ALLOCATOR, Frame, ActivePageTable, PhysicalAddress, EntryFlags};
-use sdt::Sdt;
+use spin::{Once, RwLock, RwLockReadGuard, RwLockWriteGuard};
+use memory::{MappedPages, allocate_pages, FRAME_ALLOCATOR, FrameRange, PageTable, PhysicalAddress, EntryFlags};
+use sdt::{Sdt, GenericAddressStructure};
+use acpi_table::{AcpiTables, AcpiSignature};
 
 /// The static instance of the HPET's ACPI memory region, which derefs to an Hpet instance.
-static HPET: RwLock<Option<BoxRefMut<MappedPages, Hpet>>> = RwLock::new(None);
+static HPET: Once<RwLock<BoxRefMut<MappedPages, Hpet>>> = Once::new();
 
 
 /// Returns a reference to the HPET timer structure, wrapped in an Option,
@@ -31,8 +31,8 @@ static HPET: RwLock<Option<BoxRefMut<MappedPages, Hpet>>> = RwLock::new(None);
 /// ```
 /// let counter_val = get_hpet().as_ref().unwrap().get_counter();
 /// ```
-pub fn get_hpet() -> RwLockReadGuard<'static, Option<BoxRefMut<MappedPages, Hpet>>> {
-    HPET.read()
+pub fn get_hpet() -> Option<RwLockReadGuard<'static, BoxRefMut<MappedPages, Hpet>>> {
+    HPET.try().map(|h| h.read())
 }
 
 /// Returns a mutable reference to the HPET timer structure, wrapped in an Option,
@@ -41,14 +41,14 @@ pub fn get_hpet() -> RwLockReadGuard<'static, Option<BoxRefMut<MappedPages, Hpet
 /// ```
 /// get_hpet_mut().as_mut().unwrap().enable_counter(true);
 /// ```
-pub fn get_hpet_mut() -> RwLockWriteGuard<'static, Option<BoxRefMut<MappedPages, Hpet>>> {
-    HPET.write()
+pub fn get_hpet_mut() -> Option<RwLockWriteGuard<'static, BoxRefMut<MappedPages, Hpet>>> {
+    HPET.try().map(|h| h.write())
 }
 
 
 /// A structure that offers access to HPET through its I/O registers, 
 /// specified by the format here: <https://wiki.osdev.org/HPET#HPET_registers>.
-#[repr(packed)]
+#[repr(C)]
 pub struct Hpet {
     /// The General Capabilities and ID Register, at offset 0x0.
     pub general_capabilities_and_id: ReadOnly<u64>,
@@ -118,7 +118,7 @@ impl Hpet {
 /// A structure that wraps HPET I/O register for each timer comparator, 
 /// specified by the format here: <https://wiki.osdev.org/HPET#HPET_registers>.
 /// There are between 3 and 32 of these in an HPET-enabled system.
-#[repr(packed)]
+#[repr(C)]
 pub struct HpetTimer {
     /// This timer's Configuration and Capability register.
     pub configuration_and_capability: Volatile<u64>,
@@ -131,69 +131,63 @@ pub struct HpetTimer {
 }
 
 
-/// Finds and initializes the HPET, and enables its main counter.
-/// Returns a mutable reference to the `Hpet` struct
-pub fn init(hpet_sdt: &'static Sdt, active_table: &mut ActivePageTable) -> Result<(), &'static str> {
-    let hpet_inner = HpetInner::new(hpet_sdt)?;    
+pub const HPET_SIGNATURE: &'static [u8; 4] = b"HPET";
 
-    let phys_addr = PhysicalAddress::new(hpet_inner.gen_addr_struct.address as usize)?;
-    let page = try!(allocate_pages(1).ok_or("Couldn't allocate_pages one page")); // only need one page for HPET data
-    let frame = Frame::range_inclusive_addr(phys_addr, 1);  // 1 byte long, we just want 1 page
-    let mut fa = try!(FRAME_ALLOCATOR.try().ok_or("Couldn't get Frame allocator")).lock();
-    let hpet_page = try!(active_table.map_allocated_pages_to(page, frame, 
-        EntryFlags::PRESENT | EntryFlags::WRITABLE | EntryFlags::NO_CACHE | EntryFlags::NO_EXECUTE, fa.deref_mut())
-    );
-
-    let mut hpet = BoxRefMut::new(Box::new(hpet_page)).try_map_mut(|mp| mp.as_type_mut::<Hpet>(address_page_offset(phys_addr.value())))?;
-    // get an HPET instance here just to initially enable the main counter
-    {
-        hpet.enable_counter(true);
-        debug!("Initialized HPET, period: {}, counter val: {}, num timers: {}, vendor_id: {}", 
-            hpet.counter_period_femtoseconds(), hpet.get_counter(), hpet.num_timers(), hpet.vendor_id()
-        );
-    }
-
-    *HPET.write() = Some(hpet);
-
-    Ok(())
+/// The handler for parsing the HPET table and adding it to the ACPI tables list.
+pub fn handle(
+    acpi_tables: &mut AcpiTables,
+    signature: AcpiSignature,
+    _length: usize,
+    phys_addr: PhysicalAddress
+) -> Result<(), &'static str> {
+    acpi_tables.add_table_location(signature, phys_addr, None)
 }
 
-
+/// The structure of the HPET ACPI table.
 #[repr(packed)]
-struct HpetInner {
+pub struct HpetAcpiTable {
     header: Sdt,
-
-    hw_rev_id: u8,
-    comparator_descriptor: u8,
-    pci_vendor_id: u16,
+    _hardware_revision_id: u8,
+    _comparator_descriptor: u8,
+    _pci_vendor_id: u16,
     gen_addr_struct: GenericAddressStructure,
-    hpet_number: u8,
-    min_periodic_clk_tick: u16,
-    oem_attribute: u8
+    _hpet_number: u8,
+    _min_periodic_clock_tick: u16,
+    /// also called 'page_protection'
+    _oem_attribute: u8,
 }
 
-impl HpetInner {
-    pub fn new(sdt: &'static Sdt) -> Result<HpetInner, &'static str> {
-        if &sdt.signature == b"HPET" && sdt.length as usize >= mem::size_of::<HpetInner>() {
-            let hi = unsafe { 
-                ptr::read((sdt as *const Sdt) as *const HpetInner) 
-            };
-            Ok(hi)
-        } else {
-            Err("Couldn't create new HpetInner SDT")
+impl HpetAcpiTable {
+    /// Finds the HPET in the given `AcpiTables` and returns a reference to it.
+    pub fn get<'t>(acpi_tables: &'t AcpiTables) -> Option<&'t HpetAcpiTable> {
+        acpi_tables.table(&HPET_SIGNATURE).ok()
+    }
+
+    /// Initializes the HPET counter-based timer
+    /// based on the hardware details from this ACPI table.
+    /// 
+    /// Returns a reference to the initialized `Hpet` structure.
+    pub fn init_hpet(&self, page_table: &mut PageTable) -> Result<&'static RwLock<BoxRefMut<MappedPages, Hpet>>, &'static str> {
+        let phys_addr = PhysicalAddress::new(self.gen_addr_struct.phys_addr as usize)?;
+        let frames = FrameRange::from_phys_addr(phys_addr, self.header.length as usize);
+        let pages = allocate_pages(frames.size_in_frames()).ok_or("Couldn't allocate_pages for HPET")?;
+        let fa = FRAME_ALLOCATOR.try().ok_or("Couldn't get Frame allocator")?;
+        let hpet_mp = page_table.map_allocated_pages_to(
+            pages,
+            frames, 
+            EntryFlags::PRESENT | EntryFlags::WRITABLE | EntryFlags::NO_CACHE | EntryFlags::NO_EXECUTE,
+            fa.lock().deref_mut()
+        )?;
+
+        let mut hpet = BoxRefMut::new(Box::new(hpet_mp)).try_map_mut(|mp| mp.as_type_mut::<Hpet>(phys_addr.frame_offset()))?;
+        // enable the main counter
+        {
+            hpet.enable_counter(true);
+            debug!("Initialized HPET, period: {}, counter val: {}, num timers: {}, vendor_id: {}", 
+                hpet.counter_period_femtoseconds(), hpet.get_counter(), hpet.num_timers(), hpet.vendor_id()
+            );
         }
+
+        Ok(HPET.call_once(|| RwLock::new(hpet)))
     }
 }
-
-#[repr(packed)]
-#[derive(Debug)]
-// #[derive(Clone, Copy, Default)]
-struct GenericAddressStructure {
-    _address_space: u8,
-    _bit_width: u8,
-    _bit_offset: u8,
-    _access_size: u8,
-    /// We only care about this field, the physical address of the structure.
-    address: u64,
-}
-

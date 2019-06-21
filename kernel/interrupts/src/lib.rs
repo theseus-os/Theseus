@@ -40,7 +40,7 @@ use spin::Once;
 // use drivers::ata_pio;
 use kernel_config::time::{CONFIG_PIT_FREQUENCY_HZ}; //, CONFIG_RTC_FREQUENCY_HZ};
 // use rtc;
-use core::sync::atomic::{AtomicUsize, Ordering};
+use core::sync::atomic::{AtomicUsize, AtomicBool, Ordering};
 use memory::VirtualAddress;
 use apic::{INTERRUPT_CHIP, InterruptChip};
 use pic::PIC_MASTER_OFFSET;
@@ -203,12 +203,62 @@ pub fn init_handlers_pic() {
     // IDT.lock()[0x28].set_handler_fn(rtc_handler.unwrap());
 }
 
-/// Register an interrupt and supply the interrupt handler 
-pub fn register_interrupt(interrupt_no : u8, func: HandlerFunc) {
+/// Registers an interrupt handler. 
+/// The function fails if the interrupt number is already in use. 
+/// 
+/// # Arguments 
+/// * `interrupt_num` - the interrupt that is being requested
+/// * `func` - the handler to be registered for 'interrupt_num'
+pub fn register_interrupt(interrupt_num : u8, func: HandlerFunc) -> Result<(), &'static str> {
     let mut idt = IDT.lock();
-    idt[interrupt_no as usize].set_handler_fn(func);
+
+    // checks if the handler stored is the default apic handler which signifies that the interrupt hasn't been used yet
+    if idt[interrupt_num as usize].handler_eq(apic_unimplemented_interrupt_handler) {
+        idt[interrupt_num as usize].set_handler_fn(func);
+        Ok(())
+    }
+    else {
+        error!("register_interrupt: the requested interrupt is not available");
+        Err("register_interrupt: the requested interrupt is not available")
+    }
 } 
 
+/// Returns an interrupt number assigned by the OS and sets its handler function. 
+/// The function fails if there is no unused interrupt number.
+/// 
+/// # Arguments
+/// * `func` - the handler for the assigned interrupt number
+pub fn register_msi_interrupt(func: HandlerFunc) -> Result<u8, &'static str> {
+    let mut idt = IDT.lock();
+
+    // try to find an unused interrupt 
+    let interrupt_num = (*idt).find_free_entry(apic_unimplemented_interrupt_handler).ok_or("register_msi_interrupt: no available interrupt")?;
+    idt[interrupt_num].set_handler_fn(func);
+    
+    Ok(interrupt_num as u8)
+} 
+
+/// Returns an interrupt to the system by setting the handler to the default function. 
+/// The application provides the current interrupt handler as a safety check. 
+/// The function fails if the current handler and 'func' do not match
+/// 
+/// # Arguments
+/// * `interrupt_num` - the interrupt that needs to be deregistered
+/// * `func` - the handler that should currently be stored for 'interrupt_num'
+pub fn deregister_interrupt(interrupt_num: u8, func: HandlerFunc) -> Result<(), &'static str> {
+    let mut idt = IDT.lock();
+
+    // check if the handler stored is the same as the one provided
+    // this is to make sure no other application can deregister your interrupt
+    if idt[interrupt_num as usize].handler_eq(func) {
+        idt[interrupt_num as usize].set_handler_fn(apic_unimplemented_interrupt_handler);
+        Ok(())
+    }
+    else {
+        error!("deregister_interrupt: Cannot free interrupt due to incorrect handler function");
+        Err("deregister_interrupt: Cannot free interrupt due to incorrect handler function")
+    }
+}
 
 /// Send an end of interrupt signal, which works for all types of interrupt chips (APIC, x2apic, PIC)
 /// irq arg is only used for PIC
@@ -234,7 +284,7 @@ extern "x86-interrupt" fn pit_timer_handler(_stack_frame: &mut ExceptionStackFra
 
 
 // see this: https://forum.osdev.org/viewtopic.php?f=1&t=32655
-static mut EXTENDED_SCANCODE: bool = false;
+static EXTENDED_SCANCODE: AtomicBool = AtomicBool::new(false);
 
 /// 0x21
 extern "x86-interrupt" fn ps2_keyboard_handler(_stack_frame: &mut ExceptionStackFrame) {
@@ -250,7 +300,7 @@ extern "x86-interrupt" fn ps2_keyboard_handler(_stack_frame: &mut ExceptionStack
             // trace!("PS2_PORT interrupt: raw scan_code {:#X}", scan_code);
 
 
-            let extended = unsafe { EXTENDED_SCANCODE };
+            let extended = EXTENDED_SCANCODE.load(Ordering::SeqCst);
 
             // 0xE0 indicates an extended scancode, so we must wait for the next interrupt to get the actual scancode
             if scan_code == 0xE0 {
@@ -258,15 +308,15 @@ extern "x86-interrupt" fn ps2_keyboard_handler(_stack_frame: &mut ExceptionStack
                     error!("PS2_PORT interrupt: got two extended scancodes (0xE0) in a row! Shouldn't happen.");
                 }
                 // mark it true for the next interrupt
-                unsafe { EXTENDED_SCANCODE = true; }
+                EXTENDED_SCANCODE.store(true, Ordering::SeqCst);
             } else if scan_code == 0xE1 {
                 error!("PAUSE/BREAK key pressed ... ignoring it!");
                 // TODO: handle this, it's a 6-byte sequence (over the next 5 interrupts)
-                unsafe { EXTENDED_SCANCODE = true; }
+                EXTENDED_SCANCODE.store(true, Ordering::SeqCst);
             } else { // a regular scancode, go ahead and handle it
                 // if the previous interrupt's scan_code was an extended scan_code, then this one is not
                 if extended {
-                    unsafe { EXTENDED_SCANCODE = false; }
+                    EXTENDED_SCANCODE.store(false, Ordering::SeqCst);
                 }
                 if scan_code != 0 {  // a scan code of zero is a PS2_PORT error that we can ignore
                     if let Err(e) = keyboard::handle_keyboard_input(scan_code, extended) {
@@ -322,11 +372,7 @@ extern "x86-interrupt" fn lapic_timer_handler(_stack_frame: &mut ExceptionStackF
 
 /// 0x24
 extern "x86-interrupt" fn com1_serial_handler(_stack_frame: &mut ExceptionStackFrame) {
-    // info!("COM1 serial handler");
-
-    unsafe {
-        x86_64::instructions::port::inb(0x3F8); // read serial port value
-    }
+    info!("COM1 serial handler");
 
     eoi(Some(PIC_MASTER_OFFSET + 0x4));
 }
@@ -334,11 +380,7 @@ extern "x86-interrupt" fn com1_serial_handler(_stack_frame: &mut ExceptionStackF
 
 /// 0x26
 extern "x86-interrupt" fn apic_irq_0x26_handler(_stack_frame: &mut ExceptionStackFrame) {
-    // info!("APIX 0x26 IRQ handler");
-
-    // unsafe {
-    //     x86_64::instructions::port::inb(0x3F8); // read serial port value
-    // }
+    info!("APIX 0x26 IRQ handler");
 
     eoi(Some(PIC_MASTER_OFFSET + 0x6));
 }
@@ -379,16 +421,12 @@ extern "x86-interrupt" fn apic_unimplemented_interrupt_handler(_stack_frame: &mu
 
 
 
-pub static mut SPURIOUS_COUNT: u64 = 0;
-
 /// The Spurious interrupt handler. 
 /// This has given us a lot of problems on bochs emulator and on some real hardware, but not on QEMU.
 /// Spurious interrupts occur a lot when using PIC on real hardware, but only occurs once when using apic/x2apic. 
 /// See here for more: https://mailman.linuxchix.org/pipermail/techtalk/2002-August/012697.html.
 /// We handle it according to this advice: https://wiki.osdev.org/8259_PIC#Spurious_IRQs
 extern "x86-interrupt" fn spurious_interrupt_handler(_stack_frame: &mut ExceptionStackFrame ) {
-    unsafe { SPURIOUS_COUNT += 1; } // cheap counter just for debug info
-
     if let Some(pic) = PIC.try() {
         let irq_regs = pic.read_isr_irr();
         // check if this was a real IRQ7 (parallel port) (bit 7 will be set)

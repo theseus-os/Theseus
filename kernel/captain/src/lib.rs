@@ -23,8 +23,6 @@
 
 extern crate alloc;
 #[macro_use] extern crate log;
-#[macro_use] extern crate vga_buffer;
-
 
 extern crate kernel_config; // our configuration options, just a set of const definitions.
 extern crate irq_safety; // for irq-safe locking and interrupt utilities
@@ -38,7 +36,6 @@ extern crate mod_mgmt;
 extern crate spawn;
 extern crate tsc;
 extern crate task; 
-extern crate syscall;
 extern crate interrupts;
 extern crate acpi;
 extern crate device_manager;
@@ -51,19 +48,19 @@ extern crate font;
 extern crate input_event_manager;
 #[cfg(test_network)] extern crate exceptions_full;
 extern crate network_manager;
+extern crate pause;
 
 #[cfg(simd_personality)] extern crate simd_personality;
 
 
 
 use alloc::sync::Arc;
-use alloc::string::String;
 use alloc::vec::Vec;
 use core::ops::DerefMut;
-use core::sync::atomic::spin_loop_hint;
-use memory::{VirtualAddress, MemoryManagementInfo, MappedPages, PageTable};
+use memory::{VirtualAddress, MemoryManagementInfo, MappedPages};
 use kernel_config::memory::KERNEL_STACK_SIZE_IN_PAGES;
 use irq_safety::{MutexIrqSafe, enable_interrupts};
+use pause::spin_loop_hint;
 
 
 
@@ -98,15 +95,14 @@ pub fn init(
     // info!("TSC frequency calculated: {}", _tsc_freq);
 
     // now we initialize early driver stuff, like APIC/ACPI
-    let madt_iter = device_manager::early_init(kernel_mmi_ref.lock().deref_mut())?;
+    device_manager::early_init(kernel_mmi_ref.lock().deref_mut())?;
 
     // initialize the rest of the BSP's interrupt stuff, including TSS & GDT
-    let (double_fault_stack, privilege_stack, syscall_stack) = { 
+    let (double_fault_stack, privilege_stack) = {
         let mut kernel_mmi = kernel_mmi_ref.lock();
         (
             kernel_mmi.alloc_stack(1).ok_or("could not allocate double fault stack")?,
             kernel_mmi.alloc_stack(KERNEL_STACK_SIZE_IN_PAGES).ok_or("could not allocate privilege stack")?,
-            kernel_mmi.alloc_stack(KERNEL_STACK_SIZE_IN_PAGES).ok_or("could not allocate syscall stack")?
         )
     };
     let idt = interrupts::init(double_fault_stack.top_unusable(), privilege_stack.top_unusable())?;
@@ -115,9 +111,6 @@ pub fn init(
     // interrupts::init_handlers_pic();
     interrupts::init_handlers_apic();
     
-    // initialize the syscall 
-    syscall::init(syscall_stack.top_usable());
-
     // get BSP's apic id
     let bsp_apic_id = apic::get_bsp_id().ok_or("captain::init(): Coudln't get BSP's apic_id!")?;
 
@@ -128,7 +121,7 @@ pub fn init(
     exceptions_full::init(idt);
     
     // boot up the other cores (APs)
-    let ap_count = acpi::madt::handle_ap_cores(madt_iter, kernel_mmi_ref.clone(), ap_start_realmode_begin, ap_start_realmode_end)?;
+    let ap_count = multicore_bringup::handle_ap_cores(kernel_mmi_ref.clone(), ap_start_realmode_begin, ap_start_realmode_end)?;
     info!("Finished handling and booting up all {} AP cores.", ap_count);
 
     // init frame_buffer
@@ -138,7 +131,7 @@ pub fn init(
             trace!("Frame_buffer initialized successfully.");
         }
         Err(err) => { 
-            println_raw!("captain::init(): failed to initialize frame_buffer");
+            error!("captain::init(): failed to initialize frame_buffer");
             return Err(err);
         }
     }
@@ -179,48 +172,14 @@ pub fn init(
     // before we jump to userspace, we need to unmap the identity-mapped section of the kernel's page tables, at PML4[0]
     // unmap the kernel's original identity mapping (including multiboot2 boot_info) to clear the way for userspace mappings
     // we cannot do this until we have booted up all the APs
-    ::core::mem::drop(identity_mapped_pages);
+    drop(identity_mapped_pages);
     {
-        if let PageTable::Active(ref mut active_table) = kernel_mmi_ref.lock().page_table {
-            // for i in 0 .. 512 { 
-            //     debug!("P4[{:03}] = {:#X}", i, active_table.p4().get_entry_value(i));
-            // }
-
-            // clear the 0th P4 entry, which covers any existing identity mappings
-            active_table.p4_mut().clear_entry(0); 
-        }
-        else {
-            return Err("Couldn't get kernel's ActivePageTable to clear out identity mappings!");
-        }
+        // for i in 0 .. 512 { 
+        //     debug!("P4[{:03}] = {:#X}", i, active_table.p4().get_entry_value(i));
+        // }
+        // clear the 0th P4 entry, which covers any existing identity mappings
+        kernel_mmi_ref.lock().page_table.p4_mut().clear_entry(0); 
     }
-
-    // create and jump to the first userspace thread
-    #[cfg(spawn_userspace)] {
-        debug!("trying to jump to userspace");
-        let module = memory::get_module("u#test_program").ok_or("Error: no userspace modules named 'u#test_program' found!")?;
-        spawn::spawn_userspace(module, Some(String::from("test_program_1")))?;
-    }
-
-    #[cfg(spawn_userspace)] {
-        debug!("trying to jump to userspace 2nd time");
-        let module = memory::get_module("u#test_program").ok_or("Error: no userspace modules named 'u#test_program' found!")?;
-        spawn::spawn_userspace(module, Some(String::from("test_program_2")))?;
-    }
-
-    // create and jump to a userspace thread that tests syscalls
-    #[cfg(spawn_userspace)] {
-        debug!("trying out a system call module");
-        let module = memory::get_module("u#syscall_send").ok_or("Error: no module named 'u#syscall_send' found!")?;
-        spawn::spawn_userspace(module, None)?;
-    }
-
-    // a second duplicate syscall test user task
-    #[cfg(spawn_userspace)] {
-        debug!("trying out a receive system call module");
-        let module = memory::get_module("u#syscall_receive").ok_or("Error: no module named 'u#syscall_receive' found!")?;
-        spawn::spawn_userspace(module, None)?;
-    }
-
     
     // create a SIMD personality
     #[cfg(simd_personality)]
@@ -228,7 +187,7 @@ pub fn init(
         let simd_ext = task::SimdExt::SSE;
         warn!("SIMD_PERSONALITY FEATURE ENABLED, creating a new personality with {:?}!", simd_ext);
         spawn::KernelTaskBuilder::new(simd_personality::setup_simd_personality, simd_ext)
-            .name(String::from("setup_simd_personality"))
+            .name(alloc::string::String::from("setup_simd_personality"))
             .spawn()?;
     }
 

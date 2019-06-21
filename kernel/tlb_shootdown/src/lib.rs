@@ -1,7 +1,7 @@
 //! Support for broadcasting and handling TLB shootdown IPIs. 
 
 #![no_std]
-
+#![feature(asm)]
 
 extern crate alloc;
 #[macro_use] extern crate lazy_static;
@@ -10,13 +10,15 @@ extern crate irq_safety;
 extern crate memory;
 extern crate apic;
 extern crate x86_64;
+extern crate pause;
 
 
-use core::sync::atomic::{AtomicUsize, AtomicBool, Ordering, spin_loop_hint};
+use core::sync::atomic::{AtomicUsize, AtomicBool, Ordering};
 use alloc::vec::Vec;
 use irq_safety::{hold_interrupts, RwLockIrqSafe};
 use memory::VirtualAddress;
 use apic::{LocalApic, get_my_apic, get_lapics, LapicIpiDestination};
+use pause::spin_loop_hint;
 
 
 /// The IRQ number used for IPIs

@@ -27,7 +27,7 @@ use spin::Once;
 use raw_cpuid::CpuId;
 use x86_64::registers::msr::*;
 use irq_safety::RwLockIrqSafe;
-use memory::{FRAME_ALLOCATOR, Frame, ActivePageTable, PhysicalAddress, EntryFlags, MappedPages, allocate_pages};
+use memory::{FRAME_ALLOCATOR, Frame, FrameRange, PageTable, PhysicalAddress, EntryFlags, MappedPages, allocate_pages};
 use kernel_config::time::CONFIG_TIMESLICE_PERIOD_MICROSECONDS;
 use atomic_linked_list::atomic_map::AtomicMap;
 use atomic::Atomic;
@@ -139,7 +139,7 @@ impl LapicIpiDestination {
 
 /// Initially maps the base APIC MMIO register frames so that we can know which LAPIC (core) we are.
 /// This only does something for apic/xapic systems, it does nothing for x2apic systems, as required.
-pub fn init(active_table: &mut ActivePageTable) -> Result<(), &'static str> {
+pub fn init(page_table: &mut PageTable) -> Result<(), &'static str> {
     let x2 = has_x2apic();
     let phys_addr = PhysicalAddress::new(rdmsr(IA32_APIC_BASE) as usize)?;
     debug!("is x2apic? {}.  IA32_APIC_BASE (phys addr): {:#X}", x2, phys_addr);
@@ -147,7 +147,7 @@ pub fn init(active_table: &mut ActivePageTable) -> Result<(), &'static str> {
     // x2apic doesn't require MMIO, it just uses MSRs instead, so we don't need to map the APIC registers.
     if !x2 {
         // offset into the apic_mapped_page is always 0, regardless of the physical address
-        let apic_regs = BoxRef::new(Box::new(map_apic(active_table)?)).try_map(|mp| mp.as_type::<ApicRegisters>(0))?;
+        let apic_regs = BoxRef::new(Box::new(map_apic(page_table)?)).try_map(|mp| mp.as_type::<ApicRegisters>(0))?;
         APIC_REGS.call_once( || apic_regs);
     }
 
@@ -156,7 +156,7 @@ pub fn init(active_table: &mut ActivePageTable) -> Result<(), &'static str> {
 
 
 /// return a mapping of APIC memory-mapped I/O registers 
-fn map_apic(active_table: &mut ActivePageTable) -> Result<MappedPages, &'static str> {
+fn map_apic(page_table: &mut PageTable) -> Result<MappedPages, &'static str> {
     if has_x2apic() { return Err("map_apic() is only for use in apic/xapic systems, not x2apic."); }
 
     // make sure the local apic is enabled in xapic mode, otherwise we'll get a General Protection fault
@@ -164,9 +164,9 @@ fn map_apic(active_table: &mut ActivePageTable) -> Result<MappedPages, &'static 
     
     let phys_addr = PhysicalAddress::new(rdmsr(IA32_APIC_BASE) as usize)?;
     let new_page = try!(allocate_pages(1).ok_or("out of virtual address space!"));
-    let frames = Frame::range_inclusive(Frame::containing_address(phys_addr), Frame::containing_address(phys_addr));
+    let frames = FrameRange::new(Frame::containing_address(phys_addr), Frame::containing_address(phys_addr));
     let mut fa = try!(FRAME_ALLOCATOR.try().ok_or("apic::init(): couldn't get FRAME_ALLOCATOR")).lock();
-    let apic_mapped_page = try!(active_table.map_allocated_pages_to(
+    let apic_mapped_page = try!(page_table.map_allocated_pages_to(
         new_page, 
         frames, 
         EntryFlags::PRESENT | EntryFlags::WRITABLE | EntryFlags::NO_CACHE | EntryFlags::NO_EXECUTE, 
@@ -293,7 +293,7 @@ impl fmt::Debug for LocalApic {
 impl LocalApic {
     /// This MUST be invoked from the AP core itself when it is booting up.
     /// The BSP cannot invoke this for other APs (it can only invoke it for itself).
-    pub fn new(active_table: &mut ActivePageTable, processor: u8, apic_id: u8, is_bsp: bool, nmi_lint: u8, nmi_flags: u16) 
+    pub fn new(page_table: &mut PageTable, processor: u8, apic_id: u8, is_bsp: bool, nmi_lint: u8, nmi_flags: u16) 
         -> Result<LocalApic, &'static str>
     {
 
@@ -314,7 +314,7 @@ impl LocalApic {
         } 
         else { 
             // offset into the apic_mapped_page is always 0, regardless of the physical address
-            let apic_regs = BoxRefMut::new(Box::new(map_apic(active_table)?)).try_map_mut(|mp| mp.as_type_mut::<ApicRegisters>(0))?;
+            let apic_regs = BoxRefMut::new(Box::new(map_apic(page_table)?)).try_map_mut(|mp| mp.as_type_mut::<ApicRegisters>(0))?;
             lapic.regs = Some(apic_regs);
             lapic.enable_apic()?;
             lapic.init_timer()?;
@@ -580,12 +580,10 @@ impl LocalApic {
 
     pub fn eoi(&mut self) {
         // 0 is the only valid value to write to the EOI register/msr, others cause General Protection Fault
-        unsafe {
-            if has_x2apic() {
-                wrmsr(IA32_X2APIC_EOI, 0); 
-            } else {
-                self.regs.as_mut().expect("ApicRegisters").eoi.write(0);
-            }
+        if has_x2apic() {
+            unsafe { wrmsr(IA32_X2APIC_EOI, 0); }
+        } else {
+            self.regs.as_mut().expect("ApicRegisters").eoi.write(0);
         }
     }
 

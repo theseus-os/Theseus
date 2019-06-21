@@ -42,12 +42,13 @@ extern crate environment;
 extern crate root;
 extern crate x86_64;
 extern crate spin;
-extern crate fs_node; 
+extern crate fs_node;
+extern crate pause;
 
 
 
 use core::fmt;
-use core::sync::atomic::{Ordering, AtomicUsize, AtomicBool, spin_loop_hint};
+use core::sync::atomic::{Ordering, AtomicUsize, AtomicBool};
 use core::any::Any;
 use core::panic::PanicInfo;
 use core::ops::Deref;
@@ -57,9 +58,10 @@ use alloc::{
     string::String,
     sync::Arc,
 };
+use pause::spin_loop_hint;
 
 use irq_safety::{MutexIrqSafe, MutexIrqSafeGuardRef, MutexIrqSafeGuardRefMut, interrupts_enabled};
-use memory::{PageTable, Stack, MappedPages, Page, EntryFlags, MemoryManagementInfo, VirtualAddress};
+use memory::{Stack, MappedPages, PageRange, EntryFlags, MemoryManagementInfo, VirtualAddress};
 use atomic_linked_list::atomic_map::AtomicMap;
 use tss::tss_set_rsp0;
 use mod_mgmt::metadata::StrongCrateRef;
@@ -181,6 +183,7 @@ pub enum RunState {
 pub static RUNQUEUE_REMOVAL_FUNCTION: Once<fn(&TaskRef, u8) -> Result<(), &'static str>> = Once::new();
 
 
+#[cfg(simd_personality)]
 /// The supported levels of SIMD extensions that a `Task` can use.
 #[derive(Debug, Copy, Clone, PartialEq)]
 pub enum SimdExt {
@@ -474,30 +477,12 @@ impl Task {
             }
             else {
                 // time to change to a different address space and switch the page tables!
-
                 let mut prev_mmi_locked = prev_mmi.lock();
-                let mut next_mmi_locked = next_mmi.lock();
+                let next_mmi_locked = next_mmi.lock();
                 // debug!("task_switch [3]: switching tables! From {} {:?} to {} {:?}", 
                 //         self.name, prev_mmi_locked.page_table, next.name, next_mmi_locked.page_table);
-                
 
-                let new_active_table = {
-                    // prev_table must be an ActivePageTable, and next_table must be an InactivePageTable
-                    match &mut prev_mmi_locked.page_table {
-                        &mut PageTable::Active(ref mut active_table) => {
-                            active_table.switch(&next_mmi_locked.page_table)
-                        }
-                        _ => {
-                            panic!("BUG: task_switch(): prev_table must be an ActivePageTable!");
-                        }
-                    }
-                };
-                
-                // since we're no longer changing the prev page table to be inactive, just leave it be,
-                // and only change the next task's page table to active 
-                // (it was either active already, or it was previously inactive (and now active) if it was the first time it had been run)
-                next_mmi_locked.set_page_table(PageTable::Active(new_active_table)); 
-
+                let _new_active_table = prev_mmi_locked.page_table.switch(&next_mmi_locked.page_table);
             }
         }
        
@@ -519,7 +504,7 @@ impl Task {
         /// A private macro that actually calls the given context switch routine
         /// by putting the arguments into the proper registers, `rdi` and `rsi`.
         macro_rules! call_context_switch {
-            ($func:expr) => (
+            ($func:expr) => ( unsafe {
                 asm!("
                     mov rdi, $0; \
                     mov rsi, $1;" 
@@ -527,7 +512,7 @@ impl Task {
                     : "memory" : "intel", "volatile"
                 );
                 $func();
-            );
+            });
         }
 
         // Now it's time to perform the actual context switch.
@@ -535,9 +520,7 @@ impl Task {
         // using the singular context_switch routine that matches the actual build target. 
         #[cfg(not(simd_personality))]
         {
-            unsafe {
-                call_context_switch!(context_switch::context_switch);
-            }
+            call_context_switch!(context_switch::context_switch);
         }
         // If `simd_personality` is enabled, all `context_switch*` routines are available,
         // which allows us to choose one based on whether the prev/next Tasks are SIMD-enabled.
@@ -546,65 +529,47 @@ impl Task {
             match (&self.simd, &next.simd) {
                 (SimdExt::None, SimdExt::None) => {
                     // warn!("SWITCHING from REGULAR to REGULAR task {:?} -> {:?}", self, next);
-                    unsafe {
-                        call_context_switch!(context_switch::context_switch_regular);
-                    }
+                    call_context_switch!(context_switch::context_switch_regular);
                 }
 
                 (SimdExt::None, SimdExt::SSE)  => {
                     // warn!("SWITCHING from REGULAR to SSE task {:?} -> {:?}", self, next);
-                    unsafe {
-                        call_context_switch!(context_switch::context_switch_regular_to_sse);
-                    }
+                    call_context_switch!(context_switch::context_switch_regular_to_sse);
                 }
                 
                 (SimdExt::None, SimdExt::AVX)  => {
                     // warn!("SWITCHING from REGULAR to AVX task {:?} -> {:?}", self, next);
-                    unsafe {
-                        call_context_switch!(context_switch::context_switch_regular_to_avx);
-                    }
+                    call_context_switch!(context_switch::context_switch_regular_to_avx);
                 }
 
                 (SimdExt::SSE, SimdExt::None)  => {
                     // warn!("SWITCHING from SSE to REGULAR task {:?} -> {:?}", self, next);
-                    unsafe {
-                        call_context_switch!(context_switch::context_switch_sse_to_regular);
-                    }
+                    call_context_switch!(context_switch::context_switch_sse_to_regular);
                 }
 
                 (SimdExt::SSE, SimdExt::SSE)   => {
                     // warn!("SWITCHING from SSE to SSE task {:?} -> {:?}", self, next);
-                    unsafe {
-                        call_context_switch!(context_switch::context_switch_sse);
-                    }
+                    call_context_switch!(context_switch::context_switch_sse);
                 }
 
                 (SimdExt::SSE, SimdExt::AVX) => {
                     warn!("SWITCHING from SSE to AVX task {:?} -> {:?}", self, next);
-                    unsafe {
-                        call_context_switch!(context_switch::context_switch_sse_to_avx);
-                    }
+                    call_context_switch!(context_switch::context_switch_sse_to_avx);
                 }
 
                 (SimdExt::AVX, SimdExt::None) => {
                     // warn!("SWITCHING from AVX to REGULAR task {:?} -> {:?}", self, next);
-                    unsafe {
-                        call_context_switch!(context_switch::context_switch_avx_to_regular);
-                    }
+                    call_context_switch!(context_switch::context_switch_avx_to_regular);
                 }
 
                 (SimdExt::AVX, SimdExt::SSE) => {
                     warn!("SWITCHING from AVX to SSE task {:?} -> {:?}", self, next);
-                    unsafe {
-                        call_context_switch!(context_switch::context_switch_avx_to_sse);
-                    }
+                    call_context_switch!(context_switch::context_switch_avx_to_sse);
                 }
 
                 (SimdExt::AVX, SimdExt::AVX) => {
                     // warn!("SWITCHING from AVX to AVX task {:?} -> {:?}", self, next);
-                    unsafe {
-                        call_context_switch!(context_switch::context_switch_avx);
-                    }
+                    call_context_switch!(context_switch::context_switch_avx);
                 }
             }
         }
@@ -887,7 +852,7 @@ pub fn create_idle_task(
             stack_top, 
             stack_bottom, 
             MappedPages::from_existing(
-                Page::range_inclusive_addr(stack_bottom, stack_top.value() - stack_bottom.value()),
+                PageRange::from_virt_addr(stack_bottom, stack_top.value() - stack_bottom.value()),
                 EntryFlags::WRITABLE | EntryFlags::PRESENT
             ),
         )
@@ -931,25 +896,16 @@ struct TaskLocalData {
 /// Returns a reference to the current task's `TaskLocalData` 
 /// by using the `TaskLocalData` pointer stored in the FS base MSR register.
 fn get_task_local_data() -> Option<&'static TaskLocalData> {
-    // SAFE: it's safe to cast this as a static reference
-    // because it will always be valid for the life of a given Task's execution.
-    let tld: &'static TaskLocalData = unsafe {
+    let tld: &'static TaskLocalData = {
         let tld_ptr = rdmsr(IA32_FS_BASE) as *const TaskLocalData;
         if tld_ptr.is_null() {
             return None;
         }
-        &*tld_ptr
+        // SAFE: it's safe to cast this as a static reference
+        // because it will always be valid for the life of a given Task's execution.
+        unsafe { &*tld_ptr }
     };
     Some(&tld)
-
-    // let tld2: &TaskLocalData = unsafe {
-    //     let tld_ptr: u64;
-    //     asm!("mov $0, fs:[0x8]" : "=r"(tld_ptr) : : "memory" : "intel", "volatile");
-    //     let fs_base: u64;
-    //     asm!("mov $0, fs:[0x0]" : "=r"(fs_base) : : "memory" : "intel", "volatile");
-    //     warn!("current_task_id(): fs_base: {:#X}", fs_base);
-    //     &*(tld_ptr as *const TaskLocalData)
-    // };
 }
 
 /// Returns a cloned reference to the current task id by using the `TaskLocalData` pointer

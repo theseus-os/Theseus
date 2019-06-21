@@ -1,5 +1,6 @@
-; must match definitions in bring_up_ap()
-; TRAMPOLINE below is a Physical Address!
+; This must match the `ApTrampolineData` struct definitions used in `bring_up_ap()`.
+; See that struct definition for an explanation of how these are used.
+; The following are physical addresses.
 TRAMPOLINE          equ 0xF000
 AP_READY            equ TRAMPOLINE
 AP_PROCESSOR_ID     equ TRAMPOLINE + 8
