@@ -8,7 +8,13 @@ extern crate alloc;
 use alloc::vec::Vec;
 
 /// The compositor trait.
-///* It composes a list of buffers to a single buffer
+/// A compositor composes a list of buffers to a single buffer
 pub trait Compositor<T> {
+    /// compose the buffers in the bufferlist
+    ///
+    /// # Arguments
+    ///
+    /// * `bufferlist` - A list of buffers in the form of (buffer:T, x:i32, y:i32).
+    /// For each item in the list, buffer is a buffer object to be composed. (x, y) specifies the location of the buffer to be composed in the final buffer. 
     fn compose(bufferlist: Vec<(&T, i32, i32)>) -> Result<(), &'static str>;
 }

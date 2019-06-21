@@ -1,5 +1,5 @@
-//! This crate contains a basic draw function to draw a pixel in a framebuffer
-//! framebuffer drawer and printer invoke this pixel drawerto draw graphs in a framebuffer
+//! This crate contains a basic draw function to draw a pixel in a framebuffer.
+//! framebuffer drawer and printer invoke this pixel drawerto draw graphs in a framebuffer.
 
 #![no_std]
 

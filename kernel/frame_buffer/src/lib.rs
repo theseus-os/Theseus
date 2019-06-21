@@ -18,6 +18,7 @@ use memory::{FRAME_ALLOCATOR, Frame, PageTable, PhysicalAddress,
 use core::ops::DerefMut;
 use alloc::boxed::Box;
 
+/// A Pixel is a u32 interger. The lower 24 bits of a Pixel specifies the RGB color of a pixel
 pub type Pixel = u32;
 
 /// The final framebuffer instance. It contains the pages which are mapped to the physical framebuffer
@@ -61,8 +62,8 @@ pub struct FrameBuffer {
 
 impl FrameBuffer {
     /// Create a new virtual frame buffer with specified size
-    /// If the physical_address is provided, map the framebuffer to the physical_address.
-    /// If it is None, allocate a block of memory and map the framebuffer to it
+    /// If the physical_address is specified, the new virtual frame buffer will be mapped to hardware's physical memory at that address
+    /// If the physical_address is none, the new function will allocate a block of physical memory at a random address and map the new frame buffer to that memory
     pub fn new(width: usize, height: usize, physical_address: Option<PhysicalAddress>) -> Result<FrameBuffer, &'static str>{       
         // get a reference to the kernel's memory mapping information
         let kernel_mmi_ref = get_kernel_mmi_ref().expect("KERNEL_MMI was not yet initialized!");
@@ -157,6 +158,6 @@ impl FrameBuffer {
 /// Get the size of the final framebuffer. Return (width, height)
 pub fn get_screen_size() -> Result<(usize, usize), &'static str> {
     let final_buffer = FINAL_FRAME_BUFFER.try().
-        ok_or("FrameCopositor fails to get the final frame buffer")?.lock();
+        ok_or("The final frame buffer was not yet initialized")?.lock();
     Ok((final_buffer.width, final_buffer.height))
 }

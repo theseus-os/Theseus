@@ -1,6 +1,5 @@
-//! This crate is a frame buffer manager. 
-//! * It defines a FrameBuffer structure and creates new framebuffers for applications
-//! * It defines a compositor and owns a final framebuffer which is mapped to the physical framebuffer. The compositor will composite a sequence of framebuffers and display them in the final framebuffer
+//! This crate is a framebuffer compositor. 
+//! A framebuffer compositor will compose a sequence of framebuffers and display them in the final framebuffer
 
 #![no_std]
 
@@ -13,8 +12,6 @@ use alloc::vec::Vec;
 use frame_buffer::{FrameBuffer, FINAL_FRAME_BUFFER};
 use compositor::Compositor;
 
-pub type Pixel = u32;
-
 /// The framebuffer compositor structure. It will hold the cache of updated framebuffers for better performance.
 /// Only framebuffers that have not changed will be redisplayed in the final framebuffer 
 pub struct FrameCompositor {
@@ -22,7 +19,7 @@ pub struct FrameCompositor {
 }
 
 impl Compositor<FrameBuffer> for FrameCompositor {
-    /// compose a list of framebuffers to the final framebuffer. Every item in the list is a reference to a framebuffer with its position
+    // compose a list of framebuffers to the final framebuffer. Every item in the list is a reference to a framebuffer with its position
     fn compose(bufferlist: Vec<(&FrameBuffer, i32, i32)>) -> Result<(), &'static str> {
         let mut final_fb = FINAL_FRAME_BUFFER.try().ok_or("FrameCompositor fails to get the final frame buffer")?.lock();
         let (final_width, final_height) = final_fb.get_size();        

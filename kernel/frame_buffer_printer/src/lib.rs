@@ -14,9 +14,16 @@ use frame_buffer::{FrameBuffer};
 
 /// Print a string in a framebuffer.
 /// The string is printed at position (x, y) of the framebuffer. 
-// It is printed within an area specified by (width, height). The part extending the area will be ignored.
-pub fn print_by_bytes(mut framebuffer: &mut FrameBuffer, x: usize, y: usize, width: usize, height: usize, 
-    slice: &str, font_color: u32, bg_color: u32) -> Result<(), &'static str> {
+/// It is printed within an area specified by (width, height). The part extending the area will be ignored.
+pub fn print_by_bytes(mut framebuffer: &mut FrameBuffer, 
+    x: usize, 
+    y: usize, 
+    width: usize, 
+    height: usize, 
+    slice: &str, 
+    font_color: u32, 
+    bg_color: u32
+) -> Result<(), &'static str> {
     let buffer_width = width/CHARACTER_WIDTH;
     let buffer_height = height/CHARACTER_HEIGHT;
 
@@ -93,9 +100,9 @@ fn print_byte(framebuffer: &mut FrameBuffer, byte: u8, font_color: u32, bg_color
     }
 }
 
-// Fill a blank text area (left, top, right, bottom) with the backgroung color.
+// Fill a blank text area (left, top, right, bottom) with the color.
 fn fill_blank(framebuffer: &mut FrameBuffer, left: usize, top: usize, right: usize,
-            bottom: usize, color: u32) -> Result<(),&'static str>{
+            bottom: usize, color: u32) -> Result<(),&'static str> {
     if left >= right || top >= bottom {
         return Ok(())
     }
