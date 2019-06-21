@@ -15,6 +15,10 @@ path = "../memory"
 [dependencies.acpi]
 path = "../acpi"
 
+[dependencies.log]
+default-features = false
+version = "0.3.7"
+
 # [build]
 # rustflags = ["-C", "prefer-dynamic", "-C", "panic=abort"]
 

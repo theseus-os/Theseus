@@ -9,6 +9,7 @@ extern crate acpi;
 extern crate memory;
 extern crate alloc;
 extern crate owning_ref;
+#[macro_use] extern crate log;
 
 use owning_ref::BoxRefMut;
 use spin::{Mutex, Once};
@@ -158,16 +159,33 @@ pub struct FrameCompositor {
 
 impl Compositor for FrameCompositor {
     /// compose a list of framebuffers to the final framebuffer. Every item in the list is a reference to a framebuffer with its position
-    fn compose(bufferlist: Vec<(&FrameBuffer, usize, usize)>) -> Result<(), &'static str> {
-        let mut final_buffer = FINAL_FRAME_BUFFER.try().ok_or("FrameCopositor fails to get the final frame buffer")?.lock();
+    fn compose(bufferlist: Vec<(&FrameBuffer, i32, i32)>) -> Result<(), &'static str> {
+        let mut final_buffer = FINAL_FRAME_BUFFER.try().ok_or("FrameCompositor fails to get the final frame buffer")?.lock();
 
         // Check if the virtul frame buffer is in the mapped frame list
         for (src, x_src, y_src) in bufferlist {
-            for i in 0..src.height {
-                let dest_start = final_buffer.width * ( i + y_src ) + x_src;
-                let dest_end = dest_start + src.width;
-                let src_start = src.width * i;
-                let src_end = src_start + src.width;
+
+            let fb_x_end = x_src + src.width as i32;
+            let fb_y_end = y_src + src.height as i32;
+
+            if (fb_x_end < 0 || x_src > final_buffer.width as i32) {
+                break;
+            }
+            if (fb_y_end < 0 || y_src > final_buffer.height as i32) {
+                break;
+            }
+
+            let fb_x_start = core::cmp::max(0, x_src) as usize;
+            let fb_y_start = core::cmp::max(0, y_src) as usize;
+
+            let width = core::cmp::min(fb_x_end as usize, final_buffer.width) - fb_x_start;
+            let height = core::cmp::min(fb_y_end as usize, final_buffer.height) - fb_y_start;
+            
+            for i in 0..height {
+                let dest_start = (fb_y_start + i) * final_buffer.width + fb_x_start;
+                let dest_end = dest_start + width;
+                let src_start = src.width * ((fb_y_start + i) as i32 - y_src) as usize + (fb_x_start as i32 - x_src) as usize;
+                let src_end = src_start + width;
 
                 final_buffer.buffer[dest_start..dest_end].copy_from_slice(
                     &(src.buffer[src_start..src_end])
@@ -182,7 +200,7 @@ impl Compositor for FrameCompositor {
 /// The compositor trait.
 ///* It composes a list of buffers to a single buffer
 pub trait Compositor {
-    fn compose(bufferlist: Vec<(&FrameBuffer, usize, usize)>) -> Result<(), &'static str>;
+    fn compose(bufferlist: Vec<(&FrameBuffer, i32, i32)>) -> Result<(), &'static str>;
 }
 
 /// Get the size of the final framebuffer. Return (width, height)

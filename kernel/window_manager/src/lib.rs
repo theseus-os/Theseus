@@ -400,7 +400,7 @@ impl WindowObj{
     pub fn render(&mut self) -> Result<(), &'static str>{
         let (window_x, window_y) = { self.inner.lock().get_content_position() };
         FrameCompositor::compose(
-            vec![(&mut self.framebuffer, window_x, window_y)]
+            vec![(&mut self.framebuffer, window_x as i32, window_y as i32)]
         )
     }
 
