@@ -88,7 +88,7 @@ fn main(args: Vec<String>) -> isize {
                 println!("Invalid argument {}, not a valid adress", matches.free[0]); 
                 return -1;
             },
-        }  
+        }   
     
     }
 
@@ -96,10 +96,6 @@ fn main(args: Vec<String>) -> isize {
         println!("no arguments provided");
         return 0;
     }
-    
-    
-    
-    
 }
 
 pub fn rmain(matches: &Matches, _opts: Options, address: IpAddress) -> Result<(), &'static str> {
