@@ -22,8 +22,8 @@ use alloc::vec::Vec;
 
 pub type Pixel = u32;
 
-// The final framebuffer instance
-static FINAL_FRAME_BUFFER: Once<Mutex<FrameBuffer>> = Once::new();
+/// The final framebuffer instance. It contains the pages which are mapped to the physical framebuffer
+pub static FINAL_FRAME_BUFFER: Once<Mutex<FrameBuffer>> = Once::new();
 
 // Every pixel is of u32 type
 const PIXEL_BYTES: usize = 4;
@@ -125,8 +125,13 @@ impl FrameBuffer {
     }
 
     /// return a reference to the buffer
-    pub fn buffer(&mut self) -> &mut BoxRefMut<MappedPages, [Pixel]> {
+    pub fn buffer_mut(&mut self) -> &mut BoxRefMut<MappedPages, [Pixel]> {
         return &mut self.buffer
+    }
+
+    /// return a reference to the buffer
+    pub fn buffer(&self) -> &BoxRefMut<MappedPages, [Pixel]> {
+        return &self.buffer
     }
 
     /// get the size of the frame buffer. Return (width, height).
@@ -149,60 +154,6 @@ impl FrameBuffer {
     pub fn check_in_range(&self, x: usize, y: usize)  -> bool {
         x < self.width && y < self.height
     }
-}
-
-/// The framebuffer compositor structure. It will hold the cache of updated framebuffers for better performance.
-/// Only framebuffers that have not changed will be redisplayed in the final framebuffer 
-pub struct FrameCompositor {
-    //Cache of updated framebuffers
-}
-
-impl Compositor for FrameCompositor {
-    /// compose a list of framebuffers to the final framebuffer. Every item in the list is a reference to a framebuffer with its position
-    fn compose(bufferlist: Vec<(&FrameBuffer, i32, i32)>) -> Result<(), &'static str> {
-        let mut final_buffer = FINAL_FRAME_BUFFER.try().ok_or("FrameCompositor fails to get the final frame buffer")?.lock();
-
-        // Check if the virtul frame buffer is in the mapped frame list
-        for (src, offset_x, offset_y) in bufferlist {
-
-            let fb_x_end = offset_x + src.width as i32;
-            let fb_y_end = offset_y + src.height as i32;
-
-            // skip if the framebuffer is not in the screen
-            if (fb_x_end < 0 || offset_x > final_buffer.width as i32) {
-                break;
-            }
-            if (fb_y_end < 0 || offset_y > final_buffer.height as i32) {
-                break;
-            }
-
-            let fb_x_start = core::cmp::max(0, offset_x) as usize;
-            let fb_y_start = core::cmp::max(0, offset_y) as usize;
-
-            // just composite the area that within the final buffer
-            let width = core::cmp::min(fb_x_end as usize, final_buffer.width) - fb_x_start;
-            let height = core::cmp::min(fb_y_end as usize, final_buffer.height) - fb_y_start;
-            
-            for i in 0..height {
-                let dest_start = (fb_y_start + i) * final_buffer.width + fb_x_start;
-                let dest_end = dest_start + width;
-                let src_start = src.width * ((fb_y_start + i) as i32 - offset_y) as usize + (fb_x_start as i32 - offset_x) as usize;
-                let src_end = src_start + width;
-
-                final_buffer.buffer[dest_start..dest_end].copy_from_slice(
-                    &(src.buffer[src_start..src_end])
-                );
-            }
-        }
-
-        Ok(())
-    }
-}
-
-/// The compositor trait.
-///* It composes a list of buffers to a single buffer
-pub trait Compositor {
-    fn compose(bufferlist: Vec<(&FrameBuffer, i32, i32)>) -> Result<(), &'static str>;
 }
 
 /// Get the size of the final framebuffer. Return (width, height)

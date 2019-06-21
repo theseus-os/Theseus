@@ -209,6 +209,10 @@ version = "0.1.11"
 source = "git+https://github.com/rust-lang-nursery/compiler-builtins#045de6e5166ebaf8b74ad9d97b6bb09d5d28c982"
 
 [[package]]
+name = "compositor"
+version = "0.1.0"
+
+[[package]]
 name = "context_switch"
 version = "0.1.0"
 dependencies = [
@@ -345,6 +349,7 @@ dependencies = [
  "event_types 0.1.0",
  "font 0.1.0",
  "frame_buffer 0.1.0",
+ "frame_buffer_compositor 0.1.0",
  "frame_buffer_drawer 0.1.0",
  "frame_buffer_printer 0.1.0",
  "lazy_static 1.2.0 (registry+https://github.com/rust-lang/crates.io-index)",
@@ -476,6 +481,19 @@ name = "frame_buffer"
 version = "0.1.0"
 dependencies = [
  "acpi 0.1.0",
+ "log 0.3.9 (registry+https://github.com/rust-lang/crates.io-index)",
+ "memory 0.1.0",
+ "owning_ref 0.4.0 (git+https://github.com/kevinaboos/owning-ref-rs)",
+ "spin 0.4.10 (registry+https://github.com/rust-lang/crates.io-index)",
+]
+
+[[package]]
+name = "frame_buffer_compositor"
+version = "0.1.0"
+dependencies = [
+ "acpi 0.1.0",
+ "compositor 0.1.0",
+ "frame_buffer 0.1.0",
  "log 0.3.9 (registry+https://github.com/rust-lang/crates.io-index)",
  "memory 0.1.0",
  "owning_ref 0.4.0 (git+https://github.com/kevinaboos/owning-ref-rs)",
@@ -1822,11 +1840,13 @@ source = "registry+https://github.com/rust-lang/crates.io-index"
 name = "window_manager"
 version = "0.1.0"
 dependencies = [
+ "compositor 0.1.0",
  "dfqueue 0.1.0",
  "displayable 0.1.0",
  "event_types 0.1.0",
  "font 0.1.0",
  "frame_buffer 0.1.0",
+ "frame_buffer_compositor 0.1.0",
  "frame_buffer_drawer 0.1.0",
  "frame_buffer_printer 0.1.0",
  "lazy_static 1.2.0 (registry+https://github.com/rust-lang/crates.io-index)",

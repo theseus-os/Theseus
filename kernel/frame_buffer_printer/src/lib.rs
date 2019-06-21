@@ -81,7 +81,7 @@ fn print_byte(framebuffer: &mut FrameBuffer, byte: u8, font_color: u32, bg_color
     loop {
         let mask: u32 = fonts[byte as usize][i][j];
         let index = framebuffer.index(x + j, y + i);
-        framebuffer.buffer()[index] = font_color & mask | bg_color & (!mask);
+        framebuffer.buffer_mut()[index] = font_color & mask | bg_color & (!mask);
         j += 1;
         if j == CHARACTER_WIDTH {
             i += 1;
@@ -108,7 +108,7 @@ fn fill_blank(framebuffer: &mut FrameBuffer, left: usize, top: usize, right: usi
         }
         let start = framebuffer.index(left, y);
         let end = framebuffer.index(right, y);
-        framebuffer.buffer()[start..end].copy_from_slice(&fill);
+        framebuffer.buffer_mut()[start..end].copy_from_slice(&fill);
         y += 1;
     }
 }
