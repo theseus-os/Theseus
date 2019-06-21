@@ -4,30 +4,16 @@
 
 #![no_std]
 
-extern crate spin;
-extern crate acpi;
-extern crate memory;
 extern crate alloc;
-extern crate owning_ref;
 extern crate frame_buffer;
 extern crate compositor;
 #[macro_use] extern crate log;
 
-use owning_ref::BoxRefMut;
-use spin::{Mutex, Once};
-use memory::{FRAME_ALLOCATOR, Frame, PageTable, PhysicalAddress, 
-    EntryFlags, MappedPages, MemoryManagementInfo,
-    get_kernel_mmi_ref};
-use core::ops::DerefMut;
-use alloc::boxed::Box;
 use alloc::vec::Vec;
 use frame_buffer::{FrameBuffer, FINAL_FRAME_BUFFER};
 use compositor::Compositor;
 
 pub type Pixel = u32;
-
-// Every pixel is of u32 type
-const PIXEL_BYTES: usize = 4;
 
 /// The framebuffer compositor structure. It will hold the cache of updated framebuffers for better performance.
 /// Only framebuffers that have not changed will be redisplayed in the final framebuffer 
@@ -40,7 +26,7 @@ impl Compositor<FrameBuffer> for FrameCompositor {
     fn compose(bufferlist: Vec<(&FrameBuffer, i32, i32)>) -> Result<(), &'static str> {
         let mut final_fb = FINAL_FRAME_BUFFER.try().ok_or("FrameCompositor fails to get the final frame buffer")?.lock();
         let (final_width, final_height) = final_fb.get_size();        
-        let mut final_buffer = final_fb.buffer_mut();
+        let final_buffer = final_fb.buffer_mut();
         // Check if the virtul frame buffer is in the mapped frame list
         for (src_fb, offset_x, offset_y) in bufferlist {
             let (src_width, src_height) = src_fb.get_size();
@@ -49,10 +35,10 @@ impl Compositor<FrameBuffer> for FrameCompositor {
             let final_y_end = offset_y + src_height as i32;
 
             // skip if the framebuffer is not in the screen
-            if (final_x_end < 0 || offset_x > final_width as i32) {
+            if final_x_end < 0 || offset_x > final_width as i32 {
                 break;
             }
-            if (final_y_end < 0 || offset_y > final_height as i32) {
+            if final_y_end < 0 || offset_y > final_height as i32 {
                 break;
             }
 

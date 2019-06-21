@@ -10,7 +10,7 @@ extern crate font;
 
 use alloc::vec;
 use font::{CHARACTER_HEIGHT, CHARACTER_WIDTH, FONT_PIXEL};
-use frame_buffer::{FrameBuffer, Pixel};
+use frame_buffer::{FrameBuffer};
 
 /// Print a string in a framebuffer.
 /// The string is printed at position (x, y) of the framebuffer. 

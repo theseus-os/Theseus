@@ -1,6 +1,5 @@
 //! This crate is a frame buffer manager. 
 //! * It defines a FrameBuffer structure and creates new framebuffers for applications
-//! * It defines a compositor and owns a final framebuffer which is mapped to the physical framebuffer. The compositor will composite a sequence of framebuffers and display them in the final framebuffer
 
 #![no_std]
 
@@ -18,7 +17,6 @@ use memory::{FRAME_ALLOCATOR, Frame, PageTable, PhysicalAddress,
     get_kernel_mmi_ref};
 use core::ops::DerefMut;
 use alloc::boxed::Box;
-use alloc::vec::Vec;
 
 pub type Pixel = u32;
 

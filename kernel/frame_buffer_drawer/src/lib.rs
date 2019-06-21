@@ -11,7 +11,7 @@ extern crate font;
 
 use alloc::vec;
 use font::{CHARACTER_HEIGHT, CHARACTER_WIDTH, FONT_PIXEL};
-use frame_buffer::{FrameBuffer, Pixel};
+use frame_buffer::{FrameBuffer};
 use frame_buffer_pixel_drawer::draw_pixel;
 
 /// Draw a pixel in a framebuffer.
