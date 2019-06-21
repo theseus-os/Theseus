@@ -1,0 +1,14 @@
+[package]
+name = "compositor"
+version = "0.1.0"
+authors = ["Wenqiu Yu <yuwenqiuj@gmail.com>"]
+description = "a compositor trait which composites a list of buffers to a single buffer"
+build = "../../build.rs"
+
+[dependencies]
+
+# [build]
+# rustflags = ["-C", "prefer-dynamic", "-C", "panic=abort"]
+
+[lib]
+crate-type = ["rlib"]
