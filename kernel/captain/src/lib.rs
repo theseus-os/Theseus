@@ -143,7 +143,7 @@ pub fn init(
             trace!("font initialized successfully.");
         }
         Err(err) => { 
-            println_raw!("captain::init(): failed to initialize font");
+            error!("captain::init(): failed to initialize font");
             return Err(err);
         }
     }
@@ -155,7 +155,7 @@ pub fn init(
             trace!("window manager initialized successfully.");
         }
         Err(err) => { 
-            println_raw!("captain::init(): failed to initialize window manager");
+            error!("captain::init(): failed to initialize window manager");
             return Err(err);
         }
     }
