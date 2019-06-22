@@ -66,14 +66,12 @@ impl FrameBuffer {
     pub fn new(width: usize, height: usize, physical_address: Option<PhysicalAddress>) -> Result<FrameBuffer, &'static str>{       
         // get a reference to the kernel's memory mapping information
         let kernel_mmi_ref = memory::get_kernel_mmi_ref().ok_or("KERNEL_MMI was not yet initialized!")?;
-
         let allocator = try!(FRAME_ALLOCATOR.try().ok_or("Couldn't get Frame Allocator"));
         
+        let vesa_display_flags: EntryFlags = EntryFlags::PRESENT | EntryFlags::WRITABLE | EntryFlags::GLOBAL | EntryFlags::NO_CACHE;
+
         let size = width * height * PIXEL_BYTES;
         let pages = memory::allocate_pages_by_bytes(size).ok_or("could not allocate pages")?;
-   
-        // the default flag is that the MappedPages are not writable
-        let vesa_display_flags: EntryFlags = EntryFlags::PRESENT | EntryFlags::WRITABLE | EntryFlags::GLOBAL | EntryFlags::NO_CACHE;
         
         let mapped_frame_buffer = if let Some(address) = physical_address {
             let frame = FrameRange::from_phys_addr(address, size);
@@ -82,49 +80,15 @@ impl FrameBuffer {
             try!(kernel_mmi_ref.lock().page_table.map_allocated_pages(pages, vesa_display_flags, allocator.lock().deref_mut()))
         };
 
+        // create a refence to transmute the mapped frame buffer pages as a slice
         let buffer = BoxRefMut::new(Box::new(mapped_frame_buffer)).
             try_map_mut(|mp| mp.as_slice_mut(0, width * height))?;
     
-        return Ok(FrameBuffer{
+        Ok(FrameBuffer{
             width: width,
             height: height,
             buffer: buffer
-        });         
-        
-        // match kernel_page_table {
-        //     &mut PageTable::Active(ref mut active_table) => {
-        //         //Map the physical frame buffer memory
-        //         let pages = match memory::allocate_pages_by_bytes(size) {
-        //             Some(pages) => { pages },
-        //             None => { return Err("FrameBuffer::new() couldn't allocate pages."); }
-        //         };
-                
-        //         let allocator_mutex = FRAME_ALLOCATOR.try();
-        //         match allocator_mutex {
-        //             Some(_) => { },
-        //             None => { return Err("FrameBuffer::new() couldn't get frame allocator"); }
-        //         }
-
-        //         let mut allocator = try!(allocator_mutex.ok_or("allocate frame buffer")).lock();
-        //         let mapped_frame_buffer = if let Some(address) = physical_address {                
-        //             try!(active_table.map_allocated_pages_to(
-        //                 pages, 
-        //                 vesa_display_flags, 
-        //                 allocator.deref_mut())
-        //             )
-        //         } else {
-        //             try!(active_table.map_allocated_pages(
-        //                 pages, 
-        //                 vesa_display_flags, 
-        //                 allocator.deref_mut())
-        //             )
-        //         };
-    
-        //     },
-        //     _ => { 
-        //         return Err("FrameBuffer::new()  Couldn't get kernel's active_table");
-        //     }
-        // }
+        })
     }
 
     /// return a reference to the buffer
