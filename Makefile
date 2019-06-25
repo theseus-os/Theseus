@@ -13,12 +13,19 @@ all: iso
 IS_WSL = $(shell grep -s 'Microsoft' /proc/version)
 
 
-## Tool names/locations for cross-compiling on Mac OS (darwin)
-## Note that the GRUB_CROSS variable must match the build output of "scripts/mac_os_build_setup.sh"
+## Tool names/locations for cross-compiling on a Mac OS / macOS host (Darwin).
 UNAME = $(shell uname -s)
 ifeq ($(UNAME),Darwin)
 	CROSS = x86_64-elf-
+	## The GRUB_CROSS variable must match the build output of "scripts/mac_os_build_setup.sh"
 	GRUB_CROSS = "$(HOME)"/theseus_tools_opt/bin/
+	## macOS uses a different unmounting utility
+	UNMOUNT = diskutil unmount
+	USB_DRIVES = $(shell diskutil list external | grep -s "/dev/" | awk '{print $$1}')
+else
+	## Just use normal umount on Linux/WSL
+	UNMOUNT = umount
+	USB_DRIVES = $(shell lsblk -O | grep -i usb | awk '{print $$2}' | grep --color=never '[^0-9]$$')
 endif
 GRUB_MKRESCUE = $(GRUB_CROSS)grub-mkrescue
 	
@@ -552,7 +559,6 @@ bochs: $(iso)
 
 
 
-USB_DRIVES = $(shell lsblk -O | grep -i usb | awk '{print $$2}' | grep --color=never '[^0-9]$$')
 
 ### Checks that the supplied usb device (for usage with the boot/pxe targets).
 ### Note: this is bypassed on WSL, because WSL doesn't support raw device files yet.
@@ -579,9 +585,9 @@ ifneq ($(IS_WSL), )
 	@echo -e "\n\033[1;32mThe build finished successfully\033[0m, but WSL is unable to access raw USB devices. Instead, you must burn the ISO to a USB drive yourself."
 	@echo -e "The ISO file is available at \"$(iso)\"."
 else
-## building on regular linux
-	@umount /dev/$(usb)* 2> /dev/null  |  true  # force it to return true
-	@sudo dd bs=4M if=$(iso) of=/dev/$(usb)
+## building on Linux or macOS
+	@$(UNMOUNT) /dev/$(usb)* 2> /dev/null  |  true  ## force it to return true
+	@sudo dd bs=4194304 if=$(iso) of=/dev/$(usb)    ## use 4194304 instead of 4M because macOS doesn't support 4M
 	@sync
 endif
 	
