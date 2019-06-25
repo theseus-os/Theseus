@@ -139,9 +139,9 @@ fn get_default_iface() -> Result<NetworkInterfaceRef, String> {
         .ok_or_else(|| format!("no network interfaces available"))
 }
 
-// Retrieves the echo reply contained in the recieve buffer and prints data pertaining to the packet
+// Retrieves the echo reply contained in the receive buffer and prints data pertaining to the packet
 fn get_icmp_pong (waiting_queue: &mut HashMap<u16, i64>, times: &mut Vec<i64>, total_time: &mut i64, 
-    repr: Icmpv4Repr, recieved: &mut u16, remote_addr: IpAddress, timestamp: i64)  {
+    repr: Icmpv4Repr, received: &mut u16, remote_addr: IpAddress, timestamp: i64)  {
     
     if let Icmpv4Repr::EchoReply { seq_no, data, ..} = repr {
         if let Some(_) = waiting_queue.get(&seq_no) {
@@ -152,7 +152,7 @@ fn get_icmp_pong (waiting_queue: &mut HashMap<u16, i64>, times: &mut Vec<i64>, t
                         timestamp - packet_timestamp_ms);
             
             waiting_queue.remove(&seq_no);
-            *recieved += 1;
+            *received += 1;
             times.push((timestamp - packet_timestamp_ms) as i64);
             *total_time += timestamp - packet_timestamp_ms;
         }
@@ -259,8 +259,8 @@ fn ping(address: IpAddress, count: usize, interval: i64, timeout: i64, verbose: 
             send_at += interval;
             }
 
-            // Once the socket can successfully recieve the echo reply, unload the payload and
-            // then return the current time as well as wether the ping has been recieved         
+            // Once the socket can successfully receive the echo reply, unload the payload and
+            // then return the current time as well as wether the ping has been received         
             if socket.can_recv() {
                 let (payload, _) = match socket.recv() {
                     Ok((packet_buff,end_point)) => (packet_buff, end_point),
