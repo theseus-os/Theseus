@@ -5,12 +5,17 @@
 
 extern crate alloc;
 extern crate frame_buffer;
+extern crate frame_buffer_pixel_drawer;
 extern crate compositor;
 #[macro_use] extern crate log;
+extern crate memory;
+extern crate owning_ref;
 
 use alloc::vec::Vec;
-use frame_buffer::{FrameBuffer, FINAL_FRAME_BUFFER};
+use frame_buffer::{FrameBuffer, FINAL_FRAME_BUFFER, Pixel};
 use compositor::Compositor;
+use owning_ref::BoxRefMut;
+use memory::{MappedPages};
 
 /// The framebuffer compositor structure. It will hold the cache of updated framebuffers for better performance.
 /// Only framebuffers that have not changed will be redisplayed in the final framebuffer 
@@ -50,17 +55,47 @@ impl Compositor<FrameBuffer> for FrameCompositor {
 
             for i in 0..height {
                 let dest_start = (final_y_start + i) * final_width + final_x_start;
-                let dest_end = dest_start + width;
                 let src_start = src_width * ((final_y_start + i) as i32 - offset_y) as usize + 
                     (final_x_start as i32 - offset_x) as usize;
-                let src_end = src_start + width;
-
-                final_buffer[dest_start..dest_end].copy_from_slice(
-                    &(src_buffer[src_start..src_end])
-                );
+                render(final_buffer, src_buffer, dest_start, src_start, width);
             }
         }
 
         Ok(())
+    }
+}
+
+// copy a line of pixels from src framebuffer to the dest framebuffer. For better performance, we use memory copy instead of pixel drawer
+fn render(dest_buffer: &mut BoxRefMut<MappedPages, [Pixel]>,
+    src_buffer: &BoxRefMut<MappedPages, [Pixel]>,
+    dest_start: usize,
+    src_start: usize,
+    len: usize,
+) {
+    let dest_end = dest_start + len;
+    let src_end = src_start + len;
+    dest_buffer[dest_start..dest_end].copy_from_slice(
+        &(src_buffer[src_start..src_end])
+    );
+}
+
+// copy a line of pixels from src framebuffer to the dest framebuffer in 3d mode. 
+// We need 3d pixel drawer because we should compare the depth of every pixel
+fn render_3d(dest_buffer: &mut BoxRefMut<MappedPages, [Pixel]>,
+    src_buffer: &BoxRefMut<MappedPages, [Pixel]>,
+    dest_start: usize,
+    src_start: usize,
+    len: usize
+) {
+    let mut dest_index = dest_start;
+    let dest_end = dest_start + len;
+    let mut src_index = src_start;
+    loop {
+        frame_buffer_pixel_drawer::write_to_3d(dest_buffer, dest_index, src_buffer[src_index]);
+        dest_index += 1;
+        src_index += 1;
+        if dest_index == dest_end {
+            break;
+        }
     }
 }
