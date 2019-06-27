@@ -16,6 +16,7 @@ use memory::{FRAME_ALLOCATOR, FrameRange, PhysicalAddress,
     EntryFlags, allocate_pages_by_bytes, MappedPages, get_kernel_mmi_ref};
 use core::ops::DerefMut;
 use alloc::boxed::Box;
+use core::hash::{Hash};
 
 /// A Pixel is a u32 interger. The lower 24 bits of a Pixel specifies the RGB color of a pixel
 pub type Pixel = u32;
@@ -53,6 +54,7 @@ pub fn init() -> Result<(), &'static str > {
 }
 
 /// The virtual frame buffer struct. It contains the size of the buffer and a buffer array
+#[derive(Hash)]
 pub struct FrameBuffer {
     width: usize,
     height: usize,

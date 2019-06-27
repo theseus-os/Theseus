@@ -39,7 +39,7 @@ use alloc::sync::{Arc, Weak};
 use frame_buffer::{FrameBuffer};
 use frame_buffer_drawer::*;
 use frame_buffer_printer::print_by_bytes;
-use frame_buffer_compositor::FrameCompositor;
+use frame_buffer_compositor::{FRAME_COMPOSITOR};
 use compositor::Compositor;
 use event_types::Event;
 use alloc::string::{String, ToString};
@@ -47,7 +47,7 @@ use displayable::{TextDisplay, Cursor};
 use font::{CHARACTER_HEIGHT, CHARACTER_WIDTH};
 
 lazy_static! {
-    /// The list of all Tasks in the system.
+    /// The list of all windows in the system.
     static ref WINDOWLIST: Mutex<WindowList> = Mutex::new(
         WindowList{
             list: VecDeque::new(),
@@ -403,7 +403,7 @@ impl WindowObj{
     /// Display the content in the framebuffer of the window on the screen
     pub fn render(&mut self) -> Result<(), &'static str>{
         let (window_x, window_y) = { self.inner.lock().get_content_position() };
-        FrameCompositor::compose(
+        FRAME_COMPOSITOR.lock().compose(
             vec![(&mut self.framebuffer, window_x as i32, window_y as i32)]
         )
     }
@@ -529,7 +529,7 @@ impl WindowInner {
         let mut buffer_lock = buffer_ref.lock();
         let buffer = buffer_lock.deref_mut();
         draw_rectangle(buffer, self.x, self.y, self.width, self.height, SCREEN_BACKGROUND_COLOR);
-        FrameCompositor::compose(
+        FRAME_COMPOSITOR.lock().compose(
             vec![(buffer, 0, 0)]
         )
     }
@@ -567,7 +567,7 @@ impl WindowInner {
         let mut buffer_lock = buffer_ref.lock();
         let buffer = buffer_lock.deref_mut();
         draw_rectangle(buffer, self.x, self.y, self.width, self.height, color);
-        FrameCompositor::compose(
+        FRAME_COMPOSITOR.lock().compose(
             vec![(buffer, 0, 0)]
         )
     }

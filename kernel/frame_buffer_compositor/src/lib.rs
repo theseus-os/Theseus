@@ -2,6 +2,7 @@
 //! A framebuffer compositor will compose a sequence of framebuffers and display them in the final framebuffer
 
 #![no_std]
+#![feature(const_vec_new)]
 
 extern crate alloc;
 extern crate frame_buffer;
@@ -10,27 +11,47 @@ extern crate compositor;
 #[macro_use] extern crate log;
 extern crate memory;
 extern crate owning_ref;
+extern crate spin;
+#[macro_use] extern crate lazy_static;
 
 use alloc::vec::Vec;
+use alloc::collections::BTreeMap;
+use spin::Mutex;
 use frame_buffer::{FrameBuffer, FINAL_FRAME_BUFFER, Pixel};
 use compositor::Compositor;
 use owning_ref::BoxRefMut;
 use memory::{MappedPages};
+use core::hash::{Hash, Hasher, SipHasher};
+
+
+lazy_static! {
+    /// The instance of frame buffer compositor.
+    pub static ref FRAME_COMPOSITOR: Mutex<FrameCompositor> = Mutex::new(
+        FrameCompositor{
+            cache:BTreeMap::new()        
+        }
+    );
+}
 
 /// The framebuffer compositor structure. It will hold the cache of updated framebuffers for better performance.
 /// Only framebuffers that have not changed will be redisplayed in the final framebuffer 
 pub struct FrameCompositor {
     //Cache of updated framebuffers
+    cache: BTreeMap<u64, (i32, i32)>
 }
 
 impl Compositor<FrameBuffer> for FrameCompositor {
     // compose a list of framebuffers to the final framebuffer. Every item in the list is a reference to a framebuffer with its position
-    fn compose(bufferlist: Vec<(&FrameBuffer, i32, i32)>) -> Result<(), &'static str> {
+    fn compose(&mut self, bufferlist: Vec<(&FrameBuffer, i32, i32)>) -> Result<(), &'static str> {
         let mut final_fb = FINAL_FRAME_BUFFER.try().ok_or("FrameCompositor fails to get the final frame buffer")?.lock();
         let (final_width, final_height) = final_fb.get_size();        
         let final_buffer = final_fb.buffer_mut();
         // Check if the virtul frame buffer is in the mapped frame list
         for (src_fb, offset_x, offset_y) in bufferlist {
+            if self.cached(src_fb, offset_x, offset_y) {
+                continue;
+            }
+
             let (src_width, src_height) = src_fb.get_size();
 
             let final_x_end = offset_x + src_width as i32;
@@ -59,9 +80,24 @@ impl Compositor<FrameBuffer> for FrameCompositor {
                     (final_x_start as i32 - offset_x) as usize;
                 render(final_buffer, src_buffer, dest_start, src_start, width);
             }
+
+            self.cache.insert(hash(&src_fb), (offset_x, offset_y));
         }
 
         Ok(())
+    }
+
+    fn cached(&self, frame_buffer:&FrameBuffer, x:i32, y:i32) -> bool {
+        match self.cache.get(&hash(frame_buffer)) {
+            Some((cached_x, cached_y)) => {
+                if *cached_x == x && *cached_y == y {
+                    return true
+                } else {
+                    return false
+                }
+            },
+            None => { return false}
+        }
     }
 }
 
@@ -98,4 +134,10 @@ fn render_3d(dest_buffer: &mut BoxRefMut<MappedPages, [Pixel]>,
             break;
         }
     }
+}
+
+fn hash<T: Hash>(t: &T) -> u64 {
+    let mut s = SipHasher::new();
+    t.hash(&mut s);
+    s.finish()
 }

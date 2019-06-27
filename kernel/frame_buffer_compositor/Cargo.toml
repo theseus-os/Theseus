@@ -7,6 +7,7 @@ build = "../../build.rs"
 
 [dependencies]
 owning_ref = { git = "https://github.com/kevinaboos/owning-ref-rs" }
+spin = "0.4.10"
 
 [dependencies.frame_buffer]
 path = "../frame_buffer"
@@ -23,6 +24,10 @@ path = "../frame_buffer_pixel_drawer"
 [dependencies.log]
 default-features = false
 version = "0.3.7"
+
+[dependencies.lazy_static]
+features = ["spin_no_std", "nightly"]
+version = "1.2.0"
 
 # [build]
 # rustflags = ["-C", "prefer-dynamic", "-C", "panic=abort"]
