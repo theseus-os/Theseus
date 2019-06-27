@@ -136,14 +136,13 @@ pub fn new_window<'a>(x: usize, y: usize, width: usize, height: usize) -> Result
     let inner_ref = Arc::new(Mutex::new(inner));
 
     let mut window_list = WINDOWLIST.lock();
-    window_list.add(&inner_ref);
-    
+    window_list.add_active(&inner_ref);
     // active the void window content
     {
         let mut inner = inner_ref.lock();
         inner.clean()?;
         inner.active(true)?;
-        window_list.active = Arc::downgrade(&inner_ref); 
+        //window_list.active = Arc::downgrade(&inner_ref); 
     }
 
     // create the window
@@ -181,7 +180,7 @@ fn get_border_color(active: bool) -> u32 {
 
 impl WindowList{
     // add a new window to the list
-    fn add(&mut self, inner_ref: &Arc<Mutex<WindowInner>>) {
+    fn add_active(&mut self, inner_ref: &Arc<Mutex<WindowInner>>) {
         // // inactive all other windows and active the new one
         // for item in self.list.iter_mut(){
         //     let ref_opt = item.upgrade();
@@ -191,13 +190,22 @@ impl WindowList{
         // }
 
         // Add a reference of the new window to the window list
-        let weak_ref = Arc::downgrade(&inner_ref);
+        let weak_ref = self.active.clone();
         // window_list.active = weak_ref.clone();
         self.list.push_back(weak_ref);
+        self.active = Arc::downgrade(inner_ref);
     }
 
     // delete a window
     fn delete(&mut self, inner: &Arc<Mutex<WindowInner>>) -> Result<(), &'static str> {
+        let active = self.active.upgrade();
+        if let Some(active_ref) = active {
+            if Arc::ptr_eq(&(active_ref), inner) {
+                active_window(0, false)?;
+                return Ok(());
+            }
+        }
+
         let mut i = 0;
         let len = self.list.len();
         for item in self.list.iter(){
@@ -256,31 +264,32 @@ impl WindowList{
 
     // return a reference to the next window of current active window
     fn next(&mut self) -> Option<Arc<Mutex<WindowInner>>> {
-        let mut current_active = false;
-        for item in self.list.iter_mut(){
-            let reference = item.upgrade();
-            if let Some(window) = reference {
-                if window.lock().active {
-                    current_active = true;
-                } else if current_active {
-                    return Some(window)
-                }
-            }
-        }
+        // let mut current_active = false;
+        // for item in self.list.iter_mut(){
+        //     let reference = item.upgrade();
+        //     if let Some(window) = reference {
+        //         if window.lock().active {
+        //             current_active = true;
+        //         } else if current_active {
+        //             return Some(window)
+        //         }
+        //     }
+        // }
 
-        if current_active {
-            for item in self.list.iter_mut(){
-                let reference = item.upgrade();
-                if let Some(window) = reference {
-                    return Some(window)
-                }
-            }
+        // if current_active {
+        //     for item in self.list.iter_mut(){
+        //         let reference = item.upgrade();
+        //         if let Some(window) = reference {
+        //             return Some(window)
+        //         }
+        //     }
+        // }
+        if let Some(weak_ref) = self.list.pop_front() {
+            return weak_ref.upgrade();
         }
 
         None
     }
-
-
 }
 
 /// A window contains a reference to its inner reference owned by the window manager,
@@ -489,15 +498,10 @@ impl Drop for WindowObj {
 
         // Switches to a new active window and sets 
         // the active pointer field of the window allocator to the new active window
-        match switch_to_next() {
+        match active_window(0, false) {
             Ok(_) => {}
             Err(err) => { error!("Fail to schedule to the next window: {}", err) }
         }; 
-        
-        match window_list.delete(&(self.inner)) {
-            Ok(()) => {}
-            Err(err) => { error!("Fail to delete the window from the window manager: {}", err) }
-        }
     }
 }
 
@@ -624,22 +628,60 @@ impl Component {
 
 /// select the next window in the list and set it as active. set current active window and inactive
 pub fn switch_to_next() -> Result<(), &'static str>{
-    let mut window_list = WINDOWLIST.lock();
-    let next_window = match window_list.next() {
-        Some(window) => { window }
-        None => { return Ok(()) } //do nothing if current active window is the only window
-    };
+    active_window(0, true)
+}
 
-    // set current window as inactive    
+/// select the next window in the list and set it as active. set current active window and inactive
+pub fn switch_to(window:&WindowObj) -> Result<(), &'static str>{
+    let mut i = 0;
+    {
+        let mut window_list = WINDOWLIST.lock();
+        let len = window_list.list.len();
+        for item in window_list.list.iter(){
+            let reference = item.upgrade();
+            if let Some(inner_ptr) = reference {
+                if Arc::ptr_eq(&(inner_ptr), &window.inner) {
+                    break;
+                }
+            }
+            i += 1;
+        }
+
+        if i == len {
+            return Ok(());
+        }
+    }
+    
+    // set current window as inactive and active the ith window    
+    active_window(i, true)?;
+
+    Ok(())
+}
+
+
+// active a window of index. backup specifices whether current active window will be backup or delete
+fn active_window(index: usize, backup: bool) -> Result<(), &'static str>{
+    let mut window_list = WINDOWLIST.lock();
+
     if let Some(window) = window_list.active.upgrade() {
         let mut current = window.lock();
-        (*current).active(false)?;
+        if backup {
+            (*current).active(false)?;
+            let old_active = window_list.active.clone();
+            window_list.list.push_back(old_active);
+        } else {
+            (*current).clean()?;
+
+        }
     }
 
-    // set next window as active
-    let mut next = next_window.lock();
-    (*next).active(true)?;
-    window_list.active = Arc::downgrade(&next_window);
+    if let Some(active) = window_list.list.remove(index) { 
+        window_list.active = active;
+        if let Some(window) = window_list.active.upgrade() {
+            let mut current = window.lock();
+            (*current).active(true)?;
+        }
+    }
 
     Ok(())
 }
