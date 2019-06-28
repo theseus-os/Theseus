@@ -6,7 +6,7 @@
 members = [
 	"kernel/[!.]*/",
 	"applications/[!.]*/",
-	"kernel/window_manager/displayable/"
+	"kernel/displayable/text_display/"
 ]
 
 

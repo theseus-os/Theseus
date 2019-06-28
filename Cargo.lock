@@ -238,6 +238,9 @@ source = "git+https://github.com/rust-lang-nursery/compiler-builtins#045de6e5166
 [[package]]
 name = "compositor"
 version = "0.1.0"
+dependencies = [
+ "frame_buffer 0.1.0",
+]
 
 [[package]]
 name = "context_switch"
@@ -370,17 +373,9 @@ dependencies = [
 name = "displayable"
 version = "0.1.0"
 dependencies = [
- "dfqueue 0.1.0",
- "event_types 0.1.0",
- "font 0.1.0",
  "frame_buffer 0.1.0",
- "frame_buffer_compositor 0.1.0",
- "frame_buffer_drawer 0.1.0",
- "frame_buffer_printer 0.1.0",
- "lazy_static 1.2.0 (registry+https://github.com/rust-lang/crates.io-index)",
  "log 0.3.9 (registry+https://github.com/rust-lang/crates.io-index)",
  "spin 0.4.10 (registry+https://github.com/rust-lang/crates.io-index)",
- "tsc 0.1.0",
 ]
 
 [[package]]
@@ -1778,6 +1773,7 @@ dependencies = [
  "spin 0.4.10 (registry+https://github.com/rust-lang/crates.io-index)",
  "task 0.1.0",
  "terminal_print 0.1.0",
+ "text_display 0.1.0",
  "window_manager 0.1.0",
  "x86_64 0.1.2",
 ]
@@ -1813,6 +1809,24 @@ dependencies = [
  "log 0.3.9 (registry+https://github.com/rust-lang/crates.io-index)",
  "task 0.1.0",
  "terminal_print 0.1.0",
+]
+
+[[package]]
+name = "text_display"
+version = "0.1.0"
+dependencies = [
+ "dfqueue 0.1.0",
+ "displayable 0.1.0",
+ "event_types 0.1.0",
+ "font 0.1.0",
+ "frame_buffer 0.1.0",
+ "frame_buffer_compositor 0.1.0",
+ "frame_buffer_pixel_drawer 0.1.0",
+ "frame_buffer_printer 0.1.0",
+ "lazy_static 1.2.0 (registry+https://github.com/rust-lang/crates.io-index)",
+ "log 0.3.9 (registry+https://github.com/rust-lang/crates.io-index)",
+ "spin 0.4.10 (registry+https://github.com/rust-lang/crates.io-index)",
+ "tsc 0.1.0",
 ]
 
 [[package]]
@@ -1955,6 +1969,7 @@ dependencies = [
  "lazy_static 1.2.0 (registry+https://github.com/rust-lang/crates.io-index)",
  "log 0.3.9 (registry+https://github.com/rust-lang/crates.io-index)",
  "spin 0.4.10 (registry+https://github.com/rust-lang/crates.io-index)",
+ "text_display 0.1.0",
 ]
 
 [[package]]

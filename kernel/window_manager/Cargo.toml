@@ -38,7 +38,10 @@ path = "../event_types"
 path = "../font"
 
 [dependencies.displayable]
-path = "displayable"
+path = "../displayable"
+
+[dependencies.text_display]
+path = "../displayable/text_display"
 
 [dependencies.lazy_static]
 features = ["spin_no_std", "nightly"]

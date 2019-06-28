@@ -46,7 +46,7 @@ impl Compositor<FrameBuffer> for FrameCompositor {
         let mut final_fb = FINAL_FRAME_BUFFER.try().ok_or("FrameCompositor fails to get the final frame buffer")?.lock();
         let (final_width, final_height) = final_fb.get_size();        
         let final_buffer = final_fb.buffer_mut();
-        // Check if the virtul frame buffer is in the mapped frame list
+
         for (src_fb, offset_x, offset_y) in bufferlist {
             if self.cached(src_fb, offset_x, offset_y) {
                 continue;
@@ -58,17 +58,15 @@ impl Compositor<FrameBuffer> for FrameCompositor {
             let final_y_end = offset_y + src_height as i32;
 
             // skip if the framebuffer is not in the screen
-            if final_x_end < 0 || offset_x > final_width as i32 {
-                break;
-            }
-            if final_y_end < 0 || offset_y > final_height as i32 {
+            if final_x_end < 0 || offset_x > final_width as i32
+                || final_y_end < 0 || offset_y > final_height as i32  {
                 break;
             }
 
             let final_x_start = core::cmp::max(0, offset_x) as usize;
             let final_y_start = core::cmp::max(0, offset_y) as usize;
 
-            // just composite the area that within the final buffer
+            // just compose the part which is within the final buffer
             let width = core::cmp::min(final_x_end as usize, final_width) - final_x_start;
             let height = core::cmp::min(final_y_end as usize, final_height) - final_y_start;
             
@@ -78,7 +76,7 @@ impl Compositor<FrameBuffer> for FrameCompositor {
                 let dest_start = (final_y_start + i) * final_width + final_x_start;
                 let src_start = src_width * ((final_y_start + i) as i32 - offset_y) as usize + 
                     (final_x_start as i32 - offset_x) as usize;
-                render(final_buffer, src_buffer, dest_start, src_start, width);
+                buffer_copy(final_buffer, src_buffer, dest_start, src_start, width);
             }
 
             self.cache.insert(hash(&src_fb), (offset_x, offset_y));
@@ -104,7 +102,7 @@ impl Compositor<FrameBuffer> for FrameCompositor {
 
 // Copy an arrary of pixels from src framebuffer to the dest framebuffer. 
 // We use memory copy instead of pixel drawer for better performance
-fn render(dest_buffer: &mut BoxRefMut<MappedPages, [Pixel]>,
+fn buffer_copy(dest_buffer: &mut BoxRefMut<MappedPages, [Pixel]>,
     src_buffer: &BoxRefMut<MappedPages, [Pixel]>,
     dest_start: usize,
     src_start: usize,
@@ -119,7 +117,7 @@ fn render(dest_buffer: &mut BoxRefMut<MappedPages, [Pixel]>,
 
 // Copy a line of pixels from src framebuffer to the dest framebuffer in 3d mode. 
 // We use 3d pixel drawer because we need to compare the depth of every pixel
-fn render_3d(dest_buffer: &mut BoxRefMut<MappedPages, [Pixel]>,
+fn buffer_copy_3d(dest_buffer: &mut BoxRefMut<MappedPages, [Pixel]>,
     src_buffer: &BoxRefMut<MappedPages, [Pixel]>,
     dest_start: usize,
     src_start: usize,

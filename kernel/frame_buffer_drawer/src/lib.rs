@@ -17,7 +17,7 @@ use frame_buffer_pixel_drawer::draw_pixel;
 /// Draw a pixel in a framebuffer.
 /// The pixel is drawed at position (x, y) of the framebuffer with color
 pub fn draw_point(mut framebuffer: &mut FrameBuffer, x: usize, y: usize, color: u32){    
-    if framebuffer.check_in_range(x, y) {
+    if framebuffer.check_in_buffer(x, y) {
         draw_pixel(&mut framebuffer, x, y, color);
     }
 }
@@ -41,7 +41,7 @@ pub fn draw_line(mut framebuffer: &mut FrameBuffer, start_x: i32, start_y: i32, 
                 break;
             }          
             y = (x - start_x) * height / width + start_y;
-            if framebuffer.check_in_range(x as usize, y as usize) {
+            if framebuffer.check_in_buffer(x as usize, y as usize) {
                 draw_pixel(&mut framebuffer, x as usize, y as usize, color);
             }
             x += step;
@@ -55,7 +55,7 @@ pub fn draw_line(mut framebuffer: &mut FrameBuffer, start_x: i32, start_y: i32, 
                 break;
             }
             x = (y - start_y) * width / height + start_x;
-            if { framebuffer.check_in_range(x as usize,y as usize) }{
+            if { framebuffer.check_in_buffer(x as usize,y as usize) }{
                 draw_pixel(&mut framebuffer, x as usize, y as usize, color);
             }
             y += step;   

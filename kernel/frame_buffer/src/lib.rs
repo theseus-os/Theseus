@@ -18,7 +18,7 @@ use core::ops::DerefMut;
 use alloc::boxed::Box;
 use core::hash::{Hash};
 
-/// A Pixel is a u32 interger. The lower 24 bits of a Pixel specifies the RGB color of a pixel
+/// A Pixel is a u32 integer. The lower 24 bits of a Pixel specifie the RGB color of a pixel
 pub type Pixel = u32;
 
 /// The final framebuffer instance. It contains the pages which are mapped to the physical framebuffer
@@ -62,13 +62,13 @@ pub struct FrameBuffer {
 }
 
 impl FrameBuffer {
-    /// Create a new virtual frame buffer with specified size
-    /// If the physical_address is specified, the new virtual frame buffer will be mapped to hardware's physical memory at that address
-    /// If the physical_address is none, the new function will allocate a block of physical memory at a random address and map the new frame buffer to that memory
+    /// Create a new virtual frame buffer with specified size.
+    /// If the physical_address is specified, the new virtual frame buffer will be mapped to hardware's physical memory at that address.
+    /// If the physical_address is none, the new function will allocate a block of physical memory at a random address and map the new frame buffer to that memory.
     pub fn new(width: usize, height: usize, physical_address: Option<PhysicalAddress>) -> Result<FrameBuffer, &'static str>{       
         // get a reference to the kernel's memory mapping information
         let kernel_mmi_ref = memory::get_kernel_mmi_ref().ok_or("KERNEL_MMI was not yet initialized!")?;
-        let allocator = try!(FRAME_ALLOCATOR.try().ok_or("Couldn't get Frame Allocator"));
+        let allocator = FRAME_ALLOCATOR.try().ok_or("Couldn't get Frame Allocator")?;
         
         let vesa_display_flags: EntryFlags = EntryFlags::PRESENT | EntryFlags::WRITABLE | EntryFlags::GLOBAL | EntryFlags::NO_CACHE;
 
@@ -93,7 +93,7 @@ impl FrameBuffer {
         })
     }
 
-    /// return a reference to the buffer
+    /// return a mutable reference to the buffer
     pub fn buffer_mut(&mut self) -> &mut BoxRefMut<MappedPages, [Pixel]> {
         return &mut self.buffer
     }
@@ -120,7 +120,7 @@ impl FrameBuffer {
     }
 
     /// check if a pixel (x,y) is within the framebuffer
-    pub fn check_in_range(&self, x: usize, y: usize)  -> bool {
+    pub fn check_in_buffer(&self, x: usize, y: usize)  -> bool {
         x < self.width && y < self.height
     }
 }

@@ -2,7 +2,7 @@
 name = "frame_buffer"
 version = "0.1.0"
 authors = ["Wenqiu Yu <yuwenqiuj@gmail.com>"]
-description = "manage framebuffer objects and implement a compositor to composite multiple framebuffers"
+description = "manage framebuffer objects. contain a final framebuffer which is mapped to the physical framebuffer"
 build = "../../build.rs"
 
 [dependencies]

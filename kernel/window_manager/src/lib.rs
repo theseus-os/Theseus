@@ -26,6 +26,7 @@ extern crate frame_buffer;
 extern crate frame_buffer_drawer;
 extern crate frame_buffer_printer;
 extern crate frame_buffer_compositor;
+extern crate text_display;
 extern crate compositor;
 #[macro_use] extern crate lazy_static;
 extern crate displayable;
@@ -43,7 +44,8 @@ use frame_buffer_compositor::{FRAME_COMPOSITOR};
 use compositor::Compositor;
 use event_types::Event;
 use alloc::string::{String, ToString};
-use displayable::{TextDisplay, Cursor};
+use text_display::{TextDisplay, Cursor};
+use displayable::Displayable;
 use font::{CHARACTER_HEIGHT, CHARACTER_WIDTH};
 
 lazy_static! {
@@ -427,10 +429,11 @@ impl WindowObj{
 
     /// print a string in the window with a text displayable.
     pub fn display_string(&mut self, display_name: &str, slice: &str, font_color: u32, bg_color: u32) -> Result<(), &'static str> {
-        let (display_x, display_y) = self.get_displayable_position(display_name)?;
-        let (width, height) = self.get_displayable(display_name).ok_or("The displayable does not exist")?.get_size();        
-        print_by_bytes(&mut self.framebuffer, display_x, display_y, width, height, slice, font_color, bg_color)?;
-        self.render()
+        let displayable =  self.components.get(display_name).ok_or("")?.get_displayable();
+        displayable.display(slice, 0, 0, font_color, bg_color, &mut self.framebuffer)?;
+        self.render()?;
+
+        Ok(())
     }
 
     /// display a cursor in the window with a text displayable. position is the absolute position of the cursor
@@ -497,6 +500,7 @@ impl WindowObj{
             None
         }
     }
+    
 }
 
 /// delete the reference of a window in the manager when the window is dropped
