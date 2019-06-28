@@ -1,0 +1,51 @@
+[package]
+name = "text_display"
+version = "0.1.0"
+authors = ["Wenqiu Yu <yuwenqiuj@gmail.com>"]
+description = "allocate new windows and manage a list of existing windows"
+build = "../../../build.rs"
+
+[dependencies]
+spin = "0.4.10"
+
+[dependencies.log]
+default-features = false
+version = "0.3.7"
+
+[dependencies.dfqueue]
+path = "../../../libs/dfqueue"
+version = "0.1.0"
+
+[dependencies.frame_buffer]
+path = "../../frame_buffer"
+
+[dependencies.displayable]
+path = "../"
+
+[dependencies.frame_buffer_printer]
+path = "../../frame_buffer_printer"
+
+[dependencies.event_types]
+path = "../../event_types"
+
+[dependencies.font]
+path = "../../font"
+
+[dependencies.tsc]
+path = "../../tsc"
+
+[dependencies.frame_buffer_compositor]
+path = "../../frame_buffer_compositor"
+
+[dependencies.frame_buffer_pixel_drawer]
+path = "../../frame_buffer_pixel_drawer"
+
+[dependencies.lazy_static]
+features = ["spin_no_std", "nightly"]
+version = "1.2.0"
+
+# [build]
+# rustflags = ["-C", "prefer-dynamic", "-C", "panic=abort"]
+
+[lib]
+crate-type = ["rlib"]
