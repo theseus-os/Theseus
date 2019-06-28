@@ -470,8 +470,9 @@ QEMU_FLAGS += -smp 4
 ## QEMU's OUI dictates that the MAC addr start with "52:54:00:"
 MAC_ADDR ?= 52:54:00:d1:55:01
 
-## drive and devices commands from http://forum.osdev.org/viewtopic.php?f=1&t=26483 to use sata emulation
-QEMU_FLAGS += -drive format=raw,file=random_data2.img,if=none,id=mydisk -device ide-hd,drive=mydisk,bus=ide.0,serial=4696886396
+## Add a simple disk drive (an IDE / ATA drive)
+QEMU_FLAGS += -drive format=raw,file=random_data2.img,if=ide
+# -device ide-hd,drive=mydisk,bus=ide.0,serial=4696886396
 
 ## Read about QEMU networking options here: https://www.qemu.org/2018/05/31/nic-parameter/
 ifeq ($(net),user)

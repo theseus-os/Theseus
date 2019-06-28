@@ -1,7 +1,7 @@
 [package]
-authors = ["Aryan Sefidi <aryansefidi@gmail.com>"]
-name = "ata_pio"
-description = "Support for ATA hard disks (IDE/PATA) using PIO (not DMA), and not SATA."
+authors = ["Kevin Boos <kevinaboos@gmail.com>"]
+name = "ata"
+description = "Support for accessing ATA (IDE) disks"
 version = "0.1.0"
 build = "../../build.rs"
 
@@ -18,9 +18,6 @@ path = "../../libs/port_io"
 
 [dependencies.memory]
 path = "../memory"
-
-[dependencies.pit_clock]
-path = "../pit_clock"
 
 [dependencies.pci]
 path = "../pci"

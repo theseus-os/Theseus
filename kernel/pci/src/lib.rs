@@ -8,9 +8,47 @@ extern crate spin;
 extern crate port_io;
 
 use core::fmt;
+use core::ops::{Deref, DerefMut};
 use alloc::vec::Vec;
 use port_io::Port;
 use spin::{Once, Mutex};
+
+
+
+
+// see this: http://wiki.osdev.org/PCI#PCI_Device_Structure
+pub const PCI_VENDOR_ID:             u16 = 0x0;
+pub const PCI_DEVICE_ID:             u16 = 0x2;
+pub const PCI_COMMAND:               u16 = 0x4;
+pub const PCI_STATUS:                u16 = 0x6;
+pub const PCI_REVISION_ID:           u16 = 0x8;
+pub const PCI_PROG_IF:               u16 = 0x9;
+pub const PCI_SUBCLASS:              u16 = 0xA;
+pub const PCI_CLASS:                 u16 = 0xB;
+pub const PCI_CACHE_LINE_SIZE:       u16 = 0xC;
+pub const PCI_LATENCY_TIMER:         u16 = 0xD;
+pub const PCI_HEADER_TYPE:           u16 = 0xE;
+pub const PCI_BIST:                  u16 = 0xF;
+pub const PCI_BAR0:                  u16 = 0x10;
+pub const PCI_BAR1:                  u16 = 0x14;
+pub const PCI_BAR2:                  u16 = 0x18;
+pub const PCI_BAR3:                  u16 = 0x1C;
+pub const PCI_BAR4:                  u16 = 0x20;
+pub const PCI_BAR5:                  u16 = 0x24;
+pub const PCI_CARDBUS_CIS:           u16 = 0x28;
+pub const PCI_SUBSYSTEM_VENDOR_ID:   u16 = 0x2C;
+pub const PCI_SUBSYSTEM_ID:          u16 = 0x2E;
+pub const PCI_EXPANSION_ROM_BASE:    u16 = 0x30;
+pub const PCI_CAPABILITIES:          u16 = 0x34;
+// 0x35 through 0x3B are reserved
+pub const PCI_INTERRUPT_LINE:        u16 = 0x3C;
+pub const PCI_INTERRUPT_PIN:         u16 = 0x3D;
+pub const PCI_MIN_GRANT:             u16 = 0x3E;
+pub const PCI_MAX_LATENCY:           u16 = 0x3F;
+
+
+/// The PCI configuration space address offset should set the least-significant 2 bits to zero.
+const PCI_CONFIG_ADDRESS_OFFSET_MASK: u16 = 0xFC; 
 
 const CONFIG_ADDRESS: u16 = 0xCF8;
 const CONFIG_DATA: u16 = 0xCFC;
@@ -31,10 +69,10 @@ static PCI_CONFIG_DATA_PORT: Mutex<Port<u32>> = Mutex::new( Port::new(CONFIG_DAT
 // pub static DMA_SEC_PRDT_ADDR: Once<Mutex<Port<u32>>> = Once::new();
 
 
-pub static PCI_BUSES: Once<Vec<PciBus>> = Once::new();
 
-fn get_pci_buses() -> &'static Vec<PciBus> {
-    PCI_BUSES.call_once( || { scan_pci() } )
+pub fn get_pci_buses() -> &'static Vec<PciBus> {
+    static PCI_BUSES: Once<Vec<PciBus>> = Once::new();
+    PCI_BUSES.call_once( || scan_pci() )
 }
 
 
@@ -52,157 +90,28 @@ pub fn get_pci_device_bsf(bus: u16, slot: u16, func: u16) -> Option<&'static Pci
     None
 }
 
-/// Returns a reference to the `PciDevice` with the given vendor id and device id... Ramla
+/// Returns a reference to the first `PciDevice` with the given vendor id and device id, if one exists.
+#[deprecated(note = "This should be removed. It's bad because there can be multiple devices with the same vendor/device ID... which one gets returned?")]
 pub fn get_pci_device_vd(vendor_id: u16, device_id: u16) -> Option<&'static PciDevice> {
-    for b in get_pci_buses() {
-        for d in &b.devices {
-            if d.vendor_id == vendor_id && d.device_id == device_id {
-                return Some(&d);
-            }
-        }
-    }
-    
-    None
+    pci_device_iter().filter(|dev| dev.vendor_id == vendor_id && dev.device_id == device_id).next()
 }
 
-/// Returns an iterator that iterates over all `PciDevice`s,
-/// and, if uninitialized, it initializes the PCI bus & scans it to enumerates devices.
+
+/// Returns an iterator that iterates over all `PciDevice`s, in no particular guaranteed order. 
+/// If the PCI bus hasn't been initialized, this initializes the PCI bus & scans it to enumerates devices.
 pub fn pci_device_iter() -> impl Iterator<Item = &'static PciDevice> {
     get_pci_buses().iter().flat_map(|b| b.devices.iter())
 }
 
 
-
-/// Compute a PCI address from bus, slot, func, and offset. 
-/// The least two significant bits of offset are masked, so it's 4-byte aligned addressing,
-/// which makes sense since we read PCI config data in u32 chunks.
-#[inline(always)]
-fn pci_address(bus: u16, slot: u16, func: u16, offset: u16) -> u32 {
-    ((bus as u32) << 16) | 
-    ((slot as u32) << 11) | 
-    ((func as u32) << 8) | 
-    ((offset as u32) & (PCI_CONFIG_ADDRESS_OFFSET_MASK as u32)) | 
-    0x8000_0000
-}
-
-
-/// read 32-bit data at the specified `offset` from the PCI device specified by the given `bus`, `slot`, `func` set.  Ramla
-pub fn pci_read_32(bus: u16, slot: u16, func: u16, offset: u16) -> u32 {
-    unsafe { 
-        PCI_CONFIG_ADDRESS_PORT.lock().write(pci_address(bus, slot, func, offset)); 
-    }
-    PCI_CONFIG_DATA_PORT.lock().read() >> ((offset & (!PCI_CONFIG_ADDRESS_OFFSET_MASK)) * 8)
-}
-
-/// read 16-bit data at the specified `offset` from the PCI device specified by the given `bus`, `slot`, `func` set. 
-fn pci_read_16(bus: u16, slot: u16, func: u16, offset: u16) -> u16 {
-    pci_read_32(bus, slot, func, offset) as u16
-} 
-
-/// read 8-bit data at the specified `offset` from the PCI device specified by the given `bus`, `slot`, `func` set. 
-pub fn pci_read_8(bus: u16, slot: u16, func: u16, offset: u16) -> u8 {
-    pci_read_32(bus, slot, func, offset) as u8
-}
-
-/// write data to the specified `offset` on the PCI device specified by the given `bus`, `slot`, `func` set. 
-pub fn pci_write(bus: u16, slot: u16, func: u16, offset: u16, value: u32) {
-    unsafe { 
-        PCI_CONFIG_ADDRESS_PORT.lock().write(pci_address(bus, slot, func, offset)); 
-        PCI_CONFIG_DATA_PORT.lock().write((value) << ((offset & 2) * 8));
-    }
-}
-
-/// sets the PCI device's bit 3 in the Command portion, which is apparently needed to activate DMA (??)
-pub fn pci_set_command_bus_master_bit(pci_dev: &PciDevice) {
-    unsafe { 
-        let PciDevice { bus, slot, func, ..} = pci_dev;
-        PCI_CONFIG_ADDRESS_PORT.lock().write(pci_address(*bus, *slot, *func, PCI_COMMAND));
-        let inval = PCI_CONFIG_DATA_PORT.lock().read(); 
-        trace!("pci_set_command_bus_master_bit: PciDevice: B:{} S:{} F:{} read value: {:#x}", 
-                bus, slot, func, inval);
-        PCI_CONFIG_DATA_PORT.lock().write(inval | (1 << 2));
-        trace!("pci_set_command_bus_master_bit: PciDevice: B:{} S:{} F:{} read value AFTER WRITE CMD: {:#x}", 
-                bus, slot, func, PCI_CONFIG_DATA_PORT.lock().read());
-    }
-}
-
-/// struct representing a PCI Bus, containing an array of PCI Devices
+/// A PCI bus, which contains a list of PCI devices on that bus.
 #[derive(Debug)]
-pub struct PciBus{
+pub struct PciBus {
     /// the number of this PCI bus
     pub bus_number: u16,
     /// array of devices
     pub devices: Vec<PciDevice>,
 }
-
-// the PCI configuration address port drops the least-significant 2 bits
-const PCI_CONFIG_ADDRESS_OFFSET_MASK: u16 = 0xFC; 
-
-// see this: http://wiki.osdev.org/PCI#PCI_Device_Structure
-const PCI_VENDOR_ID:             u16 = 0x0;
-const PCI_DEVICE_ID:             u16 = 0x2;
-const PCI_COMMAND:               u16 = 0x4;
-const PCI_STATUS:                u16 = 0x6;
-const PCI_REVISION_ID:           u16 = 0x8;
-const PCI_PROG_IF:               u16 = 0x9;
-const PCI_SUBCLASS:              u16 = 0xA;
-const PCI_CLASS:                 u16 = 0xB;
-const PCI_CACHE_LINE_SIZE:       u16 = 0xC;
-const PCI_LATENCY_TIMER:         u16 = 0xD;
-const PCI_HEADER_TYPE:           u16 = 0xE;
-const PCI_BIST:                  u16 = 0xF;
-const PCI_BAR0:                  u16 = 0x10;
-const PCI_BAR1:                  u16 = 0x14;
-const PCI_BAR2:                  u16 = 0x18;
-const PCI_BAR3:                  u16 = 0x1C;
-const PCI_BAR4:                  u16 = 0x20;
-const PCI_BAR5:                  u16 = 0x24;
-const PCI_CARDBUS_CIS:           u16 = 0x28;
-const PCI_SUBSYSTEM_VENDOR_ID:   u16 = 0x2C;
-const PCI_SUBSYSTEM_ID:          u16 = 0x2E;
-const PCI_EXPANSION_ROM_BASE:    u16 = 0x30;
-const PCI_CAPABILITIES:          u16 = 0x34;
-// 0x35 through 0x3B are reserved
-const PCI_INTERRUPT_LINE:        u16 = 0x3C;
-const PCI_INTERRUPT_PIN:         u16 = 0x3D;
-const PCI_MIN_GRANT:             u16 = 0x3E;
-const PCI_MAX_LATENCY:           u16 = 0x3F;
-
-
-
-/// Contains information common to every type of PCI Device
-#[derive(Debug)]
-pub struct PciDevice {
-    pub bus: u16,
-    pub slot: u16,
-    pub func: u16,
-
-    pub vendor_id: u16,
-    pub device_id: u16, 
-    pub command: u16,
-    pub status: u16,
-    pub revision_id: u8,
-    pub prof_if: u8,
-    /// subclass can also be used to determine device type http://wiki.osdev.org/PCI#Class_Codes 
-    pub subclass: u8,
-    /// class can be used to determine device type http://wiki.osdev.org/PCI#Class_Codes 
-    pub class: u8,
-    pub cache_line_size: u8,
-    pub latency_timer: u8,
-    pub header_type: u8,
-    pub bist: u8,
-    pub bars: [u32; 6],
-    pub int_pin: u8,
-    pub int_line: u8,
-}
-
-impl fmt::Display for PciDevice { 
-    fn fmt(&self, f: &mut fmt::Formatter) -> fmt::Result {
-        write!(f, "B:{} S:{} F:{}, vendor_id: {:#x}, device_id: {:#x}, command: {:#x}, status: {:#x}, class: {:#x}, subclass: {:#x}, header_type: {:#x}, bars: {:?}, int_pin: {:#x}, int_line: {:X}", 
-            self.bus, self.slot, self.func, self.vendor_id, self.device_id, self.command, self.status, self.class, self.subclass, self.header_type, self.bars, self.int_pin, self.int_line)
-    }
-}
-
 
 
 /// Scans all PCI Buses (brute force iteration) to enumerate PCI Devices on each bus.
@@ -214,49 +123,54 @@ fn scan_pci() -> Vec<PciBus> {
         let mut device_list: Vec<PciDevice> = Vec::new();
 
         for slot in 0..32 {
+            let loc_zero = PciLocation { bus, slot, func: 0 };
+            // skip the whole slot if the vendor ID is 0xFFFF
+            if 0xFFFF == loc_zero.pci_read_16(PCI_VENDOR_ID) {
+                continue;
+            }
 
-            for f in 0..8 {
-                // get vendor id of device
-                let vendor_id = pci_read_16(bus, slot, f, PCI_VENDOR_ID);
-                // if vendor ID is 0xFFFF, no device is connected
+            // If the header's MSB is set, then there are multiple functions for this device,
+            // and we should check all 8 of them to be sure.
+            // Otherwise, only need to 
+            let header_type = loc_zero.pci_read_8(PCI_HEADER_TYPE);
+            let functions_to_check = if header_type & 0x80 == 0x80 {
+                0..8
+            } else {
+                0..1
+            };
+
+            for f in functions_to_check {
+                let loc = PciLocation { bus, slot, func: f };
+                let vendor_id = loc.pci_read_16(PCI_VENDOR_ID);
                 if vendor_id == 0xFFFF {
                     continue;
                 }
-                
-                // otherwise, get the subset of common data that describes every PCI Device
+
                 let device = PciDevice {
-                    bus: bus,
-                    slot: slot,
-                    func: f,
-
                     vendor_id:        vendor_id,
-                    device_id:        pci_read_16(bus, slot, f, PCI_DEVICE_ID), 
-                    command:          pci_read_16(bus, slot, f, PCI_COMMAND),
-                    status:           pci_read_16(bus, slot, f, PCI_STATUS),
-                    revision_id:      pci_read_8( bus, slot, f, PCI_REVISION_ID),
-                    prof_if:          pci_read_8( bus, slot, f, PCI_PROG_IF),
-                    subclass:         pci_read_8( bus, slot, f, PCI_SUBCLASS),
-                    class:            pci_read_8( bus, slot, f, PCI_CLASS),
-                    cache_line_size:  pci_read_8( bus, slot, f, PCI_CACHE_LINE_SIZE),
-                    latency_timer:    pci_read_8( bus, slot, f, PCI_LATENCY_TIMER),
-                    header_type:      pci_read_8( bus, slot, f, PCI_HEADER_TYPE),
-                    bist:             pci_read_8( bus, slot, f, PCI_BIST),
-                    bars:             [ 
-                                          pci_read_32(bus, slot, f, PCI_BAR0),
-                                          pci_read_32(bus, slot, f, PCI_BAR1), 
-                                          pci_read_32(bus, slot, f, PCI_BAR2), 
-                                          pci_read_32(bus, slot, f, PCI_BAR3), 
-                                          pci_read_32(bus, slot, f, PCI_BAR4), 
-                                          pci_read_32(bus, slot, f, PCI_BAR5), 
+                    device_id:        loc.pci_read_16(PCI_DEVICE_ID), 
+                    command:          loc.pci_read_16(PCI_COMMAND),
+                    status:           loc.pci_read_16(PCI_STATUS),
+                    revision_id:      loc.pci_read_8( PCI_REVISION_ID),
+                    prog_if:          loc.pci_read_8( PCI_PROG_IF),
+                    subclass:         loc.pci_read_8( PCI_SUBCLASS),
+                    class:            loc.pci_read_8( PCI_CLASS),
+                    cache_line_size:  loc.pci_read_8( PCI_CACHE_LINE_SIZE),
+                    latency_timer:    loc.pci_read_8( PCI_LATENCY_TIMER),
+                    header_type:      loc.pci_read_8( PCI_HEADER_TYPE),
+                    bist:             loc.pci_read_8( PCI_BIST),
+                    bars:             [
+                                          loc.pci_read_32(PCI_BAR0),
+                                          loc.pci_read_32(PCI_BAR1), 
+                                          loc.pci_read_32(PCI_BAR2), 
+                                          loc.pci_read_32(PCI_BAR3), 
+                                          loc.pci_read_32(PCI_BAR4), 
+                                          loc.pci_read_32(PCI_BAR5), 
                                       ],
-                    int_pin:          pci_read_8(bus, slot, f, PCI_INTERRUPT_PIN),
-                    int_line:         pci_read_8(bus, slot, f, PCI_INTERRUPT_LINE),
+                    int_pin:          loc.pci_read_8(PCI_INTERRUPT_PIN),
+                    int_line:         loc.pci_read_8(PCI_INTERRUPT_LINE),
+                    loc:              loc,
                 };
-
-
-                // if device.header_type != 0x00 {
-                //     warn!("PCI device has a header_type {:#X}, we do not handle it fully yet! (only support header_type 0x00)", device.header_type);
-                // }
 
                 device_list.push(device);
             }
@@ -271,6 +185,128 @@ fn scan_pci() -> Vec<PciBus> {
     buses	
 }
 
+
+/// The bus, slot, and function number of a given PCI device.
+/// This offers methods for reading and writing the PCI config space. 
+#[derive(Copy, Clone)]
+pub struct PciLocation {
+    bus:  u16,
+    slot: u16,
+    func: u16,
+}
+
+impl PciLocation {
+    pub fn bus(&self) -> u16 { self.bus }
+    pub fn slot(&self) -> u16 { self.slot }
+    pub fn function(&self) -> u16 { self.func }
+
+
+    /// Computes a PCI address from bus, slot, func, and offset. 
+    /// The least two significant bits of offset are masked, so it's 4-byte aligned addressing,
+    /// which makes sense since we read PCI data (from the configuration space) in 32-bit chunks.
+    fn pci_address(self, offset: u16) -> u32 {
+        ((self.bus  as u32) << 16) | 
+        ((self.slot as u32) << 11) | 
+        ((self.func as u32) <<  8) | 
+        ((offset as u32) & (PCI_CONFIG_ADDRESS_OFFSET_MASK as u32)) | 
+        0x8000_0000
+    }
+
+    /// read 32-bit data at the specified `offset` from the PCI device specified by the given `bus`, `slot`, `func` set.
+    pub fn pci_read_32(&self, offset: u16) -> u32 {
+        unsafe { 
+            PCI_CONFIG_ADDRESS_PORT.lock().write(self.pci_address(offset)); 
+        }
+        PCI_CONFIG_DATA_PORT.lock().read() >> ((offset & (!PCI_CONFIG_ADDRESS_OFFSET_MASK)) * 8)
+    }
+
+    /// Read 16-bit data at the specified `offset` from this PCI device.
+    pub fn pci_read_16(&self, offset: u16) -> u16 {
+        self.pci_read_32(offset) as u16
+    } 
+
+    /// Read 8-bit data at the specified `offset` from the PCI device.
+    pub fn pci_read_8(&self, offset: u16) -> u8 {
+        self.pci_read_32(offset) as u8
+    }
+
+    /// Write 32-bit data to the specified `offset` for the PCI device.
+    pub fn pci_write(&self, offset: u16, value: u32) {
+        unsafe { 
+            PCI_CONFIG_ADDRESS_PORT.lock().write(self.pci_address(offset)); 
+            PCI_CONFIG_DATA_PORT.lock().write((value) << ((offset & 2) * 8));
+        }
+    }
+
+    /// Sets the PCI device's bit 3 in the command portion, which is apparently needed to activate DMA (??)
+    pub fn pci_set_command_bus_master_bit(&self) {
+        unsafe { 
+            PCI_CONFIG_ADDRESS_PORT.lock().write(self.pci_address(PCI_COMMAND));
+        }
+        let inval = PCI_CONFIG_DATA_PORT.lock().read(); 
+        trace!("pci_set_command_bus_master_bit: PciDevice: {}, read value: {:#x}", self, inval);
+        unsafe {
+            PCI_CONFIG_DATA_PORT.lock().write(inval | (1 << 2));
+        }
+        trace!("pci_set_command_bus_master_bit: PciDevice: {}, read value AFTER WRITE CMD: {:#x}", 
+            self,
+            PCI_CONFIG_DATA_PORT.lock().read()
+        );
+    }
+}
+
+impl fmt::Display for PciLocation {
+    fn fmt(&self, f: &mut fmt::Formatter) -> Result<(), fmt::Error> {
+        write!(f, "B: {}, S: {}, F: {}", self.bus, self.slot, self.func)
+    }
+}
+
+impl fmt::Debug for PciLocation {
+    fn fmt(&self, f: &mut fmt::Formatter) -> Result<(), fmt::Error> {
+        write!(f, "{}", self)
+    }
+}
+
+
+/// Contains information common to every type of PCI Device,
+/// and offers functions for reading/writing to the PCI configuration space.
+#[derive(Debug)]
+pub struct PciDevice {
+    /// the bus, slot, and function number that locates this PCI device in the bus tree.
+    loc: PciLocation,
+
+    /// The class code, used to determine device type: http://wiki.osdev.org/PCI#Class_Codes 
+    pub class: u8,
+    /// The subclass code, used to determine device type: http://wiki.osdev.org/PCI#Class_Codes 
+    pub subclass: u8,
+    /// The programming interface of this PCI device
+    pub prog_if: u8,
+    /// The six Base Address Registers (BARs)
+    pub bars: [u32; 6],
+    pub vendor_id: u16,
+    pub device_id: u16, 
+    pub command: u16,
+    pub status: u16,
+    pub revision_id: u8,
+    pub cache_line_size: u8,
+    pub latency_timer: u8,
+    pub header_type: u8,
+    pub bist: u8,
+    pub int_pin: u8,
+    pub int_line: u8,
+}
+
+impl Deref for PciDevice {
+    type Target = PciLocation;
+    fn deref(&self) -> &PciLocation {
+        &self.loc
+    }
+}
+impl DerefMut for PciDevice {
+    fn deref_mut(&mut self) -> &mut PciLocation {
+        &mut self.loc
+    }
+}
 
 /*
 ///PCI DMA, currently set for primary bus

@@ -7,11 +7,14 @@
 extern crate spin;
 extern crate port_io;
 extern crate pit_clock;
+extern crate pci;
 
 
-use core::sync::atomic::{Ordering};
+use core::fmt;
 use spin::{Once, Mutex}; 
 use port_io::Port;
+use pci::PciDevice;
+
 
 //"PRIMARY" here refers to primary drive, drive connected at bus 0
 
@@ -82,10 +85,11 @@ static SECONDARY_COMMAND_IO: Mutex<Port<u8>> = Mutex::new( Port::new(SECONDARY_C
 
 
 
+
 pub fn init_ata_devices(){
 	let mut identify_drives: AtaDevices = AtaDevices{..Default::default()};
 	
-	ATA_DEVICES.call_once( || {
+	ATA_DEVICES.call_once(|| {
 		identify_drives.primary_master = get_ata_identify_data(0xA0);
 		identify_drives.primary_slave = get_ata_identify_data(0xB0);
 		identify_drives.secondary_master = AtaIdentifyData{..Default::default()};
@@ -109,41 +113,36 @@ fn read_primary_data_port()-> Result<[u16; 256], u16>{
     	while !ata_data_transfer_ready() {
 			loop_count +=1;
 			trace!("data port not ready in read_primary_data_port function");
-			if loop_count > 1000{
-				return Err(loop_count)
-			}
-			}
-		arr[word] = PRIMARY_DATA_PORT.lock().read();
+			// if loop_count > 1000{
+			// 	return Err(loop_count);
+			// }
+		}
 
+		arr[word] = PRIMARY_DATA_PORT.lock().read();
     }
 	
     Ok(arr)
-
 }
 
 //writes 256 u16s from an array to primary ata data port
-fn write_primary_data_port(arr: [u16;256])-> Result<u16, u16>{
+fn write_primary_data_port(arr: [u16; 256])-> Result<u16, u16>{
 	
-	for index in 0..256{
+	for (index, data) in arr.into_iter().enumerate() {
 
 		let mut loop_count = 0;
 		while !ata_data_transfer_ready() {
-			//breaks loop and returns 
 			loop_count += 1;
 			trace!("data port not ready in write_primary_data_port function");
-			if loop_count > 1000{
-				return Err(index);
-			//end of if 
+			if loop_count > 1000 {
+				return Err(index as u16);
 			}
-			//end of while
-			}
+		}
 
-		unsafe{PRIMARY_DATA_PORT.lock().write(arr[0])};
+		unsafe { PRIMARY_DATA_PORT.lock().write(*data) };
 	}
 	
 	//pausing two pit ticks so that a read is never immediately after a write
-	let start = pit_clock::PIT_TICKS.load(Ordering::SeqCst);
-	while start+2 > pit_clock::PIT_TICKS.load(Ordering::SeqCst){}
+	let _ = pit_clock::pit_wait(1);
 	
 	return Ok(256); 
 }
@@ -155,32 +154,30 @@ pub fn ata_data_transfer_ready() -> bool{
 }
 
 //returns ATA identify information drive should be 0xA0 for master or 0xB0 for slave
-pub fn get_ata_identify_data( drive:u8 )-> AtaIdentifyData{
-    
+pub fn get_ata_identify_data(drive: u8) -> AtaIdentifyData {
+    // clear out the initial command register value
     let _command_value: u8 = COMMAND_IO.lock().read();
+
 	let identify_data = AtaIdentifyData{..Default::default()};
     //let mut arr: [u16; 256] = [0; 256];
     //set port values for bus 0 to detect ATA device 
-    unsafe{PRIMARY_BUS_SELECT.lock().write(drive);
-           
-           SECTORCOUNT.lock().write(0);
-           LBALO.lock().write(0);
-           LBAMID.lock().write(0);
-           LBAHI.lock().write(0);
-
-           COMMAND_IO.lock().write(IDENTIFY_COMMAND);
-
-
+    unsafe { 
+		PRIMARY_BUS_SELECT.lock().write(drive);	
+		SECTORCOUNT.lock().write(0);
+		LBALO.lock().write(0);
+		LBAMID.lock().write(0);
+		LBAHI.lock().write(0);
+		COMMAND_IO.lock().write(IDENTIFY_COMMAND);
     }
-
 	
     let mut command_value = COMMAND_IO.lock().read();
     //if value is 0, no drive exists
     if command_value == 0 {
-        trace!("No Drive Exists");
+        trace!("Drive {:#X} does not exist.", drive);
 		return identify_data;
-
-    }
+    } else {
+		trace!("Drive {:#X} exists.", drive);
+	}
     
     
     //wait for update-in-progress value (bit 7 of COMMAND_IO port) to be set to 0
@@ -240,21 +237,20 @@ pub fn pio_read(drive:u8, lba:u32)->Result<[u16; 256],u16>{
 	}
     //selects master drive(using 0xE0 value) in primary bus (by writing to primary_bus_select-port 0x1F6)
     let master_select: u8 = drive | (0 << 4) | ((lba >> 24) & 0x0F) as u8;
-    unsafe{
-		
-	PRIMARY_BUS_SELECT.lock().write(master_select);
+    unsafe {
+		PRIMARY_BUS_SELECT.lock().write(master_select);
 
-	//number of consecutive sectors to read from, set at 1 
-	SECTORCOUNT.lock().write(1);
-    //lba is written to disk ports 
-    LBALO.lock().write((lba)as u8);
-    LBAMID.lock().write((lba>>8)as u8);
-    LBAHI.lock().write((lba>>16)as u8);
+		//number of consecutive sectors to read from, set at 1 
+		SECTORCOUNT.lock().write(1);
+		//lba is written to disk ports 
+		LBALO.lock().write((lba)as u8);
+		LBAMID.lock().write((lba>>8)as u8);
+		LBAHI.lock().write((lba>>16)as u8);
 
-    COMMAND_IO.lock().write(PIO_READ_COMMAND);
+		COMMAND_IO.lock().write(PIO_READ_COMMAND);
     }
 
-	if COMMAND_IO.lock().read()%2 == 1{
+	if COMMAND_IO.lock().read() % 2 == 1 {
 		trace!("error bit set");
 		return Err(0);
 	}
@@ -285,16 +281,16 @@ pub fn pio_write(drive:u8, lba:u32, arr: [u16;256])->Result<u16, u16>{
 	}
 	let master_select: u8 = drive | (0 << 4) | ((lba >> 24) & 0x0F) as u8;
     unsafe{	
-	PRIMARY_BUS_SELECT.lock().write(master_select);
+		PRIMARY_BUS_SELECT.lock().write(master_select);
 
-	//number of consecutive sectors to write to: set at one currently
-	SECTORCOUNT.lock().write(1);
-    //lba(address) is written to disk ports
-    LBALO.lock().write((lba)as u8);
-    LBAMID.lock().write((lba>>8)as u8);
-    LBAHI.lock().write((lba>>16)as u8);
+		//number of consecutive sectors to write to: set at one currently
+		SECTORCOUNT.lock().write(1);
+		//lba(address) is written to disk ports
+		LBALO.lock().write((lba)as u8);
+		LBAMID.lock().write((lba>>8)as u8);
+		LBAHI.lock().write((lba>>16)as u8);
 
-    COMMAND_IO.lock().write(PIO_WRITE_COMMAND);
+		COMMAND_IO.lock().write(PIO_WRITE_COMMAND);
     }
 
 	//data is ready to be written to data_io port
@@ -305,11 +301,12 @@ pub fn pio_write(drive:u8, lba:u32, arr: [u16;256])->Result<u16, u16>{
 //exists to handle interrupts from PCI
 //could be used later to replace polling system with interrupt system for reading and writing
 pub fn handle_primary_interrupt(){
-    trace!("Got IRQ 14!");
+    trace!("ATA Primary interrupt occurred.");
 }
 
 //AtaIdentifyData struct and implemenations from Tifflin Kernel
-#[repr(C,packed)]
+#[derive(Copy, Clone)]
+#[repr(packed)]
 pub struct AtaIdentifyData
 {
 	pub flags: u16,
@@ -333,7 +330,7 @@ pub struct AtaIdentifyData
 	/// LBA 48 sector count
 	pub sector_count_48: u64,
 	_unused7: [u16; 2],
-	/// [0:3] Physical sector size (in logical sectors
+	/// [0:3] Physical sector size (in logical sectors)
 	pub physical_sector_size: u16,
 	_unused8: [u16; 9],
 	/// Number of words per logical sector
@@ -367,11 +364,10 @@ impl Default for AtaIdentifyData {
 			_unusedz: [0; 257-119],
 		}
 	}
-
 }
 
 
-impl AtaIdentifyData{
+impl AtaIdentifyData {
 
 	//takes an array storing data from ATA IDENTIFY command and returns struct with the relevant information
 	fn new(arr: [u16; 256])-> AtaIdentifyData{
@@ -391,7 +387,7 @@ impl AtaIdentifyData{
 }
 
 //holds AtaIdentifyData for possible pci drives, zeroed if no ata device on that bus
-#[derive(Default)]
+#[derive(Default, Debug)]
 pub struct AtaDevices {
 	pub primary_master: AtaIdentifyData,
 	pub primary_slave: AtaIdentifyData,
@@ -401,24 +397,35 @@ pub struct AtaDevices {
 }
 
 //used to print ATAIdentifyData information to console
-impl ::core::fmt::Display for AtaIdentifyData {
-	fn fmt(&self, f: &mut ::core::fmt::Formatter) -> ::core::fmt::Result
-	{
-		try!(write!(f, "AtaIdentifyData {{"));
-		try!(write!(f, "  flags: {:#x}", self.flags));
-		try!(write!(f, "  serial_number: {:?}", RawString(&self.serial_number)));
-		try!(write!(f, "  firmware_ver: {:?}", RawString(&self.firmware_ver)));
-		try!(write!(f, "  model_number: {:?}", RawString(&self.model_number)));
-		try!(write!(f, "  sect_per_int: {}", self.sect_per_int & 0xFF));
-		try!(write!(f, "  capabilities: [{:#x},{:#x}]", self.capabilities[0], self.capabilities[1]));
-		try!(write!(f, "  valid_ext_data: {}", self.valid_ext_data));
-		try!(write!(f, "  size_of_rw_multiple: {}", self.size_of_rw_multiple));
-		try!(write!(f, "  sector_count_28: {:#x}", self.sector_count_28));
-		try!(write!(f, "  sector_count_48: {:#x}", self.sector_count_48));
-		try!(write!(f, "  physical_sector_size: {}", self.physical_sector_size));
-		try!(write!(f, "  words_per_logical_sector: {}", self.words_per_logical_sector));
-		try!(write!(f, "}}"));
-		Ok(())
+impl fmt::Debug for AtaIdentifyData {
+	fn fmt(&self, f: &mut fmt::Formatter) -> fmt::Result {
+		write!(f, "AtaIdentifyData {{ \
+			flags: {:#X}, \
+			serial_number: {:?}, \
+			firmware_ver: {:?}, \
+			model_number: {:?}, \
+			sect_per_int: {}, \
+			capabilities: [{:#X}, {:#X}], \
+			valid_ext_data: {}, \
+			size_of_rw_multiple: {}, \
+			sector_count_28: {}, \
+			sector_count_48: {}, \
+			physical_sector_size: {}, \
+			words_per_logical_sector: {}, \
+			}}",
+			self.flags,
+			RawString(&self.serial_number),
+			RawString(&self.firmware_ver),
+			RawString(&self.model_number),
+			self.sect_per_int & 0xFF,
+			self.capabilities[0], self.capabilities[1],
+			self.valid_ext_data,
+			self.size_of_rw_multiple,
+			self.sector_count_28,
+			self.sector_count_48,
+			self.physical_sector_size,
+			self.words_per_logical_sector,
+		)
 	}
 }
 
@@ -558,10 +565,6 @@ pub fn dma_read(drive:u8, lba:u32)->Result<u16,u16>{
 		trace!("error bit set");
 		return Err(0);
 	}
-
-	//pausing 100 pit ticks to ensure data has time to be transferred (temporary measure)
-	let start = pit_clock::PIT_TICKS.load(Ordering::SeqCst);
-	while start+100 > pit_clock::PIT_TICKS.load(Ordering::SeqCst){}
 
 	//data is ready to read from memory
 	Ok(1)

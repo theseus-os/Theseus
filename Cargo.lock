@@ -85,11 +85,23 @@ dependencies = [
 ]
 
 [[package]]
+name = "ata"
+version = "0.1.0"
+dependencies = [
+ "log 0.3.9 (registry+https://github.com/rust-lang/crates.io-index)",
+ "memory 0.1.0",
+ "pci 0.1.0",
+ "port_io 0.2.1",
+ "spin 0.4.10 (registry+https://github.com/rust-lang/crates.io-index)",
+]
+
+[[package]]
 name = "ata_pio"
 version = "0.1.0"
 dependencies = [
  "log 0.3.9 (registry+https://github.com/rust-lang/crates.io-index)",
  "memory 0.1.0",
+ "pci 0.1.0",
  "pit_clock 0.1.0",
  "port_io 0.2.1",
  "spin 0.4.10 (registry+https://github.com/rust-lang/crates.io-index)",
@@ -641,6 +653,7 @@ name = "interrupts"
 version = "0.1.0"
 dependencies = [
  "apic 0.1.0",
+ "ata_pio 0.1.0",
  "exceptions_early 0.1.0",
  "gdt 0.1.0",
  "irq_safety 0.1.1 (git+https://github.com/kevinaboos/irq_safety)",

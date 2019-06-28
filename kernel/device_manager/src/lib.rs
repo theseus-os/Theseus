@@ -59,7 +59,7 @@ pub fn init(keyboard_producer: DFQueueProducer<Event>) -> Result<(), &'static st
 
     
     for dev in pci::pci_device_iter() {
-        debug!("Found pci device: {:?}", dev);
+        debug!("Found PCI device (hex values): {:X?}", dev);
     }
 
     if let Some(e1000_pci_dev) = get_pci_device_vd(e1000::INTEL_VEND, e1000::E1000_DEV) {
@@ -71,35 +71,28 @@ pub fn init(keyboard_producer: DFQueueProducer<Event>) -> Result<(), &'static st
         network_manager::NETWORK_INTERFACES.lock().push(Arc::new(Mutex::new(e1000_iface)));
     }
     else {
-        warn!("No e1000 device found on this system.");
+        warn!("Note: no e1000 device found on this system.");
     }
     
 
+    // // look for ATA disk devices
+    // for dev in pci::pci_device_iter() {
+    //     // specifically, look for IDE controllers
+    //     if dev.class = 0x01 && dev.subclass = 0x01 {
+    //         ata_pio::init_drive(&dev.bars)?;
+    //     }
+    // }
+
+
     // testing ata pio read, write, and IDENTIFY functionality, example of uses, can be deleted 
-    /*
     ata_pio::init_ata_devices();
-    let test_arr: [u16; 256] = [630;256];
-    println!("Value from ATA identification function: {}", ata_pio::ATA_DEVICES.try().expect("ATA_DEVICES used before initialization").primary_master);
-    let begin = ata_pio::pio_read(0xE0,0);
-    //only use value if Result is ok
-    if begin.is_ok(){
-        println!("Value from drive at sector 0 before write:  {}", begin.unwrap()[0]);
-    }
-    ata_pio::pio_write(0xE0,0,test_arr);
-    let end = ata_pio::pio_read(0xE0,0);
-    if end.is_ok(){
-    println!("Value from drive at sector 0 after write: {}", end.unwrap()[0]);
-    }
-    */
-
-    /*
-    let bus_array = pci::PCI_BUSES.try().expect("PCI_BUSES not initialized");
-    let ref bus_zero = bus_array[0];
-    let slot_zero = bus_zero.connected_devices[0]; 
-    println!("pci config data for bus 0, slot 0: dev id - {:#x}, class code - {:#x}", slot_zero.device_id, slot_zero.class_code);
-    println!("pci config data {:#x}",pci::pci_config_read(0,0,0,0x0c));
-    println!("{:?}", bus_zero);
-    */
+    let test_arr: [u16; 256] = [630; 256];
+    debug!("Value from ATA identification function: {:?}", ata_pio::ATA_DEVICES.try().expect("ATA_DEVICES used before initialization").primary_master);
+    let begin = ata_pio::pio_read(0xE0, 0).map_err(|_e| "initial pio_read() failed")?;
+    debug!("Value from drive at sector 0 before write: {:?}", &begin[..]);
+    ata_pio::pio_write(0xE0, 0, test_arr).map_err(|_e| "pio_write() failed")?;
+    let end = ata_pio::pio_read(0xE0, 0).map_err(|_e| "subsequent pio_read() failed")?;
+    debug!("Value from drive at sector 0 after write: {:?}", &end[..]);
+    
     Ok(())
-
 }

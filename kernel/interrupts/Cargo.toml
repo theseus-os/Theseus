@@ -31,6 +31,9 @@ path = "../memory"
 [dependencies.kernel_config]
 path = "../kernel_config"
 
+[dependencies.ata_pio]
+path = "../ata_pio"
+
 [dependencies.apic]
 path = "../apic"
 

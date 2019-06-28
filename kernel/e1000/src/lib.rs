@@ -33,7 +33,7 @@ use irq_safety::MutexIrqSafe;
 use volatile::{Volatile, ReadOnly};
 use alloc::boxed::Box;
 use memory::{get_kernel_mmi_ref, FRAME_ALLOCATOR, PhysicalAddress, FrameRange, EntryFlags, allocate_pages_by_bytes, MappedPages, PhysicalMemoryArea, create_contiguous_mapping};
-use pci::{PciDevice, pci_read_32, pci_read_8, pci_write, pci_set_command_bus_master_bit};
+use pci::{PciDevice, PCI_BAR0, PCI_INTERRUPT_LINE};
 use kernel_config::memory::PAGE_SIZE;
 use owning_ref::BoxRefMut;
 use interrupts::{eoi,register_interrupt};
@@ -43,8 +43,6 @@ use network_interface_card::{NetworkInterfaceCard, TransmitBuffer, ReceiveBuffer
 
 pub const INTEL_VEND:           u16 = 0x8086;  // Vendor ID for Intel 
 pub const E1000_DEV:            u16 = 0x100E;  // Device ID for the e1000 Qemu, Bochs, and VirtualBox emmulated NICs
-const PCI_BAR0:                 u16 = 0x10;
-const PCI_INTERRUPT_LINE:       u16 = 0x3C;
 
 const E1000_NUM_RX_DESC:        usize = 8;
 const E1000_NUM_TX_DESC:        usize = 8;
@@ -326,7 +324,7 @@ impl E1000Nic {
         //debug!("e1000_nc bar_type: {0}, mem_base: {1}, io_base: {2}", e1000_nc.bar_type, e1000_nc.mem_base, e1000_nc.io_base);
         
         // Get interrupt number
-        let interrupt_num = pci_read_8(e1000_pci_dev.bus, e1000_pci_dev.slot, e1000_pci_dev.func, PCI_INTERRUPT_LINE) + PIC_MASTER_OFFSET;
+        let interrupt_num = e1000_pci_dev.pci_read_8(PCI_INTERRUPT_LINE) + PIC_MASTER_OFFSET;
         debug!("e1000 IRQ number: {}", interrupt_num);
 
         // Type of BAR0
@@ -376,17 +374,17 @@ impl E1000Nic {
         // Here's what we do: 
         // 1) read pci reg
         // 2) bitwise not and add 1 because ....
-        pci_write(dev.bus, dev.slot, dev.func, PCI_BAR0, 0xFFFF_FFFF);
-        let mut mem_size = pci_read_32(dev.bus, dev.slot, dev.func, PCI_BAR0);
+        dev.pci_write(PCI_BAR0, 0xFFFF_FFFF);
+        let mut mem_size = dev.pci_read_32(PCI_BAR0);
         //debug!("mem_size_read: {:x}", mem_size);
         mem_size = mem_size & 0xFFFF_FFF0; //mask info bits
         mem_size = !(mem_size); //bitwise not
         //debug!("mem_size_read_not: {:x}", mem_size);
         mem_size = mem_size +1; // add 1
         //debug!("mem_size: {}", mem_size);
-        pci_write(dev.bus, dev.slot, dev.func, PCI_BAR0, dev.bars[0]); //restore original value
+        dev.pci_write(PCI_BAR0, dev.bars[0]); //restore original value
         //check that value is restored
-        let bar0 = pci_read_32(dev.bus, dev.slot, dev.func, PCI_BAR0);
+        let bar0 = dev.pci_read_32(PCI_BAR0);
         debug!("original bar0: {:#X}", bar0);
         mem_size
     }
@@ -395,7 +393,7 @@ impl E1000Nic {
     /// allocates memory for the NIC, starting address and size taken from the PCI BAR0
     fn mem_map(dev: &PciDevice, mem_base: PhysicalAddress) -> Result<BoxRefMut<MappedPages, IntelE1000Registers>, &'static str> {
         // set the bust mastering bit for this PciDevice, which allows it to use DMA
-        pci_set_command_bus_master_bit(dev);
+        dev.pci_set_command_bus_master_bit();
 
         // find out amount of space needed
         let mem_size_in_bytes = E1000Nic::determine_mem_size(dev) as usize;
