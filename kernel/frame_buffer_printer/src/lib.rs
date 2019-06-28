@@ -14,7 +14,7 @@ use frame_buffer::{FrameBuffer};
 
 /// Print a string in a framebuffer.
 /// The string is printed at position (x, y) of the framebuffer. 
-/// It is printed within an area specified by (width, height). The part extending the area will be ignored.
+/// It is printed within an area specified by (width, height). The part exceeding the area will be ignored.
 pub fn print_by_bytes(mut framebuffer: &mut FrameBuffer, 
     x: usize, 
     y: usize, 

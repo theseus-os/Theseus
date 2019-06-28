@@ -65,7 +65,7 @@ pub fn draw_line(mut framebuffer: &mut FrameBuffer, start_x: i32, start_y: i32, 
 
 /// Draw a rectangle in a framebuffer.
 /// The left top point of the rectangle is (start_x, start_y).
-/// The part extending the boundary of the framebuffer will be ignored.
+/// The part exceeding the boundary of the framebuffer will be ignored.
 pub fn draw_rectangle(mut framebuffer: &mut FrameBuffer, start_x: usize, start_y: usize, width: usize, height: usize, color: u32){
     let (buffer_width, buffer_height) = framebuffer.get_size();
     let end_x: usize = { 
@@ -100,7 +100,7 @@ pub fn draw_rectangle(mut framebuffer: &mut FrameBuffer, start_x: usize, start_y
 
 ///Fill a rectangle in a framebuffer with color.
 ///The left top point of the rectangle is (start_x, start_y).
-///The part extending the boundary of the framebuffer will be ignored.
+///The part exceeding the boundary of the framebuffer will be ignored.
 pub fn fill_rectangle(mut framebuffer: &mut FrameBuffer, start_x: usize, start_y: usize, width: usize, height: usize, color: u32){
     let (buffer_width, buffer_height) = framebuffer.get_size();
    
