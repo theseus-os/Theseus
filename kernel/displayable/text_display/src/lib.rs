@@ -20,8 +20,8 @@ use displayable::Displayable;
 
 const DEFAULT_CURSOR_FREQ:u64 = 400000000;
 
-/// A displayable component for text display
-/// The owner of a framebuffer can use this text displayable to display a string. The displayable specifies the size of the text block to be displayable in the framebuffer
+/// A displayable component for text display.
+/// The owner of a framebuffer can use this text displayable to display a string. The displayable specifies the size of the text block to be displayable in the framebuffer.
 pub struct TextDisplay {
     width: usize,
     height: usize,
@@ -60,6 +60,7 @@ impl TextDisplay
         self.height = height;
     }
 
+    /// display a cursor in the text displayable
     pub fn display_cursor(&self, x:usize, y:usize, color:u32, framebuffer:&mut FrameBuffer) {
         frame_buffer_drawer::fill_rectangle(framebuffer, x, y, CHARACTER_WIDTH, CHARACTER_HEIGHT, color);
     }
