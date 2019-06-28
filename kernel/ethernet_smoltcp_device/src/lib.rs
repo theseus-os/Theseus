@@ -7,6 +7,7 @@
 extern crate spin;
 extern crate smoltcp;
 extern crate network_interface_card;
+extern crate nic_buffers;
 extern crate irq_safety;
 extern crate owning_ref;
 extern crate network_manager;
@@ -25,7 +26,8 @@ use smoltcp::{
     wire::{EthernetAddress, IpAddress, IpCidr, Ipv4Address},
     iface::{EthernetInterface, EthernetInterfaceBuilder, NeighborCache, Routes},
 };
-use network_interface_card::{NetworkInterfaceCard, TransmitBuffer, ReceivedFrame};
+use network_interface_card::NetworkInterfaceCard;
+use nic_buffers::{TransmitBuffer, ReceivedFrame};
 use owning_ref::BoxRef;
 use network_manager::NetworkInterface;
 use core::str::FromStr;

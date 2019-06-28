@@ -48,6 +48,14 @@ path = "../../libs/mpmc"
 [dependencies.network_interface_card]
 path = "../network_interface_card"
 
+[dependencies.intel_descriptors]
+path = "../intel_descriptors" 
+
+[dependencies.nic_buffers]
+path = "../nic_buffers"
+
+[dependencies.nic_queues]
+path = "../nic_queues"
 
 [lib]
 crate-type = ["rlib"]

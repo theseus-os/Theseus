@@ -21,7 +21,9 @@ extern crate x86_64;
 extern crate mpmc;
 extern crate network_interface_card;
 extern crate apic;
-
+extern crate intel_descriptors;
+extern crate nic_buffers;
+extern crate nic_queues;
 pub mod test_e1000_driver;
 mod regs;
 
@@ -39,9 +41,12 @@ use owning_ref::BoxRefMut;
 use interrupts::{eoi,register_interrupt};
 use x86_64::structures::idt::{ExceptionStackFrame};
 use network_interface_card::{
-    {NetworkInterfaceCard, TransmitBuffer, ReceiveBuffer, ReceivedFrame},
-    intel_ethernet::{NicInit, LegacyRxDesc, LegacyTxDesc, RxQueue, TxQueue},
+    NetworkInterfaceCard,
+    intel_ethernet::NicInit,
 };
+use intel_descriptors::{LegacyRxDesc, LegacyTxDesc};
+use nic_buffers::{TransmitBuffer, ReceiveBuffer, ReceivedFrame};
+use nic_queues::{RxQueue, TxQueue};
 use apic::get_my_apic_id;
 use regs:: {REG_RXDESCTAIL, REG_TXDESCTAIL};
 

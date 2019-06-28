@@ -1,0 +1,24 @@
+[package]
+name = "nic_buffers"
+version = "0.1.0"
+authors = ["Ramla-I <ijazramla@gmail.com>"]
+edition = "2018"
+build = "../../build.rs"
+
+[dependencies]
+owning_ref = { git = "https://github.com/kevinaboos/owning-ref-rs" }
+
+
+[dependencies.memory]
+path = "../memory"
+
+[dependencies.log]
+default-features = false
+version = "0.3.7"
+
+[dependencies.mpmc]
+path = "../../libs/mpmc"
+
+
+[lib]
+crate-type = ["rlib"]

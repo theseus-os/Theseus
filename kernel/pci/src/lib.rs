@@ -52,7 +52,7 @@ pub fn get_pci_device_bsf(bus: u16, slot: u16, func: u16) -> Option<&'static Pci
     None
 }
 
-/// Returns a reference to the `PciDevice` with the given vendor id and device id... Ramla
+/// Returns a reference to the `PciDevice` with the given vendor id and device id.
 pub fn get_pci_device_vd(vendor_id: u16, device_id: u16) -> Option<&'static PciDevice> {
     for b in get_pci_buses() {
         for d in &b.devices {

@@ -41,5 +41,8 @@ path = "../network_interface_card"
 [dependencies.network_manager]
 path = "../network_manager"
 
+[dependencies.nic_buffers]
+path = "../nic_buffers"
+
 [lib]
 crate-type = ["rlib"]

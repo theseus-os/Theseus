@@ -33,5 +33,15 @@ path = "../pci"
 [dependencies.irq_safety]
 git = "https://github.com/kevinaboos/irq_safety"
 
+[dependencies.intel_descriptors]
+path = "../intel_descriptors"
+
+[dependencies.nic_queues]
+path = "../nic_queues"
+
+[dependencies.nic_buffers]
+path = "../nic_buffers"
+
+
 [lib]
 crate-type = ["rlib"]

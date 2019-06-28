@@ -1,0 +1,21 @@
+[package]
+name = "intel_descriptors"
+version = "0.1.0"
+authors = ["Ramla-I <ijazramla@gmail.com>"]
+edition = "2018"
+build = "../../build.rs"
+
+[dependencies]
+volatile = "0.2.4"
+bit_field = "0.7.0"
+
+[dependencies.memory]
+path = "../memory"
+
+[dependencies.log]
+default-features = false
+version = "0.3.7"
+
+
+[lib]
+crate-type = ["rlib"]
