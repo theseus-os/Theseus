@@ -1821,7 +1821,7 @@ dependencies = [
  "font 0.1.0",
  "frame_buffer 0.1.0",
  "frame_buffer_compositor 0.1.0",
- "frame_buffer_pixel_drawer 0.1.0",
+ "frame_buffer_drawer 0.1.0",
  "frame_buffer_printer 0.1.0",
  "lazy_static 1.2.0 (registry+https://github.com/rust-lang/crates.io-index)",
  "log 0.3.9 (registry+https://github.com/rust-lang/crates.io-index)",

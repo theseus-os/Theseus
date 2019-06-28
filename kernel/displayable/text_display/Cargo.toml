@@ -37,8 +37,8 @@ path = "../../tsc"
 [dependencies.frame_buffer_compositor]
 path = "../../frame_buffer_compositor"
 
-[dependencies.frame_buffer_pixel_drawer]
-path = "../../frame_buffer_pixel_drawer"
+[dependencies.frame_buffer_drawer]
+path = "../../frame_buffer_drawer"
 
 [dependencies.lazy_static]
 features = ["spin_no_std", "nightly"]

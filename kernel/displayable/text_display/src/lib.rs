@@ -8,7 +8,7 @@
 extern crate tsc;
 extern crate font;
 extern crate frame_buffer;
-extern crate frame_buffer_pixel_drawer;
+extern crate frame_buffer_drawer;
 extern crate frame_buffer_printer;
 
 extern crate displayable;
@@ -17,8 +17,6 @@ use tsc::{tsc_ticks, TscTicks};
 use font::{CHARACTER_HEIGHT, CHARACTER_WIDTH};
 use frame_buffer::{FrameBuffer, Pixel};
 use displayable::Displayable;
-
-
 
 const DEFAULT_CURSOR_FREQ:u64 = 400000000;
 
@@ -60,6 +58,10 @@ impl TextDisplay
     pub fn resize(&mut self, width: usize, height: usize) {
         self.width = width;
         self.height = height;
+    }
+
+    pub fn display_cursor(&self, x:usize, y:usize, color:u32, framebuffer:&mut FrameBuffer) {
+        frame_buffer_drawer::fill_rectangle(framebuffer, x, y, CHARACTER_WIDTH, CHARACTER_HEIGHT, color);
     }
 }
 

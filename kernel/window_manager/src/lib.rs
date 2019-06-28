@@ -454,7 +454,8 @@ impl WindowObj{
         }
         if line < text_buffer_height {
             let color = if cursor.show() { font_color } else { bg_color };
-            fill_rectangle(&mut self.framebuffer, column * CHARACTER_WIDTH, line * CHARACTER_HEIGHT, CHARACTER_WIDTH, CHARACTER_HEIGHT, color);
+            let displayable =  self.components.get(display_name).ok_or("")?.get_displayable();
+            displayable.display_cursor(column * CHARACTER_WIDTH, line * CHARACTER_HEIGHT, color, &mut self.framebuffer);
             self.render()?;
         }
         Ok(())
