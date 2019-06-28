@@ -87,6 +87,7 @@ impl Compositor<FrameBuffer> for FrameCompositor {
         Ok(())
     }
 
+    // Check if a framebuffer has already cached since last update
     fn cached(&self, frame_buffer:&FrameBuffer, x:i32, y:i32) -> bool {
         match self.cache.get(&hash(frame_buffer)) {
             Some((cached_x, cached_y)) => {
@@ -101,7 +102,8 @@ impl Compositor<FrameBuffer> for FrameCompositor {
     }
 }
 
-// copy a line of pixels from src framebuffer to the dest framebuffer. For better performance, we use memory copy instead of pixel drawer
+// Copy an arrary of pixels from src framebuffer to the dest framebuffer. 
+// We use memory copy instead of pixel drawer for better performance
 fn render(dest_buffer: &mut BoxRefMut<MappedPages, [Pixel]>,
     src_buffer: &BoxRefMut<MappedPages, [Pixel]>,
     dest_start: usize,
@@ -115,8 +117,8 @@ fn render(dest_buffer: &mut BoxRefMut<MappedPages, [Pixel]>,
     );
 }
 
-// copy a line of pixels from src framebuffer to the dest framebuffer in 3d mode. 
-// We need 3d pixel drawer because we should compare the depth of every pixel
+// Copy a line of pixels from src framebuffer to the dest framebuffer in 3d mode. 
+// We use 3d pixel drawer because we need to compare the depth of every pixel
 fn render_3d(dest_buffer: &mut BoxRefMut<MappedPages, [Pixel]>,
     src_buffer: &BoxRefMut<MappedPages, [Pixel]>,
     dest_start: usize,
@@ -136,7 +138,8 @@ fn render_3d(dest_buffer: &mut BoxRefMut<MappedPages, [Pixel]>,
     }
 }
 
-fn hash<T: Hash>(t: &T) -> u64 {
+// Compute the hash of a framebuffer
+fn hash(t: &FrameBuffer) -> u64 {
     let mut s = SipHasher::new();
     t.hash(&mut s);
     s.finish()

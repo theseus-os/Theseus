@@ -50,7 +50,7 @@ lazy_static! {
     /// The list of all windows in the system.
     static ref WINDOWLIST: Mutex<WindowList> = Mutex::new(
         WindowList{
-            list: VecDeque::new(),
+            background_list: VecDeque::new(),
             active: Weak::new(),
         }
     );
@@ -72,11 +72,11 @@ const WINDOW_INACTIVE_COLOR: u32 = 0x343C37;
 // The background color of the screen
 const SCREEN_BACKGROUND_COLOR: u32 = 0x000000;
 
-//Wenqiu
 /// The window allocator.
 /// It contains a list of allocated window and a reference to the active window
 struct WindowList {
-    list: VecDeque<Weak<Mutex<WindowInner>>>, 
+    // The list of inactive windows. Their order is based on the last time they are updated. The first window is the most recently active window 
+    background_list: VecDeque<Weak<Mutex<WindowInner>>>, 
     // a weak pointer directly to the active WindowInner so we don't have to search for the active window when we need it quickly
     // this weak pointer is set in the WindowAllocator's switch(), delete(), and allocate() functions
     active: Weak<Mutex<WindowInner>>, 
@@ -135,17 +135,13 @@ pub fn new_window<'a>(x: usize, y: usize, width: usize, height: usize) -> Result
     
     let inner_ref = Arc::new(Mutex::new(inner));
 
-    let mut window_list = WINDOWLIST.lock();
-    window_list.add_active(&inner_ref);
-    // active the void window content
-    {
-        let mut inner = inner_ref.lock();
-        inner.clean()?;
-        inner.active(true)?;
-        //window_list.active = Arc::downgrade(&inner_ref); 
-    }
+    // add the new window and active it
+    // initialize the content of the new window
+    inner_ref.lock().clean()?;
+    WINDOWLIST.lock().add_active(&inner_ref)?;
+    
 
-    // create the window
+    // return the window object
     let window: WindowObj = WindowObj{
         inner: inner_ref,
         //text_buffer:FrameTextBuffer::new(),
@@ -180,7 +176,7 @@ fn get_border_color(active: bool) -> u32 {
 
 impl WindowList{
     // add a new window to the list
-    fn add_active(&mut self, inner_ref: &Arc<Mutex<WindowInner>>) {
+    fn add_active(&mut self, inner_ref: &Arc<Mutex<WindowInner>>) -> Result<(), &'static str> {
         // // inactive all other windows and active the new one
         // for item in self.list.iter_mut(){
         //     let ref_opt = item.upgrade();
@@ -188,49 +184,61 @@ impl WindowList{
         //         reference.lock().active(false)?;
         //     }
         // }
-
-        // Add a reference of the new window to the window list
-        let weak_ref = self.active.clone();
-        // window_list.active = weak_ref.clone();
-        self.list.push_back(weak_ref);
+        if let Some(current_active) = self.active.upgrade() {
+            current_active.lock().active(false)?;
+            let weak_ref = self.active.clone();
+            self.background_list.push_front(weak_ref);
+        }
+        
+        inner_ref.lock().active(true)?;
         self.active = Arc::downgrade(inner_ref);
+
+        Ok(())
     }
 
     // delete a window
     fn delete(&mut self, inner: &Arc<Mutex<WindowInner>>) -> Result<(), &'static str> {
-        let active = self.active.upgrade();
-        if let Some(active_ref) = active {
-            if Arc::ptr_eq(&(active_ref), inner) {
+        // If the window is active, delete it and active the next top window
+        if let Some(current_active) = self.active.upgrade() {
+            if Arc::ptr_eq(&(current_active), inner) {
                 active_window(0, false)?;
                 return Ok(());
             }
         }
 
-        let mut i = 0;
-        let len = self.list.len();
-        for item in self.list.iter(){
-            let reference = item.upgrade();
-            if let Some(inner_ptr) = reference {
-                if Arc::ptr_eq(&(inner_ptr), inner) {
-                    break;
-                }
-            }
-            i += 1;
-        }
-        if i < len {
+ 
+        if let Some(index) = self.get_bgwindow_index(&inner) {
             {
-                let window_ref = &self.list[i];
+                let window_ref = &self.background_list[index];
                 let window = window_ref.upgrade();
                 if let Some(window) = window {
                     window.lock().key_producer.enqueue(Event::ExitEvent);
                 }
             }
-            self.list.remove(i);
+            self.background_list.remove(index);
         }
 
         inner.lock().clean()?;
 
         Ok(())
+    }
+
+    fn get_bgwindow_index(&self, inner: &Arc<Mutex<WindowInner>>) -> Option<usize> {
+        let mut i = 0;
+        for item in self.background_list.iter(){
+            if let Some(item_ptr) = item.upgrade() {
+                if Arc::ptr_eq(&(item_ptr), inner) {
+                    break;
+                }
+            }
+            i += 1;
+        }
+
+        if i < self.background_list.len() {
+            return Some(i);
+        } else {
+            return None;
+        }
     }
 
     // // check if an area specified by (x, y, width, height) overlaps with an existing window
@@ -263,33 +271,33 @@ impl WindowList{
 
 
     // return a reference to the next window of current active window
-    fn next(&mut self) -> Option<Arc<Mutex<WindowInner>>> {
-        // let mut current_active = false;
-        // for item in self.list.iter_mut(){
-        //     let reference = item.upgrade();
-        //     if let Some(window) = reference {
-        //         if window.lock().active {
-        //             current_active = true;
-        //         } else if current_active {
-        //             return Some(window)
-        //         }
-        //     }
-        // }
+    // fn next(&mut self) -> Option<Arc<Mutex<WindowInner>>> {
+    //     // let mut current_active = false;
+    //     // for item in self.list.iter_mut(){
+    //     //     let reference = item.upgrade();
+    //     //     if let Some(window) = reference {
+    //     //         if window.lock().active {
+    //     //             current_active = true;
+    //     //         } else if current_active {
+    //     //             return Some(window)
+    //     //         }
+    //     //     }
+    //     // }
 
-        // if current_active {
-        //     for item in self.list.iter_mut(){
-        //         let reference = item.upgrade();
-        //         if let Some(window) = reference {
-        //             return Some(window)
-        //         }
-        //     }
-        // }
-        if let Some(weak_ref) = self.list.pop_front() {
-            return weak_ref.upgrade();
-        }
+    //     // if current_active {
+    //     //     for item in self.list.iter_mut(){
+    //     //         let reference = item.upgrade();
+    //     //         if let Some(window) = reference {
+    //     //             return Some(window)
+    //     //         }
+    //     //     }
+    //     // }
+    //     if let Some(weak_ref) = self.list.pop_front() {
+    //         return weak_ref.upgrade();
+    //     }
 
-        None
-    }
+    //     None
+    // 
 }
 
 /// A window contains a reference to its inner reference owned by the window manager,
@@ -498,7 +506,7 @@ impl Drop for WindowObj {
 
         // Switches to a new active window and sets 
         // the active pointer field of the window allocator to the new active window
-        match active_window(0, false) {
+        match window_list.delete(&self.inner) {
             Ok(_) => {}
             Err(err) => { error!("Fail to schedule to the next window: {}", err) }
         }; 
@@ -626,56 +634,43 @@ impl Component {
     }
 }
 
-/// select the next window in the list and set it as active. set current active window and inactive
+/// Select the next window in the list and set it as active. 
+/// Set current active window as inactive.
+/// The order of windows in the background is based on the last time they are active.
+/// The next window is the one which is active most recently
 pub fn switch_to_next() -> Result<(), &'static str>{
     active_window(0, true)
 }
 
-/// select the next window in the list and set it as active. set current active window and inactive
+/// Select the specified window in as active. Set current active window as inactive
 pub fn switch_to(window:&WindowObj) -> Result<(), &'static str>{
-    let mut i = 0;
-    {
-        let mut window_list = WINDOWLIST.lock();
-        let len = window_list.list.len();
-        for item in window_list.list.iter(){
-            let reference = item.upgrade();
-            if let Some(inner_ptr) = reference {
-                if Arc::ptr_eq(&(inner_ptr), &window.inner) {
-                    break;
-                }
-            }
-            i += 1;
-        }
-
-        if i == len {
-            return Ok(());
-        }
-    }
-    
-    // set current window as inactive and active the ith window    
-    active_window(i, true)?;
+    if let Some(index) = WINDOWLIST.lock().get_bgwindow_index(&window.inner) {
+        active_window(index, true)?;
+    }  
 
     Ok(())
 }
 
 
-// active a window of index. backup specifices whether current active window will be backup or delete
-fn active_window(index: usize, backup: bool) -> Result<(), &'static str>{
+// active the index_th window in the background list. 
+// # Arguments
+// * `index`: the index of the window in the background list.
+// * `set_back_current`: whether to keep current active window in the background list. delete current window if set_back_current is false
+fn active_window(index: usize, set_back_current: bool) -> Result<(), &'static str>{
     let mut window_list = WINDOWLIST.lock();
 
     if let Some(window) = window_list.active.upgrade() {
         let mut current = window.lock();
-        if backup {
+        if set_back_current {
             (*current).active(false)?;
             let old_active = window_list.active.clone();
-            window_list.list.push_back(old_active);
+            window_list.background_list.push_front(old_active);
         } else {
             (*current).clean()?;
-
         }
     }
 
-    if let Some(active) = window_list.list.remove(index) { 
+    if let Some(active) = window_list.background_list.remove(index) { 
         window_list.active = active;
         if let Some(window) = window_list.active.upgrade() {
             let mut current = window.lock();
