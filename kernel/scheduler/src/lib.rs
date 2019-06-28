@@ -10,7 +10,7 @@ extern crate runqueue;
 #[cfg(not(priority_scheduler))] extern crate scheduler_round_robin;
 
 
-use core::ops::DerefMut;
+use core::ops::Deref;
 use irq_safety::hold_interrupts;
 use apic::get_my_apic_id;
 use task::{Task, get_my_current_task, TaskRef};
@@ -37,7 +37,7 @@ pub fn schedule() -> bool {
 
     {
         if let Some(selected_next_task) = select_next_task(apic_id) {
-            next_task = selected_next_task.lock_mut().deref_mut();  // as *mut Task;
+            next_task = selected_next_task.lock().deref() as *const Task as *mut Task;
         }
         else {
             // keep running the same current task
@@ -53,7 +53,7 @@ pub fn schedule() -> bool {
     // same scoping reasons as above: to release the lock around current_task
     {
         current_task = get_my_current_task().expect("schedule(): get_my_current_task() failed")
-            .lock_mut().deref_mut() as *mut Task; 
+            .lock().deref() as *const Task as *mut Task; 
     }
 
     if current_task == next_task {
