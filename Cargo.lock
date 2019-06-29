@@ -88,6 +88,7 @@ dependencies = [
 name = "ata"
 version = "0.1.0"
 dependencies = [
+ "bitflags 1.0.4 (registry+https://github.com/rust-lang/crates.io-index)",
  "log 0.3.9 (registry+https://github.com/rust-lang/crates.io-index)",
  "memory 0.1.0",
  "pci 0.1.0",
@@ -344,6 +345,7 @@ version = "0.1.0"
 dependencies = [
  "acpi 0.1.0",
  "apic 0.1.0",
+ "ata 0.1.0",
  "ata_pio 0.1.0",
  "dfqueue 0.1.0",
  "e1000 0.1.0",

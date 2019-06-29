@@ -4,6 +4,7 @@
 extern crate alloc;
 extern crate spin;
 extern crate event_types;
+extern crate ata;
 extern crate ata_pio;
 extern crate e1000;
 extern crate memory;
@@ -75,13 +76,13 @@ pub fn init(keyboard_producer: DFQueueProducer<Event>) -> Result<(), &'static st
     }
     
 
-    // // look for ATA disk devices
-    // for dev in pci::pci_device_iter() {
-    //     // specifically, look for IDE controllers
-    //     if dev.class = 0x01 && dev.subclass = 0x01 {
-    //         ata_pio::init_drive(&dev.bars)?;
-    //     }
-    // }
+    // look for devices we support
+    for dev in pci::pci_device_iter() {
+        // look for IDE controllers (include IDE disk)
+        if dev.class == 0x01 && dev.subclass == 0x01 {
+            ata::AtaController::new(dev)?;
+        }
+    }
 
 
     // testing ata pio read, write, and IDENTIFY functionality, example of uses, can be deleted 
