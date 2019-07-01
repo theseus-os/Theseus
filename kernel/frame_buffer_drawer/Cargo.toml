@@ -2,7 +2,7 @@
 name = "frame_buffer_drawer"
 version = "0.1.0"
 authors = ["Wenqiu Yu <yuwenqiuj@gmail.com>"]
-description = "basic draw functions on the framebuffer"
+description = "basic draw functions to draw in a framebuffer"
 build = "../../build.rs"
 
 [dependencies.frame_buffer]

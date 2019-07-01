@@ -2,7 +2,7 @@
 name = "displayable"
 version = "0.1.0"
 authors = ["Wenqiu Yu <yuwenqiuj@gmail.com>"]
-description = "allocate new windows and manage a list of existing windows"
+description = "a displayable is able to display some component in a framebuffer"
 build = "../../build.rs"
 
 [dependencies]

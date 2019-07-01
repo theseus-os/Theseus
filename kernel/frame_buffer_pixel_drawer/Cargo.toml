@@ -2,7 +2,7 @@
 name = "frame_buffer_pixel_drawer"
 version = "0.1.0"
 authors = ["Wenqiu Yu <yuwenqiuj@gmail.com>"]
-description = "Basic crate to write a pixel to the framebuffer directly. Other display crates are based on this crate"
+description = "Basic crate to write a pixel to the framebuffer directly. Other draw functions are based on this crate"
 build = "../../build.rs"
 
 [dependencies]

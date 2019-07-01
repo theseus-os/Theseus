@@ -325,7 +325,7 @@ pub struct WindowObj {
 }
 
 impl WindowObj {
-    // clean the content of a window
+    // clean the content of a window. The border and padding of the window remain showing
     fn clean(&mut self) -> Result<(), &'static str> {
         let (width, height) = self.inner.lock().get_content_size();
         fill_rectangle(
@@ -727,15 +727,14 @@ impl Component {
     }
 }
 
-/// Select the next window in the list and set it as active.
-/// Set current active window as inactive.
+/// Pick the next window in the background list and set it as active.
 /// The order of windows in the background is based on the last time they are active.
-/// The next window is the one which is active most recently
+/// The next window is the one which was active most recently
 pub fn switch_to_next() -> Result<(), &'static str> {
     active_window(0, true)
 }
 
-/// Select the specified window in as active. Set current active window as inactive
+/// Set the specified window in the background list as active.
 pub fn switch_to(window: &WindowObj) -> Result<(), &'static str> {
     if let Some(index) = WINDOWLIST.lock().get_bgwindow_index(&window.inner) {
         active_window(index, true)?;
