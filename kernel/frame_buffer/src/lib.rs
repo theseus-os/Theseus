@@ -5,19 +5,13 @@
 
 extern crate multicore_bringup;
 extern crate spin;
-
 extern crate alloc;
 extern crate memory;
 extern crate owning_ref;
-#[macro_use]
-extern crate log;
+
 use alloc::boxed::Box;
-use core::hash::Hash;
 use core::ops::DerefMut;
-use memory::{
-    allocate_pages_by_bytes, get_kernel_mmi_ref, EntryFlags, FrameRange, MappedPages,
-    PhysicalAddress, FRAME_ALLOCATOR,
-};
+use memory::{EntryFlags, FrameRange, MappedPages,PhysicalAddress, FRAME_ALLOCATOR};
 use owning_ref::BoxRefMut;
 use spin::{Mutex, Once};
 

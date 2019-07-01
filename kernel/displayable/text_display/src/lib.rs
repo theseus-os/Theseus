@@ -15,7 +15,7 @@ extern crate displayable;
 
 use displayable::Displayable;
 use font::{CHARACTER_HEIGHT, CHARACTER_WIDTH};
-use frame_buffer::{FrameBuffer, Pixel};
+use frame_buffer::{FrameBuffer};
 use tsc::{tsc_ticks, TscTicks};
 
 const DEFAULT_CURSOR_FREQ: u64 = 400000000;

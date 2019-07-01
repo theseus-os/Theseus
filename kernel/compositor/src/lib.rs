@@ -4,10 +4,8 @@
 #![no_std]
 
 extern crate alloc;
-extern crate frame_buffer;
 
 use alloc::vec::Vec;
-use frame_buffer::FrameBuffer;
 
 /// The compositor trait.
 /// A compositor composes a list of buffers to a single buffer

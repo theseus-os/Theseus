@@ -21,10 +21,6 @@ path = "../compositor"
 [dependencies.frame_buffer_pixel_drawer]
 path = "../frame_buffer_pixel_drawer"
 
-[dependencies.log]
-default-features = false
-version = "0.3.7"
-
 [dependencies.lazy_static]
 features = ["spin_no_std", "nightly"]
 version = "1.2.0"

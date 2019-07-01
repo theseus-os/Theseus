@@ -47,7 +47,6 @@ use font::{CHARACTER_HEIGHT, CHARACTER_WIDTH};
 use frame_buffer::FrameBuffer;
 use frame_buffer_compositor::FRAME_COMPOSITOR;
 use frame_buffer_drawer::*;
-use frame_buffer_printer::print_by_bytes;
 use spin::{Mutex, Once};
 use text_display::{Cursor, TextDisplay};
 

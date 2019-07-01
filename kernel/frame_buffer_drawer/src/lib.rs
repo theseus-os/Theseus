@@ -5,12 +5,9 @@
 #![no_std]
 
 extern crate alloc;
-extern crate font;
 extern crate frame_buffer;
 extern crate frame_buffer_pixel_drawer;
 
-use alloc::vec;
-use font::{CHARACTER_HEIGHT, CHARACTER_WIDTH, FONT_PIXEL};
 use frame_buffer::FrameBuffer;
 use frame_buffer_pixel_drawer::draw_pixel;
 
