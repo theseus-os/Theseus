@@ -28,6 +28,13 @@ pub struct TextDisplay {
 }
 
 impl Displayable<&str> for TextDisplay {
+    // display a string in a framebuffer
+    // # Arguments
+    // * `content`: the string to be displayed
+    // * `(x, y)`: the location of the string displayed in the framebuffer
+    // * `fg_color`: color of the string 
+    // * `bg_color`: the background color of the text block
+    // * `framebuffer`: the framebuffer in which the string is displayed
     fn display(
         &self,
         content: &str,

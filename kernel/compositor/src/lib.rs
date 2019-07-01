@@ -4,7 +4,7 @@
 #![no_std]
 
 extern crate alloc;
-extern crate FrameBuffer;
+extern crate frame_buffer;
 
 use alloc::vec::Vec;
 use frame_buffer::FrameBuffer;

@@ -238,6 +238,9 @@ source = "git+https://github.com/rust-lang-nursery/compiler-builtins#045de6e5166
 [[package]]
 name = "compositor"
 version = "0.1.0"
+dependencies = [
+ "frame_buffer 0.1.0",
+]
 
 [[package]]
 name = "context_switch"

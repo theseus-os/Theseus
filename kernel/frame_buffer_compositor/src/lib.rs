@@ -39,7 +39,7 @@ pub struct FrameCompositor {
     cache: BTreeMap<u64, (i32, i32)>,
 }
 
-impl Compositor<FrameBuffer> for FrameCompositor {
+impl Compositor for FrameCompositor {
     // compose a list of framebuffers to the final framebuffer. Every item in the list is a reference to a framebuffer with its position
     fn compose(&mut self, bufferlist: Vec<(&FrameBuffer, i32, i32)>) -> Result<(), &'static str> {
         let mut final_fb = FINAL_FRAME_BUFFER
