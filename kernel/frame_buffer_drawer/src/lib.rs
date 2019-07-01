@@ -5,18 +5,18 @@
 #![no_std]
 
 extern crate alloc;
+extern crate font;
 extern crate frame_buffer;
 extern crate frame_buffer_pixel_drawer;
-extern crate font;
 
 use alloc::vec;
 use font::{CHARACTER_HEIGHT, CHARACTER_WIDTH, FONT_PIXEL};
-use frame_buffer::{FrameBuffer};
+use frame_buffer::FrameBuffer;
 use frame_buffer_pixel_drawer::draw_pixel;
 
 /// Draw a pixel in a framebuffer.
 /// The pixel is drawed at position (x, y) of the framebuffer with color
-pub fn draw_point(mut framebuffer: &mut FrameBuffer, x: usize, y: usize, color: u32){    
+pub fn draw_point(mut framebuffer: &mut FrameBuffer, x: usize, y: usize, color: u32) {
     if framebuffer.check_in_buffer(x, y) {
         draw_pixel(&mut framebuffer, x, y, color);
     }
@@ -25,7 +25,14 @@ pub fn draw_point(mut framebuffer: &mut FrameBuffer, x: usize, y: usize, color: 
 /// Draw a line in a framebuffer.
 /// The start point of the line is(start_x, start_y) and the end point is (end_x, end_y)
 /// The part exceeding the boundary of the framebuffer will be ignored.
-pub fn draw_line(mut framebuffer: &mut FrameBuffer, start_x: i32, start_y: i32, end_x: i32, end_y: i32, color: u32){
+pub fn draw_line(
+    mut framebuffer: &mut FrameBuffer,
+    start_x: i32,
+    start_y: i32,
+    end_x: i32,
+    end_y: i32,
+    color: u32,
+) {
     let width: i32 = end_x - start_x;
     let height: i32 = end_y - start_y;
 
@@ -39,7 +46,7 @@ pub fn draw_line(mut framebuffer: &mut FrameBuffer, start_x: i32, start_y: i32, 
         loop {
             if x == end_x {
                 break;
-            }          
+            }
             y = (x - start_x) * height / width + start_y;
             if framebuffer.check_in_buffer(x as usize, y as usize) {
                 draw_pixel(&mut framebuffer, x as usize, y as usize, color);
@@ -55,10 +62,10 @@ pub fn draw_line(mut framebuffer: &mut FrameBuffer, start_x: i32, start_y: i32, 
                 break;
             }
             x = (y - start_y) * width / height + start_x;
-            if { framebuffer.check_in_buffer(x as usize,y as usize) }{
+            if { framebuffer.check_in_buffer(x as usize, y as usize) } {
                 draw_pixel(&mut framebuffer, x as usize, y as usize, color);
             }
-            y += step;   
+            y += step;
         }
     }
 }
@@ -66,15 +73,28 @@ pub fn draw_line(mut framebuffer: &mut FrameBuffer, start_x: i32, start_y: i32, 
 /// Draw a rectangle in a framebuffer.
 /// The left top point of the rectangle is (start_x, start_y).
 /// The part exceeding the boundary of the framebuffer will be ignored.
-pub fn draw_rectangle(mut framebuffer: &mut FrameBuffer, start_x: usize, start_y: usize, width: usize, height: usize, color: u32){
+pub fn draw_rectangle(
+    mut framebuffer: &mut FrameBuffer,
+    start_x: usize,
+    start_y: usize,
+    width: usize,
+    height: usize,
+    color: u32,
+) {
     let (buffer_width, buffer_height) = framebuffer.get_size();
-    let end_x: usize = { 
-        if start_x + width < buffer_width { start_x + width } 
-        else { buffer_width }
+    let end_x: usize = {
+        if start_x + width < buffer_width {
+            start_x + width
+        } else {
+            buffer_width
+        }
     };
     let end_y: usize = {
-        if start_y + height < buffer_height { start_y + height } 
-        else { buffer_height }
+        if start_y + height < buffer_height {
+            start_y + height
+        } else {
+            buffer_height
+        }
     };
 
     let mut x = start_x;
@@ -101,17 +121,30 @@ pub fn draw_rectangle(mut framebuffer: &mut FrameBuffer, start_x: usize, start_y
 ///Fill a rectangle in a framebuffer with color.
 ///The left top point of the rectangle is (start_x, start_y).
 ///The part exceeding the boundary of the framebuffer will be ignored.
-pub fn fill_rectangle(mut framebuffer: &mut FrameBuffer, start_x: usize, start_y: usize, width: usize, height: usize, color: u32){
+pub fn fill_rectangle(
+    mut framebuffer: &mut FrameBuffer,
+    start_x: usize,
+    start_y: usize,
+    width: usize,
+    height: usize,
+    color: u32,
+) {
     let (buffer_width, buffer_height) = framebuffer.get_size();
-   
+
     let end_x: usize = {
-        if start_x + width < buffer_width { start_x + width } 
-        else { buffer_width }
+        if start_x + width < buffer_width {
+            start_x + width
+        } else {
+            buffer_width
+        }
     };
     let end_y: usize = {
-        if start_y + height < buffer_height { start_y + height } 
-        else { buffer_height }
-    }; 
+        if start_y + height < buffer_height {
+            start_y + height
+        } else {
+            buffer_height
+        }
+    };
 
     let mut x = start_x;
     let mut y = start_y;

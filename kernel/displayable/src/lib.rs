@@ -1,5 +1,5 @@
 //! This crate defines a trait of Displayable.
-//! A displayable is a block of content. It can display itself 
+//! A displayable is a block of content. It can display itself
 
 #![no_std]
 
@@ -18,6 +18,13 @@ pub trait Displayable<T> {
     /// * `fg_color`: the foreground color of the content to be displayed.
     /// * `bg_color`: the background color of the displayable.
     /// * `framebuffer`: the framebuffer to display in.
-    fn display(&self, content: T, x:usize, y:usize, fg_color:u32, bg_color:u32, framebuffer: &mut FrameBuffer) 
-        -> Result<(), &'static str>;
+    fn display(
+        &self,
+        content: T,
+        x: usize,
+        y: usize,
+        fg_color: u32,
+        bg_color: u32,
+        framebuffer: &mut FrameBuffer,
+    ) -> Result<(), &'static str>;
 }

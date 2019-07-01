@@ -8,8 +8,8 @@ extern crate memory;
 extern crate owning_ref;
 
 use frame_buffer::{FrameBuffer, Pixel};
+use memory::MappedPages;
 use owning_ref::BoxRefMut;
-use memory::{MappedPages};
 
 // An RGB color is represented by a 24-bit integer
 const COLOR_BITS: u32 = 24;
@@ -28,7 +28,7 @@ pub fn draw_pixel_3d(framebuffer: &mut FrameBuffer, x: usize, y: usize, z: u8, c
 }
 
 // write a 3d color to a buffer
-pub fn write_to_3d(buffer: &mut BoxRefMut<MappedPages, [Pixel]>, index:usize, color_3d: Pixel) {
+pub fn write_to_3d(buffer: &mut BoxRefMut<MappedPages, [Pixel]>, index: usize, color_3d: Pixel) {
     if (buffer[index] >> COLOR_BITS) <= color_3d >> COLOR_BITS {
         buffer[index] = color_3d;
     }
