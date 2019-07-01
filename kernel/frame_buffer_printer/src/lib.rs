@@ -13,8 +13,14 @@ use font::{CHARACTER_HEIGHT, CHARACTER_WIDTH, FONT_PIXEL};
 use frame_buffer::FrameBuffer;
 
 /// Print a string in a framebuffer.
-/// The string is printed at position (x, y) of the framebuffer.
-/// It is printed within an area specified by (width, height). The part exceeding the area will be ignored.
+/// # Arguments
+/// * `framebuffer`: the framebuffer to display in. 
+/// * `(x, y)`: the left top point of the text block. 
+/// * `width`: the width of the text block.
+/// * `height`: the height of the text block.
+/// * `slice`: the string to display
+/// * `font_color`: the color of the text
+/// * `bg_color`: the background color of the text block
 pub fn print_by_bytes(
     mut framebuffer: &mut FrameBuffer,
     x: usize,

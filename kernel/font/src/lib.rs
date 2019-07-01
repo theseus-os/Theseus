@@ -1041,7 +1041,7 @@ const FONT_BASIC: [[u8; CHARACTER_HEIGHT]; 256] = [
 pub static FONT_PIXEL: Mutex<[[[u32; CHARACTER_WIDTH]; CHARACTER_HEIGHT]; 256]> =
     Mutex::new([[[0; CHARACTER_WIDTH]; CHARACTER_HEIGHT]; 256]);
 
-///init the font mask array
+///initialize the font bitmaps array
 pub fn init() -> Result<(), &'static str> {
     let mut fonts_locked = FONT_PIXEL.lock();
     let fonts = fonts_locked.deref_mut();

@@ -6,12 +6,10 @@
 //! - default_new_window() will provide a window of default size (centered, fills majority of screen)
 //! - new_window() provides a new window whose dimensions the caller must specify
 //!
-//! Windows can be resized by calling resize()
-//! Window can be by passing the window object to delete() or directly through WindowObj.delete(), though the 2nd option requires updating the active pointer manually
-//!
-//! The window object is designed as follows:
-//! The application's window provides a screen area for the application to display its content into. The application can select
-//! from various Displayables such as TextDisplay (multiple of which can be displayed into the application's window at a time)
+//! Windows can be resized by calling resize().
+//! Window can be deleted when it is dropped or by calling WindowObj.delete().
+//! Once an active window is deleted or set as inactive, the next window in the background list will become active.
+//! The orde of windows is based on the last time it was active. The one which was active most recently is the top of the background list
 //!
 //! The WINDOW_ALLOCATOR is used by the WindowManager itself to track and modify the existing windows
 
@@ -79,13 +77,13 @@ const SCREEN_BACKGROUND_COLOR: u32 = 0x000000;
 /// The window allocator.
 /// It contains a list of allocated window and a reference to the active window
 struct WindowList {
-    // The list of inactive windows. Their order is based on the last time they are updated. The first window is the most recently active window
+    // The list of inactive windows. Their order is based on the last time they were active. The first window is the window which was active most recently.
     background_list: VecDeque<Weak<Mutex<WindowInner>>>,
-    // a weak pointer directly to the active WindowInner so we don't have to search for the active window when we need it quickly
-    // this weak pointer is set in the WindowAllocator's switch(), delete(), and allocate() functions
+    // A weak pointer to the active window.
     active: Weak<Mutex<WindowInner>>,
 }
 
+/// Initialize the window manager.
 pub fn init() -> Result<(), &'static str> {
     let (screen_width, screen_height) = frame_buffer::get_screen_size()?;
     let framebuffer = FrameBuffer::new(screen_width, screen_height, None)?;
@@ -237,6 +235,7 @@ impl WindowList {
         Ok(())
     }
 
+    // get the index of an inactive window in the background window list
     fn get_bgwindow_index(&self, inner: &Arc<Mutex<WindowInner>>) -> Option<usize> {
         let mut i = 0;
         for item in self.background_list.iter() {
@@ -317,7 +316,6 @@ impl WindowList {
 /// a consumer of inputs, a list of displayables and a framebuffer
 pub struct WindowObj {
     inner: Arc<Mutex<WindowInner>>,
-    //text_buffer:FrameTextBuffer,
     consumer: DFQueueConsumer<Event>,
     components: BTreeMap<String, Component>,
     /// the framebuffer owned by the window
@@ -406,7 +404,7 @@ impl WindowObj {
         };
     }
 
-    ///Get the content position of the window excluding border and padding
+    /// Get the content position of the window excluding border and padding
     pub fn get_content_position(&self) -> (usize, usize) {
         self.inner.lock().get_content_position()
     }
@@ -565,7 +563,7 @@ impl WindowObj {
         }
     }
 
-    ///Get a key event of the window
+    /// Get a key event of the window
     pub fn get_key_event(&self) -> Option<Event> {
         let event_opt = self.consumer.peek();
         if let Some(event) = event_opt {
@@ -578,7 +576,7 @@ impl WindowObj {
     }
 }
 
-/// delete the reference of a window in the manager when the window is dropped
+// delete the reference of a window in the manager when the window is dropped
 impl Drop for WindowObj {
     fn drop(&mut self) {
         let mut window_list = WINDOWLIST.lock();

@@ -24,7 +24,7 @@ pub static FINAL_FRAME_BUFFER: Once<Mutex<FrameBuffer>> = Once::new();
 // Every pixel is of u32 type
 const PIXEL_BYTES: usize = 4;
 
-/// Init the final frame buffer.
+/// Initialize the final frame buffer.
 /// Allocate a block of memory and map it to the physical framebuffer frames.
 /// Init the frame buffer. Allocate a block of memory and map it to the frame buffer frames.
 pub fn init() -> Result<(), &'static str> {

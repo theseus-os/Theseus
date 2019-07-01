@@ -19,9 +19,12 @@ pub fn draw_point(mut framebuffer: &mut FrameBuffer, x: usize, y: usize, color: 
     }
 }
 
-/// Draw a line in a framebuffer.
-/// The start point of the line is(start_x, start_y) and the end point is (end_x, end_y)
-/// The part exceeding the boundary of the framebuffer will be ignored.
+/// Draw a line in a framebuffer. The part exceeding the boundary of the framebuffer will be ignored.
+/// # Arguments
+/// * `framebuffer`: the framebuffer to draw in. 
+/// * `(start_x, start_y)`: the start point of the line. 
+/// * `(end_x, end_y)`: the end point of the line.
+/// * `color`: the color of the line.
 pub fn draw_line(
     mut framebuffer: &mut FrameBuffer,
     start_x: i32,
@@ -68,8 +71,13 @@ pub fn draw_line(
 }
 
 /// Draw a rectangle in a framebuffer.
-/// The left top point of the rectangle is (start_x, start_y).
 /// The part exceeding the boundary of the framebuffer will be ignored.
+/// # Arguments
+/// * `framebuffer`: the framebuffer to draw in. 
+/// * `(start_x, start_y)`: the left top point of the retangle. 
+/// * `width`: the width of the rectangle.
+/// * `height`: the height of the rectangle.
+/// * `color`: the color of the rectangle's border
 pub fn draw_rectangle(
     mut framebuffer: &mut FrameBuffer,
     start_x: usize,
@@ -115,9 +123,14 @@ pub fn draw_rectangle(
     }
 }
 
-///Fill a rectangle in a framebuffer with color.
-///The left top point of the rectangle is (start_x, start_y).
-///The part exceeding the boundary of the framebuffer will be ignored.
+/// Fill a rectangle in a framebuffer with color.
+/// The part exceeding the boundary of the framebuffer will be ignored.
+/// # Arguments
+/// * `framebuffer`: the framebuffer to draw in. 
+/// * `(start_x, start_y)`: the left top point of the retangle. 
+/// * `width`: the width of the rectangle.
+/// * `height`: the height of the rectangle.
+/// * `color`: the color of the rectangle
 pub fn fill_rectangle(
     mut framebuffer: &mut FrameBuffer,
     start_x: usize,

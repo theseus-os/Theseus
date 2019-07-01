@@ -14,22 +14,22 @@ use owning_ref::BoxRefMut;
 // An RGB color is represented by a 24-bit integer
 const COLOR_BITS: u32 = 24;
 
-// write a pixel to a framebuffer directly
+/// write a pixel to a framebuffer directly
 pub fn draw_pixel(framebuffer: &mut FrameBuffer, x: usize, y: usize, color: Pixel) {
     let index = framebuffer.index(x, y);
     framebuffer.buffer_mut()[index] = color;
 }
 
-// draw a 3d pixel to a framebuffer
+/// draw a 3d pixel to a framebuffer
 pub fn draw_pixel_3d(framebuffer: &mut FrameBuffer, x: usize, y: usize, z: u8, color: Pixel) {
     let index = framebuffer.index(x, y);
     let buffer = framebuffer.buffer_mut();
     write_to_3d(buffer, index, color + (z as u32) << COLOR_BITS);
 }
 
-// write a 3d color to a buffer
-pub fn write_to_3d(buffer: &mut BoxRefMut<MappedPages, [Pixel]>, index: usize, color_3d: Pixel) {
-    if (buffer[index] >> COLOR_BITS) <= color_3d >> COLOR_BITS {
-        buffer[index] = color_3d;
+/// write a 3d pixel to the index_th pixel of a buffer
+pub fn write_to_3d(buffer: &mut BoxRefMut<MappedPages, [Pixel]>, index: usize, pixel_3d: Pixel) {
+    if (buffer[index] >> COLOR_BITS) <= pixel_3d >> COLOR_BITS {
+        buffer[index] = pixel_3d;
     }
 }

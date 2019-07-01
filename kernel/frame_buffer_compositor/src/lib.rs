@@ -32,8 +32,9 @@ lazy_static! {
     );
 }
 
-/// The framebuffer compositor structure. It will hold the cache of updated framebuffers for better performance.
-/// Only framebuffers that have not changed will be redisplayed in the final framebuffer
+/// The framebuffer compositor structure. 
+/// It caches updated framebuffers for better performance.
+/// Framebuffers haven't changed since last compositing will be ignored
 pub struct FrameCompositor {
     //Cache of updated framebuffers
     cache: BTreeMap<u64, (i32, i32)>,
