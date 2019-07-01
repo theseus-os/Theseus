@@ -198,6 +198,14 @@ impl AtaDrive {
 		Ok(drive)
 	}
 
+	/// Reads 256 16-bit words (`u16`s) from this drive 
+	/// and places them into the provided `buffer`. 
+	/// 
+	/// #Note
+	/// This is slow, as it uses blocking port I/O instead of DMA. 
+	pub fn read_pio(&self, buffer: &mut [u8; 256]) -> Result<usize, &'static str> {
+		unimplemented!()
+	}
 
 	/// Issues an ATA identify command to probe the drive
 	/// and query its characteristics. 
@@ -281,9 +289,13 @@ impl AtaDrive {
 	}
 
 
-
+	
+	/// Reads the `status` port and returns the value. 
+	/// Because some disk drives operate (change wire values) very slowly,
+	/// this undergoes the standard procedure of reading the port value 
+	/// and discarding it 4 times before reading the real value. 
+	/// Each read is a 100ns delay, so the total delay of 400ns is proper.
 	pub fn status(&mut self) -> AtaStatus {
-		// Read the status port 4 times: a 400ns delay to accommodate slow drives.
 		for _ in 0..4 {
 			self.status.read();
 		}
@@ -358,74 +370,140 @@ impl AtaController {
 }
 
 
-
+/// The format of the
+/// 
+/// Fuller documentation is available here:
+/// <https://docs.microsoft.com/en-us/windows-hardware/drivers/ddi/content/ata/ns-ata-_identify_device_data#members
 #[derive(Copy, Clone)]
 #[repr(packed)]
-pub struct AtaIdentifyData
-{
-	flags: u16,
-	_unused1: [u16; 9],
+pub struct AtaIdentifyData {
+	general_configuration: u16,
+	num_cylinders: u16,
+	specific_configuration: u16,
+	num_heads: u16,
+	_reserved1: [u16; 2],
+	num_sectors_per_track: u16,
+	vendor_unique1: [u16; 3],
 	serial_number: [u8; 20],
-	_unused2: [u16; 3],
-	firmware_ver: [u8; 8],
+	_reserved2: [u16; 3],
+	firmware_version: [u8; 8],
 	model_number: [u8; 40],
-	/// Maximum number of blocks per transfer
-	sect_per_int: u16,
-	_unused3: u16,
-	capabilities: [u16; 2],
-	_unused4: [u16; 2],
-	/// Bitset of translation fields (next five shorts)
-	valid_ext_data: u16,
-	_unused5: [u16; 5],
-	size_of_rw_multiple: u16,
+	/// Maximum number of blocks per transfer.
+	/// Sometimes referred to as "sectors per int".
+	max_blocks_per_transfer: u8,
+	vendor_unique2: u8,
+	trusted_computing: u16,
+	capabilities: u16,
+	_reserved3: u16, // reserved word 50
+	_reserved4: [u16; 2],
+	/// A bitmask of translation fields valid and free fall control sensitivity
+	translation_fields_valid: u8,
+	free_fall_control_sensitivity: u8,
+	num_current_cylinders: u16,
+	num_current_heads: u16,
+	current_sectors_per_track: u16,
+	current_sector_capacity: u32, 
+	current_multi_sector_setting: u8,
+	/// MultiSectorSettingValid : 1;
+	/// ReservedByte59 : 3;
+	/// SanitizeFeatureSupported : 1;
+	/// CryptoScrambleExtCommandSupported : 1;
+	/// OverwriteExtCommandSupported : 1;
+	/// BlockEraseExtCommandSupported : 1;
+	ext_command_supported: u8,
 	/// LBA 28 sector count (if zero, use 48)
-	sector_count_28: u32,
-	_unused6: [u16; 100-62],
-	/// LBA 48 sector count
-	sector_count_48: u64,
-	_unused7: [u16; 2],
+	user_addressable_sectors: u32,
+	_reserved5: u16,
+	multiword_dma_support: u8,
+	multiword_dma_active: u8,
+	advanced_pio_modes: u8,
+	_reserved6: u8,
+	minimum_mw_transfer_cycle_time: u16,
+	recommended_mw_transfer_cycle_time: u16,
+	minimum_pio_cycle_time: u16,
+	minimum_pio_cycle_time_io_ready: u16,
+	additional_supported: u16,
+	_reserved7: [u16; 5],
+	/// only the first 5 bits are used, others are reserved
+	queue_depth: u16,
+	serial_ata_capabilities: u32,
+	serial_ata_features_supported: u16,
+	serial_ata_features_enabled: u16,
+	major_revision: u16,
+	minor_revision: u16,
+	command_set_support: [u16; 3],
+	command_set_active: [u16; 3],
+	ultra_dma_support: u8,
+	ultra_dma_active: u8,
+	normal_security_erase_unit: u16,
+	enhanced_security_erase_unit: u16,
+	current_apm_level: u8,
+	_reserved8: u8,
+	master_password_id: u16,
+	hardware_reset_result: u16,
+	current_acoustic_value: u8,
+	recommended_acoustic_value: u8,
+	stream_min_request_size: u16,
+	streaming_transfer_time_dma: u16,
+	streaming_access_latency_dma_pio: u16,
+	streaming_perf_granularity: u32, 
+	/// The max user LBA when using 48-bit LBA
+	max_48_bit_lba: u64,
+	streaming_transfer_time: u16,
+	dsm_cap: u16,
 	/// [0:3] Physical sector size (in logical sectors)
-	physical_sector_size: u16,
-	_unused8: [u16; 9],
-	/// Number of words per logical sector
+	physical_logical_sector_size: u16, 
+	inter_seek_delay: u16,
+	world_wide_name: [u16; 4],
+	reserved_for_world_wide_name_128: [u16; 4],
+	reserved_for_tlc_technical_report: u16,
 	words_per_logical_sector: u32,
-	_unusedz: [u16; 257-119],
+	command_set_support_ext: u16,
+	command_set_active_ext: u16,
+	reserved_for_expanded_support_and_active: [u16; 6],
+	msn_support: u16,
+	security_status: u16,
+	_reserved9: [u16; 31],
+	cfa_power_mode1: u16,
+	_reserved10: [u16; 7],
+	nominal_form_factor: u16, 
+	data_set_management_feature: u16, 
+	additional_product_id: [u16; 4],
+	_reserved11: [u16; 2],
+	current_media_serial_number: [u16; 30],
+	sct_command_transport: u16,
+	_reserved12: [u16; 2],
+	block_alignment: u16, 
+	write_read_verify_sector_count_mode_3_only: [u16; 2],
+	write_read_verify_sector_count_mode_2_only: [u16; 2],
+	nv_cache_capabilities: u16,
+	nv_cache_size_lsw: u16,
+	nv_cache_size_msw: u16,
+	nominal_media_rotation_rate: u16,
+	_reserved13: u16, 
+	nv_cache_time_to_spin_up_in_seconds: u8,
+	_reserved14: u8,
+	write_read_verify_sector_count_mode: u8,
+	_reserved15: u8,
+	_reserved16: u16,
+	transport_major_version: u16,
+	transport_minor_version: u16,
+	_reserved17: [u16; 6],
+	extended_num_of_user_addressable_sectors: u64,
+	min_blocks_per_download_microcode: u16,
+	max_blocks_per_download_microcode: u16,
+	_reserved18: [u16; 19],
+	signature: u8,
+	checksum: u8,
 }
 
-impl Default for AtaIdentifyData {
-	fn default() -> AtaIdentifyData {
-		AtaIdentifyData {
-			flags: 0,
-			_unused1: [0; 9],
-			serial_number: [0; 20],
-			_unused2: [0; 3],
-			firmware_ver: [0; 8],
-			model_number: [0; 40],
-			sect_per_int: 0,
-			_unused3: 0,
-			capabilities: [0; 2],
-			_unused4: [0; 2],
-			valid_ext_data: 0,
-			_unused5: [0; 5],
-			size_of_rw_multiple: 0,
-			sector_count_28: 0,
-			_unused6: [0; 100-62],
-			sector_count_48: 0,
-			_unused7: [0; 2],
-			physical_sector_size: 0,
-			_unused8: [0; 9],
-			words_per_logical_sector: 0,
-			_unusedz: [0; 257-119],
-		}
-	}
-}
 impl AtaIdentifyData {
 	/// Converts the given array of `u16` words, which should be the result of an ATA identify command,
 	/// into the appropriate detailed struct.
 	fn new(arr: [u16; 256])-> AtaIdentifyData{
 		let mut identify_data: AtaIdentifyData =unsafe {::core::mem::transmute(arr)};
 		flip_bytes(&mut identify_data.serial_number);
-		flip_bytes(&mut identify_data.firmware_ver);
+		flip_bytes(&mut identify_data.firmware_version);
 		flip_bytes(&mut identify_data.model_number);
 		return identify_data
 	}
@@ -434,11 +512,11 @@ impl AtaIdentifyData {
 impl fmt::Debug for AtaIdentifyData {
 	fn fmt(&self, f: &mut fmt::Formatter) -> fmt::Result {
 		write!(f, "AtaIdentifyData {{ \
-			flags: {:#X}, \
+			general_configuration: {:#X}, \
 			serial_number: {:?}, \
-			firmware_ver: {:?}, \
+			firmware_version: {:?}, \
 			model_number: {:?}, \
-			sect_per_int: {}, \
+			max_blocks_per_transfer: {}, \
 			capabilities: [{:#X}, {:#X}], \
 			valid_ext_data: {}, \
 			size_of_rw_multiple: {}, \
@@ -447,11 +525,11 @@ impl fmt::Debug for AtaIdentifyData {
 			physical_sector_size: {}, \
 			words_per_logical_sector: {}, \
 			}}",
-			self.flags,
+			self.general_configuration,
 			RawString(&self.serial_number),
-			RawString(&self.firmware_ver),
+			RawString(&self.firmware_version),
 			RawString(&self.model_number),
-			self.sect_per_int & 0xFF,
+			self.max_blocks_per_transfer & 0xFF,
 			self.capabilities[0], self.capabilities[1],
 			self.valid_ext_data,
 			self.size_of_rw_multiple,
