@@ -363,10 +363,6 @@ dependencies = [
 ]
 
 [[package]]
-name = "documentation"
-version = "0.1.0"
-
-[[package]]
 name = "e1000"
 version = "0.1.0"
 dependencies = [
