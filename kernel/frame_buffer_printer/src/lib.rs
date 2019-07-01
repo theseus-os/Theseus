@@ -1,6 +1,4 @@
-//! This crate contains a series of basic draw functions to draw graphs in a framebuffer
-//! Displayables invoke these basic functions to draw more compilicated graphs in a framebuffer
-//! A framebuffer should be passed to the framebuffer compositor to display on the screen
+//! This crate contains functions to print strings in a framebuffer
 
 #![no_std]
 
