@@ -10,9 +10,3 @@
 [submodule "libs/mpmc"]
 	path = libs/mpmc
 	url = https://github.com/theseus-os/mpmc
-[submodule "x86_64"]
-	path = x86_64
-	url = https://github.com/kevinaboos/x86_64.git
-[submodule "libs/--force"]
-	path = libs/--force
-	url = https://github.com/kevinaboos/x86_64.git
