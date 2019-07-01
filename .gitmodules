@@ -4,7 +4,7 @@
 	ignore = dirty
 [submodule "libs/x86_64"]
 	path = libs/x86_64
-	url = https://github.com/kevinaboos/x86_64.git
+	url = https://github.com/kevinaboos/x86_64
 	branch = master
 	ignore = dirty
 [submodule "libs/mpmc"]
