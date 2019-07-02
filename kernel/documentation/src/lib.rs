@@ -16,6 +16,7 @@
 //! * [How the Build Process Works](build_process/index.html)
 //! * [Loadable Mode: Runtime Loading and Linking of Crates](build_process/index.html#loadable-mode-runtime-loading-and-linking-of-crates)
 //! * [How Theseus Boots](booting/index.html)
+//! * [GUI to display on the screen](gui/index.html)
 //! 
 //! # Basic Overview of All Crates 
 //! One-line summaries of what each crate includes (may be incomplete):
@@ -76,3 +77,4 @@ pub mod build_process;
 pub mod booting;
 pub mod phis;
 pub mod git;
+pub mod gui;

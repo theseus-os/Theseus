@@ -323,8 +323,8 @@ pub struct WindowObj {
 }
 
 impl WindowObj {
-    // clean the content of a window. The border and padding of the window remain showing
-    fn clean(&mut self) -> Result<(), &'static str> {
+    /// clean the content of a window. The border and padding of the window remain showing
+    pub fn clean(&mut self) -> Result<(), &'static str> {
         let (width, height) = self.inner.lock().get_content_size();
         fill_rectangle(
             &mut self.framebuffer,
