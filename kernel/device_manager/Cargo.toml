@@ -21,9 +21,6 @@ path = "../event_types"
 [dependencies.ata]
 path = "../ata"
 
-[dependencies.ata_pio]
-path = "../ata_pio"
-
 [dependencies.memory]
 path = "../memory"
 

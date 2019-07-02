@@ -5,7 +5,6 @@ extern crate alloc;
 extern crate spin;
 extern crate event_types;
 extern crate ata;
-extern crate ata_pio;
 extern crate e1000;
 extern crate memory;
 extern crate dfqueue; 
@@ -80,20 +79,15 @@ pub fn init(keyboard_producer: DFQueueProducer<Event>) -> Result<(), &'static st
     for dev in pci::pci_device_iter() {
         // look for IDE controllers (include IDE disk)
         if dev.class == 0x01 && dev.subclass == 0x01 {
-            ata::AtaController::new(dev)?;
+            let mut ata_controller = ata::AtaController::new(dev)?;
+            let mut test_buf: [u8; 3003] = [0; 3003];
+            let bytes_read = ata_controller.primary_master.as_mut().unwrap().read_pio(&mut test_buf[..], 10)?;
+            // ata_controller.primary_master.as_mut().unwrap().read_pio(3, &mut test_buf[512..])?;
+            debug!("{:X?}", &test_buf[..]);
+            debug!("{:?}", core::str::from_utf8(&test_buf));
+            trace!("READ_PIO {} bytes", bytes_read);
         }
     }
-
-
-    // testing ata pio read, write, and IDENTIFY functionality, example of uses, can be deleted 
-    ata_pio::init_ata_devices();
-    let test_arr: [u16; 256] = [630; 256];
-    debug!("Value from ATA identification function: {:?}", ata_pio::ATA_DEVICES.try().expect("ATA_DEVICES used before initialization").primary_master);
-    let begin = ata_pio::pio_read(0xE0, 0).map_err(|_e| "initial pio_read() failed")?;
-    debug!("Value from drive at sector 0 before write: {:?}", &begin[..]);
-    ata_pio::pio_write(0xE0, 0, test_arr).map_err(|_e| "pio_write() failed")?;
-    let end = ata_pio::pio_read(0xE0, 0).map_err(|_e| "subsequent pio_read() failed")?;
-    debug!("Value from drive at sector 0 after write: {:?}", &end[..]);
     
     Ok(())
 }

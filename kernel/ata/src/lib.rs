@@ -13,7 +13,7 @@ use spin::{Once, Mutex};
 use port_io::{Port, PortReadOnly, PortWriteOnly};
 use pci::PciDevice;
 
-
+const SECTOR_SIZE_IN_BYTES: usize = 512;
 
 const DEFAULT_PRIMARY_CHANNEL_DATA_PORT:         u16 = 0x1F0;
 const DEFAULT_PRIMARY_CHANNEL_CONTROL_PORT:      u16 = 0x3F6;
@@ -72,23 +72,23 @@ bitflags! {
 #[repr(u8)]
 pub enum AtaCommand {
 	/// Read sectors with retry
-	READ_PIO         = 0x20,
-	READ_PIO_EXT     = 0x24,
+	ReadPio         = 0x20,
+	ReadPioExt      = 0x24,
 	/// Read DMA with retry
-	READ_DMA         = 0xC8,
-	READ_DMA_EXT     = 0x25,
+	ReadDma         = 0xC8,
+	ReadDmaExt      = 0x25,
 	/// Write sectors with retry
-	WRITE_PIO        = 0x30,
-	WRITE_PIO_EXT    = 0x34,
+	WritePio        = 0x30,
+	WritePioExt     = 0x34,
 	/// Write DMA with retry
-	WRITE_DMA        = 0xCA,
-	WRITE_DMA_EXT    = 0x35,
-	CACHE_FLUSH      = 0xE7,
-	CACHE_FLUSH_EXT  = 0xEA,
-	PACKET           = 0xA0,
-	IDENTIFY_PACKET  = 0xA1,
+	WriteDma        = 0xCA,
+	WriteDmaExt     = 0x35,
+	CacheFlush      = 0xE7,
+	CacheFlushExt   = 0xEA,
+	Packet          = 0xA0,
+	IdentifyPacket  = 0xA1,
 	/// The primary command for getting identifying details of an ATA drive.
-	IDENTIFY_DEVICE  = 0xEC,
+	IdentifyDevice  = 0xEC,
 }
 
 /// The two types of ATA drives that may exist on one bus.
@@ -121,13 +121,13 @@ pub struct AtaDrive {
 	sector_count: Port<u8>,
 	/// The low byte `[0:8)` of the linear block address (LBA) of the sector that we want to read or write. 
 	/// Located at `BAR0 + 3`.
-	lba_0: Port<u8>,
+	lba_low: Port<u8>,
 	/// The middle byte `[8:16)`of the linear block address (LBA) of the sector that we want to read or write. 
 	/// Located at `BAR0 + 4`.
-	lba_1: Port<u8>,
+	lba_mid: Port<u8>,
 	/// The high byte `[16:24)` of the linear block address (LBA) of the sector that we want to read or write. 
 	/// Located at `BAR0 + 5`.
-	lba_2: Port<u8>,
+	lba_high: Port<u8>,
 	/// `HDDEVSEL`, used for selecting a drive in the channel.
 	/// The lower 4 bits of this port are used for the upper 4 bits of the 28-bit LBA.
 	/// Located at `BAR0 + 6`.
@@ -175,9 +175,9 @@ impl AtaDrive {
 			error: PortReadOnly::new(data_bar + 1),
 			features: PortWriteOnly::new(data_bar + 1),
 			sector_count: Port::new(data_bar + 2),
-			lba_0: Port::new(data_bar + 3),
-			lba_1: Port::new(data_bar + 4),
-			lba_2: Port::new(data_bar + 5),
+			lba_low: Port::new(data_bar + 3),
+			lba_mid: Port::new(data_bar + 4),
+			lba_high: Port::new(data_bar + 5),
 			drive_select: Port::new(data_bar + 6),
 			command: PortWriteOnly::new(data_bar + 7),
 			status: PortReadOnly::new(data_bar + 7),
@@ -198,14 +198,105 @@ impl AtaDrive {
 		Ok(drive)
 	}
 
-	/// Reads 256 16-bit words (`u16`s) from this drive 
-	/// and places them into the provided `buffer`. 
+	/// Reads data from this drive and places it into the provided `buffer`.
+    /// The length of the given `buffer` determines the maximum number of bytes to be read.
 	/// 
-	/// #Note
+	/// Returns the number of bytes that were successfully read from the drive
+	/// and copied into the given `buffer`.
+	/// 
+	/// # Note
 	/// This is slow, as it uses blocking port I/O instead of DMA. 
-	pub fn read_pio(&self, buffer: &mut [u8; 256]) -> Result<usize, &'static str> {
-		unimplemented!()
+	pub fn read_pio(&mut self, buffer: &mut [u8], offset: usize) -> Result<usize, &'static str> {
+		// Calculate LBA and sector count based on the offset and requested read length
+		let (lba_start, lba_end_inclusive, offset_remainder) = self.lba_bounds(offset, buffer.len())?;
+		let sector_count = lba_end_inclusive - lba_start + 1; // +1 for inclusive bound
+		trace!("AtaDrive::read_pio(): lba_start: {}, lba_end: {}, sector_count: {}, offset_remainder: {}",
+			lba_start, lba_end_inclusive, sector_count, offset_remainder
+		);
+		if sector_count > (self.identify_data.max_blocks_per_transfer as u64) {
+			error!("AtaDrive::read_pio(): cannot read {} sectors ({} bytes), drive has a max of {} sectors per transfer.", 
+				sector_count, buffer.len(), self.identify_data.max_blocks_per_transfer
+			);
+			return Err("AtaDrive::read_pio(): cannot read more sectors than the drive's max");
+		}
+
+		// Set up and issue the read command.
+		if self.uses_28_bit_lba() {
+			unsafe {
+				// bits [24:28] of the LBA need to go into the lower 4 bits of the `drive_select` port.
+				self.drive_select.write(0xE0 | (self.master_slave as u8) | ((lba_start >> 24) as u8 & 0x0F));
+				self.sector_count.write(sector_count as u8);
+				self.lba_low.write( (lba_start >>  0) as u8);
+				self.lba_mid.write( (lba_start >>  8) as u8);
+				self.lba_high.write((lba_start >> 16) as u8);
+				self.command.write(AtaCommand::ReadPio as u8); // if we're doing 48-bit LBA, use ReadPioExt instead.
+			}
+		}
+
+		self.wait_on_status().map_err(|_| "error before data read")?;
+
+		// Read the actual data, one sector at a time.
+		let mut src_offset = offset_remainder; 
+		let mut dest_offset = 0;
+		for _lba in lba_start ..= lba_end_inclusive {
+			let sector = self.internal_read_sector()?;
+			// don't copy past the end of `buffer`
+			let bytes_to_copy = core::cmp::min(SECTOR_SIZE_IN_BYTES - src_offset, buffer.len() - dest_offset);
+			buffer[dest_offset .. (dest_offset + bytes_to_copy)].copy_from_slice(&sector[src_offset .. (src_offset + bytes_to_copy)]);
+			trace!("LBA {}: copied bytes into buffer[{}..{}] from sector[{}..{}]",
+				_lba, dest_offset, dest_offset + bytes_to_copy, src_offset, src_offset + bytes_to_copy,
+			);
+			dest_offset += bytes_to_copy;
+			src_offset = 0;
+		}
+
+		Ok(dest_offset)
 	}
+
+	/// Translates bounds info into an LBA, sector count, and first sector offset.
+	/// 
+	/// # Arguments
+	/// * `offset`: the absolute byte offset from the beginning of the drive at which the read/write starts.
+	/// * `length`: the number of bytes to be read/written.
+	/// 
+	/// # Return
+	/// Returns a tuple of the following information:
+	/// * the first LBA (sector number), i.e., where the transfer should start,
+	/// * the last LBA (sector number), i.e., where the transfer should end (an inclusive bound).
+	/// * the offset remainder, which is the offset into the first sector where the read should start.
+	/// 
+	/// If just one sector is to be read, the first LBA and the last LBA will be equal.
+	/// 
+	/// Returns an error if the `offset + length` extends past the bounds of this drive.
+	fn lba_bounds(&self, offset: usize, length: usize) -> Result<(u64, u64, usize), &'static str> {
+		if offset > self.size_in_bytes() {
+			return Err("offset was out of bounds");
+		}
+		let starting_lba = (offset / SECTOR_SIZE_IN_BYTES) as u64;
+		let offset_remainder = (offset % SECTOR_SIZE_IN_BYTES) as usize;
+		let ending_lba = core::cmp::min(
+			(self.size_in_sectors() - 1) as u64, // -1 because the bound is inclusive
+			((offset + length) / SECTOR_SIZE_IN_BYTES) as u64,
+		);
+		Ok((starting_lba, ending_lba, offset_remainder))
+	}
+
+
+	/// Returns the number of sectors in this drive.
+	pub fn size_in_sectors(&self) -> usize {
+		if self.identify_data.user_addressable_sectors != 0 {
+			self.identify_data.user_addressable_sectors as usize
+		} else {
+			self.identify_data.max_48_bit_lba as usize
+		}
+	}
+
+	/// Returns the size of this drive in bytes,
+	/// rounded up to the nearest sector size.
+	pub fn size_in_bytes(&self) -> usize {
+		self.size_in_sectors() * SECTOR_SIZE_IN_BYTES
+	}
+
 
 	/// Issues an ATA identify command to probe the drive
 	/// and query its characteristics. 
@@ -215,13 +306,14 @@ impl AtaDrive {
 		unsafe {
 			self.drive_select.write(0xA0 | self.master_slave as u8);
 			self.sector_count.write(0);
-			self.lba_0.write(0);
-			self.lba_1.write(0);
-			self.lba_2.write(0);
+			self.lba_low.write(0);
+			self.lba_mid.write(0);
+			self.lba_high.write(0);
 			// issue the actual commannd
-			self.command.write(AtaCommand::IDENTIFY_DEVICE as u8);
+			self.command.write(AtaCommand::IdentifyDevice as u8);
 		}
 
+		// a status of 0 means that a drive was not attached
 		if self.status().is_empty() {
 			return Err("drive did not exist");
 		}
@@ -229,12 +321,12 @@ impl AtaDrive {
 		// wait until the BUSY status bit is cleared
 		while self.status().intersects(AtaStatus::BUSY) {
 			// check for a non-ATA drive
-			if self.lba_1.read() != 0 || self.lba_2.read() != 0 {
+			if self.lba_mid.read() != 0 || self.lba_high.read() != 0 {
 				return Err("drive was not ATA");
 			}
 		}
 
-		match (self.lba_1.read(), self.lba_2.read()) {
+		match (self.lba_mid.read(), self.lba_high.read()) {
 			(0x14, 0xEB) => {
 				// PATAPI device
 				return Err("drive was an unsupported PATAPI device");
@@ -255,29 +347,61 @@ impl AtaDrive {
 			}
 		}
 
-		// wait until the drive is ready to read data from, or an error has occurred
-		loop {
-			let status = self.status();
-			if status.intersects(AtaStatus::DATA_REQUEST_READY) {
-				break; // ready to go!
-			}
-			if status.intersects(AtaStatus::ERROR) {
-				return Err("error reading identify data from drive");
-			}
-		}
-		
-		if self.status().intersects(AtaStatus::ERROR) {
-			return Err("error reading identify data from drive");
-		}
+		self.wait_on_status().map_err(|_| "error reading identify data from the drive")?;
 
-		// time to read the actual data
-		let mut arr: [u16; 256] = [0; 256];
-		for i in 0..256 {
-			arr[i] = self.data.read();
-		}
+		// we're ready to read the actual data
+		let arr = self.internal_read_sector()?;
 
 		Ok(AtaIdentifyData::new(arr))
     }
+
+	/// Performs the actual read operation once the `LBA` and other ports have been set up. 
+	/// This function reads one sector of data from the drive, 
+	/// but will only read data into the `buffer` once it has reached the `start_at_byte`.
+	/// 
+	/// Returns the number of **bytes (not words)** read.
+	fn internal_read_sector(&mut self) -> Result<[u8; SECTOR_SIZE_IN_BYTES], &'static str> {
+		// ATA PIO works by reading one 16-bit word at a time, 
+		// so one read covers two bytes of the buffer.
+		// Also, we *MUST* read a full sector for the drive to continue working properly,
+		// even if we don't need that many bytes to fill the given `buffer`.
+		let mut data = [0u8; SECTOR_SIZE_IN_BYTES];
+		for chunk in data.chunks_exact_mut(2) {
+			let word: u16 = self.data.read();
+			chunk[0] = word as u8;
+			chunk[1] = (word >> 8) as u8;
+		}
+		if self.status().intersects(AtaStatus::ERROR) {
+			error!("internal_read_sector: status: {:?}, error: {:?}", self.status(), self.error());
+			return Err("error after data read");
+		}
+		Ok(data)
+	}
+	
+	/// Performs a blocking poll that waits until the drive is ready.
+	/// 
+	/// Returns an error if the `status` port indicates an error. 
+	/// The `error` port can then be read to obtain more details on what kind of error occurred.
+	fn wait_on_status(&self) -> Result<(), ()> {
+		loop {
+			let status = self.status();
+			if status.intersects(AtaStatus::ERROR | AtaStatus::DRIVE_WRITE_FAULT) {
+				return Err(());
+			}
+			if status.intersects(AtaStatus::BUSY) { 
+				continue;
+			}
+			if status.intersects(AtaStatus::DATA_REQUEST_READY) {
+				return Ok(()); // ready to go!
+			}
+		}
+	}
+
+
+	/// Currently we always use 28-bit LBA
+	fn uses_28_bit_lba(&self) -> bool {
+		true
+	}
 
 
 	/// Issues a software reset for this drive.
@@ -290,16 +414,22 @@ impl AtaDrive {
 
 
 	
-	/// Reads the `status` port and returns the value. 
+	/// Reads the `status` port and returns the value as an `AtaStatus` bitfield. 
 	/// Because some disk drives operate (change wire values) very slowly,
 	/// this undergoes the standard procedure of reading the port value 
 	/// and discarding it 4 times before reading the real value. 
 	/// Each read is a 100ns delay, so the total delay of 400ns is proper.
-	pub fn status(&mut self) -> AtaStatus {
+	pub fn status(&self) -> AtaStatus {
 		for _ in 0..4 {
 			self.status.read();
 		}
 		AtaStatus::from_bits_truncate(self.status.read())
+	}
+
+
+	/// Reads the `error` port and returns the value as an `AtaError` bitfield.
+	pub fn error(&self) -> AtaError {
+		AtaError::from_bits_truncate(self.error.read())
 	}
 }
 
@@ -308,10 +438,10 @@ impl AtaDrive {
 /// A single ATA controller has two buses with up to two drives attached to each bus,
 /// for a total of up to four drives. 
 pub struct AtaController {
-	primary_master:    Option<AtaDrive>,
-	primary_slave:     Option<AtaDrive>,
-	secondary_master:  Option<AtaDrive>,
-	secondary_slave:   Option<AtaDrive>,
+	pub primary_master:    Option<AtaDrive>,
+	pub primary_slave:     Option<AtaDrive>,
+	pub secondary_master:  Option<AtaDrive>,
+	pub secondary_slave:   Option<AtaDrive>,
 }
 
 impl AtaController {
@@ -346,35 +476,35 @@ impl AtaController {
 			}
 		};
 
-		let bus_master_base = pci_device.bars[4];
+		// TODO: use the BAR4 for DMA in the future
+		let _bus_master_base = pci_device.bars[4]; 
 
-		trace!("Probing primary master...");
 		let primary_master   = AtaDrive::new(primary_channel_data_port, primary_channel_control_port, BusDriveSelect::Master);
-		trace!("Probing primary slave...");
 		let primary_slave    = AtaDrive::new(primary_channel_data_port, primary_channel_control_port, BusDriveSelect::Slave);
-		trace!("Probing secondary master...");
 		let secondary_master = AtaDrive::new(secondary_channel_data_port, secondary_channel_control_port, BusDriveSelect::Master);
-		trace!("Probing secondary slace...");
 		let secondary_slave  = AtaDrive::new(secondary_channel_data_port, secondary_channel_control_port, BusDriveSelect::Slave);
 		
-		debug!("Primary master: {:?}", primary_master);
-		debug!("Primary slave: {:?}", primary_slave);
-		debug!("Secondary master: {:?}", secondary_master);
-		debug!("Secondary slave: {:?}", secondary_slave);
+		debug!("Primary master: {:#X?}", primary_master);
+		debug!("Primary slave: {:#X?}", primary_slave);
+		debug!("Secondary master: {:#X?}", secondary_master);
+		debug!("Secondary slave: {:#X?}", secondary_slave);
 
-		
-		Err("unfinished")
+		Ok( AtaController {
+			primary_master: primary_master.ok(),
+			primary_slave: primary_slave.ok(),
+			secondary_master: secondary_master.ok(),
+			secondary_slave: secondary_slave.ok(),
+		})
 	}
-
-
 }
 
 
-/// The format of the
+/// Information that describes an ATA drive, 
+/// obtained from the response to an identify command.
 /// 
 /// Fuller documentation is available here:
 /// <https://docs.microsoft.com/en-us/windows-hardware/drivers/ddi/content/ata/ns-ata-_identify_device_data#members
-#[derive(Copy, Clone)]
+#[derive(Copy, Clone, Debug, Default)]
 #[repr(packed)]
 pub struct AtaIdentifyData {
 	general_configuration: u16,
@@ -387,7 +517,7 @@ pub struct AtaIdentifyData {
 	serial_number: [u8; 20],
 	_reserved2: [u16; 3],
 	firmware_version: [u8; 8],
-	model_number: [u8; 40],
+	model_number: AtaModelNumber,
 	/// Maximum number of blocks per transfer.
 	/// Sometimes referred to as "sectors per int".
 	max_blocks_per_transfer: u8,
@@ -411,7 +541,9 @@ pub struct AtaIdentifyData {
 	/// OverwriteExtCommandSupported : 1;
 	/// BlockEraseExtCommandSupported : 1;
 	ext_command_supported: u8,
-	/// LBA 28 sector count (if zero, use 48)
+	/// Number of sectors in the disk, if using 28-bit LBA. 
+	/// This can be used to calculate the size of the disk.
+	/// If zero, we're using 48-bit LBA, so you should use `max_48_bit_lba`.
 	user_addressable_sectors: u32,
 	_reserved5: u16,
 	multiword_dma_support: u8,
@@ -447,11 +579,12 @@ pub struct AtaIdentifyData {
 	streaming_transfer_time_dma: u16,
 	streaming_access_latency_dma_pio: u16,
 	streaming_perf_granularity: u32, 
-	/// The max user LBA when using 48-bit LBA
+	/// Number of sectors in the disk, if using 48-bit LBA. 
+	/// This can be used to calculate the size of the disk.
 	max_48_bit_lba: u64,
 	streaming_transfer_time: u16,
 	dsm_cap: u16,
-	/// [0:3] Physical sector size (in logical sectors)
+	/// `[0:3]` Physical sector size (in logical sectors)
 	physical_logical_sector_size: u16, 
 	inter_seek_delay: u16,
 	world_wide_name: [u16; 4],
@@ -498,80 +631,36 @@ pub struct AtaIdentifyData {
 }
 
 impl AtaIdentifyData {
-	/// Converts the given array of `u16` words, which should be the result of an ATA identify command,
-	/// into the appropriate detailed struct.
-	fn new(arr: [u16; 256])-> AtaIdentifyData{
-		let mut identify_data: AtaIdentifyData =unsafe {::core::mem::transmute(arr)};
-		flip_bytes(&mut identify_data.serial_number);
-		flip_bytes(&mut identify_data.firmware_version);
-		flip_bytes(&mut identify_data.model_number);
-		return identify_data
+	/// Converts the given byte array, which should be the result of an ATA identify command,
+	/// into a struct that contains the identified details of an ATA drive.
+	fn new(arr: [u8; SECTOR_SIZE_IN_BYTES])-> AtaIdentifyData {
+		let mut identify_data: AtaIdentifyData = unsafe { core::mem::transmute(arr) };
+		Self::flip_bytes(&mut identify_data.serial_number);
+		Self::flip_bytes(&mut identify_data.firmware_version);
+		Self::flip_bytes(&mut identify_data.model_number.0);
+		identify_data
 	}
-}
 
-impl fmt::Debug for AtaIdentifyData {
-	fn fmt(&self, f: &mut fmt::Formatter) -> fmt::Result {
-		write!(f, "AtaIdentifyData {{ \
-			general_configuration: {:#X}, \
-			serial_number: {:?}, \
-			firmware_version: {:?}, \
-			model_number: {:?}, \
-			max_blocks_per_transfer: {}, \
-			capabilities: [{:#X}, {:#X}], \
-			valid_ext_data: {}, \
-			size_of_rw_multiple: {}, \
-			sector_count_28: {}, \
-			sector_count_48: {}, \
-			physical_sector_size: {}, \
-			words_per_logical_sector: {}, \
-			}}",
-			self.general_configuration,
-			RawString(&self.serial_number),
-			RawString(&self.firmware_version),
-			RawString(&self.model_number),
-			self.max_blocks_per_transfer & 0xFF,
-			self.capabilities[0], self.capabilities[1],
-			self.valid_ext_data,
-			self.size_of_rw_multiple,
-			self.sector_count_28,
-			self.sector_count_48,
-			self.physical_sector_size,
-			self.words_per_logical_sector,
-		)
-	}
-}
-
-//flips pairs of bytes, helpful for transfers between certain big-endian and little-endian interfaces 
-fn flip_bytes(bytes: &mut [u8]) {
-	for pair in bytes.chunks_mut(2) {
-		pair.swap(0, 1);
-	}
-}
-
-//prints basic ASCII characters to the console
-pub struct RawString<'a>(pub &'a [u8]);
-impl<'a> ::core::fmt::Debug for RawString<'a>
-{
-	fn fmt(&self, f: &mut ::core::fmt::Formatter) -> ::core::fmt::Result
-	{
-		try!(write!(f, "b\""));
-		for &b in self.0
-		{
-			match b
-			{
-			b'\\' => try!(write!(f, "\\\\")),
-			b'\n' => try!(write!(f, "\\n")),
-			b'\r' => try!(write!(f, "\\r")),
-			b'"' => try!(write!(f, "\\\"")),
-			b'\0' => try!(write!(f, "\\0")),
-			// ASCII printable characters
-			32...127 => try!(write!(f, "{}", b as char)),
-			_ => try!(write!(f, "\\x{:02x}", b)),
-			}
+	/// Flips pairs of bytes to rectify quasi-endianness issues in the ATA identify response.
+	fn flip_bytes(bytes: &mut [u8]) {
+		for pair in bytes.chunks_mut(2) {
+			pair.swap(0, 1);
 		}
-		try!(write!(f, "\""));
-		::core::result::Result::Ok( () )
 	}
 }
 
-
+#[derive(Copy, Clone)]
+#[repr(packed)]
+pub struct AtaModelNumber([u8; 40]);
+impl Default for AtaModelNumber {
+	fn default() -> Self { 
+		AtaModelNumber([0; 40])
+	}
+}
+impl fmt::Debug for AtaModelNumber {
+	fn fmt(&self, f: &mut fmt::Formatter) -> fmt::Result {
+		core::str::from_utf8(&self.0)
+			.map_err(|_| fmt::Error)
+			.and_then(|s| core::fmt::Write::write_str(f, s))
+	}
+}
