@@ -32,7 +32,10 @@ pub fn main(args: Vec<String>) -> isize {
             return -1;
         }
     };
-    
+    if matches.opt_present("h") {
+        print_usage(opts);
+        return 0;
+    }
     if matches.free.is_empty() {
         return 0;
     }
@@ -96,5 +99,5 @@ fn print_usage(opts: Options) {
 }
 
 
-const USAGE: &'static str = "Usage: cd [ARGS]
-Change directory";
+const USAGE: &'static str = "Usage: cat [file ...]
+concatenate and print files";
