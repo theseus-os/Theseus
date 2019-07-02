@@ -1,5 +1,5 @@
 
-//! Guide for display on the screen
+//! Guide for displaying on the screen
 //!
 //! # Window Manager
 //! The window manager can create, delete and switch between windows.
