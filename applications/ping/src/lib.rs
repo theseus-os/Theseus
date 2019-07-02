@@ -112,10 +112,10 @@ pub fn rmain(matches: &Matches, _opts: Options, address: IpAddress) -> Result<()
         count = i.parse::<usize>().map_err(|_e| "couldn't parse number of packets")?;
     }
     if let Some(i) = matches.opt_default("i", "500") {
-        interval = i.parse::<i64>().map_err(|_e| "couldn't parse interval")?;
+        interval = i.parse::<u64>().map_err(|_e| "couldn't parse interval")?;
     }
     if let Some(i) = matches.opt_default("t", "10000") {
-        timeout = i.parse::<i64>().map_err(|_e| "couldn't parse timeout length")?;
+        timeout = i.parse::<u64>().map_err(|_e| "couldn't parse timeout length")?;
     }
     if matches.opt_present("v") {
         verbose = true;
@@ -140,12 +140,12 @@ fn get_default_iface() -> Result<NetworkInterfaceRef, String> {
 }
 
 // Retrieves the echo reply contained in the receive buffer and prints data pertaining to the packet
-fn get_icmp_pong (waiting_queue: &mut HashMap<u16, i64>, times: &mut Vec<i64>, total_time: &mut i64, 
-    repr: Icmpv4Repr, received: &mut u16, remote_addr: IpAddress, timestamp: i64)  {
+fn get_icmp_pong (waiting_queue: &mut HashMap<u16, u64>, times: &mut Vec<u64>, total_time: &mut u64, 
+    repr: Icmpv4Repr, received: &mut u16, remote_addr: IpAddress, timestamp: u64)  {
     
     if let Icmpv4Repr::EchoReply { seq_no, data, ..} = repr {
         if let Some(_) = waiting_queue.get(&seq_no) {
-            let packet_timestamp_ms = NetworkEndian::read_i64(data);
+            let packet_timestamp_ms = NetworkEndian::read_i64(data) as u64;
             
             println!("{} bytes from {}: icmp_seq={}, time={}ms",
                         data.len(), remote_addr, seq_no,
@@ -153,13 +153,13 @@ fn get_icmp_pong (waiting_queue: &mut HashMap<u16, i64>, times: &mut Vec<i64>, t
             
             waiting_queue.remove(&seq_no);
             *received += 1;
-            times.push((timestamp - packet_timestamp_ms) as i64);
+            times.push((timestamp - packet_timestamp_ms) as u64);
             *total_time += timestamp - packet_timestamp_ms;
         }
     } 
 }
 
-fn ping(address: IpAddress, count: usize, interval: i64, timeout: i64, verbose: bool) {
+fn ping(address: IpAddress, count: usize, interval: u64, timeout: u64, verbose: bool) {
 
     let startup_time = hpet_ticks!() as u64;
     let remote_addr = address;
@@ -185,13 +185,13 @@ fn ping(address: IpAddress, count: usize, interval: i64, timeout: i64, verbose: 
     let icmp_handle = sockets.add(icmp_socket);
     
     let mut send_at = match millis_since(startup_time as u64) {
-        Ok(time) => time as i64,
+        Ok(time) => time,
         Err(err) => return println!("couldn't get time since start_up: {}", err),
     };
     
     let mut seq_no = 0;
     let mut received: u16 = 0;
-    let mut total_time = 0;
+    let mut total_time: u64 = 0;
     let mut echo_payload = [0xffu8; 40];
 
     // Designate no checksum capabilities 
@@ -215,7 +215,7 @@ fn ping(address: IpAddress, count: usize, interval: i64, timeout: i64, verbose: 
         }
         {
             let timestamp = match millis_since(startup_time as u64) {
-                Ok(time) => time as i64,
+                Ok(time) => time,
                 Err(err) => return println!("couldn't get timestamp:{}", err),
             };
             let mut socket = sockets.get::<IcmpSocket>(icmp_handle); 
@@ -232,7 +232,7 @@ fn ping(address: IpAddress, count: usize, interval: i64, timeout: i64, verbose: 
             
             // Checks if the icmp sockett can send an echo request
             if socket.can_send() && seq_no < count as u16 && send_at <= timestamp {
-                NetworkEndian::write_i64(&mut echo_payload, timestamp);
+                NetworkEndian::write_i64(&mut echo_payload, timestamp as i64);
                 let icmp_repr = Icmpv4Repr::EchoRequest{
                         ident: ident,
                         seq_no: seq_no,
@@ -252,11 +252,13 @@ fn ping(address: IpAddress, count: usize, interval: i64, timeout: i64, verbose: 
                     println!("checking echo_ident of packet, should be a value: {:?}", icmp_packet.echo_ident());
                     println!("checking msg_type of packet, should be an echo_request: {:?}", icmp_packet.msg_type());
                 }
+            
             // Insert the sequence number into the waiting que along with the timestamp after an echo
             // Request has been sent
             waiting_queue.insert(seq_no, timestamp);
             seq_no += 1;
             send_at += interval;
+            
             }
 
             // Once the socket can successfully receive the echo reply, unload the payload and
@@ -296,6 +298,7 @@ fn ping(address: IpAddress, count: usize, interval: i64, timeout: i64, verbose: 
                 }
             });
 
+            // Once all the echorequests have been recieved/timed out, break from the loop  
             if seq_no == count as u16 && waiting_queue.is_empty()  {
                 break
             }
@@ -313,12 +316,12 @@ fn ping(address: IpAddress, count: usize, interval: i64, timeout: i64, verbose: 
      
     let min_ping = match times.iter().min() {
             Some(min) => min,
-            None => &(0 as i64),
+            None => &(0 as u64),
     };
 
     let max_ping = match times.iter().max() {
             Some(max) => max,
-            None => &(0 as i64),
+            None => &(0 as u64),
     };
         
     
@@ -326,7 +329,7 @@ fn ping(address: IpAddress, count: usize, interval: i64, timeout: i64, verbose: 
     
     println!("\n--- {} ping statistics ---", remote_addr);
     println!("{} packets transmitted, {} received, {:.0}% packet loss \nrtt min/avg/max = {}/{}/{}",
-            seq_no, received, 100.0 * (seq_no - (received)) as f64 / seq_no as f64, min_ping, avg_ping as f64, max_ping);
+            seq_no, received, 100.0 * (seq_no - (received)) as f64 / seq_no as f64, min_ping, avg_ping , max_ping);
     if received == 0{         
             println!("\nwarning: Ping/ICMP will not work in QEMU unless you specifically enable it. If you are able to ping  \nthe qemu gateway address 10.0.2.2 and not other addresses, your ICMP is most likely disabled");
     }
