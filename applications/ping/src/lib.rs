@@ -54,6 +54,7 @@ fn main(args: Vec<String>) -> isize {
     opts.optopt("c", "count", "amount of echo request packets to send (default: 4)", "N");
     opts.optopt("i", "interval", "interval between packets being sent in miliseconds (default: 500)", "N");
     opts.optopt("t", "timeout", "maximum time between echo request and echo reply in milliseconds (default: 10000)", "N");
+    opts.optopt("s", "buffer size", "size of packet to send to target address, (min: 8, max: 120, default: 40)", "N");
     
   
     let matches = match opts.parse(&args) {
@@ -104,6 +105,7 @@ pub fn rmain(matches: &Matches, _opts: Options, address: IpAddress) -> Result<()
     let mut count = 4;
     let mut interval = 500;
     let mut timeout = 10000;
+    let mut buffer_size = 40;
     let mut verbose = false;
     let did_work = true;
 
@@ -117,12 +119,22 @@ pub fn rmain(matches: &Matches, _opts: Options, address: IpAddress) -> Result<()
     if let Some(i) = matches.opt_default("t", "10000") {
         timeout = i.parse::<u64>().map_err(|_e| "couldn't parse timeout length")?;
     }
+    if let Some(i) = matches.opt_default("s", "40") {
+        buffer_size = i.parse::<usize>().map_err(|_e| "couldn't parse packet size")?;
+        if buffer_size > 120 {
+            return Err("packet size too large")
+        }
+        if buffer_size < 8 {
+            return Err("packet size too small")
+        }
+    }
     if matches.opt_present("v") {
         verbose = true;
     }
     
     if did_work {
-        ping(address, count, interval, timeout, verbose);
+        println!("PING {}, ({}) bytes of data", address, buffer_size);
+        ping(address, count, interval, timeout, verbose, buffer_size);
         Ok(())
     }
     else {
@@ -159,7 +171,7 @@ fn get_icmp_pong (waiting_queue: &mut HashMap<u16, u64>, times: &mut Vec<u64>, t
     } 
 }
 
-fn ping(address: IpAddress, count: usize, interval: u64, timeout: u64, verbose: bool) {
+fn ping(address: IpAddress, count: usize, interval: u64, timeout: u64, verbose: bool, buffer_size: usize) {
 
     let startup_time = hpet_ticks!() as u64;
     let remote_addr = address;
@@ -192,7 +204,7 @@ fn ping(address: IpAddress, count: usize, interval: u64, timeout: u64, verbose: 
     let mut seq_no = 0;
     let mut received: u16 = 0;
     let mut total_time: u64 = 0;
-    let mut echo_payload = [0xffu8; 40];
+    let mut echo_payload = vec![0xffu8; buffer_size];
 
     // Designate no checksum capabilities 
     let checksum_caps = ChecksumCapabilities::ignored();
