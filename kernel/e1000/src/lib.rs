@@ -21,9 +21,11 @@ extern crate x86_64;
 extern crate mpmc;
 extern crate network_interface_card;
 extern crate apic;
-extern crate intel_descriptors;
+extern crate nic_descriptors;
 extern crate nic_buffers;
 extern crate nic_queues;
+extern crate nic_init;
+
 pub mod test_e1000_driver;
 mod regs;
 
@@ -35,18 +37,16 @@ use irq_safety::{RwLockIrqSafe, MutexIrqSafe};
 use volatile::{Volatile, ReadOnly};
 use alloc::boxed::Box;
 use memory::{PhysicalAddress, VirtualAddress, MappedPages};
-use pci::{PciDevice, pci_read_8};
+use pci::{PciDevice, pci_read_8, pci_determine_mem_base};
 use kernel_config::memory::PAGE_SIZE;
 use owning_ref::BoxRefMut;
 use interrupts::{eoi,register_interrupt};
 use x86_64::structures::idt::{ExceptionStackFrame};
-use network_interface_card::{
-    NetworkInterfaceCard,
-    intel_ethernet::NicInit,
-};
-use intel_descriptors::{LegacyRxDesc, LegacyTxDesc};
+use network_interface_card:: NetworkInterfaceCard;
+use nic_init::{mem_map_reg, mem_map, init_rx_buf_pool, init_rx_queue, init_tx_queue};
+use nic_descriptors::{LegacyRxDesc, LegacyTxDesc};
 use nic_buffers::{TransmitBuffer, ReceiveBuffer, ReceivedFrame};
-use nic_queues::{RxQueue, TxQueue};
+use nic_queues::{RxQueue, TxQueue, RxQueueRegisters, TxQueueRegisters};
 use apic::get_my_apic_id;
 use regs:: {REG_RXDESCTAIL, REG_TXDESCTAIL};
 
@@ -108,6 +108,22 @@ pub struct IntelE1000Registers {
     pub tctl:                       Volatile<u32>,          // 0x400
     _padding5:                      [u8; 9212],             // 0x404 - 0x27FF
 
+    pub rx_regs:                    RegistersRx,            // 0x2800    
+    _padding8:                      [u8; 4068],             // 0x281C - 0x37FF
+
+    pub tx_regs:                    RegistersTx,            // 0x3800
+    _padding11:                     [u8; 7140],             // 0x381C - 0x53FF
+    
+    /// The lower (least significant) 32 bits of the NIC's MAC hardware address.
+    pub ral:                        Volatile<u32>,          // 0x5400
+    /// The higher (most significant) 32 bits of the NIC's MAC hardware address.
+    pub rah:                        Volatile<u32>,          // 0x5404
+    _padding12:                     [u8; 109560],           // 0x5408 - 0x1FFFF END: 0x20000 (128 KB) ..116708
+}
+
+///struct to hold registers related to one receive queue
+#[repr(C)]
+pub struct RegistersRx {
     /// The lower (least significant) 32 bits of the physical address of the array of receive descriptors.
     pub rdbal:                      Volatile<u32>,          // 0x2800
     /// The higher (most significant) 32 bits of the physical address of the array of receive descriptors.
@@ -119,9 +135,30 @@ pub struct IntelE1000Registers {
     pub rdh:                        Volatile<u32>,          // 0x2810
     _padding7:                      [u8; 4],                // 0x2814 - 0x2817
     /// The receive descriptor tail index, which points to the last available receive descriptor.
-    pub rdt:                        Volatile<u32>,          // 0x2818  
-    _padding8:                      [u8; 4068],             // 0x281C - 0x37FF
+    pub rdt:                        Volatile<u32>,          // 0x2818
+}
 
+impl RxQueueRegisters for RegistersRx {
+    fn rdbal(&mut self, val: u32) {
+        self.rdbal.write(val);
+    }
+    fn rdbah(&mut self, val: u32) {
+        self.rdbah.write(val);
+    }
+    fn rdlen(&mut self, val: u32) {
+        self.rdlen.write(val);
+    }
+    fn rdh(&mut self, val: u32) {
+        self.rdh.write(val);
+    }
+    fn rdt(&mut self, val: u32) {
+        self.rdt.write(val);
+    }
+}
+
+///struct to hold registers related to one transmit queue
+#[repr(C)]
+pub struct RegistersTx {
     /// The lower (least significant) 32 bits of the physical address of the array of transmit descriptors.
     pub tdbal:                      Volatile<u32>,          // 0x3800
     /// The higher (most significant) 32 bits of the physical address of the array of transmit descriptors.
@@ -134,15 +171,25 @@ pub struct IntelE1000Registers {
     _padding10:                     [u8; 4],                // 0x3814 - 0x3817
     /// The transmit descriptor tail index, which points to the last available transmit descriptor.
     pub tdt:                        Volatile<u32>,          // 0x3818
-    _padding11:                     [u8; 7140],             // 0x381C - 0x53FF
-    
-    /// The lower (least significant) 32 bits of the NIC's MAC hardware address.
-    pub ral:                        Volatile<u32>,          // 0x5400
-    /// The higher (most significant) 32 bits of the NIC's MAC hardware address.
-    pub rah:                        Volatile<u32>,          // 0x5404
-    _padding12:                     [u8; 109560],           // 0x5408 - 0x1FFFF END: 0x20000 (128 KB) ..116708
 }
 
+impl TxQueueRegisters for RegistersTx {
+    fn tdbal(&mut self, val: u32) {
+        self.tdbal.write(val);
+    }
+    fn tdbah(&mut self, val: u32) {
+        self.tdbah.write(val);
+    }
+    fn tdlen(&mut self, val: u32) {
+        self.tdlen.write(val);
+    }
+    fn tdh(&mut self, val: u32) {
+        self.tdh.write(val);
+    }
+    fn tdt(&mut self, val: u32) {
+        self.tdt.write(val);
+    }
+}
 
 
 /// A struct representing an e1000 network interface card.
@@ -166,8 +213,6 @@ pub struct E1000Nic {
 }
 
 
-impl NicInit for E1000Nic {}
-
 impl NetworkInterfaceCard for E1000Nic {
 
     fn send_packet(&mut self, transmit_buffer: TransmitBuffer) -> Result<(), &'static str> {
@@ -180,7 +225,7 @@ impl NetworkInterfaceCard for E1000Nic {
     }
 
     fn poll_receive(&mut self) -> Result<(), &'static str> {
-        Self::collect_from_queue(&mut self.rx_queue, E1000_NUM_RX_DESC as u16, &RX_BUFFER_POOL, E1000_RX_BUFFER_SIZE_IN_BYTES)        
+        Self::remove_frames_from_queue(&mut self.rx_queue, E1000_NUM_RX_DESC as u16, &RX_BUFFER_POOL, E1000_RX_BUFFER_SIZE_IN_BYTES)        
     }
 
     fn mac_address(&self) -> [u8; 6] {
@@ -214,9 +259,9 @@ impl E1000Nic {
         }
   
         // memory mapped base address
-        let mem_base = Self::determine_mem_base(e1000_pci_dev)?;
+        let mem_base = pci_determine_mem_base(e1000_pci_dev)?;
 
-        let (mut mapped_registers, mem_base_v) = Self::mapped_reg(e1000_pci_dev, mem_base)?;
+        let (mut mapped_registers, mem_base_v) = Self::create_e1000_regs(e1000_pci_dev, mem_base)?;
         
         Self::start_link(&mut mapped_registers);
         
@@ -228,7 +273,7 @@ impl E1000Nic {
         register_interrupt(interrupt_num, e1000_handler)?;
 
         // initialize the buffer pool
-        Self::init_rx_buf_pool(RX_BUFFER_POOL_SIZE, E1000_RX_BUFFER_SIZE_IN_BYTES, &RX_BUFFER_POOL)?;
+        init_rx_buf_pool(RX_BUFFER_POOL_SIZE, E1000_RX_BUFFER_SIZE_IN_BYTES, &RX_BUFFER_POOL)?;
 
         let (rx_descs, rx_buffers) = Self::rx_init(&mut mapped_registers)?;
         let rxq = RxQueue {
@@ -266,9 +311,14 @@ impl E1000Nic {
         Ok(())
     }
     
-    /// allocates memory for the NIC, starting address and size taken from the PCI BAR0
-    fn mapped_reg(dev: &PciDevice, mem_base: PhysicalAddress) -> Result<(BoxRefMut<MappedPages, IntelE1000Registers>, VirtualAddress), &'static str> {
-        let nic_mapped_page = Self::mem_map_reg(dev, mem_base)?;
+    /// Allocates memory for the NIC and maps the E1000 Register struct to that memory area.
+    /// Returns a reference to the mapped E1000 Registers and the virtual address where the registers are mapped.
+    /// 
+    /// # Arguments
+    /// * `device`: reference to the nic device
+    /// * `mem_base`: the physical address where the NIC's memory starts.
+    fn create_e1000_regs(device: &PciDevice, mem_base: PhysicalAddress) -> Result<(BoxRefMut<MappedPages, IntelE1000Registers>, VirtualAddress), &'static str> {
+        let nic_mapped_page = mem_map_reg(device, mem_base)?;
         let mem_base_v = nic_mapped_page.start_address();
         let regs = BoxRefMut::new(Box::new(nic_mapped_page)).try_map_mut(|mp| mp.as_type_mut::<IntelE1000Registers>(0))?;
             
@@ -326,9 +376,13 @@ impl E1000Nic {
     /// Initialize the array of receive descriptors and their corresponding receive buffers,
     /// and returns a tuple including both of them.
     fn rx_init(regs: &mut IntelE1000Registers) -> Result<(BoxRefMut<MappedPages, [LegacyRxDesc]>, Vec<ReceiveBuffer>), &'static str> {
+
+
         // get the queue of rx descriptors and its corresponding rx buffers
-        let (rx_descs, rx_bufs_in_use) = Self::init_rx_queue(E1000_NUM_RX_DESC, &RX_BUFFER_POOL, E1000_RX_BUFFER_SIZE_IN_BYTES as usize, &mut regs.rdbal, 
-                                        &mut regs.rdbah, &mut regs.rdlen, &mut regs.rdh, &mut regs.rdt)?;          
+        // let (rx_descs, rx_bufs_in_use) = Self::init_rx_queue(E1000_NUM_RX_DESC, &RX_BUFFER_POOL, E1000_RX_BUFFER_SIZE_IN_BYTES as usize, &mut regs.rdbal, 
+        //                                 &mut regs.rdbah, &mut regs.rdlen, &mut regs.rdh, &mut regs.rdt)?;          
+        
+        let (rx_descs, rx_bufs_in_use) = init_rx_queue(E1000_NUM_RX_DESC, &RX_BUFFER_POOL, E1000_RX_BUFFER_SIZE_IN_BYTES as usize, &mut regs.rx_regs)?;          
             
         // Write the tail index.
         // Note that the e1000 SDM states that we should set the RDT (tail index) to the index *beyond* the last receive descriptor, 
@@ -337,7 +391,7 @@ impl E1000Nic {
         // because the `rx_cur` counter won't be able to catch up with the head index properly. 
         // Thus, we set it to one less than that in order to prevent such bugs. 
         // This doesn't prevent all of the rx buffers from being used, they will still all be used fully.
-        regs.rdt.write((E1000_NUM_RX_DESC - 1) as u32); 
+        regs.rx_regs.rdt((E1000_NUM_RX_DESC - 1) as u32); 
         // TODO: document these various e1000 flags and why we're setting them
         regs.rctl.write(regs::RCTL_EN| regs::RCTL_SBP | regs::RCTL_LBM_NONE | regs::RTCL_RDMTS_HALF | regs::RCTL_BAM | regs::RCTL_SECRC  | regs::RCTL_BSIZE_2048);
 
@@ -346,7 +400,8 @@ impl E1000Nic {
     
     /// Initialize the array of tramsmit descriptors and return them.
     fn tx_init(regs: &mut IntelE1000Registers) -> Result<BoxRefMut<MappedPages, [LegacyTxDesc]>, &'static str> {
-        let tx_descs = Self::init_tx_queue(E1000_NUM_TX_DESC, &mut regs.tdbal, &mut regs.tdbah, &mut regs.tdlen, &mut regs.tdh, &mut regs.tdt)?;
+
+        let tx_descs = init_tx_queue(E1000_NUM_TX_DESC, &mut regs.tx_regs)?;
         
         regs.tctl.write(regs::TCTL_EN | regs::TCTL_PSP);
 
@@ -371,7 +426,7 @@ impl E1000Nic {
     /// This should be invoked whenever the NIC has a new received frame that is ready to be handled,
     /// either in a polling fashion or from a receive interrupt handler.
     fn handle_receive(&mut self) -> Result<(), &'static str> {
-        Self::collect_from_queue(&mut self.rx_queue, E1000_NUM_RX_DESC as u16, &RX_BUFFER_POOL, E1000_RX_BUFFER_SIZE_IN_BYTES)        
+        Self::remove_frames_from_queue(&mut self.rx_queue, E1000_NUM_RX_DESC as u16, &RX_BUFFER_POOL, E1000_RX_BUFFER_SIZE_IN_BYTES)        
     }
 
 

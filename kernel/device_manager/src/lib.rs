@@ -54,12 +54,12 @@ pub fn init(keyboard_producer: DFQueueProducer<Event>) -> Result<(), &'static st
     mouse::init();
 
     
-    /* for dev in pci::pci_device_iter() {
+    for dev in pci::pci_device_iter() {
         debug!("Found pci device: {:?}", dev);
-    } */
+    } 
     
     // intialize the E1000 NIC if present and add it to the list of network interfaces
-    match init_pci_dev(e1000::INTEL_VEND, e1000::E1000_DEV, &e1000::E1000Nic::init) {
+    match init_pci_device(e1000::INTEL_VEND, e1000::E1000_DEV, &e1000::E1000Nic::init) {
         Ok(()) => {
             let nic_ref = e1000::get_e1000_nic().ok_or("device_manager::init(): e1000 nic hasn't been initialized")?;
             let e1000_interface = EthernetNetworkInterface::new_ipv4_interface(nic_ref, DEFAULT_LOCAL_IP, &DEFAULT_GATEWAY_IP)?;
@@ -106,7 +106,7 @@ pub trait PciDevInitFunc = Fn(&PciDevice) -> Result<(), &'static str>;
 /// * `vendor_id`: pci vendor id of device
 /// * `device_id`: pci device id of device
 /// * `init_func`: initialization function for the pci device
-fn init_pci_dev<f: PciDevInitFunc> (vendor_id: u16, device_id: u16, init_func: &f) -> Result<(), &'static str> {
+fn init_pci_device<f: PciDevInitFunc> (vendor_id: u16, device_id: u16, init_func: &f) -> Result<(), &'static str> {
     let pci_dev = get_pci_device_vd(vendor_id, device_id).ok_or("device_manager::init_pci_dev: device not found")?;
     init_func(pci_dev)?;
     Ok(())

@@ -10,7 +10,8 @@ extern crate pci;
 extern crate spin;
 extern crate owning_ref;
 extern crate irq_safety;
-extern crate intel_descriptors;
+extern crate nic_init;
+extern crate nic_descriptors;
 extern crate nic_queues;
 extern crate nic_buffers;
 
@@ -22,18 +23,11 @@ use alloc::{
 use memory::{create_contiguous_mapping, PhysicalAddress, EntryFlags, MappedPages};
 use volatile::Volatile;
 use owning_ref::BoxRefMut;
-use intel_descriptors:: {TxDescriptor, RxDescriptor};
+use nic_descriptors:: {TxDescriptor, RxDescriptor};
 use nic_queues::{RxQueue, TxQueue};
 use nic_buffers::{TransmitBuffer, ReceiveBuffer, ReceivedFrame};
+use nic_init::{nic_mapping_flags};
 
-pub mod intel_ethernet;
-use intel_ethernet::{NicInit};
-
-/// The mapping flags used for pages that the NIC will map.
-/// This should be a const, but Rust doesn't yet allow constants for the bitflags type
-pub fn nic_mapping_flags() -> EntryFlags {
-    EntryFlags::PRESENT | EntryFlags::WRITABLE | EntryFlags::NO_CACHE | EntryFlags::NO_EXECUTE
-}
 
 /// A trait that defines the necessary minimum functions that all network interface card (NIC) drivers
 /// should implement. 
@@ -75,7 +69,7 @@ pub trait NetworkInterfaceCard {
     /// * `num_descs`: number of descriptors in the queue
     /// * `rx_buffer_pool`: pool which contains the receive buffers
     /// * `rx_buffer_size`: size of buffers in the 'rx_buffer_pool' in bytes
-    fn collect_from_queue<T: RxDescriptor>(rxq: &mut RxQueue<T>, num_descs: u16, rx_buffer_pool: &'static mpmc::Queue<ReceiveBuffer>, rx_buffer_size: u16) -> Result<(), &'static str> {
+    fn remove_frames_from_queue<T: RxDescriptor>(rxq: &mut RxQueue<T>, num_descs: u16, rx_buffer_pool: &'static mpmc::Queue<ReceiveBuffer>, rx_buffer_size: u16) -> Result<(), &'static str> {
 
         let mut cur = rxq.rx_cur as usize;
        
@@ -87,7 +81,7 @@ pub trait NetworkInterfaceCard {
             // get information about the current receive buffer
             let length = rxq.rx_descs[cur].length();
             total_packet_length += length as u16;
-            // debug!("collect_from_queue: received descriptor of length {}", length);
+            // debug!("remove_frames_from_queue: received descriptor of length {}", length);
             
             // Now that we are "removing" the current receive buffer from the list of receive buffers that the NIC can use,
             // (because we're saving it for higher layers to use),
@@ -121,7 +115,7 @@ pub trait NetworkInterfaceCard {
                 let buffers = core::mem::replace(&mut receive_buffers_in_frame, Vec::new());
                 rxq.received_frames.push_back(ReceivedFrame(buffers));
             } else {
-                warn!("NIC::collect_from_queue(): Received multi-rxbuffer frame, this scenario not fully tested!");
+                warn!("NIC::remove_frames_from_queue(): Received multi-rxbuffer frame, this scenario not fully tested!");
             }
             rxq.rx_descs[cur].reset_status();
             cur = rxq.rx_cur as usize;
@@ -135,5 +129,3 @@ pub trait NetworkInterfaceCard {
     /// otherwise it will return the regular MAC address defined by the NIC hardware.
     fn mac_address(&self) -> [u8; 6];
 }
-
-

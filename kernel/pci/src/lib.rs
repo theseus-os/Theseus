@@ -6,11 +6,13 @@
 extern crate alloc;
 extern crate spin;
 extern crate port_io;
+extern crate memory;
 
 use core::fmt;
 use alloc::vec::Vec;
 use port_io::Port;
 use spin::{Once, Mutex};
+use memory::PhysicalAddress;
 
 const CONFIG_ADDRESS: u16 = 0xCF8;
 const CONFIG_DATA: u16 = 0xCFC;
@@ -112,10 +114,53 @@ pub fn pci_write(bus: u16, slot: u16, func: u16, offset: u16, value: u32) {
     }
 }
 
+/// Returns the base address of the memory mapped registers of the PCI device from Base Address Register 0.
+pub fn pci_determine_mem_base(dev: &PciDevice) -> Result<PhysicalAddress, &'static str> {
+    // value in the BAR which means a 64-bit address space
+    let address_64 = 2;
+    let bar0 = dev.bars[0];
+
+    // memory mapped base address
+    let mem_base = 
+        // retrieve bits 1-2 to determine address space size
+        if (bar0 >> 1) & 3 == address_64 { 
+            // a 64-bit address so need to access BAR1 for the upper 32 bits
+            let bar1 = dev.bars[1];
+            // clear out the bottom 4 bits because it's a 16-byte aligned address
+            PhysicalAddress::new((bar0 & !15) as usize | ((bar1 as usize) << 32))?
+        }
+        else {
+            // clear out the bottom 4 bits because it's a 16-byte aligned address
+            PhysicalAddress::new(bar0 as usize & !15)?
+        };  
+    
+    Ok(mem_base)
+}
+
+/// Returns the amount of space needed for PCI device's registers.
+pub fn pci_determine_mem_size(dev: &PciDevice) -> u32 {
+    // Here's what we do: 
+    // 1) read pci reg
+    // 2) bitwise not and add 1 because ....
+    pci_write(dev.bus, dev.slot, dev.func, PCI_BAR0, 0xFFFF_FFFF);
+    let mut mem_size = pci_read_32(dev.bus, dev.slot, dev.func, PCI_BAR0);
+    //debug!("mem_size_read: {:x}", mem_size);
+    mem_size = mem_size & 0xFFFF_FFF0; //mask info bits
+    mem_size = !(mem_size); //bitwise not
+    //debug!("mem_size_read_not: {:x}", mem_size);
+    mem_size = mem_size +1; // add 1
+    //debug!("mem_size: {}", mem_size);
+    pci_write(dev.bus, dev.slot, dev.func, PCI_BAR0, dev.bars[0]); //restore original value
+    //check that value is restored
+    let bar0 = pci_read_32(dev.bus, dev.slot, dev.func, PCI_BAR0);
+    // debug!("original bar0: {:#X}", bar0);
+    mem_size
+}
+
 /// sets the PCI device's bit 3 in the Command portion, which is apparently needed to activate DMA (??)
-pub fn pci_set_command_bus_master_bit(pci_dev: &PciDevice) {
+pub fn pci_set_command_bus_master_bit(dev: &PciDevice) {
     unsafe { 
-        let PciDevice { bus, slot, func, ..} = pci_dev;
+        let PciDevice { bus, slot, func, ..} = dev;
         PCI_CONFIG_ADDRESS_PORT.lock().write(pci_address(*bus, *slot, *func, PCI_COMMAND));
         let inval = PCI_CONFIG_DATA_PORT.lock().read(); 
         trace!("pci_set_command_bus_master_bit: PciDevice: B:{} S:{} F:{} read value: {:#x}", 
@@ -139,80 +184,110 @@ pub fn pci_set_interrupt_disable_bit(bus: u16, slot: u16, func: u16) {
     }
 }
 
-/// Explores the pci config space and returns address of requested capability, if present
-pub fn pci_config_space(dev_pci: &PciDevice, capability_pci: u16) -> Option<u16> {
-    debug!("PCI command: {:#X}", pci_read_16(dev_pci.bus, dev_pci.slot, dev_pci.func, PCI_COMMAND));
+/// Explores the PCI config space and returns address of requested capability, if present. 
+/// PCI capabilities are stored as a linked list in the PCI config space, 
+/// with each capability storing the pointer to the next capability right after its ID.
+/// 
+/// 
+/// # Arguments
+/// * `dev`: 
+/// * `pci_capability`: 
+pub fn find_pci_capability(dev: &PciDevice, pci_capability: u16) -> Option<u16> {
+    let status = pci_read_16(dev.bus, dev.slot, dev.func, PCI_STATUS);
 
-    let status = pci_read_16(dev_pci.bus, dev_pci.slot, dev_pci.func, PCI_STATUS);
+    // capabilities are only valid if bit 4 of status register is set
+    const capabilities_valid = 1 << 4;
+    if  status & capabilities_valid != 0 {
 
-    debug!("status: {:#X}", status);
+        // retrieve the capabilities pointer from the pci config space
+        let capabilities = pci_read_8(dev.bus, dev.slot, dev.func, PCI_CAPABILITIES);
+        // debug!("capabilities pointer: {:#X}", capabilities);
 
-    // capabilities only valid if bit 4 of STATUS reg is set to 1
-    if (status >> 4 & 1) == 1 {
-        // finding capabilities pointer
-        let capabilities = pci_read_8(dev_pci.bus, dev_pci.slot, dev_pci.func, PCI_CAPABILITIES);
-        debug!("capabilities pointer: {:#X}", capabilities);
-
-        //botttom two bits of capability pointer need to be masked
+        // mask the bottom 2 bits of the capabilities pointer to find the address of the first capability
         let mut cap_addr = capabilities as u16 & 0xFFFC;
-        let mut cap_header = pci_read_16(dev_pci.bus, dev_pci.slot, dev_pci.func, cap_addr);
-        let mut cap_id;
 
-        while cap_addr != 0 {
+        // the last capability will have its next pointer equal to zero
+        let final_capability = 0;
+
+        // iterate through the linked list of capabailities until the requested capability is found or the list reaches its end
+        while cap_addr != final_capability {
+            // the capability header is a 16 bit value which contains the current capability ID and the pointer to the next capability
+            cap_header = pci_read_16(dev.bus, dev.slot, dev.func, cap_addr as u16);
+
+            // the id is the lower bit of the header
             cap_id = cap_header & 0xFF;
             
-            if cap_id == capability_pci {
-                    debug!("Found capability: {:#X} at {:#X}", capability_pci, cap_addr);
+            if cap_id == pci_capability {
+                    debug!("Found capability: {:#X} at {:#X}", pci_capability, cap_addr);
                     return Some(cap_addr);
             }
 
-            //find address of next capability
+            //find address of next capability which is the higher bit of the header
             cap_addr = (cap_header >> 8) & 0xFF;            
-            cap_header= pci_read_16(dev_pci.bus, dev_pci.slot, dev_pci.func, cap_addr as u16);
-
         }
     }
-
     None
 }
 
-/// Enable MSI interrupts for a device
-pub fn pci_enable_msi(dev_pci: &PciDevice) -> Result<(), &'static str> {
+/// Enable MSI interrupts for a PCI device.
+/// We assume the device only supports one MSI vector 
+/// and set the interrupt number and cpu id for that vector.
+/// 
+/// # Arguments
+/// * `dev`: 
+/// * `core_id`: 
+/// * `int_num`: 
+pub fn pci_enable_msi(dev: &PciDevice, core_id: u8, int_num: u8) -> Result<(), &'static str> {
 
-    let cap_addr = try!(pci_config_space(dev_pci, MSI_CAPABILITY).ok_or("Device not MSI capable"));
+    // find out if the device is msi capable
+    let cap_addr = try!(find_pci_capability(dev, MSI_CAPABILITY).ok_or("Device not MSI capable"));
 
-    // write to MSI Addr... Intel Arch SDM, vol3, 10.11
-    // 119 is the core we want to forward these interrupts to
-    pci_write(dev_pci.bus, dev_pci.slot, dev_pci.func, cap_addr+4, 0x0FEE<<20 | 119<<12);
-    // pci_write(dev_pci.bus, dev_pci.slot, dev_pci.func, cap_addr+4, 0x0FEE<<20);
+    // offset in the capability space where the message address register is located 
+    const message_address_reg_offset = 4;
+    // the memory region is a constant defined for Intel cpus where MSI messages are written
+    // it should be written to bit 20 of the message address register
+    const memory_region = 0x0FEE << 20;
+    // the core id tells which cpu the interrupt will be routed to 
+    // it should be written to bit 12 of the message address register
+    let core = (core_id as u32) << 12;
+    // set the core the MSI will be sent to in the Message Address Register (Intel Arch SDM, vol3, 10.11)
+    pci_write(dev.bus, dev.slot, dev.func, cap_addr + message_address_reg_offset, memory_region | core);
 
-    // write to MSI data, 
-    // 0x30 is the interrupt number we're assigning to this msi
-    pci_write(dev_pci.bus, dev_pci.slot, dev_pci.func, cap_addr+12, 0x30);
+    // offset in the capability space where the message data register is located 
+    const message_data_reg_offset = 12;
+    // Set the interrupt number for the MSI in the Message Data Register
+    pci_write(dev.bus, dev.slot, dev.func, cap_addr + message_data_reg_offset, int_num as u32);
 
-    //enable MSI in ctrl
-    let msi_enable = 1<<16;
-    let ctrl = pci_read_32(dev_pci.bus, dev_pci.slot, dev_pci.func, cap_addr);
-    pci_write(dev_pci.bus, dev_pci.slot, dev_pci.func, cap_addr, ctrl|msi_enable);
+    // offset in the capability space where the message control register is located 
+    const message_control_reg_offset = 2;
+    // to enable the MSI capability, we need to set it bit 0 of the message control register
+    const msi_enable = 1;
+    let ctrl = pci_read_16(dev.bus, dev.slot, dev.func, cap_addr + message_control_reg_offset) as u32;
+    // enable MSI in the Message Control Register
+    pci_write(dev.bus, dev.slot, dev.func, cap_addr + message_control_reg_offset, ctrl | msi_enable);
 
     Ok(())  
 
 }
 
-/// Enable MSI-X interrupts for a device
-pub fn pci_enable_msix(dev_pci: &PciDevice) -> Result<(), &'static str> {
+/// Enable MSI-X interrupts for a PCI device.
+/// Only the enable bit is set and the remaining initialization steps of
+/// setting the interrupt number and core id should be completed in the device driver.
+pub fn pci_enable_msix(dev: &PciDevice) -> Result<(), &'static str> {
 
-    let cap_addr = try!(pci_config_space(dev_pci, MSIX_CAPABILITY).ok_or("Device not MSI capable"));
+    // find out if the device is msi-x capable
+    let cap_addr = try!(find_pci_capability(dev, MSIX_CAPABILITY).ok_or("Device not MSI-X capable"));
 
-    let message_control_offset = 2;
-    let ctrl = pci_read_16(dev_pci.bus, dev_pci.slot, dev_pci.func, cap_addr + message_control_offset);
+    // offset in the capability space where the message control register is located 
+    const message_control_reg_offset = 2;
+    let ctrl = pci_read_16(dev.bus, dev.slot, dev.func, cap_addr + message_control_offset) as u32;
 
-    //write to bit 15 of Message Control, (82599 data sheet, section 9.3.8.1)
-    let msix_enable = 1 << 15; 
-    pci_write(dev_pci.bus, dev_pci.slot, dev_pci.func, cap_addr + message_control_offset, (ctrl|msix_enable) as u32);
+    // write to bit 15 of Message Control Register to enable MSI-X 
+    const msix_enable = 1 << 15; 
+    pci_write(dev.bus, dev.slot, dev.func, cap_addr + message_control_offset, ctrl | msix_enable);
 
-    let ctrl = pci_read_32(dev_pci.bus, dev_pci.slot, dev_pci.func, cap_addr);
-    debug!("MSIX HEADER AFTER ENABLE: {:#X}", ctrl);
+    // let ctrl = pci_read_32(dev.bus, dev.slot, dev.func, cap_addr);
+    // debug!("MSIX HEADER AFTER ENABLE: {:#X}", ctrl);
 
     Ok(())  
 
@@ -228,41 +303,42 @@ pub struct PciBus{
 }
 
 // the PCI configuration address port drops the least-significant 2 bits
-const PCI_CONFIG_ADDRESS_OFFSET_MASK: u16 = 0xFC; 
+pub const PCI_CONFIG_ADDRESS_OFFSET_MASK: u16 = 0xFC; 
 
 // see this: http://wiki.osdev.org/PCI#PCI_Device_Structure
-const PCI_VENDOR_ID:             u16 = 0x0;
-const PCI_DEVICE_ID:             u16 = 0x2;
+pub const PCI_VENDOR_ID:             u16 = 0x0;
+pub const PCI_DEVICE_ID:             u16 = 0x2;
 pub const PCI_COMMAND:               u16 = 0x4;
 pub const PCI_STATUS:                u16 = 0x6;
-const PCI_REVISION_ID:           u16 = 0x8;
-const PCI_PROG_IF:               u16 = 0x9;
-const PCI_SUBCLASS:              u16 = 0xA;
-const PCI_CLASS:                 u16 = 0xB;
-const PCI_CACHE_LINE_SIZE:       u16 = 0xC;
-const PCI_LATENCY_TIMER:         u16 = 0xD;
-const PCI_HEADER_TYPE:           u16 = 0xE;
-const PCI_BIST:                  u16 = 0xF;
+pub const PCI_REVISION_ID:           u16 = 0x8;
+pub const PCI_PROG_IF:               u16 = 0x9;
+pub const PCI_SUBCLASS:              u16 = 0xA;
+pub const PCI_CLASS:                 u16 = 0xB;
+pub const PCI_CACHE_LINE_SIZE:       u16 = 0xC;
+pub const PCI_LATENCY_TIMER:         u16 = 0xD;
+pub const PCI_HEADER_TYPE:           u16 = 0xE;
+pub const PCI_BIST:                  u16 = 0xF;
 pub const PCI_BAR0:                  u16 = 0x10;
-const PCI_BAR1:                  u16 = 0x14;
-const PCI_BAR2:                  u16 = 0x18;
-const PCI_BAR3:                  u16 = 0x1C;
-const PCI_BAR4:                  u16 = 0x20;
-const PCI_BAR5:                  u16 = 0x24;
-const PCI_CARDBUS_CIS:           u16 = 0x28;
-const PCI_SUBSYSTEM_VENDOR_ID:   u16 = 0x2C;
-const PCI_SUBSYSTEM_ID:          u16 = 0x2E;
-const PCI_EXPANSION_ROM_BASE:    u16 = 0x30;
+pub const PCI_BAR1:                  u16 = 0x14;
+pub const PCI_BAR2:                  u16 = 0x18;
+pub const PCI_BAR3:                  u16 = 0x1C;
+pub const PCI_BAR4:                  u16 = 0x20;
+pub const PCI_BAR5:                  u16 = 0x24;
+pub const PCI_CARDBUS_CIS:           u16 = 0x28;
+pub const PCI_SUBSYSTEM_VENDOR_ID:   u16 = 0x2C;
+pub const PCI_SUBSYSTEM_ID:          u16 = 0x2E;
+pub const PCI_EXPANSION_ROM_BASE:    u16 = 0x30;
+/// offset where the pci capabilities pointer is located
 pub const PCI_CAPABILITIES:          u16 = 0x34;
 // 0x35 through 0x3B are reserved
 pub const PCI_INTERRUPT_LINE:        u16 = 0x3C;
 pub const PCI_INTERRUPT_PIN:         u16 = 0x3D;
-const PCI_MIN_GRANT:             u16 = 0x3E;
-const PCI_MAX_LATENCY:           u16 = 0x3F;
+pub const PCI_MIN_GRANT:             u16 = 0x3E;
+pub const PCI_MAX_LATENCY:           u16 = 0x3F;
 
-//PCI Capability IDs
-pub const MSI_CAPABILITY:       u16 = 0x05;
-pub const MSIX_CAPABILITY:       u16 = 0x11;
+// PCI Capability IDs
+pub const MSI_CAPABILITY:           u16 = 0x05;
+pub const MSIX_CAPABILITY:          u16 = 0x11;
 
 
 

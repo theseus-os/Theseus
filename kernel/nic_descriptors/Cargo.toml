@@ -1,5 +1,5 @@
 [package]
-name = "intel_descriptors"
+name = "nic_descriptors"
 version = "0.1.0"
 authors = ["Ramla-I <ijazramla@gmail.com>"]
 edition = "2018"

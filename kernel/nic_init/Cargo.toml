@@ -1,7 +1,7 @@
 [package]
-authors = ["Kevin Boos <kevinaboos@gmail.com>"]
-name = "network_interface_card"
-description = "A set of abstractions for a Network Interface Card"
+authors = ["Ramla Ijaz <ijazramla@gmail.com>"]
+name = "nic_init"
+description = "A set of functions used to initialize a Network Interface Card"
 version = "0.1.0"
 build = "../../build.rs"
 
@@ -41,9 +41,6 @@ path = "../nic_queues"
 
 [dependencies.nic_buffers]
 path = "../nic_buffers"
-
-[dependencies.nic_init]
-path = "../nic_init"
 
 
 [lib]

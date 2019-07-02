@@ -16,6 +16,9 @@ version = "0.3.7"
 [dependencies.port_io]
 path = "../../libs/port_io"
 
+[dependencies.memory]
+path = "../memory"
+
 
 [lib]
 crate-type = ["rlib"]
