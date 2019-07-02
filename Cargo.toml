@@ -5,7 +5,8 @@
 ## except for those starting with a "." So, we build all kernel and application crates except hidden directories.
 members = [
 	"kernel/[!.]*/",
-	"applications/[!.]*/"
+	"applications/[!.]*/",
+	"documentation/"
 ]
 
 
