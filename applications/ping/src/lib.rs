@@ -132,8 +132,7 @@ pub fn rmain(matches: &Matches, _opts: Options, address: IpAddress) -> Result<()
         verbose = true;
     }
     
-    if did_work {
-        println!("PING {}, ({}) bytes of data", address, buffer_size);
+    if did_work { 
         ping(address, count, interval, timeout, verbose, buffer_size);
         Ok(())
     }
@@ -193,6 +192,15 @@ fn ping(address: IpAddress, count: usize, interval: u64, timeout: u64, verbose: 
         Err(err) => return println!("couldn't initialize the network: {}", err),
     };
 
+    // QEMU uses the 10.0.2.X for networking purposes such as DNS server on 10.0.2.3 and the SMB server on 10.0.2.4
+    // Other than 10.0.2.2, other 10.0.2.X address cause ping to fail 
+    let a4 = 255;
+    for add in 0..a4 {
+        if address == IpAddress::v4(10, 0, 2, add) && add != 2 || address == IpAddress::v4(10, 0, 2, 255) {
+            return println!("illegal address: other than 10.0.2.2, QEMU reserves the 10.0.2.X addresses for networking purposes");
+        }
+    };
+
     let mut sockets = SocketSet::new(vec![]);
     let icmp_handle = sockets.add(icmp_socket);
     
@@ -240,6 +248,7 @@ fn ping(address: IpAddress, count: usize, interval: u64, timeout: u64, verbose: 
                     Err(e) => return println!("the socket failed to bind: {}", e),
                 }; 
                 send_at = timestamp;
+                println!("PING {}, ({}) bytes of data", address, buffer_size);
             }
             
             // Checks if the icmp sockett can send an echo request
