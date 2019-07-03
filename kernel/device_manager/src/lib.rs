@@ -79,13 +79,34 @@ pub fn init(keyboard_producer: DFQueueProducer<Event>) -> Result<(), &'static st
     for dev in pci::pci_device_iter() {
         // look for IDE controllers (include IDE disk)
         if dev.class == 0x01 && dev.subclass == 0x01 {
+            warn!("Initializing ATA Controller...");
             let mut ata_controller = ata::AtaController::new(dev)?;
-            let mut test_buf: [u8; 3003] = [0; 3003];
-            let bytes_read = ata_controller.primary_master.as_mut().unwrap().read_pio(&mut test_buf[..], 10)?;
-            // ata_controller.primary_master.as_mut().unwrap().read_pio(3, &mut test_buf[512..])?;
-            debug!("{:X?}", &test_buf[..]);
-            debug!("{:?}", core::str::from_utf8(&test_buf));
+            let mut initial_buf: [u8; 6100] = [0; 6100];
+            let primary_drive = ata_controller.primary_master.as_mut().unwrap();
+            let bytes_read = primary_drive.read_pio(&mut initial_buf[..], 0)?;
+            debug!("{:X?}", &initial_buf[..]);
+            debug!("{:?}", core::str::from_utf8(&initial_buf));
             trace!("READ_PIO {} bytes", bytes_read);
+
+            let mut write_buf = [0u8; 512*3];
+            for b in write_buf.chunks_exact_mut(16) {
+                b.copy_from_slice(b"QWERTYUIOPASDFJK");
+            }
+            let bytes_written = primary_drive.write_pio(&write_buf[..512], 1024);
+            debug!("WRITE_PIO {:?}", bytes_written);
+
+            let mut after_buf: [u8; 6100] = [0; 6100];
+            let bytes_read = primary_drive.read_pio(&mut after_buf[..], 0)?;
+            debug!("{:X?}", &after_buf[..]);
+            debug!("{:?}", core::str::from_utf8(&after_buf));
+            trace!("AFTER WRITE READ_PIO {} bytes", bytes_read);
+
+
+            for (i, (before, after)) in initial_buf.iter().zip(after_buf.iter()).enumerate() {
+                if before != after {
+                    trace!("byte {} diff: {:X} -> {:X}", i, before, after);
+                }
+            }
         }
     }
     
