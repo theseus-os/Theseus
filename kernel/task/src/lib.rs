@@ -755,6 +755,11 @@ impl TaskRef {
         MutexIrqSafeGuardRef::new(self.0.deref().0.lock())
     }
 
+    /// Blocks this `Task` by setting its `RunState` to blocked.
+    pub fn block(&self) {
+        self.0.deref().0.lock().runstate = RunState::Blocked;
+    }
+
     /// Registers a function or closure that will be called if this `Task` panics.
     /// # Locking / Deadlock
     /// Obtains a write lock on the enclosed `Task` in order to mutate its state.
@@ -791,7 +796,7 @@ impl TaskRef {
     }
     
     /// Obtains the lock on the underlying `Task` in a writeable, blocking fashion.
-    #[deprecated] // TODO FIXME since 2018-09-06
+    #[deprecated(note = "This method exposes inner Task details for debugging purposes. Do not use it.")]
     pub fn lock_mut(&self) -> MutexIrqSafeGuardRefMut<Task> {
         MutexIrqSafeGuardRefMut::new(self.0.deref().0.lock())
     }
@@ -805,24 +810,6 @@ impl PartialEq for TaskRef {
 
 impl Eq for TaskRef { }
 
-// impl Hash for TaskRef {
-//     fn hash<H: Hasher>(&self, state: &mut H) {
-//         (self.0.as_ref() as *const _ as usize).hash(state);
-//     }
-// }
-
-// use core::cmp::Ord;
-// impl Ord for TaskRef {
-//     fn cmp(&self, other: &TaskRef) -> core::cmp::Ordering {
-//         (self.0.as_ref() as *const _ as usize).cmp(&(other.0.as_ref() as *const _ as usize))
-//     }
-// }
-
-// impl PartialOrd for TaskRef {
-//     fn partial_cmp(&self, other: &TaskRef) -> Option<core::cmp::Ordering> {
-//         Some(self.cmp(other))
-//     }
-// }
 
 
 /// Create and initialize an idle task, of which there is one per processor core/LocalApic.

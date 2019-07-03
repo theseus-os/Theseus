@@ -191,12 +191,12 @@ pub fn pci_set_interrupt_disable_bit(bus: u16, slot: u16, func: u16) {
 /// Explores the PCI config space and returns address of requested capability, if present. 
 /// PCI capabilities are stored as a linked list in the PCI config space, 
 /// with each capability storing the pointer to the next capability right after its ID.
-/// Returns a None value if capabilities are not valid for this device 
+/// The function returns a None value if capabilities are not valid for this device 
 /// or if the requested capability is not present. 
 /// 
 /// 
 /// # Arguments
-/// * `dev`: pci device whose config space to search
+/// * `dev`: pci device 
 /// * `pci_capability`: capability to search for
 pub fn find_pci_capability(dev: &PciDevice, pci_capability: u16) -> Option<u16> {
     let status = pci_read_16(dev.bus, dev.slot, dev.func, PCI_STATUS);
@@ -237,7 +237,7 @@ pub fn find_pci_capability(dev: &PciDevice, pci_capability: u16) -> Option<u16> 
 
 /// Enable MSI interrupts for a PCI device.
 /// We assume the device only supports one MSI vector 
-/// and set the interrupt number and cpu id for that vector.
+/// and set the interrupt number and core id for that vector.
 /// If the MSI capability is not supported then an error message is returned.
 /// 
 /// # Arguments

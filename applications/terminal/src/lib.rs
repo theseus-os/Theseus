@@ -64,7 +64,7 @@ pub fn main(_args: Vec<String>) -> isize {
     loop {
         // block this task, because it never needs to actually run again
         if let Some(my_task) = task::get_my_current_task() {
-            my_task.lock_mut().runstate = task::RunState::Blocked;
+            my_task.block();
         }
     }
     // TODO FIXME: once join() doesn't cause interrupts to be disabled, we can use join again instead of the above loop

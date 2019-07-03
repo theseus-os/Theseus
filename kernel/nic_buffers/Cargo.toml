@@ -1,5 +1,6 @@
 [package]
 name = "nic_buffers"
+description = "Structs for network transmit and receive buffers"
 version = "0.1.0"
 authors = ["Ramla-I <ijazramla@gmail.com>"]
 edition = "2018"
