@@ -7,42 +7,15 @@ extern crate nic_descriptors;
 extern crate nic_buffers;
 
 use core::ptr::write_volatile;
-use memory::{VirtualAddress, MappedPages};
-use nic_descriptors::{RxDescriptor, TxDescriptor};
 use owning_ref::BoxRefMut;
 use alloc::{
     vec::Vec,
     collections::VecDeque
 };
+use memory::{VirtualAddress, MappedPages};
+use nic_descriptors::{RxDescriptor, TxDescriptor};
 use nic_buffers::{ReceiveBuffer, ReceivedFrame};
 
-/// Set of functions to access Rx queue initialization registers.
-pub trait RxQueueRegisters {
-    /// write to the rdbal register to store the lower 32 bits of the buffer physical address
-    fn rdbal(&mut self, val: u32);
-    /// write to the rdbah register to store the higher 32 bits of the buffer physical address
-    fn rdbah(&mut self, val: u32);
-    /// write to the rdlen register to store the length of the queue in bytes
-    fn rdlen(&mut self, val: u32);
-    /// write to the rdh register to store the descriptor at the head of the queue
-    fn rdh(&mut self, val: u32);
-    /// write to the rdt register to store the descriptor at the tail of the queue
-    fn rdt(&mut self, val: u32);
-}
-
-/// Set of functions to access Tx queue initialization registers.
-pub trait TxQueueRegisters {
-    /// write to the tdbal register to store the lower 32 bits of the buffer physical address
-    fn tdbal(&mut self, val: u32);
-    /// write to the tdbah register to store the higher 32 bits of the buffer physical address
-    fn tdbah(&mut self, val: u32);
-    /// write to the tdlen register to store the length of the queue in bytes
-    fn tdlen(&mut self, val: u32);
-    /// write to the tdh register to store the descriptor at the head of the queue
-    fn tdh(&mut self, val: u32);
-    /// write to the tdt register to store the descriptor at the tail of the queue
-    fn tdt(&mut self, val: u32);
-}
 
 /// A struct that holds all information for one receive queue.
 /// There should be one such object per queue
@@ -97,7 +70,7 @@ pub struct TxQueue<T: TxDescriptor> {
 }
 
 impl<T: TxDescriptor> TxQueue<T> {
-    /// Updates the queue tail descriptor in the rdt register
+    /// Updates the queue tail descriptor in the tdt register
     pub fn update_tdt(&self, val: u32) {
         unsafe { write_volatile((self.tdt_addr.value()) as *mut u32, val) }
     }

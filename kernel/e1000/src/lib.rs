@@ -37,23 +37,21 @@ use irq_safety::{RwLockIrqSafe, MutexIrqSafe};
 use volatile::{Volatile, ReadOnly};
 use alloc::boxed::Box;
 use memory::{PhysicalAddress, VirtualAddress, MappedPages};
-use pci::{PciDevice, pci_read_8, pci_determine_mem_base};
+use pci::{PciDevice, pci_read_8, pci_determine_mem_base, PCI_BAR0, PCI_INTERRUPT_LINE};
 use kernel_config::memory::PAGE_SIZE;
 use owning_ref::BoxRefMut;
 use interrupts::{eoi,register_interrupt};
 use x86_64::structures::idt::{ExceptionStackFrame};
 use network_interface_card:: NetworkInterfaceCard;
-use nic_init::{mem_map_reg, mem_map, init_rx_buf_pool, init_rx_queue, init_tx_queue};
+use nic_init::{RxQueueRegisters, TxQueueRegisters, mem_map_reg, mem_map, init_rx_buf_pool, init_rx_queue, init_tx_queue};
 use nic_descriptors::{LegacyRxDesc, LegacyTxDesc};
 use nic_buffers::{TransmitBuffer, ReceiveBuffer, ReceivedFrame};
-use nic_queues::{RxQueue, TxQueue, RxQueueRegisters, TxQueueRegisters};
+use nic_queues::{RxQueue, TxQueue};
 use apic::get_my_apic_id;
 use regs:: {REG_RXDESCTAIL, REG_TXDESCTAIL};
 
 pub const INTEL_VEND:           u16 = 0x8086;  // Vendor ID for Intel 
 pub const E1000_DEV:            u16 = 0x100E;  // Device ID for the e1000 Qemu, Bochs, and VirtualBox emmulated NICs
-const PCI_BAR0:                 u16 = 0x10;
-const PCI_INTERRUPT_LINE:       u16 = 0x3C;
 
 const E1000_NUM_RX_DESC:        usize = 8;
 const E1000_NUM_TX_DESC:        usize = 8;
@@ -62,9 +60,9 @@ const E1000_NUM_TX_DESC:        usize = 8;
 const E1000_RX_BUFFER_SIZE_IN_BYTES:     u16 = PAGE_SIZE as u16;
 
 /// Interrupt type: Link Status Change
-pub const INT_LSC:              u32 = 0x04;
+const INT_LSC:              u32 = 0x04;
 /// Interrupt type: Receive Timer Interrupt
-pub const INT_RX:               u32 = 0x80;
+const INT_RX:               u32 = 0x80;
 
 
 /// The single instance of the E1000 NIC.

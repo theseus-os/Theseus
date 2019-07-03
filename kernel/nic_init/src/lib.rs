@@ -5,28 +5,49 @@ extern crate alloc;
 extern crate memory;
 extern crate mpmc;
 extern crate pci;
-extern crate spin;
 extern crate owning_ref;
-extern crate irq_safety;
 extern crate nic_descriptors;
-extern crate nic_queues;
 extern crate nic_buffers;
 
 use core::ops::DerefMut;
-use memory::{FRAME_ALLOCATOR, EntryFlags, PhysicalMemoryArea, FrameRange, PhysicalAddress, VirtualAddress, allocate_pages_by_bytes, get_kernel_mmi_ref, MappedPages, create_contiguous_mapping};
-use pci::{pci_read_32, pci_write, PCI_BAR0, PciDevice, pci_set_command_bus_master_bit, pci_determine_mem_size};
-use spin::Once;
+use memory::{FRAME_ALLOCATOR, EntryFlags, PhysicalMemoryArea, FrameRange, PhysicalAddress, allocate_pages_by_bytes, get_kernel_mmi_ref, MappedPages, create_contiguous_mapping};
+use pci::{PciDevice, pci_set_command_bus_master_bit, pci_determine_mem_size};
 use alloc::{
     vec::Vec,
     boxed::Box,
 };
 use owning_ref::BoxRefMut;
-use core::ptr::write_volatile;
-use alloc::collections::VecDeque;
-use irq_safety::MutexIrqSafe;
 use nic_descriptors::{RxDescriptor, TxDescriptor};
-use nic_buffers::{TransmitBuffer, ReceiveBuffer, ReceivedFrame};
-use nic_queues::{RxQueueRegisters, TxQueueRegisters};
+use nic_buffers::ReceiveBuffer;
+
+
+/// Set of functions to access registers that are needed for Rx queue initialization.
+pub trait RxQueueRegisters {
+    /// write to the rdbal register to store the lower 32 bits of the buffer physical address
+    fn rdbal(&mut self, val: u32);
+    /// write to the rdbah register to store the higher 32 bits of the buffer physical address
+    fn rdbah(&mut self, val: u32);
+    /// write to the rdlen register to store the length of the queue in bytes
+    fn rdlen(&mut self, val: u32);
+    /// write to the rdh register to store the descriptor at the head of the queue
+    fn rdh(&mut self, val: u32);
+    /// write to the rdt register to store the descriptor at the tail of the queue
+    fn rdt(&mut self, val: u32);
+}
+
+/// Set of functions to access registers that are needed for Tx queue initialization.
+pub trait TxQueueRegisters {
+    /// write to the tdbal register to store the lower 32 bits of the buffer physical address
+    fn tdbal(&mut self, val: u32);
+    /// write to the tdbah register to store the higher 32 bits of the buffer physical address
+    fn tdbah(&mut self, val: u32);
+    /// write to the tdlen register to store the length of the queue in bytes
+    fn tdlen(&mut self, val: u32);
+    /// write to the tdh register to store the descriptor at the head of the queue
+    fn tdh(&mut self, val: u32);
+    /// write to the tdt register to store the descriptor at the tail of the queue
+    fn tdt(&mut self, val: u32);
+}
 
 
 /// The mapping flags used for pages that the NIC will map.
@@ -34,6 +55,7 @@ use nic_queues::{RxQueueRegisters, TxQueueRegisters};
 pub fn nic_mapping_flags() -> EntryFlags {
     EntryFlags::PRESENT | EntryFlags::WRITABLE | EntryFlags::NO_CACHE | EntryFlags::NO_EXECUTE
 }
+
 
 /// Allocates memory for the NIC registers
 /// # Arguments 
