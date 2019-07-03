@@ -45,10 +45,14 @@ bitflags! {
 bitflags! {
 	/// The possible status values found in an ATA drive's status port.
     pub struct AtaStatus: u8 {
+		/// When set, the drive's port values are still changing, so ports shouldn't be accessed. 
 		const BUSY                 = 0x80;
+		/// When set, the drive is on. When cleared, the drive is sleeping or "spun down".
 		const DRIVE_READY          = 0x40;
 		const DRIVE_WRITE_FAULT    = 0x20;
 		const DRIVE_SEEK_COMPLETE  = 0x10;
+		/// When **cleared**, the drive is ready for data to be read/written. 
+		/// When set, the drive is handling a data request and isn't ready for another command.
 		const DATA_REQUEST_READY   = 0x08;
 		const CORRECTED_DATA       = 0x04;
 		const INDEX                = 0x02;
@@ -264,6 +268,8 @@ impl AtaDrive {
 			return Err("AtaDrive::read_pio(): cannot read more sectors than the drive's max");
 		}
 
+		self.wait_for_no_data_request_ready().map_err(|_| "error before issuing read pio command")?;
+
 		// Set up and issue the read command.
 		if lba_start > MAX_LBA_28_VALUE {
 			// Using 48-bit LBA. 
@@ -295,7 +301,7 @@ impl AtaDrive {
 			}
 		}
 
-		self.wait_for_ready().map_err(|_| "error before data read")?;
+		self.wait_for_data_request_ready().map_err(|_| "error after issuing data read command, before data read")?;
 
 		// Read the actual data, one sector at a time.
 		let mut src_offset = offset_remainder; 
@@ -313,7 +319,7 @@ impl AtaDrive {
 		}
 
 		trace!("read_pio(): status after data read: {:?}", self.status());
-		self.wait_for_ready().map_err(|_| "error after data read")?;
+		self.wait_for_no_data_request_ready().map_err(|_| "error after data read")?;
 		Ok(dest_offset)
 	}
 
@@ -351,7 +357,7 @@ impl AtaDrive {
 		// Use 28-bit LBAs, unless the LBA is too large, then we use 48-bit LBAs
 		let using_lba_28 = lba_start <= MAX_LBA_28_VALUE;
 
-		self.wait_for_ready().map_err(|_| "error before issuing write command")?;
+		self.wait_for_no_data_request_ready().map_err(|_| "error before issuing write command")?;
 
 		// Set up and issue the write command.
 		if using_lba_28 {
@@ -382,26 +388,26 @@ impl AtaDrive {
 			}
 		}
 
-		self.wait_for_ready().map_err(|_| "error before data write")?;
+		self.wait_for_data_request_ready().map_err(|_| "error after issuing write command, before data write")?;
 
 		// Write the actual data.
 		// ATA PIO works by writing one 16-bit word at a time, 
 		// so one write covers two bytes of the buffer.
 		let mut bytes_written = 0;
 		for chunk in buffer.chunks_exact(2) {
-			self.wait_for_ready().map_err(|_| "error during data write")?;
+			self.wait_for_data_request_ready().map_err(|_| "error during data write")?;
 			let word = (chunk[1] as u16) << 8 | (chunk[0] as u16);
 			unsafe { self.data.write(word); }
 			bytes_written += 2;
 		}
 
-		self.wait_for_ready().map_err(|_| "error after data write")?;
+		self.wait_for_no_data_request_ready().map_err(|_| "error after data write")?;
 
 		// Flush the drive's cache after each write command
 		let cache_flush_cmd = if using_lba_28 { AtaCommand::CacheFlush } else { AtaCommand::CacheFlushExt };
 		unsafe { self.command.write(cache_flush_cmd as u8) };
 
-		self.wait_for_ready().map_err(|_| "error after cache flush after data write")?;
+		self.wait_for_no_data_request_ready().map_err(|_| "error after cache flush after data write")?;
 		Ok(bytes_written)
 	}
 
@@ -488,8 +494,6 @@ impl AtaDrive {
 			_                           => return Err("drive was an unknown device type"),
 		};
 
-		self.wait_for_ready().map_err(|_| "error reading identify data from the drive")?;
-
 		// we're ready to read the actual data
 		let arr = self.internal_read_sector()?;
 		Ok(AtaIdentifyData::new(arr))
@@ -499,31 +503,29 @@ impl AtaDrive {
 	///
 	/// This function reads one sector of data from the drive and returns it.
 	fn internal_read_sector(&mut self) -> Result<[u8; SECTOR_SIZE_IN_BYTES], &'static str> {
+		self.wait_for_data_request_ready().map_err(|_| "error before data read")?;
 		// ATA PIO works by reading one 16-bit word at a time, 
 		// so one read covers two bytes of the buffer.
 		// Also, we *MUST* read a full sector for the drive to continue working properly,
 		// even if we don't need that many bytes to fill the given `buffer`.
 		let mut data = [0u8; SECTOR_SIZE_IN_BYTES];
 		for chunk in data.chunks_exact_mut(2) {
-			self.wait_for_ready().map_err(|_| "error during data read")?;
+			self.wait_for_data_request_ready().map_err(|_| "error during data read")?;
 			let word: u16 = self.data.read();
 			chunk[0] = word as u8;
 			chunk[1] = (word >> 8) as u8;
-		}
-		if self.status().intersects(AtaStatus::ERROR) {
-			error!("internal_read_sector: status: {:?}, error: {:?}", self.status(), self.error());
-			return Err("error after data read");
 		}
 		Ok(data)
 	}
 
 	/// Performs a blocking poll that reads the drive's status 
-	/// until it is no longer busy and it is ready
-	/// (`AtaStatus::BUSY` is `0` and `AtaStatus::DRIVE_READY` is `1`).
+	/// until it is no longer busy and data is ready to be transferred
+	/// (`AtaStatus::BUSY` is `0` and `AtaStatus::DATA_REQUEST_READY` is `1`).
 	/// 
 	/// Returns an error if the `status` port indicates an error. 
 	/// The `error` port can then be read to obtain more details on what kind of error occurred.
-	fn wait_for_ready(&self) -> Result<(), ()> {
+	fn wait_for_data_request_ready(&self) -> Result<(), ()> {
+		trace!("wait_for_data_request_ready(): initial device status: {:?}", self.status());
 		let mut loop_counter = 0;
 		loop {
 			let status = self.status();
@@ -537,12 +539,38 @@ impl AtaDrive {
 				// }
 				continue;
 			}
-			if status.intersects(AtaStatus::DRIVE_READY) {
+			if status.intersects(AtaStatus::DATA_REQUEST_READY) {
 				return Ok(()); // ready to go!
 			}
 		}
 	}
 
+	/// Performs a blocking poll that reads the drive's status 
+	/// until it is no longer busy and there is no data ready to be transferred
+	/// (`AtaStatus::BUSY` is `0` and `AtaStatus::DATA_REQUEST_READY` is `0`).
+	/// 
+	/// Returns an error if the `status` port indicates an error. 
+	/// The `error` port can then be read to obtain more details on what kind of error occurred.
+	fn wait_for_no_data_request_ready(&self) -> Result<(), ()> {
+		trace!("wait_for_no_data_request_ready(): initial device status: {:?}", self.status());
+		let mut loop_counter = 0;
+		loop {
+			let status = self.status();
+			loop_counter += 1;
+			if status.intersects(AtaStatus::ERROR | AtaStatus::DRIVE_WRITE_FAULT) {
+				return Err(());
+			}
+			if status.intersects(AtaStatus::BUSY) { 
+				// if loop_counter % 100 == 0 {
+					warn!("AtaDrive::status() has been busy waiting for a long time... is there a drive problem? (status: {:?})", status);
+				// }
+				continue;
+			}
+			if !status.intersects(AtaStatus::DATA_REQUEST_READY) {
+				return Ok(()); // ready to go!
+			}
+		}
+	}
 
 	/// Issues a software reset for this drive.
 	pub fn software_reset(&mut self) {
@@ -555,14 +583,14 @@ impl AtaDrive {
 	
 	/// Reads the `status` port and returns the value as an `AtaStatus` bitfield. 
 	/// Because some disk drives operate (change wire values) very slowly,
-	/// this undergoes the standard procedure of reading the port value 
-	/// and discarding it 4 times before reading the real value. 
+	/// this undergoes the standard procedure of reading the alternate status port 
+	/// and discarding it 4 times before reading the real status port value. 
 	/// Each read is a 100ns delay, so the total delay of 400ns is proper.
 	pub fn status(&self) -> AtaStatus {
-		let _ = self.status.read();
-		let _ = self.status.read();
-		let _ = self.status.read();
-		let _ = self.status.read();
+		let _ = self.alternate_status.read();
+		let _ = self.alternate_status.read();
+		let _ = self.alternate_status.read();
+		let _ = self.alternate_status.read();
 		AtaStatus::from_bits_truncate(self.status.read())
 	}
 
@@ -801,6 +829,6 @@ impl fmt::Debug for AtaModelNumber {
 	fn fmt(&self, f: &mut fmt::Formatter) -> fmt::Result {
 		core::str::from_utf8(&self.0)
 			.map_err(|_| fmt::Error)
-			.and_then(|s| core::fmt::Write::write_str(f, s))
+			.and_then(|s| write!(f, "{:?}", s))
 	}
 }
