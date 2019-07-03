@@ -44,9 +44,11 @@ pub trait TxDescriptor {
     fn init(&mut self);
 
     /// Updates the transmit descriptor to send the packet.
+    /// We assume that one transmit descriptor will be used to send one packet.
     /// 
     /// # Arguments
-    /// * `transmit_buffer`: buffer which contains the packet to be sent. We assume that one transmit descriptor will be used to send one packet.
+    /// * `transmit_buffer_addr`: physical address of the transmit buffer. 
+    /// * `transmit_buffer_length`: length of packet we want to send.
     fn send(&mut self, transmit_buffer_addr: PhysicalAddress, transmit_buffer_length: u16);
 
     /// Polls the Descriptor Done bit until the packet has been sent.

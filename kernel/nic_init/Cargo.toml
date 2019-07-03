@@ -1,5 +1,5 @@
 [package]
-authors = ["Ramla Ijaz <ijazramla@gmail.com>"]
+authors = ["Kevin Boos <kevinaboos@gmail.com>", "Ramla Ijaz <ijazramla@gmail.com>"]
 name = "nic_init"
 description = "A set of functions used to initialize a Network Interface Card"
 version = "0.1.0"

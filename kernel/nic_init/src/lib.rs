@@ -58,6 +58,7 @@ pub fn nic_mapping_flags() -> EntryFlags {
 
 
 /// Allocates memory for the NIC registers
+/// 
 /// # Arguments 
 /// * `dev`: reference to pci device 
 /// * `mem_base`: starting physical address of the device's memory mapped registers
@@ -71,7 +72,7 @@ pub fn mem_map_reg(dev: &PciDevice, mem_base: PhysicalAddress) -> Result<MappedP
     mem_map(mem_base, mem_size_in_bytes)
 }
 
-/// Helper function to allocate memory
+/// Helper function to allocate memory at required address.
 /// 
 /// # Arguments
 /// * `mem_base`: starting physical address of the region that need to be allocated
@@ -181,6 +182,7 @@ pub fn init_rx_queue<T: RxDescriptor>(num_desc: usize, rx_buffer_pool: &'static 
 /// 
 /// # Arguments
 /// * `num_desc`: number of descriptors in the queue
+/// * `regs`: transmit dma registers that need to be updated when creating a queue
 pub fn init_tx_queue<T: TxDescriptor>(num_desc: usize, regs: &mut TxQueueRegisters) 
     -> Result<BoxRefMut<MappedPages, [T]>, &'static str> {
 

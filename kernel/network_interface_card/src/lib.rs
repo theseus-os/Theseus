@@ -4,29 +4,17 @@ extern crate alloc;
 #[macro_use] extern crate log;
 extern crate memory;
 extern crate mpmc;
-extern crate volatile;
-extern crate bit_field;
-extern crate pci;
-extern crate spin;
-extern crate owning_ref;
-extern crate irq_safety;
 extern crate nic_init;
 extern crate nic_descriptors;
 extern crate nic_queues;
 extern crate nic_buffers;
 
-use core::ops::{Deref, DerefMut};
-use alloc::{
-    vec::Vec,
-    collections::VecDeque
-};
-use memory::{create_contiguous_mapping, PhysicalAddress, EntryFlags, MappedPages};
-use volatile::Volatile;
-use owning_ref::BoxRefMut;
+use alloc::vec::Vec;
+use memory::{create_contiguous_mapping};
+use nic_init::{nic_mapping_flags};
 use nic_descriptors:: {TxDescriptor, RxDescriptor};
 use nic_queues::{RxQueue, TxQueue};
 use nic_buffers::{TransmitBuffer, ReceiveBuffer, ReceivedFrame};
-use nic_init::{nic_mapping_flags};
 
 
 /// A trait that defines the necessary minimum functions that all network interface card (NIC) drivers

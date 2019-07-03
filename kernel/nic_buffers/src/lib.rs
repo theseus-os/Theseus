@@ -10,8 +10,6 @@ use alloc::vec::Vec;
 use memory::{PhysicalAddress, MappedPages, EntryFlags, create_contiguous_mapping};
 
 
-
-
 /// A buffer that stores a packet to be transmitted through the NIC
 /// and is guaranteed to be contiguous in physical memory. 
 /// Auto-dereferences into a `MappedPages` object that represents its underlying memory. 

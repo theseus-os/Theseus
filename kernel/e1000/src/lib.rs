@@ -70,7 +70,7 @@ const INT_RX:               u32 = 0x80;
 /// e.g., on the PCI bus or somewhere else.
 static E1000_NIC: Once<MutexIrqSafe<E1000Nic>> = Once::new();
 
-/// Returns a reference to the E1000Nic wrapped in a RwLockIrqSafe,
+/// Returns a reference to the E1000Nic wrapped in a MutexIrqSafe,
 /// if it exists and has been initialized.
 pub fn get_e1000_nic() -> Option<&'static MutexIrqSafe<E1000Nic>> {
     E1000_NIC.try()
