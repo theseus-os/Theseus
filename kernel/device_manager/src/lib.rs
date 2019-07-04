@@ -23,7 +23,6 @@ use spin::Mutex;
 use dfqueue::DFQueueProducer;
 use event_types::Event;
 use memory::MemoryManagementInfo;
-use pci::get_pci_device_vd;
 use smoltcp::wire::{IpCidr, Ipv4Address};
 use core::str::FromStr;
 
@@ -52,62 +51,43 @@ pub fn early_init(kernel_mmi: &mut MemoryManagementInfo) -> Result<(), &'static 
 }
 
 
-
+/// Initializes all other devices, such as the keyboard and mouse
+/// as well as all devices discovered on the PCI bus.
 pub fn init(keyboard_producer: DFQueueProducer<Event>) -> Result<(), &'static str>  {
     keyboard::init(keyboard_producer);
     mouse::init();
 
-    
+    // Initialize/scan the PCI bus to discover PCI devices
     for dev in pci::pci_device_iter() {
         debug!("Found PCI device (hex values): {:X?}", dev);
     }
 
-    if let Some(e1000_pci_dev) = get_pci_device_vd(e1000::INTEL_VEND, e1000::E1000_DEV) {
-        debug!("e1000 PCI device found: {:?}", e1000_pci_dev);
-        let e1000_nic_ref = e1000::E1000Nic::init(e1000_pci_dev)?;
-        let static_ip = IpCidr::from_str(DEFAULT_LOCAL_IP).map_err(|_e| "couldn't parse 'DEFAULT_LOCAL_IP' address")?;
-        let gateway_ip = Ipv4Address::from_bytes(&DEFAULT_GATEWAY_IP);
-        let e1000_iface = e1000_smoltcp_device::E1000NetworkInterface::new(e1000_nic_ref, Some(static_ip), Some(gateway_ip))?;
-        network_manager::NETWORK_INTERFACES.lock().push(Arc::new(Mutex::new(e1000_iface)));
-    }
-    else {
-        warn!("Note: no e1000 device found on this system.");
-    }
-    
-
-    // look for devices we support
+    // Iterate over all PCI devices and initialize the drivers for the devices we support.
     for dev in pci::pci_device_iter() {
-        // look for IDE controllers (include IDE disk)
+        // Look for IDE controllers for disk drives (aka PATA).
         if dev.class == 0x01 && dev.subclass == 0x01 {
-            warn!("Initializing ATA Controller...");
-            let mut ata_controller = ata::AtaController::new(dev)?;
-            let mut initial_buf: [u8; 6100] = [0; 6100];
-            let primary_drive = ata_controller.primary_master.as_mut().unwrap();
-            let bytes_read = primary_drive.read_pio(&mut initial_buf[..], 0)?;
-            debug!("{:X?}", &initial_buf[..]);
-            debug!("{:?}", core::str::from_utf8(&initial_buf));
-            trace!("READ_PIO {} bytes", bytes_read);
-
-            let mut write_buf = [0u8; 512*3];
-            for b in write_buf.chunks_exact_mut(16) {
-                b.copy_from_slice(b"QWERTYUIOPASDFJK");
-            }
-            let bytes_written = primary_drive.write_pio(&write_buf[..512], 1024);
-            debug!("WRITE_PIO {:?}", bytes_written);
-
-            let mut after_buf: [u8; 6100] = [0; 6100];
-            let bytes_read = primary_drive.read_pio(&mut after_buf[..], 0)?;
-            debug!("{:X?}", &after_buf[..]);
-            debug!("{:?}", core::str::from_utf8(&after_buf));
-            trace!("AFTER WRITE READ_PIO {} bytes", bytes_read);
-
-
-            for (i, (before, after)) in initial_buf.iter().zip(after_buf.iter()).enumerate() {
-                if before != after {
-                    trace!("byte {} diff: {:X} -> {:X}", i, before, after);
-                }
-            }
+            info!("IDE controller PCI device found at: {:?}", dev.location);
+            let ide_controller = ata::IdeController::new(dev)?;
+            debug!("{:?}", ide_controller.primary_master);
         }
+
+        // Look for networking controllers, specifically ethernet cards
+        if dev.class == 0x02 && dev.subclass == 0x00 {
+            if dev.vendor_id == e1000::INTEL_VEND && dev.device_id == e1000::E1000_DEV {
+                info!("e1000 PCI device found at: {:?}", dev.location);
+                let e1000_nic_ref = e1000::E1000Nic::init(dev)?;
+                let static_ip = IpCidr::from_str(DEFAULT_LOCAL_IP).map_err(|_e| "couldn't parse 'DEFAULT_LOCAL_IP' address")?;
+                let gateway_ip = Ipv4Address::from_bytes(&DEFAULT_GATEWAY_IP);
+                let e1000_iface = e1000_smoltcp_device::E1000NetworkInterface::new(e1000_nic_ref, Some(static_ip), Some(gateway_ip))?;
+                network_manager::NETWORK_INTERFACES.lock().push(Arc::new(Mutex::new(e1000_iface)));
+            }
+            // here: check for and initialize other ethernet cards
+        }
+    }
+
+    // Convenience notification for developers to inform them of no networking devices
+    if network_manager::NETWORK_INTERFACES.lock().is_empty() {
+        warn!("Note: no network devices found on this system.");
     }
     
     Ok(())

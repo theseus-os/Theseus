@@ -14,7 +14,6 @@ extern crate port_io;
 extern crate kernel_config;
 extern crate memory;
 extern crate apic;
-extern crate ata_pio;
 extern crate pit_clock;
 extern crate tss;
 extern crate gdt;
@@ -413,7 +412,6 @@ extern "x86-interrupt" fn pic_spurious_interrupt_handler(_stack_frame: &mut Exce
 
 /// 0x2E
 extern "x86-interrupt" fn primary_ata_handler(_stack_frame: &mut ExceptionStackFrame ) {
-    // ata_pio::handle_primary_interrupt();
     info!("Primary ATA Interrupt (0x2E)");
 
     eoi(Some(PIC_MASTER_OFFSET + 0xE));
@@ -422,7 +420,6 @@ extern "x86-interrupt" fn primary_ata_handler(_stack_frame: &mut ExceptionStackF
 
 /// 0x2F
 extern "x86-interrupt" fn secondary_ata_handler(_stack_frame: &mut ExceptionStackFrame ) {
-    // ata_pio::handle_secondary_interrupt();
     info!("Secondary ATA Interrupt (0x2F)");
     
     eoi(Some(PIC_MASTER_OFFSET + 0xF));
