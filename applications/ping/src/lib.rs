@@ -52,7 +52,7 @@ fn main(args: Vec<String>) -> isize {
     opts.optflag("h", "help", "print this help menu");
     opts.optflag("v", "verbose", "a more detailed view of packets sent and received");
     opts.optopt("c", "count", "amount of echo request packets to send (default: 4)", "N");
-    opts.optopt("i", "interval", "interval between packets being sent in miliseconds (default: 500)", "N");
+    opts.optopt("i", "interval", "interval between packets being sent in miliseconds (default: 1000)", "N");
     opts.optopt("t", "timeout", "maximum time between echo request and echo reply in milliseconds (default: 5000)", "N");
     opts.optopt("s", "buffer size", "size of packet to send to target address, (min: 8, max: 120, default: 40)", "N");
     
@@ -103,8 +103,8 @@ pub fn rmain(matches: &Matches, _opts: Options, address: IpAddress) -> Result<()
 
     
     let mut count = 4;
-    let mut interval = 500;
-    let mut timeout = 10000;
+    let mut interval = 1000;
+    let mut timeout = 5000;
     let mut buffer_size = 40;
     let mut verbose = false;
     let did_work = true;
@@ -113,7 +113,7 @@ pub fn rmain(matches: &Matches, _opts: Options, address: IpAddress) -> Result<()
     if let Some(i) = matches.opt_default("c", "4") {
         count = i.parse::<usize>().map_err(|_e| "couldn't parse number of packets")?;
     }
-    if let Some(i) = matches.opt_default("i", "500") {
+    if let Some(i) = matches.opt_default("i", "1000") {
         interval = i.parse::<u64>().map_err(|_e| "couldn't parse interval")?;
     }
     if let Some(i) = matches.opt_default("t", "5000") {
@@ -222,8 +222,7 @@ fn ping(address: IpAddress, count: usize, interval: u64, timeout: u64, verbose: 
     loop {
         
         match poll_iface(&iface, &mut sockets, startup_time) {
-            Ok(true) => poll_status = true,
-            Ok(false) => poll_status = false,
+            Ok(var) => poll_status = var,
             Err(e) => {
                 debug!("poll error: {}", e);
             }
