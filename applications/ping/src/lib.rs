@@ -53,7 +53,7 @@ fn main(args: Vec<String>) -> isize {
     opts.optflag("v", "verbose", "a more detailed view of packets sent and received");
     opts.optopt("c", "count", "amount of echo request packets to send (default: 4)", "N");
     opts.optopt("i", "interval", "interval between packets being sent in miliseconds (default: 500)", "N");
-    opts.optopt("t", "timeout", "maximum time between echo request and echo reply in milliseconds (default: 10000)", "N");
+    opts.optopt("t", "timeout", "maximum time between echo request and echo reply in milliseconds (default: 5000)", "N");
     opts.optopt("s", "buffer size", "size of packet to send to target address, (min: 8, max: 120, default: 40)", "N");
     
   
@@ -116,7 +116,7 @@ pub fn rmain(matches: &Matches, _opts: Options, address: IpAddress) -> Result<()
     if let Some(i) = matches.opt_default("i", "500") {
         interval = i.parse::<u64>().map_err(|_e| "couldn't parse interval")?;
     }
-    if let Some(i) = matches.opt_default("t", "10000") {
+    if let Some(i) = matches.opt_default("t", "5000") {
         timeout = i.parse::<u64>().map_err(|_e| "couldn't parse timeout length")?;
     }
     if let Some(i) = matches.opt_default("s", "40") {
@@ -192,14 +192,6 @@ fn ping(address: IpAddress, count: usize, interval: u64, timeout: u64, verbose: 
         Err(err) => return println!("couldn't initialize the network: {}", err),
     };
 
-    // QEMU uses the 10.0.2.X for networking purposes such as DNS server on 10.0.2.3 and the SMB server on 10.0.2.4
-    // Other than 10.0.2.2, other 10.0.2.X address cause ping to fail 
-    let a4 = 255;
-    for add in 0..a4 {
-        if address == IpAddress::v4(10, 0, 2, add) && add != 2 || address == IpAddress::v4(10, 0, 2, 255) {
-            return println!("illegal address: other than 10.0.2.2, QEMU reserves the 10.0.2.X addresses for networking purposes");
-        }
-    };
 
     let mut sockets = SocketSet::new(vec![]);
     let icmp_handle = sockets.add(icmp_socket);
@@ -213,6 +205,7 @@ fn ping(address: IpAddress, count: usize, interval: u64, timeout: u64, verbose: 
     let mut received: u16 = 0;
     let mut total_time: u64 = 0;
     let mut echo_payload = vec![0xffu8; buffer_size];
+    let mut timeout_loop = false;
 
     // Designate no checksum capabilities 
     let checksum_caps = ChecksumCapabilities::ignored();
@@ -223,12 +216,14 @@ fn ping(address: IpAddress, count: usize, interval: u64, timeout: u64, verbose: 
     // Portless icmp messages such as echo request require a 16-bit identifier to bind to
     // so that only icmp messages with this identifer can pass through the icmp socket
     let ident = 0x22b; 
+    let mut poll_status = true;
 
     // Makes sure that the icmp handle can communicate with the given ethernet interface
     loop {
         
         match poll_iface(&iface, &mut sockets, startup_time) {
-            Ok(_) => {},
+            Ok(true) => poll_status = true,
+            Ok(false) => poll_status = false,
             Err(e) => {
                 debug!("poll error: {}", e);
             }
@@ -253,18 +248,21 @@ fn ping(address: IpAddress, count: usize, interval: u64, timeout: u64, verbose: 
             
             // Checks if the icmp sockett can send an echo request
             if socket.can_send() && seq_no < count as u16 && send_at <= timestamp {
+                
                 NetworkEndian::write_i64(&mut echo_payload, timestamp as i64);
+
                 let icmp_repr = Icmpv4Repr::EchoRequest{
                         ident: ident,
                         seq_no: seq_no,
                         data: &echo_payload
                     };
+
                 let icmp_payload = match socket.send(icmp_repr.buffer_len(), remote_addr) {
                     Ok(payload) => payload,
                     Err(_err) => return println!("the icmp socket cannot send"),
                 };
+
                 let mut icmp_packet = Icmpv4Packet::new_unchecked(icmp_payload);
-                
                 
                 icmp_repr.emit(&mut icmp_packet, &checksum_caps); //turns or "emits" the raw network stack into an icmpv4 packet,
                 if verbose {
@@ -299,7 +297,6 @@ fn ping(address: IpAddress, count: usize, interval: u64, timeout: u64, verbose: 
                     Err(err) => return println!("err: {}", err),
                 }; 
                 
-        
                 get_icmp_pong(&mut waiting_queue, &mut times, &mut total_time, icmp_repr, &mut received, remote_addr, timestamp);
                 if verbose {
                     println!("buffer length: {}", icmp_repr.buffer_len());
@@ -314,13 +311,13 @@ fn ping(address: IpAddress, count: usize, interval: u64, timeout: u64, verbose: 
                 if timestamp - *from <  timeout {
                     true
                 } else {
+                    timeout_loop = true;
                     println!("From {} icmp_seq={} timeout", remote_addr, seq);
                     false
                 }
             });
-
-            // Once all the echorequests have been recieved/timed out, break from the loop  
-            if seq_no == count as u16 && waiting_queue.is_empty()  {
+            // Once all the echorequests have been recieved/timed out or if transmit buffer is unable to be flushed, break from the loop  
+            if seq_no == count as u16 && waiting_queue.is_empty() || timeout_loop == true && poll_status == false && seq_no != count as u16 {
                 break
             }
         }
