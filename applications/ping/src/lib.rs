@@ -315,8 +315,11 @@ fn ping(address: IpAddress, count: usize, interval: u64, timeout: u64, verbose: 
                     false
                 }
             });
-            // Once all the echorequests have been recieved/timed out or if transmit buffer is unable to be flushed, break from the loop  
-            if seq_no == count as u16 && waiting_queue.is_empty() || timeout_loop == true && poll_status == false && seq_no != count as u16 {
+
+            // Once all the echorequests have been recieved/timed out or if transmit buffer is unable to be flushed, break from the loop
+            let received_all_packets = seq_no == count as u16 && waiting_queue.is_empty();
+            let unflushed_txbuffer = timeout_loop == true && poll_status == false && seq_no != count as u16;  
+            if received_all_packets || unflushed_txbuffer {
                 break
             }
         }
