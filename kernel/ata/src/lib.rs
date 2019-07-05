@@ -1,4 +1,6 @@
 //! Support for accessing ATA disks (IDE).
+//! 
+//! The primary struct of interest is [`AtaDrive`](struct.AtaDrive.html).
 //!
 //! Simple rough example, preserved temporarily for posterity:
 //! ```rust
@@ -32,14 +34,12 @@
 
 #[macro_use] extern crate alloc;
 #[macro_use] extern crate log;
-extern crate spin;
 extern crate port_io;
 extern crate pci;
 #[macro_use] extern crate bitflags;
 
 use core::fmt;
 use alloc::string::String;
-use spin::{Once, Mutex}; 
 use port_io::{Port, PortReadOnly, PortWriteOnly};
 use pci::PciDevice;
 
@@ -92,7 +92,7 @@ bitflags! {
 
 bitflags! {
 	/// The possible control values used in an ATA drive's status port.
-    pub struct AtaControl: u8 {
+    struct AtaControl: u8 {
 		/// Set this to read back the High Order Byte of the last-written LBA48 value.
 		const HOB   = 0x80;
 		/// Software reset
@@ -103,10 +103,11 @@ bitflags! {
     }
 }
 
+#[allow(dead_code)]
 /// The possible commands that can be issued to an ATA drive's command port. 
 /// More esoteric commands (nearly a full list) are here: <https://wiki.osdev.org/ATA_Command_Matrix>.
 #[repr(u8)]
-pub enum AtaCommand {
+enum AtaCommand {
 	/// Read sectors using PIO (28-bit LBA)
 	ReadPio         = 0x20,
 	/// Read sectors using PIO (48-bit LBA)
@@ -177,7 +178,7 @@ enum BusDriveSelect {
 }
 
 
-/// A single ATA drive, either a Master or a Slave, 
+/// A single ATA drive, either a master or a slave, 
 /// within a larger IDE controller.
 #[derive(Debug)]
 pub struct AtaDrive {
@@ -236,8 +237,8 @@ impl AtaDrive {
 	/// Looks for an ATA drive at the location specified by the given data and control BARs,
 	/// and if one is found, it probes and initializes that drive and returns an object representing it.
 	/// 
-	/// Since two drives (one master and one slave) may exist on one IDE bus (at the same data and control BAR),
-	/// the caller must specify which one to search for. 
+	/// Since two drives (one master and one slave) may exist on one IDE bus (sharing the same data and control BAR),
+	/// the caller must specify *which* one to search for. 
 	/// The caller can look for both by calling this twice: once with `which = Master` and once with `which = Slave`.
 	fn new(data_bar: u16, control_bar: u16, which: BusDriveSelect) -> Result<AtaDrive, &'static str> {
 		let data_bar = data_bar & PCI_BAR_PORT_MASK;
@@ -609,16 +610,16 @@ impl AtaDrive {
 		}
 	}
 
-	/// Issues a software reset for this drive.
-	/// # Warning 
-	/// This is not yet implemented because it will result
-	/// in the other device on this bus (master or slave) being reset as well.
-	pub fn software_reset(&mut self) {
-		// The procedure is to first set the SRST bit, 
-		// then to wait 5 microseconds,
-		// the to clear the SRST bit.
-		unimplemented!()
-	}
+	// /// Issues a software reset for this drive.
+	// /// # Warning 
+	// /// This is not yet implemented because it will result
+	// /// in the other device on this bus (master or slave) being reset as well.
+	// pub fn software_reset(&mut self) {
+	// 	// The procedure is to first set the SRST bit, 
+	// 	// then to wait 5 microseconds,
+	// 	// the to clear the SRST bit.
+	// 	unimplemented!()
+	// }
 
 	
 	/// Reads the `status` port and returns the value as an `AtaStatus` bitfield. 
@@ -638,6 +639,15 @@ impl AtaDrive {
 	/// Reads the `error` port and returns the value as an `AtaError` bitfield.
 	pub fn error(&self) -> AtaError {
 		AtaError::from_bits_truncate(self.error.read())
+	}
+
+	/// Returns `true` if this drive is the master, or `false` if it is the slave 
+	/// on the IDE controller bus.
+	pub fn is_master(&self) -> bool {
+		match self.master_slave {
+			BusDriveSelect::Master => true,
+			BusDriveSelect::Slave => false,
+		}
 	}
 }
 
@@ -729,127 +739,127 @@ impl IdeController {
 #[derive(Copy, Clone, Debug, Default)]
 #[repr(packed)]
 pub struct AtaIdentifyData {
-	general_configuration: u16,
-	num_cylinders: u16,
-	specific_configuration: u16,
-	num_heads: u16,
+	pub general_configuration: u16,
+	pub num_cylinders: u16,
+	pub specific_configuration: u16,
+	pub num_heads: u16,
 	_reserved1: [u16; 2],
-	num_sectors_per_track: u16,
-	vendor_unique1: [u16; 3],
-	serial_number: [u8; 20],
+	pub num_sectors_per_track: u16,
+	pub vendor_unique1: [u16; 3],
+	pub serial_number: AtaSerialNumber,
 	_reserved2: [u16; 3],
-	firmware_version: [u8; 8],
-	model_number: AtaModelNumber,
+	pub firmware_version: AtaFirmwareVersion,
+	pub model_number: AtaModelNumber,
 	/// Maximum number of blocks per transfer.
 	/// Sometimes referred to as "sectors per int".
-	max_blocks_per_transfer: u8,
-	vendor_unique2: u8,
-	trusted_computing: u16,
-	capabilities: u16,
+	pub max_blocks_per_transfer: u8,
+	pub vendor_unique2: u8,
+	pub trusted_computing: u16,
+	pub capabilities: u16,
 	_reserved3: u16, // reserved word 50
 	_reserved4: [u16; 2],
 	/// A bitmask of translation fields valid and free fall control sensitivity
-	translation_fields_valid: u8,
-	free_fall_control_sensitivity: u8,
-	num_current_cylinders: u16,
-	num_current_heads: u16,
-	current_sectors_per_track: u16,
-	current_sector_capacity: u32, 
-	current_multi_sector_setting: u8,
+	pub translation_fields_valid: u8,
+	pub free_fall_control_sensitivity: u8,
+	pub num_current_cylinders: u16,
+	pub num_current_heads: u16,
+	pub current_sectors_per_track: u16,
+	pub current_sector_capacity: u32, 
+	pub current_multi_sector_setting: u8,
 	/// MultiSectorSettingValid : 1;
 	/// ReservedByte59 : 3;
 	/// SanitizeFeatureSupported : 1;
 	/// CryptoScrambleExtCommandSupported : 1;
 	/// OverwriteExtCommandSupported : 1;
 	/// BlockEraseExtCommandSupported : 1;
-	ext_command_supported: u8,
+	pub ext_command_supported: u8,
 	/// Number of sectors in the disk, if using 28-bit LBA. 
 	/// This can be used to calculate the size of the disk.
 	/// If zero, we're using 48-bit LBA, so you should use `max_48_bit_lba`.
-	user_addressable_sectors: u32,
+	pub user_addressable_sectors: u32,
 	_reserved5: u16,
-	multiword_dma_support: u8,
-	multiword_dma_active: u8,
-	advanced_pio_modes: u8,
+	pub multiword_dma_support: u8,
+	pub multiword_dma_active: u8,
+	pub advanced_pio_modes: u8,
 	_reserved6: u8,
-	minimum_mw_transfer_cycle_time: u16,
-	recommended_mw_transfer_cycle_time: u16,
-	minimum_pio_cycle_time: u16,
-	minimum_pio_cycle_time_io_ready: u16,
-	additional_supported: u16,
+	pub minimum_mw_transfer_cycle_time: u16,
+	pub recommended_mw_transfer_cycle_time: u16,
+	pub minimum_pio_cycle_time: u16,
+	pub minimum_pio_cycle_time_io_ready: u16,
+	pub additional_supported: u16,
 	_reserved7: [u16; 5],
 	/// only the first 5 bits are used, others are reserved
-	queue_depth: u16,
-	serial_ata_capabilities: u32,
-	serial_ata_features_supported: u16,
-	serial_ata_features_enabled: u16,
-	major_revision: u16,
-	minor_revision: u16,
-	command_set_support: [u16; 3],
-	command_set_active: [u16; 3],
-	ultra_dma_support: u8,
-	ultra_dma_active: u8,
-	normal_security_erase_unit: u16,
-	enhanced_security_erase_unit: u16,
-	current_apm_level: u8,
+	pub queue_depth: u16,
+	pub serial_ata_capabilities: u32,
+	pub serial_ata_features_supported: u16,
+	pub serial_ata_features_enabled: u16,
+	pub major_revision: u16,
+	pub minor_revision: u16,
+	pub command_set_support: [u16; 3],
+	pub command_set_active: [u16; 3],
+	pub ultra_dma_support: u8,
+	pub ultra_dma_active: u8,
+	pub normal_security_erase_unit: u16,
+	pub enhanced_security_erase_unit: u16,
+	pub current_apm_level: u8,
 	_reserved8: u8,
-	master_password_id: u16,
-	hardware_reset_result: u16,
-	current_acoustic_value: u8,
-	recommended_acoustic_value: u8,
-	stream_min_request_size: u16,
-	streaming_transfer_time_dma: u16,
-	streaming_access_latency_dma_pio: u16,
-	streaming_perf_granularity: u32, 
+	pub master_password_id: u16,
+	pub hardware_reset_result: u16,
+	pub current_acoustic_value: u8,
+	pub recommended_acoustic_value: u8,
+	pub stream_min_request_size: u16,
+	pub streaming_transfer_time_dma: u16,
+	pub streaming_access_latency_dma_pio: u16,
+	pub streaming_perf_granularity: u32, 
 	/// Number of sectors in the disk, if using 48-bit LBA. 
 	/// This can be used to calculate the size of the disk.
-	max_48_bit_lba: u64,
-	streaming_transfer_time: u16,
-	dsm_cap: u16,
+	pub max_48_bit_lba: u64,
+	pub streaming_transfer_time: u16,
+	pub dsm_cap: u16,
 	/// `[0:3]` Physical sector size (in logical sectors)
-	physical_logical_sector_size: u16, 
-	inter_seek_delay: u16,
-	world_wide_name: [u16; 4],
-	reserved_for_world_wide_name_128: [u16; 4],
-	reserved_for_tlc_technical_report: u16,
-	words_per_logical_sector: u32,
-	command_set_support_ext: u16,
-	command_set_active_ext: u16,
-	reserved_for_expanded_support_and_active: [u16; 6],
-	msn_support: u16,
-	security_status: u16,
+	pub physical_logical_sector_size: u16, 
+	pub inter_seek_delay: u16,
+	pub world_wide_name: [u16; 4],
+	pub reserved_for_world_wide_name_128: [u16; 4],
+	pub reserved_for_tlc_technical_report: u16,
+	pub words_per_logical_sector: u32,
+	pub command_set_support_ext: u16,
+	pub command_set_active_ext: u16,
+	pub reserved_for_expanded_support_and_active: [u16; 6],
+	pub msn_support: u16,
+	pub security_status: u16,
 	_reserved9: [u16; 31],
-	cfa_power_mode1: u16,
+	pub cfa_power_mode1: u16,
 	_reserved10: [u16; 7],
-	nominal_form_factor: u16, 
-	data_set_management_feature: u16, 
-	additional_product_id: [u16; 4],
+	pub nominal_form_factor: u16, 
+	pub data_set_management_feature: u16, 
+	pub additional_product_id: [u16; 4],
 	_reserved11: [u16; 2],
-	current_media_serial_number: [u16; 30],
-	sct_command_transport: u16,
+	pub current_media_serial_number: [u16; 30],
+	pub sct_command_transport: u16,
 	_reserved12: [u16; 2],
-	block_alignment: u16, 
-	write_read_verify_sector_count_mode_3_only: [u16; 2],
-	write_read_verify_sector_count_mode_2_only: [u16; 2],
-	nv_cache_capabilities: u16,
-	nv_cache_size_lsw: u16,
-	nv_cache_size_msw: u16,
-	nominal_media_rotation_rate: u16,
+	pub block_alignment: u16, 
+	pub write_read_verify_sector_count_mode_3_only: [u16; 2],
+	pub write_read_verify_sector_count_mode_2_only: [u16; 2],
+	pub nv_cache_capabilities: u16,
+	pub nv_cache_size_lsw: u16,
+	pub nv_cache_size_msw: u16,
+	pub nominal_media_rotation_rate: u16,
 	_reserved13: u16, 
-	nv_cache_time_to_spin_up_in_seconds: u8,
+	pub nv_cache_time_to_spin_up_in_seconds: u8,
 	_reserved14: u8,
-	write_read_verify_sector_count_mode: u8,
+	pub write_read_verify_sector_count_mode: u8,
 	_reserved15: u8,
 	_reserved16: u16,
-	transport_major_version: u16,
-	transport_minor_version: u16,
+	pub transport_major_version: u16,
+	pub transport_minor_version: u16,
 	_reserved17: [u16; 6],
-	extended_num_of_user_addressable_sectors: u64,
-	min_blocks_per_download_microcode: u16,
-	max_blocks_per_download_microcode: u16,
+	pub extended_num_of_user_addressable_sectors: u64,
+	pub min_blocks_per_download_microcode: u16,
+	pub max_blocks_per_download_microcode: u16,
 	_reserved18: [u16; 19],
-	signature: u8,
-	checksum: u8,
+	pub signature: u8,
+	pub checksum: u8,
 }
 
 impl AtaIdentifyData {
@@ -857,8 +867,8 @@ impl AtaIdentifyData {
 	/// into a struct that contains the identified details of an ATA drive.
 	fn new(arr: [u8; SECTOR_SIZE_IN_BYTES])-> AtaIdentifyData {
 		let mut identify_data: AtaIdentifyData = unsafe { core::mem::transmute(arr) };
-		Self::flip_bytes(&mut identify_data.serial_number);
-		Self::flip_bytes(&mut identify_data.firmware_version);
+		Self::flip_bytes(&mut identify_data.serial_number.0);
+		Self::flip_bytes(&mut identify_data.firmware_version.0);
 		Self::flip_bytes(&mut identify_data.model_number.0);
 		identify_data
 	}
@@ -871,6 +881,37 @@ impl AtaIdentifyData {
 	}
 }
 
+
+/// An ATA drive's serial number is a 20-byte string.
+/// 
+/// This is a wrapper around a byte string `[u8; 20]`, because Rust only supports deriving traits
+/// like `Debug` and `Default` for arrays up to 32 elements.
+#[derive(Copy, Clone)]
+#[repr(packed)]
+pub struct AtaSerialNumber([u8; 20]);
+impl Default for AtaSerialNumber {
+	fn default() -> Self { 
+		AtaSerialNumber([0; 20])
+	}
+}
+impl fmt::Display for AtaSerialNumber {
+	fn fmt(&self, f: &mut fmt::Formatter) -> fmt::Result {
+		core::str::from_utf8(&self.0)
+			.map_err(|_| fmt::Error)
+			.and_then(|s| write!(f, "{}", s))
+	}
+}
+impl fmt::Debug for AtaSerialNumber {
+	fn fmt(&self, f: &mut fmt::Formatter) -> fmt::Result {
+		write!(f, "\"{}\"", self)
+	}
+}
+
+
+/// An ATA drive's model number is a 40-byte string.
+///
+/// A wrapper around a byte string `[u8; 40]`, because Rust only supports deriving traits
+/// like `Debug` and `Default` for arrays up to 32 elements.
 #[derive(Copy, Clone)]
 #[repr(packed)]
 pub struct AtaModelNumber([u8; 40]);
@@ -879,10 +920,40 @@ impl Default for AtaModelNumber {
 		AtaModelNumber([0; 40])
 	}
 }
-impl fmt::Debug for AtaModelNumber {
+impl fmt::Display for AtaModelNumber {
 	fn fmt(&self, f: &mut fmt::Formatter) -> fmt::Result {
 		core::str::from_utf8(&self.0)
 			.map_err(|_| fmt::Error)
-			.and_then(|s| write!(f, "{:?}", s))
+			.and_then(|s| write!(f, "{}", s))
+	}
+}
+impl fmt::Debug for AtaModelNumber {
+	fn fmt(&self, f: &mut fmt::Formatter) -> fmt::Result {
+		write!(f, "\"{}\"", self)
+	}
+}
+
+
+/// An ATA drive's firmware version is an 8-byte string.
+///
+/// A wrapper around a byte string `[u8; 8]` to allow it to be printed.
+#[derive(Copy, Clone)]
+#[repr(packed)]
+pub struct AtaFirmwareVersion([u8; 8]);
+impl Default for AtaFirmwareVersion {
+	fn default() -> Self { 
+		AtaFirmwareVersion([0; 8])
+	}
+}
+impl fmt::Display for AtaFirmwareVersion {
+	fn fmt(&self, f: &mut fmt::Formatter) -> fmt::Result {
+		core::str::from_utf8(&self.0)
+			.map_err(|_| fmt::Error)
+			.and_then(|s| write!(f, "{}", s))
+	}
+}
+impl fmt::Debug for AtaFirmwareVersion {
+	fn fmt(&self, f: &mut fmt::Formatter) -> fmt::Result {
+		write!(f, "\"{}\"", self)
 	}
 }

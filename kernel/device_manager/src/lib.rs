@@ -68,7 +68,8 @@ pub fn init(keyboard_producer: DFQueueProducer<Event>) -> Result<(), &'static st
         if dev.class == 0x01 && dev.subclass == 0x01 {
             info!("IDE controller PCI device found at: {:?}", dev.location);
             let ide_controller = ata::IdeController::new(dev)?;
-            debug!("{:?}", ide_controller.primary_master);
+            // TODO: do something with the discovered ATA drives / IDE controller
+            // debug!("{:?}", ide_controller.primary_master);
         }
 
         // Look for networking controllers, specifically ethernet cards
