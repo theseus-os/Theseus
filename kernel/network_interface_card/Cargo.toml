@@ -17,8 +17,8 @@ path = "../memory"
 [dependencies.mpmc]
 path = "../../libs/mpmc"
 
-[dependencies.nic_descriptors]
-path = "../nic_descriptors"
+[dependencies.intel_ethernet]
+path = "../intel_ethernet"
 
 [dependencies.nic_queues]
 path = "../nic_queues"

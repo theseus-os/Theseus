@@ -3,8 +3,9 @@
 extern crate alloc;
 #[macro_use] extern crate log;
 extern crate memory;
-extern crate nic_descriptors;
+extern crate intel_ethernet;
 extern crate nic_buffers;
+extern crate owning_ref;
 
 use core::ptr::write_volatile;
 use owning_ref::BoxRefMut;
@@ -13,7 +14,7 @@ use alloc::{
     collections::VecDeque
 };
 use memory::{VirtualAddress, MappedPages};
-use nic_descriptors::{RxDescriptor, TxDescriptor};
+use intel_ethernet::descriptors::{RxDescriptor, TxDescriptor};
 use nic_buffers::{ReceiveBuffer, ReceivedFrame};
 
 

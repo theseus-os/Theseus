@@ -48,8 +48,8 @@ path = "../../libs/mpmc"
 [dependencies.network_interface_card]
 path = "../network_interface_card"
 
-[dependencies.nic_descriptors]
-path = "../nic_descriptors" 
+[dependencies.intel_ethernet]
+path = "../intel_ethernet" 
 
 [dependencies.nic_buffers]
 path = "../nic_buffers"

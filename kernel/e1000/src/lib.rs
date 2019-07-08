@@ -21,7 +21,7 @@ extern crate x86_64;
 extern crate mpmc;
 extern crate network_interface_card;
 extern crate apic;
-extern crate nic_descriptors;
+extern crate intel_ethernet;
 extern crate nic_buffers;
 extern crate nic_queues;
 extern crate nic_init;
@@ -37,14 +37,17 @@ use irq_safety::{RwLockIrqSafe, MutexIrqSafe};
 use volatile::{Volatile, ReadOnly};
 use alloc::boxed::Box;
 use memory::{PhysicalAddress, VirtualAddress, MappedPages};
-use pci::{PciDevice, pci_read_8, pci_determine_mem_base, PCI_BAR0, PCI_INTERRUPT_LINE};
+use pci::{PciDevice, pci_read_8, pci_determine_mem_base, PCI_BAR0, PCI_INTERRUPT_LINE, pci_set_command_bus_master_bit};
 use kernel_config::memory::PAGE_SIZE;
 use owning_ref::BoxRefMut;
 use interrupts::{eoi,register_interrupt};
 use x86_64::structures::idt::{ExceptionStackFrame};
 use network_interface_card:: NetworkInterfaceCard;
-use nic_init::{RxQueueRegisters, TxQueueRegisters, mem_map_reg, mem_map, init_rx_buf_pool, init_rx_queue, init_tx_queue};
-use nic_descriptors::{LegacyRxDesc, LegacyTxDesc};
+use nic_init::{allocate_device_register_memory, init_rx_buf_pool, init_rx_queue, init_tx_queue};
+use intel_ethernet::{
+    descriptors::{LegacyRxDescriptor, LegacyTxDescriptor},
+    types::*
+};
 use nic_buffers::{TransmitBuffer, ReceiveBuffer, ReceivedFrame};
 use nic_queues::{RxQueue, TxQueue};
 use apic::get_my_apic_id;
@@ -86,7 +89,7 @@ lazy_static! {
 
 ///struct to hold mapping of registers
 #[repr(C)]
-pub struct IntelE1000Registers {
+pub struct E1000Registers {
     pub ctrl:                       Volatile<u32>,          // 0x0
     _padding0:                      [u8; 4],                // 0x4 - 0x7
     pub status:                     ReadOnly<u32>,          // 0x8
@@ -123,70 +126,35 @@ pub struct IntelE1000Registers {
 #[repr(C)]
 pub struct RegistersRx {
     /// The lower (least significant) 32 bits of the physical address of the array of receive descriptors.
-    pub rdbal:                      Volatile<u32>,          // 0x2800
+    pub rdbal:                      Volatile<rdbal>,          // 0x2800
     /// The higher (most significant) 32 bits of the physical address of the array of receive descriptors.
-    pub rdbah:                      Volatile<u32>,          // 0x2804
+    pub rdbah:                      Volatile<rdbah>,          // 0x2804
     /// The length in bytes of the array of receive descriptors.
-    pub rdlen:                      Volatile<u32>,          // 0x2808
+    pub rdlen:                      Volatile<rdlen>,          // 0x2808
     _padding6:                      [u8; 4],                // 0x280C - 0x280F
     /// The receive descriptor head index, which points to the next available receive descriptor.
-    pub rdh:                        Volatile<u32>,          // 0x2810
+    pub rdh:                        Volatile<rdh>,          // 0x2810
     _padding7:                      [u8; 4],                // 0x2814 - 0x2817
     /// The receive descriptor tail index, which points to the last available receive descriptor.
-    pub rdt:                        Volatile<u32>,          // 0x2818
+    pub rdt:                        Volatile<rdt>,          // 0x2818
 }
 
-impl RxQueueRegisters for RegistersRx {
-    fn rdbal(&mut self, val: u32) {
-        self.rdbal.write(val);
-    }
-    fn rdbah(&mut self, val: u32) {
-        self.rdbah.write(val);
-    }
-    fn rdlen(&mut self, val: u32) {
-        self.rdlen.write(val);
-    }
-    fn rdh(&mut self, val: u32) {
-        self.rdh.write(val);
-    }
-    fn rdt(&mut self, val: u32) {
-        self.rdt.write(val);
-    }
-}
 
 ///struct to hold registers related to one transmit queue
 #[repr(C)]
 pub struct RegistersTx {
     /// The lower (least significant) 32 bits of the physical address of the array of transmit descriptors.
-    pub tdbal:                      Volatile<u32>,          // 0x3800
+    pub tdbal:                      Volatile<tdbal>,          // 0x3800
     /// The higher (most significant) 32 bits of the physical address of the array of transmit descriptors.
-    pub tdbah:                      Volatile<u32>,          // 0x3804
+    pub tdbah:                      Volatile<tdbah>,          // 0x3804
     /// The length in bytes of the array of transmit descriptors.
-    pub tdlen:                      Volatile<u32>,          // 0x3808
+    pub tdlen:                      Volatile<tdlen>,          // 0x3808
     _padding9:                      [u8; 4],                // 0x380C - 0x380F
     /// The transmit descriptor head index, which points to the next available transmit descriptor.
-    pub tdh:                        Volatile<u32>,          // 0x3810
+    pub tdh:                        Volatile<tdh>,          // 0x3810
     _padding10:                     [u8; 4],                // 0x3814 - 0x3817
     /// The transmit descriptor tail index, which points to the last available transmit descriptor.
-    pub tdt:                        Volatile<u32>,          // 0x3818
-}
-
-impl TxQueueRegisters for RegistersTx {
-    fn tdbal(&mut self, val: u32) {
-        self.tdbal.write(val);
-    }
-    fn tdbah(&mut self, val: u32) {
-        self.tdbah.write(val);
-    }
-    fn tdlen(&mut self, val: u32) {
-        self.tdlen.write(val);
-    }
-    fn tdh(&mut self, val: u32) {
-        self.tdh.write(val);
-    }
-    fn tdt(&mut self, val: u32) {
-        self.tdt.write(val);
-    }
+    pub tdt:                        Volatile<tdt>,          // 0x3818
 }
 
 
@@ -203,11 +171,11 @@ pub struct E1000Nic {
     /// The optional spoofed MAC address to use in place of `mac_hardware` when transmitting.  
     mac_spoofed: Option<[u8; 6]>,
     /// Receive queue with descriptors
-    rx_queue: RxQueue<LegacyRxDesc>,
+    rx_queue: RxQueue<LegacyRxDescriptor>,
     /// Transmit queue with descriptors
-    tx_queue: TxQueue<LegacyTxDesc>,     
+    tx_queue: TxQueue<LegacyTxDescriptor>,     
     /// memory-mapped control registers
-    regs: BoxRefMut<MappedPages, IntelE1000Registers>,
+    regs: BoxRefMut<MappedPages, E1000Registers>,
 }
 
 
@@ -259,7 +227,10 @@ impl E1000Nic {
         // memory mapped base address
         let mem_base = pci_determine_mem_base(e1000_pci_dev)?;
 
-        let (mut mapped_registers, mem_base_v) = Self::create_e1000_regs(e1000_pci_dev, mem_base)?;
+        // set the bus mastering bit for this PciDevice, which allows it to use DMA
+        pci_set_command_bus_master_bit(e1000_pci_dev);
+
+        let (mut mapped_registers, mem_base_v) = Self::map_e1000_regs(e1000_pci_dev, mem_base)?;
         
         Self::start_link(&mut mapped_registers);
         
@@ -315,10 +286,10 @@ impl E1000Nic {
     /// # Arguments
     /// * `device`: reference to the nic device
     /// * `mem_base`: the physical address where the NIC's memory starts.
-    fn create_e1000_regs(device: &PciDevice, mem_base: PhysicalAddress) -> Result<(BoxRefMut<MappedPages, IntelE1000Registers>, VirtualAddress), &'static str> {
-        let nic_mapped_page = mem_map_reg(device, mem_base)?;
+    fn map_e1000_regs(device: &PciDevice, mem_base: PhysicalAddress) -> Result<(BoxRefMut<MappedPages, E1000Registers>, VirtualAddress), &'static str> {
+        let nic_mapped_page = allocate_device_register_memory(device, mem_base)?;
         let mem_base_v = nic_mapped_page.start_address();
-        let regs = BoxRefMut::new(Box::new(nic_mapped_page)).try_map_mut(|mp| mp.as_type_mut::<IntelE1000Registers>(0))?;
+        let regs = BoxRefMut::new(Box::new(nic_mapped_page)).try_map_mut(|mp| mp.as_type_mut::<E1000Registers>(0))?;
             
         Ok((regs, mem_base_v))
     }
@@ -328,7 +299,7 @@ impl E1000Nic {
     }
 
     /// Reads the actual MAC address burned into the NIC hardware.
-    fn read_mac_address_from_nic(regs: &mut IntelE1000Registers) -> [u8; 6] {
+    fn read_mac_address_from_nic(regs: &mut E1000Registers) -> [u8; 6] {
         let mac_32_low = regs.ral.read();
         let mac_32_high = regs.rah.read();
 
@@ -345,7 +316,7 @@ impl E1000Nic {
     }   
 
     /// Start up the network
-    fn start_link(regs: &mut IntelE1000Registers) {
+    fn start_link(regs: &mut E1000Registers) {
         let val = regs.ctrl.read();
         regs.ctrl.write(val | 0x40 | 0x20);
 
@@ -373,14 +344,15 @@ impl E1000Nic {
 
     /// Initialize the array of receive descriptors and their corresponding receive buffers,
     /// and returns a tuple including both of them.
-    fn rx_init(regs: &mut IntelE1000Registers) -> Result<(BoxRefMut<MappedPages, [LegacyRxDesc]>, Vec<ReceiveBuffer>), &'static str> {
+    fn rx_init(regs: &mut E1000Registers) -> Result<(BoxRefMut<MappedPages, [LegacyRxDescriptor]>, Vec<ReceiveBuffer>), &'static str> {
 
 
         // get the queue of rx descriptors and its corresponding rx buffers
         // let (rx_descs, rx_bufs_in_use) = Self::init_rx_queue(E1000_NUM_RX_DESC, &RX_BUFFER_POOL, E1000_RX_BUFFER_SIZE_IN_BYTES as usize, &mut regs.rdbal, 
         //                                 &mut regs.rdbah, &mut regs.rdlen, &mut regs.rdh, &mut regs.rdt)?;          
         
-        let (rx_descs, rx_bufs_in_use) = init_rx_queue(E1000_NUM_RX_DESC, &RX_BUFFER_POOL, E1000_RX_BUFFER_SIZE_IN_BYTES as usize, &mut regs.rx_regs)?;          
+        let (rx_descs, rx_bufs_in_use) = init_rx_queue(E1000_NUM_RX_DESC, &RX_BUFFER_POOL, E1000_RX_BUFFER_SIZE_IN_BYTES as usize, &mut regs.rx_regs.rdbal,
+                                            &mut regs.rx_regs.rdbah, &mut regs.rx_regs.rdlen, &mut regs.rx_regs.rdt, &mut regs.rx_regs.rdh)?;          
             
         // Write the tail index.
         // Note that the e1000 SDM states that we should set the RDT (tail index) to the index *beyond* the last receive descriptor, 
@@ -389,7 +361,7 @@ impl E1000Nic {
         // because the `rx_cur` counter won't be able to catch up with the head index properly. 
         // Thus, we set it to one less than that in order to prevent such bugs. 
         // This doesn't prevent all of the rx buffers from being used, they will still all be used fully.
-        regs.rx_regs.rdt((E1000_NUM_RX_DESC - 1) as u32); 
+        regs.rx_regs.rdt.write((E1000_NUM_RX_DESC - 1) as u32); 
         // TODO: document these various e1000 flags and why we're setting them
         regs.rctl.write(regs::RCTL_EN| regs::RCTL_SBP | regs::RCTL_LBM_NONE | regs::RTCL_RDMTS_HALF | regs::RCTL_BAM | regs::RCTL_SECRC  | regs::RCTL_BSIZE_2048);
 
@@ -397,9 +369,9 @@ impl E1000Nic {
     }           
     
     /// Initialize the array of tramsmit descriptors and return them.
-    fn tx_init(regs: &mut IntelE1000Registers) -> Result<BoxRefMut<MappedPages, [LegacyTxDesc]>, &'static str> {
+    fn tx_init(regs: &mut E1000Registers) -> Result<BoxRefMut<MappedPages, [LegacyTxDescriptor]>, &'static str> {
 
-        let tx_descs = init_tx_queue(E1000_NUM_TX_DESC, &mut regs.tx_regs)?;
+        let tx_descs = init_tx_queue(E1000_NUM_TX_DESC, &mut regs.tx_regs.tdbal, &mut regs.tx_regs.tdbah, &mut regs.tx_regs.tdlen, &mut regs.tx_regs.tdt, &mut regs.tx_regs.tdh)?;
         
         regs.tctl.write(regs::TCTL_EN | regs::TCTL_PSP);
 
@@ -407,7 +379,7 @@ impl E1000Nic {
     }       
     
     /// Enable Interrupts 
-    fn enable_interrupts(regs: &mut IntelE1000Registers) {
+    fn enable_interrupts(regs: &mut E1000Registers) {
         //self.write_command(REG_IMASK ,0x1F6DC);
         //self.write_command(REG_IMASK ,0xff & !4);
     

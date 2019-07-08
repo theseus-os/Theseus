@@ -35,6 +35,11 @@ static PCI_CONFIG_DATA_PORT: Mutex<Port<u32>> = Mutex::new( Port::new(CONFIG_DAT
 
 pub static PCI_BUSES: Once<Vec<PciBus>> = Once::new();
 
+pub enum PciConfigSpaceAccessMechanism {
+    memory_mapped_registers,
+    io_ports
+} 
+
 fn get_pci_buses() -> &'static Vec<PciBus> {
     PCI_BUSES.call_once( || { scan_pci() } )
 }

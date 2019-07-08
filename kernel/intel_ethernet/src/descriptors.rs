@@ -1,13 +1,30 @@
-#![no_std]
-
-#[macro_use] extern crate log;
-extern crate memory;
-extern crate volatile;
-extern crate bit_field;
-
 use memory::PhysicalAddress;
 use volatile::{Volatile, ReadOnly};
 use bit_field::BitField;
+
+// Transmit descriptor bits
+/// Tx Command: End of Packet
+pub const TX_CMD_EOP:                      u8 = (1 << 0);     
+/// Tx Command: Insert FCS
+pub const TX_CMD_IFCS:                     u8 = (1 << 1);     
+/// Tx Command: Insert Checksum
+pub const TX_CMD_IC:                       u8 = (1 << 2);     
+/// Tx Command: Report Status
+pub const TX_CMD_RS:                       u8 = (1 << 3);     
+/// Tx Command: Report Packet Sent
+pub const TX_CMD_RPS:                      u8 = (1 << 4);     
+/// Tx Command: VLAN Packet Enable
+pub const TX_CMD_VLE:                      u8 = (1 << 6);     
+/// Tx Command: Interrupt Delay Enable
+pub const TX_CMD_IDE:                      u8 = (1 << 7);     
+/// Tx Status: descriptor Done
+pub const TX_STATUS_DD:                    u8 = 1 << 0;
+
+// Receive descriptor bits 
+/// Rx Status: Descriptor Done
+pub const RX_STATUS_DD:                    u8 = 1 << 0;
+/// Rx Status: End of Packet
+pub const RX_STATUS_EOP:                   u8 = 1 << 1;
 
 
 /// A trait for functionalities that all receive descriptors must support
@@ -60,7 +77,7 @@ pub trait TxDescriptor {
 /// This struct is a Legacy Transmit Descriptor. 
 /// There is one instance of this struct per transmit buffer. 
 #[repr(C,packed)]
-pub struct LegacyTxDesc {
+pub struct LegacyTxDescriptor {
     /// The starting physical address of the transmit buffer
     pub phys_addr:  Volatile<u64>,
     /// Length of the transmit buffer in bytes
@@ -77,7 +94,7 @@ pub struct LegacyTxDesc {
     pub vlan :      Volatile<u16>,
 }
 
-impl TxDescriptor for LegacyTxDesc {
+impl TxDescriptor for LegacyTxDescriptor {
     fn init(&mut self) {
         self.phys_addr.write(0);
         self.length.write(0);
@@ -102,7 +119,7 @@ impl TxDescriptor for LegacyTxDesc {
     }
 }
 
-impl fmt::Debug for LegacyTxDesc {
+impl fmt::Debug for LegacyTxDescriptor {
     fn fmt(&self, f: &mut fmt::Formatter) -> fmt::Result {
             write!(f, "{{addr: {:#X}, length: {}, cso: {}, cmd: {}, status: {}, css: {}, special: {}}}",
                     self.phys_addr.read(), self.length.read(), self.cso.read(), self.cmd.read(), self.status.read(), self.css.read(), self.vlan.read())
@@ -114,7 +131,7 @@ impl fmt::Debug for LegacyTxDesc {
 /// This struct is a Legacy Receive Descriptor. 
 /// There is one instance of this struct per receive buffer. 
 #[repr(C)]
-pub struct LegacyRxDesc {
+pub struct LegacyRxDescriptor {
     /// The starting physical address of the receive buffer
     pub phys_addr:  Volatile<u64>,      
     /// Length of the receive buffer in bytes
@@ -129,7 +146,7 @@ pub struct LegacyRxDesc {
     pub vlan:       ReadOnly<u16>,
 }
 
-impl RxDescriptor for LegacyRxDesc {
+impl RxDescriptor for LegacyRxDescriptor {
     fn init(&mut self, packet_buffer_address: PhysicalAddress) {
         self.phys_addr.write(packet_buffer_address.value() as u64);
         self.status.write(0);
@@ -157,7 +174,7 @@ impl RxDescriptor for LegacyRxDesc {
 }
 
 use core::fmt;
-impl fmt::Debug for LegacyRxDesc {
+impl fmt::Debug for LegacyRxDescriptor {
     fn fmt(&self, f: &mut fmt::Formatter) -> fmt::Result {
             write!(f, "{{addr: {:#X}, length: {}, checksum: {}, status: {}, errors: {}, special: {}}}",
                     self.phys_addr.read(), self.length.read(), self.checksum.read(), self.status.read(), self.errors.read(), self.vlan.read())
@@ -170,7 +187,7 @@ impl fmt::Debug for LegacyRxDesc {
 /// Read contains the addresses that the driver writes.
 /// Write Back contains information the hardware writes on receiving a packet.
 #[repr(C)]
-pub struct AdvancedRxDesc {
+pub struct AdvancedRxDescriptor {
     /// Starting physcal address of the receive buffer for the packet
     pub packet_buffer_address:  Volatile<u64>,
     /// Starting physcal address of the receive buffer for the header.
@@ -178,7 +195,7 @@ pub struct AdvancedRxDesc {
     pub header_buffer_address:  Volatile<u64>,
 }
 
-impl RxDescriptor for AdvancedRxDesc {
+impl RxDescriptor for AdvancedRxDescriptor {
     fn init (&mut self, packet_buffer_address: PhysicalAddress) {
         self.packet_buffer_address.write(packet_buffer_address.value() as u64);
         // set the header address to 0 because packet splitting is not supposed to be enabled in the 82599
@@ -206,7 +223,7 @@ impl RxDescriptor for AdvancedRxDesc {
     }
 }
 
-impl AdvancedRxDesc {
+impl AdvancedRxDescriptor {
 
     /// Write Back mode function for the Advanced Receive Descriptor.
     /// Returns the packet type that was used for the Receive Side Scaling hash function.
@@ -276,7 +293,7 @@ impl AdvancedRxDesc {
     }    
 }
 
-impl fmt::Debug for AdvancedRxDesc {
+impl fmt::Debug for AdvancedRxDescriptor {
     fn fmt(&self, f: &mut fmt::Formatter) -> fmt::Result {
         write!(f, "{{Packet buffer address: {:#X}, Packet header address: {:#X}}}",
             self.packet_buffer_address.read(), self.header_buffer_address.read())
@@ -284,26 +301,4 @@ impl fmt::Debug for AdvancedRxDesc {
 }
 
 
-// Transmit descriptor bits
-/// Tx Command: End of Packet
-pub const TX_CMD_EOP:                      u8 = (1 << 0);     
-/// Tx Command: Insert FCS
-pub const TX_CMD_IFCS:                     u8 = (1 << 1);     
-/// Tx Command: Insert Checksum
-pub const TX_CMD_IC:                       u8 = (1 << 2);     
-/// Tx Command: Report Status
-pub const TX_CMD_RS:                       u8 = (1 << 3);     
-/// Tx Command: Report Packet Sent
-pub const TX_CMD_RPS:                      u8 = (1 << 4);     
-/// Tx Command: VLAN Packet Enable
-pub const TX_CMD_VLE:                      u8 = (1 << 6);     
-/// Tx Command: Interrupt Delay Enable
-pub const TX_CMD_IDE:                      u8 = (1 << 7);     
-/// Tx Status: descriptor Done
-pub const TX_STATUS_DD:                    u8 = 1 << 0;
 
-// Receive descriptor bits 
-/// Rx Status: Descriptor Done
-pub const RX_STATUS_DD:                    u8 = 1 << 0;
-/// Rx Status: End of Packet
-pub const RX_STATUS_EOP:                   u8 = 1 << 1;

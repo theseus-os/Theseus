@@ -6,8 +6,9 @@ extern crate memory;
 extern crate mpmc;
 extern crate pci;
 extern crate owning_ref;
-extern crate nic_descriptors;
+extern crate intel_ethernet;
 extern crate nic_buffers;
+extern crate volatile;
 
 use core::ops::DerefMut;
 use memory::{FRAME_ALLOCATOR, EntryFlags, PhysicalMemoryArea, FrameRange, PhysicalAddress, allocate_pages_by_bytes, get_kernel_mmi_ref, MappedPages, create_contiguous_mapping};
@@ -17,37 +18,12 @@ use alloc::{
     boxed::Box,
 };
 use owning_ref::BoxRefMut;
-use nic_descriptors::{RxDescriptor, TxDescriptor};
+use intel_ethernet::{
+    descriptors::{RxDescriptor, TxDescriptor},
+    types::*
+};
 use nic_buffers::ReceiveBuffer;
-
-
-/// Set of functions to access registers that are needed for Rx queue initialization.
-pub trait RxQueueRegisters {
-    /// write to the rdbal register to store the lower 32 bits of the buffer physical address
-    fn rdbal(&mut self, val: u32);
-    /// write to the rdbah register to store the higher 32 bits of the buffer physical address
-    fn rdbah(&mut self, val: u32);
-    /// write to the rdlen register to store the length of the queue in bytes
-    fn rdlen(&mut self, val: u32);
-    /// write to the rdh register to store the descriptor at the head of the queue
-    fn rdh(&mut self, val: u32);
-    /// write to the rdt register to store the descriptor at the tail of the queue
-    fn rdt(&mut self, val: u32);
-}
-
-/// Set of functions to access registers that are needed for Tx queue initialization.
-pub trait TxQueueRegisters {
-    /// write to the tdbal register to store the lower 32 bits of the buffer physical address
-    fn tdbal(&mut self, val: u32);
-    /// write to the tdbah register to store the higher 32 bits of the buffer physical address
-    fn tdbah(&mut self, val: u32);
-    /// write to the tdlen register to store the length of the queue in bytes
-    fn tdlen(&mut self, val: u32);
-    /// write to the tdh register to store the descriptor at the head of the queue
-    fn tdh(&mut self, val: u32);
-    /// write to the tdt register to store the descriptor at the tail of the queue
-    fn tdt(&mut self, val: u32);
-}
+use volatile::Volatile;
 
 
 /// The mapping flags used for pages that the NIC will map.
@@ -62,14 +38,11 @@ pub fn nic_mapping_flags() -> EntryFlags {
 /// # Arguments 
 /// * `dev`: reference to pci device 
 /// * `mem_base`: starting physical address of the device's memory mapped registers
-pub fn mem_map_reg(dev: &PciDevice, mem_base: PhysicalAddress) -> Result<MappedPages, &'static str> {
-    // set the bus mastering bit for this PciDevice, which allows it to use DMA
-    pci_set_command_bus_master_bit(dev);
-
+pub fn allocate_device_register_memory(dev: &PciDevice, mem_base: PhysicalAddress) -> Result<MappedPages, &'static str> {
     //find out amount of space needed
     let mem_size_in_bytes = pci_determine_mem_size(dev) as usize;
 
-    mem_map(mem_base, mem_size_in_bytes)
+    allocate_memory(mem_base, mem_size_in_bytes)
 }
 
 /// Helper function to allocate memory at required address.
@@ -77,7 +50,7 @@ pub fn mem_map_reg(dev: &PciDevice, mem_base: PhysicalAddress) -> Result<MappedP
 /// # Arguments
 /// * `mem_base`: starting physical address of the region that need to be allocated
 /// * `mem_size_in_bytes`: size of the region that needs to be allocated 
-pub fn mem_map(mem_base: PhysicalAddress, mem_size_in_bytes: usize) -> Result<MappedPages, &'static str> {
+pub fn allocate_memory(mem_base: PhysicalAddress, mem_size_in_bytes: usize) -> Result<MappedPages, &'static str> {
     // inform the frame allocator that the physical frames where memory area for the nic exists
     // is now off-limits and should not be touched
     {
@@ -127,10 +100,14 @@ pub fn init_rx_buf_pool(num_rx_buffers: usize, buffer_size: u16, rx_buffer_pool:
 /// * `num_desc`: number of descriptors in the queue
 /// * `rx_buffer_pool`: tpool from which to take receive buffers
 /// * `buffer_size`: size of each buffer in the pool
-/// * `regs`: receive dma registers that need to be updated when creating a queue
-pub fn init_rx_queue<T: RxDescriptor>(num_desc: usize, rx_buffer_pool: &'static mpmc::Queue<ReceiveBuffer>, buffer_size: usize, regs: &mut RxQueueRegisters)
-    //rdbal: &mut Volatile<u32>, rdbah: &mut Volatile<u32>, rdlen: &mut Volatile<u32>, rdh: &mut Volatile<u32>, rdt: &mut Volatile<u32>) 
-    -> Result<(BoxRefMut<MappedPages, [T]>, Vec<ReceiveBuffer>), &'static str> {
+/// * `rdbal`: register to store the lower (least significant) 32 bits of the physical address of the array of receive descriptors
+/// * `rdbah`: register to store the higher (most significant) 32 bits of the physical address of the array of receive descriptors
+/// * `rdlen`: register to store the length in bytes of the array of receive descriptors
+/// * `rdh`: register to store the receive descriptor head index
+/// * `rdt`: register to store the receive descriptor tail index
+pub fn init_rx_queue<T: RxDescriptor>(num_desc: usize, rx_buffer_pool: &'static mpmc::Queue<ReceiveBuffer>, buffer_size: usize, 
+            rdbal: &mut Volatile<rdbal>, rdbah: &mut Volatile<rdbah>, rdlen: &mut Volatile<rdlen>, rdh: &mut Volatile<rdh>, rdt: &mut Volatile<rdt>)
+                -> Result<(BoxRefMut<MappedPages, [T]>, Vec<ReceiveBuffer>), &'static str> {
     
     let size_in_bytes_of_all_rx_descs_per_queue = num_desc * core::mem::size_of::<T>();
     
@@ -165,15 +142,15 @@ pub fn init_rx_queue<T: RxDescriptor>(num_desc: usize, rx_buffer_pool: &'static 
     let rx_desc_phys_addr_higher = (rx_descs_starting_phys_addr.value() >> 32) as u32;
     
     // write the physical address of the rx descs ring
-    regs.rdbal(rx_desc_phys_addr_lower);
-    regs.rdbah(rx_desc_phys_addr_higher);
+    rdbal.write(rx_desc_phys_addr_lower);
+    rdbah.write(rx_desc_phys_addr_higher);
 
     // write the length (in total bytes) of the rx descs array
-    regs.rdlen(size_in_bytes_of_all_rx_descs_per_queue as u32); // should be 128 byte aligned, minimum 8 descriptors
+    rdlen.write(size_in_bytes_of_all_rx_descs_per_queue as u32); // should be 128 byte aligned, minimum 8 descriptors
     
     // Write the head index (the first receive descriptor)
-    regs.rdh(0);
-    regs.rdt(0);   
+    rdh.write(0);
+    rdt.write(0);   
 
     Ok((rx_descs, rx_bufs_in_use))        
 }
@@ -182,9 +159,14 @@ pub fn init_rx_queue<T: RxDescriptor>(num_desc: usize, rx_buffer_pool: &'static 
 /// 
 /// # Arguments
 /// * `num_desc`: number of descriptors in the queue
-/// * `regs`: transmit dma registers that need to be updated when creating a queue
-pub fn init_tx_queue<T: TxDescriptor>(num_desc: usize, regs: &mut TxQueueRegisters) 
-    -> Result<BoxRefMut<MappedPages, [T]>, &'static str> {
+/// * `tdbal`: register to store the lower (least significant) 32 bits of the physical address of the array of transmit descriptors
+/// * `tdbah`: register to store the higher (most significant) 32 bits of the physical address of the array of transmit descriptors
+/// * `tdlen`: register to store the length in bytes of the array of transmit descriptors
+/// * `tdh`: register to store the transmit descriptor head index
+/// * `tdt`: register to store the transmit descriptor tail index
+pub fn init_tx_queue<T: TxDescriptor>(num_desc: usize, tdbal: &mut Volatile<tdbal>, tdbah: &mut Volatile<tdbah>, tdlen: &mut Volatile<tdlen>, 
+            tdh: &mut Volatile<tdh>, tdt: &mut Volatile<tdt>) 
+                -> Result<BoxRefMut<MappedPages, [T]>, &'static str> {
 
     let size_in_bytes_of_all_tx_descs = num_desc * core::mem::size_of::<T>();
     
@@ -205,15 +187,15 @@ pub fn init_tx_queue<T: TxDescriptor>(num_desc: usize, regs: &mut TxQueueRegiste
     let tx_desc_phys_addr_higher = (tx_descs_starting_phys_addr.value() >> 32) as u32;
 
     // write the physical address of the tx descs array
-    regs.tdbal(tx_desc_phys_addr_lower); 
-    regs.tdbah(tx_desc_phys_addr_higher); 
+    tdbal.write(tx_desc_phys_addr_lower); 
+    tdbah.write(tx_desc_phys_addr_higher); 
 
     // write the length (in total bytes) of the tx descs array
-    regs.tdlen(size_in_bytes_of_all_tx_descs as u32);               
+    tdlen.write(size_in_bytes_of_all_tx_descs as u32);               
     
     // write the head index and the tail index (both 0 initially because there are no tx requests yet)
-    regs.tdh(0);
-    regs.tdt(0);
+    tdh.write(0);
+    tdt.write(0);
 
     Ok(tx_descs)
 }

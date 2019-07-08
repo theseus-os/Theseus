@@ -5,14 +5,14 @@ extern crate alloc;
 extern crate memory;
 extern crate mpmc;
 extern crate nic_init;
-extern crate nic_descriptors;
+extern crate intel_ethernet;
 extern crate nic_queues;
 extern crate nic_buffers;
 
 use alloc::vec::Vec;
 use memory::{create_contiguous_mapping};
 use nic_init::{nic_mapping_flags};
-use nic_descriptors:: {TxDescriptor, RxDescriptor};
+use intel_ethernet::descriptors:: {TxDescriptor, RxDescriptor};
 use nic_queues::{RxQueue, TxQueue};
 use nic_buffers::{TransmitBuffer, ReceiveBuffer, ReceivedFrame};
 
@@ -64,7 +64,6 @@ pub trait NetworkInterfaceCard {
         let mut receive_buffers_in_frame: Vec<ReceiveBuffer> = Vec::new();
         let mut total_packet_length: u16 = 0;
 
-        //print status of all packets until EoP
         while rxq.rx_descs[cur].descriptor_done() {
             // get information about the current receive buffer
             let length = rxq.rx_descs[cur].length();
