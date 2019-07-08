@@ -18,8 +18,8 @@ path = "../../libs/dfqueue"
 [dependencies.event_types]
 path = "../event_types"
 
-[dependencies.ata_pio]
-path = "../ata_pio"
+[dependencies.ata]
+path = "../ata"
 
 [dependencies.memory]
 path = "../memory"
