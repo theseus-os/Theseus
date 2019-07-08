@@ -124,22 +124,22 @@ pub fn init(
     info!("Finished handling and booting up all {} AP cores.", ap_count);
 
     // //init frame_buffer
-    let rs = frame_buffer::init();
-    match rs {
-        Ok(_) => {
-            trace!("Frame_buffer initialized successfully.");
-        }
-        Err(err) => { 
-            error!("captain::init(): failed to initialize frame_buffer");
-            return Err(err);
-        }
-    }
+    // let rs = frame_buffer::init();
+    // match rs {
+    //     Ok(_) => {
+    //         trace!("Frame_buffer initialized successfully.");
+    //     }
+    //     Err(err) => { 
+    //         error!("captain::init(): failed to initialize frame_buffer");
+    //         return Err(err);
+    //     }
+    // }
 
     // initialize the input event manager, which will start the default terminal 
-    let input_event_queue_producer = input_event_manager::init()?;
+    // let input_event_queue_producer = input_event_manager::init()?;
 
     // initialize the rest of our drivers
-    device_manager::init(input_event_queue_producer)?;
+    // device_manager::init(input_event_queue_producer)?;
 
     task_fs::init()?;
 
