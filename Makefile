@@ -357,7 +357,7 @@ DOC_ROOT := $(ROOT_DIR)/build/doc/___Theseus_Crates___/index.html
 ## The entire project is built as normal using the "cargo doc" command.
 doc: check_rustc
 	@cargo doc --no-deps
-	@rustdoc --output target/doc --crate-name "___Theseus_Crates___" kernel/documentation/src/_top.rs
+	@rustdoc --output target/doc --crate-name "___Theseus_Crates___" ./documentation/src/_top.rs
 	@mkdir -p build
 	@rm -rf build/doc
 	@cp -rf target/doc ./build/
