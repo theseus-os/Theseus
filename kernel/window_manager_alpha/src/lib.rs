@@ -750,9 +750,9 @@ fn test_create_window(x: &'static str, y: &'static str, width: &'static str, hei
 /// testcase of window manager
 pub fn test() -> Result<(), &'static str> {
     // let mut vec = Vec::new(["100"]);
-    test_create_window("100", "100", "200", "200")?;
+    // test_create_window("100", "100", "200", "200")?;
     test_create_window("400", "400", "400", "400")?;
-    test_create_window("400", "100", "100", "200")?;
-    test_create_window("350", "200", "200", "400")?;
+    // test_create_window("400", "100", "100", "200")?;
+    // test_create_window("350", "200", "200", "400")?;
     Ok(())
 }

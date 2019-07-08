@@ -1,0 +1,41 @@
+[package]
+name = "window_components"
+version = "0.1.0"
+authors = ["wuyuepku <wuyue16@pku.edu.cn>"]
+description = "an easy-to-use window object owned by application"
+build = "../../build.rs"
+
+[dependencies]
+spin = "0.4.10"
+
+[dependencies.log]
+default-features = false
+version = "0.3.7"
+
+[dependencies.dfqueue]
+path = "../../libs/dfqueue"
+version = "0.1.0"
+
+[dependencies.frame_buffer_alpha]
+path = "../frame_buffer_alpha"
+
+[dependencies.window_manager_alpha]
+path = "../window_manager_alpha"
+
+[dependencies.event_types]
+path = "../event_types"
+
+[dependencies.font]
+path = "../font"
+
+[dependencies.spawn]
+path = "../spawn"
+
+[dependencies.mouse]
+path = "../mouse"
+
+[dependencies.path]
+path = "../../kernel/path"
+
+[lib]
+crate-type = ["rlib"]

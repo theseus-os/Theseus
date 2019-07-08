@@ -39,6 +39,9 @@ path = "../../kernel/runqueue"
 [dependencies.window_manager_alpha]
 path = "../../kernel/window_manager_alpha"
 
+[dependencies.window_components]
+path = "../../kernel/window_components"
+
 [dependencies.terminal_print]
 path = "../terminal_print"
 
@@ -62,3 +65,9 @@ crate-type = ["rlib"]
 
 [dependencies.scheduler]
 path = "../../kernel/scheduler"
+
+[dependencies.hpet]
+path = "../../kernel/hpet"
+
+
+
