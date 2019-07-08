@@ -10,3 +10,6 @@ path = "../../libs/keycodes_ascii"
 
 [lib]
 crate-type = ["rlib"]
+
+[dependencies.mouse_data]
+path = "../../libs/mouse_data"

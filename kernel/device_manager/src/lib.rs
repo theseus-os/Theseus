@@ -53,9 +53,9 @@ pub fn early_init(kernel_mmi: &mut MemoryManagementInfo) -> Result<(), &'static 
 
 
 
-pub fn init(keyboard_producer: DFQueueProducer<Event>) -> Result<(), &'static str>  {
-    keyboard::init(keyboard_producer);
-    mouse::init();
+pub fn init(key_producer: DFQueueProducer<Event>, mouse_producer: DFQueueProducer<Event>) -> Result<(), &'static str>  {
+    keyboard::init(key_producer);
+    mouse::init(mouse_producer);
 
     
     for dev in pci::pci_device_iter() {

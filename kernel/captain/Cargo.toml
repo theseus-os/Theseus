@@ -24,14 +24,11 @@ path = "../kernel_config"
 [dependencies.logger]
 path = "../logger"
 
-[dependencies.frame_buffer]
-path = "../frame_buffer"
+[dependencies.frame_buffer_alpha]
+path = "../frame_buffer_alpha"
 
-[dependencies.frame_buffer_3d]
-path = "../frame_buffer_3d"
-
-[dependencies.window_manager]
-path = "../window_manager"
+[dependencies.window_manager_alpha]
+path = "../window_manager_alpha"
 
 #[dependencies.graph_drawer]
 #path = "../graph_drawer"
