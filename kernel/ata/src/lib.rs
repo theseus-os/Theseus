@@ -1,4 +1,4 @@
-//! Support for accessing ATA disks (IDE).
+//! Support for accessing ATA drives (IDE).
 //! 
 //! The primary struct of interest is [`AtaDrive`](struct.AtaDrive.html).
 //!
@@ -6,7 +6,7 @@
 //! ```rust
 //! fn test_primary_ata(ide_controller: &mut ata::IdeController) -> Result<(), &'static str> {
 //!     let mut initial_buf: [u8; 6100] = [0; 6100];
-//!     let primary_drive = ide_controller.primary_master.as_mut().unwrap();
+//!     let primary_drive = ide_controller.primary.master.as_mut().unwrap();
 //!     let bytes_read = primary_drive.read_pio(&mut initial_buf[..], 0)?;
 //!     debug!("{:X?}", &initial_buf[..]);
 //!     debug!("{:?}", core::str::from_utf8(&initial_buf));
@@ -179,7 +179,7 @@ enum BusDriveSelect {
 
 
 /// A single ATA drive, either a master or a slave, 
-/// within a larger IDE controller.
+/// which sits one of two buses within a larger IDE controller.
 #[derive(Debug)]
 pub struct AtaDrive {
 	/// The port that holds the data to be written or the data from a read.
@@ -291,9 +291,9 @@ impl AtaDrive {
 		// Calculate LBA and sector count based on the offset and requested read length
 		let (lba_start, lba_end, offset_remainder) = self.lba_bounds(offset, buffer.len())?;
 		let sector_count = lba_end - lba_start;
-		trace!("AtaDrive::read_pio(): lba_start: {}, lba_end: {}, sector_count: {}, offset_remainder: {}",
-			lba_start, lba_end, sector_count, offset_remainder
-		);
+		// trace!("AtaDrive::read_pio(): lba_start: {}, lba_end: {}, sector_count: {}, offset_remainder: {}",
+		// 	lba_start, lba_end, sector_count, offset_remainder
+		// );
 		if sector_count > (self.identify_data.max_blocks_per_transfer as u64) {
 			error!("AtaDrive::read_pio(): cannot read {} sectors ({} bytes), drive has a max of {} sectors per transfer.", 
 				sector_count, buffer.len(), self.identify_data.max_blocks_per_transfer
@@ -344,9 +344,9 @@ impl AtaDrive {
 			// don't copy past the end of `buffer`
 			let bytes_to_copy = core::cmp::min(SECTOR_SIZE_IN_BYTES - src_offset, buffer.len() - dest_offset);
 			buffer[dest_offset .. (dest_offset + bytes_to_copy)].copy_from_slice(&sector[src_offset .. (src_offset + bytes_to_copy)]);
-			trace!("LBA {}: copied bytes into buffer[{}..{}] from sector[{}..{}]",
-				_lba, dest_offset, dest_offset + bytes_to_copy, src_offset, src_offset + bytes_to_copy,
-			);
+			// trace!("LBA {}: copied bytes into buffer[{}..{}] from sector[{}..{}]",
+			// 	_lba, dest_offset, dest_offset + bytes_to_copy, src_offset, src_offset + bytes_to_copy,
+			// );
 			dest_offset += bytes_to_copy;
 			src_offset = 0;
 		}
@@ -374,11 +374,11 @@ impl AtaDrive {
 		}
 
 		// Calculate LBA and sector count based on the offset and requested length
-		let (lba_start, lba_end, offset_remainder) = self.lba_bounds(offset, buffer.len())?;
+		let (lba_start, lba_end, _offset_remainder) = self.lba_bounds(offset, buffer.len())?;
 		let sector_count = lba_end - lba_start;
-		trace!("AtaDrive::write_pio(): lba_start: {}, lba_end: {}, sector_count: {}, offset_remainder: {}",
-			lba_start, lba_end, sector_count, offset_remainder
-		);
+		// trace!("AtaDrive::write_pio(): lba_start: {}, lba_end: {}, sector_count: {}, _offset_remainder: {}",
+		// 	lba_start, lba_end, sector_count, _offset_remainder
+		// );
 		if sector_count > (self.identify_data.max_blocks_per_transfer as u64) {
 			error!("AtaDrive::write_pio(): cannot write {} sectors ({} bytes), drive has a max of {} sectors per transfer.", 
 				sector_count, buffer.len(), self.identify_data.max_blocks_per_transfer
@@ -468,10 +468,9 @@ impl AtaDrive {
 			self.size_in_sectors() as u64,
 			((offset + length + SECTOR_SIZE_IN_BYTES - 1) / SECTOR_SIZE_IN_BYTES) as u64, // round up to next sector
 		);
-		trace!("lba_bounds: offset: {}, length: {}, starting_lba: {}, ending_lba: {}", offset, length, starting_lba, ending_lba);
+		// trace!("lba_bounds: offset: {}, length: {}, starting_lba: {}, ending_lba: {}", offset, length, starting_lba, ending_lba);
 		Ok((starting_lba, ending_lba, offset_remainder))
 	}
-
 
 	/// Returns the number of sectors in this drive.
 	pub fn size_in_sectors(&self) -> usize {
@@ -610,24 +609,13 @@ impl AtaDrive {
 		}
 	}
 
-	// /// Issues a software reset for this drive.
-	// /// # Warning 
-	// /// This is not yet implemented because it will result
-	// /// in the other device on this bus (master or slave) being reset as well.
-	// pub fn software_reset(&mut self) {
-	// 	// The procedure is to first set the SRST bit, 
-	// 	// then to wait 5 microseconds,
-	// 	// the to clear the SRST bit.
-	// 	unimplemented!()
-	// }
-
 	
 	/// Reads the `status` port and returns the value as an `AtaStatus` bitfield. 
-	/// Because some disk drives operate (change wire values) very slowly,
+	/// Because some drives operate (change wire values) very slowly,
 	/// this undergoes the standard procedure of reading the alternate status port 
 	/// and discarding it 4 times before reading the real status port value. 
 	/// Each read is a 100ns delay, so the total delay of 400ns is proper.
-	pub fn status(&self) -> AtaStatus {
+	fn status(&self) -> AtaStatus {
 		self.alternate_status.read();
 		self.alternate_status.read();
 		self.alternate_status.read();
@@ -637,7 +625,8 @@ impl AtaDrive {
 
 
 	/// Reads the `error` port and returns the value as an `AtaError` bitfield.
-	pub fn error(&self) -> AtaError {
+	#[allow(dead_code)]
+	fn error(&self) -> AtaError {
 		AtaError::from_bits_truncate(self.error.read())
 	}
 
@@ -657,14 +646,12 @@ impl AtaDrive {
 /// for a total of up to four drives. 
 #[derive(Debug)]
 pub struct IdeController {
-	pub primary_master:    Option<AtaDrive>,
-	pub primary_slave:     Option<AtaDrive>,
-	pub secondary_master:  Option<AtaDrive>,
-	pub secondary_slave:   Option<AtaDrive>,
+	pub primary:   AtaBus,
+	pub secondary: AtaBus,
 }
 
 impl IdeController {
-	/// Creates a new instance of an IDE disk controller based on the given PCI device.
+	/// Creates a new instance of an IDE controller based on the given PCI device.
 	pub fn new(pci_device: &PciDevice) -> Result<IdeController, &'static str> {
 		let primary_channel_data_port = match pci_device.bars[0] {
 			0x0 | 0x1 => DEFAULT_PRIMARY_CHANNEL_DATA_PORT,
@@ -705,16 +692,17 @@ impl IdeController {
 		
 		let drive_fmt = |drive: &Result<AtaDrive, &str>| -> String {
 			match drive {
-				Ok(d)  => format!("drive initialized, has {} sectors", d.size_in_sectors()),
+				Ok(d)  => format!("drive initialized, size: {} sectors", d.size_in_sectors()),
 				Err(e) => format!("{}", e),
 			}
 		};
 
-		info!("ATA drive controller: \n\
+		info!("ATA drive controller at {}: \n\
 			--> primary master:   {} \n\
 			--> primary slave:    {} \n\
 			--> secondary master: {} \n\
 			--> secondary slave:  {}",
+			pci_device.location,
 			drive_fmt(&primary_master),
 			drive_fmt(&primary_slave),
 			drive_fmt(&secondary_master),
@@ -722,11 +710,43 @@ impl IdeController {
 		);
 
 		Ok( IdeController {
-			primary_master: primary_master.ok(),
-			primary_slave: primary_slave.ok(),
-			secondary_master: secondary_master.ok(),
-			secondary_slave: secondary_slave.ok(),
+			primary: AtaBus {
+				master: primary_master.ok(),
+				slave: primary_slave.ok(),
+			},
+			secondary: AtaBus {
+				master: secondary_master.ok(),
+				slave: secondary_slave.ok(),
+			},
 		})
+	}
+}
+
+
+/// Each ATA bus on an IDE controller can have two drives attached to it,
+/// one master drive and one slave drive. 
+/// As these two drives exist on the same bus, 
+/// you cannot simultaneously access both of them;
+/// they must be accessed in a mutually-exclusive way.
+#[derive(Debug)]
+pub struct AtaBus {
+	pub master: Option<AtaDrive>,
+	pub slave:  Option<AtaDrive>,
+}
+impl AtaBus {
+	/// Issues a software reset to both drives on this bus.
+	/// Note that a reset cannot be issued to only a single drive on the bus;
+	/// a reset can only be issued to both drives on the bus simultaneously. 
+	pub fn software_reset(&mut self) -> Result<(), &'static str> {
+		// The procedure is to first set the SRST bit, 
+		// then to wait 5 microseconds,
+		// then to clear the SRST bit.
+		let _drive = match self.master.as_mut().or(self.slave.as_mut()) {
+			Some(d) => d,
+			_ => return Err("no drives exist on this bus"),
+		};
+
+		Err("unimplemented")
 	}
 }
 
@@ -773,8 +793,8 @@ pub struct AtaIdentifyData {
 	/// OverwriteExtCommandSupported : 1;
 	/// BlockEraseExtCommandSupported : 1;
 	pub ext_command_supported: u8,
-	/// Number of sectors in the disk, if using 28-bit LBA. 
-	/// This can be used to calculate the size of the disk.
+	/// Number of sectors in the drive, if using 28-bit LBA. 
+	/// This can be used to calculate the size of the drive.
 	/// If zero, we're using 48-bit LBA, so you should use `max_48_bit_lba`.
 	pub user_addressable_sectors: u32,
 	_reserved5: u16,
@@ -811,8 +831,8 @@ pub struct AtaIdentifyData {
 	pub streaming_transfer_time_dma: u16,
 	pub streaming_access_latency_dma_pio: u16,
 	pub streaming_perf_granularity: u32, 
-	/// Number of sectors in the disk, if using 48-bit LBA. 
-	/// This can be used to calculate the size of the disk.
+	/// Number of sectors in the drive, if using 48-bit LBA. 
+	/// This can be used to calculate the size of the drive.
 	pub max_48_bit_lba: u64,
 	pub streaming_transfer_time: u16,
 	pub dsm_cap: u16,

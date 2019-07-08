@@ -67,7 +67,7 @@ pub fn init(keyboard_producer: DFQueueProducer<Event>) -> Result<(), &'static st
         // Look for IDE controllers for disk drives (aka PATA).
         if dev.class == 0x01 && dev.subclass == 0x01 {
             info!("IDE controller PCI device found at: {:?}", dev.location);
-            let ide_controller = ata::IdeController::new(dev)?;
+            let _ide_controller = ata::IdeController::new(dev)?;
             // TODO: do something with the discovered ATA drives / IDE controller
             // debug!("{:?}", ide_controller.primary_master);
         }
