@@ -35,15 +35,16 @@ static PCI_CONFIG_DATA_PORT: Mutex<Port<u32>> = Mutex::new( Port::new(CONFIG_DAT
 
 pub static PCI_BUSES: Once<Vec<PciBus>> = Once::new();
 
+/// Lists the 2 possible PCI configuration space access mechanisms
+/// that can be found from the LSB of the devices's BAR0
 pub enum PciConfigSpaceAccessMechanism {
-    memory_mapped_registers,
-    io_ports
+    memory_mapped = 0,
+    io_ports = 1,
 } 
 
 fn get_pci_buses() -> &'static Vec<PciBus> {
     PCI_BUSES.call_once( || { scan_pci() } )
 }
-
 
 
 /// Returns a reference to the `PciDevice` with the given bus, slot, func identifier.

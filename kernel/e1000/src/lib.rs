@@ -37,7 +37,7 @@ use irq_safety::{RwLockIrqSafe, MutexIrqSafe};
 use volatile::{Volatile, ReadOnly};
 use alloc::boxed::Box;
 use memory::{PhysicalAddress, VirtualAddress, MappedPages};
-use pci::{PciDevice, pci_read_8, pci_determine_mem_base, PCI_BAR0, PCI_INTERRUPT_LINE, pci_set_command_bus_master_bit};
+use pci::{PciDevice, pci_read_8, pci_determine_mem_base, PCI_BAR0, PCI_INTERRUPT_LINE, pci_set_command_bus_master_bit, PciConfigSpaceAccessMechanism};
 use kernel_config::memory::PAGE_SIZE;
 use owning_ref::BoxRefMut;
 use interrupts::{eoi,register_interrupt};
@@ -110,33 +110,33 @@ pub struct E1000Registers {
     _padding5:                      [u8; 9212],             // 0x404 - 0x27FF
 
     pub rx_regs:                    RegistersRx,            // 0x2800    
-    _padding8:                      [u8; 4068],             // 0x281C - 0x37FF
+    _padding6:                      [u8; 4068],             // 0x281C - 0x37FF
 
     pub tx_regs:                    RegistersTx,            // 0x3800
-    _padding11:                     [u8; 7140],             // 0x381C - 0x53FF
+    _padding7:                      [u8; 7140],             // 0x381C - 0x53FF
     
     /// The lower (least significant) 32 bits of the NIC's MAC hardware address.
     pub ral:                        Volatile<u32>,          // 0x5400
     /// The higher (most significant) 32 bits of the NIC's MAC hardware address.
     pub rah:                        Volatile<u32>,          // 0x5404
-    _padding12:                     [u8; 109560],           // 0x5408 - 0x1FFFF END: 0x20000 (128 KB) ..116708
+    _padding8:                      [u8; 109560],           // 0x5408 - 0x1FFFF END: 0x20000 (128 KB) ..116708
 }
 
 ///struct to hold registers related to one receive queue
 #[repr(C)]
 pub struct RegistersRx {
     /// The lower (least significant) 32 bits of the physical address of the array of receive descriptors.
-    pub rdbal:                      Volatile<rdbal>,          // 0x2800
+    pub rdbal:                      Volatile<Rdbal>,        // 0x2800
     /// The higher (most significant) 32 bits of the physical address of the array of receive descriptors.
-    pub rdbah:                      Volatile<rdbah>,          // 0x2804
+    pub rdbah:                      Volatile<Rdbah>,        // 0x2804
     /// The length in bytes of the array of receive descriptors.
-    pub rdlen:                      Volatile<rdlen>,          // 0x2808
-    _padding6:                      [u8; 4],                // 0x280C - 0x280F
+    pub rdlen:                      Volatile<Rdlen>,        // 0x2808
+    _padding0:                      [u8; 4],                // 0x280C - 0x280F
     /// The receive descriptor head index, which points to the next available receive descriptor.
-    pub rdh:                        Volatile<rdh>,          // 0x2810
-    _padding7:                      [u8; 4],                // 0x2814 - 0x2817
+    pub rdh:                        Volatile<Rdh>,          // 0x2810
+    _padding1:                      [u8; 4],                // 0x2814 - 0x2817
     /// The receive descriptor tail index, which points to the last available receive descriptor.
-    pub rdt:                        Volatile<rdt>,          // 0x2818
+    pub rdt:                        Volatile<Rdt>,          // 0x2818
 }
 
 
@@ -144,17 +144,17 @@ pub struct RegistersRx {
 #[repr(C)]
 pub struct RegistersTx {
     /// The lower (least significant) 32 bits of the physical address of the array of transmit descriptors.
-    pub tdbal:                      Volatile<tdbal>,          // 0x3800
+    pub tdbal:                      Volatile<Tdbal>,        // 0x3800
     /// The higher (most significant) 32 bits of the physical address of the array of transmit descriptors.
-    pub tdbah:                      Volatile<tdbah>,          // 0x3804
+    pub tdbah:                      Volatile<Tdbah>,        // 0x3804
     /// The length in bytes of the array of transmit descriptors.
-    pub tdlen:                      Volatile<tdlen>,          // 0x3808
-    _padding9:                      [u8; 4],                // 0x380C - 0x380F
+    pub tdlen:                      Volatile<Tdlen>,        // 0x3808
+    _padding0:                      [u8; 4],                // 0x380C - 0x380F
     /// The transmit descriptor head index, which points to the next available transmit descriptor.
-    pub tdh:                        Volatile<tdh>,          // 0x3810
-    _padding10:                     [u8; 4],                // 0x3814 - 0x3817
+    pub tdh:                        Volatile<Tdh>,          // 0x3810
+    _padding1:                      [u8; 4],                // 0x3814 - 0x3817
     /// The transmit descriptor tail index, which points to the last available transmit descriptor.
-    pub tdt:                        Volatile<tdt>,          // 0x3818
+    pub tdt:                        Volatile<Tdt>,          // 0x3818
 }
 
 
@@ -211,15 +211,14 @@ impl E1000Nic {
         
         // Get interrupt number
         let interrupt_num = pci_read_8(e1000_pci_dev.bus, e1000_pci_dev.slot, e1000_pci_dev.func, PCI_INTERRUPT_LINE) + PIC_MASTER_OFFSET;
-        debug!("e1000 IRQ number: {}", interrupt_num);
+        // debug!("e1000 IRQ number: {}", interrupt_num);
 
         let bar0 = e1000_pci_dev.bars[0];
-        // Determine the type from the base address register
-        let bar_type = (bar0 as u8) & 0x01;    
-        let mem_mapped = 0;
+        // Determine the access mechanism from the base address register's bit 0
+        let bar_type = (bar0 as u8) & 0x1;    
 
         // If the base address is not memory mapped then exit
-        if bar_type != mem_mapped {
+        if bar_type == PciConfigSpaceAccessMechanism::io_ports as u8 {
             error!("e1000::init(): BAR0 is of I/O type");
             return Err("e1000::init(): BAR0 is of I/O type")
         }

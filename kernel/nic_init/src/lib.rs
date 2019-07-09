@@ -106,7 +106,7 @@ pub fn init_rx_buf_pool(num_rx_buffers: usize, buffer_size: u16, rx_buffer_pool:
 /// * `rdh`: register to store the receive descriptor head index
 /// * `rdt`: register to store the receive descriptor tail index
 pub fn init_rx_queue<T: RxDescriptor>(num_desc: usize, rx_buffer_pool: &'static mpmc::Queue<ReceiveBuffer>, buffer_size: usize, 
-            rdbal: &mut Volatile<rdbal>, rdbah: &mut Volatile<rdbah>, rdlen: &mut Volatile<rdlen>, rdh: &mut Volatile<rdh>, rdt: &mut Volatile<rdt>)
+            rdbal: &mut Volatile<Rdbal>, rdbah: &mut Volatile<Rdbah>, rdlen: &mut Volatile<Rdlen>, rdh: &mut Volatile<Rdh>, rdt: &mut Volatile<Rdt>)
                 -> Result<(BoxRefMut<MappedPages, [T]>, Vec<ReceiveBuffer>), &'static str> {
     
     let size_in_bytes_of_all_rx_descs_per_queue = num_desc * core::mem::size_of::<T>();
@@ -164,8 +164,8 @@ pub fn init_rx_queue<T: RxDescriptor>(num_desc: usize, rx_buffer_pool: &'static 
 /// * `tdlen`: register to store the length in bytes of the array of transmit descriptors
 /// * `tdh`: register to store the transmit descriptor head index
 /// * `tdt`: register to store the transmit descriptor tail index
-pub fn init_tx_queue<T: TxDescriptor>(num_desc: usize, tdbal: &mut Volatile<tdbal>, tdbah: &mut Volatile<tdbah>, tdlen: &mut Volatile<tdlen>, 
-            tdh: &mut Volatile<tdh>, tdt: &mut Volatile<tdt>) 
+pub fn init_tx_queue<T: TxDescriptor>(num_desc: usize, tdbal: &mut Volatile<Tdbal>, tdbah: &mut Volatile<Tdbah>, tdlen: &mut Volatile<Tdlen>, 
+            tdh: &mut Volatile<Tdh>, tdt: &mut Volatile<Tdt>) 
                 -> Result<BoxRefMut<MappedPages, [T]>, &'static str> {
 
     let size_in_bytes_of_all_tx_descs = num_desc * core::mem::size_of::<T>();

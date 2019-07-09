@@ -1,12 +1,12 @@
-pub type rdbal  = u32;
-pub type rdbah  = u32;
-pub type rdlen  = u32;
-pub type rdt    = u32;
-pub type rdh    = u32;
+pub type Rdbal  = u32;
+pub type Rdbah  = u32;
+pub type Rdlen  = u32;
+pub type Rdt    = u32;
+pub type Rdh    = u32;
 
-pub type tdbal  = u32;
-pub type tdbah  = u32;
-pub type tdlen  = u32;
-pub type tdt    = u32;
-pub type tdh    = u32;
+pub type Tdbal  = u32;
+pub type Tdbah  = u32;
+pub type Tdlen  = u32;
+pub type Tdt    = u32;
+pub type Tdh    = u32;
 
