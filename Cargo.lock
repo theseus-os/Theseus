@@ -371,6 +371,7 @@ name = "e1000"
 version = "0.1.0"
 dependencies = [
  "apic 0.1.0",
+ "intel_ethernet 0.1.0",
  "interrupts 0.1.0",
  "irq_safety 0.1.1 (git+https://github.com/kevinaboos/irq_safety)",
  "kernel_config 0.1.0",
@@ -379,6 +380,9 @@ dependencies = [
  "memory 0.1.0",
  "mpmc 0.1.6-pre",
  "network_interface_card 0.1.0",
+ "nic_buffers 0.1.0",
+ "nic_init 0.1.0",
+ "nic_queues 0.1.0",
  "owning_ref 0.4.0 (git+https://github.com/kevinaboos/owning-ref-rs)",
  "pci 0.1.0",
  "pic 0.1.0",
@@ -409,6 +413,7 @@ dependencies = [
  "memory 0.1.0",
  "network_interface_card 0.1.0",
  "network_manager 0.1.0",
+ "nic_buffers 0.1.0",
  "owning_ref 0.4.0 (git+https://github.com/kevinaboos/owning-ref-rs)",
  "smoltcp 0.5.0 (registry+https://github.com/rust-lang/crates.io-index)",
  "spin 0.4.10 (registry+https://github.com/rust-lang/crates.io-index)",
@@ -635,6 +640,16 @@ dependencies = [
  "text_display 0.1.0",
  "window_manager 0.1.0",
  "x86_64 0.1.2",
+]
+
+[[package]]
+name = "intel_ethernet"
+version = "0.1.0"
+dependencies = [
+ "bit_field 0.7.0 (registry+https://github.com/rust-lang/crates.io-index)",
+ "log 0.3.9 (registry+https://github.com/rust-lang/crates.io-index)",
+ "memory 0.1.0",
+ "volatile 0.2.5 (registry+https://github.com/rust-lang/crates.io-index)",
 ]
 
 [[package]]
@@ -965,17 +980,13 @@ dependencies = [
 name = "network_interface_card"
 version = "0.1.0"
 dependencies = [
- "bit_field 0.7.0 (registry+https://github.com/rust-lang/crates.io-index)",
- "irq_safety 0.1.1 (git+https://github.com/kevinaboos/irq_safety)",
- "lazy_static 1.2.0 (registry+https://github.com/rust-lang/crates.io-index)",
+ "intel_ethernet 0.1.0",
  "log 0.3.9 (registry+https://github.com/rust-lang/crates.io-index)",
  "memory 0.1.0",
  "mpmc 0.1.6-pre",
- "owning_ref 0.4.0 (git+https://github.com/kevinaboos/owning-ref-rs)",
- "pci 0.1.0",
- "spin 0.4.10 (registry+https://github.com/rust-lang/crates.io-index)",
- "volatile 0.2.5 (registry+https://github.com/rust-lang/crates.io-index)",
- "x86_64 0.1.2",
+ "nic_buffers 0.1.0",
+ "nic_init 0.1.0",
+ "nic_queues 0.1.0",
 ]
 
 [[package]]
@@ -996,6 +1007,41 @@ version = "1.0.1"
 source = "registry+https://github.com/rust-lang/crates.io-index"
 dependencies = [
  "unreachable 1.0.0 (registry+https://github.com/rust-lang/crates.io-index)",
+]
+
+[[package]]
+name = "nic_buffers"
+version = "0.1.0"
+dependencies = [
+ "log 0.3.9 (registry+https://github.com/rust-lang/crates.io-index)",
+ "memory 0.1.0",
+ "mpmc 0.1.6-pre",
+ "owning_ref 0.4.0 (git+https://github.com/kevinaboos/owning-ref-rs)",
+]
+
+[[package]]
+name = "nic_init"
+version = "0.1.0"
+dependencies = [
+ "intel_ethernet 0.1.0",
+ "log 0.3.9 (registry+https://github.com/rust-lang/crates.io-index)",
+ "memory 0.1.0",
+ "mpmc 0.1.6-pre",
+ "nic_buffers 0.1.0",
+ "owning_ref 0.4.0 (git+https://github.com/kevinaboos/owning-ref-rs)",
+ "pci 0.1.0",
+ "volatile 0.2.5 (registry+https://github.com/rust-lang/crates.io-index)",
+]
+
+[[package]]
+name = "nic_queues"
+version = "0.1.0"
+dependencies = [
+ "intel_ethernet 0.1.0",
+ "log 0.3.9 (registry+https://github.com/rust-lang/crates.io-index)",
+ "memory 0.1.0",
+ "nic_buffers 0.1.0",
+ "owning_ref 0.4.0 (git+https://github.com/kevinaboos/owning-ref-rs)",
 ]
 
 [[package]]
@@ -1085,6 +1131,7 @@ name = "pci"
 version = "0.1.0"
 dependencies = [
  "log 0.3.9 (registry+https://github.com/rust-lang/crates.io-index)",
+ "memory 0.1.0",
  "port_io 0.2.1",
  "spin 0.4.10 (registry+https://github.com/rust-lang/crates.io-index)",
 ]
