@@ -173,24 +173,25 @@ impl WindowManagerAlpha {
         }
         if let Some(now_winobj) = self.show_list[idx].upgrade() {
             // first get current color, to determine whether further get colors below   
-            let winobj = now_winobj.lock();
-            let cx = winobj.x;
-            let cy = winobj.y;
-            if winobj.framebuffer.check_in_buffer(x - cx, y - cy) {
-                let top = match winobj.framebuffer.get_pixel(x - cx, y - cy) {
-                    Ok(m) => m,
-                    Err(_) => { return self.recompute_single_pixel_show_list(x, y, idx+1); }  // this window as transparent
-                };
-                if (top >> 24) == 0 {  // totally opaque, so not waste computation
-                    return top;
-                } else {
-                    let bottom = self.recompute_single_pixel_show_list(x, y, idx+1);
-                    return alpha_mix(bottom, top);
+            let top = {
+                let winobj = now_winobj.lock();
+                let cx = winobj.x;
+                let cy = winobj.y;
+                let mut ret = T;  // defult is transparent
+                if winobj.framebuffer.check_in_buffer(x - cx, y - cy) {
+                    let top = match winobj.framebuffer.get_pixel(x - cx, y - cy) {
+                        Ok(m) => m,
+                        Err(_) => T,  // transparent
+                    };
+                    if (top >> 24) == 0 {  // totally opaque, so not waste computation
+                        return top;
+                    }
+                    ret = top;
                 }
-            } else {
-                drop(winobj);
-                return self.recompute_single_pixel_show_list(x, y, idx+1);
-            }
+                ret
+            };
+            let bottom = self.recompute_single_pixel_show_list(x, y, idx+1);
+            return alpha_mix(bottom, top);
         } else {  // need to delete this one, since the owner has been dropped, but here is immutable >.<
             // self.show_list.remove(idx);
             return self.recompute_single_pixel_show_list(x, y, idx+1);
@@ -444,20 +445,22 @@ impl WindowManagerAlpha {
     /// private function: take active window's base position and current cursor, move the window with delta
     fn move_active_window(& self) -> Result<(), &'static str> {
         if let Some(current_active) = self.active.upgrade() {
-            let mut current_active_win = current_active.lock();
-            let (cx, cy) = self.cursor;
-            let (bx, by) = current_active_win.moving_base;
-            let ox = current_active_win.x;
-            let oy = current_active_win.y;
-            let nx = ox + cx - bx;
-            let ny = oy + cy - by;
-            let width = current_active_win.width;
-            let height = current_active_win.height;
-            current_active_win.x = nx;
-            current_active_win.y = ny;
-            drop(current_active_win);
+            let (oxs, oxe, oys, oye, nxs, nxe, nys, nye) = {
+                let mut current_active_win = current_active.lock();
+                let (cx, cy) = self.cursor;
+                let (bx, by) = current_active_win.moving_base;
+                let ox = current_active_win.x;
+                let oy = current_active_win.y;
+                let nx = ox + cx - bx;
+                let ny = oy + cy - by;
+                let width = current_active_win.width;
+                let height = current_active_win.height;
+                current_active_win.x = nx;
+                current_active_win.y = ny;
+                (ox, ox + width, oy, oy + height, nx, nx + width, ny, ny + height)
+            };
             // then try to reduce time on refresh old ones
-            self.refresh_area_with_old_new(ox, ox + width, oy, oy + height, nx, nx + width, ny, ny + height)?;
+            self.refresh_area_with_old_new(oxs, oxe, oys, oye, nxs, nxe, nys, nye)?;
         } else {
             return Err("cannot fid active window to move");
         }
@@ -470,25 +473,26 @@ pub fn do_refresh_floating_border() -> Result<(), &'static str> {
     let mut win = WINDOW_MANAGER.lock();
     let (nx, ny) = win.cursor;
     if let Some(current_active) = win.active.upgrade() {
-        let current_active_win = current_active.lock();
-        if current_active_win.is_moving {  // move this window
-            // for better performance, while moving window, only border is shown for indication
-            let cx = current_active_win.x;
-            let cy = current_active_win.y;
-            let (bx, by) = current_active_win.moving_base;
-            let width = current_active_win.width;
-            let height = current_active_win.height;
-            let bxs = cx + nx - bx;
-            let bxe = bxs + width;
-            let bys = cy + ny - by;
-            let bye = bys + height;
-            // debug!("drawing border: {:?}", (bxs, bxe, bys, bye));
-            drop(current_active_win);
-            win.refresh_floating_border(true, bxs, bxe, bys, bye)?;  // refresh current border position
-        } else {
-            drop(current_active_win);
-            win.refresh_floating_border(false, 0, 0, 0, 0)?;  // hide border
-        }
+        let (is_draw, bxs, bxe, bys, bye) = {
+            let current_active_win = current_active.lock();
+            if current_active_win.is_moving {  // move this window
+                // for better performance, while moving window, only border is shown for indication
+                let cx = current_active_win.x;
+                let cy = current_active_win.y;
+                let (bx, by) = current_active_win.moving_base;
+                let width = current_active_win.width;
+                let height = current_active_win.height;
+                let bxs = cx + nx - bx;
+                let bxe = bxs + width;
+                let bys = cy + ny - by;
+                let bye = bys + height;
+                // debug!("drawing border: {:?}", (bxs, bxe, bys, bye));
+                (true, bxs, bxe, bys, bye)
+            } else {
+                (false, 0, 0, 0, 0)
+            }
+        };
+        win.refresh_floating_border(is_draw, bxs, bxe, bys, bye)?;  // refresh current border position
     } else {
         win.refresh_floating_border(false, 0, 0, 0, 0)?;  // hide border
     }
@@ -574,16 +578,18 @@ fn window_manager_loop( consumer: (DFQueueConsumer<Event>, DFQueueConsumer<Event
     
     loop {
 
-        let _event = match key_consumer.peek() {
-            Some(ev) => ev,
-            _ => { match mouse_consumer.peek() {
+        let event = {
+            let _event = match key_consumer.peek() {
                 Some(ev) => ev,
-                _ => { continue; }
-            } }
+                _ => { match mouse_consumer.peek() {
+                    Some(ev) => ev,
+                    _ => { continue; }
+                } }
+            };
+            let event = _event.clone();
+            _event.mark_completed();
+            event
         };
-        let event: Event = _event.clone();
-        _event.mark_completed();
-        drop(_event);
 
         // event could be either key input or mouse input
         match event {

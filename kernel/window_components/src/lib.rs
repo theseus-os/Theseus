@@ -93,13 +93,15 @@ impl WindowComponents {
             }
         };
 
-        let mut winobj = wincomps.winobj.lock();
-        winobj.framebuffer.fullfill_color(wincomps.background);
-        let xs = winobj.x;
-        let xe = xs + winobj.width;
-        let ys = winobj.y;
-        let ye = ys + winobj.height;
-        drop(winobj);
+        let (xs, xe, ys, ye) = {
+            let mut winobj = wincomps.winobj.lock();
+            winobj.framebuffer.fullfill_color(wincomps.background);
+            let xs = winobj.x;
+            let xe = xs + winobj.width;
+            let ys = winobj.y;
+            let ye = ys + winobj.height;
+            (xs, xe, ys, ye)
+        };
         wincomps.draw_border(true);  // active border
         window_manager_alpha::refresh_area_absolute(xs, xe, ys, ye)?;
 
@@ -181,66 +183,69 @@ impl WindowComponents {
 
     /// event handler that should be called periodically
     pub fn handle_event(&mut self) {
-        let mut winobj = self.winobj.lock();
-        let consumer = &winobj.consumer;
-        let event = match consumer.peek() {
-            Some(ev) => ev,
-            _ => { return; }
-        };
         let mut call_later_do_refresh_floating_border = false;
         let mut call_later_do_move_active_window = false;
-        match event.deref() {
-            &Event::InputEvent(ref input_event) => {
-                let key_input = input_event.key_event;
-                self.producer.enqueue(Event::new_input_event(key_input));
-            }
-            &Event::MousePositionEvent(ref mouse_event) => {
-                // debug!("mouse_event: {:?}", mouse_event);
-                if winobj.is_moving {  // only wait for left button up to exit this mode
-                    if ! mouse_event.left_button_hold {
-                        winobj.is_moving = false;
-                        winobj.give_all_mouse_event = false;
-                        self.last_mouse_position_event = mouse_event.clone();
-                        call_later_do_refresh_floating_border = true;
-                        call_later_do_move_active_window = true;
-                    }
-                } else {
-                    if mouse_event.y < self.bias_y {  // the region of top bar
-                        let r2 = WINDOW_RADIUS * WINDOW_RADIUS;
-                        let mut is_three_button = false;
-                        for i in 0..3 {
-                            let dx = mouse_event.x - WINDOW_BUTTON_BIAS_X - i * WINDOW_BUTTON_BETWEEN;
-                            let dy = mouse_event.y - self.bias_y / 2;
-                            if dx*dx + dy*dy <= r2 {
-                                is_three_button = true;
-                                if mouse_event.left_button_hold {
-                                    self.show_button(i, 2, &mut winobj);
-                                } else {
-                                    self.show_button(i, 0, &mut winobj);
-                                }
-                            } else {
-                                self.show_button(i, 1, &mut winobj);
-                            }
-                        }
-                        // check if user push the top bar, which means user willing to move the window
-                        if !is_three_button && !self.last_mouse_position_event.left_button_hold && mouse_event.left_button_hold {
-                            winobj.is_moving = true;
-                            winobj.give_all_mouse_event = true;
-                            winobj.moving_base = (mouse_event.gx, mouse_event.gy);
+        let (bx, by) = {
+            let mut winobj = self.winobj.lock();
+            let consumer = &winobj.consumer;
+            let event = match consumer.peek() {
+                Some(ev) => ev,
+                _ => { return; }
+            };
+            match event.deref() {
+                &Event::InputEvent(ref input_event) => {
+                    let key_input = input_event.key_event;
+                    self.producer.enqueue(Event::new_input_event(key_input));
+                }
+                &Event::MousePositionEvent(ref mouse_event) => {
+                    // debug!("mouse_event: {:?}", mouse_event);
+                    if winobj.is_moving {  // only wait for left button up to exit this mode
+                        if ! mouse_event.left_button_hold {
+                            winobj.is_moving = false;
+                            winobj.give_all_mouse_event = false;
+                            self.last_mouse_position_event = mouse_event.clone();
                             call_later_do_refresh_floating_border = true;
+                            call_later_do_move_active_window = true;
                         }
-                        self.last_mouse_position_event = mouse_event.clone();
-                    } else {  // the region of components
-                        // TODO: if any components want this event? ask them!
-                        self.producer.enqueue(Event::MousePositionEvent(mouse_event.clone()));
+                    } else {
+                        if mouse_event.y < self.bias_y {  // the region of top bar
+                            let r2 = WINDOW_RADIUS * WINDOW_RADIUS;
+                            let mut is_three_button = false;
+                            for i in 0..3 {
+                                let dx = mouse_event.x - WINDOW_BUTTON_BIAS_X - i * WINDOW_BUTTON_BETWEEN;
+                                let dy = mouse_event.y - self.bias_y / 2;
+                                if dx*dx + dy*dy <= r2 {
+                                    is_three_button = true;
+                                    if mouse_event.left_button_hold {
+                                        self.show_button(i, 2, &mut winobj);
+                                    } else {
+                                        self.show_button(i, 0, &mut winobj);
+                                    }
+                                } else {
+                                    self.show_button(i, 1, &mut winobj);
+                                }
+                            }
+                            // check if user push the top bar, which means user willing to move the window
+                            if !is_three_button && !self.last_mouse_position_event.left_button_hold && mouse_event.left_button_hold {
+                                winobj.is_moving = true;
+                                winobj.give_all_mouse_event = true;
+                                winobj.moving_base = (mouse_event.gx, mouse_event.gy);
+                                call_later_do_refresh_floating_border = true;
+                            }
+                            self.last_mouse_position_event = mouse_event.clone();
+                        } else {  // the region of components
+                            // TODO: if any components want this event? ask them!
+                            self.producer.enqueue(Event::MousePositionEvent(mouse_event.clone()));
+                        }
                     }
                 }
-            }
-            _ => { return; }
+                _ => { return; }
+            };
+            event.mark_completed();
+            let bx = winobj.x;
+            let by = winobj.y;
+            (bx, by)
         };
-        let bx = winobj.x;
-        let by = winobj.y;
-        drop(winobj);
         match self.refresh_three_button(bx, by) {
             Ok(_) => { }
             Err(err) => { debug!("refresh_three_button failed {}", err); }
@@ -257,8 +262,6 @@ impl WindowComponents {
                 Err(err) => { debug!("do_move_active_window failed {}", err); }
             }
         }
-
-        event.mark_completed();
     }
 }
 
@@ -354,22 +357,24 @@ impl TextArea {
                 self.char_matrix[idx] = c;
                 let wx = self.x + x * (8 + self.column_spacing);
                 let wy = self.y + y * (16 + self.line_spacing);
-                let mut winobj = _winobj.lock();
-                let winx = winobj.x;
-                let winy = winobj.y;
-                for j in 0..16 {
-                    let char_font: u8 = font::FONT_BASIC[c as usize][j];
-                    for i in 0..8 {
-                        let nx = wx + i;
-                        let ny = wy + j;
-                        if char_font & (0x80u8 >> i) != 0 {
-                            winobj.framebuffer.draw_point(nx, ny, self.text_color);
-                        } else {
-                            winobj.framebuffer.draw_point(nx, ny, self.background_color);
+                let (winx, winy) = {
+                    let mut winobj = _winobj.lock();
+                    let winx = winobj.x;
+                    let winy = winobj.y;
+                    for j in 0..16 {
+                        let char_font: u8 = font::FONT_BASIC[c as usize][j];
+                        for i in 0..8 {
+                            let nx = wx + i;
+                            let ny = wy + j;
+                            if char_font & (0x80u8 >> i) != 0 {
+                                winobj.framebuffer.draw_point(nx, ny, self.text_color);
+                            } else {
+                                winobj.framebuffer.draw_point(nx, ny, self.background_color);
+                            }
                         }
                     }
-                }
-                drop(winobj);  // release the lock
+                    (winx, winy)
+                };
                 for j in 0..16 {
                     for i in 0..8 {
                         window_manager_alpha::refresh_pixel_absolute(winx + wx + i, winy + wy + j)?;

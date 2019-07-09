@@ -172,21 +172,22 @@ impl Terminal {
             Err(err) => {debug!("new window returned err"); return Err(err)}
         };
 
-        let wincomps = window_object.lock();
-        let (width_inner, height_inner) = wincomps.inner_size();
-        debug!("new window done width: {}, height: {}", width_inner, height_inner);
-        // next add textarea to wincomps
-        const TEXTAREA_BORDER: usize = 4;
-        let textarea_object = match window_components::TextArea::new(
-            wincomps.bias_x + TEXTAREA_BORDER, wincomps.bias_y + TEXTAREA_BORDER,
-            width_inner - 2*TEXTAREA_BORDER, height_inner - 2*TEXTAREA_BORDER,
-            &wincomps.winobj, None, None, Some(wincomps.background), None
-        ) {
-            Ok(m) => m,
-            Err(err) => { debug!("new textarea returned err"); return Err(err); }
+        let textarea_object = {
+            let wincomps = window_object.lock();
+            let (width_inner, height_inner) = wincomps.inner_size();
+            debug!("new window done width: {}, height: {}", width_inner, height_inner);
+            // next add textarea to wincomps
+            const TEXTAREA_BORDER: usize = 4;
+            match window_components::TextArea::new(
+                wincomps.bias_x + TEXTAREA_BORDER, wincomps.bias_y + TEXTAREA_BORDER,
+                width_inner - 2*TEXTAREA_BORDER, height_inner - 2*TEXTAREA_BORDER,
+                &wincomps.winobj, None, None, Some(wincomps.background), None
+            ) {
+                Ok(m) => m,
+                Err(err) => { debug!("new textarea returned err"); return Err(err); }
+            }
         };
-        drop(wincomps);
-        
+
         let root = root::get_root();
         
         let env = Environment {
@@ -1053,16 +1054,17 @@ fn terminal_loop(mut terminal: Terminal) -> Result<(), &'static str> {
         // Looks at the input queue from the window manager
         // If it has unhandled items, it handles them with the match
         // If it is empty, it proceeds directly to the next loop iteration
-        let mut wincomps = terminal.window.lock();
-        wincomps.handle_event();
-
-        let _event = match wincomps.consumer.peek() {
-            Some(ev) => ev,
-            _ => { continue; }
+        let event = {
+            let mut wincomps = terminal.window.lock();
+            wincomps.handle_event();
+            let _event = match wincomps.consumer.peek() {
+                Some(ev) => ev,
+                _ => { continue; }
+            };
+            let event = _event.clone();
+            _event.mark_completed();
+            event
         };
-        let event = _event.clone();
-        _event.mark_completed();
-        drop(wincomps);
 
         match event {
             // Returns from the main loop so that the terminal object is dropped
