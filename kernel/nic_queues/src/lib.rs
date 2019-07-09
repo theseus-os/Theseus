@@ -1,3 +1,9 @@
+//! Defines the receive and transmit queues that store a ring of DMA descriptors and related information.
+//! 
+//! Receive and transmit queues are used across all NICs to keep track of incoming and outgoing packets.
+//! HW queues used by the NIC only consist of the ring of DMA descriptors. The SW queues defined here hold the ring of DMA descriptors that it shares with the HW,
+//! as well as other information such as the buffers received from the queues, the tail register for each queue and the cpu the queue is mapped to.
+
 #![no_std]
 
 extern crate alloc;

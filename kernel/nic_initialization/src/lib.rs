@@ -1,3 +1,7 @@
+//! Functions that are used in a NIC initialization procedure.
+//! 
+//! They include allocating the memory space for the device's registers, and initializing its receive and transmit queues.
+
 #![no_std]
 
 extern crate alloc;
@@ -12,7 +16,7 @@ extern crate volatile;
 
 use core::ops::DerefMut;
 use memory::{FRAME_ALLOCATOR, EntryFlags, PhysicalMemoryArea, FrameRange, PhysicalAddress, allocate_pages_by_bytes, get_kernel_mmi_ref, MappedPages, create_contiguous_mapping};
-use pci::{PciDevice, pci_set_command_bus_master_bit, pci_determine_mem_size};
+use pci::{PciDevice};
 use alloc::{
     vec::Vec,
     boxed::Box,
@@ -40,7 +44,7 @@ pub fn nic_mapping_flags() -> EntryFlags {
 /// * `mem_base`: starting physical address of the device's memory mapped registers
 pub fn allocate_device_register_memory(dev: &PciDevice, mem_base: PhysicalAddress) -> Result<MappedPages, &'static str> {
     //find out amount of space needed
-    let mem_size_in_bytes = pci_determine_mem_size(dev) as usize;
+    let mem_size_in_bytes = dev.determine_mem_size() as usize;
 
     allocate_memory(mem_base, mem_size_in_bytes)
 }

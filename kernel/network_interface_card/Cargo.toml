@@ -26,8 +26,8 @@ path = "../nic_queues"
 [dependencies.nic_buffers]
 path = "../nic_buffers"
 
-[dependencies.nic_init]
-path = "../nic_init"
+[dependencies.nic_initialization]
+path = "../nic_initialization"
 
 
 [lib]

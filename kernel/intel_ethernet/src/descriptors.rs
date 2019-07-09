@@ -1,3 +1,7 @@
+//! The different descriptor types used by Intel NICs.
+//! Usually the newer NICs use more advanced descriptor types but retain support for older ones.
+//! The difference in the types is the amount of packet information that is included in the descriptor, and the format.
+
 use memory::PhysicalAddress;
 use volatile::{Volatile, ReadOnly};
 use bit_field::BitField;
@@ -27,7 +31,11 @@ pub const RX_STATUS_DD:                    u8 = 1 << 0;
 pub const RX_STATUS_EOP:                   u8 = 1 << 1;
 
 
-/// A trait for functionalities that all receive descriptors must support
+/// A trait for the minimum set of functions needed to receive a packet using one of Intel's receive descriptor types.
+/// Receive descriptors contain the physical address where an incoming packet should be stored by the NIC,
+/// as well as bits that are updated by the HW once the packet is received.
+/// There is one receive descriptor per receive buffer. 
+/// Receive functions defined in the Network_Interface_Card crate expect a receive descriptor to implement this trait.
 pub trait RxDescriptor {
     /// Initializes a receive descriptor by clearing its status 
     /// and setting the descriptor's physical address.
@@ -55,7 +63,11 @@ pub trait RxDescriptor {
     fn length(&self) -> u64;
 }
 
-/// A trait for functionalities that all transmit descriptors must support.
+/// A trait for the minimum set of functions needed to transmit a packet using one of Intel's transmit descriptor types.
+/// Transmit descriptors contain the physical address where an outgoing packet is stored,
+/// as well as bits that are updated by the HW once the packet is sent.
+/// There is one transmit descriptor per transmit buffer.
+/// Transmit functions defined in the Network_Interface_Card crate expect a transmit descriptor to implement this trait.
 pub trait TxDescriptor {
     /// Initializes a transmit descriptor by clearing all of its values.
     fn init(&mut self);
@@ -75,7 +87,7 @@ pub trait TxDescriptor {
 
 
 /// This struct is a Legacy Transmit Descriptor. 
-/// There is one instance of this struct per transmit buffer. 
+/// It's the descriptor type used in older Intel NICs and the E1000 driver.
 #[repr(C,packed)]
 pub struct LegacyTxDescriptor {
     /// The starting physical address of the transmit buffer
@@ -129,7 +141,8 @@ impl fmt::Debug for LegacyTxDescriptor {
 
 
 /// This struct is a Legacy Receive Descriptor. 
-/// There is one instance of this struct per receive buffer. 
+/// The driver writes to the upper 64 bits, and the NIC writes to the lower 64 bits.
+/// It's the descriptor type used in older Intel NICs and the E1000 driver.
 #[repr(C)]
 pub struct LegacyRxDescriptor {
     /// The starting physical address of the receive buffer
@@ -182,10 +195,12 @@ impl fmt::Debug for LegacyRxDescriptor {
 }
 
 
-/// Advanced Receive Descriptor used in the ixgbe driver (section 7.1.6 of 82599 datasheet).
-/// It has 2 modes: Read and Write Back. There is one receive descriptor per receive buffer that can be converted between these 2 modes.
+/// Advanced Receive Descriptor used in the Ixgbe driver.
+/// It has 2 modes: Read and Write Back, both of which use the whole 128 bits. 
+/// There is one receive descriptor per receive buffer that can be converted between these 2 modes.
 /// Read contains the addresses that the driver writes.
 /// Write Back contains information the hardware writes on receiving a packet.
+/// More information can be found in the 82599 datasheet.
 #[repr(C)]
 pub struct AdvancedRxDescriptor {
     /// Starting physcal address of the receive buffer for the packet

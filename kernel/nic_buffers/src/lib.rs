@@ -1,3 +1,5 @@
+//! Defines buffers that are used to send and receive packets.
+
 #![no_std]
 
 extern crate alloc;

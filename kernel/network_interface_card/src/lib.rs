@@ -4,14 +4,14 @@ extern crate alloc;
 #[macro_use] extern crate log;
 extern crate memory;
 extern crate mpmc;
-extern crate nic_init;
+extern crate nic_initialization;
 extern crate intel_ethernet;
 extern crate nic_queues;
 extern crate nic_buffers;
 
 use alloc::vec::Vec;
 use memory::{create_contiguous_mapping};
-use nic_init::{nic_mapping_flags};
+use nic_initialization::{nic_mapping_flags};
 use intel_ethernet::descriptors:: {TxDescriptor, RxDescriptor};
 use nic_queues::{RxQueue, TxQueue};
 use nic_buffers::{TransmitBuffer, ReceiveBuffer, ReceivedFrame};

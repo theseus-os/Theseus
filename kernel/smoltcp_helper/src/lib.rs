@@ -1,4 +1,6 @@
 
+//! Collection of functions to set up a TCP connection using a smoltcp device
+
 #![no_std]
 
 #[macro_use] extern crate log;

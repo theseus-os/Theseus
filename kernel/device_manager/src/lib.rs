@@ -5,7 +5,7 @@
 extern crate alloc;
 extern crate spin;
 extern crate event_types;
-extern crate ata_pio;
+extern crate ata;
 extern crate e1000;
 extern crate memory;
 extern crate dfqueue; 
@@ -18,12 +18,17 @@ extern crate network_manager;
 extern crate ethernet_smoltcp_device;
 extern crate smoltcp;
 
+use alloc::sync::Arc;
+use spin::Mutex;
 use dfqueue::DFQueueProducer;
 use event_types::Event;
 use memory::MemoryManagementInfo;
-use pci::{PciDevice, get_pci_device_vd};
+use pci::{PciDevice};
 use ethernet_smoltcp_device::EthernetNetworkInterface;
 use network_manager::add_to_network_interfaces;
+use smoltcp::wire::{IpCidr, Ipv4Address};
+use core::str::FromStr;
+
 
 /// A randomly chosen IP address that must be outside of the DHCP range.. // TODO FIXME: use DHCP to acquire IP
 const DEFAULT_LOCAL_IP: &'static str = "10.0.2.15/24"; // the default QEMU user-slirp network gives IP addresses of "10.0.2.*"
@@ -48,66 +53,45 @@ pub fn early_init(kernel_mmi: &mut MemoryManagementInfo) -> Result<(), &'static 
 }
 
 
-
+/// Initializes all other devices, such as the keyboard and mouse
+/// as well as all devices discovered on the PCI bus.
 pub fn init(keyboard_producer: DFQueueProducer<Event>) -> Result<(), &'static str>  {
     keyboard::init(keyboard_producer);
     mouse::init();
 
-    
+    // Initialize/scan the PCI bus to discover PCI devices
     for dev in pci::pci_device_iter() {
         debug!("Found pci device: {:?}", dev);
     } 
+
+    // Iterate over all PCI devices and initialize the drivers for the devices we support.
+    for dev in pci::pci_device_iter() {
+        // Look for IDE controllers for disk drives (aka PATA).
+        if dev.class == 0x01 && dev.subclass == 0x01 {
+            info!("IDE controller PCI device found at: {:?}", dev.location);
+            let _ide_controller = ata::IdeController::new(dev)?;
+            // TODO: do something with the discovered ATA drives / IDE controller
+            // debug!("{:?}", ide_controller.primary_master);
+        }
+
+        // Look for networking controllers, specifically ethernet cards
+        if dev.class == 0x02 && dev.subclass == 0x00 {
+            if dev.vendor_id == e1000::INTEL_VEND && dev.device_id == e1000::E1000_DEV {
+                info!("e1000 PCI device found at: {:?}", dev.location);
+                let e1000_nic_ref = e1000::E1000Nic::init(dev)?;
+                let e1000_interface = EthernetNetworkInterface::new_ipv4_interface(e1000_nic_ref, DEFAULT_LOCAL_IP, &DEFAULT_GATEWAY_IP)?;
+                add_to_network_interfaces(e1000_interface)
+            }
+            // here: check for and initialize other ethernet cards
+        }
+    }
+
+    // Convenience notification for developers to inform them of no networking devices
+    if network_manager::NETWORK_INTERFACES.lock().is_empty() {
+        warn!("Note: no network devices found on this system.");
+    }
     
-    // intialize the E1000 NIC if present and add it to the list of network interfaces
-    match init_pci_device(e1000::INTEL_VEND, e1000::E1000_DEV, &e1000::E1000Nic::init) {
-        Ok(()) => {
-            let nic_ref = e1000::get_e1000_nic().ok_or("device_manager::init(): e1000 nic hasn't been initialized")?;
-            let e1000_interface = EthernetNetworkInterface::new_ipv4_interface(nic_ref, DEFAULT_LOCAL_IP, &DEFAULT_GATEWAY_IP)?;
-            add_to_network_interfaces(e1000_interface);
-        },
-        Err(_e) => warn!("E1000 device not found"),
-    };
-
-    // testing ata pio read, write, and IDENTIFY functionality, example of uses, can be deleted 
-    /*
-    ata_pio::init_ata_devices();
-    let test_arr: [u16; 256] = [630;256];
-    println!("Value from ATA identification function: {}", ata_pio::ATA_DEVICES.try().expect("ATA_DEVICES used before initialization").primary_master);
-    let begin = ata_pio::pio_read(0xE0,0);
-    //only use value if Result is ok
-    if begin.is_ok(){
-        println!("Value from drive at sector 0 before write:  {}", begin.unwrap()[0]);
-    }
-    ata_pio::pio_write(0xE0,0,test_arr);
-    let end = ata_pio::pio_read(0xE0,0);
-    if end.is_ok(){
-    println!("Value from drive at sector 0 after write: {}", end.unwrap()[0]);
-    }
-    */
-
-    /*
-    let bus_array = pci::PCI_BUSES.try().expect("PCI_BUSES not initialized");
-    let ref bus_zero = bus_array[0];
-    let slot_zero = bus_zero.connected_devices[0]; 
-    println!("pci config data for bus 0, slot 0: dev id - {:#x}, class code - {:#x}", slot_zero.device_id, slot_zero.class_code);
-    println!("pci config data {:#x}",pci::pci_config_read(0,0,0,0x0c));
-    println!("{:?}", bus_zero);
-    */
-    Ok(())
-
-}
-
-/// Trait for all pci device initialization procedures
-pub trait PciDevInitFunc = Fn(&PciDevice) -> Result<(), &'static str>;
-
-/// Finds the pci device and initializes it.
-/// 
-/// # Arguments
-/// * `vendor_id`: pci vendor id of device
-/// * `device_id`: pci device id of device
-/// * `init_func`: initialization function for the pci device
-fn init_pci_device<f: PciDevInitFunc> (vendor_id: u16, device_id: u16, init_func: &f) -> Result<(), &'static str> {
-    let pci_dev = get_pci_device_vd(vendor_id, device_id).ok_or("device_manager::init_pci_dev: device not found")?;
-    init_func(pci_dev)?;
     Ok(())
 }
+
+

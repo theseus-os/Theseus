@@ -24,7 +24,7 @@ extern crate apic;
 extern crate intel_ethernet;
 extern crate nic_buffers;
 extern crate nic_queues;
-extern crate nic_init;
+extern crate nic_initialization;
 
 pub mod test_e1000_driver;
 mod regs;
@@ -37,13 +37,13 @@ use irq_safety::{RwLockIrqSafe, MutexIrqSafe};
 use volatile::{Volatile, ReadOnly};
 use alloc::boxed::Box;
 use memory::{PhysicalAddress, VirtualAddress, MappedPages};
-use pci::{PciDevice, pci_read_8, pci_determine_mem_base, PCI_BAR0, PCI_INTERRUPT_LINE, pci_set_command_bus_master_bit, PciConfigSpaceAccessMechanism};
+use pci::{PciDevice, PCI_BAR0, PCI_INTERRUPT_LINE, PciConfigSpaceAccessMechanism};
 use kernel_config::memory::PAGE_SIZE;
 use owning_ref::BoxRefMut;
 use interrupts::{eoi,register_interrupt};
 use x86_64::structures::idt::{ExceptionStackFrame};
 use network_interface_card:: NetworkInterfaceCard;
-use nic_init::{allocate_device_register_memory, init_rx_buf_pool, init_rx_queue, init_tx_queue};
+use nic_initialization::{allocate_device_register_memory, init_rx_buf_pool, init_rx_queue, init_tx_queue};
 use intel_ethernet::{
     descriptors::{LegacyRxDescriptor, LegacyTxDescriptor},
     types::*
@@ -204,13 +204,13 @@ impl NetworkInterfaceCard for E1000Nic {
 /// functions that setup the NIC struct and handle the sending and receiving of packets
 impl E1000Nic {
     /// Initializes the new E1000 network interface card that is connected as the given PciDevice.
-    pub fn init(e1000_pci_dev: &PciDevice) -> Result<(), &'static str> {
+    pub fn init(e1000_pci_dev: &PciDevice) -> Result<&'static MutexIrqSafe<E1000Nic>, &'static str> {
         use pic::PIC_MASTER_OFFSET;
 
         //debug!("e1000_nc bar_type: {0}, mem_base: {1}, io_base: {2}", e1000_nc.bar_type, e1000_nc.mem_base, e1000_nc.io_base);
         
         // Get interrupt number
-        let interrupt_num = pci_read_8(e1000_pci_dev.bus, e1000_pci_dev.slot, e1000_pci_dev.func, PCI_INTERRUPT_LINE) + PIC_MASTER_OFFSET;
+        let interrupt_num = e1000_pci_dev.pci_read_8(PCI_INTERRUPT_LINE) + PIC_MASTER_OFFSET;
         // debug!("e1000 IRQ number: {}", interrupt_num);
 
         let bar0 = e1000_pci_dev.bars[0];
@@ -218,16 +218,16 @@ impl E1000Nic {
         let bar_type = (bar0 as u8) & 0x1;    
 
         // If the base address is not memory mapped then exit
-        if bar_type == PciConfigSpaceAccessMechanism::io_ports as u8 {
+        if bar_type == PciConfigSpaceAccessMechanism::IoPort as u8 {
             error!("e1000::init(): BAR0 is of I/O type");
             return Err("e1000::init(): BAR0 is of I/O type")
         }
   
         // memory mapped base address
-        let mem_base = pci_determine_mem_base(e1000_pci_dev)?;
+        let mem_base = e1000_pci_dev.determine_mem_base()?;
 
         // set the bus mastering bit for this PciDevice, which allows it to use DMA
-        pci_set_command_bus_master_bit(e1000_pci_dev);
+        e1000_pci_dev.pci_set_command_bus_master_bit();
 
         let (mut mapped_registers, mem_base_v) = Self::map_e1000_regs(e1000_pci_dev, mem_base)?;
         
@@ -276,7 +276,7 @@ impl E1000Nic {
         };
         
         let nic_ref = E1000_NIC.call_once(|| MutexIrqSafe::new(e1000_nic));
-        Ok(())
+        Ok(nic_ref)
     }
     
     /// Allocates memory for the NIC and maps the E1000 Register struct to that memory area.

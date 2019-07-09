@@ -1,11 +1,5 @@
-// Copyright 2016 Philipp Oppermann. See the README.md
-// file at the top-level directory of this distribution.
-//
-// Licensed under the Apache License, Version 2.0 <LICENSE-APACHE or
-// http://www.apache.org/licenses/LICENSE-2.0> or the MIT license
-// <LICENSE-MIT or http://opensource.org/licenses/MIT>, at your
-// option. This file may not be copied, modified, or distributed
-// except according to those terms.
+//! Basic interrupt handling structures and simple handler routines.
+
 #![no_std]
 #![feature(abi_x86_interrupt)]
 
@@ -34,10 +28,8 @@ extern crate tlb_shootdown;
 
 
 use ps2::handle_mouse_packet;
-use x86_64::structures::idt::{LockedIdt, ExceptionStackFrame, HandlerFunc};
+use x86_64::structures::idt::{Idt, LockedIdt, ExceptionStackFrame, HandlerFunc};
 use spin::Once;
-//use port_io::Port;
-// use drivers::ata_pio;
 use kernel_config::time::{CONFIG_PIT_FREQUENCY_HZ}; //, CONFIG_RTC_FREQUENCY_HZ};
 // use rtc;
 use core::sync::atomic::{AtomicUsize, AtomicBool, Ordering};
@@ -45,14 +37,12 @@ use memory::VirtualAddress;
 use apic::{INTERRUPT_CHIP, InterruptChip};
 use pic::PIC_MASTER_OFFSET;
 
-// use drivers::e1000;
-
 
 /// The single system-wide IDT
 /// Note: this could be per-core instead of system-wide, if needed.
 pub static IDT: LockedIdt = LockedIdt::new();
 
-/// Interface to our PIC (programmable interrupt controller) chips.
+/// The single system-wide Programmable Interrupt Controller (PIC) chip.
 static PIC: Once<pic::ChainedPics> = Once::new();
 
 
@@ -81,7 +71,7 @@ pub fn init(double_fault_stack_top_unusable: VirtualAddress, privilege_stack_top
        
         // fill all IDT entries with an unimplemented IRQ handler
         for i in 32..255 {
-            idt[i].set_handler_fn(apic_unimplemented_interrupt_handler);
+            idt[i].set_handler_fn(unimplemented_interrupt_handler);
         }
     }
 
@@ -113,90 +103,54 @@ pub fn init_ap(apic_id: u8,
 }
 
 
-pub fn init_handlers_apic() {
-    // first, do the standard interrupt remapping, but mask all PIC interrupts / disable the PIC
-    PIC.call_once( || {
-        pic::ChainedPics::init(0xFF, 0xFF) // disable all PIC IRQs
-    });
+/// Establishes the default interrupt handlers that are statically known.
+fn set_handlers(idt: &mut Idt) {
+    // exceptions (IRQS from 0-31) have already been inited before
 
-    {
-        let mut idt = IDT.lock(); // withholds interrupts
-        
-        // exceptions (IRQS from 0-31) have already been inited before
-
-        // fill all IDT entries with an unimplemented IRQ handler
-        for i in 32..255 {
-            idt[i].set_handler_fn(apic_unimplemented_interrupt_handler);
-        }
-
-        idt[0x20].set_handler_fn(pit_timer_handler);
-        idt[0x21].set_handler_fn(ps2_keyboard_handler);
-        idt[0x22].set_handler_fn(lapic_timer_handler);
-        // idt[0x23].set_handler_fn(irq_0x23_handler);
-        idt[0x24].set_handler_fn(com1_serial_handler);
-        // idt[0x25].set_handler_fn(irq_0x25_handler);
-        idt[0x26].set_handler_fn(apic_irq_0x26_handler);
-        idt[0x27].set_handler_fn(spurious_interrupt_handler); 
-
-        // idt[0x28].set_handler_fn(irq_0x28_handler);
-        // idt[0x29].set_handler_fn(nic_handler); // for Bochs
-        // idt[0x2A].set_handler_fn(irq_0x2A_handler);
-        // idt[0x2B].set_handler_fn(nic_handler);
-        idt[0x2C].set_handler_fn(ps2_mouse_handler);
-        // idt[0x2D].set_handler_fn(irq_0x2D_handler);
-        // idt[0x2E].set_handler_fn(irq_0x2E_handler);
-        // idt[0x2F].set_handler_fn(irq_0x2F_handler);
-
-        idt[apic::APIC_SPURIOUS_INTERRUPT_VECTOR as usize].set_handler_fn(apic_spurious_interrupt_handler); 
-        idt[tlb_shootdown::TLB_SHOOTDOWN_IPI_IRQ as usize].set_handler_fn(ipi_handler);
+    // fill all IDT entries with an unimplemented IRQ handler
+    for i in 32..255 {
+        idt[i].set_handler_fn(unimplemented_interrupt_handler);
     }
 
+    idt[0x20].set_handler_fn(pit_timer_handler);
+    idt[0x21].set_handler_fn(ps2_keyboard_handler);
+    idt[0x22].set_handler_fn(lapic_timer_handler);
+    idt[0x23].set_handler_fn(unimplemented_interrupt_handler);
+    idt[0x24].set_handler_fn(com1_serial_handler);
+    idt[0x25].set_handler_fn(unimplemented_interrupt_handler);
+    idt[0x26].set_handler_fn(unimplemented_interrupt_handler);
+    idt[0x27].set_handler_fn(pic_spurious_interrupt_handler); 
 
-    // now it's safe to enable every LocalApic's LVT_TIMER interrupt (for scheduling)
+    // idt[0x28].set_handler_fn(rtc_handler);
+    idt[0x28].set_handler_fn(unimplemented_interrupt_handler);
+    idt[0x29].set_handler_fn(unimplemented_interrupt_handler);
+    idt[0x2A].set_handler_fn(unimplemented_interrupt_handler);
+    idt[0x2B].set_handler_fn(unimplemented_interrupt_handler);
+    idt[0x2C].set_handler_fn(ps2_mouse_handler);
+    idt[0x2D].set_handler_fn(unimplemented_interrupt_handler);
+    idt[0x2E].set_handler_fn(primary_ata_handler);
+    idt[0x2F].set_handler_fn(secondary_ata_handler);
+
+    idt[apic::APIC_SPURIOUS_INTERRUPT_VECTOR as usize].set_handler_fn(apic_spurious_interrupt_handler); 
+    idt[tlb_shootdown::TLB_SHOOTDOWN_IPI_IRQ as usize].set_handler_fn(ipi_handler);
+}
+
+
+pub fn init_handlers_apic() {
+    // first, do the standard interrupt remapping, but mask all PIC interrupts / disable the PIC
+    PIC.call_once(|| pic::ChainedPics::init(0xFF, 0xFF)); // disable all PIC IRQs
     
+    set_handlers(&mut IDT.lock());
 }
 
 
 pub fn init_handlers_pic() {
-    {
-        let mut idt = IDT.lock(); // withholds interrupts
-		// SET UP CUSTOM INTERRUPT HANDLERS
-		// we can directly index the "idt" object because it implements the Index/IndexMut traits
-
-       
-        // MASTER PIC starts here (0x20 - 0x27)
-        idt[0x20].set_handler_fn(pit_timer_handler);
-        idt[0x21].set_handler_fn(ps2_keyboard_handler);
-        // there is no IRQ 0x22        
-        idt[0x23].set_handler_fn(irq_0x23_handler); 
-        idt[0x24].set_handler_fn(com1_serial_handler); 
-        idt[0x25].set_handler_fn(irq_0x25_handler); 
-        idt[0x26].set_handler_fn(irq_0x26_handler); 
-
-        idt[0x27].set_handler_fn(spurious_interrupt_handler); 
-
-
-        // SLAVE PIC starts here (0x28 - 0x2E)        
-        // idt[0x28].set_handler_fn(rtc_handler); // using the weird way temporarily
-
-        idt[0x29].set_handler_fn(irq_0x29_handler); 
-        idt[0x2A].set_handler_fn(irq_0x2A_handler); 
-        //idt[0x2B].set_handler_fn(irq_0x2B_handler);
-        idt[0x2B].set_handler_fn(nic_handler); 
-        idt[0x2C].set_handler_fn(ps2_mouse_handler);
-        idt[0x2D].set_handler_fn(irq_0x2D_handler); 
-
-        idt[0x2E].set_handler_fn(primary_ata);
-        // 0x2F missing right now
-
-    }
+    set_handlers(&mut IDT.lock());
 
     // init PIC, PIT and RTC interrupts
     let master_pic_mask: u8 = 0x0; // allow every interrupt
     let slave_pic_mask: u8 = 0b0000_1000; // everything is allowed except 0x2B 
-    PIC.call_once( || {
-        pic::ChainedPics::init(master_pic_mask, slave_pic_mask) // disable all PIC IRQs
-    });
+    PIC.call_once(|| pic::ChainedPics::init(master_pic_mask, slave_pic_mask));
 
     pit_clock::init(CONFIG_PIT_FREQUENCY_HZ);
     // let rtc_handler = rtc::init(CONFIG_RTC_FREQUENCY_HZ, rtc_interrupt_func);
@@ -209,16 +163,16 @@ pub fn init_handlers_pic() {
 /// # Arguments 
 /// * `interrupt_num` - the interrupt that is being requested
 /// * `func` - the handler to be registered for 'interrupt_num'
-pub fn register_interrupt(interrupt_num : u8, func: HandlerFunc) -> Result<(), &'static str> {
+pub fn register_interrupt(interrupt_num: u8, func: HandlerFunc) -> Result<(), &'static str> {
     let mut idt = IDT.lock();
 
     // checks if the handler stored is the default apic handler which signifies that the interrupt hasn't been used yet
-    if idt[interrupt_num as usize].handler_eq(apic_unimplemented_interrupt_handler) {
+    if idt[interrupt_num as usize].handler_eq(unimplemented_interrupt_handler) {
         idt[interrupt_num as usize].set_handler_fn(func);
         Ok(())
     }
     else {
-        error!("register_interrupt: the requested interrupt is not available");
+        error!("register_interrupt: the requested interrupt IRQ {} is not available", interrupt_num);
         Err("register_interrupt: the requested interrupt is not available")
     }
 } 
@@ -232,7 +186,7 @@ pub fn register_msi_interrupt(func: HandlerFunc) -> Result<u8, &'static str> {
     let mut idt = IDT.lock();
 
     // try to find an unused interrupt 
-    let interrupt_num = (*idt).find_free_entry(apic_unimplemented_interrupt_handler).ok_or("register_msi_interrupt: no available interrupt")?;
+    let interrupt_num = (*idt).find_free_entry(unimplemented_interrupt_handler).ok_or("register_msi_interrupt: no available interrupt")?;
     idt[interrupt_num].set_handler_fn(func);
     
     Ok(interrupt_num as u8)
@@ -251,7 +205,7 @@ pub fn deregister_interrupt(interrupt_num: u8, func: HandlerFunc) -> Result<(), 
     // check if the handler stored is the same as the one provided
     // this is to make sure no other application can deregister your interrupt
     if idt[interrupt_num as usize].handler_eq(func) {
-        idt[interrupt_num as usize].set_handler_fn(apic_unimplemented_interrupt_handler);
+        idt[interrupt_num as usize].set_handler_fn(unimplemented_interrupt_handler);
         Ok(())
     }
     else {
@@ -326,9 +280,8 @@ extern "x86-interrupt" fn ps2_keyboard_handler(_stack_frame: &mut ExceptionStack
             }
         }
     }
-            eoi(Some(PIC_MASTER_OFFSET + 0x1));
-
-
+    
+    eoi(Some(PIC_MASTER_OFFSET + 0x1));
 }
 
 /// 0x2C
@@ -363,8 +316,8 @@ extern "x86-interrupt" fn lapic_timer_handler(_stack_frame: &mut ExceptionStackF
     let _ticks = APIC_TIMER_TICKS.fetch_add(1, Ordering::Relaxed);
     // info!(" ({}) APIC TIMER HANDLER! TICKS = {}", apic::get_my_apic_id().unwrap_or(0xFF), _ticks);
     
-    eoi(None); // None, because it cannot possibly be a PIC interrupt
     // we must acknowledge the interrupt first before handling it because we switch tasks here, which doesn't return
+    eoi(None); // None, because 0x22 IRQ cannot possibly be a PIC interrupt
     
     scheduler::schedule();
 }
@@ -377,56 +330,47 @@ extern "x86-interrupt" fn com1_serial_handler(_stack_frame: &mut ExceptionStackF
     eoi(Some(PIC_MASTER_OFFSET + 0x4));
 }
 
-
-/// 0x26
-extern "x86-interrupt" fn apic_irq_0x26_handler(_stack_frame: &mut ExceptionStackFrame) {
-    info!("APIX 0x26 IRQ handler");
-
-    eoi(Some(PIC_MASTER_OFFSET + 0x6));
-}
-
-
-/// 0x2B
-extern "x86-interrupt" fn nic_handler(_stack_frame: &mut ExceptionStackFrame) {
-    debug!("nic handler called");
-    // e1000::e1000_handler();
-	eoi(Some(0x2B));
-}
-
-
 extern "x86-interrupt" fn apic_spurious_interrupt_handler(_stack_frame: &mut ExceptionStackFrame) {
     warn!("APIC SPURIOUS INTERRUPT HANDLER!");
 
     eoi(None);
 }
 
-extern "x86-interrupt" fn apic_unimplemented_interrupt_handler(_stack_frame: &mut ExceptionStackFrame) {
-    println_raw!("APIC UNIMPLEMENTED IRQ!!!");
-
-    if let Some(lapic_ref) = apic::get_my_apic() {
-        let lapic = lapic_ref.read();
-        let isr = lapic.get_isr(); 
-        let irr = lapic.get_irr();
-        println_raw!("APIC ISR: {:#x} {:#x} {:#x} {:#x}, {:#x} {:#x} {:#x} {:#x} \nIRR: {:#x} {:#x} {:#x} {:#x},{:#x} {:#x} {:#x} {:#x}", 
-                         isr.0, isr.1, isr.2, isr.3, isr.4, isr.5, isr.6, isr.7, irr.0, irr.1, irr.2, irr.3, irr.4, irr.5, irr.6, irr.7);
-    }
-    else {
-        println_raw!("apic_unimplemented_interrupt_handler: couldn't get my apic.");
-    }
+extern "x86-interrupt" fn unimplemented_interrupt_handler(_stack_frame: &mut ExceptionStackFrame) {
+    println_raw!("\nUnimplemented interrupt handler: {:#?}", _stack_frame);
+	match apic::INTERRUPT_CHIP.load(Ordering::Acquire) {
+        apic::InterruptChip::PIC => {
+            let irq_regs = PIC.try().map(|pic| pic.read_isr_irr());  
+            println_raw!("PIC IRQ Registers: {:?}", irq_regs);
+        }
+        apic::InterruptChip::APIC | apic::InterruptChip::X2APIC => {
+            if let Some(lapic_ref) = apic::get_my_apic() {
+                let lapic = lapic_ref.read();
+                let isr = lapic.get_isr(); 
+                let irr = lapic.get_irr();
+                println_raw!("APIC ISR: {:#x} {:#x} {:#x} {:#x}, {:#x} {:#x} {:#x} {:#x}\n \
+                    IRR: {:#x} {:#x} {:#x} {:#x},{:#x} {:#x} {:#x} {:#x}", 
+                    isr[0], isr[1], isr[2], isr[3], isr[4], isr[5], isr[6], isr[7],
+                    irr[0], irr[1], irr[2], irr[3], irr[4], irr[5], irr[6], irr[7],
+                );
+            }
+            else {
+                println_raw!("APIC ISR and IRR were unknown.");
+            }
+        }
+    };
 
     loop { }
-
-    // eoi(None);
 }
 
 
 
-/// The Spurious interrupt handler. 
+/// The Spurious interrupt handler for the PIC. 
 /// This has given us a lot of problems on bochs emulator and on some real hardware, but not on QEMU.
 /// Spurious interrupts occur a lot when using PIC on real hardware, but only occurs once when using apic/x2apic. 
 /// See here for more: https://mailman.linuxchix.org/pipermail/techtalk/2002-August/012697.html.
 /// We handle it according to this advice: https://wiki.osdev.org/8259_PIC#Spurious_IRQs
-extern "x86-interrupt" fn spurious_interrupt_handler(_stack_frame: &mut ExceptionStackFrame ) {
+extern "x86-interrupt" fn pic_spurious_interrupt_handler(_stack_frame: &mut ExceptionStackFrame ) {
     if let Some(pic) = PIC.try() {
         let irq_regs = pic.read_isr_irr();
         // check if this was a real IRQ7 (parallel port) (bit 7 will be set)
@@ -443,7 +387,7 @@ extern "x86-interrupt" fn spurious_interrupt_handler(_stack_frame: &mut Exceptio
         }
     }
     else {
-        error!("spurious_interrupt_handler(): PIC wasn't initialized!");
+        error!("pic_spurious_interrupt_handler(): PIC wasn't initialized!");
     }
 
 }
@@ -466,141 +410,22 @@ extern "x86-interrupt" fn spurious_interrupt_handler(_stack_frame: &mut Exceptio
 // }
 
 
-//0x2e
-extern "x86-interrupt" fn primary_ata(_stack_frame:&mut ExceptionStackFrame ) {
+/// 0x2E
+extern "x86-interrupt" fn primary_ata_handler(_stack_frame: &mut ExceptionStackFrame ) {
+    info!("Primary ATA Interrupt (0x2E)");
 
-    // ata_pio::handle_primary_interrupt();
-
-    eoi(Some(PIC_MASTER_OFFSET + 0xe));
+    eoi(Some(PIC_MASTER_OFFSET + 0xE));
 }
 
 
-extern "x86-interrupt" fn unimplemented_interrupt_handler(_stack_frame: &mut ExceptionStackFrame) {
-    let irq_regs = PIC.try().map(|pic| pic.read_isr_irr());    
-    println_raw!("UNIMPLEMENTED IRQ!!! {:?}", irq_regs);
-
-    loop { }
+/// 0x2F
+extern "x86-interrupt" fn secondary_ata_handler(_stack_frame: &mut ExceptionStackFrame ) {
+    info!("Secondary ATA Interrupt (0x2F)");
+    
+    eoi(Some(PIC_MASTER_OFFSET + 0xF));
 }
-
-
-extern "x86-interrupt" fn irq_0x22_handler(_stack_frame: &mut ExceptionStackFrame) {
-	let irq_regs = PIC.try().map(|pic| pic.read_isr_irr());    
-    println_raw!("\nCaught 0x22 interrupt: {:#?}", _stack_frame);
-    println_raw!("IrqRegs: {:?}", irq_regs);
-
-    loop { }
-}
-
-extern "x86-interrupt" fn irq_0x23_handler(_stack_frame: &mut ExceptionStackFrame) {
-    let irq_regs = PIC.try().map(|pic| pic.read_isr_irr());  
-	println_raw!("\nCaught 0x23 interrupt: {:#?}", _stack_frame);
-    println_raw!("IrqRegs: {:?}", irq_regs);
-
-    loop { }
-}
-
-extern "x86-interrupt" fn irq_0x24_handler(_stack_frame: &mut ExceptionStackFrame) {
-	let irq_regs = PIC.try().map(|pic| pic.read_isr_irr());
-    println_raw!("\nCaught 0x24 interrupt: {:#?}", _stack_frame);
-    println_raw!("IrqRegs: {:?}", irq_regs);
-
-    loop { }
-}
-
-extern "x86-interrupt" fn irq_0x25_handler(_stack_frame: &mut ExceptionStackFrame) {
-	let irq_regs = PIC.try().map(|pic| pic.read_isr_irr());  
-    println_raw!("\nCaught 0x25 interrupt: {:#?}", _stack_frame);
-    println_raw!("IrqRegs: {:?}", irq_regs);
-
-    loop { }
-}
-
-
-extern "x86-interrupt" fn irq_0x26_handler(_stack_frame: &mut ExceptionStackFrame) {
-	let irq_regs = PIC.try().map(|pic| pic.read_isr_irr());  
-    println_raw!("\nCaught 0x26 interrupt: {:#?}", _stack_frame);
-    println_raw!("IrqRegs: {:?}", irq_regs);
-
-    loop { }
-}
-
-extern "x86-interrupt" fn irq_0x27_handler(_stack_frame: &mut ExceptionStackFrame) {
-	let irq_regs = PIC.try().map(|pic| pic.read_isr_irr());  
-    println_raw!("\nCaught 0x27 interrupt: {:#?}", _stack_frame);
-    println_raw!("IrqRegs: {:?}", irq_regs);
-
-    loop { }
-}
-
-
-extern "x86-interrupt" fn irq_0x28_handler(_stack_frame: &mut ExceptionStackFrame) {
-	let irq_regs = PIC.try().map(|pic| pic.read_isr_irr());  
-    println_raw!("\nCaught 0x28 interrupt: {:#?}", _stack_frame);
-    println_raw!("IrqRegs: {:?}", irq_regs);
-
-    loop { }
-}
-
-
-extern "x86-interrupt" fn irq_0x29_handler(_stack_frame: &mut ExceptionStackFrame) {
-	let irq_regs = PIC.try().map(|pic| pic.read_isr_irr());  
-    println_raw!("\nCaught 0x29 interrupt: {:#?}", _stack_frame);
-    println_raw!("IrqRegs: {:?}", irq_regs);
-
-    loop { }
-}
-
-
-#[allow(non_snake_case)]
-extern "x86-interrupt" fn irq_0x2A_handler(_stack_frame: &mut ExceptionStackFrame) {
-	let irq_regs = PIC.try().map(|pic| pic.read_isr_irr());  
-    println_raw!("\nCaught 0x2A interrupt: {:#?}", _stack_frame);
-    println_raw!("IrqRegs: {:?}", irq_regs);
-
-    loop { }
-}
-
-#[allow(non_snake_case)]
-extern "x86-interrupt" fn irq_0x2B_handler(_stack_frame: &mut ExceptionStackFrame) {
-	let irq_regs = PIC.try().map(|pic| pic.read_isr_irr());  
-    println_raw!("\nCaught 0x2B interrupt: {:#?}", _stack_frame);
-    println_raw!("IrqRegs: {:?}", irq_regs);
-
-    loop { }
-}
-
-
-
-#[allow(non_snake_case)]
-extern "x86-interrupt" fn irq_0x2D_handler(_stack_frame: &mut ExceptionStackFrame) {
-	let irq_regs = PIC.try().map(|pic| pic.read_isr_irr());  
-    println_raw!("\nCaught 0x2D interrupt: {:#?}", _stack_frame);
-    println_raw!("IrqRegs: {:?}", irq_regs);
-
-    loop { }
-}
-
-#[allow(non_snake_case)]
-extern "x86-interrupt" fn irq_0x2E_handler(_stack_frame: &mut ExceptionStackFrame) {
-	let irq_regs = PIC.try().map(|pic| pic.read_isr_irr());  
-    println_raw!("\nCaught 0x2E interrupt: {:#?}", _stack_frame);
-    println_raw!("IrqRegs: {:?}", irq_regs);
-
-    loop { }
-}
-
-#[allow(non_snake_case)]
-extern "x86-interrupt" fn irq_0x2F_handler(_stack_frame: &mut ExceptionStackFrame) {
-	let irq_regs = PIC.try().map(|pic| pic.read_isr_irr());  
-    println_raw!("\nCaught 0x2F interrupt: {:#?}", _stack_frame);
-    println_raw!("IrqRegs: {:?}", irq_regs);
-
-    loop { }
-}
-
 
 
 extern "x86-interrupt" fn ipi_handler(_stack_frame: &mut ExceptionStackFrame) {
-
     eoi(None);
 }
