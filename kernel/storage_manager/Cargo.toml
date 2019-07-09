@@ -1,0 +1,28 @@
+[package]
+authors = ["Kevin Boos <kevinaboos@gmail.com>"]
+name = "storage_manager"
+description = "A crate for managing storage devices/drives"
+version = "0.1.0"
+build = "../../build.rs"
+
+[dependencies]
+spin = "0.4.10"
+owning_ref = { git = "https://github.com/kevinaboos/owning-ref-rs" }
+
+
+[dependencies.log]
+default-features = false
+version = "0.3.7"
+
+[dependencies.lazy_static]
+features = ["spin_no_std", "nightly"]
+version = "1.2.0"
+
+[dependencies.pci]
+path = "../pci"
+
+[dependencies.ata]
+path = "../ata"
+
+[lib]
+crate-type = ["rlib"]

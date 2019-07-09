@@ -42,6 +42,9 @@ path = "../keyboard"
 [dependencies.mouse]
 path = "../mouse"
 
+[dependencies.storage_manager]
+path = "../storage_manager"
+
 [dependencies.network_manager]
 path = "../network_manager"
 
