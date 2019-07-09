@@ -162,6 +162,7 @@ impl WindowComponents {
         ));
     }
 
+    /// refresh the top left three button's appearance
     fn refresh_three_button(& self, bx: usize, by: usize) -> Result<(), &'static str> {
         for i in 0..3 {
             let y = by + self.bias_y / 2;

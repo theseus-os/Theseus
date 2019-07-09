@@ -182,6 +182,7 @@ impl FrameBufferAlpha {
         }
     }
 
+    /// draw a circle on the screen with alpha
     pub fn draw_circle_alpha(&mut self, xc: usize, yc: usize, r: usize, color: Pixel) {
         let r2 = (r*r) as isize;
         for y in yc-r..yc+r {
@@ -197,11 +198,13 @@ impl FrameBufferAlpha {
         }
     }
 
+    /// draw a char on the screen with alpha
     pub fn draw_char_8x16(&mut self, x: usize, y: usize, c: u8, color: Pixel) {
         for yi in 0..16 {
             let char_font: u8 = font::FONT_BASIC[c as usize][yi];
             for xi in 0..8 {
-                if char_font & (0x80u8 >> xi) != 0 {
+                const HIGHEST_BIT: u8 = 0x80;
+                if char_font & (HIGHEST_BIT >> xi) != 0 {
                     self.draw_point_alpha(x+xi, y+yi, color);
                 }
             }
@@ -218,43 +221,47 @@ pub fn get_screen_size() -> Result<(usize, usize), &'static str> {
     Ok((final_buffer.width, final_buffer.height))
 }
 
+macro_rules! byte_alpha { ($x:expr) => (($x >> 24) as u8); }
+macro_rules! byte_red { ($x:expr) => (($x >> 16) as u8); }
+macro_rules! byte_green { ($x:expr) => (($x >> 8) as u8); }
+macro_rules! byte_blue { ($x:expr) => ($x as u8); }
+/// construct a color with alpha, red, green, blue
+fn to_color(alpha: u8, red: u8, green: u8, blue: u8) -> Pixel {
+    ((alpha as Pixel) << 24) | ((red as Pixel) << 16) | ((green as Pixel) << 8) | (blue as Pixel)
+}
+
+/// mix two color for one pixel on the top of another
 pub fn alpha_mix(bottom: Pixel, top: Pixel) -> Pixel {
-    let alpha = (top >> 24) as u16;  // [31:24] of u32, highest byte
-    let red = (top >> 16) as u8;  // [23:16] of u32
-    let green = (top >> 8) as u8;  // [15:8] of u32
-    let blue = (top >> 0) as u8;  // [7:0] of u32
-    let ori_red = (bottom >> 16) as u8;  // [23:16] of u32
-    let ori_green = (bottom >> 8) as u8;  // [15:8] of u32
-    let ori_blue = (bottom >> 0) as u8;  // [7:0] of u32
+    let alpha = byte_alpha!(top) as u16;
+    let red = byte_red!(top);
+    let green = byte_green!(top);
+    let blue = byte_blue!(top);
+    let ori_red = byte_red!(bottom);
+    let ori_green = byte_green!(bottom);
+    let ori_blue = byte_blue!(bottom);
     let new_red = (((red as u16) * (255 - alpha) + (ori_red as u16) * alpha) / 255) as u8;
     let new_green = (((green as u16) * (255 - alpha) + (ori_green as u16) * alpha) / 255) as u8;
     let new_blue = (((blue as u16) * (255 - alpha) + (ori_blue as u16) * alpha) / 255) as u8;
-    let mut new_color = bottom & 0xFF000000;  // use alpha value of bottom pixel
-    new_color |= (new_red as u32) << 16;  // [23:16] of u32
-    new_color |= (new_green as u32) << 8;  // [15:8] of u32
-    new_color |= (new_blue as u32) << 0;  // [7:0] of u32
-    new_color
+    to_color(byte_alpha!(bottom), new_red, new_green, new_blue)
 }
 
+/// mix two color linearly with a float number
 pub fn color_mix(c1: Pixel, c2: Pixel, mix: f32) -> Pixel {
-    if mix < 0f32 || mix > 1f32 {  // cannot mix value outside region
-        return 0x00000000;  // return black
+    if mix < 0f32 || mix > 1f32 {  // cannot mix value outside [0, 1]
+        const BLACK: Pixel = 0x00000000;
+        return BLACK;
     }
-    let alpha1 = (c1 >> 24) as u8;  // [31:24] of u32, highest byte
-    let red1 = (c1 >> 16) as u8;  // [23:16] of u32
-    let green1 = (c1 >> 8) as u8;  // [15:8] of u32
-    let blue1 = (c1 >> 0) as u8;  // [7:0] of u32
-    let alpha2 = (c2 >> 24) as u8;  // [31:24] of u32
-    let red2 = (c2 >> 16) as u8;  // [23:16] of u32
-    let green2 = (c2 >> 8) as u8;  // [15:8] of u32
-    let blue2 = (c2 >> 0) as u8;  // [7:0] of u32
+    let alpha1 = byte_alpha!(c1);
+    let red1 = byte_red!(c1);
+    let green1 = byte_green!(c1);
+    let blue1 = byte_blue!(c1);
+    let alpha2 = byte_alpha!(c2);
+    let red2 = byte_red!(c2);
+    let green2 = byte_green!(c2);
+    let blue2 = byte_blue!(c2);
     let new_alpha = ((alpha1 as f32) * mix + (alpha2 as f32) * (1f32-mix)) as u8;
     let new_red = ((red1 as f32) * mix + (red2 as f32) * (1f32-mix)) as u8;
     let new_green = ((green1 as f32) * mix + (green2 as f32) * (1f32-mix)) as u8;
     let new_blue = ((blue1 as f32) * mix + (blue2 as f32) * (1f32-mix)) as u8;
-    let mut new_color = (new_alpha as u32) << 24;  // [31:24] of u32
-    new_color |= (new_red as u32) << 16;  // [23:16] of u32
-    new_color |= (new_green as u32) << 8;  // [15:8] of u32
-    new_color |= (new_blue as u32) << 0;  // [7:0] of u32
-    new_color
+    to_color(new_alpha, new_red, new_green, new_blue)
 }

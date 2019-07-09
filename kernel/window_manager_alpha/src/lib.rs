@@ -55,11 +55,15 @@ lazy_static! {
     );
 }
 
-// The maximum size of cursor
+/// The maximum size of cursor
 const CURSOR_MAX_SIZE: usize = 7;
-const T: Pixel = 0xFF000000;  // transparent
-const O: Pixel = 0x00FFFFFF;  // opaque white
-const B: Pixel = 0x000000FF;  // opaque black
+/// Transparent pixel
+const T: Pixel = 0xFF000000;
+/// Opaque white
+const O: Pixel = 0x00FFFFFF;
+/// Opaque black
+const B: Pixel = 0x000000FF;
+/// the cursor picture
 const CURSOR_BASIC: [[Pixel; 2*CURSOR_MAX_SIZE+1]; 2*CURSOR_MAX_SIZE+1] = [
     [ T, T, T, T, T, T, T, T, T, T, T, T, T, T, T ],
     [ T, T, T, T, T, T, T, T, T, T, T, T, T, T, T ],
@@ -78,17 +82,26 @@ const CURSOR_BASIC: [[Pixel; 2*CURSOR_MAX_SIZE+1]; 2*CURSOR_MAX_SIZE+1] = [
     [ T, T, T, T, T, T, B, T, T, T, T, T, T, B, B ],
 ];
 
-/// indicating new window position and size
+/// the border indicating new window position and size
 const WINDOW_BORDER_SIZE: usize = 3;
+/// border's inner color
 const WINDOW_BORDER_COLOR_INNER: Pixel = 0x00CA6F1E;
+/// border's outter color
 const WINDOW_BORDER_COLOR_OUTTER: Pixel = 0xFFFFFFFF;
 
+/// window manager with overlapping and alpha enabled
 struct WindowManagerAlpha {
+    /// those window currently not shown on screen
     hide_list: VecDeque<Weak<Mutex<WindowObjAlpha>>>,
+    /// those window shown on screen that may overlapping each other
     show_list: VecDeque<Weak<Mutex<WindowObjAlpha>>>,
+    /// the only active window, receiving all keyboard events (except for those remained for WM)
     active: Weak<Mutex<WindowObjAlpha>>,  // this one is not in show_list
+    /// current cursor position
     cursor: (usize, usize),  // store the current cursor position
+    /// whether show the border to indicating new window's position and size
     is_show_border: bool,
+    /// if show border, then where to show it
     border_position: (usize, usize, usize, usize),  // xs, xe, ys, ye, could be minus value
 }
 
@@ -620,6 +633,7 @@ fn window_manager_loop( consumer: (DFQueueConsumer<Event>, DFQueueConsumer<Event
     }
 }
 
+/// handle keyboard event, push it to the active window if exists
 fn keyboard_handle_application(key_input: KeyEvent) -> Result<(), &'static str> {
     let win = WINDOW_MANAGER.lock();
     match win.pass_keyboard_event_to_window(key_input) {  // even not find a window to pass, that's ok
@@ -629,6 +643,7 @@ fn keyboard_handle_application(key_input: KeyEvent) -> Result<(), &'static str> 
     Ok(())
 }
 
+/// handle cursor event, push it to related window or anyone asked for it
 fn cursor_handle_application(mouse_event: MouseEvent) -> Result<(), &'static str> {
     do_refresh_floating_border()?;
     let win = WINDOW_MANAGER.lock();

@@ -176,8 +176,10 @@ impl Terminal {
         let (width_inner, height_inner) = wincomps.inner_size();
         debug!("new window done width: {}, height: {}", width_inner, height_inner);
         // next add textarea to wincomps
+        const TEXTAREA_BORDER: usize = 4;
         let textarea_object = match window_components::TextArea::new(
-            wincomps.bias_x + 4, wincomps.bias_y + 4, width_inner - 8, height_inner - 8,
+            wincomps.bias_x + TEXTAREA_BORDER, wincomps.bias_y + TEXTAREA_BORDER,
+            width_inner - 2*TEXTAREA_BORDER, height_inner - 2*TEXTAREA_BORDER,
             &wincomps.winobj, None, None, Some(wincomps.background), None
         ) {
             Ok(m) => m,
