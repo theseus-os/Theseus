@@ -23,7 +23,7 @@
 //! * `acpi`: ACPI (Advanced Configuration and Power Interface) support for Theseus, including multicore discovery.
 //! * `apic`: APIC (Advanced Programmable Interrupt Controller) support for Theseus (x86 only), including apic/xapic and x2apic.
 //! * `ap_start`: High-level initialization code that runs on each AP (core) after it has booted up
-//! * `ata_pio`: Support for ATA hard disks (IDE/PATA) using PIO (not DMA), and not SATA.
+//! * `ata`: Support for ATA hard disks (IDE/PATA), not SATA over AHCI.
 //! * `captain`: The main driver of Theseus. Controls the loading and initialization of all subsystems and other crates.
 //! * `input_event_manager`: Handles input events from the keyboard and routes them to the correct application. ** Being phased out by window manager
 //! * `event_types`: A temporary way to move the input_event_manager typedefs out of the input_event_manager crate.

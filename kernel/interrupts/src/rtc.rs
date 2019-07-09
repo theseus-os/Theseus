@@ -4,7 +4,6 @@ pub use irq_safety::{hold_interrupts, enable_interrupts, interrupts_enabled};
 use util;
 use kernel_config::time::{CONFIG_TIMESLICE_PERIOD_MS, CONFIG_RTC_FREQUENCY_HZ};
 use spin::Mutex;
-use drivers::ata_pio;
 
 //standard port to write to on CMOS to select registers
 const CMOS_WRITE_PORT: u16 = 0x70;

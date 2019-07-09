@@ -34,7 +34,10 @@ use atomic::Atomic;
 use pit_clock::pit_wait;
 
 
-pub static INTERRUPT_CHIP: Atomic<InterruptChip> = Atomic::new(InterruptChip::APIC);
+/// The interrupt chip that is currently configured on this machine. 
+/// The default is `InterruptChip::PIC`, but the typical case is `APIC` or `X2APIC`,
+/// which will be set once those chips have been initialized.
+pub static INTERRUPT_CHIP: Atomic<InterruptChip> = Atomic::new(InterruptChip::PIC);
 
 #[derive(Clone, Copy, PartialEq, Debug)]
 pub enum InterruptChip {
@@ -616,9 +619,11 @@ impl LocalApic {
     }
 
 
-    pub fn get_isr(&self) -> (u32, u32, u32, u32, u32, u32, u32, u32) {
+    /// Returns the values of the 8 in-service registers for this APIC,
+    /// which is a series of bitmasks that shows which interrupt lines are currently being serviced. 
+    pub fn get_isr(&self) -> [u32; 8] {
         if has_x2apic() {
-            ( 
+            [
                 rdmsr(IA32_X2APIC_ISR0) as u32, 
                 rdmsr(IA32_X2APIC_ISR1) as u32,
                 rdmsr(IA32_X2APIC_ISR2) as u32, 
@@ -627,11 +632,11 @@ impl LocalApic {
                 rdmsr(IA32_X2APIC_ISR5) as u32,
                 rdmsr(IA32_X2APIC_ISR6) as u32,
                 rdmsr(IA32_X2APIC_ISR7) as u32,
-            )
+            ]
         }
         else {
             let ref isr = self.regs.as_ref().expect("ApicRegisters").in_service_registers;
-            (
+            [
                 isr.reg0.read(),
                 isr.reg1.read(),
                 isr.reg2.read(),
@@ -640,14 +645,17 @@ impl LocalApic {
                 isr.reg5.read(),
                 isr.reg6.read(),
                 isr.reg7.read(),
-            )
+            ]
         }
     }
 
 
-    pub fn get_irr(&self) -> (u32, u32, u32, u32, u32, u32, u32, u32) {
+    /// Returns the values of the 8 request registers for this APIC,
+    /// which is a series of bitmasks that shows which interrupt lines are currently raised, 
+    /// but not yet being serviced.
+    pub fn get_irr(&self) -> [u32; 8] {
         if has_x2apic() {
-            ( 
+            [ 
                 rdmsr(IA32_X2APIC_IRR0) as u32, 
                 rdmsr(IA32_X2APIC_IRR1) as u32,
                 rdmsr(IA32_X2APIC_IRR2) as u32, 
@@ -656,11 +664,11 @@ impl LocalApic {
                 rdmsr(IA32_X2APIC_IRR5) as u32,
                 rdmsr(IA32_X2APIC_IRR6) as u32,
                 rdmsr(IA32_X2APIC_IRR7) as u32,
-            )
+            ]
         }
         else {
             let ref irr = self.regs.as_ref().expect("ApicRegisters").interrupt_request_registers;
-            (
+            [
                 irr.reg0.read(),
                 irr.reg1.read(),
                 irr.reg2.read(),
@@ -669,7 +677,7 @@ impl LocalApic {
                 irr.reg5.read(),
                 irr.reg6.read(),
                 irr.reg7.read(),
-            )
+            ]
         }
     }
 }
