@@ -5,9 +5,6 @@ description = "Try New Window"
 authors = ["wuyuepku <wuyue16@pku.edu.cn>"]
 build = "../../build.rs"
 
-[dependencies.getopts]
-getopts = { git = "https://github.com/kevinaboos/getopts" }
-
 [dependencies]
 spin = "0.4.10"
 # x86_64 = { git = "https://github.com/kevinaboos/x86_64" }

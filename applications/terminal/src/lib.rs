@@ -165,7 +165,7 @@ impl Terminal {
         // Requests a new window object from the window manager
         let (window_width, window_height) = window_manager_alpha::get_screen_size()?;
         let window_object = match window_components::WindowComponents::new(
-            50, 50, window_width - 100, window_height - 100
+            20, 20, window_width - 40, window_height - 40
         ) {
             Ok(window_object) => window_object,
             Err(err) => {debug!("new window returned err"); return Err(err)}
@@ -697,11 +697,6 @@ impl Terminal {
                 return Ok(());
             } else {
                 // Subtraction by accounts for 0-indexing
-                self.cursor.disable();
-                self.display_cursor()?;
-                self.absolute_cursor_pos -= 1;
-                self.cursor.enable();
-                self.display_cursor()?;
                 let remove_idx: usize =  self.cmdline.len() - self.left_shift -1;
                 self.cmdline.remove(remove_idx);
                 self.pop_from_stdin(true);
@@ -715,7 +710,6 @@ impl Terminal {
                 return Ok(());
             } else {
                 // Subtraction by accounts for 0-indexing
-                // self.cursor.display_cursor()?;
                 let remove_idx: usize =  self.cmdline.len() - self.left_shift;
                 // we're moving the cursor one position to the right relative to the end of the input string
                 self.cmdline.remove(remove_idx);
@@ -997,9 +991,9 @@ impl Terminal {
         self.cursor.blink();
         // debug!("absolute_cursor_pos: {}", self.absolute_cursor_pos);
         if self.cursor.show {
-            self.textarea.lock().set_char_absolute(self.absolute_cursor_pos, 221)?;
+            self.textarea.lock().set_char_absolute(self.absolute_cursor_pos - self.left_shift, 221)?;
         } else {
-            self.textarea.lock().set_char_absolute(self.absolute_cursor_pos, ' ' as u8)?;
+            self.textarea.lock().set_char_absolute(self.absolute_cursor_pos - self.left_shift, ' ' as u8)?;
         }
         Ok(())
     }

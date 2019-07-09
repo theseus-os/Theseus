@@ -1,9 +1,11 @@
+//! thie application is to create a new window with given size
+//! 
+
 #![no_std]
 #[macro_use] extern crate log;
-#[macro_use] extern crate alloc;
+extern crate alloc;
 
 extern crate keycodes_ascii;
-extern crate spin;
 extern crate dfqueue;
 extern crate spawn;
 extern crate runqueue;
@@ -12,68 +14,36 @@ extern crate window_manager_alpha;
 extern crate hpet;
 
 extern crate print;
-extern crate environment;
 extern crate window_components;
 
-extern crate task;
-extern crate getopts;
-extern crate path;
-extern crate fs_node;
-extern crate root;
 extern crate scheduler;
 
-use getopts::Options;
-use fs_node::{FsNode, FileOrDir};
-
 use event_types::{Event};
-use keycodes_ascii::{Keycode, KeyAction, KeyEvent};
-use alloc::string::{String, ToString};
+use keycodes_ascii::{Keycode, KeyAction};
+use alloc::string::{String};
 use alloc::vec::Vec;
-use alloc::sync::Arc;
-use dfqueue::{DFQueue, DFQueueConsumer, DFQueueProducer};
-use spawn::{ApplicationTaskBuilder, KernelTaskBuilder};
-use path::Path;
-use task::{TaskRef, ExitValue, KillReason};
-use environment::Environment;
-use spin::Mutex;
-use core::ops::{Deref, DerefMut};
+use core::ops::{Deref};
 use hpet::get_hpet;
 
 #[no_mangle]
 pub fn main(_args: Vec<String>) -> isize {
 
-    if (_args.len() != 5) {
+    if _args.len() != 4 {
         debug!("parameter not 5");
         return 0;
     }
 
-    let x = _args[1].parse::<usize>().unwrap();
-    let y = _args[2].parse::<usize>().unwrap();
-    let width = _args[3].parse::<usize>().unwrap();
-    let height = _args[4].parse::<usize>().unwrap();
+    let x = _args[0].parse::<usize>().unwrap();
+    let y = _args[1].parse::<usize>().unwrap();
+    let width = _args[2].parse::<usize>().unwrap();
+    let height = _args[3].parse::<usize>().unwrap();
     debug!("parameters {:?}", (x, y, width, height));
-
-    let (window_width, window_height) = match window_manager_alpha::get_screen_size() {
-        Ok(obj) => obj,
-        Err(err) => {debug!("new window returned err"); return -1 }
-    };
-
-    // [ use raw new_window ]
-
-    // let window_object = match window_manager_alpha::new_window(
-    //     x, y, width, height
-    // ) {
-    //     Ok(window_object) => window_object,
-    //     Err(err) => {debug!("new window returned err"); return -2 }
-    // };
-
-    // [ use window_components ]
 
     let _wincomps = match window_components::WindowComponents::new(
         x, y, width, height
     ) {
         Ok(m) => m,
-        Err(err) => { debug!("new window components returned err"); return -2; }
+        Err(err) => { debug!("new window components returned err: {}", err); return -2; }
     };
     let mut wincomps = _wincomps.lock();
     let (width_inner, height_inner) = wincomps.inner_size();
@@ -84,7 +54,7 @@ pub fn main(_args: Vec<String>) -> isize {
         &wincomps.winobj, None, None, Some(wincomps.background), None
     ) { 
         Ok(m) => m,
-        Err(err) => { debug!("new textarea returned err"); return -3; }
+        Err(err) => { debug!("new textarea returned err: {}", err); return -3; }
     };
     // refresh all the charaters to test performance
     let mut textarea = _textarea.lock();
@@ -110,8 +80,8 @@ pub fn main(_args: Vec<String>) -> isize {
     // }
     // char_matrix[0] = 221;
 
-    const cursor_char: u8 = 221;
-    const blink_interval: u64 = 50000000;
+    const CURSOR_CHAR: u8 = 221;
+    const BLINK_INTERVAL: u64 = 50000000;
     let start_time: u64 = get_time();
     let mut cursor_last_char: u8 = ' ' as u8;
 
@@ -175,9 +145,9 @@ pub fn main(_args: Vec<String>) -> isize {
         }
 
         // make cursor blink
-        let timidx = (get_time() - start_time) / blink_interval;
+        let timidx = (get_time() - start_time) / BLINK_INTERVAL;
         if timidx % 2 == 0 {
-            char_matrix[text_cursor] = cursor_char;
+            char_matrix[text_cursor] = CURSOR_CHAR;
         } else {
             char_matrix[text_cursor] = ' ' as u8;
         }
@@ -189,8 +159,6 @@ pub fn main(_args: Vec<String>) -> isize {
 
         scheduler::schedule();  // do nothing
     }
-
-    0
 }
 
 fn get_time() -> u64 {

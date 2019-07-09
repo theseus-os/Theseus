@@ -25,22 +25,19 @@ extern crate frame_buffer_alpha;
 #[macro_use]
 extern crate lazy_static;
 extern crate spawn;
-extern crate path;
 extern crate mouse_data;
 extern crate keycodes_ascii;
 
 mod background;
-use path::Path;
 use alloc::collections::VecDeque;
-use alloc::string::{String, ToString};
+use alloc::string::{ToString};
 use alloc::sync::{Arc, Weak};
-use alloc::vec::Vec;
 use core::ops::Deref;
 use dfqueue::{DFQueue, DFQueueConsumer, DFQueueProducer};
 use event_types::{Event, MousePositionEvent};
 use frame_buffer_alpha::{ FrameBufferAlpha, Pixel, FINAL_FRAME_BUFFER, alpha_mix, color_mix };
 use spin::{Mutex};
-use spawn::{KernelTaskBuilder, ApplicationTaskBuilder};
+use spawn::{KernelTaskBuilder};
 use mouse_data::MouseEvent;
 use keycodes_ascii::{KeyEvent};
 
@@ -303,18 +300,6 @@ impl WindowManagerAlpha {
             self.refresh_single_pixel_with_buffer(xe-1, y as usize, &mut final_fb)?;
         }
         Ok(())
-    }
-
-    /// refresh whole window, not recommended for small changes of window
-    fn refresh_window(& self, objref: &Arc<Mutex<WindowObjAlpha>>) -> Result<(), &'static str> {
-        let winobj = objref.lock();
-        let xs = winobj.x;
-        let xe = xs + winobj.width;
-        let ys = winobj.y;
-        let ye = ys + winobj.height;
-        // debug!("drawing {:?}", (xs, xe, ys, ye));
-        drop(winobj);
-        self.refresh_area(xs, xe, ys, ye)
     }
 
     /// pass keyboard event to currently active window
@@ -729,30 +714,7 @@ pub fn new_window<'a>(
     let window_ref = Arc::new(Mutex::new(window));
     let mut win = WINDOW_MANAGER.lock();
     win.set_active(&window_ref);
-    win.refresh_window(&window_ref)?;  // do not refresh now for better speed
+    // win.refresh_window(&window_ref)?;  // do not refresh now for better speed
 
     Ok(window_ref)
-}
-
-fn test_create_window(x: &'static str, y: &'static str, width: &'static str, height: &'static str) -> Result<(), &'static str> {
-    let mut arg1 : Vec<String> = Vec::new();
-    arg1.push(String::from("new_window"));
-    arg1.push(String::from(x));
-    arg1.push(String::from(y));
-    arg1.push(String::from(width));
-    arg1.push(String::from(height));
-    ApplicationTaskBuilder::new(Path::new(String::from("new_window"))).argument(
-        arg1
-    ).spawn()?;
-    Ok(())
-}
-
-/// testcase of window manager
-pub fn test() -> Result<(), &'static str> {
-    // let mut vec = Vec::new(["100"]);
-    // test_create_window("100", "100", "200", "200")?;
-    test_create_window("400", "400", "400", "400")?;
-    // test_create_window("400", "100", "100", "200")?;
-    // test_create_window("350", "200", "200", "400")?;
-    Ok(())
 }

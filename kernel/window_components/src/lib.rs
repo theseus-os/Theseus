@@ -6,7 +6,6 @@
 #![no_std]
 
 extern crate spin;
-#[macro_use]
 extern crate alloc;
 extern crate dfqueue;
 extern crate event_types;
@@ -14,22 +13,16 @@ extern crate event_types;
 extern crate log;
 extern crate frame_buffer_alpha;
 extern crate font;
-extern crate spawn;
 extern crate mouse;
-extern crate path;
 extern crate window_manager_alpha;
 
-use path::Path;
-use alloc::collections::{BTreeMap, VecDeque};
-use alloc::string::{String, ToString};
 use alloc::sync::{Arc, Weak};
 use alloc::vec::Vec;
-use core::ops::{Deref, DerefMut};
+use core::ops::{Deref};
 use dfqueue::{DFQueue, DFQueueConsumer, DFQueueProducer};
 use event_types::{Event, MousePositionEvent};
-use frame_buffer_alpha::{ FrameBufferAlpha, Pixel, FINAL_FRAME_BUFFER, alpha_mix, color_mix };
-use spin::{Mutex, Once};
-use spawn::{KernelTaskBuilder, ApplicationTaskBuilder};
+use frame_buffer_alpha::{ Pixel, color_mix };
+use spin::{Mutex};
 use window_manager_alpha::WindowObjAlpha;
 
 /// The top bar size
@@ -53,14 +46,19 @@ const WINDOW_BUTTON_BETWEEN: usize = 15;
 const WINDOW_BUTTON_SIZE: usize = 6;
 const WINDOW_BUTTON_COLOR_ERROR: Pixel = 0x00000000;  // black
 
-// do not allow overlapping of components, to reduce complexity
-// people who needs that attribute should realize another WindowComponents which allowes that
+/// abstraction of a window, providing top bar which helps user moving, close, maximize or minimize window
 pub struct WindowComponents {
-    components: BTreeMap<String, Arc<Mutex<Component>>>,
+    // TODO: not used now, change this later
+    // components: BTreeMap<String, Arc<Mutex<Component>>>,
+    /// the window object that could be used to initialize components
     pub winobj: Arc<Mutex<WindowObjAlpha>>,
-    pub bias_x: usize,  // init as WINDOW_BORDER, should not be modified
-    pub bias_y: usize,  // init as WINDOW_TOPBAR, should not be modified
-    pub background: Pixel,  // init as WINDOW_BACKGROUND
+    /// NOT MODIFY: the space remained for border, init as WINDOW_BORDER
+    pub bias_x: usize,
+    /// NOT MODIFY: the space remained for top bar, init as WINDOW_TOPBAR
+    pub bias_y: usize,
+    /// the background of this window, init as WINDOW_BACKGROUND **TODO**: not support changing yet
+    pub background: Pixel,
+    /// application could get events from this consumer
     pub consumer: DFQueueConsumer<Event>,  // event input
     producer: DFQueueProducer<Event>,  // event output used by window manager
 
@@ -68,6 +66,7 @@ pub struct WindowComponents {
 }
 
 impl WindowComponents {
+    /// create new WindowComponents and return it
     pub fn new(x: usize, y: usize, width: usize, height: usize) -> Result<Arc<Mutex<WindowComponents>>, &'static str> {
 
         if width <= 2 * WINDOW_TOPBAR || height <= WINDOW_TOPBAR + WINDOW_BORDER {
@@ -80,7 +79,6 @@ impl WindowComponents {
         let producer = consumer.obtain_producer();
 
         let mut wincomps: WindowComponents = WindowComponents {
-            components: BTreeMap::new(),
             winobj: _winobj,
             bias_x: WINDOW_BORDER,
             bias_y: WINDOW_TOPBAR,
@@ -108,7 +106,7 @@ impl WindowComponents {
         Ok(Arc::new(Mutex::new(wincomps)))
     }
 
-    pub fn draw_border(&mut self, active: bool) {
+    fn draw_border(&mut self, active: bool) {
         let mut winobj = self.winobj.lock();
         // first draw left, bottom, right border
         let mut border_color = WINDOW_BORDER_COLOR_INACTIVE;
@@ -149,7 +147,7 @@ impl WindowComponents {
     }
 
     /// show three button with status. idx = 0,1,2, state = 0,1,2 
-    fn show_button(& self, idx: usize, state: usize, mut winobj: &mut WindowObjAlpha) {
+    fn show_button(& self, idx: usize, state: usize, winobj: &mut WindowObjAlpha) {
         if idx > 2 { return; }
         if state > 2 { return; }
         let y = self.bias_y / 2;
@@ -174,20 +172,22 @@ impl WindowComponents {
         Ok(())
     }
 
+    /// return the available inner size, excluding top bar and border
     pub fn inner_size(& self) -> (usize, usize) {
         let winobj = self.winobj.lock();
         (winobj.width - 2 * self.bias_x, winobj.height - self.bias_x - self.bias_y)
     }
 
+    /// event handler that should be called periodically
     pub fn handle_event(&mut self) {
         let mut winobj = self.winobj.lock();
-        let mut consumer = &winobj.consumer;
+        let consumer = &winobj.consumer;
         let event = match consumer.peek() {
             Some(ev) => ev,
             _ => { return; }
         };
-        let mut call_later__do_refresh_floating_border = false;
-        let mut call_later__do_move_active_window = false;
+        let mut call_later_do_refresh_floating_border = false;
+        let mut call_later_do_move_active_window = false;
         match event.deref() {
             &Event::InputEvent(ref input_event) => {
                 let key_input = input_event.key_event;
@@ -200,8 +200,8 @@ impl WindowComponents {
                         winobj.is_moving = false;
                         winobj.give_all_mouse_event = false;
                         self.last_mouse_position_event = mouse_event.clone();
-                        call_later__do_refresh_floating_border = true;
-                        call_later__do_move_active_window = true;
+                        call_later_do_refresh_floating_border = true;
+                        call_later_do_move_active_window = true;
                     }
                 } else {
                     if mouse_event.y < self.bias_y {  // the region of top bar
@@ -226,7 +226,7 @@ impl WindowComponents {
                             winobj.is_moving = true;
                             winobj.give_all_mouse_event = true;
                             winobj.moving_base = (mouse_event.gx, mouse_event.gy);
-                            call_later__do_refresh_floating_border = true;
+                            call_later_do_refresh_floating_border = true;
                         }
                         self.last_mouse_position_event = mouse_event.clone();
                     } else {  // the region of components
@@ -244,13 +244,13 @@ impl WindowComponents {
             Ok(_) => { }
             Err(err) => { debug!("refresh_three_button failed {}", err); }
         }
-        if call_later__do_refresh_floating_border {
+        if call_later_do_refresh_floating_border {
             match window_manager_alpha::do_refresh_floating_border() {
                 Ok(_) => { }
                 Err(err) => { debug!("do_refresh_floating_border failed {}", err); }
             }
         }
-        if call_later__do_move_active_window {
+        if call_later_do_move_active_window {
             match window_manager_alpha::do_move_active_window() {
                 Ok(_) => { }
                 Err(err) => { debug!("do_move_active_window failed {}", err); }
@@ -261,8 +261,9 @@ impl WindowComponents {
     }
 }
 
+/// a general type for different component, not used yet
 pub enum Component {
-    textarea(TextArea),
+    TextArea(TextArea),
 }
 
 /// a textarea with fixed size, showing matrix of chars
@@ -282,6 +283,7 @@ pub struct TextArea {
 }
 
 impl TextArea {
+    /// create new textarea
     pub fn new(x: usize, y: usize, width: usize, height: usize, winobj: &Arc<Mutex<WindowObjAlpha>>
             , line_spacing: Option<usize>, column_spacing: Option<usize>
             , background_color: Option<Pixel>, text_color: Option<Pixel>)
@@ -330,15 +332,18 @@ impl TextArea {
         Ok(Arc::new(Mutex::new(textarea)))
     }
 
+    /// compute the index of char, does not check bound
     pub fn index(& self, x: usize, y: usize) -> usize {  // does not check bound
         return x + y * self.x_cnt;
     }
 
+    /// set char at given index
     pub fn set_char_absolute(&mut self, idx: usize, c: u8) -> Result<(), &'static str> {
         if idx >= self.x_cnt * self.y_cnt { return Err("x out of range"); }
         self.set_char(idx % self.x_cnt, idx / self.x_cnt, c)
     }
 
+    /// set char at given position
     pub fn set_char(&mut self, x: usize, y: usize, c: u8) -> Result<(), &'static str> {
         if x >= self.x_cnt { return Err("x out of range"); }
         if y >= self.y_cnt { return Err("y out of range"); }
@@ -376,6 +381,7 @@ impl TextArea {
         Ok(())
     }
 
+    /// update char matrix with a new one, must be equal size of current one
     pub fn set_char_matrix(&mut self, char_matrix: &Vec<u8>) -> Result<(), &'static str> {
         if char_matrix.len() != self.char_matrix.len() {
             return Err("char matrix size not match");
@@ -388,6 +394,7 @@ impl TextArea {
         Ok(())
     }
 
+    /// display a basic string, only support normal chars and `\n`
     pub fn display_string_basic(&mut self, _a: &str) -> Result<(), &'static str> {
         let a = _a.as_bytes();
         let mut i = 0;
