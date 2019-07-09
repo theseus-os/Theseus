@@ -20,11 +20,13 @@ extern crate event_types;
 extern crate frame_buffer;
 extern crate window_manager;
 extern crate path;
+extern crate alloc;
 
 use event_types::{Event};
 use dfqueue::{DFQueue, DFQueueConsumer, DFQueueProducer};
 use spawn::{KernelTaskBuilder, ApplicationTaskBuilder};
 use path::Path;
+use alloc::string::{String, ToString};
 
 /// Initializes the keyinput queue and the default display
 pub fn init() -> Result<(DFQueueProducer<Event>, DFQueueConsumer<Event>, DFQueueProducer<Event>, DFQueueConsumer<Event>), &'static str> {
@@ -39,15 +41,15 @@ pub fn init() -> Result<(DFQueueProducer<Event>, DFQueueConsumer<Event>, DFQueue
     let returned_mouse_producer = mouse_event_handling_consumer.obtain_producer();
 
     // Spawns the terminal print crate so that we can print to the terminal
-    // ApplicationTaskBuilder::new(Path::new(String::from("terminal_print")))
-    //     .name("terminal_print_singleton".to_string())
-    //     .singleton()
-    //     .spawn()?;
+    ApplicationTaskBuilder::new(Path::new(String::from("terminal_print")))
+        .name("terminal_print_singleton".to_string())
+        .singleton()
+        .spawn()?;
 
     // Spawn the default terminal (will also start the windowing manager)
-    // ApplicationTaskBuilder::new(Path::new(String::from("terminal")))
-    //     .name("default_terminal".to_string())
-    //     .spawn()?;
+    ApplicationTaskBuilder::new(Path::new(String::from("terminal")))
+        .name("default_terminal".to_string())
+        .spawn()?;
 
     Ok((returned_keyboard_producer, keyboard_event_handling_consumer, returned_mouse_producer, mouse_event_handling_consumer))
 }

@@ -40,14 +40,15 @@ path  = "../../kernel/memory"
 [dependencies.mod_mgmt]
 path = "../../kernel/mod_mgmt"
 
-[dependencies.frame_buffer]
-path = "../../kernel/frame_buffer"
+[dependencies.frame_buffer_alpha]
+path = "../../kernel/frame_buffer_alpha"
 
-[dependencies.window_manager]
-path = "../../kernel/window_manager"
+[dependencies.window_manager_alpha]
+path = "../../kernel/window_manager_alpha"
 
-[dependencies.text_display]
-path = "../../kernel/text_display"
+[dependencies.window_components]
+path = "../../kernel/window_components"
+
 [dependencies.terminal_print]
 path = "../terminal_print"
 
@@ -69,5 +70,5 @@ path = "../../kernel/path"
 [lib]
 crate-type = ["rlib"]
 
-
-
+[dependencies.tsc]
+path = "../../kernel/tsc"

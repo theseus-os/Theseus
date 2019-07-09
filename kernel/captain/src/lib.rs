@@ -149,7 +149,6 @@ pub fn init(
             return Err(err);
         }
     }
-    window_manager_alpha::test()?; // TODO: remove the test
 
     // initialize the rest of our drivers
     device_manager::init(key_producer, mouse_producer)?;
