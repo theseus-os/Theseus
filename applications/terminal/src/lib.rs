@@ -164,8 +164,9 @@ impl Terminal {
 
         // Requests a new window object from the window manager
         let (window_width, window_height) = window_manager_alpha::get_screen_size()?;
+        const WINDOW_MARGIN: usize = 20;
         let window_object = match window_components::WindowComponents::new(
-            20, 20, window_width - 40, window_height - 40
+            WINDOW_MARGIN, WINDOW_MARGIN, window_width - 2*WINDOW_MARGIN, window_height - 2*WINDOW_MARGIN
         ) {
             Ok(window_object) => window_object,
             Err(err) => {debug!("new window returned err"); return Err(err)}

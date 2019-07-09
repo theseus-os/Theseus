@@ -53,31 +53,6 @@ pub fn init() -> Result<(), &'static str> {
     let framebuffer = FrameBufferAlpha::new(buffer_width, buffer_height, Some(vesa_display_phys_start))?;
     FINAL_FRAME_BUFFER.call_once(|| Mutex::new(framebuffer));
 
-    // try: draw some rectangle on the screen
-    let mut final_fb = FINAL_FRAME_BUFFER
-        .try()
-        .ok_or("FrameCompositor fails to get the final frame buffer")?
-        .lock();
-    let xs = buffer_width * 1 / 4;
-    let xe = buffer_width * 3 / 4;
-    let ys = buffer_height * 1 / 4;
-    let ye = buffer_height * 3 / 4;
-    let fill = alloc::vec![0x0000FF00; xe - xs];
-    let mut y = ys;
-    loop {
-        if y == ye { break; }
-        let start = final_fb.index(xs, y);
-        let end = final_fb.index(xe, y);
-        final_fb.buffer_mut()[start..end].copy_from_slice(&fill);
-        y += 1;
-    }
-
-    // try: draw some other basic elements
-    final_fb.draw_point_alpha(buffer_width / 2, buffer_height / 2, 0x80FF0000);
-    final_fb.draw_rect_alpha(xs + buffer_width / 8, xe + buffer_width / 8, ys + buffer_width / 8, ye + buffer_width / 8, 0x80FF0000);
-    final_fb.draw_char_8x16(buffer_width / 2, buffer_height / 2, 'a' as u8, 0x000000FF);
-    final_fb.draw_circle_alpha(buffer_width / 4, buffer_height / 4, buffer_height / 8, 0x800000FF);
-
     Ok(())
 }
 
@@ -149,12 +124,6 @@ impl FrameBufferAlpha {
     pub fn get_size(&self) -> (usize, usize) {
         (self.width, self.height)
     }
-
-    // ///get a function to compute the index of a pixel in the buffer array. The returned function is (x:usize, y:usize) -> index:usize
-    // pub fn get_index_fn(&self) -> Box<Fn(usize, usize)->usize>{
-    //     let width = self.width;
-    //     Box::new(move |x:usize, y:usize| y * width + x )
-    // }
 
     /// compute the index of pixel (x, y) in the buffer array
     pub fn index(&self, x: usize, y: usize) -> usize {
@@ -250,42 +219,42 @@ pub fn get_screen_size() -> Result<(usize, usize), &'static str> {
 }
 
 pub fn alpha_mix(bottom: Pixel, top: Pixel) -> Pixel {
-    let alpha = (top >> 24) as u16;  // to avoid overflow
-    let red = (top >> 16) as u8;
-    let green = (top >> 8) as u8;
-    let blue = (top >> 0) as u8;
-    let ori_red = (bottom >> 16) as u8;
-    let ori_green = (bottom >> 8) as u8;
-    let ori_blue = (bottom >> 0) as u8;
+    let alpha = (top >> 24) as u16;  // [31:24] of u32, highest byte
+    let red = (top >> 16) as u8;  // [23:16] of u32
+    let green = (top >> 8) as u8;  // [15:8] of u32
+    let blue = (top >> 0) as u8;  // [7:0] of u32
+    let ori_red = (bottom >> 16) as u8;  // [23:16] of u32
+    let ori_green = (bottom >> 8) as u8;  // [15:8] of u32
+    let ori_blue = (bottom >> 0) as u8;  // [7:0] of u32
     let new_red = (((red as u16) * (255 - alpha) + (ori_red as u16) * alpha) / 255) as u8;
     let new_green = (((green as u16) * (255 - alpha) + (ori_green as u16) * alpha) / 255) as u8;
     let new_blue = (((blue as u16) * (255 - alpha) + (ori_blue as u16) * alpha) / 255) as u8;
-    let mut new_color = bottom & 0xFF000000;
-    new_color |= (new_red as u32) << 16;
-    new_color |= (new_green as u32) << 8;
-    new_color |= (new_blue as u32) << 0;
+    let mut new_color = bottom & 0xFF000000;  // use alpha value of bottom pixel
+    new_color |= (new_red as u32) << 16;  // [23:16] of u32
+    new_color |= (new_green as u32) << 8;  // [15:8] of u32
+    new_color |= (new_blue as u32) << 0;  // [7:0] of u32
     new_color
 }
 
 pub fn color_mix(c1: Pixel, c2: Pixel, mix: f32) -> Pixel {
-    if mix < 0f32 || mix > 1f32 {
+    if mix < 0f32 || mix > 1f32 {  // cannot mix value outside region
         return 0x00000000;  // return black
     }
-    let alpha1 = (c1 >> 24) as u8;
-    let red1 = (c1 >> 16) as u8;
-    let green1 = (c1 >> 8) as u8;
-    let blue1 = (c1 >> 0) as u8;
-    let alpha2 = (c2 >> 24) as u8;
-    let red2 = (c2 >> 16) as u8;
-    let green2 = (c2 >> 8) as u8;
-    let blue2 = (c2 >> 0) as u8;
+    let alpha1 = (c1 >> 24) as u8;  // [31:24] of u32, highest byte
+    let red1 = (c1 >> 16) as u8;  // [23:16] of u32
+    let green1 = (c1 >> 8) as u8;  // [15:8] of u32
+    let blue1 = (c1 >> 0) as u8;  // [7:0] of u32
+    let alpha2 = (c2 >> 24) as u8;  // [31:24] of u32
+    let red2 = (c2 >> 16) as u8;  // [23:16] of u32
+    let green2 = (c2 >> 8) as u8;  // [15:8] of u32
+    let blue2 = (c2 >> 0) as u8;  // [7:0] of u32
     let new_alpha = ((alpha1 as f32) * mix + (alpha2 as f32) * (1f32-mix)) as u8;
     let new_red = ((red1 as f32) * mix + (red2 as f32) * (1f32-mix)) as u8;
     let new_green = ((green1 as f32) * mix + (green2 as f32) * (1f32-mix)) as u8;
     let new_blue = ((blue1 as f32) * mix + (blue2 as f32) * (1f32-mix)) as u8;
-    let mut new_color = (new_alpha as u32) << 24;
-    new_color |= (new_red as u32) << 16;
-    new_color |= (new_green as u32) << 8;
-    new_color |= (new_blue as u32) << 0;
+    let mut new_color = (new_alpha as u32) << 24;  // [31:24] of u32
+    new_color |= (new_red as u32) << 16;  // [23:16] of u32
+    new_color |= (new_green as u32) << 8;  // [15:8] of u32
+    new_color |= (new_blue as u32) << 0;  // [7:0] of u32
     new_color
 }
