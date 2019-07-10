@@ -46,7 +46,7 @@ pub fn init() -> Result<DFQueueProducer<Event>, &'static str> {
         .spawn()?;
 
     // Spawn the default terminal (will also start the windowing manager)
-    ApplicationTaskBuilder::new(Path::new(String::from("terminal")))
+    ApplicationTaskBuilder::new(Path::new(String::from("shell")))
         .name("default_terminal".to_string())
         .spawn()?;
     // start the input event loop thread
@@ -82,7 +82,7 @@ fn input_event_loop(consumer:DFQueueConsumer<Event>) -> Result<(), &'static str>
                 if key_input.modifiers.control && key_input.keycode == Keycode::T && key_input.action == KeyAction::Pressed {
                     let task_name: String = format!("terminal {}", terminal_id_counter);
                     let args: Vec<String> = vec![]; // terminal::main() does not accept any arguments
-                    ApplicationTaskBuilder::new(Path::new(String::from("terminal")))
+                    ApplicationTaskBuilder::new(Path::new(String::from("shell")))
                         .argument(args)
                         .name(task_name)
                         .spawn()?;

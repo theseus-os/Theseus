@@ -1,100 +1,44 @@
-//! Terminal emulator with event-driven architecture
-//! Commands that can be run are the names of the crates in the applications directory
+//! Terminal emulator library
+//!
+//! The terminal roughly does the following things: manages all characters in a String that should be printed to the screen;
+//! cuts a slice from this String and send it to window manager to get things actually printed; manages user input command line
+//! as well as the cursor position, and delivers keyboard events.
 //! 
-//! The terminal is roughly designed as follows: the main function calls the init() function of the terminal. In here, 
-//! the terminal instance is created (defined by the Terminal struct) and an event handling loop is spawned which can handle
-//! keypresses, resize, print events, etc. 
+//! Problem: Currently there's no upper bound to the scrollback buffer, as well as other user input buffer.
+//! 
+//! Acknowledgement: Most of the functions are adopted from the `Terminal` implemented by Andrew Pham <apham727@gmail.com>.
 
 #![no_std]
-extern crate frame_buffer;
-extern crate keycodes_ascii;
-extern crate spin;
-extern crate dfqueue;
-extern crate mod_mgmt;
-extern crate spawn;
-extern crate task;
-extern crate runqueue;
-extern crate memory;
-extern crate event_types; 
-extern crate window_manager;
-extern crate text_display;
-extern crate fs_node;
-extern crate path;
-extern crate root;
-
-extern crate terminal_print;
-extern crate print;
-extern crate environment;
 
 #[macro_use] extern crate alloc;
 #[macro_use] extern crate log;
+extern crate dfqueue;
+extern crate window_manager;
+extern crate root;
+extern crate environment;
+extern crate print;
+extern crate event_types;
+extern crate spin;
 
-use event_types::{Event};
-use keycodes_ascii::{Keycode, KeyAction, KeyEvent};
 use alloc::string::{String, ToString};
 use alloc::vec::Vec;
 use alloc::sync::Arc;
 use dfqueue::{DFQueue, DFQueueConsumer, DFQueueProducer};
-use window_manager::displayable::text_display::TextDisplay;
-use spawn::{ApplicationTaskBuilder, KernelTaskBuilder};
-use path::Path;
-use task::{TaskRef, ExitValue, KillReason};
 use environment::Environment;
+use event_types::Event;
 use spin::Mutex;
-use fs_node::FileOrDir;
+use window_manager::displayable::text_display::TextDisplay;
 
 pub const FONT_COLOR: u32 = 0x93ee90;
 pub const BACKGROUND_COLOR: u32 = 0x000000;
-pub const APPLICATIONS_NAMESPACE_PATH: &'static str = "/namespaces/default/applications";
-
-
-/// A main function that calls terminal::new() and waits for the terminal loop to exit before returning an exit value
-#[no_mangle]
-pub fn main(_args: Vec<String>) -> isize {
-
-   let _task_ref =  match Terminal::new() {
-        Ok(task_ref) => {task_ref}
-        Err(err) => {
-            error!("{}", err);
-            error!("could not create terminal instance");
-            return -1;
-        }
-    };
-
-    loop {
-        // block this task, because it never needs to actually run again
-        if let Some(my_task) = task::get_my_current_task() {
-            my_task.block();
-        }
-    }
-    // TODO FIXME: once join() doesn't cause interrupts to be disabled, we can use join again instead of the above loop
-    // waits for the terminal loop to exit before exiting the main function
-    // match term_task_ref.join() {
-    //     Ok(_) => { }
-    //     Err(err) => {error!("{}", err)}
-    // }
-}
 
 /// Error type for tracking different scroll errors that a terminal
 /// application could encounter.
-enum ScrollError {
+pub enum ScrollError {
     /// Occurs when a index-calculation returns an index that is outside of the 
     /// bounds of the scroll buffer
     OffEndBound
 }
-
-/// Errors when attempting to invoke an application from the terminal. 
-enum AppErr {
-    /// The command does not match the name of any existing application in the 
-    /// application namespace directory. 
-    NotFound(String),
-    /// The terminal could not find the application namespace due to a filesystem error. 
-    NamespaceErr,
-    /// The terminal could not spawn a new task to run the new application.
-    /// Includes the String error returned from the task spawn function.
-    SpawnErr(String)
-}
-
 
 /// Terminal Structure that allows multiple terminals to be individually run.
 /// There are now two queues that constitute the event-driven terminal architecture
@@ -105,7 +49,7 @@ enum AppErr {
 /// 2) The input queue (in the window manager) that handles keypresses and resize events
 ///     - Consumer is the main terminal loop
 ///     - Producer is the window manager. Window manager is responsible for enqueuing keyevents into the active application
-struct Terminal {
+pub struct Terminal {
     /// The terminal's own window
     window: window_manager::WindowObj,
     /// The string that stores the users keypresses after the prompt
@@ -115,21 +59,10 @@ struct Terminal {
     correct_prompt_position: bool,
     // Name of the displayable object of the terminal
     display_name: String,
-    /// Vector that stores the history of commands that the user has entered
-    command_history: Vec<String>,
-    /// Variable used to track the net number of times the user has pressed up/down to cycle through the commands
-    /// ex. if the user has pressed up twice and down once, then command shift = # ups - # downs = 1 (cannot be negative)
-    history_index: usize,
-    /// The string that stores the user's keypresses if a command is currently running
+    /// The secondary buffer that stores the user's keypresses if a command is currently running
     buffer_string: String,
-    /// Variable that stores the task id of any application manually spawned from the terminal
-    current_task_ref: Option<TaskRef>,
     /// The string that is prompted to the user (ex. kernel_term~$)
     prompt_string: String,
-    /// The input_event_manager's standard output buffer to store what the terminal instance and its child processes output
-    stdout_buffer: String,
-    /// The input_event_manager's standard input buffer to store what the user inputs into the terminal application
-    stdin_buffer: String,
     /// The terminal's scrollback buffer which stores a string to be displayed by the text display
     scrollback_buffer: String,
     /// Indicates whether the text display is displaying the last part of the scrollback buffer slice
@@ -150,105 +83,20 @@ struct Terminal {
     env: Arc<Mutex<Environment>>
 }
 
+/// Privite methods of `Terminal`.
 impl Terminal {
-    /// ref num: usize => unique integer number to the terminal that corresponds to its tab number
-    pub fn new() -> Result<TaskRef, &'static str> {
-        // initialize another dfqueue for the terminal object to handle printing from applications
-        let terminal_print_dfq: DFQueue<Event>  = DFQueue::new();
-        let terminal_print_consumer = terminal_print_dfq.into_consumer();
-        let terminal_print_producer = terminal_print_consumer.obtain_producer();
-
-        // Sets up the kernel to print to this terminal instance
-        print::set_default_print_output(terminal_print_producer.obtain_producer()); 
-
-        // Requests a new window object from the window manager
-        let window_object = match window_manager::new_default_window() {
-            Ok(window_object) => window_object,
-            Err(err) => {debug!("new window returned err"); return Err(err)}
-        };
-        
-        let root = root::get_root();
-        
-        let env = Environment {
-            working_dir: Arc::clone(root::get_root()), 
-        };
-
-        let mut prompt_string = root.lock().get_absolute_path(); // ref numbers are 0-indexed
-        prompt_string = format!("{}: ",prompt_string);
-        let mut terminal = Terminal {
-            window: window_object,
-            cmdline: String::new(),
-            display_name: String::from("content"),
-            correct_prompt_position: true,
-            command_history: Vec::new(),
-            history_index: 0,
-            buffer_string: String::new(),
-            current_task_ref: None,              
-            prompt_string: prompt_string,
-            stdout_buffer: String::new(),
-            stdin_buffer: String::new(),
-            scrollback_buffer: String::new(),
-            scroll_start_idx: 0,
-            is_scroll_end: true,
-            absolute_cursor_pos: 0, 
-            left_shift: 0,
-            print_consumer: terminal_print_consumer,
-            print_producer: terminal_print_producer,
-            env: Arc::new(Mutex::new(env))
-        };
-        
-        // Inserts a producer for the print queue into global list of terminal print producers
-        let prompt_string = terminal.prompt_string.clone();
-        terminal.print_to_terminal(format!("Theseus Terminal Emulator\nPress Ctrl+C to quit a task\n{}", prompt_string))?;
-        terminal.absolute_cursor_pos = terminal.scrollback_buffer.len();
-        let task_ref = KernelTaskBuilder::new(terminal_loop, terminal)
-            .name("terminal_loop".to_string())
-            .spawn()?;
-        Ok(task_ref)
-    }
-
-    /// Printing function for use within the terminal crate
-    fn print_to_terminal(&mut self, s: String) -> Result<(), &'static str> {
-        self.scrollback_buffer.push_str(&s);
-        Ok(())
-    }
-
-    /// Redisplays the terminal prompt (does not insert a newline before it)
-    fn redisplay_prompt(&mut self) {
-        let curr_env = self.env.lock();
-        let mut prompt = curr_env.working_dir.lock().get_absolute_path();
-        prompt = format!("{}: ",prompt);
-        self.scrollback_buffer.push_str(&prompt);
-    }
-
-    /// Pushes a string to the standard out buffer and the scrollback buffer with a new line
-    fn push_to_stdout(&mut self, s: String) {
-        self.stdout_buffer.push_str(&s);
-        self.scrollback_buffer.push_str(&s);
-    }
-
-    /// Pushes a string to the standard in buffer and the scrollback buffer with a new line
-    fn push_to_stdin(&mut self, s: String) {
-        let buffer_len = self.stdin_buffer.len();
-        self.stdin_buffer.insert_str(buffer_len - self.left_shift, &s);
-        let buffer_len = self.scrollback_buffer.len();
-        self.scrollback_buffer.insert_str(buffer_len - self.left_shift , &s);
-    }
-
-    /// Removes a character from the stdin buffer; will remove the character specified by the left shift field
-    /// Pop_left is true if the caller wants to remove the character to the left of the cursor
-    /// otherwise, removes the character at the current cursor position
-    fn pop_from_stdin(&mut self, pop_left: bool) {
+    /// Erase a character from buffered command line string. It removes a character right at the cursor (i.e. del)
+    /// or on the left of the cursor (i.e. backspace). This behavior is controlled by `erase_left` parameter.
+    fn erase_from_cmdline(&mut self, erase_left: bool) {
         let mut dir = 0;
-        if pop_left {
+        if erase_left {
             dir = 1;
         }
-        let buffer_len = self.stdin_buffer.len();
-        self.stdin_buffer.remove(buffer_len - self.left_shift - dir);
         let buffer_len = self.scrollback_buffer.len();
         self.scrollback_buffer.remove(buffer_len - self.left_shift - dir);
     }
 
+    /// Get the width and height of the text display.
     fn get_displayable_dimensions(&self, name:&str) -> (usize, usize){
         if let Some(text_display) = self.window.get_displayable(name){
             text_display.get_dimensions()
@@ -265,7 +113,7 @@ impl Terminal {
     /// as if the whole physical line is displayed on the buffer
     /// 
     /// Return: starting index of the string and the cursor position(with respect to position on the screen, not in the scrollback buffer) in that order
-    fn calc_start_idx(&mut self, end_idx: usize, display_name:&str) -> (usize, usize) {
+    fn calc_start_idx(&self, end_idx: usize, display_name:&str) -> (usize, usize) {
         let (buffer_width, buffer_height) = self.get_displayable_dimensions(display_name);
         let mut start_idx = end_idx;
         let result;
@@ -341,14 +189,14 @@ impl Terminal {
             return (start_idx, (total_lines - 1) * buffer_width + last_line_chars);
 
         } else {
-            return (0,0);
+            return (0,0); /* WARNING: should change to Option<> rather than returning (0, 0) */
         }   
     }
 
     /// This function takes in the start index of some index in the scrollback buffer and calculates the end index of the
     /// scrollback buffer so that a slice containing the starting and ending index would perfectly fit inside the dimensions of 
     /// text display. 
-    fn calc_end_idx(&mut self, start_idx: usize, display_name:&str) -> Result<usize, ScrollError> {
+    fn calc_end_idx(&self, start_idx: usize, display_name:&str) -> Result<usize, ScrollError> {
         let (buffer_width,buffer_height) = self.get_displayable_dimensions(display_name);
         let scrollback_buffer_len = self.scrollback_buffer.len();
         let mut end_idx = start_idx;
@@ -416,13 +264,13 @@ impl Terminal {
                 return Err(ScrollError::OffEndBound);
             }
         } else {
-            return Ok(self.scrollback_buffer.len() - 1)
+            return Ok(self.scrollback_buffer.len() - 1) /* WARNING: maybe should return Error? */
         }
     }
 
     /// Scrolls the text display up one line
-    fn scroll_up_one_line(&mut self, display_name:&str) {
-        let buffer_width = self.get_displayable_dimensions(display_name).0;
+    fn scroll_up_one_line(&mut self) {
+        let buffer_width = self.get_displayable_dimensions(&self.display_name).0;
         let mut start_idx = self.scroll_start_idx;
         //indicates that the user has scrolled to the top of the page
         if start_idx < 1 {
@@ -457,14 +305,14 @@ impl Terminal {
     }
 
     /// Scrolls the text display down one line
-    fn scroll_down_one_line(&mut self, display_name:&str) {
-        let buffer_width = self.get_displayable_dimensions(display_name).0;
+    fn scroll_down_one_line(&mut self) {
+        let buffer_width = self.get_displayable_dimensions(&self.display_name).0;
         let prev_start_idx;
         // Prevents the user from scrolling down if already at the bottom of the page
         if self.is_scroll_end == true {
             return;} 
         prev_start_idx = self.scroll_start_idx;
-        let result = self.calc_end_idx(prev_start_idx, display_name);
+        let result = self.calc_end_idx(prev_start_idx, &self.display_name);
         let mut end_idx = match result {
             Ok(end_idx) => end_idx,
             Err(ScrollError::OffEndBound) => self.scrollback_buffer.len() -1,
@@ -473,7 +321,7 @@ impl Terminal {
         // If the newly calculated end index is the bottom of the scrollback buffer, recalculates the start index and returns
         if end_idx == self.scrollback_buffer.len() -1 {
             self.is_scroll_end = true;
-            let new_start = self.calc_start_idx(end_idx, display_name).0;
+            let new_start = self.calc_start_idx(end_idx, &self.display_name).0;
             self.scroll_start_idx = new_start;
             return;
         }
@@ -502,37 +350,37 @@ impl Terminal {
             }
         }
         // Recalculates new starting index
-        let start_idx = self.calc_start_idx(new_end_idx, display_name).0;
+        let start_idx = self.calc_start_idx(new_end_idx, &self.display_name).0;
         self.scroll_start_idx = start_idx;
     }
-    
+
     /// Shifts the text display up by making the previous first line the last line displayed on the text display
-    fn page_up(&mut self, display_name:&str) {
+    fn page_up(&mut self) {
         let new_end_idx = self.scroll_start_idx;
-        let new_start_idx = self.calc_start_idx(new_end_idx, display_name);
+        let new_start_idx = self.calc_start_idx(new_end_idx, &self.display_name);
         self.scroll_start_idx = new_start_idx.0;
     }
 
     /// Shifts the text display down by making the previous last line the first line displayed on the text display
-    fn page_down(&mut self, display_name:&str) {
+    fn page_down(&mut self) {
         let start_idx = self.scroll_start_idx;
-        let result = self.calc_end_idx(start_idx, display_name);
+        let result = self.calc_end_idx(start_idx, &self.display_name);
         let new_start_idx = match result {
             Ok(idx) => idx+ 1, 
             Err(ScrollError::OffEndBound) => {
                 let scrollback_buffer_len = self.scrollback_buffer.len();
-                let new_start_idx = self.calc_start_idx(scrollback_buffer_len, display_name).0;
+                let new_start_idx = self.calc_start_idx(scrollback_buffer_len, &self.display_name).0;
                 self.scroll_start_idx = new_start_idx;
                 self.is_scroll_end = true;
                 return;
             },
         };
-        let result = self.calc_end_idx(new_start_idx, display_name);
+        let result = self.calc_end_idx(new_start_idx, &self.display_name);
         let new_end_idx = match result {
             Ok(end_idx) => end_idx,
             Err(ScrollError::OffEndBound) => {
                 let scrollback_buffer_len = self.scrollback_buffer.len();
-                let new_start_idx = self.calc_start_idx(scrollback_buffer_len, display_name).0;
+                let new_start_idx = self.calc_start_idx(scrollback_buffer_len, &self.display_name).0;
                 self.scroll_start_idx = new_start_idx;
                 self.is_scroll_end = true;
                 return;
@@ -547,21 +395,21 @@ impl Terminal {
     }
 
     /// Updates the text display by taking a string index and displaying as much as it starting from the passed string index (i.e. starts from the top of the display and goes down)
-    fn update_display_forwards(&mut self, display_name:&str, start_idx: usize) -> Result<(), &'static str> {
+    fn update_display_forwards(&mut self, start_idx: usize) -> Result<(), &'static str> {
         self.scroll_start_idx = start_idx;
-        let result= self.calc_end_idx(start_idx, display_name); 
+        let result= self.calc_end_idx(start_idx, &self.display_name); 
         let end_idx = match result {
             Ok(end_idx) => end_idx,
             Err(ScrollError::OffEndBound) => {
                 let new_end_idx = self.scrollback_buffer.len() -1;
-                let new_start_idx = self.calc_start_idx(new_end_idx, display_name).0;
+                let new_start_idx = self.calc_start_idx(new_end_idx, &self.display_name).0;
                 self.scroll_start_idx = new_start_idx;
                 new_end_idx
             },
         };
         let result  = self.scrollback_buffer.get(start_idx..=end_idx); // =end_idx includes the end index in the slice
         if let Some(slice) = result {
-            if let Some(text_display) = self.window.get_displayable(display_name){
+            if let Some(text_display) = self.window.get_displayable(&self.display_name){
                 text_display.display_string(&(self.window), slice, FONT_COLOR, BACKGROUND_COLOR)?;
             } else {
                 return Err("faild to get the text displayable component")
@@ -572,16 +420,15 @@ impl Terminal {
         Ok(())
     }
 
-
     /// Updates the text display by taking a string index and displaying as much as it can going backwards from the passed string index (i.e. starts from the bottom of the display and goes up)
-    fn update_display_backwards(&mut self, display_name:&str, end_idx: usize) -> Result<(), &'static str> {
-        let (start_idx, cursor_pos) = self.calc_start_idx(end_idx, display_name);
+    fn update_display_backwards(&mut self, end_idx: usize) -> Result<(), &'static str> {
+        let (start_idx, cursor_pos) = self.calc_start_idx(end_idx, &self.display_name);
         self.scroll_start_idx = start_idx;
 
         let result = self.scrollback_buffer.get(start_idx..end_idx);
 
         if let Some(slice) = result {
-            if let Some(text_display) = self.window.get_displayable(display_name){
+            if let Some(text_display) = self.window.get_displayable(&self.display_name){
                 text_display.display_string(&(self.window), slice, FONT_COLOR, BACKGROUND_COLOR)?;
                 self.absolute_cursor_pos = cursor_pos;          
             } else {
@@ -593,67 +440,9 @@ impl Terminal {
         Ok(())
     }
 
-
-    /// Called by the main loop to handle the exiting of tasks initiated in the terminal
-    fn task_handler(&mut self) -> Result<(), &'static str> {
-        let task_ref_copy = match self.current_task_ref.clone() {
-            Some(task_ref) => task_ref,
-            None => { return Ok(());}
-        };
-        let exit_result = task_ref_copy.take_exit_value();
-        // match statement will see if the task has finished with an exit value yet
-        match exit_result {
-            Some(exit_val) => {
-                match exit_val {
-                    ExitValue::Completed(exit_status) => {
-                        // here: the task ran to completion successfully, so it has an exit value.
-                        // we know the return type of this task is `isize`,
-                        // so we need to downcast it from Any to isize.
-                        let val: Option<&isize> = exit_status.downcast_ref::<isize>();
-                        info!("terminal: task returned exit value: {:?}", val);
-                        if let Some(val) = val {
-                            if *val < 0 {
-                                self.print_to_terminal(format!("task returned error value {:?}\n", val))?;
-                            }
-                        }
-                    },
-
-                    ExitValue::Killed(KillReason::Requested) => {
-                        self.print_to_terminal("^C\n".to_string())?;
-                    },
-                    // If the user manually aborts the task
-                    ExitValue::Killed(kill_reason) => {
-                        warn!("task was killed because {:?}", kill_reason);
-                        self.print_to_terminal(format!("task was killed because {:?}\n", kill_reason))?;
-                    }
-                }
-                
-                terminal_print::remove_child(task_ref_copy.lock().id)?;
-                // Resets the current task id to be ready for the next command
-                self.current_task_ref = None;
-                self.redisplay_prompt();
-                // Pushes the keypresses onto the input_event_manager that were tracked whenever another command was running
-                if self.buffer_string.len() > 0 {
-                    let temp = self.buffer_string.clone();
-                    self.print_to_terminal(temp.clone())?;
-                    self.cmdline = temp;
-                    self.buffer_string.clear();
-                }
-                // Resets the bool to true once the print prompt has been redisplayed
-                self.correct_prompt_position = true;
-                let display_name = &self.display_name.clone();
-                self.refresh_display(display_name);
-            },
-        // None value indicates task has not yet finished so does nothing
-        None => { },
-        }
-        return Ok(());
-    }
-    
-
     /// Updates the cursor to a new position and refreshes display
-    fn cursor_handler(&mut self, display_name:&str) -> Result<(), &'static str> { 
-        let buffer_width = self.get_displayable_dimensions(display_name).0;
+    fn cursor_handler(&mut self) -> Result<(), &'static str> { 
+        let buffer_width = self.get_displayable_dimensions(&self.display_name).0;
         let mut new_x = self.absolute_cursor_pos %buffer_width;
         let mut new_y = self.absolute_cursor_pos /buffer_width;
         // adjusts to the correct position relative to the max rightmost absolute cursor position
@@ -664,454 +453,370 @@ impl Terminal {
             new_y -=1;
         }
 
-        if let Some(text_display) = self.window.get_displayable(display_name){
+        if let Some(text_display) = self.window.get_displayable(&self.display_name){
             text_display.set_cursor(&(self.window), new_y as u16, new_x as u16, FONT_COLOR, true);
         } else {
             return Err("faild to get the text displayable component")
         }
         return Ok(());
     }
+}
 
-    /// Called whenever the main loop consumes an input event off the DFQueue to handle a key event
-    pub fn handle_key_event(&mut self, keyevent: KeyEvent, display_name:&str) -> Result<(), &'static str> {       
-        // EVERYTHING BELOW HERE WILL ONLY OCCUR ON A KEY PRESS (not key release)
-        if keyevent.action != KeyAction::Pressed {
-            return Ok(()); 
-        }
+/// Public methods of `Terminal`.
+impl Terminal {
+    pub fn new() -> Result<Terminal, &'static str> {
+        // initialize another dfqueue for the terminal object to handle printing from applications
+        let terminal_print_dfq: DFQueue<Event>  = DFQueue::new();
+        let terminal_print_consumer = terminal_print_dfq.into_consumer();
+        let terminal_print_producer = terminal_print_consumer.obtain_producer();
 
-        // Ctrl+C signals the main loop to exit the task
-        if keyevent.modifiers.control && keyevent.keycode == Keycode::C {
-            let task_ref_copy = match self.current_task_ref {
-                Some(ref task_ref) => task_ref.clone(), 
-                None => {
-                    self.cmdline.clear();
-                    self.buffer_string.clear();
-                    self.print_to_terminal("^C\n".to_string())?;
-                    self.redisplay_prompt();
-                    self.correct_prompt_position = true;
-                    self.left_shift = 0;
-                    return Ok(());
-                }
-            };
-            match task_ref_copy.kill(KillReason::Requested) {
-                Ok(_) => {
-                    if let Err(e) = runqueue::remove_task_from_all(&task_ref_copy) {
-                        error!("Killed task but could not remove it from runqueue: {}", e);
-                    }
-                }
-                Err(e) => error!("Could not kill task, error: {}", e),
-            }
-            return Ok(());
-        }
+        // Sets up the kernel to print to this terminal instance
+        print::set_default_print_output(terminal_print_producer.obtain_producer());
 
-
-        // Tracks what the user does whenever she presses the backspace button
-        if keyevent.keycode == Keycode::Backspace  {
-            // Prevents user from moving cursor to the left of the typing bounds
-            if self.cmdline.len() == 0 || self.cmdline.len() - self.left_shift == 0 { 
-                return Ok(());
-            } else {
-                // Subtraction by accounts for 0-indexing
-                if let Some(text_display) = self.window.get_displayable(display_name){
-                    text_display.disable_cursor();
-                }
-                let remove_idx: usize =  self.cmdline.len() - self.left_shift -1;
-                self.cmdline.remove(remove_idx);
-                self.pop_from_stdin(true);
-                return Ok(());
-            }
-        }
-
-        if keyevent.keycode == Keycode::Delete {
-            // if there's no characters to the right of the cursor, does nothing
-            if self.cmdline.len() == 0 || self.left_shift == 0 { 
-                return Ok(());
-            } else {
-                // Subtraction by accounts for 0-indexing
-                if let Some(text_display) = self.window.get_displayable(display_name){
-                    text_display.disable_cursor();
-                }
-                let remove_idx: usize =  self.cmdline.len() - self.left_shift;
-                // we're moving the cursor one position to the right relative to the end of the input string
-                self.cmdline.remove(remove_idx);
-                self.pop_from_stdin(false);
-                self.left_shift -= 1; 
-                return Ok(());
-            }
-        }
-
-        // Attempts to run the command whenever the user presses enter and updates the cursor tracking variables 
-        if keyevent.keycode == Keycode::Enter && keyevent.keycode.to_ascii(keyevent.modifiers).is_some() {
-            if self.cmdline.len() == 0 {
-                // reprints the prompt on the next line if the user presses enter and hasn't typed anything into the prompt
-                self.print_to_terminal("\n".to_string())?;
-                self.redisplay_prompt();
-                return Ok(());
-            } else if self.current_task_ref.is_some() { // prevents the user from trying to execute a new command while one is currently running
-                self.print_to_terminal("Wait until the current command is finished executing\n".to_string())?;
-            } else {
-                self.command_history.push(self.cmdline.clone());
-                self.command_history.dedup(); // Removes any duplicates
-                self.history_index = 0;
-                match self.eval_cmdline() {
-                    Ok(new_task_ref) => { 
-                        let task_id = {new_task_ref.lock().id};
-                        self.current_task_ref = Some(new_task_ref);
-                        terminal_print::add_child(task_id, self.print_producer.obtain_producer())?; // adds the terminal's print producer to the terminal print crate
-                    }
-                    Err(err) => {
-                        let err_msg = match err {
-                            AppErr::NotFound(command) => format!("\n{:?} command not found.\n", command),
-                            AppErr::NamespaceErr      => format!("\nFailed to find directory of application executables.\n"),
-                            AppErr::SpawnErr(e)       => format!("\nFailed to spawn new task to run command. Error: {}.\n", e),
-                        };
-                        self.print_to_terminal(err_msg)?;
-                        self.redisplay_prompt();
-                        self.cmdline.clear();
-                        self.left_shift = 0;
-                        self.correct_prompt_position = true;
-                        return Ok(());
-                    }
-                }
-            }
-            // Clears the buffer for another command once current command is finished executing
-            self.cmdline.clear();
-            self.left_shift = 0;
-        }
-
-        // home, end, page up, page down, up arrow, down arrow for the input_event_manager
-        if keyevent.keycode == Keycode::Home && keyevent.modifiers.control {
-            // Home command only registers if the text display has the ability to scroll
-            if self.scroll_start_idx != 0 {
-                self.is_scroll_end = false;
-                self.scroll_start_idx = 0; // takes us up to the start of the page
-                if let Some(text_display) = self.window.get_displayable(display_name){
-                    text_display.disable_cursor();
-                }            
-            }
-            return Ok(());
-        }
-        if keyevent.keycode == Keycode::End && keyevent.modifiers.control{
-            if !self.is_scroll_end {
-                self.is_scroll_end = true;
-                let buffer_len = self.scrollback_buffer.len();
-                self.scroll_start_idx = self.calc_start_idx(buffer_len, display_name).0;
-            }
-            return Ok(());
-        }
-        if keyevent.modifiers.control && keyevent.modifiers.shift && keyevent.keycode == Keycode::Up  {
-            if self.scroll_start_idx != 0 {
-                self.scroll_up_one_line(display_name);
-                if let Some(text_display) = self.window.get_displayable(display_name){
-                    text_display.disable_cursor();
-                }
-            }
-            return Ok(());
-        }
-        if keyevent.modifiers.control && keyevent.modifiers.shift && keyevent.keycode == Keycode::Down  {
-            if !self.is_scroll_end {
-                self.scroll_down_one_line(display_name);
-            }
-            return Ok(());
-        }
-
-        if keyevent.keycode == Keycode::PageUp && keyevent.modifiers.shift {
-            if self.scroll_start_idx <= 1 {
-                return Ok(())
-            }
-            self.page_up(display_name);
-            self.is_scroll_end = false;
-            if let Some(text_display) = self.window.get_displayable(display_name){
-                text_display.disable_cursor();
-            }
-            return Ok(());
-        }
-
-        if keyevent.keycode == Keycode::PageDown && keyevent.modifiers.shift {
-            if self.is_scroll_end {
-                return Ok(());
-            }
-            self.page_down(display_name);
-            return Ok(());
-        }
-
-        // Cycles to the next previous command
-        if  keyevent.keycode == Keycode::Up {
-            if self.history_index == self.command_history.len() {
-                return Ok(());
-            }
-            if !self.correct_prompt_position {
-                self.redisplay_prompt();
-                self.correct_prompt_position  = true;
-            }
-            self.left_shift = 0;
-            let previous_input = self.cmdline.clone();
-            for _i in 0..previous_input.len() {
-                self.pop_from_stdin(true);
-            }
-            if self.history_index == 0 && self.cmdline.len() != 0 {
-                self.command_history.push(previous_input);
-                self.history_index += 1;
-            } 
-            self.history_index += 1;
-            let selected_command = self.command_history[self.command_history.len() - self.history_index].clone();
-            let selected_command2 = selected_command.clone();
-            self.cmdline = selected_command;
-            self.push_to_stdin(selected_command2);
-            self.correct_prompt_position = true;
-            return Ok(());
-        }
-        // Cycles to the next most recent command
-        if keyevent.keycode == Keycode::Down {
-            if self.history_index <= 1 {
-                return Ok(());
-            }
-            self.left_shift = 0;
-            let previous_input = self.cmdline.clone();
-            for _i in 0..previous_input.len() {
-                self.pop_from_stdin(true);
-            }
-            self.history_index -=1;
-            if self.history_index == 0 {return Ok(())}
-            let selected_command = self.command_history[self.command_history.len() - self.history_index].clone();
-            let selected_command2 = selected_command.clone();
-            self.cmdline = selected_command;
-            self.push_to_stdin(selected_command2);
-            self.correct_prompt_position = true;
-            return Ok(());
-        }
-
-        // Jumps to the beginning of the input string
-        if keyevent.keycode == Keycode::Home {
-            self.left_shift = self.cmdline.len();
-            return Ok(());
-        }
-
-        // Jumps to the end of the input string
-        if keyevent.keycode == Keycode::End {
-            self.left_shift = 0;
-        }   
-
-        // Adjusts the cursor tracking variables when the user presses the left and right arrow keys
-        if keyevent.keycode == Keycode::Left {
-            if self.left_shift < self.cmdline.len() {
-                self.left_shift += 1;
-            }
-                return Ok(());
-            }
-        
-        if keyevent.keycode == Keycode::Right {
-            if self.left_shift > 0 {
-                self.left_shift -= 1;
-                return Ok(());
-            }
-        }
-
-        // Tracks what the user has typed so far, excluding any keypresses by the backspace and Enter key, which are special and are handled directly below
-        if keyevent.keycode != Keycode::Enter && keyevent.keycode.to_ascii(keyevent.modifiers).is_some() {
-                if self.left_shift == 0 {
-                    if keyevent.keycode.to_ascii(keyevent.modifiers).is_some() {
-                        match keyevent.keycode.to_ascii(keyevent.modifiers) {
-                            Some(c) => {
-                                // Appends to the temporary buffer string if the user types while a command is running
-                                if self.current_task_ref.is_some() {
-                                    self.buffer_string.push(c);
-                                    return Ok(());
-                                } else {
-                                    self.cmdline.push(c);
-                                }
-                            },
-                            None => {
-                                return Err("Couldn't get key event");
-                            }
-                        }
-
-                    }
-                } else {
-                    // controls cursor movement and associated variables if the cursor is not at the end of the current line
-                    match keyevent.keycode.to_ascii(keyevent.modifiers) {
-                        Some(c) => {
-                            let insert_idx: usize = self.cmdline.len() - self.left_shift;
-                            self.cmdline.insert(insert_idx, c);
-                        },
-                        None => {
-                            return Err("Couldn't get key event");
-                        }
-                    }
-                }
-
-                // If the prompt and any keypresses aren't already the last things being displayed on the buffer, it reprints
-                if !self.correct_prompt_position{
-                    let mut cmdline = self.cmdline.clone();
-                    match cmdline.pop() {
-                        Some(_) => { }
-                        None => {return Err("couldn't pop newline from input event string")}
-                    }
-                    self.redisplay_prompt();
-                    self.print_to_terminal(cmdline)?;
-                    self.correct_prompt_position = true;
-                }
-        }
-        
-        // Pushes regular keypresses (ie ascii characters and non-meta characters) into the standard-in buffer
-        match keyevent.keycode.to_ascii(keyevent.modifiers) {
-            Some(c) => self.push_to_stdin(c.to_string()),
-            _ => { } 
-        }
-        Ok(())
-    }
-    
-
-    /// Execute the command on a new thread 
-    fn eval_cmdline(&mut self) -> Result<TaskRef, AppErr> {
-        // Parse the cmdline
-        let mut args: Vec<String> = self.cmdline.split_whitespace().map(|s| s.to_string()).collect();
-        let command = args.remove(0);
-
-	    // Check that the application actually exists
-        let app_path = Path::new(APPLICATIONS_NAMESPACE_PATH.to_string());
-        let app_list = match app_path.get(root::get_root()) {
-            Some(FileOrDir::Dir(app_dir)) => {app_dir.lock().list()},
-            _ => return Err(AppErr::NamespaceErr)
+        // Requests a new window object from the window manager
+        let window_object = match window_manager::new_default_window() {
+            Ok(window_object) => window_object,
+            Err(err) => {debug!("new window returned err"); return Err(err)}
         };
-        let mut executable = command.clone();
-        executable.push_str(".o");
-        if !app_list.contains(&executable) {
-            return Err(AppErr::NotFound(command));
-        }
 
-        let taskref = match ApplicationTaskBuilder::new(Path::new(command))
-            .argument(args)
-            .spawn() {
-                Ok(taskref) => taskref, 
-                Err(e) => return Err(AppErr::SpawnErr(e.to_string()))
-            };
-        
-        taskref.set_env(Arc::clone(&self.env)); // Set environment variable of application to the same as terminal task
+        let root = root::get_root();
 
-        // Gets the task id so we can reference this task if we need to kill it with Ctrl+C
-        return Ok(taskref);
+        let env = Environment {
+            working_dir: Arc::clone(root::get_root()), 
+        };
+
+        let mut prompt_string = root.lock().get_absolute_path(); // ref numbers are 0-indexed
+        prompt_string = format!("{}: ",prompt_string);
+        let mut terminal = Terminal {
+            window: window_object,
+            cmdline: String::new(),
+            display_name: String::from("content"),
+            correct_prompt_position: true,
+            buffer_string: String::new(),          
+            prompt_string: prompt_string,
+            scrollback_buffer: String::new(),
+            scroll_start_idx: 0,
+            is_scroll_end: true,
+            absolute_cursor_pos: 0, 
+            left_shift: 0,
+            print_consumer: terminal_print_consumer,
+            print_producer: terminal_print_producer,
+            env: Arc::new(Mutex::new(env))
+        };
+
+        // Inserts a producer for the print queue into global list of terminal print producers
+        let prompt_string = terminal.prompt_string.clone();
+        terminal.print_to_terminal(format!("Theseus Terminal Emulator\nPress Ctrl+C to quit a task\n{}", prompt_string));
+        terminal.absolute_cursor_pos = terminal.scrollback_buffer.len();
+        Ok(terminal)
     }
-    
-    fn refresh_display(&mut self, display_name:&str) {
+
+    /// Redisplays the terminal prompt (does not insert a newline before it)
+    pub fn redisplay_prompt(&mut self) {
+        let curr_env = self.env.lock();
+        let mut prompt = curr_env.working_dir.lock().get_absolute_path();
+        prompt = format!("{}: ",prompt);
+        self.scrollback_buffer.push_str(&prompt);
+        self.correct_prompt_position = true;
+    }
+
+    /// Adds a string to be printed to the terminal to the terminal scrollback buffer.
+    /// Note that one needs to call `refresh_display` to get things actually printed. 
+    pub fn print_to_terminal(&mut self, s: String) {
+        self.scrollback_buffer.push_str(&s);
+    }
+
+    /// Actually refresh the screen. Currently it's expensive.
+    pub fn refresh_display(&mut self) {
         let start_idx = self.scroll_start_idx;
         // handling display refreshing errors here so that we don't clog the main loop of the terminal
         if self.is_scroll_end {
             let buffer_len = self.scrollback_buffer.len();
-            match self.update_display_backwards(display_name, buffer_len) {
+            match self.update_display_backwards(buffer_len) {
                 Ok(_) => { }
                 Err(err) => {error!("could not update display backwards: {}", err); return}
             }
-            match self.cursor_handler(display_name) {
+            match self.cursor_handler() {
                 Ok(_) => { }
                 Err(err) => {error!("could not update cursor: {}", err); return}
             }
         } else {
-            match self.update_display_forwards(display_name, start_idx) {
+            match self.update_display_forwards(start_idx) {
                 Ok(_) => { }
                 Err(err) => {error!("could not update display forwards: {}", err); return}
             }
         }
     }
-}
 
-/// This main loop is the core component of the terminal's event-driven architecture. The terminal receives events
-/// from two queues
-/// 
-/// 1) The print queue handles print events from applications. The producer to this queue
-///    is any EXTERNAL application that prints to the terminal (any printing from within the terminal
-///    is simply pushed to the scrollback buffer using the associated print_to_terminal method)
-/// 
-/// 2) The input queue (provided by the window manager when the temrinal request a window) gives key events
-///    and resize event to the application
-/// 
-/// The print queue is handled first inside the loop iteration, which means that all print events in the print
-/// queue will always be printed to the text display before input events or any other managerial functions are handled. 
-/// This allows for clean appending to the scrollback buffer and prevents interleaving of text.
-/// 
-fn terminal_loop(mut terminal: Terminal) -> Result<(), &'static str> {
-    use core::ops::Deref;
-    let display_name = terminal.display_name.clone();
-    { 
-        let (width, height) = terminal.window.dimensions();
-        let width  = width  - 2*window_manager::WINDOW_MARGIN;
-        let height = height - 2*window_manager::WINDOW_MARGIN;
-        match terminal.window.add_displayable(&display_name, 0, 0,
-            TextDisplay::new(&display_name, width, height)) {
-                Ok(_) => { }
-                Err(err) => {return Err(err);}
-        };
+    /// Get the buffered user input command line.
+    pub fn get_cmdline(&mut self) -> String {
+        self.cmdline.clone()
     }
-    terminal.refresh_display(&display_name);
-    loop {
-        // Handle cursor blink
-        if let Some(text_display) = terminal.window.get_displayable(&display_name){
-            text_display.cursor_blink(&(terminal.window), FONT_COLOR, BACKGROUND_COLOR);
-        }
 
-        // Handles events from the print queue. The queue is "empty" is peek() returns None
-        // If it is empty, it passes over this conditional
-        if let Some(print_event) = terminal.print_consumer.peek() {
+    /// Clear the user buffered command line. The scrollback buffer is synchronically updated,
+    /// but one needs to call `refresh_display` to actually remove the line from screen.
+    pub fn clear_cmdline(&mut self) {
+        self.left_shift = 0;
+        for _i in 0..self.cmdline.len() {
+            self.erase_from_cmdline(true);
+        }
+        self.cmdline.clear();
+    }
+
+    /// Set a new buffered command line to terminal. The scrollback buffer is synchronically updated,
+    /// but one needs to call `refresh_display` to actually show the new line onto the screen.
+    pub fn set_cmdline(&mut self, s: String) {
+        if !self.cmdline.is_empty() {
+            self.clear_cmdline();
+        }
+        let buffer_len = self.scrollback_buffer.len();
+        self.scrollback_buffer.insert_str(buffer_len - self.left_shift , &s);
+        self.cmdline = s;
+        self.left_shift = 0;
+        self.correct_prompt_position = true;
+    }
+
+    /// Just clear the buffered cmdline string in terminal. The existing characters on the screen are
+    /// left untouched.
+    pub fn clear_cmdline_without_erase(&mut self) {
+        self.cmdline.clear();
+        self.left_shift = 0;
+    }
+
+    /// Erase a character on the left of the cursor. If there's nothing on the left, it simply returns.
+    pub fn erase_left_cmdline(&mut self) {
+        // Prevents user from moving cursor to the left of the typing bounds
+        if self.cmdline.len() == 0 || self.cmdline.len() - self.left_shift == 0 { 
+            return;
+        } else {
+            // Subtraction by accounts for 0-indexing
+            if let Some(text_display) = self.window.get_displayable(&self.display_name){
+                text_display.disable_cursor();
+            }
+            let remove_idx: usize =  self.cmdline.len() - self.left_shift -1;
+            self.cmdline.remove(remove_idx);
+            self.erase_from_cmdline(true);
+            return;
+        }
+    }
+
+    /// Erase a character at the cursor. If there's nothing at the cursor as well as on its right, it
+    /// simply returns.
+    pub fn erase_right_cmdline(&mut self) {
+        // if there's no characters to the right of the cursor, does nothing
+        if self.cmdline.len() == 0 || self.left_shift == 0 { 
+            return;
+        } else {
+            // Subtraction by accounts for 0-indexing
+            if let Some(text_display) = self.window.get_displayable(&self.display_name){
+                text_display.disable_cursor();
+            }
+            let remove_idx: usize =  self.cmdline.len() - self.left_shift;
+            // we're moving the cursor one position to the right relative to the end of the input string
+            self.cmdline.remove(remove_idx);
+            self.erase_from_cmdline(false);
+            self.left_shift -= 1; 
+            return;
+        }
+    }
+
+    /// Move the cursor to the very beginning of the input command line.
+    pub fn move_cursor_leftmost(&mut self) {
+        self.left_shift = self.cmdline.len();
+    }
+
+    /// Move the cursor to the very end of the input command line.
+    pub fn move_cursor_rightmost(&mut self) {
+        self.left_shift = 0;
+    }
+
+    /// Move the cursor a character left. If the cursor is already at the beginning of the command line,
+    /// it simply returns.
+    pub fn move_cursor_left(&mut self) {
+        if self.left_shift < self.cmdline.len() {
+            self.left_shift += 1;
+        }
+    }
+
+    /// Move the cursor a character right. If the cursor is already at the end of the command line,
+    /// it simply returns.
+    pub fn move_cursor_right(&mut self) {
+        if self.left_shift > 0 {
+            self.left_shift -= 1;
+        }
+    }
+
+    /// Insert a character at the cursor.
+    pub fn insert_character_to_cmdline(&mut self, c: char) -> Result<(), &'static str> {
+        let insert_idx = self.cmdline.len() - self.left_shift;
+        self.cmdline.insert(insert_idx, c);
+        let buffer_len = self.scrollback_buffer.len();
+        self.scrollback_buffer.insert_str(buffer_len - self.left_shift , &c.to_string());
+
+        // If the prompt and any keypresses aren't already the last things being displayed on the buffer, it reprints
+        if !self.correct_prompt_position {
+            let mut cmdline = self.cmdline.clone();
+            match cmdline.pop() {
+                Some(_) => { }
+                None => {return Err("couldn't pop newline from input event string")}
+            }
+            self.redisplay_prompt();
+            self.print_to_terminal(cmdline);
+            // out dated: redisplay_prompt have set it // terminal.correct_prompt_position = true;
+        }
+        Ok(())
+    }
+
+    /// Insert a character to the secondary buffer. It is used when currently a command is running.
+    /// Should be removed later when we have abstraction of `stdio`.
+    pub fn insert_character_to_buffer(&mut self, c: char) {
+        self.buffer_string.push(c);
+    }
+
+    /// Move contents from the secondary buffer to the command line buffer.
+    pub fn consume_buffer_string(&mut self) -> Result<(), &'static str> {
+        let temp = self.buffer_string.clone();
+        self.print_to_terminal(temp.clone());
+        self.cmdline = temp;
+        self.buffer_string.clear();
+        Ok(())
+    }
+
+    /// Clear the secondary buffer.
+    pub fn clear_buffer_string(&mut self) {
+        self.buffer_string.clear();
+    }
+
+    pub fn is_buffer_string_empty(&self) -> bool {
+        self.buffer_string.is_empty()
+    }
+
+    /// Scroll the screen to the very beginning.
+    pub fn move_screen_to_begin(&mut self) {
+        // Home command only registers if the text display has the ability to scroll
+        if self.scroll_start_idx != 0 {
+            self.is_scroll_end = false;
+            self.scroll_start_idx = 0; // takes us up to the start of the page
+            if let Some(text_display) = self.window.get_displayable(&self.display_name){
+                text_display.disable_cursor();
+            }
+        }
+    }
+
+    /// Scroll the screen to the very end.
+    pub fn move_screen_to_end(&mut self) {
+        if !self.is_scroll_end {
+            self.is_scroll_end = true;
+            let buffer_len = self.scrollback_buffer.len();
+            self.scroll_start_idx = self.calc_start_idx(buffer_len, &self.display_name).0;
+        }
+    }
+
+    /// Scroll the screen a line up.
+    pub fn move_screen_line_up(&mut self) {
+        if self.scroll_start_idx != 0 {
+            self.scroll_up_one_line();
+            if let Some(text_display) = self.window.get_displayable(&self.display_name){
+                text_display.disable_cursor();
+            }
+        }
+    }
+
+    /// Scroll the screen a line down.
+    pub fn move_screen_line_down(&mut self) {
+        if !self.is_scroll_end {
+            self.scroll_down_one_line();
+        }
+    }
+
+    /// Scroll the screen a page up.
+    pub fn move_screen_page_up(&mut self) {
+        if self.scroll_start_idx <= 1 {
+            return;
+        }
+        self.page_up();
+        self.is_scroll_end = false;
+        if let Some(text_display) = self.window.get_displayable(&self.display_name){
+            text_display.disable_cursor();
+        }
+    }
+
+    /// Scroll the screen a page down.
+    pub fn move_screen_page_down(&mut self) {
+        if self.is_scroll_end {
+            return;
+        }
+        self.page_down();
+    }
+
+    pub fn initialize_screen(&mut self) -> Result<(), &'static str> {
+        let display_name = self.display_name.clone();
+        { 
+            let (width, height) = self.window.dimensions();
+            let width  = width  - 2*window_manager::WINDOW_MARGIN;
+            let height = height - 2*window_manager::WINDOW_MARGIN;
+            match self.window.add_displayable(&display_name, 0, 0,
+                TextDisplay::new(&display_name, width, height)) {
+                    Ok(_) => { }
+                    Err(err) => {return Err(err);}
+            };
+        }
+        self.refresh_display();
+        Ok(())
+    }
+
+    pub fn blink_cursor(&mut self) {
+        if let Some(text_display) = self.window.get_displayable(&self.display_name){
+            text_display.cursor_blink(&self.window, FONT_COLOR, BACKGROUND_COLOR);
+        }
+    }
+
+    /// Get a key event from the underlying window.
+    pub fn get_key_event(&self) -> Option<Event> {
+        self.window.get_key_event()
+    }
+
+    pub fn close_window(self) -> Result<(), &'static str> {
+        window_manager::delete(self.window)?;
+        Ok(())
+    }
+
+    /// If there is any output event from running application, print it to the screen, otherwise it does nothing.
+    pub fn check_and_print_app_output(&mut self) -> bool {
+        use core::ops::Deref;
+        if let Some(print_event) = self.print_consumer.peek() {
             match print_event.deref() {
                 &Event::OutputEvent(ref s) => {
-                    terminal.push_to_stdout(s.text.clone());
+                    self.print_to_terminal(s.text.clone());
 
                     // Sets this bool to true so that on the next iteration the TextDisplay will refresh AFTER the 
                     // task_handler() function has cleaned up, which does its own printing to the console
-                    terminal.refresh_display(&display_name);
-                    terminal.correct_prompt_position = false;
+                    self.refresh_display();
+                    self.correct_prompt_position = false;
                 },
                 _ => { },
             }
             print_event.mark_completed();
             // Goes to the next iteration of the loop after processing print event to ensure that printing is handled before keypresses
-            continue;
-        } 
-
-
-        // Handles the cleanup of any application task that has finished running, including refreshing the display
-        terminal.task_handler()?;
-        if !terminal.correct_prompt_position {
-            terminal.redisplay_prompt();
-            terminal.correct_prompt_position = true;
+            return true;
         }
-        
-        // Looks at the input queue from the window manager
-        // If it has unhandled items, it handles them with the match
-        // If it is empty, it proceeds directly to the next loop iteration
-        let event = match terminal.window.get_key_event() {
-            Some(ev) => {
-                ev
-            },
-            _ => { continue; }
-        };
+        false
+    }
 
-        match event {
-            // Returns from the main loop so that the terminal object is dropped
-            Event::ExitEvent => {
-                trace!("exited terminal");
-                window_manager::delete(terminal.window)?;
-                return Ok(());
-            }
-
-            Event::ResizeEvent(ref _rev) => {
-                terminal.refresh_display(&display_name); // application refreshes display after resize event is received
-            }
-
-            // Handles ordinary keypresses
-            Event::InputEvent(ref input_event) => {
-                terminal.handle_key_event(input_event.key_event, &display_name)?;
-                if input_event.key_event.action == KeyAction::Pressed {
-                    // only refreshes the display on keypresses to improve display performance 
-                    terminal.refresh_display(&display_name);
-                }
-            }
-            _ => { }
+    /// Print a new prompt if we need, otherwise do nothing.
+    pub fn refresh_prompt_if_needed(&mut self) {
+        if !self.correct_prompt_position {
+            self.redisplay_prompt();
         }
-        
-    }  
+    }
+
+    /// Get a producer to the print event queue.
+    pub fn get_producer_to_screen(&mut self) -> DFQueueProducer<Event> {
+        self.print_producer.obtain_producer()
+    }
+
+    /// Get current environment.
+    pub fn get_environment(&self) -> Arc<Mutex<Environment>> {
+        Arc::clone(&self.env)
+    }
 }
-
-
-
-

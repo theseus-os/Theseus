@@ -1,0 +1,75 @@
+[package]
+name = "shell"
+version = "0.1.0"
+description = "Shell that can run commands in application directory"
+authors = ["Zhiyao Ma <zm16@pku.edu.cn>"]
+build = "../../build.rs"
+
+
+[dependencies]
+spin = "0.4.10"
+x86_64 = { path = "../../libs/x86_64" }
+
+[dependencies.log]
+default-features = false
+version = "0.3.7"
+
+[dependencies.keycodes_ascii]
+path = "../../libs/keycodes_ascii"
+
+[dependencies.dfqueue]
+path = "../../libs/dfqueue"
+version = "0.1.0"
+
+[dependencies.event_types]
+path = "../../kernel/event_types"
+
+[dependencies.spawn]
+path = "../../kernel/spawn"
+
+[dependencies.task]
+path = "../../kernel/task"
+
+[dependencies.runqueue]
+path = "../../kernel/runqueue"
+
+[dependencies.memory]
+path  = "../../kernel/memory"
+
+[dependencies.mod_mgmt]
+path = "../../kernel/mod_mgmt"
+
+[dependencies.frame_buffer]
+path = "../../kernel/frame_buffer"
+
+[dependencies.window_manager]
+path = "../../kernel/window_manager"
+
+[dependencies.text_display]
+path = "../../kernel/text_display"
+[dependencies.terminal_print]
+path = "../terminal_print"
+
+[dependencies.print]
+path = "../../kernel/print"
+
+[dependencies.fs_node]
+path = "../../kernel/fs_node"
+
+[dependencies.environment]
+path = "../../kernel/environment"
+
+[dependencies.root]
+path = "../../kernel/root"
+
+[dependencies.path]
+path = "../../kernel/path"
+
+[dependencies.libterm]
+path = "../../kernel/libterm"
+
+[lib]
+crate-type = ["rlib"]
+
+
+
