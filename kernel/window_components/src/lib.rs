@@ -83,8 +83,8 @@ impl WindowComponents {
             bias_x: WINDOW_BORDER,
             bias_y: WINDOW_TOPBAR,
             background: WINDOW_BACKGROUND,
-        consumer: consumer,
-        producer: producer,
+            consumer: consumer,
+            producer: producer,
             last_mouse_position_event: MousePositionEvent {
                 x: 0, y: 0, gx: 0, gy: 0,
                 scrolling_up: false, scrolling_down: false,
@@ -185,6 +185,7 @@ impl WindowComponents {
     pub fn handle_event(&mut self) -> Result<(), &'static str> {
         let mut call_later_do_refresh_floating_border = false;
         let mut call_later_do_move_active_window = false;
+        let mut need_to_set_active = false;
         let (bx, by) = {
             let mut winobj = self.winobj.lock();
             let consumer = &winobj.consumer;
@@ -192,6 +193,8 @@ impl WindowComponents {
                 Some(ev) => ev,
                 _ => { return Ok(()); }
             };
+            let bx = winobj.x;
+            let by = winobj.y;
             match event.deref() {
                 &Event::InputEvent(ref input_event) => {
                     let key_input = input_event.key_event;
@@ -247,16 +250,24 @@ impl WindowComponents {
                             // TODO: if any components want this event? ask them!
                             self.producer.enqueue(Event::MousePositionEvent(mouse_event.clone()));
                         }
+                        if mouse_event.y < winobj.height && mouse_event.x < winobj.width &&
+                                !self.last_mouse_position_event.left_button_hold && mouse_event.left_button_hold {
+                            need_to_set_active = true;
+                        }
                         self.last_mouse_position_event = mouse_event.clone();
                     }
                 }
                 _ => { return Ok(()); }
             };
             event.mark_completed();
-            let bx = winobj.x;
-            let by = winobj.y;
             (bx, by)
         };
+        if need_to_set_active {
+            match window_manager_alpha::set_active(&self.winobj) {
+                Ok(_) => { }
+                Err(err) => { debug!("cannot set to active {}", err); }
+            }
+        }
         match self.refresh_three_button(bx, by) {
             Ok(_) => { }
             Err(err) => { debug!("refresh_three_button failed {}", err); }

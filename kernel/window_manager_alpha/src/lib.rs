@@ -116,11 +116,17 @@ impl WindowManagerAlpha {
     }
 
     /// set one window to active, push last active (if exists) to top of show_list
-    pub fn set_active(&mut self, objref: &Arc<Mutex<WindowObjAlpha>>) {
+    pub fn set_active(&mut self, objref: &Arc<Mutex<WindowObjAlpha>>) -> Result<(), &'static str> {
+        let (xs, xe, ys, ye) = {
+            let winobj = objref.lock();
+            let xs = winobj.x; let ys = winobj.y;
+            let xe = xs + winobj.width; let ye = ys + winobj.height;
+            (xs, xe, ys, ye)
+        };
         // if it is currently actived, just return
         if let Some(current_active) = self.active.upgrade() {
             if Arc::ptr_eq(&(current_active), objref) {
-                return;  // do nothing
+                return Ok(());  // do nothing
             } else {  // save this to show_list
                 self.show_list.push_front(self.active.clone());
                 self.active = Weak::new();
@@ -137,6 +143,8 @@ impl WindowManagerAlpha {
             }, None => {}
         }
         self.active = Arc::downgrade(objref);
+        self.refresh_area(xs, xe, ys, ye)?;
+        Ok(())
     }
 
     /// judge whether this window is in hide list and return the index of it
@@ -145,12 +153,11 @@ impl WindowManagerAlpha {
         for item in self.show_list.iter() {
             if let Some(item_ptr) = item.upgrade() {
                 if Arc::ptr_eq(&(item_ptr), objref) {
-                    debug!("TODO: refresh area");
+                    return Some(i);
                 }
             }
             i += 1;
         }
-        if i < self.show_list.len() { return Some(i); }
         None
     }
 
@@ -160,12 +167,11 @@ impl WindowManagerAlpha {
         for item in self.hide_list.iter() {
             if let Some(item_ptr) = item.upgrade() {
                 if Arc::ptr_eq(&(item_ptr), objref) {
-                    debug!("TODO: refresh area");
+                    return Some(i);
                 }
             }
             i += 1;
         }
-        if i < self.hide_list.len() { return Some(i); }
         None
     }
 
@@ -416,6 +422,9 @@ impl WindowManagerAlpha {
                 current_active_win.producer.enqueue(Event::MousePositionEvent(event));
                 return Ok(());
             }
+            if current_active_win.is_moving {  // do not pass the movement event to other windows
+                return Ok(());
+            }
         }
         // then check show_list
         for i in 0..self.show_list.len() {
@@ -510,6 +519,12 @@ impl WindowManagerAlpha {
 pub fn delete_window(objref: &Arc<Mutex<WindowObjAlpha>>) -> Result<(), &'static str> {
     let mut win = WINDOW_MANAGER.lock();
     win.delete_window(objref)
+}
+
+/// set window as active
+pub fn set_active(objref: &Arc<Mutex<WindowObjAlpha>>) -> Result<(), &'static str> {
+    let mut win = WINDOW_MANAGER.lock();
+    win.set_active(objref)
 }
 
 /// refresh the floating border display, will lock WINDOW_MANAGER
@@ -761,7 +776,7 @@ pub fn new_window<'a>(
 
     let window_ref = Arc::new(Mutex::new(window));
     let mut win = WINDOW_MANAGER.lock();
-    win.set_active(&window_ref);
+    win.set_active(&window_ref)?;
     // win.refresh_window(&window_ref)?;  // do not refresh now for better speed
 
     Ok(window_ref)
