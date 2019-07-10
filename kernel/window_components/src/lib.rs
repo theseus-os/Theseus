@@ -182,7 +182,7 @@ impl WindowComponents {
     }
 
     /// event handler that should be called periodically
-    pub fn handle_event(&mut self) {
+    pub fn handle_event(&mut self) -> Result<(), &'static str> {
         let mut call_later_do_refresh_floating_border = false;
         let mut call_later_do_move_active_window = false;
         let (bx, by) = {
@@ -190,7 +190,7 @@ impl WindowComponents {
             let consumer = &winobj.consumer;
             let event = match consumer.peek() {
                 Some(ev) => ev,
-                _ => { return; }
+                _ => { return Ok(()); }
             };
             match event.deref() {
                 &Event::InputEvent(ref input_event) => {
@@ -208,7 +208,7 @@ impl WindowComponents {
                             call_later_do_move_active_window = true;
                         }
                     } else {
-                        if mouse_event.y < self.bias_y {  // the region of top bar
+                        if mouse_event.y < self.bias_y && mouse_event.x < winobj.width {  // the region of top bar
                             let r2 = WINDOW_RADIUS * WINDOW_RADIUS;
                             let mut is_three_button = false;
                             for i in 0..3 {
@@ -220,6 +220,17 @@ impl WindowComponents {
                                         self.show_button(i, 2, &mut winobj);
                                     } else {
                                         self.show_button(i, 0, &mut winobj);
+                                        if self.last_mouse_position_event.left_button_hold {  // click event
+                                            if i == 0 {
+                                                debug!("close window");
+                                                drop(winobj);
+                                                match window_manager_alpha::delete_window(&self.winobj) {
+                                                    Ok(_) => { }
+                                                    Err(err) => { debug!("do_refresh_floating_border failed {}", err); }
+                                                }
+                                                return Err("user close window");
+                                            }
+                                        }
                                     }
                                 } else {
                                     self.show_button(i, 1, &mut winobj);
@@ -232,14 +243,14 @@ impl WindowComponents {
                                 winobj.moving_base = (mouse_event.gx, mouse_event.gy);
                                 call_later_do_refresh_floating_border = true;
                             }
-                            self.last_mouse_position_event = mouse_event.clone();
                         } else {  // the region of components
                             // TODO: if any components want this event? ask them!
                             self.producer.enqueue(Event::MousePositionEvent(mouse_event.clone()));
                         }
+                        self.last_mouse_position_event = mouse_event.clone();
                     }
                 }
-                _ => { return; }
+                _ => { return Ok(()); }
             };
             event.mark_completed();
             let bx = winobj.x;
@@ -262,6 +273,7 @@ impl WindowComponents {
                 Err(err) => { debug!("do_move_active_window failed {}", err); }
             }
         }
+        Ok(())
     }
 }
 

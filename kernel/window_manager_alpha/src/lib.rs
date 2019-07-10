@@ -126,41 +126,79 @@ impl WindowManagerAlpha {
                 self.active = Weak::new();
             }
         }
-        self.delete_window(objref);  // remove item in current list
+        match self.is_window_in_show_list(&objref) {  // remove item in current list
+            Some(i) => {
+                self.show_list.remove(i);
+            }, None => {}
+        }
+        match self.is_window_in_hide_list(&objref) {  // remove item in current list
+            Some(i) => {
+                self.hide_list.remove(i);
+            }, None => {}
+        }
         self.active = Arc::downgrade(objref);
     }
 
-    /// delete one window
-    pub fn delete_window(&mut self, objref: &Arc<Mutex<WindowObjAlpha>>) {
-        if let Some(current_active) = self.active.upgrade() {
-            if Arc::ptr_eq(&(current_active), objref) {
-                self.active = Weak::new();  // delete reference
-            }
-        }
+    /// judge whether this window is in hide list and return the index of it
+    fn is_window_in_show_list(&mut self, objref: &Arc<Mutex<WindowObjAlpha>>) -> Option<usize> {
         let mut i = 0_usize;
         for item in self.show_list.iter() {
             if let Some(item_ptr) = item.upgrade() {
                 if Arc::ptr_eq(&(item_ptr), objref) {
-                    break;
+                    debug!("TODO: refresh area");
                 }
             }
             i += 1;
         }
-        if i < self.show_list.len() {
-            self.show_list.remove(i);
-        }
+        if i < self.show_list.len() { return Some(i); }
+        None
+    }
+
+    /// judge whether this window is in hide list and return the index of it
+    fn is_window_in_hide_list(&mut self, objref: &Arc<Mutex<WindowObjAlpha>>) -> Option<usize> {
         let mut i = 0_usize;
         for item in self.hide_list.iter() {
             if let Some(item_ptr) = item.upgrade() {
                 if Arc::ptr_eq(&(item_ptr), objref) {
-                    break;
+                    debug!("TODO: refresh area");
                 }
             }
             i += 1;
         }
-        if i < self.hide_list.len() {
-            self.hide_list.remove(i);
+        if i < self.hide_list.len() { return Some(i); }
+        None
+    }
+
+    /// delete one window if exists, refresh its region then
+    fn delete_window(&mut self, objref: &Arc<Mutex<WindowObjAlpha>>) -> Result<(), &'static str> {
+        let (xs, xe, ys, ye) = {
+            let winobj = objref.lock();
+            let xs = winobj.x; let ys = winobj.y;
+            let xe = xs + winobj.width; let ye = ys + winobj.height;
+            (xs, xe, ys, ye)
+        };
+        if let Some(current_active) = self.active.upgrade() {
+            if Arc::ptr_eq(&(current_active), objref) {
+                self.active = Weak::new();  // delete reference
+                self.refresh_area(xs, xe, ys, ye)?;
+                return Ok(())
+            }
         }
+        match self.is_window_in_show_list(&objref) {
+            Some(i) => {
+                self.show_list.remove(i);
+                self.refresh_area(xs, xe, ys, ye)?;
+                return Ok(())
+            }, None => {}
+        }
+        match self.is_window_in_hide_list(&objref) {
+            Some(i) => {
+                self.hide_list.remove(i);
+                self.refresh_area(xs, xe, ys, ye)?;
+                return Ok(())
+            }, None => {}
+        }
+        Err("cannot find this window")
     }
 
     /// iterately compute single pixel within show_list
@@ -468,6 +506,12 @@ impl WindowManagerAlpha {
     }
 }
 
+/// delete window
+pub fn delete_window(objref: &Arc<Mutex<WindowObjAlpha>>) -> Result<(), &'static str> {
+    let mut win = WINDOW_MANAGER.lock();
+    win.delete_window(objref)
+}
+
 /// refresh the floating border display, will lock WINDOW_MANAGER
 pub fn do_refresh_floating_border() -> Result<(), &'static str> {
     let mut win = WINDOW_MANAGER.lock();
@@ -553,23 +597,6 @@ pub struct WindowObjAlpha {
     pub is_moving: bool,
     /// the base position of window moving action, should be the cursor position when `is_moving` is set to true
     pub moving_base: (usize, usize),
-}
-
-// delete the reference of a window in the manager when the window is dropped
-impl Drop for WindowObjAlpha {
-    fn drop(&mut self) {
-
-        debug!("WindowObjAlpha drop called");
-
-        // let mut window_list = WINDOWLIST.lock();
-
-        // // Switches to a new active window and sets
-        // // the active pointer field of the window allocator to the new active window
-        // match window_list.delete(&self.inner) {
-        //     Ok(_) => {}
-        //     Err(err) => error!("Fail to schedule to the next window: {}", err),
-        // };
-    }
 }
 
 /// handles all keyboard and mouse movement in this window manager

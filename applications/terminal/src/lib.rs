@@ -1056,7 +1056,7 @@ fn terminal_loop(mut terminal: Terminal) -> Result<(), &'static str> {
         // If it is empty, it proceeds directly to the next loop iteration
         let event = {
             let mut wincomps = terminal.window.lock();
-            wincomps.handle_event();
+            wincomps.handle_event()?;
             let _event = match wincomps.consumer.peek() {
                 Some(ev) => ev,
                 _ => { continue; }

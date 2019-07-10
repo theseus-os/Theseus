@@ -86,7 +86,10 @@ pub fn main(_args: Vec<String>) -> isize {
     let mut cursor_last_char: u8 = ' ' as u8;
 
     loop {
-        wincomps.handle_event();
+        match wincomps.handle_event() {
+            Ok(_) => {},
+            Err(err) => { debug!("{}", err); return 0; }
+        }
 
         // then do my work here
         loop {
