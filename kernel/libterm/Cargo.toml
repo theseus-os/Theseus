@@ -1,0 +1,34 @@
+[package]
+name = "libterm"
+version = "0.1.0"
+authors = ["Zhiyao Ma <zm16@pku.edu.cn>"]
+
+[dependencies]
+spin = "0.4.10"
+
+[dependencies.log]
+default-features = false
+version = "0.3.7"
+
+
+[dependencies.dfqueue]
+path = "../../libs/dfqueue"
+version = "0.1.0"
+
+[dependencies.window_manager]
+path = "../window_manager"
+
+[dependencies.environment]
+path = "../environment"
+
+[dependencies.root]
+path = "../root"
+
+[dependencies.print]
+path = "../print"
+
+[dependencies.event_types]
+path = "../event_types"
+
+[lib]
+crate-type = ["rlib"]
