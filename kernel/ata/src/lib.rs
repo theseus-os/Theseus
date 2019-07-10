@@ -37,11 +37,17 @@
 extern crate port_io;
 extern crate pci;
 #[macro_use] extern crate bitflags;
+extern crate storage_device;
 
 use core::fmt;
-use alloc::string::String;
+use alloc::{
+	string::String,
+	boxed::Box,
+};
 use port_io::{Port, PortReadOnly, PortWriteOnly};
 use pci::PciDevice;
+use storage_device::{StorageDevice, StorageController};
+
 
 const SECTOR_SIZE_IN_BYTES: usize = 512;
 
@@ -54,8 +60,6 @@ const MAX_LBA_28_VALUE: u64 = (1 << 28) - 1;
 
 /// To use a BAR as a Port address, you must mask out the lowest 2 bits.
 const PCI_BAR_PORT_MASK: u16 = 0xFFFC;
-
-
 
 
 bitflags! {
@@ -472,21 +476,6 @@ impl AtaDrive {
 		Ok((starting_lba, ending_lba, offset_remainder))
 	}
 
-	/// Returns the number of sectors in this drive.
-	pub fn size_in_sectors(&self) -> usize {
-		if self.identify_data.user_addressable_sectors != 0 {
-			self.identify_data.user_addressable_sectors as usize
-		} else {
-			self.identify_data.max_48_bit_lba as usize
-		}
-	}
-
-	/// Returns the size of this drive in bytes,
-	/// rounded up to the nearest sector size.
-	pub fn size_in_bytes(&self) -> usize {
-		self.size_in_sectors() * SECTOR_SIZE_IN_BYTES
-	}
-
 
 	/// Issues an ATA identify command to probe the drive
 	/// and query its characteristics. 
@@ -638,6 +627,34 @@ impl AtaDrive {
 			BusDriveSelect::Slave => false,
 		}
 	}
+
+	fn as_storage_device(&self) -> &StorageDevice {
+		self
+	}
+}
+
+impl StorageDevice for AtaDrive {
+	fn read_sector(&mut self, buffer: &mut [u8], offset_in_sectors: usize) -> Result<usize, &'static str> {
+		self.read_pio(buffer, offset_in_sectors)
+	}
+
+    fn write_sector(&mut self, buffer: &[u8], offset_in_sectors: usize) -> Result<usize, &'static str> {
+		self.write_pio(buffer, offset_in_sectors)
+	}
+
+	/// Returns the number of sectors in this drive.
+	fn size_in_sectors(&self) -> usize {
+		if self.identify_data.user_addressable_sectors != 0 {
+			self.identify_data.user_addressable_sectors as usize
+		} else {
+			self.identify_data.max_48_bit_lba as usize
+		}
+	}
+
+    fn sector_size_in_bytes(&self) -> usize {
+		SECTOR_SIZE_IN_BYTES
+	}
+
 }
 
 
@@ -719,6 +736,87 @@ impl IdeController {
 				slave: secondary_slave.ok(),
 			},
 		})
+	}
+
+	/// Returns an `Iterator` over all of the `AtaDrive`s 
+	/// that exist (and are supported) in this `IdeController`.
+	/// The order of iteration is: 
+	/// primary master, primary slave, secondary master, and secondary slave;
+	/// any devices that do not exist are skipped.
+	pub fn iter(&self) -> IdeControllerIter {
+		IdeControllerIter {
+			next: NextDrive::PrimaryMaster,
+			controller: self,
+		}
+	}
+}
+
+impl StorageController for IdeController {
+    fn devices<'c>(&'c self) -> Box<(dyn Iterator<Item = &'c dyn StorageDevice> + 'c)> {
+		Box::new(self.iter())
+	}
+
+    // fn devices_mut(&mut self) -> &Iterator<Item = &mut StorageDevice> { }
+}
+
+/// The order in which `AtaDrive`s in an `IdeController` are iterated over.
+#[derive(Clone)]
+enum NextDrive {
+	PrimaryMaster,
+	PrimarySlave,
+	SecondaryMaster,
+	SecondarySlave,
+}
+
+/// Provides an iterator over all `AtaDrive`s in an `IdeController`.
+/// See the [`IdeController::iter()`](struct.IdeController.html#method.iter) method.
+#[derive(Clone)]
+pub struct IdeControllerIter<'c> {
+	/// which drive will be returned on the next call to `next()`
+	next: NextDrive,
+	controller: &'c IdeController,
+}
+impl<'c> Iterator for IdeControllerIter<'c> {
+	type Item = &'c dyn StorageDevice; // AtaDrive;
+
+    fn next(&mut self) -> Option<Self::Item> {
+		match self.next {
+			NextDrive::PrimaryMaster => {
+				self.next = NextDrive::PrimarySlave;
+				trace!("PM -> PS");
+				if self.controller.primary.master.is_some() {
+					self.controller.primary.master.as_ref().map(|d| d.as_storage_device())
+				} else {
+					self.next()
+				}
+			}
+			NextDrive::PrimarySlave => {
+				self.next = NextDrive::SecondaryMaster;
+				trace!("PS -> SM");
+				if self.controller.primary.slave.is_some() {
+					self.controller.primary.slave.as_ref().map(|d| d.as_storage_device())
+				} else {
+					self.next()
+				}
+			}
+			NextDrive::SecondaryMaster => {
+				self.next = NextDrive::SecondarySlave;
+				trace!("SM -> SS");
+				if self.controller.secondary.master.is_some() {
+					self.controller.secondary.master.as_ref().map(|d| d.as_storage_device())
+				} else {
+					self.next()
+				}
+			}
+			NextDrive::SecondarySlave => {
+				trace!("SS -> None");
+				if self.controller.secondary.slave.is_some() {
+					self.controller.secondary.slave.as_ref().map(|d| d.as_storage_device())
+				} else {
+					None
+				}
+			}
+		}
 	}
 }
 

@@ -105,6 +105,11 @@ pub fn init(keyboard_producer: DFQueueProducer<Event>) -> Result<(), &'static st
     if network_manager::NETWORK_INTERFACES.lock().is_empty() {
         warn!("Note: no network devices found on this system.");
     }
+
+    warn!("TESTING STORAGE_CONTROLLERS...");
+    if let Some(controller) = storage_manager::STORAGE_CONTROLLERS.lock().iter().next() {
+        let _ = controller.lock().devices(); // prints something currently
+    }
     
     Ok(())
 }
