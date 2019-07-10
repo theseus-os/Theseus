@@ -16,6 +16,7 @@
 #![no_std]
 
 extern crate spin;
+#[macro_use]
 extern crate alloc;
 extern crate dfqueue;
 extern crate event_types;
@@ -27,19 +28,22 @@ extern crate lazy_static;
 extern crate spawn;
 extern crate mouse_data;
 extern crate keycodes_ascii;
+extern crate path;
 
 mod background;
 use alloc::collections::VecDeque;
-use alloc::string::{ToString};
+use alloc::string::{String, ToString};
 use alloc::sync::{Arc, Weak};
+use alloc::vec::Vec;
 use core::ops::Deref;
 use dfqueue::{DFQueue, DFQueueConsumer, DFQueueProducer};
 use event_types::{Event, MousePositionEvent};
 use frame_buffer_alpha::{ FrameBufferAlpha, Pixel, FINAL_FRAME_BUFFER, alpha_mix, color_mix };
 use spin::{Mutex};
-use spawn::{KernelTaskBuilder};
+use spawn::{KernelTaskBuilder, ApplicationTaskBuilder};
 use mouse_data::MouseEvent;
-use keycodes_ascii::{KeyEvent};
+use keycodes_ascii::{KeyEvent, Keycode, KeyAction};
+use path::Path;
 
 lazy_static! {
     /// The list of all windows in the system.
@@ -51,6 +55,7 @@ lazy_static! {
             cursor: (0, 0),
             is_show_border: false,
             border_position: (0, 0, 0, 0),
+            terminal_id_counter: 1,
         }
     );
 }
@@ -103,6 +108,8 @@ struct WindowManagerAlpha {
     is_show_border: bool,
     /// if show border, then where to show it
     border_position: (usize, usize, usize, usize),  // xs, xe, ys, ye, could be minus value
+    /// to record how many terminals has been created, avoid same name
+    terminal_id_counter: usize,
 }
 
 /// Window manager object that stores non-critical information
@@ -683,6 +690,21 @@ fn window_manager_loop( consumer: (DFQueueConsumer<Event>, DFQueueConsumer<Event
 
 /// handle keyboard event, push it to the active window if exists
 fn keyboard_handle_application(key_input: KeyEvent) -> Result<(), &'static str> {
+    // first judge whether is system remained keys
+    if key_input.modifiers.control && key_input.keycode == Keycode::T && key_input.action == KeyAction::Pressed {
+        let terminal_id_counter = {
+            let mut win = WINDOW_MANAGER.lock();
+            win.terminal_id_counter += 1;
+            win.terminal_id_counter
+        };
+        let task_name: String = format!("terminal {}", terminal_id_counter);
+        let args: Vec<String> = vec![]; // terminal::main() does not accept any arguments
+        ApplicationTaskBuilder::new(Path::new(String::from("terminal")))
+            .argument(args)
+            .name(task_name)
+            .spawn()?;
+    }
+    // then pass them to window
     let win = WINDOW_MANAGER.lock();
     match win.pass_keyboard_event_to_window(key_input) {  // even not find a window to pass, that's ok
         Ok(_) => { },
