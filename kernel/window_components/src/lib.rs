@@ -63,6 +63,7 @@ pub struct WindowComponents {
     producer: DFQueueProducer<Event>,  // event output used by window manager
 
     last_mouse_position_event: MousePositionEvent,
+    last_is_active: bool,
 }
 
 impl WindowComponents {
@@ -90,7 +91,8 @@ impl WindowComponents {
                 scrolling_up: false, scrolling_down: false,
                 left_button_hold: false, right_button_hold: false,
                 fourth_button_hold: false, fifth_button_hold: false,
-            }
+            },
+            last_is_active: true,  // new window is by default active
         };
 
         let (xs, xe, ys, ye) = {
@@ -103,11 +105,19 @@ impl WindowComponents {
             (xs, xe, ys, ye)
         };
         wincomps.draw_border(true);  // active border
+        // draw three buttons
+        {
+            let mut winobj = wincomps.winobj.lock();
+            wincomps.show_button(0, 1, &mut winobj);
+            wincomps.show_button(1, 1, &mut winobj);
+            wincomps.show_button(2, 1, &mut winobj);
+        }
         window_manager_alpha::refresh_area_absolute(xs, xe, ys, ye)?;
 
         Ok(Arc::new(Mutex::new(wincomps)))
     }
 
+    /// draw the border of this window
     fn draw_border(&mut self, active: bool) {
         let mut winobj = self.winobj.lock();
         // first draw left, bottom, right border
@@ -142,10 +152,21 @@ impl WindowComponents {
                 }
             }
         }
-        // draw three buttons
-        self.show_button(0, 1, &mut winobj);
-        self.show_button(1, 1, &mut winobj);
-        self.show_button(2, 1, &mut winobj);
+    }
+
+    /// refresh border
+    fn refresh_border(& self, bx: usize, by: usize) -> Result<(), &'static str> {
+        let (width, height) = {
+            let winobj = self.winobj.lock();
+            let width = winobj.width;
+            let height = winobj.height;
+            (width, height)
+        };
+        window_manager_alpha::refresh_area_absolute(bx+0, bx+self.bias_x, by+self.bias_y, by+height)?;
+        window_manager_alpha::refresh_area_absolute(bx+0, bx+width, by+height - self.bias_x, by+height)?;
+        window_manager_alpha::refresh_area_absolute(bx+width - self.bias_x, bx+width, by+self.bias_y, by+height)?;
+        window_manager_alpha::refresh_area_absolute(bx+0, bx+width, by+0, by+self.bias_y)?;
+        Ok(())
     }
 
     /// show three button with status. idx = 0,1,2, state = 0,1,2 
@@ -186,6 +207,25 @@ impl WindowComponents {
         let mut call_later_do_refresh_floating_border = false;
         let mut call_later_do_move_active_window = false;
         let mut need_to_set_active = false;
+        let mut need_refresh_three_button = false;
+        let is_active = window_manager_alpha::is_active(&self.winobj);
+        if is_active != self.last_is_active {
+            self.draw_border(is_active);
+            self.last_is_active = is_active;
+            let (bx, by) = {
+                let mut winobj = self.winobj.lock();
+                let bx = winobj.x;
+                let by = winobj.y;
+                self.show_button(0, 1, &mut winobj);
+                self.show_button(1, 1, &mut winobj);
+                self.show_button(2, 1, &mut winobj);
+                (bx, by)
+            };
+            match self.refresh_border(bx, by) {
+                Ok(_) => { }
+                Err(err) => { debug!("refresh_border failed {}", err); }
+            }
+        }
         let (bx, by) = {
             let mut winobj = self.winobj.lock();
             let consumer = &winobj.consumer;
@@ -221,8 +261,10 @@ impl WindowComponents {
                                     is_three_button = true;
                                     if mouse_event.left_button_hold {
                                         self.show_button(i, 2, &mut winobj);
+                                        need_refresh_three_button = true;
                                     } else {
                                         self.show_button(i, 0, &mut winobj);
+                                        need_refresh_three_button = true;
                                         if self.last_mouse_position_event.left_button_hold {  // click event
                                             if i == 0 {
                                                 debug!("close window");
@@ -237,6 +279,7 @@ impl WindowComponents {
                                     }
                                 } else {
                                     self.show_button(i, 1, &mut winobj);
+                                    need_refresh_three_button = true;
                                 }
                             }
                             // check if user push the top bar, which means user willing to move the window
@@ -268,9 +311,11 @@ impl WindowComponents {
                 Err(err) => { debug!("cannot set to active {}", err); }
             }
         }
-        match self.refresh_three_button(bx, by) {
-            Ok(_) => { }
-            Err(err) => { debug!("refresh_three_button failed {}", err); }
+        if need_refresh_three_button {  // if border has been refreshed, no need to refresh buttons
+            match self.refresh_three_button(bx, by) {
+                Ok(_) => { }
+                Err(err) => { debug!("refresh_three_button failed {}", err); }
+            }
         }
         if call_later_do_refresh_floating_border {
             match window_manager_alpha::do_refresh_floating_border() {
@@ -297,13 +342,15 @@ pub enum Component {
 pub struct TextArea {
     x: usize,
     y: usize,
-    width: usize,
-    height: usize,
+    // width: usize,
+    // height: usize,
     line_spacing: usize,
     column_spacing: usize,
     background_color: Pixel,
     text_color: Pixel,
+    /// the x dimension char count
     pub x_cnt: usize,  // do not change this
+    /// the y dimension char count
     pub y_cnt: usize,  // do not change this
     char_matrix: Vec<u8>,
     winobj: Weak<Mutex<WindowObjAlpha>>,
@@ -319,8 +366,8 @@ impl TextArea {
         let mut textarea: TextArea = TextArea {
             x: x,
             y: y,
-            width: width,
-            height: height,
+            // width: width,
+            // height: height,
             line_spacing: match line_spacing {
                 Some(m) => m,
                 _ => 2,

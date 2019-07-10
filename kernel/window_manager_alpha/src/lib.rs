@@ -534,6 +534,17 @@ pub fn set_active(objref: &Arc<Mutex<WindowObjAlpha>>) -> Result<(), &'static st
     win.set_active(objref)
 }
 
+/// whether a window is active
+pub fn is_active(objref: &Arc<Mutex<WindowObjAlpha>>) -> bool {
+    let mut win = WINDOW_MANAGER.lock();
+    if let Some(current_active) = win.active.upgrade() {
+        if Arc::ptr_eq(&(current_active), objref) {
+            return true;
+        }
+    }
+    return false;
+}
+
 /// refresh the floating border display, will lock WINDOW_MANAGER
 pub fn do_refresh_floating_border() -> Result<(), &'static str> {
     let mut win = WINDOW_MANAGER.lock();
