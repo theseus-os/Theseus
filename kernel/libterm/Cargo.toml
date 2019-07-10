@@ -1,7 +1,7 @@
 [package]
 name = "libterm"
 version = "0.1.0"
-authors = ["Zhiyao Ma <zm16@pku.edu.cn>"]
+authors = ["Andrew Pham <apham727@gmail.com>", "Zhiyao Ma <zm16@pku.edu.cn>"]
 
 [dependencies]
 spin = "0.4.10"

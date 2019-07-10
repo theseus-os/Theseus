@@ -5,8 +5,6 @@
 //! spawns and manages tasks, and records previously executed user commands.
 //! 
 //! Problem: Currently there's no upper bound to the user command line history.
-//!
-//! Acknowledgement: Most of the functions are adopted from the `Terminal` implemented by Andrew Pham <apham727@gmail.com>.
 
 #![no_std]
 extern crate frame_buffer;

@@ -5,8 +5,6 @@
 //! as well as the cursor position, and delivers keyboard events.
 //! 
 //! Problem: Currently there's no upper bound to the scrollback buffer, as well as other user input buffer.
-//! 
-//! Acknowledgement: Most of the functions are adopted from the `Terminal` implemented by Andrew Pham <apham727@gmail.com>.
 
 #![no_std]
 
