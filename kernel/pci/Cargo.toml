@@ -7,7 +7,7 @@ build = "../../build.rs"
 
 [dependencies]
 spin = "0.4.10"
-
+bit_field = "0.7.0"
 
 [dependencies.log]
 default-features = false

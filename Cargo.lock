@@ -342,8 +342,6 @@ dependencies = [
  "mouse 0.1.0",
  "network_manager 0.1.0",
  "pci 0.1.0",
- "smoltcp 0.5.0 (registry+https://github.com/rust-lang/crates.io-index)",
- "spin 0.4.10 (registry+https://github.com/rust-lang/crates.io-index)",
 ]
 
 [[package]]
@@ -415,7 +413,6 @@ dependencies = [
  "nic_buffers 0.1.0",
  "owning_ref 0.4.0 (git+https://github.com/kevinaboos/owning-ref-rs)",
  "smoltcp 0.5.0 (registry+https://github.com/rust-lang/crates.io-index)",
- "spin 0.4.10 (registry+https://github.com/rust-lang/crates.io-index)",
 ]
 
 [[package]]
@@ -612,7 +609,6 @@ dependencies = [
  "percent-encoding 1.0.2",
  "smoltcp 0.5.0 (registry+https://github.com/rust-lang/crates.io-index)",
  "smoltcp_helper 0.1.0",
- "spin 0.4.10 (registry+https://github.com/rust-lang/crates.io-index)",
 ]
 
 [[package]]
@@ -1129,6 +1125,7 @@ version = "0.1.0"
 name = "pci"
 version = "0.1.0"
 dependencies = [
+ "bit_field 0.7.0 (registry+https://github.com/rust-lang/crates.io-index)",
  "log 0.3.9 (registry+https://github.com/rust-lang/crates.io-index)",
  "memory 0.1.0",
  "port_io 0.2.1",

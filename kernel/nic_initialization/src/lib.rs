@@ -1,6 +1,6 @@
 //! Functions that are used in a NIC initialization procedure.
 //! 
-//! They include allocating the memory space for the device's registers, and initializing its receive and transmit queues.
+//! They include allocating memory space for the device's registers, and initializing its receive and transmit queues.
 
 #![no_std]
 
@@ -49,7 +49,7 @@ pub fn allocate_device_register_memory(dev: &PciDevice, mem_base: PhysicalAddres
     allocate_memory(mem_base, mem_size_in_bytes)
 }
 
-/// Helper function to allocate memory at required address.
+/// Helper function to allocate memory at required address
 /// 
 /// # Arguments
 /// * `mem_base`: starting physical address of the region that need to be allocated
@@ -82,7 +82,7 @@ pub fn allocate_memory(mem_base: PhysicalAddress, mem_size_in_bytes: usize) -> R
 /// # Arguments
 /// * `num_rx_buffers`: number of buffers that are initially added to the pool 
 /// * `buffer_size`: size of the receive buffers in bytes
-/// * `rx_buffer_pool: buffer pool to initialize
+/// * `rx_buffer_pool`: buffer pool to initialize
 pub fn init_rx_buf_pool(num_rx_buffers: usize, buffer_size: u16, rx_buffer_pool: &'static mpmc::Queue<ReceiveBuffer>) -> Result<(), &'static str> {
     let length = buffer_size;
     for _i in 0..num_rx_buffers {
@@ -102,7 +102,7 @@ pub fn init_rx_buf_pool(num_rx_buffers: usize, buffer_size: u16, rx_buffer_pool:
 /// 
 /// # Arguments
 /// * `num_desc`: number of descriptors in the queue
-/// * `rx_buffer_pool`: tpool from which to take receive buffers
+/// * `rx_buffer_pool`: pool from which to take receive buffers
 /// * `buffer_size`: size of each buffer in the pool
 /// * `rdbal`: register to store the lower (least significant) 32 bits of the physical address of the array of receive descriptors
 /// * `rdbah`: register to store the higher (most significant) 32 bits of the physical address of the array of receive descriptors

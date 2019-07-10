@@ -8,20 +8,16 @@
 extern crate alloc;
 extern crate smoltcp;
 extern crate network_manager;
-extern crate spin;
 extern crate hpet;
 extern crate httparse;
 #[macro_use] extern crate smoltcp_helper;
 
-use core::convert::TryInto;
 use core::str;
 use alloc::vec::Vec;
 use alloc::string::String;
-use spin::Once;
 use hpet::get_hpet;
 use smoltcp::{
     socket::{SocketSet, TcpSocket, SocketHandle},
-    time::Instant
 };
 use network_manager::{NetworkInterfaceRef};
 use smoltcp_helper::{millis_since, poll_iface};

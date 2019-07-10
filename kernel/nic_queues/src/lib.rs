@@ -7,7 +7,7 @@
 #![no_std]
 
 extern crate alloc;
-#[macro_use] extern crate log;
+extern crate log;
 extern crate memory;
 extern crate intel_ethernet;
 extern crate nic_buffers;
@@ -25,10 +25,9 @@ use nic_buffers::{ReceiveBuffer, ReceivedFrame};
 
 
 /// A struct that holds all information for one receive queue.
-/// There should be one such object per queue
+/// There should be one such object per queue.
 pub struct RxQueue<T: RxDescriptor> {
     /// The number of the queue, stored here for our convenience.
-    /// It should match its index in the `queue` field of the RxQueues struct
     pub id: u8,
     /// Receive descriptors
     pub rx_descs: BoxRefMut<MappedPages, [T]>,
@@ -63,7 +62,6 @@ impl<T: RxDescriptor> RxQueue<T> {
 /// There should be one such object per queue.
 pub struct TxQueue<T: TxDescriptor> {
     /// The number of the queue, stored here for our convenience.
-    /// It should match its index in the `queue` field of the TxQueues struct
     pub id: u8,
     /// Transmit descriptors 
     pub tx_descs: BoxRefMut<MappedPages, [T]>,

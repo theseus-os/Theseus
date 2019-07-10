@@ -6,7 +6,6 @@ version = "0.1.0"
 build = "../../build.rs"
 
 [dependencies]
-spin = "0.4.10"
 httparse = { version = "1.3.3", default-features = false }
 
 

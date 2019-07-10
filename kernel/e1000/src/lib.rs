@@ -33,11 +33,11 @@ mod regs;
 use spin::Once; 
 use alloc::vec::Vec;
 use alloc::collections::VecDeque;
-use irq_safety::{RwLockIrqSafe, MutexIrqSafe};
+use irq_safety::MutexIrqSafe;
 use volatile::{Volatile, ReadOnly};
 use alloc::boxed::Box;
 use memory::{PhysicalAddress, VirtualAddress, MappedPages};
-use pci::{PciDevice, PCI_BAR0, PCI_INTERRUPT_LINE, PciConfigSpaceAccessMechanism};
+use pci::{PciDevice, PCI_INTERRUPT_LINE, PciConfigSpaceAccessMechanism};
 use kernel_config::memory::PAGE_SIZE;
 use owning_ref::BoxRefMut;
 use interrupts::{eoi,register_interrupt};
@@ -158,7 +158,7 @@ pub struct RegistersTx {
 }
 
 
-/// A struct representing an e1000 network interface card.
+/// struct representing an e1000 network interface card.
 pub struct E1000Nic {
     /// Type of BAR0
     bar_type: u8,

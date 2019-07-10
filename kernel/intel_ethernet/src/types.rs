@@ -1,4 +1,4 @@
-//! Type aliases for 32-bit registers that are used to initialize receive and transmit queues
+//! Type aliases for 32-bit registers that are used to initialize receive and transmit queues.
 
 /// Receive Descriptor Base Address Low Register
 pub type Rdbal  = u32;

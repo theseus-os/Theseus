@@ -7,6 +7,7 @@ extern crate alloc;
 extern crate spin;
 extern crate port_io;
 extern crate memory;
+extern crate bit_field;
 
 use core::fmt;
 use core::ops::{Deref, DerefMut};
@@ -14,6 +15,7 @@ use alloc::vec::Vec;
 use port_io::Port;
 use spin::{Once, Mutex};
 use memory::PhysicalAddress;
+use bit_field::BitField;
 
 // The below constants define the PCI configuration space. 
 // More info here: <http://wiki.osdev.org/PCI#PCI_Device_Structure>
@@ -258,9 +260,9 @@ impl PciLocation {
         let command = PCI_CONFIG_DATA_PORT.lock().read(); 
         trace!("pci_set_interrupt_disable_bit: PciDevice: {}, read value: {:#x}", self, command);
 
-        const interrupt_disable: u32 = 1 << 10;
+        const INTERRUPT_DISABLE: u32 = 1 << 10;
         unsafe {
-            PCI_CONFIG_DATA_PORT.lock().write(command | interrupt_disable);
+            PCI_CONFIG_DATA_PORT.lock().write(command | INTERRUPT_DISABLE);
         }
         trace!("pci_set_interrupt_disable_bit: PciDevice: {} read value AFTER WRITE CMD: {:#x}", 
             self, PCI_CONFIG_DATA_PORT.lock().read());
@@ -275,8 +277,8 @@ impl PciLocation {
         let status = self.pci_read_16(PCI_STATUS);
 
         // capabilities are only valid if bit 4 of status register is set
-        const capabilities_valid: u16 = 1 << 4;
-        if  status & capabilities_valid != 0 {
+        const CAPABILITIES_VALID: u16 = 1 << 4;
+        if  status & CAPABILITIES_VALID != 0 {
 
             // retrieve the capabilities pointer from the pci config space
             let capabilities = self.pci_read_8(PCI_CAPABILITIES);
@@ -351,26 +353,26 @@ pub struct PciDevice {
 }
 
 impl PciDevice {
-    /// Returns the base address of the memory mapped registers of the PCI device from Base Address Register 0.
+    /// Returns the base address of the memory mapped registers of the PCI device from BAR0 if 32-bit
+    /// or BAR1:BAR0 if 64-bit
     pub fn determine_mem_base(&self) -> Result<PhysicalAddress, &'static str> {
         // value in the BAR which means a 64-bit address space
-        let address_64 = 2;
-        let bar0 = self.bars[0];
+        const ADDRESS_64_BIT: u32 = 2;
+        let mut bar0 = self.bars[0];
 
         // memory mapped base address
         let mem_base = 
             // retrieve bits 1-2 to determine address space size
-            if (bar0 >> 1) & 3 == address_64 { 
+            if bar0.get_bits(1..3) == ADDRESS_64_BIT { 
                 // a 64-bit address so need to access BAR1 for the upper 32 bits
                 let bar1 = self.bars[1];
                 // clear out the bottom 4 bits because it's a 16-byte aligned address
-                PhysicalAddress::new((bar0 & !0xF) as usize | ((bar1 as usize) << 32))?
+                PhysicalAddress::new(*bar0.set_bits(0..4, 0) as usize | ((bar1 as usize) << 32))?
             }
             else {
                 // clear out the bottom 4 bits because it's a 16-byte aligned address
-                PhysicalAddress::new(bar0 as usize & !0xF)?
+                PhysicalAddress::new(*bar0.set_bits(0..4, 0) as usize)?
             };  
-        
         Ok(mem_base)
     }
 
@@ -384,14 +386,14 @@ impl PciDevice {
         self.pci_write(PCI_BAR0, 0xFFFF_FFFF);
         let mut mem_size = self.pci_read_32(PCI_BAR0);
         //debug!("mem_size_read: {:x}", mem_size);
-        mem_size = mem_size & 0xFFFF_FFF0; //mask info bits
+        mem_size = *mem_size.set_bits(0..4, 0); //mask info bits (the last 4 bits)
         mem_size = !(mem_size); //bitwise not
-        //debug!("mem_size_read_not: {:x}", mem_size);
-        mem_size = mem_size +1; // add 1
+        // debug!("mem_size_read_not: {:x}", mem_size);
+        mem_size = mem_size + 1; // add 1
         //debug!("mem_size: {}", mem_size);
         self.pci_write(PCI_BAR0, self.bars[0]); //restore original value
         //check that value is restored
-        let bar0 = self.pci_read_32(PCI_BAR0);
+        // let bar0 = self.pci_read_32(PCI_BAR0);
         // debug!("original bar0: {:#X}", bar0);
         mem_size
     }
@@ -410,31 +412,30 @@ impl PciDevice {
         let cap_addr = self.find_pci_capability(MSI_CAPABILITY).ok_or("Device not MSI capable")?;
 
         // offset in the capability space where the message address register is located 
-        const message_address_reg_offset: u16 = 4;
+        const MESSAGE_ADDRESS_REGISTER_OFFSET: u16 = 4;
         // the memory region is a constant defined for Intel cpus where MSI messages are written
         // it should be written to bit 20 of the message address register
-        const memory_region: u32 = 0x0FEE << 20;
+        const MEMORY_REGION: u32 = 0x0FEE << 20;
         // the core id tells which cpu the interrupt will be routed to 
         // it should be written to bit 12 of the message address register
         let core = (core_id as u32) << 12;
         // set the core the MSI will be sent to in the Message Address Register (Intel Arch SDM, vol3, 10.11)
-        self.pci_write(cap_addr + message_address_reg_offset, memory_region | core);
+        self.pci_write(cap_addr + MESSAGE_ADDRESS_REGISTER_OFFSET, MEMORY_REGION| core);
 
         // offset in the capability space where the message data register is located 
-        const message_data_reg_offset: u16 = 12;
+        const MESSAGE_DATA_REGISTER_OFFSET: u16 = 12;
         // Set the interrupt number for the MSI in the Message Data Register
-        self.pci_write(cap_addr + message_data_reg_offset, int_num as u32);
+        self.pci_write(cap_addr + MESSAGE_DATA_REGISTER_OFFSET, int_num as u32);
 
         // offset in the capability space where the message control register is located 
-        const message_control_reg_offset: u16 = 2;
+        const MESSAGE_CONTROL_REGISTER_OFFSET: u16 = 2;
         // to enable the MSI capability, we need to set it bit 0 of the message control register
-        const msi_enable: u32 = 1;
-        let ctrl = self.pci_read_16(cap_addr + message_control_reg_offset) as u32;
+        const MSI_ENABLE: u32 = 1;
+        let ctrl = self.pci_read_16(cap_addr + MESSAGE_CONTROL_REGISTER_OFFSET) as u32;
         // enable MSI in the Message Control Register
-        self.pci_write(cap_addr + message_control_reg_offset, ctrl | msi_enable);
+        self.pci_write(cap_addr + MESSAGE_CONTROL_REGISTER_OFFSET, ctrl | MSI_ENABLE);
 
         Ok(())  
-
     }
 
     /// Enable MSI-X interrupts for a PCI device.
@@ -446,18 +447,17 @@ impl PciDevice {
         let cap_addr = self.find_pci_capability(MSIX_CAPABILITY).ok_or("Device not MSI-X capable")?;
 
         // offset in the capability space where the message control register is located 
-        const message_control_reg_offset: u16 = 2;
-        let ctrl = self.pci_read_16(cap_addr + message_control_reg_offset) as u32;
+        const MESSAGE_CONTROL_REGISTER_OFFSET: u16 = 2;
+        let ctrl = self.pci_read_16(cap_addr + MESSAGE_CONTROL_REGISTER_OFFSET) as u32;
 
         // write to bit 15 of Message Control Register to enable MSI-X 
-        const msix_enable: u32 = 1 << 15; 
-        self.pci_write(cap_addr + message_control_reg_offset, ctrl | msix_enable);
+        const MSIX_ENABLE: u32 = 1 << 15; 
+        self.pci_write(cap_addr + MESSAGE_CONTROL_REGISTER_OFFSET, ctrl | MSIX_ENABLE);
 
         // let ctrl = pci_read_32(dev.bus, dev.slot, dev.func, cap_addr);
         // debug!("MSIX HEADER AFTER ENABLE: {:#X}", ctrl);
 
         Ok(())  
-
     }
 }
 
@@ -478,6 +478,6 @@ impl DerefMut for PciDevice {
 /// Lists the 2 possible PCI configuration space access mechanisms
 /// that can be found from the LSB of the devices's BAR0
 pub enum PciConfigSpaceAccessMechanism {
-    MmemoryMapped = 0,
+    MemoryMapped = 0,
     IoPort = 1,
 }

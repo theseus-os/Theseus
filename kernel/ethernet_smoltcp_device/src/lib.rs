@@ -4,7 +4,6 @@
 
 #[macro_use] extern crate log;
 #[macro_use] extern crate alloc;
-extern crate spin;
 extern crate smoltcp;
 extern crate network_interface_card;
 extern crate nic_buffers;
@@ -16,7 +15,6 @@ extern crate network_manager;
 use alloc::{
     boxed::Box,
     collections::BTreeMap,
-    sync::Arc
 };
 use irq_safety::MutexIrqSafe;
 use smoltcp::{
@@ -31,7 +29,6 @@ use nic_buffers::{TransmitBuffer, ReceivedFrame};
 use owning_ref::BoxRef;
 use network_manager::NetworkInterface;
 use core::str::FromStr;
-use spin::Mutex;
 
 /// standard MTU for ethernet cards
 const DEFAULT_MTU: usize = 1500;

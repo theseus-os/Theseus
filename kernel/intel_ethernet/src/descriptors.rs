@@ -88,7 +88,7 @@ pub trait TxDescriptor {
 
 /// This struct is a Legacy Transmit Descriptor. 
 /// It's the descriptor type used in older Intel NICs and the E1000 driver.
-#[repr(C,packed)]
+#[repr(C)]
 pub struct LegacyTxDescriptor {
     /// The starting physical address of the transmit buffer
     pub phys_addr:  Volatile<u64>,
@@ -203,10 +203,10 @@ impl fmt::Debug for LegacyRxDescriptor {
 /// More information can be found in the 82599 datasheet.
 #[repr(C)]
 pub struct AdvancedRxDescriptor {
-    /// Starting physcal address of the receive buffer for the packet
+    /// Starting physcal address of the receive buffer for the packet.
     pub packet_buffer_address:  Volatile<u64>,
     /// Starting physcal address of the receive buffer for the header.
-    /// This field will only be used if header splitting is enabled    
+    /// This field will only be used if header splitting is enabled. 
     pub header_buffer_address:  Volatile<u64>,
 }
 

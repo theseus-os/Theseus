@@ -30,7 +30,7 @@ use itertools::Itertools;
 use hpet::get_hpet;
 use smoltcp::{
     wire::{Ipv4Address, IpEndpoint},
-    socket::{SocketSet, SocketHandle, TcpSocket, TcpSocketBuffer, TcpState},
+    socket::{SocketSet, TcpSocket, TcpSocketBuffer, TcpState},
 };
 use sha3::{Digest, Sha3_512};
 use percent_encoding::{DEFAULT_ENCODE_SET, utf8_percent_encode};

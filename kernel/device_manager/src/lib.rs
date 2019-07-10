@@ -2,8 +2,6 @@
 #![feature(trait_alias)]
 
 #[macro_use] extern crate log;
-extern crate alloc;
-extern crate spin;
 extern crate event_types;
 extern crate ata;
 extern crate e1000;
@@ -16,18 +14,12 @@ extern crate pci;
 extern crate mouse;
 extern crate network_manager;
 extern crate ethernet_smoltcp_device;
-extern crate smoltcp;
 
-use alloc::sync::Arc;
-use spin::Mutex;
 use dfqueue::DFQueueProducer;
 use event_types::Event;
 use memory::MemoryManagementInfo;
-use pci::{PciDevice};
 use ethernet_smoltcp_device::EthernetNetworkInterface;
 use network_manager::add_to_network_interfaces;
-use smoltcp::wire::{IpCidr, Ipv4Address};
-use core::str::FromStr;
 
 
 /// A randomly chosen IP address that must be outside of the DHCP range.. // TODO FIXME: use DHCP to acquire IP

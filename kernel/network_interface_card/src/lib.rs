@@ -62,12 +62,12 @@ pub trait NetworkInterfaceCard {
         let mut cur = rxq.rx_cur as usize;
        
         let mut receive_buffers_in_frame: Vec<ReceiveBuffer> = Vec::new();
-        let mut total_packet_length: u16 = 0;
+        let mut _total_packet_length: u16 = 0;
 
         while rxq.rx_descs[cur].descriptor_done() {
             // get information about the current receive buffer
             let length = rxq.rx_descs[cur].length();
-            total_packet_length += length as u16;
+            _total_packet_length += length as u16;
             // debug!("remove_frames_from_queue: received descriptor of length {}", length);
             
             // Now that we are "removing" the current receive buffer from the list of receive buffers that the NIC can use,
