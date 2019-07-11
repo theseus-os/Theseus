@@ -1,0 +1,21 @@
+[package]
+name = "intel_ethernet"
+description = "defines structs and traits for DMA descriptors and register type aliases unique to Intel NICs"
+version = "0.1.0"
+authors = ["Ramla-I <ijazramla@gmail.com>"]
+build = "../../build.rs"
+
+[dependencies]
+volatile = "0.2.4"
+bit_field = "0.7.0"
+
+[dependencies.memory]
+path = "../memory"
+
+[dependencies.log]
+default-features = false
+version = "0.3.7"
+
+
+[lib]
+crate-type = ["rlib"]
