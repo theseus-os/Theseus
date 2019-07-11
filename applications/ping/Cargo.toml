@@ -30,8 +30,8 @@ features = ["nightly"]
 [dependencies.network_manager]
 path = "../../kernel/network_manager"
 
-[dependencies.http_client]
-path = "../../kernel/http_client"
+[dependencies.smoltcp_helper]
+path = "../../kernel/smoltcp_helper"
 
 [dependencies.ota_update_client]
 path = "../../kernel/ota_update_client"

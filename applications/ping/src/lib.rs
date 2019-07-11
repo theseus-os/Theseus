@@ -13,7 +13,7 @@ extern crate smoltcp;
 extern crate network_manager;
 extern crate byteorder;
 extern crate hpet;
-extern crate http_client;
+extern crate smoltcp_helper;
 extern crate hashbrown;
 extern crate ota_update_client;
 extern crate getopts;
@@ -32,7 +32,7 @@ use smoltcp::{
 };
 use network_manager::{NetworkInterfaceRef, NETWORK_INTERFACES};
 use byteorder::{ByteOrder, NetworkEndian};
-use http_client::{millis_since, poll_iface};
+use smoltcp_helper::{millis_since, poll_iface};
 
 
 macro_rules! hpet_ticks {
