@@ -16,15 +16,11 @@ use alloc::boxed::Box;
 use core::ops::DerefMut;
 use memory::{EntryFlags, FrameRange, MappedPages,PhysicalAddress, FRAME_ALLOCATOR};
 use owning_ref::BoxRefMut;
-use spin::{Mutex, Once};
 
 /// A Pixel is a u32 integer. The lower 24 bits of a Pixel specifie the RGB color of a pixel
 /// , while the first 8bit is alpha channel which helps to composite windows
 /// alpha = 0 means opaque and 0xFF means transparent
 pub type Pixel = u32;
-
-/// The final framebuffer instance. It contains the pages which are mapped to the physical framebuffer
-pub static FINAL_FRAME_BUFFER: Once<Mutex<FrameBufferAlpha>> = Once::new();
 
 // Every pixel is of u32 type
 const PIXEL_BYTES: usize = 4;
@@ -32,7 +28,7 @@ const PIXEL_BYTES: usize = 4;
 /// Initialize the final frame buffer.
 /// Allocate a block of memory and map it to the physical framebuffer frames.
 /// Init the frame buffer. Allocate a block of memory and map it to the frame buffer frames.
-pub fn init() -> Result<(), &'static str> {
+pub fn init() -> Result<FrameBufferAlpha, &'static str> {
     // Get the graphic mode information
     let vesa_display_phys_start: PhysicalAddress;
     let buffer_width: usize;
@@ -51,17 +47,16 @@ pub fn init() -> Result<(), &'static str> {
 
     // Initialize the final framebuffer
     let framebuffer = FrameBufferAlpha::new(buffer_width, buffer_height, Some(vesa_display_phys_start))?;
-    FINAL_FRAME_BUFFER.call_once(|| Mutex::new(framebuffer));
 
-    Ok(())
+    Ok(framebuffer)
 }
 
 /// The virtual frame buffer struct. It contains the size of the buffer and a buffer array
 #[derive(Hash)]
 pub struct FrameBufferAlpha {
-    width: usize,
-    height: usize,
-    buffer: BoxRefMut<MappedPages, [Pixel]>,
+    pub width: usize,
+    pub height: usize,
+    pub buffer: BoxRefMut<MappedPages, [Pixel]>,
 }
 
 impl FrameBufferAlpha {
@@ -210,15 +205,6 @@ impl FrameBufferAlpha {
             }
         }
     }
-}
-
-/// Get the size of the final framebuffer. Return (width, height)
-pub fn get_screen_size() -> Result<(usize, usize), &'static str> {
-    let final_buffer = FINAL_FRAME_BUFFER
-        .try()
-        .ok_or("The final frame buffer was not yet initialized")?
-        .lock();
-    Ok((final_buffer.width, final_buffer.height))
 }
 
 macro_rules! byte_alpha { ($x:expr) => (($x >> 24) as u8); }

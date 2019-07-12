@@ -125,21 +125,22 @@ pub fn init(
 
     // init frame_buffer_alpha
     let rs = frame_buffer_alpha::init();
-    match rs {
-        Ok(_) => {
+    let final_fb = match rs {
+        Ok(final_fb) => {
             trace!("Frame_buffer_alpha initialized successfully.");
+            final_fb
         }
         Err(err) => { 
             error!("captain::init(): failed to initialize frame_buffer_alpha");
             return Err(err);
         }
-    }
+    };
 
     // initialize the input event manager, which will start the default terminal 
     let (key_producer, key_consumer, mouse_producer, mouse_consumer) = input_event_manager::init()?;
 
     // init window manager_alpha
-    let rs = window_manager_alpha::init(key_consumer, mouse_consumer);
+    let rs = window_manager_alpha::init(key_consumer, mouse_consumer, final_fb);
     match rs {
         Ok(_) => {
             trace!("window manager alpha initialized successfully.");

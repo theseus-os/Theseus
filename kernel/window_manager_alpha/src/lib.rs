@@ -23,8 +23,6 @@ extern crate event_types;
 #[macro_use]
 extern crate log;
 extern crate frame_buffer_alpha;
-#[macro_use]
-extern crate lazy_static;
 extern crate spawn;
 extern crate mouse_data;
 extern crate keycodes_ascii;
@@ -38,27 +36,14 @@ use alloc::vec::Vec;
 use core::ops::Deref;
 use dfqueue::{DFQueue, DFQueueConsumer, DFQueueProducer};
 use event_types::{Event, MousePositionEvent};
-use frame_buffer_alpha::{ FrameBufferAlpha, Pixel, FINAL_FRAME_BUFFER, alpha_mix, color_mix };
-use spin::{Mutex};
+use frame_buffer_alpha::{ FrameBufferAlpha, Pixel, alpha_mix, color_mix };
+use spin::{Mutex, Once};
 use spawn::{KernelTaskBuilder, ApplicationTaskBuilder};
 use mouse_data::MouseEvent;
 use keycodes_ascii::{KeyEvent, Keycode, KeyAction};
 use path::Path;
 
-lazy_static! {
-    /// The list of all windows in the system.
-    static ref WINDOW_MANAGER: Mutex<WindowManagerAlpha> = Mutex::new(
-        WindowManagerAlpha {
-            hide_list: VecDeque::new(),
-            show_list: VecDeque::new(),
-            active: Weak::new(),
-            cursor: (0, 0),
-            is_show_border: false,
-            border_position: (0, 0, 0, 0),
-            terminal_id_counter: 1,
-        }
-    );
-}
+static WINDOW_MANAGER: Once<Mutex<WindowManagerAlpha>> = Once::new();
 
 /// The maximum size of cursor
 const CURSOR_MAX_SIZE: usize = 7;
@@ -110,17 +95,12 @@ struct WindowManagerAlpha {
     border_position: (usize, usize, usize, usize),  // xs, xe, ys, ye, could be minus value
     /// to record how many terminals has been created, avoid same name
     terminal_id_counter: usize,
+    /// the frame buffer that it should print on
+    final_fb: FrameBufferAlpha,
 }
 
 /// Window manager object that stores non-critical information
 impl WindowManagerAlpha {
-    /// push current active to show_list
-    pub fn clear_active(&mut self) {
-        if let Some(_) = self.active.upgrade() {
-            self.show_list.push_front(self.active.clone());
-            self.active = Weak::new();
-        }
-    }
 
     /// set one window to active, push last active (if exists) to top of show_list
     pub fn set_active(&mut self, objref: &Arc<Mutex<WindowObjAlpha>>) -> Result<(), &'static str> {
@@ -250,8 +230,8 @@ impl WindowManagerAlpha {
     }
 
     /// refresh one pixel on frame buffer
-    fn refresh_single_pixel_with_buffer(& self, x: usize, y: usize, final_fb: &mut FrameBufferAlpha) -> Result<(), &'static str> {
-        if ! final_fb.check_in_buffer(x, y) {
+    fn refresh_single_pixel_with_buffer(&mut self, x: usize, y: usize) -> Result<(), &'static str> {
+        if ! self.final_fb.check_in_buffer(x, y) {
             return Ok(());
         }
         if let Some(current_active) = self.active.upgrade() {
@@ -261,18 +241,18 @@ impl WindowManagerAlpha {
             if current_active_win.framebuffer.check_in_buffer(x - cx, y - cy) {
                 let top = current_active_win.framebuffer.get_pixel(x - cx, y - cy)?;
                 if (top >> 24) == 0 {  // totally opaque, so not waste computation
-                    final_fb.draw_point(x, y, top);
+                    self.final_fb.draw_point(x, y, top);
                 } else {
                     let bottom = self.recompute_single_pixel_show_list(x, y, 0);
-                    final_fb.draw_point(x, y, alpha_mix(bottom, top));
+                    self.final_fb.draw_point(x, y, alpha_mix(bottom, top));
                 }
             } else {
                 let pixel = self.recompute_single_pixel_show_list(x, y, 0);
-                final_fb.draw_point(x, y, pixel);
+                self.final_fb.draw_point(x, y, pixel);
             }
         } else {  // nothing is active now
             let pixel = self.recompute_single_pixel_show_list(x, y, 0);
-            final_fb.draw_point(x, y, pixel);
+            self.final_fb.draw_point(x, y, pixel);
         }
         // then draw border
         if self.is_show_border {
@@ -287,82 +267,76 @@ impl WindowManagerAlpha {
                 if top {  // left-top
                     let dx = xs-x; let dy = ys-y;
                     if dx+dy <= WINDOW_BORDER_SIZE {
-                        final_fb.draw_point_alpha(x, y, color_mix(
+                        self.final_fb.draw_point_alpha(x, y, color_mix(
                             WINDOW_BORDER_COLOR_OUTTER, WINDOW_BORDER_COLOR_INNER, (dx+dy) as f32 / WINDOW_BORDER_SIZE as f32));
                     }
                 } else if bottom {  // left-bottom
                     let dx = xs-x; let dy = y-(ye-1);
                     if dx+dy <= WINDOW_BORDER_SIZE {
-                        final_fb.draw_point_alpha(x, y, color_mix(
+                        self.final_fb.draw_point_alpha(x, y, color_mix(
                             WINDOW_BORDER_COLOR_OUTTER, WINDOW_BORDER_COLOR_INNER, (dx+dy) as f32 / WINDOW_BORDER_SIZE as f32));
                     }
                 } else {  // only left
-                    final_fb.draw_point_alpha(x, y, color_mix(
+                    self.final_fb.draw_point_alpha(x, y, color_mix(
                         WINDOW_BORDER_COLOR_OUTTER, WINDOW_BORDER_COLOR_INNER, (xs-x) as f32 / WINDOW_BORDER_SIZE as f32));
                 }
             } else if right {
                 if top {  // right-top
                     let dx = x-(xe-1); let dy = ys-y;
                     if dx+dy <= WINDOW_BORDER_SIZE {
-                        final_fb.draw_point_alpha(x, y, color_mix(
+                        self.final_fb.draw_point_alpha(x, y, color_mix(
                             WINDOW_BORDER_COLOR_OUTTER, WINDOW_BORDER_COLOR_INNER, (dx+dy) as f32 / WINDOW_BORDER_SIZE as f32));
                     }
                 } else if bottom {  // right-bottom
                     let dx = x-(xe-1); let dy = y-(ye-1);
                     if dx+dy <= WINDOW_BORDER_SIZE {
-                        final_fb.draw_point_alpha(x, y, color_mix(
+                        self.final_fb.draw_point_alpha(x, y, color_mix(
                             WINDOW_BORDER_COLOR_OUTTER, WINDOW_BORDER_COLOR_INNER, (dx+dy) as f32 / WINDOW_BORDER_SIZE as f32));
                     }
                 } else {  // only right
-                    final_fb.draw_point_alpha(x, y, color_mix(
+                    self.final_fb.draw_point_alpha(x, y, color_mix(
                         WINDOW_BORDER_COLOR_OUTTER, WINDOW_BORDER_COLOR_INNER, (x-(xe-1)) as f32 / WINDOW_BORDER_SIZE as f32));
                 }
             } else if top {  // only top
-                final_fb.draw_point_alpha(x, y, color_mix(
+                self.final_fb.draw_point_alpha(x, y, color_mix(
                     WINDOW_BORDER_COLOR_OUTTER, WINDOW_BORDER_COLOR_INNER, (ys-y) as f32 / WINDOW_BORDER_SIZE as f32));
             } else if bottom {  // only bottom
-                final_fb.draw_point_alpha(x, y, color_mix(
+                self.final_fb.draw_point_alpha(x, y, color_mix(
                     WINDOW_BORDER_COLOR_OUTTER, WINDOW_BORDER_COLOR_INNER, (y-(ye-1)) as f32 / WINDOW_BORDER_SIZE as f32));
             }
         }
         // finally draw cursor
         let (cx, cy) = self.cursor;
         if ((x-cx) <= CURSOR_MAX_SIZE || (cx-x) <= CURSOR_MAX_SIZE) && ((y-cy) <= CURSOR_MAX_SIZE || (cy-y) <= CURSOR_MAX_SIZE) {
-            final_fb.draw_point_alpha(x, y, CURSOR_BASIC[CURSOR_MAX_SIZE + x - cx][CURSOR_MAX_SIZE + y - cy]);
+            self.final_fb.draw_point_alpha(x, y, CURSOR_BASIC[CURSOR_MAX_SIZE + x - cx][CURSOR_MAX_SIZE + y - cy]);
         }
         Ok(())
     }
 
     /// recompute single pixel value and refresh it on screen
-    pub fn refresh_single_pixel(& self, x: usize, y: usize) -> Result<(), &'static str> {
-        let mut final_fb = FINAL_FRAME_BUFFER
-            .try() .ok_or("The final frame buffer was not yet initialized")?.lock();
-        self.refresh_single_pixel_with_buffer(x, y, &mut final_fb)
+    pub fn refresh_single_pixel(&mut self, x: usize, y: usize) -> Result<(), &'static str> {
+        self.refresh_single_pixel_with_buffer(x, y)
     }
 
     /// refresh an area
-    fn refresh_area(& self, xs: usize, xe: usize, ys: usize, ye: usize) -> Result<(), &'static str> {
-        let mut final_fb = FINAL_FRAME_BUFFER
-            .try() .ok_or("The final frame buffer was not yet initialized")?.lock();
+    fn refresh_area(&mut self, xs: usize, xe: usize, ys: usize, ye: usize) -> Result<(), &'static str> {
         for x in xs as isize .. xe as isize {
             for y in ys as isize .. ye as isize {
-                self.refresh_single_pixel_with_buffer(x as usize, y as usize, &mut final_fb)?;
+                self.refresh_single_pixel_with_buffer(x as usize, y as usize)?;
             }
         }
         Ok(())
     }
 
     /// refresh an rectangle border
-    fn refresh_rect_border(& self, xs: usize, xe: usize, ys: usize, ye: usize) -> Result<(), &'static str> {
-        let mut final_fb = FINAL_FRAME_BUFFER
-            .try() .ok_or("The final frame buffer was not yet initialized")?.lock();
+    fn refresh_rect_border(&mut self, xs: usize, xe: usize, ys: usize, ye: usize) -> Result<(), &'static str> {
         for x in xs as isize .. xe as isize {
-            self.refresh_single_pixel_with_buffer(x as usize, ys, &mut final_fb)?;
-            self.refresh_single_pixel_with_buffer(x as usize, ye-1, &mut final_fb)?;
+            self.refresh_single_pixel_with_buffer(x as usize, ys)?;
+            self.refresh_single_pixel_with_buffer(x as usize, ye-1)?;
         }
         for y in ys as isize .. ye as isize {
-            self.refresh_single_pixel_with_buffer(xs, y as usize, &mut final_fb)?;
-            self.refresh_single_pixel_with_buffer(xe-1, y as usize, &mut final_fb)?;
+            self.refresh_single_pixel_with_buffer(xs, y as usize)?;
+            self.refresh_single_pixel_with_buffer(xe-1, y as usize)?;
         }
         Ok(())
     }
@@ -476,7 +450,7 @@ impl WindowManagerAlpha {
     }
 
     /// optimized refresh area for less computation up to 2x
-    fn refresh_area_with_old_new(& self, 
+    fn refresh_area_with_old_new(&mut self, 
             _oxs: usize, _oxe: usize, _oys: usize, _oye: usize, 
             _nxs: usize, _nxe: usize, _nys: usize, _nye: usize) -> Result<(), &'static str> {
         let oxs = _oxs as isize; let oxe = _oxe as isize; let oys = _oys as isize; let oye = _oye as isize;
@@ -497,7 +471,7 @@ impl WindowManagerAlpha {
     }
 
     /// private function: take active window's base position and current cursor, move the window with delta
-    fn move_active_window(& self) -> Result<(), &'static str> {
+    fn move_active_window(&mut self) -> Result<(), &'static str> {
         if let Some(current_active) = self.active.upgrade() {
             let (oxs, oxe, oys, oye, nxs, nxe, nys, nye) = {
                 let mut current_active_win = current_active.lock();
@@ -524,30 +498,35 @@ impl WindowManagerAlpha {
 
 /// delete window
 pub fn delete_window(objref: &Arc<Mutex<WindowObjAlpha>>) -> Result<(), &'static str> {
-    let mut win = WINDOW_MANAGER.lock();
+    let mut win = WINDOW_MANAGER.try().ok_or("The static window manager was not yet initialized")?.lock();
     win.delete_window(objref)
 }
 
 /// set window as active
 pub fn set_active(objref: &Arc<Mutex<WindowObjAlpha>>) -> Result<(), &'static str> {
-    let mut win = WINDOW_MANAGER.lock();
+    let mut win = WINDOW_MANAGER.try().ok_or("The static window manager was not yet initialized")?.lock();
     win.set_active(objref)
 }
 
 /// whether a window is active
 pub fn is_active(objref: &Arc<Mutex<WindowObjAlpha>>) -> bool {
-    let mut win = WINDOW_MANAGER.lock();
-    if let Some(current_active) = win.active.upgrade() {
-        if Arc::ptr_eq(&(current_active), objref) {
-            return true;
+    match WINDOW_MANAGER.try().ok_or("The static window manager was not yet initialized") {
+        Ok(mtx) => {
+            let win = mtx.lock();
+            if let Some(current_active) = win.active.upgrade() {
+                if Arc::ptr_eq(&(current_active), objref) {
+                    return true;
+                }
+            }
         }
+        _ => {}
     }
-    return false;
+    false
 }
 
 /// refresh the floating border display, will lock WINDOW_MANAGER
 pub fn do_refresh_floating_border() -> Result<(), &'static str> {
-    let mut win = WINDOW_MANAGER.lock();
+    let mut win = WINDOW_MANAGER.try().ok_or("The static window manager was not yet initialized")?.lock();
     let (nx, ny) = win.cursor;
     if let Some(current_active) = win.active.upgrade() {
         let (is_draw, bxs, bxe, bys, bye) = {
@@ -578,30 +557,45 @@ pub fn do_refresh_floating_border() -> Result<(), &'static str> {
 
 /// execute moving active window action, will lock WINDOW_MANAGER
 pub fn do_move_active_window() -> Result<(), &'static str> {
-    let win = WINDOW_MANAGER.lock();
+    let mut win = WINDOW_MANAGER.try().ok_or("The static window manager was not yet initialized")?.lock();
     win.move_active_window()
 }
 
 /// refresh one pixel using absolute position, will lock WINDOW_MANAGER
 pub fn refresh_pixel_absolute(x: usize, y: usize) -> Result<(), &'static str> {
-    let win = WINDOW_MANAGER.lock();
+    let mut win = WINDOW_MANAGER.try().ok_or("The static window manager was not yet initialized")?.lock();
     win.refresh_single_pixel(x, y)
 }
 
 /// refresh an area using abosolute position, will lock WINDOW_MANAGER
 pub fn refresh_area_absolute(xs: usize, xe: usize, ys: usize, ye: usize) -> Result<(), &'static str> {
-    let win = WINDOW_MANAGER.lock();
+    let mut win = WINDOW_MANAGER.try().ok_or("The static window manager was not yet initialized")?.lock();
     win.refresh_area(xs, xe, ys, ye)
 }
 
 /// Initialize the window manager
-pub fn init(key_comsumer: DFQueueConsumer<Event>, mouse_comsumer: DFQueueConsumer<Event>) -> Result<(), &'static str> {
-    let (screen_width, screen_height) = frame_buffer_alpha::get_screen_size()?;
+pub fn init(key_comsumer: DFQueueConsumer<Event>, mouse_comsumer: DFQueueConsumer<Event>, 
+        final_fb: FrameBufferAlpha) -> Result<(), &'static str> {
     debug!("window manager alpha init called");
 
-    WINDOW_MANAGER.lock().cursor = (screen_width/2, screen_height/2);  // set cursor to middle
+    // initialize static window manager
+    let window_manager = WindowManagerAlpha {
+            hide_list: VecDeque::new(),
+            show_list: VecDeque::new(),
+            active: Weak::new(),
+            cursor: (0, 0),
+            is_show_border: false,
+            border_position: (0, 0, 0, 0),
+            terminal_id_counter: 1,
+            final_fb: final_fb,
+    };
+    WINDOW_MANAGER.call_once(|| Mutex::new(window_manager));
 
-    WINDOW_MANAGER.lock().refresh_area(0, screen_width, 0, screen_height)?;
+    let mut win = WINDOW_MANAGER.try().ok_or("The static window manager was not yet initialized")?.lock();
+    let screen_width = win.final_fb.width;
+    let screen_height = win.final_fb.height;
+    win.cursor = (screen_width/2, screen_height/2);  // set cursor to middle
+    win.refresh_area(0, screen_width, 0, screen_height)?;
 
     KernelTaskBuilder::new(window_manager_loop, (key_comsumer, mouse_comsumer) )
         .name("window_manager_loop".to_string())
@@ -704,7 +698,7 @@ fn keyboard_handle_application(key_input: KeyEvent) -> Result<(), &'static str> 
     // first judge whether is system remained keys
     if key_input.modifiers.control && key_input.keycode == Keycode::T && key_input.action == KeyAction::Pressed {
         let terminal_id_counter = {
-            let mut win = WINDOW_MANAGER.lock();
+            let mut win = WINDOW_MANAGER.try().ok_or("The static window manager was not yet initialized")?.lock();
             win.terminal_id_counter += 1;
             win.terminal_id_counter
         };
@@ -716,7 +710,7 @@ fn keyboard_handle_application(key_input: KeyEvent) -> Result<(), &'static str> 
             .spawn()?;
     }
     // then pass them to window
-    let win = WINDOW_MANAGER.lock();
+    let win = WINDOW_MANAGER.try().ok_or("The static window manager was not yet initialized")?.lock();
     match win.pass_keyboard_event_to_window(key_input) {  // even not find a window to pass, that's ok
         Ok(_) => { },
         Err(_) => { },
@@ -727,7 +721,7 @@ fn keyboard_handle_application(key_input: KeyEvent) -> Result<(), &'static str> 
 /// handle cursor event, push it to related window or anyone asked for it
 fn cursor_handle_application(mouse_event: MouseEvent) -> Result<(), &'static str> {
     do_refresh_floating_border()?;
-    let win = WINDOW_MANAGER.lock();
+    let win = WINDOW_MANAGER.try().ok_or("The static window manager was not yet initialized")?.lock();
     match win.pass_mouse_event_to_window(mouse_event) {  // even not find a window to pass, that's ok
         Ok(_) => { },
         Err(_) => { },
@@ -737,18 +731,19 @@ fn cursor_handle_application(mouse_event: MouseEvent) -> Result<(), &'static str
 
 /// return the screen size of current window manager
 pub fn get_screen_size() -> Result<(usize, usize), &'static str> {
-    frame_buffer_alpha::get_screen_size()
+    let win = WINDOW_MANAGER.try().ok_or("The static window manager was not yet initialized")?.lock();
+    Ok((win.final_fb.width, win.final_fb.height))
 }
 
 /// return current absolute position of cursor
-pub fn get_cursor() -> (usize, usize) {
-    let win = WINDOW_MANAGER.lock();
-    win.cursor
+pub fn get_cursor() -> Result<(usize, usize), &'static str> {
+    let win = WINDOW_MANAGER.try().ok_or("The static window manager was not yet initialized")?.lock();
+    Ok(win.cursor)
 }
 
 /// move mouse with delta, this will refresh cursor position
 pub fn move_cursor(x: isize, y: isize) -> Result<(), &'static str> {
-    let (ox, oy) = get_cursor();
+    let (ox, oy) = get_cursor()?;
     let mut nx = (ox as isize) + (x as isize);
     let mut ny = (oy as isize) + (y as isize);
     let (screen_width, screen_height) = get_screen_size()?;
@@ -762,8 +757,8 @@ pub fn move_cursor(x: isize, y: isize) -> Result<(), &'static str> {
 
 /// move mouse to absolute position
 pub fn move_cursor_to(nx: usize, ny: usize) -> Result<(), &'static str> {
-    let (ox, oy) = get_cursor();
-    let mut win = WINDOW_MANAGER.lock();
+    let (ox, oy) = get_cursor()?;
+    let mut win = WINDOW_MANAGER.try().ok_or("The static window manager was not yet initialized")?.lock();
     win.cursor = (nx, ny);
     // then update region of old mouse
     for x in (ox-CURSOR_MAX_SIZE) as isize .. (ox+CURSOR_MAX_SIZE+1) as isize {
@@ -808,7 +803,7 @@ pub fn new_window<'a>(
     };
 
     let window_ref = Arc::new(Mutex::new(window));
-    let mut win = WINDOW_MANAGER.lock();
+    let mut win = WINDOW_MANAGER.try().ok_or("The static window manager was not yet initialized")?.lock();
     win.set_active(&window_ref)?;
     // win.refresh_window(&window_ref)?;  // do not refresh now for better speed
 
