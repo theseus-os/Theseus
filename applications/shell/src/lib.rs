@@ -40,6 +40,11 @@ use path::Path;
 use task::{TaskRef, ExitValue, KillReason};
 use fs_node::FileOrDir;
 use libterm::Terminal;
+use dfqueue::{DFQueue, DFQueueConsumer, DFQueueProducer};
+use alloc::sync::Arc;
+use spin::Mutex;
+use environment::Environment;
+use core::mem;
 
 pub const APPLICATIONS_NAMESPACE_PATH: &'static str = "/namespaces/default/applications";
 
@@ -96,6 +101,12 @@ enum AppErr {
 struct Shell {
     /// Variable that stores the task id of any application manually spawned from the terminal
     current_task_ref: Option<TaskRef>,
+    /// The string that stores the users keypresses after the prompt
+    cmdline: String,
+    /// The secondary buffer that stores the user's keypresses while a command is currently running
+    secondary_buffer: String,
+    /// Variable that tracks how far left the cursor is from the maximum rightmost position (above)
+    left_shift: usize,
     /// Vector that stores the history of commands that the user has entered
     command_history: Vec<String>,
     /// Variable used to track the net number of times the user has pressed up/down to cycle through the commands
@@ -104,6 +115,12 @@ struct Shell {
     /// When someone enters some commands, but before pressing `enter` it presses `up` to see previous commands,
     /// we must push it to command_history. We don't want to push it twice.
     buffered_cmd_recorded: bool,
+    /// The consumer to the terminal's print dfqueue
+    print_consumer: DFQueueConsumer<Event>,
+    /// The producer to the terminal's print dfqueue
+    print_producer: DFQueueProducer<Event>,
+    /// The terminal's current environment
+    env: Arc<Mutex<Environment>>,
     /// the terminal that is bind with the shell instance
     terminal: Terminal
 }
@@ -111,23 +128,131 @@ struct Shell {
 impl Shell {
     /// Create a new shell. Must provide a terminal to bind with the new shell in the argument.
     fn new(terminal: Terminal) -> Shell {
+        // initialize another dfqueue for the terminal object to handle printing from applications
+        let terminal_print_dfq: DFQueue<Event>  = DFQueue::new();
+        let print_consumer = terminal_print_dfq.into_consumer();
+        let print_producer = print_consumer.obtain_producer();
+
+        // Sets up the kernel to print to this terminal instance
+        print::set_default_print_output(print_producer.obtain_producer());
+
+        let env = Environment {
+            working_dir: Arc::clone(root::get_root()), 
+        };
+
         Shell {
             current_task_ref: None,
+            cmdline: String::new(),
+            secondary_buffer: String::new(),
+            left_shift: 0,
             command_history: Vec::new(),
             history_index: 0,
             buffered_cmd_recorded: false,
+            print_consumer,
+            print_producer,
+            env: Arc::new(Mutex::new(env)),
             terminal
         }
     }
 
-
-    fn goto_previous_command(&mut self) {
-        if self.history_index == self.command_history.len() {
-            return;
+    /// Insert a character to the command line buffer in the shell.
+    /// The position to insert is determined by the internal maintained variable `left_shift`,
+    /// which indicates the position counting from the end of the command line.
+    /// `sync_terminal` indicates whether the terminal screen will be synchronically updated.
+    fn insert_char_to_cmdline(&mut self, c: char, sync_terminal: bool) -> Result<(), &'static str> {
+        let insert_idx = self.cmdline.len() - self.left_shift;
+        self.cmdline.insert(insert_idx, c);
+        if sync_terminal {
+            self.terminal.insert_char_to_screen(c, self.left_shift)?;
         }
-        self.terminal.refresh_prompt_if_needed();
+        Ok(())
+    }
+
+    /// Remove a character from the command line buffer in the shell. If there is nothing to
+    /// be removed, it does nothing and returns.
+    /// The position to insert is determined by the internal maintained variable `left_shift`,
+    /// which indicates the position counting from the end of the command line.
+    /// `sync_terminal` indicates whether the terminal screen will be synchronically updated.
+    fn remove_char_from_cmdline(&mut self, erase_left: bool, sync_terminal: bool) -> Result<(), &'static str> {
+        let mut left_shift = self.left_shift;
+        if erase_left { left_shift += 1; }
+        if left_shift > self.cmdline.len() || left_shift == 0 { return Ok(()); }
+        let erase_idx = self.cmdline.len() - left_shift;
+        self.cmdline.remove(erase_idx);
+        if sync_terminal {
+            self.terminal.remove_char_from_screen(left_shift)?;
+        }
+        Ok(())
+    }
+
+    /// Clear the command line buffer.
+    /// `sync_terminal` indicates whether the terminal screen will be synchronically updated.
+    fn clear_cmdline(&mut self, sync_terminal: bool) -> Result<(), &'static str> {
+        if sync_terminal {
+            for _i in 0..self.cmdline.len() {
+                self.terminal.remove_char_from_screen(1)?;
+            }
+        }
+        self.cmdline.clear();
+        self.left_shift = 0;
+        Ok(())
+    }
+
+    /// Set the command line to be a specific string.
+    /// `sync_terminal` indicates whether the terminal screen will be synchronically updated.
+    fn set_cmdline(&mut self, s: String, sync_terminal: bool) -> Result<(), &'static str> {
+        if !self.cmdline.is_empty() {
+            self.clear_cmdline(sync_terminal)?;
+        }
+        self.cmdline = s.clone();
+        self.left_shift = 0;
+        if sync_terminal {
+            self.terminal.print_to_terminal(s);
+        }
+        Ok(())
+    }
+
+    /// Move the content from secondary buffer to the command line buffer.
+    /// `sync_terminal` indicates whether the terminal screen will be synchronically updated.
+    fn consume_secondary_buffer(&mut self, sync_terminal: bool) -> Result<(), &'static str> {
+        self.set_cmdline(self.secondary_buffer.clone(), sync_terminal)?;
+        self.secondary_buffer.clear();
+        Ok(())
+    }
+
+    /// Move the cursor to the very beginning of the input command line.
+    fn move_cursor_leftmost(&mut self) {
+        self.left_shift = self.cmdline.len();
+    }
+
+    /// Move the cursor to the very end of the input command line.
+    fn move_cursor_rightmost(&mut self) {
+        self.left_shift = 0;
+    }
+
+    /// Move the cursor a character left. If the cursor is already at the beginning of the command line,
+    /// it simply returns.
+    fn move_cursor_left(&mut self) {
+        if self.left_shift < self.cmdline.len() {
+            self.left_shift += 1;
+        }
+    }
+
+    /// Move the cursor a character right. If the cursor is already at the end of the command line,
+    /// it simply returns.
+    fn move_cursor_right(&mut self) {
+        if self.left_shift > 0 {
+            self.left_shift -= 1;
+        }
+    }
+
+    /// Roll to the next previous command. If there is no more previous commands, it does nothing.
+    fn goto_previous_command(&mut self) -> Result<(), &'static str> {
+        if self.history_index == self.command_history.len() {
+            return Ok(());
+        }
         if self.history_index == 0 {
-            let previous_input = self.terminal.get_cmdline();
+            let previous_input = self.cmdline.clone();
             if !previous_input.is_empty() {
                 self.command_history.push(previous_input);
                 self.history_index += 1;
@@ -136,30 +261,33 @@ impl Shell {
         }
         self.history_index += 1;
         let selected_command = self.command_history[self.command_history.len() - self.history_index].clone();
-        self.terminal.set_cmdline(selected_command);
+        self.set_cmdline(selected_command, true)?;
+        Ok(())
     }
 
-    fn goto_next_command(&mut self) {
+    /// Roll to the next recent command. If it is already the most recent command, it does nothing.
+    fn goto_next_command(&mut self) -> Result<(), &'static str> {
         if self.history_index == 0 {
-            return;
+            return Ok(());
         }
         if self.history_index == 1 {
             if self.buffered_cmd_recorded {
                 // command_histroy has at least one element. safe to unwrap here.
                 let selected_command = self.command_history.pop().unwrap();
-                self.terminal.set_cmdline(selected_command);
+                self.set_cmdline(selected_command, true)?;
                 self.history_index -= 1;
                 self.buffered_cmd_recorded = false;
-                return;
+                return Ok(());
             }
         }
         self.history_index -=1;
         if self.history_index == 0 {
-            self.terminal.clear_cmdline();
-            return;
+            self.clear_cmdline(true)?;
+            return Ok(());
         }
         let selected_command = self.command_history[self.command_history.len() - self.history_index].clone();
-        self.terminal.set_cmdline(selected_command);
+        self.set_cmdline(selected_command, true)?;
+        Ok(())
     }
 
     fn handle_key_event(&mut self, keyevent: KeyEvent) -> Result<(), &'static str> {       
@@ -173,10 +301,10 @@ impl Shell {
             let task_ref_copy = match self.current_task_ref {
                 Some(ref task_ref) => task_ref.clone(), 
                 None => {
-                    self.terminal.clear_cmdline();
-                    self.terminal.clear_buffer_string();
+                    self.clear_cmdline(true)?;
+                    self.secondary_buffer.clear();
                     self.terminal.print_to_terminal("^C\n".to_string());
-                    self.terminal.redisplay_prompt();
+                    self.redisplay_prompt();
                     return Ok(());
                 }
             };
@@ -193,22 +321,22 @@ impl Shell {
 
         // Tracks what the user does whenever she presses the backspace button
         if keyevent.keycode == Keycode::Backspace  {
-            self.terminal.erase_left_cmdline();
+            self.remove_char_from_cmdline(true, true)?;
             return Ok(());
         }
 
         if keyevent.keycode == Keycode::Delete {
-            self.terminal.erase_right_cmdline();
+            self.remove_char_from_cmdline(false, true)?;
             return Ok(());
         }
 
         // Attempts to run the command whenever the user presses enter and updates the cursor tracking variables 
         if keyevent.keycode == Keycode::Enter && keyevent.keycode.to_ascii(keyevent.modifiers).is_some() {
-            let cmdline = self.terminal.get_cmdline();
+            let cmdline = self.cmdline.clone();
             if cmdline.len() == 0 {
                 // reprints the prompt on the next line if the user presses enter and hasn't typed anything into the prompt
                 self.terminal.print_to_terminal("\n".to_string());
-                self.terminal.redisplay_prompt();
+                self.redisplay_prompt();
                 return Ok(());
             } else if self.current_task_ref.is_some() { // prevents the user from trying to execute a new command while one is currently running
                 self.terminal.print_to_terminal("Wait until the current command is finished executing\n".to_string());
@@ -221,7 +349,7 @@ impl Shell {
                     Ok(new_task_ref) => { 
                         let task_id = {new_task_ref.lock().id};
                         self.current_task_ref = Some(new_task_ref);
-                        terminal_print::add_child(task_id, self.terminal.get_producer_to_screen())?; // adds the terminal's print producer to the terminal print crate
+                        terminal_print::add_child(task_id, self.print_producer.obtain_producer())?; // adds the terminal's print producer to the terminal print crate
                     }
                     Err(err) => {
                         let err_msg = match err {
@@ -230,14 +358,14 @@ impl Shell {
                             AppErr::SpawnErr(e)       => format!("Failed to spawn new task to run command. Error: {}.\n", e),
                         };
                         self.terminal.print_to_terminal(err_msg);
-                        self.terminal.redisplay_prompt();
-                        self.terminal.clear_cmdline_without_erase();
+                        self.redisplay_prompt();
+                        self.clear_cmdline(false)?;
                         return Ok(());
                     }
                 }
             }
             // Clears the buffer for next command once current command starts executing
-            self.terminal.clear_cmdline_without_erase();
+            self.clear_cmdline(false)?;
             return Ok(());
         }
 
@@ -271,35 +399,36 @@ impl Shell {
 
         // Cycles to the next previous command
         if  keyevent.keycode == Keycode::Up {
-            self.goto_previous_command();
+            self.goto_previous_command()?;
             return Ok(());
         }
+
         // Cycles to the next most recent command
         if keyevent.keycode == Keycode::Down {
-            self.goto_next_command();
+            self.goto_next_command()?;
             return Ok(());
         }
 
         // Jumps to the beginning of the input string
         if keyevent.keycode == Keycode::Home {
-            self.terminal.move_cursor_leftmost();
+            self.move_cursor_leftmost();
             return Ok(());
         }
 
         // Jumps to the end of the input string
         if keyevent.keycode == Keycode::End {
-            self.terminal.move_cursor_rightmost();
+            self.move_cursor_rightmost();
             return Ok(());
         }
 
         // Adjusts the cursor tracking variables when the user presses the left and right arrow keys
         if keyevent.keycode == Keycode::Left {
-            self.terminal.move_cursor_left();
+            self.move_cursor_left();
             return Ok(());
         }
 
         if keyevent.keycode == Keycode::Right {
-            self.terminal.move_cursor_right();
+            self.move_cursor_right();
             return Ok(());
         }
 
@@ -310,11 +439,11 @@ impl Shell {
                     // If currently we have a task running, insert it to the terminal buffer, otherwise
                     // to the cmdline.
                     if self.current_task_ref.is_some() {
-                        self.terminal.insert_character_to_buffer(c);
+                        self.secondary_buffer.push(c);
                         return Ok(());
                     }
                     else {
-                        self.terminal.insert_character_to_cmdline(c)?;
+                        self.insert_char_to_cmdline(c, true)?;
                     }
                 },
                 None => {
@@ -327,7 +456,7 @@ impl Shell {
 
     fn eval_cmdline(&mut self) -> Result<TaskRef, AppErr> {
         // Parse the cmdline
-        let cmdline = self.terminal.get_cmdline();
+        let cmdline = self.cmdline.clone();
         let mut args: Vec<String> = cmdline.split_whitespace().map(|s| s.to_string()).collect();
         let command = args.remove(0);
 
@@ -350,16 +479,16 @@ impl Shell {
                 Err(e) => return Err(AppErr::SpawnErr(e.to_string()))
             };
         
-        taskref.set_env(self.terminal.get_environment()); // Set environment variable of application to the same as terminal task
+        taskref.set_env(self.env.clone()); // Set environment variable of application to the same as terminal task
 
         // Gets the task id so we can reference this task if we need to kill it with Ctrl+C
         return Ok(taskref);
     }
 
-    fn task_handler(&mut self) -> Result<(), &'static str> {
+    fn task_handler(&mut self) -> Result<bool, &'static str> {
         let task_ref_copy = match self.current_task_ref.clone() {
             Some(task_ref) => task_ref,
-            None => { return Ok(());}
+            None => { return Ok(false); }
         };
         let exit_result = task_ref_copy.take_exit_value();
         // match statement will see if the task has finished with an exit value yet
@@ -392,18 +521,47 @@ impl Shell {
                 terminal_print::remove_child(task_ref_copy.lock().id)?;
                 // Resets the current task id to be ready for the next command
                 self.current_task_ref = None;
-                self.terminal.redisplay_prompt();
                 // Pushes the keypresses onto the input_event_manager that were tracked whenever another command was running
-                if !self.terminal.is_buffer_string_empty() {
-                    self.terminal.consume_buffer_string()?;
+                if !self.secondary_buffer.is_empty() {
+                    self.consume_secondary_buffer(true)?;
                 }
                 // Resets the bool to true once the print prompt has been redisplayed
-                self.terminal.refresh_display();
+                self.terminal.refresh_display(self.left_shift);
             },
         // None value indicates task has not yet finished so does nothing
-        None => { /* WARNING: really should do nothing? */ },
+        None => { },
         }
-        return Ok(());
+        Ok(true)
+    }
+
+    /// Redisplays the terminal prompt (does not insert a newline before it)
+    fn redisplay_prompt(&mut self) {
+        let curr_env = self.env.lock();
+        let mut prompt = curr_env.working_dir.lock().get_absolute_path();
+        prompt = format!("{}: ",prompt);
+        self.terminal.print_to_terminal(prompt);
+        // self.correct_prompt_position = true;
+    }
+
+    /// If there is any output event from running application, print it to the screen, otherwise it does nothing.
+    fn check_and_print_app_output(&mut self) -> bool {
+        use core::ops::Deref;
+        if let Some(print_event) = self.print_consumer.peek() {
+            match print_event.deref() {
+                &Event::OutputEvent(ref s) => {
+                    self.terminal.print_to_terminal(s.text.clone());
+
+                    // Sets this bool to true so that on the next iteration the TextDisplay will refresh AFTER the 
+                    // task_handler() function has cleaned up, which does its own printing to the console
+                    self.terminal.refresh_display(0);
+                },
+                _ => { },
+            }
+            print_event.mark_completed();
+            // Goes to the next iteration of the loop after processing print event to ensure that printing is handled before keypresses
+            return true;
+        }
+        false
     }
 
     /// This main loop is the core component of the shell's event-driven architecture. The shell receives events
@@ -419,19 +577,22 @@ impl Shell {
     /// queue will always be printed to the text display before input events or any other managerial functions are handled. 
     /// This allows for clean appending to the scrollback buffer and prevents interleaving of text.
     fn start(mut self) -> Result<(), &'static str> {
+        self.redisplay_prompt();
+        self.terminal.refresh_display(0);
         loop {
             self.terminal.blink_cursor();
 
             // If there is anything from running applications to be printed, it printed on the screen and then
             // return true, so that the loop continues, otherwise nothing happens and we keep on going with the
             // loop body. We do so to ensure that printing is handled before keypresses.
-            if self.terminal.check_and_print_app_output() { continue; }
+            if self.check_and_print_app_output() { continue; }
 
 
             // Handles the cleanup of any application task that has finished running, including refreshing the display
-            self.task_handler()?;
-            self.terminal.refresh_prompt_if_needed();
-
+            if self.task_handler()? {
+                self.redisplay_prompt();
+                self.terminal.refresh_display(0);
+            }
             // Looks at the input queue from the window manager
             // If it has unhandled items, it handles them with the match
             // If it is empty, it proceeds directly to the next loop iteration
@@ -451,7 +612,7 @@ impl Shell {
                 }
 
                 Event::ResizeEvent(ref _rev) => {
-                    self.terminal.refresh_display(); // application refreshes display after resize event is received
+                    self.terminal.refresh_display(self.left_shift); // application refreshes display after resize event is received
                 }
 
                 // Handles ordinary keypresses
@@ -459,7 +620,7 @@ impl Shell {
                     self.handle_key_event(input_event.key_event)?;
                     if input_event.key_event.action == KeyAction::Pressed {
                         // only refreshes the display on keypresses to improve display performance 
-                        self.terminal.refresh_display();
+                        self.terminal.refresh_display(self.left_shift);
                     }
                 }
                 _ => { }

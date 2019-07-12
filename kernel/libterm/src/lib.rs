@@ -21,10 +21,7 @@ extern crate spin;
 use alloc::string::{String, ToString};
 use alloc::vec::Vec;
 use alloc::sync::Arc;
-use dfqueue::{DFQueue, DFQueueConsumer, DFQueueProducer};
-use environment::Environment;
 use event_types::Event;
-use spin::Mutex;
 use window_manager::displayable::text_display::TextDisplay;
 
 pub const FONT_COLOR: u32 = 0x93ee90;
@@ -50,17 +47,8 @@ pub enum ScrollError {
 pub struct Terminal {
     /// The terminal's own window
     window: window_manager::WindowObj,
-    /// The string that stores the users keypresses after the prompt
-    cmdline: String,
-    /// Indicates whether the prompt string + any additional keypresses are the last thing that is printed on the prompt
-    /// If this is false, the terminal will reprint out the prompt + the additional keypresses 
-    correct_prompt_position: bool,
     // Name of the displayable object of the terminal
     display_name: String,
-    /// The secondary buffer that stores the user's keypresses if a command is currently running
-    buffer_string: String,
-    /// The string that is prompted to the user (ex. kernel_term~$)
-    prompt_string: String,
     /// The terminal's scrollback buffer which stores a string to be displayed by the text display
     scrollback_buffer: String,
     /// Indicates whether the text display is displaying the last part of the scrollback buffer slice
@@ -69,31 +57,11 @@ pub struct Terminal {
     scroll_start_idx: usize,
     /// Indicates the rightmost position of the cursor ON THE text display, NOT IN THE SCROLLBACK BUFFER (i.e. one more than the position of the last non_whitespace character
     /// being displayed on the text display)
-    absolute_cursor_pos: usize,
-    /// Variable that tracks how far left the cursor is from the maximum rightmost position (above)
-    /// absolute_cursor_pos - left shift will be the position on the text display where the cursor will be displayed
-    left_shift: usize,
-    /// The consumer to the terminal's print dfqueue
-    print_consumer: DFQueueConsumer<Event>,
-    /// The producer to the terminal's print dfqueue
-    print_producer: DFQueueProducer<Event>,
-    /// The terminal's current environment
-    env: Arc<Mutex<Environment>>
+    absolute_cursor_pos: usize
 }
 
 /// Privite methods of `Terminal`.
 impl Terminal {
-    /// Erase a character from buffered command line string. It removes a character right at the cursor (i.e. del)
-    /// or on the left of the cursor (i.e. backspace). This behavior is controlled by `erase_left` parameter.
-    fn erase_from_cmdline(&mut self, erase_left: bool) {
-        let mut dir = 0;
-        if erase_left {
-            dir = 1;
-        }
-        let buffer_len = self.scrollback_buffer.len();
-        self.scrollback_buffer.remove(buffer_len - self.left_shift - dir);
-    }
-
     /// Get the width and height of the text display.
     fn get_displayable_dimensions(&self, name:&str) -> (usize, usize){
         if let Some(text_display) = self.window.get_displayable(name){
@@ -439,16 +407,16 @@ impl Terminal {
     }
 
     /// Updates the cursor to a new position and refreshes display
-    fn cursor_handler(&mut self) -> Result<(), &'static str> { 
+    fn cursor_handler(&mut self, left_shift: usize) -> Result<(), &'static str> { 
         let buffer_width = self.get_displayable_dimensions(&self.display_name).0;
-        let mut new_x = self.absolute_cursor_pos %buffer_width;
-        let mut new_y = self.absolute_cursor_pos /buffer_width;
+        let mut new_x = self.absolute_cursor_pos % buffer_width;
+        let mut new_y = self.absolute_cursor_pos / buffer_width;
         // adjusts to the correct position relative to the max rightmost absolute cursor position
-        if new_x >= self.left_shift  {
-            new_x -= self.left_shift;
+        if new_x >= left_shift  {
+            new_x -= left_shift;
         } else {
-            new_x = buffer_width  + new_x - self.left_shift;
-            new_y -=1;
+            new_x = buffer_width + new_x - left_shift;
+            new_y -= 1;
         }
 
         if let Some(text_display) = self.window.get_displayable(&self.display_name){
@@ -463,14 +431,6 @@ impl Terminal {
 /// Public methods of `Terminal`.
 impl Terminal {
     pub fn new() -> Result<Terminal, &'static str> {
-        // initialize another dfqueue for the terminal object to handle printing from applications
-        let terminal_print_dfq: DFQueue<Event>  = DFQueue::new();
-        let terminal_print_consumer = terminal_print_dfq.into_consumer();
-        let terminal_print_producer = terminal_print_consumer.obtain_producer();
-
-        // Sets up the kernel to print to this terminal instance
-        print::set_default_print_output(terminal_print_producer.obtain_producer());
-
         // Requests a new window object from the window manager
         let window_object = match window_manager::new_default_window() {
             Ok(window_object) => window_object,
@@ -479,43 +439,20 @@ impl Terminal {
 
         let root = root::get_root();
 
-        let env = Environment {
-            working_dir: Arc::clone(root::get_root()), 
-        };
-
-        let mut prompt_string = root.lock().get_absolute_path(); // ref numbers are 0-indexed
-        prompt_string = format!("{}: ",prompt_string);
+        // let mut prompt_string = root.lock().get_absolute_path(); // ref numbers are 0-indexed
         let mut terminal = Terminal {
             window: window_object,
-            cmdline: String::new(),
             display_name: String::from("content"),
-            correct_prompt_position: true,
-            buffer_string: String::new(),          
-            prompt_string: prompt_string,
             scrollback_buffer: String::new(),
             scroll_start_idx: 0,
             is_scroll_end: true,
-            absolute_cursor_pos: 0, 
-            left_shift: 0,
-            print_consumer: terminal_print_consumer,
-            print_producer: terminal_print_producer,
-            env: Arc::new(Mutex::new(env))
+            absolute_cursor_pos: 0
         };
 
         // Inserts a producer for the print queue into global list of terminal print producers
-        let prompt_string = terminal.prompt_string.clone();
-        terminal.print_to_terminal(format!("Theseus Terminal Emulator\nPress Ctrl+C to quit a task\n{}", prompt_string));
+        terminal.print_to_terminal(format!("Theseus Terminal Emulator\nPress Ctrl+C to quit a task\n"));
         terminal.absolute_cursor_pos = terminal.scrollback_buffer.len();
         Ok(terminal)
-    }
-
-    /// Redisplays the terminal prompt (does not insert a newline before it)
-    pub fn redisplay_prompt(&mut self) {
-        let curr_env = self.env.lock();
-        let mut prompt = curr_env.working_dir.lock().get_absolute_path();
-        prompt = format!("{}: ",prompt);
-        self.scrollback_buffer.push_str(&prompt);
-        self.correct_prompt_position = true;
     }
 
     /// Adds a string to be printed to the terminal to the terminal scrollback buffer.
@@ -525,7 +462,7 @@ impl Terminal {
     }
 
     /// Actually refresh the screen. Currently it's expensive.
-    pub fn refresh_display(&mut self) {
+    pub fn refresh_display(&mut self, left_shift: usize) {
         let start_idx = self.scroll_start_idx;
         // handling display refreshing errors here so that we don't clog the main loop of the terminal
         if self.is_scroll_end {
@@ -534,7 +471,7 @@ impl Terminal {
                 Ok(_) => { }
                 Err(err) => {error!("could not update display backwards: {}", err); return}
             }
-            match self.cursor_handler() {
+            match self.cursor_handler(left_shift) {
                 Ok(_) => { }
                 Err(err) => {error!("could not update cursor: {}", err); return}
             }
@@ -546,149 +483,39 @@ impl Terminal {
         }
     }
 
-    /// Get the buffered user input command line.
-    pub fn get_cmdline(&mut self) -> String {
-        self.cmdline.clone()
-    }
-
-    /// Clear the user buffered command line. The scrollback buffer is synchronically updated,
-    /// but one needs to call `refresh_display` to actually remove the line from screen.
-    pub fn clear_cmdline(&mut self) {
-        self.left_shift = 0;
-        for _i in 0..self.cmdline.len() {
-            self.erase_from_cmdline(true);
-        }
-        self.cmdline.clear();
-    }
-
-    /// Set a new buffered command line to terminal. The scrollback buffer is synchronically updated,
-    /// but one needs to call `refresh_display` to actually show the new line onto the screen.
-    pub fn set_cmdline(&mut self, s: String) {
-        if !self.cmdline.is_empty() {
-            self.clear_cmdline();
-        }
-        let buffer_len = self.scrollback_buffer.len();
-        self.scrollback_buffer.insert_str(buffer_len - self.left_shift , &s);
-        self.cmdline = s;
-        self.left_shift = 0;
-        self.correct_prompt_position = true;
-    }
-
-    /// Just clear the buffered cmdline string in terminal. The existing characters on the screen are
-    /// left untouched.
-    pub fn clear_cmdline_without_erase(&mut self) {
-        self.cmdline.clear();
-        self.left_shift = 0;
-    }
-
-    /// Erase a character on the left of the cursor. If there's nothing on the left, it simply returns.
-    pub fn erase_left_cmdline(&mut self) {
-        // Prevents user from moving cursor to the left of the typing bounds
-        if self.cmdline.len() == 0 || self.cmdline.len() - self.left_shift == 0 { 
-            return;
-        } else {
-            // Subtraction by accounts for 0-indexing
-            if let Some(text_display) = self.window.get_displayable(&self.display_name){
-                text_display.disable_cursor();
-            }
-            let remove_idx: usize =  self.cmdline.len() - self.left_shift -1;
-            self.cmdline.remove(remove_idx);
-            self.erase_from_cmdline(true);
-            return;
+    pub fn disable_cursor(&mut self) {
+        if let Some(text_display) = self.window.get_displayable(&self.display_name) {
+            text_display.disable_cursor();
         }
     }
 
-    /// Erase a character at the cursor. If there's nothing at the cursor as well as on its right, it
-    /// simply returns.
-    pub fn erase_right_cmdline(&mut self) {
-        // if there's no characters to the right of the cursor, does nothing
-        if self.cmdline.len() == 0 || self.left_shift == 0 { 
-            return;
-        } else {
-            // Subtraction by accounts for 0-indexing
-            if let Some(text_display) = self.window.get_displayable(&self.display_name){
-                text_display.disable_cursor();
-            }
-            let remove_idx: usize =  self.cmdline.len() - self.left_shift;
-            // we're moving the cursor one position to the right relative to the end of the input string
-            self.cmdline.remove(remove_idx);
-            self.erase_from_cmdline(false);
-            self.left_shift -= 1; 
-            return;
-        }
-    }
-
-    /// Move the cursor to the very beginning of the input command line.
-    pub fn move_cursor_leftmost(&mut self) {
-        self.left_shift = self.cmdline.len();
-    }
-
-    /// Move the cursor to the very end of the input command line.
-    pub fn move_cursor_rightmost(&mut self) {
-        self.left_shift = 0;
-    }
-
-    /// Move the cursor a character left. If the cursor is already at the beginning of the command line,
-    /// it simply returns.
-    pub fn move_cursor_left(&mut self) {
-        if self.left_shift < self.cmdline.len() {
-            self.left_shift += 1;
-        }
-    }
-
-    /// Move the cursor a character right. If the cursor is already at the end of the command line,
-    /// it simply returns.
-    pub fn move_cursor_right(&mut self) {
-        if self.left_shift > 0 {
-            self.left_shift -= 1;
-        }
-    }
-
-    /// Insert a character at the cursor.
-    pub fn insert_character_to_cmdline(&mut self, c: char) -> Result<(), &'static str> {
-        let insert_idx = self.cmdline.len() - self.left_shift;
-        self.cmdline.insert(insert_idx, c);
-        let buffer_len = self.scrollback_buffer.len();
-        self.scrollback_buffer.insert_str(buffer_len - self.left_shift , &c.to_string());
-
-        // If the prompt and any keypresses aren't already the last things being displayed on the buffer, it reprints
-        if !self.correct_prompt_position {
-            let mut cmdline = self.cmdline.clone();
-            match cmdline.pop() {
-                Some(_) => { }
-                None => {return Err("couldn't pop newline from input event string")}
-            }
-            self.redisplay_prompt();
-            self.print_to_terminal(cmdline);
-            // out dated: redisplay_prompt have set it // terminal.correct_prompt_position = true;
-        }
+    /// Insert a character to the screen. The position is specified by parameter `left_shift`,
+    /// that is the relative distance to the end of the whole output on the screen.
+    /// left_shift == 0 means to append characters onto the screen, while left_shift == 1 means to
+    /// insert a character right before the exsiting last character.
+    /// One must call `refresh_display` to get things actually showed.
+    pub fn insert_char_to_screen(&mut self, c: char, left_shift: usize) -> Result<(), &'static str> {
+        let buflen = self.scrollback_buffer.len();
+        if buflen < left_shift { return Err("left_shift is larger than length of scrollback buffer"); }
+        let insert_idx = buflen - left_shift;
+        self.scrollback_buffer.insert_str(insert_idx, &c.to_string());
         Ok(())
     }
 
-    /// Insert a character to the secondary buffer. It is used when currently a command is running.
-    /// Should be removed later when we have abstraction of `stdio`.
-    pub fn insert_character_to_buffer(&mut self, c: char) {
-        self.buffer_string.push(c);
-    }
-
-    /// Move contents from the secondary buffer to the command line buffer.
-    pub fn consume_buffer_string(&mut self) -> Result<(), &'static str> {
-        let temp = self.buffer_string.clone();
-        self.print_to_terminal(temp.clone());
-        self.cmdline = temp;
-        self.buffer_string.clear();
+    /// Remove a character from the screen. The position is specified by parameter `left_shift`,
+    /// that is the relative distance to the end of the whole output on the screen.
+    /// left_shift == 1 means to remove the last character on the screen.
+    /// left_shift == 0 is INVALID here, since there's nothing at the "end" of the screen.
+    /// One must call `refresh_display` to get things actually removed on the screen.
+    pub fn remove_char_from_screen(&mut self, left_shift: usize) -> Result<(), &'static str> {
+        let buflen = self.scrollback_buffer.len();
+        if buflen < left_shift { return Err("left_shift is larger than length of scrollback buffer"); }
+        if left_shift == 0 { return Err("cannot remove character at left_shift == 0"); }
+        let remove_idx = buflen - left_shift;
+        self.scrollback_buffer.remove(remove_idx);
         Ok(())
     }
-
-    /// Clear the secondary buffer.
-    pub fn clear_buffer_string(&mut self) {
-        self.buffer_string.clear();
-    }
-
-    pub fn is_buffer_string_empty(&self) -> bool {
-        self.buffer_string.is_empty()
-    }
-
+    
     /// Scroll the screen to the very beginning.
     pub fn move_screen_to_begin(&mut self) {
         // Home command only registers if the text display has the ability to scroll
@@ -759,7 +586,6 @@ impl Terminal {
                     Err(err) => {return Err(err);}
             };
         }
-        self.refresh_display();
         Ok(())
     }
 
@@ -777,44 +603,5 @@ impl Terminal {
     pub fn close_window(self) -> Result<(), &'static str> {
         window_manager::delete(self.window)?;
         Ok(())
-    }
-
-    /// If there is any output event from running application, print it to the screen, otherwise it does nothing.
-    pub fn check_and_print_app_output(&mut self) -> bool {
-        use core::ops::Deref;
-        if let Some(print_event) = self.print_consumer.peek() {
-            match print_event.deref() {
-                &Event::OutputEvent(ref s) => {
-                    self.print_to_terminal(s.text.clone());
-
-                    // Sets this bool to true so that on the next iteration the TextDisplay will refresh AFTER the 
-                    // task_handler() function has cleaned up, which does its own printing to the console
-                    self.refresh_display();
-                    self.correct_prompt_position = false;
-                },
-                _ => { },
-            }
-            print_event.mark_completed();
-            // Goes to the next iteration of the loop after processing print event to ensure that printing is handled before keypresses
-            return true;
-        }
-        false
-    }
-
-    /// Print a new prompt if we need, otherwise do nothing.
-    pub fn refresh_prompt_if_needed(&mut self) {
-        if !self.correct_prompt_position {
-            self.redisplay_prompt();
-        }
-    }
-
-    /// Get a producer to the print event queue.
-    pub fn get_producer_to_screen(&mut self) -> DFQueueProducer<Event> {
-        self.print_producer.obtain_producer()
-    }
-
-    /// Get current environment.
-    pub fn get_environment(&self) -> Arc<Mutex<Environment>> {
-        Arc::clone(&self.env)
     }
 }
