@@ -268,12 +268,7 @@ impl WindowComponents {
                                         if self.last_mouse_position_event.left_button_hold {  // click event
                                             if i == 0 {
                                                 debug!("close window");
-                                                drop(winobj);
-                                                match window_manager_alpha::delete_window(&self.winobj) {
-                                                    Ok(_) => { }
-                                                    Err(err) => { debug!("do_refresh_floating_border failed {}", err); }
-                                                }
-                                                return Err("user close window");
+                                                return Err("user close window");  // window will not close until app drop self
                                             }
                                         }
                                     }
@@ -330,6 +325,15 @@ impl WindowComponents {
             }
         }
         Ok(())
+    }
+}
+
+impl Drop for WindowComponents {
+    fn drop(&mut self) {
+        match window_manager_alpha::delete_window(&self.winobj) {
+            Ok(_) => { }
+            Err(err) => { debug!("delete_window failed {}", err); }
+        }
     }
 }
 
