@@ -1,5 +1,14 @@
 //! Manages and handles initialization of all storage devices
 //! and storage controllers in the system.
+//! 
+//! Quick example of how to access storage controllers and devices:
+//! ```rust
+//! if let Some(controller) = storage_manager::STORAGE_CONTROLLERS.lock().iter().next() {
+//!     if let Some(drive) = controller.lock().devices().next() {
+//!         debug!("Found drive with size {}, {} sectors", drive.size_in_bytes(), drive.size_in_sectors());
+//!    }
+//! }
+//! ```
 
 #![no_std]
 
@@ -19,6 +28,8 @@ use alloc::{
 use spin::Mutex;
 use pci::PciDevice;
 use storage_device::StorageControllerRef;
+
+pub use storage_device::*;
 
 
 lazy_static! {
