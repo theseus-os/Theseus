@@ -553,6 +553,32 @@ debug: $(iso)
 gdb:
 	@rust-os-gdb/bin/rust-gdb "$(nano_core_binary)" -ex "target remote :1234"
 
+### ARM
+arminit:
+	RUST_TARGET_PATH=$(PWD)/cfg \
+		RUSTFLAGS="--emit=obj -C debuginfo=2  -D unused-must-use" xargo build  --all --release --target aarch64-theseus 
+
+	mkdir -p ./build/boot/grub
+
+	cp ./cfg/grub-aarch64.cfg ./build/boot/grub/grub.cfg
+
+	cp ./target/aarch64-theseus/release/nano_core.efi ./build/boot/kernel.efi
+###Wenqiu TODO: add application & use variable
+	mkdir -p $(OBJECT_FILES_BUILD_DIR)
+	@for f in ./target/aarch64-theseus/release/deps/*.o "$(HOME)"/.xargo/lib/rustlib/aarch64-theseus/lib/*.o; do \
+		cp -vf  $${f}  $(OBJECT_FILES_BUILD_DIR)/`basename $${f} | sed -n -e 's/\(.*\)/$(KERNEL_PREFIX)\1/p'`   2> /dev/null ; \
+	done
+
+	grub-mkrescue -o theseus.iso ./build
+
+arm: arminit
+	qemu-system-aarch64 -m 2048 -cpu cortex-a57 -smp 2 -M virt -bios QEMU_EFI.fd -nographic -drive if=none,file=theseus.iso,id=cdrom,media=cdrom -device virtio-scsi-device -device scsi-cd,drive=cdrom
+
+armqemu: arminit	
+	qemu-system-aarch64 -s -S -m 2048 -cpu cortex-a57 -smp 2 -M virt -bios QEMU_EFI.fd -nographic -drive if=none,file=theseus.iso,id=cdrom,media=cdrom -device virtio-scsi-device -device scsi-cd,drive=cdrom
+
+armgdb:
+	 aarch64-none-elf-gdb "kernel.bin" -ex "target remote :1234"
 
 
 ### builds and runs Theseus in Bochs

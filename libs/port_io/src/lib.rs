@@ -30,33 +30,45 @@ pub trait PortOut {
 
 impl PortOut for u8 {
     unsafe fn port_out(port: u16, value: Self) {
+        #[cfg(any(target_arch="x86", target_arch="x86_64"))]
         outb(value, port);
     }
 }
 impl PortOut for u16 {
     unsafe fn port_out(port: u16, value: Self) {
+        #[cfg(any(target_arch="x86", target_arch="x86_64"))]
         outw(value, port);
     }
 }
 impl PortOut for u32 {
     unsafe fn port_out(port: u16, value: Self) {
+        #[cfg(any(target_arch="x86", target_arch="x86_64"))]
         outl(value, port);
     }
 }
 
 impl PortIn for u8 {
     unsafe fn port_in(port: u16) -> Self {
-        inb(port)
+        #[cfg(any(target_arch="x86", target_arch="x86_64"))]
+        return inb(port);
+        #[cfg(any(target_arch="aarch64"))]
+        return 0;
     }
 }
 impl PortIn for u16 {
     unsafe fn port_in(port: u16) -> Self {
-        inw(port)
+        #[cfg(any(target_arch="x86", target_arch="x86_64"))]
+        return inw(port);
+        #[cfg(any(target_arch="aarch64"))]
+        return 0
     }
 }
 impl PortIn for u32 {
     unsafe fn port_in(port: u16) -> Self {
-        inl(port)
+        #[cfg(any(target_arch="x86", target_arch="x86_64"))]
+        return inl(port);
+        #[cfg(any(target_arch="aarch64"))]
+        return 0;
     }
 }
 

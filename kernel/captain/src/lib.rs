@@ -168,6 +168,7 @@ pub fn init(
 
 
     info!("captain::init(): initialization done! Enabling interrupts and entering Task 0's idle loop...");
+    #[cfg(any(target_arch="x86", target_arch="x86_64"))]
     enable_interrupts();
     scheduler::schedule();
     // NOTE: DO NOT PUT ANY CODE BELOW THIS POINT, AS IT SHOULD NEVER RUN!
