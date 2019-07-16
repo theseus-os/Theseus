@@ -1,14 +1,5 @@
 //! Manages and handles initialization of all storage devices
 //! and storage controllers in the system.
-//! 
-//! Quick example of how to access storage controllers and devices:
-//! ```rust
-//! if let Some(controller) = storage_manager::STORAGE_CONTROLLERS.lock().iter().next() {
-//!     if let Some(drive) = controller.lock().devices().next() {
-//!         debug!("Found drive with size {}, {} sectors", drive.size_in_bytes(), drive.size_in_sectors());
-//!    }
-//! }
-//! ```
 
 #![no_std]
 
@@ -43,7 +34,7 @@ lazy_static! {
 /// 
 /// Returns `Ok(true)` if successful, 
 /// `Ok(false)` if the given `PciDevice` isn't a supported storage device,
-/// and an error upon failure.
+/// and an error if it fails to initialize a supported storage device.
 pub fn init_device(pci_device: &PciDevice) -> Result<bool, &'static str> {
     // We currently only support IDE controllers for ATA drives (aka PATA).
     if pci_device.class == 0x01 && pci_device.subclass == 0x01 {

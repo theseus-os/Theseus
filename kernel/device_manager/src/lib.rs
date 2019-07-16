@@ -106,36 +106,6 @@ pub fn init(keyboard_producer: DFQueueProducer<Event>) -> Result<(), &'static st
     if network_manager::NETWORK_INTERFACES.lock().is_empty() {
         warn!("Note: no network devices found on this system.");
     }
-
-    warn!("TESTING STORAGE_CONTROLLERS...");
-    if let Some(controller) = storage_manager::STORAGE_CONTROLLERS.lock().iter().next() {
-        if let Some(drive) = controller.lock().devices().next() {
-            debug!("Found drive with size {}, {} sectors", drive.size_in_bytes(), drive.size_in_sectors());
-
-            use storage_manager::StorageDevice;
-            #[allow(mutable_transmutes)]
-            let drive = unsafe { &mut *(drive as *const dyn StorageDevice as *mut dyn StorageDevice) };
-            let mut initial_buf: [u8; 6144] = [0; 6144];
-            let sectors_read = drive.read_sectors(&mut initial_buf[..], 0);
-            debug!("[SUCCESS] sectors_read: {:?}", sectors_read);
-            debug!("{:?}", core::str::from_utf8(&initial_buf));
-
-            let mut write_buf = [0u8; 512*3];
-            for b in write_buf.chunks_exact_mut(16) {
-                b.copy_from_slice(b"QWERTYUIOPASDFJK");
-            }
-            let bytes_written = drive.write_sectors(&write_buf[..], 2);
-            debug!("WRITE_PIO {:?}", bytes_written);
-
-            let mut after_buf: [u8; 6144] = [0; 6144];
-            let sectors_read = drive.read_sectors(&mut after_buf[..], 0)?;
-            debug!("{:X?}", &after_buf[..]);
-            debug!("{:?}", core::str::from_utf8(&after_buf));
-            trace!("AFTER WRITE READ_PIO {} sectors", sectors_read);
-
-
-        }
-    }
     
     Ok(())
 }

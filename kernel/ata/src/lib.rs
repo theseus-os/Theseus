@@ -125,6 +125,8 @@ pub enum AtaDeviceType {
 	PataPi,
 	/// A serial ATA (SATA) drive that is operating in legacy IDE emulation mode,
 	/// **not the standard AHCI interface for SATA**.
+	/// Some systems refer to this as a `SEMB` (SATA Enclosure Management Bridge) device,
+	/// which may or may not be attached through a port multiplier.
 	Sata,
 	/// A serial ATA (SATA) drive that that is operating in legacy IDE emulation mode 
 	/// and uses the packet interface.
@@ -425,8 +427,6 @@ impl AtaDrive {
 
 			for chunk in buffer[buffer_offset .. (buffer_offset + SECTOR_SIZE_IN_BYTES)].chunks_exact(2) {
 				// ATA PIO works by writing one 16-bit word at a time, 
-		// ATA PIO works by writing one 16-bit word at a time, 
-				// ATA PIO works by writing one 16-bit word at a time, 
 				// so one 16-bit write covers two bytes of the buffer.
 				let word = (chunk[1] as u16) << 8 | (chunk[0] as u16);
 				unsafe { self.data.write(word); }
@@ -486,8 +486,6 @@ impl AtaDrive {
 		let mut buffer: [u8; SECTOR_SIZE_IN_BYTES] = [0; SECTOR_SIZE_IN_BYTES];
 		self.wait_for_data_ready().map_err(|_| "error before identify data read")?;
 		for chunk in buffer.chunks_exact_mut(2) {
-			// ATA PIO works by reading one 16-bit word at a time, 
-		// ATA PIO works by reading one 16-bit word at a time, 
 			// ATA PIO works by reading one 16-bit word at a time, 
 			// so one read covers two bytes of the buffer.
 			let word: u16 = self.data.read();
@@ -585,6 +583,10 @@ impl AtaDrive {
 	/// 
 	/// This should only be used to clear leftover error values before identifying the drive,
 	/// or when the drive is stuck in the BUSY status.
+	///
+	/// # Warning
+	/// This resets BOTH (master and slave) drives on this bus, so do not call this
+	/// unless you are certain the other drive has no in-progress transfers.
 	fn software_reset(&mut self) {
 		// Procedure is (1) set the SRST bit, (2) wait 5us, (3) clear the SRST bit.
 		unsafe { self.control.write(AtaControl::SRST.bits()); }
@@ -604,11 +606,11 @@ impl AtaDrive {
 		}
 	}
 
-	fn as_storage_device(&self) -> &dyn StorageDevice {
+	pub fn as_storage_device(&self) -> &dyn StorageDevice {
 		self
 	}
 
-	fn as_storage_device_mut(&mut self) -> &mut dyn StorageDevice {
+	pub fn as_storage_device_mut(&mut self) -> &mut dyn StorageDevice {
 		self
 	}
 }
@@ -746,7 +748,7 @@ enum NextDrive {
 	SecondarySlave,
 }
 
-/// Provides an iterator over all `AtaDrive`s in an `IdeController`, immutably.
+/// Provides an iterator over all `AtaDrive`s in an `IdeController`.
 /// See the [`IdeController::iter()`](struct.IdeController.html#method.iter) method.
 #[derive(Clone)]
 pub struct IdeControllerIter<'c> {
