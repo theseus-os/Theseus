@@ -104,12 +104,16 @@ impl Terminal {
                 }
             }
 
-            let mut last_line_chars = 1;
+            let mut last_line_chars = 0;
             // Case where the last newline does not occur at the end of the slice
             if new_line_indices[0].0 != slice.len() - 1 {
                 start_idx -= slice.len() -1 - new_line_indices[0].0;
                 total_lines += (slice.len()-1 - new_line_indices[0].0)/buffer_width + 1;
                 last_line_chars = (slice.len() -1 - new_line_indices[0].0) % buffer_width; // fix: account for more than one line
+            }
+            else {
+                start_idx -= 1;
+                total_lines += 1;
             }
 
             // covers everything *up to* the characters between the beginning of the slice and the first new line character
