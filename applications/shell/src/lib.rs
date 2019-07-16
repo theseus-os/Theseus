@@ -22,11 +22,13 @@ extern crate text_display;
 extern crate fs_node;
 extern crate path;
 extern crate root;
+extern crate scheduler;
 
 extern crate terminal_print;
 extern crate print;
 extern crate environment;
 extern crate libterm;
+extern crate application_io;
 
 #[macro_use] extern crate alloc;
 #[macro_use] extern crate log;
@@ -44,9 +46,15 @@ use dfqueue::{DFQueue, DFQueueConsumer, DFQueueProducer};
 use alloc::sync::Arc;
 use spin::Mutex;
 use environment::Environment;
-use core::mem;
+use alloc::boxed::Box;
 
 pub const APPLICATIONS_NAMESPACE_PATH: &'static str = "/namespaces/default/applications";
+
+#[derive(Debug)]
+struct Job {
+    task: TaskRef,
+    kbd_event_producer: DFQueueProducer<KeyEvent>
+}
 
 /// A main function that spawns a new shell and waits for the shell loop to exit before returning an exit value
 #[no_mangle]
@@ -100,7 +108,7 @@ enum AppErr {
 
 struct Shell {
     /// Variable that stores the task id of any application manually spawned from the terminal
-    current_task_ref: Option<TaskRef>,
+    current_task_ref: Option<Job>,
     /// The string that stores the users keypresses after the prompt
     cmdline: String,
     /// The secondary buffer that stores the user's keypresses while a command is currently running
@@ -299,7 +307,7 @@ impl Shell {
         // Ctrl+C signals the main loop to exit the task
         if keyevent.modifiers.control && keyevent.keycode == Keycode::C {
             let task_ref_copy = match self.current_task_ref {
-                Some(ref task_ref) => task_ref.clone(), 
+                Some(ref job) => job.task.clone(), 
                 None => {
                     self.clear_cmdline(true)?;
                     self.secondary_buffer.clear();
@@ -308,15 +316,52 @@ impl Shell {
                     return Ok(());
                 }
             };
-            match task_ref_copy.kill(KillReason::Requested) {
-                Ok(_) => {
-                    if let Err(e) = runqueue::remove_task_from_all(&task_ref_copy) {
-                        error!("Killed task but could not remove it from runqueue: {}", e);
+            let task_id = task_ref_copy.lock().id;
+
+            // Remove all the queues between shell and the running application.
+            application_io::remove_app_shell_relation(task_id)?;
+
+            // Lock the shared structure in `application_io` and then kill the running application
+            application_io::locked_and_execute(Box::new(move || {
+                match task_ref_copy.kill(KillReason::Requested) {
+                    Ok(_) => {
+                        if let Err(e) = runqueue::remove_task_from_all(&task_ref_copy) {
+                            error!("Killed task but could not remove it from runqueue: {}", e);
+                        }
+                    }
+                    Err(e) => error!("Could not kill task, error: {}", e),
+                }
+
+                // Here we must wait for the running application to quit before releasing the lock,
+                // because the previous `kill` method will NOT stop the application immediately.
+                // Rather, it would let the application finish the current time slice before actually
+                // killing it.
+                loop {
+                    scheduler::schedule(); // yield the CPU
+                    if !task_ref_copy.lock().is_running() {
+                        break;
                     }
                 }
-                Err(e) => error!("Could not kill task, error: {}", e),
-            }
+            }));
             return Ok(());
+        }
+
+        // HANDLE ALL SPECIAL KEYBOARD EVENTS ABOVE.
+        // Applications can request shell to forward the keyboard events.
+        // However, we must intercept all application management related events, e.g. ctrl-c,
+        // before making the forward.
+        
+        // Check whether we should forward the keyboard event to the running application.
+        // If so, we forward the keyboard event to the application and let it handle itself.
+        // In other words, we skip handling them in the shell.
+        if self.current_task_ref.is_some() {
+            if let Some(ref job_ref) = self.current_task_ref {
+                let requesting_direct = application_io::is_requesting_forward(job_ref.task.lock().id);
+                if requesting_direct {
+                    job_ref.kbd_event_producer.enqueue(keyevent);
+                    return Ok(());
+                }
+            }
         }
 
         // Tracks what the user does whenever she presses the backspace button
@@ -348,7 +393,16 @@ impl Shell {
                 match self.eval_cmdline() {
                     Ok(new_task_ref) => { 
                         let task_id = {new_task_ref.lock().id};
-                        self.current_task_ref = Some(new_task_ref);
+                        let app_kbd_event_queue: DFQueue<KeyEvent> = DFQueue::new();
+                        let app_kbd_event_consumer = app_kbd_event_queue.into_consumer();
+                        let app_kbv_event_producer = app_kbd_event_consumer.obtain_producer();
+                        self.current_task_ref = Some(
+                            Job {
+                                task: new_task_ref,
+                                kbd_event_producer: app_kbv_event_producer
+                            }
+                        );
+                        application_io::create_app_shell_relation(task_id, app_kbd_event_consumer)?;
                         terminal_print::add_child(task_id, self.print_producer.obtain_producer())?; // adds the terminal's print producer to the terminal print crate
                     }
                     Err(err) => {
@@ -486,8 +540,8 @@ impl Shell {
     }
 
     fn task_handler(&mut self) -> Result<bool, &'static str> {
-        let task_ref_copy = match self.current_task_ref.clone() {
-            Some(task_ref) => task_ref,
+        let task_ref_copy = match &self.current_task_ref {
+            Some(task_ref) => task_ref.task.clone(),
             None => { return Ok(false); }
         };
         let exit_result = task_ref_copy.take_exit_value();
@@ -518,6 +572,7 @@ impl Shell {
                     }
                 }
                 
+                application_io::remove_app_shell_relation(task_ref_copy.lock().id)?;
                 terminal_print::remove_child(task_ref_copy.lock().id)?;
                 // Resets the current task id to be ready for the next command
                 self.current_task_ref = None;
@@ -529,7 +584,7 @@ impl Shell {
                 self.terminal.refresh_display(self.left_shift);
             },
         // None value indicates task has not yet finished so does nothing
-        None => { },
+        None => { return Ok(false); },
         }
         Ok(true)
     }
