@@ -18,6 +18,9 @@ path = "../../libs/port_io"
 [dependencies.pci]
 path = "../pci"
 
+[dependencies.storage_device]
+path = "../storage_device"
+
 
 [lib]
 crate-type = ["rlib"]
