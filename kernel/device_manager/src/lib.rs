@@ -3,7 +3,6 @@
 
 #[macro_use] extern crate log;
 extern crate event_types;
-extern crate ata;
 extern crate e1000;
 extern crate memory;
 extern crate dfqueue; 
@@ -12,8 +11,10 @@ extern crate acpi;
 extern crate keyboard;
 extern crate pci;
 extern crate mouse;
+extern crate storage_manager;
 extern crate network_manager;
 extern crate ethernet_smoltcp_device;
+
 
 use dfqueue::DFQueueProducer;
 use event_types::Event;
@@ -34,11 +35,10 @@ const DEFAULT_GATEWAY_IP: [u8; 4] = [10, 0, 2, 2]; // the default QEMU user-slir
 
 /// This is for early-stage initialization of things like VGA, ACPI, (IO)APIC, etc.
 pub fn early_init(kernel_mmi: &mut MemoryManagementInfo) -> Result<(), &'static str> {
-    // first, init the local apic info
+    // First, initialize the local apic info.
     apic::init(&mut kernel_mmi.page_table)?;
     
-    // then init/parse the ACPI tables to fill in the APIC details, among other things
-    // this returns an iterator over the "APIC" (MADT) tables, which we use to boot AP cores
+    // Then, parse the ACPI tables to acquire system configuration info.
     acpi::init(&mut kernel_mmi.page_table)?;
 
     Ok(())
@@ -58,24 +58,38 @@ pub fn init(keyboard_producer: DFQueueProducer<Event>) -> Result<(), &'static st
 
     // Iterate over all PCI devices and initialize the drivers for the devices we support.
     for dev in pci::pci_device_iter() {
-        // Look for IDE controllers for disk drives (aka PATA).
-        if dev.class == 0x01 && dev.subclass == 0x01 {
-            info!("IDE controller PCI device found at: {:?}", dev.location);
-            let _ide_controller = ata::IdeController::new(dev)?;
-            // TODO: do something with the discovered ATA drives / IDE controller
-            // debug!("{:?}", ide_controller.primary_master);
+        // Currently we skip Bridge devices, since we have no use for them yet. 
+        if dev.class == 0x06 {
+            continue;
         }
 
+        // If this is a storage device, initialize it as such.
+        match storage_manager::init_device(dev) {
+            // finished with this device, proceed to the next one.
+            Ok(true)  => continue,
+            // fall through, let another handler deal with it.
+            Ok(false) => { }
+            // error, so skip this device.
+            Err(e) => {
+                error!("Failed to initialize storage device, it will be unavailable.\n{:?}\nError: {}", dev, e);
+                continue;
+            }
+        }
+
+        // If this is a network device, initialize it as such.
         // Look for networking controllers, specifically ethernet cards
         if dev.class == 0x02 && dev.subclass == 0x00 {
             if dev.vendor_id == e1000::INTEL_VEND && dev.device_id == e1000::E1000_DEV {
                 info!("e1000 PCI device found at: {:?}", dev.location);
                 let e1000_nic_ref = e1000::E1000Nic::init(dev)?;
                 let e1000_interface = EthernetNetworkInterface::new_ipv4_interface(e1000_nic_ref, DEFAULT_LOCAL_IP, &DEFAULT_GATEWAY_IP)?;
-                add_to_network_interfaces(e1000_interface)
+                add_to_network_interfaces(e1000_interface);
+                continue;
             }
             // here: check for and initialize other ethernet cards
         }
+
+        warn!("Ignoring PCI device with no handler. {:?}", dev);
     }
 
     // Convenience notification for developers to inform them of no networking devices
