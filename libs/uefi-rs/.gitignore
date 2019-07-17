@@ -1,0 +1,5 @@
+# Cargo places all built files here.
+/target/
+
+# Libraries should not commit their .lock files.
+Cargo.lock

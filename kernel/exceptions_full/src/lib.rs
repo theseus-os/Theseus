@@ -18,6 +18,7 @@ use x86_64::registers::msr::*;
 
 
 pub fn init(idt_ref: &'static LockedIdt) {
+    #[cfg(any(target_arch="x86", target_arch="x86_64"))]
     { 
         let mut idt = idt_ref.lock(); // withholds interrupts
 
@@ -90,6 +91,7 @@ fn kill_and_halt(exception_number: u8) -> ! {
 
 
 /// exception 0x00
+#[cfg(any(target_arch="x86", target_arch="x86_64"))]
 pub extern "x86-interrupt" fn divide_by_zero_handler(stack_frame: &mut ExceptionStackFrame) {
     println_both!("\nEXCEPTION: DIVIDE BY ZERO\n{:#?}\n", stack_frame);
 
@@ -97,6 +99,7 @@ pub extern "x86-interrupt" fn divide_by_zero_handler(stack_frame: &mut Exception
 }
 
 /// exception 0x01
+#[cfg(any(target_arch="x86", target_arch="x86_64"))]
 pub extern "x86-interrupt" fn debug_handler(stack_frame: &mut ExceptionStackFrame) {
     println_both!("\nEXCEPTION: DEBUG at {:#x}\n{:#?}\n",
              stack_frame.instruction_pointer,
@@ -106,6 +109,7 @@ pub extern "x86-interrupt" fn debug_handler(stack_frame: &mut ExceptionStackFram
 }
 
 /// exception 0x02, also used for TLB Shootdown IPIs and sampling interrupts
+#[cfg(any(target_arch="x86", target_arch="x86_64"))]
 extern "x86-interrupt" fn nmi_handler(stack_frame: &mut ExceptionStackFrame) {
     let mut expected_nmi = false;
     
@@ -136,6 +140,7 @@ extern "x86-interrupt" fn nmi_handler(stack_frame: &mut ExceptionStackFrame) {
 
 
 /// exception 0x03
+#[cfg(any(target_arch="x86", target_arch="x86_64"))]
 pub extern "x86-interrupt" fn breakpoint_handler(stack_frame: &mut ExceptionStackFrame) {
     println_both!("\nEXCEPTION: BREAKPOINT at {:#x}\n{:#?}\n",
              stack_frame.instruction_pointer,
@@ -145,6 +150,7 @@ pub extern "x86-interrupt" fn breakpoint_handler(stack_frame: &mut ExceptionStac
 }
 
 /// exception 0x04
+#[cfg(any(target_arch="x86", target_arch="x86_64"))]
 pub extern "x86-interrupt" fn overflow_handler(stack_frame: &mut ExceptionStackFrame) {
     println_both!("\nEXCEPTION: OVERFLOW at {:#x}\n{:#?}\n",
              stack_frame.instruction_pointer,
@@ -154,6 +160,7 @@ pub extern "x86-interrupt" fn overflow_handler(stack_frame: &mut ExceptionStackF
 }
 
 // exception 0x05
+#[cfg(any(target_arch="x86", target_arch="x86_64"))]
 pub extern "x86-interrupt" fn bound_range_exceeded_handler(stack_frame: &mut ExceptionStackFrame) {
     println_both!("\nEXCEPTION: BOUND RANGE EXCEEDED at {:#x}\n{:#?}\n",
              stack_frame.instruction_pointer,
@@ -163,6 +170,7 @@ pub extern "x86-interrupt" fn bound_range_exceeded_handler(stack_frame: &mut Exc
 }
 
 /// exception 0x06
+#[cfg(any(target_arch="x86", target_arch="x86_64"))]
 pub extern "x86-interrupt" fn invalid_opcode_handler(stack_frame: &mut ExceptionStackFrame) {
     println_both!("\nEXCEPTION: INVALID OPCODE at {:#x}\n{:#?}\n",
              stack_frame.instruction_pointer,
@@ -173,6 +181,7 @@ pub extern "x86-interrupt" fn invalid_opcode_handler(stack_frame: &mut Exception
 
 /// exception 0x07
 /// see this: http://wiki.osdev.org/I_Cant_Get_Interrupts_Working#I_keep_getting_an_IRQ7_for_no_apparent_reason
+#[cfg(any(target_arch="x86", target_arch="x86_64"))]
 pub extern "x86-interrupt" fn device_not_available_handler(stack_frame: &mut ExceptionStackFrame) {
     println_both!("\nEXCEPTION: DEVICE_NOT_AVAILABLE at {:#x}\n{:#?}\n",
              stack_frame.instruction_pointer,
@@ -182,6 +191,7 @@ pub extern "x86-interrupt" fn device_not_available_handler(stack_frame: &mut Exc
 }
 
 /// exception 0x08
+#[cfg(any(target_arch="x86", target_arch="x86_64"))]
 pub extern "x86-interrupt" fn double_fault_handler(stack_frame: &mut ExceptionStackFrame, _error_code: u64) {
     println_both!("\nEXCEPTION: DOUBLE FAULT\n{:#?}\n", stack_frame);
     
@@ -189,6 +199,7 @@ pub extern "x86-interrupt" fn double_fault_handler(stack_frame: &mut ExceptionSt
 }
 
 /// exception 0x0a
+#[cfg(any(target_arch="x86", target_arch="x86_64"))]
 pub extern "x86-interrupt" fn invalid_tss_handler(stack_frame: &mut ExceptionStackFrame, error_code: u64) {
     println_both!("\nEXCEPTION: INVALID_TSS FAULT\nerror code: \
                                   {:#b}\n{:#?}\n",
@@ -198,6 +209,7 @@ pub extern "x86-interrupt" fn invalid_tss_handler(stack_frame: &mut ExceptionSta
 }
 
 /// exception 0x0b
+#[cfg(any(target_arch="x86", target_arch="x86_64"))]
 pub extern "x86-interrupt" fn segment_not_present_handler(stack_frame: &mut ExceptionStackFrame, error_code: u64) {
     println_both!("\nEXCEPTION: SEGMENT_NOT_PRESENT FAULT\nerror code: \
                                   {:#b}\n{:#?}\n",
@@ -208,6 +220,7 @@ pub extern "x86-interrupt" fn segment_not_present_handler(stack_frame: &mut Exce
 }
 
 /// exception 0x0d
+#[cfg(any(target_arch="x86", target_arch="x86_64"))]
 pub extern "x86-interrupt" fn general_protection_fault_handler(stack_frame: &mut ExceptionStackFrame, error_code: u64) {
     println_both!("\nEXCEPTION: GENERAL PROTECTION FAULT \nerror code: \
                                   {:#X}\n{:#?}\n",
@@ -218,6 +231,7 @@ pub extern "x86-interrupt" fn general_protection_fault_handler(stack_frame: &mut
 }
 
 /// exception 0x0e
+#[cfg(any(target_arch="x86", target_arch="x86_64"))]
 pub extern "x86-interrupt" fn page_fault_handler(stack_frame: &mut ExceptionStackFrame, error_code: PageFaultErrorCode) {
     use x86_64::registers::control_regs;
     println_both!("\nEXCEPTION: PAGE FAULT while accessing {:#x}\nerror code: \

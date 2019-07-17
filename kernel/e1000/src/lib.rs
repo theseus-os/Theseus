@@ -238,6 +238,7 @@ impl E1000Nic {
         //e1000_nc.clear_statistics();
         
         Self::enable_interrupts(&mut mapped_registers);
+        #[cfg(any(target_arch="x86", target_arch="x86_64"))]
         register_interrupt(interrupt_num, e1000_handler)?;
 
         // initialize the buffer pool
@@ -427,6 +428,7 @@ impl E1000Nic {
     }
 }
 
+#[cfg(any(target_arch="x86", target_arch="x86_64"))]
 extern "x86-interrupt" fn e1000_handler(_stack_frame: &mut ExceptionStackFrame) {
     if let Some(ref e1000_nic_ref) = E1000_NIC.try() {
         let mut e1000_nic = e1000_nic_ref.lock();

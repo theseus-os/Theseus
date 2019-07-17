@@ -14,6 +14,10 @@ x86_64 = { path = "../../libs/x86_64" } # currently using our local copy, forked
 xmas-elf = { version = "0.6.2", git = "https://github.com/kevinaboos/xmas-elf.git" }
 bit_field = "0.7.0"
 type-name = "0.1.0"
+uefi = { path = "../../libs/uefi-rs" }
+uefi_services = { path = "../../libs/uefi-rs/uefi-services" }
+uefi-exts = { path = "../../libs/uefi-rs/uefi-exts" }
+uefi_alloc = { path = "../../libs/uefi-rs/uefi-alloc" }
 
 [dependencies.derive_more]
 version = "0.14.0"

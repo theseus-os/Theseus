@@ -98,6 +98,7 @@ fn shutdown(msg: core::fmt::Arguments) -> ! {
 /// then change the [`captain::init`](../captain/fn.init.html) routine.
 /// 
 #[no_mangle]
+#[cfg(any(target_arch="x86", target_arch="x86_64"))]
 pub extern "C" fn nano_core_start(multiboot_information_virtual_address: usize) {
     println_raw!("Entered nano_core_start()."); 
 	

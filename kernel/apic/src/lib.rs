@@ -12,6 +12,7 @@ extern crate atomic_linked_list;
 extern crate memory;
 extern crate spin;
 extern crate kernel_config;
+#[cfg(any(target_arch="x86", target_arch="x86_64"))]
 extern crate raw_cpuid;
 extern crate x86_64;
 extern crate pit_clock;
@@ -24,6 +25,7 @@ use volatile::{Volatile, ReadOnly, WriteOnly};
 use alloc::boxed::Box;
 use owning_ref::{BoxRef, BoxRefMut};
 use spin::Once;
+#[cfg(any(target_arch="x86", target_arch="x86_64"))]
 use raw_cpuid::CpuId;
 use x86_64::registers::msr::*;
 use irq_safety::RwLockIrqSafe;
@@ -68,11 +70,17 @@ pub fn is_bsp() -> bool {
 
 /// Returns true if the machine has support for x2apic
 pub fn has_x2apic() -> bool {
-    static IS_X2APIC: Once<bool> = Once::new(); // caches the result
+    #[cfg(any(target_arch="x86", target_arch="x86_64"))]
+    {
+        static IS_X2APIC: Once<bool> = Once::new(); // caches the result
     let res: &bool = IS_X2APIC.call_once( || {
-        CpuId::new().get_feature_info().expect("Couldn't get CpuId feature info").has_x2apic()
-    });
-    *res // because call_once returns a reference to the cached IS_X2APIC value
+            CpuId::new().get_feature_info().expect("Couldn't get CpuId feature info").has_x2apic()
+        });
+        return *res // because call_once returns a reference to the cached IS_X2APIC value
+    }
+
+    #[cfg(any(target_arch="aarch64"))]
+    true
 }
 
 /// Returns a reference to the list of LocalApics, one per processor core

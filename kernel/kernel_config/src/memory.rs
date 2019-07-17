@@ -61,8 +61,10 @@ pub const KERNEL_STACK_SIZE_IN_PAGES: usize = 16;
 /// i.e., the linear offset between physical memory and kernel memory.
 /// So, for example, the VGA buffer will be mapped from 0xb8000 to 0xFFFFFFFF800b8000.
 /// This is -2GiB from the end of the 64-bit address space.
+#[cfg(any(target_arch="x86", target_arch="x86_64"))]
 pub const KERNEL_OFFSET: usize = 0xFFFF_FFFF_8000_0000;
-
+#[cfg(any(target_arch="aarch64"))]
+pub const KERNEL_OFFSET: usize = 0xFFFF_FFFF_0000_0000;
 
 
 /// The kernel text region is where we load kernel modules. 

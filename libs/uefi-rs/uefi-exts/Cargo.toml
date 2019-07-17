@@ -1,0 +1,14 @@
+[package]
+name = "uefi-exts"
+version = "0.1.0"
+authors = ["Gabriel Majeri <gabriel.majeri6@gmail.com>"]
+publish = false
+edition = "2018"
+
+[dependencies]
+uefi = { path = ".." }
+uefi_services = { path = "../uefi-services" }
+uefi_alloc = { path = "../uefi-alloc" }
+
+[lib]
+crate-type = ["rlib"]

@@ -60,6 +60,7 @@ pub fn init(double_fault_stack_top_unusable: VirtualAddress, privilege_stack_top
 
     // initialize early exception handlers
     exceptions_early::init(&IDT);
+    #[cfg(any(target_arch="x86", target_arch="x86_64"))]
     {
         // set the special double fault handler's stack
         let mut idt = IDT.lock(); // withholds interrupts
@@ -108,31 +109,34 @@ fn set_handlers(idt: &mut Idt) {
     // exceptions (IRQS from 0-31) have already been inited before
 
     // fill all IDT entries with an unimplemented IRQ handler
-    for i in 32..255 {
-        idt[i].set_handler_fn(unimplemented_interrupt_handler);
+    #[cfg(any(target_arch="x86", target_arch="x86_64"))]
+    {
+        for i in 32..255 {
+            idt[i].set_handler_fn(unimplemented_interrupt_handler);
+        }
+
+        idt[0x20].set_handler_fn(pit_timer_handler);
+        idt[0x21].set_handler_fn(ps2_keyboard_handler);
+        idt[0x22].set_handler_fn(lapic_timer_handler);
+        idt[0x23].set_handler_fn(unimplemented_interrupt_handler);
+        idt[0x24].set_handler_fn(com1_serial_handler);
+        idt[0x25].set_handler_fn(unimplemented_interrupt_handler);
+        idt[0x26].set_handler_fn(unimplemented_interrupt_handler);
+        idt[0x27].set_handler_fn(pic_spurious_interrupt_handler); 
+
+        // idt[0x28].set_handler_fn(rtc_handler);
+        idt[0x28].set_handler_fn(unimplemented_interrupt_handler);
+        idt[0x29].set_handler_fn(unimplemented_interrupt_handler);
+        idt[0x2A].set_handler_fn(unimplemented_interrupt_handler);
+        idt[0x2B].set_handler_fn(unimplemented_interrupt_handler);
+        idt[0x2C].set_handler_fn(ps2_mouse_handler);
+        idt[0x2D].set_handler_fn(unimplemented_interrupt_handler);
+        idt[0x2E].set_handler_fn(primary_ata_handler);
+        idt[0x2F].set_handler_fn(secondary_ata_handler);
+
+        idt[apic::APIC_SPURIOUS_INTERRUPT_VECTOR as usize].set_handler_fn(apic_spurious_interrupt_handler); 
+        idt[tlb_shootdown::TLB_SHOOTDOWN_IPI_IRQ as usize].set_handler_fn(ipi_handler);
     }
-
-    idt[0x20].set_handler_fn(pit_timer_handler);
-    idt[0x21].set_handler_fn(ps2_keyboard_handler);
-    idt[0x22].set_handler_fn(lapic_timer_handler);
-    idt[0x23].set_handler_fn(unimplemented_interrupt_handler);
-    idt[0x24].set_handler_fn(com1_serial_handler);
-    idt[0x25].set_handler_fn(unimplemented_interrupt_handler);
-    idt[0x26].set_handler_fn(unimplemented_interrupt_handler);
-    idt[0x27].set_handler_fn(pic_spurious_interrupt_handler); 
-
-    // idt[0x28].set_handler_fn(rtc_handler);
-    idt[0x28].set_handler_fn(unimplemented_interrupt_handler);
-    idt[0x29].set_handler_fn(unimplemented_interrupt_handler);
-    idt[0x2A].set_handler_fn(unimplemented_interrupt_handler);
-    idt[0x2B].set_handler_fn(unimplemented_interrupt_handler);
-    idt[0x2C].set_handler_fn(ps2_mouse_handler);
-    idt[0x2D].set_handler_fn(unimplemented_interrupt_handler);
-    idt[0x2E].set_handler_fn(primary_ata_handler);
-    idt[0x2F].set_handler_fn(secondary_ata_handler);
-
-    idt[apic::APIC_SPURIOUS_INTERRUPT_VECTOR as usize].set_handler_fn(apic_spurious_interrupt_handler); 
-    idt[tlb_shootdown::TLB_SHOOTDOWN_IPI_IRQ as usize].set_handler_fn(ipi_handler);
 }
 
 
@@ -167,14 +171,20 @@ pub fn register_interrupt(interrupt_num: u8, func: HandlerFunc) -> Result<(), &'
     let mut idt = IDT.lock();
 
     // checks if the handler stored is the default apic handler which signifies that the interrupt hasn't been used yet
-    if idt[interrupt_num as usize].handler_eq(unimplemented_interrupt_handler) {
-        idt[interrupt_num as usize].set_handler_fn(func);
-        Ok(())
+    #[cfg(any(target_arch="x86", target_arch="x86_64"))]
+    {
+        if idt[interrupt_num as usize].handler_eq(unimplemented_interrupt_handler) {
+            idt[interrupt_num as usize].set_handler_fn(func);
+            Ok(())
+        }
+        else {
+            error!("register_interrupt: the requested interrupt IRQ {} is not available", interrupt_num);
+            Err("register_interrupt: the requested interrupt is not available")
+        }
     }
-    else {
-        error!("register_interrupt: the requested interrupt IRQ {} is not available", interrupt_num);
-        Err("register_interrupt: the requested interrupt is not available")
-    }
+
+    #[cfg(any(target_arch="aarch64"))]
+    Ok(())
 } 
 
 /// Returns an interrupt number assigned by the OS and sets its handler function. 
@@ -186,10 +196,16 @@ pub fn register_msi_interrupt(func: HandlerFunc) -> Result<u8, &'static str> {
     let mut idt = IDT.lock();
 
     // try to find an unused interrupt 
-    let interrupt_num = (*idt).find_free_entry(unimplemented_interrupt_handler).ok_or("register_msi_interrupt: no available interrupt")?;
-    idt[interrupt_num].set_handler_fn(func);
+    #[cfg(any(target_arch="x86", target_arch="x86_64"))]
+    {
+        let interrupt_num = (*idt).find_free_entry(unimplemented_interrupt_handler).ok_or("register_msi_interrupt: no available interrupt")?;
+        idt[interrupt_num].set_handler_fn(func);
     
-    Ok(interrupt_num as u8)
+        return Ok(interrupt_num as u8)
+    }
+
+    #[cfg(any(target_arch="aarch64"))]
+    Ok(0)
 } 
 
 /// Returns an interrupt to the system by setting the handler to the default function. 
@@ -205,6 +221,7 @@ pub fn deregister_interrupt(interrupt_num: u8, func: HandlerFunc) -> Result<(), 
     // check if the handler stored is the same as the one provided
     // this is to make sure no other application can deregister your interrupt
     if idt[interrupt_num as usize].handler_eq(func) {
+        #[cfg(any(target_arch="x86", target_arch="x86_64"))]
         idt[interrupt_num as usize].set_handler_fn(unimplemented_interrupt_handler);
         Ok(())
     }
@@ -230,6 +247,7 @@ pub fn eoi(irq: Option<u8>) {
 
 
 /// 0x20
+#[cfg(any(target_arch="x86", target_arch="x86_64"))]
 extern "x86-interrupt" fn pit_timer_handler(_stack_frame: &mut ExceptionStackFrame) {
     pit_clock::handle_timer_interrupt();
 
@@ -241,6 +259,7 @@ extern "x86-interrupt" fn pit_timer_handler(_stack_frame: &mut ExceptionStackFra
 static EXTENDED_SCANCODE: AtomicBool = AtomicBool::new(false);
 
 /// 0x21
+#[cfg(any(target_arch="x86", target_arch="x86_64"))]
 extern "x86-interrupt" fn ps2_keyboard_handler(_stack_frame: &mut ExceptionStackFrame) {
 
     let indicator = ps2::ps2_status_register();
@@ -285,6 +304,7 @@ extern "x86-interrupt" fn ps2_keyboard_handler(_stack_frame: &mut ExceptionStack
 }
 
 /// 0x2C
+#[cfg(any(target_arch="x86", target_arch="x86_64"))]
 extern "x86-interrupt" fn ps2_mouse_handler(_stack_frame: &mut ExceptionStackFrame) {
 
     let indicator = ps2::ps2_status_register();
@@ -312,6 +332,7 @@ extern "x86-interrupt" fn ps2_mouse_handler(_stack_frame: &mut ExceptionStackFra
 
 pub static APIC_TIMER_TICKS: AtomicUsize = AtomicUsize::new(0);
 /// 0x22
+#[cfg(any(target_arch="x86", target_arch="x86_64"))]
 extern "x86-interrupt" fn lapic_timer_handler(_stack_frame: &mut ExceptionStackFrame) {
     let _ticks = APIC_TIMER_TICKS.fetch_add(1, Ordering::Relaxed);
     // info!(" ({}) APIC TIMER HANDLER! TICKS = {}", apic::get_my_apic_id().unwrap_or(0xFF), _ticks);
@@ -324,18 +345,21 @@ extern "x86-interrupt" fn lapic_timer_handler(_stack_frame: &mut ExceptionStackF
 
 
 /// 0x24
+#[cfg(any(target_arch="x86", target_arch="x86_64"))]
 extern "x86-interrupt" fn com1_serial_handler(_stack_frame: &mut ExceptionStackFrame) {
     info!("COM1 serial handler");
 
     eoi(Some(PIC_MASTER_OFFSET + 0x4));
 }
 
+#[cfg(any(target_arch="x86", target_arch="x86_64"))]
 extern "x86-interrupt" fn apic_spurious_interrupt_handler(_stack_frame: &mut ExceptionStackFrame) {
     warn!("APIC SPURIOUS INTERRUPT HANDLER!");
 
     eoi(None);
 }
 
+#[cfg(any(target_arch="x86", target_arch="x86_64"))]
 extern "x86-interrupt" fn unimplemented_interrupt_handler(_stack_frame: &mut ExceptionStackFrame) {
     println_raw!("\nUnimplemented interrupt handler: {:#?}", _stack_frame);
 	match apic::INTERRUPT_CHIP.load(Ordering::Acquire) {
@@ -370,6 +394,7 @@ extern "x86-interrupt" fn unimplemented_interrupt_handler(_stack_frame: &mut Exc
 /// Spurious interrupts occur a lot when using PIC on real hardware, but only occurs once when using apic/x2apic. 
 /// See here for more: https://mailman.linuxchix.org/pipermail/techtalk/2002-August/012697.html.
 /// We handle it according to this advice: https://wiki.osdev.org/8259_PIC#Spurious_IRQs
+#[cfg(any(target_arch="x86", target_arch="x86_64"))]
 extern "x86-interrupt" fn pic_spurious_interrupt_handler(_stack_frame: &mut ExceptionStackFrame ) {
     if let Some(pic) = PIC.try() {
         let irq_regs = pic.read_isr_irr();
@@ -411,6 +436,7 @@ extern "x86-interrupt" fn pic_spurious_interrupt_handler(_stack_frame: &mut Exce
 
 
 /// 0x2E
+#[cfg(any(target_arch="x86", target_arch="x86_64"))]
 extern "x86-interrupt" fn primary_ata_handler(_stack_frame: &mut ExceptionStackFrame ) {
     info!("Primary ATA Interrupt (0x2E)");
 
@@ -419,6 +445,7 @@ extern "x86-interrupt" fn primary_ata_handler(_stack_frame: &mut ExceptionStackF
 
 
 /// 0x2F
+#[cfg(any(target_arch="x86", target_arch="x86_64"))]
 extern "x86-interrupt" fn secondary_ata_handler(_stack_frame: &mut ExceptionStackFrame ) {
     info!("Secondary ATA Interrupt (0x2F)");
     
@@ -426,6 +453,7 @@ extern "x86-interrupt" fn secondary_ata_handler(_stack_frame: &mut ExceptionStac
 }
 
 
+#[cfg(any(target_arch="x86", target_arch="x86_64"))]
 extern "x86-interrupt" fn ipi_handler(_stack_frame: &mut ExceptionStackFrame) {
     eoi(None);
 }

@@ -71,7 +71,21 @@ bitflags! {
         // const GLOBAL            = 1 << 8;
         const GLOBAL            = 0; // disabling because VirtualBox doesn't like it
         const NO_EXECUTE        = 1 << 63;
+
+        //ARM MMU
+        const PAGE    =         1 << 1;
+        const DEVICE  =         1 << 2;
+        const NON_CACHE =       1 << 3;
+        const USER_ARM =            1 << 6;
+        const READONLY =        1 << 7;
+        const OUT_SHARE =       2 << 8;
+        const INNER_SHARE =     3 << 8;
+
+        const ACCESSEDARM =        1 << 10;
+
+        const NO_EXE_ARM =         1 << 54; 
     }
+    
 }
 
 impl EntryFlags {

@@ -26,11 +26,13 @@ use linked_list_allocator::Heap;
 use irq_safety::MutexIrqSafe; 
 
 
+#[cfg(any(target_arch="x86", target_arch="x86_64"))]
 #[global_allocator]
 static ALLOCATOR: IrqSafeHeap = IrqSafeHeap::empty();
 
 /// NOTE: the heap memory MUST BE MAPPED before calling this init function.
 pub fn init(start_virt_addr: usize, size_in_bytes: usize) {
+    #[cfg(any(target_arch="x86", target_arch="x86_64"))]
     unsafe {
         ALLOCATOR.lock().init(start_virt_addr, size_in_bytes);
     }

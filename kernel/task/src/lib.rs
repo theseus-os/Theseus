@@ -505,6 +505,7 @@ impl Task {
         /// by putting the arguments into the proper registers, `rdi` and `rsi`.
         macro_rules! call_context_switch {
             ($func:expr) => ( unsafe {
+                #[cfg(any(target_arch="x86", target_arch="x86_64"))]
                 asm!("
                     mov rdi, $0; \
                     mov rsi, $1;" 

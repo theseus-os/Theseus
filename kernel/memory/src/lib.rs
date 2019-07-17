@@ -25,6 +25,10 @@ extern crate heap_irq_safe;
 #[macro_use] extern crate derive_more;
 extern crate bit_field;
 extern crate type_name;
+extern crate uefi;
+extern crate uefi_services;
+extern crate uefi_exts;
+extern crate uefi_alloc;
 
 /// Just like Rust's `try!()` macro, 
 /// but forgets the given `obj`s to prevent them from being dropped,
@@ -63,9 +67,14 @@ use spin::Once;
 use irq_safety::MutexIrqSafe;
 use alloc::vec::Vec;
 use alloc::sync::Arc;
-use kernel_config::memory::{PAGE_SIZE, MAX_PAGE_NUMBER, KERNEL_OFFSET, KERNEL_HEAP_START, KERNEL_HEAP_INITIAL_SIZE, KERNEL_STACK_ALLOCATOR_BOTTOM, KERNEL_STACK_ALLOCATOR_TOP_ADDR};
+use kernel_config::memory::{PAGE_SIZE, MAX_PAGE_NUMBER, KERNEL_OFFSET, KERNEL_HEAP_START, KERNEL_HEAP_INITIAL_SIZE, KERNEL_STACK_ALLOCATOR_BOTTOM, KERNEL_STACK_ALLOCATOR_TOP_ADDR, ENTRIES_PER_PAGE_TABLE};
 use bit_field::BitField;
+use uefi::prelude::*;
+use uefi_exts::BootServicesExt;
+use uefi::proto::console::text::Output;
+use uefi::table::boot::{MemoryDescriptor, MemoryType};
 
+use core::fmt::Write;
 
 /// A virtual memory address, which is a `usize` under the hood.
 #[derive(
@@ -81,6 +90,7 @@ impl VirtualAddress {
     /// Creates a new `VirtualAddress`, 
     /// checking that the address is canonical, 
     /// i.e., bits (64:48] are sign-extended from bit 47.
+    #[cfg(any(target_arch="x86", target_arch="x86_64"))]
     pub fn new(virt_addr: usize) -> Result<VirtualAddress, &'static str> {
         match virt_addr.get_bits(47..64) {
             0 | 0b1_1111_1111_1111_1111 => Ok(VirtualAddress(virt_addr)),
@@ -88,10 +98,28 @@ impl VirtualAddress {
         }
     }
 
-    /// Creates a new `VirtualAddress` that is guaranteed to be canonical
+    #[cfg(any(target_arch="aarch64"))]
+    pub fn new(virt_addr: usize) -> Result<VirtualAddress, &'static str> {
+        match virt_addr.get_bits(48..64) {
+            0 | 0b1111_1111_1111_1111 => Ok(VirtualAddress(virt_addr)),
+            _ => Err("VirtualAddress bits 48-63 must be a sign-extension of bit 47"),
+        }
+    }
+
+/// Creates a new `VirtualAddress` that is guaranteed to be canonical
     /// by forcing the upper bits (64:48] to be sign-extended from bit 47.
+    #[cfg(any(target_arch="x86", target_arch="x86_64"))]
     pub fn new_canonical(mut virt_addr: usize) -> VirtualAddress {
         match virt_addr.get_bit(47) {
+            false => virt_addr.set_bits(48..64, 0),
+            true  => virt_addr.set_bits(48..64, 0xffff),
+        };
+        VirtualAddress(virt_addr)
+    }
+
+    #[cfg(any(target_arch="aarch64"))]
+    pub fn new_canonical(mut virt_addr: usize) -> VirtualAddress {
+        match virt_addr.get_bit(48) {
             false => virt_addr.set_bits(48..64, 0),
             true  => virt_addr.set_bits(48..64, 0xffff),
         };
@@ -445,6 +473,7 @@ pub fn set_broadcast_tlb_shootdown_cb(func: fn(Vec<VirtualAddress>)) {
 ///  * the MappedPages of the kernel's rodata section,
 ///  * the MappedPages of the kernel's data section,
 ///  * the kernel's list of *other* higher-half MappedPages, which should be kept forever.
+#[cfg(any(target_arch="x86", target_arch="x86_64"))]
 pub fn init(boot_info: &BootInformation) 
     -> Result<(Arc<MutexIrqSafe<MemoryManagementInfo>>, MappedPages, MappedPages, MappedPages, Vec<MappedPages>), &'static str> 
 {
@@ -585,6 +614,143 @@ pub fn init(boot_info: &BootInformation)
     Ok( (kernel_mmi_ref.clone(), text_mapped_pages, rodata_mapped_pages, data_mapped_pages, identity_mapped_pages) )
 }
 
+
+#[no_mangle]
+pub unsafe extern "win64" fn __chkstk() {}
+
+#[cfg(any(windows, target_arch="aarch64", target_env = "msvc"))]
+pub fn init(bt:&BootServices, stdout:&mut Output, image: uefi::Handle) 
+    -> Result<(Arc<MutexIrqSafe<MemoryManagementInfo>>, MappedPages, MappedPages, MappedPages, Vec<MappedPages>), &'static str> {
+    let mapped_info_size = bt.memory_map_size();
+    let mapped_info_size = mapped_info_size + 108 * mem::size_of::<MemoryDescriptor>();
+    
+    let mut buffer = Vec::with_capacity(mapped_info_size);
+    unsafe {
+        buffer.set_len(mapped_info_size);
+    }
+    let (_key, mut maps_iter) = bt
+        .memory_map(&mut buffer)
+        .expect_success("Failed to retrieve UEFI memory map");
+
+    let mut kernel_phys_start: PhysicalAddress = PhysicalAddress::new(0)?;
+    let mut kernel_phys_end: PhysicalAddress = PhysicalAddress::new(0)?;
+    let mut avail_index = 0;
+    let mut available: [PhysicalMemoryArea; 32] = Default::default();
+
+    let mut occupied: [PhysicalMemoryArea; 32] = Default::default();
+    let mut occup_index = 0;
+
+    let mut mapped_pages_index = 0;
+    loop {
+        match ( maps_iter.next()){
+            Some(mapped_pages) => {
+                let phys_start = mapped_pages.phys_start as usize;
+                let size = mapped_pages.page_count as usize * 0x1000;
+
+                match mapped_pages.ty {
+                    MemoryType::CONVENTIONAL => {
+                        if kernel_phys_start.value() == 0 {
+                            available[avail_index] = PhysicalMemoryArea {
+                                base_addr: PhysicalAddress::new(phys_start)?,
+                                size_in_bytes: size,
+                                typ: 1, 
+                                acpi: 0, 
+                            };
+                        }
+                        avail_index += 1;
+                    },
+                    _ => {
+                        // occupied[occup_index] = PhysicalMemoryArea::new(
+                        //     phys_start, size, 1, 0);
+                        // occup_index += 1;
+                        if kernel_phys_start.value() == 0 {
+                            kernel_phys_start = PhysicalAddress::new(phys_start as usize)?;
+                            kernel_phys_end = PhysicalAddress::new(phys_start + size)?;
+                        } else if kernel_phys_end.value() <= phys_start {
+                            kernel_phys_end = PhysicalAddress::new((phys_start + size) as usize)?;
+                        } else {
+
+                        }
+                    }
+                }
+               
+                debug!("{:#X} size:{:#X} type {:?}\n", phys_start, 
+                    size, mapped_pages.ty);
+                // match stdout.write_str(&mapresult){
+                //     Ok(_) => {},
+                //     Err(err) => {},
+                // }
+            },
+            None => break,
+        }
+
+        mapped_pages_index += 1;
+    }
+
+    let kernel_virt_end = kernel_phys_end + KERNEL_OFFSET;
+
+    // match stdout.write_str(&format!("kernel_phys_start: {:#x}, kernel_phys_end: {:#x} kernel_virt_end = {:#x}",
+    //     kernel_phys_start,
+    //     kernel_phys_end,
+    //     kernel_virt_end)) {
+    //     _ => {}
+    // }
+    debug!("kernel_phys_start: {:#x}, kernel_phys_end: {:#x} kernel_virt_end = {:#x}", kernel_phys_start, kernel_phys_end, kernel_virt_end);
+
+    // UEFI uses the Load File Protocal to load modules
+    // // calculate the bounds of physical memory that is occupied by modules we've loaded 
+    // // (we can reclaim this later after the module is loaded, but not until then)
+    // let (modules_start, modules_end) = {
+    //     let mut mod_min = usize::max_value();
+    //     let mut mod_max = 0;
+    //     use core::cmp::{max, min};
+
+    //     for m in boot_info.module_tags() {
+    //         mod_min = min(mod_min, m.start_address() as usize);
+    //         mod_max = max(mod_max, m.end_address() as usize);
+    //     }
+    //     (mod_min, mod_max)
+    // };
+    // // print_early!("Modules physical memory region: start {:#X} to end {:#X}", modules_start, modules_end);
+
+   
+
+    // init the frame allocator with the available memory sections and the occupied memory sections
+    let fa = AreaFrameAllocator::new(available, avail_index, occupied, occup_index)?;
+    let frame_allocator_mutex: &MutexIrqSafe<AreaFrameAllocator> = FRAME_ALLOCATOR.call_once(|| {
+        MutexIrqSafe::new( fa ) 
+    });
+
+    // Initialize paging (create a new page table), which also initializes the kernel heap.
+    let (page_table, kernel_vmas, text_mapped_pages, rodata_mapped_pages, data_mapped_pages, higher_half_mapped_pages, identity_mapped_pages) = try!(
+        paging::init(bt, frame_allocator_mutex, kernel_phys_start, kernel_phys_end, stdout, image)
+    );
+    // HERE: heap is initialized! Can now use alloc types.
+
+    debug!("Done with paging::init()!, active_table: {:?}", page_table);
+    
+    // init the kernel stack allocator, a singleton
+    let kernel_stack_allocator = {
+        let stack_alloc_start = Page::containing_address(VirtualAddress::new_canonical(KERNEL_STACK_ALLOCATOR_BOTTOM)); 
+        let stack_alloc_end = Page::containing_address(VirtualAddress::new_canonical(KERNEL_STACK_ALLOCATOR_TOP_ADDR));
+        let stack_alloc_range = PageRange::new(stack_alloc_start, stack_alloc_end);
+        stack_allocator::StackAllocator::new(stack_alloc_range, false)
+    };
+
+    // return the kernel's memory info 
+    let kernel_mmi = MemoryManagementInfo {
+        page_table: page_table,
+        vmas: kernel_vmas,
+        extra_mapped_pages: higher_half_mapped_pages,
+        stack_allocator: kernel_stack_allocator, 
+    };
+
+    let kernel_mmi_ref = KERNEL_MMI.call_once( || {
+        Arc::new(MutexIrqSafe::new(kernel_mmi))
+    });
+
+    Ok( (kernel_mmi_ref.clone(), text_mapped_pages, rodata_mapped_pages, data_mapped_pages, identity_mapped_pages) )
+}
 
 
 /// A `Frame` is a chunk of **physical** memory, 

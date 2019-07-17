@@ -1,0 +1,13 @@
+[package]
+name = "uefi-logger"
+version = "0.1.0"
+authors = ["Gabriel Majeri <gabriel.majeri6@gmail.com>"]
+publish = false
+edition = "2018"
+
+[dependencies]
+uefi = { path = ".." }
+log = { version = "0.4", default-features = false }
+
+[lib]
+crate-type = ["rlib"]
