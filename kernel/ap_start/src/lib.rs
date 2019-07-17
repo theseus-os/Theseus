@@ -72,8 +72,8 @@ pub fn kstart_ap(processor_id: u8, apic_id: u8,
 
 
     info!("Entering idle_task loop on AP {} ...", apic_id);
-    #[cfg(any(target_arch="x86", target_arch="x86_64"))]
     enable_interrupts();
+    
     scheduler::schedule();
 
     loop { 

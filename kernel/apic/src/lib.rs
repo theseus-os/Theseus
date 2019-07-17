@@ -79,7 +79,7 @@ pub fn has_x2apic() -> bool {
     #[cfg(any(target_arch="x86", target_arch="x86_64"))]
     {
         static IS_X2APIC: Once<bool> = Once::new(); // caches the result
-    let res: &bool = IS_X2APIC.call_once( || {
+        let res: &bool = IS_X2APIC.call_once( || {
             CpuId::new().get_feature_info().expect("Couldn't get CpuId feature info").has_x2apic()
         });
         return *res // because call_once returns a reference to the cached IS_X2APIC value
