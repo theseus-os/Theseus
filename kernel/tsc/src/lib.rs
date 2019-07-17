@@ -46,6 +46,7 @@ pub fn tsc_ticks() -> TscTicks {
     // SAFE: just reading TSC value
     #[cfg(any(target_arch="x86", target_arch="x86_64"))]
     let ticks = unsafe { core::arch::x86_64::__rdtscp(&mut val) };
+    // WENQIU get ticks
     #[cfg(any(target_arch="aarch64"))]
     let ticks = 0; 
     TscTicks(ticks)

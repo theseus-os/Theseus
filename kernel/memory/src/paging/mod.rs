@@ -407,15 +407,10 @@ pub fn get_current_p4() -> Frame {
     #[cfg(any(target_arch="aarch64"))]
     {   
         let p4:usize;
-        unsafe {  asm!("mrs $0, TTBR0_EL1" : "=r"(p4) : : : "volatile");};
+        unsafe {  asm!("mrs $0, TTBR0_EL1" : "=r"(p4) : : : "volatile"); };
         return Frame::containing_address(PhysicalAddress::new_canonical(p4))
     }
 }
-
-#[cfg(any(target_arch="aarch64"))]
-fn arm_flush() {
-}
-
 
 #[cfg(any(target_arch="aarch64"))]
 pub fn enable_higher_half() {
@@ -830,28 +825,8 @@ pub fn init(bt:&BootServices, allocator_mutex: &MutexIrqSafe<AreaFrameAllocator>
     
     let p4_frame = get_current_p4();
     set_recursive(p4_frame.start_address().value() as u64);    
-    // // bootstrap an active_table from the currently-loaded page table
-    // // bootstrap a PageTable from the currently-loaded page table
-    // let mut page_table = PageTable::from_current();
-    // // bootstrap a PageTable from the currently-loaded page table
     
     let mut page_table = PageTable::from_current();
-
-    // let boot_info_start_vaddr: VirtualAddress  = boot_info.start_address();
-    // let boot_info_start_paddr: PhysicalAddress = try!(active_table.translate(boot_info_start_vaddr)
-    //                                                  .ok_or("Couldn't get boot_info physical address")
-    // );
-    // let boot_info_end_vaddr: VirtualAddress  = boot_info.end_address();
-    // let boot_info_end_paddr: PhysicalAddress = try!(active_table.translate(boot_info_end_vaddr)
-    //                                                .ok_or("Couldn't get boot_info physical address")
-    // );
-    // let boot_info_size = boot_info.total_size();
-    // // print_raw!("multiboot start: {:#X}-->{:#X}, multiboot end: {:#X}-->{:#X}, size: {:#X}\n",
-    // //         boot_info_start_vaddr, boot_info_start_paddr, boot_info_end_vaddr, boot_info_end_paddr, boot_info_size
-    // // );
-    // info!("multiboot start: {:#X}-->{:#X}, multiboot end: {:#X}-->{:#X}, size: {:#X}\n",
-    //         boot_info_start_vaddr, boot_info_start_paddr, boot_info_end_vaddr, boot_info_end_paddr, boot_info_size
-    // );
 
     // frame is a single frame, and temp_frames1/2 are tuples of 3 Frames each.
     let (new_frame, temp_frames1, temp_frames2) = {

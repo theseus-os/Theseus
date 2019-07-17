@@ -6,6 +6,7 @@ description = "a special concrete implementation of the Directory trait; differs
 
 [dependencies]
 spin = "0.4.5"
+
 [target.'cfg(any(target_arch = "x86_64", target_arch="x86"))'.dependencies]
 x86_64 = { path = "../../libs/x86_64" }
 

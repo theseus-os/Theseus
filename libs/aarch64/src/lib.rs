@@ -1,7 +1,7 @@
 //! This crate provides x86_64 specific functions and data structures,
 //! and access to various system registers.
 
-#![cfg(any(target_arch="aarch64", target_arch="x86_64"))]
+#![cfg(any(target_arch="aarch64"))]
 
 #![warn(missing_docs)]
 

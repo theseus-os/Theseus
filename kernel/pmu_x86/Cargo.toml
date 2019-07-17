@@ -7,14 +7,15 @@ build = "../../build.rs"
 
 [dependencies]
 spin = "0.4.10"
-# x86_64 = { git = "https://github.com/kevinaboos/x86_64" }
+
 [target.'cfg(any(target_arch = "x86_64", target_arch="x86"))'.dependencies]
-x86_64 = { path = "../../libs/x86_64" }
+# x86_64 = { git = "https://github.com/kevinaboos/x86_64" }
+x86_64 = { path = "../../libs/x86_64" } # currently using our local copy, forked from Phil Opp's crate
+# raw-cpuid only supports x86
 raw-cpuid={ version = "6.1.0", features = [ "use_arch" ] }
 
 [target.'cfg(target_arch = "aarch64")'.dependencies]
 aarch64 = { path = "../../libs/aarch64" }
- # currently using our local copy, forked from Phil Opp's crate
 
 [dependencies.apic]
 path = "../apic"
