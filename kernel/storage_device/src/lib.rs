@@ -9,12 +9,14 @@
 
 extern crate alloc;
 extern crate spin;
+#[macro_use] extern crate downcast_rs;
 
 use alloc::{
     boxed::Box,
     sync::Arc,
 };
 use spin::Mutex;
+use downcast_rs::Downcast;
 
 
 /// A trait that represents a storage controller,
@@ -36,7 +38,7 @@ pub type StorageControllerRef = Arc<Mutex<dyn StorageController + Send>>;
 /// 
 /// It offers functions to read and write at sector granularity,
 /// as well as basic functions to query device info.
-pub trait StorageDevice {
+pub trait StorageDevice: Downcast {
     /// Reads content from the storage device into the given `buffer`.
     /// 
     /// # Arguments 
@@ -73,6 +75,7 @@ pub trait StorageDevice {
         self.sector_size_in_bytes() * self.size_in_sectors()
     }
 }
+impl_downcast!(StorageDevice);
 
 /// A trait object wrapped in an Arc and Mutex that allows 
 /// arbitrary storage devices to be shared in a thread-safe manner.
