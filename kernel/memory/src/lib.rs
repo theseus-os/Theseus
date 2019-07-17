@@ -103,6 +103,7 @@ impl VirtualAddress {
 
     #[cfg(any(target_arch="aarch64"))]
     pub fn new(virt_addr: usize) -> Result<VirtualAddress, &'static str> {
+        // The offset is 0xFFFFFFFF00000000
         match virt_addr.get_bits(48..64) {
             0 | 0b1111_1111_1111_1111 => Ok(VirtualAddress(virt_addr)),
             _ => Err("VirtualAddress bits 48-63 must be a sign-extension of bit 47"),
@@ -122,6 +123,7 @@ impl VirtualAddress {
 
     #[cfg(any(target_arch="aarch64"))]
     pub fn new_canonical(mut virt_addr: usize) -> VirtualAddress {
+        // The offset is 0xFFFFFFFF00000000
         match virt_addr.get_bit(48) {
             false => virt_addr.set_bits(48..64, 0),
             true  => virt_addr.set_bits(48..64, 0xffff),

@@ -93,7 +93,7 @@ impl Mapper {
     pub fn translate_page(&self, page: Page) -> Option<Frame> {
         let p3 = self.p4().next_table(page.p4_index());
 
-        #[cfg(any(target_arch="x86", target_arch="x86_64"))]
+        // #[cfg(any(target_arch="x86", target_arch="x86_64"))]
         let huge_page = || {
             p3.and_then(|p3| {
                 let p3_entry = &p3[page.p3_index()];
@@ -111,7 +111,11 @@ impl Mapper {
                     let p2_entry = &p2[page.p2_index()];
                     // 2MiB page?
                     if let Some(start_frame) = p2_entry.pointed_frame() {
-                        if p2_entry.flags().contains(EntryFlags::HUGE_PAGE) {
+                        #[cfg(any(target_arch="x86", target_arch="x86_64"))]
+                        let is_huge = p2_entry.flags().contains(EntryFlags::HUGE_PAGE);
+                        #[cfg(any(target_arch="aarch64"))]
+                        let is_huge = !p2_entry.flags().contains(EntryFlags::PAGE);
+                        if is_huge {
                             // address must be 2MiB aligned
                             assert!(start_frame.number % ENTRIES_PER_PAGE_TABLE == 0);
                             return Some(Frame { number: start_frame.number + page.p1_index() });
@@ -122,35 +126,34 @@ impl Mapper {
             })
         };
 
-        #[cfg(any(target_arch="aarch64"))]
-        let huge_page = || {
-            p3.and_then(|p3| {
-                let p3_entry = &p3[page.p3_index()];
+        // let huge_page = || {
+        //     p3.and_then(|p3| {
+        //         let p3_entry = &p3[page.p3_index()];
 
-                // 1GiB page?
-                if let Some(start_frame) = p3_entry.pointed_frame() {
-                    if !p3_entry.flags().contains(EntryFlags::PAGE) {
-                        // address must be 1GiB aligned
-                        assert!(start_frame.number % (ENTRIES_PER_PAGE_TABLE * ENTRIES_PER_PAGE_TABLE) == 0);
-                        return Some(Frame {
-                            number: start_frame.number + page.p2_index() * ENTRIES_PER_PAGE_TABLE + page.p1_index(),
-                        });
-                    }
-                }
-               if let Some(p2) = p3.next_table(page.p3_index()) {
-                    let p2_entry = &p2[page.p2_index()];
-                    // 2MiB page?
-                    if let Some(start_frame) = p2_entry.pointed_frame() {
-                        if !p2_entry.flags().contains(EntryFlags::PAGE) {
-                            // address must be 2MiB aligned
-                            assert!(start_frame.number % ENTRIES_PER_PAGE_TABLE == 0);
-                            return Some(Frame { number: start_frame.number + page.p1_index() });
-                        }
-                    }
-                }
-                None
-            })
-        };
+        //         // 1GiB page?
+        //         if let Some(start_frame) = p3_entry.pointed_frame() {
+        //             if !p3_entry.flags().contains(EntryFlags::PAGE) {
+        //                 // address must be 1GiB aligned
+        //                 assert!(start_frame.number % (ENTRIES_PER_PAGE_TABLE * ENTRIES_PER_PAGE_TABLE) == 0);
+        //                 return Some(Frame {
+        //                     number: start_frame.number + page.p2_index() * ENTRIES_PER_PAGE_TABLE + page.p1_index(),
+        //                 });
+        //             }
+        //         }
+        //        if let Some(p2) = p3.next_table(page.p3_index()) {
+        //             let p2_entry = &p2[page.p2_index()];
+        //             // 2MiB page?
+        //             if let Some(start_frame) = p2_entry.pointed_frame() {
+        //                 if  {
+        //                     // address must be 2MiB aligned
+        //                     assert!(start_frame.number % ENTRIES_PER_PAGE_TABLE == 0);
+        //                     return Some(Frame { number: start_frame.number + page.p1_index() });
+        //                 }
+        //             }
+        //         }
+        //         None
+        //     })
+        // };
 
         p3.and_then(|p3| p3.next_table(page.p3_index()))
             .and_then(|p2| p2.next_table(page.p2_index()))
