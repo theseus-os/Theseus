@@ -14,6 +14,7 @@ extern crate mouse;
 extern crate storage_manager;
 extern crate network_manager;
 extern crate ethernet_smoltcp_device;
+extern crate ata;
 
 
 use dfqueue::DFQueueProducer;

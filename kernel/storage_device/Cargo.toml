@@ -8,7 +8,7 @@ build = "../../build.rs"
 [dependencies]
 spin = "0.4.10"
 owning_ref = { git = "https://github.com/kevinaboos/owning-ref-rs" }
-
+downcast-rs = "1.0.4"
 
 [dependencies.log]
 default-features = false

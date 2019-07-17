@@ -32,6 +32,8 @@ exclude = [
 getopts = { git = "https://github.com/kevinaboos/getopts" }
 ### use our own no_std-compatible qp trie
 qp-trie = { git = "https://github.com/theseus-os/qp-trie-rs" }
+### use our own no_std-compatible downcast-rs
+downcast-rs = { git = "https://github.com/theseus-os/downcast-rs" }
 
 
 ### These profiles fix the new rustc behavior of splitting one crate into many object files. 
