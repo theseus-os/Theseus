@@ -18,17 +18,19 @@ extern crate alloc;
 extern crate linked_list_allocator;
 extern crate irq_safety; 
 extern crate spin;
+extern crate uefi_alloc;
 
 use core::ops::Deref;
 use core::ptr::NonNull;
 use alloc::alloc::{GlobalAlloc, Layout};
 use linked_list_allocator::Heap;
-use irq_safety::MutexIrqSafe; 
+use irq_safety::MutexIrqSafe;
 
 
-#[cfg(any(target_arch="x86", target_arch="x86_64"))]
 #[global_allocator]
+#[cfg(any(target_arch="x86", target_arch="x86_64"))]
 static ALLOCATOR: IrqSafeHeap = IrqSafeHeap::empty();
+
 
 /// NOTE: the heap memory MUST BE MAPPED before calling this init function.
 pub fn init(start_virt_addr: usize, size_in_bytes: usize) {

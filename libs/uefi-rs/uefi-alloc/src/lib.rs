@@ -83,5 +83,6 @@ unsafe impl GlobalAlloc for Allocator {
     }
 }
 
-//#[global_allocator]
+#[global_allocator]
+#[cfg(any(target_arch="aarch64"))]
 static ALLOCATOR: Allocator = Allocator;

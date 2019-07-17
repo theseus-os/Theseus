@@ -584,6 +584,7 @@ dependencies = [
  "irq_safety 0.1.1 (git+https://github.com/kevinaboos/irq_safety)",
  "linked_list_allocator 0.6.3 (registry+https://github.com/rust-lang/crates.io-index)",
  "spin 0.4.10 (registry+https://github.com/rust-lang/crates.io-index)",
+ "uefi_alloc 0.1.0",
 ]
 
 [[package]]
