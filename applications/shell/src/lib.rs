@@ -47,13 +47,15 @@ use alloc::sync::Arc;
 use spin::Mutex;
 use environment::Environment;
 use alloc::boxed::Box;
+use core::mem;
 
 pub const APPLICATIONS_NAMESPACE_PATH: &'static str = "/namespaces/default/applications";
 
 #[derive(Debug)]
 struct Job {
     task: TaskRef,
-    kbd_event_producer: DFQueueProducer<KeyEvent>
+    kbd_event_producer: DFQueueProducer<KeyEvent>,
+    input_producer: DFQueueProducer<u8>
 }
 
 /// A main function that spawns a new shell and waits for the shell loop to exit before returning an exit value
@@ -111,8 +113,8 @@ struct Shell {
     current_task_ref: Option<Job>,
     /// The string that stores the users keypresses after the prompt
     cmdline: String,
-    /// The secondary buffer that stores the user's keypresses while a command is currently running
-    secondary_buffer: String,
+    /// This buffer stores characters before sending them to running application on `enter` key strike
+    input_buffer: String,
     /// Variable that tracks how far left the cursor is from the maximum rightmost position (above)
     left_shift: usize,
     /// Vector that stores the history of commands that the user has entered
@@ -151,7 +153,7 @@ impl Shell {
         Shell {
             current_task_ref: None,
             cmdline: String::new(),
-            secondary_buffer: String::new(),
+            input_buffer: String::new(),
             left_shift: 0,
             command_history: Vec::new(),
             history_index: 0,
@@ -220,11 +222,23 @@ impl Shell {
         Ok(())
     }
 
-    /// Move the content from secondary buffer to the command line buffer.
+    /// Insert a character to the input buffer to the application.
     /// `sync_terminal` indicates whether the terminal screen will be synchronically updated.
-    fn consume_secondary_buffer(&mut self, sync_terminal: bool) -> Result<(), &'static str> {
-        self.set_cmdline(self.secondary_buffer.clone(), sync_terminal)?;
-        self.secondary_buffer.clear();
+    fn insert_char_to_input_buff(&mut self, c: char, sync_terminal: bool) -> Result<(), &'static str> {
+        self.input_buffer.push(c);
+        if sync_terminal {
+            self.terminal.insert_char_to_screen(c, 0)?;
+        }
+        Ok(())
+    }
+
+    /// Remove a character from the input buffer to the application.
+    /// `sync_terminal` indicates whether the terminal screen will be synchronically updated.
+    fn remove_char_from_input_buff(&mut self, sync_terminal: bool) -> Result<(), &'static str> {
+        let popped = self.input_buffer.pop();
+        if popped.is_some() && sync_terminal {
+            self.terminal.remove_char_from_screen(1)?;
+        }
         Ok(())
     }
 
@@ -310,7 +324,7 @@ impl Shell {
                 Some(ref job) => job.task.clone(), 
                 None => {
                     self.clear_cmdline(true)?;
-                    self.secondary_buffer.clear();
+                    self.input_buffer.clear();
                     self.terminal.print_to_terminal("^C\n".to_string());
                     self.redisplay_prompt();
                     return Ok(());
@@ -366,7 +380,11 @@ impl Shell {
 
         // Tracks what the user does whenever she presses the backspace button
         if keyevent.keycode == Keycode::Backspace  {
-            self.remove_char_from_cmdline(true, true)?;
+            if self.current_task_ref.is_some() {
+                self.remove_char_from_input_buff(true)?;
+            } else {
+                self.remove_char_from_cmdline(true, true)?;
+            }
             return Ok(());
         }
 
@@ -378,45 +396,31 @@ impl Shell {
         // Attempts to run the command whenever the user presses enter and updates the cursor tracking variables 
         if keyevent.keycode == Keycode::Enter && keyevent.keycode.to_ascii(keyevent.modifiers).is_some() {
             let cmdline = self.cmdline.clone();
-            if cmdline.len() == 0 {
+            if cmdline.len() == 0 && self.current_task_ref.is_none() {
                 // reprints the prompt on the next line if the user presses enter and hasn't typed anything into the prompt
                 self.terminal.print_to_terminal("\n".to_string());
                 self.redisplay_prompt();
                 return Ok(());
-            } else if self.current_task_ref.is_some() { // prevents the user from trying to execute a new command while one is currently running
-                self.terminal.print_to_terminal("Wait until the current command is finished executing\n".to_string());
-            } else {
+            } else if self.current_task_ref.is_some() { // send buffered characters to the running application
+                match &self.current_task_ref {
+                    Some(job) => {
+                        self.terminal.print_to_terminal("\n".to_string());
+                        let mut buffered_string = String::new();
+                        mem::swap(&mut buffered_string, &mut self.input_buffer);
+                        buffered_string.push('\n');
+                        for b in buffered_string.as_bytes() {
+                            job.input_producer.enqueue(*b);
+                        }
+                    },
+                    _ => {}
+                }
+                return Ok(());
+            } else { // start a new job
                 self.terminal.print_to_terminal("\n".to_string());
                 self.command_history.push(cmdline.clone());
                 self.command_history.dedup(); // Removes any duplicates
                 self.history_index = 0;
-                match self.eval_cmdline() {
-                    Ok(new_task_ref) => { 
-                        let task_id = {new_task_ref.lock().id};
-                        let app_kbd_event_queue: DFQueue<KeyEvent> = DFQueue::new();
-                        let app_kbd_event_consumer = app_kbd_event_queue.into_consumer();
-                        let app_kbv_event_producer = app_kbd_event_consumer.obtain_producer();
-                        self.current_task_ref = Some(
-                            Job {
-                                task: new_task_ref,
-                                kbd_event_producer: app_kbv_event_producer
-                            }
-                        );
-                        application_io::create_app_shell_relation(task_id, app_kbd_event_consumer)?;
-                        terminal_print::add_child(task_id, self.print_producer.obtain_producer())?; // adds the terminal's print producer to the terminal print crate
-                    }
-                    Err(err) => {
-                        let err_msg = match err {
-                            AppErr::NotFound(command) => format!("{:?} command not found.\n", command),
-                            AppErr::NamespaceErr      => format!("Failed to find directory of application executables.\n"),
-                            AppErr::SpawnErr(e)       => format!("Failed to spawn new task to run command. Error: {}.\n", e),
-                        };
-                        self.terminal.print_to_terminal(err_msg);
-                        self.redisplay_prompt();
-                        self.clear_cmdline(false)?;
-                        return Ok(());
-                    }
-                }
+                self.current_task_ref = self.build_new_job();
             }
             // Clears the buffer for next command once current command starts executing
             self.clear_cmdline(false)?;
@@ -490,10 +494,10 @@ impl Shell {
         if keyevent.keycode != Keycode::Enter && keyevent.keycode.to_ascii(keyevent.modifiers).is_some() {
             match keyevent.keycode.to_ascii(keyevent.modifiers) {
                 Some(c) => {
-                    // If currently we have a task running, insert it to the terminal buffer, otherwise
+                    // If currently we have a task running, insert it to the input buffer, otherwise
                     // to the cmdline.
                     if self.current_task_ref.is_some() {
-                        self.secondary_buffer.push(c);
+                        self.insert_char_to_input_buff(c, true)?;
                         return Ok(());
                     }
                     else {
@@ -539,6 +543,49 @@ impl Shell {
         return Ok(taskref);
     }
 
+    /// Start a new job in the shell by the command line.
+    fn build_new_job(&mut self) -> Option<Job> {
+        match self.eval_cmdline() {
+            Ok(new_task_ref) => { 
+                let task_id = {new_task_ref.lock().id};
+                let app_kbd_event_queue: DFQueue<KeyEvent> = DFQueue::new();
+                let app_kbd_event_consumer = app_kbd_event_queue.into_consumer();
+                let app_kbv_event_producer = app_kbd_event_consumer.obtain_producer();
+                let app_input_queue: DFQueue<u8> = DFQueue::new();
+                let app_input_consumer = app_input_queue.into_consumer();
+                let app_input_producer = app_input_consumer.obtain_producer();
+                let new_job = Job {
+                    task: new_task_ref,
+                    kbd_event_producer: app_kbv_event_producer,
+                    input_producer: app_input_producer
+                };
+                if let Err(msg) = application_io::create_app_shell_relation(task_id, app_kbd_event_consumer,
+                                                                            app_input_consumer) {
+                    self.terminal.print_to_terminal(format!("{}\n", msg).to_string());
+                    return None;
+                }
+                if let Err(msg) = terminal_print::add_child(task_id, self.print_producer.obtain_producer()) { // adds the terminal's print producer to the terminal print crate
+                    self.terminal.print_to_terminal(format!("{}\n", msg).to_string());
+                    return None;
+                }
+                Some(new_job)
+            }
+            Err(err) => {
+                let err_msg = match err {
+                    AppErr::NotFound(command) => format!("{:?} command not found.\n", command),
+                    AppErr::NamespaceErr      => format!("Failed to find directory of application executables.\n"),
+                    AppErr::SpawnErr(e)       => format!("Failed to spawn new task to run command. Error: {}.\n", e),
+                };
+                self.terminal.print_to_terminal(err_msg);
+                self.redisplay_prompt();
+                if let Err(msg) = self.clear_cmdline(false) {
+                    self.terminal.print_to_terminal(format!("{}\n", msg).to_string());
+                }
+                None
+            }
+        }
+    }
+
     fn task_handler(&mut self) -> Result<bool, &'static str> {
         let task_ref_copy = match &self.current_task_ref {
             Some(task_ref) => task_ref.task.clone(),
@@ -576,10 +623,7 @@ impl Shell {
                 terminal_print::remove_child(task_ref_copy.lock().id)?;
                 // Resets the current task id to be ready for the next command
                 self.current_task_ref = None;
-                // Pushes the keypresses onto the input_event_manager that were tracked whenever another command was running
-                if !self.secondary_buffer.is_empty() {
-                    self.consume_secondary_buffer(true)?;
-                }
+                
                 // Resets the bool to true once the print prompt has been redisplayed
                 self.terminal.refresh_display(self.left_shift);
             },
