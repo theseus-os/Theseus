@@ -8,23 +8,19 @@
 extern crate alloc;
 extern crate smoltcp;
 extern crate network_manager;
-extern crate spin;
 extern crate hpet;
 extern crate httparse;
+#[macro_use] extern crate smoltcp_helper;
 
-
-use core::convert::TryInto;
 use core::str;
 use alloc::vec::Vec;
 use alloc::string::String;
-use spin::Once;
 use hpet::get_hpet;
 use smoltcp::{
     socket::{SocketSet, TcpSocket, SocketHandle},
-    time::Instant
 };
 use network_manager::{NetworkInterfaceRef};
-
+use smoltcp_helper::{millis_since, poll_iface};
 
 /// The states that implement the finite state machine for 
 /// sending and receiving the HTTP request and response, respectively.
@@ -37,55 +33,6 @@ enum HttpState {
     /// The response has been received in full, including the headers and the entire content.
     Responded
 }
-
-
-/// A simple macro to get the current HPET clock ticks.
-#[macro_export]
-macro_rules! hpet_ticks {
-    () => {
-        get_hpet().as_ref().ok_or("coudln't get HPET timer")?.get_counter()
-    };
-}
-
-
-/// Function to calculate the currently elapsed time (in milliseconds) since the given `start_time` (also milliseconds).
-pub fn millis_since(start_time: u64) -> Result<u64, &'static str> {
-    const FEMTOSECONDS_PER_MILLISECOND: u64 = 1_000_000_000_000;
-    static HPET_PERIOD_FEMTOSECONDS: Once<u32> = Once::new();
-
-    let hpet_freq = match HPET_PERIOD_FEMTOSECONDS.try() {
-        Some(period) => period,
-        _ => {
-            let freq = get_hpet().as_ref().ok_or("couldn't get HPET")?.counter_period_femtoseconds();
-            HPET_PERIOD_FEMTOSECONDS.call_once(|| freq)
-        }
-    };
-    let hpet_freq = *hpet_freq as u64;
-
-    let end_time: u64 = hpet_ticks!();
-    // Convert to ms
-    let diff = (end_time - start_time) * hpet_freq / FEMTOSECONDS_PER_MILLISECOND;
-    Ok(diff)
-}
-
-
-/// A convenience function to poll the given network interface (i.e., flush tx/rx).
-/// Returns true if any packets were sent or received through that interface on the given `sockets`.
-pub fn poll_iface(iface: &NetworkInterfaceRef, sockets: &mut SocketSet, startup_time: u64) -> Result<bool, &'static str> {
-    let timestamp: i64 = millis_since(startup_time)?
-        .try_into()
-        .map_err(|_e| "millis_since() u64 timestamp was larger than i64")?;
-    // debug!("calling iface.poll() with timestamp: {:?}", timestamp);
-    let packets_were_sent_or_received = match iface.lock().poll(sockets, Instant::from_millis(timestamp)) {
-        Ok(b) => b,
-        Err(err) => {
-            warn!("http_client: poll error: {}", err);
-            false
-        }
-    };
-    Ok(packets_were_sent_or_received)
-}
-
 
 /// Checks to see if the provided HTTP request can be properly parsed, and returns true if so.
 pub fn check_http_request(request_bytes: &[u8]) -> bool {

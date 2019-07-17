@@ -6,7 +6,6 @@ version = "0.1.0"
 build = "../../build.rs"
 
 [dependencies]
-spin = "0.4.10"
 httparse = { version = "1.3.3", default-features = false }
 
 
@@ -32,3 +31,6 @@ features = [
     "proto-ipv4", "proto-igmp", "proto-ipv6", "proto-dhcpv4",
     "socket-raw", "socket-udp", "socket-tcp", "socket-icmp", 
 ]
+
+[dependencies.smoltcp_helper]
+path = "../smoltcp_helper"
