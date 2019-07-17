@@ -7,7 +7,10 @@
 #![no_std]
 
 extern crate port_io;
+#[cfg(any(target_arch="x86", target_arch="x86_64"))]
 extern crate x86_64;
+#[cfg(any(target_arch="aarch64"))]
+extern crate aarch64;
 
 use core::fmt;
 
@@ -242,6 +245,9 @@ fn io_wait() {
     // older versions of Linux and other PC operating systems have
     // worked around this by writing garbage data to port 0x80, which
     // allegedly takes long enough to make everything work on most hardware.
+    #[cfg(any(target_arch="x86", target_arch="x86_64"))]
     use x86_64::instructions::port::outb;
+    #[cfg(any(target_arch="aarch64"))]
+    use aarch64::instructions::port::outb;
     unsafe { outb(0x80, 0); }
 }

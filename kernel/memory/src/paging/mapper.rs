@@ -11,7 +11,10 @@ use core::mem;
 use core::ops::DerefMut;
 use core::ptr::Unique;
 use core::slice;
+#[cfg(any(target_arch="x86", target_arch="x86_64"))]
 use x86_64;
+#[cfg(any(target_arch="aarch64"))]
+use aarch64;
 use {BROADCAST_TLB_SHOOTDOWN_FUNC, VirtualAddress, PhysicalAddress, FRAME_ALLOCATOR, FrameRange, Page, Frame, FrameAllocator, AllocatedPages}; 
 use paging::{PageRange, get_current_p4};
 use paging::entry::EntryFlags;
@@ -583,7 +586,10 @@ impl MappedPages {
             p1[page.p1_index()].set(frame, new_flags | EntryFlags::PRESENT);
 
             let vaddr = page.start_address();
+            #[cfg(any(target_arch="x86", target_arch="x86_64"))]
             x86_64::instructions::tlb::flush(x86_64::VirtualAddress(vaddr.value()));
+            #[cfg(any(target_arch="aarch64"))]
+            aarch64::instructions::tlb::flush(aarch64::VirtualAddress(vaddr.value()));
             if broadcast_tlb_shootdown.is_some() && vaddr.value() != TEMPORARY_PAGE_FRAME {
                 vaddrs.push(vaddr);
             }
@@ -623,7 +629,10 @@ impl MappedPages {
             p1[page.p1_index()].set_unused();
 
             let vaddr = page.start_address();
+            #[cfg(any(target_arch="x86", target_arch="x86_64"))]
             x86_64::instructions::tlb::flush(x86_64::VirtualAddress(page.start_address().value()));
+            #[cfg(any(target_arch="aarch64"))]
+            aarch64::instructions::tlb::flush(aarch64::VirtualAddress(page.start_address().value()));
             if broadcast_tlb_shootdown.is_some() && vaddr.value() != TEMPORARY_PAGE_FRAME {
                 vaddrs.push(vaddr);
             }

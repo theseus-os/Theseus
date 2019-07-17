@@ -28,7 +28,10 @@
 
 extern crate spin;
 #[macro_use] extern crate lazy_static;
+#[cfg(any(target_arch="x86", target_arch="x86_64"))]
 extern crate x86_64;
+#[cfg(any(target_arch="aarch64"))]
+extern crate aarch64;
 #[cfg(any(target_arch="x86", target_arch="x86_64"))]
 extern crate raw_cpuid;
 extern crate atomic_linked_list;
@@ -39,9 +42,18 @@ extern crate alloc;
 extern crate apic;
 #[macro_use] extern crate log;
 
+#[cfg(any(target_arch="x86", target_arch="x86_64"))]
 use x86_64::registers::msr::*;
+#[cfg(any(target_arch="aarch64"))]
+use aarch64::registers::msr::*;
+#[cfg(any(target_arch="x86", target_arch="x86_64"))]
 use x86_64::VirtualAddress;
+#[cfg(any(target_arch="aarch64"))]
+use aarch64::VirtualAddress;
+#[cfg(any(target_arch="x86", target_arch="x86_64"))]
 use x86_64::structures::idt::ExceptionStackFrame;
+#[cfg(any(target_arch="aarch64"))]
+use aarch64::structures::idt::ExceptionStackFrame;
 #[cfg(any(target_arch="x86", target_arch="x86_64"))]
 use raw_cpuid::*;
 use spin::{Once, Mutex};

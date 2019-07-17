@@ -3,7 +3,10 @@
 #![no_std]
 #![feature(abi_x86_interrupt)]
 
+#[cfg(any(target_arch="x86", target_arch="x86_64"))]
 extern crate x86_64;
+#[cfg(any(target_arch="aarch64"))]
+extern crate aarch64;
 extern crate task;
 extern crate runqueue;
 extern crate apic;
@@ -13,8 +16,15 @@ extern crate pmu_x86;
 #[macro_use] extern crate vga_buffer; // for println_raw!()
 #[macro_use] extern crate print; // for regular println!()
 
+#[cfg(any(target_arch="x86", target_arch="x86_64"))]
 use x86_64::structures::idt::{LockedIdt, ExceptionStackFrame, PageFaultErrorCode};
+#[cfg(any(target_arch="aarch64"))]
+use aarch64::structures::idt::{LockedIdt, ExceptionStackFrame, PageFaultErrorCode};
+
+#[cfg(any(target_arch="x86", target_arch="x86_64"))]
 use x86_64::registers::msr::*;
+#[cfg(any(target_arch="aarch64"))]
+use aarch64::registers::msr::*;
 
 
 pub fn init(idt_ref: &'static LockedIdt) {
@@ -233,7 +243,10 @@ pub extern "x86-interrupt" fn general_protection_fault_handler(stack_frame: &mut
 /// exception 0x0e
 #[cfg(any(target_arch="x86", target_arch="x86_64"))]
 pub extern "x86-interrupt" fn page_fault_handler(stack_frame: &mut ExceptionStackFrame, error_code: PageFaultErrorCode) {
+    #[cfg(any(target_arch="x86", target_arch="x86_64"))]
     use x86_64::registers::control_regs;
+    #[cfg(any(target_arch="aarch64"))]
+    use aarch64::registers::control_regs;
     println_both!("\nEXCEPTION: PAGE FAULT while accessing {:#x}\nerror code: \
                                   {:?}\n{:#?}\n",
              control_regs::cr2(),

@@ -17,7 +17,10 @@ extern crate pci;
 extern crate owning_ref;
 extern crate interrupts;
 extern crate pic;
+#[cfg(any(target_arch="x86", target_arch="x86_64"))]
 extern crate x86_64;
+#[cfg(any(target_arch="aarch64"))]
+extern crate aarch64;
 extern crate mpmc;
 extern crate network_interface_card;
 extern crate apic;
@@ -41,7 +44,10 @@ use pci::{PciDevice, PCI_INTERRUPT_LINE, PciConfigSpaceAccessMechanism};
 use kernel_config::memory::PAGE_SIZE;
 use owning_ref::BoxRefMut;
 use interrupts::{eoi,register_interrupt};
+#[cfg(any(target_arch="x86", target_arch="x86_64"))]
 use x86_64::structures::idt::{ExceptionStackFrame};
+#[cfg(any(target_arch="aarch64"))]
+use aarch64::structures::idt::{ExceptionStackFrame};
 use network_interface_card:: NetworkInterfaceCard;
 use nic_initialization::{allocate_device_register_memory, init_rx_buf_pool, init_rx_queue, init_tx_queue};
 use intel_ethernet::{

@@ -31,8 +31,14 @@ use core::{
 use multiboot2;
 use super::*;
 
+#[cfg(any(target_arch="x86", target_arch="x86_64"))]
 use x86_64::registers::control_regs;
+#[cfg(any(target_arch="aarch64"))]
+use aarch64::registers::control_regs;
+#[cfg(any(target_arch="x86", target_arch="x86_64"))]
 use x86_64::instructions::tlb;
+#[cfg(any(target_arch="aarch64"))]
+use aarch64::instructions::tlb;
 
 use kernel_config::memory::{PAGE_SIZE, MAX_PAGE_NUMBER, RECURSIVE_P4_INDEX};
 use kernel_config::memory::{KERNEL_TEXT_P4_INDEX, KERNEL_HEAP_P4_INDEX, KERNEL_STACK_P4_INDEX};
@@ -331,7 +337,7 @@ impl PageTable {
         #[cfg(any(target_arch="aarch64"))]
         {
             self.p4_mut()[RECURSIVE_P4_INDEX].set(other_table.p4_table.clone(), EntryFlags::PRESENT | EntryFlags::WRITABLE | EntryFlags::INNER_SHARE | EntryFlags::ACCESSEDARM ); 
-            arm_flush();
+            tlb::flush_all();
         }
 
         // set mapper's target frame to reflect that future mappings will be mapped into the other_table
@@ -352,7 +358,7 @@ impl PageTable {
 
         #[cfg(any(target_arch="aarch64"))] {
             p4_table[RECURSIVE_P4_INDEX].set(backup, EntryFlags::PRESENT | EntryFlags::PAGE | EntryFlags::INNER_SHARE | EntryFlags::ACCESSEDARM);
-            arm_flush();
+            tlb::flush_all();
         }
 
         // here, temporary_page is dropped, which auto unmaps it
@@ -379,7 +385,7 @@ impl PageTable {
             msr ttbr0_el1, x0;
             dsb ish; 
             isb; " : :"{x0}"(new_table.p4_table.start_address().value() as u64): : "volatile");
-            arm_flush();
+            tlb::flush_all();
         }
         let current_table_after_switch = PageTable::from_current();
         current_table_after_switch
@@ -408,16 +414,6 @@ pub fn get_current_p4() -> Frame {
 
 #[cfg(any(target_arch="aarch64"))]
 fn arm_flush() {
-    unsafe {
-          asm!("
-            isb;
-            dsb ishst;
-            tlbi vmalle1is;
-            dsb nsh;            
-            dsb ish; 
-            isb; " : : : : "volatile");
-         
-    }
 }
 
 

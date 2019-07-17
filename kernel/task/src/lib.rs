@@ -40,7 +40,10 @@ extern crate mod_mgmt;
 extern crate context_switch;
 extern crate environment;
 extern crate root;
+#[cfg(any(target_arch="x86", target_arch="x86_64"))]
 extern crate x86_64;
+#[cfg(any(target_arch="aarch64"))]
+extern crate aarch64;
 extern crate spin;
 extern crate fs_node;
 extern crate pause;
@@ -67,7 +70,10 @@ use tss::tss_set_rsp0;
 use mod_mgmt::metadata::StrongCrateRef;
 use environment::Environment;
 use spin::Mutex;
+#[cfg(any(target_arch="x86", target_arch="x86_64"))]
 use x86_64::registers::msr::{rdmsr, wrmsr, IA32_FS_BASE};
+#[cfg(any(target_arch="aarch64"))]
+use aarch64::registers::msr::{rdmsr, wrmsr, IA32_FS_BASE};
 use fs_node::DirRef;
 
 

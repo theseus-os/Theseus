@@ -22,7 +22,10 @@ extern crate alloc;
 extern crate rlibc; // basic memset/memcpy libc functions
 extern crate spin;
 extern crate multiboot2;
+#[cfg(any(target_arch="x86", target_arch="x86_64"))]
 extern crate x86_64;
+#[cfg(any(target_arch="aarch64"))]
+extern crate aarch64;
 extern crate kernel_config; // our configuration options, just a set of const definitions.
 extern crate irq_safety; // for irq-safe locking and interrupt utilities
 
@@ -45,7 +48,10 @@ pub fn nano_core_public_func(val: u8) {
 
 
 use core::ops::DerefMut;
+#[cfg(any(target_arch="x86", target_arch="x86_64"))]
 use x86_64::structures::idt::LockedIdt;
+#[cfg(any(target_arch="aarch64"))]
+use aarch64::structures::idt::LockedIdt;
 use memory::VirtualAddress;
 use kernel_config::memory::KERNEL_OFFSET;
 

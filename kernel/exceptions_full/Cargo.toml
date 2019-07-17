@@ -7,7 +7,12 @@ build = "../../build.rs"
 
 [dependencies]
 # x86_64 = { git = "https://github.com/kevinaboos/x86_64" }
-x86_64 = { path = "../../libs/x86_64" } # currently using our local copy, forked from Phil Opp's crate
+[target.'cfg(any(target_arch = "x86_64", target_arch="x86"))'.dependencies]
+x86_64 = { path = "../../libs/x86_64" }
+
+[target.'cfg(target_arch = "aarch64")'.dependencies]
+aarch64 = { path = "../../libs/aarch64" }
+ # currently using our local copy, forked from Phil Opp's crate
 
 [dependencies.log]
 default-features = false

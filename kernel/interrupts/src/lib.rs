@@ -8,7 +8,10 @@
 
 #[macro_use] extern crate log;
 #[macro_use] extern crate vga_buffer;
+#[cfg(any(target_arch="x86", target_arch="x86_64"))]
 extern crate x86_64;
+#[cfg(any(target_arch="aarch64"))]
+extern crate aarch64;
 extern crate spin;
 extern crate port_io;
 extern crate kernel_config;
@@ -28,7 +31,10 @@ extern crate tlb_shootdown;
 
 
 use ps2::handle_mouse_packet;
+#[cfg(any(target_arch="x86", target_arch="x86_64"))]
 use x86_64::structures::idt::{Idt, LockedIdt, ExceptionStackFrame, HandlerFunc};
+#[cfg(any(target_arch="aarch64"))]
+use aarch64::structures::idt::{Idt, LockedIdt, ExceptionStackFrame, HandlerFunc};
 use spin::Once;
 use kernel_config::time::{CONFIG_PIT_FREQUENCY_HZ}; //, CONFIG_RTC_FREQUENCY_HZ};
 // use rtc;

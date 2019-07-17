@@ -19,7 +19,10 @@ extern crate irq_safety;
 extern crate kernel_config;
 extern crate atomic_linked_list;
 extern crate xmas_elf;
+#[cfg(any(target_arch="x86", target_arch="x86_64"))]
 extern crate x86_64;
+#[cfg(any(target_arch="aarch64"))]
+extern crate aarch64;
 #[macro_use] extern crate bitflags;
 extern crate heap_irq_safe;
 #[macro_use] extern crate derive_more;
