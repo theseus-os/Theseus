@@ -47,6 +47,9 @@ path = "../network_manager"
 [dependencies.ethernet_smoltcp_device]
 path = "../ethernet_smoltcp_device"
 
+[dependencies.ata]
+path = "../ata"
+
 
 [lib]
 crate-type = ["rlib"]
