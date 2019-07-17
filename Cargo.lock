@@ -78,6 +78,7 @@ dependencies = [
  "memory 0.1.0",
  "owning_ref 0.4.0 (git+https://github.com/kevinaboos/owning-ref-rs)",
  "pit_clock 0.1.0",
+ "raw-cpuid 6.1.0 (registry+https://github.com/rust-lang/crates.io-index)",
  "spin 0.4.10 (registry+https://github.com/rust-lang/crates.io-index)",
  "volatile 0.2.5 (registry+https://github.com/rust-lang/crates.io-index)",
  "x86_64 0.1.2",
@@ -204,6 +205,11 @@ dependencies = [
  "task 0.1.0",
  "terminal_print 0.1.0",
 ]
+
+[[package]]
+name = "cc"
+version = "1.0.37"
+source = "registry+https://github.com/rust-lang/crates.io-index"
 
 [[package]]
 name = "cd"
@@ -1224,6 +1230,7 @@ dependencies = [
  "memory 0.1.0",
  "pit_clock 0.1.0",
  "port_io 0.2.1",
+ "raw-cpuid 6.1.0 (registry+https://github.com/rust-lang/crates.io-index)",
  "spin 0.4.10 (registry+https://github.com/rust-lang/crates.io-index)",
  "task 0.1.0",
  "x86_64 0.1.2",
@@ -1356,6 +1363,16 @@ version = "0.1.0"
 source = "registry+https://github.com/rust-lang/crates.io-index"
 dependencies = [
  "rand_core 0.3.0 (registry+https://github.com/rust-lang/crates.io-index)",
+]
+
+[[package]]
+name = "raw-cpuid"
+version = "6.1.0"
+source = "registry+https://github.com/rust-lang/crates.io-index"
+dependencies = [
+ "bitflags 1.0.4 (registry+https://github.com/rust-lang/crates.io-index)",
+ "cc 1.0.37 (registry+https://github.com/rust-lang/crates.io-index)",
+ "rustc_version 0.2.3 (registry+https://github.com/rust-lang/crates.io-index)",
 ]
 
 [[package]]
@@ -2064,6 +2081,7 @@ source = "git+https://github.com/kevinaboos/zero.git#9fc7ff523138a21f40359b706d2
 "checksum block-padding 0.1.2 (registry+https://github.com/rust-lang/crates.io-index)" = "4fc4358306e344bf9775d0197fd00d2603e5afb0771bb353538630f022068ea3"
 "checksum byte-tools 0.3.0 (registry+https://github.com/rust-lang/crates.io-index)" = "980479e6fde23246dfb54d47580d66b4e99202e7579c5eaa9fe10ecb5ebd2182"
 "checksum byteorder 1.2.7 (registry+https://github.com/rust-lang/crates.io-index)" = "94f88df23a25417badc922ab0f5716cc1330e87f71ddd9203b3a3ccd9cedf75d"
+"checksum cc 1.0.37 (registry+https://github.com/rust-lang/crates.io-index)" = "39f75544d7bbaf57560d2168f28fd649ff9c76153874db88bdbdfd839b1a7e7d"
 "checksum cfg-if 0.1.6 (registry+https://github.com/rust-lang/crates.io-index)" = "082bb9b28e00d3c9d39cc03e64ce4cea0f1bb9b3fde493f0cbc008472d22bdf4"
 "checksum compiler_builtins 0.1.11 (git+https://github.com/rust-lang-nursery/compiler-builtins)" = "<none>"
 "checksum cortex-a 2.4.0 (registry+https://github.com/rust-lang/crates.io-index)" = "97867bac786c0a2912f7df981bdb8b6ea109a2422c22b37faf651d558a054453"
@@ -2099,6 +2117,7 @@ source = "git+https://github.com/kevinaboos/zero.git#9fc7ff523138a21f40359b706d2
 "checksum rand_isaac 0.1.1 (registry+https://github.com/rust-lang/crates.io-index)" = "ded997c9d5f13925be2a6fd7e66bf1872597f759fd9dd93513dd7e92e5a5ee08"
 "checksum rand_pcg 0.1.1 (registry+https://github.com/rust-lang/crates.io-index)" = "086bd09a33c7044e56bb44d5bdde5a60e7f119a9e95b0775f545de759a32fe05"
 "checksum rand_xorshift 0.1.0 (registry+https://github.com/rust-lang/crates.io-index)" = "effa3fcaa47e18db002bdde6060944b6d2f9cfd8db471c30e873448ad9187be3"
+"checksum raw-cpuid 6.1.0 (registry+https://github.com/rust-lang/crates.io-index)" = "30a9d219c32c9132f7be513c18be77c9881c7107d2ab5569d205a6a0f0e6dc7d"
 "checksum register 0.3.3 (registry+https://github.com/rust-lang/crates.io-index)" = "469bb5ddde81d67fb8bba4e14d77689b8166cfd077abe7530591cefe29d05823"
 "checksum rlibc 1.0.0 (registry+https://github.com/rust-lang/crates.io-index)" = "fc874b127765f014d792f16763a81245ab80500e2ad921ed4ee9e82481ee08fe"
 "checksum rustc-demangle 0.1.14 (registry+https://github.com/rust-lang/crates.io-index)" = "ccc78bfd5acd7bf3e89cffcf899e5cb1a52d6fafa8dec2739ad70c9577a57288"

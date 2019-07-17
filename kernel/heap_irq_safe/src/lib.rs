@@ -27,7 +27,7 @@ use irq_safety::MutexIrqSafe;
 
 
 #[cfg(any(target_arch="x86", target_arch="x86_64"))]
-//#[global_allocator]
+#[global_allocator]
 static ALLOCATOR: IrqSafeHeap = IrqSafeHeap::empty();
 
 /// NOTE: the heap memory MUST BE MAPPED before calling this init function.
