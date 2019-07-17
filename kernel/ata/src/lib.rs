@@ -258,7 +258,7 @@ impl AtaDrive {
 	}
 
 	/// Reads data from this drive starting at the given `offset_in_sectors` into the provided `buffer`.
-    /// The length of the given `buffer` determines the number of bytes to be written.
+	/// The length of the given `buffer` determines the number of bytes to be written.
 	/// 
 	/// As content is read from the drive at sector granularity, 
 	/// the buffer length must be a multiple of the sector size (512 bytes),
@@ -350,7 +350,7 @@ impl AtaDrive {
 	// TODO: refactor read and write into a single internal "I/O" function, since they're mostly identical.
 
 	/// Writes data from the provided `buffer` to this drive, starting at the given `offset_in_sectors` into the drive.
-    /// The length of the given `buffer` determines the number of bytes to be written.
+	/// The length of the given `buffer` determines the number of bytes to be written.
 	/// 
 	/// As content is written to the drive at sector granularity, 
 	/// the buffer length must be a multiple of the sector size (512 bytes),
