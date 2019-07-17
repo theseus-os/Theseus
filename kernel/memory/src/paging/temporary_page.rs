@@ -59,9 +59,14 @@ impl TemporaryPage {
             warn!("temporary page {:?} is already mapped, trying the next lowest Page", page);
             page -= 1;
         }
-        
+        #[cfg(any(target_arch="x86", target_arch="x86_64"))]
+        let flags = EntryFlags::WRITABLE;
+
+        #[cfg(any(target_arch="aarch64"))]
+        let flags = EntryFlags::PAGE | EntryFlags::ACCESSEDARM;
+
         self.mapped_page = Some( 
-            try!(page_table.map_to(page, frame, EntryFlags::WRITABLE, &mut self.allocator))
+            try!(page_table.map_to(page, frame, flags, &mut self.allocator))
         );
         
         let table: &mut Table<Level1> = try!( 

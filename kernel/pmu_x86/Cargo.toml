@@ -36,9 +36,9 @@ path = "../pit_clock"
 [dependencies.port_io]
 path = "../../libs/port_io"
 
-[dependencies.raw-cpuid]
-version = "6.1.0"
-features = [ "use_arch" ]
+#[dependencies.raw-cpuid]
+#version = "6.1.0"
+#features = [ "use_arch" ]
 
 [dependencies.task]
 path = "../task"

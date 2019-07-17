@@ -83,5 +83,5 @@ unsafe impl GlobalAlloc for Allocator {
     }
 }
 
-//#[global_allocator]
+#[global_allocator]
 static ALLOCATOR: Allocator = Allocator;

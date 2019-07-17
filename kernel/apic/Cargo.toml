@@ -37,9 +37,9 @@ path = "../memory"
 [dependencies.kernel_config]
 path = "../kernel_config"
 
-[dependencies.raw-cpuid]
-version = "6.1.0"
-features = [ "use_arch" ]
+#[dependencies.raw-cpuid]
+#version = "6.1.0"
+#features = [ "use_arch" ]
 
 [features]
 apic_timer_fixed = []
