@@ -244,6 +244,7 @@ impl E1000Nic {
         //e1000_nc.clear_statistics();
         
         Self::enable_interrupts(&mut mapped_registers);
+        
         #[cfg(any(target_arch="x86", target_arch="x86_64"))]
         register_interrupt(interrupt_num, e1000_handler)?;
 

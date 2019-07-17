@@ -139,10 +139,7 @@ pub extern "x86-interrupt" fn general_protection_fault_handler(stack_frame: &mut
 
 #[cfg(any(target_arch="x86", target_arch="x86_64"))]
 pub extern "x86-interrupt" fn early_page_fault_handler(stack_frame: &mut ExceptionStackFrame, error_code: PageFaultErrorCode) {
-    #[cfg(any(target_arch="x86", target_arch="x86_64"))]
     use x86_64::registers::control_regs;
-    #[cfg(any(target_arch="aarch64"))]
-    use aarch64::registers::control_regs;
     println_raw!("\nEXCEPTION (early): PAGE FAULT (early handler) while accessing {:#x}\nerror code: \
                                   {:?}\n{:#?}",
              control_regs::cr2(),

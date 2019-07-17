@@ -98,10 +98,10 @@ pub fn create_tss_gdt(apic_id: u8,
                   privilege_stack_top_unusable: VirtualAddress) {
     #[cfg(any(target_arch="x86", target_arch="x86_64"))]
     use x86_64::instructions::segmentation::{set_cs, load_ds, load_ss};
-    #[cfg(any(target_arch="aarch64"))]
-    use aarch64::instructions::segmentation::{set_cs, load_ds, load_ss};
     #[cfg(any(target_arch="x86", target_arch="x86_64"))]
     use x86_64::instructions::tables::load_tss;
+    #[cfg(any(target_arch="aarch64"))]
+    use aarch64::instructions::segmentation::{set_cs, load_ds, load_ss};
     #[cfg(any(target_arch="aarch64"))]
     use aarch64::instructions::tables::load_tss;
 

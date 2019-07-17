@@ -10,13 +10,12 @@ spin = "0.4.10"
 bit_field = "0.7.0"
 bitflags = "1.0.4"
 
-# x86_64 = { git = "https://github.com/kevinaboos/x86_64" }
 [target.'cfg(any(target_arch = "x86_64", target_arch="x86"))'.dependencies]
-x86_64 = { path = "../../libs/x86_64" }
+# x86_64 = { git = "https://github.com/kevinaboos/x86_64" }
+x86_64 = { path = "../../libs/x86_64" } # currently using our local copy, forked from Phil Opp's crate
 
 [target.'cfg(target_arch = "aarch64")'.dependencies]
 aarch64 = { path = "../../libs/aarch64" }
- # currently using our local copy, forked from Phil Opp's crate
 
 [dependencies.log]
 default-features = false
