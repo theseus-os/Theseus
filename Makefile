@@ -222,6 +222,7 @@ cargo: check_rustc check_xargo
 
 ## This builds the nano_core binary itself, which is the fully-linked code that first runs right after the bootloader
 $(nano_core_binary): cargo $(nano_core_static_lib) $(assembly_object_files) $(linker_script)
+	@rm -f ./kernel/nano_core/src/main.rs
 	@mkdir -p $(BUILD_DIR)
 	@mkdir -p $(NANO_CORE_BUILD_DIR)
 	@mkdir -p $(OBJECT_FILES_BUILD_DIR)
@@ -558,7 +559,7 @@ arminit:
 	cp ./kernel/nano_core/src/boot/arch_aarch64/main.rs ./kernel/nano_core/src/
 	RUST_TARGET_PATH=$(PWD)/cfg \
 		RUSTFLAGS="--emit=obj -C debuginfo=2  -D unused-must-use" xargo build  --all --release --target aarch64-theseus 
-	rm ./kernel/nano_core/src/main.rs
+	rm -f ./kernel/nano_core/src/main.rs
 
 	mkdir -p ./build/boot/grub
 

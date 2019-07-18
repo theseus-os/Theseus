@@ -10,3 +10,6 @@
 [submodule "libs/mpmc"]
 	path = libs/mpmc
 	url = https://github.com/theseus-os/mpmc
+[submodule "libs/uefi-rs"]
+	path = libs/uefi-rs
+	url = https://github.com/snoword/uefi-rs

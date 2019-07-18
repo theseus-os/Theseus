@@ -15,6 +15,7 @@ use x86_64::structures::idt::{LockedIdt, ExceptionStackFrame, PageFaultErrorCode
 #[cfg(any(target_arch="aarch64"))]
 use aarch64::structures::idt::{LockedIdt, ExceptionStackFrame, PageFaultErrorCode};
 
+// For aarch64, exception handlers are defined in libs/src/proto/debug
 
 pub fn init(idt_ref: &'static LockedIdt) {
     #[cfg(any(target_arch="x86", target_arch="x86_64"))]

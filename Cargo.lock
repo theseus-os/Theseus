@@ -1952,8 +1952,6 @@ name = "uefi-exts"
 version = "0.1.0"
 dependencies = [
  "uefi 0.1.0",
- "uefi_alloc 0.1.0",
- "uefi_services 0.1.0",
 ]
 
 [[package]]
