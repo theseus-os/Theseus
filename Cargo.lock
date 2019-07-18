@@ -333,7 +333,6 @@ version = "0.1.0"
 dependencies = [
  "acpi 0.1.0",
  "apic 0.1.0",
- "ata 0.1.0",
  "dfqueue 0.1.0",
  "e1000 0.1.0",
  "ethernet_smoltcp_device 0.1.0",

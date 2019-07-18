@@ -14,7 +14,6 @@ extern crate mouse;
 extern crate storage_manager;
 extern crate network_manager;
 extern crate ethernet_smoltcp_device;
-extern crate ata;
 
 
 use dfqueue::DFQueueProducer;
@@ -97,8 +96,6 @@ pub fn init(keyboard_producer: DFQueueProducer<Event>) -> Result<(), &'static st
     if network_manager::NETWORK_INTERFACES.lock().is_empty() {
         warn!("Note: no network devices found on this system.");
     }
-    
+
     Ok(())
 }
-
-
