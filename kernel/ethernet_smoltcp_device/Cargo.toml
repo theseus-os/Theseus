@@ -1,12 +1,11 @@
 [package]
 authors = ["Kevin Boos <kevinaboos@gmail.com>"]
-name = "e1000_smoltcp_device"
-description = "An interface glue layer that allows smoltcp to use the e1000 crate"
+name = "ethernet_smoltcp_device"
+description = "An interface glue layer that allows smoltcp to use ethernet crates"
 version = "0.1.0"
 build = "../../build.rs"
 
 [dependencies]
-spin = "0.4.10"
 owning_ref = { git = "https://github.com/kevinaboos/owning-ref-rs" }
 
 
@@ -40,6 +39,9 @@ path = "../network_interface_card"
 
 [dependencies.network_manager]
 path = "../network_manager"
+
+[dependencies.nic_buffers]
+path = "../nic_buffers"
 
 [lib]
 crate-type = ["rlib"]

@@ -1,0 +1,27 @@
+[package]
+name = "nic_queues"
+description = "Defines structs that hold all information related to nic receive and transmit queues"
+version = "0.1.0"
+authors = ["Ramla-I <ijazramla@gmail.com>"]
+build = "../../build.rs"
+
+[dependencies]
+owning_ref = { git = "https://github.com/kevinaboos/owning-ref-rs" }
+
+
+[dependencies.memory]
+path = "../memory"
+
+[dependencies.log]
+default-features = false
+version = "0.3.7"
+
+[dependencies.intel_ethernet]
+path = "../intel_ethernet"
+
+[dependencies.nic_buffers]
+path = "../nic_buffers"
+
+
+[lib]
+crate-type = ["rlib"]
