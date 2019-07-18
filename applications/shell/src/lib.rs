@@ -378,6 +378,14 @@ impl Shell {
             }
         }
 
+        // Perform command line auto completion.
+        if keyevent.keycode == Keycode::Tab {
+            if self.current_task_ref.is_none() {
+                self.complete_cmdline();
+            }
+            return Ok(());
+        }
+
         // Tracks what the user does whenever she presses the backspace button
         if keyevent.keycode == Keycode::Backspace  {
             if self.current_task_ref.is_some() {
@@ -586,6 +594,64 @@ impl Shell {
         }
     }
 
+    /// Automatically complete the half-entered command line if possible.
+    /// If there exists only one possibility, the half-entered command line is completed.
+    /// If there are several possibilities, it will show all possibilities.
+    /// Otherwise, it does nothing.
+    fn complete_cmdline(&mut self) {
+        if self.cmdline.is_empty() {
+            return;
+        }
+
+        // Get all possible program names and match against them.
+        let app_path = Path::new(APPLICATIONS_NAMESPACE_PATH.to_string());
+        let app_list = match app_path.get(root::get_root()) {
+            Some(FileOrDir::Dir(app_dir)) => {app_dir.lock().list()},
+            _ => {
+                error!("Failed to find directory of application executables.");
+                return;
+            }
+        };
+        let mut possible_names = Vec::new();
+        for app_name in &app_list {
+            if app_name.starts_with(&self.cmdline) {
+                possible_names.push(app_name.clone());
+            }
+        }
+
+        if !possible_names.is_empty() {
+
+            // drop the extension name
+            for name in &mut possible_names {
+                if name.ends_with(".o") {
+                    name.pop(); name.pop();
+                }
+            }
+
+            // only one possible name, complete the command line
+            if possible_names.len() == 1 {
+                let current_cmd_len = self.cmdline.len();
+                for c in possible_names[0][current_cmd_len..possible_names[0].len()].chars() {
+                    if let Err(_) = self.insert_char_to_cmdline(c, true) {
+                        error!("Failed to insert character while completing cmdline.");
+                    }
+                }
+            } else { // several possible names, list them sequentially
+                self.terminal.print_to_terminal("\n".to_string());
+                let mut is_first = true;
+                for name in possible_names {
+                    if !is_first {
+                        self.terminal.print_to_terminal("    ".to_string());
+                    }
+                    self.terminal.print_to_terminal(name);
+                    is_first = false;
+                }
+                self.terminal.print_to_terminal("\n".to_string());
+                self.redisplay_prompt();
+            }
+        }
+    }
+
     fn task_handler(&mut self) -> Result<bool, &'static str> {
         let task_ref_copy = match &self.current_task_ref {
             Some(task_ref) => task_ref.task.clone(),
@@ -639,7 +705,7 @@ impl Shell {
         let mut prompt = curr_env.working_dir.lock().get_absolute_path();
         prompt = format!("{}: ",prompt);
         self.terminal.print_to_terminal(prompt);
-        // self.correct_prompt_position = true;
+        self.terminal.print_to_terminal(self.cmdline.clone());
     }
 
     /// If there is any output event from running application, print it to the screen, otherwise it does nothing.
