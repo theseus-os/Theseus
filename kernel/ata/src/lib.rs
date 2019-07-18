@@ -21,7 +21,7 @@ use alloc::{
 };
 use port_io::{Port, PortReadOnly, PortWriteOnly};
 use pci::PciDevice;
-use storage_device::{StorageDevice, StorageController};
+use storage_device::{StorageDevice, StorageDeviceRef, StorageController};
 
 
 const SECTOR_SIZE_IN_BYTES: usize = 512;
@@ -427,7 +427,6 @@ impl AtaBus {
 			chunk[0] = word as u8;
 			chunk[1] = (word >> 8) as u8;
 		}
-		trace!("AtaDrive::identify_drive(): done reading {} bytes", buffer.len());
 		self.wait_for_data_done().map_err(|_| "error after identify data read")?;
 		Ok(AtaIdentifyData::new(buffer))
     }
@@ -595,9 +594,9 @@ impl AtaDrive {
 		let lba_start = offset_in_sectors;
 		let lba_end = lba_start + (length_in_bytes / SECTOR_SIZE_IN_BYTES);
 		let sector_count = lba_end - lba_start;
-		trace!("AtaDrive::read_pio(): lba_start: {}, lba_end: {}, sector_count: {}",
-			lba_start, lba_end, sector_count,
-		);
+		// trace!("AtaDrive::read_pio(): lba_start: {}, lba_end: {}, sector_count: {}",
+		// 	lba_start, lba_end, sector_count,
+		// );
 		if sector_count > (self.identify_data.max_blocks_per_transfer as usize) {
 			error!("AtaDrive::read_pio(): cannot read {} sectors, drive has a max of {} sectors per transfer.", 
 				sector_count, self.identify_data.max_blocks_per_transfer
@@ -631,9 +630,9 @@ impl AtaDrive {
 		let lba_start = offset_in_sectors;
 		let lba_end = lba_start + (length_in_bytes / SECTOR_SIZE_IN_BYTES);
 		let sector_count = lba_end - lba_start;
-		trace!("AtaDrive::write_pio(): lba_start: {}, lba_end: {}, sector_count: {}",
-			lba_start, lba_end, sector_count,
-		);
+		// trace!("AtaDrive::write_pio(): lba_start: {}, lba_end: {}, sector_count: {}",
+		// 	lba_start, lba_end, sector_count,
+		// );
 		if sector_count > (self.identify_data.max_blocks_per_transfer as usize) {
 			error!("AtaDrive::write_pio(): cannot write {} sectors, drive has a max of {} sectors per transfer.", 
 				sector_count, self.identify_data.max_blocks_per_transfer
@@ -680,15 +679,17 @@ impl StorageDevice for AtaDrive {
 }
 
 
+pub type AtaDriveRef = Arc<Mutex<AtaDrive>>;
+
 
 /// A single IDE controller has two buses with up to two drives attached to each bus,
 /// for a total of up to four drives. 
 #[derive(Debug)]
 pub struct IdeController {
-	pub primary_master:   Option<AtaDrive>,
-	pub primary_slave:    Option<AtaDrive>,
-	pub secondary_master: Option<AtaDrive>,
-	pub secondary_slave:  Option<AtaDrive>,
+	pub primary_master:   Option<AtaDriveRef>,
+	pub primary_slave:    Option<AtaDriveRef>,
+	pub secondary_master: Option<AtaDriveRef>,
+	pub secondary_slave:  Option<AtaDriveRef>,
 }
 
 impl IdeController {
@@ -754,10 +755,10 @@ impl IdeController {
 		);
 
 		Ok( IdeController {
-			primary_master:   primary_master.ok(),
-			primary_slave:    primary_slave.ok(),
-			secondary_master: secondary_master.ok(),
-			secondary_slave:  secondary_slave.ok(),
+			primary_master:   primary_master.ok().map(|d| Arc::new(Mutex::new(d))),
+			primary_slave:    primary_slave.ok().map(|d| Arc::new(Mutex::new(d))),
+			secondary_master: secondary_master.ok().map(|d| Arc::new(Mutex::new(d))),
+			secondary_slave:  secondary_slave.ok().map(|d| Arc::new(Mutex::new(d))),
 		})
 	}
 
@@ -775,8 +776,10 @@ impl IdeController {
 }
 
 impl StorageController for IdeController {
-    fn devices<'c>(&'c self) -> Box<(dyn Iterator<Item = &'c dyn StorageDevice> + 'c)> {
-		Box::new(self.iter())
+    fn devices<'c>(&'c self) -> Box<(dyn Iterator<Item = StorageDeviceRef> + 'c)> {
+		Box::new(
+			self.iter().map(|ata_drive_ref| Arc::clone(ata_drive_ref) as StorageDeviceRef)
+		)
 	}
 }
 
@@ -798,7 +801,7 @@ pub struct IdeControllerIter<'c> {
 	controller: &'c IdeController,
 }
 impl<'c> Iterator for IdeControllerIter<'c> {
-	type Item = &'c dyn StorageDevice; // AtaDrive;
+	type Item = &'c AtaDriveRef;
 
 
     fn next(&mut self) -> Option<Self::Item> {
@@ -806,7 +809,7 @@ impl<'c> Iterator for IdeControllerIter<'c> {
 			NextDrive::PrimaryMaster => {
 				self.next = NextDrive::PrimarySlave;
 				if self.controller.primary_master.is_some() {
-					self.controller.primary_master.as_ref().map(|d| { let sd: &dyn StorageDevice = d; sd })
+					self.controller.primary_master.as_ref()
 				} else {
 					self.next()
 				}
@@ -814,7 +817,7 @@ impl<'c> Iterator for IdeControllerIter<'c> {
 			NextDrive::PrimarySlave => {
 				self.next = NextDrive::SecondaryMaster;
 				if self.controller.primary_slave.is_some() {
-					self.controller.primary_slave.as_ref().map(|d| { let sd: &dyn StorageDevice = d; sd })
+					self.controller.primary_slave.as_ref()
 				} else {
 					self.next()
 				}
@@ -822,14 +825,14 @@ impl<'c> Iterator for IdeControllerIter<'c> {
 			NextDrive::SecondaryMaster => {
 				self.next = NextDrive::SecondarySlave;
 				if self.controller.secondary_master.is_some() {
-					self.controller.secondary_master.as_ref().map(|d| { let sd: &dyn StorageDevice = d; sd })
+					self.controller.secondary_master.as_ref()
 				} else {
 					self.next()
 				}
 			}
 			NextDrive::SecondarySlave => {
 				if self.controller.secondary_slave.is_some() {
-					self.controller.secondary_slave.as_ref().map(|d| { let sd: &dyn StorageDevice = d; sd })
+					self.controller.secondary_slave.as_ref()
 				} else {
 					None
 				}
