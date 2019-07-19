@@ -1,0 +1,28 @@
+[package]
+name = "fat32"
+version = "0.1.0"
+authors = ["Barry Shiberu <bereketshiberu@gmail.com>"]
+description = "FAT32 support"
+
+
+[dependencies]
+cpuio = "*"
+spin = "0.4.9"
+numtoa = { git = "https://github.com/mmstick/numtoa.git"}
+
+[dependencies.lazy_static]
+version = "1.0"
+features = ["spin_no_std"]
+
+[dependencies.log]
+default-features = false
+version = "0.3.7"
+
+[dependencies.storage_device]
+path = "../storage_device"
+
+[dependencies.storage_manager]
+path = "../storage_manager"
+
+[lib]
+crate-type = ["rlib"]
