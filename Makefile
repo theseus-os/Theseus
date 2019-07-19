@@ -507,7 +507,7 @@ QEMU_FLAGS += -smp 4
 MAC_ADDR ?= 52:54:00:d1:55:01
 
 ## Add a disk drive, a PATA drive over an IDE controller interface.
-QEMU_FLAGS += -drive format=raw,file=random_data2.img,if=ide
+QEMU_FLAGS += -drive format=raw,file=random_data2.img,if=ide -drive format=raw,file=fat32.img,if=ide
 
 ## Add a disk drive, a SATA drive over the AHCI interface.
 ## We don't yet have SATA support in Theseus.
