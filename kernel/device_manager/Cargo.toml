@@ -6,7 +6,6 @@ version = "0.1.0"
 build = "../../build.rs"
 
 [dependencies]
-spin = "0.4.10"
 
 [dependencies.log]
 default-features = false
@@ -17,9 +16,6 @@ path = "../../libs/dfqueue"
 
 [dependencies.event_types]
 path = "../event_types"
-
-[dependencies.ata]
-path = "../ata"
 
 [dependencies.memory]
 path = "../memory"
@@ -42,21 +38,15 @@ path = "../keyboard"
 [dependencies.mouse]
 path = "../mouse"
 
+[dependencies.storage_manager]
+path = "../storage_manager"
+
 [dependencies.network_manager]
 path = "../network_manager"
 
-[dependencies.e1000_smoltcp_device]
-path = "../e1000_smoltcp_device"
+[dependencies.ethernet_smoltcp_device]
+path = "../ethernet_smoltcp_device"
 
-[dependencies.smoltcp]
-version = "0.5.0"
-default-features = false
-features = [
-    "alloc", 
-    # "log", "verbose", 
-    "proto-ipv4", "proto-igmp", "proto-ipv6", "proto-dhcpv4",
-    "socket-raw", "socket-udp", "socket-tcp", "socket-icmp", 
-]
 
 [lib]
 crate-type = ["rlib"]
