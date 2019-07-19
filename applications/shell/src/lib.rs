@@ -505,7 +505,20 @@ impl Shell {
                     // If currently we have a task running, insert it to the input buffer, otherwise
                     // to the cmdline.
                     if self.current_task_ref.is_some() {
-                        self.insert_char_to_input_buff(c, true)?;
+                        let mut task_id: usize = 0;
+                        if let Some(job) = &self.current_task_ref {
+                            task_id = job.task.lock().id;
+                        }
+                        let need_echo = !application_io::is_requesting_no_echo(task_id);
+                        self.insert_char_to_input_buff(c, need_echo)?;
+                        if let Some(job) = &self.current_task_ref {
+                            if application_io::is_requesting_immediate_delivery(task_id) { 
+                                for b in self.input_buffer.as_bytes() {
+                                    job.input_producer.enqueue(*b);
+                                }
+                                self.input_buffer.clear();
+                            }
+                        }
                         return Ok(());
                     }
                     else {

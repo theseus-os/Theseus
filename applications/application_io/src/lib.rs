@@ -38,6 +38,14 @@ lazy_static! {
 }
 
 lazy_static! {
+    /// Maps the child applications's task ID to a flag indicating whether the application want to disable the echo of
+    /// terminal or not. If the flag is set to be true, shell will not echo the character to the terminal screen upon
+    /// user key strike.
+    static ref APP_NO_SHELL_ECHO: Mutex<BTreeMap<usize, bool>> =
+        Mutex::new(BTreeMap::new());
+}
+
+lazy_static! {
     /// Maps the child application's task ID to its consumer of the keyboard events directed by the parent shell.
     /// The queue simulates connecting an input event stream to the application.
     static ref SHELL_KEY_EVENT_CONSUMER: Mutex<BTreeMap<usize, DFQueueConsumer<KeyEvent>>> =
@@ -64,6 +72,7 @@ pub fn create_app_shell_relation(child_task_id: usize,
                                  input_byte_consumer: DFQueueConsumer<u8>) -> Result<(), &'static str> {
     APP_DIRECT_KEY_ACCESS.lock().insert(child_task_id, false);
     APP_BYTE_IMMEDIATE_DELIVERY.lock().insert(child_task_id, false);
+    APP_NO_SHELL_ECHO.lock().insert(child_task_id, false);
     SHELL_KEY_EVENT_CONSUMER.lock().insert(child_task_id, keyboard_event_consumer);
     SHELL_INPUT_BYTE_CONSUMER.lock().insert(child_task_id, input_byte_consumer);
     Ok(())
@@ -73,6 +82,7 @@ pub fn create_app_shell_relation(child_task_id: usize,
 pub fn remove_app_shell_relation(child_task_id: usize) -> Result<(), &'static str> {
     APP_DIRECT_KEY_ACCESS.lock().remove(&child_task_id);
     APP_BYTE_IMMEDIATE_DELIVERY.lock().remove(&child_task_id);
+    APP_NO_SHELL_ECHO.lock().remove(&child_task_id);
     SHELL_KEY_EVENT_CONSUMER.lock().remove(&child_task_id);
     SHELL_INPUT_BYTE_CONSUMER.lock().remove(&child_task_id);
     Ok(())
@@ -209,6 +219,45 @@ pub fn stop_immediate_delivery() -> Result<(), &'static str> {
     };
 
     APP_BYTE_IMMEDIATE_DELIVERY.lock().insert(task_id, false);
+    Ok(())
+}
+
+/// Check whether the shell should echo the character on the terminal screen upon user key strike. If the function
+/// returns `true`, then the shell should not echo, and vice versa.
+pub fn is_requesting_no_echo(task_id: usize) -> bool {
+    let map = APP_NO_SHELL_ECHO.lock();
+    let result = map.get(&task_id);
+    if let Some(flag) = result {
+        return *flag;
+    }
+    return false;
+}
+
+/// Applications call this function to disable the shell from echoing characters to the terminal screen.
+pub fn request_no_echo() -> Result<(), &'static str> {
+    let task_id = match task::get_my_current_task_id() {
+        Some(task_id) => {task_id},
+        None => {
+            error!("Cannot get task ID for no echo request");
+            return Err("Cannot get task ID for no echo request");
+        }
+    };
+
+    APP_NO_SHELL_ECHO.lock().insert(task_id, true);
+    Ok(())
+}
+
+/// Applications call this function to re-enable the shell to echo characters to the terminal screen.
+pub fn stop_no_echo() -> Result<(), &'static str> {
+    let task_id = match task::get_my_current_task_id() {
+        Some(task_id) => {task_id},
+        None => {
+            error!("Cannot get task ID for requesting shell to echo again");
+            return Err("Cannot get task ID for requesting shell to echo again");
+        }
+    };
+
+    APP_NO_SHELL_ECHO.lock().insert(task_id, false);
     Ok(())
 }
 
