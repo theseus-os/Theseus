@@ -139,7 +139,7 @@ impl FrameBufferAlpha {
     }
 
     /// fullfill the frame buffer with given color
-    pub fn fullfill_color(&mut self, color: Pixel) {
+    pub fn fill_color(&mut self, color: Pixel) {
         for y in 0..self.height {
             for x in 0..self.width {
                 self.draw_point(x, y, color);
@@ -207,10 +207,10 @@ impl FrameBufferAlpha {
     }
 }
 
-macro_rules! byte_alpha { ($x:expr) => (($x >> 24) as u8); }
-macro_rules! byte_red { ($x:expr) => (($x >> 16) as u8); }
-macro_rules! byte_green { ($x:expr) => (($x >> 8) as u8); }
-macro_rules! byte_blue { ($x:expr) => ($x as u8); }
+fn byte_alpha(x: Pixel) -> u8 { (x >> 24) as u8 }
+fn byte_red(x: Pixel) -> u8 { (x >> 16) as u8 }
+fn byte_green(x: Pixel) -> u8 { (x >> 8) as u8 }
+fn byte_blue(x: Pixel) -> u8 { (x >> 0) as u8 }
 /// construct a color with alpha, red, green, blue
 fn to_color(alpha: u8, red: u8, green: u8, blue: u8) -> Pixel {
     ((alpha as Pixel) << 24) | ((red as Pixel) << 16) | ((green as Pixel) << 8) | (blue as Pixel)
@@ -218,17 +218,17 @@ fn to_color(alpha: u8, red: u8, green: u8, blue: u8) -> Pixel {
 
 /// mix two color for one pixel on the top of another
 pub fn alpha_mix(bottom: Pixel, top: Pixel) -> Pixel {
-    let alpha = byte_alpha!(top) as u16;
-    let red = byte_red!(top);
-    let green = byte_green!(top);
-    let blue = byte_blue!(top);
-    let ori_red = byte_red!(bottom);
-    let ori_green = byte_green!(bottom);
-    let ori_blue = byte_blue!(bottom);
+    let alpha = byte_alpha(top) as u16;
+    let red = byte_red(top);
+    let green = byte_green(top);
+    let blue = byte_blue(top);
+    let ori_red = byte_red(bottom);
+    let ori_green = byte_green(bottom);
+    let ori_blue = byte_blue(bottom);
     let new_red = (((red as u16) * (255 - alpha) + (ori_red as u16) * alpha) / 255) as u8;
     let new_green = (((green as u16) * (255 - alpha) + (ori_green as u16) * alpha) / 255) as u8;
     let new_blue = (((blue as u16) * (255 - alpha) + (ori_blue as u16) * alpha) / 255) as u8;
-    to_color(byte_alpha!(bottom), new_red, new_green, new_blue)
+    to_color(byte_alpha(bottom), new_red, new_green, new_blue)
 }
 
 /// mix two color linearly with a float number
@@ -237,14 +237,14 @@ pub fn color_mix(c1: Pixel, c2: Pixel, mix: f32) -> Pixel {
         const BLACK: Pixel = 0x00000000;
         return BLACK;
     }
-    let alpha1 = byte_alpha!(c1);
-    let red1 = byte_red!(c1);
-    let green1 = byte_green!(c1);
-    let blue1 = byte_blue!(c1);
-    let alpha2 = byte_alpha!(c2);
-    let red2 = byte_red!(c2);
-    let green2 = byte_green!(c2);
-    let blue2 = byte_blue!(c2);
+    let alpha1 = byte_alpha(c1);
+    let red1 = byte_red(c1);
+    let green1 = byte_green(c1);
+    let blue1 = byte_blue(c1);
+    let alpha2 = byte_alpha(c2);
+    let red2 = byte_red(c2);
+    let green2 = byte_green(c2);
+    let blue2 = byte_blue(c2);
     let new_alpha = ((alpha1 as f32) * mix + (alpha2 as f32) * (1f32-mix)) as u8;
     let new_red = ((red1 as f32) * mix + (red2 as f32) * (1f32-mix)) as u8;
     let new_green = ((green1 as f32) * mix + (green2 as f32) * (1f32-mix)) as u8;

@@ -1,7 +1,16 @@
-//! Window Components that helps build easy-to-use applications
-//! depend on window_manager_alpha which provides multiple-window management
+//! Window Components that helps build easy-to-use GUI applications
 //! 
-//! The components object should be owned by application
+//! The `window_components` object should be owned by application, see `applications/new_window` as a demo to use this library
+//! 
+//! This library will create a window with default title bar and border. It handles the commonly used interactions like moving 
+//! the window or close the window. Also, it is responsible to show title bar differently when window is active. The library 
+//! frees applications from handling the complicated interaction with window manager, however, advanced users could learn from 
+//! this library about how to use window manager APIs directly.
+//! 
+//! Currently the component only supports `textarea` which is a fixed size area to display matrix of characters. User could implement 
+//! other components in other crate, means this library has not a centralized control of all components, leaving flexibility to user. 
+//! Basically, `textarea` is initialized with the Arc of window object which is initialized by `window_components`, means, 
+//! `window_components` and `textarea` are in the same level, except for the priority to handle events.
 
 #![no_std]
 
@@ -25,64 +34,72 @@ use frame_buffer_alpha::{ Pixel, color_mix };
 use spin::{Mutex};
 use window_manager_alpha::WindowObjAlpha;
 
-/// The top bar size
-const WINDOW_TOPBAR: usize = 15;
+/// The title bar size
+const WINDOW_TITLE_BAR: usize = 15;
 /// left, right, bottom border size
 const WINDOW_BORDER: usize = 2;
 /// border radius
 const WINDOW_RADIUS: usize = 5;
 /// default background color
 const WINDOW_BACKGROUND: Pixel = 0x40FFFFFF;
-/// border and bar color
+/// border and title bar color when window is inactive
 const WINDOW_BORDER_COLOR_INACTIVE: Pixel = 0x00333333;
+/// border and title bar color when window is active, the top part color
 const WINDOW_BORDER_COLOR_ACTIVE_TOP: Pixel = 0x00BBBBBB;
+/// border and title bar color when window is active, the bottom part color
 const WINDOW_BORDER_COLOR_ACTIVE_BOTTOM: Pixel = 0x00666666;
-/// window button color
+/// window button color: red
 const WINDOW_BUTTON_COLOR_CLOSE: Pixel = 0x00E74C3C;
+/// window button color: green
 const WINDOW_BUTTON_COLOR_MINIMIZE: Pixel = 0x00239B56;
+/// window button color: purple
 const WINDOW_BUTTON_COLOR_MAXIMIZE: Pixel = 0x007D3C98;
+/// window button bias from left, in pixel
 const WINDOW_BUTTON_BIAS_X: usize = 12;
+/// the interval between buttons, in pixel
 const WINDOW_BUTTON_BETWEEN: usize = 15;
+/// the button size, in pixel
 const WINDOW_BUTTON_SIZE: usize = 6;
-const WINDOW_BUTTON_COLOR_ERROR: Pixel = 0x00000000;  // black
 
-/// abstraction of a window, providing top bar which helps user moving, close, maximize or minimize window
+/// abstraction of a window, providing title bar which helps user moving, close, maximize or minimize window
 pub struct WindowComponents {
-    // TODO: not used now, change this later
-    // components: BTreeMap<String, Arc<Mutex<Component>>>,
     /// the window object that could be used to initialize components
     pub winobj: Arc<Mutex<WindowObjAlpha>>,
-    /// NOT MODIFY: the space remained for border, init as WINDOW_BORDER
+    /// READ-ONLY variable: the space remained for border, init as WINDOW_BORDER
     pub bias_x: usize,
-    /// NOT MODIFY: the space remained for top bar, init as WINDOW_TOPBAR
+    /// READ-ONLY variable: the space remained for title bar, init as WINDOW_TITLE_BAR
     pub bias_y: usize,
-    /// the background of this window, init as WINDOW_BACKGROUND **TODO**: not support changing yet
+    /// READ-ONLY variable: the background of this window, init as WINDOW_BACKGROUND
     pub background: Pixel,
     /// application could get events from this consumer
-    pub consumer: DFQueueConsumer<Event>,  // event input
-    producer: DFQueueProducer<Event>,  // event output used by window manager
+    pub consumer: DFQueueConsumer<Event>,
+    /// event output used by window manager, private variable
+    producer: DFQueueProducer<Event>,
 
+    /// last mouse position event, used to judge click and press-moving event
     last_mouse_position_event: MousePositionEvent,
+    /// record last result of whether this window is active, to reduce redraw overhead
     last_is_active: bool,
 }
 
 impl WindowComponents {
-    /// create new WindowComponents and return it
+    /// create new WindowComponents by given position and size, return the Mutex of it for ease of sharing
     pub fn new(x: usize, y: usize, width: usize, height: usize) -> Result<Arc<Mutex<WindowComponents>>, &'static str> {
 
-        if width <= 2 * WINDOW_TOPBAR || height <= WINDOW_TOPBAR + WINDOW_BORDER {
+        if width <= 2 * WINDOW_TITLE_BAR || height <= WINDOW_TITLE_BAR + WINDOW_BORDER {
             return Err("window too small to even draw border");
         }
 
-        let _winobj = window_manager_alpha::new_window(x, y, width, height)?;
+        let winobj_mutex = window_manager_alpha::new_window(x, y, width, height)?;
 
+        // create event queue for components
         let consumer = DFQueue::new().into_consumer();
         let producer = consumer.obtain_producer();
 
         let mut wincomps: WindowComponents = WindowComponents {
-            winobj: _winobj,
+            winobj: winobj_mutex,
             bias_x: WINDOW_BORDER,
-            bias_y: WINDOW_TOPBAR,
+            bias_y: WINDOW_TITLE_BAR,
             background: WINDOW_BACKGROUND,
             consumer: consumer,
             producer: producer,
@@ -97,14 +114,14 @@ impl WindowComponents {
 
         let (xs, xe, ys, ye) = {
             let mut winobj = wincomps.winobj.lock();
-            winobj.framebuffer.fullfill_color(wincomps.background);
+            winobj.framebuffer.fill_color(wincomps.background);
             let xs = winobj.x;
             let xe = xs + winobj.width;
             let ys = winobj.y;
             let ye = ys + winobj.height;
             (xs, xe, ys, ye)
         };
-        wincomps.draw_border(true);  // active border
+        wincomps.draw_border(true);  // draw window with active border
         // draw three buttons
         {
             let mut winobj = wincomps.winobj.lock();
@@ -117,7 +134,7 @@ impl WindowComponents {
         Ok(Arc::new(Mutex::new(wincomps)))
     }
 
-    /// draw the border of this window
+    /// draw the border of this window, with argument of whether this window is active now
     fn draw_border(&mut self, active: bool) {
         let mut winobj = self.winobj.lock();
         // first draw left, bottom, right border
@@ -130,7 +147,7 @@ impl WindowComponents {
         winobj.framebuffer.draw_rect(0, self.bias_x, self.bias_y, height, border_color);
         winobj.framebuffer.draw_rect(0, width, height - self.bias_x, height, border_color);
         winobj.framebuffer.draw_rect(width - self.bias_x, width, self.bias_y, height, border_color);
-        // then draw the top bar
+        // then draw the title bar
         if active {
             for i in 0..self.bias_y {
                 winobj.framebuffer.draw_rect(0, width, i, i+1, frame_buffer_alpha::color_mix(
@@ -154,7 +171,7 @@ impl WindowComponents {
         }
     }
 
-    /// refresh border
+    /// refresh border, telling window manager to refresh 
     fn refresh_border(& self, bx: usize, by: usize) -> Result<(), &'static str> {
         let (width, height) = {
             let winobj = self.winobj.lock();
@@ -169,7 +186,7 @@ impl WindowComponents {
         Ok(())
     }
 
-    /// show three button with status. idx = 0,1,2, state = 0,1,2 
+    /// show three button with status. idx = 0,1,2 (which button), state = 0,1,2
     fn show_button(& self, idx: usize, state: usize, winobj: &mut WindowObjAlpha) {
         if idx > 2 { return; }
         if state > 2 { return; }
@@ -180,7 +197,10 @@ impl WindowComponents {
                 0 => WINDOW_BUTTON_COLOR_CLOSE,
                 1 => WINDOW_BUTTON_COLOR_MINIMIZE,
                 2 => WINDOW_BUTTON_COLOR_MAXIMIZE,
-                _ => WINDOW_BUTTON_COLOR_ERROR,
+                _ => {
+                    const WINDOW_BUTTON_COLOR_ERROR: Pixel = 0x00000000;  // black
+                    WINDOW_BUTTON_COLOR_ERROR
+                }
             }, 0.2f32 * (state as f32)
         ));
     }
@@ -196,13 +216,14 @@ impl WindowComponents {
         Ok(())
     }
 
-    /// return the available inner size, excluding top bar and border
+    /// return the available inner size, excluding title bar and border
     pub fn inner_size(& self) -> (usize, usize) {
         let winobj = self.winobj.lock();
         (winobj.width - 2 * self.bias_x, winobj.height - self.bias_x - self.bias_y)
     }
 
-    /// event handler that should be called periodically
+    /// event handler that should be called periodically by applications. This will handle user events as well as produce 
+    /// the unhandled ones for other components to handle.
     pub fn handle_event(&mut self) -> Result<(), &'static str> {
         let mut call_later_do_refresh_floating_border = false;
         let mut call_later_do_move_active_window = false;
@@ -221,9 +242,8 @@ impl WindowComponents {
                 self.show_button(2, 1, &mut winobj);
                 (bx, by)
             };
-            match self.refresh_border(bx, by) {
-                Ok(_) => { }
-                Err(err) => { debug!("refresh_border failed {}", err); }
+            if let Err(err) = self.refresh_border(bx, by) {
+                error!("refresh_border failed {}", err);
             }
         }
         let (bx, by) = {
@@ -251,7 +271,7 @@ impl WindowComponents {
                             call_later_do_move_active_window = true;
                         }
                     } else {
-                        if mouse_event.y < self.bias_y && mouse_event.x < winobj.width {  // the region of top bar
+                        if mouse_event.y < self.bias_y && mouse_event.x < winobj.width {  // the region of title bar
                             let r2 = WINDOW_RADIUS * WINDOW_RADIUS;
                             let mut is_three_button = false;
                             for i in 0..3 {
@@ -277,7 +297,7 @@ impl WindowComponents {
                                     need_refresh_three_button = true;
                                 }
                             }
-                            // check if user push the top bar, which means user willing to move the window
+                            // check if user push the title bar, which means user willing to move the window
                             if !is_three_button && !self.last_mouse_position_event.left_button_hold && mouse_event.left_button_hold {
                                 winobj.is_moving = true;
                                 winobj.give_all_mouse_event = true;
@@ -301,27 +321,23 @@ impl WindowComponents {
             (bx, by)
         };
         if need_to_set_active {
-            match window_manager_alpha::set_active(&self.winobj) {
-                Ok(_) => { }
-                Err(err) => { debug!("cannot set to active {}", err); }
+            if let Err(err) = window_manager_alpha::set_active(&self.winobj) {
+                error!("cannot set to active {}", err);
             }
         }
         if need_refresh_three_button {  // if border has been refreshed, no need to refresh buttons
-            match self.refresh_three_button(bx, by) {
-                Ok(_) => { }
-                Err(err) => { debug!("refresh_three_button failed {}", err); }
+            if let Err(err) = self.refresh_three_button(bx, by) {
+                error!("refresh_three_button failed {}", err);
             }
         }
         if call_later_do_refresh_floating_border {
-            match window_manager_alpha::do_refresh_floating_border() {
-                Ok(_) => { }
-                Err(err) => { debug!("do_refresh_floating_border failed {}", err); }
+            if let Err(err) = window_manager_alpha::do_refresh_floating_border() {
+                error!("do_refresh_floating_border failed {}", err);
             }
         }
         if call_later_do_move_active_window {
-            match window_manager_alpha::do_move_active_window() {
-                Ok(_) => { }
-                Err(err) => { debug!("do_move_active_window failed {}", err); }
+            if let Err(err) = window_manager_alpha::do_move_active_window() {
+                error!("do_move_active_window failed {}", err);
             }
         }
         Ok(())
@@ -330,16 +346,10 @@ impl WindowComponents {
 
 impl Drop for WindowComponents {
     fn drop(&mut self) {
-        match window_manager_alpha::delete_window(&self.winobj) {
-            Ok(_) => { }
-            Err(err) => { debug!("delete_window failed {}", err); }
+        if let Err(err) = window_manager_alpha::delete_window(&self.winobj) {
+            error!("delete_window failed {}", err);
         }
     }
-}
-
-/// a general type for different component, not used yet
-pub enum Component {
-    TextArea(TextArea),
 }
 
 /// a textarea with fixed size, showing matrix of chars
@@ -362,6 +372,11 @@ pub struct TextArea {
 
 impl TextArea {
     /// create new textarea
+    /// * `x`, `y`, `width`, `height`: the position and size of this textarea. Note that position is relative to window
+    /// * `line_spacing`: the spacing between lines, default to 2
+    /// * `column_spacing`: the spacing between chars, default to 1
+    /// * `background_color`: the background color, default to transparent
+    /// * `text_color`: the color of text, default to opaque black
     pub fn new(x: usize, y: usize, width: usize, height: usize, winobj: &Arc<Mutex<WindowObjAlpha>>
             , line_spacing: Option<usize>, column_spacing: Option<usize>
             , background_color: Option<Pixel>, text_color: Option<Pixel>)
@@ -388,8 +403,8 @@ impl TextArea {
                 Some(m) => m,
                 _ => 0x00000000,  // default is an opaque black
             },
-            x_cnt: 0,
-            y_cnt: 0,
+            x_cnt: 0,  // will modify later
+            y_cnt: 0,  // will modify later
             char_matrix: Vec::new(),
             winobj: Arc::downgrade(winobj),
         };
@@ -415,24 +430,24 @@ impl TextArea {
         return x + y * self.x_cnt;
     }
 
-    /// set char at given index
+    /// set char at given index, for example, if you want to modify the char at (i, j), the `idx` should be self.index(i, j)
     pub fn set_char_absolute(&mut self, idx: usize, c: u8) -> Result<(), &'static str> {
         if idx >= self.x_cnt * self.y_cnt { return Err("x out of range"); }
         self.set_char(idx % self.x_cnt, idx / self.x_cnt, c)
     }
 
-    /// set char at given position
+    /// set char at given position, where i < self.x_cnt, j < self.y_cnt
     pub fn set_char(&mut self, x: usize, y: usize, c: u8) -> Result<(), &'static str> {
         if x >= self.x_cnt { return Err("x out of range"); }
         if y >= self.y_cnt { return Err("y out of range"); }
-        if let Some(_winobj) = self.winobj.upgrade() {
+        if let Some(winobj_mutex) = self.winobj.upgrade() {
             if self.char_matrix[self.index(x, y)] != c {  // need to redraw
                 let idx = self.index(x, y);
                 self.char_matrix[idx] = c;
                 let wx = self.x + x * (8 + self.column_spacing);
                 let wy = self.y + y * (16 + self.line_spacing);
                 let (winx, winy) = {
-                    let mut winobj = _winobj.lock();
+                    let mut winobj = winobj_mutex.lock();
                     let winx = winobj.x;
                     let winy = winobj.y;
                     for j in 0..16 {
@@ -475,8 +490,8 @@ impl TextArea {
     }
 
     /// display a basic string, only support normal chars and `\n`
-    pub fn display_string_basic(&mut self, _a: &str) -> Result<(), &'static str> {
-        let a = _a.as_bytes();
+    pub fn display_string_basic(&mut self, string: &str) -> Result<(), &'static str> {
+        let a = string.as_bytes();
         let mut i = 0;
         let mut j = 0;
         for k in 0 .. a.len() {

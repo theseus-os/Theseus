@@ -56,7 +56,7 @@ pub fn main(_args: Vec<String>) -> isize {
         x, y, width, height  // the position and size of window, including the title bar and border
     ) {
         Ok(m) => m,
-        Err(err) => { debug!("new window components returned err: {}", err); return -2; }
+        Err(err) => { error!("new window components returned err: {}", err); return -2; }
     };
     let mut wincomps = wincomps_mutex.lock();
 
@@ -71,7 +71,7 @@ pub fn main(_args: Vec<String>) -> isize {
         None, None, Some(wincomps.background), None  // use default parameters
     ) {
         Ok(m) => m,
-        Err(err) => { debug!("new textarea returned err: {}", err); return -3; }
+        Err(err) => { error!("new textarea returned err: {}", err); return -3; }
     };
     let mut textarea = textarea_mutex.lock();
 
@@ -101,12 +101,9 @@ pub fn main(_args: Vec<String>) -> isize {
 
     loop {
         // first let WindowComponents to handle basic user inputs, and leaves those unhandled events
-        match wincomps.handle_event() {
-            Ok(_) => {},
-            Err(err) => {
-                debug!("{}", err);  // when user click close button, this will trigger, and simply exit the program
-                return 0;
-            }
+        if let Err(err) = wincomps.handle_event() {
+            debug!("{}", err);  // when user click close button, this will trigger, and simply exit the program
+            return 0;
         }
 
         // handle events of application, like user input text, moving cursor, etc.
@@ -170,9 +167,9 @@ pub fn main(_args: Vec<String>) -> isize {
         }
 
         // update char matrix for textarea to display, this is efficient that will only redraw the changed chars
-        match textarea.set_char_matrix(&char_matrix) {
-            Ok(_) => {}
-            Err(err) => {debug!("set char matrix failed: {}", err); return -5; }
+        if let Err(err) = textarea.set_char_matrix(&char_matrix) {
+            error!("set char matrix failed: {}", err);
+            return -5;
         }
 
         // be nice to other applications
@@ -182,9 +179,9 @@ pub fn main(_args: Vec<String>) -> isize {
 
 /// get current time for cursor blinking
 fn get_time() -> u64 {
-    match get_hpet().as_ref().ok_or("couldn't get HPET timer") {
-        Ok(m) => m.get_counter(),
-        Err(_) => 0
+    match get_hpet().as_ref() {
+        Some(m) => m.get_counter(),
+        _ => { error!("couldn't get HPET timer"); 0 }
     }
 }
 

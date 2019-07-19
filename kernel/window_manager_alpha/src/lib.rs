@@ -1,11 +1,10 @@
 //! Window manager that simulates a desktop environment with alpha channel.
+//! 
 //! windows overlapped each other would obey the rules of alpha channel composition
 //!
 //! Applications request window objects from the window manager through:
 //! - new_window(x, y, width, height) provides a new window whose dimensions the caller must specify
 //!
-//! **TODO**: Windows can be resized by calling resize().
-//! **TODO**: Window can be deleted when it is dropped or by calling WindowObj.delete().
 //! There are three types of window: `active`, `show_list` and `hide_list`
 //! - `active` window is the only one active, who gets all keyboard event
 //! - `show_list` windows are shown by their up-down relationships, with overlapped part using alpha channel composition
@@ -45,16 +44,16 @@ use path::Path;
 
 static WINDOW_MANAGER: Once<Mutex<WindowManagerAlpha>> = Once::new();
 
-/// The maximum size of cursor
-const CURSOR_MAX_SIZE: usize = 7;
+/// The maximum size of mouse
+const MOUSE_MAX_SIZE: usize = 7;
 /// Transparent pixel
 const T: Pixel = 0xFF000000;
 /// Opaque white
 const O: Pixel = 0x00FFFFFF;
 /// Opaque black
 const B: Pixel = 0x000000FF;
-/// the cursor picture
-const CURSOR_BASIC: [[Pixel; 2*CURSOR_MAX_SIZE+1]; 2*CURSOR_MAX_SIZE+1] = [
+/// the mouse picture
+const MOUSE_BASIC: [[Pixel; 2*MOUSE_MAX_SIZE+1]; 2*MOUSE_MAX_SIZE+1] = [
     [ T, T, T, T, T, T, T, T, T, T, T, T, T, T, T ],
     [ T, T, T, T, T, T, T, T, T, T, T, T, T, T, T ],
     [ T, T, T, T, T, T, T, T, T, T, T, T, T, T, T ],
@@ -79,6 +78,24 @@ const WINDOW_BORDER_COLOR_INNER: Pixel = 0x00CA6F1E;
 /// border's outter color
 const WINDOW_BORDER_COLOR_OUTTER: Pixel = 0xFFFFFFFF;
 
+/// a 2D point
+struct Point {
+    x: usize,
+    y: usize,
+}
+
+/// a rectangle region
+struct RectRegion {
+    /// x start 
+    xs: usize,
+    /// x end (exclusive)
+    xe: usize,
+    /// y start
+    ys: usize,
+    /// y end (exclusive)
+    ye: usize,
+}
+
 /// window manager with overlapping and alpha enabled
 struct WindowManagerAlpha {
     /// those window currently not shown on screen
@@ -87,12 +104,12 @@ struct WindowManagerAlpha {
     show_list: VecDeque<Weak<Mutex<WindowObjAlpha>>>,
     /// the only active window, receiving all keyboard events (except for those remained for WM)
     active: Weak<Mutex<WindowObjAlpha>>,  // this one is not in show_list
-    /// current cursor position
-    cursor: (usize, usize),  // store the current cursor position
+    /// current mouse position
+    mouse: Point,
     /// whether show the border to indicating new window's position and size
     is_show_border: bool,
     /// if show border, then where to show it
-    border_position: (usize, usize, usize, usize),  // xs, xe, ys, ye, could be minus value
+    border_position: RectRegion,
     /// to record how many terminals has been created, avoid same name
     terminal_id_counter: usize,
     /// the frame buffer that it should print on
@@ -256,7 +273,10 @@ impl WindowManagerAlpha {
         }
         // then draw border
         if self.is_show_border {
-            let (xs, xe, ys, ye) = self.border_position;
+            let (xs, xe, ys, ye) = {
+                let r = &self.border_position;
+                (r.xs, r.xe, r.ys, r.ye)
+            };
             let x_in = x as isize >= (xs-WINDOW_BORDER_SIZE) as isize && x as isize <= (xe-1+WINDOW_BORDER_SIZE) as isize;
             let y_in = y as isize >= (ys-WINDOW_BORDER_SIZE) as isize && y as isize <= (ye-1+WINDOW_BORDER_SIZE) as isize;
             let left = xs-x <= WINDOW_BORDER_SIZE && y_in;
@@ -305,10 +325,13 @@ impl WindowManagerAlpha {
                     WINDOW_BORDER_COLOR_OUTTER, WINDOW_BORDER_COLOR_INNER, (y-(ye-1)) as f32 / WINDOW_BORDER_SIZE as f32));
             }
         }
-        // finally draw cursor
-        let (cx, cy) = self.cursor;
-        if ((x-cx) <= CURSOR_MAX_SIZE || (cx-x) <= CURSOR_MAX_SIZE) && ((y-cy) <= CURSOR_MAX_SIZE || (cy-y) <= CURSOR_MAX_SIZE) {
-            self.final_fb.draw_point_alpha(x, y, CURSOR_BASIC[CURSOR_MAX_SIZE + x - cx][CURSOR_MAX_SIZE + y - cy]);
+        // finally draw mouse
+        let (cx, cy) = {
+            let m = &self.mouse;
+            (m.x, m.y)
+        };
+        if ((x-cx) <= MOUSE_MAX_SIZE || (cx-x) <= MOUSE_MAX_SIZE) && ((y-cy) <= MOUSE_MAX_SIZE || (cy-y) <= MOUSE_MAX_SIZE) {
+            self.final_fb.draw_point_alpha(x, y, MOUSE_BASIC[MOUSE_MAX_SIZE + x - cx][MOUSE_MAX_SIZE + y - cy]);
         }
         Ok(())
     }
@@ -350,9 +373,12 @@ impl WindowManagerAlpha {
         Err("cannot find window to pass key event")
     }
 
-    /// pass mouse event to the top window that cursor on, may also transfer to those want all events
+    /// pass mouse event to the top window that mouse on, may also transfer to those want all events
     fn pass_mouse_event_to_window(& self, mouse_event: MouseEvent) -> Result<(), &'static str> {
-        let (x, y) = self.cursor;
+        let (x, y) = {
+            let m = &self.mouse;
+            (m.x, m.y)
+        };
         let mut event: MousePositionEvent = MousePositionEvent {
             x: 0,
             y: 0,
@@ -379,8 +405,8 @@ impl WindowManagerAlpha {
         }
         // show list
         for i in 0..self.show_list.len() {
-            if let Some(_now_winobj) = self.show_list[i].upgrade() {
-                let now_winobj = _now_winobj.lock();
+            if let Some(now_winobj_mutex) = self.show_list[i].upgrade() {
+                let now_winobj = now_winobj_mutex.lock();
                 let cx = now_winobj.x;
                 let cy = now_winobj.y;
                 if now_winobj.give_all_mouse_event {
@@ -409,8 +435,8 @@ impl WindowManagerAlpha {
         }
         // then check show_list
         for i in 0..self.show_list.len() {
-            if let Some(_now_winobj) = self.show_list[i].upgrade() {
-                let now_winobj = _now_winobj.lock();
+            if let Some(now_winobj_mutex) = self.show_list[i].upgrade() {
+                let now_winobj = now_winobj_mutex.lock();
                 let cx = now_winobj.x;
                 let cy = now_winobj.y;
                 if now_winobj.framebuffer.check_in_buffer(x - cx, y - cy) {
@@ -431,9 +457,12 @@ impl WindowManagerAlpha {
         let last_show_border = self.is_show_border;
         self.is_show_border = show;
         if last_show_border {
-            let (oxs, oxe, oys, oye) = self.border_position;
+            let (oxs, oxe, oys, oye) = {
+                let r = &self.border_position;
+                (r.xs, r.xe, r.ys, r.ye)
+            };
             if show {  // otherwise don't change position
-                self.border_position = (xs, xe, ys, ye);
+                self.border_position = RectRegion { xs, xe, ys, ye };
             }
             for i in 0..WINDOW_BORDER_SIZE+1 {
                 self.refresh_rect_border(oxs-i, oxe+i, oys-i, oye+i)?;
@@ -441,7 +470,7 @@ impl WindowManagerAlpha {
         }
         // then draw current border
         if show {
-            self.border_position = (xs, xe, ys, ye);
+            self.border_position = RectRegion { xs, xe, ys, ye };
             for i in 0..WINDOW_BORDER_SIZE+1 {
                 self.refresh_rect_border(xs-i, xe+i, ys-i, ye+i)?;
             }
@@ -451,31 +480,34 @@ impl WindowManagerAlpha {
 
     /// optimized refresh area for less computation up to 2x
     fn refresh_area_with_old_new(&mut self, 
-            _oxs: usize, _oxe: usize, _oys: usize, _oye: usize, 
-            _nxs: usize, _nxe: usize, _nys: usize, _nye: usize) -> Result<(), &'static str> {
-        let oxs = _oxs as isize; let oxe = _oxe as isize; let oys = _oys as isize; let oye = _oye as isize;
-        let nxs = _nxs as isize; let nxe = _nxe as isize; let nys = _nys as isize; let nye = _nye as isize;
+            uoxs: usize, uoxe: usize, uoys: usize, uoye: usize, 
+            unxs: usize, unxe: usize, unys: usize, unye: usize) -> Result<(), &'static str> {
+        let oxs = uoxs as isize; let oxe = uoxe as isize; let oys = uoys as isize; let oye = uoye as isize;
+        let nxs = unxs as isize; let nxe = unxe as isize; let nys = unys as isize; let nye = unye as isize;
         // first refresh new area for better user experience
-        self.refresh_area(_nxs, _nxe, _nys, _nye)?;
+        self.refresh_area(unxs, unxe, unys, unye)?;
         // then refresh old area that not overlapped by new one
         if nxs >= oxe || nxe <= oxs || nys >= oye || nye <= oys {  // have to refresh all
-            self.refresh_area(_oxs, _oxe, _oys, _oye)?;
+            self.refresh_area(uoxs, uoxe, uoys, uoye)?;
         } else {  // there existes overlapped region, optimize them!
-            let mut _cxs = _oxs; let mut _cxe = _oxe;
-            if oxs < nxs { self.refresh_area(_oxs, _nxs, _oys, _oye)?; _cxs = _nxs; }
-            if oxe > nxe { self.refresh_area(_nxe, _oxe, _oys, _oye)?; _cxe = _nxe; }
-            if oys < nys { self.refresh_area(_cxs, _cxe, _oys, _nys)?; }
-            if oye > nye { self.refresh_area(_cxs, _cxe, _nye, _oye)?; }
+            let mut ucxs = uoxs; let mut ucxe = uoxe;
+            if oxs < nxs { self.refresh_area(uoxs, unxs, uoys, uoye)?; ucxs = unxs; }
+            if oxe > nxe { self.refresh_area(unxe, uoxe, uoys, uoye)?; ucxe = unxe; }
+            if oys < nys { self.refresh_area(ucxs, ucxe, uoys, unys)?; }
+            if oye > nye { self.refresh_area(ucxs, ucxe, unye, uoye)?; }
         }
         Ok(())
     }
 
-    /// private function: take active window's base position and current cursor, move the window with delta
+    /// private function: take active window's base position and current mouse, move the window with delta
     fn move_active_window(&mut self) -> Result<(), &'static str> {
         if let Some(current_active) = self.active.upgrade() {
             let (oxs, oxe, oys, oye, nxs, nxe, nys, nye) = {
                 let mut current_active_win = current_active.lock();
-                let (cx, cy) = self.cursor;
+                let (cx, cy) = {
+                    let m = &self.mouse;
+                    (m.x, m.y)
+                };
                 let (bx, by) = current_active_win.moving_base;
                 let ox = current_active_win.x;
                 let oy = current_active_win.y;
@@ -496,7 +528,7 @@ impl WindowManagerAlpha {
     }
 }
 
-/// delete window
+/// delete window the given window
 pub fn delete_window(objref: &Arc<Mutex<WindowObjAlpha>>) -> Result<(), &'static str> {
     let mut win = WINDOW_MANAGER.try().ok_or("The static window manager was not yet initialized")?.lock();
     win.delete_window(objref)
@@ -527,7 +559,10 @@ pub fn is_active(objref: &Arc<Mutex<WindowObjAlpha>>) -> bool {
 /// refresh the floating border display, will lock WINDOW_MANAGER
 pub fn do_refresh_floating_border() -> Result<(), &'static str> {
     let mut win = WINDOW_MANAGER.try().ok_or("The static window manager was not yet initialized")?.lock();
-    let (nx, ny) = win.cursor;
+    let (nx, ny) = {
+        let m = &win.mouse;
+        (m.x, m.y)
+    };
     if let Some(current_active) = win.active.upgrade() {
         let (is_draw, bxs, bxe, bys, bye) = {
             let current_active_win = current_active.lock();
@@ -555,7 +590,7 @@ pub fn do_refresh_floating_border() -> Result<(), &'static str> {
     Ok(())
 }
 
-/// execute moving active window action, will lock WINDOW_MANAGER
+/// execute moving active window action, this will lock WINDOW_MANAGER
 pub fn do_move_active_window() -> Result<(), &'static str> {
     let mut win = WINDOW_MANAGER.try().ok_or("The static window manager was not yet initialized")?.lock();
     win.move_active_window()
@@ -573,8 +608,8 @@ pub fn refresh_area_absolute(xs: usize, xe: usize, ys: usize, ye: usize) -> Resu
     win.refresh_area(xs, xe, ys, ye)
 }
 
-/// Initialize the window manager
-pub fn init(key_comsumer: DFQueueConsumer<Event>, mouse_comsumer: DFQueueConsumer<Event>, 
+/// Initialize the window manager, should provide the consumer of keyboard and mouse event, as well as a frame buffer to draw
+pub fn init(key_consumer: DFQueueConsumer<Event>, mouse_consumer: DFQueueConsumer<Event>, 
         final_fb: FrameBufferAlpha) -> Result<(), &'static str> {
     debug!("window manager alpha init called");
 
@@ -583,9 +618,9 @@ pub fn init(key_comsumer: DFQueueConsumer<Event>, mouse_comsumer: DFQueueConsume
             hide_list: VecDeque::new(),
             show_list: VecDeque::new(),
             active: Weak::new(),
-            cursor: (0, 0),
+            mouse: Point { x: 0, y: 0 },
             is_show_border: false,
-            border_position: (0, 0, 0, 0),
+            border_position: RectRegion { xs: 0, xe: 0, ys: 0, ye: 0 },
             terminal_id_counter: 1,
             final_fb: final_fb,
     };
@@ -594,10 +629,10 @@ pub fn init(key_comsumer: DFQueueConsumer<Event>, mouse_comsumer: DFQueueConsume
     let mut win = WINDOW_MANAGER.try().ok_or("The static window manager was not yet initialized")?.lock();
     let screen_width = win.final_fb.width;
     let screen_height = win.final_fb.height;
-    win.cursor = (screen_width/2, screen_height/2);  // set cursor to middle
+    win.mouse = Point { x: screen_width/2, y: screen_height/2 };  // set mouse to middle
     win.refresh_area(0, screen_width, 0, screen_height)?;
 
-    KernelTaskBuilder::new(window_manager_loop, (key_comsumer, mouse_comsumer) )
+    KernelTaskBuilder::new(window_manager_loop, (key_consumer, mouse_consumer) )
         .name("window_manager_loop".to_string())
         .spawn()?;
 
@@ -622,7 +657,7 @@ pub struct WindowObjAlpha {
     pub give_all_mouse_event: bool,  // whether give this application the mouse event
     /// whether in moving state, only available when it is active
     pub is_moving: bool,
-    /// the base position of window moving action, should be the cursor position when `is_moving` is set to true
+    /// the base position of window moving action, should be the mouse position when `is_moving` is set to true
     pub moving_base: (usize, usize),
 }
 
@@ -633,15 +668,15 @@ fn window_manager_loop( consumer: (DFQueueConsumer<Event>, DFQueueConsumer<Event
     loop {
 
         let event = {
-            let _event = match key_consumer.peek() {
+            let ev = match key_consumer.peek() {
                 Some(ev) => ev,
                 _ => { match mouse_consumer.peek() {
                     Some(ev) => ev,
                     _ => { continue; }
                 } }
             };
-            let event = _event.clone();
-            _event.mark_completed();
+            let event = ev.clone();
+            ev.mark_completed();
             event
         };
 
@@ -660,7 +695,7 @@ fn window_manager_loop( consumer: (DFQueueConsumer<Event>, DFQueueConsumer<Event
                 let mouse_displacement = &mouse_event.displacement;
                 let mut x = (mouse_displacement.x as i8) as isize;
                 let mut y = (mouse_displacement.y as i8) as isize;
-                // need to combine cursor events if there pending a lot
+                // need to combine mouse events if there pending a lot
                 loop {
                     let next_event = match mouse_consumer.peek() {
                         Some(ev) => ev,
@@ -711,37 +746,37 @@ fn keyboard_handle_application(key_input: KeyEvent) -> Result<(), &'static str> 
     }
     // then pass them to window
     let win = WINDOW_MANAGER.try().ok_or("The static window manager was not yet initialized")?.lock();
-    match win.pass_keyboard_event_to_window(key_input) {  // even not find a window to pass, that's ok
-        Ok(_) => { },
-        Err(_) => { },
+    if let Err(_) = win.pass_keyboard_event_to_window(key_input) {
+        // even not find a window to pass, that's ok
     }
     Ok(())
 }
 
-/// handle cursor event, push it to related window or anyone asked for it
+/// handle mouse event, push it to related window or anyone asked for it
 fn cursor_handle_application(mouse_event: MouseEvent) -> Result<(), &'static str> {
     do_refresh_floating_border()?;
     let win = WINDOW_MANAGER.try().ok_or("The static window manager was not yet initialized")?.lock();
-    match win.pass_mouse_event_to_window(mouse_event) {  // even not find a window to pass, that's ok
-        Ok(_) => { },
-        Err(_) => { },
+    if let Err(_) = win.pass_mouse_event_to_window(mouse_event) {
+        // even not find a window to pass, that's ok
     }
     Ok(())
 }
 
-/// return the screen size of current window manager
+/// return the screen size of current window manager, (width, height)
 pub fn get_screen_size() -> Result<(usize, usize), &'static str> {
     let win = WINDOW_MANAGER.try().ok_or("The static window manager was not yet initialized")?.lock();
     Ok((win.final_fb.width, win.final_fb.height))
 }
 
-/// return current absolute position of cursor
+/// return current absolute position of mouse, (x, y)
 pub fn get_cursor() -> Result<(usize, usize), &'static str> {
     let win = WINDOW_MANAGER.try().ok_or("The static window manager was not yet initialized")?.lock();
-    Ok(win.cursor)
+    let x = win.mouse.x;
+    let y = win.mouse.y;
+    Ok((x, y))
 }
 
-/// move mouse with delta, this will refresh cursor position
+/// move mouse with delta, this will refresh mouse position
 pub fn move_cursor(x: isize, y: isize) -> Result<(), &'static str> {
     let (ox, oy) = get_cursor()?;
     let mut nx = (ox as isize) + (x as isize);
@@ -759,23 +794,23 @@ pub fn move_cursor(x: isize, y: isize) -> Result<(), &'static str> {
 pub fn move_cursor_to(nx: usize, ny: usize) -> Result<(), &'static str> {
     let (ox, oy) = get_cursor()?;
     let mut win = WINDOW_MANAGER.try().ok_or("The static window manager was not yet initialized")?.lock();
-    win.cursor = (nx, ny);
+    win.mouse = Point { x: nx, y: ny };
     // then update region of old mouse
-    for x in (ox-CURSOR_MAX_SIZE) as isize .. (ox+CURSOR_MAX_SIZE+1) as isize {
-        for y in (oy-CURSOR_MAX_SIZE) as isize .. (oy+CURSOR_MAX_SIZE+1) as isize {
+    for x in (ox-MOUSE_MAX_SIZE) as isize .. (ox+MOUSE_MAX_SIZE+1) as isize {
+        for y in (oy-MOUSE_MAX_SIZE) as isize .. (oy+MOUSE_MAX_SIZE+1) as isize {
             win.refresh_single_pixel(x as usize, y as usize)?;
         }
     }
     // draw new mouse in the new position
-    for x in (nx-CURSOR_MAX_SIZE) as isize .. (nx+CURSOR_MAX_SIZE+1) as isize {
-        for y in (ny-CURSOR_MAX_SIZE) as isize .. (ny+CURSOR_MAX_SIZE+1) as isize {
+    for x in (nx-MOUSE_MAX_SIZE) as isize .. (nx+MOUSE_MAX_SIZE+1) as isize {
+        for y in (ny-MOUSE_MAX_SIZE) as isize .. (ny+MOUSE_MAX_SIZE+1) as isize {
             win.refresh_single_pixel(x as usize, y as usize)?;
         }
     }
     Ok(())
 }
 
-/// new window object
+/// new window object with given position and size
 pub fn new_window<'a>(
     x: usize, y: usize, width: usize, height: usize,
 ) -> Result<Arc<Mutex<WindowObjAlpha>>, &'static str> {
@@ -786,7 +821,7 @@ pub fn new_window<'a>(
 
     // Init the frame buffer of the window
     let mut framebuffer = FrameBufferAlpha::new(width, height, None)?;
-    framebuffer.fullfill_color(0x80FFFFFF);  // draw with half transparent white
+    framebuffer.fill_color(0x80FFFFFF);  // draw with half transparent white
 
     // new window object
     let window: WindowObjAlpha = WindowObjAlpha {
