@@ -1,7 +1,7 @@
 [package]
 name = "window_components"
 version = "0.1.0"
-authors = ["wuyuepku <wuyue16@pku.edu.cn>"]
+authors = ["Yue Wu <wuyue16@pku.edu.cn>"]
 description = "an easy-to-use window object owned by application"
 build = "../../build.rs"
 

@@ -2,7 +2,7 @@
 name = "new_window"
 version = "0.1.0"
 description = "Try New Window"
-authors = ["wuyuepku <wuyue16@pku.edu.cn>"]
+authors = ["Yue Wu <wuyue16@pku.edu.cn>"]
 build = "../../build.rs"
 
 [dependencies]

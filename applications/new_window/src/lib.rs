@@ -1,5 +1,16 @@
-//! thie application is to create a new window with given size
+//! This application is to create a new window with given size, and user could edit text on it
 //! 
+//! usage:      x y width height (unit is pixel)
+//! 
+//! This simple application is to test `WindowManagerAlpha` with multiple window overlapping each other, 
+//! as well as test `WindowComponents` which provides easy-to-use interface for application to enable GUI.
+//! 
+//! User could edit text in this window. Special keys are supported in this simple editor, such as moving up, down, left and right. 
+//! Other basic operations like backspace and new-line is also supported.
+//! 
+//! This application could also be used to test performance, by uncomment the code block that refreshing chars from `a` to `z`. 
+//! You would notice that even if refreshing all the chars is slow, it is quite fast when you editing texts, thanks to partial refreshing 
+//! mechanism supported by both `WindowManagerAlpha` and `WindowComponents`
 
 #![no_std]
 #[macro_use] extern crate log;
@@ -33,31 +44,38 @@ pub fn main(_args: Vec<String>) -> isize {
         return 0;
     }
 
+    // take arguments as the parameter to create a window
     let x = _args[0].parse::<usize>().unwrap();
     let y = _args[1].parse::<usize>().unwrap();
     let width = _args[2].parse::<usize>().unwrap();
     let height = _args[3].parse::<usize>().unwrap();
     debug!("parameters {:?}", (x, y, width, height));
 
-    let _wincomps = match window_components::WindowComponents::new(
-        x, y, width, height
+    // create the instance of WindowComponents, which provides basic drawing of a window and basic response to user input
+    let wincomps_mutex = match window_components::WindowComponents::new(
+        x, y, width, height  // the position and size of window, including the title bar and border
     ) {
         Ok(m) => m,
         Err(err) => { debug!("new window components returned err: {}", err); return -2; }
     };
-    let mut wincomps = _wincomps.lock();
+    let mut wincomps = wincomps_mutex.lock();
+
+    // get the actual inner size for user to put components
     let (width_inner, height_inner) = wincomps.inner_size();
     debug!("new window done width: {}, height: {}", width_inner, height_inner);
-    // next add textarea to wincomps
-    let _textarea = match window_components::TextArea::new(
-        wincomps.bias_x + 4, wincomps.bias_y + 4, width_inner - 8, height_inner - 8,
-        &wincomps.winobj, None, None, Some(wincomps.background), None
-    ) { 
+
+    // add textarea to WindowComponents
+    let textarea_mutex = match window_components::TextArea::new(
+        wincomps.bias_x + 4, wincomps.bias_y + 4, width_inner - 8, height_inner - 8,  // position and size of textarea
+        &wincomps.winobj,  // bind this textarea to WindowComponents
+        None, None, Some(wincomps.background), None  // use default parameters
+    ) {
         Ok(m) => m,
         Err(err) => { debug!("new textarea returned err: {}", err); return -3; }
     };
-    // refresh all the charaters to test performance
-    let mut textarea = _textarea.lock();
+    let mut textarea = textarea_mutex.lock();
+
+    // refresh all the characters to test performance,
     // for c in ('a' as u8) .. ('z' as u8 + 1) {
     //     for i in 0 .. textarea.x_cnt {
     //         for j in 0 .. textarea.y_cnt {
@@ -69,29 +87,29 @@ pub fn main(_args: Vec<String>) -> isize {
     //     }
     // }
 
-    debug!("all done");
+    // prepare for display chars
+    let mut char_matrix: Vec<u8> = Vec::new();  // the text that should be displayed
+    let text_cnt: usize = textarea.x_cnt * textarea.y_cnt;  // the total count of chars in textarea
+    char_matrix.resize(text_cnt, ' ' as u8);  // fill in the textarea with blank char
 
-    let mut char_matrix: Vec<u8> = Vec::new();
-    let mut text_cursor: usize = 0;
-    let text_cnt: usize = textarea.x_cnt * textarea.y_cnt;
-    char_matrix.resize(text_cnt, ' ' as u8);
-    // for c in 0 as usize .. 256 as usize {
-    //     char_matrix[c] = c as u8;
-    // }
-    // char_matrix[0] = 221;
-
-    const CURSOR_CHAR: u8 = 221;
-    const BLINK_INTERVAL: u64 = 50000000;
-    let start_time: u64 = get_time();
-    let mut cursor_last_char: u8 = ' ' as u8;
+    // prepare for user-friendly cursor display
+    let mut text_cursor: usize = 0;  // the current cursor position
+    const CURSOR_CHAR: u8 = 221;  // cursor char, refer to font.rs
+    const BLINK_INTERVAL: u64 = 50000000;  // the interval to display a blink of cursor, for better user experience
+    let start_time: u64 = get_time();  // used to compute blink of cursor
+    let mut cursor_last_char: u8 = ' ' as u8;  // store the char that is overwritten by cursor, to support arbitrary cursor movement
 
     loop {
+        // first let WindowComponents to handle basic user inputs, and leaves those unhandled events
         match wincomps.handle_event() {
             Ok(_) => {},
-            Err(err) => { debug!("{}", err); return 0; }
+            Err(err) => {
+                debug!("{}", err);  // when user click close button, this will trigger, and simply exit the program
+                return 0;
+            }
         }
 
-        // then do my work here
+        // handle events of application, like user input text, moving cursor, etc.
         loop {
             let _event = match wincomps.consumer.peek() {
                 Some(ev) => ev,
@@ -101,38 +119,34 @@ pub fn main(_args: Vec<String>) -> isize {
                 &Event::InputEvent(ref input_event) => {
                     let key_event = input_event.key_event;
                     if key_event.action == KeyAction::Pressed {
+                        // first handle special keys that allows user to move the cursor and delete chars
                         if key_event.keycode == Keycode::Backspace {
-                            char_matrix[(text_cursor + text_cnt - 1) % text_cnt] = ' ' as u8;
-                            char_matrix[text_cursor] = cursor_last_char;
-                            text_cursor = (text_cursor + text_cnt - 1) % text_cnt;
-                            cursor_last_char = char_matrix[text_cursor]
+                            let new_cursor = (text_cursor + text_cnt - 1) % text_cnt;
+                            char_matrix[new_cursor] = ' ' as u8;  // set last char to ' '
+                            move_cursor_restore_old(&mut char_matrix, &mut text_cursor, &mut cursor_last_char, new_cursor);
                         } else if key_event.keycode == Keycode::Enter {
-                            char_matrix[text_cursor] = cursor_last_char;
-                            text_cursor = ((text_cursor / textarea.x_cnt + 1) * textarea.x_cnt) % text_cnt;
-                            cursor_last_char = char_matrix[text_cursor]
+                            let new_cursor = ((text_cursor / textarea.x_cnt + 1) * textarea.x_cnt) % text_cnt;
+                            move_cursor_restore_old(&mut char_matrix, &mut text_cursor, &mut cursor_last_char, new_cursor);
                         } else if key_event.keycode == Keycode::Up {
-                            char_matrix[text_cursor] = cursor_last_char;
-                            text_cursor = ((text_cursor / textarea.x_cnt + textarea.y_cnt - 1) * textarea.x_cnt
+                            let new_cursor = ((text_cursor / textarea.x_cnt + textarea.y_cnt - 1) * textarea.x_cnt
                                 + (text_cursor % textarea.x_cnt)) % text_cnt;
-                            cursor_last_char = char_matrix[text_cursor]
+                            move_cursor_restore_old(&mut char_matrix, &mut text_cursor, &mut cursor_last_char, new_cursor);
                         } else if key_event.keycode == Keycode::Down {
-                            char_matrix[text_cursor] = cursor_last_char;
-                            text_cursor = ((text_cursor / textarea.x_cnt + 1) * textarea.x_cnt
+                            let new_cursor = ((text_cursor / textarea.x_cnt + 1) * textarea.x_cnt
                                 + (text_cursor % textarea.x_cnt)) % text_cnt;
-                            cursor_last_char = char_matrix[text_cursor]
+                            move_cursor_restore_old(&mut char_matrix, &mut text_cursor, &mut cursor_last_char, new_cursor);
                         } else if key_event.keycode == Keycode::Left {
-                            char_matrix[text_cursor] = cursor_last_char;
-                            text_cursor = ((text_cursor / textarea.x_cnt) * textarea.x_cnt 
+                            let new_cursor = ((text_cursor / textarea.x_cnt) * textarea.x_cnt
                                 + (((text_cursor % textarea.x_cnt) + textarea.x_cnt - 1) % textarea.x_cnt)) % text_cnt;
-                            cursor_last_char = char_matrix[text_cursor]
-                        } else if key_event.keycode == Keycode::Right {
-                            char_matrix[text_cursor] = cursor_last_char;
-                            text_cursor = ((text_cursor / textarea.x_cnt) * textarea.x_cnt 
+                            move_cursor_restore_old(&mut char_matrix, &mut text_cursor, &mut cursor_last_char, new_cursor);
+                        } else if key_event.keycode == Keycode::Right { 
+                            let new_cursor = ((text_cursor / textarea.x_cnt) * textarea.x_cnt
                                 + (((text_cursor % textarea.x_cnt) + 1) % textarea.x_cnt)) % text_cnt;
-                            cursor_last_char = char_matrix[text_cursor]
+                            move_cursor_restore_old(&mut char_matrix, &mut text_cursor, &mut cursor_last_char, new_cursor);
                         } else {
                             match key_event.keycode.to_ascii(key_event.modifiers) {
                                 Some(c) => {
+                                    // for normal keys, just display them and move the cursor forward
                                     char_matrix[text_cursor] = c as u8;
                                     text_cursor = (text_cursor + 1) % text_cnt;
                                     cursor_last_char = char_matrix[text_cursor]
@@ -144,10 +158,10 @@ pub fn main(_args: Vec<String>) -> isize {
                 }
                 _ => {}
             }
-            _event.mark_completed();
+            _event.mark_completed();  // always consume the event, and ignore those unknown ones
         }
 
-        // make cursor blink
+        // make cursor blink by computing the time from start
         let timidx = (get_time() - start_time) / BLINK_INTERVAL;
         if timidx % 2 == 0 {
             char_matrix[text_cursor] = CURSOR_CHAR;
@@ -155,18 +169,28 @@ pub fn main(_args: Vec<String>) -> isize {
             char_matrix[text_cursor] = ' ' as u8;
         }
 
+        // update char matrix for textarea to display, this is efficient that will only redraw the changed chars
         match textarea.set_char_matrix(&char_matrix) {
             Ok(_) => {}
             Err(err) => {debug!("set char matrix failed: {}", err); return -5; }
         }
 
-        scheduler::schedule();  // do nothing
+        // be nice to other applications
+        scheduler::schedule();
     }
 }
 
+/// get current time for cursor blinking
 fn get_time() -> u64 {
     match get_hpet().as_ref().ok_or("couldn't get HPET timer") {
         Ok(m) => m.get_counter(),
         Err(_) => 0
     }
+}
+
+/// set cursor to a new position and restore the old one
+fn move_cursor_restore_old(char_matrix: &mut Vec<u8>, text_cursor: &mut usize, cursor_last_char: &mut u8, new_cursor: usize) {
+    char_matrix[*text_cursor] = *cursor_last_char;  // first restore the previous char
+    *text_cursor = new_cursor;  // update new cursor
+    *cursor_last_char = char_matrix[*text_cursor];  // record the current char for later restore
 }

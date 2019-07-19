@@ -1,7 +1,7 @@
 [package]
 name = "window_manager_alpha"
 version = "0.1.0"
-authors = ["wuyuepku <wuyue16@pku.edu.cn>"]
+authors = ["Yue Wu <wuyue16@pku.edu.cn>"]
 description = "allocate new windows and manage a list of existing windows"
 build = "../../build.rs"
 
