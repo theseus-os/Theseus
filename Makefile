@@ -557,11 +557,13 @@ gdb:
 ### ARM
 arminit:
 	cp ./kernel/nano_core/src/boot/arch_aarch64/main.rs ./kernel/nano_core/src/
+	mkdir -p ./build/boot/grub
+	aarch64-none-elf-as -c kernel/nano_core/src/boot/arch_aarch64/boot.s \
+		-o ./build/boot/boot.o	
 	RUST_TARGET_PATH=$(PWD)/cfg \
-		RUSTFLAGS="--emit=obj -C debuginfo=2  -D unused-must-use" xargo build  --all --release --target aarch64-theseus 
+		RUSTFLAGS="--emit=obj -C debuginfo=2 -D unused-must-use" xargo build  --all --release --target aarch64-theseus 
 	rm -f ./kernel/nano_core/src/main.rs
 
-	mkdir -p ./build/boot/grub
 
 	cp ./cfg/grub-aarch64.cfg ./build/boot/grub/grub.cfg
 

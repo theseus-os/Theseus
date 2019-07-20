@@ -42,10 +42,10 @@ extern crate irq_safety; // for irq-safe locking and interrupt utilities
 extern crate state_store;
 extern crate memory; // the virtual memory subsystem
 extern crate mod_mgmt;
-extern crate exceptions_early;
 extern crate captain;
 extern crate panic_unwind; // the panic/unwind lang items
 */
+extern crate exceptions_early;
 extern crate logger;
 extern crate uefi;
 extern crate uefi_services;
@@ -88,29 +88,6 @@ fn shutdown(msg: core::fmt::Arguments) -> ! {
 
 
 /// The main entry point into Theseus, that is, the first Rust code that the Theseus kernel runs. 
-///
-/// This is called from assembly code entry point for Theseus, found in `nano_core/src/boot/arch_x86_64/boot.asm`.
-///
-/// This function does the following things: 
-///
-/// * Bootstraps the OS, including [logging](../logger/index.html) 
-///   and basic early [exception handlers](../exceptions_early/fn.init.html)
-/// * Sets up basic [virtual memory](../memory/fn.init.html)
-/// * Initializes the [state_store](../state_store/index.html) module
-/// * Finally, calls the Captain module, which initializes and configures the rest of Theseus.
-///
-/// If a failure occurs and is propagated back up to this function, the OS is shut down.
-/// 
-/// # Note
-/// In general, you never need to modify the `nano_core` to change Theseus's behavior,
-/// because the `nano_core` is essentially logic-agnostic boilerplate code and set up routines. 
-/// If you want to customize or change how the OS components are initialized, 
-/// then change the [`captain::init`](../captain/fn.init.html) routine.
-/// 
-fn warp (int:u64) -> u64 {
-    return int;
-}
-
 #[cfg(any(windows, target_arch="aarch64", target_env = "msvc"))]
 #[no_mangle]
 pub extern "win64" fn efi_main(image: uefi::Handle, st: SystemTable<Boot>){
@@ -211,6 +188,7 @@ pub extern "win64" fn nano_core_start(image: uefi::Handle, st: SystemTable<Boot>
     unsafe{ 
         let dir =(*protocol).open_volume().expect("Fail to get access to the file system");
     }
+    exceptions_early::init();
 
     // TODO: captain::init()
     loop {

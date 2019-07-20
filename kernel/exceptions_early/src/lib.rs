@@ -2,8 +2,10 @@
 
 #![no_std]
 #![feature(abi_x86_interrupt)]
+ #![feature(asm)]
 
 #[macro_use] extern crate vga_buffer; // for println_raw!()
+#[macro_use] extern crate log;
 #[cfg(any(target_arch="x86", target_arch="x86_64"))]
 extern crate x86_64;
 #[cfg(any(target_arch="aarch64"))]
@@ -17,8 +19,8 @@ use aarch64::structures::idt::{LockedIdt, ExceptionStackFrame, PageFaultErrorCod
 
 // For aarch64, exception handlers are defined in libs/src/proto/debug
 
+#[cfg(any(target_arch="x86", target_arch="x86_64"))]
 pub fn init(idt_ref: &'static LockedIdt) {
-    #[cfg(any(target_arch="x86", target_arch="x86_64"))]
     { 
         let mut idt = idt_ref.lock(); // withholds interrupts
 
@@ -51,6 +53,48 @@ pub fn init(idt_ref: &'static LockedIdt) {
 
     idt_ref.load();
 }
+
+#[cfg(any(target_arch="aarch64"))]
+pub fn init() {
+    let vector:u32;
+    unsafe {  asm!("mrs $0, VBAR_EL1" : "=r"(vector) : : : "volatile") };
+    //let exception = vector as *mut u32;
+    let exception = VECTORS.as_ptr() as u32;
+    let exception = exception + 0x800 - (exception % 0x800);
+    debug!("Wenqiu : {:X}", exception);
+    
+    let mut addr = exception;
+    for i in 0..16 {
+        unsafe { 
+            let handler = exception_default_handler as u32;
+            let handler = handler as u32;
+            unsafe { debug!("Wenqiu : {:X}: {:X}", addr, handler); }
+            let entry = addr as *mut u32;
+            *entry = 0x98000000 as u32 - (addr as u32 - handler as u32)/4;
+            //let exception = (vector + 4) as *mut u32;
+            //*exception = 0x9400e5fc;
+        
+            addr += 0x80;
+        }
+        
+    }
+
+    unsafe {
+        asm!("
+            msr VBAR_EL1, x0;
+            dsb ish; 
+            isb; " : :"{x0}"(exception): : "volatile");
+    }
+
+    debug!("WEnqiu: {}", exception);
+
+    unsafe { *(0x400 as *mut u32) = 'd' as u32; }
+
+
+
+    //return Frame::containing_address(PhysicalAddress::new_canonical(p4))
+}
+
 
 
 
@@ -148,4 +192,14 @@ pub extern "x86-interrupt" fn early_page_fault_handler(stack_frame: &mut Excepti
              stack_frame);
 
     loop {}
+}
+
+
+#[cfg(any(target_arch="aarch64"))]
+static VECTORS:[[u32;0x20]; 17] = [[0;0x20];17];
+
+fn exception_default_handler() {
+
+    debug!("Exceptions!");
+    loop { }
 }

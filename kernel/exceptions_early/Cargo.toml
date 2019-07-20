@@ -16,6 +16,9 @@ aarch64 = { path = "../../libs/aarch64" }
 [dependencies.vga_buffer]
 path = "../vga_buffer"
 
+[dependencies.log]
+default-features = false
+version = "0.3.7"
 
 [lib]
 crate-type = ["rlib"]

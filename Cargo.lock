@@ -453,6 +453,7 @@ name = "exceptions_early"
 version = "0.1.0"
 dependencies = [
  "aarch64 0.1.2",
+ "log 0.3.9 (registry+https://github.com/rust-lang/crates.io-index)",
  "vga_buffer 0.1.0",
  "x86_64 0.1.2",
 ]

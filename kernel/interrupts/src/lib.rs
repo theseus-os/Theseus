@@ -65,6 +65,7 @@ pub fn init(double_fault_stack_top_unusable: VirtualAddress, privilege_stack_top
     gdt::create_tss_gdt(bsp_id, double_fault_stack_top_unusable, privilege_stack_top_unusable);
 
     // initialize early exception handlers
+    #[cfg(any(target_arch="x86", target_arch="x86_64"))]
     exceptions_early::init(&IDT);
     #[cfg(any(target_arch="x86", target_arch="x86_64"))]
     {
