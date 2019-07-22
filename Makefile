@@ -558,12 +558,12 @@ MAIN_DIR:=$(ROOT_DIR)/kernel/nano_core/src/boot/arch_aarch64
 NANO_CORE_DIR:=$(ROOT_DIR)/kernel/nano_core/src
 
 ### ARM
+arminit:export TARGET:=aarch64-theseus
 arminit:
 	@BUILD_MODE=release
 	@CROSS=aarch64-none-elf-
 	@cp $(MAIN_DIR)/main.rs $(NANO_CORE_DIR)
 	@mkdir -p $(BUILD_DIR)/boot/grub
-	@export TARGET=aarch64-theseus
 	RUST_TARGET_PATH=$(PWD)/cfg \
 		RUSTFLAGS="--emit=obj -C debuginfo=2 -D unused-must-use" xargo build  --all --release --target aarch64-theseus 
 	rm -f $(NANO_CORE_DIR)/main.rs

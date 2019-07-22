@@ -623,11 +623,14 @@ pub fn init(boot_info: &BootInformation)
 #[no_mangle]
 pub unsafe extern "win64" fn __chkstk() {}
 
+/// Initialize the memory system
 #[cfg(any(windows, target_arch="aarch64", target_env = "msvc"))]
 pub fn init(bt:&BootServices, stdout:&mut Output, image: uefi::Handle) 
     -> Result<(Arc<MutexIrqSafe<MemoryManagementInfo>>, MappedPages, MappedPages, MappedPages, Vec<MappedPages>), &'static str> {
+    // get memory layout information
+    const EXTRA_MEMORY_INFO_BUFFER_SIZE:usize = 8;
     let mapped_info_size = bt.memory_map_size();
-    let mapped_info_size = mapped_info_size + 108 * mem::size_of::<MemoryDescriptor>();
+    let mapped_info_size = mapped_info_size + EXTRA_MEMORY_INFO_BUFFER_SIZE * mem::size_of::<MemoryDescriptor>();
     
     let mut buffer = Vec::with_capacity(mapped_info_size);
     unsafe {
@@ -637,6 +640,7 @@ pub fn init(bt:&BootServices, stdout:&mut Output, image: uefi::Handle)
         .memory_map(&mut buffer)
         .expect_success("Failed to retrieve UEFI memory map");
 
+    // parse memory layout information
     let mut kernel_phys_start: PhysicalAddress = PhysicalAddress::new(0)?;
     let mut kernel_phys_end: PhysicalAddress = PhysicalAddress::new(0)?;
     let mut avail_index = 0;
@@ -665,9 +669,6 @@ pub fn init(bt:&BootServices, stdout:&mut Output, image: uefi::Handle)
                         avail_index += 1;
                     },
                     _ => {
-                        // occupied[occup_index] = PhysicalMemoryArea::new(
-                        //     phys_start, size, 1, 0);
-                        // occup_index += 1;
                         if kernel_phys_start.value() == 0 {
                             kernel_phys_start = PhysicalAddress::new(phys_start as usize)?;
                             kernel_phys_end = PhysicalAddress::new(phys_start + size)?;
@@ -679,12 +680,8 @@ pub fn init(bt:&BootServices, stdout:&mut Output, image: uefi::Handle)
                     }
                 }
                
-                debug!("{:#X} size:{:#X} type {:?}\n", phys_start, 
+                debug!("Memory area start:{:#X} size:{:#X} type {:?}\n", phys_start, 
                     size, mapped_pages.ty);
-                // match stdout.write_str(&mapresult){
-                //     Ok(_) => {},
-                //     Err(err) => {},
-                // }
             },
             None => break,
         }
@@ -693,16 +690,9 @@ pub fn init(bt:&BootServices, stdout:&mut Output, image: uefi::Handle)
     }
 
     let kernel_virt_end = kernel_phys_end + KERNEL_OFFSET;
-
-    // match stdout.write_str(&format!("kernel_phys_start: {:#x}, kernel_phys_end: {:#x} kernel_virt_end = {:#x}",
-    //     kernel_phys_start,
-    //     kernel_phys_end,
-    //     kernel_virt_end)) {
-    //     _ => {}
-    // }
     debug!("kernel_phys_start: {:#x}, kernel_phys_end: {:#x} kernel_virt_end = {:#x}", kernel_phys_start, kernel_phys_end, kernel_virt_end);
 
-    // UEFI uses the Load File Protocal to load modules
+    // UEFI uses the Load File Protocol to load modules
     // // calculate the bounds of physical memory that is occupied by modules we've loaded 
     // // (we can reclaim this later after the module is loaded, but not until then)
     // let (modules_start, modules_end) = {

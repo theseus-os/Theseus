@@ -822,7 +822,6 @@ pub fn init(bt:&BootServices, allocator_mutex: &MutexIrqSafe<AreaFrameAllocator>
    -> Result<(PageTable, Vec<VirtualMemoryArea>, MappedPages, MappedPages, MappedPages, Vec<MappedPages>, Vec<MappedPages>), &'static str> {
     //init higher half
     enable_higher_half();
-    
     let p4_frame = get_current_p4();
     set_recursive(p4_frame.start_address().value() as u64);    
     
@@ -842,13 +841,8 @@ pub fn init(bt:&BootServices, allocator_mutex: &MutexIrqSafe<AreaFrameAllocator>
 
     try!(enable_temporary_page(allocator_mutex));
 
-    // let mut new_table: InactivePageTable = {
-    //     try!(InactivePageTable::new(frame, &mut active_table, TemporaryPage::new(temp_frames1)))
-    // };
-
     let mut new_table = PageTable::new_table(&mut page_table, new_frame, TemporaryPage::new(temp_frames1))?;
     
-//  let elf_sections_tag = try!(boot_info.elf_sections_tag().ok_or("no Elf sections tag present!"));   
     let mut vmas: [VirtualMemoryArea; 32] = Default::default();
     let mut text_mapped_pages: Option<MappedPages> = None;
     let mut rodata_mapped_pages: Option<MappedPages> = None;
@@ -871,7 +865,6 @@ pub fn init(bt:&BootServices, allocator_mutex: &MutexIrqSafe<AreaFrameAllocator>
         mapper.p4_mut().clear_entry(KERNEL_TEXT_P4_INDEX);
         mapper.p4_mut().clear_entry(KERNEL_HEAP_P4_INDEX);
         mapper.p4_mut().clear_entry(KERNEL_STACK_P4_INDEX);
-        unsafe{debug!("Wenqiu:{:X}", *temp)};
 
         let mut text_start:   Option<(VirtualAddress, PhysicalAddress)> = None;
         let mut text_end:     Option<(VirtualAddress, PhysicalAddress)> = None;

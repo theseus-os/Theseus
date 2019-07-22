@@ -21,9 +21,6 @@ exclude = [
 	"target",
 	"tools",
 	"userspace",
-
-	## dunno what this is, but it doesn't compile! @Wenqiu?
-	"kernel/graph_drawer",
 ]
 
 
