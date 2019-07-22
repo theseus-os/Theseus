@@ -439,9 +439,7 @@ unsafe {
         msr sctlr_el1, x0;
         isb;" : : : : "volatile");
     };
-    debug!("Wenqiu: higher");
-
-           
+    debug!("Enable higher half page table");          
 }
 
 #[cfg(any(target_arch="aarch64"))]
