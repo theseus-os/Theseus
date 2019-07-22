@@ -48,8 +48,8 @@ path = "../memory"
 [dependencies.mod_mgmt]
 path = "../mod_mgmt"
 
-[dependencies.exceptions_full]
-path = "../exceptions_full"
+[target.'cfg(any(target_arch = "x86_64", target_arch="x86"))'.dependencies]
+exceptions_full = { path = "../exceptions_full" }
 
 [dependencies.apic]
 path = "../apic"

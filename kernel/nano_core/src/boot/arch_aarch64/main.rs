@@ -53,15 +53,8 @@ extern crate uefi_alloc;
 
 use uefi::prelude::*;
 use uefi_exts::BootServicesExt;
-use uefi::proto::console::text::Output;
-use uefi::table::boot::{MemoryDescriptor};
 
 use core::fmt::Write;
-use core::mem;
-
-use crate::alloc::vec::Vec;
-use alloc::string::String;
-
 
 /// Just like Rust's `try!()` macro, but instead of performing an early return upon an error,
 /// it invokes the `shutdown()` function upon an error in order to cleanly exit Theseus OS.
@@ -107,60 +100,50 @@ pub extern "win64" fn efi_main(image: uefi::Handle, st: SystemTable<Boot>){
     // }
 }
 
-/// Prepare and execute transition from EL2 to EL1.
-#[cfg(any(target_arch="aarch64"))]
-#[inline]
-fn setup_and_enter_el1_from_el2(image: uefi::Handle, st: SystemTable<Boot>) -> ! {
-    use cortex_a::{asm, regs::*};
+// Prepare and execute transition from EL2 to EL1.
+// Not in use now
+// #[cfg(any(target_arch="aarch64"))]
+// #[inline]
+// fn _setup_and_enter_el1_from_el2(image: uefi::Handle, st: SystemTable<Boot>) -> ! {
+//     use cortex_a::{asm, regs::*};
 
-    const STACK_START: u64 = 0x80_000;
+//     const STACK_START: u64 = 0x80_000;
 
-    // Enable timer counter registers for EL1
-    CNTHCTL_EL2.write(CNTHCTL_EL2::EL1PCEN::SET + CNTHCTL_EL2::EL1PCTEN::SET);
+//     // Enable timer counter registers for EL1
+//     CNTHCTL_EL2.write(CNTHCTL_EL2::EL1PCEN::SET + CNTHCTL_EL2::EL1PCTEN::SET);
 
-    // No offset for reading the counters
-    CNTVOFF_EL2.set(0);
+//     // No offset for reading the counters
+//     CNTVOFF_EL2.set(0);
 
-    // Set EL1 execution state to AArch64
-    // TODO: Explain the SWIO bit
-    HCR_EL2.write(HCR_EL2::RW::EL1IsAarch64 + HCR_EL2::SWIO::SET);
+//     // Set EL1 execution state to AArch64
+//     // TODO: Explain the SWIO bit
+//     HCR_EL2.write(HCR_EL2::RW::EL1IsAarch64 + HCR_EL2::SWIO::SET);
 
-    // Set up a simulated exception return.
-    //
-    // First, fake a saved program status, where all interrupts were
-    // masked and SP_EL1 was used as a stack pointer.
-    SPSR_EL2.write(
-        SPSR_EL2::D::Masked
-            + SPSR_EL2::A::Masked
-            + SPSR_EL2::I::Masked
-            + SPSR_EL2::F::Masked
-            + SPSR_EL2::M::EL1h,
-    );
+//     // Set up a simulated exception return.
+//     //
+//     // First, fake a saved program status, where all interrupts were
+//     // masked and SP_EL1 was used as a stack pointer.
+//     SPSR_EL2.write(
+//         SPSR_EL2::D::Masked
+//             + SPSR_EL2::A::Masked
+//             + SPSR_EL2::I::Masked
+//             + SPSR_EL2::F::Masked
+//             + SPSR_EL2::M::EL1h,
+//     );
 
-    // Second, let the link register point to reset().
-    ELR_EL2.set(reset as *const () as u64);
+//     // Second, let the link register point to reset().
+//     ELR_EL2.set(reset as *const () as u64);
 
-    // Set up SP_EL1 (stack pointer), which will be used by EL1 once
-    // we "return" to it.
-    SP_EL1.set(STACK_START);
+//     // Set up SP_EL1 (stack pointer), which will be used by EL1 once
+//     // we "return" to it.
+//     SP_EL1.set(STACK_START);
 
-    nano_core_start(image: uefi::Handle, st: SystemTable<Boot>);
-    // Use `eret` to "return" to EL1. This will result in execution of
-    // `reset()` in EL1.
+//     nano_core_start(image: uefi::Handle, st: SystemTable<Boot>);
+//     // Use `eret` to "return" to EL1. This will result in execution of
+//     // `reset()` in EL1.
 
-    asm::eret()
-}
-
-unsafe fn reset(image: uefi::Handle, st: SystemTable<Boot>) {
-    extern "C" {
-        // Boundaries of the .bss section, provided by the linker script
-        static mut __bss_start: u64;
-        static mut __bss_end: u64;
-    }
-
-    // Zeroes the .bss section
-    //r0::zero_bss(&mut __bss_start, &mut __bss_end);
-}
+//     asm::eret()
+// }
 
 #[no_mangle]
 #[cfg(any(target_arch="aarch64"))]
@@ -170,13 +153,13 @@ pub extern "win64" fn nano_core_start(image: uefi::Handle, st: SystemTable<Boot>
     let stdout = st.stdout();
     
     let _ = stdout.clear();
-    let (kernel_mmi_ref, text_mapped_pages, rodata_mapped_pages, data_mapped_pages, identity_mapped_pages) =  try_exit!(memory::init(&bt, stdout, image));
+    let (_kernel_mmi_ref, _text_mapped_pages, _rodata_mapped_pages, _data_mapped_pages, _identity_mapped_pages) =  try_exit!(memory::init(&bt, stdout, image));
 
     debug!("nano_core_start(): initialized memory subsystem.");
 
     match stdout.write_str(WELCOME_STRING){
         Ok(_) => {},
-        Err(err) => {},
+        Err(err) => {error!("Fail to write the welcome string: {}", err)},
     };
 
     // Get the root directory
@@ -185,7 +168,7 @@ pub extern "win64" fn nano_core_start(image: uefi::Handle, st: SystemTable<Boot>
     let protocol = bt.find_protocol::<SearchedProtocol>().expect_success("Failed to init the SimpleFileSystem protocol").get();
 
     unsafe{ 
-        let dir =(*protocol).open_volume().expect("Fail to get access to the file system");
+        let _dir =(*protocol).open_volume().expect("Fail to get access to the file system");
     }
 
     // Disable temporarily because the interrupt handler is to be implemented
@@ -200,7 +183,7 @@ pub extern "win64" fn nano_core_start(image: uefi::Handle, st: SystemTable<Boot>
                 let string = format!("{}", key);
                 match stdout.write_str(&string) {
                         Ok(_) => {},
-                        Err(err) => {},
+                        Err(err) => { debug!("Fail to display the input:{}", err) },
                 };
             },
             None => { }
@@ -208,21 +191,17 @@ pub extern "win64" fn nano_core_start(image: uefi::Handle, st: SystemTable<Boot>
     }
 }
 
+pub fn main() {
+    loop {
 
-//EFI application entry point related
-fn main() {
-    unsafe {
-        //*(0x09000000 as *mut u32) = 'd' as u32;
     }
-    loop { }
 }
-
 
 #[panic_handler]
 fn panic_handler(_info: &core::panic::PanicInfo) -> ! {
     loop{
 
-     }
+    }
 }
 
 #[alloc_error_handler]

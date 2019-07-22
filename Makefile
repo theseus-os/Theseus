@@ -558,8 +558,8 @@ MAIN_DIR:=$(ROOT_DIR)/kernel/nano_core/src/boot/arch_aarch64
 NANO_CORE_DIR:=$(ROOT_DIR)/kernel/nano_core/src
 
 ### ARM
-arminit:export TARGET:=aarch64-theseus
-arminit:
+armbuild:export TARGET:=aarch64-theseus
+armbuild:
 	@BUILD_MODE=release
 	@CROSS=aarch64-none-elf-
 	@cp $(MAIN_DIR)/main.rs $(NANO_CORE_DIR)
@@ -580,10 +580,10 @@ arminit:
 	
 	grub-mkrescue -o theseus.iso $(BUILD_DIR)
 
-arm: arminit
+arm: armbuild
 	qemu-system-aarch64 -m 2048 -cpu cortex-a57 -smp 2 -M virt -bios QEMU_EFI.fd -nographic -drive if=none,file=theseus.iso,id=cdrom,media=cdrom -device virtio-scsi-device -device scsi-cd,drive=cdrom
 
-armqemu: arminit	
+armqemu: armbuild	
 	qemu-system-aarch64 -s -S -m 2048 -cpu cortex-a57 -smp 2 -M virt -bios QEMU_EFI.fd -nographic -drive if=none,file=theseus.iso,id=cdrom,media=cdrom -device virtio-scsi-device -device scsi-cd,drive=cdrom
 
 armgdb:

@@ -5,8 +5,6 @@
 
 #[cfg(any(target_arch="x86", target_arch="x86_64"))]
 extern crate x86_64;
-#[cfg(any(target_arch="aarch64"))]
-extern crate aarch64;
 extern crate task;
 extern crate runqueue;
 extern crate apic;
@@ -18,17 +16,12 @@ extern crate pmu_x86;
 
 #[cfg(any(target_arch="x86", target_arch="x86_64"))]
 use x86_64::structures::idt::{LockedIdt, ExceptionStackFrame, PageFaultErrorCode};
-#[cfg(any(target_arch="aarch64"))]
-use aarch64::structures::idt::{LockedIdt, ExceptionStackFrame, PageFaultErrorCode};
 
 #[cfg(any(target_arch="x86", target_arch="x86_64"))]
 use x86_64::registers::msr::*;
-#[cfg(any(target_arch="aarch64"))]
-use aarch64::registers::msr::*;
 
-
+#[cfg(any(target_arch="x86", target_arch="x86_64"))]
 pub fn init(idt_ref: &'static LockedIdt) {
-    #[cfg(any(target_arch="x86", target_arch="x86_64"))]
     { 
         let mut idt = idt_ref.lock(); // withholds interrupts
 

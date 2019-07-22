@@ -1,7 +1,4 @@
-//! This crate provides x86_64 specific functions and data structures,
-//! and access to various system registers.
-
-#![cfg(any(target_arch="aarch64"))]
+//! This crate is reserved for arm instructions. It is to be implemented and part of the functions will be replaced by cortex-a crate
 
 #![warn(missing_docs)]
 

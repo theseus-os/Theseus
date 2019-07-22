@@ -1,27 +1,11 @@
 [package]
-
 name = "aarch64"
 version = "0.1.2"
 authors = [
-  "Gerd Zellweger <mail@gerdzellweger.com>",
-  "Eric Kidd <git@randomhacks.net>",
-  "Philipp Oppermann <dev@phil-opp.com>",
-  "Dan Schatzberg <schatzberg.dan@gmail.com>",
-  "John Ericson <John_Ericson@Yahoo.com>",
-  "Rex Lunae <rexlunae@gmail.com>"
+  "Wenqiu Yu <yuwenqiuj@gmail.com>",
 ]
 
-description = "Compitable with the x86_64 instruction crate."
-
-repository = "https://github.com/phil-opp/x86_64"
-documentation = "https://docs.rs/x86_64"
-readme = "README.md"
-keywords = ["amd64", "x86", "x86_64", "no_std"]
-license = "MIT"
-
-[[test]]
-name = "no_std_build"
-harness = false
+description = "Reserved crate for arm instructions"
 
 [dependencies]
 bit_field = "0.7.0"
