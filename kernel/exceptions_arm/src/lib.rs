@@ -25,24 +25,27 @@ pub fn init() {
     debug!("Wenqiu : {:X}", exception);
     
     let mut addr = exception;
-    for i in 0..16 {
-        unsafe { 
-            let handler = exception_default_handler as u32;
-            let handler = handler as u32;
-            unsafe { debug!("Wenqiu : {:X}: {:X}", addr, handler); }
-            let test = &exceptions[i] as *const _ as u32;
-            unsafe { debug!("Wenqiu entry : {:X}: {:X}", test, handler); }
-            //let ins = 0x98000000 as u32 - (test as u32 - handler as u32)/4;
-            //let exception = (vector + 4) as *mut u32;
-            //*exception = 0x9400e5fc;
-            let ins = 0x98000000 as u32 - (test as u32 - handler as u32)/4;
-            unsafe { debug!("Wenqiu entry : {:X}: {:X}", test, ins); }
-            let ins = assemble_inst_bl(test, handler);
-            unsafe { debug!("Wenqiu entry : {:X}: {:X}", test, ins); }
-            exceptions[i].instructions[0] = ins;
-        }
-        
+
+    unsafe { 
+        exceptions[0].instructions[0] = assemble_inst_bl(&exceptions[0], exception_synchronous_handler);
+        exceptions[1].instructions[0] = assemble_inst_bl(&exceptions[1], exception_irq_handler);
+        exceptions[2].instructions[0] = assemble_inst_bl(&exceptions[2], exception_fiq_handler);
+        exceptions[3].instructions[0] = assemble_inst_bl(&exceptions[3], exception_SError_handler);
+        exceptions[4].instructions[0] = assemble_inst_bl(&exceptions[4], exception_synchronous_handler);
+        exceptions[5].instructions[0] = assemble_inst_bl(&exceptions[5], exception_irq_handler);
+        exceptions[6].instructions[0] = assemble_inst_bl(&exceptions[6], exception_fiq_handler);
+        exceptions[7].instructions[0] = assemble_inst_bl(&exceptions[7], exception_SError_handler);
+        exceptions[8].instructions[0] = assemble_inst_bl(&exceptions[8], exception_synchronous_handler);
+        exceptions[9].instructions[0] = assemble_inst_bl(&exceptions[9], exception_irq_handler);
+        exceptions[10].instructions[0] = assemble_inst_bl(&exceptions[10], exception_fiq_handler);
+        exceptions[11].instructions[0] = assemble_inst_bl(&exceptions[11], exception_SError_handler);
+        exceptions[12].instructions[0] = assemble_inst_bl(&exceptions[12], exception_synchronous_handler);
+        exceptions[13].instructions[0] = assemble_inst_bl(&exceptions[13], exception_irq_handler);
+        exceptions[14].instructions[0] = assemble_inst_bl(&exceptions[14], exception_fiq_handler);
+        exceptions[15].instructions[0] = assemble_inst_bl(&exceptions[15], exception_SError_handler);
+
     }
+    
 
     unsafe {
         asm!("
@@ -51,20 +54,14 @@ pub fn init() {
             isb; " : :"{x0}"(exception): : "volatile");
     }
 
-    debug!("WEnqiu: {}", exception);
-
-    unsafe { *(0x400 as *mut u32) = 'd' as u32; }
-
-
-
-    //return Frame::containing_address(PhysicalAddress::new_canonical(p4))
+//    unsafe { *(0x400 as *mut u32) = 'd' as u32; }
 }
 
-fn assemble_inst_bl(vector:u32, handler: u32) -> u32 {
+fn assemble_inst_bl(vector:&ExceptionEntry, handler: fn()) -> u32 {
     const INST_BL:u32 = 0x94000000;
     const BL_RANGE:u32 = 0x4000000;
     let dest_addr = handler as u32;
-    let src_addr = vector;// as *const _ as u32;
+    let src_addr = vector as *const _ as u32;
     let offset = BL_RANGE - (src_addr as u32 - dest_addr as u32)/4;
     INST_BL + offset
 }
@@ -83,8 +80,34 @@ impl ExceptionEntry {
     }
 }
 
+
+// TODO print register information
 #[cfg(any(target_arch="aarch64"))]
 fn exception_default_handler() {
-    debug!("Exceptions!");
+    error!("Default Exceptions!");
+    loop { }
+}
+
+#[cfg(any(target_arch="aarch64"))]
+fn exception_synchronous_handler() {
+    error!("Synchronous Exceptions!");
+    loop { }
+}
+
+#[cfg(any(target_arch="aarch64"))]
+fn exception_irq_handler() {
+    error!("IRQ Exceptions!");
+    loop { }
+}
+
+#[cfg(any(target_arch="aarch64"))]
+fn exception_fiq_handler() {
+    error!("FIQ Exceptions!");
+    loop { }
+}
+
+#[cfg(any(target_arch="aarch64"))]
+fn exception_SError_handler() {
+    error!("SErrorExceptions!");
     loop { }
 }
