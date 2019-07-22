@@ -856,11 +856,6 @@ pub fn init(bt:&BootServices, allocator_mutex: &MutexIrqSafe<AreaFrameAllocator>
         // clear out the initially-mapped kernel entries of P4, since we're recreating kernel page tables from scratch.
         // (they were initialized in InactivePageTable::new())
         //let p4 = mapper.p4_mut();
-        let temp = mapper.p4() as *const _ as usize;
-
-        let temp = 0xffffff7fbfdfeff8 as *const usize;
-
-        debug!("Last {:X}", 18446743522877890560 as usize);
 
         mapper.p4_mut().clear_entry(KERNEL_TEXT_P4_INDEX);
         mapper.p4_mut().clear_entry(KERNEL_HEAP_P4_INDEX);
@@ -966,7 +961,7 @@ pub fn init(bt:&BootServices, allocator_mutex: &MutexIrqSafe<AreaFrameAllocator>
                                 address_section = UEFI_START;
                                 // This partion is not mapped as read-only because in the original mapping by UEFI, it is writable. 
                                 // If map this partion as read-only, some UEFI services such as log does not work.
-                                identity_mapped_pages[index] = Some(try!( mapper.map_frames(//WEnqiu TODO: add readonly
+                                identity_mapped_pages[index] = Some(try!( mapper.map_frames(
                                     FrameRange::from_phys_addr(start_phys_addr, size as usize), 
                                     Page::containing_address(start_virt_addr - KERNEL_OFFSET), EntryFlags::PAGE, allocator.deref_mut())
                                 ));
