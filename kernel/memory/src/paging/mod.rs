@@ -439,6 +439,7 @@ unsafe {
         msr sctlr_el1, x0;
         isb;" : : : : "volatile");
     };
+    tlb::flush_all();
     debug!("Enable higher half page table");          
 }
 
