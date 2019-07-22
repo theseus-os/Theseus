@@ -319,7 +319,7 @@ impl PageTable {
         -> Result<(), &'static str>
         where F: FnOnce(&mut Mapper) -> Result<(), &'static str>
     {
-        let mut backup = get_current_p4();
+        let backup = get_current_p4();
         if self.p4_table != backup {
             return Err("To invoke PageTable::with(), that PageTable ('self') must be currently active.");
         }
@@ -815,8 +815,7 @@ pub fn init(allocator_mutex: &MutexIrqSafe<AreaFrameAllocator>, boot_info: &mult
 }
 
 #[cfg(any(target_arch="aarch64"))]
-pub fn init(bt:&BootServices, allocator_mutex: &MutexIrqSafe<AreaFrameAllocator>, 
-    phy_start:PhysicalAddress, phy_end:PhysicalAddress, stdout:&mut Output, image: uefi::Handle) 
+pub fn init(bt:&BootServices, allocator_mutex: &MutexIrqSafe<AreaFrameAllocator>) 
    -> Result<(PageTable, Vec<VirtualMemoryArea>, MappedPages, MappedPages, MappedPages, Vec<MappedPages>, Vec<MappedPages>), &'static str> {
     //init higher half
     enable_higher_half();
@@ -866,16 +865,15 @@ pub fn init(bt:&BootServices, allocator_mutex: &MutexIrqSafe<AreaFrameAllocator>
         let mut data_start:   Option<(VirtualAddress, PhysicalAddress)> = None;
         let mut data_end:     Option<(VirtualAddress, PhysicalAddress)> = None;
 
-        let mut text_flags:       Option<EntryFlags> = None;
-        let mut rodata_flags:     Option<EntryFlags> = None;
-        let mut data_flags:       Option<EntryFlags> = None;
+        let text_flags:       Option<EntryFlags> = None;
+        let rodata_flags:     Option<EntryFlags> = None;
+        let data_flags:       Option<EntryFlags> = None;
 
 
         // scoped to release the frame allocator lock
         
         let mut allocator = allocator_mutex.lock(); 
 
-        let mut index = 0;    
         const EXTRA_MEMORY_INFO_BUFFER_SIZE:usize = 8;
         let mapped_info_size = bt.memory_map_size() + EXTRA_MEMORY_INFO_BUFFER_SIZE * mem::size_of::<MemoryDescriptor>();
         
@@ -889,13 +887,6 @@ pub fn init(bt:&BootServices, allocator_mutex: &MutexIrqSafe<AreaFrameAllocator>
             .expect_success("Failed to retrieve UEFI memory map");
         
         let mut kernel_phys_start: PhysicalAddress = PhysicalAddress::new(0)?;
-        let mut kernel_phys_end: PhysicalAddress = PhysicalAddress::new(0)?;
-        let mut avail_index = 0;
-        let mut available: [PhysicalMemoryArea; 32] = Default::default();
-
-        let mut occupied: [PhysicalMemoryArea; 32] = Default::default();
-        let mut occup_index = 0;
-
         let mut mapped_pages_index = 0;
 
         const DEFAULT:usize = 0;
@@ -1049,7 +1040,7 @@ pub fn init(bt:&BootServices, allocator_mutex: &MutexIrqSafe<AreaFrameAllocator>
         ));
         vmas[index] = VirtualMemoryArea::new(hardware_virt, (HARDWARE_END - HARDWARE_START) as usize,
             EntryFlags::PAGE, ".mmio");
-        index += 1;
+        //index += 1;
 
         // now we map the 5 main sections into 3 groups according to flags
         text_mapped_pages = Some( try!( mapper.map_frames(

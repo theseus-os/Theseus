@@ -641,8 +641,8 @@ pub fn init(bt:&BootServices, stdout:&mut Output, image: uefi::Handle)
     let mut avail_index = 0;
     let mut available: [PhysicalMemoryArea; 32] = Default::default();
 
-    let mut occupied: [PhysicalMemoryArea; 32] = Default::default();
-    let mut occup_index = 0;
+    let occupied: [PhysicalMemoryArea; 32] = Default::default();
+    let occup_index = 0;
 
     let mut mapped_pages_index = 0;
     loop {
@@ -713,7 +713,7 @@ pub fn init(bt:&BootServices, stdout:&mut Output, image: uefi::Handle)
 
     // Initialize paging (create a new page table), which also initializes the kernel heap.
     let (page_table, kernel_vmas, text_mapped_pages, rodata_mapped_pages, data_mapped_pages, higher_half_mapped_pages, identity_mapped_pages) = try!(
-        paging::init(bt, frame_allocator_mutex, kernel_phys_start, kernel_phys_end, stdout, image)
+        paging::init(bt, frame_allocator_mutex)
     );
     // HERE: heap is initialized! Can now use alloc types.
 

@@ -49,8 +49,11 @@ pub fn tsc_ticks() -> TscTicks {
     // get systick
     #[cfg(any(target_arch="aarch64"))]
     // TODO: use cortex crate instead
-    let ticks:u64;
-    unsafe {  asm!("ldr $0, =0xE000E018" : "=r"(ticks) : : : "volatile"); };
+    let ticks:u64 = unsafe {
+        let systick:u64;
+        asm!("ldr $0, =0xE000E018" : "=r"(systick) : : : "volatile"); 
+        systick
+    };
  
     TscTicks(ticks)
 }
