@@ -187,7 +187,9 @@ pub extern "win64" fn nano_core_start(image: uefi::Handle, st: SystemTable<Boot>
     unsafe{ 
         let dir =(*protocol).open_volume().expect("Fail to get access to the file system");
     }
-    exceptions_arm::init();
+
+    // Disable temporarily because the interrupt handler is to be implemented
+    //exceptions_arm::init();
 
     // TODO: captain::init()
     loop {

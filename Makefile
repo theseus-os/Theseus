@@ -554,27 +554,31 @@ debug: $(iso)
 gdb:
 	@rust-os-gdb/bin/rust-gdb "$(nano_core_binary)" -ex "target remote :1234"
 
+MAIN_DIR:=$(ROOT_DIR)/kernel/nano_core/src/boot/arch_aarch64
+NANO_CORE_DIR:=$(ROOT_DIR)/kernel/nano_core/src
+
 ### ARM
 arminit:
-	cp ./kernel/nano_core/src/boot/arch_aarch64/main.rs ./kernel/nano_core/src/
-	mkdir -p ./build/boot/grub
-	aarch64-none-elf-as -c kernel/nano_core/src/boot/arch_aarch64/boot.s \
-		-o ./build/boot/boot.o	
+	@BUILD_MODE=release
+	@CROSS=aarch64-none-elf-
+	@cp $(MAIN_DIR)/main.rs $(NANO_CORE_DIR)
+	@mkdir -p $(BUILD_DIR)/boot/grub
+	@export TARGET=aarch64-theseus
 	RUST_TARGET_PATH=$(PWD)/cfg \
 		RUSTFLAGS="--emit=obj -C debuginfo=2 -D unused-must-use" xargo build  --all --release --target aarch64-theseus 
-	rm -f ./kernel/nano_core/src/main.rs
+	rm -f $(NANO_CORE_DIR)/main.rs
 
 
-	cp ./cfg/grub-aarch64.cfg ./build/boot/grub/grub.cfg
+	cp $(ROOT_DIR)/cfg/grub-aarch64.cfg $(BUILD_DIR)/boot/grub/grub.cfg
 
-	cp ./target/aarch64-theseus/release/nano_core.efi ./build/boot/kernel.efi
-###Wenqiu TODO: add application & use variable
+	cp $(ROOT_DIR)/target/$(TARGET)/$(BUILD_MODE)/nano_core.efi $(BUILD_DIR)/boot/kernel.efi$
+
 	mkdir -p $(OBJECT_FILES_BUILD_DIR)
-	@for f in ./target/aarch64-theseus/release/deps/*.o "$(HOME)"/.xargo/lib/rustlib/aarch64-theseus/lib/*.o; do \
+	@for f in $(ROOT_DIR)/target/$(TARGET)/$(BUILD_MODE)/deps/*.o "$(HOME)"/.xargo/lib/rustlib/aarch64-theseus/lib/*.o; do \
 		cp -vf  $${f}  $(OBJECT_FILES_BUILD_DIR)/`basename $${f} | sed -n -e 's/\(.*\)/$(KERNEL_PREFIX)\1/p'`   2> /dev/null ; \
 	done
-
-	grub-mkrescue -o theseus.iso ./build
+	
+	grub-mkrescue -o theseus.iso $(BUILD_DIR)
 
 arm: arminit
 	qemu-system-aarch64 -m 2048 -cpu cortex-a57 -smp 2 -M virt -bios QEMU_EFI.fd -nographic -drive if=none,file=theseus.iso,id=cdrom,media=cdrom -device virtio-scsi-device -device scsi-cd,drive=cdrom
@@ -583,7 +587,8 @@ armqemu: arminit
 	qemu-system-aarch64 -s -S -m 2048 -cpu cortex-a57 -smp 2 -M virt -bios QEMU_EFI.fd -nographic -drive if=none,file=theseus.iso,id=cdrom,media=cdrom -device virtio-scsi-device -device scsi-cd,drive=cdrom
 
 armgdb:
-	 aarch64-none-elf-gdb "kernel.bin" -ex "target remote :1234"
+	@CROSS=aarch64-none-elf-
+	$(CROSS)gdb "kernel.bin" -ex "target remote :1234"
 
 
 ### builds and runs Theseus in Bochs

@@ -54,7 +54,6 @@ pub fn init() {
             isb; " : :"{x0}"(exception): : "volatile");
     }
 
-//    unsafe { *(0x400 as *mut u32) = 'd' as u32; }
 }
 
 fn assemble_inst_bl(vector:&ExceptionEntry, handler: fn()) -> u32 {
