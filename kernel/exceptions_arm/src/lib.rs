@@ -18,7 +18,7 @@ pub fn init() {
     let vector:u32;
     unsafe {  asm!("mrs $0, VBAR_EL1" : "=r"(vector) : : : "volatile") };
     //let exception = vector as *mut u32;
-    let exceptions = VECTORS.lock();
+    let mut exceptions = VECTORS.lock();
 
     let exception = exceptions.as_ptr() as u32;
 //    let exception = exception + 0x800 - (exception % 0x800);
@@ -30,12 +30,16 @@ pub fn init() {
             let handler = exception_default_handler as u32;
             let handler = handler as u32;
             unsafe { debug!("Wenqiu : {:X}: {:X}", addr, handler); }
-            let entry = addr as *mut u32;
-            *entry = 0x98000000 as u32 - (addr as u32 - handler as u32)/4;
+            let test = &exceptions[i] as *const _ as u32;
+            unsafe { debug!("Wenqiu entry : {:X}: {:X}", test, handler); }
+            //let ins = 0x98000000 as u32 - (test as u32 - handler as u32)/4;
             //let exception = (vector + 4) as *mut u32;
             //*exception = 0x9400e5fc;
-        
-            addr += 0x80;
+            let ins = 0x98000000 as u32 - (test as u32 - handler as u32)/4;
+            unsafe { debug!("Wenqiu entry : {:X}: {:X}", test, ins); }
+            let ins = assemble_inst_bl(test, handler);
+            unsafe { debug!("Wenqiu entry : {:X}: {:X}", test, ins); }
+            exceptions[i].instructions[0] = ins;
         }
         
     }
@@ -54,6 +58,15 @@ pub fn init() {
 
 
     //return Frame::containing_address(PhysicalAddress::new_canonical(p4))
+}
+
+fn assemble_inst_bl(vector:u32, handler: u32) -> u32 {
+    const INST_BL:u32 = 0x94000000;
+    const BL_RANGE:u32 = 0x4000000;
+    let dest_addr = handler as u32;
+    let src_addr = vector;// as *const _ as u32;
+    let offset = BL_RANGE - (src_addr as u32 - dest_addr as u32)/4;
+    INST_BL + offset
 }
 
 #[derive(Copy, Clone)]
