@@ -619,18 +619,13 @@ pub fn init(boot_info: &BootInformation)
     Ok( (kernel_mmi_ref.clone(), text_mapped_pages, rodata_mapped_pages, data_mapped_pages, identity_mapped_pages) )
 }
 
-
-#[no_mangle]
-pub unsafe extern "win64" fn __chkstk() {}
-
 /// Initialize the memory system
 #[cfg(any(windows, target_arch="aarch64", target_env = "msvc"))]
 pub fn init(bt:&BootServices, stdout:&mut Output, image: uefi::Handle) 
     -> Result<(Arc<MutexIrqSafe<MemoryManagementInfo>>, MappedPages, MappedPages, MappedPages, Vec<MappedPages>), &'static str> {
     // get memory layout information
     const EXTRA_MEMORY_INFO_BUFFER_SIZE:usize = 8;
-    let mapped_info_size = bt.memory_map_size();
-    let mapped_info_size = mapped_info_size + EXTRA_MEMORY_INFO_BUFFER_SIZE * mem::size_of::<MemoryDescriptor>();
+    let mapped_info_size = bt.memory_map_size() + EXTRA_MEMORY_INFO_BUFFER_SIZE * mem::size_of::<MemoryDescriptor>();
     
     let mut buffer = Vec::with_capacity(mapped_info_size);
     unsafe {
@@ -654,7 +649,7 @@ pub fn init(bt:&BootServices, stdout:&mut Output, image: uefi::Handle)
         match ( maps_iter.next()){
             Some(mapped_pages) => {
                 let phys_start = mapped_pages.phys_start as usize;
-                let size = mapped_pages.page_count as usize * 0x1000;
+                let size = mapped_pages.page_count as usize * PAGE_SIZE;
 
                 match mapped_pages.ty {
                     MemoryType::CONVENTIONAL => {

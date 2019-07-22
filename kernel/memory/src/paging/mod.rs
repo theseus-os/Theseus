@@ -41,7 +41,7 @@ use x86_64::instructions::tlb;
 use aarch64::instructions::tlb;
 
 use kernel_config::memory::{PAGE_SIZE, MAX_PAGE_NUMBER, RECURSIVE_P4_INDEX};
-use kernel_config::memory::{KERNEL_TEXT_P4_INDEX, KERNEL_HEAP_P4_INDEX, KERNEL_STACK_P4_INDEX};
+use kernel_config::memory::{KERNEL_TEXT_P4_INDEX, KERNEL_HEAP_P4_INDEX, KERNEL_STACK_P4_INDEX, MAX_VIRTUAL_ADDRESS};
 
 
 
@@ -876,8 +876,8 @@ pub fn init(bt:&BootServices, allocator_mutex: &MutexIrqSafe<AreaFrameAllocator>
         let mut allocator = allocator_mutex.lock(); 
 
         let mut index = 0;    
-        let mapped_info_size = bt.memory_map_size();
-        let mapped_info_size = mapped_info_size + 8 * mem::size_of::<MemoryDescriptor>();
+        const EXTRA_MEMORY_INFO_BUFFER_SIZE:usize = 8;
+        let mapped_info_size = bt.memory_map_size() + EXTRA_MEMORY_INFO_BUFFER_SIZE * mem::size_of::<MemoryDescriptor>();
         
         let mut buffer = Vec::with_capacity(mapped_info_size);
         unsafe {
@@ -907,12 +907,13 @@ pub fn init(bt:&BootServices, allocator_mutex: &MutexIrqSafe<AreaFrameAllocator>
 
         let flags = EntryFlags::GLOBAL;
 
+        debug!("Start to map occupied memories in the new page table");
         loop {
 
             match ( maps_iter.next()){
                 Some(mapped_pages) => {
                     let start_phys_addr = mapped_pages.phys_start as usize;
-                    let size = mapped_pages.page_count as usize * 0x1000;
+                    let size = mapped_pages.page_count as usize * PAGE_SIZE;
 
                     if kernel_phys_start.value() == 0 {
                         kernel_phys_start = PhysicalAddress::new(start_phys_addr)?;
@@ -921,7 +922,7 @@ pub fn init(bt:&BootServices, allocator_mutex: &MutexIrqSafe<AreaFrameAllocator>
                     let end_phys_addr;
                     let end_virt_addr;
                     let start_virt_addr;
-                    if start_phys_addr < 0xFFFFFFFFFFFFFFFF - KERNEL_OFFSET as usize {
+                    if start_phys_addr < MAX_VIRTUAL_ADDRESS - KERNEL_OFFSET as usize {
                         start_virt_addr = start_phys_addr as usize + KERNEL_OFFSET;
                         end_virt_addr = VirtualAddress::new( start_virt_addr as usize + size )?;
                         end_phys_addr = PhysicalAddress::new( start_phys_addr as usize + size )?;
@@ -959,6 +960,7 @@ pub fn init(bt:&BootServices, allocator_mutex: &MutexIrqSafe<AreaFrameAllocator>
                                 address_section = UEFI_START;
                                 // This partion is not mapped as read-only because in the original mapping by UEFI, it is writable. 
                                 // If map this partion as read-only, some UEFI services such as log does not work.
+                                // Map is as read-only if UEFI services are of no use after memory::init()
                                 identity_mapped_pages[index] = Some(try!( mapper.map_frames(
                                     FrameRange::from_phys_addr(start_phys_addr, size as usize), 
                                     Page::containing_address(start_virt_addr - KERNEL_OFFSET), EntryFlags::PAGE, allocator.deref_mut())
@@ -976,8 +978,8 @@ pub fn init(bt:&BootServices, allocator_mutex: &MutexIrqSafe<AreaFrameAllocator>
                                     Some((current_va, current_pa)) => {
                                         if current_pa < end_phys_addr {
                                             rodata_end = Some((end_virt_addr, end_phys_addr));
-                                        } else {//MMIO
-                                            //MMIO is handled together with other hardware resources later
+                                        } else {
+                                            //MMIO is mapped together with other hardware resources later
                                         }
                                     },
                                     None => {
@@ -1008,6 +1010,7 @@ pub fn init(bt:&BootServices, allocator_mutex: &MutexIrqSafe<AreaFrameAllocator>
             mapped_pages_index += 1;
         }
 
+        // UEFI memory layout
         //conventional
         //image data
         //image code
