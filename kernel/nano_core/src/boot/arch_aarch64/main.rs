@@ -16,7 +16,6 @@
 //! 
 
 #![no_std]
-
 #![feature(lang_items)]
 #![feature(alloc_error_handler)]
 #![feature(type_ascription)]
@@ -45,7 +44,7 @@ extern crate mod_mgmt;
 extern crate captain;
 extern crate panic_unwind; // the panic/unwind lang items
 */
-extern crate exceptions_early;
+extern crate exceptions_arm;
 extern crate logger;
 extern crate uefi;
 extern crate uefi_services;
@@ -188,7 +187,7 @@ pub extern "win64" fn nano_core_start(image: uefi::Handle, st: SystemTable<Boot>
     unsafe{ 
         let dir =(*protocol).open_volume().expect("Fail to get access to the file system");
     }
-    exceptions_early::init();
+    exceptions_arm::init();
 
     // TODO: captain::init()
     loop {

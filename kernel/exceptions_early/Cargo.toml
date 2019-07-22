@@ -9,10 +9,6 @@ build = "../../build.rs"
 # x86_64 = { git = "https://github.com/kevinaboos/x86_64" }
 x86_64 = { path = "../../libs/x86_64" } # currently using our local copy, forked from Phil Opp's crate
 
-[target.'cfg(target_arch = "aarch64")'.dependencies]
-aarch64 = { path = "../../libs/aarch64" }
-
-
 [dependencies.vga_buffer]
 path = "../vga_buffer"
 

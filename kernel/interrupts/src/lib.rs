@@ -20,6 +20,7 @@ extern crate apic;
 extern crate pit_clock;
 extern crate tss;
 extern crate gdt;
+#[cfg(any(target_arch="x86", target_arch="x86_64"))]
 extern crate exceptions_early;
 extern crate pic;
 extern crate scheduler;

@@ -33,6 +33,7 @@ extern crate logger;
 extern crate state_store;
 extern crate memory; // the virtual memory subsystem
 extern crate mod_mgmt;
+#[cfg(any(target_arch="x86", target_arch="x86_64"))]
 extern crate exceptions_early;
 extern crate captain;
 extern crate panic_unwind; // the panic/unwind lang items
