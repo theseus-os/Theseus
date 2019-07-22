@@ -489,7 +489,6 @@ fn add_af_flag(p4_entry:u64, level:usize) {
 
 #[cfg(any(target_arch="aarch64"))]
 pub fn set_recursive(p4_addr:u64) {
-    debug!("Wenqiu: set recursive");
     unsafe { 
         let recur_addr:*mut u64 = (p4_addr + RECURSIVE_P4_INDEX as u64 * 8) as *mut u64;
         *recur_addr = p4_addr + 0x0703;
@@ -1018,7 +1017,6 @@ pub fn init(bt:&BootServices, allocator_mutex: &MutexIrqSafe<AreaFrameAllocator>
         //mmio
         //mmio
 
-        debug!("WEnqiu: 1010101");
         let (text_start_virt,    text_start_phys)    = try!(text_start  .ok_or("Couldn't find start of .text section"));
         let (_text_end_virt,     text_end_phys)      = try!(text_end    .ok_or("Couldn't find end of .text section"));
         let (rodata_start_virt,  rodata_start_phys)  = try!(rodata_start.ok_or("Couldn't find start of .rodata section"));
@@ -1035,39 +1033,20 @@ pub fn init(bt:&BootServices, allocator_mutex: &MutexIrqSafe<AreaFrameAllocator>
             EntryFlags::GLOBAL, ".uefi");
         index += 1;
 
-        debug!("WEnqiu: 10101012");
 
         //Hardware resources https://github.com/qemu/qemu/blob/master/hw/arm/virt.c
         const HARDWARE_START:u64 = 0x1000 ;
         const HARDWARE_END:u64 = 0x40000000;
-        let hardware_virt = VirtualAddress::new_canonical(HARDWARE_START as usize + 0xffff000000000000);
-        debug!("WEnqiu: 1010104");
+        const HIGHER_HALF:usize = 0xFFFF000000000000;
+        let hardware_virt = VirtualAddress::new_canonical(HARDWARE_START as usize | HIGHER_HALF);
         identity_mapped_pages[index] = Some(try!( mapper.map_frames(
             FrameRange::from_phys_addr(PhysicalAddress::new(HARDWARE_START as usize)?,  (HARDWARE_END - HARDWARE_START) as usize), 
                 Page::containing_address(hardware_virt), 
                 EntryFlags::PAGE | EntryFlags::ACCESSEDARM | EntryFlags::INNER_SHARE, allocator.deref_mut())
         ));
-        debug!("WEnqiu: 1010105s");
         vmas[index] = VirtualMemoryArea::new(hardware_virt, (HARDWARE_END - HARDWARE_START) as usize,
             EntryFlags::PAGE, ".mmio");
         index += 1;
-        debug!("WEnqiu: 1010103");
-
-        //Hardware resources https://github.com/qemu/qemu/blob/master/hw/arm/virt.c
-        // const RESERVE_START:u64 = 0x0000008000000000 ;
-        // const RESERVE_END:u64 = 0x0000010000000000;
-        // let reserve_virt = VirtualAddress::new_canonical(RESERVE_START as usize + 0xffff000000000000);
-        // debug!("WEnqiu: 1010104");
-        // identity_mapped_pages[index] = Some(try!( mapper.map_frames(
-        //     FrameRange::from_phys_addr(PhysicalAddress::new(RESERVE_START as usize)?,  (RESERVE_END - RESERVE_START) as usize), 
-        //         Page::containing_address(reserve_virt), 
-        //         EntryFlags::PAGE | EntryFlags::ACCESSEDARM | EntryFlags::INNER_SHARE, allocator.deref_mut())
-        // ));
-        // debug!("WEnqiu: 1010105s");
-        // vmas[index] = VirtualMemoryArea::new(reserve_virt, (RESERVE_END - RESERVE_START) as usize,
-        //     EntryFlags::PAGE, ".reserve");
-        // index += 1;
-        // debug!("WEnqiu: 1010103");
 
         // now we map the 5 main sections into 3 groups according to flags
         text_mapped_pages = Some( try!( mapper.map_frames(
@@ -1085,13 +1064,10 @@ pub fn init(bt:&BootServices, allocator_mutex: &MutexIrqSafe<AreaFrameAllocator>
             Page::containing_address(data_start_virt), 
             EntryFlags::PAGE | EntryFlags::ACCESSEDARM | EntryFlags::INNER_SHARE, allocator.deref_mut())
         ));   
-        debug!("WEnqiu: 10101011111");
 
         Ok(()) // mapping closure completed successfully
 
     })); // TemporaryPage is dropped here
-
-    debug!("Wenqiu:5");
 
     let text_mapped_pages   = try!(text_mapped_pages  .ok_or("Couldn't map .text section"));
     let rodata_mapped_pages = try!(rodata_mapped_pages.ok_or("Couldn't map .rodata section"));

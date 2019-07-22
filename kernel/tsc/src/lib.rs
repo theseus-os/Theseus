@@ -1,5 +1,5 @@
 #![no_std]
-
+#![feature(asm)]
 #[macro_use] extern crate log;
 extern crate pit_clock;
 
@@ -46,9 +46,12 @@ pub fn tsc_ticks() -> TscTicks {
     // SAFE: just reading TSC value
     #[cfg(any(target_arch="x86", target_arch="x86_64"))]
     let ticks = unsafe { core::arch::x86_64::__rdtscp(&mut val) };
-    // WENQIU get ticks
+    // get systick
     #[cfg(any(target_arch="aarch64"))]
-    let ticks = 0; 
+    // TODO: use cortex crate instead
+    let ticks:u64;
+    unsafe {  asm!("ldr $0, =0xE000E018" : "=r"(ticks) : : : "volatile"); };
+ 
     TscTicks(ticks)
 }
 
