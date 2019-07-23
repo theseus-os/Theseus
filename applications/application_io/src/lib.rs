@@ -3,7 +3,7 @@
 
 #[macro_use] extern crate lazy_static;
 #[macro_use] extern crate log;
-extern crate alloc;
+#[macro_use] extern crate alloc;
 extern crate task;
 extern crate dfqueue;
 extern crate event_types;
@@ -11,7 +11,7 @@ extern crate spin;
 extern crate keycodes_ascii;
 
 use keycodes_ascii::KeyEvent;
-use dfqueue::DFQueueConsumer;
+use dfqueue::{DFQueueConsumer, DFQueueProducer};
 use alloc::collections::BTreeMap;
 use alloc::vec::Vec;
 use alloc::string::String;
@@ -46,6 +46,11 @@ lazy_static! {
 }
 
 lazy_static! {
+    static ref APP_OUTPUT_BYTE_PRODUCER: Mutex<BTreeMap<usize, DFQueueProducer<u8>>> =
+        Mutex::new(BTreeMap::new());
+}
+
+lazy_static! {
     /// Maps the child application's task ID to its consumer of the keyboard events directed by the parent shell.
     /// The queue simulates connecting an input event stream to the application.
     static ref SHELL_KEY_EVENT_CONSUMER: Mutex<BTreeMap<usize, DFQueueConsumer<KeyEvent>>> =
@@ -59,6 +64,22 @@ lazy_static! {
         Mutex::new(BTreeMap::new());
 }
 
+/// Calls `print!()` with an extra newline ('\n') appended to the end. 
+#[macro_export]
+macro_rules! println {
+    ($fmt:expr) => (print!(concat!($fmt, "\n")));
+    ($fmt:expr, $($arg:tt)*) => (print!(concat!($fmt, "\n"), $($arg)*));
+}
+
+/// The main printing macro, which simply pushes an output event to the input_event_manager's event queue. 
+/// This ensures that only one thread (the input_event_manager acting as a consumer) ever accesses the GUI.
+#[macro_export]
+macro_rules! print {
+    ($($arg:tt)*) => ({
+        $crate::print_to_stdout_args(format_args!($($arg)*));
+    });
+}
+
 /// Lock all shared states (i.e. those defined in `lazy_static!`) and execute the closure.
 pub fn locked_and_execute(f: Box<Fn()>) {
     let _flag_guard = APP_DIRECT_KEY_ACCESS.lock();
@@ -68,11 +89,13 @@ pub fn locked_and_execute(f: Box<Fn()>) {
 
 /// Set up queues between shell and application.
 pub fn create_app_shell_relation(child_task_id: usize,
+                                 app_output_producer: DFQueueProducer<u8>,
                                  keyboard_event_consumer: DFQueueConsumer<KeyEvent>,
                                  input_byte_consumer: DFQueueConsumer<u8>) -> Result<(), &'static str> {
     APP_DIRECT_KEY_ACCESS.lock().insert(child_task_id, false);
     APP_BYTE_IMMEDIATE_DELIVERY.lock().insert(child_task_id, false);
     APP_NO_SHELL_ECHO.lock().insert(child_task_id, false);
+    APP_OUTPUT_BYTE_PRODUCER.lock().insert(child_task_id, app_output_producer);
     SHELL_KEY_EVENT_CONSUMER.lock().insert(child_task_id, keyboard_event_consumer);
     SHELL_INPUT_BYTE_CONSUMER.lock().insert(child_task_id, input_byte_consumer);
     Ok(())
@@ -83,6 +106,7 @@ pub fn remove_app_shell_relation(child_task_id: usize) -> Result<(), &'static st
     APP_DIRECT_KEY_ACCESS.lock().remove(&child_task_id);
     APP_BYTE_IMMEDIATE_DELIVERY.lock().remove(&child_task_id);
     APP_NO_SHELL_ECHO.lock().remove(&child_task_id);
+    APP_OUTPUT_BYTE_PRODUCER.lock().remove(&child_task_id);
     SHELL_KEY_EVENT_CONSUMER.lock().remove(&child_task_id);
     SHELL_INPUT_BYTE_CONSUMER.lock().remove(&child_task_id);
     Ok(())
@@ -258,6 +282,33 @@ pub fn stop_no_echo() -> Result<(), &'static str> {
     };
 
     APP_NO_SHELL_ECHO.lock().insert(task_id, false);
+    Ok(())
+}
+
+use core::fmt;
+/// Converts the given `core::fmt::Arguments` to a `String` and enqueues the string into the correct terminal print-producer
+pub fn print_to_stdout_args(fmt_args: fmt::Arguments) {
+    put_output_bytes(format!("{}", fmt_args).into_bytes()).unwrap_or_else(|_| {});
+}
+
+/// Applications call this function to put a vector of bytes (representing a UTF-8 character stream or something more
+/// generic) to the shell.
+pub fn put_output_bytes(bytes: Vec<u8>) -> Result<(), &'static str> {
+    let task_id = match task::get_my_current_task_id() {
+        Some(task_id) => {task_id},
+        None => {
+            error!("Cannot get task ID for output bytes producing");
+            return Err("Cannot get task ID for output bytes producing");
+        }
+    };
+
+    let map = APP_OUTPUT_BYTE_PRODUCER.lock();
+    let result = map.get(&task_id);
+    if let Some(producer) = result {
+        for byte in bytes {
+            producer.enqueue(byte);
+        }
+    }
     Ok(())
 }
 

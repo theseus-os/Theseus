@@ -53,9 +53,14 @@ pub const APPLICATIONS_NAMESPACE_PATH: &'static str = "/namespaces/default/appli
 
 #[derive(Debug)]
 struct Job {
+    /// Task reference structure representing the running task.
     task: TaskRef,
+    /// Keyboard event producer. Shell uses this producer to deliver keyboard events to the application.
     kbd_event_producer: DFQueueProducer<KeyEvent>,
-    input_producer: DFQueueProducer<u8>
+    /// This is the input end of the stdin pipe.
+    input_producer: DFQueueProducer<u8>,
+    /// This is the output end of the stdout pipe.
+    output_consumer: DFQueueConsumer<u8>
 }
 
 /// A main function that spawns a new shell and waits for the shell loop to exit before returning an exit value
@@ -575,12 +580,18 @@ impl Shell {
                 let app_input_queue: DFQueue<u8> = DFQueue::new();
                 let app_input_consumer = app_input_queue.into_consumer();
                 let app_input_producer = app_input_consumer.obtain_producer();
+                let app_output_queue: DFQueue<u8> = DFQueue::new();
+                let app_output_consumer = app_output_queue.into_consumer();
+                let app_output_producer = app_output_consumer.obtain_producer();
                 let new_job = Job {
                     task: new_task_ref,
                     kbd_event_producer: app_kbv_event_producer,
-                    input_producer: app_input_producer
+                    input_producer: app_input_producer,
+                    output_consumer: app_output_consumer
                 };
-                if let Err(msg) = application_io::create_app_shell_relation(task_id, app_kbd_event_consumer,
+                if let Err(msg) = application_io::create_app_shell_relation(task_id,
+                                                                            app_output_producer,
+                                                                            app_kbd_event_consumer,
                                                                             app_input_consumer) {
                     self.terminal.print_to_terminal(format!("{}\n", msg).to_string());
                     return None;
@@ -723,6 +734,8 @@ impl Shell {
 
     /// If there is any output event from running application, print it to the screen, otherwise it does nothing.
     fn check_and_print_app_output(&mut self) -> bool {
+
+        // Support for legacy output by `terminal_print`.
         use core::ops::Deref;
         if let Some(print_event) = self.print_consumer.peek() {
             match print_event.deref() {
@@ -739,6 +752,30 @@ impl Shell {
             // Goes to the next iteration of the loop after processing print event to ensure that printing is handled before keypresses
             return true;
         }
+
+        // Support for new output method by `application_io`.
+        if self.current_task_ref.is_some() {
+            let mut bytes: Vec<u8> = Vec::new();
+            if let Some(task_ref) = &self.current_task_ref {
+                loop {
+                    if let Some(byte) = task_ref.output_consumer.peek() {
+                        bytes.push(*byte);
+                        byte.mark_completed();
+                    } else {
+                        break;
+                    }
+                }
+            }
+            if bytes.is_empty() {
+                return false;
+            } else {
+                let s = String::from_utf8_lossy(&bytes);
+                self.terminal.print_to_terminal(s.to_string());
+                self.terminal.refresh_display(0);
+                return true;
+            }
+        }
+
         false
     }
 
