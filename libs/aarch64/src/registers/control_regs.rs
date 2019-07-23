@@ -56,7 +56,7 @@ pub fn cr0() -> Cr0 {
 ///
 /// # Safety
 /// Changing the CR0 register is unsafe, because e.g. disabling paging would violate memory safety.
-pub unsafe fn cr0_write(val: Cr0) {
+pub unsafe fn cr0_write(_val: Cr0) {
 }
 
 /// Update CR0.
@@ -86,7 +86,7 @@ pub fn cr3() -> PhysicalAddress {
 /// # Safety
 /// Changing the level 4 page table is unsafe, because it's possible to violate memory safety by
 /// changing the page mapping.
-pub unsafe fn cr3_write(val: PhysicalAddress) {
+pub unsafe fn cr3_write(_val: PhysicalAddress) {
 }
 
 /// Contains various flags to control operations in protected mode.
@@ -98,5 +98,5 @@ pub fn cr4() -> Cr4 {
 ///
 /// # Safety
 /// It's not clear if it's always memory safe to change the CR4 register.
-pub unsafe fn cr4_write(val: Cr4) {
+pub unsafe fn cr4_write(_val: Cr4) {
 }

@@ -29,9 +29,6 @@ extern crate heap_irq_safe;
 extern crate bit_field;
 extern crate type_name;
 extern crate uefi;
-extern crate uefi_services;
-extern crate uefi_exts;
-extern crate uefi_alloc;
 
 /// Just like Rust's `try!()` macro, 
 /// but forgets the given `obj`s to prevent them from being dropped,
@@ -73,11 +70,7 @@ use alloc::sync::Arc;
 use kernel_config::memory::{PAGE_SIZE, MAX_PAGE_NUMBER, KERNEL_OFFSET, KERNEL_HEAP_START, KERNEL_HEAP_INITIAL_SIZE, KERNEL_STACK_ALLOCATOR_BOTTOM, KERNEL_STACK_ALLOCATOR_TOP_ADDR, ENTRIES_PER_PAGE_TABLE};
 use bit_field::BitField;
 use uefi::prelude::*;
-use uefi_exts::BootServicesExt;
-use uefi::proto::console::text::Output;
 use uefi::table::boot::{MemoryDescriptor, MemoryType};
-
-use core::fmt::Write;
 
 /// A virtual memory address, which is a `usize` under the hood.
 #[derive(
@@ -621,7 +614,7 @@ pub fn init(boot_info: &BootInformation)
 
 /// Initialize the memory system
 #[cfg(any(windows, target_arch="aarch64", target_env = "msvc"))]
-pub fn init(bt:&BootServices, stdout:&mut Output, image: uefi::Handle) 
+pub fn init(bt:&BootServices) 
     -> Result<(Arc<MutexIrqSafe<MemoryManagementInfo>>, MappedPages, MappedPages, MappedPages, Vec<MappedPages>), &'static str> {
     // get memory layout information
     const EXTRA_MEMORY_INFO_BUFFER_SIZE:usize = 8;
@@ -644,9 +637,8 @@ pub fn init(bt:&BootServices, stdout:&mut Output, image: uefi::Handle)
     let occupied: [PhysicalMemoryArea; 32] = Default::default();
     let occup_index = 0;
 
-    let mut mapped_pages_index = 0;
     loop {
-        match ( maps_iter.next()){
+        match maps_iter.next() {
             Some(mapped_pages) => {
                 let phys_start = mapped_pages.phys_start as usize;
                 let size = mapped_pages.page_count as usize * PAGE_SIZE;
@@ -681,7 +673,7 @@ pub fn init(bt:&BootServices, stdout:&mut Output, image: uefi::Handle)
             None => break,
         }
 
-        mapped_pages_index += 1;
+        //mapped_pages_index += 1;
     }
 
     let kernel_virt_end = kernel_phys_end + KERNEL_OFFSET;

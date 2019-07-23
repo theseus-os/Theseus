@@ -43,16 +43,16 @@ pub fn rdtscp() -> u64 {
 // Model specific registers
 
 /// Write 64 bits to msr register.
-pub unsafe fn wrmsr(msr: u32, value: u64) {
+pub unsafe fn wrmsr(_msr: u32, _value: u64) {
     //TODO
 }
 
 /// Read 64 bits msr register.
-pub fn rdmsr(msr: u32) -> u64 {
+pub fn rdmsr(_msr: u32) -> u64 {
     0
 }
 
 /// Read 64 bit PMC (performance monitor counter).
-pub fn rdpmc(msr: u32) -> u64 {
+pub fn rdpmc(_msr: u32) -> u64 {
     0
 }

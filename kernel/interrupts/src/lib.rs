@@ -35,7 +35,7 @@ use ps2::handle_mouse_packet;
 #[cfg(any(target_arch="x86", target_arch="x86_64"))]
 use x86_64::structures::idt::{Idt, LockedIdt, ExceptionStackFrame, HandlerFunc};
 #[cfg(any(target_arch="aarch64"))]
-use aarch64::structures::idt::{Idt, LockedIdt, ExceptionStackFrame, HandlerFunc};
+use aarch64::structures::idt::{Idt, LockedIdt, HandlerFunc};
 use spin::Once;
 use kernel_config::time::{CONFIG_PIT_FREQUENCY_HZ}; //, CONFIG_RTC_FREQUENCY_HZ};
 // use rtc;

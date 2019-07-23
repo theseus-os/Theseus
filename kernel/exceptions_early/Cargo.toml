@@ -12,9 +12,5 @@ x86_64 = { path = "../../libs/x86_64" } # currently using our local copy, forked
 [dependencies.vga_buffer]
 path = "../vga_buffer"
 
-[dependencies.log]
-default-features = false
-version = "0.3.7"
-
 [lib]
 crate-type = ["rlib"]

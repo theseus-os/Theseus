@@ -6,7 +6,6 @@ use VirtualAddress;
 /// directly related to the task-switch mechanism,
 /// but is used for finding kernel level stack
 /// if interrupts arrive while in kernel mode.
-#[derive(Debug)]
 #[repr(C, packed)]
 pub struct TaskStateSegment {
     reserved_1: u32,

@@ -7,32 +7,32 @@ use structures::gdt::SegmentSelector;
 /// to %cs. Instead we push the new segment selector
 /// and return value on the stack and use lretq
 /// to reload cs and continue at 1:.
-pub unsafe fn set_cs(sel: SegmentSelector) {
+pub unsafe fn set_cs(_sel: SegmentSelector) {
     //TODO
 }
 
 /// Reload stack segment register.
-pub unsafe fn load_ss(sel: SegmentSelector) {
+pub unsafe fn load_ss(_sel: SegmentSelector) {
     //TODO
 }
 
 /// Reload data segment register.
-pub unsafe fn load_ds(sel: SegmentSelector) {
+pub unsafe fn load_ds(_sel: SegmentSelector) {
     //TODO
 }
 
 /// Reload es segment register.
-pub unsafe fn load_es(sel: SegmentSelector) {
+pub unsafe fn load_es(_sel: SegmentSelector) {
     //TODO
 }
 
 /// Reload fs segment register.
-pub unsafe fn load_fs(sel: SegmentSelector) {
+pub unsafe fn load_fs(_sel: SegmentSelector) {
     //TODO
 }
 
 /// Reload gs segment register.
-pub unsafe fn load_gs(sel: SegmentSelector) {
+pub unsafe fn load_gs(_sel: SegmentSelector) {
     //TODO
 }
 

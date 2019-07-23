@@ -55,5 +55,6 @@ pub fn flags() -> Flags {
 }
 
 /// Writes the RFLAGS register.
-pub fn set_flags(val: Flags) {
+pub fn set_flags(_val: Flags) {
+
 }

@@ -15,43 +15,32 @@ lazy_static! {
 
 #[cfg(any(target_arch="aarch64"))]
 pub fn init() {
-    let vector:u32;
-    unsafe {  asm!("mrs $0, VBAR_EL1" : "=r"(vector) : : : "volatile") };
-    //let exception = vector as *mut u32;
+    
     let mut exceptions = VECTORS.lock();
-
-    let exception = exceptions.as_ptr() as u32;
-//    let exception = exception + 0x800 - (exception % 0x800);
-    debug!("Wenqiu : {:X}", exception);
     
-    let mut addr = exception;
+    exceptions[0].instructions[0] = assemble_inst_bl(&exceptions[0], exception_synchronous_handler);
+    exceptions[1].instructions[0] = assemble_inst_bl(&exceptions[1], exception_irq_handler);
+    exceptions[2].instructions[0] = assemble_inst_bl(&exceptions[2], exception_fiq_handler);
+    exceptions[3].instructions[0] = assemble_inst_bl(&exceptions[3], exception_serror_handler);
+    exceptions[4].instructions[0] = assemble_inst_bl(&exceptions[4], exception_synchronous_handler);
+    exceptions[5].instructions[0] = assemble_inst_bl(&exceptions[5], exception_irq_handler);
+    exceptions[6].instructions[0] = assemble_inst_bl(&exceptions[6], exception_fiq_handler);
+    exceptions[7].instructions[0] = assemble_inst_bl(&exceptions[7], exception_serror_handler);
+    exceptions[8].instructions[0] = assemble_inst_bl(&exceptions[8], exception_synchronous_handler);
+    exceptions[9].instructions[0] = assemble_inst_bl(&exceptions[9], exception_irq_handler);
+    exceptions[10].instructions[0] = assemble_inst_bl(&exceptions[10], exception_fiq_handler);
+    exceptions[11].instructions[0] = assemble_inst_bl(&exceptions[11], exception_serror_handler);
+    exceptions[12].instructions[0] = assemble_inst_bl(&exceptions[12], exception_synchronous_handler);
+    exceptions[13].instructions[0] = assemble_inst_bl(&exceptions[13], exception_irq_handler);
+    exceptions[14].instructions[0] = assemble_inst_bl(&exceptions[14], exception_fiq_handler);
+    exceptions[15].instructions[0] = assemble_inst_bl(&exceptions[15], exception_serror_handler);
 
-    unsafe { 
-        exceptions[0].instructions[0] = assemble_inst_bl(&exceptions[0], exception_synchronous_handler);
-        exceptions[1].instructions[0] = assemble_inst_bl(&exceptions[1], exception_irq_handler);
-        exceptions[2].instructions[0] = assemble_inst_bl(&exceptions[2], exception_fiq_handler);
-        exceptions[3].instructions[0] = assemble_inst_bl(&exceptions[3], exception_SError_handler);
-        exceptions[4].instructions[0] = assemble_inst_bl(&exceptions[4], exception_synchronous_handler);
-        exceptions[5].instructions[0] = assemble_inst_bl(&exceptions[5], exception_irq_handler);
-        exceptions[6].instructions[0] = assemble_inst_bl(&exceptions[6], exception_fiq_handler);
-        exceptions[7].instructions[0] = assemble_inst_bl(&exceptions[7], exception_SError_handler);
-        exceptions[8].instructions[0] = assemble_inst_bl(&exceptions[8], exception_synchronous_handler);
-        exceptions[9].instructions[0] = assemble_inst_bl(&exceptions[9], exception_irq_handler);
-        exceptions[10].instructions[0] = assemble_inst_bl(&exceptions[10], exception_fiq_handler);
-        exceptions[11].instructions[0] = assemble_inst_bl(&exceptions[11], exception_SError_handler);
-        exceptions[12].instructions[0] = assemble_inst_bl(&exceptions[12], exception_synchronous_handler);
-        exceptions[13].instructions[0] = assemble_inst_bl(&exceptions[13], exception_irq_handler);
-        exceptions[14].instructions[0] = assemble_inst_bl(&exceptions[14], exception_fiq_handler);
-        exceptions[15].instructions[0] = assemble_inst_bl(&exceptions[15], exception_SError_handler);
-
-    }
-    
-
+    let address = exceptions.as_ptr() as u32;
     unsafe {
         asm!("
             msr VBAR_EL1, x0;
             dsb ish; 
-            isb; " : :"{x0}"(exception): : "volatile");
+            isb; " : :"{x0}"(address): : "volatile");
     }
 
 }
@@ -82,7 +71,7 @@ impl ExceptionEntry {
 
 // TODO print register information
 #[cfg(any(target_arch="aarch64"))]
-fn exception_default_handler() {
+fn _exception_default_handler() {
     error!("Default Exceptions!");
     loop { }
 }
@@ -106,7 +95,7 @@ fn exception_fiq_handler() {
 }
 
 #[cfg(any(target_arch="aarch64"))]
-fn exception_SError_handler() {
+fn exception_serror_handler() {
     error!("SErrorExceptions!");
     loop { }
 }

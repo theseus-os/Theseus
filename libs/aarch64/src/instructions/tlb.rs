@@ -3,7 +3,7 @@
 use VirtualAddress;
 
 /// Invalidate the given address in the TLB using the `invlpg` instruction.
-pub fn flush(addr: VirtualAddress) {
+pub fn flush(_addr: VirtualAddress) {
 //    unsafe { asm!("invlpg ($0)" :: "r" (addr.0) : "memory") };
     //TODO
 }

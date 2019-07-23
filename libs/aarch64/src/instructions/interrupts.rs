@@ -23,7 +23,5 @@ macro_rules! int {
 
 /// Cause a breakpoint exception by invoking the `int3` instruction.
 pub fn int3() {
-    unsafe {
     //TODO
-    }
 }

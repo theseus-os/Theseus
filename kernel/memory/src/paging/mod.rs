@@ -33,8 +33,6 @@ use super::*;
 
 #[cfg(any(target_arch="x86", target_arch="x86_64"))]
 use x86_64::registers::control_regs;
-#[cfg(any(target_arch="aarch64"))]
-use aarch64::registers::control_regs;
 #[cfg(any(target_arch="x86", target_arch="x86_64"))]
 use x86_64::instructions::tlb;
 #[cfg(any(target_arch="aarch64"))]
@@ -865,9 +863,9 @@ pub fn init(bt:&BootServices, allocator_mutex: &MutexIrqSafe<AreaFrameAllocator>
         let mut data_start:   Option<(VirtualAddress, PhysicalAddress)> = None;
         let mut data_end:     Option<(VirtualAddress, PhysicalAddress)> = None;
 
-        let text_flags:       Option<EntryFlags> = None;
-        let rodata_flags:     Option<EntryFlags> = None;
-        let data_flags:       Option<EntryFlags> = None;
+        // let text_flags:       Option<EntryFlags> = None;
+        // let rodata_flags:     Option<EntryFlags> = None;
+        // let data_flags:       Option<EntryFlags> = None;
 
 
         // scoped to release the frame allocator lock
@@ -882,12 +880,11 @@ pub fn init(bt:&BootServices, allocator_mutex: &MutexIrqSafe<AreaFrameAllocator>
             buffer.set_len(mapped_info_size);
         }
 
-        let (key, mut maps_iter) = bt
+        let (_key, mut maps_iter) = bt
             .memory_map(&mut buffer)
             .expect_success("Failed to retrieve UEFI memory map");
         
         let mut kernel_phys_start: PhysicalAddress = PhysicalAddress::new(0)?;
-        let mut mapped_pages_index = 0;
 
         const DEFAULT:usize = 0;
         const IMAGE_START:usize = 1;
@@ -896,12 +893,10 @@ pub fn init(bt:&BootServices, allocator_mutex: &MutexIrqSafe<AreaFrameAllocator>
 
         let mut index = 0;
 
-        let flags = EntryFlags::GLOBAL;
-
         debug!("Start to map occupied memories in the new page table");
         loop {
 
-            match ( maps_iter.next()){
+            match maps_iter.next() {
                 Some(mapped_pages) => {
                     let start_phys_addr = mapped_pages.phys_start as usize;
                     let size = mapped_pages.page_count as usize * PAGE_SIZE;
@@ -966,7 +961,7 @@ pub fn init(bt:&BootServices, allocator_mutex: &MutexIrqSafe<AreaFrameAllocator>
                                     rodata_start = Some((start_virt_addr, start_phys_addr));
                                 }
                                 match rodata_end {
-                                    Some((current_va, current_pa)) => {
+                                    Some((_current_va, current_pa)) => {
                                         if current_pa < end_phys_addr {
                                             rodata_end = Some((end_virt_addr, end_phys_addr));
                                         } else {
@@ -998,7 +993,7 @@ pub fn init(bt:&BootServices, allocator_mutex: &MutexIrqSafe<AreaFrameAllocator>
                 None => break,
             }
 
-            mapped_pages_index += 1;
+            //mapped_pages_index += 1;
         }
 
         // UEFI memory layout

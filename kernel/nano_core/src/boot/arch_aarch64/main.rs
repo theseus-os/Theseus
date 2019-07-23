@@ -147,13 +147,13 @@ pub extern "win64" fn efi_main(image: uefi::Handle, st: SystemTable<Boot>){
 
 #[no_mangle]
 #[cfg(any(target_arch="aarch64"))]
-pub extern "win64" fn nano_core_start(image: uefi::Handle, st: SystemTable<Boot>) -> !{
+pub extern "win64" fn nano_core_start(_image: uefi::Handle, st: SystemTable<Boot>) -> !{
     uefi_services::init(&st);
     let bt = st.boot_services();
     let stdout = st.stdout();
     
     let _ = stdout.clear();
-    let (_kernel_mmi_ref, _text_mapped_pages, _rodata_mapped_pages, _data_mapped_pages, _identity_mapped_pages) =  try_exit!(memory::init(&bt, stdout, image));
+    let (_kernel_mmi_ref, _text_mapped_pages, _rodata_mapped_pages, _data_mapped_pages, _identity_mapped_pages) =  try_exit!(memory::init(&bt));
 
     debug!("nano_core_start(): initialized memory subsystem.");
 

@@ -4,7 +4,6 @@ use structures::gdt::SegmentSelector;
 
 /// A struct describing a pointer to a descriptor table (GDT / IDT).
 /// This is in a format suitable for giving to 'lgdt' or 'lidt'.
-#[derive(Debug)]
 #[repr(C, packed)]
 pub struct DescriptorTablePointer {
     /// Size of the DT.
@@ -14,24 +13,24 @@ pub struct DescriptorTablePointer {
 }
 
 /// Load GDT table.
-pub unsafe fn lgdt(gdt: &DescriptorTablePointer) {
+pub unsafe fn lgdt(_gdt: &DescriptorTablePointer) {
     //TODO
 }
 
 /// Load LDT table.
-pub unsafe fn lldt(ldt: &DescriptorTablePointer) {
+pub unsafe fn lldt(_ldt: &DescriptorTablePointer) {
     // asm!("lldt ($0)" :: "r" (ldt) : "memory");
     //TODO
 }
 
 /// Load IDT table.
-pub unsafe fn lidt(idt: &DescriptorTablePointer) {
+pub unsafe fn lidt(_idt: &DescriptorTablePointer) {
     // asm!("lidt ($0)" :: "r" (idt) : "memory");
     //TODO
 }
 
 /// Load the task state register using the `ltr` instruction.
-pub unsafe fn load_tss(sel: SegmentSelector) {
+pub unsafe fn load_tss(_sel: SegmentSelector) {
     // asm!("ltr $0" :: "r" (sel.0));
     //TODO
 }

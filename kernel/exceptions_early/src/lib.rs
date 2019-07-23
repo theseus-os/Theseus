@@ -4,7 +4,6 @@
 #![feature(asm)]
 
 #[macro_use] extern crate vga_buffer; // for println_raw!()
-#[macro_use] extern crate log;
 #[cfg(any(target_arch="x86", target_arch="x86_64"))]
 extern crate x86_64;
 
