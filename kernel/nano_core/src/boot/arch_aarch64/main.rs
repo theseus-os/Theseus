@@ -1,49 +1,27 @@
-//! The aptly-named tiny crate containing the first OS code to run.
+//! This crate is the entry point of the generated .efi file.
 //! 
-//! The `nano_core` is very simple, and only does the following things:
-//! 
-//! 1. Bootstraps the OS after the bootloader is finished, and initializes simple things like logging.
-//! 2. Establishes a simple virtual memory subsystem so that other modules can be loaded.
-//! 3. Loads the core library module, the `captain` module, and then calls [`captain::init()`](../captain/fn.init.html) as a final step.
-//! 4. That's it! Once `nano_core` gives complete control to the `captain`, it takes no other actions.
+//! The rust compiler compiles the crate which contains the main.rs file as ahe lib, link it and generate a .efi file.
 //!
-//! In general, you shouldn't ever need to change `nano_core`. 
-//! That's because `nano_core` doesn't contain any specific program logic, 
-//! it just sets up an initial environment so that other subsystems can run.
+//! The aarch64-theseus.json file specifies the entry point of the uefi.
 //! 
-//! If you want to change how the OS starts up and which systems it initializes, 
-//! you should change the code in the [`captain`](../captain/index.html) crate instead.
-//! 
+//! Currently the nano_core crate does the following:
+//! 1. Initialize the UEFI console services for early log.
+//! 2. Initialize the memory and create a new page table.
+//! 3. Initialize the early exception handler.
+//!
+//! To be compatible with x86, the `make arm` command will copy this file to nano_core/src and does the compiling. Otherwise for x86 architecture the compiler will try to compile the crate as an application. 
 
 #![no_std]
 #![feature(lang_items)]
 #![feature(alloc_error_handler)]
 #![feature(type_ascription)]
-//#[cfg(loadable)] 
-//#[macro_use] extern crate alloc;
-//#[cfg(not(loadable))] 
+
 #[macro_use] extern crate alloc;
 
 #[macro_use] extern crate log;
 extern crate rlibc; // basic memset/memcpy libc functions
 extern crate cortex_a;
 
-/*extern crate spin;
-extern crate multiboot2;
-#[cfg(any(target_arch="x86", target_arch="x86_64"))]
-extern crate x86_64;
-#[cfg(any(target_arch="aarch64"))]
-extern crate aarch64;
-extern crate kernel_config; // our configuration options, just a set of const definitions.
-extern crate irq_safety; // for irq-safe locking and interrupt utilities
-
-
-extern crate state_store;
-extern crate memory; // the virtual memory subsystem
-extern crate mod_mgmt;
-extern crate captain;
-extern crate panic_unwind; // the panic/unwind lang items
-*/
 extern crate exceptions_arm;
 extern crate logger;
 extern crate uefi;
@@ -78,25 +56,11 @@ fn shutdown(msg: core::fmt::Arguments) -> ! {
 
 
 
-/// The main entry point into Theseus, that is, the first Rust code that the Theseus kernel runs. 
+/// The main entry point of the UEFI application. It enters the Theseus OS
 #[cfg(any(windows, target_arch="aarch64", target_env = "msvc"))]
 #[no_mangle]
 pub extern "win64" fn efi_main(image: uefi::Handle, st: SystemTable<Boot>){
-    /*use cortex_a::{asm, regs::*};
-
-    const CORE_0: u64 = 0;
-    const CORE_MASK: u64 = 0x3;
-    const EL2: u32 = CurrentEL::EL::EL2.value;
-
-    if (CORE_0 == MPIDR_EL1.get() & CORE_MASK) && (EL2 == CurrentEL.get()) {
-        setup_and_enter_el1_from_el2(image, st)
-    }*/
     nano_core_start(image, st);
-
-
-    // loop {
-    //     asm::wfe();
-    // }
 }
 
 // Prepare and execute transition from EL2 to EL1.
@@ -146,16 +110,20 @@ pub extern "win64" fn efi_main(image: uefi::Handle, st: SystemTable<Boot>){
 
 #[no_mangle]
 #[cfg(any(target_arch="aarch64"))]
+/// The entrypoint of Theseus.
+/// `image` is the handler of the image file. Currently it is of no use.
+/// `st` is the systemtable of UEFI. It contains all the services provides by UEFI.
 pub extern "win64" fn nano_core_start(_image: uefi::Handle, st: SystemTable<Boot>) -> !{
+    // init useful UEFI services
     uefi_services::init(&st);
     let bt = st.boot_services();
     let stdout = st.stdout();
-    
     let _ = stdout.clear();
+    
+    // init memory manager
     let (_kernel_mmi_ref, _text_mapped_pages, _rodata_mapped_pages, _data_mapped_pages, _identity_mapped_pages) =  try_exit!(memory::init(&bt));
-
     debug!("nano_core_start(): initialized memory subsystem.");
-
+    
     match stdout.write_str(WELCOME_STRING){
         Ok(_) => {},
         Err(err) => {error!("Fail to write the welcome string: {}", err)},

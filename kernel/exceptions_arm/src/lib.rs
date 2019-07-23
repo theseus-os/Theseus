@@ -15,7 +15,6 @@ lazy_static! {
 
 #[cfg(any(target_arch="aarch64"))]
 pub fn init() {
-    
     let mut exceptions = VECTORS.lock();
     
     exceptions[0].instructions[0] = assemble_inst_bl(&exceptions[0], exception_synchronous_handler);
@@ -69,33 +68,47 @@ impl ExceptionEntry {
 }
 
 
-// TODO print register information
-#[cfg(any(target_arch="aarch64"))]
 fn _exception_default_handler() {
     error!("Default Exceptions!");
+    print_registers();
     loop { }
 }
 
-#[cfg(any(target_arch="aarch64"))]
 fn exception_synchronous_handler() {
     error!("Synchronous Exceptions!");
+    print_registers();
     loop { }
 }
 
-#[cfg(any(target_arch="aarch64"))]
 fn exception_irq_handler() {
     error!("IRQ Exceptions!");
+    print_registers();
     loop { }
 }
 
-#[cfg(any(target_arch="aarch64"))]
 fn exception_fiq_handler() {
     error!("FIQ Exceptions!");
+    print_registers();
     loop { }
 }
 
-#[cfg(any(target_arch="aarch64"))]
 fn exception_serror_handler() {
     error!("SErrorExceptions!");
+    print_registers();
     loop { }
+}
+
+fn print_registers() {
+    let esr_el1:u64;
+    let elr_el1:u64;
+    let spsr_el1:u64;
+    let far_el1:u64;
+    unsafe {  
+        asm!("mrs $0, ESR_EL1" : "=r"(esr_el1) : : : "volatile"); 
+        asm!("mrs $0, ELR_EL1" : "=r"(elr_el1) : : : "volatile"); 
+        asm!("mrs $0, SPSR_EL1" : "=r"(spsr_el1) : : : "volatile"); 
+        asm!("mrs $0, FAR_EL1" : "=r"(far_el1) : : : "volatile"); 
+        
+    };
+    error!("ESR_EL1={:X}\nELR_EL1={:X}\nSPSR_EL1={:X}\nFAR_EL1={:X}\n", esr_el1, elr_el1, spsr_el1, far_el1);
 }

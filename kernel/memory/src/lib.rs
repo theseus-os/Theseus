@@ -56,6 +56,10 @@ pub use self::area_frame_allocator::AreaFrameAllocator;
 pub use self::paging::*;
 pub use self::stack_allocator::{StackAllocator, Stack};
 
+#[cfg(any(target_arch="aarch64"))]
+pub const ARM_HARDWARE_START:u64 = 0x1000 ;
+#[cfg(any(target_arch="aarch64"))]
+pub const ARM_HARDWARE_END:u64 = 0x40000000;
 
 use core::{
     ops::{RangeInclusive, Deref, DerefMut},
@@ -634,8 +638,8 @@ pub fn init(bt:&BootServices)
     let mut avail_index = 0;
     let mut available: [PhysicalMemoryArea; 32] = Default::default();
 
-    let occupied: [PhysicalMemoryArea; 32] = Default::default();
-    let occup_index = 0;
+    let mut occupied: [PhysicalMemoryArea; 32] = Default::default();
+    let mut occup_index = 0;
 
     loop {
         match maps_iter.next() {
@@ -675,6 +679,10 @@ pub fn init(bt:&BootServices)
 
         //mapped_pages_index += 1;
     }
+
+    occupied[occup_index] = PhysicalMemoryArea::new(kernel_phys_start, kernel_phys_end.value() - kernel_phys_start.value(), 1, 0); // kernel
+    occup_index += 1;
+    occupied[occup_index] = PhysicalMemoryArea::new(PhysicalAddress::new_canonical(ARM_HARDWARE_START as usize), (ARM_HARDWARE_END - ARM_HARDWARE_START) as usize, 1, 0); // hardware
 
     let kernel_virt_end = kernel_phys_end + KERNEL_OFFSET;
     debug!("kernel_phys_start: {:#x}, kernel_phys_end: {:#x} kernel_virt_end = {:#x}", kernel_phys_start, kernel_phys_end, kernel_virt_end);

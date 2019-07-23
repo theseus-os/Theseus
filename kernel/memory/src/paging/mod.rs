@@ -973,9 +973,10 @@ pub fn init(bt:&BootServices, allocator_mutex: &MutexIrqSafe<AreaFrameAllocator>
                                     }
                                 }
                             } else {
+                                let start_virt_addr = VirtualAddress::new_canonical(start_phys_addr.value());
                                 identity_mapped_pages[index] = Some(try!( mapper.map_frames(
                                                 FrameRange::from_phys_addr(start_phys_addr, size as usize), 
-                                                Page::containing_address(start_virt_addr - KERNEL_OFFSET), 
+                                                Page::containing_address(start_virt_addr), 
                                                 EntryFlags::GLOBAL | EntryFlags::PAGE, allocator.deref_mut())
                                 ));
                                 vmas[index] = VirtualMemoryArea::new(start_virt_addr, size as usize, EntryFlags::GLOBAL, ".conventional");
@@ -1024,16 +1025,16 @@ pub fn init(bt:&BootServices, allocator_mutex: &MutexIrqSafe<AreaFrameAllocator>
 
 
         //Hardware resources https://github.com/qemu/qemu/blob/master/hw/arm/virt.c
-        const HARDWARE_START:u64 = 0x1000 ;
-        const HARDWARE_END:u64 = 0x40000000;
+        use super::ARM_HARDWARE_START;
+        use super::ARM_HARDWARE_END;
         const HIGHER_HALF:usize = 0xFFFF000000000000;
-        let hardware_virt = VirtualAddress::new_canonical(HARDWARE_START as usize | HIGHER_HALF);
+        let hardware_virt = VirtualAddress::new_canonical(ARM_HARDWARE_START as usize | HIGHER_HALF);
         identity_mapped_pages[index] = Some(try!( mapper.map_frames(
-            FrameRange::from_phys_addr(PhysicalAddress::new(HARDWARE_START as usize)?,  (HARDWARE_END - HARDWARE_START) as usize), 
+            FrameRange::from_phys_addr(PhysicalAddress::new(ARM_HARDWARE_START as usize)?,  (ARM_HARDWARE_END - ARM_HARDWARE_START) as usize), 
                 Page::containing_address(hardware_virt), 
                 EntryFlags::PAGE | EntryFlags::ACCESSEDARM | EntryFlags::INNER_SHARE, allocator.deref_mut())
         ));
-        vmas[index] = VirtualMemoryArea::new(hardware_virt, (HARDWARE_END - HARDWARE_START) as usize,
+        vmas[index] = VirtualMemoryArea::new(hardware_virt, (ARM_HARDWARE_END - ARM_HARDWARE_START) as usize,
             EntryFlags::PAGE, ".mmio");
         //index += 1;
 
