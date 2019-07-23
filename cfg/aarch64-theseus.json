@@ -12,7 +12,7 @@
     "lld-link": [
       "/Subsystem:EFI_Application",
 			"/Entry:efi_main",
-			"/Machine:arm64"
+      "/Machine:arm64"
     ]
   },
   "panic-strategy": "abort",

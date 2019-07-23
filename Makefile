@@ -587,7 +587,7 @@ armdebug: armbuild
 
 armgdb: export CROSS=aarch64-none-elf-
 armgdb:
-	$(CROSS)gdb "kernel.bin" -ex "target remote :1234"
+	$(CROSS)gdb "./build/boot/kernel.efi" -ex "target remote :1234"
 
 
 ### builds and runs Theseus in Bochs

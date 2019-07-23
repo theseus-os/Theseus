@@ -196,7 +196,12 @@ To debug Theseus, downlowd the cross compiler
 
 Add `path_to_aarch64-none-elf/bin` to `$PATH`, or move `path_to_aarch64-none-elf/bin/*` to `/usr/bin` which is already in `$PATH`
 
-Run `make armdebug` in a terminal, and run `make armgdb` in another terminal.
+Run `make armdebug` in a terminal, and run `make armgdb` in another terminal
+
+GDB cannot set breakpoints based on the source file, since we need to generate another file with symbols table for debugging. The reference is here: https://wiki.osdev.org/Debugging_UEFI_applications_with_GDB.
+
+It is able to set breakpoints at certain address, check memories and registers or display instructions.
+
 
 
 
