@@ -46,8 +46,7 @@ pub fn tsc_ticks() -> TscTicks {
     #[cfg(any(target_arch="x86", target_arch="x86_64"))]
     let ticks = {
         let mut val = 0;
-        unsafe { core::arch::x86_64::__rdtscp(&mut val) };
-        val as u64
+        unsafe { core::arch::x86_64::__rdtscp(&mut val) }
     };
     // get systick
     #[cfg(any(target_arch="aarch64"))]
