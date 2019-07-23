@@ -1,5 +1,5 @@
 //! Provides a type for the task state segment structure.
-
+//! For compatibility with x86 temporarily. To be implemented in the future
 use VirtualAddress;
 
 /// In 64-bit mode the TSS holds information that is not

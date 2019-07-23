@@ -1,5 +1,5 @@
 //! Types for the Global Descriptor Table and segment selectors.
-
+//! For compatibility with x86. Will be implemented later
 use core::fmt;
 use PrivilegeLevel;
 use bit_field::BitField;

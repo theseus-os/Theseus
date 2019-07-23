@@ -1,13 +1,5 @@
-// Copyright 2017 Philipp Oppermann. See the README.md
-// file at the top-level directory of this distribution.
-//
-// Licensed under the Apache License, Version 2.0 <LICENSE-APACHE or
-// http://www.apache.org/licenses/LICENSE-2.0> or the MIT license
-// <LICENSE-MIT or http://opensource.org/licenses/MIT>, at your
-// option. This file may not be copied, modified, or distributed
-// except according to those terms.
-
-//! Provides types for the Interrupt Descriptor Table and its entries.
+//! This mod is for compatibility with x86
+//! We will implement a new ARM interrupt crate
 
 use core::fmt;
 use core::marker::PhantomData;
@@ -438,26 +430,13 @@ impl Idt {
     /// Thus, it offers the same safety guarantee as &'static self
     #[doc(hidden)]
     fn load(&self) {
-    // pub fn load(&'static self) {
-    //     use instructions::tables::{DescriptorTablePointer, lidt};
-    //     use core::mem::size_of;
-
-    //     let ptr = DescriptorTablePointer {
-    //         base: self as *const _ as u64,
-    //         limit: (size_of::<Self>() - 1) as u16,
-    //     };
-
-    //     unsafe { lidt(&ptr) };
-    // 
+        // TODO
     }
 
     /// Returns the last IDT entry that has the default_handler loaded, 
     /// which signifies that the interrupt isn't being used by any device yet
     pub fn find_free_entry(&self, _default_handler: HandlerFunc) -> Option<usize> {
-        // // offset in the IDT where user interrupts start 
-        // let interrupt_offset = 32;
-        // // we are iterating though the interrupt table in reverse because lower interrupts are more likely to be reserved
-        // self.interrupts.iter().rposition(|&entry| entry.handler_eq(default_handler)).map(|entry| entry + interrupt_offset)
+        // TODO
         None
     }
 }
@@ -553,26 +532,6 @@ impl<F> IdtEntry<F> {
         }
     }
 
-    // / Set the handler address for the IDT entry and sets the present bit.
-    // /
-    // / For the code selector field, this function uses the code segment selector currently
-    // / active in the CPU.
-    // /
-    // / The function returns a mutable reference to the entry's options that allows
-    // / further customization.
-    // fn set_handler_addr(&mut self, addr: u64) -> &mut EntryOptions {
-    //     use instructions::segmentation;
-
-    //     self.pointer_low = addr as u16;
-    //     self.pointer_middle = (addr >> 16) as u16;
-    //     self.pointer_high = (addr >> 32) as u32;
-
-    //     self.gdt_selector = segmentation::cs().0;
-
-    //     self.options.set_present(true);
-    //     &mut self.options
-    // }
-
     /// Returns `true` if this interrupt handler's address is equal to the `address` of the given handler.
     fn handler_addr_eq(&self, address: u64) -> bool {
         let pointer_low = address as u16;
@@ -587,18 +546,6 @@ impl<F> IdtEntry<F> {
 macro_rules! impl_set_handler_fn {
     ($h:ty) => {
         impl IdtEntry<$h> {
-            /// Set the handler function for the IDT entry and sets the present bit.
-            ///
-            /// For the code selector field, this function uses the code segment selector currently
-            /// active in the CPU.
-            ///
-            /// The function returns a mutable reference to the entry's options that allows
-            /// further customization.
-            // pub fn set_handler_fn(&mut self, handler: $h) -> &mut EntryOptions {
-            //     self.set_handler_addr(handler as u64)
-            // }
-            
-            /// Returns `true` if this interrupt handler's function is equivalent to the given 'handler'.
             pub fn handler_eq(&self, handler: $h) -> bool {
                 self.handler_addr_eq(handler as u64)
             }
@@ -617,11 +564,6 @@ pub struct EntryOptions(u16);
 impl EntryOptions {
     /// Creates a minimal options field with all the must-be-one bits set.
     const fn minimal() -> Self {
-        // let mut options = 0;
-        // options.set_bits(9..12, 0b111); // 'must-be-one' bits
-        // EntryOptions(options)
-
-        // const-compatible version
         EntryOptions(0b111 << 9)
     }
 

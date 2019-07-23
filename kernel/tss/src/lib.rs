@@ -64,11 +64,6 @@ pub fn create_tss(apic_id: u8,
         tss.interrupt_stack_table[DOUBLE_FAULT_IST_INDEX] = x86_64::VirtualAddress(double_fault_stack_top_unusable.value());
     }
 
-    #[cfg(arget_arch="aarch64")]
-    {    
-        tss.privilege_stack_table[0] = aarch64::VirtualAddress(privilege_stack_top_unusable.value());
-        tss.interrupt_stack_table[DOUBLE_FAULT_IST_INDEX] = aarch64::VirtualAddress(double_fault_stack_top_unusable.value());
-    }
     // insert into TSS list
     TSS.insert(apic_id, Mutex::new(tss));
     let tss_ref = TSS.get(&apic_id).unwrap(); // safe to unwrap since we just added it to the list

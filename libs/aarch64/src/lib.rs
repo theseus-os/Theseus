@@ -1,4 +1,4 @@
-//! This crate is reserved for arm instructions. It is to be implemented and part of the functions will be replaced by cortex-a crate
+//! This crate is reserved for arm instructions. It is to be implemented and part of the functions will be replaced by `cortex-m` crate
 
 #![warn(missing_docs)]
 
