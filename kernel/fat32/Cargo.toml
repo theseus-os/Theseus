@@ -2,13 +2,11 @@
 name = "fat32"
 version = "0.1.0"
 authors = ["Barry Shiberu <bereketshiberu@gmail.com>"]
-description = "FAT32 support"
+description = "physical filesystem -- FAT32 support"
 
 
 [dependencies]
-cpuio = "*"
-spin = "0.4.9"
-numtoa = { git = "https://github.com/mmstick/numtoa.git"}
+spin = "0.4.10"
 
 [dependencies.lazy_static]
 version = "1.0"
@@ -20,6 +18,9 @@ version = "0.3.7"
 
 [dependencies.storage_device]
 path = "../storage_device"
+
+[dependencies.fs_node]
+path = "../fs_node"
 
 [dependencies.storage_manager]
 path = "../storage_manager"
