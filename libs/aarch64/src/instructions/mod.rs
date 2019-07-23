@@ -1,9 +1,7 @@
 //! Low level functions for special x86 instructions.
 
 pub mod interrupts;
-pub mod tables;
 pub mod tlb;
-pub mod segmentation;
 
 /// For compatibility
 /// Write 64 bits to msr register in x86.

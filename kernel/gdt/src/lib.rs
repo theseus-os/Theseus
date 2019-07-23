@@ -190,15 +190,15 @@ impl Gdt {
     pub fn load(&self) {
         #[cfg(any(target_arch="x86", target_arch="x86_64"))]
         use x86_64::instructions::tables::{DescriptorTablePointer, lgdt};
-        #[cfg(any(target_arch="aarch64"))]
-        use aarch64::instructions::tables::{DescriptorTablePointer, lgdt};
         use core::mem::size_of;
 
+        #[cfg(any(target_arch="x86", target_arch="x86_64"))]
         let ptr = DescriptorTablePointer {
             base: self.table.as_ptr() as u64,
             limit: (self.table.len() * size_of::<u64>() - 1) as u16,
         };
 
+        #[cfg(any(target_arch="x86", target_arch="x86_64"))]
         unsafe { lgdt(&ptr) };
     }
 }

@@ -439,15 +439,16 @@ impl Idt {
     #[doc(hidden)]
     fn load(&self) {
     // pub fn load(&'static self) {
-        use instructions::tables::{DescriptorTablePointer, lidt};
-        use core::mem::size_of;
+    //     use instructions::tables::{DescriptorTablePointer, lidt};
+    //     use core::mem::size_of;
 
-        let ptr = DescriptorTablePointer {
-            base: self as *const _ as u64,
-            limit: (size_of::<Self>() - 1) as u16,
-        };
+    //     let ptr = DescriptorTablePointer {
+    //         base: self as *const _ as u64,
+    //         limit: (size_of::<Self>() - 1) as u16,
+    //     };
 
-        unsafe { lidt(&ptr) };
+    //     unsafe { lidt(&ptr) };
+    // 
     }
 
     /// Returns the last IDT entry that has the default_handler loaded, 
