@@ -1011,7 +1011,6 @@ dependencies = [
  "state_store 0.1.0",
  "uefi 0.1.0",
  "uefi-exts 0.1.0",
- "uefi_alloc 0.1.0",
  "uefi_services 0.1.0",
  "vga_buffer 0.1.0",
  "x86_64 0.1.2",

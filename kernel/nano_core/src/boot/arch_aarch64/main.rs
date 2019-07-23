@@ -49,7 +49,6 @@ extern crate logger;
 extern crate uefi;
 extern crate uefi_services;
 extern crate uefi_exts;
-extern crate uefi_alloc;
 
 use uefi::prelude::*;
 use uefi_exts::BootServicesExt;
