@@ -184,6 +184,21 @@ Then, simply run `make debug` to build and run Theseus in QEMU, which will pause
 To attach the debugger to our paused QEMU instance, run `make gdb` in another terminal. QEMU will be paused until we move the debugger forward, with `n` to step through or `c` to continue running the debugger.  
 Try setting a breakpoint at the kernel's entry function using `b nano_core::nano_core_start` or at a specific file/line, e.g., `b scheduler.rs:40`.
 
+## Run Theseus on ARM
+Update the submodules. Run
+`git submodule update`
+
+Run Theseus on ARM.
+`make arm`
+
+To debug Theseus, downlowd the cross compiler 
+`git clone https://github.com/arter97/aarch64-none-elf-6.1.git`
+
+Add `path_to_aarch64-none-elf/bin` to `$PATH`, or move `path_to_aarch64-none-elf/bin/*` to `/usr/bin` which is already in `$PATH`
+
+Run `make armdebug` in a terminal, and run `make armgdb` in another terminal.
+
+
 
 ## Documentation
 Once your build environment is fully set up, you can generate Theseus's documentation in standard Rust docs.rs format. 

@@ -559,9 +559,8 @@ NANO_CORE_DIR:=$(ROOT_DIR)/kernel/nano_core/src
 
 ### ARM
 armbuild:export TARGET:=aarch64-theseus
+armbuild:export BUILD_MODE=release
 armbuild:
-	@BUILD_MODE=release
-	@CROSS=aarch64-none-elf-
 	@cp $(MAIN_DIR)/main.rs $(NANO_CORE_DIR)
 	@mkdir -p $(BUILD_DIR)/boot/grub
 	RUST_TARGET_PATH=$(PWD)/cfg \
@@ -583,11 +582,11 @@ armbuild:
 arm: armbuild
 	qemu-system-aarch64 -m 2048 -cpu cortex-a57 -smp 2 -M virt -bios QEMU_EFI.fd -nographic -drive if=none,file=theseus.iso,id=cdrom,media=cdrom -device virtio-scsi-device -device scsi-cd,drive=cdrom
 
-armqemu: armbuild	
+armdebug: armbuild	
 	qemu-system-aarch64 -s -S -m 2048 -cpu cortex-a57 -smp 2 -M virt -bios QEMU_EFI.fd -nographic -drive if=none,file=theseus.iso,id=cdrom,media=cdrom -device virtio-scsi-device -device scsi-cd,drive=cdrom
 
+armgdb: export CROSS=aarch64-none-elf-
 armgdb:
-	@CROSS=aarch64-none-elf-
 	$(CROSS)gdb "kernel.bin" -ex "target remote :1234"
 
 
