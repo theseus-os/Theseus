@@ -10,3 +10,4 @@ description = "Reserved crate for arm instructions"
 [dependencies]
 bit_field = "0.7.0"
 irq_safety = { git = "https://github.com/kevinaboos/irq_safety" }
+cortex-m = "0.6.0"

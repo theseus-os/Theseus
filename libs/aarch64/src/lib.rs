@@ -14,6 +14,7 @@ pub use address::{VirtualAddress, PhysicalAddress};
 
 extern crate bit_field;
 extern crate irq_safety;
+extern crate cortex_m;
 
 #[macro_use]
 mod bitflags;

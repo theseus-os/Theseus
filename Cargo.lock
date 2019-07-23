@@ -5,6 +5,7 @@ name = "aarch64"
 version = "0.1.2"
 dependencies = [
  "bit_field 0.7.0 (registry+https://github.com/rust-lang/crates.io-index)",
+ "cortex-m 0.6.0 (registry+https://github.com/rust-lang/crates.io-index)",
  "irq_safety 0.1.1 (git+https://github.com/kevinaboos/irq_safety)",
 ]
 
@@ -57,6 +58,14 @@ dependencies = [
 ]
 
 [[package]]
+name = "aligned"
+version = "0.3.1"
+source = "registry+https://github.com/rust-lang/crates.io-index"
+dependencies = [
+ "as-slice 0.1.0 (registry+https://github.com/rust-lang/crates.io-index)",
+]
+
+[[package]]
 name = "ap_start"
 version = "0.1.0"
 dependencies = [
@@ -94,6 +103,15 @@ dependencies = [
 ]
 
 [[package]]
+name = "as-slice"
+version = "0.1.0"
+source = "registry+https://github.com/rust-lang/crates.io-index"
+dependencies = [
+ "generic-array 0.12.0 (registry+https://github.com/rust-lang/crates.io-index)",
+ "stable_deref_trait 1.1.1 (registry+https://github.com/rust-lang/crates.io-index)",
+]
+
+[[package]]
 name = "ata"
 version = "0.1.0"
 dependencies = [
@@ -111,6 +129,14 @@ source = "registry+https://github.com/rust-lang/crates.io-index"
 [[package]]
 name = "atomic_linked_list"
 version = "0.1.0"
+
+[[package]]
+name = "bare-metal"
+version = "0.2.4"
+source = "registry+https://github.com/rust-lang/crates.io-index"
+dependencies = [
+ "rustc_version 0.2.3 (registry+https://github.com/rust-lang/crates.io-index)",
+]
 
 [[package]]
 name = "bit_field"
@@ -277,6 +303,16 @@ version = "2.4.0"
 source = "registry+https://github.com/rust-lang/crates.io-index"
 dependencies = [
  "register 0.3.3 (registry+https://github.com/rust-lang/crates.io-index)",
+]
+
+[[package]]
+name = "cortex-m"
+version = "0.6.0"
+source = "registry+https://github.com/rust-lang/crates.io-index"
+dependencies = [
+ "aligned 0.3.1 (registry+https://github.com/rust-lang/crates.io-index)",
+ "bare-metal 0.2.4 (registry+https://github.com/rust-lang/crates.io-index)",
+ "volatile-register 0.2.0 (registry+https://github.com/rust-lang/crates.io-index)",
 ]
 
 [[package]]
@@ -1728,6 +1764,11 @@ dependencies = [
 ]
 
 [[package]]
+name = "stable_deref_trait"
+version = "1.1.1"
+source = "registry+https://github.com/rust-lang/crates.io-index"
+
+[[package]]
 name = "state_store"
 version = "0.1.0"
 dependencies = [
@@ -2035,6 +2076,11 @@ name = "util"
 version = "0.1.0"
 
 [[package]]
+name = "vcell"
+version = "0.1.0"
+source = "registry+https://github.com/rust-lang/crates.io-index"
+
+[[package]]
 name = "vfs_node"
 version = "0.1.0"
 dependencies = [
@@ -2066,6 +2112,14 @@ source = "registry+https://github.com/rust-lang/crates.io-index"
 name = "volatile"
 version = "0.2.5"
 source = "registry+https://github.com/rust-lang/crates.io-index"
+
+[[package]]
+name = "volatile-register"
+version = "0.2.0"
+source = "registry+https://github.com/rust-lang/crates.io-index"
+dependencies = [
+ "vcell 0.1.0 (registry+https://github.com/rust-lang/crates.io-index)",
+]
 
 [[package]]
 name = "window_manager"
@@ -2110,7 +2164,10 @@ version = "0.1.3"
 source = "git+https://github.com/kevinaboos/zero.git#9fc7ff523138a21f40359b706d2d6bf91deafc62"
 
 [metadata]
+"checksum aligned 0.3.1 (registry+https://github.com/rust-lang/crates.io-index)" = "d3a316c7ea8e1e9ece54862c992def5a7ac14de9f5832b69d71760680efeeefa"
+"checksum as-slice 0.1.0 (registry+https://github.com/rust-lang/crates.io-index)" = "293dac66b274fab06f95e7efb05ec439a6b70136081ea522d270bc351ae5bb27"
 "checksum atomic 0.4.4 (registry+https://github.com/rust-lang/crates.io-index)" = "e5208a0c1ca6d26af893a20ad156a6def478f23c26900b1f95e2086aeb870146"
+"checksum bare-metal 0.2.4 (registry+https://github.com/rust-lang/crates.io-index)" = "a3caf393d93b2d453e80638d0674597020cef3382ada454faacd43d1a55a735a"
 "checksum bit_field 0.7.0 (registry+https://github.com/rust-lang/crates.io-index)" = "ff91a64014e1bc53bf643920f2c9ab5f0980d92a0948295f3ee550e9266849ad"
 "checksum bitflags 1.0.4 (registry+https://github.com/rust-lang/crates.io-index)" = "228047a76f468627ca71776ecdebd732a3423081fcf5125585bcd7c49886ce12"
 "checksum block-buffer 0.7.0 (registry+https://github.com/rust-lang/crates.io-index)" = "49665c62e0e700857531fa5d3763e91b539ff1abeebd56808d378b495870d60d"
@@ -2121,6 +2178,7 @@ source = "git+https://github.com/kevinaboos/zero.git#9fc7ff523138a21f40359b706d2
 "checksum cfg-if 0.1.6 (registry+https://github.com/rust-lang/crates.io-index)" = "082bb9b28e00d3c9d39cc03e64ce4cea0f1bb9b3fde493f0cbc008472d22bdf4"
 "checksum compiler_builtins 0.1.11 (git+https://github.com/rust-lang-nursery/compiler-builtins)" = "<none>"
 "checksum cortex-a 2.4.0 (registry+https://github.com/rust-lang/crates.io-index)" = "97867bac786c0a2912f7df981bdb8b6ea109a2422c22b37faf651d558a054453"
+"checksum cortex-m 0.6.0 (registry+https://github.com/rust-lang/crates.io-index)" = "f3c18719fdc57db65668bfc977db9a0fa1a41d718c5d9cd4f652c9d4b0e0956a"
 "checksum derive_more 0.14.0 (registry+https://github.com/rust-lang/crates.io-index)" = "fbe9f11be34f800b3ecaaed0ec9ec2e015d1d0ba0c8644c1310f73d6e8994615"
 "checksum digest 0.8.0 (registry+https://github.com/rust-lang/crates.io-index)" = "05f47366984d3ad862010e22c7ce81a7dbcaebbdfb37241a620f8b6596ee135c"
 "checksum either 1.5.0 (registry+https://github.com/rust-lang/crates.io-index)" = "3be565ca5c557d7f59e7cfcf1844f9e3033650c929c6566f511e8005f205c1d0"
@@ -2166,6 +2224,7 @@ source = "git+https://github.com/kevinaboos/zero.git#9fc7ff523138a21f40359b706d2
 "checksum smoltcp 0.5.0 (registry+https://github.com/rust-lang/crates.io-index)" = "fef582369edb298c6c41319a544ca9c4e83622f226055ccfcb35974fbb55ed34"
 "checksum spin 0.4.10 (registry+https://github.com/rust-lang/crates.io-index)" = "ceac490aa12c567115b40b7b7fceca03a6c9d53d5defea066123debc83c5dc1f"
 "checksum stable_deref_trait 1.1.1 (git+https://github.com/kevinaboos/stable_deref_trait.git?branch=spin)" = "<none>"
+"checksum stable_deref_trait 1.1.1 (registry+https://github.com/rust-lang/crates.io-index)" = "dba1a27d3efae4351c8051072d619e3ade2820635c3958d826bfea39d59b54c8"
 "checksum syn 0.15.33 (registry+https://github.com/rust-lang/crates.io-index)" = "ec52cd796e5f01d0067225a5392e70084acc4c0013fa71d55166d38a8b307836"
 "checksum tock-registers 0.3.0 (registry+https://github.com/rust-lang/crates.io-index)" = "c758f5195a2e0df9d9fecf6f506506b2766ff74cf64db1e995c87e2761a5c3e2"
 "checksum type-name 0.1.0 (registry+https://github.com/rust-lang/crates.io-index)" = "2943970af6eaf4699869a46d6b250a3b26ce246f1cba2a059e109cbf4012d908"
@@ -2174,7 +2233,9 @@ source = "git+https://github.com/kevinaboos/zero.git#9fc7ff523138a21f40359b706d2
 "checksum unicode-width 0.1.5 (registry+https://github.com/rust-lang/crates.io-index)" = "882386231c45df4700b275c7ff55b6f3698780a650026380e72dabe76fa46526"
 "checksum unicode-xid 0.1.0 (registry+https://github.com/rust-lang/crates.io-index)" = "fc72304796d0818e357ead4e000d19c9c174ab23dc11093ac919054d20a6a7fc"
 "checksum unreachable 1.0.0 (registry+https://github.com/rust-lang/crates.io-index)" = "382810877fe448991dfc7f0dd6e3ae5d58088fd0ea5e35189655f84e6814fa56"
+"checksum vcell 0.1.0 (registry+https://github.com/rust-lang/crates.io-index)" = "45c297f0afb6928cd08ab1ff9d95e99392595ea25ae1b5ecf822ff8764e57a0d"
 "checksum void 1.0.2 (registry+https://github.com/rust-lang/crates.io-index)" = "6a02e4885ed3bc0f2de90ea6dd45ebcbb66dacffe03547fadbb0eeae2770887d"
 "checksum volatile 0.2.5 (registry+https://github.com/rust-lang/crates.io-index)" = "d9ca391c55768e479d5c2f8beb40c136df09257292a809ea514e82cfdfc15d00"
+"checksum volatile-register 0.2.0 (registry+https://github.com/rust-lang/crates.io-index)" = "0d67cb4616d99b940db1d6bd28844ff97108b498a6ca850e5b6191a532063286"
 "checksum xmas-elf 0.6.2 (git+https://github.com/kevinaboos/xmas-elf.git)" = "<none>"
 "checksum zero 0.1.3 (git+https://github.com/kevinaboos/zero.git)" = "<none>"
