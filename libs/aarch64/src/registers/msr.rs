@@ -1,5 +1,6 @@
 //! MSR value list and function to read and write them.
-
+//! For compatibility. x86 msr registers definition
+//! It is of no use in arm and will be deleted
 #![allow(missing_docs)]
 
 pub use instructions::{rdmsr, wrmsr};
