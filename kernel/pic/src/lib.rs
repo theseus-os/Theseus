@@ -246,8 +246,8 @@ fn io_wait() {
     // worked around this by writing garbage data to port 0x80, which
     // allegedly takes long enough to make everything work on most hardware.
     #[cfg(any(target_arch="x86", target_arch="x86_64"))]
-    use x86_64::instructions::port::outb;
-    #[cfg(any(target_arch="aarch64"))]
-    use aarch64::instructions::port::outb;
-    unsafe { outb(0x80, 0); }
+    {
+        use x86_64::instructions::port::outb;
+        unsafe { outb(0x80, 0); }
+    }
 }

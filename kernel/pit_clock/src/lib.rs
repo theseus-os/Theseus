@@ -47,11 +47,9 @@ pub fn init(freq_hertz: u32) {
     }
 
     // SAFE because we're simply configuring the PIT clock, and the code below is correct.
+    #[cfg(any(target_arch="x86", target_arch="x86_64"))]
     unsafe {
-        #[cfg(any(target_arch="x86", target_arch="x86_64"))]
         use x86_64::instructions::port::inb;
-        #[cfg(any(target_arch="aarch64"))]
-        use aarch64::instructions::port::inb;
         PIT_COMMAND.lock().write(0x36); // 0x36: see this: http://www.osdever.net/bkerndev/Docs/pit.htm
 
         // must write the low byte and then the high byte
@@ -72,11 +70,9 @@ pub fn pit_wait(microseconds: u32) -> Result<(), &'static str> {
     }
 
     // SAFE because we're simply configuring the PIT clock, and the code below is correct.
+    #[cfg(any(target_arch="x86", target_arch="x86_64"))]
     unsafe {
-        #[cfg(any(target_arch="x86", target_arch="x86_64"))]
         use x86_64::instructions::port::{inb, outb};
-        #[cfg(any(target_arch="aarch64"))]
-        use aarch64::instructions::port::{inb, outb};
         // see code example: https://wiki.osdev.org/APIC_timer
         let port_61_val = inb(0x61); 
         outb(0x61, port_61_val & 0xFD | 0x1); // sets the speaker channel 2 to be controlled by PIT hardware
@@ -98,6 +94,9 @@ pub fn pit_wait(microseconds: u32) -> Result<(), &'static str> {
         while inb(0x61) & 0x20 != 0 { }
         Ok(())
     }
+
+    #[cfg(any(target_arch="aarch64"))]
+    Ok(())
 }
 
 

@@ -1,6 +1,5 @@
 //! Low level functions for special x86 instructions.
 
-pub mod port;
 pub mod interrupts;
 pub mod tables;
 pub mod tlb;
