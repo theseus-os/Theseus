@@ -123,13 +123,13 @@ pub extern "win64" fn nano_core_start(_image: uefi::Handle, st: SystemTable<Boot
     // init memory manager
     let (_kernel_mmi_ref, _text_mapped_pages, _rodata_mapped_pages, _data_mapped_pages, _identity_mapped_pages) =  try_exit!(memory::init(&bt));
     debug!("nano_core_start(): initialized memory subsystem.");
-    
+
     match stdout.write_str(WELCOME_STRING){
         Ok(_) => {},
         Err(err) => {error!("Fail to write the welcome string: {}", err)},
     };
 
-    // Get the root directory
+    // Get the root directory if the filesystem. It is of no use because we will have our own file system. 
     type SearchedProtocol<'boot> = uefi::proto::media::fs::SimpleFileSystem;
 
     let protocol = bt.find_protocol::<SearchedProtocol>().expect_success("Failed to init the SimpleFileSystem protocol").get();
@@ -138,10 +138,11 @@ pub extern "win64" fn nano_core_start(_image: uefi::Handle, st: SystemTable<Boot
         let _dir =(*protocol).open_volume().expect("Fail to get access to the file system");
     }
 
-    // Disable temporarily because the interrupt handler is to be implemented
-    //exceptions_arm::init();
+    // Disable temporarily because the interrupt handler is to be implemented. Currently we should rely on UEFI handler for keyboard support
+    // exceptions_arm::init();
 
     // TODO: captain::init()
+
     loop {
         let stdin = st.stdin();
         let key_opt = stdin.read_key().expect_success("Fail to read the input");
@@ -158,6 +159,7 @@ pub extern "win64" fn nano_core_start(_image: uefi::Handle, st: SystemTable<Boot
     }
 }
 
+/// No use since the linker specifies efi_main as th entrypoint
 pub fn main() {
     loop {
 

@@ -815,6 +815,7 @@ pub fn init(allocator_mutex: &MutexIrqSafe<AreaFrameAllocator>, boot_info: &mult
 #[cfg(any(target_arch="aarch64"))]
 pub fn init(bt:&BootServices, allocator_mutex: &MutexIrqSafe<AreaFrameAllocator>) 
    -> Result<(PageTable, Vec<VirtualMemoryArea>, MappedPages, MappedPages, MappedPages, Vec<MappedPages>, Vec<MappedPages>), &'static str> {
+
     //init higher half
     enable_higher_half();
     let p4_frame = get_current_p4();
@@ -894,6 +895,7 @@ pub fn init(bt:&BootServices, allocator_mutex: &MutexIrqSafe<AreaFrameAllocator>
         let mut index = 0;
 
         debug!("Start to map occupied memories in the new page table");
+        // Before map the higher half, map these pages to indentical address because UEFI service might be in use after switching.
         loop {
 
             match maps_iter.next() {
@@ -1029,7 +1031,8 @@ pub fn init(bt:&BootServices, allocator_mutex: &MutexIrqSafe<AreaFrameAllocator>
         use super::ARM_HARDWARE_END;
         const HIGHER_HALF:usize = 0xFFFF000000000000;
         let hardware_virt = VirtualAddress::new_canonical(ARM_HARDWARE_START as usize | HIGHER_HALF);
-        identity_mapped_pages[index] = Some(try!( mapper.map_frames(
+        let mut higher_index = 0;
+        higher_half_mapped_pages[higher_index] = Some(try!( mapper.map_frames(
             FrameRange::from_phys_addr(PhysicalAddress::new(ARM_HARDWARE_START as usize)?,  (ARM_HARDWARE_END - ARM_HARDWARE_START) as usize), 
                 Page::containing_address(hardware_virt), 
                 EntryFlags::PAGE | EntryFlags::ACCESSEDARM | EntryFlags::INNER_SHARE, allocator.deref_mut())
@@ -1037,6 +1040,7 @@ pub fn init(bt:&BootServices, allocator_mutex: &MutexIrqSafe<AreaFrameAllocator>
         vmas[index] = VirtualMemoryArea::new(hardware_virt, (ARM_HARDWARE_END - ARM_HARDWARE_START) as usize,
             EntryFlags::PAGE, ".mmio");
         //index += 1;
+        //higher_index += 1;
 
         // now we map the 5 main sections into 3 groups according to flags
         text_mapped_pages = Some( try!( mapper.map_frames(
