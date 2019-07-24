@@ -989,6 +989,7 @@ impl Shell {
                 "jobs" => return true,
                 "fg" => return true,
                 "bg" => return true,
+                "clear" => return true,
                 _ => return false
             }
         }
@@ -1005,11 +1006,19 @@ impl Shell {
                 "jobs" => self.execute_internal_jobs(),
                 "fg" => self.execute_internal_fg(),
                 "bg" => self.execute_internal_bg(),
+                "clear" => self.execute_internal_clear(),
                 _ => Ok(())
             }
         } else {
             Ok(())
         }
+    }
+
+    fn execute_internal_clear(&mut self) -> Result<(), &'static str> {
+        self.terminal.clear();
+        self.clear_cmdline(false)?;
+        self.redisplay_prompt();
+        Ok(())
     }
 
     /// Execute `bg` command. It takes a job number and runs the in the background.

@@ -12,7 +12,6 @@
 #[macro_use] extern crate log;
 extern crate dfqueue;
 extern crate window_manager;
-extern crate root;
 extern crate environment;
 extern crate print;
 extern crate event_types;
@@ -20,7 +19,6 @@ extern crate spin;
 
 use alloc::string::{String, ToString};
 use alloc::vec::Vec;
-use alloc::sync::Arc;
 use event_types::Event;
 use window_manager::displayable::text_display::TextDisplay;
 
@@ -97,7 +95,7 @@ impl Terminal {
             // if there are no new lines in the slice
             if new_line_indices.is_empty() {
                 if buffer_height * buffer_width > end_idx {
-                    return (0,buffer_height * buffer_width -1);
+                    return (0, end_idx);
                 } else {
                     start_idx -= buffer_height * buffer_width; // text with no newlines will fill the entire buffer
                     return (start_idx, buffer_height * buffer_width -1);
@@ -441,8 +439,6 @@ impl Terminal {
             Err(err) => {debug!("new window returned err"); return Err(err)}
         };
 
-        let root = root::get_root();
-
         // let mut prompt_string = root.lock().get_absolute_path(); // ref numbers are 0-indexed
         let mut terminal = Terminal {
             window: window_object,
@@ -576,6 +572,14 @@ impl Terminal {
             return;
         }
         self.page_down();
+    }
+
+    /// Clear all.
+    pub fn clear(&mut self) {
+        self.scrollback_buffer.clear();
+        self.scroll_start_idx = 0;
+        self.absolute_cursor_pos = 0;
+        self.is_scroll_end = true;
     }
 
     pub fn initialize_screen(&mut self) -> Result<(), &'static str> {
