@@ -135,6 +135,16 @@ dependencies = [
 ]
 
 [[package]]
+name = "block_io"
+version = "0.1.0"
+dependencies = [
+ "hashbrown 0.1.8 (registry+https://github.com/rust-lang/crates.io-index)",
+ "lazy_static 1.2.0 (registry+https://github.com/rust-lang/crates.io-index)",
+ "log 0.3.9 (registry+https://github.com/rust-lang/crates.io-index)",
+ "storage_device 0.1.0",
+]
+
+[[package]]
 name = "bm"
 version = "0.1.0"
 dependencies = [
