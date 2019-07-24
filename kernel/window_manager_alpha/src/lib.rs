@@ -44,8 +44,8 @@ use path::Path;
 
 static WINDOW_MANAGER: Once<Mutex<WindowManagerAlpha>> = Once::new();
 
-/// The maximum size of mouse
-const MOUSE_MAX_SIZE: usize = 7;
+/// The half size of mouse in number of pixels, the actual size of pointer is 1+2*`MOUSE_POINTER_HALF_SIZE`
+const MOUSE_POINTER_HALF_SIZE: usize = 7;
 /// Transparent pixel
 const T: Pixel = Pixel { alpha: 0xFF, red: 0x00, green: 0x00, blue: 0x00 };
 /// Opaque white
@@ -53,7 +53,7 @@ const O: Pixel = Pixel { alpha: 0x00, red: 0xFF, green: 0xFF, blue: 0xFF };
 /// Opaque blue
 const B: Pixel = Pixel { alpha: 0x00, red: 0x00, green: 0x00, blue: 0xFF };
 /// the mouse picture
-const MOUSE_BASIC: [[Pixel; 2*MOUSE_MAX_SIZE+1]; 2*MOUSE_MAX_SIZE+1] = [
+const MOUSE_BASIC: [[Pixel; 2*MOUSE_POINTER_HALF_SIZE+1]; 2*MOUSE_POINTER_HALF_SIZE+1] = [
     [ T, T, T, T, T, T, T, T, T, T, T, T, T, T, T ],
     [ T, T, T, T, T, T, T, T, T, T, T, T, T, T, T ],
     [ T, T, T, T, T, T, T, T, T, T, T, T, T, T, T ],
@@ -332,8 +332,8 @@ impl WindowManagerAlpha {
             let m = &self.mouse;
             (m.x, m.y)
         };
-        if ((x-cx) <= MOUSE_MAX_SIZE || (cx-x) <= MOUSE_MAX_SIZE) && ((y-cy) <= MOUSE_MAX_SIZE || (cy-y) <= MOUSE_MAX_SIZE) {
-            self.final_fb.draw_point_alpha(x, y, MOUSE_BASIC[MOUSE_MAX_SIZE + x - cx][MOUSE_MAX_SIZE + y - cy]);
+        if ((x-cx) <= MOUSE_POINTER_HALF_SIZE || (cx-x) <= MOUSE_POINTER_HALF_SIZE) && ((y-cy) <= MOUSE_POINTER_HALF_SIZE || (cy-y) <= MOUSE_POINTER_HALF_SIZE) {
+            self.final_fb.draw_point_alpha(x, y, MOUSE_BASIC[MOUSE_POINTER_HALF_SIZE + x - cx][MOUSE_POINTER_HALF_SIZE + y - cy]);
         }
         Ok(())
     }
@@ -482,8 +482,10 @@ impl WindowManagerAlpha {
 
     /// optimized refresh area for less computation up to 2x
     fn refresh_area_with_old_new(&mut self, 
-            uoxs: usize, uoxe: usize, uoys: usize, uoye: usize, 
-            unxs: usize, unxe: usize, unys: usize, unye: usize) -> Result<(), &'static str> {
+            old_x_start: usize, old_x_end: usize, old_y_start: usize, old_y_end: usize, 
+            new_x_start: usize, new_x_end: usize, new_y_start: usize, new_y_end: usize) -> Result<(), &'static str> {
+        let uoxs = old_x_start; let uoxe = old_x_end; let uoys = old_y_start; let uoye = old_y_end;
+        let unxs = new_x_start; let unxe = new_x_end; let unys = new_y_start; let unye = new_y_end;
         let oxs = uoxs as isize; let oxe = uoxe as isize; let oys = uoys as isize; let oye = uoye as isize;
         let nxs = unxs as isize; let nxe = unxe as isize; let nys = unys as isize; let nye = unye as isize;
         // first refresh new area for better user experience
@@ -749,7 +751,9 @@ fn keyboard_handle_application(key_input: KeyEvent) -> Result<(), &'static str> 
     // then pass them to window
     let win = WINDOW_MANAGER.try().ok_or("The static window manager was not yet initialized")?.lock();
     if let Err(_) = win.pass_keyboard_event_to_window(key_input) {
-        // even not find a window to pass, that's ok
+        // note that keyboard event should be passed to currently active window
+        // if no window is active now, this function will return Err, but that's OK for now.
+        // This part could be used to add logic when no active window is present, how to handle keyboards, but just leave blank now
     }
     Ok(())
 }
@@ -759,7 +763,10 @@ fn cursor_handle_application(mouse_event: MouseEvent) -> Result<(), &'static str
     do_refresh_floating_border()?;
     let win = WINDOW_MANAGER.try().ok_or("The static window manager was not yet initialized")?.lock();
     if let Err(_) = win.pass_mouse_event_to_window(mouse_event) {
-        // even not find a window to pass, that's ok
+        // the mouse event should be passed to the window that satisfies:
+        // 1. the mouse position is currently in the window area
+        // 2. the window is the top one (active window or show_list windows) under the mouse pointer
+        // if no window is found in this position, that is system background area. Add logic to handle those events later
     }
     Ok(())
 }
@@ -798,14 +805,14 @@ pub fn move_cursor_to(nx: usize, ny: usize) -> Result<(), &'static str> {
     let mut win = WINDOW_MANAGER.try().ok_or("The static window manager was not yet initialized")?.lock();
     win.mouse = Point { x: nx, y: ny };
     // then update region of old mouse
-    for x in (ox-MOUSE_MAX_SIZE) as isize .. (ox+MOUSE_MAX_SIZE+1) as isize {
-        for y in (oy-MOUSE_MAX_SIZE) as isize .. (oy+MOUSE_MAX_SIZE+1) as isize {
+    for x in (ox-MOUSE_POINTER_HALF_SIZE) as isize .. (ox+MOUSE_POINTER_HALF_SIZE+1) as isize {
+        for y in (oy-MOUSE_POINTER_HALF_SIZE) as isize .. (oy+MOUSE_POINTER_HALF_SIZE+1) as isize {
             win.refresh_single_pixel(x as usize, y as usize)?;
         }
     }
     // draw new mouse in the new position
-    for x in (nx-MOUSE_MAX_SIZE) as isize .. (nx+MOUSE_MAX_SIZE+1) as isize {
-        for y in (ny-MOUSE_MAX_SIZE) as isize .. (ny+MOUSE_MAX_SIZE+1) as isize {
+    for x in (nx-MOUSE_POINTER_HALF_SIZE) as isize .. (nx+MOUSE_POINTER_HALF_SIZE+1) as isize {
+        for y in (ny-MOUSE_POINTER_HALF_SIZE) as isize .. (ny+MOUSE_POINTER_HALF_SIZE+1) as isize {
             win.refresh_single_pixel(x as usize, y as usize)?;
         }
     }

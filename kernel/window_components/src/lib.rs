@@ -34,11 +34,11 @@ use frame_buffer_alpha::{ Pixel, color_mix };
 use spin::{Mutex};
 use window_manager_alpha::WindowObjAlpha;
 
-/// The title bar size
+/// The title bar size, in number of pixels
 const WINDOW_TITLE_BAR: usize = 15;
-/// left, right, bottom border size
+/// left, right, bottom border size, in number of pixels
 const WINDOW_BORDER: usize = 2;
-/// border radius
+/// border radius, in number of pixels
 const WINDOW_RADIUS: usize = 5;
 /// default background color
 const WINDOW_BACKGROUND: Pixel = Pixel { alpha: 0x40, red: 0xFF, green: 0xFF, blue: 0xFF };
@@ -54,11 +54,11 @@ const WINDOW_BUTTON_COLOR_CLOSE: Pixel = Pixel { alpha: 0x00, red: 0xE7, green: 
 const WINDOW_BUTTON_COLOR_MINIMIZE: Pixel = Pixel { alpha: 0x00, red: 0x23, green: 0x9B, blue: 0x56 };
 /// window button color: purple
 const WINDOW_BUTTON_COLOR_MAXIMIZE: Pixel = Pixel { alpha: 0x00, red: 0x7D, green: 0x3C, blue: 0x98 };
-/// window button bias from left, in pixel
+/// window button margin from left, in number of pixels
 const WINDOW_BUTTON_BIAS_X: usize = 12;
-/// the interval between buttons, in pixel
+/// the interval between buttons, in number of pixels
 const WINDOW_BUTTON_BETWEEN: usize = 15;
-/// the button size, in pixel
+/// the button size, in number of pixels
 const WINDOW_BUTTON_SIZE: usize = 6;
 
 /// abstraction of a window, providing title bar which helps user moving, close, maximize or minimize window
