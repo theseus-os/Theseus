@@ -66,7 +66,7 @@ pub const KERNEL_OFFSET: usize = 0xFFFF_FFFF_8000_0000;
 
 /// The virtual address where the initial kernel (the nano_core) is mapped to on aarch64.
 /// Actual value: 0xFFFFFFFF00000000.
-/// The offset is 0xFFFFFFFF00000000 because the UEFI services starts from 0xBBA80000
+/// The offset is 0xFFFFFFFF00000000 because the kernel code starts from 0x9*******
 #[cfg(any(target_arch="aarch64"))]
 pub const KERNEL_OFFSET: usize = 0xFFFF_FFFF_0000_0000;
 

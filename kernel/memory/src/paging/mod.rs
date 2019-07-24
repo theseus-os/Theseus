@@ -1029,20 +1029,26 @@ pub fn init(bt:&BootServices, allocator_mutex: &MutexIrqSafe<AreaFrameAllocator>
         //Hardware resources https://github.com/qemu/qemu/blob/master/hw/arm/virt.c
         use super::ARM_HARDWARE_START;
         use super::ARM_HARDWARE_END;
-        const HIGHER_HALF:usize = 0xFFFF000000000000;
-        let hardware_virt = VirtualAddress::new_canonical(ARM_HARDWARE_START as usize | HIGHER_HALF);
-        let mut higher_index = 0;
-        higher_half_mapped_pages[higher_index] = Some(try!( mapper.map_frames(
+        let hardware_virt = VirtualAddress::new_canonical(ARM_HARDWARE_START as usize);
+        // Map hardware to identity for UEFI services
+        identity_mapped_pages[index] = Some(try!( mapper.map_frames(
+            FrameRange::from_phys_addr(PhysicalAddress::new(ARM_HARDWARE_START as usize)?,  (ARM_HARDWARE_END - ARM_HARDWARE_START) as usize), 
+                Page::containing_address(hardware_virt), 
+                EntryFlags::PAGE | EntryFlags::ACCESSEDARM | EntryFlags::INNER_SHARE, allocator.deref_mut())
+        ));
+  
+        // Map hardware to higher half for future use
+        let hardware_virt = VirtualAddress::new_canonical(ARM_HARDWARE_START as usize + KERNEL_OFFSET);
+        higher_half_mapped_pages[index] = Some(try!( mapper.map_frames(
             FrameRange::from_phys_addr(PhysicalAddress::new(ARM_HARDWARE_START as usize)?,  (ARM_HARDWARE_END - ARM_HARDWARE_START) as usize), 
                 Page::containing_address(hardware_virt), 
                 EntryFlags::PAGE | EntryFlags::ACCESSEDARM | EntryFlags::INNER_SHARE, allocator.deref_mut())
         ));
         vmas[index] = VirtualMemoryArea::new(hardware_virt, (ARM_HARDWARE_END - ARM_HARDWARE_START) as usize,
             EntryFlags::PAGE, ".mmio");
-        //index += 1;
-        //higher_index += 1;
-
-        // now we map the 5 main sections into 3 groups according to flags
+        index += 1;
+        
+        // now we map the 5 main sections
         text_mapped_pages = Some( try!( mapper.map_frames(
             FrameRange::from_phys_addr(text_start_phys, text_end_phys.value() - text_start_phys.value()), 
             Page::containing_address(text_start_virt), 

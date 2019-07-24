@@ -633,14 +633,21 @@ pub fn init(bt:&BootServices)
         .expect_success("Failed to retrieve UEFI memory map");
 
     // parse memory layout information
-    let mut kernel_phys_start: PhysicalAddress = PhysicalAddress::new(0)?;
-    let mut kernel_phys_end: PhysicalAddress = PhysicalAddress::new(0)?;
+//    let mut kernel_phys_start: PhysicalAddress = PhysicalAddress::new(0)?;
+//    let mut kernel_phys_end: PhysicalAddress = PhysicalAddress::new(0)?;
     let mut avail_index = 0;
     let mut available: [PhysicalMemoryArea; 32] = Default::default();
 
     let mut occupied: [PhysicalMemoryArea; 32] = Default::default();
     let mut occup_index = 0;
 
+    const DEFAULT:usize = 0;
+    const IMAGE_START:usize = 1;
+    const UEFI_START:usize = 2;
+    let mut address_section = DEFAULT;
+
+    let mut uefi_phys_start: PhysicalAddress = PhysicalAddress::new(0)?;
+    let mut uefi_phys_end: PhysicalAddress = PhysicalAddress::new(0)?;
     loop {
         match maps_iter.next() {
             Some(mapped_pages) => {
@@ -649,25 +656,59 @@ pub fn init(bt:&BootServices)
 
                 match mapped_pages.ty {
                     MemoryType::CONVENTIONAL => {
-                        if kernel_phys_start.value() == 0 {
+                        if address_section == DEFAULT {
                             available[avail_index] = PhysicalMemoryArea {
                                 base_addr: PhysicalAddress::new(phys_start)?,
                                 size_in_bytes: size,
                                 typ: 1, 
                                 acpi: 0, 
                             };
-                        }
-                        avail_index += 1;
-                    },
-                    _ => {
-                        if kernel_phys_start.value() == 0 {
-                            kernel_phys_start = PhysicalAddress::new(phys_start as usize)?;
-                            kernel_phys_end = PhysicalAddress::new(phys_start + size)?;
-                        } else if kernel_phys_end.value() <= phys_start {
-                            kernel_phys_end = PhysicalAddress::new((phys_start + size) as usize)?;
+                            avail_index += 1;
+                            address_section = IMAGE_START;
                         } else {
-
+                            uefi_phys_end = PhysicalAddress::new( phys_start + size )?
                         }
+                    },
+                    MemoryType::LOADER_DATA => {
+                        if address_section == IMAGE_START {
+                            occupied[occup_index] = PhysicalMemoryArea {
+                                base_addr: PhysicalAddress::new(phys_start)?,
+                                size_in_bytes: size,
+                                typ: 1, 
+                                acpi: 0, 
+                            };
+                            occup_index += 1;
+                        } else {
+                            uefi_phys_end = PhysicalAddress::new( phys_start + size )?
+                        }
+                    }
+                    MemoryType::LOADER_CODE => {
+                        if address_section == IMAGE_START {
+                            occupied[occup_index] = PhysicalMemoryArea {
+                                base_addr: PhysicalAddress::new(phys_start)?,
+                                size_in_bytes: size,
+                                typ: 1, 
+                                acpi: 0, 
+                            };
+                            address_section = UEFI_START
+                        } else {
+                            uefi_phys_end = PhysicalAddress::new( phys_start + size )?
+                        }
+                    }
+                    MemoryType::MMIO => {
+                        occupied[occup_index] = PhysicalMemoryArea {
+                            base_addr: PhysicalAddress::new(phys_start)?,
+                            size_in_bytes: size,
+                            typ: 1, 
+                            acpi: 0, 
+                        };
+                        occup_index += 1;
+                    }
+                    _ => {
+                        if uefi_phys_start.value() == 0 {
+                            uefi_phys_start = PhysicalAddress::new(phys_start as usize)?;
+                        } 
+                        uefi_phys_end = PhysicalAddress::new(phys_start + size)?;
                     }
                 }
                
@@ -680,12 +721,12 @@ pub fn init(bt:&BootServices)
         //mapped_pages_index += 1;
     }
 
-    occupied[occup_index] = PhysicalMemoryArea::new(kernel_phys_start, kernel_phys_end.value() - kernel_phys_start.value(), 1, 0); // kernel
+    occupied[occup_index] = PhysicalMemoryArea::new(uefi_phys_start, uefi_phys_end.value() - uefi_phys_start.value(), 1, 0); // kernel
     occup_index += 1;
     occupied[occup_index] = PhysicalMemoryArea::new(PhysicalAddress::new_canonical(ARM_HARDWARE_START as usize), (ARM_HARDWARE_END - ARM_HARDWARE_START) as usize, 1, 0); // hardware
 
-    let kernel_virt_end = kernel_phys_end + KERNEL_OFFSET;
-    debug!("kernel_phys_start: {:#x}, kernel_phys_end: {:#x} kernel_virt_end = {:#x}", kernel_phys_start, kernel_phys_end, kernel_virt_end);
+    let uefi_virt_end = uefi_phys_end + KERNEL_OFFSET;
+    debug!("uefi_phys_start: {:#X}, uefi_phys_end: {:#X} uefi_virt_end = {:#X}", uefi_phys_start, uefi_phys_end, uefi_virt_end);
 
     // UEFI uses the Load File Protocol to load modules
     // // calculate the bounds of physical memory that is occupied by modules we've loaded 
