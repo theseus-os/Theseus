@@ -179,9 +179,9 @@ impl Terminal {
             // next add textarea to wincomps
             const TEXTAREA_BORDER: usize = 4;
             match window_components::TextArea::new(
-                wincomps.bias_x + TEXTAREA_BORDER, wincomps.bias_y + TEXTAREA_BORDER,
+                wincomps.get_bias_x() + TEXTAREA_BORDER, wincomps.get_bias_y() + TEXTAREA_BORDER,
                 width_inner - 2*TEXTAREA_BORDER, height_inner - 2*TEXTAREA_BORDER,
-                &wincomps.winobj, None, None, Some(wincomps.background), None
+                &wincomps.winobj, None, None, Some(wincomps.get_background()), None
             ) {
                 Ok(m) => m,
                 Err(err) => { debug!("new textarea returned err"); return Err(err); }

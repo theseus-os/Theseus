@@ -65,12 +65,12 @@ const WINDOW_BUTTON_SIZE: usize = 6;
 pub struct WindowComponents {
     /// the window object that could be used to initialize components
     pub winobj: Arc<Mutex<WindowObjAlpha>>,
-    /// READ-ONLY variable: the space remained for border, init as WINDOW_BORDER
-    pub bias_x: usize,
-    /// READ-ONLY variable: the space remained for title bar, init as WINDOW_TITLE_BAR
-    pub bias_y: usize,
-    /// READ-ONLY variable: the background of this window, init as WINDOW_BACKGROUND
-    pub background: Pixel,
+    /// the space remained for border, init as WINDOW_BORDER
+    bias_x: usize,
+    /// the space remained for title bar, init as WINDOW_TITLE_BAR
+    bias_y: usize,
+    /// the background of this window, init as WINDOW_BACKGROUND
+    background: Pixel,
     /// application could get events from this consumer
     pub consumer: DFQueueConsumer<Event>,
     /// event output used by window manager, private variable
@@ -342,6 +342,15 @@ impl WindowComponents {
         }
         Ok(())
     }
+
+    /// get space remained for border, in number of pixel
+    pub fn get_bias_x(&self) -> usize { self.bias_x }
+
+    /// get space remained for title bar, in number of pixel
+    pub fn get_bias_y(&self) -> usize { self.bias_y }
+
+    /// get background color
+    pub fn get_background(&self) -> Pixel { self.background }
 }
 
 impl Drop for WindowComponents {
