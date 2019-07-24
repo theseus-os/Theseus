@@ -114,6 +114,8 @@ struct WindowManagerAlpha {
     terminal_id_counter: usize,
     /// the frame buffer that it should print on
     final_fb: FrameBufferAlpha,
+    /// if it this is true, do not refresh whole screen until someone calls "refresh_area_absolute"
+    delay_refresh_first_time: bool,
 }
 
 /// Window manager object that stores non-critical information
@@ -650,7 +652,14 @@ pub fn refresh_pixel_absolute(x: isize, y: isize) -> Result<(), &'static str> {
 /// refresh an area using abosolute position, will lock WINDOW_MANAGER
 pub fn refresh_area_absolute(x_start: isize, x_end: isize, y_start: isize, y_end: isize) -> Result<(), &'static str> {
     let mut win = WINDOW_MANAGER.try().ok_or("The static window manager was not yet initialized")?.lock();
-    win.refresh_area(x_start, x_end, y_start, y_end)
+    if win.delay_refresh_first_time {
+        win.delay_refresh_first_time = false;
+        let width = win.final_fb.width as isize;
+        let height = win.final_fb.height as isize;
+        win.refresh_area_with_old_new(0, width, 0, height, x_start, x_end, y_start, y_end)   
+    } else {
+        win.refresh_area(x_start, x_end, y_start, y_end)   
+    }
 }
 
 /// Initialize the window manager, should provide the consumer of keyboard and mouse event, as well as a frame buffer to draw
@@ -659,6 +668,7 @@ pub fn init(key_consumer: DFQueueConsumer<Event>, mouse_consumer: DFQueueConsume
     debug!("window manager alpha init called");
 
     // initialize static window manager
+    let delay_refresh_first_time = true;
     let window_manager = WindowManagerAlpha {
             hide_list: VecDeque::new(),
             show_list: VecDeque::new(),
@@ -668,6 +678,7 @@ pub fn init(key_consumer: DFQueueConsumer<Event>, mouse_consumer: DFQueueConsume
             border_position: RectRegion { x_start: 0, x_end: 0, y_start: 0, y_end: 0 },
             terminal_id_counter: 1,
             final_fb: final_fb,
+            delay_refresh_first_time: delay_refresh_first_time,
     };
     WINDOW_MANAGER.call_once(|| Mutex::new(window_manager));
 
@@ -675,7 +686,9 @@ pub fn init(key_consumer: DFQueueConsumer<Event>, mouse_consumer: DFQueueConsume
     let screen_width = win.final_fb.width;
     let screen_height = win.final_fb.height;
     win.mouse = Point { x: screen_width/2, y: screen_height/2 };  // set mouse to middle
-    win.refresh_area(0, screen_width as isize, 0, screen_height as isize)?;
+    if ! delay_refresh_first_time {
+        win.refresh_area(0, screen_width as isize, 0, screen_height as isize)?;
+    }
 
     KernelTaskBuilder::new(window_manager_loop, (key_consumer, mouse_consumer) )
         .name("window_manager_loop".to_string())
