@@ -47,11 +47,11 @@ static WINDOW_MANAGER: Once<Mutex<WindowManagerAlpha>> = Once::new();
 /// The maximum size of mouse
 const MOUSE_MAX_SIZE: usize = 7;
 /// Transparent pixel
-const T: Pixel = 0xFF000000;
+const T: Pixel = Pixel { alpha: 0xFF, red: 0x00, green: 0x00, blue: 0x00 };
 /// Opaque white
-const O: Pixel = 0x00FFFFFF;
-/// Opaque black
-const B: Pixel = 0x000000FF;
+const O: Pixel = Pixel { alpha: 0x00, red: 0xFF, green: 0xFF, blue: 0xFF };
+/// Opaque blue
+const B: Pixel = Pixel { alpha: 0x00, red: 0x00, green: 0x00, blue: 0xFF };
 /// the mouse picture
 const MOUSE_BASIC: [[Pixel; 2*MOUSE_MAX_SIZE+1]; 2*MOUSE_MAX_SIZE+1] = [
     [ T, T, T, T, T, T, T, T, T, T, T, T, T, T, T ],
@@ -74,9 +74,9 @@ const MOUSE_BASIC: [[Pixel; 2*MOUSE_MAX_SIZE+1]; 2*MOUSE_MAX_SIZE+1] = [
 /// the border indicating new window position and size
 const WINDOW_BORDER_SIZE: usize = 3;
 /// border's inner color
-const WINDOW_BORDER_COLOR_INNER: Pixel = 0x00CA6F1E;
+const WINDOW_BORDER_COLOR_INNER: Pixel = Pixel { alpha: 0x00, red: 0xCA, green: 0x6F, blue: 0x1E };
 /// border's outter color
-const WINDOW_BORDER_COLOR_OUTTER: Pixel = 0xFFFFFFFF;
+const WINDOW_BORDER_COLOR_OUTTER: Pixel = Pixel { alpha: 0xFF, red: 0xFF, green: 0xFF, blue: 0xFF };
 
 /// a 2D point
 struct Point {
@@ -119,8 +119,8 @@ struct WindowManagerAlpha {
 /// Window manager object that stores non-critical information
 impl WindowManagerAlpha {
 
-    /// set one window to active, push last active (if exists) to top of show_list
-    pub fn set_active(&mut self, objref: &Arc<Mutex<WindowObjAlpha>>) -> Result<(), &'static str> {
+    /// set one window to active, push last active (if exists) to top of show_list. if `refresh` is `true`, will then refresh the window's area
+    pub fn set_active(&mut self, objref: &Arc<Mutex<WindowObjAlpha>>, refresh: bool) -> Result<(), &'static str> {
         let (xs, xe, ys, ye) = {
             let winobj = objref.lock();
             let xs = winobj.x; let ys = winobj.y;
@@ -147,7 +147,9 @@ impl WindowManagerAlpha {
             }, None => {}
         }
         self.active = Arc::downgrade(objref);
-        self.refresh_area(xs, xe, ys, ye)?;
+        if refresh {
+            self.refresh_area(xs, xe, ys, ye)?;
+        }
         Ok(())
     }
 
@@ -215,9 +217,9 @@ impl WindowManagerAlpha {
     fn recompute_single_pixel_show_list(& self, x: usize, y: usize, idx: usize) -> Pixel {
         if idx >= self.show_list.len() {
             if x < 1280 && y < 1080 {
-                return background::BACKGROUND[y/2][x/2];
+                return background::BACKGROUND[y/2][x/2].into();
             }
-            return 0x00000000;  // return black
+            return 0x00000000.into();  // return black
         }
         if let Some(now_winobj) = self.show_list[idx].upgrade() {
             // first get current color, to determine whether further get colors below   
@@ -231,7 +233,7 @@ impl WindowManagerAlpha {
                         Ok(m) => m,
                         Err(_) => T,  // transparent
                     };
-                    if (top >> 24) == 0 {  // totally opaque, so not waste computation
+                    if top.alpha == 0 {  // totally opaque, so not waste computation
                         return top;
                     }
                     ret = top;
@@ -257,7 +259,7 @@ impl WindowManagerAlpha {
             let cy = current_active_win.y;
             if current_active_win.framebuffer.check_in_buffer(x - cx, y - cy) {
                 let top = current_active_win.framebuffer.get_pixel(x - cx, y - cy)?;
-                if (top >> 24) == 0 {  // totally opaque, so not waste computation
+                if top.alpha == 0 {  // totally opaque, so not waste computation
                     self.final_fb.draw_point(x, y, top);
                 } else {
                     let bottom = self.recompute_single_pixel_show_list(x, y, 0);
@@ -537,7 +539,7 @@ pub fn delete_window(objref: &Arc<Mutex<WindowObjAlpha>>) -> Result<(), &'static
 /// set window as active
 pub fn set_active(objref: &Arc<Mutex<WindowObjAlpha>>) -> Result<(), &'static str> {
     let mut win = WINDOW_MANAGER.try().ok_or("The static window manager was not yet initialized")?.lock();
-    win.set_active(objref)
+    win.set_active(objref, true)
 }
 
 /// whether a window is active
@@ -821,7 +823,7 @@ pub fn new_window<'a>(
 
     // Init the frame buffer of the window
     let mut framebuffer = FrameBufferAlpha::new(width, height, None)?;
-    framebuffer.fill_color(0x80FFFFFF);  // draw with half transparent white
+    framebuffer.fill_color(0x80FFFFFF.into());  // draw with half transparent white
 
     // new window object
     let window: WindowObjAlpha = WindowObjAlpha {
@@ -839,8 +841,7 @@ pub fn new_window<'a>(
 
     let window_ref = Arc::new(Mutex::new(window));
     let mut win = WINDOW_MANAGER.try().ok_or("The static window manager was not yet initialized")?.lock();
-    win.set_active(&window_ref)?;
-    // win.refresh_window(&window_ref)?;  // do not refresh now for better speed
+    win.set_active(&window_ref, false)?;  // do not refresh now for better speed
 
     Ok(window_ref)
 }

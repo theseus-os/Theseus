@@ -20,7 +20,15 @@ use owning_ref::BoxRefMut;
 /// A Pixel is a u32 integer. The lower 24 bits of a Pixel specifie the RGB color of a pixel
 /// , while the first 8bit is alpha channel which helps to composite windows
 /// alpha = 0 means opaque and 0xFF means transparent
-pub type Pixel = u32;
+#[repr(C, packed)]
+#[derive(Hash, Debug, Clone, Copy)]
+pub struct Pixel {
+    pub blue: u8,
+    pub green: u8,
+    pub red: u8,
+    pub alpha: u8
+}
+// pub type Pixel = u32;
 
 // Every pixel is of u32 type
 const PIXEL_BYTES: usize = 4;
@@ -138,7 +146,7 @@ impl FrameBufferAlpha {
         Ok(self.buffer[self.index(x, y)])
     }
 
-    /// fullfill the frame buffer with given color
+    /// fill the entire frame buffer with given `color`
     pub fn fill_color(&mut self, color: Pixel) {
         for y in 0..self.height {
             for x in 0..self.width {
@@ -207,47 +215,51 @@ impl FrameBufferAlpha {
     }
 }
 
-fn byte_alpha(x: Pixel) -> u8 { (x >> 24) as u8 }
-fn byte_red(x: Pixel) -> u8 { (x >> 16) as u8 }
-fn byte_green(x: Pixel) -> u8 { (x >> 8) as u8 }
-fn byte_blue(x: Pixel) -> u8 { (x >> 0) as u8 }
-/// construct a color with alpha, red, green, blue
-fn to_color(alpha: u8, red: u8, green: u8, blue: u8) -> Pixel {
-    ((alpha as Pixel) << 24) | ((red as Pixel) << 16) | ((green as Pixel) << 8) | (blue as Pixel)
-}
-
 /// mix two color for one pixel on the top of another
 pub fn alpha_mix(bottom: Pixel, top: Pixel) -> Pixel {
-    let alpha = byte_alpha(top) as u16;
-    let red = byte_red(top);
-    let green = byte_green(top);
-    let blue = byte_blue(top);
-    let ori_red = byte_red(bottom);
-    let ori_green = byte_green(bottom);
-    let ori_blue = byte_blue(bottom);
+    let alpha = top.alpha as u16;
+    let red = top.red;
+    let green = top.green;
+    let blue = top.blue;
+    let ori_red = bottom.red;
+    let ori_green = bottom.green;
+    let ori_blue = bottom.blue;
     let new_red = (((red as u16) * (255 - alpha) + (ori_red as u16) * alpha) / 255) as u8;
     let new_green = (((green as u16) * (255 - alpha) + (ori_green as u16) * alpha) / 255) as u8;
     let new_blue = (((blue as u16) * (255 - alpha) + (ori_blue as u16) * alpha) / 255) as u8;
-    to_color(byte_alpha(bottom), new_red, new_green, new_blue)
+    Pixel {
+        alpha: bottom.alpha, 
+        red: new_red,
+        green: new_green,
+        blue: new_blue
+    }
 }
 
 /// mix two color linearly with a float number
 pub fn color_mix(c1: Pixel, c2: Pixel, mix: f32) -> Pixel {
     if mix < 0f32 || mix > 1f32 {  // cannot mix value outside [0, 1]
-        const BLACK: Pixel = 0x00000000;
+        const BLACK: Pixel = Pixel{ alpha: 0, red: 0, green: 0, blue: 0};
         return BLACK;
     }
-    let alpha1 = byte_alpha(c1);
-    let red1 = byte_red(c1);
-    let green1 = byte_green(c1);
-    let blue1 = byte_blue(c1);
-    let alpha2 = byte_alpha(c2);
-    let red2 = byte_red(c2);
-    let green2 = byte_green(c2);
-    let blue2 = byte_blue(c2);
-    let new_alpha = ((alpha1 as f32) * mix + (alpha2 as f32) * (1f32-mix)) as u8;
-    let new_red = ((red1 as f32) * mix + (red2 as f32) * (1f32-mix)) as u8;
-    let new_green = ((green1 as f32) * mix + (green2 as f32) * (1f32-mix)) as u8;
-    let new_blue = ((blue1 as f32) * mix + (blue2 as f32) * (1f32-mix)) as u8;
-    to_color(new_alpha, new_red, new_green, new_blue)
+    let new_alpha = ((c1.alpha as f32) * mix + (c2.alpha as f32) * (1f32-mix)) as u8;
+    let new_red = ((c1.red as f32) * mix + (c2.red as f32) * (1f32-mix)) as u8;
+    let new_green = ((c1.green as f32) * mix + (c2.green as f32) * (1f32-mix)) as u8;
+    let new_blue = ((c1.blue as f32) * mix + (c2.blue as f32) * (1f32-mix)) as u8;
+    Pixel {
+        alpha: new_alpha, 
+        red: new_red,
+        green: new_green,
+        blue: new_blue
+    }
+}
+
+impl From<u32> for Pixel {
+    fn from(item: u32) -> Self {
+        Pixel {
+            alpha: (item >> 24) as u8,
+            red: (item >> 16) as u8,
+            green: (item >> 8) as u8,
+            blue: item as u8
+        }
+    }
 }

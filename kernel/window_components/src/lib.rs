@@ -41,19 +41,19 @@ const WINDOW_BORDER: usize = 2;
 /// border radius
 const WINDOW_RADIUS: usize = 5;
 /// default background color
-const WINDOW_BACKGROUND: Pixel = 0x40FFFFFF;
+const WINDOW_BACKGROUND: Pixel = Pixel { alpha: 0x40, red: 0xFF, green: 0xFF, blue: 0xFF };
 /// border and title bar color when window is inactive
-const WINDOW_BORDER_COLOR_INACTIVE: Pixel = 0x00333333;
+const WINDOW_BORDER_COLOR_INACTIVE: Pixel = Pixel { alpha: 0x00, red: 0x33, green: 0x33, blue: 0x33 };
 /// border and title bar color when window is active, the top part color
-const WINDOW_BORDER_COLOR_ACTIVE_TOP: Pixel = 0x00BBBBBB;
+const WINDOW_BORDER_COLOR_ACTIVE_TOP: Pixel = Pixel { alpha: 0x00, red: 0xBB, green: 0xBB, blue: 0xBB };
 /// border and title bar color when window is active, the bottom part color
-const WINDOW_BORDER_COLOR_ACTIVE_BOTTOM: Pixel = 0x00666666;
+const WINDOW_BORDER_COLOR_ACTIVE_BOTTOM: Pixel = Pixel { alpha: 0x00, red: 0x66, green: 0x66, blue: 0x66 };
 /// window button color: red
-const WINDOW_BUTTON_COLOR_CLOSE: Pixel = 0x00E74C3C;
+const WINDOW_BUTTON_COLOR_CLOSE: Pixel = Pixel { alpha: 0x00, red: 0xE7, green: 0x4C, blue: 0x3C };
 /// window button color: green
-const WINDOW_BUTTON_COLOR_MINIMIZE: Pixel = 0x00239B56;
+const WINDOW_BUTTON_COLOR_MINIMIZE: Pixel = Pixel { alpha: 0x00, red: 0x23, green: 0x9B, blue: 0x56 };
 /// window button color: purple
-const WINDOW_BUTTON_COLOR_MAXIMIZE: Pixel = 0x007D3C98;
+const WINDOW_BUTTON_COLOR_MAXIMIZE: Pixel = Pixel { alpha: 0x00, red: 0x7D, green: 0x3C, blue: 0x98 };
 /// window button bias from left, in pixel
 const WINDOW_BUTTON_BIAS_X: usize = 12;
 /// the interval between buttons, in pixel
@@ -164,8 +164,8 @@ impl WindowComponents {
                 let dx1 = WINDOW_RADIUS - i;
                 let dy1 = WINDOW_RADIUS - j;
                 if dx1*dx1 + dy1*dy1 > r2 {  // draw this to transparent
-                    winobj.framebuffer.draw_point(i, j, 0xFFFFFFFF);
-                    winobj.framebuffer.draw_point(width-i-1, j, 0xFFFFFFFF);
+                    winobj.framebuffer.draw_point(i, j, 0xFFFFFFFF.into());
+                    winobj.framebuffer.draw_point(width-i-1, j, 0xFFFFFFFF.into());
                 }
             }
         }
@@ -193,12 +193,12 @@ impl WindowComponents {
         let y = self.bias_y / 2;
         let x = WINDOW_BUTTON_BIAS_X + idx * WINDOW_BUTTON_BETWEEN;
         winobj.framebuffer.draw_circle_alpha(x, y, WINDOW_BUTTON_SIZE, color_mix(
-            0x00000000, match idx {
+            0x00000000.into(), match idx {
                 0 => WINDOW_BUTTON_COLOR_CLOSE,
                 1 => WINDOW_BUTTON_COLOR_MINIMIZE,
                 2 => WINDOW_BUTTON_COLOR_MAXIMIZE,
                 _ => {
-                    const WINDOW_BUTTON_COLOR_ERROR: Pixel = 0x00000000;  // black
+                    const WINDOW_BUTTON_COLOR_ERROR: Pixel = Pixel { alpha: 0x00, red: 0x00, green: 0x00, blue: 0x00 };  // black
                     WINDOW_BUTTON_COLOR_ERROR
                 }
             }, 0.2f32 * (state as f32)
@@ -397,11 +397,11 @@ impl TextArea {
             },
             background_color: match background_color {
                 Some(m) => m,
-                _ => 0xFFFFFFFF,  // default is a transparent one
+                _ => 0xFFFFFFFF.into(),  // default is a transparent one
             },
             text_color: match text_color {
                 Some(m) => m,
-                _ => 0x00000000,  // default is an opaque black
+                _ => 0x00000000.into(),  // default is an opaque black
             },
             x_cnt: 0,  // will modify later
             y_cnt: 0,  // will modify later
