@@ -48,10 +48,16 @@ use spin::Mutex;
 use environment::Environment;
 use alloc::boxed::Box;
 use core::mem;
+use alloc::collections::BTreeMap;
 
 pub const APPLICATIONS_NAMESPACE_PATH: &'static str = "/namespaces/default/applications";
 
-#[derive(Debug)]
+#[derive(PartialEq)]
+enum JobStatus {
+    Running,
+    Stopped
+}
+
 struct Job {
     /// Task reference structure representing the running task.
     task: TaskRef,
@@ -60,7 +66,11 @@ struct Job {
     /// This is the input end of the stdin pipe.
     input_producer: DFQueueProducer<u8>,
     /// This is the output end of the stdout pipe.
-    output_consumer: DFQueueConsumer<u8>
+    output_consumer: DFQueueConsumer<u8>,
+    /// Status of the job.
+    status: JobStatus,
+    /// Command line that was used to invoke the job.
+    cmd: String
 }
 
 /// A main function that spawns a new shell and waits for the shell loop to exit before returning an exit value
@@ -115,7 +125,8 @@ enum AppErr {
 
 struct Shell {
     /// Variable that stores the task id of any application manually spawned from the terminal
-    current_task_ref: Option<Job>,
+    jobs: BTreeMap<isize, Job>,
+    fg_job_num: isize,
     /// The string that stores the users keypresses after the prompt
     cmdline: String,
     /// This buffer stores characters before sending them to running application on `enter` key strike
@@ -156,7 +167,8 @@ impl Shell {
         };
 
         Shell {
-            current_task_ref: None,
+            jobs: BTreeMap::new(),
+            fg_job_num: 0,
             cmdline: String::new(),
             input_buffer: String::new(),
             left_shift: 0,
@@ -323,10 +335,10 @@ impl Shell {
             return Ok(()); 
         }
 
-        // Ctrl+C signals the main loop to exit the task
+        // Ctrl+C signals the shell to exit the job
         if keyevent.modifiers.control && keyevent.keycode == Keycode::C {
-            let task_ref_copy = match self.current_task_ref {
-                Some(ref job) => job.task.clone(), 
+            let task_ref_copy = match self.jobs.get(&self.fg_job_num) {
+                Some(job) => job.task.clone(), 
                 None => {
                     self.clear_cmdline(true)?;
                     self.input_buffer.clear();
@@ -365,6 +377,39 @@ impl Shell {
             return Ok(());
         }
 
+        // Ctrl+Z signals the shell to stop the job
+        if keyevent.modifiers.control && keyevent.keycode == Keycode::Z {
+            // Do nothing if we have no running foreground job.
+            if self.fg_job_num == 0 {
+                return Ok(());
+            }
+
+            let task_ref_copy = match self.jobs.get(&self.fg_job_num) {
+                Some(job) => job.task.clone(), 
+                None => {
+                    return Ok(());
+                }
+            };
+
+            // Lock the shared structure in `application_io` and then stop the running application
+            application_io::locked_and_execute(Box::new(move || {
+                task_ref_copy.block();
+
+                // Here we must wait for the running application to stop before releasing the lock,
+                // because the previous `block` method will NOT stop the application immediately.
+                // Rather, it would let the application finish the current time slice before actually
+                // stopping it.
+                loop {
+                    scheduler::schedule(); // yield the CPU
+                    if !task_ref_copy.lock().is_running() {
+                        break;
+                    }
+                }
+            }));
+
+            return Ok(());
+        }
+
         // HANDLE ALL SPECIAL KEYBOARD EVENTS ABOVE.
         // Applications can request shell to forward the keyboard events.
         // However, we must intercept all application management related events, e.g. ctrl-c,
@@ -373,8 +418,8 @@ impl Shell {
         // Check whether we should forward the keyboard event to the running application.
         // If so, we forward the keyboard event to the application and let it handle itself.
         // In other words, we skip handling them in the shell.
-        if self.current_task_ref.is_some() {
-            if let Some(ref job_ref) = self.current_task_ref {
+        if self.fg_job_num != 0 {
+            if let Some(job_ref) = self.jobs.get(&self.fg_job_num) {
                 let requesting_direct = application_io::is_requesting_forward(job_ref.task.lock().id);
                 if requesting_direct {
                     job_ref.kbd_event_producer.enqueue(keyevent);
@@ -385,7 +430,7 @@ impl Shell {
 
         // Perform command line auto completion.
         if keyevent.keycode == Keycode::Tab {
-            if self.current_task_ref.is_none() {
+            if self.fg_job_num == 0 {
                 self.complete_cmdline();
             }
             return Ok(());
@@ -393,7 +438,7 @@ impl Shell {
 
         // Tracks what the user does whenever she presses the backspace button
         if keyevent.keycode == Keycode::Backspace  {
-            if self.current_task_ref.is_some() {
+            if self.fg_job_num != 0 {
                 self.remove_char_from_input_buff(true)?;
             } else {
                 self.remove_char_from_cmdline(true, true)?;
@@ -409,13 +454,13 @@ impl Shell {
         // Attempts to run the command whenever the user presses enter and updates the cursor tracking variables 
         if keyevent.keycode == Keycode::Enter && keyevent.keycode.to_ascii(keyevent.modifiers).is_some() {
             let cmdline = self.cmdline.clone();
-            if cmdline.len() == 0 && self.current_task_ref.is_none() {
+            if cmdline.len() == 0 && self.fg_job_num == 0 {
                 // reprints the prompt on the next line if the user presses enter and hasn't typed anything into the prompt
                 self.terminal.print_to_terminal("\n".to_string());
                 self.redisplay_prompt();
                 return Ok(());
-            } else if self.current_task_ref.is_some() { // send buffered characters to the running application
-                match &self.current_task_ref {
+            } else if self.fg_job_num != 0 { // send buffered characters to the running application
+                match self.jobs.get(&self.fg_job_num) {
                     Some(job) => {
                         self.terminal.print_to_terminal("\n".to_string());
                         let mut buffered_string = String::new();
@@ -433,7 +478,27 @@ impl Shell {
                 self.command_history.push(cmdline.clone());
                 self.command_history.dedup(); // Removes any duplicates
                 self.history_index = 0;
-                self.current_task_ref = self.build_new_job();
+
+                if self.is_internal_command() { // shell executes internal commands
+                    self.execute_internal()?;
+                    self.clear_cmdline(false)?;
+                    self.terminal.refresh_display(0);
+                } else { // shell invokes user programs
+                    self.fg_job_num = self.build_new_job();
+
+                    // If the new job is to run in the background, then we should not put it to foreground.
+                    if let Some(last) = self.cmdline.split_whitespace().last() {
+                        if last == "&" {
+                            self.terminal.print_to_terminal(
+                                format!("[{}] [running] {}\n", self.fg_job_num, self.cmdline)
+                                .to_string()
+                            );
+                            self.fg_job_num = 0;
+                            self.clear_cmdline(false)?;
+                            self.redisplay_prompt();
+                        }
+                    }
+                }
             }
             // Clears the buffer for next command once current command starts executing
             self.clear_cmdline(false)?;
@@ -509,14 +574,14 @@ impl Shell {
                 Some(c) => {
                     // If currently we have a task running, insert it to the input buffer, otherwise
                     // to the cmdline.
-                    if self.current_task_ref.is_some() {
+                    if self.fg_job_num != 0 {
                         let mut task_id: usize = 0;
-                        if let Some(job) = &self.current_task_ref {
+                        if let Some(job) = self.jobs.get(&self.fg_job_num) {
                             task_id = job.task.lock().id;
                         }
                         let need_echo = !application_io::is_requesting_no_echo(task_id);
                         self.insert_char_to_input_buff(c, need_echo)?;
-                        if let Some(job) = &self.current_task_ref {
+                        if let Some(job) = self.jobs.get(&self.fg_job_num) {
                             if application_io::is_requesting_immediate_delivery(task_id) { 
                                 for b in self.input_buffer.as_bytes() {
                                     job.input_producer.enqueue(*b);
@@ -544,6 +609,13 @@ impl Shell {
         let mut args: Vec<String> = cmdline.split_whitespace().map(|s| s.to_string()).collect();
         let command = args.remove(0);
 
+        // If the last arg is `&`, remove it.
+        if let Some(last_arg) = args.last() {
+            if last_arg == "&" {
+                args.pop();
+            }
+        }
+
         // Check that the application actually exists
         let app_path = Path::new(APPLICATIONS_NAMESPACE_PATH.to_string());
         let app_list = match app_path.get(root::get_root()) {
@@ -570,9 +642,11 @@ impl Shell {
     }
 
     /// Start a new job in the shell by the command line.
-    fn build_new_job(&mut self) -> Option<Job> {
+    fn build_new_job(&mut self) -> isize {
         match self.eval_cmdline() {
-            Ok(new_task_ref) => { 
+            Ok(new_task_ref) => {
+
+                // Create a new job structure.
                 let task_id = {new_task_ref.lock().id};
                 let app_kbd_event_queue: DFQueue<KeyEvent> = DFQueue::new();
                 let app_kbd_event_consumer = app_kbd_event_queue.into_consumer();
@@ -587,20 +661,35 @@ impl Shell {
                     task: new_task_ref,
                     kbd_event_producer: app_kbv_event_producer,
                     input_producer: app_input_producer,
-                    output_consumer: app_output_consumer
+                    output_consumer: app_output_consumer,
+                    status: JobStatus::Running,
+                    cmd: self.cmdline.clone()
                 };
+
+                // Create stdio relationship between the shell and new user program.
                 if let Err(msg) = application_io::create_app_shell_relation(task_id,
                                                                             app_output_producer,
                                                                             app_kbd_event_consumer,
                                                                             app_input_consumer) {
                     self.terminal.print_to_terminal(format!("{}\n", msg).to_string());
-                    return None;
+                    return 0;
                 }
                 if let Err(msg) = terminal_print::add_child(task_id, self.print_producer.obtain_producer()) { // adds the terminal's print producer to the terminal print crate
                     self.terminal.print_to_terminal(format!("{}\n", msg).to_string());
-                    return None;
+                    return 0;
                 }
-                Some(new_job)
+
+                // Allocate a job number for the new job. It will start from 1 and choose the smallest number
+                // that has not yet been allocated.
+                let mut new_job_num: isize = 1;
+                for (key, _) in self.jobs.iter() {
+                    if new_job_num != *key {
+                        break;
+                    }
+                    new_job_num += 1;
+                }
+                self.jobs.insert(new_job_num, new_job);
+                return new_job_num;
             }
             Err(err) => {
                 let err_msg = match err {
@@ -609,11 +698,11 @@ impl Shell {
                     AppErr::SpawnErr(e)       => format!("Failed to spawn new task to run command. Error: {}.\n", e),
                 };
                 self.terminal.print_to_terminal(err_msg);
-                self.redisplay_prompt();
                 if let Err(msg) = self.clear_cmdline(false) {
                     self.terminal.print_to_terminal(format!("{}\n", msg).to_string());
                 }
-                None
+                self.redisplay_prompt();
+                0
             }
         }
     }
@@ -676,51 +765,93 @@ impl Shell {
         }
     }
 
-    fn task_handler(&mut self) -> Result<bool, &'static str> {
-        let task_ref_copy = match &self.current_task_ref {
-            Some(task_ref) => task_ref.task.clone(),
-            None => { return Ok(false); }
-        };
-        let exit_result = task_ref_copy.take_exit_value();
-        // match statement will see if the task has finished with an exit value yet
-        match exit_result {
-            Some(exit_val) => {
-                match exit_val {
-                    ExitValue::Completed(exit_status) => {
-                        // here: the task ran to completion successfully, so it has an exit value.
-                        // we know the return type of this task is `isize`,
-                        // so we need to downcast it from Any to isize.
-                        let val: Option<&isize> = exit_status.downcast_ref::<isize>();
-                        info!("terminal: task returned exit value: {:?}", val);
-                        if let Some(val) = val {
-                            if *val < 0 {
-                                self.terminal.print_to_terminal(format!("task returned error value {:?}\n", val));
+    fn task_handler(&mut self) -> Result<(bool, bool), &'static str> {
+        let mut need_refresh = false;
+        let mut need_prompt = false;
+        let mut job_to_be_removed: Vec<isize> = Vec::new();
+
+        // Iterate through all jobs. If any job has exited, remove its stdio queues and remove it from
+        // the job list. If any job has just stopped, mark it as stopped in the job list.
+        for (job_num, job) in self.jobs.iter_mut() {
+            let task_ref_copy = job.task.clone();
+            if task_ref_copy.lock().has_exited() { // a job has exited
+                let exit_result = task_ref_copy.take_exit_value();
+                // match statement will see if the task has finished with an exit value yet
+                match exit_result {
+                    Some(exit_val) => {
+                        match exit_val {
+                            ExitValue::Completed(exit_status) => {
+                                // here: the task ran to completion successfully, so it has an exit value.
+                                // we know the return type of this task is `isize`,
+                                // so we need to downcast it from Any to isize.
+                                let val: Option<&isize> = exit_status.downcast_ref::<isize>();
+                                info!("terminal: task [{}] returned exit value: {:?}", task_ref_copy.lock().id, val);
+                                if let Some(val) = val {
+                                    if *val < 0 {
+                                        self.terminal.print_to_terminal(
+                                            format!("task [{}] returned error value {:?}\n", task_ref_copy.lock().id, val)
+                                        );
+                                    }
+                                }
+                            },
+
+                            ExitValue::Killed(KillReason::Requested) => {
+                                self.terminal.print_to_terminal("^C\n".to_string());
+                            },
+                            // If the user manually aborts the task
+                            ExitValue::Killed(kill_reason) => {
+                                warn!("task [{}] was killed because {:?}", task_ref_copy.lock().id, kill_reason);
+                                self.terminal.print_to_terminal(
+                                    format!("task [{}] was killed because {:?}\n", task_ref_copy.lock().id, kill_reason)
+                                );
                             }
                         }
-                    },
+                        
+                        // Remove the queue for stdio
+                        application_io::remove_app_shell_relation(task_ref_copy.lock().id)?;
+                        terminal_print::remove_child(task_ref_copy.lock().id)?;
 
-                    ExitValue::Killed(KillReason::Requested) => {
-                        self.terminal.print_to_terminal("^C\n".to_string());
+                        // Record the completed job and remove them from job list later.
+                        job_to_be_removed.push(*job_num);
+                        if self.fg_job_num == *job_num {
+                            self.fg_job_num = 0;
+                            need_prompt = true;
+                        } else {
+                            self.terminal.print_to_terminal(
+                                format!("[{}] [finished] {}\n", job_num, job.cmd)
+                                .to_string()
+                            );
+                        }
+
+                        need_refresh = true;
                     },
-                    // If the user manually aborts the task
-                    ExitValue::Killed(kill_reason) => {
-                        warn!("task was killed because {:?}", kill_reason);
-                        self.terminal.print_to_terminal(format!("task was killed because {:?}\n", kill_reason));
-                    }
+                    // None value indicates an error somewhere.
+                    None => {
+                        error!("task [{}] exited with None exit value.", task_ref_copy.lock().id);
+                    },
                 }
-                
-                application_io::remove_app_shell_relation(task_ref_copy.lock().id)?;
-                terminal_print::remove_child(task_ref_copy.lock().id)?;
-                // Resets the current task id to be ready for the next command
-                self.current_task_ref = None;
-                
-                // Resets the bool to true once the print prompt has been redisplayed
-                self.terminal.refresh_display(self.left_shift);
-            },
-        // None value indicates task has not yet finished so does nothing
-        None => { return Ok(false); },
+            } else if !task_ref_copy.lock().is_runnable() && job.status != JobStatus::Stopped { // task has just stopped
+                job.status = JobStatus::Stopped;
+                self.terminal.print_to_terminal(
+                    format!("[{}] [stopped] {}\n", job_num, job.cmd)
+                    .to_string()
+                );
+
+                if *job_num == self.fg_job_num {
+                    self.fg_job_num = 0;
+                    need_prompt = true;
+                }
+                need_refresh = true;
+            }
         }
-        Ok(true)
+
+        // Actually remove the exited jobs from the job list. We could not do it previously since we were
+        // iterating through the job list.
+        for finished_job_num in job_to_be_removed {
+            self.jobs.remove(&finished_job_num);
+        }
+
+        Ok((need_refresh, need_prompt))
     }
 
     /// Redisplays the terminal prompt (does not insert a newline before it)
@@ -754,9 +885,10 @@ impl Shell {
         }
 
         // Support for new output method by `application_io`.
-        if self.current_task_ref.is_some() {
+        if self.fg_job_num != 0 {
             let mut bytes: Vec<u8> = Vec::new();
-            if let Some(task_ref) = &self.current_task_ref {
+            if let Some(task_ref) = self.jobs.get(&self.fg_job_num) {
+                // Consume all characters that are currently in the queue.
                 loop {
                     if let Some(byte) = task_ref.output_consumer.peek() {
                         bytes.push(*byte);
@@ -804,8 +936,11 @@ impl Shell {
 
 
             // Handles the cleanup of any application task that has finished running, including refreshing the display
-            if self.task_handler()? {
+            let (need_refresh, need_prompt) = self.task_handler()?;
+            if need_prompt {
                 self.redisplay_prompt();
+            }
+            if need_refresh {
                 self.terminal.refresh_display(0);
             }
             // Looks at the input queue from the window manager
@@ -841,6 +976,116 @@ impl Shell {
                 _ => { }
             }
         }
+    }
+}
+
+/// Shell internal command related methods.
+impl Shell {
+    /// Check if the current command line is a shell internal command.
+    fn is_internal_command(&self) -> bool {
+        let mut iter = self.cmdline.split_whitespace();
+        if let Some(cmd) = iter.next() {
+            match cmd.as_ref() {
+                "jobs" => return true,
+                "fg" => return true,
+                "bg" => return true,
+                _ => return false
+            }
+        }
+        false
+    }
+
+    /// Execute the command line as an internal command. If the current command line fails to
+    /// be a shell internal command, this function does nothing.
+    fn execute_internal(&mut self) -> Result<(), &'static str> {
+        let cmdline_copy = self.cmdline.clone();
+        let mut iter = cmdline_copy.split_whitespace();
+        if let Some(cmd) = iter.next() {
+            match cmd.as_ref() {
+                "jobs" => self.execute_internal_jobs(),
+                "fg" => self.execute_internal_fg(),
+                "bg" => self.execute_internal_bg(),
+                _ => Ok(())
+            }
+        } else {
+            Ok(())
+        }
+    }
+
+    /// Execute `bg` command. It takes a job number and runs the in the background.
+    fn execute_internal_bg(&mut self) -> Result<(), &'static str> {
+        let cmdline_copy = self.cmdline.clone();
+        let mut iter = cmdline_copy.split_whitespace();
+        iter.next();
+        let args: Vec<&str> = iter.collect();
+        if args.len() != 1 {
+            self.terminal.print_to_terminal("Usage: bg %job_num\n".to_string());
+            return Ok(());
+        }
+        if let Some('%') = args[0].chars().nth(0) {
+            let job_num = args[0].chars().skip(1).collect::<String>();
+            if let Ok(job_num) = job_num.parse::<isize>() {
+                if let Some(job) = self.jobs.get_mut(&job_num) {
+                    if !job.task.lock().has_exited() {
+                        job.task.unblock();
+                        job.status = JobStatus::Running;
+                    }
+                    self.clear_cmdline(false)?;
+                    self.redisplay_prompt();
+                    return Ok(());
+                }
+                self.terminal.print_to_terminal(format!("No job number {} found!\n", job_num).to_string());
+                return Ok(());
+            }
+        }
+        self.terminal.print_to_terminal("Usage: bg %job_num\n".to_string());
+        Ok(())
+    }
+
+    /// Execute `fg` command. It takes a job number and runs the job in the foreground.
+    fn execute_internal_fg(&mut self) -> Result<(), &'static str> {
+        let cmdline_copy = self.cmdline.clone();
+        let mut iter = cmdline_copy.split_whitespace();
+        iter.next();
+        let args: Vec<&str> = iter.collect();
+        if args.len() != 1 {
+            self.terminal.print_to_terminal("Usage: fg %job_num\n".to_string());
+            return Ok(());
+        }
+        if let Some('%') = args[0].chars().nth(0) {
+            let job_num = args[0].chars().skip(1).collect::<String>();
+            if let Ok(job_num) = job_num.parse::<isize>() {
+                if let Some(job) = self.jobs.get_mut(&job_num) {
+                    self.fg_job_num = job_num;
+                    if !job.task.lock().has_exited() {
+                        job.task.unblock();
+                        job.status = JobStatus::Running;
+                    }
+                    return Ok(());
+                }
+                self.terminal.print_to_terminal(format!("No job number {} found!\n", job_num).to_string());
+                return Ok(());
+            }
+        }
+        self.terminal.print_to_terminal("Usage: fg %job_num\n".to_string());
+        Ok(())
+    }
+
+    /// Execute `jobs` command. It lists all jobs.
+    fn execute_internal_jobs(&mut self) -> Result<(), &'static str> {
+        for (job_num, job_ref) in &self.jobs {
+            let status = match &job_ref.status {
+                JobStatus::Running => "running",
+                JobStatus::Stopped => "stopped"
+            };
+            self.terminal.print_to_terminal(format!("[{}] [{}] {}\n", job_num, status, job_ref.cmd).to_string());
+        }
+        if self.jobs.is_empty() {
+            self.terminal.print_to_terminal("No running or stopped jobs.\n".to_string());
+        }
+        self.clear_cmdline(false)?;
+        self.redisplay_prompt();
+        Ok(())
     }
 }
 

@@ -760,6 +760,11 @@ impl TaskRef {
         self.0.deref().0.lock().runstate = RunState::Blocked;
     }
 
+    /// Unblocks this `Task` by setting its `RunState` to runnable.
+    pub fn unblock(&self) {
+        self.0.deref().0.lock().runstate = RunState::Runnable;
+    }
+
     /// Registers a function or closure that will be called if this `Task` panics.
     /// # Locking / Deadlock
     /// Obtains a write lock on the enclosed `Task` in order to mutate its state.
