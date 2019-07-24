@@ -1,7 +1,6 @@
 //! Early exception handlers that do nothing but print an error and hang.
 #![no_std]
 #![feature(abi_x86_interrupt)]
-#![feature(asm)]
 
 #[macro_use] extern crate vga_buffer; // for println_raw!()
 #[cfg(any(target_arch="x86", target_arch="x86_64"))]

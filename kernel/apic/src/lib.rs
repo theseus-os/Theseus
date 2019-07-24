@@ -85,6 +85,7 @@ pub fn has_x2apic() -> bool {
         return *res // because call_once returns a reference to the cached IS_X2APIC value
     }
 
+    // return true temporarily for compatibility
     #[cfg(any(target_arch="aarch64"))]
     true
 }
