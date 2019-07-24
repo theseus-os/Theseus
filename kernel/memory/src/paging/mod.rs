@@ -1150,7 +1150,6 @@ pub fn init(
             );
             index += 1;
 
-            //Hardware resources https://github.com/qemu/qemu/blob/master/hw/arm/virt.c
             use super::ARM_HARDWARE_END;
             use super::ARM_HARDWARE_START;
             let hardware_virt = VirtualAddress::new_canonical(ARM_HARDWARE_START as usize);

@@ -58,6 +58,7 @@ pub use self::area_frame_allocator::AreaFrameAllocator;
 pub use self::paging::*;
 pub use self::stack_allocator::{Stack, StackAllocator};
 
+//Hardware resources https://github.com/qemu/qemu/blob/master/hw/arm/virt.c
 #[cfg(any(target_arch = "aarch64"))]
 pub const ARM_HARDWARE_START: u64 = 0x1000;
 #[cfg(any(target_arch = "aarch64"))]

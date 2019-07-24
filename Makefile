@@ -562,22 +562,22 @@ armbuild:export TARGET:=aarch64-theseus
 armbuild:export BUILD_MODE=release
 armbuild:
 	@cp $(MAIN_DIR)/main.rs $(NANO_CORE_DIR)
-	@mkdir -p $(BUILD_DIR)/boot/grub
+	@mkdir -p $(GRUB_ISOFILES)/boot/grub
 	RUST_TARGET_PATH=$(PWD)/cfg \
 		RUSTFLAGS="--emit=obj -C debuginfo=2 -D unused-must-use" xargo build  --all --release --target aarch64-theseus 
 	@rm -f $(NANO_CORE_DIR)/main.rs
 
 
-	cp $(ROOT_DIR)/cfg/grub-aarch64.cfg $(BUILD_DIR)/boot/grub/grub.cfg
+	cp $(ROOT_DIR)/cfg/grub-aarch64.cfg $(GRUB_ISOFILES)/boot/grub/grub.cfg
 
-	cp $(ROOT_DIR)/target/$(TARGET)/$(BUILD_MODE)/nano_core.efi $(BUILD_DIR)/boot/kernel.efi$
+	cp $(ROOT_DIR)/target/$(TARGET)/$(BUILD_MODE)/nano_core.efi $(GRUB_ISOFILES)/boot/kernel.efi$
 
 	mkdir -p $(OBJECT_FILES_BUILD_DIR)
 	@for f in $(ROOT_DIR)/target/$(TARGET)/$(BUILD_MODE)/deps/*.o "$(HOME)"/.xargo/lib/rustlib/aarch64-theseus/lib/*.o; do \
 		cp -vf  $${f}  $(OBJECT_FILES_BUILD_DIR)/`basename $${f} | sed -n -e 's/\(.*\)/$(KERNEL_PREFIX)\1/p'`   2> /dev/null ; \
 	done
 	
-	grub-mkrescue -o theseus.iso $(BUILD_DIR)
+	grub-mkrescue -o theseus.iso $(GRUB_ISOFILES)
 
 arm: armbuild
 	qemu-system-aarch64 -m 2048 -cpu cortex-a57 -smp 2 -M virt -bios QEMU_EFI.fd -nographic -drive if=none,file=theseus.iso,id=cdrom,media=cdrom -device virtio-scsi-device -device scsi-cd,drive=cdrom
