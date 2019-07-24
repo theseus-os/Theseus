@@ -144,11 +144,9 @@ pub extern "win64" fn nano_core_start(_image: uefi::Handle, st: SystemTable<Boot
         Err(err) => error!("Fail to write the welcome string: {}", err),
     };
 
-    // Get the root directory of the filesystem. 
-    type SearchedProtocol<'boot> = uefi::proto::media::fs::SimpleFileSystem;
-
+    // Test: Get the root directory of the filesystem so that we can iterate all modules. 
     let protocol = bt
-        .find_protocol::<SearchedProtocol>()
+        .find_protocol::<uefi::proto::media::fs::SimpleFileSystem>()
         .expect_success("Failed to init the SimpleFileSystem protocol")
         .get();
 
@@ -157,19 +155,12 @@ pub extern "win64" fn nano_core_start(_image: uefi::Handle, st: SystemTable<Boot
             .open_volume()
             .expect("Fail to get access to the file system");
     }
-    
-    // Test UEFI load file protocol
-    // type SearchedProtocol<'boot> = uefi::proto::media::fs::LoadFile;
-    // let protocol = bt
-    //     .find_protocol::<SearchedProtocol>()
-    //     .expect_success("Failed to init the SimpleFileSystem protocol")
-    //     .get();
-    // unsafe {
-    //     let result = (*protocol)
-    //         .load_file()
-    //         .expect("Fail to get access to the file system");
-    // }
 
+    // Test: Get the load file protocol
+    let protocol = bt
+        .find_protocol::<uefi::proto::media::load::LoadFile>()
+        .expect_success("Failed to init the SimpleFileSystem protocol")
+        .get();
 
     // Disable temporarily because the interrupt handler is to be implemented. Currently we should rely on UEFI handler for keyboard support
     // exceptions_arm::init();
