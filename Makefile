@@ -372,7 +372,7 @@ view-doc: doc
 	@echo -e "Opening documentation index file in your browser..."
 ifneq ($(IS_WSL), )
 ## building on WSL
-	@powershell.exe -c $(DOC_ROOT) &
+	@cmd.exe /C start "$(shell wslpath -w $(DOC_ROOT))" &
 else
 ## building on regular Linux or macOS
 	@xdg-open $(DOC_ROOT) > /dev/null 2>&1 || open $(DOC_ROOT) &
