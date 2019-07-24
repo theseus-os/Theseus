@@ -491,7 +491,7 @@ impl WindowManagerAlpha {
         let last_show_border = self.is_show_border;
         self.is_show_border = show;
         if last_show_border {
-            let (oxs, oxe, oys, oye) = {
+            let (old_x_start, old_x_end, old_y_start, old_y_end) = {
                 let r = &self.border_position;
                 (r.x_start, r.x_end, r.y_start, r.y_end)
             };
@@ -499,7 +499,7 @@ impl WindowManagerAlpha {
                 self.border_position = RectRegion { x_start, x_end, y_start, y_end };
             }
             for i in 0..(WINDOW_BORDER_SIZE+1) as isize {
-                self.refresh_rect_border(oxs-i, oxe+i, oys-i, oye+i)?;
+                self.refresh_rect_border(old_x_start-i, old_x_end+i, old_y_start-i, old_y_end+i)?;
             }
         }
         // then draw current border
