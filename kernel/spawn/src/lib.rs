@@ -566,7 +566,6 @@ fn task_wrapper<F, A, R>() -> !
     };
     let func = kthread_call_val.func;
     let arg: A = *arg; 
-
     enable_interrupts(); // we must enable interrupts for the new task, otherwise we won't be able to preempt it.
     compiler_fence(Ordering::SeqCst); // I don't think this is necessary...    
     debug!("task_wrapper [1]: \"{}\" about to call kthread func {:?} with arg {:?}, interrupts are {}", curr_task_name, debugit!(func), debugit!(arg), interrupts_enabled());

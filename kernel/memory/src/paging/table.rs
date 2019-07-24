@@ -7,21 +7,20 @@
 // option. This file may not be copied, modified, or distributed
 // except according to those terms.
 
+use super::super::{FrameAllocator, VirtualAddress};
 use super::entry::{Entry, EntryFlags};
-use kernel_config::memory::{PAGE_SHIFT, ENTRIES_PER_PAGE_TABLE};
-use super::super::{VirtualAddress, FrameAllocator};
-use core::ops::{Index, IndexMut};
 use core::marker::PhantomData;
+use core::ops::{Index, IndexMut};
+use kernel_config::memory::{ENTRIES_PER_PAGE_TABLE, PAGE_SHIFT};
 
-
-// Now that we're using the 511th entry of the P4 table for mapping the higher-half kernel, 
+// Now that we're using the 511th entry of the P4 table for mapping the higher-half kernel,
 // we need to use the 510th entry of P4 instead!
 // see this: http://forum.osdev.org/viewtopic.php?f=1&p=176913
 //      and: http://forum.osdev.org/viewtopic.php?f=15&t=25545
 // NOTE: keep this in sync with the recursive index in kernel_config/memory.rs, and the one in boot/*/boot.asm.
-pub const P4: *mut Table<Level4> = 0o177777_776_776_776_776_0000 as *mut _; 
-                                         // ^p4 ^p3 ^p2 ^p1 ^offset  
-                                         // ^ 0o776 means that we're always looking at the 510th entry recursively
+pub const P4: *mut Table<Level4> = 0o177777_776_776_776_776_0000 as *mut _;
+// ^p4 ^p3 ^p2 ^p1 ^offset
+// ^ 0o776 means that we're always looking at the 510th entry recursively
 
 pub struct Table<L: TableLevel> {
     entries: [Entry; ENTRIES_PER_PAGE_TABLE],
@@ -29,7 +28,8 @@ pub struct Table<L: TableLevel> {
 }
 
 impl<L> Table<L>
-    where L: TableLevel
+where
+    L: TableLevel,
 {
     pub fn zero(&mut self) {
         for entry in self.entries.iter_mut() {
@@ -52,20 +52,22 @@ impl<L> Table<L>
 }
 
 impl<L> Table<L>
-    where L: HierarchicalLevel
+where
+    L: HierarchicalLevel,
 {
-
     /// uses 'index' as an index into this table's list of 512 entries
-    /// returns the virtual address of the next lowest page table 
+    /// returns the virtual address of the next lowest page table
     /// (so P4 would give P3, P3 -> P2, P2 -> P1).
     fn next_table_address(&self, index: usize) -> Option<VirtualAddress> {
         let entry_flags = self[index].flags();
-        
-        #[cfg(any(target_arch="x86", target_arch="x86_64"))]
-        let ispage = entry_flags.contains(EntryFlags::PRESENT) && !entry_flags.contains(EntryFlags::HUGE_PAGE);
-        #[cfg(any(target_arch="aarch64"))]
-        let ispage = entry_flags.contains(EntryFlags::PRESENT) && entry_flags.contains(EntryFlags::PAGE);
-        
+
+        #[cfg(any(target_arch = "x86", target_arch = "x86_64"))]
+        let ispage = entry_flags.contains(EntryFlags::PRESENT)
+            && !entry_flags.contains(EntryFlags::HUGE_PAGE);
+        #[cfg(any(target_arch = "aarch64"))]
+        let ispage =
+            entry_flags.contains(EntryFlags::PRESENT) && entry_flags.contains(EntryFlags::PAGE);
+
         if ispage {
             let table_address = self as *const _ as usize;
             let next_table_vaddr: usize = (table_address << 9) | (index << PAGE_SHIFT);
@@ -78,31 +80,43 @@ impl<L> Table<L>
     /// returns the next lowest page table (so P4 would give P3, P3 -> P2, P2 -> P1)
     pub fn next_table(&self, index: usize) -> Option<&Table<L::NextLevel>> {
         // convert the next table address from a raw pointer back to a Table type
-        self.next_table_address(index).map(|vaddr| unsafe { &*(vaddr.value() as *const _) })
+        self.next_table_address(index)
+            .map(|vaddr| unsafe { &*(vaddr.value() as *const _) })
     }
 
     pub fn next_table_mut(&mut self, index: usize) -> Option<&mut Table<L::NextLevel>> {
-        self.next_table_address(index).map(|vaddr| unsafe { &mut *(vaddr.value() as *mut _) })
+        self.next_table_address(index)
+            .map(|vaddr| unsafe { &mut *(vaddr.value() as *mut _) })
     }
 
-    pub fn next_table_create<A>(&mut self,
-                                index: usize,
-                                flags: EntryFlags,
-                                allocator: &mut A)
-                                -> &mut Table<L::NextLevel>
-        where A: FrameAllocator
+    pub fn next_table_create<A>(
+        &mut self,
+        index: usize,
+        flags: EntryFlags,
+        allocator: &mut A,
+    ) -> &mut Table<L::NextLevel>
+    where
+        A: FrameAllocator,
     {
         if self.next_table(index).is_none() {
-            assert!(!self[index].flags().contains(EntryFlags::HUGE_PAGE),
-                    "mapping code does not support huge pages");
+            assert!(
+                !self[index].flags().contains(EntryFlags::HUGE_PAGE),
+                "mapping code does not support huge pages"
+            );
             let frame = allocator.allocate_frame().expect("no frames available");
 
-            #[cfg(any(target_arch="x86", target_arch="x86_64"))]
+            #[cfg(any(target_arch = "x86", target_arch = "x86_64"))]
             self[index].set(frame, flags | EntryFlags::PRESENT | EntryFlags::WRITABLE); // must be PRESENT | WRITABLE
 
-            #[cfg(any(target_arch="aarch64"))]
-            self[index].set(frame, flags & EntryFlags::WRITABLE | EntryFlags::PRESENT | EntryFlags::ACCESSEDARM | EntryFlags::PAGE); 
-            
+            #[cfg(any(target_arch = "aarch64"))]
+            self[index].set(
+                frame,
+                flags & EntryFlags::WRITABLE
+                    | EntryFlags::PRESENT
+                    | EntryFlags::ACCESSEDARM
+                    | EntryFlags::PAGE,
+            );
+
             self.next_table_mut(index).unwrap().zero();
         }
         self.next_table_mut(index).unwrap()
@@ -110,7 +124,8 @@ impl<L> Table<L>
 }
 
 impl<L> Index<usize> for Table<L>
-    where L: TableLevel
+where
+    L: TableLevel,
 {
     type Output = Entry;
 
@@ -120,7 +135,8 @@ impl<L> Index<usize> for Table<L>
 }
 
 impl<L> IndexMut<usize> for Table<L>
-    where L: TableLevel
+where
+    L: TableLevel,
 {
     fn index_mut(&mut self, index: usize) -> &mut Entry {
         &mut self.entries[index]

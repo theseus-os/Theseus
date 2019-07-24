@@ -191,6 +191,7 @@ pub fn register_interrupt(interrupt_num: u8, func: HandlerFunc) -> Result<(), &'
         }
     }
 
+    // Return OK temporarily for compatibility
     #[cfg(any(target_arch="aarch64"))]
     Ok(())
 } 

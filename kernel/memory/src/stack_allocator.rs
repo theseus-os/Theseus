@@ -1,6 +1,6 @@
 use super::paging::*;
-use super::{PAGE_SIZE, FrameAllocator, VirtualAddress, VirtualMemoryArea};
 use super::Mapper;
+use super::{FrameAllocator, VirtualAddress, VirtualMemoryArea, PAGE_SIZE};
 
 #[derive(Debug)]
 pub struct StackAllocator {
@@ -12,30 +12,39 @@ impl StackAllocator {
     /// Create a new `StackAllocator` that allocates random frames
     /// and maps them to the given range of `Page`s.
     pub fn new(range: PageRange, usermode: bool) -> StackAllocator {
-        StackAllocator { 
-            range: range, 
+        StackAllocator {
+            range: range,
             usermode: usermode,
         }
     }
 }
 
 impl StackAllocator {
-    
-    /// Allocates a new stack and maps it to the active page table. 
-    /// The given `page_table` can be a `PageTable` or a `Mapper`, 
+    /// Allocates a new stack and maps it to the active page table.
+    /// The given `page_table` can be a `PageTable` or a `Mapper`,
     /// because `PageTable` automatically derefs into a `Mapper`.
-    /// Reserves an unmapped guard page to catch stack overflows. 
+    /// Reserves an unmapped guard page to catch stack overflows.
     /// The given `usermode` argument determines whether the stack is accessible from userspace.
     /// Returns the newly-allocated stack and a VMA to represent its mapping.
-    pub fn alloc_stack<FA>(&mut self, page_table: &mut Mapper, frame_allocator: &mut FA, size_in_pages: usize)
-            -> Option<(Stack, VirtualMemoryArea)> where FA: FrameAllocator 
+    pub fn alloc_stack<FA>(
+        &mut self,
+        page_table: &mut Mapper,
+        frame_allocator: &mut FA,
+        size_in_pages: usize,
+    ) -> Option<(Stack, VirtualMemoryArea)>
+    where
+        FA: FrameAllocator,
     {
         if size_in_pages == 0 {
             return None; /* a zero sized stack maikes no sense */
         }
 
         // minimum required flag is WRITABLE
-        let flags = if self.usermode { EntryFlags::USER_ACCESSIBLE | EntryFlags::WRITABLE} else { EntryFlags::WRITABLE };
+        let flags = if self.usermode {
+            EntryFlags::USER_ACCESSIBLE | EntryFlags::WRITABLE
+        } else {
+            EntryFlags::WRITABLE
+        };
 
         // clone the range, since we only want to change it on success
         let mut range = self.range.clone();
@@ -58,10 +67,17 @@ impl StackAllocator {
 
                 // map stack pages to physical frames
                 // but don't map the guard page, that should be left unmapped
-                let stack_pages = match page_table.map_pages(PageRange::new(start, end), flags, frame_allocator) {
+                let stack_pages = match page_table.map_pages(
+                    PageRange::new(start, end),
+                    flags,
+                    frame_allocator,
+                ) {
                     Ok(pages) => pages,
                     Err(e) => {
-                        error!("alloc_stack(): couldn't map_pages for the new Stack, error: {}", e);
+                        error!(
+                            "alloc_stack(): couldn't map_pages for the new Stack, error: {}",
+                            e
+                        );
                         return None;
                     }
                 };
@@ -69,17 +85,27 @@ impl StackAllocator {
                 let stack_vma = VirtualMemoryArea::new(
                     start.start_address(),
                     end.start_address().value() - start.start_address().value() + PAGE_SIZE, // + 1 Page because it's an inclusive range
-                    flags, 
-                    if flags.contains(EntryFlags::USER_ACCESSIBLE) { "User Stack" } else { "Kernel Stack" }, 
+                    flags,
+                    if flags.contains(EntryFlags::USER_ACCESSIBLE) {
+                        "User Stack"
+                    } else {
+                        "Kernel Stack"
+                    },
                 );
 
                 // create a new stack
                 // stack grows downward from the top address (which is the last page's start_addr + page size)
                 let top_of_stack = end.start_address() + PAGE_SIZE;
-                Some( (Stack::new(top_of_stack, start.start_address(), stack_pages), stack_vma) )
+                Some((
+                    Stack::new(top_of_stack, start.start_address(), stack_pages),
+                    stack_vma,
+                ))
             }
             _ => {
-                error!("alloc_stack failed, not enough free pages to allocate {}!", size_in_pages);
+                error!(
+                    "alloc_stack failed, not enough free pages to allocate {}!",
+                    size_in_pages
+                );
                 None /* not enough pages */
             }
         }
@@ -103,19 +129,18 @@ impl Stack {
         }
     }
 
-    /// the top of this Stack. This address is not dereferenceable, the one right below it is. 
+    /// the top of this Stack. This address is not dereferenceable, the one right below it is.
     /// to get the highest usable address in this Stack, call `top_usable()`
     pub fn top_unusable(&self) -> VirtualAddress {
         self.top
     }
 
-    /// Returns the highest usable address of this Stack, 
+    /// Returns the highest usable address of this Stack,
     /// which is top_unusable() - sizeof(VirtualAddress)
     pub fn top_usable(&self) -> VirtualAddress {
         use core::mem;
         self.top - mem::size_of::<VirtualAddress>()
     }
-
 
     pub fn bottom(&self) -> VirtualAddress {
         self.bottom

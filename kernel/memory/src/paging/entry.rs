@@ -8,12 +8,11 @@
 // except according to those terms.
 
 use super::super::Frame;
+use bit_field::BitField;
+use kernel_config::memory::PAGE_SHIFT;
 use multiboot2;
 use xmas_elf;
 use PhysicalAddress;
-use bit_field::BitField;
-use kernel_config::memory::PAGE_SHIFT;
-
 
 /// A page table entry, which is a `u64` value under the hood.
 /// It contains a physical frame address and entry flag access bits.
@@ -36,8 +35,10 @@ impl Entry {
     pub fn pointed_frame(&self) -> Option<Frame> {
         if self.flags().contains(EntryFlags::PRESENT) {
             let mut frame_paddr = self.0 as usize;
-            frame_paddr.set_bits(0 .. (PAGE_SHIFT as u8), 0);
-            Some(Frame::containing_address(PhysicalAddress::new_canonical(frame_paddr)))
+            frame_paddr.set_bits(0..(PAGE_SHIFT as u8), 0);
+            Some(Frame::containing_address(PhysicalAddress::new_canonical(
+                frame_paddr,
+            )))
         } else {
             None
         }
@@ -73,19 +74,17 @@ bitflags! {
         const NO_EXECUTE        = 1 << 63;
 
         //ARM MMU
-        const PAGE    =         1 << 1;
-        const DEVICE  =         1 << 2;
-        const NON_CACHE =       1 << 3;
-        const USER_ARM =            1 << 6;
-        const READONLY =        1 << 7;
-        const OUT_SHARE =       2 << 8;
-        const INNER_SHARE =     3 << 8;
-
-        const ACCESSEDARM =        1 << 10;
-
-        const NO_EXE_ARM =         1 << 54; 
+        const PAGE              = 1 << 1;
+        const DEVICE            = 1 << 2;
+        const NON_CACHE         = 1 << 3;
+        const USER_ARM          = 1 << 6;
+        const READONLY          = 1 << 7;
+        const OUT_SHARE         = 2 << 8;
+        const INNER_SHARE       = 3 << 8;
+        const ACCESSEDARM       = 1 << 10;
+        const NO_EXE_ARM        = 1 << 54;
     }
-    
+
 }
 
 impl EntryFlags {
@@ -94,7 +93,7 @@ impl EntryFlags {
         self.intersects(EntryFlags::WRITABLE)
     }
 
-    /// Returns true if these flags are executable, 
+    /// Returns true if these flags are executable,
     /// which means that the `NO_EXECUTE` bit on x86 is *not* set.
     pub fn is_executable(&self) -> bool {
         !self.intersects(EntryFlags::NO_EXECUTE)
@@ -120,8 +119,8 @@ impl EntryFlags {
     }
 
     pub fn from_elf_section_flags(elf_flags: u64) -> EntryFlags {
-        use xmas_elf::sections::{SHF_WRITE, SHF_ALLOC, SHF_EXECINSTR};
-        
+        use xmas_elf::sections::{SHF_ALLOC, SHF_EXECINSTR, SHF_WRITE};
+
         let mut flags = EntryFlags::empty();
 
         if elf_flags & SHF_ALLOC == SHF_ALLOC {
@@ -141,7 +140,7 @@ impl EntryFlags {
 
     pub fn from_elf_program_flags(prog_flags: xmas_elf::program::Flags) -> EntryFlags {
         let mut flags = EntryFlags::empty();
-        
+
         if prog_flags.is_read() {
             // section is loaded to memory
             flags = flags | EntryFlags::PRESENT;

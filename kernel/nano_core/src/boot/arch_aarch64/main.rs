@@ -1,15 +1,15 @@
 //! This crate is the entry point of the generated .efi file.
-//! 
+//!
 //! The rust compiler compiles the crate which contains the main.rs file as ahe lib, link it and generate a .efi file.
 //!
 //! The aarch64-theseus.json file specifies the entry point of the uefi file.
-//! 
+//!
 //! Currently the nano_core crate does the following:
 //! 1. Initialize the UEFI console services for early log.
 //! 2. Initialize the memory and create a new page table.
 //! 3. Initialize the early exception handler.
 //!
-//! To be compatible with x86, the `make arm` command will copy this file to nano_core/src, does the compiling and remove it. If the file is in nano_core/src, for x86 architecture the compiler will try to compile the crate as an application. 
+//! To be compatible with x86, the `make arm` command will copy this file to nano_core/src, does the compiling and remove it. If the file is in nano_core/src, for x86 architecture the compiler will try to compile the crate as an application.
 //!
 //! In generating the kernel.efi file, first, the rust compiler compiles all crates and `nano_core` as libraries. It then uses rust-lld to wrap them and generate a kernel.efi file. The entry point of the file is specified in aarch64-theseus.json
 //!  
@@ -22,17 +22,19 @@
 #![feature(alloc_error_handler)]
 #![feature(type_ascription)]
 
-#[macro_use] extern crate alloc;
+#[macro_use]
+extern crate alloc;
 
-#[macro_use] extern crate log;
-extern crate rlibc; // basic memset/memcpy libc functions
+#[macro_use]
+extern crate log;
 extern crate cortex_a;
+extern crate rlibc; // basic memset/memcpy libc functions
 
 extern crate exceptions_arm;
 extern crate logger;
 extern crate uefi;
-extern crate uefi_services;
 extern crate uefi_exts;
+extern crate uefi_services;
 
 use uefi::prelude::*;
 use uefi_exts::BootServicesExt;
@@ -42,15 +44,18 @@ use core::fmt::Write;
 /// Just like Rust's `try!()` macro, but instead of performing an early return upon an error,
 /// it invokes the `shutdown()` function upon an error in order to cleanly exit Theseus OS.
 macro_rules! try_exit {
-    ($expr:expr) => (match $expr {
-        Ok(val) => val,
-        Err(err_msg) => {
-            $crate::shutdown(format_args!("{}", err_msg));
+    ($expr:expr) => {
+        match $expr {
+            Ok(val) => val,
+            Err(err_msg) => {
+                $crate::shutdown(format_args!("{}", err_msg));
+            }
         }
-    });
-    ($expr:expr,) => (try!($expr));
+    };
+    ($expr:expr,) => {
+        try!($expr)
+    };
 }
-
 
 /// Shuts down Theseus and prints the given formatted arguuments.
 fn shutdown(msg: core::fmt::Arguments) -> ! {
@@ -60,12 +65,10 @@ fn shutdown(msg: core::fmt::Arguments) -> ! {
     panic!("{}", msg);
 }
 
-
-
 /// The main entry point of the UEFI application. It enters the Theseus OS
-#[cfg(any(windows, target_arch="aarch64", target_env = "msvc"))]
+#[cfg(any(windows, target_arch = "aarch64", target_env = "msvc"))]
 #[no_mangle]
-pub extern "win64" fn efi_main(image: uefi::Handle, st: SystemTable<Boot>){
+pub extern "win64" fn efi_main(image: uefi::Handle, st: SystemTable<Boot>) {
     nano_core_start(image, st);
 }
 
@@ -115,33 +118,44 @@ pub extern "win64" fn efi_main(image: uefi::Handle, st: SystemTable<Boot>){
 // }
 
 #[no_mangle]
-#[cfg(any(target_arch="aarch64"))]
+#[cfg(any(target_arch = "aarch64"))]
 /// The entrypoint of Theseus.
 /// `image` is the handler of the image file. Currently it is of no use.
 /// `st` is the systemtable of UEFI. It contains all the services provides by UEFI.
-pub extern "win64" fn nano_core_start(_image: uefi::Handle, st: SystemTable<Boot>) -> !{
+pub extern "win64" fn nano_core_start(_image: uefi::Handle, st: SystemTable<Boot>) -> ! {
     // init useful UEFI services
     uefi_services::init(&st);
     let bt = st.boot_services();
     let stdout = st.stdout();
     let _ = stdout.clear();
-    
+
     // init memory manager
-    let (_kernel_mmi_ref, _text_mapped_pages, _rodata_mapped_pages, _data_mapped_pages, _identity_mapped_pages) =  try_exit!(memory::init(&bt));
+    let (
+        _kernel_mmi_ref,
+        _text_mapped_pages,
+        _rodata_mapped_pages,
+        _data_mapped_pages,
+        _identity_mapped_pages,
+    ) = try_exit!(memory::init(&bt));
     debug!("nano_core_start(): initialized memory subsystem.");
 
-    match stdout.write_str(WELCOME_STRING){
-        Ok(_) => {},
-        Err(err) => {error!("Fail to write the welcome string: {}", err)},
+    match stdout.write_str(WELCOME_STRING) {
+        Ok(_) => {}
+        Err(err) => error!("Fail to write the welcome string: {}", err),
     };
 
-    // Get the root directory if the filesystem. It is of no use because we will have our own file system. 
+    // Get the root directory if the filesystem. It is of no use because we will have our own file system.
     type SearchedProtocol<'boot> = uefi::proto::media::fs::SimpleFileSystem;
 
-    let protocol = bt.find_protocol::<SearchedProtocol>().expect_success("Failed to init the SimpleFileSystem protocol").get();
+    let protocol = bt
+        .find_protocol::<SearchedProtocol>()
+        .expect_success("Failed to init the SimpleFileSystem protocol")
+        .get();
 
-    unsafe{ 
-        let _dir =(*protocol).open_volume().expect("Fail to get access to the file system");
+    unsafe {
+        let _dir = (*protocol)
+            .open_volume()
+            .expect("Fail to get access to the file system");
     }
 
     // Disable temporarily because the interrupt handler is to be implemented. Currently we should rely on UEFI handler for keyboard support
@@ -156,38 +170,32 @@ pub extern "win64" fn nano_core_start(_image: uefi::Handle, st: SystemTable<Boot
             Some(key) => {
                 let string = format!("{}", key);
                 match stdout.write_str(&string) {
-                        Ok(_) => {},
-                        Err(err) => { debug!("Fail to display the input:{}", err) },
+                    Ok(_) => {}
+                    Err(err) => debug!("Fail to display the input:{}", err),
                 };
-            },
-            None => { }
-        };          
+            }
+            None => {}
+        };
     }
 }
 
 /// No use since the linker specifies efi_main as th entrypoint
 pub fn main() {
-    loop {
-
-    }
+    loop {}
 }
 
 #[panic_handler]
 fn panic_handler(_info: &core::panic::PanicInfo) -> ! {
-    loop{
-
-    }
+    loop {}
 }
 
 #[alloc_error_handler]
 fn alloc_error_handler(_layout: core::alloc::Layout) -> ! {
-    loop{ 
-    }
+    loop {}
 }
 
 #[lang = "start"]
-fn start() { }
-
+fn start() {}
 
 const WELCOME_STRING: &'static str = "
  _____ _
