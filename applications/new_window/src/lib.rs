@@ -45,8 +45,8 @@ pub fn main(_args: Vec<String>) -> isize {
     }
 
     // take arguments as the parameter to create a window
-    let x = _args[0].parse::<usize>().unwrap();
-    let y = _args[1].parse::<usize>().unwrap();
+    let x = _args[0].parse::<isize>().unwrap();
+    let y = _args[1].parse::<isize>().unwrap();
     let width = _args[2].parse::<usize>().unwrap();
     let height = _args[3].parse::<usize>().unwrap();
     debug!("parameters {:?}", (x, y, width, height));

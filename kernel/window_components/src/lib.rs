@@ -84,7 +84,7 @@ pub struct WindowComponents {
 
 impl WindowComponents {
     /// create new WindowComponents by given position and size, return the Mutex of it for ease of sharing
-    pub fn new(x: usize, y: usize, width: usize, height: usize) -> Result<Arc<Mutex<WindowComponents>>, &'static str> {
+    pub fn new(x: isize, y: isize, width: usize, height: usize) -> Result<Arc<Mutex<WindowComponents>>, &'static str> {
 
         if width <= 2 * WINDOW_TITLE_BAR || height <= WINDOW_TITLE_BAR + WINDOW_BORDER {
             return Err("window too small to even draw border");
@@ -112,14 +112,14 @@ impl WindowComponents {
             last_is_active: true,  // new window is by default active
         };
 
-        let (xs, xe, ys, ye) = {
+        let (x_start, x_end, y_start, y_end) = {
             let mut winobj = wincomps.winobj.lock();
             winobj.framebuffer.fill_color(wincomps.background);
-            let xs = winobj.x;
-            let xe = xs + winobj.width;
-            let ys = winobj.y;
-            let ye = ys + winobj.height;
-            (xs, xe, ys, ye)
+            let x_start = winobj.x;
+            let x_end = x_start + winobj.width as isize;
+            let y_start = winobj.y;
+            let y_end = y_start + winobj.height as isize;
+            (x_start, x_end, y_start, y_end)
         };
         wincomps.draw_border(true);  // draw window with active border
         // draw three buttons
@@ -129,7 +129,7 @@ impl WindowComponents {
             wincomps.show_button(1, 1, &mut winobj);
             wincomps.show_button(2, 1, &mut winobj);
         }
-        window_manager_alpha::refresh_area_absolute(xs, xe, ys, ye)?;
+        window_manager_alpha::refresh_area_absolute(x_start, x_end, y_start, y_end)?;
 
         Ok(Arc::new(Mutex::new(wincomps)))
     }
@@ -172,17 +172,17 @@ impl WindowComponents {
     }
 
     /// refresh border, telling window manager to refresh 
-    fn refresh_border(& self, bx: usize, by: usize) -> Result<(), &'static str> {
+    fn refresh_border(& self, bx: isize, by: isize) -> Result<(), &'static str> {
         let (width, height) = {
             let winobj = self.winobj.lock();
             let width = winobj.width;
             let height = winobj.height;
             (width, height)
         };
-        window_manager_alpha::refresh_area_absolute(bx+0, bx+self.bias_x, by+self.bias_y, by+height)?;
-        window_manager_alpha::refresh_area_absolute(bx+0, bx+width, by+height - self.bias_x, by+height)?;
-        window_manager_alpha::refresh_area_absolute(bx+width - self.bias_x, bx+width, by+self.bias_y, by+height)?;
-        window_manager_alpha::refresh_area_absolute(bx+0, bx+width, by+0, by+self.bias_y)?;
+        window_manager_alpha::refresh_area_absolute(bx, bx+self.bias_x as isize, by+self.bias_y as isize, by+height as isize)?;
+        window_manager_alpha::refresh_area_absolute(bx, bx+width as isize, by+height as isize - self.bias_x as isize, by+height as isize)?;
+        window_manager_alpha::refresh_area_absolute(bx+width as isize - self.bias_x as isize, bx+width as isize, by+self.bias_y as isize, by+height as isize)?;
+        window_manager_alpha::refresh_area_absolute(bx, bx+width as isize, by, by+self.bias_y as isize)?;
         Ok(())
     }
 
@@ -211,7 +211,7 @@ impl WindowComponents {
             let y = by + self.bias_y / 2;
             let x = bx + WINDOW_BUTTON_BIAS_X + i * WINDOW_BUTTON_BETWEEN;
             let r = WINDOW_RADIUS;
-            window_manager_alpha::refresh_area_absolute(x-r, x+r+1, y-r, y+r+1)?;
+            window_manager_alpha::refresh_area_absolute((x-r) as isize, (x+r+1) as isize, (y-r) as isize, (y+r+1) as isize)?;
         }
         Ok(())
     }
@@ -271,13 +271,13 @@ impl WindowComponents {
                             call_later_do_move_active_window = true;
                         }
                     } else {
-                        if mouse_event.y < self.bias_y && mouse_event.x < winobj.width {  // the region of title bar
+                        if (mouse_event.y as usize) < self.bias_y && (mouse_event.x as usize) < winobj.width {  // the region of title bar
                             let r2 = WINDOW_RADIUS * WINDOW_RADIUS;
                             let mut is_three_button = false;
                             for i in 0..3 {
-                                let dx = mouse_event.x - WINDOW_BUTTON_BIAS_X - i * WINDOW_BUTTON_BETWEEN;
-                                let dy = mouse_event.y - self.bias_y / 2;
-                                if dx*dx + dy*dy <= r2 {
+                                let dx = mouse_event.x - WINDOW_BUTTON_BIAS_X as isize - (i as isize) * WINDOW_BUTTON_BETWEEN as isize;
+                                let dy = mouse_event.y - self.bias_y as isize / 2;
+                                if dx*dx + dy*dy <= r2 as isize {
                                     is_three_button = true;
                                     if mouse_event.left_button_hold {
                                         self.show_button(i, 2, &mut winobj);
@@ -308,7 +308,7 @@ impl WindowComponents {
                             // TODO: if any components want this event? ask them!
                             self.producer.enqueue(Event::MousePositionEvent(mouse_event.clone()));
                         }
-                        if mouse_event.y < winobj.height && mouse_event.x < winobj.width &&
+                        if (mouse_event.y as usize) < winobj.height && (mouse_event.x as usize) < winobj.width &&
                                 !self.last_mouse_position_event.left_button_hold && mouse_event.left_button_hold {
                             need_to_set_active = true;
                         }
@@ -326,7 +326,7 @@ impl WindowComponents {
             }
         }
         if need_refresh_three_button {  // if border has been refreshed, no need to refresh buttons
-            if let Err(err) = self.refresh_three_button(bx, by) {
+            if let Err(err) = self.refresh_three_button(bx as usize, by as usize) {
                 error!("refresh_three_button failed {}", err);
             }
         }
@@ -466,7 +466,7 @@ impl TextArea {
                 };
                 for j in 0..16 {
                     for i in 0..8 {
-                        window_manager_alpha::refresh_pixel_absolute(winx + wx + i, winy + wy + j)?;
+                        window_manager_alpha::refresh_pixel_absolute(winx + wx as isize + i, winy + wy as isize + j)?;
                     }
                 }
             }
