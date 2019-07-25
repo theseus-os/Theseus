@@ -362,10 +362,6 @@ dependencies = [
 ]
 
 [[package]]
-name = "documentation"
-version = "0.1.0"
-
-[[package]]
 name = "downcast-rs"
 version = "1.0.4"
 source = "git+https://github.com/theseus-os/downcast-rs#5d2c787a754b6d5aa44e7c91470d2bb160818617"
