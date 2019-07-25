@@ -14,5 +14,5 @@
 ## Getting started
 - [Development Environment](chapter_2.md)
 
-## Writing a kernel app
-- [Writing a kernel app](app.md)
+## Application Development
+- [Developing an Application](app.md)

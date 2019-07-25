@@ -1,4 +1,5 @@
 # Booting Process and Flow of Execution
+
 The kernel takes over from the bootloader (GRUB, or another multiboot2-compatible bootloader) in `nano_core/src//arch_x86_64/boot.asm:start` and is running in *32-bit protected mode*. 
 After initializing paging and other things, the assembly file `boot.asm` jumps to `long_mode_start`, which runs it code in long mode. 
 Then, it jumps to `start_high`, so now we're running in the higher half because Theseus is a [higher-half kernel]ps://wiki.osdev.org/Higher_Half_Kernel). 

@@ -1,5 +1,5 @@
 
-# Devlopment Environment Setup
+# Setting up your Development Environment
 
 ## Building Theseus
 

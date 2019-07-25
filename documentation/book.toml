@@ -1,6 +1,0 @@
-[book]
-title = "All about Theseus"
-authors = ["Kevin Boos", "Lin Zhong"]
-description = "What we would like to share about the design and implementation of Theseus."
-multilingual = false
-src = "src"

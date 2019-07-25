@@ -362,10 +362,6 @@ dependencies = [
 ]
 
 [[package]]
-name = "documentation"
-version = "0.1.0"
-
-[[package]]
 name = "downcast-rs"
 version = "1.0.4"
 source = "git+https://github.com/theseus-os/downcast-rs#5d2c787a754b6d5aa44e7c91470d2bb160818617"
@@ -1969,10 +1965,6 @@ source = "registry+https://github.com/rust-lang/crates.io-index"
 name = "volatile"
 version = "0.2.5"
 source = "registry+https://github.com/rust-lang/crates.io-index"
-
-[[package]]
-name = "wget"
-version = "0.1.0"
 
 [[package]]
 name = "window_manager"
