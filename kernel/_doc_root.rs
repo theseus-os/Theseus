@@ -1,29 +1,27 @@
-//! Theseus is a new OS written from scratch in Rust, with the goals of runtime composability and state spill freedom.    
-//! 
 //! # Overview of Theseus
-//! The Theseus kernel is composed of many small module entities, each contained within a single Rust crate, and built all together as a cargo virtual workspace. 
+//! 
+//! Theseus is a new OS written from scratch in Rust, with primary goals of runtime composability and state spill freedom.
+//! 
+//! The Theseus kernel is composed of many small entities, each contained within a single Rust crate, and built all together as a cargo virtual workspace. 
 //! All crates in Theseus are listed in the sidebar to the left. Click on a crate name to read more about it, and the functions and types it provides.
-//! Each crate is its own project with its own "Cargo.toml" manifest file that specifies that crate's dependencies and features. 
+//! Each crate is its own project with its own `Cargo.toml` manifest file that specifies that crate's dependencies and features.
 //! 
-//! Theseus is essentially a loose "bag of modules" without any source-level hierarchy or submodules, as you can see by flatly listing the contents of the `kernel` directory.
-//! All crate entities (modules) are on equal footing, except for the [`nano_core`](../nano_core/index.html), which is a tiny module containing the first code that runs after the bootloader to bootstrap the OS.
+//! ## The Theseus Book
 //! 
+//! You are currently reading the documentation auto-generated from inline source code comments,
+//! which is useful for obtaining specific, developer-oriented implementation details about types and functions in each crate. 
 //! 
-//! # Table of Contents
-//! * [Advice and Principles for Contributing to Theseus](contributing/index.html)
-//! * [Git-based Development](git/index.html)
-//! * [The PHIS Principle: Performance in Hardware, Isolation in Software](phis/index.html)
-//! * [How the Build Process Works](build_process/index.html)
-//! * [Loadable Mode: Runtime Loading and Linking of Crates](build_process/index.html#loadable-mode-runtime-loading-and-linking-of-crates)
-//! * [How Theseus Boots](booting/index.html)
+//! For a more general description of Theseus's concepts, organization, build process, contributing guidelines, and more,
+//! please build and view the Theseus Book (currently not hosted online anywhere, but available in the `book` directory).
 //! 
-//! # Basic Overview of All Crates 
-//! One-line summaries of what each crate includes (may be incomplete):
+//! ## Basic Overview of All Crates
+//! 
+//! One-line summaries of what each crate includes (may be incomplete/out-of-date):
 //! 
 //! * `acpi`: ACPI (Advanced Configuration and Power Interface) support for Theseus, including multicore discovery.
 //! * `apic`: APIC (Advanced Programmable Interrupt Controller) support for Theseus (x86 only), including apic/xapic and x2apic.
 //! * `ap_start`: High-level initialization code that runs on each AP (core) after it has booted up
-//! * `ata`: Support for ATA hard disks (IDE/PATA), not SATA over AHCI.
+//! * `ata_pio`: Support for ATA hard disks (IDE/PATA) using PIO (not DMA), and not SATA.
 //! * `captain`: The main driver of Theseus. Controls the loading and initialization of all subsystems and other crates.
 //! * `input_event_manager`: Handles input events from the keyboard and routes them to the correct application. ** Being phased out by window manager
 //! * `event_types`: A temporary way to move the input_event_manager typedefs out of the input_event_manager crate.
@@ -58,13 +56,3 @@
 //! * `tss`: TSS (Task State Segment support (x86 only) for Theseus.
 //! * `vfs_node`: contains the structs VFSDirectory and VFSFile, which are the most basic, generic implementers of the traits Directory and File
 //! * `vga_buffer`: Simple routines for printing to the screen using the x86 VGA buffer text mode.
-//!
-
-
-
-#![no_std]
-pub mod contributing;
-pub mod build_process;
-pub mod booting;
-pub mod phis;
-pub mod git;

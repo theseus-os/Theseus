@@ -106,22 +106,22 @@ assembly_object_files := $(patsubst $(NANO_CORE_SRC_DIR)/boot/arch_$(ARCH)/%.asm
 
 
 # get all the subdirectories in kernel/, i.e., the list of all kernel crates
-KERNEL_CRATES := $(notdir $(wildcard kernel/*))
+KERNEL_CRATE_NAMES := $(notdir $(wildcard kernel/*))
 # exclude the build directory 
-KERNEL_CRATES := $(filter-out build/. target/., $(KERNEL_CRATES))
+KERNEL_CRATE_NAMES := $(filter-out build/. target/., $(KERNEL_CRATE_NAMES))
 # exclude hidden directories starting with a "."
-KERNEL_CRATES := $(filter-out .*/, $(KERNEL_CRATES))
+KERNEL_CRATE_NAMES := $(filter-out .*/, $(KERNEL_CRATE_NAMES))
 # remove the trailing /. on each name
-KERNEL_CRATES := $(patsubst %/., %, $(KERNEL_CRATES))
+KERNEL_CRATE_NAMES := $(patsubst %/., %, $(KERNEL_CRATE_NAMES))
 
 # get all the subdirectories in applications/, i.e., the list of application crates
-APP_CRATES := $(notdir $(wildcard applications/*))
+APP_CRATE_NAMES := $(notdir $(wildcard applications/*))
 # exclude the build directory 
-APP_CRATES := $(filter-out build/. target/., $(APP_CRATES))
+APP_CRATE_NAMES := $(filter-out build/. target/., $(APP_CRATE_NAMES))
 # exclude hidden directories starting with a "."
-APP_CRATES := $(filter-out .*/, $(APP_CRATES))
+APP_CRATE_NAMES := $(filter-out .*/, $(APP_CRATE_NAMES))
 # remove the trailing /. on each name
-APP_CRATES := $(patsubst %/., %, $(APP_CRATES))
+APP_CRATE_NAMES := $(patsubst %/., %, $(APP_CRATE_NAMES))
 
 
 ### PHONY is the list of targets that *always* get rebuilt regardless of dependent files' modification timestamps.
@@ -178,7 +178,7 @@ build: $(nano_core_binary)
 ## In the above loop, we gave all object files the kernel prefix, so we need to rename the application object files with the proper app prefix.
 ## Currently, we remove the hash suffix from application object file names so they're easier to find, but we could change that later 
 ## if we ever want to give applications specific versioning semantics (based on those hashes, like with kernel crates)
-	@for app in $(APP_CRATES) ; do  \
+	@for app in $(APP_CRATE_NAMES) ; do  \
 		mv  $(OBJECT_FILES_BUILD_DIR)/$(KERNEL_PREFIX)$${app}-*.o  $(OBJECT_FILES_BUILD_DIR)/$(APP_PREFIX)$${app}.o ; \
 		$(CROSS)strip --strip-debug  $(OBJECT_FILES_BUILD_DIR)/$(APP_PREFIX)$${app}.o ; \
 	done
@@ -198,7 +198,7 @@ cargo: check_rustc check_xargo
 ## But it doesn't really seem to work (it's not the cause of xargo rebuilding everything).
 ## For the "xargo rustc" command below, all of the arguments to cargo/xargo come before the "--",
 ## whereas all of the arguments to rustc come after the "--".
-# 	for kd in $(KERNEL_CRATES) ; do  \
+# 	for kd in $(KERNEL_CRATE_NAMES) ; do  \
 # 		cd $${kd} ; \
 # 		echo -e "\n========= BUILDING KERNEL CRATE $${kd} ==========\n" ; \
 # 		RUST_TARGET_PATH="$(CFG_DIR)" RUSTFLAGS="$(RUSTFLAGS)" \
@@ -208,7 +208,7 @@ cargo: check_rustc check_xargo
 # 			--target $(TARGET) ; \
 # 		cd .. ; \
 # 	done
-# for app in $(APP_CRATES) ; do  \
+# for app in $(APP_CRATE_NAMES) ; do  \
 # 	cd $${app} ; \
 # 	RUST_TARGET_PATH="$(CFG_DIR)" RUSTFLAGS="$(RUSTFLAGS)" \
 # 		xargo rustc \
@@ -355,19 +355,19 @@ DOC_ROOT := $(ROOT_DIR)/build/doc/___Theseus_Crates___/index.html
 
 ## Builds Theseus's documentation.
 ## The entire project is built as normal using the "cargo doc" command.
+docs: doc
 doc: check_rustc
-	@cargo doc --no-deps
-	@rustdoc --output target/doc --crate-name "___Theseus_Crates___" ./documentation/src/_top.rs
+	@cargo doc --all --no-deps $(addprefix --exclude , $(APP_CRATE_NAMES))
+	@rustdoc --output target/doc --crate-name "___Theseus_Crates___" $(ROOT_DIR)/kernel/_doc_root.rs
 	@mkdir -p build
 	@rm -rf build/doc
 	@cp -rf target/doc ./build/
-	@echo -e "\n\nDocumentation is now available in the build/doc directory."
-
-docs: doc
+	@echo -e "\nDocumentation is now available at: \"$(DOC_ROOT)\"."
 
 
 ## Opens the documentation root in the system's default browser. 
 ## the "powershell" command is used on Windows Subsystem for Linux
+view-docs: view-doc
 view-doc: doc
 	@echo -e "Opening documentation index file in your browser..."
 ifneq ($(IS_WSL), )
@@ -378,7 +378,23 @@ else
 	@xdg-open $(DOC_ROOT) > /dev/null 2>&1 || open $(DOC_ROOT) &
 endif
 
-view-docs: view-doc
+
+## The top-level book file.
+BOOK_ROOT := $(ROOT_DIR)/book/book/index.html
+
+## Builds the Theseus book in the `book` directory.
+book: $(wildcard book/src/*)
+ifneq ($(shell mdbook --version > /dev/null 2>&1 && echo $$?), 0)
+	@echo -e "\nError: please install mdbook:"
+	@echo -e "  cargo install mdbook"
+	@exit 1
+endif
+	@cd book && mdbook build
+	@echo -e "\nThe Theseus Book is now available at \"$(BOOK_ROOT)\"."
+
+
+## Opens the top-level file of the Theseus book.
+view-book: book
 
 
 ## Removes all build files
@@ -392,10 +408,10 @@ clean:
 help: 
 	@echo -e "\nThe following make targets are available:"
 	@echo -e "   iso:"
-	@echo -e "\t The most basic target. Builds the full Theseus OS and creates a bootable ISO image."
+	@echo -e "\t The default and most basic target. Builds the full Theseus OS and creates a bootable ISO image."
 
 	@echo -e "   run:"
-	@echo -e "\t The most common target. Builds Theseus (like the 'iso' target) and runs it using QEMU."
+	@echo -e "\t Builds Theseus (like the 'iso' target) and runs it using QEMU."
 
 	@echo -e "   loadable:"
 	@echo -e "\t Same as 'run', but enables the 'loadable' configuration so that all crates are dynamically loaded."
@@ -434,24 +450,27 @@ help:
 	@echo -e "\t then checkout version 2 (or otherwise make some changes) and run 'make build_server'."
 	@echo -e "\t Then, a running instance of Theseus version 1 can contact this machine's build_server to update itself to version 2."
 	
-
-
-	@echo -e "   doc:"
-	@echo -e "\t Builds Theseus documentation from its Rust source code (rustdoc)."
-	@echo -e "   view-doc:"
-	@echo -e "\t Builds Theseus documentation and then opens it in your default browser."
-	
 	@echo -e "\nThe following key-value options are available for QEMU targets, like 'run' and 'debug':"
 	@echo -e "   net=user:"
 	@echo -e "\t Enable networking with an e1000 NIC in the guest and a userspace SLIRP-based interface in the host (QEMU default)."
 	@echo -e "   net=tap:"
 	@echo -e "\t Enable networking with an e1000 NIC in the guest and a TAP interface in the host."
-	@echo -e "   kvm=yes:"
-	@echo -e "\t Enable KVM acceleration (the host computer must support it)."
+# @echo -e "   kvm=yes:"
+# @echo -e "\t Enable KVM acceleration (the host computer must support it)."
 	@echo -e "   host=yes:"
 	@echo -e "\t Use the host CPU model, which is required for using certain x86 hardware, e.g., PMU, AVX. This also enables KVM."
 	@echo -e "   int=yes:"
 	@echo -e "\t Enable interrupt logging in QEMU console (-d int)."
+
+	@echo -e "\nThe following make targets exist for building documentation:"
+	@echo -e "   doc:"
+	@echo -e "\t Builds Theseus documentation from its Rust source code (rustdoc)."
+	@echo -e "   view-doc:"
+	@echo -e "\t Builds Theseus documentation and then opens it in your default browser."
+	@echo -e "   book:"
+	@echo -e "\t Builds the Theseus book using the mdbook Markdown tool."
+	@echo -e "   view-book:"
+	@echo -e "\t Builds the Theseus book and then opens it in your default browser."
 	@echo ""
 
 
