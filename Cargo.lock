@@ -1971,6 +1971,10 @@ version = "0.2.5"
 source = "registry+https://github.com/rust-lang/crates.io-index"
 
 [[package]]
+name = "wget"
+version = "0.1.0"
+
+[[package]]
 name = "window_manager"
 version = "0.1.0"
 dependencies = [
