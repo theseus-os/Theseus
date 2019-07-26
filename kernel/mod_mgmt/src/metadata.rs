@@ -235,15 +235,15 @@ impl LoadedCrate {
         // We initially map the as writable because we'll have to copy things into them
         let (new_text_pages, new_rodata_pages, new_data_pages) = {
             let new_text_pages = match self.text_pages {
-                Some(ref tp) => Some(tp.lock().deep_copy(Some(TEXT_SECTION_FLAGS() | EntryFlags::WRITABLE), page_table, allocator)?),
+                Some(ref tp) => Some(tp.lock().deep_copy(Some(TEXT_SECTION_FLAGS | EntryFlags::WRITABLE), page_table, allocator)?),
                 None => None,
             };
             let new_rodata_pages = match self.rodata_pages {
-                Some(ref rp) => Some(rp.lock().deep_copy(Some(RODATA_SECTION_FLAGS() | EntryFlags::WRITABLE), page_table, allocator)?),
+                Some(ref rp) => Some(rp.lock().deep_copy(Some(RODATA_SECTION_FLAGS | EntryFlags::WRITABLE), page_table, allocator)?),
                 None => None,
             };
             let new_data_pages = match self.data_pages {
-                Some(ref dp) => Some(dp.lock().deep_copy(Some(DATA_BSS_SECTION_FLAGS()), page_table, allocator)?),
+                Some(ref dp) => Some(dp.lock().deep_copy(Some(DATA_BSS_SECTION_FLAGS), page_table, allocator)?),
                 None => None,
             };
             (new_text_pages, new_rodata_pages, new_data_pages)
@@ -385,10 +385,10 @@ impl LoadedCrate {
 
         // since we mapped all the new MappedPages as writable, we need to properly remap them.
         if let Some(ref mut tp) = new_text_pages_locked { 
-            tp.remap(page_table, TEXT_SECTION_FLAGS())?;
+            tp.remap(page_table, TEXT_SECTION_FLAGS)?;
         }
         if let Some(ref mut rp) = new_rodata_pages_locked { 
-            rp.remap(page_table, RODATA_SECTION_FLAGS())?;
+            rp.remap(page_table, RODATA_SECTION_FLAGS)?;
         }
         // data/bss sections are already mapped properly, since they're supposed to be writable
 
