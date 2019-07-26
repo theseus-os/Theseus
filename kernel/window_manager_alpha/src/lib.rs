@@ -3,7 +3,7 @@
 //! windows overlapped each other would obey the rules of alpha channel composition
 //!
 //! Applications request window objects from the window manager through:
-//! - new_window(x, y, width, height) provides a new window whose dimensions the caller must specify
+//! - new_window(`x`, `y`, `width`, `height`) provides a new window whose dimensions the caller must specify
 //!
 //! There are three types of window: `active`, `show_list` and `hide_list`
 //! - `active` window is the only one active, who gets all keyboard event
@@ -603,7 +603,9 @@ pub fn is_active(objref: &Arc<Mutex<WindowObjAlpha>>) -> bool {
     false
 }
 
-/// refresh the floating border display, will lock WINDOW_MANAGER
+/// refresh the floating border display, will lock WINDOW_MANAGER. This is useful to show the window size and position without much computation, 
+/// means only a thin border is updated and shown. The size and position of floating border is set inside active window by `moving_base`. Only moving 
+/// is supported now, which means the relative position of current mouse and `moving_base` is actually the new position of border
 pub fn do_refresh_floating_border() -> Result<(), &'static str> {
     let mut win = WINDOW_MANAGER.try().ok_or("The static window manager was not yet initialized")?.lock();
     let (new_x, new_y) = {
@@ -699,9 +701,9 @@ pub fn init(key_consumer: DFQueueConsumer<Event>, mouse_consumer: DFQueueConsume
 
 /// Window object that should be owned by application
 pub struct WindowObjAlpha {
-    /// absolute position of this window
+    /// absolute position of this window, the number of pixels to the left of the screen
     pub x: isize,
-    /// absolute position of this window
+    /// absolute position of this window, the number of pixels to the top of the screen
     pub y: isize,
     pub width: usize,
     pub height: usize,
@@ -840,7 +842,7 @@ pub fn get_cursor() -> Result<(usize, usize), &'static str> {
 }
 
 /// move mouse with delta, this will refresh mouse position
-pub fn move_cursor(x: isize, y: isize) -> Result<(), &'static str> {
+fn move_cursor(x: isize, y: isize) -> Result<(), &'static str> {
     let (ox, oy) = get_cursor()?;
     let mut nx = (ox as isize) + (x as isize);
     let mut ny = (oy as isize) + (y as isize);
@@ -854,7 +856,7 @@ pub fn move_cursor(x: isize, y: isize) -> Result<(), &'static str> {
 }
 
 /// move mouse to absolute position
-pub fn move_cursor_to(nx: usize, ny: usize) -> Result<(), &'static str> {
+fn move_cursor_to(nx: usize, ny: usize) -> Result<(), &'static str> {
     let (ox, oy) = get_cursor()?;
     let mut win = WINDOW_MANAGER.try().ok_or("The static window manager was not yet initialized")?.lock();
     win.mouse = Point { x: nx, y: ny };

@@ -66,7 +66,7 @@ pub fn main(_args: Vec<String>) -> isize {
 
     // add textarea to WindowComponents
     let textarea_mutex = match window_components::TextArea::new(
-        wincomps.get_bias_x() + 4, wincomps.get_bias_y() + 4, width_inner - 8, height_inner - 8,  // position and size of textarea
+        wincomps.get_border_size() + 4, wincomps.get_title_size() + 4, width_inner - 8, height_inner - 8,  // position and size of textarea
         &wincomps.winobj,  // bind this textarea to WindowComponents
         None, None, Some(wincomps.get_background()), None  // use default parameters
     ) {

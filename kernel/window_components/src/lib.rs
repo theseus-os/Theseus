@@ -66,9 +66,9 @@ pub struct WindowComponents {
     /// the window object that could be used to initialize components
     pub winobj: Arc<Mutex<WindowObjAlpha>>,
     /// the space remained for border, init as WINDOW_BORDER
-    bias_x: usize,
+    border_size: usize,
     /// the space remained for title bar, init as WINDOW_TITLE_BAR
-    bias_y: usize,
+    title_size: usize,
     /// the background of this window, init as WINDOW_BACKGROUND
     background: Pixel,
     /// application could get events from this consumer
@@ -98,8 +98,8 @@ impl WindowComponents {
 
         let mut wincomps: WindowComponents = WindowComponents {
             winobj: winobj_mutex,
-            bias_x: WINDOW_BORDER,
-            bias_y: WINDOW_TITLE_BAR,
+            border_size: WINDOW_BORDER,
+            title_size: WINDOW_TITLE_BAR,
             background: WINDOW_BACKGROUND,
             consumer: consumer,
             producer: producer,
@@ -144,18 +144,18 @@ impl WindowComponents {
         }
         let width = winobj.width;
         let height = winobj.height;
-        winobj.framebuffer.draw_rect(0, self.bias_x, self.bias_y, height, border_color);
-        winobj.framebuffer.draw_rect(0, width, height - self.bias_x, height, border_color);
-        winobj.framebuffer.draw_rect(width - self.bias_x, width, self.bias_y, height, border_color);
+        winobj.framebuffer.draw_rect(0, self.border_size, self.title_size, height, border_color);
+        winobj.framebuffer.draw_rect(0, width, height - self.border_size, height, border_color);
+        winobj.framebuffer.draw_rect(width - self.border_size, width, self.title_size, height, border_color);
         // then draw the title bar
         if active {
-            for i in 0..self.bias_y {
+            for i in 0..self.title_size {
                 winobj.framebuffer.draw_rect(0, width, i, i+1, frame_buffer_alpha::color_mix(
-                    WINDOW_BORDER_COLOR_ACTIVE_BOTTOM, WINDOW_BORDER_COLOR_ACTIVE_TOP, (i as f32) / (self.bias_y as f32)
+                    WINDOW_BORDER_COLOR_ACTIVE_BOTTOM, WINDOW_BORDER_COLOR_ACTIVE_TOP, (i as f32) / (self.title_size as f32)
                 ));
             }
         } else {
-            winobj.framebuffer.draw_rect(0, width, 0, self.bias_y, border_color);
+            winobj.framebuffer.draw_rect(0, width, 0, self.title_size, border_color);
         }
         // draw radius finally
         let r2 = WINDOW_RADIUS * WINDOW_RADIUS;
@@ -179,10 +179,10 @@ impl WindowComponents {
             let height = winobj.height;
             (width, height)
         };
-        window_manager_alpha::refresh_area_absolute(bx, bx+self.bias_x as isize, by+self.bias_y as isize, by+height as isize)?;
-        window_manager_alpha::refresh_area_absolute(bx, bx+width as isize, by+height as isize - self.bias_x as isize, by+height as isize)?;
-        window_manager_alpha::refresh_area_absolute(bx+width as isize - self.bias_x as isize, bx+width as isize, by+self.bias_y as isize, by+height as isize)?;
-        window_manager_alpha::refresh_area_absolute(bx, bx+width as isize, by, by+self.bias_y as isize)?;
+        window_manager_alpha::refresh_area_absolute(bx, bx+self.border_size as isize, by+self.title_size as isize, by+height as isize)?;
+        window_manager_alpha::refresh_area_absolute(bx, bx+width as isize, by+height as isize - self.border_size as isize, by+height as isize)?;
+        window_manager_alpha::refresh_area_absolute(bx+width as isize - self.border_size as isize, bx+width as isize, by+self.title_size as isize, by+height as isize)?;
+        window_manager_alpha::refresh_area_absolute(bx, bx+width as isize, by, by+self.title_size as isize)?;
         Ok(())
     }
 
@@ -190,7 +190,7 @@ impl WindowComponents {
     fn show_button(& self, idx: usize, state: usize, winobj: &mut WindowObjAlpha) {
         if idx > 2 { return; }
         if state > 2 { return; }
-        let y = self.bias_y / 2;
+        let y = self.title_size / 2;
         let x = WINDOW_BUTTON_BIAS_X + idx * WINDOW_BUTTON_BETWEEN;
         winobj.framebuffer.draw_circle_alpha(x, y, WINDOW_BUTTON_SIZE, color_mix(
             0x00000000.into(), match idx {
@@ -208,7 +208,7 @@ impl WindowComponents {
     /// refresh the top left three button's appearance
     fn refresh_three_button(& self, bx: usize, by: usize) -> Result<(), &'static str> {
         for i in 0..3 {
-            let y = by + self.bias_y / 2;
+            let y = by + self.title_size / 2;
             let x = bx + WINDOW_BUTTON_BIAS_X + i * WINDOW_BUTTON_BETWEEN;
             let r = WINDOW_RADIUS;
             window_manager_alpha::refresh_area_absolute((x-r) as isize, (x+r+1) as isize, (y-r) as isize, (y+r+1) as isize)?;
@@ -219,7 +219,7 @@ impl WindowComponents {
     /// return the available inner size, excluding title bar and border
     pub fn inner_size(& self) -> (usize, usize) {
         let winobj = self.winobj.lock();
-        (winobj.width - 2 * self.bias_x, winobj.height - self.bias_x - self.bias_y)
+        (winobj.width - 2 * self.border_size, winobj.height - self.border_size - self.title_size)
     }
 
     /// event handler that should be called periodically by applications. This will handle user events as well as produce 
@@ -271,12 +271,12 @@ impl WindowComponents {
                             call_later_do_move_active_window = true;
                         }
                     } else {
-                        if (mouse_event.y as usize) < self.bias_y && (mouse_event.x as usize) < winobj.width {  // the region of title bar
+                        if (mouse_event.y as usize) < self.title_size && (mouse_event.x as usize) < winobj.width {  // the region of title bar
                             let r2 = WINDOW_RADIUS * WINDOW_RADIUS;
                             let mut is_three_button = false;
                             for i in 0..3 {
                                 let dx = mouse_event.x - WINDOW_BUTTON_BIAS_X as isize - (i as isize) * WINDOW_BUTTON_BETWEEN as isize;
-                                let dy = mouse_event.y - self.bias_y as isize / 2;
+                                let dy = mouse_event.y - self.title_size as isize / 2;
                                 if dx*dx + dy*dy <= r2 as isize {
                                     is_three_button = true;
                                     if mouse_event.left_button_hold {
@@ -343,11 +343,13 @@ impl WindowComponents {
         Ok(())
     }
 
-    /// get space remained for border, in number of pixel
-    pub fn get_bias_x(&self) -> usize { self.bias_x }
+    /// get space remained for border, in number of pixel. There is border on the left, right and bottom. 
+    /// When user add their components, should margin its area to avoid overlapping these borders.
+    pub fn get_border_size(&self) -> usize { self.border_size }
 
-    /// get space remained for title bar, in number of pixel
-    pub fn get_bias_y(&self) -> usize { self.bias_y }
+    /// get space remained for title bar, in number of pixel. The title bar is on the top of the window, so when user 
+    /// add their components, should margin its area to avoid overlapping the title bar.
+    pub fn get_title_size(&self) -> usize { self.title_size }
 
     /// get background color
     pub fn get_background(&self) -> Pixel { self.background }
@@ -361,7 +363,9 @@ impl Drop for WindowComponents {
     }
 }
 
-/// a textarea with fixed size, showing matrix of chars
+/// a textarea with fixed size, showing matrix of chars.
+///
+/// The chars are allowed to be modified and update, however, one cannot change the matrix size during run-time.
 pub struct TextArea {
     x: usize,
     y: usize,
@@ -434,12 +438,12 @@ impl TextArea {
         Ok(Arc::new(Mutex::new(textarea)))
     }
 
-    /// compute the index of char, does not check bound
+    /// compute the index of char, does not check bound. one can use this to compute index as argument for `set_char_absolute`.
     pub fn index(& self, x: usize, y: usize) -> usize {  // does not check bound
         return x + y * self.x_cnt;
     }
 
-    /// set char at given index, for example, if you want to modify the char at (i, j), the `idx` should be self.index(i, j)
+    /// set char at given index, for example, if you want to modify the char at (i, j), the `idx` should be `self.index(i, j)`
     pub fn set_char_absolute(&mut self, idx: usize, c: u8) -> Result<(), &'static str> {
         if idx >= self.x_cnt * self.y_cnt { return Err("x out of range"); }
         self.set_char(idx % self.x_cnt, idx / self.x_cnt, c)
