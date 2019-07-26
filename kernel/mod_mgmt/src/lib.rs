@@ -1375,7 +1375,7 @@ impl CrateNamespace {
     /// * `verbose_log`: whether to log detailed messages for debugging.
     fn load_crate_sections<'f>(
         &self,
-        crate_file: &'f File,
+        crate_file: &'f dyn File,
         kernel_mmi_ref: &MmiRef,
         _verbose_log: bool
     ) -> Result<(StrongCrateRef, ElfFile<'f>), &'static str> {
@@ -1845,7 +1845,8 @@ impl CrateNamespace {
                             rela_entry.get_offset(), rela_entry.get_addend(), rela_entry.get_symbol_table_index(), rela_entry.get_type());
                     }
 
-                    let source_sec_entry: &xmas_elf::symbol_table::Entry = &symtab[rela_entry.get_symbol_table_index() as usize];
+                    use xmas_elf::symbol_table::Entry;
+                    let source_sec_entry = &symtab[rela_entry.get_symbol_table_index() as usize];
                     let source_sec_shndx = source_sec_entry.shndx() as usize; 
                     if verbose_log { 
                         let source_sec_header_name = source_sec_entry.get_section_header(&elf_file, rela_entry.get_symbol_table_index() as usize)

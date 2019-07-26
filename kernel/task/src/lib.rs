@@ -72,7 +72,7 @@ use fs_node::DirRef;
 
 
 /// The signature of the callback function that can hook into receiving a panic. 
-pub type PanicHandler = Box<Fn(&PanicInfoOwned) + Send>;
+pub type PanicHandler = Box<dyn Fn(&PanicInfoOwned) + Send>;
 
 /// Just like `core::panic::PanicInfo`, but with owned String types instead of &str references.
 #[derive(Debug, Clone)]
@@ -151,7 +151,7 @@ pub enum ExitValue {
     /// The Task ran to completion and returned the enclosed `Any` value.
     /// The caller of this type should know what type this Task returned,
     /// and should therefore be able to downcast it appropriately.
-    Completed(Box<Any + Send>),
+    Completed(Box<dyn Any + Send>),
     /// The Task did NOT run to completion, and was instead killed.
     /// The reason for it being killed is enclosed. 
     Killed(KillReason),
@@ -217,7 +217,7 @@ pub struct Task {
     /// the virtual address of (a pointer to) the `TaskLocalData` struct, which refers back to this `Task` struct.
     task_local_data_ptr: VirtualAddress,
     /// Data that should be dropped after a task switch; for example, the previous Task's TaskLocalData.
-    drop_after_task_switch: Option<Box<Any + Send>>,
+    drop_after_task_switch: Option<Box<dyn Any + Send>>,
     /// memory management details: page tables, mappings, allocators, etc.
     /// Wrapped in an Arc & Mutex because it's shared between all other tasks in the same address space
     pub mmi: Option<Arc<MutexIrqSafe<MemoryManagementInfo>>>, 
@@ -493,7 +493,7 @@ impl Task {
         // We store the removed TaskLocalData in the next Task struct so that we can access it after the context switch.
         if self.has_exited() {
             // trace!("task_switch(): preparing to drop TaskLocalData for running task {}", self);
-            next.drop_after_task_switch = self.take_task_local_data().map(|tld_box| tld_box as Box<Any + Send>);
+            next.drop_after_task_switch = self.take_task_local_data().map(|tld_box| tld_box as Box<dyn Any + Send>);
         }
 
         // release this core's task switch lock
@@ -725,7 +725,7 @@ impl TaskRef {
     /// # Note 
     /// The `Task` will not be halted immediately -- 
     /// it will finish running its current timeslice, and then never be run again.
-    pub fn exit(&self, exit_value: Box<Any + Send>) -> Result<(), &'static str> {
+    pub fn exit(&self, exit_value: Box<dyn Any + Send>) -> Result<(), &'static str> {
         self.internal_exit(ExitValue::Completed(exit_value))
     }
 

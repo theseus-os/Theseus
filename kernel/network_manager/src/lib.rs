@@ -57,7 +57,7 @@ pub trait NetworkInterface {
 
 /// A trait object wrapped in an Arc and Mutex that allows 
 /// arbitrary network interfaces to be shared in a thread-safe manner.
-pub type NetworkInterfaceRef = Arc<Mutex<NetworkInterface + Send>>;
+pub type NetworkInterfaceRef = Arc<Mutex<dyn NetworkInterface + Send>>;
 
 /// Add a Nic to the global list of network interfaces.
 /// The Nic must implement the NetworkInterface trait.
