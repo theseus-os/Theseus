@@ -49,7 +49,7 @@ impl MemFile {
             mp: mapped_pages, 
             parent: Arc::downgrade(parent), 
         };
-        let file_ref = Arc::new(Mutex::new(memfile)) as Arc<Mutex<File + Send>>;
+        let file_ref = Arc::new(Mutex::new(memfile)) as FileRef;
         parent.lock().insert(FileOrDir::File(file_ref.clone()))?; // adds the newly created file to the tree
         Ok(file_ref)
     }
