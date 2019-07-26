@@ -1,0 +1,27 @@
+[package]
+name = "terminal_map"
+version = "0.1.0"
+authors = ["Zhiyao Ma <zm16@pku.edu.cn>"]
+description = "Offers applications the ability to read from or print to the terminal."
+build = "../../build.rs"
+
+
+[dependencies]
+spin = "0.4.10"
+
+[dependencies.task]
+path = "../../kernel/task"
+
+[dependencies.log]
+default-features = false
+version = "0.3.7"
+
+[dependencies.libterm]
+path = "../../kernel/libterm"
+
+[dependencies.lazy_static]
+features = ["spin_no_std", "nightly"]
+version = "1.2.0"
+
+[lib]
+crate-type = ["rlib"]

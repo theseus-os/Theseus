@@ -39,6 +39,11 @@ pub fn init() -> Result<DFQueueProducer<Event>, &'static str> {
     let keyboard_event_handling_consumer = keyboard_event_handling_queue.into_consumer();
     let returned_keyboard_producer = keyboard_event_handling_consumer.obtain_producer();
 
+    ApplicationTaskBuilder::new(Path::new(String::from("terminal_map")))
+        .name("map_programs_to_corresponding_term".to_string())
+        .singleton()
+        .spawn()?;
+
     // Spawns the terminal print crate so that we can print to the terminal
     ApplicationTaskBuilder::new(Path::new(String::from("terminal_print")))
         .name("terminal_print_singleton".to_string())

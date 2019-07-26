@@ -608,8 +608,15 @@ impl Terminal {
         self.window.get_key_event()
     }
 
-    pub fn close_window(self) -> Result<(), &'static str> {
-        window_manager::delete(self.window)?;
-        Ok(())
+    pub fn get_width_height(&self) -> (usize, usize) {
+        self.get_displayable_dimensions(&self.display_name)
+    }
+}
+
+impl Drop for Terminal {
+    fn drop(&mut self) {
+        window_manager::delete(&self.window).unwrap_or_else(|e| {
+            error!("failed to delete window on terminal dropping, {}", e);
+        });
     }
 }

@@ -74,6 +74,9 @@ path = "../application_io"
 [dependencies.scheduler]
 path = "../../kernel/scheduler"
 
+[dependencies.terminal_map]
+path = "../terminal_map"
+
 [lib]
 crate-type = ["rlib"]
 

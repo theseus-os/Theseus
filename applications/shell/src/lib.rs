@@ -29,6 +29,7 @@ extern crate print;
 extern crate environment;
 extern crate libterm;
 extern crate application_io;
+extern crate terminal_map;
 
 #[macro_use] extern crate alloc;
 #[macro_use] extern crate log;
@@ -77,16 +78,10 @@ struct Job {
 #[no_mangle]
 pub fn main(_args: Vec<String>) -> isize {
 
-    let terminal =  match Terminal::new() {
-        Ok(_terminal) => { _terminal }
-        Err(err) => {
-            error!("{}", err);
-            error!("could not create terminal instance");
-            return -1;
-        }
-    };
+    // No actuall use. Just to placate the compiler.
+    let _dummy = 0;
 
-    let _task_ref = match KernelTaskBuilder::new(shell_loop, terminal)
+    let _task_ref = match KernelTaskBuilder::new(shell_loop, _dummy)
         .name("shell_loop".to_string())
         .spawn() {
         Ok(task_ref) => { task_ref }
@@ -148,12 +143,12 @@ struct Shell {
     /// The terminal's current environment
     env: Arc<Mutex<Environment>>,
     /// the terminal that is bind with the shell instance
-    terminal: Terminal
+    terminal: Arc<Mutex<Terminal>>
 }
 
 impl Shell {
     /// Create a new shell. Must provide a terminal to bind with the new shell in the argument.
-    fn new(terminal: Terminal) -> Shell {
+    fn new() -> Result<Shell, &'static str> {
         // initialize another dfqueue for the terminal object to handle printing from applications
         let terminal_print_dfq: DFQueue<Event>  = DFQueue::new();
         let print_consumer = terminal_print_dfq.into_consumer();
@@ -166,7 +161,10 @@ impl Shell {
             working_dir: Arc::clone(root::get_root()), 
         };
 
-        Shell {
+        let terminal = terminal_map::get_terminal_or_default()?;
+        terminal.lock().initialize_screen()?;
+
+        Ok(Shell {
             jobs: BTreeMap::new(),
             fg_job_num: 0,
             cmdline: String::new(),
@@ -179,7 +177,7 @@ impl Shell {
             print_producer,
             env: Arc::new(Mutex::new(env)),
             terminal
-        }
+        })
     }
 
     /// Insert a character to the command line buffer in the shell.
@@ -190,7 +188,7 @@ impl Shell {
         let insert_idx = self.cmdline.len() - self.left_shift;
         self.cmdline.insert(insert_idx, c);
         if sync_terminal {
-            self.terminal.insert_char_to_screen(c, self.left_shift)?;
+            self.terminal.lock().insert_char_to_screen(c, self.left_shift)?;
         }
         Ok(())
     }
@@ -207,7 +205,7 @@ impl Shell {
         let erase_idx = self.cmdline.len() - left_shift;
         self.cmdline.remove(erase_idx);
         if sync_terminal {
-            self.terminal.remove_char_from_screen(left_shift)?;
+            self.terminal.lock().remove_char_from_screen(left_shift)?;
         }
         Ok(())
     }
@@ -217,7 +215,7 @@ impl Shell {
     fn clear_cmdline(&mut self, sync_terminal: bool) -> Result<(), &'static str> {
         if sync_terminal {
             for _i in 0..self.cmdline.len() {
-                self.terminal.remove_char_from_screen(1)?;
+                self.terminal.lock().remove_char_from_screen(1)?;
             }
         }
         self.cmdline.clear();
@@ -234,7 +232,7 @@ impl Shell {
         self.cmdline = s.clone();
         self.left_shift = 0;
         if sync_terminal {
-            self.terminal.print_to_terminal(s);
+            self.terminal.lock().print_to_terminal(s);
         }
         Ok(())
     }
@@ -244,7 +242,7 @@ impl Shell {
     fn insert_char_to_input_buff(&mut self, c: char, sync_terminal: bool) -> Result<(), &'static str> {
         self.input_buffer.push(c);
         if sync_terminal {
-            self.terminal.insert_char_to_screen(c, 0)?;
+            self.terminal.lock().insert_char_to_screen(c, 0)?;
         }
         Ok(())
     }
@@ -254,7 +252,7 @@ impl Shell {
     fn remove_char_from_input_buff(&mut self, sync_terminal: bool) -> Result<(), &'static str> {
         let popped = self.input_buffer.pop();
         if popped.is_some() && sync_terminal {
-            self.terminal.remove_char_from_screen(1)?;
+            self.terminal.lock().remove_char_from_screen(1)?;
         }
         Ok(())
     }
@@ -342,7 +340,7 @@ impl Shell {
                 None => {
                     self.clear_cmdline(true)?;
                     self.input_buffer.clear();
-                    self.terminal.print_to_terminal("^C\n".to_string());
+                    self.terminal.lock().print_to_terminal("^C\n".to_string());
                     self.redisplay_prompt();
                     return Ok(());
                 }
@@ -456,13 +454,13 @@ impl Shell {
             let cmdline = self.cmdline.clone();
             if cmdline.len() == 0 && self.fg_job_num == 0 {
                 // reprints the prompt on the next line if the user presses enter and hasn't typed anything into the prompt
-                self.terminal.print_to_terminal("\n".to_string());
+                self.terminal.lock().print_to_terminal("\n".to_string());
                 self.redisplay_prompt();
                 return Ok(());
             } else if self.fg_job_num != 0 { // send buffered characters to the running application
                 match self.jobs.get(&self.fg_job_num) {
                     Some(job) => {
-                        self.terminal.print_to_terminal("\n".to_string());
+                        self.terminal.lock().print_to_terminal("\n".to_string());
                         let mut buffered_string = String::new();
                         mem::swap(&mut buffered_string, &mut self.input_buffer);
                         buffered_string.push('\n');
@@ -474,7 +472,7 @@ impl Shell {
                 }
                 return Ok(());
             } else { // start a new job
-                self.terminal.print_to_terminal("\n".to_string());
+                self.terminal.lock().print_to_terminal("\n".to_string());
                 self.command_history.push(cmdline.clone());
                 self.command_history.dedup(); // Removes any duplicates
                 self.history_index = 0;
@@ -482,14 +480,14 @@ impl Shell {
                 if self.is_internal_command() { // shell executes internal commands
                     self.execute_internal()?;
                     self.clear_cmdline(false)?;
-                    self.terminal.refresh_display(0);
+                    self.terminal.lock().refresh_display(0);
                 } else { // shell invokes user programs
                     self.fg_job_num = self.build_new_job();
 
                     // If the new job is to run in the background, then we should not put it to foreground.
                     if let Some(last) = self.cmdline.split_whitespace().last() {
                         if last == "&" {
-                            self.terminal.print_to_terminal(
+                            self.terminal.lock().print_to_terminal(
                                 format!("[{}] [running] {}\n", self.fg_job_num, self.cmdline)
                                 .to_string()
                             );
@@ -507,29 +505,29 @@ impl Shell {
 
         // home, end, page up, page down, up arrow, down arrow for the input_event_manager
         if keyevent.keycode == Keycode::Home && keyevent.modifiers.control {
-            self.terminal.move_screen_to_begin();
+            self.terminal.lock().move_screen_to_begin();
             return Ok(());
         }
         if keyevent.keycode == Keycode::End && keyevent.modifiers.control{
-            self.terminal.move_screen_to_end();
+            self.terminal.lock().move_screen_to_end();
             return Ok(());
         }
         if keyevent.modifiers.control && keyevent.modifiers.shift && keyevent.keycode == Keycode::Up  {
-            self.terminal.move_screen_line_up();
+            self.terminal.lock().move_screen_line_up();
             return Ok(());
         }
         if keyevent.modifiers.control && keyevent.modifiers.shift && keyevent.keycode == Keycode::Down  {
-            self.terminal.move_screen_line_down();
+            self.terminal.lock().move_screen_line_down();
             return Ok(());
         }
 
         if keyevent.keycode == Keycode::PageUp && keyevent.modifiers.shift {
-            self.terminal.move_screen_page_up();
+            self.terminal.lock().move_screen_page_up();
             return Ok(());
         }
 
         if keyevent.keycode == Keycode::PageDown && keyevent.modifiers.shift {
-            self.terminal.move_screen_page_down();
+            self.terminal.lock().move_screen_page_down();
             return Ok(());
         }
 
@@ -666,16 +664,21 @@ impl Shell {
                     cmd: self.cmdline.clone()
                 };
 
+                if let Err(msg) = terminal_map::set_terminal_same_as_myself(task_id) {
+                    self.terminal.lock().print_to_terminal(format!("{}\n", msg).to_string());
+                    return 0;
+                }
+
                 // Create stdio relationship between the shell and new user program.
                 if let Err(msg) = application_io::create_app_shell_relation(task_id,
                                                                             app_output_producer,
                                                                             app_kbd_event_consumer,
                                                                             app_input_consumer) {
-                    self.terminal.print_to_terminal(format!("{}\n", msg).to_string());
+                    self.terminal.lock().print_to_terminal(format!("{}\n", msg).to_string());
                     return 0;
                 }
                 if let Err(msg) = terminal_print::add_child(task_id, self.print_producer.obtain_producer()) { // adds the terminal's print producer to the terminal print crate
-                    self.terminal.print_to_terminal(format!("{}\n", msg).to_string());
+                    self.terminal.lock().print_to_terminal(format!("{}\n", msg).to_string());
                     return 0;
                 }
 
@@ -697,9 +700,9 @@ impl Shell {
                     AppErr::NamespaceErr      => format!("Failed to find directory of application executables.\n"),
                     AppErr::SpawnErr(e)       => format!("Failed to spawn new task to run command. Error: {}.\n", e),
                 };
-                self.terminal.print_to_terminal(err_msg);
+                self.terminal.lock().print_to_terminal(err_msg);
                 if let Err(msg) = self.clear_cmdline(false) {
-                    self.terminal.print_to_terminal(format!("{}\n", msg).to_string());
+                    self.terminal.lock().print_to_terminal(format!("{}\n", msg).to_string());
                 }
                 self.redisplay_prompt();
                 0
@@ -750,16 +753,16 @@ impl Shell {
                     }
                 }
             } else { // several possible names, list them sequentially
-                self.terminal.print_to_terminal("\n".to_string());
+                self.terminal.lock().print_to_terminal("\n".to_string());
                 let mut is_first = true;
                 for name in possible_names {
                     if !is_first {
-                        self.terminal.print_to_terminal("    ".to_string());
+                        self.terminal.lock().print_to_terminal("    ".to_string());
                     }
-                    self.terminal.print_to_terminal(name);
+                    self.terminal.lock().print_to_terminal(name);
                     is_first = false;
                 }
-                self.terminal.print_to_terminal("\n".to_string());
+                self.terminal.lock().print_to_terminal("\n".to_string());
                 self.redisplay_prompt();
             }
         }
@@ -788,7 +791,7 @@ impl Shell {
                                 info!("terminal: task [{}] returned exit value: {:?}", task_ref_copy.lock().id, val);
                                 if let Some(val) = val {
                                     if *val < 0 {
-                                        self.terminal.print_to_terminal(
+                                        self.terminal.lock().print_to_terminal(
                                             format!("task [{}] returned error value {:?}\n", task_ref_copy.lock().id, val)
                                         );
                                     }
@@ -796,17 +799,20 @@ impl Shell {
                             },
 
                             ExitValue::Killed(KillReason::Requested) => {
-                                self.terminal.print_to_terminal("^C\n".to_string());
+                                self.terminal.lock().print_to_terminal("^C\n".to_string());
                             },
                             // If the user manually aborts the task
                             ExitValue::Killed(kill_reason) => {
                                 warn!("task [{}] was killed because {:?}", task_ref_copy.lock().id, kill_reason);
-                                self.terminal.print_to_terminal(
+                                self.terminal.lock().print_to_terminal(
                                     format!("task [{}] was killed because {:?}\n", task_ref_copy.lock().id, kill_reason)
                                 );
                             }
                         }
-                        
+
+                        // Remove the exited child from the terminal mapping structure.
+                        terminal_map::remove_terminal(task_ref_copy.lock().id);
+
                         // Remove the queue for stdio
                         application_io::remove_app_shell_relation(task_ref_copy.lock().id)?;
                         terminal_print::remove_child(task_ref_copy.lock().id)?;
@@ -817,7 +823,7 @@ impl Shell {
                             self.fg_job_num = 0;
                             need_prompt = true;
                         } else {
-                            self.terminal.print_to_terminal(
+                            self.terminal.lock().print_to_terminal(
                                 format!("[{}] [finished] {}\n", job_num, job.cmd)
                                 .to_string()
                             );
@@ -832,7 +838,7 @@ impl Shell {
                 }
             } else if !task_ref_copy.lock().is_runnable() && job.status != JobStatus::Stopped { // task has just stopped
                 job.status = JobStatus::Stopped;
-                self.terminal.print_to_terminal(
+                self.terminal.lock().print_to_terminal(
                     format!("[{}] [stopped] {}\n", job_num, job.cmd)
                     .to_string()
                 );
@@ -859,8 +865,8 @@ impl Shell {
         let curr_env = self.env.lock();
         let mut prompt = curr_env.working_dir.lock().get_absolute_path();
         prompt = format!("{}: ",prompt);
-        self.terminal.print_to_terminal(prompt);
-        self.terminal.print_to_terminal(self.cmdline.clone());
+        self.terminal.lock().print_to_terminal(prompt);
+        self.terminal.lock().print_to_terminal(self.cmdline.clone());
     }
 
     /// If there is any output event from running application, print it to the screen, otherwise it does nothing.
@@ -871,11 +877,11 @@ impl Shell {
         if let Some(print_event) = self.print_consumer.peek() {
             match print_event.deref() {
                 &Event::OutputEvent(ref s) => {
-                    self.terminal.print_to_terminal(s.text.clone());
+                    self.terminal.lock().print_to_terminal(s.text.clone());
 
                     // Sets this bool to true so that on the next iteration the TextDisplay will refresh AFTER the 
                     // task_handler() function has cleaned up, which does its own printing to the console
-                    self.terminal.refresh_display(0);
+                    self.terminal.lock().refresh_display(0);
                 },
                 _ => { },
             }
@@ -902,8 +908,8 @@ impl Shell {
                 return false;
             } else {
                 let s = String::from_utf8_lossy(&bytes);
-                self.terminal.print_to_terminal(s.to_string());
-                self.terminal.refresh_display(0);
+                self.terminal.lock().print_to_terminal(s.to_string());
+                self.terminal.lock().refresh_display(0);
                 return true;
             }
         }
@@ -925,9 +931,9 @@ impl Shell {
     /// This allows for clean appending to the scrollback buffer and prevents interleaving of text.
     fn start(mut self) -> Result<(), &'static str> {
         self.redisplay_prompt();
-        self.terminal.refresh_display(0);
+        self.terminal.lock().refresh_display(0);
         loop {
-            self.terminal.blink_cursor();
+            self.terminal.lock().blink_cursor();
 
             // If there is anything from running applications to be printed, it printed on the screen and then
             // return true, so that the loop continues, otherwise nothing happens and we keep on going with the
@@ -941,12 +947,12 @@ impl Shell {
                 self.redisplay_prompt();
             }
             if need_refresh {
-                self.terminal.refresh_display(0);
+                self.terminal.lock().refresh_display(0);
             }
             // Looks at the input queue from the window manager
             // If it has unhandled items, it handles them with the match
             // If it is empty, it proceeds directly to the next loop iteration
-            let event = match self.terminal.get_key_event() {
+            let event = match self.terminal.lock().get_key_event() {
                 Some(ev) => {
                     ev
                 },
@@ -954,15 +960,14 @@ impl Shell {
             };
 
             match event {
-                // Returns from the main loop so that the terminal object is dropped
+                // Returns from the main loop.
                 Event::ExitEvent => {
                     trace!("exited terminal");
-                    self.terminal.close_window()?;
                     return Ok(());
                 }
 
                 Event::ResizeEvent(ref _rev) => {
-                    self.terminal.refresh_display(self.left_shift); // application refreshes display after resize event is received
+                    self.terminal.lock().refresh_display(self.left_shift); // application refreshes display after resize event is received
                 }
 
                 // Handles ordinary keypresses
@@ -970,7 +975,7 @@ impl Shell {
                     self.handle_key_event(input_event.key_event)?;
                     if input_event.key_event.action == KeyAction::Pressed {
                         // only refreshes the display on keypresses to improve display performance 
-                        self.terminal.refresh_display(self.left_shift);
+                        self.terminal.lock().refresh_display(self.left_shift);
                     }
                 }
                 _ => { }
@@ -1015,7 +1020,7 @@ impl Shell {
     }
 
     fn execute_internal_clear(&mut self) -> Result<(), &'static str> {
-        self.terminal.clear();
+        self.terminal.lock().clear();
         self.clear_cmdline(false)?;
         self.redisplay_prompt();
         Ok(())
@@ -1028,7 +1033,7 @@ impl Shell {
         iter.next();
         let args: Vec<&str> = iter.collect();
         if args.len() != 1 {
-            self.terminal.print_to_terminal("Usage: bg %job_num\n".to_string());
+            self.terminal.lock().print_to_terminal("Usage: bg %job_num\n".to_string());
             return Ok(());
         }
         if let Some('%') = args[0].chars().nth(0) {
@@ -1043,11 +1048,11 @@ impl Shell {
                     self.redisplay_prompt();
                     return Ok(());
                 }
-                self.terminal.print_to_terminal(format!("No job number {} found!\n", job_num).to_string());
+                self.terminal.lock().print_to_terminal(format!("No job number {} found!\n", job_num).to_string());
                 return Ok(());
             }
         }
-        self.terminal.print_to_terminal("Usage: bg %job_num\n".to_string());
+        self.terminal.lock().print_to_terminal("Usage: bg %job_num\n".to_string());
         Ok(())
     }
 
@@ -1058,7 +1063,7 @@ impl Shell {
         iter.next();
         let args: Vec<&str> = iter.collect();
         if args.len() != 1 {
-            self.terminal.print_to_terminal("Usage: fg %job_num\n".to_string());
+            self.terminal.lock().print_to_terminal("Usage: fg %job_num\n".to_string());
             return Ok(());
         }
         if let Some('%') = args[0].chars().nth(0) {
@@ -1072,11 +1077,11 @@ impl Shell {
                     }
                     return Ok(());
                 }
-                self.terminal.print_to_terminal(format!("No job number {} found!\n", job_num).to_string());
+                self.terminal.lock().print_to_terminal(format!("No job number {} found!\n", job_num).to_string());
                 return Ok(());
             }
         }
-        self.terminal.print_to_terminal("Usage: fg %job_num\n".to_string());
+        self.terminal.lock().print_to_terminal("Usage: fg %job_num\n".to_string());
         Ok(())
     }
 
@@ -1087,10 +1092,10 @@ impl Shell {
                 JobStatus::Running => "running",
                 JobStatus::Stopped => "stopped"
             };
-            self.terminal.print_to_terminal(format!("[{}] [{}] {}\n", job_num, status, job_ref.cmd).to_string());
+            self.terminal.lock().print_to_terminal(format!("[{}] [{}] {}\n", job_num, status, job_ref.cmd).to_string());
         }
         if self.jobs.is_empty() {
-            self.terminal.print_to_terminal("No running or stopped jobs.\n".to_string());
+            self.terminal.lock().print_to_terminal("No running or stopped jobs.\n".to_string());
         }
         self.clear_cmdline(false)?;
         self.redisplay_prompt();
@@ -1100,9 +1105,8 @@ impl Shell {
 
 
 /// Start a new shell. Shell::start() is an infinite loop, so normally we do not return from this function.
-fn shell_loop(mut terminal: Terminal) -> Result<(), &'static str> {
+fn shell_loop(mut _dummy: i32) -> Result<(), &'static str> {
 
-    terminal.initialize_screen()?;
-    Shell::new(terminal).start()?;
+    Shell::new()?.start()?;
     Ok(())
 }
