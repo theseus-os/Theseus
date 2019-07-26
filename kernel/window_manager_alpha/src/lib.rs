@@ -282,52 +282,60 @@ impl WindowManagerAlpha {
                 let r = &self.border_position;
                 (r.x_start, r.x_end, r.y_start, r.y_end)
             };
-            let x_in = x as isize >= x_start - WINDOW_BORDER_SIZE as isize && x as isize <= x_end-1 + WINDOW_BORDER_SIZE as isize;
-            let y_in = y as isize >= y_start - WINDOW_BORDER_SIZE as isize && y as isize <= y_end-1 + WINDOW_BORDER_SIZE as isize;
-            let left = x_start as usize - x <= WINDOW_BORDER_SIZE && y_in;
-            let right = x - (x_end - 1) as usize <= WINDOW_BORDER_SIZE && y_in;
-            let top = y_start as usize - y <= WINDOW_BORDER_SIZE && x_in;
-            let bottom = y - (y_end - 1) as usize <= WINDOW_BORDER_SIZE && x_in;
+            let sx = x as isize;
+            let sy = y as isize;
+            let ux_start = x_start as usize;
+            let uy_start = y_start as usize;
+            let ux_end_1 = (x_end - 1) as usize;
+            let uy_end_1 = (y_end - 1) as usize;
+            let window_border_size = WINDOW_BORDER_SIZE as isize;
+            let x_in = sx >= x_start - window_border_size && sx <= x_end-1 + window_border_size;
+            let y_in = sy >= y_start - window_border_size && sy <= y_end-1 + window_border_size;
+            let left = ux_start - x <= WINDOW_BORDER_SIZE && y_in;
+            let right = x - ux_end_1 <= WINDOW_BORDER_SIZE && y_in;
+            let top = uy_start - y <= WINDOW_BORDER_SIZE && x_in;
+            let bottom = y - uy_end_1 <= WINDOW_BORDER_SIZE && x_in;
+            let f32_window_border_size = WINDOW_BORDER_SIZE as f32;
             if left {
                 if top {  // left-top
-                    let dx = x_start as usize - x; let dy = y_start as usize - y;
+                    let dx = ux_start - x; let dy = uy_start - y;
                     if dx+dy <= WINDOW_BORDER_SIZE {
                         self.final_fb.draw_point_alpha(x, y, color_mix(
-                            WINDOW_BORDER_COLOR_OUTTER, WINDOW_BORDER_COLOR_INNER, (dx+dy) as f32 / WINDOW_BORDER_SIZE as f32));
+                            WINDOW_BORDER_COLOR_OUTTER, WINDOW_BORDER_COLOR_INNER, (dx+dy) as f32 / f32_window_border_size));
                     }
                 } else if bottom {  // left-bottom
-                    let dx = x_start as usize - x; let dy = y - (y_end-1) as usize;
+                    let dx = ux_start - x; let dy = y - uy_end_1;
                     if dx+dy <= WINDOW_BORDER_SIZE {
                         self.final_fb.draw_point_alpha(x, y, color_mix(
-                            WINDOW_BORDER_COLOR_OUTTER, WINDOW_BORDER_COLOR_INNER, (dx+dy) as f32 / WINDOW_BORDER_SIZE as f32));
+                            WINDOW_BORDER_COLOR_OUTTER, WINDOW_BORDER_COLOR_INNER, (dx+dy) as f32 / f32_window_border_size));
                     }
                 } else {  // only left
                     self.final_fb.draw_point_alpha(x, y, color_mix(
-                        WINDOW_BORDER_COLOR_OUTTER, WINDOW_BORDER_COLOR_INNER, (x_start as usize - x) as f32 / WINDOW_BORDER_SIZE as f32));
+                        WINDOW_BORDER_COLOR_OUTTER, WINDOW_BORDER_COLOR_INNER, (ux_start - x) as f32 / f32_window_border_size));
                 }
             } else if right {
                 if top {  // right-top
-                    let dx = x - (x_end-1) as usize; let dy = y_start as usize - y;
+                    let dx = x - ux_end_1; let dy = uy_start - y;
                     if dx+dy <= WINDOW_BORDER_SIZE {
                         self.final_fb.draw_point_alpha(x, y, color_mix(
-                            WINDOW_BORDER_COLOR_OUTTER, WINDOW_BORDER_COLOR_INNER, (dx+dy) as f32 / WINDOW_BORDER_SIZE as f32));
+                            WINDOW_BORDER_COLOR_OUTTER, WINDOW_BORDER_COLOR_INNER, (dx+dy) as f32 / f32_window_border_size));
                     }
                 } else if bottom {  // right-bottom
-                    let dx = x - (x_end-1) as usize; let dy = y - (y_end-1) as usize;
+                    let dx = x - ux_end_1; let dy = y - uy_end_1;
                     if dx+dy <= WINDOW_BORDER_SIZE {
                         self.final_fb.draw_point_alpha(x, y, color_mix(
-                            WINDOW_BORDER_COLOR_OUTTER, WINDOW_BORDER_COLOR_INNER, (dx+dy) as f32 / WINDOW_BORDER_SIZE as f32));
+                            WINDOW_BORDER_COLOR_OUTTER, WINDOW_BORDER_COLOR_INNER, (dx+dy) as f32 / f32_window_border_size));
                     }
                 } else {  // only right
                     self.final_fb.draw_point_alpha(x, y, color_mix(
-                        WINDOW_BORDER_COLOR_OUTTER, WINDOW_BORDER_COLOR_INNER, (x - (x_end-1) as usize) as f32 / WINDOW_BORDER_SIZE as f32));
+                        WINDOW_BORDER_COLOR_OUTTER, WINDOW_BORDER_COLOR_INNER, (x - ux_end_1) as f32 / f32_window_border_size));
                 }
             } else if top {  // only top
                 self.final_fb.draw_point_alpha(x, y, color_mix(
-                    WINDOW_BORDER_COLOR_OUTTER, WINDOW_BORDER_COLOR_INNER, (y_start as usize - y) as f32 / WINDOW_BORDER_SIZE as f32));
+                    WINDOW_BORDER_COLOR_OUTTER, WINDOW_BORDER_COLOR_INNER, (uy_start - y) as f32 / f32_window_border_size));
             } else if bottom {  // only bottom
                 self.final_fb.draw_point_alpha(x, y, color_mix(
-                    WINDOW_BORDER_COLOR_OUTTER, WINDOW_BORDER_COLOR_INNER, (y - (y_end-1) as usize) as f32 / WINDOW_BORDER_SIZE as f32));
+                    WINDOW_BORDER_COLOR_OUTTER, WINDOW_BORDER_COLOR_INNER, (y - uy_end_1) as f32 / f32_window_border_size));
             }
         }
         // finally draw mouse
@@ -486,7 +494,8 @@ impl WindowManagerAlpha {
         Err("cannot find window to pass")
     }
 
-    /// refresh the floating border indicating user of new window position and size
+    /// refresh the floating border indicating user of new window position and size. `show` indicates whether to show the border or not. 
+    /// (x_start, x_end, y_start, y_end) indicates the position and size of this border.
     fn refresh_floating_border(& mut self, show: bool, x_start: isize, x_end: isize, y_start: isize, y_end: isize) -> Result<(), &'static str> {
         if !self.is_show_border && !show { return Ok(()) }
         // first clear old border

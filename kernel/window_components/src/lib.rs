@@ -177,12 +177,14 @@ impl WindowComponents {
             let winobj = self.winobj.lock();
             let width = winobj.width;
             let height = winobj.height;
-            (width, height)
+            (width as isize, height as isize)
         };
-        window_manager_alpha::refresh_area_absolute(bx, bx+self.border_size as isize, by+self.title_size as isize, by+height as isize)?;
-        window_manager_alpha::refresh_area_absolute(bx, bx+width as isize, by+height as isize - self.border_size as isize, by+height as isize)?;
-        window_manager_alpha::refresh_area_absolute(bx+width as isize - self.border_size as isize, bx+width as isize, by+self.title_size as isize, by+height as isize)?;
-        window_manager_alpha::refresh_area_absolute(bx, bx+width as isize, by, by+self.title_size as isize)?;
+        let border_size = self.border_size as isize;
+        let title_size = self.title_size as isize;
+        window_manager_alpha::refresh_area_absolute(bx, bx+border_size, by+title_size, by+height)?;
+        window_manager_alpha::refresh_area_absolute(bx, bx+width, by+height - border_size, by+height)?;
+        window_manager_alpha::refresh_area_absolute(bx+width - border_size, bx+width, by+title_size, by+height)?;
+        window_manager_alpha::refresh_area_absolute(bx, bx+width, by, by+title_size)?;
         Ok(())
     }
 
