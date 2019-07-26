@@ -6,7 +6,7 @@ version = "0.1.0"
 build = "../../build.rs"
 
 [dependencies]
-bitflags = "1.0.4"
+bitflags = "1.1.0"
 spin = "0.4.10"
 
 [dependencies.log]
