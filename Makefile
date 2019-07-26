@@ -35,8 +35,8 @@ GRUB_MKRESCUE = $(GRUB_CROSS)grub-mkrescue
 ### For ensuring that the host computer has the proper version of the Rust compiler
 ###################################################################################################
 
-RUSTC_CURRENT_SUPPORTED_VERSION := rustc 1.36.0-nightly (08bfe1612 2019-05-02)
-RUSTC_CURRENT_INSTALL_VERSION := nightly-2019-05-03
+RUSTC_CURRENT_SUPPORTED_VERSION := rustc 1.38.0-nightly (78ca1bda3 2019-07-08)
+RUSTC_CURRENT_INSTALL_VERSION := nightly-2019-07-09
 RUSTC_OUTPUT=$(shell rustc --version)
 
 check_rustc: 	

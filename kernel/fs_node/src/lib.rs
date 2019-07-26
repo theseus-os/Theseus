@@ -23,13 +23,13 @@ use memory::MappedPages;
 
 
 /// A reference to any type that implements the Directory trait.
-pub type DirRef =  Arc<Mutex<Directory + Send>>;
+pub type DirRef =  Arc<Mutex<dyn Directory + Send>>;
 /// A weak reference to any type that implements the Directory trait.
-pub type WeakDirRef = Weak<Mutex<Directory + Send>>;
+pub type WeakDirRef = Weak<Mutex<dyn Directory + Send>>;
 /// A reference to any type that implements the File trait.
-pub type FileRef = Arc<Mutex<File + Send>>;
+pub type FileRef = Arc<Mutex<dyn File + Send>>;
 /// A weak reference to any type that implements the File trait.
-pub type WeakFileRef = Weak<Mutex<File + Send>>;
+pub type WeakFileRef = Weak<Mutex<dyn File + Send>>;
 
 
 /// A trait that covers any filesystem node, both files and directories.
