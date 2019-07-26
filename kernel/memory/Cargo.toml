@@ -7,7 +7,7 @@ build = "../../build.rs"
 
 [dependencies]
 spin = "0.4.10"
-bitflags = "1.0.4"
+bitflags = "1.1.0"
 multiboot2 = "0.7.1"
 # x86_64 = { git = "https://github.com/kevinaboos/x86_64" }
 x86_64 = { path = "../../libs/x86_64" } # currently using our local copy, forked from Phil Opp's crate

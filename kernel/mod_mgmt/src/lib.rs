@@ -97,22 +97,9 @@ pub fn get_namespaces_directory() -> Option<DirRef> {
 }
 
 
-/// This should be a const, but Rust doesn't like OR-ing bitflags as a const expression.
-#[allow(non_snake_case)]
-pub fn TEXT_SECTION_FLAGS() -> EntryFlags {
-    EntryFlags::PRESENT
-}
-/// This should be a const, but Rust doesn't like OR-ing bitflags as a const expression.
-#[allow(non_snake_case)]
-pub fn RODATA_SECTION_FLAGS() -> EntryFlags {
-    EntryFlags::PRESENT | EntryFlags::NO_EXECUTE
-}
-/// This should be a const, but Rust doesn't like OR-ing bitflags as a const expression.
-#[allow(non_snake_case)]
-pub fn DATA_BSS_SECTION_FLAGS() -> EntryFlags {
-    EntryFlags::PRESENT | EntryFlags::NO_EXECUTE | EntryFlags::WRITABLE
-}
-
+const TEXT_SECTION_FLAGS:     EntryFlags = EntryFlags::PRESENT;
+const RODATA_SECTION_FLAGS:   EntryFlags = EntryFlags::from_bits_truncate(EntryFlags::PRESENT.bits() | EntryFlags::NO_EXECUTE.bits());
+const DATA_BSS_SECTION_FLAGS: EntryFlags = EntryFlags::from_bits_truncate(EntryFlags::PRESENT.bits() | EntryFlags::NO_EXECUTE.bits() | EntryFlags::WRITABLE.bits());
 
 
 /// Initializes the module management system based on the bootloader-provided modules, and
@@ -1943,10 +1930,10 @@ impl CrateNamespace {
         // Finally, remap each section's mapped pages to the proper permission bits, 
         // since we initially mapped them all as writable
         if let Some(ref tp) = new_crate.text_pages { 
-            tp.lock().remap(&mut kernel_mmi_ref.lock().page_table, TEXT_SECTION_FLAGS())?;
+            tp.lock().remap(&mut kernel_mmi_ref.lock().page_table, TEXT_SECTION_FLAGS)?;
         }
         if let Some(ref rp) = new_crate.rodata_pages {
-            rp.lock().remap(&mut kernel_mmi_ref.lock().page_table, RODATA_SECTION_FLAGS())?;
+            rp.lock().remap(&mut kernel_mmi_ref.lock().page_table, RODATA_SECTION_FLAGS)?;
         }
         // data/bss sections are already mapped properly, since they're supposed to be writable
 
@@ -2403,9 +2390,9 @@ fn allocate_section_pages(elf_file: &ElfFile, kernel_mmi_ref: &MmiRef)
 
         // we must allocate these pages separately because they will have different flags later
         (
-            if text_bytecount   > 0 { allocate_pages_closure(text_bytecount,   TEXT_SECTION_FLAGS()).ok()     } else { None }, 
-            if rodata_bytecount > 0 { allocate_pages_closure(rodata_bytecount, RODATA_SECTION_FLAGS()).ok()   } else { None }, 
-            if data_bytecount   > 0 { allocate_pages_closure(data_bytecount,   DATA_BSS_SECTION_FLAGS()).ok() } else { None }
+            if text_bytecount   > 0 { allocate_pages_closure(text_bytecount,   TEXT_SECTION_FLAGS).ok()     } else { None }, 
+            if rodata_bytecount > 0 { allocate_pages_closure(rodata_bytecount, RODATA_SECTION_FLAGS).ok()   } else { None }, 
+            if data_bytecount   > 0 { allocate_pages_closure(data_bytecount,   DATA_BSS_SECTION_FLAGS).ok() } else { None }
         )
     };
 
