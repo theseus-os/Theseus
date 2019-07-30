@@ -16,8 +16,8 @@ lazy_static! {
 }
 
 #[cfg(any(target_arch = "aarch64"))]
-// Initialize the exception vectors
-// In arm, the address of the vector is in VBAR_EL1. The vector is of 16 entries and their address is aligned with 0x80. Every entry represents the handler of a type of exception. Once an exception occurs, the system jumps to the address of the related entry and continue with the handler. Usually we do not put handlers in the entries directly, but put `bl handler` in the entry so that the system can jump to a custom handler.
+/// Initialize the exception vectors
+/// In arm, the address of the vector is in VBAR_EL1. The vector contains 16 entries and their addresses are aligned with 0x80. Every entry is the handler of a type of exception. Once an exception occurs, the system jumps to the address of the related entry and continues with the handler. Usually we do not put handlers in the entries directly, but put `bl handler` in the entry so that the system can jump to a custom handler.
 pub fn init() {
     let mut exceptions = VECTORS.lock();
 
