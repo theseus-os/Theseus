@@ -72,12 +72,16 @@ impl ExceptionEntry {
     }
 }
 
-fn _exception_default_handler() {
-    error!("Default Exceptions!");
-    print_registers();
-    loop {}
-}
+// fn _exception_default_handler() {
+//     error!("Default Exceptions!");
+//     print_registers();
+//     loop {}
+// }
 
+// The exception vection contains 16 entries. 
+// These entries represent four different types of exceptions at four different level. 
+// Here we define four exceptions for each exception type and print the corresponding registers. 
+// In the future, we will handle exceptions such as interrupts and print more information.
 fn exception_synchronous_handler() {
     error!("Synchronous Exceptions!");
     print_registers();
