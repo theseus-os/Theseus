@@ -66,7 +66,7 @@ impl ContextAVX {
 #[macro_export]
 macro_rules! save_registers_avx {
     () => (
-        #[cfg(any(target_arch = "x86", target_arch = "x86_64"))]
+        #[cfg(target_arch = "x86_64")]
         asm!("
             # save all of the ymm registers (for AVX)
             # each register is 32 bytes (256 bits), and there are 16 of them
@@ -99,7 +99,7 @@ macro_rules! save_registers_avx {
 #[macro_export]
 macro_rules! restore_registers_avx {
     () => (
-        #[cfg(any(target_arch = "x86", target_arch = "x86_64"))]
+        #[cfg(target_arch = "x86_64")]
         asm!("
             # restore all of the ymm registers
             vmovups ymm15, [rsp + 32*15]   # pop ymm15

@@ -11,7 +11,7 @@ extern crate irq_safety;
 extern crate spin;
 extern crate state_store;
 #[macro_use] extern crate log;
-#[cfg(any(target_arch = "x86", target_arch = "x86_64"))]
+#[cfg(target_arch = "x86_64")]
 extern crate x86_64;
 #[cfg(any(target_arch = "aarch64"))]
 extern crate aarch64;

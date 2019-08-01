@@ -22,7 +22,7 @@ extern crate alloc;
 extern crate rlibc; // basic memset/memcpy libc functions
 extern crate spin;
 extern crate multiboot2;
-#[cfg(any(target_arch = "x86", target_arch = "x86_64"))]
+#[cfg(target_arch = "x86_64")]
 extern crate x86_64;
 #[cfg(any(target_arch = "aarch64"))]
 extern crate aarch64;
@@ -33,7 +33,7 @@ extern crate logger;
 extern crate state_store;
 extern crate memory; // the virtual memory subsystem
 extern crate mod_mgmt;
-#[cfg(any(target_arch = "x86", target_arch = "x86_64"))]
+#[cfg(target_arch = "x86_64")]
 extern crate exceptions_early;
 extern crate captain;
 extern crate panic_unwind; // the panic/unwind lang items
@@ -49,7 +49,7 @@ pub fn nano_core_public_func(val: u8) {
 
 
 use core::ops::DerefMut;
-#[cfg(any(target_arch = "x86", target_arch = "x86_64"))]
+#[cfg(target_arch = "x86_64")]
 use x86_64::structures::idt::LockedIdt;
 #[cfg(any(target_arch = "aarch64"))]
 use aarch64::structures::idt::LockedIdt;
@@ -105,7 +105,7 @@ fn shutdown(msg: core::fmt::Arguments) -> ! {
 /// then change the [`captain::init`](../captain/fn.init.html) routine.
 /// 
 #[no_mangle]
-#[cfg(any(target_arch = "x86", target_arch = "x86_64"))]
+#[cfg(target_arch = "x86_64")]
 pub extern "C" fn nano_core_start(multiboot_information_virtual_address: usize) {
     println_raw!("Entered nano_core_start()."); 
 	
