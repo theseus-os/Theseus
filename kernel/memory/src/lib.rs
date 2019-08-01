@@ -1,7 +1,7 @@
 //! This crate implements the virtual memory subsystem for Theseus,
-//! which is fairly robust and provides a unification between
-//! arbitrarily mapped sections of memory and Rust's lifetime system.
-//! Originally based on Phil Opp's blog_os.
+//! which is fairly robust and provides a unification between 
+//! arbitrarily mapped sections of memory and Rust's lifetime system. 
+//! Originally based on Phil Opp's blog_os. 
 
 #![no_std]
 #![feature(asm)]
@@ -13,10 +13,8 @@
 extern crate alloc;
 extern crate multiboot2;
 extern crate spin;
-#[macro_use]
-extern crate lazy_static;
-#[macro_use]
-extern crate log;
+#[macro_use] extern crate lazy_static;
+#[macro_use] extern crate log;
 #[cfg(any(target_arch = "aarch64"))]
 extern crate aarch64;
 extern crate atomic_linked_list;
@@ -25,16 +23,14 @@ extern crate kernel_config;
 #[cfg(any(target_arch = "x86", target_arch = "x86_64"))]
 extern crate x86_64;
 extern crate xmas_elf;
-#[macro_use]
-extern crate bitflags;
+#[macro_use] extern crate bitflags;
 extern crate heap_irq_safe;
-#[macro_use]
-extern crate derive_more;
+#[macro_use] extern crate derive_more;
 extern crate bit_field;
 extern crate type_name;
 extern crate uefi;
 
-/// Just like Rust's `try!()` macro,
+/// Just like Rust's `try!()` macro, 
 /// but forgets the given `obj`s to prevent them from being dropped,
 /// as they would normally be upon return of an Error using `try!()`.
 /// This must come BEFORE the below modules in order for them to be able to use it.
@@ -56,7 +52,7 @@ mod stack_allocator;
 
 pub use self::area_frame_allocator::AreaFrameAllocator;
 pub use self::paging::*;
-pub use self::stack_allocator::{Stack, StackAllocator};
+pub use self::stack_allocator::{StackAllocator, Stack};
 
 //Hardware resources https://github.com/qemu/qemu/blob/master/hw/arm/virt.c
 #[cfg(any(target_arch = "aarch64"))]
@@ -68,53 +64,35 @@ use alloc::sync::Arc;
 use alloc::vec::Vec;
 use bit_field::BitField;
 use core::{
+    ops::{Deref, DerefMut, RangeInclusive},
     iter::Step,
     mem,
-    ops::{Deref, DerefMut, RangeInclusive},
-};
-use irq_safety::MutexIrqSafe;
-use kernel_config::memory::{
-    ENTRIES_PER_PAGE_TABLE, KERNEL_HEAP_INITIAL_SIZE, KERNEL_HEAP_START, KERNEL_OFFSET,
-    KERNEL_STACK_ALLOCATOR_BOTTOM, KERNEL_STACK_ALLOCATOR_TOP_ADDR, MAX_PAGE_NUMBER, PAGE_SIZE,
 };
 use multiboot2::BootInformation;
+use multiboot2::BootInformation;
 use spin::Once;
+use spin::Once;
+use irq_safety::MutexIrqSafe;
+use alloc::vec::Vec;
+use alloc::sync::Arc;
+use kernel_config::memory::{PAGE_SIZE, MAX_PAGE_NUMBER, KERNEL_OFFSET, KERNEL_HEAP_START, KERNEL_HEAP_INITIAL_SIZE, KERNEL_STACK_ALLOCATOR_BOTTOM, KERNEL_STACK_ALLOCATOR_TOP_ADDR, ENTRIES_PER_PAGE_TABLE};
+use bit_field::BitField;
 use uefi::prelude::*;
 use uefi::table::boot::{MemoryDescriptor, MemoryType};
 
 /// A virtual memory address, which is a `usize` under the hood.
 #[derive(
-    Clone,
-    Copy,
-    PartialEq,
-    Eq,
-    PartialOrd,
-    Ord,
-    Hash,
-    Default,
-    Debug,
-    Display,
-    Binary,
-    Octal,
-    LowerHex,
-    UpperHex,
-    BitAnd,
-    BitOr,
-    BitXor,
-    BitAndAssign,
-    BitOrAssign,
-    BitXorAssign,
-    Add,
-    Sub,
-    AddAssign,
-    SubAssign,
+    Clone, Copy, PartialEq, Eq, PartialOrd, Ord, Hash, Default,
+    Debug, Display, Binary, Octal, LowerHex, UpperHex,
+    BitAnd, BitOr, BitXor, BitAndAssign, BitOrAssign, BitXorAssign, 
+    Add, Sub, AddAssign, SubAssign
 )]
 #[repr(transparent)]
 pub struct VirtualAddress(usize);
 
 impl VirtualAddress {
-    /// Creates a new `VirtualAddress`,
-    /// checking that the address is canonical,
+    /// Creates a new `VirtualAddress`, 
+    /// checking that the address is canonical, 
     /// i.e., bits (64:48] are sign-extended from bit 47.
     #[cfg(any(target_arch = "x86", target_arch = "x86_64"))]
     pub fn new(virt_addr: usize) -> Result<VirtualAddress, &'static str> {
@@ -166,8 +144,8 @@ impl VirtualAddress {
     }
 
     /// Returns the offset that this VirtualAddress specifies into its containing memory Page.
-    ///
-    /// For example, if the PAGE_SIZE is 4KiB, then this will return
+    /// 
+    /// For example, if the PAGE_SIZE is 4KiB, then this will return 
     /// the least significant 12 bits (12:0] of this VirtualAddress.
     pub fn page_offset(&self) -> usize {
         self.0 & (PAGE_SIZE - 1)
@@ -217,46 +195,17 @@ impl From<VirtualAddress> for usize {
 
 /// A physical memory address, which is a `usize` under the hood.
 #[derive(
-    Clone,
-    Copy,
-    PartialEq,
-    Eq,
-    PartialOrd,
-    Ord,
-    Hash,
-    Default,
-    Debug,
-    Display,
-    Binary,
-    Octal,
-    LowerHex,
-    UpperHex,
-    BitAnd,
-    BitOr,
-    BitXor,
-    BitAndAssign,
-    BitOrAssign,
-    BitXorAssign,
-    Add,
-    Sub,
-    Mul,
-    Div,
-    Rem,
-    Shr,
-    Shl,
-    AddAssign,
-    SubAssign,
-    MulAssign,
-    DivAssign,
-    RemAssign,
-    ShrAssign,
-    ShlAssign,
+    Clone, Copy, PartialEq, Eq, PartialOrd, Ord, Hash, Default,
+    Debug, Display, Binary, Octal, LowerHex, UpperHex,
+    BitAnd, BitOr, BitXor, BitAndAssign, BitOrAssign, BitXorAssign, 
+    Add, Sub, Mul, Div, Rem, Shr, Shl, 
+    AddAssign, SubAssign, MulAssign, DivAssign, RemAssign, ShrAssign, ShlAssign,
 )]
 #[repr(transparent)]
 pub struct PhysicalAddress(usize);
 
 impl PhysicalAddress {
-    /// Creates a new `PhysicalAddress`,
+    /// Creates a new `PhysicalAddress`, 
     /// checking that the bits (64:52] are 0.
     pub fn new(phys_addr: usize) -> Result<PhysicalAddress, &'static str> {
         match phys_addr.get_bits(52..64) {
@@ -284,7 +233,7 @@ impl PhysicalAddress {
     }
 
     /// Returns the offset that this PhysicalAddress specifies into its containing memory Frame.
-    ///
+    /// 
     /// For example, if the PAGE_SIZE is 4KiB, then this will return
     /// the least significant 12 bits (12:0] of this PhysicalAddress.
     pub fn frame_offset(&self) -> usize {
@@ -327,6 +276,8 @@ impl From<PhysicalAddress> for usize {
     }
 }
 
+
+
 /// The memory management info and address space of the kernel
 static KERNEL_MMI: Once<Arc<MutexIrqSafe<MemoryManagementInfo>>> = Once::new();
 
@@ -336,25 +287,24 @@ pub fn get_kernel_mmi_ref() -> Option<Arc<MutexIrqSafe<MemoryManagementInfo>>> {
     KERNEL_MMI.try().cloned()
 }
 
-/// The one and only frame allocator, a singleton.
+
+/// The one and only frame allocator, a singleton. 
 pub static FRAME_ALLOCATOR: Once<MutexIrqSafe<AreaFrameAllocator>> = Once::new();
 
 /// Convenience method for allocating a new Frame.
 pub fn allocate_frame() -> Option<Frame> {
-    FRAME_ALLOCATOR
-        .try()
-        .and_then(|fa| fa.lock().allocate_frame())
+    FRAME_ALLOCATOR.try().and_then(|fa| fa.lock().allocate_frame())
 }
+
 
 /// Convenience method for allocating several contiguous Frames.
 pub fn allocate_frames(num_frames: usize) -> Option<FrameRange> {
-    FRAME_ALLOCATOR
-        .try()
-        .and_then(|fa| fa.lock().allocate_frames(num_frames))
+    FRAME_ALLOCATOR.try().and_then(|fa| fa.lock().allocate_frames(num_frames))
 }
 
 /// An Arc reference to a `MemoryManagementInfo` struct.
 pub type MmiRef = Arc<MutexIrqSafe<MemoryManagementInfo>>;
+
 
 /// This holds all the information for a `Task`'s memory mappings and address space
 /// (this is basically the equivalent of Linux's mm_struct)
@@ -362,7 +312,7 @@ pub type MmiRef = Arc<MutexIrqSafe<MemoryManagementInfo>>;
 pub struct MemoryManagementInfo {
     /// the PageTable that should be switched to when this Task is switched to.
     pub page_table: PageTable,
-
+    
     /// the list of virtual memory areas mapped currently in this Task's address space
     pub vmas: Vec<VirtualMemoryArea>,
 
@@ -372,53 +322,41 @@ pub struct MemoryManagementInfo {
     pub extra_mapped_pages: Vec<MappedPages>,
 
     /// the task's stack allocator, which is initialized with a range of Pages from which to allocate.
-    pub stack_allocator: stack_allocator::StackAllocator, // TODO: this shouldn't be public, once we move spawn_userspace code into this module
+    pub stack_allocator: stack_allocator::StackAllocator,  // TODO: this shouldn't be public, once we move spawn_userspace code into this module
 }
 
 impl MemoryManagementInfo {
     /// Allocates a new stack in the currently-running Task's address space.
-    /// Also, this adds the newly-allocated stack to this struct's `vmas` vector.
+    /// Also, this adds the newly-allocated stack to this struct's `vmas` vector. 
     /// Whether this is a kernelspace or userspace stack is determined by how this MMI's stack_allocator was initialized.
-    ///
+    /// 
     /// # Important Note
-    /// You cannot call this to allocate a stack in a different `MemoryManagementInfo`/`PageTable` than the one you're currently running.
+    /// You cannot call this to allocate a stack in a different `MemoryManagementInfo`/`PageTable` than the one you're currently running. 
     /// It will only work for allocating a stack in the currently-running MMI.
     pub fn alloc_stack(&mut self, size_in_pages: usize) -> Option<Stack> {
-        let &mut MemoryManagementInfo {
-            ref mut page_table,
-            ref mut vmas,
-            ref mut stack_allocator,
-            ..
-        } = self;
+        let &mut MemoryManagementInfo { ref mut page_table, ref mut vmas, ref mut stack_allocator, .. } = self;
 
-        if let Some((stack, stack_vma)) = FRAME_ALLOCATOR.try().and_then(|fa| {
-            stack_allocator.alloc_stack(page_table, fa.lock().deref_mut(), size_in_pages)
-        }) {
+        if let Some((stack, stack_vma)) = FRAME_ALLOCATOR.try().and_then(|fa| stack_allocator.alloc_stack(page_table, fa.lock().deref_mut(), size_in_pages)) {
             vmas.push(stack_vma);
             Some(stack)
         } else {
-            error!(
-                "MemoryManagementInfo::alloc_stack: failed to allocate stack of {} pages!",
-                size_in_pages
-            );
+            error!("MemoryManagementInfo::alloc_stack: failed to allocate stack of {} pages!", size_in_pages);
             None
         }
     }
 }
 
+
+
 /// A convenience function that creates a new memory mapping by allocating frames that are contiguous in physical memory.
 /// Returns a tuple containing the new `MappedPages` and the starting PhysicalAddress of the first frame,
 /// which is a convenient way to get the physical address without walking the page tables.
-///
+/// 
 /// # Locking / Deadlock
 /// Currently, this function acquires the lock on the `FRAME_ALLOCATOR` and the kernel's `MemoryManagementInfo` instance.
 /// Thus, the caller should ensure that the locks on those two variables are not held when invoking this function.
-pub fn create_contiguous_mapping(
-    size_in_bytes: usize,
-    flags: EntryFlags,
-) -> Result<(MappedPages, PhysicalAddress), &'static str> {
-    let allocated_pages = allocate_pages_by_bytes(size_in_bytes)
-        .ok_or("e1000::create_contiguous_mapping(): couldn't allocate pages!")?;
+pub fn create_contiguous_mapping(size_in_bytes: usize, flags: EntryFlags) -> Result<(MappedPages, PhysicalAddress), &'static str> {
+    let allocated_pages = allocate_pages_by_bytes(size_in_bytes).ok_or("e1000::create_contiguous_mapping(): couldn't allocate pages!")?;
 
     let kernel_mmi_ref = get_kernel_mmi_ref()
         .ok_or("create_contiguous_mapping(): KERNEL_MMI was not yet initialized!")?;
