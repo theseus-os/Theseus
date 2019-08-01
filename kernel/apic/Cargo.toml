@@ -11,7 +11,7 @@ volatile = "0.2.5"
 owning_ref = { git = "https://github.com/kevinaboos/owning-ref-rs" }
 atomic = { version = "0.4.4", features = [ "nightly" ] }
 
-[target.'cfg(any(target_arch = "x86_64", target_arch="x86"))'.dependencies]
+[target.'cfg(any(target_arch = "x86_64", target_arch = "x86"))'.dependencies]
 # x86_64 = { git = "https://github.com/kevinaboos/x86_64" }
 x86_64 = { path = "../../libs/x86_64" }
 # raw-cpuid does not support aarch64

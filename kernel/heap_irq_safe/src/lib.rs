@@ -28,13 +28,13 @@ use irq_safety::MutexIrqSafe;
 
 
 #[global_allocator]
-#[cfg(any(target_arch="x86", target_arch="x86_64"))]
+#[cfg(any(target_arch = "x86", target_arch = "x86_64"))]
 static ALLOCATOR: IrqSafeHeap = IrqSafeHeap::empty();
 
 
 /// NOTE: the heap memory MUST BE MAPPED before calling this init function.
 pub fn init(start_virt_addr: usize, size_in_bytes: usize) {
-    #[cfg(any(target_arch="x86", target_arch="x86_64"))]
+    #[cfg(any(target_arch = "x86", target_arch = "x86_64"))]
     unsafe {
         ALLOCATOR.lock().init(start_virt_addr, size_in_bytes);
     }

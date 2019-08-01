@@ -41,7 +41,7 @@ impl ContextRegular {
 #[macro_export]
 macro_rules! save_registers_regular {
     () => (
-        #[cfg(any(target_arch="x86", target_arch="x86_64"))]
+        #[cfg(any(target_arch = "x86", target_arch = "x86_64"))]
         asm!("
             # save all general purpose registers into the previous task
             push rbx
@@ -65,7 +65,7 @@ macro_rules! save_registers_regular {
 #[macro_export]
 macro_rules! switch_stacks {
     () => (
-        #[cfg(any(target_arch="x86", target_arch="x86_64"))]
+        #[cfg(any(target_arch = "x86", target_arch = "x86_64"))]
         asm!("
             # switch the stack pointers
             mov [rdi], rsp
@@ -82,7 +82,7 @@ macro_rules! switch_stacks {
 #[macro_export]
 macro_rules! restore_registers_regular {
     () => (
-        #[cfg(any(target_arch="x86", target_arch="x86_64"))]
+        #[cfg(any(target_arch = "x86", target_arch = "x86_64"))]
         asm!("
             # restore the next task's general purpose registers
             pop r15

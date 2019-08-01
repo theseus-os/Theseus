@@ -74,7 +74,7 @@ pub extern "win64" fn efi_main(image: uefi::Handle, st: SystemTable<Boot>) {
 
 // Prepare and execute transition from EL2 to EL1.
 // Not in use now
-// #[cfg(any(target_arch="aarch64"))]
+// #[cfg(any(target_arch = "aarch64"))]
 // #[inline]
 // fn _setup_and_enter_el1_from_el2(image: uefi::Handle, st: SystemTable<Boot>) -> ! {
 //     use cortex_a::{asm, regs::*};

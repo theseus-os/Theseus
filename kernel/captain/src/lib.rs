@@ -45,7 +45,7 @@ extern crate scheduler;
 extern crate frame_buffer;
 #[cfg(mirror_log_to_vga)] #[macro_use] extern crate print;
 extern crate input_event_manager;
-#[cfg(any(target_arch="x86", target_arch="x86_64"))]
+#[cfg(any(target_arch = "x86", target_arch = "x86_64"))]
 #[cfg(test_network)] extern crate exceptions_full;
 extern crate network_manager;
 extern crate pause;
@@ -118,7 +118,7 @@ pub fn init(
     spawn::init(kernel_mmi_ref.clone(), bsp_apic_id, bsp_stack_bottom, bsp_stack_top)?;
 
     // after we've initialized the task subsystem, we can use better exception handlers
-    #[cfg(any(target_arch="x86", target_arch="x86_64"))]
+    #[cfg(any(target_arch = "x86", target_arch = "x86_64"))]
     exceptions_full::init(idt);
     
     // boot up the other cores (APs)

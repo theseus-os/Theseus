@@ -17,7 +17,7 @@ extern crate pci;
 extern crate owning_ref;
 extern crate interrupts;
 extern crate pic;
-#[cfg(any(target_arch="x86", target_arch="x86_64"))]
+#[cfg(any(target_arch = "x86", target_arch = "x86_64"))]
 extern crate x86_64;
 extern crate mpmc;
 extern crate network_interface_card;
@@ -42,7 +42,7 @@ use pci::{PciDevice, PCI_INTERRUPT_LINE, PciConfigSpaceAccessMechanism};
 use kernel_config::memory::PAGE_SIZE;
 use owning_ref::BoxRefMut;
 use interrupts::{eoi,register_interrupt};
-#[cfg(any(target_arch="x86", target_arch="x86_64"))]
+#[cfg(any(target_arch = "x86", target_arch = "x86_64"))]
 use x86_64::structures::idt::{ExceptionStackFrame};
 use network_interface_card:: NetworkInterfaceCard;
 use nic_initialization::{allocate_device_register_memory, init_rx_buf_pool, init_rx_queue, init_tx_queue};
@@ -241,7 +241,7 @@ impl E1000Nic {
         
         Self::enable_interrupts(&mut mapped_registers);
         
-        #[cfg(any(target_arch="x86", target_arch="x86_64"))]
+        #[cfg(any(target_arch = "x86", target_arch = "x86_64"))]
         register_interrupt(interrupt_num, e1000_handler)?;
 
         // initialize the buffer pool
@@ -431,7 +431,7 @@ impl E1000Nic {
     }
 }
 
-#[cfg(any(target_arch="x86", target_arch="x86_64"))]
+#[cfg(any(target_arch = "x86", target_arch = "x86_64"))]
 extern "x86-interrupt" fn e1000_handler(_stack_frame: &mut ExceptionStackFrame) {
     if let Some(ref e1000_nic_ref) = E1000_NIC.try() {
         let mut e1000_nic = e1000_nic_ref.lock();
