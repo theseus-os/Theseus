@@ -11,8 +11,11 @@ cfg-if = "0.1.6"
 [dependencies.context_switch_sse]
 path = "../context_switch_sse"
 
-[dependencies.context_switch_regular]
-path = "../context_switch_regular"
+[target.'cfg(target_arch = "x86_64")'.dependencies]
+context_switch_regular = { path = "../context_switch_regular"}
+
+[target.'cfg(target_arch = "aarch64")'.dependencies]
+context_switch_arm = { path = "../context_switch_arm"}
 
 [dependencies.context_switch_avx]
 path = "../context_switch_avx"

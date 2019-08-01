@@ -4,14 +4,16 @@
 #![no_std]
 #![feature(asm, naked_functions)]
 
+#[cfg(target_arch = "x86_64")]
 #[macro_use] extern crate context_switch_regular;
 
+#[cfg(target_arch = "x86_64")]
 use context_switch_regular::ContextRegular;
-
 
 /// The registers saved before a context switch and restored after a context switch
 /// for SSE-enabled Tasks.
 #[repr(C, packed)]
+#[cfg(target_arch = "x86_64")]
 pub struct ContextSSE {
     // The order of the registers here MUST MATCH the order of 
     // registers popped in the context_switch() function below. 
@@ -34,6 +36,7 @@ pub struct ContextSSE {
     regular: ContextRegular,
 }
 
+#[cfg(target_arch = "x86_64")]
 impl ContextSSE {
     /// Creates a new ContextSSE struct that will cause the
     /// SSE-enabled Task containing it to begin its execution at the given `rip`.
@@ -64,6 +67,7 @@ impl ContextSSE {
 /// An assembly macro for saving regular x86_64 registers.
 /// by pushing them onto the stack.
 #[macro_export]
+#[cfg(target_arch = "x86_64")]
 macro_rules! save_registers_sse {
     () => (
         #[cfg(any(target_arch = "x86", target_arch = "x86_64"))]
@@ -97,6 +101,7 @@ macro_rules! save_registers_sse {
 /// An assembly macro for saving regular x86_64 registers.
 /// by pushing them onto the stack.
 #[macro_export]
+#[cfg(target_arch = "x86_64")]
 macro_rules! restore_registers_sse {
     () => (
         #[cfg(any(target_arch = "x86", target_arch = "x86_64"))]
@@ -139,6 +144,7 @@ macro_rules! restore_registers_sse {
 /// and the second argument into the `rsi` register right before invoking this function.
 #[naked]
 #[inline(never)]
+#[cfg(target_arch = "x86_64")]
 pub unsafe fn context_switch_sse() {
     // Since this is a naked function that expects its arguments in two registers,
     // you CANNOT place any log statements or other instructions here,

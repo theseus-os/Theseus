@@ -38,10 +38,10 @@ impl ContextRegular {
 
 /// An assembly macro for saving regular x86_64 registers.
 /// by pushing them onto the stack.
+#[cfg(any(target_arch = "x86", target_arch = "x86_64"))]
 #[macro_export]
 macro_rules! save_registers_regular {
     () => (
-        #[cfg(any(target_arch = "x86", target_arch = "x86_64"))]
         asm!("
             # save all general purpose registers into the previous task
             push rbx
@@ -62,10 +62,10 @@ macro_rules! save_registers_regular {
 /// 
 /// * The `rdi` register must contain a pointer to the previous task's stack pointer.
 /// * The `rsi` register must contain the value of the next task's stack pointer.
+#[cfg(any(target_arch = "x86", target_arch = "x86_64"))]
 #[macro_export]
 macro_rules! switch_stacks {
     () => (
-        #[cfg(any(target_arch = "x86", target_arch = "x86_64"))]
         asm!("
             # switch the stack pointers
             mov [rdi], rsp
@@ -79,10 +79,10 @@ macro_rules! switch_stacks {
 
 /// An assembly macro for saving regular x86_64 registers.
 /// by pushing them onto the stack.
+#[cfg(any(target_arch = "x86", target_arch = "x86_64"))]
 #[macro_export]
 macro_rules! restore_registers_regular {
     () => (
-        #[cfg(any(target_arch = "x86", target_arch = "x86_64"))]
         asm!("
             # restore the next task's general purpose registers
             pop r15
@@ -111,6 +111,7 @@ macro_rules! restore_registers_regular {
 /// and the second argument into the `rsi` register right before invoking this function.
 #[naked]
 #[inline(never)]
+#[cfg(any(target_arch = "x86", target_arch = "x86_64"))]
 pub unsafe fn context_switch_regular() {
     // Since this is a naked function that expects its arguments in two registers,
     // you CANNOT place any log statements or other instructions here,

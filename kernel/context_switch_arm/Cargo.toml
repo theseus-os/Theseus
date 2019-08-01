@@ -1,0 +1,9 @@
+[package]
+authors = ["Wenqiu Yu <yuwenqiuj@gmail.com>"]
+name = "context_switch_arm"
+description = "Context switching routines and structs for ARM64"
+version = "0.1.0"
+build = "../../build.rs"
+
+[lib]
+crate-type = ["rlib"]
