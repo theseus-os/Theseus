@@ -23,8 +23,8 @@ path = "../ata"
 [dependencies.memory]
 path = "../memory"
 
-[dependencies.apic]
-path = "../apic"
+[target.'cfg(target_arch = "x86_64")'.dependencies]
+apic = { path = "../apic"}
 
 [dependencies.e1000]
 path = "../e1000"

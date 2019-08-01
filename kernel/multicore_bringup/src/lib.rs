@@ -14,6 +14,7 @@ extern crate irq_safety;
 extern crate memory;
 extern crate pit_clock;
 extern crate kernel_config;
+#[cfg(target_arch = "x86_64")]
 extern crate apic;
 extern crate acpi;
 extern crate madt;
@@ -34,6 +35,7 @@ use volatile::Volatile;
 use irq_safety::MutexIrqSafe;
 use memory::{VirtualAddress, PhysicalAddress, MappedPages, Page, Frame, FrameRange, EntryFlags, MemoryManagementInfo, FRAME_ALLOCATOR, Stack};
 use kernel_config::memory::{PAGE_SIZE, PAGE_SHIFT};
+#[cfg(target_arch = "x86_64")]
 use apic::{LocalApic, get_lapics, get_my_apic_id, has_x2apic, get_bsp_id};
 use ap_start::{kstart_ap, AP_READY_FLAG};
 use madt::{Madt, MadtEntry, MadtLocalApic, find_nmi_entry_for_processor};
@@ -74,6 +76,7 @@ pub struct GraphicInfo{
 /// * kernel_mmi_ref: A reference to the locked MMI structure for the kernel.
 /// * ap_start_realmode_begin: the starting virtual address of where the ap_start realmode code is.
 /// * ap_start_realmode_end: the ending virtual address of where the ap_start realmode code is.
+#[cfg(target_arch = "x86_64")]
 pub fn handle_ap_cores(
     kernel_mmi_ref: Arc<MutexIrqSafe<MemoryManagementInfo>>,
     ap_start_realmode_begin: VirtualAddress,
@@ -241,6 +244,7 @@ struct ApTrampolineData {
 
 
 /// Called by the BSP to initialize the given `new_lapic` using IPIs.
+#[cfg(target_arch = "x86_64")]
 fn bring_up_ap(
     bsp_lapic: &mut LocalApic,
     new_lapic: &MadtLocalApic, 

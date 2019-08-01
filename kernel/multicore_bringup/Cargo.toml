@@ -31,8 +31,8 @@ path = "../mod_mgmt"
 [dependencies.acpi]
 path = "../acpi"
 
-[dependencies.apic]
-path = "../apic"
+[target.'cfg(target_arch = "x86_64")'.dependencies]
+apic = { path = "../apic"}
 
 [dependencies.ap_start]
 path = "../ap_start"

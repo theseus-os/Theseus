@@ -10,8 +10,8 @@ getopts = "0.2.18"
 [dependencies.terminal_print]
 path = "../terminal_print"
 
-[dependencies.apic]
-path = "../../kernel/apic"
+[target.'cfg(target_arch = "x86_64")'.dependencies]
+apic = { path = "../../kernel/apic" }
 
 [dependencies.task]
 path = "../../kernel/task"

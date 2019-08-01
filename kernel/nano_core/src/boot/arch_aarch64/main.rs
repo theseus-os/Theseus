@@ -74,7 +74,7 @@ pub extern "win64" fn efi_main(image: uefi::Handle, st: SystemTable<Boot>) {
 
 // Prepare and execute transition from EL2 to EL1.
 // Not in use now
-// #[cfg(any(target_arch = "aarch64"))]
+// #[cfg(target_arch = "aarch64")]
 // #[inline]
 // fn _setup_and_enter_el1_from_el2(image: uefi::Handle, st: SystemTable<Boot>) -> ! {
 //     use cortex_a::{asm, regs::*};
@@ -118,7 +118,7 @@ pub extern "win64" fn efi_main(image: uefi::Handle, st: SystemTable<Boot>) {
 // }
 
 #[no_mangle]
-#[cfg(any(target_arch = "aarch64"))]
+#[cfg(target_arch = "aarch64")]
 /// The entrypoint of Theseus.
 /// `image` is the handler of the image file. Currently it is of no use.
 /// `st` is the systemtable of UEFI. It contains all the services provides by UEFI.

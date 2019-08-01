@@ -72,6 +72,7 @@ extern crate memory;
 extern crate mod_mgmt;
 extern crate task;
 extern crate spawn;
+#[cfg(target_arch = "x86_64")]
 extern crate apic;
 extern crate fs_node;
 

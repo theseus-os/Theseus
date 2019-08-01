@@ -9,6 +9,7 @@ extern crate interrupts;
 extern crate spawn;
 extern crate scheduler;
 extern crate kernel_config;
+#[cfg(target_arch = "x86_64")]
 extern crate apic;
 extern crate tlb_shootdown;
 extern crate pause;
@@ -17,6 +18,7 @@ use core::sync::atomic::{AtomicBool, Ordering};
 use irq_safety::{enable_interrupts, RwLockIrqSafe};
 use memory::{VirtualAddress, get_kernel_mmi_ref};
 use kernel_config::memory::KERNEL_STACK_SIZE_IN_PAGES;
+#[cfg(target_arch = "x86_64")]
 use apic::{LocalApic, get_lapics, get_my_apic_id};
 use pause::spin_loop_hint;
 
@@ -59,17 +61,19 @@ pub fn kstart_ap(processor_id: u8, apic_id: u8,
     // we do this last (after all other initialization) in order to prevent this lapic
     // from prematurely receiving IPIs or being used in other ways,
     // and also to ensure that if this apic fails to init, it's not accidentally used as a functioning apic in the list.
-    let lapic = {
-        let mut kernel_mmi = kernel_mmi_ref.lock();
-        LocalApic::new(&mut kernel_mmi.page_table, processor_id, apic_id, false, nmi_lint, nmi_flags)
-            .expect("kstart_ap(): failed to create LocalApic")
-    };
-    tlb_shootdown::init();
-    if get_my_apic_id() != Some(apic_id) {
-        error!("FATAL ERROR: AP {} get_my_apic_id() returned {:?}! They must match!", apic_id, get_my_apic_id());
+    #[cfg(target_arch = "x86_64")]
+    {
+        let lapic = {
+            let mut kernel_mmi = kernel_mmi_ref.lock();
+            LocalApic::new(&mut kernel_mmi.page_table, processor_id, apic_id, false, nmi_lint, nmi_flags)
+                .expect("kstart_ap(): failed to create LocalApic")
+        };
+        tlb_shootdown::init();
+        if get_my_apic_id() != Some(apic_id) {
+            error!("FATAL ERROR: AP {} get_my_apic_id() returned {:?}! They must match!", apic_id, get_my_apic_id());
+        }
+        get_lapics().insert(apic_id, RwLockIrqSafe::new(lapic));
     }
-    get_lapics().insert(apic_id, RwLockIrqSafe::new(lapic));
-
 
     info!("Entering idle_task loop on AP {} ...", apic_id);
     enable_interrupts();

@@ -24,8 +24,8 @@ path = "../task"
 [dependencies.spawn]
 path = "../spawn"
 
-[dependencies.apic]
-path = "../apic"
+[target.'cfg(target_arch = "x86_64")'.dependencies]
+apic = { path = "../apic"}
 
 [dependencies.mod_mgmt]
 path = "../mod_mgmt"

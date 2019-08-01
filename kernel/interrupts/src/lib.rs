@@ -8,7 +8,7 @@
 
 #[macro_use] extern crate log;
 #[macro_use] extern crate vga_buffer;
-#[cfg(any(target_arch = "x86", target_arch = "x86_64"))]
+#[cfg(target_arch = "x86_64")]
 extern crate x86_64;
 #[cfg(any(target_arch = "aarch64"))]
 extern crate aarch64;
@@ -16,11 +16,12 @@ extern crate spin;
 extern crate port_io;
 extern crate kernel_config;
 extern crate memory;
+#[cfg(target_arch = "x86_64")]
 extern crate apic;
 extern crate pit_clock;
 extern crate tss;
 extern crate gdt;
-#[cfg(any(target_arch = "x86", target_arch = "x86_64"))]
+#[cfg(target_arch = "x86_64")]
 extern crate exceptions_early;
 extern crate pic;
 extern crate scheduler;
@@ -41,6 +42,7 @@ use kernel_config::time::{CONFIG_PIT_FREQUENCY_HZ}; //, CONFIG_RTC_FREQUENCY_HZ}
 // use rtc;
 use core::sync::atomic::{AtomicUsize, AtomicBool, Ordering};
 use memory::VirtualAddress;
+#[cfg(target_arch = "x86_64")]
 use apic::{INTERRUPT_CHIP, InterruptChip};
 use pic::PIC_MASTER_OFFSET;
 
@@ -58,6 +60,7 @@ static PIC: Once<pic::ChainedPics> = Once::new();
 /// # Arguments: 
 /// * `double_fault_stack_top_unusable`: the address of the top of a newly allocated stack, to be used as the double fault exception handler stack.
 /// * `privilege_stack_top_unusable`: the address of the top of a newly allocated stack, to be used as the privilege stack (Ring 3 -> Ring 0 stack).
+#[cfg(target_arch = "x86_64")]
 pub fn init(double_fault_stack_top_unusable: VirtualAddress, privilege_stack_top_unusable: VirtualAddress) 
     -> Result<&'static LockedIdt, &'static str> 
 {
@@ -95,6 +98,13 @@ pub fn init(double_fault_stack_top_unusable: VirtualAddress, privilege_stack_top
 
 }
 
+#[cfg(target_arch = "aarch64")]
+pub fn init(double_fault_stack_top_unusable: VirtualAddress, privilege_stack_top_unusable: VirtualAddress) 
+    -> Result<&'static LockedIdt, &'static str> 
+{
+    // TODO
+    Ok(&IDT)
+}
 
 /// Similar to `init()`, but for APs to call after the BSP has already invoked `init()`.
 pub fn init_ap(apic_id: u8, 
@@ -243,6 +253,7 @@ pub fn deregister_interrupt(interrupt_num: u8, func: HandlerFunc) -> Result<(), 
 /// Send an end of interrupt signal, which works for all types of interrupt chips (APIC, x2apic, PIC)
 /// irq arg is only used for PIC
 pub fn eoi(irq: Option<u8>) {
+    #[cfg(target_arch = "x86_64")]
     match INTERRUPT_CHIP.load(Ordering::Acquire) {
         InterruptChip::APIC |
         InterruptChip::X2APIC => {

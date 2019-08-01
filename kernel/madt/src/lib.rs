@@ -8,6 +8,7 @@
 extern crate irq_safety;
 extern crate memory;
 extern crate ioapic;
+#[cfg(target_arch = "x86_64")]
 extern crate apic;
 extern crate pic;
 extern crate sdt;
@@ -15,6 +16,7 @@ extern crate acpi_table;
 
 use core::mem::size_of;
 use memory::{MappedPages, PageTable, PhysicalAddress}; 
+#[cfg(target_arch = "x86_64")]
 use apic::{LocalApic, get_my_apic_id, get_lapics, get_bsp_id};
 use irq_safety::RwLockIrqSafe;
 use sdt::Sdt;
@@ -92,6 +94,7 @@ impl<'t> Madt<'t> {
     /// (the first core to run).
     pub fn bsp_init(&self, page_table: &mut PageTable) -> Result<(), &'static str> {
         handle_ioapic_entries(self.iter(), page_table)?;
+        #[cfg(target_arch = "x86_64")]
         handle_bsp_lapic_entry(self.iter(), page_table)?;
         Ok(())
     }
@@ -299,6 +302,7 @@ pub struct MadtLocalApicAddressOverride {
 /// Handles the BSP's (bootstrap processor, the first core to boot) entry in the given MADT iterator.
 /// This should be the first function invoked to initialize the BSP information, 
 /// and should come before any other entries in the MADT are handled.
+#[cfg(target_arch = "x86_64")]
 fn handle_bsp_lapic_entry(madt_iter: MadtIter, page_table: &mut PageTable) -> Result<(), &'static str> {
     use pic::PIC_MASTER_OFFSET;
 

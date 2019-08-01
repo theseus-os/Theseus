@@ -16,6 +16,7 @@ extern crate scheduler;
 extern crate mod_mgmt;
 extern crate gdt;
 extern crate owning_ref;
+#[cfg(target_arch = "x86_64")]
 extern crate apic;
 extern crate context_switch;
 extern crate path;
@@ -592,6 +593,7 @@ fn task_wrapper<F, A, R>() -> !
 
         // (2) Remove it from its runqueue
         #[cfg(not(runqueue_state_spill_evaluation))]  // the normal case
+        #[cfg(target_arch = "x86_64")]
         {
             if let Err(e) = apic::get_my_apic_id()
                 .and_then(|id| runqueue::get_runqueue(id))

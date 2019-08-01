@@ -13,7 +13,7 @@ extern crate state_store;
 #[macro_use] extern crate log;
 #[cfg(target_arch = "x86_64")]
 extern crate x86_64;
-#[cfg(any(target_arch = "aarch64"))]
+#[cfg(target_arch = "aarch64")]
 extern crate aarch64;
 
 use port_io::Port;

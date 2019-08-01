@@ -7,6 +7,7 @@
 extern crate x86_64;
 extern crate task;
 extern crate runqueue;
+#[cfg(target_arch = "x86_64")]
 extern crate apic;
 extern crate tlb_shootdown;
 extern crate pmu_x86;

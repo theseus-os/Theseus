@@ -18,8 +18,8 @@ path = "../memory"
 [dependencies.pic]
 path = "../pic"
 
-[dependencies.apic]
-path = "../apic"
+[target.'cfg(target_arch = "x86_64")'.dependencies]
+apic = { path = "../apic"}
 
 [dependencies.ioapic]
 path = "../ioapic"

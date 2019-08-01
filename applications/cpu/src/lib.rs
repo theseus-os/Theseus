@@ -2,6 +2,7 @@
 #[macro_use] extern crate alloc;
 #[macro_use] extern crate terminal_print;
 
+#[cfg(target_arch = "x86_64")]
 extern crate apic;
 extern crate getopts;
 extern crate task;
@@ -10,6 +11,7 @@ extern crate runqueue;
 use getopts::Options;
 use alloc::vec::Vec;
 use alloc::string::String;
+#[cfg(target_arch = "x86_64")]
 use apic::get_lapics;
 
 #[no_mangle]
@@ -27,7 +29,9 @@ pub fn main(args: Vec<String>) -> isize {
         return print_usage(opts)
     }
 
+    #[cfg(target_arch = "x86_64")]
     let all_lapics = get_lapics();
+    #[cfg(target_arch = "x86_64")]
     for lapic in all_lapics.iter() {
         let lapic = lapic.1;
         let apic_id = lapic.read().apic_id;

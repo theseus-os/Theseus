@@ -31,8 +31,8 @@ path = "../spawn"
 [dependencies.kernel_config]
 path = "../kernel_config"
 
-[dependencies.apic]
-path = "../apic"
+[target.'cfg(target_arch = "x86_64")'.dependencies]
+apic = { path = "../apic"}
 
 [dependencies.tlb_shootdown]
 path = "../tlb_shootdown"

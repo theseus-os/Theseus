@@ -31,6 +31,7 @@ extern crate dfqueue; // decoupled, fault-tolerant queue
 extern crate event_types; // a temporary way to use input_event_manager types 
 extern crate logger;
 extern crate memory; // the virtual memory subsystem 
+#[cfg(target_arch = "x86_64")]
 extern crate apic; 
 extern crate mod_mgmt;
 extern crate spawn;
@@ -75,6 +76,7 @@ pub fn mirror_to_vga_cb(_color: &logger::LogColor, prefix: &'static str, args: c
 /// Initialize the Captain, which is the main module that steers the ship of Theseus. 
 /// This does all the rest of the module loading and initialization so that the OS 
 /// can continue running and do actual useful work.
+#[cfg(target_arch = "x86_64")]
 pub fn init(
     kernel_mmi_ref: Arc<MutexIrqSafe<MemoryManagementInfo>>, 
     identity_mapped_pages: Vec<MappedPages>,
@@ -181,4 +183,17 @@ pub fn init(
         // TODO: put this core into a low-power state
         // TODO: exit this loop cleanly upon a shutdown signal
     }
+}
+
+#[cfg(target_arch = "aarch64")]
+pub fn init(
+    kernel_mmi_ref: Arc<MutexIrqSafe<MemoryManagementInfo>>, 
+    identity_mapped_pages: Vec<MappedPages>,
+    bsp_stack_bottom: VirtualAddress,
+    bsp_stack_top: VirtualAddress,
+    ap_start_realmode_begin: VirtualAddress,
+    ap_start_realmode_end: VirtualAddress,
+) -> Result<(), &'static str> {
+    // TODO
+    Ok(())
 }

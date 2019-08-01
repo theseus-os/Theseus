@@ -50,9 +50,7 @@ path = "../mod_mgmt"
 
 [target.'cfg(target_arch = "x86_64")'.dependencies]
 exceptions_full = { path = "../exceptions_full" }
-
-[dependencies.apic]
-path = "../apic"
+apic = { path = "../apic"}
 
 [dependencies.spawn]
 path = "../spawn"

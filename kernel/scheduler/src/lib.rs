@@ -3,6 +3,7 @@
 extern crate alloc;
 #[macro_use] extern crate log;
 extern crate irq_safety;
+#[cfg(target_arch = "x86_64")]
 extern crate apic;
 extern crate task;
 extern crate runqueue;
@@ -12,6 +13,7 @@ extern crate runqueue;
 
 use core::ops::Deref;
 use irq_safety::hold_interrupts;
+#[cfg(target_arch = "x86_64")]
 use apic::get_my_apic_id;
 use task::{Task, get_my_current_task, TaskRef};
 #[cfg(priority_scheduler)] use scheduler_priority::select_next_task;
@@ -21,6 +23,7 @@ use task::{Task, get_my_current_task, TaskRef};
 /// and then performs a task switch to that new `Task`.
 ///
 /// Interrupts will be disabled while this function runs.
+#[cfg(target_arch = "x86_64")]
 pub fn schedule() -> bool {
     let _held_interrupts = hold_interrupts(); // auto-reenables interrupts on early return
 
@@ -72,6 +75,12 @@ pub fn schedule() -> bool {
     // let new_current: TaskId = CURRENT_TASK.load(Ordering::SeqCst);
     // trace!("AFTER TASK_SWITCH CALL (current={}), interrupts are {}", new_current, ::interrupts::interrupts_enabled());
  
+    true
+}
+
+#[cfg(target_arch = "aarch64")]
+pub fn schedule() -> bool {
+    // TODO
     true
 }
 

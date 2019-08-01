@@ -19,6 +19,7 @@ extern crate ioapic;
 extern crate pit_clock;
 extern crate ap_start;
 extern crate pic; 
+#[cfg(target_arch = "x86_64")]
 extern crate apic;
 extern crate hpet;
 extern crate pause;

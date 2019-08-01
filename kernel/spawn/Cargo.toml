@@ -34,8 +34,8 @@ path = "../memory"
 [dependencies.kernel_config]
 path = "../kernel_config"
 
-[dependencies.apic]
-path = "../apic"
+[target.'cfg(target_arch = "x86_64")'.dependencies]
+apic = { path = "../apic"}
 
 [dependencies.tss]
 path = "../tss"

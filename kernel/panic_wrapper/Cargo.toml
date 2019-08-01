@@ -21,8 +21,8 @@ path = "../task"
 [dependencies.runqueue]
 path = "../runqueue"
 
-[dependencies.apic]
-path = "../apic"
+[target.'cfg(target_arch = "x86_64")'.dependencies]
+apic = { path = "../apic"}
 
 
 [lib]

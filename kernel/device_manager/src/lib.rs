@@ -7,6 +7,7 @@ extern crate ata;
 extern crate e1000;
 extern crate memory;
 extern crate dfqueue; 
+#[cfg(target_arch = "x86_64")]
 extern crate apic;
 extern crate acpi;
 extern crate keyboard;
@@ -35,6 +36,7 @@ const DEFAULT_GATEWAY_IP: [u8; 4] = [10, 0, 2, 2]; // the default QEMU user-slir
 /// This is for early-stage initialization of things like VGA, ACPI, (IO)APIC, etc.
 pub fn early_init(kernel_mmi: &mut MemoryManagementInfo) -> Result<(), &'static str> {
     // first, init the local apic info
+    #[cfg(target_arch = "x86_64")]
     apic::init(&mut kernel_mmi.page_table)?;
     
     // then init/parse the ACPI tables to fill in the APIC details, among other things

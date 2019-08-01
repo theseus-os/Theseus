@@ -30,8 +30,8 @@ path = "../kernel_config"
 [dependencies.ioapic]
 path = "../ioapic"
 
-[dependencies.apic]
-path = "../apic"
+[target.'cfg(target_arch = "x86_64")'.dependencies]
+apic = { path = "../apic"}
 
 [dependencies.pit_clock]
 path = "../pit_clock"
