@@ -5,7 +5,9 @@ description = "The main driver of Theseus. Controls the loading and initializati
 version = "0.1.0"
 build = "../../build.rs"
 
-[dependencies]
+[target.'cfg(target_arch = "x86_64")'.dependencies]
+exceptions_full = { path = "../exceptions_full" }
+apic = { path = "../apic"}
 
 [dependencies.log]
 default-features = false
@@ -47,10 +49,6 @@ path = "../memory"
 
 [dependencies.mod_mgmt]
 path = "../mod_mgmt"
-
-[target.'cfg(target_arch = "x86_64")'.dependencies]
-exceptions_full = { path = "../exceptions_full" }
-apic = { path = "../apic"}
 
 [dependencies.spawn]
 path = "../spawn"

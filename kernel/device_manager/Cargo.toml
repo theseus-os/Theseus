@@ -5,7 +5,8 @@ description = "Code for handling the sequence required to manage and initialize 
 version = "0.1.0"
 build = "../../build.rs"
 
-[dependencies]
+[target.'cfg(target_arch = "x86_64")'.dependencies]
+apic = { path = "../apic"}
 
 [dependencies.log]
 default-features = false
@@ -22,9 +23,6 @@ path = "../ata"
 
 [dependencies.memory]
 path = "../memory"
-
-[target.'cfg(target_arch = "x86_64")'.dependencies]
-apic = { path = "../apic"}
 
 [dependencies.e1000]
 path = "../e1000"

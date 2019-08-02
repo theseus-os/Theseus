@@ -9,6 +9,8 @@ build = "../../build.rs"
 spin = "0.4.10"
 volatile = "0.2.5"
 
+[target.'cfg(target_arch = "x86_64")'.dependencies]
+apic = { path = "../apic"}
 
 [dependencies.log]
 default-features = false
@@ -29,9 +31,6 @@ path = "../kernel_config"
 
 [dependencies.ioapic]
 path = "../ioapic"
-
-[target.'cfg(target_arch = "x86_64")'.dependencies]
-apic = { path = "../apic"}
 
 [dependencies.pit_clock]
 path = "../pit_clock"

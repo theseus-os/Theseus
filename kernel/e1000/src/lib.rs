@@ -17,10 +17,11 @@ extern crate pci;
 extern crate owning_ref;
 extern crate interrupts;
 extern crate pic;
-#[cfg(any(target_arch = "x86", target_arch = "x86_64"))]
+#[cfg(target_arch = "x86_64")]
 extern crate x86_64;
 extern crate mpmc;
 extern crate network_interface_card;
+#[cfg(target_arch = "x86_64")]
 extern crate apic;
 extern crate intel_ethernet;
 extern crate nic_buffers;
@@ -52,6 +53,7 @@ use intel_ethernet::{
 };
 use nic_buffers::{TransmitBuffer, ReceiveBuffer, ReceivedFrame};
 use nic_queues::{RxQueue, TxQueue};
+#[cfg(target_arch = "x86_64")]
 use apic::get_my_apic_id;
 use regs:: {REG_RXDESCTAIL, REG_TXDESCTAIL};
 
@@ -247,6 +249,11 @@ impl E1000Nic {
         // initialize the buffer pool
         init_rx_buf_pool(RX_BUFFER_POOL_SIZE, E1000_RX_BUFFER_SIZE_IN_BYTES, &RX_BUFFER_POOL)?;
 
+        #[cfg(target_arch = "x86_64")]
+        let cpu_id = get_my_apic_id().ok_or("E1000::init(): couldn't get my apic id")?;
+        #[cfg(target_arch = "aarch64")]
+        let cpu_id = 0; // TODO
+
         let (rx_descs, rx_buffers) = Self::rx_init(&mut mapped_registers)?;
         let rxq = RxQueue {
             id: 0,
@@ -255,7 +262,7 @@ impl E1000Nic {
             rx_bufs_in_use: rx_buffers,
             received_frames: VecDeque::new(),
             // here the cpu id is irrelevant because there's no DCA or MSI 
-            cpu_id: get_my_apic_id().ok_or("E1000::init(): couldn't get my apic id")?,
+            cpu_id: cpu_id,
             rdt_addr: VirtualAddress::new(mem_base_v.value() + REG_RXDESCTAIL as usize)?,
         };
 
@@ -264,7 +271,7 @@ impl E1000Nic {
             id: 0,
             tx_descs: tx_descs,
             tx_cur: 0,
-            cpu_id: get_my_apic_id().ok_or("E1000::init(): couldn't get my apic id")?,
+            cpu_id: cpu_id,
             tdt_addr: VirtualAddress::new(mem_base_v.value() + REG_TXDESCTAIL as usize)?,
         };
 

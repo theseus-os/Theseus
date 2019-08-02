@@ -7,11 +7,11 @@ build = "../../build.rs"
 [dependencies]
 getopts = "0.2.18"
 
-[dependencies.terminal_print]
-path = "../terminal_print"
-
 [target.'cfg(target_arch = "x86_64")'.dependencies]
 apic = { path = "../../kernel/apic" }
+
+[dependencies.terminal_print]
+path = "../terminal_print"
 
 [dependencies.task]
 path = "../../kernel/task"

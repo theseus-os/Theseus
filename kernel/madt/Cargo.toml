@@ -5,6 +5,9 @@ authors = ["Kevin Boos <kevinaboos@gmail.com>"]
 description = "Support for ACPI MADT"
 build = "../../build.rs"
 
+[target.'cfg(target_arch = "x86_64")'.dependencies]
+apic = { path = "../apic"}
+
 [dependencies.log]
 default-features = false
 version = "0.3.7"
@@ -17,9 +20,6 @@ path = "../memory"
 
 [dependencies.pic]
 path = "../pic"
-
-[target.'cfg(target_arch = "x86_64")'.dependencies]
-apic = { path = "../apic"}
 
 [dependencies.ioapic]
 path = "../ioapic"

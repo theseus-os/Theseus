@@ -5,6 +5,7 @@
 extern crate alloc;
 #[macro_use] extern crate print;
 extern crate getopts;
+#[cfg(target_arch = "x86_64")]
 extern crate pmu_x86;
 extern crate spawn;
 
@@ -55,12 +56,21 @@ pub fn main(args: Vec<String>) -> isize {
         .pin_on_core(0)
         .spawn()?;
     */
-    pmu_x86::init();
-    let _sampler = pmu_x86::start_samples(pmu_x86::EventType::UnhaltedReferenceCycles, 0xFFFFF, None, 10);
-    /*
-    pmu_x86::init();
-    let sampler = pmu_x86::start_samples(pmu_x86::EventType::UnhaltedReferenceCycles, 0xFFFFF, None, 10);
-    */
+    #[cfg(target_arch = "x86_64")]
+    {
+        pmu_x86::init();
+        let _sampler = pmu_x86::start_samples(pmu_x86::EventType::UnhaltedReferenceCycles, 0xFFFFF, None, 10);
+        /*
+        pmu_x86::init();
+        let sampler = pmu_x86::start_samples(pmu_x86::EventType::UnhaltedReferenceCycles, 0xFFFFF, None, 10);
+        */
+    }
+    
+    #[cfg(target_arch = "aarch64")]
+    {
+        // TODO
+    }
+    
     if matches.opt_present("h") {
         print_usage(opts);
         return 0;

@@ -16,8 +16,6 @@ extern crate kernel_config;
 extern crate raw_cpuid;
 #[cfg(any(target_arch="x86", target_arch="x86_64"))]
 extern crate x86_64;
-#[cfg(any(target_arch="aarch64"))]
-extern crate aarch64;
 extern crate pit_clock;
 extern crate atomic;
 
@@ -30,10 +28,7 @@ use owning_ref::{BoxRef, BoxRefMut};
 use spin::Once;
 #[cfg(any(target_arch="x86", target_arch="x86_64"))]
 use raw_cpuid::CpuId;
-#[cfg(any(target_arch="x86", target_arch="x86_64"))]
 use x86_64::registers::msr::*;
-#[cfg(any(target_arch="aarch64"))]
-use aarch64::registers::msr::*;
 use irq_safety::RwLockIrqSafe;
 use memory::{FRAME_ALLOCATOR, Frame, FrameRange, PageTable, PhysicalAddress, EntryFlags, MappedPages, allocate_pages};
 use kernel_config::time::CONFIG_TIMESLICE_PERIOD_MICROSECONDS;
@@ -82,12 +77,6 @@ pub fn has_x2apic() -> bool {
         CpuId::new().get_feature_info().expect("Couldn't get CpuId feature info").has_x2apic()
     });
     return *res // because call_once returns a reference to the cached IS_X2APIC value
-}
-
-#[cfg(target_arch = "aarch64")]
-pub fn has_x2apic() -> bool {
-    // TODO
-    true
 }
 
 /// Returns a reference to the list of LocalApics, one per processor core

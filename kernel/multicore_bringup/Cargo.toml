@@ -9,6 +9,9 @@ build = "../../build.rs"
 spin = "0.4.10"
 volatile = "0.2.5"
 
+[target.'cfg(target_arch = "x86_64")'.dependencies]
+apic = { path = "../apic"}
+
 [dependencies.log]
 default-features = false
 version = "0.3.7"
@@ -30,9 +33,6 @@ path = "../mod_mgmt"
 
 [dependencies.acpi]
 path = "../acpi"
-
-[target.'cfg(target_arch = "x86_64")'.dependencies]
-apic = { path = "../apic"}
 
 [dependencies.ap_start]
 path = "../ap_start"

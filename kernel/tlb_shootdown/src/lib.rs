@@ -8,8 +8,9 @@ extern crate alloc;
 // #[macro_use] extern crate log;
 extern crate irq_safety;
 extern crate memory;
+#[cfg(target_arch = "x86_64")]
 extern crate apic;
-#[cfg(any(target_arch = "x86", target_arch = "x86_64"))]
+#[cfg(target_arch = "x86_64")]
 extern crate x86_64;
 #[cfg(any(target_arch = "aarch64"))]
 extern crate aarch64;
@@ -20,6 +21,7 @@ use core::sync::atomic::{AtomicUsize, AtomicBool, Ordering};
 use alloc::vec::Vec;
 use irq_safety::{hold_interrupts, RwLockIrqSafe};
 use memory::VirtualAddress;
+#[cfg(target_arch = "x86_64")]
 use apic::{LocalApic, get_my_apic, get_lapics, LapicIpiDestination};
 use pause::spin_loop_hint;
 
@@ -48,10 +50,18 @@ pub fn init() {
 /// Do not invoke this directly, but rather pass it as a callback to the memory subsystem,
 /// which will invoke it as needed (on remap/unmap operations).
 fn broadcast_tlb_shootdown(virtual_addresses: Vec<VirtualAddress>) {
-    if let Some(my_lapic) = get_my_apic() {
-        // info!("broadcast_tlb_shootdown():  AP {}, vaddrs: {:?}", my_lapic.read().apic_id, virtual_addresses);
-        send_tlb_shootdown_ipi(&mut my_lapic.write(), virtual_addresses);
+    #[cfg(target_arch = "x86_64")]
+    {
+        if let Some(my_lapic) = get_my_apic() {
+            // info!("broadcast_tlb_shootdown():  AP {}, vaddrs: {:?}", my_lapic.read().apic_id, virtual_addresses);
+            send_tlb_shootdown_ipi(&mut my_lapic.write(), virtual_addresses);
+        }
     }
+    #[cfg(target_arch = "aarch64")]
+    {
+        // TODO
+    }
+    
 }
 
 
@@ -74,6 +84,7 @@ pub fn handle_tlb_shootdown_ipi(virtual_addresses: &[VirtualAddress]) {
 
 /// Sends an IPI to all other cores (except me) to trigger 
 /// a TLB flush of the given `VirtualAddress`es
+#[cfg(target_arch = "x86_64")]
 pub fn send_tlb_shootdown_ipi(my_lapic: &mut LocalApic, virtual_addresses: Vec<VirtualAddress>) {        
     // skip sending IPIs if there are no other cores running
     let core_count = get_lapics().iter().count();

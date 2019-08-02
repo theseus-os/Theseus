@@ -8,6 +8,8 @@ build = "../../build.rs"
 [dependencies]
 spin = "0.4.10"
 
+[target.'cfg(target_arch = "x86_64")'.dependencies]
+apic = { path = "../apic"}
 
 [dependencies.log]
 default-features = false
@@ -30,9 +32,6 @@ path = "../spawn"
 
 [dependencies.kernel_config]
 path = "../kernel_config"
-
-[target.'cfg(target_arch = "x86_64")'.dependencies]
-apic = { path = "../apic"}
 
 [dependencies.tlb_shootdown]
 path = "../tlb_shootdown"

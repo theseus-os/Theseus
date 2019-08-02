@@ -5,9 +5,10 @@ description = "Routines for handling TLB shootdowns"
 version = "0.1.0"
 build = "../../build.rs"
 
-[target.'cfg(any(target_arch = "x86_64", target_arch = "x86"))'.dependencies]
+[target.'cfg(target_arch = "x86_64")'.dependencies]
 # x86_64 = { git = "https://github.com/kevinaboos/x86_64" }
 x86_64 = { path = "../../libs/x86_64" } # currently using our local copy, forked from Phil Opp's crate
+apic = { path = "../apic"}
 
 [target.'cfg(target_arch = "aarch64")'.dependencies]
 aarch64 = { path = "../../libs/aarch64" }
@@ -25,9 +26,6 @@ git = "https://github.com/kevinaboos/irq_safety"
 
 [dependencies.memory]
 path = "../memory"
-
-[dependencies.apic]
-path = "../apic"
 
 [dependencies.pause]
 path = "../pause"

@@ -9,15 +9,15 @@ build = "../../build.rs"
 [dependencies]
 spin = "0.4.10"
 
+[target.'cfg(target_arch = "x86_64")'.dependencies]
+apic = { path = "../apic"}
+
 [dependencies.log]
 default-features = false
 version = "0.3.7"
 
 [dependencies.irq_safety]
 git = "https://github.com/kevinaboos/irq_safety"
-
-[target.'cfg(target_arch = "x86_64")'.dependencies]
-apic = { path = "../apic"}
 
 [dependencies.task]
 path = "../task"
