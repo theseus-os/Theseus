@@ -61,7 +61,7 @@ impl<L> Table<L>
     fn next_table_address(&self, index: usize) -> Option<VirtualAddress> {
         let entry_flags = self[index].flags();
         
-        #[cfg(any(target_arch = "x86", target_arch = "x86_64"))]
+        #[cfg(target_arch = "x86_64")]
         let ispage = entry_flags.contains(EntryFlags::PRESENT) && !entry_flags.contains(EntryFlags::HUGE_PAGE);
         #[cfg(any(target_arch = "aarch64"))]
         let ispage = entry_flags.contains(EntryFlags::PRESENT) && entry_flags.contains(EntryFlags::PAGE);
@@ -97,7 +97,7 @@ impl<L> Table<L>
                     "mapping code does not support huge pages");
             let frame = allocator.allocate_frame().expect("no frames available");
 
-            #[cfg(any(target_arch = "x86", target_arch = "x86_64"))]
+            #[cfg(target_arch = "x86_64")]
             self[index].set(frame, flags | EntryFlags::PRESENT | EntryFlags::WRITABLE); // must be PRESENT | WRITABLE
 
             #[cfg(any(target_arch = "aarch64"))]

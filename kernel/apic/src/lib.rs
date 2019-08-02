@@ -12,9 +12,9 @@ extern crate atomic_linked_list;
 extern crate memory;
 extern crate spin;
 extern crate kernel_config;
-#[cfg(any(target_arch="x86", target_arch="x86_64"))]
+#[cfg( target_arch="x86_64")]
 extern crate raw_cpuid;
-#[cfg(any(target_arch="x86", target_arch="x86_64"))]
+#[cfg( target_arch="x86_64")]
 extern crate x86_64;
 extern crate pit_clock;
 extern crate atomic;
@@ -26,7 +26,7 @@ use volatile::{Volatile, ReadOnly, WriteOnly};
 use alloc::boxed::Box;
 use owning_ref::{BoxRef, BoxRefMut};
 use spin::Once;
-#[cfg(any(target_arch="x86", target_arch="x86_64"))]
+#[cfg( target_arch="x86_64")]
 use raw_cpuid::CpuId;
 use x86_64::registers::msr::*;
 use irq_safety::RwLockIrqSafe;

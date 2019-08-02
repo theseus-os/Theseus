@@ -11,7 +11,7 @@ use core::mem;
 use core::ops::DerefMut;
 use core::ptr::Unique;
 use core::slice;
-#[cfg(any(target_arch = "x86", target_arch = "x86_64"))]
+#[cfg(target_arch = "x86_64")]
 use x86_64;
 #[cfg(any(target_arch = "aarch64"))]
 use aarch64;
@@ -110,7 +110,7 @@ impl Mapper {
                     let p2_entry = &p2[page.p2_index()];
                     // 2MiB page?
                     if let Some(start_frame) = p2_entry.pointed_frame() {
-                        #[cfg(any(target_arch = "x86", target_arch = "x86_64"))]
+                        #[cfg(target_arch = "x86_64")]
                         let is_huge = p2_entry.flags().contains(EntryFlags::HUGE_PAGE);
                         #[cfg(any(target_arch = "aarch64"))]
                         let is_huge = !p2_entry.flags().contains(EntryFlags::PAGE);
@@ -154,7 +154,7 @@ impl Mapper {
                 return Err("page was already in use");
             } 
 
-            #[cfg(any(target_arch = "x86", target_arch = "x86_64"))]
+            #[cfg(target_arch = "x86_64")]
             p1[page.p1_index()].set(frame, flags | EntryFlags::PRESENT);
 
             #[cfg(any(target_arch = "aarch64"))]
@@ -200,7 +200,7 @@ impl Mapper {
                 return Err("page was already in use");
             } 
 
-            #[cfg(any(target_arch = "x86", target_arch = "x86_64"))]
+            #[cfg(target_arch = "x86_64")]
             p1[page.p1_index()].set(frame, flags | EntryFlags::PRESENT);
             #[cfg(any(target_arch = "aarch64"))]
             p1[page.p1_index()].set(frame, flags | EntryFlags::PRESENT | EntryFlags :: ACCESSEDARM | EntryFlags::INNER_SHARE);
@@ -559,7 +559,7 @@ impl MappedPages {
             p1[page.p1_index()].set(frame, new_flags | EntryFlags::PRESENT);
 
             let vaddr = page.start_address();
-            #[cfg(any(target_arch = "x86", target_arch = "x86_64"))]
+            #[cfg(target_arch = "x86_64")]
             x86_64::instructions::tlb::flush(x86_64::VirtualAddress(vaddr.value()));
             #[cfg(any(target_arch = "aarch64"))]
             aarch64::instructions::tlb::flush(aarch64::VirtualAddress(vaddr.value()));
@@ -602,7 +602,7 @@ impl MappedPages {
             p1[page.p1_index()].set_unused();
 
             let vaddr = page.start_address();
-            #[cfg(any(target_arch = "x86", target_arch = "x86_64"))]
+            #[cfg(target_arch = "x86_64")]
             x86_64::instructions::tlb::flush(x86_64::VirtualAddress(page.start_address().value()));
             #[cfg(any(target_arch = "aarch64"))]
             aarch64::instructions::tlb::flush(aarch64::VirtualAddress(page.start_address().value()));

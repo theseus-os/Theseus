@@ -73,7 +73,7 @@ pub fn handle_tlb_shootdown_ipi(virtual_addresses: &[VirtualAddress]) {
     // trace!("handle_tlb_shootdown_ipi(): AP {}, vaddrs: {:?}", apic_id, virtual_addresses);
 
     for vaddr in virtual_addresses {
-        #[cfg(any(target_arch = "x86", target_arch = "x86_64"))]
+        #[cfg(target_arch = "x86_64")]
         x86_64::instructions::tlb::flush(x86_64::VirtualAddress(vaddr.value()));
         #[cfg(any(target_arch = "aarch64"))]
         aarch64::instructions::tlb::flush(aarch64::VirtualAddress(vaddr.value()));

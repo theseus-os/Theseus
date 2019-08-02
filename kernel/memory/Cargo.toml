@@ -14,7 +14,7 @@ bit_field = "0.7.0"
 type-name = "0.1.0"
 uefi = { path = "../../libs/uefi-rs" }
 
-[target.'cfg(any(target_arch = "x86_64", target_arch = "x86"))'.dependencies]
+[target.'cfg(target_arch = "x86_64")'.dependencies]
 # x86_64 = { git = "https://github.com/kevinaboos/x86_64" }
 x86_64 = { path = "../../libs/x86_64" }
 

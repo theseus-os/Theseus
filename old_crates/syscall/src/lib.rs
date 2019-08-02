@@ -18,7 +18,7 @@ extern crate util;
 extern crate gdt;
 extern crate apic;
 extern crate alloc;
-#[cfg(any(target_arch = "x86", target_arch = "x86_64"))]
+#[cfg(target_arch = "x86_64")]
 extern crate x86_64;
 #[cfg(any(target_arch = "aarch64"))]
 extern crate aarch64;
@@ -171,7 +171,7 @@ fn enable_syscall_sysret(syscall_stack_pointer: VirtualAddress) {
     // set up GS segment using its MSR, it should point to a special kernel stack that we can use for this.
     // Right now we're just using the save privilege level stack used for interrupts from user space (TSS's rsp 0)
     // in the future, this will be a separate value per-thread, using thread-local storage
-    #[cfg(any(target_arch = "x86", target_arch = "x86_64"))]
+    #[cfg(target_arch = "x86_64")]
     use x86_64::registers::msr::{IA32_GS_BASE, IA32_KERNEL_GS_BASE, IA32_FMASK, IA32_STAR, IA32_LSTAR, wrmsr};
     #[cfg(any(target_arch = "aarch64"))]
     use aarch64::registers::msr::{IA32_GS_BASE, IA32_KERNEL_GS_BASE, IA32_FMASK, IA32_STAR, IA32_LSTAR, wrmsr};

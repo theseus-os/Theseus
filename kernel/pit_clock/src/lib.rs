@@ -7,7 +7,7 @@
 extern crate spin;
 #[macro_use] extern crate log;
 extern crate port_io;
-#[cfg(any(target_arch = "x86", target_arch = "x86_64"))]
+#[cfg(target_arch = "x86_64")]
 extern crate x86_64;
 #[cfg(any(target_arch = "aarch64"))]
 extern crate aarch64;
@@ -47,7 +47,7 @@ pub fn init(freq_hertz: u32) {
     }
 
     // SAFE because we're simply configuring the PIT clock, and the code below is correct.
-    #[cfg(any(target_arch = "x86", target_arch = "x86_64"))]
+    #[cfg(target_arch = "x86_64")]
     unsafe {
         use x86_64::instructions::port::inb;
         PIT_COMMAND.lock().write(0x36); // 0x36: see this: http://www.osdever.net/bkerndev/Docs/pit.htm
@@ -70,7 +70,7 @@ pub fn pit_wait(microseconds: u32) -> Result<(), &'static str> {
     }
 
     // SAFE because we're simply configuring the PIT clock, and the code below is correct.
-    #[cfg(any(target_arch = "x86", target_arch = "x86_64"))]
+    #[cfg(target_arch = "x86_64")]
     unsafe {
         use x86_64::instructions::port::{inb, outb};
         // see code example: https://wiki.osdev.org/APIC_timer

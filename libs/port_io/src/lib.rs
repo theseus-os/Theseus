@@ -8,10 +8,10 @@ use core::marker::PhantomData;
 
 // TODO impl port I/O for aarch64
 // These cfg statements should cause compiler errors on non-x86 platforms.
-#[cfg(any(target_arch = "x86", target_arch = "x86_64"))]
+#[cfg(target_arch = "x86_64")]
 mod x86;
 
-#[cfg(any(target_arch = "x86", target_arch = "x86_64"))]
+#[cfg(target_arch = "x86_64")]
 pub use x86::{inb, outb, inw, outw, inl, outl};
 
 
@@ -31,26 +31,26 @@ pub trait PortOut {
 
 impl PortOut for u8 {
     unsafe fn port_out(port: u16, value: Self) {
-        #[cfg(any(target_arch = "x86", target_arch = "x86_64"))]
+        #[cfg(target_arch = "x86_64")]
         outb(value, port);
     }
 }
 impl PortOut for u16 {
     unsafe fn port_out(port: u16, value: Self) {
-        #[cfg(any(target_arch = "x86", target_arch = "x86_64"))]
+        #[cfg(target_arch = "x86_64")]
         outw(value, port);
     }
 }
 impl PortOut for u32 {
     unsafe fn port_out(port: u16, value: Self) {
-        #[cfg(any(target_arch = "x86", target_arch = "x86_64"))]
+        #[cfg(target_arch = "x86_64")]
         outl(value, port);
     }
 }
 
 impl PortIn for u8 {
     unsafe fn port_in(port: u16) -> Self {
-        #[cfg(any(target_arch = "x86", target_arch = "x86_64"))]
+        #[cfg(target_arch = "x86_64")]
         return inb(port);
         #[cfg(any(target_arch = "aarch64"))]
         return 0;
@@ -58,7 +58,7 @@ impl PortIn for u8 {
 }
 impl PortIn for u16 {
     unsafe fn port_in(port: u16) -> Self {
-        #[cfg(any(target_arch = "x86", target_arch = "x86_64"))]
+        #[cfg(target_arch = "x86_64")]
         return inw(port);
         #[cfg(any(target_arch = "aarch64"))]
         return 0
@@ -66,7 +66,7 @@ impl PortIn for u16 {
 }
 impl PortIn for u32 {
     unsafe fn port_in(port: u16) -> Self {
-        #[cfg(any(target_arch = "x86", target_arch = "x86_64"))]
+        #[cfg(target_arch = "x86_64")]
         return inl(port);
         #[cfg(any(target_arch = "aarch64"))]
         return 0;

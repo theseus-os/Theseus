@@ -59,7 +59,7 @@ impl TemporaryPage {
             warn!("temporary page {:?} is already mapped, trying the next lowest Page", page);
             page -= 1;
         }
-        #[cfg(any(target_arch = "x86", target_arch = "x86_64"))]
+        #[cfg(target_arch = "x86_64")]
         let flags = EntryFlags::WRITABLE;
 
         #[cfg(any(target_arch = "aarch64"))]

@@ -31,9 +31,9 @@ use core::{
 use multiboot2;
 use super::*;
 
-#[cfg(any(target_arch = "x86", target_arch = "x86_64"))]
+#[cfg(target_arch = "x86_64")]
 use x86_64::registers::control_regs;
-#[cfg(any(target_arch = "x86", target_arch = "x86_64"))]
+#[cfg(target_arch = "x86_64")]
 use x86_64::instructions::tlb;
 #[cfg(any(target_arch = "aarch64"))]
 use aarch64::instructions::tlb;
@@ -282,7 +282,7 @@ impl PageTable {
             let table = try!(temporary_page.map_table_frame(new_p4_frame.clone(), current_page_table));
             table.zero();
 
-            #[cfg(any(target_arch = "x86", target_arch = "x86_64"))]
+            #[cfg(target_arch = "x86_64")]
             let flags = EntryFlags::PRESENT | EntryFlags::WRITABLE;
 
             #[cfg(any(target_arch = "aarch64"))]
@@ -326,7 +326,7 @@ impl PageTable {
         let p4_table = temporary_page.map_table_frame(backup.clone(), self)?;
 
         // overwrite recursive mapping
-        #[cfg(any(target_arch = "x86", target_arch = "x86_64"))]
+        #[cfg(target_arch = "x86_64")]
         {
             self.p4_mut()[RECURSIVE_P4_INDEX].set(other_table.p4_table.clone(), EntryFlags::PRESENT | EntryFlags::WRITABLE | EntryFlags::INNER_SHARE); 
             tlb::flush_all();
@@ -348,7 +348,7 @@ impl PageTable {
         self.mapper.target_p4 = self.p4_table.clone();
 
         // // restore recursive mapping to original p4 table
-        #[cfg(any(target_arch = "x86", target_arch = "x86_64"))]
+        #[cfg(target_arch = "x86_64")]
         {
             p4_table[RECURSIVE_P4_INDEX].set(backup, EntryFlags::PRESENT | EntryFlags::WRITABLE);
             tlb::flush_all();
@@ -371,7 +371,7 @@ impl PageTable {
         // debug!("PageTable::switch() old table: {:?}, new table: {:?}", self, new_table);
 
         // perform the actual page table switch
-        #[cfg(any(target_arch = "x86", target_arch = "x86_64"))]
+        #[cfg(target_arch = "x86_64")]
         unsafe {
             control_regs::cr3_write(x86_64::PhysicalAddress(new_table.p4_table.start_address().value() as u64));
         }
@@ -399,7 +399,7 @@ impl PageTable {
 
 /// Returns the current top-level page table frame, e.g., cr3 on x86
 pub fn get_current_p4() -> Frame {
-    #[cfg(any(target_arch = "x86", target_arch = "x86_64"))]
+    #[cfg(target_arch = "x86_64")]
     { return Frame::containing_address(PhysicalAddress::new_canonical(control_regs::cr3().0 as usize)) }
 
     #[cfg(any(target_arch = "aarch64"))]
@@ -511,7 +511,7 @@ pub fn set_recursive(p4_addr:u64) {
 /// Otherwise, it returns a str error message. 
 /// 
 /// Note: this was previously called remap_the_kernel.
-#[cfg(any(target_arch = "x86", target_arch = "x86_64"))]
+#[cfg(target_arch = "x86_64")]
 pub fn init(allocator_mutex: &MutexIrqSafe<AreaFrameAllocator>, boot_info: &multiboot2::BootInformation) 
     -> Result<(PageTable, Vec<VirtualMemoryArea>, MappedPages, MappedPages, MappedPages, Vec<MappedPages>, Vec<MappedPages>), &'static str>
 {

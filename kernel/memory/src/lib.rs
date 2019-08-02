@@ -19,7 +19,7 @@ extern crate irq_safety;
 extern crate kernel_config;
 extern crate atomic_linked_list;
 extern crate xmas_elf;
-#[cfg(any(target_arch = "x86", target_arch = "x86_64"))]
+#[cfg(target_arch = "x86_64")]
 extern crate x86_64;
 #[cfg(any(target_arch = "aarch64"))]
 extern crate aarch64;
@@ -90,7 +90,7 @@ impl VirtualAddress {
     /// Creates a new `VirtualAddress`, 
     /// checking that the address is canonical, 
     /// i.e., bits (64:48] are sign-extended from bit 47.
-    #[cfg(any(target_arch = "x86", target_arch = "x86_64"))]
+    #[cfg(target_arch = "x86_64")]
     pub fn new(virt_addr: usize) -> Result<VirtualAddress, &'static str> {
         match virt_addr.get_bits(47..64) {
             0 | 0b1_1111_1111_1111_1111 => Ok(VirtualAddress(virt_addr)),
@@ -109,7 +109,7 @@ impl VirtualAddress {
 
 /// Creates a new `VirtualAddress` that is guaranteed to be canonical
     /// by forcing the upper bits (64:48] to be sign-extended from bit 47.
-    #[cfg(any(target_arch = "x86", target_arch = "x86_64"))]
+    #[cfg(target_arch = "x86_64")]
     pub fn new_canonical(mut virt_addr: usize) -> VirtualAddress {
         match virt_addr.get_bit(47) {
             false => virt_addr.set_bits(48..64, 0),
@@ -475,7 +475,7 @@ pub fn set_broadcast_tlb_shootdown_cb(func: fn(Vec<VirtualAddress>)) {
 ///  * the MappedPages of the kernel's rodata section,
 ///  * the MappedPages of the kernel's data section,
 ///  * the kernel's list of *other* higher-half MappedPages, which should be kept forever.
-#[cfg(any(target_arch = "x86", target_arch = "x86_64"))]
+#[cfg(target_arch = "x86_64")]
 pub fn init(boot_info: &BootInformation) 
     -> Result<(Arc<MutexIrqSafe<MemoryManagementInfo>>, MappedPages, MappedPages, MappedPages, Vec<MappedPages>), &'static str> 
 {
