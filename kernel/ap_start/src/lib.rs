@@ -52,8 +52,12 @@ pub fn kstart_ap(processor_id: u8, apic_id: u8,
             kernel_mmi.alloc_stack(KERNEL_STACK_SIZE_IN_PAGES).expect("kstart_ap(): could not allocate privilege stack"),
         )
     };
+    
+    #[cfg(target_arch = "x86_64")]
     let _idt = interrupts::init_ap(apic_id, double_fault_stack.top_unusable(), privilege_stack.top_unusable())
         .expect("kstart_ap(): failed to initialize interrupts!");
+    #[cfg(target_arch = "aarch64")]
+    let _idt = interrupts::init_ap().expect("kstart_ap(): failed to initialize interrupts!");
 
     spawn::init(kernel_mmi_ref.clone(), apic_id, stack_start, stack_end).unwrap();
 

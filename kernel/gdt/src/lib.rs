@@ -5,25 +5,15 @@
 #[macro_use] extern crate bitflags;
 extern crate bit_field;
 extern crate atomic_linked_list;
-#[cfg(any(target_arch = "x86", target_arch = "x86_64"))]
+#[cfg(target_arch = "x86_64")]
 extern crate x86_64;
-#[cfg(any(target_arch = "aarch64"))]
-extern crate aarch64;
 extern crate spin;
 extern crate tss;
 extern crate memory;
 
 use atomic_linked_list::atomic_map::AtomicMap;
-#[cfg(any(target_arch = "x86", target_arch = "x86_64"))]
+#[cfg(target_arch = "x86_64")]
 use x86_64::{
-    structures::{
-        tss::TaskStateSegment,
-        gdt::SegmentSelector,
-    },
-    PrivilegeLevel,
-};
-#[cfg(any(target_arch = "aarch64"))]
-use aarch64::{
     structures::{
         tss::TaskStateSegment,
         gdt::SegmentSelector,
@@ -40,12 +30,19 @@ lazy_static! {
 }
 
 
+#[cfg(target_arch = "x86_64")]
 static KERNEL_CODE_SELECTOR:  Once<SegmentSelector> = Once::new();
+#[cfg(target_arch = "x86_64")]
 static KERNEL_DATA_SELECTOR:  Once<SegmentSelector> = Once::new();
+#[cfg(target_arch = "x86_64")]
 static USER_CODE_32_SELECTOR: Once<SegmentSelector> = Once::new();
+#[cfg(target_arch = "x86_64")]
 static USER_DATA_32_SELECTOR: Once<SegmentSelector> = Once::new();
+#[cfg(target_arch = "x86_64")]
 static USER_CODE_64_SELECTOR: Once<SegmentSelector> = Once::new();
+#[cfg(target_arch = "x86_64")]
 static USER_DATA_64_SELECTOR: Once<SegmentSelector> = Once::new();
+#[cfg(target_arch = "x86_64")]
 static TSS_SELECTOR:          Once<SegmentSelector> = Once::new();
 
 
@@ -62,6 +59,7 @@ pub enum AvailableSegmentSelector {
 }
 
 /// Stupid hack because SegmentSelector is not Cloneable/Copyable
+#[cfg(target_arch = "x86_64")]
 pub fn get_segment_selector(selector: AvailableSegmentSelector) -> SegmentSelector {
     let seg: &SegmentSelector = match selector {
         AvailableSegmentSelector::KernelCode => {
@@ -93,12 +91,13 @@ pub fn get_segment_selector(selector: AvailableSegmentSelector) -> SegmentSelect
 
 /// Creates a new GDT, sets up the TSS with the given double fault stack
 /// and privilege stack, and then loads that new GDT & TSS.
+#[cfg(target_arch = "x86_64")]
 pub fn create_tss_gdt(apic_id: u8, 
                   double_fault_stack_top_unusable: VirtualAddress, 
                   privilege_stack_top_unusable: VirtualAddress) {
-    #[cfg(any(target_arch = "x86", target_arch = "x86_64"))]
+    #[cfg(target_arch = "x86_64")]
     use x86_64::instructions::segmentation::{set_cs, load_ds, load_ss};
-    #[cfg(any(target_arch = "x86", target_arch = "x86_64"))]
+    #[cfg(target_arch = "x86_64")]
     use x86_64::instructions::tables::load_tss;
     
     let tss_ref = tss::create_tss(apic_id, double_fault_stack_top_unusable, privilege_stack_top_unusable);
@@ -140,7 +139,7 @@ pub fn create_tss_gdt(apic_id: u8,
         // debug!("Loaded GDT for apic {}: {}", apic_id, gdt_ref);
     }
 
-    #[cfg(any(target_arch = "x86", target_arch = "x86_64"))]
+    #[cfg(target_arch = "x86_64")]
     unsafe {
         set_cs(get_segment_selector(AvailableSegmentSelector::KernelCode)); // reload code segment register
         load_tss(get_segment_selector(AvailableSegmentSelector::Tss)); // load TSS
@@ -156,6 +155,7 @@ pub struct Gdt {
     next_free: usize,
 }
 
+#[cfg(target_arch = "x86_64")]
 impl Gdt {
     pub fn new() -> Gdt {
         Gdt {
@@ -188,17 +188,17 @@ impl Gdt {
     }
 
     pub fn load(&self) {
-        #[cfg(any(target_arch = "x86", target_arch = "x86_64"))]
+        #[cfg(target_arch = "x86_64")]
         use x86_64::instructions::tables::{DescriptorTablePointer, lgdt};
         use core::mem::size_of;
 
-        #[cfg(any(target_arch = "x86", target_arch = "x86_64"))]
+        #[cfg(target_arch = "x86_64")]
         let ptr = DescriptorTablePointer {
             base: self.table.as_ptr() as u64,
             limit: (self.table.len() * size_of::<u64>() - 1) as u16,
         };
 
-        #[cfg(any(target_arch = "x86", target_arch = "x86_64"))]
+        #[cfg(target_arch = "x86_64")]
         unsafe { lgdt(&ptr) };
     }
 }
@@ -226,6 +226,7 @@ pub enum Descriptor {
     SystemSegment(u64, u64),
 }
 
+#[cfg(target_arch = "x86_64")]
 impl Descriptor {
     pub fn kernel_code_segment() -> Descriptor {
         let flags = DescriptorFlags::LONG_MODE | 

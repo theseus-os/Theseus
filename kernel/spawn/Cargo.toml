@@ -10,6 +10,9 @@ atomic = { version = "0.4.4", features = [ "nightly" ] }
 owning_ref = { git = "https://github.com/kevinaboos/owning-ref-rs" }
 type-name = "0.1.0"
 
+[target.'cfg(target_arch = "x86_64")'.dependencies]
+apic = { path = "../apic"}
+gdt = { path = "../gdt" }
 
 [dependencies.log]
 default-features = false
@@ -34,9 +37,6 @@ path = "../memory"
 [dependencies.kernel_config]
 path = "../kernel_config"
 
-[target.'cfg(target_arch = "x86_64")'.dependencies]
-apic = { path = "../apic"}
-
 [dependencies.tss]
 path = "../tss"
 
@@ -45,9 +45,6 @@ path = "../task"
 
 [dependencies.runqueue]
 path = "../runqueue"
-
-[dependencies.gdt]
-path = "../gdt"
 
 [dependencies.scheduler]
 path = "../scheduler"

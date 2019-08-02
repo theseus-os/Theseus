@@ -14,6 +14,7 @@ extern crate task;
 extern crate runqueue;
 extern crate scheduler;
 extern crate mod_mgmt;
+#[cfg(target_arch = "x86_64")]
 extern crate gdt;
 extern crate owning_ref;
 #[cfg(target_arch = "x86_64")]
