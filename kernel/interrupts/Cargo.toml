@@ -14,6 +14,7 @@ x86_64 = { path = "../../libs/x86_64" } # currently using our local copy, forked
 exceptions_early = { path = "../exceptions_early" }
 apic = { path = "../apic" }
 gdt = { path = "../gdt" }
+tss = { path = "../tss" }
 
 [target.'cfg(target_arch = "aarch64")'.dependencies]
 aarch64 = { path = "../../libs/aarch64" }
@@ -40,9 +41,6 @@ path = "../kernel_config"
 
 [dependencies.tlb_shootdown]
 path = "../tlb_shootdown"
-
-[dependencies.tss]
-path = "../tss"
 
 [dependencies.pic]
 path = "../pic"

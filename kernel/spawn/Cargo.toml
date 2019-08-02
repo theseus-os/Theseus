@@ -13,6 +13,7 @@ type-name = "0.1.0"
 [target.'cfg(target_arch = "x86_64")'.dependencies]
 apic = { path = "../apic"}
 gdt = { path = "../gdt" }
+tss = { path = "../tss" }
 
 [dependencies.log]
 default-features = false
@@ -36,9 +37,6 @@ path = "../memory"
 
 [dependencies.kernel_config]
 path = "../kernel_config"
-
-[dependencies.tss]
-path = "../tss"
 
 [dependencies.task]
 path = "../task"

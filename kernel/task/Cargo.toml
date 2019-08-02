@@ -11,6 +11,7 @@ spin = "0.4.10"
 [target.'cfg(any(target_arch = "x86_64", target_arch = "x86"))'.dependencies]
 # x86_64 = { git = "https://github.com/kevinaboos/x86_64" }
 x86_64 = { path = "../../libs/x86_64" } # currently using our local copy, forked from Phil Opp's crate
+tss = { path = "../tss" }
 
 [target.'cfg(target_arch = "aarch64")'.dependencies]
 aarch64 = { path = "../../libs/aarch64" }
@@ -28,9 +29,6 @@ git = "https://github.com/kevinaboos/irq_safety"
 
 [dependencies.atomic_linked_list]
 path = "../../libs/atomic_linked_list"
-
-[dependencies.tss]
-path = "../tss"
 
 [dependencies.memory]
 path = "../memory"

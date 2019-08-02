@@ -19,6 +19,7 @@ extern crate memory;
 #[cfg(target_arch = "x86_64")]
 extern crate apic;
 extern crate pit_clock;
+#[cfg(target_arch = "x86_64")]
 extern crate tss;
 #[cfg(target_arch = "x86_64")]
 extern crate gdt;

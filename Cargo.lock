@@ -1954,7 +1954,6 @@ dependencies = [
 name = "tss"
 version = "0.1.0"
 dependencies = [
- "aarch64 0.1.2",
  "apic 0.1.0",
  "atomic_linked_list 0.1.0",
  "lazy_static 1.2.0 (registry+https://github.com/rust-lang/crates.io-index)",

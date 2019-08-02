@@ -4,17 +4,11 @@
 #[macro_use] extern crate log;
 extern crate atomic_linked_list;
 extern crate memory;
-#[cfg(any(target_arch = "x86", target_arch = "x86_64"))]
 extern crate x86_64;
-#[cfg(any(target_arch = "aarch64"))]
-extern crate aarch64;
 extern crate apic;
 extern crate spin;
 
-#[cfg(any(target_arch = "x86", target_arch = "x86_64"))]
 use x86_64::structures::tss::TaskStateSegment;
-#[cfg(any(target_arch = "aarch64"))]
-use aarch64::structures::tss::TaskStateSegment;
 use atomic_linked_list::atomic_map::AtomicMap;
 use spin::Mutex;
 use memory::VirtualAddress;
@@ -40,10 +34,7 @@ pub fn tss_set_rsp0(new_privilege_stack_top: VirtualAddress) -> Result<(), &'sta
         error!("tss_set_rsp0(): couldn't find TSS for apic {}", my_apic_id);
         "No TSS for the current core's apid id" 
     })).lock();
-    #[cfg(any(target_arch = "x86", target_arch = "x86_64"))]
-    { tss_entry.privilege_stack_table[0] = x86_64::VirtualAddress(new_privilege_stack_top.value()); }
-    #[cfg(target_arch = "aarch64")]
-    { tss_entry.privilege_stack_table[0] = aarch64::VirtualAddress(new_privilege_stack_top.value()); }
+    tss_entry.privilege_stack_table[0] = x86_64::VirtualAddress(new_privilege_stack_top.value());
     // trace!("tss_set_rsp0: new TSS {:?}", tss_entry);
     Ok(())
 }
@@ -58,11 +49,8 @@ pub fn create_tss(apic_id: u8,
 {
     let mut tss = TaskStateSegment::new();
     // TSS.RSP0 is used in kernel space after a transition from Ring 3 -> Ring 0
-    #[cfg(any(target_arch = "x86", target_arch = "x86_64"))]
-    {    
-        tss.privilege_stack_table[0] = x86_64::VirtualAddress(privilege_stack_top_unusable.value());
-        tss.interrupt_stack_table[DOUBLE_FAULT_IST_INDEX] = x86_64::VirtualAddress(double_fault_stack_top_unusable.value());
-    }
+    tss.privilege_stack_table[0] = x86_64::VirtualAddress(privilege_stack_top_unusable.value());
+    tss.interrupt_stack_table[DOUBLE_FAULT_IST_INDEX] = x86_64::VirtualAddress(double_fault_stack_top_unusable.value());
 
     // insert into TSS list
     TSS.insert(apic_id, Mutex::new(tss));

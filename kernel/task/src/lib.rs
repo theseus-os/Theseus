@@ -35,6 +35,7 @@
 extern crate irq_safety;
 extern crate atomic_linked_list;
 extern crate memory;
+#[cfg(target_arch = "x86_64")]
 extern crate tss;
 extern crate mod_mgmt;
 extern crate context_switch;
@@ -66,6 +67,7 @@ use pause::spin_loop_hint;
 use irq_safety::{MutexIrqSafe, MutexIrqSafeGuardRef, MutexIrqSafeGuardRefMut, interrupts_enabled};
 use memory::{Stack, MappedPages, PageRange, EntryFlags, MemoryManagementInfo, VirtualAddress};
 use atomic_linked_list::atomic_map::AtomicMap;
+#[cfg(target_arch = "x86_64")]
 use tss::tss_set_rsp0;
 use mod_mgmt::metadata::StrongCrateRef;
 use environment::Environment;
@@ -454,16 +456,24 @@ impl Task {
         // We can safely skip setting the TSS RSP0 when switching to a kernel task, 
         // i.e., when `next` is not a userspace task
         if next.is_userspace() {
-            let next_kstack = next.kstack.as_ref().expect("BUG: task_switch(): error: next task's kstack was None!");
-            let new_tss_rsp0 = next_kstack.bottom() + (next_kstack.size() / 2); // the middle half of the stack
-            if tss_set_rsp0(new_tss_rsp0).is_ok() { 
-                // debug!("task_switch [2]: new_tss_rsp = {:#X}", new_tss_rsp0);
+            #[cfg(target_arch = "x86_64")]
+            {
+                let next_kstack = next.kstack.as_ref().expect("BUG: task_switch(): error: next task's kstack was None!");
+                let new_tss_rsp0 = next_kstack.bottom() + (next_kstack.size() / 2); // the middle half of the stack
+                if tss_set_rsp0(new_tss_rsp0).is_ok() { 
+                    // debug!("task_switch [2]: new_tss_rsp = {:#X}", new_tss_rsp0);
+                }
+                else {
+                    error!("task_switch(): failed to set AP {} TSS RSP0, aborting task switch!", apic_id);
+                    my_task_switch_lock.store(false, Ordering::SeqCst);
+                    return;
+                }
             }
-            else {
-                error!("task_switch(): failed to set AP {} TSS RSP0, aborting task switch!", apic_id);
-                my_task_switch_lock.store(false, Ordering::SeqCst);
-                return;
+            #[cfg(target_arch = "aarch64")]
+            {
+                // TODO
             }
+            
         }
 
         // update runstates
