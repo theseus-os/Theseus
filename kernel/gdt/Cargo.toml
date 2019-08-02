@@ -7,13 +7,10 @@ build = "../../build.rs"
 
 [dependencies]
 spin = "0.4.10"
-bit_field = "0.7.0"
-bitflags = "1.0.4"
-
-[target.'cfg(any(target_arch = "x86_64", target_arch = "x86"))'.dependencies]
 # x86_64 = { git = "https://github.com/kevinaboos/x86_64" }
 x86_64 = { path = "../../libs/x86_64" } # currently using our local copy, forked from Phil Opp's crate
-tss = { path = "../tss" }
+bit_field = "0.7.0"
+bitflags = "1.1.0"
 
 [dependencies.log]
 default-features = false
@@ -28,6 +25,10 @@ path = "../../libs/atomic_linked_list"
 
 [dependencies.memory]
 path = "../memory"
+
+[dependencies.tss]
+path = "../tss"
+
 
 [lib]
 crate-type = ["rlib"]
