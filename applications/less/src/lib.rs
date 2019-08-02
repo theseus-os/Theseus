@@ -2,6 +2,7 @@
 
 #[macro_use] extern crate application_io;
 #[macro_use] extern crate alloc;
+#[macro_use] extern crate lazy_static;
 extern crate task;
 extern crate getopts;
 extern crate path;
@@ -31,6 +32,12 @@ struct LineSlice {
     start: usize,
     /// The ending index in the String for a line. (exclusive)
     end: usize
+}
+
+lazy_static! {
+    // Globally accessible IOProperty.
+    static ref IO_PROPERTY: Arc<application_io::IOProperty> =
+        application_io::claim_property().unwrap();
 }
 
 /// Read the whole file to a String.
@@ -160,7 +167,7 @@ fn event_handler_loop(content: &String, map: &BTreeMap<usize, LineSlice>) -> Res
 
     // Handle user keyboard strikes.
     loop {
-        match application_io::get_keyboard_event() {
+        match application_io::get_keyboard_event(&IO_PROPERTY) {
             Ok(Some(keyevent)) => {
                 match keyevent.keycode {
                     // Quit the program on "Q".
@@ -188,7 +195,7 @@ fn event_handler_loop(content: &String, map: &BTreeMap<usize, LineSlice>) -> Res
                 }
             },
             Err(e) => {
-                println!("{}", e);
+                ssfprintln!(&IO_PROPERTY, "{}", e);
             },
             _ => {}
         }
@@ -199,13 +206,16 @@ fn event_handler_loop(content: &String, map: &BTreeMap<usize, LineSlice>) -> Res
 #[no_mangle]
 pub fn main(args: Vec<String>) -> isize {
 
+    // Initialize IOProperty if it hasn't been initialized.
+    lazy_static::initialize(&IO_PROPERTY);
+
     // Set and parse options.
     let mut opts = Options::new();
     opts.optflag("h", "help", "print this help menu");
     let matches = match opts.parse(&args) {
         Ok(m) => m,
         Err(_f) => {
-            println!("{}", _f);
+            ssfprintln!(&IO_PROPERTY, "{}", _f);
             print_usage(opts);
             return -1;
         }
@@ -223,35 +233,29 @@ pub fn main(args: Vec<String>) -> isize {
     let content = match get_content_string(matches.free[0].to_string()) {
         Ok(s) => s,
         Err(e) => {
-            println!("{}", e);
+            ssfprintln!(&IO_PROPERTY, "{}", e);
             return -1;
         }
     };
 
     // Request the shell to direct keyboard events instead of pushing it
     // to stdin.
-    if let Err(e) = application_io::request_kbd_event_forward() {
-        println!("{}", e);
-        return -1;
-    }
+    application_io::request_kbd_event_forward(&IO_PROPERTY);
 
     // Turn off the echo of shell, so that it won't print characters to
     // the terminal on keyboard strikes.
-    if let Err(e) = application_io::request_no_echo() {
-        println!("{}", e);
-        return -1;
-    }
+    application_io::request_no_echo(&IO_PROPERTY);
 
     // Get it run.
     let map =  match parse_content(&content) {
         Ok(map) => {map},
         Err(e) => {
-            println!("{}", e);
+            ssfprintln!(&IO_PROPERTY, "{}", e);
             return -1;
         }
     };
     if let Err(e) = event_handler_loop(&content, &map) {
-        println!("{}", e);
+        ssfprintln!(&IO_PROPERTY, "{}", e);
         return -1;
     }
 
@@ -259,7 +263,7 @@ pub fn main(args: Vec<String>) -> isize {
 }
 
 fn print_usage(opts: Options) {
-    println!("{}", opts.usage(USAGE));
+    ssfprintln!(&IO_PROPERTY, "{}", opts.usage(USAGE));
 }
 
 const USAGE: &'static str = "Usage: less file

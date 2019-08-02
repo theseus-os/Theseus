@@ -6,17 +6,11 @@ build = "../../build.rs"
 
 [dependencies]
 
-
-[dependencies.log]
-default-features = false
-version = "0.3.7"
-
-
-[dependencies.terminal_print]
-path = "../terminal_print"
-
 [dependencies.application_io]
 path = "../application_io"
+
+[dependencies.lazy_static]
+features = ["spin_no_std", "nightly"]
 
 [lib]
 crate-type = ["rlib"]

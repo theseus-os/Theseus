@@ -18,5 +18,8 @@ path = "../terminal_print"
 [dependencies.application_io]
 path = "../application_io"
 
+[dependencies.lazy_static]
+features = ["spin_no_std", "nightly"]
+
 [lib]
 crate-type = ["rlib"]

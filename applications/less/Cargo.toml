@@ -33,7 +33,8 @@ path = "../../libs/keycodes_ascii"
 [dependencies.libterm]
 path = "../../kernel/libterm"
 
-
+[dependencies.lazy_static]
+features = ["spin_no_std", "nightly"]
 
 [lib]
 crate-type = ["rlib"]

@@ -5,6 +5,9 @@
 //! spawns and manages tasks, and records previously executed user commands.
 //! 
 //! Problem: Currently there's no upper bound to the user command line history.
+//! 
+//! TODO LIST:
+//! 1. when shell fails to upgrade the weak pointer, it should kill the child task
 
 #![no_std]
 extern crate frame_buffer;
@@ -44,12 +47,14 @@ use task::{TaskRef, ExitValue, KillReason};
 use fs_node::FileOrDir;
 use libterm::Terminal;
 use dfqueue::{DFQueue, DFQueueConsumer, DFQueueProducer};
-use alloc::sync::Arc;
+use alloc::sync::{Arc, Weak};
 use spin::Mutex;
 use environment::Environment;
 use alloc::boxed::Box;
 use core::mem;
 use alloc::collections::BTreeMap;
+use application_io::IOProperty;
+use core::sync::atomic::Ordering::SeqCst;
 
 pub const APPLICATIONS_NAMESPACE_PATH: &'static str = "/namespaces/default/applications";
 
@@ -70,6 +75,8 @@ struct Job {
     output_consumer: DFQueueConsumer<u8>,
     /// Status of the job.
     status: JobStatus,
+    /// IO property of the job.
+    io_property: Weak<IOProperty>,
     /// Command line that was used to invoke the job.
     cmd: String
 }
@@ -348,7 +355,7 @@ impl Shell {
             let task_id = task_ref_copy.lock().id;
 
             // Remove all the queues between shell and the running application.
-            application_io::remove_app_shell_relation(task_id)?;
+            //// application_io::remove_app_shell_relation(task_id)?;
 
             // Lock the shared structure in `application_io` and then kill the running application
             application_io::locked_and_execute(Box::new(move || {
@@ -418,7 +425,10 @@ impl Shell {
         // In other words, we skip handling them in the shell.
         if self.fg_job_num != 0 {
             if let Some(job_ref) = self.jobs.get(&self.fg_job_num) {
-                let requesting_direct = application_io::is_requesting_forward(job_ref.task.lock().id);
+                //// let requesting_direct = application_io::is_requesting_forward(job_ref.task.lock().id);
+                let requesting_direct = job_ref.io_property.upgrade()
+                                        .ok_or("Cannot upgrade child IOProperty weak pointer")?
+                                        .direct_key_access_flag.load(SeqCst);
                 if requesting_direct {
                     job_ref.kbd_event_producer.enqueue(keyevent);
                     return Ok(());
@@ -574,19 +584,28 @@ impl Shell {
                     // to the cmdline.
                     if self.fg_job_num != 0 {
                         let mut task_id: usize = 0;
+                        let mut need_echo = true;
+                        let mut immediate_delivery = false;
                         if let Some(job) = self.jobs.get(&self.fg_job_num) {
                             task_id = job.task.lock().id;
+                            if let Some(child_io_property) = job.io_property.upgrade() {
+                                immediate_delivery = child_io_property.immediate_delivery_flag.load(SeqCst);
+                                need_echo = !child_io_property.no_shell_echo_flag.load(SeqCst);
+                            } else {
+                                return Err("Couldn't upgrade child io_property from weak.");
+                            }
                         }
-                        let need_echo = !application_io::is_requesting_no_echo(task_id);
+                        //// let need_echo = !application_io::is_requesting_no_echo(task_id);
                         self.insert_char_to_input_buff(c, need_echo)?;
                         if let Some(job) = self.jobs.get(&self.fg_job_num) {
-                            if application_io::is_requesting_immediate_delivery(task_id) { 
+                            if immediate_delivery { 
                                 for b in self.input_buffer.as_bytes() {
                                     job.input_producer.enqueue(*b);
                                 }
                                 self.input_buffer.clear();
                             }
                         }
+
                         return Ok(());
                     }
                     else {
@@ -628,7 +647,7 @@ impl Shell {
 
         let taskref = match ApplicationTaskBuilder::new(Path::new(command))
             .argument(args)
-            .spawn() {
+            .spawn(true) {
                 Ok(taskref) => taskref, 
                 Err(e) => return Err(AppErr::SpawnErr(e.to_string()))
             };
@@ -655,12 +674,19 @@ impl Shell {
                 let app_output_queue: DFQueue<u8> = DFQueue::new();
                 let app_output_consumer = app_output_queue.into_consumer();
                 let app_output_producer = app_output_consumer.obtain_producer();
+
+                let child_io_property = 
+                    application_io::deposit_default_property(task_id, app_output_producer,
+                                                            app_kbd_event_consumer, app_input_consumer).unwrap();
+                new_task_ref.unblock();
+
                 let new_job = Job {
                     task: new_task_ref,
                     kbd_event_producer: app_kbv_event_producer,
                     input_producer: app_input_producer,
                     output_consumer: app_output_consumer,
                     status: JobStatus::Running,
+                    io_property: child_io_property,
                     cmd: self.cmdline.clone()
                 };
 
@@ -670,13 +696,13 @@ impl Shell {
                 }
 
                 // Create stdio relationship between the shell and new user program.
-                if let Err(msg) = application_io::create_app_shell_relation(task_id,
-                                                                            app_output_producer,
-                                                                            app_kbd_event_consumer,
-                                                                            app_input_consumer) {
-                    self.terminal.lock().print_to_terminal(format!("{}\n", msg).to_string());
-                    return 0;
-                }
+                // if let Err(msg) = application_io::create_app_shell_relation(task_id,
+                //                                                             app_output_producer,
+                //                                                             app_kbd_event_consumer,
+                //                                                             app_input_consumer) {
+                //     self.terminal.lock().print_to_terminal(format!("{}\n", msg).to_string());
+                //     return 0;
+                // }
                 if let Err(msg) = terminal_print::add_child(task_id, self.print_producer.obtain_producer()) { // adds the terminal's print producer to the terminal print crate
                     self.terminal.lock().print_to_terminal(format!("{}\n", msg).to_string());
                     return 0;
@@ -814,7 +840,8 @@ impl Shell {
                         terminal_map::remove_terminal(task_ref_copy.lock().id);
 
                         // Remove the queue for stdio
-                        application_io::remove_app_shell_relation(task_ref_copy.lock().id)?;
+                        //// application_io::remove_app_shell_relation(task_ref_copy.lock().id)?;
+                        application_io::remove_property(task_ref_copy.lock().id);
                         terminal_print::remove_child(task_ref_copy.lock().id)?;
 
                         // Record the completed job and remove them from job list later.

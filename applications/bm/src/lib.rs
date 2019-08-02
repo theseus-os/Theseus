@@ -297,7 +297,7 @@ fn do_spawn_inner(overhead_ct: u64, th: usize, nr: usize, child_core: u8) -> Res
 		let child = ApplicationTaskBuilder::new(Path::new(String::from("hello")))
 	        .pin_on_core(child_core) // the child is always in the my core -1
 	        //.argument(Vec::new())
-	        .spawn()?;
+	        .spawn(false)?;
 
 	    child.join().expect("Cannot join child");
 	    child.take_exit_value().expect("Cannot take the exit value");

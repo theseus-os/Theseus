@@ -42,23 +42,23 @@ pub fn init() -> Result<DFQueueProducer<Event>, &'static str> {
     ApplicationTaskBuilder::new(Path::new(String::from("terminal_map")))
         .name("map_programs_to_corresponding_term".to_string())
         .singleton()
-        .spawn()?;
+        .spawn(false)?;
 
     // Spawns the terminal print crate so that we can print to the terminal
     ApplicationTaskBuilder::new(Path::new(String::from("terminal_print")))
         .name("terminal_print_singleton".to_string())
         .singleton()
-        .spawn()?;
+        .spawn(false)?;
     
     ApplicationTaskBuilder::new(Path::new(String::from("application_io")))
         .name("application_io_manager".to_string())
         .singleton()
-        .spawn()?;
+        .spawn(false)?;
 
     // Spawn the default terminal (will also start the windowing manager)
     ApplicationTaskBuilder::new(Path::new(String::from("shell")))
         .name("default_terminal".to_string())
-        .spawn()?;
+        .spawn(false)?;
     // start the input event loop thread
     KernelTaskBuilder::new(input_event_loop, keyboard_event_handling_consumer)
         .name("input_event_loop".to_string())
@@ -95,7 +95,7 @@ fn input_event_loop(consumer:DFQueueConsumer<Event>) -> Result<(), &'static str>
                     ApplicationTaskBuilder::new(Path::new(String::from("shell")))
                         .argument(args)
                         .name(task_name)
-                        .spawn()?;
+                        .spawn(false)?;
                     terminal_id_counter += 1;
                     meta_keypress = true;
                     event.mark_completed();

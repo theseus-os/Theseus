@@ -136,11 +136,13 @@ impl<F, A, R> KernelTaskBuilder<F, A, R>
     /// This merely makes the new task Runnable, it does not switch to it immediately. That will happen on the next scheduler invocation.
     #[inline(never)]
     pub fn spawn(self) -> Result<TaskRef, &'static str> {
-        self.spawn_internal(None)
+        self.spawn_internal(None, false)
     }
 
     /// The internal spawn routine for both regular kernel Tasks and application Tasks.
-    fn spawn_internal(self, app_crate: Option<StrongCrateRef>) -> Result<TaskRef, &'static str> {
+    /// If `postponed_start` is set to be true, then the spawned task will be in Blocked state,
+    /// otherwise in Runnable state.
+    fn spawn_internal(self, app_crate: Option<StrongCrateRef>, postponed_start: bool) -> Result<TaskRef, &'static str> {
         let mut new_task = Task::new();
         new_task.name = self.name.unwrap_or_else(|| String::from( 
             // if a Task name wasn't provided, then just use the function's name
@@ -177,7 +179,11 @@ impl<F, A, R> KernelTaskBuilder<F, A, R>
         }
 
         new_task.kstack = Some(kstack);
-        new_task.runstate = RunState::Runnable; // ready to be scheduled in
+        if postponed_start {
+            new_task.runstate = RunState::Blocked;
+        } else {
+            new_task.runstate = RunState::Runnable; // ready to be scheduled in
+        }
 
         let new_task_id = new_task.id;
         let task_ref = TaskRef::new(new_task);
@@ -270,7 +276,7 @@ impl ApplicationTaskBuilder {
     /// This merely makes the new task Runnable, it does not task switch to it immediately. That will happen on the next scheduler invocation.
     /// 
     /// This is similar (but not identical) to the `exec()` system call in POSIX environments. 
-    pub fn spawn(self) -> Result<TaskRef, &'static str> {
+    pub fn spawn(self, postponed_start: bool) -> Result<TaskRef, &'static str> {
         let app_crate_ref = {
             let kernel_mmi_ref = get_kernel_mmi_ref().ok_or("couldn't get_kernel_mmi_ref")?;
             mod_mgmt::get_default_namespace().ok_or("couldn't get default namespace")?
@@ -301,7 +307,7 @@ impl ApplicationTaskBuilder {
         #[cfg(simd_personality)]
         let ktb = ktb.simd(self.simd);
 
-        ktb.spawn_internal(Some(app_crate_ref))
+        ktb.spawn_internal(Some(app_crate_ref), postponed_start)
     }
 
 }
