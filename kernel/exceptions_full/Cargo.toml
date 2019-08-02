@@ -5,7 +5,7 @@ description = "Exception handlers that are fully-featured, i.e., aware of the ap
 version = "0.1.0"
 build = "../../build.rs"
 
-[target.'cfg(any(target_arch = "x86_64", target_arch = "x86"))'.dependencies]
+[dependencies]
 # x86_64 = { git = "https://github.com/kevinaboos/x86_64" }
 x86_64 = { path = "../../libs/x86_64" } # currently using our local copy, forked from Phil Opp's crate
 
