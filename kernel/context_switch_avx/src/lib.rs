@@ -4,16 +4,14 @@
 #![no_std]
 #![feature(asm, naked_functions)]
 
-#[cfg(target_arch = "x86_64")]
 #[macro_use] extern crate context_switch_regular;
 
-#[cfg(target_arch = "x86_64")]
 use context_switch_regular::ContextRegular;
+
 
 /// The registers saved before a context switch and restored after a context switch
 /// for AVX-enabled Tasks.
 #[repr(C, packed)]
-#[cfg(target_arch = "x86_64")]
 pub struct ContextAVX {
     // The order of the registers here MUST MATCH the order of 
     // registers popped in the context_switch() function below. 
@@ -36,7 +34,6 @@ pub struct ContextAVX {
     regular: ContextRegular,
 }
 
-#[cfg(target_arch = "x86_64")]
 impl ContextAVX {
     /// Creates a new ContextAVX struct that will cause the
     /// AVX-enabled Task containing it to begin its execution at the given `rip`.
@@ -67,7 +64,6 @@ impl ContextAVX {
 /// An assembly macro for saving AVX registers
 /// by pushing them onto the stack.
 #[macro_export]
-#[cfg(target_arch = "x86_64")]
 macro_rules! save_registers_avx {
     () => (
         asm!("
@@ -100,7 +96,6 @@ macro_rules! save_registers_avx {
 /// An assembly macro for restoring AVX registers
 /// by popping them off of the stack.
 #[macro_export]
-#[cfg(target_arch = "x86_64")]
 macro_rules! restore_registers_avx {
     () => (
         asm!("
@@ -142,7 +137,6 @@ macro_rules! restore_registers_avx {
 /// and the second argument into the `rsi` register right before invoking this function.
 #[naked]
 #[inline(never)]
-#[cfg(target_arch = "x86_64")]
 pub unsafe fn context_switch_avx() {
     // Since this is a naked function that expects its arguments in two registers,
     // you CANNOT place any log statements or other instructions here,
