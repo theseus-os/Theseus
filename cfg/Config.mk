@@ -57,3 +57,13 @@ RUSTFLAGS += -Z merge-functions=disabled
 ## besides the current crate or the crate that defines the function.
 ## As far as I can tell, this does not have a significant impact on object code size or performance.
 RUSTFLAGS += -Z share-generics=no
+
+## exclude arch-specific crates
+EXCLUDE_X86_SPECIFIC := --exclude gdt
+EXCLUDE_X86_SPECIFIC += --exclude tss
+EXCLUDE_X86_SPECIFIC += --exclude apic
+EXCLUDE_X86_SPECIFIC += --exclude context_switch_regular
+EXCLUDE_X86_SPECIFIC += --exclude context_switch_avx
+EXCLUDE_X86_SPECIFIC += --exclude context_switch_sse
+EXCLUDE_X86_SPECIFIC += --exclude exceptions_early
+EXCLUDE_X86_SPECIFIC += --exclude exceptions_full

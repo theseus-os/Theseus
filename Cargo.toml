@@ -9,8 +9,6 @@ members = [
 	"documentation/"
 ]
 
-
-
 exclude = [
 	## exclude the build directories
 	"build",
@@ -22,7 +20,6 @@ exclude = [
 	"tools",
 	"userspace",
 ]
-
 
 [patch.crates-io]
 ### use our own no_std-compatilbe getopts

@@ -12,7 +12,6 @@ extern crate tss;
 extern crate memory;
 
 use atomic_linked_list::atomic_map::AtomicMap;
-#[cfg(target_arch = "x86_64")]
 use x86_64::{
     structures::{
         tss::TaskStateSegment,

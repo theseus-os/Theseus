@@ -564,7 +564,7 @@ armbuild:
 	@cp $(MAIN_DIR)/main.rs $(NANO_CORE_DIR)
 	@mkdir -p $(GRUB_ISOFILES)/boot/grub
 	RUST_TARGET_PATH=$(PWD)/cfg \
-		RUSTFLAGS="--emit=obj -C debuginfo=2 -D unused-must-use" xargo build  --all --release --target aarch64-theseus 
+		RUSTFLAGS="--emit=obj -C debuginfo=2 -D unused-must-use" xargo build  --all $(EXCLUDE_X86_SPECIFIC) --release --target aarch64-theseus 
 	@rm -f $(NANO_CORE_DIR)/main.rs
 
 
