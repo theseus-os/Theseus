@@ -28,11 +28,7 @@
 
 extern crate spin;
 #[macro_use] extern crate lazy_static;
-#[cfg(any(target_arch = "x86", target_arch = "x86_64"))]
 extern crate x86_64;
-#[cfg(any(target_arch = "aarch64"))]
-extern crate aarch64;
-#[cfg(any(target_arch = "x86", target_arch = "x86_64"))]
 extern crate raw_cpuid;
 extern crate atomic_linked_list;
 extern crate task;
@@ -42,19 +38,9 @@ extern crate alloc;
 extern crate apic;
 #[macro_use] extern crate log;
 
-#[cfg(any(target_arch = "x86", target_arch = "x86_64"))]
 use x86_64::registers::msr::*;
-#[cfg(any(target_arch = "aarch64"))]
-use aarch64::registers::msr::*;
-#[cfg(any(target_arch = "x86", target_arch = "x86_64"))]
 use x86_64::VirtualAddress;
-#[cfg(any(target_arch = "aarch64"))]
-use aarch64::VirtualAddress;
-#[cfg(any(target_arch = "x86", target_arch = "x86_64"))]
 use x86_64::structures::idt::ExceptionStackFrame;
-#[cfg(any(target_arch = "aarch64"))]
-use aarch64::structures::idt::ExceptionStackFrame;
-#[cfg(any(target_arch = "x86", target_arch = "x86_64"))]
 use raw_cpuid::*;
 use spin::{Once, Mutex};
 use atomic_linked_list::atomic_map::*;
@@ -96,28 +82,25 @@ static NUM_PMC: u32 = 4;
 /// Initialization function that retrieves the version ID number. Version ID of 0 means no 
 /// performance monitoring is avaialable on the CPU (likely due to virtualization without hardware assistance).
 pub fn init() {
-    #[cfg(any(target_arch = "x86", target_arch = "x86_64"))]
-    {
-        let cpuid = CpuId::new();
-        if let Some(perf_mon_info) = cpuid.get_performance_monitoring_info() {
-            PMU_VERSION.call_once(||perf_mon_info.version_id() as u16);
-            if let Some(pmu_ver) = PMU_VERSION.try() {  
-                if pmu_ver > &0 {
-                    unsafe{
-                        //clear values in counters and their settings
-                        wrmsr(IA32_PERF_GLOBAL_CTRL, 0);
-                        wrmsr(IA32_PMC0, 0);
-                        wrmsr(IA32_PMC1, 0);
-                        wrmsr(IA32_PMC2, 0);
-                        wrmsr(IA32_PMC3, 0);
-                        wrmsr(IA32_FIXED_CTR0, 0);
-                        wrmsr(IA32_FIXED_CTR1, 0);
-                        wrmsr(IA32_FIXED_CTR2, 0);
-                        //sets fixed function counters to count events at all privilege levels
-                        wrmsr(IA32_FIXED_CTR_CTRL, 0x333);
-                        //enables all counters: each counter has another enable bit in other MSRs so these should likely never be cleared once first set
-                        wrmsr(IA32_PERF_GLOBAL_CTRL, 0x07 << 32 | 0x0f);
-                    }
+    let cpuid = CpuId::new();
+    if let Some(perf_mon_info) = cpuid.get_performance_monitoring_info() {
+        PMU_VERSION.call_once(||perf_mon_info.version_id() as u16);
+        if let Some(pmu_ver) = PMU_VERSION.try() {  
+            if pmu_ver > &0 {
+                unsafe{
+                    //clear values in counters and their settings
+                    wrmsr(IA32_PERF_GLOBAL_CTRL, 0);
+                    wrmsr(IA32_PMC0, 0);
+                    wrmsr(IA32_PMC1, 0);
+                    wrmsr(IA32_PMC2, 0);
+                    wrmsr(IA32_PMC3, 0);
+                    wrmsr(IA32_FIXED_CTR0, 0);
+                    wrmsr(IA32_FIXED_CTR1, 0);
+                    wrmsr(IA32_FIXED_CTR2, 0);
+                    //sets fixed function counters to count events at all privilege levels
+                    wrmsr(IA32_FIXED_CTR_CTRL, 0x333);
+                    //enables all counters: each counter has another enable bit in other MSRs so these should likely never be cleared once first set
+                    wrmsr(IA32_PERF_GLOBAL_CTRL, 0x07 << 32 | 0x0f);
                 }
             }
         }
@@ -457,14 +440,8 @@ pub fn handle_sample(stack_frame: &mut ExceptionStackFrame) {
 /// Read 64 bit PMC (performance monitor counter).
 pub fn rdpmc(msr: u32) -> u64 {
     let (high, low): (u32, u32);
-    #[cfg(any(target_arch = "x86", target_arch = "x86_64"))]
     unsafe {
         asm!("rdpmc": "={eax}" (low), "={edx}" (high): "{ecx}" (msr) : "memory" : "volatile");
-    }
-    #[cfg(any(target_arch = "aarch64"))]
-    { 
-        high = 0;
-        low = 0;
     }
     ((high as u64) << 32) | (low as u64)
 }

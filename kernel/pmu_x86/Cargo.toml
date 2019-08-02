@@ -7,16 +7,11 @@ build = "../../build.rs"
 
 [dependencies]
 spin = "0.4.10"
-
-[target.'cfg(target_arch = "x86_64")'.dependencies]
 # x86_64 = { git = "https://github.com/kevinaboos/x86_64" }
 x86_64 = { path = "../../libs/x86_64" } # currently using our local copy, forked from Phil Opp's crate
-# raw-cpuid only supports x86
-raw-cpuid={ version = "6.1.0", features = [ "use_arch" ] }
-apic = { path = "../apic"}
 
-[target.'cfg(target_arch = "aarch64")'.dependencies]
-aarch64 = { path = "../../libs/aarch64" }
+[dependencies.apic]
+path = "../apic"
 
 [dependencies.atomic_linked_list]
 path = "../../libs/atomic_linked_list"
@@ -40,6 +35,10 @@ path = "../pit_clock"
 
 [dependencies.port_io]
 path = "../../libs/port_io"
+
+[dependencies.raw-cpuid]
+version = "6.1.0"
+features = [ "use_arch" ]
 
 [dependencies.task]
 path = "../task"
