@@ -11,6 +11,8 @@ extern crate spin;
 
 use spin::Mutex;
 
+type Instruction = u32;
+
 lazy_static! {
     static ref VECTORS: Mutex<[ExceptionEntry; 16]> = Mutex::new([ExceptionEntry::new(); 16]);
 }
@@ -33,8 +35,7 @@ pub fn init() {
     exceptions[9].instructions[0] = assemble_inst_bl(&exceptions[9], exception_irq_handler);
     exceptions[10].instructions[0] = assemble_inst_bl(&exceptions[10], exception_fiq_handler);
     exceptions[11].instructions[0] = assemble_inst_bl(&exceptions[11], exception_serror_handler);
-    exceptions[12].instructions[0] =
-        assemble_inst_bl(&exceptions[12], exception_synchronous_handler);
+    exceptions[12].instructions[0] = assemble_inst_bl(&exceptions[12], exception_synchronous_handler);
     exceptions[13].instructions[0] = assemble_inst_bl(&exceptions[13], exception_irq_handler);
     exceptions[14].instructions[0] = assemble_inst_bl(&exceptions[14], exception_fiq_handler);
     exceptions[15].instructions[0] = assemble_inst_bl(&exceptions[15], exception_serror_handler);
@@ -66,7 +67,7 @@ fn assemble_inst_bl(vector: &ExceptionEntry, handler: fn()) -> u32 {
 #[derive(Copy, Clone)]
 #[repr(C, align(0x80))]
 struct ExceptionEntry {
-    instructions: [u32; 0x20],
+    instructions: [Instruction; 0x20],
 }
 
 impl ExceptionEntry {
