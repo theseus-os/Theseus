@@ -54,7 +54,12 @@ fn assemble_inst_bl(vector: &ExceptionEntry, handler: fn()) -> u32 {
     const BL_RANGE: u32 = 0x4000000;
     let dest_addr = handler as u32;
     let src_addr = vector as *const _ as u32;
-    let offset = BL_RANGE - (src_addr as u32 - dest_addr as u32) / 4;
+    let offset;
+    if src_addr > dest_addr {
+        offset = BL_RANGE - (src_addr as u32 - dest_addr as u32) / 4;
+    } else {
+        offset = dest_addr - src_addr;
+    }
     INST_BL + offset
 }
 
