@@ -8,10 +8,10 @@ extern crate log;
 #[macro_use]
 extern crate lazy_static;
 extern crate spin;
+extern crate aarch64;
 
 use spin::Mutex;
-
-type Instruction = u32;
+use aarch64::Instruction;
 
 lazy_static! {
     static ref VECTORS: Mutex<[ExceptionEntry; 16]> = Mutex::new([ExceptionEntry::new(); 16]);
@@ -50,8 +50,8 @@ pub fn init() {
 }
 
 // Assembles a `bl handler` instruction. Passes the address of the vector because the address of the destination is relative
-fn assemble_inst_bl(vector: &ExceptionEntry, handler: fn()) -> u32 {
-    const INST_BL: u32 = 0x94000000;
+fn assemble_inst_bl(vector: &ExceptionEntry, handler: fn()) -> Instruction {
+    const INST_BL: Instruction = 0x94000000;
     const BL_RANGE: u32 = 0x4000000;
     let dest_addr = handler as u32;
     let src_addr = vector as *const _ as u32;

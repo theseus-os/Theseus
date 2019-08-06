@@ -17,5 +17,8 @@ version = "0.3.7"
 features = ["spin_no_std", "nightly"]
 version = "1.2.0"
 
+[dependencies.aarch64]
+path = "../../libs/aarch64"
+
 [lib]
 crate-type = ["rlib"]

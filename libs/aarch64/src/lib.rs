@@ -25,6 +25,8 @@ pub mod structures;
 
 mod address;
 
+pub type Instruction = u32;
+
 /// Represents a protection ring level.
 #[derive(Debug, Copy, Clone, PartialEq, Eq)]
 #[repr(u8)]
