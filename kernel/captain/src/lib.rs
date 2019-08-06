@@ -37,6 +37,7 @@ extern crate mod_mgmt;
 extern crate spawn;
 extern crate tsc;
 extern crate task; 
+#[cfg(target_arch = "x86_64")]
 extern crate interrupts;
 extern crate acpi;
 extern crate device_manager;

@@ -8,6 +8,7 @@ build = "../../build.rs"
 [target.'cfg(target_arch = "x86_64")'.dependencies]
 exceptions_full = { path = "../exceptions_full" }
 apic = { path = "../apic"}
+interrupts = { path = "../interrupts"}
 
 [dependencies.log]
 default-features = false
@@ -55,9 +56,6 @@ path = "../spawn"
 
 [dependencies.tsc]
 path = "../tsc"
-
-[dependencies.interrupts]
-path = "../interrupts"
 
 [dependencies.acpi]
 path = "../acpi"

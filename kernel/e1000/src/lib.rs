@@ -15,6 +15,7 @@ extern crate kernel_config;
 extern crate memory;
 extern crate pci; 
 extern crate owning_ref;
+#[cfg(target_arch = "x86_64")]
 extern crate interrupts;
 extern crate pic;
 #[cfg(target_arch = "x86_64")]
@@ -42,6 +43,7 @@ use memory::{PhysicalAddress, VirtualAddress, MappedPages};
 use pci::{PciDevice, PCI_INTERRUPT_LINE, PciConfigSpaceAccessMechanism};
 use kernel_config::memory::PAGE_SIZE;
 use owning_ref::BoxRefMut;
+#[cfg(target_arch = "x86_64")]
 use interrupts::{eoi,register_interrupt};
 #[cfg(target_arch = "x86_64")]
 use x86_64::structures::idt::{ExceptionStackFrame};

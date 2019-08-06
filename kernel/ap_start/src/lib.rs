@@ -5,6 +5,7 @@
 extern crate spin;
 extern crate irq_safety;
 extern crate memory;
+#[cfg(target_arch = "x86_64")]
 extern crate interrupts;
 extern crate spawn;
 extern crate scheduler;
@@ -57,8 +58,9 @@ pub fn kstart_ap(processor_id: u8, apic_id: u8,
     let _idt = interrupts::init_ap(apic_id, double_fault_stack.top_unusable(), privilege_stack.top_unusable())
         .expect("kstart_ap(): failed to initialize interrupts!");
     #[cfg(target_arch = "aarch64")]
-    let _idt = interrupts::init_ap().expect("kstart_ap(): failed to initialize interrupts!");
-
+    {
+        // TODO
+    }
     spawn::init(kernel_mmi_ref.clone(), apic_id, stack_start, stack_end).unwrap();
 
     // as a final step, init this apic as a new LocalApic, and add it to the list of all lapics.

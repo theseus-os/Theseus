@@ -10,6 +10,7 @@ spin = "0.4.10"
 
 [target.'cfg(target_arch = "x86_64")'.dependencies]
 apic = { path = "../apic"}
+interrupts = { path = "../interrupts"}
 
 [dependencies.log]
 default-features = false
@@ -20,9 +21,6 @@ git = "https://github.com/kevinaboos/irq_safety"
 
 [dependencies.memory]
 path = "../memory"
-
-[dependencies.interrupts]
-path = "../interrupts"
 
 [dependencies.scheduler]
 path = "../scheduler"

@@ -14,6 +14,7 @@ owning_ref = { git = "https://github.com/kevinaboos/owning-ref-rs" }
 # x86_64 = { git = "https://github.com/kevinaboos/x86_64" }
 x86_64 = { path = "../../libs/x86_64" } # currently using our local copy, forked from Phil Opp's crate
 apic = { path = "../apic"}
+interrupts = { path = "../interrupts"}
 
 [dependencies.log]
 default-features = false
@@ -37,9 +38,6 @@ path = "../pic"
 
 [dependencies.pci]
 path = "../pci"
-
-[dependencies.interrupts]
-path = "../interrupts"
 
 [dependencies.mpmc]
 path = "../../libs/mpmc"
