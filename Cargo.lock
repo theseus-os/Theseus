@@ -1057,7 +1057,6 @@ dependencies = [
 name = "nano_core"
 version = "0.1.0"
 dependencies = [
- "aarch64 0.1.2",
  "captain 0.1.0",
  "compiler_builtins 0.1.11 (git+https://github.com/rust-lang-nursery/compiler-builtins)",
  "cortex-a 2.4.0 (registry+https://github.com/rust-lang/crates.io-index)",

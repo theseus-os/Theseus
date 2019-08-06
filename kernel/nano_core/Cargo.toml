@@ -17,7 +17,6 @@ x86_64 = { path = "../../libs/x86_64" }# currently using our local copy, forked 
 exceptions_early = { path = "../exceptions_early" }
 
 [target.'cfg(target_arch = "aarch64")'.dependencies]
-aarch64 = { path = "../../libs/aarch64" } 
 exceptions_arm = { path = "../exceptions_arm" }
 
 uefi = { path = "../../libs/uefi-rs" }

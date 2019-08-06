@@ -74,8 +74,6 @@ use environment::Environment;
 use spin::Mutex;
 #[cfg(target_arch = "x86_64")]
 use x86_64::registers::msr::{rdmsr, wrmsr, IA32_FS_BASE};
-#[cfg(any(target_arch = "aarch64"))]
-use aarch64::registers::msr::{rdmsr, wrmsr, IA32_FS_BASE};
 use fs_node::DirRef;
 
 
@@ -393,10 +391,16 @@ impl Task {
     /// 
     /// Currently this is achieved by writing a pointer to the `TaskLocalData` 
     /// into the FS segment register base MSR.
+    #[cfg(target_arch = "x86_64")]
     fn set_as_current_task(&self) {
         unsafe {
             wrmsr(IA32_FS_BASE, self.task_local_data_ptr.value() as u64);
         }
+    }
+
+    #[cfg(target_arch = "aarch64")]
+    fn set_as_current_task(&self) {
+        // TODO
     }
 
     /// Removes this `Task`'s `TaskLocalData` cyclical task reference so that it can be dropped.
@@ -899,6 +903,7 @@ struct TaskLocalData {
 
 /// Returns a reference to the current task's `TaskLocalData` 
 /// by using the `TaskLocalData` pointer stored in the FS base MSR register.
+#[cfg(target_arch = "x86_64")]
 fn get_task_local_data() -> Option<&'static TaskLocalData> {
     let tld: &'static TaskLocalData = {
         let tld_ptr = rdmsr(IA32_FS_BASE) as *const TaskLocalData;
@@ -910,6 +915,12 @@ fn get_task_local_data() -> Option<&'static TaskLocalData> {
         unsafe { &*tld_ptr }
     };
     Some(&tld)
+}
+
+#[cfg(target_arch = "aarch64")]
+fn get_task_local_data() -> Option<&'static TaskLocalData> {
+    // TODO
+    None
 }
 
 /// Returns a cloned reference to the current task id by using the `TaskLocalData` pointer

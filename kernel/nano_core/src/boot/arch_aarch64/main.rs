@@ -163,7 +163,7 @@ pub extern "win64" fn nano_core_start(_image: uefi::Handle, st: SystemTable<Boot
         .get();
 
     // Disable temporarily because the interrupt handler is to be implemented. Currently we should rely on UEFI handler for keyboard support
-    exceptions_arm::init();
+    // exceptions_arm::init();
 
     // TODO: captain::init()
 

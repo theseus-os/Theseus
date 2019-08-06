@@ -24,8 +24,6 @@ extern crate spin;
 extern crate multiboot2;
 #[cfg(target_arch = "x86_64")]
 extern crate x86_64;
-#[cfg(target_arch = "aarch64")]
-extern crate aarch64;
 extern crate kernel_config; // our configuration options, just a set of const definitions.
 extern crate irq_safety; // for irq-safe locking and interrupt utilities
 
@@ -51,13 +49,12 @@ pub fn nano_core_public_func(val: u8) {
 use core::ops::DerefMut;
 #[cfg(target_arch = "x86_64")]
 use x86_64::structures::idt::LockedIdt;
-#[cfg(target_arch = "aarch64")]
-use aarch64::structures::idt::LockedIdt;
 use memory::VirtualAddress;
 use kernel_config::memory::KERNEL_OFFSET;
 
 /// An initial interrupt descriptor table for catching very simple exceptions only.
 /// This is no longer used after interrupts are set up properly, it's just a failsafe.
+#[cfg(target_arch = "x86_64")]
 static EARLY_IDT: LockedIdt = LockedIdt::new();
 
 
