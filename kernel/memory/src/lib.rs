@@ -68,9 +68,9 @@ use alloc::vec::Vec;
 use alloc::sync::Arc;
 use kernel_config::memory::{PAGE_SIZE, MAX_PAGE_NUMBER, KERNEL_HEAP_START, KERNEL_HEAP_INITIAL_SIZE, KERNEL_STACK_ALLOCATOR_BOTTOM, KERNEL_STACK_ALLOCATOR_TOP_ADDR, ENTRIES_PER_PAGE_TABLE};
 #[cfg(target_arch = "x86_64")]
-use kernel_config::memory::x86_64::KERNEL_OFFSET;
+use kernel_config::memory::x86_64::{KERNEL_OFFSET, KERNEL_OFFSET_BITS_START, KERNEL_OFFSET_PREFIX};
 #[cfg(any(target_arch = "aarch64"))]
-use kernel_config::memory::arm::{KERNEL_OFFSET, HARDWARE_START, HARDWARE_END};
+use kernel_config::memory::arm::{KERNEL_OFFSET, KERNEL_OFFSET_BITS_START, KERNEL_OFFSET_PREFIX, HARDWARE_START, HARDWARE_END};
 use bit_field::BitField;
 use uefi::prelude::*;
 use uefi::table::boot::{MemoryDescriptor, MemoryType};
@@ -89,38 +89,17 @@ impl VirtualAddress {
     /// Creates a new `VirtualAddress`, 
     /// checking that the address is canonical, 
     /// i.e., bits (64:48] are sign-extended from bit 47.
-    #[cfg(target_arch = "x86_64")]
     pub fn new(virt_addr: usize) -> Result<VirtualAddress, &'static str> {
-        match virt_addr.get_bits(47..64) {
-            0 | 0b1_1111_1111_1111_1111 => Ok(VirtualAddress(virt_addr)),
-            _ => Err("VirtualAddress bits 48-63 must be a sign-extension of bit 47"),
-        }
-    }
-
-    #[cfg(any(target_arch = "aarch64"))]
-    pub fn new(virt_addr: usize) -> Result<VirtualAddress, &'static str> {
-        // The offset is 0xFFFFFFFF00000000
-        match virt_addr.get_bits(48..64) {
-            0 | 0b1111_1111_1111_1111 => Ok(VirtualAddress(virt_addr)),
+        match virt_addr.get_bits(KERNEL_OFFSET_BITS_START..64) {
+            0 | KERNEL_OFFSET_PREFIX => Ok(VirtualAddress(virt_addr)),
             _ => Err("VirtualAddress bits 48-63 must be a sign-extension of bit 47"),
         }
     }
 
 /// Creates a new `VirtualAddress` that is guaranteed to be canonical
     /// by forcing the upper bits (64:48] to be sign-extended from bit 47.
-    #[cfg(target_arch = "x86_64")]
     pub fn new_canonical(mut virt_addr: usize) -> VirtualAddress {
-        match virt_addr.get_bit(47) {
-            false => virt_addr.set_bits(48..64, 0),
-            true  => virt_addr.set_bits(48..64, 0xffff),
-        };
-        VirtualAddress(virt_addr)
-    }
-
-    #[cfg(any(target_arch = "aarch64"))]
-    pub fn new_canonical(mut virt_addr: usize) -> VirtualAddress {
-        // The offset is 0xFFFFFFFF00000000
-        match virt_addr.get_bit(48) {
+        match virt_addr.get_bit(KERNEL_OFFSET_BITS_START) {
             false => virt_addr.set_bits(48..64, 0),
             true  => virt_addr.set_bits(48..64, 0xffff),
         };
