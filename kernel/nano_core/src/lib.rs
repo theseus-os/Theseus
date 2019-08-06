@@ -50,7 +50,8 @@ use core::ops::DerefMut;
 #[cfg(target_arch = "x86_64")]
 use x86_64::structures::idt::LockedIdt;
 use memory::VirtualAddress;
-use kernel_config::memory::KERNEL_OFFSET;
+#[cfg(target_arch = "x86_64")]
+use kernel_config::memory::x86_64::KERNEL_OFFSET;
 
 /// An initial interrupt descriptor table for catching very simple exceptions only.
 /// This is no longer used after interrupts are set up properly, it's just a failsafe.
