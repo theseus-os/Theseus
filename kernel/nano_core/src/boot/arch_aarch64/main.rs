@@ -57,7 +57,7 @@ macro_rules! try_exit {
     };
 }
 
-/// Shuts down Theseus and prints the given formatted arguuments.
+// Shuts down Theseus and prints the given formatted arguuments.
 fn shutdown(msg: core::fmt::Arguments) -> ! {
     warn!("Theseus is shutting down, msg: {}", msg);
 

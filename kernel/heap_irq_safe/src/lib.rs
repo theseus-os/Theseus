@@ -24,7 +24,7 @@ use core::ops::Deref;
 use core::ptr::NonNull;
 use alloc::alloc::{GlobalAlloc, Layout};
 use linked_list_allocator::Heap;
-use irq_safety::MutexIrqSafe;
+use irq_safety::MutexIrqSafe; 
 
 
 #[global_allocator]
@@ -33,13 +33,17 @@ static ALLOCATOR: IrqSafeHeap = IrqSafeHeap::empty();
 
 
 /// NOTE: the heap memory MUST BE MAPPED before calling this init function.
+#[cfg(target_arch = "x86_64")]
 pub fn init(start_virt_addr: usize, size_in_bytes: usize) {
-    #[cfg(target_arch = "x86_64")]
     unsafe {
         ALLOCATOR.lock().init(start_virt_addr, size_in_bytes);
     }
 }
 
+#[cfg(target_arch = "aarch64")]
+pub fn init(start_virt_addr: usize, size_in_bytes: usize) {
+    // TODO
+}
 
 /// This is mostly copied from LockedHeap, just to use IrqSafe versions instead of spin::Mutex.
 pub struct IrqSafeHeap(MutexIrqSafe<Heap>);

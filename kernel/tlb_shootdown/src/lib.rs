@@ -49,21 +49,18 @@ pub fn init() {
 /// Broadcasts TLB shootdown IPI to all other AP cores.
 /// Do not invoke this directly, but rather pass it as a callback to the memory subsystem,
 /// which will invoke it as needed (on remap/unmap operations).
+#[cfg(target_arch = "x86_64")]
 fn broadcast_tlb_shootdown(virtual_addresses: Vec<VirtualAddress>) {
-    #[cfg(target_arch = "x86_64")]
-    {
-        if let Some(my_lapic) = get_my_apic() {
-            // info!("broadcast_tlb_shootdown():  AP {}, vaddrs: {:?}", my_lapic.read().apic_id, virtual_addresses);
-            send_tlb_shootdown_ipi(&mut my_lapic.write(), virtual_addresses);
-        }
+    if let Some(my_lapic) = get_my_apic() {
+        // info!("broadcast_tlb_shootdown():  AP {}, vaddrs: {:?}", my_lapic.read().apic_id, virtual_addresses);
+        send_tlb_shootdown_ipi(&mut my_lapic.write(), virtual_addresses);
     }
-    #[cfg(target_arch = "aarch64")]
-    {
-        // TODO
-    }
-    
 }
-
+    
+#[cfg(target_arch = "aarch64")]
+fn broadcast_tlb_shootdown(virtual_addresses: Vec<VirtualAddress>) {
+    // TODO    
+}
 
 /// Handles a TLB shootdown ipi by flushing the `VirtualAddress`es 
 /// currently stored in `TLB_SHOOTDOWN_IPI_VIRTUAL_ADDRESSES`.

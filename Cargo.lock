@@ -747,28 +747,7 @@ dependencies = [
 name = "interrupts_arm"
 version = "0.1.0"
 dependencies = [
- "aarch64 0.1.2",
- "apic 0.1.0",
- "exceptions_early 0.1.0",
- "gdt 0.1.0",
- "irq_safety 0.1.1 (git+https://github.com/kevinaboos/irq_safety)",
- "kernel_config 0.1.0",
- "keyboard 0.1.0",
- "lazy_static 1.2.0 (registry+https://github.com/rust-lang/crates.io-index)",
- "log 0.3.9 (registry+https://github.com/rust-lang/crates.io-index)",
  "memory 0.1.0",
- "mouse 0.1.0",
- "pic 0.1.0",
- "pit_clock 0.1.0",
- "port_io 0.2.1",
- "ps2 0.1.0",
- "scheduler 0.1.0",
- "spin 0.4.10 (registry+https://github.com/rust-lang/crates.io-index)",
- "task 0.1.0",
- "tlb_shootdown 0.1.0",
- "tss 0.1.0",
- "vga_buffer 0.1.0",
- "x86_64 0.1.2",
 ]
 
 [[package]]

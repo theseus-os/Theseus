@@ -11,7 +11,7 @@ spin = "0.4.10"
 multiboot2 = "0.7.1"
 rlibc = "1.0.0"
 
-[target.'cfg(any(target_arch = "x86_64", target_arch = "x86"))'.dependencies]
+[target.'cfg(any(target_arch = "x86_64"))'.dependencies]
 # x86_64 = { git = "https://github.com/kevinaboos/x86_64" }
 x86_64 = { path = "../../libs/x86_64" }# currently using our local copy, forked from Phil Opp's crate
 exceptions_early = { path = "../exceptions_early" }

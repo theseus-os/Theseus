@@ -41,23 +41,24 @@ impl TscTicks {
 
 
 /// Returns the current number of ticks from the TSC, i.e., `rdtscp`. 
+#[cfg(target_arch = "x86_64")]
 pub fn tsc_ticks() -> TscTicks {
+    let mut val = 0;
     // SAFE: just reading TSC value
-    #[cfg(target_arch = "x86_64")]
-    let ticks = {
-        let mut val = 0;
-        unsafe { core::arch::x86_64::__rdtscp(&mut val) }
-    };
-    // get systick
-    #[cfg(any(target_arch = "aarch64"))]
-    // TODO: use cortex crate instead
-    let ticks:u64 = unsafe {
+    let ticks = unsafe { core::arch::x86_64::__rdtscp(&mut val) };
+    TscTicks(ticks)
+}
+
+/// Returns the current number of ticks from the TSC, i.e., `rdtscp`. 
+#[cfg(target_arch = "aarch64")]
+pub fn tsc_ticks() -> TscTicks {
+    let ticks = unsafe {
         let systick:u64;
         asm!("ldr $0, =0xE000E018" : "=r"(systick) : : : "volatile"); 
         systick
     };
- 
     TscTicks(ticks)
+ 
 }
 
 /// Returns the frequency of the TSC for the system, 

@@ -5,66 +5,8 @@ description = "Interrupt configuration and handlers for ARM64"
 version = "0.1.0"
 build = "../../build.rs"
 
-[dependencies]
-spin = "0.4.10"
-
-[target.'cfg(target_arch = "x86_64")'.dependencies]
-# x86_64 = { git = "https://github.com/kevinaboos/x86_64" }
-x86_64 = { path = "../../libs/x86_64" } # currently using our local copy, forked from Phil Opp's crate
-exceptions_early = { path = "../exceptions_early" }
-apic = { path = "../apic" }
-gdt = { path = "../gdt" }
-tss = { path = "../tss" }
-
-[target.'cfg(target_arch = "aarch64")'.dependencies]
-aarch64 = { path = "../../libs/aarch64" }
-
-[dependencies.log]
-default-features = false
-version = "0.3.7"
-
-[dependencies.lazy_static]
-features = ["spin_no_std", "nightly"]
-version = "1.2.0"
-
-[dependencies.irq_safety]
-git = "https://github.com/kevinaboos/irq_safety"
-
-[dependencies.port_io]
-path = "../../libs/port_io"
-
 [dependencies.memory]
 path = "../memory"
-
-[dependencies.kernel_config]
-path = "../kernel_config"
-
-[dependencies.tlb_shootdown]
-path = "../tlb_shootdown"
-
-[dependencies.pic]
-path = "../pic"
-
-[dependencies.task]
-path = "../task"
-
-[dependencies.pit_clock]
-path = "../pit_clock"
-
-[dependencies.keyboard]
-path = "../keyboard"
-
-[dependencies.mouse]
-path = "../mouse"
-
-[dependencies.ps2]
-path = "../ps2"
-
-[dependencies.scheduler]
-path = "../scheduler"
-
-[dependencies.vga_buffer]
-path = "../vga_buffer"
 
 [lib]
 crate-type = ["rlib"]

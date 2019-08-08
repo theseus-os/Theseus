@@ -238,6 +238,7 @@ impl ChainedPics {
 
 
 #[inline(always)]
+#[cfg(target_arch = "x86_64")]
 fn io_wait() {
     // We need to add a short delay between writes to our PICs, especially on
     // older motherboards.  But we don't necessarily have any kind of
@@ -245,9 +246,12 @@ fn io_wait() {
     // older versions of Linux and other PC operating systems have
     // worked around this by writing garbage data to port 0x80, which
     // allegedly takes long enough to make everything work on most hardware.
-    #[cfg(target_arch = "x86_64")]
-    {
-        use x86_64::instructions::port::outb;
-        unsafe { outb(0x80, 0); }
-    }
+    use x86_64::instructions::port::outb;
+    unsafe { outb(0x80, 0); }
+}
+
+#[inline(always)]
+#[cfg(target_arch = "aarch64")]
+fn io_wait() {
+    // TODO
 }
