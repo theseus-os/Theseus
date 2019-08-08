@@ -121,7 +121,6 @@ pub fn init(
     spawn::init(kernel_mmi_ref.clone(), bsp_apic_id, bsp_stack_bottom, bsp_stack_top)?;
 
     // after we've initialized the task subsystem, we can use better exception handlers
-    #[cfg(target_arch = "x86_64")]
     exceptions_full::init(idt);
     
     // boot up the other cores (APs)

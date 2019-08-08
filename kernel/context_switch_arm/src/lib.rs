@@ -7,17 +7,17 @@
 
 /// The registers saved before a context switch and restored after a context switch.
 #[repr(C, packed)]
-pub struct ContextRegular {
+pub struct ContextARM {
     // The order of the registers here MUST MATCH the order of 
     // registers popped in the restore_registers_regular!() macro below. 
     // TODO
 }
 
-impl ContextRegular {
-    /// Creates a new ContextRegular struct that will cause the
+impl ContextARM {
+    /// Creates a new ContextARM struct that will cause the
     /// Task containing it to begin its execution at the given `rip`.
-    pub fn new(rip: usize) -> ContextRegular {
-        ContextRegular {
+    pub fn new(rip: usize) -> ContextARM {
+        ContextARM {
             // TODO
         }
     }
@@ -27,7 +27,7 @@ impl ContextRegular {
 /// An assembly macro for saving regular aarch64 registers.
 /// by pushing them onto the stack.
 #[macro_export]
-macro_rules! save_registers_regular {
+macro_rules! save_registers_arm {
     () => (
         // TODO
     );
@@ -44,22 +44,22 @@ macro_rules! switch_stacks {
 }
 
 
-/// An assembly macro for saving regular aarch64 registers.
+/// An assembly macro for saving aarch64 registers.
 /// by pushing them onto the stack.
 #[macro_export]
-macro_rules! restore_registers_regular {
+macro_rules! restore_registers_arm {
     () => (
         // TODO
     );
 }
 
 
-/// Switches context from a regular Task to another regular Task.
+/// Switches context from a arm Task to another arm Task.
 /// 
 #[naked]
 #[inline(never)]
-pub unsafe fn context_switch_regular() {
-    save_registers_regular!();
+pub unsafe fn context_switch_arm() {
+    save_registers_arm!();
     switch_stacks!();
-    restore_registers_regular!();
+    restore_registers_arm!();
 }

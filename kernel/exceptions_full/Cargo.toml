@@ -8,7 +8,6 @@ build = "../../build.rs"
 [dependencies]
 # x86_64 = { git = "https://github.com/kevinaboos/x86_64" }
 x86_64 = { path = "../../libs/x86_64" } # currently using our local copy, forked from Phil Opp's crate
-apic = { path = "../apic"}
 
 [dependencies.log]
 default-features = false
@@ -19,6 +18,9 @@ path = "../vga_buffer"
 
 [dependencies.print]
 path = "../print"
+
+[dependencies.apic]
+path = "../apic"
 
 [dependencies.tlb_shootdown]
 path = "../tlb_shootdown"

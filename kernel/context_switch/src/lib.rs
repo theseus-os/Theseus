@@ -179,8 +179,8 @@ cfg_if! {
     else if #[cfg(target_arch = "aarch64")] {
         // this covers ARM registers
         extern crate context_switch_arm;
-        pub use context_switch_arm::ContextRegular as Context;
-        pub use context_switch_arm::context_switch_regular as context_switch;
+        pub use context_switch_arm::ContextARM as Context;
+        pub use context_switch_arm::context_switch_arm as context_switch;
     }
 
     else {

@@ -8,11 +8,12 @@ build = "../../build.rs"
 bm_in_us = []
 
 [target.'cfg(target_arch = "x86_64")'.dependencies]
-apic = { path = "../../kernel/apic" }
+apic = { path = "../../kernel/apic"}
 
 # [dependencies.log]
 # default-features = false
 # version = "0.3.7"
+
 
 [dependencies.terminal_print]
 path = "../terminal_print"
