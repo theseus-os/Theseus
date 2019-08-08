@@ -6,7 +6,6 @@
 
 use core::marker::PhantomData;
 
-// TODO impl port I/O for aarch64
 // These cfg statements should cause compiler errors on non-x86 platforms.
 #[cfg(any(target_arch="x86", target_arch="x86_64"))]
 mod x86;
@@ -14,6 +13,11 @@ mod x86;
 #[cfg(any(target_arch="x86", target_arch="x86_64"))]
 pub use x86::{inb, outb, inw, outw, inl, outl};
 
+#[cfg(target_arch = "aarch64")]
+mod aarch64;
+
+#[cfg(target_arch = "aarch64")]
+pub use aarch64::{inb, outb, inw, outw, inl, outl};
 
 /// This trait is defined for any type which can be read from a port.
 /// x86 processors support Port IO for `u8`, `u16` and `u32`.
@@ -30,65 +34,34 @@ pub trait PortOut {
 }
 
 impl PortOut for u8 {
-    #[cfg(target_arch = "x86_64")]
     unsafe fn port_out(port: u16, value: Self) {
         outb(value, port);
     }
-
-    #[cfg(target_arch = "aarch64")]
-    unsafe fn port_out(port: u16, value: Self) {
-        // TODO
-    }
 }
 impl PortOut for u16 {
-    #[cfg(target_arch = "x86_64")]
     unsafe fn port_out(port: u16, value: Self) {
         outw(value, port);
     }
-    #[cfg(target_arch = "aarch64")]
-    unsafe fn port_out(port: u16, value: Self) {
-        // TODO
-    }
 }
 impl PortOut for u32 {
-    #[cfg(target_arch = "x86_64")]
     unsafe fn port_out(port: u16, value: Self) {
         outl(value, port);
-    }
-    #[cfg(target_arch = "aarch64")]
-    unsafe fn port_out(port: u16, value: Self) {
-        // TODO
     }
 }
 
 impl PortIn for u8 {
-    #[cfg(target_arch = "x86_64")]
     unsafe fn port_in(port: u16) -> Self {
-        return inb(port);
-    }
-    #[cfg(target_arch = "aarch64")]
-    unsafe fn port_in(port: u16) -> Self {
-        0
+        inb(port)
     }
 }
 impl PortIn for u16 {
-    #[cfg(target_arch = "x86_64")]
     unsafe fn port_in(port: u16) -> Self {
-        return inw(port);
-    }
-    #[cfg(target_arch = "aarch64")]
-    unsafe fn port_in(port: u16) -> Self {
-        0
+        inw(port)
     }
 }
 impl PortIn for u32 {
-    #[cfg(target_arch = "x86_64")]
     unsafe fn port_in(port: u16) -> Self {
-        return inl(port);
-    }
-    #[cfg(target_arch = "aarch64")]
-    unsafe fn port_in(port: u16) -> Self {
-        0
+        inl(port)
     }
 }
 

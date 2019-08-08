@@ -583,7 +583,7 @@ arm: armbuild
 	qemu-system-aarch64 -m 2048 -cpu cortex-a57 -smp 2 -M virt -bios QEMU_EFI.fd -nographic -drive if=none,file=theseus.iso,id=cdrom,media=cdrom -device virtio-scsi-device -device scsi-cd,drive=cdrom
 
 armdebug: armbuild	
-	qemu-system-aarch64 -s -S -m 2048 -cpu cortex-a57 -smp 2 -M virt -bios QEMU_EFI.fd -nographic -drive if=none,file=theseus.iso,id=cdrom,media=cdrom -device virtio-scsi-device -device scsi-cd,drive=cdrom
+	qemu-system-aarch64 -s -S -m 2048 -cpu cortex-a57 -smp 2 -M virt -bios /usr/share/qemu-efi/QEMU_EFI.fd -nographic -drive if=none,file=theseus.iso,id=cdrom,media=cdrom -device virtio-scsi-device -device scsi-cd,drive=cdrom
 
 armgdb: export CROSS=aarch64-none-elf-
 armgdb:

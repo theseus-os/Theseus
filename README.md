@@ -188,6 +188,12 @@ Try setting a breakpoint at the kernel's entry function using `b nano_core::nano
 Update the submodules. Run:
 `git submodule update`
 
+Install QEMU for ARM:
+`sudo apt-get install qemu-system-arm`
+
+Install QEMU-EFI firmware
+`sudo apt-get install qemu-efi`
+
 Run Theseus on ARM:
 `make arm`
 
