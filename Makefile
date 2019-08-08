@@ -577,7 +577,7 @@ armbuild:
 		cp -vf  $${f}  $(OBJECT_FILES_BUILD_DIR)/`basename $${f} | sed -n -e 's/\(.*\)/$(KERNEL_PREFIX)\1/p'`   2> /dev/null ; \
 	done
 	
-	grub-mkrescue -o theseus.iso $(GRUB_ISOFILES)
+	$(GRUB_MKRESCUE) -d $(HOME)/grub-dir/lib/grub/arm64-efi -o theseus.iso $(GRUB_ISOFILES)
 
 arm: armbuild
 	qemu-system-aarch64 -m 2048 -cpu cortex-a57 -smp 2 -M virt -bios /usr/share/qemu-efi/QEMU_EFI.fd -nographic -drive if=none,file=theseus.iso,id=cdrom,media=cdrom -device virtio-scsi-device -device scsi-cd,drive=cdrom

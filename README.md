@@ -194,6 +194,14 @@ Install QEMU for ARM:
 Install QEMU-EFI firmware
 `sudo apt-get install qemu-efi`
 
+Add Grub support for ARM64-efi
+`git clone https://git.savannah.gnu.org/git/grub.git`
+`cd grub`
+`./autogen.sh`
+`mkdir $HOME/grub-dir`
+`./configure --prefix=$HOME/grub-dir --target=aarch64 --with-platform=efi`
+`make & make install`
+
 Run Theseus on ARM:
 `make arm`
 
