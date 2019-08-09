@@ -28,12 +28,12 @@ extern crate alloc;
 #[macro_use]
 extern crate log;
 extern crate rlibc; // basic memset/memcpy libc functions
-
+extern crate memory;
 extern crate exceptions_arm;
-extern crate logger;
 extern crate uefi;
 extern crate uefi_exts;
 extern crate uefi_services;
+extern crate panic_unwind; // the panic/unwind lang items
 
 use uefi::prelude::*;
 use uefi_exts::BootServicesExt;
@@ -185,15 +185,15 @@ pub fn main() {
     loop {}
 }
 
-#[panic_handler]
-fn panic_handler(_info: &core::panic::PanicInfo) -> ! {
-    loop {}
-}
+// #[panic_handler]
+// pub fn panic_handler(_info: &core::panic::PanicInfo) -> ! {
+//     loop {}
+// }
 
-#[alloc_error_handler]
-fn alloc_error_handler(_layout: core::alloc::Layout) -> ! {
-    loop {}
-}
+// #[alloc_error_handler]
+// fn alloc_error_handler(_layout: core::alloc::Layout) -> ! {
+//     loop {}
+// }
 
 #[lang = "start"]
 fn start() {}

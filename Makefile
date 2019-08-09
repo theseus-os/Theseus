@@ -385,7 +385,6 @@ view-docs: view-doc
 clean:
 	cargo clean
 	@rm -rf build
-	@rm -f $(ROOT_DIR)/kernel/nano_core/src/main.rs	
 #@$(MAKE) -C userspace clean
 	
 
@@ -554,14 +553,12 @@ debug: $(iso)
 gdb:
 	@rust-os-gdb/bin/rust-gdb "$(nano_core_binary)" -ex "target remote :1234"
 
-MAIN_DIR:=$(ROOT_DIR)/kernel/nano_core/src/boot/arch_aarch64
 NANO_CORE_DIR:=$(ROOT_DIR)/kernel/nano_core/src
 
 ### ARM
 armbuild:export TARGET:=aarch64-theseus
 armbuild:export BUILD_MODE=release
 armbuild:
-	@cp $(MAIN_DIR)/main.rs $(NANO_CORE_DIR)
 	@mkdir -p $(GRUB_ISOFILES)/boot/grub
 	RUST_TARGET_PATH=$(PWD)/cfg \
 		RUSTFLAGS="--emit=obj -C debuginfo=2 -D unused-must-use" xargo build  --all $(EXCLUDE_X86_SPECIFIC) --release --target aarch64-theseus 
@@ -570,7 +567,7 @@ armbuild:
 
 	cp $(ROOT_DIR)/cfg/grub-aarch64.cfg $(GRUB_ISOFILES)/boot/grub/grub.cfg
 
-	cp $(ROOT_DIR)/target/$(TARGET)/$(BUILD_MODE)/nano_core.efi $(GRUB_ISOFILES)/boot/kernel.efi$
+	cp $(ROOT_DIR)/target/$(TARGET)/$(BUILD_MODE)/nano_core_arm.efi $(GRUB_ISOFILES)/boot/kernel.efi$
 
 	mkdir -p $(OBJECT_FILES_BUILD_DIR)
 	@for f in $(ROOT_DIR)/target/$(TARGET)/$(BUILD_MODE)/deps/*.o "$(HOME)"/.xargo/lib/rustlib/aarch64-theseus/lib/*.o; do \
