@@ -27,7 +27,6 @@ extern crate keycodes_ascii;
 extern crate frame_buffer;
 extern crate event_types;
 extern crate spawn;
-extern crate pit_clock;
 
 #[macro_use] extern crate log;
 //#[macro_use] extern crate util;

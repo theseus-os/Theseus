@@ -11,6 +11,7 @@ volatile = "0.2.5"
 
 [target.'cfg(target_arch = "x86_64")'.dependencies]
 apic = { path = "../apic"}
+pit_clock = { path = "../pit_clock"}
 
 [dependencies.log]
 default-features = false
@@ -31,9 +32,6 @@ path = "../kernel_config"
 
 [dependencies.ioapic]
 path = "../ioapic"
-
-[dependencies.pit_clock]
-path = "../pit_clock"
 
 [dependencies.pic]
 path = "../pic"

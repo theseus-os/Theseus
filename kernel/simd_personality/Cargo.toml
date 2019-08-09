@@ -10,9 +10,7 @@ cfg-if = "0.1.6"
 
 [target.'cfg(target_arch = "x86_64")'.dependencies]
 apic = { path = "../apic"}
-
-[dependencies.pit_clock]
-path = "../pit_clock"
+pit_clock = { path = "../pit_clock"}
 
 [dependencies.log]
 default-features = false

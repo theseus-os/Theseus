@@ -12,6 +12,7 @@ extern crate spin;
 extern crate volatile;
 extern crate irq_safety;
 extern crate memory;
+#[cfg(target_arch = "x86_64")]
 extern crate pit_clock;
 extern crate kernel_config;
 #[cfg(target_arch = "x86_64")]

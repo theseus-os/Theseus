@@ -16,6 +16,7 @@ extern crate spin;
 extern crate memory;
 extern crate kernel_config;
 extern crate ioapic;
+#[cfg(target_arch = "x86_64")]
 extern crate pit_clock;
 extern crate ap_start;
 extern crate pic; 

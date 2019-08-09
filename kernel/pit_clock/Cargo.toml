@@ -7,8 +7,6 @@ build = "../../build.rs"
 
 [dependencies]
 spin = "0.4.10"
-
-[target.'cfg(any(target_arch = "x86_64", target_arch = "x86"))'.dependencies]
 # x86_64 = { git = "https://github.com/kevinaboos/x86_64" }
 x86_64 = { path = "../../libs/x86_64" } # currently using our local copy, forked from Phil Opp's crate
 

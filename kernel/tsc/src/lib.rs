@@ -1,6 +1,7 @@
 #![no_std]
 #![feature(asm)]
 #[macro_use] extern crate log;
+#[cfg(target_arch = "x86_64")]
 extern crate pit_clock;
 
 use core::sync::atomic::{AtomicUsize, Ordering};
@@ -76,7 +77,12 @@ pub fn get_tsc_frequency() -> Result<u64, &'static str> {
         // a freq of zero means it hasn't yet been initialized.
         let start = tsc_ticks();
         // wait 10000 us (10 ms)
+        #[cfg(target_arch = "x86_64")]
         try!(pit_clock::pit_wait(10000));
+        #[cfg(target_arch = "aarch64")]
+        {
+            //TODO
+        }
         let end = tsc_ticks(); 
 
         let diff = try!(end.sub(&start).ok_or("couldn't subtract end-start TSC tick values"));

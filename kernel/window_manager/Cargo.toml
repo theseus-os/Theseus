@@ -48,10 +48,6 @@ path = "../event_types"
 [dependencies.spawn]
 path = "../spawn"
 
-[dependencies.pit_clock]
-path = "../pit_clock"
-
-
 
 # [build]
 # rustflags = ["-C", "prefer-dynamic", "-C", "panic=abort"]
