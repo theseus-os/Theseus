@@ -7,10 +7,7 @@
 #![no_std]
 
 extern crate port_io;
-#[cfg(target_arch = "x86_64")]
 extern crate x86_64;
-#[cfg(any(target_arch = "aarch64"))]
-extern crate aarch64;
 
 use core::fmt;
 
@@ -238,7 +235,6 @@ impl ChainedPics {
 
 
 #[inline(always)]
-#[cfg(target_arch = "x86_64")]
 fn io_wait() {
     // We need to add a short delay between writes to our PICs, especially on
     // older motherboards.  But we don't necessarily have any kind of
@@ -248,10 +244,4 @@ fn io_wait() {
     // allegedly takes long enough to make everything work on most hardware.
     use x86_64::instructions::port::outb;
     unsafe { outb(0x80, 0); }
-}
-
-#[inline(always)]
-#[cfg(target_arch = "aarch64")]
-fn io_wait() {
-    // TODO
 }

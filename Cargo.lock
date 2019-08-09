@@ -27,7 +27,6 @@ dependencies = [
  "madt 0.1.0",
  "memory 0.1.0",
  "pause 0.1.0",
- "pic 0.1.0",
  "pit_clock 0.1.0",
  "rsdp 0.1.0",
  "rsdt 0.1.0",
@@ -1250,7 +1249,6 @@ version = "1.0.2"
 name = "pic"
 version = "0.1.0"
 dependencies = [
- "aarch64 0.1.2",
  "log 0.3.9 (registry+https://github.com/rust-lang/crates.io-index)",
  "memory 0.1.0",
  "port_io 0.2.1",

@@ -10,6 +10,7 @@ extern crate memory;
 extern crate ioapic;
 #[cfg(target_arch = "x86_64")]
 extern crate apic;
+#[cfg(target_arch = "x86_64")]
 extern crate pic;
 extern crate sdt;
 extern crate acpi_table;

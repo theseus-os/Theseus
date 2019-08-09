@@ -33,9 +33,6 @@ path = "../kernel_config"
 [dependencies.ioapic]
 path = "../ioapic"
 
-[dependencies.pic]
-path = "../pic"
-
 [dependencies.ap_start]
 path = "../ap_start"
 
