@@ -7,6 +7,7 @@ description = "physical filesystem -- FAT32 support"
 
 [dependencies]
 spin = "0.4.10"
+byteorder = { version = "1", default-features = false }
 
 [dependencies.lazy_static]
 version = "1.0"
@@ -16,11 +17,17 @@ features = ["spin_no_std"]
 default-features = false
 version = "0.3.7"
 
+[dependencies.memory]
+path = "../memory"
+
 [dependencies.storage_device]
 path = "../storage_device"
 
 [dependencies.fs_node]
 path = "../fs_node"
+
+[dependencies.root]
+path = "../root"
 
 [dependencies.storage_manager]
 path = "../storage_manager"
