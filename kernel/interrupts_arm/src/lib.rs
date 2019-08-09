@@ -8,6 +8,7 @@ extern crate memory;
 
 use memory::VirtualAddress;
 
+/// TODO: init the interrupts handlers
 pub fn init(double_fault_stack_top_unusable: VirtualAddress, privilege_stack_top_unusable: VirtualAddress) 
     -> Result<(), &'static str> 
 {
@@ -15,12 +16,7 @@ pub fn init(double_fault_stack_top_unusable: VirtualAddress, privilege_stack_top
     Ok(())
 }
 
-pub fn init_ap(/*parameters*/) -> Result<(), &'static str> {
-    // TODO
-    Ok(())
-}
-
-/// Establishes the default interrupt handlers that are statically known.
+// Establishes the default interrupt handlers that are statically known.
 fn set_handlers() {
     // TODO
 }

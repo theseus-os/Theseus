@@ -13,6 +13,7 @@ extern crate aarch64;
 use spin::Mutex;
 use aarch64::Instruction;
 
+// Exception handler table
 lazy_static! {
     static ref VECTORS: Mutex<[ExceptionEntry; 16]> = Mutex::new([ExceptionEntry::new(); 16]);
 }
@@ -111,6 +112,7 @@ fn exception_serror_handler() {
     loop {}
 }
 
+// Print the value of exception related registers
 fn print_registers() {
     let esr_el1: u64;
     let elr_el1: u64;
