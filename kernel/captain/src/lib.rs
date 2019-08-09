@@ -186,6 +186,7 @@ pub fn init(
     }
 }
 
+/// TODO: Initialization
 #[cfg(target_arch = "aarch64")]
 pub fn init(
     kernel_mmi_ref: Arc<MutexIrqSafe<MemoryManagementInfo>>, 

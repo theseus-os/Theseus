@@ -439,23 +439,6 @@ dependencies = [
 [[package]]
 name = "e1000_arm"
 version = "0.1.0"
-dependencies = [
- "intel_ethernet 0.1.0",
- "irq_safety 0.1.1 (git+https://github.com/kevinaboos/irq_safety)",
- "kernel_config 0.1.0",
- "lazy_static 1.2.0 (registry+https://github.com/rust-lang/crates.io-index)",
- "log 0.3.9 (registry+https://github.com/rust-lang/crates.io-index)",
- "memory 0.1.0",
- "mpmc 0.1.6-pre",
- "network_interface_card 0.1.0",
- "nic_buffers 0.1.0",
- "nic_initialization 0.1.0",
- "nic_queues 0.1.0",
- "owning_ref 0.4.0 (git+https://github.com/kevinaboos/owning-ref-rs)",
- "pci 0.1.0",
- "spin 0.4.10 (registry+https://github.com/rust-lang/crates.io-index)",
- "volatile 0.2.5 (registry+https://github.com/rust-lang/crates.io-index)",
-]
 
 [[package]]
 name = "either"
@@ -1525,7 +1508,6 @@ dependencies = [
 name = "rtc"
 version = "0.1.0"
 dependencies = [
- "aarch64 0.1.2",
  "irq_safety 0.1.1 (git+https://github.com/kevinaboos/irq_safety)",
  "kernel_config 0.1.0",
  "lazy_static 1.2.0 (registry+https://github.com/rust-lang/crates.io-index)",
@@ -1533,7 +1515,6 @@ dependencies = [
  "port_io 0.2.1",
  "spin 0.4.10 (registry+https://github.com/rust-lang/crates.io-index)",
  "state_store 0.1.0",
- "x86_64 0.1.2",
 ]
 
 [[package]]
@@ -1694,7 +1675,6 @@ dependencies = [
  "log 0.3.9 (registry+https://github.com/rust-lang/crates.io-index)",
  "memory 0.1.0",
  "mod_mgmt 0.1.0",
- "pit_clock 0.1.0",
  "spawn 0.1.0",
  "task 0.1.0",
 ]
@@ -1836,7 +1816,6 @@ dependencies = [
 name = "task"
 version = "0.1.0"
 dependencies = [
- "aarch64 0.1.2",
  "atomic_linked_list 0.1.0",
  "context_switch 0.1.0",
  "environment 0.1.0",

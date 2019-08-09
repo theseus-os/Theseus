@@ -43,8 +43,6 @@ extern crate environment;
 extern crate root;
 #[cfg(target_arch = "x86_64")]
 extern crate x86_64;
-#[cfg(any(target_arch = "aarch64"))]
-extern crate aarch64;
 extern crate spin;
 extern crate fs_node;
 extern crate pause;
