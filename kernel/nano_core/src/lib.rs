@@ -47,7 +47,7 @@ pub fn nano_core_public_func(val: u8) {
 use core::ops::DerefMut;
 use x86_64::structures::idt::LockedIdt;
 use memory::VirtualAddress;
-use kernel_config::memory::KERNEL_OFFSET;
+use kernel_config::memory::x86_64::KERNEL_OFFSET;
 
 /// An initial interrupt descriptor table for catching very simple exceptions only.
 /// This is no longer used after interrupts are set up properly, it's just a failsafe.

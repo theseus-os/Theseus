@@ -74,3 +74,5 @@ EXCLUDE_X86_SPECIFIC += --exclude nano_core
 ## exclude arch-specific crates
 EXCLUDE_ARM_SPECIFIC := --exclude exceptions_arm
 EXCLUDE_ARM_SPECIFIC += --exclude interrupts_arm
+EXCLUDE_ARM_SPECIFIC += --exclude context_switch_arm
+EXCLUDE_ARM_SPECIFIC += --exclude nano_core_arm

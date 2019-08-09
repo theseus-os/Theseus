@@ -1028,6 +1028,28 @@ version = "0.1.0"
 dependencies = [
  "captain 0.1.0",
  "compiler_builtins 0.1.11 (git+https://github.com/rust-lang-nursery/compiler-builtins)",
+ "exceptions_early 0.1.0",
+ "irq_safety 0.1.1 (git+https://github.com/kevinaboos/irq_safety)",
+ "kernel_config 0.1.0",
+ "log 0.3.9 (registry+https://github.com/rust-lang/crates.io-index)",
+ "logger 0.1.0",
+ "memory 0.1.0",
+ "mod_mgmt 0.1.0",
+ "multiboot2 0.7.1 (registry+https://github.com/rust-lang/crates.io-index)",
+ "panic_unwind 0.1.0",
+ "rlibc 1.0.0 (registry+https://github.com/rust-lang/crates.io-index)",
+ "spin 0.4.10 (registry+https://github.com/rust-lang/crates.io-index)",
+ "state_store 0.1.0",
+ "vga_buffer 0.1.0",
+ "x86_64 0.1.2",
+]
+
+[[package]]
+name = "nano_core_arm"
+version = "0.1.0"
+dependencies = [
+ "captain 0.1.0",
+ "compiler_builtins 0.1.11 (git+https://github.com/rust-lang-nursery/compiler-builtins)",
  "exceptions_arm 0.1.0",
  "exceptions_early 0.1.0",
  "irq_safety 0.1.1 (git+https://github.com/kevinaboos/irq_safety)",
@@ -1044,7 +1066,6 @@ dependencies = [
  "uefi 0.1.0",
  "uefi-exts 0.1.0",
  "uefi_services 0.1.0",
- "vga_buffer 0.1.0",
  "x86_64 0.1.2",
 ]
 

@@ -1,0 +1,35 @@
+[package]
+authors = ["Wenqiu Yu <yuwenqiuj@gmail.com>"]
+name = "nano_core_arm"
+description = "The minimalist crate that takes over after the bootloader and is responsible for pre-initialization of Theseus, before handing off control to the captain on ARM64"
+version = "0.1.0"
+build = "../../build.rs"
+
+
+[dependencies]
+spin = "0.4.10"
+multiboot2 = "0.7.1"
+rlibc = "1.0.0"
+
+exceptions_arm = { path = "../exceptions_arm" }
+
+uefi = { path = "../../libs/uefi-rs" }
+uefi_services = { path = "../../libs/uefi-rs/uefi-services" }
+uefi-exts = { path = "../../libs/uefi-rs/uefi-exts" }
+
+[dependencies.log]
+default-features = false
+version = "0.3.7"
+
+[dependencies.mod_mgmt]
+path = "../mod_mgmt"
+
+[features]
+loadable = []
+
+
+[lib]
+# staticlib is required to build a self-contained, fully-linked .a file 
+# that we can jump to from the bootloader.
+crate-type = ["staticlib"]  
+

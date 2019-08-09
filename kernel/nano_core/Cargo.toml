@@ -10,18 +10,9 @@ build = "../../build.rs"
 spin = "0.4.10"
 multiboot2 = "0.7.1"
 rlibc = "1.0.0"
-
-[target.'cfg(any(target_arch = "x86_64"))'.dependencies]
 # x86_64 = { git = "https://github.com/kevinaboos/x86_64" }
-x86_64 = { path = "../../libs/x86_64" }# currently using our local copy, forked from Phil Opp's crate
-exceptions_early = { path = "../exceptions_early" }
+x86_64 = { path = "../../libs/x86_64" } # currently using our local copy, forked from Phil Opp's crate
 
-[target.'cfg(target_arch = "aarch64")'.dependencies]
-exceptions_arm = { path = "../exceptions_arm" }
-
-uefi = { path = "../../libs/uefi-rs" }
-uefi_services = { path = "../../libs/uefi-rs/uefi-services" }
-uefi-exts = { path = "../../libs/uefi-rs/uefi-exts" }
 
 [dependencies.compiler_builtins]
 git = "https://github.com/rust-lang-nursery/compiler-builtins"
@@ -49,6 +40,9 @@ path = "../memory"
 
 [dependencies.mod_mgmt]
 path = "../mod_mgmt"
+
+[dependencies.exceptions_early]
+path = "../exceptions_early"
 
 [dependencies.captain]
 path = "../captain"
