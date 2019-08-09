@@ -22,7 +22,6 @@ extern crate alloc;
 extern crate rlibc; // basic memset/memcpy libc functions
 extern crate spin;
 extern crate multiboot2;
-#[cfg(target_arch = "x86_64")]
 extern crate x86_64;
 extern crate kernel_config; // our configuration options, just a set of const definitions.
 extern crate irq_safety; // for irq-safe locking and interrupt utilities
@@ -31,7 +30,6 @@ extern crate logger;
 extern crate state_store;
 extern crate memory; // the virtual memory subsystem
 extern crate mod_mgmt;
-#[cfg(target_arch = "x86_64")]
 extern crate exceptions_early;
 extern crate captain;
 extern crate panic_unwind; // the panic/unwind lang items
@@ -47,15 +45,12 @@ pub fn nano_core_public_func(val: u8) {
 
 
 use core::ops::DerefMut;
-#[cfg(target_arch = "x86_64")]
 use x86_64::structures::idt::LockedIdt;
 use memory::VirtualAddress;
-#[cfg(target_arch = "x86_64")]
-use kernel_config::memory::x86_64::KERNEL_OFFSET;
+use kernel_config::memory::KERNEL_OFFSET;
 
 /// An initial interrupt descriptor table for catching very simple exceptions only.
 /// This is no longer used after interrupts are set up properly, it's just a failsafe.
-#[cfg(target_arch = "x86_64")]
 static EARLY_IDT: LockedIdt = LockedIdt::new();
 
 
@@ -103,7 +98,6 @@ fn shutdown(msg: core::fmt::Arguments) -> ! {
 /// then change the [`captain::init`](../captain/fn.init.html) routine.
 /// 
 #[no_mangle]
-#[cfg(target_arch = "x86_64")]
 pub extern "C" fn nano_core_start(multiboot_information_virtual_address: usize) {
     println_raw!("Entered nano_core_start()."); 
 	

@@ -1185,14 +1185,12 @@ dependencies = [
 name = "path"
 version = "0.1.0"
 dependencies = [
- "aarch64 0.1.2",
  "fs_node 0.1.0",
  "lazy_static 1.2.0 (registry+https://github.com/rust-lang/crates.io-index)",
  "log 0.3.9 (registry+https://github.com/rust-lang/crates.io-index)",
  "root 0.1.0",
  "spin 0.4.10 (registry+https://github.com/rust-lang/crates.io-index)",
  "vfs_node 0.1.0",
- "x86_64 0.1.2",
 ]
 
 [[package]]
@@ -1456,12 +1454,10 @@ dependencies = [
 name = "root"
 version = "0.1.0"
 dependencies = [
- "aarch64 0.1.2",
  "fs_node 0.1.0",
  "lazy_static 1.2.0 (registry+https://github.com/rust-lang/crates.io-index)",
  "log 0.3.9 (registry+https://github.com/rust-lang/crates.io-index)",
  "spin 0.4.10 (registry+https://github.com/rust-lang/crates.io-index)",
- "x86_64 0.1.2",
 ]
 
 [[package]]

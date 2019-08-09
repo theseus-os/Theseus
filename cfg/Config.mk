@@ -69,6 +69,7 @@ EXCLUDE_X86_SPECIFIC += --exclude exceptions_early
 EXCLUDE_X86_SPECIFIC += --exclude exceptions_full
 EXCLUDE_X86_SPECIFIC += --exclude pmu_x86
 EXCLUDE_X86_SPECIFIC += --exclude interrupts
+EXCLUDE_X86_SPECIFIC += --exclude nano_core
 
 ## exclude arch-specific crates
 EXCLUDE_ARM_SPECIFIC := --exclude exceptions_arm
