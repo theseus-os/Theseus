@@ -7,6 +7,7 @@ build = "../../build.rs"
 
 [target.'cfg(target_arch = "x86_64")'.dependencies]
 apic = { path = "../apic"}
+e1000 = { path = "../e1000"}
 
 [dependencies.log]
 default-features = false

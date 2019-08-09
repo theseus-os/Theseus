@@ -4,6 +4,7 @@
 #[macro_use] extern crate log;
 extern crate event_types;
 extern crate ata;
+#[cfg(target_arch = "x86_64")]
 extern crate e1000;
 extern crate memory;
 extern crate dfqueue; 

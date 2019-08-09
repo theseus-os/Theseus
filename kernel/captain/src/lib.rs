@@ -41,6 +41,7 @@ extern crate task;
 extern crate interrupts;
 extern crate acpi;
 extern crate device_manager;
+#[cfg(target_arch = "x86_64")]
 extern crate e1000;
 extern crate window_manager;
 extern crate scheduler;

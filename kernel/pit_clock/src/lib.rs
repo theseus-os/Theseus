@@ -9,8 +9,6 @@ extern crate spin;
 extern crate port_io;
 #[cfg(target_arch = "x86_64")]
 extern crate x86_64;
-#[cfg(any(target_arch = "aarch64"))]
-extern crate aarch64;
 
 use port_io::Port;
 use spin::Mutex;
