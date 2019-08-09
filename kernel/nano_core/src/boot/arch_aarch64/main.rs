@@ -65,7 +65,6 @@ fn shutdown(msg: core::fmt::Arguments) -> ! {
 }
 
 /// The main entry point of the UEFI application. It enters the Theseus OS
-#[cfg(any(windows, target_arch = "aarch64", target_env = "msvc"))]
 #[no_mangle]
 pub extern "win64" fn efi_main(image: uefi::Handle, st: SystemTable<Boot>) {
     nano_core_start(image, st);
@@ -117,7 +116,6 @@ pub extern "win64" fn efi_main(image: uefi::Handle, st: SystemTable<Boot>) {
 // }
 
 #[no_mangle]
-#[cfg(target_arch = "aarch64")]
 /// The entrypoint of Theseus.
 /// `image` is the handler of the image file. Currently it is of no use.
 /// `st` is the systemtable of UEFI. It contains all the services provides by UEFI.
@@ -182,7 +180,7 @@ pub extern "win64" fn nano_core_start(_image: uefi::Handle, st: SystemTable<Boot
     }
 }
 
-/// No use since the linker specifies efi_main as th entrypoint
+/// Not in use since the linker will pick efi_main as the entrypoint
 pub fn main() {
     loop {}
 }

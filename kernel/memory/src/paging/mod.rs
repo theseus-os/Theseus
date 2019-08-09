@@ -327,15 +327,14 @@ impl PageTable {
         #[cfg(target_arch = "x86_64")]
         {
             self.p4_mut()[RECURSIVE_P4_INDEX].set(other_table.p4_table.clone(), EntryFlags::PRESENT | EntryFlags::WRITABLE | EntryFlags::INNER_SHARE); 
-            tlb::flush_all();
         }
 
         #[cfg(any(target_arch = "aarch64"))]
         {
             self.p4_mut()[RECURSIVE_P4_INDEX].set(other_table.p4_table.clone(), EntryFlags::PRESENT | EntryFlags::WRITABLE | EntryFlags::INNER_SHARE | EntryFlags::ACCESSEDARM ); 
-            tlb::flush_all();
         }
 
+        tlb::flush_all();
         // set mapper's target frame to reflect that future mappings will be mapped into the other_table
         self.mapper.target_p4 = other_table.p4_table.clone();
 
@@ -349,13 +348,12 @@ impl PageTable {
         #[cfg(target_arch = "x86_64")]
         {
             p4_table[RECURSIVE_P4_INDEX].set(backup, EntryFlags::PRESENT | EntryFlags::WRITABLE);
-            tlb::flush_all();
         }
 
         #[cfg(any(target_arch = "aarch64"))] {
             p4_table[RECURSIVE_P4_INDEX].set(backup, EntryFlags::PRESENT | EntryFlags::PAGE | EntryFlags::INNER_SHARE | EntryFlags::ACCESSEDARM);
-            tlb::flush_all();
         }
+        tlb::flush_all();
 
         // here, temporary_page is dropped, which auto unmaps it
         ret
@@ -396,20 +394,23 @@ impl PageTable {
 
 
 /// Returns the current top-level page table frame, e.g., cr3 on x86
+#[cfg(target_arch = "x86_64")]
 pub fn get_current_p4() -> Frame {
-    #[cfg(target_arch = "x86_64")]
-    { return Frame::containing_address(PhysicalAddress::new_canonical(control_regs::cr3().0 as usize)) }
-
-    #[cfg(any(target_arch = "aarch64"))]
-    {   
-        let p4:usize;
-        unsafe {  asm!("mrs $0, TTBR0_EL1" : "=r"(p4) : : : "volatile"); };
-        return Frame::containing_address(PhysicalAddress::new_canonical(p4))
-    }
+    Frame::containing_address(PhysicalAddress::new_canonical(control_regs::cr3().0 as usize))
 }
 
+/// Returns the current top-level page table frame, e.g., cr3 on x86
+#[cfg(target_arch = "aarch64")]
+pub fn get_current_p4() -> Frame {
+    let p4:usize;
+    unsafe {  asm!("mrs $0, TTBR0_EL1" : "=r"(p4) : : : "volatile"); };
+    Frame::containing_address(PhysicalAddress::new_canonical(p4))
+}
+
+
 #[cfg(any(target_arch = "aarch64"))]
-pub fn enable_higher_half() {
+// Enable the higher half address. Specific for ARM.
+fn enable_higher_half() {
 unsafe {
     let p4_addr = get_current_p4().start_address().value() as u64;
     let recur_addr:*mut u64 = (p4_addr + RECURSIVE_P4_INDEX as u64 * 8) as *mut u64;
@@ -466,6 +467,7 @@ fn enable_temporary_page(allocator_mutex: &MutexIrqSafe<AreaFrameAllocator>) -> 
 
 
 #[cfg(any(target_arch = "aarch64"))]
+// Set P1/P2/P3/P4 pages mapped by UEFI as accessible
 fn add_af_flag(p4_entry:u64, level:usize) {
     const ADDRESS_MASK:u64 = 0xfffffffffffff000;
     let p4_addr = p4_entry & ADDRESS_MASK;
@@ -483,8 +485,9 @@ fn add_af_flag(p4_entry:u64, level:usize) {
 }
 
 
+// Set the recursive entry is P4 page
 #[cfg(any(target_arch = "aarch64"))]
-pub fn set_recursive(p4_addr:u64) {
+fn set_recursive(p4_addr:u64) {
     unsafe { 
         let recur_addr:*mut u64 = (p4_addr + RECURSIVE_P4_INDEX as u64 * 8) as *mut u64;
         *recur_addr = p4_addr + 0x0703;
@@ -833,7 +836,7 @@ pub fn init(bt:&BootServices, allocator_mutex: &MutexIrqSafe<AreaFrameAllocator>
         )
     };
 
-    try!(enable_temporary_page(allocator_mutex));
+    //try!(enable_temporary_page(allocator_mutex));
 
     let mut new_table = PageTable::new_table(&mut page_table, new_frame, TemporaryPage::new(temp_frames1))?;
     
@@ -845,8 +848,7 @@ pub fn init(bt:&BootServices, allocator_mutex: &MutexIrqSafe<AreaFrameAllocator>
     let mut identity_mapped_pages: [Option<MappedPages>; 32] = Default::default();
 
     // consumes and auto unmaps temporary page
-    try!( page_table.with(&mut new_table, TemporaryPage::new(temp_frames2), |mapper| {
-        
+    try!( page_table.with(&mut new_table, TemporaryPage::new(temp_frames2), |mapper| {        
         // clear out the initially-mapped kernel entries of P4, since we're recreating kernel page tables from scratch.
         // (they were initialized in InactivePageTable::new())
         //let p4 = mapper.p4_mut();
@@ -866,9 +868,7 @@ pub fn init(bt:&BootServices, allocator_mutex: &MutexIrqSafe<AreaFrameAllocator>
         // let rodata_flags:     Option<EntryFlags> = None;
         // let data_flags:       Option<EntryFlags> = None;
 
-
         // scoped to release the frame allocator lock
-        
         let mut allocator = allocator_mutex.lock(); 
 
         const EXTRA_MEMORY_INFO_BUFFER_SIZE:usize = 8;
@@ -895,7 +895,6 @@ pub fn init(bt:&BootServices, allocator_mutex: &MutexIrqSafe<AreaFrameAllocator>
         debug!("Start to map occupied memories in the new page table");
         // Before map the higher half, map these pages to indentical address because UEFI service might be in use after switching.
         loop {
-
             match maps_iter.next() {
                 Some(mapped_pages) => {
                     let start_phys_addr = mapped_pages.phys_start as usize;
@@ -910,18 +909,17 @@ pub fn init(bt:&BootServices, allocator_mutex: &MutexIrqSafe<AreaFrameAllocator>
                     let start_virt_addr;
                     if start_phys_addr < MAX_VIRTUAL_ADDRESS - KERNEL_OFFSET as usize {
                         start_virt_addr = start_phys_addr as usize + KERNEL_OFFSET;
-                        end_virt_addr = VirtualAddress::new( start_virt_addr as usize + size )?;
-                        end_phys_addr = PhysicalAddress::new( start_phys_addr as usize + size )?;
+                        end_virt_addr = VirtualAddress::new(start_virt_addr as usize + size)?;
+                        end_phys_addr = PhysicalAddress::new(start_phys_addr as usize + size)?;
                     } else {
                         start_virt_addr = start_phys_addr as usize;
-                        end_virt_addr = VirtualAddress::new( start_virt_addr as usize + size )?;
-                        end_phys_addr = PhysicalAddress::new( start_phys_addr as usize + size )?;
+                        end_virt_addr = VirtualAddress::new(start_virt_addr as usize + size)?;
+                        end_phys_addr = PhysicalAddress::new(start_phys_addr as usize + size)?;
                     }
 
                     let start_virt_addr = VirtualAddress::new(start_virt_addr as usize)?;         
                     let start_phys_addr = PhysicalAddress::new(start_phys_addr as usize)?;         
-                    match mapped_pages.ty{
-
+                    match mapped_pages.ty {
                          MemoryType::LOADER_DATA => {
 
                             if address_section == IMAGE_START {
@@ -975,9 +973,9 @@ pub fn init(bt:&BootServices, allocator_mutex: &MutexIrqSafe<AreaFrameAllocator>
                             } else {
                                 let start_virt_addr = VirtualAddress::new_canonical(start_phys_addr.value());
                                 identity_mapped_pages[index] = Some(try!( mapper.map_frames(
-                                                FrameRange::from_phys_addr(start_phys_addr, size as usize), 
-                                                Page::containing_address(start_virt_addr), 
-                                                EntryFlags::GLOBAL | EntryFlags::PAGE, allocator.deref_mut())
+                                    FrameRange::from_phys_addr(start_phys_addr, size as usize), 
+                                    Page::containing_address(start_virt_addr), 
+                                    EntryFlags::GLOBAL | EntryFlags::PAGE, allocator.deref_mut())
                                 ));
                                 vmas[index] = VirtualMemoryArea::new(start_virt_addr, size as usize, EntryFlags::GLOBAL, ".conventional");
                                 index += 1;
@@ -993,7 +991,6 @@ pub fn init(bt:&BootServices, allocator_mutex: &MutexIrqSafe<AreaFrameAllocator>
                 },
                 None => break,
             }
-
             //mapped_pages_index += 1;
         }
 
@@ -1023,8 +1020,6 @@ pub fn init(bt:&BootServices, allocator_mutex: &MutexIrqSafe<AreaFrameAllocator>
             EntryFlags::GLOBAL, ".uefi");
         index += 1;
 
-
-        //Hardware resources https://github.com/qemu/qemu/blob/master/hw/arm/virt.c
         use super::HARDWARE_START;
         use super::HARDWARE_END;
         let hardware_virt = VirtualAddress::new_canonical(HARDWARE_START as usize);
@@ -1037,7 +1032,7 @@ pub fn init(bt:&BootServices, allocator_mutex: &MutexIrqSafe<AreaFrameAllocator>
   
         // Map hardware to higher half for future use
         let hardware_virt = VirtualAddress::new_canonical(HARDWARE_START as usize + KERNEL_OFFSET);
-        higher_half_mapped_pages[index] = Some(try!( mapper.map_frames(
+        higher_half_mapped_pages[index] = Some(try!(mapper.map_frames(
             FrameRange::from_phys_addr(PhysicalAddress::new(HARDWARE_START as usize)?,  (HARDWARE_END - HARDWARE_START) as usize), 
                 Page::containing_address(hardware_virt), 
                 EntryFlags::PAGE | EntryFlags::ACCESSEDARM | EntryFlags::INNER_SHARE, allocator.deref_mut())
@@ -1078,7 +1073,6 @@ pub fn init(bt:&BootServices, allocator_mutex: &MutexIrqSafe<AreaFrameAllocator>
 
     // After this point, we must "forget" all of the above mapped_pages instances if an error occurs,
     // because they will be auto-unmapped from the new page table upon return, causing all execution to stop.          
-
 
     // We must map the heap memory here, before it can initialized! 
     let (heap_mapped_pages, heap_vma) = {
