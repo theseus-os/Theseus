@@ -32,6 +32,7 @@ pub static AP_READY_FLAG: AtomicBool = AtomicBool::new(false);
 
 /// Entry to rust for an AP.
 /// The arguments must match the invocation order in "ap_boot.asm"
+#[cfg(target_arch = "x86_64")]
 pub fn kstart_ap(processor_id: u8, apic_id: u8, 
                  stack_start: VirtualAddress, stack_end: VirtualAddress,
                  nmi_lint: u8, nmi_flags: u16) -> ! 
@@ -53,33 +54,26 @@ pub fn kstart_ap(processor_id: u8, apic_id: u8,
             kernel_mmi.alloc_stack(KERNEL_STACK_SIZE_IN_PAGES).expect("kstart_ap(): could not allocate privilege stack"),
         )
     };
-    
-    #[cfg(target_arch = "x86_64")]
     let _idt = interrupts::init_ap(apic_id, double_fault_stack.top_unusable(), privilege_stack.top_unusable())
         .expect("kstart_ap(): failed to initialize interrupts!");
-    #[cfg(target_arch = "aarch64")]
-    {
-        // TODO
-    }
+
     spawn::init(kernel_mmi_ref.clone(), apic_id, stack_start, stack_end).unwrap();
 
     // as a final step, init this apic as a new LocalApic, and add it to the list of all lapics.
     // we do this last (after all other initialization) in order to prevent this lapic
     // from prematurely receiving IPIs or being used in other ways,
     // and also to ensure that if this apic fails to init, it's not accidentally used as a functioning apic in the list.
-    #[cfg(target_arch = "x86_64")]
-    {
-        let lapic = {
-            let mut kernel_mmi = kernel_mmi_ref.lock();
-            LocalApic::new(&mut kernel_mmi.page_table, processor_id, apic_id, false, nmi_lint, nmi_flags)
-                .expect("kstart_ap(): failed to create LocalApic")
-        };
-        tlb_shootdown::init();
-        if get_my_apic_id() != Some(apic_id) {
-            error!("FATAL ERROR: AP {} get_my_apic_id() returned {:?}! They must match!", apic_id, get_my_apic_id());
-        }
-        get_lapics().insert(apic_id, RwLockIrqSafe::new(lapic));
+    let lapic = {
+        let mut kernel_mmi = kernel_mmi_ref.lock();
+        LocalApic::new(&mut kernel_mmi.page_table, processor_id, apic_id, false, nmi_lint, nmi_flags)
+            .expect("kstart_ap(): failed to create LocalApic")
+    };
+    tlb_shootdown::init();
+    if get_my_apic_id() != Some(apic_id) {
+        error!("FATAL ERROR: AP {} get_my_apic_id() returned {:?}! They must match!", apic_id, get_my_apic_id());
     }
+    get_lapics().insert(apic_id, RwLockIrqSafe::new(lapic));
+
 
     info!("Entering idle_task loop on AP {} ...", apic_id);
     enable_interrupts();

@@ -37,6 +37,7 @@ use memory::{VirtualAddress, PhysicalAddress, MappedPages, Page, Frame, FrameRan
 use kernel_config::memory::{PAGE_SIZE, PAGE_SHIFT};
 #[cfg(target_arch = "x86_64")]
 use apic::{LocalApic, get_lapics, get_my_apic_id, has_x2apic, get_bsp_id};
+#[cfg(target_arch = "x86_64")]
 use ap_start::{kstart_ap, AP_READY_FLAG};
 use madt::{Madt, MadtEntry, MadtLocalApic, find_nmi_entry_for_processor};
 use pause::spin_loop_hint;

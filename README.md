@@ -197,7 +197,7 @@ Install QEMU-EFI firmware
 Add Grub support for ARM64-efi
 `git clone https://git.savannah.gnu.org/git/grub.git`
 `cd grub`
-`./autogen.sh`
+`./autogen.sh` (The command my be different for the newest grub. Just check the INSTALL file)
 `mkdir $HOME/grub-dir`
 `./configure --prefix=$HOME/grub-dir --target=aarch64 --with-platform=efi`
 `make & make install`
