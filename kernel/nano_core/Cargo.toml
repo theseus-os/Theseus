@@ -23,8 +23,6 @@ uefi = { path = "../../libs/uefi-rs" }
 uefi_services = { path = "../../libs/uefi-rs/uefi-services" }
 uefi-exts = { path = "../../libs/uefi-rs/uefi-exts" }
 
-cortex-a = "2.3.1"
-
 [dependencies.compiler_builtins]
 git = "https://github.com/rust-lang-nursery/compiler-builtins"
 default-features = false

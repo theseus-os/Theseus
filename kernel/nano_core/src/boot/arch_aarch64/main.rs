@@ -27,7 +27,6 @@ extern crate alloc;
 
 #[macro_use]
 extern crate log;
-extern crate cortex_a;
 extern crate rlibc; // basic memset/memcpy libc functions
 
 extern crate exceptions_arm;
