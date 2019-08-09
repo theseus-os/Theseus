@@ -1,0 +1,11 @@
+[package]
+authors = ["Wenqiu Yu <yuwenqiuj@gmail.com>"]
+name = "e1000_arm"
+description = "Support for the e1000 NIC and driver on ARM"
+version = "0.1.0"
+build = "../../build.rs"
+
+[dependencies]
+
+[lib]
+crate-type = ["rlib"]
