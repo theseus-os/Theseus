@@ -9,6 +9,8 @@ build = "../../build.rs"
 spin = "0.4.10"
 owning_ref = { git = "https://github.com/kevinaboos/owning-ref-rs" }
 
+[target.'cfg(target_arch = "x86_64")'.dependencies]
+e1000 = { path = "../e1000"}
 
 [dependencies.log]
 default-features = false
@@ -17,9 +19,6 @@ version = "0.3.7"
 [dependencies.lazy_static]
 features = ["spin_no_std", "nightly"]
 version = "1.2.0"
-
-[dependencies.e1000]
-path = "../e1000"
 
 [dependencies.smoltcp]
 version = "0.5.0"

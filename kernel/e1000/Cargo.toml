@@ -8,13 +8,10 @@ build = "../../build.rs"
 [dependencies]
 spin = "0.4.10"
 volatile = "0.2.5"
-owning_ref = { git = "https://github.com/kevinaboos/owning-ref-rs" }
-
-[target.'cfg(target_arch = "x86_64")'.dependencies]
 # x86_64 = { git = "https://github.com/kevinaboos/x86_64" }
 x86_64 = { path = "../../libs/x86_64" } # currently using our local copy, forked from Phil Opp's crate
-apic = { path = "../apic"}
-interrupts = { path = "../interrupts"}
+owning_ref = { git = "https://github.com/kevinaboos/owning-ref-rs" }
+
 
 [dependencies.log]
 default-features = false
@@ -33,11 +30,17 @@ path = "../kernel_config"
 [dependencies.memory]
 path = "../memory"
 
+[dependencies.apic]
+path = "../apic"
+
 [dependencies.pic]
 path = "../pic"
 
 [dependencies.pci]
 path = "../pci"
+
+[dependencies.interrupts]
+path = "../interrupts"
 
 [dependencies.mpmc]
 path = "../../libs/mpmc"

@@ -25,9 +25,6 @@ path = "../ata"
 [dependencies.memory]
 path = "../memory"
 
-[dependencies.e1000]
-path = "../e1000"
-
 [dependencies.acpi]
 path = "../acpi"
 

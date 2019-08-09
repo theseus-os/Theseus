@@ -70,14 +70,17 @@ pub fn init(keyboard_producer: DFQueueProducer<Event>) -> Result<(), &'static st
         }
 
         // Look for networking controllers, specifically ethernet cards
-        if dev.class == 0x02 && dev.subclass == 0x00 {
-            if dev.vendor_id == e1000::INTEL_VEND && dev.device_id == e1000::E1000_DEV {
-                info!("e1000 PCI device found at: {:?}", dev.location);
-                let e1000_nic_ref = e1000::E1000Nic::init(dev)?;
-                let e1000_interface = EthernetNetworkInterface::new_ipv4_interface(e1000_nic_ref, DEFAULT_LOCAL_IP, &DEFAULT_GATEWAY_IP)?;
-                add_to_network_interfaces(e1000_interface)
+        #[cfg(target_arch = "x86_64")]
+        {
+            if dev.class == 0x02 && dev.subclass == 0x00 {
+                if dev.vendor_id == e1000::INTEL_VEND && dev.device_id == e1000::E1000_DEV {
+                    info!("e1000 PCI device found at: {:?}", dev.location);
+                    let e1000_nic_ref = e1000::E1000Nic::init(dev)?;
+                    let e1000_interface = EthernetNetworkInterface::new_ipv4_interface(e1000_nic_ref, DEFAULT_LOCAL_IP, &DEFAULT_GATEWAY_IP)?;
+                    add_to_network_interfaces(e1000_interface)
+                }
+                // here: check for and initialize other ethernet cards
             }
-            // here: check for and initialize other ethernet cards
         }
     }
 

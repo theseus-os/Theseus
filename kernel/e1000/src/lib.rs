@@ -15,14 +15,11 @@ extern crate kernel_config;
 extern crate memory;
 extern crate pci; 
 extern crate owning_ref;
-#[cfg(target_arch = "x86_64")]
 extern crate interrupts;
 extern crate pic;
-#[cfg(target_arch = "x86_64")]
 extern crate x86_64;
 extern crate mpmc;
 extern crate network_interface_card;
-#[cfg(target_arch = "x86_64")]
 extern crate apic;
 extern crate intel_ethernet;
 extern crate nic_buffers;
@@ -43,9 +40,7 @@ use memory::{PhysicalAddress, VirtualAddress, MappedPages};
 use pci::{PciDevice, PCI_INTERRUPT_LINE, PciConfigSpaceAccessMechanism};
 use kernel_config::memory::PAGE_SIZE;
 use owning_ref::BoxRefMut;
-#[cfg(target_arch = "x86_64")]
 use interrupts::{eoi,register_interrupt};
-#[cfg(target_arch = "x86_64")]
 use x86_64::structures::idt::{ExceptionStackFrame};
 use network_interface_card:: NetworkInterfaceCard;
 use nic_initialization::{allocate_device_register_memory, init_rx_buf_pool, init_rx_queue, init_tx_queue};
@@ -55,7 +50,6 @@ use intel_ethernet::{
 };
 use nic_buffers::{TransmitBuffer, ReceiveBuffer, ReceivedFrame};
 use nic_queues::{RxQueue, TxQueue};
-#[cfg(target_arch = "x86_64")]
 use apic::get_my_apic_id;
 use regs:: {REG_RXDESCTAIL, REG_TXDESCTAIL};
 
@@ -244,17 +238,10 @@ impl E1000Nic {
         //e1000_nc.clear_statistics();
         
         Self::enable_interrupts(&mut mapped_registers);
-        
-        #[cfg(target_arch = "x86_64")]
         register_interrupt(interrupt_num, e1000_handler)?;
 
         // initialize the buffer pool
         init_rx_buf_pool(RX_BUFFER_POOL_SIZE, E1000_RX_BUFFER_SIZE_IN_BYTES, &RX_BUFFER_POOL)?;
-
-        #[cfg(target_arch = "x86_64")]
-        let cpu_id = get_my_apic_id().ok_or("E1000::init(): couldn't get my apic id")?;
-        #[cfg(target_arch = "aarch64")]
-        let cpu_id = 0; // TODO
 
         let (rx_descs, rx_buffers) = Self::rx_init(&mut mapped_registers)?;
         let rxq = RxQueue {
@@ -264,7 +251,7 @@ impl E1000Nic {
             rx_bufs_in_use: rx_buffers,
             received_frames: VecDeque::new(),
             // here the cpu id is irrelevant because there's no DCA or MSI 
-            cpu_id: cpu_id,
+            cpu_id: get_my_apic_id().ok_or("E1000::init(): couldn't get my apic id")?,
             rdt_addr: VirtualAddress::new(mem_base_v.value() + REG_RXDESCTAIL as usize)?,
         };
 
@@ -273,7 +260,7 @@ impl E1000Nic {
             id: 0,
             tx_descs: tx_descs,
             tx_cur: 0,
-            cpu_id: cpu_id,
+            cpu_id: get_my_apic_id().ok_or("E1000::init(): couldn't get my apic id")?,
             tdt_addr: VirtualAddress::new(mem_base_v.value() + REG_TXDESCTAIL as usize)?,
         };
 
@@ -440,7 +427,6 @@ impl E1000Nic {
     }
 }
 
-#[cfg(target_arch = "x86_64")]
 extern "x86-interrupt" fn e1000_handler(_stack_frame: &mut ExceptionStackFrame) {
     if let Some(ref e1000_nic_ref) = E1000_NIC.try() {
         let mut e1000_nic = e1000_nic_ref.lock();
