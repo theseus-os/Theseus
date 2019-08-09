@@ -595,7 +595,7 @@ pub fn init(boot_info: &BootInformation)
 }
 
 /// Initialize the memory system
-#[cfg(any(windows, target_arch = "aarch64", target_env = "msvc"))]
+#[cfg(target_arch = "aarch64")]
 pub fn init(bt: &BootServices) 
     -> Result<(Arc<MutexIrqSafe<MemoryManagementInfo>>, MappedPages, MappedPages, MappedPages, Vec<MappedPages>), &'static str> 
 {

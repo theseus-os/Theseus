@@ -195,12 +195,18 @@ Install QEMU-EFI firmware
 `sudo apt-get install qemu-efi`
 
 Add Grub support for ARM64-efi
+You can build the target with grub, or just download the target files. Here is how to build it:
 `git clone https://git.savannah.gnu.org/git/grub.git`
 `cd grub`
 `./autogen.sh` (The command my be different for the newest grub. Just check the INSTALL file)
 `mkdir $HOME/grub-dir`
 `./configure --prefix=$HOME/grub-dir --target=aarch64 --with-platform=efi`
 `make & make install`
+
+Or You can just download the files to a local path:
+`mkdir -p $HOME/grub-dir/lib/grub`
+`cd $HOME/grub-dir/lib/grub` 
+`git clone https://github.com/snoword/arm64-efi.git`
 
 Run Theseus on ARM:
 `make arm`
