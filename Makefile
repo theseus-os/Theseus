@@ -553,17 +553,13 @@ debug: $(iso)
 gdb:
 	@rust-os-gdb/bin/rust-gdb "$(nano_core_binary)" -ex "target remote :1234"
 
-NANO_CORE_DIR:=$(ROOT_DIR)/kernel/nano_core/src
-
 ### ARM
 armbuild:export TARGET:=aarch64-theseus
 armbuild:export BUILD_MODE=release
 armbuild:
 	@mkdir -p $(GRUB_ISOFILES)/boot/grub
 	RUST_TARGET_PATH=$(PWD)/cfg \
-		RUSTFLAGS="--emit=obj -C debuginfo=2 -D unused-must-use" xargo build  --all $(EXCLUDE_X86_SPECIFIC) --release --target aarch64-theseus 
-	@rm -f $(NANO_CORE_DIR)/main.rs
-
+		RUSTFLAGS="--emit=obj -C debuginfo=2 -D unused-must-use" xargo build  --all $(EXCLUDE_X86_SPECIFIC) --release --target $(TARGET)
 
 	cp $(ROOT_DIR)/cfg/grub-aarch64.cfg $(GRUB_ISOFILES)/boot/grub/grub.cfg
 
