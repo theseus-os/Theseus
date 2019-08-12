@@ -521,9 +521,9 @@ impl Task {
 
         /// A private macro that actually calls the given context switch routine
         /// by putting the arguments into the proper registers, `rdi` and `rsi`.
+        #[cfg(target_arch = "x86_64")]
         macro_rules! call_context_switch {
             ($func:expr) => ( unsafe {
-                #[cfg(target_arch = "x86_64")]
                 asm!("
                     mov rdi, $0; \
                     mov rsi, $1;" 
@@ -531,6 +531,13 @@ impl Task {
                     : "memory" : "intel", "volatile"
                 );
                 $func();
+            });
+        }
+
+        #[cfg(target_arch = "aarch64")]
+        macro_rules! call_context_switch {
+            ($func:expr) => ( unsafe {
+                // TODO
             });
         }
 
