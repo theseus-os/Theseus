@@ -11,7 +11,7 @@
 //!
 //! To be compatible with x86, the `make arm` command will copy this file to nano_core/src, does the compiling and remove it. If the file is in nano_core/src, for x86 architecture the compiler will try to compile the crate as an application.
 //!
-//! In generating the kernel.efi file, first, the rust compiler compiles all crates and `nano_core` as libraries. It then uses rust-lld to wrap them and generate a kernel.efi file. The entry point of the file is specified in aarch64-theseus.json
+//! In generating the kernel.efi file, first, the rust compiler compiles all crates and `nano_core` as libraries. It then uses rust-lld to wrap them and generate a kernel.efi file. The entry point of the file is specified in aarch64-theseus.json.
 //!  
 //! To create the image, `grub-mkrescue` wraps kernel.efi together with modules and a grub.cfg file and generate an image. The command will put a grub.efi file in this image.
 //!
@@ -56,7 +56,7 @@ macro_rules! try_exit {
     };
 }
 
-// Shuts down Theseus and prints the given formatted arguuments.
+// Shuts down Theseus and prints the given formatted arguments.
 fn shutdown(msg: core::fmt::Arguments) -> ! {
     warn!("Theseus is shutting down, msg: {}", msg);
 
@@ -118,7 +118,7 @@ pub extern "win64" fn efi_main(image: uefi::Handle, st: SystemTable<Boot>) {
 #[no_mangle]
 /// The entrypoint of Theseus.
 /// `image` is the handler of the image file. Currently it is of no use.
-/// `st` is the systemtable of UEFI. It contains all the services provides by UEFI.
+/// `st` is the systemtable of UEFI. It contains all the services provided by UEFI.
 pub extern "win64" fn nano_core_start(_image: uefi::Handle, st: SystemTable<Boot>) -> ! {
     // init useful UEFI services
     uefi_services::init(&st);
@@ -184,16 +184,6 @@ pub extern "win64" fn nano_core_start(_image: uefi::Handle, st: SystemTable<Boot
 pub fn main() {
     loop {}
 }
-
-// #[panic_handler]
-// pub fn panic_handler(_info: &core::panic::PanicInfo) -> ! {
-//     loop {}
-// }
-
-// #[alloc_error_handler]
-// fn alloc_error_handler(_layout: core::alloc::Layout) -> ! {
-//     loop {}
-// }
 
 #[lang = "start"]
 fn start() {}
