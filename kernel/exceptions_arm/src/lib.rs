@@ -18,7 +18,7 @@ lazy_static! {
     static ref VECTORS: Mutex<[ExceptionEntry; 16]> = Mutex::new([ExceptionEntry::new(); 16]);
 }
 
-/// Initialize the exception vectors
+/// Initialize the exception vectors.
 /// In arm, the address of the vector is in VBAR_EL1. The vector contains 16 entries and their addresses are aligned with 0x80. Every entry is the handler of a type of exception. Once an exception occurs, the system jumps to the address of the related entry and continues with the handler. Usually we do not put handlers in the entries directly, but put `bl handler` in the entry so that the system can jump to a custom handler.
 pub fn init() {
     let mut exceptions = VECTORS.lock();
@@ -64,6 +64,7 @@ fn assemble_inst_bl(vector: &ExceptionEntry, handler: fn()) -> Instruction {
     INST_BL + offset
 }
 
+// An exception handler entry
 #[derive(Copy, Clone)]
 #[repr(C, align(0x80))]
 struct ExceptionEntry {
