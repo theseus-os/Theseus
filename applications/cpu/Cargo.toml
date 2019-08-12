@@ -5,7 +5,7 @@ authors = ["Christine Wang <chrissywang54@gmail.com>"]
 build = "../../build.rs"
 
 [target.'cfg(target_arch = "x86_64")'.dependencies]
-apic = { path = "../../kernel/apic"}
+apic = { path = "../../kernel/apic" }
 
 [dependencies]
 getopts = "0.2.18"

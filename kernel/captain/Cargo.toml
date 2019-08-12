@@ -7,9 +7,9 @@ build = "../../build.rs"
 
 [target.'cfg(target_arch = "x86_64")'.dependencies]
 exceptions_full = { path = "../exceptions_full" }
-apic = { path = "../apic"}
-e1000 = { path = "../e1000"}
-interrupts = { path = "../interrupts"}
+apic = { path = "../apic" }
+e1000 = { path = "../e1000" }
+interrupts = { path = "../interrupts" }
 
 [dependencies.log]
 default-features = false

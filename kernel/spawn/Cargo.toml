@@ -11,7 +11,7 @@ owning_ref = { git = "https://github.com/kevinaboos/owning-ref-rs" }
 type-name = "0.1.0"
 
 [target.'cfg(target_arch = "x86_64")'.dependencies]
-apic = { path = "../apic"}
+apic = { path = "../apic" }
 gdt = { path = "../gdt" }
 tss = { path = "../tss" }
 

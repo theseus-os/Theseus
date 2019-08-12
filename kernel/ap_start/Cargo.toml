@@ -9,8 +9,8 @@ build = "../../build.rs"
 spin = "0.4.10"
 
 [target.'cfg(target_arch = "x86_64")'.dependencies]
-apic = { path = "../apic"}
-interrupts = { path = "../interrupts"}
+apic = { path = "../apic" }
+interrupts = { path = "../interrupts" }
 
 [dependencies.log]
 default-features = false

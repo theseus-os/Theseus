@@ -6,8 +6,8 @@ description = "Support for ACPI MADT"
 build = "../../build.rs"
 
 [target.'cfg(target_arch = "x86_64")'.dependencies]
-apic = { path = "../apic"}
-pic = { path = "../pic"}
+apic = { path = "../apic" }
+pic = { path = "../pic" }
 
 [dependencies.log]
 default-features = false

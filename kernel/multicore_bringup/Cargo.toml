@@ -10,8 +10,8 @@ spin = "0.4.10"
 volatile = "0.2.5"
 
 [target.'cfg(target_arch = "x86_64")'.dependencies]
-apic = { path = "../apic"}
-pit_clock = { path = "../pit_clock"}
+apic = { path = "../apic" }
+pit_clock = { path = "../pit_clock" }
 
 [dependencies.log]
 default-features = false

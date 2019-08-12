@@ -10,7 +10,7 @@ build = "../../build.rs"
 spin = "0.4.10"
 
 [target.'cfg(target_arch = "x86_64")'.dependencies]
-apic = { path = "../apic"}
+apic = { path = "../apic" }
 
 [dependencies.log]
 default-features = false
