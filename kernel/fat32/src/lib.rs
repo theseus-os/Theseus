@@ -344,7 +344,6 @@ impl File for PFSFile {
                 Err(_) => return Err("error reading sector"),
             };
             
-            // 
             sector_offset += fs.sectors_per_cluster as u64;
             
             if (position + sectors_read as u32) > self.size {
@@ -861,7 +860,15 @@ impl Filesystem {
     }
 }
 
+
 /// Creates a PFSfile structure based on a provided path
+/// 
+/// # Arguments 
+/// * `fs`: the filesystem structure wrapped in an Arc and Mutex
+/// * `path`: the absolute path of the file in this format `/hello/poem.txt` or `\\hello\\poem.txt`
+/// 
+/// # Returns
+/// A PFSFile structure for the file if it exists, otherwise returns an Error
 pub fn open(fs: Arc<Mutex<Filesystem>>, path: &str) -> Result<PFSFile, Error> {
 
         // First confirms the validity of the path
@@ -941,9 +948,11 @@ pub fn open(fs: Arc<Mutex<Filesystem>>, path: &str) -> Result<PFSFile, Error> {
 
 /// Takes in a drive for a filesystem and initializes it if it's FAT32 
 /// 
-/// # Return value
+/// # Arguments
+/// * `sd`: the storage device that contains the FAT32 filesystem structure
 /// 
-/// If one of the attached drives contains a fat filesystem, this returns the filesystem structure needed to run operations on the disk 
+/// # Return
+/// If the drive passed in contains a fat filesystem, this returns the filesystem structure needed to run operations on the disk 
 pub fn init(sd: storage_device::StorageDeviceRef) -> Result<Filesystem, &'static str>  {
     
    
@@ -968,9 +977,9 @@ pub fn init(sd: storage_device::StorageDeviceRef) -> Result<Filesystem, &'static
 /// Creates a FATdirectory structure for the root directory
 /// 
 /// # Arguments 
-/// 
 /// * `fs`: the filesystem structure wrapped in an Arc and Mutex
 /// 
+/// # Returns
 /// Returns the FATDirectory structure for the root directory 
 pub fn root_dir(fs: Arc<Mutex<Filesystem>>) -> Result<PFSDirectory, Error> {
 
@@ -996,8 +1005,10 @@ pub fn root_dir(fs: Arc<Mutex<Filesystem>>) -> Result<PFSDirectory, Error> {
 
 /// Detects whether the drive passed into the function is a FAT32 drive
 /// 
-/// # Return value
+/// # Arguments
+/// * `disk`: the storage device that contains the FAT32 filesystem structure
 /// 
+/// # Return value
 /// Returns true if the storage device passed into the function has a fat filesystem structure
 pub fn detect_fat(disk: &storage_device::StorageDeviceRef) -> bool {
     
@@ -1016,6 +1027,10 @@ pub fn detect_fat(disk: &storage_device::StorageDeviceRef) -> bool {
 
 /// A case-insenstive way to compare FATdirectory entry name which is in [u8;11] and a str literal to be able to 
 /// confirm whether the directory/file that you're looking at is the one specified 
+/// 
+/// # Arguments
+/// * `name`: the name of the next destination in the path
+/// * `de`: the directory entry that's currently being looked at
 /// 
 /// # Examples
 /// ```rust
