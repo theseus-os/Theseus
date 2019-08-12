@@ -26,8 +26,6 @@
 //! use fat32::root_dir;
 //!
 //!
-//!
-//!
 //!if let Some(controller) = storage_manager::STORAGE_CONTROLLERS.lock().iter().next() {
 //!    for sd in controller.lock().devices() {
 //!        match fat32::init(sd) {
@@ -238,7 +236,8 @@ impl Fat32Header {
     }
 }
 
-/// The 32-byte FAT directory format that contains metadata about a PFSfile/subdirectory inside a PFSdirectory
+/// The actual 32-byte FAT directory format that contains metadata about a file/subdirectory inside a FAT32
+/// formatted filesystem
 struct FatDirectory {
     name: [u8; 11], // 8 letter entry with a 3 letter ext
     flags: u8, // designate the PFSdirectory as r,w,r/w
@@ -249,7 +248,8 @@ struct FatDirectory {
     size: u32, // size of PFSfile in bytes, volume label or subdirectory flags should be set to 0
 }
 
-/// Based on the FatDirectory structure and used to describe the files/subdirectories in a PFSDirectory 
+/// Based on the FatDirectory structure and used to describe the files/subdirectories in a FAT32 
+/// formatted filesystem, used for convience purposes
 pub struct DirectoryEntry {
     pub name: [u8; 11], 
     long_name: [u8; 255], // Long-name format currently not supported
@@ -258,7 +258,8 @@ pub struct DirectoryEntry {
     cluster: u32,
 }
 
-/// Structure for a PFSFile entry inside a PFSDirectory 
+/// Structure for a file in FAT32. This key information is used to transverse the
+/// drive to find the file data  
 pub struct PFSFile {
     filesystem: Arc<Mutex<Filesystem>>,
     pub name: String,
@@ -271,28 +272,37 @@ pub struct PFSFile {
 }
 
 impl File for PFSFile {
-    /// Given an empty data buffer and a PFSfile structure, will read off the bytes of that PFSfile and put it into the data buffer
-    /// If the given buffer is less than the size of the file, read will return the first bytes read unless an offset is specified
+    /// Given an empty data buffer and a FATfile structure, will read off the bytes of that FATfile and place the data into the data buffer
+    /// If the given buffer is less than the size of the file, read will return the first bytes read unless
     /// 
-    /// The input buffer has to be a multiple of the cluster size in bytes for the file to be read
+    /// # Arguments 
+    /// * `data`: the source buffer. The length of the `data` determines how many clusters will be read, 
+    ///   and must be an even multiple of the filesystem's cluster size in bytes = [`sector size`]*[`sectors per cluster`].
+    /// 
+    /// # Returns
+    /// 
     /// Returns the number of bytes read 
-    fn read(&self, data: &mut [u8], offset: usize) -> Result<usize, &'static str> {
+    fn read(&self, data: &mut [u8], _offset: usize) -> Result<usize, &'static str> {
 
-        // place a lock on the filesystem
-        let fs = self.filesystem.lock();
-        let mut counter: usize = offset;
         
-        let cluster_size_in_bytes: usize = fs.sectors_per_cluster() as usize *512 as usize;
-        // the inserted buffer has to be a multiple of the cluster size in bytes for clean reads
+        // Place a lock on the filesystem
+        let fs = self.filesystem.lock();
+
+        let cluster_size_in_bytes: usize = fs.sectors_per_cluster() as usize * 512 as usize;
+        let mut position = self.position;
+        let mut active_cluster = self.active_cluster;
+        let mut sector_offset = self.sector_offset;
+        
+        let mut cluster_offset = 0;
+
+        // The inserted buffer must be a multiple of the cluster size in bytes for clean reads.
+        // clusters act as a sort of boundary in FAT for every file/directory and to minimize
+        // disk requests, its best to read clusters at a time
         if data.len() as usize % cluster_size_in_bytes != 0{
             return Err("data buffer size must be a multiple of the cluster size in bytes");
         }
 
-        let mut position = self.position;
-        let mut active_cluster = self.active_cluster;
-        let mut sector_offset = self.sector_offset;
-
-        // for every cluster, a new sector read request must be sent to read at the new sector position
+        // Represents the number of clusters that must be read
         let num_reads: usize = data.len() as usize/cluster_size_in_bytes;
             
         for _i in 0..num_reads{
@@ -310,7 +320,7 @@ impl File for PFSFile {
                 break;
             }
             
-            // If the current sector position is more than the sectors per cluster, it will move onto the next cluster
+            // When the end of the cluster is reached in terms of sector, it will move onto the next cluster
             if sector_offset == u64::from(fs.sectors_per_cluster()) {
                 match fs.next_cluster(active_cluster) {
                     Err(_e) => {
@@ -328,12 +338,13 @@ impl File for PFSFile {
             // current position is the current sector thats to be read at
             let current_position = cluster_start as u64 + sector_offset;
 
-            // Reads at the beginning cluster
-            let sectors_read = match fs.header().drive.lock().read_sectors(&mut data[(0+counter)..(cluster_size_in_bytes as usize + counter as usize)], current_position as usize) {
+            // Reads at the beginning sector of the cluster
+            let sectors_read = match fs.header().drive.lock().read_sectors(&mut data[(0+cluster_offset)..(cluster_size_in_bytes as usize + cluster_offset as usize)], current_position as usize) {
                 Ok(bytes) => bytes,
                 Err(_) => return Err("error reading sector"),
             };
             
+            // 
             sector_offset += fs.sectors_per_cluster as u64;
             
             if (position + sectors_read as u32) > self.size {
@@ -344,7 +355,7 @@ impl File for PFSFile {
                 position += cluster_size_in_bytes as u32;
             }
 
-            counter += cluster_size_in_bytes as usize;
+            cluster_offset += cluster_size_in_bytes as usize;
         }
         
         Ok(position as usize)
@@ -355,6 +366,7 @@ impl File for PFSFile {
         Err("write not implemeneted yet")
     }
 
+    /// Returns the size of the file
     fn size(&self) -> usize {
         (self.size as usize)
     }     
@@ -379,12 +391,12 @@ impl FsNode for PFSFile {
 }
 
 #[derive(Clone)]
-/// Structure for a PFSDirectory
+/// Structure for a FAT32 directory. 
 pub struct PFSDirectory {
     filesystem: Arc<Mutex<Filesystem>>,
-    name: String,
-    pub parent: WeakDirRef,
-    cluster: u32,
+    pub name: String,
+    pub parent: WeakDirRef, // the directory that holds the metadata for this directory. The root directory's parent should be itself
+    pub cluster: u32, // the cluster number that the directory is stored in
     sector: u32,
     offset: usize,
 }
@@ -402,9 +414,8 @@ impl Directory for PFSDirectory {
         };
         
         for entry in entries {
-            // Compares the name of the next destination in the path and the name of the PFSdirectory entry that it's currently looking at
-                if compare_name(name, &entry) {
-                // let dir_ref = Arc::new(Mutex::new(*current_dir)) as Arc<Mutex<Directory + Send>>;
+            // Compares the name of the next entry in the current directory
+            if compare_name(name, &entry) {
                 match entry.file_type {
                     FileType::PFSDirectory => {
                         // Intializes the different trait objects depedent on whether the file is a file or subdirectory
@@ -433,18 +444,22 @@ impl Directory for PFSDirectory {
 
     fn list(&self) -> Vec<String> {
 
-        let mut list: Vec<String> = Vec::new();
+        let mut list_of_names: Vec<String> = Vec::new();
+        // Returns a vector of the 32-byte directory structures
         let entries = match self.entries() {
             Ok(entries) => entries,
-            Err(_) => return list,
+            Err(_) => return list_of_names,
         };
+
+        // Iterates through the 32-byte directory structures and pushes the name of each one into the list
         for entry in entries {
-            list.push(match core::str::from_utf8(&entry.name) {
+            list_of_names.push(match core::str::from_utf8(&entry.name) {
                 Ok(name) => name.to_string(),
-                Err(_) => return list,
+                Err(_) => return list_of_names,
             })
         }
-        list
+        
+        list_of_names
     }
 
     fn remove(&mut self, _node: &FileOrDir) -> Option<FileOrDir> {
@@ -469,12 +484,12 @@ impl FsNode for PFSDirectory {
 
 impl PFSDirectory {
     
-    /// Returns the next PFSdirectory entry in a PFSdirectory while mutating the Directory object to offset each time the function is used
-    /// and returns EndOfFile if the next PFSdirectory doesn't exist
+    /// Returns the next FATDirectory entry in a FATdirectory while mutating the directory object to offset an entry each time 
+    /// the function is used and returns EndOfFile if the next PFSdirectory doesn't exist
     pub fn next_entry(&mut self) -> Result<DirectoryEntry, Error> {
         
+        let fs = self.filesystem.lock();
         loop {
-            let fs = self.filesystem.lock();
             let sector = if self.cluster > 0 {
                 
                 // Identifies if the sector number is greater than the size of one cluster, and if it is
@@ -573,17 +588,17 @@ impl PFSDirectory {
         }
     }
 
-    /// Returns a vector of all the directory entries in a directory without mutating the Directory
+    /// Returns a vector of all the directory entries in a directory without mutating the directory
     pub fn entries(&self) -> Result<Vec<DirectoryEntry>, Error> {
-        
+         
+        let fs = self.filesystem.lock();
         let mut cluster = self.cluster;
         let mut self_sector = self.sector;
         let mut entry_collection: Vec<DirectoryEntry> = Vec::new(); 
 
         loop {    
-            let fs = self.filesystem.lock();
+            // Looks at current cluster number of the directory and moves to the exact sector
             let sector = if cluster > 0 {
-                
                 // Identifies if the sector number is greater than the size of one cluster, and if it is
                 // it will move on to the next cluster
                 if self_sector >= fs.sectors_per_cluster {
@@ -612,9 +627,10 @@ impl PFSDirectory {
             let mut counter = 32;
             let mut directory_entries: Vec<FatDirectory> = Vec::new(); 
 
-            // This goes through the 8 possible PFSdirectory entries in a PFSdirectory sector 
-            // A PFSdirectory entry is 32 bytes, so it simply jumps to the next PFSdirectory entry by adding 32 bytes to the counter
+            // This goes through the 8 possible directory entries in a FATdirectory sector 
+            // A PFSdirectory entry is 32 bytes, so it simply jumps to the next PFSdirectory entry by adding 64 bytes to the counter
             for _entries in 0..8 { 
+                // Turns the bytes of data into FATDirectory structures 
                 let dir: FatDirectory = FatDirectory {
                     name: match data[(0+counter)..(11+counter)].try_into() {
                         Ok(array) => array,
@@ -667,12 +683,9 @@ impl PFSDirectory {
                     long_name: [0; 255] // long names not supported
                 };
 
-
-                // Offset is the PFSdirectory entry number that you are looking at
                 entry_collection.push(entry); 
-                // offset = i + 1;
             }
-            // Once you reach the final PFSdirectory entry of the sector, you move up one sector and set the offset to 0
+            // Once you reach the final PFSdirectory entry of the sector, you move up one sector
             self_sector += 1;
         }
     }
@@ -952,7 +965,13 @@ pub fn init(sd: storage_device::StorageDeviceRef) -> Result<Filesystem, &'static
     Err("failed to intialize fat filesystem for disk")
 }
 
-/// Creates a directory structure for the root directory
+/// Creates a FATdirectory structure for the root directory
+/// 
+/// # Arguments 
+/// 
+/// * `fs`: the filesystem structure wrapped in an Arc and Mutex
+/// 
+/// Returns the FATDirectory structure for the root directory 
 pub fn root_dir(fs: Arc<Mutex<Filesystem>>) -> Result<PFSDirectory, Error> {
 
         fs.lock();
@@ -979,7 +998,7 @@ pub fn root_dir(fs: Arc<Mutex<Filesystem>>) -> Result<PFSDirectory, Error> {
 /// 
 /// # Return value
 /// 
-/// returns true if the storage device passed into the function has a fat filesystem structure
+/// Returns true if the storage device passed into the function has a fat filesystem structure
 pub fn detect_fat(disk: &storage_device::StorageDeviceRef) -> bool {
     
     let mut initial_buf: Vec<u8> = vec![0; disk.lock().sector_size_in_bytes()];
@@ -995,8 +1014,8 @@ pub fn detect_fat(disk: &storage_device::StorageDeviceRef) -> bool {
     };    
 }
 
-/// A case-insenstive way to compare PFSdirectory entry name which is in [u8;11] and a str literal to be able to 
-/// confirm whether the PFSdirectory/PFSfile that you're looking at is the one specified 
+/// A case-insenstive way to compare FATdirectory entry name which is in [u8;11] and a str literal to be able to 
+/// confirm whether the directory/file that you're looking at is the one specified 
 /// 
 /// # Examples
 /// ```rust
@@ -1037,7 +1056,7 @@ fn compare_short_name(name: &str, de: &DirectoryEntry) -> bool {
     true
 }
 
-/// A struct and impl being used to represent the root directory
+/// A struct and impl being used to represent the parent of the root directory in FAT, taken from the root kernel
 pub struct RootDirectory {
     /// A list of DirRefs or pointers to the child directories   
     children: BTreeMap<String, FileOrDir>,
