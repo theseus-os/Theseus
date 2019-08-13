@@ -8,8 +8,8 @@ build = "../../build.rs"
 [dependencies]
 getopts = "0.2.18"
 
-[target.'cfg(target_arch = "x86_64")'.dependencies]
-pmu_x86 = { path = "../../kernel/pmu_x86" }
+[dependencies.pmu_x86]
+path = "../../kernel/pmu_x86"
 
 [dependencies.print]
 path = "../../kernel/print"

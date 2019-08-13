@@ -7,8 +7,8 @@ build = "../../build.rs"
 [features]
 bm_in_us = []
 
-[target.'cfg(target_arch = "x86_64")'.dependencies]
-apic = { path = "../../kernel/apic" }
+[dependencies]
+
 
 # [dependencies.log]
 # default-features = false
@@ -23,6 +23,9 @@ path = "../../kernel/task"
 
 [dependencies.hpet]
 path = "../../kernel/hpet"
+
+[dependencies.apic]
+path = "../../kernel/apic"
 
 [dependencies.spawn]
 path = "../../kernel/spawn"

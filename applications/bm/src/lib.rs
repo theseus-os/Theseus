@@ -6,7 +6,6 @@ extern crate hpet;
 #[macro_use] extern crate terminal_print;
 // #[macro_use] extern crate log;
 extern crate fs_node;
-#[cfg(target_arch = "x86_64")]
 extern crate apic;
 extern crate spawn;
 extern crate path;
@@ -66,14 +65,8 @@ macro_rules! printlnwarn {
 	($fmt:expr, $($arg:tt)*) => (println!(concat!("BM-WARN: ", $fmt), $($arg)*));
 }
 
-#[cfg(target_arch = "x86_64")]
 macro_rules! CPU_ID {
 	() => (apic::get_my_apic_id().unwrap())
-}
-
-#[cfg(target_arch = "aarch64")]
-macro_rules! CPU_ID { // TODO
-	() => ( 0 )
 }
 
 #[no_mangle]
@@ -879,7 +872,6 @@ fn print_stats(vec: Vec<u64>) {
 }
 
 /// Helper function to pick a free child core if possible
-#[cfg(target_arch = "x86_64")]
 fn pick_child_core() -> Result<u8, &'static str> {
 	// try with current core -1
 	let child_core: u8 = CPU_ID!() as u8 - 1;
@@ -892,12 +884,6 @@ fn pick_child_core() -> Result<u8, &'static str> {
 	printlninfo!("WARNING : Cannot pick a child core because cores are busy");
 	printlninfo!("WARNING : Selecting current core");
 	return Ok(child_core);
-}
-
-#[cfg(target_arch = "aarch64")]
-fn pick_child_core() -> Result<u8, &'static str> {
-	// TODO
-	Ok(0)
 }
 
 /// Helper function to get current working directory

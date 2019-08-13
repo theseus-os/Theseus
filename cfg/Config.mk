@@ -73,6 +73,10 @@ EXCLUDE_X86_SPECIFIC += --exclude nano_core
 EXCLUDE_X86_SPECIFIC += --exclude e1000
 EXCLUDE_X86_SPECIFIC += --exclude pic
 EXCLUDE_X86_SPECIFIC += --exclude pit_clock
+EXCLUDE_X86_SPECIFIC += --exclude bm
+EXCLUDE_X86_SPECIFIC += --exclude cpu
+EXCLUDE_X86_SPECIFIC += --exclude pmu_sample_start
+EXCLUDE_X86_SPECIFIC += --exclude pmu_sample_stop
 
 ## exclude arch-specific crates
 EXCLUDE_ARM_SPECIFIC := --exclude exceptions_arm

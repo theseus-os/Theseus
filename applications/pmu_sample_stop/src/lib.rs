@@ -5,7 +5,6 @@
 extern crate alloc;
 #[macro_use] extern crate print;
 extern crate getopts;
-#[cfg(target_arch = "x86_64")]
 extern crate pmu_x86;
 
 use alloc::vec::Vec;
@@ -28,37 +27,28 @@ pub fn main(args: Vec<String>) -> isize {
     };
     println!("We are indeed here!");
     //let sampler = pmu_x86::start_samples(pmu_x86::EventType::UnhaltedReferenceCycles, 0xFFFFF, None, 150);
-    #[cfg(target_arch = "x86_64")]
-    {
-        let sampler = pmu_x86::retrieve_samples();
-        if let Ok(mut my_sampler) = sampler {
-            pmu_x86::print_samples(&mut my_sampler);
-            /*
-            println!("Sampling running ok.");
-            let mut counter = 0;
-            while counter < 300 {
-                println!("{}", counter);
-                counter += 1;
-            } 
-            */
-            /*
-            if let Ok(mut samples) = pmu_x86::retrieve_samples() {
-                println!("The results from retrieve_samples was okay");
-                pmu_x86::print_samples(&mut samples);
-            } else {
-                println!("Something went wrong!");
-            }
-            */
+    let sampler = pmu_x86::retrieve_samples();
+    if let Ok(mut my_sampler) = sampler {
+        pmu_x86::print_samples(&mut my_sampler);
+        /*
+        println!("Sampling running ok.");
+        let mut counter = 0;
+        while counter < 300 {
+            println!("{}", counter);
+            counter += 1;
+        } 
+        */
+        /*
+        if let Ok(mut samples) = pmu_x86::retrieve_samples() {
+            println!("The results from retrieve_samples was okay");
+            pmu_x86::print_samples(&mut samples);
         } else {
-            println!("Sample didn't begin");
+            println!("Something went wrong!");
         }
+        */
+    } else {
+        println!("Sample didn't begin");
     }
-    
-    #[cfg(target_arch = "aarch64")]
-    {
-        // TODO
-    }
-    
     if matches.opt_present("h") {
         print_usage(opts);
         return 0;
