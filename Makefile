@@ -380,6 +380,17 @@ endif
 
 view-docs: view-doc
 
+## Documents of ARM64-specific crates
+view-doc-arm: export TARGET:=aarch64-theseus
+view-doc-arm:
+	RUST_TARGET_PATH=$(PWD)/cfg \
+		xargo doc --no-deps --verbose --all $(EXCLUDE_X86_SPECIFIC) --target=$(TARGET)
+	@rustdoc --output target/$(TARGET)/doc --crate-name "___Theseus_Crates___" ./documentation/src/_top.rs
+	@mkdir -p build
+	@rm -rf build/doc
+	@cp -rf target/$(TARGET)/doc ./build/
+	@echo -e "\n\nDocumentation is now available in the build/doc directory."
+	@xdg-open $(DOC_ROOT) > /dev/null 2>&1 || open $(DOC_ROOT) &
 
 ## Removes all build files
 clean:

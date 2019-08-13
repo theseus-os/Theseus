@@ -1,5 +1,7 @@
-//! This crate contains structures and routines for context switching 
-//! on ARM64
+//! This crate contains structures and routines for context switching
+//! on ARM64.
+//!
+//! To be implemented.
 
 #![no_std]
 #![feature(asm, naked_functions)]
