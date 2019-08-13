@@ -384,7 +384,7 @@ view-docs: view-doc
 view-doc-arm: export TARGET:=aarch64-theseus
 view-doc-arm:
 	RUST_TARGET_PATH=$(PWD)/cfg \
-		xargo doc --no-deps --verbose --all $(EXCLUDE_X86_SPECIFIC) --target=$(TARGET)
+		xargo doc --no-deps --all $(EXCLUDE_X86_SPECIFIC) --target=$(TARGET)
 	@rustdoc --output target/$(TARGET)/doc --crate-name "___Theseus_Crates___" ./documentation/src/_top.rs
 	@mkdir -p build
 	@rm -rf build/doc

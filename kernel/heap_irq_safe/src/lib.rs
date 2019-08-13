@@ -40,6 +40,7 @@ pub fn init(start_virt_addr: usize, size_in_bytes: usize) {
     }
 }
 
+/// TODO. Currently use heap in uefi-rs
 #[cfg(target_arch = "aarch64")]
 pub fn init(start_virt_addr: usize, size_in_bytes: usize) {
     // TODO

@@ -60,6 +60,7 @@ pub fn panic_wrapper(panic_info: &PanicInfo) -> Result<(), &'static str> {
     }
 }
 
+/// TODO: handle panic
 #[cfg(target_arch = "aarch64")]
 pub fn panic_wrapper(panic_info: &PanicInfo) -> Result<(), &'static str> {
     // TODO

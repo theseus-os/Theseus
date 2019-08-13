@@ -357,7 +357,6 @@ impl PageTable {
 
         // here, temporary_page is dropped, which auto unmaps it
         ret
-
     }
 
 
@@ -399,7 +398,7 @@ pub fn get_current_p4() -> Frame {
     Frame::containing_address(PhysicalAddress::new_canonical(control_regs::cr3().0 as usize))
 }
 
-/// Returns the current top-level page table frame, e.g., cr3 on x86
+/// Returns the current top-level page table frame e.g., TTBR0_EL1 on ARM64
 #[cfg(target_arch = "aarch64")]
 pub fn get_current_p4() -> Frame {
     let p4:usize;
@@ -813,6 +812,20 @@ pub fn init(allocator_mutex: &MutexIrqSafe<AreaFrameAllocator>, boot_info: &mult
     Ok((new_page_table, kernel_vmas, text_mapped_pages, rodata_mapped_pages, data_mapped_pages, higher_half, identity))
 }
 
+/// Initializes a new page table and sets up all necessary mappings for the kernel to continue running. 
+/// Returns the following tuple, if successful:
+/// 
+///  * The kernel's new PageTable, which is now currently active,
+///  * the kernel's list of VirtualMemoryAreas,
+///  * the kernels' text section MappedPages,
+///  * the kernels' rodata section MappedPages,
+///  * the kernels' data section MappedPages,
+///  * the kernel's list of *other* higher-half MappedPages, which should be kept forever,
+///  * the kernel's list of identity-mapped MappedPages, which should be dropped before starting the first userspace program. 
+///
+/// Otherwise, it returns a str error message. 
+/// 
+/// Note: this was previously called remap_the_kernel.
 #[cfg(any(target_arch = "aarch64"))]
 pub fn init(bt:&BootServices, allocator_mutex: &MutexIrqSafe<AreaFrameAllocator>) 
    -> Result<(PageTable, Vec<VirtualMemoryArea>, MappedPages, MappedPages, MappedPages, Vec<MappedPages>, Vec<MappedPages>), &'static str> {

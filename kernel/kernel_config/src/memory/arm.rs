@@ -34,5 +34,7 @@ pub const KERNEL_OFFSET_PREFIX: usize = 0b1111_1111_1111_1111;
 //     [VIRT_PCIE_MMIO] =          { 0x10000000, 0x2eff0000 },
 //     [VIRT_PCIE_PIO] =           { 0x3eff0000, 0x00010000 },
 //     [VIRT_PCIE_ECAM] =          { 0x3f000000, 0x01000000 },
+/// The start address of memory mapped hardwares
 pub const HARDWARE_START: u64 = 0x1000;
+/// The end address of memory mapped hardwares
 pub const HARDWARE_END: u64 = 0x40000000;

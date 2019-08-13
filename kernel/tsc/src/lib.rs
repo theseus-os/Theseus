@@ -50,7 +50,7 @@ pub fn tsc_ticks() -> TscTicks {
     TscTicks(ticks)
 }
 
-/// Returns the current number of ticks from the TSC, i.e., `rdtscp`. 
+/// Returns the current number of ticks from the TSC, i.e., `0xE000E018`. 
 #[cfg(target_arch = "aarch64")]
 pub fn tsc_ticks() -> TscTicks {
     let ticks = unsafe {

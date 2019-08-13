@@ -396,6 +396,7 @@ impl Task {
         }
     }
 
+    // TODO: Sets this `Task` as this core's current task.
     #[cfg(target_arch = "aarch64")]
     fn set_as_current_task(&self) {
         // TODO
@@ -534,6 +535,7 @@ impl Task {
             });
         }
 
+        // TODO: A private macro that actually calls the given context switch routine
         #[cfg(target_arch = "aarch64")]
         macro_rules! call_context_switch {
             ($func:expr) => ( unsafe {
@@ -922,6 +924,7 @@ fn get_task_local_data() -> Option<&'static TaskLocalData> {
     Some(&tld)
 }
 
+// TODO: Returns a reference to the current task's `TaskLocalData`.
 #[cfg(target_arch = "aarch64")]
 fn get_task_local_data() -> Option<&'static TaskLocalData> {
     // TODO

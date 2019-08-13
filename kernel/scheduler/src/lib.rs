@@ -78,6 +78,7 @@ pub fn schedule() -> bool {
     true
 }
 
+/// TODO: schedule tasks
 #[cfg(target_arch = "aarch64")]
 pub fn schedule() -> bool {
     // TODO
