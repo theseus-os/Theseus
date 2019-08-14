@@ -183,7 +183,9 @@ build: $(nano_core_binary)
 		$(CROSS)strip --strip-debug  $(OBJECT_FILES_BUILD_DIR)/$(APP_PREFIX)$${app}.o ; \
 	done
 
-
+ifeq ($(TARGET), aarch64-theseus)
+	RUSTFLAGS="--emit=obj -C debuginfo=2 -D unused-must-use"
+endif
 
 ## This target invokes the actual Rust build process
 cargo: check_rustc check_xargo
@@ -192,7 +194,7 @@ cargo: check_rustc check_xargo
 	@echo -e "\t KERNEL_PREFIX: \"$(KERNEL_PREFIX)\""
 	@echo -e "\t APP_PREFIX: \"$(APP_PREFIX)\""
 	@echo -e "\t THESEUS_CONFIG: \"$(THESEUS_CONFIG)\""
-	RUST_TARGET_PATH="$(CFG_DIR)" RUSTFLAGS="$(RUSTFLAGS)" xargo build  $(CARGOFLAGS)  $(RUST_FEATURES) --all $(EXCLUDE_x86_64-theseus) --target $(TARGET)
+	RUST_TARGET_PATH="$(CFG_DIR)" RUSTFLAGS="$(RUSTFLAGS)" xargo build  $(CARGOFLAGS)  $(RUST_FEATURES) --all $(EXCLUDE_$(TARGET)) --target $(TARGET)
 
 ## We tried using the "xargo rustc" command here instead of "xargo build" to avoid xargo unnecessarily rebuilding core/alloc crates,
 ## But it doesn't really seem to work (it's not the cause of xargo rebuilding everything).
@@ -219,19 +221,26 @@ cargo: check_rustc check_xargo
 # 	cd .. ; \
 # done
 
+nano_core_binary_pre := cargo
+ifeq ($(TARGET), x86_64-theseus)
+	nano_core_binary_pre += $(nano_core_static_lib)
+	nano_core_binary_pre += $(assembly_object_files)
+	nano_core_binary_pre += $(linker_script)
+endif	
 
 ## This builds the nano_core binary itself, which is the fully-linked code that first runs right after the bootloader
-$(nano_core_binary): cargo $(nano_core_static_lib) $(assembly_object_files) $(linker_script)
+$(nano_core_binary): $(nano_core_binary_pre)
 	@mkdir -p $(BUILD_DIR)
 	@mkdir -p $(NANO_CORE_BUILD_DIR)
 	@mkdir -p $(OBJECT_FILES_BUILD_DIR)
+ifeq ($(TARGET), x86_64-theseus)
 	$(CROSS)ld -n -T $(linker_script) -o $(nano_core_binary) $(assembly_object_files) $(nano_core_static_lib)
 ## run "readelf" on the nano_core binary, remove LOCAL and WEAK symbols from the ELF file, and then demangle it, and then output to a sym file
 	@cargo run --manifest-path $(ROOT_DIR)/tools/demangle_readelf_file/Cargo.toml \
 		<($(CROSS)readelf -S -s -W $(nano_core_binary) | sed '/LOCAL  /d;/WEAK   /d') \
 		>  $(OBJECT_FILES_BUILD_DIR)/$(KERNEL_PREFIX)nano_core.sym
 	@echo -n -e '\0' >> $(OBJECT_FILES_BUILD_DIR)/$(KERNEL_PREFIX)nano_core.sym
-
+endif
 
 ### This compiles the assembly files in the nano_core. 
 ### This target is currently rebuilt every time to accommodate changing CFLAGS.
