@@ -535,8 +535,10 @@ else
 	QEMU_FLAGS += -cpu Broadwell
 endif
 
+# QEMU flags for ARM64
 ifeq ($(ARCH), aarch64)
-	QEMU_FLAGS := -m 1024 #memory
+	QEMU_FLAGS := -s
+	QEMU_FLAGS += -m 1024 #memory
 	QEMU_FLAGS += -cpu cortex-a57 #cpu model 
 	QEMU_FLAGS += -smp 2 
 	QEMU_FLAGS += -M virt #machine model
@@ -546,7 +548,7 @@ ifeq ($(ARCH), aarch64)
 	QEMU_FLAGS += -device virtio-scsi-device 
 	QEMU_FLAGS += -device scsi-cd,drive=cdrom
 endif
-
+	
 ## Currently, kvm by itself can cause problems, but it works with the "host" option (above).
 ifeq ($(kvm),yes)
 $(error Error: the 'kvm=yes' option is currently broken. Use 'host=yes' instead")
@@ -582,14 +584,18 @@ run: $(iso)
 
 ### builds and runs Theseus in QEMU, but pauses execution until a GDB instance is connected.
 debug: $(iso)
-	@qemu-system-x86_64 $(QEMU_FLAGS) -S
+	@qemu-system-$(ARCH) $(QEMU_FLAGS) -S
 #-monitor stdio
 
 
 ### Runs a gdb instance on the host machine. 
 ### Run this after invoking "make debug" in a different terminal.
 gdb:
+ifeq ($(ARCH), aarch64)
+	@aarch64-none-elf-gdb "./build/boot/kernel.efi" -ex "target remote :1234"
+else
 	@rust-os-gdb/bin/rust-gdb "$(nano_core_binary)" -ex "target remote :1234"
+endif
 
 ### ARM
 armbuild:export TARGET:=aarch64-theseus
