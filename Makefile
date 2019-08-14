@@ -192,7 +192,7 @@ cargo: check_rustc check_xargo
 	@echo -e "\t KERNEL_PREFIX: \"$(KERNEL_PREFIX)\""
 	@echo -e "\t APP_PREFIX: \"$(APP_PREFIX)\""
 	@echo -e "\t THESEUS_CONFIG: \"$(THESEUS_CONFIG)\""
-	RUST_TARGET_PATH="$(CFG_DIR)" RUSTFLAGS="$(RUSTFLAGS)" xargo build  $(CARGOFLAGS)  $(RUST_FEATURES) --all $(EXCLUDE_ARM_SPECIFIC) --target $(TARGET)
+	RUST_TARGET_PATH="$(CFG_DIR)" RUSTFLAGS="$(RUSTFLAGS)" xargo build  $(CARGOFLAGS)  $(RUST_FEATURES) --all $(EXCLUDE_x86_64-theseus) --target $(TARGET)
 
 ## We tried using the "xargo rustc" command here instead of "xargo build" to avoid xargo unnecessarily rebuilding core/alloc crates,
 ## But it doesn't really seem to work (it's not the cause of xargo rebuilding everything).
@@ -355,12 +355,23 @@ DOC_ROOT := $(ROOT_DIR)/build/doc/___Theseus_Crates___/index.html
 
 ## Builds Theseus's documentation.
 ## The entire project is built as normal using the "cargo doc" command.
+ifeq ($(TARGET), x86_64-theseus)
+	TARGET_DOC = target/doc
+else
+	TARGET_DOC = target/$(TARGET)/doc
+endif
+
 doc: check_rustc
+ifeq ($(TARGET), x86_64-theseus)
 	@cargo doc --no-deps
-	@rustdoc --output target/doc --crate-name "___Theseus_Crates___" ./documentation/src/_top.rs
+else
+	RUST_TARGET_PATH=$(PWD)/cfg \
+		xargo doc --no-deps --all $(EXCLUDE_$(TARGET)) --target=$(TARGET)
+endif
+	rustdoc --output $(TARGET_DOC) --crate-name "___Theseus_Crates___" ./documentation/src/_top.rs
 	@mkdir -p build
 	@rm -rf build/doc
-	@cp -rf target/doc ./build/
+	@cp -rf $(TARGET_DOC) ./build/
 	@echo -e "\n\nDocumentation is now available in the build/doc directory."
 
 docs: doc
@@ -384,7 +395,7 @@ view-docs: view-doc
 view-doc-arm: export TARGET:=aarch64-theseus
 view-doc-arm:
 	RUST_TARGET_PATH=$(PWD)/cfg \
-		xargo doc --no-deps --all $(EXCLUDE_X86_SPECIFIC) --target=$(TARGET)
+		xargo doc --no-deps --all $(EXCLUDE_aarch64-theseus) --target=$(TARGET)
 	@rustdoc --output target/$(TARGET)/doc --crate-name "___Theseus_Crates___" ./documentation/src/_top.rs
 	@mkdir -p build
 	@rm -rf build/doc
@@ -570,7 +581,7 @@ armbuild:export BUILD_MODE=release
 armbuild:
 	@mkdir -p $(GRUB_ISOFILES)/boot/grub
 	RUST_TARGET_PATH=$(PWD)/cfg \
-		RUSTFLAGS="--emit=obj -C debuginfo=2 -D unused-must-use" xargo build  --all $(EXCLUDE_X86_SPECIFIC) --release --target $(TARGET)
+		RUSTFLAGS="--emit=obj -C debuginfo=2 -D unused-must-use" xargo build  --all $(EXCLUDE_aarch64-theseus) --release --target $(TARGET)
 
 	cp $(ROOT_DIR)/cfg/grub-aarch64.cfg $(GRUB_ISOFILES)/boot/grub/grub.cfg
 
