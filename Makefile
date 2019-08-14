@@ -29,6 +29,9 @@ else
 endif
 GRUB_MKRESCUE = $(GRUB_CROSS)grub-mkrescue
 	
+ifeq ($(TARGET), aarch64-theseus)
+	GRUB_MKRESCUE_OPTIOINS = -d $(HOME)/grub-dir/lib/grub/arm64-efi
+endif
 
 
 ###################################################################################################
@@ -151,17 +154,20 @@ check_captain:
 		exit 1; \
 	fi;
 
-
 ### This target builds an .iso OS image from all of the compiled crates.
 ### It skips building userspace for now, but you can add it back in by adding "userspace" to the line below.
 $(iso): build check_captain
 # after building kernel and application modules, copy the kernel boot image files
 	@mkdir -p $(GRUB_ISOFILES)/boot/grub
+ifeq ($(TARGET), aarch64-theseus)
+	cp $(ROOT_DIR)/cfg/grub-aarch64.cfg $(GRUB_ISOFILES)/boot/grub/grub.cfg
+	cp $(ROOT_DIR)/target/$(TARGET)/$(BUILD_MODE)/nano_core_arm.efi $(GRUB_ISOFILES)/boot/kernel.efi	
+else
 	@cp $(nano_core_binary) $(GRUB_ISOFILES)/boot/kernel.bin
 # autogenerate the grub.cfg file
 	cargo run --manifest-path $(ROOT_DIR)/tools/grub_cfg_generation/Cargo.toml -- $(GRUB_ISOFILES)/modules/ -o $(GRUB_ISOFILES)/boot/grub/grub.cfg
-	$(GRUB_MKRESCUE) -o $(iso) $(GRUB_ISOFILES)  2> /dev/null
-
+endif
+	$(GRUB_MKRESCUE) $(GRUB_MKRESCUE_OPTIOINS) -o $(iso) $(GRUB_ISOFILES)  2> /dev/null
 
 ### Convenience target for building the ISO	using the above target
 iso: $(iso)
@@ -178,13 +184,11 @@ build: $(nano_core_binary)
 ## In the above loop, we gave all object files the kernel prefix, so we need to rename the application object files with the proper app prefix.
 ## Currently, we remove the hash suffix from application object file names so they're easier to find, but we could change that later 
 ## if we ever want to give applications specific versioning semantics (based on those hashes, like with kernel crates)
+ifeq ($(TARGET), x86_64-theseus)
 	@for app in $(APP_CRATES) ; do  \
 		mv  $(OBJECT_FILES_BUILD_DIR)/$(KERNEL_PREFIX)$${app}-*.o  $(OBJECT_FILES_BUILD_DIR)/$(APP_PREFIX)$${app}.o ; \
 		$(CROSS)strip --strip-debug  $(OBJECT_FILES_BUILD_DIR)/$(APP_PREFIX)$${app}.o ; \
 	done
-
-ifeq ($(TARGET), aarch64-theseus)
-	RUSTFLAGS="--emit=obj -C debuginfo=2 -D unused-must-use"
 endif
 
 ## This target invokes the actual Rust build process
@@ -194,8 +198,11 @@ cargo: check_rustc check_xargo
 	@echo -e "\t KERNEL_PREFIX: \"$(KERNEL_PREFIX)\""
 	@echo -e "\t APP_PREFIX: \"$(APP_PREFIX)\""
 	@echo -e "\t THESEUS_CONFIG: \"$(THESEUS_CONFIG)\""
+ifeq ($(TARGET), aarch64-theseus)
+	RUST_TARGET_PATH="$(CFG_DIR)" RUSTFLAGS="--emit=obj -C debuginfo=2 -D unused-must-use" xargo build  $(CARGOFLAGS)  $(RUST_FEATURES) --all $(EXCLUDE_$(TARGET)) --target $(TARGET)
+else
 	RUST_TARGET_PATH="$(CFG_DIR)" RUSTFLAGS="$(RUSTFLAGS)" xargo build  $(CARGOFLAGS)  $(RUST_FEATURES) --all $(EXCLUDE_$(TARGET)) --target $(TARGET)
-
+endif
 ## We tried using the "xargo rustc" command here instead of "xargo build" to avoid xargo unnecessarily rebuilding core/alloc crates,
 ## But it doesn't really seem to work (it's not the cause of xargo rebuilding everything).
 ## For the "xargo rustc" command below, all of the arguments to cargo/xargo come before the "--",
@@ -594,7 +601,7 @@ armbuild:
 
 	cp $(ROOT_DIR)/cfg/grub-aarch64.cfg $(GRUB_ISOFILES)/boot/grub/grub.cfg
 
-	cp $(ROOT_DIR)/target/$(TARGET)/$(BUILD_MODE)/nano_core_arm.efi $(GRUB_ISOFILES)/boot/kernel.efi$
+	cp $(ROOT_DIR)/target/$(TARGET)/$(BUILD_MODE)/nano_core_arm.efi $(GRUB_ISOFILES)/boot/kernel.efi
 
 	mkdir -p $(OBJECT_FILES_BUILD_DIR)
 	@for f in $(ROOT_DIR)/target/$(TARGET)/$(BUILD_MODE)/deps/*.o "$(HOME)"/.xargo/lib/rustlib/aarch64-theseus/lib/*.o; do \
