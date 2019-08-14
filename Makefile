@@ -29,7 +29,7 @@ else
 endif
 GRUB_MKRESCUE = $(GRUB_CROSS)grub-mkrescue
 	
-# Set arch-target for grub-mkrescue
+# Set arch-specific options for grub-mkrescue
 ifeq ($(ARCH), aarch64)
 	GRUB_MKRESCUE_OPTIOINS = -d $(HOME)/grub-dir/lib/grub/arm64-efi
 endif
@@ -185,6 +185,7 @@ build: $(nano_core_binary)
 ## In the above loop, we gave all object files the kernel prefix, so we need to rename the application object files with the proper app prefix.
 ## Currently, we remove the hash suffix from application object file names so they're easier to find, but we could change that later 
 ## if we ever want to give applications specific versioning semantics (based on those hashes, like with kernel crates)
+## Skip this step for ARM64 temporarily
 ifeq ($(ARCH), x86_64)
 	@for app in $(APP_CRATES) ; do  \
 		mv  $(OBJECT_FILES_BUILD_DIR)/$(KERNEL_PREFIX)$${app}-*.o  $(OBJECT_FILES_BUILD_DIR)/$(APP_PREFIX)$${app}.o ; \
@@ -199,11 +200,7 @@ cargo: check_rustc check_xargo
 	@echo -e "\t KERNEL_PREFIX: \"$(KERNEL_PREFIX)\""
 	@echo -e "\t APP_PREFIX: \"$(APP_PREFIX)\""
 	@echo -e "\t THESEUS_CONFIG: \"$(THESEUS_CONFIG)\""
-ifeq ($(ARCH), aarch64)
-	RUST_TARGET_PATH="$(CFG_DIR)" RUSTFLAGS="--emit=obj -C debuginfo=2 -D unused-must-use" xargo build  $(CARGOFLAGS)  $(RUST_FEATURES) --all $(EXCLUDE_$(TARGET)) --target $(TARGET)
-else
 	RUST_TARGET_PATH="$(CFG_DIR)" RUSTFLAGS="$(RUSTFLAGS)" xargo build  $(CARGOFLAGS)  $(RUST_FEATURES) --all $(EXCLUDE_$(TARGET)) --target $(TARGET)
-endif
 ## We tried using the "xargo rustc" command here instead of "xargo build" to avoid xargo unnecessarily rebuilding core/alloc crates,
 ## But it doesn't really seem to work (it's not the cause of xargo rebuilding everything).
 ## For the "xargo rustc" command below, all of the arguments to cargo/xargo come before the "--",

@@ -36,8 +36,10 @@ endif
 RUSTFLAGS += --emit=obj
 ## enable debug info even for release builds
 RUSTFLAGS += -C debuginfo=2
+ifneq ($(ARCH), aarch64)
 ## using a large code model 
 RUSTFLAGS += -C code-model=large
+endif
 ## use static relocation model to avoid GOT-based relocation types and .got/.got.plt sections
 RUSTFLAGS += -C relocation-model=static
 ## promote unused must-use types (like Result) to an error
