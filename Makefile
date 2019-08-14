@@ -226,6 +226,7 @@ cargo: check_rustc check_xargo
 # 	cd .. ; \
 # done
 
+# Arch specific files for linker
 nano_core_binary_pre := cargo
 ifeq ($(ARCH), x86_64)
 	nano_core_binary_pre += $(nano_core_static_lib)
@@ -367,18 +368,20 @@ preserve_old_modules:
 ## The top-level (root) documentation file
 DOC_ROOT := $(ROOT_DIR)/build/doc/___Theseus_Crates___/index.html
 
-## Builds Theseus's documentation.
-## The entire project is built as normal using the "cargo doc" command.
+## The output directory of rustdoc is different for non-platform architecture
 ifeq ($(ARCH), x86_64)
 	TARGET_DOC = target/doc
 else
 	TARGET_DOC = target/$(TARGET)/doc
 endif
 
+## Builds Theseus's documentation.
+## The entire project is built as normal using the "cargo doc" command.
 doc: check_rustc
 ifeq ($(ARCH), x86_64)
 	@cargo doc --no-deps
 else
+	# Set target for non-platform architecture
 	RUST_TARGET_PATH=$(PWD)/cfg \
 		xargo doc --no-deps --all $(EXCLUDE_$(TARGET)) --target=$(TARGET)
 endif
@@ -532,6 +535,12 @@ ifeq ($(host),yes)
 else
 	QEMU_FLAGS += -cpu Broadwell
 endif
+	
+## Currently, kvm by itself can cause problems, but it works with the "host" option (above).
+ifeq ($(kvm),yes)
+$(error Error: the 'kvm=yes' option is currently broken. Use 'host=yes' instead")
+	# QEMU_FLAGS += -accel kvm
+endif
 
 # QEMU flags for ARM64
 ifeq ($(ARCH), aarch64)
@@ -546,14 +555,6 @@ ifeq ($(ARCH), aarch64)
 	QEMU_FLAGS += -device virtio-scsi-device 
 	QEMU_FLAGS += -device scsi-cd,drive=cdrom
 endif
-	
-## Currently, kvm by itself can cause problems, but it works with the "host" option (above).
-ifeq ($(kvm),yes)
-$(error Error: the 'kvm=yes' option is currently broken. Use 'host=yes' instead")
-	# QEMU_FLAGS += -accel kvm
-endif
-
-
 
 ###################################################################################################
 ### This section has targets for running and debugging 
