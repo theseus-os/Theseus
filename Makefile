@@ -29,7 +29,7 @@ else
 endif
 GRUB_MKRESCUE = $(GRUB_CROSS)grub-mkrescue
 	
-ifeq ($(TARGET), aarch64-theseus)
+ifeq ($(ARCH), aarch64)
 	GRUB_MKRESCUE_OPTIOINS = -d $(HOME)/grub-dir/lib/grub/arm64-efi
 endif
 
@@ -156,10 +156,10 @@ check_captain:
 
 ### This target builds an .iso OS image from all of the compiled crates.
 ### It skips building userspace for now, but you can add it back in by adding "userspace" to the line below.
-$(iso): #build check_captain
+$(iso): build check_captain
 # after building kernel and application modules, copy the kernel boot image files
 	@mkdir -p $(GRUB_ISOFILES)/boot/grub
-ifeq ($(TARGET), aarch64-theseus)
+ifeq ($(ARCH), aarch64)
 	cp $(ROOT_DIR)/cfg/grub-aarch64.cfg $(GRUB_ISOFILES)/boot/grub/grub.cfg
 	cp $(ROOT_DIR)/target/$(TARGET)/$(BUILD_MODE)/nano_core_arm.efi $(GRUB_ISOFILES)/boot/kernel.efi	
 else
@@ -184,7 +184,7 @@ build: $(nano_core_binary)
 ## In the above loop, we gave all object files the kernel prefix, so we need to rename the application object files with the proper app prefix.
 ## Currently, we remove the hash suffix from application object file names so they're easier to find, but we could change that later 
 ## if we ever want to give applications specific versioning semantics (based on those hashes, like with kernel crates)
-ifeq ($(TARGET), x86_64-theseus)
+ifeq ($(ARCH), x86_64)
 	@for app in $(APP_CRATES) ; do  \
 		mv  $(OBJECT_FILES_BUILD_DIR)/$(KERNEL_PREFIX)$${app}-*.o  $(OBJECT_FILES_BUILD_DIR)/$(APP_PREFIX)$${app}.o ; \
 		$(CROSS)strip --strip-debug  $(OBJECT_FILES_BUILD_DIR)/$(APP_PREFIX)$${app}.o ; \
@@ -198,7 +198,7 @@ cargo: check_rustc check_xargo
 	@echo -e "\t KERNEL_PREFIX: \"$(KERNEL_PREFIX)\""
 	@echo -e "\t APP_PREFIX: \"$(APP_PREFIX)\""
 	@echo -e "\t THESEUS_CONFIG: \"$(THESEUS_CONFIG)\""
-ifeq ($(TARGET), aarch64-theseus)
+ifeq ($(ARCH), aarch64)
 	RUST_TARGET_PATH="$(CFG_DIR)" RUSTFLAGS="--emit=obj -C debuginfo=2 -D unused-must-use" xargo build  $(CARGOFLAGS)  $(RUST_FEATURES) --all $(EXCLUDE_$(TARGET)) --target $(TARGET)
 else
 	RUST_TARGET_PATH="$(CFG_DIR)" RUSTFLAGS="$(RUSTFLAGS)" xargo build  $(CARGOFLAGS)  $(RUST_FEATURES) --all $(EXCLUDE_$(TARGET)) --target $(TARGET)
@@ -229,7 +229,7 @@ endif
 # done
 
 nano_core_binary_pre := cargo
-ifeq ($(TARGET), x86_64-theseus)
+ifeq ($(ARCH), x86_64)
 	nano_core_binary_pre += $(nano_core_static_lib)
 	nano_core_binary_pre += $(assembly_object_files)
 	nano_core_binary_pre += $(linker_script)
@@ -240,7 +240,7 @@ $(nano_core_binary): $(nano_core_binary_pre)
 	@mkdir -p $(BUILD_DIR)
 	@mkdir -p $(NANO_CORE_BUILD_DIR)
 	@mkdir -p $(OBJECT_FILES_BUILD_DIR)
-ifeq ($(TARGET), x86_64-theseus)
+ifeq ($(ARCH), x86_64)
 	$(CROSS)ld -n -T $(linker_script) -o $(nano_core_binary) $(assembly_object_files) $(nano_core_static_lib)
 ## run "readelf" on the nano_core binary, remove LOCAL and WEAK symbols from the ELF file, and then demangle it, and then output to a sym file
 	@cargo run --manifest-path $(ROOT_DIR)/tools/demangle_readelf_file/Cargo.toml \
@@ -407,17 +407,6 @@ endif
 
 view-docs: view-doc
 
-## Documents of ARM64-specific crates
-view-doc-arm: export TARGET:=aarch64-theseus
-view-doc-arm:
-	RUST_TARGET_PATH=$(PWD)/cfg \
-		xargo doc --no-deps --all $(EXCLUDE_aarch64-theseus) --target=$(TARGET)
-	@rustdoc --output target/$(TARGET)/doc --crate-name "___Theseus_Crates___" ./documentation/src/_top.rs
-	@mkdir -p build
-	@rm -rf build/doc
-	@cp -rf target/$(TARGET)/doc ./build/
-	@echo -e "\n\nDocumentation is now available in the build/doc directory."
-	@xdg-open $(DOC_ROOT) > /dev/null 2>&1 || open $(DOC_ROOT) &
 
 ## Removes all build files
 clean:
@@ -606,18 +595,18 @@ gdb:
 armbuild:export TARGET:=aarch64-theseus
 armbuild:export BUILD_MODE=release
 armbuild:
-	# @mkdir -p $(GRUB_ISOFILES)/boot/grub
-	# RUST_TARGET_PATH=$(PWD)/cfg \
-	# 	RUSTFLAGS="--emit=obj -C debuginfo=2 -D unused-must-use" xargo build  --all $(EXCLUDE_aarch64-theseus) --release --target $(TARGET)
+	@mkdir -p $(GRUB_ISOFILES)/boot/grub
+	RUST_TARGET_PATH=$(PWD)/cfg \
+		RUSTFLAGS="--emit=obj -C debuginfo=2 -D unused-must-use" xargo build  --all $(EXCLUDE_aarch64-theseus) --release --target $(TARGET)
 
-	# cp $(ROOT_DIR)/cfg/grub-aarch64.cfg $(GRUB_ISOFILES)/boot/grub/grub.cfg
+	cp $(ROOT_DIR)/cfg/grub-aarch64.cfg $(GRUB_ISOFILES)/boot/grub/grub.cfg
 
-	# cp $(ROOT_DIR)/target/$(TARGET)/$(BUILD_MODE)/nano_core_arm.efi $(GRUB_ISOFILES)/boot/kernel.efi
+	cp $(ROOT_DIR)/target/$(TARGET)/$(BUILD_MODE)/nano_core_arm.efi $(GRUB_ISOFILES)/boot/kernel.efi
 
-	# mkdir -p $(OBJECT_FILES_BUILD_DIR)
-	# @for f in $(ROOT_DIR)/target/$(TARGET)/$(BUILD_MODE)/deps/*.o "$(HOME)"/.xargo/lib/rustlib/aarch64-theseus/lib/*.o; do \
-	# 	cp -vf  $${f}  $(OBJECT_FILES_BUILD_DIR)/`basename $${f} | sed -n -e 's/\(.*\)/$(KERNEL_PREFIX)\1/p'`   2> /dev/null ; \
-	# done
+	mkdir -p $(OBJECT_FILES_BUILD_DIR)
+	@for f in $(ROOT_DIR)/target/$(TARGET)/$(BUILD_MODE)/deps/*.o "$(HOME)"/.xargo/lib/rustlib/aarch64-theseus/lib/*.o; do \
+		cp -vf  $${f}  $(OBJECT_FILES_BUILD_DIR)/`basename $${f} | sed -n -e 's/\(.*\)/$(KERNEL_PREFIX)\1/p'`   2> /dev/null ; \
+	done
 	
 	$(GRUB_MKRESCUE) -d $(HOME)/grub-dir/lib/grub/arm64-efi -o $(iso) $(GRUB_ISOFILES)
 
