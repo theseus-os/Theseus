@@ -29,6 +29,7 @@ else
 endif
 GRUB_MKRESCUE = $(GRUB_CROSS)grub-mkrescue
 	
+# Set arch-target for grub-mkrescue
 ifeq ($(ARCH), aarch64)
 	GRUB_MKRESCUE_OPTIOINS = -d $(HOME)/grub-dir/lib/grub/arm64-efi
 endif
@@ -597,43 +598,12 @@ else
 	@rust-os-gdb/bin/rust-gdb "$(nano_core_binary)" -ex "target remote :1234"
 endif
 
-### ARM
-armbuild:export TARGET:=aarch64-theseus
-armbuild:export BUILD_MODE=release
-armbuild:
-	@mkdir -p $(GRUB_ISOFILES)/boot/grub
-	RUST_TARGET_PATH=$(PWD)/cfg \
-		RUSTFLAGS="--emit=obj -C debuginfo=2 -D unused-must-use" xargo build  --all $(EXCLUDE_aarch64-theseus) --release --target $(TARGET)
-
-	cp $(ROOT_DIR)/cfg/grub-aarch64.cfg $(GRUB_ISOFILES)/boot/grub/grub.cfg
-
-	cp $(ROOT_DIR)/target/$(TARGET)/$(BUILD_MODE)/nano_core_arm.efi $(GRUB_ISOFILES)/boot/kernel.efi
-
-	mkdir -p $(OBJECT_FILES_BUILD_DIR)
-	@for f in $(ROOT_DIR)/target/$(TARGET)/$(BUILD_MODE)/deps/*.o "$(HOME)"/.xargo/lib/rustlib/aarch64-theseus/lib/*.o; do \
-		cp -vf  $${f}  $(OBJECT_FILES_BUILD_DIR)/`basename $${f} | sed -n -e 's/\(.*\)/$(KERNEL_PREFIX)\1/p'`   2> /dev/null ; \
-	done
-	
-	$(GRUB_MKRESCUE) -d $(HOME)/grub-dir/lib/grub/arm64-efi -o $(iso) $(GRUB_ISOFILES)
-
-arm: armbuild
-	qemu-system-aarch64 -m 1024 -cpu cortex-a57 -smp 2 -M virt -bios /usr/share/qemu-efi/QEMU_EFI.fd -nographic -drive if=none,file=$(iso),id=cdrom,media=cdrom -device virtio-scsi-device -device scsi-cd,drive=cdrom
-
-armdebug: armbuild	
-	qemu-system-aarch64 -s -S -m 1024 -cpu cortex-a57 -smp 2 -M virt -bios /usr/share/qemu-efi/QEMU_EFI.fd -nographic -drive if=none,file=theseus.iso,id=cdrom,media=cdrom -device virtio-scsi-device -device scsi-cd,drive=cdrom
-
-armgdb: export CROSS=aarch64-none-elf-
-armgdb:
-	$(CROSS)gdb "./build/boot/kernel.efi" -ex "target remote :1234"
-
 
 ### builds and runs Theseus in Bochs
 bochs : export override THESEUS_CONFIG += apic_timer_fixed
 bochs: $(iso) 
 	# @qemu-img resize random_data2.img 100K
 	bochs -f bochsrc.txt -q
-
-
 
 
 ### Checks that the supplied usb device (for usage with the boot/pxe targets).
