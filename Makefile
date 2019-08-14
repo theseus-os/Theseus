@@ -200,7 +200,7 @@ cargo: check_rustc check_xargo
 	@echo -e "\t KERNEL_PREFIX: \"$(KERNEL_PREFIX)\""
 	@echo -e "\t APP_PREFIX: \"$(APP_PREFIX)\""
 	@echo -e "\t THESEUS_CONFIG: \"$(THESEUS_CONFIG)\""
-	RUST_TARGET_PATH="$(CFG_DIR)" RUSTFLAGS="$(RUSTFLAGS)" xargo build  $(CARGOFLAGS)  $(RUST_FEATURES) --all $(EXCLUDE_$(TARGET)) --target $(TARGET)
+	RUST_TARGET_PATH="$(CFG_DIR)" RUSTFLAGS="$(RUSTFLAGS)" xargo build  $(CARGOFLAGS)  $(RUST_FEATURES) --all $(CARGO_BUILD_EXCLUDE) --target $(TARGET)
 ## We tried using the "xargo rustc" command here instead of "xargo build" to avoid xargo unnecessarily rebuilding core/alloc crates,
 ## But it doesn't really seem to work (it's not the cause of xargo rebuilding everything).
 ## For the "xargo rustc" command below, all of the arguments to cargo/xargo come before the "--",
@@ -383,7 +383,7 @@ ifeq ($(ARCH), x86_64)
 else
 	# Set target for non-platform architecture
 	RUST_TARGET_PATH=$(PWD)/cfg \
-		xargo doc --no-deps --all $(EXCLUDE_$(TARGET)) --target=$(TARGET)
+		xargo doc --no-deps --all $(CARGO_BUILD_EXCLUDE) --target=$(TARGET)
 endif
 	rustdoc --output $(TARGET_DOC) --crate-name "___Theseus_Crates___" ./documentation/src/_top.rs
 	@mkdir -p build
@@ -535,7 +535,6 @@ ifeq ($(host),yes)
 else
 	QEMU_FLAGS += -cpu Broadwell
 endif
-	
 ## Currently, kvm by itself can cause problems, but it works with the "host" option (above).
 ifeq ($(kvm),yes)
 $(error Error: the 'kvm=yes' option is currently broken. Use 'host=yes' instead")
@@ -602,6 +601,8 @@ bochs : export override THESEUS_CONFIG += apic_timer_fixed
 bochs: $(iso) 
 	# @qemu-img resize random_data2.img 100K
 	bochs -f bochsrc.txt -q
+
+
 
 
 ### Checks that the supplied usb device (for usage with the boot/pxe targets).

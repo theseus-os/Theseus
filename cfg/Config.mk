@@ -61,28 +61,32 @@ RUSTFLAGS += -Z merge-functions=disabled
 RUSTFLAGS += -Z share-generics=no
 
 ## exclude arch-specific crates
-EXCLUDE_aarch64-theseus := --exclude gdt
-EXCLUDE_aarch64-theseus += --exclude tss
-EXCLUDE_aarch64-theseus += --exclude apic
-EXCLUDE_aarch64-theseus += --exclude context_switch_regular
-EXCLUDE_aarch64-theseus += --exclude context_switch_avx
-EXCLUDE_aarch64-theseus += --exclude context_switch_sse
-EXCLUDE_aarch64-theseus += --exclude exceptions_early
-EXCLUDE_aarch64-theseus += --exclude exceptions_full
-EXCLUDE_aarch64-theseus += --exclude pmu_x86
-EXCLUDE_aarch64-theseus += --exclude interrupts
-EXCLUDE_aarch64-theseus += --exclude nano_core
-EXCLUDE_aarch64-theseus += --exclude e1000
-EXCLUDE_aarch64-theseus += --exclude pic
-EXCLUDE_aarch64-theseus += --exclude pit_clock
-EXCLUDE_aarch64-theseus += --exclude bm
-EXCLUDE_aarch64-theseus += --exclude cpu
-EXCLUDE_aarch64-theseus += --exclude pmu_sample_start
-EXCLUDE_aarch64-theseus += --exclude pmu_sample_stop
+ifeq ($(ARCH), aarch64)
+	CARGO_BUILD_EXCLUDE := --exclude gdt
+	CARGO_BUILD_EXCLUDE += --exclude tss
+	CARGO_BUILD_EXCLUDE += --exclude apic
+	CARGO_BUILD_EXCLUDE += --exclude context_switch_regular
+	CARGO_BUILD_EXCLUDE += --exclude context_switch_avx
+	CARGO_BUILD_EXCLUDE += --exclude context_switch_sse
+	CARGO_BUILD_EXCLUDE += --exclude exceptions_early
+	CARGO_BUILD_EXCLUDE += --exclude exceptions_full
+	CARGO_BUILD_EXCLUDE += --exclude pmu_x86
+	CARGO_BUILD_EXCLUDE += --exclude interrupts
+	CARGO_BUILD_EXCLUDE += --exclude nano_core
+	CARGO_BUILD_EXCLUDE += --exclude e1000
+	CARGO_BUILD_EXCLUDE += --exclude pic
+	CARGO_BUILD_EXCLUDE += --exclude pit_clock
+	CARGO_BUILD_EXCLUDE += --exclude bm
+	CARGO_BUILD_EXCLUDE += --exclude cpu
+	CARGO_BUILD_EXCLUDE += --exclude pmu_sample_start
+	CARGO_BUILD_EXCLUDE += --exclude pmu_sample_stop
+endif
 
 ## exclude arch-specific crates
-EXCLUDE_x86_64-theseus := --exclude exceptions_arm
-EXCLUDE_x86_64-theseus += --exclude interrupts_arm
-EXCLUDE_x86_64-theseus += --exclude context_switch_arm
-EXCLUDE_x86_64-theseus += --exclude e1000_arm
-EXCLUDE_x86_64-theseus += --exclude nano_core_arm
+ifeq ($(ARCH), x86_64)
+	CARGO_BUILD_EXCLUDE := --exclude exceptions_arm
+	CARGO_BUILD_EXCLUDE += --exclude interrupts_arm
+	CARGO_BUILD_EXCLUDE += --exclude context_switch_arm
+	CARGO_BUILD_EXCLUDE += --exclude e1000_arm
+	CARGO_BUILD_EXCLUDE += --exclude nano_core_arm
+endif

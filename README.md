@@ -209,7 +209,7 @@ Or you can generate these files by building grub with configuration:
 `make & make install`
 
 
-Run Theseus on ARM64:
+Run Theseus for ARM64:
 `make run ARCH=aarch64`
 
 ### Debug Theseus on ARM
@@ -218,8 +218,8 @@ Downlowd the cross compiler:
 
 Add `path_to_aarch64-none-elf/bin` to `$PATH`, or move `path_to_aarch64-none-elf/bin/*` to `/usr/bin` which is already in `$PATH`
 
-Run `make armdebug` in a terminal.
-Run `make armgdb` in another terminal.
+Run `make debug ARCH=aarch64` in a terminal.
+Run `make gdb ARCH=aarch64` in another terminal.
 
 GDB cannot set breakpoints based on the source file now since we need to generate another file with debug sections for gdb. The reference is here: https://wiki.osdev.org/Debugging_UEFI_applications_with_GDB.
 
