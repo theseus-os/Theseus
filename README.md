@@ -235,6 +235,8 @@ To do so, simply run:
 To view the documentation in a browser on your local machine, run:     
 `make view-doc`
 
+To view the documentation of a specific architecture, set ARCH. For example:     
+`make view-doc ARCH=aarch64`
 
 ## IDE Setup  
 Our personal preference is to use Visual Studio Code (VS Code), which has excellent, official support from the Rust language team. Other options are available [here](https://areweideyet.com/), but we don't recommend them.
