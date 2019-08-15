@@ -44,13 +44,13 @@ pub fn main(args: Vec<String>) -> isize {
 
     if matches.opt_present("a") {
         out.push_str("==== Kernel Crate Files ====\n");
-        for f in namespace.dirs().kernel_directory().lock().list() {
+        for f in namespace.dir().lock().list() {
             out.push_str(&format!("{}\n", f)); 
         }
-        out.push_str("\n==== Application Crate Files ====\n");
-        for f in namespace.dirs().applications_directory().lock().list() {
-            out.push_str(&format!("{}\n", f)); 
-        }
+        out.push_str("\n==== Application Crate Files ====\n TODO FIX ME");
+        // for f in namespace.dir().lock().list() {
+        //     out.push_str(&format!("{}\n", f)); 
+        // }
     }
     else {
         for n in namespace.crate_names() {
@@ -68,4 +68,4 @@ fn print_usage(opts: Options) {
 
 
 const USAGE: &'static str = "\nUsage: lsmod [OPTION]
-Lists the modules that are currently loaded in the default crate namespace.";
+Lists the crates that are loaded in the currently-active crate namespace.";

@@ -27,6 +27,9 @@ path = "../../libs/atomic_linked_list"
 [dependencies.tss]
 path = "../tss"
 
+[dependencies.kernel_config]
+path = "../kernel_config"
+
 [dependencies.memory]
 path = "../memory"
 

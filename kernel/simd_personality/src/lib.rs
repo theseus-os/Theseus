@@ -133,14 +133,14 @@ fn internal_setup_simd_personality(simd_ext: SimdExt) -> Result<(), &'static str
 	let core_lib_simd = simd_namespace.get_kernel_file_starting_with("core-")
 		.ok_or_else(|| "couldn't find a single 'core' object file in simd_personality")?;
 	let crate_files = vec![compiler_builtins_simd, core_lib_simd];
-	simd_namespace.load_kernel_crates(crate_files.iter(), Some(backup_namespace), &kernel_mmi_ref, false)?;
+	simd_namespace.load_crates(crate_files.iter(), Some(backup_namespace), &kernel_mmi_ref, false)?;
 
 
 	// load the actual crate that we want to run in the simd namespace, "simd_test"
 	let simd_test_file = simd_namespace.get_kernel_file_starting_with("simd_test-")
 		.ok_or_else(|| "couldn't find a single 'simd_test' object file in simd_personality")?;
 	simd_namespace.enable_fuzzy_symbol_matching();
-	simd_namespace.load_kernel_crate(&simd_test_file, Some(backup_namespace), &kernel_mmi_ref, false)?;
+	simd_namespace.load_crate(&simd_test_file, Some(backup_namespace), &kernel_mmi_ref, false)?;
 	simd_namespace.disable_fuzzy_symbol_matching();
 
 

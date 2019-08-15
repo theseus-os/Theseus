@@ -412,19 +412,11 @@ impl MmiFile {
 
     /// Generates the mmi info string.
     fn generate(&self) -> String {
-        let mut output = String::new();
-        match self.taskref.lock().mmi {
-            Some(ref mmi_ref) => {
-                let mmi = mmi_ref.lock();
-                output = format!(
-                    "Page table:\n{:?}
-                     Virtual memory areas:\n{:?}\n",
-                     mmi.page_table, mmi.vmas
-                );
-            }
-            _ => output.push_str("MMI is uninitialized."),
-        }
-        output
+        let task = self.taskref.lock();
+        let mmi = task.mmi.lock();
+        format!("Page table:\n{:?}\nVirtual memory areas:\n{:?}\n",
+            mmi.page_table, mmi.vmas
+        )
     }
 }
 

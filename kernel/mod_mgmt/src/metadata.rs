@@ -3,7 +3,6 @@
 //! [This is a good link](https://users.rust-lang.org/t/circular-reference-issue/9097)
 //! for understanding why we need `Arc`/`Weak` to handle recursive/circular data structures in Rust. 
 
-use core::ops::{Deref};
 use spin::Mutex;
 use alloc::vec::Vec;
 use alloc::string::String;
@@ -15,7 +14,6 @@ use super::{TEXT_SECTION_FLAGS, RODATA_SECTION_FLAGS, DATA_BSS_SECTION_FLAGS};
 use cow_arc::{CowArc, CowWeak};
 use path::Path;
 
-use super::SymbolMap;
 use qp_trie::{Trie, wrapper::BString};
 
 /// A Strong reference (`Arc`) to a `LoadedSection`.
@@ -31,6 +29,9 @@ pub type WeakCrateRef = CowWeak<LoadedCrate>; // Weak<Mutex<LoadedCrate>>;
 
 const CRATE_PREFIX_DELIMITER: &'static str = "#";
 
+/// The type of a crate, 
+/// based on its object file naming convention.
+/// See the `from_module_name()` function for more. 
 #[derive(Debug, PartialEq)]
 pub enum CrateType {
     Kernel,
@@ -43,6 +44,16 @@ impl CrateType {
             CrateType::Kernel       => "k",
             CrateType::Application  => "a",
             CrateType::Userspace    => "u",
+        }
+    }
+
+    /// Returns the string suffix for use as the name 
+    /// of the crate object file's containing namespace.
+    pub fn namespace_name(&self) -> &'static str {
+        match self {
+            CrateType::Kernel       => "_kernel",
+            CrateType::Application  => "_applications",
+            CrateType::Userspace    => "_userspace",
         }
     }
 
@@ -402,40 +413,6 @@ impl LoadedCrate {
 
         Ok(new_crate)
     }
-}
-
-
-/// Returns a map containing all symbols,
-/// filtered to include only `LoadedSection`s that satisfy the given predicate
-/// (if the predicate returns true for a given section, then it is included in the map).
-/// 
-/// The symbols come from the sections in the given section iterator (if Some), 
-/// otherwise they come from this crate's sections list.
-/// 
-/// See [`global_symbol_map`](#method.global_system_map) for an example.
-pub fn symbol_map<'a, I, F>(
-    sections: I,
-    crate_name: &str,
-    predicate: F,
-) -> SymbolMap 
-    where F: Fn(&LoadedSection) -> bool, 
-            I: IntoIterator<Item = &'a StrongSectionRef> 
-{
-    let mut map: SymbolMap = SymbolMap::new();
-    for sec in sections.into_iter().filter(|sec| predicate(sec.lock().deref())) {
-        let key = sec.lock().name.clone();
-        if let Some(old_val) = map.insert_str(&key, Arc::downgrade(&sec)) {
-            if key.ends_with("_LOC") || crate_name == "nano_core" {
-                // ignoring these special cases currently
-            }
-            else {
-                warn!("symbol_map(): crate \"{}\" had duplicate section for symbol \"{}\", old: {:?}, new: {:?}", 
-                    crate_name, key, old_val.upgrade(), sec);
-            }
-        }
-    }
-
-    map
 }
 
 
