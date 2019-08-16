@@ -978,16 +978,18 @@ impl Terminal {
         let command = args.remove(0);
 
 	    // Check that the application actually exists
-        let app_list = task::get_my_current_task()
-            .map(|t| t.get_namespace().dir().lock().list())
+        let namespace_dir = task::get_my_current_task()
+            .map(|t| t.get_namespace().dir().clone())
             .ok_or(AppErr::NamespaceErr)?;
-        let mut executable = command.clone();
-        executable.push_str(".o");
-        if !app_list.contains(&executable) {
-            return Err(AppErr::NotFound(command));
-        }
+        let cmd_crate_name = format!("{}-", command);
+        let mut matching_apps = namespace_dir.get_files_starting_with(&cmd_crate_name).into_iter();
+        let app_file = matching_apps.next();
+        let second_match = matching_apps.next(); // return an error if there are multiple matching apps 
+        let app_path = app_file.xor(second_match)
+            .map(|f| Path::new(f.lock().get_absolute_path()))
+            .ok_or(AppErr::NotFound(command))?;
 
-        let taskref = match ApplicationTaskBuilder::new(Path::new(command))
+        let taskref = match ApplicationTaskBuilder::new(app_path)
             .argument(args)
             .spawn() {
                 Ok(taskref) => taskref, 

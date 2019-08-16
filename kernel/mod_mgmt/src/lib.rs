@@ -263,6 +263,29 @@ impl NamespaceDir {
     /// Creates a new `NamespaceDir` that wraps the given `DirRef`.
     pub fn new(dir: DirRef) -> NamespaceDir {
         NamespaceDir(dir)
+    }    
+
+    /// Finds the single file in this directory whose name starts with the given `prefix`.
+    /// 
+    /// # Return
+    /// If a single file matches, then that file is returned. 
+    /// Otherwise, if no files or multiple files match, then `None` is returned.
+    pub fn get_file_starting_with(&self, prefix: &str) -> Option<FileRef> {
+        let mut matching_files = self.get_files_starting_with(prefix).into_iter();
+        matching_files.next()
+            .filter(|_| matching_files.next().is_none()) // ensure single element
+    }
+
+    /// Returns the list of files in this Directory whose name starts with the given `prefix`.
+    pub fn get_files_starting_with(&self, prefix: &str) -> Vec<FileRef> {
+        let children = { self.0.lock().list() };
+        children.into_iter().filter_map(|name| {
+            if name.starts_with(prefix) {
+                self.0.lock().get_file(&name)
+            } else {
+                None
+            }
+        }).collect()
     }
 
     /// Gets the given object file based on its crate name prefix. 
@@ -407,27 +430,31 @@ impl CrateNamespace {
     }
 
     /// Returns a list of all of the crate names currently loaded into this `CrateNamespace`,
-    /// including all crates in any recursive namespaces as well.
+    /// including all crates in any recursive namespaces as well if `recursive` is `true`.
     /// This is a slow method mostly for debugging, since it allocates new Strings for each crate name.
-    pub fn crate_names(&self) -> Vec<String> {
+    pub fn crate_names(&self, recursive: bool) -> Vec<String> {
         let mut crates: Vec<String> = self.crate_tree.lock().keys().map(|bstring| String::from(bstring.as_str())).collect();
 
-        if let Some(mut crates_recursive) = self.recursive_namespace.as_ref().map(|r_ns| r_ns.crate_names()) {
-            crates.append(&mut crates_recursive);
+        if recursive {
+            if let Some(mut crates_recursive) = self.recursive_namespace.as_ref().map(|r_ns| r_ns.crate_names(recursive)) {
+                crates.append(&mut crates_recursive);
+            }
         }
         crates
     }
 
-    /// Iterates over all crates in this namespace and its recursive namespaces,
-    /// and calls the given function `f` on each crate.
+    /// Iterates over all crates in this namespace and calls the given function `f` on each crate.
+    /// If `recursive` is true, crates in recursive namespaces are included as well.
     /// The function `f` is called with two arguments: the name of the crate, and a reference to the crate. 
-    pub fn crate_iter<F: Fn(&str, &StrongCrateRef)>(&self, f: F) {
+    pub fn crate_iter<F>(&self, recursive: bool, mut f: F) where F: FnMut(&str, &StrongCrateRef) {
         for (crate_name, crate_ref) in self.crate_tree.lock().iter() {
             f(crate_name.as_str(), crate_ref);
         }
 
-        if let Some(ref r_ns) = self.recursive_namespace {
-            r_ns.crate_iter(f);
+        if recursive {
+            if let Some(ref r_ns) = self.recursive_namespace {
+                r_ns.crate_iter(recursive, f);
+            }
         }
     }
 
@@ -744,7 +771,7 @@ impl CrateNamespace {
                 // First, before we perform any expensive crate loading, let's try an optimization
                 // based on cached crates that were unloaded during a previous swap operation. 
                 if let Some(cached_crates) = self.unloaded_crate_cache.lock().remove(&swap_requests) {
-                    warn!("Using optimized swap routine to swap in cached crates: {:?}", cached_crates.crate_names());
+                    warn!("Using optimized swap routine to swap in cached crates: {:?}", cached_crates.crate_names(true));
                     (cached_crates, true)
                 } else {
                     // If no optimization is possible (no cached crates exist for this swap request), 
@@ -1139,7 +1166,7 @@ impl CrateNamespace {
         // We can't just move the crates in the swap request list, because we may have loaded other crates from their object files (for the first time).
         // Thus, we need to move all newly-loaded crates from the temp namespace into this namespace;
         // for this, we add only the non-shared (exclusive) crates, because shared crates are those that came from the backup namespace.
-        namespace_of_new_crates.crate_iter(|new_crate_name, new_crate_ref| {
+        namespace_of_new_crates.crate_iter(true, |new_crate_name, new_crate_ref| {
             if new_crate_ref.is_shared() {
                 if self.get_crate(new_crate_name).is_none() { 
                     error!("BUG: shared crate {} was not already in the current (backup) namespace", new_crate_name);
@@ -1195,7 +1222,7 @@ impl CrateNamespace {
         #[cfg(not(loscd_eval))]
         {
             debug!("swap_crates() [end]: adding old_crates to cache. \n   future_swap_requests: {:?}, \n   old_crates: {:?}", 
-                future_swap_requests, cached_crates.crate_names());
+                future_swap_requests, cached_crates.crate_names(true));
             self.unloaded_crate_cache.lock().insert(future_swap_requests, cached_crates);
         }
 
@@ -2292,13 +2319,8 @@ impl CrateNamespace {
     /// 
     /// Returns the absolute `Path` of the matching crate file.
     pub fn get_crate_file_starting_with(&self, prefix: &str) -> Option<Path> {
-        let children = { self.dir.lock().list() };
-        let mut iter = children.into_iter().filter(|child_name| child_name.starts_with(prefix));
-        let cfile_in_this_namespace = iter.next()
-            .filter(|_| iter.next().is_none()) // ensure single element
-            .and_then(|name| self.dir.lock().get_file(&name))
+        let cfile_in_this_namespace = self.dir.get_file_starting_with(prefix)
             .map(|f| Path::new(f.lock().get_absolute_path()));
-
         let cfile_in_recursive_namespace = self.recursive_namespace().as_ref().and_then(|r_ns| r_ns.get_crate_file_starting_with(prefix));
 
         cfile_in_this_namespace.xor(cfile_in_recursive_namespace)
@@ -2310,15 +2332,11 @@ impl CrateNamespace {
     /// 
     /// Returns a list of the absolute `Path`s of matching kernel files.
     pub fn get_crate_files_starting_with(&self, prefix: &str) -> Vec<Path> {
-        let children = { self.dir.lock().list() };
-        let mut cfiles: Vec<Path> = children.into_iter().filter_map(|name| {
-            if name.starts_with(prefix) {
-                self.dir.lock().get_file(&name)
-                    .map(|f| Path::new(f.lock().get_absolute_path()))
-            } else {
-                None // remove non-matches
-            }
-        }).collect();
+        let mut cfiles: Vec<Path> = self.dir
+            .get_files_starting_with(prefix)
+            .into_iter()
+            .map(|f| Path::new(f.lock().get_absolute_path()))
+            .collect();
 
         if let Some(mut cfiles_recursive) = self.recursive_namespace().as_ref().map(|r_ns| r_ns.get_crate_files_starting_with(prefix)) {
             cfiles.append(&mut cfiles_recursive);

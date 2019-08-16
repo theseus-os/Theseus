@@ -36,10 +36,7 @@ use alloc::{
 use irq_safety::{MutexIrqSafe, hold_interrupts, enable_interrupts, interrupts_enabled};
 use memory::{get_kernel_mmi_ref, MemoryManagementInfo, VirtualAddress};
 use task::{Task, TaskRef, get_my_current_task, RunState, TASKLIST, TASK_SWITCH_LOCKS};
-use mod_mgmt::{
-    CrateNamespace,
-    metadata::StrongCrateRef,
-};
+use mod_mgmt::CrateNamespace;
 use path::Path;
 
 #[cfg(spawn_userspace)]
