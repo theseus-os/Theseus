@@ -45,9 +45,6 @@ path = "../environment"
 [dependencies.root]
 path = "../root"
 
-[dependencies.fs_node]
-path = "../fs_node"
-
 [dependencies.pause]
 path = "../pause"
 

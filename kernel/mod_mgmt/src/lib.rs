@@ -82,10 +82,7 @@ pub fn get_default_namespace() -> Option<&'static Arc<CrateNamespace>> {
 
 /// Returns the top-level directory that contains all of the namespaces. 
 pub fn get_namespaces_directory() -> Option<DirRef> {
-    match root::get_root().lock().get(NAMESPACES_DIRECTORY_NAME) {
-        Some(FileOrDir::Dir(dir)) => Some(dir),
-        _ => None,
-    }
+    root::get_root().lock().get_dir(NAMESPACES_DIRECTORY_NAME)
 }
 
 
@@ -280,10 +277,7 @@ impl NamespaceDir {
     /// * The name "a#ps.o" will look for and return the file "ps.o".
     pub fn get_crate_object_file(&self, crate_object_file_name: &str) -> Option<FileRef> {
         let (_crate_type, _prefix, objfilename) = CrateType::from_module_name(crate_object_file_name).ok()?;
-        match self.0.lock().get(objfilename) { 
-            Some(FileOrDir::File(f)) => Some(f),
-            _ => None,
-        }
+        self.0.lock().get_file(objfilename)
     }
 
     /// Insert the given crate object file based on its crate type prefix. 
@@ -344,7 +338,10 @@ pub struct CrateNamespace {
     /// Symbols declared as "no_mangle" will appear in the map with no crate prefix, as expected.
     symbol_map: Mutex<SymbolMap>,
 
-    /// The 
+    /// The `CrateNamespace` that lies below this namespace, and can also be used by this namespace
+    /// to resolve symbols and load crates that are relied on by other crates in this namespace.
+    /// So, for example, if this namespace contains a set of application crates,
+    /// its `recursive_namespace` could contain the set of kernel crates that these application crates rely on.
     recursive_namespace: Option<Arc<CrateNamespace>>,
 
     /// The set of crates that have been previously unloaded (e.g., swapped out) from this namespace. 
@@ -395,6 +392,12 @@ impl CrateNamespace {
         &self.dir
     }
 
+    /// Returns the recursive namespace that this `CrateNamespace` is built atop,
+    /// if one exists.
+    pub fn recursive_namespace(&self) -> Option<&Arc<CrateNamespace>> {
+        self.recursive_namespace.as_ref()
+    }
+
     pub fn enable_fuzzy_symbol_matching(&mut self) {
         self.fuzzy_symbol_matching = true;
     }
@@ -403,35 +406,49 @@ impl CrateNamespace {
         self.fuzzy_symbol_matching = false;
     }
 
-    /// Returns a list of all of the crate names currently loaded into this `CrateNamespace`.
+    /// Returns a list of all of the crate names currently loaded into this `CrateNamespace`,
+    /// including all crates in any recursive namespaces as well.
     /// This is a slow method mostly for debugging, since it allocates new Strings for each crate name.
     pub fn crate_names(&self) -> Vec<String> {
-        self.crate_tree.lock().keys().map(|bstring| String::from(bstring.as_str())).collect()
+        let mut crates: Vec<String> = self.crate_tree.lock().keys().map(|bstring| String::from(bstring.as_str())).collect();
+
+        if let Some(mut crates_recursive) = self.recursive_namespace.as_ref().map(|r_ns| r_ns.crate_names()) {
+            crates.append(&mut crates_recursive);
+        }
+        crates
     }
 
-
-    /// Iterates over all crates in this namespace and calls the given function `f` on each crate.
+    /// Iterates over all crates in this namespace and its recursive namespaces,
+    /// and calls the given function `f` on each crate.
     /// The function `f` is called with two arguments: the name of the crate, and a reference to the crate. 
     pub fn crate_iter<F: Fn(&str, &StrongCrateRef)>(&self, f: F) {
         for (crate_name, crate_ref) in self.crate_tree.lock().iter() {
             f(crate_name.as_str(), crate_ref);
         }
+
+        if let Some(ref r_ns) = self.recursive_namespace {
+            r_ns.crate_iter(f);
+        }
     }
 
-    /// Acquires the lock on this `CrateNamespace`'s crate list and looks for the crate 
+    /// Acquires the lock on this `CrateNamespace`'s crate list and returns the crate 
     /// that matches the given `crate_name`, if it exists in this namespace.
+    /// If it does not exist in this namespace, then the recursive namespace is searched as well.
     /// 
     /// Returns a `StrongCrateReference` that **has not** been marked as a shared crate reference,
     /// so if the caller wants to keep the returned `StrongCrateRef` as a shared crate 
     /// that jointly exists in another namespace, they should invoke the 
     /// [`CowArc::share()`](cow_arc/CowArc.share.html) function on the returned value.
     pub fn get_crate(&self, crate_name: &str) -> Option<StrongCrateRef> {
-        self.crate_tree.lock().get_str(crate_name).map(|r| CowArc::clone_shallow(r))
+        self.crate_tree.lock().get_str(crate_name)
+            .map(|c| CowArc::clone_shallow(c))
+            .or_else(|| self.recursive_namespace.as_ref().and_then(|r_ns| r_ns.get_crate(crate_name)))
     }
 
-    /// Finds the `LoadedCrate` that corresponds to the given crate_name_prefix,
+    /// Finds the `LoadedCrate` that corresponds to the given `crate_name_prefix`,
     /// *if and only if* the list of `LoadedCrate`s only contains a single possible match,
     /// and returns a tuple of the crate's name and a reference to the crate.
+    /// If it does not exist in this namespace, then the recursive namespace is searched as well.
     /// 
     /// # Important Usage Note
     /// To avoid greedily matching more crates than expected, you may wish to end the `crate_name_prefix` with "`-`".
@@ -446,11 +463,18 @@ impl CrateNamespace {
     ///   To match only `my_crate`, call this function as `get_crate_starting_with("my_crate-")`
     ///   (note the trailing "`-`").
     pub fn get_crate_starting_with(&self, crate_name_prefix: &str) -> Option<(String, StrongCrateRef)> { 
+        // First, we see if there's a single matching crate in this namespace. 
         let crates = self.crate_tree.lock();
         let mut iter = crates.iter_prefix_str(crate_name_prefix);
-        iter.next()
+        let crate_in_this_namespace = iter.next()
             .filter(|_| iter.next().is_none()) // ensure single element
-            .map(|(key, val)| (key.clone().into(), val.clone()))
+            .map(|(key, val)| (key.clone().into(), val.clone()));
+
+        // Second, we see if there's a single matching crate in the recursive namespace.
+        let crate_in_recursive_namespace = self.recursive_namespace().as_ref().and_then(|r_ns| r_ns.get_crate_starting_with(crate_name_prefix));
+
+        // There can only be one matching crate across all recursive namespaces.
+        crate_in_this_namespace.xor(crate_in_recursive_namespace) 
     }
 
 
@@ -498,24 +522,24 @@ impl CrateNamespace {
     /// 
     /// # Arguments
     /// * `crate_file_path`: the path to the crate object file that will be loaded into this `CrateNamespace`.
-    /// * `backup_namespace`: the `CrateNamespace` that should be searched for missing symbols 
+    /// * `temp_backup_namespace`: the `CrateNamespace` that should be searched for missing symbols 
     ///   (for relocations) if a symbol cannot be found in this `CrateNamespace`. 
     ///   For example, the default namespace could be used by passing in `Some(get_default_namespace())`.
-    ///   If `backup_namespace` is `None`, then no other namespace will be searched, 
+    ///   If `temp_backup_namespace` is `None`, then no other namespace will be searched, 
     ///   and any missing symbols will return an `Err`. 
     /// * `kernel_mmi_ref`: a mutable reference to the kernel's `MemoryManagementInfo`.
     /// * `verbose_log`: a boolean value whether to enable verbose_log logging of crate loading actions.
     pub fn load_crate(
         &self,
         crate_file_path: &Path,
-        backup_namespace: Option<&CrateNamespace>, 
+        temp_backup_namespace: Option<&CrateNamespace>, 
         kernel_mmi_ref: &MmiRef, 
         verbose_log: bool
     ) -> Result<usize, &'static str> {
 
         #[cfg(not(loscd_eval))]
         debug!("load_crate: trying to load crate {}", crate_file_path);
-        let new_crate_ref = self.load_crate_internal(crate_file_path, backup_namespace, kernel_mmi_ref, verbose_log)?;
+        let new_crate_ref = self.load_crate_internal(crate_file_path, temp_backup_namespace, kernel_mmi_ref, verbose_log)?;
         
         let (new_crate_name, new_syms) = {
             let new_crate = new_crate_ref.lock_as_ref();
@@ -535,7 +559,7 @@ impl CrateNamespace {
     /// See [`load_crate`](#method.load_crate) and [`load_crate_as_application`](#method.load_crate_as_application).
     fn load_crate_internal(&self,
         crate_file_path: &Path,
-        backup_namespace: Option<&CrateNamespace>, 
+        temp_backup_namespace: Option<&CrateNamespace>, 
         kernel_mmi_ref: &MmiRef, 
         verbose_log: bool
     ) -> Result<StrongCrateRef, &'static str> {
@@ -548,7 +572,7 @@ impl CrateNamespace {
         };
         let crate_file = crate_file_ref.lock();
         let (new_crate_ref, elf_file) = self.load_crate_sections(crate_file.deref(), kernel_mmi_ref, verbose_log)?;
-        self.perform_relocations(&elf_file, &new_crate_ref, backup_namespace, kernel_mmi_ref, verbose_log)?;
+        self.perform_relocations(&elf_file, &new_crate_ref, temp_backup_namespace, kernel_mmi_ref, verbose_log)?;
         Ok(new_crate_ref)
     }
 
@@ -565,7 +589,7 @@ impl CrateNamespace {
     pub fn load_crates<'p, I>(
         &self,
         crate_file_paths: I,
-        backup_namespace: Option<&CrateNamespace>,
+        temp_backup_namespace: Option<&CrateNamespace>,
         kernel_mmi_ref: &MmiRef,
         verbose_log: bool,
     ) -> Result<(), &'static str> 
@@ -600,7 +624,7 @@ impl CrateNamespace {
         
         // finally, we do all of the relocations 
         for (new_crate_ref, elf_file) in partially_loaded_crates {
-            self.perform_relocations(&elf_file, &new_crate_ref, backup_namespace, kernel_mmi_ref, verbose_log)?;
+            self.perform_relocations(&elf_file, &new_crate_ref, temp_backup_namespace, kernel_mmi_ref, verbose_log)?;
             let name = new_crate_ref.lock_as_ref().crate_name.clone();
             self.crate_tree.lock().insert(name.into(), new_crate_ref);
         }
@@ -1167,8 +1191,6 @@ impl CrateNamespace {
             Ok(())
         };
         copy_directory_contents(&namespace_of_new_crates.dir, &self.dir)?;
-        // copy_directory_contents(&namespace_of_new_crates.dirs.app, &self.dirs.app)?;
-        // copy_directory_contents(&namespace_of_new_crates.dirs.user, &self.dirs.user)?; // not used currently
 
         #[cfg(not(loscd_eval))]
         {
@@ -1702,7 +1724,7 @@ impl CrateNamespace {
         &self,
         elf_file: &ElfFile,
         new_crate_ref: &StrongCrateRef,
-        backup_namespace: Option<&CrateNamespace>,
+        temp_backup_namespace: Option<&CrateNamespace>,
         kernel_mmi_ref: &MmiRef,
         verbose_log: bool
     ) -> Result<(), &'static str> {
@@ -1802,7 +1824,7 @@ impl CrateNamespace {
                                 let demangled = demangle(source_sec_name).to_string();
 
                                 // search for the symbol's demangled name in the kernel's symbol map
-                                self.get_symbol_or_load(&demangled, backup_namespace, kernel_mmi_ref, verbose_log)
+                                self.get_symbol_or_load(&demangled, temp_backup_namespace, kernel_mmi_ref, verbose_log)
                                     .upgrade()
                                     .ok_or("Couldn't get symbol for foreign relocation entry, nor load its containing crate")
                             }
@@ -1975,14 +1997,18 @@ impl CrateNamespace {
 
 
     /// A convenience function that returns a weak reference to the `LoadedSection`
-    /// that matches the given name (`demangled_full_symbol`), if it exists in the symbol map.
+    /// that matches the given name (`demangled_full_symbol`), 
+    /// if it exists in this namespace's or its recursive namespace's symbol map.
     /// Otherwise, it returns None if the symbol does not exist.
     fn get_symbol_internal(&self, demangled_full_symbol: &str) -> Option<WeakSectionRef> {
         self.symbol_map.lock().get_str(demangled_full_symbol).cloned()
+            // search the recursive namespace if the symbol cannot be found in this namespace
+            .or_else(|| self.recursive_namespace.as_ref().and_then(|rns| rns.get_symbol_internal(demangled_full_symbol)))
     }
 
 
     /// Finds the corresponding `LoadedSection` reference for the given fully-qualified symbol string.
+    /// Searches this namespace first, and then its recursive namespace as well.
     pub fn get_symbol(&self, demangled_full_symbol: &str) -> WeakSectionRef {
         self.get_symbol_internal(demangled_full_symbol)
             .unwrap_or_else(|| Weak::default())
@@ -1994,57 +2020,60 @@ impl CrateNamespace {
     /// automatically find and/or load the crate containing that symbol 
     /// (and does so recursively for any of its crate dependencies).
     /// 
-    /// (1) First, it looks up the symbol in this namespace's symbol map, and returns it if present. 
+    /// (1) First, it recursively searches this namespace's and its recursive namespaces' symbol maps, 
+    ///     and returns the symbol if already loaded.
     /// 
-    /// (2) Second, if the symbol is missing from this namespace, it looks in the `backup_namespace`. 
-    ///     If we find it there, then add that shared crate into this namespace.
+    /// (2) Second, if the symbol is missing from this namespace, it looks in the `temp_backup_namespace`. 
+    ///     If we find it there, then we add that symbol and its containing crate as a shared crate in this namespace.
     /// 
-    /// (3) Third, if the missing symbol isn't in the backup namespace either, 
-    ///     try to load its containing crate from the module file. 
+    /// (3) Third, if this namespace has `fuzzy_symbol_matching` enabled, it searches the backup namespace
+    ///     for symbols that match the given `demangled_full_symbol` without the hash suffix. 
+    /// 
+    /// (4) Fourth, if the missing symbol isn't in the backup namespace either, 
+    ///     try to load its containing crate from the object file. 
     ///     This can only be done for symbols that have a leading crate name, such as "my_crate::foo";
     ///     if a symbol was given the `no_mangle` attribute, then we will not be able to find it,
     ///     and that symbol's containing crate should be manually loaded before invoking this. 
     /// 
-    /// (4) Fourth, if this namespace has `fuzzy_symbol_matching` enabled, it searches the backup namespace
-    ///     for symbols that match the given `demangled_full_symbol` without the hash suffix. 
     /// 
     /// # Arguments
-    /// * `demangled_full_symbol`: a fully-qualified symbol string, e.g., "my_crate::MyStruct::do_foo::h843a9ea794da0c24".
-    /// * `backup_namespace`: the `CrateNamespace` that should be searched for missing symbols 
-    ///   if a symbol cannot be found in this `CrateNamespace`. 
-    ///   For example, the default namespace could be used by passing in `Some(get_default_namespace())`.
-    ///   If `backup_namespace` is `None`, then no other namespace will be searched.
+    /// * `demangled_full_symbol`: a fully-qualified symbol string, e.g., "my_crate::MyStruct::foo::h843a9ea794da0c24".
+    /// * `temp_backup_namespace`: the `CrateNamespace` that should be temporarily searched (just during this call)
+    ///   for the missing symbol.
+    ///   If `temp_backup_namespace` is `None`, then only this namespace (and its recursive namespaces) will be searched.
     /// * `kernel_mmi_ref`: a mutable reference to the kernel's `MemoryManagementInfo`.
     pub fn get_symbol_or_load(
         &self, 
         demangled_full_symbol: &str, 
-        backup_namespace: Option<&CrateNamespace>, 
+        temp_backup_namespace: Option<&CrateNamespace>, 
         kernel_mmi_ref: &MmiRef,
         verbose_log: bool
     ) -> WeakSectionRef {
         // First, see if the section for the given symbol is already available and loaded
+        // in either this namespace or the recursive namespace
         if let Some(sec) = self.get_symbol_internal(demangled_full_symbol) {
             return sec;
         }
 
-        // If not, our second option is to check the backup_namespace
+        // If not, our second option is to check the temp_backup_namespace
         // to see if that namespace already has the section we want
-        if let Some(backup) = backup_namespace {
+        if let Some(backup) = temp_backup_namespace {
             // info!("Symbol \"{}\" not initially found, attempting to load it from backup namespace {:?}", 
             //     demangled_full_symbol, backup.name);
             if let Some(weak_sec) = backup.get_symbol_internal(demangled_full_symbol) {
                 if let Some(sec) = weak_sec.upgrade() {
-                    // If we found it in the backup_namespace, then that saves us the effort of having to load the crate again.
+                    // If we found it in the temp_backup_namespace, then that saves us the effort of having to load the crate again.
                     // We need to add a shared reference to that section's parent crate to this namespace as well, 
                     // so it can't be dropped while this namespace is still relying on it.  
                     let pcref_opt = { sec.lock().parent_crate.upgrade() };
                     if let Some(parent_crate_ref) = pcref_opt {
                         let parent_crate_name = {
                             let parent_crate = parent_crate_ref.lock_as_ref();
-                            // Here, there is a potential for optimization: add all symbols from the parent_crate into the current namespace.
+                            // Here, there is a misguided potential for optimization: add all symbols from the parent_crate into the current namespace.
                             // While this would save lookup/loading time if future symbols were needed from this crate,
                             // we *cannot* do this because it violates the expectations of certain namespaces. 
                             // For example, some namespaces may want to use just *one* symbol from another namespace's crate, not all of them. 
+                            // Thus, we just add the one symbol for `sec` to this namespace.
                             self.add_symbols(Some(sec.clone()).iter(), verbose_log);
                             parent_crate.crate_name.clone()
                         };
@@ -2064,15 +2093,15 @@ impl CrateNamespace {
         }
 
         // Try to fuzzy match the symbol to see if a single match for it has already been loaded into the backup namespace.
-        // This is basically the same code as the above backup_namespace conditional, but checks to ensure there aren't multiple fuzzy matches.
+        // This is basically the same code as the above temp_backup_namespace conditional, but checks to ensure there aren't multiple fuzzy matches.
         if self.fuzzy_symbol_matching {
-            if let Some(backup) = backup_namespace {
+            if let Some(backup) = temp_backup_namespace {
                 let fuzzy_matches = backup.find_symbols_starting_with(LoadedSection::section_name_without_hash(demangled_full_symbol));
                 
                 if fuzzy_matches.len() == 1 {
                     let (_sec_name, weak_sec) = &fuzzy_matches[0];
                     if let Some(sec) = weak_sec.upgrade() {
-                        // If we found it in the backup_namespace, we need to add a shared reference to that section's parent crate
+                        // If we found it in the temp_backup_namespace, we need to add a shared reference to that section's parent crate
                         // to this namespace so it can't be dropped while this namespace is still relying on it.  
                         let pcref_opt = { sec.lock().parent_crate.upgrade() };
                         if let Some(parent_crate_ref) = pcref_opt {
@@ -2100,7 +2129,7 @@ impl CrateNamespace {
             }
         }
 
-        // As a final attempt, we try to load the kernel crate(s) containing the missing symbol.
+        // As a final attempt, we try to load the crate(s) containing the missing symbol.
         // We are only able to do this for mangled symbols that contain a crate name, such as "my_crate::foo". 
         // If "foo()" was marked no_mangle, then we don't know which crate to load because there is no "my_crate::" before it.
         // There are multiple potential containing crates, so we try to load each one to find the missing symbol.
@@ -2110,29 +2139,31 @@ impl CrateNamespace {
             // Try to find and load the missing crate object file from this namespace's directory set,
             // (or from the backup namespace's directory set).
             if let Some(dependency_crate_file_path) = self.get_crate_file_starting_with(&crate_dependency_name)
-                .or_else(|| backup_namespace.and_then(|backup| backup.get_crate_file_starting_with(&crate_dependency_name)))
+                .or_else(|| temp_backup_namespace.and_then(|backup| backup.get_crate_file_starting_with(&crate_dependency_name)))
             {   
                 // Check to make sure this crate is not already loaded into this namespace.
                 if self.crate_tree.lock().contains_key_str(dependency_crate_file_path.file_stem()) {
-                    // trace!("(skipping already-loaded crate {:?})", dependency_crate_file_path);
+                    trace!("  (skipping already-loaded crate {:?})", dependency_crate_file_path);
                     continue;
                 }
                 #[cfg(not(loscd_eval))]
                 info!("Symbol \"{}\" not initially found, attempting to load crate {:?} that may contain it.", 
                     demangled_full_symbol, crate_dependency_name);
 
-                if let Ok(_num_new_syms) = self.load_crate(&dependency_crate_file_path, backup_namespace, kernel_mmi_ref, verbose_log) {
-                    // try again to find the missing symbol, now that we've loaded the missing crate
-                    if let Some(sec) = self.get_symbol_internal(demangled_full_symbol) {
-                        return sec;
-                    } else {
-                        trace!("Loaded symbol's (\"{}\") containing crate {:?}, but still couldn't find the symbol.", 
-                            demangled_full_symbol, dependency_crate_file_path);
+                match self.load_crate(&dependency_crate_file_path, temp_backup_namespace, kernel_mmi_ref, verbose_log) {
+                    Ok(_num_new_syms) => {
+                        // try again to find the missing symbol, now that we've loaded the missing crate
+                        if let Some(sec) = self.get_symbol_internal(demangled_full_symbol) {
+                            return sec;
+                        } else {
+                            trace!("Loaded symbol's (\"{}\") containing crate {:?}, but still couldn't find the symbol.", 
+                                demangled_full_symbol, dependency_crate_file_path);
+                        }
                     }
-                }
-                else {
-                    error!("Found symbol's (\"{}\") containing crate, but couldn't load that crate file {:?}.",
-                        demangled_full_symbol, dependency_crate_file_path);
+                    Err(_e) => {
+                        error!("Found symbol's (\"{}\") containing crate, but couldn't load the crate file {:?}. Error: {:?}",
+                            demangled_full_symbol, dependency_crate_file_path, _e);
+                    }
                 }
             }
             else {
@@ -2141,13 +2172,23 @@ impl CrateNamespace {
             }
         }
 
-        error!("Symbol \"{}\" not found. Try loading the specific crate manually first.", demangled_full_symbol);
-        Weak::default() // same as returning None, since it must be upgraded to an Arc before being used
+
+        // Finally, try getting/loading the symbol from the recursive namespace instead
+        if let Some(sec) = self.recursive_namespace().as_ref().map(|r_ns|
+            r_ns.get_symbol_or_load(demangled_full_symbol, temp_backup_namespace, kernel_mmi_ref, verbose_log)
+        ) {
+            sec
+        }
+        else {
+            error!("Symbol \"{}\" not found. Try loading the specific crate manually first.", demangled_full_symbol);
+            Weak::default() // same as returning None, since it must be upgraded to an Arc before being used
+        }
     }
 
 
     /// Returns a copied list of the corresponding `LoadedSection`s 
     /// with names that start with the given `symbol_prefix`.
+    /// This will also search the recursive namespace's symbol map. 
     /// 
     /// This method causes allocation because it creates a copy
     /// of the matching entries in the symbol map.
@@ -2158,15 +2199,22 @@ impl CrateNamespace {
     /// Calling `find_symbols_starting_with("my_crate::foo")` will return 
     /// a vector containing both sections, which can then be iterated through.
     pub fn find_symbols_starting_with(&self, symbol_prefix: &str) -> Vec<(String, WeakSectionRef)> { 
-        self.symbol_map.lock()
+        let mut syms: Vec<(String, WeakSectionRef)> = self.symbol_map.lock()
             .iter_prefix_str(symbol_prefix)
             .map(|(k, v)| (String::from(k.as_str()), v.clone()))
-            .collect()
+            .collect();
+
+        if let Some(mut syms_recursive) = self.recursive_namespace().as_ref().map(|r_ns| r_ns.find_symbols_starting_with(symbol_prefix)) {
+            syms.append(&mut syms_recursive);
+        }
+
+        syms
     }
 
 
     /// Returns a weak reference to the `LoadedSection` whose name beings with the given `symbol_prefix`,
     /// *if and only if* the symbol map only contains a single possible matching symbol.
+    /// This will also search the recursive namespace's symbol map. 
     /// 
     /// # Important Usage Note
     /// To avoid greedily matching more symbols than expected, you may wish to end the `symbol_prefix` with "`::`".
@@ -2190,16 +2238,30 @@ impl CrateNamespace {
     ///   To match only `foo`, call this function as `get_symbol_starting_with("my_crate::foo::")`
     ///   (note the trailing "`::`").
     pub fn get_symbol_starting_with(&self, symbol_prefix: &str) -> WeakSectionRef { 
+        self.get_symbol_starting_with_internal(symbol_prefix)
+            .unwrap_or_default()
+    }
+
+    /// This is an internal version of method: [`get_symbol_starting_with()`](#method.get_symbol_starting_with) 
+    /// that returns an Option to allow easier recursive use.
+    fn get_symbol_starting_with_internal(&self, symbol_prefix: &str) -> Option<WeakSectionRef> { 
+        // First, we see if there's a single matching symbol in this namespace. 
         let map = self.symbol_map.lock();
         let mut iter = map.iter_prefix_str(symbol_prefix).map(|tuple| tuple.1);
-        iter.next()
+        let symbol_in_this_namespace = iter.next()
             .filter(|_| iter.next().is_none()) // ensure single element
-            .cloned()
-            .unwrap_or_default()
+            .cloned();
+        
+        // Second, we see if there's a single matching symbol in the recursive namespace.
+        let symbol_in_recursive_namespace = self.recursive_namespace().as_ref().and_then(|r_ns| r_ns.get_symbol_starting_with_internal(symbol_prefix));
+
+        // There can only be one matching crate across all recursive namespaces.
+        symbol_in_this_namespace.xor(symbol_in_recursive_namespace)
     }
 
     
     /// Simple debugging function that returns the entire symbol map as a String.
+    /// This includes only symbols from this namespace, and excludes symbols from recursive namespaces.
     pub fn dump_symbol_map(&self) -> String {
         use core::fmt::Write;
         let mut output: String = String::new();
@@ -2208,6 +2270,19 @@ impl CrateNamespace {
             Ok(_) => output,
             _ => String::from("(error)"),
         }
+    }
+
+    /// Same as [`dump_symbol_map()`](#method.dump_symbol_map), 
+    /// but includes symbols from recursive namespaces.
+    pub fn dump_symbol_map_recursive(&self) -> String {
+        let mut syms = self.dump_symbol_map();
+
+        if let Some(ref r_ns) = self.recursive_namespace {
+            let syms_recursive = r_ns.dump_symbol_map_recursive();
+            syms = format!("{}\n{}", syms, syms_recursive);
+        }
+
+        syms
     }
 
 
@@ -2219,15 +2294,14 @@ impl CrateNamespace {
     pub fn get_crate_file_starting_with(&self, prefix: &str) -> Option<Path> {
         let children = { self.dir.lock().list() };
         let mut iter = children.into_iter().filter(|child_name| child_name.starts_with(prefix));
-        iter.next()
+        let cfile_in_this_namespace = iter.next()
             .filter(|_| iter.next().is_none()) // ensure single element
-            .and_then(|name| { 
-                let file_or_dir = { self.dir.lock().get(&name) };
-                match file_or_dir {
-                    Some(FileOrDir::File(f)) => Some(Path::new(f.lock().get_absolute_path())),
-                    _ => None,
-                }
-            })
+            .and_then(|name| self.dir.lock().get_file(&name))
+            .map(|f| Path::new(f.lock().get_absolute_path()));
+
+        let cfile_in_recursive_namespace = self.recursive_namespace().as_ref().and_then(|r_ns| r_ns.get_crate_file_starting_with(prefix));
+
+        cfile_in_this_namespace.xor(cfile_in_recursive_namespace)
     }
 
 
@@ -2237,17 +2311,20 @@ impl CrateNamespace {
     /// Returns a list of the absolute `Path`s of matching kernel files.
     pub fn get_crate_files_starting_with(&self, prefix: &str) -> Vec<Path> {
         let children = { self.dir.lock().list() };
-        children.into_iter().filter_map(|name| {
+        let mut cfiles: Vec<Path> = children.into_iter().filter_map(|name| {
             if name.starts_with(prefix) {
-                let file_or_dir = { self.dir.lock().get(&name) };
-                match file_or_dir {
-                    Some(FileOrDir::File(f)) => Some(Path::new(f.lock().get_absolute_path())),
-                    _ => None,
-                }
+                self.dir.lock().get_file(&name)
+                    .map(|f| Path::new(f.lock().get_absolute_path()))
             } else {
                 None // remove non-matches
             }
-        }).collect()
+        }).collect();
+
+        if let Some(mut cfiles_recursive) = self.recursive_namespace().as_ref().map(|r_ns| r_ns.get_crate_files_starting_with(prefix)) {
+            cfiles.append(&mut cfiles_recursive);
+        }
+
+        cfiles
     }
 
 }

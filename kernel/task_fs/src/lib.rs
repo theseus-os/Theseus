@@ -72,10 +72,7 @@ impl TaskFs {
     }
 
     fn get_self_pointer(&self) -> Option<DirRef> {
-        match root::get_root().lock().get(&self.get_name()) {
-            Some(FileOrDir::Dir(dir)) => Some(dir),
-            _ => None,
-        }
+        root::get_root().lock().get_dir(&self.get_name())
     }
 
     fn get_internal(&self, node: &str) -> Result<FileOrDir, &'static str> {

@@ -115,10 +115,7 @@ fn internal_setup_simd_personality(simd_ext: SimdExt) -> Result<(), &'static str
 	//     .../namespaces/sse/application
 	//     .../namespaces/sse/userspace
 	let namespaces_dir = get_namespaces_directory().ok_or("top-level namespaces directory wasn't yet initialized")?;
-	let base_dir = match namespaces_dir.lock().get(namespace_name) {
-		Some(FileOrDir::Dir(d)) => d,
-		_ => return Err("couldn't find directory at given path"),
-	};
+	let base_dir = namespaces_dir.lock().get_dir(namespace_name).ok_or("couldn't find directory at given path")?;
 	let mut simd_namespace = CrateNamespace::new(
 		String::from(namespace_name), 
 		NamespaceDirectorySet::from_existing_base_dir(base_dir).map_err(|e| {

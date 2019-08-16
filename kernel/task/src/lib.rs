@@ -42,7 +42,6 @@ extern crate environment;
 extern crate root;
 extern crate x86_64;
 extern crate spin;
-extern crate fs_node;
 extern crate pause;
 extern crate kernel_config;
 
@@ -73,7 +72,6 @@ use mod_mgmt::{
 use environment::Environment;
 use spin::Mutex;
 use x86_64::registers::msr::{rdmsr, wrmsr, IA32_FS_BASE};
-use fs_node::DirRef;
 
 
 /// The signature of the callback function that can hook into receiving a panic. 
@@ -940,14 +938,4 @@ pub fn get_my_current_task() -> Option<&'static TaskRef> {
 /// stored in the FS base MSR register.
 pub fn get_my_current_task_id() -> Option<usize> {
     get_task_local_data().map(|tld| tld.current_task_id)
-}
-
-/// Returns the current Task's working Directory
-/// from its `Environment` object.
-pub fn get_my_working_dir() -> Option<DirRef> {
-    get_my_current_task().map(|taskref| {
-        let env = taskref.get_env();
-        let env_locked = env.lock();
-        Arc::clone(&env_locked.working_dir)
-    })
 }
