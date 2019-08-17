@@ -59,17 +59,6 @@ pub fn main(_args: Vec<String>) -> isize {
     };
 
 
-    // testing namespaces from terminal
-    { 
-        let ns_dir = task::get_my_current_task().unwrap().get_namespace().dir().clone();
-        let ns_dir_locked = ns_dir.lock();
-        trace!("Terminal task's namespace dir: {:?}\n{:?}",
-            ns_dir_locked.get_name(), ns_dir_locked.list(),
-        );
-    }
-    ///////////////////////////////////////////////////////////
-
-
     loop {
         // block this task, because it never needs to actually run again
         if let Some(my_task) = task::get_my_current_task() {
