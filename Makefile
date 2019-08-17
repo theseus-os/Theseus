@@ -130,7 +130,7 @@ APP_CRATE_NAMES := $(patsubst %/., %, $(APP_CRATE_NAMES))
 ## but I haven't had time yet to develop that script. It would be fairly straightforward using a tool like `cargo deps`. 
 ## So, for now, we just do it manually.
 ## You can execute this to view dependencies to help you out:
-## `cd kernel/nano_core && cargo deps --include-orphans | dot -Tpng > /tmp/graph.png && xdg-open /tmp/graph.png`
+## `cd kernel/nano_core && cargo deps --include-orphans --no-transitive-deps | dot -Tpdf > /tmp/graph.pdf && xdg-open /tmp/graph.pdf`
 APP_CRATE_NAMES += getopts unicode_width
 
 
