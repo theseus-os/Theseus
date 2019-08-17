@@ -123,6 +123,16 @@ APP_CRATE_NAMES := $(filter-out .*/, $(APP_CRATE_NAMES))
 # remove the trailing /. on each name
 APP_CRATE_NAMES := $(patsubst %/., %, $(APP_CRATE_NAMES))
 
+## Specify which crates are app libraries. 
+## These crates can be instantiated multiply (per-task) rather than once (system-wide);
+## they will only be multiply instantiated if they have data/bss sections
+## Ideally we would do this with a script that analyzes dependencies to see if a crate is only used by application crates,
+## but I haven't had time yet to develop that script. It would be fairly straightforward using a tool like `cargo deps`. 
+## So, for now, we just do it manually.
+## You can execute this to view dependencies to help you out:
+## `cd kernel/nano_core && cargo deps --include-orphans --no-transitive-deps | dot -Tpdf > /tmp/graph.pdf && xdg-open /tmp/graph.pdf`
+APP_CRATE_NAMES += getopts unicode_width
+
 
 ### PHONY is the list of targets that *always* get rebuilt regardless of dependent files' modification timestamps.
 ### Most targets are PHONY because cargo itself handles whether or not to rebuild the Rust code base.
@@ -167,8 +177,12 @@ $(iso): build check_captain
 iso: $(iso)
 
 
-## This first invokes the make target that runs the actual compiler, and then copies all object files into the build dir. 
-## It gives all object files the KERNEL_PREFIX, except for "executable" application object files that get the APP_PREFIX.
+## This first invokes the make target that runs the actual compiler, and then copies all object files into the build dir.
+## This also classifies crate object files into either "application" or "kernel" crates:
+## -- an application crate is any executable application in the `applications/` directory, or a library crate that is ONLY used by other applications,
+## -- a kernel crate is any crate in the `kernel/` directory, or any other crates that are used 
+## Obviously, if a crate is used by both other application crates and by kernel crates, it is still a kernel crate. 
+## Then, we give all kernel crate object files the KERNEL_PREFIX and all application crate object files the APP_PREFIX.
 build: $(nano_core_binary)
 ## Copy all object files into the main build directory and prepend the kernel prefix.
 ## All object files include those from the target/ directory, and the core, alloc, and compiler_builtins libraries
@@ -176,11 +190,11 @@ build: $(nano_core_binary)
 		cp -vf  $${f}  $(OBJECT_FILES_BUILD_DIR)/`basename $${f} | sed -n -e 's/\(.*\)/$(KERNEL_PREFIX)\1/p'`   2> /dev/null ; \
 	done
 ## In the above loop, we gave all object files the kernel prefix, so we need to rename the application object files with the proper app prefix.
-## Currently, we remove the hash suffix from application object file names so they're easier to find, but we could change that later 
-## if we ever want to give applications specific versioning semantics (based on those hashes, like with kernel crates)
 	@for app in $(APP_CRATE_NAMES) ; do  \
-		mv  $(OBJECT_FILES_BUILD_DIR)/$(KERNEL_PREFIX)$${app}-*.o  $(OBJECT_FILES_BUILD_DIR)/$(APP_PREFIX)$${app}.o ; \
-		$(CROSS)strip --strip-debug  $(OBJECT_FILES_BUILD_DIR)/$(APP_PREFIX)$${app}.o ; \
+		OLD_FILE_PATH=$(OBJECT_FILES_BUILD_DIR)/$(KERNEL_PREFIX)$${app}-*.o ; \
+		NEW_FILE_PATH=$(OBJECT_FILES_BUILD_DIR)/`basename $${OLD_FILE_PATH} | sed -n -e 's/$(KERNEL_PREFIX)\(.*\)/$(APP_PREFIX)\1/p'` ; \
+		mv  $${OLD_FILE_PATH}  $${NEW_FILE_PATH} ; \
+		$(CROSS)strip  --strip-debug  $${NEW_FILE_PATH} ; \
 	done
 
 

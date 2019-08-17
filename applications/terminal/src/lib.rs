@@ -18,7 +18,6 @@ extern crate memory;
 extern crate event_types; 
 extern crate window_manager;
 extern crate text_display;
-extern crate fs_node;
 extern crate path;
 extern crate root;
 
@@ -41,11 +40,9 @@ use path::Path;
 use task::{TaskRef, ExitValue, KillReason};
 use environment::Environment;
 use spin::Mutex;
-use fs_node::FileOrDir;
 
 pub const FONT_COLOR: u32 = 0x93ee90;
 pub const BACKGROUND_COLOR: u32 = 0x000000;
-pub const APPLICATIONS_NAMESPACE_PATH: &'static str = "/namespaces/default/applications";
 
 
 /// A main function that calls terminal::new() and waits for the terminal loop to exit before returning an exit value
@@ -60,6 +57,7 @@ pub fn main(_args: Vec<String>) -> isize {
             return -1;
         }
     };
+
 
     loop {
         // block this task, because it never needs to actually run again
@@ -969,18 +967,18 @@ impl Terminal {
         let command = args.remove(0);
 
 	    // Check that the application actually exists
-        let app_path = Path::new(APPLICATIONS_NAMESPACE_PATH.to_string());
-        let app_list = match app_path.get(root::get_root()) {
-            Some(FileOrDir::Dir(app_dir)) => {app_dir.lock().list()},
-            _ => return Err(AppErr::NamespaceErr)
-        };
-        let mut executable = command.clone();
-        executable.push_str(".o");
-        if !app_list.contains(&executable) {
-            return Err(AppErr::NotFound(command));
-        }
+        let namespace_dir = task::get_my_current_task()
+            .map(|t| t.get_namespace().dir().clone())
+            .ok_or(AppErr::NamespaceErr)?;
+        let cmd_crate_name = format!("{}-", command);
+        let mut matching_apps = namespace_dir.get_files_starting_with(&cmd_crate_name).into_iter();
+        let app_file = matching_apps.next();
+        let second_match = matching_apps.next(); // return an error if there are multiple matching apps 
+        let app_path = app_file.xor(second_match)
+            .map(|f| Path::new(f.lock().get_absolute_path()))
+            .ok_or(AppErr::NotFound(command))?;
 
-        let taskref = match ApplicationTaskBuilder::new(Path::new(command))
+        let taskref = match ApplicationTaskBuilder::new(app_path)
             .argument(args)
             .spawn() {
                 Ok(taskref) => taskref, 

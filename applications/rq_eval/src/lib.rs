@@ -113,7 +113,7 @@ fn run_whole(num_tasks: usize) -> Result<(), &'static str> {
 
 fn run_single(iterations: usize) -> Result<(), &'static str> {
     println!("Evaluating runqueue {} with SINGLE tasks, {} iterations...", CONFIG, iterations);
-    let mut task = Task::new();
+    let mut task = Task::new(None)?;
     task.name = String::from("rq_eval_single_task_unrunnable");
     let taskref = TaskRef::new(task);
 
