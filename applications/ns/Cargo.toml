@@ -1,7 +1,8 @@
 [package]
-name = "lsmod"
+name = "ns"
 version = "0.1.0"
 authors = ["Kevin Boos <kevinaboos@gmail.com>"]
+description = "An app for interacting with crate namespaces"
 build = "../../build.rs"
 
 [dependencies]
@@ -15,3 +16,6 @@ path = "../../kernel/mod_mgmt"
 
 [dependencies.memory]
 path = "../../kernel/memory"
+
+[dependencies.task]
+path = "../../kernel/task"
