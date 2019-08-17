@@ -205,7 +205,7 @@ fn find_section(section_name: &str) -> Result<StrongSectionRef, String> {
 /// separated by the newline character `'\n'`.
 fn _find_crate(crate_name: &str) -> Result<StrongCrateRef, String> {
     let namespace = get_my_current_namespace();
-    let matching_crate_names: Vec<String> = namespace.crate_names()
+    let matching_crate_names: Vec<String> = namespace.crate_names(true)
         .into_iter()
         .filter(|name| name.starts_with(crate_name))
         .collect();

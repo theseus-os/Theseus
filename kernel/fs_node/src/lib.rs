@@ -80,8 +80,24 @@ pub trait File : FsNode {
 
 /// Trait for directories, implementors of Directory must also implement FsNode
 pub trait Directory : FsNode {
-    /// Gets the file or directory from the current directory based on its name.
-    fn get(&self, name: &str) -> Option<FileOrDir>; 
+    /// Gets either the file or directory in this `Directory`  on its name.
+    fn get(&self, name: &str) -> Option<FileOrDir>;
+
+    /// Like [`get()`], but only looks for files matching the given `name` in this `Directory`.
+    fn get_file(&self, name: &str) -> Option<FileRef> {
+        match self.get(name) {
+            Some(FileOrDir::File(f)) => Some(f),
+            _ => None,
+        }
+    }
+
+    /// Like [`get()`], but only looks for directories matching the given `name` in this `Directory`.
+    fn get_dir(&self, name: &str) -> Option<DirRef> {
+        match self.get(name) {
+            Some(FileOrDir::Dir(d)) => Some(d),
+            _ => None,
+        }
+    }
 
     /// Inserts the given new file or directory into this directory.
     /// If an existing node has the same name, that node is replaced and returned.

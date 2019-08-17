@@ -72,10 +72,7 @@ impl TaskFs {
     }
 
     fn get_self_pointer(&self) -> Option<DirRef> {
-        match root::get_root().lock().get(&self.get_name()) {
-            Some(FileOrDir::Dir(dir)) => Some(dir),
-            _ => None,
-        }
+        root::get_root().lock().get_dir(&self.get_name())
     }
 
     fn get_internal(&self, node: &str) -> Result<FileOrDir, &'static str> {
@@ -412,19 +409,11 @@ impl MmiFile {
 
     /// Generates the mmi info string.
     fn generate(&self) -> String {
-        let mut output = String::new();
-        match self.taskref.lock().mmi {
-            Some(ref mmi_ref) => {
-                let mmi = mmi_ref.lock();
-                output = format!(
-                    "Page table:\n{:?}
-                     Virtual memory areas:\n{:?}\n",
-                     mmi.page_table, mmi.vmas
-                );
-            }
-            _ => output.push_str("MMI is uninitialized."),
-        }
-        output
+        let task = self.taskref.lock();
+        let mmi = task.mmi.lock();
+        format!("Page table:\n{:?}\nVirtual memory areas:\n{:?}\n",
+            mmi.page_table, mmi.vmas
+        )
     }
 }
 
