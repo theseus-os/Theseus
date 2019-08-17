@@ -511,6 +511,7 @@ fn set_recursive(p4_addr:u64) {
 /// Otherwise, it returns a str error message. 
 /// 
 /// Note: this was previously called remap_the_kernel.
+#[cfg(target_arch = "x86_64")]
 pub fn init(allocator_mutex: &MutexIrqSafe<AreaFrameAllocator>, boot_info: &multiboot2::BootInformation) 
     -> Result<(PageTable, Vec<VirtualMemoryArea>, MappedPages, MappedPages, MappedPages, Vec<MappedPages>, Vec<MappedPages>), &'static str>
 {

@@ -21,19 +21,14 @@ extern crate atomic_linked_list;
 extern crate xmas_elf;
 #[cfg(target_arch = "x86_64")]
 extern crate x86_64;
-#[cfg(target_arch = "x86_64")]
-extern crate memory_x86;
 #[cfg(any(target_arch = "aarch64"))]
 extern crate aarch64;
-#[cfg(any(target_arch = "aarch64"))]
-extern crate memory_arm;
 #[macro_use] extern crate bitflags;
 extern crate heap_irq_safe;
 #[macro_use] extern crate derive_more;
 extern crate bit_field;
 extern crate type_name;
 extern crate uefi;
-
 
 /// Just like Rust's `try!()` macro, 
 /// but forgets the given `obj`s to prevent them from being dropped,
@@ -74,8 +69,6 @@ use alloc::sync::Arc;
 use kernel_config::memory::{PAGE_SIZE, MAX_PAGE_NUMBER, KERNEL_HEAP_START, KERNEL_HEAP_INITIAL_SIZE, KERNEL_STACK_ALLOCATOR_BOTTOM, KERNEL_STACK_ALLOCATOR_TOP_ADDR, ENTRIES_PER_PAGE_TABLE};
 #[cfg(target_arch = "x86_64")]
 use kernel_config::memory::x86_64::{KERNEL_OFFSET, KERNEL_OFFSET_BITS_START, KERNEL_OFFSET_PREFIX};
-#[cfg(target_arch = "x86_64")]
-use memory_x86::{get_kernel_addr};
 #[cfg(any(target_arch = "aarch64"))]
 use kernel_config::memory::arm::{KERNEL_OFFSET, KERNEL_OFFSET_BITS_START, KERNEL_OFFSET_PREFIX, HARDWARE_START, HARDWARE_END};
 use bit_field::BitField;
@@ -460,14 +453,10 @@ pub fn set_broadcast_tlb_shootdown_cb(func: fn(Vec<VirtualAddress>)) {
 ///  * the MappedPages of the kernel's rodata section,
 ///  * the MappedPages of the kernel's data section,
 ///  * the kernel's list of *other* higher-half MappedPages, which should be kept forever.
+#[cfg(target_arch = "x86_64")]
 pub fn init(boot_info: &BootInformation) 
     -> Result<(Arc<MutexIrqSafe<MemoryManagementInfo>>, MappedPages, MappedPages, MappedPages, Vec<MappedPages>), &'static str> 
 {
-    let (kps, kve, kpe) = get_kernel_addr(&boot_info)?;
-    let kernel_phys_start = PhysicalAddress::new(kps)?;
-    let kernel_virt_end = VirtualAddress::new(kve)?;
-    let kernel_phys_end = PhysicalAddress::new(kpe)?;
-    
     let memory_map_tag = boot_info.memory_map_tag().ok_or("Memory map tag not found")?;
     let elf_sections_tag = boot_info.elf_sections_tag().ok_or("Elf sections tag not found")?;
 
