@@ -5,9 +5,6 @@
 //! spawns and manages tasks, and records previously executed user commands.
 //! 
 //! Problem: Currently there's no upper bound to the user command line history.
-//! 
-//! TODO LIST:
-//! 1. when shell fails to upgrade the weak pointer, it should kill the child task
 
 #![no_std]
 extern crate frame_buffer;
@@ -26,13 +23,14 @@ extern crate fs_node;
 extern crate path;
 extern crate root;
 extern crate scheduler;
+extern crate stdio;
+extern crate core_io;
+extern crate app_io;
 
 extern crate terminal_print;
 extern crate print;
 extern crate environment;
 extern crate libterm;
-extern crate application_io;
-extern crate terminal_map;
 
 #[macro_use] extern crate alloc;
 #[macro_use] extern crate log;
@@ -47,14 +45,15 @@ use task::{TaskRef, ExitValue, KillReason};
 use fs_node::FileOrDir;
 use libterm::Terminal;
 use dfqueue::{DFQueue, DFQueueConsumer, DFQueueProducer};
-use alloc::sync::{Arc, Weak};
+use alloc::sync::Arc;
 use spin::Mutex;
 use environment::Environment;
 use alloc::boxed::Box;
 use core::mem;
 use alloc::collections::BTreeMap;
-use application_io::IOProperty;
-use core::sync::atomic::Ordering::SeqCst;
+use stdio::{Stdio, KeyEventQueue, KeyEventQueueReadHandle, KeyEventQueueWriteHandle};
+use core_io::{Read, Write};
+use core::ops::Deref;
 
 pub const APPLICATIONS_NAMESPACE_PATH: &'static str = "/namespaces/default/applications";
 
@@ -67,16 +66,14 @@ enum JobStatus {
 struct Job {
     /// Task reference structure representing the running task.
     task: TaskRef,
-    /// Keyboard event producer. Shell uses this producer to deliver keyboard events to the application.
-    kbd_event_producer: DFQueueProducer<KeyEvent>,
-    /// This is the input end of the stdin pipe.
-    input_producer: DFQueueProducer<u8>,
-    /// This is the output end of the stdout pipe.
-    output_consumer: DFQueueConsumer<u8>,
     /// Status of the job.
     status: JobStatus,
-    /// IO property of the job.
-    io_property: Weak<IOProperty>,
+    /// Stdin queue of the job.
+    stdin: Stdio,
+    /// Stdout queue of the job.
+    stdout: Stdio,
+    /// Stderr queue of the job.
+    stderr: Stdio,
     /// Command line that was used to invoke the job.
     cmd: String
 }
@@ -128,6 +125,13 @@ enum AppErr {
 struct Shell {
     /// Variable that stores the task id of any application manually spawned from the terminal
     jobs: BTreeMap<isize, Job>,
+    /// Map task number to job number.
+    task_to_job: BTreeMap<usize, isize>,
+    /// Read handle to the key event queue. Applications can take it.
+    key_event_consumer: Arc<Mutex<Option<KeyEventQueueReadHandle>>>,
+    /// Write handle to the key event queue.
+    key_event_producer: KeyEventQueueWriteHandle,
+    /// Foreground job number.
     fg_job_num: isize,
     /// The string that stores the users keypresses after the prompt
     cmdline: String,
@@ -161,6 +165,10 @@ impl Shell {
         let print_consumer = terminal_print_dfq.into_consumer();
         let print_producer = print_consumer.obtain_producer();
 
+        let key_event_queue: KeyEventQueue = KeyEventQueue::new();
+        let key_event_producer = key_event_queue.get_write_handle();
+        let key_event_consumer = key_event_queue.get_read_handle();
+
         // Sets up the kernel to print to this terminal instance
         print::set_default_print_output(print_producer.obtain_producer());
 
@@ -168,11 +176,14 @@ impl Shell {
             working_dir: Arc::clone(root::get_root()), 
         };
 
-        let terminal = terminal_map::get_terminal_or_default()?;
+        let terminal = app_io::get_terminal_or_default()?;
         terminal.lock().initialize_screen()?;
 
         Ok(Shell {
             jobs: BTreeMap::new(),
+            task_to_job: BTreeMap::new(),
+            key_event_consumer: Arc::new(Mutex::new(Some(key_event_consumer))),
+            key_event_producer,
             fg_job_num: 0,
             cmdline: String::new(),
             input_buffer: String::new(),
@@ -352,13 +363,9 @@ impl Shell {
                     return Ok(());
                 }
             };
-            let task_id = task_ref_copy.lock().id;
 
-            // Remove all the queues between shell and the running application.
-            //// application_io::remove_app_shell_relation(task_id)?;
-
-            // Lock the shared structure in `application_io` and then kill the running application
-            application_io::locked_and_execute(Box::new(move || {
+            // Lock the shared structure in `app_io` and then kill the running application
+            app_io::lock_and_execute(Box::new(move || {
                 match task_ref_copy.kill(KillReason::Requested) {
                     Ok(_) => {
                         if let Err(e) = runqueue::remove_task_from_all(&task_ref_copy) {
@@ -396,8 +403,8 @@ impl Shell {
                 }
             };
 
-            // Lock the shared structure in `application_io` and then stop the running application
-            application_io::locked_and_execute(Box::new(move || {
+            // Lock the shared structure in `app_io` and then stop the running application
+            app_io::lock_and_execute(Box::new(move || {
                 task_ref_copy.block();
 
                 // Here we must wait for the running application to stop before releasing the lock,
@@ -413,27 +420,6 @@ impl Shell {
             }));
 
             return Ok(());
-        }
-
-        // HANDLE ALL SPECIAL KEYBOARD EVENTS ABOVE.
-        // Applications can request shell to forward the keyboard events.
-        // However, we must intercept all application management related events, e.g. ctrl-c,
-        // before making the forward.
-        
-        // Check whether we should forward the keyboard event to the running application.
-        // If so, we forward the keyboard event to the application and let it handle itself.
-        // In other words, we skip handling them in the shell.
-        if self.fg_job_num != 0 {
-            if let Some(job_ref) = self.jobs.get(&self.fg_job_num) {
-                //// let requesting_direct = application_io::is_requesting_forward(job_ref.task.lock().id);
-                let requesting_direct = job_ref.io_property.upgrade()
-                                        .ok_or("Cannot upgrade child IOProperty weak pointer")?
-                                        .direct_key_access_flag.load(SeqCst);
-                if requesting_direct {
-                    job_ref.kbd_event_producer.enqueue(keyevent);
-                    return Ok(());
-                }
-            }
         }
 
         // Perform command line auto completion.
@@ -474,9 +460,8 @@ impl Shell {
                         let mut buffered_string = String::new();
                         mem::swap(&mut buffered_string, &mut self.input_buffer);
                         buffered_string.push('\n');
-                        for b in buffered_string.as_bytes() {
-                            job.input_producer.enqueue(*b);
-                        }
+                        job.stdin.get_write_handle().lock().write_all(buffered_string.as_bytes())
+                            .or(Err("shell failed to write to stdin"))?;
                     },
                     _ => {}
                 }
@@ -577,35 +562,18 @@ impl Shell {
         }
 
         // Tracks what the user has typed so far, excluding any keypresses by the backspace and Enter key, which are special and are handled directly below
-        if keyevent.keycode != Keycode::Enter && keyevent.keycode.to_ascii(keyevent.modifiers).is_some() {
+        if keyevent.keycode.to_ascii(keyevent.modifiers).is_some() {
             match keyevent.keycode.to_ascii(keyevent.modifiers) {
                 Some(c) => {
                     // If currently we have a task running, insert it to the input buffer, otherwise
                     // to the cmdline.
                     if self.fg_job_num != 0 {
-                        let mut task_id: usize = 0;
-                        let mut need_echo = true;
-                        let mut immediate_delivery = false;
+                        self.insert_char_to_input_buff(c, true)?;
                         if let Some(job) = self.jobs.get(&self.fg_job_num) {
-                            task_id = job.task.lock().id;
-                            if let Some(child_io_property) = job.io_property.upgrade() {
-                                immediate_delivery = child_io_property.immediate_delivery_flag.load(SeqCst);
-                                need_echo = !child_io_property.no_shell_echo_flag.load(SeqCst);
-                            } else {
-                                return Err("Couldn't upgrade child io_property from weak.");
-                            }
+                            job.stdin.get_write_handle().lock().write_all(self.input_buffer.as_bytes())
+                                .or(Err("shell failed to write to stdin"))?;
+                            self.input_buffer.clear();
                         }
-                        //// let need_echo = !application_io::is_requesting_no_echo(task_id);
-                        self.insert_char_to_input_buff(c, need_echo)?;
-                        if let Some(job) = self.jobs.get(&self.fg_job_num) {
-                            if immediate_delivery { 
-                                for b in self.input_buffer.as_bytes() {
-                                    job.input_producer.enqueue(*b);
-                                }
-                                self.input_buffer.clear();
-                            }
-                        }
-
                         return Ok(());
                     }
                     else {
@@ -665,48 +633,23 @@ impl Shell {
 
                 // Create a new job structure.
                 let task_id = {new_task_ref.lock().id};
-                let app_kbd_event_queue: DFQueue<KeyEvent> = DFQueue::new();
-                let app_kbd_event_consumer = app_kbd_event_queue.into_consumer();
-                let app_kbv_event_producer = app_kbd_event_consumer.obtain_producer();
-                let app_input_queue: DFQueue<u8> = DFQueue::new();
-                let app_input_consumer = app_input_queue.into_consumer();
-                let app_input_producer = app_input_consumer.obtain_producer();
-                let app_output_queue: DFQueue<u8> = DFQueue::new();
-                let app_output_consumer = app_output_queue.into_consumer();
-                let app_output_producer = app_output_consumer.obtain_producer();
-
-                let child_io_property = 
-                    application_io::deposit_default_property(task_id, app_output_producer,
-                                                            app_kbd_event_consumer, app_input_consumer).unwrap();
-                new_task_ref.unblock();
 
                 let new_job = Job {
                     task: new_task_ref,
-                    kbd_event_producer: app_kbv_event_producer,
-                    input_producer: app_input_producer,
-                    output_consumer: app_output_consumer,
                     status: JobStatus::Running,
-                    io_property: child_io_property,
+                    stdin: Stdio::new(),
+                    stdout: Stdio::new(),
+                    stderr: Stdio::new(),
                     cmd: self.cmdline.clone()
                 };
 
-                if let Err(msg) = terminal_map::set_terminal_same_as_myself(task_id) {
-                    self.terminal.lock().print_to_terminal(format!("{}\n", msg).to_string());
-                    return 0;
-                }
-
-                // Create stdio relationship between the shell and new user program.
-                // if let Err(msg) = application_io::create_app_shell_relation(task_id,
-                //                                                             app_output_producer,
-                //                                                             app_kbd_event_consumer,
-                //                                                             app_input_consumer) {
-                //     self.terminal.lock().print_to_terminal(format!("{}\n", msg).to_string());
-                //     return 0;
-                // }
                 if let Err(msg) = terminal_print::add_child(task_id, self.print_producer.obtain_producer()) { // adds the terminal's print producer to the terminal print crate
                     self.terminal.lock().print_to_terminal(format!("{}\n", msg).to_string());
                     return 0;
                 }
+
+                app_io::add_child(task_id, new_job.stdin.get_read_handle(), new_job.stdout.get_write_handle(), 
+                                  new_job.stderr.get_write_handle(), self.key_event_consumer.clone()).unwrap();
 
                 // Allocate a job number for the new job. It will start from 1 and choose the smallest number
                 // that has not yet been allocated.
@@ -718,6 +661,11 @@ impl Shell {
                     new_job_num += 1;
                 }
                 self.jobs.insert(new_job_num, new_job);
+                self.task_to_job.insert(task_id, new_job_num);
+                match self.jobs.get(&new_job_num) {
+                    Some(job) => job.task.unblock(),
+                    None => return 0 // 0 means no new job is spawned
+                };
                 return new_job_num;
             }
             Err(err) => {
@@ -731,7 +679,7 @@ impl Shell {
                     self.terminal.lock().print_to_terminal(format!("{}\n", msg).to_string());
                 }
                 self.redisplay_prompt();
-                0
+                0 // 0 means no new job is spawned
             }
         }
     }
@@ -836,12 +784,7 @@ impl Shell {
                             }
                         }
 
-                        // Remove the exited child from the terminal mapping structure.
-                        terminal_map::remove_terminal(task_ref_copy.lock().id);
-
-                        // Remove the queue for stdio
-                        //// application_io::remove_app_shell_relation(task_ref_copy.lock().id)?;
-                        application_io::remove_property(task_ref_copy.lock().id);
+                        // Remove the queue for legacy terminal print
                         terminal_print::remove_child(task_ref_copy.lock().id)?;
 
                         // Record the completed job and remove them from job list later.
@@ -878,10 +821,24 @@ impl Shell {
             }
         }
 
+        // Print all remaining output for exited tasks.
+        if self.check_and_print_app_output() {
+            need_refresh = true;
+        }
+
+        // Trash all remaining unread keyboard events.
+        if let Some(ref consumer) = *self.key_event_consumer.lock() {
+            while let Some(_key_event) = consumer.read_one() {}
+        }
+
         // Actually remove the exited jobs from the job list. We could not do it previously since we were
-        // iterating through the job list.
+        // iterating through the job list. At the same time, remove them from the task_to_job mapping, and
+        // remove the queues in app_io.
         for finished_job_num in job_to_be_removed {
-            self.jobs.remove(&finished_job_num);
+            if let Some(job) = self.jobs.remove(&finished_job_num) {
+                self.task_to_job.remove(&job.task.lock().id);
+                app_io::remove_child(job.task.lock().id)?;
+            }
         }
 
         Ok((need_refresh, need_prompt))
@@ -900,7 +857,6 @@ impl Shell {
     fn check_and_print_app_output(&mut self) -> bool {
 
         // Support for legacy output by `terminal_print`.
-        use core::ops::Deref;
         if let Some(print_event) = self.print_consumer.peek() {
             match print_event.deref() {
                 &Event::OutputEvent(ref s) => {
@@ -917,27 +873,25 @@ impl Shell {
             return true;
         }
 
-        // Support for new output method by `application_io`.
-        if self.fg_job_num != 0 {
-            let mut bytes: Vec<u8> = Vec::new();
-            if let Some(task_ref) = self.jobs.get(&self.fg_job_num) {
-                // Consume all characters that are currently in the queue.
-                loop {
-                    if let Some(byte) = task_ref.output_consumer.peek() {
-                        bytes.push(*byte);
-                        byte.mark_completed();
-                    } else {
-                        break;
-                    }
+        let mut buf: [u8; 256] = [0; 256];
+
+        // iterate through all jobs to see if they have something to print
+        for (_job_num, job) in self.jobs.iter() {
+            let stdout = job.stdout.get_read_handle();
+            let mut stdout = stdout.lock();
+            match stdout.read(&mut buf) {
+                Ok(cnt) => {
+                    mem::drop(stdout);
+                    let s = String::from_utf8_lossy(&buf[0..cnt]);
+                    let mut locked_terminal = self.terminal.lock();
+                    locked_terminal.print_to_terminal(s.to_string());
+                    locked_terminal.refresh_display(0);
+                },
+                Err(_) => {
+                    mem::drop(stdout);
+                    error!("failed to read from stdout");
+                    return false;
                 }
-            }
-            if bytes.is_empty() {
-                return false;
-            } else {
-                let s = String::from_utf8_lossy(&bytes);
-                self.terminal.lock().print_to_terminal(s.to_string());
-                self.terminal.lock().refresh_display(0);
-                return true;
             }
         }
 
@@ -979,33 +933,48 @@ impl Shell {
             // Looks at the input queue from the window manager
             // If it has unhandled items, it handles them with the match
             // If it is empty, it proceeds directly to the next loop iteration
-            let event = match self.terminal.lock().get_key_event() {
+            match self.terminal.lock().get_key_event() {
                 Some(ev) => {
-                    ev
+                    match ev {
+                        // Returns from the main loop.
+                        Event::ExitEvent => {
+                            trace!("exited terminal");
+                            return Ok(());
+                        }
+
+                        Event::ResizeEvent(ref _rev) => {
+                            self.terminal.lock().refresh_display(self.left_shift); // application refreshes display after resize event is received
+                        }
+
+                        // Handles ordinary keypresses
+                        Event::InputEvent(ref input_event) => {
+                            self.key_event_producer.write_one(input_event.key_event);
+                        }
+                        _ => { }
+                    };
                 },
-                _ => { continue; }
+                _ => { }
             };
 
-            match event {
-                // Returns from the main loop.
-                Event::ExitEvent => {
-                    trace!("exited terminal");
-                    return Ok(());
-                }
-
-                Event::ResizeEvent(ref _rev) => {
-                    self.terminal.lock().refresh_display(self.left_shift); // application refreshes display after resize event is received
-                }
-
-                // Handles ordinary keypresses
-                Event::InputEvent(ref input_event) => {
-                    self.handle_key_event(input_event.key_event)?;
-                    if input_event.key_event.action == KeyAction::Pressed {
-                        // only refreshes the display on keypresses to improve display performance 
-                        self.terminal.lock().refresh_display(self.left_shift);
+            let mut need_refresh = false;
+            loop {
+                let locked_consumer = self.key_event_consumer.lock();
+                if let Some(ref key_event_consumer) = locked_consumer.deref() {
+                    if let Some(key_event) = key_event_consumer.read_one() {
+                        mem::drop(locked_consumer); // drop the lock so that we can invoke the method on the next line
+                        self.handle_key_event(key_event)?;
+                        if key_event.action == KeyAction::Pressed { need_refresh = true; }
+                    } else { // currently the key event queue is empty, break the loop
+                        break;
                     }
+                } else { // currently the key event queue is taken by an application
+                    break;
                 }
-                _ => { }
+            }
+            if need_refresh {
+                self.terminal.lock().refresh_display(self.left_shift);
+            } else {
+                scheduler::schedule(); // yield the CPU if nothing to do
             }
         }
     }
@@ -1114,7 +1083,7 @@ impl Shell {
 
     /// Execute `jobs` command. It lists all jobs.
     fn execute_internal_jobs(&mut self) -> Result<(), &'static str> {
-        for (job_num, job_ref) in &self.jobs {
+        for (job_num, job_ref) in self.jobs.iter() {
             let status = match &job_ref.status {
                 JobStatus::Running => "running",
                 JobStatus::Stopped => "stopped"

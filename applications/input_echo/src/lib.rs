@@ -1,47 +1,33 @@
 #![no_std]
 
 extern crate alloc;
-#[macro_use] extern crate application_io;
-#[macro_use] extern crate lazy_static;
+extern crate core_io;
+extern crate app_io;
 
 use alloc::vec::Vec;
 use alloc::string::String;
-use alloc::sync::Arc;
-
-lazy_static! {
-    // Globally accessible IOProperty.
-    static ref IO_PROPERTY: Arc<application_io::IOProperty> =
-        application_io::claim_property().unwrap();
-}
+use core_io::Write;
 
 #[no_mangle]
 pub fn main(_args: Vec<String>) -> isize {
 
-    // Initialize IOProperty if it hasn't been initialized.
-    lazy_static::initialize(&IO_PROPERTY);
+    let mut stdin = match app_io::stdin() {
+        Ok(stdin) => stdin,
+        Err(_) => return 1
+    };
+    let stdout = match app_io::stdout() {
+        Ok(stdout) => stdout,
+        Err(_) => return 1
+    };
 
+    let mut buf = String::new();
     loop {
-
-        // Test for non state spill free version
-        let result = application_io::get_input_bytes_spilled();
-        let data = match result {
-            Ok(data) => data,
-            Err(_) => return 1
-        };
-        if let Some(line) = data {
-            let parsed_line = String::from_utf8_lossy(&line);
-            println!("{}", parsed_line).unwrap();
+        if let Err(_) =  stdin.read_line(&mut buf) {
+            return 1;
         }
-
-        // Test for state spill free version
-        let result = application_io::get_input_bytes(&IO_PROPERTY);
-        let data = match result {
-            Ok(data) => data,
-            Err(_) => return 1
-        };
-        if let Some(line) = data {
-            let parsed_line = String::from_utf8_lossy(&line);
-            ssfprintln!(&IO_PROPERTY, "{}", parsed_line);
+        if let Err(_) = stdout.lock().write_all(buf.as_bytes()) {
+            return 1;
         }
+        buf.clear();
     }
 }

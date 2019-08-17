@@ -9,6 +9,7 @@ build = "../../build.rs"
 [dependencies]
 spin = "0.4.10"
 x86_64 = { path = "../../libs/x86_64" }
+core_io = "0.1"
 
 [dependencies.log]
 default-features = false
@@ -68,14 +69,17 @@ path = "../../kernel/path"
 [dependencies.libterm]
 path = "../../kernel/libterm"
 
-[dependencies.application_io]
-path = "../application_io"
-
 [dependencies.scheduler]
 path = "../../kernel/scheduler"
 
-[dependencies.terminal_map]
-path = "../terminal_map"
+[dependencies.stdio]
+path = "../../libs/stdio"
+
+[dependencies.lazy_static]
+features = ["spin_no_std", "nightly"]
+
+[dependencies.app_io]
+path = "../app_io"
 
 [lib]
 crate-type = ["rlib"]

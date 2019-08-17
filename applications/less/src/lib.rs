@@ -1,18 +1,18 @@
 #![no_std]
 
-#[macro_use] extern crate application_io;
 #[macro_use] extern crate alloc;
-#[macro_use] extern crate lazy_static;
 extern crate task;
 extern crate getopts;
 extern crate path;
 extern crate fs_node;
-extern crate terminal_map;
 extern crate keycodes_ascii;
 extern crate libterm;
 extern crate spin;
+extern crate app_io;
+extern crate stdio;
+extern crate core_io;
 
-use keycodes_ascii::Keycode;
+use keycodes_ascii::{Keycode, KeyAction};
 use core::str;
 use alloc::{
     vec::Vec,
@@ -25,6 +25,8 @@ use fs_node::FileOrDir;
 use alloc::collections::BTreeMap;
 use libterm::Terminal;
 use spin::Mutex;
+use stdio::{StdioWriteHandle, KeyEventConsumerGuard};
+use core_io::Write;
 
 /// The metadata for each line in the file.
 struct LineSlice {
@@ -32,12 +34,6 @@ struct LineSlice {
     start: usize,
     /// The ending index in the String for a line. (exclusive)
     end: usize
-}
-
-lazy_static! {
-    // Globally accessible IOProperty.
-    static ref IO_PROPERTY: Arc<application_io::IOProperty> =
-        application_io::claim_property().unwrap();
 }
 
 /// Read the whole file to a String.
@@ -99,7 +95,7 @@ fn get_content_string(file_path: String) -> Result<String, String> {
 /// not to cause panic.
 fn parse_content(content: &String) -> Result<BTreeMap<usize, LineSlice>, &'static str> {
     // Get the width and height of the terminal screen.
-    let (width, _height) = terminal_map::get_terminal_or_default()?.lock().get_width_height();
+    let (width, _height) = app_io::get_terminal_or_default()?.lock().get_width_height();
 
     // Record the slice index of each line.
     let mut map: BTreeMap<usize, LineSlice> = BTreeMap::new();
@@ -156,10 +152,12 @@ fn display_content(content: &String, map: &BTreeMap<usize, LineSlice>,
 }
 
 /// Handle user keyboard strikes and perform corresponding operations.
-fn event_handler_loop(content: &String, map: &BTreeMap<usize, LineSlice>) -> Result<(), &'static str> {
+fn event_handler_loop(content: &String, map: &BTreeMap<usize, LineSlice>,
+                      key_event_queue: KeyEventConsumerGuard)
+                      -> Result<(), &'static str> {
 
     // Get a copy of the terminal pointer. The terminal is *not* locked here.
-    let terminal = terminal_map::get_terminal_or_default()?;
+    let terminal = app_io::get_terminal_or_default()?;
 
     // Display the beginning of the file.
     let mut line_start: usize = 0;
@@ -167,8 +165,9 @@ fn event_handler_loop(content: &String, map: &BTreeMap<usize, LineSlice>) -> Res
 
     // Handle user keyboard strikes.
     loop {
-        match application_io::get_keyboard_event(&IO_PROPERTY) {
-            Ok(Some(keyevent)) => {
+        match key_event_queue.read_one() {
+            Some(keyevent) => {
+                if keyevent.action != KeyAction::Pressed { continue; }
                 match keyevent.keycode {
                     // Quit the program on "Q".
                     Keycode::Q => {
@@ -194,9 +193,6 @@ fn event_handler_loop(content: &String, map: &BTreeMap<usize, LineSlice>) -> Res
                     _ => {}
                 }
             },
-            Err(e) => {
-                ssfprintln!(&IO_PROPERTY, "{}", e);
-            },
             _ => {}
         }
     }
@@ -206,26 +202,35 @@ fn event_handler_loop(content: &String, map: &BTreeMap<usize, LineSlice>) -> Res
 #[no_mangle]
 pub fn main(args: Vec<String>) -> isize {
 
-    // Initialize IOProperty if it hasn't been initialized.
-    lazy_static::initialize(&IO_PROPERTY);
+    // Acquire key event queue.
+    let key_event_queue = match app_io::take_event_queue() {
+        Ok(queue) => queue,
+        Err(_) => return 1
+    };
+
+    // Acquire stdout queue.
+    let stdout = match app_io::stdout() {
+        Ok(stdout) => stdout,
+        Err(_) => return 1
+    };
 
     // Set and parse options.
     let mut opts = Options::new();
     opts.optflag("h", "help", "print this help menu");
     let matches = match opts.parse(&args) {
         Ok(m) => m,
-        Err(_f) => {
-            ssfprintln!(&IO_PROPERTY, "{}", _f);
-            print_usage(opts);
+        Err(e) => {
+            let _ = stdout.lock().write_all(format!("{}\n", e).as_bytes());
+            print_usage(opts, stdout);
             return -1;
         }
     };
     if matches.opt_present("h") {
-        print_usage(opts);
+        print_usage(opts, stdout);
         return 0;
     }
     if matches.free.is_empty() {
-        print_usage(opts);
+        print_usage(opts, stdout);
         return 0;
     }
 
@@ -233,37 +238,36 @@ pub fn main(args: Vec<String>) -> isize {
     let content = match get_content_string(matches.free[0].to_string()) {
         Ok(s) => s,
         Err(e) => {
-            ssfprintln!(&IO_PROPERTY, "{}", e);
+            let mut locked_stdout = stdout.lock();
+            let _ = locked_stdout.write_all(e.as_bytes());
+            let _ = locked_stdout.write_all(&['\n' as u8]);
             return -1;
         }
     };
-
-    // Request the shell to direct keyboard events instead of pushing it
-    // to stdin.
-    application_io::request_kbd_event_forward(&IO_PROPERTY);
-
-    // Turn off the echo of shell, so that it won't print characters to
-    // the terminal on keyboard strikes.
-    application_io::request_no_echo(&IO_PROPERTY);
 
     // Get it run.
     let map =  match parse_content(&content) {
         Ok(map) => {map},
         Err(e) => {
-            ssfprintln!(&IO_PROPERTY, "{}", e);
+            let mut locked_stdout = stdout.lock();
+            let _ = locked_stdout.write_all(e.as_bytes());
+            let _ = locked_stdout.write_all(&['\n' as u8]);
             return -1;
         }
     };
-    if let Err(e) = event_handler_loop(&content, &map) {
-        ssfprintln!(&IO_PROPERTY, "{}", e);
+
+    if let Err(e) = event_handler_loop(&content, &map, key_event_queue) {
+        let mut locked_stdout = stdout.lock();
+        let _ = locked_stdout.write_all(e.as_bytes());
+        let _ = locked_stdout.write_all(&['\n' as u8]);
         return -1;
     }
 
     return 0;
 }
 
-fn print_usage(opts: Options) {
-    ssfprintln!(&IO_PROPERTY, "{}", opts.usage(USAGE));
+fn print_usage(opts: Options, stdout: StdioWriteHandle) {
+    let _ = stdout.lock().write_all(format!("{}\n", opts.usage(USAGE)).as_bytes());
 }
 
 const USAGE: &'static str = "Usage: less file

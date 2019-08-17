@@ -1,50 +1,43 @@
 #![no_std]
 
 extern crate alloc;
-#[macro_use] extern crate application_io;
-#[macro_use] extern crate lazy_static;
+extern crate core_io;
+extern crate stdio;
+extern crate app_io;
 
 use alloc::vec::Vec;
 use alloc::string::String;
-use alloc::sync::Arc;
-
-lazy_static! {
-    // Globally accessible IOProperty.
-    static ref IO_PROPERTY: Arc<application_io::IOProperty> =
-        application_io::claim_property().unwrap();
-}
+use core_io::{Read, Write};
+use core::mem;
 
 #[no_mangle]
 pub fn main(_args: Vec<String>) -> isize {
 
-    // Initialize IOProperty if it hasn't been initialized.
-    lazy_static::initialize(&IO_PROPERTY);
-
-    application_io::request_immediate_delivery(&IO_PROPERTY);
-    application_io::request_no_echo(&IO_PROPERTY);
+    let stdin = match app_io::stdin() {
+        Ok(stdin) => stdin,
+        Err(_) => return 1
+    };
+    let stdout = match app_io::stdout() {
+        Ok(stdout) => stdout,
+        Err(_) => return 1
+    };
+    let mut buf = [0u8];
 
     loop {
-
-        // Test for state spill free version
-        let result = application_io::get_input_bytes(&IO_PROPERTY);
-        let data = match result {
-            Ok(data) => data,
+        let mut stdin_locked = stdin.lock();
+        match stdin_locked.read(&mut buf) {
+            Ok(cnt) => {
+                if cnt == 0 && stdin_locked.is_eof() { return 0; }
+                else if cnt == 0 { continue; }
+                // never lock stdin and stdout at the same time to avoid deadlock
+                mem::drop(stdin_locked);
+                let mut stdout_locked = stdout.lock();
+                match stdout_locked.write_all(&buf) {
+                    Ok(_cnt) => {},
+                    Err(_) => return 1
+                }
+            },
             Err(_) => return 1
         };
-        if let Some(line) = data {
-            let parsed_line = String::from_utf8_lossy(&line);
-            ssfprintln!(&IO_PROPERTY, "{}", parsed_line);
-        }
-
-        // Test for state spill free version
-        let result = application_io::get_input_bytes_spilled();
-        let data = match result {
-            Ok(data) => data,
-            Err(_) => return 1
-        };
-        if let Some(line) = data {
-            let parsed_line = String::from_utf8_lossy(&line);
-            println!("{}", parsed_line).unwrap();
-        }
     }
 }

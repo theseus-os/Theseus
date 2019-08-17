@@ -7,13 +7,7 @@ build = "../../build.rs"
 [dependencies]
 getopts = { git = "https://github.com/kevinaboos/getopts" }
 spin = "0.4.10"
-
-[dependencies.log]
-default-features = false
-version = "0.3.7"
-
-[dependencies.application_io]
-path = "../application_io"
+core_io = "0.1"
 
 [dependencies.task]
 path = "../../kernel/task"
@@ -24,17 +18,18 @@ path = "../../kernel/path"
 [dependencies.fs_node]
 path = "../../kernel/fs_node"
 
-[dependencies.terminal_map]
-path = "../terminal_map"
-
 [dependencies.keycodes_ascii]
 path = "../../libs/keycodes_ascii"
 
 [dependencies.libterm]
 path = "../../kernel/libterm"
 
-[dependencies.lazy_static]
-features = ["spin_no_std", "nightly"]
+[dependencies.app_io]
+path = "../app_io"
+
+[dependencies.stdio]
+path = "../../libs/stdio"
+
 
 [lib]
 crate-type = ["rlib"]

@@ -1,49 +1,42 @@
 #![no_std]
 
 extern crate alloc;
-#[macro_use] extern crate application_io;
-#[macro_use] extern crate lazy_static;
+extern crate core_io;
+extern crate scheduler;
+extern crate shell;
+extern crate app_io;
+use core_io::Write;
 
 use alloc::vec::Vec;
 use alloc::string::String;
-use alloc::sync::Arc;
-
-lazy_static! {
-    // Globally accessible IOProperty.
-    static ref IO_PROPERTY: Arc<application_io::IOProperty> =
-        application_io::claim_property().unwrap();
-}
-
+use alloc::string::ToString;
 
 #[no_mangle]
 pub fn main(_args: Vec<String>) -> isize {
+    if let Err(_) = run() { return 1; }
+    return 0;
+}
 
-    // Initialize IOProperty if it hasn't been initialized.
-    lazy_static::initialize(&IO_PROPERTY);
+fn run() -> Result<(), &'static str> {
+    let stdout = app_io::stdout()?;
+    let queue = app_io::take_event_queue()?;
+    let ack = "event received\n".to_string();
+    let ack = ack.as_bytes();
 
-    application_io::request_kbd_event_forward(&IO_PROPERTY);
-    loop {
+    let mut cnt = 0;
 
-        // Test for state spill free version
-        let result = application_io::get_keyboard_event(&IO_PROPERTY);
-        let event = match result {
-            Ok(event) => event,
-            Err(_) => return 1
-        };
-        match event {
-            Some(_event) => ssfprintln!(&IO_PROPERTY, "event received"),
-            _ => {}
-        };
-
-        // Test for non state spill free version
-        let result = application_io::get_keyboard_event_spilled();
-        let event = match result {
-            Ok(event) => event,
-            Err(_) => return 1
-        };
-        match event {
-            Some(_event) => println!("event received").unwrap(),
-            _ => {}
-        };
+    // Print an acknowledge message to the screen.
+    // Note that one keyboard strike contains at least two events:
+    // one pressing event and one releasing event.
+    while cnt < 10 {
+        if let Some(_key_event) = queue.read_one() {
+            let mut stdout_locked = stdout.lock();
+            stdout_locked.write_all(&ack).or(Err("bad write"))?;
+            core::mem::drop(stdout_locked);
+            cnt += 1;
+        }
+        scheduler::schedule();
     }
+
+    Ok(())
 }
