@@ -85,30 +85,18 @@ dependencies = [
 ]
 
 [[package]]
-name = "application_io"
+name = "app_io"
 version = "0.1.0"
 dependencies = [
- "dfqueue 0.1.0",
- "environment 0.1.0",
  "event_types 0.1.0",
- "frame_buffer 0.1.0",
- "fs_node 0.1.0",
  "keycodes_ascii 0.1.0",
  "lazy_static 1.2.0 (registry+https://github.com/rust-lang/crates.io-index)",
  "libterm 0.1.0",
  "log 0.3.9 (registry+https://github.com/rust-lang/crates.io-index)",
- "memory 0.1.0",
- "mod_mgmt 0.1.0",
- "path 0.1.0",
  "print 0.1.0",
- "root 0.1.0",
- "runqueue 0.1.0",
- "spawn 0.1.0",
  "spin 0.4.10 (registry+https://github.com/rust-lang/crates.io-index)",
+ "stdio 0.1.0",
  "task 0.1.0",
- "terminal_print 0.1.0",
- "text_display 0.1.0",
- "window_manager 0.1.0",
  "x86_64 0.1.2",
 ]
 
@@ -289,6 +277,14 @@ name = "context_switch_sse"
 version = "0.1.0"
 dependencies = [
  "context_switch_regular 0.1.0",
+]
+
+[[package]]
+name = "core_io"
+version = "0.1.20190701"
+source = "registry+https://github.com/rust-lang/crates.io-index"
+dependencies = [
+ "rustc_version 0.1.7 (registry+https://github.com/rust-lang/crates.io-index)",
 ]
 
 [[package]]
@@ -647,18 +643,17 @@ source = "registry+https://github.com/rust-lang/crates.io-index"
 name = "immediate_input_echo"
 version = "0.1.0"
 dependencies = [
- "application_io 0.1.0",
- "log 0.3.9 (registry+https://github.com/rust-lang/crates.io-index)",
- "terminal_print 0.1.0",
+ "app_io 0.1.0",
+ "core_io 0.1.20190701 (registry+https://github.com/rust-lang/crates.io-index)",
+ "stdio 0.1.0",
 ]
 
 [[package]]
 name = "input_echo"
 version = "0.1.0"
 dependencies = [
- "application_io 0.1.0",
- "log 0.3.9 (registry+https://github.com/rust-lang/crates.io-index)",
- "terminal_print 0.1.0",
+ "app_io 0.1.0",
+ "core_io 0.1.20190701 (registry+https://github.com/rust-lang/crates.io-index)",
 ]
 
 [[package]]
@@ -765,9 +760,10 @@ dependencies = [
 name = "keyboard_echo"
 version = "0.1.0"
 dependencies = [
- "application_io 0.1.0",
- "log 0.3.9 (registry+https://github.com/rust-lang/crates.io-index)",
- "terminal_print 0.1.0",
+ "app_io 0.1.0",
+ "core_io 0.1.20190701 (registry+https://github.com/rust-lang/crates.io-index)",
+ "scheduler 0.1.0",
+ "shell 0.1.0",
 ]
 
 [[package]]
@@ -791,6 +787,22 @@ version = "1.2.0"
 source = "registry+https://github.com/rust-lang/crates.io-index"
 dependencies = [
  "spin 0.4.10 (registry+https://github.com/rust-lang/crates.io-index)",
+]
+
+[[package]]
+name = "less"
+version = "0.1.0"
+dependencies = [
+ "app_io 0.1.0",
+ "core_io 0.1.20190701 (registry+https://github.com/rust-lang/crates.io-index)",
+ "fs_node 0.1.0",
+ "getopts 0.2.18 (git+https://github.com/kevinaboos/getopts)",
+ "keycodes_ascii 0.1.0",
+ "libterm 0.1.0",
+ "path 0.1.0",
+ "spin 0.4.10 (registry+https://github.com/rust-lang/crates.io-index)",
+ "stdio 0.1.0",
+ "task 0.1.0",
 ]
 
 [[package]]
@@ -1491,6 +1503,14 @@ source = "registry+https://github.com/rust-lang/crates.io-index"
 
 [[package]]
 name = "rustc_version"
+version = "0.1.7"
+source = "registry+https://github.com/rust-lang/crates.io-index"
+dependencies = [
+ "semver 0.1.20 (registry+https://github.com/rust-lang/crates.io-index)",
+]
+
+[[package]]
+name = "rustc_version"
 version = "0.2.3"
 source = "registry+https://github.com/rust-lang/crates.io-index"
 dependencies = [
@@ -1563,6 +1583,11 @@ version = "0.1.0"
 
 [[package]]
 name = "semver"
+version = "0.1.20"
+source = "registry+https://github.com/rust-lang/crates.io-index"
+
+[[package]]
+name = "semver"
 version = "0.9.0"
 source = "registry+https://github.com/rust-lang/crates.io-index"
 dependencies = [
@@ -1598,13 +1623,15 @@ dependencies = [
 name = "shell"
 version = "0.1.0"
 dependencies = [
- "application_io 0.1.0",
+ "app_io 0.1.0",
+ "core_io 0.1.20190701 (registry+https://github.com/rust-lang/crates.io-index)",
  "dfqueue 0.1.0",
  "environment 0.1.0",
  "event_types 0.1.0",
  "frame_buffer 0.1.0",
  "fs_node 0.1.0",
  "keycodes_ascii 0.1.0",
+ "lazy_static 1.2.0 (registry+https://github.com/rust-lang/crates.io-index)",
  "libterm 0.1.0",
  "log 0.3.9 (registry+https://github.com/rust-lang/crates.io-index)",
  "memory 0.1.0",
@@ -1616,6 +1643,7 @@ dependencies = [
  "scheduler 0.1.0",
  "spawn 0.1.0",
  "spin 0.4.10 (registry+https://github.com/rust-lang/crates.io-index)",
+ "stdio 0.1.0",
  "task 0.1.0",
  "terminal_print 0.1.0",
  "text_display 0.1.0",
@@ -1729,6 +1757,15 @@ dependencies = [
  "runqueue_round_robin 0.1.0",
  "spin 0.4.10 (registry+https://github.com/rust-lang/crates.io-index)",
  "task 0.1.0",
+]
+
+[[package]]
+name = "stdio"
+version = "0.1.0"
+dependencies = [
+ "core_io 0.1.20190701 (registry+https://github.com/rust-lang/crates.io-index)",
+ "keycodes_ascii 0.1.0",
+ "spin 0.4.10 (registry+https://github.com/rust-lang/crates.io-index)",
 ]
 
 [[package]]
@@ -2002,6 +2039,7 @@ source = "git+https://github.com/kevinaboos/zero.git#9fc7ff523138a21f40359b706d2
 "checksum cc 1.0.28 (registry+https://github.com/rust-lang/crates.io-index)" = "bb4a8b715cb4597106ea87c7c84b2f1d452c7492033765df7f32651e66fcf749"
 "checksum cfg-if 0.1.9 (registry+https://github.com/rust-lang/crates.io-index)" = "b486ce3ccf7ffd79fdeb678eac06a9e6c09fc88d33836340becb8fffe87c5e33"
 "checksum compiler_builtins 0.1.11 (git+https://github.com/rust-lang-nursery/compiler-builtins)" = "<none>"
+"checksum core_io 0.1.20190701 (registry+https://github.com/rust-lang/crates.io-index)" = "bb3b45b225c233ea8b95309256e842264692c68eeb543e06755de9072dd1178a"
 "checksum derive_more 0.14.0 (registry+https://github.com/rust-lang/crates.io-index)" = "fbe9f11be34f800b3ecaaed0ec9ec2e015d1d0ba0c8644c1310f73d6e8994615"
 "checksum digest 0.8.0 (registry+https://github.com/rust-lang/crates.io-index)" = "05f47366984d3ad862010e22c7ce81a7dbcaebbdfb37241a620f8b6596ee135c"
 "checksum either 1.5.0 (registry+https://github.com/rust-lang/crates.io-index)" = "3be565ca5c557d7f59e7cfcf1844f9e3033650c929c6566f511e8005f205c1d0"
@@ -2037,9 +2075,11 @@ source = "git+https://github.com/kevinaboos/zero.git#9fc7ff523138a21f40359b706d2
 "checksum raw-cpuid 6.1.0 (registry+https://github.com/rust-lang/crates.io-index)" = "30a9d219c32c9132f7be513c18be77c9881c7107d2ab5569d205a6a0f0e6dc7d"
 "checksum rlibc 1.0.0 (registry+https://github.com/rust-lang/crates.io-index)" = "fc874b127765f014d792f16763a81245ab80500e2ad921ed4ee9e82481ee08fe"
 "checksum rustc-demangle 0.1.14 (registry+https://github.com/rust-lang/crates.io-index)" = "ccc78bfd5acd7bf3e89cffcf899e5cb1a52d6fafa8dec2739ad70c9577a57288"
+"checksum rustc_version 0.1.7 (registry+https://github.com/rust-lang/crates.io-index)" = "c5f5376ea5e30ce23c03eb77cbe4962b988deead10910c372b226388b594c084"
 "checksum rustc_version 0.2.3 (registry+https://github.com/rust-lang/crates.io-index)" = "138e3e0acb6c9fb258b19b67cb8abd63c00679d2851805ea151465464fe9030a"
 "checksum scopeguard 0.3.3 (registry+https://github.com/rust-lang/crates.io-index)" = "94258f53601af11e6a49f722422f6e3425c52b06245a5cf9bc09908b174f5e27"
 "checksum scroll 0.9.2 (registry+https://github.com/rust-lang/crates.io-index)" = "2f84d114ef17fd144153d608fba7c446b0145d038985e7a8cc5d08bb0ce20383"
+"checksum semver 0.1.20 (registry+https://github.com/rust-lang/crates.io-index)" = "d4f410fedcf71af0345d7607d246e7ad15faaadd49d240ee3b24e5dc21a820ac"
 "checksum semver 0.9.0 (registry+https://github.com/rust-lang/crates.io-index)" = "1d7eb9ef2c18661902cc47e535f9bc51b78acd254da71d375c2f6720d9a40403"
 "checksum semver-parser 0.7.0 (registry+https://github.com/rust-lang/crates.io-index)" = "388a1df253eca08550bef6c72392cfe7c30914bf41df5269b68cbd6ff8f570a3"
 "checksum sha3 0.8.1 (registry+https://github.com/rust-lang/crates.io-index)" = "34a5e54083ce2b934bf059fdf38e7330a154177e029ab6c4e18638f2f624053a"
