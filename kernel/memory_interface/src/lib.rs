@@ -10,17 +10,22 @@
 #![feature(unboxed_closures)]
 #![feature(step_trait, range_is_empty)]
 
+#[cfg(target_arch = "x86_64")]
 extern crate memory_x86;
+#[cfg(target_arch = "aarch64")]
+extern crate memory_arm;
 extern crate memory;
 extern crate alloc;
 extern crate multiboot2;
 extern crate irq_safety;
 
-pub use memory_x86::{arch_init};
+#[cfg(target_arch = "x86_64")]
+use memory_x86::{arch_init, BootInformation};
+#[cfg(target_arch = "aarch64")]
+use memory_arm::{arch_init, BootInformation};
 pub use memory::*;
 
 use alloc::vec::Vec;
-use multiboot2::BootInformation;
 use irq_safety::MutexIrqSafe;
 use alloc::sync::Arc;
 

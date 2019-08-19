@@ -80,6 +80,7 @@ ifeq ($(ARCH), aarch64)
 	CARGO_BUILD_EXCLUDE += --exclude cpu
 	CARGO_BUILD_EXCLUDE += --exclude pmu_sample_start
 	CARGO_BUILD_EXCLUDE += --exclude pmu_sample_stop
+	CARGO_BUILD_EXCLUDE += --exclude memory_x86
 endif
 
 ## exclude arch-specific crates
@@ -89,4 +90,5 @@ ifeq ($(ARCH), x86_64)
 	CARGO_BUILD_EXCLUDE += --exclude context_switch_arm
 	CARGO_BUILD_EXCLUDE += --exclude e1000_arm
 	CARGO_BUILD_EXCLUDE += --exclude nano_core_arm
+	CARGO_BUILD_EXCLUDE += --exclude memory_arm
 endif

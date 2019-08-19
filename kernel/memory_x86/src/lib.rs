@@ -32,6 +32,7 @@ extern crate uefi;
 extern crate memory;
 
 pub use memory::*;
+pub use multiboot2::BootInformation;
 
 use core::{
     ops::{RangeInclusive, Deref, DerefMut},
@@ -39,7 +40,6 @@ use core::{
     mem,
 };
 
-use multiboot2::BootInformation;
 use spin::Once;
 use irq_safety::MutexIrqSafe;
 use alloc::vec::Vec;

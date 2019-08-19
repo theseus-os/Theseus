@@ -1,6 +1,6 @@
 [package]
 authors = ["Kevin Boos <kevinaboos@gmail.com>"]
-name = "memory_interface"
+name = "memory_arm"
 description = "The virtual memory subsystem."
 version = "0.1.0"
 build = "../../build.rs"
@@ -18,11 +18,9 @@ memory = { path = "../memory" }
 [target.'cfg(target_arch = "x86_64")'.dependencies]
 # x86_64 = { git = "https://github.com/kevinaboos/x86_64" }
 x86_64 = { path = "../../libs/x86_64" }
-memory_x86 = { path = "../memory_x86" }
 
 [target.'cfg(target_arch = "aarch64")'.dependencies]
 aarch64 = { path = "../../libs/aarch64" }
-memory_arm = { path = "../memory_arm" }
 
 [dependencies.derive_more]
 version = "0.14.0"
