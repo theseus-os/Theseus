@@ -19,8 +19,6 @@ extern crate irq_safety;
 extern crate kernel_config;
 extern crate atomic_linked_list;
 extern crate xmas_elf;
-#[cfg(target_arch = "x86_64")]
-extern crate x86_64;
 #[cfg(any(target_arch = "aarch64"))]
 extern crate aarch64;
 #[macro_use] extern crate bitflags;
@@ -50,11 +48,17 @@ macro_rules! try_forget {
 mod area_frame_allocator;
 mod stack_allocator;
 pub mod paging;
+pub mod arch;
 
 
 pub use self::area_frame_allocator::AreaFrameAllocator;
 pub use self::paging::*;
 pub use self::stack_allocator::{StackAllocator, Stack};
+
+#[cfg(any(target_arch = "x86_64"))]
+use self::arch::x86_64::*;
+#[cfg(any(target_arch = "aarch64"))]
+use self::arch::aarch64::*;
 
 use core::{
     ops::{RangeInclusive, Deref, DerefMut},

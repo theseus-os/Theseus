@@ -16,7 +16,6 @@ mod mapper;
 #[cfg(mapper_spillful)]
 pub mod mapper_spillful;
 
-
 pub use self::entry::*;
 pub use self::temporary_page::TemporaryPage;
 pub use self::mapper::*;
@@ -30,13 +29,6 @@ use core::{
 };
 use multiboot2;
 use super::*;
-
-#[cfg(target_arch = "x86_64")]
-use x86_64::registers::control_regs;
-#[cfg(target_arch = "x86_64")]
-use x86_64::instructions::tlb;
-#[cfg(any(target_arch = "aarch64"))]
-use aarch64::instructions::tlb;
 
 use kernel_config::memory::{PAGE_SIZE, MAX_PAGE_NUMBER, RECURSIVE_P4_INDEX};
 use kernel_config::memory::{KERNEL_TEXT_P4_INDEX, KERNEL_HEAP_P4_INDEX, KERNEL_STACK_P4_INDEX, MAX_VIRTUAL_ADDRESS};

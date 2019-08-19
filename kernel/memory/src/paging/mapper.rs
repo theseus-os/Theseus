@@ -11,8 +11,6 @@ use core::mem;
 use core::ops::DerefMut;
 use core::ptr::Unique;
 use core::slice;
-#[cfg(target_arch = "x86_64")]
-use x86_64;
 #[cfg(any(target_arch = "aarch64"))]
 use aarch64;
 use {BROADCAST_TLB_SHOOTDOWN_FUNC, VirtualAddress, PhysicalAddress, FRAME_ALLOCATOR, FrameRange, Page, Frame, FrameAllocator, AllocatedPages}; 
