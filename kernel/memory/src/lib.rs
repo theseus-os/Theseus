@@ -48,8 +48,8 @@ macro_rules! try_forget {
 
 
 mod area_frame_allocator;
-mod paging;
 mod stack_allocator;
+pub mod paging;
 
 
 pub use self::area_frame_allocator::AreaFrameAllocator;
@@ -255,7 +255,7 @@ impl From<PhysicalAddress> for usize {
 
 
 /// The memory management info and address space of the kernel
-static KERNEL_MMI: Once<Arc<MutexIrqSafe<MemoryManagementInfo>>> = Once::new();
+pub static KERNEL_MMI: Once<Arc<MutexIrqSafe<MemoryManagementInfo>>> = Once::new();
 
 /// returns a cloned reference to the kernel's `MemoryManagementInfo`, if initialized.
 /// If not, it returns None.

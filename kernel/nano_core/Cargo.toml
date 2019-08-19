@@ -38,6 +38,9 @@ path = "../state_store"
 [dependencies.memory]
 path = "../memory"
 
+[dependencies.memory_interface]
+path = "../memory_interface"
+
 [dependencies.mod_mgmt]
 path = "../mod_mgmt"
 
