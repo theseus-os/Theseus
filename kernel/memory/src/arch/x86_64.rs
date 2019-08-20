@@ -42,6 +42,10 @@ impl EntryFlags {
     pub fn is_page(&self) -> bool {
         self.contains(EntryFlags::PRESENT) && !self.contains(EntryFlags::HUGE_PAGE)
     }
+
+    pub fn set_writable(&self) -> EntryFlags {
+        self.clone() | EntryFlags::rw_flags()
+    }
 }
 
 

@@ -27,6 +27,7 @@ bitflags! {
         const NON_CACHE         = 1 << 3;
         const USER_ARM          = 1 << 6;
         const READONLY          = 1 << 7;
+//        const WRITABLE          = 0 << 7;
         const OUT_SHARE         = 2 << 8;
         const INNER_SHARE       = 3 << 8;
         const ACCESSEDARM       = 1 << 10;
@@ -46,6 +47,10 @@ impl EntryFlags {
 
     pub fn default() -> EntryFlags {
         EntryFlags::PRESENT | EntryFlags :: ACCESSEDARM | EntryFlags::INNER_SHARE | EntryFlags::PAGE
+    }
+
+    pub fn set_writable(&self) -> EntryFlags {
+        self.clone() & !EntryFlags::READONLY | EntryFlags::PRESENT | EntryFlags :: ACCESSEDARM | EntryFlags::PAGE
     }
 
     pub fn is_page(&self) -> bool {

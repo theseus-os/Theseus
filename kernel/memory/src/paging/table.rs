@@ -92,11 +92,12 @@ impl<L> Table<L>
                     "mapping code does not support huge pages");
             let frame = allocator.allocate_frame().expect("no frames available");
 
-            #[cfg(target_arch = "x86_64")]
-            self[index].set(frame, flags | EntryFlags::PRESENT | EntryFlags::WRITABLE); // must be PRESENT | WRITABLE
+            // #[cfg(target_arch = "x86_64")]
+            // self[index].set(frame, flags | EntryFlags::PRESENT | EntryFlags::WRITABLE); // must be PRESENT | WRITABLE
 
-            #[cfg(any(target_arch = "aarch64"))]
-            self[index].set(frame, flags & EntryFlags::WRITABLE | EntryFlags::PRESENT | EntryFlags::ACCESSEDARM | EntryFlags::PAGE); 
+            //#[cfg(any(target_arch = "aarch64"))]
+            self[index].set(frame, flags.set_writable());
+            //EntryFlags::WRITABLE | EntryFlags::PRESENT | EntryFlags::ACCESSEDARM | EntryFlags::PAGE); 
             
             self.next_table_mut(index).unwrap().zero();
         }
