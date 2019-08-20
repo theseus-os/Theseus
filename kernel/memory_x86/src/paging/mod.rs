@@ -20,7 +20,7 @@ pub fn init(allocator_mutex: &MutexIrqSafe<AreaFrameAllocator>, boot_info: &mult
     -> Result<(PageTable, Vec<VirtualMemoryArea>, MappedPages, MappedPages, MappedPages, Vec<MappedPages>, Vec<MappedPages>), &'static str>
 {
     // bootstrap a PageTable from the currently-loaded page table
-    let mut page_table = PageTable::from_current(get_current_p4());
+    let mut page_table = PageTable::from_current();
 
     let boot_info_start_vaddr = VirtualAddress::new(boot_info.start_address())?;
     let boot_info_start_paddr = page_table.translate(boot_info_start_vaddr).ok_or("Couldn't get boot_info start physical address")?;
