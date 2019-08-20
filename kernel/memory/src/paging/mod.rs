@@ -310,16 +310,8 @@ impl PageTable {
         let p4_table = temporary_page.map_table_frame(backup.clone(), self)?;
 
         // overwrite recursive mapping
-        #[cfg(target_arch = "x86_64")]
-        {
-            self.p4_mut()[RECURSIVE_P4_INDEX].set(other_table.p4_table.clone(), EntryFlags::PRESENT | EntryFlags::WRITABLE | EntryFlags::INNER_SHARE); 
-        }
-
-        #[cfg(any(target_arch = "aarch64"))]
-        {
-            self.p4_mut()[RECURSIVE_P4_INDEX].set(other_table.p4_table.clone(), EntryFlags::PRESENT | EntryFlags::WRITABLE | EntryFlags::INNER_SHARE | EntryFlags::ACCESSEDARM ); 
-        }
-
+        self.p4_mut()[RECURSIVE_P4_INDEX].set(other_table.p4_table.clone(), rw_entry_flags()); 
+        
         tlb::flush_all();
         // set mapper's target frame to reflect that future mappings will be mapped into the other_table
         self.mapper.target_p4 = other_table.p4_table.clone();
@@ -330,46 +322,22 @@ impl PageTable {
         // restore mapper's target frame to reflect that future mappings will be mapped using the currently-active (original) PageTable
         self.mapper.target_p4 = self.p4_table.clone();
 
-        // // restore recursive mapping to original p4 table
-        #[cfg(target_arch = "x86_64")]
-        {
-            p4_table[RECURSIVE_P4_INDEX].set(backup, EntryFlags::PRESENT | EntryFlags::WRITABLE);
-        }
-
-        #[cfg(any(target_arch = "aarch64"))] {
-            p4_table[RECURSIVE_P4_INDEX].set(backup, EntryFlags::PRESENT | EntryFlags::PAGE | EntryFlags::INNER_SHARE | EntryFlags::ACCESSEDARM);
-        }
+        // restore recursive mapping to original p4 table
+        p4_table[RECURSIVE_P4_INDEX].set(backup, rw_entry_flags());
         tlb::flush_all();
 
         // here, temporary_page is dropped, which auto unmaps it
         ret
     }
 
-
-    /// Switches from the currently-active page table (this `PageTable`, i.e., `self`) to the given `new_table`.
-    /// Returns the newly-switched-to PageTable.
     pub fn switch(&mut self, new_table: &PageTable) -> PageTable {
         // debug!("PageTable::switch() old table: {:?}, new table: {:?}", self, new_table);
 
         // perform the actual page table switch
-        #[cfg(target_arch = "x86_64")]
-        unsafe {
-            control_regs::cr3_write(x86_64::PhysicalAddress(new_table.p4_table.start_address().value() as u64));
-        }
-
-        #[cfg(any(target_arch = "aarch64"))] 
-        unsafe {
-          asm!("
-            msr ttbr1_el1, x0;
-            msr ttbr0_el1, x0;
-            dsb ish; 
-            isb; " : :"{x0}"(new_table.p4_table.start_address().value() as u64): : "volatile");
-            tlb::flush_all();
-        }
+        set_new_p4(new_table.p4_table.start_address().value() as u64);
         let current_table_after_switch = PageTable::from_current();
         current_table_after_switch
     }
-
 
     /// Returns the physical address of this page table's top-level p4 frame
     pub fn physical_address(&self) -> PhysicalAddress {

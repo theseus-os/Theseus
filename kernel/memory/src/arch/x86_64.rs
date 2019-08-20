@@ -26,3 +26,9 @@ bitflags! {
     }
     
 }
+
+pub fn set_new_p4(p4: u64) {
+    unsafe {
+        control_regs::cr3_write(x86_64::PhysicalAddress(p4));
+    }
+}

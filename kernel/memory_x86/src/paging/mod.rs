@@ -18,6 +18,29 @@ pub fn get_current_p4() -> Frame {
     Frame::containing_address(PhysicalAddress::new_canonical(control_regs::cr3().0 as usize))
 }
 
+    /// Switches from the currently-active page table (this `PageTable`, i.e., `self`) to the given `new_table`.
+    /// Returns the newly-switched-to PageTable.
+    pub fn switch(&mut self, new_table: &PageTable) -> PageTable {
+        // debug!("PageTable::switch() old table: {:?}, new table: {:?}", self, new_table);
+
+        // perform the actual page table switch
+        #[cfg(target_arch = "x86_64")]
+        unsafe {
+            control_regs::cr3_write(x86_64::PhysicalAddress(new_table.p4_table.start_address().value() as u64));
+        }
+
+        #[cfg(any(target_arch = "aarch64"))] 
+        unsafe {
+          asm!("
+            msr ttbr1_el1, x0;
+            msr ttbr0_el1, x0;
+            dsb ish; 
+            isb; " : :"{x0}"(new_table.p4_table.start_address().value() as u64): : "volatile");
+            tlb::flush_all();
+        }
+        let current_table_after_switch = PageTable::from_current();
+        current_table_after_switch
+    }
 /// Initializes a new page table and sets up all necessary mappings for the kernel to continue running. 
 /// Returns the following tuple, if successful:
 /// 

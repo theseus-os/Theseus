@@ -35,3 +35,14 @@ bitflags! {
     }
     
 }
+
+fn set_new_p4(p4: u64) {
+    unsafe {
+        asm!("
+        msr ttbr1_el1, x0;
+        msr ttbr0_el1, x0;
+        dsb ish; 
+        isb; " : :"{x0}"(p4): : "volatile");
+        tlb::flush_all();
+    }
+}

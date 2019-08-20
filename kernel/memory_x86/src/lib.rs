@@ -53,7 +53,6 @@ use bit_field::BitField;
 use uefi::prelude::*;
 use uefi::table::boot::{MemoryDescriptor, MemoryType};
 
-
 /// Initializes the virtual memory management system and returns a MemoryManagementInfo instance,
 /// which represents Task zero's (the kernel's) address space. 
 /// Consumes the given BootInformation, because after the memory system is initialized,
