@@ -9,6 +9,10 @@ pub fn rw_entry_flags() -> EntryFlags {
     EntryFlags::PRESENT | EntryFlags::WRITABLE | EntryFlags::ACCESSEDARM | EntryFlags::INNER_SHARE
 }
 
+pub fn default_entry_flags() -> EntryFlags {
+    EntryFlags::PRESENT | EntryFlags::WRITABLE | EntryFlags::ACCESSEDARM | EntryFlags::INNER_SHARE
+}
+
 bitflags! {
     #[derive(Default)]
     pub struct EntryFlags: u64 {
@@ -36,6 +40,12 @@ bitflags! {
         const NO_EXE_ARM        = 1 << 54;
     }
     
+}
+
+impl EntryFlags {
+    pub fn is_huge(&self) -> bool {
+        !self.contains(EntryFlags::PAGE)
+    }
 }
 
 /// Set the p4 address of the new page table

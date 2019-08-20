@@ -53,10 +53,7 @@ pub use self::area_frame_allocator::AreaFrameAllocator;
 pub use self::paging::*;
 pub use self::stack_allocator::{StackAllocator, Stack};
 
-#[cfg(any(target_arch = "x86_64"))]
-use self::arch::x86_64::*;
-#[cfg(any(target_arch = "aarch64"))]
-use self::arch::aarch64::*;
+use self::arch::*;
 
 #[cfg(any(target_arch = "x86_64"))]
 pub use self::arch::x86_64::EntryFlags;

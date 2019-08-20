@@ -106,11 +106,7 @@ impl Mapper {
                     let p2_entry = &p2[page.p2_index()];
                     // 2MiB page?
                     if let Some(start_frame) = p2_entry.pointed_frame() {
-                        #[cfg(target_arch = "x86_64")]
-                        let is_huge = p2_entry.flags().contains(EntryFlags::HUGE_PAGE);
-                        #[cfg(any(target_arch = "aarch64"))]
-                        let is_huge = !p2_entry.flags().contains(EntryFlags::PAGE);
-                        if is_huge {
+                        if p2_entry.flags().is_huge() {
                             // address must be 2MiB aligned
                             assert!(start_frame.number % ENTRIES_PER_PAGE_TABLE == 0);
                             return Some(Frame { number: start_frame.number + page.p1_index() });

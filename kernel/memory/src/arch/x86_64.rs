@@ -29,6 +29,13 @@ bitflags! {
     
 }
 
+impl EntryFlags {
+    pub fn is_huge(&self) -> bool {
+        self.contains(EntryFlags::HUGE_PAGE)
+    }
+}
+
+
 /// Set the new P4 table address
 pub fn set_new_p4(p4: u64) {
     unsafe {
