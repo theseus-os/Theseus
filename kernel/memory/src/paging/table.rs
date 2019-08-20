@@ -60,13 +60,8 @@ impl<L> Table<L>
     /// (so P4 would give P3, P3 -> P2, P2 -> P1).
     fn next_table_address(&self, index: usize) -> Option<VirtualAddress> {
         let entry_flags = self[index].flags();
-        
-        #[cfg(target_arch = "x86_64")]
-        let ispage = entry_flags.contains(EntryFlags::PRESENT) && !entry_flags.contains(EntryFlags::HUGE_PAGE);
-        #[cfg(any(target_arch = "aarch64"))]
-        let ispage = entry_flags.contains(EntryFlags::PRESENT) && entry_flags.contains(EntryFlags::PAGE);
-        
-        if ispage {
+                
+        if entry_flags.is_page() {
             let table_address = self as *const _ as usize;
             let next_table_vaddr: usize = (table_address << 9) | (index << PAGE_SHIFT);
             Some(VirtualAddress::new_canonical(next_table_vaddr))

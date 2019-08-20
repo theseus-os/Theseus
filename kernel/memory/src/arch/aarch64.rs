@@ -47,6 +47,10 @@ impl EntryFlags {
     pub fn default() -> EntryFlags {
         EntryFlags::PRESENT | EntryFlags :: ACCESSEDARM | EntryFlags::INNER_SHARE | EntryFlags::PAGE
     }
+
+    pub fn is_page(&self) -> bool {
+        self.contains(EntryFlags::PRESENT) && self.contains(EntryFlags::PAGE)
+    }
 }
 
 /// Set the p4 address of the new page table

@@ -38,6 +38,10 @@ impl EntryFlags {
     pub fn rw_flags() -> EntryFlags {
         EntryFlags::default() | EntryFlags::WRITABLE
     }
+
+    pub fn is_page(&self) -> bool {
+        self.contains(EntryFlags::PRESENT) && !self.contains(EntryFlags::HUGE_PAGE)
+    }
 }
 
 
