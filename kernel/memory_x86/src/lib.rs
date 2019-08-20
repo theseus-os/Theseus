@@ -48,7 +48,7 @@ use kernel_config::memory::{PAGE_SIZE, MAX_PAGE_NUMBER, KERNEL_HEAP_START, KERNE
 #[cfg(target_arch = "x86_64")]
 use kernel_config::memory::x86_64::{KERNEL_OFFSET, KERNEL_OFFSET_BITS_START, KERNEL_OFFSET_PREFIX};
 #[cfg(any(target_arch = "aarch64"))]
-use kernel_config::memory::arm::{KERNEL_OFFSET, KERNEL_OFFSET_BITS_START, KERNEL_OFFSET_PREFIX, HARDWARE_START, HARDWARE_END};
+use kernel_config::memory::aarch64::{KERNEL_OFFSET, KERNEL_OFFSET_BITS_START, KERNEL_OFFSET_PREFIX, HARDWARE_START, HARDWARE_END};
 use bit_field::BitField;
 use uefi::prelude::*;
 use uefi::table::boot::{MemoryDescriptor, MemoryType};

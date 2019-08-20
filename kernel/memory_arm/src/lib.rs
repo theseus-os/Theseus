@@ -44,7 +44,7 @@ use irq_safety::MutexIrqSafe;
 use alloc::vec::Vec;
 use alloc::sync::Arc;
 use kernel_config::memory::{PAGE_SIZE, MAX_PAGE_NUMBER, KERNEL_HEAP_START, KERNEL_HEAP_INITIAL_SIZE, KERNEL_STACK_ALLOCATOR_BOTTOM, KERNEL_STACK_ALLOCATOR_TOP_ADDR, ENTRIES_PER_PAGE_TABLE};
-use kernel_config::memory::arm::{KERNEL_OFFSET, KERNEL_OFFSET_BITS_START, KERNEL_OFFSET_PREFIX, HARDWARE_START, HARDWARE_END};
+use kernel_config::memory::aarch64::{KERNEL_OFFSET, KERNEL_OFFSET_BITS_START, KERNEL_OFFSET_PREFIX, HARDWARE_START, HARDWARE_END};
 use bit_field::BitField;
 use uefi::prelude::*;
 use uefi::table::boot::{MemoryDescriptor, MemoryType};
