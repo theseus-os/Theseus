@@ -19,8 +19,6 @@ extern crate irq_safety;
 extern crate kernel_config;
 extern crate atomic_linked_list;
 extern crate xmas_elf;
-#[cfg(any(target_arch = "aarch64"))]
-extern crate aarch64;
 #[macro_use] extern crate bitflags;
 extern crate heap_irq_safe;
 #[macro_use] extern crate derive_more;
@@ -47,9 +45,8 @@ macro_rules! try_forget {
 
 mod area_frame_allocator;
 mod stack_allocator;
+mod arch;
 pub mod paging;
-pub mod arch;
-
 
 pub use self::area_frame_allocator::AreaFrameAllocator;
 pub use self::paging::*;
@@ -59,6 +56,11 @@ pub use self::stack_allocator::{StackAllocator, Stack};
 use self::arch::x86_64::*;
 #[cfg(any(target_arch = "aarch64"))]
 use self::arch::aarch64::*;
+
+#[cfg(any(target_arch = "x86_64"))]
+pub use self::arch::x86_64::EntryFlags;
+#[cfg(any(target_arch = "aarch64"))]
+pub use self::arch::aarch64::EntryFlags;
 
 use core::{
     ops::{RangeInclusive, Deref, DerefMut},
@@ -71,10 +73,6 @@ use irq_safety::MutexIrqSafe;
 use alloc::vec::Vec;
 use alloc::sync::Arc;
 use kernel_config::memory::{PAGE_SIZE, MAX_PAGE_NUMBER, KERNEL_HEAP_START, KERNEL_HEAP_INITIAL_SIZE, KERNEL_STACK_ALLOCATOR_BOTTOM, KERNEL_STACK_ALLOCATOR_TOP_ADDR, ENTRIES_PER_PAGE_TABLE};
-#[cfg(target_arch = "x86_64")]
-use kernel_config::memory::x86_64::{KERNEL_OFFSET, KERNEL_OFFSET_BITS_START, KERNEL_OFFSET_PREFIX};
-#[cfg(any(target_arch = "aarch64"))]
-use kernel_config::memory::arm::{KERNEL_OFFSET, KERNEL_OFFSET_BITS_START, KERNEL_OFFSET_PREFIX, HARDWARE_START, HARDWARE_END};
 use bit_field::BitField;
 use uefi::prelude::*;
 use uefi::table::boot::{MemoryDescriptor, MemoryType};

@@ -7,7 +7,8 @@
 // option. This file may not be copied, modified, or distributed
 // except according to those terms.
 
-use super::super::Frame;
+pub use super::super::EntryFlags;
+use super::super::{Frame};
 use multiboot2;
 use xmas_elf;
 use PhysicalAddress;
@@ -57,48 +58,31 @@ impl Entry {
     }
 }
 
-bitflags! {
-    #[derive(Default)]
-    pub struct EntryFlags: u64 {
-        const PRESENT           = 1 << 0;
-        const WRITABLE          = 1 << 1;
-        const USER_ACCESSIBLE   = 1 << 2;
-        const WRITE_THROUGH     = 1 << 3;
-        const NO_CACHE          = 1 << 4;
-        const ACCESSED          = 1 << 5;
-        const DIRTY             = 1 << 6;
-        const HUGE_PAGE         = 1 << 7;
-        // const GLOBAL            = 1 << 8;
-        const GLOBAL            = 0; // disabling because VirtualBox doesn't like it
-        const NO_EXECUTE        = 1 << 63;
+pub trait FlagOperator {
+    fn is_writable(&self) -> bool;
 
-        //ARM MMU
-        const PAGE              = 1 << 1;
-        const DEVICE            = 1 << 2;
-        const NON_CACHE         = 1 << 3;
-        const USER_ARM          = 1 << 6;
-        const READONLY          = 1 << 7;
-        const OUT_SHARE         = 2 << 8;
-        const INNER_SHARE       = 3 << 8;
-        const ACCESSEDARM       = 1 << 10;
-        const NO_EXE_ARM        = 1 << 54;
-    }
-    
+    fn is_executable(&self) -> bool;
+
+    fn from_multiboot2_section_flags(section: &multiboot2::ElfSection) -> EntryFlags;
+
+    fn from_elf_section_flags(elf_flags: u64) -> EntryFlags;
+
+    fn from_elf_program_flags(prog_flags: xmas_elf::program::Flags) -> EntryFlags;
 }
 
-impl EntryFlags {
+impl FlagOperator for EntryFlags {
     /// Returns true if these flags have the `WRITABLE` bit set.
-    pub fn is_writable(&self) -> bool {
+    fn is_writable(&self) -> bool {
         self.intersects(EntryFlags::WRITABLE)
     }
 
     /// Returns true if these flags are executable, 
     /// which means that the `NO_EXECUTE` bit on x86 is *not* set.
-    pub fn is_executable(&self) -> bool {
+    fn is_executable(&self) -> bool {
         !self.intersects(EntryFlags::NO_EXECUTE)
     }
 
-    pub fn from_multiboot2_section_flags(section: &multiboot2::ElfSection) -> EntryFlags {
+    fn from_multiboot2_section_flags(section: &multiboot2::ElfSection) -> EntryFlags {
         use multiboot2::ElfSectionFlags;
 
         let mut flags = EntryFlags::empty();
@@ -117,7 +101,7 @@ impl EntryFlags {
         flags
     }
 
-    pub fn from_elf_section_flags(elf_flags: u64) -> EntryFlags {
+    fn from_elf_section_flags(elf_flags: u64) -> EntryFlags {
         use xmas_elf::sections::{SHF_WRITE, SHF_ALLOC, SHF_EXECINSTR};
         
         let mut flags = EntryFlags::empty();
@@ -137,7 +121,7 @@ impl EntryFlags {
         flags
     }
 
-    pub fn from_elf_program_flags(prog_flags: xmas_elf::program::Flags) -> EntryFlags {
+    fn from_elf_program_flags(prog_flags: xmas_elf::program::Flags) -> EntryFlags {
         let mut flags = EntryFlags::empty();
         
         if prog_flags.is_read() {

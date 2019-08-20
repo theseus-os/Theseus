@@ -11,11 +11,8 @@
 //! * 507: userspace stacks
 //! * 506 down to 0:  available for user processes
 
-#[cfg(target_arch = "x86_64")]
 pub mod x86_64;
-
-#[cfg(target_arch = "aarch64")]
-pub mod arm;
+pub mod aarch64;
 
 /// 64-bit architecture results in 8 bytes per address.
 pub const BYTES_PER_ADDR: usize = 8;

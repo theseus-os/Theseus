@@ -271,14 +271,8 @@ impl PageTable {
         {
             let table = try!(temporary_page.map_table_frame(new_p4_frame.clone(), current_page_table));
             table.zero();
-
-            #[cfg(target_arch = "x86_64")]
-            let flags = EntryFlags::PRESENT | EntryFlags::WRITABLE;
-
-            #[cfg(any(target_arch = "aarch64"))]
-            let flags = EntryFlags::PRESENT | EntryFlags::WRITABLE | EntryFlags::ACCESSEDARM | EntryFlags::INNER_SHARE;
                         
-            table[RECURSIVE_P4_INDEX].set(new_p4_frame.clone(), flags);
+            table[RECURSIVE_P4_INDEX].set(new_p4_frame.clone(), rw_entry_flags());
 
             // start out by copying all the kernel sections into the new table
             table.copy_entry_from_table(current_page_table.p4(), KERNEL_TEXT_P4_INDEX);
