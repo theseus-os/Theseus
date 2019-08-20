@@ -3,6 +3,8 @@ extern crate aarch64;
 pub use self::aarch64::instructions::tlb;
 pub use kernel_config::memory::aarch64::{KERNEL_OFFSET, KERNEL_OFFSET_BITS_START, KERNEL_OFFSET_PREFIX, HARDWARE_START, HARDWARE_END};
 
+use super::super::{Frame, PhysicalAddress};
+
 pub fn rw_entry_flags() -> EntryFlags {
     EntryFlags::PRESENT | EntryFlags::WRITABLE | EntryFlags::ACCESSEDARM | EntryFlags::INNER_SHARE
 }
@@ -36,7 +38,8 @@ bitflags! {
     
 }
 
-fn set_new_p4(p4: u64) {
+/// Set the p4 address of the new page table
+pub fn set_new_p4(p4: u64) {
     unsafe {
         asm!("
         msr ttbr1_el1, x0;
@@ -45,4 +48,12 @@ fn set_new_p4(p4: u64) {
         isb; " : :"{x0}"(p4): : "volatile");
         tlb::flush_all();
     }
+}
+
+
+/// Returns the current top-level page table frame e.g., TTBR0_EL1 on ARM64
+pub fn get_current_p4() -> Frame {
+    let p4:usize;
+    unsafe {  asm!("mrs $0, TTBR0_EL1" : "=r"(p4) : : : "volatile"); };
+    Frame::containing_address(PhysicalAddress::new_canonical(p4))
 }

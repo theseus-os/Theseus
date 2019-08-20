@@ -30,6 +30,7 @@ extern crate uefi;
 /// but forgets the given `obj`s to prevent them from being dropped,
 /// as they would normally be upon return of an Error using `try!()`.
 /// This must come BEFORE the below modules in order for them to be able to use it.
+#[macro_export]
 macro_rules! try_forget {
     ($expr:expr, $($obj:expr),*) => (match $expr {
         Ok(val) => val,
@@ -60,7 +61,7 @@ use self::arch::aarch64::*;
 #[cfg(any(target_arch = "x86_64"))]
 pub use self::arch::x86_64::EntryFlags;
 #[cfg(any(target_arch = "aarch64"))]
-pub use self::arch::aarch64::EntryFlags;
+pub use self::arch::aarch64::{EntryFlags, get_current_p4};
 
 use core::{
     ops::{RangeInclusive, Deref, DerefMut},

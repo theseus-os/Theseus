@@ -19,9 +19,6 @@ extern crate irq_safety;
 extern crate kernel_config;
 extern crate atomic_linked_list;
 extern crate xmas_elf;
-#[cfg(target_arch = "x86_64")]
-extern crate x86_64;
-#[cfg(any(target_arch = "aarch64"))]
 extern crate aarch64;
 #[macro_use] extern crate bitflags;
 extern crate heap_irq_safe;
@@ -29,7 +26,9 @@ extern crate heap_irq_safe;
 extern crate bit_field;
 extern crate type_name;
 extern crate uefi;
-extern crate memory;
+#[macro_use] extern crate memory;
+
+mod paging;
 
 pub use memory::*;
 
@@ -43,11 +42,12 @@ use spin::Once;
 use irq_safety::MutexIrqSafe;
 use alloc::vec::Vec;
 use alloc::sync::Arc;
-use kernel_config::memory::{PAGE_SIZE, MAX_PAGE_NUMBER, KERNEL_HEAP_START, KERNEL_HEAP_INITIAL_SIZE, KERNEL_STACK_ALLOCATOR_BOTTOM, KERNEL_STACK_ALLOCATOR_TOP_ADDR, ENTRIES_PER_PAGE_TABLE};
+use kernel_config::memory::{PAGE_SIZE, MAX_PAGE_NUMBER, KERNEL_HEAP_START, KERNEL_HEAP_INITIAL_SIZE, KERNEL_STACK_ALLOCATOR_BOTTOM, KERNEL_STACK_ALLOCATOR_TOP_ADDR, ENTRIES_PER_PAGE_TABLE, MAX_VIRTUAL_ADDRESS, KERNEL_STACK_P4_INDEX, KERNEL_HEAP_P4_INDEX, KERNEL_TEXT_P4_INDEX, RECURSIVE_P4_INDEX};
 use kernel_config::memory::aarch64::{KERNEL_OFFSET, KERNEL_OFFSET_BITS_START, KERNEL_OFFSET_PREFIX, HARDWARE_START, HARDWARE_END};
 use bit_field::BitField;
 use uefi::prelude::*;
 use uefi::table::boot::{MemoryDescriptor, MemoryType};
+use aarch64::instructions::tlb;
 
 pub type BootInformation = BootServices;
 
