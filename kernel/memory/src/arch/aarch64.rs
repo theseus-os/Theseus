@@ -5,13 +5,6 @@ pub use kernel_config::memory::aarch64::{KERNEL_OFFSET, KERNEL_OFFSET_BITS_START
 
 use super::super::{Frame, PhysicalAddress};
 
-pub fn rw_entry_flags() -> EntryFlags {
-    EntryFlags::PRESENT | EntryFlags::WRITABLE | EntryFlags::ACCESSEDARM | EntryFlags::INNER_SHARE
-}
-
-pub fn default_entry_flags() -> EntryFlags {
-    EntryFlags::PRESENT | EntryFlags::WRITABLE | EntryFlags::ACCESSEDARM | EntryFlags::INNER_SHARE
-}
 
 bitflags! {
     #[derive(Default)]
@@ -46,6 +39,14 @@ impl EntryFlags {
     pub fn is_huge(&self) -> bool {
         !self.contains(EntryFlags::PAGE)
     }
+
+    pub fn rw_flags() -> EntryFlags {
+        EntryFlags::default()
+    }
+
+    pub fn default() -> EntryFlags {
+        EntryFlags::PRESENT | EntryFlags :: ACCESSEDARM | EntryFlags::INNER_SHARE | EntryFlags::PAGE
+    }
 }
 
 /// Set the p4 address of the new page table
@@ -66,4 +67,9 @@ pub fn get_current_p4() -> Frame {
     let p4:usize;
     unsafe {  asm!("mrs $0, TTBR0_EL1" : "=r"(p4) : : : "volatile"); };
     Frame::containing_address(PhysicalAddress::new_canonical(p4))
+}
+
+
+pub fn flush(address:usize) {
+    tlb::flush(aarch64::VirtualAddress(address));
 }

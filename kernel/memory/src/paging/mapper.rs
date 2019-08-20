@@ -18,6 +18,7 @@ use paging::table::{P4, Table, Level4};
 use kernel_config::memory::{ENTRIES_PER_PAGE_TABLE, PAGE_SIZE, TEMPORARY_PAGE_VIRT_ADDR};
 use alloc::vec::Vec;
 use type_name;
+use super::super::arch::flush;
 
 pub struct Mapper {
     p4: Unique<Table<Level4>>,
@@ -146,11 +147,7 @@ impl Mapper {
                 return Err("page was already in use");
             } 
 
-            #[cfg(target_arch = "x86_64")]
-            p1[page.p1_index()].set(frame, flags | EntryFlags::PRESENT);
-
-            #[cfg(any(target_arch = "aarch64"))]
-            p1[page.p1_index()].set(frame, flags | EntryFlags::PRESENT | EntryFlags :: ACCESSEDARM | EntryFlags::INNER_SHARE);
+            p1[page.p1_index()].set(frame, flags | EntryFlags::default());
 
         }
 
@@ -192,10 +189,7 @@ impl Mapper {
                 return Err("page was already in use");
             } 
 
-            #[cfg(target_arch = "x86_64")]
-            p1[page.p1_index()].set(frame, flags | EntryFlags::PRESENT);
-            #[cfg(any(target_arch = "aarch64"))]
-            p1[page.p1_index()].set(frame, flags | EntryFlags::PRESENT | EntryFlags :: ACCESSEDARM | EntryFlags::INNER_SHARE);
+            p1[page.p1_index()].set(frame, flags | EntryFlags::default());
         }
 
         Ok(MappedPages {
@@ -551,10 +545,7 @@ impl MappedPages {
             p1[page.p1_index()].set(frame, new_flags | EntryFlags::PRESENT);
 
             let vaddr = page.start_address();
-            #[cfg(target_arch = "x86_64")]
-            x86_64::instructions::tlb::flush(x86_64::VirtualAddress(vaddr.value()));
-            #[cfg(any(target_arch = "aarch64"))]
-            aarch64::instructions::tlb::flush(aarch64::VirtualAddress(vaddr.value()));
+            flush(vaddr.value());
             if broadcast_tlb_shootdown.is_some() && vaddr.value() != TEMPORARY_PAGE_FRAME {
                 vaddrs.push(vaddr);
             }
@@ -594,10 +585,7 @@ impl MappedPages {
             p1[page.p1_index()].set_unused();
 
             let vaddr = page.start_address();
-            #[cfg(target_arch = "x86_64")]
-            x86_64::instructions::tlb::flush(x86_64::VirtualAddress(page.start_address().value()));
-            #[cfg(any(target_arch = "aarch64"))]
-            aarch64::instructions::tlb::flush(aarch64::VirtualAddress(page.start_address().value()));
+            flush(page.start_address().value());
             if broadcast_tlb_shootdown.is_some() && vaddr.value() != TEMPORARY_PAGE_FRAME {
                 vaddrs.push(vaddr);
             }

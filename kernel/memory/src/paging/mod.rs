@@ -271,7 +271,7 @@ impl PageTable {
             let table = try!(temporary_page.map_table_frame(new_p4_frame.clone(), current_page_table));
             table.zero();
                         
-            table[RECURSIVE_P4_INDEX].set(new_p4_frame.clone(), rw_entry_flags());
+            table[RECURSIVE_P4_INDEX].set(new_p4_frame.clone(), EntryFlags::rw_flags());
 
             // start out by copying all the kernel sections into the new table
             table.copy_entry_from_table(current_page_table.p4(), KERNEL_TEXT_P4_INDEX);
@@ -309,7 +309,7 @@ impl PageTable {
         let p4_table = temporary_page.map_table_frame(backup.clone(), self)?;
 
         // overwrite recursive mapping
-        self.p4_mut()[RECURSIVE_P4_INDEX].set(other_table.p4_table.clone(), rw_entry_flags()); 
+        self.p4_mut()[RECURSIVE_P4_INDEX].set(other_table.p4_table.clone(), EntryFlags::rw_flags()); 
         
         tlb::flush_all();
         // set mapper's target frame to reflect that future mappings will be mapped into the other_table
@@ -322,7 +322,7 @@ impl PageTable {
         self.mapper.target_p4 = self.p4_table.clone();
 
         // restore recursive mapping to original p4 table
-        p4_table[RECURSIVE_P4_INDEX].set(backup, rw_entry_flags());
+        p4_table[RECURSIVE_P4_INDEX].set(backup, EntryFlags::rw_flags());
         tlb::flush_all();
 
         // here, temporary_page is dropped, which auto unmaps it
