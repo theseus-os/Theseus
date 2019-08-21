@@ -854,7 +854,6 @@ dependencies = [
  "multiboot2 0.7.1 (registry+https://github.com/rust-lang/crates.io-index)",
  "spin 0.4.10 (registry+https://github.com/rust-lang/crates.io-index)",
  "type-name 0.1.0 (registry+https://github.com/rust-lang/crates.io-index)",
- "x86_64 0.1.2",
  "xmas-elf 0.6.2 (git+https://github.com/kevinaboos/xmas-elf.git)",
 ]
 

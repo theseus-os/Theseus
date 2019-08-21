@@ -3,7 +3,7 @@
 /// Basic operations on entryflags
 pub trait EntryFlagsOper<T> {
     /// Returns ture if the page the entry points to is a huge page.
-    /// For x86, it means the flags contains a HUGE_PAGE bit.
+    /// For x86, it means the flags contain a HUGE_PAGE bit.
     fn is_huge(&self) -> bool;
 
     /// The default flags of an accessible page.

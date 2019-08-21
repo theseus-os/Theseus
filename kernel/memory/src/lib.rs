@@ -46,14 +46,15 @@ macro_rules! try_forget {
 
 
 mod area_frame_allocator;
-mod stack_allocator;
 mod paging;
+mod stack_allocator;
+
 
 pub use self::area_frame_allocator::AreaFrameAllocator;
 pub use self::paging::*;
 pub use self::stack_allocator::{StackAllocator, Stack};
 
-use mmu_x86::{set_new_p4, get_p4_address, flush_all};
+use mmu_x86::{set_new_p4, get_p4_address, flush_all, flush};
 
 pub use entry_flags_oper::EntryFlagsOper;
 pub use mmu_x86::EntryFlags;

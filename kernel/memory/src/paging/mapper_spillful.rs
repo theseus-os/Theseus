@@ -4,8 +4,6 @@ use super::super::{Page, BROADCAST_TLB_SHOOTDOWN_FUNC, VirtualMemoryArea, FrameA
 use super::table::{self, Table, Level4};
 use irq_safety::MutexIrqSafe;
 use alloc::vec::Vec;
-use x86_64;
-
 
 
 lazy_static! {
@@ -147,7 +145,7 @@ impl MapperSpillful {
             p1[page.p1_index()].set(frame, new_flags | EntryFlags::PRESENT);
 
             let vaddr = page.start_address();
-            x86_64::instructions::tlb::flush(x86_64::VirtualAddress(vaddr));
+            flush(vaddr);
             if broadcast_tlb_shootdown.is_some() && vaddr != TEMPORARY_PAGE_FRAME {
                 vaddrs.push(vaddr);
             }
@@ -207,7 +205,7 @@ impl MapperSpillful {
             p1[page.p1_index()].set_unused();
 
             let vaddr = page.start_address();
-            x86_64::instructions::tlb::flush(x86_64::VirtualAddress(vaddr));
+            flush(vaddr);
             if broadcast_tlb_shootdown.is_some() && vaddr != TEMPORARY_PAGE_FRAME {
                 vaddrs.push(vaddr);
             }
