@@ -25,8 +25,10 @@ extern crate heap_irq_safe;
 extern crate bit_field;
 extern crate type_name;
 extern crate uefi;
-#[cfg(any(target_arch = "x86_64"))]
+#[cfg(target_arch = "x86_64")]
 extern crate mmu_x86;
+#[cfg(target_arch = "aarch64")]
+extern crate mmu_arm;
 extern crate entry_flags_oper;
 
 /// Just like Rust's `try!()` macro, 
@@ -55,14 +57,16 @@ pub use self::area_frame_allocator::AreaFrameAllocator;
 pub use self::paging::*;
 pub use self::stack_allocator::{StackAllocator, Stack};
 
-#[cfg(any(target_arch = "x86_64"))]
+#[cfg(target_arch = "x86_64")]
 use mmu_x86::{KERNEL_OFFSET_BITS_START, KERNEL_OFFSET_PREFIX, set_new_p4, get_p4_address, flush, flush_all};
+#[cfg(target_arch = "aarch64")]
+use mmu_arm::{KERNEL_OFFSET_BITS_START, KERNEL_OFFSET_PREFIX, set_new_p4, get_p4_address, flush, flush_all};
 
 pub use entry_flags_oper::EntryFlagsOper;
-#[cfg(any(target_arch = "x86_64"))]
+#[cfg(target_arch = "x86_64")]
 pub use mmu_x86::EntryFlags;
-#[cfg(any(target_arch = "aarch64"))]
-pub use self::arch::aarch64::{EntryFlags, get_current_p4};
+#[cfg(target_arch = "aarch64")]
+pub use mmu_arm::EntryFlags;
 
 use core::{
     ops::{RangeInclusive, Deref, DerefMut},
