@@ -5,7 +5,11 @@ description = "Entry points for panics and unwinding, as required by the Rust co
 version = "0.1.0"
 build = "../../build.rs"
 
-[dependencies]
+[target.'cfg(target_arch = "x86_64")'.dependencies]
+panic_wrapper = { path = "../panic_wrapper" }
+
+[target.'cfg(target_arch = "aarch64")'.dependencies]
+panic_wrapper_arm = { path = "../panic_wrapper_arm" }
 
 [dependencies.log]
 default-features = false
@@ -13,9 +17,6 @@ version = "0.3.7"
 
 [dependencies.memory]
 path = "../memory"
-
-[dependencies.panic_wrapper]
-path = "../panic_wrapper"
 
 [dependencies.mod_mgmt]
 path = "../mod_mgmt"

@@ -1158,7 +1158,6 @@ dependencies = [
 name = "network_manager"
 version = "0.1.0"
 dependencies = [
- "e1000 0.1.0",
  "lazy_static 1.2.0 (registry+https://github.com/rust-lang/crates.io-index)",
  "log 0.3.9 (registry+https://github.com/rust-lang/crates.io-index)",
  "owning_ref 0.4.0 (git+https://github.com/kevinaboos/owning-ref-rs)",
@@ -1260,11 +1259,23 @@ dependencies = [
  "memory 0.1.0",
  "mod_mgmt 0.1.0",
  "panic_wrapper 0.1.0",
+ "panic_wrapper_arm 0.1.0",
  "vga_buffer 0.1.0",
 ]
 
 [[package]]
 name = "panic_wrapper"
+version = "0.1.0"
+dependencies = [
+ "apic 0.1.0",
+ "log 0.3.9 (registry+https://github.com/rust-lang/crates.io-index)",
+ "memory 0.1.0",
+ "runqueue 0.1.0",
+ "task 0.1.0",
+]
+
+[[package]]
+name = "panic_wrapper_arm"
 version = "0.1.0"
 dependencies = [
  "apic 0.1.0",
