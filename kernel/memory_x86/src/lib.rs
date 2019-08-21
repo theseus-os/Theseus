@@ -10,39 +10,24 @@
 #![feature(unboxed_closures)]
 #![feature(step_trait, range_is_empty)]
 
-extern crate spin;
 extern crate multiboot2;
 extern crate alloc;
-#[macro_use] extern crate lazy_static;
 #[macro_use] extern crate log;
 extern crate irq_safety;
 extern crate kernel_config;
-extern crate atomic_linked_list;
-extern crate xmas_elf;
 extern crate x86_64;
-#[macro_use] extern crate bitflags;
 extern crate heap_irq_safe;
-#[macro_use] extern crate derive_more;
-extern crate bit_field;
-extern crate type_name;
 extern crate memory;
 
 mod paging;
 
 pub use multiboot2::BootInformation;
 
-use core::{
-    ops::{RangeInclusive, Deref, DerefMut},
-    iter::Step,
-    mem,
-};
-use spin::Once;
+use core::ops::DerefMut;
 use irq_safety::MutexIrqSafe;
 use alloc::vec::Vec;
 use alloc::sync::Arc;
-use kernel_config::memory::{PAGE_SIZE, MAX_PAGE_NUMBER, KERNEL_HEAP_START, KERNEL_HEAP_INITIAL_SIZE, KERNEL_STACK_ALLOCATOR_BOTTOM, KERNEL_STACK_ALLOCATOR_TOP_ADDR, ENTRIES_PER_PAGE_TABLE, KERNEL_HEAP_P4_INDEX, KERNEL_STACK_P4_INDEX, KERNEL_TEXT_P4_INDEX};
-use kernel_config::memory::{KERNEL_OFFSET};
-use bit_field::BitField;
+use kernel_config::memory::{KERNEL_HEAP_START, KERNEL_HEAP_INITIAL_SIZE, KERNEL_STACK_ALLOCATOR_BOTTOM, KERNEL_STACK_ALLOCATOR_TOP_ADDR, KERNEL_HEAP_P4_INDEX, KERNEL_STACK_P4_INDEX, KERNEL_TEXT_P4_INDEX, KERNEL_OFFSET};
 use memory::*;
 
 /// Initializes the virtual memory management system and returns a MemoryManagementInfo instance,

@@ -27,10 +27,9 @@ use core::{
     mem,
     iter::Step,
 };
-use multiboot2;
 use super::*;
 
-use kernel_config::memory::{PAGE_SIZE, MAX_PAGE_NUMBER, RECURSIVE_P4_INDEX, KERNEL_TEXT_P4_INDEX, KERNEL_HEAP_P4_INDEX, KERNEL_STACK_P4_INDEX, MAX_VIRTUAL_ADDRESS};
+use kernel_config::memory::{PAGE_SIZE, MAX_PAGE_NUMBER, RECURSIVE_P4_INDEX, KERNEL_TEXT_P4_INDEX, KERNEL_HEAP_P4_INDEX, KERNEL_STACK_P4_INDEX};
 
 
 #[derive(Clone, Copy, PartialEq, Eq, PartialOrd, Ord)]

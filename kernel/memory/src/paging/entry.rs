@@ -9,8 +9,6 @@
 
 pub use super::super::EntryFlags;
 use super::super::{Frame};
-use multiboot2;
-use xmas_elf;
 use PhysicalAddress;
 use bit_field::BitField;
 use kernel_config::memory::PAGE_SHIFT;

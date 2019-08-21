@@ -13,7 +13,6 @@
 extern crate memory_x86;
 extern crate memory;
 extern crate alloc;
-extern crate multiboot2;
 extern crate irq_safety;
 
 use memory_x86::{arch_init, BootInformation};

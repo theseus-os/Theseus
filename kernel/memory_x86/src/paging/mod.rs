@@ -1,7 +1,5 @@
 use super::*;
 
-use super::x86_64::registers::control_regs;
-
 /// Initializes a new page table and sets up all necessary mappings for the kernel to continue running. 
 /// Returns the following tuple, if successful:
 /// 

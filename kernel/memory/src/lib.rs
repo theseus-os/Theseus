@@ -19,7 +19,6 @@ extern crate irq_safety;
 extern crate kernel_config;
 extern crate atomic_linked_list;
 extern crate xmas_elf;
-#[macro_use] extern crate bitflags;
 extern crate heap_irq_safe;
 #[macro_use] extern crate derive_more;
 extern crate bit_field;
@@ -54,7 +53,7 @@ pub use self::area_frame_allocator::AreaFrameAllocator;
 pub use self::paging::*;
 pub use self::stack_allocator::{StackAllocator, Stack};
 
-use mmu_x86::{set_new_p4, get_p4_address, flush, flush_all};
+use mmu_x86::{set_new_p4, get_p4_address, flush_all};
 
 pub use entry_flags_oper::EntryFlagsOper;
 pub use mmu_x86::EntryFlags;
@@ -64,12 +63,11 @@ use core::{
     iter::Step,
     mem,
 };
-use multiboot2::BootInformation;
 use spin::Once;
 use irq_safety::MutexIrqSafe;
 use alloc::vec::Vec;
 use alloc::sync::Arc;
-use kernel_config::memory::{PAGE_SIZE, MAX_PAGE_NUMBER, KERNEL_HEAP_START, KERNEL_HEAP_INITIAL_SIZE, KERNEL_STACK_ALLOCATOR_BOTTOM, KERNEL_STACK_ALLOCATOR_TOP_ADDR, ENTRIES_PER_PAGE_TABLE};
+use kernel_config::memory::{PAGE_SIZE, MAX_PAGE_NUMBER};
 use bit_field::BitField;
 
 /// A virtual memory address, which is a `usize` under the hood.

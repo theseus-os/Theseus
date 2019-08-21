@@ -7,7 +7,7 @@ extern crate xmas_elf;
 extern crate multiboot2;
 extern crate entry_flags_oper;
 
-use x86_64::{instructions::tlb, registers::control_regs, VirtualAddress};
+use x86_64::{instructions::tlb, registers::control_regs};
 pub use kernel_config::memory::{KERNEL_OFFSET};
 use entry_flags_oper::EntryFlagsOper;
 
