@@ -3,16 +3,18 @@
 //! [This is a good link](https://users.rust-lang.org/t/circular-reference-issue/9097)
 //! for understanding why we need `Arc`/`Weak` to handle recursive/circular data structures in Rust. 
 
-use core::ops::{Deref};
 use spin::Mutex;
-use alloc::{Vec, String, BTreeMap};
-use alloc::arc::{Arc, Weak};
-use memory::{MappedPages, VirtualAddress, PageTable, MemoryManagementInfo, EntryFlags, FrameAllocator};
+use alloc::vec::Vec;
+use alloc::string::String;
+use alloc::collections::{BTreeMap, BTreeSet};
+use alloc::sync::{Arc, Weak};
+use memory::{MappedPages, VirtualAddress, PageTable, EntryFlags, FrameAllocator};
 use dependency::*;
 use super::{TEXT_SECTION_FLAGS, RODATA_SECTION_FLAGS, DATA_BSS_SECTION_FLAGS};
 use cow_arc::{CowArc, CowWeak};
+use path::Path;
 
-use super::SymbolMap;
+use qp_trie::{Trie, wrapper::BString};
 
 /// A Strong reference (`Arc`) to a `LoadedSection`.
 pub type StrongSectionRef  = Arc<Mutex<LoadedSection>>;
@@ -27,22 +29,17 @@ pub type WeakCrateRef = CowWeak<LoadedCrate>; // Weak<Mutex<LoadedCrate>>;
 
 const CRATE_PREFIX_DELIMITER: &'static str = "#";
 
-#[derive(PartialEq)]
+/// The type of a crate, 
+/// based on its object file naming convention.
+/// See the `from_module_name()` function for more. 
+#[derive(Debug, PartialEq)]
 pub enum CrateType {
     Kernel,
     Application,
     Userspace,
 }
 impl CrateType {
-    pub fn prefix(&self) -> &'static str {
-        match self {
-            CrateType::Kernel       => "k#",
-            CrateType::Application  => "a#",
-            CrateType::Userspace    => "u#",
-        }
-    }
-
-    fn first_prefix(&self) -> &'static str {
+    fn first_char(&self) -> &'static str {
         match self {
             CrateType::Kernel       => "k",
             CrateType::Application  => "a",
@@ -50,29 +47,46 @@ impl CrateType {
         }
     }
 
-    /// Returns a tuple of (CrateType, &str) based on the given `module_name`,
-    /// in which the `&str` is the rest of the module name after the prefix. 
+    /// Returns the string suffix for use as the name 
+    /// of the crate object file's containing namespace.
+    pub fn namespace_name(&self) -> &'static str {
+        match self {
+            CrateType::Kernel       => "_kernel",
+            CrateType::Application  => "_applications",
+            CrateType::Userspace    => "_userspace",
+        }
+    }
+
+    /// Returns a tuple of (CrateType, &str, &str) based on the given `module_name`,
+    /// in which the `CrateType` is based on the first character, 
+    /// the first `&str` is the namespace prefix, e.g., `"sse"` in `"k_sse#..."`,
+    /// and the second `&str` is the rest of the module file name after the prefix delimiter `"#"`.
+    /// 
     /// # Examples 
     /// ```
-    /// let result = CrateType::from_module_name("k#my_crate");
-    /// assert_eq!(result, (CrateType::Kernel, "my_crate") );
+    /// let result = CrateType::from_module_name("k#my_crate.o");
+    /// assert_eq!(result, (CrateType::Kernel, "", "my_crate.o") );
+    /// 
+    /// let result = CrateType::from_module_name("ksse#my_crate.o");
+    /// assert_eq!(result, (CrateType::Kernel, "sse", "my_crate.o") );
     /// ```
-    pub fn from_module_name<'a>(module_name: &'a str) -> Result<(CrateType, &'a str), &'static str> {
+    pub fn from_module_name<'a>(module_name: &'a str) -> Result<(CrateType, &'a str, &'a str), &'static str> {
         let mut iter = module_name.split(CRATE_PREFIX_DELIMITER);
-        let prefix = iter.next().ok_or("couldn't get crate type prefix before delimiter")?;
-        let crate_name = iter.next().ok_or("couldn't get crate name after prefix delimiter")?;
+        let prefix = iter.next().ok_or("couldn't parse crate type prefix before delimiter")?;
+        let crate_name = iter.next().ok_or("couldn't parse crate name after prefix delimiter")?;
         if iter.next().is_some() {
-            return Err("too many # delimiters in crate's module name");
+            return Err("found more than one '#' delimiter in module name");
         }
+        let namespace_prefix = prefix.get(1..).unwrap_or("");
         
-        if prefix.starts_with(CrateType::Kernel.first_prefix()) {
-            Ok((CrateType::Kernel, crate_name))
+        if prefix.starts_with(CrateType::Kernel.first_char()) {
+            Ok((CrateType::Kernel, namespace_prefix, crate_name))
         }
-        else if prefix.starts_with(CrateType::Application.first_prefix()) {
-            Ok((CrateType::Application, crate_name))
+        else if prefix.starts_with(CrateType::Application.first_char()) {
+            Ok((CrateType::Application, namespace_prefix, crate_name))
         }
-        else if prefix.starts_with(CrateType::Userspace.first_prefix()) {
-            Ok((CrateType::Userspace, crate_name))
+        else if prefix.starts_with(CrateType::Userspace.first_char()) {
+            Ok((CrateType::Userspace, namespace_prefix, crate_name))
         }
         else {
             Err("module_name didn't start with a known CrateType prefix")
@@ -81,25 +95,25 @@ impl CrateType {
 
 
     pub fn is_application(module_name: &str) -> bool {
-        module_name.starts_with(CrateType::Application.first_prefix())
+        module_name.starts_with(CrateType::Application.first_char())
     }
 
     pub fn is_kernel(module_name: &str) -> bool {
-        module_name.starts_with(CrateType::Kernel.first_prefix())
+        module_name.starts_with(CrateType::Kernel.first_char())
     }
 
     pub fn is_userspace(module_name: &str) -> bool {
-        module_name.starts_with(CrateType::Userspace.first_prefix())
+        module_name.starts_with(CrateType::Userspace.first_char())
     }
 }
-
-
 
 
 /// Represents a single crate object file that has been loaded into the system.
 pub struct LoadedCrate {
     /// The name of this crate.
     pub crate_name: String,
+    /// The absolute path of the object file that this crate was loaded from.
+    pub object_file_abs_path: Path,
     /// A map containing all the sections in this crate.
     /// In general we're only interested the values (the `LoadedSection`s themselves),
     /// but we keep each section's shndx (section header index from its crate's ELF file)
@@ -114,12 +128,40 @@ pub struct LoadedCrate {
     /// The `MappedPages` that include the data and bss sections for this crate.
     /// i.e., sections that are readable and writable but not executable.
     pub data_pages: Option<Arc<Mutex<MappedPages>>>,
+    
+    // The members below are most used to accelerate crate swapping //
+
+    /// The set of global symbols in this crate, including regular ones 
+    /// that are prefixed with the `crate_name` and `no_mangle` symbols that are not.
+    pub global_symbols: BTreeSet<BString>,
+    /// The set of BSS sections in this crate.
+    /// The key is the section name and the value is a reference to the section;
+    /// these sections are also in the `sections` member above.
+    pub bss_sections: Trie<BString, StrongSectionRef>,
+    /// The set of symbols that this crate's global symbols are reexported under,
+    /// i.e., they have been added to the enclosing `CrateNamespace`'s symbol map under these names.
+    /// 
+    /// This is primarily used when swapping crates, and it is useful in the following way. 
+    /// If this crate is the new crate that is swapped in to replace another crate, 
+    /// and the caller of the `swap_crates()` function specifies that this crate 
+    /// should expose its symbols with names that match the old crate it's replacing, 
+    /// then this will be populated with the names of corresponding symbols from the old crate that its replacing.
+    /// For example, if this crate has a symbol `keyboard::init::h456`, and it replaced an older crate
+    /// that had the symbol `keyboard::init::123`, and `reexport_new_symbols_as_old` was true,
+    /// then `keyboard::init::h123` will be added to this set.
+    /// 
+    /// When a crate is first loaded, this will be empty by default, 
+    /// because this crate will only have populated its `global_symbols` set during loading. 
+    pub reexported_symbols: BTreeSet<BString>,
 }
 
 use core::fmt;
 impl fmt::Debug for LoadedCrate {
     fn fmt(&self, f: &mut fmt::Formatter) -> fmt::Result {
-        write!(f, "LoadedCrate{{{}}}", self.crate_name)
+        write!(f, "LoadedCrate(name: {:?}, objfile: {:?})", 
+            self.crate_name, 
+            self.object_file_abs_path,
+        )
     }
 }
 
@@ -132,29 +174,40 @@ impl Drop for LoadedCrate {
 impl LoadedCrate {
     /// Returns the `LoadedSection` of type `SectionType::Text` that matches the requested function name, if it exists in this `LoadedCrate`.
     /// Only matches demangled names, e.g., "my_crate::foo".
-    pub fn get_function_section(&self, func_name: &str) -> Option<StrongSectionRef> {
+    pub fn get_function_section(&self, func_name: &str) -> Option<&StrongSectionRef> {
         self.find_section(|sec| sec.is_text() && sec.name == func_name)
     }
 
     /// Returns the first `LoadedSection` that matches the given predicate
-    pub fn find_section<F>(&self, predicate: F) -> Option<StrongSectionRef> 
+    pub fn find_section<F>(&self, predicate: F) -> Option<&StrongSectionRef> 
         where F: Fn(&LoadedSection) -> bool
     {
-        self.sections.values().filter(|sec_ref| {
-            let sec = sec_ref.lock();
-            predicate(&sec)
-        }).next().cloned()
+        self.sections.values()
+            .filter(|sec_ref| predicate(&sec_ref.lock()))
+            .next()
     }
 
+    /// Returns the substring of this crate's name that excludes the trailing hash. 
+    /// If there is no hash, then it returns the entire name. 
+    pub fn crate_name_without_hash(&self) -> &str {
+        // the hash identifier (delimiter) is "-"
+        self.crate_name.split("-")
+            .next()
+            .unwrap_or_else(|| &self.crate_name)
+    }
 
-    pub fn crates_i_depend_on(&self) -> Vec<StrongCrateRef> {
-        unimplemented!();
+    /// Returns this crate name as a symbol prefix, including a trailing "`::`".
+    /// If there is no hash, then it returns the entire name with a trailing "`::`".
+    /// # Example
+    /// * Crate name: "`device_manager-e3769b63863a4030`", return value: "`device_manager::`"
+    /// * Crate name: "`hello`"` return value: "`hello::`"
+    pub fn crate_name_as_prefix(&self) -> String {
+        format!("{}::", self.crate_name_without_hash())
     }
 
     /// Currently may contain duplicates!
     pub fn crates_dependent_on_me(&self) -> Vec<WeakCrateRef> {
         let mut results: Vec<WeakCrateRef> = Vec::new();
-
         for sec in self.sections.values() {
             let sec_locked = sec.lock();
             for dep_sec in &sec_locked.sections_dependent_on_me {
@@ -165,7 +218,6 @@ impl LoadedCrate {
                 }
             }
         }
-
         results
     }
 
@@ -187,30 +239,25 @@ impl LoadedCrate {
     /// so they all have to be duplicated at once into a new `MappedPages` range at the crate level.
     pub fn deep_copy<A: FrameAllocator>(
         &self, 
-        kernel_mmi: &mut MemoryManagementInfo, 
+        page_table: &mut PageTable, 
         allocator: &mut A
     ) -> Result<StrongCrateRef, &'static str> {
         // First, deep copy all of the memory regions.
         // We initially map the as writable because we'll have to copy things into them
         let (new_text_pages, new_rodata_pages, new_data_pages) = {
-            if let PageTable::Active(ref mut active_table) = kernel_mmi.page_table {
-                let new_text_pages = match self.text_pages {
-                    Some(ref tp) => Some(tp.lock().deep_copy(Some(TEXT_SECTION_FLAGS() | EntryFlags::WRITABLE), active_table, allocator)?),
-                    None => None,
-                };
-                let new_rodata_pages = match self.rodata_pages {
-                    Some(ref rp) => Some(rp.lock().deep_copy(Some(RODATA_SECTION_FLAGS() | EntryFlags::WRITABLE), active_table, allocator)?),
-                    None => None,
-                };
-                let new_data_pages = match self.data_pages {
-                    Some(ref dp) => Some(dp.lock().deep_copy(Some(DATA_BSS_SECTION_FLAGS()), active_table, allocator)?),
-                    None => None,
-                };
-                (new_text_pages, new_rodata_pages, new_data_pages)
-            }
-            else {
-                return Err("couldn't get kernel's active page table");
-            }
+            let new_text_pages = match self.text_pages {
+                Some(ref tp) => Some(tp.lock().deep_copy(Some(TEXT_SECTION_FLAGS | EntryFlags::WRITABLE), page_table, allocator)?),
+                None => None,
+            };
+            let new_rodata_pages = match self.rodata_pages {
+                Some(ref rp) => Some(rp.lock().deep_copy(Some(RODATA_SECTION_FLAGS | EntryFlags::WRITABLE), page_table, allocator)?),
+                None => None,
+            };
+            let new_data_pages = match self.data_pages {
+                Some(ref dp) => Some(dp.lock().deep_copy(Some(DATA_BSS_SECTION_FLAGS), page_table, allocator)?),
+                None => None,
+            };
+            (new_text_pages, new_rodata_pages, new_data_pages)
         };
 
         let new_text_pages_ref   = new_text_pages  .map(|mp| Arc::new(Mutex::new(mp)));
@@ -222,11 +269,15 @@ impl LoadedCrate {
         let mut new_data_pages_locked   = new_data_pages_ref  .as_ref().map(|dp| dp.lock());
 
         let new_crate = CowArc::new(LoadedCrate {
-            crate_name:   self.crate_name.clone(),
-            sections:     BTreeMap::new(),
-            text_pages:   new_text_pages_ref.clone(),
-            rodata_pages: new_rodata_pages_ref.clone(),
-            data_pages:   new_data_pages_ref.clone(),
+            crate_name:              self.crate_name.clone(),
+            object_file_abs_path:    self.object_file_abs_path.clone(),
+            sections:                BTreeMap::new(),
+            text_pages:              new_text_pages_ref.clone(),
+            rodata_pages:            new_rodata_pages_ref.clone(),
+            data_pages:              new_data_pages_ref.clone(),
+            global_symbols:          self.global_symbols.clone(),
+            bss_sections:            Trie::new(),
+            reexported_symbols:      self.reexported_symbols.clone(),
         });
         let new_crate_weak_ref = CowArc::downgrade(&new_crate);
 
@@ -234,7 +285,8 @@ impl LoadedCrate {
         // 1) The parent_crate reference itself, since we're replacing that with a new one,
         // 2) The section's mapped_pages, which will point to a new `MappedPages` object for the newly-copied crate,
         // 3) The section's virt_addr, which is based on its new mapped_pages
-        let mut new_sections = BTreeMap::new();
+        let mut new_sections: BTreeMap<usize, StrongSectionRef> = BTreeMap::new();
+        let mut new_bss_sections: Trie<BString, StrongSectionRef> = Trie::new();
         for (shndx, old_sec_ref) in self.sections.iter() {
             let old_sec = old_sec_ref.lock();
             let new_sec_mapped_pages_offset = old_sec.mapped_pages_offset;
@@ -255,10 +307,9 @@ impl LoadedCrate {
             };
             let new_sec_virt_addr = new_sec_virt_addr.ok_or_else(|| "BUG: couldn't get virt_addr for new section")?;
 
-            let new_sec = LoadedSection::with_dependencies(
+            let new_sec_ref = Arc::new(Mutex::new(LoadedSection::with_dependencies(
                 old_sec.typ,                            // section type is the same
                 old_sec.name.clone(),                   // name is the same
-                old_sec.hash.clone(),                   // hash is the same
                 new_sec_mapped_pages_ref,               // mapped_pages is different, points to the new duplicated one
                 new_sec_mapped_pages_offset,            // mapped_pages_offset is the same
                 new_sec_virt_addr,                      // virt_addr is different, based on the new mapped_pages
@@ -268,9 +319,12 @@ impl LoadedCrate {
                 old_sec.sections_i_depend_on.clone(),   // dependencies are the same, but relocations need to be re-written
                 Vec::new(),                             // no sections can possibly depend on this one, since we just created it
                 old_sec.internal_dependencies.clone()   // internal dependencies are the same, but relocations need to be re-written
-            );
+            )));
 
-            new_sections.insert(shndx, Arc::new(Mutex::new(new_sec)));
+            if old_sec.typ == SectionType::Bss {
+                new_bss_sections.insert_str(&old_sec.name, new_sec_ref.clone());
+            }
+            new_sections.insert(*shndx, new_sec_ref);
         }
 
 
@@ -289,7 +343,7 @@ impl LoadedCrate {
 
             // The newly-duplicated crate still depends on the same sections, so we keep those as is, 
             // but we do need to recalculate those relocations.
-            for mut strong_dep in new_sec.sections_i_depend_on.iter_mut() {
+            for strong_dep in new_sec.sections_i_depend_on.iter_mut() {
                 // we can skip modifying "absolute" relocations, since those only depend on the source section,
                 // which we haven't actually changed (we've duplicated the target section here, not the source)
                 if !strong_dep.relocation.is_absolute() {
@@ -340,56 +394,25 @@ impl LoadedCrate {
             }
         }
 
-        // since we mapped all the new MappedPages as writable, we need to properly remap them
-        if let PageTable::Active(ref mut active_table) = kernel_mmi.page_table {
-            if let Some(ref mut tp) = new_text_pages_locked { 
-                try!(tp.remap(active_table, TEXT_SECTION_FLAGS()));
-            }
-            if let Some(ref mut rp) = new_rodata_pages_locked { 
-                try!(rp.remap(active_table, RODATA_SECTION_FLAGS()));
-            }
-            // data/bss sections are already mapped properly, since they're supposed to be writable
+        // since we mapped all the new MappedPages as writable, we need to properly remap them.
+        if let Some(ref mut tp) = new_text_pages_locked { 
+            tp.remap(page_table, TEXT_SECTION_FLAGS)?;
         }
-        else {
-            return Err("couldn't get kernel's active page table");
+        if let Some(ref mut rp) = new_rodata_pages_locked { 
+            rp.remap(page_table, RODATA_SECTION_FLAGS)?;
+        }
+        // data/bss sections are already mapped properly, since they're supposed to be writable
+
+        // set the new_crate's section-related lists, since we didn't do it earlier
+        {
+            let mut new_crate_mut = new_crate.lock_as_mut()
+                .ok_or_else(|| "BUG: LoadedCrate::deep_copy(): couldn't get exclusive mutable access to copied new_crate")?;
+            new_crate_mut.sections = new_sections;
+            new_crate_mut.bss_sections = new_bss_sections;
         }
 
         Ok(new_crate)
     }
-}
-
-
-/// Returns a map containing all symbols,
-/// filtered to include only `LoadedSection`s that satisfy the given predicate
-/// (if the predicate returns true for a given section, then it is included in the map).
-/// 
-/// The symbols come from the sections in the given section iterator (if Some), 
-/// otherwise they come from this crate's sections list.
-/// 
-/// See [`global_symbol_map`](#method.global_system_map) for an example.
-pub fn symbol_map<'a, I, F>(
-    sections: I,
-    crate_name: &str,
-    predicate: F,
-) -> SymbolMap 
-    where F: Fn(&LoadedSection) -> bool, 
-            I: IntoIterator<Item = &'a StrongSectionRef> 
-{
-    let mut map: SymbolMap = BTreeMap::new();
-    for sec in sections.into_iter().filter(|sec| predicate(sec.lock().deref())) {
-        let key = sec.lock().name.clone();
-        if let Some(old_val) = map.insert(key.clone(), Arc::downgrade(&sec)) {
-            if key.ends_with("_LOC") || crate_name == "nano_core" {
-                // ignoring these special cases currently
-            }
-            else {
-                warn!("symbol_map(): crate \"{}\" had duplicate section for symbol \"{}\", old: {:?}, new: {:?}", 
-                    crate_name, key, old_val.upgrade(), sec);
-            }
-        }
-    }
-
-    map
 }
 
 
@@ -407,26 +430,28 @@ pub enum SectionType {
 /// Represents a .text, .rodata, .data, or .bss section
 /// that has been loaded and is part of a `LoadedCrate`.
 /// The containing `SectionType` enum determines which type of section it is.
-#[derive(Debug)]
 pub struct LoadedSection {
     /// The type of this section: .text, .rodata, .data, or .bss.
     pub typ: SectionType,
     /// The full String name of this section, a fully-qualified symbol, 
-    /// e.g., `<crate>::<module>::<struct>::<fn_name>`
-    /// For example, test_lib::MyStruct::new
-    pub name: String,
-    /// the unique hash generated for this section by the Rust compiler,
+    /// with the format `<crate>::[<module>::][<struct>::]<fn_name>::<hash>`.
+    /// The unique hash is generated for each section by the Rust compiler,
     /// which can be used as a version identifier. 
-    /// Not all symbols will have a hash, like those that are not mangled.
-    pub hash: Option<String>,
+    /// Not all symbols will have a hash, e.g., ones that are not mangled.
+    /// 
+    /// # Examples
+    /// * `test_lib::MyStruct::new::h843a613894da0c24`
+    /// * `my_crate::my_function::hbce878984534ceda`   
+    pub name: String,
     /// The `MappedPages` that cover this section.
     pub mapped_pages: Arc<Mutex<MappedPages>>, 
     /// The offset into the `mapped_pages` where this section starts
     pub mapped_pages_offset: usize,
     /// The `VirtualAddress` of this section, cached here as a performance optimization
     /// so we can avoid doing the calculation based on this section's mapped_pages and mapped_pages_offset.
-    /// This address value should not be used for accessing this section's data through a non-safe dereference,
-    /// rather it's just here to help speed up and simply relocations.
+    /// This address value should not be used for accessing this section's data through 
+    /// a non-safe dereference or transmute operation. 
+    /// Instead, it's just here to help speed up and simply relocations.
     virt_addr: VirtualAddress, 
     /// The size in bytes of this section
     pub size: usize,
@@ -455,7 +480,6 @@ impl LoadedSection {
     pub fn new(
         typ: SectionType, 
         name: String, 
-        hash: Option<String>, 
         mapped_pages: Arc<Mutex<MappedPages>>,
         mapped_pages_offset: usize,
         virt_addr: VirtualAddress,
@@ -463,14 +487,13 @@ impl LoadedSection {
         global: bool, 
         parent_crate: WeakCrateRef,
     ) -> LoadedSection {
-        LoadedSection::with_dependencies(typ, name, hash, mapped_pages, mapped_pages_offset, virt_addr, size, global, parent_crate, Vec::new(), Vec::new(), Vec::new())
+        LoadedSection::with_dependencies(typ, name, mapped_pages, mapped_pages_offset, virt_addr, size, global, parent_crate, Vec::new(), Vec::new(), Vec::new())
     }
 
     /// Same as [new()`](#method.new), but uses the given `dependencies` instead of the default empty list.
     pub fn with_dependencies(
         typ: SectionType, 
         name: String, 
-        hash: Option<String>, 
         mapped_pages: Arc<Mutex<MappedPages>>,
         mapped_pages_offset: usize,
         virt_addr: VirtualAddress,
@@ -482,7 +505,7 @@ impl LoadedSection {
         internal_dependencies: Vec<InternalDependency>,
     ) -> LoadedSection {
         LoadedSection {
-            typ, name, hash, mapped_pages, mapped_pages_offset, virt_addr, size, global, parent_crate, sections_i_depend_on, sections_dependent_on_me, internal_dependencies
+            typ, name, mapped_pages, mapped_pages_offset, virt_addr, size, global, parent_crate, sections_i_depend_on, sections_dependent_on_me, internal_dependencies
         }
     }
 
@@ -511,16 +534,29 @@ impl LoadedSection {
         self.typ == SectionType::Bss
     }
 
-    /// Returns the index of the first `StrongDependency` object with a section
-    /// that matches the given `matching_section` in this `LoadedSection`'s `sections_i_depend_on` list.
-    pub fn find_strong_dependency(&self, matching_section: &StrongSectionRef) -> Option<usize> {
-        for (index, strong_dep) in self.sections_i_depend_on.iter().enumerate() {
-            if Arc::ptr_eq(matching_section, &strong_dep.section) {
-                return Some(index);
-            }
-        }
-        None
+    /// Returns the substring of this section's name that excludes the trailing hash. 
+    /// 
+    /// See the identical associated function [`section_name_without_hash()`](#method.section_name_without_hash) for more. 
+    pub fn name_without_hash(&self) -> &str {
+        Self::section_name_without_hash(&self.name)
     }
+
+
+    /// Returns the substring of the given section's name that excludes the trailing hash,
+    /// but includes the hash delimiter "`::h`". 
+    /// If there is no hash, then it returns the full section name unchanged.
+    /// 
+    /// # Examples
+    /// name: "`keyboard_new::init::h832430094f98e56b`", return value: "`keyboard_new::init::h`"
+    /// name: "`start_me`", return value: "`start_me`"
+    pub fn section_name_without_hash(sec_name: &str) -> &str {
+        // the hash identifier (delimiter) is "::h"
+        const HASH_DELIMITER: &'static str = "::h";
+        sec_name.rfind("::h")
+            .and_then(|end| sec_name.get(0 .. (end + HASH_DELIMITER.len())))
+            .unwrap_or_else(|| &sec_name)
+    }
+
 
     /// Returns the index of the first `WeakDependent` object with a section
     /// that matches the given `matching_section` in this `LoadedSection`'s `sections_dependent_on_me` list.
@@ -551,8 +587,8 @@ impl LoadedSection {
 
         if dest_sec_data.len() == source_sec_data.len() {
             dest_sec_data.copy_from_slice(source_sec_data);
-            debug!("Copied data from source section {:?} {:?} ({:#X}) to dest section {:?} {:?} ({:#X})",
-                self.typ, self.name, self.size, destination_section.typ, destination_section.name, destination_section.size);
+            // debug!("Copied data from source section {:?} {:?} ({:#X}) to dest section {:?} {:?} ({:#X})",
+            //     self.typ, self.name, self.size, destination_section.typ, destination_section.name, destination_section.size);
             Ok(())
         }
         else {
@@ -563,8 +599,8 @@ impl LoadedSection {
     }
 }
 
-impl Drop for LoadedSection {
-    fn drop(&mut self) {
-        trace!("### Dropped LoadedSection {:?} {:?}", self.typ, self.name);
+impl fmt::Debug for LoadedSection {
+    fn fmt(&self, f: &mut fmt::Formatter) -> fmt::Result {
+        write!(f, "LoadedSection(name: {:?}, vaddr: {:#X}, size: {})", self.name, self.virt_addr, self.size)
     }
 }

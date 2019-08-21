@@ -24,9 +24,7 @@
 //!
 
 #![no_std]
-#![feature(integer_atomics)]
 #![feature(asm)]
-#![feature(alloc)]
 
 extern crate spin;
 #[macro_use] extern crate lazy_static;
@@ -49,7 +47,7 @@ use atomic_linked_list::atomic_map::*;
 use core::sync::atomic::{AtomicU32, Ordering, AtomicUsize};
 use irq_safety::MutexIrqSafe;
 use alloc::vec::Vec;
-use alloc::BTreeSet;
+use alloc::collections::BTreeSet;
 
 pub static PMU_VERSION: Once<u16> = Once::new();
 pub static SAMPLE_START_VALUE: AtomicUsize = AtomicUsize::new(0);
@@ -381,6 +379,9 @@ pub fn print_samples(sample_results: &mut SampleResults) {
 }
 
 pub fn handle_sample(stack_frame: &mut ExceptionStackFrame) {
+    // println_both!("what value is in the status register {:x}", rdmsr(IA32_PERF_GLOBAL_STAUS));
+    unsafe { wrmsr(IA32_PERF_GLOBAL_OVF_CTRL, 0); }
+    // println_both!("what value is in the status register after clear: {:x}", rdmsr(IA32_PERF_GLOBAL_STAUS));
     
     debug!("handle_sample(): [0] on core {:?}!", apic::get_my_apic_id());
 

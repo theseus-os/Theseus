@@ -1,9 +1,21 @@
 [package]
 authors = ["Kevin Boos <kevinaboos@gmail.com>"]
 name = "context_switch"
-description = "Context switching routines and structs for regular (non-SSE) register sets"
+description = "Top-level wrapper crate for managing all possible configurations for context switching routines and structs"
 version = "0.1.0"
 build = "../../build.rs"
+
+[dependencies]
+cfg-if = "0.1.6"
+
+[dependencies.context_switch_sse]
+path = "../context_switch_sse"
+
+[dependencies.context_switch_regular]
+path = "../context_switch_regular"
+
+[dependencies.context_switch_avx]
+path = "../context_switch_avx"
 
 [lib]
 crate-type = ["rlib"]

@@ -1,0 +1,26 @@
+[package]
+name = "heapfile"
+version = "0.1.0"
+authors = ["Kevin Boos <kevinaboos@gmail.com>"]
+description = "An implementation of in-memory files, backed by heap memory"
+
+
+[dependencies]
+spin = "0.4.5"
+x86_64 = { path = "../../libs/x86_64" } # currently using our local copy, forked from Phil Opp's crate
+
+[dependencies.fs_node]
+path = "../fs_node"
+
+[dependencies.memory]
+path = "../memory"
+
+[dependencies.log]
+default-features = false
+version = "0.3.7"
+
+[dependencies.irq_safety]
+git = "https://github.com/kevinaboos/irq_safety"
+
+[lib]
+crate-type = ["rlib"]

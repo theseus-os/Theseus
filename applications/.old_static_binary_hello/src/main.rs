@@ -2,7 +2,6 @@
 #![no_main]
 #![feature(lang_items)]
 
-// #![feature(alloc)]
 
 // extern crate alloc;
 extern crate rlibc;

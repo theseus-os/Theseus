@@ -5,5 +5,8 @@ description = "Context switching routines and structs for SSE-enabled register s
 version = "0.1.0"
 build = "../../build.rs"
 
+[dependencies.context_switch_regular]
+path = "../context_switch_regular"
+
 [lib]
 crate-type = ["rlib"]

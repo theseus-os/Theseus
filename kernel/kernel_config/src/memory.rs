@@ -17,21 +17,8 @@ pub const BYTES_PER_ADDR: usize = 8;
 
 /// The lower 12 bits of a virtual address correspond to the P1 page frame offset. 
 pub const PAGE_SHIFT: usize = 12;
-/// page size is 4096 bytes, 4KiB pages.
+/// Page size is 4096 bytes, 4KiB pages.
 pub const PAGE_SIZE: usize = (1 << PAGE_SHIFT);
-
-/// returns the offset of an address into a Page.
-#[inline(always)]
-pub fn address_page_offset(addr: usize) -> usize {
-    addr % PAGE_SIZE
-}
-
-/// returns true if an address is page-aligned
-#[inline(always)]
-pub fn address_is_page_aligned(addr: usize) -> bool {
-    address_page_offset(addr) == 0
-}
-
 
 /// Value: 0. Shift the Page number (not the address!) by this to get the P1 index.
 pub const P1_INDEX_SHIFT: usize = 0;
@@ -91,7 +78,7 @@ pub const KERNEL_TEXT_MAX_SIZE: usize = ADDRESSABILITY_PER_P4_ENTRY - (2 * 1024 
 /// which is the slot right below the recursive P4 entry (510)
 /// actual value: 0o177777_776_000_000_000_0000, or 0xFFFF_FF00_0000_0000
 pub const KERNEL_HEAP_START: usize = 0xFFFF_0000_0000_0000 | (KERNEL_HEAP_P4_INDEX << (P4_INDEX_SHIFT + PAGE_SHIFT));
-pub const KERNEL_HEAP_INITIAL_SIZE: usize = 16 * 1024 * 1024; // 16 MiB
+pub const KERNEL_HEAP_INITIAL_SIZE: usize = 64 * 1024 * 1024; // 64 MiB
 /// the kernel heap gets the whole 509th P4 entry.
 pub const KERNEL_HEAP_MAX_SIZE: usize = ADDRESSABILITY_PER_P4_ENTRY;
 

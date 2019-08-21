@@ -16,23 +16,15 @@
 //! 
 
 #![no_std]
-#![feature(alloc)]
-#![feature(used)]
-
-
-#[cfg(loadable)] 
-#[macro_use] extern crate alloc;
-#[cfg(not(loadable))] 
-extern crate alloc;
 
 #[macro_use] extern crate log;
+extern crate alloc;
 extern crate rlibc; // basic memset/memcpy libc functions
 extern crate spin;
 extern crate multiboot2;
 extern crate x86_64;
 extern crate kernel_config; // our configuration options, just a set of const definitions.
 extern crate irq_safety; // for irq-safe locking and interrupt utilities
-
 
 extern crate logger;
 extern crate state_store;
@@ -45,9 +37,7 @@ extern crate panic_unwind; // the panic/unwind lang items
 #[macro_use] extern crate vga_buffer;
 
 
-// see this: https://doc.rust-lang.org/1.22.1/unstable-book/print.html#used
 #[link_section = ".pre_init_array"] // "pre_init_array" is a section never removed by --gc-sections
-#[used]
 #[doc(hidden)]
 pub fn nano_core_public_func(val: u8) {
     error!("NANO_CORE_PUBLIC_FUNC: got val {}", val);
@@ -56,7 +46,8 @@ pub fn nano_core_public_func(val: u8) {
 
 use core::ops::DerefMut;
 use x86_64::structures::idt::LockedIdt;
-
+use memory::VirtualAddress;
+use kernel_config::memory::KERNEL_OFFSET;
 
 /// An initial interrupt descriptor table for catching very simple exceptions only.
 /// This is no longer used after interrupts are set up properly, it's just a failsafe.
@@ -72,7 +63,7 @@ macro_rules! try_exit {
             $crate::shutdown(format_args!("{}", err_msg));
         }
     });
-    ($expr:expr,) => (try!($expr));
+    // ($expr:expr,) => (try!($expr));
 }
 
 
@@ -123,29 +114,51 @@ pub extern "C" fn nano_core_start(multiboot_information_virtual_address: usize) 
     println_raw!("nano_core_start(): initialized early IDT with exception handlers."); 
 
     // safety-wise, we have to trust the multiboot address we get from the boot-up asm code, but we can check its validity
-    if !memory::Page::is_valid_address(multiboot_information_virtual_address) {
-        try_exit!(Err("multiboot info address was invalid! Ensure that nano_core_start() is being invoked properly from boot.asm!"));
+    if VirtualAddress::new(multiboot_information_virtual_address).is_err() {
+        try_exit!(Err("multiboot info virtual address was invalid! Ensure that nano_core_start() is being invoked properly from boot.asm!"));
     }
     let boot_info = unsafe { multiboot2::load(multiboot_information_virtual_address) };
-    println_raw!("nano_core_start(): loaded multiboot2 info."); 
-
+    println_raw!("nano_core_start(): booted via multiboot2."); 
 
     // init memory management: set up stack with guard page, heap, kernel text/data mappings, etc
-    // this consumes boot_info
-    let (kernel_mmi_ref, text_mapped_pages, rodata_mapped_pages, data_mapped_pages, identity_mapped_pages) = try_exit!(memory::init(boot_info));
+    let (kernel_mmi_ref, text_mapped_pages, rodata_mapped_pages, data_mapped_pages, identity_mapped_pages) = try_exit!(memory::init(&boot_info));
     println_raw!("nano_core_start(): initialized memory subsystem."); 
+    // After this point, we must "forget" all of the above mapped_pages instances if an error occurs,
+    // because they will be auto-unmapped upon a returned error, causing all execution to stop. 
+    // (at least until we transfer ownership of them to the `parse_nano_core` function below.)
 
-    // now that we have virtual memory, including a heap, we can create basic things like state_store
     state_store::init();
     trace!("state_store initialized.");
     println_raw!("nano_core_start(): initialized state store.");     
 
-    // Parse the nano_core crate (the code we're already running) in both regular mode and loadable mode,
-    // since we need it to load and run applications as crates in the kernel.
+    // initialize the module management subsystem, so we can create the default crate namespace
+    let default_namespace = match mod_mgmt::init(&boot_info, kernel_mmi_ref.lock().deref_mut()) {
+        Ok(namespace) => namespace,
+        Err(err) => { 
+            core::mem::forget(text_mapped_pages);
+            core::mem::forget(rodata_mapped_pages);
+            core::mem::forget(data_mapped_pages);
+            core::mem::forget(identity_mapped_pages);
+            shutdown(format_args!("{}", err));
+        }
+    };
+    println_raw!("nano_core_start(): initialized crate namespace subsystem."); 
+
+    // Parse the nano_core crate (the code we're already running) since we need it to load and run applications.
     println_raw!("nano_core_start(): parsing nano_core crate, please wait ..."); 
-    match mod_mgmt::parse_nano_core::parse_nano_core(kernel_mmi_ref.lock().deref_mut(), text_mapped_pages, rodata_mapped_pages, data_mapped_pages, false) {
-        Ok(_new_syms) => {
-            // debug!("========================== Symbol map after nano_core {}: ========================\n{}", _new_syms, mod_mgmt::metadata::dump_symbol_map());
+    let bsp_stack_top: VirtualAddress;
+    let bsp_stack_bottom: VirtualAddress;
+    let ap_realmode_begin: VirtualAddress;
+    let ap_realmode_end: VirtualAddress;
+    match mod_mgmt::parse_nano_core::parse_nano_core(default_namespace, text_mapped_pages, rodata_mapped_pages, data_mapped_pages, false) {
+        Ok((init_symbols, _num_new_syms)) => {
+            // Get symbols from the boot assembly code that defines where the BSP stack and the ap_start code are.
+            // The symbols in the ".init" section will be in init_symbols, all others will be in the regular namespace symbol tree.
+            bsp_stack_top     = try_exit!(default_namespace.get_symbol("initial_bsp_stack_top").upgrade().ok_or("Missing expected symbol from assembly code \"initial_bsp_stack_top\"")).lock().virt_addr();
+            bsp_stack_bottom  = try_exit!(default_namespace.get_symbol("initial_bsp_stack_bottom").upgrade().ok_or("Missing expected symbol from assembly code \"initial_bsp_stack_bottom\"")).lock().virt_addr();
+            ap_realmode_begin = try_exit!(init_symbols.get("ap_start_realmode").ok_or("Missing expected symbol from assembly code \"ap_start_realmode\"").and_then(|v| VirtualAddress::new(*v + KERNEL_OFFSET)));
+            ap_realmode_end   = try_exit!(init_symbols.get("ap_start_realmode_end").ok_or("Missing expected symbol from assembly code \"ap_start_realmode_end\"").and_then(|v| VirtualAddress::new(*v + KERNEL_OFFSET)));
+            // debug!("bsp_stack_top: {:#X}, bsp_stack_bottom: {:#X}, ap_realmode_begin: {:#X}, ap_realmode_end: {:#X}", bsp_stack_top, bsp_stack_bottom, ap_realmode_begin, ap_realmode_end);
         }
         Err((msg, mapped_pages)) => {
             // Because this function takes ownership of the text/rodata/data mapped_pages that cover the currently-running code,
@@ -154,36 +167,48 @@ pub extern "C" fn nano_core_start(multiboot_information_virtual_address: usize) 
             shutdown(format_args!("parse_nano_core() failed! error: {}", msg));
         }
     }
+    println_raw!("nano_core_start(): finished parsing the nano_core crate."); 
+
     
-    // if in loadable mode, parse the two crates we always need: the core library (Rust no_std lib) and the captain
+    // if in loadable mode, parse the crates we always need: the core library (Rust no_std lib), the panic handlers, and the captain
     #[cfg(loadable)] 
     {
-        let kernel_prefix = mod_mgmt::metadata::CrateType::Kernel.prefix();
-        let core_module = try_exit!(memory::get_module(&format!("{}core", kernel_prefix)).ok_or("couldn't find core module"));
-        let _num_libcore_syms = try_exit!(mod_mgmt::get_default_namespace().load_kernel_crate(core_module, None, kernel_mmi_ref.lock().deref_mut(), false));
-        // debug!("========================== Symbol map after nano_core {} and libcore {}: ========================\n{}", _num_nano_core_syms, _num_libcore_syms, mod_mgmt::metadata::dump_symbol_map());
+        println_raw!("nano_core_start(): loading the \"captain\" crate...");     
+        let captain_path = try_exit!(default_namespace.get_crate_file_starting_with("captain-").ok_or("couldn't find the singular \"captain\" crate object file"));
+        let _num_captain_syms = try_exit!(default_namespace.load_crate(&captain_path, None, &kernel_mmi_ref, false));
         
-        let captain_module = try_exit!(memory::get_module(&format!("{}captain", kernel_prefix)).ok_or("couldn't find captain module"));
-        let _num_captain_syms = try_exit!(mod_mgmt::get_default_namespace().load_kernel_crate(captain_module, None, kernel_mmi_ref.lock().deref_mut(), false));
+        let panic_wrapper_path = try_exit!(default_namespace.get_crate_file_starting_with("panic_wrapper-").ok_or("couldn't find the singular \"panic_wrapper\" crate object file"));
+        let _num_libcore_syms = try_exit!(default_namespace.load_crate(&panic_wrapper_path, None, &kernel_mmi_ref, false));
     }
 
 
     // at this point, we load and jump directly to the Captain, which will take it from here. 
     // That's it, the nano_core is done! That's really all it does! 
+    println_raw!("nano_core_start(): invoking the captain...");     
+    #[cfg(not(loadable))]
+    {
+        try_exit!(
+            captain::init(kernel_mmi_ref, identity_mapped_pages, 
+                bsp_stack_bottom, bsp_stack_top,
+                ap_realmode_begin, ap_realmode_end
+            )
+        );
+    }
     #[cfg(loadable)]
     {
-        use alloc::Vec;
-        use alloc::arc::Arc;
+        use alloc::vec::Vec;
+        use alloc::sync::Arc;
         use irq_safety::MutexIrqSafe;
         use memory::{MappedPages, MemoryManagementInfo};
-        use mod_mgmt::metadata::CrateType;
 
         let section_ref = try_exit!(
-            mod_mgmt::get_default_namespace().get_symbol_or_load("captain::init", CrateType::Kernel.prefix(), None, kernel_mmi_ref.lock().deref_mut(), false)
+            default_namespace.get_symbol_starting_with("captain::init::")
             .upgrade()
-            .ok_or("no symbol: captain::init")
+            .ok_or("no single symbol matching \"captain::init\"")
         );
-        type CaptainInitFunc = fn(Arc<MutexIrqSafe<MemoryManagementInfo>>, Vec<MappedPages>, usize, usize, usize, usize) -> Result<(), &'static str>;
+        info!("The nano_core is invoking the captain init function: {:?}", section_ref.lock().name);
+
+        type CaptainInitFunc = fn(Arc<MutexIrqSafe<MemoryManagementInfo>>, Vec<MappedPages>, VirtualAddress, VirtualAddress, VirtualAddress, VirtualAddress) -> Result<(), &'static str>;
         let mut space = 0;
         let (mapped_pages, mapped_pages_offset) = { 
             let section = section_ref.lock();
@@ -195,17 +220,8 @@ pub extern "C" fn nano_core_start(multiboot_information_virtual_address: usize) 
 
         try_exit!(
             func(kernel_mmi_ref, identity_mapped_pages, 
-                get_bsp_stack_bottom(), get_bsp_stack_top(),
-                get_ap_start_realmode_begin(), get_ap_start_realmode_end()
-            )
-        );
-    }
-    #[cfg(not(loadable))]
-    {
-        try_exit!(
-            captain::init(kernel_mmi_ref, identity_mapped_pages, 
-                get_bsp_stack_bottom(), get_bsp_stack_top(),
-                get_ap_start_realmode_begin(), get_ap_start_realmode_end()
+                bsp_stack_bottom, bsp_stack_top,
+                ap_realmode_begin, ap_realmode_end
             )
         );
     }
@@ -217,39 +233,13 @@ pub extern "C" fn nano_core_start(multiboot_information_virtual_address: usize) 
 
 
 
-// symbols exposed in the initial assembly boot files
-// DO NOT DEREFERENCE THESE DIRECTLY!! THEY ARE SIMPLY ADDRESSES USED FOR SIZE CALCULATIONS.
-// A DIRECT ACCESS WILL CAUSE A PAGE FAULT
+// These extern definitions are here just to ensure that these symbols are defined in the assembly files. 
+// Defining them here produces a linker error if they are absent, which is better than a runtime error (early detection!).
+// We don't actually use them, and they should not be accessed or dereferenced, because they are merely values, not addresses. 
+#[allow(dead_code)]
 extern {
     static initial_bsp_stack_top: usize;
     static initial_bsp_stack_bottom: usize;
     static ap_start_realmode: usize;
     static ap_start_realmode_end: usize;
-}
-
-use kernel_config::memory::KERNEL_OFFSET;
-/// Returns the starting virtual address of where the ap_start realmode code is.
-fn get_ap_start_realmode_begin() -> usize {
-    let addr = unsafe { &ap_start_realmode as *const _ as usize };
-    // debug!("ap_start_realmode addr: {:#x}", addr);
-    addr + KERNEL_OFFSET
-}
-
-/// Returns the ending virtual address of where the ap_start realmode code is.
-fn get_ap_start_realmode_end() -> usize {
-    let addr = unsafe { &ap_start_realmode_end as *const _ as usize };
-    // debug!("ap_start_realmode_end addr: {:#x}", addr);
-    addr + KERNEL_OFFSET
-} 
-
-fn get_bsp_stack_bottom() -> usize {
-    unsafe {
-        &initial_bsp_stack_bottom as *const _ as usize
-    }
-}
-
-fn get_bsp_stack_top() -> usize {
-    unsafe {
-        &initial_bsp_stack_top as *const _ as usize
-    }
 }

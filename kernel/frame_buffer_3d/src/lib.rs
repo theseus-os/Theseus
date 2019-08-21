@@ -2,9 +2,7 @@
 
 
 #![no_std]
-#![feature(alloc)]
 #![feature(const_fn)]
-#![feature(unique)]
 #![feature(ptr_internals)]
 #![feature(asm)]
 
@@ -20,11 +18,10 @@ extern crate alloc;
 //#[macro_use] extern crate acpi;
 
 use core::ptr::Unique;
-use spin::Mutex;
+use spin::{Mutex, Once};
 use alloc::vec::Vec;
-use memory::{FRAME_ALLOCATOR, Frame, PageTable, PhysicalAddress, 
-    EntryFlags, allocate_pages_by_bytes, MappedPages, MemoryManagementInfo,
-    get_kernel_mmi_ref, AllocatedPages};
+use memory::{FRAME_ALLOCATOR, FrameRange, VirtualAddress, PhysicalAddress, 
+    EntryFlags, allocate_pages_by_bytes, MappedPages, get_kernel_mmi_ref};
 use core::ops::DerefMut;
 
 
@@ -40,66 +37,39 @@ pub const FRAME_BUFFER_WIDTH:usize = 640*3;
 pub const FRAME_BUFFER_HEIGHT:usize = 480;
 
 
-static mut FRAME_BUFFER_PAGES:Option<MappedPages> = None;
+static FRAME_BUFFER_PAGES: Once<MappedPages> = Once::new();
 
 
 ///Init the frame buffer in 3D mode. Allocate a block of memory and map it to the physical frame buffer.
 pub fn init() -> Result<(), &'static str > {
-
-    //Wenqiu Allocate VESA frame buffer
-    const VESA_DISPLAY_PHYS_START: PhysicalAddress = 0xFD00_0000;
-    const VESA_DISPLAY_PHYS_SIZE: usize = FRAME_BUFFER_WIDTH*FRAME_BUFFER_HEIGHT;
+    const VESA_DISPLAY_PHYS_START: usize = 0xFD00_0000;
+    const VESA_DISPLAY_PHYS_SIZE: usize = FRAME_BUFFER_WIDTH * FRAME_BUFFER_HEIGHT;
 
     // get a reference to the kernel's memory mapping information
     let kernel_mmi_ref = get_kernel_mmi_ref().expect("KERNEL_MMI was not yet initialized!");
     let mut kernel_mmi_locked = kernel_mmi_ref.lock();
 
-    // destructure the kernel's MMI so we can access its page table
-    let MemoryManagementInfo { 
-        page_table: ref mut kernel_page_table, 
-        .. // don't need to access other stuff in kernel_mmi
-    } = *kernel_mmi_locked;
-    
-    match kernel_page_table {
-        &mut PageTable::Active(ref mut active_table) => {
-            let pages:AllocatedPages = match allocate_pages_by_bytes(VESA_DISPLAY_PHYS_SIZE) {
-                Some(pages) => { pages },
-                None => { return Err("frame_buffer_3d::init() couldn't allocate pages."); }
-            };
-            
-            let vesa_display_flags = EntryFlags::PRESENT | EntryFlags::WRITABLE | EntryFlags::GLOBAL | EntryFlags::NO_CACHE;
-            let allocator_mutex = FRAME_ALLOCATOR.try();
-            if allocator_mutex.is_none(){
-                return Err("framebuffer::init() Couldn't get frame allocator");
-            } 
+    let pages = allocate_pages_by_bytes(VESA_DISPLAY_PHYS_SIZE).ok_or("frame_buffer_3d::init() couldn't allocate pages")?;
+    let vesa_display_flags = EntryFlags::PRESENT | EntryFlags::WRITABLE | EntryFlags::GLOBAL | EntryFlags::NO_CACHE;
+    let allocator = FRAME_ALLOCATOR.try().ok_or("Couldn't get frame allocator")?;
 
-            let err = FRAME_DRAWER.lock().init_frame_buffer(pages.start_address());
-            if err.is_err(){
-                debug!("Fail to init frame buffer");
-                return err;
-            }
-            let mut allocator = try!(allocator_mutex.ok_or("asdfasdf")).lock();
-            let mapped_frame_buffer = try!(active_table.map_allocated_pages_to(
-                pages, 
-                Frame::range_inclusive_addr(VESA_DISPLAY_PHYS_START, VESA_DISPLAY_PHYS_SIZE), 
-                vesa_display_flags, 
-                allocator.deref_mut())
-            );
+    FRAME_DRAWER.lock().init_frame_buffer(pages.start_address())?;
+    let mapped_frame_buffer = kernel_mmi_locked.page_table.map_allocated_pages_to(
+        pages, 
+        FrameRange::from_phys_addr(PhysicalAddress::new_canonical(VESA_DISPLAY_PHYS_START), VESA_DISPLAY_PHYS_SIZE), 
+        vesa_display_flags, 
+        allocator.lock().deref_mut()
+    )?;
 
-            unsafe { FRAME_BUFFER_PAGES = Some(mapped_frame_buffer); }
+    FRAME_BUFFER_PAGES.call_once(|| mapped_frame_buffer);
 
-            Ok(())
-        }
-        _ => { 
-            return Err("framebuffer::init() Couldn't get kernel's active_table");
-        }
-    }
+    Ok(())
 }
 
 
 static FRAME_DRAWER: Mutex<Drawer> = {
     Mutex::new(Drawer {
-        start_address:0,
+        start_address: VirtualAddress::zero(),
         buffer: unsafe {Unique::new_unchecked((VGA_BUFFER_ADDR) as *mut _) },
         depth: [[core::usize::MAX;FRAME_BUFFER_WIDTH/3];FRAME_BUFFER_HEIGHT],
     })
@@ -149,7 +119,7 @@ struct Point {
 }
 
 struct Drawer {
-    start_address: usize,
+    start_address: VirtualAddress,
     buffer: Unique<Buffer>,
     depth : [[usize; FRAME_BUFFER_WIDTH/3]; FRAME_BUFFER_HEIGHT], 
 }
@@ -240,15 +210,15 @@ impl Drawer {
         unsafe { self.buffer.as_mut() }
     } 
 
-    fn init_frame_buffer(&mut self, virtual_address:usize) -> Result<(), &'static str>{
-        if self.start_address == 0 {
+    fn init_frame_buffer(&mut self, virtual_address: VirtualAddress) -> Result<(), &'static str>{
+        if self.start_address.value() == 0 {
             self.start_address = virtual_address;
-            match Unique::new((virtual_address) as *mut _) {
+            match Unique::new(virtual_address.value() as *mut _) {
                 Some(buffer) => { 
                     self.buffer = buffer; 
                     trace!("Set frame buffer address {:#x}", virtual_address);
                 },
-                None => { return Err("Fail to new virtual frame buffer"); }
+                None => { return Err("Failed to init new frame buffer"); }
             }
         }
         Ok(())

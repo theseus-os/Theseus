@@ -76,7 +76,7 @@ impl<T> AtomicLinkedList<T> {
             else {
                 // it didn't work, the head value wasn't updated, meaning that another process updated it before we could
                 // so we need to start over by reading the head ptr again and trying to swap it in again
-                #[test]
+                #[cfg(test)] 
                 println!("        attempt {}", _attempt);
             }
         }
@@ -154,7 +154,7 @@ impl<'a, T: 'a> Iterator for AtomicLinkedListIterMut<'a, T> {
 #[test]
 /// To run this test, execute: `cargo test test_ll -- --nocapture`
 fn test_ll() {
-    use alloc::arc::Arc;
+    use alloc::sync::Arc;
     use std::thread;
 
     let list: Arc<AtomicLinkedList<u64>> = Arc::new(AtomicLinkedList::new());

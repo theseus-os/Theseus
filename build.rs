@@ -9,6 +9,7 @@ const CFG_PREFIX: &'static str = "cargo:rustc-cfg=";
 // const LOADABLE: &'static str = "loadable";
 // const MIRROR_LOG_TO_VGA: &'static str = "mirror_log_to_vga";
 // const SIMD_PERSONALITY: &'static str = "simd_personality";
+// const PRIORITY_SCHEDULER: &'static str = "priority_scheduler";
 
 fn main() {
     println!("cargo:rerun-if-env-changed=THESEUS_CONFIG");

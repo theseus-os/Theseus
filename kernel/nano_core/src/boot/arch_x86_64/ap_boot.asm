@@ -1,5 +1,6 @@
-; must match definitions in bring_up_ap()
-; TRAMPOLINE below is a Physical Address!
+; This must match the `ApTrampolineData` struct definitions used in `bring_up_ap()`.
+; See that struct definition for an explanation of how these are used.
+; The following are physical addresses.
 TRAMPOLINE          equ 0xF000
 AP_READY            equ TRAMPOLINE
 AP_PROCESSOR_ID     equ TRAMPOLINE + 8
@@ -19,6 +20,10 @@ bits 32 ;We are still in protected mode
 
 extern set_up_SSE
 
+%ifdef ENABLE_AVX
+extern set_up_AVX
+%endif
+
 global ap_start_protected_mode
 ap_start_protected_mode:
 	; xchg bx, bx ; bochs magic breakpoint
@@ -26,6 +31,10 @@ ap_start_protected_mode:
 	mov esp, 0xFC00; set a new stack pointer, 512 bytes below our AP_STARTUP code region
 
 	call set_up_SSE ; in boot.asm
+
+%ifdef ENABLE_AVX
+	call set_up_AVX ; in boot.asm
+%endif
     
 	call set_up_paging_ap
 	

@@ -6,27 +6,17 @@ version = "0.1.0"
 build = "../../build.rs"
 
 [dependencies]
-spin = "0.4.5"
+spin = "0.4.10"
 
 [dependencies.volatile]
-version = "0.2.3"
+version = "0.2.5"
 features = ["const_fn"]
 
 [dependencies.serial_port]
 path = "../serial_port"
 
-[dependencies.text_display]
-path = "../text_display"
-
 [dependencies.kernel_config]
 path = "../kernel_config"
-
-[dependencies.port_io]
-path = "../../libs/port_io"
-
-[dependencies.log]
-default-features = false
-version = "0.3.7"
 
 [dependencies.event_types]
 path = "../event_types"

@@ -20,13 +20,13 @@ impl TextDisplay
     }
 
     /// takes in a str slice and display as much as it can to the screen
-    pub fn display_string(&self, slice: &str) -> Result<(), &'static str>{
+    pub fn display_string(&self, _slice: &str) -> Result<(), &'static str>{
         Ok(())
     }
 
     /// Function to set a cursor on the display at an (x,y) position. 
     /// set_cursor() should accept coordinates within those specified by get_dimensions() and display to window
-    pub fn set_cursor(&mut self, line: u16, column: u16, reset:bool){
+    pub fn set_cursor(&mut self, _line: u16, _column: u16, _reset: bool){
 
     } 
     /// Take the cursor off the display

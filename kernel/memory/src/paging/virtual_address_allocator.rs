@@ -3,9 +3,9 @@
 //! The minimum unit of allocation is a single page. 
 
 use kernel_config::memory::{KERNEL_TEXT_START, KERNEL_TEXT_MAX_SIZE, PAGE_SIZE};
-use super::{VirtualAddress, Page, PageIter};
+use super::{VirtualAddress, Page, PageRange};
 use spin::Mutex;
-use alloc::LinkedList;
+use alloc::collections::LinkedList;
 
 /// A group of contiguous pages, much like a hole in other allocators. 
 struct Chunk {
@@ -21,20 +21,20 @@ impl Chunk {
 		// subtract one because it's an inclusive range
 		let end_page = self.start_page + self.size_in_pages - 1;
 		AllocatedPages {
-			pages: Page::range_inclusive(self.start_page, end_page),							
+			pages: PageRange::new(self.start_page, end_page),							
 		}
 	}
 }
 
 
 /// Represents an allocated range of virtual addresses, specified in pages. 
-/// These pages are not mapped to any physical memory frames, you must do that separately.
+/// These pages are not initially mapped to any physical memory frames, you must do that separately.
 /// This object represents ownership of those pages; if this object falls out of scope,
 /// it will be dropped, and the pages will be de-allocated. 
 /// See `MappedPages` struct for a similar object that unmaps pages when dropped.
 #[derive(Debug)]
 pub struct AllocatedPages {
-	pub pages: PageIter,
+	pub pages: PageRange,
 }
 
 impl AllocatedPages {
@@ -49,20 +49,20 @@ impl AllocatedPages {
 }
 // use core::ops::Deref;
 // impl Deref for AllocatedPages {
-//     type Target = PageIter;
+//     type Target = PageRange;
 
-//     fn deref(&self) -> &PageIter {
+//     fn deref(&self) -> &PageRange {
 //         &self.pages
 //     }
 // }
 
-impl Drop for AllocatedPages {
-    fn drop(&mut self) {
-        if let Err(_) = deallocate_pages(self) {
-			error!("AllocatedPages::drop(): error deallocating pages");
-		}
-    }
-}
+// impl Drop for AllocatedPages {
+//     fn drop(&mut self) {
+//         if let Err(_) = deallocate_pages(self) {
+// 			error!("AllocatedPages::drop(): error deallocating pages");
+// 		}
+//     }
+// }
 
 
 
@@ -73,7 +73,7 @@ lazy_static!{
 		// and goes until the end of the kernel free text section
 		let initial_chunk: Chunk = Chunk {
 			allocated: false,
-			start_page: Page::containing_address(KERNEL_TEXT_START),
+			start_page: Page::containing_address(VirtualAddress::new_canonical(KERNEL_TEXT_START)),
 			size_in_pages: KERNEL_TEXT_MAX_SIZE / PAGE_SIZE,
 		};
 		let mut list: LinkedList<Chunk> = LinkedList::new();
@@ -84,9 +84,9 @@ lazy_static!{
 
 
 /// Convenience function for allocating pages by giving the number of bytes
-/// rather than the number of pages. It will still allocated whole pages
+/// rather than the number of pages. It will still allocate whole pages
 /// by rounding up the number of bytes. 
-/// See [allocate_pages]](allocate_pages)
+/// See [`allocate_pages()`](fn.allocate_pages.html)
 pub fn allocate_pages_by_bytes(num_bytes: usize) -> Option<AllocatedPages> {
 	let num_pages = (num_bytes + PAGE_SIZE - 1) / PAGE_SIZE; // round up
 	allocate_pages(num_pages)
@@ -102,7 +102,7 @@ pub fn allocate_pages_by_bytes(num_bytes: usize) -> Option<AllocatedPages> {
 pub fn allocate_pages(num_pages: usize) -> Option<AllocatedPages> {
 
 	if num_pages == 0 {
-		error!("allocate_pages(): requested an allocation of 0 pages... stupid!");
+		warn!("allocate_pages(): requested an allocation of 0 pages... stupid!");
 		return None;
 	}
 
@@ -110,33 +110,32 @@ pub fn allocate_pages(num_pages: usize) -> Option<AllocatedPages> {
 	let mut new_start_page: Option<Page> = None;
 
 	let mut locked_list = FREE_PAGE_LIST.lock();
-	{
-		for mut c in locked_list.iter_mut() {
-			// skip already-allocated chunks and chunks that are too small
-			if c.allocated || c.size_in_pages < num_pages {
-				continue;
-			}
-
-			// here: we have found a suitable chunk
-			let start_page = c.start_page;
-			let remaining_size = c.size_in_pages - num_pages;
-			if remaining_size == 0 {
-				// if the chunk is exactly the right size, just update it in-place as 'allocated'
-				c.allocated = true;
-				return Some(c.as_allocated_pages())
-			}
-
-			// here: we have the chunk and we need to split it up into two chunks
-			assert!(c.allocated == false, "BUG: an already-allocated chunk is going to be split!");
-			
-			// first, update in-place the original free (unallocated) chunk to be smaller, since we're removing pages from it
-			c.size_in_pages = remaining_size;
-			c.start_page += num_pages;
-
-			// second, create a new chunk that has the pages we've peeled off the original chunk being split
-			// (or rather, we create the chunk below outside of the iterator loop, so just tell it where to start here)
-			new_start_page = Some(start_page);
+	for mut c in locked_list.iter_mut() {
+		// skip already-allocated chunks and chunks that are too small
+		if c.allocated || c.size_in_pages < num_pages {
+			continue;
 		}
+
+		// here: we have found a suitable chunk
+		let start_page = c.start_page;
+		let remaining_size = c.size_in_pages - num_pages;
+		if remaining_size == 0 {
+			// if the chunk is exactly the right size, just update it in-place as 'allocated'
+			c.allocated = true;
+			return Some(c.as_allocated_pages())
+		}
+
+		// here: we have the chunk and we need to split it up into two chunks
+		assert!(c.allocated == false, "BUG: an already-allocated chunk is going to be split!");
+		
+		// first, update in-place the original free (unallocated) chunk to be smaller, since we're removing pages from it
+		c.size_in_pages = remaining_size;
+		c.start_page += num_pages;
+
+		// second, create a new chunk that has the pages we've peeled off the original chunk being split
+		// (or rather, we create the chunk below outside of the iterator loop, so here we just tell it where to start)
+		new_start_page = Some(start_page);
+		break;
 	}
 
 	if let Some(p) = new_start_page {
@@ -156,6 +155,7 @@ pub fn allocate_pages(num_pages: usize) -> Option<AllocatedPages> {
 }
 
 
+#[allow(dead_code)]
 fn deallocate_pages(_pages: &mut AllocatedPages) -> Result<(), ()> {
 	trace!("Virtual Address Allocator: deallocate_pages is not yet implemented, trying to dealloc: {:?}", _pages);
 	Ok(())

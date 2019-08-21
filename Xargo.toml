@@ -3,3 +3,6 @@ alloc = {}
 
 [target.x86_64-theseus-sse.dependencies]
 alloc = {}
+
+[target.x86_64-theseus-avx.dependencies]
+alloc = {}

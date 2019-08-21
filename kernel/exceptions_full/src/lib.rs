@@ -2,20 +2,20 @@
 
 #![no_std]
 #![feature(abi_x86_interrupt)]
-#![feature(integer_atomics)]
 
 extern crate x86_64;
 extern crate task;
 extern crate runqueue;
 extern crate apic;
+extern crate tlb_shootdown;
 extern crate pmu_x86;
-#[macro_use] extern crate log;
+// #[macro_use] extern crate log;
 #[macro_use] extern crate vga_buffer; // for println_raw!()
 #[macro_use] extern crate print; // for regular println!()
 
 use x86_64::structures::idt::{LockedIdt, ExceptionStackFrame, PageFaultErrorCode};
 use x86_64::registers::msr::*;
-use runqueue::RunQueue;
+
 
 pub fn init(idt_ref: &'static LockedIdt) {
     { 
@@ -55,12 +55,12 @@ pub fn init(idt_ref: &'static LockedIdt) {
 /// calls println!() and then println_raw!()
 macro_rules! println_both {
     ($fmt:expr) => {
-        print!(concat!($fmt, "\n"));
         print_raw!(concat!($fmt, "\n"));
+        print!(concat!($fmt, "\n"));
     };
     ($fmt:expr, $($arg:tt)*) => {
-        print!(concat!($fmt, "\n"), $($arg)*);
         print_raw!(concat!($fmt, "\n"), $($arg)*);
+        print!(concat!($fmt, "\n"), $($arg)*);
     };
 }
 
@@ -71,12 +71,17 @@ fn kill_and_halt(exception_number: u8) -> ! {
     if let Some(taskref) = task::get_my_current_task() {
         match taskref.kill(task::KillReason::Exception(exception_number)) {
             Ok(_) => {
-                if let Err(e) = RunQueue::remove_task_from_all(taskref) {
-                    error!("kill_and_halt(): killed task after exception, but could not remove it from runqueue: {}", e);
+                println_both!("Killed task {:?} due to exception {}.", taskref, exception_number);
+                if let Err(e) = runqueue::remove_task_from_all(taskref) {
+                    println_both!("kill_and_halt(): killed task after exception, but could not remove it from runqueue: {}", e);
                 }
             }
-            Err(e) => error!("kill_and_halt(): error killing current task {:?}: {}", taskref, e),
+            Err(e) => {
+                println_both!("kill_and_halt(): error killing current task {:?}: {}", taskref, e);
+            }
         }
+    } else {
+        println_both!("kill_and_halt(): couldn't get the current task after exception.");
     }
 
     loop { }
@@ -106,19 +111,15 @@ extern "x86-interrupt" fn nmi_handler(stack_frame: &mut ExceptionStackFrame) {
     
     // sampling interrupt handler: increments a counter, records the IP for the sample, and resets the hardware counter 
     if rdmsr(IA32_PERF_GLOBAL_STAUS) != 0 {
-        // println_both!("what value is in the status register {:x}", rdmsr(IA32_PERF_GLOBAL_STAUS));
-        unsafe { wrmsr(IA32_PERF_GLOBAL_OVF_CTRL, 0); }
-        // println_both!("what value is in the status register after clear: {:x}", rdmsr(IA32_PERF_GLOBAL_STAUS));
-
         pmu_x86::handle_sample(stack_frame);
         expected_nmi = true;
     }
 
     // currently we're using NMIs to send TLB shootdown IPIs
-    let vaddrs = apic::TLB_SHOOTDOWN_IPI_VIRTUAL_ADDRESSES.read();
+    let vaddrs = tlb_shootdown::TLB_SHOOTDOWN_IPI_VIRTUAL_ADDRESSES.read();
     if !vaddrs.is_empty() {
         // trace!("nmi_handler (AP {})", apic::get_my_apic_id().unwrap_or(0xFF));
-        apic::handle_tlb_shootdown_ipi(&vaddrs);
+        tlb_shootdown::handle_tlb_shootdown_ipi(&vaddrs);
         expected_nmi = true;
     }
 

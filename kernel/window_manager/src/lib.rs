@@ -16,10 +16,7 @@
 //! The WINDOW_ALLOCATOR is used by the WindowManager itself to track and modify the existing windows
 
 #![no_std]
-#![feature(alloc)]
 #![feature(const_fn)]
-#![feature(unique)]
-#![feature(unique)]
 #![feature(asm)]
 
 extern crate spin;
@@ -39,11 +36,10 @@ extern crate acpi;
 
 
 use spin::{Once, Mutex};
-use alloc::VecDeque;
-use alloc::btree_map::BTreeMap;
+use alloc::collections::{VecDeque, BTreeMap};
 use core::ops::Deref;
 use dfqueue::{DFQueue,DFQueueConsumer,DFQueueProducer};
-use alloc::arc::{Arc, Weak};
+use alloc::sync::{Arc, Weak};
 use frame_buffer::text_buffer::{FrameTextBuffer};
 use event_types::Event;
 use alloc::string::{String, ToString};
@@ -59,8 +55,8 @@ const WINDOW_INACTIVE_COLOR:u32 = 0x343C37;
 const SCREEN_BACKGROUND_COLOR:u32 = 0x000000;
 
 /// 10 pixel gap between windows 
-pub const GAP_SIZE:usize = 10;
-pub const WINDOW_MARGIN:usize = 2;
+pub const GAP_SIZE: usize = 10;
+pub const WINDOW_MARGIN: usize = 2;
 
 struct WindowAllocator {
     allocated: VecDeque<Weak<Mutex<WindowInner>>>, 
@@ -333,6 +329,13 @@ impl WindowObj{
         inner.clean();
     }
 
+    /// Returns the dimensions of this window,
+    /// as a tuple of `(width, height)`.
+    pub fn dimensions(&self) -> (usize, usize) {
+        let inner_locked = self.inner.lock();
+        (inner_locked.width, inner_locked.height)
+    }
+
     ///Add a new displayable structure to the window
     ///We check if the displayable is in the window. But we do not check if it is overlapped with others
     pub fn add_displayable(&mut self, key: &str, x:usize, y:usize, displayable:TextDisplay) -> Result<(), &'static str>{
@@ -473,20 +476,20 @@ impl WindowObj{
 }
 
 struct WindowInner {
-    /// the upper left x-coordinate of inner:&Arc<Mutex<WindowInner>>
+    /// the upper left x-coordinate of the window
     x: usize,
-    /// the upper left y-coordinate of inner:&Arc<Mutex<WindowInner>>
-    y:usize,
+    /// the upper left y-coordinate of the window
+    y: usize,
     /// the width of the window
-    width:usize,
+    width: usize,
     /// the height of the window
-    height:usize,
+    height: usize,
     /// whether the window is active
-    active:bool,
-    /// a consumer of key input events inner:&Arc<Mutex<WindowInner>>
-    margin:usize,
+    active: bool,
+    /// a consumer of key input events to the window
+    margin: usize,
     /// the producer accepting a key event
-    key_producer:DFQueueProducer<Event>,
+    key_producer: DFQueueProducer<Event>,
 }
 
 impl WindowInner {
@@ -617,36 +620,3 @@ pub fn adjust_windows_before_addition() -> Result<(usize, usize, usize), &'stati
 }
 
 */
-
-
-//Test functions for performance evaluation
-/*pub fn set_time_start() {
-    let hpet_lock = get_hpet();
-    unsafe { STARTING_TIME = hpet_lock.as_ref().unwrap().get_counter(); }   
-}
-
-pub fn calculate_time_statistic() {
-    let statistic = STATISTIC.call_once(|| {
-        Mutex::new(Vec::new())
-    });
-
-  unsafe{
-
-    let hpet_lock = get_hpet();
-    let end_time = hpet_lock.as_ref().unwrap().get_counter();  
-
-   
-    let mut queue = statistic.lock();
-    queue.push(end_time - STARTING_TIME);
-
-    STARTING_TIME = 0;
-
-    COUNTER  = COUNTER+1;
-
-    if COUNTER == 1000 {
-        for i in 0..queue.len(){
-            trace!("Time\t{}", queue.pop().unwrap());
-        }
-        COUNTER = 0;
-    }
-}*/

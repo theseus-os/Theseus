@@ -1,7 +1,6 @@
 //! This application is an example of how to write applications in Theseus.
 
 #![no_std]
-#![feature(alloc)]
 
 extern crate alloc;
 #[macro_use] extern crate print;
@@ -9,7 +8,8 @@ extern crate getopts;
 extern crate pmu_x86;
 extern crate spawn;
 
-use alloc::{Vec, String};
+use alloc::vec::Vec;
+use alloc::string::String;
 use getopts::Options;
 
 

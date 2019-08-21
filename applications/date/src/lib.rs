@@ -1,5 +1,4 @@
 #![no_std]
-#![feature(alloc)]
 // #![feature(plugin)]
 // #![plugin(application_main_fn)]
 
@@ -8,7 +7,8 @@ extern crate alloc;
 #[macro_use] extern crate terminal_print;
 extern crate rtc;
 
-use alloc::{Vec, String};
+use alloc::vec::Vec;
+use alloc::string::String;
 
 
 #[no_mangle]

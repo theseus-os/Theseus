@@ -1,36 +1,23 @@
-//! The vga buffer that implements basic printing in VGA text mode.
+//! Support for basic printing to a simple 80x25 text-mode VGA buffer. 
+//!
+//! Does not support scrolling, cursors, or any other features of a regular drawn framebuffer.
 
 #![no_std]
-#![feature(alloc)]
 #![feature(const_fn)]
-#![feature(unique)]
 #![feature(ptr_internals)]
 
-// #[macro_use] extern crate log;
-extern crate alloc;
 extern crate kernel_config;
-extern crate port_io;
 extern crate serial_port;
 extern crate spin;
 extern crate volatile;
-extern crate text_display;
-
-//#[macro_use] extern crate log;
 
 
-// Andrew: refernece note below
-
-//use text_display::TextDisplay;
 use core::fmt;
 use core::ptr::Unique;
-//use core::mem;
-//use port_io::Port;
 use spin::Mutex;
 use volatile::Volatile;
-
 use kernel_config::memory::KERNEL_OFFSET;
 
-pub mod raw;
 
 /// defined by x86's physical memory maps
 const VGA_BUFFER_VIRTUAL_ADDR: usize = 0xb8000 + KERNEL_OFFSET;
@@ -40,128 +27,105 @@ const BUFFER_HEIGHT: usize = 25;
 /// width of the VGA text window
 const BUFFER_WIDTH: usize = 80;
 
-//type Line = [ScreenChar; BUFFER_WIDTH];
 
-/*const BLANK_LINE: Line = [ScreenChar::new(b' ', ColorCode::new(Color::LightGreen, Color::Black)); BUFFER_WIDTH];
-static CURSOR_PORT_START: Mutex<Port<u8>> = Mutex::new(Port::new(0x3D4));
-static CURSOR_PORT_END: Mutex<Port<u8>> = Mutex::new(Port::new(0x3D5));
-static AUXILLARY_ADDR: Mutex<Port<u8>> = Mutex::new(Port::new(0x3E0));
-
-const UNLOCK_SEQ_1: u8 = 0x0A;
-const UNLOCK_SEQ_2: u8 = 0x0B;
-const UNLOCK_SEQ_3: u8 = 0xC0;
-const UNLOCK_SEQ_4: u8 = 0xE0;
-const UPDATE_SEQ_1: u8 = 0x0E;
-const UPDATE_SEQ_2: u8 = 0x0F;
-const UPDATE_SEQ_3: u16 = 0xFF;
-const CURSOR_START: u8 = 0b00000001;
-const CURSOR_END: u8 = 0b00010000;
-const RIGHT_BIT_SHIFT: u8 = 8;
-const DISABLE_SEQ_1: u8 = 0x0A;
-const DISABLE_SEQ_2: u8 = 0x20;
-
-*/
-/// An instance of a VGA text buffer which can be displayed to the screen.
-pub struct VgaBuffer { }
-impl VgaBuffer {
-    pub fn new() -> VgaBuffer {
-        VgaBuffer { }
+/// The singleton VGA writer instance that writes to the VGA text buffer.
+static EARLY_VGA_WRITER: Mutex<VgaBuffer> = Mutex::new(
+    VgaBuffer {
+        column_position: 0,
+        // SAFE: the assembly boot up code ensures this is mapped into memory.
+        buffer: unsafe { Unique::new_unchecked((VGA_BUFFER_VIRTUAL_ADDR) as *mut _) },
     }
+);
+
+#[macro_export]
+macro_rules! print_raw {
+    ($($arg:tt)*) => ({
+        let _ = $crate::print_args_raw(format_args!($($arg)*));
+    });
+}
+
+#[macro_export]
+macro_rules! println_raw {
+    ($fmt:expr) => (print_raw!(concat!($fmt, "\n")));
+    ($fmt:expr, $($arg:tt)*) => (print_raw!(concat!($fmt, "\n"), $($arg)*));
+}
+
+#[doc(hidden)]
+pub fn print_args_raw(args: fmt::Arguments) -> fmt::Result {
+    use core::fmt::Write;
+    EARLY_VGA_WRITER.lock().write_fmt(args)
 }
 
 
-/// Implements TextDisplay trait for vga buffer.
-/// set_cursor() should accept coordinates within those specified by get_dimensions() and display to window
-/*impl TextDisplay for VgaBuffer {
-    /// Update the cursor based on the given x and y coordinates (sourced from OsDev Wiki),
-    /// which correspond to the column and row (line) respectively 
-    fn set_cursor(&mut self, line: u16, column: u16, reset:bool) {
-        let pos: u16 = line * BUFFER_WIDTH as u16 + column;
+type VgaTextBufferLine = [Volatile<ScreenChar>; BUFFER_WIDTH];
+type VgaTextBuffer     = [VgaTextBufferLine; BUFFER_HEIGHT];
 
-        unsafe {
-            // enables cursor 
-            CURSOR_PORT_START.lock().write(UNLOCK_SEQ_1);
-            let temp_read: u8 = (CURSOR_PORT_END.lock().read() & UNLOCK_SEQ_3) | CURSOR_START;
-            CURSOR_PORT_END.lock().write(temp_read);
-            CURSOR_PORT_START.lock().write(UNLOCK_SEQ_2);
-            let temp_read2 = (AUXILLARY_ADDR.lock().read() & UNLOCK_SEQ_4) | CURSOR_END;
-            CURSOR_PORT_END.lock().write(temp_read2);
-            // updates cursor 
-            CURSOR_PORT_START.lock().write(UPDATE_SEQ_2);
-            CURSOR_PORT_END.lock().write((pos & UPDATE_SEQ_3) as u8);
-            CURSOR_PORT_START.lock().write(UPDATE_SEQ_1);
-            CURSOR_PORT_END.lock().write(((pos >> RIGHT_BIT_SHIFT) & UPDATE_SEQ_3) as u8);
-        }
-        return;
-    }
 
-    /// Disables the cursor
-    /// Still maintains the cursor's position
-    fn disable_cursor(&mut self) {
-        unsafe {
-            CURSOR_PORT_START.lock().write(DISABLE_SEQ_1);
-            CURSOR_PORT_END.lock().write(DISABLE_SEQ_2);
-        }
-    }
-
-    /// Returns a tuple containing (buffer height, buffer width)
-    fn get_dimensions(&self) -> (usize, usize) {
-        (BUFFER_WIDTH, BUFFER_HEIGHT)
-    }
-
-    /// Requires that a str slice that will exactly fit the vga buffer
-    /// The calculation is done inside the input_event_manager crate by the print_to_vga function and associated methods
-    /// Parses the string into line objects and then prints them onto the vga buffer
-    fn display_string(&mut self, slice: &str) -> Result<(), &'static str> {
-        let mut curr_column = 0;
-        let mut new_line = BLANK_LINE;
-        let mut i = 0;
-        use core::ptr::write_volatile;
-        // iterates through the string slice and puts it into lines that will fit on the vga buffer
-        for byte in slice.bytes() {
-            if byte == b'\n' { // if we reach a line break
-                let addr = (VGA_BUFFER_VIRTUAL_ADDR + i * mem::size_of::<Line>()) as *mut Line;
-                unsafe { write_volatile(addr, new_line); }
-                new_line = BLANK_LINE;
-                curr_column = 0;
-                i += 1;
-            } else { // if we reach the end of the line with no line break
-                if curr_column == BUFFER_WIDTH {
-                    curr_column = 0;
-                    let addr = (VGA_BUFFER_VIRTUAL_ADDR + i * mem::size_of::<Line>()) as *mut Line;
-                    unsafe { write_volatile(addr, new_line); }
-                    i += 1;
-                    new_line = BLANK_LINE;
+struct VgaBuffer {
+    column_position: usize,
+    buffer: Unique<VgaTextBuffer>,
+}
+impl VgaBuffer {
+    pub fn write_byte(&mut self, byte: u8) {
+        match byte {
+            b'\n' => self.new_line(),
+            byte => {
+                if self.column_position >= BUFFER_WIDTH {
+                    self.new_line();
                 }
-                new_line[curr_column] = ScreenChar::new(byte, ColorCode::default());
-                curr_column += 1;
+                let row = BUFFER_HEIGHT - 1;
+                let col = self.column_position;
+
+                self.buffer()[row][col].write(
+                    ScreenChar {
+                        ascii_character: byte,
+                        color_code: ColorCode::default(),
+                    }
+                );
+                self.column_position += 1;
             }
         }
+    }
 
-        // writes the last line not covered in the loop
-        let addr = (VGA_BUFFER_VIRTUAL_ADDR + i * mem::size_of::<Line>()) as *mut Line;
-        unsafe { write_volatile(addr, new_line); }
-
-        // fills the remainder of the vga buffer with blank lines if there any unfilled ones
-        if i < BUFFER_HEIGHT -1 {
-            for j in i+1..BUFFER_HEIGHT {
-                let addr = (VGA_BUFFER_VIRTUAL_ADDR + j * mem::size_of::<Line>()) as *mut Line;
-                // trace!("   writing BLANK ({}) at addr {:#X}", i, addr as usize);
-                unsafe { write_volatile(addr, BLANK_LINE); }
+    fn new_line(&mut self) {
+        for row in 1..BUFFER_HEIGHT {
+            for col in 0..BUFFER_WIDTH {
+                let character = self.buffer()[row][col].read();
+                self.buffer()[row - 1][col].write(character);
             }
         }
-        Ok(())
+        self.clear_row(BUFFER_HEIGHT - 1);
+        self.column_position = 0;
     }
 
-    fn cursor_blink(&mut self) {
-        // VGA buffer cursor blink is hardware based
+    fn clear_row(&mut self, row: usize) {
+        let blank = ScreenChar {
+            ascii_character: b' ',
+            color_code: ColorCode::default()
+        };
+        for col in 0..BUFFER_WIDTH {
+            self.buffer()[row][col].write(blank);
+        }
     }
+
+    fn buffer(&mut self) -> &mut [VgaTextBufferLine] {
+        // SAFE: mutability is protected by the lock surrounding the RawVgaBuffer instance
+        unsafe { self.buffer.as_mut() }
+    }
+}
+impl fmt::Write for VgaBuffer {
+    fn write_str(&mut self, s: &str) -> ::core::fmt::Result {
         
-    fn get_key_event(&self) -> Option<Event> {
-        None
+        // mirror DIRECTLY to serial port, do not use the log statements
+        // because that can introduce an infinite loop when mirror_to_serial is enabled.
+        let ret = serial_port::write_str(s); 
+        
+        for byte in s.bytes() {
+            self.write_byte(byte)
+        }
+        ret
     }
-
-}*/
+}
 
 
 #[allow(dead_code)]

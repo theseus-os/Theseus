@@ -7,17 +7,13 @@ build = "../../build.rs"
 
 
 [dependencies]
-spin = "0.4.5"
+spin = "0.4.10"
 # x86_64 = { git = "https://github.com/kevinaboos/x86_64" }
 x86_64 = { path = "../../libs/x86_64" }
 
 [dependencies.log]
 default-features = false
 version = "0.3.7"
-
-[dependencies.lazy_static]
-features = ["spin_no_std"]
-version = "1.0"
 
 [dependencies.keycodes_ascii]
 path = "../../libs/keycodes_ascii"
@@ -29,9 +25,6 @@ path = "../window_manager"
 path = "../../libs/dfqueue"
 version = "0.1.0"
 
-[dependencies.atomic_linked_list]
-path = "../../libs/atomic_linked_list"
-
 [dependencies.event_types]
 path = "../event_types"
 
@@ -41,17 +34,11 @@ path = "../spawn"
 [dependencies.task]
 path = "../task"
 
-[dependencies.memory]
-path  = "../memory"
-
 [dependencies.mod_mgmt]
-path = "../mod_mgmt"
+path  = "../mod_mgmt"
 
-[dependencies.text_display]
-path = "../text_display"
-
-[dependencies.frame_buffer]
-path = "../frame_buffer"
+[dependencies.path]
+path = "../path"
 
 
 [lib]

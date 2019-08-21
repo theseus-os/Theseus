@@ -1,5 +1,4 @@
 #![no_std]
-#![feature(alloc)]
 
 #[macro_use]
 extern crate log;
@@ -7,7 +6,7 @@ extern crate alloc;
 extern crate port_io;
 extern crate spin;
 
-use alloc::Vec;
+use alloc::vec::Vec;
 use port_io::Port;
 use spin::Mutex;
 

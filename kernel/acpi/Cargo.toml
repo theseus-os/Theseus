@@ -6,22 +6,17 @@ version = "0.1.0"
 build = "../../build.rs"
 
 [dependencies]
-spin = "0.4.5"
-volatile = "0.2.4"
+spin = "0.4.10"
+volatile = "0.2.5"
 
-
-[dependencies.owning_ref]
-# version = "0.3.3"
-# path = "../../libs/owning-ref-rs"
-git = "https://github.com/kevinaboos/owning-ref-rs.git"
 
 [dependencies.log]
 default-features = false
 version = "0.3.7"
 
 [dependencies.lazy_static]
-features = ["spin_no_std"]
-version = "1.0"
+features = ["spin_no_std", "nightly"]
+version = "1.2.0"
 
 [dependencies.irq_safety]
 git = "https://github.com/kevinaboos/irq_safety"
@@ -47,6 +42,29 @@ path = "../pic"
 [dependencies.ap_start]
 path = "../ap_start"
 
+[dependencies.acpi_table]
+path = "../acpi_table"
+
+[dependencies.acpi_table_handler]
+path = "../acpi_table_handler"
+
+[dependencies.rsdp]
+path = "../rsdp"
+
+[dependencies.rsdt]
+path = "../rsdt"
+
+[dependencies.fadt]
+path = "../fadt"
+
+[dependencies.madt]
+path = "../madt"
+
+[dependencies.hpet]
+path = "../hpet"
+
+[dependencies.pause]
+path = "../pause"
 
 [lib]
 crate-type = ["rlib"]

@@ -6,7 +6,7 @@ version = "0.1.0"
 build = "../../build.rs"
 
 [dependencies]
-spin = "0.4.5"
+spin = "0.4.10"
 
 
 [dependencies.log]
@@ -22,9 +22,6 @@ path = "../memory"
 [dependencies.interrupts]
 path = "../interrupts"
 
-[dependencies.syscall]
-path = "../syscall"
-
 [dependencies.scheduler]
 path = "../scheduler"
 
@@ -36,6 +33,12 @@ path = "../kernel_config"
 
 [dependencies.apic]
 path = "../apic"
+
+[dependencies.tlb_shootdown]
+path = "../tlb_shootdown"
+
+[dependencies.pause]
+path = "../pause"
 
 
 [lib]

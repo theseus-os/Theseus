@@ -8,7 +8,7 @@
 //! *Note: this printing crate only supports single-task child applications
 
 #![no_std]
-#![feature(alloc)]
+#![feature(asm)]
 
 #[macro_use] extern crate alloc;
 #[macro_use] extern crate lazy_static;
@@ -18,10 +18,9 @@ extern crate dfqueue;
 extern crate event_types;
 extern crate spin;
 
-use core::sync::atomic::spin_loop_hint;
 use event_types::Event;
 use dfqueue::DFQueueProducer;
-use alloc::btree_map::BTreeMap;
+use alloc::collections::BTreeMap;
 use alloc::vec::Vec;
 use alloc::string::String;
 use spin::Mutex;
@@ -43,9 +42,9 @@ macro_rules! print {
     });
 }
 
-/// Maps the child application's task ID to its parent terminal print_producer to track parent-child relationships between
-/// applications so that applications can print to the correct terminal
 lazy_static! {
+    /// Maps the child application's task ID to its parent terminal print_producer to track parent-child relationships between
+    /// applications so that applications can print to the correct terminal
     static ref TERMINAL_PRINT_PRODUCERS: Mutex<BTreeMap<usize, DFQueueProducer<Event>>> = Mutex::new(BTreeMap::new());
 }
 
@@ -73,7 +72,7 @@ pub fn print_to_stdout_args(fmt_args: fmt::Arguments) {
         None => {
             // We cannot use log macros here, because when they're mirrored to the vga, they will cause infinite loops on an error.
             // Instead, we write direclty to the serial port. 
-            let _ = serial_port::write_fmt_log("\x1b[31m", "[E] ", format_args!("error in print!/println! macro."), "\x1b[0m\n");
+            let _ = serial_port::write_fmt_log("\x1b[31m", "[E] ", format_args!("error in print!/println! macro: failed to get current task id"), "\x1b[0m\n");
             return;
         }
     };
@@ -90,6 +89,9 @@ pub fn print_to_stdout_args(fmt_args: fmt::Arguments) {
 #[no_mangle]
 pub fn main(_args: Vec<String>) -> isize {
     loop {
-        spin_loop_hint();
+        // block this task, because it never needs to actually run again
+        if let Some(my_task) = task::get_my_current_task() {
+            my_task.block();
+        }
     }
 }

@@ -1,11 +1,10 @@
 #![no_std]
-#![feature(alloc)]
 
 extern crate alloc;
 extern crate spin;
 extern crate owning_ref;
 
-use alloc::arc::{Arc, Weak};
+use alloc::sync::{Arc, Weak};
 use spin::Mutex;
 use owning_ref::{MutexGuardRef, MutexGuardRefMut};
 
@@ -39,7 +38,7 @@ use owning_ref::{MutexGuardRef, MutexGuardRefMut};
 ///   and only duplicates the outer reference. 
 #[derive(Debug)]
 pub struct CowArc<T> {
-    arc: Arc<InnerRef<T>>,
+    arc: Arc<InnerArc<T>>,
 }
 impl<T> CowArc<T> {
     /// Crates a new `CowArc` that wraps the given data. 
@@ -47,7 +46,7 @@ impl<T> CowArc<T> {
     /// that is, not shared. 
     pub fn new(data: T) -> CowArc<T> {
         CowArc {
-            arc: Arc::new(InnerRef {
+            arc: Arc::new(InnerArc {
                 inner_arc: Arc::new(Mutex::new(data)),
             })
         }
@@ -80,7 +79,9 @@ impl<T> CowArc<T> {
     /// Downgrades this `CowArc` into a `CowWeak` weak reference.
     pub fn downgrade(this: &CowArc<T>) -> CowWeak<T> {
         CowWeak {
-            weak: Arc::downgrade(&this.arc),
+            weak: InnerWeak {
+                inner_weak: Arc::downgrade(&(this.arc.inner_arc))
+            },
         }
     }
 
@@ -88,6 +89,12 @@ impl<T> CowArc<T> {
     /// and `false` if it is in the `Exclusive` state.
     pub fn is_shared(&self) -> bool {
         Arc::strong_count(&self.arc.inner_arc) > 1
+    }
+
+    /// Returns true if the two `CowArc`s point to the same value
+    /// (not just values that compare as equal).
+    pub fn ptr_eq(&self, other: &Self) -> bool {
+        Arc::ptr_eq(&self.arc, &other.arc)
     }
 
 
@@ -123,7 +130,7 @@ impl<T> Clone for CowArc<T> {
     fn clone(&self) -> CowArc<T> {
         CowArc {
             arc: Arc::new(
-                InnerRef {
+                InnerArc {
                     inner_arc: Arc::clone(&self.arc.inner_arc),
                 }
             ),
@@ -137,21 +144,24 @@ impl<T> Clone for CowArc<T> {
 /// A weak reference to a `CowArc`, just like a `Weak` is to an `Arc`.
 #[derive(Debug)]
 pub struct CowWeak<T> {
-    weak: Weak<InnerRef<T>>,
+    /// This must be a weak reference to the `InnerArc` inside the `CowArc`
+    weak: InnerWeak<T>,
 }
 impl<T> CowWeak<T> {
     /// Just like `Weak::upgrade()`, attempts to upgrade this `CowWeak`
     /// into a strong reference to the `CowArc` that it points to.
     pub fn upgrade(&self) -> Option<CowArc<T>> {
-        self.weak.upgrade().map(|arc| CowArc {
-            arc: arc,
+        self.weak.inner_weak.upgrade().map(|inner_arc| CowArc {
+            arc: Arc::new(InnerArc{ inner_arc }),
         })
     }
 }
 impl<T> Clone for CowWeak<T> {
     fn clone(&self) -> CowWeak<T> {
         CowWeak {
-            weak: self.weak.clone()
+            weak: InnerWeak { 
+                inner_weak: self.weak.inner_weak.clone()
+            },
         }
     }
 }
@@ -159,6 +169,12 @@ impl<T> Clone for CowWeak<T> {
 
 /// The inner reference inside of a `CowArc`.
 #[derive(Debug)]
-struct InnerRef<T> {
+struct InnerArc<T> {
     inner_arc: Arc<Mutex<T>>,
+}
+
+/// The inner reference inside of a `CowWeak`.
+#[derive(Debug)]
+struct InnerWeak<T> {
+    inner_weak: Weak<Mutex<T>>,
 }

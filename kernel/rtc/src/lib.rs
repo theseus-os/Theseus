@@ -1,5 +1,4 @@
 #![no_std]
-#![feature(alloc)]
 #![feature(const_fn)]
 #![feature(unboxed_closures)]
 #![feature(abi_x86_interrupt)]
@@ -17,7 +16,8 @@ extern crate x86_64;
 use port_io::Port;
 use irq_safety::hold_interrupts;
 use core::sync::atomic::{AtomicUsize, Ordering};
-use spin::{Mutex, Once};
+use spin::Mutex;
+// use spin::Once;
 use state_store::{get_state, insert_state, SSCached};
 
 
@@ -44,18 +44,18 @@ lazy_static! {
 
 pub type RtcInterruptFunction = fn(Option<usize>);
 
-static RTC_INTERRUPT_FUNC: Once<RtcInterruptFunction> = Once::new();
+// static RTC_INTERRUPT_FUNC: Once<RtcInterruptFunction> = Once::new();
 
-/// Initialize the RTC interrupt with the given frequency
-/// and the given closure that will run on each RTC interrupt.
-/// The closure is provided with the current number of RTC ticks since boot,
-/// in the form of an `Option<usize>` because it is not guaranteed that the number of ticks can be retrieved.
-pub fn init(rtc_freq: usize, interrupt_func: RtcInterruptFunction) -> Result<(HandlerFunc), ()> {
-    RTC_INTERRUPT_FUNC.call_once(|| interrupt_func);
-    enable_rtc_interrupt();
-    let res = set_rtc_frequency(rtc_freq);
-    res.map( |_| rtc_interrupt_handler as HandlerFunc )
-}
+// /// Initialize the RTC interrupt with the given frequency
+// /// and the given closure that will run on each RTC interrupt.
+// /// The closure is provided with the current number of RTC ticks since boot,
+// /// in the form of an `Option<usize>` because it is not guaranteed that the number of ticks can be retrieved.
+// pub fn init(rtc_freq: usize, interrupt_func: RtcInterruptFunction) -> Result<(HandlerFunc), ()> {
+//     RTC_INTERRUPT_FUNC.call_once(|| interrupt_func);
+//     enable_rtc_interrupt();
+//     let res = set_rtc_frequency(rtc_freq);
+//     res.map( |_| rtc_interrupt_handler as HandlerFunc )
+// }
 
 
 //write a u8 to the CMOS port (0x70)
@@ -145,9 +145,8 @@ pub fn get_rtc_ticks() -> Result<usize, ()> {
 
 
 /// turn on IRQ 8 (mapped to 0x28), rtc begins sending interrupts 
-fn enable_rtc_interrupt()
+pub fn enable_rtc_interrupt()
 {
-    // disable interrupts until _held_interrupts goes out of scope
     let _held_interrupts = hold_interrupts();
 
     write_cmos(0x0C);
@@ -187,20 +186,18 @@ fn log2(value: usize) -> usize {
 
 /// sets the period of the RTC interrupt. 
 /// `rate` must be a power of 2, between 2 and 8192 inclusive.
-fn set_rtc_frequency(rate: usize) -> Result<(), ()> {
-
-    if (!rate.is_power_of_two()) || rate < 2 || rate > 8192 {
+pub fn set_rtc_frequency(rate: usize) -> Result<(), ()> {
+    if !(rate.is_power_of_two() && rate >= 2 && rate <= 8192) {
         error!("RTC rate was {}, must be a power of two between [2: 8192] inclusive!", rate);
         return Err(());
     }
 
-    // disable interrupts until _held_interrupts goes out of scope
-    let _held_interrupts = hold_interrupts();
-
     // formula is "rate = 32768 Hz >> (dividor - 1)"
     let dividor: u8 = log2(rate) as u8 + 2; 
 
-    //bottom 4 bits of register A are rate, setting them to rate we want without altering top 4 bits
+    let _held_interrupts = hold_interrupts();
+
+    // bottom 4 bits of register A are the "rate dividor", setting them to rate we want without altering top 4 bits
     write_cmos(0x8A);
     let prev = read_cmos();
     write_cmos(0x8A); 
@@ -213,76 +210,4 @@ fn set_rtc_frequency(rate: usize) -> Result<(), ()> {
     Ok(())
     
     // here: _held_interrupts falls out of scope, re-enabling interrupts if they were previously enabled.
-}
-
-
-// idea here: https://github.com/rust-lang/rust/issues/44291
-
-use x86_64::instructions::port::outb;
-use x86_64::structures::idt::{HandlerFunc, ExceptionStackFrame};
-// use alloc::boxed::Box;
-
-// pub fn rtc_interrupt_handler_builder<'a, F>(func: F) -> &'a Fn()
-//     // ( extern "x86-interrupt" fn(&mut ExceptionStackFrame) )
-//     where F: Fn(Option<usize>) + 'a
-// {
-//     let returned_func = || {
-//         // writing to register 0x0C and reading its value is required for subsequent interrupts to fire
-//         write_cmos(0x0C);
-//         read_cmos();
-
-//         let arg: Option<usize> = RTC_TICKS.get().map(|atomic_ticks| atomic_ticks.fetch_add(1, Ordering::SeqCst) + 1); // +1 because fetch_add returns previous value
-//         // because the RTC handler is used for scheduling, we have to acknowledge the interrupt now
-//         unsafe { outb(0x20, 0x20); outb(0xA0, 0x20); }
-//         func(arg);
-
-//     };
-
-//     &'a returned_func
-// }
-
-
-
-// pub fn rtc_interrupt_handler_builder(func: Box<Fn(Option<usize>)> ) -> ( extern "x86-interrupt" fn(&mut ExceptionStackFrame) )
-// {
-//     // let closure = || {
-//     // };
-
-//     let returned_func = |esf| {
-//         // writing to register 0x0C and reading its value is required for subsequent interrupts to fire
-//         write_cmos(0x0C);
-//         read_cmos();
-
-//         let arg: Option<usize> = RTC_TICKS.get().map(|atomic_ticks| atomic_ticks.fetch_add(1, Ordering::SeqCst) + 1); // +1 because fetch_add returns previous value
-//         // because the RTC handler is used for scheduling, we have to acknowledge the interrupt now
-//         unsafe { outb(0x20, 0x28); outb(0xA0, 0x28); }
-//         func(arg);
-
-//     };
-
-//     returned_func as (extern "x86-interrupt" fn(&mut ExceptionStackFrame))
-// }
-
-
-
-pub fn rtc_ack_irq() {
-    // writing to register 0x0C and reading its value is required for subsequent interrupts to fire
-    write_cmos(0x0C);
-    read_cmos();
-}
-
-
-pub extern "x86-interrupt" fn rtc_interrupt_handler(_stack_frame: &mut ExceptionStackFrame) {
-
-    // we must acknowledge the interrupt first before handling it, in case the custom func does something like task switch
-    rtc_ack_irq();
-    unsafe { outb(0x20, 0x20); outb(0xA0, 0x20); } // equivalent to:  unsafe { PIC.notify_end_of_interrupt(0x28); } 
-
-    if let Some(rtc_interrupt_func) = RTC_INTERRUPT_FUNC.try() {
-        let arg: Option<usize> = RTC_TICKS.get().map(|atomic_ticks| atomic_ticks.fetch_add(1, Ordering::SeqCst) + 1); // +1 because fetch_add returns previous value
-        rtc_interrupt_func(arg);
-    }
-    else {
-        warn!("RTC_INTERRUPT_FUNC was None, doing nothing this interrupt.");
-    }
 }

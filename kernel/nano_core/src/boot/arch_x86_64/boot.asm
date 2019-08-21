@@ -16,15 +16,8 @@ global start
 section .init.text32 progbits alloc exec nowrite
 bits 32 ;We are still in protected mode
 start:
-	; The bootloader has loaded us into 32-bit protected mode on a x86
-	; machine. Interrupts are disabled. Paging is disabled. The processor
-	; state is as defined in the multiboot standard. The kernel has full
-	; control of the CPU. The kernel can only make use of hardware features
-	; and any code it provides as part of itself. There's no printf
-	; function, unless the kernel provides its own <stdio.h> header and a
-	; printf implementation. There are no security restrictions, no
-	; safeguards, no debugging mechanisms, only what the kernel provides
-	; itself. It has absolute and complete power over the machine.
+	; The bootloader has loaded us into 32-bit protected mode. 
+	; Interrupts are disabled. Paging is disabled.
 
 	; To set up a stack, we set the esp register to point to the top of our
 	; stack (as it grows downwards on x86 systems). This is necessarily done
@@ -45,6 +38,9 @@ start:
 	call check_long_mode
 
 	call set_up_SSE
+%ifdef ENABLE_AVX
+	call set_up_AVX
+%endif
 
 	call set_up_page_tables
 	call enable_paging
@@ -197,7 +193,7 @@ check_long_mode:
 	jmp _error
 
 
-; Check for SSE and enable it. Throw error 'a' if unsupported
+; Check for SSE and enable it. Prints error 'a' if unsupported
 global set_up_SSE
 set_up_SSE:
 	mov eax, 0x1
@@ -219,6 +215,37 @@ set_up_SSE:
 .no_SSE:
 	mov al, "a"
 	jmp _error
+
+
+; Check for AVX and enable it. Prints error 'b' if unsupported
+%ifdef ENABLE_AVX
+global set_up_AVX
+set_up_AVX:
+	; check architectural support
+	mov eax, 0x1
+	cpuid
+	test ecx, 1 << 26	; is XSAVE supported?
+	jz .no_AVX
+	test ecx, 1 << 28	; is AVX supported?
+	jz .no_AVX
+
+	; enable OSXSAVE
+	mov eax, cr4
+	or eax, 1 << 18		; enable OSXSAVE
+	mov cr4, eax
+
+	; enable AVX
+	mov ecx, 0
+	xgetbv
+	or eax, 110b		; enable SSE and AVX
+	mov ecx, 0
+	xsetbv
+
+	ret
+.no_AVX:
+	mov al, "b"
+	jmp _error
+%endif
 
 ; Prints `ERR: ` and the given error code to screen and hangs.
 ; parameter: error code (in ascii) in al
@@ -273,6 +300,16 @@ start_high:
 	mov es, ax
 	mov fs, ax
 	mov gs, ax
+
+	; clear out the FS/GS base MSRs
+	xor eax, eax          ; set to 0
+	xor edx, edx          ; set to 0
+	mov ecx, 0xc0000100   ; FS BASE MSR
+	wrmsr
+	mov ecx, 0xc0000101   ; GS BASE MSR
+	wrmsr
+	mov ecx, 0xc0000102   ; GS KERNEL BASE MSR
+	wrmsr
 
 
 	; Save the multiboot address

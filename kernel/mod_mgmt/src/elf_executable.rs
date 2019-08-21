@@ -1,4 +1,4 @@
-use alloc::Vec;
+use alloc::vec::Vec;
 use memory::{MappedPages, VirtualMemoryArea, VirtualAddress};
 
 use xmas_elf::ElfFile;
@@ -52,12 +52,12 @@ pub fn parse_elf_executable(mapped_pages: MappedPages, size_in_bytes: usize) -> 
         // TODO: how to get name of program section?
         // could infer it based on perms, like .text or .data
         prog_sects.push(ElfProgramSegment {
-            vma: VirtualMemoryArea::new(prog.virtual_addr() as VirtualAddress, prog.mem_size() as usize, flags, "test_name"),
+            vma: VirtualMemoryArea::new(VirtualAddress::new(prog.virtual_addr() as usize)?, prog.mem_size() as usize, flags, "test_name"),
             offset: prog.offset() as usize,
         });
     }
 
-    let entry_point = elf_file.header.pt2.entry_point() as VirtualAddress;
+    let entry_point = VirtualAddress::new(elf_file.header.pt2.entry_point() as usize)?;
 
     Ok((prog_sects, entry_point))
 }

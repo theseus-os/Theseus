@@ -8,8 +8,4 @@ license = "MIT"
 
 [dependencies]
 spin = "0.4.5"
-
-[dependencies.owning_ref]
-# version = "0.3.3"
-# path = "../../libs/owning-ref-rs"
-git = "https://github.com/kevinaboos/owning-ref-rs.git"
+owning_ref = { git = "https://github.com/kevinaboos/owning-ref-rs" }

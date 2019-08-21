@@ -5,10 +5,10 @@ authors = ["Kevin Boos <kevinaboos@gmail.com>"]
 build = "../../build.rs"
 
 [dependencies]
-getopts = { git = "https://github.com/kevinaboos/getopts" }
+getopts = "0.2.18"
 
 [dependencies.itertools]
-version = "0.7.8"
+version = "0.7.9"
 default-features = false
 
 [dependencies.terminal_print]
@@ -19,3 +19,15 @@ path = "../../kernel/mod_mgmt"
 
 [dependencies.memory]
 path = "../../kernel/memory"
+
+[dependencies.task]
+path = "../../kernel/task"
+
+[dependencies.hpet]
+path = "../../kernel/hpet"
+
+[dependencies.fs_node]
+path = "../../kernel/fs_node"
+
+[dependencies.path]
+path = "../../kernel/path"

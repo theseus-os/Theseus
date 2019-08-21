@@ -47,50 +47,106 @@
 //! i.e., a classic bottom-half/top-half design.
 //!
 
+
 #![no_std]
-#![feature(alloc)]
 #![feature(compiler_builtins_lib)]
 
+// NOTE: the `cfg_if` macro makes the entire file dependent upon the `simd_personality` config.
+#[macro_use] extern crate cfg_if;
+cfg_if! { if #[cfg(simd_personality)] {
+
+
+/* 
+ * NOTE: now, we're using the compiler_builtins crate that is built by xargo by default, but we can switch back
+ * to this one if needed since it does export different symbols based on Cargo.toml feature choices.
 // This crate is required for the SIMD environment,
 // so we can resolve symbols that the core lib requires. 
 #[cfg(target_feature = "sse2")]
 extern crate compiler_builtins as _compiler_builtins; 
+*/
 
-#[macro_use] extern crate alloc;
+
 #[macro_use] extern crate log;
+#[macro_use] extern crate alloc;
 extern crate memory;
 extern crate mod_mgmt;
-extern crate spawn;
 extern crate task;
+extern crate spawn;
+extern crate apic;
+extern crate fs_node;
 
 
-use core::ops::DerefMut;
-use alloc::String;
-use memory::{get_kernel_mmi_ref, get_module};
-use mod_mgmt::CrateNamespace;
+use alloc::string::String;
+use mod_mgmt::{CrateNamespace, get_default_namespace, get_namespaces_directory, NamespaceDirectorySet};
 use spawn::KernelTaskBuilder;
+use fs_node::FileOrDir; 
+use task::SimdExt;
 
 
-const SSE_KERNEL_PREFIX: &'static str = "k_sse#";
+/// Initializes a new SIMD personality based on the provided `simd_ext` level of given SIMD extensions, e.g., SSE, AVX.
+pub fn setup_simd_personality(simd_ext: SimdExt) -> Result<(), &'static str> {
+	match internal_setup_simd_personality(simd_ext) {
+		Ok(o) => {
+			debug!("SIMD personality setup completed successfully.");
+			Ok(o)
+		}
+		Err(e) => {
+			error!("Error setting up SIMD personality: {}", e); 
+			Err(e)
+		}
+	}
+}
 
 
-pub fn setup_simd_personality(_: ()) -> Result<(), &'static str> {
-	let kernel_mmi_ref = get_kernel_mmi_ref().ok_or_else(|| "couldn't get kernel mmi")?;
+fn internal_setup_simd_personality(simd_ext: SimdExt) -> Result<(), &'static str> {
+	let namespace_name = match simd_ext {
+		SimdExt::AVX => "avx",
+		SimdExt::SSE => "sse",
+		SimdExt::None => return Err("Cannot create a new SIMD personality with SimdExt::None!"),
+	};
 
-	let backup_namespace = mod_mgmt::get_default_namespace();
-	let simd_namespace = CrateNamespace::with_name("simd");
+	let kernel_mmi_ref = memory::get_kernel_mmi_ref().ok_or_else(|| "couldn't get kernel mmi")?;
+	let backup_namespace = get_default_namespace().ok_or("default crate namespace wasn't yet initialized")?;
+
+	// The `mod_mgmt::init()` function should have initialized the following directories, 
+	// for example, if 'sse' was the prefix used to build the SSE versions of each crate:
+	//     .../namespaces/sse/
+	//     .../namespaces/sse/kernel
+	//     .../namespaces/sse/application
+	//     .../namespaces/sse/userspace
+	let namespaces_dir = get_namespaces_directory().ok_or("top-level namespaces directory wasn't yet initialized")?;
+	let base_dir = namespaces_dir.lock().get_dir(namespace_name).ok_or("couldn't find directory at given path")?;
+	let mut simd_namespace = CrateNamespace::new(
+		String::from(namespace_name), 
+		NamespaceDirectorySet::from_existing_base_dir(base_dir).map_err(|e| {
+			error!("Couldn't find expected namespace directory {:?}, did you choose the correct SimdExt?", namespace_name);
+			e
+		})?,
+	);
 
 	// Load things that are specific (private) to the SIMD world, like core library and compiler builtins
-	let compiler_builtins_simd = get_module("k_sse#compiler_builtins").ok_or_else(|| "couldn't get k_sse#compiler_builtins module")?;
-	let core_lib_simd = get_module("k_sse#core").ok_or_else(|| "couldn't get k_sse#core module")?;
-	let new_modules = vec![compiler_builtins_simd, core_lib_simd];
-	simd_namespace.load_kernel_crates(new_modules.into_iter(), Some(backup_namespace), kernel_mmi_ref.lock().deref_mut(), false)?;
+	let compiler_builtins_simd = simd_namespace.get_kernel_file_starting_with("compiler_builtins-")
+		.ok_or_else(|| "couldn't find a single 'compiler_builtins' object file in simd_personality")?;
+	let core_lib_simd = simd_namespace.get_kernel_file_starting_with("core-")
+		.ok_or_else(|| "couldn't find a single 'core' object file in simd_personality")?;
+	let crate_files = vec![compiler_builtins_simd, core_lib_simd];
+	simd_namespace.load_crates(crate_files.iter(), Some(backup_namespace), &kernel_mmi_ref, false)?;
 
+
+	// load the actual crate that we want to run in the simd namespace, "simd_test"
+	let simd_test_file = simd_namespace.get_kernel_file_starting_with("simd_test-")
+		.ok_or_else(|| "couldn't find a single 'simd_test' object file in simd_personality")?;
+	simd_namespace.enable_fuzzy_symbol_matching();
+	simd_namespace.load_crate(&simd_test_file, Some(backup_namespace), &kernel_mmi_ref, false)?;
+	simd_namespace.disable_fuzzy_symbol_matching();
+
+
+	let this_core = apic::get_my_apic_id().ok_or("couldn't get my APIC id")?;
 	
 	type SimdTestFunc = fn(());
-	let section_ref1 = simd_namespace.get_symbol_or_load("simd_test::test1", SSE_KERNEL_PREFIX, Some(backup_namespace), kernel_mmi_ref.lock().deref_mut(), false)
+	let section_ref1 = simd_namespace.get_symbol_starting_with("simd_test::test1::")
 		.upgrade()
-		.ok_or("no symbol: simd_test::test1")?;
+		.ok_or("no single symbol matching \"simd_test::test1\"")?;
 	let mut space1 = 0;	
 	let (mapped_pages1, mapped_pages_offset1) = { 
 		let section = section_ref1.lock();
@@ -98,15 +154,16 @@ pub fn setup_simd_personality(_: ()) -> Result<(), &'static str> {
 	};
 	let func1: &SimdTestFunc = mapped_pages1.lock().as_func(mapped_pages_offset1, &mut space1)?;
 	let task1 = KernelTaskBuilder::new(func1, ())
-		.name(String::from("simd_test_1-sse"))
-		.pin_on_core(2)
+		.name(format!("simd_test_1-{}", namespace_name))
+		.pin_on_core(this_core)
+		.simd(simd_ext)
 		.spawn()?;
-	debug!("finished spawning first simd task");
+	debug!("finished spawning simd_test::test1 task");
 
 
-	let section_ref2 = simd_namespace.get_symbol_or_load("simd_test::test2", SSE_KERNEL_PREFIX, Some(backup_namespace), kernel_mmi_ref.lock().deref_mut(), false)
+	let section_ref2 = simd_namespace.get_symbol_starting_with("simd_test::test2::")
 		.upgrade()
-		.ok_or("no symbol: simd_test::test2")?;
+		.ok_or("no single symbol matching \"simd_test::test2\"")?;
 	let mut space2 = 0;	
 	let (mapped_pages2, mapped_pages_offset2) = { 
 		let section = section_ref2.lock();
@@ -114,15 +171,16 @@ pub fn setup_simd_personality(_: ()) -> Result<(), &'static str> {
 	};
 	let func: &SimdTestFunc = mapped_pages2.lock().as_func(mapped_pages_offset2, &mut space2)?;
 	let task2 = KernelTaskBuilder::new(func, ())
-		.name(String::from("simd_test_2-sse"))
-		.pin_on_core(2)
+		.name(format!("simd_test_2-{}", namespace_name))
+		.pin_on_core(this_core)
+		.simd(simd_ext)
 		.spawn()?;
-	debug!("finished spawning second simd task");
+	debug!("finished spawning simd_test::test2 task");
 
 
-	let section_ref3 = simd_namespace.get_symbol_or_load("simd_test::test_short", SSE_KERNEL_PREFIX, Some(backup_namespace), kernel_mmi_ref.lock().deref_mut(), false)
+	let section_ref3 = simd_namespace.get_symbol_starting_with("simd_test::test_short::")
 		.upgrade()
-		.ok_or("no symbol: simd_test::test_short")?;
+		.ok_or("no single symbol matching \"simd_test::test_short\"")?;
 	let mut space3 = 0;	
 	let (mapped_pages3, mapped_pages_offset3) = { 
 		let section = section_ref3.lock();
@@ -130,11 +188,11 @@ pub fn setup_simd_personality(_: ()) -> Result<(), &'static str> {
 	};
 	let func: &SimdTestFunc = mapped_pages3.lock().as_func(mapped_pages_offset3, &mut space3)?;
 	let task3 = KernelTaskBuilder::new(func, ())
-		.name(String::from("simd_test_short-sse"))
-		.pin_on_core(2)
-		.simd()
+		.name(format!("simd_test_short-{}", namespace_name))
+		.pin_on_core(this_core)
+		.simd(simd_ext)
 		.spawn()?;
-	debug!("finished spawning second simd task");
+	debug!("finished spawning simd_test::test_short task");
 
 
 	// we can't return here because the mapped pages that contain
@@ -143,10 +201,13 @@ pub fn setup_simd_personality(_: ()) -> Result<(), &'static str> {
 	// TODO FIXME: check for this somehow in the thread spawn code, perhaps by giving the new thread ownership of the MappedPages,
 	//             just like we do for application Tasks
 
+	loop { }
+	
 	task1.join()?;
 	task2.join()?;
 	task3.join()?;
 
 	Ok(())
-
 }
+		
+}} // end of cfg_if block

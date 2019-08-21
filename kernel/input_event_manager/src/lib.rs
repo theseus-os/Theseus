@@ -8,30 +8,34 @@
 //! In the future, the input event manager will handle other forms of input to the OS
 
 #![no_std]
-#![feature(alloc)]
 extern crate keycodes_ascii;
 extern crate spin;
 extern crate dfqueue;
-extern crate atomic_linked_list; 
-extern crate mod_mgmt;
 extern crate spawn;
 extern crate task;
-extern crate memory;
-// temporary, should remove this once we fix crate system
+extern crate mod_mgmt;
 extern crate event_types; 
-extern crate frame_buffer;
 extern crate window_manager;
+extern crate path;
 
 #[macro_use] extern crate alloc;
 #[macro_use] extern crate log;
 
+use alloc::{
+    string::{String, ToString},
+    vec::Vec,
+    sync::Arc,
+};
 use event_types::{Event};
 use keycodes_ascii::{Keycode, KeyAction};
 use dfqueue::{DFQueue, DFQueueConsumer, DFQueueProducer};
-use alloc::string::{String,ToString};
-use alloc::vec::Vec;
-use mod_mgmt::metadata::CrateType;
+use mod_mgmt::{
+    CrateNamespace,
+    NamespaceDir,
+    metadata::CrateType,
+};
 use spawn::{KernelTaskBuilder, ApplicationTaskBuilder};
+use path::Path;
 
 /// Initializes the keyinput queue and the default display
 pub fn init() -> Result<DFQueueProducer<Event>, &'static str> {
@@ -40,24 +44,45 @@ pub fn init() -> Result<DFQueueProducer<Event>, &'static str> {
     let keyboard_event_handling_consumer = keyboard_event_handling_queue.into_consumer();
     let returned_keyboard_producer = keyboard_event_handling_consumer.obtain_producer();
 
+    // Create the first application CrateNamespace via the following steps:
+    // (1) get the default kernel CrateNamespace, which will serve as the new app namespace's recursive namespace,
+    // (2) get the directory where the default app namespace should have been populated when mod_mgmt was init'd,
+    // (3) create the actual new application CrateNamespace
+    let default_kernel_namespace = mod_mgmt::get_default_namespace()
+        .ok_or("input_event_manager::init(): default CrateNamespace not yet initialized")?;
+    let default_app_namespace_name = CrateType::Application.namespace_name().to_string(); // this will be "_applications"
+    let default_app_namespace_dir = mod_mgmt::get_namespaces_directory()
+        .and_then(|ns_dir| ns_dir.lock().get_dir(&default_app_namespace_name))
+        .ok_or("Couldn't find the directory for the default application CrateNamespace")?;
+    let default_app_namespace = Arc::new(CrateNamespace::new(
+        default_app_namespace_name,
+        NamespaceDir::new(default_app_namespace_dir),
+        Some(default_kernel_namespace.clone()),
+    ));
+
+    let terminal_print_path = default_app_namespace.get_crate_file_starting_with("terminal_print-")
+        .ok_or("Couldn't find terminal_print application in default app namespace")?;
+    let terminal_path = default_app_namespace.get_crate_file_starting_with("terminal-")
+        .ok_or("Couldn't find terminal application in default app namespace")?;
+
     // Spawns the terminal print crate so that we can print to the terminal
-    let app_prefix = CrateType::Application.prefix();
-    let term_print_module = memory::get_module(&format!("{}terminal_print", app_prefix)).ok_or("Error: terminal_print module not found")?;
-    ApplicationTaskBuilder::new(term_print_module)
+    ApplicationTaskBuilder::new(terminal_print_path)
         .name("terminal_print_singleton".to_string())
+        .namespace(default_app_namespace.clone())
         .singleton()
         .spawn()?;
 
-    // Initializes the default terminal (will also start the windowing manager)
-    let term_module = memory::get_module(&format!("{}terminal", app_prefix)).ok_or("Error: terminal module not found")?;
-    // spawn the default terminal
-    ApplicationTaskBuilder::new(term_module)
+    // Spawn the default terminal (will also start the windowing manager)
+    ApplicationTaskBuilder::new(terminal_path)
         .name("default_terminal".to_string())
+        .namespace(default_app_namespace)
         .spawn()?;
+
     // start the input event loop thread
     KernelTaskBuilder::new(input_event_loop, keyboard_event_handling_consumer)
         .name("input_event_loop".to_string())
         .spawn()?;
+
     Ok(returned_keyboard_producer)
 }
 
@@ -86,8 +111,7 @@ fn input_event_loop(consumer:DFQueueConsumer<Event>) -> Result<(), &'static str>
                 if key_input.modifiers.control && key_input.keycode == Keycode::T && key_input.action == KeyAction::Pressed {
                     let task_name: String = format!("terminal {}", terminal_id_counter);
                     let args: Vec<String> = vec![]; // terminal::main() does not accept any arguments
-                    let term_module = memory::get_module(&format!("{}terminal", CrateType::Application.prefix())).ok_or("Error: terminal module not found")?;
-                    ApplicationTaskBuilder::new(term_module)
+                    ApplicationTaskBuilder::new(Path::new(String::from("terminal")))
                         .argument(args)
                         .name(task_name)
                         .spawn()?;

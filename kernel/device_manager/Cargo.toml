@@ -1,0 +1,52 @@
+[package]
+authors = ["Kevin Boos <kevinaboos@gmail.com>"]
+name = "device_manager"
+description = "Code for handling the sequence required to manage and initialize each driver"
+version = "0.1.0"
+build = "../../build.rs"
+
+[dependencies]
+
+[dependencies.log]
+default-features = false
+version = "0.3.7"
+
+[dependencies.dfqueue]
+path = "../../libs/dfqueue"
+
+[dependencies.event_types]
+path = "../event_types"
+
+[dependencies.memory]
+path = "../memory"
+
+[dependencies.apic]
+path = "../apic"
+
+[dependencies.e1000]
+path = "../e1000"
+
+[dependencies.acpi]
+path = "../acpi"
+
+[dependencies.pci]
+path = "../pci"
+
+[dependencies.keyboard]
+path = "../keyboard"
+
+[dependencies.mouse]
+path = "../mouse"
+
+[dependencies.storage_manager]
+path = "../storage_manager"
+
+[dependencies.network_manager]
+path = "../network_manager"
+
+[dependencies.ethernet_smoltcp_device]
+path = "../ethernet_smoltcp_device"
+
+
+[lib]
+crate-type = ["rlib"]

@@ -6,12 +6,7 @@ version = "0.1.0"
 build = "../../build.rs"
 
 [dependencies]
-# rlibc = "1.0.0"
-
-[target.'cfg(target_feature = "sse2")'.dependencies.compiler_builtins]
-git = "https://github.com/rust-lang-nursery/compiler-builtins"
-features = [ "no-lang-items" ]
-# features = [ "no-lang-items", "mem"]
+cfg-if = "0.1.6"
 
 [dependencies.pit_clock]
 path = "../pit_clock"
@@ -23,14 +18,24 @@ version = "0.3.7"
 [dependencies.memory]
 path = "../memory"
 
-[dependencies.spawn]
-path = "../spawn"
-
 [dependencies.task]
 path = "../task"
 
+[dependencies.spawn]
+path = "../spawn"
+
+[dependencies.apic]
+path = "../apic"
+
 [dependencies.mod_mgmt]
 path = "../mod_mgmt"
+
+[dependencies.fs_node]
+path = "../fs_node"
+
+# [target.'cfg(target_feature = "sse2")'.dependencies.compiler_builtins]
+# git = "https://github.com/rust-lang-nursery/compiler-builtins"
+# features = [ "no-lang-items" ]
 
 [lib]
 crate-type = ["rlib"]

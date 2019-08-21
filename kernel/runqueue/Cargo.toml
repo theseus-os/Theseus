@@ -12,8 +12,8 @@ default-features = false
 version = "0.3.7"
 
 [dependencies.lazy_static]
-features = ["spin_no_std"]
-version = "1.0"
+features = ["spin_no_std", "nightly"]
+version = "1.2.0"
 
 [dependencies.irq_safety]
 git = "https://github.com/kevinaboos/irq_safety"
@@ -24,6 +24,11 @@ path = "../../libs/atomic_linked_list"
 [dependencies.task]
 path = "../task"
 
+[dependencies.runqueue_round_robin]
+path = "../runqueue_round_robin"
+
+[dependencies.runqueue_priority]
+path = "../runqueue_priority"
 
 ## This should be dependent upon 'cfg(single_simd_task_optimization)',
 ## but it cannot be because of https://github.com/rust-lang/cargo/issues/5499.
