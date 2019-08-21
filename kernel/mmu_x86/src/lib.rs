@@ -1,15 +1,16 @@
 #![no_std]
 
-extern crate x86_64;
 extern crate kernel_config;
-#[macro_use] extern crate bitflags;
-extern crate xmas_elf;
-extern crate multiboot2;
+extern crate x86_64;
+#[macro_use]
+extern crate bitflags;
 extern crate entry_flags_oper;
+extern crate multiboot2;
+extern crate xmas_elf;
 
-use x86_64::{instructions::tlb, registers::control_regs};
-pub use kernel_config::memory::{KERNEL_OFFSET};
 use entry_flags_oper::EntryFlagsOper;
+pub use kernel_config::memory::KERNEL_OFFSET;
+use x86_64::{instructions::tlb, registers::control_regs};
 
 bitflags! {
     #[derive(Default)]
@@ -26,17 +27,17 @@ bitflags! {
         const GLOBAL            = 0; // disabling because VirtualBox doesn't like it
         const NO_EXECUTE        = 1 << 63;
     }
-    
+
 }
 
 impl EntryFlagsOper<EntryFlags> for EntryFlags {
-    /// Returns ture if the page the entry points to is a huge page. 
+    /// Returns ture if the page the entry points to is a huge page.
     /// Which means the flags contains a HUGE_PAGE bit
     fn is_huge(&self) -> bool {
         self.contains(EntryFlags::HUGE_PAGE)
     }
 
-    /// The default flags of an accessible page. 
+    /// The default flags of an accessible page.
     /// For every accessiable page the PRESENT bit should be set
     fn default_flags() -> EntryFlags {
         EntryFlags::PRESENT
@@ -47,7 +48,7 @@ impl EntryFlagsOper<EntryFlags> for EntryFlags {
         EntryFlags::WRITABLE
     }
 
-    /// The flags of a writable page. 
+    /// The flags of a writable page.
     /// For every writable page the PRESENT and WRITABLE bits should be set
     fn rw_flags() -> EntryFlags {
         EntryFlags::default_flags() | EntryFlags::WRITABLE
@@ -69,12 +70,11 @@ impl EntryFlagsOper<EntryFlags> for EntryFlags {
         self.intersects(EntryFlags::WRITABLE)
     }
 
-    /// Returns true if these flags are executable, 
+    /// Returns true if these flags are executable,
     /// which means that the `NO_EXECUTE` bit on x86 is *not* set.
     fn is_executable(&self) -> bool {
         !self.intersects(EntryFlags::NO_EXECUTE)
     }
-
 }
 
 impl EntryFlags {
@@ -98,8 +98,8 @@ impl EntryFlags {
     }
 
     pub fn from_elf_section_flags(elf_flags: u64) -> EntryFlags {
-        use xmas_elf::sections::{SHF_WRITE, SHF_ALLOC, SHF_EXECINSTR};
-        
+        use xmas_elf::sections::{SHF_ALLOC, SHF_EXECINSTR, SHF_WRITE};
+
         let mut flags = EntryFlags::empty();
 
         if elf_flags & SHF_ALLOC == SHF_ALLOC {
@@ -119,7 +119,7 @@ impl EntryFlags {
 
     pub fn from_elf_program_flags(prog_flags: xmas_elf::program::Flags) -> EntryFlags {
         let mut flags = EntryFlags::empty();
-        
+
         if prog_flags.is_read() {
             // section is loaded to memory
             flags = flags | EntryFlags::PRESENT;
@@ -136,8 +136,7 @@ impl EntryFlags {
     }
 }
 
-
-/// Set the new P4 table address. 
+/// Set the new P4 table address.
 /// Switch to the new page table p4 points to
 pub fn set_new_p4(p4: u64) {
     unsafe {
@@ -145,17 +144,16 @@ pub fn set_new_p4(p4: u64) {
     }
 }
 
-
 /// Returns the current top-level page table frame, e.g., cr3 on x86
 // pub fn get_p4_address() -> Frame {
-//     
+//
 // }
 pub fn get_p4_address() -> usize {
     control_regs::cr3().0 as usize
 }
 
 /// Flush the virtual address translation buffer of the specific address
-pub fn flush(address:usize) {
+pub fn flush(address: usize) {
     tlb::flush(x86_64::VirtualAddress(address));
 }
 
