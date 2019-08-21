@@ -16,6 +16,7 @@ mod mapper;
 #[cfg(mapper_spillful)]
 pub mod mapper_spillful;
 
+
 pub use self::entry::*;
 pub use self::temporary_page::TemporaryPage;
 pub use self::mapper::*;
@@ -29,7 +30,8 @@ use core::{
 };
 use super::*;
 
-use kernel_config::memory::{PAGE_SIZE, MAX_PAGE_NUMBER, RECURSIVE_P4_INDEX, KERNEL_TEXT_P4_INDEX, KERNEL_HEAP_P4_INDEX, KERNEL_STACK_P4_INDEX};
+use kernel_config::memory::{PAGE_SIZE, MAX_PAGE_NUMBER, RECURSIVE_P4_INDEX};
+use kernel_config::memory::{KERNEL_TEXT_P4_INDEX, KERNEL_HEAP_P4_INDEX, KERNEL_STACK_P4_INDEX};
 
 
 #[derive(Clone, Copy, PartialEq, Eq, PartialOrd, Ord)]
@@ -269,7 +271,7 @@ impl PageTable {
         {
             let table = try!(temporary_page.map_table_frame(new_p4_frame.clone(), current_page_table));
             table.zero();
-                        
+
             table[RECURSIVE_P4_INDEX].set(new_p4_frame.clone(), EntryFlags::rw_flags());
 
             // start out by copying all the kernel sections into the new table
@@ -337,10 +339,16 @@ impl PageTable {
         current_table_after_switch
     }
 
+
     /// Returns the physical address of this page table's top-level p4 frame
     pub fn physical_address(&self) -> PhysicalAddress {
         self.p4_table.start_address()
     }
+}
+
+
+pub fn get_current_p4() -> Frame {
+    Frame::containing_address(PhysicalAddress::new_canonical(get_p4_address()))
 }
 
 // /// Get a stack trace, borrowed from Redox

@@ -47,7 +47,7 @@ macro_rules! try_forget {
 
 mod area_frame_allocator;
 mod stack_allocator;
-pub mod paging;
+mod paging;
 
 pub use self::area_frame_allocator::AreaFrameAllocator;
 pub use self::paging::*;
@@ -91,7 +91,7 @@ impl VirtualAddress {
         }
     }
 
-/// Creates a new `VirtualAddress` that is guaranteed to be canonical
+    /// Creates a new `VirtualAddress` that is guaranteed to be canonical
     /// by forcing the upper bits (64:48] to be sign-extended from bit 47.
     pub fn new_canonical(mut virt_addr: usize) -> VirtualAddress {
         match virt_addr.get_bit(47) {
@@ -317,10 +317,6 @@ impl MemoryManagementInfo {
             None
         }
     }
-}
-
-pub fn get_current_p4() -> Frame {
-    Frame::containing_address(PhysicalAddress::new_canonical(get_p4_address()))
 }
 
 /// A convenience function that creates a new memory mapping by allocating frames that are contiguous in physical memory.

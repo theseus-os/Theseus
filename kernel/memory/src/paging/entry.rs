@@ -7,8 +7,7 @@
 // option. This file may not be copied, modified, or distributed
 // except according to those terms.
 
-pub use super::super::EntryFlags;
-use super::super::{Frame};
+use super::super::{Frame, EntryFlags};
 use PhysicalAddress;
 use bit_field::BitField;
 use kernel_config::memory::PAGE_SHIFT;

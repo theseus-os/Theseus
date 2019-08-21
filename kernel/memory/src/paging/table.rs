@@ -7,9 +7,9 @@
 // option. This file may not be copied, modified, or distributed
 // except according to those terms.
 
-use super::entry::{Entry, EntryFlags};
+use super::entry::{Entry};
 use kernel_config::memory::{PAGE_SHIFT, ENTRIES_PER_PAGE_TABLE};
-use super::super::{VirtualAddress, FrameAllocator};
+use super::super::{VirtualAddress, FrameAllocator, EntryFlags};
 use core::ops::{Index, IndexMut};
 use core::marker::PhantomData;
 
