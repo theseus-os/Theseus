@@ -106,7 +106,7 @@ impl Mapper {
                     let p2_entry = &p2[page.p2_index()];
                     // 2MiB page?
                     if let Some(start_frame) = p2_entry.pointed_frame() {
-                        if p2_entry.flags().contains(EntryFlags::HUGE_PAGE) {
+                        if p2_entry.flags().is_huge() {
                             // address must be 2MiB aligned
                             assert!(start_frame.number % ENTRIES_PER_PAGE_TABLE == 0);
                             return Some(Frame { number: start_frame.number + page.p1_index() });
@@ -146,7 +146,7 @@ impl Mapper {
                 return Err("page was already in use");
             } 
 
-            p1[page.p1_index()].set(frame, flags | EntryFlags::PRESENT);
+            p1[page.p1_index()].set(frame, flags | EntryFlags::default_flags());
         }
 
         Ok(MappedPages {
@@ -187,7 +187,7 @@ impl Mapper {
                 return Err("page was already in use");
             } 
 
-            p1[page.p1_index()].set(frame, flags | EntryFlags::PRESENT);
+            p1[page.p1_index()].set(frame, flags | EntryFlags::default_flags());
         }
 
         Ok(MappedPages {
@@ -540,7 +540,7 @@ impl MappedPages {
                 .ok_or("mapping code does not support huge pages")?;
             
             let frame = p1[page.p1_index()].pointed_frame().ok_or("remap(): page not mapped")?;
-            p1[page.p1_index()].set(frame, new_flags | EntryFlags::PRESENT);
+            p1[page.p1_index()].set(frame, new_flags | EntryFlags::default_flags());
 
             let vaddr = page.start_address();
             x86_64::instructions::tlb::flush(x86_64::VirtualAddress(vaddr.value()));

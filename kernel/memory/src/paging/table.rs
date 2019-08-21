@@ -9,7 +9,7 @@
 
 use super::entry::{Entry};
 use kernel_config::memory::{PAGE_SHIFT, ENTRIES_PER_PAGE_TABLE};
-use super::super::{VirtualAddress, FrameAllocator, EntryFlags};
+use super::super::{VirtualAddress, FrameAllocator, EntryFlags, EntryFlagsOper};
 use core::ops::{Index, IndexMut};
 use core::marker::PhantomData;
 
@@ -60,7 +60,7 @@ impl<L> Table<L>
     /// (so P4 would give P3, P3 -> P2, P2 -> P1).
     fn next_table_address(&self, index: usize) -> Option<VirtualAddress> {
         let entry_flags = self[index].flags();
-        if entry_flags.contains(EntryFlags::PRESENT) && !entry_flags.contains(EntryFlags::HUGE_PAGE) {
+        if entry_flags.is_page() {
             let table_address = self as *const _ as usize;
             let next_table_vaddr: usize = (table_address << 9) | (index << PAGE_SHIFT);
             Some(VirtualAddress::new_canonical(next_table_vaddr))
@@ -90,7 +90,7 @@ impl<L> Table<L>
             assert!(!self[index].flags().contains(EntryFlags::HUGE_PAGE),
                     "mapping code does not support huge pages");
             let frame = allocator.allocate_frame().expect("no frames available");
-            self[index].set(frame, flags | EntryFlags::PRESENT | EntryFlags::WRITABLE); // must be PRESENT | WRITABLE
+            self[index].set(frame, flags.set_writable()); // must be PRESENT | WRITABLE for x86
             self.next_table_mut(index).unwrap().zero();
         }
         self.next_table_mut(index).unwrap()

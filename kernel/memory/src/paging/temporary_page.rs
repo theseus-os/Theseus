@@ -10,7 +10,7 @@
 use {FrameRange};
 use paging::{PageTable, MappedPages};
 use super::table::{Table, Level1};
-use super::{Page, Frame, FrameAllocator, VirtualAddress};
+use super::{Page, Frame, FrameAllocator, VirtualAddress, EntryFlagsOper};
 use kernel_config::memory::TEMPORARY_PAGE_VIRT_ADDR;
 
 
@@ -61,7 +61,7 @@ impl TemporaryPage {
         }
         
         self.mapped_page = Some( 
-            try!(page_table.map_to(page, frame, EntryFlags::WRITABLE, &mut self.allocator))
+            try!(page_table.map_to(page, frame, EntryFlags::writable(), &mut self.allocator))
         );
         
         let table: &mut Table<Level1> = try!( 
