@@ -65,9 +65,9 @@ const WINDOW_BUTTON_SIZE: usize = 6;
 pub struct WindowComponents {
     /// the window object that could be used to initialize components
     pub winobj: Arc<Mutex<WindowObjAlpha>>,
-    /// the space remained for border, init as WINDOW_BORDER
+    /// the witdth of border, init as WINDOW_BORDER. the border is still part of the window and remains flexibility for user to change border style or remove border. However, for most application a border is useful for user to identify the region.
     border_size: usize,
-    /// the space remained for title bar, init as WINDOW_TITLE_BAR
+    /// the height of title bar in pixel, init as WINDOW_TITLE_BAR. it is render inside the window so user shouldn't use this area anymore
     title_size: usize,
     /// the background of this window, init as WINDOW_BACKGROUND
     background: Pixel,
@@ -84,6 +84,7 @@ pub struct WindowComponents {
 
 impl WindowComponents {
     /// create new WindowComponents by given position and size, return the Mutex of it for ease of sharing
+    /// x, y is the distance relative to left-top of window
     pub fn new(x: isize, y: isize, width: usize, height: usize) -> Result<Arc<Mutex<WindowComponents>>, &'static str> {
 
         if width <= 2 * WINDOW_TITLE_BAR || height <= WINDOW_TITLE_BAR + WINDOW_BORDER {

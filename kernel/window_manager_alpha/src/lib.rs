@@ -496,6 +496,8 @@ impl WindowManagerAlpha {
 
     /// refresh the floating border indicating user of new window position and size. `show` indicates whether to show the border or not. 
     /// (x_start, x_end, y_start, y_end) indicates the position and size of this border.
+    /// if this is not clear, you can simply try this attribute by pressing left mouse on the top bar of any window and move the mouse, then you should see a thin border
+    /// this is extremely useful when performance is not enough for re-render the whole window when moving the mouse
     fn refresh_floating_border(& mut self, show: bool, x_start: isize, x_end: isize, y_start: isize, y_end: isize) -> Result<(), &'static str> {
         if !self.is_show_border && !show { return Ok(()) }
         // first clear old border
@@ -524,6 +526,8 @@ impl WindowManagerAlpha {
     }
 
     /// optimized refresh area for less computation up to 2x
+    /// it works like this: first refresh all the region of new position, which let user see the new content faster
+    /// then it try to reduce computation by only refresh the region that is in old one but NOT in new one.
     fn refresh_area_with_old_new(&mut self, 
             old_x_start: isize, old_x_end: isize, old_y_start: isize, old_y_end: isize, 
             new_x_start: isize, new_x_end: isize, new_y_start: isize, new_y_end: isize) -> Result<(), &'static str> {
@@ -584,13 +588,13 @@ impl WindowManagerAlpha {
     }
 }
 
-/// delete window the given window
+/// delete the given window by removing it from any lists, then refresh the region so that it is deleted on screen
 pub fn delete_window(objref: &Arc<Mutex<WindowObjAlpha>>) -> Result<(), &'static str> {
     let mut win = WINDOW_MANAGER.try().ok_or("The static window manager was not yet initialized")?.lock();
     win.delete_window(objref)
 }
 
-/// set window as active
+/// set window as active, the active window is always at top, so it will refresh the region of this window
 pub fn set_active(objref: &Arc<Mutex<WindowObjAlpha>>) -> Result<(), &'static str> {
     let mut win = WINDOW_MANAGER.try().ok_or("The static window manager was not yet initialized")?.lock();
     win.set_active(objref, true)
