@@ -12,16 +12,15 @@ extern crate spin;
 extern crate volatile;
 extern crate irq_safety;
 extern crate memory;
-#[cfg(target_arch = "x86_64")]
 extern crate pit_clock;
 extern crate kernel_config;
-#[cfg(target_arch = "x86_64")]
 extern crate apic;
 extern crate acpi;
 extern crate madt;
 extern crate mod_mgmt;
 extern crate ap_start;
 extern crate pause;
+extern crate graphic_mode;
 
 use core::{
     ops::DerefMut,
@@ -36,12 +35,11 @@ use volatile::Volatile;
 use irq_safety::MutexIrqSafe;
 use memory::{VirtualAddress, PhysicalAddress, MappedPages, Page, Frame, FrameRange, EntryFlags, MemoryManagementInfo, FRAME_ALLOCATOR, Stack};
 use kernel_config::memory::{PAGE_SIZE, PAGE_SHIFT};
-#[cfg(target_arch = "x86_64")]
 use apic::{LocalApic, get_lapics, get_my_apic_id, has_x2apic, get_bsp_id};
-#[cfg(target_arch = "x86_64")]
 use ap_start::{kstart_ap, AP_READY_FLAG};
 use madt::{Madt, MadtEntry, MadtLocalApic, find_nmi_entry_for_processor};
 use pause::spin_loop_hint;
+use graphic_mode::{GRAPHIC_INFO, GraphicInfo};
 
 
 /// The physical address that an AP jumps to when it first is booted by the BSP.
@@ -52,25 +50,7 @@ const AP_STARTUP: usize = 0x10000;
 /// Value: 0xF000
 const TRAMPOLINE: usize = AP_STARTUP - PAGE_SIZE;
 
-const GRAPHIC_INFO_TRAMPOLINE_OFFSET: usize = 0x100;
-
-// graphic mode information
-pub static GRAPHIC_INFO:Mutex<GraphicInfo> = Mutex::new(GraphicInfo{
-    width:0,
-    height:0,
-    physical_address:0,
-});
-
-/// A structure to access framebuffer information 
-/// that was discovered and populated in the AP's real-mode 
-/// initialization seqeunce.
-/// TODO FIXME: remove this struct, find another way to obtain framebuffer info.
-pub struct GraphicInfo{
-    pub width:u64,
-    pub height:u64,
-    pub physical_address:u64,
-}
-
+pub const GRAPHIC_INFO_TRAMPOLINE_OFFSET: usize = 0x100;
 /// Starts up and sets up AP cores based on system information from ACPI
 /// (specifically the MADT (APIC) table).
 /// 
@@ -78,7 +58,6 @@ pub struct GraphicInfo{
 /// * kernel_mmi_ref: A reference to the locked MMI structure for the kernel.
 /// * ap_start_realmode_begin: the starting virtual address of where the ap_start realmode code is.
 /// * ap_start_realmode_end: the ending virtual address of where the ap_start realmode code is.
-#[cfg(target_arch = "x86_64")]
 pub fn handle_ap_cores(
     kernel_mmi_ref: Arc<MutexIrqSafe<MemoryManagementInfo>>,
     ap_start_realmode_begin: VirtualAddress,
@@ -189,12 +168,7 @@ pub fn handle_ap_cores(
         let rs = trampoline_mapped_pages.as_type::<GraphicInfo>(GRAPHIC_INFO_TRAMPOLINE_OFFSET);
         match rs {
             Ok(graphic_info) => {
-                let mut info = GRAPHIC_INFO.lock();
-                *info = GraphicInfo {
-                    width:graphic_info.width,
-                    height:graphic_info.height,
-                    physical_address:graphic_info.physical_address,
-                };
+                graphic_mode::init(graphic_info);
             },
             Err(_) => { error!("Fail to get the graphic information"); }
         };
@@ -246,7 +220,6 @@ struct ApTrampolineData {
 
 
 /// Called by the BSP to initialize the given `new_lapic` using IPIs.
-#[cfg(target_arch = "x86_64")]
 fn bring_up_ap(
     bsp_lapic: &mut LocalApic,
     new_lapic: &MadtLocalApic, 

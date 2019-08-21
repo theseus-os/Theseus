@@ -29,6 +29,7 @@ extern crate irq_safety; // for irq-safe locking and interrupt utilities
 extern crate logger;
 extern crate state_store;
 extern crate memory; // the virtual memory subsystem
+extern crate memory_interface; // the virtual memory subsystem
 extern crate mod_mgmt;
 extern crate exceptions_early;
 extern crate captain;
@@ -121,7 +122,7 @@ pub extern "C" fn nano_core_start(multiboot_information_virtual_address: usize) 
     println_raw!("nano_core_start(): booted via multiboot2."); 
 
     // init memory management: set up stack with guard page, heap, kernel text/data mappings, etc
-    let (kernel_mmi_ref, text_mapped_pages, rodata_mapped_pages, data_mapped_pages, identity_mapped_pages) = try_exit!(memory::init(&boot_info));
+    let (kernel_mmi_ref, text_mapped_pages, rodata_mapped_pages, data_mapped_pages, identity_mapped_pages) = try_exit!(memory_interface::init(&boot_info));
     println_raw!("nano_core_start(): initialized memory subsystem."); 
     // After this point, we must "forget" all of the above mapped_pages instances if an error occurs,
     // because they will be auto-unmapped upon a returned error, causing all execution to stop. 

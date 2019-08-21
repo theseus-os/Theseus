@@ -13,12 +13,18 @@ extern crate alloc;
 #[macro_use] extern crate log;
 #[macro_use] extern crate vga_buffer;
 extern crate memory;
+#[cfg(target_arch = "x86_64")]
 extern crate panic_wrapper;
+#[cfg(target_arch = "aarch64")]
+extern crate panic_wrapper_arm;
 extern crate mod_mgmt;
 
 
 use core::panic::PanicInfo;
-
+#[cfg(target_arch = "x86_64")]
+use panic_wrapper::panic_wrapper;
+#[cfg(target_arch = "aarch64")]
+use panic_wrapper_arm::panic_wrapper;
 
 #[cfg(not(test))]
 #[lang = "eh_personality"]
@@ -41,7 +47,7 @@ fn panic_entry_point(info: &PanicInfo) -> ! {
         // proceed with calling the panic_wrapper, but don't shutdown with try_exit() if errors occur here
         #[cfg(not(loadable))]
         {
-            panic_wrapper::panic_wrapper(info)
+            panic_wrapper(info)
         }
         #[cfg(loadable)]
         {

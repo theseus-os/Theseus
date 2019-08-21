@@ -8,7 +8,6 @@
 extern crate alloc;
 #[macro_use] extern crate log;
 extern crate memory;
-#[cfg(target_arch = "x86_64")]
 extern crate apic;
 extern crate task;
 extern crate runqueue;
@@ -25,7 +24,6 @@ use task::{KillReason, PanicInfoOwned};
 /// * if there is no registered panic handler, then it prints a standard message plus a stack backtrace.
 /// * Finally, it kills the panicked `Task`.
 /// 
-#[cfg(target_arch = "x86_64")]
 pub fn panic_wrapper(panic_info: &PanicInfo) -> Result<(), &'static str> {
     trace!("at top of panic_wrapper: {:?}", panic_info);
 
@@ -58,11 +56,4 @@ pub fn panic_wrapper(panic_info: &PanicInfo) -> Result<(), &'static str> {
     else {
         Err("")
     }
-}
-
-/// TODO: handle panic
-#[cfg(target_arch = "aarch64")]
-pub fn panic_wrapper(panic_info: &PanicInfo) -> Result<(), &'static str> {
-    // TODO
-    Ok(())
 }

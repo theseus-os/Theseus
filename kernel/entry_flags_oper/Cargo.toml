@@ -1,7 +1,7 @@
 [package]
-authors = ["Kevin Boos <kevinaboos@gmail.com>"]
-name = "memory"
-description = "The virtual memory subsystem."
+authors = ["Wenqiu Yu <yuwenqiuj@gmail.com>"]
+name = "entry_flags_oper"
+description = "The trait of operations on entry flags"
 version = "0.1.0"
 build = "../../build.rs"
 
@@ -17,11 +17,9 @@ uefi = { path = "../../libs/uefi-rs" }
 [target.'cfg(target_arch = "x86_64")'.dependencies]
 # x86_64 = { git = "https://github.com/kevinaboos/x86_64" }
 x86_64 = { path = "../../libs/x86_64" }
-mmu_x86 = { path = "../mmu_x86" }
 
 [target.'cfg(target_arch = "aarch64")'.dependencies]
 aarch64 = { path = "../../libs/aarch64" }
-mmu_arm = { path = "../mmu_arm" }
 
 [dependencies.derive_more]
 version = "0.14.0"
@@ -47,9 +45,6 @@ path = "../kernel_config"
 
 [dependencies.heap_irq_safe]
 path = "../heap_irq_safe"
-
-[dependencies.entry_flags_oper]
-path = "../entry_flags_oper"
 
 [lib]
 crate-type = ["rlib"]

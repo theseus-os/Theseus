@@ -9,10 +9,6 @@ build = "../../build.rs"
 spin = "0.4.10"
 volatile = "0.2.5"
 
-[target.'cfg(target_arch = "x86_64")'.dependencies]
-apic = { path = "../apic" }
-pit_clock = { path = "../pit_clock" }
-
 [dependencies.log]
 default-features = false
 version = "0.3.7"
@@ -26,11 +22,17 @@ path = "../memory"
 [dependencies.kernel_config]
 path = "../kernel_config"
 
+[dependencies.pit_clock]
+path = "../pit_clock"
+
 [dependencies.mod_mgmt]
 path = "../mod_mgmt"
 
 [dependencies.acpi]
 path = "../acpi"
+
+[dependencies.apic]
+path = "../apic"
 
 [dependencies.ap_start]
 path = "../ap_start"
@@ -41,6 +43,8 @@ path = "../madt"
 [dependencies.pause]
 path = "../pause"
 
+[dependencies.graphic_mode]
+path = "../graphic_mode"
 
 [lib]
 crate-type = ["rlib"]

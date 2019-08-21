@@ -19,7 +19,7 @@ use volatile::Volatile;
 #[cfg(target_arch = "x86_64")]
 use kernel_config::memory::x86_64::KERNEL_OFFSET;
 #[cfg(target_arch = "aarch64")]
-use kernel_config::memory::arm::KERNEL_OFFSET;
+use kernel_config::memory::aarch64::KERNEL_OFFSET;
 
 
 /// defined by x86's physical memory maps

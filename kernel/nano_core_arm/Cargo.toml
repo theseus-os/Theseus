@@ -27,6 +27,9 @@ path = "../mod_mgmt"
 [dependencies.memory]
 path = "../memory"
 
+[dependencies.memory_interface]
+path = "../memory_interface"
+
 [dependencies.panic_unwind]
 path = "../panic_unwind"
 

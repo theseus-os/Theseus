@@ -10,6 +10,7 @@ extern crate alloc;
 extern crate log;
 extern crate rlibc; // basic memset/memcpy libc functions
 extern crate memory;
+extern crate memory_interface;
 extern crate exceptions_arm;
 extern crate uefi;
 extern crate uefi_exts;
@@ -114,7 +115,7 @@ pub extern "win64" fn nano_core_start(_image: uefi::Handle, st: SystemTable<Boot
         _rodata_mapped_pages,
         _data_mapped_pages,
         _identity_mapped_pages,
-    ) = try_exit!(memory::init(&bt));
+    ) = try_exit!(memory_interface::init(&bt));
     debug!("nano_core_start(): initialized memory subsystem.");
 
     match stdout.write_str(WELCOME_STRING) {

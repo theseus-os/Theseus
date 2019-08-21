@@ -11,17 +11,13 @@ use core::mem;
 use core::ops::DerefMut;
 use core::ptr::Unique;
 use core::slice;
-#[cfg(target_arch = "x86_64")]
-use x86_64;
-#[cfg(any(target_arch = "aarch64"))]
-use aarch64;
 use {BROADCAST_TLB_SHOOTDOWN_FUNC, VirtualAddress, PhysicalAddress, FRAME_ALLOCATOR, FrameRange, Page, Frame, FrameAllocator, AllocatedPages}; 
 use paging::{PageRange, get_current_p4};
-use paging::entry::EntryFlags;
 use paging::table::{P4, Table, Level4};
 use kernel_config::memory::{ENTRIES_PER_PAGE_TABLE, PAGE_SIZE, TEMPORARY_PAGE_VIRT_ADDR};
 use alloc::vec::Vec;
 use type_name;
+use super::{flush, EntryFlags, EntryFlagsOper};
 
 pub struct Mapper {
     p4: Unique<Table<Level4>>,
@@ -110,11 +106,7 @@ impl Mapper {
                     let p2_entry = &p2[page.p2_index()];
                     // 2MiB page?
                     if let Some(start_frame) = p2_entry.pointed_frame() {
-                        #[cfg(target_arch = "x86_64")]
-                        let is_huge = p2_entry.flags().contains(EntryFlags::HUGE_PAGE);
-                        #[cfg(any(target_arch = "aarch64"))]
-                        let is_huge = !p2_entry.flags().contains(EntryFlags::PAGE);
-                        if is_huge {
+                        if p2_entry.flags().is_huge() {
                             // address must be 2MiB aligned
                             assert!(start_frame.number % ENTRIES_PER_PAGE_TABLE == 0);
                             return Some(Frame { number: start_frame.number + page.p1_index() });
@@ -154,11 +146,7 @@ impl Mapper {
                 return Err("page was already in use");
             } 
 
-            #[cfg(target_arch = "x86_64")]
-            p1[page.p1_index()].set(frame, flags | EntryFlags::PRESENT);
-
-            #[cfg(any(target_arch = "aarch64"))]
-            p1[page.p1_index()].set(frame, flags | EntryFlags::PRESENT | EntryFlags :: ACCESSEDARM | EntryFlags::INNER_SHARE);
+            p1[page.p1_index()].set(frame, flags | EntryFlags::default_flags());
 
         }
 
@@ -200,10 +188,7 @@ impl Mapper {
                 return Err("page was already in use");
             } 
 
-            #[cfg(target_arch = "x86_64")]
-            p1[page.p1_index()].set(frame, flags | EntryFlags::PRESENT);
-            #[cfg(any(target_arch = "aarch64"))]
-            p1[page.p1_index()].set(frame, flags | EntryFlags::PRESENT | EntryFlags :: ACCESSEDARM | EntryFlags::INNER_SHARE);
+            p1[page.p1_index()].set(frame, flags | EntryFlags::default_flags());
         }
 
         Ok(MappedPages {
@@ -559,10 +544,7 @@ impl MappedPages {
             p1[page.p1_index()].set(frame, new_flags | EntryFlags::PRESENT);
 
             let vaddr = page.start_address();
-            #[cfg(target_arch = "x86_64")]
-            x86_64::instructions::tlb::flush(x86_64::VirtualAddress(vaddr.value()));
-            #[cfg(any(target_arch = "aarch64"))]
-            aarch64::instructions::tlb::flush(aarch64::VirtualAddress(vaddr.value()));
+            flush(vaddr.value());
             if broadcast_tlb_shootdown.is_some() && vaddr.value() != TEMPORARY_PAGE_FRAME {
                 vaddrs.push(vaddr);
             }
@@ -602,10 +584,7 @@ impl MappedPages {
             p1[page.p1_index()].set_unused();
 
             let vaddr = page.start_address();
-            #[cfg(target_arch = "x86_64")]
-            x86_64::instructions::tlb::flush(x86_64::VirtualAddress(page.start_address().value()));
-            #[cfg(any(target_arch = "aarch64"))]
-            aarch64::instructions::tlb::flush(aarch64::VirtualAddress(page.start_address().value()));
+            flush(page.start_address().value());
             if broadcast_tlb_shootdown.is_some() && vaddr.value() != TEMPORARY_PAGE_FRAME {
                 vaddrs.push(vaddr);
             }

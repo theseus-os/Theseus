@@ -8,7 +8,6 @@ build = "../../build.rs"
 spin = "0.4.10"
 volatile = "0.2.5"
 
-
 [dependencies.lazy_static]
 features = ["spin_no_std", "nightly"]
 version = "1.2.0"
@@ -32,14 +31,14 @@ path = "../memory"
 [dependencies.util]
 path = "../../libs/util"
 
-[dependencies.multicore_bringup]
-path = "../multicore_bringup"
-
 [dependencies.tsc]
 path = "../tsc"
 
 [dependencies.vga_buffer]
 path = "../vga_buffer"
+
+[dependencies.graphic_mode]
+path = "../graphic_mode"
 
 # [build]
 # rustflags = ["-C", "prefer-dynamic", "-C", "panic=abort"]

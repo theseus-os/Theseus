@@ -6,8 +6,6 @@
 #![feature(asm)]
 
 extern crate spin;
-extern crate multicore_bringup;
-
 extern crate volatile;
 extern crate serial_port;
 extern crate kernel_config;
@@ -15,6 +13,7 @@ extern crate memory;
 #[macro_use] extern crate log;
 extern crate util;
 extern crate alloc;
+extern crate graphic_mode;
 
 
 use spin::{Mutex};
@@ -22,6 +21,7 @@ use memory::{FRAME_ALLOCATOR, FrameRange, PhysicalAddress,
     EntryFlags, allocate_pages_by_bytes, MappedPages, get_kernel_mmi_ref};
 use core::ops::DerefMut;
 use alloc::boxed::Box;
+use graphic_mode::GRAPHIC_INFO;
 
 //The buffer for text printing
 pub mod text_buffer;
@@ -39,7 +39,7 @@ pub fn init() -> Result<(), &'static str > {
     let BUFFER_WIDTH:usize;
     let BUFFER_HEIGHT:usize;
     {
-        let graphic_info = multicore_bringup::GRAPHIC_INFO.lock();
+        let graphic_info = GRAPHIC_INFO.lock();
         if graphic_info.physical_address == 0 {
             return Err("Fail to get graphic mode infomation!");
         }
