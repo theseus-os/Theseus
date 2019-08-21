@@ -36,5 +36,8 @@ version = "1.2.0"
 [dependencies.stdio]
 path = "../../libs/stdio"
 
+[dependencies.scheduler]
+path = "../../kernel/scheduler"
+
 [lib]
 crate-type = ["rlib"]

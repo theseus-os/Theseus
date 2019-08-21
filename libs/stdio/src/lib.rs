@@ -12,6 +12,7 @@ use alloc::collections::VecDeque;
 use alloc::sync::Arc;
 use alloc::boxed::Box;
 use alloc::string::String;
+use alloc::vec::Vec;
 use spin::{Mutex, MutexGuard};
 use core_io::{Read, Write};
 use keycodes_ascii::KeyEvent;
@@ -21,7 +22,7 @@ use core::ops::Deref;
 struct IoCoreBuffer<T> {
     /// The ring buffer.
     queue: VecDeque<T>,
-    /// The EOF mark. We meet EOF when it equals `ture`.
+    /// The EOF mark. We meet EOF when it equals `true`.
     end: bool
 }
 
@@ -32,39 +33,45 @@ struct IoCore<T> {
 
 /// A ring buffer containing bytes. It forms `stdin`, `stdout` and `stderr`.
 pub struct Stdio {
-    core: Arc<IoCore<u8>>
+    core: Arc<IoCore<u8>>,
+    read_handle_lock: Arc<Mutex<()>>,
+    write_handle_lock: Arc<Mutex<()>>
 }
 
 /// A read handle to stdio buffers.
 #[derive(Clone)]
 pub struct StdioReadHandle {
     /// Inner buffer to support buffered read.
-    inner_buf: [u8; 256],
+    inner_buf: Vec<u8>,
     /// The length of actual buffered bytes.
     inner_content_len: usize,
     /// Points to the ring buffer.
-    core: Arc<IoCore<u8>>
+    core: Arc<IoCore<u8>>,
+    read_handle_lock: Arc<Mutex<()>>
 }
 
 /// A write handle to stdio buffers.
 #[derive(Clone)]
 pub struct StdioWriteHandle {
     /// Points to the ring buffer.
-    core: Arc<IoCore<u8>>
+    core: Arc<IoCore<u8>>,
+    write_handle_lock: Arc<Mutex<()>>
 }
 
 /// `StdioReadGuard` acts like `MutexGuard`, it locks the underlying ring buffer during its
 /// lifetime, and provides reading methods to the ring buffer. The lock will be automatically
 /// released on dropping of this structure.
 pub struct StdioReadGuard<'a> {
-    guard: MutexGuard<'a, IoCoreBuffer<u8>>
+    _guard: MutexGuard<'a, ()>,
+    core: Arc<IoCore<u8>>
 }
 
 /// `StdioReadGuard` acts like `MutexGuard`, it locks the underlying ring buffer during its
 /// lifetime, and provides writing methods to the ring buffer. The lock will be automatically
 /// released on dropping of this structure.
 pub struct StdioWriteGuard<'a> {
-    guard: MutexGuard<'a, IoCoreBuffer<u8>>
+    _guard: MutexGuard<'a, ()>,
+    core: Arc<IoCore<u8>>
 }
 
 impl<T> IoCoreBuffer<T> {
@@ -90,34 +97,57 @@ impl Stdio {
     /// Create a new stdio buffer.
     pub fn new() -> Stdio {
         Stdio {
-            core: Arc::new(IoCore::new())
+            core: Arc::new(IoCore::new()),
+            read_handle_lock: Arc::new(Mutex::new(())),
+            write_handle_lock: Arc::new(Mutex::new(()))
         }
     }
 
     /// Get a read handle to the stdio buffer. Note that each read handle has its own
-    /// inner buffer.
+    /// inner buffer. The buffer size is set to be 256 bytes. Resort to
+    /// `get_read_handle_with_buf_capacity` if one needs a different buffer size.
     pub fn get_read_handle(&self) -> StdioReadHandle {
+        let mut inner_buf = Vec::new();
+        inner_buf.resize(256, 0);
         StdioReadHandle {
-            inner_buf: [0u8; 256],
+            inner_buf,
             inner_content_len: 0,
-            core: self.core.clone()
+            core: self.core.clone(),
+            read_handle_lock: Arc::clone(&self.read_handle_lock)
+        }
+    }
+
+    /// Get a read handle to the stdio buffer with a customized buffer size.
+    /// Note that each read handle has its own inner buffer.
+    pub fn get_read_handle_with_buf_capacity(&self, capacity: usize) -> StdioReadHandle {
+        let mut inner_buf = Vec::new();
+        inner_buf.resize(capacity, 0);
+        StdioReadHandle {
+            inner_buf,
+            inner_content_len: 0,
+            core: self.core.clone(),
+            read_handle_lock: Arc::clone(&self.read_handle_lock)
         }
     }
 
     /// Get a write handle to the stdio buffer.
     pub fn get_write_handle(&self) -> StdioWriteHandle {
         StdioWriteHandle {
-            core: self.core.clone()
+            core: self.core.clone(),
+            write_handle_lock: Arc::clone(&self.write_handle_lock)
         }
     }
 }
 
 impl StdioReadHandle {
-    /// Lock the underlying ring buffer and return a guard that can perform reading
-    /// operation to that buffer.
+    /// Lock the read handle and return a guard that can perform reading operation to that buffer.
+    /// Note that this lock does not lock the underlying ring buffer. It only excludes other
+    /// read handle from performing simultaneous read, but does *not* prevent a write handle
+    /// to perform writing to the underlying ring buffer.
     pub fn lock(&self) -> StdioReadGuard {
         StdioReadGuard {
-            guard: self.core.mtx.lock()
+            _guard: self.read_handle_lock.lock(),
+            core: Arc::clone(&self.core)
         }
     }
 
@@ -127,10 +157,11 @@ impl StdioReadHandle {
     pub fn read_line(&mut self, buf: &mut String) -> Result<usize, core_io::Error> {
         let mut total_cnt = 0usize;    // total number of bytes read this time
         let mut new_cnt;               // number of bytes returned from a `read()` invocation
-        let mut tmp_buf = [0u8; 256];  // temporary buffer
+        let mut tmp_buf = Vec::new();  // temporary buffer
         let mut line_finished = false; // mark if we have finished a line
 
         // Copy from the inner buffer. Process the remaining characters from last read first.
+        tmp_buf.resize(self.inner_buf.len(), 0);
         tmp_buf[0..self.inner_content_len].clone_from_slice(&self.inner_buf[0..self.inner_content_len]);
         new_cnt = self.inner_content_len;
         self.inner_content_len = 0;
@@ -160,31 +191,37 @@ impl StdioReadHandle {
             // We have not finished a whole line. Try to read more from the ring buffer, until
             // we hit EOF.
             let mut locked = self.lock();
-            new_cnt = locked.read(&mut tmp_buf)?;
+            new_cnt = locked.read(&mut tmp_buf[..])?;
             if new_cnt == 0 && locked.is_eof() { return Ok(total_cnt); }
         }
     }
 }
 
 impl StdioWriteHandle {
-    /// Lock the underlying ring buffer and return a guard that can perform writing
-    /// operation to that buffer.
+    /// Lock the write handle and return a guard that can perform writing operation to that buffer.
+    /// Note that this lock does not lock the underlying ring buffer. It only excludes other
+    /// write handle from performing simultaneous write, but does *not* prevent a read handle
+    /// to perform reading to the underlying ring buffer.
     pub fn lock(&self) -> StdioWriteGuard {
         StdioWriteGuard {
-            guard: self.core.mtx.lock()
+            _guard: self.write_handle_lock.lock(),
+            core: Arc::clone(&self.core)
         }
     }
 }
 
 impl<'a> Read for StdioReadGuard<'a> {
-    /// Read from the ring buffer. It returns the number of bytes read.
+    /// Read from the ring buffer. It returns the number of bytes read. Currently it is not possible
+    /// to return an error, but one should *not* simply unwrap the return value since the implementation
+    /// detail is subjected to change in the future.
     fn read(&mut self, buf: &mut [u8]) -> Result<usize, core_io::Error> {
         let mut buf_iter = buf.iter_mut();
         let mut cnt: usize = 0;
+        let mut locked_core = self.core.mtx.lock();
 
         // Keep reading if we have empty space in the output buffer
         // and available byte in the ring buffer.
-        while let (Some(buf_elem), Some(queue_elem)) = (buf_iter.next(), self.guard.queue.pop_front()) {
+        while let (Some(buf_elem), Some(queue_elem)) = (buf_iter.next(), locked_core.queue.pop_front()) {
             *buf_elem = queue_elem;
             cnt += 1;
         }
@@ -193,10 +230,17 @@ impl<'a> Read for StdioReadGuard<'a> {
 }
 
 impl<'a> Write for StdioWriteGuard<'a> {
-    /// Write to the ring buffer. It returns the number of bytes written.
+    /// Write to the ring buffer. It returns the number of bytes written. Currently it is not possible
+    /// to return an error, but one should *not* simply unwrap the return value since the implementation
+    /// detail is subjected to change in the future.
+    /// 
+    /// Also note that this method does *not* guarantee to write all given bytes, although it currently
+    /// does so. Always check the return value when using this method. Otherwise, use `write_all` to
+    /// ensure that all given bytes are written.
     fn write(&mut self, buf: &[u8]) -> Result<usize, core_io::Error> {
+        let mut locked_core = self.core.mtx.lock();
         for byte in buf {
-            self.guard.queue.push_back(*byte)
+            locked_core.queue.push_back(*byte)
         }
         Ok(buf.len())
     }
@@ -210,14 +254,14 @@ impl<'a> Write for StdioWriteGuard<'a> {
 impl<'a> StdioReadGuard<'a> {
     /// Check if the EOF flag of the queue has been set.
     pub fn is_eof(&self) -> bool {
-        self.guard.end
+        self.core.mtx.lock().end
     }
 }
 
 impl<'a> StdioWriteGuard<'a> {
     /// Set the EOF flag of the queue to true.
     pub fn set_eof(&mut self) {
-        self.guard.end = true;
+        self.core.mtx.lock().end = true;
     }
 }
 

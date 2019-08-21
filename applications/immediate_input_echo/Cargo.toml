@@ -13,5 +13,9 @@ path = "../../libs/stdio"
 [dependencies.app_io]
 path = "../app_io"
 
+[dependencies.log]
+default-features = false
+version = "0.3.7"
+
 [lib]
 crate-type = ["rlib"]

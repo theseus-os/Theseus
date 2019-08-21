@@ -5,21 +5,26 @@ extern crate core_io;
 extern crate scheduler;
 extern crate shell;
 extern crate app_io;
-use core_io::Write;
+#[macro_use] extern crate log;
 
+use core_io::Write;
 use alloc::vec::Vec;
 use alloc::string::String;
 use alloc::string::ToString;
 
 #[no_mangle]
 pub fn main(_args: Vec<String>) -> isize {
-    if let Err(_) = run() { return 1; }
-    return 0;
+    if let Err(e) = run() {
+        error!("{}", e);
+        return 1;
+    }
+    0
 }
 
 fn run() -> Result<(), &'static str> {
     let stdout = app_io::stdout()?;
-    let queue = app_io::take_event_queue()?;
+    let mut stdout_locked = stdout.lock();
+    let queue = app_io::take_key_event_queue()?;
     let ack = "event received\n".to_string();
     let ack = ack.as_bytes();
 
@@ -30,9 +35,7 @@ fn run() -> Result<(), &'static str> {
     // one pressing event and one releasing event.
     while cnt < 10 {
         if let Some(_key_event) = queue.read_one() {
-            let mut stdout_locked = stdout.lock();
-            stdout_locked.write_all(&ack).or(Err("bad write"))?;
-            core::mem::drop(stdout_locked);
+            stdout_locked.write_all(&ack).or(Err("failed to perform write_all"))?;
             cnt += 1;
         }
         scheduler::schedule();

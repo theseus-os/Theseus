@@ -4,40 +4,39 @@ extern crate alloc;
 extern crate core_io;
 extern crate stdio;
 extern crate app_io;
+#[macro_use] extern crate log;
 
 use alloc::vec::Vec;
 use alloc::string::String;
 use core_io::{Read, Write};
-use core::mem;
 
 #[no_mangle]
 pub fn main(_args: Vec<String>) -> isize {
+    if let Err(e) = run() {
+        error!("{}", e);
+        return 1;
+    }
+    0
+}
 
-    let stdin = match app_io::stdin() {
-        Ok(stdin) => stdin,
-        Err(_) => return 1
-    };
-    let stdout = match app_io::stdout() {
-        Ok(stdout) => stdout,
-        Err(_) => return 1
-    };
+fn run() -> Result<(), &'static str> {
+    app_io::request_stdin_instant_flush()?;
+    let stdin = app_io::stdin()?;
+    let stdout = app_io::stdout()?;
     let mut buf = [0u8];
 
-    loop {
-        let mut stdin_locked = stdin.lock();
-        match stdin_locked.read(&mut buf) {
-            Ok(cnt) => {
-                if cnt == 0 && stdin_locked.is_eof() { return 0; }
-                else if cnt == 0 { continue; }
-                // never lock stdin and stdout at the same time to avoid deadlock
-                mem::drop(stdin_locked);
-                let mut stdout_locked = stdout.lock();
-                match stdout_locked.write_all(&buf) {
-                    Ok(_cnt) => {},
-                    Err(_) => return 1
-                }
-            },
-            Err(_) => return 1
-        };
+    // Can lock them at the same time. Won't run into deadlock.
+    let mut stdin_locked = stdin.lock();
+    let mut stdout_locked = stdout.lock();
+
+    let mut cnt = 0;
+    while cnt < 10 {
+        let byte_num = stdin_locked.read(&mut buf).or(Err("failed to invoke read"))?;
+        if byte_num == 0 && stdin_locked.is_eof() { break; }
+        else if byte_num == 0 { continue; }
+        stdout_locked.write_all(&buf).or(Err("failed to invoke write_all"))?;
+        cnt += 1;
     }
+    stdout_locked.write_all(&['\n' as u8]).or(Err("failed to invoke write_all"))?;
+    Ok(())
 }

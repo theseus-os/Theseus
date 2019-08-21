@@ -203,7 +203,7 @@ fn event_handler_loop(content: &String, map: &BTreeMap<usize, LineSlice>,
 pub fn main(args: Vec<String>) -> isize {
 
     // Acquire key event queue.
-    let key_event_queue = match app_io::take_event_queue() {
+    let key_event_queue = match app_io::take_key_event_queue() {
         Ok(queue) => queue,
         Err(_) => return 1
     };

@@ -46,7 +46,7 @@ use fs_node::FileOrDir;
 use libterm::Terminal;
 use dfqueue::{DFQueue, DFQueueConsumer, DFQueueProducer};
 use alloc::sync::Arc;
-use spin::Mutex;
+use spin::{Mutex, MutexGuard};
 use environment::Environment;
 use alloc::boxed::Box;
 use core::mem;
@@ -54,18 +54,27 @@ use alloc::collections::BTreeMap;
 use stdio::{Stdio, KeyEventQueue, KeyEventQueueReadHandle, KeyEventQueueWriteHandle};
 use core_io::{Read, Write};
 use core::ops::Deref;
+use app_io::{IoHandles, IoControlFlags};
 
 pub const APPLICATIONS_NAMESPACE_PATH: &'static str = "/namespaces/default/applications";
 
+/// The status of a spawned application.
 #[derive(PartialEq)]
 enum JobStatus {
+    /// Normal state.
     Running,
+    /// The application is suspended (but not killed), e.g. upon ctrl-Z.
     Stopped
 }
 
+/// This structure is used by shell to track its spawned applications. It contains stdio
+/// queues for the running task and a reference to the task structure. Shell uses it to
+/// perform stdio to applications and block/unblock spawned tasks.
 struct Job {
     /// Task reference structure representing the running task.
     task: TaskRef,
+    /// A copy of the task id. Mainly for performance optimization.
+    task_id: usize,
     /// Status of the job.
     status: JobStatus,
     /// Stdin queue of the job.
@@ -365,7 +374,8 @@ impl Shell {
             };
 
             // Lock the shared structure in `app_io` and then kill the running application
-            app_io::lock_and_execute(Box::new(move || {
+            app_io::lock_and_execute(Box::new(move |_flags_guard: MutexGuard<BTreeMap<usize, IoControlFlags>>,
+                                                    _handles_guard: MutexGuard<BTreeMap<usize, IoHandles>>| {
                 match task_ref_copy.kill(KillReason::Requested) {
                     Ok(_) => {
                         if let Err(e) = runqueue::remove_task_from_all(&task_ref_copy) {
@@ -404,7 +414,8 @@ impl Shell {
             };
 
             // Lock the shared structure in `app_io` and then stop the running application
-            app_io::lock_and_execute(Box::new(move || {
+            app_io::lock_and_execute(Box::new(move |_flags_guard: MutexGuard<BTreeMap<usize, IoControlFlags>>,
+                                                    _handles_guard: MutexGuard<BTreeMap<usize, IoHandles>>| {
                 task_ref_copy.block();
 
                 // Here we must wait for the running application to stop before releasing the lock,
@@ -477,7 +488,7 @@ impl Shell {
                     self.clear_cmdline(false)?;
                     self.terminal.lock().refresh_display(0);
                 } else { // shell invokes user programs
-                    self.fg_job_num = self.build_new_job();
+                    self.fg_job_num = self.build_new_job()?;
 
                     // If the new job is to run in the background, then we should not put it to foreground.
                     if let Some(last) = self.cmdline.split_whitespace().last() {
@@ -570,9 +581,11 @@ impl Shell {
                     if self.fg_job_num != 0 {
                         self.insert_char_to_input_buff(c, true)?;
                         if let Some(job) = self.jobs.get(&self.fg_job_num) {
-                            job.stdin.get_write_handle().lock().write_all(self.input_buffer.as_bytes())
-                                .or(Err("shell failed to write to stdin"))?;
-                            self.input_buffer.clear();
+                            if app_io::is_requesting_instant_flush(&job.task_id)? {
+                                job.stdin.get_write_handle().lock().write_all(self.input_buffer.as_bytes())
+                                    .or(Err("shell failed to write to stdin"))?;
+                                self.input_buffer.clear();
+                            }
                         }
                         return Ok(());
                     }
@@ -627,15 +640,15 @@ impl Shell {
     }
 
     /// Start a new job in the shell by the command line.
-    fn build_new_job(&mut self) -> isize {
+    fn build_new_job(&mut self) -> Result<isize, &'static str> {
         match self.eval_cmdline() {
             Ok(new_task_ref) => {
 
                 // Create a new job structure.
-                let task_id = {new_task_ref.lock().id};
-
+                let task_id = new_task_ref.lock().id;
                 let new_job = Job {
                     task: new_task_ref,
+                    task_id,
                     status: JobStatus::Running,
                     stdin: Stdio::new(),
                     stdout: Stdio::new(),
@@ -643,13 +656,25 @@ impl Shell {
                     cmd: self.cmdline.clone()
                 };
 
-                if let Err(msg) = terminal_print::add_child(task_id, self.print_producer.obtain_producer()) { // adds the terminal's print producer to the terminal print crate
+                // Insert print event producer to `terminal_print` to support legacy output.
+                if let Err(msg) = terminal_print::add_child(task_id, self.print_producer.obtain_producer()) {
                     self.terminal.lock().print_to_terminal(format!("{}\n", msg).to_string());
-                    return 0;
+                    return Err(msg);
                 }
 
-                app_io::add_child(task_id, new_job.stdin.get_read_handle(), new_job.stdout.get_write_handle(), 
-                                  new_job.stderr.get_write_handle(), self.key_event_consumer.clone()).unwrap();
+                // Set up IoHandles in `app_io`.
+                let terminal = app_io::get_terminal_or_default()?;
+                let handles = IoHandles::new(
+                    new_job.stdin.get_read_handle(),
+                    new_job.stdout.get_write_handle(),
+                    new_job.stderr.get_write_handle(),
+                    self.key_event_consumer.clone(),
+                    terminal
+                );
+                app_io::insert_child_handles(task_id, handles);
+
+                // All IO handles have been set up for the new task. Safe to unblock it now.
+                new_job.task.unblock();
 
                 // Allocate a job number for the new job. It will start from 1 and choose the smallest number
                 // that has not yet been allocated.
@@ -662,12 +687,8 @@ impl Shell {
                 }
                 self.jobs.insert(new_job_num, new_job);
                 self.task_to_job.insert(task_id, new_job_num);
-                match self.jobs.get(&new_job_num) {
-                    Some(job) => job.task.unblock(),
-                    None => return 0 // 0 means no new job is spawned
-                };
-                return new_job_num;
-            }
+                Ok(new_job_num)
+            },
             Err(err) => {
                 let err_msg = match err {
                     AppErr::NotFound(command) => format!("{:?} command not found.\n", command),
@@ -679,7 +700,7 @@ impl Shell {
                     self.terminal.lock().print_to_terminal(format!("{}\n", msg).to_string());
                 }
                 self.redisplay_prompt();
-                0 // 0 means no new job is spawned
+                Err("Failed to evaluate command line.")
             }
         }
     }
@@ -762,11 +783,11 @@ impl Shell {
                                 // we know the return type of this task is `isize`,
                                 // so we need to downcast it from Any to isize.
                                 let val: Option<&isize> = exit_status.downcast_ref::<isize>();
-                                info!("terminal: task [{}] returned exit value: {:?}", task_ref_copy.lock().id, val);
+                                info!("terminal: task [{}] returned exit value: {:?}", job.task_id, val);
                                 if let Some(val) = val {
                                     if *val < 0 {
                                         self.terminal.lock().print_to_terminal(
-                                            format!("task [{}] returned error value {:?}\n", task_ref_copy.lock().id, val)
+                                            format!("task [{}] returned error value {:?}\n", job.task_id, val)
                                         );
                                     }
                                 }
@@ -777,15 +798,15 @@ impl Shell {
                             },
                             // If the user manually aborts the task
                             ExitValue::Killed(kill_reason) => {
-                                warn!("task [{}] was killed because {:?}", task_ref_copy.lock().id, kill_reason);
+                                warn!("task [{}] was killed because {:?}", job.task_id, kill_reason);
                                 self.terminal.lock().print_to_terminal(
-                                    format!("task [{}] was killed because {:?}\n", task_ref_copy.lock().id, kill_reason)
+                                    format!("task [{}] was killed because {:?}\n", job.task_id, kill_reason)
                                 );
                             }
                         }
 
                         // Remove the queue for legacy terminal print
-                        terminal_print::remove_child(task_ref_copy.lock().id)?;
+                        terminal_print::remove_child(job.task_id)?;
 
                         // Record the completed job and remove them from job list later.
                         job_to_be_removed.push(*job_num);
@@ -803,7 +824,7 @@ impl Shell {
                     },
                     // None value indicates an error somewhere.
                     None => {
-                        error!("task [{}] exited with None exit value.", task_ref_copy.lock().id);
+                        error!("task [{}] exited with None exit value.", job.task_id);
                     },
                 }
             } else if !task_ref_copy.lock().is_runnable() && job.status != JobStatus::Stopped { // task has just stopped
@@ -837,7 +858,7 @@ impl Shell {
         for finished_job_num in job_to_be_removed {
             if let Some(job) = self.jobs.remove(&finished_job_num) {
                 self.task_to_job.remove(&job.task.lock().id);
-                app_io::remove_child(job.task.lock().id)?;
+                app_io::remove_child_handles(&job.task.lock().id);
             }
         }
 
@@ -855,6 +876,7 @@ impl Shell {
 
     /// If there is any output event from running application, print it to the screen, otherwise it does nothing.
     fn check_and_print_app_output(&mut self) -> bool {
+        let mut need_refresh = false;
 
         // Support for legacy output by `terminal_print`.
         if let Some(print_event) = self.print_consumer.peek() {
@@ -870,13 +892,15 @@ impl Shell {
             }
             print_event.mark_completed();
             // Goes to the next iteration of the loop after processing print event to ensure that printing is handled before keypresses
-            return true;
+            need_refresh =  true;
         }
 
         let mut buf: [u8; 256] = [0; 256];
 
         // iterate through all jobs to see if they have something to print
         for (_job_num, job) in self.jobs.iter() {
+
+            // Deal with all stdout output.
             let stdout = job.stdout.get_read_handle();
             let mut stdout = stdout.lock();
             match stdout.read(&mut buf) {
@@ -885,17 +909,33 @@ impl Shell {
                     let s = String::from_utf8_lossy(&buf[0..cnt]);
                     let mut locked_terminal = self.terminal.lock();
                     locked_terminal.print_to_terminal(s.to_string());
-                    locked_terminal.refresh_display(0);
+                    if cnt != 0 { need_refresh = true; }
                 },
                 Err(_) => {
                     mem::drop(stdout);
                     error!("failed to read from stdout");
-                    return false;
                 }
-            }
+            };
+
+            // Deal with all stderr output.
+            let stderr = job.stderr.get_read_handle();
+            let mut stderr = stderr.lock();
+            match stderr.read(&mut buf) {
+                Ok(cnt) => {
+                    mem::drop(stderr);
+                    let s = String::from_utf8_lossy(&buf[0..cnt]);
+                    let mut locked_terminal = self.terminal.lock();
+                    locked_terminal.print_to_terminal(s.to_string());
+                    if cnt != 0 { need_refresh = true; }
+                },
+                Err(_) => {
+                    mem::drop(stderr);
+                    error!("failed to read from stderr");
+                }
+            };
         }
 
-        false
+        need_refresh
     }
 
     /// This main loop is the core component of the shell's event-driven architecture. The shell receives events
@@ -911,6 +951,8 @@ impl Shell {
     /// queue will always be printed to the text display before input events or any other managerial functions are handled. 
     /// This allows for clean appending to the scrollback buffer and prevents interleaving of text.
     fn start(mut self) -> Result<(), &'static str> {
+        let mut need_refresh = false;
+        let mut need_prompt = false;
         self.redisplay_prompt();
         self.terminal.lock().refresh_display(0);
         loop {
@@ -919,17 +961,25 @@ impl Shell {
             // If there is anything from running applications to be printed, it printed on the screen and then
             // return true, so that the loop continues, otherwise nothing happens and we keep on going with the
             // loop body. We do so to ensure that printing is handled before keypresses.
-            if self.check_and_print_app_output() { continue; }
+            if self.check_and_print_app_output() {
+                need_refresh = true;
+                continue;
+            }
 
+            // Handles the cleanup of any application task that has finished running, returns whether we need
+            // a new prompt or need to refresh the screen.
+            let (need_refresh_on_task_event, need_prompt_on_task_event) = self.task_handler()?;
 
-            // Handles the cleanup of any application task that has finished running, including refreshing the display
-            let (need_refresh, need_prompt) = self.task_handler()?;
-            if need_prompt {
+            // Print prompt or refresh the screen based on needs.
+            if need_prompt || need_prompt_on_task_event {
                 self.redisplay_prompt();
+                need_prompt = false;
             }
-            if need_refresh {
+            if need_refresh || need_refresh_on_task_event {
                 self.terminal.lock().refresh_display(0);
+                need_refresh = false;
             }
+
             // Looks at the input queue from the window manager
             // If it has unhandled items, it handles them with the match
             // If it is empty, it proceeds directly to the next loop iteration
@@ -962,7 +1012,9 @@ impl Shell {
                 if let Some(ref key_event_consumer) = locked_consumer.deref() {
                     if let Some(key_event) = key_event_consumer.read_one() {
                         mem::drop(locked_consumer); // drop the lock so that we can invoke the method on the next line
-                        self.handle_key_event(key_event)?;
+                        if let Err(e) = self.handle_key_event(key_event) {
+                            error!("{}", e);
+                        }
                         if key_event.action == KeyAction::Pressed { need_refresh = true; }
                     } else { // currently the key event queue is empty, break the loop
                         break;
