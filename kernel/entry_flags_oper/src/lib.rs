@@ -30,6 +30,4 @@ pub trait EntryFlagsOper<T> {
     /// Returns true if these flags are executable, 
     /// which means that the `NO_EXECUTE` bit on x86 is *not* set.
     fn is_executable(&self) -> bool;
-
-    fn from_elf_program_flags(prog_flags: xmas_elf::program::Flags) -> T;
 }

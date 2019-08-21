@@ -12,7 +12,6 @@ multiboot2 = "0.7.1"
 xmas-elf = { version = "0.6.2", git = "https://github.com/kevinaboos/xmas-elf.git" }
 bit_field = "0.7.0"
 type-name = "0.1.0"
-uefi = { path = "../../libs/uefi-rs" }
 memory = { path = "../memory" }
 # x86_64 = { git = "https://github.com/kevinaboos/x86_64" }
 x86_64 = { path = "../../libs/x86_64" }

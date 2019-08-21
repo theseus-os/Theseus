@@ -8,7 +8,7 @@ extern crate multiboot2;
 extern crate entry_flags_oper;
 
 use x86_64::{instructions::tlb, registers::control_regs, VirtualAddress};
-pub use kernel_config::memory::x86_64::{KERNEL_OFFSET, KERNEL_OFFSET_BITS_START, KERNEL_OFFSET_PREFIX};
+pub use kernel_config::memory::{KERNEL_OFFSET};
 use entry_flags_oper::EntryFlagsOper;
 
 bitflags! {
@@ -75,24 +75,6 @@ impl EntryFlagsOper<EntryFlags> for EntryFlags {
         !self.intersects(EntryFlags::NO_EXECUTE)
     }
 
-    fn from_elf_program_flags(prog_flags: xmas_elf::program::Flags) -> EntryFlags {
-        let mut flags = EntryFlags::empty();
-        
-        if prog_flags.is_read() {
-            // section is loaded to memory
-            flags = flags | EntryFlags::PRESENT;
-        }
-        if prog_flags.is_write() {
-            flags = flags | EntryFlags::WRITABLE;
-        }
-        if !prog_flags.is_execute() {
-            // only mark no execute if the execute flag isn't 1
-            flags = flags | EntryFlags::NO_EXECUTE;
-        }
-
-        flags
-    }
-
 }
 
 impl EntryFlags {
@@ -135,6 +117,23 @@ impl EntryFlags {
         flags
     }
 
+    pub fn from_elf_program_flags(prog_flags: xmas_elf::program::Flags) -> EntryFlags {
+        let mut flags = EntryFlags::empty();
+        
+        if prog_flags.is_read() {
+            // section is loaded to memory
+            flags = flags | EntryFlags::PRESENT;
+        }
+        if prog_flags.is_write() {
+            flags = flags | EntryFlags::WRITABLE;
+        }
+        if !prog_flags.is_execute() {
+            // only mark no execute if the execute flag isn't 1
+            flags = flags | EntryFlags::NO_EXECUTE;
+        }
+
+        flags
+    }
 }
 
 

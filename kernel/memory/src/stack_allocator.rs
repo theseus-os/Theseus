@@ -1,5 +1,5 @@
 use super::paging::*;
-use super::{PAGE_SIZE, FrameAllocator, VirtualAddress, VirtualMemoryArea};
+use super::{PAGE_SIZE, FrameAllocator, VirtualAddress, VirtualMemoryArea, EntryFlags};
 use super::Mapper;
 
 #[derive(Debug)]

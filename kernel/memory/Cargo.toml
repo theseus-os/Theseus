@@ -40,5 +40,11 @@ path = "../kernel_config"
 [dependencies.heap_irq_safe]
 path = "../heap_irq_safe"
 
+[dependencies.mmu_x86]
+path = "../mmu_x86"
+
+[dependencies.entry_flags_oper]
+path = "../entry_flags_oper"
+
 [lib]
 crate-type = ["rlib"]

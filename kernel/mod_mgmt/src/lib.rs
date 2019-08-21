@@ -44,7 +44,7 @@ use xmas_elf::{
 use goblin::elf::reloc::*;
 
 use util::round_up_power_of_two;
-use memory::{MmiRef, FRAME_ALLOCATOR, MemoryManagementInfo, FrameRange, VirtualAddress, PhysicalAddress, MappedPages, EntryFlags, allocate_pages_by_bytes};
+use memory::{MmiRef, FRAME_ALLOCATOR, MemoryManagementInfo, FrameRange, VirtualAddress, PhysicalAddress, MappedPages, EntryFlags, EntryFlagsOper, allocate_pages_by_bytes};
 use multiboot2::BootInformation;
 use metadata::{StrongCrateRef, WeakSectionRef};
 use cow_arc::CowArc;
