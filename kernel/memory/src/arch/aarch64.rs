@@ -19,7 +19,7 @@ bitflags! {
         const HUGE_PAGE         = 1 << 7;
         //const GLOBAL            = 1 << 8;
         const GLOBAL            = 0; // disabling because VirtualBox doesn't like it
-        const NO_EXECUTE        = 1 << 63;
+        //const NO_EXECUTE        = 1 << 63;
 
         //ARM MMU
         const PAGE              = 1 << 1;
@@ -31,7 +31,7 @@ bitflags! {
         const OUT_SHARE         = 2 << 8;
         const INNER_SHARE       = 3 << 8;
         const ACCESSEDARM       = 1 << 10;
-        const NO_EXE_ARM        = 1 << 54;
+        const NO_EXECUTE        = 1 << 54;
     }
     
 }
@@ -49,6 +49,10 @@ impl EntryFlags {
         EntryFlags::PRESENT | EntryFlags :: ACCESSEDARM | EntryFlags::INNER_SHARE | EntryFlags::PAGE
     }
 
+    pub fn writable() -> EntryFlags {
+        EntryFlags::PAGE | EntryFlags::ACCESSEDARM
+    }
+
     pub fn set_writable(&self) -> EntryFlags {
         self.clone() & !EntryFlags::READONLY | EntryFlags::PRESENT | EntryFlags :: ACCESSEDARM | EntryFlags::PAGE
     }
@@ -56,6 +60,23 @@ impl EntryFlags {
     pub fn is_page(&self) -> bool {
         self.contains(EntryFlags::PRESENT) && self.contains(EntryFlags::PAGE)
     }
+
+    /// Returns true if these flags have the `WRITABLE` bit set.
+    pub fn is_writable(&self) -> bool {
+        !self.intersects(EntryFlags::READONLY)
+    }
+
+    /// Returns true if these flags are executable, 
+    /// which means that the `NO_EXECUTE` bit on x86 is *not* set.
+    pub fn is_executable(&self) -> bool {
+        !self.intersects(EntryFlags::NO_EXECUTE)
+    }
+
+    pub fn from_elf_program_flags(prog_flags: xmas_elf::program::Flags) -> EntryFlags {
+        // TODO
+        EntryFlags::default()
+    }
+
 }
 
 /// Set the p4 address of the new page table
