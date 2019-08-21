@@ -145,7 +145,7 @@ impl<F, A, R> KernelTaskBuilder<F, A, R>
     fn spawn_internal<PB>(
         self, 
         post_builder_func: Option<PB>,
-        , postponed_start: bool) 
+        postponed_start: bool) 
     -> Result<TaskRef, &'static str> 
         where PB: FnOnce(&mut Task) -> Result<(), &'static str>
     {

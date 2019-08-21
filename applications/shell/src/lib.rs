@@ -7,6 +7,7 @@
 //! Problem: Currently there's no upper bound to the user command line history.
 
 #![no_std]
+#![feature(option_xor)]
 extern crate frame_buffer;
 extern crate keycodes_ascii;
 extern crate spin;
@@ -19,7 +20,6 @@ extern crate memory;
 extern crate event_types; 
 extern crate window_manager;
 extern crate text_display;
-extern crate fs_node;
 extern crate path;
 extern crate root;
 extern crate scheduler;
@@ -42,7 +42,6 @@ use alloc::vec::Vec;
 use spawn::{ApplicationTaskBuilder, KernelTaskBuilder};
 use path::Path;
 use task::{TaskRef, ExitValue, KillReason};
-use fs_node::FileOrDir;
 use libterm::Terminal;
 use dfqueue::{DFQueue, DFQueueConsumer, DFQueueProducer};
 use alloc::sync::Arc;
@@ -397,6 +396,11 @@ impl Shell {
                         }
                     }
                 }));
+            } else {
+                self.clear_cmdline(true)?;
+                self.input_buffer.clear();
+                self.terminal.lock().print_to_terminal("^C\n".to_string());
+                self.redisplay_prompt();
             }
             return Ok(());
         }
@@ -500,6 +504,7 @@ impl Shell {
                     self.terminal.lock().refresh_display(0);
                 } else { // shell invokes user programs
                     let new_job_num = self.build_new_job()?;
+                    self.fg_job_num = Some(new_job_num);
 
                     // If the new job is to run in the background, then we should not put it to foreground.
                     if let Some(last) = self.cmdline.split_whitespace().last() {
@@ -512,8 +517,6 @@ impl Shell {
                             self.clear_cmdline(false)?;
                             self.redisplay_prompt();
                         }
-                    } else { // Otherwise, put the new job to the foreground.
-                        self.fg_job_num = Some(new_job_num);
                     }
                 }
             }
@@ -628,18 +631,18 @@ impl Shell {
         }
 
         // Check that the application actually exists
-        let app_path = Path::new(APPLICATIONS_NAMESPACE_PATH.to_string());
-        let app_list = match app_path.get(root::get_root()) {
-            Some(FileOrDir::Dir(app_dir)) => {app_dir.lock().list()},
-            _ => return Err(AppErr::NamespaceErr)
-        };
-        let mut executable = command.clone();
-        executable.push_str(".o");
-        if !app_list.contains(&executable) {
-            return Err(AppErr::NotFound(command));
-        }
+        let namespace_dir = task::get_my_current_task()
+            .map(|t| t.get_namespace().dir().clone())
+            .ok_or(AppErr::NamespaceErr)?;
+        let cmd_crate_name = format!("{}-", command);
+        let mut matching_apps = namespace_dir.get_files_starting_with(&cmd_crate_name).into_iter();
+        let app_file = matching_apps.next();
+        let second_match = matching_apps.next(); // return an error if there are multiple matching apps 
+        let app_path = app_file.xor(second_match)
+            .map(|f| Path::new(f.lock().get_absolute_path()))
+            .ok_or(AppErr::NotFound(command))?;
 
-        let taskref = match ApplicationTaskBuilder::new(Path::new(command))
+        let taskref = match ApplicationTaskBuilder::new(app_path)
             .argument(args)
             .spawn(true) {
                 Ok(taskref) => taskref, 
@@ -727,29 +730,27 @@ impl Shell {
             return;
         }
 
-        // Get all possible program names and match against them.
-        let app_path = Path::new(APPLICATIONS_NAMESPACE_PATH.to_string());
-        let app_list = match app_path.get(root::get_root()) {
-            Some(FileOrDir::Dir(app_dir)) => {app_dir.lock().list()},
-            _ => {
-                error!("Failed to find directory of application executables.");
+        let namespace_dir = match task::get_my_current_task()
+            .map(|t| t.get_namespace().dir().clone())
+            .ok_or(AppErr::NamespaceErr) {
+            Ok(dir) => dir,
+            Err(_) => {
+                error!("Failed to get namespace_dir while completing cmdline.");
                 return;
             }
         };
-        let mut possible_names = Vec::new();
-        for app_name in &app_list {
-            if app_name.starts_with(&self.cmdline) {
-                possible_names.push(app_name.clone());
-            }
-        }
+        let cmd_crate_name = format!("{}", self.cmdline);
+        let mut possible_names = namespace_dir.get_file_names_starting_with(&cmd_crate_name);
 
         if !possible_names.is_empty() {
 
-            // drop the extension name
+            // drop the extension name and hash value
             for name in &mut possible_names {
-                if name.ends_with(".o") {
-                    name.pop(); name.pop();
+                let mut clean_name = String::new();
+                if let Some(prefix) = name.split("-").next() {
+                    clean_name = prefix.to_string();
                 }
+                mem::swap(name, &mut clean_name);
             }
 
             // only one possible name, complete the command line

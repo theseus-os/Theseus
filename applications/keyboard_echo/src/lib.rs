@@ -5,7 +5,6 @@
 #[macro_use] extern crate alloc;
 extern crate core_io;
 extern crate scheduler;
-extern crate shell;
 extern crate app_io;
 extern crate keycodes_ascii;
 #[macro_use] extern crate log;

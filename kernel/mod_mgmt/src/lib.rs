@@ -2,6 +2,7 @@
 #![feature(rustc_private)]
 #![feature(slice_concat_ext)]
 #![feature(const_fn)]
+#![feature(option_xor)]
 
 #[macro_use] extern crate alloc;
 #[macro_use] extern crate log;
@@ -286,6 +287,13 @@ impl NamespaceDir {
                 None
             }
         }).collect()
+    }
+
+    /// Returns the list of file names in this Directory whose name starts with the given `prefix`.
+    pub fn get_file_names_starting_with(&self, prefix: &str) -> Vec<String> {
+        let children = { self.0.lock().list() };
+        children.into_iter().filter(|name| { name.starts_with(prefix) })
+        .collect()
     }
 
     /// Gets the given object file based on its crate name prefix. 

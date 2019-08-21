@@ -10,9 +10,6 @@ core_io = "0.1"
 [dependencies.scheduler]
 path = "../../kernel/scheduler"
 
-[dependencies.shell]
-path = "../shell"
-
 [dependencies.app_io]
 path = "../app_io"
 

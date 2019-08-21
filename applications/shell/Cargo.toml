@@ -74,12 +74,10 @@ path = "../../libs/stdio"
 
 [dependencies.lazy_static]
 features = ["spin_no_std", "nightly"]
+version = "1.2.0"
 
 [dependencies.app_io]
 path = "../app_io"
 
 [lib]
 crate-type = ["rlib"]
-
-
-

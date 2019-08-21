@@ -62,7 +62,9 @@ pub fn init() -> Result<DFQueueProducer<Event>, &'static str> {
 
     let terminal_print_path = default_app_namespace.get_crate_file_starting_with("terminal_print-")
         .ok_or("Couldn't find terminal_print application in default app namespace")?;
-    let terminal_path = default_app_namespace.get_crate_file_starting_with("shell-")
+    let shell_path = default_app_namespace.get_crate_file_starting_with("shell-")
+        .ok_or("Couldn't find terminal application in default app namespace")?;
+    let app_io_path = default_app_namespace.get_crate_file_starting_with("app_io-")
         .ok_or("Couldn't find terminal application in default app namespace")?;
 
     // Spawns the terminal print crate so that we can print to the terminal
@@ -72,13 +74,13 @@ pub fn init() -> Result<DFQueueProducer<Event>, &'static str> {
         .singleton()
         .spawn(false)?;
 
-    ApplicationTaskBuilder::new(Path::new(String::from("app_io")))
+    ApplicationTaskBuilder::new(app_io_path)
         .name("application_io_manager".to_string())
         .singleton()
         .spawn(false)?;
 
     // Spawn the default terminal (will also start the windowing manager)
-    ApplicationTaskBuilder::new(terminal_path)
+    ApplicationTaskBuilder::new(shell_path)
         .name("default_terminal".to_string())
         .namespace(default_app_namespace)
         .spawn(false)?;
@@ -86,7 +88,7 @@ pub fn init() -> Result<DFQueueProducer<Event>, &'static str> {
     // start the input event loop thread
     KernelTaskBuilder::new(input_event_loop, keyboard_event_handling_consumer)
         .name("input_event_loop".to_string())
-        .spawn(false)?;
+        .spawn()?;
 
     Ok(returned_keyboard_producer)
 }

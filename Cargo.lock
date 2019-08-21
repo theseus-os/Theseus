@@ -1722,7 +1722,6 @@ dependencies = [
  "environment 0.1.0",
  "event_types 0.1.0",
  "frame_buffer 0.1.0",
- "fs_node 0.1.0",
  "keycodes_ascii 0.1.0",
  "lazy_static 1.2.0 (registry+https://github.com/rust-lang/crates.io-index)",
  "libterm 0.1.0",
