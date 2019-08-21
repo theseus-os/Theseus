@@ -1,4 +1,5 @@
 #![no_std]
+#![feature(const_fn)]
 
 #[macro_use] extern crate lazy_static;
 // #[macro_use] extern crate log;
@@ -210,60 +211,57 @@ pub enum Descriptor {
 }
 
 impl Descriptor {
-    pub fn kernel_code_segment() -> Descriptor {
-        let flags = DescriptorFlags::LONG_MODE | 
-                    DescriptorFlags::PRESENT | 
-                    DescriptorFlags::PRIVILEGE_RING0 | 
-                    DescriptorFlags::USER_SEGMENT | 
-                    DescriptorFlags::EXECUTABLE | 
-                    DescriptorFlags::READ_WRITE;
-        Descriptor::UserSegment(flags.bits())
+    pub const fn kernel_code_segment() -> Descriptor {
+        let flags = DescriptorFlags::LONG_MODE.bits() | 
+                    DescriptorFlags::PRESENT.bits() | 
+                    DescriptorFlags::PRIVILEGE_RING0.bits() | 
+                    DescriptorFlags::USER_SEGMENT.bits() | 
+                    DescriptorFlags::EXECUTABLE.bits() | 
+                    DescriptorFlags::READ_WRITE.bits();
+        Descriptor::UserSegment(flags)
     }
 
-    pub fn kernel_data_segment() -> Descriptor {
-        let flags = DescriptorFlags::PRESENT | 
-                    DescriptorFlags::PRIVILEGE_RING0 | 
-                    DescriptorFlags::USER_SEGMENT | 
-                    DescriptorFlags::READ_WRITE; 
-                    // | DescriptorFlags::ACCESSED;
-        Descriptor::UserSegment(flags.bits())
+    pub const fn kernel_data_segment() -> Descriptor {
+        let flags = DescriptorFlags::PRESENT.bits() | 
+                    DescriptorFlags::PRIVILEGE_RING0.bits() | 
+                    DescriptorFlags::USER_SEGMENT.bits() | 
+                    DescriptorFlags::READ_WRITE.bits(); 
+        Descriptor::UserSegment(flags)
     }
 
-    pub fn user_code_32_segment() -> Descriptor {
-        let flags = DescriptorFlags::SIZE | 
-                    DescriptorFlags::PRESENT | 
-                    DescriptorFlags::PRIVILEGE_RING3 | 
-                    DescriptorFlags::USER_SEGMENT | 
-                    DescriptorFlags::EXECUTABLE;
-        Descriptor::UserSegment(flags.bits())
+    pub const fn user_code_32_segment() -> Descriptor {
+        let flags = DescriptorFlags::SIZE.bits() | 
+                    DescriptorFlags::PRESENT.bits() | 
+                    DescriptorFlags::PRIVILEGE_RING3.bits() | 
+                    DescriptorFlags::USER_SEGMENT.bits() | 
+                    DescriptorFlags::EXECUTABLE.bits();
+        Descriptor::UserSegment(flags)
     }
 
-    pub fn user_data_32_segment() -> Descriptor {
-        let flags = DescriptorFlags::SIZE | 
-                    DescriptorFlags::PRESENT | 
-                    DescriptorFlags::PRIVILEGE_RING3 | 
-                    DescriptorFlags::USER_SEGMENT | 
-                    DescriptorFlags::READ_WRITE; 
-                    // | DescriptorFlags::ACCESSED;
-        Descriptor::UserSegment(flags.bits())
+    pub const fn user_data_32_segment() -> Descriptor {
+        let flags = DescriptorFlags::SIZE.bits() | 
+                    DescriptorFlags::PRESENT.bits() | 
+                    DescriptorFlags::PRIVILEGE_RING3.bits() | 
+                    DescriptorFlags::USER_SEGMENT.bits() | 
+                    DescriptorFlags::READ_WRITE.bits(); 
+        Descriptor::UserSegment(flags)
     }
 
-    pub fn user_code_64_segment() -> Descriptor {
-        let flags = DescriptorFlags::LONG_MODE | 
-                    DescriptorFlags::PRESENT | 
-                    DescriptorFlags::PRIVILEGE_RING3 | 
-                    DescriptorFlags::USER_SEGMENT | 
-                    DescriptorFlags::EXECUTABLE;
-        Descriptor::UserSegment(flags.bits())
+    pub const fn user_code_64_segment() -> Descriptor {
+        let flags = DescriptorFlags::LONG_MODE.bits() | 
+                    DescriptorFlags::PRESENT.bits() | 
+                    DescriptorFlags::PRIVILEGE_RING3.bits() | 
+                    DescriptorFlags::USER_SEGMENT.bits() | 
+                    DescriptorFlags::EXECUTABLE.bits();
+        Descriptor::UserSegment(flags)
     }
 
-    pub fn user_data_64_segment() -> Descriptor {
-        let flags = DescriptorFlags::PRESENT | 
-                    DescriptorFlags::PRIVILEGE_RING3 | 
-                    DescriptorFlags::USER_SEGMENT | 
-                    DescriptorFlags::READ_WRITE; 
-                    // | DescriptorFlags::ACCESSED;
-        Descriptor::UserSegment(flags.bits())
+    pub const fn user_data_64_segment() -> Descriptor {
+        let flags = DescriptorFlags::PRESENT.bits() | 
+                    DescriptorFlags::PRIVILEGE_RING3.bits() | 
+                    DescriptorFlags::USER_SEGMENT.bits() | 
+                    DescriptorFlags::READ_WRITE.bits(); 
+        Descriptor::UserSegment(flags)
     }
     
 

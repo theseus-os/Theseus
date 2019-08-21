@@ -40,7 +40,7 @@ impl VFSDirectory {
             children: BTreeMap::new(),
             parent: Arc::downgrade(parent),
         };
-        let dir_ref = Arc::new(Mutex::new(directory)) as Arc<Mutex<Directory + Send>>;
+        let dir_ref = Arc::new(Mutex::new(directory)) as DirRef;
         parent.lock().insert(FileOrDir::Dir(dir_ref.clone()))?;
         Ok(dir_ref)
     }
@@ -110,7 +110,7 @@ impl VFSFile {
             _contents: contents,
             parent: Arc::downgrade(parent),
         };
-        let file_ref = Arc::new(Mutex::new(file)) as Arc<Mutex<File + Send>>;
+        let file_ref = Arc::new(Mutex::new(file)) as FileRef;
         parent.lock().insert(FileOrDir::File(file_ref.clone()))?;
         Ok(file_ref)
     }

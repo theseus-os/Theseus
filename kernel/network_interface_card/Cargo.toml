@@ -6,24 +6,29 @@ version = "0.1.0"
 build = "../../build.rs"
 
 [dependencies]
-spin = "0.4.10"
-# x86_64 = { git = "https://github.com/kevinaboos/x86_64" }
-x86_64 = { path = "../../libs/x86_64" } # currently using our local copy, forked from Phil Opp's crate
-
 
 [dependencies.log]
 default-features = false
 version = "0.3.7"
-
-[dependencies.lazy_static]
-features = ["spin_no_std", "nightly"]
-version = "1.2.0"
 
 [dependencies.memory]
 path = "../memory"
 
 [dependencies.mpmc]
 path = "../../libs/mpmc"
+
+[dependencies.intel_ethernet]
+path = "../intel_ethernet"
+
+[dependencies.nic_queues]
+path = "../nic_queues"
+
+[dependencies.nic_buffers]
+path = "../nic_buffers"
+
+[dependencies.nic_initialization]
+path = "../nic_initialization"
+
 
 [lib]
 crate-type = ["rlib"]

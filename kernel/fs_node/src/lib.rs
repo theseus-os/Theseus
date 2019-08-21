@@ -23,13 +23,13 @@ use memory::MappedPages;
 
 
 /// A reference to any type that implements the Directory trait.
-pub type DirRef =  Arc<Mutex<Directory + Send>>;
+pub type DirRef =  Arc<Mutex<dyn Directory + Send>>;
 /// A weak reference to any type that implements the Directory trait.
-pub type WeakDirRef = Weak<Mutex<Directory + Send>>;
+pub type WeakDirRef = Weak<Mutex<dyn Directory + Send>>;
 /// A reference to any type that implements the File trait.
-pub type FileRef = Arc<Mutex<File + Send>>;
+pub type FileRef = Arc<Mutex<dyn File + Send>>;
 /// A weak reference to any type that implements the File trait.
-pub type WeakFileRef = Weak<Mutex<File + Send>>;
+pub type WeakFileRef = Weak<Mutex<dyn File + Send>>;
 
 
 /// A trait that covers any filesystem node, both files and directories.
@@ -80,8 +80,24 @@ pub trait File : FsNode {
 
 /// Trait for directories, implementors of Directory must also implement FsNode
 pub trait Directory : FsNode {
-    /// Gets the file or directory from the current directory based on its name.
-    fn get(&self, name: &str) -> Option<FileOrDir>; 
+    /// Gets either the file or directory in this `Directory`  on its name.
+    fn get(&self, name: &str) -> Option<FileOrDir>;
+
+    /// Like [`get()`], but only looks for files matching the given `name` in this `Directory`.
+    fn get_file(&self, name: &str) -> Option<FileRef> {
+        match self.get(name) {
+            Some(FileOrDir::File(f)) => Some(f),
+            _ => None,
+        }
+    }
+
+    /// Like [`get()`], but only looks for directories matching the given `name` in this `Directory`.
+    fn get_dir(&self, name: &str) -> Option<DirRef> {
+        match self.get(name) {
+            Some(FileOrDir::Dir(d)) => Some(d),
+            _ => None,
+        }
+    }
 
     /// Inserts the given new file or directory into this directory.
     /// If an existing node has the same name, that node is replaced and returned.

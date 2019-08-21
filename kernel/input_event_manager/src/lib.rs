@@ -11,24 +11,29 @@
 extern crate keycodes_ascii;
 extern crate spin;
 extern crate dfqueue;
-extern crate atomic_linked_list; 
 extern crate spawn;
 extern crate task;
-extern crate memory;
-// temporary, should remove this once we fix crate system
+extern crate mod_mgmt;
 extern crate event_types; 
-extern crate frame_buffer;
 extern crate window_manager;
 extern crate path;
 
 #[macro_use] extern crate alloc;
 #[macro_use] extern crate log;
 
+use alloc::{
+    string::{String, ToString},
+    vec::Vec,
+    sync::Arc,
+};
 use event_types::{Event};
 use keycodes_ascii::{Keycode, KeyAction};
 use dfqueue::{DFQueue, DFQueueConsumer, DFQueueProducer};
-use alloc::string::{String,ToString};
-use alloc::vec::Vec;
+use mod_mgmt::{
+    CrateNamespace,
+    NamespaceDir,
+    metadata::CrateType,
+};
 use spawn::{KernelTaskBuilder, ApplicationTaskBuilder};
 use path::Path;
 
@@ -39,9 +44,31 @@ pub fn init() -> Result<DFQueueProducer<Event>, &'static str> {
     let keyboard_event_handling_consumer = keyboard_event_handling_queue.into_consumer();
     let returned_keyboard_producer = keyboard_event_handling_consumer.obtain_producer();
 
+    // Create the first application CrateNamespace via the following steps:
+    // (1) get the default kernel CrateNamespace, which will serve as the new app namespace's recursive namespace,
+    // (2) get the directory where the default app namespace should have been populated when mod_mgmt was init'd,
+    // (3) create the actual new application CrateNamespace
+    let default_kernel_namespace = mod_mgmt::get_default_namespace()
+        .ok_or("input_event_manager::init(): default CrateNamespace not yet initialized")?;
+    let default_app_namespace_name = CrateType::Application.namespace_name().to_string(); // this will be "_applications"
+    let default_app_namespace_dir = mod_mgmt::get_namespaces_directory()
+        .and_then(|ns_dir| ns_dir.lock().get_dir(&default_app_namespace_name))
+        .ok_or("Couldn't find the directory for the default application CrateNamespace")?;
+    let default_app_namespace = Arc::new(CrateNamespace::new(
+        default_app_namespace_name,
+        NamespaceDir::new(default_app_namespace_dir),
+        Some(default_kernel_namespace.clone()),
+    ));
+
+    let terminal_print_path = default_app_namespace.get_crate_file_starting_with("terminal_print-")
+        .ok_or("Couldn't find terminal_print application in default app namespace")?;
+    let terminal_path = default_app_namespace.get_crate_file_starting_with("shell-")
+        .ok_or("Couldn't find terminal application in default app namespace")?;
+
     // Spawns the terminal print crate so that we can print to the terminal
-    ApplicationTaskBuilder::new(Path::new(String::from("terminal_print")))
+    ApplicationTaskBuilder::new(terminal_print_path)
         .name("terminal_print_singleton".to_string())
+        .namespace(default_app_namespace.clone())
         .singleton()
         .spawn(false)?;
 
@@ -51,13 +78,15 @@ pub fn init() -> Result<DFQueueProducer<Event>, &'static str> {
         .spawn(false)?;
 
     // Spawn the default terminal (will also start the windowing manager)
-    ApplicationTaskBuilder::new(Path::new(String::from("shell")))
+    ApplicationTaskBuilder::new(terminal_path)
         .name("default_terminal".to_string())
+        .namespace(default_app_namespace)
         .spawn(false)?;
+
     // start the input event loop thread
     KernelTaskBuilder::new(input_event_loop, keyboard_event_handling_consumer)
         .name("input_event_loop".to_string())
-        .spawn()?;
+        .spawn(false)?;
 
     Ok(returned_keyboard_producer)
 }

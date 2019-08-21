@@ -26,7 +26,7 @@ lazy_static! {
         let root_dir = RootDirectory {
             children: BTreeMap::new() 
         };
-        let strong_root = Arc::new(Mutex::new(root_dir)) as Arc<Mutex<Directory + Send>>;
+        let strong_root = Arc::new(Mutex::new(root_dir)) as DirRef;
         (ROOT_DIRECTORY_NAME.to_string(), strong_root)
     };
 }

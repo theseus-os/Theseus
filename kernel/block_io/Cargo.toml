@@ -1,0 +1,26 @@
+[package]
+authors = ["Kevin Boos <kevinaboos@gmail.com>"]
+name = "block_io"
+description = "A generic layer for converting between IO streams of different block sizes, with caching"
+version = "0.1.0"
+build = "../../build.rs"
+
+[dependencies]
+
+[dependencies.log]
+default-features = false
+version = "0.3.7"
+
+[dependencies.lazy_static]
+features = ["spin_no_std", "nightly"]
+version = "1.2.0"
+
+[dependencies.hashbrown]
+version = "0.1.8"
+features = ["nightly"]
+
+[dependencies.storage_device]
+path = "../storage_device"
+
+[lib]
+crate-type = ["rlib"]
