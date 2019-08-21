@@ -1,0 +1,12 @@
+[package]
+authors = ["Wenqiu Yu <yuwenqiuj@gmail.com>"]
+name = "graphic_mode"
+description = "The graphic mode information"
+version = "0.1.0"
+build = "../../build.rs"
+
+[dependencies]
+spin = "0.4.10"
+
+[lib]
+crate-type = ["rlib"]

@@ -528,11 +528,11 @@ dependencies = [
 name = "frame_buffer"
 version = "0.1.0"
 dependencies = [
+ "graphic_mode 0.1.0",
  "kernel_config 0.1.0",
  "lazy_static 1.2.0 (registry+https://github.com/rust-lang/crates.io-index)",
  "log 0.3.9 (registry+https://github.com/rust-lang/crates.io-index)",
  "memory 0.1.0",
- "multicore_bringup 0.1.0",
  "serial_port 0.1.0",
  "spin 0.4.10 (registry+https://github.com/rust-lang/crates.io-index)",
  "state_store 0.1.0",
@@ -605,6 +605,13 @@ source = "registry+https://github.com/rust-lang/crates.io-index"
 dependencies = [
  "plain 0.2.3 (registry+https://github.com/rust-lang/crates.io-index)",
  "scroll 0.9.2 (registry+https://github.com/rust-lang/crates.io-index)",
+]
+
+[[package]]
+name = "graphic_mode"
+version = "0.1.0"
+dependencies = [
+ "spin 0.4.10 (registry+https://github.com/rust-lang/crates.io-index)",
 ]
 
 [[package]]
@@ -1080,6 +1087,7 @@ dependencies = [
  "acpi 0.1.0",
  "ap_start 0.1.0",
  "apic 0.1.0",
+ "graphic_mode 0.1.0",
  "irq_safety 0.1.1 (git+https://github.com/kevinaboos/irq_safety)",
  "kernel_config 0.1.0",
  "log 0.3.9 (registry+https://github.com/rust-lang/crates.io-index)",

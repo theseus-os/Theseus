@@ -10,6 +10,10 @@ exceptions_full = { path = "../exceptions_full" }
 apic = { path = "../apic" }
 e1000 = { path = "../e1000" }
 interrupts = { path = "../interrupts" }
+multicore_bringup = { path = "../multicore_bringup" }
+
+#[target.'cfg(target_arch = "aarch64")'.dependencies]
+#multicore_bringup_arm = { path = ../multicore_bringup_arm }
 
 [dependencies.log]
 default-features = false
@@ -60,9 +64,6 @@ path = "../tsc"
 
 [dependencies.acpi]
 path = "../acpi"
-
-[dependencies.multicore_bringup]
-path = "../multicore_bringup"
 
 [dependencies.device_manager]
 path = "../device_manager"
