@@ -141,7 +141,7 @@ struct Shell {
     /// Write handle to the key event queue.
     key_event_producer: KeyEventQueueWriteHandle,
     /// Foreground job number.
-    fg_job_num: isize,
+    fg_job_num: Option<isize>,
     /// The string that stores the users keypresses after the prompt
     cmdline: String,
     /// This buffer stores characters before sending them to running application on `enter` key strike
@@ -193,7 +193,7 @@ impl Shell {
             task_to_job: BTreeMap::new(),
             key_event_consumer: Arc::new(Mutex::new(Some(key_event_consumer))),
             key_event_producer,
-            fg_job_num: 0,
+            fg_job_num: None,
             cmdline: String::new(),
             input_buffer: String::new(),
             left_shift: 0,
@@ -362,88 +362,91 @@ impl Shell {
 
         // Ctrl+C signals the shell to exit the job
         if keyevent.modifiers.control && keyevent.keycode == Keycode::C {
-            let task_ref_copy = match self.jobs.get(&self.fg_job_num) {
-                Some(job) => job.task.clone(), 
-                None => {
-                    self.clear_cmdline(true)?;
-                    self.input_buffer.clear();
-                    self.terminal.lock().print_to_terminal("^C\n".to_string());
-                    self.redisplay_prompt();
-                    return Ok(());
-                }
-            };
+            if let Some(ref fg_job_num) = self.fg_job_num {
+                let task_ref_copy = match self.jobs.get(fg_job_num) {
+                    Some(job) => job.task.clone(), 
+                    None => {
+                        self.clear_cmdline(true)?;
+                        self.input_buffer.clear();
+                        self.terminal.lock().print_to_terminal("^C\n".to_string());
+                        self.redisplay_prompt();
+                        return Ok(());
+                    }
+                };
 
-            // Lock the shared structure in `app_io` and then kill the running application
-            app_io::lock_and_execute(Box::new(move |_flags_guard: MutexGuard<BTreeMap<usize, IoControlFlags>>,
-                                                    _handles_guard: MutexGuard<BTreeMap<usize, IoHandles>>| {
-                match task_ref_copy.kill(KillReason::Requested) {
-                    Ok(_) => {
-                        if let Err(e) = runqueue::remove_task_from_all(&task_ref_copy) {
-                            error!("Killed task but could not remove it from runqueue: {}", e);
+                // Lock the shared structure in `app_io` and then kill the running application
+                app_io::lock_and_execute(Box::new(move |_flags_guard: MutexGuard<BTreeMap<usize, IoControlFlags>>,
+                                                        _handles_guard: MutexGuard<BTreeMap<usize, IoHandles>>| {
+                    match task_ref_copy.kill(KillReason::Requested) {
+                        Ok(_) => {
+                            if let Err(e) = runqueue::remove_task_from_all(&task_ref_copy) {
+                                error!("Killed task but could not remove it from runqueue: {}", e);
+                            }
+                        }
+                        Err(e) => error!("Could not kill task, error: {}", e),
+                    }
+
+                    // Here we must wait for the running application to quit before releasing the lock,
+                    // because the previous `kill` method will NOT stop the application immediately.
+                    // Rather, it would let the application finish the current time slice before actually
+                    // killing it.
+                    loop {
+                        scheduler::schedule(); // yield the CPU
+                        if !task_ref_copy.lock().is_running() {
+                            break;
                         }
                     }
-                    Err(e) => error!("Could not kill task, error: {}", e),
-                }
-
-                // Here we must wait for the running application to quit before releasing the lock,
-                // because the previous `kill` method will NOT stop the application immediately.
-                // Rather, it would let the application finish the current time slice before actually
-                // killing it.
-                loop {
-                    scheduler::schedule(); // yield the CPU
-                    if !task_ref_copy.lock().is_running() {
-                        break;
-                    }
-                }
-            }));
+                }));
+            }
             return Ok(());
         }
 
         // Ctrl+Z signals the shell to stop the job
         if keyevent.modifiers.control && keyevent.keycode == Keycode::Z {
             // Do nothing if we have no running foreground job.
-            if self.fg_job_num == 0 {
-                return Ok(());
-            }
 
-            let task_ref_copy = match self.jobs.get(&self.fg_job_num) {
-                Some(job) => job.task.clone(), 
-                None => {
-                    return Ok(());
-                }
-            };
-
-            // Lock the shared structure in `app_io` and then stop the running application
-            app_io::lock_and_execute(Box::new(move |_flags_guard: MutexGuard<BTreeMap<usize, IoControlFlags>>,
-                                                    _handles_guard: MutexGuard<BTreeMap<usize, IoHandles>>| {
-                task_ref_copy.block();
-
-                // Here we must wait for the running application to stop before releasing the lock,
-                // because the previous `block` method will NOT stop the application immediately.
-                // Rather, it would let the application finish the current time slice before actually
-                // stopping it.
-                loop {
-                    scheduler::schedule(); // yield the CPU
-                    if !task_ref_copy.lock().is_running() {
-                        break;
+            if let Some(ref fg_job_num) = self.fg_job_num {
+                let task_ref_copy = match self.jobs.get(fg_job_num) {
+                    Some(job) => job.task.clone(), 
+                    None => {
+                        return Ok(());
                     }
-                }
-            }));
+                };
+
+                // Lock the shared structure in `app_io` and then stop the running application
+                app_io::lock_and_execute(Box::new(move |_flags_guard: MutexGuard<BTreeMap<usize, IoControlFlags>>,
+                                                        _handles_guard: MutexGuard<BTreeMap<usize, IoHandles>>| {
+                    task_ref_copy.block();
+
+                    // Here we must wait for the running application to stop before releasing the lock,
+                    // because the previous `block` method will NOT stop the application immediately.
+                    // Rather, it would let the application finish the current time slice before actually
+                    // stopping it.
+                    loop {
+                        scheduler::schedule(); // yield the CPU
+                        if !task_ref_copy.lock().is_running() {
+                            break;
+                        }
+                    }
+                }));
+            }
 
             return Ok(());
         }
 
         // Set EOF to the stdin of the foreground job.
         if keyevent.modifiers.control && keyevent.keycode == Keycode::D {
-            if let Some(job) = self.jobs.get(&self.fg_job_num) {
-                job.stdin.get_write_handle().lock().set_eof();
+            if let Some(ref fg_job_num) = self.fg_job_num {
+                if let Some(job) = self.jobs.get(fg_job_num) {
+                    job.stdin.get_write_handle().lock().set_eof();
+                }
             }
             return Ok(());
         }
 
         // Perform command line auto completion.
         if keyevent.keycode == Keycode::Tab {
-            if self.fg_job_num == 0 {
+            if self.fg_job_num.is_none() {
                 self.complete_cmdline();
             }
             return Ok(());
@@ -451,7 +454,7 @@ impl Shell {
 
         // Tracks what the user does whenever she presses the backspace button
         if keyevent.keycode == Keycode::Backspace  {
-            if self.fg_job_num != 0 {
+            if self.fg_job_num.is_some() {
                 self.remove_char_from_input_buff(true)?;
             } else {
                 self.remove_char_from_cmdline(true, true)?;
@@ -467,13 +470,13 @@ impl Shell {
         // Attempts to run the command whenever the user presses enter and updates the cursor tracking variables 
         if keyevent.keycode == Keycode::Enter && keyevent.keycode.to_ascii(keyevent.modifiers).is_some() {
             let cmdline = self.cmdline.clone();
-            if cmdline.len() == 0 && self.fg_job_num == 0 {
+            if cmdline.len() == 0 && self.fg_job_num.is_none() {
                 // reprints the prompt on the next line if the user presses enter and hasn't typed anything into the prompt
                 self.terminal.lock().print_to_terminal("\n".to_string());
                 self.redisplay_prompt();
                 return Ok(());
-            } else if self.fg_job_num != 0 { // send buffered characters to the running application
-                match self.jobs.get(&self.fg_job_num) {
+            } else if let Some(ref fg_job_num) = self.fg_job_num { // send buffered characters to the running application
+                match self.jobs.get(fg_job_num) {
                     Some(job) => {
                         self.terminal.lock().print_to_terminal("\n".to_string());
                         let mut buffered_string = String::new();
@@ -496,19 +499,21 @@ impl Shell {
                     self.clear_cmdline(false)?;
                     self.terminal.lock().refresh_display(0);
                 } else { // shell invokes user programs
-                    self.fg_job_num = self.build_new_job()?;
+                    let new_job_num = self.build_new_job()?;
 
                     // If the new job is to run in the background, then we should not put it to foreground.
                     if let Some(last) = self.cmdline.split_whitespace().last() {
                         if last == "&" {
                             self.terminal.lock().print_to_terminal(
-                                format!("[{}] [running] {}\n", self.fg_job_num, self.cmdline)
+                                format!("[{}] [running] {}\n", new_job_num, self.cmdline)
                                 .to_string()
                             );
-                            self.fg_job_num = 0;
+                            self.fg_job_num = None;
                             self.clear_cmdline(false)?;
                             self.redisplay_prompt();
                         }
+                    } else { // Otherwise, put the new job to the foreground.
+                        self.fg_job_num = Some(new_job_num);
                     }
                 }
             }
@@ -586,9 +591,9 @@ impl Shell {
                 Some(c) => {
                     // If currently we have a task running, insert it to the input buffer, otherwise
                     // to the cmdline.
-                    if self.fg_job_num != 0 {
+                    if let Some(fg_job_num) = self.fg_job_num {
                         self.insert_char_to_input_buff(c, true)?;
-                        if let Some(job) = self.jobs.get(&self.fg_job_num) {
+                        if let Some(job) = self.jobs.get(&fg_job_num) {
                             if app_io::is_requesting_instant_flush(&job.task_id)? {
                                 job.stdin.get_write_handle().lock().write_all(self.input_buffer.as_bytes())
                                     .or(Err("shell failed to write to stdin"))?;
@@ -818,8 +823,8 @@ impl Shell {
 
                         // Record the completed job and remove them from job list later.
                         job_to_be_removed.push(*job_num);
-                        if self.fg_job_num == *job_num {
-                            self.fg_job_num = 0;
+                        if self.fg_job_num == Some(*job_num) {
+                            self.fg_job_num = None;
                             need_prompt = true;
                         } else {
                             self.terminal.lock().print_to_terminal(
@@ -842,8 +847,8 @@ impl Shell {
                     .to_string()
                 );
 
-                if *job_num == self.fg_job_num {
-                    self.fg_job_num = 0;
+                if Some(*job_num) == self.fg_job_num {
+                    self.fg_job_num = None;
                     need_prompt = true;
                 }
                 need_refresh = true;
@@ -1126,7 +1131,7 @@ impl Shell {
             let job_num = args[0].chars().skip(1).collect::<String>();
             if let Ok(job_num) = job_num.parse::<isize>() {
                 if let Some(job) = self.jobs.get_mut(&job_num) {
-                    self.fg_job_num = job_num;
+                    self.fg_job_num = Some(job_num);
                     if !job.task.lock().has_exited() {
                         job.task.unblock();
                         job.status = JobStatus::Running;

@@ -94,6 +94,7 @@ dependencies = [
  "libterm 0.1.0",
  "log 0.3.9 (registry+https://github.com/rust-lang/crates.io-index)",
  "print 0.1.0",
+ "scheduler 0.1.0",
  "spin 0.4.10 (registry+https://github.com/rust-lang/crates.io-index)",
  "stdio 0.1.0",
  "task 0.1.0",
@@ -645,6 +646,7 @@ version = "0.1.0"
 dependencies = [
  "app_io 0.1.0",
  "core_io 0.1.20190701 (registry+https://github.com/rust-lang/crates.io-index)",
+ "log 0.3.9 (registry+https://github.com/rust-lang/crates.io-index)",
  "stdio 0.1.0",
 ]
 
@@ -654,6 +656,7 @@ version = "0.1.0"
 dependencies = [
  "app_io 0.1.0",
  "core_io 0.1.20190701 (registry+https://github.com/rust-lang/crates.io-index)",
+ "log 0.3.9 (registry+https://github.com/rust-lang/crates.io-index)",
 ]
 
 [[package]]
@@ -762,6 +765,8 @@ version = "0.1.0"
 dependencies = [
  "app_io 0.1.0",
  "core_io 0.1.20190701 (registry+https://github.com/rust-lang/crates.io-index)",
+ "keycodes_ascii 0.1.0",
+ "log 0.3.9 (registry+https://github.com/rust-lang/crates.io-index)",
  "scheduler 0.1.0",
  "shell 0.1.0",
 ]
