@@ -25,6 +25,9 @@ extern crate heap_irq_safe;
 extern crate bit_field;
 extern crate type_name;
 extern crate uefi;
+#[cfg(any(target_arch = "x86_64"))]
+extern crate mmu_x86;
+extern crate entry_flags_oper;
 
 /// Just like Rust's `try!()` macro, 
 /// but forgets the given `obj`s to prevent them from being dropped,
@@ -46,17 +49,18 @@ macro_rules! try_forget {
 
 mod area_frame_allocator;
 mod stack_allocator;
-mod arch;
 pub mod paging;
 
 pub use self::area_frame_allocator::AreaFrameAllocator;
 pub use self::paging::*;
 pub use self::stack_allocator::{StackAllocator, Stack};
 
-use self::arch::*;
-
 #[cfg(any(target_arch = "x86_64"))]
-pub use self::arch::x86_64::EntryFlags;
+use mmu_x86::{KERNEL_OFFSET_BITS_START, KERNEL_OFFSET_PREFIX, set_new_p4, get_p4_address, flush, flush_all};
+
+pub use entry_flags_oper::EntryFlagsOper;
+#[cfg(any(target_arch = "x86_64"))]
+pub use mmu_x86::EntryFlags;
 #[cfg(any(target_arch = "aarch64"))]
 pub use self::arch::aarch64::{EntryFlags, get_current_p4};
 
@@ -324,7 +328,9 @@ impl MemoryManagementInfo {
     }
 }
 
-
+pub fn get_current_p4() -> Frame {
+    Frame::containing_address(PhysicalAddress::new_canonical(get_p4_address()))
+}
 
 /// A convenience function that creates a new memory mapping by allocating frames that are contiguous in physical memory.
 /// Returns a tuple containing the new `MappedPages` and the starting PhysicalAddress of the first frame,

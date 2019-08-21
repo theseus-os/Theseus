@@ -311,7 +311,7 @@ impl PageTable {
         // overwrite recursive mapping
         self.p4_mut()[RECURSIVE_P4_INDEX].set(other_table.p4_table.clone(), EntryFlags::rw_flags()); 
         
-        tlb::flush_all();
+        flush_all();
         // set mapper's target frame to reflect that future mappings will be mapped into the other_table
         self.mapper.target_p4 = other_table.p4_table.clone();
 
@@ -323,7 +323,7 @@ impl PageTable {
 
         // restore recursive mapping to original p4 table
         p4_table[RECURSIVE_P4_INDEX].set(backup, EntryFlags::rw_flags());
-        tlb::flush_all();
+        flush_all();
 
         // here, temporary_page is dropped, which auto unmaps it
         ret

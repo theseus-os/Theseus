@@ -57,15 +57,3 @@ impl Entry {
         self.0
     }
 }
-
-pub trait FlagOperator {
-    // fn from_multiboot2_section_flags(section: &multiboot2::ElfSection) -> EntryFlags;
-
-    // fn from_elf_section_flags(elf_flags: u64) -> EntryFlags;
-
-//    fn from_elf_program_flags(prog_flags: xmas_elf::program::Flags) -> EntryFlags;
-}
-
-impl FlagOperator for EntryFlags {
-    
-}

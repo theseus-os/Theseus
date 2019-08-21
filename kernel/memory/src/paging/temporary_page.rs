@@ -10,7 +10,7 @@
 use {FrameRange};
 use paging::{PageTable, MappedPages};
 use super::table::{Table, Level1};
-use super::{Page, Frame, FrameAllocator, VirtualAddress};
+use super::{Page, Frame, FrameAllocator, VirtualAddress, EntryFlagsOper};
 use kernel_config::memory::TEMPORARY_PAGE_VIRT_ADDR;
 
 

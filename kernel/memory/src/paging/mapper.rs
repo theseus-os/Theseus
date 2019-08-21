@@ -13,12 +13,11 @@ use core::ptr::Unique;
 use core::slice;
 use {BROADCAST_TLB_SHOOTDOWN_FUNC, VirtualAddress, PhysicalAddress, FRAME_ALLOCATOR, FrameRange, Page, Frame, FrameAllocator, AllocatedPages}; 
 use paging::{PageRange, get_current_p4};
-use paging::entry::{EntryFlags, FlagOperator};
 use paging::table::{P4, Table, Level4};
 use kernel_config::memory::{ENTRIES_PER_PAGE_TABLE, PAGE_SIZE, TEMPORARY_PAGE_VIRT_ADDR};
 use alloc::vec::Vec;
 use type_name;
-use super::super::arch::flush;
+use super::{flush, EntryFlags, EntryFlagsOper};
 
 pub struct Mapper {
     p4: Unique<Table<Level4>>,
@@ -147,7 +146,7 @@ impl Mapper {
                 return Err("page was already in use");
             } 
 
-            p1[page.p1_index()].set(frame, flags | EntryFlags::default());
+            p1[page.p1_index()].set(frame, flags | EntryFlags::default_flags());
 
         }
 
@@ -189,7 +188,7 @@ impl Mapper {
                 return Err("page was already in use");
             } 
 
-            p1[page.p1_index()].set(frame, flags | EntryFlags::default());
+            p1[page.p1_index()].set(frame, flags | EntryFlags::default_flags());
         }
 
         Ok(MappedPages {
