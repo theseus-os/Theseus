@@ -433,6 +433,14 @@ impl Shell {
             return Ok(());
         }
 
+        // Set EOF to the stdin of the foreground job.
+        if keyevent.modifiers.control && keyevent.keycode == Keycode::D {
+            if let Some(job) = self.jobs.get(&self.fg_job_num) {
+                job.stdin.get_write_handle().lock().set_eof();
+            }
+            return Ok(());
+        }
+
         // Perform command line auto completion.
         if keyevent.keycode == Keycode::Tab {
             if self.fg_job_num == 0 {

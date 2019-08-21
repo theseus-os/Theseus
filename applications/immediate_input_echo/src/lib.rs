@@ -1,6 +1,7 @@
+//! An application to test instant stdin flush.
 #![no_std]
 
-extern crate alloc;
+#[macro_use] extern crate alloc;
 extern crate core_io;
 extern crate stdio;
 extern crate app_io;
@@ -29,13 +30,19 @@ fn run() -> Result<(), &'static str> {
     let mut stdin_locked = stdin.lock();
     let mut stdout_locked = stdout.lock();
 
-    let mut cnt = 0;
-    while cnt < 10 {
+    stdout_locked.write_all(
+            format!("{}\n{}\n\n",
+                "Echo upon receiving a character input.",
+                "Press `ctrl-D` to exit cleanly."
+            ).as_bytes()
+        )
+        .or(Err("failed to perform write_all"))?;
+
+    loop {
         let byte_num = stdin_locked.read(&mut buf).or(Err("failed to invoke read"))?;
         if byte_num == 0 && stdin_locked.is_eof() { break; }
         else if byte_num == 0 { continue; }
         stdout_locked.write_all(&buf).or(Err("failed to invoke write_all"))?;
-        cnt += 1;
     }
     stdout_locked.write_all(&['\n' as u8]).or(Err("failed to invoke write_all"))?;
     Ok(())

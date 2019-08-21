@@ -153,7 +153,8 @@ impl StdioReadHandle {
 
     /// Read a line from the ring buffer and return. Remaining bytes are stored in the inner
     /// buffer. Do NOT use this function alternatively with `read()` method defined in
-    /// `StdioReadGuard`. This function returns the number of bytes read.
+    /// `StdioReadGuard`. This function returns the number of bytes read. It will return
+    /// zero only upon EOF.
     pub fn read_line(&mut self, buf: &mut String) -> Result<usize, core_io::Error> {
         let mut total_cnt = 0usize;    // total number of bytes read this time
         let mut new_cnt;               // number of bytes returned from a `read()` invocation
