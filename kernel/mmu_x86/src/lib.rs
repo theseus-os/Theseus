@@ -31,47 +31,34 @@ bitflags! {
 }
 
 impl EntryFlagsOper<EntryFlags> for EntryFlags {
-    /// Returns ture if the page the entry points to is a huge page.
-    /// Which means the flags contains a HUGE_PAGE bit
     fn is_huge(&self) -> bool {
         self.contains(EntryFlags::HUGE_PAGE)
     }
 
-    /// The default flags of an accessible page.
-    /// For every accessiable page the PRESENT bit should be set
     fn default_flags() -> EntryFlags {
         EntryFlags::PRESENT
     }
 
-    /// return the flags of a writable page excluding the default bits
     fn writable() -> EntryFlags {
         EntryFlags::WRITABLE
     }
 
-    /// The flags of a writable page.
-    /// For every writable page the PRESENT and WRITABLE bits should be set
     fn rw_flags() -> EntryFlags {
         EntryFlags::default_flags() | EntryFlags::WRITABLE
     }
 
-    /// Returns true if the page is accessiable and is not huge
     fn is_page(&self) -> bool {
         self.contains(EntryFlags::PRESENT) && !self.contains(EntryFlags::HUGE_PAGE)
     }
 
-    /// Set the page the entry points to as writable.
-    /// Set the PRESENT and WRITABLE bits of the flags
     fn set_writable(&self) -> EntryFlags {
         self.clone() | EntryFlags::rw_flags()
     }
 
-    /// Returns true if these flags have the `WRITABLE` bit set.
     fn is_writable(&self) -> bool {
         self.intersects(EntryFlags::WRITABLE)
     }
 
-    /// Returns true if these flags are executable,
-    /// which means that the `NO_EXECUTE` bit on x86 is *not* set.
     fn is_executable(&self) -> bool {
         !self.intersects(EntryFlags::NO_EXECUTE)
     }
@@ -136,8 +123,7 @@ impl EntryFlags {
     }
 }
 
-/// Set the new P4 table address.
-/// Switch to the new page table p4 points to
+/// Set the new P4 table address to switch to the new page table p4 points to.
 pub fn set_new_p4(p4: u64) {
     unsafe {
         control_regs::cr3_write(x86_64::PhysicalAddress(p4));
@@ -145,9 +131,6 @@ pub fn set_new_p4(p4: u64) {
 }
 
 /// Returns the current top-level page table frame, e.g., cr3 on x86
-// pub fn get_p4_address() -> Frame {
-//
-// }
 pub fn get_p4_address() -> usize {
     control_regs::cr3().0 as usize
 }

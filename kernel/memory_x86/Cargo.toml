@@ -1,5 +1,5 @@
 [package]
-authors = ["Kevin Boos <kevinaboos@gmail.com>"]
+authors = ["Wenqiu Yu<kevinaboos@gmail.com>"]
 name = "memory_x86"
 description = "The virtual memory subsystem."
 version = "0.1.0"
@@ -7,8 +7,6 @@ build = "../../build.rs"
 
 [dependencies]
 multiboot2 = "0.7.1"
-bit_field = "0.7.0"
-type-name = "0.1.0"
 memory = { path = "../memory" }
 # x86_64 = { git = "https://github.com/kevinaboos/x86_64" }
 x86_64 = { path = "../../libs/x86_64" }
@@ -19,9 +17,6 @@ version = "0.3.7"
 
 [dependencies.irq_safety]
 git = "https://github.com/kevinaboos/irq_safety"
-
-[dependencies.atomic_linked_list]
-path = "../../libs/atomic_linked_list"
 
 [dependencies.kernel_config]
 path = "../kernel_config"

@@ -1,7 +1,5 @@
-//! This crate implements the virtual memory subsystem for Theseus,
-//! which is fairly robust and provides a unification between
-//! arbitrarily mapped sections of memory and Rust's lifetime system.
-//! Originally based on Phil Opp's blog_os.
+//! This crate provide abstract interfaces for memory subsytem.
+//! The init function invokes arch-specific init functions to initialize the memory subsystem.
 
 #![no_std]
 #![feature(asm)]

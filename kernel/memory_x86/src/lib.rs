@@ -16,7 +16,6 @@ extern crate alloc;
 extern crate irq_safety;
 extern crate kernel_config;
 extern crate x86_64;
-extern crate heap_irq_safe;
 extern crate memory;
 
 mod paging;
