@@ -15,7 +15,7 @@ use entry_flags_oper::EntryFlagsOper;
 use x86_64::{instructions::tlb, registers::control_regs};
 
 bitflags! {
-    /// Entry access flag bits;
+    /// Entry access flag bits.
     #[derive(Default)]
     pub struct EntryFlags: u64 {
         const PRESENT           = 1 << 0;

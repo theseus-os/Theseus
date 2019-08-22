@@ -1,4 +1,4 @@
-//! The EntrFlagsOper trait defines basic operations on entryflags. The `mmu` crate implements this trait for EntryFlags on different architectures.
+//! The `EntrFlagsOper` trait defines basic operations on entry flags. The `mmu` crate implements this trait for `EntryFlags` on different architectures.
 
 #![no_std]
 
