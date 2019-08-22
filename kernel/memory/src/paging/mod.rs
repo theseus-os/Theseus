@@ -333,7 +333,6 @@ impl PageTable {
     }
 
 
-
     /// Switches from the currently-active page table (this `PageTable`, i.e., `self`) to the given `new_table`.
     /// Returns the newly-switched-to PageTable.
     pub fn switch(&mut self, new_table: &PageTable) -> PageTable {

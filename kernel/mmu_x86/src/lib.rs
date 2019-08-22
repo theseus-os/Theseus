@@ -1,4 +1,4 @@
-//! This crate contains arch-specific structures and functions related to MMU. 
+//! This crate contains arch-specific structures and functions related to MMU.  
 //! Definitions in this crate should be exported from `memory` for general use.
 
 #![no_std]
