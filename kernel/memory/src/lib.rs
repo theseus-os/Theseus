@@ -56,6 +56,7 @@ pub use self::stack_allocator::{StackAllocator, Stack};
 
 use mmu_x86::{set_new_p4, get_p4_address, flush_all, flush};
 
+/// Export EntryFlags so that others does not need to get access to mmu_<arch>.
 pub use entry_flags_oper::EntryFlagsOper;
 pub use mmu_x86::EntryFlags;
 
@@ -319,6 +320,8 @@ impl MemoryManagementInfo {
         }
     }
 }
+
+
 
 /// A convenience function that creates a new memory mapping by allocating frames that are contiguous in physical memory.
 /// Returns a tuple containing the new `MappedPages` and the starting PhysicalAddress of the first frame,

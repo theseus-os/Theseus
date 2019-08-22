@@ -1,7 +1,5 @@
-//! This crate implements the virtual memory subsystem for Theseus,
-//! which is fairly robust and provides a unification between 
-//! arbitrarily mapped sections of memory and Rust's lifetime system. 
-//! Originally based on Phil Opp's blog_os. 
+//! This crate implements the virtual memory subsystem interfaces for Theseus on x86_64.
+//! Abstrace memory interfaces uses this crate to manipulate the memory subsystem on x86_64;
 
 #![no_std]
 #![feature(asm)]

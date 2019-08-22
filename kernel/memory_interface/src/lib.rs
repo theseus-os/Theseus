@@ -1,5 +1,5 @@
-//! This crate provide abstract interfaces for memory subsytem.
-//! The init function invokes arch-specific init functions to initialize the memory subsystem.
+//! This crate provides abstract interfaces for memory subsytem.
+//! It invokes arch-specific functions to manipulate the memory subsystem.
 
 #![no_std]
 #![feature(asm)]
@@ -20,6 +20,8 @@ use alloc::sync::Arc;
 use alloc::vec::Vec;
 use irq_safety::MutexIrqSafe;
 
+/// Initiialize the memory subsystem.
+/// This function is an abstract interface. In invokes arch-specific init functions to initialize the memory subsystem.
 pub fn init(
     boot_info: &BootInformation,
 ) -> Result<

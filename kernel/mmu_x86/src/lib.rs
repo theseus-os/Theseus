@@ -1,3 +1,6 @@
+//! This crate contains arch-specific structures and functions related to MMU. 
+//! Definitions in this crate should be exported from memory so that others does not need to get access to this crate.
+
 #![no_std]
 
 extern crate kernel_config;

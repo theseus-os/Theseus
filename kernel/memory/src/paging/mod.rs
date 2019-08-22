@@ -34,6 +34,8 @@ use kernel_config::memory::{PAGE_SIZE, MAX_PAGE_NUMBER, RECURSIVE_P4_INDEX};
 use kernel_config::memory::{KERNEL_TEXT_P4_INDEX, KERNEL_HEAP_P4_INDEX, KERNEL_STACK_P4_INDEX};
 
 
+
+
 #[derive(Clone, Copy, PartialEq, Eq, PartialOrd, Ord)]
 pub struct Page {
     number: usize, 
@@ -310,9 +312,9 @@ impl PageTable {
         let p4_table = temporary_page.map_table_frame(backup.clone(), self)?;
 
         // overwrite recursive mapping
-        self.p4_mut()[RECURSIVE_P4_INDEX].set(other_table.p4_table.clone(), EntryFlags::rw_flags()); 
-        
+        self.p4_mut()[RECURSIVE_P4_INDEX].set(other_table.p4_table.clone(), EntryFlags::rw_flags());         
         flush_all();
+
         // set mapper's target frame to reflect that future mappings will be mapped into the other_table
         self.mapper.target_p4 = other_table.p4_table.clone();
 
@@ -330,6 +332,10 @@ impl PageTable {
         ret
     }
 
+
+
+    /// Switches from the currently-active page table (this `PageTable`, i.e., `self`) to the given `new_table`.
+    /// Returns the newly-switched-to PageTable.
     pub fn switch(&mut self, new_table: &PageTable) -> PageTable {
         // debug!("PageTable::switch() old table: {:?}, new table: {:?}", self, new_table);
 
