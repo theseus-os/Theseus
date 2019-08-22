@@ -55,9 +55,6 @@ path = "../terminal_print"
 [dependencies.print]
 path = "../../kernel/print"
 
-[dependencies.fs_node]
-path = "../../kernel/fs_node"
-
 [dependencies.environment]
 path = "../../kernel/environment"
 

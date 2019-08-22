@@ -31,10 +31,12 @@ use volatile::Volatile;
 
 
 /// The mapping flags used for pages that the NIC will map.
-/// This should be a const, but Rust doesn't yet allow constants for the bitflags type
-pub fn nic_mapping_flags() -> EntryFlags {
-    EntryFlags::PRESENT | EntryFlags::WRITABLE | EntryFlags::NO_CACHE | EntryFlags::NO_EXECUTE
-}
+pub const NIC_MAPPING_FLAGS: EntryFlags = EntryFlags::from_bits_truncate(
+    EntryFlags::PRESENT.bits() |
+    EntryFlags::WRITABLE.bits() |
+    EntryFlags::NO_CACHE.bits() |
+    EntryFlags::NO_EXECUTE.bits()
+);
 
 
 /// Allocates memory for the NIC registers
@@ -65,14 +67,13 @@ pub fn allocate_memory(mem_base: PhysicalAddress, mem_size_in_bytes: usize) -> R
     // set up virtual pages and physical frames to be mapped
     let pages_nic = allocate_pages_by_bytes(mem_size_in_bytes).ok_or("NicInit::mem_map(): couldn't allocated virtual page!")?;
     let frames_nic = FrameRange::from_phys_addr(mem_base, mem_size_in_bytes);
-    let flags = nic_mapping_flags();
 
     // debug!("NicInit: memory base: {:#X}, memory size: {}", mem_base, mem_size_in_bytes);
 
     let kernel_mmi_ref = get_kernel_mmi_ref().ok_or("NicInit::mem_map(): KERNEL_MMI was not yet initialized!")?;
     let mut kernel_mmi = kernel_mmi_ref.lock();
     let mut fa = FRAME_ALLOCATOR.try().ok_or("NicInit::mem_map(): Couldn't get FRAME ALLOCATOR")?.lock();
-    let nic_mapped_page = kernel_mmi.page_table.map_allocated_pages_to(pages_nic, frames_nic, flags, fa.deref_mut())?;
+    let nic_mapped_page = kernel_mmi.page_table.map_allocated_pages_to(pages_nic, frames_nic, NIC_MAPPING_FLAGS, fa.deref_mut())?;
 
     Ok(nic_mapped_page)
 }
@@ -86,7 +87,7 @@ pub fn allocate_memory(mem_base: PhysicalAddress, mem_size_in_bytes: usize) -> R
 pub fn init_rx_buf_pool(num_rx_buffers: usize, buffer_size: u16, rx_buffer_pool: &'static mpmc::Queue<ReceiveBuffer>) -> Result<(), &'static str> {
     let length = buffer_size;
     for _i in 0..num_rx_buffers {
-        let (mp, phys_addr) = create_contiguous_mapping(length as usize, nic_mapping_flags())?; 
+        let (mp, phys_addr) = create_contiguous_mapping(length as usize, NIC_MAPPING_FLAGS)?; 
         let rx_buf = ReceiveBuffer::new(mp, phys_addr, length, rx_buffer_pool);
         if rx_buffer_pool.push(rx_buf).is_err() {
             // if the queue is full, it returns an Err containing the object trying to be pushed
@@ -116,7 +117,7 @@ pub fn init_rx_queue<T: RxDescriptor>(num_desc: usize, rx_buffer_pool: &'static 
     let size_in_bytes_of_all_rx_descs_per_queue = num_desc * core::mem::size_of::<T>();
     
     // Rx descriptors must be 128 byte-aligned, which is satisfied below because it's aligned to a page boundary.
-    let (rx_descs_mapped_pages, rx_descs_starting_phys_addr) = create_contiguous_mapping(size_in_bytes_of_all_rx_descs_per_queue, nic_mapping_flags())?;
+    let (rx_descs_mapped_pages, rx_descs_starting_phys_addr) = create_contiguous_mapping(size_in_bytes_of_all_rx_descs_per_queue, NIC_MAPPING_FLAGS)?;
 
     // cast our physically-contiguous MappedPages into a slice of receive descriptors
     let mut rx_descs = BoxRefMut::new(Box::new(rx_descs_mapped_pages)).try_map_mut(|mp| mp.as_slice_mut::<T>(0, num_desc))?;
@@ -129,7 +130,7 @@ pub fn init_rx_queue<T: RxDescriptor>(num_desc: usize, rx_buffer_pool: &'static 
         let rx_buf = rx_buffer_pool.pop()
             .ok_or("Couldn't obtain a ReceiveBuffer from the pool")
             .or_else(|_e| {
-                create_contiguous_mapping(buffer_size, nic_mapping_flags())
+                create_contiguous_mapping(buffer_size, NIC_MAPPING_FLAGS)
                     .map(|(buf_mapped, buf_paddr)| 
                         ReceiveBuffer::new(buf_mapped, buf_paddr, buffer_size as u16, rx_buffer_pool)
                     )
@@ -175,7 +176,7 @@ pub fn init_tx_queue<T: TxDescriptor>(num_desc: usize, tdbal: &mut Volatile<Tdba
     let size_in_bytes_of_all_tx_descs = num_desc * core::mem::size_of::<T>();
     
     // Tx descriptors must be 128 byte-aligned, which is satisfied below because it's aligned to a page boundary.
-    let (tx_descs_mapped_pages, tx_descs_starting_phys_addr) = create_contiguous_mapping(size_in_bytes_of_all_tx_descs, nic_mapping_flags())?;
+    let (tx_descs_mapped_pages, tx_descs_starting_phys_addr) = create_contiguous_mapping(size_in_bytes_of_all_tx_descs, NIC_MAPPING_FLAGS)?;
 
     // cast our physically-contiguous MappedPages into a slice of transmit descriptors
     let mut tx_descs = BoxRefMut::new(Box::new(tx_descs_mapped_pages))

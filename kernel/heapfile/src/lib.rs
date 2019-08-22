@@ -46,7 +46,7 @@ impl HeapFile {
             vec: vec, 
             parent: Arc::downgrade(parent), 
         };
-        let file_ref = Arc::new(Mutex::new(hf)) as Arc<Mutex<File + Send>>;
+        let file_ref = Arc::new(Mutex::new(hf)) as FileRef;
         parent.lock().insert(FileOrDir::File(file_ref.clone()))?;
         Ok(file_ref)
     }

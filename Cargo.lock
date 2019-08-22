@@ -88,10 +88,12 @@ dependencies = [
 name = "ata"
 version = "0.1.0"
 dependencies = [
- "bitflags 1.0.4 (registry+https://github.com/rust-lang/crates.io-index)",
+ "bitflags 1.1.0 (registry+https://github.com/rust-lang/crates.io-index)",
  "log 0.3.9 (registry+https://github.com/rust-lang/crates.io-index)",
  "pci 0.1.0",
  "port_io 0.2.1",
+ "spin 0.4.10 (registry+https://github.com/rust-lang/crates.io-index)",
+ "storage_device 0.1.0",
 ]
 
 [[package]]
@@ -110,7 +112,7 @@ source = "registry+https://github.com/rust-lang/crates.io-index"
 
 [[package]]
 name = "bitflags"
-version = "1.0.4"
+version = "1.1.0"
 source = "registry+https://github.com/rust-lang/crates.io-index"
 
 [[package]]
@@ -130,6 +132,16 @@ version = "0.1.2"
 source = "registry+https://github.com/rust-lang/crates.io-index"
 dependencies = [
  "byte-tools 0.3.0 (registry+https://github.com/rust-lang/crates.io-index)",
+]
+
+[[package]]
+name = "block_io"
+version = "0.1.0"
+dependencies = [
+ "hashbrown 0.1.8 (registry+https://github.com/rust-lang/crates.io-index)",
+ "lazy_static 1.2.0 (registry+https://github.com/rust-lang/crates.io-index)",
+ "log 0.3.9 (registry+https://github.com/rust-lang/crates.io-index)",
+ "storage_device 0.1.0",
 ]
 
 [[package]]
@@ -330,7 +342,6 @@ version = "0.1.0"
 dependencies = [
  "acpi 0.1.0",
  "apic 0.1.0",
- "ata 0.1.0",
  "dfqueue 0.1.0",
  "e1000 0.1.0",
  "ethernet_smoltcp_device 0.1.0",
@@ -341,6 +352,7 @@ dependencies = [
  "mouse 0.1.0",
  "network_manager 0.1.0",
  "pci 0.1.0",
+ "storage_manager 0.1.0",
 ]
 
 [[package]]
@@ -359,8 +371,9 @@ dependencies = [
 ]
 
 [[package]]
-name = "documentation"
-version = "0.1.0"
+name = "downcast-rs"
+version = "1.0.4"
+source = "git+https://github.com/theseus-os/downcast-rs#5d2c787a754b6d5aa44e7c91470d2bb160818617"
 
 [[package]]
 name = "e1000"
@@ -397,6 +410,7 @@ name = "environment"
 version = "0.1.0"
 dependencies = [
  "fs_node 0.1.0",
+ "root 0.1.0",
 ]
 
 [[package]]
@@ -541,7 +555,7 @@ version = "0.1.0"
 dependencies = [
  "atomic_linked_list 0.1.0",
  "bit_field 0.7.0 (registry+https://github.com/rust-lang/crates.io-index)",
- "bitflags 1.0.4 (registry+https://github.com/rust-lang/crates.io-index)",
+ "bitflags 1.1.0 (registry+https://github.com/rust-lang/crates.io-index)",
  "lazy_static 1.2.0 (registry+https://github.com/rust-lang/crates.io-index)",
  "log 0.3.9 (registry+https://github.com/rust-lang/crates.io-index)",
  "memory 0.1.0",
@@ -649,19 +663,15 @@ source = "registry+https://github.com/rust-lang/crates.io-index"
 name = "input_event_manager"
 version = "0.1.0"
 dependencies = [
- "atomic_linked_list 0.1.0",
  "dfqueue 0.1.0",
  "event_types 0.1.0",
- "frame_buffer 0.1.0",
  "keycodes_ascii 0.1.0",
- "lazy_static 1.2.0 (registry+https://github.com/rust-lang/crates.io-index)",
  "log 0.3.9 (registry+https://github.com/rust-lang/crates.io-index)",
- "memory 0.1.0",
+ "mod_mgmt 0.1.0",
  "path 0.1.0",
  "spawn 0.1.0",
  "spin 0.4.10 (registry+https://github.com/rust-lang/crates.io-index)",
  "task 0.1.0",
- "text_display 0.1.0",
  "window_manager 0.1.0",
  "x86_64 0.1.2",
 ]
@@ -821,16 +831,6 @@ dependencies = [
 ]
 
 [[package]]
-name = "lsmod"
-version = "0.1.0"
-dependencies = [
- "getopts 0.2.18 (git+https://github.com/kevinaboos/getopts)",
- "memory 0.1.0",
- "mod_mgmt 0.1.0",
- "terminal_print 0.1.0",
-]
-
-[[package]]
 name = "madt"
 version = "0.1.0"
 dependencies = [
@@ -867,7 +867,7 @@ version = "0.1.0"
 dependencies = [
  "atomic_linked_list 0.1.0",
  "bit_field 0.7.0 (registry+https://github.com/rust-lang/crates.io-index)",
- "bitflags 1.0.4 (registry+https://github.com/rust-lang/crates.io-index)",
+ "bitflags 1.1.0 (registry+https://github.com/rust-lang/crates.io-index)",
  "derive_more 0.14.0 (registry+https://github.com/rust-lang/crates.io-index)",
  "heap_irq_safe 0.1.0",
  "irq_safety 0.1.1 (git+https://github.com/kevinaboos/irq_safety)",
@@ -958,7 +958,7 @@ name = "multiboot2"
 version = "0.7.1"
 source = "registry+https://github.com/rust-lang/crates.io-index"
 dependencies = [
- "bitflags 1.0.4 (registry+https://github.com/rust-lang/crates.io-index)",
+ "bitflags 1.1.0 (registry+https://github.com/rust-lang/crates.io-index)",
 ]
 
 [[package]]
@@ -1093,6 +1093,17 @@ dependencies = [
  "memory 0.1.0",
  "nic_buffers 0.1.0",
  "owning_ref 0.4.0 (git+https://github.com/kevinaboos/owning-ref-rs)",
+]
+
+[[package]]
+name = "ns"
+version = "0.1.0"
+dependencies = [
+ "getopts 0.2.18 (git+https://github.com/kevinaboos/getopts)",
+ "memory 0.1.0",
+ "mod_mgmt 0.1.0",
+ "task 0.1.0",
+ "terminal_print 0.1.0",
 ]
 
 [[package]]
@@ -1405,7 +1416,7 @@ name = "raw-cpuid"
 version = "6.1.0"
 source = "registry+https://github.com/rust-lang/crates.io-index"
 dependencies = [
- "bitflags 1.0.4 (registry+https://github.com/rust-lang/crates.io-index)",
+ "bitflags 1.1.0 (registry+https://github.com/rust-lang/crates.io-index)",
  "cc 1.0.28 (registry+https://github.com/rust-lang/crates.io-index)",
  "rustc_version 0.2.3 (registry+https://github.com/rust-lang/crates.io-index)",
 ]
@@ -1670,7 +1681,7 @@ name = "smoltcp"
 version = "0.5.0"
 source = "registry+https://github.com/rust-lang/crates.io-index"
 dependencies = [
- "bitflags 1.0.4 (registry+https://github.com/rust-lang/crates.io-index)",
+ "bitflags 1.1.0 (registry+https://github.com/rust-lang/crates.io-index)",
  "byteorder 1.2.7 (registry+https://github.com/rust-lang/crates.io-index)",
  "managed 0.7.1 (registry+https://github.com/rust-lang/crates.io-index)",
 ]
@@ -1751,6 +1762,31 @@ dependencies = [
 ]
 
 [[package]]
+name = "storage_device"
+version = "0.1.0"
+dependencies = [
+ "downcast-rs 1.0.4 (git+https://github.com/theseus-os/downcast-rs)",
+ "lazy_static 1.2.0 (registry+https://github.com/rust-lang/crates.io-index)",
+ "log 0.3.9 (registry+https://github.com/rust-lang/crates.io-index)",
+ "owning_ref 0.4.0 (git+https://github.com/kevinaboos/owning-ref-rs)",
+ "pci 0.1.0",
+ "spin 0.4.10 (registry+https://github.com/rust-lang/crates.io-index)",
+]
+
+[[package]]
+name = "storage_manager"
+version = "0.1.0"
+dependencies = [
+ "ata 0.1.0",
+ "lazy_static 1.2.0 (registry+https://github.com/rust-lang/crates.io-index)",
+ "log 0.3.9 (registry+https://github.com/rust-lang/crates.io-index)",
+ "owning_ref 0.4.0 (git+https://github.com/kevinaboos/owning-ref-rs)",
+ "pci 0.1.0",
+ "spin 0.4.10 (registry+https://github.com/rust-lang/crates.io-index)",
+ "storage_device 0.1.0",
+]
+
+[[package]]
 name = "swap"
 version = "0.1.0"
 dependencies = [
@@ -1782,8 +1818,8 @@ dependencies = [
  "atomic_linked_list 0.1.0",
  "context_switch 0.1.0",
  "environment 0.1.0",
- "fs_node 0.1.0",
  "irq_safety 0.1.1 (git+https://github.com/kevinaboos/irq_safety)",
+ "kernel_config 0.1.0",
  "lazy_static 1.2.0 (registry+https://github.com/rust-lang/crates.io-index)",
  "log 0.3.9 (registry+https://github.com/rust-lang/crates.io-index)",
  "memory 0.1.0",
@@ -2073,7 +2109,7 @@ source = "git+https://github.com/kevinaboos/zero.git#9fc7ff523138a21f40359b706d2
 [metadata]
 "checksum atomic 0.4.4 (registry+https://github.com/rust-lang/crates.io-index)" = "e5208a0c1ca6d26af893a20ad156a6def478f23c26900b1f95e2086aeb870146"
 "checksum bit_field 0.7.0 (registry+https://github.com/rust-lang/crates.io-index)" = "ff91a64014e1bc53bf643920f2c9ab5f0980d92a0948295f3ee550e9266849ad"
-"checksum bitflags 1.0.4 (registry+https://github.com/rust-lang/crates.io-index)" = "228047a76f468627ca71776ecdebd732a3423081fcf5125585bcd7c49886ce12"
+"checksum bitflags 1.1.0 (registry+https://github.com/rust-lang/crates.io-index)" = "3d155346769a6855b86399e9bc3814ab343cd3d62c7e985113d46a0ec3c281fd"
 "checksum block-buffer 0.7.0 (registry+https://github.com/rust-lang/crates.io-index)" = "49665c62e0e700857531fa5d3763e91b539ff1abeebd56808d378b495870d60d"
 "checksum block-padding 0.1.2 (registry+https://github.com/rust-lang/crates.io-index)" = "4fc4358306e344bf9775d0197fd00d2603e5afb0771bb353538630f022068ea3"
 "checksum byte-tools 0.3.0 (registry+https://github.com/rust-lang/crates.io-index)" = "980479e6fde23246dfb54d47580d66b4e99202e7579c5eaa9fe10ecb5ebd2182"
@@ -2083,6 +2119,7 @@ source = "git+https://github.com/kevinaboos/zero.git#9fc7ff523138a21f40359b706d2
 "checksum compiler_builtins 0.1.11 (git+https://github.com/rust-lang-nursery/compiler-builtins)" = "<none>"
 "checksum derive_more 0.14.0 (registry+https://github.com/rust-lang/crates.io-index)" = "fbe9f11be34f800b3ecaaed0ec9ec2e015d1d0ba0c8644c1310f73d6e8994615"
 "checksum digest 0.8.0 (registry+https://github.com/rust-lang/crates.io-index)" = "05f47366984d3ad862010e22c7ce81a7dbcaebbdfb37241a620f8b6596ee135c"
+"checksum downcast-rs 1.0.4 (git+https://github.com/theseus-os/downcast-rs)" = "<none>"
 "checksum either 1.5.0 (registry+https://github.com/rust-lang/crates.io-index)" = "3be565ca5c557d7f59e7cfcf1844f9e3033650c929c6566f511e8005f205c1d0"
 "checksum generic-array 0.12.0 (registry+https://github.com/rust-lang/crates.io-index)" = "3c0f28c2f5bfb5960175af447a2da7c18900693738343dc896ffbcabd9839592"
 "checksum getopts 0.2.18 (git+https://github.com/kevinaboos/getopts)" = "<none>"
