@@ -13,7 +13,7 @@ extern crate irq_safety;
 extern crate memory;
 extern crate memory_x86;
 
-pub use memory::*;
+use memory::{MappedPages, MemoryManagementInfo};
 use memory_x86::{arch_init, BootInformation};
 
 use alloc::sync::Arc;

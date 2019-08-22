@@ -1,5 +1,5 @@
 //! This crate implements the virtual memory subsystem interfaces for Theseus on x86_64.
-//! Abstrace memory interfaces uses this crate to manipulate the memory subsystem on x86_64;
+//! `memory_interface` uses this crate to manipulate the memory subsystem on x86_64;
 
 #![no_std]
 #![feature(asm)]
@@ -18,6 +18,7 @@ extern crate memory;
 
 mod paging;
 
+// Export arch-specific information structure to `memory_interface`. 
 pub use multiboot2::BootInformation;
 
 use core::ops::DerefMut;

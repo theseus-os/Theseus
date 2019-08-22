@@ -1,5 +1,5 @@
 //! This crate contains arch-specific structures and functions related to MMU. 
-//! Definitions in this crate should be exported from memory so that others does not need to get access to this crate.
+//! Definitions in this crate should be exported from `memory` for general use.
 
 #![no_std]
 
@@ -12,7 +12,7 @@ extern crate multiboot2;
 extern crate xmas_elf;
 
 use entry_flags_oper::EntryFlagsOper;
-pub use kernel_config::memory::KERNEL_OFFSET;
+use kernel_config::memory::KERNEL_OFFSET;
 use x86_64::{instructions::tlb, registers::control_regs};
 
 bitflags! {

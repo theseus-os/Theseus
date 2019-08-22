@@ -1,3 +1,5 @@
+//! The EntrFlagsOper trait defines basic operations on entryflags. The mmu crate implements this trait for EntryFlags on different architectures.
+
 #![no_std]
 
 /// Basic operations on entryflags
