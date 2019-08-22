@@ -12,7 +12,6 @@ extern crate multiboot2;
 extern crate xmas_elf;
 
 use entry_flags_oper::EntryFlagsOper;
-use kernel_config::memory::KERNEL_OFFSET;
 use x86_64::{instructions::tlb, registers::control_regs};
 
 bitflags! {
