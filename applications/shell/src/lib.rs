@@ -7,7 +7,6 @@
 //! Problem: Currently there's no upper bound to the user command line history.
 
 #![no_std]
-#![feature(option_xor)]
 extern crate frame_buffer;
 extern crate keycodes_ascii;
 extern crate spin;

@@ -138,8 +138,8 @@ pub fn get_terminal_or_default() -> Result<Arc<Mutex<Terminal>>, &'static str> {
 /// without causing a deadlock. In other words, by using this function, shell can prevent the
 /// application from holding the lock of these shared maps before killing it. Otherwise, the
 /// lock will never get a chance to be released. Since we currently don't have stack unwinding.
-pub fn lock_and_execute<'a>(f: Box<Fn(MutexGuard<'a, BTreeMap<usize, IoControlFlags>>,
-                                      MutexGuard<'a, BTreeMap<usize, IoHandles>>)>) {
+pub fn lock_and_execute<'a>(f: Box<dyn Fn(MutexGuard<'a, BTreeMap<usize, IoControlFlags>>,
+                                          MutexGuard<'a, BTreeMap<usize, IoHandles>>)>) {
     let locked_flags = APP_IO_CTRL_FLAGS.lock();
     let locked_handles = APP_IO_HANDLES.lock();
     f(locked_flags, locked_handles);

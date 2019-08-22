@@ -2,7 +2,6 @@
 #![feature(rustc_private)]
 #![feature(slice_concat_ext)]
 #![feature(const_fn)]
-#![feature(option_xor)]
 
 #[macro_use] extern crate alloc;
 #[macro_use] extern crate log;

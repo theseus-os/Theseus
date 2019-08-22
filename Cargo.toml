@@ -33,6 +33,8 @@ getopts = { git = "https://github.com/kevinaboos/getopts" }
 qp-trie = { git = "https://github.com/theseus-os/qp-trie-rs" }
 ### use our own no_std-compatible downcast-rs
 downcast-rs = { git = "https://github.com/theseus-os/downcast-rs" }
+### use the latest version of core_io that supports the latest nightly Rust compiler
+core_io = { git = "https://github.com/Acciente717/rust-core_io" }
 
 
 ### These profiles fix the new rustc behavior of splitting one crate into many object files. 
