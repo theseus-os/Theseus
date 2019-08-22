@@ -113,7 +113,7 @@ pub fn main(_args: Vec<String>) -> isize {
                 _ => { break; }
             };
             match _event.deref() {
-                &Event::InputEvent(ref input_event) => {
+                &Event::KeyboardEvent(ref input_event) => {
                     let key_event = input_event.key_event;
                     if key_event.action == KeyAction::Pressed {
                         // first handle special keys that allows user to move the cursor and delete chars

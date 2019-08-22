@@ -1,5 +1,9 @@
-//! This crate is a frame buffer manager.
-//! * It defines a FrameBufferAlpha structure and creates new framebuffers for applications
+//! Framebuffer with alpha channel composition
+//! 
+//! It defines a FrameBufferAlpha structure and creates new framebuffers for applications, 
+//! also defines the color format which is composed of blue, green, red and alpha.
+//!
+//! Several predefined functions can help to manipulate the framebuffer objects and single pixel.
 
 #![no_std]
 
@@ -17,9 +21,10 @@ use core::ops::DerefMut;
 use memory::{EntryFlags, FrameRange, MappedPages,PhysicalAddress, FRAME_ALLOCATOR};
 use owning_ref::BoxRefMut;
 
-/// A Pixel is a u32 integer. The lower 24 bits of a Pixel specifie the RGB color of a pixel
-/// , while the first 8bit is alpha channel which helps to composite windows
-/// alpha = 0 means opaque and 0xFF means transparent
+/// A `Pixel` is a `u32` broken down into four bytes. 
+/// The lower 24 bits of a Pixel specify its RGB color values, while the upper 8bit is an `alpha` channel,
+/// in which an `alpha` value of `0` represents an opaque pixel and `0xFF` represents a completely transparent pixel. 
+/// The `alpha` value is used in an alpha-blending compositor that supports transparency.
 #[repr(C, packed)]
 #[derive(Hash, Debug, Clone, Copy)]
 pub struct Pixel {
@@ -28,14 +33,16 @@ pub struct Pixel {
     pub red: u8,
     pub alpha: u8
 }
-// pub type Pixel = u32;
 
-// Every pixel is of u32 type
-const PIXEL_BYTES: usize = 4;
+/// predefined opaque black
+pub const BLACK: Pixel = Pixel{ alpha: 0, red: 0, green: 0, blue: 0};
+/// predefined opaque white
+pub const WHITE: Pixel = Pixel{ alpha: 0, red: 255, green: 255, blue: 255};
 
-/// Initialize the final frame buffer.
-/// Allocate a block of memory and map it to the physical framebuffer frames.
-/// Init the frame buffer. Allocate a block of memory and map it to the frame buffer frames.
+// Every pixel is of `Pixel` type, which is 4 byte as defined in `Pixel`
+const PIXEL_BYTES: usize = core::mem::size_of::<Pixel>();
+
+/// Initialize the final frame buffer by allocating a block of memory and map it to the physical framebuffer frames.
 pub fn init() -> Result<FrameBufferAlpha, &'static str> {
     // Get the graphic mode information
     let vesa_display_phys_start: PhysicalAddress;
@@ -59,8 +66,7 @@ pub fn init() -> Result<FrameBufferAlpha, &'static str> {
     Ok(framebuffer)
 }
 
-/// The virtual frame buffer struct. It contains the size of the buffer and a buffer array
-#[derive(Hash)]
+/// The frame buffer struct of either virtual frame buffer or physical frame buffer. It contains the size of the buffer and a buffer array
 pub struct FrameBufferAlpha {
     pub width: usize,
     pub height: usize,
@@ -68,9 +74,9 @@ pub struct FrameBufferAlpha {
 }
 
 impl FrameBufferAlpha {
-    /// Create a new virtual frame buffer with specified size.
-    /// If the physical_address is specified, the new virtual frame buffer will be mapped to hardware's physical memory at that address.
-    /// If the physical_address is none, the new function will allocate a block of physical memory at a random address and map the new frame buffer to that memory.
+    /// Create a new frame buffer with specified size. 
+    /// If the physical_address is specified, the new frame buffer will be mapped to hardware's physical memory at that address. 
+    /// If the physical_address is none, the new function will allocate a block of physical memory at a random address and map the new frame buffer to that memory, which is a virtual frame buffer.
     pub fn new(
         width: usize,
         height: usize,
@@ -164,7 +170,7 @@ impl FrameBufferAlpha {
     /// draw a point on this framebuffer with alpha
     pub fn draw_point_alpha(&mut self, x: usize, y: usize, color: Pixel) {
         let idx = self.index(x, y);
-        self.buffer[idx] = alpha_mix(self.buffer[idx], color);
+        self.buffer[idx] = self.buffer[idx].alpha_mix(color);
     }
 
     /// draw a rectangle on this framebuffer
@@ -185,7 +191,7 @@ impl FrameBufferAlpha {
         }
     }
 
-    /// draw a circle on the screen with alpha
+    /// draw a circle on the screen with alpha. (`xc`, `yc`) is the position of the center of the circle, and `r` is the radius
     pub fn draw_circle_alpha(&mut self, xc: usize, yc: usize, r: usize, color: Pixel) {
         let r2 = (r*r) as isize;
         for y in yc-r..yc+r {
@@ -215,41 +221,42 @@ impl FrameBufferAlpha {
     }
 }
 
-/// mix two color for one pixel on the top of another
-pub fn alpha_mix(bottom: Pixel, top: Pixel) -> Pixel {
-    let alpha = top.alpha as u16;
-    let red = top.red;
-    let green = top.green;
-    let blue = top.blue;
-    let ori_red = bottom.red;
-    let ori_green = bottom.green;
-    let ori_blue = bottom.blue;
-    let new_red = (((red as u16) * (255 - alpha) + (ori_red as u16) * alpha) / 255) as u8;
-    let new_green = (((green as u16) * (255 - alpha) + (ori_green as u16) * alpha) / 255) as u8;
-    let new_blue = (((blue as u16) * (255 - alpha) + (ori_blue as u16) * alpha) / 255) as u8;
-    Pixel {
-        alpha: bottom.alpha, 
-        red: new_red,
-        green: new_green,
-        blue: new_blue
+impl Pixel {
+    /// mix two color using alpha channel composition, supposing `self` is on top of `other` pixel.
+    pub fn alpha_mix(self, other: Self) -> Self {
+        let alpha = self.alpha as u16;
+        let red = self.red;
+        let green = self.green;
+        let blue = self.blue;
+        let ori_red = other.red;
+        let ori_green = other.green;
+        let ori_blue = other.blue;
+        let new_red = (((red as u16) * (255 - alpha) + (ori_red as u16) * alpha) / 255) as u8;
+        let new_green = (((green as u16) * (255 - alpha) + (ori_green as u16) * alpha) / 255) as u8;
+        let new_blue = (((blue as u16) * (255 - alpha) + (ori_blue as u16) * alpha) / 255) as u8;
+        Self {
+            alpha: other.alpha, 
+            red: new_red,
+            green: new_green,
+            blue: new_blue
+        }
     }
-}
 
-/// mix two color linearly with a float number
-pub fn color_mix(c1: Pixel, c2: Pixel, mix: f32) -> Pixel {
-    if mix < 0f32 || mix > 1f32 {  // cannot mix value outside [0, 1]
-        const BLACK: Pixel = Pixel{ alpha: 0, red: 0, green: 0, blue: 0};
-        return BLACK;
-    }
-    let new_alpha = ((c1.alpha as f32) * mix + (c2.alpha as f32) * (1f32-mix)) as u8;
-    let new_red = ((c1.red as f32) * mix + (c2.red as f32) * (1f32-mix)) as u8;
-    let new_green = ((c1.green as f32) * mix + (c2.green as f32) * (1f32-mix)) as u8;
-    let new_blue = ((c1.blue as f32) * mix + (c2.blue as f32) * (1f32-mix)) as u8;
-    Pixel {
-        alpha: new_alpha, 
-        red: new_red,
-        green: new_green,
-        blue: new_blue
+    /// mix two color linearly with a float number, with mix `self` and (1-mix) `other`. If mix is outside range of [0, 1], black will be returned
+    pub fn color_mix(self, other: Self, mix: f32) -> Self {
+        if mix < 0f32 || mix > 1f32 {  // cannot mix value outside [0, 1]
+            return BLACK;
+        }
+        let new_alpha = ((self.alpha as f32) * mix + (other.alpha as f32) * (1f32-mix)) as u8;
+        let new_red = ((self.red as f32) * mix + (other.red as f32) * (1f32-mix)) as u8;
+        let new_green = ((self.green as f32) * mix + (other.green as f32) * (1f32-mix)) as u8;
+        let new_blue = ((self.blue as f32) * mix + (other.blue as f32) * (1f32-mix)) as u8;
+        Pixel {
+            alpha: new_alpha, 
+            red: new_red,
+            green: new_green,
+            blue: new_blue
+        }
     }
 }
 

@@ -2,7 +2,7 @@
 name = "frame_buffer_alpha"
 version = "0.1.0"
 authors = ["Yue Wu <wuyue16@pku.edu.cn>"]
-description = "manage framebuffer objects. contain a final framebuffer which is mapped to the physical framebuffer"
+description = "framebuffer object which follows alpha channel composition"
 build = "../../build.rs"
 
 [dependencies]

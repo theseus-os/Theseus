@@ -1,4 +1,4 @@
-//! Window Components that helps build easy-to-use GUI applications
+//! This Window Components is designated to help user to build easy-to-use GUI applications
 //! 
 //! The `window_components` object should be owned by application, see `applications/new_window` as a demo to use this library
 //! 
@@ -30,7 +30,7 @@ use alloc::vec::Vec;
 use core::ops::{Deref};
 use dfqueue::{DFQueue, DFQueueConsumer, DFQueueProducer};
 use event_types::{Event, MousePositionEvent};
-use frame_buffer_alpha::{ Pixel, color_mix };
+use frame_buffer_alpha::{ Pixel, BLACK };
 use spin::{Mutex};
 use window_manager_alpha::WindowObjAlpha;
 
@@ -65,7 +65,7 @@ const WINDOW_BUTTON_SIZE: usize = 6;
 pub struct WindowComponents {
     /// the window object that could be used to initialize components
     pub winobj: Arc<Mutex<WindowObjAlpha>>,
-    /// the witdth of border, init as WINDOW_BORDER. the border is still part of the window and remains flexibility for user to change border style or remove border. However, for most application a border is useful for user to identify the region.
+    /// the width of border, init as WINDOW_BORDER. the border is still part of the window and remains flexibility for user to change border style or remove border. However, for most application a border is useful for user to identify the region.
     border_size: usize,
     /// the height of title bar in pixel, init as WINDOW_TITLE_BAR. it is render inside the window so user shouldn't use this area anymore
     title_size: usize,
@@ -84,7 +84,7 @@ pub struct WindowComponents {
 
 impl WindowComponents {
     /// create new WindowComponents by given position and size, return the Mutex of it for ease of sharing
-    /// x, y is the distance relative to left-top of window
+    /// x, y is the distance in pixel relative to left-top of window
     pub fn new(x: isize, y: isize, width: usize, height: usize) -> Result<Arc<Mutex<WindowComponents>>, &'static str> {
 
         if width <= 2 * WINDOW_TITLE_BAR || height <= WINDOW_TITLE_BAR + WINDOW_BORDER {
@@ -151,8 +151,8 @@ impl WindowComponents {
         // then draw the title bar
         if active {
             for i in 0..self.title_size {
-                winobj.framebuffer.draw_rect(0, width, i, i+1, frame_buffer_alpha::color_mix(
-                    WINDOW_BORDER_COLOR_ACTIVE_BOTTOM, WINDOW_BORDER_COLOR_ACTIVE_TOP, (i as f32) / (self.title_size as f32)
+                winobj.framebuffer.draw_rect(0, width, i, i+1, WINDOW_BORDER_COLOR_ACTIVE_BOTTOM.color_mix(
+                    WINDOW_BORDER_COLOR_ACTIVE_TOP, (i as f32) / (self.title_size as f32)
                 ));
             }
         } else {
@@ -195,8 +195,8 @@ impl WindowComponents {
         if state > 2 { return; }
         let y = self.title_size / 2;
         let x = WINDOW_BUTTON_BIAS_X + idx * WINDOW_BUTTON_BETWEEN;
-        winobj.framebuffer.draw_circle_alpha(x, y, WINDOW_BUTTON_SIZE, color_mix(
-            0x00000000.into(), match idx {
+        winobj.framebuffer.draw_circle_alpha(x, y, WINDOW_BUTTON_SIZE, BLACK.color_mix(
+            match idx {
                 0 => WINDOW_BUTTON_COLOR_CLOSE,
                 1 => WINDOW_BUTTON_COLOR_MINIMIZE,
                 2 => WINDOW_BUTTON_COLOR_MAXIMIZE,
@@ -259,9 +259,9 @@ impl WindowComponents {
             let bx = winobj.x;
             let by = winobj.y;
             match event.deref() {
-                &Event::InputEvent(ref input_event) => {
+                &Event::KeyboardEvent(ref input_event) => {
                     let key_input = input_event.key_event;
-                    self.producer.enqueue(Event::new_input_event(key_input));
+                    self.producer.enqueue(Event::new_keyboard_event(key_input));
                 }
                 &Event::MousePositionEvent(ref mouse_event) => {
                     // debug!("mouse_event: {:?}", mouse_event);

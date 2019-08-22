@@ -8,7 +8,8 @@ use keycodes_ascii::{KeyEvent};
 use alloc::string::String;
 use mouse_data::MouseEvent;
 
-/// an event describe mouse position rather than movement
+/// A event describe mouse position rather than movement differential from last event. 
+/// It contains two position, (x,y) for the relative position in each window, and (gx,gy) for global absolute position of the screen.
 #[derive(Debug, Clone)]
 pub struct MousePositionEvent {  // tells window application of the cursor information
     /// the relative position in window
@@ -30,22 +31,22 @@ pub struct MousePositionEvent {  // tells window application of the cursor infor
 #[derive(Debug, Clone)]
 pub enum Event {
     /// An input event from a keyboard
-    InputEvent(KeyboardInputEvent),
+    KeyboardEvent(KeyboardInputEvent),
     /// An input event from a mouse
-    MouseInputEvent(MouseEvent),
+    MouseMovementEvent(MouseEvent),
     /// An event from another entity that wishes to print a message
     OutputEvent(PrintOutputEvent),
     /// Tells an application that the window manager has resized that application's window
     /// so that it knows to perform any necessary tasks related to window size, such as text reflow.
-    ResizeEvent(WindowResizeEvent),
-    /// The event tells application about now cursor position
+    WindowResizeEvent(WindowResizeEvent),
+    /// The event tells application about cursor's position currently (including relative to a window and relative to a screen)
     MousePositionEvent(MousePositionEvent),
     ExitEvent,
 }
 
 impl Event {
-    pub fn new_input_event(kev: KeyEvent) -> Event {
-        Event::InputEvent(KeyboardInputEvent::new(kev))
+    pub fn new_keyboard_event(kev: KeyEvent) -> Event {
+        Event::KeyboardEvent(KeyboardInputEvent::new(kev))
     }
 
     pub fn new_output_event<S>(s: S) -> Event where S: Into<String> {
@@ -53,7 +54,7 @@ impl Event {
     }
 
     pub fn new_resize_event(x: usize, y: usize, width: usize, height: usize) -> Event {
-        Event::ResizeEvent(WindowResizeEvent::new(x,y,width, height))
+        Event::WindowResizeEvent(WindowResizeEvent::new(x,y,width, height))
     }
 
 }

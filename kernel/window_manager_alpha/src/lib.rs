@@ -35,7 +35,7 @@ use alloc::vec::Vec;
 use core::ops::Deref;
 use dfqueue::{DFQueue, DFQueueConsumer, DFQueueProducer};
 use event_types::{Event, MousePositionEvent};
-use frame_buffer_alpha::{ FrameBufferAlpha, Pixel, alpha_mix, color_mix };
+use frame_buffer_alpha::{ FrameBufferAlpha, Pixel };
 use spin::{Mutex, Once};
 use spawn::{KernelTaskBuilder, ApplicationTaskBuilder};
 use mouse_data::MouseEvent;
@@ -244,7 +244,7 @@ impl WindowManagerAlpha {
                 ret
             };
             let bottom = self.recompute_single_pixel_show_list(x, y, idx+1);
-            return alpha_mix(bottom, top);
+            return top.alpha_mix(bottom);
         } else {  // need to delete this one, since the owner has been dropped, but here is immutable >.<
             // self.show_list.remove(idx);
             return self.recompute_single_pixel_show_list(x, y, idx+1);
@@ -266,7 +266,7 @@ impl WindowManagerAlpha {
                     self.final_fb.draw_point(x, y, top);
                 } else {
                     let bottom = self.recompute_single_pixel_show_list(x, y, 0);
-                    self.final_fb.draw_point(x, y, alpha_mix(bottom, top));
+                    self.final_fb.draw_point(x, y, top.alpha_mix(bottom));
                 }
             } else {
                 let pixel = self.recompute_single_pixel_show_list(x, y, 0);
@@ -300,42 +300,42 @@ impl WindowManagerAlpha {
                 if top {  // left-top
                     let dx = ux_start - x; let dy = uy_start - y;
                     if dx+dy <= WINDOW_BORDER_SIZE {
-                        self.final_fb.draw_point_alpha(x, y, color_mix(
-                            WINDOW_BORDER_COLOR_OUTTER, WINDOW_BORDER_COLOR_INNER, (dx+dy) as f32 / f32_window_border_size));
+                        self.final_fb.draw_point_alpha(x, y, WINDOW_BORDER_COLOR_OUTTER.color_mix(
+                            WINDOW_BORDER_COLOR_INNER, (dx+dy) as f32 / f32_window_border_size));
                     }
                 } else if bottom {  // left-bottom
                     let dx = ux_start - x; let dy = y - uy_end_1;
                     if dx+dy <= WINDOW_BORDER_SIZE {
-                        self.final_fb.draw_point_alpha(x, y, color_mix(
-                            WINDOW_BORDER_COLOR_OUTTER, WINDOW_BORDER_COLOR_INNER, (dx+dy) as f32 / f32_window_border_size));
+                        self.final_fb.draw_point_alpha(x, y, WINDOW_BORDER_COLOR_OUTTER.color_mix(
+                            WINDOW_BORDER_COLOR_INNER, (dx+dy) as f32 / f32_window_border_size));
                     }
                 } else {  // only left
-                    self.final_fb.draw_point_alpha(x, y, color_mix(
-                        WINDOW_BORDER_COLOR_OUTTER, WINDOW_BORDER_COLOR_INNER, (ux_start - x) as f32 / f32_window_border_size));
+                    self.final_fb.draw_point_alpha(x, y, WINDOW_BORDER_COLOR_OUTTER.color_mix(
+                        WINDOW_BORDER_COLOR_INNER, (ux_start - x) as f32 / f32_window_border_size));
                 }
             } else if right {
                 if top {  // right-top
                     let dx = x - ux_end_1; let dy = uy_start - y;
                     if dx+dy <= WINDOW_BORDER_SIZE {
-                        self.final_fb.draw_point_alpha(x, y, color_mix(
-                            WINDOW_BORDER_COLOR_OUTTER, WINDOW_BORDER_COLOR_INNER, (dx+dy) as f32 / f32_window_border_size));
+                        self.final_fb.draw_point_alpha(x, y, WINDOW_BORDER_COLOR_OUTTER.color_mix(
+                            WINDOW_BORDER_COLOR_INNER, (dx+dy) as f32 / f32_window_border_size));
                     }
                 } else if bottom {  // right-bottom
                     let dx = x - ux_end_1; let dy = y - uy_end_1;
                     if dx+dy <= WINDOW_BORDER_SIZE {
-                        self.final_fb.draw_point_alpha(x, y, color_mix(
-                            WINDOW_BORDER_COLOR_OUTTER, WINDOW_BORDER_COLOR_INNER, (dx+dy) as f32 / f32_window_border_size));
+                        self.final_fb.draw_point_alpha(x, y, WINDOW_BORDER_COLOR_OUTTER.color_mix(
+                            WINDOW_BORDER_COLOR_INNER, (dx+dy) as f32 / f32_window_border_size));
                     }
                 } else {  // only right
-                    self.final_fb.draw_point_alpha(x, y, color_mix(
-                        WINDOW_BORDER_COLOR_OUTTER, WINDOW_BORDER_COLOR_INNER, (x - ux_end_1) as f32 / f32_window_border_size));
+                    self.final_fb.draw_point_alpha(x, y, WINDOW_BORDER_COLOR_OUTTER.color_mix(
+                        WINDOW_BORDER_COLOR_INNER, (x - ux_end_1) as f32 / f32_window_border_size));
                 }
             } else if top {  // only top
-                self.final_fb.draw_point_alpha(x, y, color_mix(
-                    WINDOW_BORDER_COLOR_OUTTER, WINDOW_BORDER_COLOR_INNER, (uy_start - y) as f32 / f32_window_border_size));
+                self.final_fb.draw_point_alpha(x, y, WINDOW_BORDER_COLOR_OUTTER.color_mix(
+                    WINDOW_BORDER_COLOR_INNER, (uy_start - y) as f32 / f32_window_border_size));
             } else if bottom {  // only bottom
-                self.final_fb.draw_point_alpha(x, y, color_mix(
-                    WINDOW_BORDER_COLOR_OUTTER, WINDOW_BORDER_COLOR_INNER, (y - uy_end_1) as f32 / f32_window_border_size));
+                self.final_fb.draw_point_alpha(x, y, WINDOW_BORDER_COLOR_OUTTER.color_mix(
+                    WINDOW_BORDER_COLOR_INNER, (y - uy_end_1) as f32 / f32_window_border_size));
             }
         }
         // finally draw mouse
@@ -412,7 +412,7 @@ impl WindowManagerAlpha {
     fn pass_keyboard_event_to_window(& self, key_event: KeyEvent) -> Result<(), &'static str> {
         if let Some(current_active) = self.active.upgrade() {
             let current_active_win = current_active.lock();
-            current_active_win.producer.enqueue(Event::new_input_event(key_event));
+            current_active_win.producer.enqueue(Event::new_keyboard_event(key_event));
         }
         Err("cannot find window to pass key event")
     }
@@ -759,11 +759,11 @@ fn window_manager_loop( consumer: (DFQueueConsumer<Event>, DFQueueConsumer<Event
                 trace!("exiting the main loop of the window manager loop");
                 return Ok(()); 
             }
-            Event::InputEvent(ref input_event) => {
+            Event::KeyboardEvent(ref input_event) => {
                 let key_input = input_event.key_event;
                 keyboard_handle_application(key_input)?;
             }
-            Event::MouseInputEvent(ref mouse_event) => {
+            Event::MouseMovementEvent(ref mouse_event) => {
                 // mouse::mouse_to_print(&mouse_event);
                 let mouse_displacement = &mouse_event.displacement;
                 let mut x = (mouse_displacement.x as i8) as isize;
@@ -775,7 +775,7 @@ fn window_manager_loop( consumer: (DFQueueConsumer<Event>, DFQueueConsumer<Event
                         _ => { break; }
                     };
                     match next_event.deref() {
-                        &Event::MouseInputEvent(ref next_mouse_event) => {
+                        &Event::MouseMovementEvent(ref next_mouse_event) => {
                             if next_mouse_event.mousemove.scrolling_up == mouse_event.mousemove.scrolling_up &&
                                     next_mouse_event.mousemove.scrolling_down == mouse_event.mousemove.scrolling_down &&
                                     next_mouse_event.buttonact.left_button_hold == mouse_event.buttonact.left_button_hold &&

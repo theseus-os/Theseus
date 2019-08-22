@@ -105,14 +105,14 @@ enum AppErr {
 ///     - Consumer is the main terminal loop
 ///     - Producer is the window manager. Window manager is responsible for enqueuing keyevents into the active application
 struct Terminal {
-    /// The terminal's own window
+    /// The terminal's own window, this is a WindowComponents object which handles the events of user input properly like moving window and close window
     window: Arc<Mutex<window_components::WindowComponents>>,
     /// The string that stores the users keypresses after the prompt
     cmdline: String,
     /// Indicates whether the prompt string + any additional keypresses are the last thing that is printed on the prompt
     /// If this is false, the terminal will reprint out the prompt + the additional keypresses 
     correct_prompt_position: bool,
-    // textare object of the terminal
+    // textarea object of the terminal, it has a weak reference to the window object so that calling function of this object will draw on the screen
     textarea: Arc<Mutex<window_components::TextArea>>,
     /// Vector that stores the history of commands that the user has entered
     command_history: Vec<String>,
@@ -992,12 +992,14 @@ impl Terminal {
     }
 
     fn display_cursor(&mut self) -> Result<(), &'static str> {
-        self.cursor.blink();
+        self.cursor.check_time();
         // debug!("absolute_cursor_pos: {}", self.absolute_cursor_pos);
-        if self.cursor.show {
-            self.textarea.lock().set_char_absolute(self.absolute_cursor_pos - self.left_shift, 221)?;
-        } else {
-            self.textarea.lock().set_char_absolute(self.absolute_cursor_pos - self.left_shift, ' ' as u8)?;
+        if self.cursor.enabled {
+            if self.cursor.show {
+                self.textarea.lock().set_char_absolute(self.absolute_cursor_pos - self.left_shift, 221)?;
+            } else {
+                self.textarea.lock().set_char_absolute(self.absolute_cursor_pos - self.left_shift, ' ' as u8)?;
+            }
         }
         Ok(())
     }
@@ -1075,12 +1077,12 @@ fn terminal_loop(mut terminal: Terminal) -> Result<(), &'static str> {
                 return Ok(());
             }
 
-            Event::ResizeEvent(ref _rev) => {
+            Event::WindowResizeEvent(ref _rev) => {
                 terminal.refresh_display(); // application refreshes display after resize event is received
             }
 
             // Handles ordinary keypresses
-            Event::InputEvent(ref input_event) => {
+            Event::KeyboardEvent(ref input_event) => {
                 terminal.handle_key_event(input_event.key_event)?;
                 if input_event.key_event.action == KeyAction::Pressed {
                     // only refreshes the display on keypresses to improve display performance 
@@ -1093,49 +1095,55 @@ fn terminal_loop(mut terminal: Terminal) -> Result<(), &'static str> {
     }  
 }
 
+/// The cursor structure is mainly a timer for cursor to blink properly, which also has multiple status recorded. 
+/// When `enabled` is false, it should remain the original word. When `enabled` is true and `show` is false, it should display blank character, only when `enabled` is true, and `show` is true, it should display cursor character.
 pub struct Cursor {
+    /// Terminal will set this variable to enable blink or not. When this is not enabled, function `blink` will always return `false` which means do not refresh the cursor
     enabled: bool,
-    freq: u64,
+    /// The time of blinking interval. Initially set to `DEFAULT_CURSOR_BLINK_INTERVAL`, however, can be changed during run-time
+    blink_interval: u64,
+    /// Record the time of last blink state change. This variable is updated when `reset` is called or `blink` is called and the time duration is larger than `DEFAULT_CURSOR_BLINK_INTERVAL`
     time: TscTicks,
+    /// If function `blink` returns true, then this variable indicates whether display the cursor or not. To fully determine whether to display the cursor, user should call `is_show` function
     show: bool,
 }
 
-const DEFAULT_CURSOR_FREQ: u64 = 400000000;
+const DEFAULT_CURSOR_BLINK_INTERVAL: u64 = 400000000;
 impl Cursor {
-    /// create a new cursor struct
+    /// Create a new cursor object which is initially enabled. The `blink_interval` is initialized as `DEFAULT_CURSOR_BLINK_INTERVAL` however one can change this at any time. `time` is set to current time.
     pub fn new() -> Cursor {
         Cursor {
             enabled: true,
-            freq: DEFAULT_CURSOR_FREQ,
+            blink_interval: DEFAULT_CURSOR_BLINK_INTERVAL,
             time: tsc_ticks(),
             show: true,
         }
     }
 
-    /// reset the cursor
+    /// Reset the cursor by setting `show` to true and `time` to current time. This doesn't effect `enabled` variable. This will not effect the display unless terminal application refresh the textarea by using the status of `Cursor` object
     pub fn reset(&mut self) {
         self.show = true;
         self.time = tsc_ticks();
     }
 
-    /// enable a cursor
+    /// Enable a cursor and call `reset` internally to make sure the behavior is the same after enable it (same initial state and same interval to change)
     pub fn enable(&mut self) {
         self.enabled = true;
         self.reset();
     }
 
-    /// disable a cursor
+    /// Disable a cursor by setting `enabled` to false
     pub fn disable(&mut self) {
         self.enabled = false;
     }
 
-    /// change the blink state show/hidden of a cursor. The terminal calls this function in a loop
-    pub fn blink(&mut self) -> bool {
+    /// Change the blink state shown/hidden of a cursor. The terminal calls this function in a loop. It does not effect the cursor directly, see doc of `Cursor` about how to use this.
+    pub fn check_time(&mut self) -> bool {
         if self.enabled {
             let time = tsc_ticks();
             if let Some(duration) = time.sub(&(self.time)) {
                 if let Some(ns) = duration.to_ns() {
-                    if ns >= self.freq {
+                    if ns >= self.blink_interval {
                         self.time = time;
                         self.show = !self.show;
                         return true;
@@ -1144,10 +1152,5 @@ impl Cursor {
             }
         }
         false
-    }
-
-    /// check if the cursor should be displayed
-    pub fn show(&self) -> bool {
-        self.enabled && self.show
     }
 }

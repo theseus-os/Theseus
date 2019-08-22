@@ -113,7 +113,7 @@ pub fn handle_mouse_input(readdata: u32) -> Result<(), &'static str> {
 
     let mouse_event = MouseEvent::new(*action, *mmove, *dis);
     // mouse_to_print(&mouse_event);  // use this to debug  
-    let event = Event::MouseInputEvent(mouse_event);
+    let event = Event::MouseMovementEvent(mouse_event);
 
     if let Some(producer) = MOUSE_PRODUCER.try() {
         producer.enqueue(event);

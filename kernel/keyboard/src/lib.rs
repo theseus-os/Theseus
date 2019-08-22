@@ -109,7 +109,7 @@ pub fn handle_keyboard_input(scan_code: u8, _extended: bool) -> Result<(), &'sta
             let keycode = Keycode::from_scancode(adjusted_scan_code); 
             match keycode {
                 Some(keycode) => { // this re-scopes (shadows) keycode
-                    let event = Event::new_input_event(KeyEvent::new(keycode, action, modifiers.clone()));
+                    let event = Event::new_keyboard_event(KeyEvent::new(keycode, action, modifiers.clone()));
                     if let Some(producer) = KEYBOARD_PRODUCER.try() {
                         producer.enqueue(event);
                         Ok(()) // successfully queued up KeyEvent 
