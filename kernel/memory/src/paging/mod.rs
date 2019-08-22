@@ -351,7 +351,7 @@ impl PageTable {
     }
 }
 
-
+/// Returns the current top-level page table frame.
 pub fn get_current_p4() -> Frame {
     Frame::containing_address(PhysicalAddress::new_canonical(get_p4_address()))
 }

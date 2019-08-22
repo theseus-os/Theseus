@@ -18,7 +18,7 @@ extern crate memory;
 
 mod paging;
 
-// Export arch-specific information structure to `memory_interface`. 
+/// Export arch-specific information structure to `memory_interface`. 
 pub use multiboot2::BootInformation;
 
 use core::ops::DerefMut;

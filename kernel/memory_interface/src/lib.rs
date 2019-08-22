@@ -20,8 +20,17 @@ use alloc::sync::Arc;
 use alloc::vec::Vec;
 use irq_safety::MutexIrqSafe;
 
-/// Initiialize the memory subsystem. 
-/// This function is an abstract interface. In invokes arch-specific init functions to initialize the memory subsystem.
+/// This function is an abstract interface. In invokes arch-specific init functions to initialize the virtual memory management system and returns a MemoryManagementInfo instance,
+/// which represents Task zero's (the kernel's) address space. 
+/// Consumes the given BootInformation, because after the memory system is initialized,
+/// the original BootInformation will be unmapped and inaccessible.
+/// 
+/// Returns the following tuple, if successful:
+///  * The kernel's new MemoryManagementInfo
+///  * the MappedPages of the kernel's text section,
+///  * the MappedPages of the kernel's rodata section,
+///  * the MappedPages of the kernel's data section,
+///  * the kernel's list of *other* higher-half MappedPages, which should be kept forever. 
 pub fn init(
     boot_info: &BootInformation,
 ) -> Result<
