@@ -5,7 +5,7 @@
 //! Applications request window objects from the window manager through:
 //! - new_window(`x`, `y`, `width`, `height`) provides a new window whose dimensions the caller must specify
 //!
-//! There are three types of window: `active`, `show_list` and `hide_list`
+//! There are three groups of window: `active`, `show_list` and `hide_list`
 //! - `active` window is the only one active, who gets all keyboard event
 //! - `show_list` windows are shown by their up-down relationships, with overlapped part using alpha channel composition
 //! - `hide_list` windows are those not current shown but will be invoked to show later
@@ -35,7 +35,7 @@ use alloc::vec::Vec;
 use core::ops::Deref;
 use dfqueue::{DFQueue, DFQueueConsumer, DFQueueProducer};
 use event_types::{Event, MousePositionEvent};
-use frame_buffer_alpha::{ FrameBufferAlpha, Pixel };
+use frame_buffer_alpha::{ FrameBufferAlpha, Pixel, BLACK };
 use spin::{Mutex, Once};
 use spawn::{KernelTaskBuilder, ApplicationTaskBuilder};
 use mouse_data::MouseEvent;
@@ -108,10 +108,8 @@ struct WindowManagerAlpha {
     mouse: Point,
     /// whether show the border to indicating new window's position and size
     is_show_border: bool,
-    /// if show border, then where to show it
+    /// If a window is being repositioned (e.g., by dragging it), this is the position of that window's border
     border_position: RectRegion,
-    /// to record how many terminals has been created, avoid same name
-    terminal_id_counter: usize,
     /// the frame buffer that it should print on
     final_fb: FrameBufferAlpha,
     /// if it this is true, do not refresh whole screen until someone calls "refresh_area_absolute"
@@ -216,13 +214,15 @@ impl WindowManagerAlpha {
         Err("cannot find this window")
     }
 
-    /// iterately compute single pixel within show_list
+    /// Recompute single pixel within show_list in a reduced complexity, by compute pixels under it only if it is not opaque
     fn recompute_single_pixel_show_list(& self, x: usize, y: usize, idx: usize) -> Pixel {
         if idx >= self.show_list.len() {
-            if x < 1280 && y < 1080 {
+            // screen should be 1280*1080 but background figure is just 640*540
+            // larger screen size will be black border and smaller screen size will see part of the background picture
+            if x < 2 * background::BACKGROUND_WIDTH && y < 2 * background::BACKGROUND_HEIGHT {
                 return background::BACKGROUND[y/2][x/2].into();
             }
-            return 0x00000000.into();  // return black
+            return BLACK;  // return black
         }
         if let Some(now_winobj) = self.show_list[idx].upgrade() {
             // first get current color, to determine whether further get colors below   
@@ -359,7 +359,7 @@ impl WindowManagerAlpha {
         return Ok(())  // don't need to update this pixel because it is not displayed on the screen
     }
 
-    /// refresh an area
+    /// refresh an area by recompute every pixel in this region and update on the screen
     fn refresh_area(&mut self, x_start: isize, x_end: isize, y_start: isize, y_end: isize) -> Result<(), &'static str> {
         let x_start = core::cmp::max(x_start, 0);
         let x_end = core::cmp::min(x_end, self.final_fb.width as isize);
@@ -691,7 +691,6 @@ pub fn init(key_consumer: DFQueueConsumer<Event>, mouse_consumer: DFQueueConsume
             mouse: Point { x: 0, y: 0 },
             is_show_border: false,
             border_position: RectRegion { x_start: 0, x_end: 0, y_start: 0, y_end: 0 },
-            terminal_id_counter: 1,
             final_fb: final_fb,
             delay_refresh_first_time: delay_refresh_first_time,
     };
@@ -726,9 +725,12 @@ pub struct WindowObjAlpha {
     /// frame buffer of this window
     pub framebuffer: FrameBufferAlpha,
 
-    /// if true, window manager will send all mouse event to this window, otherwise only when mouse is on this window does it send
-    pub give_all_mouse_event: bool,  // whether give this application the mouse event
-    /// whether in moving state, only available when it is active
+    /// if true, window manager will send all mouse event to this window, otherwise only when mouse is on this window does it send. 
+    /// This is extremely helpful when application wants to know mouse movement outside itself, because by default window manager only sends mouse event 
+    /// when mouse is in the window's region. This is used when user move the window, to receive mouse event when mouse is out of the current window.
+    pub give_all_mouse_event: bool,
+    /// whether in moving state, only available when it is active. This is set when user press on the title bar (except for the buttons), 
+    /// and keeping mouse pressed when moving the mouse.
     pub is_moving: bool,
     /// the base position of window moving action, should be the mouse position when `is_moving` is set to true
     pub moving_base: (isize, isize),
@@ -805,12 +807,7 @@ fn window_manager_loop( consumer: (DFQueueConsumer<Event>, DFQueueConsumer<Event
 fn keyboard_handle_application(key_input: KeyEvent) -> Result<(), &'static str> {
     // first judge whether is system remained keys
     if key_input.modifiers.control && key_input.keycode == Keycode::T && key_input.action == KeyAction::Pressed {
-        let terminal_id_counter = {
-            let mut win = WINDOW_MANAGER.try().ok_or("The static window manager was not yet initialized")?.lock();
-            win.terminal_id_counter += 1;
-            win.terminal_id_counter
-        };
-        let task_name: String = format!("terminal {}", terminal_id_counter);
+        let task_name: String = format!("terminal");
         let args: Vec<String> = vec![]; // terminal::main() does not accept any arguments
         ApplicationTaskBuilder::new(Path::new(String::from("terminal")))
             .argument(args)

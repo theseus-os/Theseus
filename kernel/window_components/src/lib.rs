@@ -406,7 +406,10 @@ pub struct TextArea {
 }
 
 impl TextArea {
-    /// create new textarea
+    /// create new textarea with all characters initialized as ' ' (space character which shows nothing).
+    /// after initialization, this textarea has a weak reference to the window object, 
+    /// and calling the API to change textarea will immediately update display on screen
+    ///
     /// * `x`, `y`, `width`, `height`: the position and size of this textarea. Note that position is relative to window
     /// * `line_spacing`: the spacing between lines, default to 2
     /// * `column_spacing`: the spacing between chars, default to 1
@@ -451,11 +454,6 @@ impl TextArea {
         textarea.x_cnt = width / (8 + textarea.column_spacing);
         textarea.y_cnt = height / (16 + textarea.line_spacing);
         textarea.char_matrix.resize(textarea.x_cnt * textarea.y_cnt, ' ' as u8);  // first fill with blank char
-        // for i in 0..textarea.x_cnt {
-        //     for j in 0..textarea.y_cnt {
-        //         textarea.set_char(i, j, ' ' as u8)?;  // set them all to ' ', means nothing to show
-        //     }
-        // }
 
         Ok(Arc::new(Mutex::new(textarea)))
     }
@@ -516,7 +514,7 @@ impl TextArea {
                 }
             }
         } else {
-            return Err("winobj not existed");
+            return Err("winobj not existed, perhaps calling this function after window is destoryed");
         }
         Ok(())
     }

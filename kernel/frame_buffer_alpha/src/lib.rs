@@ -170,7 +170,7 @@ impl FrameBufferAlpha {
     /// draw a point on this framebuffer with alpha
     pub fn draw_point_alpha(&mut self, x: usize, y: usize, color: Pixel) {
         let idx = self.index(x, y);
-        self.buffer[idx] = self.buffer[idx].alpha_mix(color);
+        self.buffer[idx] = color.alpha_mix(self.buffer[idx]);
     }
 
     /// draw a rectangle on this framebuffer
