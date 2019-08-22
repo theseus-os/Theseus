@@ -61,7 +61,7 @@ impl TemporaryPage {
         }
         
         self.mapped_page = Some( 
-            try!(page_table.map_to(page, frame, EntryFlags::writable(), &mut self.allocator))
+            try!(page_table.map_to(page, frame, EntryFlags::WRITABLE, &mut self.allocator))
         );
         
         let table: &mut Table<Level1> = try!( 

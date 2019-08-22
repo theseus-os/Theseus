@@ -12,9 +12,6 @@ pub trait EntryFlagsOper<T> {
     /// For x86, the `PRESENT` bit should be set.
     fn default_flags() -> T;
 
-    /// return the flags of a writable page excluding the default bits.
-    fn writable() -> T;
-
     /// The flags of a writable page. 
     /// For x86 the `PRESENT` and `WRITABLE` bits should be set.
     fn rw_flags() -> T;

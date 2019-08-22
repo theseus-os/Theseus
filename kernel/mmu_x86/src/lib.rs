@@ -42,10 +42,6 @@ impl EntryFlagsOper<EntryFlags> for EntryFlags {
         EntryFlags::PRESENT
     }
 
-    fn writable() -> EntryFlags {
-        EntryFlags::WRITABLE
-    }
-
     fn rw_flags() -> EntryFlags {
         EntryFlags::default_flags() | EntryFlags::WRITABLE
     }
