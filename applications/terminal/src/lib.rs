@@ -18,7 +18,6 @@ extern crate memory;
 extern crate event_types; 
 extern crate window_manager_alpha;
 extern crate tsc;
-extern crate fs_node;
 extern crate path;
 extern crate root;
 extern crate window_components;
@@ -41,7 +40,6 @@ use path::Path;
 use task::{TaskRef, ExitValue, KillReason};
 use environment::Environment;
 use spin::Mutex;
-use fs_node::FileOrDir;
 use tsc::{tsc_ticks, TscTicks};
 
 pub const APPLICATIONS_NAMESPACE_PATH: &'static str = "/namespaces/default/applications";

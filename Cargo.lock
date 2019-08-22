@@ -1853,7 +1853,6 @@ dependencies = [
  "environment 0.1.0",
  "event_types 0.1.0",
  "frame_buffer_alpha 0.1.0",
- "fs_node 0.1.0",
  "keycodes_ascii 0.1.0",
  "log 0.3.9 (registry+https://github.com/rust-lang/crates.io-index)",
  "memory 0.1.0",

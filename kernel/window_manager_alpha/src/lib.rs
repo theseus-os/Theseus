@@ -106,10 +106,8 @@ struct WindowManagerAlpha {
     active: Weak<Mutex<WindowObjAlpha>>,  // this one is not in show_list
     /// current mouse position
     mouse: Point,
-    /// whether show the border to indicating new window's position and size
-    is_show_border: bool,
     /// If a window is being repositioned (e.g., by dragging it), this is the position of that window's border
-    border_position: RectRegion,
+    repositioned_border: Option<RectRegion>,
     /// the frame buffer that it should print on
     final_fb: FrameBufferAlpha,
     /// if it this is true, do not refresh whole screen until someone calls "refresh_area_absolute"
@@ -277,9 +275,9 @@ impl WindowManagerAlpha {
             self.final_fb.draw_point(x, y, pixel);
         }
         // then draw border
-        if self.is_show_border {
+        if let Some(repositioned_border) = &self.repositioned_border {
             let (x_start, x_end, y_start, y_end) = {
-                let r = &self.border_position;
+                let r = &repositioned_border;
                 (r.x_start, r.x_end, r.y_start, r.y_end)
             };
             let sx = x as isize;
@@ -499,17 +497,17 @@ impl WindowManagerAlpha {
     /// if this is not clear, you can simply try this attribute by pressing left mouse on the top bar of any window and move the mouse, then you should see a thin border
     /// this is extremely useful when performance is not enough for re-render the whole window when moving the mouse
     fn refresh_floating_border(& mut self, show: bool, x_start: isize, x_end: isize, y_start: isize, y_end: isize) -> Result<(), &'static str> {
-        if !self.is_show_border && !show { return Ok(()) }
-        // first clear old border
-        let last_show_border = self.is_show_border;
-        self.is_show_border = show;
-        if last_show_border {
+        if self.repositioned_border.is_none() && !show { return Ok(()) }
+        // first clear old border if exists
+        if let Some(repositioned_border) = &self.repositioned_border {
             let (old_x_start, old_x_end, old_y_start, old_y_end) = {
-                let r = &self.border_position;
+                let r = &repositioned_border;
                 (r.x_start, r.x_end, r.y_start, r.y_end)
             };
             if show {  // otherwise don't change position
-                self.border_position = RectRegion { x_start, x_end, y_start, y_end };
+                self.repositioned_border = Some(RectRegion { x_start, x_end, y_start, y_end });
+            } else {
+                self.repositioned_border = None;
             }
             for i in 0..(WINDOW_BORDER_SIZE+1) as isize {
                 self.refresh_rect_border(old_x_start-i, old_x_end+i, old_y_start-i, old_y_end+i)?;
@@ -517,7 +515,7 @@ impl WindowManagerAlpha {
         }
         // then draw current border
         if show {
-            self.border_position = RectRegion { x_start, x_end, y_start, y_end };
+            self.repositioned_border = Some(RectRegion { x_start, x_end, y_start, y_end });
             for i in 0..(WINDOW_BORDER_SIZE+1) as isize {
                 self.refresh_rect_border(x_start-i, x_end+i, y_start-i, y_end+i)?;
             }
@@ -689,8 +687,7 @@ pub fn init(key_consumer: DFQueueConsumer<Event>, mouse_consumer: DFQueueConsume
             show_list: VecDeque::new(),
             active: Weak::new(),
             mouse: Point { x: 0, y: 0 },
-            is_show_border: false,
-            border_position: RectRegion { x_start: 0, x_end: 0, y_start: 0, y_end: 0 },
+            repositioned_border: Some(RectRegion { x_start: 0, x_end: 0, y_start: 0, y_end: 0 }),
             final_fb: final_fb,
             delay_refresh_first_time: delay_refresh_first_time,
     };
