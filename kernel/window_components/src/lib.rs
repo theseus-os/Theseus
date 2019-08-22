@@ -51,15 +51,36 @@ const WINDOW_BORDER_COLOR_ACTIVE_BOTTOM: Pixel = Pixel { alpha: 0x00, red: 0x66,
 /// window button color: red
 const WINDOW_BUTTON_COLOR_CLOSE: Pixel = Pixel { alpha: 0x00, red: 0xE7, green: 0x4C, blue: 0x3C };
 /// window button color: green
-const WINDOW_BUTTON_COLOR_MINIMIZE: Pixel = Pixel { alpha: 0x00, red: 0x23, green: 0x9B, blue: 0x56 };
+const WINDOW_BUTTON_COLOR_MINIMIZE_MAMIMIZE: Pixel = Pixel { alpha: 0x00, red: 0x23, green: 0x9B, blue: 0x56 };
 /// window button color: purple
-const WINDOW_BUTTON_COLOR_MAXIMIZE: Pixel = Pixel { alpha: 0x00, red: 0x7D, green: 0x3C, blue: 0x98 };
+const WINDOW_BUTTON_COLOR_HIDE: Pixel = Pixel { alpha: 0x00, red: 0x7D, green: 0x3C, blue: 0x98 };
 /// window button margin from left, in number of pixels
 const WINDOW_BUTTON_BIAS_X: usize = 12;
 /// the interval between buttons, in number of pixels
 const WINDOW_BUTTON_BETWEEN: usize = 15;
 /// the button size, in number of pixels
 const WINDOW_BUTTON_SIZE: usize = 6;
+
+/// The buttons shown in title bar
+enum TopButton {
+    /// Button to close the window
+    Close,
+    /// Button to minimize/maximize the window (depends on the current state)
+    MinimizeMaximize,
+    /// Button to hide the window
+    Hide,
+}
+
+impl From<usize> for TopButton {
+    fn from(item: usize) -> Self {
+        match item {
+            0 => TopButton::Close,
+            1 => TopButton::MinimizeMaximize,
+            2 => TopButton::Hide,
+            _ => TopButton::Close
+        }
+    }
+}
 
 /// abstraction of a window, providing title bar which helps user moving, close, maximize or minimize window
 pub struct WindowComponents {
@@ -126,9 +147,9 @@ impl WindowComponents {
         // draw three buttons
         {
             let mut winobj = wincomps.winobj.lock();
-            wincomps.show_button(0, 1, &mut winobj);
-            wincomps.show_button(1, 1, &mut winobj);
-            wincomps.show_button(2, 1, &mut winobj);
+            wincomps.show_button(TopButton::Close, 1, &mut winobj);
+            wincomps.show_button(TopButton::MinimizeMaximize, 1, &mut winobj);
+            wincomps.show_button(TopButton::Hide, 1, &mut winobj);
         }
         window_manager_alpha::refresh_area_absolute(x_start, x_end, y_start, y_end)?;
 
@@ -189,21 +210,19 @@ impl WindowComponents {
         Ok(())
     }
 
-    /// show three button with status. idx = 0,1,2 (which button), state = 0,1,2
-    fn show_button(& self, idx: usize, state: usize, winobj: &mut WindowObjAlpha) {
-        if idx > 2 { return; }
-        if state > 2 { return; }
+    /// show three button with status. state = 0,1,2 for three different color
+    fn show_button(& self, button: TopButton, state: usize, winobj: &mut WindowObjAlpha) {
         let y = self.title_size / 2;
-        let x = WINDOW_BUTTON_BIAS_X + idx * WINDOW_BUTTON_BETWEEN;
+        let x = WINDOW_BUTTON_BIAS_X + WINDOW_BUTTON_BETWEEN * match button {
+            TopButton::Close => 0,
+            TopButton::MinimizeMaximize => 1,
+            TopButton::Hide => 2,
+        };
         winobj.framebuffer.draw_circle_alpha(x, y, WINDOW_BUTTON_SIZE, BLACK.color_mix(
-            match idx {
-                0 => WINDOW_BUTTON_COLOR_CLOSE,
-                1 => WINDOW_BUTTON_COLOR_MINIMIZE,
-                2 => WINDOW_BUTTON_COLOR_MAXIMIZE,
-                _ => {
-                    const WINDOW_BUTTON_COLOR_ERROR: Pixel = Pixel { alpha: 0x00, red: 0x00, green: 0x00, blue: 0x00 };  // black
-                    WINDOW_BUTTON_COLOR_ERROR
-                }
+            match button {
+                TopButton::Close => WINDOW_BUTTON_COLOR_CLOSE,
+                TopButton::MinimizeMaximize => WINDOW_BUTTON_COLOR_MINIMIZE_MAMIMIZE,
+                TopButton::Hide => WINDOW_BUTTON_COLOR_HIDE,
             }, 0.2f32 * (state as f32)
         ));
     }
@@ -240,9 +259,9 @@ impl WindowComponents {
                 let mut winobj = self.winobj.lock();
                 let bx = winobj.x;
                 let by = winobj.y;
-                self.show_button(0, 1, &mut winobj);
-                self.show_button(1, 1, &mut winobj);
-                self.show_button(2, 1, &mut winobj);
+                self.show_button(TopButton::Close, 1, &mut winobj);
+                self.show_button(TopButton::MinimizeMaximize, 1, &mut winobj);
+                self.show_button(TopButton::Hide, 1, &mut winobj);
                 (bx, by)
             };
             if let Err(err) = self.refresh_border(bx, by) {
@@ -283,10 +302,10 @@ impl WindowComponents {
                                 if dx*dx + dy*dy <= r2 as isize {
                                     is_three_button = true;
                                     if mouse_event.left_button_hold {
-                                        self.show_button(i, 2, &mut winobj);
+                                        self.show_button(TopButton::from(i), 2, &mut winobj);
                                         need_refresh_three_button = true;
                                     } else {
-                                        self.show_button(i, 0, &mut winobj);
+                                        self.show_button(TopButton::from(i), 0, &mut winobj);
                                         need_refresh_three_button = true;
                                         if self.last_mouse_position_event.left_button_hold {  // click event
                                             if i == 0 {
@@ -296,7 +315,7 @@ impl WindowComponents {
                                         }
                                     }
                                 } else {
-                                    self.show_button(i, 1, &mut winobj);
+                                    self.show_button(TopButton::from(i), 1, &mut winobj);
                                     need_refresh_three_button = true;
                                 }
                             }
@@ -379,9 +398,9 @@ pub struct TextArea {
     background_color: Pixel,
     text_color: Pixel,
     /// the x dimension char count
-    pub x_cnt: usize,  // do not change this
+    x_cnt: usize,
     /// the y dimension char count
-    pub y_cnt: usize,  // do not change this
+    y_cnt: usize,
     char_matrix: Vec<u8>,
     winobj: Weak<Mutex<WindowObjAlpha>>,
 }
@@ -439,6 +458,16 @@ impl TextArea {
         // }
 
         Ok(Arc::new(Mutex::new(textarea)))
+    }
+
+    /// get the x dimension char count
+    pub fn get_x_cnt(& self) -> usize {
+        self.x_cnt
+    }
+
+    /// get the y dimension char count
+    pub fn get_y_cnt(& self) -> usize {
+        self.y_cnt
     }
 
     /// compute the index of char, does not check bound. one can use this to compute index as argument for `set_char_absolute`.

@@ -274,7 +274,7 @@ impl Terminal {
 
     fn get_displayable_dimensions(&self) -> (usize, usize){
         let textarea = self.textarea.lock();
-        (textarea.x_cnt, textarea.y_cnt)
+        (textarea.get_x_cnt(), textarea.get_y_cnt())
     }
 
     /// This function takes in the end index of some index in the scrollback buffer and calculates the starting index of the

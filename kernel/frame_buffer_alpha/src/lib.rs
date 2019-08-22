@@ -222,7 +222,7 @@ impl FrameBufferAlpha {
 }
 
 impl Pixel {
-    /// mix two color using alpha channel composition, supposing `self` is on top of `other` pixel.
+    /// mix two color using alpha channel composition, supposing `self` is on the top of `other` pixel.
     pub fn alpha_mix(self, other: Self) -> Self {
         let alpha = self.alpha as u16;
         let red = self.red;

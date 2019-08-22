@@ -77,8 +77,8 @@ pub fn main(_args: Vec<String>) -> isize {
 
     // refresh all the characters to test performance,
     // for c in ('a' as u8) .. ('z' as u8 + 1) {
-    //     for i in 0 .. textarea.x_cnt {
-    //         for j in 0 .. textarea.y_cnt {
+    //     for i in 0 .. textarea.get_x_cnt() {
+    //         for j in 0 .. textarea.get_y_cnt() {
     //             match textarea.set_char(i, j, c) {
     //                 Ok(_) => {}
     //                 Err(_) => {debug!("set char failed"); return -4; }
@@ -89,7 +89,7 @@ pub fn main(_args: Vec<String>) -> isize {
 
     // prepare for display chars
     let mut char_matrix: Vec<u8> = Vec::new();  // the text that should be displayed
-    let text_cnt: usize = textarea.x_cnt * textarea.y_cnt;  // the total count of chars in textarea
+    let text_cnt: usize = textarea.get_x_cnt() * textarea.get_y_cnt();  // the total count of chars in textarea
     char_matrix.resize(text_cnt, ' ' as u8);  // fill in the textarea with blank char
 
     // prepare for user-friendly cursor display
@@ -122,23 +122,23 @@ pub fn main(_args: Vec<String>) -> isize {
                             char_matrix[new_cursor] = ' ' as u8;  // set last char to ' '
                             move_cursor_restore_old(&mut char_matrix, &mut text_cursor, &mut cursor_last_char, new_cursor);
                         } else if key_event.keycode == Keycode::Enter {
-                            let new_cursor = ((text_cursor / textarea.x_cnt + 1) * textarea.x_cnt) % text_cnt;
+                            let new_cursor = ((text_cursor / textarea.get_x_cnt() + 1) * textarea.get_x_cnt()) % text_cnt;
                             move_cursor_restore_old(&mut char_matrix, &mut text_cursor, &mut cursor_last_char, new_cursor);
                         } else if key_event.keycode == Keycode::Up {
-                            let new_cursor = ((text_cursor / textarea.x_cnt + textarea.y_cnt - 1) * textarea.x_cnt
-                                + (text_cursor % textarea.x_cnt)) % text_cnt;
+                            let new_cursor = ((text_cursor / textarea.get_x_cnt() + textarea.get_y_cnt() - 1) * textarea.get_x_cnt()
+                                + (text_cursor % textarea.get_x_cnt())) % text_cnt;
                             move_cursor_restore_old(&mut char_matrix, &mut text_cursor, &mut cursor_last_char, new_cursor);
                         } else if key_event.keycode == Keycode::Down {
-                            let new_cursor = ((text_cursor / textarea.x_cnt + 1) * textarea.x_cnt
-                                + (text_cursor % textarea.x_cnt)) % text_cnt;
+                            let new_cursor = ((text_cursor / textarea.get_x_cnt() + 1) * textarea.get_x_cnt()
+                                + (text_cursor % textarea.get_x_cnt())) % text_cnt;
                             move_cursor_restore_old(&mut char_matrix, &mut text_cursor, &mut cursor_last_char, new_cursor);
                         } else if key_event.keycode == Keycode::Left {
-                            let new_cursor = ((text_cursor / textarea.x_cnt) * textarea.x_cnt
-                                + (((text_cursor % textarea.x_cnt) + textarea.x_cnt - 1) % textarea.x_cnt)) % text_cnt;
+                            let new_cursor = ((text_cursor / textarea.get_x_cnt()) * textarea.get_x_cnt()
+                                + (((text_cursor % textarea.get_x_cnt()) + textarea.get_x_cnt() - 1) % textarea.get_x_cnt())) % text_cnt;
                             move_cursor_restore_old(&mut char_matrix, &mut text_cursor, &mut cursor_last_char, new_cursor);
                         } else if key_event.keycode == Keycode::Right { 
-                            let new_cursor = ((text_cursor / textarea.x_cnt) * textarea.x_cnt
-                                + (((text_cursor % textarea.x_cnt) + 1) % textarea.x_cnt)) % text_cnt;
+                            let new_cursor = ((text_cursor / textarea.get_x_cnt()) * textarea.get_x_cnt()
+                                + (((text_cursor % textarea.get_x_cnt()) + 1) % textarea.get_x_cnt())) % text_cnt;
                             move_cursor_restore_old(&mut char_matrix, &mut text_cursor, &mut cursor_last_char, new_cursor);
                         } else {
                             match key_event.keycode.to_ascii(key_event.modifiers) {
