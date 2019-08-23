@@ -1,42 +1,9 @@
-// Copyright 2016 Philipp Oppermann. See the README.md
-// file at the top-level directory of this distribution.
-//
-// Licensed under the Apache License, Version 2.0 <LICENSE-APACHE or
-// http://www.apache.org/licenses/LICENSE-2.0> or the MIT license
-// <LICENSE-MIT or http://opensource.org/licenses/MIT>, at your
-// option. This file may not be copied, modified, or distributed
-// except according to those terms.
-
-// mod virtual_address_allocator;
-// mod entry;
-// mod table;
-// mod temporary_page;
-// mod mapper;
-
-// #[cfg(mapper_spillful)]
-// pub mod mapper_spillful;
-
-
-// pub use self::entry::*;
-// pub use self::temporary_page::TemporaryPage;
-// pub use self::mapper::*;
-// pub use self::virtual_address_allocator::{AllocatedPages};
-// pub use mapper::{Mapper, MappedPages};
-// pub use temporary_page::TemporaryPage;
-
-
 use core::{
     ops::{RangeInclusive, Add, AddAssign, Sub, SubAssign, Deref, DerefMut},
     mem,
     iter::Step,
 };
 use super::*;
-
-
-use kernel_config::memory::{PAGE_SIZE, MAX_PAGE_NUMBER, RECURSIVE_P4_INDEX};
-use kernel_config::memory::{KERNEL_TEXT_P4_INDEX, KERNEL_HEAP_P4_INDEX, KERNEL_STACK_P4_INDEX};
-
-
 
 
 #[derive(Clone, Copy, PartialEq, Eq, PartialOrd, Ord)]
