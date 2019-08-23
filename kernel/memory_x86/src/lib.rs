@@ -138,8 +138,8 @@ pub fn get_available_memory(
     Ok((available, avail_index))
 }
 
-/// calculate the bounds of physical memory that is occupied by modules we've loaded
-/// (we can reclaim this later after the module is loaded, but not until then)
+/// Calculate the bounds of physical memory that is occupied by modules we've loaded.
+/// Returns (start_address, end_address).
 pub fn get_modules_address(boot_info: &BootInformation) -> (usize, usize) {
     let mut mod_min = usize::max_value();
     let mut mod_max = 0;
@@ -162,4 +162,12 @@ pub fn get_boot_info_mem_area(
         1,
         0,
     ))
+}
+
+pub fn get_boot_info_address(
+    boot_info: &BootInformation,
+) -> Result<(memory_address::VirtualAddress, memory_address::VirtualAddress), &'static str> {
+    let boot_info_start_vaddr = memory_address::VirtualAddress::new(boot_info.start_address())?;
+    let boot_info_end_vaddr = memory_address::VirtualAddress::new(boot_info.end_address())?;
+    Ok((boot_info_start_vaddr, boot_info_end_vaddr))
 }

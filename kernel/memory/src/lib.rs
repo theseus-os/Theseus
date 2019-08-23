@@ -58,7 +58,7 @@ pub use self::stack_allocator::{StackAllocator, Stack};
 pub use memory_address::{VirtualAddress, PhysicalAddress, PhysicalMemoryArea, Frame};
 
 #[cfg(target_arch = "x86_64")]
-use memory_x86::{set_new_p4, get_p4_address, get_kernel_address, get_available_memory, get_modules_address, get_boot_info_mem_area, tlb, BootInformation};
+use memory_x86::{set_new_p4, get_p4_address, get_kernel_address, get_available_memory, get_modules_address, get_boot_info_mem_area, get_boot_info_address, tlb, BootInformation};
 
 #[cfg(target_arch = "x86_64")]
 pub use memory_x86::EntryFlags;// Export EntryFlags so that others does not need to get access to memory_<arch>.
@@ -267,6 +267,7 @@ pub fn init(boot_info: &BootInformation)
     let (available, avail_len) = get_available_memory(memory_map_tag, kernel_phys_end)?;
 
     // Get the address of memory occupied by loaded modules
+    // (we can reclaim this later after the module is loaded, but not until then).
     let (modules_start, modules_end) = get_modules_address(&boot_info);
 
     // print_early!("Modules physical memory region: start {:#X} to end {:#X}", modules_start, modules_end);

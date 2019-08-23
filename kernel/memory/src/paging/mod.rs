@@ -380,9 +380,9 @@ pub fn init(allocator_mutex: &MutexIrqSafe<AreaFrameAllocator>, boot_info: &mult
     // bootstrap a PageTable from the currently-loaded page table
     let mut page_table = PageTable::from_current();
 
-    let boot_info_start_vaddr = VirtualAddress::new(boot_info.start_address())?;
+    let (boot_info_start_vaddr, boot_info_end_vaddr) = get_boot_info_address(&boot_info)?;
+
     let boot_info_start_paddr = page_table.translate(boot_info_start_vaddr).ok_or("Couldn't get boot_info start physical address")?;
-    let boot_info_end_vaddr = VirtualAddress::new(boot_info.end_address())?;
     let boot_info_end_paddr = page_table.translate(boot_info_end_vaddr).ok_or("Couldn't get boot_info end physical address")?;
     let boot_info_size = boot_info.total_size();
     info!("multiboot start: {:#X}-->{:#X}, multiboot end: {:#X}-->{:#X}, size: {:#X}\n",
