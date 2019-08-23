@@ -434,7 +434,7 @@ pub fn init(allocator_mutex: &MutexIrqSafe<AreaFrameAllocator>, boot_info: &mult
                 text_flags,
                 rodata_flags,
                 data_flags,
-                identity_sections) = add_section_vmem_areas(&boot_info, &mut vmas)?;
+                identity_sections) = add_sections_vmem_areas(&boot_info, &mut vmas)?;
 
             // to allow the APs to boot up, we identity map the kernel sections too.
             // (lower half virtual addresses mapped to same lower half physical addresses)
@@ -481,25 +481,20 @@ pub fn init(allocator_mutex: &MutexIrqSafe<AreaFrameAllocator>, boot_info: &mult
                 data_flags, allocator.deref_mut())
             ));
 
-            // map the VGA display memory as writable, which technically goes from 0xA_0000 - 0xC_0000 (exclusive),
-            // VGA text mode only goes from 0xB_8000 - 0XC_0000
-            const VGA_DISPLAY_PHYS_START: usize = 0xA_0000;
-            const VGA_DISPLAY_PHYS_END: usize = 0xC_0000;
-            const VGA_SIZE_IN_BYTES: usize = VGA_DISPLAY_PHYS_END - VGA_DISPLAY_PHYS_START;
-            let vga_display_virt_addr = VirtualAddress::new_canonical(VGA_DISPLAY_PHYS_START + KERNEL_OFFSET);
-            let vga_display_flags = EntryFlags::PRESENT | EntryFlags::WRITABLE | EntryFlags::GLOBAL | EntryFlags::NO_CACHE;
+            // map the VGA display memory as writable
+            let (vga_display_phys_start, vga_display_virt_addr, vga_size_in_bytes, vga_display_flags) = add_vga_vmem_area()?;
             higher_half_mapped_pages[index] = Some( try!( mapper.map_frames(
-                FrameRange::from_phys_addr(PhysicalAddress::new(VGA_DISPLAY_PHYS_START)?, VGA_SIZE_IN_BYTES), 
+                FrameRange::from_phys_addr(vga_display_phys_start, vga_size_in_bytes), 
                 Page::containing_address(vga_display_virt_addr), 
                 vga_display_flags,
                 allocator.deref_mut())
             ));
-            vmas[index] = VirtualMemoryArea::new(vga_display_virt_addr, VGA_SIZE_IN_BYTES, vga_display_flags, "Kernel VGA Display Memory");
+            vmas[index] = VirtualMemoryArea::new(vga_display_virt_addr, vga_size_in_bytes, vga_display_flags, "Kernel VGA Display Memory");
             debug!("mapped kernel section: vga_buffer at addr: {:?}", vmas[index]);
             // also do an identity mapping for APs that need it while booting
             identity_mapped_pages[index] = Some( try!( mapper.map_frames(
-                FrameRange::from_phys_addr(PhysicalAddress::new(VGA_DISPLAY_PHYS_START)?, VGA_SIZE_IN_BYTES), 
-                Page::containing_address(VirtualAddress::new_canonical(VGA_DISPLAY_PHYS_START)), 
+                FrameRange::from_phys_addr(vga_display_phys_start, vga_size_in_bytes), 
+                Page::containing_address(VirtualAddress::new_canonical(vga_display_phys_start.value())), 
                 vga_display_flags, allocator.deref_mut())
             ));
             index += 1;

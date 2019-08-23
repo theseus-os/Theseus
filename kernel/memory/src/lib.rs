@@ -58,7 +58,7 @@ pub use self::stack_allocator::{StackAllocator, Stack};
 pub use memory_address::{VirtualAddress, PhysicalAddress, PhysicalMemoryArea, Frame, VirtualMemoryArea, Page, PageRange};
 
 #[cfg(target_arch = "x86_64")]
-use memory_x86::{set_new_p4, get_p4_address, get_kernel_address, get_available_memory, get_modules_address, get_boot_info_mem_area, get_boot_info_address, add_section_vmem_areas, tlb, BootInformation};
+use memory_x86::{set_new_p4, get_p4_address, get_kernel_address, get_available_memory, get_modules_address, get_boot_info_mem_area, get_boot_info_address, add_sections_vmem_areas, add_vga_vmem_area, tlb, BootInformation};
 
 #[cfg(target_arch = "x86_64")]
 pub use memory_x86::EntryFlags;// Export EntryFlags so that others does not need to get access to memory_<arch>.

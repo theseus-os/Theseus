@@ -172,7 +172,7 @@ pub fn get_boot_info_address(
     Ok((boot_info_start_vaddr, boot_info_end_vaddr))
 }
 
-pub fn add_section_vmem_areas(
+pub fn add_sections_vmem_areas(
     boot_info: &BootInformation,
     vmas: &mut [VirtualMemoryArea; 32],
 ) -> Result<(
@@ -319,4 +319,14 @@ pub fn add_section_vmem_areas(
     } // end of section iterator
 
     Ok((index, text_start, text_end, rodata_start, rodata_end, data_start, data_end, text_flags, rodata_flags, data_flags, identity_sections))
+}
+
+pub fn add_vga_vmem_area() -> Result<(PhysicalAddress, VirtualAddress, usize, EntryFlags), &'static str> {
+    const VGA_DISPLAY_PHYS_START: usize = 0xA_0000;
+    const VGA_DISPLAY_PHYS_END: usize = 0xC_0000;
+    let vga_size_in_bytes: usize = VGA_DISPLAY_PHYS_END - VGA_DISPLAY_PHYS_START;
+    let vga_display_virt_addr = VirtualAddress::new_canonical(VGA_DISPLAY_PHYS_START + KERNEL_OFFSET);
+    let vga_display_flags = EntryFlags::PRESENT | EntryFlags::WRITABLE | EntryFlags::GLOBAL | EntryFlags::NO_CACHE;
+
+    Ok((PhysicalAddress::new(VGA_DISPLAY_PHYS_START)?, vga_display_virt_addr, vga_size_in_bytes, vga_display_flags))
 }
