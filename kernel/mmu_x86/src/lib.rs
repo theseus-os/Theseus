@@ -12,7 +12,9 @@ extern crate multiboot2;
 extern crate xmas_elf;
 
 use entry_flags_oper::EntryFlagsOper;
-use x86_64::{instructions::tlb, registers::control_regs};
+use x86_64::{registers::control_regs};
+
+pub use x86_64::{VirtualAddress, instructions::tlb};
 
 bitflags! {
     /// Entry access flag bits.
@@ -132,14 +134,4 @@ pub fn set_new_p4(p4: u64) {
 /// Returns the current top-level page table frame, e.g., cr3 on x86
 pub fn get_p4_address() -> usize {
     control_regs::cr3().0 as usize
-}
-
-/// Flush the virtual address translation buffer of the specific address
-pub fn flush(address: usize) {
-    tlb::flush(x86_64::VirtualAddress(address));
-}
-
-/// Flush all the virtual address translation buffer
-pub fn flush_all() {
-    tlb::flush_all();
 }

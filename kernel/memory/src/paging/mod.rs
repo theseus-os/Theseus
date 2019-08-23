@@ -313,7 +313,7 @@ impl PageTable {
 
         // overwrite recursive mapping
         self.p4_mut()[RECURSIVE_P4_INDEX].set(other_table.p4_table.clone(), EntryFlags::rw_flags());         
-        flush_all();
+        tlb::flush_all();
 
         // set mapper's target frame to reflect that future mappings will be mapped into the other_table
         self.mapper.target_p4 = other_table.p4_table.clone();
@@ -326,7 +326,7 @@ impl PageTable {
 
         // restore recursive mapping to original p4 table
         p4_table[RECURSIVE_P4_INDEX].set(backup, EntryFlags::rw_flags());
-        flush_all();
+        tlb::flush_all();
 
         // here, temporary_page is dropped, which auto unmaps it
         ret
@@ -404,3 +404,9 @@ pub fn get_current_p4() -> Frame {
 //         }
 //     }
 // }
+
+/// Flush the virtual address translation buffer of the specific address
+#[cfg(target_arch = "x86_64")]
+pub fn flush(vaddr: VirtualAddress) {
+    tlb::flush(mmu_x86::VirtualAddress(vaddr.value()));
+}

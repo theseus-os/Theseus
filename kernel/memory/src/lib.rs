@@ -54,7 +54,7 @@ pub use self::area_frame_allocator::AreaFrameAllocator;
 pub use self::paging::*;
 pub use self::stack_allocator::{StackAllocator, Stack};
 
-use mmu_x86::{set_new_p4, get_p4_address, flush_all, flush};
+use mmu_x86::{set_new_p4, get_p4_address, tlb};
 
 pub use entry_flags_oper::EntryFlagsOper;
 pub use mmu_x86::EntryFlags;// Export EntryFlags so that others does not need to get access to mmu_<arch>.

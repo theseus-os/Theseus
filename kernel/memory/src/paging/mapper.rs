@@ -543,7 +543,7 @@ impl MappedPages {
             p1[page.p1_index()].set(frame, new_flags | EntryFlags::default_flags());
 
             let vaddr = page.start_address();
-            flush(vaddr.value());
+            flush(vaddr);
             if broadcast_tlb_shootdown.is_some() && vaddr.value() != TEMPORARY_PAGE_FRAME {
                 vaddrs.push(vaddr);
             }
@@ -583,7 +583,7 @@ impl MappedPages {
             p1[page.p1_index()].set_unused();
 
             let vaddr = page.start_address();
-            flush(page.start_address().value());
+            flush(page.start_address());
             if broadcast_tlb_shootdown.is_some() && vaddr.value() != TEMPORARY_PAGE_FRAME {
                 vaddrs.push(vaddr);
             }
