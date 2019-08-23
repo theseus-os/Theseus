@@ -55,10 +55,10 @@ pub use self::area_frame_allocator::AreaFrameAllocator;
 pub use self::paging::*;
 pub use self::stack_allocator::{StackAllocator, Stack};
 
-pub use memory_address::{VirtualAddress, PhysicalAddress};
+pub use memory_address::{VirtualAddress, PhysicalAddress, PhysicalMemoryArea, Frame};
 
 #[cfg(target_arch = "x86_64")]
-use memory_x86::{set_new_p4, get_p4_address, get_kernel_address, tlb, BootInformation};
+use memory_x86::{set_new_p4, get_p4_address, get_kernel_address, get_available_memory, tlb, BootInformation};
 
 #[cfg(target_arch = "x86_64")]
 pub use memory_x86::EntryFlags;// Export EntryFlags so that others does not need to get access to memory_<arch>.
@@ -172,28 +172,6 @@ pub fn create_contiguous_mapping(size_in_bytes: usize, flags: EntryFlags) -> Res
 }
 
 
-/// An area of physical memory. 
-#[derive(Copy, Clone, Debug, Default)]
-#[repr(C)]
-pub struct PhysicalMemoryArea {
-    pub base_addr: PhysicalAddress,
-    pub size_in_bytes: usize,
-    pub typ: u32,
-    pub acpi: u32
-}
-impl PhysicalMemoryArea {
-    pub fn new(paddr: PhysicalAddress, size_in_bytes: usize, typ: u32, acpi: u32) -> PhysicalMemoryArea {
-        PhysicalMemoryArea {
-            base_addr: paddr,
-            size_in_bytes: size_in_bytes,
-            typ: typ,
-            acpi: acpi,
-        }
-    }
-}
-
-
-
 /// A region of virtual memory that is mapped into a [`Task`](../task/struct.Task.html)'s address space
 #[derive(Debug, Default, Clone, PartialEq)]
 pub struct VirtualMemoryArea {
@@ -276,6 +254,7 @@ pub fn set_broadcast_tlb_shootdown_cb(func: fn(Vec<VirtualAddress>)) {
 pub fn init(boot_info: &BootInformation) 
     -> Result<(Arc<MutexIrqSafe<MemoryManagementInfo>>, MappedPages, MappedPages, MappedPages, Vec<MappedPages>), &'static str> 
 {
+    // Get the start and end address of the kernel.
     let (kernel_phys_start, kernel_phys_end, kernel_virt_end, memory_map_tag) = get_kernel_address(&boot_info)?;
 
     debug!("kernel_phys_start: {:#x}, kernel_phys_end: {:#x} kernel_virt_end = {:#x}",
@@ -284,35 +263,8 @@ pub fn init(boot_info: &BootInformation)
         kernel_virt_end
     );
   
-    // parse the list of physical memory areas from multiboot
-    let mut available: [PhysicalMemoryArea; 32] = Default::default();
-    let mut avail_index = 0;
-    for area in memory_map_tag.memory_areas() {
-        let area_start = PhysicalAddress::new(area.start_address() as usize)?;
-        let area_end   = PhysicalAddress::new(area.end_address() as usize)?;
-        let area_size  = area.size() as usize;
-        debug!("memory area base_addr={:#x} length={:#x} ({:?})", area_start, area_size, area);
-        
-        // optimization: we reserve memory from areas below the end of the kernel's physical address,
-        // which includes addresses beneath 1 MB
-        if area_end < kernel_phys_end {
-            debug!("--> skipping region before kernel_phys_end");
-            continue;
-        }
-        let start_paddr: PhysicalAddress = if area_start >= kernel_phys_end { area_start } else { kernel_phys_end };
-        let start_paddr = (Frame::containing_address(start_paddr) + 1).start_address(); // align up to next page
-
-        available[avail_index] = PhysicalMemoryArea {
-            base_addr: start_paddr,
-            size_in_bytes: area_size,
-            typ: 1, 
-            acpi: 0, 
-        };
-
-        info!("--> memory region established: start={:#x}, size_in_bytes={:#x}", available[avail_index].base_addr, available[avail_index].size_in_bytes);
-        // print_early!("--> memory region established: start={:#x}, size_in_bytes={:#x}\n", available[avail_index].base_addr, available[avail_index].size_in_bytes);
-        avail_index += 1;
-    }
+    // Get availabe physical memory areas
+    let (available, avail_index) = get_available_memory(memory_map_tag, kernel_phys_end)?;
 
     // calculate the bounds of physical memory that is occupied by modules we've loaded 
     // (we can reclaim this later after the module is loaded, but not until then)
@@ -392,93 +344,6 @@ pub fn init(boot_info: &BootInformation)
     Ok( (kernel_mmi_ref.clone(), text_mapped_pages, rodata_mapped_pages, data_mapped_pages, identity_mapped_pages) )
 }
 
-/// A `Frame` is a chunk of **physical** memory, 
-/// similar to how a `Page` is a chunk of **virtual** memory. 
-#[derive(Clone, Copy, PartialEq, Eq, PartialOrd, Ord)]
-pub struct Frame {
-    number: usize,
-}
-impl fmt::Debug for Frame {
-    fn fmt(&self, f: &mut fmt::Formatter) -> fmt::Result {
-        write!(f, "Frame(paddr: {:#X})", self.start_address()) 
-    }
-}
-
-impl Frame {
-	/// Returns the `Frame` containing the given `PhysicalAddress`.
-    pub fn containing_address(phys_addr: PhysicalAddress) -> Frame {
-        Frame { number: phys_addr.value() / PAGE_SIZE }
-    }
-
-    /// Returns the `PhysicalAddress` at the start of this `Frame`.
-    pub fn start_address(&self) -> PhysicalAddress {
-        PhysicalAddress::new_canonical(self.number * PAGE_SIZE)
-    }
-}
-
-use core::ops::{Add, AddAssign, Sub, SubAssign};
-impl Add<usize> for Frame {
-    type Output = Frame;
-
-    fn add(self, rhs: usize) -> Frame {
-        // cannot exceed max page number (which is also max frame number)
-        Frame {
-            number: core::cmp::min(MAX_PAGE_NUMBER, self.number.saturating_add(rhs)),
-        }
-    }
-}
-
-impl AddAssign<usize> for Frame {
-    fn add_assign(&mut self, rhs: usize) {
-        *self = Frame {
-            number: core::cmp::min(MAX_PAGE_NUMBER, self.number.saturating_add(rhs)),
-        };
-    }
-}
-
-impl Sub<usize> for Frame {
-    type Output = Frame;
-
-    fn sub(self, rhs: usize) -> Frame {
-        Frame { number: self.number.saturating_sub(rhs) }
-    }
-}
-
-impl SubAssign<usize> for Frame {
-    fn sub_assign(&mut self, rhs: usize) {
-        *self = Frame {
-            number: self.number.saturating_sub(rhs),
-        };
-    }
-}
-
-// Implementing these functions allow `Frame` to be in an `Iterator`.
-impl Step for Frame {
-    #[inline]
-    fn steps_between(start: &Frame, end: &Frame) -> Option<usize> {
-        Step::steps_between(&start.number, &end.number)
-    }
-    #[inline]
-    fn replace_one(&mut self) -> Self {
-        mem::replace(self, Frame { number: 1 })
-    }
-    #[inline]
-    fn replace_zero(&mut self) -> Self {
-        mem::replace(self, Frame { number: 0 })
-    }
-    #[inline]
-    fn add_one(&self) -> Self {
-        Add::add(*self, 1)
-    }
-    #[inline]
-    fn sub_one(&self) -> Self {
-        Sub::sub(*self, 1)
-    }
-    #[inline]
-    fn add_usize(&self, n: usize) -> Option<Frame> {
-        Some(*self + n)
-    }
-}
 
 
 /// A range of `Frame`s that are contiguous in physical memory.
