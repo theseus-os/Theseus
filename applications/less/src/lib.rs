@@ -11,6 +11,7 @@ extern crate spin;
 extern crate app_io;
 extern crate stdio;
 extern crate core_io;
+#[macro_use] extern crate log;
 
 use keycodes_ascii::{Keycode, KeyAction};
 use core::str;
@@ -25,7 +26,7 @@ use fs_node::FileOrDir;
 use alloc::collections::BTreeMap;
 use libterm::Terminal;
 use spin::Mutex;
-use stdio::{StdioWriter, KeyEventReadGuard};
+use stdio::{StdioWriter, KeyEventQueueReader};
 use core_io::Write;
 
 /// The metadata for each line in the file.
@@ -153,7 +154,7 @@ fn display_content(content: &String, map: &BTreeMap<usize, LineSlice>,
 
 /// Handle user keyboard strikes and perform corresponding operations.
 fn event_handler_loop(content: &String, map: &BTreeMap<usize, LineSlice>,
-                      key_event_queue: KeyEventReadGuard)
+                      key_event_queue: &KeyEventQueueReader)
                       -> Result<(), &'static str> {
 
     // Get a copy of the terminal pointer. The terminal is *not* locked here.
@@ -202,16 +203,13 @@ fn event_handler_loop(content: &String, map: &BTreeMap<usize, LineSlice>,
 #[no_mangle]
 pub fn main(args: Vec<String>) -> isize {
 
-    // Acquire key event queue.
-    let key_event_queue = match app_io::take_key_event_queue() {
-        Ok(queue) => queue,
-        Err(_) => return 1
-    };
-
-    // Acquire stdout queue.
+    // Get stdout.
     let stdout = match app_io::stdout() {
         Ok(stdout) => stdout,
-        Err(_) => return 1
+        Err(e) => {
+            error!("{}", e);
+            return 1;
+        }
     };
 
     // Set and parse options.
@@ -220,7 +218,7 @@ pub fn main(args: Vec<String>) -> isize {
     let matches = match opts.parse(&args) {
         Ok(m) => m,
         Err(e) => {
-            let _ = stdout.lock().write_all(format!("{}\n", e).as_bytes());
+            error!("{}", e);
             print_usage(opts, stdout);
             return -1;
         }
@@ -233,37 +231,29 @@ pub fn main(args: Vec<String>) -> isize {
         print_usage(opts, stdout);
         return 0;
     }
+    let filename = matches.free[0].clone();
+
+    if let Err(e) = run(filename) {
+        error!("{}", e);
+        return 1;
+    }
+    return 0;
+}
+
+fn run(filename: String) -> Result<(), String> {
+
+    // Acquire key event queue.
+    let key_event_queue = app_io::take_key_event_queue()?;
+    let key_event_queue = (*key_event_queue).as_ref()
+                          .ok_or("failed to take key event reader")?;
 
     // Read the whole file to a String.
-    let content = match get_content_string(matches.free[0].to_string()) {
-        Ok(s) => s,
-        Err(e) => {
-            let mut locked_stdout = stdout.lock();
-            let _ = locked_stdout.write_all(e.as_bytes());
-            let _ = locked_stdout.write_all(&['\n' as u8]);
-            return -1;
-        }
-    };
+    let content = get_content_string(filename)?;
 
     // Get it run.
-    let map =  match parse_content(&content) {
-        Ok(map) => {map},
-        Err(e) => {
-            let mut locked_stdout = stdout.lock();
-            let _ = locked_stdout.write_all(e.as_bytes());
-            let _ = locked_stdout.write_all(&['\n' as u8]);
-            return -1;
-        }
-    };
+    let map = parse_content(&content)?;
 
-    if let Err(e) = event_handler_loop(&content, &map, key_event_queue) {
-        let mut locked_stdout = stdout.lock();
-        let _ = locked_stdout.write_all(e.as_bytes());
-        let _ = locked_stdout.write_all(&['\n' as u8]);
-        return -1;
-    }
-
-    return 0;
+    Ok(event_handler_loop(&content, &map, key_event_queue)?)
 }
 
 fn print_usage(opts: Options, stdout: StdioWriter) {

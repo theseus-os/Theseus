@@ -321,7 +321,7 @@ pub struct KeyEventReadGuard {
 impl KeyEventReadGuard {
     /// Create a new `KeyEventReadGuard`. This function *takes* a reader
     /// to `KeyEventQueue`. Thus, the `reader` will never be `None` until the
-    /// `drop()` method. We can safely `unwrap()` the `reader` field.
+    /// `drop()` method.
     pub fn new(reader: KeyEventQueueReader,
                closure: Box<dyn Fn(&mut Option<KeyEventQueueReader>)>) -> KeyEventReadGuard {
         KeyEventReadGuard {
@@ -340,12 +340,10 @@ impl Drop for KeyEventReadGuard {
 }
 
 impl Deref for KeyEventReadGuard {
-    type Target = KeyEventQueueReader;
+    type Target = Option<KeyEventQueueReader>;
 
-    /// It allows us to access the reader with dot operator. Note that `reader`
-    /// will never be `None` before `drop()`. So we can safely call `unwrap()` here. See
-    /// `new()` method for details.
+    /// It allows us to access the reader with dot operator.
     fn deref(&self) -> &Self::Target {
-        self.reader.as_ref().unwrap()
+        &self.reader
     }
 }

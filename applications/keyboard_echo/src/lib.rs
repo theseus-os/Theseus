@@ -27,6 +27,7 @@ fn run() -> Result<(), &'static str> {
     let stdout = app_io::stdout()?;
     let mut stdout_locked = stdout.lock();
     let queue = app_io::take_key_event_queue()?;
+    let queue = (*queue).as_ref().ok_or("failed to get key event reader")?;
     let ack = "event received\n".as_bytes();
 
     stdout_locked.write_all(
