@@ -23,8 +23,7 @@ extern crate heap_irq_safe;
 #[macro_use] extern crate derive_more;
 extern crate bit_field;
 extern crate type_name;
-extern crate mmu_x86;
-extern crate entry_flags_oper;
+extern crate page_table_x86;
 
 
 /// Just like Rust's `try!()` macro, 
@@ -54,10 +53,9 @@ pub use self::area_frame_allocator::AreaFrameAllocator;
 pub use self::paging::*;
 pub use self::stack_allocator::{StackAllocator, Stack};
 
-use mmu_x86::{set_new_p4, get_p4_address, tlb};
+use page_table_x86::{set_new_p4, get_p4_address, tlb};
 
-pub use entry_flags_oper::EntryFlagsOper;
-pub use mmu_x86::EntryFlags;// Export EntryFlags so that others does not need to get access to mmu_<arch>.
+pub use page_table_x86::EntryFlags;// Export EntryFlags so that others does not need to get access to mmu_<arch>.
 
 
 use core::{

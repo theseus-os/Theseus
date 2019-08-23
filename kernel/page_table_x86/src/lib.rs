@@ -7,14 +7,12 @@ extern crate kernel_config;
 extern crate x86_64;
 #[macro_use]
 extern crate bitflags;
-extern crate entry_flags_oper;
 extern crate multiboot2;
 extern crate xmas_elf;
 
-use entry_flags_oper::EntryFlagsOper;
 use x86_64::{registers::control_regs};
 
-pub use x86_64::{VirtualAddress, instructions::tlb};
+pub use x86_64::{PhysicalAddress, VirtualAddress, instructions::tlb};
 
 bitflags! {
     /// Entry access flag bits.
@@ -35,37 +33,48 @@ bitflags! {
 
 }
 
-impl EntryFlagsOper<EntryFlags> for EntryFlags {
-    fn is_huge(&self) -> bool {
+impl EntryFlags {
+    /// Returns ture if the page the entry points to is a huge page. 
+    /// For x86, it means the flags contain a `HUGE_PAGE` bit.
+    pub fn is_huge(&self) -> bool {
         self.contains(EntryFlags::HUGE_PAGE)
     }
 
-    fn default_flags() -> EntryFlags {
+    /// The default flags of an accessible page. 
+    /// For x86, the `PRESENT` bit should be set.
+    pub fn default_flags() -> EntryFlags {
         EntryFlags::PRESENT
     }
 
-    fn rw_flags() -> EntryFlags {
+    /// The flags of a writable page. 
+    /// For x86 the `PRESENT` and `WRITABLE` bits should be set.
+    pub fn rw_flags() -> EntryFlags {
         EntryFlags::default_flags() | EntryFlags::WRITABLE
     }
 
-    fn is_page(&self) -> bool {
+    /// Returns true if the page is accessiable and is not huge.
+    pub fn is_page(&self) -> bool {
         self.contains(EntryFlags::PRESENT) && !self.contains(EntryFlags::HUGE_PAGE)
     }
 
-    fn set_writable(&self) -> EntryFlags {
+    /// Set the page the entry points to as writable. 
+    /// For x86 set the `PRESENT` and `WRITABLE` bits of the flags.
+    pub fn set_writable(&self) -> EntryFlags {
         self.clone() | EntryFlags::rw_flags()
     }
 
-    fn is_writable(&self) -> bool {
+    /// Returns true if the page is writable. 
+    /// For x86 it means the flags contain `WRITABLE`.
+    pub fn is_writable(&self) -> bool {
         self.intersects(EntryFlags::WRITABLE)
     }
 
-    fn is_executable(&self) -> bool {
+    /// Returns true if these flags are executable,
+    /// which means that the `NO_EXECUTE` bit on x86 is *not* set.
+    pub fn is_executable(&self) -> bool {
         !self.intersects(EntryFlags::NO_EXECUTE)
     }
-}
 
-impl EntryFlags {
     pub fn from_multiboot2_section_flags(section: &multiboot2::ElfSection) -> EntryFlags {
         use multiboot2::ElfSectionFlags;
 
@@ -125,13 +134,13 @@ impl EntryFlags {
 }
 
 /// Set the new P4 table address to switch to the new page table p4 points to.
-pub fn set_new_p4(p4: u64) {
+pub fn set_new_p4(p4: PhysicalAddress) {
     unsafe {
-        control_regs::cr3_write(x86_64::PhysicalAddress(p4));
+        control_regs::cr3_write(p4);
     }
 }
 
 /// Returns the current top-level page table frame, e.g., cr3 on x86
-pub fn get_p4_address() -> usize {
-    control_regs::cr3().0 as usize
+pub fn get_p4_address() -> PhysicalAddress {
+    control_regs::cr3()
 }

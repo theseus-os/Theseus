@@ -9,7 +9,7 @@
 
 use super::entry::{Entry};
 use kernel_config::memory::{PAGE_SHIFT, ENTRIES_PER_PAGE_TABLE};
-use super::super::{VirtualAddress, FrameAllocator, EntryFlags, EntryFlagsOper};
+use super::super::{VirtualAddress, FrameAllocator, EntryFlags};
 use core::ops::{Index, IndexMut};
 use core::marker::PhantomData;
 

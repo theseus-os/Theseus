@@ -17,7 +17,7 @@ use paging::table::{P4, Table, Level4};
 use kernel_config::memory::{ENTRIES_PER_PAGE_TABLE, PAGE_SIZE, TEMPORARY_PAGE_VIRT_ADDR};
 use alloc::vec::Vec;
 use type_name;
-use super::super::{EntryFlags, EntryFlagsOper, flush};
+use super::super::{EntryFlags, flush};
 
 pub struct Mapper {
     p4: Unique<Table<Level4>>,

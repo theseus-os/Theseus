@@ -339,7 +339,8 @@ impl PageTable {
         // debug!("PageTable::switch() old table: {:?}, new table: {:?}", self, new_table);
 
         // perform the actual page table switch
-        set_new_p4(new_table.p4_table.start_address().value() as u64);
+        #[cfg(target_arch = "x86_64")]
+        set_new_p4(page_table_x86::PhysicalAddress(new_table.p4_table.start_address().value() as u64));
         let current_table_after_switch = PageTable::from_current();
         current_table_after_switch
     }
@@ -354,7 +355,7 @@ impl PageTable {
 
 /// Returns the current top-level page table frame.
 pub fn get_current_p4() -> Frame {
-    Frame::containing_address(PhysicalAddress::new_canonical(get_p4_address()))
+    Frame::containing_address(PhysicalAddress::new_canonical(get_p4_address().0 as usize))
 }
 
 // /// Get a stack trace, borrowed from Redox
@@ -408,5 +409,5 @@ pub fn get_current_p4() -> Frame {
 /// Flush the virtual address translation buffer of the specific address
 #[cfg(target_arch = "x86_64")]
 pub fn flush(vaddr: VirtualAddress) {
-    tlb::flush(mmu_x86::VirtualAddress(vaddr.value()));
+    tlb::flush(page_table_x86::VirtualAddress(vaddr.value()));
 }
