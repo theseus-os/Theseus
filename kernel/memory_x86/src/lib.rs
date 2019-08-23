@@ -14,7 +14,7 @@ extern crate multiboot2;
 extern crate log;
 extern crate irq_safety;
 extern crate kernel_config;
-extern crate memory_address;
+extern crate memory_area;
 extern crate page_table_x86;
 pub extern crate x86_64;
 
@@ -29,7 +29,7 @@ use alloc::vec::Vec;
 use core::ops::DerefMut;
 use irq_safety::MutexIrqSafe;
 use kernel_config::memory::KERNEL_OFFSET;
-use memory_address::{Frame, PhysicalAddress, PhysicalMemoryArea, VirtualAddress, VirtualMemoryArea};
+use memory_area::{Frame, PhysicalAddress, PhysicalMemoryArea, VirtualAddress, VirtualMemoryArea};
 use multiboot2::MemoryMapTag;
 
 /// Get the address of memory occupied by the loaded kernel.

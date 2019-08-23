@@ -25,7 +25,7 @@ extern crate bit_field;
 extern crate type_name;
 #[cfg(target_arch = "x86_64")]
 extern crate memory_x86;
-extern crate memory_address;
+extern crate memory_area;
 
 
 /// Just like Rust's `try!()` macro, 
@@ -55,7 +55,7 @@ pub use self::area_frame_allocator::AreaFrameAllocator;
 pub use self::paging::*;
 pub use self::stack_allocator::{StackAllocator, Stack};
 
-pub use memory_address::{VirtualAddress, PhysicalAddress, PhysicalMemoryArea, Frame, VirtualMemoryArea, Page, PageRange};
+pub use memory_area::{VirtualAddress, PhysicalAddress, PhysicalMemoryArea, Frame, VirtualMemoryArea, Page, PageRange};
 
 #[cfg(target_arch = "x86_64")]
 use memory_x86::{set_new_p4, get_p4_address, get_kernel_address, get_available_memory, get_modules_address, get_boot_info_mem_area, get_boot_info_address, add_sections_vmem_areas, add_vga_vmem_area, tlb, BootInformation};

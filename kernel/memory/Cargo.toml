@@ -42,8 +42,8 @@ path = "../heap_irq_safe"
 [dependencies.memory_x86]
 path = "../memory_x86"
 
-[dependencies.memory_address]
-path = "../memory_address"
+[dependencies.memory_area]
+path = "../memory_area"
 
 [lib]
 crate-type = ["rlib"]
