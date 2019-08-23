@@ -54,7 +54,8 @@ impl Page {
 
 	/// Returns the `VirtualAddress` as the start of this `Page`.
     pub fn start_address(&self) -> VirtualAddress {
-        VirtualAddress(self.number * PAGE_SIZE)
+        // Cannot create VirtualAddress directly because the field is private
+        VirtualAddress::new_canonical(self.number * PAGE_SIZE)
     }
 
 	/// Returns the 9-bit part of this page's virtual address that is the index into the P4 page table entries list.

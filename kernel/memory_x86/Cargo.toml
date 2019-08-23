@@ -26,5 +26,8 @@ path = "../heap_irq_safe"
 [dependencies.page_table_x86]
 path = "../page_table_x86"
 
+[dependencies.memory_address]
+path = "../memory_address"
+
 [lib]
 crate-type = ["rlib"]

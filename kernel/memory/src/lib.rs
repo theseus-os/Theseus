@@ -25,6 +25,7 @@ extern crate bit_field;
 extern crate type_name;
 #[cfg(target_arch = "x86_64")]
 extern crate memory_x86;
+extern crate memory_address;
 
 
 /// Just like Rust's `try!()` macro, 
@@ -54,8 +55,10 @@ pub use self::area_frame_allocator::AreaFrameAllocator;
 pub use self::paging::*;
 pub use self::stack_allocator::{StackAllocator, Stack};
 
+pub use memory_address::{VirtualAddress, PhysicalAddress};
+
 #[cfg(target_arch = "x86_64")]
-use memory_x86::{set_new_p4, get_p4_address, tlb, BootInformation};
+use memory_x86::{set_new_p4, get_p4_address, get_kernel_address, tlb, BootInformation};
 
 #[cfg(target_arch = "x86_64")]
 pub use memory_x86::EntryFlags;// Export EntryFlags so that others does not need to get access to memory_<arch>.
@@ -72,185 +75,6 @@ use alloc::vec::Vec;
 use alloc::sync::Arc;
 use kernel_config::memory::{PAGE_SIZE, MAX_PAGE_NUMBER, KERNEL_HEAP_START, KERNEL_HEAP_INITIAL_SIZE, KERNEL_STACK_ALLOCATOR_BOTTOM, KERNEL_STACK_ALLOCATOR_TOP_ADDR, KERNEL_HEAP_P4_INDEX, KERNEL_STACK_P4_INDEX, KERNEL_TEXT_P4_INDEX, KERNEL_OFFSET};
 use bit_field::BitField;
-
-/// A virtual memory address, which is a `usize` under the hood.
-#[derive(
-    Clone, Copy, PartialEq, Eq, PartialOrd, Ord, Hash, Default,
-    Debug, Display, Binary, Octal, LowerHex, UpperHex,
-    BitAnd, BitOr, BitXor, BitAndAssign, BitOrAssign, BitXorAssign, 
-    Add, Sub, AddAssign, SubAssign
-)]
-#[repr(transparent)]
-pub struct VirtualAddress(usize);
-
-impl VirtualAddress {
-    /// Creates a new `VirtualAddress`, 
-    /// checking that the address is canonical, 
-    /// i.e., bits (64:48] are sign-extended from bit 47.
-    pub fn new(virt_addr: usize) -> Result<VirtualAddress, &'static str> {
-        match virt_addr.get_bits(47..64) {
-            0 | 0b1_1111_1111_1111_1111 => Ok(VirtualAddress(virt_addr)),
-            _ => Err("VirtualAddress bits 48-63 must be a sign-extension of bit 47"),
-        }
-    }
-
-    /// Creates a new `VirtualAddress` that is guaranteed to be canonical
-    /// by forcing the upper bits (64:48] to be sign-extended from bit 47.
-    pub fn new_canonical(mut virt_addr: usize) -> VirtualAddress {
-        match virt_addr.get_bit(47) {
-            false => virt_addr.set_bits(48..64, 0),
-            true  => virt_addr.set_bits(48..64, 0xffff),
-        };
-        VirtualAddress(virt_addr)
-    }
-
-    /// Creates a VirtualAddress with the value 0.
-    pub const fn zero() -> VirtualAddress {
-        VirtualAddress(0)
-    }
-
-    /// Returns the underlying `usize` value for this `VirtualAddress`.
-    #[inline]
-    pub fn value(&self) -> usize {
-        self.0
-    }
-
-    /// Returns the offset that this VirtualAddress specifies into its containing memory Page.
-    /// 
-    /// For example, if the PAGE_SIZE is 4KiB, then this will return 
-    /// the least significant 12 bits (12:0] of this VirtualAddress.
-    pub fn page_offset(&self) -> usize {
-        self.0 & (PAGE_SIZE - 1)
-    }
-}
-
-impl core::fmt::Pointer for VirtualAddress {
-    fn fmt(&self, f: &mut fmt::Formatter) -> fmt::Result {
-        write!(f, "{:p}", self.0 as *const usize)
-    }
-}
-
-impl Add<usize> for VirtualAddress {
-    type Output = VirtualAddress;
-
-    fn add(self, rhs: usize) -> VirtualAddress {
-        VirtualAddress::new_canonical(self.0.saturating_add(rhs))
-    }
-}
-
-impl AddAssign<usize> for VirtualAddress {
-    fn add_assign(&mut self, rhs: usize) {
-        *self = VirtualAddress::new_canonical(self.0.saturating_add(rhs));
-    }
-}
-
-impl Sub<usize> for VirtualAddress {
-    type Output = VirtualAddress;
-
-    fn sub(self, rhs: usize) -> VirtualAddress {
-        VirtualAddress::new_canonical(self.0.saturating_sub(rhs))
-    }
-}
-
-impl SubAssign<usize> for VirtualAddress {
-    fn sub_assign(&mut self, rhs: usize) {
-        *self = VirtualAddress::new_canonical(self.0.saturating_sub(rhs));
-    }
-}
-
-impl From<VirtualAddress> for usize {
-    #[inline]
-    fn from(virt_addr: VirtualAddress) -> usize {
-        virt_addr.0
-    }
-}
-
-
-/// A physical memory address, which is a `usize` under the hood.
-#[derive(
-    Clone, Copy, PartialEq, Eq, PartialOrd, Ord, Hash, Default,
-    Debug, Display, Binary, Octal, LowerHex, UpperHex,
-    BitAnd, BitOr, BitXor, BitAndAssign, BitOrAssign, BitXorAssign, 
-    Add, Sub, Mul, Div, Rem, Shr, Shl, 
-    AddAssign, SubAssign, MulAssign, DivAssign, RemAssign, ShrAssign, ShlAssign
-)]
-#[repr(transparent)]
-pub struct PhysicalAddress(usize);
-
-impl PhysicalAddress {
-    /// Creates a new `PhysicalAddress`, 
-    /// checking that the bits (64:52] are 0.
-    pub fn new(phys_addr: usize) -> Result<PhysicalAddress, &'static str> {
-        match phys_addr.get_bits(52..64) {
-            0 => Ok(PhysicalAddress(phys_addr)),
-            _ => Err("PhysicalAddress bits 52-63 must be zero"),
-        }
-    }
-
-    /// Creates a new `PhysicalAddress` that is guaranteed to be canonical
-    /// by forcing the upper bits (64:52] to be 0.
-    pub fn new_canonical(mut phys_addr: usize) -> PhysicalAddress {
-        phys_addr.set_bits(52..64, 0);
-        PhysicalAddress(phys_addr)
-    }
-
-    /// Returns the underlying `usize` value for this `PhysicalAddress`.
-    #[inline]
-    pub fn value(&self) -> usize {
-        self.0
-    }
-
-    /// Creates a PhysicalAddress with the value 0.
-    pub const fn zero() -> PhysicalAddress {
-        PhysicalAddress(0)
-    }
-
-    /// Returns the offset that this PhysicalAddress specifies into its containing memory Frame.
-    /// 
-    /// For example, if the PAGE_SIZE is 4KiB, then this will return 
-    /// the least significant 12 bits (12:0] of this PhysicalAddress.
-    pub fn frame_offset(&self) -> usize {
-        self.0 & (PAGE_SIZE - 1)
-    }
-}
-
-
-impl Add<usize> for PhysicalAddress {
-    type Output = PhysicalAddress;
-
-    fn add(self, rhs: usize) -> PhysicalAddress {
-        PhysicalAddress::new_canonical(self.0.saturating_add(rhs))
-    }
-}
-
-impl AddAssign<usize> for PhysicalAddress {
-    fn add_assign(&mut self, rhs: usize) {
-        *self = PhysicalAddress::new_canonical(self.0.saturating_add(rhs));
-    }
-}
-
-impl Sub<usize> for PhysicalAddress {
-    type Output = PhysicalAddress;
-
-    fn sub(self, rhs: usize) -> PhysicalAddress {
-        PhysicalAddress::new_canonical(self.0.saturating_sub(rhs))
-    }
-}
-
-impl SubAssign<usize> for PhysicalAddress {
-    fn sub_assign(&mut self, rhs: usize) {
-        *self = PhysicalAddress::new_canonical(self.0.saturating_sub(rhs));
-    }
-}
-
-impl From<PhysicalAddress> for usize {
-    #[inline]
-    fn from(virt_addr: PhysicalAddress) -> usize {
-        virt_addr.0
-    }
-}
-
-
 
 /// The memory management info and address space of the kernel
 pub static KERNEL_MMI: Once<Arc<MutexIrqSafe<MemoryManagementInfo>>> = Once::new();
@@ -452,28 +276,7 @@ pub fn set_broadcast_tlb_shootdown_cb(func: fn(Vec<VirtualAddress>)) {
 pub fn init(boot_info: &BootInformation) 
     -> Result<(Arc<MutexIrqSafe<MemoryManagementInfo>>, MappedPages, MappedPages, MappedPages, Vec<MappedPages>), &'static str> 
 {
-    let memory_map_tag = boot_info.memory_map_tag().ok_or("Memory map tag not found")?;
-    let elf_sections_tag = boot_info.elf_sections_tag().ok_or("Elf sections tag not found")?;
-
-    // Our linker script specifies that the kernel will have the .init section starting at 1MB and ending at 1MB + .init size
-    // and all other kernel sections will start at (KERNEL_OFFSET + 1MB) and end at (KERNEL_OFFSET + 1MB + size).
-    // So, the start of the kernel is its physical address, but the end of it is its virtual address... confusing, I know
-    // Thus, kernel_phys_start is the same as kernel_virt_start initially, but we remap them later in paging::init.
-    let kernel_phys_start = PhysicalAddress::new(
-        elf_sections_tag.sections()
-            .filter(|s| s.is_allocated())
-            .map(|s| s.start_address())
-            .min()
-            .ok_or("Couldn't find kernel start (phys) address")? as usize
-    )?;
-    let kernel_virt_end = VirtualAddress::new(
-        elf_sections_tag.sections()
-            .filter(|s| s.is_allocated())
-            .map(|s| s.end_address())
-            .max()
-            .ok_or("Couldn't find kernel end (virt) address")? as usize
-    )?;
-    let kernel_phys_end = PhysicalAddress::new(kernel_virt_end.value() - KERNEL_OFFSET)?;
+    let (kernel_phys_start, kernel_phys_end, kernel_virt_end, memory_map_tag) = get_kernel_address(&boot_info)?;
 
     debug!("kernel_phys_start: {:#x}, kernel_phys_end: {:#x} kernel_virt_end = {:#x}",
         kernel_phys_start,
