@@ -340,12 +340,12 @@ impl Drop for KeyEventReadGuard {
 }
 
 impl Deref for KeyEventReadGuard {
-    type Target = KeyEventQueueReader;
+    type Target = Option<KeyEventQueueReader>;
 
     /// It allows us to access the reader with dot operator. Note that `reader`
     /// will never be `None` before `drop()`. So we can safely call `unwrap()` here. See
     /// `new()` method for details.
     fn deref(&self) -> &Self::Target {
-        self.reader.as_ref().unwrap()
+        &self.reader
     }
 }
