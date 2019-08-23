@@ -58,7 +58,7 @@ pub use self::stack_allocator::{StackAllocator, Stack};
 pub use memory_address::{VirtualAddress, PhysicalAddress, PhysicalMemoryArea, Frame};
 
 #[cfg(target_arch = "x86_64")]
-use memory_x86::{set_new_p4, get_p4_address, get_kernel_address, get_available_memory, get_modules_address, tlb, BootInformation};
+use memory_x86::{set_new_p4, get_p4_address, get_kernel_address, get_available_memory, get_modules_address, get_boot_info_mem_area, tlb, BootInformation};
 
 #[cfg(target_arch = "x86_64")]
 pub use memory_x86::EntryFlags;// Export EntryFlags so that others does not need to get access to memory_<arch>.
@@ -273,15 +273,22 @@ pub fn init(boot_info: &BootInformation)
 
     let mut occupied: [PhysicalMemoryArea; 32] = Default::default();
     let mut occup_index = 0;
+    
+    
     occupied[occup_index] = PhysicalMemoryArea::new(PhysicalAddress::zero(), 0x10_0000, 1, 0); // reserve addresses under 1 MB
     occup_index += 1;
     occupied[occup_index] = PhysicalMemoryArea::new(kernel_phys_start, kernel_phys_end.value() - kernel_phys_start.value(), 1, 0); // the kernel boot image is already in use
     occup_index += 1;
-    occupied[occup_index] = PhysicalMemoryArea::new(PhysicalAddress::new(boot_info.start_address() - KERNEL_OFFSET)?, boot_info.end_address() - boot_info.start_address(), 1, 0); // preserve bootloader info
-    occup_index += 1;
+    
+    #[cfg(target_arch = "x86_64")]
+    {   
+        // preserve the multiboot information
+        occupied[occup_index] = get_boot_info_mem_area(&boot_info)?;
+        occup_index += 1;
+    }
+
     occupied[occup_index] = PhysicalMemoryArea::new(PhysicalAddress::new(modules_start)?, modules_end - modules_start, 1, 0); // preserve all modules
     occup_index += 1;
-
 
     // init the frame allocator with the available memory sections and the occupied memory sections
     let fa = AreaFrameAllocator::new(available, avail_len, occupied, occup_index)?;
