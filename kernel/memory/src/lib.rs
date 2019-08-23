@@ -55,10 +55,10 @@ pub use self::area_frame_allocator::AreaFrameAllocator;
 pub use self::paging::*;
 pub use self::stack_allocator::{StackAllocator, Stack};
 
-pub use memory_address::{VirtualAddress, PhysicalAddress, PhysicalMemoryArea, Frame};
+pub use memory_address::{VirtualAddress, PhysicalAddress, PhysicalMemoryArea, Frame, VirtualMemoryArea, Page, PageRange};
 
 #[cfg(target_arch = "x86_64")]
-use memory_x86::{set_new_p4, get_p4_address, get_kernel_address, get_available_memory, get_modules_address, get_boot_info_mem_area, get_boot_info_address, tlb, BootInformation};
+use memory_x86::{set_new_p4, get_p4_address, get_kernel_address, get_available_memory, get_modules_address, get_boot_info_mem_area, get_boot_info_address, add_section_vmem_areas, tlb, BootInformation};
 
 #[cfg(target_arch = "x86_64")]
 pub use memory_x86::EntryFlags;// Export EntryFlags so that others does not need to get access to memory_<arch>.
@@ -169,65 +169,6 @@ pub fn create_contiguous_mapping(size_in_bytes: usize, flags: EntryFlags) -> Res
     let starting_phys_addr = frames.start_address();
     let mp = kernel_mmi.page_table.map_allocated_pages_to(allocated_pages, frames, flags, frame_allocator.deref_mut())?;
     Ok((mp, starting_phys_addr))
-}
-
-
-/// A region of virtual memory that is mapped into a [`Task`](../task/struct.Task.html)'s address space
-#[derive(Debug, Default, Clone, PartialEq)]
-pub struct VirtualMemoryArea {
-    start: VirtualAddress,
-    size: usize,
-    flags: EntryFlags,
-    desc: &'static str,
-}
-use core::fmt;
-impl fmt::Display for VirtualMemoryArea {
-    fn fmt(&self, f: &mut fmt::Formatter) -> fmt::Result {
-        write!(f, "start: {:#X}, size: {:#X}, flags: {:#X}, desc: {}", 
-                  self.start, self.size, self.flags, self.desc
-        )
-    }
-}
-
-
-impl VirtualMemoryArea {
-    pub fn new(start: VirtualAddress, size: usize, flags: EntryFlags, desc: &'static str) -> Self {
-        VirtualMemoryArea {
-            start: start,
-            size: size,
-            flags: flags,
-            desc: desc,
-        }
-    }
-
-    pub fn start_address(&self) -> VirtualAddress {
-        self.start
-    }
-
-    pub fn size(&self) -> usize {
-        self.size
-    }
-
-    pub fn flags(&self) -> EntryFlags {
-        self.flags
-    }
-
-    pub fn desc(&self) -> &'static str {
-        self.desc
-    }
-
-    /// Get an iterator that covers all the pages in this VirtualMemoryArea
-    pub fn pages(&self) -> PageRange {
-
-        // check that the end_page won't be invalid
-        if (self.start.value() + self.size) < 1 {
-            return PageRange::empty();
-        }
-        
-        let start_page = Page::containing_address(self.start);
-        let end_page = Page::containing_address(self.start + self.size - 1);
-        PageRange::new(start_page, end_page)
-    }
 }
 
 

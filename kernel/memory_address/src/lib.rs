@@ -23,7 +23,9 @@ extern crate heap_irq_safe;
 #[macro_use] extern crate derive_more;
 extern crate bit_field;
 extern crate type_name;
+extern crate page_table_x86;
 
+pub mod paging;
 
 /// Just like Rust's `try!()` macro, 
 /// but forgets the given `obj`s to prevent them from being dropped,
@@ -42,6 +44,7 @@ macro_rules! try_forget {
     });
 }
 
+pub use paging::{Page, PageRange};
 
 use core::{
     ops::{RangeInclusive, Deref, DerefMut},
@@ -55,6 +58,7 @@ use alloc::vec::Vec;
 use alloc::sync::Arc;
 use kernel_config::memory::{PAGE_SIZE, MAX_PAGE_NUMBER, KERNEL_HEAP_START, KERNEL_HEAP_INITIAL_SIZE, KERNEL_STACK_ALLOCATOR_BOTTOM, KERNEL_STACK_ALLOCATOR_TOP_ADDR, KERNEL_HEAP_P4_INDEX, KERNEL_STACK_P4_INDEX, KERNEL_TEXT_P4_INDEX, KERNEL_OFFSET};
 use bit_field::BitField;
+use page_table_x86::EntryFlags;
 
 /// A virtual memory address, which is a `usize` under the hood.
 #[derive(
@@ -447,5 +451,63 @@ pub trait FrameAllocator {
     fn deallocate_frame(&mut self, frame: Frame);
     /// Call this when a heap is set up, and the `alloc` types can be used.
     fn alloc_ready(&mut self);
+}
+
+/// A region of virtual memory that is mapped into a [`Task`](../task/struct.Task.html)'s address space
+#[derive(Debug, Default, Clone, PartialEq)]
+pub struct VirtualMemoryArea {
+    start: VirtualAddress,
+    size: usize,
+    flags: EntryFlags,
+    desc: &'static str,
+}
+
+impl fmt::Display for VirtualMemoryArea {
+    fn fmt(&self, f: &mut fmt::Formatter) -> fmt::Result {
+        write!(f, "start: {:#X}, size: {:#X}, flags: {:#X}, desc: {}", 
+                  self.start, self.size, self.flags, self.desc
+        )
+    }
+}
+
+
+impl VirtualMemoryArea {
+    pub fn new(start: VirtualAddress, size: usize, flags: EntryFlags, desc: &'static str) -> Self {
+        VirtualMemoryArea {
+            start: start,
+            size: size,
+            flags: flags,
+            desc: desc,
+        }
+    }
+
+    pub fn start_address(&self) -> VirtualAddress {
+        self.start
+    }
+
+    pub fn size(&self) -> usize {
+        self.size
+    }
+
+    pub fn flags(&self) -> EntryFlags {
+        self.flags
+    }
+
+    pub fn desc(&self) -> &'static str {
+        self.desc
+    }
+
+    /// Get an iterator that covers all the pages in this VirtualMemoryArea
+    pub fn pages(&self) -> PageRange {
+
+        // check that the end_page won't be invalid
+        if (self.start.value() + self.size) < 1 {
+            return PageRange::empty();
+        }
+        
+        let start_page = Page::containing_address(self.start);
+        let end_page = Page::containing_address(self.start + self.size - 1);
+        PageRange::new(start_page, end_page)
+    }
 }
 

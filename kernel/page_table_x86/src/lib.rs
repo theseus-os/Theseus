@@ -12,7 +12,7 @@ extern crate xmas_elf;
 
 use x86_64::{registers::control_regs};
 
-pub use x86_64::{PhysicalAddress, VirtualAddress, instructions::tlb};
+use x86_64::{PhysicalAddress, VirtualAddress};
 
 bitflags! {
     /// Entry access flag bits.
