@@ -423,6 +423,7 @@ pub fn init(allocator_mutex: &MutexIrqSafe<AreaFrameAllocator>, boot_info: &mult
         {
             let mut allocator = allocator_mutex.lock(); 
 
+            // add virtual memory area occupied by kernel data and code
             let (mut index, 
                 mut text_start, 
                 mut text_end, 
@@ -438,8 +439,9 @@ pub fn init(allocator_mutex: &MutexIrqSafe<AreaFrameAllocator>, boot_info: &mult
             // to allow the APs to boot up, we identity map the kernel sections too.
             // (lower half virtual addresses mapped to same lower half physical addresses)
             // we will unmap these later before we start booting to userspace processes
-            for (start_phys_addr, start_virt_addr, size, flags) in identity_sections {
-                identity_mapped_pages[index] = Some(
+            for i in 0..index {
+                let (start_phys_addr, start_virt_addr, size, flags) = identity_sections[i]; 
+                identity_mapped_pages[i] = Some(
                     mapper.map_frames(
                         FrameRange::from_phys_addr(start_phys_addr, size), 
                         Page::containing_address(start_virt_addr - KERNEL_OFFSET),

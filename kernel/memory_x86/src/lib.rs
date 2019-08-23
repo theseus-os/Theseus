@@ -186,7 +186,7 @@ pub fn add_section_vmem_areas(
         Option<EntryFlags>,
         Option<EntryFlags>,
         Option<EntryFlags>,
-        Vec<(PhysicalAddress, VirtualAddress, usize, EntryFlags)>,
+        [(PhysicalAddress, VirtualAddress, usize, EntryFlags); 32]
     ),
     &'static str,
 > {
@@ -205,8 +205,7 @@ pub fn add_section_vmem_areas(
     let mut data_flags:       Option<EntryFlags> = None;
 
 
-    let mut identity_sections: Vec<(PhysicalAddress, VirtualAddress, usize, EntryFlags)> =
-        Vec::new();
+    let mut identity_sections: [(PhysicalAddress, VirtualAddress, usize, EntryFlags); 32] = Default::default();
 
     // map the allocated kernel text sections
     for section in elf_sections_tag.sections() {
@@ -308,15 +307,16 @@ pub fn add_section_vmem_areas(
             vmas[index]
         );
 
-        identity_sections.push((
+        identity_sections[index] = (
             start_phys_addr,
             start_virt_addr,
             section.size() as usize,
             flags,
-        ));
+        );
 
+        debug!("Wenqiu: add identity_section");
         index += 1;
     } // end of section iterator
 
-    Ok((index, text_start, text_end, rodata_start, rodata_end, data_start, data_end, text_flags, data_flags, rodata_flags, identity_sections))
+    Ok((index, text_start, text_end, rodata_start, rodata_end, data_start, data_end, text_flags, rodata_flags, data_flags, identity_sections))
 }
