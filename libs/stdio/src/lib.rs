@@ -311,36 +311,35 @@ impl KeyEventQueueWriter {
 /// it get instantiated, it *takes* the reader of the `KeyEventQueue`. When it
 /// goes out of the scope, the taken reader will be automatically returned back
 /// to the shell by `drop()` method.
-pub struct KeyEventConsumerGuard {
+pub struct KeyEventReadGuard {
     /// The taken reader of the `KeyEventQueue`.
     reader: Option<KeyEventQueueReader>,
     /// The closure to be excuted on dropping.
-    closure: Box<dyn Fn(KeyEventQueueReader)>
+    closure: Box<dyn Fn(&mut Option<KeyEventQueueReader>)>
 }
 
-impl KeyEventConsumerGuard {
-    /// Create a new `KeyEventConsumerGuard`. This function *takes* a reader
+impl KeyEventReadGuard {
+    /// Create a new `KeyEventReadGuard`. This function *takes* a reader
     /// to `KeyEventQueue`. Thus, the `reader` will never be `None` until the
     /// `drop()` method. We can safely `unwrap()` the `reader` field.
     pub fn new(reader: KeyEventQueueReader,
-               closure: Box<dyn Fn(KeyEventQueueReader)>) -> KeyEventConsumerGuard {
-        KeyEventConsumerGuard {
+               closure: Box<dyn Fn(&mut Option<KeyEventQueueReader>)>) -> KeyEventReadGuard {
+        KeyEventReadGuard {
             reader: Some(reader),
             closure
         }
     }
 }
 
-impl Drop for KeyEventConsumerGuard {
+impl Drop for KeyEventReadGuard {
     /// Returns the reader of `KeyEventQueue` back to shell by executing the
-    /// closure. Note that `reader` will never be `None` before `drop()`. So we
-    /// can safely call `unwrap()` here. See `new()` method for details.
+    /// closure.
     fn drop(&mut self) {
-        (self.closure)(self.reader.take().unwrap());
+        (self.closure)(&mut self.reader);
     }
 }
 
-impl Deref for KeyEventConsumerGuard {
+impl Deref for KeyEventReadGuard {
     type Target = KeyEventQueueReader;
 
     /// It allows us to access the reader with dot operator. Note that `reader`

@@ -25,7 +25,7 @@ use fs_node::FileOrDir;
 use alloc::collections::BTreeMap;
 use libterm::Terminal;
 use spin::Mutex;
-use stdio::{StdioWriter, KeyEventConsumerGuard};
+use stdio::{StdioWriter, KeyEventReadGuard};
 use core_io::Write;
 
 /// The metadata for each line in the file.
@@ -153,7 +153,7 @@ fn display_content(content: &String, map: &BTreeMap<usize, LineSlice>,
 
 /// Handle user keyboard strikes and perform corresponding operations.
 fn event_handler_loop(content: &String, map: &BTreeMap<usize, LineSlice>,
-                      key_event_queue: KeyEventConsumerGuard)
+                      key_event_queue: KeyEventReadGuard)
                       -> Result<(), &'static str> {
 
     // Get a copy of the terminal pointer. The terminal is *not* locked here.

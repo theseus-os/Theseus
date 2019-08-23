@@ -22,7 +22,7 @@ extern crate keycodes_ascii;
 extern crate libterm;
 extern crate scheduler;
 
-use stdio::{StdioReader, StdioWriter, KeyEventConsumerGuard,
+use stdio::{StdioReader, StdioWriter, KeyEventReadGuard,
             KeyEventQueueReader};
 use spin::{Mutex, MutexGuard};
 use alloc::collections::BTreeMap;
@@ -220,14 +220,15 @@ pub fn stderr() -> Result<StdioWriter, &'static str> {
 /// to let it run. The third case happens when the reader of the key event queue has
 /// already been taken by some other task, which may be running simultaneously, or be killed
 /// prematurely so that it cannot return the key event reader on exit.
-pub fn take_key_event_queue() -> Result<KeyEventConsumerGuard, &'static str> {
+pub fn take_key_event_queue() -> Result<KeyEventReadGuard, &'static str> {
     let task_id = task::get_my_current_task_id().ok_or("failed to get task_id to take key event queue")?;
     let locked_streams = APP_IO_STREAMS.lock();
     match locked_streams.get(&task_id) {
         Some(queues) => {
             match queues.key_event_reader.lock().take() {
-                Some(reader) => Ok(KeyEventConsumerGuard::new(reader,
-                                        Box::new(|reader| { return_event_queue(reader); }))),
+                Some(reader) => Ok(KeyEventReadGuard::new(reader,
+                                        Box::new(|reader: &mut Option<KeyEventQueueReader>|
+                                                 { return_event_queue(reader); }))),
                 None => Err("currently the reader to key event queue is not available")
             }
         },
@@ -235,15 +236,15 @@ pub fn take_key_event_queue() -> Result<KeyEventConsumerGuard, &'static str> {
     }
 }
 
-/// This function is automatically invoked upon dropping of `KeyEventConsumerGuard`.
+/// This function is automatically invoked upon dropping of `KeyEventReadGuard`.
 /// It returns the reader of key event queue back to the shell.
-fn return_event_queue(reader: KeyEventQueueReader) {
+fn return_event_queue(reader: &mut Option<KeyEventQueueReader>) {
     match task::get_my_current_task_id().ok_or("failed to get task_id to return event queue") {
         Ok(task_id) => {
             let locked_streams = APP_IO_STREAMS.lock();
             match locked_streams.get(&task_id) {
                 Some(queues) => {
-                    queues.key_event_reader.lock().replace(reader);
+                    core::mem::swap(&mut *queues.key_event_reader.lock(), reader);
                 },
                 None => { error!("no stderr for this task"); }
             };
