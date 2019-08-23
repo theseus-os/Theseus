@@ -31,6 +31,12 @@ use kernel_config::memory::KERNEL_OFFSET;
 use multiboot2::MemoryMapTag;
 use memory_address::{PhysicalMemoryArea, Frame};
 
+/// Get the address of memory occupied by the loaded kernel. 
+/// Returns the following tuple, if successful:
+/// 
+///  * The kernel's start physical address,
+///  * the kernel's end physical address,
+///  * the kernels' end virtual address
 pub fn get_kernel_address(
     boot_info: &BootInformation,
 ) -> Result<
@@ -80,11 +86,16 @@ pub fn get_kernel_address(
     ))
 }
 
+/// Get the memory areas occupied by the loaded kernel. Parse the list of physical memory areas from multiboot.
+/// Returns the following tuple, if successful:
+/// 
+///  * A list of avaiable physical memory areas,
+///  * the number of occupied areas, i.e. the index of the next ,
+///  * the kernels' end virtual address
 pub fn get_available_memory(
     memory_map_tag: &'static MemoryMapTag,
     kernel_phys_end: memory_address::PhysicalAddress,
 ) -> Result<([PhysicalMemoryArea; 32], usize), &'static str> {
-    // parse the list of physical memory areas from multiboot
     let mut available: [PhysicalMemoryArea; 32] = Default::default();
     let mut avail_index = 0;
     for area in memory_map_tag.memory_areas() {
@@ -125,4 +136,18 @@ pub fn get_available_memory(
     }
 
     Ok((available, avail_index))
+}
+
+/// calculate the bounds of physical memory that is occupied by modules we've loaded 
+/// (we can reclaim this later after the module is loaded, but not until then)
+pub fn get_modules_address(boot_info: &BootInformation) -> (usize, usize) {
+    let mut mod_min = usize::max_value();
+    let mut mod_max = 0;
+    use core::cmp::{max, min};
+
+    for m in boot_info.module_tags() {
+        mod_min = min(mod_min, m.start_address() as usize);
+        mod_max = max(mod_max, m.end_address() as usize);
+    }
+    (mod_min, mod_max)
 }

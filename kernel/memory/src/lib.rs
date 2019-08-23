@@ -58,7 +58,7 @@ pub use self::stack_allocator::{StackAllocator, Stack};
 pub use memory_address::{VirtualAddress, PhysicalAddress, PhysicalMemoryArea, Frame};
 
 #[cfg(target_arch = "x86_64")]
-use memory_x86::{set_new_p4, get_p4_address, get_kernel_address, get_available_memory, tlb, BootInformation};
+use memory_x86::{set_new_p4, get_p4_address, get_kernel_address, get_available_memory, get_modules_address, tlb, BootInformation};
 
 #[cfg(target_arch = "x86_64")]
 pub use memory_x86::EntryFlags;// Export EntryFlags so that others does not need to get access to memory_<arch>.
@@ -264,21 +264,11 @@ pub fn init(boot_info: &BootInformation)
     );
   
     // Get availabe physical memory areas
-    let (available, avail_index) = get_available_memory(memory_map_tag, kernel_phys_end)?;
+    let (available, avail_len) = get_available_memory(memory_map_tag, kernel_phys_end)?;
 
-    // calculate the bounds of physical memory that is occupied by modules we've loaded 
-    // (we can reclaim this later after the module is loaded, but not until then)
-    let (modules_start, modules_end) = {
-        let mut mod_min = usize::max_value();
-        let mut mod_max = 0;
-        use core::cmp::{max, min};
+    // Get the address of memory occupied by loaded modules
+    let (modules_start, modules_end) = get_modules_address(&boot_info);
 
-        for m in boot_info.module_tags() {
-            mod_min = min(mod_min, m.start_address() as usize);
-            mod_max = max(mod_max, m.end_address() as usize);
-        }
-        (mod_min, mod_max)
-    };
     // print_early!("Modules physical memory region: start {:#X} to end {:#X}", modules_start, modules_end);
 
     let mut occupied: [PhysicalMemoryArea; 32] = Default::default();
@@ -294,7 +284,7 @@ pub fn init(boot_info: &BootInformation)
 
 
     // init the frame allocator with the available memory sections and the occupied memory sections
-    let fa = AreaFrameAllocator::new(available, avail_index, occupied, occup_index)?;
+    let fa = AreaFrameAllocator::new(available, avail_len, occupied, occup_index)?;
     let frame_allocator_mutex: &MutexIrqSafe<AreaFrameAllocator> = FRAME_ALLOCATOR.call_once(|| {
         MutexIrqSafe::new( fa ) 
     });
