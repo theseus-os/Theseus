@@ -19,76 +19,65 @@ use keycodes_ascii::KeyEvent;
 use core::ops::Deref;
 
 /// A ring buffer with an EOF mark.
-struct IoCoreBuffer<T> {
+pub struct RingBufferEof<T> {
     /// The ring buffer.
     queue: VecDeque<T>,
     /// The EOF mark. We meet EOF when it equals `true`.
     end: bool
 }
 
-/// A ring buffer protected by mutex.
-struct IoCore<T> {
-    mtx: Mutex<IoCoreBuffer<T>>
-}
+/// A reference to a ring buffer with an EOF mark with mutex protection.
+pub type RingBufferEofRef<T> = Arc<Mutex<RingBufferEof<T>>>;
 
 /// A ring buffer containing bytes. It forms `stdin`, `stdout` and `stderr`.
+/// The two `Arc`s actually point to the same ring buffer. It is designed to prevent
+/// interleaved reading but at the same time allow writing to the ring buffer while
+/// the reader is holding the lock, and vice versa.
 pub struct Stdio {
-    core: Arc<IoCore<u8>>,
-    read_handle_lock: Arc<Mutex<()>>,
-    write_handle_lock: Arc<Mutex<()>>
+    /// This prevents interleaved reading.
+    read_access: Arc<Mutex<RingBufferEofRef<u8>>>,
+    /// This prevents interleaved writing.
+    write_access: Arc<Mutex<RingBufferEofRef<u8>>>
 }
 
-/// A read handle to stdio buffers.
+/// A reader to stdio buffers.
 #[derive(Clone)]
-pub struct StdioReadHandle {
+pub struct StdioReader {
     /// Inner buffer to support buffered read.
-    inner_buf: Vec<u8>,
+    inner_buf: Box<[u8]>,
     /// The length of actual buffered bytes.
     inner_content_len: usize,
     /// Points to the ring buffer.
-    core: Arc<IoCore<u8>>,
-    read_handle_lock: Arc<Mutex<()>>
+    read_access: Arc<Mutex<RingBufferEofRef<u8>>>
 }
 
-/// A write handle to stdio buffers.
+/// A writer to stdio buffers.
 #[derive(Clone)]
-pub struct StdioWriteHandle {
+pub struct StdioWriter {
     /// Points to the ring buffer.
-    core: Arc<IoCore<u8>>,
-    write_handle_lock: Arc<Mutex<()>>
+    write_access: Arc<Mutex<RingBufferEofRef<u8>>>
 }
 
 /// `StdioReadGuard` acts like `MutexGuard`, it locks the underlying ring buffer during its
 /// lifetime, and provides reading methods to the ring buffer. The lock will be automatically
 /// released on dropping of this structure.
 pub struct StdioReadGuard<'a> {
-    _guard: MutexGuard<'a, ()>,
-    core: Arc<IoCore<u8>>
+    guard: MutexGuard<'a, RingBufferEofRef<u8>>
 }
 
 /// `StdioReadGuard` acts like `MutexGuard`, it locks the underlying ring buffer during its
 /// lifetime, and provides writing methods to the ring buffer. The lock will be automatically
 /// released on dropping of this structure.
 pub struct StdioWriteGuard<'a> {
-    _guard: MutexGuard<'a, ()>,
-    core: Arc<IoCore<u8>>
+    guard: MutexGuard<'a, RingBufferEofRef<u8>>
 }
 
-impl<T> IoCoreBuffer<T> {
+impl<T> RingBufferEof<T> {
     /// Create a new ring buffer.
-    fn new() -> IoCoreBuffer<T> {
-        IoCoreBuffer {
+    fn new() -> RingBufferEof<T> {
+        RingBufferEof {
             queue: VecDeque::new(),
             end: false
-        }
-    }
-}
-
-impl<T> IoCore<T> {
-    /// Create a new ring buffer enclosed by a mutex.
-    fn new() -> IoCore<T> {
-        IoCore {
-            mtx: Mutex::new(IoCoreBuffer::new())
         }
     }
 }
@@ -96,58 +85,52 @@ impl<T> IoCore<T> {
 impl Stdio {
     /// Create a new stdio buffer.
     pub fn new() -> Stdio {
+        let ring_buffer = Arc::new(Mutex::new(RingBufferEof::new()));
         Stdio {
-            core: Arc::new(IoCore::new()),
-            read_handle_lock: Arc::new(Mutex::new(())),
-            write_handle_lock: Arc::new(Mutex::new(()))
+            read_access: Arc::new(Mutex::new(Arc::clone(&ring_buffer))),
+            write_access: Arc::new(Mutex::new(ring_buffer))
         }
     }
 
-    /// Get a read handle to the stdio buffer. Note that each read handle has its own
+    /// Get a reader to the stdio buffer. Note that each reader has its own
     /// inner buffer. The buffer size is set to be 256 bytes. Resort to
-    /// `get_read_handle_with_buf_capacity` if one needs a different buffer size.
-    pub fn get_read_handle(&self) -> StdioReadHandle {
-        let mut inner_buf = Vec::new();
-        inner_buf.resize(256, 0);
-        StdioReadHandle {
-            inner_buf,
+    /// `get_reader_with_buf_capacity` if one needs a different buffer size.
+    pub fn get_reader(&self) -> StdioReader {
+        StdioReader {
+            inner_buf: Box::new([0u8; 256]),
             inner_content_len: 0,
-            core: self.core.clone(),
-            read_handle_lock: Arc::clone(&self.read_handle_lock)
+            read_access: Arc::clone(&self.read_access)
         }
     }
 
-    /// Get a read handle to the stdio buffer with a customized buffer size.
-    /// Note that each read handle has its own inner buffer.
-    pub fn get_read_handle_with_buf_capacity(&self, capacity: usize) -> StdioReadHandle {
+    /// Get a reader to the stdio buffer with a customized buffer size.
+    /// Note that each reader has its own inner buffer.
+    pub fn get_reader_with_buf_capacity(&self, capacity: usize) -> StdioReader {
         let mut inner_buf = Vec::new();
-        inner_buf.resize(capacity, 0);
-        StdioReadHandle {
-            inner_buf,
+        inner_buf.resize(capacity, 0u8);
+        StdioReader {
+            inner_buf: inner_buf.into_boxed_slice(),
             inner_content_len: 0,
-            core: self.core.clone(),
-            read_handle_lock: Arc::clone(&self.read_handle_lock)
+            read_access: Arc::clone(&self.read_access)
         }
     }
 
-    /// Get a write handle to the stdio buffer.
-    pub fn get_write_handle(&self) -> StdioWriteHandle {
-        StdioWriteHandle {
-            core: self.core.clone(),
-            write_handle_lock: Arc::clone(&self.write_handle_lock)
+    /// Get a writer to the stdio buffer.
+    pub fn get_writer(&self) -> StdioWriter {
+        StdioWriter {
+            write_access: Arc::clone(&self.write_access)
         }
     }
 }
 
-impl StdioReadHandle {
-    /// Lock the read handle and return a guard that can perform reading operation to that buffer.
+impl StdioReader {
+    /// Lock the reader and return a guard that can perform reading operation to that buffer.
     /// Note that this lock does not lock the underlying ring buffer. It only excludes other
-    /// read handle from performing simultaneous read, but does *not* prevent a write handle
-    /// to perform writing to the underlying ring buffer.
+    /// readr from performing simultaneous read, but does *not* prevent a writer to perform
+    /// writing to the underlying ring buffer.
     pub fn lock(&self) -> StdioReadGuard {
         StdioReadGuard {
-            _guard: self.read_handle_lock.lock(),
-            core: Arc::clone(&self.core)
+            guard: self.read_access.lock()
         }
     }
 
@@ -198,15 +181,14 @@ impl StdioReadHandle {
     }
 }
 
-impl StdioWriteHandle {
-    /// Lock the write handle and return a guard that can perform writing operation to that buffer.
+impl StdioWriter {
+    /// Lock the writer and return a guard that can perform writing operation to that buffer.
     /// Note that this lock does not lock the underlying ring buffer. It only excludes other
-    /// write handle from performing simultaneous write, but does *not* prevent a read handle
-    /// to perform reading to the underlying ring buffer.
+    /// writer from performing simultaneous write, but does *not* prevent a reader to perform
+    /// reading to the underlying ring buffer.
     pub fn lock(&self) -> StdioWriteGuard {
         StdioWriteGuard {
-            _guard: self.write_handle_lock.lock(),
-            core: Arc::clone(&self.core)
+            guard: self.write_access.lock()
         }
     }
 }
@@ -218,7 +200,7 @@ impl<'a> Read for StdioReadGuard<'a> {
     fn read(&mut self, buf: &mut [u8]) -> Result<usize, core_io::Error> {
         let mut buf_iter = buf.iter_mut();
         let mut cnt: usize = 0;
-        let mut locked_core = self.core.mtx.lock();
+        let mut locked_core = self.guard.lock();
 
         // Keep reading if we have empty space in the output buffer
         // and available byte in the ring buffer.
@@ -239,7 +221,7 @@ impl<'a> Write for StdioWriteGuard<'a> {
     /// does so. Always check the return value when using this method. Otherwise, use `write_all` to
     /// ensure that all given bytes are written.
     fn write(&mut self, buf: &[u8]) -> Result<usize, core_io::Error> {
-        let mut locked_core = self.core.mtx.lock();
+        let mut locked_core = self.guard.lock();
         for byte in buf {
             locked_core.queue.push_back(*byte)
         }
@@ -255,116 +237,116 @@ impl<'a> Write for StdioWriteGuard<'a> {
 impl<'a> StdioReadGuard<'a> {
     /// Check if the EOF flag of the queue has been set.
     pub fn is_eof(&self) -> bool {
-        self.core.mtx.lock().end
+        self.guard.lock().end
     }
 }
 
 impl<'a> StdioWriteGuard<'a> {
     /// Set the EOF flag of the queue to true.
     pub fn set_eof(&mut self) {
-        self.core.mtx.lock().end = true;
+        self.guard.lock().end = true;
     }
 }
 
 pub struct KeyEventQueue {
     /// A ring buffer storing `KeyEvent`.
-    key_event_queue: Arc<IoCore<KeyEvent>>
+    key_event_queue: RingBufferEofRef<KeyEvent>
 }
 
-/// A read handle to keyevent ring buffer.
+/// A reader to keyevent ring buffer.
 #[derive(Clone)]
-pub struct KeyEventQueueReadHandle {
+pub struct KeyEventQueueReader {
     /// Points to the ring buffer storing `KeyEvent`.
-    key_event_queue: Arc<IoCore<KeyEvent>>
+    key_event_queue: RingBufferEofRef<KeyEvent>
 }
 
-/// A write handle to keyevent ring buffer.
+/// A writer to keyevent ring buffer.
 #[derive(Clone)]
-pub struct KeyEventQueueWriteHandle {
+pub struct KeyEventQueueWriter {
     /// Points to the ring buffer storing `KeyEvent`.
-    key_event_queue: Arc<IoCore<KeyEvent>>
+    key_event_queue: RingBufferEofRef<KeyEvent>
 }
 
 impl KeyEventQueue {
     /// Create a new ring buffer storing `KeyEvent`.
     pub fn new() -> KeyEventQueue {
         KeyEventQueue {
-            key_event_queue: Arc::new(IoCore::new())
+            key_event_queue: Arc::new(Mutex::new(RingBufferEof::new()))
         }
     }
 
-    /// Get a read handle to the ring buffer.
-    pub fn get_read_handle(&self) -> KeyEventQueueReadHandle {
-        KeyEventQueueReadHandle {
+    /// Get a reader to the ring buffer.
+    pub fn get_reader(&self) -> KeyEventQueueReader {
+        KeyEventQueueReader {
             key_event_queue: self.key_event_queue.clone()
         }
     }
 
-    /// Get a write handle to the ring buffer.
-    pub fn get_write_handle(&self) -> KeyEventQueueWriteHandle {
-        KeyEventQueueWriteHandle {
+    /// Get a writer to the ring buffer.
+    pub fn get_writer(&self) -> KeyEventQueueWriter {
+        KeyEventQueueWriter {
             key_event_queue: self.key_event_queue.clone()
         }
     }
 }
 
-impl KeyEventQueueReadHandle {
+impl KeyEventQueueReader {
     /// Try to read a keyevent from the ring buffer. It returns `None` if currently
     /// the ring buffer is empty.
     pub fn read_one(&self) -> Option<KeyEvent> {
-        let mut locked_queue = self.key_event_queue.mtx.lock();
+        let mut locked_queue = self.key_event_queue.lock();
         locked_queue.queue.pop_front()
     }
 }
 
-impl KeyEventQueueWriteHandle {
+impl KeyEventQueueWriter {
     /// Push a keyevent into the ring buffer.
     pub fn write_one(&self, key_event: KeyEvent) {
-        let mut locked_queue = self.key_event_queue.mtx.lock();
+        let mut locked_queue = self.key_event_queue.lock();
         locked_queue.queue.push_back(key_event);
     }
 }
 
 /// A structure that allows applications to access keyboard events directly. When
-/// it get instantiated, it *takes* the read handle of the `KeyEventQueue`. When it
-/// goes out of the scope, the taken read handle will be automatically returned back
+/// it get instantiated, it *takes* the reader of the `KeyEventQueue`. When it
+/// goes out of the scope, the taken reader will be automatically returned back
 /// to the shell by `drop()` method.
 pub struct KeyEventConsumerGuard {
-    /// The taken read handle of the `KeyEventQueue`.
-    read_handle: Option<KeyEventQueueReadHandle>,
+    /// The taken reader of the `KeyEventQueue`.
+    reader: Option<KeyEventQueueReader>,
     /// The closure to be excuted on dropping.
-    closure: Box<Fn(KeyEventQueueReadHandle)>
+    closure: Box<dyn Fn(KeyEventQueueReader)>
 }
 
 impl KeyEventConsumerGuard {
-    /// Create a new `KeyEventConsumerGuard`. This function *takes* a read handle
-    /// to `KeyEventQueue`. Thus, the `read_handle` will never be `None` until the
-    /// `drop()` method. We can safely `unwrap()` the `read_handle` field.
-    pub fn new(read_handle: KeyEventQueueReadHandle,
-               closure: Box<Fn(KeyEventQueueReadHandle)>) -> KeyEventConsumerGuard {
+    /// Create a new `KeyEventConsumerGuard`. This function *takes* a reader
+    /// to `KeyEventQueue`. Thus, the `reader` will never be `None` until the
+    /// `drop()` method. We can safely `unwrap()` the `reader` field.
+    pub fn new(reader: KeyEventQueueReader,
+               closure: Box<dyn Fn(KeyEventQueueReader)>) -> KeyEventConsumerGuard {
         KeyEventConsumerGuard {
-            read_handle: Some(read_handle),
+            reader: Some(reader),
             closure
         }
     }
 }
 
 impl Drop for KeyEventConsumerGuard {
-    /// Returns the read handle of `KeyEventQueue` back to shell by executing the
-    /// closure. Note that `read_handle` will never be `None` before `drop()`. So we
+    /// Returns the reader of `KeyEventQueue` back to shell by executing the
+    /// closure. Note that `reader` will never be `None` before `drop()`. So we
     /// can safely call `unwrap()` here. See `new()` method for details.
     fn drop(&mut self) {
-        (self.closure)(self.read_handle.take().unwrap());
+        (self.closure)(self.reader.take().unwrap());
     }
 }
 
 impl Deref for KeyEventConsumerGuard {
-    type Target = KeyEventQueueReadHandle;
+    type Target = KeyEventQueueReader;
 
-    /// It allows us to access the read handle with dot operator. Note that `read_handle`
+    /// It allows us to access the reader with dot operator. Note that `reader`
     /// will never be `None` before `drop()`. So we can safely call `unwrap()` here. See
     /// `new()` method for details.
     fn deref(&self) -> &Self::Target {
-        self.read_handle.as_ref().unwrap()
+        self.reader.as_ref().unwrap()
     }
 }

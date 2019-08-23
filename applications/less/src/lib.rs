@@ -25,7 +25,7 @@ use fs_node::FileOrDir;
 use alloc::collections::BTreeMap;
 use libterm::Terminal;
 use spin::Mutex;
-use stdio::{StdioWriteHandle, KeyEventConsumerGuard};
+use stdio::{StdioWriter, KeyEventConsumerGuard};
 use core_io::Write;
 
 /// The metadata for each line in the file.
@@ -266,7 +266,7 @@ pub fn main(args: Vec<String>) -> isize {
     return 0;
 }
 
-fn print_usage(opts: Options, stdout: StdioWriteHandle) {
+fn print_usage(opts: Options, stdout: StdioWriter) {
     let _ = stdout.lock().write_all(format!("{}\n", opts.usage(USAGE)).as_bytes());
 }
 

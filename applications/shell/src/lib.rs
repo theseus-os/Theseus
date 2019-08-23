@@ -49,10 +49,10 @@ use environment::Environment;
 use alloc::boxed::Box;
 use core::mem;
 use alloc::collections::BTreeMap;
-use stdio::{Stdio, KeyEventQueue, KeyEventQueueReadHandle, KeyEventQueueWriteHandle};
+use stdio::{Stdio, KeyEventQueue, KeyEventQueueReader, KeyEventQueueWriter};
 use core_io::{Read, Write};
 use core::ops::Deref;
-use app_io::{IoHandles, IoControlFlags};
+use app_io::{IoStreams, IoControlFlags};
 
 pub const APPLICATIONS_NAMESPACE_PATH: &'static str = "/namespaces/default/applications";
 
@@ -134,10 +134,10 @@ struct Shell {
     jobs: BTreeMap<isize, Job>,
     /// Map task number to job number.
     task_to_job: BTreeMap<usize, isize>,
-    /// Read handle to the key event queue. Applications can take it.
-    key_event_consumer: Arc<Mutex<Option<KeyEventQueueReadHandle>>>,
-    /// Write handle to the key event queue.
-    key_event_producer: KeyEventQueueWriteHandle,
+    /// Reader to the key event queue. Applications can take it.
+    key_event_consumer: Arc<Mutex<Option<KeyEventQueueReader>>>,
+    /// Writer to the key event queue.
+    key_event_producer: KeyEventQueueWriter,
     /// Foreground job number.
     fg_job_num: Option<isize>,
     /// The string that stores the users keypresses after the prompt
@@ -173,8 +173,8 @@ impl Shell {
         let print_producer = print_consumer.obtain_producer();
 
         let key_event_queue: KeyEventQueue = KeyEventQueue::new();
-        let key_event_producer = key_event_queue.get_write_handle();
-        let key_event_consumer = key_event_queue.get_read_handle();
+        let key_event_producer = key_event_queue.get_writer();
+        let key_event_consumer = key_event_queue.get_reader();
 
         // Sets up the kernel to print to this terminal instance
         print::set_default_print_output(print_producer.obtain_producer());
@@ -374,7 +374,7 @@ impl Shell {
 
                 // Lock the shared structure in `app_io` and then kill the running application
                 app_io::lock_and_execute(Box::new(move |_flags_guard: MutexGuard<BTreeMap<usize, IoControlFlags>>,
-                                                        _handles_guard: MutexGuard<BTreeMap<usize, IoHandles>>| {
+                                                        _streamss_guard: MutexGuard<BTreeMap<usize, IoStreams>>| {
                     match task_ref_copy.kill(KillReason::Requested) {
                         Ok(_) => {
                             if let Err(e) = runqueue::remove_task_from_all(&task_ref_copy) {
@@ -418,7 +418,7 @@ impl Shell {
 
                 // Lock the shared structure in `app_io` and then stop the running application
                 app_io::lock_and_execute(Box::new(move |_flags_guard: MutexGuard<BTreeMap<usize, IoControlFlags>>,
-                                                        _handles_guard: MutexGuard<BTreeMap<usize, IoHandles>>| {
+                                                        _streams_guard: MutexGuard<BTreeMap<usize, IoStreams>>| {
                     task_ref_copy.block();
 
                     // Here we must wait for the running application to stop before releasing the lock,
@@ -441,7 +441,7 @@ impl Shell {
         if keyevent.modifiers.control && keyevent.keycode == Keycode::D {
             if let Some(ref fg_job_num) = self.fg_job_num {
                 if let Some(job) = self.jobs.get(fg_job_num) {
-                    job.stdin.get_write_handle().lock().set_eof();
+                    job.stdin.get_writer().lock().set_eof();
                 }
             }
             return Ok(());
@@ -485,7 +485,7 @@ impl Shell {
                         let mut buffered_string = String::new();
                         mem::swap(&mut buffered_string, &mut self.input_buffer);
                         buffered_string.push('\n');
-                        job.stdin.get_write_handle().lock().write_all(buffered_string.as_bytes())
+                        job.stdin.get_writer().lock().write_all(buffered_string.as_bytes())
                             .or(Err("shell failed to write to stdin"))?;
                     },
                     _ => {}
@@ -597,7 +597,7 @@ impl Shell {
                         self.insert_char_to_input_buff(c, true)?;
                         if let Some(job) = self.jobs.get(&fg_job_num) {
                             if app_io::is_requesting_instant_flush(&job.task_id)? {
-                                job.stdin.get_write_handle().lock().write_all(self.input_buffer.as_bytes())
+                                job.stdin.get_writer().lock().write_all(self.input_buffer.as_bytes())
                                     .or(Err("shell failed to write to stdin"))?;
                                 self.input_buffer.clear();
                             }
@@ -677,18 +677,18 @@ impl Shell {
                     return Err(msg);
                 }
 
-                // Set up IoHandles in `app_io`.
+                // Set up IoStreams in `app_io`.
                 let terminal = app_io::get_terminal_or_default()?;
-                let handles = IoHandles::new(
-                    new_job.stdin.get_read_handle(),
-                    new_job.stdout.get_write_handle(),
-                    new_job.stderr.get_write_handle(),
+                let streams = IoStreams::new(
+                    new_job.stdin.get_reader(),
+                    new_job.stdout.get_writer(),
+                    new_job.stderr.get_writer(),
                     self.key_event_consumer.clone(),
                     terminal
                 );
-                app_io::insert_child_handles(task_id, handles);
+                app_io::insert_child_streams(task_id, streams);
 
-                // All IO handles have been set up for the new task. Safe to unblock it now.
+                // All IO streams have been set up for the new task. Safe to unblock it now.
                 new_job.task.unblock();
 
                 // Allocate a job number for the new job. It will start from 1 and choose the smallest number
@@ -871,7 +871,7 @@ impl Shell {
         for finished_job_num in job_to_be_removed {
             if let Some(job) = self.jobs.remove(&finished_job_num) {
                 self.task_to_job.remove(&job.task.lock().id);
-                app_io::remove_child_handles(&job.task.lock().id);
+                app_io::remove_child_streams(&job.task.lock().id);
             }
         }
 
@@ -914,7 +914,7 @@ impl Shell {
         for (_job_num, job) in self.jobs.iter() {
 
             // Deal with all stdout output.
-            let stdout = job.stdout.get_read_handle();
+            let stdout = job.stdout.get_reader();
             let mut stdout = stdout.lock();
             match stdout.read(&mut buf) {
                 Ok(cnt) => {
@@ -931,7 +931,7 @@ impl Shell {
             };
 
             // Deal with all stderr output.
-            let stderr = job.stderr.get_read_handle();
+            let stderr = job.stderr.get_reader();
             let mut stderr = stderr.lock();
             match stderr.read(&mut buf) {
                 Ok(cnt) => {

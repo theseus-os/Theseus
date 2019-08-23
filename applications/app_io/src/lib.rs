@@ -3,11 +3,11 @@
 //! 
 //! Usage example:
 //! 1. shell spawns a new app, and creates queues of `stdin`, `stdout` and `stderr`
-//! 2. shell stores the read handle of `stdin` and write handle of `stdout` and `stderr` to `app_io`,
-//!    along with the read handle of key event queue and the pointer to the running terminal instance.
-//! 3. app calls app_io::stdin to get the read handle of `stdin`, and can perform reading just like
+//! 2. shell stores the reader of `stdin` and writer of `stdout` and `stderr` to `app_io`,
+//!    along with the reader of key event queue and the pointer to the running terminal instance.
+//! 3. app calls app_io::stdin to get the reader of `stdin`, and can perform reading just like
 //!    using the standard library
-//! 4. app calls app_io::stdout to get the write handle of stdin, and can perform output just like
+//! 4. app calls app_io::stdout to get the writer of stdin, and can perform output just like
 //!    using the standard library
 //! 5. after app exits, shell removes the structure stored in `app_io` and destructs all stdio queues
 
@@ -22,8 +22,8 @@ extern crate keycodes_ascii;
 extern crate libterm;
 extern crate scheduler;
 
-use stdio::{StdioReadHandle, StdioWriteHandle, KeyEventConsumerGuard,
-            KeyEventQueueReadHandle};
+use stdio::{StdioReader, StdioWriter, KeyEventConsumerGuard,
+            KeyEventQueueReader};
 use spin::{Mutex, MutexGuard};
 use alloc::collections::BTreeMap;
 use alloc::boxed::Box;
@@ -34,18 +34,18 @@ use libterm::Terminal;
 
 /// Stores the stdio queues, key event queue and the pointer to the terminal
 /// for applications. This structure is provided for application's use and only
-/// contains necessary one-end handles to queues. On the shell side, we have
+/// contains necessary one-end readers/writers to queues. On the shell side, we have
 /// full control to queues.
-pub struct IoHandles {
-    /// The read handle to stdin.
-    stdin: StdioReadHandle,
-    /// The write handle to stdout.
-    stdout: StdioWriteHandle,
-    /// The write handle to stderr.
-    stderr: StdioWriteHandle,
-    /// The read handle to key event queue. This is the same handle as that in
-    /// shell. Apps can take this handle to directly access keyboard events.
-    key_event_read_handle: Arc<Mutex<Option<KeyEventQueueReadHandle>>>,
+pub struct IoStreams {
+    /// The reader to stdin.
+    stdin: StdioReader,
+    /// The writer to stdout.
+    stdout: StdioWriter,
+    /// The writer to stderr.
+    stderr: StdioWriter,
+    /// The reader to key event queue. This is the same reader as that in
+    /// shell. Apps can take this reader to directly access keyboard events.
+    key_event_reader: Arc<Mutex<Option<KeyEventQueueReader>>>,
     /// Points to the terminal.
     terminal: Arc<Mutex<Terminal>>
 }
@@ -67,16 +67,16 @@ impl IoControlFlags {
     }
 }
 
-impl IoHandles {
-    pub fn new(stdin: StdioReadHandle, stdout: StdioWriteHandle,
-               stderr: StdioWriteHandle,
-               key_event_read_handle: Arc<Mutex<Option<KeyEventQueueReadHandle>>>,
-               terminal: Arc<Mutex<Terminal>>) -> IoHandles {
-        IoHandles {
+impl IoStreams {
+    pub fn new(stdin: StdioReader, stdout: StdioWriter,
+               stderr: StdioWriter,
+               key_event_reader: Arc<Mutex<Option<KeyEventQueueReader>>>,
+               terminal: Arc<Mutex<Terminal>>) -> IoStreams {
+        IoStreams {
             stdin,
             stdout,
             stderr,
-            key_event_read_handle,
+            key_event_reader,
             terminal
         }
     }
@@ -88,18 +88,18 @@ impl IoHandles {
 
 lazy_static! {
     /// Map applications to their IoControlFlags structure. Here the key is the task_id
-    /// of each task. When shells call `insert_child_handles`, the default value is
-    /// automatically inserted for that task. When shells call `remove_child_handles`,
+    /// of each task. When shells call `insert_child_streams`, the default value is
+    /// automatically inserted for that task. When shells call `remove_child_streams`,
     /// the corresponding structure is removed from this map.
     static ref APP_IO_CTRL_FLAGS: Mutex<BTreeMap<usize, IoControlFlags>> = Mutex::new(BTreeMap::new());
 }
 
 lazy_static! {
-    /// Map applications to their IoHandles structure. Here the key is the task_id of
-    /// each task. Shells should call `insert_child_handles` when spawning a new app,
+    /// Map applications to their IoStreams structure. Here the key is the task_id of
+    /// each task. Shells should call `insert_child_streams` when spawning a new app,
     /// which effectively stores a new key value pair to this map. After applications
-    /// exit, shells should call `remove_child_handles` to clean up.
-    static ref APP_IO_HANDLES: Mutex<BTreeMap<usize, IoHandles>> = Mutex::new(BTreeMap::new());
+    /// exit, shells should call `remove_child_streams` to clean up.
+    static ref APP_IO_STREAMS: Mutex<BTreeMap<usize, IoStreams>> = Mutex::new(BTreeMap::new());
 }
 
 lazy_static! {
@@ -120,7 +120,7 @@ pub fn get_terminal_or_default() -> Result<Arc<Mutex<Terminal>>, &'static str> {
     let task_id = task::get_my_current_task_id()
                       .ok_or("Cannot get task ID for getting default terminal")?;
 
-    if let Some(property) = APP_IO_HANDLES.lock().get(&task_id) {
+    if let Some(property) = APP_IO_STREAMS.lock().get(&task_id) {
         return Ok(Arc::clone(&property.terminal));
     }
 
@@ -139,111 +139,111 @@ pub fn get_terminal_or_default() -> Result<Arc<Mutex<Terminal>>, &'static str> {
 /// application from holding the lock of these shared maps before killing it. Otherwise, the
 /// lock will never get a chance to be released. Since we currently don't have stack unwinding.
 pub fn lock_and_execute<'a>(f: Box<dyn Fn(MutexGuard<'a, BTreeMap<usize, IoControlFlags>>,
-                                          MutexGuard<'a, BTreeMap<usize, IoHandles>>)>) {
+                                          MutexGuard<'a, BTreeMap<usize, IoStreams>>)>) {
     let locked_flags = APP_IO_CTRL_FLAGS.lock();
-    let locked_handles = APP_IO_HANDLES.lock();
-    f(locked_flags, locked_handles);
+    let locked_streams = APP_IO_STREAMS.lock();
+    f(locked_flags, locked_streams);
 }
 
-/// Shells call this function to store queue handles and the pointer to terminal for applications.
-/// If there is any existing handles for the task (which should not happen in normal practice),
-/// it returns the old one, otherwise returns None.
-pub fn insert_child_handles(task_id: usize, handles: IoHandles) -> Option<IoHandles> {
+/// Shells call this function to store queue readers/writers and the pointer to terminal for
+/// applications. If there is any existing readers/writers for the task (which should not
+/// happen in normal practice), it returns the old one, otherwise returns None.
+pub fn insert_child_streams(task_id: usize, streams: IoStreams) -> Option<IoStreams> {
     let mut locked_flags = APP_IO_CTRL_FLAGS.lock();
     locked_flags.insert(task_id, IoControlFlags::new());
     core::mem::drop(locked_flags);
-    let mut locked_handles = APP_IO_HANDLES.lock();
-    locked_handles.insert(task_id, handles)
+    let mut locked_streams = APP_IO_STREAMS.lock();
+    locked_streams.insert(task_id, streams)
 }
 
 /// Shells call this function to remove queues and pointer to terminal for applications. It returns
-/// the removed handles in the return value if the key matches, otherwise returns None.
-pub fn remove_child_handles(task_id: &usize) -> Option<IoHandles> {
+/// the removed streams in the return value if the key matches, otherwise returns None.
+pub fn remove_child_streams(task_id: &usize) -> Option<IoStreams> {
     let mut locked_flags = APP_IO_CTRL_FLAGS.lock();
     locked_flags.remove(task_id);
     core::mem::drop(locked_flags);
-    let mut locked_handles = APP_IO_HANDLES.lock();
-    locked_handles.remove(task_id)
+    let mut locked_streams = APP_IO_STREAMS.lock();
+    locked_streams.remove(task_id)
 }
 
-/// Applications call this function to acquire a read handle to its stdin queue.
+/// Applications call this function to acquire a reader to its stdin queue.
 /// 
 /// Errors can occur in two cases. One is when it fails to get the task_id of the calling
-/// task, and the second is that there's no stdin handles stored in the map. Shells should
-/// make sure to store IoHandles for the newly spawned app first, and then unblocks the app
+/// task, and the second is that there's no stdin reader stored in the map. Shells should
+/// make sure to store IoStreams for the newly spawned app first, and then unblocks the app
 /// to let it run.
-pub fn stdin() -> Result<StdioReadHandle, &'static str> {
+pub fn stdin() -> Result<StdioReader, &'static str> {
     let task_id = task::get_my_current_task_id().ok_or("failed to get task_id to get stdin")?;
-    let locked_handles = APP_IO_HANDLES.lock();
-    match locked_handles.get(&task_id) {
+    let locked_streams = APP_IO_STREAMS.lock();
+    match locked_streams.get(&task_id) {
         Some(queues) => Ok(queues.stdin.clone()),
         None => Err("no stdin for this task")
     }
 }
 
-/// Applications call this function to acquire a write handle to its stdout queue.
+/// Applications call this function to acquire a writer to its stdout queue.
 /// 
 /// Errors can occur in two cases. One is when it fails to get the task_id of the calling
-/// task, and the second is that there's no stdout handles stored in the map. Shells should
-/// make sure to store IoHandles for the newly spawned app first, and then unblocks the app
+/// task, and the second is that there's no stdout writer stored in the map. Shells should
+/// make sure to store IoStreams for the newly spawned app first, and then unblocks the app
 /// to let it run.
-pub fn stdout() -> Result<StdioWriteHandle, &'static str> {
+pub fn stdout() -> Result<StdioWriter, &'static str> {
     let task_id = task::get_my_current_task_id().ok_or("failed to get task_id to get stdout")?;
-    let locked_handles = APP_IO_HANDLES.lock();
-    match locked_handles.get(&task_id) {
+    let locked_streams = APP_IO_STREAMS.lock();
+    match locked_streams.get(&task_id) {
         Some(queues) => Ok(queues.stdout.clone()),
         None => Err("no stdout for this task")
     }
 }
 
-/// Applications call this function to acquire a write handle to its stderr queue.
+/// Applications call this function to acquire a writer to its stderr queue.
 /// 
 /// Errors can occur in two cases. One is when it fails to get the task_id of the calling
-/// task, and the second is that there's no stderr handles stored in the map. Shells should
-/// make sure to store IoHandles for the newly spawned app first, and then unblocks the app
+/// task, and the second is that there's no stderr writer stored in the map. Shells should
+/// make sure to store IoStreams for the newly spawned app first, and then unblocks the app
 /// to let it run.
-pub fn stderr() -> Result<StdioWriteHandle, &'static str> {
+pub fn stderr() -> Result<StdioWriter, &'static str> {
     let task_id = task::get_my_current_task_id().ok_or("failed to get task_id to get stderr")?;
-    let locked_handles = APP_IO_HANDLES.lock();
-    match locked_handles.get(&task_id) {
+    let locked_streams = APP_IO_STREAMS.lock();
+    match locked_streams.get(&task_id) {
         Some(queues) => Ok(queues.stderr.clone()),
         None => Err("no stderr for this task")
     }
 }
 
-/// Applications call this function to take read handle to the key event queue to directly
+/// Applications call this function to take reader to the key event queue to directly
 /// access keyboard events.
 /// 
 /// Errors can occur in three cases. One is when it fails to get the task_id of the calling
-/// task, and the second is that there's no stderr handles stored in the map. Shells should
-/// make sure to store IoHandles for the newly spawned app first, and then unblocks the app
-/// to let it run. The third case happens when the read handle of the key event queue has
+/// task, and the second is that there's no key event reader stored in the map. Shells should
+/// make sure to store IoStreams for the newly spawned app first, and then unblocks the app
+/// to let it run. The third case happens when the reader of the key event queue has
 /// already been taken by some other task, which may be running simultaneously, or be killed
-/// prematurely so that it cannot return the key event handle on exit.
+/// prematurely so that it cannot return the key event reader on exit.
 pub fn take_key_event_queue() -> Result<KeyEventConsumerGuard, &'static str> {
     let task_id = task::get_my_current_task_id().ok_or("failed to get task_id to take key event queue")?;
-    let locked_handles = APP_IO_HANDLES.lock();
-    match locked_handles.get(&task_id) {
+    let locked_streams = APP_IO_STREAMS.lock();
+    match locked_streams.get(&task_id) {
         Some(queues) => {
-            match queues.key_event_read_handle.lock().take() {
-                Some(read_handle) => Ok(KeyEventConsumerGuard::new(read_handle,
-                                        Box::new(|read_handle| { return_event_queue(read_handle); }))),
-                None => Err("currently the read handle to key event queue is not available")
+            match queues.key_event_reader.lock().take() {
+                Some(reader) => Ok(KeyEventConsumerGuard::new(reader,
+                                        Box::new(|reader| { return_event_queue(reader); }))),
+                None => Err("currently the reader to key event queue is not available")
             }
         },
-        None => Err("no key event queue handle for this task")
+        None => Err("no key event queue reader for this task")
     }
 }
 
 /// This function is automatically invoked upon dropping of `KeyEventConsumerGuard`.
-/// It returns the read handle of key event queue back to the shell.
-fn return_event_queue(read_handle: KeyEventQueueReadHandle) {
+/// It returns the reader of key event queue back to the shell.
+fn return_event_queue(reader: KeyEventQueueReader) {
     match task::get_my_current_task_id().ok_or("failed to get task_id to return event queue") {
         Ok(task_id) => {
-            let locked_handles = APP_IO_HANDLES.lock();
-            match locked_handles.get(&task_id) {
+            let locked_streams = APP_IO_STREAMS.lock();
+            match locked_streams.get(&task_id) {
                 Some(queues) => {
-                    queues.key_event_read_handle.lock().replace(read_handle);
+                    queues.key_event_reader.lock().replace(reader);
                 },
                 None => { error!("no stderr for this task"); }
             };
