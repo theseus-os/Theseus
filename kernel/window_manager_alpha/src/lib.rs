@@ -1,15 +1,13 @@
-//! Window manager that simulates a desktop environment with alpha channel.
+//! A window manager that simulates a basic desktop environment with an alpha (transparency) channel.
 //! 
-//! windows overlapped each other would obey the rules of alpha channel composition
-//!
-//! Applications request window objects from the window manager through:
-//! - new_window(`x`, `y`, `width`, `height`) provides a new window whose dimensions the caller must specify
-//!
-//! There are three groups of window: `active`, `show_list` and `hide_list`
-//! - `active` window is the only one active, who gets all keyboard event
-//! - `show_list` windows are shown by their up-down relationships, with overlapped part using alpha channel composition
-//! - `hide_list` windows are those not current shown but will be invoked to show later
-//! Window object holder could set itself to active, pushing the last active window (if exists) to the top of show_list
+//! Multiple windows that overlap each other will be show according to conventional alpha blending techniques,
+//! e.g., a transparent window will be rendered with the windows "beneath" it also being visible.
+//! 
+//! Applications can create new window objects for themselves by invoking the `new_window()` function.
+//! There are three groups that each window can be in: `active`, `show_list` and `hide_list`:
+//! - `active`: not really a group, just a single window that is currently "active", i.e., receives all keyboard input events.
+//! - `show_list`: windows that are currently shown on screen, ordered by their z-axis depth.
+//! - `hide_list`: windows that are currently not being shown on screen, but may be shown later.
 //!
 
 #![no_std]
@@ -23,6 +21,7 @@ extern crate event_types;
 extern crate log;
 extern crate frame_buffer_alpha;
 extern crate spawn;
+extern crate mod_mgmt;
 extern crate mouse_data;
 extern crate keycodes_ascii;
 extern crate path;
@@ -75,7 +74,7 @@ const MOUSE_BASIC: [[Pixel; 2*MOUSE_POINTER_HALF_SIZE+1]; 2*MOUSE_POINTER_HALF_S
 const WINDOW_BORDER_SIZE: usize = 3;
 /// border's inner color
 const WINDOW_BORDER_COLOR_INNER: Pixel = Pixel { alpha: 0x00, red: 0xCA, green: 0x6F, blue: 0x1E };
-/// border's outter color
+/// border's outer color
 const WINDOW_BORDER_COLOR_OUTTER: Pixel = Pixel { alpha: 0xFF, red: 0xFF, green: 0xFF, blue: 0xFF };
 
 /// a 2D point
@@ -116,7 +115,6 @@ struct WindowManagerAlpha {
     delay_refresh_first_time: bool,
 }
 
-/// Window manager object that stores non-critical information
 impl WindowManagerAlpha {
 
     /// set one window to active, push last active (if exists) to top of show_list. if `refresh` is `true`, will then refresh the window's area
@@ -678,21 +676,24 @@ pub fn refresh_area_absolute(x_start: isize, x_end: isize, y_start: isize, y_end
 }
 
 /// Initialize the window manager, should provide the consumer of keyboard and mouse event, as well as a frame buffer to draw
-pub fn init(key_consumer: DFQueueConsumer<Event>, mouse_consumer: DFQueueConsumer<Event>, 
-        final_fb: FrameBufferAlpha) -> Result<(), &'static str> {
-    debug!("window manager alpha init called");
+pub fn init(
+    key_consumer: DFQueueConsumer<Event>,
+    mouse_consumer: DFQueueConsumer<Event>,
+    final_fb: FrameBufferAlpha
+) -> Result<(), &'static str> {
+    debug!("Initializing the window manager alpha (transparency)...");
 
     // initialize static window manager
     let delay_refresh_first_time = true;
     let window_manager = WindowManagerAlpha {
-            hide_list: VecDeque::new(),
-            show_list: VecDeque::new(),
-            active: Weak::new(),
-            mouse: Point { x: 0, y: 0 },
-            is_show_border: false,
-            border_position: RectRegion { x_start: 0, x_end: 0, y_start: 0, y_end: 0 },
-            final_fb: final_fb,
-            delay_refresh_first_time: delay_refresh_first_time,
+        hide_list: VecDeque::new(),
+        show_list: VecDeque::new(),
+        active: Weak::new(),
+        mouse: Point { x: 0, y: 0 },
+        is_show_border: false,
+        border_position: RectRegion { x_start: 0, x_end: 0, y_start: 0, y_end: 0 },
+        final_fb: final_fb,
+        delay_refresh_first_time: delay_refresh_first_time,
     };
     WINDOW_MANAGER.call_once(|| Mutex::new(window_manager));
 
@@ -745,10 +746,10 @@ fn window_manager_loop( consumer: (DFQueueConsumer<Event>, DFQueueConsumer<Event
         let event = {
             let ev = match key_consumer.peek() {
                 Some(ev) => ev,
-                _ => { match mouse_consumer.peek() {
+                _ => match mouse_consumer.peek() {
                     Some(ev) => ev,
-                    _ => { continue; }
-                } }
+                    _ => continue,
+                }
             };
             let event = ev.clone();
             ev.mark_completed();
@@ -805,13 +806,31 @@ fn window_manager_loop( consumer: (DFQueueConsumer<Event>, DFQueueConsumer<Event
 
 /// handle keyboard event, push it to the active window if exists
 fn keyboard_handle_application(key_input: KeyEvent) -> Result<(), &'static str> {
-    // first judge whether is system remained keys
+    // Check for WM-level actions here, e.g., spawning a new terminal via Ctrl+Alt+T
     if key_input.modifiers.control && key_input.keycode == Keycode::T && key_input.action == KeyAction::Pressed {
+        // Since the WM currently runs in the kernel, we need to create a new application namespace for the terminal
+        use mod_mgmt::{CrateNamespace, NamespaceDir, metadata::CrateType};
+        let default_kernel_namespace = mod_mgmt::get_default_namespace()
+            .ok_or("default CrateNamespace not yet initialized")?;
+        let new_app_namespace_name = CrateType::Application.namespace_name().to_string();
+        let new_app_namespace_dir = mod_mgmt::get_namespaces_directory()
+            .and_then(|ns_dir| ns_dir.lock().get_dir(&new_app_namespace_name))
+            .ok_or("Couldn't find the directory to create a new application CrateNamespace")?;
+        let new_app_namespace = Arc::new(CrateNamespace::new(
+            new_app_namespace_name,
+            NamespaceDir::new(new_app_namespace_dir),
+            Some(default_kernel_namespace.clone()),
+        ));
+        
         let task_name: String = format!("terminal");
         let args: Vec<String> = vec![]; // terminal::main() does not accept any arguments
-        ApplicationTaskBuilder::new(Path::new(String::from("terminal")))
+        let terminal_obj_file = new_app_namespace.dir().get_file_starting_with("terminal-")
+            .ok_or("Couldn't find terminal application file to run upon Ctrl+Alt+T")?;
+        let path = Path::new(terminal_obj_file.lock().get_absolute_path());
+        ApplicationTaskBuilder::new(path)
             .argument(args)
             .name(task_name)
+            .namespace(new_app_namespace)
             .spawn()?;
     }
     // then pass them to window
