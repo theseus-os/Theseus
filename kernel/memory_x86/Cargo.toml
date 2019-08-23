@@ -7,7 +7,6 @@ build = "../../build.rs"
 
 [dependencies]
 multiboot2 = "0.7.1"
-memory = { path = "../memory" }
 # x86_64 = { git = "https://github.com/kevinaboos/x86_64" }
 x86_64 = { path = "../../libs/x86_64" }
 
@@ -23,6 +22,9 @@ path = "../kernel_config"
 
 [dependencies.heap_irq_safe]
 path = "../heap_irq_safe"
+
+[dependencies.page_table_x86]
+path = "../page_table_x86"
 
 [lib]
 crate-type = ["rlib"]
