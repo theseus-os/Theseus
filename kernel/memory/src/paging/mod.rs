@@ -24,14 +24,11 @@ pub use self::virtual_address_allocator::*;
 
 
 use core::{
-    ops::{RangeInclusive, Add, AddAssign, Sub, SubAssign, Deref, DerefMut},
-    mem,
     fmt,
-    iter::Step,
 };
 use super::*;
 
-use kernel_config::memory::{PAGE_SIZE, MAX_PAGE_NUMBER, RECURSIVE_P4_INDEX};
+use kernel_config::memory::{RECURSIVE_P4_INDEX};
 use kernel_config::memory::{KERNEL_TEXT_P4_INDEX, KERNEL_HEAP_P4_INDEX, KERNEL_STACK_P4_INDEX};
 
 
@@ -425,15 +422,10 @@ pub fn init(allocator_mutex: &MutexIrqSafe<AreaFrameAllocator>, boot_info: &mult
 
             // add virtual memory area occupied by kernel data and code
             let (mut index, 
-                mut text_start, 
-                mut text_end, 
-                mut rodata_start, 
-                mut rodata_end, 
-                mut data_start, 
-                mut data_end, 
-                text_flags,
-                rodata_flags,
-                data_flags,
+                text_start, text_end, 
+                rodata_start, rodata_end, 
+                data_start, data_end, 
+                text_flags, rodata_flags, data_flags,
                 identity_sections) = add_sections_vmem_areas(&boot_info, &mut vmas)?;
 
             // to allow the APs to boot up, we identity map the kernel sections too.

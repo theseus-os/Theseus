@@ -1,16 +1,3 @@
-//! This crate implements the virtual memory subsystem for Theseus,
-//! which is fairly robust and provides a unification between 
-//! arbitrarily mapped sections of memory and Rust's lifetime system. 
-//! Originally based on Phil Opp's blog_os. 
-
-// Wenqiu: remove features
-#![no_std]
-#![feature(asm)]
-#![feature(ptr_internals)]
-#![feature(core_intrinsics)]
-#![feature(unboxed_closures)]
-#![feature(step_trait, range_is_empty)]
-
 use super::*;
 
 /// A virtual memory address, which is a `usize` under the hood.

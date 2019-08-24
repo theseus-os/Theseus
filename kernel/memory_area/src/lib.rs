@@ -4,18 +4,12 @@
 //! Originally based on Phil Opp's blog_os. 
 
 #![no_std]
-#![feature(asm)]
-#![feature(ptr_internals)]
-#![feature(core_intrinsics)]
-#![feature(unboxed_closures)]
-#![feature(step_trait, range_is_empty)]
+#![feature(range_is_empty)]
+#![feature(step_trait)]
 
 extern crate spin;
 extern crate multiboot2;
 extern crate alloc;
-#[macro_use] extern crate lazy_static;
-#[macro_use] extern crate log;
-extern crate irq_safety;
 extern crate kernel_config;
 extern crate atomic_linked_list;
 extern crate xmas_elf;
@@ -55,10 +49,8 @@ use core::{
     fmt
 };
 use spin::Once;
-use irq_safety::MutexIrqSafe;
 use alloc::vec::Vec;
-use alloc::sync::Arc;
-use kernel_config::memory::{PAGE_SIZE, MAX_PAGE_NUMBER, KERNEL_HEAP_START, KERNEL_HEAP_INITIAL_SIZE, KERNEL_STACK_ALLOCATOR_BOTTOM, KERNEL_STACK_ALLOCATOR_TOP_ADDR, KERNEL_HEAP_P4_INDEX, KERNEL_STACK_P4_INDEX, KERNEL_TEXT_P4_INDEX, KERNEL_OFFSET};
+use kernel_config::memory::{PAGE_SIZE, MAX_PAGE_NUMBER};
 use bit_field::BitField;
 use page_table_x86::EntryFlags;
 

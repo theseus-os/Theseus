@@ -10,9 +10,7 @@ extern crate bitflags;
 extern crate multiboot2;
 extern crate xmas_elf;
 
-use x86_64::{registers::control_regs};
-
-use x86_64::{PhysicalAddress, VirtualAddress};
+use x86_64::{registers::control_regs, PhysicalAddress};
 
 bitflags! {
     /// Entry access flag bits.

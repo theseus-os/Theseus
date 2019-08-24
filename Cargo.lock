@@ -864,8 +864,6 @@ dependencies = [
  "heap_irq_safe 0.1.0",
  "irq_safety 0.1.1 (git+https://github.com/kevinaboos/irq_safety)",
  "kernel_config 0.1.0",
- "lazy_static 1.2.0 (registry+https://github.com/rust-lang/crates.io-index)",
- "log 0.3.9 (registry+https://github.com/rust-lang/crates.io-index)",
  "multiboot2 0.7.1 (registry+https://github.com/rust-lang/crates.io-index)",
  "page_table_x86 0.1.0",
  "spin 0.4.10 (registry+https://github.com/rust-lang/crates.io-index)",
@@ -877,8 +875,6 @@ dependencies = [
 name = "memory_x86"
 version = "0.1.0"
 dependencies = [
- "heap_irq_safe 0.1.0",
- "irq_safety 0.1.1 (git+https://github.com/kevinaboos/irq_safety)",
  "kernel_config 0.1.0",
  "log 0.3.9 (registry+https://github.com/rust-lang/crates.io-index)",
  "memory_area 0.1.0",

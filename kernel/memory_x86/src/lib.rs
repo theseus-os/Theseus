@@ -8,14 +8,12 @@
 #![feature(unboxed_closures)]
 #![feature(step_trait, range_is_empty)]
 
-extern crate alloc;
 extern crate multiboot2;
 #[macro_use]
 extern crate log;
-extern crate irq_safety;
-extern crate kernel_config;
 extern crate memory_area;
 extern crate page_table_x86;
+extern crate kernel_config;
 pub extern crate x86_64;
 
 /// Export arch-specific information structure to `memory`.
@@ -24,10 +22,6 @@ pub use multiboot2::BootInformation;
 pub use page_table_x86::{EntryFlags, get_p4_address, set_new_p4};
 pub use x86_64::{instructions::tlb};
 
-use alloc::sync::Arc;
-use alloc::vec::Vec;
-use core::ops::DerefMut;
-use irq_safety::MutexIrqSafe;
 use kernel_config::memory::KERNEL_OFFSET;
 use memory_area::{Frame, PhysicalAddress, PhysicalMemoryArea, VirtualAddress, VirtualMemoryArea};
 use multiboot2::MemoryMapTag;

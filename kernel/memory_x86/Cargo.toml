@@ -14,14 +14,8 @@ x86_64 = { path = "../../libs/x86_64" }
 default-features = false
 version = "0.3.7"
 
-[dependencies.irq_safety]
-git = "https://github.com/kevinaboos/irq_safety"
-
 [dependencies.kernel_config]
 path = "../kernel_config"
-
-[dependencies.heap_irq_safe]
-path = "../heap_irq_safe"
 
 [dependencies.page_table_x86]
 path = "../page_table_x86"

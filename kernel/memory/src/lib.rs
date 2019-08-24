@@ -20,7 +20,7 @@ extern crate kernel_config;
 extern crate atomic_linked_list;
 extern crate xmas_elf;
 extern crate heap_irq_safe;
-#[macro_use] extern crate derive_more;
+extern crate derive_more;
 extern crate bit_field;
 extern crate type_name;
 #[cfg(target_arch = "x86_64")]
@@ -66,15 +66,12 @@ pub use memory_x86::EntryFlags;// Export EntryFlags so that others does not need
 
 use core::{
     ops::{RangeInclusive, Deref, DerefMut},
-    iter::Step,
-    mem,
 };
 use spin::Once;
 use irq_safety::MutexIrqSafe;
 use alloc::vec::Vec;
 use alloc::sync::Arc;
-use kernel_config::memory::{PAGE_SIZE, MAX_PAGE_NUMBER, KERNEL_HEAP_START, KERNEL_HEAP_INITIAL_SIZE, KERNEL_STACK_ALLOCATOR_BOTTOM, KERNEL_STACK_ALLOCATOR_TOP_ADDR, KERNEL_HEAP_P4_INDEX, KERNEL_STACK_P4_INDEX, KERNEL_TEXT_P4_INDEX, KERNEL_OFFSET};
-use bit_field::BitField;
+use kernel_config::memory::{PAGE_SIZE, KERNEL_HEAP_START, KERNEL_HEAP_INITIAL_SIZE, KERNEL_STACK_ALLOCATOR_BOTTOM, KERNEL_STACK_ALLOCATOR_TOP_ADDR, KERNEL_OFFSET};
 
 /// The memory management info and address space of the kernel
 pub static KERNEL_MMI: Once<Arc<MutexIrqSafe<MemoryManagementInfo>>> = Once::new();
