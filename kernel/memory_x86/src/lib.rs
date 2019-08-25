@@ -11,7 +11,7 @@
 extern crate multiboot2;
 #[macro_use]
 extern crate log;
-extern crate memory_area;
+extern crate memory_structs;
 extern crate page_table_x86;
 extern crate kernel_config;
 pub extern crate x86_64;
@@ -23,7 +23,7 @@ pub use page_table_x86::{EntryFlags, get_p4_address, set_new_p4};
 pub use x86_64::{instructions::tlb};
 
 use kernel_config::memory::KERNEL_OFFSET;
-use memory_area::{Frame, PhysicalAddress, PhysicalMemoryArea, VirtualAddress, VirtualMemoryArea};
+use memory_structs::{Frame, PhysicalAddress, PhysicalMemoryArea, VirtualAddress, VirtualMemoryArea};
 use multiboot2::MemoryMapTag;
 
 /// Get the address of memory occupied by the loaded kernel.
@@ -308,7 +308,6 @@ pub fn add_sections_vmem_areas(
             flags,
         );
 
-        debug!("Wenqiu: add identity_section");
         index += 1;
     } // end of section iterator
 

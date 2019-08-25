@@ -1,6 +1,6 @@
 [package]
 authors = ["Wenqiu Yu<yuwenqiu@gmail.com>"]
-name = "memory_area"
+name = "memory_structs"
 description = "The address of memory system."
 version = "0.1.0"
 build = "../../build.rs"

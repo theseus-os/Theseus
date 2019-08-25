@@ -845,7 +845,7 @@ dependencies = [
  "kernel_config 0.1.0",
  "lazy_static 1.2.0 (registry+https://github.com/rust-lang/crates.io-index)",
  "log 0.3.9 (registry+https://github.com/rust-lang/crates.io-index)",
- "memory_area 0.1.0",
+ "memory_structs 0.1.0",
  "memory_x86 0.1.0",
  "multiboot2 0.7.1 (registry+https://github.com/rust-lang/crates.io-index)",
  "spin 0.4.10 (registry+https://github.com/rust-lang/crates.io-index)",
@@ -854,7 +854,7 @@ dependencies = [
 ]
 
 [[package]]
-name = "memory_area"
+name = "memory_structs"
 version = "0.1.0"
 dependencies = [
  "atomic_linked_list 0.1.0",
@@ -877,7 +877,7 @@ version = "0.1.0"
 dependencies = [
  "kernel_config 0.1.0",
  "log 0.3.9 (registry+https://github.com/rust-lang/crates.io-index)",
- "memory_area 0.1.0",
+ "memory_structs 0.1.0",
  "multiboot2 0.7.1 (registry+https://github.com/rust-lang/crates.io-index)",
  "page_table_x86 0.1.0",
  "x86_64 0.1.2",

@@ -20,8 +20,8 @@ path = "../kernel_config"
 [dependencies.page_table_x86]
 path = "../page_table_x86"
 
-[dependencies.memory_area]
-path = "../memory_area"
+[dependencies.memory_structs]
+path = "../memory_structs"
 
 [lib]
 crate-type = ["rlib"]
