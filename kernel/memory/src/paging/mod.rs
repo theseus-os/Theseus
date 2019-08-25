@@ -245,7 +245,7 @@ pub fn init(allocator_mutex: &MutexIrqSafe<AreaFrameAllocator>, boot_info: &mult
                 identity_mapped_pages[i] = Some(
                     mapper.map_frames(
                         FrameRange::from_phys_addr(start_phys_addr, size), 
-                        Page::containing_address(start_virt_addr - KERNEL_OFFSET), 
+                        Page::containing_address(start_virt_addr), 
                         flags,
                         allocator.deref_mut()
                     )?
@@ -283,7 +283,8 @@ pub fn init(allocator_mutex: &MutexIrqSafe<AreaFrameAllocator>, boot_info: &mult
             ));
 
             // map the VGA display memory as writable
-            let (vga_display_phys_addr, vga_display_virt_addr, vga_size_in_bytes, vga_display_flags) = get_vga_mem_addr()?;
+            let (vga_display_phys_addr, vga_size_in_bytes, vga_display_flags) = get_vga_mem_addr()?;
+            let vga_display_virt_addr = VirtualAddress::new_canonical(vga_display_phys_addr.value() + KERNEL_OFFSET);
             higher_half_mapped_pages[index] = Some( try!( mapper.map_frames(
                 FrameRange::from_phys_addr(vga_display_phys_addr, vga_size_in_bytes), 
                 Page::containing_address(vga_display_virt_addr), 

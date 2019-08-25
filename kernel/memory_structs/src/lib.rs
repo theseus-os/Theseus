@@ -30,6 +30,183 @@ use kernel_config::memory::{MAX_PAGE_NUMBER, PAGE_SIZE};
 use page_table_x86::EntryFlags;
 use spin::Once;
 
+/// A virtual memory address, which is a `usize` under the hood.
+#[derive(
+    Clone, Copy, PartialEq, Eq, PartialOrd, Ord, Hash, Default, 
+    Debug, Display, Binary, Octal, LowerHex, UpperHex, 
+    BitAnd, BitOr, BitXor, BitAndAssign, BitOrAssign, BitXorAssign, 
+    Add, Sub, AddAssign, SubAssign
+)]
+#[repr(transparent)]
+pub struct VirtualAddress(usize);
+
+impl VirtualAddress {
+    /// Creates a new `VirtualAddress`,
+    /// checking that the address is canonical,
+    /// i.e., bits (64:48] are sign-extended from bit 47.
+    pub fn new(virt_addr: usize) -> Result<VirtualAddress, &'static str> {
+        match virt_addr.get_bits(47..64) {
+            0 | 0b1_1111_1111_1111_1111 => Ok(VirtualAddress(virt_addr)),
+            _ => Err("VirtualAddress bits 48-63 must be a sign-extension of bit 47"),
+        }
+    }
+
+    /// Creates a new `VirtualAddress` that is guaranteed to be canonical
+    /// by forcing the upper bits (64:48] to be sign-extended from bit 47.
+    pub fn new_canonical(mut virt_addr: usize) -> VirtualAddress {
+        match virt_addr.get_bit(47) {
+            false => virt_addr.set_bits(48..64, 0),
+            true => virt_addr.set_bits(48..64, 0xffff),
+        };
+        VirtualAddress(virt_addr)
+    }
+
+    /// Creates a VirtualAddress with the value 0.
+    pub const fn zero() -> VirtualAddress {
+        VirtualAddress(0)
+    }
+
+    /// Returns the underlying `usize` value for this `VirtualAddress`.
+    #[inline]
+    pub fn value(&self) -> usize {
+        self.0
+    }
+
+    /// Returns the offset that this VirtualAddress specifies into its containing memory Page.
+    ///
+    /// For example, if the PAGE_SIZE is 4KiB, then this will return
+    /// the least significant 12 bits (12:0] of this VirtualAddress.
+    pub fn page_offset(&self) -> usize {
+        self.0 & (PAGE_SIZE - 1)
+    }
+}
+
+impl core::fmt::Pointer for VirtualAddress {
+    fn fmt(&self, f: &mut fmt::Formatter) -> fmt::Result {
+        write!(f, "{:p}", self.0 as *const usize)
+    }
+}
+
+impl Add<usize> for VirtualAddress {
+    type Output = VirtualAddress;
+
+    fn add(self, rhs: usize) -> VirtualAddress {
+        VirtualAddress::new_canonical(self.0.saturating_add(rhs))
+    }
+}
+
+impl AddAssign<usize> for VirtualAddress {
+    fn add_assign(&mut self, rhs: usize) {
+        *self = VirtualAddress::new_canonical(self.0.saturating_add(rhs));
+    }
+}
+
+impl Sub<usize> for VirtualAddress {
+    type Output = VirtualAddress;
+
+    fn sub(self, rhs: usize) -> VirtualAddress {
+        VirtualAddress::new_canonical(self.0.saturating_sub(rhs))
+    }
+}
+
+impl SubAssign<usize> for VirtualAddress {
+    fn sub_assign(&mut self, rhs: usize) {
+        *self = VirtualAddress::new_canonical(self.0.saturating_sub(rhs));
+    }
+}
+
+impl From<VirtualAddress> for usize {
+    #[inline]
+    fn from(virt_addr: VirtualAddress) -> usize {
+        virt_addr.0
+    }
+}
+
+
+/// A physical memory address, which is a `usize` under the hood.
+#[derive(
+    Clone, Copy, PartialEq, Eq, PartialOrd, Ord, Hash, Default,
+    Debug, Display, Binary, Octal, LowerHex, UpperHex, 
+    BitAnd, BitOr, BitXor, BitAndAssign, BitOrAssign, BitXorAssign,
+    Add, Sub, Mul, Div, Rem, Shr, Shl,
+    AddAssign, SubAssign, MulAssign, DivAssign, RemAssign, ShrAssign, ShlAssign,
+)]
+#[repr(transparent)]
+pub struct PhysicalAddress(usize);
+
+impl PhysicalAddress {
+    /// Creates a new `PhysicalAddress`,
+    /// checking that the bits (64:52] are 0.
+    pub fn new(phys_addr: usize) -> Result<PhysicalAddress, &'static str> {
+        match phys_addr.get_bits(52..64) {
+            0 => Ok(PhysicalAddress(phys_addr)),
+            _ => Err("PhysicalAddress bits 52-63 must be zero"),
+        }
+    }
+
+    /// Creates a new `PhysicalAddress` that is guaranteed to be canonical
+    /// by forcing the upper bits (64:52] to be 0.
+    pub fn new_canonical(mut phys_addr: usize) -> PhysicalAddress {
+        phys_addr.set_bits(52..64, 0);
+        PhysicalAddress(phys_addr)
+    }
+
+    /// Returns the underlying `usize` value for this `PhysicalAddress`.
+    #[inline]
+    pub fn value(&self) -> usize {
+        self.0
+    }
+
+    /// Creates a PhysicalAddress with the value 0.
+    pub const fn zero() -> PhysicalAddress {
+        PhysicalAddress(0)
+    }
+
+    /// Returns the offset that this PhysicalAddress specifies into its containing memory Frame.
+    ///
+    /// For example, if the PAGE_SIZE is 4KiB, then this will return
+    /// the least significant 12 bits (12:0] of this PhysicalAddress.
+    pub fn frame_offset(&self) -> usize {
+        self.0 & (PAGE_SIZE - 1)
+    }
+}
+
+impl Add<usize> for PhysicalAddress {
+    type Output = PhysicalAddress;
+
+    fn add(self, rhs: usize) -> PhysicalAddress {
+        PhysicalAddress::new_canonical(self.0.saturating_add(rhs))
+    }
+}
+
+impl AddAssign<usize> for PhysicalAddress {
+    fn add_assign(&mut self, rhs: usize) {
+        *self = PhysicalAddress::new_canonical(self.0.saturating_add(rhs));
+    }
+}
+
+impl Sub<usize> for PhysicalAddress {
+    type Output = PhysicalAddress;
+
+    fn sub(self, rhs: usize) -> PhysicalAddress {
+        PhysicalAddress::new_canonical(self.0.saturating_sub(rhs))
+    }
+}
+
+impl SubAssign<usize> for PhysicalAddress {
+    fn sub_assign(&mut self, rhs: usize) {
+        *self = PhysicalAddress::new_canonical(self.0.saturating_sub(rhs));
+    }
+}
+
+impl From<PhysicalAddress> for usize {
+    #[inline]
+    fn from(virt_addr: PhysicalAddress) -> usize {
+        virt_addr.0
+    }
+}
+
+
 /// An area of physical memory.
 #[derive(Copy, Clone, Debug, Default)]
 #[repr(C)]
@@ -54,6 +231,66 @@ impl PhysicalMemoryArea {
         }
     }
 }
+
+
+/// A region of virtual memory that is mapped into a [`Task`](../task/struct.Task.html)'s address space
+#[derive(Debug, Default, Clone, PartialEq)]
+pub struct VirtualMemoryArea {
+    start: VirtualAddress,
+    size: usize,
+    flags: EntryFlags,
+    desc: &'static str,
+}
+
+impl fmt::Display for VirtualMemoryArea {
+    fn fmt(&self, f: &mut fmt::Formatter) -> fmt::Result {
+        write!(
+            f,
+            "start: {:#X}, size: {:#X}, flags: {:#X}, desc: {}",
+            self.start, self.size, self.flags, self.desc
+        )
+    }
+}
+
+impl VirtualMemoryArea {
+    pub fn new(start: VirtualAddress, size: usize, flags: EntryFlags, desc: &'static str) -> Self {
+        VirtualMemoryArea {
+            start: start,
+            size: size,
+            flags: flags,
+            desc: desc,
+        }
+    }
+
+    pub fn start_address(&self) -> VirtualAddress {
+        self.start
+    }
+
+    pub fn size(&self) -> usize {
+        self.size
+    }
+
+    pub fn flags(&self) -> EntryFlags {
+        self.flags
+    }
+
+    pub fn desc(&self) -> &'static str {
+        self.desc
+    }
+
+    /// Get an iterator that covers all the pages in this VirtualMemoryArea
+    pub fn pages(&self) -> PageRange {
+        // check that the end_page won't be invalid
+        if (self.start.value() + self.size) < 1 {
+            return PageRange::empty();
+        }
+
+        let start_page = Page::containing_address(self.start);
+        let end_page = Page::containing_address(self.start + self.size - 1);
+        PageRange::new(start_page, end_page)
+    }
+}
+
 
 /// A `Frame` is a chunk of **physical** memory,
 /// similar to how a `Page` is a chunk of **virtual** memory.
@@ -233,72 +470,8 @@ impl IntoIterator for FrameRange {
     }
 }
 
-pub trait FrameAllocator {
-    fn allocate_frame(&mut self) -> Option<Frame>;
-    fn allocate_frames(&mut self, num_frames: usize) -> Option<FrameRange>;
-    fn deallocate_frame(&mut self, frame: Frame);
-    /// Call this when a heap is set up, and the `alloc` types can be used.
-    fn alloc_ready(&mut self);
-}
 
-/// A region of virtual memory that is mapped into a [`Task`](../task/struct.Task.html)'s address space
-#[derive(Debug, Default, Clone, PartialEq)]
-pub struct VirtualMemoryArea {
-    start: VirtualAddress,
-    size: usize,
-    flags: EntryFlags,
-    desc: &'static str,
-}
-
-impl fmt::Display for VirtualMemoryArea {
-    fn fmt(&self, f: &mut fmt::Formatter) -> fmt::Result {
-        write!(
-            f,
-            "start: {:#X}, size: {:#X}, flags: {:#X}, desc: {}",
-            self.start, self.size, self.flags, self.desc
-        )
-    }
-}
-
-impl VirtualMemoryArea {
-    pub fn new(start: VirtualAddress, size: usize, flags: EntryFlags, desc: &'static str) -> Self {
-        VirtualMemoryArea {
-            start: start,
-            size: size,
-            flags: flags,
-            desc: desc,
-        }
-    }
-
-    pub fn start_address(&self) -> VirtualAddress {
-        self.start
-    }
-
-    pub fn size(&self) -> usize {
-        self.size
-    }
-
-    pub fn flags(&self) -> EntryFlags {
-        self.flags
-    }
-
-    pub fn desc(&self) -> &'static str {
-        self.desc
-    }
-
-    /// Get an iterator that covers all the pages in this VirtualMemoryArea
-    pub fn pages(&self) -> PageRange {
-        // check that the end_page won't be invalid
-        if (self.start.value() + self.size) < 1 {
-            return PageRange::empty();
-        }
-
-        let start_page = Page::containing_address(self.start);
-        let end_page = Page::containing_address(self.start + self.size - 1);
-        PageRange::new(start_page, end_page)
-    }
-}
-
+/// A virtual memory page, which contains the index of the page
 #[derive(Clone, Copy, PartialEq, Eq, PartialOrd, Ord)]
 pub struct Page {
     number: usize,
@@ -483,229 +656,5 @@ impl IntoIterator for PageRange {
 
     fn into_iter(self) -> Self::IntoIter {
         self.0
-    }
-}
-
-/// A virtual memory address, which is a `usize` under the hood.
-#[derive(
-    Clone,
-    Copy,
-    PartialEq,
-    Eq,
-    PartialOrd,
-    Ord,
-    Hash,
-    Default,
-    Debug,
-    Display,
-    Binary,
-    Octal,
-    LowerHex,
-    UpperHex,
-    BitAnd,
-    BitOr,
-    BitXor,
-    BitAndAssign,
-    BitOrAssign,
-    BitXorAssign,
-    Add,
-    Sub,
-    AddAssign,
-    SubAssign,
-)]
-#[repr(transparent)]
-pub struct VirtualAddress(usize);
-
-impl VirtualAddress {
-    /// Creates a new `VirtualAddress`,
-    /// checking that the address is canonical,
-    /// i.e., bits (64:48] are sign-extended from bit 47.
-    pub fn new(virt_addr: usize) -> Result<VirtualAddress, &'static str> {
-        match virt_addr.get_bits(47..64) {
-            0 | 0b1_1111_1111_1111_1111 => Ok(VirtualAddress(virt_addr)),
-            _ => Err("VirtualAddress bits 48-63 must be a sign-extension of bit 47"),
-        }
-    }
-
-    /// Creates a new `VirtualAddress` that is guaranteed to be canonical
-    /// by forcing the upper bits (64:48] to be sign-extended from bit 47.
-    pub fn new_canonical(mut virt_addr: usize) -> VirtualAddress {
-        match virt_addr.get_bit(47) {
-            false => virt_addr.set_bits(48..64, 0),
-            true => virt_addr.set_bits(48..64, 0xffff),
-        };
-        VirtualAddress(virt_addr)
-    }
-
-    /// Creates a VirtualAddress with the value 0.
-    pub const fn zero() -> VirtualAddress {
-        VirtualAddress(0)
-    }
-
-    /// Returns the underlying `usize` value for this `VirtualAddress`.
-    #[inline]
-    pub fn value(&self) -> usize {
-        self.0
-    }
-
-    /// Returns the offset that this VirtualAddress specifies into its containing memory Page.
-    ///
-    /// For example, if the PAGE_SIZE is 4KiB, then this will return
-    /// the least significant 12 bits (12:0] of this VirtualAddress.
-    pub fn page_offset(&self) -> usize {
-        self.0 & (PAGE_SIZE - 1)
-    }
-}
-
-impl core::fmt::Pointer for VirtualAddress {
-    fn fmt(&self, f: &mut fmt::Formatter) -> fmt::Result {
-        write!(f, "{:p}", self.0 as *const usize)
-    }
-}
-
-impl Add<usize> for VirtualAddress {
-    type Output = VirtualAddress;
-
-    fn add(self, rhs: usize) -> VirtualAddress {
-        VirtualAddress::new_canonical(self.0.saturating_add(rhs))
-    }
-}
-
-impl AddAssign<usize> for VirtualAddress {
-    fn add_assign(&mut self, rhs: usize) {
-        *self = VirtualAddress::new_canonical(self.0.saturating_add(rhs));
-    }
-}
-
-impl Sub<usize> for VirtualAddress {
-    type Output = VirtualAddress;
-
-    fn sub(self, rhs: usize) -> VirtualAddress {
-        VirtualAddress::new_canonical(self.0.saturating_sub(rhs))
-    }
-}
-
-impl SubAssign<usize> for VirtualAddress {
-    fn sub_assign(&mut self, rhs: usize) {
-        *self = VirtualAddress::new_canonical(self.0.saturating_sub(rhs));
-    }
-}
-
-impl From<VirtualAddress> for usize {
-    #[inline]
-    fn from(virt_addr: VirtualAddress) -> usize {
-        virt_addr.0
-    }
-}
-
-/// A physical memory address, which is a `usize` under the hood.
-#[derive(
-    Clone,
-    Copy,
-    PartialEq,
-    Eq,
-    PartialOrd,
-    Ord,
-    Hash,
-    Default,
-    Debug,
-    Display,
-    Binary,
-    Octal,
-    LowerHex,
-    UpperHex,
-    BitAnd,
-    BitOr,
-    BitXor,
-    BitAndAssign,
-    BitOrAssign,
-    BitXorAssign,
-    Add,
-    Sub,
-    Mul,
-    Div,
-    Rem,
-    Shr,
-    Shl,
-    AddAssign,
-    SubAssign,
-    MulAssign,
-    DivAssign,
-    RemAssign,
-    ShrAssign,
-    ShlAssign,
-)]
-#[repr(transparent)]
-pub struct PhysicalAddress(usize);
-
-impl PhysicalAddress {
-    /// Creates a new `PhysicalAddress`,
-    /// checking that the bits (64:52] are 0.
-    pub fn new(phys_addr: usize) -> Result<PhysicalAddress, &'static str> {
-        match phys_addr.get_bits(52..64) {
-            0 => Ok(PhysicalAddress(phys_addr)),
-            _ => Err("PhysicalAddress bits 52-63 must be zero"),
-        }
-    }
-
-    /// Creates a new `PhysicalAddress` that is guaranteed to be canonical
-    /// by forcing the upper bits (64:52] to be 0.
-    pub fn new_canonical(mut phys_addr: usize) -> PhysicalAddress {
-        phys_addr.set_bits(52..64, 0);
-        PhysicalAddress(phys_addr)
-    }
-
-    /// Returns the underlying `usize` value for this `PhysicalAddress`.
-    #[inline]
-    pub fn value(&self) -> usize {
-        self.0
-    }
-
-    /// Creates a PhysicalAddress with the value 0.
-    pub const fn zero() -> PhysicalAddress {
-        PhysicalAddress(0)
-    }
-
-    /// Returns the offset that this PhysicalAddress specifies into its containing memory Frame.
-    ///
-    /// For example, if the PAGE_SIZE is 4KiB, then this will return
-    /// the least significant 12 bits (12:0] of this PhysicalAddress.
-    pub fn frame_offset(&self) -> usize {
-        self.0 & (PAGE_SIZE - 1)
-    }
-}
-
-impl Add<usize> for PhysicalAddress {
-    type Output = PhysicalAddress;
-
-    fn add(self, rhs: usize) -> PhysicalAddress {
-        PhysicalAddress::new_canonical(self.0.saturating_add(rhs))
-    }
-}
-
-impl AddAssign<usize> for PhysicalAddress {
-    fn add_assign(&mut self, rhs: usize) {
-        *self = PhysicalAddress::new_canonical(self.0.saturating_add(rhs));
-    }
-}
-
-impl Sub<usize> for PhysicalAddress {
-    type Output = PhysicalAddress;
-
-    fn sub(self, rhs: usize) -> PhysicalAddress {
-        PhysicalAddress::new_canonical(self.0.saturating_sub(rhs))
-    }
-}
-
-impl SubAssign<usize> for PhysicalAddress {
-    fn sub_assign(&mut self, rhs: usize) {
-        *self = PhysicalAddress::new_canonical(self.0.saturating_sub(rhs));
-    }
-}
-
-impl From<PhysicalAddress> for usize {
-    #[inline]
-    fn from(virt_addr: PhysicalAddress) -> usize {
-        virt_addr.0
     }
 }

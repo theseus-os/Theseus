@@ -72,7 +72,7 @@ use alloc::sync::Arc;
 use kernel_config::memory::{PAGE_SIZE, KERNEL_HEAP_START, KERNEL_HEAP_INITIAL_SIZE, KERNEL_STACK_ALLOCATOR_BOTTOM, KERNEL_STACK_ALLOCATOR_TOP_ADDR, KERNEL_OFFSET};
 
 /// The memory management info and address space of the kernel
-pub static KERNEL_MMI: Once<Arc<MutexIrqSafe<MemoryManagementInfo>>> = Once::new();
+static KERNEL_MMI: Once<Arc<MutexIrqSafe<MemoryManagementInfo>>> = Once::new();
 
 /// returns a cloned reference to the kernel's `MemoryManagementInfo`, if initialized.
 /// If not, it returns None.
@@ -211,7 +211,7 @@ pub fn init(boot_info: &BootInformation)
     // print_early!("Modules physical memory region: start {:#X} to end {:#X}", modules_start, modules_end);
 
     let mut occupied: [PhysicalMemoryArea; 32] = Default::default();
-    let mut occup_index = 0;  
+    let mut occup_index = 0;
     occupied[occup_index] = PhysicalMemoryArea::new(PhysicalAddress::zero(), 0x10_0000, 1, 0); // reserve addresses under 1 MB
     occup_index += 1;
     occupied[occup_index] = PhysicalMemoryArea::new(kernel_phys_start, kernel_phys_end.value() - kernel_phys_start.value(), 1, 0); // the kernel boot image is already in use
@@ -222,6 +222,7 @@ pub fn init(boot_info: &BootInformation)
     occup_index += 1;
     occupied[occup_index] = PhysicalMemoryArea::new(PhysicalAddress::new(modules_start)?, modules_end - modules_start, 1, 0); // preserve all modules
     occup_index += 1;
+
 
     // init the frame allocator with the available memory sections and the occupied memory sections
     let fa = AreaFrameAllocator::new(available, avail_len, occupied, occup_index)?;

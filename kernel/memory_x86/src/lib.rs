@@ -1,5 +1,6 @@
 //! This crate implements the virtual memory subsystem interfaces for Theseus on x86_64.
-//! `memory_interface` uses this crate to manipulate the memory subsystem on x86_64;
+//! `memory` uses this crate to get the memory layout and other arch-specific information on x86_64;
+//! This is top arch-specific memory crate. All arch-specific definitions of memory system are exported in this crate.
 
 #![no_std]
 #![feature(asm)]
@@ -9,16 +10,14 @@
 #![feature(step_trait, range_is_empty)]
 
 extern crate multiboot2;
-#[macro_use]
-extern crate log;
+#[macro_use] extern crate log;
 extern crate kernel_config;
 extern crate memory_structs;
 extern crate page_table_x86;
 pub extern crate x86_64;
 
-/// Export arch-specific information structure to `memory`.
+// Export arch-specific definitions to `memory`.
 pub use multiboot2::BootInformation;
-/// This is top arch-specific memory crate. Export all memory-related definitions here.
 pub use page_table_x86::{get_p4_address, set_new_p4, EntryFlags};
 pub use x86_64::instructions::tlb;
 
@@ -33,7 +32,7 @@ use multiboot2::MemoryMapTag;
 ///
 ///  * The kernel's start physical address,
 ///  * the kernel's end physical address,
-///  * the kernels' end virtual address
+///  * the kernels' end virtual address.
 pub fn get_kernel_address(
     boot_info: &BootInformation,
 ) -> Result<(PhysicalAddress, PhysicalAddress, VirtualAddress), &'static str> {
@@ -73,12 +72,12 @@ pub fn get_kernel_address(
 /// Returns the following tuple, if successful:
 ///
 ///  * A list of avaiable physical memory areas,
-///  * the number of occupied areas, i.e. the index of the next ,
-///  * the kernels' end virtual address
+///  * the number of occupied areas.
 pub fn get_available_memory(
     boot_info: &BootInformation,
     kernel_phys_end: PhysicalAddress,
 ) -> Result<([PhysicalMemoryArea; 32], usize), &'static str> {
+    // parse the list of physical memory areas from multiboot
     let mut available: [PhysicalMemoryArea; 32] = Default::default();
     let mut avail_index = 0;
     let memory_map_tag = boot_info
@@ -124,7 +123,7 @@ pub fn get_available_memory(
     Ok((available, avail_index))
 }
 
-/// Calculate the bounds of physical memory that is occupied by modules we've loaded.
+/// Get the bounds of physical memory that is occupied by loaded modules. 
 /// Returns (start_address, end_address).
 pub fn get_modules_address(boot_info: &BootInformation) -> (usize, usize) {
     let mut mod_min = usize::max_value();
@@ -138,7 +137,7 @@ pub fn get_modules_address(boot_info: &BootInformation) -> (usize, usize) {
     (mod_min, mod_max)
 }
 
-/// Get the physical memory area occupied by the multiboot information
+/// Get the physical memory area occupied by the boot loader information.
 pub fn get_boot_info_mem_area(
     boot_info: &BootInformation,
 ) -> Result<PhysicalMemoryArea, &'static str> {
@@ -150,6 +149,8 @@ pub fn get_boot_info_mem_area(
     ))
 }
 
+/// Get the address of the boot loader information. 
+/// Returns (start_address, end_address). 
 pub fn get_boot_info_address(
     boot_info: &BootInformation,
 ) -> Result<(VirtualAddress, VirtualAddress), &'static str> {
@@ -158,6 +159,18 @@ pub fn get_boot_info_address(
     Ok((boot_info_start_vaddr, boot_info_end_vaddr))
 }
 
+/// Add the virtual memory areas occupied by kernel code and data containing sections .init, .text, .rodata, .data, .bss. 
+/// Returns the following tuple, if successful:
+///  * The number of added memory areas,
+///  * the start address of text,
+///  * the end address of text,
+///  * the start address of rodata,
+///  * the end address of rodata,
+///  * the start address of data,
+///  * the entryflags of text,
+///  * the entryflags of rodata,
+///  * the entryflags of data,
+///  * a list of lower half section addresses to be mapped to identical addresses. The items are in the form (start_physical_address, start_virtual_address, section_size, entryflags).
 pub fn add_sections_vmem_areas(
     boot_info: &BootInformation,
     vmas: &mut [VirtualMemoryArea; 32],
@@ -296,9 +309,10 @@ pub fn add_sections_vmem_areas(
             vmas[index]
         );
 
+        // These sections will be mapped to identical lower half addresses. 
         identity_sections[index] = (
             start_phys_addr,
-            start_virt_addr,
+            start_virt_addr - KERNEL_OFFSET,
             section.size() as usize,
             flags,
         );
@@ -308,32 +322,27 @@ pub fn add_sections_vmem_areas(
 
     Ok((
         index,
-        text_start,
-        text_end,
-        rodata_start,
-        rodata_end,
-        data_start,
-        data_end,
-        text_flags,
-        rodata_flags,
-        data_flags,
+        text_start, text_end,
+        rodata_start, rodata_end,
+        data_start, data_end,
+        text_flags, rodata_flags, data_flags,
         identity_sections,
     ))
 }
 
+
+/// Get the address of memory occupied by vga. 
+/// Returns(start_physical_address, size, entryflags). 
 pub fn get_vga_mem_addr(
-) -> Result<(PhysicalAddress, VirtualAddress, usize, EntryFlags), &'static str> {
+) -> Result<(PhysicalAddress, usize, EntryFlags), &'static str> {
     const VGA_DISPLAY_PHYS_START: usize = 0xA_0000;
     const VGA_DISPLAY_PHYS_END: usize = 0xC_0000;
     let vga_size_in_bytes: usize = VGA_DISPLAY_PHYS_END - VGA_DISPLAY_PHYS_START;
-    let vga_display_virt_addr =
-        VirtualAddress::new_canonical(VGA_DISPLAY_PHYS_START + KERNEL_OFFSET);
     let vga_display_flags =
         EntryFlags::PRESENT | EntryFlags::WRITABLE | EntryFlags::GLOBAL | EntryFlags::NO_CACHE;
 
     Ok((
         PhysicalAddress::new(VGA_DISPLAY_PHYS_START)?,
-        vga_display_virt_addr,
         vga_size_in_bytes,
         vga_display_flags,
     ))

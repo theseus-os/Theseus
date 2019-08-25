@@ -1,12 +1,11 @@
-//! This crate contains arch-specific structures and functions related to MMU.  
-//! Definitions in this crate should be exported from `memory` for general use.
+//! This crate contains arch-specific structures and functions related to MMU.
+//! Definitions in this crate should be exported from `memory_x86` for upper-level crates.
 
 #![no_std]
 
 extern crate kernel_config;
 extern crate x86_64;
-#[macro_use]
-extern crate bitflags;
+#[macro_use] extern crate bitflags;
 extern crate multiboot2;
 extern crate xmas_elf;
 
@@ -55,7 +54,7 @@ impl EntryFlags {
         self.contains(EntryFlags::PRESENT) && !self.contains(EntryFlags::HUGE_PAGE)
     }
 
-    /// Set the page the entry points to as writable.
+    /// Set the entryflags as writable.
     /// For x86 set the `PRESENT` and `WRITABLE` bits of the flags.
     pub fn set_writable(&self) -> EntryFlags {
         self.clone() | EntryFlags::rw_flags()
@@ -73,6 +72,7 @@ impl EntryFlags {
         !self.intersects(EntryFlags::NO_EXECUTE)
     }
 
+    /// Get flags according to the properties of a section from multiboot2.
     pub fn from_multiboot2_section_flags(section: &multiboot2::ElfSection) -> EntryFlags {
         use multiboot2::ElfSectionFlags;
 
@@ -92,6 +92,7 @@ impl EntryFlags {
         flags
     }
 
+    /// Get flags according to the properties of a section from elf flags.
     pub fn from_elf_section_flags(elf_flags: u64) -> EntryFlags {
         use xmas_elf::sections::{SHF_ALLOC, SHF_EXECINSTR, SHF_WRITE};
 
@@ -112,6 +113,7 @@ impl EntryFlags {
         flags
     }
 
+    /// Get flags according to the properties of program. 
     pub fn from_elf_program_flags(prog_flags: xmas_elf::program::Flags) -> EntryFlags {
         let mut flags = EntryFlags::empty();
 
