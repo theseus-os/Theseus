@@ -17,10 +17,12 @@
 #[macro_use] extern crate log;
 extern crate stdio;
 extern crate spin;
-extern crate alloc;
+#[macro_use] extern crate alloc;
 extern crate keycodes_ascii;
 extern crate libterm;
 extern crate scheduler;
+extern crate serial_port;
+extern crate core_io;
 
 use stdio::{StdioReader, StdioWriter, KeyEventReadGuard,
             KeyEventQueueReader};
@@ -301,6 +303,62 @@ pub fn is_requesting_instant_flush(task_id: &usize) -> Result<bool, &'static str
         },
         None => Err("no io control flags for this task")
     }
+}
+
+/// Calls `print!()` with an extra newline ('\n') appended to the end. 
+#[macro_export]
+macro_rules! println {
+    ($fmt:expr) => (print!(concat!($fmt, "\n")));
+    ($fmt:expr, $($arg:tt)*) => (print!(concat!($fmt, "\n"), $($arg)*));
+
+}
+
+/// The main printing macro, which simply pushes an output event to the input_event_manager's event queue. 
+/// This ensures that only one thread (the input_event_manager acting as a consumer) ever accesses the GUI.
+#[macro_export]
+macro_rules! print {
+    ($($arg:tt)*) => ({
+        $crate::print_to_stdout_args(format_args!($($arg)*));
+    });
+}
+
+use core::fmt;
+use core_io::Write;
+/// Converts the given `core::fmt::Arguments` to a `String` and enqueues the string into the correct
+/// terminal print-producer
+pub fn print_to_stdout_args(fmt_args: fmt::Arguments) {
+    let task_id = match task::get_my_current_task_id() {
+        Some(task_id) => task_id,
+        None => {
+            // We cannot use log macros here, because when they're mirrored to the vga, they will cause
+            // infinite loops on an error. Instead, we write direclty to the serial port. 
+            let _ = serial_port::write_fmt_log(
+                "\x1b[31m", "[E] ",
+                format_args!("error in print!/println! macro: failed to get current task id"), "\x1b[0m\n"
+            );
+            return;
+        }
+    };
+
+    // Obtains the correct stdout stream and push the output bytes.
+    let locked_streams = APP_IO_STREAMS.lock();
+    match locked_streams.get(&task_id) {
+        Some(queues) => {
+            if let Err(_) = queues.stdout.lock().write_all(format!("{}", fmt_args).as_bytes()) {
+                let _ = serial_port::write_fmt_log(
+                    "\x1b[31m", "[E] ",
+                    format_args!("failed to write to stdout"), "\x1b[0m\n"
+                );
+            }
+        },
+        None => {
+            let _ = serial_port::write_fmt_log(
+                "\x1b[31m", "[E] ",
+                format_args!("error in print!/println! macro: no stdout queue for current task"), "\x1b[0m\n"
+            );
+            return;
+        }
+    };
 }
 
 #[no_mangle]

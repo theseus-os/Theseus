@@ -9,6 +9,7 @@ build = "../../build.rs"
 [dependencies]
 spin = "0.4.10"
 x86_64 = { path = "../../libs/x86_64" }
+core_io = "0.1"
 
 [dependencies.log]
 default-features = false
@@ -38,6 +39,9 @@ path = "../../libs/stdio"
 
 [dependencies.scheduler]
 path = "../../kernel/scheduler"
+
+[dependencies.serial_port]
+path = "../../kernel/serial_port"
 
 [lib]
 crate-type = ["rlib"]
