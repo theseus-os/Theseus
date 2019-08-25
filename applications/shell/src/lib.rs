@@ -50,7 +50,7 @@ use alloc::boxed::Box;
 use core::mem;
 use alloc::collections::BTreeMap;
 use stdio::{Stdio, KeyEventQueue, KeyEventQueueReader, KeyEventQueueWriter};
-use core_io::{Read, Write};
+use core_io::Write;
 use core::ops::Deref;
 use app_io::{IoStreams, IoControlFlags};
 
@@ -916,7 +916,7 @@ impl Shell {
             // Deal with all stdout output.
             let stdout = job.stdout.get_reader();
             let mut stdout = stdout.lock();
-            match stdout.read(&mut buf) {
+            match stdout.try_read(&mut buf) {
                 Ok(cnt) => {
                     mem::drop(stdout);
                     let s = String::from_utf8_lossy(&buf[0..cnt]);
@@ -933,7 +933,7 @@ impl Shell {
             // Deal with all stderr output.
             let stderr = job.stderr.get_reader();
             let mut stderr = stderr.lock();
-            match stderr.read(&mut buf) {
+            match stderr.try_read(&mut buf) {
                 Ok(cnt) => {
                     mem::drop(stderr);
                     let s = String::from_utf8_lossy(&buf[0..cnt]);

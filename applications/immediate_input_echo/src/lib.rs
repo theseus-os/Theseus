@@ -40,8 +40,7 @@ fn run() -> Result<(), &'static str> {
 
     loop {
         let byte_num = stdin_locked.read(&mut buf).or(Err("failed to invoke read"))?;
-        if byte_num == 0 && stdin_locked.is_eof() { break; }
-        else if byte_num == 0 { continue; }
+        if byte_num == 0 { break; }
         stdout_locked.write_all(&buf).or(Err("failed to invoke write_all"))?;
     }
     stdout_locked.write_all(&['\n' as u8]).or(Err("failed to invoke write_all"))?;
