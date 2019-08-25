@@ -13,7 +13,7 @@ extern crate xmas_elf;
 #[macro_use] extern crate derive_more;
 extern crate bit_field;
 #[cfg(target_arch = "x86_64")]
-extern crate page_table_x86;
+extern crate entryflags_x86;
 extern crate type_name;
 
 use bit_field::BitField;
@@ -24,7 +24,7 @@ use core::{
 };
 use kernel_config::memory::{MAX_PAGE_NUMBER, PAGE_SIZE};
 #[cfg(target_arch = "x86_64")]
-use page_table_x86::EntryFlags;
+use entryflags_x86::EntryFlags;
 
 /// A virtual memory address, which is a `usize` under the hood.
 #[derive(

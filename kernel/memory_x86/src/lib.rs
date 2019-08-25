@@ -1,5 +1,5 @@
 //! This crate implements the virtual memory subsystem interfaces for Theseus on x86_64.
-//! `memory` uses this crate to get the memory layout and other arch-specific information on x86_64;
+//! `memory` uses this crate to get the memory layout and do other arch-specific operations on x86_64.  
 //! This is the top arch-specific memory crate. All arch-specific definitions for memory system are exported in this crate.
 
 #![no_std]
@@ -13,22 +13,22 @@ extern crate multiboot2;
 #[macro_use] extern crate log;
 extern crate kernel_config;
 extern crate memory_structs;
-extern crate page_table_x86;
-pub extern crate x86_64;
+extern crate entryflags_x86;
+extern crate x86_64;
 
 // export arch-specific definitions to `memory`.
 pub use multiboot2::BootInformation;
-pub use page_table_x86::{get_p4_address, set_new_p4, EntryFlags};
-pub use x86_64::instructions::tlb;
+pub use entryflags_x86::EntryFlags;
 
 use kernel_config::memory::KERNEL_OFFSET;
 use memory_structs::{
     Frame, PhysicalAddress, PhysicalMemoryArea, VirtualAddress, VirtualMemoryArea,
 };
+use x86_64::{registers::control_regs, instructions::tlb};
 
 /// Get the address of memory occupied by the loaded kernel.
-/// Returns the following tuple, if successful:
 ///
+/// Returns the following tuple, if successful:
 ///  * The kernel's start physical address,
 ///  * the kernel's end physical address,
 ///  * the kernels' end virtual address.
@@ -65,8 +65,8 @@ pub fn get_kernel_address(
 }
 
 /// Get the available memory areas. Parse the list of physical memory areas from multiboot.
-/// Returns the following tuple, if successful:
 ///
+/// Returns the following tuple, if successful:
 ///  * A list of avaiable physical memory areas,
 ///  * the number of occupied areas.
 pub fn get_available_memory(
@@ -119,7 +119,8 @@ pub fn get_available_memory(
     Ok((available, avail_index))
 }
 
-/// Get the bounds of physical memory that is occupied by loaded modules. 
+/// Get the bounds of physical memory that is occupied by loaded modules.
+/// 
 /// Returns (start_address, end_address).
 pub fn get_modules_address(boot_info: &BootInformation) -> (usize, usize) {
     let mut mod_min = usize::max_value();
@@ -145,7 +146,8 @@ pub fn get_boot_info_mem_area(
     ))
 }
 
-/// Get the virtual address of the boot loader information. 
+/// Get the virtual address of the boot loader information.
+/// 
 /// Returns (start_address, end_address). 
 pub fn get_boot_info_vaddress(
     boot_info: &BootInformation,
@@ -155,7 +157,8 @@ pub fn get_boot_info_vaddress(
     Ok((boot_info_start_vaddr, boot_info_end_vaddr))
 }
 
-/// Add the virtual memory areas occupied by kernel code and data containing sections .init, .text, .rodata, .data, .bss. 
+/// Add the virtual memory areas occupied by kernel code and data containing sections .init, .text, .rodata, .data, and .bss.
+/// 
 /// Returns the following tuple, if successful:
 ///  * The number of added memory areas,
 ///  * the start address of text,
@@ -327,7 +330,8 @@ pub fn add_sections_vmem_areas(
 }
 
 
-/// Get the address of memory occupied by vga. 
+/// Get the address of memory occupied by vga.
+/// 
 /// Returns(start_physical_address, size, entryflags). 
 pub fn get_vga_mem_addr(
 ) -> Result<(PhysicalAddress, usize, EntryFlags), &'static str> {
@@ -342,4 +346,27 @@ pub fn get_vga_mem_addr(
         vga_size_in_bytes,
         vga_display_flags,
     ))
+}
+
+/// Flush the the specific virtual address in TLB. 
+pub fn flush(vaddr: VirtualAddress) {
+    tlb::flush(x86_64::VirtualAddress(vaddr.value()));
+}
+
+/// Flush the whole TLB. 
+pub fn flush_all() {
+    tlb::flush_all();
+}
+
+/// Set the new P4 table address to switch to the new page table p4 points to.
+pub fn set_new_p4(p4: PhysicalAddress) {
+    unsafe {
+        control_regs::cr3_write(x86_64::PhysicalAddress(p4.value() as u64));
+    }
+}
+
+/// Returns the current top-level page table frame.
+pub fn get_current_p4() -> Frame {
+    Frame::containing_address(PhysicalAddress::new_canonical(control_regs::cr3()
+.0 as usize))
 }

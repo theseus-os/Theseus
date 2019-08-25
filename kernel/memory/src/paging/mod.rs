@@ -121,7 +121,7 @@ impl PageTable {
 
         // overwrite recursive mapping
         self.p4_mut()[RECURSIVE_P4_INDEX].set(other_table.p4_table.clone(), EntryFlags::rw_flags());         
-        tlb::flush_all();
+        flush_all();
 
         // set mapper's target frame to reflect that future mappings will be mapped into the other_table
         self.mapper.target_p4 = other_table.p4_table.clone();
@@ -134,7 +134,7 @@ impl PageTable {
 
         // restore recursive mapping to original p4 table
         p4_table[RECURSIVE_P4_INDEX].set(backup, EntryFlags::rw_flags());
-        tlb::flush_all();
+        flush_all();
 
         // here, temporary_page is dropped, which auto unmaps it
         ret
@@ -148,8 +148,7 @@ impl PageTable {
 
         // perform the actual page table switch
         // requires absolute path to specify the arch-specific type
-        #[cfg(target_arch = "x86_64")]
-        set_new_p4(memory_x86::x86_64::PhysicalAddress(new_table.p4_table.start_address().value() as u64));
+        set_new_p4(new_table.p4_table.start_address());
         let current_table_after_switch = PageTable::from_current();
         current_table_after_switch
     }
@@ -160,13 +159,6 @@ impl PageTable {
         self.p4_table.start_address()
     }
 }
-
-
-/// Returns the current top-level page table frame.
-pub fn get_current_p4() -> Frame {
-    Frame::containing_address(PhysicalAddress::new_canonical(get_p4_address().0 as usize))
-}
-
 
 /// Initializes a new page table and sets up all necessary mappings for the kernel to continue running. 
 /// Returns the following tuple, if successful:
@@ -432,10 +424,3 @@ pub fn init(allocator_mutex: &MutexIrqSafe<AreaFrameAllocator>, boot_info: &mult
 //         }
 //     }
 // }
-
-/// Flush the virtual address translation buffer of the specific virtual address
-#[cfg(target_arch = "x86_64")]
-pub fn flush(vaddr: VirtualAddress) {
-    // add this arch-specific function because we need an absolute path to distinguish VirtualAddress from the one defined in memory_structs.
-    tlb::flush(memory_x86::x86_64::VirtualAddress(vaddr.value()));
-}

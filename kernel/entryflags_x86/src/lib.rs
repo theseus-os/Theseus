@@ -1,15 +1,12 @@
-//! This crate contains arch-specific structures and functions related to page table on x86.
+//! This crate defines the entryflags of page table on x86.  
 //! Definitions in this crate should be exported from `memory_x86` for upper-level crates.
 
 #![no_std]
 
-extern crate kernel_config;
-extern crate x86_64;
 #[macro_use] extern crate bitflags;
 extern crate multiboot2;
 extern crate xmas_elf;
 
-use x86_64::{registers::control_regs, PhysicalAddress};
 
 bitflags! {
     /// Entry access flag bits.
@@ -49,7 +46,7 @@ impl EntryFlags {
         EntryFlags::default_flags() | EntryFlags::WRITABLE
     }
 
-    /// Returns true if the page is accessiable and is not huge.
+    /// Returns true if the page is accessible and is not huge.
     pub fn is_page(&self) -> bool {
         self.contains(EntryFlags::PRESENT) && !self.contains(EntryFlags::HUGE_PAGE)
     }
@@ -133,14 +130,3 @@ impl EntryFlags {
     }
 }
 
-/// Set the new P4 table address to switch to the new page table p4 points to.
-pub fn set_new_p4(p4: PhysicalAddress) {
-    unsafe {
-        control_regs::cr3_write(p4);
-    }
-}
-
-/// Returns the current top-level page table frame, e.g., cr3 on x86
-pub fn get_p4_address() -> PhysicalAddress {
-    control_regs::cr3()
-}

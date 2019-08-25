@@ -26,8 +26,8 @@ path = "../kernel_config"
 [dependencies.heap_irq_safe]
 path = "../heap_irq_safe"
 
-[dependencies.page_table_x86]
-path = "../page_table_x86"
+[dependencies.entryflags_x86]
+path = "../entryflags_x86"
 
 [lib]
 crate-type = ["rlib"]

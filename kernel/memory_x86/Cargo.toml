@@ -17,8 +17,8 @@ version = "0.3.7"
 [dependencies.kernel_config]
 path = "../kernel_config"
 
-[dependencies.page_table_x86]
-path = "../page_table_x86"
+[dependencies.entryflags_x86]
+path = "../entryflags_x86"
 
 [dependencies.memory_structs]
 path = "../memory_structs"
