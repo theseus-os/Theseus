@@ -1,13 +1,12 @@
 [package]
 authors = ["Wenqiu Yu<yuwenqiu@gmail.com>"]
 name = "memory_structs"
-description = "The address of memory system."
+description = "The common structs of memory system."
 version = "0.1.0"
 build = "../../build.rs"
 
 [dependencies]
 spin = "0.4.10"
-bitflags = "1.1.0"
 multiboot2 = "0.7.1"
 # x86_64 = { git = "https://github.com/kevinaboos/x86_64" }
 xmas-elf = { version = "0.6.2", git = "https://github.com/kevinaboos/xmas-elf.git" }
@@ -18,9 +17,6 @@ type-name = "0.1.0"
 version = "0.14.0"
 default-features = false
 features = [ "no_std" ]
-
-[dependencies.irq_safety]
-git = "https://github.com/kevinaboos/irq_safety"
 
 [dependencies.atomic_linked_list]
 path = "../../libs/atomic_linked_list"

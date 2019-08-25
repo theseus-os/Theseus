@@ -20,7 +20,6 @@ extern crate kernel_config;
 extern crate atomic_linked_list;
 extern crate xmas_elf;
 extern crate heap_irq_safe;
-extern crate derive_more;
 extern crate bit_field;
 extern crate type_name;
 #[cfg(target_arch = "x86_64")]
@@ -32,7 +31,6 @@ extern crate memory_structs;
 /// but forgets the given `obj`s to prevent them from being dropped,
 /// as they would normally be upon return of an Error using `try!()`.
 /// This must come BEFORE the below modules in order for them to be able to use it.
-#[macro_export]
 macro_rules! try_forget {
     ($expr:expr, $($obj:expr),*) => (match $expr {
         Ok(val) => val,
@@ -55,10 +53,10 @@ pub use self::area_frame_allocator::AreaFrameAllocator;
 pub use self::paging::*;
 pub use self::stack_allocator::{StackAllocator, Stack};
 
-pub use memory_structs::{VirtualAddress, PhysicalAddress, PhysicalMemoryArea, Frame, VirtualMemoryArea, Page, PageRange};
+pub use memory_structs::*;
 
 #[cfg(target_arch = "x86_64")]
-use memory_x86::{set_new_p4, get_p4_address, get_kernel_address, get_available_memory, get_modules_address, get_boot_info_mem_area, get_boot_info_address, add_sections_vmem_areas, add_vga_vmem_area, tlb, BootInformation};
+use memory_x86::*;
 
 #[cfg(target_arch = "x86_64")]
 pub use memory_x86::EntryFlags;// Export EntryFlags so that others does not need to get access to memory_<arch>.
@@ -178,6 +176,8 @@ pub fn set_broadcast_tlb_shootdown_cb(func: fn(Vec<VirtualAddress>)) {
     BROADCAST_TLB_SHOOTDOWN_FUNC.call_once(|| func);
 }
 
+
+
 /// Initializes the virtual memory management system and returns a MemoryManagementInfo instance,
 /// which represents Task zero's (the kernel's) address space. 
 /// Consumes the given BootInformation, because after the memory system is initialized,
@@ -193,7 +193,7 @@ pub fn init(boot_info: &BootInformation)
     -> Result<(Arc<MutexIrqSafe<MemoryManagementInfo>>, MappedPages, MappedPages, MappedPages, Vec<MappedPages>), &'static str> 
 {
     // Get the start and end address of the kernel.
-    let (kernel_phys_start, kernel_phys_end, kernel_virt_end, memory_map_tag) = get_kernel_address(&boot_info)?;
+    let (kernel_phys_start, kernel_phys_end, kernel_virt_end) = get_kernel_address(&boot_info)?;
 
     debug!("kernel_phys_start: {:#x}, kernel_phys_end: {:#x} kernel_virt_end = {:#x}",
         kernel_phys_start,
@@ -202,30 +202,24 @@ pub fn init(boot_info: &BootInformation)
     );
   
     // Get availabe physical memory areas
-    let (available, avail_len) = get_available_memory(memory_map_tag, kernel_phys_end)?;
+    let (available, avail_len) = get_available_memory(&boot_info, kernel_phys_end)?;
 
-    // Get the address of memory occupied by loaded modules
+    // Get the bounds of physical memory that is occupied by memories we've loaded 
     // (we can reclaim this later after the module is loaded, but not until then).
     let (modules_start, modules_end) = get_modules_address(&boot_info);
 
     // print_early!("Modules physical memory region: start {:#X} to end {:#X}", modules_start, modules_end);
 
     let mut occupied: [PhysicalMemoryArea; 32] = Default::default();
-    let mut occup_index = 0;
-    
-    
+    let mut occup_index = 0;  
     occupied[occup_index] = PhysicalMemoryArea::new(PhysicalAddress::zero(), 0x10_0000, 1, 0); // reserve addresses under 1 MB
     occup_index += 1;
     occupied[occup_index] = PhysicalMemoryArea::new(kernel_phys_start, kernel_phys_end.value() - kernel_phys_start.value(), 1, 0); // the kernel boot image is already in use
     occup_index += 1;
-    
-    #[cfg(target_arch = "x86_64")]
-    {   
-        // preserve the multiboot information
-        occupied[occup_index] = get_boot_info_mem_area(&boot_info)?;
-        occup_index += 1;
-    }
-
+    // preserve the multiboot information for x86_64. 
+    // for aarch64 we should get the memories occupied by uefi services
+    occupied[occup_index] = get_boot_info_mem_area(&boot_info)?;
+    occup_index += 1;
     occupied[occup_index] = PhysicalMemoryArea::new(PhysicalAddress::new(modules_start)?, modules_end - modules_start, 1, 0); // preserve all modules
     occup_index += 1;
 
@@ -262,7 +256,7 @@ pub fn init(boot_info: &BootInformation)
         let stack_alloc_start = Page::containing_address(VirtualAddress::new_canonical(KERNEL_STACK_ALLOCATOR_BOTTOM)); 
         let stack_alloc_end = Page::containing_address(VirtualAddress::new_canonical(KERNEL_STACK_ALLOCATOR_TOP_ADDR));
         let stack_alloc_range = PageRange::new(stack_alloc_start, stack_alloc_end);
-        StackAllocator::new(stack_alloc_range, false)
+        stack_allocator::StackAllocator::new(stack_alloc_range, false)
     };
 
     // return the kernel's memory info 
@@ -279,96 +273,6 @@ pub fn init(boot_info: &BootInformation)
 
     Ok( (kernel_mmi_ref.clone(), text_mapped_pages, rodata_mapped_pages, data_mapped_pages, identity_mapped_pages) )
 }
-
-
-
-/// A range of `Frame`s that are contiguous in physical memory.
-#[derive(Debug, Clone)]
-pub struct FrameRange(RangeInclusive<Frame>);
-
-impl FrameRange {
-    /// Creates a new range of `Frame`s that spans from `start` to `end`,
-    /// both inclusive bounds.
-    pub fn new(start: Frame, end: Frame) -> FrameRange {
-        FrameRange(RangeInclusive::new(start, end))
-    }
-
-    /// Creates a FrameRange that will always yield `None`.
-    pub fn empty() -> FrameRange {
-        FrameRange::new(Frame { number: 1 }, Frame { number: 0 })
-    }
-    
-    /// A convenience method for creating a new `FrameRange` 
-    /// that spans all `Frame`s from the given physical address 
-    /// to an end bound based on the given size.
-    pub fn from_phys_addr(starting_virt_addr: PhysicalAddress, size_in_bytes: usize) -> FrameRange {
-        let start_frame = Frame::containing_address(starting_virt_addr);
-        let end_frame = Frame::containing_address(starting_virt_addr + size_in_bytes - 1);
-        FrameRange::new(start_frame, end_frame)
-    }
-
-    /// Returns the `PhysicalAddress` of the starting `Frame` in this `FrameRange`.
-    pub fn start_address(&self) -> PhysicalAddress {
-        self.0.start().start_address()
-    }
-
-    /// Returns the number of `Frame`s covered by this iterator. 
-    /// Use this instead of the Iterator trait's `count()` method.
-    /// This is instant, because it doesn't need to iterate over each entry, unlike normal iterators.
-    pub fn size_in_frames(&self) -> usize {
-        // add 1 because it's an inclusive range
-        self.0.end().number + 1 - self.0.start().number
-    }
-
-    /// Whether this `FrameRange` contains the given `PhysicalAddress`.
-    pub fn contains_phys_addr(&self, phys_addr: PhysicalAddress) -> bool {
-        self.0.contains(&Frame::containing_address(phys_addr))
-    }
-
-    /// Returns the offset of the given `PhysicalAddress` within this `FrameRange`,
-    /// i.e., the difference between `phys_addr` and `self.start()`.
-    pub fn offset_from_start(&self, phys_addr: PhysicalAddress) -> Option<usize> {
-        if self.contains_phys_addr(phys_addr) {
-            Some(phys_addr.value() - self.start_address().value())
-        } else {
-            None
-        }
-    }
-
-    /// Returns a new, separate `FrameRange` that is extended to include the given `Frame`. 
-    pub fn to_extended(&self, frame_to_include: Frame) -> FrameRange {
-        // if the current FrameRange was empty, return a new FrameRange containing only the given frame_to_include
-        if self.is_empty() {
-            return FrameRange::new(frame_to_include.clone(), frame_to_include);
-        }
-
-        let start = core::cmp::min(self.0.start(), &frame_to_include);
-        let end   = core::cmp::max(self.0.end(),   &frame_to_include);
-        FrameRange::new(start.clone(), end.clone())
-    }
-}
-
-impl Deref for FrameRange {
-    type Target = RangeInclusive<Frame>;
-    fn deref(&self) -> &RangeInclusive<Frame> {
-        &self.0
-    }
-}
-impl DerefMut for FrameRange {
-    fn deref_mut(&mut self) -> &mut RangeInclusive<Frame> {
-        &mut self.0
-    }
-}
-
-impl IntoIterator for FrameRange {
-    type Item = Frame;
-    type IntoIter = RangeInclusive<Frame>;
-
-    fn into_iter(self) -> Self::IntoIter {
-        self.0
-    }
-}
-
 
 pub trait FrameAllocator {
     fn allocate_frame(&mut self) -> Option<Frame>;

@@ -32,19 +32,19 @@ bitflags! {
 }
 
 impl EntryFlags {
-    /// Returns ture if the page the entry points to is a huge page. 
+    /// Returns ture if the page the entry points to is a huge page.
     /// For x86, it means the flags contain a `HUGE_PAGE` bit.
     pub fn is_huge(&self) -> bool {
         self.contains(EntryFlags::HUGE_PAGE)
     }
 
-    /// The default flags of an accessible page. 
+    /// The default flags of an accessible page.
     /// For x86, the `PRESENT` bit should be set.
     pub fn default_flags() -> EntryFlags {
         EntryFlags::PRESENT
     }
 
-    /// The flags of a writable page. 
+    /// The flags of a writable page.
     /// For x86 the `PRESENT` and `WRITABLE` bits should be set.
     pub fn rw_flags() -> EntryFlags {
         EntryFlags::default_flags() | EntryFlags::WRITABLE
@@ -55,13 +55,13 @@ impl EntryFlags {
         self.contains(EntryFlags::PRESENT) && !self.contains(EntryFlags::HUGE_PAGE)
     }
 
-    /// Set the page the entry points to as writable. 
+    /// Set the page the entry points to as writable.
     /// For x86 set the `PRESENT` and `WRITABLE` bits of the flags.
     pub fn set_writable(&self) -> EntryFlags {
         self.clone() | EntryFlags::rw_flags()
     }
 
-    /// Returns true if the page is writable. 
+    /// Returns true if the page is writable.
     /// For x86 it means the flags contain `WRITABLE`.
     pub fn is_writable(&self) -> bool {
         self.intersects(EntryFlags::WRITABLE)

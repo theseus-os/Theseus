@@ -17,7 +17,7 @@ use paging::table::{P4, Table, Level4};
 use kernel_config::memory::{ENTRIES_PER_PAGE_TABLE, PAGE_SIZE, TEMPORARY_PAGE_VIRT_ADDR};
 use alloc::vec::Vec;
 use type_name;
-use super::super::{EntryFlags, flush};
+use super::{EntryFlags, flush};
 
 pub struct Mapper {
     p4: Unique<Table<Level4>>,
@@ -94,7 +94,7 @@ impl Mapper {
                 let p3_entry = &p3[page.p3_index()];
                 // 1GiB page?
                 if let Some(start_frame) = p3_entry.pointed_frame() {
-                    if p3_entry.flags().contains(EntryFlags::HUGE_PAGE) {
+                    if p3_entry.flags().is_huge() {
                         // address must be 1GiB aligned
                         assert!(start_frame.number % (ENTRIES_PER_PAGE_TABLE * ENTRIES_PER_PAGE_TABLE) == 0);
                         return Some(Frame {

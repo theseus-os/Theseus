@@ -1,48 +1,51 @@
-//! This crate implements the virtual memory subsystem for Theseus,
-//! which is fairly robust and provides a unification between 
-//! arbitrarily mapped sections of memory and Rust's lifetime system. 
-//! Originally based on Phil Opp's blog_os. 
+//! This crate contains the common structus of virtual memory subsystem shared by `memory_<arch>` crates.  
+//! Structs in this crate are exported from `memory` for upper-level crates to use.
 
 #![no_std]
 #![feature(range_is_empty)]
 #![feature(step_trait)]
 
-extern crate spin;
-extern crate multiboot2;
 extern crate alloc;
-extern crate kernel_config;
 extern crate atomic_linked_list;
-extern crate xmas_elf;
 extern crate heap_irq_safe;
-#[macro_use] extern crate derive_more;
+extern crate kernel_config;
+extern crate multiboot2;
+extern crate spin;
+extern crate xmas_elf;
+#[macro_use]
+extern crate derive_more;
 extern crate bit_field;
-extern crate type_name;
 extern crate page_table_x86;
+extern crate type_name;
 
+use alloc::vec::Vec;
+use bit_field::BitField;
 use core::{
-    ops::{RangeInclusive, Add, AddAssign, Sub, SubAssign, Deref, DerefMut},
-    mem,
     fmt,
     iter::Step,
+    mem,
+    ops::{Add, AddAssign, Deref, DerefMut, RangeInclusive, Sub, SubAssign},
 };
-use spin::Once;
-use alloc::vec::Vec;
-use kernel_config::memory::{PAGE_SIZE, MAX_PAGE_NUMBER};
-use bit_field::BitField;
+use kernel_config::memory::{MAX_PAGE_NUMBER, PAGE_SIZE};
 use page_table_x86::EntryFlags;
+use spin::Once;
 
-
-/// An area of physical memory. 
+/// An area of physical memory.
 #[derive(Copy, Clone, Debug, Default)]
 #[repr(C)]
 pub struct PhysicalMemoryArea {
     pub base_addr: PhysicalAddress,
     pub size_in_bytes: usize,
     pub typ: u32,
-    pub acpi: u32
+    pub acpi: u32,
 }
 impl PhysicalMemoryArea {
-    pub fn new(paddr: PhysicalAddress, size_in_bytes: usize, typ: u32, acpi: u32) -> PhysicalMemoryArea {
+    pub fn new(
+        paddr: PhysicalAddress,
+        size_in_bytes: usize,
+        typ: u32,
+        acpi: u32,
+    ) -> PhysicalMemoryArea {
         PhysicalMemoryArea {
             base_addr: paddr,
             size_in_bytes: size_in_bytes,
@@ -52,32 +55,24 @@ impl PhysicalMemoryArea {
     }
 }
 
-
-
-static BROADCAST_TLB_SHOOTDOWN_FUNC: Once<fn(Vec<VirtualAddress>)> = Once::new();
-
-/// Set the function callback that will be invoked every time a TLB shootdown is necessary,
-/// i.e., during page table remapping and unmapping operations.
-pub fn set_broadcast_tlb_shootdown_cb(func: fn(Vec<VirtualAddress>)) {
-    BROADCAST_TLB_SHOOTDOWN_FUNC.call_once(|| func);
-}
-
-/// A `Frame` is a chunk of **physical** memory, 
-/// similar to how a `Page` is a chunk of **virtual** memory. 
+/// A `Frame` is a chunk of **physical** memory,
+/// similar to how a `Page` is a chunk of **virtual** memory.
 #[derive(Clone, Copy, PartialEq, Eq, PartialOrd, Ord)]
 pub struct Frame {
     pub number: usize,
 }
 impl fmt::Debug for Frame {
     fn fmt(&self, f: &mut fmt::Formatter) -> fmt::Result {
-        write!(f, "Frame(paddr: {:#X})", self.start_address()) 
+        write!(f, "Frame(paddr: {:#X})", self.start_address())
     }
 }
 
 impl Frame {
-	/// Returns the `Frame` containing the given `PhysicalAddress`.
+    /// Returns the `Frame` containing the given `PhysicalAddress`.
     pub fn containing_address(phys_addr: PhysicalAddress) -> Frame {
-        Frame { number: phys_addr.value() / PAGE_SIZE }
+        Frame {
+            number: phys_addr.value() / PAGE_SIZE,
+        }
     }
 
     /// Returns the `PhysicalAddress` at the start of this `Frame`.
@@ -109,7 +104,9 @@ impl Sub<usize> for Frame {
     type Output = Frame;
 
     fn sub(self, rhs: usize) -> Frame {
-        Frame { number: self.number.saturating_sub(rhs) }
+        Frame {
+            number: self.number.saturating_sub(rhs),
+        }
     }
 }
 
@@ -149,7 +146,6 @@ impl Step for Frame {
     }
 }
 
-
 /// A range of `Frame`s that are contiguous in physical memory.
 #[derive(Debug, Clone)]
 pub struct FrameRange(RangeInclusive<Frame>);
@@ -165,9 +161,9 @@ impl FrameRange {
     pub fn empty() -> FrameRange {
         FrameRange::new(Frame { number: 1 }, Frame { number: 0 })
     }
-    
-    /// A convenience method for creating a new `FrameRange` 
-    /// that spans all `Frame`s from the given physical address 
+
+    /// A convenience method for creating a new `FrameRange`
+    /// that spans all `Frame`s from the given physical address
     /// to an end bound based on the given size.
     pub fn from_phys_addr(starting_virt_addr: PhysicalAddress, size_in_bytes: usize) -> FrameRange {
         let start_frame = Frame::containing_address(starting_virt_addr);
@@ -180,7 +176,7 @@ impl FrameRange {
         self.0.start().start_address()
     }
 
-    /// Returns the number of `Frame`s covered by this iterator. 
+    /// Returns the number of `Frame`s covered by this iterator.
     /// Use this instead of the Iterator trait's `count()` method.
     /// This is instant, because it doesn't need to iterate over each entry, unlike normal iterators.
     pub fn size_in_frames(&self) -> usize {
@@ -203,7 +199,7 @@ impl FrameRange {
         }
     }
 
-    /// Returns a new, separate `FrameRange` that is extended to include the given `Frame`. 
+    /// Returns a new, separate `FrameRange` that is extended to include the given `Frame`.
     pub fn to_extended(&self, frame_to_include: Frame) -> FrameRange {
         // if the current FrameRange was empty, return a new FrameRange containing only the given frame_to_include
         if self.is_empty() {
@@ -211,7 +207,7 @@ impl FrameRange {
         }
 
         let start = core::cmp::min(self.0.start(), &frame_to_include);
-        let end   = core::cmp::max(self.0.end(),   &frame_to_include);
+        let end = core::cmp::max(self.0.end(), &frame_to_include);
         FrameRange::new(start.clone(), end.clone())
     }
 }
@@ -237,7 +233,6 @@ impl IntoIterator for FrameRange {
     }
 }
 
-
 pub trait FrameAllocator {
     fn allocate_frame(&mut self) -> Option<Frame>;
     fn allocate_frames(&mut self, num_frames: usize) -> Option<FrameRange>;
@@ -257,12 +252,13 @@ pub struct VirtualMemoryArea {
 
 impl fmt::Display for VirtualMemoryArea {
     fn fmt(&self, f: &mut fmt::Formatter) -> fmt::Result {
-        write!(f, "start: {:#X}, size: {:#X}, flags: {:#X}, desc: {}", 
-                  self.start, self.size, self.flags, self.desc
+        write!(
+            f,
+            "start: {:#X}, size: {:#X}, flags: {:#X}, desc: {}",
+            self.start, self.size, self.flags, self.desc
         )
     }
 }
-
 
 impl VirtualMemoryArea {
     pub fn new(start: VirtualAddress, size: usize, flags: EntryFlags, desc: &'static str) -> Self {
@@ -292,43 +288,42 @@ impl VirtualMemoryArea {
 
     /// Get an iterator that covers all the pages in this VirtualMemoryArea
     pub fn pages(&self) -> PageRange {
-
         // check that the end_page won't be invalid
         if (self.start.value() + self.size) < 1 {
             return PageRange::empty();
         }
-        
+
         let start_page = Page::containing_address(self.start);
         let end_page = Page::containing_address(self.start + self.size - 1);
         PageRange::new(start_page, end_page)
     }
 }
 
-
-
 #[derive(Clone, Copy, PartialEq, Eq, PartialOrd, Ord)]
 pub struct Page {
-    number: usize, 
+    number: usize,
 }
 impl fmt::Debug for Page {
     fn fmt(&self, f: &mut fmt::Formatter) -> fmt::Result {
-        write!(f, "Page(vaddr: {:#X})", self.start_address()) 
+        write!(f, "Page(vaddr: {:#X})", self.start_address())
     }
 }
 
 impl Page {
     /// Returns the `Page` that contains the given `VirtualAddress`.
     pub fn containing_address(virt_addr: VirtualAddress) -> Page {
-        Page { number: virt_addr.value() / PAGE_SIZE }
+        Page {
+            number: virt_addr.value() / PAGE_SIZE,
+        }
     }
 
-	/// Returns the `VirtualAddress` as the start of this `Page`.
+    /// Returns the `VirtualAddress` as the start of this `Page`.
     pub fn start_address(&self) -> VirtualAddress {
         // Cannot create VirtualAddress directly because the field is private
         VirtualAddress::new_canonical(self.number * PAGE_SIZE)
     }
 
-	/// Returns the 9-bit part of this page's virtual address that is the index into the P4 page table entries list.
+    /// Returns the 9-bit part of this page's virtual address that is the index into the P4 page table entries list.
     pub fn p4_index(&self) -> usize {
         (self.number >> 27) & 0x1FF
     }
@@ -344,7 +339,7 @@ impl Page {
     }
 
     /// Returns the 9-bit part of this page's virtual address that is the index into the P2 page table entries list.
-    /// Using this returned `usize` value as an index into the P1 entries list will give you the final PTE, 
+    /// Using this returned `usize` value as an index into the P1 entries list will give you the final PTE,
     /// from which you can extract the mapped `Frame` (or its physical address) using `pointed_frame()`.
     pub fn p1_index(&self) -> usize {
         (self.number >> 0) & 0x1FF
@@ -374,7 +369,9 @@ impl Sub<usize> for Page {
     type Output = Page;
 
     fn sub(self, rhs: usize) -> Page {
-        Page { number: self.number.saturating_sub(rhs) }
+        Page {
+            number: self.number.saturating_sub(rhs),
+        }
     }
 }
 
@@ -414,8 +411,6 @@ impl Step for Page {
     }
 }
 
-
-
 /// A range of `Page`s that are contiguous in virtual memory.
 #[derive(Debug, Clone)]
 pub struct PageRange(RangeInclusive<Page>);
@@ -431,9 +426,9 @@ impl PageRange {
     pub fn empty() -> PageRange {
         PageRange::new(Page { number: 1 }, Page { number: 0 })
     }
-    
-    /// A convenience method for creating a new `PageRange` 
-    /// that spans all `Page`s from the given virtual address 
+
+    /// A convenience method for creating a new `PageRange`
+    /// that spans all `Page`s from the given virtual address
     /// to an end bound based on the given size.
     pub fn from_virt_addr(starting_virt_addr: VirtualAddress, size_in_bytes: usize) -> PageRange {
         let start_page = Page::containing_address(starting_virt_addr);
@@ -446,7 +441,7 @@ impl PageRange {
         self.0.start().start_address()
     }
 
-    /// Returns the number of `Page`s covered by this iterator. 
+    /// Returns the number of `Page`s covered by this iterator.
     /// Use this instead of the Iterator trait's `count()` method.
     /// This is instant, because it doesn't need to iterate over each entry, unlike normal iterators.
     pub fn size_in_pages(&self) -> usize {
@@ -491,20 +486,39 @@ impl IntoIterator for PageRange {
     }
 }
 
-
 /// A virtual memory address, which is a `usize` under the hood.
 #[derive(
-    Clone, Copy, PartialEq, Eq, PartialOrd, Ord, Hash, Default,
-    Debug, Display, Binary, Octal, LowerHex, UpperHex,
-    BitAnd, BitOr, BitXor, BitAndAssign, BitOrAssign, BitXorAssign, 
-    Add, Sub, AddAssign, SubAssign
+    Clone,
+    Copy,
+    PartialEq,
+    Eq,
+    PartialOrd,
+    Ord,
+    Hash,
+    Default,
+    Debug,
+    Display,
+    Binary,
+    Octal,
+    LowerHex,
+    UpperHex,
+    BitAnd,
+    BitOr,
+    BitXor,
+    BitAndAssign,
+    BitOrAssign,
+    BitXorAssign,
+    Add,
+    Sub,
+    AddAssign,
+    SubAssign,
 )]
 #[repr(transparent)]
 pub struct VirtualAddress(usize);
 
 impl VirtualAddress {
-    /// Creates a new `VirtualAddress`, 
-    /// checking that the address is canonical, 
+    /// Creates a new `VirtualAddress`,
+    /// checking that the address is canonical,
     /// i.e., bits (64:48] are sign-extended from bit 47.
     pub fn new(virt_addr: usize) -> Result<VirtualAddress, &'static str> {
         match virt_addr.get_bits(47..64) {
@@ -518,7 +532,7 @@ impl VirtualAddress {
     pub fn new_canonical(mut virt_addr: usize) -> VirtualAddress {
         match virt_addr.get_bit(47) {
             false => virt_addr.set_bits(48..64, 0),
-            true  => virt_addr.set_bits(48..64, 0xffff),
+            true => virt_addr.set_bits(48..64, 0xffff),
         };
         VirtualAddress(virt_addr)
     }
@@ -535,8 +549,8 @@ impl VirtualAddress {
     }
 
     /// Returns the offset that this VirtualAddress specifies into its containing memory Page.
-    /// 
-    /// For example, if the PAGE_SIZE is 4KiB, then this will return 
+    ///
+    /// For example, if the PAGE_SIZE is 4KiB, then this will return
     /// the least significant 12 bits (12:0] of this VirtualAddress.
     pub fn page_offset(&self) -> usize {
         self.0 & (PAGE_SIZE - 1)
@@ -584,20 +598,48 @@ impl From<VirtualAddress> for usize {
     }
 }
 
-
 /// A physical memory address, which is a `usize` under the hood.
 #[derive(
-    Clone, Copy, PartialEq, Eq, PartialOrd, Ord, Hash, Default,
-    Debug, Display, Binary, Octal, LowerHex, UpperHex,
-    BitAnd, BitOr, BitXor, BitAndAssign, BitOrAssign, BitXorAssign, 
-    Add, Sub, Mul, Div, Rem, Shr, Shl, 
-    AddAssign, SubAssign, MulAssign, DivAssign, RemAssign, ShrAssign, ShlAssign
+    Clone,
+    Copy,
+    PartialEq,
+    Eq,
+    PartialOrd,
+    Ord,
+    Hash,
+    Default,
+    Debug,
+    Display,
+    Binary,
+    Octal,
+    LowerHex,
+    UpperHex,
+    BitAnd,
+    BitOr,
+    BitXor,
+    BitAndAssign,
+    BitOrAssign,
+    BitXorAssign,
+    Add,
+    Sub,
+    Mul,
+    Div,
+    Rem,
+    Shr,
+    Shl,
+    AddAssign,
+    SubAssign,
+    MulAssign,
+    DivAssign,
+    RemAssign,
+    ShrAssign,
+    ShlAssign,
 )]
 #[repr(transparent)]
 pub struct PhysicalAddress(usize);
 
 impl PhysicalAddress {
-    /// Creates a new `PhysicalAddress`, 
+    /// Creates a new `PhysicalAddress`,
     /// checking that the bits (64:52] are 0.
     pub fn new(phys_addr: usize) -> Result<PhysicalAddress, &'static str> {
         match phys_addr.get_bits(52..64) {
@@ -625,14 +667,13 @@ impl PhysicalAddress {
     }
 
     /// Returns the offset that this PhysicalAddress specifies into its containing memory Frame.
-    /// 
-    /// For example, if the PAGE_SIZE is 4KiB, then this will return 
+    ///
+    /// For example, if the PAGE_SIZE is 4KiB, then this will return
     /// the least significant 12 bits (12:0] of this PhysicalAddress.
     pub fn frame_offset(&self) -> usize {
         self.0 & (PAGE_SIZE - 1)
     }
 }
-
 
 impl Add<usize> for PhysicalAddress {
     type Output = PhysicalAddress;

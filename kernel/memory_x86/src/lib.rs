@@ -11,19 +11,21 @@
 extern crate multiboot2;
 #[macro_use]
 extern crate log;
+extern crate kernel_config;
 extern crate memory_structs;
 extern crate page_table_x86;
-extern crate kernel_config;
 pub extern crate x86_64;
 
 /// Export arch-specific information structure to `memory`.
 pub use multiboot2::BootInformation;
 /// This is top arch-specific memory crate. Export all memory-related definitions here.
-pub use page_table_x86::{EntryFlags, get_p4_address, set_new_p4};
-pub use x86_64::{instructions::tlb};
+pub use page_table_x86::{get_p4_address, set_new_p4, EntryFlags};
+pub use x86_64::instructions::tlb;
 
 use kernel_config::memory::KERNEL_OFFSET;
-use memory_structs::{Frame, PhysicalAddress, PhysicalMemoryArea, VirtualAddress, VirtualMemoryArea};
+use memory_structs::{
+    Frame, PhysicalAddress, PhysicalMemoryArea, VirtualAddress, VirtualMemoryArea,
+};
 use multiboot2::MemoryMapTag;
 
 /// Get the address of memory occupied by the loaded kernel.
@@ -34,15 +36,7 @@ use multiboot2::MemoryMapTag;
 ///  * the kernels' end virtual address
 pub fn get_kernel_address(
     boot_info: &BootInformation,
-) -> Result<
-    (
-        PhysicalAddress,
-        PhysicalAddress,
-        VirtualAddress,
-        &'static MemoryMapTag,
-    ),
-    &'static str,
-> {
+) -> Result<(PhysicalAddress, PhysicalAddress, VirtualAddress), &'static str> {
     let memory_map_tag = boot_info
         .memory_map_tag()
         .ok_or("Memory map tag not found")?;
@@ -72,12 +66,7 @@ pub fn get_kernel_address(
     )?;
     let kernel_phys_end = PhysicalAddress::new(kernel_virt_end.value() - KERNEL_OFFSET)?;
 
-    Ok((
-        kernel_phys_start,
-        kernel_phys_end,
-        kernel_virt_end,
-        memory_map_tag,
-    ))
+    Ok((kernel_phys_start, kernel_phys_end, kernel_virt_end))
 }
 
 /// Get the memory areas occupied by the loaded kernel. Parse the list of physical memory areas from multiboot.
@@ -87,11 +76,14 @@ pub fn get_kernel_address(
 ///  * the number of occupied areas, i.e. the index of the next ,
 ///  * the kernels' end virtual address
 pub fn get_available_memory(
-    memory_map_tag: &'static MemoryMapTag,
+    boot_info: &BootInformation,
     kernel_phys_end: PhysicalAddress,
 ) -> Result<([PhysicalMemoryArea; 32], usize), &'static str> {
     let mut available: [PhysicalMemoryArea; 32] = Default::default();
     let mut avail_index = 0;
+    let memory_map_tag = boot_info
+        .memory_map_tag()
+        .ok_or("Memory map tag not found")?;
     for area in memory_map_tag.memory_areas() {
         let area_start = PhysicalAddress::new(area.start_address() as usize)?;
         let area_end = PhysicalAddress::new(area.end_address() as usize)?;
@@ -169,7 +161,8 @@ pub fn get_boot_info_address(
 pub fn add_sections_vmem_areas(
     boot_info: &BootInformation,
     vmas: &mut [VirtualMemoryArea; 32],
-) -> Result<(
+) -> Result<
+    (
         usize,
         Option<(VirtualAddress, PhysicalAddress)>,
         Option<(VirtualAddress, PhysicalAddress)>,
@@ -180,26 +173,28 @@ pub fn add_sections_vmem_areas(
         Option<EntryFlags>,
         Option<EntryFlags>,
         Option<EntryFlags>,
-        [(PhysicalAddress, VirtualAddress, usize, EntryFlags); 32]
+        [(PhysicalAddress, VirtualAddress, usize, EntryFlags); 32],
     ),
     &'static str,
 > {
-    let elf_sections_tag = try!(boot_info.elf_sections_tag().ok_or("no Elf sections tag present!"));   
+    let elf_sections_tag = try!(boot_info
+        .elf_sections_tag()
+        .ok_or("no Elf sections tag present!"));
 
     let mut index = 0;
-    let mut text_start:   Option<(VirtualAddress, PhysicalAddress)> = None;
-    let mut text_end:     Option<(VirtualAddress, PhysicalAddress)> = None;
+    let mut text_start: Option<(VirtualAddress, PhysicalAddress)> = None;
+    let mut text_end: Option<(VirtualAddress, PhysicalAddress)> = None;
     let mut rodata_start: Option<(VirtualAddress, PhysicalAddress)> = None;
-    let mut rodata_end:   Option<(VirtualAddress, PhysicalAddress)> = None;
-    let mut data_start:   Option<(VirtualAddress, PhysicalAddress)> = None;
-    let mut data_end:     Option<(VirtualAddress, PhysicalAddress)> = None;
+    let mut rodata_end: Option<(VirtualAddress, PhysicalAddress)> = None;
+    let mut data_start: Option<(VirtualAddress, PhysicalAddress)> = None;
+    let mut data_end: Option<(VirtualAddress, PhysicalAddress)> = None;
 
-    let mut text_flags:       Option<EntryFlags> = None;
-    let mut rodata_flags:     Option<EntryFlags> = None;
-    let mut data_flags:       Option<EntryFlags> = None;
+    let mut text_flags: Option<EntryFlags> = None;
+    let mut rodata_flags: Option<EntryFlags> = None;
+    let mut data_flags: Option<EntryFlags> = None;
 
-
-    let mut identity_sections: [(PhysicalAddress, VirtualAddress, usize, EntryFlags); 32] = Default::default();
+    let mut identity_sections: [(PhysicalAddress, VirtualAddress, usize, EntryFlags); 32] =
+        Default::default();
 
     // map the allocated kernel text sections
     for section in elf_sections_tag.sections() {
@@ -311,15 +306,35 @@ pub fn add_sections_vmem_areas(
         index += 1;
     } // end of section iterator
 
-    Ok((index, text_start, text_end, rodata_start, rodata_end, data_start, data_end, text_flags, rodata_flags, data_flags, identity_sections))
+    Ok((
+        index,
+        text_start,
+        text_end,
+        rodata_start,
+        rodata_end,
+        data_start,
+        data_end,
+        text_flags,
+        rodata_flags,
+        data_flags,
+        identity_sections,
+    ))
 }
 
-pub fn add_vga_vmem_area() -> Result<(PhysicalAddress, VirtualAddress, usize, EntryFlags), &'static str> {
+pub fn get_vga_mem_addr(
+) -> Result<(PhysicalAddress, VirtualAddress, usize, EntryFlags), &'static str> {
     const VGA_DISPLAY_PHYS_START: usize = 0xA_0000;
     const VGA_DISPLAY_PHYS_END: usize = 0xC_0000;
     let vga_size_in_bytes: usize = VGA_DISPLAY_PHYS_END - VGA_DISPLAY_PHYS_START;
-    let vga_display_virt_addr = VirtualAddress::new_canonical(VGA_DISPLAY_PHYS_START + KERNEL_OFFSET);
-    let vga_display_flags = EntryFlags::PRESENT | EntryFlags::WRITABLE | EntryFlags::GLOBAL | EntryFlags::NO_CACHE;
+    let vga_display_virt_addr =
+        VirtualAddress::new_canonical(VGA_DISPLAY_PHYS_START + KERNEL_OFFSET);
+    let vga_display_flags =
+        EntryFlags::PRESENT | EntryFlags::WRITABLE | EntryFlags::GLOBAL | EntryFlags::NO_CACHE;
 
-    Ok((PhysicalAddress::new(VGA_DISPLAY_PHYS_START)?, vga_display_virt_addr, vga_size_in_bytes, vga_display_flags))
+    Ok((
+        PhysicalAddress::new(VGA_DISPLAY_PHYS_START)?,
+        vga_display_virt_addr,
+        vga_size_in_bytes,
+        vga_display_flags,
+    ))
 }
