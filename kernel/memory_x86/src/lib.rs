@@ -134,7 +134,7 @@ pub fn get_modules_address(boot_info: &BootInformation) -> (usize, usize) {
     (mod_min, mod_max)
 }
 
-/// Get the physical memory area occupied by the boot loader information.
+/// Get the physical memory area occupied by the bootloader information.
 pub fn get_boot_info_mem_area(
     boot_info: &BootInformation,
 ) -> Result<PhysicalMemoryArea, &'static str> {
@@ -146,7 +146,7 @@ pub fn get_boot_info_mem_area(
     ))
 }
 
-/// Get the virtual address of the boot loader information.
+/// Get the virtual address of the bootloader information.
 /// 
 /// Returns (start_address, end_address). 
 pub fn get_boot_info_vaddress(
@@ -330,7 +330,7 @@ pub fn add_sections_vmem_areas(
 }
 
 
-/// Get the address of memory occupied by vga.
+/// Get the physical memory occupied by vga.
 /// 
 /// Returns(start_physical_address, size, entryflags). 
 pub fn get_vga_mem_addr(
@@ -358,7 +358,7 @@ pub fn flush_all() {
     tlb::flush_all();
 }
 
-/// Set the new P4 table address to switch to the new page table p4 points to.
+/// Set the new top-level page table address to switch to the new page table p4 points to.
 pub fn set_new_p4(p4: PhysicalAddress) {
     unsafe {
         control_regs::cr3_write(x86_64::PhysicalAddress(p4.value() as u64));
