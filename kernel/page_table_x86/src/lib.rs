@@ -1,4 +1,4 @@
-//! This crate contains arch-specific structures and functions related to MMU.
+//! This crate contains arch-specific structures and functions related to page table on x86.
 //! Definitions in this crate should be exported from `memory_x86` for upper-level crates.
 
 #![no_std]

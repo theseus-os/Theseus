@@ -1,6 +1,6 @@
 //! This crate implements the virtual memory subsystem interfaces for Theseus on x86_64.
 //! `memory` uses this crate to get the memory layout and other arch-specific information on x86_64;
-//! This is top arch-specific memory crate. All arch-specific definitions of memory system are exported in this crate.
+//! This is the top arch-specific memory crate. All arch-specific definitions for memory system are exported in this crate.
 
 #![no_std]
 #![feature(asm)]
@@ -25,7 +25,6 @@ use kernel_config::memory::KERNEL_OFFSET;
 use memory_structs::{
     Frame, PhysicalAddress, PhysicalMemoryArea, VirtualAddress, VirtualMemoryArea,
 };
-use multiboot2::MemoryMapTag;
 
 /// Get the address of memory occupied by the loaded kernel.
 /// Returns the following tuple, if successful:
@@ -36,9 +35,6 @@ use multiboot2::MemoryMapTag;
 pub fn get_kernel_address(
     boot_info: &BootInformation,
 ) -> Result<(PhysicalAddress, PhysicalAddress, VirtualAddress), &'static str> {
-    let memory_map_tag = boot_info
-        .memory_map_tag()
-        .ok_or("Memory map tag not found")?;
     let elf_sections_tag = boot_info
         .elf_sections_tag()
         .ok_or("Elf sections tag not found")?;

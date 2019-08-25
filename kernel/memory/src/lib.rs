@@ -63,7 +63,7 @@ pub use memory_x86::EntryFlags;// Export EntryFlags so that others does not need
 
 
 use core::{
-    ops::{RangeInclusive, Deref, DerefMut},
+    ops::{Deref, DerefMut},
 };
 use spin::Once;
 use irq_safety::MutexIrqSafe;

@@ -1,24 +1,22 @@
-//! This crate contains the common structus of virtual memory subsystem shared by `memory_<arch>` crates.  
-//! Structs in this crate are exported from `memory` for upper-level crates to use.
+//! This crate contains the common structures of virtual memory subsystem shared by `memory_<arch>` crates.  
+//! Structs in this crate are exported from `memory` for upper-level crates.
 
 #![no_std]
 #![feature(range_is_empty)]
 #![feature(step_trait)]
 
-extern crate alloc;
 extern crate atomic_linked_list;
 extern crate heap_irq_safe;
 extern crate kernel_config;
 extern crate multiboot2;
-extern crate spin;
 extern crate xmas_elf;
 #[macro_use]
 extern crate derive_more;
 extern crate bit_field;
+#[cfg(target_arch = "x86_64")]
 extern crate page_table_x86;
 extern crate type_name;
 
-use alloc::vec::Vec;
 use bit_field::BitField;
 use core::{
     fmt,
@@ -27,8 +25,8 @@ use core::{
     ops::{Add, AddAssign, Deref, DerefMut, RangeInclusive, Sub, SubAssign},
 };
 use kernel_config::memory::{MAX_PAGE_NUMBER, PAGE_SIZE};
+#[cfg(target_arch = "x86_64")]
 use page_table_x86::EntryFlags;
-use spin::Once;
 
 /// A virtual memory address, which is a `usize` under the hood.
 #[derive(
