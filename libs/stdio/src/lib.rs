@@ -197,33 +197,86 @@ impl<'a> Read for StdioReadGuard<'a> {
     /// Read from the ring buffer. It returns the number of bytes read. Currently it is not possible
     /// to return an error, but one should *not* simply unwrap the return value since the implementation
     /// detail is subjected to change in the future.
+    /// 
+    /// Note that this method will block when currently nothing can be read out and wait to read at
+    /// least one byte. It will only return zero under one of two scenarios:
+    /// 1. The EOF flag has been set.
+    /// 2. The buffer specified was 0 bytes in length.
     fn read(&mut self, buf: &mut [u8]) -> Result<usize, core_io::Error> {
-        let mut buf_iter = buf.iter_mut();
-        let mut cnt: usize = 0;
-        let mut locked_core = self.guard.lock();
 
-        // Keep reading if we have empty space in the output buffer
-        // and available byte in the ring buffer.
-        while let (Some(buf_elem), Some(queue_elem)) = (buf_iter.next(), locked_core.queue.pop_front()) {
-            *buf_elem = queue_elem;
-            cnt += 1;
+        // Deal with the edge case that the buffer specified was 0 bytes in length.
+        if buf.len() == 0 { return Ok(0); }
+
+        let mut cnt: usize = 0;
+        loop {
+            let end; // EOF flag
+            {
+                let mut locked_ring_buf = self.guard.lock();
+                let mut buf_iter = buf[cnt..].iter_mut();
+
+                // Keep reading if we have empty space in the output buffer
+                // and available byte in the ring buffer.
+                while let (Some(buf_elem), Some(queue_elem))
+                            = (buf_iter.next(), locked_ring_buf.queue.pop_front()) {
+                    *buf_elem = queue_elem;
+                    cnt += 1;
+                }
+
+                end = locked_ring_buf.end;
+            } // the lock on the ring buffer is guaranteed to be dropped here
+
+            // Break if we have read something or we encounter EOF.
+            if cnt > 0 || end { break; }
         }
         return Ok(cnt);
     }
 }
 
-impl<'a> Write for StdioWriteGuard<'a> {
-    /// Write to the ring buffer. It returns the number of bytes written. Currently it is not possible
+impl<'a> StdioReadGuard<'a> {
+    /// Read from the ring buffer. It returns the number of bytes read. Currently it is not possible
     /// to return an error, but one should *not* simply unwrap the return value since the implementation
     /// detail is subjected to change in the future.
+    /// 
+    /// Note that this is the non-blocking version of `read`. It directly returns zero when currently
+    /// the underlying ring buffer is empty.
+    pub fn try_read(&mut self, buf: &mut [u8]) -> Result<usize, core_io::Error> {
+
+        // Deal with the edge case that the buffer specified was 0 bytes in length.
+        if buf.len() == 0 { return Ok(0); }
+
+        let mut buf_iter = buf.iter_mut();
+        let mut cnt: usize = 0;
+        let mut locked_ring_buf = self.guard.lock();
+
+        // Keep reading if we have empty space in the output buffer
+        // and available byte in the ring buffer.
+        while let (Some(buf_elem), Some(queue_elem))
+                    = (buf_iter.next(), locked_ring_buf.queue.pop_front()) {
+            *buf_elem = queue_elem;
+            cnt += 1;
+        }
+
+        return Ok(cnt);
+    }
+}
+
+impl<'a> Write for StdioWriteGuard<'a> {
+    /// Write to the ring buffer. It returns the number of bytes written.
+    /// 
+    /// When this method is called after setting the EOF flag, it returns error with `ErrorKind`
+    /// set to `UnexpectedEof`.
     /// 
     /// Also note that this method does *not* guarantee to write all given bytes, although it currently
     /// does so. Always check the return value when using this method. Otherwise, use `write_all` to
     /// ensure that all given bytes are written.
     fn write(&mut self, buf: &[u8]) -> Result<usize, core_io::Error> {
-        let mut locked_core = self.guard.lock();
+        if self.guard.lock().end {
+            return Err(core_io::Error::new(core_io::ErrorKind::UnexpectedEof,
+                                           "cannot write to a stream with EOF set"));
+        }
+        let mut locked_ring_buf = self.guard.lock();
         for byte in buf {
-            locked_core.queue.push_back(*byte)
+            locked_ring_buf.queue.push_back(*byte)
         }
         Ok(buf.len())
     }
