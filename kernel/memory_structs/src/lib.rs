@@ -10,8 +10,7 @@ extern crate heap_irq_safe;
 extern crate kernel_config;
 extern crate multiboot2;
 extern crate xmas_elf;
-#[macro_use]
-extern crate derive_more;
+#[macro_use] extern crate derive_more;
 extern crate bit_field;
 #[cfg(target_arch = "x86_64")]
 extern crate page_table_x86;
@@ -19,7 +18,6 @@ extern crate type_name;
 
 use bit_field::BitField;
 use core::{
-    fmt,
     iter::Step,
     mem,
     ops::{Add, AddAssign, Deref, DerefMut, RangeInclusive, Sub, SubAssign},
@@ -169,6 +167,7 @@ impl PhysicalAddress {
     }
 }
 
+
 impl Add<usize> for PhysicalAddress {
     type Output = PhysicalAddress;
 
@@ -231,6 +230,7 @@ impl PhysicalMemoryArea {
 }
 
 
+
 /// A region of virtual memory that is mapped into a [`Task`](../task/struct.Task.html)'s address space
 #[derive(Debug, Default, Clone, PartialEq)]
 pub struct VirtualMemoryArea {
@@ -239,7 +239,7 @@ pub struct VirtualMemoryArea {
     flags: EntryFlags,
     desc: &'static str,
 }
-
+use core::fmt;
 impl fmt::Display for VirtualMemoryArea {
     fn fmt(&self, f: &mut fmt::Formatter) -> fmt::Result {
         write!(
@@ -249,6 +249,7 @@ impl fmt::Display for VirtualMemoryArea {
         )
     }
 }
+
 
 impl VirtualMemoryArea {
     pub fn new(start: VirtualAddress, size: usize, flags: EntryFlags, desc: &'static str) -> Self {
@@ -380,6 +381,7 @@ impl Step for Frame {
         Some(*self + n)
     }
 }
+
 
 /// A range of `Frame`s that are contiguous in physical memory.
 #[derive(Debug, Clone)]

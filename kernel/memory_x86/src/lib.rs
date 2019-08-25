@@ -16,7 +16,7 @@ extern crate memory_structs;
 extern crate page_table_x86;
 pub extern crate x86_64;
 
-// Export arch-specific definitions to `memory`.
+// export arch-specific definitions to `memory`.
 pub use multiboot2::BootInformation;
 pub use page_table_x86::{get_p4_address, set_new_p4, EntryFlags};
 pub use x86_64::instructions::tlb;
@@ -64,7 +64,7 @@ pub fn get_kernel_address(
     Ok((kernel_phys_start, kernel_phys_end, kernel_virt_end))
 }
 
-/// Get the memory areas occupied by the loaded kernel. Parse the list of physical memory areas from multiboot.
+/// Get the available memory areas. Parse the list of physical memory areas from multiboot.
 /// Returns the following tuple, if successful:
 ///
 ///  * A list of avaiable physical memory areas,
@@ -145,9 +145,9 @@ pub fn get_boot_info_mem_area(
     ))
 }
 
-/// Get the address of the boot loader information. 
+/// Get the virtual address of the boot loader information. 
 /// Returns (start_address, end_address). 
-pub fn get_boot_info_address(
+pub fn get_boot_info_vaddress(
     boot_info: &BootInformation,
 ) -> Result<(VirtualAddress, VirtualAddress), &'static str> {
     let boot_info_start_vaddr = VirtualAddress::new(boot_info.start_address())?;

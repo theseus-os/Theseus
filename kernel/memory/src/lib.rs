@@ -192,7 +192,7 @@ pub fn set_broadcast_tlb_shootdown_cb(func: fn(Vec<VirtualAddress>)) {
 pub fn init(boot_info: &BootInformation) 
     -> Result<(Arc<MutexIrqSafe<MemoryManagementInfo>>, MappedPages, MappedPages, MappedPages, Vec<MappedPages>), &'static str> 
 {
-    // Get the start and end address of the kernel.
+    // get the start and end addresses of the kernel.
     let (kernel_phys_start, kernel_phys_end, kernel_virt_end) = get_kernel_address(&boot_info)?;
 
     debug!("kernel_phys_start: {:#x}, kernel_phys_end: {:#x} kernel_virt_end = {:#x}",
@@ -201,11 +201,11 @@ pub fn init(boot_info: &BootInformation)
         kernel_virt_end
     );
   
-    // Get availabe physical memory areas
+    // get availabe physical memory areas
     let (available, avail_len) = get_available_memory(&boot_info, kernel_phys_end)?;
 
-    // Get the bounds of physical memory that is occupied by memories we've loaded 
-    // (we can reclaim this later after the module is loaded, but not until then).
+    // get the bounds of physical memory that is occupied by modules we've loaded 
+    // (we can reclaim this later after the module is loaded, but not until then)
     let (modules_start, modules_end) = get_modules_address(&boot_info);
 
     // print_early!("Modules physical memory region: start {:#X} to end {:#X}", modules_start, modules_end);
@@ -217,7 +217,6 @@ pub fn init(boot_info: &BootInformation)
     occupied[occup_index] = PhysicalMemoryArea::new(kernel_phys_start, kernel_phys_end.value() - kernel_phys_start.value(), 1, 0); // the kernel boot image is already in use
     occup_index += 1;
     // preserve the multiboot information for x86_64. 
-    // for aarch64 we should get the memories occupied by uefi services
     occupied[occup_index] = get_boot_info_mem_area(&boot_info)?;
     occup_index += 1;
     occupied[occup_index] = PhysicalMemoryArea::new(PhysicalAddress::new(modules_start)?, modules_end - modules_start, 1, 0); // preserve all modules

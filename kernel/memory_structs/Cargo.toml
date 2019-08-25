@@ -1,7 +1,7 @@
 [package]
 authors = ["Wenqiu Yu<yuwenqiu@gmail.com>"]
 name = "memory_structs"
-description = "The common structs of memory system."
+description = "The common structs of memory system"
 version = "0.1.0"
 build = "../../build.rs"
 

@@ -113,7 +113,7 @@ impl EntryFlags {
         flags
     }
 
-    /// Get flags according to the properties of program. 
+    /// Get flags according to the properties of a program. 
     pub fn from_elf_program_flags(prog_flags: xmas_elf::program::Flags) -> EntryFlags {
         let mut flags = EntryFlags::empty();
 

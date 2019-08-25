@@ -188,7 +188,7 @@ pub fn init(allocator_mutex: &MutexIrqSafe<AreaFrameAllocator>, boot_info: &mult
     // bootstrap a PageTable from the currently-loaded page table
     let mut page_table = PageTable::from_current();
 
-    let (boot_info_start_vaddr, boot_info_end_vaddr) = get_boot_info_address(&boot_info)?;
+    let (boot_info_start_vaddr, boot_info_end_vaddr) = get_boot_info_vaddress(&boot_info)?;
     let boot_info_start_paddr = page_table.translate(boot_info_start_vaddr).ok_or("Couldn't get boot_info start physical address")?;
     let boot_info_end_paddr = page_table.translate(boot_info_end_vaddr).ok_or("Couldn't get boot_info end physical address")?;
     let boot_info_size = boot_info.total_size();
@@ -229,7 +229,7 @@ pub fn init(allocator_mutex: &MutexIrqSafe<AreaFrameAllocator>, boot_info: &mult
         {
             let mut allocator = allocator_mutex.lock(); 
 
-            // add virtual memory areas occupied by kernel data and code
+            // add virtual memory areas occupied by kernel data and code sections
             let (mut index, 
                 text_start, text_end, 
                 rodata_start, rodata_end, 
@@ -245,7 +245,7 @@ pub fn init(allocator_mutex: &MutexIrqSafe<AreaFrameAllocator>, boot_info: &mult
                 identity_mapped_pages[i] = Some(
                     mapper.map_frames(
                         FrameRange::from_phys_addr(start_phys_addr, size), 
-                        Page::containing_address(start_virt_addr), 
+                        Page::containing_address(start_virt_addr),// the returned virtual address is identical 
                         flags,
                         allocator.deref_mut()
                     )?
@@ -433,9 +433,9 @@ pub fn init(allocator_mutex: &MutexIrqSafe<AreaFrameAllocator>, boot_info: &mult
 //     }
 // }
 
-/// Flush the virtual address translation buffer of the specific address
+/// Flush the virtual address translation buffer of the specific virtual address
 #[cfg(target_arch = "x86_64")]
 pub fn flush(vaddr: VirtualAddress) {
-    // define this function for common use because we need an arch-specific absolute path to distinguish VirtualAddress from the one defined in memory_structs and exported in this crate.
+    // add this arch-specific function because we need an absolute path to distinguish VirtualAddress from the one defined in memory_structs.
     tlb::flush(memory_x86::x86_64::VirtualAddress(vaddr.value()));
 }
