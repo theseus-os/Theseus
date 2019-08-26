@@ -76,11 +76,11 @@ enum JobStatus {
 /// When pipe is used, the i-th job's `stdout` is directed to the (i+1)-th job's `stdin`.
 /// `stderr` is always read by shell and currently cannot be redirected.
 struct Job {
-    /// References to the tasks that form this job. They are stored in th esame sequence as
+    /// References to the tasks that form this job. They are stored in the same sequence as
     /// in the command line.
     tasks: Vec<TaskRef>,
-    /// A copy of the task ids. Mainly for performance optimization. Stored in the same
-    /// sequence as `tasks`.
+    /// A copy of the task ids. Mainly for performance optimization. Task ids are stored
+    /// in the same sequence as in `tasks`.
     task_ids: Vec<usize>,
     /// Status of the job.
     status: JobStatus,
@@ -95,9 +95,9 @@ struct Job {
     /// the applications to the shell, and currently cannot be redirected. Note that there
     /// are N queues in total.
     stderr_queues: Vec<Stdio>,
-    /// The input writer of the job. It is the writer to `pipe_queues[0]`.
+    /// The input writer of the job. It is the writer of `pipe_queues[0]`.
     stdin_writer: StdioWriter,
-    /// The output reader of the job. It is the reader to `pipe_queues[N]`.
+    /// The output reader of the job. It is the reader of `pipe_queues[N]`.
     stdout_reader: StdioReader,
     /// Command line that was used to create the job.
     cmd: String
@@ -183,9 +183,12 @@ struct Shell {
 }
 
 impl Shell {
-    /// Create a new shell. Must provide a terminal to bind with the new shell in the argument.
+    /// Create a new shell. Currently the shell will bind to the default terminal instance provided
+    /// by the `app_io` crate.
     fn new() -> Result<Shell, &'static str> {
-        // initialize another dfqueue for the terminal object to handle printing from applications
+        // Initialize a dfqueue for the terminal object to handle printing from applications.
+        // Note that this is only to support legacy output. Newly developed applications should
+        // turn to use `stdio` provided by the `stdio` crate together with the support of `app_io`.
         let terminal_print_dfq: DFQueue<Event>  = DFQueue::new();
         let print_consumer = terminal_print_dfq.into_consumer();
         let print_producer = print_consumer.obtain_producer();
@@ -318,7 +321,7 @@ impl Shell {
         }
     }
 
-    /// Move the cursor a character right. If the cursor is already at the end of the command line,
+    /// Move the cursor a character to the right. If the cursor is already at the end of the command line,
     /// it simply returns.
     fn move_cursor_right(&mut self) {
         if self.left_shift > 0 {
@@ -326,7 +329,7 @@ impl Shell {
         }
     }
 
-    /// Roll to the next previous command. If there is no more previous commands, it does nothing.
+    /// Roll to the next previous command. If there is no more previous command, it does nothing.
     fn goto_previous_command(&mut self) -> Result<(), &'static str> {
         if self.history_index == self.command_history.len() {
             return Ok(());
@@ -409,8 +412,9 @@ impl Shell {
 
                         // Here we must wait for the running application to quit before releasing the lock,
                         // because the previous `kill` method will NOT stop the application immediately.
-                        // Rather, it would let the application finish the current time slice before actually
-                        // killing it.
+                        // We must circumvent the situation where the application is killed while holding the
+                        // lock. We wait for the application to finish its last time slice. It will then be
+                        // removed from the run queue. We can thereafter release the lock.
                         loop {
                             scheduler::schedule(); // yield the CPU
                             if !task_ref.lock().is_running() {
@@ -451,8 +455,9 @@ impl Shell {
 
                         // Here we must wait for the running application to stop before releasing the lock,
                         // because the previous `block` method will NOT stop the application immediately.
-                        // Rather, it would let the application finish the current time slice before actually
-                        // stopping it.
+                        // We must circumvent the situation where the application is stopped while holding the
+                        // lock. We wait for the application to finish its last time slice. It will then be
+                        // truly blocked. We can thereafter release the lock.
                         loop {
                             scheduler::schedule(); // yield the CPU
                             if !task_ref.lock().is_running() {
@@ -646,7 +651,7 @@ impl Shell {
     }
 
     /// Create a single task. `cmd` is the name of the application. `args` are the provided
-    /// argumeents. It returns a task reference on success.
+    /// arguments. It returns a task reference on success.
     fn create_single_task(&mut self, cmd: String, args: Vec<String>) -> Result<TaskRef, AppErr> {
 
         // Check that the application actually exists
@@ -722,7 +727,7 @@ impl Shell {
                     task_ids.push(task_ref.lock().id);
                 }
 
-                // Set up the chain of queues between applications, and between shell and application.
+                // Set up the chain of queues between applications, and between shell and applications.
                 // See the comments for `Job` to get a view of how queues are chained.
                 let first_stdio_queue = Stdio::new();
                 let job_stdin_writer = first_stdio_queue.get_writer();
@@ -913,7 +918,8 @@ impl Shell {
     /// Automatically complete the half-entered command line if possible.
     /// If there exists only one possibility, the half-entered command line is completed.
     /// If there are several possibilities, it will show all possibilities.
-    /// Otherwise, it does nothing.
+    /// Otherwise, it does nothing. It tries to match against all internal commands,
+    /// all applications in the namespace, and all valid file paths.
     fn complete_cmdline(&mut self) -> Result<(), &'static str> {
         if self.cmdline.is_empty() {
             return Ok(());
