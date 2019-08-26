@@ -131,7 +131,8 @@ fn parse_content(content: &String) -> Result<BTreeMap<usize, LineSlice>, &'stati
 /// Display part of the file (may be whole file if the file is short) to the terminal, starting
 /// at line number `line_start`.
 fn display_content(content: &String, map: &BTreeMap<usize, LineSlice>,
-                   line_start: usize, terminal: &Arc<Mutex<Terminal>>) {
+                   line_start: usize, terminal: &Arc<Mutex<Terminal>>)
+                   -> Result<(), &'static str> {
     // Get exclusive control of the terminal. It is locked through the whole function to
     // avoid the overhead of locking it multiple times.
     let mut locked_terminal = terminal.lock();
@@ -143,13 +144,21 @@ fn display_content(content: &String, map: &BTreeMap<usize, LineSlice>,
         line_end = map.len();
     }
 
-    // Refresh the terminal with the lines we've selected. Unwrap is used here since the keys
-    // passed to the map are guaranteed to be valid.
+    // Refresh the terminal with the lines we've selected.
+    let start_indicies = match map.get(&line_start) {
+        Some(indicies) => indicies,
+        None => return Err("failed to get the byte indicies of the first line")
+    };
+    let end_indicies = match map.get(&(line_end - 1)) {
+        Some(indicies) => indicies,
+        None => return Err("failed to get the byte indicies of the last line")
+    };
     locked_terminal.clear();
     locked_terminal.print_to_terminal(
-        content[map.get(&line_start).unwrap().start..map.get(&(line_end-1)).unwrap().end].to_string()
+        content[start_indicies.start..end_indicies.end].to_string()
     );
     locked_terminal.refresh_display(0);
+    Ok(())
 }
 
 /// Handle user keyboard strikes and perform corresponding operations.
@@ -162,7 +171,7 @@ fn event_handler_loop(content: &String, map: &BTreeMap<usize, LineSlice>,
 
     // Display the beginning of the file.
     let mut line_start: usize = 0;
-    display_content(content, map, 0, &terminal);
+    display_content(content, map, 0, &terminal)?;
 
     // Handle user keyboard strikes.
     loop {
@@ -182,14 +191,14 @@ fn event_handler_loop(content: &String, map: &BTreeMap<usize, LineSlice>,
                         if line_start + 1 < map.len() {
                             line_start += 1;
                         }
-                        display_content(content, map, line_start, &terminal);
+                        display_content(content, map, line_start, &terminal)?;
                     },
                     // Scroll up a line on "Up".
                     Keycode::Up => {
                         if line_start > 0 {
                             line_start -= 1;
                         }
-                        display_content(content, map, line_start, &terminal);
+                        display_content(content, map, line_start, &terminal)?;
                     }
                     _ => {}
                 }
