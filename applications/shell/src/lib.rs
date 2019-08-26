@@ -7,6 +7,7 @@
 //! Problem: Currently there's no upper bound to the user command line history.
 
 #![no_std]
+#![feature(slice_concat_ext)]
 extern crate frame_buffer;
 extern crate keycodes_ascii;
 extern crate spin;
@@ -25,7 +26,7 @@ extern crate scheduler;
 extern crate stdio;
 extern crate core_io;
 extern crate app_io;
-
+extern crate fs_node;
 extern crate terminal_print;
 extern crate print;
 extern crate environment;
@@ -54,6 +55,8 @@ use stdio::{Stdio, KeyEventQueue, KeyEventQueueReader, KeyEventQueueWriter,
 use core_io::Write;
 use core::ops::Deref;
 use app_io::{IoStreams, IoControlFlags};
+use fs_node::FileOrDir;
+use alloc::slice::SliceConcatExt;
 
 pub const APPLICATIONS_NAMESPACE_PATH: &'static str = "/namespaces/default/applications";
 
@@ -475,7 +478,7 @@ impl Shell {
         // Perform command line auto completion.
         if keyevent.keycode == Keycode::Tab {
             if self.fg_job_num.is_none() {
-                self.complete_cmdline();
+                self.complete_cmdline()?;
             }
             return Ok(());
         }
@@ -800,26 +803,137 @@ impl Shell {
         }
     }
 
-    /// Automatically complete the half-entered command line if possible.
-    /// If there exists only one possibility, the half-entered command line is completed.
-    /// If there are several possibilities, it will show all possibilities.
-    /// Otherwise, it does nothing.
-    fn complete_cmdline(&mut self) {
-        if self.cmdline.is_empty() {
-            return;
+    /// Try to match the incomplete command against all internal commands. Returns a
+    /// vector that contains all matching results.
+    fn find_internal_cmd_match(&mut self, incomplete_cmd: &String) -> Result<Vec<String>, &'static str> {
+        let internal_cmds = vec!["fg", "bg", "jobs", "clear"];
+        let mut match_cmds = Vec::new();
+        for cmd in internal_cmds.iter() {
+            if cmd.starts_with(incomplete_cmd) {
+                match_cmds.push(cmd.to_string());
+            }
         }
+        Ok(match_cmds)
+    }
 
+    /// Try to match the incomplete command against all applications in the same namespace.
+    /// Returns a vector that contains all matching results.
+    fn find_app_name_match(&mut self, incomplete_cmd: &String) -> Result<Vec<String>, &'static str> {
         let namespace_dir = match task::get_my_current_task()
             .map(|t| t.get_namespace().dir().clone())
             .ok_or(AppErr::NamespaceErr) {
             Ok(dir) => dir,
             Err(_) => {
-                error!("Failed to get namespace_dir while completing cmdline.");
-                return;
+                return Err("Failed to get namespace_dir while completing cmdline.");
             }
         };
-        let cmd_crate_name = format!("{}", self.cmdline);
-        let mut possible_names = namespace_dir.get_file_names_starting_with(&cmd_crate_name);
+        let cmd_crate_name = format!("{}", incomplete_cmd);
+        Ok(namespace_dir.get_file_names_starting_with(&cmd_crate_name))
+    }
+
+    /// Try to match the incomplete command against all possible path names. For example, if the
+    /// current command is `foo/bar/examp`, it first tries to walk the directory of `foo/bar`. If
+    /// it succeeds, it then lists all filenames under `foo/bar` and tries to match `examp` against
+    /// those filenames. It returns a vector that contains all matching results.
+    fn find_file_path_match(&mut self, incomplete_cmd: &String) -> Result<Vec<String>, &'static str> {
+
+        // Stores all possible matches.
+        let mut match_list = Vec::new();
+
+        let taskref = match task::get_my_current_task() {
+            Some(t) => t,
+            None => return Err("Failed to get task reference while completing cmdline.")
+        };
+
+        // Get current working dir.
+        let mut curr_wd = {
+            let locked_task = taskref.lock();
+            let curr_env = locked_task.env.lock();
+            Arc::clone(&curr_env.working_dir)
+        };
+
+        // Check if the last character is a slash.
+        let slash_ending = match incomplete_cmd.chars().last() {
+            Some('/') => true,
+            _ => false
+        };
+
+        // Split the path by slash and filter out consecutive slashes.
+        let mut nodes: Vec<_> = incomplete_cmd.split("/").filter(|node| { node.len() > 0 }).collect();
+
+        // Get the last node in the path, which is to be completed.
+        let incomplete_node = {
+            // If the command ends with a slash, then we should list all files under
+            // that directory. An empty string is always the prefix of any string.
+            if slash_ending {
+                ""
+            } else {
+                match nodes.pop() {
+                    Some(node) => node,
+                    None => return Ok(match_list)
+                }
+            }
+        };
+
+        // Walk through nodes existing in the command.
+        for node in &nodes {
+            let path = Path::new(node.to_string());
+            match path.get(&curr_wd) {
+                Some(file_dir_enum) => {
+                    match file_dir_enum {
+                        FileOrDir::Dir(dir) => { curr_wd = dir; },
+                        FileOrDir::File(_file) => { return Ok(match_list); }
+                    }
+                },
+                _ => { return Ok(match_list); }
+            };
+        }
+
+        // Try to match the name of the file.
+        let mut child_list = curr_wd.lock().list(); 
+        child_list.reverse();
+        for child in child_list.iter() {
+            if child.starts_with(&incomplete_node) {
+                match_list.push(child.clone());
+            }
+        }
+
+        // Change the matching name in the list to full path names.
+        let mut parent_dir = nodes.join("/");
+        if !parent_dir.is_empty() { parent_dir.push('/'); }
+        let mut full_path;
+        for match_name in match_list.iter_mut() {
+            full_path = parent_dir.clone() + match_name;
+            core::mem::swap(&mut full_path, match_name);
+        }
+        Ok(match_list)
+    }
+
+    /// Automatically complete the half-entered command line if possible.
+    /// If there exists only one possibility, the half-entered command line is completed.
+    /// If there are several possibilities, it will show all possibilities.
+    /// Otherwise, it does nothing.
+    fn complete_cmdline(&mut self) -> Result<(), &'static str> {
+        if self.cmdline.is_empty() {
+            return Ok(());
+        }
+
+        // Get the last string slice in the pipe chain.
+        let last_cmd_in_pipe = match self.cmdline.split("|").last() {
+            Some(cmd) => cmd,
+            None => return Ok(())
+        };
+
+        // Get the last word in the args (or maybe the command name itself).
+        let last_word_in_cmd = match last_cmd_in_pipe.split(" ").last() {
+            Some(word) => word.to_string(),
+            None => return Ok(())
+        };
+
+        // Try to find matches.
+        let mut possible_names = self.find_file_path_match(&last_word_in_cmd)?;
+        possible_names.extend(self.find_internal_cmd_match(&last_word_in_cmd)?.iter().cloned());
+        possible_names.extend(self.find_app_name_match(&last_word_in_cmd)?.iter().cloned());
 
         if !possible_names.is_empty() {
 
@@ -834,11 +948,11 @@ impl Shell {
 
             // only one possible name, complete the command line
             if possible_names.len() == 1 {
-                let current_cmd_len = self.cmdline.len();
-                for c in possible_names[0][current_cmd_len..possible_names[0].len()].chars() {
-                    if let Err(_) = self.insert_char_to_cmdline(c, true) {
-                        error!("Failed to insert character while completing cmdline.");
-                    }
+                for _ in 0..last_word_in_cmd.len() {
+                    self.remove_char_from_cmdline(true, true)?;
+                }
+                for c in possible_names[0].chars() {
+                    self.insert_char_to_cmdline(c, true)?;
                 }
             } else { // several possible names, list them sequentially
                 self.terminal.lock().print_to_terminal("\n".to_string());
@@ -847,13 +961,16 @@ impl Shell {
                     if !is_first {
                         self.terminal.lock().print_to_terminal("    ".to_string());
                     }
-                    self.terminal.lock().print_to_terminal(name);
+                    if let Some(basename) = name.split("/").last() {
+                        self.terminal.lock().print_to_terminal(basename.to_string());
+                    }
                     is_first = false;
                 }
                 self.terminal.lock().print_to_terminal("\n".to_string());
                 self.redisplay_prompt();
             }
         }
+        Ok(())
     }
 
     fn task_handler(&mut self) -> Result<(bool, bool), &'static str> {

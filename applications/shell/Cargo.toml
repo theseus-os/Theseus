@@ -79,5 +79,8 @@ version = "1.2.0"
 [dependencies.app_io]
 path = "../app_io"
 
+[dependencies.fs_node]
+path = "../../kernel/fs_node"
+
 [lib]
 crate-type = ["rlib"]
