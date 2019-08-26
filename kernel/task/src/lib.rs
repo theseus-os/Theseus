@@ -145,6 +145,8 @@ pub enum KillReason {
     /// A non-language-level problem, such as a Page Fault or some other machine exception.
     /// The number of the exception is included, e.g., 15 (0xE) for a Page Fault.
     Exception(u8),
+    /// Failed to spawn due to the failure of spawing other applications in the pipe chain.
+    BrokenPipeAtSpawn,
 }
 
 
