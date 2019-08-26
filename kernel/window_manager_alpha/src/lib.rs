@@ -364,8 +364,8 @@ impl WindowManagerAlpha {
         let y_start = core::cmp::max(y_start, 0);
         let y_end = core::cmp::min(y_end, self.final_fb.height as isize);
         if x_start <= x_end && y_start <= y_end {
-            for x in x_start .. x_end {
-                for y in y_start .. y_end {
+            for y in y_start .. y_end {
+                for x in x_start .. x_end {
                     self.refresh_single_pixel_with_buffer(x as usize, y as usize)?;
                 }
             }
@@ -868,14 +868,14 @@ fn move_cursor_to(nx: usize, ny: usize) -> Result<(), &'static str> {
     let mut win = WINDOW_MANAGER.try().ok_or("The static window manager was not yet initialized")?.lock();
     win.mouse = Point { x: nx, y: ny };
     // then update region of old mouse
-    for x in (ox-MOUSE_POINTER_HALF_SIZE) as isize .. (ox+MOUSE_POINTER_HALF_SIZE+1) as isize {
-        for y in (oy-MOUSE_POINTER_HALF_SIZE) as isize .. (oy+MOUSE_POINTER_HALF_SIZE+1) as isize {
+    for y in (oy-MOUSE_POINTER_HALF_SIZE) as isize .. (oy+MOUSE_POINTER_HALF_SIZE+1) as isize {
+        for x in (ox-MOUSE_POINTER_HALF_SIZE) as isize .. (ox+MOUSE_POINTER_HALF_SIZE+1) as isize {
             win.refresh_single_pixel(x, y)?;
         }
     }
     // draw new mouse in the new position
-    for x in (nx-MOUSE_POINTER_HALF_SIZE) as isize .. (nx+MOUSE_POINTER_HALF_SIZE+1) as isize {
-        for y in (ny-MOUSE_POINTER_HALF_SIZE) as isize .. (ny+MOUSE_POINTER_HALF_SIZE+1) as isize {
+    for y in (ny-MOUSE_POINTER_HALF_SIZE) as isize .. (ny+MOUSE_POINTER_HALF_SIZE+1) as isize {
+        for x in (nx-MOUSE_POINTER_HALF_SIZE) as isize .. (nx+MOUSE_POINTER_HALF_SIZE+1) as isize {
             win.refresh_single_pixel(x, y)?;
         }
     }
