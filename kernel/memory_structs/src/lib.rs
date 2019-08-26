@@ -673,10 +673,10 @@ pub struct MemoryMappingInfo {
     pub flags: Option<EntryFlags>,
 }
 
-/// The mapping information of the kernel sections. 
-/// It only contains the section we care about.
+/// The mapping information of merged kernel sections.
+/// It only contains the three sections we care about.
 #[derive(Default)]
-pub struct KernelSectionsMappingInfo {
+pub struct SectionsMappingInfo {
    pub text: MemoryMappingInfo,
    pub rodata: MemoryMappingInfo,
    pub data: MemoryMappingInfo,

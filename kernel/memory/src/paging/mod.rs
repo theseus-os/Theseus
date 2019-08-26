@@ -230,18 +230,18 @@ pub fn init(allocator_mutex: &MutexIrqSafe<AreaFrameAllocator>, boot_info: &mult
 
             // add virtual memory areas occupied by kernel data and code sections
             let (mut index, 
-                kernel_sections_info,
-                all_sections_info) = add_sections_vmem_areas(&boot_info, &mut vmas)?;
+                sections_info,
+                memories_info) = add_sections_vmem_areas(&boot_info, &mut vmas)?;
 
             // to allow the APs to boot up, we identity map the kernel sections too.
             // (lower half virtual addresses mapped to same lower half physical addresses)
             // we will unmap these later before we start booting to userspace processes
             for i in 0..index {
-                let section_info = &all_sections_info[i];
-                let (start_virt_addr, start_phys_addr) = section_info.start.ok_or("Couldn't find start of the section")?;
-                let (_end_virt_addr, end_phys_addr) = section_info.end.ok_or("Couldn't find end of the section")?;
+                let memory_info = &memories_info[i];
+                let (start_virt_addr, start_phys_addr) = memory_info.start.ok_or("Couldn't find start of the section")?;
+                let (_end_virt_addr, end_phys_addr) = memory_info.end.ok_or("Couldn't find end of the section")?;
                 let size = end_phys_addr.value() - start_phys_addr.value();
-                let flags = section_info.flags.ok_or("Couldn't find the section flags")?;
+                let flags = memory_info.flags.ok_or("Couldn't find the section flags")?;
                 identity_mapped_pages[i] = Some(
                     mapper.map_frames(
                         FrameRange::from_phys_addr(start_phys_addr, size), 
@@ -254,16 +254,16 @@ pub fn init(allocator_mutex: &MutexIrqSafe<AreaFrameAllocator>, boot_info: &mult
             }
 
 
-            let (text_start_virt,    text_start_phys)    = kernel_sections_info.text.start  .ok_or("Couldn't find start of .text section")?;
-            let (_text_end_virt,     text_end_phys)      = kernel_sections_info.text.end    .ok_or("Couldn't find end of .text section")?;
-            let (rodata_start_virt,  rodata_start_phys)  = kernel_sections_info.rodata.start.ok_or("Couldn't find start of .rodata section")?;
-            let (_rodata_end_virt,   rodata_end_phys)    = kernel_sections_info.rodata.end  .ok_or("Couldn't find end of .rodata section")?;
-            let (data_start_virt,    data_start_phys)    = kernel_sections_info.data.start  .ok_or("Couldn't find start of .data section")?;
-            let (_data_end_virt,     data_end_phys)      = kernel_sections_info.data.end    .ok_or("Couldn't find start of .data section")?;
+            let (text_start_virt,    text_start_phys)    = sections_info.text.start  .ok_or("Couldn't find start of .text section")?;
+            let (_text_end_virt,     text_end_phys)      = sections_info.text.end    .ok_or("Couldn't find end of .text section")?;
+            let (rodata_start_virt,  rodata_start_phys)  = sections_info.rodata.start.ok_or("Couldn't find start of .rodata section")?;
+            let (_rodata_end_virt,   rodata_end_phys)    = sections_info.rodata.end  .ok_or("Couldn't find end of .rodata section")?;
+            let (data_start_virt,    data_start_phys)    = sections_info.data.start  .ok_or("Couldn't find start of .data section")?;
+            let (_data_end_virt,     data_end_phys)      = sections_info.data.end    .ok_or("Couldn't find start of .data section")?;
 
-            let text_flags    = kernel_sections_info.text.flags  .ok_or("Couldn't find .text section flags")?;
-            let rodata_flags  = kernel_sections_info.rodata.flags.ok_or("Couldn't find .rodata section flags")?;
-            let data_flags    = kernel_sections_info.data.flags  .ok_or("Couldn't find .data section flags")?;
+            let text_flags    = sections_info.text.flags  .ok_or("Couldn't find .text section flags")?;
+            let rodata_flags  = sections_info.rodata.flags.ok_or("Couldn't find .rodata section flags")?;
+            let data_flags    = sections_info.data.flags  .ok_or("Couldn't find .data section flags")?;
 
 
             // now we map the 5 main sections into 3 groups according to flags

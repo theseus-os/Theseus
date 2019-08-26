@@ -22,7 +22,7 @@ pub use entryflags_x86_64::EntryFlags;
 
 use kernel_config::memory::KERNEL_OFFSET;
 use memory_structs::{
-    Frame, PhysicalAddress, PhysicalMemoryArea, VirtualAddress, VirtualMemoryArea, MemoryMappingInfo, KernelSectionsMappingInfo,
+    Frame, PhysicalAddress, PhysicalMemoryArea, VirtualAddress, VirtualMemoryArea, MemoryMappingInfo, SectionsMappingInfo,
 };
 use x86_64::{registers::control_regs, instructions::tlb};
 
@@ -162,19 +162,12 @@ pub fn get_boot_info_vaddress(
 /// 
 /// Returns the following tuple, if successful:
 ///  * The number of added memory areas;
-///  * The mapping information of the kernel sections. The three sections we care are {text, rodata, data}.
-///  * a list of the information about all sections.
+///  * The mapping information of merged kernel sections. The three sections after merging are {text, rodata, data}.
+///  * a list of the mapping information about all sections.
 pub fn add_sections_vmem_areas(
     boot_info: &BootInformation,
     vmas: &mut [VirtualMemoryArea; 32],
-) -> Result<
-    (
-        usize,
-        KernelSectionsMappingInfo,
-        [MemoryMappingInfo; 32],
-    ),
-    &'static str,
-> {
+) -> Result<(usize, SectionsMappingInfo, [MemoryMappingInfo; 32]), &'static str> {
     let elf_sections_tag = try!(boot_info
         .elf_sections_tag()
         .ok_or("no Elf sections tag present!"));
@@ -191,7 +184,7 @@ pub fn add_sections_vmem_areas(
     let mut rodata_flags: Option<EntryFlags> = None;
     let mut data_flags: Option<EntryFlags> = None;
 
-    let mut all_sections_info: [MemoryMappingInfo; 32] =
+    let mut memories_mapping_info: [MemoryMappingInfo; 32] =
         Default::default();
 
     // map the allocated kernel text sections
@@ -294,8 +287,8 @@ pub fn add_sections_vmem_areas(
             vmas[index]
         );
 
-        // These sections will be mapped to identical lower half addresses. 
-        all_sections_info[index] = MemoryMappingInfo {
+        // These memories will be mapped to identical lower half addresses. 
+        memories_mapping_info[index] = MemoryMappingInfo {
             start: Some((start_virt_addr, start_phys_addr)),
             end: Some((end_virt_addr, end_phys_addr)),
             flags: Some(flags),
@@ -320,13 +313,13 @@ pub fn add_sections_vmem_areas(
         flags: data_flags,
     };
 
-    let kernel_secions_info = KernelSectionsMappingInfo {
+    let secions_mapping_info = SectionsMappingInfo {
         text: text,
         rodata: rodata,
         data: data,
     };
 
-    Ok((index, kernel_secions_info, all_sections_info))
+    Ok((index, secions_mapping_info, memories_mapping_info))
 }
 
 
