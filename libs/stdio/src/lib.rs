@@ -169,6 +169,7 @@ impl StdioReader {
             // If we have read a whole line, copy any byte left to inner buffer, and then return.
             if line_finished {
                 self.inner_buf[0..new_cnt-cnt_before_new_line].clone_from_slice(&tmp_buf[cnt_before_new_line..new_cnt]);
+                self.inner_content_len = new_cnt - cnt_before_new_line;
                 return Ok(total_cnt);
             }
 
@@ -257,6 +258,10 @@ impl<'a> StdioReadGuard<'a> {
         }
 
         return Ok(cnt);
+    }
+
+    pub fn left_size(&self) -> usize {
+        return self.guard.lock().queue.len();
     }
 }
 
