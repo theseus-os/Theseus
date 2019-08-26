@@ -32,7 +32,7 @@ pub type RingBufferEofRef<T> = Arc<Mutex<RingBufferEof<T>>>;
 /// A ring buffer containing bytes. It forms `stdin`, `stdout` and `stderr`.
 /// The two `Arc`s actually point to the same ring buffer. It is designed to prevent
 /// interleaved reading but at the same time allow writing to the ring buffer while
-/// the reader is holding the lock, and vice versa.
+/// the reader is holding its lock, and vice versa.
 pub struct Stdio {
     /// This prevents interleaved reading.
     read_access: Arc<Mutex<RingBufferEofRef<u8>>>,
@@ -106,7 +106,7 @@ impl Stdio {
     /// Get a reader to the stdio buffer with a customized buffer size.
     /// Note that each reader has its own inner buffer.
     pub fn get_reader_with_buf_capacity(&self, capacity: usize) -> StdioReader {
-        let mut inner_buf = Vec::new();
+        let mut inner_buf = Vec::with_capacity(capacity);
         inner_buf.resize(capacity, 0u8);
         StdioReader {
             inner_buf: inner_buf.into_boxed_slice(),
