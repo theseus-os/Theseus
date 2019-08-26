@@ -217,10 +217,13 @@ impl<'a> Read for StdioReadGuard<'a> {
 
                 // Keep reading if we have empty space in the output buffer
                 // and available byte in the ring buffer.
-                while let (Some(buf_elem), Some(queue_elem))
-                            = (buf_iter.next(), locked_ring_buf.queue.pop_front()) {
-                    *buf_elem = queue_elem;
-                    cnt += 1;
+                while let Some(buf_entry) = buf_iter.next() {
+                    if let Some(queue_elem) = locked_ring_buf.queue.pop_front() {
+                        *buf_entry = queue_elem;
+                        cnt += 1;
+                    } else {
+                        break;
+                    }
                 }
 
                 end = locked_ring_buf.end;
