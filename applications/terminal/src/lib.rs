@@ -42,9 +42,6 @@ use environment::Environment;
 use spin::Mutex;
 use tsc::{tsc_ticks, TscTicks};
 
-pub const APPLICATIONS_NAMESPACE_PATH: &'static str = "/namespaces/default/applications";
-
-
 
 /// A main function that calls terminal::new() and waits for the terminal loop to exit before returning an exit value
 #[no_mangle]

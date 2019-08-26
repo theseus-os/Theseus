@@ -29,6 +29,9 @@ path = "../font"
 features = ["spin_no_std", "nightly"]
 version = "1.2.0"
 
+[dependencies.mod_mgmt]
+path = "../mod_mgmt"
+
 [dependencies.spawn]
 path = "../spawn"
 

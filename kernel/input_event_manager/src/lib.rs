@@ -20,7 +20,7 @@ extern crate path;
 extern crate alloc;
 
 use alloc::{
-    string::{ToString},
+    string::ToString,
     sync::Arc,
 };
 use event_types::{Event};
@@ -30,7 +30,8 @@ use mod_mgmt::{
     NamespaceDir,
     metadata::CrateType,
 };
-use spawn::{ApplicationTaskBuilder};
+use spawn::ApplicationTaskBuilder;
+
 
 /// Initializes the keyinput queue and the default display
 pub fn init() -> Result<(DFQueueProducer<Event>, DFQueueConsumer<Event>, DFQueueProducer<Event>, DFQueueConsumer<Event>), &'static str> {
