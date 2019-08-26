@@ -7,9 +7,11 @@
 //!    along with the reader of key event queue and the pointer to the running terminal instance.
 //! 3. app calls app_io::stdin to get the reader of `stdin`, and can perform reading just like
 //!    using the standard library
-//! 4. app calls app_io::stdout to get the writer of stdin, and can perform output just like
+//! 4. app calls app_io::stdout to get the writer of `stdin`, and can perform output just like
 //!    using the standard library
-//! 5. after app exits, shell removes the structure stored in `app_io` and destructs all stdio queues
+//! 5. after app exits, shell would set EOF flags to its `stdin`, `stdout` and `stderr` queues.
+//! 6. if all apps in a job exit, app shell removes all the structure stored in `app_io` and
+//!    destructs all stdio queues
 
 #![no_std]
 
