@@ -33,8 +33,8 @@ path = "../kernel_config"
 [dependencies.heap_irq_safe]
 path = "../heap_irq_safe"
 
-[dependencies.memory_x86]
-path = "../memory_x86"
+[dependencies.memory_x86_64]
+path = "../memory_x86_64"
 
 [dependencies.memory_structs]
 path = "../memory_structs"

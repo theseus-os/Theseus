@@ -407,7 +407,7 @@ version = "1.5.0"
 source = "registry+https://github.com/rust-lang/crates.io-index"
 
 [[package]]
-name = "entryflags_x86"
+name = "entryflags_x86_64"
 version = "0.1.0"
 dependencies = [
  "bitflags 1.1.0 (registry+https://github.com/rust-lang/crates.io-index)",
@@ -854,7 +854,7 @@ dependencies = [
  "lazy_static 1.2.0 (registry+https://github.com/rust-lang/crates.io-index)",
  "log 0.3.9 (registry+https://github.com/rust-lang/crates.io-index)",
  "memory_structs 0.1.0",
- "memory_x86 0.1.0",
+ "memory_x86_64 0.1.0",
  "multiboot2 0.7.1 (registry+https://github.com/rust-lang/crates.io-index)",
  "spin 0.4.10 (registry+https://github.com/rust-lang/crates.io-index)",
  "type-name 0.1.0 (registry+https://github.com/rust-lang/crates.io-index)",
@@ -868,7 +868,7 @@ dependencies = [
  "atomic_linked_list 0.1.0",
  "bit_field 0.7.0 (registry+https://github.com/rust-lang/crates.io-index)",
  "derive_more 0.14.0 (registry+https://github.com/rust-lang/crates.io-index)",
- "entryflags_x86 0.1.0",
+ "entryflags_x86_64 0.1.0",
  "heap_irq_safe 0.1.0",
  "kernel_config 0.1.0",
  "multiboot2 0.7.1 (registry+https://github.com/rust-lang/crates.io-index)",
@@ -877,10 +877,10 @@ dependencies = [
 ]
 
 [[package]]
-name = "memory_x86"
+name = "memory_x86_64"
 version = "0.1.0"
 dependencies = [
- "entryflags_x86 0.1.0",
+ "entryflags_x86_64 0.1.0",
  "kernel_config 0.1.0",
  "log 0.3.9 (registry+https://github.com/rust-lang/crates.io-index)",
  "memory_structs 0.1.0",

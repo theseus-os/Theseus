@@ -17,7 +17,7 @@ use paging::table::{P4, Table, Level4};
 use kernel_config::memory::{ENTRIES_PER_PAGE_TABLE, PAGE_SIZE, TEMPORARY_PAGE_VIRT_ADDR};
 use alloc::vec::Vec;
 use type_name;
-use super::{EntryFlags, flush};
+use super::{EntryFlags, tlb_flush_virt_addr};
 
 pub struct Mapper {
     p4: Unique<Table<Level4>>,
@@ -543,7 +543,7 @@ impl MappedPages {
             p1[page.p1_index()].set(frame, new_flags | EntryFlags::default_flags());
 
             let vaddr = page.start_address();
-            flush(vaddr);
+            tlb_flush_virt_addr(vaddr);
             if broadcast_tlb_shootdown.is_some() && vaddr.value() != TEMPORARY_PAGE_FRAME {
                 vaddrs.push(vaddr);
             }
@@ -583,7 +583,7 @@ impl MappedPages {
             p1[page.p1_index()].set_unused();
 
             let vaddr = page.start_address();
-            flush(page.start_address());
+            tlb_flush_virt_addr(page.start_address());
             if broadcast_tlb_shootdown.is_some() && vaddr.value() != TEMPORARY_PAGE_FRAME {
                 vaddrs.push(vaddr);
             }

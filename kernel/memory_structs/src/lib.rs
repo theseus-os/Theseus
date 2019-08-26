@@ -13,7 +13,7 @@ extern crate xmas_elf;
 #[macro_use] extern crate derive_more;
 extern crate bit_field;
 #[cfg(target_arch = "x86_64")]
-extern crate entryflags_x86;
+extern crate entryflags_x86_64;
 extern crate type_name;
 
 use bit_field::BitField;
@@ -24,7 +24,7 @@ use core::{
 };
 use kernel_config::memory::{MAX_PAGE_NUMBER, PAGE_SIZE};
 #[cfg(target_arch = "x86_64")]
-use entryflags_x86::EntryFlags;
+use entryflags_x86_64::EntryFlags;
 
 /// A virtual memory address, which is a `usize` under the hood.
 #[derive(
@@ -659,4 +659,25 @@ impl IntoIterator for PageRange {
     fn into_iter(self) -> Self::IntoIter {
         self.0
     }
+}
+
+
+/// The information of a memory area for mapping.
+#[derive(Default)]
+pub struct MemoryMappingInfo {
+    /// The start address. It contains the virtual address and the physical address.
+    pub start: Option<(VirtualAddress, PhysicalAddress)>,
+    /// The end address. It contains the virtual address and the physical address.
+    pub end: Option<(VirtualAddress, PhysicalAddress)>,
+    /// The entry flags of the memory.
+    pub flags: Option<EntryFlags>,
+}
+
+/// The mapping information of the kernel sections. 
+/// It only contains the section we care about.
+#[derive(Default)]
+pub struct KernelSectionsMappingInfo {
+   pub text: MemoryMappingInfo,
+   pub rodata: MemoryMappingInfo,
+   pub data: MemoryMappingInfo,
 }

@@ -121,7 +121,7 @@ impl PageTable {
 
         // overwrite recursive mapping
         self.p4_mut()[RECURSIVE_P4_INDEX].set(other_table.p4_table.clone(), EntryFlags::rw_flags());         
-        flush_all();
+        tlb_flush_all();
 
         // set mapper's target frame to reflect that future mappings will be mapped into the other_table
         self.mapper.target_p4 = other_table.p4_table.clone();
@@ -134,7 +134,7 @@ impl PageTable {
 
         // restore recursive mapping to original p4 table
         p4_table[RECURSIVE_P4_INDEX].set(backup, EntryFlags::rw_flags());
-        flush_all();
+        tlb_flush_all();
 
         // here, temporary_page is dropped, which auto unmaps it
         ret
@@ -148,7 +148,7 @@ impl PageTable {
 
         // perform the actual page table switch
         // requires absolute path to specify the arch-specific type
-        set_new_p4(new_table.p4_table.start_address());
+        set_p4(new_table.p4_table.start_address());
         let current_table_after_switch = PageTable::from_current();
         current_table_after_switch
     }
@@ -159,6 +159,13 @@ impl PageTable {
         self.p4_table.start_address()
     }
 }
+
+
+/// Returns the current top-level page table frame, e.g., cr3 on x86
+pub fn get_current_p4() -> Frame {
+    Frame::containing_address(get_p4())
+}
+
 
 /// Initializes a new page table and sets up all necessary mappings for the kernel to continue running. 
 /// Returns the following tuple, if successful:
@@ -223,21 +230,22 @@ pub fn init(allocator_mutex: &MutexIrqSafe<AreaFrameAllocator>, boot_info: &mult
 
             // add virtual memory areas occupied by kernel data and code sections
             let (mut index, 
-                text_start, text_end, 
-                rodata_start, rodata_end, 
-                data_start, data_end, 
-                text_flags, rodata_flags, data_flags,
-                identity_sections) = add_sections_vmem_areas(&boot_info, &mut vmas)?;
+                kernel_sections_info,
+                all_sections_info) = add_sections_vmem_areas(&boot_info, &mut vmas)?;
 
             // to allow the APs to boot up, we identity map the kernel sections too.
             // (lower half virtual addresses mapped to same lower half physical addresses)
             // we will unmap these later before we start booting to userspace processes
             for i in 0..index {
-                let (start_phys_addr, start_virt_addr, size, flags) = identity_sections[i]; 
+                let section_info = &all_sections_info[i];
+                let (start_virt_addr, start_phys_addr) = section_info.start.ok_or("Couldn't find start of the section")?;
+                let (_end_virt_addr, end_phys_addr) = section_info.end.ok_or("Couldn't find end of the section")?;
+                let size = end_phys_addr.value() - start_phys_addr.value();
+                let flags = section_info.flags.ok_or("Couldn't find the section flags")?;
                 identity_mapped_pages[i] = Some(
                     mapper.map_frames(
                         FrameRange::from_phys_addr(start_phys_addr, size), 
-                        Page::containing_address(start_virt_addr),// the returned virtual address is identical 
+                        Page::containing_address(start_virt_addr - KERNEL_OFFSET), 
                         flags,
                         allocator.deref_mut()
                     )?
@@ -245,16 +253,17 @@ pub fn init(allocator_mutex: &MutexIrqSafe<AreaFrameAllocator>, boot_info: &mult
                 debug!("           also mapped vaddr {:#X} to paddr {:#x} (size {:#X})", start_virt_addr - KERNEL_OFFSET, start_phys_addr, size);
             }
 
-            let (text_start_virt,    text_start_phys)    = text_start  .ok_or("Couldn't find start of .text section")?;
-            let (_text_end_virt,     text_end_phys)      = text_end    .ok_or("Couldn't find end of .text section")?;
-            let (rodata_start_virt,  rodata_start_phys)  = rodata_start.ok_or("Couldn't find start of .rodata section")?;
-            let (_rodata_end_virt,   rodata_end_phys)    = rodata_end  .ok_or("Couldn't find end of .rodata section")?;
-            let (data_start_virt,    data_start_phys)    = data_start  .ok_or("Couldn't find start of .data section")?;
-            let (_data_end_virt,     data_end_phys)      = data_end    .ok_or("Couldn't find start of .data section")?;
 
-            let text_flags    = text_flags  .ok_or("Couldn't find .text section flags")?;
-            let rodata_flags  = rodata_flags.ok_or("Couldn't find .rodata section flags")?;
-            let data_flags    = data_flags  .ok_or("Couldn't find .data section flags")?;
+            let (text_start_virt,    text_start_phys)    = kernel_sections_info.text.start  .ok_or("Couldn't find start of .text section")?;
+            let (_text_end_virt,     text_end_phys)      = kernel_sections_info.text.end    .ok_or("Couldn't find end of .text section")?;
+            let (rodata_start_virt,  rodata_start_phys)  = kernel_sections_info.rodata.start.ok_or("Couldn't find start of .rodata section")?;
+            let (_rodata_end_virt,   rodata_end_phys)    = kernel_sections_info.rodata.end  .ok_or("Couldn't find end of .rodata section")?;
+            let (data_start_virt,    data_start_phys)    = kernel_sections_info.data.start  .ok_or("Couldn't find start of .data section")?;
+            let (_data_end_virt,     data_end_phys)      = kernel_sections_info.data.end    .ok_or("Couldn't find start of .data section")?;
+
+            let text_flags    = kernel_sections_info.text.flags  .ok_or("Couldn't find .text section flags")?;
+            let rodata_flags  = kernel_sections_info.rodata.flags.ok_or("Couldn't find .rodata section flags")?;
+            let data_flags    = kernel_sections_info.data.flags  .ok_or("Couldn't find .data section flags")?;
 
 
             // now we map the 5 main sections into 3 groups according to flags

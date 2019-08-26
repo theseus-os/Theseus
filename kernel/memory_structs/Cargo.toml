@@ -1,5 +1,5 @@
 [package]
-authors = ["Wenqiu Yu<yuwenqiu@gmail.com>"]
+authors = ["Kevin Boos <kevinaboos@gmail.com>"]
 name = "memory_structs"
 description = "The common structs of memory system"
 version = "0.1.0"
@@ -26,8 +26,8 @@ path = "../kernel_config"
 [dependencies.heap_irq_safe]
 path = "../heap_irq_safe"
 
-[dependencies.entryflags_x86]
-path = "../entryflags_x86"
+[dependencies.entryflags_x86_64]
+path = "../entryflags_x86_64"
 
 [lib]
 crate-type = ["rlib"]

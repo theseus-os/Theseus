@@ -23,7 +23,7 @@ extern crate heap_irq_safe;
 extern crate bit_field;
 extern crate type_name;
 #[cfg(target_arch = "x86_64")]
-extern crate memory_x86;
+extern crate memory_x86_64;
 extern crate memory_structs;
 
 
@@ -56,10 +56,10 @@ pub use self::stack_allocator::{StackAllocator, Stack};
 pub use memory_structs::*;
 
 #[cfg(target_arch = "x86_64")]
-use memory_x86::*;
+use memory_x86_64::*;
 
 #[cfg(target_arch = "x86_64")]
-pub use memory_x86::EntryFlags;// Export EntryFlags so that others does not need to get access to memory_<arch>.
+pub use memory_x86_64::EntryFlags;// Export EntryFlags so that others does not need to get access to memory_<arch>.
 
 
 use core::{
