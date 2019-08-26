@@ -1,3 +1,5 @@
+//! A text file reader which allows the user using `Up` and `Down` to scroll the screen.
+
 #![no_std]
 
 #[macro_use] extern crate alloc;
