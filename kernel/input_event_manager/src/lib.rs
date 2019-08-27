@@ -8,6 +8,7 @@
 //! In the future, the input event manager will handle other forms of input to the OS
 
 #![no_std]
+#[macro_use] extern crate log;
 extern crate keycodes_ascii;
 extern crate spin;
 extern crate dfqueue;
@@ -18,13 +19,15 @@ extern crate event_types;
 extern crate window_manager;
 extern crate path;
 extern crate alloc;
+extern crate window_manager_alpha;
+extern crate frame_buffer_alpha;
 
 use alloc::{
     string::ToString,
     sync::Arc,
 };
 use event_types::{Event};
-use dfqueue::{DFQueue, DFQueueConsumer, DFQueueProducer};
+use dfqueue::{DFQueue, DFQueueProducer};
 use mod_mgmt::{
     CrateNamespace,
     NamespaceDir,
@@ -34,7 +37,7 @@ use spawn::ApplicationTaskBuilder;
 
 
 /// Initializes the keyinput queue and the default display
-pub fn init() -> Result<(DFQueueProducer<Event>, DFQueueConsumer<Event>, DFQueueProducer<Event>, DFQueueConsumer<Event>), &'static str> {
+pub fn init() -> Result<(DFQueueProducer<Event>, DFQueueProducer<Event>), &'static str> {
     // keyinput queue initialization
     let keyboard_event_handling_queue: DFQueue<Event> = DFQueue::new();
     let keyboard_event_handling_consumer = keyboard_event_handling_queue.into_consumer();
@@ -66,6 +69,31 @@ pub fn init() -> Result<(DFQueueProducer<Event>, DFQueueConsumer<Event>, DFQueue
     let terminal_path = default_app_namespace.get_crate_file_starting_with("terminal-")
         .ok_or("Couldn't find terminal application in default app namespace")?;
 
+    // init frame_buffer_alpha
+    let rs = frame_buffer_alpha::init();
+    let final_fb = match rs {
+        Ok(final_fb) => {
+            trace!("Frame_buffer_alpha initialized successfully.");
+            final_fb
+        }
+        Err(err) => { 
+            error!("captain::init(): failed to initialize frame_buffer_alpha");
+            return Err(err);
+        }
+    };
+
+    // init window manager_alpha
+    let rs = window_manager_alpha::init(keyboard_event_handling_consumer, mouse_event_handling_consumer, final_fb);
+    match rs {
+        Ok(_) => {
+            trace!("window manager alpha initialized successfully.");
+        }
+        Err(err) => { 
+            error!("captain::init(): failed to initialize window manager alpha");
+            return Err(err);
+        }
+    }
+
     // Spawns the terminal print crate so that we can print to the terminal
     ApplicationTaskBuilder::new(terminal_print_path)
         .name("terminal_print_singleton".to_string())
@@ -79,5 +107,5 @@ pub fn init() -> Result<(DFQueueProducer<Event>, DFQueueConsumer<Event>, DFQueue
         .namespace(default_app_namespace)
         .spawn()?;
 
-    Ok((returned_keyboard_producer, keyboard_event_handling_consumer, returned_mouse_producer, mouse_event_handling_consumer))
+    Ok((returned_keyboard_producer, returned_mouse_producer))
 }

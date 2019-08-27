@@ -40,9 +40,7 @@ extern crate interrupts;
 extern crate acpi;
 extern crate device_manager;
 extern crate e1000;
-extern crate window_manager_alpha;
 extern crate scheduler;
-extern crate frame_buffer_alpha;
 #[cfg(mirror_log_to_vga)] #[macro_use] extern crate print;
 extern crate input_event_manager;
 #[cfg(test_network)] extern crate exceptions_full;
@@ -123,33 +121,8 @@ pub fn init(
     let ap_count = multicore_bringup::handle_ap_cores(kernel_mmi_ref.clone(), ap_start_realmode_begin, ap_start_realmode_end)?;
     info!("Finished handling and booting up all {} AP cores.", ap_count);
 
-    // init frame_buffer_alpha
-    let rs = frame_buffer_alpha::init();
-    let final_fb = match rs {
-        Ok(final_fb) => {
-            trace!("Frame_buffer_alpha initialized successfully.");
-            final_fb
-        }
-        Err(err) => { 
-            error!("captain::init(): failed to initialize frame_buffer_alpha");
-            return Err(err);
-        }
-    };
-
-    // initialize the input event manager, which will start the default terminal 
-    let (key_producer, key_consumer, mouse_producer, mouse_consumer) = input_event_manager::init()?;
-
-    // init window manager_alpha
-    let rs = window_manager_alpha::init(key_consumer, mouse_consumer, final_fb);
-    match rs {
-        Ok(_) => {
-            trace!("window manager alpha initialized successfully.");
-        }
-        Err(err) => { 
-            error!("captain::init(): failed to initialize window manager alpha");
-            return Err(err);
-        }
-    }
+    // initialize the input event manager, which will start window manager and the default terminal 
+    let (key_producer, mouse_producer) = input_event_manager::init()?;
 
     // initialize the rest of our drivers
     device_manager::init(key_producer, mouse_producer)?;

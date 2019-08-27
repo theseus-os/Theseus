@@ -24,12 +24,6 @@ path = "../kernel_config"
 [dependencies.logger]
 path = "../logger"
 
-[dependencies.frame_buffer_alpha]
-path = "../frame_buffer_alpha"
-
-[dependencies.window_manager_alpha]
-path = "../window_manager_alpha"
-
 #[dependencies.graph_drawer]
 #path = "../graph_drawer"
 

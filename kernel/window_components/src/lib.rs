@@ -151,7 +151,9 @@ impl WindowComponents {
             wincomps.show_button(TopButton::MinimizeMaximize, 1, &mut winobj);
             wincomps.show_button(TopButton::Hide, 1, &mut winobj);
         }
+        debug!("before refresh");
         window_manager_alpha::refresh_area_absolute(x_start, x_end, y_start, y_end)?;
+        debug!("after refresh");
 
         Ok(Arc::new(Mutex::new(wincomps)))
     }

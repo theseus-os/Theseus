@@ -52,7 +52,7 @@ const O: Pixel = Pixel { alpha: 0x00, red: 0xFF, green: 0xFF, blue: 0xFF };
 /// Opaque blue
 const B: Pixel = Pixel { alpha: 0x00, red: 0x00, green: 0x00, blue: 0xFF };
 /// the mouse picture
-const MOUSE_BASIC: [[Pixel; 2*MOUSE_POINTER_HALF_SIZE+1]; 2*MOUSE_POINTER_HALF_SIZE+1] = [
+static MOUSE_BASIC: [[Pixel; 2*MOUSE_POINTER_HALF_SIZE+1]; 2*MOUSE_POINTER_HALF_SIZE+1] = [
     [ T, T, T, T, T, T, T, T, T, T, T, T, T, T, T ],
     [ T, T, T, T, T, T, T, T, T, T, T, T, T, T, T ],
     [ T, T, T, T, T, T, T, T, T, T, T, T, T, T, T ],
@@ -224,8 +224,8 @@ impl WindowManagerAlpha {
             // first get current color, to determine whether further get colors below   
             let top = {
                 let winobj = now_winobj.lock();
-                let relative_x = x - winobj.x as usize;
-                let relative_y = y - winobj.y as usize;
+                let relative_x = (x as isize - winobj.x) as usize;
+                let relative_y = (y as isize - winobj.y) as usize;
                 let mut ret = T;  // defult is transparent
                 if winobj.framebuffer.check_in_buffer(relative_x, relative_y) {
                     let top = match winobj.framebuffer.get_pixel(relative_x, relative_y) {
@@ -252,10 +252,12 @@ impl WindowManagerAlpha {
         if ! self.final_fb.check_in_buffer(x, y) {
             return Ok(());
         }
+        let sx = x as isize;
+        let sy = y as isize;
         if let Some(current_active) = self.active.upgrade() {
             let current_active_win = current_active.lock();
-            let relative_x = x - current_active_win.x as usize;
-            let relative_y = y - current_active_win.y as usize;
+            let relative_x = (sx - current_active_win.x) as usize;
+            let relative_y = (sy - current_active_win.y) as usize;
             if current_active_win.framebuffer.check_in_buffer(relative_x,  relative_y) {
                 let top = current_active_win.framebuffer.get_pixel(relative_x,  relative_y)?;
                 if top.alpha == 0 {  // totally opaque, so not waste computation
@@ -278,69 +280,65 @@ impl WindowManagerAlpha {
                 let r = &repositioned_border;
                 (r.x_start, r.x_end, r.y_start, r.y_end)
             };
-            let sx = x as isize;
-            let sy = y as isize;
-            let ux_start = x_start as usize;
-            let uy_start = y_start as usize;
-            let ux_end_1 = (x_end - 1) as usize;
-            let uy_end_1 = (y_end - 1) as usize;
+            let sx_end_1 = x_end - 1;
+            let sy_end_1 = y_end - 1;
             let window_border_size = WINDOW_BORDER_SIZE as isize;
-            let x_in = sx >= x_start - window_border_size && sx <= x_end-1 + window_border_size;
-            let y_in = sy >= y_start - window_border_size && sy <= y_end-1 + window_border_size;
-            let left = ux_start - x <= WINDOW_BORDER_SIZE && y_in;
-            let right = x - ux_end_1 <= WINDOW_BORDER_SIZE && y_in;
-            let top = uy_start - y <= WINDOW_BORDER_SIZE && x_in;
-            let bottom = y - uy_end_1 <= WINDOW_BORDER_SIZE && x_in;
+            let x_in = sx >= x_start - window_border_size && sx <= sx_end_1 + window_border_size;
+            let y_in = sy >= y_start - window_border_size && sy <= sy_end_1 + window_border_size;
+            let left = (x_start - sx) as usize <= WINDOW_BORDER_SIZE && y_in;
+            let right = (sx - sx_end_1) as usize <= WINDOW_BORDER_SIZE && y_in;
+            let top = (y_start - sy) as usize <= WINDOW_BORDER_SIZE && x_in;
+            let bottom = (sy - sy_end_1) as usize <= WINDOW_BORDER_SIZE && x_in;
             let f32_window_border_size = WINDOW_BORDER_SIZE as f32;
             if left {
                 if top {  // left-top
-                    let dx = ux_start - x; let dy = uy_start - y;
-                    if dx+dy <= WINDOW_BORDER_SIZE {
+                    let dx = x_start - sx; let dy = y_start - sy;
+                    if (dx+dy) as usize <= WINDOW_BORDER_SIZE {
                         self.final_fb.draw_point_alpha(x, y, WINDOW_BORDER_COLOR_OUTTER.color_mix(
-                            WINDOW_BORDER_COLOR_INNER, (dx+dy) as f32 / f32_window_border_size));
+                            WINDOW_BORDER_COLOR_INNER, (dx+dy) as usize as f32 / f32_window_border_size));
                     }
                 } else if bottom {  // left-bottom
-                    let dx = ux_start - x; let dy = y - uy_end_1;
-                    if dx+dy <= WINDOW_BORDER_SIZE {
+                    let dx = x_start - sx; let dy = sy - sy_end_1;
+                    if (dx+dy) as usize <= WINDOW_BORDER_SIZE {
                         self.final_fb.draw_point_alpha(x, y, WINDOW_BORDER_COLOR_OUTTER.color_mix(
-                            WINDOW_BORDER_COLOR_INNER, (dx+dy) as f32 / f32_window_border_size));
+                            WINDOW_BORDER_COLOR_INNER, (dx+dy) as usize as f32 / f32_window_border_size));
                     }
                 } else {  // only left
                     self.final_fb.draw_point_alpha(x, y, WINDOW_BORDER_COLOR_OUTTER.color_mix(
-                        WINDOW_BORDER_COLOR_INNER, (ux_start - x) as f32 / f32_window_border_size));
+                        WINDOW_BORDER_COLOR_INNER, (x_start - sx) as usize as f32 / f32_window_border_size));
                 }
             } else if right {
                 if top {  // right-top
-                    let dx = x - ux_end_1; let dy = uy_start - y;
-                    if dx+dy <= WINDOW_BORDER_SIZE {
+                    let dx = sx - sx_end_1; let dy = y_start - sy;
+                    if (dx+dy) as usize <= WINDOW_BORDER_SIZE {
                         self.final_fb.draw_point_alpha(x, y, WINDOW_BORDER_COLOR_OUTTER.color_mix(
-                            WINDOW_BORDER_COLOR_INNER, (dx+dy) as f32 / f32_window_border_size));
+                            WINDOW_BORDER_COLOR_INNER, (dx+dy) as usize as f32 / f32_window_border_size));
                     }
                 } else if bottom {  // right-bottom
-                    let dx = x - ux_end_1; let dy = y - uy_end_1;
-                    if dx+dy <= WINDOW_BORDER_SIZE {
+                    let dx = sx - sx_end_1; let dy = sy - sy_end_1;
+                    if (dx+dy) as usize <= WINDOW_BORDER_SIZE {
                         self.final_fb.draw_point_alpha(x, y, WINDOW_BORDER_COLOR_OUTTER.color_mix(
-                            WINDOW_BORDER_COLOR_INNER, (dx+dy) as f32 / f32_window_border_size));
+                            WINDOW_BORDER_COLOR_INNER, (dx+dy) as usize as f32 / f32_window_border_size));
                     }
                 } else {  // only right
                     self.final_fb.draw_point_alpha(x, y, WINDOW_BORDER_COLOR_OUTTER.color_mix(
-                        WINDOW_BORDER_COLOR_INNER, (x - ux_end_1) as f32 / f32_window_border_size));
+                        WINDOW_BORDER_COLOR_INNER, (sx - sx_end_1) as usize as f32 / f32_window_border_size));
                 }
             } else if top {  // only top
                 self.final_fb.draw_point_alpha(x, y, WINDOW_BORDER_COLOR_OUTTER.color_mix(
-                    WINDOW_BORDER_COLOR_INNER, (uy_start - y) as f32 / f32_window_border_size));
+                    WINDOW_BORDER_COLOR_INNER, (y_start - sy) as usize as f32 / f32_window_border_size));
             } else if bottom {  // only bottom
                 self.final_fb.draw_point_alpha(x, y, WINDOW_BORDER_COLOR_OUTTER.color_mix(
-                    WINDOW_BORDER_COLOR_INNER, (y - uy_end_1) as f32 / f32_window_border_size));
+                    WINDOW_BORDER_COLOR_INNER, (sy - sy_end_1) as usize as f32 / f32_window_border_size));
             }
         }
         // finally draw mouse
         let (cx, cy) = {
             let m = &self.mouse;
-            (m.x, m.y)
+            (m.x as isize, m.y as isize)
         };
-        if ((x-cx) <= MOUSE_POINTER_HALF_SIZE || (cx-x) <= MOUSE_POINTER_HALF_SIZE) && ((y-cy) <= MOUSE_POINTER_HALF_SIZE || (cy-y) <= MOUSE_POINTER_HALF_SIZE) {
-            self.final_fb.draw_point_alpha(x, y, MOUSE_BASIC[MOUSE_POINTER_HALF_SIZE + x - cx][MOUSE_POINTER_HALF_SIZE + y - cy]);
+        if ((sx-cx) as usize <= MOUSE_POINTER_HALF_SIZE || (cx-sx) as usize <= MOUSE_POINTER_HALF_SIZE) && ((sy-cy) as usize <= MOUSE_POINTER_HALF_SIZE || (cy-sy) as usize <= MOUSE_POINTER_HALF_SIZE) {
+            self.final_fb.draw_point_alpha(x, y, MOUSE_BASIC[MOUSE_POINTER_HALF_SIZE + x - cx as usize][MOUSE_POINTER_HALF_SIZE + y - cy as usize]);
         }
         Ok(())
     }
@@ -667,7 +665,7 @@ pub fn refresh_area_absolute(x_start: isize, x_end: isize, y_start: isize, y_end
         win.delay_refresh_first_time = false;
         let width = win.final_fb.width as isize;
         let height = win.final_fb.height as isize;
-        win.refresh_area_with_old_new(0, width, 0, height, x_start, x_end, y_start, y_end)   
+        win.refresh_area_with_old_new(0, width, 0, height, x_start, x_end, y_start, y_end)
     } else {
         win.refresh_area(x_start, x_end, y_start, y_end)   
     }
@@ -688,7 +686,7 @@ pub fn init(
         show_list: VecDeque::new(),
         active: Weak::new(),
         mouse: Point { x: 0, y: 0 },
-        repositioned_border: Some(RectRegion { x_start: 0, x_end: 0, y_start: 0, y_end: 0 }),
+        repositioned_border: None,
         final_fb: final_fb,
         delay_refresh_first_time: delay_refresh_first_time,
     };
@@ -887,14 +885,14 @@ fn move_cursor_to(nx: usize, ny: usize) -> Result<(), &'static str> {
     let mut win = WINDOW_MANAGER.try().ok_or("The static window manager was not yet initialized")?.lock();
     win.mouse = Point { x: nx, y: ny };
     // then update region of old mouse
-    for y in (oy-MOUSE_POINTER_HALF_SIZE) as isize .. (oy+MOUSE_POINTER_HALF_SIZE+1) as isize {
-        for x in (ox-MOUSE_POINTER_HALF_SIZE) as isize .. (ox+MOUSE_POINTER_HALF_SIZE+1) as isize {
+    for y in oy as isize - MOUSE_POINTER_HALF_SIZE as isize .. (oy+MOUSE_POINTER_HALF_SIZE+1) as isize {
+        for x in ox as isize - MOUSE_POINTER_HALF_SIZE as isize .. (ox+MOUSE_POINTER_HALF_SIZE+1) as isize {
             win.refresh_single_pixel(x, y)?;
         }
     }
     // draw new mouse in the new position
-    for y in (ny-MOUSE_POINTER_HALF_SIZE) as isize .. (ny+MOUSE_POINTER_HALF_SIZE+1) as isize {
-        for x in (nx-MOUSE_POINTER_HALF_SIZE) as isize .. (nx+MOUSE_POINTER_HALF_SIZE+1) as isize {
+    for y in ny as isize - MOUSE_POINTER_HALF_SIZE as isize .. (ny+MOUSE_POINTER_HALF_SIZE+1) as isize {
+        for x in nx as isize -MOUSE_POINTER_HALF_SIZE as isize .. (nx+MOUSE_POINTER_HALF_SIZE+1) as isize {
             win.refresh_single_pixel(x, y)?;
         }
     }

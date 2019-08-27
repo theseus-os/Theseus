@@ -40,6 +40,12 @@ path  = "../mod_mgmt"
 [dependencies.path]
 path = "../path"
 
+[dependencies.frame_buffer_alpha]
+path = "../frame_buffer_alpha"
+
+[dependencies.window_manager_alpha]
+path = "../window_manager_alpha"
+
 
 [lib]
 crate-type = ["rlib"]
