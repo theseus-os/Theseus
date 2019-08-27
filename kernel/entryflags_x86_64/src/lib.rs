@@ -1,4 +1,4 @@
-//! This crate defines the entryflags of page table on x86.  
+//! This crate defines the entryflags of page table on x86_64.  
 //! Definitions in this crate should be exported from `memory_x86_64` for upper-level crates.
 
 #![no_std]
@@ -34,13 +34,13 @@ impl EntryFlags {
         self.contains(EntryFlags::HUGE_PAGE)
     }
 
-    /// The bits must be set for an accessible page.
+    /// Returns the bits that must be set for an accessible page.
     /// For x86, the `PRESENT` bit should be set.
     pub fn present() -> EntryFlags {
         EntryFlags::PRESENT
     }
 
-    /// The flags of a accessiable writable page.
+    /// Returns the flags of an accessiable writable page.
     /// For x86 the `PRESENT` and `WRITABLE` bits should be set.
     pub fn writable_page() -> EntryFlags {
         EntryFlags::present() | EntryFlags::WRITABLE
@@ -52,7 +52,7 @@ impl EntryFlags {
     }
 
     /// Sets the entryflags as writable and accessible and returns it.
-    /// For x86 set the `PRESENT` and `WRITABLE` bits of the flags.
+    /// For x86 the `PRESENT` and `WRITABLE` bits should be set.
     pub fn as_writable_page(self) -> EntryFlags {
         self | EntryFlags::writable_page()
     }
@@ -69,7 +69,7 @@ impl EntryFlags {
         !self.intersects(EntryFlags::NO_EXECUTE)
     }
 
-    /// Get flags according to the properties of a section from multiboot2.
+    /// Gets flags according to the properties of a section from multiboot2.
     pub fn from_multiboot2_section_flags(section: &multiboot2::ElfSection) -> EntryFlags {
         use multiboot2::ElfSectionFlags;
 
@@ -89,7 +89,7 @@ impl EntryFlags {
         flags
     }
 
-    /// Get flags according to the properties of a section from elf flags.
+    /// Gets flags according to the properties of a section from elf flags.
     pub fn from_elf_section_flags(elf_flags: u64) -> EntryFlags {
         use xmas_elf::sections::{SHF_ALLOC, SHF_EXECINSTR, SHF_WRITE};
 
@@ -110,7 +110,7 @@ impl EntryFlags {
         flags
     }
 
-    /// Get flags according to the properties of a program. 
+    /// Gets flags according to the properties of a program. 
     pub fn from_elf_program_flags(prog_flags: xmas_elf::program::Flags) -> EntryFlags {
         let mut flags = EntryFlags::empty();
 

@@ -27,7 +27,7 @@ use memory_structs::{
 use x86_64::{registers::control_regs, instructions::tlb};
 
 
-/// Get the address of memory occupied by the loaded kernel.
+/// Gets the address of memory occupied by the loaded kernel.
 ///
 /// Returns the following tuple, if successful:
 ///  * The kernel's start physical address,
@@ -65,7 +65,7 @@ pub fn get_kernel_address(
     Ok((kernel_phys_start, kernel_phys_end, kernel_virt_end))
 }
 
-/// Get the available memory areas. Parse the list of physical memory areas from multiboot.
+/// Gets the available memory areas. Parse the list of physical memory areas from multiboot.
 ///
 /// Returns the following tuple, if successful:
 ///  * A list of avaiable physical memory areas,
@@ -120,7 +120,7 @@ pub fn get_available_memory(
     Ok((available, avail_index))
 }
 
-/// Get the bounds of physical memory that is occupied by loaded modules.
+/// Gets the bounds of physical memory that is occupied by loaded modules.
 /// 
 /// Returns (start_address, end_address).
 pub fn get_modules_address(boot_info: &BootInformation) -> (usize, usize) {
@@ -135,7 +135,7 @@ pub fn get_modules_address(boot_info: &BootInformation) -> (usize, usize) {
     (mod_min, mod_max)
 }
 
-/// Get the physical memory area occupied by the bootloader information.
+/// Gets the physical memory area occupied by the bootloader information.
 pub fn get_boot_info_mem_area(
     boot_info: &BootInformation,
 ) -> Result<PhysicalMemoryArea, &'static str> {
@@ -147,7 +147,7 @@ pub fn get_boot_info_mem_area(
     ))
 }
 
-/// Get the virtual address of the bootloader information.
+/// Gets the virtual address of the bootloader information.
 /// 
 /// Returns (start_address, end_address). 
 pub fn get_boot_info_vaddress(
@@ -158,7 +158,7 @@ pub fn get_boot_info_vaddress(
     Ok((boot_info_start_vaddr, boot_info_end_vaddr))
 }
 
-/// Add the virtual memory areas occupied by kernel code and data containing sections .init, .text, .rodata, .data, and .bss.
+/// Adds the virtual memory areas occupied by kernel code and data containing sections .init, .text, .rodata, .data, and .bss.
 /// 
 /// Returns the following tuple, if successful:
 ///  * The number of added memory areas;
@@ -323,9 +323,9 @@ pub fn add_sections_vmem_areas(
 }
 
 
-/// Get the physical memory occupied by vga.
+/// Gets the physical memory occupied by vga.
 /// 
-/// Returns(start_physical_address, size, entryflags). 
+/// Returns (start_physical_address, size, entryflags). 
 pub fn get_vga_mem_addr(
 ) -> Result<(PhysicalAddress, usize, EntryFlags), &'static str> {
     const VGA_DISPLAY_PHYS_START: usize = 0xA_0000;
@@ -341,24 +341,24 @@ pub fn get_vga_mem_addr(
     ))
 }
 
-/// Flush the the specific virtual address in TLB. 
+/// Flushs the the specific virtual address in TLB. 
 pub fn tlb_flush_virt_addr(vaddr: VirtualAddress) {
     tlb::flush(x86_64::VirtualAddress(vaddr.value()));
 }
 
-/// Flush the whole TLB. 
+/// Flushs the whole TLB. 
 pub fn tlb_flush_all() {
     tlb::flush_all();
 }
 
-/// Set the top-level page table address to enable the new page table p4 points to.
+/// Sets the top-level page table address to enable the new page table p4 points to.
 pub fn set_p4(p4: PhysicalAddress) {
     unsafe {
         control_regs::cr3_write(x86_64::PhysicalAddress(p4.value() as u64));
     }
 }
 
-/// Returns the current top-level page table frame.
+/// Returns the current top-level page table address.
 pub fn get_p4() -> PhysicalAddress {
     PhysicalAddress::new_canonical(control_regs::cr3().0 as usize)
 }
