@@ -58,12 +58,13 @@ pub struct IoStreams {
 /// perform IO accordingly.
 pub struct IoControlFlags {
     /// When set to be `true`, the shell will immediately flush received character
-    /// input to stdin rather than waiting for enter keystrike. Default value
-    /// is `false`.
+    /// input to stdin rather than waiting for enter keystrike.
     stdin_instant_flush: bool
 }
 
 impl IoControlFlags {
+    /// Create a new `IoControlFlags` instance. `stdin_instant_flush` is set to
+    /// be `false` on default.
     pub fn new() -> IoControlFlags {
         IoControlFlags {
             stdin_instant_flush: false
@@ -142,8 +143,9 @@ pub fn get_terminal_or_default() -> Result<Arc<Mutex<Terminal>>, &'static str> {
 /// without causing a deadlock. In other words, by using this function, shell can prevent the
 /// application from holding the lock of these shared maps before killing it. Otherwise, the
 /// lock will never get a chance to be released. Since we currently don't have stack unwinding.
-pub fn lock_and_execute<'a>(f: Box<dyn Fn(MutexGuard<'a, BTreeMap<usize, IoControlFlags>>,
-                                          MutexGuard<'a, BTreeMap<usize, IoStreams>>)>) {
+pub fn lock_and_execute<'a, F>(f: &F)
+    where F: Fn(MutexGuard<'a, BTreeMap<usize, IoControlFlags>>,
+                MutexGuard<'a, BTreeMap<usize, IoStreams>>) {
     let locked_flags = APP_IO_CTRL_FLAGS.lock();
     let locked_streams = APP_IO_STREAMS.lock();
     f(locked_flags, locked_streams);
@@ -153,21 +155,15 @@ pub fn lock_and_execute<'a>(f: Box<dyn Fn(MutexGuard<'a, BTreeMap<usize, IoContr
 /// applications. If there is any existing readers/writers for the task (which should not
 /// happen in normal practice), it returns the old one, otherwise returns None.
 pub fn insert_child_streams(task_id: usize, streams: IoStreams) -> Option<IoStreams> {
-    let mut locked_flags = APP_IO_CTRL_FLAGS.lock();
-    locked_flags.insert(task_id, IoControlFlags::new());
-    core::mem::drop(locked_flags);
-    let mut locked_streams = APP_IO_STREAMS.lock();
-    locked_streams.insert(task_id, streams)
+    APP_IO_CTRL_FLAGS.lock().insert(task_id, IoControlFlags::new());
+    APP_IO_STREAMS.lock().insert(task_id, streams)
 }
 
 /// Shells call this function to remove queues and pointer to terminal for applications. It returns
 /// the removed streams in the return value if the key matches, otherwise returns None.
 pub fn remove_child_streams(task_id: &usize) -> Option<IoStreams> {
-    let mut locked_flags = APP_IO_CTRL_FLAGS.lock();
-    locked_flags.remove(task_id);
-    core::mem::drop(locked_flags);
-    let mut locked_streams = APP_IO_STREAMS.lock();
-    locked_streams.remove(task_id)
+    APP_IO_CTRL_FLAGS.lock().remove(task_id);
+    APP_IO_STREAMS.lock().remove(task_id)
 }
 
 /// Applications call this function to acquire a reader to its stdin queue.
@@ -230,9 +226,10 @@ pub fn take_key_event_queue() -> Result<KeyEventReadGuard, &'static str> {
     match locked_streams.get(&task_id) {
         Some(queues) => {
             match queues.key_event_reader.lock().take() {
-                Some(reader) => Ok(KeyEventReadGuard::new(reader,
-                                        Box::new(|reader: &mut Option<KeyEventQueueReader>|
-                                                 { return_event_queue(reader); }))),
+                Some(reader) => Ok(KeyEventReadGuard::new(
+                    reader,
+                    Box::new(|reader: &mut Option<KeyEventQueueReader>|  { return_event_queue(reader); }),
+                )),
                 None => Err("currently the reader to key event queue is not available")
             }
         },
@@ -254,8 +251,7 @@ fn return_event_queue(reader: &mut Option<KeyEventQueueReader>) {
             };
         },
         Err(e) => {
-            error!("{}", e);
-            error!("failed to get task_id to store event queue");
+            error!("app_io::return_event_queue(): Failed to get task_id to store new event queue. Error: {}", e);
         }
     };
 }
@@ -333,7 +329,7 @@ pub fn print_to_stdout_args(fmt_args: fmt::Arguments) {
         Some(task_id) => task_id,
         None => {
             // We cannot use log macros here, because when they're mirrored to the vga, they will cause
-            // infinite loops on an error. Instead, we write direclty to the serial port. 
+            // infinite loops on an error. Instead, we write directly to the serial port. 
             let _ = serial_port::write_fmt_log(
                 "\x1b[31m", "[E] ",
                 format_args!("error in print!/println! macro: failed to get current task id"), "\x1b[0m\n"

@@ -47,7 +47,6 @@ use dfqueue::{DFQueue, DFQueueConsumer, DFQueueProducer};
 use alloc::sync::Arc;
 use spin::{Mutex, MutexGuard};
 use environment::Environment;
-use alloc::boxed::Box;
 use core::mem;
 use alloc::collections::BTreeMap;
 use stdio::{Stdio, KeyEventQueue, KeyEventQueueReader, KeyEventQueueWriter,
@@ -57,8 +56,6 @@ use core::ops::Deref;
 use app_io::{IoStreams, IoControlFlags};
 use fs_node::FileOrDir;
 use alloc::slice::SliceConcatExt;
-
-pub const APPLICATIONS_NAMESPACE_PATH: &'static str = "/namespaces/default/applications";
 
 /// The status of a job.
 #[derive(PartialEq)]
@@ -107,10 +104,7 @@ struct Job {
 #[no_mangle]
 pub fn main(_args: Vec<String>) -> isize {
 
-    // No actuall use. Just to placate the compiler.
-    let _dummy = 0;
-
-    let _task_ref = match KernelTaskBuilder::new(shell_loop, _dummy)
+    let _task_ref = match KernelTaskBuilder::new(shell_loop, ())
         .name("shell_loop".to_string())
         .spawn() {
         Ok(task_ref) => { task_ref }
@@ -395,8 +389,8 @@ impl Shell {
                 };
 
                 // Lock the shared structure in `app_io` and then kill the running application
-                app_io::lock_and_execute(Box::new(move |_flags_guard: MutexGuard<BTreeMap<usize, IoControlFlags>>,
-                                                        _streamss_guard: MutexGuard<BTreeMap<usize, IoStreams>>| {
+                app_io::lock_and_execute(&move |_flags_guard: MutexGuard<BTreeMap<usize, IoControlFlags>>,
+                                                _streamss_guard: MutexGuard<BTreeMap<usize, IoStreams>>| {
 
                     // Kill all tasks in the job.
                     for task_ref in &task_refs {
@@ -422,7 +416,8 @@ impl Shell {
                             }
                         }
                     }
-                }));
+                });
+                self.terminal.lock().print_to_terminal("^C\n".to_string());
             } else {
                 self.clear_cmdline(true)?;
                 self.input_buffer.clear();
@@ -445,8 +440,8 @@ impl Shell {
                 };
 
                 // Lock the shared structure in `app_io` and then stop the running application
-                app_io::lock_and_execute(Box::new(move |_flags_guard: MutexGuard<BTreeMap<usize, IoControlFlags>>,
-                                                        _streams_guard: MutexGuard<BTreeMap<usize, IoStreams>>| {
+                app_io::lock_and_execute(&move |_flags_guard: MutexGuard<BTreeMap<usize, IoControlFlags>>,
+                                                _streams_guard: MutexGuard<BTreeMap<usize, IoStreams>>| {
                     
                     // Stop all tasks in the job.
                     for task_ref in &task_refs {
@@ -465,7 +460,7 @@ impl Shell {
                             }
                         }
                     }
-                }));
+                });
             }
 
             return Ok(());
@@ -668,7 +663,8 @@ impl Shell {
 
         let taskref = match ApplicationTaskBuilder::new(app_path)
             .argument(args)
-            .spawn(true) {
+            .block()
+            .spawn() {
                 Ok(taskref) => taskref, 
                 Err(e) => return Err(AppErr::SpawnErr(e.to_string()))
             };
@@ -703,7 +699,7 @@ impl Shell {
                 // Once we run into an error, we must kill all previously spawned tasks in this command line.
                 Err(e) => {
                     for task_ref in task_refs {
-                        if let Err(kill_error) = task_ref.kill(KillReason::BrokenPipeAtSpawn) {
+                        if let Err(kill_error) = task_ref.kill(KillReason::Requested) {
                             error!("{}", kill_error);
                         }
                     }
@@ -834,7 +830,7 @@ impl Shell {
             }
         };
         let cmd_crate_name = format!("{}", incomplete_cmd);
-        Ok(namespace_dir.get_file_names_starting_with(&cmd_crate_name))
+        Ok(namespace_dir.get_file_and_dir_names_starting_with(&cmd_crate_name))
     }
 
     /// Try to match the incomplete command against all possible path names. For example, if the
@@ -1013,7 +1009,7 @@ impl Shell {
                             },
 
                             ExitValue::Killed(KillReason::Requested) => {
-                                self.terminal.lock().print_to_terminal("^C\n".to_string());
+                                // Nothing to do. We have already print "^C" while handling keyboard event.
                             },
                             // If the user manually aborts the task
                             ExitValue::Killed(kill_reason) => {
@@ -1420,8 +1416,7 @@ impl Shell {
 
 
 /// Start a new shell. Shell::start() is an infinite loop, so normally we do not return from this function.
-fn shell_loop(mut _dummy: i32) -> Result<(), &'static str> {
-
+fn shell_loop(mut _dummy: ()) -> Result<(), &'static str> {
     Shell::new()?.start()?;
     Ok(())
 }

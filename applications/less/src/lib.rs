@@ -147,17 +147,17 @@ fn display_content(content: &String, map: &BTreeMap<usize, LineSlice>,
     }
 
     // Refresh the terminal with the lines we've selected.
-    let start_indicies = match map.get(&line_start) {
-        Some(indicies) => indicies,
-        None => return Err("failed to get the byte indicies of the first line")
+    let start_indices = match map.get(&line_start) {
+        Some(indices) => indices,
+        None => return Err("failed to get the byte indices of the first line")
     };
-    let end_indicies = match map.get(&(line_end - 1)) {
-        Some(indicies) => indicies,
-        None => return Err("failed to get the byte indicies of the last line")
+    let end_indices = match map.get(&(line_end - 1)) {
+        Some(indices) => indices,
+        None => return Err("failed to get the byte indices of the last line")
     };
     locked_terminal.clear();
     locked_terminal.print_to_terminal(
-        content[start_indicies.start..end_indicies.end].to_string()
+        content[start_indices.start..end_indices.end].to_string()
     );
     locked_terminal.refresh_display(0);
     Ok(())

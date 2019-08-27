@@ -72,18 +72,18 @@ pub fn init() -> Result<DFQueueProducer<Event>, &'static str> {
         .name("terminal_print_singleton".to_string())
         .namespace(default_app_namespace.clone())
         .singleton()
-        .spawn(false)?;
+        .spawn()?;
 
     ApplicationTaskBuilder::new(app_io_path)
         .name("application_io_manager".to_string())
         .singleton()
-        .spawn(false)?;
+        .spawn()?;
 
     // Spawn the default terminal (will also start the windowing manager)
     ApplicationTaskBuilder::new(shell_path)
         .name("default_terminal".to_string())
         .namespace(default_app_namespace)
-        .spawn(false)?;
+        .spawn()?;
 
     // start the input event loop thread
     KernelTaskBuilder::new(input_event_loop, keyboard_event_handling_consumer)
@@ -121,7 +121,7 @@ fn input_event_loop(consumer:DFQueueConsumer<Event>) -> Result<(), &'static str>
                     ApplicationTaskBuilder::new(Path::new(String::from("shell")))
                         .argument(args)
                         .name(task_name)
-                        .spawn(false)?;
+                        .spawn()?;
                     terminal_id_counter += 1;
                     meta_keypress = true;
                     event.mark_completed();
