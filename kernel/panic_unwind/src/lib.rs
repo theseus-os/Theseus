@@ -24,12 +24,14 @@ use core::panic::PanicInfo;
 #[lang = "eh_personality"]
 #[no_mangle]
 #[doc(hidden)]
-pub extern "C" fn eh_personality() {}
+pub extern "C" fn eh_personality() {
+    error!("EH_PERSONALITY IS UNHANDLED!");
+}
 
 
 /// The singular entry point for a language-level panic.
 #[cfg(not(test))]
-#[panic_handler]
+#[panic_handler] // same as:  #[lang = "panic_impl"]
 #[doc(hidden)]
 fn panic_entry_point(info: &PanicInfo) -> ! {
 
@@ -83,18 +85,18 @@ fn panic_entry_point(info: &PanicInfo) -> ! {
 
 
 
-// /// This function isn't used since our Theseus target.json file
-// /// chooses panic=abort (as does our build process), 
-// /// but building on Windows (for an IDE) with the pc-windows-gnu toolchain requires it.
-// #[allow(non_snake_case)]
-// #[lang = "eh_unwind_resume"]
-// #[no_mangle]
+/// This function isn't used since our Theseus target.json file
+/// chooses panic=abort (as does our build process), 
+/// but building on Windows (for an IDE) with the pc-windows-gnu toolchain requires it.
+#[allow(non_snake_case)]
+#[lang = "eh_unwind_resume"]
+#[no_mangle]
 // #[cfg(all(target_os = "windows", target_env = "gnu"))]
-// #[doc(hidden)]
-// pub extern "C" fn rust_eh_unwind_resume(_arg: *const i8) -> ! {
-//     error!("\n\nin rust_eh_unwind_resume, unimplemented!");
-//     loop {}
-// }
+#[doc(hidden)]
+pub extern "C" fn rust_eh_unwind_resume(_arg: *const i8) -> ! {
+    error!("\n\nin rust_eh_unwind_resume, unimplemented!");
+    loop {}
+}
 
 
 #[allow(non_snake_case)]
