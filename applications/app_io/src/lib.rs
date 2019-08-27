@@ -1,6 +1,12 @@
 //! This crate stores the IO queues and pointers to terminals for running applications.
 //! It provides some APIs similar to std::io for applications to access those queues.
 //! 
+//! This crate internally has two maps which store the `IoControlFlags` and `IoStreams`
+//! structures for each task. These two maps are named `APP_IO_CTRL_FLAGS` and
+//! `APP_IO_STREAMS`, respectively. They are protected with mutex locks. To *avoid deadlock*
+//! when locking them at the same time, one must acquire the lock for `APP_IO_CTRL_FLAGS`
+//! first and then `APP_IO_STREAMS`.
+//! 
 //! Usage example:
 //! 1. shell spawns a new app, and creates queues of `stdin`, `stdout` and `stderr`
 //! 2. shell stores the reader of `stdin` and writer of `stdout` and `stderr` to `app_io`,
@@ -86,10 +92,6 @@ impl IoStreams {
         }
     }
 }
-
-// IMPORTANT NOTE:
-// To avoid probable deadlock, if we need to lock multiple maps at the same time, we must
-// perform it in the sequence the *same* as the following definition.
 
 lazy_static! {
     /// Map applications to their IoControlFlags structure. Here the key is the task_id
