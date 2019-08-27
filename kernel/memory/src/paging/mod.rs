@@ -147,7 +147,6 @@ impl PageTable {
         // debug!("PageTable::switch() old table: {:?}, new table: {:?}", self, new_table);
 
         // perform the actual page table switch
-        // requires absolute path to specify the arch-specific type
         set_p4(new_table.p4_table.start_address());
         let current_table_after_switch = PageTable::from_current();
         current_table_after_switch
@@ -161,7 +160,7 @@ impl PageTable {
 }
 
 
-/// Returns the current top-level page table frame, e.g., cr3 on x86
+/// Returns the current top-level page table frame
 pub fn get_current_p4() -> Frame {
     Frame::containing_address(get_p4())
 }

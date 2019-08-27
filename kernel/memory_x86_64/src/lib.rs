@@ -162,7 +162,7 @@ pub fn get_boot_info_vaddress(
 /// 
 /// Returns the following tuple, if successful:
 ///  * The number of added memory areas;
-///  * The mapping information of merged kernel sections. The three sections after merging are {text, rodata, data}.
+///  * the mapping information of merged kernel sections containing {text, rodata, data}.
 ///  * a list of the mapping information about all sections.
 pub fn add_sections_vmem_areas(
     boot_info: &BootInformation,
@@ -341,7 +341,7 @@ pub fn get_vga_mem_addr(
     ))
 }
 
-/// Flushs the the specific virtual address in TLB. 
+/// Flushs the specific virtual address in TLB. 
 pub fn tlb_flush_virt_addr(vaddr: VirtualAddress) {
     tlb::flush(x86_64::VirtualAddress(vaddr.value()));
 }

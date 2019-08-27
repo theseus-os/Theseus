@@ -29,19 +29,19 @@ bitflags! {
 
 impl EntryFlags {
     /// Returns ture if the page the entry points to is a huge page.
-    /// For x86, it means the flags contain a `HUGE_PAGE` bit.
+    /// For x86_64, it means the flags contain a `HUGE_PAGE` bit.
     pub fn is_huge(&self) -> bool {
         self.contains(EntryFlags::HUGE_PAGE)
     }
 
     /// Returns the bits that must be set for an accessible page.
-    /// For x86, the `PRESENT` bit should be set.
+    /// For x86_64, the `PRESENT` bit should be set.
     pub fn present() -> EntryFlags {
         EntryFlags::PRESENT
     }
 
     /// Returns the flags of an accessiable writable page.
-    /// For x86 the `PRESENT` and `WRITABLE` bits should be set.
+    /// For x86_64 the `PRESENT` and `WRITABLE` bits should be set.
     pub fn writable_page() -> EntryFlags {
         EntryFlags::present() | EntryFlags::WRITABLE
     }
@@ -52,19 +52,19 @@ impl EntryFlags {
     }
 
     /// Sets the entryflags as writable and accessible and returns it.
-    /// For x86 the `PRESENT` and `WRITABLE` bits should be set.
+    /// For x86_64 the `PRESENT` and `WRITABLE` bits should be set.
     pub fn as_writable_page(self) -> EntryFlags {
         self | EntryFlags::writable_page()
     }
 
     /// Returns true if the page is writable.
-    /// For x86 it means the flags contain `WRITABLE`.
+    /// For x86_64 it means the flags contain `WRITABLE`.
     pub fn is_writable(&self) -> bool {
         self.intersects(EntryFlags::WRITABLE)
     }
 
     /// Returns true if these flags are executable,
-    /// which means that the `NO_EXECUTE` bit on x86 is *not* set.
+    /// which means that the `NO_EXECUTE` bit on x86_64 is *not* set.
     pub fn is_executable(&self) -> bool {
         !self.intersects(EntryFlags::NO_EXECUTE)
     }
