@@ -197,8 +197,8 @@ impl FrameBufferAlpha {
         for y in yc-r..yc+r {
             for x in xc-r..xc+r {
                 if self.check_in_buffer(x, y) {
-                    let xd = (x-xc) as isize;
-                    let yd = (y-yc) as isize;
+                    let xd = x as isize - xc as isize;
+                    let yd = y as isize - yc as isize;
                     if xd*xd + yd*yd <= r2 {
                         self.draw_point_alpha(x, y, color);
                     }
