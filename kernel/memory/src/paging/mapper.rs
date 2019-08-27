@@ -146,7 +146,7 @@ impl Mapper {
                 return Err("page was already in use");
             } 
 
-            p1[page.p1_index()].set(frame, flags | EntryFlags::default_flags());
+            p1[page.p1_index()].set(frame, flags | EntryFlags::present());
         }
 
         Ok(MappedPages {
@@ -187,7 +187,7 @@ impl Mapper {
                 return Err("page was already in use");
             } 
 
-            p1[page.p1_index()].set(frame, flags | EntryFlags::default_flags());
+            p1[page.p1_index()].set(frame, flags | EntryFlags::present());
         }
 
         Ok(MappedPages {
@@ -540,7 +540,7 @@ impl MappedPages {
                 .ok_or("mapping code does not support huge pages")?;
             
             let frame = p1[page.p1_index()].pointed_frame().ok_or("remap(): page not mapped")?;
-            p1[page.p1_index()].set(frame, new_flags | EntryFlags::default_flags());
+            p1[page.p1_index()].set(frame, new_flags | EntryFlags::present());
 
             let vaddr = page.start_address();
             tlb_flush_virt_addr(vaddr);

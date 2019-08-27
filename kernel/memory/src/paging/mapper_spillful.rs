@@ -98,7 +98,7 @@ impl MapperSpillful {
                 error!("MapperSpillful::map() page {:#x} -> frame {:#X}, page was already in use!", page.start_address(), frame.start_address());
                 return Err("page was already mapped");
             }
-            p1[page.p1_index()].set(frame, flags | EntryFlags::default_flags());
+            p1[page.p1_index()].set(frame, flags | EntryFlags::present());
         }
 
         VMAS.lock().push(VirtualMemoryArea::new(vaddr, size, flags, ""));
@@ -142,7 +142,7 @@ impl MapperSpillful {
                 .ok_or("mapping code does not support huge pages")?;
             
             let frame = try!(p1[page.p1_index()].pointed_frame().ok_or("remap(): page not mapped"));
-            p1[page.p1_index()].set(frame, new_flags | EntryFlags::default_flags());
+            p1[page.p1_index()].set(frame, new_flags | EntryFlags::present());
 
             let vaddr = page.start_address();
             tlb_flush_virt_addr(vaddr);

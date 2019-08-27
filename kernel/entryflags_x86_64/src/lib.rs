@@ -34,27 +34,27 @@ impl EntryFlags {
         self.contains(EntryFlags::HUGE_PAGE)
     }
 
-    /// The default flags of an accessible page.
+    /// The bits must be set for an accessible page.
     /// For x86, the `PRESENT` bit should be set.
-    pub fn default_flags() -> EntryFlags {
+    pub fn present() -> EntryFlags {
         EntryFlags::PRESENT
     }
 
-    /// The flags of a writable page.
+    /// The flags of a accessiable writable page.
     /// For x86 the `PRESENT` and `WRITABLE` bits should be set.
-    pub fn rw_flags() -> EntryFlags {
-        EntryFlags::default_flags() | EntryFlags::WRITABLE
+    pub fn writable_page() -> EntryFlags {
+        EntryFlags::present() | EntryFlags::WRITABLE
     }
 
     /// Returns true if the page is accessible and is not huge.
-    pub fn is_page(&self) -> bool {
+    pub fn is_regular_page(&self) -> bool {
         self.contains(EntryFlags::PRESENT) && !self.contains(EntryFlags::HUGE_PAGE)
     }
 
-    /// Set the entryflags as writable.
+    /// Sets the entryflags as writable and accessible and returns it.
     /// For x86 set the `PRESENT` and `WRITABLE` bits of the flags.
-    pub fn set_writable(&self) -> EntryFlags {
-        self.clone() | EntryFlags::rw_flags()
+    pub fn as_writable_page(self) -> EntryFlags {
+        self | EntryFlags::writable_page()
     }
 
     /// Returns true if the page is writable.
