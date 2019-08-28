@@ -162,8 +162,8 @@ pub fn get_boot_info_vaddress(
 /// 
 /// Returns the following tuple, if successful:
 ///  * The number of added memory areas,
-///  * the mapping information of merged kernel sections containing {text, rodata, data},
-///  * a list of the mapping information about all sections.
+///  * the address bounds of initial kernel sections containing {text, rodata, data},
+///  * a list of the address bounds about all sections.
 pub fn add_sections_vmem_areas(
     boot_info: &BootInformation,
     vmas: &mut [VirtualMemoryArea; 32],
