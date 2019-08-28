@@ -247,6 +247,7 @@ impl Shell {
         if sync_terminal {
             self.terminal.lock().remove_char_from_screen(left_shift)?;
         }
+        if !erase_left { self.left_shift -= 1; }
         Ok(())
     }
 
