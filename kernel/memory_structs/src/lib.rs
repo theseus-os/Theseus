@@ -666,11 +666,11 @@ impl IntoIterator for PageRange {
 #[derive(Default)]
 pub struct SectionMemoryBounds {
     /// The start address. It contains the virtual address and the physical address.
-    pub start: Option<(VirtualAddress, PhysicalAddress)>,
+    pub start: (VirtualAddress, PhysicalAddress),
     /// The end address. It contains the virtual address and the physical address.
-    pub end: Option<(VirtualAddress, PhysicalAddress)>,
+    pub end: (VirtualAddress, PhysicalAddress),
     /// The entry flags of the memory.
-    pub flags: Option<EntryFlags>,
+    pub flags: EntryFlags,
 }
 
 /// The mapping information of merged kernel sections.

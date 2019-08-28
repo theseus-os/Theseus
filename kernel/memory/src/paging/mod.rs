@@ -237,15 +237,14 @@ pub fn init(allocator_mutex: &MutexIrqSafe<AreaFrameAllocator>, boot_info: &mult
             // we will unmap these later before we start booting to userspace processes
             for i in 0..index {
                 let smb = &sections_memory_bounds[i];
-                let (start_virt_addr, start_phys_addr) = smb.start.ok_or("Couldn't find start of the section")?;
-                let (_end_virt_addr, end_phys_addr) = smb.end.ok_or("Couldn't find end of the section")?;
+                let (start_virt_addr, start_phys_addr) = smb.start;
+                let (_end_virt_addr, end_phys_addr) = smb.end;
                 let size = end_phys_addr.value() - start_phys_addr.value();
-                let flags = smb.flags.ok_or("Couldn't find the section flags")?;
                 identity_mapped_pages[i] = Some(
                     mapper.map_frames(
                         FrameRange::from_phys_addr(start_phys_addr, size), 
                         Page::containing_address(start_virt_addr - KERNEL_OFFSET), 
-                        flags,
+                        smb.flags,
                         allocator.deref_mut()
                     )?
                 );
@@ -253,16 +252,16 @@ pub fn init(allocator_mutex: &MutexIrqSafe<AreaFrameAllocator>, boot_info: &mult
             }
 
 
-            let (text_start_virt,    text_start_phys)    = initial_sections_memory_bounds.text.start  .ok_or("Couldn't find start of .text section")?;
-            let (_text_end_virt,     text_end_phys)      = initial_sections_memory_bounds.text.end    .ok_or("Couldn't find end of .text section")?;
-            let (rodata_start_virt,  rodata_start_phys)  = initial_sections_memory_bounds.rodata.start.ok_or("Couldn't find start of .rodata section")?;
-            let (_rodata_end_virt,   rodata_end_phys)    = initial_sections_memory_bounds.rodata.end  .ok_or("Couldn't find end of .rodata section")?;
-            let (data_start_virt,    data_start_phys)    = initial_sections_memory_bounds.data.start  .ok_or("Couldn't find start of .data section")?;
-            let (_data_end_virt,     data_end_phys)      = initial_sections_memory_bounds.data.end    .ok_or("Couldn't find start of .data section")?;
+            let (text_start_virt,    text_start_phys)    = initial_sections_memory_bounds.text.start;
+            let (_text_end_virt,     text_end_phys)      = initial_sections_memory_bounds.text.end;
+            let (rodata_start_virt,  rodata_start_phys)  = initial_sections_memory_bounds.rodata.start;
+            let (_rodata_end_virt,   rodata_end_phys)    = initial_sections_memory_bounds.rodata.end;
+            let (data_start_virt,    data_start_phys)    = initial_sections_memory_bounds.data.start;
+            let (_data_end_virt,     data_end_phys)      = initial_sections_memory_bounds.data.end;
 
-            let text_flags    = initial_sections_memory_bounds.text.flags  .ok_or("Couldn't find .text section flags")?;
-            let rodata_flags  = initial_sections_memory_bounds.rodata.flags.ok_or("Couldn't find .rodata section flags")?;
-            let data_flags    = initial_sections_memory_bounds.data.flags  .ok_or("Couldn't find .data section flags")?;
+            let text_flags    = initial_sections_memory_bounds.text.flags  ;
+            let rodata_flags  = initial_sections_memory_bounds.rodata.flags;
+            let data_flags    = initial_sections_memory_bounds.data.flags;
 
 
             // now we map the 5 main sections into 3 groups according to flags

@@ -289,13 +289,24 @@ pub fn add_sections_vmem_areas(
 
         // These memories will be mapped to identical lower half addresses. 
         sections_memory_bounds[index] = SectionMemoryBounds {
-            start: Some((start_virt_addr, start_phys_addr)),
-            end: Some((end_virt_addr, end_phys_addr)),
-            flags: Some(flags),
+            start: (start_virt_addr, start_phys_addr),
+            end: (end_virt_addr, end_phys_addr),
+            flags: flags,
         };
 
         index += 1;
     } // end of section iterator
+
+    let text_start    = text_start  .ok_or("Couldn't find start of .text section")?;
+    let text_end      = text_end    .ok_or("Couldn't find end of .text section")?;
+    let rodata_start  = rodata_start.ok_or("Couldn't find start of .rodata section")?;
+    let rodata_end    = rodata_end  .ok_or("Couldn't find end of .rodata section")?;
+    let data_start    = data_start  .ok_or("Couldn't find start of .data section")?;
+    let data_end      = data_end    .ok_or("Couldn't find start of .data section")?;
+
+    let text_flags    = text_flags  .ok_or("Couldn't find .text section flags")?;
+    let rodata_flags  = rodata_flags.ok_or("Couldn't find .rodata section flags")?;
+    let data_flags    = data_flags  .ok_or("Couldn't find .data section flags")?;
 
     let text = SectionMemoryBounds {
         start: text_start,
