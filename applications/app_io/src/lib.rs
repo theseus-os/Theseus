@@ -1,12 +1,6 @@
 //! This crate stores the IO queues and pointers to terminals for running applications.
 //! It provides some APIs similar to std::io for applications to access those queues.
 //! 
-//! This crate internally has two maps which store the `IoControlFlags` and `IoStreams`
-//! structures for each task. These two maps are named `APP_IO_CTRL_FLAGS` and
-//! `APP_IO_STREAMS`, respectively. They are protected with mutex locks. To *avoid deadlock*
-//! when locking them at the same time, one must acquire the lock for `APP_IO_CTRL_FLAGS`
-//! first and then `APP_IO_STREAMS`.
-//! 
 //! Usage example:
 //! 1. shell spawns a new app, and creates queues of `stdin`, `stdout` and `stderr`
 //! 2. shell stores the reader of `stdin` and writer of `stdout` and `stderr` to `app_io`,
@@ -93,20 +87,47 @@ impl IoStreams {
     }
 }
 
-lazy_static! {
-    /// Map applications to their IoControlFlags structure. Here the key is the task_id
-    /// of each task. When shells call `insert_child_streams`, the default value is
-    /// automatically inserted for that task. When shells call `remove_child_streams`,
-    /// the corresponding structure is removed from this map.
-    static ref APP_IO_CTRL_FLAGS: Mutex<BTreeMap<usize, IoControlFlags>> = Mutex::new(BTreeMap::new());
-}
+mod shared_maps {
+    use spin::{Mutex, MutexGuard};
+    use alloc::collections::BTreeMap;
+    use IoControlFlags;
+    use IoStreams;
 
-lazy_static! {
-    /// Map applications to their IoStreams structure. Here the key is the task_id of
-    /// each task. Shells should call `insert_child_streams` when spawning a new app,
-    /// which effectively stores a new key value pair to this map. After applications
-    /// exit, shells should call `remove_child_streams` to clean up.
-    static ref APP_IO_STREAMS: Mutex<BTreeMap<usize, IoStreams>> = Mutex::new(BTreeMap::new());
+    lazy_static! {
+        /// Map applications to their IoControlFlags structure. Here the key is the task_id
+        /// of each task. When shells call `insert_child_streams`, the default value is
+        /// automatically inserted for that task. When shells call `remove_child_streams`,
+        /// the corresponding structure is removed from this map.
+        static ref APP_IO_CTRL_FLAGS: Mutex<BTreeMap<usize, IoControlFlags>> = Mutex::new(BTreeMap::new());
+    }
+
+    lazy_static! {
+        /// Map applications to their IoStreams structure. Here the key is the task_id of
+        /// each task. Shells should call `insert_child_streams` when spawning a new app,
+        /// which effectively stores a new key value pair to this map. After applications
+        /// exit, shells should call `remove_child_streams` to clean up.
+        static ref APP_IO_STREAMS: Mutex<BTreeMap<usize, IoStreams>> = Mutex::new(BTreeMap::new());
+    }
+
+    /// Lock and returns the `MutexGuard` of `APP_IO_CTRL_FLAGS`. Use `lock_all_maps()` if
+    /// you want to lock both of the maps to avoid deadlock.
+    pub fn lock_flag_map() -> MutexGuard<'static, BTreeMap<usize, IoControlFlags>> {
+        APP_IO_CTRL_FLAGS.lock()
+    }
+
+    /// Lock and returns the `MutexGuard` of `APP_IO_STREAMS`. Use `lock_all_maps()` if
+    /// you want to lock both of the maps to avoid deadlock.
+    pub fn lock_stream_map() -> MutexGuard<'static, BTreeMap<usize, IoStreams>> {
+        APP_IO_STREAMS.lock()
+    }
+
+    /// Lock two maps `APP_IO_CTRL_FLAGS` and `APP_IO_STREAMS` at the same time and returns a
+    /// tuple containing their `MutexGuard`s. This function exerts a sequence of locking when
+    /// we need to lock more than one of them. This prevents deadlock.
+    pub fn lock_all_maps() -> (MutexGuard<'static, BTreeMap<usize, IoControlFlags>>,
+                               MutexGuard<'static, BTreeMap<usize, IoStreams>>) {
+        (APP_IO_CTRL_FLAGS.lock(), APP_IO_STREAMS.lock())
+    }
 }
 
 lazy_static! {
@@ -127,7 +148,7 @@ pub fn get_terminal_or_default() -> Result<Arc<Mutex<Terminal>>, &'static str> {
     let task_id = task::get_my_current_task_id()
                       .ok_or("Cannot get task ID for getting default terminal")?;
 
-    if let Some(property) = APP_IO_STREAMS.lock().get(&task_id) {
+    if let Some(property) = shared_maps::lock_stream_map().get(&task_id) {
         return Ok(Arc::clone(&property.terminal));
     }
 
@@ -148,8 +169,7 @@ pub fn get_terminal_or_default() -> Result<Arc<Mutex<Terminal>>, &'static str> {
 pub fn lock_and_execute<'a, F>(f: &F)
     where F: Fn(MutexGuard<'a, BTreeMap<usize, IoControlFlags>>,
                 MutexGuard<'a, BTreeMap<usize, IoStreams>>) {
-    let locked_flags = APP_IO_CTRL_FLAGS.lock();
-    let locked_streams = APP_IO_STREAMS.lock();
+    let (locked_flags, locked_streams) = shared_maps::lock_all_maps();
     f(locked_flags, locked_streams);
 }
 
@@ -157,15 +177,15 @@ pub fn lock_and_execute<'a, F>(f: &F)
 /// applications. If there is any existing readers/writers for the task (which should not
 /// happen in normal practice), it returns the old one, otherwise returns None.
 pub fn insert_child_streams(task_id: usize, streams: IoStreams) -> Option<IoStreams> {
-    APP_IO_CTRL_FLAGS.lock().insert(task_id, IoControlFlags::new());
-    APP_IO_STREAMS.lock().insert(task_id, streams)
+    shared_maps::lock_flag_map().insert(task_id, IoControlFlags::new());
+    shared_maps::lock_stream_map().insert(task_id, streams)
 }
 
 /// Shells call this function to remove queues and pointer to terminal for applications. It returns
 /// the removed streams in the return value if the key matches, otherwise returns None.
 pub fn remove_child_streams(task_id: &usize) -> Option<IoStreams> {
-    APP_IO_CTRL_FLAGS.lock().remove(task_id);
-    APP_IO_STREAMS.lock().remove(task_id)
+    shared_maps::lock_flag_map().remove(task_id);
+    shared_maps::lock_stream_map().remove(task_id)
 }
 
 /// Applications call this function to acquire a reader to its stdin queue.
@@ -176,7 +196,7 @@ pub fn remove_child_streams(task_id: &usize) -> Option<IoStreams> {
 /// to let it run.
 pub fn stdin() -> Result<StdioReader, &'static str> {
     let task_id = task::get_my_current_task_id().ok_or("failed to get task_id to get stdin")?;
-    let locked_streams = APP_IO_STREAMS.lock();
+    let locked_streams = shared_maps::lock_stream_map();
     match locked_streams.get(&task_id) {
         Some(queues) => Ok(queues.stdin.clone()),
         None => Err("no stdin for this task")
@@ -191,7 +211,7 @@ pub fn stdin() -> Result<StdioReader, &'static str> {
 /// to let it run.
 pub fn stdout() -> Result<StdioWriter, &'static str> {
     let task_id = task::get_my_current_task_id().ok_or("failed to get task_id to get stdout")?;
-    let locked_streams = APP_IO_STREAMS.lock();
+    let locked_streams = shared_maps::lock_stream_map();
     match locked_streams.get(&task_id) {
         Some(queues) => Ok(queues.stdout.clone()),
         None => Err("no stdout for this task")
@@ -206,7 +226,7 @@ pub fn stdout() -> Result<StdioWriter, &'static str> {
 /// to let it run.
 pub fn stderr() -> Result<StdioWriter, &'static str> {
     let task_id = task::get_my_current_task_id().ok_or("failed to get task_id to get stderr")?;
-    let locked_streams = APP_IO_STREAMS.lock();
+    let locked_streams = shared_maps::lock_stream_map();
     match locked_streams.get(&task_id) {
         Some(queues) => Ok(queues.stderr.clone()),
         None => Err("no stderr for this task")
@@ -224,7 +244,7 @@ pub fn stderr() -> Result<StdioWriter, &'static str> {
 /// prematurely so that it cannot return the key event reader on exit.
 pub fn take_key_event_queue() -> Result<KeyEventReadGuard, &'static str> {
     let task_id = task::get_my_current_task_id().ok_or("failed to get task_id to take key event queue")?;
-    let locked_streams = APP_IO_STREAMS.lock();
+    let locked_streams = shared_maps::lock_stream_map();
     match locked_streams.get(&task_id) {
         Some(queues) => {
             match queues.key_event_reader.lock().take() {
@@ -244,7 +264,7 @@ pub fn take_key_event_queue() -> Result<KeyEventReadGuard, &'static str> {
 fn return_event_queue(reader: &mut Option<KeyEventQueueReader>) {
     match task::get_my_current_task_id().ok_or("failed to get task_id to return event queue") {
         Ok(task_id) => {
-            let locked_streams = APP_IO_STREAMS.lock();
+            let locked_streams = shared_maps::lock_stream_map();
             match locked_streams.get(&task_id) {
                 Some(queues) => {
                     core::mem::swap(&mut *queues.key_event_reader.lock(), reader);
@@ -265,7 +285,7 @@ fn return_event_queue(reader: &mut Option<KeyEventQueueReader>) {
 /// or it finds no IoControlFlags structure for that task.
 pub fn request_stdin_instant_flush() -> Result<(), &'static str> {
     let task_id = task::get_my_current_task_id().ok_or("failed to get task_id to request stdin instant flush")?;
-    let mut locked_flags = APP_IO_CTRL_FLAGS.lock();
+    let mut locked_flags = shared_maps::lock_flag_map();
     match locked_flags.get_mut(&task_id) {
         Some(flags) => {
             flags.stdin_instant_flush = true;
@@ -282,7 +302,7 @@ pub fn request_stdin_instant_flush() -> Result<(), &'static str> {
 /// or it finds no IoControlFlags structure for that task.
 pub fn cancel_stdin_instant_flush() -> Result<(), &'static str> {
     let task_id = task::get_my_current_task_id().ok_or("failed to get task_id to cancel stdin instant flush")?;
-    let mut locked_flags = APP_IO_CTRL_FLAGS.lock();
+    let mut locked_flags = shared_maps::lock_flag_map();
     match locked_flags.get_mut(&task_id) {
         Some(flags) => {
             flags.stdin_instant_flush = false;
@@ -296,7 +316,7 @@ pub fn cancel_stdin_instant_flush() -> Result<(), &'static str> {
 /// 
 /// Error can occur when there is no IoControlFlags structure for that task.
 pub fn is_requesting_instant_flush(task_id: &usize) -> Result<bool, &'static str> {
-    let locked_flags = APP_IO_CTRL_FLAGS.lock();
+    let locked_flags = shared_maps::lock_flag_map();
     match locked_flags.get(task_id) {
         Some(flags) => {
             Ok(flags.stdin_instant_flush)
@@ -341,7 +361,7 @@ pub fn print_to_stdout_args(fmt_args: fmt::Arguments) {
     };
 
     // Obtains the correct stdout stream and push the output bytes.
-    let locked_streams = APP_IO_STREAMS.lock();
+    let locked_streams = shared_maps::lock_stream_map();
     match locked_streams.get(&task_id) {
         Some(queues) => {
             if let Err(_) = queues.stdout.lock().write_all(format!("{}", fmt_args).as_bytes()) {
