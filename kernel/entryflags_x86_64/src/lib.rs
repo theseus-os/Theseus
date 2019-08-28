@@ -20,6 +20,7 @@ bitflags! {
         const ACCESSED          = 1 << 5;
         const DIRTY             = 1 << 6;
         const HUGE_PAGE         = 1 << 7;
+        const PAGE         = 0; // opposite to HUGE_PAGE. Add it for compatibility
         // const GLOBAL            = 1 << 8;
         const GLOBAL            = 0; // disabling because VirtualBox doesn't like it
         const NO_EXECUTE        = 1 << 63;
@@ -28,39 +29,28 @@ bitflags! {
 }
 
 impl EntryFlags {
-    /// Returns ture if the page the entry points to is a huge page.
+    /// Returns true if the page the entry points to is a huge page.
     /// For x86_64, it means the flags contain a `HUGE_PAGE` bit.
     pub fn is_huge(&self) -> bool {
-        self.contains(EntryFlags::HUGE_PAGE)
+        self.intersects(EntryFlags::HUGE_PAGE)
     }
 
-    /// Returns the bits that must be set for an accessible page.
-    /// For x86_64, the `PRESENT` bit should be set.
-    pub fn present() -> EntryFlags {
-        EntryFlags::PRESENT
-    }
-
-    /// Returns the flags of an accessiable writable page.
-    /// For x86_64 the `PRESENT` and `WRITABLE` bits should be set.
-    pub fn writable_page() -> EntryFlags {
-        EntryFlags::present() | EntryFlags::WRITABLE
-    }
-
-    /// Returns true if the page is accessible and is not huge.
-    pub fn is_regular_page(&self) -> bool {
-        self.contains(EntryFlags::PRESENT) && !self.contains(EntryFlags::HUGE_PAGE)
-    }
-
-    /// Sets the entryflags as writable and accessible and returns it.
-    /// For x86_64 the `PRESENT` and `WRITABLE` bits should be set.
-    pub fn as_writable_page(self) -> EntryFlags {
-        self | EntryFlags::writable_page()
+    /// Turns the flags into huge. 
+    /// For x86_64, the `HUGE_PAGE` bits should be set.
+    pub fn into_huge(self) -> EntryFlags {
+        self | EntryFlags::HUGE_PAGE
     }
 
     /// Returns true if the page is writable.
     /// For x86_64 it means the flags contain `WRITABLE`.
     pub fn is_writable(&self) -> bool {
         self.intersects(EntryFlags::WRITABLE)
+    }
+
+    /// Turns the flags into writable. 
+    /// For x86_64, the `WRITABLE` bit should be set.
+    pub fn into_writable(self) -> EntryFlags {
+        self | EntryFlags::WRITABLE
     }
 
     /// Returns true if these flags are executable,

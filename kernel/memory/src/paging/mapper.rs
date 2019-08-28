@@ -130,7 +130,8 @@ impl Mapper {
         where A: FrameAllocator
     {
         // P4, P3, and P2 entries should never set NO_EXECUTE, only the lowest-level P1 entry should. 
-        let mut top_level_flags = flags.clone();
+        // P4, P3, and P2 entries should not be huge.
+        let mut top_level_flags = flags.clone() | EntryFlags::PAGE;
         top_level_flags.set(EntryFlags::NO_EXECUTE, false);
         // top_level_flags.set(EntryFlags::WRITABLE, true); // is the same true for the WRITABLE bit?
 
@@ -146,7 +147,7 @@ impl Mapper {
                 return Err("page was already in use");
             } 
 
-            p1[page.p1_index()].set(frame, flags | EntryFlags::present());
+            p1[page.p1_index()].set(frame, flags | EntryFlags::PRESENT);
         }
 
         Ok(MappedPages {
@@ -163,7 +164,8 @@ impl Mapper {
         where A: FrameAllocator
     {
         // P4, P3, and P2 entries should never set NO_EXECUTE, only the lowest-level P1 entry should. 
-        let mut top_level_flags = flags.clone();
+        // P4, P3, and P2 entryies should not be huge.
+        let mut top_level_flags = flags.clone() | EntryFlags::PAGE;
         top_level_flags.set(EntryFlags::NO_EXECUTE, false);
         // top_level_flags.set(EntryFlags::WRITABLE, true); // is the same true for the WRITABLE bit?
 
@@ -187,7 +189,7 @@ impl Mapper {
                 return Err("page was already in use");
             } 
 
-            p1[page.p1_index()].set(frame, flags | EntryFlags::present());
+            p1[page.p1_index()].set(frame, flags | EntryFlags::PRESENT | EntryFlags::PAGE);
         }
 
         Ok(MappedPages {
@@ -540,7 +542,7 @@ impl MappedPages {
                 .ok_or("mapping code does not support huge pages")?;
             
             let frame = p1[page.p1_index()].pointed_frame().ok_or("remap(): page not mapped")?;
-            p1[page.p1_index()].set(frame, new_flags | EntryFlags::present());
+            p1[page.p1_index()].set(frame, new_flags | EntryFlags::PRESENT | EntryFlags::PAGE);
 
             let vaddr = page.start_address();
             tlb_flush_virt_addr(vaddr);

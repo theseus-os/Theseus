@@ -664,7 +664,7 @@ impl IntoIterator for PageRange {
 
 /// The information of a memory area for mapping.
 #[derive(Default)]
-pub struct MemoryMappingInfo {
+pub struct SectionMemoryBounds {
     /// The start address. It contains the virtual address and the physical address.
     pub start: Option<(VirtualAddress, PhysicalAddress)>,
     /// The end address. It contains the virtual address and the physical address.
@@ -676,8 +676,8 @@ pub struct MemoryMappingInfo {
 /// The mapping information of merged kernel sections.
 /// It only contains the three sections we care about.
 #[derive(Default)]
-pub struct SectionsMappingInfo {
-   pub text: MemoryMappingInfo,
-   pub rodata: MemoryMappingInfo,
-   pub data: MemoryMappingInfo,
+pub struct InitialSectionsMemoryBounds {
+   pub text: SectionMemoryBounds,
+   pub rodata: SectionMemoryBounds,
+   pub data: SectionMemoryBounds,
 }

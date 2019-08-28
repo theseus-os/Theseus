@@ -22,7 +22,7 @@ pub use entryflags_x86_64::EntryFlags;
 
 use kernel_config::memory::KERNEL_OFFSET;
 use memory_structs::{
-    Frame, PhysicalAddress, PhysicalMemoryArea, VirtualAddress, VirtualMemoryArea, MemoryMappingInfo, SectionsMappingInfo,
+    Frame, PhysicalAddress, PhysicalMemoryArea, VirtualAddress, VirtualMemoryArea, SectionMemoryBounds, InitialSectionsMemoryBounds,
 };
 use x86_64::{registers::control_regs, instructions::tlb};
 
@@ -32,7 +32,7 @@ use x86_64::{registers::control_regs, instructions::tlb};
 /// Returns the following tuple, if successful:
 ///  * The kernel's start physical address,
 ///  * the kernel's end physical address,
-///  * the kernels' end virtual address.
+///  * the kernel's end virtual address.
 pub fn get_kernel_address(
     boot_info: &BootInformation,
 ) -> Result<(PhysicalAddress, PhysicalAddress, VirtualAddress), &'static str> {
@@ -161,13 +161,13 @@ pub fn get_boot_info_vaddress(
 /// Adds the virtual memory areas occupied by kernel code and data containing sections .init, .text, .rodata, .data, and .bss.
 /// 
 /// Returns the following tuple, if successful:
-///  * The number of added memory areas;
-///  * the mapping information of merged kernel sections containing {text, rodata, data}.
+///  * The number of added memory areas,
+///  * the mapping information of merged kernel sections containing {text, rodata, data},
 ///  * a list of the mapping information about all sections.
 pub fn add_sections_vmem_areas(
     boot_info: &BootInformation,
     vmas: &mut [VirtualMemoryArea; 32],
-) -> Result<(usize, SectionsMappingInfo, [MemoryMappingInfo; 32]), &'static str> {
+) -> Result<(usize, InitialSectionsMemoryBounds, [SectionMemoryBounds; 32]), &'static str> {
     let elf_sections_tag = try!(boot_info
         .elf_sections_tag()
         .ok_or("no Elf sections tag present!"));
@@ -184,7 +184,7 @@ pub fn add_sections_vmem_areas(
     let mut rodata_flags: Option<EntryFlags> = None;
     let mut data_flags: Option<EntryFlags> = None;
 
-    let mut memories_mapping_info: [MemoryMappingInfo; 32] =
+    let mut sections_memory_bounds: [SectionMemoryBounds; 32] =
         Default::default();
 
     // map the allocated kernel text sections
@@ -288,7 +288,7 @@ pub fn add_sections_vmem_areas(
         );
 
         // These memories will be mapped to identical lower half addresses. 
-        memories_mapping_info[index] = MemoryMappingInfo {
+        sections_memory_bounds[index] = SectionMemoryBounds {
             start: Some((start_virt_addr, start_phys_addr)),
             end: Some((end_virt_addr, end_phys_addr)),
             flags: Some(flags),
@@ -297,29 +297,29 @@ pub fn add_sections_vmem_areas(
         index += 1;
     } // end of section iterator
 
-    let text = MemoryMappingInfo {
+    let text = SectionMemoryBounds {
         start: text_start,
         end: text_end,
         flags: text_flags,
     };
-    let rodata = MemoryMappingInfo {
+    let rodata = SectionMemoryBounds {
         start: rodata_start,
         end: rodata_end,
         flags: rodata_flags,
     };
-    let data = MemoryMappingInfo {
+    let data = SectionMemoryBounds {
         start: data_start,
         end: data_end,
         flags: data_flags,
     };
 
-    let secions_mapping_info = SectionsMappingInfo {
+    let initial_sections_memory_bounds = InitialSectionsMemoryBounds {
         text: text,
         rodata: rodata,
         data: data,
     };
 
-    Ok((index, secions_mapping_info, memories_mapping_info))
+    Ok((index, initial_sections_memory_bounds, sections_memory_bounds))
 }
 
 
@@ -341,12 +341,12 @@ pub fn get_vga_mem_addr(
     ))
 }
 
-/// Flushs the specific virtual address in TLB. 
+/// Flushes the specific virtual address in TLB. 
 pub fn tlb_flush_virt_addr(vaddr: VirtualAddress) {
     tlb::flush(x86_64::VirtualAddress(vaddr.value()));
 }
 
-/// Flushs the whole TLB. 
+/// Flushes the whole TLB. 
 pub fn tlb_flush_all() {
     tlb::flush_all();
 }

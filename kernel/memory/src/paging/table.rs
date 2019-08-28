@@ -60,7 +60,7 @@ impl<L> Table<L>
     /// (so P4 would give P3, P3 -> P2, P2 -> P1).
     fn next_table_address(&self, index: usize) -> Option<VirtualAddress> {
         let entry_flags = self[index].flags();
-        if entry_flags.is_regular_page() {
+        if entry_flags.contains(EntryFlags::PRESENT) && !entry_flags.is_huge() {
             let table_address = self as *const _ as usize;
             let next_table_vaddr: usize = (table_address << 9) | (index << PAGE_SHIFT);
             Some(VirtualAddress::new_canonical(next_table_vaddr))
@@ -87,10 +87,10 @@ impl<L> Table<L>
         where A: FrameAllocator
     {
         if self.next_table(index).is_none() {
-            assert!(!self[index].flags().contains(EntryFlags::HUGE_PAGE),
+            assert!(!self[index].flags().is_huge(),
                     "mapping code does not support huge pages");
             let frame = allocator.allocate_frame().expect("no frames available");
-            self[index].set(frame, flags.as_writable_page()); // must be PRESENT | WRITABLE for x86_64
+            self[index].set(frame, flags.into_writable() | EntryFlags::PRESENT); // must be PRESENT | WRITABLE for x86_64
             self.next_table_mut(index).unwrap().zero();
         }
         self.next_table_mut(index).unwrap()

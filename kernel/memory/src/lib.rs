@@ -201,7 +201,7 @@ pub fn init(boot_info: &BootInformation)
         kernel_virt_end
     );
   
-    // get availabe physical memory areas
+    // get available physical memory areas
     let (available, avail_len) = get_available_memory(&boot_info, kernel_phys_end)?;
 
     // get the bounds of physical memory that is occupied by modules we've loaded 
