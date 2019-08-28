@@ -130,7 +130,7 @@ impl Mapper {
         where A: FrameAllocator
     {
         // P4, P3, and P2 entries should never set NO_EXECUTE, only the lowest-level P1 entry should. 
-        // P4, P3, and P2 entries should not be huge.
+        // P4, P3, and P2 entries should not be huge page. Set `PAGE` here because `next_table_create` will check if it is not huge.
         let mut top_level_flags = flags.clone() | EntryFlags::PAGE;
         top_level_flags.set(EntryFlags::NO_EXECUTE, false);
         // top_level_flags.set(EntryFlags::WRITABLE, true); // is the same true for the WRITABLE bit?
@@ -164,7 +164,7 @@ impl Mapper {
         where A: FrameAllocator
     {
         // P4, P3, and P2 entries should never set NO_EXECUTE, only the lowest-level P1 entry should. 
-        // P4, P3, and P2 entryies should not be huge.
+        // P4, P3, and P2 entries should not be huge page. Set `PAGE` here because `next_table_create` will check if it is not huge.
         let mut top_level_flags = flags.clone() | EntryFlags::PAGE;
         top_level_flags.set(EntryFlags::NO_EXECUTE, false);
         // top_level_flags.set(EntryFlags::WRITABLE, true); // is the same true for the WRITABLE bit?
