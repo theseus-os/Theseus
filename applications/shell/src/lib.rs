@@ -2,9 +2,7 @@
 //! Commands that can be run are the names of the crates in the applications directory
 //! 
 //! The shell has the following responsibilities: handles key events delivered from terminal, manages terminal display,
-//! spawns and manages tasks, and records previously executed user commands.
-//! 
-//! Problem: Currently there's no upper bound to the user command line history.
+//! spawns and manages tasks, and records the history of executed user commands.
 
 #![no_std]
 #![feature(slice_concat_ext)]

@@ -133,9 +133,11 @@ impl<F, A, R> KernelTaskBuilder<F, A, R>
         self
     }
 
-    /// Set the new Task's Runstate to be `Blocked` instead of `Runnable` when it is first spawned.
-    /// This allows another task to delay this task's execution arbitrarily, e.g., to set up other
-    /// things for the newly-spawned (but not yet running) task. 
+    /// Set the new Task's `RunState` to be `Blocked` instead of `Runnable` when it is first spawned.
+    /// This allows another task to delay the new task's execution arbitrarily, 
+    /// e.g., to set up other things for the newly-spawned (but not yet running) task. 
+    /// 
+    /// Note that the new Task will not be `Runnable` until it is explicitly set as such.
     pub fn block(mut self) -> KernelTaskBuilder<F, A, R> {
         self.blocked = true;
         self
@@ -291,9 +293,11 @@ impl ApplicationTaskBuilder {
         self
     }
 
-    /// Set the new Task's Runstate to be `Blocked` instead of `Runnable` when it is first spawned.
-    /// This allows another task to delay this task's execution arbitrarily, e.g., to set up other
-    /// things for the newly-spawned (but not yet running) task. 
+    /// Set this new application Task's `RunState` to be `Blocked` instead of `Runnable` when it is first spawned.
+    /// This allows another task to delay the new task's execution arbitrarily, 
+    /// e.g., to set up other things for the newly-spawned (but not yet running) task. 
+    /// 
+    /// Note that the new Task will not be `Runnable` until it is explicitly set as such.
     pub fn block(mut self) -> ApplicationTaskBuilder {
         self.blocked = true;
         self
@@ -325,28 +329,21 @@ impl ApplicationTaskBuilder {
         };
 
         // build and spawn the actual underlying kernel Task
-        let ktb = KernelTaskBuilder::new(*main_func, self.argument)
+        let mut ktb = KernelTaskBuilder::new(*main_func, self.argument)
             .name(self.name.unwrap_or_else(|| app_crate_ref.lock_as_ref().crate_name.clone()));
         
-        let ktb = if let Some(core) = self.pin_on_core {
-            ktb.pin_on_core(core)
-        } else {
-            ktb
-        };
+        ktb.pin_on_core = self.pin_on_core;
+        ktb.blocked = self.blocked;
 
-        #[cfg(simd_personality)]
-        let mut ktb = ktb.simd(self.simd);
+        #[cfg(simd_personality)] {
+            ktb.simd = self.simd;
+        }
 
+        // set up app-specific task states right before the task creation is completed
         let post_build_func = |new_task: &mut Task| -> Result<(), &'static str> {
             new_task.app_crate = Some(app_crate_ref);
             new_task.namespace = namespace;
             Ok(())
-        };
-
-        let ktb = if self.blocked {
-            ktb.block()
-        } else {
-            ktb
         };
 
         ktb.spawn_internal(Some(post_build_func))

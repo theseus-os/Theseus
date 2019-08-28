@@ -3,8 +3,6 @@
 //! The terminal roughly does the following things: manages all characters in a String that should be printed to the screen;
 //! cuts a slice from this String and send it to window manager to get things actually printed; manages user input command line
 //! as well as the cursor position, and delivers keyboard events.
-//! 
-//! Problem: Currently there's no upper bound to the scrollback buffer, as well as other user input buffer.
 
 #![no_std]
 
