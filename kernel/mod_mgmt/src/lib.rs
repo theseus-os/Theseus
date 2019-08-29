@@ -288,6 +288,14 @@ impl NamespaceDir {
         }).collect()
     }
 
+    /// Returns the list of file and directory names in this Directory whose name start with the given `prefix`.
+    pub fn get_file_and_dir_names_starting_with(&self, prefix: &str) -> Vec<String> {
+        let children = { self.0.lock().list() };
+        children.into_iter()
+            .filter(|name| name.starts_with(prefix))
+            .collect()
+    }
+
     /// Gets the given object file based on its crate name prefix. 
     /// 
     /// # Arguments

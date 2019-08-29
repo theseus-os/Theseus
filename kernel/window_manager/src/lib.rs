@@ -116,12 +116,12 @@ pub fn switch() -> Result<(), &'static str> {
 }
 
 /// delete a window object
-pub fn delete(window:WindowObj) -> Result<(), &'static str> {
+pub fn delete(window: &WindowObj) -> Result<(), &'static str> {
     let mut allocator = try!(WINDOW_ALLOCATOR.try().ok_or("The window allocator is not initialized")).lock();
     // Switches to a new active window and sets 
     // the active pointer field of the window allocator to the new active window
     allocator.switch(); 
-    allocator.delete(&(window.inner));
+    allocator.delete(&window.inner);
     Ok(())
 }
 
