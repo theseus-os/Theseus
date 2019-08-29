@@ -195,12 +195,13 @@ impl StdioWriter {
 }
 
 impl<'a> Read for StdioReadGuard<'a> {
-    /// Read from the ring buffer. It returns the number of bytes read. Currently it is not possible
-    /// to return an error, but one should *not* simply unwrap the return value since the implementation
-    /// detail is subjected to change in the future.
+    /// Read from the ring buffer. Returns the number of bytes read. 
     /// 
-    /// Note that this method will block when currently nothing can be read out and wait to read at
-    /// least one byte. It will only return zero under one of two scenarios:
+    /// Currently it is not possible to return an error, 
+    /// but one should *not* assume that because it is subject to change in the future.
+    /// 
+    /// Note that this method will block until at least one byte is available to be read.
+    /// It will only return zero under one of two scenarios:
     /// 1. The EOF flag has been set.
     /// 2. The buffer specified was 0 bytes in length.
     fn read(&mut self, buf: &mut [u8]) -> Result<usize, core_io::Error> {
@@ -237,12 +238,9 @@ impl<'a> Read for StdioReadGuard<'a> {
 }
 
 impl<'a> StdioReadGuard<'a> {
-    /// Read from the ring buffer. It returns the number of bytes read. Currently it is not possible
-    /// to return an error, but one should *not* simply unwrap the return value since the implementation
-    /// detail is subjected to change in the future.
+    /// Same as `read()`, but is non-blocking.
     /// 
-    /// Note that this is the non-blocking version of `read`. It directly returns zero when currently
-    /// the underlying ring buffer is empty.
+    /// Returns `Ok(0)` when the underlying buffer is empty.
     pub fn try_read(&mut self, buf: &mut [u8]) -> Result<usize, core_io::Error> {
 
         // Deal with the edge case that the buffer specified was 0 bytes in length.
@@ -254,8 +252,7 @@ impl<'a> StdioReadGuard<'a> {
 
         // Keep reading if we have empty space in the output buffer
         // and available byte in the ring buffer.
-        while let (Some(buf_elem), Some(queue_elem))
-                    = (buf_iter.next(), locked_ring_buf.queue.pop_front()) {
+        while let (Some(buf_elem), Some(queue_elem)) = (buf_iter.next(), locked_ring_buf.queue.pop_front()) {
             *buf_elem = queue_elem;
             cnt += 1;
         }
@@ -263,13 +260,14 @@ impl<'a> StdioReadGuard<'a> {
         return Ok(cnt);
     }
 
-    pub fn left_size(&self) -> usize {
+    /// Returns the number of bytes still in the read buffer.
+    pub fn remaining_bytes(&self) -> usize {
         return self.guard.lock().queue.len();
     }
 }
 
 impl<'a> Write for StdioWriteGuard<'a> {
-    /// Write to the ring buffer. It returns the number of bytes written.
+    /// Write to the ring buffer, returniong the number of bytes written.
     /// 
     /// When this method is called after setting the EOF flag, it returns error with `ErrorKind`
     /// set to `UnexpectedEof`.
@@ -368,10 +366,11 @@ impl KeyEventQueueWriter {
     }
 }
 
-/// A structure that allows applications to access keyboard events directly. When
-/// it get instantiated, it *takes* the reader of the `KeyEventQueue`. When it
-/// goes out of the scope, the taken reader will be automatically returned back
-/// to the shell by `drop()` method.
+/// A structure that allows applications to access keyboard events directly. 
+/// When it gets instantiated, it `take`s the reader of the `KeyEventQueue` away from the `shell`, 
+/// or whichever entity previously owned the queue.
+/// When it goes out of the scope, the taken reader will be automatically returned
+/// back to the `shell` or the original owner in its `Drop` routine.
 pub struct KeyEventReadGuard {
     /// The taken reader of the `KeyEventQueue`.
     reader: Option<KeyEventQueueReader>,
@@ -383,8 +382,10 @@ impl KeyEventReadGuard {
     /// Create a new `KeyEventReadGuard`. This function *takes* a reader
     /// to `KeyEventQueue`. Thus, the `reader` will never be `None` until the
     /// `drop()` method.
-    pub fn new(reader: KeyEventQueueReader,
-               closure: Box<dyn Fn(&mut Option<KeyEventQueueReader>)>) -> KeyEventReadGuard {
+    pub fn new(
+        reader: KeyEventQueueReader,
+        closure: Box<dyn Fn(&mut Option<KeyEventQueueReader>)>
+    ) -> KeyEventReadGuard {
         KeyEventReadGuard {
             reader: Some(reader),
             closure
@@ -393,8 +394,7 @@ impl KeyEventReadGuard {
 }
 
 impl Drop for KeyEventReadGuard {
-    /// Returns the reader of `KeyEventQueue` back to shell by executing the
-    /// closure.
+    /// Returns the reader of `KeyEventQueue` back to the previous owner by executing the closure.
     fn drop(&mut self) {
         (self.closure)(&mut self.reader);
     }
@@ -403,7 +403,6 @@ impl Drop for KeyEventReadGuard {
 impl Deref for KeyEventReadGuard {
     type Target = Option<KeyEventQueueReader>;
 
-    /// It allows us to access the reader with dot operator.
     fn deref(&self) -> &Self::Target {
         &self.reader
     }
