@@ -1,6 +1,8 @@
 //! This crate implements the virtual memory subsystem interfaces for Theseus on x86_64.
 //! `memory` uses this crate to get the memory layout and do other arch-specific operations on x86_64.  
-//! This is the top arch-specific memory crate. All arch-specific definitions for memory system are exported in this crate.
+//! 
+//! This is the top-level arch-specific memory crate. 
+//! All arch-specific definitions for memory system are exported from this crate.
 
 #![no_std]
 #![feature(asm)]
@@ -16,7 +18,6 @@ extern crate memory_structs;
 extern crate entryflags_x86_64;
 extern crate x86_64;
 
-// export arch-specific definitions to `memory`.
 pub use multiboot2::BootInformation;
 pub use entryflags_x86_64::EntryFlags;
 
@@ -27,12 +28,12 @@ use memory_structs::{
 use x86_64::{registers::control_regs, instructions::tlb};
 
 
-/// Gets the address of memory occupied by the loaded kernel.
+/// Finds and returns the relevant addresses for the kernel image loaded into memory by the bootloader.
 ///
 /// Returns the following tuple, if successful:
-///  * The kernel's start physical address,
-///  * the kernel's end physical address,
-///  * the kernel's end virtual address.
+///  * The kernel's starting physical address,
+///  * the kernel's ending physical address,
+///  * the kernel's ending virtual address.
 pub fn get_kernel_address(
     boot_info: &BootInformation,
 ) -> Result<(PhysicalAddress, PhysicalAddress, VirtualAddress), &'static str> {
@@ -65,11 +66,11 @@ pub fn get_kernel_address(
     Ok((kernel_phys_start, kernel_phys_end, kernel_virt_end))
 }
 
-/// Gets the available memory areas. Parse the list of physical memory areas from multiboot.
+/// Gets the available physical memory areas from the bootloader-provided list.
 ///
 /// Returns the following tuple, if successful:
-///  * A list of avaiable physical memory areas,
-///  * the number of occupied areas.
+///  * An array of available physical memory areas,
+///  * The number of valid entries in that array.
 pub fn get_available_memory(
     boot_info: &BootInformation,
     kernel_phys_end: PhysicalAddress,
@@ -102,28 +103,27 @@ pub fn get_available_memory(
         };
         let start_paddr = (Frame::containing_address(start_paddr) + 1).start_address(); // align up to next page
 
-        available[avail_index] = PhysicalMemoryArea {
+        let new_entry = available.get_mut(avail_index).ok_or("Found more than 32 physical memory areas, only 32 are supported.")?;
+        *new_entry = PhysicalMemoryArea {
             base_addr: start_paddr,
             size_in_bytes: area_size,
             typ: 1,
             acpi: 0,
         };
 
-        info!(
-            "--> memory region established: start={:#x}, size_in_bytes={:#x}",
-            available[avail_index].base_addr, available[avail_index].size_in_bytes
+        info!("--> memory region established: start={:#x}, size_in_bytes={:#x}",
+            new_entry.base_addr, new_entry.size_in_bytes
         );
-        // print_early!("--> memory region established: start={:#x}, size_in_bytes={:#x}\n", available[avail_index].base_addr, available[avail_index].size_in_bytes);
         avail_index += 1;
     }
 
     Ok((available, avail_index))
 }
 
-/// Gets the bounds of physical memory that is occupied by loaded modules.
+/// Gets the address bounds of physical memory occupied by all bootloader-loaded modules.
 /// 
 /// Returns (start_address, end_address).
-pub fn get_modules_address(boot_info: &BootInformation) -> (usize, usize) {
+pub fn get_modules_address(boot_info: &BootInformation) -> (PhysicalAddress, PhysicalAddress) {
     let mut mod_min = usize::max_value();
     let mut mod_max = 0;
     use core::cmp::{max, min};
@@ -132,7 +132,7 @@ pub fn get_modules_address(boot_info: &BootInformation) -> (usize, usize) {
         mod_min = min(mod_min, m.start_address() as usize);
         mod_max = max(mod_max, m.end_address() as usize);
     }
-    (mod_min, mod_max)
+    (PhysicalAddress::new_canonical(mod_min), PhysicalAddress::new_canonical(mod_max))
 }
 
 /// Gets the physical memory area occupied by the bootloader information.
@@ -363,10 +363,8 @@ pub fn tlb_flush_all() {
 }
 
 /// Sets the top-level page table address to enable the new page table p4 points to.
-pub fn set_p4(p4: PhysicalAddress) {
-    unsafe {
-        control_regs::cr3_write(x86_64::PhysicalAddress(p4.value() as u64));
-    }
+pub unsafe fn set_p4(p4: PhysicalAddress) {
+    control_regs::cr3_write(x86_64::PhysicalAddress(p4.value() as u64));
 }
 
 /// Returns the current top-level page table address.

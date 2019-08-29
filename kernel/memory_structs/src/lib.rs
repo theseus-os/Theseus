@@ -1,5 +1,4 @@
-//! This crate contains the common structures of virtual memory subsystem shared by `memory_<arch>` crates.  
-//! Structs in this crate are exported from `memory` for upper-level crates.
+//! This crate contains common types used for memory mapping. 
 
 #![no_std]
 #![feature(range_is_empty)]

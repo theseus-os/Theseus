@@ -1,7 +1,7 @@
 [package]
 authors = ["Kevin Boos <kevinaboos@gmail.com>"]
 name = "memory_structs"
-description = "The common structs of memory system"
+description = "Common types used in the memory management subsystem"
 version = "0.1.0"
 build = "../../build.rs"
 

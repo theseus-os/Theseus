@@ -147,7 +147,7 @@ impl PageTable {
         // debug!("PageTable::switch() old table: {:?}, new table: {:?}", self, new_table);
 
         // perform the actual page table switch
-        set_p4(new_table.p4_table.start_address());
+        unsafe { set_p4(new_table.p4_table.start_address()); }
         let current_table_after_switch = PageTable::from_current();
         current_table_after_switch
     }

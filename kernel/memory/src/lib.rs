@@ -204,22 +204,19 @@ pub fn init(boot_info: &BootInformation)
     // get available physical memory areas
     let (available, avail_len) = get_available_memory(&boot_info, kernel_phys_end)?;
 
-    // get the bounds of physical memory that is occupied by modules we've loaded 
-    // (we can reclaim this later after the module is loaded, but not until then)
-    let (modules_start, modules_end) = get_modules_address(&boot_info);
+    // Get the bounds of physical memory that is occupied by bootloader-loaded modules.
+    let (modules_start_paddr, modules_end_paddr) = get_modules_address(&boot_info);
 
-    // print_early!("Modules physical memory region: start {:#X} to end {:#X}", modules_start, modules_end);
-
+    // Set up the initial list of reserved physical memory frames such that the frame allocator does not re-use them.
     let mut occupied: [PhysicalMemoryArea; 32] = Default::default();
     let mut occup_index = 0;
     occupied[occup_index] = PhysicalMemoryArea::new(PhysicalAddress::zero(), 0x10_0000, 1, 0); // reserve addresses under 1 MB
     occup_index += 1;
     occupied[occup_index] = PhysicalMemoryArea::new(kernel_phys_start, kernel_phys_end.value() - kernel_phys_start.value(), 1, 0); // the kernel boot image is already in use
     occup_index += 1;
-    // preserve the multiboot information for x86_64. 
-    occupied[occup_index] = get_boot_info_mem_area(&boot_info)?;
+    occupied[occup_index] = get_boot_info_mem_area(&boot_info)?; // preserve the multiboot information for x86_64. 
     occup_index += 1;
-    occupied[occup_index] = PhysicalMemoryArea::new(PhysicalAddress::new(modules_start)?, modules_end - modules_start, 1, 0); // preserve all modules
+    occupied[occup_index] = PhysicalMemoryArea::new(modules_start_paddr, modules_end_paddr.value() - modules_start_paddr.value(), 1, 0); // preserve all bootloader modules
     occup_index += 1;
 
 
@@ -228,9 +225,6 @@ pub fn init(boot_info: &BootInformation)
     let frame_allocator_mutex: &MutexIrqSafe<AreaFrameAllocator> = FRAME_ALLOCATOR.call_once(|| {
         MutexIrqSafe::new( fa ) 
     });
-
-    // print_early!("Boot info: {:?}\n", boot_info);
-
 
     // Initialize paging (create a new page table), which also initializes the kernel heap.
 

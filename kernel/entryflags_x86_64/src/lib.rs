@@ -1,5 +1,4 @@
-//! This crate defines the entryflags of page table on x86_64.  
-//! Definitions in this crate should be exported from `memory_x86_64` for upper-level crates.
+//! This crate defines the structure of page table entry flags on x86_64.
 
 #![no_std]
 
@@ -9,7 +8,7 @@ extern crate xmas_elf;
 
 
 bitflags! {
-    /// Entry access flag bits.
+    /// Page table entry flags.
     #[derive(Default)]
     pub struct EntryFlags: u64 {
         const PRESENT           = 1 << 0;
@@ -29,32 +28,28 @@ bitflags! {
 
 impl EntryFlags {
     /// Returns true if the page the entry points to is a huge page.
-    /// For x86_64, it means the flags contain a `HUGE_PAGE` bit.
     pub fn is_huge(&self) -> bool {
         self.intersects(EntryFlags::HUGE_PAGE)
     }
 
-    /// Turns the flags into huge. 
-    /// For x86_64, the `HUGE_PAGE` bits should be set.
+    /// Copies this new `EntryFlags` object and sets the huge page flag.
     pub fn into_huge(self) -> EntryFlags {
         self | EntryFlags::HUGE_PAGE
     }
 
     /// Returns true if the page is writable.
-    /// For x86_64 it means the flags contain `WRITABLE`.
     pub fn is_writable(&self) -> bool {
         self.intersects(EntryFlags::WRITABLE)
     }
 
-    /// Turns the flags into writable. 
-    /// For x86_64, the `WRITABLE` bit should be set.
+    /// Copies this new `EntryFlags` object and sets the writable flag.
     pub fn into_writable(self) -> EntryFlags {
         self | EntryFlags::WRITABLE
     }
 
-    /// Returns true if these flags are executable,
-    /// which means that the `NO_EXECUTE` bit on x86_64 is *not* set.
+    /// Returns true if these flags are executable.
     pub fn is_executable(&self) -> bool {
+        // On x86_64, this means that the `NO_EXECUTE` bit is *not* set.
         !self.intersects(EntryFlags::NO_EXECUTE)
     }
 
