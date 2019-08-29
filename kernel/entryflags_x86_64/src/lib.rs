@@ -20,7 +20,6 @@ bitflags! {
         const ACCESSED          = 1 << 5;
         const DIRTY             = 1 << 6;
         const HUGE_PAGE         = 1 << 7;
-        const PAGE              = 0; // opposite to HUGE_PAGE. Add it for compatibility
         // const GLOBAL            = 1 << 8;
         const GLOBAL            = 0; // disabling because VirtualBox doesn't like it
         const NO_EXECUTE        = 1 << 63;

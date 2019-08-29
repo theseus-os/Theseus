@@ -84,8 +84,7 @@ impl MapperSpillful {
         where A: FrameAllocator
     {
         // P4, P3, and P2 entries should never set NO_EXECUTE, only the lowest-level P1 entry should. 
-        // P4, P3, and P2 entries should not be huge page. Set `PAGE` here because `next_table_create` will check if it is not huge. 
-        let mut top_level_flags = flags.clone() | EntryFlags::PAGE;
+        let mut top_level_flags = flags.clone();
         top_level_flags.set(EntryFlags::NO_EXECUTE, false);
         // top_level_flags.set(EntryFlags::WRITABLE, true); // is the same true for the WRITABLE bit?
 
@@ -99,7 +98,7 @@ impl MapperSpillful {
                 error!("MapperSpillful::map() page {:#x} -> frame {:#X}, page was already in use!", page.start_address(), frame.start_address());
                 return Err("page was already mapped");
             }
-            p1[page.p1_index()].set(frame, flags | EntryFlags::PRESENT | EntryFlags::PAGE);
+            p1[page.p1_index()].set(frame, flags | EntryFlags::PRESENT);
         }
 
         VMAS.lock().push(VirtualMemoryArea::new(vaddr, size, flags, ""));
@@ -143,7 +142,7 @@ impl MapperSpillful {
                 .ok_or("mapping code does not support huge pages")?;
             
             let frame = try!(p1[page.p1_index()].pointed_frame().ok_or("remap(): page not mapped"));
-            p1[page.p1_index()].set(frame, new_flags | EntryFlags::PRESENT | EntryFlags::PAGE);
+            p1[page.p1_index()].set(frame, new_flags | EntryFlags::PRESENT);
 
             let vaddr = page.start_address();
             tlb_flush_virt_addr(vaddr);
