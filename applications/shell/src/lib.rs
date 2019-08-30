@@ -417,9 +417,10 @@ impl Shell {
                 });
                 self.terminal.lock().print_to_terminal("^C\n".to_string());
             } else {
-                self.clear_cmdline(true)?;
+                self.clear_cmdline(false)?;
                 self.input_buffer.clear();
                 self.terminal.lock().print_to_terminal("^C\n".to_string());
+                self.history_index = 0;
                 self.redisplay_prompt();
             }
             return Ok(());
