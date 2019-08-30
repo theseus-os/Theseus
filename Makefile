@@ -194,7 +194,7 @@ build: $(nano_core_binary)
 		OLD_FILE_PATH=$(OBJECT_FILES_BUILD_DIR)/$(KERNEL_PREFIX)$${app}-*.o ; \
 		NEW_FILE_PATH=$(OBJECT_FILES_BUILD_DIR)/`basename $${OLD_FILE_PATH} | sed -n -e 's/$(KERNEL_PREFIX)\(.*\)/$(APP_PREFIX)\1/p'` ; \
 		mv  $${OLD_FILE_PATH}  $${NEW_FILE_PATH} ; \
-		$(CROSS)strip  --strip-debug  $${NEW_FILE_PATH} ; \
+		# $(CROSS)strip  --strip-debug  $${NEW_FILE_PATH} ; \
 	done
 
 

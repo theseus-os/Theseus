@@ -16,6 +16,7 @@
 //! 
 
 #![no_std]
+#![feature(compiler_builtins_lib)]
 
 #[macro_use] extern crate log;
 extern crate alloc;
@@ -35,6 +36,11 @@ extern crate captain;
 extern crate panic_unwind; // the panic/unwind lang items
 
 #[macro_use] extern crate vga_buffer;
+
+/// This module is a hack to get around the lack of the 
+/// `__truncdfsf2` function in the `compiler_builtins` crate.
+/// See this: <https://github.com/rust-lang-nursery/compiler-builtins/pull/262>
+mod truncate;
 
 
 #[link_section = ".pre_init_array"] // "pre_init_array" is a section never removed by --gc-sections

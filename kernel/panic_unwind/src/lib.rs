@@ -15,6 +15,7 @@ extern crate alloc;
 extern crate memory;
 extern crate panic_wrapper;
 extern crate mod_mgmt;
+extern crate gimli;
 
 
 use core::panic::PanicInfo;

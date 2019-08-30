@@ -8,6 +8,7 @@
 extern crate spin;
 extern crate irq_safety;
 extern crate xmas_elf;
+extern crate gimli;
 extern crate memory;
 extern crate multiboot2;
 extern crate kernel_config;
@@ -1367,7 +1368,7 @@ impl CrateNamespace {
         use xmas_elf::header::Type;
         let typ = elf_file.header.pt2.type_().as_type();
         if typ != Type::Relocatable {
-            error!("load_crate_sections(): crate \"{}\" was a {:?} Elf File, must be Relocatable!", crate_name, typ);
+            error!("load_crate_sections(): crate \"{}\" was a {:?} Elf File, must be Relocatable!", &crate_name, typ);
             return Err("not a relocatable elf file");
         }
 
@@ -1419,12 +1420,13 @@ impl CrateNamespace {
         const RELRO_PREFIX:  &'static str = "rel.ro.";
 
         let new_crate = CowArc::new(LoadedCrate {
-            crate_name:              String::from(crate_name),
+            crate_name:              crate_name.clone(),
             object_file_abs_path:    abs_path,
             sections:                BTreeMap::new(),
             text_pages:              text_pages  .as_ref().map(|r| Arc::clone(r)),
             rodata_pages:            rodata_pages.as_ref().map(|r| Arc::clone(r)),
             data_pages:              data_pages  .as_ref().map(|r| Arc::clone(r)),
+            extra_sections:          Vec::new(),
             global_symbols:          BTreeSet::new(),
             bss_sections:            Trie::new(),
             reexported_symbols:      BTreeSet::new(),
@@ -1438,28 +1440,49 @@ impl CrateNamespace {
         // the map of BSS section names to the actual BSS section
         let mut bss_sections: Trie<BString, StrongSectionRef> = Trie::new();
 
+        // the section index of the `.eh_frame` section
+        let mut eh_frame_shndx: Option<u16> = None;
+
+
         for (shndx, sec) in elf_file.section_iter().enumerate() {
-            // the PROGBITS sections (.text, .rodata, .data) and the NOBITS (.bss) sections are what we care about
             let sec_typ = sec.get_type();
-            // look for PROGBITS (.text, .rodata, .data) and NOBITS (.bss) sections
+            // Skip null section(s), because they have no name field
+            if sec_typ == Ok(ShType::Null) {
+                continue; 
+            }
+            // Even if we're using the next section's data (for a zero-sized section, as handled below),
+            // we still want to use this current section's actual name and flags!
+            let sec_name = match sec.get_name(&elf_file) {
+                Ok(name) => name,
+                Err(_e) => {
+                    error!("load_crate_sections: couldn't get section name for section [{}]: {:?}\n    error: {}", shndx, sec, _e);
+                    return Err("couldn't get section name");
+                }
+            };
+            let sec_flags = sec.flags();
+
+            // In this loop, we handle only PROGBITS (.text, .rodata, .data) and NOBITS (.bss) sections
             if sec_typ == Ok(ShType::ProgBits) || sec_typ == Ok(ShType::NoBits) {
-
-                // even if we're using the next section's data (for a zero-sized section),
-                // we still want to use this current section's actual name and flags!
-                let sec_flags = sec.flags();
-                let sec_name = match sec.get_name(&elf_file) {
-                    Ok(name) => name,
-                    Err(_e) => {
-                        error!("load_crate_sections: couldn't get section name for section [{}]: {:?}\n    error: {}", shndx, sec, _e);
-                        return Err("couldn't get section name");
+                
+                // We don't handle .note sections, but if one was ever executable, we would need to do something about it
+                if sec_name.starts_with(".note") {
+                    if sec_flags & SHF_EXECINSTR == SHF_EXECINSTR {
+                        warn!("load_crate_sections: crate {:?} had a section {:?} at index {} that requires an executable stack. \
+                            Skipping this section because executable stacks are unsupported.", 
+                            crate_name, sec_name, shndx
+                        );
                     }
-                };
+                    continue;
+                }
 
+                // the ".gcc_except_table" section contains landing pads for exception handling
+                if sec_name == ExtraSection::GccExceptTable.section_name() {
+                    // skipping this for now
+                    continue; 
+                }
                 
                 // some special sections are fine to ignore
-                if  sec_name.starts_with(".note")   ||   // ignore GNU note sections
-                    sec_name.starts_with(".gcc")    ||   // ignore gcc special sections for now
-                    sec_name.starts_with(".debug")  ||   // ignore debug special sections for now
+                if  sec_name.starts_with(".debug")  ||   // ignore debug special sections for now
                     sec_name == ".text"                  // ignore the header .text section (with no content)
                 {
                     continue;    
@@ -1729,6 +1752,83 @@ impl CrateNamespace {
                 }
 
             }
+
+            // save the index of the .eh_frame section for later
+            else if sec_name == ExtraSection::EhFrame.section_name() {
+                eh_frame_shndx = Some(shndx as u16);
+            }
+        }
+
+
+        // After handling all the regular PROGBITS/NOBITS sections, 
+        // we can parse the `.eh_frame` section (or later, the `.debug_frame` section)
+        if let Some(shndx) = eh_frame_shndx {
+            
+            // dumping out section offsets just for now
+            for (index, lsec) in loaded_sections.iter() {
+                let s = lsec.lock();
+                trace!("Section [{}]: {}: offset {:#X}  (vaddr: {:#X})", index, s.name, s.mapped_pages_offset, s.virt_addr());
+            }
+
+
+            let sec = elf_file.section_header(shndx)?;
+            warn!("Parsing crate {}'s eh_frame section {:?}...", crate_name, sec);
+            use gimli::{EhFrame, EndianSlice, CieOrFde, NativeEndian, UnwindSection, BaseAddresses};
+            let mut eh_frame_pages = allocate_and_map_as_writable(size_in_bytes, EntryFlags::empty(), kernel_mmi_ref)
+                .map_err(|_e| "Couldn't map pages for .eh_frame section")?;
+            let eh_frame_vaddr = eh_frame_pages.start_address().value();
+            let text_pages_vaddr = text_pages_locked.as_ref().map(|tp| tp.start_address().value()).unwrap_or_default();
+            trace!("   eh_frame_vaddr: {:#X}, text_pages_vaddr: {:#X}", eh_frame_vaddr, text_pages_vaddr);
+            let eh_frame_slice = if let Ok(SectionData::Undefined(sec_data)) = sec.get_data(&elf_file) {
+                let slice: &mut [u8] = eh_frame_pages.as_slice_mut(0, sec.size() as usize)?;
+                slice.copy_from_slice(sec_data);
+                slice
+            } else {
+                return Err("Couldn't get section data for eh_frame section");
+            };
+            let eh_frame = EhFrame::new(eh_frame_slice, NativeEndian);
+            let base_addrs = BaseAddresses::default()
+                .set_eh_frame(eh_frame_vaddr as u64)
+                .set_text(text_pages_vaddr as u64);
+
+            let mut current_cie = None;
+            let mut entries = eh_frame.entries(&base_addrs);
+            while let Some(cfi_entry) = entries.next().map_err(|_e| {
+                error!("gimli error: {:?}", _e);
+                "gimli error while iterating through eh_frame entries"
+            })? {
+                debug!("Found eh_frame entry: {:?}", cfi_entry);
+                match cfi_entry {
+                    CieOrFde::Cie(cie) => {
+                        debug!("  --> moving on to CIE at offset {}", cie.offset());
+                        let mut instructions = cie.instructions(&eh_frame, &base_addrs);
+                        while let Some(instr) = instructions.next().map_err(|_e| {
+                            error!("gimli error: {:?}", _e);
+                            "gimli error while iterating through eh_frame Cie instructions list"
+                        })? {
+                            debug!("    CIE instr: {:?}", instr);
+                        }
+
+                        current_cie = Some(cie);
+                    }
+                    CieOrFde::Fde(partial_fde) => {
+                        debug!("    Parsing partial FDE...");
+                        let full_fde = partial_fde.parse(|_sec, _base_addrs, _sec_offset| {
+                            current_cie.clone().ok_or(gimli::Error::NotCiePointer)
+                        }).map_err(|_e| {
+                            error!("gimli error: {:?}", _e);
+                            "gimli error while parsing partial FDE"
+                        })?;
+                        debug!("      Full FDE: {:?}", full_fde);
+                    }
+                }
+            }
+        }
+        else {
+            warn!("The crate oject file {:?} did not have an '.eh_frame' section \
+                used for stack unwinding... that is very strange!",
+                crate_name
+            );
         }
 
         // set the new_crate's section-related lists, since we didn't do it earlier
@@ -2362,8 +2462,7 @@ struct SectionPages {
 
 /// Allocates enough space for the sections that are found in the given `ElfFile`.
 /// Returns a tuple of `MappedPages` for the .text, .rodata, and .data/.bss sections, in that order.
-fn allocate_section_pages(elf_file: &ElfFile, kernel_mmi_ref: &MmiRef) 
-    -> Result<SectionPages, &'static str> 
+fn allocate_section_pages(elf_file: &ElfFile, kernel_mmi_ref: &MmiRef) -> Result<SectionPages, &'static str> 
 {
     // Calculate how many bytes (and thus how many pages) we need for each of the three section types,
     // which are text (present | exec), rodata (present | noexec), data/bss (present | writable)
@@ -2400,36 +2499,28 @@ fn allocate_section_pages(elf_file: &ElfFile, kernel_mmi_ref: &MmiRef)
         (text, rodata, data)
     };
 
-    // create a closure here to allocate N contiguous virtual memory pages
-    // and map them to random frames as writable, returns Result<MappedPages, &'static str>
-    let (text_pages, rodata_pages, data_pages): (Option<MappedPages>, Option<MappedPages>, Option<MappedPages>) = {
-        let mut frame_allocator = try!(FRAME_ALLOCATOR.try().ok_or("couldn't get FRAME_ALLOCATOR")).lock();
+    // Allocate contiguous virtual memory pages for each section and map them to random frames as writable.
+    // We must allocate these pages separately because they will have different flags later.
+    let text_pages =   if text_bytecount   > 0 { Some(allocate_and_map_as_writable(text_bytecount,   TEXT_SECTION_FLAGS,     kernel_mmi_ref)?) } else { None };
+    let rodata_pages = if rodata_bytecount > 0 { Some(allocate_and_map_as_writable(rodata_bytecount, RODATA_SECTION_FLAGS,   kernel_mmi_ref)?) } else { None };
+    let data_pages =   if data_bytecount   > 0 { Some(allocate_and_map_as_writable(data_bytecount,   DATA_BSS_SECTION_FLAGS, kernel_mmi_ref)?) } else { None };
 
-        let mut allocate_pages_closure = |size_in_bytes: usize, flags: EntryFlags| {
-            let allocated_pages = try!(allocate_pages_by_bytes(size_in_bytes).ok_or("Couldn't allocate_pages_by_bytes, out of virtual address space"));
+    Ok(SectionPages {
+        text_pages,
+        rodata_pages,
+        data_pages,
+    })
+}
 
-            // Right now we're just simply copying small sections to the new memory,
-            // so we have to map those pages to real (randomly chosen) frames first. 
-            // because we're copying bytes to the newly allocated pages, we need to make them writable too, 
-            // and then change the page permissions (by using remap) later. 
-            kernel_mmi_ref.lock().page_table.map_allocated_pages(allocated_pages, flags | EntryFlags::PRESENT | EntryFlags::WRITABLE, frame_allocator.deref_mut())
-        };
 
-        // we must allocate these pages separately because they will have different flags later
-        (
-            if text_bytecount   > 0 { allocate_pages_closure(text_bytecount,   TEXT_SECTION_FLAGS).ok()     } else { None }, 
-            if rodata_bytecount > 0 { allocate_pages_closure(rodata_bytecount, RODATA_SECTION_FLAGS).ok()   } else { None }, 
-            if data_bytecount   > 0 { allocate_pages_closure(data_bytecount,   DATA_BSS_SECTION_FLAGS).ok() } else { None }
-        )
-    };
-
-    Ok(
-        SectionPages {
-            text_pages,
-            rodata_pages,
-            data_pages,
-        }
-    )
+/// A convenience function for allocating contiguous virtual memory pages and mapping them to random physical frames. 
+/// 
+/// The returned `MappedPages` will be at least as large as `size_in_bytes`, rounded up to the nearest `Page` size, 
+/// and is mapped as writable along with the other specified `flags` to ensure we can copy content into it.
+fn allocate_and_map_as_writable(size_in_bytes: usize, flags: EntryFlags, kernel_mmi_ref: &MmiRef) -> Result<MappedPages, &'static str> {
+    let mut frame_allocator = FRAME_ALLOCATOR.try().ok_or("couldn't get FRAME_ALLOCATOR")?.lock();
+    let allocated_pages = allocate_pages_by_bytes(size_in_bytes).ok_or("Couldn't allocate_pages_by_bytes, out of virtual address space")?;
+    kernel_mmi_ref.lock().page_table.map_allocated_pages(allocated_pages, flags | EntryFlags::PRESENT | EntryFlags::WRITABLE, frame_allocator.deref_mut())
 }
 
 

@@ -2,9 +2,12 @@
 //! As such, it performs no loading, but rather just creates metadata that represents
 //! the existing kernel code that was loaded by the bootloader, and adds those functions to the system map.
 
-use alloc::string::{String, ToString};
-use alloc::collections::{BTreeMap, BTreeSet};
-use alloc::sync::Arc;
+use alloc::{
+    string::{String, ToString},
+    collections::{BTreeMap, BTreeSet},
+    sync::Arc,
+    vec::Vec,
+};
 use spin::Mutex;
 use cow_arc::CowArc;
 
@@ -141,6 +144,7 @@ fn parse_nano_core_symbol_file<F: File + ?Sized>(
         text_pages:              Some(text_pages.clone()),
         rodata_pages:            Some(rodata_pages.clone()),
         data_pages:              Some(data_pages.clone()),
+        extra_sections:          Vec::new(),
         global_symbols:          BTreeSet::new(),
         bss_sections:            Trie::new(),
         reexported_symbols:      BTreeSet::new(),
@@ -512,6 +516,7 @@ fn parse_nano_core_binary<F: File + ?Sized>(
         text_pages:              Some(text_pages.clone()),
         rodata_pages:            Some(rodata_pages.clone()),
         data_pages:              Some(data_pages.clone()),
+        extra_sections:          Vec::new(),
         global_symbols:          BTreeSet::new(),
         bss_sections:            Trie::new(),
         reexported_symbols:      BTreeSet::new(),
