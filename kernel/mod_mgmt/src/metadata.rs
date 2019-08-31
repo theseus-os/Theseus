@@ -108,66 +108,6 @@ impl CrateType {
 }
 
 
-/// The set of possible sections in an object file beyond 
-/// the regular sections of `.text`, `.data`, `.rodata`, and `.bss`. 
-/// These are useful for debugging information and stack unwinding/unrolling/backtraces.
-/// 
-/// Examples include `.debug_*`, `.eh_frame`, and `.gcc_except_table`.
-/// these sections always have a standardized name with no specific suffixes.
-pub enum ExtraSection {
-    DebugStr,
-    DebugLoc,
-    DebugAbbrev,
-    DebugInfo,
-    DebugRanges,
-    DebugMacInfo,
-    DebugPubNames,
-    DebugPubTypes,
-    DebugLine,
-    /// The ".gcc_except_table" contains landing pads for exception handling,
-    /// comprising the LSDA (Language Specific Data Area),
-    /// which is effectively used to determine when we should stop the stack unwinding process
-    /// (e.g., "catching" an exception). 
-    /// 
-    /// Blog post from author of gold linker: <https://www.airs.com/blog/archives/464>
-    /// 
-    /// Mailing list discussion here: <https://gcc.gnu.org/ml/gcc-help/2010-09/msg00116.html>
-    /// 
-    /// Here is a sample repository parsing this section: <https://github.com/nest-leonlee/gcc_except_table>
-    /// 
-    GccExceptTable,
-    /// The ".eh_frame" contains information about stack unwinding and destructor functions
-    /// that should be called when traversing up the stack for cleanup. 
-    /// 
-    /// Blog post from author of gold linker: <https://www.airs.com/blog/archives/460>
-    /// Some documentation here: <https://gcc.gnu.org/wiki/Dwarf2EHNewbiesHowto>
-    /// 
-    EhFrame,
-}
-impl ExtraSection {
-    /// Returns the string name of the given extra section,
-    /// which is fixed based on its type.
-    /// Unlike regular sections (.text, .data, .rodata, .bss),
-    /// these sections always have a standardized name with no specific suffixes.
-    pub fn section_name(&self) -> &'static str {
-        match self {
-            Self::DebugStr       => ".debug_str",
-            Self::DebugLoc       => ".debug_loc",
-            Self::DebugAbbrev    => ".debug_abbrev",
-            Self::DebugInfo      => ".debug_info",
-            Self::DebugRanges    => ".debug_ranges",
-            Self::DebugMacInfo   => ".debug_macinfo",
-            Self::DebugPubNames  => ".debug_pubnames",
-            Self::DebugPubTypes  => ".debug_pubtypes",
-            Self::DebugLine      => ".debug_line",
-            Self::GccExceptTable => ".gcc_except_table",
-            Self::EhFrame        => ".eh_frame",
-        }
-    }
-}
-
-
-
 /// Represents a single crate object file that has been loaded into the system.
 pub struct LoadedCrate {
     /// The name of this crate.
@@ -188,10 +128,6 @@ pub struct LoadedCrate {
     /// The `MappedPages` that include the .data and .bss sections for this crate.
     /// i.e., sections that are readable and writable but not executable.
     pub data_pages: Option<Arc<Mutex<MappedPages>>>,
-    /// The extra sections that are not required for loading, linking, and executing this crate. 
-    /// This excludes `.text`, `.rodata`, `.data`, and `.bss`, and includes other sections like
-    /// `.eh_frame`, `.gcc_except_table`, and all of the `.debug_*` sections.
-    pub extra_sections: Vec<ExtraSection>,
     
     // The members below are most used to accelerate crate swapping,
     // and are not strictly necessary just for normal crate usage and management.
@@ -340,12 +276,10 @@ impl LoadedCrate {
             text_pages:              new_text_pages_ref.clone(),
             rodata_pages:            new_rodata_pages_ref.clone(),
             data_pages:              new_data_pages_ref.clone(),
-            extra_sections:          Vec::new(),
             global_symbols:          self.global_symbols.clone(),
             bss_sections:            Trie::new(),
             reexported_symbols:      self.reexported_symbols.clone(),
         });
-        warn!("LoadedCrate::deep_copy(): extra_sections (.debug_*, .eh_frame, .gcc_except_table) are NOT YET IMPLEMENTED (TODO)!!");
         let new_crate_weak_ref = CowArc::downgrade(&new_crate);
 
         // Second, deep copy the entire list of sections and fix things that don't make sense to directly clone:
@@ -362,7 +296,9 @@ impl LoadedCrate {
                     new_text_pages_ref.clone().ok_or_else(|| "BUG: missing text pages in newly-copied crate")?,
                     new_text_pages_locked.as_ref().and_then(|tp| tp.address_at_offset(new_sec_mapped_pages_offset)),
                 ),
-                SectionType::Rodata => (
+                SectionType::Rodata |
+                SectionType::GccExceptTable | 
+                SectionType::EhFrame => (
                     new_rodata_pages_ref.clone().ok_or_else(|| "BUG: missing rodata pages in newly-copied crate")?,
                     new_rodata_pages_locked.as_ref().and_then(|rp| rp.address_at_offset(new_sec_mapped_pages_offset)),
                 ),
@@ -401,10 +337,12 @@ impl LoadedCrate {
         for new_sec_ref in new_sections.values() {
             let mut new_sec = new_sec_ref.lock();
             let new_sec_mapped_pages = match new_sec.typ {
-                SectionType::Text   => new_text_pages_locked.as_mut().ok_or_else(|| "BUG: missing text pages in newly-copied crate")?,
-                SectionType::Rodata => new_rodata_pages_locked.as_mut().ok_or_else(|| "BUG: missing rodata pages in newly-copied crate")?,
+                SectionType::Text    => new_text_pages_locked.as_mut().ok_or_else(|| "BUG: missing text pages in newly-copied crate")?,
+                SectionType::Rodata |
+                SectionType::GccExceptTable | 
+                SectionType::EhFrame => new_rodata_pages_locked.as_mut().ok_or_else(|| "BUG: missing rodata pages in newly-copied crate")?,
                 SectionType::Data |
-                SectionType::Bss    => new_data_pages_locked.as_mut().ok_or_else(|| "BUG: missing data pages in newly-copied crate")?,
+                SectionType::Bss     => new_data_pages_locked.as_mut().ok_or_else(|| "BUG: missing data pages in newly-copied crate")?,
             };
             let new_sec_mapped_pages_offset = new_sec.mapped_pages_offset;
 
@@ -483,22 +421,38 @@ impl LoadedCrate {
 }
 
 
-/// The possible types of `LoadedSection`s: .text, .rodata, .data, or .bss.
-/// A .bss section is basically treated the same as .data, 
-/// but we keep them separate
+/// The possible types of sections that can be loaded from a crate object file.
 #[derive(Debug, Copy, Clone, PartialEq)]
 pub enum SectionType {
     Text,
     Rodata,
     Data,
-    Bss
+    Bss,
+    /// The ".gcc_except_table" contains landing pads for exception handling,
+    /// comprising the LSDA (Language Specific Data Area),
+    /// which is effectively used to determine when we should stop the stack unwinding process
+    /// (e.g., "catching" an exception). 
+    /// 
+    /// Blog post from author of gold linker: <https://www.airs.com/blog/archives/464>
+    /// 
+    /// Mailing list discussion here: <https://gcc.gnu.org/ml/gcc-help/2010-09/msg00116.html>
+    /// 
+    /// Here is a sample repository parsing this section: <https://github.com/nest-leonlee/gcc_except_table>
+    /// 
+    GccExceptTable,
+    /// The ".eh_frame" contains information about stack unwinding and destructor functions
+    /// that should be called when traversing up the stack for cleanup. 
+    /// 
+    /// Blog post from author of gold linker: <https://www.airs.com/blog/archives/460>
+    /// Some documentation here: <https://gcc.gnu.org/wiki/Dwarf2EHNewbiesHowto>
+    /// 
+    EhFrame,
 }
 
-/// Represents a .text, .rodata, .data, or .bss section
-/// that has been loaded and is part of a `LoadedCrate`.
+/// Represents a section that has been loaded and is part of a `LoadedCrate`.
 /// The containing `SectionType` enum determines which type of section it is.
 pub struct LoadedSection {
-    /// The type of this section: .text, .rodata, .data, or .bss.
+    /// The type of this section, e.g., `.text`, `.rodata`, `.data`, `.bss`, etc.
     pub typ: SectionType,
     /// The full String name of this section, a fully-qualified symbol, 
     /// with the format `<crate>::[<module>::][<struct>::]<fn_name>::<hash>`.
