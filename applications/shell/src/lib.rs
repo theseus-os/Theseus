@@ -5,7 +5,6 @@
 //! spawns and manages tasks, and records the history of executed user commands.
 
 #![no_std]
-#![feature(slice_concat_ext)]
 extern crate frame_buffer;
 extern crate keycodes_ascii;
 extern crate spin;
@@ -53,7 +52,6 @@ use core_io::Write;
 use core::ops::Deref;
 use app_io::{IoStreams, IoControlFlags};
 use fs_node::FileOrDir;
-use alloc::slice::SliceConcatExt;
 
 /// The status of a job.
 #[derive(PartialEq)]
@@ -417,9 +415,10 @@ impl Shell {
                 });
                 self.terminal.lock().print_to_terminal("^C\n".to_string());
             } else {
-                self.clear_cmdline(true)?;
+                self.clear_cmdline(false)?;
                 self.input_buffer.clear();
                 self.terminal.lock().print_to_terminal("^C\n".to_string());
+                self.history_index = 0;
                 self.redisplay_prompt();
             }
             return Ok(());
@@ -827,8 +826,21 @@ impl Shell {
                 return Err("Failed to get namespace_dir while completing cmdline.");
             }
         };
-        let cmd_crate_name = format!("{}", incomplete_cmd);
-        Ok(namespace_dir.get_file_and_dir_names_starting_with(&cmd_crate_name))
+        let mut names = namespace_dir.get_file_and_dir_names_starting_with(&incomplete_cmd);
+
+        // Drop the extension name and hash value.
+        let mut clean_name = String::new();
+        for name in names.iter_mut() {
+            if let Some(prefix) = name.split("-").next() {
+                clean_name = prefix.to_string();
+            }
+            if !clean_name.is_empty() {
+                core::mem::swap(name, &mut clean_name);
+                clean_name.clear();
+            }
+        }
+
+        Ok(names)
     }
 
     /// Try to match the incomplete command against all possible path names. For example, if the
@@ -870,7 +882,7 @@ impl Shell {
             } else {
                 match nodes.pop() {
                     Some(node) => node,
-                    None => return Ok(match_list)
+                    None => ""
                 }
             }
         };
@@ -890,23 +902,89 @@ impl Shell {
         }
 
         // Try to match the name of the file.
-        let mut child_list = curr_wd.lock().list(); 
+        let locked_working_dir = curr_wd.lock();
+        let mut child_list = locked_working_dir.list(); 
         child_list.reverse();
         for child in child_list.iter() {
             if child.starts_with(&incomplete_node) {
-                match_list.push(child.clone());
+                if let Some(_) = locked_working_dir.get_file(&child) {
+                    match_list.push(child.clone());
+                } else if let Some (_) = locked_working_dir.get_dir(&child) {
+                    let mut cloned = child.clone();
+                    cloned.push('/');
+                    match_list.push(cloned);
+                }
             }
         }
 
-        // Change the matching name in the list to full path names.
-        let mut parent_dir = nodes.join("/");
-        if !parent_dir.is_empty() { parent_dir.push('/'); }
-        let mut full_path;
-        for match_name in match_list.iter_mut() {
-            full_path = parent_dir.clone() + match_name;
-            core::mem::swap(&mut full_path, match_name);
-        }
         Ok(match_list)
+    }
+
+    // Print all command line choices in aligned colomns.
+    fn aligned_print_match(&mut self, possible_names: Vec<String>) -> Result<(), &'static str> {
+        if possible_names.is_empty() { return Ok(()); }
+
+        // Get terminal screen width.
+        let (width, _) = self.terminal.lock().get_width_height();
+
+        // Find the length of the longest string.
+        let longest_len = match possible_names.iter().map(|name| name.len()).max() {
+            Some(length) => length,
+            None => return Ok(())
+        };
+
+        // Calculate how many we can put on each line. We use four spaces to separate
+        // each string. Thus, we should find the max `str_num_in_line` that satisfies
+        // str_num_in_line * longest_len + (str_num_in_line - 1) * 4 <= width.
+        // That is: #str_num_in_line <= (4 + width) / (4 + longest).
+        let str_num_in_line = (4 + width) / (4 + longest_len);
+
+        let mut locked_terminal = self.terminal.lock();
+        locked_terminal.print_to_terminal("\n".to_string());
+
+        // If the longest string is very very long which exceeds a single line, we should
+        // print them line by line. Otherwise, we put multiple results in one line and
+        // separate them by four or more spaces.
+        if str_num_in_line == 0 {
+            for name in possible_names {
+                locked_terminal.print_to_terminal(name.to_string());
+                locked_terminal.print_to_terminal("\n".to_string());
+            }
+        } else {
+            let mut current_in_line = 0;
+            let mut first_in_line = true;
+            for name in possible_names {
+
+                // Pad every string to the same length, same as the longest.
+                let mut padded = name.clone();
+                for _ in 0..(longest_len-name.len()) { padded.push(' '); }
+
+                // Write to the terminal buffer.
+                if !first_in_line {
+                    locked_terminal.print_to_terminal("    ".to_string());
+                } else {
+                    first_in_line = false;
+                }
+                locked_terminal.print_to_terminal(padded);
+
+                // Move to a new line if we need.
+                current_in_line += 1;
+                if current_in_line == str_num_in_line {
+                    current_in_line = 0;
+                    first_in_line = true;
+                    locked_terminal.print_to_terminal("\n".to_string());
+                }
+            }
+
+            // Move to a new line if the current line is not empty.
+            if !first_in_line {
+                locked_terminal.print_to_terminal("\n".to_string());
+            }
+        }
+
+        mem::drop(locked_terminal);
+        self.redisplay_prompt();
+        Ok(())
     }
 
     /// Automatically complete the half-entered command line if possible.
@@ -915,12 +993,10 @@ impl Shell {
     /// Otherwise, it does nothing. It tries to match against all internal commands,
     /// all applications in the namespace, and all valid file paths.
     fn complete_cmdline(&mut self) -> Result<(), &'static str> {
-        if self.cmdline.is_empty() {
-            return Ok(());
-        }
 
         // Get the last string slice in the pipe chain.
-        let last_cmd_in_pipe = match self.cmdline.split("|").last() {
+        let cmdline = self.cmdline.clone();
+        let last_cmd_in_pipe = match cmdline.split("|").last() {
             Some(cmd) => cmd,
             None => return Ok(())
         };
@@ -931,46 +1007,31 @@ impl Shell {
             None => return Ok(())
         };
 
-        // Try to find matches.
-        let mut possible_names = self.find_file_path_match(&last_word_in_cmd)?;
-        possible_names.extend(self.find_internal_cmd_match(&last_word_in_cmd)?.iter().cloned());
+        // Try to find matches. Only match against internal commands and applications
+        // within the namespace if we are entering the command. Otherwise, we are trying
+        // to complete an argument, then we also include file paths to match against.
+        let mut possible_names = self.find_internal_cmd_match(&last_word_in_cmd)?;
         possible_names.extend(self.find_app_name_match(&last_word_in_cmd)?.iter().cloned());
-
-        if !possible_names.is_empty() {
-
-            // drop the extension name and hash value
-            for name in &mut possible_names {
-                let mut clean_name = String::new();
-                if let Some(prefix) = name.split("-").next() {
-                    clean_name = prefix.to_string();
-                }
-                mem::swap(name, &mut clean_name);
-            }
-
-            // only one possible name, complete the command line
-            if possible_names.len() == 1 {
-                for _ in 0..last_word_in_cmd.len() {
-                    self.remove_char_from_cmdline(true, true)?;
-                }
-                for c in possible_names[0].chars() {
-                    self.insert_char_to_cmdline(c, true)?;
-                }
-            } else { // several possible names, list them sequentially
-                self.terminal.lock().print_to_terminal("\n".to_string());
-                let mut is_first = true;
-                for name in possible_names {
-                    if !is_first {
-                        self.terminal.lock().print_to_terminal("    ".to_string());
-                    }
-                    if let Some(basename) = name.split("/").last() {
-                        self.terminal.lock().print_to_terminal(basename.to_string());
-                    }
-                    is_first = false;
-                }
-                self.terminal.lock().print_to_terminal("\n".to_string());
-                self.redisplay_prompt();
-            }
+        if !last_cmd_in_pipe.trim().is_empty() {
+            possible_names.extend(self.find_file_path_match(&last_word_in_cmd)?.iter().cloned());
         }
+
+        // If there is only one possiblity, complete the command line.
+        if possible_names.len() == 1 {
+            let char_num_to_pop = match last_word_in_cmd.split('/').last() {
+                Some(incomplete_basename) => incomplete_basename.len(),
+                None => last_word_in_cmd.len()
+            };
+            for _ in 0..char_num_to_pop {
+                self.remove_char_from_cmdline(true, true)?;
+            }
+            for c in possible_names[0].chars() {
+                self.insert_char_to_cmdline(c, true)?;
+            }
+        } else { // Print our choice to the terminal.
+            self.aligned_print_match(possible_names)?;
+        }
+
         Ok(())
     }
 
