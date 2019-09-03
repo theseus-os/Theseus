@@ -11,14 +11,13 @@ use core::mem;
 use core::ops::DerefMut;
 use core::ptr::Unique;
 use core::slice;
-use x86_64;
 use {BROADCAST_TLB_SHOOTDOWN_FUNC, VirtualAddress, PhysicalAddress, FRAME_ALLOCATOR, FrameRange, Page, Frame, FrameAllocator, AllocatedPages}; 
 use paging::{PageRange, get_current_p4};
-use paging::entry::EntryFlags;
 use paging::table::{P4, Table, Level4};
 use kernel_config::memory::{ENTRIES_PER_PAGE_TABLE, PAGE_SIZE, TEMPORARY_PAGE_VIRT_ADDR};
 use alloc::vec::Vec;
 use type_name;
+use super::{EntryFlags, tlb_flush_virt_addr};
 
 pub struct Mapper {
     p4: Unique<Table<Level4>>,
@@ -95,7 +94,7 @@ impl Mapper {
                 let p3_entry = &p3[page.p3_index()];
                 // 1GiB page?
                 if let Some(start_frame) = p3_entry.pointed_frame() {
-                    if p3_entry.flags().contains(EntryFlags::HUGE_PAGE) {
+                    if p3_entry.flags().is_huge() {
                         // address must be 1GiB aligned
                         assert!(start_frame.number % (ENTRIES_PER_PAGE_TABLE * ENTRIES_PER_PAGE_TABLE) == 0);
                         return Some(Frame {
@@ -107,7 +106,7 @@ impl Mapper {
                     let p2_entry = &p2[page.p2_index()];
                     // 2MiB page?
                     if let Some(start_frame) = p2_entry.pointed_frame() {
-                        if p2_entry.flags().contains(EntryFlags::HUGE_PAGE) {
+                        if p2_entry.flags().is_huge() {
                             // address must be 2MiB aligned
                             assert!(start_frame.number % ENTRIES_PER_PAGE_TABLE == 0);
                             return Some(Frame { number: start_frame.number + page.p1_index() });
@@ -310,8 +309,7 @@ impl MappedPages {
         }
     }
 
-	/// Returns the start address of the first page. 
-    #[deprecated]
+	/// Returns the `VirtualAddress` at the start of the first `Page` in this `MappedPages`.
 	pub fn start_address(&self) -> VirtualAddress {
 		self.pages.start_address()
 	}
@@ -545,7 +543,7 @@ impl MappedPages {
             p1[page.p1_index()].set(frame, new_flags | EntryFlags::PRESENT);
 
             let vaddr = page.start_address();
-            x86_64::instructions::tlb::flush(x86_64::VirtualAddress(vaddr.value()));
+            tlb_flush_virt_addr(vaddr);
             if broadcast_tlb_shootdown.is_some() && vaddr.value() != TEMPORARY_PAGE_FRAME {
                 vaddrs.push(vaddr);
             }
@@ -585,7 +583,7 @@ impl MappedPages {
             p1[page.p1_index()].set_unused();
 
             let vaddr = page.start_address();
-            x86_64::instructions::tlb::flush(x86_64::VirtualAddress(page.start_address().value()));
+            tlb_flush_virt_addr(page.start_address());
             if broadcast_tlb_shootdown.is_some() && vaddr.value() != TEMPORARY_PAGE_FRAME {
                 vaddrs.push(vaddr);
             }

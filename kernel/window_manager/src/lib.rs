@@ -64,7 +64,7 @@ lazy_static! {
 static SCREEN_FRAME_BUFFER: Once<Arc<Mutex<FrameBuffer>>> = Once::new();
 
 // 10 pixel gap between windows
-const WINDOW_MARGIN: usize = 10;
+pub const WINDOW_MARGIN: usize = 10;
 // 2 pixel padding within a window
 const WINDOW_PADDING: usize = 2;
 // The border color of an active window
@@ -119,11 +119,9 @@ pub fn new_window<'a>(
     if width < 2 * WINDOW_PADDING || height < 2 * WINDOW_PADDING {
         return Err("Window size must be greater than the padding");
     }
-
     // Init the key input producer and consumer
     let consumer = DFQueue::new().into_consumer();
     let producer = consumer.obtain_producer();
-
     // Init the frame buffer of the window
     let framebuffer = FrameBuffer::new(
         width - 2 * WINDOW_PADDING,
@@ -151,8 +149,8 @@ pub fn new_window<'a>(
 
     // add the new window and active it
     // initialize the content of the new window
-    inner_ref.lock().clean()?;
-    WINDOWLIST.lock().add_active(&inner_ref)?;
+    inner_ref.lock().clean()?;    trace!("5");
+    WINDOWLIST.lock().add_active(&inner_ref)?;    trace!("6");
 
     // return the window object
     let window: WindowObj = WindowObj {

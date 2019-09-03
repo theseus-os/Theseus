@@ -13,6 +13,7 @@ use xmas_elf::ElfFile;
 use xmas_elf::sections::ShType;
 use xmas_elf::sections::{SHF_WRITE, SHF_ALLOC, SHF_EXECINSTR};
 use rustc_demangle::demangle;
+use cstr_core::CStr;
 
 use memory::{VirtualAddress, MappedPages};
 use metadata::{LoadedCrate, StrongCrateRef, LoadedSection, StrongSectionRef, SectionType};
@@ -73,11 +74,11 @@ pub fn parse_nano_core(
     let data_pages   = Arc::new(Mutex::new(data_pages));
 
     let nano_core_file_path = try_mp!(
-        namespace.get_kernel_file_starting_with(NANO_CORE_FILENAME_PREFIX).ok_or("couldn't find the expected \"nano_core\" kernel file"),
+        namespace.get_crate_file_starting_with(NANO_CORE_FILENAME_PREFIX).ok_or("couldn't find the expected \"nano_core\" kernel file"),
         text_pages, rodata_pages, data_pages
     );
 
-    let nano_core_file_ref = match nano_core_file_path.get(&namespace.dirs().kernel_directory()) {
+    let nano_core_file_ref = match nano_core_file_path.get(namespace.dir()) {
         Some(FileOrDir::File(f)) => f,
         _ => return Err(("BUG: no nano_core file at expected path", [text_pages, rodata_pages, data_pages])),
     };
@@ -148,7 +149,6 @@ fn parse_nano_core_symbol_file<F: File + ?Sized>(
 
     // scoped to drop the borrow on mapped_pages through `bytes`
     {
-        use util::c_str::CStr;
         let bytes = try_mp!(mapped_pages.as_slice(0, size), text_pages, rodata_pages, data_pages);
         let symbol_cstr = try_mp!(CStr::from_bytes_with_nul(bytes).map_err(|e| {
             error!("parse_nano_core_symbol_file(): error casting nano_core symbol file to CStr: {:?}", e);

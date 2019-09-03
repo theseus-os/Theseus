@@ -41,7 +41,7 @@ path = "../font"
 path = "../displayable"
 
 [dependencies.text_display]
-path = "../displayable/text_display"
+path = "../../kernel/displayable/text_display"
 
 [dependencies.lazy_static]
 features = ["spin_no_std", "nightly"]

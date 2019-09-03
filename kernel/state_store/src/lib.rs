@@ -30,7 +30,7 @@ use atomic_linked_list::atomic_map::AtomicMap;
 /// but rather an Arc<T> that itself is wrapped in the Box.
 /// In summary, Any = Arc<T>, and Box<Any> = Box<Arc<T>>
 /// in order for us to obtain weak references to that specific type T.
-struct SystemStateList( pub AtomicMap<TypeId, Box<Any>> ); 
+struct SystemStateList( pub AtomicMap<TypeId, Box<dyn Any>> ); 
 impl SystemStateList {
 	fn new() -> SystemStateList {
 		SystemStateList( AtomicMap::new() )
@@ -82,7 +82,7 @@ pub fn init() {
 // /// If the map did not previously have a SystemState of this type, `None` is returned.
 // /// If the map did previously have one, the value is updated, and the old value is returned.
 pub fn insert_state<S: Any>(state: S) -> Option<S> {
-	let old_val: Option<Box<Any>> = SYSTEM_STATE.try().expect("SYSTEM_STATE uninited").0.insert(
+	let old_val: Option<Box<dyn Any>> = SYSTEM_STATE.try().expect("SYSTEM_STATE uninited").0.insert(
 		TypeId::of::<S>(), 
 		Box::new( Arc::new(state) ) // Arc<S> is the type that is represented by Any
 	);

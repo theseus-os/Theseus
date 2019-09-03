@@ -33,7 +33,7 @@ static PIT_COMMAND: Mutex<Port<u8>> = Mutex::new( Port::new(COMMAND_REGISTER) );
 static PIT_CHANNEL_0: Mutex<Port<u8>> = Mutex::new( Port::new(CHANNEL0) );
 static PIT_CHANNEL_2: Mutex<Port<u8>> = Mutex::new( Port::new(CHANNEL2) );
 
-pub static PIT_TICKS: AtomicUsize = AtomicUsize::new(0);
+static PIT_TICKS: AtomicUsize = AtomicUsize::new(0);
 
 
 pub fn init(freq_hertz: u32) {

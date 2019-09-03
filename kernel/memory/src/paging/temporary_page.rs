@@ -48,7 +48,7 @@ impl TemporaryPage {
     /// 
     pub fn map_table_frame(&mut self, frame: Frame, page_table: &mut PageTable) -> Result<&mut Table<Level1>, &'static str>
     {
-        use super::entry::EntryFlags;
+        use super::EntryFlags;
 
         // Find a free page that is not already mapped, starting from the top of the kernel heap region.
         // It'd be nice to use the virtual address allocator (allocate_pages), but we CANNOT use it

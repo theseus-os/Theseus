@@ -1,0 +1,47 @@
+[package]
+name = "app_io"
+version = "0.1.0"
+authors = ["Zhiyao Ma <zm16@pku.edu.cn>"]
+description = "Offers applications the ability to read from or print to the terminal."
+build = "../../build.rs"
+
+
+[dependencies]
+spin = "0.4.10"
+x86_64 = { path = "../../libs/x86_64" }
+core_io = "0.1"
+
+[dependencies.log]
+default-features = false
+version = "0.3.7"
+
+[dependencies.keycodes_ascii]
+path = "../../libs/keycodes_ascii"
+
+[dependencies.event_types]
+path = "../../kernel/event_types"
+
+[dependencies.task]
+path = "../../kernel/task"
+
+[dependencies.print]
+path = "../../kernel/print"
+
+[dependencies.libterm]
+path = "../../kernel/libterm"
+
+[dependencies.lazy_static]
+features = ["spin_no_std", "nightly"]
+version = "1.2.0"
+
+[dependencies.stdio]
+path = "../../libs/stdio"
+
+[dependencies.scheduler]
+path = "../../kernel/scheduler"
+
+[dependencies.serial_port]
+path = "../../kernel/serial_port"
+
+[lib]
+crate-type = ["rlib"]

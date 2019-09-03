@@ -1,5 +1,5 @@
 #![no_std]
-#[macro_use] extern crate terminal_print;
+#[macro_use] extern crate app_io;
 // #[macro_use] extern crate log;
 
 #[macro_use] extern crate alloc;
@@ -7,6 +7,7 @@ extern crate task;
 extern crate getopts;
 extern crate path;
 extern crate fs_node;
+extern crate core_io;
 
 use core::str;
 use alloc::{
@@ -17,6 +18,7 @@ use alloc::{
 use getopts::Options;
 use path::Path;
 use fs_node::FileOrDir;
+use core_io::{Read, Write};
 
 
 #[no_mangle]
@@ -32,8 +34,15 @@ pub fn main(args: Vec<String>) -> isize {
             return -1;
         }
     };
-    
+    if matches.opt_present("h") {
+        print_usage(opts);
+        return 0;
+    }
     if matches.free.is_empty() {
+        if let Err(e) = echo_from_stdin() {
+            println!("{}", e);
+            return -1;
+        }
         return 0;
     }
     let taskref = match task::get_my_current_task() {
@@ -95,6 +104,22 @@ fn print_usage(opts: Options) {
     println!("{}", opts.usage(USAGE));
 }
 
+fn echo_from_stdin() -> Result<(), &'static str> {
+    let stdin = app_io::stdin()?;
+    let mut stdin_locked = stdin.lock();
+    let stdout = app_io::stdout()?;
+    let mut stdout_locked = stdout.lock();
+    let mut buf = [0u8; 256];
 
-const USAGE: &'static str = "Usage: cd [ARGS]
-Change directory";
+    // Read from stdin and print it back.
+    loop {
+        let cnt = stdin_locked.read(&mut buf).or(Err("failed to perform read"))?;
+        if cnt == 0 { break; }
+        stdout_locked.write_all(&buf[0..cnt])
+            .or(Err("faileld to perform write_all"))?;
+    }
+    Ok(())
+}
+
+const USAGE: &'static str = "Usage: cat [file ...]
+concatenate and print files";
