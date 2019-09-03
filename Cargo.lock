@@ -383,18 +383,6 @@ name = "documentation"
 version = "0.1.0"
 
 [[package]]
-name = "drawer"
-version = "0.1.0"
-dependencies = [
- "frame_buffer 0.1.0",
- "frame_buffer_drawer 0.1.0",
- "print 0.1.0",
- "spin 0.4.10 (registry+https://github.com/rust-lang/crates.io-index)",
- "terminal_print 0.1.0",
- "volatile 0.1.0 (registry+https://github.com/rust-lang/crates.io-index)",
-]
-
-[[package]]
 name = "e1000"
 version = "0.1.0"
 dependencies = [
@@ -969,6 +957,10 @@ version = "0.1.0"
 [[package]]
 name = "mpmc"
 version = "0.1.6-pre"
+dependencies = [
+ "log 0.3.9 (registry+https://github.com/rust-lang/crates.io-index)",
+ "spawn 0.1.0",
+]
 
 [[package]]
 name = "multiboot2"
@@ -1942,11 +1934,6 @@ source = "registry+https://github.com/rust-lang/crates.io-index"
 
 [[package]]
 name = "volatile"
-version = "0.1.0"
-source = "registry+https://github.com/rust-lang/crates.io-index"
-
-[[package]]
-name = "volatile"
 version = "0.2.5"
 source = "registry+https://github.com/rust-lang/crates.io-index"
 
@@ -2052,7 +2039,6 @@ source = "git+https://github.com/kevinaboos/zero.git#9fc7ff523138a21f40359b706d2
 "checksum unicode-xid 0.1.0 (registry+https://github.com/rust-lang/crates.io-index)" = "fc72304796d0818e357ead4e000d19c9c174ab23dc11093ac919054d20a6a7fc"
 "checksum unreachable 1.0.0 (registry+https://github.com/rust-lang/crates.io-index)" = "382810877fe448991dfc7f0dd6e3ae5d58088fd0ea5e35189655f84e6814fa56"
 "checksum void 1.0.2 (registry+https://github.com/rust-lang/crates.io-index)" = "6a02e4885ed3bc0f2de90ea6dd45ebcbb66dacffe03547fadbb0eeae2770887d"
-"checksum volatile 0.1.0 (registry+https://github.com/rust-lang/crates.io-index)" = "37c5d76c0f40ba4f8ac10ec4717d4e98ce3e58c5607eea36e9464226fc5e0a95"
 "checksum volatile 0.2.5 (registry+https://github.com/rust-lang/crates.io-index)" = "d9ca391c55768e479d5c2f8beb40c136df09257292a809ea514e82cfdfc15d00"
 "checksum xmas-elf 0.6.2 (git+https://github.com/kevinaboos/xmas-elf.git)" = "<none>"
 "checksum zero 0.1.3 (git+https://github.com/kevinaboos/zero.git)" = "<none>"
