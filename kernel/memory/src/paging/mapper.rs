@@ -732,7 +732,7 @@ impl MappedPages {
         
         // check flags to make sure mutability is allowed (otherwise a page fault would occur on a write)
         if !self.flags.is_writable() {
-            error!("MappedPages::as_slice_mut(): requested mutable slice of type {} with length {} (total size {}) at byte_offset {}, but MappedPages weren't writable (flags: {:?}",
+            error!("MappedPages::as_slice_mut(): requested mutable slice of type {} with length {} (total size {}) at byte_offset {}, but MappedPages weren't writable (flags: {:?})",
                 type_name::get::<T>(),
                 length, size_in_bytes, byte_offset, self.flags
             );

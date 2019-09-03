@@ -1858,9 +1858,6 @@ impl CrateNamespace {
             // currently not using debug sections
             if let Ok(name) = sec.get_name(&elf_file) {
                 if name.starts_with(".rela.debug")         // ignore debug special sections for now
-                //    name.starts_with(".rela.eh_frame") || 
-                //    name.starts_with(".rela.note")     ||   // ignore GNU note sections
-                //    name.starts_with(".rela.gcc")      ||   // ignore gcc special sections for now
                 {
                     continue;
                 }
@@ -2008,104 +2005,89 @@ impl CrateNamespace {
         Ok(())
     }
 
-    /*
     /// The `.eh_frame` section cannot be used until its relocation entries have been filled in,
     /// which is performed along with all the other sections in [perform_relocations()`](#method.perform_relocations).
-    fn handle_eh_frame(
+    pub fn handle_eh_frame(
         &self,
-        elf_file: &ElfFile,
-        new_crate_ref: &StrongCrateRef,
-        kernel_mmi_ref: &MmiRef,
+        crate_ref: &StrongCrateRef,
         verbose_log: bool
     ) -> Result<(), &'static str> {
+        use gimli::{EhFrame, CieOrFde, NativeEndian, UnwindSection, BaseAddresses, CommonInformationEntry};
 
-        let new_crate = new_crate_ref.lock_as_ref();
-        let crate_name = &new_crate.crate_name;
+        let verbose_log = true;
 
-        let text_pages = match new_crate.text_pages {
-            Some(ref tp) => tp,
-            // a crate with no .text sections will not have a .eh_frame section.
-            None => return Ok(()),
-        };
+        let parent_crate = crate_ref.lock_as_ref();
+        let crate_name = &parent_crate.crate_name;
 
-        // After handling all the regular PROGBITS/NOBITS sections, 
-        // we can parse the `.eh_frame` section (or later, the `.debug_frame` section)
-        if let Some(sec) = elf_file.find_section_by_name(ExtraSection::EhFrame.section_name()) {
-            let loaded_sections = &new_crate.sections;
+        let text_pages = parent_crate.text_pages.as_ref()
+            .ok_or("crate did not contain any .text sections, which must exist to parse .eh_frame")?;
+        let text_pages_vaddr = text_pages.lock().start_address().value();
 
-            // dumping out section offsets just for now
-            for (index, lsec) in loaded_sections.iter() {
-                let s = lsec.lock();
-                trace!("Section [{}]: {}: offset {:#X}  (vaddr: {:#X})", index, s.name, s.mapped_pages_offset, s.virt_addr());
-            }
+        let eh_frame_sec_ref = parent_crate.sections.values()
+            .filter(|s| s.lock().typ == SectionType::EhFrame)
+            .next()
+            .ok_or("crate did not contain an .eh_frame section")?;
+        
+        let sec = eh_frame_sec_ref.lock();
+        let size_in_bytes = sec.size;
+        let sec_pages = sec.mapped_pages.lock();
+        let eh_frame_vaddr = sec.virt_addr().value();
+        assert_eq!(eh_frame_vaddr, sec_pages.start_address().value() + sec.mapped_pages_offset, "eh_frame address mismatch");
 
-            let size_in_bytes = sec.size() as usize;
+        warn!("Parsing crate {}'s eh_frame section {:?}...", crate_name, sec);
+        trace!("    eh_frame_vaddr: {:#X}, text_pages_vaddr: {:#X}", eh_frame_vaddr, text_pages_vaddr);
 
-            warn!("Parsing crate {}'s eh_frame section {:?}...", crate_name, sec);
-            use gimli::{EhFrame, EndianSlice, CieOrFde, NativeEndian, UnwindSection, BaseAddresses};
-            let mut eh_frame_pages = allocate_and_map_as_writable(size_in_bytes, EntryFlags::empty(), kernel_mmi_ref)
-                .map_err(|_e| "Couldn't map pages for .eh_frame section")?;
-            let eh_frame_vaddr = eh_frame_pages.start_address().value();
-            let text_pages_vaddr = text_pages.lock().start_address().value();
-            trace!("   eh_frame_vaddr: {:#X}, text_pages_vaddr: {:#X}", eh_frame_vaddr, text_pages_vaddr);
-            let eh_frame_slice = if let Ok(SectionData::Undefined(sec_data)) = sec.get_data(&elf_file) {
-                let slice: &mut [u8] = eh_frame_pages.as_slice_mut(0, sec.size() as usize)?;
-                slice.copy_from_slice(sec_data);
-                slice
-            } else {
-                return Err("Couldn't get section data for eh_frame section");
-            };
-            let eh_frame = EhFrame::new(eh_frame_slice, NativeEndian);
-            let base_addrs = BaseAddresses::default()
-                .set_eh_frame(eh_frame_vaddr as u64)
-                .set_text(text_pages_vaddr as u64);
+        let eh_frame_slice: &[u8] = sec_pages.as_slice(sec.mapped_pages_offset, size_in_bytes)?;
 
-            let mut current_cie = None;
-            let mut entries = eh_frame.entries(&base_addrs);
-            while let Some(cfi_entry) = entries.next().map_err(|_e| {
-                error!("gimli error: {:?}", _e);
-                "gimli error while iterating through eh_frame entries"
-            })? {
-                debug!("Found eh_frame entry: {:?}", cfi_entry);
-                match cfi_entry {
-                    CieOrFde::Cie(cie) => {
-                        debug!("  --> moving on to CIE at offset {}", cie.offset());
-                        let mut instructions = cie.instructions(&eh_frame, &base_addrs);
-                        while let Some(instr) = instructions.next().map_err(|_e| {
-                            error!("gimli error: {:?}", _e);
-                            "gimli error while iterating through eh_frame Cie instructions list"
-                        })? {
-                            debug!("    CIE instr: {:?}", instr);
-                        }
+        let eh_frame = EhFrame::new(eh_frame_slice, NativeEndian);
+        let base_addrs = BaseAddresses::default()
+            .set_eh_frame(eh_frame_vaddr as u64)
+            .set_text(text_pages_vaddr as u64);
 
-                        current_cie = Some(cie);
+        // The map from CIE offset to CIE struct, which is needed to parse every partial FDE
+        let mut cie_map: BTreeMap<usize, CommonInformationEntry<_>> = BTreeMap::new();
+        let mut entries = eh_frame.entries(&base_addrs);
+        while let Some(cfi_entry) = entries.next().map_err(|_e| {
+            error!("gimli error: {:?}", _e);
+            "gimli error while iterating through eh_frame entries"
+        })? {
+            debug!("Found eh_frame entry: {:?}", cfi_entry);
+            match cfi_entry {
+                CieOrFde::Cie(cie) => {
+                    debug!("  --> moving on to CIE at offset {}", cie.offset());
+                    let mut instructions = cie.instructions(&eh_frame, &base_addrs);
+                    while let Some(instr) = instructions.next().map_err(|_e| {
+                        error!("gimli error: {:?}", _e);
+                        "gimli error while iterating through eh_frame Cie instructions list"
+                    })? {
+                        debug!("    CIE instr: {:?}", instr);
                     }
-                    CieOrFde::Fde(partial_fde) => {
-                        debug!("    Parsing partial FDE...");
-                        let full_fde = partial_fde.parse(|_sec, _base_addrs, _sec_offset| {
-                            current_cie.clone().ok_or(gimli::Error::NotCiePointer)
-                        }).map_err(|_e| {
-                            error!("gimli error: {:?}", _e);
-                            "gimli error while parsing partial FDE"
-                        })?;
-                        debug!("      Full FDE: {:?}", full_fde);
-                    }
+                    cie_map.insert(cie.offset(), cie);
+                }
+                CieOrFde::Fde(partial_fde) => {
+                    debug!("    Parsing partial FDE...");
+                    let full_fde = partial_fde.parse(|_eh_frame_gimli_sec, _base_addrs, cie_offset| {
+                        let cie_offset = cie_offset.0;
+                        debug!("PartialFDE::parse(): cie_offset: {}", cie_offset);
+                        let required_cie = cie_map.get(&cie_offset).cloned().ok_or_else(|| {
+                            error!("BUG: partial FDE required CIE offset {:?}, but that CIE couldn't be found. Available CIEs: {:?}", cie_offset, cie_map);
+                            gimli::Error::NotCiePointer
+                        });
+                        required_cie
+                    }).map_err(|_e| {
+                        error!("gimli error: {:?}", _e);
+                        "gimli error while parsing partial FDE"
+                    })?;
+                    debug!("      Full FDE: {:?}", full_fde);
                 }
             }
         }
-        else {
-            if new_crate.text_pages.is_some() {
-                warn!("The crate oject file {:?} had '.text*' section(s) \
-                    but did not have an '.eh_frame' section \
-                    used for stack unwinding. The ELF file is likely corrupt.",
-                    crate_name
-                );
-            }
-        }
+
+        info!("successfully iterated through {}'s eh_frame entries", crate_name);
+
 
         Ok(())
     }
-    */
 
     
     /// Adds the given symbol to this namespace's symbol map.
