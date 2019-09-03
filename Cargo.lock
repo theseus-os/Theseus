@@ -2207,6 +2207,25 @@ version = "0.2.5"
 source = "registry+https://github.com/rust-lang/crates.io-index"
 
 [[package]]
+name = "window_2d"
+version = "0.1.0"
+dependencies = [
+ "compositor 0.1.0",
+ "dfqueue 0.1.0",
+ "displayable 0.1.0",
+ "event_types 0.1.0",
+ "font 0.1.0",
+ "frame_buffer 0.1.0",
+ "frame_buffer_compositor 0.1.0",
+ "frame_buffer_drawer 0.1.0",
+ "frame_buffer_printer 0.1.0",
+ "lazy_static 1.2.0 (registry+https://github.com/rust-lang/crates.io-index)",
+ "log 0.3.9 (registry+https://github.com/rust-lang/crates.io-index)",
+ "spin 0.4.10 (registry+https://github.com/rust-lang/crates.io-index)",
+ "text_display 0.1.0",
+]
+
+[[package]]
 name = "window_manager"
 version = "0.1.0"
 dependencies = [
@@ -2223,6 +2242,7 @@ dependencies = [
  "log 0.3.9 (registry+https://github.com/rust-lang/crates.io-index)",
  "spin 0.4.10 (registry+https://github.com/rust-lang/crates.io-index)",
  "text_display 0.1.0",
+ "window_2d 0.1.0",
 ]
 
 [[package]]
