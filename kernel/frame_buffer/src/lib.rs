@@ -1,276 +1,147 @@
-//! This crate is a frame buffer for display on the screen in 2D mode
+//! This crate is a frame buffer manager.
+//! * It defines a FrameBuffer structure and creates new framebuffers for applications
 
 #![no_std]
-#![feature(const_fn)]
-#![feature(ptr_internals)]
-#![feature(asm)]
 
-extern crate spin;
 extern crate multicore_bringup;
-
-extern crate volatile;
-extern crate serial_port;
-extern crate kernel_config;
-extern crate memory;
-#[macro_use] extern crate log;
-extern crate util;
+extern crate spin;
 extern crate alloc;
+extern crate memory;
+extern crate owning_ref;
 
-
-use spin::{Mutex};
-use memory::{FRAME_ALLOCATOR, FrameRange, PhysicalAddress, 
-    EntryFlags, allocate_pages_by_bytes, MappedPages, get_kernel_mmi_ref};
-use core::ops::DerefMut;
 use alloc::boxed::Box;
+use core::ops::DerefMut;
+use memory::{EntryFlags, FrameRange, MappedPages,PhysicalAddress, FRAME_ALLOCATOR};
+use owning_ref::BoxRefMut;
+use spin::{Mutex, Once};
 
-//The buffer for text printing
-pub mod text_buffer;
-//The font for text printing
-pub mod font;
+/// A Pixel is a u32 integer. The lower 24 bits of a Pixel specifie the RGB color of a pixel
+pub type Pixel = u32;
 
-const PIXEL_BYTES:usize = 4;
+/// The final framebuffer instance. It contains the pages which are mapped to the physical framebuffer
+pub static FINAL_FRAME_BUFFER: Once<Mutex<FrameBuffer>> = Once::new();
 
+// Every pixel is of u32 type
+const PIXEL_BYTES: usize = 4;
+
+/// Initialize the final frame buffer.
+/// Allocate a block of memory and map it to the physical framebuffer frames.
 /// Init the frame buffer. Allocate a block of memory and map it to the frame buffer frames.
-pub fn init() -> Result<(), &'static str > {
-    
-    //Get the graphic mode information
-    let VESA_DISPLAY_PHYS_START:PhysicalAddress;
-    let VESA_DISPLAY_PHYS_SIZE: usize;
-    let BUFFER_WIDTH:usize;
-    let BUFFER_HEIGHT:usize;
+pub fn init() -> Result<(), &'static str> {
+    // Get the graphic mode information
+    let vesa_display_phys_start: PhysicalAddress;
+    let buffer_width: usize;
+    let buffer_height: usize;
     {
         let graphic_info = multicore_bringup::GRAPHIC_INFO.lock();
         if graphic_info.physical_address == 0 {
             return Err("Fail to get graphic mode infomation!");
         }
-        VESA_DISPLAY_PHYS_START = PhysicalAddress::new(graphic_info.physical_address as usize)?;
-        BUFFER_WIDTH = graphic_info.width as usize;
-        BUFFER_HEIGHT = graphic_info.height as usize;
-        VESA_DISPLAY_PHYS_SIZE= BUFFER_WIDTH * BUFFER_HEIGHT * PIXEL_BYTES;
+        vesa_display_phys_start = PhysicalAddress::new(graphic_info.physical_address as usize)?;
+        buffer_width = graphic_info.width as usize;
+        buffer_height = graphic_info.height as usize;
     };
+    // Initialize the final framebuffer
+    let framebuffer = FrameBuffer::new(buffer_width, buffer_height, Some(vesa_display_phys_start))?;
+    FINAL_FRAME_BUFFER.call_once(|| Mutex::new(framebuffer));
 
-    // init the font for text printing
-    font::init()?;
-
-    // get a reference to the kernel's memory mapping information
-    let kernel_mmi_ref = get_kernel_mmi_ref().expect("KERNEL_MMI was not yet initialized!");
-    let mut kernel_mmi_locked = kernel_mmi_ref.lock();
-    let pages = allocate_pages_by_bytes(VESA_DISPLAY_PHYS_SIZE).ok_or("couldn't allocate framebuffer pages")?;
-    let vesa_display_flags = EntryFlags::PRESENT | EntryFlags::WRITABLE | EntryFlags::GLOBAL | EntryFlags::NO_CACHE;
-    let allocator = FRAME_ALLOCATOR.try().ok_or("Couldn't get frame allocator")?;
-    let mapped_frame_buffer = kernel_mmi_locked.page_table.map_allocated_pages_to(
-        pages, 
-        FrameRange::from_phys_addr(VESA_DISPLAY_PHYS_START, VESA_DISPLAY_PHYS_SIZE), 
-        vesa_display_flags, 
-        allocator.lock().deref_mut()
-    )?;
-
-    FRAME_DRAWER.lock().set_mode_info(BUFFER_WIDTH, BUFFER_HEIGHT, mapped_frame_buffer);
     Ok(())
 }
 
-// Window manager uses this drawer to draw/print to the screen
-static FRAME_DRAWER: Mutex<Drawer> = {
-    Mutex::new(Drawer {
-        width:0,
-        height:0,
-        pages:None,
-    })
-};
-
-/// draw a pixel with coordinates and color
-pub fn draw_pixel(x:usize, y:usize, color:u32) {
-    FRAME_DRAWER.lock().draw_pixel(x, y, color);
+/// The virtual frame buffer struct. It contains the size of the buffer and a buffer array
+#[derive(Hash)]
+pub struct FrameBuffer {
+    width: usize,
+    height: usize,
+    buffer: BoxRefMut<MappedPages, [Pixel]>,
 }
 
-/// draw a line with start and end coordinates and color
-pub fn draw_line(start_x:usize, start_y:usize, end_x:usize, end_y:usize, color:u32) {
-    FRAME_DRAWER.lock().draw_line(start_x as i32, start_y as i32, end_x as i32, end_y as i32, color);
-}
+impl FrameBuffer {
+    /// Create a new virtual frame buffer with specified size.
+    /// If the physical_address is specified, the new virtual frame buffer will be mapped to hardware's physical memory at that address.
+    /// If the physical_address is none, the new function will allocate a block of physical memory at a random address and map the new frame buffer to that memory.
+    pub fn new(
+        width: usize,
+        height: usize,
+        physical_address: Option<PhysicalAddress>,
+    ) -> Result<FrameBuffer, &'static str> {
+        // get a reference to the kernel's memory mapping information
+        let kernel_mmi_ref =
+            memory::get_kernel_mmi_ref().ok_or("KERNEL_MMI was not yet initialized!")?;
+        let allocator = FRAME_ALLOCATOR
+            .try()
+            .ok_or("Couldn't get Frame Allocator")?;
 
-/// draw a rectangle with upper left coordinates, width, height and color
-pub fn draw_rectangle(start_x:usize, start_y:usize, width:usize, height:usize, color:u32) {
-    FRAME_DRAWER.lock().draw_rectangle(start_x, start_y, width, height, color)
-}
+        let vesa_display_flags: EntryFlags =
+            EntryFlags::PRESENT | EntryFlags::WRITABLE | EntryFlags::GLOBAL | EntryFlags::NO_CACHE;
 
-/// fill a rectangle with upper left coordinates, width, height and color
-pub fn fill_rectangle(start_x:usize, start_y:usize, width:usize, height:usize, color:u32) {
-    FRAME_DRAWER.lock().fill_rectangle(start_x, start_y, width, height, color)
-}
+        let size = width * height * PIXEL_BYTES;
+        let pages = memory::allocate_pages_by_bytes(size).ok_or("could not allocate pages")?;
 
-/*pub struct Point {
-    pub x: usize,
-    pub y: usize,
-    pub color: usize,
-}*/
+        let mapped_frame_buffer = if let Some(address) = physical_address {
+            let frame = FrameRange::from_phys_addr(address, size);
+            try!(kernel_mmi_ref.lock().page_table.map_allocated_pages_to(
+                pages,
+                frame,
+                vesa_display_flags,
+                allocator.lock().deref_mut()
+            ))
+        } else {
+            try!(kernel_mmi_ref.lock().page_table.map_allocated_pages(
+                pages,
+                vesa_display_flags,
+                allocator.lock().deref_mut()
+            ))
+        };
 
-// The drawer is responsible for drawing/printing to the screen
-pub struct Drawer {
-    pub width:usize,
-    height:usize,
-    pages:Option<MappedPages>,
-}
+        // create a refence to transmute the mapped frame buffer pages as a slice
+        let buffer = BoxRefMut::new(Box::new(mapped_frame_buffer))
+            .try_map_mut(|mp| mp.as_slice_mut(0, width * height))?;
 
-impl Drawer {
-    // set the graphic mode information of the buffer
-    fn set_mode_info(&mut self, width:usize, height:usize, pages:MappedPages) {
-        self.width = width;
-        self.height = height;
-        self.pages = Some(pages);
+        Ok(FrameBuffer {
+            width: width,
+            height: height,
+            buffer: buffer,
+        })
     }
 
-    //get the resolution of the screen
-    fn get_resolution(&self) -> (usize, usize) {
+    /// return a mutable reference to the buffer
+    pub fn buffer_mut(&mut self) -> &mut BoxRefMut<MappedPages, [Pixel]> {
+        return &mut self.buffer;
+    }
+
+    /// return a reference to the buffer
+    pub fn buffer(&self) -> &BoxRefMut<MappedPages, [Pixel]> {
+        return &self.buffer;
+    }
+
+    /// get the size of the frame buffer. Return (width, height).
+    pub fn get_size(&self) -> (usize, usize) {
         (self.width, self.height)
     }
 
-    fn draw_pixel(&mut self, x:usize, y:usize, color:u32) {
-        let index = self.get_index_fn();
-        let buffer;
-        match self.buffer() {
-            Ok(rs) => {buffer = rs;},
-            Err(err) => { error!("Failed to get frame buffer: {}", err); return; },
-        }
-        buffer[index(x, y)] = color;
+    // ///get a function to compute the index of a pixel in the buffer array. The returned function is (x:usize, y:usize) -> index:usize
+    // pub fn get_index_fn(&self) -> Box<Fn(usize, usize)->usize>{
+    //     let width = self.width;
+    //     Box::new(move |x:usize, y:usize| y * width + x )
+    // }
+
+    /// compute the index of pixel (x, y) in the buffer array
+    pub fn index(&self, x: usize, y: usize) -> usize {
+        y * self.width + x
     }
 
-    fn draw_line(&mut self, start_x:i32, start_y:i32, end_x:i32, end_y:i32, color:u32){
-        let width:i32 = end_x-start_x;
-        let height:i32 = end_y-start_y;
-        let (buffer_width, buffer_height) = {self.get_resolution()};
-        let index = self.get_index_fn();
-
-        let buffer;
-        match self.buffer() {
-            Ok(rs) => {buffer = rs;},
-            Err(err) => {
-                error!("Failed to get frame buffer: {}", err); return;},
-        }
-
-        if width.abs() > height.abs() {
-            let mut y;
-            let mut x = start_x;
-            let step = if width > 0 {1} else {-1};
-
-            loop {
-                if x == end_x {
-                    break;
-                }          
-                y = (x - start_x) * height / width + start_y;
-                if check_in_range(x as usize,y as usize, buffer_width, buffer_height) {
-                    buffer[index(x as usize, y as usize)] = color;
-                }
-                x += step;
-            }
-        } else {
-            let mut x;
-            let mut y = start_y;
-            let step = if height > 0 {1} else {-1};
-            loop {
-                if y == end_y {
-                    break;
-                }
-                x = (y - start_y) * width / height + start_x;
-                if check_in_range(x as usize,y as usize, buffer_width, buffer_height) {
-                    buffer[index(x as usize, y as usize)] = color;
-                }
-                y += step;   
-            }
-        }
-
+    /// check if a pixel (x,y) is within the framebuffer
+    pub fn check_in_buffer(&self, x: usize, y: usize) -> bool {
+        x < self.width && y < self.height
     }
-
-    fn draw_rectangle(&mut self, start_x:usize, start_y:usize, width:usize, height:usize, color:u32){
-        let end_x:usize = {if start_x + width < self.width { start_x + width } 
-            else { self.width }};
-        let end_y:usize = {if start_y + height < self.height { start_y + height } 
-            else { self.height }};  
-        let index = self.get_index_fn();
-
-        let buffer;
-        match self.buffer() {
-            Ok(rs) => {buffer = rs;},
-            Err(err) => { error!("Fail to get frame buffer: {}", err); return;},
-        }
-  
-        let mut x = start_x;
-        loop {
-            if x == end_x {
-                break;
-            }
-            buffer[index(x, start_y)] = color;
-            buffer[index(x, end_y-1)] = color;
-            x += 1;
-        }
-
-        let mut y = start_y;
-        loop {
-            if y == end_y {
-                break;
-            }
-            buffer[index(start_x, y)] = color;
-            buffer[index(end_x-1, y)] = color;
-            y += 1;
-        }
-    }
-
-    fn fill_rectangle(&mut self, start_x:usize, start_y:usize, width:usize, height:usize, color:u32){
-        let end_x:usize = {if start_x + width < self.width { start_x + width } 
-            else { self.width }};
-        let end_y:usize = {if start_y + height < self.height { start_y + height } 
-            else { self.height }};  
-
-        let mut x = start_x;
-        let mut y = start_y;
-
-        let index = self.get_index_fn();
-
-        let buffer;
-        match self.buffer() {
-            Ok(rs) => {buffer = rs;},
-            Err(err) => { error!("Fail to get frame buffer: {}", err); return;},
-        }
-        
-        loop {
-            if x == end_x {
-                y += 1;
-                if y == end_y {
-                    break;
-                }
-                x = start_x;
-            }
-
-            buffer[index(x, y)] = color;
-            x += 1;
-        }
-    }
-
-    // return the framebuffer
-    pub fn buffer(&mut self) -> Result<&mut[u32], &'static str> {
-        match self.pages {
-            Some(ref mut pages) => {
-                let buffer = try!(pages.as_slice_mut(0, self.width*self.height));
-                return Ok(buffer);
-            },
-            None => { return Err("no allocated pages in framebuffer") }
-        }
-    }
-
-    // get the index computation function according to the width of the buffer
-    // call it to get the index function before locking the buffer
-    pub fn get_index_fn(&self) -> Box<Fn(usize, usize)->usize>{
-        let width = self.width;
-        Box::new(move |x:usize, y:usize| y * width + x )
-    }
-
 }
 
-// Get the resolution of the screen
-pub fn get_resolution() -> (usize, usize) {
-    FRAME_DRAWER.lock().get_resolution()
-}
-
-// Check if a point is in the screen
-fn check_in_range(x:usize, y:usize, width:usize, height:usize)  -> bool {
-    x < width && y < height
+/// Get the size of the final framebuffer. Return (width, height)
+pub fn get_screen_size() -> Result<(usize, usize), &'static str> {
+    let final_buffer = FINAL_FRAME_BUFFER
+        .try()
+        .ok_or("The final frame buffer was not yet initialized")?
+        .lock();
+    Ok((final_buffer.width, final_buffer.height))
 }

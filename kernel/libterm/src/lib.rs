@@ -14,11 +14,12 @@ extern crate environment;
 extern crate print;
 extern crate event_types;
 extern crate spin;
+extern crate text_display;
 
 use alloc::string::{String, ToString};
 use alloc::vec::Vec;
 use event_types::Event;
-use window_manager::displayable::text_display::TextDisplay;
+use text_display::{TextDisplay, Cursor};
 
 pub const FONT_COLOR: u32 = 0x93ee90;
 pub const BACKGROUND_COLOR: u32 = 0x000000;
@@ -375,11 +376,7 @@ impl Terminal {
         };
         let result  = self.scrollback_buffer.get(start_idx..=end_idx); // =end_idx includes the end index in the slice
         if let Some(slice) = result {
-            if let Some(text_display) = self.window.get_displayable(&self.display_name){
-                text_display.display_string(&(self.window), slice, FONT_COLOR, BACKGROUND_COLOR)?;
-            } else {
-                return Err("faild to get the text displayable component")
-            }
+            self.window.display_string(&self.display_name, slice, FONT_COLOR, BACKGROUND_COLOR)?;
         } else {
             return Err("could not get slice of scrollback buffer string");
         }
@@ -394,12 +391,7 @@ impl Terminal {
         let result = self.scrollback_buffer.get(start_idx..end_idx);
 
         if let Some(slice) = result {
-            if let Some(text_display) = self.window.get_displayable(&self.display_name){
-                text_display.display_string(&(self.window), slice, FONT_COLOR, BACKGROUND_COLOR)?;
-                self.absolute_cursor_pos = cursor_pos;          
-            } else {
-                return Err("faild to get the text displayable component")
-            }
+            self.window.display_string(&self.display_name, slice, FONT_COLOR, BACKGROUND_COLOR)?;
         } else {
             return Err("could not get slice of scrollback buffer string");
         }
@@ -420,7 +412,8 @@ impl Terminal {
         }
 
         if let Some(text_display) = self.window.get_displayable(&self.display_name){
-            text_display.set_cursor(&(self.window), new_y as u16, new_x as u16, FONT_COLOR, true);
+            // TODO: WENQIU disable cursor
+            // text_display.set_cursor(&(self.window), new_y as u16, new_x as u16, FONT_COLOR, true);
         } else {
             return Err("faild to get the text displayable component")
         }
@@ -482,8 +475,9 @@ impl Terminal {
     }
 
     pub fn disable_cursor(&mut self) {
-        if let Some(text_display) = self.window.get_displayable(&self.display_name) {
-            text_display.disable_cursor();
+        if let Some(text_display) = self.window.get_displayable(&self.display_name){
+            // TODO: WENQIU disable cursor
+            // text_display.disable_cursor();
         }
     }
 
@@ -521,7 +515,8 @@ impl Terminal {
             self.is_scroll_end = false;
             self.scroll_start_idx = 0; // takes us up to the start of the page
             if let Some(text_display) = self.window.get_displayable(&self.display_name){
-                text_display.disable_cursor();
+                // TODO: WENQIU disable cursor
+                //text_display.disable_cursor();
             }
         }
     }
@@ -540,7 +535,8 @@ impl Terminal {
         if self.scroll_start_idx != 0 {
             self.scroll_up_one_line();
             if let Some(text_display) = self.window.get_displayable(&self.display_name){
-                text_display.disable_cursor();
+                // TODO: WENQIU disable cursor
+                //text_display.disable_cursor();
             }
         }
     }
@@ -560,7 +556,8 @@ impl Terminal {
         self.page_up();
         self.is_scroll_end = false;
         if let Some(text_display) = self.window.get_displayable(&self.display_name){
-            text_display.disable_cursor();
+            // TODO: WENQIU disable cursor
+            //text_display.disable_cursor();
         }
     }
 
@@ -586,18 +583,16 @@ impl Terminal {
             let (width, height) = self.window.dimensions();
             let width  = width  - 2*window_manager::WINDOW_MARGIN;
             let height = height - 2*window_manager::WINDOW_MARGIN;
-            match self.window.add_displayable(&display_name, 0, 0,
-                TextDisplay::new(&display_name, width, height)) {
-                    Ok(_) => { }
-                    Err(err) => {return Err(err);}
-            };
+            let text_display = TextDisplay::new(width, height)?;
+            self.window.add_displayable(&display_name, 0, 0, text_display)?;
         }
         Ok(())
     }
 
     pub fn blink_cursor(&mut self) {
+        // TODO: WENQIU cursor blink
         if let Some(text_display) = self.window.get_displayable(&self.display_name){
-            text_display.cursor_blink(&self.window, FONT_COLOR, BACKGROUND_COLOR);
+            //text_display.cursor_blink(&self.window, FONT_COLOR, BACKGROUND_COLOR);
         }
     }
 
@@ -613,8 +608,10 @@ impl Terminal {
 
 impl Drop for Terminal {
     fn drop(&mut self) {
-        window_manager::delete(&self.window).unwrap_or_else(|e| {
+        //window_manager::delete(terminal.window)?;
+        /* window_manager::delete(&self.window).unwrap_or_else(|e| {
             error!("failed to delete window on terminal dropping, {}", e);
         });
+        */
     }
 }

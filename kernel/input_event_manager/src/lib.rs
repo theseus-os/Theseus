@@ -130,7 +130,7 @@ fn input_event_loop(consumer:DFQueueConsumer<Event>) -> Result<(), &'static str>
 
                 // Switches between terminal windows
                 if key_input.modifiers.alt && key_input.keycode == Keycode::Tab && key_input.action == KeyAction::Pressed {
-                    window_manager::switch()?;
+                    window_manager::switch_to_next()?;
                     meta_keypress = true;
                     event.mark_completed();
 

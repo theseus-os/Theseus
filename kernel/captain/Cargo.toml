@@ -33,8 +33,8 @@ path = "../frame_buffer_3d"
 [dependencies.window_manager]
 path = "../window_manager"
 
-#[dependencies.graph_drawer]
-#path = "../graph_drawer"
+[dependencies.font]
+path = "../font"
 
 [dependencies.input_event_manager]
 path = "../input_event_manager"

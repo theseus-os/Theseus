@@ -43,6 +43,7 @@ extern crate e1000;
 extern crate window_manager;
 extern crate scheduler;
 extern crate frame_buffer;
+extern crate font;
 #[cfg(mirror_log_to_vga)] #[macro_use] extern crate print;
 extern crate input_event_manager;
 #[cfg(test_network)] extern crate exceptions_full;
@@ -123,7 +124,7 @@ pub fn init(
     let ap_count = multicore_bringup::handle_ap_cores(kernel_mmi_ref.clone(), ap_start_realmode_begin, ap_start_realmode_end)?;
     info!("Finished handling and booting up all {} AP cores.", ap_count);
 
-    // //init frame_buffer
+    // init frame_buffer
     let rs = frame_buffer::init();
     match rs {
         Ok(_) => {
@@ -131,6 +132,30 @@ pub fn init(
         }
         Err(err) => { 
             error!("captain::init(): failed to initialize frame_buffer");
+            return Err(err);
+        }
+    }
+
+    // init font
+    let rs = font::init();
+    match rs {
+        Ok(_) => {
+            trace!("font initialized successfully.");
+        }
+        Err(err) => { 
+            error!("captain::init(): failed to initialize font");
+            return Err(err);
+        }
+    }
+
+    // init window manager
+    let rs = window_manager::init();
+    match rs {
+        Ok(_) => {
+            trace!("window manager initialized successfully.");
+        }
+        Err(err) => { 
+            error!("captain::init(): failed to initialize window manager");
             return Err(err);
         }
     }

@@ -16,7 +16,6 @@ extern crate runqueue;
 extern crate memory;
 extern crate event_types; 
 extern crate window_manager;
-extern crate text_display;
 extern crate path;
 extern crate root;
 extern crate scheduler;

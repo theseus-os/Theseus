@@ -2,60 +2,53 @@
 name = "window_manager"
 version = "0.1.0"
 authors = ["Wenqiu Yu <yuwenqiuj@gmail.com>"]
+description = "allocate new windows and manage a list of existing windows"
 build = "../../build.rs"
 
 [dependencies]
 spin = "0.4.10"
-volatile = "0.2.5"
-
-
-[dependencies.lazy_static]
-features = ["spin_no_std", "nightly"]
-version = "1.2.0"
-
-[dependencies.serial_port]
-path = "../serial_port"
-
-[dependencies.kernel_config]
-path = "../kernel_config"
-
-[dependencies.state_store]
-path = "../state_store"
 
 [dependencies.log]
 default-features = false
 version = "0.3.7"
 
-[dependencies.irq_safety]
-git = "https://github.com/kevinaboos/irq_safety"
-
 [dependencies.dfqueue]
 path = "../../libs/dfqueue"
 version = "0.1.0"
 
-[dependencies.keycodes_ascii]
-path = "../../libs/keycodes_ascii"
-
 [dependencies.frame_buffer]
 path = "../frame_buffer"
 
-[dependencies.acpi]
-path = "../acpi"
+[dependencies.frame_buffer_compositor]
+path = "../frame_buffer_compositor"
+
+[dependencies.compositor]
+path = "../compositor"
+
+[dependencies.frame_buffer_drawer]
+path = "../frame_buffer_drawer"
+
+[dependencies.frame_buffer_printer]
+path = "../frame_buffer_printer"
 
 [dependencies.event_types]
 path = "../event_types"
 
-[dependencies.spawn]
-path = "../spawn"
+[dependencies.font]
+path = "../font"
 
-[dependencies.pit_clock]
-path = "../pit_clock"
+[dependencies.displayable]
+path = "../displayable"
 
+[dependencies.text_display]
+path = "../../kernel/displayable/text_display"
 
+[dependencies.lazy_static]
+features = ["spin_no_std", "nightly"]
+version = "1.2.0"
 
 # [build]
 # rustflags = ["-C", "prefer-dynamic", "-C", "panic=abort"]
-
 
 [lib]
 crate-type = ["rlib"]

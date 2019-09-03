@@ -1,105 +1,183 @@
-//! Window manager that simulates a desktop environment. 
+//! Window manager that simulates a desktop environment.
 //! *note: since window overlap is not yet supported, any application that asks for a window that would overlap
 //! with an existing window will be returned an error
-//! 
+//!
 //! Applications request window objects from the window manager through either of two functions:
 //! - default_new_window() will provide a window of default size (centered, fills majority of screen)
 //! - new_window() provides a new window whose dimensions the caller must specify
-//! 
-//! Windows can be resized by calling resize()
-//! Window can be by passing the window object to delete() or directly through WindowObj.delete(), though the 2nd option requires updating the active pointer manually
-//! 
-//! The window object is designed as follows:
-//! The application's window provides a screen area for the application to display its content into. The application can select
-//! from various Displayables such as TextDisplay (multiple of which can be displayed into the application's window at a time)
-//! 
+//!
+//! Windows can be resized by calling resize().
+//! Window can be deleted when it is dropped or by calling WindowObj.delete().
+//! Once an active window is deleted or set as inactive, the next window in the background list will become active.
+//! The orde of windows is based on the last time it was active. The one which was active most recently is the top of the background list
+//!
 //! The WINDOW_ALLOCATOR is used by the WindowManager itself to track and modify the existing windows
 
 #![no_std]
-#![feature(const_fn)]
-#![feature(asm)]
 
 extern crate spin;
-extern crate irq_safety;
+#[macro_use]
 extern crate alloc;
 extern crate dfqueue;
-extern crate keycodes_ascii;
-extern crate frame_buffer;
 extern crate event_types;
-extern crate spawn;
-extern crate pit_clock;
+#[macro_use]
+extern crate log;
+extern crate compositor;
+extern crate frame_buffer;
+extern crate frame_buffer_compositor;
+extern crate frame_buffer_drawer;
+extern crate frame_buffer_printer;
+extern crate text_display;
+#[macro_use]
+extern crate lazy_static;
+extern crate displayable;
+extern crate font;
 
-#[macro_use] extern crate log;
-//#[macro_use] extern crate util;
-
-extern crate acpi;
-
-
-use spin::{Once, Mutex};
-use alloc::collections::{VecDeque, BTreeMap};
-use core::ops::Deref;
-use dfqueue::{DFQueue,DFQueueConsumer,DFQueueProducer};
-use alloc::sync::{Arc, Weak};
-use frame_buffer::text_buffer::{FrameTextBuffer};
-use event_types::Event;
+use alloc::collections::{BTreeMap, VecDeque};
 use alloc::string::{String, ToString};
+use alloc::sync::{Arc, Weak};
+use compositor::Compositor;
+use core::ops::{Deref, DerefMut};
+use dfqueue::{DFQueue, DFQueueConsumer, DFQueueProducer};
+use displayable::Displayable;
+use event_types::Event;
+use font::{CHARACTER_HEIGHT, CHARACTER_WIDTH};
+use frame_buffer::FrameBuffer;
+use frame_buffer_compositor::FRAME_COMPOSITOR;
+use frame_buffer_drawer::*;
+use spin::{Mutex, Once};
+use text_display::{Cursor, TextDisplay};
 
-pub mod displayable;
-
-use displayable::text_display::TextDisplay;
-
-
-static WINDOW_ALLOCATOR: Once<Mutex<WindowAllocator>> = Once::new();
-const WINDOW_ACTIVE_COLOR:u32 = 0xFFFFFF;
-const WINDOW_INACTIVE_COLOR:u32 = 0x343C37;
-const SCREEN_BACKGROUND_COLOR:u32 = 0x000000;
-
-/// 10 pixel gap between windows 
-pub const GAP_SIZE: usize = 10;
-pub const WINDOW_MARGIN: usize = 2;
-
-struct WindowAllocator {
-    allocated: VecDeque<Weak<Mutex<WindowInner>>>, 
-    // a weak pointer directly to the active WindowInner so we don't have to search for the active window when we need it quickly
-    // this weak pointer is set in the WindowAllocator's switch(), delete(), and allocate() functions
-    active: Weak<Mutex<WindowInner>>, 
+lazy_static! {
+    /// The list of all windows in the system.
+    static ref WINDOWLIST: Mutex<WindowList> = Mutex::new(
+        WindowList{
+            background_list: VecDeque::new(),
+            active: Weak::new(),
+        }
+    );
 }
 
-/// Applications call this function to request a new window object with a default size (mostly fills screen with GAP_SIZE around all borders)
+// A framebuffer owned by the window manager.
+// This framebuffer is responsible for display borders. Windows owned by applications cannot get access to their borders.
+// All the display behaviors of borders are controled by the window manager
+static SCREEN_FRAME_BUFFER: Once<Arc<Mutex<FrameBuffer>>> = Once::new();
+
+// 10 pixel gap between windows
+pub const WINDOW_MARGIN: usize = 10;
+// 2 pixel padding within a window
+const WINDOW_PADDING: usize = 2;
+// The border color of an active window
+const WINDOW_ACTIVE_COLOR: u32 = 0xFFFFFF;
+// The border color of an inactive window
+const WINDOW_INACTIVE_COLOR: u32 = 0x343C37;
+// The background color of the screen
+const SCREEN_BACKGROUND_COLOR: u32 = 0x000000;
+
+/// The window allocator.
+/// It contains a list of allocated window and a reference to the active window
+struct WindowList {
+    // The list of inactive windows. Their order is based on the last time they were active. The first window is the window which was active most recently.
+    background_list: VecDeque<Weak<Mutex<WindowInner>>>,
+    // A weak pointer to the active window.
+    active: Weak<Mutex<WindowInner>>,
+}
+
+/// Initialize the window manager.
+pub fn init() -> Result<(), &'static str> {
+    let (screen_width, screen_height) = frame_buffer::get_screen_size()?;
+    let framebuffer = FrameBuffer::new(screen_width, screen_height, None)?;
+    SCREEN_FRAME_BUFFER.call_once(|| Arc::new(Mutex::new(framebuffer)));
+    Ok(())
+}
+
+/// Applications call this function to request a new window object with a default size (mostly fills screen with WINDOW_MARGIN around all borders)
 /// If the caller a specific window size, it should call new_window()
 pub fn new_default_window() -> Result<WindowObj, &'static str> {
-    let (window_width, window_height) = get_screen_size();
-    match new_window(GAP_SIZE, GAP_SIZE, window_width - 2* GAP_SIZE, window_height - 2* GAP_SIZE) {
-        Ok(new_window) => {return Ok(new_window)}
-        Err(err) => {return Err(err)}
+    let (window_width, window_height) = frame_buffer::get_screen_size()?;
+    match new_window(
+        WINDOW_MARGIN,
+        WINDOW_MARGIN,
+        window_width - 2 * WINDOW_MARGIN,
+        window_height - 2 * WINDOW_MARGIN,
+    ) {
+        Ok(new_window) => return Ok(new_window),
+        Err(err) => return Err(err),
     }
 }
 
 /// Lets the caller specify the dimensions of the new window and returns a new window
 /// Params x,y specify the (x,y) coordinates of the top left corner of the window
 /// Params width and height specify dimenions of new window in pixels
-pub fn new_window<'a>(x:usize, y:usize, width:usize, height:usize) -> Result<WindowObj, &'static str>{
+pub fn new_window<'a>(
+    x: usize,
+    y: usize,
+    width: usize,
+    height: usize,
+) -> Result<WindowObj, &'static str> {
+    // Check the size of the window
+    if width < 2 * WINDOW_PADDING || height < 2 * WINDOW_PADDING {
+        return Err("Window size must be greater than the padding");
+    }
+    // Init the key input producer and consumer
+    let consumer = DFQueue::new().into_consumer();
+    let producer = consumer.obtain_producer();
+    // Init the frame buffer of the window
+    let framebuffer = FrameBuffer::new(
+        width - 2 * WINDOW_PADDING,
+        height - 2 * WINDOW_PADDING,
+        None,
+    )?;
+    let inner = WindowInner {
+        x: x,
+        y: y,
+        width: width,
+        height: height,
+        active: true,
+        padding: WINDOW_PADDING,
+        key_producer: producer,
+    };
 
-    let allocator: &Mutex<WindowAllocator> = WINDOW_ALLOCATOR.call_once(|| {
-        Mutex::new(WindowAllocator{
-            allocated:VecDeque::new(),
-            active:Weak::new(),
-        })
-    });
+    // // Check if the window overlaps with others
+    // let inner_ref = Arc::new(Mutex::new(inner));
+    // let overlapped = self.check_overlap(&inner_ref, x, y, width, height);
+    // if overlapped  {
+    //     return Err("Request area is already allocated");
+    // }
 
-    allocator.lock().allocate(x,y,width,height)
+    let inner_ref = Arc::new(Mutex::new(inner));
+
+    // add the new window and active it
+    // initialize the content of the new window
+    inner_ref.lock().clean()?;    trace!("5");
+    WINDOWLIST.lock().add_active(&inner_ref)?;    trace!("6");
+
+    // return the window object
+    let window: WindowObj = WindowObj {
+        inner: inner_ref,
+        //text_buffer:FrameTextBuffer::new(),
+        consumer: consumer,
+        components: BTreeMap::new(),
+        framebuffer: framebuffer,
+    };
+
+    Ok(window)
 }
 
 /// Puts an input event into the active window (i.e. a keypress event, resize event, etc.)
 /// If the caller wants to put an event into a specific window, use put_event_into_app()
-pub fn send_event_to_active(event: Event) -> Result<(), &'static str>{    
-    let mut allocator = try!(WINDOW_ALLOCATOR.try().ok_or("The window allocator is not initialized")).lock();
-    allocator.send_event(event)
+pub fn send_event_to_active(event: Event) -> Result<(), &'static str> {
+    let window_list = WINDOWLIST.lock();
+    let active_ref = window_list.active.upgrade(); // grabs a pointer to the active WindowInner
+    if let Some(window) = active_ref {
+        let window = window.lock();
+        window.key_producer.enqueue(event);
+    }
+    Ok(())
 }
 
-
-// Gets the border color specified by the window manager
-fn get_border_color(active:bool) -> u32 {
+// Gets the border color according to the active state
+fn get_border_color(active: bool) -> u32 {
     if active {
         WINDOW_ACTIVE_COLOR
     } else {
@@ -107,361 +185,383 @@ fn get_border_color(active:bool) -> u32 {
     }
 }
 
-
-/// switch the active window. Active the next window in the list based on the order they are created
-pub fn switch() -> Result<(), &'static str> {
-    let mut allocator = try!(WINDOW_ALLOCATOR.try().ok_or("The window allocator is not initialized")).lock();
-    allocator.switch();
-    Ok(())
-}
-
-/// delete a window object
-pub fn delete(window: &WindowObj) -> Result<(), &'static str> {
-    let mut allocator = try!(WINDOW_ALLOCATOR.try().ok_or("The window allocator is not initialized")).lock();
-    // Switches to a new active window and sets 
-    // the active pointer field of the window allocator to the new active window
-    allocator.switch(); 
-    allocator.delete(&window.inner);
-    Ok(())
-}
-
-/// Returns the width and height (in pixels) of the screen 
-pub fn get_screen_size() -> (usize, usize) {
-    frame_buffer::get_resolution()
-}
-
-impl WindowAllocator{
-    
-    // Allocate a new window and return it
-    fn allocate(&mut self, x:usize, y:usize, width:usize, height:usize) -> Result<WindowObj, &'static str>{
-        /*{
-            let mut drawer = frame_buffer::FRAME_DRAWER.lock();
-                let index = frame_buffer::get_index_fn(drawer.width);
-
-                let buffer;
-                match drawer.buffer() {
-                    Ok(rs) => {buffer = rs;},
-                    Err(err) => {return Err(err);},
-                }
-                buffer[index(0,0)] = 0x777777;
-        }*/
-
-        let (buffer_width, buffer_height) = frame_buffer::get_resolution();
-        if width < 2 * WINDOW_MARGIN || height < 2 * WINDOW_MARGIN {
-            return Err("Window size must be greater than the margin");
+impl WindowList {
+    // add a new window to the list
+    fn add_active(&mut self, inner_ref: &Arc<Mutex<WindowInner>>) -> Result<(), &'static str> {
+        // // inactive all other windows and active the new one
+        // for item in self.list.iter_mut(){
+        //     let ref_opt = item.upgrade();
+        //     if let Some(reference) = ref_opt {
+        //         reference.lock().active(false)?;
+        //     }
+        // }
+        if let Some(current_active) = self.active.upgrade() {
+            current_active.lock().active(false)?;
+            let weak_ref = self.active.clone();
+            self.background_list.push_front(weak_ref);
         }
 
-        if x + width >= buffer_width
-       || y + height >= buffer_height {
-            return Err("Requested area extends the screen size");
-        }
+        inner_ref.lock().active(true)?;
+        self.active = Arc::downgrade(inner_ref);
 
-        let consumer = DFQueue::new().into_consumer();
-        let producer = consumer.obtain_producer();
-
-        //new_window = ||{WindowObj{x:x,y:y,width:width,height:height,active:true}};
-
-        let inner = WindowInner{
-            x:x,
-            y:y,
-            width:width,
-            height:height,
-            active:true,
-            margin:WINDOW_MARGIN,
-            key_producer:producer,
-        };
-
-        let inner_ref = Arc::new(Mutex::new(inner));
-
-        let overlapped = self.check_overlap(&inner_ref, x, y, width, height);       
-        if overlapped  {
-            return Err("Request area is already allocated");
-        }
-
-        // draw the window
-        {
-            let inner_lock = inner_ref.lock();
-            inner_lock.clean();
-            inner_lock.draw_border(get_border_color(true));
-        }
-        
-        // inactive all other windows and active the new one
-        for item in self.allocated.iter_mut(){
-            let ref_opt = item.upgrade();
-            if let Some(reference) = ref_opt {
-                reference.lock().active(false);
-            }
-        }
-        let weak_ref = Arc::downgrade(&inner_ref);
-        self.active = weak_ref.clone();
-        self.allocated.push_back(weak_ref);
-
-        // new the window
-        let window: WindowObj = WindowObj{
-            inner:inner_ref,
-            //text_buffer:FrameTextBuffer::new(),
-            consumer:consumer,
-            components:BTreeMap::new(),
-        }; 
-
-        Ok(window)    
+        Ok(())
     }
 
-    /// Switches to the next active window in the window allocator list
-    /// This function returns the index of the previously active window in the window_allocator.allocated vector
-    fn switch(&mut self) -> usize {
-        let mut flag = false;
-        let mut i = 0;
-        let mut prev_active = 0;
-        for item in self.allocated.iter_mut(){
-            let reference = item.upgrade();
-            if let Some(window) = reference {
-                let mut window = window.lock();
-                if flag {
-                    (*window).active(true);
-                    self.active = item.clone(); // clones the weak pointer to put in the active field
-                    flag = false;
-                    self.active = item.clone();
-                } else if window.active {
-                    (*window).active(false);
-                    prev_active = i;
-                    flag = true;
-                }
-                i += 1;
-            }
-        }
-        if flag {
-            for item in self.allocated.iter_mut(){
-                let reference = item.upgrade();
-                if let Some(window) = reference {
-                    let mut window = window.lock();
-                    (*window).active(true);
-                    self.active = item.clone(); // clones the weak pointer to put into the active field
-                    break;
-                }
+    // delete a window
+    fn delete(&mut self, inner: &Arc<Mutex<WindowInner>>) -> Result<(), &'static str> {
+        // If the window is active, delete it and active the next top window
+        if let Some(current_active) = self.active.upgrade() {
+            if Arc::ptr_eq(&(current_active), inner) {
+                active_window(0, false)?;
+                return Ok(());
             }
         }
 
-        return prev_active;
-    }
-
-    fn delete(&mut self, inner:&Arc<Mutex<WindowInner>>){
-        let mut i = 0;
-        let len = self.allocated.len();
-        for item in self.allocated.iter(){
-            let reference = item.upgrade();
-            if let Some(inner_ptr) = reference {
-                if Arc::ptr_eq(&(inner_ptr), inner) {
-                    break;
-                }
-            }
-            i += 1;
-        }
-        if i < len {
+        if let Some(index) = self.get_bgwindow_index(&inner) {
             {
-                let window_ref = &self.allocated[i];
+                let window_ref = &self.background_list[index];
                 let window = window_ref.upgrade();
                 if let Some(window) = window {
                     window.lock().key_producer.enqueue(Event::ExitEvent);
                 }
             }
-            self.allocated.remove(i);
+            self.background_list.remove(index);
         }
 
-        let inner_lock = inner.lock();
-        inner_lock.clean();
-        inner_lock.draw_border(SCREEN_BACKGROUND_COLOR);
-    }
+        inner.lock().clean()?;
 
-    fn check_overlap(&mut self, inner:&Arc<Mutex<WindowInner>>, x:usize, y:usize, width:usize, height:usize) -> bool {
-        let mut len = self.allocated.len();
-        let mut i = 0;
-        while i < len {
-            {   
-                let mut void = false;
-                if let Some(reference) = self.allocated.get(i) {
-                    if let Some(allocated_ref) = reference.upgrade() {
-                        if !Arc::ptr_eq(&allocated_ref, inner) {
-                            if allocated_ref.lock().is_overlapped(x, y, width, height) {
-                                return true;
-                            }
-                        }
-                        i += 1;
-                    } else {
-                        void = true;
-                    }
-                }
-                if void {
-                    self.allocated.remove(i);
-                    len -= 1;
-                }
-            }
-        }
-        false
-    }
-    
-    /// enqueues the key event into the active window
-    fn send_event(&mut self, event:Event) -> Result<(), &'static str> {
-        let reference = self.active.upgrade(); // grabs a pointer to the active WindowInner
-        if let Some(window) = reference {
-            let mut window = window.lock();
-            window.key_producer.enqueue(event);
-        }
         Ok(())
     }
 
-}
+    // get the index of an inactive window in the background window list
+    fn get_bgwindow_index(&self, inner: &Arc<Mutex<WindowInner>>) -> Option<usize> {
+        let mut i = 0;
+        for item in self.background_list.iter() {
+            if let Some(item_ptr) = item.upgrade() {
+                if Arc::ptr_eq(&(item_ptr), inner) {
+                    break;
+                }
+            }
+            i += 1;
+        }
 
-/// a window object
-pub struct WindowObj {
-    inner:Arc<Mutex<WindowInner>>,
-    //text_buffer:FrameTextBuffer,
-    consumer:DFQueueConsumer<Event>,
-    components:BTreeMap<String, Component>,
-}
-
-
-impl WindowObj{
-
-    // clean the content of the window
-    fn clean(&self) {
-        let inner = self.inner.lock();
-        inner.clean();
+        if i < self.background_list.len() {
+            return Some(i);
+        } else {
+            return None;
+        }
     }
 
-    /// Returns the dimensions of this window,
-    /// as a tuple of `(width, height)`.
+    // // check if an area specified by (x, y, width, height) overlaps with an existing window
+    // fn check_overlap(&mut self, inner:&Arc<Mutex<WindowInner>>, x:usize, y:usize, width:usize, height:usize) -> bool {
+    //     let mut len = self.allocated.len();
+    //     let mut i = 0;
+    //     while i < len {
+    //         {
+    //             let mut void = false;
+    //             if let Some(reference) = self.allocated.get(i) {
+    //                 if let Some(allocated_ref) = reference.upgrade() {
+    //                     if !Arc::ptr_eq(&allocated_ref, inner) {
+    //                         if allocated_ref.lock().is_overlapped(x, y, width, height) {
+    //                             return true;
+    //                         }
+    //                     }
+    //                     i += 1;
+    //                 } else {
+    //                     void = true;
+    //                 }
+    //             }
+    //             if void {
+    //                 self.list.remove(i);
+    //                 len -= 1;
+    //             }
+    //         }
+    //     }
+    //     false
+    // }
+
+    // return a reference to the next window of current active window
+    // fn next(&mut self) -> Option<Arc<Mutex<WindowInner>>> {
+    //     // let mut current_active = false;
+    //     // for item in self.list.iter_mut(){
+    //     //     let reference = item.upgrade();
+    //     //     if let Some(window) = reference {
+    //     //         if window.lock().active {
+    //     //             current_active = true;
+    //     //         } else if current_active {
+    //     //             return Some(window)
+    //     //         }
+    //     //     }
+    //     // }
+
+    //     // if current_active {
+    //     //     for item in self.list.iter_mut(){
+    //     //         let reference = item.upgrade();
+    //     //         if let Some(window) = reference {
+    //     //             return Some(window)
+    //     //         }
+    //     //     }
+    //     // }
+    //     if let Some(weak_ref) = self.list.pop_front() {
+    //         return weak_ref.upgrade();
+    //     }
+
+    //     None
+    //
+}
+
+/// A window contains a reference to its inner reference owned by the window manager,
+/// a consumer of inputs, a list of displayables and a framebuffer
+pub struct WindowObj {
+    inner: Arc<Mutex<WindowInner>>,
+    consumer: DFQueueConsumer<Event>,
+    components: BTreeMap<String, Component>,
+    /// the framebuffer owned by the window
+    framebuffer: FrameBuffer,
+}
+
+impl WindowObj {
+    /// clean the content of a window. The border and padding of the window remain showing
+    pub fn clean(&mut self) -> Result<(), &'static str> {
+        let (width, height) = self.inner.lock().get_content_size();
+        fill_rectangle(
+            &mut self.framebuffer,
+            0,
+            0,
+            width,
+            height,
+            SCREEN_BACKGROUND_COLOR,
+        );
+        self.render()
+    }
+
+    /// Returns the content dimensions of this window,
+    /// as a tuple of `(width, height)`. It does not include the padding
     pub fn dimensions(&self) -> (usize, usize) {
         let inner_locked = self.inner.lock();
-        (inner_locked.width, inner_locked.height)
+        inner_locked.get_content_size()
     }
 
-    ///Add a new displayable structure to the window
-    ///We check if the displayable is in the window. But we do not check if it is overlapped with others
-    pub fn add_displayable(&mut self, key: &str, x:usize, y:usize, displayable:TextDisplay) -> Result<(), &'static str>{
+    /// Add a new displayable structure to the window
+    /// We check if the displayable is in the window. But we do not check if it is overlapped with others
+    pub fn add_displayable(
+        &mut self,
+        key: &str,
+        x: usize,
+        y: usize,
+        displayable: TextDisplay,
+    ) -> Result<(), &'static str> {
         let key = key.to_string();
         let (width, height) = displayable.get_size();
         let inner = self.inner.lock();
-        if !inner.check_in_content(inner.x + inner.margin + x, inner.y + inner.margin + y) ||
-            !inner.check_in_content(inner.x + inner.margin + x + width, inner.y + inner.margin + y) ||
-            !inner.check_in_content(inner.x + inner.margin + x, inner.y + inner.margin + y + height) ||
-            !inner.check_in_content(inner.x + inner.margin + x + width, inner.y + inner.margin + y + height) {
+
+        if !inner.check_in_content(x, y)
+            || !inner.check_in_content(x + width, y)
+            || !inner.check_in_content(x, y + height)
+            || !inner.check_in_content(x + width, y + height)
+        {
             return Err("The displayable does not fit the window size.");
-        } 
-        
+        }
+
         let component = Component {
-            x:x,
-            y:y,
-            displayable:displayable,
+            x: x,
+            y: y,
+            displayable: displayable,
         };
 
         self.components.insert(key, component);
         Ok(())
     }
 
-    pub fn remove_displayable(&mut self, key:&str){
-        self.components.remove(key);
+    /// Remove a displayable according to its name
+    pub fn remove_displayable(&mut self, name: &str) {
+        self.components.remove(name);
     }
 
-    pub fn get_displayable(&self, key:&str) -> Option<&TextDisplay> {
-        let opt = self.components.get(key);
+    /// Get a displayable of the name
+    pub fn get_displayable(&self, name: &str) -> Option<&TextDisplay> {
+        let opt = self.components.get(name);
         match opt {
-            None => {return None},
-            Some(component) => {return Some(component.get_displayable());},
+            None => return None,
+            Some(component) => {
+                return Some(component.get_displayable());
+            }
         };
     }
 
-    pub fn get_displayable_position(&self, key:&str) -> Result<(usize, usize), &'static str> {
+    /// Get the position of a displayable in the window
+    pub fn get_displayable_position(&self, key: &str) -> Result<(usize, usize), &'static str> {
         let opt = self.components.get(key);
         match opt {
-            None => {return Err("No such displayable");},
-            Some(component) => {return Ok(component.get_position());},
+            None => {
+                return Err("No such displayable");
+            }
+            Some(component) => {
+                return Ok(component.get_position());
+            }
         };
     }
 
-    ///Get the content position of the displayable excluding border and padding
+    /// Get the content position of the window excluding border and padding
     pub fn get_content_position(&self) -> (usize, usize) {
-        let inner = self.inner.lock();
-        (inner.x + inner.margin, inner.y + inner.margin)
+        self.inner.lock().get_content_position()
     }
 
-    /// draw a pixel in a window
-    pub fn draw_pixel(&self, x:usize, y:usize, color:u32){
-        let inner = self.inner.lock();
-        if x >= inner.width - 2 || y >= inner.height - 2 {
-            return;
+    // /// draw a pixel in a window
+    // pub fn draw_pixel(&mut self, x:usize, y:usize, color:u32) -> Result<(), &'static str> {
+    //     draw_pixel(&mut self.framebuffer, x, y, color);
+    //     let (content_x, content_y) = self.inner.lock().get_content_position();
+    //     FrameCompositor::compose(
+    //         vec![(&self.framebuffer, content_x, content_y)]
+    //     )
+    // }
+
+    // /// draw a line in a window
+    // pub fn draw_line(&mut self, start_x:usize, start_y:usize, end_x:usize, end_y:usize, color:u32) -> Result<(), &'static str> {
+    //     draw_line(&mut self.framebuffer, start_x as i32, start_y as i32,
+    //         end_x as i32, end_y as i32, color);
+    //     let (content_x, content_y) = self.inner.lock().get_content_position();
+    //     FrameCompositor::compose(
+    //         vec![(&self.framebuffer, content_x, content_y)]
+    //     )
+    // }
+
+    // /// draw a rectangle in a window
+    // pub fn draw_rectangle(&mut self, x:usize, y:usize, width:usize, height:usize, color:u32)
+    //     -> Result<(), &'static str> {
+    //     draw_rectangle(&mut self.framebuffer, x, y, width, height,
+    //             color);
+    //     let (content_x, content_y) = self.inner.lock().get_content_position();
+    //     FrameCompositor::compose(
+    //         vec![(&self.framebuffer, content_x, content_y)]
+    //     )
+    // }
+
+    // /// fill a rectangle in a window
+    // pub fn fill_rectangle(&mut self, x:usize, y:usize, width:usize, height:usize, color:u32)
+    //     -> Result<(), &'static str> {
+    //     fill_rectangle(&mut self.framebuffer, x, y, width, height,
+    //             color);
+    //     let (content_x, content_y) = self.inner.lock().get_content_position();
+    //     FrameCompositor::compose(
+    //         vec![(&self.framebuffer, content_x, content_y)]
+    //     )
+    // }
+
+    /// Display the content in the framebuffer of the window on the screen
+    pub fn render(&mut self) -> Result<(), &'static str> {
+        let (window_x, window_y) = { self.inner.lock().get_content_position() };
+        FRAME_COMPOSITOR.lock().compose(vec![(
+            &mut self.framebuffer,
+            window_x as i32,
+            window_y as i32,
+        )])
+    }
+
+    /// print a string in the window with a text displayable.
+    pub fn display_string(
+        &mut self,
+        display_name: &str,
+        slice: &str,
+        font_color: u32,
+        bg_color: u32,
+    ) -> Result<(), &'static str> {
+        let displayable = self
+            .components
+            .get(display_name)
+            .ok_or("")?
+            .get_displayable();
+        displayable.display(slice, 0, 0, font_color, bg_color, &mut self.framebuffer)?;
+        self.render()?;
+
+        Ok(())
+    }
+
+    /// display a cursor in the window with a text displayable. position is the absolute position of the cursor
+    pub fn display_cursor(
+        &mut self,
+        cursor: &Cursor,
+        display_name: &str,
+        position: usize,
+        leftshift: usize,
+        font_color: u32,
+        bg_color: u32,
+    ) -> Result<(), &'static str> {
+        let (text_buffer_width, text_buffer_height) = match self.get_displayable(display_name) {
+            Some(text_display) => text_display.get_dimensions(),
+            None => return Err("The displayable does not exist"),
+        };
+
+        let mut column = position % text_buffer_width;
+        let mut line = position / text_buffer_width;
+        // adjusts to the correct position relative to the max rightmost absolute cursor position
+        if column >= leftshift {
+            column -= leftshift;
+        } else {
+            column = text_buffer_width + column - leftshift;
+            line -= 1;
         }
-        frame_buffer::draw_pixel(x + inner.x + 1, y + inner.y + 1, color);
-    }
-
-    /// draw a line in a window
-    pub fn draw_line(&self, start_x:usize, start_y:usize, end_x:usize, end_y:usize, color:u32){
-        let inner = self.inner.lock();
-        if start_x > inner.width - 2
-            || start_y > inner.height - 2
-            || end_x > inner.width - 2
-            || end_y > inner.height - 2 {
-            return;
+        if line < text_buffer_height {
+            let color = if cursor.show() { font_color } else { bg_color };
+            let displayable = self
+                .components
+                .get(display_name)
+                .ok_or("")?
+                .get_displayable();
+            displayable.display_cursor(
+                column * CHARACTER_WIDTH,
+                line * CHARACTER_HEIGHT,
+                color,
+                &mut self.framebuffer,
+            );
+            self.render()?;
         }
-        frame_buffer::draw_line(start_x + inner.x + 1, start_y + inner.y + 1, 
-            end_x + inner.x + 1, end_y + inner.y + 1, color);
+        Ok(())
     }
-
-    /// draw a square in a window
-    pub fn draw_rectangle(&self, x:usize, y:usize, width:usize, height:usize, color:u32){
-        let inner = self.inner.lock();
-        if x + width > inner.width - 2
-            || y + height > inner.height - 2 {
-            return;
-        }
-        frame_buffer::draw_rectangle(x + inner.x + 1, y + inner.y + 1, width, height, 
-            color);
-    }
-
-    /// Requires that a str slice that will exactly fit the frame buffer
-    /// The calculation is done inside the console crate by the print_by_bytes function and associated methods
-    /// Print every byte and fill the blank with background color
-    /*pub fn display_&str(&mut self, slice: &str) -> Result<(), &'static str> {
-        let inner = self.inner.lock();
-        self.text_buffer.print_by_bytes(inner.x + inner.margin, inner.y + inner.margin, 
-            inner.width - 2 * inner.margin, inner.height - 2 * inner.margin, 
-            slice)
-    }*/
-    
-    /*
-    pub fn draw_border(&self) -> (usize, usize, usize){
-        let inner = self.inner.lock();
-        inner.draw_border(get_border_color(inner.active))
-    }
-    */
 
     // @Andrew
-    pub fn resize(&mut self, x:usize, y:usize, width:usize, height:usize) -> Result<(), &'static str>{
-        { // checks for overlap
-            let inner = self.inner.clone();
-            let mut allocator = try!(WINDOW_ALLOCATOR.try().ok_or("The window allocator is not initialized")).lock();
-            match allocator.check_overlap(&inner, x,y,width,height) {
-                true => {return Err("cannot resize because requested resize will cause overlap")}
-                false => { }
-            }
-        }
-        
+    /// resize a window as (width, height) at (x, y)
+    pub fn resize(
+        &mut self,
+        x: usize,
+        y: usize,
+        width: usize,
+        height: usize,
+    ) -> Result<(), &'static str> {
+        // checks for overlap
+        // {
+        //     let inner = self.inner.clone();
+        //     let mut allocator = try!(WINDOW_ALLOCATOR.try().ok_or("The window allocator is not initialized")).lock();
+        //     match allocator.check_overlap(&inner, x,y,width,height) {
+        //         true => {return Err("cannot resize because requested resize will cause overlap")}
+        //         false => { }
+        //     }
+        // }
+
+        self.clean()?;
         let mut inner = self.inner.lock();
         match inner.resize(x, y, width, height) {
             Ok(percent) => {
                 for (_key, item) in self.components.iter_mut() {
                     let (x, y) = item.get_position();
                     let (width, height) = item.get_displayable().get_size();
-                    item.resize(x*percent.0/100, y*percent.1/100, width*percent.0/100, height*percent.1/100);
+                    item.resize(
+                        x * percent.0 / 100,
+                        y * percent.1 / 100,
+                        width * percent.0 / 100,
+                        height * percent.1 / 100,
+                    );
                 }
-                inner.key_producer.enqueue(Event::new_resize_event(x, y, width, height));
+                inner
+                    .key_producer
+                    .enqueue(Event::new_resize_event(x, y, width, height));
                 Ok(())
-            },
-            Err(err) => { Err(err) }
+            }
+            Err(err) => Err(err),
         }
     }
 
-    ///Get a key event of the window
+    /// Get a key event of the window
     pub fn get_key_event(&self) -> Option<Event> {
         let event_opt = self.consumer.peek();
         if let Some(event) = event_opt {
@@ -472,104 +572,200 @@ impl WindowObj{
             None
         }
     }
-
 }
 
+// delete the reference of a window in the manager when the window is dropped
+impl Drop for WindowObj {
+    fn drop(&mut self) {
+        let mut window_list = WINDOWLIST.lock();
+
+        // Switches to a new active window and sets
+        // the active pointer field of the window allocator to the new active window
+        match window_list.delete(&self.inner) {
+            Ok(_) => {}
+            Err(err) => error!("Fail to schedule to the next window: {}", err),
+        };
+    }
+}
+
+// The structure is owned by the window manager. It contains the information of a window but under the control of the manager
 struct WindowInner {
-    /// the upper left x-coordinate of the window
+    // the upper left x-coordinate of the window
     x: usize,
-    /// the upper left y-coordinate of the window
+    // the upper left y-coordinate of the window
     y: usize,
-    /// the width of the window
+    // the width of the window
     width: usize,
-    /// the height of the window
+    // the height of the window
     height: usize,
-    /// whether the window is active
+    // whether the window is active
     active: bool,
-    /// a consumer of key input events to the window
-    margin: usize,
-    /// the producer accepting a key event
+    // a consumer of key input events to the window
+    padding: usize,
+    // the producer accepting a key event
     key_producer: DFQueueProducer<Event>,
 }
 
 impl WindowInner {
-
-    //check if the window is overlapped with any existing window
-    fn is_overlapped(&self, x:usize, y:usize, width:usize, height:usize) -> bool {
-        if self.check_in_area(x, y)
-            {return true;}
-        if self.check_in_area(x, y+height)
-            {return true;}
-        if self.check_in_area(x+width, y)
-            {return true;}
-        if self.check_in_area(x+width, y+height)
-            {return true;}
-        false        
-    } 
-
-    // check if the pixel is within the window
-    fn check_in_area(&self, x:usize, y:usize) -> bool {        
-        return x>= self.x && x <= self.x+self.width 
-                && y>=self.y && y<=self.y+self.height;
+    //clean the window on the screen including the border and padding
+    fn clean(&self) -> Result<(), &'static str> {
+        let buffer_ref = match SCREEN_FRAME_BUFFER.try() {
+            Some(buffer) => buffer,
+            None => return Err("Fail to get the virtual frame buffer"),
+        };
+        let mut buffer_lock = buffer_ref.lock();
+        let buffer = buffer_lock.deref_mut();
+        draw_rectangle(
+            buffer,
+            self.x,
+            self.y,
+            self.width,
+            self.height,
+            SCREEN_BACKGROUND_COLOR,
+        );
+        FRAME_COMPOSITOR.lock().compose(vec![(buffer, 0, 0)])
     }
 
-    // check if the pixel is within the window exluding the border and margin
-    fn check_in_content(&self, x:usize, y:usize) -> bool {        
-        return x>= self.x+self.margin && x <= self.x+self.width-self.margin 
-                && y>=self.y+self.margin && y<=self.y+self.height-self.margin;
+    // //check if the window is overlapped with any existing window
+    // fn is_overlapped(&self, x:usize, y:usize, width:usize, height:usize) -> bool {
+    //     return self.check_in_area(x, y) && self.check_in_area(x, y + height)
+    //         && self.check_in_area(x + width, y) && self.check_in_area(x + width, y + height)
+    // }
+
+    // // check if the pixel is within the window
+    // fn check_in_area(&self, x:usize, y:usize) -> bool {
+    //     return x >= self.x && x <= self.x + self.width
+    //             && y >= self.y && y <= self.y + self.height;
+    // }
+
+    // check if the pixel is within the window exluding the border and padding
+    fn check_in_content(&self, x: usize, y: usize) -> bool {
+        return x <= self.width - 2 * self.padding && y <= self.height - 2 * self.padding;
     }
 
     // active or inactive a window
-    fn active(&mut self, active:bool){
+    fn active(&mut self, active: bool) -> Result<(), &'static str> {
         self.active = active;
-        self.draw_border(get_border_color(active));
-    }
-
-    // clean the content of a window
-    fn clean(&self) {
-        frame_buffer::fill_rectangle(self.x + self.margin, self.y + self.margin,
-            self.width - 2 * self.margin, self.height - 2 * self.margin, SCREEN_BACKGROUND_COLOR);
+        self.draw_border(WINDOW_ACTIVE_COLOR)?;
+        Ok(())
     }
 
     // draw the border of the window
-    fn draw_border(&self, color:u32) {
-        frame_buffer::draw_rectangle(self.x, self.y, self.width, self.height, color);           }
+    fn draw_border(&self, color: u32) -> Result<(), &'static str> {
+        let buffer_ref = match SCREEN_FRAME_BUFFER.try() {
+            Some(buffer) => buffer,
+            None => return Err("Fail to get the virtual frame buffer"),
+        };
+        let mut buffer_lock = buffer_ref.lock();
+        let buffer = buffer_lock.deref_mut();
+        draw_rectangle(buffer, self.x, self.y, self.width, self.height, color);
+        FRAME_COMPOSITOR.lock().compose(vec![(buffer, 0, 0)])
+    }
 
-    /// adjust the size of a window
-    fn resize(&mut self, x:usize, y:usize, width:usize, height:usize) -> Result<(usize, usize), &'static str> {
-        self.draw_border(SCREEN_BACKGROUND_COLOR);
-        self.clean();
-        let percent = ((width-self.margin)*100/(self.width-self.margin), (height-self.margin)*100/(self.height-self.margin));
+    // adjust the size of a window
+    fn resize(
+        &mut self,
+        x: usize,
+        y: usize,
+        width: usize,
+        height: usize,
+    ) -> Result<(usize, usize), &'static str> {
+        self.draw_border(SCREEN_BACKGROUND_COLOR)?;
+        let percent = (
+            (width - self.padding) * 100 / (self.width - self.padding),
+            (height - self.padding) * 100 / (self.height - self.padding),
+        );
         self.x = x;
         self.y = y;
         self.width = width;
-        self.height = height; 
-        self.draw_border(get_border_color(self.active));
+        self.height = height;
+        self.draw_border(get_border_color(self.active))?;
         Ok(percent)
     }
 
+    // get the size of content without padding
+    fn get_content_size(&self) -> (usize, usize) {
+        (
+            self.width - 2 * self.padding,
+            self.height - 2 * self.padding,
+        )
+    }
+
+    // get the position of content without padding
+    fn get_content_position(&self) -> (usize, usize) {
+        (self.x + self.padding, self.y + self.padding)
+    }
 }
 
+// a component contains a displayable and its position
 struct Component {
-    x:usize,
-    y:usize,
-    displayable:TextDisplay,
+    x: usize,
+    y: usize,
+    displayable: TextDisplay,
 }
 
 impl Component {
-    pub fn get_displayable(&self) -> &TextDisplay {
-        return &(self.displayable)
+    // get the displayable
+    fn get_displayable(&self) -> &TextDisplay {
+        return &(self.displayable);
     }
 
-    pub fn get_position(&self) -> (usize, usize) {
+    // get the position of the displayable
+    fn get_position(&self) -> (usize, usize) {
         (self.x, self.y)
     }
 
-    fn resize(&mut self, x:usize, y:usize, width:usize, height:usize) {
+    // resize the displayable
+    fn resize(&mut self, x: usize, y: usize, width: usize, height: usize) {
         self.x = x;
         self.y = y;
         self.displayable.resize(width, height);
     }
+}
+
+/// Pick the next window in the background list and set it as active.
+/// The order of windows in the background is based on the last time they are active.
+/// The next window is the one which was active most recently
+pub fn switch_to_next() -> Result<(), &'static str> {
+    active_window(0, true)
+}
+
+/// Set the specified window in the background list as active.
+pub fn switch_to(window: &WindowObj) -> Result<(), &'static str> {
+    if let Some(index) = WINDOWLIST.lock().get_bgwindow_index(&window.inner) {
+        active_window(index, true)?;
+    }
+
+    Ok(())
+}
+
+// active the index_th window in the background list.
+// # Arguments
+// * `index`: the index of the window in the background list.
+// * `set_back_current`: whether to keep current active window in the background list. delete current window if set_back_current is false
+fn active_window(index: usize, set_back_current: bool) -> Result<(), &'static str> {
+    let mut window_list = WINDOWLIST.lock();
+
+    if let Some(window) = window_list.active.upgrade() {
+        let mut current = window.lock();
+        if set_back_current {
+            (*current).active(false)?;
+            let old_active = window_list.active.clone();
+            window_list.background_list.push_front(old_active);
+        } else {
+            (*current).clean()?;
+        }
+    }
+
+    if let Some(active) = window_list.background_list.remove(index) {
+        window_list.active = active;
+        if let Some(window) = window_list.active.upgrade() {
+            let mut current = window.lock();
+            (*current).active(true)?;
+        }
+    }
+
+    Ok(())
 }
 
 /*  Following two functions can be used to systematically resize windows forcibly
@@ -578,18 +774,18 @@ pub fn adjust_window_after_deletion() -> Result<(), &'static str> {
     let mut allocator = try!(WINDOW_ALLOCATOR.try().ok_or("The window allocator is not initialized")).lock();
     let num_windows = allocator.deref_mut().allocated.len();
     // one gap between each window and one gap between the edge windows and the frame buffer boundary
-    let window_height = (frame_buffer::FRAME_BUFFER_HEIGHT - GAP_SIZE * (num_windows + 1))/(num_windows); 
-    let window_width = frame_buffer::FRAME_BUFFER_WIDTH - 2 * GAP_SIZE; // fill the width of the screen with a slight gap at the boundaries
-    let mut height_index = GAP_SIZE; // start resizing the windows after the first gap 
+    let window_height = (frame_buffer::FRAME_BUFFER_HEIGHT - WINDOW_MARGIN * (num_windows + 1))/(num_windows);
+    let window_width = frame_buffer::FRAME_BUFFER_WIDTH - 2 * WINDOW_MARGIN; // fill the width of the screen with a slight gap at the boundaries
+    let mut height_index = WINDOW_MARGIN; // start resizing the windows after the first gap
 
     // Resizes the windows vertically
     for window_inner_ref in allocator.deref_mut().allocated.iter_mut() {
         let strong_window_ptr = window_inner_ref.upgrade();
         if let Some(window_inner_ptr) = strong_window_ptr {
             let mut locked_window_ptr = window_inner_ptr.lock();
-            locked_window_ptr.resize(GAP_SIZE, height_index, window_width, window_height)?;
+            locked_window_ptr.resize(WINDOW_MARGIN, height_index, window_width, window_height)?;
             locked_window_ptr.key_producer.enqueue(Event::DisplayEvent); // refreshes display after resize
-            height_index += window_height + GAP_SIZE; // advance to the height index of the next window
+            height_index += window_height + WINDOW_MARGIN; // advance to the height index of the next window
         }
     }
     Ok(())
@@ -598,9 +794,9 @@ pub fn adjust_windows_before_addition() -> Result<(usize, usize, usize), &'stati
     let mut allocator = try!(WINDOW_ALLOCATOR.try().ok_or("The window allocator is not initialized")).lock();
     let num_windows = allocator.deref_mut().allocated.len();
     // one gap between each window and one gap between the edge windows and the frame buffer boundary
-    let window_height = (frame_buffer::FRAME_BUFFER_HEIGHT - GAP_SIZE * (num_windows + 2))/(num_windows + 1); 
-    let window_width = frame_buffer::FRAME_BUFFER_WIDTH - 2 * GAP_SIZE; // refreshes display after resize
-    let mut height_index = GAP_SIZE; // start resizing the windows after the first gap 
+    let window_height = (display::FRAME_BUFFER_HEIGHT - WINDOW_MARGIN * (num_windows + 2))/(num_windows + 1);
+    let window_width = frame_buffer::FRAME_BUFFER_WIDTH - 2 * WINDOW_MARGIN; // refreshes display after resize
+    let mut height_index = WINDOW_MARGIN; // start resizing the windows after the first gap
 
     if num_windows >=1  {
         // Resizes the windows vertically
@@ -608,9 +804,9 @@ pub fn adjust_windows_before_addition() -> Result<(usize, usize, usize), &'stati
             let strong_ptr = window_inner_ref.upgrade();
             if let Some(window_inner_ptr) = strong_ptr {
                 let mut locked_window_ptr = window_inner_ptr.lock();
-                locked_window_ptr.resize(GAP_SIZE, height_index, window_width, window_height)?;
-                locked_window_ptr.key_producer.enqueue(Event::DisplayEvent); // refreshes window after  
-                height_index += window_height + GAP_SIZE; // advance to the height index of the next window
+                locked_window_ptr.resize(WINDOW_MARGIN, height_index, window_width, window_height)?;
+                locked_window_ptr.key_producer.enqueue(Event::DisplayEvent); // refreshes window after
+                height_index += window_height + WINDOW_MARGIN; // advance to the height index of the next window
             }
         }
     }
