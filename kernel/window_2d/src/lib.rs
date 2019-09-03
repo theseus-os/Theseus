@@ -32,6 +32,7 @@ extern crate text_display;
 extern crate lazy_static;
 extern crate displayable;
 extern crate font;
+extern crate window;
 
 use alloc::collections::{BTreeMap, VecDeque};
 use alloc::string::{String, ToString};
@@ -47,6 +48,7 @@ use frame_buffer_compositor::FRAME_COMPOSITOR;
 use frame_buffer_drawer::*;
 use spin::{Mutex, Once};
 use text_display::{Cursor, TextDisplay};
+use window::Window;
 
 // A framebuffer owned by the window manager.
 // This framebuffer is responsible for display borders. Windows owned by applications cannot get access to their borders.
@@ -276,7 +278,7 @@ impl WindowObj {
 
     // @Andrew
     /// resize a window as (width, height) at (x, y)
-    pub fn resize(
+/*    pub fn resize(
         &mut self,
         x: usize,
         y: usize,
@@ -314,7 +316,7 @@ impl WindowObj {
             }
             Err(err) => Err(err),
         }
-    }
+    }*/
 
     /// Get a key event of the window
     pub fn get_key_event(&self) -> Option<Event> {
@@ -347,9 +349,9 @@ pub struct WindowInner {
     pub key_producer: DFQueueProducer<Event>,
 }
 
-impl WindowInner {
+impl Window for WindowInner {
     //clean the window on the screen including the border and padding
-    pub fn clean(&self) -> Result<(), &'static str> {
+    fn clean(&self) -> Result<(), &'static str> {
         let buffer_ref = match SCREEN_FRAME_BUFFER.try() {
             Some(buffer) => buffer,
             None => return Err("Fail to get the virtual frame buffer"),
@@ -385,7 +387,7 @@ impl WindowInner {
     }
 
     // active or inactive a window
-    pub fn active(&mut self, active: bool) -> Result<(), &'static str> {
+    fn active(&mut self, active: bool) -> Result<(), &'static str> {
         self.active = active;
         self.draw_border(WINDOW_ACTIVE_COLOR)?;
         Ok(())
@@ -404,7 +406,7 @@ impl WindowInner {
     }
 
     // adjust the size of a window
-    fn resize(
+/*    fn resize(
         &mut self,
         x: usize,
         y: usize,
@@ -422,7 +424,7 @@ impl WindowInner {
         self.height = height;
         self.draw_border(get_border_color(self.active))?;
         Ok(percent)
-    }
+    }*/
 
     // get the size of content without padding
     fn get_content_size(&self) -> (usize, usize) {
@@ -436,6 +438,11 @@ impl WindowInner {
     fn get_content_position(&self) -> (usize, usize) {
         (self.x + self.padding, self.y + self.padding)
     }
+
+    fn key_producer(&mut self) -> &mut DFQueueProducer<Event> {
+        &mut self.key_producer
+    }
+
 }
 
 // a component contains a displayable and its position

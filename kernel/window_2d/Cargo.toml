@@ -40,6 +40,9 @@ path = "../font"
 [dependencies.displayable]
 path = "../displayable"
 
+[dependencies.window]
+path = "../window"
+
 [dependencies.text_display]
 path = "../../kernel/displayable/text_display"
 
