@@ -5,7 +5,6 @@
 //! spawns and manages tasks, and records the history of executed user commands.
 
 #![no_std]
-extern crate frame_buffer;
 extern crate keycodes_ascii;
 extern crate spin;
 extern crate dfqueue;
@@ -14,9 +13,7 @@ extern crate spawn;
 extern crate task;
 extern crate runqueue;
 extern crate memory;
-extern crate event_types; 
-extern crate window_manager;
-extern crate text_display;
+extern crate event_types;
 extern crate path;
 extern crate root;
 extern crate scheduler;
@@ -195,7 +192,6 @@ impl Shell {
         };
 
         let terminal = app_io::get_terminal_or_default()?;
-        terminal.lock().initialize_screen()?;
 
         Ok(Shell {
             jobs: BTreeMap::new(),
@@ -1274,7 +1270,7 @@ impl Shell {
         self.redisplay_prompt();
         self.terminal.lock().refresh_display(0);
         loop {
-            self.terminal.lock().blink_cursor();
+            self.terminal.lock().blink_cursor(self.left_shift)?;
 
             // If there is anything from running applications to be printed, it printed on the screen and then
             // return true, so that the loop continues, otherwise nothing happens and we keep on going with the
@@ -1310,12 +1306,12 @@ impl Shell {
                             return Ok(());
                         }
 
-                        Event::ResizeEvent(ref _rev) => {
+                        Event::WindowResizeEvent(ref _rev) => {
                             self.terminal.lock().refresh_display(self.left_shift); // application refreshes display after resize event is received
                         }
 
                         // Handles ordinary keypresses
-                        Event::InputEvent(ref input_event) => {
+                        Event::KeyboardEvent(ref input_event) => {
                             self.key_event_producer.write_one(input_event.key_event);
                         }
                         _ => { }

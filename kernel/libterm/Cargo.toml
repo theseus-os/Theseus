@@ -16,8 +16,14 @@ version = "0.3.7"
 path = "../../libs/dfqueue"
 version = "0.1.0"
 
-[dependencies.window_manager]
-path = "../window_manager"
+[dependencies.frame_buffer_alpha]
+path = "../../kernel/frame_buffer_alpha"
+
+[dependencies.window_manager_alpha]
+path = "../../kernel/window_manager_alpha"
+
+[dependencies.window_components]
+path = "../../kernel/window_components"
 
 [dependencies.environment]
 path = "../environment"
@@ -33,3 +39,6 @@ path = "../event_types"
 
 [lib]
 crate-type = ["rlib"]
+
+[dependencies.tsc]
+path = "../../kernel/tsc"

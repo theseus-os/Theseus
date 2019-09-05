@@ -817,10 +817,10 @@ fn keyboard_handle_application(key_input: KeyEvent) -> Result<(), &'static str> 
             Some(default_kernel_namespace.clone()),
         ));
         
-        let task_name: String = format!("terminal");
-        let args: Vec<String> = vec![]; // terminal::main() does not accept any arguments
-        let terminal_obj_file = new_app_namespace.dir().get_file_starting_with("terminal-")
-            .ok_or("Couldn't find terminal application file to run upon Ctrl+Alt+T")?;
+        let task_name: String = format!("shell");
+        let args: Vec<String> = vec![]; // shell::main() does not accept any arguments
+        let terminal_obj_file = new_app_namespace.dir().get_file_starting_with("shell-")
+            .ok_or("Couldn't find shell application file to run upon Ctrl+Alt+T")?;
         let path = Path::new(terminal_obj_file.lock().get_absolute_path());
         ApplicationTaskBuilder::new(path)
             .argument(args)
