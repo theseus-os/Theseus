@@ -19,12 +19,13 @@ extern crate irq_safety;
 extern crate kernel_config;
 extern crate atomic_linked_list;
 extern crate xmas_elf;
-extern crate x86_64;
-#[macro_use] extern crate bitflags;
 extern crate heap_irq_safe;
-#[macro_use] extern crate derive_more;
 extern crate bit_field;
 extern crate type_name;
+#[cfg(target_arch = "x86_64")]
+extern crate memory_x86_64;
+extern crate memory_structs;
+
 
 /// Just like Rust's `try!()` macro, 
 /// but forgets the given `obj`s to prevent them from being dropped,
@@ -52,199 +53,23 @@ pub use self::area_frame_allocator::AreaFrameAllocator;
 pub use self::paging::*;
 pub use self::stack_allocator::{StackAllocator, Stack};
 
+pub use memory_structs::*;
+
+#[cfg(target_arch = "x86_64")]
+use memory_x86_64::*;
+
+#[cfg(target_arch = "x86_64")]
+pub use memory_x86_64::EntryFlags;// Export EntryFlags so that others does not need to get access to memory_<arch>.
+
 
 use core::{
-    ops::{RangeInclusive, Deref, DerefMut},
-    iter::Step,
-    mem,
+    ops::{Deref, DerefMut},
 };
-use multiboot2::BootInformation;
 use spin::Once;
 use irq_safety::MutexIrqSafe;
 use alloc::vec::Vec;
 use alloc::sync::Arc;
-use kernel_config::memory::{PAGE_SIZE, MAX_PAGE_NUMBER, KERNEL_OFFSET, KERNEL_HEAP_START, KERNEL_HEAP_INITIAL_SIZE, KERNEL_STACK_ALLOCATOR_BOTTOM, KERNEL_STACK_ALLOCATOR_TOP_ADDR};
-use bit_field::BitField;
-
-
-/// A virtual memory address, which is a `usize` under the hood.
-#[derive(
-    Clone, Copy, PartialEq, Eq, PartialOrd, Ord, Hash, Default,
-    Debug, Display, Binary, Octal, LowerHex, UpperHex,
-    BitAnd, BitOr, BitXor, BitAndAssign, BitOrAssign, BitXorAssign, 
-    Add, Sub, AddAssign, SubAssign
-)]
-#[repr(transparent)]
-pub struct VirtualAddress(usize);
-
-impl VirtualAddress {
-    /// Creates a new `VirtualAddress`, 
-    /// checking that the address is canonical, 
-    /// i.e., bits (64:48] are sign-extended from bit 47.
-    pub fn new(virt_addr: usize) -> Result<VirtualAddress, &'static str> {
-        match virt_addr.get_bits(47..64) {
-            0 | 0b1_1111_1111_1111_1111 => Ok(VirtualAddress(virt_addr)),
-            _ => Err("VirtualAddress bits 48-63 must be a sign-extension of bit 47"),
-        }
-    }
-
-    /// Creates a new `VirtualAddress` that is guaranteed to be canonical
-    /// by forcing the upper bits (64:48] to be sign-extended from bit 47.
-    pub fn new_canonical(mut virt_addr: usize) -> VirtualAddress {
-        match virt_addr.get_bit(47) {
-            false => virt_addr.set_bits(48..64, 0),
-            true  => virt_addr.set_bits(48..64, 0xffff),
-        };
-        VirtualAddress(virt_addr)
-    }
-
-    /// Creates a VirtualAddress with the value 0.
-    pub const fn zero() -> VirtualAddress {
-        VirtualAddress(0)
-    }
-
-    /// Returns the underlying `usize` value for this `VirtualAddress`.
-    #[inline]
-    pub fn value(&self) -> usize {
-        self.0
-    }
-
-    /// Returns the offset that this VirtualAddress specifies into its containing memory Page.
-    /// 
-    /// For example, if the PAGE_SIZE is 4KiB, then this will return 
-    /// the least significant 12 bits (12:0] of this VirtualAddress.
-    pub fn page_offset(&self) -> usize {
-        self.0 & (PAGE_SIZE - 1)
-    }
-}
-
-impl core::fmt::Pointer for VirtualAddress {
-    fn fmt(&self, f: &mut fmt::Formatter) -> fmt::Result {
-        write!(f, "{:p}", self.0 as *const usize)
-    }
-}
-
-impl Add<usize> for VirtualAddress {
-    type Output = VirtualAddress;
-
-    fn add(self, rhs: usize) -> VirtualAddress {
-        VirtualAddress::new_canonical(self.0.saturating_add(rhs))
-    }
-}
-
-impl AddAssign<usize> for VirtualAddress {
-    fn add_assign(&mut self, rhs: usize) {
-        *self = VirtualAddress::new_canonical(self.0.saturating_add(rhs));
-    }
-}
-
-impl Sub<usize> for VirtualAddress {
-    type Output = VirtualAddress;
-
-    fn sub(self, rhs: usize) -> VirtualAddress {
-        VirtualAddress::new_canonical(self.0.saturating_sub(rhs))
-    }
-}
-
-impl SubAssign<usize> for VirtualAddress {
-    fn sub_assign(&mut self, rhs: usize) {
-        *self = VirtualAddress::new_canonical(self.0.saturating_sub(rhs));
-    }
-}
-
-impl From<VirtualAddress> for usize {
-    #[inline]
-    fn from(virt_addr: VirtualAddress) -> usize {
-        virt_addr.0
-    }
-}
-
-
-/// A physical memory address, which is a `usize` under the hood.
-#[derive(
-    Clone, Copy, PartialEq, Eq, PartialOrd, Ord, Hash, Default,
-    Debug, Display, Binary, Octal, LowerHex, UpperHex,
-    BitAnd, BitOr, BitXor, BitAndAssign, BitOrAssign, BitXorAssign, 
-    Add, Sub, Mul, Div, Rem, Shr, Shl, 
-    AddAssign, SubAssign, MulAssign, DivAssign, RemAssign, ShrAssign, ShlAssign
-)]
-#[repr(transparent)]
-pub struct PhysicalAddress(usize);
-
-impl PhysicalAddress {
-    /// Creates a new `PhysicalAddress`, 
-    /// checking that the bits (64:52] are 0.
-    pub fn new(phys_addr: usize) -> Result<PhysicalAddress, &'static str> {
-        match phys_addr.get_bits(52..64) {
-            0 => Ok(PhysicalAddress(phys_addr)),
-            _ => Err("PhysicalAddress bits 52-63 must be zero"),
-        }
-    }
-
-    /// Creates a new `PhysicalAddress` that is guaranteed to be canonical
-    /// by forcing the upper bits (64:52] to be 0.
-    pub fn new_canonical(mut phys_addr: usize) -> PhysicalAddress {
-        phys_addr.set_bits(52..64, 0);
-        PhysicalAddress(phys_addr)
-    }
-
-    /// Returns the underlying `usize` value for this `PhysicalAddress`.
-    #[inline]
-    pub fn value(&self) -> usize {
-        self.0
-    }
-
-    /// Creates a PhysicalAddress with the value 0.
-    pub const fn zero() -> PhysicalAddress {
-        PhysicalAddress(0)
-    }
-
-    /// Returns the offset that this PhysicalAddress specifies into its containing memory Frame.
-    /// 
-    /// For example, if the PAGE_SIZE is 4KiB, then this will return 
-    /// the least significant 12 bits (12:0] of this PhysicalAddress.
-    pub fn frame_offset(&self) -> usize {
-        self.0 & (PAGE_SIZE - 1)
-    }
-}
-
-
-impl Add<usize> for PhysicalAddress {
-    type Output = PhysicalAddress;
-
-    fn add(self, rhs: usize) -> PhysicalAddress {
-        PhysicalAddress::new_canonical(self.0.saturating_add(rhs))
-    }
-}
-
-impl AddAssign<usize> for PhysicalAddress {
-    fn add_assign(&mut self, rhs: usize) {
-        *self = PhysicalAddress::new_canonical(self.0.saturating_add(rhs));
-    }
-}
-
-impl Sub<usize> for PhysicalAddress {
-    type Output = PhysicalAddress;
-
-    fn sub(self, rhs: usize) -> PhysicalAddress {
-        PhysicalAddress::new_canonical(self.0.saturating_sub(rhs))
-    }
-}
-
-impl SubAssign<usize> for PhysicalAddress {
-    fn sub_assign(&mut self, rhs: usize) {
-        *self = PhysicalAddress::new_canonical(self.0.saturating_sub(rhs));
-    }
-}
-
-impl From<PhysicalAddress> for usize {
-    #[inline]
-    fn from(virt_addr: PhysicalAddress) -> usize {
-        virt_addr.0
-    }
-}
-
-
+use kernel_config::memory::{PAGE_SIZE, KERNEL_HEAP_START, KERNEL_HEAP_INITIAL_SIZE, KERNEL_STACK_ALLOCATOR_BOTTOM, KERNEL_STACK_ALLOCATOR_TOP_ADDR, KERNEL_OFFSET};
 
 /// The memory management info and address space of the kernel
 static KERNEL_MMI: Once<Arc<MutexIrqSafe<MemoryManagementInfo>>> = Once::new();
@@ -342,87 +167,6 @@ pub fn create_contiguous_mapping(size_in_bytes: usize, flags: EntryFlags) -> Res
 }
 
 
-/// An area of physical memory. 
-#[derive(Copy, Clone, Debug, Default)]
-#[repr(C)]
-pub struct PhysicalMemoryArea {
-    pub base_addr: PhysicalAddress,
-    pub size_in_bytes: usize,
-    pub typ: u32,
-    pub acpi: u32
-}
-impl PhysicalMemoryArea {
-    pub fn new(paddr: PhysicalAddress, size_in_bytes: usize, typ: u32, acpi: u32) -> PhysicalMemoryArea {
-        PhysicalMemoryArea {
-            base_addr: paddr,
-            size_in_bytes: size_in_bytes,
-            typ: typ,
-            acpi: acpi,
-        }
-    }
-}
-
-
-
-/// A region of virtual memory that is mapped into a [`Task`](../task/struct.Task.html)'s address space
-#[derive(Debug, Default, Clone, PartialEq)]
-pub struct VirtualMemoryArea {
-    start: VirtualAddress,
-    size: usize,
-    flags: EntryFlags,
-    desc: &'static str,
-}
-use core::fmt;
-impl fmt::Display for VirtualMemoryArea {
-    fn fmt(&self, f: &mut fmt::Formatter) -> fmt::Result {
-        write!(f, "start: {:#X}, size: {:#X}, flags: {:#X}, desc: {}", 
-                  self.start, self.size, self.flags, self.desc
-        )
-    }
-}
-
-
-impl VirtualMemoryArea {
-    pub fn new(start: VirtualAddress, size: usize, flags: EntryFlags, desc: &'static str) -> Self {
-        VirtualMemoryArea {
-            start: start,
-            size: size,
-            flags: flags,
-            desc: desc,
-        }
-    }
-
-    pub fn start_address(&self) -> VirtualAddress {
-        self.start
-    }
-
-    pub fn size(&self) -> usize {
-        self.size
-    }
-
-    pub fn flags(&self) -> EntryFlags {
-        self.flags
-    }
-
-    pub fn desc(&self) -> &'static str {
-        self.desc
-    }
-
-    /// Get an iterator that covers all the pages in this VirtualMemoryArea
-    pub fn pages(&self) -> PageRange {
-
-        // check that the end_page won't be invalid
-        if (self.start.value() + self.size) < 1 {
-            return PageRange::empty();
-        }
-        
-        let start_page = Page::containing_address(self.start);
-        let end_page = Page::containing_address(self.start + self.size - 1);
-        PageRange::new(start_page, end_page)
-    }
-}
-
-
 
 static BROADCAST_TLB_SHOOTDOWN_FUNC: Once<fn(Vec<VirtualAddress>)> = Once::new();
 
@@ -448,28 +192,8 @@ pub fn set_broadcast_tlb_shootdown_cb(func: fn(Vec<VirtualAddress>)) {
 pub fn init(boot_info: &BootInformation) 
     -> Result<(Arc<MutexIrqSafe<MemoryManagementInfo>>, MappedPages, MappedPages, MappedPages, Vec<MappedPages>), &'static str> 
 {
-    let memory_map_tag = boot_info.memory_map_tag().ok_or("Memory map tag not found")?;
-    let elf_sections_tag = boot_info.elf_sections_tag().ok_or("Elf sections tag not found")?;
-
-    // Our linker script specifies that the kernel will have the .init section starting at 1MB and ending at 1MB + .init size
-    // and all other kernel sections will start at (KERNEL_OFFSET + 1MB) and end at (KERNEL_OFFSET + 1MB + size).
-    // So, the start of the kernel is its physical address, but the end of it is its virtual address... confusing, I know
-    // Thus, kernel_phys_start is the same as kernel_virt_start initially, but we remap them later in paging::init.
-    let kernel_phys_start = PhysicalAddress::new(
-        elf_sections_tag.sections()
-            .filter(|s| s.is_allocated())
-            .map(|s| s.start_address())
-            .min()
-            .ok_or("Couldn't find kernel start (phys) address")? as usize
-    )?;
-    let kernel_virt_end = VirtualAddress::new(
-        elf_sections_tag.sections()
-            .filter(|s| s.is_allocated())
-            .map(|s| s.end_address())
-            .max()
-            .ok_or("Couldn't find kernel end (virt) address")? as usize
-    )?;
-    let kernel_phys_end = PhysicalAddress::new(kernel_virt_end.value() - KERNEL_OFFSET)?;
+    // get the start and end addresses of the kernel.
+    let (kernel_phys_start, kernel_phys_end, kernel_virt_end) = get_kernel_address(&boot_info)?;
 
     debug!("kernel_phys_start: {:#x}, kernel_phys_end: {:#x} kernel_virt_end = {:#x}",
         kernel_phys_start,
@@ -477,71 +201,30 @@ pub fn init(boot_info: &BootInformation)
         kernel_virt_end
     );
   
-    // parse the list of physical memory areas from multiboot
-    let mut available: [PhysicalMemoryArea; 32] = Default::default();
-    let mut avail_index = 0;
-    for area in memory_map_tag.memory_areas() {
-        let area_start = PhysicalAddress::new(area.start_address() as usize)?;
-        let area_end   = PhysicalAddress::new(area.end_address() as usize)?;
-        let area_size  = area.size() as usize;
-        debug!("memory area base_addr={:#x} length={:#x} ({:?})", area_start, area_size, area);
-        
-        // optimization: we reserve memory from areas below the end of the kernel's physical address,
-        // which includes addresses beneath 1 MB
-        if area_end < kernel_phys_end {
-            debug!("--> skipping region before kernel_phys_end");
-            continue;
-        }
-        let start_paddr: PhysicalAddress = if area_start >= kernel_phys_end { area_start } else { kernel_phys_end };
-        let start_paddr = (Frame::containing_address(start_paddr) + 1).start_address(); // align up to next page
+    // get available physical memory areas
+    let (available, avail_len) = get_available_memory(&boot_info, kernel_phys_end)?;
 
-        available[avail_index] = PhysicalMemoryArea {
-            base_addr: start_paddr,
-            size_in_bytes: area_size,
-            typ: 1, 
-            acpi: 0, 
-        };
+    // Get the bounds of physical memory that is occupied by bootloader-loaded modules.
+    let (modules_start_paddr, modules_end_paddr) = get_modules_address(&boot_info);
 
-        info!("--> memory region established: start={:#x}, size_in_bytes={:#x}", available[avail_index].base_addr, available[avail_index].size_in_bytes);
-        // print_early!("--> memory region established: start={:#x}, size_in_bytes={:#x}\n", available[avail_index].base_addr, available[avail_index].size_in_bytes);
-        avail_index += 1;
-    }
-
-    // calculate the bounds of physical memory that is occupied by modules we've loaded 
-    // (we can reclaim this later after the module is loaded, but not until then)
-    let (modules_start, modules_end) = {
-        let mut mod_min = usize::max_value();
-        let mut mod_max = 0;
-        use core::cmp::{max, min};
-
-        for m in boot_info.module_tags() {
-            mod_min = min(mod_min, m.start_address() as usize);
-            mod_max = max(mod_max, m.end_address() as usize);
-        }
-        (mod_min, mod_max)
-    };
-    // print_early!("Modules physical memory region: start {:#X} to end {:#X}", modules_start, modules_end);
-
+    // Set up the initial list of reserved physical memory frames such that the frame allocator does not re-use them.
     let mut occupied: [PhysicalMemoryArea; 32] = Default::default();
     let mut occup_index = 0;
     occupied[occup_index] = PhysicalMemoryArea::new(PhysicalAddress::zero(), 0x10_0000, 1, 0); // reserve addresses under 1 MB
     occup_index += 1;
     occupied[occup_index] = PhysicalMemoryArea::new(kernel_phys_start, kernel_phys_end.value() - kernel_phys_start.value(), 1, 0); // the kernel boot image is already in use
     occup_index += 1;
-    occupied[occup_index] = PhysicalMemoryArea::new(PhysicalAddress::new(boot_info.start_address() - KERNEL_OFFSET)?, boot_info.end_address() - boot_info.start_address(), 1, 0); // preserve bootloader info
+    occupied[occup_index] = get_boot_info_mem_area(&boot_info)?; // preserve the multiboot information for x86_64. 
     occup_index += 1;
-    occupied[occup_index] = PhysicalMemoryArea::new(PhysicalAddress::new(modules_start)?, modules_end - modules_start, 1, 0); // preserve all modules
+    occupied[occup_index] = PhysicalMemoryArea::new(modules_start_paddr, modules_end_paddr.value() - modules_start_paddr.value(), 1, 0); // preserve all bootloader modules
     occup_index += 1;
 
 
     // init the frame allocator with the available memory sections and the occupied memory sections
-    let fa = AreaFrameAllocator::new(available, avail_index, occupied, occup_index)?;
+    let fa = AreaFrameAllocator::new(available, avail_len, occupied, occup_index)?;
     let frame_allocator_mutex: &MutexIrqSafe<AreaFrameAllocator> = FRAME_ALLOCATOR.call_once(|| {
         MutexIrqSafe::new( fa ) 
     });
-
-    // print_early!("Boot info: {:?}\n", boot_info);
-
 
     // Initialize paging (create a new page table), which also initializes the kernel heap.
 
@@ -584,185 +267,6 @@ pub fn init(boot_info: &BootInformation)
 
     Ok( (kernel_mmi_ref.clone(), text_mapped_pages, rodata_mapped_pages, data_mapped_pages, identity_mapped_pages) )
 }
-
-
-
-/// A `Frame` is a chunk of **physical** memory, 
-/// similar to how a `Page` is a chunk of **virtual** memory. 
-#[derive(Clone, Copy, PartialEq, Eq, PartialOrd, Ord)]
-pub struct Frame {
-    number: usize,
-}
-impl fmt::Debug for Frame {
-    fn fmt(&self, f: &mut fmt::Formatter) -> fmt::Result {
-        write!(f, "Frame(paddr: {:#X})", self.start_address()) 
-    }
-}
-
-impl Frame {
-	/// Returns the `Frame` containing the given `PhysicalAddress`.
-    pub fn containing_address(phys_addr: PhysicalAddress) -> Frame {
-        Frame { number: phys_addr.value() / PAGE_SIZE }
-    }
-
-    /// Returns the `PhysicalAddress` at the start of this `Frame`.
-    pub fn start_address(&self) -> PhysicalAddress {
-        PhysicalAddress::new_canonical(self.number * PAGE_SIZE)
-    }
-}
-
-use core::ops::{Add, AddAssign, Sub, SubAssign};
-impl Add<usize> for Frame {
-    type Output = Frame;
-
-    fn add(self, rhs: usize) -> Frame {
-        // cannot exceed max page number (which is also max frame number)
-        Frame {
-            number: core::cmp::min(MAX_PAGE_NUMBER, self.number.saturating_add(rhs)),
-        }
-    }
-}
-
-impl AddAssign<usize> for Frame {
-    fn add_assign(&mut self, rhs: usize) {
-        *self = Frame {
-            number: core::cmp::min(MAX_PAGE_NUMBER, self.number.saturating_add(rhs)),
-        };
-    }
-}
-
-impl Sub<usize> for Frame {
-    type Output = Frame;
-
-    fn sub(self, rhs: usize) -> Frame {
-        Frame { number: self.number.saturating_sub(rhs) }
-    }
-}
-
-impl SubAssign<usize> for Frame {
-    fn sub_assign(&mut self, rhs: usize) {
-        *self = Frame {
-            number: self.number.saturating_sub(rhs),
-        };
-    }
-}
-
-// Implementing these functions allow `Frame` to be in an `Iterator`.
-impl Step for Frame {
-    #[inline]
-    fn steps_between(start: &Frame, end: &Frame) -> Option<usize> {
-        Step::steps_between(&start.number, &end.number)
-    }
-    #[inline]
-    fn replace_one(&mut self) -> Self {
-        mem::replace(self, Frame { number: 1 })
-    }
-    #[inline]
-    fn replace_zero(&mut self) -> Self {
-        mem::replace(self, Frame { number: 0 })
-    }
-    #[inline]
-    fn add_one(&self) -> Self {
-        Add::add(*self, 1)
-    }
-    #[inline]
-    fn sub_one(&self) -> Self {
-        Sub::sub(*self, 1)
-    }
-    #[inline]
-    fn add_usize(&self, n: usize) -> Option<Frame> {
-        Some(*self + n)
-    }
-}
-
-
-/// A range of `Frame`s that are contiguous in physical memory.
-#[derive(Debug, Clone)]
-pub struct FrameRange(RangeInclusive<Frame>);
-
-impl FrameRange {
-    /// Creates a new range of `Frame`s that spans from `start` to `end`,
-    /// both inclusive bounds.
-    pub fn new(start: Frame, end: Frame) -> FrameRange {
-        FrameRange(RangeInclusive::new(start, end))
-    }
-
-    /// Creates a FrameRange that will always yield `None`.
-    pub fn empty() -> FrameRange {
-        FrameRange::new(Frame { number: 1 }, Frame { number: 0 })
-    }
-    
-    /// A convenience method for creating a new `FrameRange` 
-    /// that spans all `Frame`s from the given physical address 
-    /// to an end bound based on the given size.
-    pub fn from_phys_addr(starting_virt_addr: PhysicalAddress, size_in_bytes: usize) -> FrameRange {
-        let start_frame = Frame::containing_address(starting_virt_addr);
-        let end_frame = Frame::containing_address(starting_virt_addr + size_in_bytes - 1);
-        FrameRange::new(start_frame, end_frame)
-    }
-
-    /// Returns the `PhysicalAddress` of the starting `Frame` in this `FrameRange`.
-    pub fn start_address(&self) -> PhysicalAddress {
-        self.0.start().start_address()
-    }
-
-    /// Returns the number of `Frame`s covered by this iterator. 
-    /// Use this instead of the Iterator trait's `count()` method.
-    /// This is instant, because it doesn't need to iterate over each entry, unlike normal iterators.
-    pub fn size_in_frames(&self) -> usize {
-        // add 1 because it's an inclusive range
-        self.0.end().number + 1 - self.0.start().number
-    }
-
-    /// Whether this `FrameRange` contains the given `PhysicalAddress`.
-    pub fn contains_phys_addr(&self, phys_addr: PhysicalAddress) -> bool {
-        self.0.contains(&Frame::containing_address(phys_addr))
-    }
-
-    /// Returns the offset of the given `PhysicalAddress` within this `FrameRange`,
-    /// i.e., the difference between `phys_addr` and `self.start()`.
-    pub fn offset_from_start(&self, phys_addr: PhysicalAddress) -> Option<usize> {
-        if self.contains_phys_addr(phys_addr) {
-            Some(phys_addr.value() - self.start_address().value())
-        } else {
-            None
-        }
-    }
-
-    /// Returns a new, separate `FrameRange` that is extended to include the given `Frame`. 
-    pub fn to_extended(&self, frame_to_include: Frame) -> FrameRange {
-        // if the current FrameRange was empty, return a new FrameRange containing only the given frame_to_include
-        if self.is_empty() {
-            return FrameRange::new(frame_to_include.clone(), frame_to_include);
-        }
-
-        let start = core::cmp::min(self.0.start(), &frame_to_include);
-        let end   = core::cmp::max(self.0.end(),   &frame_to_include);
-        FrameRange::new(start.clone(), end.clone())
-    }
-}
-
-impl Deref for FrameRange {
-    type Target = RangeInclusive<Frame>;
-    fn deref(&self) -> &RangeInclusive<Frame> {
-        &self.0
-    }
-}
-impl DerefMut for FrameRange {
-    fn deref_mut(&mut self) -> &mut RangeInclusive<Frame> {
-        &mut self.0
-    }
-}
-
-impl IntoIterator for FrameRange {
-    type Item = Frame;
-    type IntoIter = RangeInclusive<Frame>;
-
-    fn into_iter(self) -> Self::IntoIter {
-        self.0
-    }
-}
-
 
 pub trait FrameAllocator {
     fn allocate_frame(&mut self) -> Option<Frame>;
