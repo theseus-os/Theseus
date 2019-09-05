@@ -404,17 +404,18 @@ impl Terminal {
 
     /// Updates the cursor to a new position and refreshes display
     fn cursor_handler(&mut self, left_shift: usize) -> Result<(), &'static str> { 
-        let buffer_width = self.get_displayable_dimensions().0;
-        let mut new_x = self.absolute_cursor_pos % buffer_width;
-        let mut new_y = self.absolute_cursor_pos / buffer_width;
-        // adjusts to the correct position relative to the max rightmost absolute cursor position
-        if new_x >= left_shift  {
-            new_x -= left_shift;
-        } else {
-            new_x = buffer_width + new_x - left_shift;
-            new_y -= 1;
+        let (buffer_width, buffer_height) = self.get_displayable_dimensions();
+
+        // We have shifted the cursor out of the screen.
+        if left_shift / buffer_width > buffer_height {
+            self.cursor.disable();
+            return Ok(());
         }
 
+        let new_x = (self.absolute_cursor_pos - left_shift) % buffer_width;
+        let new_y = (self.absolute_cursor_pos - left_shift) / buffer_width;
+
+        
         self.cursor.check_time();
         // debug!("absolute_cursor_pos: {}", self.absolute_cursor_pos);
         if self.cursor.enabled {
