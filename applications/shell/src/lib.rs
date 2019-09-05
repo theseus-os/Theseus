@@ -995,7 +995,7 @@ impl Shell {
     fn complete_cmdline(&mut self) -> Result<(), &'static str> {
 
         // Get the last string slice in the pipe chain.
-        let cmdline = self.cmdline.clone();
+        let cmdline = self.cmdline[0..self.cmdline.len()-self.left_shift].to_string();
         let last_cmd_in_pipe = match cmdline.split("|").last() {
             Some(cmd) => cmd,
             None => return Ok(())
