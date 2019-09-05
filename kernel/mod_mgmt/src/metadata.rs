@@ -211,12 +211,32 @@ impl LoadedCrate {
         let mut results: Vec<WeakCrateRef> = Vec::new();
         for sec in self.sections.values() {
             let sec_locked = sec.lock();
-            for dep_sec in &sec_locked.sections_dependent_on_me {
-                if let Some(dep_sec) = dep_sec.section.upgrade() {
+            for weak_dep in &sec_locked.sections_dependent_on_me {
+                if let Some(dep_sec) = weak_dep.section.upgrade() {
                     let dep_sec_locked = dep_sec.lock();
                     let parent_crate = dep_sec_locked.parent_crate.clone();
                     results.push(parent_crate);
                 }
+            }
+        }
+        results
+    }
+
+
+    /// Returns the set of crates that this crate depends on. 
+    /// Only includes direct dependencies "one hop" away, 
+    /// not recursive dependencies "multiples hops" away.
+    /// 
+    /// Currently, the list may include duplicates.
+    /// The caller is responsible for filtering out duplicates when using the list.
+    pub fn crates_i_depend_on(&self) -> Vec<WeakCrateRef> {
+        let mut results: Vec<WeakCrateRef> = Vec::new();
+        for sec in self.sections.values() {
+            let sec_locked = sec.lock();
+            for strong_dep in &sec_locked.sections_i_depend_on {
+                let dep_sec_locked = strong_dep.section.lock();
+                let parent_crate = dep_sec_locked.parent_crate.clone();
+                results.push(parent_crate);
             }
         }
         results

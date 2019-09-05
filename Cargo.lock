@@ -1005,8 +1005,8 @@ dependencies = [
  "memory 0.1.0",
  "mod_mgmt 0.1.0",
  "multiboot2 0.7.1 (registry+https://github.com/rust-lang/crates.io-index)",
- "panic_unwind 0.1.0",
  "rlibc 1.0.0 (registry+https://github.com/rust-lang/crates.io-index)",
+ "simple_panic_unwind 0.1.0",
  "spin 0.4.10 (registry+https://github.com/rust-lang/crates.io-index)",
  "state_store 0.1.0",
  "vga_buffer 0.1.0",
@@ -1660,6 +1660,17 @@ dependencies = [
 ]
 
 [[package]]
+name = "simple_panic_unwind"
+version = "0.1.0"
+dependencies = [
+ "gimli 0.19.0 (registry+https://github.com/rust-lang/crates.io-index)",
+ "log 0.3.9 (registry+https://github.com/rust-lang/crates.io-index)",
+ "memory 0.1.0",
+ "mod_mgmt 0.1.0",
+ "task 0.1.0",
+]
+
+[[package]]
 name = "single_simd_task_optimization"
 version = "0.1.0"
 dependencies = [
@@ -1968,6 +1979,16 @@ version = "1.0.0"
 source = "registry+https://github.com/rust-lang/crates.io-index"
 dependencies = [
  "void 1.0.2 (registry+https://github.com/rust-lang/crates.io-index)",
+]
+
+[[package]]
+name = "unwind_test"
+version = "0.1.0"
+dependencies = [
+ "log 0.3.9 (registry+https://github.com/rust-lang/crates.io-index)",
+ "mod_mgmt 0.1.0",
+ "task 0.1.0",
+ "terminal_print 0.1.0",
 ]
 
 [[package]]

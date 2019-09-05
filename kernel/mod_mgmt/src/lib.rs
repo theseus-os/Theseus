@@ -445,16 +445,26 @@ impl CrateNamespace {
     }
 
     /// Iterates over all crates in this namespace and calls the given function `f` on each crate.
-    /// If `recursive` is true, crates in recursive namespaces are included as well.
-    /// The function `f` is called with two arguments: the name of the crate, and a reference to the crate. 
-    pub fn crate_iter<F>(&self, recursive: bool, mut f: F) where F: FnMut(&str, &StrongCrateRef) {
+    /// If `recursive` is true, crates in recursive namespaces are included in the iteration as well.
+    /// 
+    /// The function `f` is called with two arguments: the name of the crate, and a reference to the crate.
+    /// The function `f` must return a boolean value that indicates whether to continue iterating; 
+    /// if `true`, the iteration will continue, if `false`, the iteration will stop. 
+    pub fn for_each_crate<F>(
+        &self,
+        recursive: bool,
+        mut f: F
+    ) where F: FnMut(&str, &StrongCrateRef) -> bool {
         for (crate_name, crate_ref) in self.crate_tree.lock().iter() {
-            f(crate_name.as_str(), crate_ref);
+            let keep_going = f(crate_name.as_str(), crate_ref);
+            if !keep_going {
+                return;
+            }
         }
 
         if recursive {
             if let Some(ref r_ns) = self.recursive_namespace {
-                r_ns.crate_iter(recursive, f);
+                r_ns.for_each_crate(recursive, f);
             }
         }
     }
@@ -1167,7 +1177,7 @@ impl CrateNamespace {
         // We can't just move the crates in the swap request list, because we may have loaded other crates from their object files (for the first time).
         // Thus, we need to move all newly-loaded crates from the temp namespace into this namespace;
         // for this, we add only the non-shared (exclusive) crates, because shared crates are those that came from the backup namespace.
-        namespace_of_new_crates.crate_iter(true, |new_crate_name, new_crate_ref| {
+        namespace_of_new_crates.for_each_crate(true, |new_crate_name, new_crate_ref| {
             if new_crate_ref.is_shared() {
                 if self.get_crate(new_crate_name).is_none() { 
                     error!("BUG: shared crate {} was not already in the current (backup) namespace", new_crate_name);
@@ -1182,6 +1192,7 @@ impl CrateNamespace {
                 self.add_symbols(new_crate_ref.lock_as_ref().sections.values(), verbose_log); // TODO: later, when qp_trie supports `drain()`, we can improve this futher.
                 self.crate_tree.lock().insert_str(new_crate_name, new_crate_ref.clone());
             }
+            true
         });
 
         #[cfg(loscd_eval)]
@@ -2012,7 +2023,7 @@ impl CrateNamespace {
         crate_ref: &StrongCrateRef,
         verbose_log: bool
     ) -> Result<(), &'static str> {
-        use gimli::{EhFrame, CieOrFde, NativeEndian, UnwindSection, BaseAddresses, CommonInformationEntry};
+        use gimli::{EhFrame, CieOrFde, NativeEndian, UnwindSection, UninitializedUnwindContext, UnwindTable, BaseAddresses, CommonInformationEntry};
 
         let verbose_log = true;
 
@@ -2051,13 +2062,13 @@ impl CrateNamespace {
             error!("gimli error: {:?}", _e);
             "gimli error while iterating through eh_frame entries"
         })? {
-            debug!("Found eh_frame entry: {:?}", cfi_entry);
+            // debug!("Found eh_frame entry: {:?}", cfi_entry);
             match cfi_entry {
                 CieOrFde::Cie(cie) => {
                     debug!("  --> moving on to CIE at offset {}", cie.offset());
                     let mut instructions = cie.instructions(&eh_frame, &base_addrs);
                     while let Some(instr) = instructions.next().map_err(|_e| {
-                        error!("gimli error: {:?}", _e);
+                        error!("CIE instructions gimli error: {:?}", _e);
                         "gimli error while iterating through eh_frame Cie instructions list"
                     })? {
                         debug!("    CIE instr: {:?}", instr);
@@ -2079,6 +2090,26 @@ impl CrateNamespace {
                         "gimli error while parsing partial FDE"
                     })?;
                     debug!("      Full FDE: {:?}", full_fde);
+                    let mut instructions = full_fde.instructions(&eh_frame, &base_addrs);
+                    while let Some(instr) = instructions.next().map_err(|_e| {
+                        error!("FDE instructions gimli error: {:?}", _e);
+                        "gimli error while iterating through eh_frame FDE instructions list"
+                    })? {
+                        debug!("    FDE instr: {:?}", instr);
+                    }
+
+                    let mut uninit_unwind_ctx = UninitializedUnwindContext::new();
+                    let mut table = full_fde.rows(&eh_frame, &base_addrs, &mut uninit_unwind_ctx)
+                        .map_err(|_e| {
+                            error!("FDE rows gimli error: {:?}", _e);
+                            "gimli error while calling fde.rows()"
+                        })?;
+                    while let Some(row) = table.next_row().map_err(|_e| {
+                        error!("Table row gimli error: {:?}", _e);
+                        "gimli error while iterating through FDE unwind table rows"
+                    })? {
+                        debug!("        FDE unwind row: {:?}", row);
+                    }
                 }
             }
         }
@@ -2188,6 +2219,91 @@ impl CrateNamespace {
         }
         
         count
+    }
+
+    /// Finds the `.text` section that contains the given `instruction_pointer` (program counter).
+    /// Also searches any recursive namespaces as well.
+    /// 
+    /// If a `starting_crate` is provided, the search will begin from that crate
+    /// and include all of its dependencies recursively. 
+    /// If no `starting_crate` is provided, all crates in this namespace will be searched, in no particular order.
+    /// 
+    /// TODO FIXME: currently starting_crate is searched non-recursively, meaning that its dependencies are excluded.
+    /// 
+    /// # Usage
+    /// This is mostly useful for printing symbol names for a stack trace (backtrace).
+    /// It is also similar in functionality to the tool `addr2line`, 
+    /// but gives the section itself rather than the line of code.
+    /// 
+    /// # Locking
+    /// This can obtain the lock on every crate and every section, 
+    /// so to avoid deadlock, please ensure that the caller task does not hold any such locks.
+    /// 
+    /// # Note
+    /// This is currently incredibly slow because, in the worst case,
+    /// it will iterate through **every** section in **every** loaded crate,
+    /// not just the publicly-visible (global) ones. 
+    pub fn get_containing_section(
+        &self, 
+        instruction_pointer: VirtualAddress, 
+        starting_crate: Option<&StrongCrateRef>
+    ) -> Option<(StrongSectionRef, usize)> {
+
+        // an inner function that searches just a single crate for the section
+        fn find_section_in_crate(instruction_pointer: VirtualAddress, crate_locked: &LoadedCrate) -> Option<(StrongSectionRef, usize)> {
+            let crate_text_start_vaddr = if let Some(tp_ref) = &crate_locked.text_pages {
+                tp_ref.lock().start_address()
+            } else {
+                // crate has no text sections, so it cannot possibly contain the instruction pointer
+                return None;
+            };
+            if instruction_pointer < crate_text_start_vaddr {
+                // If the instruction pointer comes before (is less than) the start of the crate's .text sections,
+                // then it definitely cannot contain the given instruction pointer.
+                return None;
+            }
+            // Here: the crate *might* contain the instruction pointer, so we need to go through each of its sections.
+            for sec_ref in crate_locked.sections.values() {
+                let sec = sec_ref.lock();
+                let vaddr = sec.virt_addr();
+                // If the section's address bounds contain the instruction pointer, then we've found it.
+                // Only a single section can contain the address, so it's safe to stop once we've found a match.
+                if sec.typ == SectionType::Text && 
+                    instruction_pointer >= vaddr && 
+                    instruction_pointer < (vaddr + sec.size)
+                {
+                    let offset = instruction_pointer - vaddr;
+                    return Some((sec_ref.clone(), offset.value()));
+                }
+            }
+            None
+        }
+
+
+        // If a starting crate was given, search that first. 
+        if let Some(crate_ref) = starting_crate {
+            let crate_locked = crate_ref.lock_as_ref();
+            if let Some(found) = find_section_in_crate(instruction_pointer, &crate_locked) {
+                return Some(found);
+            }
+        }
+
+        let mut found_section = None;
+
+        // Here, we didn't find the symbol when searching from the starting crate, 
+        // so perform a brute-force search of all crates in this namespace (recursively).
+        self.for_each_crate(true, |_crate_name, crate_ref| {
+            let crate_locked = crate_ref.lock_as_ref();
+            if let Some(found) = find_section_in_crate(instruction_pointer, &crate_locked) {
+                found_section = Some(found);
+                false // stop iterating, we've found it!
+            }
+            else {
+                true // keep searching
+            }
+        });
+
+        found_section
     }
 
 

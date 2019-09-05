@@ -234,18 +234,19 @@ fn parse_nano_core_symbol_file<F: File + ?Sized>(
             let rodata_pages_locked = rodata_pages.lock();
             let data_pages_locked = data_pages.lock();
 
-            // third, parse each symbol table entry, which should all have "GLOBAL" bindings
+            // third, parse each symbol table entry
             for (_line_num, line) in file_iterator {
                 if line.is_empty() { continue; }
                 
                 // we need the following items from a symbol table entry:
                 // * Value (address),      column 1
                 // * Size,                 column 2
+                // * Bind (visibility),    column 4
                 // * Ndx,                  column 6
                 // * DemangledName#hash    column 7 to end
 
                 // Can't use split_whitespace() here, because we need to splitn and then get the remainder of the line
-                // after we've split the first 7 columns by whitespace. So we write a custom closure to group multiple whitespaces together.\
+                // after we've split the first 7 columns by whitespace. So we write a custom closure to group multiple whitespaces together.
                 // We use "splitn(8, ..)" because it stops at the 8th column (column index 7) and gets the rest of the line in a single iteration.
                 let mut prev_whitespace = true; // by default, we start assuming that the previous element was whitespace.
                 let mut parts = line.splitn(8, |c: char| {
@@ -266,11 +267,13 @@ fn parse_nano_core_symbol_file<F: File + ?Sized>(
                 let sec_vaddr = try_break!(parts.next().ok_or("parse_nano_core_symbol_file(): couldn't get column 1 'Value'"), loop_result);
                 let sec_size  = try_break!(parts.next().ok_or("parse_nano_core_symbol_file(): couldn't get column 2 'Size'"),  loop_result);
                 let _typ      = try_break!(parts.next().ok_or("parse_nano_core_symbol_file(): couldn't get column 3 'Type'"),  loop_result);
-                let _bind     = try_break!(parts.next().ok_or("parse_nano_core_symbol_file(): couldn't get column 4 'Bind'"),  loop_result);
+                let bind      = try_break!(parts.next().ok_or("parse_nano_core_symbol_file(): couldn't get column 4 'Bind'"),  loop_result);
                 let _vis      = try_break!(parts.next().ok_or("parse_nano_core_symbol_file(): couldn't get column 5 'Vis'"),   loop_result);
                 let sec_ndx   = try_break!(parts.next().ok_or("parse_nano_core_symbol_file(): couldn't get column 6 'Ndx'"),   loop_result);
                 let name      = try_break!(parts.next().ok_or("parse_nano_core_symbol_file(): couldn't get column 7 'Name'"),  loop_result);
                 
+                let global = bind == "GLOBAL";
+                debug!("parse_nano_core_symbol_file: sec {}, global = {}", name, global);
                 let sec_vaddr = try_break!(usize::from_str_radix(sec_vaddr, 16)
                     .map_err(|e| {
                         error!("parse_nano_core_symbol_file(): error parsing virtual address Value at line {}: {:?}\n    line: {}", _line_num + 1, e, line);
@@ -315,7 +318,7 @@ fn parse_nano_core_symbol_file<F: File + ?Sized>(
                             try_break!(text_pages_locked.offset_of_address(sec_vaddr).ok_or("nano_core text section wasn't covered by its mapped pages!"), loop_result), 
                             sec_vaddr,
                             sec_size,
-                            true,
+                            global,
                             new_crate_weak_ref.clone(), 
                         )))
                     );
@@ -331,7 +334,7 @@ fn parse_nano_core_symbol_file<F: File + ?Sized>(
                             try_break!(rodata_pages_locked.offset_of_address(sec_vaddr).ok_or("nano_core rodata section wasn't covered by its mapped pages!"), loop_result),
                             sec_vaddr,
                             sec_size,
-                            true,
+                            global,
                             new_crate_weak_ref.clone(),
                         )))
                     );
@@ -347,7 +350,7 @@ fn parse_nano_core_symbol_file<F: File + ?Sized>(
                             try_break!(data_pages_locked.offset_of_address(sec_vaddr).ok_or("nano_core data section wasn't covered by its mapped pages!"), loop_result),
                             sec_vaddr,
                             sec_size,
-                            true,
+                            global,
                             new_crate_weak_ref.clone(),
                         )))
                     );
@@ -363,7 +366,7 @@ fn parse_nano_core_symbol_file<F: File + ?Sized>(
                             try_break!(data_pages_locked.offset_of_address(sec_vaddr).ok_or("nano_core bss section wasn't covered by its mapped pages!"), loop_result),
                             sec_vaddr,
                             sec_size,
-                            true,
+                            global,
                             new_crate_weak_ref.clone(),
                         )))
                     );
@@ -537,83 +540,82 @@ fn parse_nano_core_binary<F: File + ?Sized>(
 
         use xmas_elf::symbol_table::Entry;
         for entry in symtab.iter() {
-            // public symbols can have any visibility setting, but it's the binding that matters (must be GLOBAL)            
+            // public symbols can have any visibility setting, but it's the binding that matters (GLOBAL or LOCAL)
             if let Ok(bind) = entry.get_binding() {
-                if bind == xmas_elf::symbol_table::Binding::Global {
-                    if let Ok(typ) = entry.get_type() {
-                        if typ == xmas_elf::symbol_table::Type::Func || typ == xmas_elf::symbol_table::Type::Object {
-                            let sec_value = entry.value() as usize;
-                            let sec_size = entry.size() as usize;
-                            let name = try_break!(entry.get_name(&elf_file), loop_result);
+                let global = bind == xmas_elf::symbol_table::Binding::Global;
+                if let Ok(typ) = entry.get_type() {
+                    if typ == xmas_elf::symbol_table::Type::Func || typ == xmas_elf::symbol_table::Type::Object {
+                        let sec_value = entry.value() as usize;
+                        let sec_size = entry.size() as usize;
+                        let name = try_break!(entry.get_name(&elf_file), loop_result);
 
-                            let demangled = demangle(name).to_string();
-                            // debug!("parse_nano_core_binary(): name: {}, demangled: {}, vaddr: {:#X}, size: {:#X}", name, demangled, sec_value, sec_size);
+                        let demangled = demangle(name).to_string();
+                        // debug!("parse_nano_core_binary(): name: {}, demangled: {}, vaddr: {:#X}, size: {:#X}", name, demangled, sec_value, sec_size);
 
-                            let new_section = {
-                                if entry.shndx() as usize == text_shndx {
-                                    let sec_vaddr = try_break!(VirtualAddress::new(sec_value), loop_result);
-                                    Some(LoadedSection::new(
-                                        SectionType::Text,
-                                        demangled,
-                                        Arc::clone(&text_pages),
-                                        try_break!(text_pages_locked.offset_of_address(sec_vaddr).ok_or("nano_core text section wasn't covered by its mapped pages!"), loop_result),
-                                        sec_vaddr,
-                                        sec_size,
-                                        true,
-                                        new_crate_weak_ref.clone(),
-                                    ))
-                                }
-                                else if entry.shndx() as usize == rodata_shndx {
-                                    let sec_vaddr = try_break!(VirtualAddress::new(sec_value), loop_result);
-                                    Some(LoadedSection::new(
-                                        SectionType::Rodata,
-                                        demangled,
-                                        Arc::clone(&rodata_pages),
-                                        try_break!(rodata_pages_locked.offset_of_address(sec_vaddr).ok_or("nano_core rodata section wasn't covered by its mapped pages!"), loop_result),
-                                        sec_vaddr,
-                                        sec_size,
-                                        true,
-                                        new_crate_weak_ref.clone(),
-                                    ))
-                                }
-                                else if entry.shndx() as usize == data_shndx {
-                                    let sec_vaddr = try_break!(VirtualAddress::new(sec_value), loop_result);
-                                    Some(LoadedSection::new(
-                                        SectionType::Data,
-                                        demangled,
-                                        Arc::clone(&data_pages),
-                                        try_break!(data_pages_locked.offset_of_address(sec_vaddr).ok_or("nano_core data section wasn't covered by its mapped pages!"), loop_result),
-                                        sec_vaddr,
-                                        sec_size,
-                                        true,
-                                        new_crate_weak_ref.clone(),
-                                    ))
-                                }
-                                else if entry.shndx() as usize == bss_shndx {
-                                    let sec_vaddr = try_break!(VirtualAddress::new(sec_value), loop_result);
-                                    Some(LoadedSection::new(
-                                        SectionType::Bss,
-                                        demangled,
-                                        Arc::clone(&data_pages),
-                                        try_break!(data_pages_locked.offset_of_address(sec_vaddr).ok_or("nano_core bss section wasn't covered by its mapped pages!"), loop_result),
-                                        sec_vaddr,
-                                        sec_size,
-                                        true,
-                                        new_crate_weak_ref.clone(),
-                                    ))
-                                }
-                                else {
-                                    trace!("Unexpected entry.shndx(): {}", entry.shndx());
-                                    init_symbols.insert(demangled, sec_value);
-                                    None
-                                }
-                            };
-
-                            if let Some(sec) = new_section {
-                                // debug!("parse_nano_core: new section: {:?}", sec);
-                                sections.insert(section_counter, Arc::new(Mutex::new(sec)));
-                                section_counter += 1;
+                        let new_section = {
+                            if entry.shndx() as usize == text_shndx {
+                                let sec_vaddr = try_break!(VirtualAddress::new(sec_value), loop_result);
+                                Some(LoadedSection::new(
+                                    SectionType::Text,
+                                    demangled,
+                                    Arc::clone(&text_pages),
+                                    try_break!(text_pages_locked.offset_of_address(sec_vaddr).ok_or("nano_core text section wasn't covered by its mapped pages!"), loop_result),
+                                    sec_vaddr,
+                                    sec_size,
+                                    global,
+                                    new_crate_weak_ref.clone(),
+                                ))
                             }
+                            else if entry.shndx() as usize == rodata_shndx {
+                                let sec_vaddr = try_break!(VirtualAddress::new(sec_value), loop_result);
+                                Some(LoadedSection::new(
+                                    SectionType::Rodata,
+                                    demangled,
+                                    Arc::clone(&rodata_pages),
+                                    try_break!(rodata_pages_locked.offset_of_address(sec_vaddr).ok_or("nano_core rodata section wasn't covered by its mapped pages!"), loop_result),
+                                    sec_vaddr,
+                                    sec_size,
+                                    global,
+                                    new_crate_weak_ref.clone(),
+                                ))
+                            }
+                            else if entry.shndx() as usize == data_shndx {
+                                let sec_vaddr = try_break!(VirtualAddress::new(sec_value), loop_result);
+                                Some(LoadedSection::new(
+                                    SectionType::Data,
+                                    demangled,
+                                    Arc::clone(&data_pages),
+                                    try_break!(data_pages_locked.offset_of_address(sec_vaddr).ok_or("nano_core data section wasn't covered by its mapped pages!"), loop_result),
+                                    sec_vaddr,
+                                    sec_size,
+                                    global,
+                                    new_crate_weak_ref.clone(),
+                                ))
+                            }
+                            else if entry.shndx() as usize == bss_shndx {
+                                let sec_vaddr = try_break!(VirtualAddress::new(sec_value), loop_result);
+                                Some(LoadedSection::new(
+                                    SectionType::Bss,
+                                    demangled,
+                                    Arc::clone(&data_pages),
+                                    try_break!(data_pages_locked.offset_of_address(sec_vaddr).ok_or("nano_core bss section wasn't covered by its mapped pages!"), loop_result),
+                                    sec_vaddr,
+                                    sec_size,
+                                    global,
+                                    new_crate_weak_ref.clone(),
+                                ))
+                            }
+                            else {
+                                trace!("Unexpected entry.shndx(): {}", entry.shndx());
+                                init_symbols.insert(demangled, sec_value);
+                                None
+                            }
+                        };
+
+                        if let Some(sec) = new_section {
+                            // debug!("parse_nano_core: new section: {:?}", sec);
+                            sections.insert(section_counter, Arc::new(Mutex::new(sec)));
+                            section_counter += 1;
                         }
                     }
                 }

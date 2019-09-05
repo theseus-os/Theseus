@@ -1,0 +1,22 @@
+[package]
+name = "unwind_test"
+version = "0.1.0"
+authors = ["Kevin Boos <kevinaboos@gmail.com>"]
+build = "../../build.rs"
+
+[dependencies]
+
+
+[dependencies.log]
+default-features = false
+version = "0.3.7"
+
+
+[dependencies.mod_mgmt]
+path = "../../kernel/mod_mgmt"
+
+[dependencies.terminal_print]
+path = "../terminal_print"
+
+[dependencies.task]
+path = "../../kernel/task"

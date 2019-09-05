@@ -47,8 +47,10 @@ path = "../exceptions_early"
 [dependencies.captain]
 path = "../captain"
 
-[dependencies.panic_unwind]
-path = "../panic_unwind"
+# [dependencies.panic_unwind]
+# path = "../panic_unwind"
+[dependencies.simple_panic_unwind]
+path = "../simple_panic_unwind"
 
 [dependencies.vga_buffer]
 path = "../vga_buffer"
