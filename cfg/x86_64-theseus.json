@@ -11,5 +11,5 @@
   "os": "none",
   "features": "-mmx,-sse,+soft-float",
   "disable-redzone": true,
-  "panic": "unwind"
+  "panic": "abort"
 }

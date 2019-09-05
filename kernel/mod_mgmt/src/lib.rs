@@ -1480,9 +1480,7 @@ impl CrateNamespace {
 
         // In this loop, we handle only "allocated" sections that occupy memory in the actual loaded object file.
         // This includes .text, .rodata, .data, .bss, .gcc_except_table, .eh_frame, and potentially others.
-        // Note that we skip the first 3 sections, because relocatable object files start with 3 irrelevant sections:
-        // the null section, the strtab section, and an empty .text section.
-        for (shndx, sec) in elf_file.section_iter().enumerate().skip(3) {
+        for (shndx, sec) in elf_file.section_iter().enumerate() {
             let sec_flags = sec.flags();
             // Skip non-allocated sections, because they don't appear in the loaded object file.
             if sec_flags & SHF_ALLOC == 0 {
@@ -1499,12 +1497,11 @@ impl CrateNamespace {
                 }
             };
 
-            // Note: no need to do this because we skipped the first 3 sections above.
-            // // ignore the empty .text section at the start
-            // if sec_name == ".text" {
-            //     continue;    
-            // }    
-            
+            // ignore the empty .text section at the start
+            if sec_name == ".text" {
+                continue;    
+            }
+
             // This handles the rare case of a zero-sized section. 
             // A section of size zero shouldn't necessarily be removed, as they are sometimes referenced in relocations;
             // typically the zero-sized section itself is a reference to the next section in the list of section headers.
@@ -2029,11 +2026,10 @@ impl CrateNamespace {
     pub fn handle_eh_frame(
         &self,
         crate_ref: &StrongCrateRef,
-        verbose_log: bool
+        _verbose_log: bool
     ) -> Result<(), &'static str> {
-        use gimli::{EhFrame, CieOrFde, NativeEndian, UnwindSection, UninitializedUnwindContext, UnwindTable, BaseAddresses, CommonInformationEntry};
+        use gimli::{EhFrame, CieOrFde, NativeEndian, UnwindSection, UninitializedUnwindContext, BaseAddresses, CommonInformationEntry};
 
-        let verbose_log = true;
 
         let parent_crate = crate_ref.lock_as_ref();
         let crate_name = &parent_crate.crate_name;
