@@ -46,3 +46,6 @@ crate-type = ["rlib"]
 
 [dependencies.keycodes_ascii]
 path = "../../libs/keycodes_ascii"
+
+[dependencies.scheduler]
+path = "../../kernel/scheduler"

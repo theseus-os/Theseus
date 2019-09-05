@@ -25,6 +25,7 @@ extern crate mod_mgmt;
 extern crate mouse_data;
 extern crate keycodes_ascii;
 extern crate path;
+extern crate scheduler;
 
 mod background;
 use alloc::collections::VecDeque;
@@ -743,7 +744,10 @@ fn window_manager_loop( consumer: (DFQueueConsumer<Event>, DFQueueConsumer<Event
                 Some(ev) => ev,
                 _ => match mouse_consumer.peek() {
                     Some(ev) => ev,
-                    _ => continue,
+                    _ => {
+                        scheduler::schedule(); // yield the CPU and try again later
+                        continue;
+                    }
                 }
             };
             let event = ev.clone();

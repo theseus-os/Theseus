@@ -2261,6 +2261,7 @@ dependencies = [
  "mod_mgmt 0.1.0",
  "mouse_data 0.1.0",
  "path 0.1.0",
+ "scheduler 0.1.0",
  "spawn 0.1.0",
  "spin 0.4.10 (registry+https://github.com/rust-lang/crates.io-index)",
 ]
