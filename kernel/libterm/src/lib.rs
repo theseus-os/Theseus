@@ -408,16 +408,16 @@ impl Terminal {
 
     /// Updates the cursor to a new position and refreshes display
     fn cursor_handler(&mut self, left_shift: usize) -> Result<(), &'static str> { 
-        let buffer_width = self.get_displayable_dimensions(&self.display_name).0;
-        let mut new_x = self.absolute_cursor_pos % buffer_width;
-        let mut new_y = self.absolute_cursor_pos / buffer_width;
-        // adjusts to the correct position relative to the max rightmost absolute cursor position
-        if new_x >= left_shift  {
-            new_x -= left_shift;
-        } else {
-            new_x = buffer_width + new_x - left_shift;
-            new_y -= 1;
+        let (buffer_width, buffer_height) = self.get_displayable_dimensions(&self.display_name);
+
+        // We have shifted the cursor out of the screen.
+        if left_shift / buffer_width > buffer_height {
+            self.disable_cursor();
+            return Ok(());
         }
+
+        let new_x = (self.absolute_cursor_pos - left_shift) % buffer_width;
+        let new_y = (self.absolute_cursor_pos - left_shift) / buffer_width;
 
         if let Some(text_display) = self.window.get_displayable(&self.display_name){
             text_display.set_cursor(&(self.window), new_y as u16, new_x as u16, FONT_COLOR, true);
