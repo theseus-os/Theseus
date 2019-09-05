@@ -230,7 +230,6 @@ fn parse_nano_core_symbol_file<F: File + ?Sized>(
                     .ok_or("the nano_core .eh_frame section wasn't covered by the read-only mapped pages!"),
                     text_pages, rodata_pages, data_pages
                 );
-                warn!("Found nano_core's .eh_frame section: vaddr: {:#X}, size: {:#X}, MPO: {:#X}", sec_vaddr, sec_size, mapped_pages_offset);
                 sections.insert(
                     section_counter,
                     Arc::new(Mutex::new(LoadedSection::new(
@@ -244,6 +243,7 @@ fn parse_nano_core_symbol_file<F: File + ?Sized>(
                         new_crate_weak_ref.clone(), 
                     )))
                 );
+                section_counter += 1;
             }
             else if let Some(start) = line.find(".gcc_except_table ") {
                 let (sec_vaddr, sec_size) = try_mp!(parse_section_vaddr_size(&line[start..])
@@ -255,7 +255,6 @@ fn parse_nano_core_symbol_file<F: File + ?Sized>(
                     .ok_or("the nano_core .gcc_except_table section wasn't covered by the read-only mapped pages!"),
                     text_pages, rodata_pages, data_pages
                 );
-                warn!("Found nano_core's .gcc_except_table section: vaddr: {:#X}, size: {:#X}, MPO: {:#X}", sec_vaddr, sec_size, mapped_pages_offset);
                 sections.insert(
                     section_counter,
                     Arc::new(Mutex::new(LoadedSection::new(
@@ -269,6 +268,7 @@ fn parse_nano_core_symbol_file<F: File + ?Sized>(
                         new_crate_weak_ref.clone(), 
                     )))
                 );
+                section_counter += 1;
             }
 
             // once we've found the 4 sections we care about, we're done
