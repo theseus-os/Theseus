@@ -66,7 +66,9 @@ pub fn init() -> Result<(DFQueueProducer<Event>, DFQueueProducer<Event>), &'stat
 
     let terminal_print_path = default_app_namespace.get_crate_file_starting_with("terminal_print-")
         .ok_or("Couldn't find terminal_print application in default app namespace")?;
-    let terminal_path = default_app_namespace.get_crate_file_starting_with("terminal-")
+    let shell_path = default_app_namespace.get_crate_file_starting_with("shell-")
+        .ok_or("Couldn't find terminal application in default app namespace")?;
+    let app_io_path = default_app_namespace.get_crate_file_starting_with("app_io-")
         .ok_or("Couldn't find terminal application in default app namespace")?;
 
     // init frame_buffer_alpha
@@ -101,8 +103,13 @@ pub fn init() -> Result<(DFQueueProducer<Event>, DFQueueProducer<Event>), &'stat
         .singleton()
         .spawn()?;
 
+    ApplicationTaskBuilder::new(app_io_path)
+        .name("application_io_manager".to_string())
+        .singleton()
+        .spawn()?;
+
     // Spawn the default terminal (will also start the windowing manager)
-    ApplicationTaskBuilder::new(terminal_path)
+    ApplicationTaskBuilder::new(shell_path)
         .name("default_terminal".to_string())
         .namespace(default_app_namespace)
         .spawn()?;
