@@ -111,9 +111,8 @@ pub fn parse_nano_core(
 
 
 /// Parses the nano_core symbol file that represents the already loaded (and currently running) nano_core code.
-/// Basically, just searches for global (public) symbols, which are added to the system map and the crate metadata.
-/// 
-/// Drops the given `mapped_pages` that hold the nano_core module file itself.
+/// Basically, just searches the section list for offsets, size, and flag data,
+/// and parses the symbol table to populate the list of sections.
 fn parse_nano_core_symbol_file<F: File + ?Sized>(
     nano_core_object_file: &F,
     text_pages:   Arc<Mutex<MappedPages>>,
@@ -170,7 +169,7 @@ fn parse_nano_core_symbol_file<F: File + ?Sized>(
         let mut bss_shndx:    Option<usize> = None;
 
         
-        // a closure that parses a section index out of a string like "[7]"
+        // a closure that parses a section header's index (e.g., "[7]") out of the given str
         let parse_section_ndx = |str_ref: &str| {
             let open  = str_ref.find("[");
             let close = str_ref.find("]");
@@ -178,7 +177,28 @@ fn parse_nano_core_symbol_file<F: File + ?Sized>(
                 .and_then(|t| t.trim().parse::<usize>().ok())
         };
 
-        // first, find the section indices that we care about: .text, .data, .rodata, and .bss
+        // a closure that parses a section header's address and size
+        let parse_section_vaddr_size = |sec_hdr_line_starting_at_name: &str| {
+            let mut tokens = sec_hdr_line_starting_at_name.split_whitespace();
+            tokens.next(); // skip Name 
+            tokens.next(); // skip Type
+            let addr_hex_str = tokens.next();
+            tokens.next(); // skip Off (offset)
+            let size_hex_str = tokens.next();
+            // parse both the Address and Size fields as hex strings
+            addr_hex_str.and_then(|a| usize::from_str_radix(a, 16).ok())
+                .and_then(|addr| VirtualAddress::new(addr).ok())
+                .and_then(|vaddr| {
+                    size_hex_str.and_then(|s| usize::from_str_radix(s, 16).ok())
+                        .and_then(|size| Some((vaddr, size)))
+                })
+        };
+
+        // First, find the section indices that we care about: .text, .data, .rodata, .bss, 
+        // and also .eh_frame and .gcc_except_table, which are handled specially.
+        // The reason we first look for the section indices is because we create
+        // individual sections per symbol instead of one for each of those four sections,
+        // which is how normal Rust crates are built and loaded (one section per symbol).
         let file_iterator = symbol_str.lines().enumerate();
         for (_line_num, line) in file_iterator.clone() {
 
@@ -188,17 +208,67 @@ fn parse_nano_core_symbol_file<F: File + ?Sized>(
 
             // debug!("Looking at line: {:?}", line);
 
-            if line.contains(".text") && line.contains("PROGBITS") {
+            if line.contains(".text ") && line.contains("PROGBITS") {
                 text_shndx = parse_section_ndx(line);
             }
-            else if line.contains(".data") && line.contains("PROGBITS") {
+            else if line.contains(".data ") && line.contains("PROGBITS") {
                 data_shndx = parse_section_ndx(line);
             }
-            else if line.contains(".rodata") && line.contains("PROGBITS") {
+            else if line.contains(".rodata ") && line.contains("PROGBITS") {
                 rodata_shndx = parse_section_ndx(line);
             }
-            else if line.contains(".bss") && line.contains("NOBITS") {
+            else if line.contains(".bss ") && line.contains("NOBITS") {
                 bss_shndx = parse_section_ndx(line);
+            }
+            else if let Some(start) = line.find(".eh_frame ") {
+                let (sec_vaddr, sec_size) = try_mp!(parse_section_vaddr_size(&line[start..])
+                    .ok_or("Failed to parse the .eh_frame section header's address and size"),
+                    text_pages, rodata_pages, data_pages
+                );
+                let mapped_pages_offset_opt = rodata_pages.lock().offset_of_address(sec_vaddr);
+                let mapped_pages_offset = try_mp!(mapped_pages_offset_opt
+                    .ok_or("the nano_core .eh_frame section wasn't covered by the read-only mapped pages!"),
+                    text_pages, rodata_pages, data_pages
+                );
+                warn!("Found nano_core's .eh_frame section: vaddr: {:#X}, size: {:#X}, MPO: {:#X}", sec_vaddr, sec_size, mapped_pages_offset);
+                sections.insert(
+                    section_counter,
+                    Arc::new(Mutex::new(LoadedSection::new(
+                        SectionType::EhFrame,
+                        String::from(".eh_frame"),
+                        Arc::clone(&rodata_pages),
+                        mapped_pages_offset,
+                        sec_vaddr,
+                        sec_size,
+                        false, // .eh_frame is not global
+                        new_crate_weak_ref.clone(), 
+                    )))
+                );
+            }
+            else if let Some(start) = line.find(".gcc_except_table ") {
+                let (sec_vaddr, sec_size) = try_mp!(parse_section_vaddr_size(&line[start..])
+                    .ok_or("Failed to parse the .gcc_except_table section header's address and size"),
+                    text_pages, rodata_pages, data_pages
+                );
+                let mapped_pages_offset_opt = rodata_pages.lock().offset_of_address(sec_vaddr);
+                let mapped_pages_offset = try_mp!(mapped_pages_offset_opt
+                    .ok_or("the nano_core .gcc_except_table section wasn't covered by the read-only mapped pages!"),
+                    text_pages, rodata_pages, data_pages
+                );
+                warn!("Found nano_core's .gcc_except_table section: vaddr: {:#X}, size: {:#X}, MPO: {:#X}", sec_vaddr, sec_size, mapped_pages_offset);
+                sections.insert(
+                    section_counter,
+                    Arc::new(Mutex::new(LoadedSection::new(
+                        SectionType::GccExceptTable,
+                        String::from(".gcc_except_table"),
+                        Arc::clone(&rodata_pages),
+                        mapped_pages_offset,
+                        sec_vaddr,
+                        sec_size,
+                        false, // .gcc_except_table is not global
+                        new_crate_weak_ref.clone(), 
+                    )))
+                );
             }
 
             // once we've found the 4 sections we care about, we're done
@@ -273,7 +343,6 @@ fn parse_nano_core_symbol_file<F: File + ?Sized>(
                 let name      = try_break!(parts.next().ok_or("parse_nano_core_symbol_file(): couldn't get column 7 'Name'"),  loop_result);
                 
                 let global = bind == "GLOBAL";
-                debug!("parse_nano_core_symbol_file: sec {}, global = {}", name, global);
                 let sec_vaddr = try_break!(usize::from_str_radix(sec_vaddr, 16)
                     .map_err(|e| {
                         error!("parse_nano_core_symbol_file(): error parsing virtual address Value at line {}: {:?}\n    line: {}", _line_num + 1, e, line);
