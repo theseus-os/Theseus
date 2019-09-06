@@ -119,17 +119,18 @@ pub struct LoadedCrate {
     /// but we keep each section's shndx (section header index from its crate's ELF file)
     /// as the key because it helps us quickly handle relocations and crate swapping.
     pub sections: BTreeMap<usize, StrongSectionRef>,
-    /// The `MappedPages` that include the text sections for this crate,
+    /// The `MappedPages` that include the .text sections for this crate,
     /// i.e., sections that are readable and executable, but not writable.
     pub text_pages: Option<Arc<Mutex<MappedPages>>>,
-    /// The `MappedPages` that include the rodata sections for this crate.
+    /// The `MappedPages` that include the .rodata sections for this crate.
     /// i.e., sections that are read-only, not writable nor executable.
     pub rodata_pages: Option<Arc<Mutex<MappedPages>>>,
-    /// The `MappedPages` that include the data and bss sections for this crate.
+    /// The `MappedPages` that include the .data and .bss sections for this crate.
     /// i.e., sections that are readable and writable but not executable.
     pub data_pages: Option<Arc<Mutex<MappedPages>>>,
     
-    // The members below are most used to accelerate crate swapping //
+    // The members below are most used to accelerate crate swapping,
+    // and are not strictly necessary just for normal crate usage and management.
 
     /// The set of global symbols in this crate, including regular ones 
     /// that are prefixed with the `crate_name` and `no_mangle` symbols that are not.
@@ -210,12 +211,32 @@ impl LoadedCrate {
         let mut results: Vec<WeakCrateRef> = Vec::new();
         for sec in self.sections.values() {
             let sec_locked = sec.lock();
-            for dep_sec in &sec_locked.sections_dependent_on_me {
-                if let Some(dep_sec) = dep_sec.section.upgrade() {
+            for weak_dep in &sec_locked.sections_dependent_on_me {
+                if let Some(dep_sec) = weak_dep.section.upgrade() {
                     let dep_sec_locked = dep_sec.lock();
                     let parent_crate = dep_sec_locked.parent_crate.clone();
                     results.push(parent_crate);
                 }
+            }
+        }
+        results
+    }
+
+
+    /// Returns the set of crates that this crate depends on. 
+    /// Only includes direct dependencies "one hop" away, 
+    /// not recursive dependencies "multiples hops" away.
+    /// 
+    /// Currently, the list may include duplicates.
+    /// The caller is responsible for filtering out duplicates when using the list.
+    pub fn crates_i_depend_on(&self) -> Vec<WeakCrateRef> {
+        let mut results: Vec<WeakCrateRef> = Vec::new();
+        for sec in self.sections.values() {
+            let sec_locked = sec.lock();
+            for strong_dep in &sec_locked.sections_i_depend_on {
+                let dep_sec_locked = strong_dep.section.lock();
+                let parent_crate = dep_sec_locked.parent_crate.clone();
+                results.push(parent_crate);
             }
         }
         results
@@ -295,7 +316,9 @@ impl LoadedCrate {
                     new_text_pages_ref.clone().ok_or_else(|| "BUG: missing text pages in newly-copied crate")?,
                     new_text_pages_locked.as_ref().and_then(|tp| tp.address_at_offset(new_sec_mapped_pages_offset)),
                 ),
-                SectionType::Rodata => (
+                SectionType::Rodata |
+                SectionType::GccExceptTable | 
+                SectionType::EhFrame => (
                     new_rodata_pages_ref.clone().ok_or_else(|| "BUG: missing rodata pages in newly-copied crate")?,
                     new_rodata_pages_locked.as_ref().and_then(|rp| rp.address_at_offset(new_sec_mapped_pages_offset)),
                 ),
@@ -334,10 +357,12 @@ impl LoadedCrate {
         for new_sec_ref in new_sections.values() {
             let mut new_sec = new_sec_ref.lock();
             let new_sec_mapped_pages = match new_sec.typ {
-                SectionType::Text   => new_text_pages_locked.as_mut().ok_or_else(|| "BUG: missing text pages in newly-copied crate")?,
-                SectionType::Rodata => new_rodata_pages_locked.as_mut().ok_or_else(|| "BUG: missing rodata pages in newly-copied crate")?,
+                SectionType::Text    => new_text_pages_locked.as_mut().ok_or_else(|| "BUG: missing text pages in newly-copied crate")?,
+                SectionType::Rodata |
+                SectionType::GccExceptTable | 
+                SectionType::EhFrame => new_rodata_pages_locked.as_mut().ok_or_else(|| "BUG: missing rodata pages in newly-copied crate")?,
                 SectionType::Data |
-                SectionType::Bss    => new_data_pages_locked.as_mut().ok_or_else(|| "BUG: missing data pages in newly-copied crate")?,
+                SectionType::Bss     => new_data_pages_locked.as_mut().ok_or_else(|| "BUG: missing data pages in newly-copied crate")?,
             };
             let new_sec_mapped_pages_offset = new_sec.mapped_pages_offset;
 
@@ -416,22 +441,38 @@ impl LoadedCrate {
 }
 
 
-/// The possible types of `LoadedSection`s: .text, .rodata, .data, or .bss.
-/// A .bss section is basically treated the same as .data, 
-/// but we keep them separate
+/// The possible types of sections that can be loaded from a crate object file.
 #[derive(Debug, Copy, Clone, PartialEq)]
 pub enum SectionType {
     Text,
     Rodata,
     Data,
-    Bss
+    Bss,
+    /// The ".gcc_except_table" contains landing pads for exception handling,
+    /// comprising the LSDA (Language Specific Data Area),
+    /// which is effectively used to determine when we should stop the stack unwinding process
+    /// (e.g., "catching" an exception). 
+    /// 
+    /// Blog post from author of gold linker: <https://www.airs.com/blog/archives/464>
+    /// 
+    /// Mailing list discussion here: <https://gcc.gnu.org/ml/gcc-help/2010-09/msg00116.html>
+    /// 
+    /// Here is a sample repository parsing this section: <https://github.com/nest-leonlee/gcc_except_table>
+    /// 
+    GccExceptTable,
+    /// The ".eh_frame" contains information about stack unwinding and destructor functions
+    /// that should be called when traversing up the stack for cleanup. 
+    /// 
+    /// Blog post from author of gold linker: <https://www.airs.com/blog/archives/460>
+    /// Some documentation here: <https://gcc.gnu.org/wiki/Dwarf2EHNewbiesHowto>
+    /// 
+    EhFrame,
 }
 
-/// Represents a .text, .rodata, .data, or .bss section
-/// that has been loaded and is part of a `LoadedCrate`.
+/// Represents a section that has been loaded and is part of a `LoadedCrate`.
 /// The containing `SectionType` enum determines which type of section it is.
 pub struct LoadedSection {
-    /// The type of this section: .text, .rodata, .data, or .bss.
+    /// The type of this section, e.g., `.text`, `.rodata`, `.data`, `.bss`, etc.
     pub typ: SectionType,
     /// The full String name of this section, a fully-qualified symbol, 
     /// with the format `<crate>::[<module>::][<struct>::]<fn_name>::<hash>`.
