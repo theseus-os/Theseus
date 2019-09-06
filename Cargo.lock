@@ -2129,7 +2129,6 @@ name = "unwind_test"
 version = "0.1.0"
 dependencies = [
  "log 0.3.9 (registry+https://github.com/rust-lang/crates.io-index)",
- "mod_mgmt 0.1.0",
  "task 0.1.0",
  "terminal_print 0.1.0",
 ]

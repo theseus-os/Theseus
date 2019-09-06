@@ -48,22 +48,26 @@ fn panic_entry_point(info: &PanicInfo) -> ! {
         }
         #[cfg(loadable)]
         {
-            type PanicWrapperFunc = fn(&PanicInfo) -> Result<(), &'static str>;
-            let section_ref = mod_mgmt::get_default_namespace()
-                .and_then(|namespace| namespace.get_symbol_starting_with("panic_wrapper::panic_wrapper::").upgrade())
-                .ok_or("Couldn't get single symbol matching \"panic_wrapper::panic_wrapper\"");
-
-            // call the panic_wrapper function, otherwise return an Err into "res"
-            let mut space = 0;
-            section_ref.and_then(|section_ref| {
+            // An internal function for calling the panic_wrapper, but returning errors along the way.
+            // We must make sure to not hold any locks when invoking the panic_wrapper function.
+            fn invoke_panic_wrapper(info: &PanicInfo) -> Result<(), &'static str> {
+                type PanicWrapperFunc = fn(&PanicInfo) -> Result<(), &'static str>;
+                let section_ref = mod_mgmt::get_default_namespace()
+                    .and_then(|namespace| namespace.get_symbol_starting_with("panic_wrapper::panic_wrapper::").upgrade())
+                    .ok_or("Couldn't get single symbol matching \"panic_wrapper::panic_wrapper\"")?;
                 let (mapped_pages, mapped_pages_offset) = { 
                     let section = section_ref.lock();
                     (section.mapped_pages.clone(), section.mapped_pages_offset)
                 };
-                let mapped_pages_locked = mapped_pages.lock();
-                mapped_pages_locked.as_func::<PanicWrapperFunc>(mapped_pages_offset, &mut space)
-                    .and_then(|func| func(info)) // actually call the function
-            })
+                let mut space = 0;
+                let func: &PanicWrapperFunc = {
+                    mapped_pages.lock().as_func(mapped_pages_offset, &mut space)?
+                };
+                func(info)
+            }
+
+            // call the above internal function
+            invoke_panic_wrapper(info)
         }
     }
     else {

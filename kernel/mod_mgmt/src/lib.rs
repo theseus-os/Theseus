@@ -2255,8 +2255,12 @@ impl CrateNamespace {
 
         // an inner function that searches just a single crate for the section
         fn find_section_in_crate(instruction_pointer: VirtualAddress, crate_locked: &LoadedCrate) -> Option<(StrongSectionRef, usize)> {
+            // trace!("find_section_in_crate() [top]: IP: {:#X}, crate_locked: {:?}", instruction_pointer, crate_locked.crate_name);            
             let crate_text_start_vaddr = if let Some(tp_ref) = &crate_locked.text_pages {
-                tp_ref.lock().start_address()
+                // trace!("find_section_in_crate(): locking text_pages");
+                let vaddr = tp_ref.lock().start_address();
+                // trace!("find_section_in_crate(): locked successfully.");
+                vaddr
             } else {
                 // crate has no text sections, so it cannot possibly contain the instruction pointer
                 return None;
@@ -2268,7 +2272,9 @@ impl CrateNamespace {
             }
             // Here: the crate *might* contain the instruction pointer, so we need to go through each of its sections.
             for sec_ref in crate_locked.sections.values() {
+                // trace!("find_section_in_crate: locking sec_ref: {:?}", sec_ref);
                 let sec = sec_ref.lock();
+                // trace!("find_section_in_crate: locked sec_ref successfully.");
                 let vaddr = sec.virt_addr();
                 // If the section's address bounds contain the instruction pointer, then we've found it.
                 // Only a single section can contain the address, so it's safe to stop once we've found a match.
@@ -2286,7 +2292,9 @@ impl CrateNamespace {
 
         // If a starting crate was given, search that first. 
         if let Some(crate_ref) = starting_crate {
+            // trace!("get_containing_section(): analyzing starting_crate, locking crate_ref");
             let crate_locked = crate_ref.lock_as_ref();
+            // trace!("get_containing_section(): analyzing starting_crate, locked crate_ref successfully");
             if let Some(found) = find_section_in_crate(instruction_pointer, &crate_locked) {
                 return Some(found);
             }
@@ -2297,7 +2305,9 @@ impl CrateNamespace {
         // Here, we didn't find the symbol when searching from the starting crate, 
         // so perform a brute-force search of all crates in this namespace (recursively).
         self.for_each_crate(true, |_crate_name, crate_ref| {
+            // trace!("get_containing_section(): in for_each_crate, locking crate_ref: {:?}", _crate_name);
             let crate_locked = crate_ref.lock_as_ref();
+            // trace!("get_containing_section(): in for_each_crate, locked crate_ref successfully");
             if let Some(found) = find_section_in_crate(instruction_pointer, &crate_locked) {
                 found_section = Some(found);
                 false // stop iterating, we've found it!

@@ -212,7 +212,7 @@ pub extern "C" fn nano_core_start(multiboot_information_virtual_address: usize) 
             .upgrade()
             .ok_or("no single symbol matching \"captain::init\"")
         );
-        info!("The nano_core is invoking the captain init function: {:?}", section_ref.lock().name);
+        info!("The nano_core (in loadable mode) is invoking the captain init function: {:?}", section_ref.lock().name);
 
         type CaptainInitFunc = fn(Arc<MutexIrqSafe<MemoryManagementInfo>>, Vec<MappedPages>, VirtualAddress, VirtualAddress, VirtualAddress, VirtualAddress) -> Result<(), &'static str>;
         let mut space = 0;

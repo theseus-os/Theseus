@@ -13,9 +13,6 @@ default-features = false
 version = "0.3.7"
 
 
-[dependencies.mod_mgmt]
-path = "../../kernel/mod_mgmt"
-
 [dependencies.terminal_print]
 path = "../terminal_print"
 
