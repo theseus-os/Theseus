@@ -20,10 +20,23 @@ pub fn main(_args: Vec<String>) -> isize {
         println!("Caught a panic at {}", info);
     }));
 
-    info!("test_panic::main(): registering panic handler: {:?}. Calling panic...", _res);
+    info!("test_panic::main(): registering panic handler... {:?}.", _res);
 
+    match _args.get(0).map(|s| &**s) {
+        // indexing test
+        Some("-i") => {
+            info!("test_panic::main(): trying out of bounds access...");
+            warn!("test_panic unexpectedly successed: args[100] = {}", _args[100]); // this should panic
+        }
+        // direct panic by default
+        _ => {
+            info!("test_panic::main(): directly calling panic...");
+            panic!("yo i'm testing a panic!!");
+        }
+    }
 
-    panic!("yo i'm testing a panic!!");
+    warn!("test_panic returned successfully...? Isn't it supposed to panic?");
+    0
 }
 
 
