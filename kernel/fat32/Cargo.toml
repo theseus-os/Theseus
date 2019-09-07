@@ -1,8 +1,9 @@
 [package]
-name = "fat32"
-version = "0.1.0"
 authors = ["Barry Shiberu <bereketshiberu@gmail.com>"]
+name = "fat32"
 description = "physical filesystem -- FAT32 support"
+version = "0.1.0"
+build = "../../build.rs"
 
 
 [dependencies]

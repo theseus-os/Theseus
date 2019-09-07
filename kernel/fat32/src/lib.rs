@@ -174,18 +174,18 @@ impl Header {
         let fatheader = Header {
             drive: disk, 
             data: bpb_sector.clone(),
-            bytes_per_sector: LittleEndian::read_u16(&mut bpb_sector[11..13]),
+            bytes_per_sector: LittleEndian::read_u16(&bpb_sector[11..13]),
             sectors_per_cluster: bpb_sector[13],
             reserved_sectors: bpb_sector[14],
             fat_count: bpb_sector[16],
-            _root_dir_count: LittleEndian::read_u16(&mut bpb_sector[17..19]),
-            legacy_sectors: LittleEndian::read_u16(&mut bpb_sector[19..21]) as u16,
+            _root_dir_count: LittleEndian::read_u16(&bpb_sector[17..19]),
+            legacy_sectors: LittleEndian::read_u16(&bpb_sector[19..21]),
             _media_type: bpb_sector[21],
             legacy_sectors_per_fat: bpb_sector[22],
-            _sectors_per_track: LittleEndian::read_u16(&mut bpb_sector[0x18..0x20]) as u16, // 0x18
-            _head_count: LittleEndian::read_u16(&mut bpb_sector[26..28]) as u16,
-            _hidden_sectors: LittleEndian::read_u32(&mut bpb_sector[28..32]) as u32,
-            sectors: LittleEndian::read_u32(&mut bpb_sector[32..36]) as u32,
+            _sectors_per_track: LittleEndian::read_u16(&bpb_sector[0x18..0x20]), // TODO why is this indexed with hex? It's not even two bytes
+            _head_count: LittleEndian::read_u16(&bpb_sector[26..28]),
+            _hidden_sectors: LittleEndian::read_u32(&bpb_sector[28..32]),
+            sectors: LittleEndian::read_u32(&bpb_sector[32..36]),
         };
 
         // debug!("bytes per sector: {}", fatheader.bytes_per_sector);
@@ -385,7 +385,7 @@ impl FsNode for PFSFile {
     }
 
     fn set_parent_dir(&mut self, _new_parent: WeakDirRef) {
-        debug!("set parent for file not supported yet");
+        warn!("set parent for file not supported yet");
     }
 }
 
@@ -789,6 +789,7 @@ impl Filesystem {
         ((cluster - 2) * self.sectors_per_cluster) + self.first_data_sector
     }
 
+    // TODO: this method seems like it should be renamed.
     /// Initializes a PFSDirectory strcuture based on the cluster that the PFSdirectory is stored in
     fn get_directory(&self, cluster: u32, name: String, parent: DirRef, fs: Arc<Mutex<Filesystem>>) -> Result<PFSDirectory, Error> {
         // debug!("name of directory:{}", name);
@@ -802,6 +803,7 @@ impl Filesystem {
         })
     }
 
+    // TODO: rename this method.
     /// Initializes a PFSFile strcture based on the cluster that the PFSfile is stored as well as it's size
     fn get_file(&self, cluster: u32, size: u32, name: String, parent: DirRef, fs: Arc<Mutex<Filesystem>> ) -> Result<PFSFile, Error> {
         debug!("name of file:{}", name);
@@ -817,6 +819,7 @@ impl Filesystem {
         })
     }
 
+    // TODO: document the behavior for EOF encountered (since this is useful).
     /// Used to transverse to the next cluster of a PFSfile/PFSdirectory that spans multiple clusters by utlizing the FAT component
     fn next_cluster(&self, cluster: u32) -> Result<u32, Error> {
         match self.fat_type {
@@ -860,7 +863,7 @@ impl Filesystem {
     }
 }
 
-
+// TODO allow this to work relative to a directory (that is, root or other y'know).
 /// Creates a PFSfile structure based on a provided path
 /// 
 /// # Arguments 
@@ -882,7 +885,7 @@ pub fn open(fs: Arc<Mutex<Filesystem>>, path: &str) -> Result<PFSFile, Error> {
             children: BTreeMap::new() 
         };
         
-        let strong_root = Arc::new(Mutex::new(root_dir)) as Arc<Mutex<Directory + Send>>;
+        let strong_root = Arc::new(Mutex::new(root_dir)) as Arc<Mutex<dyn Directory + Send>>;
         // let fs = Arc::new(Mutex::new(self));
         fs.lock();
         
@@ -926,7 +929,7 @@ pub fn open(fs: Arc<Mutex<Filesystem>>, path: &str) -> Result<PFSFile, Error> {
                     Ok(de) => {
                         // Compares the name of the next destination in the path and the name of the PFSdirectory entry that it's currently looking at
                         if compare_name(sub, &de) {
-                            // let dir_ref = Arc::new(Mutex::new(*current_dir)) as Arc<Mutex<Directory + Send>>;
+                            // let dir_ref = Arc::new(Mutex::new(*current_dir)) as Arc<Mutex<dyn Directory + Send>>;
                             match de.file_type {
                                 FileType::PFSDirectory => {
                                     // If the next destination is a PFSdirectory, this will initialize the PFSdirectory structure for that  
@@ -954,8 +957,7 @@ pub fn open(fs: Arc<Mutex<Filesystem>>, path: &str) -> Result<PFSFile, Error> {
 /// # Return
 /// If the drive passed in contains a fat filesystem, this returns the filesystem structure needed to run operations on the disk 
 pub fn init(sd: storage_device::StorageDeviceRef) -> Result<Filesystem, &'static str>  {
-    
-   
+    info!("Attempting to initialize a fat32 filesystem");
     // Once a FAT32 filesystem is detected, this will create the Filesystem structure from the drive
     if detect_fat(&sd) == true {
         let header = match Header::new(sd){
@@ -988,7 +990,7 @@ pub fn root_dir(fs: Arc<Mutex<Filesystem>>) -> Result<PFSDirectory, Error> {
             children: BTreeMap::new() 
         };
              
-        let strong_root = Arc::new(Mutex::new(root_dir)) as Arc<Mutex<Directory + Send>>;
+        let strong_root = Arc::new(Mutex::new(root_dir)) as Arc<Mutex<dyn Directory + Send>>;
 
         let fatdir = PFSDirectory {
         filesystem: fs.clone(),
@@ -1017,10 +1019,10 @@ pub fn detect_fat(disk: &storage_device::StorageDeviceRef) -> bool {
         Ok(bytes) => bytes,
         Err(_) => return false,
     };
-    
-    // The offset at 0x52 in the extended FAT32 BPB is used to detect the Filesystem type 
-    match initial_buf[82..87] {
-        [0x46,0x41,0x54,0x33,0x32] => return true,
+    info!("Magic sequence: {:X?}", &initial_buf[82..90]);
+    // The offset at 0x52 in the extended FAT32 BPB is used to detect the Filesystem type ("FAT32   ")
+    match initial_buf[82..90] {
+        [0x46,0x41,0x54,0x33,0x32, 0x20, 0x20, 0x20] => return true,
         _ => return false,
     };    
 }
