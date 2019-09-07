@@ -208,6 +208,7 @@ dependencies = [
  "e1000 0.1.0",
  "event_types 0.1.0",
  "exceptions_full 0.1.0",
+ "fat32 0.1.0",
  "frame_buffer 0.1.0",
  "frame_buffer_3d 0.1.0",
  "input_event_manager 0.1.0",
@@ -227,6 +228,7 @@ dependencies = [
  "scheduler 0.1.0",
  "simd_personality 0.1.0",
  "spawn 0.1.0",
+ "storage_manager 0.1.0",
  "task 0.1.0",
  "task_fs 0.1.0",
  "tsc 0.1.0",
@@ -534,6 +536,21 @@ dependencies = [
 name = "fallible-iterator"
 version = "0.2.0"
 source = "registry+https://github.com/rust-lang/crates.io-index"
+
+[[package]]
+name = "fat32"
+version = "0.1.0"
+dependencies = [
+ "byteorder 1.2.7 (registry+https://github.com/rust-lang/crates.io-index)",
+ "fs_node 0.1.0",
+ "lazy_static 1.2.0 (registry+https://github.com/rust-lang/crates.io-index)",
+ "log 0.3.9 (registry+https://github.com/rust-lang/crates.io-index)",
+ "memory 0.1.0",
+ "root 0.1.0",
+ "spin 0.4.10 (registry+https://github.com/rust-lang/crates.io-index)",
+ "storage_device 0.1.0",
+ "storage_manager 0.1.0",
+]
 
 [[package]]
 name = "frame_buffer"
@@ -1070,6 +1087,24 @@ dependencies = [
  "util 0.1.0",
  "vfs_node 0.1.0",
  "xmas-elf 0.6.2 (git+https://github.com/kevinaboos/xmas-elf.git)",
+]
+
+[[package]]
+name = "mount_fat32"
+version = "0.1.0"
+dependencies = [
+ "ata 0.1.0",
+ "device_manager 0.1.0",
+ "fat32 0.1.0",
+ "fs_node 0.1.0",
+ "getopts 0.2.18 (git+https://github.com/kevinaboos/getopts)",
+ "log 0.3.9 (registry+https://github.com/rust-lang/crates.io-index)",
+ "path 0.1.0",
+ "spin 0.4.10 (registry+https://github.com/rust-lang/crates.io-index)",
+ "storage_device 0.1.0",
+ "storage_manager 0.1.0",
+ "task 0.1.0",
+ "terminal_print 0.1.0",
 ]
 
 [[package]]

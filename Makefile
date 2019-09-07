@@ -598,7 +598,13 @@ bochs: $(iso)
 	bochs -f bochsrc.txt -q
 
 
-
+### Creates a fat32 filesystem that we can mount and test with:
+### Additional requirements: 
+fat32.img:
+	dd if=/dev/zero of=fat32.img count=50 bs=1M
+	./fat32fdisk.sh
+	echo 'test'
+	mkfs.vfat -F 32 fat32.img
 
 ### Checks that the supplied usb device (for usage with the boot/pxe targets).
 ### Note: this is bypassed on WSL, because WSL doesn't support raw device files yet.
