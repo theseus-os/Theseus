@@ -118,6 +118,16 @@ use alloc::string::String;
 use alloc::string::ToString;
 use memory::MappedPages;
 
+/// The end-of-cluster value written by this implementation of FAT32.
+/// Note that many implementations use different values for EOC
+/// DO NOT UNDER ANY CIRCUMSTANCE CHECK THIS FOR EQUALITY TO DETERMINE EOC
+const EOC: u32 = 0x0fff_ffff;
+
+/// Checks if a cluster number is an EOC value:
+#[inline]
+pub fn is_eoc(cluster: u32) -> bool {
+    (cluster & 0x0fff_ffff) > 0x0fff_fff8
+}
 
 #[derive(Debug, PartialEq)]
 pub enum Error {
@@ -389,6 +399,16 @@ impl FsNode for PFSFile {
     }
 }
 
+/// Structure to store the position of a fat32 directory during a walk.
+pub struct PFSPosition {
+    /// Cluster number of the current position.
+    cluster: u32, 
+    /// Sector offset into the current cluster
+    sector_offset: u32, 
+    /// Entry offset into the current sector
+    entry_offset: usize, 
+}
+
 #[derive(Clone)]
 /// Structure for a FAT32 directory. 
 pub struct PFSDirectory {
@@ -403,6 +423,7 @@ pub struct PFSDirectory {
 impl Directory for PFSDirectory {
     fn insert(&mut self, _node: FileOrDir) -> Result<Option<FileOrDir>, &'static str> {
         Err("insert directory not implemented yet")
+        // Walk the direcotry table and find an empty spot (or insert)
     }
 
     fn get(&self, name: &str) -> Option<FileOrDir> {
@@ -483,10 +504,102 @@ impl FsNode for PFSDirectory {
 
 impl PFSDirectory {
     
+    // TODO abstract the state in these functions into some sort of directory walk structure?
+    // I think this is the best way forward that achieves both performance and general code cleanliness goals.
+    // Furthermore it would prevent state spill within the module.
+    
+    /// Sets the directory state to being the first entry in the directory (used by next_entry)
+    pub fn initial_pos(&self) -> PFSPosition {
+        PFSPosition {
+            cluster: self.cluster,
+            sector_offset: 0,
+            entry_offset: 0, 
+        }
+    }
+    
+    /// Advances a PFSPosition by one entry and returns the new entry if successful.
+    /// Note that if EOC is reached the cluster is set to the EOC value found. I think this may not be ideal API design however so it potentially may need to change.
+    pub fn advance_pos(&self, pos: &PFSPosition) -> Result<PFSPosition, Error> {
+        let fs = self.filesystem.lock();
+        
+        let mut new_pos = PFSPosition {
+            cluster : pos.cluster,
+            entry_offset : pos.entry_offset + 32, // TODO I'd like to pull this constant from FatDirectory. This size is only 32 if the type is #repr(packed) however so that's not really ideal unless we want the type to model directly reading from disk (in which case we'd want something to annotate the numbers as little endian).
+            sector_offset : pos.sector_offset, 
+        };
+        
+        if new_pos.entry_offset >= fs.bytes_per_sector as usize {
+            new_pos.entry_offset = 0;
+            new_pos.sector_offset = new_pos.sector_offset + 1;
+        }
+        
+        if new_pos.sector_offset >= fs.sectors_per_cluster {
+            new_pos.sector_offset = 0;
+            new_pos.cluster = fs.next_cluster(self.cluster)?;
+        }
+        
+        Ok(new_pos)
+    }
+    
+    
+    /// Returns the entry indicated by PFSPosition. TODO allow this to save reads and writes.
+    /// the function is used and returns EndOfFile if the next PFSdirectory doesn't exist
+    /// Note that this function will happily return unused directory entries since it simply provides a sequential view of the entries on disk.
+    /// Does not yet support long filenames.
+    pub fn get_entry(&self, pos: &PFSPosition) -> Result<DirectoryEntry, Error> {
+        let fs = self.filesystem.lock();
+        
+        let sector = pos.cluster * fs.sectors_per_cluster() + pos.sector_offset;
+        
+        // Get the sector on disk corresponding to our sector and cluster:
+        let mut data: Vec<u8> = vec![0; fs.bytes_per_sector as usize];
+        let _sectors_read = match fs.header.drive.lock().read_sectors(&mut data[..], (sector) as usize) {
+            Ok(bytes) => bytes,
+            Err(_) => return Err(Error::BlockError),
+        };
+        
+        let entry_offset = pos.entry_offset;
+        let fat_dir = FatDirectory {
+            name: match data[(entry_offset)..(11+entry_offset)].try_into() {
+                        Ok(array) => array,
+                        Err(_) => return Err(Error::BlockError),
+            },
+            flags: data[11+entry_offset],
+            _unused1: match data[(12+entry_offset)..(20+entry_offset)].try_into() {
+                        Ok(array) => array,
+                        Err(_) => return Err(Error::BlockError),
+            },
+            cluster_high: LittleEndian::read_u16(&mut data[(20+entry_offset)..(22+entry_offset)]) as u16,
+            _unused2: match data[(22+entry_offset)..(26+entry_offset)].try_into() {
+                Ok(array) => array,
+                Err(_) => return Err(Error::BlockError),
+            },
+            cluster_low: LittleEndian::read_u16(&mut data[(26+entry_offset)..(28+entry_offset)]) as u16,
+            size: LittleEndian::read_u32(&mut data[(28+entry_offset)..(32+entry_offset)]) as u32,
+        };
+        
+        // TODO this needs to ensure that unused directory entries are properly marked?
+        Ok(DirectoryEntry {
+            name: fat_dir.name,
+            file_type: if fat_dir.flags & 0x10 == 0x10 {
+                FileType::PFSDirectory
+            } else {
+                FileType::PFSFile
+            },
+            cluster: (u32::from(fat_dir.cluster_high)) << 16 | u32::from(fat_dir.cluster_low),
+            size: fat_dir.size,
+            long_name: [0; 255] // long names not supported
+        })
+    }
+    
+    
+    // TODO get rid of this function?
+    /// Note that the offset used by this function is different from the offset used by the other next entry function.
     /// Returns the next FATDirectory entry in a FATdirectory while mutating the directory object to offset an entry each time 
     /// the function is used and returns EndOfFile if the next PFSdirectory doesn't exist
+    #[deprecated]
     pub fn next_entry(&mut self) -> Result<DirectoryEntry, Error> {
-        
+        warn!("next_entry called. This corrupts the directory for future use");
         let fs = self.filesystem.lock();
         loop {
             let sector = if self.cluster > 0 {
@@ -508,7 +621,7 @@ impl PFSDirectory {
                 self.sector
                     + fs.first_sector_of_cluster(self.cluster)
             } else {
-                self.sector
+                self.sector // TODO what does this section do?
             };
 
             // let fs = self.filesystem;
@@ -688,12 +801,19 @@ impl PFSDirectory {
             self_sector += 1;
         }
     }
+    
+    /// Walks the list of directory entries and attempts to find an empty entry.
+    /// Otherwise grows the directory by ???(TODO) entries and returns the relevant entry (TODO should it?)
+    pub fn find_empty_or_grow(&self) -> Result<DirectoryEntry, Error> {
+        Err(Error::Unsupported)
+    }
+    
 }
 
 /// Structure for the filesystem to be used to transverse the disk and run operations on the disk
 pub struct Filesystem {
     header: Header, // This is meant to read the first 512 bytes of the virtual drive in order to obtain device information
-    bytes_per_sector: u32, // default set to 512
+    bytes_per_sector: u32, // default set to 512 // TODO why aren't we using this instead of the drive's value?
     sectors: u32, // depends on number of clusters and sectors per cluster
     fat_type: u8, // support for fat32 only
     clusters: u32, // number of clusters
@@ -843,6 +963,7 @@ impl Filesystem {
                 let next_cluster = next_cluster_raw & 0x0fff_ffff;
                 // debug!("the next cluster is: {}", next_cluster);
                 
+                // TODO use is_eoc
                 if next_cluster >= 0x0fff_fff8 {
                     Err(Error::EndOfFile)
                 } else {

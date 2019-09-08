@@ -49,7 +49,7 @@ extern crate input_event_manager;
 #[cfg(test_network)] extern crate exceptions_full;
 extern crate network_manager;
 extern crate pause;
-extern crate fat32; // Unused but allows gdb to work with fat32 module.
+extern crate fat32; // Only used for dummy code but needed to make fat32 work with gdb.
 
 #[cfg(simd_personality)] extern crate simd_personality;
 
@@ -62,7 +62,6 @@ use memory::{VirtualAddress, MemoryManagementInfo, MappedPages};
 use kernel_config::memory::KERNEL_STACK_SIZE_IN_PAGES;
 use irq_safety::{MutexIrqSafe, enable_interrupts};
 use pause::spin_loop_hint;
-use fat32::detect_fat;
 
 
 
