@@ -105,5 +105,13 @@ path = "../task_fs"
 [dependencies.pause]
 path = "../pause"
 
+# Used to allow for debugging the fat32 crate. Can be commented out later?
+[dependencies.fat32]
+path = "../fat32"
+
+# Used to allow for debugging the fat32 crate. Can be commented out later?
+[dependencies.storage_manager]
+path = "../storage_manager"
+
 [lib]
 crate-type = ["rlib"]

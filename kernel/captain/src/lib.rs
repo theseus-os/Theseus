@@ -41,6 +41,7 @@ extern crate acpi;
 extern crate device_manager;
 extern crate e1000;
 extern crate window_manager;
+extern crate storage_manager;
 extern crate scheduler;
 extern crate frame_buffer;
 #[cfg(mirror_log_to_vga)] #[macro_use] extern crate print;
@@ -48,6 +49,7 @@ extern crate input_event_manager;
 #[cfg(test_network)] extern crate exceptions_full;
 extern crate network_manager;
 extern crate pause;
+extern crate fat32; // Only used for dummy code but needed to make fat32 work with gdb.
 
 #[cfg(simd_personality)] extern crate simd_personality;
 
@@ -143,6 +145,14 @@ pub fn init(
 
     task_fs::init()?;
 
+    
+    // Some janky fat32 code to quickly test something:
+    if let Some(controller) = storage_manager::STORAGE_CONTROLLERS.lock().iter().next() {
+        for sd in controller.lock().devices() {
+            /* println!("Got a drive"); */
+            fat32::detect_fat(&sd);
+        }
+    }
 
     // before we jump to userspace, we need to unmap the identity-mapped section of the kernel's page tables, at PML4[0]
     // unmap the kernel's original identity mapping (including multiboot2 boot_info) to clear the way for userspace mappings

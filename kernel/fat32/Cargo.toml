@@ -1,0 +1,39 @@
+[package]
+authors = ["Barry Shiberu <bereketshiberu@gmail.com>"]
+name = "fat32"
+description = "physical filesystem -- FAT32 support"
+version = "0.1.0"
+build = "../../build.rs"
+
+
+[dependencies]
+spin = "0.4.10"
+zerocopy = "0.2.8"
+byteorder = { version = "1", default-features = false }
+
+[dependencies.lazy_static]
+version = "1.0"
+features = ["spin_no_std"]
+
+[dependencies.log]
+default-features = false
+version = "0.3.7"
+
+[dependencies.memory]
+path = "../memory"
+
+[dependencies.storage_device]
+path = "../storage_device"
+
+[dependencies.fs_node]
+path = "../fs_node"
+
+[dependencies.root]
+path = "../root"
+
+[dependencies.storage_manager]
+path = "../storage_manager"
+
+
+[lib]
+crate-type = ["rlib"]
