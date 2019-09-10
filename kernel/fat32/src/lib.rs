@@ -105,7 +105,9 @@ extern crate spin;
 extern crate memory;
 extern crate root;
 extern crate byteorder;
+extern crate zerocopy;
 
+use zerocopy::{FromBytes, AsBytes};
 use byteorder::ByteOrder;
 use byteorder::LittleEndian;
 use alloc::collections::BTreeMap;
@@ -131,9 +133,24 @@ const EMPTY_CLUSTER: u32 = 0;
 
 /// Checks if a cluster number is an EOC value:
 #[inline]
-pub fn is_eoc(cluster: u32) -> bool {
-    (cluster & 0x0fff_ffff) > 0x0fff_fff8
+fn is_eoc(cluster: u32) -> bool {
+    cluster_from_raw(cluster) > 0x0fff_fff8
 }
+
+/// Checks if a cluster number counts as free:
+#[inline]
+fn is_empty_cluster(cluster: u32) -> bool {
+    cluster_from_raw(cluster) == EMPTY_CLUSTER
+}
+
+// TODO misleading name makes it sound like we're handling the endian-ness
+/// Converts a cluster number read raw from disk into the value used for computation.
+#[inline]
+fn cluster_from_raw(cluster: u32) -> u32 {
+    (cluster & 0x0fff_ffff)
+}
+
+
 
 #[derive(Debug, PartialEq)]
 pub enum Error {
@@ -254,6 +271,62 @@ impl Fat32Header {
     }
 }
 
+#[repr(packed)]
+#[derive(FromBytes, AsBytes)]
+// TODO I'd like to make cluster high and low not-vectors. But the endian-ness package we have only supports
+// this sort of operation.
+/// A raw 32-byte FAT directory which is packed and has little endian fields.
+struct RawFatDirectory {
+    name: [u8; 11], // 8 letter entry with a 3 letter ext
+    flags: u8, // designate the PFSdirectory as r,w,r/w
+    _unused1: [u8; 8], // unused data
+    cluster_high: u16, // but contains permissions required to access the PFSfile
+    _unused2: [u8; 4], // data including modified time
+    cluster_low: u16, // the starting cluster of the PFSfile
+    size: u32, // size of PFSfile in bytes, volume label or subdirectory flags should be set to 0
+}
+
+impl RawFatDirectory {
+    fn to_fat_directory(&self) -> FatDirectory {
+        FatDirectory {
+            name: self.name,
+            flags: self.flags,
+            _unused1: self._unused1,
+            cluster_high: u16::from_le(self.cluster_high),
+            _unused2: self._unused2,
+            cluster_low: u16::from_le(self.cluster_low),
+            size: u32::from_le(self.size),
+        }
+    }
+    
+    fn to_directory_entry(&self) -> DirectoryEntry {
+        DirectoryEntry {
+            name: self.name,
+            file_type: if self.flags & 0x10 == 0x10 {
+                FileType::PFSDirectory
+            } else {
+                FileType::PFSFile
+            },
+            cluster: (u32::from(u16::from_le(self.cluster_high))) << 16 | u32::from(u16::from_le(self.cluster_low)),
+            size: u32::from_le(self.size),
+            long_name: [0; 255] // long names not supported. TODO
+        } 
+    }
+    
+    fn make_unused() -> RawFatDirectory {
+        RawFatDirectory {
+            name: [FREE_DIRECTORY_ENTRY; 11],
+            flags: 0,
+            _unused1: [0; 8],
+            cluster_high: 0,
+            _unused2: [0; 4],
+            cluster_low: 0,
+            size: 0,
+        }
+    }
+}
+
+// TODO do we still need this type?
 /// The actual 32-byte FAT directory format that contains metadata about a file/subdirectory inside a FAT32
 /// formatted filesystem
 struct FatDirectory {
@@ -285,6 +358,18 @@ impl FatDirectory {
             long_name: [0; 255] // long names not supported. TODO
         } 
     }
+    
+    fn to_raw_fat_directory(&self) -> RawFatDirectory {
+        RawFatDirectory {
+            name: self.name,
+            flags: self.flags,
+            _unused1: self._unused1,
+            cluster_high: u16::to_le(self.cluster_high),
+            _unused2: self._unused2,
+            cluster_low: u16::to_le(self.cluster_low),
+            size: u32::to_le(self.size),
+        }
+    }
 }
 
 /// Based on the FatDirectory structure and used to describe the files/subdirectories in a FAT32 
@@ -295,6 +380,30 @@ pub struct DirectoryEntry {
     file_type: FileType,
     pub size: u32,
     cluster: u32,
+}
+
+/// TODO these methods need to potentially generate a sequence of entries.
+impl DirectoryEntry {
+    fn to_directory_entry(&self) -> FatDirectory {
+        // Janky but I don't know if we want the fat_directory type for much longer anyway?
+        // FIXME
+        self.to_raw_fat_directory().to_fat_directory()
+    }
+    
+    fn to_raw_fat_directory(&self) -> RawFatDirectory {
+        RawFatDirectory {
+            name: self.name,
+            flags: match self.file_type {
+                FileType::PFSFile => 0x0,
+                FileType::PFSDirectory => 0x10,
+            }, // FIXME need to store more flags in DirectoryEntry type
+            _unused1: [0; 8],
+            cluster_high: u16::to_le((self.cluster >> 16) as u16),
+            _unused2: [0; 4],
+            cluster_low: u16::to_le((self.cluster) as u16),
+            size: u32::to_le(self.size),
+        }
+    }
 }
 
 /// Structure for a file in FAT32. This key information is used to transverse the
@@ -611,6 +720,43 @@ impl PFSDirectory {
         Ok(fat_dir)
     }
     
+    // FIXME use sub byte transactions at some point?
+    /// Writes the RawFatDirectory dir to the position pos in the file.
+    fn write_fat_directory(&self, pos: &PFSPosition, dir: &RawFatDirectory, fs :&Filesystem) -> Result<usize, Error> {
+        let cluster = pos.cluster;
+        let base_sector = fs.first_sector_of_cluster(cluster);
+        let sector = pos.sector_offset + base_sector;
+        let entry = pos.entry_offset;
+        
+        // Verify that entry is a multiple of the size of object want to write:
+        if entry % size_of::<RawFatDirectory>() != 0 {
+            return Err(Error::IllegalArgument);
+        }
+        
+        // Fetch the data from the disk:
+        let mut data: Vec<u8> = vec![0; fs.bytes_per_sector as usize];
+        let _sectors_read = match fs.header.drive.lock().read_sectors(&mut data[..], sector as usize) {
+            Ok(bytes) => bytes,
+            Err(_) => {
+                return Err(Error::BlockError);
+            },
+        };
+        
+        // TODO needs to copy into byte array
+        data[entry..(entry + size_of::<RawFatDirectory>())].copy_from_slice(dir.as_bytes());
+        
+        // Write the old out:
+        let _sectors_written = match fs.header.drive.lock().write_sectors(&data, sector as usize) {
+            Ok(sectors) => sectors,
+            Err(_) => {
+                warn!("Fat32 disk is in an inconsistent state");
+                return Err(Error::BlockError);
+            },
+        };
+        
+        Ok(size_of::<RawFatDirectory>())
+    }
+    
 
     
     
@@ -737,10 +883,7 @@ impl PFSDirectory {
         let mut pos = self.initial_pos();
         
         loop {
-            let dir: FatDirectory = match self.get_fat_directory(&pos) {
-                Ok(valid_dir) => valid_dir,
-                Err(e) => return Err(e),
-            };
+            let dir: FatDirectory = self.get_fat_directory(&pos)?;
             
             if dir.is_free() {
                 return Ok(pos); // Pos is now set to the position of a free directory so we can continue.
@@ -754,6 +897,9 @@ impl PFSDirectory {
         }
     }
     
+    // FIXME currently this is called by a function that locks the fs -> double lock?
+    // I think the "best" solution is perhaps to make everything that's not part of the public interface pass the fs in as an argument.
+    // Make FS an argument I suppose. Seems dumb though.
     /// Grows the directory given a PFSPosition in the last cluster of the file and returns a new position in the new_cluster.
     fn grow_directory(&self, pos_end: &PFSPosition) -> Result<PFSPosition, Error> {
         let fs = self.filesystem.lock();
@@ -767,25 +913,38 @@ impl PFSDirectory {
             warn!("Directory growth assumes size is a multiple of cluster size");
         }
         
-        // TODO abstract into a grow node sort of function.
-        // Verify that the next element is EOC. Also try to extend without fragmentation.
-        
-        // Fetch the FAT for the next table:
-        let fat_entry = Filesystem::fat_entry_from_cluster(pos.cluster + 1);
-        let fat_sector = fs.fat_sector_from_fat_entry(fat_entry);
-        let mut data: Vec<u8> = vec![0; fs.bytes_per_sector as usize];
-        let _sectors_read = match fs.header.drive.lock().read_sectors(&mut data[..], fat_sector as usize) {
-                Ok(bytes) => bytes,
-                Err(_) => return Err(Error::BlockError),
-        };
-        
+        // TODO grow the node: 
         // Otherwise find an empty cluster.
-        Err(Error::Unsupported)
+        let new_cluster = fs.extend_chain(pos.cluster)?;
         
         // Now write all the entries in that cluster to be unused and return a PFSPosition with those entries.
+        let mut pos = PFSPosition {
+            cluster: new_cluster,
+            sector_offset: 0,
+            entry_offset: 0,
+        };
         
-        // Update the size in the parent's directory entry.
+        let unused_entry = RawFatDirectory::make_unused();
+        
+        loop {
+            self.write_fat_directory(&pos, &unused_entry, &fs)?;
+            pos = match self.advance_pos(&pos) {
+                Ok(p) => p,
+                Err(Error::EndOfFile) => break,
+                Err(e) => return Err(e),
+            }
+        }
+        
+        // Update the size in the parent's directory entry. -> Note this isn't actually necessary for a directory.
+        // TODO make sure we don't actually need to update size in dir_entry.
+        
         // Update the size now that the directory is at the end.
+        // TODO verify that we don't need to do this.
+        
+        pos.cluster = new_cluster;
+        pos.sector_offset = 0;
+        pos.entry_offset = 0;
+        Ok(pos)
     }
 
     /// Returns a vector of all the directory entries in a directory without mutating the directory
@@ -1044,7 +1203,7 @@ impl Filesystem {
                 // Read more here: https://en.wikipedia.org/wiki/Design_of_the_FAT_file_system#FAT
                 let entry_offset = fat_entry % (self.bytes_per_sector / size_of::<u32>() as u32);
                 let next_cluster_raw = LittleEndian::read_u32(&mut data[entry_offset as usize..(entry_offset as usize +size_of::<u32>())]) as u32; 
-                let next_cluster = next_cluster_raw & 0x0fff_ffff;
+                let next_cluster = cluster_from_raw(next_cluster_raw);
                 // debug!("the next cluster is: {}", next_cluster);
                 
                 if is_eoc(next_cluster) {
@@ -1101,13 +1260,115 @@ impl Filesystem {
         return Err(Error::DiskFull);
     }
     
+    /// Extends a cluster chain by one cluster and returns the new cluster of the extended chain.
+    fn extend_chain(&self, old_tail: u32) -> Result<u32, Error> {
+        // Fetch the FAT for the table entry and check if next entry is free.
+        let fat_entry = Filesystem::fat_entry_from_cluster(old_tail);
+        let fat_sector = self.fat_sector_from_fat_entry(fat_entry);
+        let mut data: Vec<u8> = vec![0; self.bytes_per_sector as usize];
+        let _sectors_read = match self.header.drive.lock().read_sectors(&mut data[..], fat_sector as usize) {
+                Ok(bytes) => bytes,
+                Err(_) => return Err(Error::BlockError),
+        };
+        
+        // Verify that the current position is indeed EOC
+        let entry_offset = fat_entry % (self.bytes_per_sector / size_of::<u32>() as u32);
+        let cluster_value = LittleEndian::read_u32(
+            &mut data[entry_offset as usize..(entry_offset as usize +size_of::<u32>())]) as u32;
+        let cluster_value = cluster_from_raw(cluster_value);
+            
+        if !is_eoc(cluster_value) {
+            warn!("Tried to extend chain without end of cluster. Found {:x} at cluster {:x}", cluster_value, old_tail);
+            return Err(Error::IllegalArgument);
+        }
+        
+        let mut cluster_found = false;
+        
+        // TODO this sort of logic could easily be written with a PFSPosition struct?
+        // In general this code section is pretty ugly. Could be refactored.
+        
+        // See if we can trivially extend the chain?
+        let mut new_cluster_candidate = old_tail + 1;
+        let mut new_fat_entry = Filesystem::fat_entry_from_cluster(new_cluster_candidate);
+        let mut new_fat_sector = self.fat_sector_from_fat_entry(new_fat_entry);
+        let mut new_entry_offset = new_fat_entry % (self.bytes_per_sector / size_of::<u32>() as u32);
+        
+        // TODO also check in the case where the FAT is not split across a sector boundary.
+        if new_fat_sector == fat_sector {
+            let next_cluster_value = LittleEndian::read_u32(
+                &mut data[new_entry_offset as usize..(new_entry_offset as usize +size_of::<u32>())]) as u32;
+            let next_cluster_value = cluster_from_raw(next_cluster_value);
+                
+            if is_empty_cluster(next_cluster_value) {
+                cluster_found = true;
+            }
+        }
+        
+        // Handle the case where we need to walk the FAT to find a free cluster:
+        if !cluster_found {
+            new_cluster_candidate = self.find_empty_cluster()?;
+            // Recompute the fat entry,sector etc:
+            new_fat_entry = Filesystem::fat_entry_from_cluster(new_cluster_candidate);
+            new_fat_sector = self.fat_sector_from_fat_entry(new_fat_entry);
+            new_entry_offset = new_fat_entry % (self.bytes_per_sector / size_of::<u32>() as u32);
+        }
+        
+        // TODO the order may affect correctness in cases where disk accesses fail. Consider this at some point.
+        // FIXME this code would also greatly benefit from byte granularity transactions
+        // Update the disk segments and write to disk:
+        LittleEndian::write_u32(
+            &mut data[entry_offset as usize..(entry_offset as usize +size_of::<u32>())], new_cluster_candidate);
+        if new_fat_sector == fat_sector {
+            LittleEndian::write_u32(
+                &mut data[new_entry_offset as usize..(new_entry_offset as usize +size_of::<u32>())], 
+                EOC);
+                
+            // Write the data out:
+            let _sectors_written = match self.header.drive.lock().write_sectors(&data, fat_sector as usize) {
+                Ok(sectors) => sectors,
+                Err(_) => return Err(Error::BlockError),
+            };
+        } else {
+            // Write the old out:
+            let _sectors_written = match self.header.drive.lock().write_sectors(&data, fat_sector as usize) {
+                Ok(sectors) => sectors,
+                Err(_) => return Err(Error::BlockError),
+            };
+            
+            // Read the new sector in
+            let _sectors_read = match self.header.drive.lock().read_sectors(&mut data[..], new_fat_sector as usize) {
+                Ok(bytes) => bytes,
+                Err(_) => {
+                    warn!("Fat32 disk is in an inconsistent state");
+                    return Err(Error::BlockError);
+                },
+            };
+            
+            // Overwrite the old entry
+            LittleEndian::write_u32(
+                &mut data[new_entry_offset as usize..(new_entry_offset as usize +size_of::<u32>())], 
+                EOC);
+                
+            // Write the old out:
+            let _sectors_written = match self.header.drive.lock().write_sectors(&data, new_fat_sector as usize) {
+                Ok(sectors) => sectors,
+                Err(_) => {
+                    warn!("Fat32 disk is in an inconsistent state");
+                    return Err(Error::BlockError);
+                },
+            };
+        }
+        
+        Ok(new_cluster_candidate)
+    }
+    
     #[inline]
     fn bytes_per_cluster(&self) -> u32 {
         return self.bytes_per_sector * self.sectors_per_cluster;
     }
     
     #[inline]
-    /// Computes the fat entry in the FAT corresponding to a given cluster.
+    /// Computes the fat entry in bytes in the FAT corresponding to a given cluster.
     fn fat_entry_from_cluster(cluster: u32) -> u32 {
         cluster * 4
     }
