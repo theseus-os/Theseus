@@ -8,6 +8,7 @@ build = "../../build.rs"
 
 [dependencies]
 spin = "0.4.10"
+zerocopy = "0.2.8"
 byteorder = { version = "1", default-features = false }
 
 [dependencies.lazy_static]
