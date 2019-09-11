@@ -236,15 +236,15 @@ pub fn init(allocator_mutex: &MutexIrqSafe<AreaFrameAllocator>, boot_info: &mult
             // (lower half virtual addresses mapped to same lower half physical addresses)
             // we will unmap these later before we start booting to userspace processes
             for i in 0..index {
-                let smb = &sections_memory_bounds[i];
-                let (start_virt_addr, start_phys_addr) = smb.start;
-                let (_end_virt_addr, end_phys_addr) = smb.end;
+                let sec = &sections_memory_bounds[i];
+                let (start_virt_addr, start_phys_addr) = sec.start;
+                let (_end_virt_addr, end_phys_addr) = sec.end;
                 let size = end_phys_addr.value() - start_phys_addr.value();
                 identity_mapped_pages[i] = Some(
                     mapper.map_frames(
                         FrameRange::from_phys_addr(start_phys_addr, size), 
                         Page::containing_address(start_virt_addr - KERNEL_OFFSET), 
-                        smb.flags,
+                        sec.flags,
                         allocator.deref_mut()
                     )?
                 );
@@ -259,7 +259,7 @@ pub fn init(allocator_mutex: &MutexIrqSafe<AreaFrameAllocator>, boot_info: &mult
             let (data_start_virt,    data_start_phys)    = initial_sections_memory_bounds.data.start;
             let (_data_end_virt,     data_end_phys)      = initial_sections_memory_bounds.data.end;
 
-            let text_flags    = initial_sections_memory_bounds.text.flags  ;
+            let text_flags    = initial_sections_memory_bounds.text.flags;
             let rodata_flags  = initial_sections_memory_bounds.rodata.flags;
             let data_flags    = initial_sections_memory_bounds.data.flags;
 
@@ -382,52 +382,3 @@ pub fn init(allocator_mutex: &MutexIrqSafe<AreaFrameAllocator>, boot_info: &mult
     // Return the new_page_table because that's the one that should be used by the kernel in future mappings. 
     Ok((new_page_table, kernel_vmas, text_mapped_pages, rodata_mapped_pages, data_mapped_pages, higher_half, identity))
 }
-
-
-// /// Get a stack trace, borrowed from Redox
-// /// TODO: Check for stack being mapped before dereferencing
-// #[inline(never)]
-// pub fn stack_trace() {
-//     use core::mem;
-
-//     // SAFE, just a stack trace for debugging purposes, and pointers are checked. 
-//     unsafe {
-        
-//         // get the stack base pointer
-//         let mut rbp: usize;
-//         asm!("" : "={rbp}"(rbp) : : : "intel", "volatile");
-
-//         error!("STACK TRACE: {:>016X}", rbp);
-//         //Maximum 64 frames
-//         let page_table = PageTable::from_current();
-//         for _frame in 0..64 {
-//             if let Some(rip_rbp) = rbp.checked_add(mem::size_of::<usize>()) {
-//                 // TODO: is this the right condition?
-//                 match (VirtualAddress::new(rbp), VirtualAddress::new(rip_rbp)) {
-//                     (Ok(rbp_vaddr), Ok(rip_rbp_vaddr)) => {
-//                         if page_table.translate(rbp_vaddr).is_some() && page_table.translate(rip_rbp_vaddr).is_some() {
-//                             let rip = *(rip_rbp as *const usize);
-//                             if rip == 0 {
-//                                 error!(" {:>016X}: EMPTY RETURN", rbp);
-//                                 break;
-//                             }
-//                             error!("  {:>016X}: {:>016X}", rbp, rip);
-//                             rbp = *(rbp as *const usize);
-//                             // symbol_trace(rip);
-//                         } else {
-//                             error!("  {:>016X}: GUARD PAGE", rbp);
-//                             break;
-//                         }
-//                     }
-//                     _ => {
-//                         error!(" {:>016X}: INVALID_ADDRESS", rbp);
-//                         break;
-//                     }
-//                 }
-                
-//             } else {
-//                 error!("  {:>016X}: RBP OVERFLOW", rbp);
-//             }
-//         }
-//     }
-// }
