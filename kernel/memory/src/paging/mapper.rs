@@ -489,7 +489,7 @@ impl MappedPages {
         let size_in_pages = self.size_in_pages();
 
         use paging::allocate_pages;
-        let new_pages = allocate_pages(self.size_in_pages()).ok_or_else(|| "Couldn't allocate_pages()")?;
+        let new_pages = allocate_pages(size_in_pages).ok_or_else(|| "Couldn't allocate_pages()")?;
 
         // we must temporarily map the new pages as Writable, since we're about to copy data into them
         let new_flags = new_flags.unwrap_or(self.flags);

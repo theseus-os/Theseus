@@ -33,7 +33,7 @@ pub fn panic_wrapper(panic_info: &PanicInfo) -> Result<(), &'static str> {
     // let my_crate = curr_task_locked.app_crate.as_ref().expect("unwind_test's app_crate was None");
     // for sec_ref in my_crate.lock_as_ref().sections.values() {
     //     let sec = sec_ref.lock();
-    //     trace!("    section {:?}, vaddr: {:#X}, size: {:#X}", sec.name, sec.virt_addr(), sec.size);
+    //     trace!("    section {:?}, vaddr: {:#X}, size: {:#X}", sec.name, sec.start_address(), sec.size());
     // }
     // namespace.handle_eh_frame(&my_crate, true).expect("handle_eh_frame failed");
 
@@ -56,7 +56,7 @@ pub fn panic_wrapper(panic_info: &PanicInfo) -> Result<(), &'static str> {
     stack_trace(
         &mmi_ref.lock().page_table,
         &|instruction_pointer: VirtualAddress| {
-            namespace.get_containing_section(instruction_pointer, app_crate_ref.as_ref())
+            namespace.get_section_containing_address(instruction_pointer, app_crate_ref.as_ref(), false)
                 .map(|(sec_ref, offset)| (sec_ref.lock().name.clone(), offset))
         },
     );

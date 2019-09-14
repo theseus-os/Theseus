@@ -75,7 +75,7 @@ fn panic_unwind_test(info: &PanicInfo) -> ! {
     panic_wrapper::stack_trace(
         &mmi_ref.lock().page_table,
         &|instruction_pointer: VirtualAddress| {
-            namespace.get_containing_section(instruction_pointer, app_crate_ref.as_ref())
+            namespace.get_section_containing_address(instruction_pointer, app_crate_ref.as_ref(), false)
                 .map(|(sec_ref, offset)| (sec_ref.lock().name.clone(), offset))
         },
     );
@@ -83,7 +83,7 @@ fn panic_unwind_test(info: &PanicInfo) -> ! {
     let starting_instruction_pointer = panic_wrapper::get_first_non_panic_instruction_pointer(
         &mmi_ref.lock().page_table,
         &|instruction_pointer: VirtualAddress| {
-            namespace.get_containing_section(instruction_pointer, app_crate_ref.as_ref())
+            namespace.get_section_containing_address(instruction_pointer, app_crate_ref.as_ref(), false)
                 .map(|(sec_ref, offset)| (sec_ref.lock().name.clone(), offset))
         },
     ).expect("couldn't determine which instruction pointer was the first non-panic-related one");
@@ -93,7 +93,7 @@ fn panic_unwind_test(info: &PanicInfo) -> ! {
     
     // search for unwind entry related to the current instruction pointer
     // first, we need to get the containing crate for this IP
-    let my_crate = namespace.get_containing_section(starting_instruction_pointer, app_crate_ref.as_ref())
+    let my_crate = namespace.get_section_containing_address(starting_instruction_pointer, app_crate_ref.as_ref(), false)
         .and_then(|(sec_ref, _offset)| sec_ref.lock().parent_crate.upgrade())
         .expect("panic_unwind_test(): couldn't get section/crate");
 
@@ -124,7 +124,7 @@ pub fn handle_eh_frame(
 
     let text_pages = parent_crate.text_pages.as_ref()
         .ok_or("crate did not contain any .text sections, which must exist to parse .eh_frame")?;
-    let text_pages_vaddr = text_pages.lock().start_address().value();
+    let text_pages_vaddr = text_pages.1.start.value();
 
     let eh_frame_sec_ref = parent_crate.sections.values()
         .filter(|s| s.lock().typ == SectionType::EhFrame)
@@ -132,9 +132,9 @@ pub fn handle_eh_frame(
         .ok_or("crate did not contain an .eh_frame section")?;
     
     let sec = eh_frame_sec_ref.lock();
-    let size_in_bytes = sec.size;
+    let size_in_bytes = sec.size();
     let sec_pages = sec.mapped_pages.lock();
-    let eh_frame_vaddr = sec.virt_addr().value();
+    let eh_frame_vaddr = sec.start_address().value();
     assert_eq!(eh_frame_vaddr, sec_pages.start_address().value() + sec.mapped_pages_offset, "eh_frame address mismatch");
 
     warn!("Parsing crate {}'s eh_frame section {:?}...", crate_name, sec);

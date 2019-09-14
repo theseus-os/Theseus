@@ -135,13 +135,19 @@ fn parse_nano_core_symbol_file<F: File + ?Sized>(
     // we build a list of other non-section symbols too, such as constants defined in assembly code
     let mut init_symbols: BTreeMap<String, usize> = BTreeMap::new();
 
+    let mp_range = |mp_ref: &Arc<Mutex<MappedPages>>| {
+
+        let mp = mp_ref.lock();
+        mp.start_address() .. (mp.start_address() + mp.size_in_bytes())
+    };
+
     let new_crate = CowArc::new(LoadedCrate {
         crate_name:              crate_name,
         object_file_abs_path:    abs_path,
         sections:                BTreeMap::new(),
-        text_pages:              Some(text_pages.clone()),
-        rodata_pages:            Some(rodata_pages.clone()),
-        data_pages:              Some(data_pages.clone()),
+        text_pages:              Some((text_pages.clone(),   mp_range(&text_pages))),
+        rodata_pages:            Some((rodata_pages.clone(), mp_range(&rodata_pages))),
+        data_pages:              Some((data_pages.clone(),   mp_range(&data_pages))),
         global_symbols:          BTreeSet::new(),
         bss_sections:            Trie::new(),
         reexported_symbols:      BTreeSet::new(),
@@ -214,11 +220,11 @@ fn parse_nano_core_symbol_file<F: File + ?Sized>(
             else if line.contains(".data ") && line.contains("PROGBITS") {
                 data_shndx = parse_section_ndx(line);
             }
-            else if line.contains(".rodata ") && line.contains("PROGBITS") {
-                rodata_shndx = parse_section_ndx(line);
-            }
             else if line.contains(".bss ") && line.contains("NOBITS") {
                 bss_shndx = parse_section_ndx(line);
+            }
+            else if line.contains(".rodata ") && line.contains("PROGBITS") {
+                rodata_shndx = parse_section_ndx(line);
             }
             else if let Some(start) = line.find(".eh_frame ") {
                 let (sec_vaddr, sec_size) = try_mp!(parse_section_vaddr_size(&line[start..])
@@ -579,13 +585,18 @@ fn parse_nano_core_binary<F: File + ?Sized>(
     let data_shndx   = try_mp!(data_shndx.ok_or("couldn't find .data section in nano_core ELF"), text_pages, rodata_pages, data_pages);
     let bss_shndx    = try_mp!(bss_shndx.ok_or("couldn't find .bss section in nano_core ELF"), text_pages, rodata_pages, data_pages);
 
+    let mp_range = |mp_ref: &Arc<Mutex<MappedPages>>| {
+        let mp = mp_ref.lock();
+        mp.start_address() .. (mp.start_address() + mp.size_in_bytes())
+    };
+
     let new_crate = CowArc::new(LoadedCrate {
         crate_name:              crate_name, 
         object_file_abs_path:    abs_path,
         sections:                BTreeMap::new(),
-        text_pages:              Some(text_pages.clone()),
-        rodata_pages:            Some(rodata_pages.clone()),
-        data_pages:              Some(data_pages.clone()),
+        text_pages:              Some((text_pages.clone(),   mp_range(&text_pages))),
+        rodata_pages:            Some((rodata_pages.clone(), mp_range(&rodata_pages))),
+        data_pages:              Some((data_pages.clone(),   mp_range(&data_pages))),
         global_symbols:          BTreeSet::new(),
         bss_sections:            Trie::new(),
         reexported_symbols:      BTreeSet::new(),

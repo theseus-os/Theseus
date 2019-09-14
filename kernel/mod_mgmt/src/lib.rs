@@ -28,7 +28,7 @@ extern crate memfs;
 extern crate hpet;
 extern crate cstr_core;
 
-use core::ops::{DerefMut, Deref};
+use core::ops::{DerefMut, Deref, Range};
 use alloc::{
     vec::Vec,
     collections::{BTreeMap, btree_map, BTreeSet},
@@ -1001,7 +1001,7 @@ impl CrateNamespace {
                                 relocation_entry, 
                                 &mut target_sec_mapped_pages, 
                                 target_sec.mapped_pages_offset, 
-                                new_source_sec.virt_addr(), 
+                                new_source_sec.start_address(), 
                                 verbose_log
                             )?;
 
@@ -1307,7 +1307,7 @@ impl CrateNamespace {
                     relocation_entry, 
                     &mut target_sec_mapped_pages, 
                     target_sec.mapped_pages_offset, 
-                    new_source_sec.virt_addr(), 
+                    new_source_sec.start_address(), 
                     false
                 )?;
 
@@ -1380,7 +1380,7 @@ impl CrateNamespace {
             return Err("the crate has already been loaded, cannot load it again in the same namespace");
         }
 
-        // Parse the given `mapped_pages` as an ELF file
+        // Parse the crate file as an ELF file
         let byte_slice: &[u8] = mapped_pages.as_slice(0, size_in_bytes)?;
         let elf_file = ElfFile::new(byte_slice)?; // returns Err(&str) if ELF parse fails
 
@@ -1397,14 +1397,9 @@ impl CrateNamespace {
 
         // allocate enough space to load the sections
         let section_pages = allocate_section_pages(&elf_file, kernel_mmi_ref)?;
-        let text_pages    = section_pages.executable_pages.map(|tp| Arc::new(Mutex::new(tp)));
-        let end_of_text   = section_pages.end_of_text_section;
-        let rodata_pages  = section_pages.read_only_pages.map(|rp| Arc::new(Mutex::new(rp)));
-        let data_pages    = section_pages.read_write_pages.map(|dp| Arc::new(Mutex::new(dp)));
-
-        let mut exec_pages_locked   = text_pages  .as_ref().map(|tp| tp.lock());
-        let mut read_only_pages_locked = rodata_pages.as_ref().map(|rp| rp.lock());
-        let mut read_write_pages_locked   = data_pages  .as_ref().map(|dp| dp.lock());
+        let mut text_pages   = section_pages.executable_pages.map(|(tp, range)| (Arc::new(Mutex::new(tp)), range));
+        let mut rodata_pages = section_pages.read_only_pages.map( |(rp, range)| (Arc::new(Mutex::new(rp)), range));
+        let mut data_pages   = section_pages.read_write_pages.map(|(dp, range)| (Arc::new(Mutex::new(dp)), range));
 
         // Check the symbol table to get the set of sections that are global (publicly visible).
         let global_sections: BTreeSet<usize> = {
@@ -1438,12 +1433,13 @@ impl CrateNamespace {
         // (+) It's way faster to load the sections, since we can just bulk copy all .text sections at once 
         //     instead of copying them individually on a per-section basis (or just remap their pages directly).
         // (-) It ends up wasting a few hundred bytes here and there, but almost always under 100 bytes.
-        if let Some(ref mut tp) = exec_pages_locked {
-            let text_destination: &mut [u8] = tp.as_slice_mut(0, end_of_text)?;
-            let text_source = elf_file.input.get(..end_of_text).ok_or("BUG: end of last .text section was miscalculated to be beyond ELF file bounds")?;
+        if let Some((ref mut tp, ref tp_range)) = text_pages {
+            let text_size = tp_range.end.value() - tp_range.start.value();
+            let mut tp_locked = tp.lock();
+            let text_destination: &mut [u8] = tp_locked.as_slice_mut(0, text_size)?;
+            let text_source = elf_file.input.get(..text_size).ok_or("BUG: end of last .text section was miscalculated to be beyond ELF file bounds")?;
             text_destination.copy_from_slice(text_source);
         }
-        let text_pages_vaddr = exec_pages_locked.as_ref().map(|tp| tp.start_address());
 
         // Because .rodata, .data, and .bss may be intermingled, 
         // we copy them into their respective pages individually on a per-section basis, 
@@ -1477,6 +1473,9 @@ impl CrateNamespace {
         let mut global_symbols: BTreeSet<BString> = BTreeSet::new();
         // the map of BSS section names to the actual BSS section
         let mut bss_sections: Trie<BString, StrongSectionRef> = Trie::new();
+
+        let mut read_only_pages_locked  = rodata_pages.as_ref().map(|(rp, _)| (rp.clone(), rp.lock()));
+        let mut read_write_pages_locked = data_pages  .as_ref().map(|(dp, _)| (dp.clone(), dp.lock()));
 
 
         // In this loop, we handle only "allocated" sections that occupy memory in the actual loaded object file.
@@ -1546,14 +1545,14 @@ impl CrateNamespace {
 
                     // We already copied the content of all .text sections above, 
                     // so here we just record the metadata into a new `LoadedSection` object.
-                    if let (Some(ref tp_ref), Some(text_vaddr)) = (&text_pages, text_pages_vaddr) {
+                    if let Some((ref tp_ref, ref tp_range)) = text_pages {
                         let is_global = global_sections.contains(&shndx);
                         if is_global {
                             global_symbols.insert(demangled.clone().into());
                         }
 
                         let text_offset = sec.offset() as usize;
-                        let dest_vaddr = text_vaddr + text_offset;
+                        let dest_vaddr = tp_range.start + text_offset;
 
                         loaded_sections.insert(shndx, 
                             Arc::new(Mutex::new(LoadedSection::new(
@@ -1590,7 +1589,7 @@ impl CrateNamespace {
                     };
                     let demangled = demangle(name).to_string();
                     
-                    if let (Some(ref dp_ref), Some(ref mut dp)) = (&data_pages, &mut read_write_pages_locked) {
+                    if let Some((ref dp_ref, ref mut dp)) = read_write_pages_locked {
                         // here: we're ready to copy the data/bss section to the proper address
                         let dest_vaddr = dp.address_at_offset(data_offset)
                             .ok_or_else(|| "BUG: data_offset wasn't within data_pages")?;
@@ -1644,7 +1643,7 @@ impl CrateNamespace {
                     let demangled = demangle(name).to_string();
                     
                     // we still use DataSection to represent the .bss sections, since they have the same flags
-                    if let (Some(ref dp_ref), Some(ref mut dp)) = (&data_pages, &mut read_write_pages_locked) {
+                    if let Some((ref dp_ref, ref mut dp)) = read_write_pages_locked {
                         // here: we're ready to fill the bss section with zeroes at the proper address
                         let dest_vaddr = dp.address_at_offset(data_offset)
                             .ok_or_else(|| "BUG: data_offset wasn't within data_pages")?;
@@ -1688,7 +1687,7 @@ impl CrateNamespace {
                 if let Some(name) = sec_name.get(RODATA_PREFIX.len() ..) {
                     let demangled = demangle(name).to_string();
 
-                    if let (Some(ref rp_ref), Some(ref mut rp)) = (&rodata_pages, &mut read_only_pages_locked) {
+                    if let Some((ref rp_ref, ref mut rp)) = read_only_pages_locked {
                         // here: we're ready to copy the rodata section to the proper address
                         let dest_vaddr = rp.address_at_offset(rodata_offset)
                             .ok_or_else(|| "BUG: rodata_offset wasn't within rodata_mapped_pages")?;
@@ -1739,7 +1738,7 @@ impl CrateNamespace {
             // Fifth, if neither executable nor writable nor .rodata, handle the `.gcc_except_table` section
             else if sec_name == GCC_EXCEPT_TABLE_NAME {
                 // The gcc_except_table section is read-only, so we put it in the .rodata pages
-                if let (Some(ref rp_ref), Some(ref mut rp)) = (&rodata_pages, &mut read_only_pages_locked) {
+                if let Some((ref rp_ref, ref mut rp)) = read_only_pages_locked {
                     // here: we're ready to copy the rodata section to the proper address
                     let dest_vaddr = rp.address_at_offset(rodata_offset)
                         .ok_or_else(|| "BUG: rodata_offset wasn't within rodata_mapped_pages")?;
@@ -1783,7 +1782,7 @@ impl CrateNamespace {
             // Sixth, if neither executable nor writable nor .rodata nor .gcc_except_table, handle the `.eh_frame` section
             else if sec_name == EH_FRAME_NAME {
                 // The eh_frame section is read-only, so we put it in the .rodata pages
-                if let (Some(ref rp_ref), Some(ref mut rp)) = (&rodata_pages, &mut read_only_pages_locked) {
+                if let Some((ref rp_ref, ref mut rp)) = read_only_pages_locked {
                     // here: we're ready to copy the rodata section to the proper address
                     let dest_vaddr = rp.address_at_offset(rodata_offset)
                         .ok_or_else(|| "BUG: rodata_offset wasn't within rodata_mapped_pages")?;
@@ -1973,7 +1972,7 @@ impl CrateNamespace {
                         relocation_entry,
                         &mut target_sec_mapped_pages,
                         target_sec.mapped_pages_offset,
-                        if source_and_target_are_same_section { target_sec.virt_addr() } else { source_sec_ref.lock().virt_addr() },
+                        if source_and_target_are_same_section { target_sec.start_address() } else { source_sec_ref.lock().start_address() },
                         verbose_log
                     )?;
 
@@ -2012,10 +2011,10 @@ impl CrateNamespace {
         // Finally, remap each section's mapped pages to the proper permission bits, 
         // since we initially mapped them all as writable
         if let Some(ref tp) = new_crate.text_pages { 
-            tp.lock().remap(&mut kernel_mmi_ref.lock().page_table, TEXT_SECTION_FLAGS)?;
+            tp.0.lock().remap(&mut kernel_mmi_ref.lock().page_table, TEXT_SECTION_FLAGS)?;
         }
         if let Some(ref rp) = new_crate.rodata_pages {
-            rp.lock().remap(&mut kernel_mmi_ref.lock().page_table, RODATA_SECTION_FLAGS)?;
+            rp.0.lock().remap(&mut kernel_mmi_ref.lock().page_table, RODATA_SECTION_FLAGS)?;
         }
         // data/bss sections are already mapped properly, since they're supposed to be writable
 
@@ -2040,8 +2039,8 @@ impl CrateNamespace {
                             // debug!("       add_symbol(): replacing section: old: {:?}, new: {:?}", old_sec_ref, new_section_ref);
                             let old_sec = old_sec_ref.lock();
                             let new_sec = new_section_ref.lock();
-                            if new_sec.size != old_sec.size {
-                                warn!("         add_symbol(): Unexpectedly replacing differently-sized section: old: ({}B) {:?}, new: ({}B) {:?}", old_sec.size, old_sec.name, new_sec.size, new_sec.name);
+                            if new_sec.size() != old_sec.size() {
+                                warn!("         add_symbol(): Unexpectedly replacing differently-sized section: old: ({}B) {:?}, new: ({}B) {:?}", old_sec.size(), old_sec.name, new_sec.size(), new_sec.name);
                             } 
                             else {
                                 warn!("         add_symbol(): Replacing new symbol already present: old {:?}, new: {:?}", old_sec.name, new_sec.name);
@@ -2123,8 +2122,97 @@ impl CrateNamespace {
         count
     }
 
-    /// Finds the `.text` section that contains the given `instruction_pointer` (program counter).
-    /// Also searches any recursive namespaces as well.
+    
+    /// Finds the crate that contains the given `VirtualAddress` in its loaded code,
+    /// also searching any recursive namespaces as well.
+    /// 
+    /// By default, only executable sections (`.text`) are searched, since typically the only use case 
+    /// for this function is to search for an instruction pointer (program counter) address.
+    /// However, if `search_all_section_types` is `true`, both the read-only and read-write sections
+    /// will be included in the search, e.g., `.rodata`, `.data`, `.bss`. 
+    /// 
+    /// If a `starting_crate` is provided, the search will begin from that crate
+    /// and include all of its dependencies recursively. 
+    /// If no `starting_crate` is provided, all crates in this namespace will be searched, in no particular order.
+    /// 
+    /// TODO FIXME: currently starting_crate is searched non-recursively, meaning that its dependencies are excluded.
+    /// 
+    /// # Usage
+    /// This is mostly useful for printing symbol names for a stack trace (backtrace).
+    /// It is also similar in functionality to the tool `addr2line`, 
+    /// but gives the section itself rather than the line of code.
+    /// 
+    /// # Locking
+    /// This can obtain the lock on every crate and every section, 
+    /// so to avoid deadlock, please ensure that the caller task does not hold any such locks.
+    /// It does *not* need to obtain locks on the underlying `MappedPages` regions.
+    /// 
+    /// # Note
+    /// This is a slow procedure because, in the worst case,
+    /// it will iterate through **every** loaded crate.
+    pub fn get_crate_containing_address(
+        &self, 
+        virt_addr: VirtualAddress, 
+        starting_crate: Option<&StrongCrateRef>,
+        search_all_section_types: bool,
+    ) -> Option<StrongCrateRef> {
+
+        // A closure to test whether the given `crate_ref` contains the `virt_addr`.
+        let crate_contains_vaddr = |crate_ref: &StrongCrateRef| {
+            let krate = crate_ref.lock_as_ref();
+            if let Some(ref tp) = krate.text_pages {
+                if tp.1.contains(&virt_addr) { 
+                    return true;
+                }
+            }
+            if search_all_section_types {
+                if let Some(ref rp) = krate.rodata_pages {
+                    if rp.1.contains(&virt_addr) {
+                        return true;
+                    }
+                }
+                if let Some(ref dp) = krate.data_pages {
+                    if dp.1.contains(&virt_addr) {
+                        return true;
+                    }
+                }
+            }
+            false
+        };
+        
+        // If a starting crate was given, search that first. 
+        if let Some(crate_ref) = starting_crate {
+            if crate_contains_vaddr(crate_ref) {
+                return Some(crate_ref.clone());
+            }
+        }
+
+        let mut found_crate = None;
+
+        // Here, we didn't find the symbol when searching from the starting crate, 
+        // so perform a brute-force search of all crates in this namespace (recursively).
+        self.for_each_crate(true, |_crate_name, crate_ref| {
+            if crate_contains_vaddr(crate_ref) {
+                found_crate = Some(crate_ref.clone());
+                false // stop iterating, we've found it!
+            }
+            else {
+                true // keep searching
+            }
+        });
+
+        found_crate
+    }
+
+
+
+    /// Finds the section that contains the given `VirtualAddress` in its loaded code,
+    /// also searching any recursive namespaces as well.
+    /// 
+    /// By default, only executable sections (`.text`) are searched, since typically the only use case 
+    /// for this function is to search for an instruction pointer (program counter) address.
+    /// However, if `search_all_mappings` is `true`, both the read-only and read-write sections
+    /// will be included in the search, e.g., `.rodata`, `.data`, `.bss`. 
     /// 
     /// If a `starting_crate` is provided, the search will begin from that crate
     /// and include all of its dependencies recursively. 
@@ -2142,80 +2230,41 @@ impl CrateNamespace {
     /// so to avoid deadlock, please ensure that the caller task does not hold any such locks.
     /// 
     /// # Note
-    /// This is currently incredibly slow because, in the worst case,
+    /// This is a slow procedure because, in the worst case,
     /// it will iterate through **every** section in **every** loaded crate,
     /// not just the publicly-visible (global) ones. 
-    pub fn get_containing_section(
+    pub fn get_section_containing_address(
         &self, 
-        instruction_pointer: VirtualAddress, 
-        starting_crate: Option<&StrongCrateRef>
+        virt_addr: VirtualAddress, 
+        starting_crate: Option<&StrongCrateRef>,
+        search_all_section_types: bool,
     ) -> Option<(StrongSectionRef, usize)> {
 
-        // an inner function that searches just a single crate for the section
-        fn find_section_in_crate(instruction_pointer: VirtualAddress, crate_locked: &LoadedCrate) -> Option<(StrongSectionRef, usize)> {
-            // trace!("find_section_in_crate() [top]: IP: {:#X}, crate_locked: {:?}", instruction_pointer, crate_locked.crate_name);            
-            let crate_text_start_vaddr = if let Some(tp_ref) = &crate_locked.text_pages {
-                // trace!("find_section_in_crate(): locking text_pages");
-                let vaddr = tp_ref.lock().start_address();
-                // trace!("find_section_in_crate(): locked successfully.");
-                vaddr
-            } else {
-                // crate has no text sections, so it cannot possibly contain the instruction pointer
-                return None;
+        // First, we find the crate that contains the address, then later we narrow it down.
+        let containing_crate = self.get_crate_containing_address(virt_addr, starting_crate, search_all_section_types)?;
+        let crate_locked = containing_crate.lock_as_ref();
+
+        // Second, we find the section in that crate that contains the address.
+        for sec_ref in crate_locked.sections.values() {
+            // trace!("get_section_containing_address: locking sec_ref: {:?}", sec_ref);
+            let sec = sec_ref.lock();
+            let eligible_section = match sec.typ {
+                SectionType::Text => true, // .text sections are always included
+                SectionType::Rodata | 
+                SectionType::Data |
+                SectionType::Bss if search_all_section_types => true, // other sections are included if requested
+                _ => false,
             };
-            if instruction_pointer < crate_text_start_vaddr {
-                // If the instruction pointer comes before (is less than) the start of the crate's .text sections,
-                // then it definitely cannot contain the given instruction pointer.
-                return None;
-            }
-            // Here: the crate *might* contain the instruction pointer, so we need to go through each of its sections.
-            for sec_ref in crate_locked.sections.values() {
-                // trace!("find_section_in_crate: locking sec_ref: {:?}", sec_ref);
-                let sec = sec_ref.lock();
-                // trace!("find_section_in_crate: locked sec_ref successfully.");
-                let vaddr = sec.virt_addr();
-                // If the section's address bounds contain the instruction pointer, then we've found it.
-                // Only a single section can contain the address, so it's safe to stop once we've found a match.
-                if sec.typ == SectionType::Text && 
-                    instruction_pointer >= vaddr && 
-                    instruction_pointer < (vaddr + sec.size)
-                {
-                    let offset = instruction_pointer - vaddr;
-                    return Some((sec_ref.clone(), offset.value()));
-                }
-            }
-            None
-        }
-
-
-        // If a starting crate was given, search that first. 
-        if let Some(crate_ref) = starting_crate {
-            // trace!("get_containing_section(): analyzing starting_crate, locking crate_ref");
-            let crate_locked = crate_ref.lock_as_ref();
-            // trace!("get_containing_section(): analyzing starting_crate, locked crate_ref successfully");
-            if let Some(found) = find_section_in_crate(instruction_pointer, &crate_locked) {
-                return Some(found);
+            
+            // If the section's address bounds contain the address, then we've found it.
+            // Only a single section can contain the address, so it's safe to stop once we've found a match.
+            if eligible_section && sec.address_range.contains(&virt_addr) {
+                let offset = virt_addr.value() - sec.start_address().value();
+                return Some((sec_ref.clone(), offset));
             }
         }
-
-        let mut found_section = None;
-
-        // Here, we didn't find the symbol when searching from the starting crate, 
-        // so perform a brute-force search of all crates in this namespace (recursively).
-        self.for_each_crate(true, |_crate_name, crate_ref| {
-            // trace!("get_containing_section(): in for_each_crate, locking crate_ref: {:?}", _crate_name);
-            let crate_locked = crate_ref.lock_as_ref();
-            // trace!("get_containing_section(): in for_each_crate, locked crate_ref successfully");
-            if let Some(found) = find_section_in_crate(instruction_pointer, &crate_locked) {
-                found_section = Some(found);
-                false // stop iterating, we've found it!
-            }
-            else {
-                true // keep searching
-            }
-        });
-
-        found_section
+        None
+        
     }
 
 
@@ -2547,16 +2596,15 @@ impl CrateNamespace {
 /// A convenience wrapper for a set of the three possible types of `MappedPages`
 /// that can be allocated and mapped for a single `LoadedCrate`. 
 struct SectionPages {
-    /// MappedPages that will hold any and all executable sections: `.text`.
-    executable_pages: Option<MappedPages>,
-    /// The ending offset of the last .text section, i.e., 
-    /// the end bounds of how far we should copy content from the crate object file
-    /// into the above `text_pages`.
-    end_of_text_section: usize,
-    /// MappedPages that will hold any and all read-only sections: `.rodata`, `.eh_frame`, `.gcc_except_table`.
-    read_only_pages: Option<MappedPages>,
-    /// MappedPages that will hold any and all read-write sections: `.data` and `.bss`.
-    read_write_pages: Option<MappedPages>,
+    /// MappedPages that will hold any and all executable sections: `.text`
+    /// and their bounds express in `VirtualAddress`es.
+    executable_pages: Option<(MappedPages, Range<VirtualAddress>)>,
+    /// MappedPages that will hold any and all read-only sections: `.rodata`, `.eh_frame`, `.gcc_except_table`
+    /// and their bounds express in `VirtualAddress`es.
+    read_only_pages: Option<(MappedPages, Range<VirtualAddress>)>,
+    /// MappedPages that will hold any and all read-write sections: `.data` and `.bss`
+    /// and their bounds express in `VirtualAddress`es.
+    read_write_pages: Option<(MappedPages, Range<VirtualAddress>)>,
 }
 
 
@@ -2607,11 +2655,15 @@ fn allocate_section_pages(elf_file: &ElfFile, kernel_mmi_ref: &MmiRef) -> Result
     let read_only_pages =  if ro_bytes   > 0 { Some(allocate_and_map_as_writable(ro_bytes,   RODATA_SECTION_FLAGS,   kernel_mmi_ref)?) } else { None };
     let read_write_pages = if rw_bytes   > 0 { Some(allocate_and_map_as_writable(rw_bytes,   DATA_BSS_SECTION_FLAGS, kernel_mmi_ref)?) } else { None };
 
+    let range_tuple = |mp: MappedPages, size_in_bytes: usize| {
+        let start = mp.start_address();
+        (mp, start..(start + size_in_bytes))
+    };
+
     Ok(SectionPages {
-        executable_pages,
-        end_of_text_section: exec_bytes,
-        read_only_pages,
-        read_write_pages,
+        executable_pages: executable_pages.map(|mp| range_tuple(mp, exec_bytes)),
+        read_only_pages:  read_only_pages .map(|mp| range_tuple(mp, ro_bytes)),
+        read_write_pages: read_write_pages.map(|mp| range_tuple(mp, rw_bytes)),
     })
 }
 
