@@ -139,3 +139,79 @@ pub fn stack_trace(
         }
     }
 }
+
+
+/// Gets the first instruction pointer in the call stack
+/// that IS NOT part of the panicking code handling flow, 
+/// i.e., the first "application code" address that we should actually unwind. 
+/// 
+/// # Note
+/// This is for testing purposes, eventually we will likely need 
+/// to unwind all addresses including the call frames in the panic handling functions.
+#[inline(never)]
+pub fn get_first_non_panic_instruction_pointer(
+    current_page_table: &PageTable,
+    addr_to_symbol: &dyn Fn(VirtualAddress) -> Option<(String, usize)>
+) -> Option<VirtualAddress> {
+
+    // SAFETY: pointers are checked 
+    // get the stack base pointer
+    let mut rbp: usize;
+    let mut rsp: usize;
+    unsafe {
+        asm!("" : "={rbp}"(rbp), "={rsp}"(rsp) : : "memory" : "intel", "volatile");
+    }
+
+    if rbp == 0 {
+        error!("Frame pointers have been omitted in this build. \
+            Stack tracing/unwinding cannot be performed because we don't yet \
+            support using DWARF .debug_* sections to backtrace the stack. \
+            Make sure that the rustc option '-C force-frame-pointers=yes' is used."
+        );
+        return None;
+    }
+
+    // There are 3 function calls in the panic handling flow:
+    // * core::panicking::panic
+    // * core::panicking::panic_fmt
+    // * rust_begin_unwind
+    // As far as I can tell, that's a fixed number, so we can just ignore 
+    // the first three call frames, and return the fourth!
+
+    let mut call_stack_depth = 0;
+
+    for _frame in 0..64 {
+        if let Some(rip_rbp) = rbp.checked_add(core::mem::size_of::<usize>()) {
+            if let (Ok(rbp_vaddr), Ok(rip_rbp_vaddr)) = (VirtualAddress::new(rbp), VirtualAddress::new(rip_rbp)) {
+                if current_page_table.translate(rbp_vaddr).is_some() && current_page_table.translate(rip_rbp_vaddr).is_some() {
+                    let rip = unsafe { *(rip_rbp as *const usize) };
+                    if rip == 0 {
+                        // error!("  {:>#018X}: BEGINNING OF STACK", rbp);
+                        break;
+                    }
+                    if call_stack_depth == 3 {
+                        return VirtualAddress::new(rip).ok();
+                    }
+                    // if let Some((symbol_name, offset)) = addr_to_symbol(VirtualAddress::new_canonical(rip)) {
+                    //     error!("  {:>#018X}: {:>#018X} in {} + {:#X}", rbp, rip, symbol_name, offset);
+                    // } else {
+                    //     error!("  {:>#018X}: {:>#018X} in ??", rbp, rip);
+                    // }
+                    // move up the call stack to the previous frame
+                    call_stack_depth += 1;
+                    rbp = unsafe { *(rbp as *const usize) };
+                } else {
+                    // error!("  {:>#018X}: GUARD PAGE", rbp);
+                    break;
+                }
+            } else {
+                // error!(" {:>#018X}: INVALID VIRTUAL ADDRESS in RBP", rbp);
+                break;
+            }
+        } else {
+            // error!("  {:>#018X}: RBP OVERFLOW", rbp);
+        }
+    }
+
+    None
+}
