@@ -413,10 +413,7 @@ pub struct PFSFile {
     pub name: String,
     pub parent: WeakDirRef,
     pub start_cluster: u32,
-    active_cluster: u32,
-    sector_offset: u64,
     pub size: u32,
-    position: u32,
 }
 
 impl File for PFSFile {
@@ -426,22 +423,28 @@ impl File for PFSFile {
     /// # Arguments 
     /// * `data`: the source buffer. The length of the `data` determines how many clusters will be read, 
     ///   and must be an even multiple of the filesystem's cluster size in bytes = [`sector size`]*[`sectors per cluster`].
+    /// * `offset`: the byte offset for the file to begin reading at
     /// 
     /// # Returns
     /// 
     /// Returns the number of bytes read 
-    fn read(&self, data: &mut [u8], _offset: usize) -> Result<usize, &'static str> {
+    fn read(&self, data: &mut [u8], offset: usize) -> Result<usize, &'static str> {
 
         
         // Place a lock on the filesystem
         let fs = self.filesystem.lock();
 
         let cluster_size_in_bytes: usize = fs.sectors_per_cluster() as usize * 512 as usize;
-        let mut position = self.position;
-        let mut active_cluster = self.active_cluster;
-        let mut sector_offset = self.sector_offset;
-        
+        let mut position: u32 = 0;
+        let mut current_cluster = self.start_cluster;
+        let mut sector_offset: u32 = 0;
         let mut cluster_offset = 0;
+
+        let mut file_walk = PFSPosition{
+            cluster: current_cluster,
+            sector_offset: 0,
+            entry_offset: 0,
+        };
 
         // The inserted buffer must be a multiple of the cluster size in bytes for clean reads.
         // clusters act as a sort of boundary in FAT for every file/directory and to minimize
@@ -453,8 +456,8 @@ impl File for PFSFile {
         // Represents the number of clusters that must be read
         let num_reads: usize = data.len() as usize/cluster_size_in_bytes;
             
-        for _i in 0..num_reads{
-            
+        for _i in 0..num_reads{   
+
             // The position is used to track how far along the PFSfile it is, and if the position goes
             // beyond the size of the PFSfile OR the array is full, it returns end of PFSfile
             if position >= (data.len() as u32) {
@@ -469,30 +472,48 @@ impl File for PFSFile {
             }
             
             // When the end of the cluster is reached in terms of sector, it will move onto the next cluster
-            if sector_offset == u64::from(fs.sectors_per_cluster()) {
-                match fs.next_cluster(active_cluster) {
+            if sector_offset == u32::from(fs.sectors_per_cluster()) {
+                match fs.next_cluster(current_cluster) {
                     Err(_e) => {
                         return Err("Error in moving to next clusters");
                     }
                     Ok(cluster) => {
-                        active_cluster = cluster;
+                        current_cluster = cluster;
                         sector_offset = 0;
                     }
                 }
             }
+            
+            // the byte difference is the difference between the offset (the byte to begin reading at)
+            // and the position(the current byte position based upon walking from cluster to cluster)
+            let byte_difference = offset as u32 - position;
+            let reached_sector = byte_difference/fs.bytes_per_sector;
 
-            let cluster_start = fs.first_sector_of_cluster(active_cluster);
+            // this if statement determines wether moving on to the next cluster would cause it to move beyond the
+            // specified offset and if it does, fills in the PFSPosition with info about the specific position of the offset
+            if position + cluster_size_in_bytes as u32 > offset as u32 {
+                file_walk.cluster = current_cluster;
+                file_walk.sector_offset = reached_sector;
+                file_walk.entry_offset = byte_difference as usize - reached_sector as usize*fs.bytes_per_sector as usize;
+                debug!("the PFSposition cluster: {:?}", file_walk.cluster);
+                debug!("the PFSposition sector offset: {:?}", file_walk.sector_offset);
+                debug!("the PFSposition entry_offset: {:?}", file_walk.entry_offset);
+            }
 
-            // current position is the current sector thats to be read at
-            let current_position = cluster_start as u64 + sector_offset;
+            let cluster_start = fs.first_sector_of_cluster(current_cluster);
+
+            // the current sector thats to be read at
+            let current_sector = cluster_start + sector_offset;
 
             // Reads at the beginning sector of the cluster
-            let sectors_read = match fs.header().drive.lock().read_sectors(&mut data[(0+cluster_offset)..(cluster_size_in_bytes as usize + cluster_offset as usize)], current_position as usize) {
-                Ok(bytes) => bytes,
-                Err(_) => return Err("error reading sector"),
+            let sectors_read = match fs.header().drive.lock().read_sectors(
+                &mut data[(0+cluster_offset)..(cluster_size_in_bytes as usize + cluster_offset as usize)], 
+                current_sector as usize) {
+                    Ok(bytes) => bytes,
+                    Err(_) => return Err("error reading sector"),
             };
             
-            sector_offset += fs.sectors_per_cluster as u64;
+            sector_offset += fs.sectors_per_cluster;
             
             if (position + sectors_read as u32) > self.size {
                 let bytes_read = self.size - position;
@@ -503,6 +524,9 @@ impl File for PFSFile {
             }
 
             cluster_offset += cluster_size_in_bytes as usize;
+            // debug!("current cluster {}",current_cluster);
+            // debug!("current offset{}",sector_offset);
+            // debug!("current position{}",position);
         }
         
         Ok(position as usize)
@@ -1174,10 +1198,7 @@ impl Filesystem {
             name: name,
             parent: Arc::downgrade(&parent),
             start_cluster: cluster,
-            active_cluster: cluster,
-            sector_offset: 0,
             size,
-            position: 0,
         })
     }
 
