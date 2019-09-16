@@ -584,9 +584,33 @@ pub struct PFSDirectory {
 }
 
 impl Directory for PFSDirectory {
-    fn insert(&mut self, _node: FileOrDir) -> Result<Option<FileOrDir>, &'static str> {
+    fn insert(&mut self, node: FileOrDir) -> Result<Option<FileOrDir>, &'static str> {
+        let name = node.get_name();
+
+        // TODO validate that the node is actually an instance of a PFS type.
+        // if not then we will not have sufficient information to actually make it.
+        
+
+        // Validate that the name is less than the maximum length for a directory entry. TODO
+
+        // TODO this is wrong behavior. We should have an internal search that returns the pos
+        // of the file and then edit that file.
+        if self.get(&name).is_some() {
+            return Err("Matching item already exists.");
+        }
+
+        // Must lock after the call to get since that also locks the fs.
+        let fs = self.filesystem.lock();
+
+        // Find an empty node or grow the directory as needed. TODO different size.
+        let empty_pos = match self.find_empty_or_grow(&fs, 1) {
+            Ok(pos) => pos,
+            Err(_e) => return Err("Failed to grow directory and couldn't find empty space."), // TODO better errors.
+        };
+
+        //match self.write_fat_directory(&fs, pos, node.)
+        
         Err("insert directory not implemented yet")
-        // Walk the direcotry table and find an empty spot (or insert)
     }
 
     fn get(&self, name: &str) -> Option<FileOrDir> {
@@ -682,8 +706,7 @@ impl PFSDirectory {
     
     /// Advances a PFSPosition by one entry and returns the new entry if successful.
     /// Note that if EOC is reached the cluster is set to the EOC value found. I think this may not be ideal API design however so it potentially may need to change.
-    pub fn advance_pos(&self, pos: &PFSPosition) -> Result<PFSPosition, Error> {
-        let fs = self.filesystem.lock();
+    pub fn advance_pos(&self, fs: &Filesystem, pos: &PFSPosition) -> Result<PFSPosition, Error> {
         
         let mut new_pos = PFSPosition {
             cluster : pos.cluster,
@@ -708,8 +731,7 @@ impl PFSDirectory {
     /// Returns the entry indicated by PFSPosition. TODO allow this to save reads and writes.
     /// the function is used and returns EndOfFile if the next PFSdirectory doesn't exist
     /// Note that this function will happily return unused directory entries since it simply provides a sequential view of the entries on disk.
-    fn get_fat_directory(&self, pos: &PFSPosition) -> Result<FatDirectory, Error> {
-        let fs = self.filesystem.lock();
+    fn get_fat_directory(&self, fs: &Filesystem, pos: &PFSPosition) -> Result<FatDirectory, Error> {
         
         let sector = fs.first_sector_of_cluster(pos.cluster) + pos.sector_offset;
         
@@ -746,7 +768,7 @@ impl PFSDirectory {
     
     // FIXME use sub byte transactions at some point?
     /// Writes the RawFatDirectory dir to the position pos in the file.
-    fn write_fat_directory(&self, pos: &PFSPosition, dir: &RawFatDirectory, fs :&Filesystem) -> Result<usize, Error> {
+    fn write_fat_directory(&self, fs :&Filesystem, pos: &PFSPosition, dir: &RawFatDirectory) -> Result<usize, Error> {
         let cluster = pos.cluster;
         let base_sector = fs.first_sector_of_cluster(cluster);
         let sector = pos.sector_offset + base_sector;
@@ -894,7 +916,7 @@ impl PFSDirectory {
     // TODO: support larger sizes (for placing long name directories)
     /// Walks the directory tables and finds an empty entry then returns a position where that entry can be placed.
     /// Currently does not support sizes larger than 1 entry.
-    pub fn find_empty_or_grow(&self, size_needed: usize) -> Result<PFSPosition, Error> {
+    pub fn find_empty_or_grow(&self, fs: &Filesystem, size_needed: usize) -> Result<PFSPosition, Error> {
         if size_needed == 0 {
             return Err(Error::IllegalArgument);
         }
@@ -907,14 +929,14 @@ impl PFSDirectory {
         let mut pos = self.initial_pos();
         
         loop {
-            let dir: FatDirectory = self.get_fat_directory(&pos)?;
+            let dir: FatDirectory = self.get_fat_directory(fs, &pos)?;
             
             if dir.is_free() {
                 return Ok(pos); // Pos is now set to the position of a free directory so we can continue.
             }
             
-            pos = match self.advance_pos(&pos) {
-                Err(Error::EndOfFile) => return self.grow_directory(&pos),
+            pos = match self.advance_pos(fs, &pos) {
+                Err(Error::EndOfFile) => return self.grow_directory(fs, &pos),
                 Ok(new_pos) => new_pos,
                 Err(e) => return Err(e),
             }
@@ -925,8 +947,7 @@ impl PFSDirectory {
     // I think the "best" solution is perhaps to make everything that's not part of the public interface pass the fs in as an argument.
     // Make FS an argument I suppose. Seems dumb though.
     /// Grows the directory given a PFSPosition in the last cluster of the file and returns a new position in the new_cluster.
-    fn grow_directory(&self, pos_end: &PFSPosition) -> Result<PFSPosition, Error> {
-        let fs = self.filesystem.lock();
+    fn grow_directory(&self, fs: &Filesystem, pos_end: &PFSPosition) -> Result<PFSPosition, Error> {
         
         // Rename for convenience with other existing code.
         let pos = pos_end;
@@ -951,8 +972,8 @@ impl PFSDirectory {
         let unused_entry = RawFatDirectory::make_unused();
         
         loop {
-            self.write_fat_directory(&pos, &unused_entry, &fs)?;
-            pos = match self.advance_pos(&pos) {
+            self.write_fat_directory(fs, &pos, &unused_entry)?;
+            pos = match self.advance_pos(fs, &pos) {
                 Ok(p) => p,
                 Err(Error::EndOfFile) => break,
                 Err(e) => return Err(e),
