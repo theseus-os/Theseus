@@ -45,7 +45,6 @@ ifneq (${RUSTC_CURRENT_SUPPORTED_VERSION}, ${RUSTC_OUTPUT})
 	@echo -e "\nError: your rustc version does not match our supported compiler version."
 	@echo -e "To install the proper version of rustc, run the following commands:\n"
 	@echo -e "   rustup toolchain install $(RUSTC_CURRENT_INSTALL_VERSION)"
-	@echo -e "   rustup default $(RUSTC_CURRENT_INSTALL_VERSION)"
 	@echo -e "   rustup component add rust-src"
 	@echo -e "   make clean\n"
 	@echo -e "Then you can retry building!\n"
