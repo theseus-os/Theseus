@@ -8,7 +8,6 @@
 extern crate spin;
 extern crate irq_safety;
 extern crate xmas_elf;
-extern crate gimli;
 extern crate memory;
 extern crate multiboot2;
 extern crate kernel_config;
@@ -57,7 +56,6 @@ use vfs_node::VFSDirectory;
 use path::Path;
 use memfs::MemFile;
 use crate_name_utils::{get_containing_crate_name, replace_containing_crate_name};
-use gimli::{BaseAddresses, EhFrame, EndianSlice, LittleEndian, NativeEndian, UninitializedUnwindContext, UnwindSection, UnwindTableRow};
 
 
 pub mod elf_executable;

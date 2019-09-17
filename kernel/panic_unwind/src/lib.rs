@@ -25,12 +25,11 @@ mod unwind;
 
 use core::panic::PanicInfo;
 use memory::VirtualAddress;
-use unwind::Unwinder;
+use unwind::{NamespaceUnwinder, Unwinder};
 use fallible_iterator::FallibleIterator;
-use gimli::{EhFrame, BaseAddresses, UnwindSection, UninitializedUnwindContext, NativeEndian};
+use gimli::BaseAddresses;
 use mod_mgmt::{
-    CrateNamespace, 
-    metadata::{StrongCrateRef, SectionType},
+    metadata::{StrongCrateRef, StrongSectionRef, SectionType},
 };
 
 
@@ -61,7 +60,7 @@ fn panic_unwind_test(info: &PanicInfo) -> ! {
         asm!("lea $0, [rip]" : "=r"(rip), "={rbp}"(rbp), "={rsp}"(rsp) : : "memory" : "intel", "volatile");
     }
     debug!("panic_unwind_test(): register values: RIP: {:#X}, RSP: {:#X}, RBP: {:#X}", rip, rsp, rbp);
-    let curr_instruction_pointer = VirtualAddress::new_canonical(rip);
+    let _curr_instruction_pointer = VirtualAddress::new_canonical(rip);
 
     let curr_task = task::get_my_current_task().expect("panic_unwind_test(): get_my_current_task() failed");
     let namespace = curr_task.get_namespace();
@@ -80,6 +79,7 @@ fn panic_unwind_test(info: &PanicInfo) -> ! {
         },
     );
 
+    /*
     let starting_instruction_pointer = panic_wrapper::get_first_non_panic_instruction_pointer(
         &mmi_ref.lock().page_table,
         &|instruction_pointer: VirtualAddress| {
@@ -87,19 +87,20 @@ fn panic_unwind_test(info: &PanicInfo) -> ! {
                 .map(|(sec_ref, offset)| (sec_ref.lock().name.clone(), offset))
         },
     ).expect("couldn't determine which instruction pointer was the first non-panic-related one");
-
     debug!("panic_unwind_test(): starting search at RIP: {:#X}", starting_instruction_pointer);
-    
-    
     // search for unwind entry related to the current instruction pointer
     // first, we need to get the containing crate for this IP
-    let my_crate = namespace.get_section_containing_address(starting_instruction_pointer, app_crate_ref.as_ref(), false)
-        .and_then(|(sec_ref, _offset)| sec_ref.lock().parent_crate.upgrade())
-        .expect("panic_unwind_test(): couldn't get section/crate");
-
+    let my_crate = namespace.get_crate_containing_address(starting_instruction_pointer, app_crate_ref.as_ref(), false)
+        .expect("panic_unwind_test(): couldn't get crate containing address");
     debug!("panic_unwind_test(): looking at crate {:?}", my_crate);
+    */
 
-    handle_eh_frame(&namespace, &my_crate, starting_instruction_pointer, true).expect("handle_eh_frame failed");
+    debug!("Starting NamespaceUnwinder!");
+    let mut unwinder = NamespaceUnwinder::new(namespace, app_crate_ref);
+    unwinder.trace(print_stack_frames);
+    debug!("Done with NamespaceUnwinder!");
+
+    // handle_eh_frame(&namespace, &my_crate, starting_instruction_pointer, true).expect("handle_eh_frame failed");
     
 
 
@@ -108,74 +109,30 @@ fn panic_unwind_test(info: &PanicInfo) -> ! {
 }
 
 
-/// The `.eh_frame` section cannot be used until its relocation entries have been filled in,
-/// which is performed along with all the other sections in [perform_relocations()`](#method.perform_relocations).
-pub fn handle_eh_frame(
-    _namespace: &CrateNamespace,
-    crate_ref: &StrongCrateRef,
-    instruction_pointer: VirtualAddress,
-    _verbose_log: bool
-) -> Result<(), &'static str> {
-    
-    let instruction_pointer = instruction_pointer.value() as u64;
-
+/// Returns a tuple of .eh_frame section for the given `crate_ref`
+/// and the base addresses (its .text section address and .eh_frame section address).
+/// 
+/// # Locking / Deadlock
+/// Obtains the lock on the given `crate_ref` 
+/// and the lock on all of its sections while iterating through them.
+/// 
+/// The latter lock on the crate's `rodata_pages` object will be held
+/// for the entire lifetime of the returned object. 
+fn get_eh_frame_info(crate_ref: &StrongCrateRef) -> Option<(StrongSectionRef, BaseAddresses)> {
     let parent_crate = crate_ref.lock_as_ref();
-    let crate_name = &parent_crate.crate_name;
-
-    let text_pages = parent_crate.text_pages.as_ref()
-        .ok_or("crate did not contain any .text sections, which must exist to parse .eh_frame")?;
-    let text_pages_vaddr = text_pages.1.start.value();
 
     let eh_frame_sec_ref = parent_crate.sections.values()
         .filter(|s| s.lock().typ == SectionType::EhFrame)
-        .next()
-        .ok_or("crate did not contain an .eh_frame section")?;
+        .next()?;
     
-    let sec = eh_frame_sec_ref.lock();
-    let size_in_bytes = sec.size();
-    let sec_pages = sec.mapped_pages.lock();
-    let eh_frame_vaddr = sec.start_address().value();
-    assert_eq!(eh_frame_vaddr, sec_pages.start_address().value() + sec.mapped_pages_offset, "eh_frame address mismatch");
-
-    warn!("Parsing crate {}'s eh_frame section {:?}...", crate_name, sec);
-    trace!("    eh_frame_vaddr: {:#X}, text_pages_vaddr: {:#X}", eh_frame_vaddr, text_pages_vaddr);
-
-    let eh_frame_slice: &[u8] = sec_pages.as_slice(sec.mapped_pages_offset, size_in_bytes)?;
-
-    let eh_frame = EhFrame::new(eh_frame_slice, NativeEndian);
+    let eh_frame_vaddr = eh_frame_sec_ref.lock().start_address().value();
+    let text_pages_vaddr = parent_crate.text_pages.as_ref()?.1.start.value();
     let base_addrs = BaseAddresses::default()
         .set_eh_frame(eh_frame_vaddr as u64)
         .set_text(text_pages_vaddr as u64);
 
-
-    // find the FDE that corresponds to the given instruction pointer
-    let relevant_fde = eh_frame.fde_for_address(
-        &base_addrs, 
-        instruction_pointer,
-        |eh_frame_sec, b_addrs, cie_offset| {
-            eh_frame_sec.cie_from_offset(b_addrs, cie_offset)
-        },
-    ).map_err(|_e| {
-        error!("gimli error: {:?}", _e);
-        "gimli error while finding FDE for address"
-    })?;
-
-    debug!("Found FDE for addr {:#X}: {:?}", instruction_pointer, relevant_fde);
-
-    let mut unwind_ctx = UninitializedUnwindContext::new();
-    let mut unwind_table_row = relevant_fde.unwind_info_for_address(&eh_frame, &base_addrs, &mut unwind_ctx, instruction_pointer).map_err(|_e| {
-        error!("gimli error: {:?}", _e);
-        "gimli error while finding unwind info for address"
-    })?;
-
-    debug!("Found unwind table row for addr {:#X}: {:?}", instruction_pointer, unwind_table_row);
-    // unwind_frame(&unwind_table_row)?;
-
-
-    debug!("Starting DwarfUnwinder..."); 
-    let mut unwinder = unwind::DwarfUnwinder::new(eh_frame_slice, eh_frame_vaddr as u64, text_pages_vaddr as u64);
-    unwinder.trace(print_stack_frames);
-    debug!("Done with DwarfUnwinder!");
+    Some((eh_frame_sec_ref.clone(), base_addrs))
+}
 
     // // The map from CIE offset to CIE struct, which is needed to parse every partial FDE
     // let mut cie_map: BTreeMap<usize, CommonInformationEntry<_>> = BTreeMap::new();
@@ -219,7 +176,6 @@ pub fn handle_eh_frame(
     //             })? {
     //                 debug!("    FDE instr: {:?}", instr);
     //             }
-
     //             let mut uninit_unwind_ctx = UninitializedUnwindContext::new();
     //             let mut table = full_fde.rows(&eh_frame, &base_addrs, &mut uninit_unwind_ctx)
     //                 .map_err(|_e| {
@@ -235,16 +191,14 @@ pub fn handle_eh_frame(
     //         }
     //     }
     // }
-
     // info!("successfully iterated through {}'s eh_frame entries", crate_name);
 
 
-    Ok(())
-}
+
 
 fn print_stack_frames(stack_frames: &mut unwind::StackFrames) {
     while let Some(frame) = stack_frames.next().expect("stack_frames.next() error") {
-        info!("StackFrame: {:?}", frame);
+        info!("StackFrame: {:#X?}", frame);
         // backtrace::resolve(x.registers()[16].unwrap() as *mut std::os::raw::c_void, |sym| println!("{:?} ({:?}:{:?})", sym.name(), sym.filename(), sym.lineno()));
         // println!("{:?}", frame);
     }

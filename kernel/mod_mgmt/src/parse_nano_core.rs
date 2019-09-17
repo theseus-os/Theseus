@@ -136,7 +136,6 @@ fn parse_nano_core_symbol_file<F: File + ?Sized>(
     let mut init_symbols: BTreeMap<String, usize> = BTreeMap::new();
 
     let mp_range = |mp_ref: &Arc<Mutex<MappedPages>>| {
-
         let mp = mp_ref.lock();
         mp.start_address() .. (mp.start_address() + mp.size_in_bytes())
     };

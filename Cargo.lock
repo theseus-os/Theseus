@@ -1051,7 +1051,6 @@ dependencies = [
  "crate_name_utils 0.1.0",
  "cstr_core 0.1.2 (registry+https://github.com/rust-lang/crates.io-index)",
  "fs_node 0.1.0",
- "gimli 0.19.0 (registry+https://github.com/rust-lang/crates.io-index)",
  "goblin 0.0.19 (registry+https://github.com/rust-lang/crates.io-index)",
  "hashbrown 0.1.8 (registry+https://github.com/rust-lang/crates.io-index)",
  "hpet 0.1.0",
