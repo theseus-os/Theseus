@@ -9,10 +9,10 @@ pub struct Registers {
 
 impl Debug for Registers {
     fn fmt(&self, fmt: &mut Formatter) -> FmtResult {
-        for reg in &self.registers {
+        for (i, reg) in self.registers.iter().enumerate() {
             match *reg {
-                None => write!(fmt, " XXX")?,
-                Some(x) => write!(fmt, " 0x{:x}", x)?,
+                None => { } // write!(fmt, "[{}]: None, ", i)?,
+                Some(r) => write!(fmt, "[{}]: {:#X}, ", i, r)?,
             }
         }
         Ok(())

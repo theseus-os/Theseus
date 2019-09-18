@@ -29,6 +29,7 @@ use unwind::{NamespaceUnwinder, Unwinder};
 use fallible_iterator::FallibleIterator;
 use gimli::BaseAddresses;
 use mod_mgmt::{
+    CrateNamespace,
     metadata::{StrongCrateRef, StrongSectionRef, SectionType},
 };
 
@@ -199,6 +200,7 @@ fn get_eh_frame_info(crate_ref: &StrongCrateRef) -> Option<(StrongSectionRef, Ba
 fn print_stack_frames(stack_frames: &mut unwind::StackFrames) {
     while let Some(frame) = stack_frames.next().expect("stack_frames.next() error") {
         info!("StackFrame: {:#X?}", frame);
+        info!("  in func: {:?}", stack_frames.unwinder().namespace().get_section_containing_address(VirtualAddress::new_canonical(frame.initial_address() as usize), stack_frames.unwinder().starting_crate(), false));
         // backtrace::resolve(x.registers()[16].unwrap() as *mut std::os::raw::c_void, |sym| println!("{:?} ({:?}:{:?})", sym.name(), sym.filename(), sym.lineno()));
         // println!("{:?}", frame);
     }

@@ -2,19 +2,16 @@
 //! 
 
 use alloc::{
-    vec::Vec,
     sync::Arc,
 };
 use gimli::{
     UnwindSection, 
-    UnwindTable, 
     UnwindTableRow, 
     EhFrame, 
     BaseAddresses, 
     UninitializedUnwindContext, 
     FrameDescriptionEntry,
     Pointer,
-    Reader,
     EndianSlice,
     NativeEndian,
     CfaRule,
@@ -99,6 +96,14 @@ impl NamespaceUnwinder {
     pub fn new(namespace: Arc<CrateNamespace>, starting_crate: Option<StrongCrateRef>) -> NamespaceUnwinder {
         NamespaceUnwinder { namespace, starting_crate }
     }
+
+    pub fn namespace(&self) -> &CrateNamespace {
+        &self.namespace
+    }
+
+    pub fn starting_crate(&self) -> Option<&StrongCrateRef> {
+        self.starting_crate.as_ref()
+    }
 }
 
 impl Unwinder for NamespaceUnwinder {
@@ -130,6 +135,11 @@ impl<'a> StackFrames<'a> {
 
     pub fn registers(&mut self) -> &mut Registers {
         &mut self.registers
+    }
+
+    /// Returns a reference to the underlying unwinder's context/state.
+    pub fn unwinder(&self) -> &NamespaceUnwinder {
+        self.unwinder
     }
 }
 
@@ -163,7 +173,7 @@ impl<'a> FallibleIterator for StackFrames<'a> {
             newregs[7] = Some(cfa);
 
             *registers = newregs;
-            trace!("registers:{:?}", registers);
+            trace!("registers: {:?}", registers);
         }
 
 
@@ -237,38 +247,41 @@ pub fn registers<F>(mut f: F) where F: FnMut(Registers) {
     let mut f = &mut f as UnwindPayload;
     trace!("in registers(): calling unwind_trampoline...");
     unsafe { unwind_trampoline(&mut f) };
+    trace!("in registers(): returned from unwind_trampoline.");
+
 }
 
 
 /// This function saves the current register values by pushing them onto the stack
 /// before invoking the function "unwind_recorder" with those register values as the only argument.
 /// 
-/// The calling convention here is that the first argument will be placed into the `RDI` register,
-/// i.e., the payload function.
+/// The calling convention dictates that the first argument, the payload function, is passed in the RDI register.
 #[naked]
 #[inline(never)]
 pub unsafe extern fn unwind_trampoline(_payload: *mut UnwindPayload) {
+    // DO NOT touch RDI register, which has the `_payload` function; it needs to be passed into unwind_recorder.
     asm!("
         # copy the stack pointer to RSI
         movq %rsp, %rsi
-        # .cfi_def_cfa rsi, 8
         pushq %rbp
-        # .cfi_offset rbp, -16
         pushq %rbx
         pushq %r12
         pushq %r13
         pushq %r14
         pushq %r15
         # To invoke `unwind_recorder`, we need to put: 
-        # the payload in RDI (it's already there, just don't overwrite it),
-        # the stack in RSI,
-        # and a pointer to the saved registers in RDX.
+        # (1) the payload in RDI (it's already there, just don't overwrite it),
+        # (2) the stack in RSI,
+        # (3) a pointer to the saved registers in RDX.
         movq %rsp, %rdx   # pointer to saved regs (on the stack)
-        # subq 0x08, %rsp   # allocate space for the return address (?) I REMOVED THIS, UNSURE IF NEEDED
-        # .cfi_def_cfa rsp, 0x40
         call unwind_recorder
-        addq 0x38, %rsp
-        # .cfi_def_cfa rsp, 8
+        # restore saved registers
+        popq %r15
+        popq %r14
+        popq %r13
+        popq %r12
+        popq %rbx
+        popq %rbp
         ret
     ");
     core::hint::unreachable_unchecked();
@@ -332,6 +345,12 @@ pub struct SavedRegs {
     pub rbp: u64,
 }
 
+
+/// The calling convention dictates the following order of arguments: 
+/// * first arg in `RDI` register, the payload function,
+/// * second arg in `RSI` register, the stack pointer,
+/// * third arg in `RDX` register, the saved register values used to recover execution context
+///   after we change the register values during unwinding.
 #[no_mangle]
 unsafe extern "C" fn unwind_recorder(payload: *mut UnwindPayload, stack: u64, saved_regs: *mut SavedRegs) {
     trace!("unwind_recorder: payload {:#X}, stack: {:#X}, saved_regs: {:#X}",
@@ -345,7 +364,7 @@ unsafe extern "C" fn unwind_recorder(payload: *mut UnwindPayload, stack: u64, sa
     let mut registers = Registers::default();
     registers[X86_64::RBX] = Some(saved_regs.rbx);
     registers[X86_64::RBP] = Some(saved_regs.rbp);
-    registers[X86_64::RSP] = Some(stack + 8); // the stack value passed in is one 
+    registers[X86_64::RSP] = Some(stack + 8); // the stack value passed in is one pointer width below the real RSP
     registers[X86_64::R12] = Some(saved_regs.r12);
     registers[X86_64::R13] = Some(saved_regs.r13);
     registers[X86_64::R14] = Some(saved_regs.r14);
