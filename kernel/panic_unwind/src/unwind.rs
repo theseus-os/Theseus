@@ -1,6 +1,8 @@
 //! Taken from the gimli/unwind-rs/src/glue.rs file
 //! 
 
+#![allow(nonstandard_style)]
+
 use alloc::{
     sync::Arc,
 };
@@ -27,6 +29,13 @@ use mod_mgmt::{
 use memory::VirtualAddress;
 
 
+
+pub type c_int = i32;
+pub type c_void = u64; // doesn't really matter
+pub type uintptr_t = usize;
+
+
+
 /// Due to lifetime and locking issues, we cannot store a direct reference to an unwind table row. 
 /// Instead, here we store references to the objects needed to calculate/obtain an unwind table row.
 struct UnwindRowReference {
@@ -46,15 +55,25 @@ impl UnwindRowReference {
         let eh_frame_slice: &[u8] = sec_pages.as_slice(sec.mapped_pages_offset, size_in_bytes)?;
         let eh_frame = EhFrame::new(eh_frame_slice, NativeEndian);
         let mut unwind_ctx = UninitializedUnwindContext::new();
-        let relevant_fde = eh_frame.fde_for_address(&self.base_addrs, self.caller, EhFrame::cie_from_offset).map_err(|_e| {
+        let fde = eh_frame.fde_for_address(&self.base_addrs, self.caller, EhFrame::cie_from_offset).map_err(|_e| {
             error!("gimli error: {:?}", _e);
             "gimli error while finding FDE for address"
         })?;
-        let mut unwind_table_row = relevant_fde.unwind_info_for_address(&eh_frame, &self.base_addrs, &mut unwind_ctx, self.caller).map_err(|_e| {
+        let unwind_table_row = fde.unwind_info_for_address(&eh_frame, &self.base_addrs, &mut unwind_ctx, self.caller).map_err(|_e| {
             error!("gimli error: {:?}", _e);
             "gimli error while finding unwind info for address"
         })?;
-        f(&relevant_fde, &unwind_table_row)
+        
+        debug!("FDE: {:?} ", fde);
+        let mut instructions = fde.instructions(&eh_frame, &self.base_addrs);
+        while let Some(instr) = instructions.next().map_err(|_e| {
+            error!("FDE instructions gimli error: {:?}", _e);
+            "gimli error while iterating through eh_frame FDE instructions list"
+        })? {
+            debug!("    FDE instr: {:?}", instr);
+        }
+
+        f(&fde, &unwind_table_row)
     }
 }
 
@@ -177,13 +196,14 @@ impl<'a> FallibleIterator for StackFrames<'a> {
         }
 
 
-        if let Some(mut caller) = registers[X86_64::RA] {
+        if let Some(return_address) = registers[X86_64::RA] {
             // we've reached the end of the stack, so we're done iterating
-            if caller == 0 {
+            if return_address == 0 {
                 return Ok(None);
             }
 
-            caller -= 1; // look at the previous instruction (since x86 advances the PC/IP to the next instruction automatically)
+            // The return address (RA register) points 1 byte past the call instruction
+            let caller = return_address - 1;
             debug!("caller is {:#X}", caller);
 
             // get the unwind info for the caller address
@@ -227,20 +247,6 @@ unsafe fn deref_ptr(ptr: Pointer) -> u64 {
 }
 
 
-#[no_mangle]
-#[inline(never)]
-fn test_payload(r: Registers) {
-    trace!("test_payload: registers {:#X?}", r);
-}
-
-#[no_mangle]
-#[inline(never)]
-pub fn test_invoke() {
-    let mut tpf: UnwindPayload = &mut test_payload;
-    unsafe { unwind_trampoline(&mut tpf) };
-}
-
-
 type UnwindPayload<'a> = &'a mut dyn FnMut(Registers);
 
 pub fn registers<F>(mut f: F) where F: FnMut(Registers) {
@@ -248,7 +254,6 @@ pub fn registers<F>(mut f: F) where F: FnMut(Registers) {
     trace!("in registers(): calling unwind_trampoline...");
     unsafe { unwind_trampoline(&mut f) };
     trace!("in registers(): returned from unwind_trampoline.");
-
 }
 
 
@@ -391,9 +396,247 @@ pub unsafe fn land(regs: &Registers) {
         r13: regs[X86_64::R13].unwrap_or(0),
         r14: regs[X86_64::R14].unwrap_or(0),
         r15: regs[X86_64::R15].unwrap_or(0),
-        rsp: regs[X86_64::RSP].unwrap(),
+        rsp: regs[X86_64::RSP].expect("in unwind::land(): RSP was None!"),
     };
     lr.rsp -= 8;
     *(lr.rsp as *mut u64) = regs[X86_64::RA].unwrap();
     unwind_lander(&lr);
 }
+
+
+
+
+
+/// The type signature of the personality function, see `rust_eh_personality`.
+type PersonalityFunction = extern "C" fn(
+    version: c_int, 
+    actions: _Unwind_Action,
+    class: u64,
+    object: *mut _Unwind_Exception,
+    context: *mut _Unwind_Context
+) -> _Unwind_Reason_Code;
+
+
+#[cfg(not(test))]
+#[lang = "eh_personality"]
+#[no_mangle]
+#[doc(hidden)]
+/// This function will always be emitted as "rust_eh_personality" no matter what function name we give it here.
+unsafe extern "C" fn rust_eh_personality(
+    version: c_int, 
+    actions: _Unwind_Action,
+    class: u64,
+    object: *mut _Unwind_Exception,
+    context: *mut _Unwind_Context
+) -> _Unwind_Reason_Code {
+    error!("rust_eh_personality(): version: {:?}, actions: {:?}, class: {:?}, object: {:?}, context: {:?}",
+        version, actions, class, object, context
+    );
+
+    if version != 1 {
+        error!("rust_eh_personality(): version was {}, must be 1.", version);
+        return _Unwind_Reason_Code::_URC_FATAL_PHASE1_ERROR;
+    }
+
+
+    _Unwind_Reason_Code::_URC_END_OF_STACK
+}
+
+
+
+#[repr(C)]
+#[derive(Copy, Clone, PartialEq, Debug)]
+pub enum _Unwind_Action {
+    _UA_SEARCH_PHASE = 1,
+    _UA_CLEANUP_PHASE = 2,
+    _UA_HANDLER_FRAME = 4,
+    _UA_FORCE_UNWIND = 8,
+    _UA_END_OF_STACK = 16,
+}
+
+#[repr(C)]
+#[derive(Copy, Clone, PartialEq, Debug)]
+pub enum _Unwind_Reason_Code {
+    _URC_NO_REASON = 0,
+    _URC_FOREIGN_EXCEPTION_CAUGHT = 1,
+    _URC_FATAL_PHASE2_ERROR = 2,
+    _URC_FATAL_PHASE1_ERROR = 3,
+    _URC_NORMAL_STOP = 4,
+    _URC_END_OF_STACK = 5,
+    _URC_HANDLER_FOUND = 6,
+    _URC_INSTALL_CONTEXT = 7,
+    _URC_CONTINUE_UNWIND = 8,
+    _URC_FAILURE = 9, // used only by ARM EHABI
+}
+
+pub type _Unwind_Exception_Class = u64;
+pub type _Unwind_Exception_Cleanup_Fn = extern "C" fn(unwind_code: _Unwind_Reason_Code, exception: *mut _Unwind_Exception);
+
+
+#[cfg(target_arch = "x86_64")]
+pub const UNWINDER_PRIVATE_DATA_SIZE: usize = 6;
+#[cfg(target_arch = "aarch64")]
+pub const UNWINDER_PRIVATE_DATA_SIZE: usize = 2;
+
+
+#[repr(C)]
+pub struct _Unwind_Exception {
+    pub exception_class: _Unwind_Exception_Class,
+    pub exception_cleanup: _Unwind_Exception_Cleanup_Fn,
+    pub private_contptr: Option<u64>,
+    pub private: [_Unwind_Word; UNWINDER_PRIVATE_DATA_SIZE],
+}
+
+pub type _Unwind_Word = uintptr_t;
+pub type _Unwind_Ptr = uintptr_t;
+
+pub struct _Unwind_Context {
+    pub lsda: u64,
+    pub ip: u64,
+    pub initial_address: u64,
+    pub registers: *mut Registers,
+}
+
+pub type _Unwind_Trace_Fn = extern "C" fn(ctx: *mut _Unwind_Context, arg: *mut c_void) -> _Unwind_Reason_Code;
+
+/*
+// FIXME: we skip over this function when unwinding, so we should ensure
+// it never needs any cleanup. Currently this is not true.
+#[no_mangle]
+pub unsafe extern "C" fn _Unwind_Resume(exception: *mut _Unwind_Exception) -> ! {
+    registers(|registers| {
+        if let Some(registers) = unwind_tracer(registers, exception) {
+            land(&registers);
+        }
+    });
+    unreachable!();
+}
+*/
+
+#[no_mangle]
+pub unsafe extern "C" fn _Unwind_DeleteException(exception: *mut _Unwind_Exception) {
+    ((*exception).exception_cleanup)(_Unwind_Reason_Code::_URC_FOREIGN_EXCEPTION_CAUGHT, exception);
+    trace!("exception deleted.");
+}
+
+#[no_mangle]
+pub unsafe extern "C" fn _Unwind_GetRegionStart(ctx: *mut _Unwind_Context) -> _Unwind_Ptr {
+    (*ctx).initial_address as usize
+}
+
+#[no_mangle]
+pub unsafe extern "C" fn _Unwind_GetTextRelBase(ctx: *mut _Unwind_Context) -> _Unwind_Ptr {
+    unreachable!();
+}
+
+#[no_mangle]
+pub unsafe extern "C" fn _Unwind_GetDataRelBase(ctx: *mut _Unwind_Context) -> _Unwind_Ptr {
+    unreachable!();
+}
+
+#[no_mangle]
+pub unsafe extern "C" fn _Unwind_GetLanguageSpecificData(ctx: *mut _Unwind_Context) -> *mut c_void {
+    (*ctx).lsda as *mut c_void
+}
+
+#[no_mangle]
+pub unsafe extern "C" fn _Unwind_SetGR(ctx: *mut _Unwind_Context, reg_index: c_int, value: _Unwind_Word) {
+    (*(*ctx).registers)[reg_index as u16] = Some(value as u64);
+}
+
+#[no_mangle]
+pub unsafe extern "C" fn _Unwind_SetIP(ctx: *mut _Unwind_Context, value: _Unwind_Word) {
+    (*(*ctx).registers)[X86_64::RA] = Some(value as u64);
+}
+
+#[no_mangle]
+pub unsafe extern "C" fn _Unwind_GetIPInfo(ctx: *mut _Unwind_Context, ip_before_insn: *mut c_int) -> _Unwind_Word {
+    *ip_before_insn = 0;
+    (*ctx).ip as usize
+}
+
+#[no_mangle]
+pub unsafe extern "C" fn _Unwind_FindEnclosingFunction(pc: *mut c_void) -> *mut c_void {
+    pc // FIXME: implement this
+}
+
+
+
+/*
+
+/// Unwind_RaiseException is the first entry point invoked by Rust's panic handler in the std lib. 
+/// Obviously, the core lib doesn't do that, so we need to do it ourselves.
+/// 
+// FIXME: Set `unwind(allowed)` because we need to be able to unwind this function as
+// part of its operation. But this means any panics in this function are undefined
+// behaviour, and we don't currently ensure it doesn't panic.
+#[unwind(allowed)]
+#[no_mangle]
+pub unsafe extern "C" fn _Unwind_RaiseException(exception: *mut _Unwind_Exception) -> _Unwind_Reason_Code {
+    (*exception).private_contptr = None;
+    registers(|registers| {
+        if let Some(registers) = unwind_tracer(registers, exception) {
+            land(&registers);
+        }
+    });
+    unreachable!();
+}
+
+unsafe fn unwind_tracer(registers: Registers, exception: *mut _Unwind_Exception) -> Option<Registers> {
+    let mut unwinder = DwarfUnwinder::default();
+    let mut frames = StackFrames::new(&mut unwinder, registers);
+
+    if let Some(contptr) = (*exception).private_contptr {
+        loop {
+            if let Some(frame) = frames.next().unwrap() {
+                if frames.registers()[X86_64::RSP].unwrap() == contptr {
+                    break;
+                }
+            } else {
+                return None;
+            }
+        }
+    }
+
+    while let Some(frame) = frames.next().unwrap() {
+        if let Some(personality_fn_vaddr) = frame.personality {
+            trace!("HAS PERSONALITY");
+            let personality_func: PersonalityFunction = core::mem::transmute(personality_fn_vaddr);
+
+            let mut ctx = _Unwind_Context {
+                lsda: frame.lsda.unwrap(),
+                ip: frames.registers()[X86_64::RA].unwrap(),
+                initial_address: frame.initial_address,
+                registers: frames.registers(),
+            };
+
+            (*exception).private_contptr = frames.registers()[X86_64::RSP];
+
+            // ABI specifies that phase 1 is optional, so we just run phase 2 (CLEANUP_PHASE)
+            match personality_func(1, _Unwind_Action::_UA_CLEANUP_PHASE, (*exception).exception_class, exception, &mut ctx) {
+                _Unwind_Reason_Code::_URC_CONTINUE_UNWIND => (),
+                _Unwind_Reason_Code::_URC_INSTALL_CONTEXT => return Some(frames.registers),
+                x => panic!("wtf reason code {:?}", x),
+            }
+        }
+    }
+    None
+}
+
+#[no_mangle]
+pub unsafe extern "C" fn _Unwind_Backtrace(trace: _Unwind_Trace_Fn, trace_argument: *mut c_void) -> _Unwind_Reason_Code {
+    DwarfUnwinder::default().trace(|frames| {
+        while let Some(frame) = frames.next().unwrap() {
+            let mut ctx = _Unwind_Context {
+                lsda: frame.lsda.unwrap_or(0),
+                ip: frames.registers()[X86_64::RA].unwrap(),
+                initial_address: frame.initial_address,
+                registers: frames.registers(),
+            };
+
+            trace(&mut ctx, trace_argument);
+        }
+    });
+    _Unwind_Reason_Code::_URC_END_OF_STACK
+}
+*/

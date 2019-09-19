@@ -9,6 +9,7 @@
 #![feature(lang_items)]
 #![feature(panic_info_message)]
 #![feature(asm, naked_functions)]
+#![feature(unwind_attributes)]
 
 extern crate alloc;
 #[macro_use] extern crate log;
@@ -22,6 +23,7 @@ extern crate fallible_iterator;
 
 mod registers;
 mod unwind;
+mod lsda;
 
 use core::panic::PanicInfo;
 use memory::VirtualAddress;
@@ -32,17 +34,6 @@ use mod_mgmt::{
     CrateNamespace,
     metadata::{StrongCrateRef, StrongSectionRef, SectionType},
 };
-
-
-
-
-#[cfg(not(test))]
-#[lang = "eh_personality"]
-#[no_mangle]
-#[doc(hidden)]
-pub extern "C" fn eh_personality() {
-    error!("EH_PERSONALITY IS UNHANDLED!");
-}
 
 
 /// The singular entry point for a language-level panic.
@@ -96,9 +87,24 @@ fn panic_unwind_test(info: &PanicInfo) -> ! {
     debug!("panic_unwind_test(): looking at crate {:?}", my_crate);
     */
 
+
+    // dump some info about the loaded app crate
+    if let Some(ref app_crate) = app_crate_ref {
+        let krate = app_crate.lock_as_ref();
+        trace!("============== Crate {} =================", krate.crate_name);
+        trace!("text_pages:   {:#X?}", krate.text_pages.as_ref().map(|(_, range)| (range.start, range.end)));
+        trace!("rodata_pages: {:#X?}", krate.rodata_pages.as_ref().map(|(_, range)| (range.start, range.end)));
+        trace!("data_pages:   {:#X?}", krate.data_pages.as_ref().map(|(_, range)| (range.start, range.end)));
+        for s in krate.sections.values() {
+            trace!("   {:?}", &*s.lock());
+        }
+
+    }
+
     debug!("Starting NamespaceUnwinder!");
     let mut unwinder = NamespaceUnwinder::new(namespace, app_crate_ref);
-    unwinder.trace(print_stack_frames);
+    // unwinder.trace(print_stack_frames);
+    unwinder.trace(unwind_stack_frames);
     debug!("Done with NamespaceUnwinder!");
 
     // handle_eh_frame(&namespace, &my_crate, starting_instruction_pointer, true).expect("handle_eh_frame failed");
@@ -201,10 +207,51 @@ fn print_stack_frames(stack_frames: &mut unwind::StackFrames) {
     while let Some(frame) = stack_frames.next().expect("stack_frames.next() error") {
         info!("StackFrame: {:#X?}", frame);
         info!("  in func: {:?}", stack_frames.unwinder().namespace().get_section_containing_address(VirtualAddress::new_canonical(frame.initial_address() as usize), stack_frames.unwinder().starting_crate(), false));
+        if let Some(lsda) = frame.lsda() {
+            info!("  LSDA section: {:?}", stack_frames.unwinder().namespace().get_section_containing_address(VirtualAddress::new_canonical(lsda as usize), stack_frames.unwinder().starting_crate(), true));
+        }
         // backtrace::resolve(x.registers()[16].unwrap() as *mut std::os::raw::c_void, |sym| println!("{:?} ({:?}:{:?})", sym.name(), sym.filename(), sym.lineno()));
         // println!("{:?}", frame);
     }
 }
+
+
+fn unwind_stack_frames(stack_frames: &mut unwind::StackFrames) {
+    let mut i = -1;
+    while let Some(frame) = stack_frames.next().expect("stack_frames.next() error") {
+        i += 1;
+
+        info!("StackFrame[{}]: {:#X?}", i, frame);
+        info!("  in func: {:?}", stack_frames.unwinder().namespace().get_section_containing_address(VirtualAddress::new_canonical(frame.initial_address() as usize), stack_frames.unwinder().starting_crate(), false));
+        if i < 3 {
+            info!("    (skipping unwinding this frame for now, within a panic/unwind handler.)");
+            continue;
+        }
+        if let Some(lsda) = frame.lsda() {
+            let lsda = VirtualAddress::new_canonical(lsda as usize);
+            if let Some((lsda_sec_ref, _)) = stack_frames.unwinder().namespace().get_section_containing_address(lsda, stack_frames.unwinder().starting_crate(), true) {
+                info!("  parsing LSDA section: {:?}", lsda_sec_ref);
+                let sec = lsda_sec_ref.lock();
+                let starting_offset = sec.mapped_pages_offset + (lsda.value() - sec.address_range.start.value());
+                let length_til_end_of_mp = sec.address_range.end.value() - lsda.value();
+                let sec_mp = sec.mapped_pages.lock();
+                let lsda_slice = sec_mp.as_slice::<u8>(starting_offset, length_til_end_of_mp)
+                    .expect("unwind_stack_frames(): couldn't get LSDA pointer as a slice");
+                let res = lsda::parse_lsda(lsda_slice);
+                if let Err(e) = res {
+                    error!("unwind_stack_frames(): gimli error returned by parse_lsda(): {:?}", e);
+                }
+            } else {
+                error!("  BUG: couldn't find LSDA section (.gcc_except_table) for LSDA address: {:#X}", lsda);
+            }
+
+
+        }
+        // backtrace::resolve(x.registers()[16].unwrap() as *mut std::os::raw::c_void, |sym| println!("{:?} ({:?}:{:?})", sym.name(), sym.filename(), sym.lineno()));
+        // println!("{:?}", frame);
+    }
+}
+
 
 /// The singular entry point for a language-level panic.
 #[cfg(not(test))]

@@ -1395,9 +1395,9 @@ impl CrateNamespace {
 
         // allocate enough space to load the sections
         let section_pages = allocate_section_pages(&elf_file, kernel_mmi_ref)?;
-        let mut text_pages   = section_pages.executable_pages.map(|(tp, range)| (Arc::new(Mutex::new(tp)), range));
-        let mut rodata_pages = section_pages.read_only_pages.map( |(rp, range)| (Arc::new(Mutex::new(rp)), range));
-        let mut data_pages   = section_pages.read_write_pages.map(|(dp, range)| (Arc::new(Mutex::new(dp)), range));
+        let text_pages   = section_pages.executable_pages.map(|(tp, range)| (Arc::new(Mutex::new(tp)), range));
+        let rodata_pages = section_pages.read_only_pages.map( |(rp, range)| (Arc::new(Mutex::new(rp)), range));
+        let data_pages   = section_pages.read_write_pages.map(|(dp, range)| (Arc::new(Mutex::new(dp)), range));
 
         // Check the symbol table to get the set of sections that are global (publicly visible).
         let global_sections: BTreeSet<usize> = {
@@ -1431,7 +1431,7 @@ impl CrateNamespace {
         // (+) It's way faster to load the sections, since we can just bulk copy all .text sections at once 
         //     instead of copying them individually on a per-section basis (or just remap their pages directly).
         // (-) It ends up wasting a few hundred bytes here and there, but almost always under 100 bytes.
-        if let Some((ref mut tp, ref tp_range)) = text_pages {
+        if let Some((ref tp, ref tp_range)) = text_pages {
             let text_size = tp_range.end.value() - tp_range.start.value();
             let mut tp_locked = tp.lock();
             let text_destination: &mut [u8] = tp_locked.as_slice_mut(0, text_size)?;
@@ -2209,7 +2209,7 @@ impl CrateNamespace {
     /// 
     /// By default, only executable sections (`.text`) are searched, since typically the only use case 
     /// for this function is to search for an instruction pointer (program counter) address.
-    /// However, if `search_all_mappings` is `true`, both the read-only and read-write sections
+    /// However, if `search_all_section_types` is `true`, both the read-only and read-write sections
     /// will be included in the search, e.g., `.rodata`, `.data`, `.bss`. 
     /// 
     /// If a `starting_crate` is provided, the search will begin from that crate
@@ -2246,13 +2246,8 @@ impl CrateNamespace {
         for sec_ref in crate_locked.sections.values() {
             // trace!("get_section_containing_address: locking sec_ref: {:?}", sec_ref);
             let sec = sec_ref.lock();
-            let eligible_section = match sec.typ {
-                SectionType::Text => true, // .text sections are always included
-                SectionType::Rodata | 
-                SectionType::Data |
-                SectionType::Bss if search_all_section_types => true, // other sections are included if requested
-                _ => false,
-            };
+            // .text sections are always included, other sections are included if requested.
+            let eligible_section = sec.typ == SectionType::Text || search_all_section_types;
             
             // If the section's address bounds contain the address, then we've found it.
             // Only a single section can contain the address, so it's safe to stop once we've found a match.
