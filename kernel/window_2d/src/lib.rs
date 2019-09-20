@@ -37,6 +37,7 @@ extern crate window;
 use alloc::collections::{BTreeMap, VecDeque};
 use alloc::string::{String, ToString};
 use alloc::sync::{Arc, Weak};
+use alloc::boxed::Box;
 use compositor::Compositor;
 use core::ops::{Deref, DerefMut};
 use dfqueue::{DFQueue, DFQueueConsumer, DFQueueProducer};
@@ -70,7 +71,7 @@ pub const SCREEN_BACKGROUND_COLOR: u32 = 0x000000;
 /// A window contains a reference to its inner reference owned by the window manager,
 /// a consumer of inputs, a list of displayables and a framebuffer
 pub struct WindowObj {
-    pub inner: Arc<Mutex<WindowInner>>,
+    pub inner: Arc<Mutex<Box<Window>>>,
     pub consumer: DFQueueConsumer<Event>,
     pub components: BTreeMap<String, Component>,
     /// the framebuffer owned by the window
@@ -162,6 +163,10 @@ impl WindowObj {
     /// Get the content position of the window excluding border and padding
     pub fn get_content_position(&self) -> (usize, usize) {
         self.inner.lock().get_content_position()
+    }
+
+    pub fn inner(&self) -> &Arc<Mutex<Box<Window>>> {
+        &self.inner
     }
 
     // /// draw a pixel in a window
@@ -479,3 +484,4 @@ fn get_border_color(active: bool) -> u32 {
         WINDOW_INACTIVE_COLOR
     }
 }
+

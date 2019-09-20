@@ -32,8 +32,8 @@ extern crate text_display;
 extern crate lazy_static;
 extern crate displayable;
 extern crate font;
-extern crate window_2d;
 extern crate window;
+extern crate window_2d;
 
 use alloc::collections::{BTreeMap, VecDeque};
 use alloc::string::{String, ToString};
@@ -49,51 +49,18 @@ use frame_buffer_compositor::FRAME_COMPOSITOR;
 use frame_buffer_drawer::*;
 use spin::{Mutex, Once};
 use text_display::{Cursor, TextDisplay};
-pub use window_2d::*;
 pub use window::Window;
 use alloc::boxed::Box;
+pub use window_2d::*;
 
 lazy_static! {
     /// The list of all windows in the system.
-    static ref WINDOWLIST: Mutex<WindowList<WindowInner>> = Mutex::new(
+    static ref WINDOWLIST: Mutex<WindowList> = Mutex::new(
         WindowList{
             background_list: VecDeque::new(),
             active: Weak::new(),
         }
     );
-}
-
-
-/// The window allocator.
-/// It contains a list of allocated window and a reference to the active window
-struct WindowList<T: Window> {
-    // The list of inactive windows. Their order is based on the last time they were active. The first window is the window which was active most recently.
-    background_list: VecDeque<Weak<Mutex<T>>>,
-    // A weak pointer to the active window.
-    active: Weak<Mutex<T>>,
-}
-
-/// Initialize the window manager.
-pub fn init() -> Result<(), &'static str> {
-    let (screen_width, screen_height) = frame_buffer::get_screen_size()?;
-    let framebuffer = FrameBuffer::new(screen_width, screen_height, None)?;
-    SCREEN_FRAME_BUFFER.call_once(|| Arc::new(Mutex::new(framebuffer)));
-    Ok(())
-}
-
-/// Applications call this function to request a new window object with a default size (mostly fills screen with WINDOW_MARGIN around all borders)
-/// If the caller a specific window size, it should call new_window()
-pub fn new_default_window() -> Result<WindowObj, &'static str> {
-    let (window_width, window_height) = frame_buffer::get_screen_size()?;
-    match new_window(
-        WINDOW_MARGIN,
-        WINDOW_MARGIN,
-        window_width - 2 * WINDOW_MARGIN,
-        window_height - 2 * WINDOW_MARGIN,
-    ) {
-        Ok(new_window) => return Ok(new_window),
-        Err(err) => return Err(err),
-    }
 }
 
 /// Lets the caller specify the dimensions of the new window and returns a new window
@@ -135,7 +102,8 @@ pub fn new_window<'a>(
     //     return Err("Request area is already allocated");
     // }
 
-    let inner_ref = Arc::new(Mutex::new(inner));
+    let inner_obj:Box<Window> = Box::new(inner);
+    let inner_ref = Arc::new(Mutex::new(inner_obj));
 
     // add the new window and active it
     // initialize the content of the new window
@@ -154,22 +122,54 @@ pub fn new_window<'a>(
     Ok(window)
 }
 
+/// Applications call this function to request a new window object with a default size (mostly fills screen with WINDOW_MARGIN around all borders)
+/// If the caller a specific window size, it should call new_window()
+pub fn new_default_window() -> Result<WindowObj, &'static str> {
+    let (window_width, window_height) = frame_buffer::get_screen_size()?;
+    match new_window(
+        WINDOW_MARGIN,
+        WINDOW_MARGIN,
+        window_width - 2 * WINDOW_MARGIN,
+        window_height - 2 * WINDOW_MARGIN,
+    ) {
+        Ok(new_window) => return Ok(new_window),
+        Err(err) => return Err(err),
+    }
+}
+
+/// The window allocator.
+/// It contains a list of allocated window and a reference to the active window
+struct WindowList {
+    // The list of inactive windows. Their order is based on the last time they were active. The first window is the window which was active most recently.
+    background_list: VecDeque<Weak<Mutex<Box<Window>>>>,
+    // A weak pointer to the active window.
+    active: Weak<Mutex<Box<Window>>>,
+}
+
+/// Initialize the window manager.
+pub fn init() -> Result<(), &'static str> {
+    let (screen_width, screen_height) = frame_buffer::get_screen_size()?;
+    let framebuffer = FrameBuffer::new(screen_width, screen_height, None)?;
+    SCREEN_FRAME_BUFFER.call_once(|| Arc::new(Mutex::new(framebuffer)));
+    Ok(())
+}
+
 /// Puts an input event into the active window (i.e. a keypress event, resize event, etc.)
 /// If the caller wants to put an event into a specific window, use put_event_into_app()
 pub fn send_event_to_active(event: Event) -> Result<(), &'static str> {
     let window_list = WINDOWLIST.lock();
     let active_ref = window_list.active.upgrade(); // grabs a pointer to the active WindowInner
     if let Some(window) = active_ref {
-        let window = window.lock();
-        window.key_producer.enqueue(event);
+        let mut window = window.lock();
+        window.key_producer().enqueue(event);
     }
     Ok(())
 }
 
 
-impl<T:Window> WindowList<T> {
+impl WindowList {
     // add a new window to the list
-    fn add_active(&mut self, inner_ref: &Arc<Mutex<T>>) -> Result<(), &'static str> {
+    fn add_active(&mut self, inner_ref: &Arc<Mutex<Box<Window>>>) -> Result<(), &'static str> {
         // // inactive all other windows and active the new one
         // for item in self.list.iter_mut(){
         //     let ref_opt = item.upgrade();
@@ -190,7 +190,7 @@ impl<T:Window> WindowList<T> {
     }
 
     // delete a window
-    fn delete(&mut self, inner: &Arc<Mutex<T>>) -> Result<(), &'static str> {
+    fn delete(&mut self, inner: &Arc<Mutex<Box<Window>>>) -> Result<(), &'static str> {
         // If the window is active, delete it and active the next top window
         if let Some(current_active) = self.active.upgrade() {
             if Arc::ptr_eq(&(current_active), inner) {
@@ -216,7 +216,7 @@ impl<T:Window> WindowList<T> {
     }
 
     // get the index of an inactive window in the background window list
-    fn get_bgwindow_index(&self, inner: &Arc<Mutex<T>>) -> Option<usize> {
+    fn get_bgwindow_index(&self, inner: &Arc<Mutex<Box<Window>>>) -> Option<usize> {
         let mut i = 0;
         for item in self.background_list.iter() {
             if let Some(item_ptr) = item.upgrade() {
@@ -302,7 +302,7 @@ pub fn switch_to_next() -> Result<(), &'static str> {
 
 /// Set the specified window in the background list as active.
 pub fn switch_to(window: &WindowObj) -> Result<(), &'static str> {
-    if let Some(index) = WINDOWLIST.lock().get_bgwindow_index(&window.inner) {
+    if let Some(index) = WINDOWLIST.lock().get_bgwindow_index(&window.inner()) {
         active_window(index, true)?;
     }
 
