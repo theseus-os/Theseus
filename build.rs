@@ -20,6 +20,9 @@ fn main() {
         println!("{}{}", CFG_PREFIX, s);
     }
 
+    // println!("cargo:rustc-link-search=static_libs/");
+    // println!("cargo:rustc-link-lib=static=test");
+
     eprintln!("ran build script, configs: {}", configs);
 
 }

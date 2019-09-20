@@ -120,7 +120,8 @@ pub fn DATA_BSS_SECTION_FLAGS() -> EntryFlags {
 pub fn init(boot_info: &BootInformation, kernel_mmi: &mut MemoryManagementInfo) -> Result<&'static CrateNamespace, &'static str> {
     let (_namespaces_dir, default_dirs) = parse_bootloader_modules_into_files(boot_info, kernel_mmi)?;
     // create the default CrateNamespace based on the default namespace directory set
-    let default_namespace = CrateNamespace::new(DEFAULT_NAMESPACE_NAME.to_string(), default_dirs);
+    let mut default_namespace = CrateNamespace::new(DEFAULT_NAMESPACE_NAME.to_string(), default_dirs);
+    default_namespace.enable_fuzzy_symbol_matching();
     Ok(DEFAULT_CRATE_NAMESPACE.call_once(|| default_namespace))
 }
 
@@ -157,6 +158,7 @@ fn parse_bootloader_modules_into_files(
         let prefix = if prefix == "" { DEFAULT_NAMESPACE_NAME } else { prefix };
         let name = String::from(file_name);
 
+
         let pages = allocate_pages_by_bytes(size_in_bytes).ok_or("Couldn't allocate virtual pages for bootloader module area")?;
         let mp = kernel_mmi.page_table.map_allocated_pages_to(
             pages, 
@@ -165,7 +167,8 @@ fn parse_bootloader_modules_into_files(
             fa.lock().deref_mut()
         )?;
 
-        // debug!("Module: {:?}, size {}, mp: {:?}", name, size_in_bytes, mp);
+        debug!("Module: {:?}, size {}, mp: {:?}", name, size_in_bytes, mp);
+
 
         let create_file = |dirs: &NamespaceDirectorySet| {
             let parent_dir = match crate_type { 

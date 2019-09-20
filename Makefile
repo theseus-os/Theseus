@@ -91,7 +91,7 @@ iso := $(BUILD_DIR)/theseus-$(ARCH).iso
 GRUB_ISOFILES := $(BUILD_DIR)/grub-isofiles
 OBJECT_FILES_BUILD_DIR := $(GRUB_ISOFILES)/modules
 
-
+test_static_lib = static_libs/libtest.a
 ## This is the output path of the xargo command, defined by cargo (not our choice).
 nano_core_static_lib := $(ROOT_DIR)/target/$(TARGET)/$(BUILD_MODE)/libnano_core.a
 ## The directory where the nano_core source files are
@@ -172,7 +172,7 @@ iso: $(iso)
 build: $(nano_core_binary)
 ## Copy all object files into the main build directory and prepend the kernel prefix.
 ## All object files include those from the target/ directory, and the core, alloc, and compiler_builtins libraries
-	@for f in ./target/$(TARGET)/$(BUILD_MODE)/deps/*.o "$(HOME)"/.xargo/lib/rustlib/$(TARGET)/lib/*.o; do \
+	@for f in ./target/$(TARGET)/$(BUILD_MODE)/deps/*.o  ./external_bin/*.o "$(HOME)"/.xargo/lib/rustlib/$(TARGET)/lib/*.o; do \
 		cp -vf  $${f}  $(OBJECT_FILES_BUILD_DIR)/`basename $${f} | sed -n -e 's/\(.*\)/$(KERNEL_PREFIX)\1/p'`   2> /dev/null ; \
 	done
 ## In the above loop, we gave all object files the kernel prefix, so we need to rename the application object files with the proper app prefix.
@@ -221,11 +221,11 @@ cargo: check_rustc check_xargo
 
 
 ## This builds the nano_core binary itself, which is the fully-linked code that first runs right after the bootloader
-$(nano_core_binary): cargo $(nano_core_static_lib) $(assembly_object_files) $(linker_script)
+$(nano_core_binary): cargo $(nano_core_static_lib) $(assembly_object_files) $(linker_script) 
 	@mkdir -p $(BUILD_DIR)
 	@mkdir -p $(NANO_CORE_BUILD_DIR)
 	@mkdir -p $(OBJECT_FILES_BUILD_DIR)
-	$(CROSS)ld -n -T $(linker_script) -o $(nano_core_binary) $(assembly_object_files) $(nano_core_static_lib)
+	$(CROSS)ld -n -T $(linker_script) -o $(nano_core_binary) $(assembly_object_files) $(nano_core_static_lib) 
 ## run "readelf" on the nano_core binary, remove LOCAL and WEAK symbols from the ELF file, and then demangle it, and then output to a sym file
 	@cargo run --manifest-path $(ROOT_DIR)/tools/demangle_readelf_file/Cargo.toml \
 		<($(CROSS)readelf -S -s -W $(nano_core_binary) | sed '/LOCAL  /d;/WEAK   /d') \
