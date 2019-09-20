@@ -632,7 +632,6 @@ impl LoadedSection {
             .unwrap_or_else(|| &sec_name)
     }
 
-
     /// Returns the index of the first `WeakDependent` object with a section
     /// that matches the given `matching_section` in this `LoadedSection`'s `sections_dependent_on_me` list.
     pub fn find_weak_dependent(&self, matching_section: &StrongSectionRef) -> Option<usize> {

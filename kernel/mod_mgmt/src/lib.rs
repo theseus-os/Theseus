@@ -138,6 +138,7 @@ fn parse_bootloader_modules_into_files(
         let dir_name = format!("{}{}", prefix, crate_type.namespace_name());
         let name = String::from(file_name);
 
+
         let pages = allocate_pages_by_bytes(size_in_bytes).ok_or("Couldn't allocate virtual pages for bootloader module area")?;
         let mp = kernel_mmi.page_table.map_allocated_pages_to(
             pages, 
@@ -146,7 +147,8 @@ fn parse_bootloader_modules_into_files(
             fa.lock().deref_mut()
         )?;
 
-        // debug!("Module: {:?}, size {}, mp: {:?}", name, size_in_bytes, mp);
+        debug!("Module: {:?}, size {}, mp: {:?}", name, size_in_bytes, mp);
+
 
         let create_file = |dir: &DirRef| {
             MemFile::from_mapped_pages(mp, name, size_in_bytes, dir)
