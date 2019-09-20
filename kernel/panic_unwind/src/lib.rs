@@ -29,7 +29,7 @@ use core::panic::PanicInfo;
 use memory::VirtualAddress;
 use unwind::{NamespaceUnwinder, Unwinder};
 use fallible_iterator::FallibleIterator;
-use gimli::BaseAddresses;
+use gimli::{BaseAddresses, NativeEndian};
 use mod_mgmt::{
     CrateNamespace,
     metadata::{StrongCrateRef, StrongSectionRef, SectionType},
@@ -237,9 +237,10 @@ fn unwind_stack_frames(stack_frames: &mut unwind::StackFrames) {
                 let sec_mp = sec.mapped_pages.lock();
                 let lsda_slice = sec_mp.as_slice::<u8>(starting_offset, length_til_end_of_mp)
                     .expect("unwind_stack_frames(): couldn't get LSDA pointer as a slice");
-                let res = lsda::parse_lsda(lsda_slice);
-                if let Err(e) = res {
-                    error!("unwind_stack_frames(): gimli error returned by parse_lsda(): {:?}", e);
+                let table = lsda::GccExceptTable::new(lsda_slice, NativeEndian, frame.initial_address());
+                let mut iter = table.call_site_table_entries().unwrap();
+                while let Some(entry) = iter.next().unwrap() {
+                    debug!("{:#X?}", entry);
                 }
             } else {
                 error!("  BUG: couldn't find LSDA section (.gcc_except_table) for LSDA address: {:#X}", lsda);
