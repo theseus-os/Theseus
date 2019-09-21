@@ -141,95 +141,33 @@ fn get_eh_frame_info(crate_ref: &StrongCrateRef) -> Option<(StrongSectionRef, Ba
     Some((eh_frame_sec_ref.clone(), base_addrs))
 }
 
-    // // The map from CIE offset to CIE struct, which is needed to parse every partial FDE
-    // let mut cie_map: BTreeMap<usize, CommonInformationEntry<_>> = BTreeMap::new();
-    // let mut entries = eh_frame.entries(&base_addrs);
-    // while let Some(cfi_entry) = entries.next().map_err(|_e| {
-    //     error!("gimli error: {:?}", _e);
-    //     "gimli error while iterating through eh_frame entries"
-    // })? {
-    //     // debug!("Found eh_frame entry: {:?}", cfi_entry);
-    //     match cfi_entry {
-    //         CieOrFde::Cie(cie) => {
-    //             debug!("  --> moving on to CIE at offset {}", cie.offset());
-    //             let mut instructions = cie.instructions(&eh_frame, &base_addrs);
-    //             while let Some(instr) = instructions.next().map_err(|_e| {
-    //                 error!("CIE instructions gimli error: {:?}", _e);
-    //                 "gimli error while iterating through eh_frame Cie instructions list"
-    //             })? {
-    //                 debug!("    CIE instr: {:?}", instr);
-    //             }
-    //             cie_map.insert(cie.offset(), cie);
-    //         }
-    //         CieOrFde::Fde(partial_fde) => {
-    //             debug!("    Parsing partial FDE...");
-    //             let full_fde = partial_fde.parse(|_eh_frame_gimli_sec, _base_addrs, cie_offset| {
-    //                 let cie_offset = cie_offset.0;
-    //                 debug!("PartialFDE::parse(): cie_offset: {}", cie_offset);
-    //                 let required_cie = cie_map.get(&cie_offset).cloned().ok_or_else(|| {
-    //                     error!("BUG: partial FDE required CIE offset {:?}, but that CIE couldn't be found. Available CIEs: {:?}", cie_offset, cie_map);
-    //                     gimli::Error::NotCiePointer
-    //                 });
-    //                 required_cie
-    //             }).map_err(|_e| {
-    //                 error!("gimli error: {:?}", _e);
-    //                 "gimli error while parsing partial FDE"
-    //             })?;
-    //             debug!("      Full FDE: {:?}", full_fde);
-    //             let mut instructions = full_fde.instructions(&eh_frame, &base_addrs);
-    //             while let Some(instr) = instructions.next().map_err(|_e| {
-    //                 error!("FDE instructions gimli error: {:?}", _e);
-    //                 "gimli error while iterating through eh_frame FDE instructions list"
-    //             })? {
-    //                 debug!("    FDE instr: {:?}", instr);
-    //             }
-    //             let mut uninit_unwind_ctx = UninitializedUnwindContext::new();
-    //             let mut table = full_fde.rows(&eh_frame, &base_addrs, &mut uninit_unwind_ctx)
-    //                 .map_err(|_e| {
-    //                     error!("FDE rows gimli error: {:?}", _e);
-    //                     "gimli error while calling fde.rows()"
-    //                 })?;
-    //             while let Some(row) = table.next_row().map_err(|_e| {
-    //                 error!("Table row gimli error: {:?}", _e);
-    //                 "gimli error while iterating through FDE unwind table rows"
-    //             })? {
-    //                 debug!("        FDE unwind row: {:?}", row);
-    //             }
-    //         }
-    //     }
-    // }
-    // info!("successfully iterated through {}'s eh_frame entries", crate_name);
 
-
-
-
-fn print_stack_frames(stack_frames: &mut unwind::StackFrames) {
+fn print_stack_frames(stack_frames: &mut unwind::StackFrameIter) {
     while let Some(frame) = stack_frames.next().expect("stack_frames.next() error") {
         info!("StackFrame: {:#X?}", frame);
         info!("  in func: {:?}", stack_frames.unwinder().namespace().get_section_containing_address(VirtualAddress::new_canonical(frame.initial_address() as usize), stack_frames.unwinder().starting_crate(), false));
         if let Some(lsda) = frame.lsda() {
             info!("  LSDA section: {:?}", stack_frames.unwinder().namespace().get_section_containing_address(VirtualAddress::new_canonical(lsda as usize), stack_frames.unwinder().starting_crate(), true));
         }
-        // backtrace::resolve(x.registers()[16].unwrap() as *mut std::os::raw::c_void, |sym| println!("{:?} ({:?}:{:?})", sym.name(), sym.filename(), sym.lineno()));
-        // println!("{:?}", frame);
     }
 }
 
 
-fn unwind_stack_frames(stack_frames: &mut unwind::StackFrames) {
+fn unwind_stack_frames(stack_frame_iter: &mut unwind::StackFrameIter) {
     let mut i = -1;
-    while let Some(frame) = stack_frames.next().expect("stack_frames.next() error") {
+    while let Some(frame) = stack_frame_iter.next().expect("stack_frame_iter.next() error") {
         i += 1;
 
         info!("StackFrame[{}]: {:#X?}", i, frame);
-        info!("  in func: {:?}", stack_frames.unwinder().namespace().get_section_containing_address(VirtualAddress::new_canonical(frame.initial_address() as usize), stack_frames.unwinder().starting_crate(), false));
+        info!("  In func: {:?}", stack_frame_iter.unwinder().namespace().get_section_containing_address(VirtualAddress::new_canonical(frame.initial_address() as usize), stack_frame_iter.unwinder().starting_crate(), false));
+        info!("  Regs: {:?}", stack_frame_iter.registers());
         if i < 3 {
             info!("    (skipping unwinding this frame for now, within a panic/unwind handler.)");
             continue;
         }
         if let Some(lsda) = frame.lsda() {
             let lsda = VirtualAddress::new_canonical(lsda as usize);
-            if let Some((lsda_sec_ref, _)) = stack_frames.unwinder().namespace().get_section_containing_address(lsda, stack_frames.unwinder().starting_crate(), true) {
+            if let Some((lsda_sec_ref, _)) = stack_frame_iter.unwinder().namespace().get_section_containing_address(lsda, stack_frame_iter.unwinder().starting_crate(), true) {
                 info!("  parsing LSDA section: {:?}", lsda_sec_ref);
                 let sec = lsda_sec_ref.lock();
                 let starting_offset = sec.mapped_pages_offset + (lsda.value() - sec.address_range.start.value());
@@ -238,18 +176,28 @@ fn unwind_stack_frames(stack_frames: &mut unwind::StackFrames) {
                 let lsda_slice = sec_mp.as_slice::<u8>(starting_offset, length_til_end_of_mp)
                     .expect("unwind_stack_frames(): couldn't get LSDA pointer as a slice");
                 let table = lsda::GccExceptTable::new(lsda_slice, NativeEndian, frame.initial_address());
-                let mut iter = table.call_site_table_entries().unwrap();
-                while let Some(entry) = iter.next().unwrap() {
-                    debug!("{:#X?}", entry);
+
+                // let mut iter = table.call_site_table_entries().unwrap();
+                // while let Some(entry) = iter.next().unwrap() {
+                //     debug!("{:#X?}", entry);
+                // }
+
+                let entry = table.call_site_table_entry_for_address(frame.caller_address())
+                    .expect("unwind_stack_frames(): couldn't find a call site table entry for this stack frame's caller address");
+
+                debug!("Found call site entry for address {:#X}: {:#X?}", frame.caller_address(), entry);
+                
+                // Jump to the actual landing pad function, or rather, a function that will jump there after setting up register values properly.
+                debug!("*** JUMPING TO LANDING PAD FUNCTION AT {:#X}", entry.landing_pad_address());
+                unsafe {
+                    unwind::land(stack_frame_iter.registers(), entry.landing_pad_address());
                 }
+                debug!("*** RETURNED call to unwind::land()");
+                
             } else {
                 error!("  BUG: couldn't find LSDA section (.gcc_except_table) for LSDA address: {:#X}", lsda);
             }
-
-
         }
-        // backtrace::resolve(x.registers()[16].unwrap() as *mut std::os::raw::c_void, |sym| println!("{:?} ({:?}:{:?})", sym.name(), sym.filename(), sym.lineno()));
-        // println!("{:?}", frame);
     }
 }
 

@@ -78,14 +78,14 @@ impl<R: Reader> GccExceptTable<R> {
         Ok(CallSiteTableIterator {
             call_site_table_encoding: call_site_table_header.encoding,
             end_of_call_site_table,
-            landing_pad_start: lsda_header.landing_pad_start.unwrap_or(self.function_starting_vaddr),
+            landing_pad_base: lsda_header.landing_pad_base.unwrap_or(self.function_starting_vaddr),
             reader, 
         })
     }
 
     /// Iterates over the call site table and finds the entry that matches the given instruction pointer (IP), 
     /// i.e., the entry that covers the range of addresses that the `ip` falls within.
-    pub fn find_call_site_table_entry_for_address(&self, address: u64) -> gimli::Result<CallSiteTableEntry> {
+    pub fn call_site_table_entry_for_address(&self, address: u64) -> gimli::Result<CallSiteTableEntry> {
         let mut iter = self.call_site_table_entries()?;
         while let Some(entry) = iter.next()? {
             if entry.range_of_covered_addresses().contains(&address) {
@@ -98,19 +98,19 @@ impl<R: Reader> GccExceptTable<R> {
 
 #[derive(Debug)]
 struct LsdaHeader {
-    /// The encoding used to read the next value `landing_pad_start`.
-    landing_pad_start_encoding: DwEhPe,
-    /// If the above `landing_pad_start_encoding` is not `DW_EH_PE_omit`,
+    /// The encoding used to read the next value `landing_pad_base`.
+    landing_pad_base_encoding: DwEhPe,
+    /// If the above `landing_pad_base_encoding` is not `DW_EH_PE_omit`,
     /// then this is the value that should be used as the base address of the landing pad,
     /// which is used by all the offsets specified in the LSDA call site tables and action tables.
-    /// It is decoded using the above `landing_pad_start_encoding`, 
+    /// It is decoded using the above `landing_pad_base_encoding`, 
     /// which is typically the uleb128 encoding, but not always guaranteed to be.
     /// Otherwise, if `DW_EH_PE_omit`, the default value is the starting function address
     /// specified in the FDE (FrameDescriptionEntry) corresponding to this LSDA.
     /// 
     /// Typically, this will be the virtual address of the function that this cleanup routine is for;
     /// such cleanup routines are usually at the end of the function's text section.
-    landing_pad_start: Option<u64>,
+    landing_pad_base: Option<u64>,
     /// The encoding used to read pointer values in the type table.
     type_table_encoding: DwEhPe,
     /// If the above `type_table_encoding` is not `DW_EH_PE_omit`, 
@@ -137,8 +137,8 @@ impl LsdaHeader {
         };
 
         Ok(LsdaHeader{
-            landing_pad_start_encoding: lp_encoding,
-            landing_pad_start: lp,
+            landing_pad_base_encoding: lp_encoding,
+            landing_pad_base: lp,
             type_table_encoding: tt_encoding,
             type_table_offset: tt_offset,
         })
@@ -181,13 +181,13 @@ pub struct CallSiteTableEntry {
     /// The starting address of the function that this GccExceptTable pertains to.
     /// This is not actually part of the table entry as defined in the gcc LSDA spec,
     /// it comes from the top-level LSDA header and is replicated here for convenience. 
-    landing_pad_start: u64
+    landing_pad_base: u64
 }
 impl CallSiteTableEntry {
     fn parse<R: gimli::Reader>(
         reader: &mut R,
         call_site_encoding: DwEhPe,
-        landing_pad_start: u64,
+        landing_pad_base: u64,
     ) -> gimli::Result<CallSiteTableEntry> {
         let cs_start  = read_encoded_pointer(reader, call_site_encoding)?;
         let cs_length = read_encoded_pointer(reader, call_site_encoding)?;
@@ -198,18 +198,18 @@ impl CallSiteTableEntry {
             length: cs_length,
             landing_pad_offset: cs_lp,
             action_offset: cs_action,
-            landing_pad_start,
+            landing_pad_base,
         })
     }
 
     /// The range of addresses (instruction pointers) that are covered by this entry. 
     pub fn range_of_covered_addresses(&self) -> Range<u64> {
-        (self.landing_pad_start + self.starting_ip_offset) .. (self.landing_pad_start + self.starting_ip_offset + self.length)
+        (self.landing_pad_base + self.starting_ip_offset) .. (self.landing_pad_base + self.starting_ip_offset + self.length)
     }
 
     /// The address of the actual landing pad, i.e., the cleanup routine that should run
-    pub fn landing_pad_start_address(&self) -> u64 {
-        self.landing_pad_start + self.landing_pad_offset
+    pub fn landing_pad_address(&self) -> u64 {
+        self.landing_pad_base + self.landing_pad_offset
     }
 
     /// The offset into the action table that specifies which additional action should be undertaken
@@ -235,7 +235,7 @@ pub struct CallSiteTableIterator<R: Reader> {
     /// i.e., the reader offset right after the final call site table entry.
     end_of_call_site_table: u64,
     /// The starting address of the function that this GccExceptTable pertains to.
-    landing_pad_start: u64,
+    landing_pad_base: u64,
     /// This reader must be queued up to the beginning of the first call site table entry,
     /// i.e., right after the end of the call site table header.
     reader: R,
@@ -247,7 +247,7 @@ impl<R: Reader> FallibleIterator for CallSiteTableIterator<R> {
 
     fn next(&mut self) -> Result<Option<Self::Item>, Self::Error> {
         if self.reader.offset_id().0 < self.end_of_call_site_table {
-            let entry = CallSiteTableEntry::parse(&mut self.reader, self.call_site_table_encoding, self.landing_pad_start)?;
+            let entry = CallSiteTableEntry::parse(&mut self.reader, self.call_site_table_encoding, self.landing_pad_base)?;
             if let Some(action_offset) = entry.action_offset() {
                 warn!("unsupported/unhandled call site action, offset (with 1 added): {:#X}", action_offset);
             }

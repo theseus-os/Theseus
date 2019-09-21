@@ -3,6 +3,7 @@
 
 #![allow(nonstandard_style)]
 
+use core::fmt;
 use alloc::{
     sync::Arc,
 };
@@ -78,11 +79,14 @@ impl UnwindRowReference {
 }
 
 
+/// A single frame in the stack, which contains
+/// unwinding-related information for a single function call's stack frame.
 #[derive(Debug)]
 pub struct StackFrame {
     personality: Option<u64>,
     lsda: Option<u64>,
     initial_address: u64,
+    caller_address: u64,
 }
 
 impl StackFrame {
@@ -94,13 +98,17 @@ impl StackFrame {
         self.lsda
     }
 
+    pub fn caller_address(&self) -> u64 {
+        self.caller_address
+    }
+
     pub fn initial_address(&self) -> u64 {
         self.initial_address
     }
 }
 
 pub trait Unwinder {
-    fn trace<F>(&mut self, f: F) where F: FnMut(&mut StackFrames);
+    fn trace<F>(&mut self, f: F) where F: FnMut(&mut StackFrameIter);
 }
 
 type NativeEndianSliceReader<'i> = EndianSlice<'i, NativeEndian>;
@@ -126,34 +134,55 @@ impl NamespaceUnwinder {
 }
 
 impl Unwinder for NamespaceUnwinder {
-    fn trace<F>(&mut self, mut f: F) where F: FnMut(&mut StackFrames) {
+    fn trace<F>(&mut self, mut f: F) where F: FnMut(&mut StackFrameIter) {
         trace!("in NamespaceUnwinder::trace()");
         registers(|registers| {
-            let mut frames = StackFrames::new(self, registers);
+            let mut frames = StackFrameIter::new(self, registers);
             f(&mut frames)
         });
     }
 }
 
 
-
-pub struct StackFrames<'a> {
+/// An iterator over all of the stack frames on the current stack,
+/// which works in reverse calling order from the current function
+/// up the call stack to the very first function on the stack,
+/// at which point it will return `None`. 
+/// 
+/// This is a lazy iterator: the previous frame in the call stack
+/// is only calculated upon invocation of the `next()` method. 
+/// 
+/// This can be used with the `FallibleIterator` trait.
+pub struct StackFrameIter<'a> {
+    /// A reference to the underlying unwinding data 
+    /// that is used to traverse the stack frames.
     unwinder: &'a mut NamespaceUnwinder,
+    /// The register values that 
+    /// These register values will change on each invocation of `next()`
+    /// as different stack frames are successively iterated over.
     registers: Registers,
+    /// Unwinding state related to the previous frame in the call stack:
+    /// a reference to its row/entry in the unwinding table,
+    /// and the Canonical Frame Address (CFA value) that is used to determine the next frame.
     state: Option<(UnwindRowReference, u64)>,
 }
 
-impl<'a> StackFrames<'a> {
+impl<'a> StackFrameIter<'a> {
     pub fn new(unwinder: &'a mut NamespaceUnwinder, registers: Registers) -> Self {
-        StackFrames {
+        StackFrameIter {
             unwinder,
             registers,
             state: None,
         }
     }
 
-    pub fn registers(&mut self) -> &mut Registers {
-        &mut self.registers
+    /// Returns the array of register values as they existed during the stack frame
+    /// that is currently being iterated over. 
+    /// This is necessary in order to restore the proper register values 
+    /// before jumping to the **landing pad** (a cleanup function or exception catcher/panic handler)
+    /// such that the landing pad function will actually execute properly with the right context.
+    pub fn registers(&self) -> &Registers {
+        &self.registers
     }
 
     /// Returns a reference to the underlying unwinder's context/state.
@@ -162,7 +191,7 @@ impl<'a> StackFrames<'a> {
     }
 }
 
-impl<'a> FallibleIterator for StackFrames<'a> {
+impl<'a> FallibleIterator for StackFrameIter<'a> {
     type Item = StackFrame;
     type Error = &'static str;
 
@@ -175,7 +204,9 @@ impl<'a> FallibleIterator for StackFrames<'a> {
             unwind_row_ref.with_unwind_info(|_fde, row| {
                 for &(reg, ref rule) in row.registers() {
                     trace!("rule {:?} {:?}", reg, rule);
-                    assert!(reg != X86_64::RSP); // stack = cfa
+                    // The stack pointer (RSP) is given by the CFA calculated during the previous iteration,
+                    // there should *not* be a register rule defining the value of the RSP directly.
+                    assert!(reg != X86_64::RSP); 
                     newregs[reg] = match *rule {
                         RegisterRule::Undefined => unreachable!(), // registers[reg],
                         RegisterRule::SameValue => Some(registers[reg].unwrap()), // not sure why this exists
@@ -202,7 +233,8 @@ impl<'a> FallibleIterator for StackFrames<'a> {
                 return Ok(None);
             }
 
-            // The return address (RA register) points 1 byte past the call instruction
+            // The return address (RA register) points to the next instruction (1 byte past the call instruction),
+            // since the processor has advanced it to the next instruction to continue executing after the function returns. 
             let caller = return_address - 1;
             debug!("caller is {:#X}", caller);
 
@@ -228,6 +260,7 @@ impl<'a> FallibleIterator for StackFrames<'a> {
                     personality: fde.personality().map(|x| unsafe { deref_ptr(x) }),
                     lsda: fde.lsda().map(|x| unsafe { deref_ptr(x) }),
                     initial_address: fde.initial_address(),
+                    caller_address: caller,
                 };
                 Ok((cfa, frame))
             })?;
@@ -259,6 +292,8 @@ pub fn registers<F>(mut f: F) where F: FnMut(Registers) {
 
 /// This function saves the current register values by pushing them onto the stack
 /// before invoking the function "unwind_recorder" with those register values as the only argument.
+/// This is needed because the unwind info tables describe register values as operations (offsets/addends)
+/// that are relative to the current register values, so we must have those current values as a starting point. 
 /// 
 /// The calling convention dictates that the first argument, the payload function, is passed in the RDI register.
 #[naked]
@@ -292,28 +327,41 @@ pub unsafe extern fn unwind_trampoline(_payload: *mut UnwindPayload) {
     core::hint::unreachable_unchecked();
 }
 
+
+
+// NOTE: can landing also refer to the process of jumping to a cleanup handler? Hmm, I think so... 
+// I mean, why wouldn't they use the same type of trampoline thing?
+/// **Landing** refers to the process of jumping to an exception handler (e.g., a "catch" block)
+/// at which the unwinding procedure should stop running cleanup functions while bubbling up the call stack.
+/// 
+/// This function basically fills the actual CPU registers with the values in the given `LandingRegisters`
+/// and then jumps to the exception handler (landing pad) pointed to by the stack pointer (RSP) in those `LandingRegisters`.
+/// 
+/// This is similar in design to how a context switch operation restores registers for the next task.
 #[naked]
+#[inline(never)]
 unsafe extern fn unwind_lander(_regs: *const LandingRegisters) {
     asm!("
-     movq %rdi, %rsp
-     popq %rax
-     popq %rbx
-     popq %rcx
-     popq %rdx
-     popq %rdi
-     popq %rsi
-     popq %rbp
-     popq %r8
-     popq %r9
-     popq %r10
-     popq %r11
-     popq %r12
-     popq %r13
-     popq %r14
-     popq %r15
-     movq 0(%rsp), %rsp
-     ret // HYPERSPACE JUMP :D
-     ");
+        movq %rdi, %rsp
+        popq %rax
+        popq %rbx
+        popq %rcx
+        popq %rdx
+        popq %rdi
+        popq %rsi
+        popq %rbp
+        popq %r8
+        popq %r9
+        popq %r10
+        popq %r11
+        popq %r12
+        popq %r13
+        popq %r14
+        popq %r15
+        movq 0(%rsp), %rsp
+        # now we jump to the actual landing pad function
+        ret
+    ");
     core::hint::unreachable_unchecked();
 }
 
@@ -379,8 +427,8 @@ unsafe extern "C" fn unwind_recorder(payload: *mut UnwindPayload, stack: u64, sa
     payload(registers);
 }
 
-pub unsafe fn land(regs: &Registers) {
-    let mut lr = LandingRegisters {
+pub unsafe fn land(regs: &Registers, landing_pad_address: u64) {
+    let mut landing_regs = LandingRegisters {
         rax: regs[X86_64::RAX].unwrap_or(0),
         rbx: regs[X86_64::RBX].unwrap_or(0),
         rcx: regs[X86_64::RCX].unwrap_or(0),
@@ -396,11 +444,17 @@ pub unsafe fn land(regs: &Registers) {
         r13: regs[X86_64::R13].unwrap_or(0),
         r14: regs[X86_64::R14].unwrap_or(0),
         r15: regs[X86_64::R15].unwrap_or(0),
-        rsp: regs[X86_64::RSP].expect("in unwind::land(): RSP was None!"),
+        rsp: regs[X86_64::RSP].expect("in unwind::land(): RSP was None, \
+            it must be set to the landing pad address (of the unwind cleanup function or exception handler)!"),
     };
-    lr.rsp -= 8;
-    *(lr.rsp as *mut u64) = regs[X86_64::RA].unwrap();
-    unwind_lander(&lr);
+
+    // Now place the landing pad function's address at the "bottom" of the stack
+    // -- not really the bottom of the whole stack, just the last thing to be popped off after the landing_regs.
+    landing_regs.rsp -= 8;
+    // *(lr.rsp as *mut u64) = regs[X86_64::RA].expect("in unwind::land(): the return address was None");
+    *(landing_regs.rsp as *mut u64) = landing_pad_address;
+    trace!("unwind_lander regs: {:#X?}", landing_regs);
+    unwind_lander(&landing_regs);
 }
 
 
@@ -584,7 +638,7 @@ pub unsafe extern "C" fn _Unwind_RaiseException(exception: *mut _Unwind_Exceptio
 
 unsafe fn unwind_tracer(registers: Registers, exception: *mut _Unwind_Exception) -> Option<Registers> {
     let mut unwinder = DwarfUnwinder::default();
-    let mut frames = StackFrames::new(&mut unwinder, registers);
+    let mut frames = StackFrameIter::new(&mut unwinder, registers);
 
     if let Some(contptr) = (*exception).private_contptr {
         loop {
