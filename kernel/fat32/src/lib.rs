@@ -98,6 +98,7 @@
 
 #[macro_use] extern crate alloc;
 #[macro_use] extern crate log;
+#[macro_use] extern crate bitflags;
 extern crate storage_device;
 extern crate storage_manager;
 extern crate fs_node;
@@ -128,13 +129,30 @@ const EOC: u32 = 0x0fff_ffff;
 /// Magic byte used to mark a directory table as free. Set as first byte of name field.
 const FREE_DIRECTORY_ENTRY: u8 = 0xe5;
 
+/// Byte to mark entry as a "dot" entry.
+const DOT_DIRECTORY_ENTRY: u8 = 0x2e;
+
 /// Empty cluster marked as 0.
 const EMPTY_CLUSTER: u32 = 0;
+
+bitflags! {
+    struct FileAttributes: u8 {
+        const READ_ONLY = 0x1;
+        const HIDDEN = 0x2;
+        const SYSTEM = 0x4;
+        const VOLUME_LABEL = 0x8;
+        const SUBDIRECTORY = 0x10;
+        const ARCHIVE = 0x20;
+        const DEVICE = 0x40;
+        // Combinations of flags that are useful:
+        const VFAT = Self::READ_ONLY.bits | Self::HIDDEN.bits | Self::SYSTEM.bits | Self::VOLUME_LABEL.bits;
+    }
+}
 
 /// Checks if a cluster number is an EOC value:
 #[inline]
 fn is_eoc(cluster: u32) -> bool {
-    cluster_from_raw(cluster) > 0x0fff_fff8
+    cluster_from_raw(cluster) >= 0x0fff_fff8
 }
 
 /// Checks if a cluster number counts as free:
@@ -342,7 +360,19 @@ struct FatDirectory {
 impl FatDirectory {
     #[inline]
     fn is_free(&self) -> bool {
-        self.name[0] == FREE_DIRECTORY_ENTRY
+        self.name[0] == 0 ||
+            self.name[0] == FREE_DIRECTORY_ENTRY 
+            // TODO looks like this doesn't seem to match the implementation that generated my code
+    }
+
+    #[inline]
+    fn is_dot(&self) -> bool {
+        self.name[0] == DOT_DIRECTORY_ENTRY
+    }
+
+    #[inline]
+    fn is_vfat(&self) -> bool {
+        self.flags & FileAttributes::VFAT.bits == FileAttributes::VFAT.bits
     }
     
     fn to_directory_entry(&self) -> DirectoryEntry {
@@ -375,7 +405,7 @@ impl FatDirectory {
 /// Based on the FatDirectory structure and used to describe the files/subdirectories in a FAT32 
 /// formatted filesystem, used for convience purposes
 pub struct DirectoryEntry {
-    pub name: [u8; 11], 
+    pub name: [u8; 11], // TODO note that mapping this to a rust string can be challenging.
     long_name: [u8; 255], // Long-name format currently not supported
     file_type: FileType,
     pub size: u32,
@@ -653,9 +683,12 @@ impl Directory for PFSDirectory {
 
         let mut list_of_names: Vec<String> = Vec::new();
         // Returns a vector of the 32-byte directory structures
-        let entries = match self.entries() {
+        let entries = match self.entries2() {
             Ok(entries) => entries,
-            Err(_) => return list_of_names,
+            Err(_) => {
+                warn!("Failed to read list of names from directory");
+                return list_of_names;
+            },
         };
 
         // Iterates through the 32-byte directory structures and pushes the name of each one into the list
@@ -704,6 +737,7 @@ impl PFSDirectory {
         }
     }
     
+    // TODO this function can be abstracted onto the FS to simply take an offset (and this would call the FS implementation with offset=32)
     /// Advances a PFSPosition by one entry and returns the new entry if successful.
     /// Note that if EOC is reached the cluster is set to the EOC value found. I think this may not be ideal API design however so it potentially may need to change.
     pub fn advance_pos(&self, fs: &Filesystem, pos: &PFSPosition) -> Result<PFSPosition, Error> {
@@ -721,7 +755,8 @@ impl PFSDirectory {
         
         if new_pos.sector_offset >= fs.sectors_per_cluster {
             new_pos.sector_offset = 0;
-            new_pos.cluster = fs.next_cluster(self.cluster)?;
+            new_pos.cluster = fs.next_cluster(pos.cluster)?;
+            //new_pos.entry_offset = 0;
         }
         
         Ok(new_pos)
@@ -992,6 +1027,37 @@ impl PFSDirectory {
         Ok(pos)
     }
 
+    /// TODO should replace the entries function
+    pub fn entries2(&self) -> Result<Vec<DirectoryEntry>, Error> {
+        debug!("Getting entries for {:?}", self.name);
+        let fs = self.filesystem.lock();
+
+        let mut entry_collection: Vec<DirectoryEntry> = Vec::new(); 
+        let mut pos = self.initial_pos();
+        
+        loop {
+            let dir: FatDirectory = self.get_fat_directory(&fs, &pos)?;
+            
+            // TODO VFAT long name check needs to be done correctly.
+            if !dir.is_free() && !dir.is_vfat() {
+                debug!("Found new entry {:?}", debug_name(&dir.name));
+                entry_collection.push(dir.to_directory_entry());
+            }
+
+            // If the first byte of the directory is 0 we have reached the end of allocated directory entries
+            if dir.name[0] == 0 {
+                return Ok(entry_collection);
+            }
+            
+            pos = match self.advance_pos(&fs, &pos) {
+                Err(Error::EndOfFile) => return Ok(entry_collection),
+                Ok(new_pos) => new_pos,
+                Err(e) => return Err(e),
+            };
+            debug!("New position: cluster: {}, sector_off: {}, byte off: {}", pos.cluster, pos.sector_offset, pos.entry_offset);
+        }
+    }
+
     /// Returns a vector of all the directory entries in a directory without mutating the directory
     pub fn entries(&self) -> Result<Vec<DirectoryEntry>, Error> {
          
@@ -1228,11 +1294,11 @@ impl Filesystem {
     fn next_cluster(&self, cluster: u32) -> Result<u32, Error> {
         match self.fat_type {
             32 => {
-
-                // debug!("the current cluster is:{}", cluster);
                 // FAT32 uses 32 bits per FAT entry, so 1 entry = 4 bytes
                 let fat_entry = Filesystem::fat_entry_from_cluster(cluster);
                 let fat_sector = self.fat_sector_from_fat_entry(fat_entry);
+                let entry_offset = fat_entry % self.bytes_per_sector;
+                debug!("the current cluster is:{}, need to read sector: {}, offset from entry: {}, entry: {}", cluster, fat_sector, entry_offset, fat_entry);
 
                 let mut data: Vec<u8> = vec![0; self.header.drive.lock().sector_size_in_bytes()];
                 let _sectors_read = match self.header.drive.lock().read_sectors(&mut data[..], fat_sector as usize) {
@@ -1243,10 +1309,12 @@ impl Filesystem {
                 // Because FAT32 uses 4 bytes per cluster entry, to get to a cluster's exact byte entry in the FAT you can use the cluster number * 4
                 // And to get to the next cluster, the FAT must be read in little endian order using the mutliple_hex_to_int function 
                 // Read more here: https://en.wikipedia.org/wiki/Design_of_the_FAT_file_system#FAT
-                let entry_offset = fat_entry % (self.bytes_per_sector / size_of::<u32>() as u32);
-                let next_cluster_raw = LittleEndian::read_u32(&mut data[entry_offset as usize..(entry_offset as usize +size_of::<u32>())]) as u32; 
+                let next_cluster_raw = LittleEndian::read_u32(&mut data[entry_offset as usize..(entry_offset as usize +size_of::<u32>())]) as u32;
                 let next_cluster = cluster_from_raw(next_cluster_raw);
-                // debug!("the next cluster is: {}", next_cluster);
+
+                let data_test = &data[entry_offset as usize..(entry_offset as usize +size_of::<u32>())];
+
+                debug!("the next cluster is: {:x}, raw: {:x}", next_cluster, next_cluster_raw);
                 
                 if is_eoc(next_cluster) {
                     Err(Error::EndOfFile)
@@ -1255,7 +1323,10 @@ impl Filesystem {
                 }
             }
 
-            _ => Err(Error::Unsupported),
+            _ => {
+                warn!("next_cluster called for unsupported FS");
+                Err(Error::Unsupported)
+            },
         }
     }
     
@@ -1430,93 +1501,6 @@ impl Filesystem {
     }
 }
 
-// TODO allow this to work relative to a directory (that is, root or other y'know).
-/// Creates a PFSfile structure based on a provided path
-/// 
-/// # Arguments 
-/// * `fs`: the filesystem structure wrapped in an Arc and Mutex
-/// * `path`: the absolute path of the file in this format `/hello/poem.txt` or `\\hello\\poem.txt`
-/// 
-/// # Returns
-/// A PFSFile structure for the file if it exists, otherwise returns an Error
-pub fn open(fs: Arc<Mutex<Filesystem>>, path: &str) -> Result<PFSFile, Error> {
-
-        // First confirms the validity of the path
-        assert_eq!(path.find('/').or_else(|| path.find('\\')), Some(0));
-
-        let mut residual = path;
-
-        // Starts at root PFSdirectory
-
-        let root_dir = RootDirectory {
-            children: BTreeMap::new() 
-        };
-        
-        let strong_root = Arc::new(Mutex::new(root_dir)) as Arc<Mutex<dyn Directory + Send>>;
-        // let fs = Arc::new(Mutex::new(self));
-        fs.lock();
-        
-        let mut current_dir = PFSDirectory {
-            filesystem: fs.clone(),
-            name: "ROOT".to_string(),
-            parent: Arc::downgrade(&strong_root) ,
-            cluster: 2,
-            sector: 0,
-            offset: 0,
-            size: 0, // TODO this method is borked so perhaps don't abuse the code this way.
-        };
-        // Ok(fatdir) 
-
-        // This loop transverses the path until the specified PFSfile is found
-        loop {
-            // sub is the first PFSdirectory/PFSfile name in the path and residual is what is left
-            // this takes the following letters of the string \\hello\\bye\\hello.txt
-            let sub = match &residual[1..]
-                .find('/')
-                .or_else(|| (&residual[1..]).find('\\'))
-            {
-                None => &residual[1..],
-                Some(x) => {
-                    let sub: &str = &residual[1..=*x];
-                    residual = &residual[(*x + 1)..];
-                    sub
-                }
-            };
-
-            // If the PFSdirectory doesn't have any entries, returns NotFound
-            if sub.is_empty() {
-                return Err(Error::NotFound);
-            }
-            
-            loop {
-                // Keeps going through the entries in the PFSdirectory until it reaches the next sub-PFSdirectory or the specified PFSfile
-                
-                match current_dir.next_entry() {
-                    Err(Error::EndOfFile) => return Err(Error::NotFound),
-                    Err(e) => return Err(e),
-                    Ok(de) => {
-                        // Compares the name of the next destination in the path and the name of the PFSdirectory entry that it's currently looking at
-                        if compare_name(sub, &de) {
-                            // let dir_ref = Arc::new(Mutex::new(*current_dir)) as Arc<Mutex<dyn Directory + Send>>;
-                            match de.file_type {
-                                FileType::PFSDirectory => {
-                                    // If the next destination is a PFSdirectory, this will initialize the PFSdirectory structure for that  
-                                    // PFSdirectory and set the current PFSdirectory to be that PFSdirectory
-                                    current_dir = match fs.clone().lock().get_directory(de.cluster, sub.to_string(), Arc::new(Mutex::new(current_dir)) as DirRef, fs.clone(), de.size) { 
-                                        Ok(dir) => dir,
-                                        Err(_) => return Err(Error::NotFound) 
-                                    };
-                                    break;
-                                }
-                                FileType::PFSFile => return fs.clone().lock().get_file(de.cluster, de.size, sub.to_string(), Arc::new(Mutex::new(current_dir)) as DirRef, fs.clone()),
-                            }
-                        }
-                    }
-                }
-            }
-        }
-}
-
 /// Takes in a drive for a filesystem and initializes it if it's FAT32 
 /// 
 /// # Arguments
@@ -1543,36 +1527,6 @@ pub fn init(sd: storage_device::StorageDeviceRef) -> Result<Filesystem, &'static
     }    
     Err("failed to intialize fat filesystem for disk")
 }
-
-/// Creates a FATdirectory structure for the root directory
-/// 
-/// # Arguments 
-/// * `fs`: the filesystem structure wrapped in an Arc and Mutex
-/// 
-/// # Returns
-/// Returns the FATDirectory structure for the root directory 
-pub fn root_dir(fs: Arc<Mutex<Filesystem>>) -> Result<PFSDirectory, Error> {
-
-        fs.lock();
-        let root_dir = RootDirectory {
-            children: BTreeMap::new() 
-        };
-             
-        let strong_root = Arc::new(Mutex::new(root_dir)) as Arc<Mutex<dyn Directory + Send>>;
-
-        let fatdir = PFSDirectory {
-        filesystem: fs.clone(),
-        name: "ROOT".to_string(),
-        parent: Arc::downgrade(&strong_root) ,
-        cluster: 2,
-        sector: 0,
-        offset: 0,
-        size: 0, // TODO this is wrong but this method also just doesn't make much sense because root should be backed by disk.
-        };
-        Ok(fatdir) 
-        
-}
-
 
 /// Detects whether the drive passed into the function is a FAT32 drive
 /// 
@@ -1642,52 +1596,65 @@ fn compare_short_name(name: &str, de: &DirectoryEntry) -> bool {
     true
 }
 
+/// Creates a FATdirectory structure for the root directory
+/// 
+/// # Arguments 
+/// * `fs`: the filesystem structure wrapped in an Arc and Mutex
+/// 
+/// # Returns
+/// Returns the FATDirectory structure for the root directory 
+pub fn root_dir(fs: Arc<Mutex<Filesystem>>) -> Result<RootDirectory, Error> {
+
+    let fatdir = PFSDirectory {
+        filesystem: fs.clone(),
+        name: "/".to_string(),
+        parent: Weak::<Mutex<PFSDirectory>>::new(),
+        cluster: 2,
+        sector: 0,
+        offset: 0,
+        size: 0, // TODO this is wrong but this method also just doesn't make much sense because root should be backed by disk.
+    };
+
+    let underlying_root = Arc::new(Mutex::new(fatdir));
+
+    // fs.lock();
+    let new_root_dir = RootDirectory {
+        underlying_dir: underlying_root.clone(),
+    };
+
+    // This is pretty weird, but it seems to be necessary to set our own parent as ourselves.
+    underlying_root.lock().parent = Arc::downgrade(&(underlying_root.clone() as Arc<Mutex<dyn Directory + Send>>));
+
+    Ok(new_root_dir) 
+        
+}
+
+// TODO this is a pretty dumb setup but it seems to work for now. I'll try to work out a better solution later.
 /// A struct and impl being used to represent the parent of the root directory in FAT, taken from the root kernel
 pub struct RootDirectory {
     /// A list of DirRefs or pointers to the child directories   
-    children: BTreeMap<String, FileOrDir>,
+    underlying_dir: Arc<Mutex<PFSDirectory>>, // TODO should I do something for the parent.
 }
 
 impl Directory for RootDirectory {
     fn insert(&mut self, node: FileOrDir) -> Result<Option<FileOrDir>, &'static str> {
-        let name = node.get_name();
-        if let Some(mut old_node) = self.children.insert(name, node) {
-            old_node.set_parent_dir(Weak::<Mutex<RootDirectory>>::new());
-            Ok(Some(old_node))
-        } else {
-            Ok(None)
-        }
+        self.underlying_dir.lock().insert(node)
     }
 
     fn get(&self, name: &str) -> Option<FileOrDir> {
-        self.children.get(name).cloned()
+        self.underlying_dir.lock().get(name)
     }
 
     fn list(&self) -> Vec<String> {
-        self.children.keys().cloned().collect()
+        self.underlying_dir.lock().list()
     }
 
     fn remove(&mut self, node: &FileOrDir) -> Option<FileOrDir> {
-        // Prevents removal of root
-        match node {
-            &FileOrDir::Dir(ref dir) => {
-                if Arc::ptr_eq(dir, root::get_root()) {
-                    error!("Ignoring attempt to remove the root directory.");
-                    return None;
-                }
-            },
-            _ => {}
-        }
-        
-        if let Some(mut old_node) = self.children.remove(&node.get_name()) {
-            old_node.set_parent_dir(Weak::<Mutex<RootDirectory>>::new());
-            Some(old_node)
-        } else {
-            None
-        }
+        self.underlying_dir.lock().remove(node)
     }
 }
 
+// TODO these are most likely wrong implementations.
 impl FsNode for RootDirectory {
     /// Recursively gets the absolute pathname as a String
     fn get_absolute_path(&self) -> String {
@@ -1695,15 +1662,28 @@ impl FsNode for RootDirectory {
     }
 
     fn get_name(&self) -> String {
-        root::ROOT_DIRECTORY_NAME.to_string()
+        self.underlying_dir.lock().get_name()
     }
 
-    /// we just return the root itself because it is the top of the filesystem
+    // TODO I had to break this since the old implementation used the root from .
+    // I think during the creation of the root directory we'll want to save a DirRef to it?
+    // Could be another field I suppose.
+    // Maybe the best solution is to have root_dir return a DirRef and then have the root dir hold onto a weak dir Ref to itself.
+    // That sounds dumb but it might just work.
+    /// we just return the root itself because it is the top of the filesystem.
     fn get_parent_dir(&self) -> Option<DirRef> {
-        Some(root::get_root().clone())
+        None
     }
 
     fn set_parent_dir(&mut self, _: WeakDirRef) {
         // do nothing
+    }
+}
+
+/// Function to print the raw byte name as a string. TODO find a better way.
+fn debug_name(byte_name: &[u8]) -> &str {
+    match core::str::from_utf8(byte_name) {
+        Ok(name) => name,
+        Err(_) => "Couldn't find name"
     }
 }

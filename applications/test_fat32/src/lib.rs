@@ -22,7 +22,7 @@ use alloc::string::String;
 use alloc::string::ToString;
 use alloc::sync::{Arc, Weak};
 use spin::Mutex;
-use fs_node::{File, Directory, FileOrDir};
+use fs_node::{File, Directory, FileOrDir, FsNode};
 use fat32::root_dir;
 use path::Path;
 use getopts::Options;
@@ -152,6 +152,11 @@ fn print_dir(d : &dyn Directory) {
             }
         };
 
+        // Don't need to want to get "dot" entries (or else we end up in a loop).
+        if node.get_name().chars().nth(0).unwrap_or('.') == '.' {
+            continue;
+        }
+
         match node {
             FileOrDir::File(f) => {
                 let f_locked: &dyn File = &(*f.lock()); // This looks pretty horrible, but it seems legitimate.
@@ -173,28 +178,31 @@ fn print_file(f: &dyn File) {
     println!("Printing file: {:?}, {:} bytes.", f.get_name(), f.size());
     // Now print the first 512 bytes. Might be shorter than this many bytes.
     let mut data = [0; SECTOR_SIZE];
+    let mut pos = 0;
 
     let size = f.size();
 
-    let mut bytes_read = match f.read(&mut data, 0) {
+    let mut bytes_read = match f.read(&mut data, pos) {
         Ok(bytes) => bytes,
         Err(_) => {
             println!("Failed to read from file");
             return;
         }
     };
+    pos += bytes_read;
 
     print_data(&data);
 
     // Read until the end of file.
-    while bytes_read < size {
-        bytes_read += match f.read(&mut data, 0) {
+    while bytes_read <= size {
+        bytes_read += match f.read(&mut data, pos) {
             Ok(bytes) => bytes,
             Err(_) => {
                 println!("Failed to read from file");
                 return;
             }
-        }
+        };
+        pos += bytes_read;
     }
 
     print_data(&data);

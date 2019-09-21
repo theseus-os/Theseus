@@ -541,6 +541,7 @@ source = "registry+https://github.com/rust-lang/crates.io-index"
 name = "fat32"
 version = "0.1.0"
 dependencies = [
+ "bitflags 1.1.0 (registry+https://github.com/rust-lang/crates.io-index)",
  "byteorder 1.3.2 (registry+https://github.com/rust-lang/crates.io-index)",
  "fs_node 0.1.0",
  "lazy_static 1.2.0 (registry+https://github.com/rust-lang/crates.io-index)",
