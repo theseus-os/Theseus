@@ -10,11 +10,13 @@ extern crate frame_buffer;
 extern crate frame_buffer_drawer;
 extern crate frame_buffer_printer;
 extern crate tsc;
+extern crate alloc;
 #[macro_use]extern crate log;
 
 extern crate displayable;
 
 use displayable::Displayable;
+use alloc::boxed::Box;
 use font::{CHARACTER_HEIGHT, CHARACTER_WIDTH};
 use frame_buffer::{FrameBuffer};
 use tsc::{tsc_ticks, TscTicks};

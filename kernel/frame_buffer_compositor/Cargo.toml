@@ -16,6 +16,9 @@ version = "0.3.7"
 [dependencies.frame_buffer]
 path = "../frame_buffer"
 
+[dependencies.frame_buffer_2d]
+path = "../frame_buffer_2d"
+
 [dependencies.memory]
 path = "../memory"
 

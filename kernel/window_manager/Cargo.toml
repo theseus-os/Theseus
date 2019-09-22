@@ -43,6 +43,9 @@ path = "../displayable"
 [dependencies.window]
 path = "../window"
 
+[dependencies.frame_buffer_2d]
+path = "../frame_buffer_2d"
+
 [dependencies.text_display]
 path = "../../kernel/displayable/text_display"
 

@@ -18,6 +18,7 @@ extern crate log;
 
 use alloc::collections::BTreeMap;
 use alloc::vec::Vec;
+use alloc::boxed::Box;
 use compositor::Compositor;
 use core::hash::{Hash, Hasher, SipHasher};
 use frame_buffer::{FrameBuffer, Pixel, FINAL_FRAME_BUFFER};
@@ -72,7 +73,7 @@ impl Compositor for FrameCompositor {
             .ok_or("FrameCompositor fails to get the final frame buffer")?
             .lock();
         let (final_width, final_height) = final_fb.get_size();
-        let final_buffer = final_fb.buffer_mut();
+        //let final_buffer = final_fb.buffer_mut();
 
         for (src_fb, offset_x, offset_y) in bufferlist {
             if self.cached(src_fb, offset_x, offset_y) {
@@ -105,7 +106,8 @@ impl Compositor for FrameCompositor {
                 let dest_start = (final_y_start + i) * final_width + final_x_start;
                 let src_start = src_width * ((final_y_start + i) as i32 - offset_y) as usize
                     + (final_x_start as i32 - offset_x) as usize;
-                buffer_copy(final_buffer, src_buffer, dest_start, src_start, width);
+                let src_end = src_start + width;
+                final_fb.buffer_copy(&(src_buffer[src_start..src_end]), dest_start);
             }
 
             let new_cache = BufferCache {
@@ -124,7 +126,7 @@ impl Compositor for FrameCompositor {
                 };
             }
 
-            self.cache.insert(hash(&src_fb), new_cache);
+            self.cache.insert(src_fb.get_hash(), new_cache);
         }
 
         Ok(())
@@ -132,7 +134,7 @@ impl Compositor for FrameCompositor {
 
     // Check if a framebuffer has already cached since last update
     fn cached(&self, frame_buffer: &FrameBuffer, x: i32, y: i32) -> bool {
-        match self.cache.get(&hash(frame_buffer)) {
+        match self.cache.get(&(frame_buffer.get_hash())) {
             Some(cache) => {
                 if cache.x == x && cache.y == y {
                     return true;
@@ -145,24 +147,9 @@ impl Compositor for FrameCompositor {
     }
 }
 
-
-// Copy an arrary of pixels from src framebuffer to the dest framebuffer.
-// We use memory copy instead of pixel drawer for better performance
-fn buffer_copy(
-    dest_buffer: &mut BoxRefMut<MappedPages, [Pixel]>,
-    src_buffer: &BoxRefMut<MappedPages, [Pixel]>,
-    dest_start: usize,
-    src_start: usize,
-    len: usize,
-) {
-    let dest_end = dest_start + len;
-    let src_end = src_start + len;
-    dest_buffer[dest_start..dest_end].copy_from_slice(&(src_buffer[src_start..src_end]));
-}
-
 // Copy a line of pixels from src framebuffer to the dest framebuffer in 3d mode.
 // We use 3d pixel drawer because we need to compare the depth of every pixel
-fn buffer_copy_3d(
+/*fn buffer_copy_3d(
     dest_buffer: &mut BoxRefMut<MappedPages, [Pixel]>,
     src_buffer: &BoxRefMut<MappedPages, [Pixel]>,
     dest_start: usize,
@@ -180,11 +167,11 @@ fn buffer_copy_3d(
             break;
         }
     }
-}
+}Wenqiu:*/
 
 // Compute the hash of a framebuffer
-fn hash(t: &FrameBuffer) -> u64 {
+/*fn hash(t: &FrameBuffer) -> u64 {
     let mut s = SipHasher::new();
     t.hash(&mut s);
     s.finish()
-}
+}*/

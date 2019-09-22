@@ -7,6 +7,7 @@ build = "../../build.rs"
 
 [dependencies]
 spin = "0.4.10"
+downcast-rs = "1.0.4"
 
 [dependencies.log]
 default-features = false
@@ -18,6 +19,9 @@ version = "0.1.0"
 
 [dependencies.frame_buffer]
 path = "../frame_buffer"
+
+[dependencies.frame_buffer_2d]
+path = "../frame_buffer_2d"
 
 [dependencies.frame_buffer_compositor]
 path = "../frame_buffer_compositor"

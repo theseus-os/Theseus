@@ -7,6 +7,7 @@ extern crate alloc;
 extern crate frame_buffer;
 
 use alloc::vec::Vec;
+use alloc::boxed::Box;
 use frame_buffer::FrameBuffer;
 
 /// The compositor trait.

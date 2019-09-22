@@ -4,8 +4,10 @@
 #![no_std]
 
 extern crate frame_buffer;
+extern crate alloc;
 
 use frame_buffer::FrameBuffer;
+use alloc::boxed::Box;
 
 /// The displayable trait.
 pub trait Displayable<T> {

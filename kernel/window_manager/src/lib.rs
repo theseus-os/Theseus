@@ -24,6 +24,7 @@ extern crate event_types;
 extern crate log;
 extern crate compositor;
 extern crate frame_buffer;
+extern crate frame_buffer_2d;
 extern crate frame_buffer_compositor;
 extern crate frame_buffer_drawer;
 extern crate frame_buffer_printer;
@@ -46,6 +47,7 @@ use font::{CHARACTER_HEIGHT, CHARACTER_WIDTH};
 use frame_buffer::FrameBuffer;
 use frame_buffer_compositor::FRAME_COMPOSITOR;
 use frame_buffer_drawer::*;
+use frame_buffer_2d::FrameBufferRGB;
 use spin::{Mutex, Once};
 use text_display::{Cursor, TextDisplay};
 pub use window::Window;
@@ -65,8 +67,15 @@ pub const SCREEN_BACKGROUND_COLOR: u32 = 0x000000;
 // A framebuffer owned by the window manager.
 // This framebuffer is responsible for display borders. Windows owned by applications cannot get access to their borders.
 // All the display behaviors of borders are controled by the window manager
-pub static SCREEN_FRAME_BUFFER: Once<Arc<Mutex<FrameBuffer>>> = Once::new();
+pub static SCREEN_FRAME_BUFFER: Once<Arc<Mutex<FrameBufferRGB>>> = Once::new();
 
+/// Initialize the window manager.
+pub fn init() -> Result<(), &'static str> {
+    let (screen_width, screen_height) = frame_buffer::get_screen_size()?;
+    let framebuffer = FrameBufferRGB::new(screen_width, screen_height, None)?;
+    SCREEN_FRAME_BUFFER.call_once(|| Arc::new(Mutex::new(framebuffer)));
+    Ok(())
+}
 
 lazy_static! {
     /// The list of all windows in the system.
@@ -78,6 +87,7 @@ lazy_static! {
     );
 }
 
+
 /// The window allocator.
 /// It contains a list of allocated window and a reference to the active window
 pub struct WindowList {
@@ -85,14 +95,6 @@ pub struct WindowList {
     background_list: VecDeque<Weak<Mutex<Box<Window>>>>,
     // A weak pointer to the active window.
     active: Weak<Mutex<Box<Window>>>,
-}
-
-/// Initialize the window manager.
-pub fn init() -> Result<(), &'static str> {
-    let (screen_width, screen_height) = frame_buffer::get_screen_size()?;
-    let framebuffer = FrameBuffer::new(screen_width, screen_height, None)?;
-    SCREEN_FRAME_BUFFER.call_once(|| Arc::new(Mutex::new(framebuffer)));
-    Ok(())
 }
 
 /// Puts an input event into the active window (i.e. a keypress event, resize event, etc.)

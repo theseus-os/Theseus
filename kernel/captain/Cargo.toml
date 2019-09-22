@@ -27,6 +27,9 @@ path = "../logger"
 [dependencies.frame_buffer]
 path = "../frame_buffer"
 
+[dependencies.frame_buffer_2d]
+path = "../frame_buffer_2d"
+
 [dependencies.window_manager]
 path = "../window_manager"
 

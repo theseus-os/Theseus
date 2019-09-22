@@ -5,12 +5,14 @@ extern crate event_types;
 extern crate alloc;
 extern crate spin;
 extern crate dfqueue;
+extern crate frame_buffer;
 
 use text_display::{Cursor, TextDisplay};
 use event_types::Event;
 use alloc::sync::{Arc, Weak};
 use spin::{Mutex, Once};
 use dfqueue::{DFQueue, DFQueueConsumer, DFQueueProducer};
+use frame_buffer:: FrameBuffer;
 
 pub trait Window: Send {
     //clean the window on the screen including the border and padding

@@ -6,16 +6,15 @@
 
 extern crate alloc;
 extern crate frame_buffer;
-extern crate frame_buffer_pixel_drawer;
 
 use frame_buffer::FrameBuffer;
-use frame_buffer_pixel_drawer::draw_pixel;
+use alloc::boxed::Box;
 
 /// Draw a pixel in a framebuffer.
 /// The pixel is drawed at position (x, y) of the framebuffer with color
 pub fn draw_point(mut framebuffer: &mut FrameBuffer, x: usize, y: usize, color: u32) {
     if framebuffer.check_in_buffer(x, y) {
-        draw_pixel(&mut framebuffer, x, y, color);
+        framebuffer.draw_pixel(x, y, color);
     }
 }
 
@@ -49,7 +48,7 @@ pub fn draw_line(
             }
             y = (x - start_x) * height / width + start_y;
             if framebuffer.check_in_buffer(x as usize, y as usize) {
-                draw_pixel(&mut framebuffer, x as usize, y as usize, color);
+                framebuffer.draw_pixel(x as usize, y as usize, color);
             }
             x += step;
         }
@@ -63,7 +62,7 @@ pub fn draw_line(
             }
             x = (y - start_y) * width / height + start_x;
             if { framebuffer.check_in_buffer(x as usize, y as usize) } {
-                draw_pixel(&mut framebuffer, x as usize, y as usize, color);
+                framebuffer.draw_pixel(x as usize, y as usize, color);
             }
             y += step;
         }
@@ -107,8 +106,8 @@ pub fn draw_rectangle(
         if x == end_x {
             break;
         }
-        draw_pixel(&mut framebuffer, x as usize, start_y as usize, color);
-        draw_pixel(&mut framebuffer, x as usize, end_y - 1 as usize, color);
+        framebuffer.draw_pixel(x as usize, start_y as usize, color);
+        framebuffer.draw_pixel(x as usize, end_y - 1 as usize, color);
         x += 1;
     }
 
@@ -117,8 +116,8 @@ pub fn draw_rectangle(
         if y == end_y {
             break;
         }
-        draw_pixel(&mut framebuffer, start_x as usize, y as usize, color);
-        draw_pixel(&mut framebuffer, end_x - 1 as usize, y as usize, color);
+        framebuffer.draw_pixel(start_x as usize, y as usize, color);
+        framebuffer.draw_pixel(end_x - 1 as usize, y as usize, color);
         y += 1;
     }
 }
@@ -160,7 +159,7 @@ pub fn fill_rectangle(
     let mut y = start_y;
     loop {
         loop {
-            draw_pixel(&mut framebuffer, x as usize, y as usize, color);
+            framebuffer.draw_pixel(x as usize, y as usize, color);
             x += 1;
             if x == end_x {
                 break;

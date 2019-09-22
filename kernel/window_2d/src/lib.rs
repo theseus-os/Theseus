@@ -24,6 +24,7 @@ extern crate event_types;
 extern crate log;
 extern crate compositor;
 extern crate frame_buffer;
+extern crate frame_buffer_2d;
 extern crate frame_buffer_compositor;
 extern crate frame_buffer_drawer;
 extern crate frame_buffer_printer;
@@ -34,6 +35,8 @@ extern crate displayable;
 extern crate font;
 extern crate window;
 extern crate window_manager;
+extern crate downcast_rs;
+use downcast_rs::Downcast;
 
 use alloc::collections::{BTreeMap, VecDeque};
 use alloc::string::{String, ToString};
@@ -41,11 +44,13 @@ use alloc::sync::{Arc, Weak};
 use alloc::boxed::Box;
 use compositor::Compositor;
 use core::ops::{Deref, DerefMut};
+use core::any::Any;
 use dfqueue::{DFQueue, DFQueueConsumer, DFQueueProducer};
 use displayable::Displayable;
 use event_types::Event;
 use font::{CHARACTER_HEIGHT, CHARACTER_WIDTH};
 use frame_buffer::FrameBuffer;
+use frame_buffer_2d::FrameBufferRGB;
 use frame_buffer_compositor::FRAME_COMPOSITOR;
 use frame_buffer_drawer::*;
 use spin::{Mutex, Once};
@@ -56,15 +61,14 @@ use window_manager::{WINDOWLIST, SCREEN_FRAME_BUFFER, WINDOW_MARGIN, WINDOW_PADD
 
 /// A window contains a reference to its inner reference owned by the window manager,
 /// a consumer of inputs, a list of displayables and a framebuffer
-pub struct WindowObj {
+pub struct WindowObj<Buffer: FrameBuffer> {
     pub inner: Arc<Mutex<Box<Window>>>,
     pub consumer: DFQueueConsumer<Event>,
     pub components: BTreeMap<String, Component>,
-    /// the framebuffer owned by the window
-    pub framebuffer: FrameBuffer,
+    pub framebuffer: Buffer,
 }
 
-impl WindowObj {
+impl<Buffer: FrameBuffer> WindowObj<Buffer> {
     /// clean the content of a window. The border and padding of the window remain showing
     pub fn clean(&mut self) -> Result<(), &'static str> {
         let (width, height) = self.inner.lock().get_content_size();
@@ -78,7 +82,7 @@ impl WindowObj {
         );
         self.render()
     }
-
+ 
     /// Returns the content dimensions of this window,
     /// as a tuple of `(width, height)`. It does not include the padding
     pub fn dimensions(&self) -> (usize, usize) {
@@ -470,7 +474,7 @@ pub fn new_window<'a>(
     y: usize,
     width: usize,
     height: usize,
-) -> Result<WindowObj, &'static str> {
+) -> Result<WindowObj<FrameBufferRGB>, &'static str> {
     // Check the size of the window
     if width < 2 * WINDOW_PADDING || height < 2 * WINDOW_PADDING {
         return Err("Window size must be greater than the padding");
@@ -479,7 +483,7 @@ pub fn new_window<'a>(
     let consumer = DFQueue::new().into_consumer();
     let producer = consumer.obtain_producer();
     // Init the frame buffer of the window
-    let framebuffer = FrameBuffer::new(
+    let framebuffer = FrameBufferRGB::new(
         width - 2 * WINDOW_PADDING,
         height - 2 * WINDOW_PADDING,
         None,
@@ -510,7 +514,7 @@ pub fn new_window<'a>(
     window_manager::WINDOWLIST.lock().add_active(&inner_ref)?;
 
     // return the window object
-    let window: WindowObj = WindowObj {
+    let window: WindowObj<FrameBufferRGB> = WindowObj {
         inner: inner_ref,
         //text_buffer:FrameTextBuffer::new(),
         consumer: consumer,
@@ -523,7 +527,7 @@ pub fn new_window<'a>(
 
 /// Applications call this function to request a new window object with a default size (mostly fills screen with WINDOW_MARGIN around all borders)
 /// If the caller a specific window size, it should call new_window()
-pub fn new_default_window() -> Result<WindowObj, &'static str> {
+pub fn new_default_window() -> Result<WindowObj<FrameBufferRGB>, &'static str> {
     let (window_width, window_height) = frame_buffer::get_screen_size()?;
     match new_window(
         WINDOW_MARGIN,
@@ -537,7 +541,7 @@ pub fn new_default_window() -> Result<WindowObj, &'static str> {
 }
 
 // delete the reference of a window in the manager when the window is dropped
-impl Drop for WindowObj {
+impl<Buffer: FrameBuffer> Drop for WindowObj<Buffer> {
     fn drop(&mut self) {
         let mut window_list = WINDOWLIST.lock();
 

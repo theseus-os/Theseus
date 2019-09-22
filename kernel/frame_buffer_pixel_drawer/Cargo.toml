@@ -8,6 +8,9 @@ build = "../../build.rs"
 [dependencies]
 owning_ref = { git = "https://github.com/kevinaboos/owning-ref-rs" }
 
+[dependencies.frame_buffer_2d]
+path = "../frame_buffer_2d"
+
 [dependencies.frame_buffer]
 path = "../frame_buffer"
 

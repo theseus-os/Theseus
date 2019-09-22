@@ -16,11 +16,13 @@ extern crate print;
 extern crate event_types;
 extern crate spin;
 extern crate text_display;
+extern crate frame_buffer_2d;
 
 use alloc::string::{String, ToString};
 use alloc::vec::Vec;
 use event_types::Event;
 use text_display::{TextDisplay, Cursor};
+use frame_buffer_2d::FrameBufferRGB;
 
 pub const FONT_COLOR: u32 = 0x93ee90;
 pub const BACKGROUND_COLOR: u32 = 0x000000;
@@ -44,7 +46,7 @@ pub enum ScrollError {
 ///     - Producer is the window manager. Window manager is responsible for enqueuing keyevents into the active application
 pub struct Terminal {
     /// The terminal's own window
-    window: window_2d::WindowObj,
+    window: window_2d::WindowObj<FrameBufferRGB>,
     // Name of the displayable object of the terminal
     display_name: String,
     /// The terminal's scrollback buffer which stores a string to be displayed by the text display

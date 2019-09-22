@@ -4,12 +4,14 @@
 
 extern crate alloc;
 extern crate font;
+extern crate frame_buffer_2d;
 extern crate frame_buffer;
+
 #[macro_use] extern crate log;
 
 use alloc::vec;
 use font::{CHARACTER_HEIGHT, CHARACTER_WIDTH, FONT_PIXEL};
-use frame_buffer::FrameBuffer;
+use frame_buffer::{FrameBuffer};
 
 /// Print a string in a framebuffer.
 /// # Arguments
@@ -39,7 +41,7 @@ pub fn print_by_bytes(
         if byte == b'\n' {
             // fill the remaining blank of current line and go to the next line
             fill_blank(
-                &mut framebuffer,
+                framebuffer,
                 x + curr_column * CHARACTER_WIDTH,
                 y + curr_line * CHARACTER_HEIGHT,
                 x + width,
@@ -61,7 +63,7 @@ pub fn print_by_bytes(
                 }
             }
             print_byte(
-                &mut framebuffer,
+                framebuffer,
                 byte,
                 font_color,
                 bg_color,
@@ -75,7 +77,7 @@ pub fn print_by_bytes(
     }
     
     //Fill the blank of the last line
-    fill_blank(&mut framebuffer,
+    fill_blank(framebuffer,
         x + curr_column * CHARACTER_WIDTH,
         y + curr_line * CHARACTER_HEIGHT,
         x + width,
@@ -83,7 +85,7 @@ pub fn print_by_bytes(
         bg_color)?;
 
     //Fill the blank of remaining lines
-    fill_blank(&mut framebuffer,
+    fill_blank(framebuffer,
         x, y + (curr_line + 1 )* CHARACTER_HEIGHT, x + width, y + height,
         bg_color)?;
 
@@ -110,8 +112,9 @@ fn print_byte(
     let mut j = 0;
     loop {
         let mask: u32 = fonts[byte as usize][i][j];
-        let index = framebuffer.index(x + j, y + i);
-        framebuffer.buffer_mut()[index] = font_color & mask | bg_color & (!mask);
+        //let index = framebuffer.index();
+        let color = font_color & mask | bg_color & (!mask);
+        framebuffer.draw_pixel(x + j, y + i, color);
         j += 1;
         if j == CHARACTER_WIDTH {
             i += 1;
@@ -144,7 +147,7 @@ fn fill_blank(
         }
         let start = framebuffer.index(left, y);
         let end = framebuffer.index(right, y);
-        framebuffer.buffer_mut()[start..end].copy_from_slice(&fill);
+        framebuffer.buffer_copy(&fill, start);
         y += 1;
     }
 }
