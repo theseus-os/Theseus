@@ -131,7 +131,7 @@ impl WindowList {
     }
 
     // delete a window
-    fn delete(&mut self, inner: &Arc<Mutex<Box<Window>>>) -> Result<(), &'static str> {
+    pub fn delete(&mut self, inner: &Arc<Mutex<Box<Window>>>) -> Result<(), &'static str> {
         // If the window is active, delete it and active the next top window
         if let Some(current_active) = self.active.upgrade() {
             if Arc::ptr_eq(&(current_active), inner) {
@@ -327,17 +327,3 @@ pub fn adjust_windows_before_addition() -> Result<(usize, usize, usize), &'stati
 }
 
 */
-
-// delete the reference of a window in the manager when the window is dropped
-// impl Drop for WindowObj {
-//     fn drop(&mut self) {
-//         let mut window_list = WINDOWLIST.lock();
-
-//         // Switches to a new active window and sets
-//         // the active pointer field of the window allocator to the new active window
-//         match window_list.delete(&self.inner) {
-//             Ok(_) => {}
-//             Err(err) => error!("Fail to schedule to the next window: {}", err),
-//         };
-//     }
-// }

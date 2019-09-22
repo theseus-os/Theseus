@@ -51,7 +51,7 @@ use frame_buffer_drawer::*;
 use spin::{Mutex, Once};
 use text_display::{Cursor, TextDisplay};
 use window::Window;
-use window_manager::{SCREEN_FRAME_BUFFER, WINDOW_MARGIN, WINDOW_PADDING, WINDOW_INACTIVE_COLOR, WINDOW_ACTIVE_COLOR, SCREEN_BACKGROUND_COLOR};
+use window_manager::{WINDOWLIST, SCREEN_FRAME_BUFFER, WINDOW_MARGIN, WINDOW_PADDING, WINDOW_INACTIVE_COLOR, WINDOW_ACTIVE_COLOR, SCREEN_BACKGROUND_COLOR};
 
 
 /// A window contains a reference to its inner reference owned by the window manager,
@@ -545,3 +545,16 @@ pub fn new_default_window() -> Result<WindowObj, &'static str> {
     }
 }
 
+// delete the reference of a window in the manager when the window is dropped
+impl Drop for WindowObj {
+    fn drop(&mut self) {
+        let mut window_list = WINDOWLIST.lock();
+
+        // Switches to a new active window and sets
+        // the active pointer field of the window allocator to the new active window
+        match window_list.delete(&self.inner) {
+            Ok(_) => {}
+            Err(err) => error!("Fail to schedule to the next window: {}", err),
+        };
+    }
+}
