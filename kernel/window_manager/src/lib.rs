@@ -33,7 +33,6 @@ extern crate lazy_static;
 extern crate displayable;
 extern crate font;
 extern crate window;
-extern crate window_2d;
 
 use alloc::collections::{BTreeMap, VecDeque};
 use alloc::string::{String, ToString};
@@ -51,11 +50,27 @@ use spin::{Mutex, Once};
 use text_display::{Cursor, TextDisplay};
 pub use window::Window;
 use alloc::boxed::Box;
-pub use window_2d::*;
+
+// 10 pixel gap between windows
+pub const WINDOW_MARGIN: usize = 10;
+// 2 pixel padding within a window
+pub const WINDOW_PADDING: usize = 2;
+// The border color of an active window
+pub const WINDOW_ACTIVE_COLOR: u32 = 0xFFFFFF;
+// The border color of an inactive window
+pub const WINDOW_INACTIVE_COLOR: u32 = 0x343C37;
+// The background color of the screen
+pub const SCREEN_BACKGROUND_COLOR: u32 = 0x000000;
+
+// A framebuffer owned by the window manager.
+// This framebuffer is responsible for display borders. Windows owned by applications cannot get access to their borders.
+// All the display behaviors of borders are controled by the window manager
+pub static SCREEN_FRAME_BUFFER: Once<Arc<Mutex<FrameBuffer>>> = Once::new();
+
 
 lazy_static! {
     /// The list of all windows in the system.
-    static ref WINDOWLIST: Mutex<WindowList> = Mutex::new(
+    pub static ref WINDOWLIST: Mutex<WindowList> = Mutex::new(
         WindowList{
             background_list: VecDeque::new(),
             active: Weak::new(),
@@ -63,83 +78,9 @@ lazy_static! {
     );
 }
 
-/// Lets the caller specify the dimensions of the new window and returns a new window
-/// Params x,y specify the (x,y) coordinates of the top left corner of the window
-/// Params width and height specify dimenions of new window in pixels
-pub fn new_window<'a>(
-    x: usize,
-    y: usize,
-    width: usize,
-    height: usize,
-) -> Result<WindowObj, &'static str> {
-    // Check the size of the window
-    if width < 2 * WINDOW_PADDING || height < 2 * WINDOW_PADDING {
-        return Err("Window size must be greater than the padding");
-    }
-    // Init the key input producer and consumer
-    let consumer = DFQueue::new().into_consumer();
-    let producer = consumer.obtain_producer();
-    // Init the frame buffer of the window
-    let framebuffer = FrameBuffer::new(
-        width - 2 * WINDOW_PADDING,
-        height - 2 * WINDOW_PADDING,
-        None,
-    )?;
-    let inner = WindowInner {
-        x: x,
-        y: y,
-        width: width,
-        height: height,
-        active: true,
-        padding: WINDOW_PADDING,
-        key_producer: producer,
-    };
-
-    // // Check if the window overlaps with others
-    // let inner_ref = Arc::new(Mutex::new(inner));
-    // let overlapped = self.check_overlap(&inner_ref, x, y, width, height);
-    // if overlapped  {
-    //     return Err("Request area is already allocated");
-    // }
-
-    let inner_obj:Box<Window> = Box::new(inner);
-    let inner_ref = Arc::new(Mutex::new(inner_obj));
-
-    // add the new window and active it
-    // initialize the content of the new window
-    inner_ref.lock().clean()?; 
-    WINDOWLIST.lock().add_active(&inner_ref)?;
-
-    // return the window object
-    let window: WindowObj = WindowObj {
-        inner: inner_ref,
-        //text_buffer:FrameTextBuffer::new(),
-        consumer: consumer,
-        components: BTreeMap::new(),
-        framebuffer: framebuffer,
-    };
-
-    Ok(window)
-}
-
-/// Applications call this function to request a new window object with a default size (mostly fills screen with WINDOW_MARGIN around all borders)
-/// If the caller a specific window size, it should call new_window()
-pub fn new_default_window() -> Result<WindowObj, &'static str> {
-    let (window_width, window_height) = frame_buffer::get_screen_size()?;
-    match new_window(
-        WINDOW_MARGIN,
-        WINDOW_MARGIN,
-        window_width - 2 * WINDOW_MARGIN,
-        window_height - 2 * WINDOW_MARGIN,
-    ) {
-        Ok(new_window) => return Ok(new_window),
-        Err(err) => return Err(err),
-    }
-}
-
 /// The window allocator.
 /// It contains a list of allocated window and a reference to the active window
-struct WindowList {
+pub struct WindowList {
     // The list of inactive windows. Their order is based on the last time they were active. The first window is the window which was active most recently.
     background_list: VecDeque<Weak<Mutex<Box<Window>>>>,
     // A weak pointer to the active window.
@@ -168,8 +109,8 @@ pub fn send_event_to_active(event: Event) -> Result<(), &'static str> {
 
 
 impl WindowList {
-    // add a new window to the list
-    fn add_active(&mut self, inner_ref: &Arc<Mutex<Box<Window>>>) -> Result<(), &'static str> {
+    /// Add a new window to the list
+    pub fn add_active(&mut self, inner_ref: &Arc<Mutex<Box<Window>>>) -> Result<(), &'static str> {
         // // inactive all other windows and active the new one
         // for item in self.list.iter_mut(){
         //     let ref_opt = item.upgrade();
@@ -301,8 +242,8 @@ pub fn switch_to_next() -> Result<(), &'static str> {
 }
 
 /// Set the specified window in the background list as active.
-pub fn switch_to(window: &WindowObj) -> Result<(), &'static str> {
-    if let Some(index) = WINDOWLIST.lock().get_bgwindow_index(&window.inner()) {
+pub fn switch_to(window: &Arc<Mutex<Box<Window>>>) -> Result<(), &'static str> {
+    if let Some(index) = WINDOWLIST.lock().get_bgwindow_index(window) {
         active_window(index, true)?;
     }
 

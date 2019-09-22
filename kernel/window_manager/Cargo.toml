@@ -31,9 +31,6 @@ path = "../frame_buffer_drawer"
 [dependencies.frame_buffer_printer]
 path = "../frame_buffer_printer"
 
-[dependencies.window_2d]
-path = "../window_2d"
-
 [dependencies.event_types]
 path = "../event_types"
 

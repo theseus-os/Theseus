@@ -43,6 +43,9 @@ path = "../displayable"
 [dependencies.window]
 path = "../window"
 
+[dependencies.window_manager]
+path = "../window_manager"
+
 [dependencies.text_display]
 path = "../../kernel/displayable/text_display"
 

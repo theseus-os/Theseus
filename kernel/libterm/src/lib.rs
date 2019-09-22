@@ -10,6 +10,7 @@
 #[macro_use] extern crate log;
 extern crate dfqueue;
 extern crate window_manager;
+extern crate window_2d;
 extern crate environment;
 extern crate print;
 extern crate event_types;
@@ -43,7 +44,7 @@ pub enum ScrollError {
 ///     - Producer is the window manager. Window manager is responsible for enqueuing keyevents into the active application
 pub struct Terminal {
     /// The terminal's own window
-    window: window_manager::WindowObj,
+    window: window_2d::WindowObj,
     // Name of the displayable object of the terminal
     display_name: String,
     /// The terminal's scrollback buffer which stores a string to be displayed by the text display
@@ -425,7 +426,7 @@ impl Terminal {
 impl Terminal {
     pub fn new() -> Result<Terminal, &'static str> {
         // Requests a new window object from the window manager
-        let window_object = match window_manager::new_default_window() {
+        let window_object = match window_2d::new_default_window() {
             Ok(window_object) => window_object,
             Err(err) => {debug!("new window returned err"); return Err(err)}
         };

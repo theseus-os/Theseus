@@ -9,6 +9,10 @@ build = "../../build.rs"
 owning_ref = { git = "https://github.com/kevinaboos/owning-ref-rs" }
 spin = "0.4.10"
 
+[dependencies.log]
+default-features = false
+version = "0.3.7"
+
 [dependencies.frame_buffer]
 path = "../frame_buffer"
 

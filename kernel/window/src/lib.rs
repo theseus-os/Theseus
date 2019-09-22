@@ -26,26 +26,14 @@ pub trait Window: Send {
     fn draw_border(&self, color: u32) -> Result<(), &'static str>;
 
     // adjust the size of a window
-/*    fn resize(
+    fn resize(
         &mut self,
         x: usize,
         y: usize,
         width: usize,
         height: usize,
-    ) -> Result<(usize, usize), &'static str> {
-        self.draw_border(SCREEN_BACKGROUND_COLOR)?;
-        let percent = (
-            (width - self.padding) * 100 / (self.width - self.padding),
-            (height - self.padding) * 100 / (self.height - self.padding),
-        );
-        self.x = x;
-        self.y = y;
-        self.width = width;
-        self.height = height;
-        self.draw_border(get_border_color(self.active))?;
-        Ok(percent)
-    }
-*/
+    ) -> Result<(usize, usize), &'static str>;
+
     // get the size of content without padding
     fn get_content_size(&self) -> (usize, usize);
 

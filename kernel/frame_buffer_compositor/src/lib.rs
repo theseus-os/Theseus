@@ -13,6 +13,8 @@ extern crate owning_ref;
 extern crate spin;
 #[macro_use]
 extern crate lazy_static;
+#[macro_use]
+extern crate log;
 
 use alloc::collections::BTreeMap;
 use alloc::vec::Vec;
@@ -37,7 +39,29 @@ lazy_static! {
 /// Framebuffers haven't changed since last compositing will be ignored
 pub struct FrameCompositor {
     //Cache of updated framebuffers
-    cache: BTreeMap<u64, (i32, i32)>,
+    cache: BTreeMap<u64, BufferCache>,
+}
+
+struct BufferCache {
+    x: i32,
+    y: i32,
+    width: usize,
+    height: usize,
+}
+
+impl BufferCache {
+    // check if the pixel is within the window
+    fn check_in_area(&self, x:i32, y:i32) -> bool {
+        return x >= self.x && x <= self.x + self.width as i32
+                && y >= self.y && y <= self.y + self.height as i32;
+    }
+
+    fn overlap(&self, cache: &BufferCache) -> bool {
+        self.check_in_area(cache.x, cache.y) ||
+        self.check_in_area(cache.x + cache.width as i32, cache.y) ||
+        self.check_in_area(cache.x, cache.y + cache.height as i32) ||
+        self.check_in_area(cache.x + cache.width as i32, cache.y + cache.height as i32)
+    }
 }
 
 impl Compositor for FrameCompositor {
@@ -54,7 +78,6 @@ impl Compositor for FrameCompositor {
             if self.cached(src_fb, offset_x, offset_y) {
                 continue;
             }
-
             let (src_width, src_height) = src_fb.get_size();
 
             let final_x_end = offset_x + src_width as i32;
@@ -85,7 +108,26 @@ impl Compositor for FrameCompositor {
                 buffer_copy(final_buffer, src_buffer, dest_start, src_start, width);
             }
 
-            self.cache.insert(hash(&src_fb), (offset_x, offset_y));
+            let new_cache = BufferCache {
+                x: offset_x,
+                y: offset_y,
+                width: src_width,
+                height: src_height
+            };
+
+            let keys:Vec<_> = self.cache.keys().cloned().collect();
+            for key in keys {
+                match self.cache.get(&key){
+                    Some(cache) => {
+                        if cache.overlap(&new_cache) {
+                            self.cache.remove(&key);
+                        }
+                    },
+                    None => {}
+                };
+            }
+
+            self.cache.insert(hash(&src_fb), new_cache);
         }
 
         Ok(())
@@ -94,8 +136,8 @@ impl Compositor for FrameCompositor {
     // Check if a framebuffer has already cached since last update
     fn cached(&self, frame_buffer: &FrameBuffer, x: i32, y: i32) -> bool {
         match self.cache.get(&hash(frame_buffer)) {
-            Some((cached_x, cached_y)) => {
-                if *cached_x == x && *cached_y == y {
+            Some(cache) => {
+                if cache.x == x && cache.y == y {
                     return true;
                 } else {
                     return false;
@@ -105,6 +147,7 @@ impl Compositor for FrameCompositor {
         }
     }
 }
+
 
 // Copy an arrary of pixels from src framebuffer to the dest framebuffer.
 // We use memory copy instead of pixel drawer for better performance

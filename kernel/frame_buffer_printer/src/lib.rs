@@ -5,6 +5,7 @@
 extern crate alloc;
 extern crate font;
 extern crate frame_buffer;
+#[macro_use] extern crate log;
 
 use alloc::vec;
 use font::{CHARACTER_HEIGHT, CHARACTER_WIDTH, FONT_PIXEL};
@@ -72,19 +73,19 @@ pub fn print_by_bytes(
             curr_column += 1;
         }
     }
+    
+    //Fill the blank of the last line
+    fill_blank(&mut framebuffer,
+        x + curr_column * CHARACTER_WIDTH,
+        y + curr_line * CHARACTER_HEIGHT,
+        x + width,
+        y + (curr_line + 1 )* CHARACTER_HEIGHT,
+        bg_color)?;
 
-    // //Fill the blank of the last line
-    // fill_blank(&mut buffer,
-    //     x + curr_column * CHARACTER_WIDTH,
-    //     y + curr_line * CHARACTER_HEIGHT,
-    //     x + width,
-    //     y + (curr_line + 1 )* CHARACTER_HEIGHT,
-    //     bg_color, &index)?;
-
-    // Fill the blank of remaining lines
-    // fill_blank(&mut buffer,
-    //     x, y + (curr_line + 1 )* CHARACTER_HEIGHT, x + width, y + height,
-    //     bg_color, &index)?;
+    //Fill the blank of remaining lines
+    fill_blank(&mut framebuffer,
+        x, y + (curr_line + 1 )* CHARACTER_HEIGHT, x + width, y + height,
+        bg_color)?;
 
     Ok(())
 }
