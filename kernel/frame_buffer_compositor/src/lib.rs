@@ -117,13 +117,10 @@ impl Compositor for FrameCompositor {
 
             let keys:Vec<_> = self.cache.keys().cloned().collect();
             for key in keys {
-                match self.cache.get(&key){
-                    Some(cache) => {
-                        if cache.overlap(&new_cache) {
-                            self.cache.remove(&key);
-                        }
-                    },
-                    None => {}
+                if let Some(cache) = self.cache.get(&key){
+                    if cache.overlap(&new_cache) {
+                        self.cache.remove(&key);
+                    }
                 };
             }
 

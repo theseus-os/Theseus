@@ -584,17 +584,18 @@ impl Terminal {
             let (width, height) = self.window.dimensions();
             let width  = width  - 2*window_manager::WINDOW_MARGIN;
             let height = height - 2*window_manager::WINDOW_MARGIN;
-            let text_display = TextDisplay::new(width, height)?;
+            let mut text_display = TextDisplay::new(width, height)?;
+            text_display.cursor_init();
             self.window.add_displayable(&display_name, 0, 0, text_display)?;
         }
         Ok(())
     }
 
-    pub fn blink_cursor(&mut self) {
-        // TODO: WENQIU cursor blink
-        if let Some(text_display) = self.window.get_displayable(&self.display_name){
-            //text_display.cursor_blink(&self.window, FONT_COLOR, BACKGROUND_COLOR);
-        }
+    pub fn blink_cursor(&mut self) -> Result<(), &'static str> {
+        // if let Some(text_display) = self.window.get_displayable(&self.display_name){
+        //     text_display.display_cursor(&self.window, FONT_COLOR, BACKGROUND_COLOR);
+        // }
+        self.window.display_cursor(&self.display_name, FONT_COLOR, BACKGROUND_COLOR)
     }
 
     /// Get a key event from the underlying window.

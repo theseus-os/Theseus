@@ -29,7 +29,7 @@ pub fn print_by_bytes(
     slice: &str,
     font_color: u32,
     bg_color: u32,
-) -> Result<(), &'static str> {
+) -> Result<(usize, usize), &'static str> {
     let buffer_width = width / CHARACTER_WIDTH;
     let buffer_height = height / CHARACTER_HEIGHT;
 
@@ -87,7 +87,7 @@ pub fn print_by_bytes(
         x, y + (curr_line + 1 )* CHARACTER_HEIGHT, x + width, y + height,
         bg_color)?;
 
-    Ok(())
+    Ok((curr_column, curr_line))
 }
 
 // print a byte to the framebuffer buffer at (line, column) in the text area.

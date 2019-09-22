@@ -17,7 +17,7 @@ pub trait Displayable<T> {
     /// * `bg_color`: the background color of the displayable.
     /// * `framebuffer`: the framebuffer to display in.
     fn display(
-        &self,
+        &mut self,
         content: T,
         x: usize,
         y: usize,

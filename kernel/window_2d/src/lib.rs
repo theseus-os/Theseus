@@ -123,6 +123,17 @@ impl WindowObj {
     }
 
     /// Get a displayable of the name
+    pub fn get_displayable_mut(&mut self, name: &str) -> Option<&mut TextDisplay> {
+        let opt = self.components.get_mut(name);
+        match opt {
+            None => return None,
+            Some(component) => {
+                return Some(component.get_displayable_mut());
+            }
+        };
+    }
+
+    /// Get a displayable of the name
     pub fn get_displayable(&self, name: &str) -> Option<&TextDisplay> {
         let opt = self.components.get(name);
         match opt {
@@ -216,9 +227,9 @@ impl WindowObj {
     ) -> Result<(), &'static str> {
         let displayable = self
             .components
-            .get(display_name)
+            .get_mut(display_name)
             .ok_or("")?
-            .get_displayable();
+            .get_displayable_mut();
         displayable.display(slice, 0, 0, font_color, bg_color, &mut self.framebuffer)?;
         self.render()?;
 
@@ -228,42 +239,17 @@ impl WindowObj {
     /// display a cursor in the window with a text displayable. position is the absolute position of the cursor
     pub fn display_cursor(
         &mut self,
-        cursor: &Cursor,
         display_name: &str,
-        position: usize,
-        leftshift: usize,
         font_color: u32,
         bg_color: u32,
     ) -> Result<(), &'static str> {
-        let (text_buffer_width, text_buffer_height) = match self.get_displayable(display_name) {
-            Some(text_display) => text_display.get_dimensions(),
-            None => return Err("The displayable does not exist"),
-        };
-
-        let mut column = position % text_buffer_width;
-        let mut line = position / text_buffer_width;
-        // adjusts to the correct position relative to the max rightmost absolute cursor position
-        if column >= leftshift {
-            column -= leftshift;
-        } else {
-            column = text_buffer_width + column - leftshift;
-            line -= 1;
-        }
-        if line < text_buffer_height {
-            let color = if cursor.show() { font_color } else { bg_color };
-            let displayable = self
-                .components
-                .get(display_name)
-                .ok_or("")?
-                .get_displayable();
-            displayable.display_cursor(
-                column * CHARACTER_WIDTH,
-                line * CHARACTER_HEIGHT,
-                color,
-                &mut self.framebuffer,
-            );
-            self.render()?;
-        }
+        let displayable = self
+            .components
+            .get_mut(display_name)
+            .ok_or("")?
+            .get_displayable_mut();
+        displayable.display_cursor(0, 0, font_color, bg_color, &mut self.framebuffer);
+        self.render()?;
         Ok(())
     }
 
@@ -447,6 +433,11 @@ impl Component {
     // get the displayable
     fn get_displayable(&self) -> &TextDisplay {
         return &(self.displayable);
+    }
+
+    // get the displayable
+    fn get_displayable_mut(&mut self) -> &mut TextDisplay {
+        return &mut (self.displayable);
     }
 
     // get the position of the displayable

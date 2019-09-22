@@ -1270,7 +1270,7 @@ impl Shell {
         self.redisplay_prompt();
         self.terminal.lock().refresh_display(0);
         loop {
-            self.terminal.lock().blink_cursor();
+            self.terminal.lock().blink_cursor()?;
 
             // If there is anything from running applications to be printed, it printed on the screen and then
             // return true, so that the loop continues, otherwise nothing happens and we keep on going with the
