@@ -446,6 +446,64 @@ pub struct PFSFile {
     pub size: u32,
 }
 
+impl PFSFile {
+    /// Given an PFSFile Structure and the n number of clusters to advance through, returns the nth cluster number of where the file data
+    /// is stored 
+    pub fn cluster_advancer(&self, cluster_advance: usize) -> Result<u32, &'static str> {
+        
+        let mut counter: usize = 0;
+        let mut current_cluster = self.start_cluster;
+        while cluster_advance != counter {
+            match self.filesystem.lock().next_cluster(current_cluster) {
+                Err(_e) => {
+                    return Err("Error in moving to next clusters");
+                }
+                Ok(cluster) => {
+                    counter += 1;
+                    current_cluster = cluster;
+                }
+            }
+        }
+        return Ok(current_cluster);
+    }
+
+    /// Given an offset, returns the PFSPosition of the file
+    pub fn seek(&self, offset: usize) -> Result<PFSPosition, &'static str> {
+        let fs = self.filesystem.lock();
+        let mut position: usize = 0;
+
+        let cluster_size_in_bytes: usize = fs.sectors_per_cluster() as usize * fs.bytes_per_sector as usize;
+        let clusters_to_advance: usize =  offset/cluster_size_in_bytes;
+        
+        let mut counter: usize = 0;
+        let mut current_cluster = self.start_cluster;
+
+        while clusters_to_advance != counter {
+            match fs.next_cluster(current_cluster) {
+                Err(_e) => {
+                    return Err("Error in moving to next clusters");
+                }
+                Ok(cluster) => {
+                    counter += 1;
+                    current_cluster = cluster;
+                }
+            }
+        }
+        
+        let nth_cluster = current_cluster;
+        let byte_difference = offset - (clusters_to_advance * cluster_size_in_bytes);
+        let reached_sector = byte_difference as u32/fs.bytes_per_sector;
+        // debug!("cluster: {}", nth_cluster);
+        // debug!("sector: {}", reached_sector);
+        // debug!("byte_offset: {}", byte_difference - reached_sector as usize *fs.bytes_per_sector as usize);
+        return Ok(PFSPosition{
+            cluster: nth_cluster,
+            sector_offset: reached_sector,
+            entry_offset: byte_difference - reached_sector as usize *fs.bytes_per_sector as usize
+        })
+    }
+}
+
 impl File for PFSFile {
     /// Given an empty data buffer and a FATfile structure, will read off the bytes of that FATfile and place the data into the data buffer
     /// If the given buffer is less than the size of the file, read will return the first bytes read unless
