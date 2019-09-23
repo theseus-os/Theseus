@@ -97,7 +97,7 @@ impl<Buffer: FrameBuffer> WindowObj<Buffer> {
         key: &str,
         x: usize,
         y: usize,
-        displayable: TextDisplay,
+        displayable: Box<Displayable>,
     ) -> Result<(), &'static str> {
         let key = key.to_string();
         let (width, height) = displayable.get_size();
@@ -127,7 +127,7 @@ impl<Buffer: FrameBuffer> WindowObj<Buffer> {
     }
 
     /// Get a displayable of the name
-    pub fn get_displayable_mut(&mut self, name: &str) -> Option<&mut TextDisplay> {
+    pub fn get_displayable_mut(&mut self, name: &str) -> Option<&mut Box<Displayable>> {
         let opt = self.components.get_mut(name);
         match opt {
             None => return None,
@@ -138,7 +138,7 @@ impl<Buffer: FrameBuffer> WindowObj<Buffer> {
     }
 
     /// Get a displayable of the name
-    pub fn get_displayable(&self, name: &str) -> Option<&TextDisplay> {
+    pub fn get_displayable(&self, name: &str) -> Option<&Box<Displayable>> {
         let opt = self.components.get(name);
         match opt {
             None => return None,
@@ -234,8 +234,13 @@ impl<Buffer: FrameBuffer> WindowObj<Buffer> {
             .get_mut(display_name)
             .ok_or("")?
             .get_displayable_mut();
-        displayable.display(slice, 0, 0, font_color, bg_color, &mut self.framebuffer)?;
-        self.render()?;
+        if let Some(text_display) = displayable.downcast_mut::<TextDisplay>() {
+            text_display.set_text(slice);
+            text_display.display(0, 0, font_color, bg_color, &mut self.framebuffer)?;
+            self.render()?;
+        } else {
+            return Err("The displayable is not a text displayable");
+        }
 
         Ok(())
     }
@@ -252,8 +257,14 @@ impl<Buffer: FrameBuffer> WindowObj<Buffer> {
             .get_mut(display_name)
             .ok_or("")?
             .get_displayable_mut();
-        displayable.display_cursor(0, 0, font_color, bg_color, &mut self.framebuffer);
-        self.render()?;
+
+        if let Some(text_display) = displayable.downcast_mut::<TextDisplay>() {
+            text_display.display_cursor(0, 0, font_color, bg_color, &mut self.framebuffer);
+            self.render()?;
+        } else {
+            return Err("The displayable is not a text displayable");
+        }
+        
         Ok(())
     }
 
@@ -430,17 +441,17 @@ impl Window for WindowInner {
 pub struct Component {
     x: usize,
     y: usize,
-    displayable: TextDisplay,
+    displayable: Box<Displayable>,
 }
 
 impl Component {
     // get the displayable
-    fn get_displayable(&self) -> &TextDisplay {
+    fn get_displayable(&self) -> &Box<Displayable> {
         return &(self.displayable);
     }
 
     // get the displayable
-    fn get_displayable_mut(&mut self) -> &mut TextDisplay {
+    fn get_displayable_mut(&mut self) -> &mut Box<Displayable> {
         return &mut (self.displayable);
     }
 

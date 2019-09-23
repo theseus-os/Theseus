@@ -40,5 +40,8 @@ path = "../event_types"
 [dependencies.text_display]
 path = "../../kernel/displayable/text_display"
 
+[dependencies.displayable]
+path = "../../kernel/displayable"
+
 [lib]
 crate-type = ["rlib"]

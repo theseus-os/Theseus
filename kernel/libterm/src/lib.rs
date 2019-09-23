@@ -16,13 +16,17 @@ extern crate print;
 extern crate event_types;
 extern crate spin;
 extern crate text_display;
+extern crate displayable;
 extern crate frame_buffer_2d;
 
 use alloc::string::{String, ToString};
 use alloc::vec::Vec;
+use alloc::boxed::Box;
 use event_types::Event;
 use text_display::{TextDisplay, Cursor};
+use displayable::Displayable;
 use frame_buffer_2d::FrameBufferRGB;
+
 
 pub const FONT_COLOR: u32 = 0x93ee90;
 pub const BACKGROUND_COLOR: u32 = 0x000000;
@@ -64,11 +68,13 @@ pub struct Terminal {
 impl Terminal {
     /// Get the width and height of the text display.
     fn get_displayable_dimensions(&self, name:&str) -> (usize, usize){
-        if let Some(text_display) = self.window.get_displayable(name){
-            text_display.get_dimensions()
-        } else {
-            (0, 0)
+        if let Some(displayable) = self.window.get_displayable(name){
+            if let Some(text_display) = displayable.downcast_ref::<TextDisplay>() {
+                return text_display.get_dimensions()
+            }
         }
+
+        (0, 0)
     }
 
     /// This function takes in the end index of some index in the scrollback buffer and calculates the starting index of the
@@ -588,7 +594,8 @@ impl Terminal {
             let height = height - 2*window_manager::WINDOW_MARGIN;
             let mut text_display = TextDisplay::new(width, height)?;
             text_display.cursor_init();
-            self.window.add_displayable(&display_name, 0, 0, text_display)?;
+            let displayable: Box<Displayable> = Box::new(text_display);
+            self.window.add_displayable(&display_name, 0, 0, displayable)?;
         }
         Ok(())
     }

@@ -17,6 +17,7 @@ extern crate displayable;
 
 use displayable::Displayable;
 use alloc::boxed::Box;
+use alloc::string::String;
 use font::{CHARACTER_HEIGHT, CHARACTER_WIDTH};
 use frame_buffer::{FrameBuffer};
 use tsc::{tsc_ticks, TscTicks};
@@ -31,9 +32,10 @@ pub struct TextDisplay {
     next_col: usize,
     next_line: usize,
     cursor: Option<Cursor>,
+    text: String,
 }
 
-impl Displayable<&str> for TextDisplay {
+impl Displayable for TextDisplay {
     // display a string in a framebuffer
     // # Arguments
     // * `content`: the string to be displayed
@@ -43,7 +45,6 @@ impl Displayable<&str> for TextDisplay {
     // * `framebuffer`: the framebuffer in which the string is displayed
     fn display(
         &mut self,
-        content: &str,
         x: usize,
         y: usize,
         fg_color: u32,
@@ -56,7 +57,7 @@ impl Displayable<&str> for TextDisplay {
             y,
             self.width,
             self.height,
-            content,
+            self.text.as_str(),
             fg_color,
             bg_color,
         )?;
@@ -64,6 +65,18 @@ impl Displayable<&str> for TextDisplay {
         self.next_line = line;
         Ok(())
     }
+
+    /// resize the text displayable area
+    fn resize(&mut self, width: usize, height: usize) {
+        self.width = width;
+        self.height = height;
+    }
+
+    /// Gets the size of the text area
+    fn get_size(&self) -> (usize, usize) {
+        (self.width, self.height)
+    }
+
 }
 
 impl TextDisplay {
@@ -75,7 +88,12 @@ impl TextDisplay {
             next_col: 0,
             next_line: 0,
             cursor: None,
+            text: String::new(),
         })
+    }
+
+    pub fn set_text(&mut self, text: &str) {
+        self.text = String::from(text);
     }
 
     pub fn cursor_init(&mut self) {
@@ -85,17 +103,6 @@ impl TextDisplay {
     /// Gets the dimensions of the text area to display
     pub fn get_dimensions(&self) -> (usize, usize) {
         (self.width / CHARACTER_WIDTH, self.height / CHARACTER_HEIGHT)
-    }
-
-    /// Gets the size of the text area
-    pub fn get_size(&self) -> (usize, usize) {
-        (self.width, self.height)
-    }
-
-    /// resize the text displayable area
-    pub fn resize(&mut self, width: usize, height: usize) {
-        self.width = width;
-        self.height = height;
     }
 
     /// display a cursor in the text displayable

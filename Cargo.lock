@@ -425,6 +425,7 @@ dependencies = [
 name = "displayable"
 version = "0.1.0"
 dependencies = [
+ "downcast-rs 1.0.4 (git+https://github.com/theseus-os/downcast-rs)",
  "frame_buffer 0.1.0",
  "log 0.3.9 (registry+https://github.com/rust-lang/crates.io-index)",
  "spin 0.4.10 (registry+https://github.com/rust-lang/crates.io-index)",
@@ -930,6 +931,7 @@ name = "libterm"
 version = "0.1.0"
 dependencies = [
  "dfqueue 0.1.0",
+ "displayable 0.1.0",
  "environment 0.1.0",
  "event_types 0.1.0",
  "frame_buffer_2d 0.1.0",

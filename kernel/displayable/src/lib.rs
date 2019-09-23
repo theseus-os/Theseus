@@ -5,12 +5,15 @@
 
 extern crate frame_buffer;
 extern crate alloc;
+#[macro_use]
+extern crate downcast_rs;
 
+use downcast_rs::Downcast;
 use frame_buffer::FrameBuffer;
 use alloc::boxed::Box;
 
 /// The displayable trait.
-pub trait Displayable<T> {
+pub trait Displayable: Downcast + Send {
     /// to display itself in a framebuffer
     /// # Arguments
     /// * `content`: the content to be displayed.
@@ -20,11 +23,17 @@ pub trait Displayable<T> {
     /// * `framebuffer`: the framebuffer to display in.
     fn display(
         &mut self,
-        content: T,
         x: usize,
         y: usize,
         fg_color: u32,
         bg_color: u32,
         framebuffer: &mut FrameBuffer,
     ) -> Result<(), &'static str>;
+
+    /// resize the displayable area
+    fn resize(&mut self, width: usize, height: usize);
+
+        /// Gets the size of the text area
+    fn get_size(&self) -> (usize, usize);
 }
+impl_downcast!(Displayable);
