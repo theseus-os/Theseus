@@ -17,7 +17,7 @@ extern crate event_types;
 extern crate spin;
 extern crate text_display;
 extern crate displayable;
-extern crate frame_buffer_2d;
+extern crate frame_buffer_rgb;
 
 use alloc::string::{String, ToString};
 use alloc::vec::Vec;
@@ -25,7 +25,7 @@ use alloc::boxed::Box;
 use event_types::Event;
 use text_display::{TextDisplay, Cursor};
 use displayable::Displayable;
-use frame_buffer_2d::FrameBufferRGB;
+use frame_buffer_rgb::FrameBufferRGB;
 
 
 pub const FONT_COLOR: u32 = 0x93ee90;

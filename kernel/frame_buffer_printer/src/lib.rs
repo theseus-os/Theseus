@@ -4,7 +4,7 @@
 
 extern crate alloc;
 extern crate font;
-extern crate frame_buffer_2d;
+extern crate frame_buffer_rgb;
 extern crate frame_buffer;
 
 #[macro_use] extern crate log;

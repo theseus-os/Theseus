@@ -22,8 +22,8 @@ path = "../window_manager"
 [dependencies.window_2d]
 path = "../window_2d"
 
-[dependencies.frame_buffer_2d]
-path = "../frame_buffer_2d"
+[dependencies.frame_buffer_rgb]
+path = "../frame_buffer_rgb"
 
 [dependencies.environment]
 path = "../environment"

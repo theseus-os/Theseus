@@ -43,7 +43,7 @@ extern crate e1000;
 extern crate window_manager;
 extern crate scheduler;
 extern crate frame_buffer;
-extern crate frame_buffer_2d;
+extern crate frame_buffer_rgb;
 extern crate font;
 #[cfg(mirror_log_to_vga)] #[macro_use] extern crate print;
 extern crate input_event_manager;
@@ -126,7 +126,7 @@ pub fn init(
     info!("Finished handling and booting up all {} AP cores.", ap_count);
 
     // init frame_buffer
-    let rs = frame_buffer_2d::init();
+    let rs = frame_buffer_rgb::init();
     match rs {
         Ok(_) => {
             trace!("Frame_buffer initialized successfully.");

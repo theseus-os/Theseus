@@ -9,8 +9,8 @@ build = "../../build.rs"
 default-features = false
 version = "0.3.7"
 
-[dependencies.frame_buffer_2d]
-path = "../frame_buffer_2d"
+[dependencies.frame_buffer_rgb]
+path = "../frame_buffer_rgb"
 
 [dependencies.frame_buffer]
 path = "../frame_buffer"
