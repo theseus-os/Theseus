@@ -7,7 +7,6 @@
 extern crate alloc;
 extern crate compositor;
 extern crate frame_buffer;
-extern crate frame_buffer_pixel_drawer;
 extern crate memory;
 extern crate owning_ref;
 extern crate spin;
