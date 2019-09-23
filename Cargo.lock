@@ -608,16 +608,6 @@ dependencies = [
 ]
 
 [[package]]
-name = "frame_buffer_pixel_drawer"
-version = "0.1.0"
-dependencies = [
- "frame_buffer 0.1.0",
- "frame_buffer_2d 0.1.0",
- "memory 0.1.0",
- "owning_ref 0.4.0 (git+https://github.com/kevinaboos/owning-ref-rs)",
-]
-
-[[package]]
 name = "frame_buffer_printer"
 version = "0.1.0"
 dependencies = [
