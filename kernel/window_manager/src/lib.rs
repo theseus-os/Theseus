@@ -39,14 +39,14 @@ pub const SCREEN_BACKGROUND_COLOR: u32 = 0x000000;
 /// A framebuffer owned by the window manager.
 /// This framebuffer is responsible for displaying borders and gaps between windows. Windows owned by applications cannot get access to their borders.
 /// All the display behaviors of borders are controled by the window manager.
-pub static SCREEN_FRAME_BUFFER: Once<Arc<Mutex<FrameBufferRGB>>> = Once::new();
+pub static DESKTOP_FRAME_BUFFER: Once<Arc<Mutex<FrameBufferRGB>>> = Once::new();
 
 /// Initializes the window manager. 
 /// Currently the framebuffer is of type `FrameBufferRGB`. In the future we would be able to have window manager of different `FrameBuffer`s.
 pub fn init() -> Result<(), &'static str> {
     let (screen_width, screen_height) = frame_buffer::get_screen_size()?;
     let framebuffer = FrameBufferRGB::new(screen_width, screen_height, None)?;
-    SCREEN_FRAME_BUFFER.call_once(|| Arc::new(Mutex::new(framebuffer)));
+    DESKTOP_FRAME_BUFFER.call_once(|| Arc::new(Mutex::new(framebuffer)));
     Ok(())
 }
 
@@ -70,7 +70,6 @@ pub struct WindowList {
 }
 
 /// Puts an input event into the active window (i.e. a keypress event, resize event, etc.).
-/// If the caller wants to put an event into a specific window, use put_event_into_app().
 pub fn send_event_to_active(event: Event) -> Result<(), &'static str> {
     let window_list = WINDOWLIST.lock();
     let active_ref = window_list.active.upgrade(); // grabs a pointer to the active WindowInner
@@ -203,7 +202,7 @@ impl WindowList {
     
 }
 
-/// Picks the next window in the background list and set it as active.
+/// Picks the next window in the background list and sets it as active.
 /// The order of windows in the background is based on the last time they are active.
 /// The next window is the one which was active most recently.
 pub fn switch_to_next() -> Result<(), &'static str> {

@@ -25,7 +25,7 @@ pub trait Displayable: Downcast + Send {
         framebuffer: &mut dyn FrameBuffer,
     ) -> Result<(), &'static str>;
 
-    /// Resize the displayable area.
+    /// Resizes the displayable area.
     fn resize(&mut self, width: usize, height: usize);
 
     /// Gets the size of the area occupied by the displayable.

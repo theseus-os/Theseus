@@ -41,7 +41,7 @@ use spin::Mutex;
 use text_display::{Cursor, TextDisplay};
 use window::Window;
 use window_manager::{
-    SCREEN_BACKGROUND_COLOR, SCREEN_FRAME_BUFFER, WINDOWLIST, WINDOW_ACTIVE_COLOR,
+    SCREEN_BACKGROUND_COLOR, DESKTOP_FRAME_BUFFER, WINDOWLIST, WINDOW_ACTIVE_COLOR,
     WINDOW_INACTIVE_COLOR, WINDOW_MARGIN, WINDOW_PADDING,
 };
 
@@ -273,7 +273,7 @@ pub struct WindowInner {
     pub height: usize,
     /// whether the window is active
     pub active: bool,
-    /// a consumer of key input events to the window
+    /// the padding outside the content of the window including the border.
     pub padding: usize,
     /// the producer accepting a key event
     pub key_producer: DFQueueProducer<Event>,
@@ -281,7 +281,7 @@ pub struct WindowInner {
 
 impl Window for WindowInner {
     fn clean(&self) -> Result<(), &'static str> {
-        let buffer_ref = match SCREEN_FRAME_BUFFER.try() {
+        let buffer_ref = match DESKTOP_FRAME_BUFFER.try() {
             Some(buffer) => buffer,
             None => return Err("Fail to get the virtual frame buffer"),
         };
@@ -309,7 +309,7 @@ impl Window for WindowInner {
     }
 
     fn draw_border(&self, color: u32) -> Result<(), &'static str> {
-        let buffer_ref = match SCREEN_FRAME_BUFFER.try() {
+        let buffer_ref = match DESKTOP_FRAME_BUFFER.try() {
             Some(buffer) => buffer,
             None => return Err("Fail to get the virtual frame buffer"),
         };

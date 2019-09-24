@@ -1,4 +1,4 @@
-//! This crate defines a trait of Compositor.
+//! This crate defines a trait of `Compositor`  .
 //! A compositor composites a list of buffers to a single buffer.
 
 #![no_std]
