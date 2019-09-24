@@ -4,11 +4,12 @@ extern crate spin;
 use core::ops::DerefMut;
 use spin::Mutex;
 
-///The width of a character
+/// The width of a character.
 pub const CHARACTER_WIDTH: usize = 9;
-///The height of a character
+/// The height of a character.
 pub const CHARACTER_HEIGHT: usize = 16;
-///The bit graph array of characters
+
+// The bitmap array of characters.
 const FONT_BASIC: [[u8; CHARACTER_HEIGHT]; 256] = [
     [
         0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00,
