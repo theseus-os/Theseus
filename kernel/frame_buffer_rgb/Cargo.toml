@@ -15,9 +15,6 @@ path = "../memory"
 [dependencies.frame_buffer]
 path = "../frame_buffer"
 
-[dependencies.util]
-path = "../../libs/util"
-
 [dependencies.multicore_bringup]
 path = "../multicore_bringup"
 

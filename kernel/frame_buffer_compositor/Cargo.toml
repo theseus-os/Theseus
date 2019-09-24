@@ -2,7 +2,7 @@
 name = "frame_buffer_compositor"
 version = "0.1.0"
 authors = ["Wenqiu Yu <yuwenqiuj@gmail.com>"]
-description = "the frame buffer compositor composites a list of frame buffers to a final frame buffer"
+description = "the frame buffer compositor composites a list of framebuffers to a final framebuffer"
 build = "../../build.rs"
 
 [dependencies]
@@ -10,9 +10,6 @@ spin = "0.4.10"
 
 [dependencies.frame_buffer]
 path = "../frame_buffer"
-
-[dependencies.frame_buffer_rgb]
-path = "../frame_buffer_rgb"
 
 [dependencies.compositor]
 path = "../compositor"

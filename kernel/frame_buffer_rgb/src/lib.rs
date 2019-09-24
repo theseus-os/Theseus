@@ -1,31 +1,31 @@
-//! This crate is a frame buffer manager.
-//! * It defines a FrameBuffer structure and creates new framebuffers for applications
+//! This crate defines a FrameBufferRGB structure.
+//! The structure implements the FrameBuffer trait. Every pixel in it as a 2D RGB pixel.
 
 #![no_std]
 
-extern crate multicore_bringup;
-extern crate spin;
 extern crate alloc;
-extern crate memory;
-extern crate owning_ref;
 extern crate frame_buffer;
+extern crate memory;
+extern crate multicore_bringup;
+extern crate owning_ref;
+extern crate spin;
 
 use alloc::boxed::Box;
-use core::ops::DerefMut;
-use memory::{EntryFlags, FrameRange, MappedPages,PhysicalAddress, FRAME_ALLOCATOR};
 use core::hash::{Hash, Hasher, SipHasher};
+use core::ops::DerefMut;
+use frame_buffer::{FrameBuffer, Pixel, FINAL_FRAME_BUFFER};
+use memory::{EntryFlags, FrameRange, MappedPages, PhysicalAddress, FRAME_ALLOCATOR};
 use owning_ref::BoxRefMut;
-use spin::{Mutex};
-use frame_buffer::{Pixel, FrameBuffer, FINAL_FRAME_BUFFER};
+use spin::Mutex;
 
 // Every pixel is of u32 type
 const PIXEL_BYTES: usize = 4;
 
 /// Initialize the final frame buffer.
 /// Allocate a block of memory and map it to the physical framebuffer frames.
-/// Init the frame buffer. Allocate a block of memory and map it to the frame buffer frames.
+/// Initialize the frame buffer. Allocate a block of memory and map it to the frame buffer frames.
 pub fn init() -> Result<(), &'static str> {
-    // Get the graphic mode information
+    // get the graphic mode information
     let vesa_display_phys_start: PhysicalAddress;
     let buffer_width: usize;
     let buffer_height: usize;
@@ -38,14 +38,15 @@ pub fn init() -> Result<(), &'static str> {
         buffer_width = graphic_info.width as usize;
         buffer_height = graphic_info.height as usize;
     };
-    // Initialize the final framebuffer
-    let framebuffer = FrameBufferRGB::new(buffer_width, buffer_height, Some(vesa_display_phys_start))?;
+    // init the final framebuffer
+    let framebuffer =
+        FrameBufferRGB::new(buffer_width, buffer_height, Some(vesa_display_phys_start))?;
     FINAL_FRAME_BUFFER.call_once(|| Mutex::new(Box::new(framebuffer)));
 
     Ok(())
 }
 
-/// The virtual frame buffer struct. It contains the size of the buffer and a buffer array
+/// The RGB frame buffer structurn. It implements the FrameBuffer trait.
 #[derive(Hash)]
 pub struct FrameBufferRGB {
     width: usize,
@@ -54,7 +55,7 @@ pub struct FrameBufferRGB {
 }
 
 impl FrameBufferRGB {
-    /// Create a new virtual frame buffer with specified size.
+    /// Create a new frame buffer with specified size.
     /// If the physical_address is specified, the new virtual frame buffer will be mapped to hardware's physical memory at that address.
     /// If the physical_address is none, the new function will allocate a block of physical memory at a random address and map the new frame buffer to that memory.
     pub fn new(
@@ -106,33 +107,22 @@ impl FrameBufferRGB {
     pub fn buffer_mut(&mut self) -> &mut BoxRefMut<MappedPages, [Pixel]> {
         return &mut self.buffer;
     }
-
-
 }
 
 impl FrameBuffer for FrameBufferRGB {
-    /// return a reference to the buffer
     fn buffer(&self) -> &BoxRefMut<MappedPages, [Pixel]> {
         return &self.buffer;
     }
 
-    /// get the size of the frame buffer. Return (width, height).
     fn get_size(&self) -> (usize, usize) {
         (self.width, self.height)
     }
 
-    // ///get a function to compute the index of a pixel in the buffer array. The returned function is (x:usize, y:usize) -> index:usize
-    // pub fn get_index_fn(&self) -> Box<Fn(usize, usize)->usize>{
-    //     let width = self.width;
-    //     Box::new(move |x:usize, y:usize| y * width + x )
-    // }
-
-    /// check if a pixel (x,y) is within the framebuffer
     fn check_in_buffer(&self, x: usize, y: usize) -> bool {
         x < self.width && y < self.height
     }
 
-    fn buffer_copy(&mut self, src:&[Pixel], dest_start:usize){
+    fn buffer_copy(&mut self, src: &[Pixel], dest_start: usize) {
         let len = src.len();
         let dest_end = dest_start + len;
         self.buffer_mut()[dest_start..dest_end].copy_from_slice(src);
@@ -149,9 +139,7 @@ impl FrameBuffer for FrameBufferRGB {
         self.buffer[index] = color;
     }
 
-    /// compute the index of pixel (x, y) in the buffer array
     fn index(&self, x: usize, y: usize) -> usize {
         y * self.width + x
     }
-
 }

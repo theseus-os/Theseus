@@ -1,6 +1,5 @@
 //! This crate contains a series of basic draw functions to draw in a framebuffer.
-//! Displayables invoke these basic functions to draw more compilicated graphs in a framebuffer.
-//! A framebuffer should be passed to the framebuffer compositor to display on the screen.
+//! Displayables invoke these basic functions to draw more compilicated contents in a framebuffer.
 
 #![no_std]
 
@@ -8,8 +7,8 @@ extern crate frame_buffer;
 
 use frame_buffer::FrameBuffer;
 
-/// Draw a pixel in a framebuffer.
-/// The pixel is drawed at position (x, y) of the framebuffer with color
+/// Draw a point in a framebuffer.
+/// The point is drawed at position (x, y) of the framebuffer with color.
 pub fn draw_point(framebuffer: &mut dyn FrameBuffer, x: usize, y: usize, color: u32) {
     if framebuffer.check_in_buffer(x, y) {
         framebuffer.draw_pixel(x, y, color);
@@ -18,8 +17,8 @@ pub fn draw_point(framebuffer: &mut dyn FrameBuffer, x: usize, y: usize, color: 
 
 /// Draw a line in a framebuffer. The part exceeding the boundary of the framebuffer will be ignored.
 /// # Arguments
-/// * `framebuffer`: the framebuffer to draw in. 
-/// * `(start_x, start_y)`: the start point of the line. 
+/// * `framebuffer`: the framebuffer to draw in.
+/// * `(start_x, start_y)`: the start point of the line.
 /// * `(end_x, end_y)`: the end point of the line.
 /// * `color`: the color of the line.
 pub fn draw_line(
@@ -70,11 +69,11 @@ pub fn draw_line(
 /// Draw a rectangle in a framebuffer.
 /// The part exceeding the boundary of the framebuffer will be ignored.
 /// # Arguments
-/// * `framebuffer`: the framebuffer to draw in. 
-/// * `(start_x, start_y)`: the left top point of the retangle. 
+/// * `framebuffer`: the framebuffer to draw in.
+/// * `(start_x, start_y)`: the left top point of the retangle.
 /// * `width`: the width of the rectangle.
 /// * `height`: the height of the rectangle.
-/// * `color`: the color of the rectangle's border
+/// * `color`: the color of the rectangle's border.
 pub fn draw_rectangle(
     framebuffer: &mut dyn FrameBuffer,
     start_x: usize,
@@ -123,11 +122,11 @@ pub fn draw_rectangle(
 /// Fill a rectangle in a framebuffer with color.
 /// The part exceeding the boundary of the framebuffer will be ignored.
 /// # Arguments
-/// * `framebuffer`: the framebuffer to draw in. 
-/// * `(start_x, start_y)`: the left top point of the retangle. 
+/// * `framebuffer`: the framebuffer to draw in.
+/// * `(start_x, start_y)`: the left top point of the retangle.
 /// * `width`: the width of the rectangle.
 /// * `height`: the height of the rectangle.
-/// * `color`: the color of the rectangle
+/// * `color`: the color of the rectangle.
 pub fn fill_rectangle(
     framebuffer: &mut dyn FrameBuffer,
     start_x: usize,

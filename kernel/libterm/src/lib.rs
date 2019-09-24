@@ -27,7 +27,6 @@ use text_display::{TextDisplay, Cursor};
 use displayable::Displayable;
 use frame_buffer_rgb::FrameBufferRGB;
 
-
 pub const FONT_COLOR: u32 = 0x93ee90;
 pub const BACKGROUND_COLOR: u32 = 0x000000;
 
@@ -59,9 +58,7 @@ pub struct Terminal {
     is_scroll_end: bool,
     /// The starting index of the scrollback buffer string slice that is currently being displayed on the text display
     scroll_start_idx: usize,
-    /// Indicates the rightmost position of the cursor ON THE text display, NOT IN THE SCROLLBACK BUFFER (i.e. one more than the position of the last non_whitespace character
-    /// being displayed on the text display)
-    absolute_cursor_pos: usize,
+    /// The cursor of the terminal.
     cursor: Cursor
 }
 
@@ -71,6 +68,7 @@ impl Terminal {
     fn get_displayable_dimensions(&self, name:&str) -> (usize, usize){
         if let Some(displayable) = self.window.get_displayable(name){
             if let Some(text_display) = displayable.downcast_ref::<TextDisplay>() {
+                // return the dimensions only if the displayable is a text displayable
                 return text_display.get_dimensions()
             }
         }
@@ -386,7 +384,7 @@ impl Terminal {
         };
         let result  = self.scrollback_buffer.get(start_idx..=end_idx); // =end_idx includes the end index in the slice
         if let Some(slice) = result {
-            self.window.display_string(&self.display_name, slice, FONT_COLOR, BACKGROUND_COLOR)?;
+            self.window.display_string(&self.display_name, slice)?;
         } else {
             return Err("could not get slice of scrollback buffer string");
         }
@@ -401,7 +399,7 @@ impl Terminal {
         let result = self.scrollback_buffer.get(start_idx..end_idx);
 
         if let Some(slice) = result {
-            self.window.display_string(&self.display_name, slice, FONT_COLOR, BACKGROUND_COLOR)?;
+            self.window.display_string(&self.display_name, slice)?;
         } else {
             return Err("could not get slice of scrollback buffer string");
         }
@@ -425,13 +423,11 @@ impl Terminal {
             scrollback_buffer: String::new(),
             scroll_start_idx: 0,
             is_scroll_end: true,
-            absolute_cursor_pos: 0,
             cursor: Cursor::new(FONT_COLOR),
         };
 
         // Inserts a producer for the print queue into global list of terminal print producers
         terminal.print_to_terminal(format!("Theseus Terminal Emulator\nPress Ctrl+C to quit a task\n"));
-        terminal.absolute_cursor_pos = terminal.scrollback_buffer.len();
         Ok(terminal)
     }
 
@@ -557,7 +553,6 @@ impl Terminal {
     pub fn clear(&mut self) {
         self.scrollback_buffer.clear();
         self.scroll_start_idx = 0;
-        self.absolute_cursor_pos = 0;
         self.is_scroll_end = true;
     }
 
@@ -590,10 +585,8 @@ impl Terminal {
 
 impl Drop for Terminal {
     fn drop(&mut self) {
-        //window_manager::delete(terminal.window)?;
-        /* window_manager::delete(&self.window).unwrap_or_else(|e| {
+        window_manager::delete(&self.window).unwrap_or_else(|e| {
             error!("failed to delete window on terminal dropping, {}", e);
         });
-        */
     }
 }

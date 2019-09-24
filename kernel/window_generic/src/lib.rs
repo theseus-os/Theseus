@@ -221,8 +221,6 @@ impl<Buffer: FrameBuffer> WindowGeneric<Buffer> {
         &mut self,
         display_name: &str,
         slice: &str,
-        font_color: u32,
-        bg_color: u32,
     ) -> Result<(), &'static str> {
         let component = self
             .components

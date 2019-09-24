@@ -5,10 +5,6 @@ authors = ["Wenqiu Yu <yuwenqiuj@gmail.com>"]
 description = "Print a string in a framebuffer"
 build = "../../build.rs"
 
-[dependencies.log]
-default-features = false
-version = "0.3.7"
-
 [dependencies.frame_buffer_rgb]
 path = "../frame_buffer_rgb"
 

@@ -556,16 +556,7 @@ source = "registry+https://github.com/rust-lang/crates.io-index"
 name = "font"
 version = "0.1.0"
 dependencies = [
- "acpi 0.1.0",
- "lazy_static 1.2.0 (registry+https://github.com/rust-lang/crates.io-index)",
- "log 0.3.9 (registry+https://github.com/rust-lang/crates.io-index)",
- "memory 0.1.0",
- "serial_port 0.1.0",
  "spin 0.4.10 (registry+https://github.com/rust-lang/crates.io-index)",
- "state_store 0.1.0",
- "tsc 0.1.0",
- "util 0.1.0",
- "volatile 0.2.5 (registry+https://github.com/rust-lang/crates.io-index)",
 ]
 
 [[package]]
@@ -576,7 +567,6 @@ dependencies = [
  "multicore_bringup 0.1.0",
  "owning_ref 0.4.0 (git+https://github.com/kevinaboos/owning-ref-rs)",
  "spin 0.4.10 (registry+https://github.com/rust-lang/crates.io-index)",
- "util 0.1.0",
 ]
 
 [[package]]
@@ -585,7 +575,6 @@ version = "0.1.0"
 dependencies = [
  "compositor 0.1.0",
  "frame_buffer 0.1.0",
- "frame_buffer_rgb 0.1.0",
  "lazy_static 1.2.0 (registry+https://github.com/rust-lang/crates.io-index)",
  "spin 0.4.10 (registry+https://github.com/rust-lang/crates.io-index)",
 ]
@@ -595,7 +584,6 @@ name = "frame_buffer_drawer"
 version = "0.1.0"
 dependencies = [
  "frame_buffer 0.1.0",
- "frame_buffer_rgb 0.1.0",
 ]
 
 [[package]]
@@ -605,7 +593,6 @@ dependencies = [
  "font 0.1.0",
  "frame_buffer 0.1.0",
  "frame_buffer_rgb 0.1.0",
- "log 0.3.9 (registry+https://github.com/rust-lang/crates.io-index)",
 ]
 
 [[package]]
@@ -617,7 +604,6 @@ dependencies = [
  "multicore_bringup 0.1.0",
  "owning_ref 0.4.0 (git+https://github.com/kevinaboos/owning-ref-rs)",
  "spin 0.4.10 (registry+https://github.com/rust-lang/crates.io-index)",
- "util 0.1.0",
 ]
 
 [[package]]

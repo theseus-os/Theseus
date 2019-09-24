@@ -1,5 +1,5 @@
 //! This crate is a framebuffer compositor.
-//! A framebuffer compositor will compose a sequence of framebuffers and display them in the final framebuffer
+//! A framebuffer compositor will compose a sequence of framebuffers and display them in the final framebuffer.
 
 #![no_std]
 #![feature(const_vec_new)]
@@ -11,7 +11,6 @@ extern crate spin;
 #[macro_use]
 extern crate lazy_static;
 
-
 use alloc::collections::BTreeMap;
 use alloc::vec::Vec;
 use compositor::Compositor;
@@ -19,7 +18,7 @@ use frame_buffer::{FrameBuffer, FINAL_FRAME_BUFFER};
 use spin::Mutex;
 
 lazy_static! {
-    /// The instance of frame buffer compositor.
+    /// The instance of the frame buffer compositor.
     pub static ref FRAME_COMPOSITOR: Mutex<FrameCompositor> = Mutex::new(
         FrameCompositor{
             cache:BTreeMap::new()
@@ -27,14 +26,15 @@ lazy_static! {
     );
 }
 
-/// The framebuffer compositor structure. 
-/// It caches updated framebuffers for better performance.
-/// Framebuffers haven't changed since last compositing will be ignored
+/// The framebuffer compositor structure.
+/// It caches framebuffers as soft states for better performance.
+/// Framebuffers which haven't updated since last compositing will be ignored.
 pub struct FrameCompositor {
-    //Cache of updated framebuffers
+    // Cache of updated framebuffers
     cache: BTreeMap<u64, BufferCache>,
 }
 
+// The information of a cached framebuffer. It contains the position and size of the framebuffer.
 struct BufferCache {
     x: i32,
     y: i32,
@@ -43,29 +43,33 @@ struct BufferCache {
 }
 
 impl BufferCache {
-    // check if the pixel is within the window
-    fn check_in_area(&self, x:i32, y:i32) -> bool {
-        return x >= self.x && x <= self.x + self.width as i32
-                && y >= self.y && y <= self.y + self.height as i32;
+    // check if the pixel is within the framebuffer
+    fn check_in_area(&self, x: i32, y: i32) -> bool {
+        return x >= self.x
+            && x <= self.x + self.width as i32
+            && y >= self.y
+            && y <= self.y + self.height as i32;
     }
 
+    // check if the cached framebuffer overlaps with another one
     fn overlap(&self, cache: &BufferCache) -> bool {
-        self.check_in_area(cache.x, cache.y) ||
-        self.check_in_area(cache.x + cache.width as i32, cache.y) ||
-        self.check_in_area(cache.x, cache.y + cache.height as i32) ||
-        self.check_in_area(cache.x + cache.width as i32, cache.y + cache.height as i32)
+        self.check_in_area(cache.x, cache.y)
+            || self.check_in_area(cache.x + cache.width as i32, cache.y)
+            || self.check_in_area(cache.x, cache.y + cache.height as i32)
+            || self.check_in_area(cache.x + cache.width as i32, cache.y + cache.height as i32)
     }
 }
 
 impl Compositor for FrameCompositor {
-    // compose a list of framebuffers to the final framebuffer. Every item in the list is a reference to a framebuffer with its position
-    fn compose(&mut self, bufferlist: Vec<(&dyn FrameBuffer, i32, i32)>) -> Result<(), &'static str> {
+    fn compose(
+        &mut self,
+        bufferlist: Vec<(&dyn FrameBuffer, i32, i32)>,
+    ) -> Result<(), &'static str> {
         let mut final_fb = FINAL_FRAME_BUFFER
             .try()
             .ok_or("FrameCompositor fails to get the final frame buffer")?
             .lock();
         let (final_width, final_height) = final_fb.get_size();
-        //let final_buffer = final_fb.buffer_mut();
 
         for (src_fb, offset_x, offset_y) in bufferlist {
             if self.cached(src_fb, offset_x, offset_y) {
@@ -93,7 +97,6 @@ impl Compositor for FrameCompositor {
             let height = core::cmp::min(final_y_end as usize, final_height) - final_y_start;
 
             let src_buffer = src_fb.buffer();
-
             for i in 0..height {
                 let dest_start = (final_y_start + i) * final_width + final_x_start;
                 let src_start = src_width * ((final_y_start + i) as i32 - offset_y) as usize
@@ -106,12 +109,12 @@ impl Compositor for FrameCompositor {
                 x: offset_x,
                 y: offset_y,
                 width: src_width,
-                height: src_height
+                height: src_height,
             };
 
-            let keys:Vec<_> = self.cache.keys().cloned().collect();
+            let keys: Vec<_> = self.cache.keys().cloned().collect();
             for key in keys {
-                if let Some(cache) = self.cache.get(&key){
+                if let Some(cache) = self.cache.get(&key) {
                     if cache.overlap(&new_cache) {
                         self.cache.remove(&key);
                     }
@@ -124,7 +127,7 @@ impl Compositor for FrameCompositor {
         Ok(())
     }
 
-    // Check if a framebuffer has already cached since last update
+    // check if a framebuffer has already been cached since last update
     fn cached(&self, frame_buffer: &dyn FrameBuffer, x: i32, y: i32) -> bool {
         match self.cache.get(&(frame_buffer.get_hash())) {
             Some(cache) => {

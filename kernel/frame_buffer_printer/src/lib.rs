@@ -4,22 +4,23 @@
 
 extern crate alloc;
 extern crate font;
-extern crate frame_buffer_rgb;
 extern crate frame_buffer;
+extern crate frame_buffer_rgb;
 
 use alloc::vec;
 use font::{CHARACTER_HEIGHT, CHARACTER_WIDTH, FONT_PIXEL};
-use frame_buffer::{FrameBuffer};
+use frame_buffer::FrameBuffer;
 
 /// Print a string in a framebuffer.
 /// # Arguments
-/// * `framebuffer`: the framebuffer to display in. 
-/// * `(x, y)`: the left top point of the text block. 
+/// * `framebuffer`: the framebuffer to display in.
+/// * `(x, y)`: the left top point of the text block.
 /// * `width`: the width of the text block.
 /// * `height`: the height of the text block.
-/// * `slice`: the string to display
-/// * `font_color`: the color of the text
-/// * `bg_color`: the background color of the text block
+/// * `slice`: the string to display.
+/// * `font_color`: the color of the text.
+/// * `bg_color`: the background color of the text block.
+/// Returns (column, line) of the end, i.e. the position of the next symbol.
 pub fn print_by_bytes(
     framebuffer: &mut dyn FrameBuffer,
     x: usize,
@@ -73,20 +74,28 @@ pub fn print_by_bytes(
             curr_column += 1;
         }
     }
-    
+
     //Fill the blank of the last line
-    fill_blank(framebuffer,
+    fill_blank(
+        framebuffer,
         x + curr_column * CHARACTER_WIDTH,
         y + curr_line * CHARACTER_HEIGHT,
         x + width,
-        y + (curr_line + 1 )* CHARACTER_HEIGHT,
-        bg_color)?;
+        y + (curr_line + 1) * CHARACTER_HEIGHT,
+        bg_color,
+    )?;
 
     //Fill the blank of remaining lines
-    fill_blank(framebuffer,
-        x, y + (curr_line + 1 )* CHARACTER_HEIGHT, x + width, y + height,
-        bg_color)?;
-    
+    fill_blank(
+        framebuffer,
+        x,
+        y + (curr_line + 1) * CHARACTER_HEIGHT,
+        x + width,
+        y + height,
+        bg_color,
+    )?;
+
+    // return the position of the end.
     Ok((curr_column, curr_line))
 }
 
@@ -110,7 +119,6 @@ fn print_byte(
     let mut j = 0;
     loop {
         let mask: u32 = fonts[byte as usize][i][j];
-        //let index = framebuffer.index();
         let color = font_color & mask | bg_color & (!mask);
         framebuffer.draw_pixel(x + j, y + i, color);
         j += 1;
@@ -124,7 +132,7 @@ fn print_byte(
     }
 }
 
-// Fill a blank text area (left, top, right, bottom) with the color.
+// fill a blank text area (left, top, right, bottom) with color.
 fn fill_blank(
     framebuffer: &mut dyn FrameBuffer,
     left: usize,
