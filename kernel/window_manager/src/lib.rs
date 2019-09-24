@@ -3,7 +3,7 @@
 //! The manager matains a list of background windows and an active window.
 //! Once an active window is deleted or set as inactive, the next window in the background list will become active.
 //!
-//! The order of windows is based on the last time it was active. The one which was active most recently is the top of the background list.
+//! The order of windows is based on the last time it becomes active. The one which was active most recently is at the top of the background list.
 
 #![no_std]
 
@@ -37,11 +37,11 @@ pub const WINDOW_INACTIVE_COLOR: u32 = 0x343C37;
 pub const SCREEN_BACKGROUND_COLOR: u32 = 0x000000;
 
 /// A framebuffer owned by the window manager.
-/// This framebuffer is responsible for display borders and gaps between windows. Windows owned by applications cannot get access to their borders.
+/// This framebuffer is responsible for displaying borders and gaps between windows. Windows owned by applications cannot get access to their borders.
 /// All the display behaviors of borders are controled by the window manager.
 pub static SCREEN_FRAME_BUFFER: Once<Arc<Mutex<FrameBufferRGB>>> = Once::new();
 
-/// Initialize the window manager. 
+/// Initializes the window manager. 
 /// Currently the framebuffer is of type `FrameBufferRGB`. In the future we would be able to have window manager of different `FrameBuffer`s.
 pub fn init() -> Result<(), &'static str> {
     let (screen_width, screen_height) = frame_buffer::get_screen_size()?;
@@ -87,13 +87,6 @@ impl WindowList {
         &mut self,
         inner_ref: &Arc<Mutex<Box<dyn Window>>>,
     ) -> Result<(), &'static str> {
-        // // inactive all other windows and active the new one
-        // for item in self.list.iter_mut(){
-        //     let ref_opt = item.upgrade();
-        //     if let Some(reference) = ref_opt {
-        //         reference.lock().active(false)?;
-        //     }
-        // }
         if let Some(current_active) = self.active.upgrade() {
             current_active.lock().active(false)?;
             let weak_ref = self.active.clone();
@@ -108,7 +101,7 @@ impl WindowList {
 
     /// Deletes a window from the list.
     pub fn delete(&mut self, inner: &Arc<Mutex<Box<dyn Window>>>) -> Result<(), &'static str> {
-        // If the window is active, delete it and active the next top window
+        // if the window is active, delete it and active the next top window
         if let Some(current_active) = self.active.upgrade() {
             if Arc::ptr_eq(&(current_active), inner) {
                 active_window(0, false)?;
@@ -151,62 +144,63 @@ impl WindowList {
         }
     }
 
-    // // check if an area specified by (x, y, width, height) overlaps with an existing window
-    // fn check_overlap(&mut self, inner:&Arc<Mutex<WindowInner>>, x:usize, y:usize, width:usize, height:usize) -> bool {
-    //     let mut len = self.allocated.len();
-    //     let mut i = 0;
-    //     while i < len {
-    //         {
-    //             let mut void = false;
-    //             if let Some(reference) = self.allocated.get(i) {
-    //                 if let Some(allocated_ref) = reference.upgrade() {
-    //                     if !Arc::ptr_eq(&allocated_ref, inner) {
-    //                         if allocated_ref.lock().is_overlapped(x, y, width, height) {
-    //                             return true;
-    //                         }
-    //                     }
-    //                     i += 1;
-    //                 } else {
-    //                     void = true;
-    //                 }
-    //             }
-    //             if void {
-    //                 self.list.remove(i);
-    //                 len -= 1;
-    //             }
-    //         }
-    //     }
-    //     false
-    // }
+    /*// check if an area specified by (x, y, width, height) overlaps with an existing window
+    fn check_overlap(&mut self, inner:&Arc<Mutex<WindowInner>>, x:usize, y:usize, width:usize, height:usize) -> bool {
+        let mut len = self.allocated.len();
+        let mut i = 0;
+        while i < len {
+            {
+                let mut void = false;
+                if let Some(reference) = self.allocated.get(i) {
+                    if let Some(allocated_ref) = reference.upgrade() {
+                        if !Arc::ptr_eq(&allocated_ref, inner) {
+                            if allocated_ref.lock().is_overlapped(x, y, width, height) {
+                                return true;
+                            }
+                        }
+                        i += 1;
+                    } else {
+                        void = true;
+                    }
+                }
+                if void {
+                    self.list.remove(i);
+                    len -= 1;
+                }
+            }
+        }
+        false
+    }
 
     // return a reference to the next window of current active window
-    // fn next(&mut self) -> Option<Arc<Mutex<WindowInner>>> {
-    //     // let mut current_active = false;
-    //     // for item in self.list.iter_mut(){
-    //     //     let reference = item.upgrade();
-    //     //     if let Some(window) = reference {
-    //     //         if window.lock().active {
-    //     //             current_active = true;
-    //     //         } else if current_active {
-    //     //             return Some(window)
-    //     //         }
-    //     //     }
-    //     // }
+    fn next(&mut self) -> Option<Arc<Mutex<WindowInner>>> {
+        // let mut current_active = false;
+        // for item in self.list.iter_mut(){
+        //     let reference = item.upgrade();
+        //     if let Some(window) = reference {
+        //         if window.lock().active {
+        //             current_active = true;
+        //         } else if current_active {
+        //             return Some(window)
+        //         }
+        //     }
+        // }
 
-    //     // if current_active {
-    //     //     for item in self.list.iter_mut(){
-    //     //         let reference = item.upgrade();
-    //     //         if let Some(window) = reference {
-    //     //             return Some(window)
-    //     //         }
-    //     //     }
-    //     // }
-    //     if let Some(weak_ref) = self.list.pop_front() {
-    //         return weak_ref.upgrade();
-    //     }
+        // if current_active {
+        //     for item in self.list.iter_mut(){
+        //         let reference = item.upgrade();
+        //         if let Some(window) = reference {
+        //             return Some(window)
+        //         }
+        //     }
+        // }
+        if let Some(weak_ref) = self.list.pop_front() {
+            return weak_ref.upgrade();
+        }
 
-    //     None
-    //
+        None
+    }*/
+    
 }
 
 /// Picks the next window in the background list and set it as active.
@@ -228,13 +222,13 @@ pub fn switch_to(window: &Arc<Mutex<Box<dyn Window>>>) -> Result<(), &'static st
 // Actives a window in the background list.
 // # Arguments
 // * `index`: the index of the window in the background list.
-// * `set_back_current`: whether to keep current active window in the background list. Delete current window if `set_back_current` is false.
-fn active_window(index: usize, set_back_current: bool) -> Result<(), &'static str> {
+// * `set_current_back`: whether to keep current active window in the background list. Delete current window if `set_current_back` is false.
+fn active_window(index: usize, set_current_back: bool) -> Result<(), &'static str> {
     let mut window_list = WINDOWLIST.lock();
 
     if let Some(window) = window_list.active.upgrade() {
         let mut current = window.lock();
-        if set_back_current {
+        if set_current_back {
             (*current).active(false)?;
             let old_active = window_list.active.clone();
             window_list.background_list.push_front(old_active);

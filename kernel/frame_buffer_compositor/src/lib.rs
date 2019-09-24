@@ -43,7 +43,7 @@ struct BufferCache {
 }
 
 impl BufferCache {
-    // check if the pixel is within the framebuffer
+    // checks if the pixel is within the framebuffer
     fn check_in_area(&self, x: i32, y: i32) -> bool {
         return x >= self.x
             && x <= self.x + self.width as i32
@@ -51,7 +51,7 @@ impl BufferCache {
             && y <= self.y + self.height as i32;
     }
 
-    // check if the cached framebuffer overlaps with another one
+    // checks if the cached framebuffer overlaps with another one
     fn overlap(&self, cache: &BufferCache) -> bool {
         self.check_in_area(cache.x, cache.y)
             || self.check_in_area(cache.x + cache.width as i32, cache.y)
@@ -114,7 +114,6 @@ impl Compositor for FrameCompositor {
                 width: src_width,
                 height: src_height,
             };
-
             let keys: Vec<_> = self.cache.keys().cloned().collect();
             for key in keys {
                 if let Some(cache) = self.cache.get(&key) {
@@ -123,14 +122,12 @@ impl Compositor for FrameCompositor {
                     }
                 };
             }
-
             self.cache.insert(src_fb.get_hash(), new_cache);
         }
 
         Ok(())
     }
 
-    // check if a framebuffer has already been cached since last update
     fn cached(&self, frame_buffer: &dyn FrameBuffer, x: i32, y: i32) -> bool {
         match self.cache.get(&(frame_buffer.get_hash())) {
             Some(cache) => {

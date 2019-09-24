@@ -1,4 +1,4 @@
-//! This crate contains functions to print strings in a framebuffer
+//! This crate contains functions to print strings in a framebuffer.
 
 #![no_std]
 
@@ -11,7 +11,7 @@ use alloc::vec;
 use font::{CHARACTER_HEIGHT, CHARACTER_WIDTH, FONT_PIXEL};
 use frame_buffer::FrameBuffer;
 
-/// Print a string in a framebuffer.
+/// Prints a string in a framebuffer.
 /// Returns (column, line) of the end, i.e. the position of the next symbol.
 /// # Arguments
 /// * `framebuffer`: the framebuffer to display in.
@@ -75,7 +75,7 @@ pub fn print_by_bytes(
         }
     }
 
-    //Fill the blank of the last line
+    //fill the blank of the last line
     fill_blank(
         framebuffer,
         x + curr_column * CHARACTER_WIDTH,
@@ -85,7 +85,7 @@ pub fn print_by_bytes(
         bg_color,
     )?;
 
-    //Fill the blank of remaining lines
+    //fill the blank of remaining lines
     fill_blank(
         framebuffer,
         x,
@@ -99,7 +99,7 @@ pub fn print_by_bytes(
     Ok((curr_column, curr_line))
 }
 
-// print a byte to the framebuffer buffer at (line, column) in the text area.
+// print a byte to the framebuffer at (line, column) in the text area.
 // (left, top) specifies the location of the text area in the framebuffer.
 fn print_byte(
     framebuffer: &mut dyn FrameBuffer,

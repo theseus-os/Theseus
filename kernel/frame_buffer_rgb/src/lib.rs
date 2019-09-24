@@ -22,7 +22,7 @@ use spin::Mutex;
 const PIXEL_BYTES: usize = 4;
 
 /// Initialize the final frame buffer.
-/// Allocate a block of memory and map it to the physical framebuffer frames.
+/// Allocates a block of memory and map it to the physical framebuffer frames.
 pub fn init() -> Result<(), &'static str> {
     // get the graphic mode information
     let vesa_display_phys_start: PhysicalAddress;
@@ -102,7 +102,7 @@ impl FrameBufferRGB {
         })
     }
 
-    /// Returns a mutable reference to the buffer.
+    /// Returns a mutable reference to the mapped memory of the buffer.
     pub fn buffer_mut(&mut self) -> &mut BoxRefMut<MappedPages, [Pixel]> {
         return &mut self.buffer;
     }

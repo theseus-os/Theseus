@@ -17,7 +17,7 @@ pub trait Compositor {
     /// # Arguments
     ///
     /// * `bufferlist` - A list of buffers in the form of (buffer:T, x:i32, y:i32).
-    /// For each item in the list, buffer is a buffer object to be composed. (x, y) specifies the location of the buffer to be composed in the final buffer.
+    /// For each tuple in the list, buffer is a buffer object to be composed. (x, y) specifies the location of the buffer to be composed in the final buffer.
     fn compose(
         &mut self,
         bufferlist: Vec<(&dyn FrameBuffer, i32, i32)>,

@@ -28,7 +28,7 @@
 //! * `event_types`: A temporary way to move the input_event_manager typedefs out of the input_event_manager crate.
 //! * `device_manager`: Code for handling the sequence required to initialize each driver.
 //! * `displayable`: Defines a displayable trait. A displayable can display itself in a framebuffer.
-//! * `text_display`: A text display contains a block of text and can display in a framebuffer.
+//! * `text_display`: A text display is a displayable. It contains a block of text and can display in a framebuffer.
 //! * `e1000`: Support for the e1000 NIC and driver.
 //! * `exceptions_early`: Early exception handlers that do nothing but print an error and hang.
 //! * `exceptions_full`: Exception handlers that are more fully-featured, i.e., kills tasks on an exception.
@@ -37,7 +37,7 @@
 //! * `frame_buffer_compositor`: Composites a list of framebuffers to a final framebuffer which is mapped to the physical framebuffer.
 //! * `frame_drawer`: Basic draw functions.
 //! * `frame_printer`: Prints a string in a frame buffer.
-//! * `frame_buffer_rgb`: The RGB FrameBuffer. It displays pixels without the alpha channel.
+//! * `frame_buffer_rgb`: The RGB FrameBuffer. It contains pixels without the alpha channel.
 //! * `fs_node`: defines the traits for File and Directory. These files and directories mimic that of a standard unix virtual filesystem
 //! * `gdt`: GDT (Global Descriptor Table) support (x86 only) for Theseus.
 //! * `interrupts`: Interrupt configuration and handlers for Theseus. 

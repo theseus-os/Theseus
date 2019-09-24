@@ -26,6 +26,7 @@ use event_types::Event;
 use text_display::{TextDisplay, Cursor};
 use displayable::Displayable;
 use frame_buffer_rgb::FrameBufferRGB;
+use window_generic::WindowGeneric;
 
 pub const FONT_COLOR: u32 = 0x93ee90;
 pub const BACKGROUND_COLOR: u32 = 0x000000;
@@ -49,7 +50,7 @@ pub enum ScrollError {
 ///     - Producer is the window manager. Window manager is responsible for enqueuing keyevents into the active application
 pub struct Terminal {
     /// The terminal's own window
-    window: window_generic::WindowGeneric<FrameBufferRGB>,
+    window: WindowGeneric<FrameBufferRGB>,
     // Name of the displayable object of the terminal
     display_name: String,
     /// The terminal's scrollback buffer which stores a string to be displayed by the text display

@@ -14,7 +14,7 @@ use frame_buffer::FrameBuffer;
 
 /// The displayable trait.
 pub trait Displayable: Downcast + Send {
-    /// Display in a framebuffer.
+    /// Displays in a framebuffer.
     /// # Arguments
     /// * `(x, y)`: the position to display in the framebuffer.
     /// * `framebuffer`: the framebuffer to display in.
@@ -28,7 +28,7 @@ pub trait Displayable: Downcast + Send {
     /// Resize the displayable area.
     fn resize(&mut self, width: usize, height: usize);
 
-    /// Gets the size of the text area.
+    /// Gets the size of the area occupied by the displayable.
     fn get_size(&self) -> (usize, usize);
 }
 impl_downcast!(Displayable);

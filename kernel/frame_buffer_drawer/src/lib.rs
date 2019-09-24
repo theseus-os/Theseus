@@ -1,5 +1,5 @@
 //! This crate contains a series of basic draw functions to draw in a framebuffer.
-//! Displayables invoke these basic functions to draw more compilicated contents in a framebuffer.
+//! Displayables invoke these basic functions to display themselves in a framebuffer.
 
 #![no_std]
 
@@ -7,7 +7,7 @@ extern crate frame_buffer;
 
 use frame_buffer::FrameBuffer;
 
-/// Draw a point in a framebuffer.
+/// Draws a point in a framebuffer.
 /// The point is drawn at position (x, y) of the framebuffer with color.
 pub fn draw_point(framebuffer: &mut dyn FrameBuffer, x: usize, y: usize, color: u32) {
     if framebuffer.check_in_buffer(x, y) {
@@ -15,7 +15,7 @@ pub fn draw_point(framebuffer: &mut dyn FrameBuffer, x: usize, y: usize, color: 
     }
 }
 
-/// Draw a line in a framebuffer. The part exceeding the boundary of the framebuffer will be ignored.
+/// Draws a line in a framebuffer. The part exceeding the boundary of the framebuffer will be ignored.
 /// # Arguments
 /// * `framebuffer`: the framebuffer to draw in.
 /// * `(start_x, start_y)`: the start point of the line.
@@ -66,7 +66,7 @@ pub fn draw_line(
     }
 }
 
-/// Draw a rectangle in a framebuffer.
+/// Draws a rectangle in a framebuffer.
 /// The part exceeding the boundary of the framebuffer will be ignored.
 /// # Arguments
 /// * `framebuffer`: the framebuffer to draw in.
@@ -120,7 +120,7 @@ pub fn draw_rectangle(
     }
 }
 
-/// Fill a rectangle in a framebuffer with color.
+/// Fills a rectangle in a framebuffer with color.
 /// The part exceeding the boundary of the framebuffer will be ignored.
 /// # Arguments
 /// * `framebuffer`: the framebuffer to draw in.

@@ -2,7 +2,7 @@
 name = "frame_buffer_printer"
 version = "0.1.0"
 authors = ["Wenqiu Yu <yuwenqiuj@gmail.com>"]
-description = "Print a string in a framebuffer"
+description = "print a string in a framebuffer"
 build = "../../build.rs"
 
 [dependencies.frame_buffer_rgb]

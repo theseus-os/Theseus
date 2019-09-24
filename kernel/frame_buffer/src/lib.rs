@@ -1,5 +1,5 @@
 //! This crate defines the `FrameBuffer` trait and maintains the final framebuffer.
-//! A `Framebuffer` contains fundamental display interfaces.
+//! A `Framebuffer` contains fundamental display interfaces including displaying a single pixel and copying a buffer of pixels.
 
 #![no_std]
 
@@ -29,7 +29,7 @@ pub trait FrameBuffer: Send {
     /// Returns (width, height).
     fn get_size(&self) -> (usize, usize);
 
-    /// Displays a buffer of pixels in the framebuffer from index `dest_start`.
+    /// Copies a buffer of pixels to the framebuffer from index `dest_start`.
     fn buffer_copy(&mut self, src: &[Pixel], dest_start: usize);
 
     /// Computes the index of pixel (x, y) in the buffer array.

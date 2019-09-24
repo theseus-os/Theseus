@@ -22,11 +22,12 @@ use tsc::{tsc_ticks, TscTicks};
 
 const DEFAULT_CURSOR_FREQ: u64 = 400000000;
 
-/// A text displayable displayable profiles the size and color of a block of text. It can display in a framebuffer.
+/// A text displayable profiles the size and color of a block of text. It can display in a framebuffer.
 pub struct TextDisplay {
     width: usize,
     height: usize,
-    // the position of the next symbol. They are updated after display and they will be useful for optimization.
+    // the position of the next symbol
+    // the position is updated after display and they will be useful for optimization.
     next_col: usize,
     next_line: usize,
     text: String,
@@ -148,7 +149,7 @@ pub struct Cursor {
 }
 
 impl Cursor {
-    /// Create a new cursor structure.
+    /// Creates a new cursor structure.
     pub fn new(color: u32) -> Cursor {
         Cursor {
             enabled: true,
@@ -159,24 +160,24 @@ impl Cursor {
         }
     }
 
-    /// Reset the blink state of the cursor.
+    /// Resets the blink state of the cursor.
     pub fn reset(&mut self) {
         self.show = true;
         self.time = tsc_ticks();
     }
 
-    /// Enable a cursor.
+    /// Enables a cursor.
     pub fn enable(&mut self) {
         self.enabled = true;
         self.reset();
     }
 
-    /// Disable a cursor.
+    /// Disables a cursor.
     pub fn disable(&mut self) {
         self.enabled = false;
     }
 
-    /// Change the blink state show/hidden of a cursor based on its frequency. An application calls this function in a loop.
+    /// Changes the blink state show/hidden of a cursor based on its frequency. An application calls this function in a loop.
     pub fn blink(&mut self) -> bool {
         if self.enabled {
             let time = tsc_ticks();
@@ -193,7 +194,7 @@ impl Cursor {
         false
     }
 
-    /// Check if the cursor should be displayed.
+    /// Checks if the cursor should be shown.
     pub fn show(&self) -> bool {
         self.enabled && self.show
     }

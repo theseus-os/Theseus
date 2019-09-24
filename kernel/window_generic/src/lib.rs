@@ -59,7 +59,7 @@ pub struct WindowGeneric<Buffer: FrameBuffer> {
 }
 
 impl<Buffer: FrameBuffer> WindowGeneric<Buffer> {
-    /// Clean the content of a window. The border and padding of the window remain showing.
+    /// Cleans the content of a window. The border and padding of the window remain showing.
     pub fn clean(&mut self) -> Result<(), &'static str> {
         let (width, height) = self.inner.lock().get_content_size();
         fill_rectangle(
@@ -81,7 +81,7 @@ impl<Buffer: FrameBuffer> WindowGeneric<Buffer> {
     }
 
     /// Adds a new displayable to the window.
-    /// We check if the displayable is in the window, but do not check if it is overlapped with others.
+    /// This function checks if the displayable is in the window, but does not check if it is overlapped with others.
     pub fn add_displayable(
         &mut self,
         key: &str,
@@ -116,7 +116,7 @@ impl<Buffer: FrameBuffer> WindowGeneric<Buffer> {
         self.components.remove(name);
     }
 
-    /// Gets a mutable displayable by its name.
+    /// Gets a mutable reference to a displayable by its name.
     pub fn get_displayable_mut(&mut self, name: &str) -> Option<&mut Box<dyn Displayable>> {
         let opt = self.components.get_mut(name);
         match opt {
@@ -151,12 +151,12 @@ impl<Buffer: FrameBuffer> WindowGeneric<Buffer> {
         };
     }
 
-    /// Gets the content position of the window excluding border and padding
+    /// Gets the content position of the window excluding border and padding.
     pub fn get_content_position(&self) -> (usize, usize) {
         self.inner.lock().get_content_position()
     }
 
-    /// Render the content of the window to the screen.
+    /// Renders the content of the window to the screen.
     pub fn render(&mut self) -> Result<(), &'static str> {
         let (window_x, window_y) = { self.inner.lock().get_content_position() };
         FRAME_COMPOSITOR.lock().compose(vec![(
@@ -207,7 +207,7 @@ impl<Buffer: FrameBuffer> WindowGeneric<Buffer> {
     }
 
     // @Andrew
-    /// Resize a window as (width, height) at (x, y).
+    /// Resizes a window as (width, height) at (x, y).
     pub fn resize(
         &mut self,
         x: usize,
@@ -355,7 +355,7 @@ impl Window for WindowInner {
     }
 }
 
-/// a component contains a displayable and its position.
+/// A component contains a displayable and its position.
 pub struct Component {
     x: usize,
     y: usize,
@@ -363,22 +363,22 @@ pub struct Component {
 }
 
 impl Component {
-    // get the displayable
+    // gets the displayable
     fn get_displayable(&self) -> &Box<dyn Displayable> {
         return &(self.displayable);
     }
 
-    // get the displayable
+    // gets a mutable reference to the displayable
     fn get_displayable_mut(&mut self) -> &mut Box<dyn Displayable> {
         return &mut (self.displayable);
     }
 
-    // get the position of the displayable
+    // gets the position of the displayable
     fn get_position(&self) -> (usize, usize) {
         (self.x, self.y)
     }
 
-    // resize the displayable
+    // resizes the displayable
     fn resize(&mut self, x: usize, y: usize, width: usize, height: usize) {
         self.x = x;
         self.y = y;
@@ -395,7 +395,7 @@ fn get_border_color(active: bool) -> u32 {
     }
 }
 
-/// return a new window. Currently the window is of `FrameBufferRGB`. In the future we will be able to create a window of any structure which implements `FrameBuffer`.
+/// Creates a new window. Currently the window is of `FrameBufferRGB`. In the future we will be able to create a window of any structure which implements `FrameBuffer`.
 /// (x, y) specify the coordinates of the top left corner of the window.
 /// (width, height) specify the size of the new window.
 pub fn new_window<'a>(

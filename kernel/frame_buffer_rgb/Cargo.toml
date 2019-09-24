@@ -2,7 +2,7 @@
 name = "frame_buffer_rgb"
 version = "0.1.0"
 authors = ["Wenqiu Yu <yuwenqiuj@gmail.com>"]
-description = "manage framebuffer objects. contain a final framebuffer which is mapped to the physical framebuffer"
+description = "a framebuffer with RGB pixels"
 build = "../../build.rs"
 
 [dependencies]

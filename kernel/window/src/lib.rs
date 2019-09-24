@@ -1,5 +1,5 @@
 //! This crate defines a `Window` trait.
-//! The window manager maintains a list of `Window` object.
+//! A window manager maintains a list of `Window` objects.
 
 #![no_std]
 
@@ -9,7 +9,7 @@ extern crate dfqueue;
 use event_types::Event;
 use dfqueue::{DFQueueProducer};
 
-/// The window trait.
+/// The `Window` trait.
 pub trait Window: Send {
     /// Cleans the window on the screen including the border and padding.
     fn clean(&self) -> Result<(), &'static str>;

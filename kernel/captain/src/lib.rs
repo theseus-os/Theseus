@@ -127,7 +127,7 @@ pub fn init(
 
     // init the display subsystem
     // the final frame_buffer is set as FrameBufferRGB
-    // we are able to initialize it as different implementations of FrameBuffer 
+    // we are able to initialize the final framebuffer as any kind of FrameBuffer
     frame_buffer_rgb::init()?;
     font::init()?;
     window_manager::init()?;
