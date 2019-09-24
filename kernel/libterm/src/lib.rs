@@ -492,7 +492,7 @@ impl Terminal {
         if self.scroll_start_idx != 0 {
             self.is_scroll_end = false;
             self.scroll_start_idx = 0; // takes us up to the start of the page
-            self.window.display_end_cursor(&mut self.cursor, &self.display_name, FONT_COLOR, BACKGROUND_COLOR)?;
+            self.window.display_end_cursor(&mut self.cursor, &self.display_name)?;
         }
         
         Ok(())
@@ -502,7 +502,7 @@ impl Terminal {
     pub fn move_screen_to_end(&mut self) -> Result<(), &'static str> {
         if !self.is_scroll_end {
             self.cursor.disable();
-            self.window.display_end_cursor(&mut self.cursor, &self.display_name, FONT_COLOR, BACKGROUND_COLOR)?;
+            self.window.display_end_cursor(&mut self.cursor, &self.display_name)?;
             self.is_scroll_end = true;
             let buffer_len = self.scrollback_buffer.len();
             self.scroll_start_idx = self.calc_start_idx(buffer_len, &self.display_name).0;
@@ -515,7 +515,7 @@ impl Terminal {
     pub fn move_screen_line_up(&mut self) -> Result<(), &'static str> {
         if self.scroll_start_idx != 0 {
             self.scroll_up_one_line();
-            self.window.display_end_cursor(&mut self.cursor, &self.display_name, FONT_COLOR, BACKGROUND_COLOR)?;
+            self.window.display_end_cursor(&mut self.cursor, &self.display_name)?;
         }
         Ok(())
     }
@@ -524,7 +524,7 @@ impl Terminal {
     pub fn move_screen_line_down(&mut self) -> Result<(), &'static str> {
         if !self.is_scroll_end {
             self.cursor.disable();
-            self.window.display_end_cursor(&mut self.cursor, &self.display_name, FONT_COLOR, BACKGROUND_COLOR)?;
+            self.window.display_end_cursor(&mut self.cursor, &self.display_name)?;
             self.scroll_down_one_line();
             self.cursor.enable();
         }
@@ -538,7 +538,7 @@ impl Terminal {
         }
         self.page_up();
         self.is_scroll_end = false;
-        self.window.display_end_cursor(&mut self.cursor, &self.display_name, FONT_COLOR, BACKGROUND_COLOR)
+        self.window.display_end_cursor(&mut self.cursor, &self.display_name)
     }
 
     /// Scroll the screen a page down.
@@ -547,7 +547,7 @@ impl Terminal {
             return Ok(());
         }
         self.cursor.disable();
-        self.window.display_end_cursor(&mut self.cursor, &self.display_name, FONT_COLOR, BACKGROUND_COLOR)?;
+        self.window.display_end_cursor(&mut self.cursor, &self.display_name)?;
         self.page_down();
         self.cursor.enable();
         Ok(())
@@ -575,7 +575,7 @@ impl Terminal {
     }
 
     pub fn blink_cursor(&mut self) -> Result<(), &'static str> {
-        self.window.display_end_cursor(&mut self.cursor, &self.display_name, FONT_COLOR, BACKGROUND_COLOR)
+        self.window.display_end_cursor(&mut self.cursor, &self.display_name)
     }
 
     /// Get a key event from the underlying window.

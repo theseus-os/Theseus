@@ -2110,15 +2110,11 @@ dependencies = [
 name = "text_display"
 version = "0.1.0"
 dependencies = [
- "dfqueue 0.1.0",
  "displayable 0.1.0",
- "event_types 0.1.0",
  "font 0.1.0",
  "frame_buffer 0.1.0",
- "frame_buffer_compositor 0.1.0",
  "frame_buffer_drawer 0.1.0",
  "frame_buffer_printer 0.1.0",
- "lazy_static 1.2.0 (registry+https://github.com/rust-lang/crates.io-index)",
  "spin 0.4.10 (registry+https://github.com/rust-lang/crates.io-index)",
  "tsc 0.1.0",
 ]
