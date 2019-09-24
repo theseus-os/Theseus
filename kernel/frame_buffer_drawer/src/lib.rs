@@ -98,6 +98,7 @@ pub fn draw_rectangle(
         }
     };
 
+    // draw the four lines of the rectangle.
     let mut x = start_x;
     loop {
         if x == end_x {
@@ -152,6 +153,7 @@ pub fn fill_rectangle(
         }
     };
 
+    // draw every pixel line by line
     let mut x = start_x;
     let mut y = start_y;
     loop {

@@ -7,7 +7,7 @@ build = "../../build.rs"
 
 [dependencies]
 getopts = "0.2.18"
-cfg-if = "0.1.6"
+cfg-if = "0.1.9"
 
 [dependencies.log]
 default-features = false

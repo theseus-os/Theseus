@@ -72,6 +72,7 @@ impl Compositor for FrameCompositor {
         let (final_width, final_height) = final_fb.get_size();
 
         for (src_fb, offset_x, offset_y) in bufferlist {
+            // skip if already cached
             if self.cached(src_fb, offset_x, offset_y) {
                 continue;
             }
@@ -96,6 +97,7 @@ impl Compositor for FrameCompositor {
             let width = core::cmp::min(final_x_end as usize, final_width) - final_x_start;
             let height = core::cmp::min(final_y_end as usize, final_height) - final_y_start;
 
+            // copy every line to the final framebuffer.
             let src_buffer = src_fb.buffer();
             for i in 0..height {
                 let dest_start = (final_y_start + i) * final_width + final_x_start;
@@ -105,6 +107,7 @@ impl Compositor for FrameCompositor {
                 final_fb.buffer_copy(&(src_buffer[src_start..src_end]), dest_start);
             }
 
+            // cache the new framebuffer and remove all caches that are overlapped by it.
             let new_cache = BufferCache {
                 x: offset_x,
                 y: offset_y,

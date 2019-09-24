@@ -6,7 +6,7 @@ version = "0.1.0"
 build = "../../build.rs"
 
 [dependencies]
-cfg-if = "0.1.6"
+cfg-if = "0.1.9"
 
 [dependencies.pit_clock]
 path = "../pit_clock"
