@@ -29,31 +29,26 @@ extern crate frame_buffer_compositor;
 extern crate frame_buffer_drawer;
 extern crate frame_buffer_printer;
 extern crate text_display;
-#[macro_use]
-extern crate lazy_static;
 extern crate displayable;
 extern crate font;
 extern crate window;
 extern crate window_manager;
 extern crate downcast_rs;
-use downcast_rs::Downcast;
 
-use alloc::collections::{BTreeMap, VecDeque};
+use alloc::collections::{BTreeMap};
 use alloc::string::{String, ToString};
-use alloc::sync::{Arc, Weak};
+use alloc::sync::{Arc};
 use alloc::boxed::Box;
 use compositor::Compositor;
 use core::ops::{Deref, DerefMut};
-use core::any::Any;
 use dfqueue::{DFQueue, DFQueueConsumer, DFQueueProducer};
 use displayable::Displayable;
 use event_types::Event;
-use font::{CHARACTER_HEIGHT, CHARACTER_WIDTH};
 use frame_buffer::FrameBuffer;
 use frame_buffer_rgb::FrameBufferRGB;
 use frame_buffer_compositor::FRAME_COMPOSITOR;
 use frame_buffer_drawer::*;
-use spin::{Mutex, Once};
+use spin::{Mutex};
 use text_display::{Cursor, TextDisplay};
 use window::Window;
 use window_manager::{WINDOWLIST, SCREEN_FRAME_BUFFER, WINDOW_MARGIN, WINDOW_PADDING, WINDOW_INACTIVE_COLOR, WINDOW_ACTIVE_COLOR, SCREEN_BACKGROUND_COLOR};
@@ -62,7 +57,7 @@ use window_manager::{WINDOWLIST, SCREEN_FRAME_BUFFER, WINDOW_MARGIN, WINDOW_PADD
 /// A window contains a reference to its inner reference owned by the window manager,
 /// a consumer of inputs, a list of displayables and a framebuffer
 pub struct WindowGeneric<Buffer: FrameBuffer> {
-    pub inner: Arc<Mutex<Box<Window>>>,
+    pub inner: Arc<Mutex<Box<dyn Window>>>,
     pub consumer: DFQueueConsumer<Event>,
     pub components: BTreeMap<String, Component>,
     pub framebuffer: Buffer,
@@ -97,7 +92,7 @@ impl<Buffer: FrameBuffer> WindowGeneric<Buffer> {
         key: &str,
         x: usize,
         y: usize,
-        displayable: Box<Displayable>,
+        displayable: Box<dyn Displayable>,
     ) -> Result<(), &'static str> {
         let key = key.to_string();
         let (width, height) = displayable.get_size();
@@ -127,7 +122,7 @@ impl<Buffer: FrameBuffer> WindowGeneric<Buffer> {
     }
 
     /// Get a displayable of the name
-    pub fn get_displayable_mut(&mut self, name: &str) -> Option<&mut Box<Displayable>> {
+    pub fn get_displayable_mut(&mut self, name: &str) -> Option<&mut Box<dyn Displayable>> {
         let opt = self.components.get_mut(name);
         match opt {
             None => return None,
@@ -138,7 +133,7 @@ impl<Buffer: FrameBuffer> WindowGeneric<Buffer> {
     }
 
     /// Get a displayable of the name
-    pub fn get_displayable(&self, name: &str) -> Option<&Box<Displayable>> {
+    pub fn get_displayable(&self, name: &str) -> Option<&Box<dyn Displayable>> {
         let opt = self.components.get(name);
         match opt {
             None => return None,
@@ -166,7 +161,7 @@ impl<Buffer: FrameBuffer> WindowGeneric<Buffer> {
         self.inner.lock().get_content_position()
     }
 
-    pub fn inner(&self) -> &Arc<Mutex<Box<Window>>> {
+    pub fn inner(&self) -> &Arc<Mutex<Box<dyn Window>>> {
         &self.inner
     }
 
@@ -229,14 +224,18 @@ impl<Buffer: FrameBuffer> WindowGeneric<Buffer> {
         font_color: u32,
         bg_color: u32,
     ) -> Result<(), &'static str> {
-        let displayable = self
+        let component = self
             .components
             .get_mut(display_name)
-            .ok_or("")?
-            .get_displayable_mut();
+            .ok_or("")?;
+        let (x, y) = component.get_position();
+        let displayable = component.get_displayable_mut();
+
+        /* Optimization: if current string is the prefix of the new string, just print the appended characters. */
+
         if let Some(text_display) = displayable.downcast_mut::<TextDisplay>() {
             text_display.set_text(slice);
-            text_display.display(0, 0, font_color, bg_color, &mut self.framebuffer)?;
+            text_display.display(x, y, font_color, bg_color, &mut self.framebuffer)?;
             self.render()?;
         } else {
             return Err("The displayable is not a text displayable");
@@ -253,15 +252,16 @@ impl<Buffer: FrameBuffer> WindowGeneric<Buffer> {
         font_color: u32,
         bg_color: u32,
     ) -> Result<(), &'static str> {
-        let displayable = self
+        let component = self
             .components
             .get_mut(display_name)
-            .ok_or("")?
-            .get_displayable_mut();
+            .ok_or("")?;
+        let (x, y) = component.get_position();
+        let displayable = component.get_displayable_mut();
 
         if let Some(text_display) = displayable.downcast_mut::<TextDisplay>() {
             let (col, line) = text_display.get_next_pos();
-            text_display.display_cursor(cursor, 0, 0, col, line, font_color, bg_color, &mut self.framebuffer);
+            text_display.display_cursor(cursor, x, y, col, line, font_color, bg_color, &mut self.framebuffer);
             self.render()?;
         } else {
             return Err("The displayable is not a text displayable");
@@ -443,17 +443,17 @@ impl Window for WindowInner {
 pub struct Component {
     x: usize,
     y: usize,
-    displayable: Box<Displayable>,
+    displayable: Box<dyn Displayable>,
 }
 
 impl Component {
     // get the displayable
-    fn get_displayable(&self) -> &Box<Displayable> {
+    fn get_displayable(&self) -> &Box<dyn Displayable> {
         return &(self.displayable);
     }
 
     // get the displayable
-    fn get_displayable_mut(&mut self) -> &mut Box<Displayable> {
+    fn get_displayable_mut(&mut self) -> &mut Box<dyn Displayable> {
         return &mut (self.displayable);
     }
 
@@ -518,7 +518,7 @@ pub fn new_window<'a>(
     //     return Err("Request area is already allocated");
     // }
 
-    let inner_obj:Box<Window> = Box::new(inner);
+    let inner_obj:Box<dyn Window> = Box::new(inner);
     let inner_ref = Arc::new(Mutex::new(inner_obj));
 
     // add the new window and active it
