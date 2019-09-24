@@ -6,7 +6,6 @@ description = "allocate new windows and manage a list of existing windows"
 build = "../../build.rs"
 
 [dependencies]
-spin = "0.4.10"
 
 [dependencies.log]
 default-features = false
@@ -39,9 +38,6 @@ path = "../font"
 
 [dependencies.displayable]
 path = "../displayable"
-
-[dependencies.text_display]
-path = "../../kernel/displayable/text_display"
 
 [dependencies.lazy_static]
 features = ["spin_no_std", "nightly"]

@@ -16,36 +16,18 @@
 #![no_std]
 
 extern crate spin;
-#[macro_use]
 extern crate alloc;
-extern crate dfqueue;
 extern crate event_types;
-#[macro_use]
-extern crate log;
-extern crate compositor;
-extern crate frame_buffer;
 extern crate frame_buffer_rgb;
-extern crate frame_buffer_compositor;
-extern crate frame_buffer_drawer;
+extern crate frame_buffer;
 extern crate frame_buffer_printer;
 #[macro_use]
 extern crate lazy_static;
-extern crate displayable;
-extern crate font;
 extern crate window;
 
-use alloc::collections::{BTreeMap, VecDeque};
-use alloc::string::{String, ToString};
+use alloc::collections::{VecDeque};
 use alloc::sync::{Arc, Weak};
-use compositor::Compositor;
-use core::ops::{Deref, DerefMut};
-use dfqueue::{DFQueue, DFQueueConsumer, DFQueueProducer};
-use displayable::Displayable;
 use event_types::Event;
-use font::{CHARACTER_HEIGHT, CHARACTER_WIDTH};
-use frame_buffer::FrameBuffer;
-use frame_buffer_compositor::FRAME_COMPOSITOR;
-use frame_buffer_drawer::*;
 use frame_buffer_rgb::FrameBufferRGB;
 use spin::{Mutex, Once};
 pub use window::Window;
