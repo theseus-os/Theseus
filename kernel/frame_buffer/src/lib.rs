@@ -1,5 +1,6 @@
 //! This crate defines FrameBuffer trait.
 //! A Framebuffer contains fundamental display interfaces.
+//! It maintains the final framebuffer.
 
 #![no_std]
 
