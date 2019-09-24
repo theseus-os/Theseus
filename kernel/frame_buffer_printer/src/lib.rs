@@ -89,12 +89,6 @@ pub fn print_by_bytes(
         x, y + (curr_line + 1 )* CHARACTER_HEIGHT, x + width, y + height,
         bg_color)?;
     
-    // go back to the last position if the next position is out of the screen
-    if curr_line == buffer_height {
-        curr_line -= 1;
-        curr_column = buffer_width -1;
-    }
-
     Ok((curr_column, curr_line))
 }
 

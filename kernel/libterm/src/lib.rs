@@ -499,12 +499,16 @@ impl Terminal {
     }
 
     /// Scroll the screen to the very end.
-    pub fn move_screen_to_end(&mut self) {
+    pub fn move_screen_to_end(&mut self) -> Result<(), &'static str> {
         if !self.is_scroll_end {
+            self.cursor.disable();
+            self.window.display_end_cursor(&mut self.cursor, &self.display_name, FONT_COLOR, BACKGROUND_COLOR)?;
             self.is_scroll_end = true;
             let buffer_len = self.scrollback_buffer.len();
             self.scroll_start_idx = self.calc_start_idx(buffer_len, &self.display_name).0;
+            self.cursor.enable();
         }
+        Ok(())
     }
 
     /// Scroll the screen a line up.
@@ -513,15 +517,18 @@ impl Terminal {
             self.scroll_up_one_line();
             self.window.display_end_cursor(&mut self.cursor, &self.display_name, FONT_COLOR, BACKGROUND_COLOR)?;
         }
-
         Ok(())
     }
 
     /// Scroll the screen a line down.
-    pub fn move_screen_line_down(&mut self) {
+    pub fn move_screen_line_down(&mut self) -> Result<(), &'static str> {
         if !self.is_scroll_end {
+            self.cursor.disable();
+            self.window.display_end_cursor(&mut self.cursor, &self.display_name, FONT_COLOR, BACKGROUND_COLOR)?;
             self.scroll_down_one_line();
+            self.cursor.enable();
         }
+        Ok(())
     }
 
     /// Scroll the screen a page up.
@@ -535,11 +542,15 @@ impl Terminal {
     }
 
     /// Scroll the screen a page down.
-    pub fn move_screen_page_down(&mut self) {
+    pub fn move_screen_page_down(&mut self) -> Result<(), &'static str> {
         if self.is_scroll_end {
-            return;
+            return Ok(());
         }
+        self.cursor.disable();
+        self.window.display_end_cursor(&mut self.cursor, &self.display_name, FONT_COLOR, BACKGROUND_COLOR)?;
         self.page_down();
+        self.cursor.enable();
+        Ok(())
     }
 
     /// Clear all.
@@ -564,9 +575,6 @@ impl Terminal {
     }
 
     pub fn blink_cursor(&mut self) -> Result<(), &'static str> {
-        // if let Some(text_display) = self.window.get_displayable(&self.display_name){
-        //     text_display.display_cursor(&self.window, FONT_COLOR, BACKGROUND_COLOR);
-        // }
         self.window.display_end_cursor(&mut self.cursor, &self.display_name, FONT_COLOR, BACKGROUND_COLOR)
     }
 

@@ -551,15 +551,13 @@ impl Shell {
             return self.terminal.lock().move_screen_to_begin();
         }
         if keyevent.keycode == Keycode::End && keyevent.modifiers.control{
-            self.terminal.lock().move_screen_to_end();
-            return Ok(());
+            return self.terminal.lock().move_screen_to_end();
         }
         if keyevent.modifiers.control && keyevent.modifiers.shift && keyevent.keycode == Keycode::Up  {
             return self.terminal.lock().move_screen_line_up();
         }
         if keyevent.modifiers.control && keyevent.modifiers.shift && keyevent.keycode == Keycode::Down  {
-            self.terminal.lock().move_screen_line_down();
-            return Ok(());
+            return self.terminal.lock().move_screen_line_down();
         }
 
         if keyevent.keycode == Keycode::PageUp && keyevent.modifiers.shift {
@@ -567,8 +565,7 @@ impl Shell {
         }
 
         if keyevent.keycode == Keycode::PageDown && keyevent.modifiers.shift {
-            self.terminal.lock().move_screen_page_down();
-            return Ok(());
+            return self.terminal.lock().move_screen_page_down();
         }
 
         // Cycles to the next previous command
