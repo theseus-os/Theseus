@@ -255,26 +255,25 @@ impl<Buffer: FrameBuffer> WindowGeneric<Buffer> {
     }
 }
 
-// The structure is owned by the window manager. It contains the information of a window but under the control of the manager
+/// The structure is owned by the window manager. It contains the information of a window but under the control of the manager
 pub struct WindowInner {
-    // the upper left x-coordinate of the window
+    /// the upper left x-coordinate of the window
     pub x: usize,
-    // the upper left y-coordinate of the window
+    /// the upper left y-coordinate of the window
     pub y: usize,
-    // the width of the window
+    /// the width of the window
     pub width: usize,
-    // the height of the window
+    /// the height of the window
     pub height: usize,
-    // whether the window is active
+    /// whether the window is active
     pub active: bool,
-    // a consumer of key input events to the window
+    /// a consumer of key input events to the window
     pub padding: usize,
-    // the producer accepting a key event
+    /// the producer accepting a key event
     pub key_producer: DFQueueProducer<Event>,
 }
 
 impl Window for WindowInner {
-    //clean the window on the screen including the border and padding
     fn clean(&self) -> Result<(), &'static str> {
         let buffer_ref = match SCREEN_FRAME_BUFFER.try() {
             Some(buffer) => buffer,
@@ -293,31 +292,16 @@ impl Window for WindowInner {
         FRAME_COMPOSITOR.lock().compose(vec![(buffer, 0, 0)])
     }
 
-    // //check if the window is overlapped with any existing window
-    // fn is_overlapped(&self, x:usize, y:usize, width:usize, height:usize) -> bool {
-    //     return self.check_in_area(x, y) && self.check_in_area(x, y + height)
-    //         && self.check_in_area(x + width, y) && self.check_in_area(x + width, y + height)
-    // }
-
-    // // check if the pixel is within the window
-    // fn check_in_area(&self, x:usize, y:usize) -> bool {
-    //     return x >= self.x && x <= self.x + self.width
-    //             && y >= self.y && y <= self.y + self.height;
-    // }
-
-    // check if the pixel is within the window exluding the border and padding
     fn check_in_content(&self, x: usize, y: usize) -> bool {
         return x <= self.width - 2 * self.padding && y <= self.height - 2 * self.padding;
     }
 
-    // active or inactive a window
     fn active(&mut self, active: bool) -> Result<(), &'static str> {
         self.active = active;
         self.draw_border(WINDOW_ACTIVE_COLOR)?;
         Ok(())
     }
 
-    // draw the border of the window
     fn draw_border(&self, color: u32) -> Result<(), &'static str> {
         let buffer_ref = match SCREEN_FRAME_BUFFER.try() {
             Some(buffer) => buffer,
@@ -329,7 +313,6 @@ impl Window for WindowInner {
         FRAME_COMPOSITOR.lock().compose(vec![(buffer, 0, 0)])
     }
 
-    // adjust the size of a window
     fn resize(
         &mut self,
         x: usize,
@@ -350,7 +333,6 @@ impl Window for WindowInner {
         Ok(percent)
     }
 
-    // get the size of content without padding
     fn get_content_size(&self) -> (usize, usize) {
         (
             self.width - 2 * self.padding,
@@ -358,7 +340,6 @@ impl Window for WindowInner {
         )
     }
 
-    // get the position of content without padding
     fn get_content_position(&self) -> (usize, usize) {
         (self.x + self.padding, self.y + self.padding)
     }
@@ -368,7 +349,7 @@ impl Window for WindowInner {
     }
 }
 
-// a component contains a displayable and its position
+/// a component contains a displayable and its position.
 pub struct Component {
     x: usize,
     y: usize,
@@ -399,7 +380,7 @@ impl Component {
     }
 }
 
-// Gets the border color according to the active state
+// gets the border color according to the active state
 fn get_border_color(active: bool) -> u32 {
     if active {
         WINDOW_ACTIVE_COLOR
@@ -408,23 +389,23 @@ fn get_border_color(active: bool) -> u32 {
     }
 }
 
-/// Lets the caller specify the dimensions of the new window and returns a new window
-/// Params x,y specify the (x,y) coordinates of the top left corner of the window
-/// Params width and height specify dimenions of new window in pixels
+/// return a new window. Currently the window is of `FrameBufferRGB`. In the future we will be able to create a window of any structure which implements `FrameBuffer`.
+/// (x, y) specify the coordinates of the top left corner of the window.
+/// (width, height) specify the size of the new window.
 pub fn new_window<'a>(
     x: usize,
     y: usize,
     width: usize,
     height: usize,
 ) -> Result<WindowGeneric<FrameBufferRGB>, &'static str> {
-    // Check the size of the window
+    // check the size of the window
     if width < 2 * WINDOW_PADDING || height < 2 * WINDOW_PADDING {
         return Err("Window size must be greater than the padding");
     }
-    // Init the key input producer and consumer
+    // init the key input producer and consumer
     let consumer = DFQueue::new().into_consumer();
     let producer = consumer.obtain_producer();
-    // Init the frame buffer of the window
+    // init the frame buffer of the window
     let framebuffer = FrameBufferRGB::new(
         width - 2 * WINDOW_PADDING,
         height - 2 * WINDOW_PADDING,
@@ -458,7 +439,6 @@ pub fn new_window<'a>(
     // return the window object
     let window: WindowGeneric<FrameBufferRGB> = WindowGeneric {
         inner: inner_ref,
-        //text_buffer:FrameTextBuffer::new(),
         consumer: consumer,
         components: BTreeMap::new(),
         framebuffer: framebuffer,
@@ -467,8 +447,7 @@ pub fn new_window<'a>(
     Ok(window)
 }
 
-/// Applications call this function to request a new window object with a default size (mostly fills screen with WINDOW_MARGIN around all borders)
-/// If the caller a specific window size, it should call new_window()
+/// Applications call this function to request a new window object with a default size (mostly fills screen with WINDOW_MARGIN around all borders).
 pub fn new_default_window() -> Result<WindowGeneric<FrameBufferRGB>, &'static str> {
     let (window_width, window_height) = frame_buffer::get_screen_size()?;
     match new_window(
@@ -482,7 +461,7 @@ pub fn new_default_window() -> Result<WindowGeneric<FrameBufferRGB>, &'static st
     }
 }
 
-// delete the reference of a window in the manager when the window is dropped
+// delete the reference of a window in the manager when a window is dropped.
 impl<Buffer: FrameBuffer> Drop for WindowGeneric<Buffer> {
     fn drop(&mut self) {
         let mut window_list = WINDOWLIST.lock();

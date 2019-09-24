@@ -1,37 +1,29 @@
 //! Window manager that simulates a desktop environment.
-//! *note: since window overlap is not yet supported, any application that asks for a window that would overlap
-//! with an existing window will be returned an error
-//!
-//! Applications request window objects from the window manager through either of two functions:
-//! - default_new_window() will provide a window of default size (centered, fills majority of screen)
-//! - new_window() provides a new window whose dimensions the caller must specify
-//!
-//! Windows can be resized by calling resize().
-//! Window can be deleted when it is dropped or by calling WindowGeneric.delete().
+//! The manager matains a list of background windows and an active window.
 //! Once an active window is deleted or set as inactive, the next window in the background list will become active.
-//! The orde of windows is based on the last time it was active. The one which was active most recently is the top of the background list
+//! The order of windows is based on the last time it was active. The one which was active most recently is the top of the background list.
 //!
-//! The WINDOW_ALLOCATOR is used by the WindowManager itself to track and modify the existing windows
+//! The WINDOW_ALLOCATOR is used by the `WindowManager` itself to track and modify existing windows
 
 #![no_std]
 
-extern crate spin;
 extern crate alloc;
 extern crate event_types;
-extern crate frame_buffer_rgb;
 extern crate frame_buffer;
 extern crate frame_buffer_printer;
+extern crate frame_buffer_rgb;
+extern crate spin;
 #[macro_use]
 extern crate lazy_static;
 extern crate window;
 
-use alloc::collections::{VecDeque};
+use alloc::boxed::Box;
+use alloc::collections::VecDeque;
 use alloc::sync::{Arc, Weak};
 use event_types::Event;
 use frame_buffer_rgb::FrameBufferRGB;
 use spin::{Mutex, Once};
 pub use window::Window;
-use alloc::boxed::Box;
 
 // 10 pixel gap between windows
 pub const WINDOW_MARGIN: usize = 10;
@@ -45,11 +37,12 @@ pub const WINDOW_INACTIVE_COLOR: u32 = 0x343C37;
 pub const SCREEN_BACKGROUND_COLOR: u32 = 0x000000;
 
 // A framebuffer owned by the window manager.
-// This framebuffer is responsible for display borders. Windows owned by applications cannot get access to their borders.
-// All the display behaviors of borders are controled by the window manager
+// This framebuffer is responsible for display borders and gaps between windows. Windows owned by applications cannot get access to their borders.
+// All the display behaviors of borders are controled by the window manager.
 pub static SCREEN_FRAME_BUFFER: Once<Arc<Mutex<FrameBufferRGB>>> = Once::new();
 
-/// Initialize the window manager.
+/// Initialize the window manager. 
+/// Currently the framebuffer is of type `FrameBufferRGB`. In the future we would be able to have window manager of different FrameBuffers.
 pub fn init() -> Result<(), &'static str> {
     let (screen_width, screen_height) = frame_buffer::get_screen_size()?;
     let framebuffer = FrameBufferRGB::new(screen_width, screen_height, None)?;
@@ -67,8 +60,7 @@ lazy_static! {
     );
 }
 
-
-/// The window allocator.
+/// The window list.
 /// It contains a list of allocated window and a reference to the active window
 pub struct WindowList {
     // The list of inactive windows. Their order is based on the last time they were active. The first window is the window which was active most recently.
@@ -77,8 +69,8 @@ pub struct WindowList {
     active: Weak<Mutex<Box<dyn Window>>>,
 }
 
-/// Puts an input event into the active window (i.e. a keypress event, resize event, etc.)
-/// If the caller wants to put an event into a specific window, use put_event_into_app()
+/// Puts an input event into the active window (i.e. a keypress event, resize event, etc.).
+/// If the caller wants to put an event into a specific window, use put_event_into_app().
 pub fn send_event_to_active(event: Event) -> Result<(), &'static str> {
     let window_list = WINDOWLIST.lock();
     let active_ref = window_list.active.upgrade(); // grabs a pointer to the active WindowInner
@@ -89,10 +81,12 @@ pub fn send_event_to_active(event: Event) -> Result<(), &'static str> {
     Ok(())
 }
 
-
 impl WindowList {
-    /// Add a new window to the list
-    pub fn add_active(&mut self, inner_ref: &Arc<Mutex<Box<dyn Window>>>) -> Result<(), &'static str> {
+    /// Adds and actives a new window to the list.
+    pub fn add_active(
+        &mut self,
+        inner_ref: &Arc<Mutex<Box<dyn Window>>>,
+    ) -> Result<(), &'static str> {
         // // inactive all other windows and active the new one
         // for item in self.list.iter_mut(){
         //     let ref_opt = item.upgrade();
@@ -112,7 +106,7 @@ impl WindowList {
         Ok(())
     }
 
-    // delete a window
+    // Deletes a window.
     pub fn delete(&mut self, inner: &Arc<Mutex<Box<dyn Window>>>) -> Result<(), &'static str> {
         // If the window is active, delete it and active the next top window
         if let Some(current_active) = self.active.upgrade() {
@@ -138,7 +132,7 @@ impl WindowList {
         Ok(())
     }
 
-    // get the index of an inactive window in the background window list
+    // gets the index of an inactive window in the background window list.
     fn get_bgwindow_index(&self, inner: &Arc<Mutex<Box<dyn Window>>>) -> Option<usize> {
         let mut i = 0;
         for item in self.background_list.iter() {
@@ -215,15 +209,14 @@ impl WindowList {
     //
 }
 
-
-/// Pick the next window in the background list and set it as active.
+/// Picks the next window in the background list and set it as active.
 /// The order of windows in the background is based on the last time they are active.
-/// The next window is the one which was active most recently
+/// The next window is the one which was active most recently.
 pub fn switch_to_next() -> Result<(), &'static str> {
     active_window(0, true)
 }
 
-/// Set the specified window in the background list as active.
+/// Sets the specified window in the background list as active.
 pub fn switch_to(window: &Arc<Mutex<Box<dyn Window>>>) -> Result<(), &'static str> {
     if let Some(index) = WINDOWLIST.lock().get_bgwindow_index(window) {
         active_window(index, true)?;
@@ -232,10 +225,10 @@ pub fn switch_to(window: &Arc<Mutex<Box<dyn Window>>>) -> Result<(), &'static st
     Ok(())
 }
 
-// active the index_th window in the background list.
+// Actives a window in the background list.
 // # Arguments
 // * `index`: the index of the window in the background list.
-// * `set_back_current`: whether to keep current active window in the background list. delete current window if set_back_current is false
+// * `set_back_current`: whether to keep current active window in the background list. Delete current window if `set_back_current` is false.
 fn active_window(index: usize, set_back_current: bool) -> Result<(), &'static str> {
     let mut window_list = WINDOWLIST.lock();
 
