@@ -17,9 +17,10 @@ use spin::{Mutex, Once};
 /// A pixel on the screen is mapped to a u32 integer.
 pub type Pixel = u32;
 
-/// The final framebuffer instance. It contains the pages which are mapped to the physical framebuffer
+/// The final framebuffer instance. It contains the pages which are mapped to the physical framebuffer.
 pub static FINAL_FRAME_BUFFER: Once<Mutex<Box<dyn FrameBuffer>>> = Once::new();
 
+/// The `FrameBuffer` trait.
 pub trait FrameBuffer: Send {
     /// Returns a reference to the mapped memory.
     fn buffer(&self) -> &BoxRefMut<MappedPages, [Pixel]>;

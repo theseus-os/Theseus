@@ -7,7 +7,6 @@ build = "../../build.rs"
 
 [dependencies]
 spin = "0.4.10"
-downcast-rs = "1.0.4"
 
 [dependencies.log]
 default-features = false
@@ -38,9 +37,6 @@ path = "../frame_buffer_printer"
 [dependencies.event_types]
 path = "../event_types"
 
-[dependencies.font]
-path = "../font"
-
 [dependencies.displayable]
 path = "../displayable"
 
@@ -52,10 +48,6 @@ path = "../window_manager"
 
 [dependencies.text_display]
 path = "../../kernel/displayable/text_display"
-
-[dependencies.lazy_static]
-features = ["spin_no_std", "nightly"]
-version = "1.2.0"
 
 # [build]
 # rustflags = ["-C", "prefer-dynamic", "-C", "panic=abort"]

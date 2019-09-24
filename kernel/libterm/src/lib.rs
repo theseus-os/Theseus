@@ -585,13 +585,6 @@ impl Terminal {
 
 impl Drop for Terminal {
     fn drop(&mut self) {
-        let mut window_list = window_manager::WINDOWLIST.lock();
-
-        // Switches to a new active window and sets
-        // the active pointer field of the window allocator to the new active window
-        match window_list.delete(&self.window.inner) {
-            Ok(_) => {}
-            Err(err) => error!("Fail to schedule to the next window: {}", err),
-        };
+        /*The window object will invoke its drop method and be deleted from the window manager list*/
     }
 }

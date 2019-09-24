@@ -1,17 +1,6 @@
-//! Window manager that simulates a desktop environment.
-//! *note: since window overlap is not yet supported, any application that asks for a window that would overlap
-//! with an existing window will be returned an error
-//!
-//! Applications request window objects from the window manager through either of two functions:
-//! - default_new_window() will provide a window of default size (centered, fills majority of screen)
-//! - new_window() provides a new window whose dimensions the caller must specify
-//!
-//! Windows can be resized by calling resize().
-//! Window can be deleted when it is dropped or by calling WindowGeneric.delete().
-//! Once an active window is deleted or set as inactive, the next window in the background list will become active.
-//! The orde of windows is based on the last time it was active. The one which was active most recently is the top of the background list
-//!
-//! The WINDOW_ALLOCATOR is used by the WindowManager itself to track and modify the existing windows
+//! This crate defines a `WindowGeneric` structure. This structure contains a `WindowInner` structure which implements the `Window` trait.
+//! The `new_window` function creates a new WindowGeneric objects and add its inner object to the window manager. The outer `WindowGeneric` object will be returned to the application who creates the window.
+//! When a window is dropped, its inner object will be deleted from the window manager.
 
 #![no_std]
 
@@ -23,36 +12,36 @@ extern crate event_types;
 #[macro_use]
 extern crate log;
 extern crate compositor;
+extern crate displayable;
 extern crate frame_buffer;
-extern crate frame_buffer_rgb;
 extern crate frame_buffer_compositor;
 extern crate frame_buffer_drawer;
 extern crate frame_buffer_printer;
+extern crate frame_buffer_rgb;
 extern crate text_display;
-extern crate displayable;
-extern crate font;
 extern crate window;
 extern crate window_manager;
-extern crate downcast_rs;
 
-use alloc::collections::{BTreeMap};
-use alloc::string::{String, ToString};
-use alloc::sync::{Arc};
 use alloc::boxed::Box;
+use alloc::collections::BTreeMap;
+use alloc::string::{String, ToString};
+use alloc::sync::Arc;
 use compositor::Compositor;
 use core::ops::{Deref, DerefMut};
 use dfqueue::{DFQueue, DFQueueConsumer, DFQueueProducer};
 use displayable::Displayable;
 use event_types::Event;
 use frame_buffer::FrameBuffer;
-use frame_buffer_rgb::FrameBufferRGB;
 use frame_buffer_compositor::FRAME_COMPOSITOR;
 use frame_buffer_drawer::*;
-use spin::{Mutex};
+use frame_buffer_rgb::FrameBufferRGB;
+use spin::Mutex;
 use text_display::{Cursor, TextDisplay};
 use window::Window;
-use window_manager::{WINDOWLIST, SCREEN_FRAME_BUFFER, WINDOW_MARGIN, WINDOW_PADDING, WINDOW_INACTIVE_COLOR, WINDOW_ACTIVE_COLOR, SCREEN_BACKGROUND_COLOR};
-
+use window_manager::{
+    SCREEN_BACKGROUND_COLOR, SCREEN_FRAME_BUFFER, WINDOWLIST, WINDOW_ACTIVE_COLOR,
+    WINDOW_INACTIVE_COLOR, WINDOW_MARGIN, WINDOW_PADDING,
+};
 
 /// A window contains a reference to its inner reference owned by the window manager,
 /// a consumer of inputs, a list of displayables and a framebuffer
@@ -64,7 +53,7 @@ pub struct WindowGeneric<Buffer: FrameBuffer> {
 }
 
 impl<Buffer: FrameBuffer> WindowGeneric<Buffer> {
-    /// clean the content of a window. The border and padding of the window remain showing
+    /// Clean the content of a window. The border and padding of the window remain showing.
     pub fn clean(&mut self) -> Result<(), &'static str> {
         let (width, height) = self.inner.lock().get_content_size();
         fill_rectangle(
@@ -77,16 +66,16 @@ impl<Buffer: FrameBuffer> WindowGeneric<Buffer> {
         );
         self.render()
     }
- 
+
     /// Returns the content dimensions of this window,
-    /// as a tuple of `(width, height)`. It does not include the padding
+    /// as a tuple of `(width, height)`. It does not include the padding.
     pub fn dimensions(&self) -> (usize, usize) {
         let inner_locked = self.inner.lock();
         inner_locked.get_content_size()
     }
 
-    /// Add a new displayable structure to the window
-    /// We check if the displayable is in the window. But we do not check if it is overlapped with others
+    /// Adds a new displayable to the window.
+    /// We check if the displayable is in the window. But we do not check if it is overlapped with others.
     pub fn add_displayable(
         &mut self,
         key: &str,
@@ -116,12 +105,12 @@ impl<Buffer: FrameBuffer> WindowGeneric<Buffer> {
         Ok(())
     }
 
-    /// Remove a displayable according to its name
+    /// Removes a displayable according to its name.
     pub fn remove_displayable(&mut self, name: &str) {
         self.components.remove(name);
     }
 
-    /// Get a displayable of the name
+    /// Gets a mutable displayable of the name.
     pub fn get_displayable_mut(&mut self, name: &str) -> Option<&mut Box<dyn Displayable>> {
         let opt = self.components.get_mut(name);
         match opt {
@@ -132,7 +121,7 @@ impl<Buffer: FrameBuffer> WindowGeneric<Buffer> {
         };
     }
 
-    /// Get a displayable of the name
+    /// Gets a displayable of the name.
     pub fn get_displayable(&self, name: &str) -> Option<&Box<dyn Displayable>> {
         let opt = self.components.get(name);
         match opt {
@@ -143,7 +132,7 @@ impl<Buffer: FrameBuffer> WindowGeneric<Buffer> {
         };
     }
 
-    /// Get the position of a displayable in the window
+    /// Gets the position of a displayable in the window
     pub fn get_displayable_position(&self, key: &str) -> Result<(usize, usize), &'static str> {
         let opt = self.components.get(key);
         match opt {
@@ -156,57 +145,12 @@ impl<Buffer: FrameBuffer> WindowGeneric<Buffer> {
         };
     }
 
-    /// Get the content position of the window excluding border and padding
+    /// Gets the content position of the window excluding border and padding
     pub fn get_content_position(&self) -> (usize, usize) {
         self.inner.lock().get_content_position()
     }
 
-    pub fn inner(&self) -> &Arc<Mutex<Box<dyn Window>>> {
-        &self.inner
-    }
-
-    // /// draw a pixel in a window
-    // pub fn draw_pixel(&mut self, x:usize, y:usize, color:u32) -> Result<(), &'static str> {
-    //     draw_pixel(&mut self.framebuffer, x, y, color);
-    //     let (content_x, content_y) = self.inner.lock().get_content_position();
-    //     FrameCompositor::compose(
-    //         vec![(&self.framebuffer, content_x, content_y)]
-    //     )
-    // }
-
-    // /// draw a line in a window
-    // pub fn draw_line(&mut self, start_x:usize, start_y:usize, end_x:usize, end_y:usize, color:u32) -> Result<(), &'static str> {
-    //     draw_line(&mut self.framebuffer, start_x as i32, start_y as i32,
-    //         end_x as i32, end_y as i32, color);
-    //     let (content_x, content_y) = self.inner.lock().get_content_position();
-    //     FrameCompositor::compose(
-    //         vec![(&self.framebuffer, content_x, content_y)]
-    //     )
-    // }
-
-    // /// draw a rectangle in a window
-    // pub fn draw_rectangle(&mut self, x:usize, y:usize, width:usize, height:usize, color:u32)
-    //     -> Result<(), &'static str> {
-    //     draw_rectangle(&mut self.framebuffer, x, y, width, height,
-    //             color);
-    //     let (content_x, content_y) = self.inner.lock().get_content_position();
-    //     FrameCompositor::compose(
-    //         vec![(&self.framebuffer, content_x, content_y)]
-    //     )
-    // }
-
-    // /// fill a rectangle in a window
-    // pub fn fill_rectangle(&mut self, x:usize, y:usize, width:usize, height:usize, color:u32)
-    //     -> Result<(), &'static str> {
-    //     fill_rectangle(&mut self.framebuffer, x, y, width, height,
-    //             color);
-    //     let (content_x, content_y) = self.inner.lock().get_content_position();
-    //     FrameCompositor::compose(
-    //         vec![(&self.framebuffer, content_x, content_y)]
-    //     )
-    // }
-
-    /// Display the content in the framebuffer of the window on the screen
+    /// Render the content of the window on the screen
     pub fn render(&mut self) -> Result<(), &'static str> {
         let (window_x, window_y) = { self.inner.lock().get_content_position() };
         FRAME_COMPOSITOR.lock().compose(vec![(
@@ -216,16 +160,9 @@ impl<Buffer: FrameBuffer> WindowGeneric<Buffer> {
         )])
     }
 
-    /// print a string in the window with a text displayable.
-    pub fn display_string(
-        &mut self,
-        display_name: &str,
-        slice: &str,
-    ) -> Result<(), &'static str> {
-        let component = self
-            .components
-            .get_mut(display_name)
-            .ok_or("")?;
+    /// Prints a string in the window with a text displayable.
+    pub fn display_string(&mut self, display_name: &str, slice: &str) -> Result<(), &'static str> {
+        let component = self.components.get_mut(display_name).ok_or("")?;
         let (x, y) = component.get_position();
         let displayable = component.get_displayable_mut();
 
@@ -242,16 +179,13 @@ impl<Buffer: FrameBuffer> WindowGeneric<Buffer> {
         Ok(())
     }
 
-    /// display a cursor in the window with a text displayable. position is the absolute position of the cursor
+    /// Displays a cursor in the window with a text displayable.
     pub fn display_end_cursor(
         &mut self,
         cursor: &mut Cursor,
         display_name: &str,
     ) -> Result<(), &'static str> {
-        let component = self
-            .components
-            .get_mut(display_name)
-            .ok_or("")?;
+        let component = self.components.get_mut(display_name).ok_or("")?;
         let (x, y) = component.get_position();
         let displayable = component.get_displayable_mut();
 
@@ -262,7 +196,7 @@ impl<Buffer: FrameBuffer> WindowGeneric<Buffer> {
         } else {
             return Err("The displayable is not a text displayable");
         }
-        
+
         Ok(())
     }
 
@@ -308,7 +242,7 @@ impl<Buffer: FrameBuffer> WindowGeneric<Buffer> {
         }
     }
 
-    /// Get a key event of the window
+    /// Gets a key event of the window.
     pub fn get_key_event(&self) -> Option<Event> {
         let event_opt = self.consumer.peek();
         if let Some(event) = event_opt {
@@ -432,7 +366,6 @@ impl Window for WindowInner {
     fn key_producer(&mut self) -> &mut DFQueueProducer<Event> {
         &mut self.key_producer
     }
-
 }
 
 // a component contains a displayable and its position
@@ -514,12 +447,12 @@ pub fn new_window<'a>(
     //     return Err("Request area is already allocated");
     // }
 
-    let inner_obj:Box<dyn Window> = Box::new(inner);
+    let inner_obj: Box<dyn Window> = Box::new(inner);
     let inner_ref = Arc::new(Mutex::new(inner_obj));
 
     // add the new window and active it
     // initialize the content of the new window
-    inner_ref.lock().clean()?; 
+    inner_ref.lock().clean()?;
     window_manager::WINDOWLIST.lock().add_active(&inner_ref)?;
 
     // return the window object
