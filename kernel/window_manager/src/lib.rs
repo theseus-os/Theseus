@@ -23,7 +23,7 @@ use alloc::sync::{Arc, Weak};
 use event_types::Event;
 use frame_buffer_rgb::FrameBufferRGB;
 use spin::{Mutex, Once};
-pub use window::Window;
+use window::Window;
 
 /// 10 pixel gap between windows
 pub const WINDOW_MARGIN: usize = 10;
