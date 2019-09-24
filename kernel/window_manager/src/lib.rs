@@ -28,7 +28,6 @@ extern crate frame_buffer_rgb;
 extern crate frame_buffer_compositor;
 extern crate frame_buffer_drawer;
 extern crate frame_buffer_printer;
-extern crate text_display;
 #[macro_use]
 extern crate lazy_static;
 extern crate displayable;
@@ -49,7 +48,6 @@ use frame_buffer_compositor::FRAME_COMPOSITOR;
 use frame_buffer_drawer::*;
 use frame_buffer_rgb::FrameBufferRGB;
 use spin::{Mutex, Once};
-use text_display::{Cursor, TextDisplay};
 pub use window::Window;
 use alloc::boxed::Box;
 
@@ -92,9 +90,9 @@ lazy_static! {
 /// It contains a list of allocated window and a reference to the active window
 pub struct WindowList {
     // The list of inactive windows. Their order is based on the last time they were active. The first window is the window which was active most recently.
-    background_list: VecDeque<Weak<Mutex<Box<Window>>>>,
+    background_list: VecDeque<Weak<Mutex<Box<dyn Window>>>>,
     // A weak pointer to the active window.
-    active: Weak<Mutex<Box<Window>>>,
+    active: Weak<Mutex<Box<dyn Window>>>,
 }
 
 /// Puts an input event into the active window (i.e. a keypress event, resize event, etc.)
@@ -112,7 +110,7 @@ pub fn send_event_to_active(event: Event) -> Result<(), &'static str> {
 
 impl WindowList {
     /// Add a new window to the list
-    pub fn add_active(&mut self, inner_ref: &Arc<Mutex<Box<Window>>>) -> Result<(), &'static str> {
+    pub fn add_active(&mut self, inner_ref: &Arc<Mutex<Box<dyn Window>>>) -> Result<(), &'static str> {
         // // inactive all other windows and active the new one
         // for item in self.list.iter_mut(){
         //     let ref_opt = item.upgrade();
@@ -133,7 +131,7 @@ impl WindowList {
     }
 
     // delete a window
-    pub fn delete(&mut self, inner: &Arc<Mutex<Box<Window>>>) -> Result<(), &'static str> {
+    pub fn delete(&mut self, inner: &Arc<Mutex<Box<dyn Window>>>) -> Result<(), &'static str> {
         // If the window is active, delete it and active the next top window
         if let Some(current_active) = self.active.upgrade() {
             if Arc::ptr_eq(&(current_active), inner) {
@@ -159,7 +157,7 @@ impl WindowList {
     }
 
     // get the index of an inactive window in the background window list
-    fn get_bgwindow_index(&self, inner: &Arc<Mutex<Box<Window>>>) -> Option<usize> {
+    fn get_bgwindow_index(&self, inner: &Arc<Mutex<Box<dyn Window>>>) -> Option<usize> {
         let mut i = 0;
         for item in self.background_list.iter() {
             if let Some(item_ptr) = item.upgrade() {
@@ -244,7 +242,7 @@ pub fn switch_to_next() -> Result<(), &'static str> {
 }
 
 /// Set the specified window in the background list as active.
-pub fn switch_to(window: &Arc<Mutex<Box<Window>>>) -> Result<(), &'static str> {
+pub fn switch_to(window: &Arc<Mutex<Box<dyn Window>>>) -> Result<(), &'static str> {
     if let Some(index) = WINDOWLIST.lock().get_bgwindow_index(window) {
         active_window(index, true)?;
     }
