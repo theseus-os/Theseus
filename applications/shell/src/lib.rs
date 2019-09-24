@@ -522,7 +522,7 @@ impl Shell {
                 if self.is_internal_command() { // shell executes internal commands
                     self.execute_internal()?;
                     self.clear_cmdline(false)?;
-                    self.terminal.lock().refresh_display(0);
+                    self.terminal.lock().refresh_display();
                 } else { // shell invokes user programs
                     let new_job_num = self.build_new_job()?;
                     self.fg_job_num = Some(new_job_num);
@@ -1196,7 +1196,7 @@ impl Shell {
 
                     // Sets this bool to true so that on the next iteration the TextDisplay will refresh AFTER the 
                     // task_handler() function has cleaned up, which does its own printing to the console
-                    self.terminal.lock().refresh_display(0);
+                    self.terminal.lock().refresh_display();
                 },
                 _ => { },
             }
@@ -1265,7 +1265,7 @@ impl Shell {
         let mut need_refresh = false;
         let mut need_prompt = false;
         self.redisplay_prompt();
-        self.terminal.lock().refresh_display(0);
+        self.terminal.lock().refresh_display();
         loop {
             self.terminal.lock().blink_cursor()?;
 
@@ -1287,7 +1287,7 @@ impl Shell {
                 need_prompt = false;
             }
             if need_refresh || need_refresh_on_task_event {
-                self.terminal.lock().refresh_display(0);
+                self.terminal.lock().refresh_display();
                 need_refresh = false;
             }
 
@@ -1304,7 +1304,7 @@ impl Shell {
                         }
 
                         Event::ResizeEvent(ref _rev) => {
-                            self.terminal.lock().refresh_display(self.left_shift); // application refreshes display after resize event is received
+                            self.terminal.lock().refresh_display(); // application refreshes display after resize event is received
                         }
 
                         // Handles ordinary keypresses
@@ -1335,7 +1335,7 @@ impl Shell {
                 }
             }
             if need_refresh {
-                self.terminal.lock().refresh_display(self.left_shift);
+                self.terminal.lock().refresh_display();
             } else {
                 scheduler::schedule(); // yield the CPU if nothing to do
             }

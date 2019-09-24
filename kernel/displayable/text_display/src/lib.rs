@@ -31,7 +31,6 @@ pub struct TextDisplay {
     height: usize,
     next_col: usize,
     next_line: usize,
-    cursor: Option<Cursor>,
     text: String,
 }
 
@@ -87,7 +86,6 @@ impl TextDisplay {
             height: height,
             next_col: 0,
             next_line: 0,
-            cursor: None,
             text: String::new(),
         })
     }
@@ -96,30 +94,28 @@ impl TextDisplay {
         self.text = String::from(text);
     }
 
-    pub fn cursor_init(&mut self) {
-        self.cursor = Some(Cursor::new());
-    }
-
     /// Gets the dimensions of the text area to display
     pub fn get_dimensions(&self) -> (usize, usize) {
         (self.width / CHARACTER_WIDTH, self.height / CHARACTER_HEIGHT)
     }
 
     /// display a cursor in the text displayable
-    pub fn display_cursor(&mut self, x: usize, y: usize, font_color: u32, bg_color: u32, framebuffer: &mut FrameBuffer) {
-        if let Some(cursor) = &mut self.cursor {
-            if cursor.blink() {
-                let color = if cursor.show { font_color } else { bg_color };
-                frame_buffer_drawer::fill_rectangle(
-                    framebuffer,
-                    x + self.next_col * CHARACTER_WIDTH,
-                    y + self.next_line * CHARACTER_HEIGHT,
-                    CHARACTER_WIDTH,
-                    CHARACTER_HEIGHT,
-                    color,
-                );
-            }
+    pub fn display_cursor(&mut self, cursor: &mut Cursor, x: usize, y: usize, col:usize, line: usize, font_color: u32, bg_color: u32, framebuffer: &mut FrameBuffer) {
+        if cursor.blink() {
+            let color = if cursor.show { font_color } else { bg_color };
+            frame_buffer_drawer::fill_rectangle(
+                framebuffer,
+                x + col * CHARACTER_WIDTH,
+                y + line * CHARACTER_HEIGHT,
+                CHARACTER_WIDTH,
+                CHARACTER_HEIGHT,
+                color,
+            );
         }
+    }
+
+    pub fn get_next_pos(&self) -> (usize, usize) {
+        (self.next_col, self.next_line)
     }
 }
 

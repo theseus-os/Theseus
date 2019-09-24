@@ -159,7 +159,7 @@ fn display_content(content: &String, map: &BTreeMap<usize, LineSlice>,
     locked_terminal.print_to_terminal(
         content[start_indices.start..end_indices.end].to_string()
     );
-    locked_terminal.refresh_display(0);
+    locked_terminal.refresh_display();
     Ok(())
 }
 
@@ -185,7 +185,7 @@ fn event_handler_loop(content: &String, map: &BTreeMap<usize, LineSlice>,
                     Keycode::Q => {
                         let mut locked_terminal = terminal.lock();
                         locked_terminal.clear();
-                        locked_terminal.refresh_display(0);
+                        locked_terminal.refresh_display();
                         return Ok(());
                     },
                     // Scroll down a line on "Down".

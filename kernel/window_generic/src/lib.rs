@@ -246,8 +246,9 @@ impl<Buffer: FrameBuffer> WindowGeneric<Buffer> {
     }
 
     /// display a cursor in the window with a text displayable. position is the absolute position of the cursor
-    pub fn display_cursor(
+    pub fn display_end_cursor(
         &mut self,
+        cursor: &mut Cursor,
         display_name: &str,
         font_color: u32,
         bg_color: u32,
@@ -259,7 +260,8 @@ impl<Buffer: FrameBuffer> WindowGeneric<Buffer> {
             .get_displayable_mut();
 
         if let Some(text_display) = displayable.downcast_mut::<TextDisplay>() {
-            text_display.display_cursor(0, 0, font_color, bg_color, &mut self.framebuffer);
+            let (col, line) = text_display.get_next_pos();
+            text_display.display_cursor(cursor, 0, 0, col, line, font_color, bg_color, &mut self.framebuffer);
             self.render()?;
         } else {
             return Err("The displayable is not a text displayable");
