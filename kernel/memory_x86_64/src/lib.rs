@@ -184,38 +184,19 @@ pub fn add_sections_vmem_areas(
     let mut rodata_flags: Option<EntryFlags> = None;
     let mut data_flags: Option<EntryFlags> = None;
 
-    let mut sections_memory_bounds: [SectionMemoryBounds; 32] =
-        Default::default();
+    let mut sections_memory_bounds: [SectionMemoryBounds; 32] = Default::default();
 
     // map the allocated kernel text sections
     for section in elf_sections_tag.sections() {
         // skip sections that don't need to be loaded into memory
         if section.size() == 0
             || !section.is_allocated()
-            || section.name().starts_with(".gcc")
-            || section.name().starts_with(".eh_frame")
             || section.name().starts_with(".debug")
         {
             continue;
         }
 
-        debug!(
-            "Looking at loaded section {} at {:#X}, size {:#X}",
-            section.name(),
-            section.start_address(),
-            section.size()
-        );
-
-        if PhysicalAddress::new_canonical(section.start_address() as usize).frame_offset() != 0 {
-            error!(
-                "Section {} at {:#X}, size {:#X} was not page-aligned!",
-                section.name(),
-                section.start_address(),
-                section.size()
-            );
-            return Err("Kernel ELF Section was not page-aligned");
-        }
-
+        debug!("Looking at loaded section {} at {:#X}, size {:#X}", section.name(), section.start_address(), section.size());
         let flags = EntryFlags::from_multiboot2_section_flags(&section) | EntryFlags::GLOBAL;
 
         // even though the linker stipulates that the kernel sections have a higher-half virtual address,
@@ -239,16 +220,27 @@ pub fn add_sections_vmem_areas(
         let end_virt_addr = start_virt_addr + (section.size() as usize);
         let end_phys_addr = start_phys_addr + (section.size() as usize);
 
-        // the linker script (linker_higher_half.ld) defines the following order of sections:
-        //     .init (start) then .text (end)
-        //     .data (start) then .bss (end)
-        //     .rodata (start and end)
-        // Those are the only sections we care about.
+        // Currently, we require that the linker script specify that each section should be page-aligned.
+        // This isn't truly necessary, but it simplifies the logic here quite a bit. 
+        if start_phys_addr.frame_offset() != 0 {
+            error!("Section {} at {:#X}, size {:#X} was not page-aligned!", section.name(), section.start_address(), section.size());
+            return Err("Kernel ELF Section was not page-aligned");
+        }
+
+        // The linker script (linker_higher_half.ld) defines the following order of sections:
+        // (1) .init (start of executable pages)
+        // (2) .text (end of executable pages)
+        // (3) .rodata (start of read-only pages)
+        // (4) .eh_frame
+        // (5) .gcc_except_table (end of read-only pages)
+        // (6) .data (start of read-write pages)
+        // (7) .bss (end of read-write pages)
+        // Those are the only sections we care about; we ignore subsequent `.debug_*` sections (and .got).
         let static_str_name = match section.name() {
             ".init" => {
                 text_start = Some((start_virt_addr, start_phys_addr));
                 "nano_core .init"
-            }
+            } 
             ".text" => {
                 text_end = Some((end_virt_addr, end_phys_addr));
                 text_flags = Some(flags);
@@ -256,9 +248,15 @@ pub fn add_sections_vmem_areas(
             }
             ".rodata" => {
                 rodata_start = Some((start_virt_addr, start_phys_addr));
-                rodata_end = Some((end_virt_addr, end_phys_addr));
-                rodata_flags = Some(flags);
                 "nano_core .rodata"
+            }
+            ".eh_frame" => {
+                "nano_core .eh_frame"
+            }
+            ".gcc_except_table" => {
+                rodata_end   = Some((end_virt_addr, end_phys_addr));
+                rodata_flags = Some(flags);
+                "nano_core .gcc_except_table"
             }
             ".data" => {
                 data_start = Some((start_virt_addr, start_phys_addr));
@@ -269,23 +267,14 @@ pub fn add_sections_vmem_areas(
                 data_end = Some((end_virt_addr, end_phys_addr));
                 "nano_core .bss"
             }
-            _ => {
+            _ =>  {
                 error!("Section {} at {:#X}, size {:#X} was not an expected section (.init, .text, .data, .bss, .rodata)", 
                         section.name(), section.start_address(), section.size());
                 return Err("Kernel ELF Section had an unexpected name (expected .init, .text, .data, .bss, .rodata)");
             }
         };
-        vmas[index] = VirtualMemoryArea::new(
-            start_virt_addr,
-            section.size() as usize,
-            flags,
-            static_str_name,
-        );
-        debug!(
-            "     mapping kernel section: {} at addr: {:?}",
-            section.name(),
-            vmas[index]
-        );
+        vmas[index] = VirtualMemoryArea::new(start_virt_addr, section.size() as usize, flags, static_str_name);
+        debug!("     mapping kernel section: {} at addr: {:?}", section.name(), vmas[index]);
 
         // These memories will be mapped to identical lower half addresses. 
         sections_memory_bounds[index] = SectionMemoryBounds {

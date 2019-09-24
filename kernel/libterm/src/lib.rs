@@ -10,7 +10,7 @@
 #[macro_use] extern crate log;
 extern crate dfqueue;
 extern crate window_manager;
-extern crate window_2d;
+extern crate window_generic;
 extern crate environment;
 extern crate print;
 extern crate event_types;
@@ -50,7 +50,7 @@ pub enum ScrollError {
 ///     - Producer is the window manager. Window manager is responsible for enqueuing keyevents into the active application
 pub struct Terminal {
     /// The terminal's own window
-    window: window_2d::WindowObj<FrameBufferRGB>,
+    window: window_generic::WindowGeneric<FrameBufferRGB>,
     // Name of the displayable object of the terminal
     display_name: String,
     /// The terminal's scrollback buffer which stores a string to be displayed by the text display
@@ -409,16 +409,16 @@ impl Terminal {
 
     /// Updates the cursor to a new position and refreshes display
     fn cursor_handler(&mut self, left_shift: usize) -> Result<(), &'static str> { 
-        let buffer_width = self.get_displayable_dimensions(&self.display_name).0;
-        let mut new_x = self.absolute_cursor_pos % buffer_width;
-        let mut new_y = self.absolute_cursor_pos / buffer_width;
-        // adjusts to the correct position relative to the max rightmost absolute cursor position
-        if new_x >= left_shift  {
-            new_x -= left_shift;
-        } else {
-            new_x = buffer_width + new_x - left_shift;
-            new_y -= 1;
+        let (buffer_width, buffer_height) = self.get_displayable_dimensions(&self.display_name);
+
+        // We have shifted the cursor out of the screen.
+        if left_shift / buffer_width > buffer_height {
+            self.disable_cursor();
+            return Ok(());
         }
+
+        let new_x = (self.absolute_cursor_pos - left_shift) % buffer_width;
+        let new_y = (self.absolute_cursor_pos - left_shift) / buffer_width;
 
         if let Some(text_display) = self.window.get_displayable(&self.display_name){
             // TODO: WENQIU disable cursor
@@ -434,7 +434,7 @@ impl Terminal {
 impl Terminal {
     pub fn new() -> Result<Terminal, &'static str> {
         // Requests a new window object from the window manager
-        let window_object = match window_2d::new_default_window() {
+        let window_object = match window_generic::new_default_window() {
             Ok(window_object) => window_object,
             Err(err) => {debug!("new window returned err"); return Err(err)}
         };
@@ -518,16 +518,15 @@ impl Terminal {
     }
     
     /// Scroll the screen to the very beginning.
-    pub fn move_screen_to_begin(&mut self) {
+    pub fn move_screen_to_begin(&mut self) -> Result<(), &'static str> {
         // Home command only registers if the text display has the ability to scroll
         if self.scroll_start_idx != 0 {
             self.is_scroll_end = false;
             self.scroll_start_idx = 0; // takes us up to the start of the page
-            if let Some(text_display) = self.window.get_displayable(&self.display_name){
-                // TODO: WENQIU disable cursor
-                //text_display.disable_cursor();
-            }
+            self.window.display_cursor(&self.display_name, FONT_COLOR, BACKGROUND_COLOR)?;
         }
+        
+        Ok(())
     }
 
     /// Scroll the screen to the very end.
@@ -540,14 +539,13 @@ impl Terminal {
     }
 
     /// Scroll the screen a line up.
-    pub fn move_screen_line_up(&mut self) {
+    pub fn move_screen_line_up(&mut self) -> Result<(), &'static str> {
         if self.scroll_start_idx != 0 {
             self.scroll_up_one_line();
-            if let Some(text_display) = self.window.get_displayable(&self.display_name){
-                // TODO: WENQIU disable cursor
-                //text_display.disable_cursor();
-            }
+            self.window.display_cursor(&self.display_name, FONT_COLOR, BACKGROUND_COLOR)?;
         }
+
+        Ok(())
     }
 
     /// Scroll the screen a line down.
@@ -558,16 +556,13 @@ impl Terminal {
     }
 
     /// Scroll the screen a page up.
-    pub fn move_screen_page_up(&mut self) {
+    pub fn move_screen_page_up(&mut self) -> Result<(), &'static str> {
         if self.scroll_start_idx <= 1 {
-            return;
+            return Ok(());
         }
         self.page_up();
         self.is_scroll_end = false;
-        if let Some(text_display) = self.window.get_displayable(&self.display_name){
-            // TODO: WENQIU disable cursor
-            //text_display.disable_cursor();
-        }
+        self.window.display_cursor(&self.display_name, FONT_COLOR, BACKGROUND_COLOR)
     }
 
     /// Scroll the screen a page down.

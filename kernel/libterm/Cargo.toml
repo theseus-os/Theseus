@@ -19,8 +19,8 @@ version = "0.1.0"
 [dependencies.window_manager]
 path = "../window_manager"
 
-[dependencies.window_2d]
-path = "../window_2d"
+[dependencies.window_generic]
+path = "../window_generic"
 
 [dependencies.frame_buffer_rgb]
 path = "../frame_buffer_rgb"

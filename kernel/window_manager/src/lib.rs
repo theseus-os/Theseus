@@ -7,7 +7,7 @@
 //! - new_window() provides a new window whose dimensions the caller must specify
 //!
 //! Windows can be resized by calling resize().
-//! Window can be deleted when it is dropped or by calling WindowObj.delete().
+//! Window can be deleted when it is dropped or by calling WindowGeneric.delete().
 //! Once an active window is deleted or set as inactive, the next window in the background list will become active.
 //! The orde of windows is based on the last time it was active. The one which was active most recently is the top of the background list
 //!

@@ -58,3 +58,10 @@ RUSTFLAGS += -Z share-generics=no
 ## besides the current crate or the crate that defines the function.
 ## As far as I can tell, this does not have a significant impact on object code size or performance.
 RUSTFLAGS += -Z share-generics=no
+
+## This forces frame pointers to be generated, i.e., the stack base pointer (RBP register on x86_64)
+## will be used to store the starting address of the current stack frame.
+## This is used for stack unwinding purposes, in order to trace back up the call stack.
+## If/when we support using DWARF .debug_* sections to obtain the size of the current stack frame,
+## we can remove/disable this, since we won't need to use RBP anymore. 
+RUSTFLAGS += -C force-frame-pointers=yes

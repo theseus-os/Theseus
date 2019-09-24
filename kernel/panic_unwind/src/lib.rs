@@ -15,6 +15,7 @@ extern crate alloc;
 extern crate memory;
 extern crate panic_wrapper;
 extern crate mod_mgmt;
+extern crate gimli;
 
 
 use core::panic::PanicInfo;
@@ -24,12 +25,14 @@ use core::panic::PanicInfo;
 #[lang = "eh_personality"]
 #[no_mangle]
 #[doc(hidden)]
-pub extern "C" fn eh_personality() {}
+pub extern "C" fn eh_personality() {
+    error!("EH_PERSONALITY IS UNHANDLED!");
+}
 
 
 /// The singular entry point for a language-level panic.
 #[cfg(not(test))]
-#[panic_handler]
+#[panic_handler] // same as:  #[lang = "panic_impl"]
 #[doc(hidden)]
 fn panic_entry_point(info: &PanicInfo) -> ! {
 
@@ -45,22 +48,26 @@ fn panic_entry_point(info: &PanicInfo) -> ! {
         }
         #[cfg(loadable)]
         {
-            type PanicWrapperFunc = fn(&PanicInfo) -> Result<(), &'static str>;
-            let section_ref = mod_mgmt::get_default_namespace()
-                .and_then(|namespace| namespace.get_symbol_starting_with("panic_wrapper::panic_wrapper::").upgrade())
-                .ok_or("Couldn't get single symbol matching \"panic_wrapper::panic_wrapper\"");
-
-            // call the panic_wrapper function, otherwise return an Err into "res"
-            let mut space = 0;
-            section_ref.and_then(|section_ref| {
+            // An internal function for calling the panic_wrapper, but returning errors along the way.
+            // We must make sure to not hold any locks when invoking the panic_wrapper function.
+            fn invoke_panic_wrapper(info: &PanicInfo) -> Result<(), &'static str> {
+                type PanicWrapperFunc = fn(&PanicInfo) -> Result<(), &'static str>;
+                let section_ref = mod_mgmt::get_default_namespace()
+                    .and_then(|namespace| namespace.get_symbol_starting_with("panic_wrapper::panic_wrapper::").upgrade())
+                    .ok_or("Couldn't get single symbol matching \"panic_wrapper::panic_wrapper\"")?;
                 let (mapped_pages, mapped_pages_offset) = { 
                     let section = section_ref.lock();
                     (section.mapped_pages.clone(), section.mapped_pages_offset)
                 };
-                let mapped_pages_locked = mapped_pages.lock();
-                mapped_pages_locked.as_func::<PanicWrapperFunc>(mapped_pages_offset, &mut space)
-                    .and_then(|func| func(info)) // actually call the function
-            })
+                let mut space = 0;
+                let func: &PanicWrapperFunc = {
+                    mapped_pages.lock().as_func(mapped_pages_offset, &mut space)?
+                };
+                func(info)
+            }
+
+            // call the above internal function
+            invoke_panic_wrapper(info)
         }
     }
     else {
@@ -83,18 +90,18 @@ fn panic_entry_point(info: &PanicInfo) -> ! {
 
 
 
-// /// This function isn't used since our Theseus target.json file
-// /// chooses panic=abort (as does our build process), 
-// /// but building on Windows (for an IDE) with the pc-windows-gnu toolchain requires it.
-// #[allow(non_snake_case)]
-// #[lang = "eh_unwind_resume"]
-// #[no_mangle]
+/// This function isn't used since our Theseus target.json file
+/// chooses panic=abort (as does our build process), 
+/// but building on Windows (for an IDE) with the pc-windows-gnu toolchain requires it.
+#[allow(non_snake_case)]
+#[lang = "eh_unwind_resume"]
+#[no_mangle]
 // #[cfg(all(target_os = "windows", target_env = "gnu"))]
-// #[doc(hidden)]
-// pub extern "C" fn rust_eh_unwind_resume(_arg: *const i8) -> ! {
-//     error!("\n\nin rust_eh_unwind_resume, unimplemented!");
-//     loop {}
-// }
+#[doc(hidden)]
+pub extern "C" fn rust_eh_unwind_resume(_arg: *const i8) -> ! {
+    error!("\n\nin rust_eh_unwind_resume, unimplemented!");
+    loop {}
+}
 
 
 #[allow(non_snake_case)]

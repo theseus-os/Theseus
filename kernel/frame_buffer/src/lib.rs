@@ -26,10 +26,10 @@ pub static FINAL_FRAME_BUFFER: Once<Mutex<Box<FrameBuffer>>> = Once::new();
 // Every pixel is of u32 type
 const PIXEL_BYTES: usize = 4;
 
-pub trait FrameBuffer: Send + Downcast {
+pub trait FrameBuffer: Send {
     /// return a mutable reference to the buffer
     //fn buffer_mut(&mut self) -> &mut BoxRefMut<MappedPages, [Pixel]>;
-
+    
     /// return a reference to the buffer
     fn buffer(&self) -> &BoxRefMut<MappedPages, [Pixel]>;
 
@@ -55,7 +55,6 @@ pub trait FrameBuffer: Send + Downcast {
     fn draw_pixel(&mut self, x: usize, y: usize, color: Pixel);
 
 }
-impl_downcast!(FrameBuffer);
 
 
 /// Get the size of the final framebuffer. Return (width, height)

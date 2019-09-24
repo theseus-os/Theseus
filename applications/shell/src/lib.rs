@@ -548,16 +548,14 @@ impl Shell {
 
         // home, end, page up, page down, up arrow, down arrow for the input_event_manager
         if keyevent.keycode == Keycode::Home && keyevent.modifiers.control {
-            self.terminal.lock().move_screen_to_begin();
-            return Ok(());
+            return self.terminal.lock().move_screen_to_begin();
         }
         if keyevent.keycode == Keycode::End && keyevent.modifiers.control{
             self.terminal.lock().move_screen_to_end();
             return Ok(());
         }
         if keyevent.modifiers.control && keyevent.modifiers.shift && keyevent.keycode == Keycode::Up  {
-            self.terminal.lock().move_screen_line_up();
-            return Ok(());
+            return self.terminal.lock().move_screen_line_up();
         }
         if keyevent.modifiers.control && keyevent.modifiers.shift && keyevent.keycode == Keycode::Down  {
             self.terminal.lock().move_screen_line_down();
@@ -565,8 +563,7 @@ impl Shell {
         }
 
         if keyevent.keycode == Keycode::PageUp && keyevent.modifiers.shift {
-            self.terminal.lock().move_screen_page_up();
-            return Ok(());
+            return self.terminal.lock().move_screen_page_up();
         }
 
         if keyevent.keycode == Keycode::PageDown && keyevent.modifiers.shift {
@@ -991,7 +988,7 @@ impl Shell {
     fn complete_cmdline(&mut self) -> Result<(), &'static str> {
 
         // Get the last string slice in the pipe chain.
-        let cmdline = self.cmdline.clone();
+        let cmdline = self.cmdline[0..self.cmdline.len()-self.left_shift].to_string();
         let last_cmd_in_pipe = match cmdline.split("|").last() {
             Some(cmd) => cmd,
             None => return Ok(())

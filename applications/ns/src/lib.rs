@@ -92,8 +92,9 @@ fn print_files(output: &mut String, indent: usize, namespace: &CrateNamespace, r
 fn print_crates(output: &mut String, indent: usize, namespace: &CrateNamespace, recursive: bool) -> core::fmt::Result {
     writeln!(output, "\n{:indent$}{} CrateNamespace has loaded crates:", "", namespace.name, indent = indent)?;
     // We do recursion manually here so we can separately print each recursive namespace.
-    namespace.crate_iter(false, |crate_name, crate_ref| {
+    namespace.for_each_crate(false, |crate_name, crate_ref| {
         let _ = writeln!(output, "{:indent$}{}    {}", "", crate_name, crate_ref.lock_as_ref().object_file_abs_path, indent = (indent + 4));
+        true
     });
 
     if recursive {
