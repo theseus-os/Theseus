@@ -14,7 +14,7 @@ use frame_buffer::FrameBuffer;
 
 /// The displayable trait.
 pub trait Displayable: Downcast + Send {
-    /// Display in a framebuffer
+    /// Display in a framebuffer.
     /// # Arguments
     /// * `(x, y)`: the position to display in the framebuffer.
     /// * `framebuffer`: the framebuffer to display in.

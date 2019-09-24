@@ -1,6 +1,7 @@
 //! This crate defines text displayable.
 //! A text displayable profiles a block of text to be displayed in a framebuffer.
-//! This crate also defines a Cursor structure. A cursor can be displayed within a text displayable. The structure specifies the size and blink frequency and implement the blink method for a cursor.
+//!
+//! This crate also defines a cursor structure. A cursor is a special symbol which can be displayed within a text displayable. The structure specifies the size and blink frequency and implement the blink method for a cursor.
 
 #![no_std]
 
@@ -21,7 +22,7 @@ use tsc::{tsc_ticks, TscTicks};
 
 const DEFAULT_CURSOR_FREQ: u64 = 400000000;
 
-/// A text displayable displayable profiles the size of color of a block of text. It can display in a framebuffer.
+/// A text displayable displayable profiles the size and color of a block of text. It can display in a framebuffer.
 pub struct TextDisplay {
     width: usize,
     height: usize,
@@ -135,9 +136,9 @@ impl TextDisplay {
     }
 }
 
-/// A cursor struct. It contains whether it is enabled,
+/// A cursor structure. It contains whether it is enabled,
 /// the frequency it blinks, the last time it blinks, the current blink state show/hidden, and its color.
-/// A cursor is a special symbol which can be displayed with a text displayable.
+/// A cursor is a special symbol which can be displayed within a text displayable.
 pub struct Cursor {
     enabled: bool,
     freq: u64,
@@ -175,7 +176,7 @@ impl Cursor {
         self.enabled = false;
     }
 
-    /// Change the blink state show/hidden of a cursor based on its frequency. /// An application calls this function in a loop.
+    /// Change the blink state show/hidden of a cursor based on its frequency. An application calls this function in a loop.
     pub fn blink(&mut self) -> bool {
         if self.enabled {
             let time = tsc_ticks();

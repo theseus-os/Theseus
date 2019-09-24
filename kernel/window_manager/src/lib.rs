@@ -1,9 +1,9 @@
 //! Window manager that simulates a desktop environment.
+//!
 //! The manager matains a list of background windows and an active window.
 //! Once an active window is deleted or set as inactive, the next window in the background list will become active.
-//! The order of windows is based on the last time it was active. The one which was active most recently is the top of the background list.
 //!
-//! The WINDOW_ALLOCATOR is used by the `WindowManager` itself to track and modify existing windows
+//! The order of windows is based on the last time it was active. The one which was active most recently is the top of the background list.
 
 #![no_std]
 
@@ -25,24 +25,24 @@ use frame_buffer_rgb::FrameBufferRGB;
 use spin::{Mutex, Once};
 pub use window::Window;
 
-// 10 pixel gap between windows
+/// 10 pixel gap between windows
 pub const WINDOW_MARGIN: usize = 10;
-// 2 pixel padding within a window
+/// 2 pixel padding within a window
 pub const WINDOW_PADDING: usize = 2;
-// The border color of an active window
+/// The border color of an active window
 pub const WINDOW_ACTIVE_COLOR: u32 = 0xFFFFFF;
-// The border color of an inactive window
+/// The border color of an inactive window
 pub const WINDOW_INACTIVE_COLOR: u32 = 0x343C37;
-// The background color of the screen
+/// The background color of the screen
 pub const SCREEN_BACKGROUND_COLOR: u32 = 0x000000;
 
-// A framebuffer owned by the window manager.
-// This framebuffer is responsible for display borders and gaps between windows. Windows owned by applications cannot get access to their borders.
-// All the display behaviors of borders are controled by the window manager.
+/// A framebuffer owned by the window manager.
+/// This framebuffer is responsible for display borders and gaps between windows. Windows owned by applications cannot get access to their borders.
+/// All the display behaviors of borders are controled by the window manager.
 pub static SCREEN_FRAME_BUFFER: Once<Arc<Mutex<FrameBufferRGB>>> = Once::new();
 
 /// Initialize the window manager. 
-/// Currently the framebuffer is of type `FrameBufferRGB`. In the future we would be able to have window manager of different FrameBuffers.
+/// Currently the framebuffer is of type `FrameBufferRGB`. In the future we would be able to have window manager of different `FrameBuffer`s.
 pub fn init() -> Result<(), &'static str> {
     let (screen_width, screen_height) = frame_buffer::get_screen_size()?;
     let framebuffer = FrameBufferRGB::new(screen_width, screen_height, None)?;
@@ -60,8 +60,8 @@ lazy_static! {
     );
 }
 
-/// The window list.
-/// It contains a list of allocated window and a reference to the active window
+/// The window list structure.
+/// It contains a list of allocated window and a reference to the active window.
 pub struct WindowList {
     // The list of inactive windows. Their order is based on the last time they were active. The first window is the window which was active most recently.
     background_list: VecDeque<Weak<Mutex<Box<dyn Window>>>>,
@@ -82,7 +82,7 @@ pub fn send_event_to_active(event: Event) -> Result<(), &'static str> {
 }
 
 impl WindowList {
-    /// Adds and actives a new window to the list.
+    /// Adds a new window to the list and actives it.
     pub fn add_active(
         &mut self,
         inner_ref: &Arc<Mutex<Box<dyn Window>>>,
@@ -106,7 +106,7 @@ impl WindowList {
         Ok(())
     }
 
-    // Deletes a window.
+    /// Deletes a window from the list.
     pub fn delete(&mut self, inner: &Arc<Mutex<Box<dyn Window>>>) -> Result<(), &'static str> {
         // If the window is active, delete it and active the next top window
         if let Some(current_active) = self.active.upgrade() {

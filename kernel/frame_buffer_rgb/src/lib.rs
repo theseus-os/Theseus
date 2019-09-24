@@ -1,5 +1,5 @@
-//! This crate defines a FrameBufferRGB structure.
-//! The structure implements the FrameBuffer trait. Every pixel in it as a 2D RGB pixel.
+//! This crate defines a `FrameBufferRGB` structure.
+//! The structure implements the `FrameBuffer` trait. Every pixel in it is a RGB pixel without alpha channel.
 
 #![no_std]
 
@@ -23,7 +23,6 @@ const PIXEL_BYTES: usize = 4;
 
 /// Initialize the final frame buffer.
 /// Allocate a block of memory and map it to the physical framebuffer frames.
-/// Initialize the frame buffer. Allocate a block of memory and map it to the frame buffer frames.
 pub fn init() -> Result<(), &'static str> {
     // get the graphic mode information
     let vesa_display_phys_start: PhysicalAddress;
@@ -46,7 +45,7 @@ pub fn init() -> Result<(), &'static str> {
     Ok(())
 }
 
-/// The RGB frame buffer structurn. It implements the FrameBuffer trait.
+/// The RGB frame buffer structure. It implements the `FrameBuffer` trait.
 #[derive(Hash)]
 pub struct FrameBufferRGB {
     width: usize,
@@ -55,9 +54,9 @@ pub struct FrameBufferRGB {
 }
 
 impl FrameBufferRGB {
-    /// Create a new frame buffer with specified size.
-    /// If the physical_address is specified, the new virtual frame buffer will be mapped to hardware's physical memory at that address.
-    /// If the physical_address is none, the new function will allocate a block of physical memory at a random address and map the new frame buffer to that memory.
+    /// Creates a new RGB frame buffer with specified size.
+    /// If the `physical_address` is specified, the new virtual frame buffer will be mapped to hardware's physical memory at that address.
+    /// If the `physical_address` is none, the new function will allocate a block of physical memory at a random address and map the new frame buffer to that memory.
     pub fn new(
         width: usize,
         height: usize,
@@ -103,7 +102,7 @@ impl FrameBufferRGB {
         })
     }
 
-    /// return a mutable reference to the buffer
+    /// Returns a mutable reference to the buffer.
     pub fn buffer_mut(&mut self) -> &mut BoxRefMut<MappedPages, [Pixel]> {
         return &mut self.buffer;
     }

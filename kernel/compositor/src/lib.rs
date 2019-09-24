@@ -12,7 +12,7 @@ use frame_buffer::FrameBuffer;
 /// The compositor trait.
 /// A compositor composes a list of buffers to a single buffer.
 pub trait Compositor {
-    /// Compose the buffers in the bufferlist
+    /// Compose the buffers in the bufferlist.
     ///
     /// # Arguments
     ///

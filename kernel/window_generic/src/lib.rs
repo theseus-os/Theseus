@@ -1,5 +1,7 @@
 //! This crate defines a `WindowGeneric` structure. This structure contains a `WindowInner` structure which implements the `Window` trait.
-//! The `new_window` function creates a new WindowGeneric objects and add its inner object to the window manager. The outer `WindowGeneric` object will be returned to the application who creates the window.
+//!
+//! The `new_window` function creates a new `WindowGeneric` object and adds its inner object to the window manager. The outer `WindowGeneric` object will be returned to the application who creates the window.
+//!
 //! When a window is dropped, its inner object will be deleted from the window manager.
 
 #![no_std]
@@ -44,11 +46,15 @@ use window_manager::{
 };
 
 /// A window contains a reference to its inner reference owned by the window manager,
-/// a consumer of inputs, a list of displayables and a framebuffer
+/// a consumer of inputs, a list of displayables and a framebuffer.
 pub struct WindowGeneric<Buffer: FrameBuffer> {
+    /// The inner object of the window.
     pub inner: Arc<Mutex<Box<dyn Window>>>,
+    /// The key input consumer.
     pub consumer: DFQueueConsumer<Event>,
+    /// The components in the window.
     pub components: BTreeMap<String, Component>,
+    /// The framebuffer owned by the window.
     pub framebuffer: Buffer,
 }
 
@@ -75,7 +81,7 @@ impl<Buffer: FrameBuffer> WindowGeneric<Buffer> {
     }
 
     /// Adds a new displayable to the window.
-    /// We check if the displayable is in the window. But we do not check if it is overlapped with others.
+    /// We check if the displayable is in the window, but do not check if it is overlapped with others.
     pub fn add_displayable(
         &mut self,
         key: &str,
@@ -105,12 +111,12 @@ impl<Buffer: FrameBuffer> WindowGeneric<Buffer> {
         Ok(())
     }
 
-    /// Removes a displayable according to its name.
+    /// Removes a displayable by its name.
     pub fn remove_displayable(&mut self, name: &str) {
         self.components.remove(name);
     }
 
-    /// Gets a mutable displayable of the name.
+    /// Gets a mutable displayable by its name.
     pub fn get_displayable_mut(&mut self, name: &str) -> Option<&mut Box<dyn Displayable>> {
         let opt = self.components.get_mut(name);
         match opt {
@@ -121,7 +127,7 @@ impl<Buffer: FrameBuffer> WindowGeneric<Buffer> {
         };
     }
 
-    /// Gets a displayable of the name.
+    /// Gets a displayable by its name.
     pub fn get_displayable(&self, name: &str) -> Option<&Box<dyn Displayable>> {
         let opt = self.components.get(name);
         match opt {
@@ -132,7 +138,7 @@ impl<Buffer: FrameBuffer> WindowGeneric<Buffer> {
         };
     }
 
-    /// Gets the position of a displayable in the window
+    /// Gets the position of a displayable in the window.
     pub fn get_displayable_position(&self, key: &str) -> Result<(usize, usize), &'static str> {
         let opt = self.components.get(key);
         match opt {
@@ -150,7 +156,7 @@ impl<Buffer: FrameBuffer> WindowGeneric<Buffer> {
         self.inner.lock().get_content_position()
     }
 
-    /// Render the content of the window on the screen
+    /// Render the content of the window to the screen.
     pub fn render(&mut self) -> Result<(), &'static str> {
         let (window_x, window_y) = { self.inner.lock().get_content_position() };
         FRAME_COMPOSITOR.lock().compose(vec![(
@@ -160,7 +166,7 @@ impl<Buffer: FrameBuffer> WindowGeneric<Buffer> {
         )])
     }
 
-    /// Prints a string in the window with a text displayable.
+    /// Prints a string in the window with a text displayable by its name.
     pub fn display_string(&mut self, display_name: &str, slice: &str) -> Result<(), &'static str> {
         let component = self.components.get_mut(display_name).ok_or("")?;
         let (x, y) = component.get_position();
@@ -179,7 +185,7 @@ impl<Buffer: FrameBuffer> WindowGeneric<Buffer> {
         Ok(())
     }
 
-    /// Displays a cursor in the window with a text displayable.
+    /// Displays a cursor in the window with a text displayable by its name.
     pub fn display_end_cursor(
         &mut self,
         cursor: &mut Cursor,
@@ -201,7 +207,7 @@ impl<Buffer: FrameBuffer> WindowGeneric<Buffer> {
     }
 
     // @Andrew
-    /// resize a window as (width, height) at (x, y)
+    /// Resize a window as (width, height) at (x, y).
     pub fn resize(
         &mut self,
         x: usize,

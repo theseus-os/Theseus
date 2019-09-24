@@ -1,5 +1,5 @@
 //! This crate defines a `Window` trait.
-//! A structure which implements the trait can be managed by a window manager.
+//! The window manager maintains a list of `Window` object.
 
 #![no_std]
 
@@ -9,7 +9,7 @@ extern crate dfqueue;
 use event_types::Event;
 use dfqueue::{DFQueueProducer};
 
-/// The window trait
+/// The window trait.
 pub trait Window: Send {
     /// Cleans the window on the screen including the border and padding.
     fn clean(&self) -> Result<(), &'static str>;
@@ -17,7 +17,7 @@ pub trait Window: Send {
     /// Checks if the pixel (x, y) is within the window exluding the border and padding.
     fn check_in_content(&self, x: usize, y: usize) -> bool;
 
-    /// Active or inactive a window.
+    /// Actives or inactives a window.
     fn active(&mut self, active: bool) -> Result<(), &'static str>;
 
     /// Draws the border of the window.

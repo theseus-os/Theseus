@@ -1,6 +1,5 @@
-//! This crate defines FrameBuffer trait.
-//! A Framebuffer contains fundamental display interfaces.
-//! It maintains the final framebuffer.
+//! This crate defines the `FrameBuffer` trait and maintains the final framebuffer.
+//! A `Framebuffer` contains fundamental display interfaces.
 
 #![no_std]
 
@@ -30,20 +29,20 @@ pub trait FrameBuffer: Send {
     /// Returns (width, height).
     fn get_size(&self) -> (usize, usize);
 
-    /// Display a buffer of pixels in the framebuffer from index `dest_start`.
+    /// Displays a buffer of pixels in the framebuffer from index `dest_start`.
     fn buffer_copy(&mut self, src: &[Pixel], dest_start: usize);
 
-    /// Compute the index of pixel (x, y) in the buffer array.
+    /// Computes the index of pixel (x, y) in the buffer array.
     fn index(&self, x: usize, y: usize) -> usize;
 
-    /// Check if a pixel (x, y) is within the framebuffer.
+    /// Checks if a pixel (x, y) is within the framebuffer.
     fn check_in_buffer(&self, x: usize, y: usize) -> bool;
 
-    /// Gets the indentical hash of framebuffer.
+    /// Gets the indentical hash of the framebuffer.
     /// The frame buffer compositor uses this hash to cache framebuffers.
     fn get_hash(&self) -> u64;
 
-    /// Draw a pixel in the framebuffer.
+    /// Draws a pixel in the framebuffer.
     fn draw_pixel(&mut self, x: usize, y: usize, color: Pixel);
 }
 

@@ -12,6 +12,7 @@ use font::{CHARACTER_HEIGHT, CHARACTER_WIDTH, FONT_PIXEL};
 use frame_buffer::FrameBuffer;
 
 /// Print a string in a framebuffer.
+/// Returns (column, line) of the end, i.e. the position of the next symbol.
 /// # Arguments
 /// * `framebuffer`: the framebuffer to display in.
 /// * `(x, y)`: the left top point of the text block.
@@ -20,7 +21,6 @@ use frame_buffer::FrameBuffer;
 /// * `slice`: the string to display.
 /// * `font_color`: the color of the text.
 /// * `bg_color`: the background color of the text block.
-/// Returns (column, line) of the end, i.e. the position of the next symbol.
 pub fn print_by_bytes(
     framebuffer: &mut dyn FrameBuffer,
     x: usize,

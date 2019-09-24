@@ -32,11 +32,11 @@
 //! * `e1000`: Support for the e1000 NIC and driver.
 //! * `exceptions_early`: Early exception handlers that do nothing but print an error and hang.
 //! * `exceptions_full`: Exception handlers that are more fully-featured, i.e., kills tasks on an exception.
-//! * `font`: Define font for an array of ASCII code.
-//! * `frame_buffer`: Define a framebuffer trait.
-//! * `frame_buffer_compositor`: Composite a list of framebuffers to a final framebuffer which is mapped to the physical framebuffer.
+//! * `font`: Defines font for an array of ASCII code.
+//! * `frame_buffer`: Defines a framebuffer trait.
+//! * `frame_buffer_compositor`: Composites a list of framebuffers to a final framebuffer which is mapped to the physical framebuffer.
 //! * `frame_drawer`: Basic draw functions.
-//! * `frame_printer`: Print a string in a frame buffer.
+//! * `frame_printer`: Prints a string in a frame buffer.
 //! * `frame_buffer_rgb`: The RGB FrameBuffer. It display pixels without the alpha channel.
 //! * `fs_node`: defines the traits for File and Directory. These files and directories mimic that of a standard unix virtual filesystem
 //! * `gdt`: GDT (Global Descriptor Table) support (x86 only) for Theseus.
@@ -66,4 +66,4 @@
 //! * `vga_buffer`: Simple routines for printing to the screen using the x86 VGA buffer text mode.
 //! * `window`: Defines a trait for window.
 //! * `window_generic`: Defines a generic window structure which implements the Window trait.
-//! * `window_manager`: Maintains a list of existing window.
+//! * `window_manager`: Maintains a list of existing windows.

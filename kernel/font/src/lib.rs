@@ -1037,12 +1037,12 @@ const FONT_BASIC: [[u8; CHARACTER_HEIGHT]; 256] = [
     ],
 ];
 
-///The font mask array.
-///FONT_PIXEL[ascii][y][x] = 0xFFFFFFFF/0x00000000 in which ascii is the ascii code of a character, and (x, y) represents its coordinate
+/// The font mask array.
+/// FONT_PIXEL[ascii][y][x] = 0xFFFFFFFF/0x00000000 in which `ascii` is the ASCII code of a character, and (x, y) represents its coordinate.
 pub static FONT_PIXEL: Mutex<[[[u32; CHARACTER_WIDTH]; CHARACTER_HEIGHT]; 256]> =
     Mutex::new([[[0; CHARACTER_WIDTH]; CHARACTER_HEIGHT]; 256]);
 
-///initialize the font bitmaps array
+/// Initialize the font bitmaps array.
 pub fn init() -> Result<(), &'static str> {
     let mut fonts_locked = FONT_PIXEL.lock();
     let fonts = fonts_locked.deref_mut();

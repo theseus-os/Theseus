@@ -8,7 +8,7 @@ extern crate frame_buffer;
 use frame_buffer::FrameBuffer;
 
 /// Draw a point in a framebuffer.
-/// The point is drawed at position (x, y) of the framebuffer with color.
+/// The point is drawn at position (x, y) of the framebuffer with color.
 pub fn draw_point(framebuffer: &mut dyn FrameBuffer, x: usize, y: usize, color: u32) {
     if framebuffer.check_in_buffer(x, y) {
         framebuffer.draw_pixel(x, y, color);
