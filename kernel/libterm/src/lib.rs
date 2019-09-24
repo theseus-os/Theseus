@@ -585,8 +585,13 @@ impl Terminal {
 
 impl Drop for Terminal {
     fn drop(&mut self) {
-        window_manager::delete(&self.window).unwrap_or_else(|e| {
-            error!("failed to delete window on terminal dropping, {}", e);
-        });
+        let mut window_list = window_manager::WINDOWLIST.lock();
+
+        // Switches to a new active window and sets
+        // the active pointer field of the window allocator to the new active window
+        match window_list.delete(&self.window.inner) {
+            Ok(_) => {}
+            Err(err) => error!("Fail to schedule to the next window: {}", err),
+        };
     }
 }
