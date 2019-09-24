@@ -11,12 +11,10 @@ extern crate frame_buffer_drawer;
 extern crate frame_buffer_printer;
 extern crate tsc;
 extern crate alloc;
-#[macro_use]extern crate log;
 
 extern crate displayable;
 
 use displayable::Displayable;
-use alloc::boxed::Box;
 use alloc::string::String;
 use font::{CHARACTER_HEIGHT, CHARACTER_WIDTH};
 use frame_buffer::{FrameBuffer};
@@ -48,7 +46,7 @@ impl Displayable for TextDisplay {
         y: usize,
         fg_color: u32,
         bg_color: u32,
-        framebuffer: &mut FrameBuffer,
+        framebuffer: &mut dyn FrameBuffer,
     ) -> Result<(), &'static str> {
         let (col, line) = frame_buffer_printer::print_by_bytes(
             framebuffer,
@@ -100,7 +98,7 @@ impl TextDisplay {
     }
 
     /// display a cursor in the text displayable
-    pub fn display_cursor(&mut self, cursor: &mut Cursor, x: usize, y: usize, col:usize, line: usize, font_color: u32, bg_color: u32, framebuffer: &mut FrameBuffer) {
+    pub fn display_cursor(&mut self, cursor: &mut Cursor, x: usize, y: usize, col:usize, line: usize, font_color: u32, bg_color: u32, framebuffer: &mut dyn FrameBuffer) {
         if cursor.blink() {
             let color = if cursor.show { font_color } else { bg_color };
             frame_buffer_drawer::fill_rectangle(

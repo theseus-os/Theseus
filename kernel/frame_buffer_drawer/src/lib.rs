@@ -4,15 +4,13 @@
 
 #![no_std]
 
-extern crate alloc;
 extern crate frame_buffer;
 
 use frame_buffer::FrameBuffer;
-use alloc::boxed::Box;
 
 /// Draw a pixel in a framebuffer.
 /// The pixel is drawed at position (x, y) of the framebuffer with color
-pub fn draw_point(mut framebuffer: &mut FrameBuffer, x: usize, y: usize, color: u32) {
+pub fn draw_point(framebuffer: &mut dyn FrameBuffer, x: usize, y: usize, color: u32) {
     if framebuffer.check_in_buffer(x, y) {
         framebuffer.draw_pixel(x, y, color);
     }
@@ -25,7 +23,7 @@ pub fn draw_point(mut framebuffer: &mut FrameBuffer, x: usize, y: usize, color: 
 /// * `(end_x, end_y)`: the end point of the line.
 /// * `color`: the color of the line.
 pub fn draw_line(
-    mut framebuffer: &mut FrameBuffer,
+    framebuffer: &mut dyn FrameBuffer,
     start_x: i32,
     start_y: i32,
     end_x: i32,
@@ -78,7 +76,7 @@ pub fn draw_line(
 /// * `height`: the height of the rectangle.
 /// * `color`: the color of the rectangle's border
 pub fn draw_rectangle(
-    mut framebuffer: &mut FrameBuffer,
+    framebuffer: &mut dyn FrameBuffer,
     start_x: usize,
     start_y: usize,
     width: usize,
@@ -131,7 +129,7 @@ pub fn draw_rectangle(
 /// * `height`: the height of the rectangle.
 /// * `color`: the color of the rectangle
 pub fn fill_rectangle(
-    mut framebuffer: &mut FrameBuffer,
+    framebuffer: &mut dyn FrameBuffer,
     start_x: usize,
     start_y: usize,
     width: usize,

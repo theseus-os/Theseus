@@ -7,22 +7,15 @@
 extern crate alloc;
 extern crate compositor;
 extern crate frame_buffer;
-extern crate memory;
-extern crate owning_ref;
 extern crate spin;
 #[macro_use]
 extern crate lazy_static;
-#[macro_use]
-extern crate log;
+
 
 use alloc::collections::BTreeMap;
 use alloc::vec::Vec;
-use alloc::boxed::Box;
 use compositor::Compositor;
-use core::hash::{Hash, Hasher, SipHasher};
-use frame_buffer::{FrameBuffer, Pixel, FINAL_FRAME_BUFFER};
-use memory::MappedPages;
-use owning_ref::BoxRefMut;
+use frame_buffer::{FrameBuffer, FINAL_FRAME_BUFFER};
 use spin::Mutex;
 
 lazy_static! {
@@ -66,7 +59,7 @@ impl BufferCache {
 
 impl Compositor for FrameCompositor {
     // compose a list of framebuffers to the final framebuffer. Every item in the list is a reference to a framebuffer with its position
-    fn compose(&mut self, bufferlist: Vec<(&FrameBuffer, i32, i32)>) -> Result<(), &'static str> {
+    fn compose(&mut self, bufferlist: Vec<(&dyn FrameBuffer, i32, i32)>) -> Result<(), &'static str> {
         let mut final_fb = FINAL_FRAME_BUFFER
             .try()
             .ok_or("FrameCompositor fails to get the final frame buffer")?
@@ -132,7 +125,7 @@ impl Compositor for FrameCompositor {
     }
 
     // Check if a framebuffer has already cached since last update
-    fn cached(&self, frame_buffer: &FrameBuffer, x: i32, y: i32) -> bool {
+    fn cached(&self, frame_buffer: &dyn FrameBuffer, x: i32, y: i32) -> bool {
         match self.cache.get(&(frame_buffer.get_hash())) {
             Some(cache) => {
                 if cache.x == x && cache.y == y {
@@ -166,11 +159,4 @@ impl Compositor for FrameCompositor {
             break;
         }
     }
-}Wenqiu:*/
-
-// Compute the hash of a framebuffer
-/*fn hash(t: &FrameBuffer) -> u64 {
-    let mut s = SipHasher::new();
-    t.hash(&mut s);
-    s.finish()
 }*/

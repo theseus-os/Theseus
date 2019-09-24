@@ -27,7 +27,7 @@ pub trait Displayable: Downcast + Send {
         y: usize,
         fg_color: u32,
         bg_color: u32,
-        framebuffer: &mut FrameBuffer,
+        framebuffer: &mut dyn FrameBuffer,
     ) -> Result<(), &'static str>;
 
     /// resize the displayable area

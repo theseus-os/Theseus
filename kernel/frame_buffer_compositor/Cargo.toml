@@ -6,21 +6,13 @@ description = "the frame buffer compositor composites a list of frame buffers to
 build = "../../build.rs"
 
 [dependencies]
-owning_ref = { git = "https://github.com/kevinaboos/owning-ref-rs" }
 spin = "0.4.10"
-
-[dependencies.log]
-default-features = false
-version = "0.3.7"
 
 [dependencies.frame_buffer]
 path = "../frame_buffer"
 
 [dependencies.frame_buffer_rgb]
 path = "../frame_buffer_rgb"
-
-[dependencies.memory]
-path = "../memory"
 
 [dependencies.compositor]
 path = "../compositor"

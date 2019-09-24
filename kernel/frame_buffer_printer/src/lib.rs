@@ -7,8 +7,6 @@ extern crate font;
 extern crate frame_buffer_rgb;
 extern crate frame_buffer;
 
-#[macro_use] extern crate log;
-
 use alloc::vec;
 use font::{CHARACTER_HEIGHT, CHARACTER_WIDTH, FONT_PIXEL};
 use frame_buffer::{FrameBuffer};
@@ -23,7 +21,7 @@ use frame_buffer::{FrameBuffer};
 /// * `font_color`: the color of the text
 /// * `bg_color`: the background color of the text block
 pub fn print_by_bytes(
-    mut framebuffer: &mut FrameBuffer,
+    framebuffer: &mut dyn FrameBuffer,
     x: usize,
     y: usize,
     width: usize,
@@ -95,7 +93,7 @@ pub fn print_by_bytes(
 // print a byte to the framebuffer buffer at (line, column) in the text area.
 // (left, top) specifies the location of the text area in the framebuffer.
 fn print_byte(
-    framebuffer: &mut FrameBuffer,
+    framebuffer: &mut dyn FrameBuffer,
     byte: u8,
     font_color: u32,
     bg_color: u32,
@@ -128,7 +126,7 @@ fn print_byte(
 
 // Fill a blank text area (left, top, right, bottom) with the color.
 fn fill_blank(
-    framebuffer: &mut FrameBuffer,
+    framebuffer: &mut dyn FrameBuffer,
     left: usize,
     top: usize,
     right: usize,
@@ -146,7 +144,6 @@ fn fill_blank(
             return Ok(());
         }
         let start = framebuffer.index(left, y);
-        let end = framebuffer.index(right, y);
         framebuffer.buffer_copy(&fill, start);
         y += 1;
     }

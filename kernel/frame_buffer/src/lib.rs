@@ -8,23 +8,17 @@ extern crate spin;
 extern crate alloc;
 extern crate memory;
 extern crate owning_ref;
-#[macro_use] extern crate downcast_rs;
 
 use alloc::boxed::Box;
-use core::ops::DerefMut;
-use memory::{EntryFlags, FrameRange, MappedPages,PhysicalAddress, FRAME_ALLOCATOR};
+use memory::{MappedPages};
 use owning_ref::BoxRefMut;
 use spin::{Mutex, Once};
-use downcast_rs::Downcast;
 
 /// A Pixel is a u32 integer. The lower 24 bits of a Pixel specifie the RGB color of a pixel
 pub type Pixel = u32;
 
 /// The final framebuffer instance. It contains the pages which are mapped to the physical framebuffer
-pub static FINAL_FRAME_BUFFER: Once<Mutex<Box<FrameBuffer>>> = Once::new();
-
-// Every pixel is of u32 type
-const PIXEL_BYTES: usize = 4;
+pub static FINAL_FRAME_BUFFER: Once<Mutex<Box<dyn FrameBuffer>>> = Once::new();
 
 pub trait FrameBuffer: Send {
     /// return a mutable reference to the buffer

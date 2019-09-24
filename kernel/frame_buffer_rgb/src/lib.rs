@@ -15,7 +15,7 @@ use core::ops::DerefMut;
 use memory::{EntryFlags, FrameRange, MappedPages,PhysicalAddress, FRAME_ALLOCATOR};
 use core::hash::{Hash, Hasher, SipHasher};
 use owning_ref::BoxRefMut;
-use spin::{Mutex, Once};
+use spin::{Mutex};
 use frame_buffer::{Pixel, FrameBuffer, FINAL_FRAME_BUFFER};
 
 // Every pixel is of u32 type
