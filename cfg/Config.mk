@@ -50,7 +50,6 @@ RUSTFLAGS += -D unused-must-use
 ## Either "trampolines" or "disabled" works here, not sure how they're different
 RUSTFLAGS += -Z merge-functions=disabled
 # RUSTFLAGS += -Z merge-functions=trampolines
-RUSTFLAGS += -Z share-generics=no
 
 ## This prevents monomorphized instances of generic functions from being shared across crates.
 ## It vastly simplifies the procedure of finding missing symbols in the crate loader,

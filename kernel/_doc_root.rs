@@ -23,6 +23,7 @@
 //! * `ap_start`: High-level initialization code that runs on each AP (core) after it has booted up
 //! * `ata_pio`: Support for ATA hard disks (IDE/PATA) using PIO (not DMA), and not SATA.
 //! * `captain`: The main driver of Theseus. Controls the loading and initialization of all subsystems and other crates.
+//! * `input_event_manager`: Handles input events from the keyboard and routes them to the correct application. ** Being phased out by window manager
 //! * `compositor`: The trait of a compositor. It composes a list of buffers to a final buffer
 //! * `event_types`: A temporary way to move the input_event_manager typedefs out of the input_event_manager crate.
 //! * `device_manager`: Code for handling the sequence required to initialize each driver.

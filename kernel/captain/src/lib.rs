@@ -125,41 +125,13 @@ pub fn init(
     let ap_count = multicore_bringup::handle_ap_cores(kernel_mmi_ref.clone(), ap_start_realmode_begin, ap_start_realmode_end)?;
     info!("Finished handling and booting up all {} AP cores.", ap_count);
 
-    // init frame_buffer
-    let rs = frame_buffer_rgb::init();
-    match rs {
-        Ok(_) => {
-            trace!("Frame_buffer initialized successfully.");
-        }
-        Err(err) => { 
-            error!("captain::init(): failed to initialize frame_buffer");
-            return Err(err);
-        }
-    }
-
-    // init font
-    let rs = font::init();
-    match rs {
-        Ok(_) => {
-            trace!("font initialized successfully.");
-        }
-        Err(err) => { 
-            error!("captain::init(): failed to initialize font");
-            return Err(err);
-        }
-    }
-
-    // init window manager
-    let rs = window_manager::init();
-    match rs {
-        Ok(_) => {
-            trace!("window manager initialized successfully.");
-        }
-        Err(err) => { 
-            error!("captain::init(): failed to initialize window manager");
-            return Err(err);
-        }
-    }
+    // init the display subsystem
+    // the final frame_buffer is set as FrameBufferRGB
+    // we are able to initialize it as different implementations of FrameBuffer 
+    frame_buffer_rgb::init()?;
+    font::init()?;
+    window_manager::init()?;
+    info!("Display subsystem initialized successfully.");
 
     // initialize the input event manager, which will start the default terminal 
     let input_event_queue_producer = input_event_manager::init()?;

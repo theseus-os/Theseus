@@ -235,7 +235,7 @@ impl<Buffer: FrameBuffer> WindowGeneric<Buffer> {
 
         if let Some(text_display) = displayable.downcast_mut::<TextDisplay>() {
             text_display.set_text(slice);
-            text_display.display(x, y, font_color, bg_color, &mut self.framebuffer)?;
+            text_display.display(x, y, &mut self.framebuffer)?;
             self.render()?;
         } else {
             return Err("The displayable is not a text displayable");
@@ -261,7 +261,7 @@ impl<Buffer: FrameBuffer> WindowGeneric<Buffer> {
 
         if let Some(text_display) = displayable.downcast_mut::<TextDisplay>() {
             let (col, line) = text_display.get_next_pos();
-            text_display.display_cursor(cursor, x, y, col, line, font_color, bg_color, &mut self.framebuffer);
+            text_display.display_cursor(cursor, x, y, col, line, font_color, &mut self.framebuffer);
             self.render()?;
         } else {
             return Err("The displayable is not a text displayable");

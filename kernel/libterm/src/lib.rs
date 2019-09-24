@@ -426,7 +426,7 @@ impl Terminal {
             scroll_start_idx: 0,
             is_scroll_end: true,
             absolute_cursor_pos: 0,
-            cursor: Cursor::new(),
+            cursor: Cursor::new(FONT_COLOR),
         };
 
         // Inserts a producer for the print queue into global list of terminal print producers
@@ -567,7 +567,7 @@ impl Terminal {
             let (width, height) = self.window.dimensions();
             let width  = width  - 2*window_manager::WINDOW_MARGIN;
             let height = height - 2*window_manager::WINDOW_MARGIN;
-            let text_display = TextDisplay::new(width, height)?;
+            let text_display = TextDisplay::new(width, height, FONT_COLOR, BACKGROUND_COLOR)?;
             let displayable: Box<dyn Displayable> = Box::new(text_display);
             self.window.add_displayable(&display_name, 0, 0, displayable)?;
         }

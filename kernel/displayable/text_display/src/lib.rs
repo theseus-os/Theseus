@@ -30,6 +30,8 @@ pub struct TextDisplay {
     next_col: usize,
     next_line: usize,
     text: String,
+    fg_color: u32,
+    bg_color: u32,
 }
 
 impl Displayable for TextDisplay {
@@ -44,8 +46,6 @@ impl Displayable for TextDisplay {
         &mut self,
         x: usize,
         y: usize,
-        fg_color: u32,
-        bg_color: u32,
         framebuffer: &mut dyn FrameBuffer,
     ) -> Result<(), &'static str> {
         let (col, line) = frame_buffer_printer::print_by_bytes(
@@ -55,8 +55,8 @@ impl Displayable for TextDisplay {
             self.width,
             self.height,
             self.text.as_str(),
-            fg_color,
-            bg_color,
+            self.fg_color,
+            self.bg_color,
         )?;
         self.next_col = col;
         self.next_line = line;
@@ -78,13 +78,15 @@ impl Displayable for TextDisplay {
 
 impl TextDisplay {
     /// create a new displayable of size (width, height)
-    pub fn new(width: usize, height: usize) -> Result<TextDisplay, &'static str> {
+    pub fn new(width: usize, height: usize, fg_color: u32, bg_color: u32) -> Result<TextDisplay, &'static str> {
         Ok(TextDisplay {
             width: width,
             height: height,
             next_col: 0,
             next_line: 0,
             text: String::new(),
+            fg_color: fg_color,
+            bg_color: bg_color,
         })
     }
 
@@ -98,9 +100,9 @@ impl TextDisplay {
     }
 
     /// display a cursor in the text displayable
-    pub fn display_cursor(&mut self, cursor: &mut Cursor, x: usize, y: usize, col:usize, line: usize, font_color: u32, bg_color: u32, framebuffer: &mut dyn FrameBuffer) {
+    pub fn display_cursor(&mut self, cursor: &mut Cursor, x: usize, y: usize, col:usize, line: usize, font_color: u32, framebuffer: &mut dyn FrameBuffer) {
         if cursor.blink() {
-            let color = if cursor.show { font_color } else { bg_color };
+            let color = if cursor.show { font_color } else { self.bg_color };
             frame_buffer_drawer::fill_rectangle(
                 framebuffer,
                 x + col * CHARACTER_WIDTH,
@@ -125,16 +127,18 @@ pub struct Cursor {
     freq: u64,
     time: TscTicks,
     show: bool,
+    color: u32,
 }
 
 impl Cursor {
     /// create a new cursor struct
-    pub fn new() -> Cursor {
+    pub fn new(color: u32) -> Cursor {
         Cursor {
             enabled: true,
             freq: DEFAULT_CURSOR_FREQ,
             time: tsc_ticks(),
             show: true,
+            color: color,
         }
     }
 
