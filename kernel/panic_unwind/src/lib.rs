@@ -27,13 +27,14 @@ mod lsda;
 
 use core::panic::PanicInfo;
 use memory::VirtualAddress;
-use unwind::{NamespaceUnwinder, Unwinder};
+use unwind::{NamespaceUnwinder, StackFrameIter};
 use fallible_iterator::FallibleIterator;
 use gimli::{BaseAddresses, NativeEndian};
 use mod_mgmt::{
     CrateNamespace,
     metadata::{StrongCrateRef, StrongSectionRef, SectionType},
 };
+use alloc::boxed::Box;
 
 
 /// The singular entry point for a language-level panic.
@@ -102,16 +103,23 @@ fn panic_unwind_test(info: &PanicInfo) -> ! {
     }
 
     debug!("Starting NamespaceUnwinder!");
-    let mut unwinder = NamespaceUnwinder::new(namespace, app_crate_ref);
-    // unwinder.trace(print_stack_frames);
-    unwinder.trace(unwind_stack_frames);
-    debug!("Done with NamespaceUnwinder!");
+    let unwinder = NamespaceUnwinder::new(namespace, app_crate_ref);
+    unwind::invoke_with_current_registers(unwinder, |unwinder, registers| {
+        let mut frame_iter = Box::new(StackFrameIter::new(unwinder, registers));
+        // For now, skip the first three frames, which correspond to functions in the panic handlers themselves.
+        frame_iter.next().expect("error skipping call stack frame 0 in unwinder");
+        frame_iter.next().expect("error skipping call stack frame 1 in unwinder");
+        frame_iter.next().expect("error skipping call stack frame 2 in unwinder");
 
-    // handle_eh_frame(&namespace, &my_crate, starting_instruction_pointer, true).expect("handle_eh_frame failed");
-    
+        let frame_iter_ptr = Box::into_raw(frame_iter);
+        let res = continue_unwinding(frame_iter_ptr); 
+        if let Err(e) = res {
+            error!("BUG: the call to start unwinding returned unexpectedly. Error: {}", e);
+        }
+    });
+    unreachable!();
 
-
-    error!("REACHED END OF panic_unwind_test()! Looping infinitely...");
+    error!("BUG:  REACHED END OF panic_unwind_test()! Looping infinitely...");
     loop {}
 }
 
@@ -152,19 +160,21 @@ fn print_stack_frames(stack_frames: &mut unwind::StackFrameIter) {
     }
 }
 
-
-fn unwind_stack_frames(stack_frame_iter: &mut unwind::StackFrameIter) {
-    let mut i = -1;
-    while let Some(frame) = stack_frame_iter.next().expect("stack_frame_iter.next() error") {
-        i += 1;
-
-        info!("StackFrame[{}]: {:#X?}", i, frame);
+/// Continues the unwinding process 
+///  
+fn continue_unwinding(stack_frame_iter_ptr: *mut unwind::StackFrameIter) -> Result<(), &'static str> {
+    let stack_frame_iter = unsafe {&mut *stack_frame_iter_ptr};
+    
+    trace!("continue_unwinding(): stack_frame_iter: {:#X?}", stack_frame_iter);
+    
+    let (mut regs, landing_pad_address) = if let Some(frame) = stack_frame_iter.next().map_err(|e| {
+        error!("continue_unwinding: error getting next stack frame in the call stack: {}", e);
+        "continue_unwinding: error getting next stack frame in the call stack"
+    })? {
+        info!("Unwinding StackFrame: {:#X?}", frame);
         info!("  In func: {:?}", stack_frame_iter.unwinder().namespace().get_section_containing_address(VirtualAddress::new_canonical(frame.initial_address() as usize), stack_frame_iter.unwinder().starting_crate(), false));
         info!("  Regs: {:?}", stack_frame_iter.registers());
-        if i < 3 {
-            info!("    (skipping unwinding this frame for now, within a panic/unwind handler.)");
-            continue;
-        }
+
         if let Some(lsda) = frame.lsda() {
             let lsda = VirtualAddress::new_canonical(lsda as usize);
             if let Some((lsda_sec_ref, _)) = stack_frame_iter.unwinder().namespace().get_section_containing_address(lsda, stack_frame_iter.unwinder().starting_crate(), true) {
@@ -174,31 +184,68 @@ fn unwind_stack_frames(stack_frame_iter: &mut unwind::StackFrameIter) {
                 let length_til_end_of_mp = sec.address_range.end.value() - lsda.value();
                 let sec_mp = sec.mapped_pages.lock();
                 let lsda_slice = sec_mp.as_slice::<u8>(starting_offset, length_til_end_of_mp)
-                    .expect("unwind_stack_frames(): couldn't get LSDA pointer as a slice");
+                    .map_err(|_e| "continue_unwinding(): couldn't get LSDA pointer as a slice")?;
                 let table = lsda::GccExceptTable::new(lsda_slice, NativeEndian, frame.initial_address());
 
-                // let mut iter = table.call_site_table_entries().unwrap();
-                // while let Some(entry) = iter.next().unwrap() {
-                //     debug!("{:#X?}", entry);
-                // }
+                let mut iter = table.call_site_table_entries().unwrap();
+                while let Some(entry) = iter.next().unwrap() {
+                    debug!("{:#X?}", entry);
+                }
 
-                let entry = table.call_site_table_entry_for_address(frame.caller_address())
-                    .expect("unwind_stack_frames(): couldn't find a call site table entry for this stack frame's caller address");
+                let entry = table.call_site_table_entry_for_address(frame.caller_address()).map_err(|e| {
+                    error!("continue_unwinding(): couldn't find a call site table entry for this stack frame's caller address. Error: {}", e);
+                    "continue_unwinding(): couldn't find a call site table entry for this stack frame's caller address."
+                })?;
 
                 debug!("Found call site entry for address {:#X}: {:#X?}", frame.caller_address(), entry);
-                
-                // Jump to the actual landing pad function, or rather, a function that will jump there after setting up register values properly.
-                debug!("*** JUMPING TO LANDING PAD FUNCTION AT {:#X}", entry.landing_pad_address());
-                unsafe {
-                    unwind::land(stack_frame_iter.registers(), entry.landing_pad_address());
-                }
-                debug!("*** RETURNED call to unwind::land()");
-                
+                (stack_frame_iter.registers().clone(), entry.landing_pad_address())
             } else {
                 error!("  BUG: couldn't find LSDA section (.gcc_except_table) for LSDA address: {:#X}", lsda);
+                return Err("BUG: couldn't find LSDA section (.gcc_except_table) for LSDA address specified in stack frame");
             }
+        } else {
+            trace!("continue_unwinding(): stack frame has no LSDA");
+            return continue_unwinding(stack_frame_iter_ptr);
         }
+    } else {
+        trace!("continue_unwinding(): NO REMAINING STACK FRAMES");
+        return Ok(());
+    };
+
+    // Jump to the actual landing pad function, or rather, a function that will jump there after setting up register values properly.
+    debug!("*** JUMPING TO LANDING PAD FUNCTION AT {:#X}", landing_pad_address);
+    // Once the unwinding cleanup function is done, it will call _Unwind_Resume (technically, it jumps to it),
+    // and pass the value in the landing regs' RAX register as the argument to _Unwind_Resume. 
+    // So, whatever we put into RAX in the landing regs will be placed into the first arg (RDI) in _Unwind_Resume.
+    // This is arch-specific; for x86_64 the transfer is from RAX to RDI, for ARM/AARCH64, the transfer is from R0 -> R1 or X0 -> X1.
+    // See this for more mappings: <https://github.com/rust-lang/rust/blob/master/src/libpanic_unwind/gcc.rs#L102>
+    regs[gimli::X86_64::RAX] = Some(stack_frame_iter_ptr as u64);
+    debug!("    set RAX value to {:#X?}", regs[gimli::X86_64::RAX]);
+    unsafe {
+        unwind::land(&regs, landing_pad_address);
     }
+    debug!("*** BUG call to unwind::land() returned, which should never happen!");
+    unreachable!();
+}
+
+
+/// This function is automatically jumped to after each unwinding cleanup routine finishes executing,
+/// so it's basically the return address of every cleanup routine.
+/// Thus, this is a middle point in the unwinding execution flow; 
+/// here we need to continue (*resume*) the unwinding procedure 
+/// by basically figuring out where we just came from and picking up where we left off. 
+/// That logic is performed in `unwind_tracer()`, see that function for more.
+#[no_mangle]
+pub unsafe extern "C" fn _Unwind_Resume(stack_frame_iter_ptr: *mut unwind::StackFrameIter) -> ! {
+    trace!("_Unwind_Resume: stack_frame_iter pointer value: {:#X}", stack_frame_iter_ptr as usize);
+    // trace!("_Unwind_Resume: stack_frame_iter: {:?}", &*stack_frame_iter);
+    let res = continue_unwinding(stack_frame_iter_ptr);
+    if let Err(e) = res {
+        error!("_Unwind_Resume: continue_unwinding() returned an error: {}", e);
+        // what do we do here???
+    }
+
+    unreachable!();
 }
 
 
@@ -259,30 +306,6 @@ fn panic_entry_point(info: &PanicInfo) -> ! {
     loop {}
 }
 
-
-
-/// This function isn't used since our Theseus target.json file
-/// chooses panic=abort (as does our build process), 
-/// but building on Windows (for an IDE) with the pc-windows-gnu toolchain requires it.
-#[allow(non_snake_case)]
-#[lang = "eh_unwind_resume"]
-#[no_mangle]
-// #[cfg(all(target_os = "windows", target_env = "gnu"))]
-#[doc(hidden)]
-pub extern "C" fn rust_eh_unwind_resume(_arg: *const i8) -> ! {
-    error!("\n\nin rust_eh_unwind_resume, unimplemented!");
-    loop {}
-}
-
-
-#[allow(non_snake_case)]
-#[no_mangle]
-#[cfg(not(target_os = "windows"))]
-#[doc(hidden)]
-pub extern "C" fn _Unwind_Resume() -> ! {
-    error!("\n\nin _Unwind_Resume, unimplemented!");
-    loop {}
-}
 
 
 #[alloc_error_handler]

@@ -933,14 +933,14 @@ fn get_task_local_data() -> Option<&'static TaskLocalData> {
     Some(&tld)
 }
 
-/// Returns a cloned reference to the current task id by using the `TaskLocalData` pointer
-/// stored in the FS base MSR register.
+/// Returns a reference to the current task by using the `TaskLocalData` pointer
+/// stored in the thread-local storage (FS base model-specific register).
 pub fn get_my_current_task() -> Option<&'static TaskRef> {
     get_task_local_data().map(|tld| &tld.current_taskref)
 }
 
 /// Returns the current Task's id by using the `TaskLocalData` pointer
-/// stored in the FS base MSR register.
+/// stored in the thread-local storage (FS base model-specific register).
 pub fn get_my_current_task_id() -> Option<usize> {
     get_task_local_data().map(|tld| tld.current_task_id)
 }

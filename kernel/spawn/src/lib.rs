@@ -586,40 +586,55 @@ fn task_wrapper<F, A, R>() -> !
           R: Send + 'static,
           F: FnOnce(A) -> R, 
 {
-    let curr_task_ref = get_my_current_task().expect("BUG: task_wrapper: couldn't get_my_current_task().");
-    let curr_task_name = curr_task_ref.lock().name.clone();
+    // This is scoped to ensure that absolutely no resources that require dropping are held
+    // when invoking the task's entry function, in order to simplify cleanup when unwinding.
+    // Tthat is, only values on the stack are allowed, nothing can be allocated/locked.
+    let (func, arg) = {
+        let curr_task_ref = get_my_current_task().expect("BUG: task_wrapper: couldn't get_my_current_task().");
+        let curr_task_name = curr_task_ref.lock().name.clone();
 
-    let kthread_call_stack_ptr: *mut KthreadCall<F, A, R> = {
-        let t = curr_task_ref.lock();
-        // when spawning a kernel task() above, we use the very bottom of the stack to hold the pointer to the kthread_call
-        // let off: isize = 0;
-        unsafe {
-            // dereference it once to get the raw pointer (from the Box<KthreadCall>)
-            *(t.kstack.bottom().value() as *mut *mut KthreadCall<F, A, R>) as *mut KthreadCall<F, A, R>
-        }
-    };
+        let kthread_call_stack_ptr: *mut KthreadCall<F, A, R> = {
+            let t = curr_task_ref.lock();
+            // when spawning a kernel task() above, we use the very bottom of the stack to hold the pointer to the kthread_call
+            // let off: isize = 0;
+            unsafe {
+                // dereference it once to get the raw pointer (from the Box<KthreadCall>)
+                *(t.kstack.bottom().value() as *mut *mut KthreadCall<F, A, R>) as *mut KthreadCall<F, A, R>
+            }
+        };
 
-    // the pointer to the kthread_call struct (func and arg) was placed on the stack
-    let kthread_call: Box<KthreadCall<F, A, R>> = unsafe {
-        Box::from_raw(kthread_call_stack_ptr)
-    };
-    let kthread_call_val: KthreadCall<F, A, R> = *kthread_call;
+        // the pointer to the kthread_call struct (func and arg) was placed on the stack
+        let kthread_call: Box<KthreadCall<F, A, R>> = unsafe {
+            Box::from_raw(kthread_call_stack_ptr)
+        };
+        let kthread_call_val: KthreadCall<F, A, R> = *kthread_call;
 
-    let arg: Box<A> = unsafe {
-        Box::from_raw(kthread_call_val.arg)
+        let arg: A = {
+            // we do this to make sure the box is freed before calling the task func
+            let boxed_arg: Box<A> = unsafe {
+                Box::from_raw(kthread_call_val.arg)
+            };
+            *boxed_arg
+        };
+        let func = kthread_call_val.func;
+        debug!("task_wrapper [1]: \"{}\" about to call kthread func {:?} with arg {:?}", curr_task_name, debugit!(func), debugit!(arg));
+        (func, arg)
     };
-    let func = kthread_call_val.func;
-    let arg: A = *arg; 
 
     
     enable_interrupts(); // we must enable interrupts for the new task, otherwise we won't be able to preempt it.
     compiler_fence(Ordering::SeqCst); // I don't think this is necessary...    
-    debug!("task_wrapper [1]: \"{}\" about to call kthread func {:?} with arg {:?}, interrupts are {}", curr_task_name, debugit!(func), debugit!(arg), interrupts_enabled());
 
     // Now we're ready to actually invoke the entry point function that this Task was spawned for
     let exit_value = func(arg);
 
-    debug!("task_wrapper [2]: \"{}\" exited with return value {:?}", curr_task_name, debugit!(exit_value));
+    // let mut panic_cause: u64 = 0;
+    // let result = unsafe {
+    //     core::instrinsics::try(fn_ptr, arg_ptr, cause_ptr)
+    // };
+    // debug!("task_wrapper [2.5]: result {:?}", debugit!(result));
+        
+
     // Here: now that the task is finished running, we must clean in up by doing three things:
     // (1) Put the task into a non-runnable mode (exited), and set its exit value
     // (2) Remove it from its runqueue
@@ -628,6 +643,11 @@ fn task_wrapper<F, A, R>() -> !
     // Otherwise, this task could be marked as `Exited`, and then a context switch could occur to another task,
     // which would prevent this task from ever running again, so it would never get to remove itself from the runqueue.
     { 
+        let curr_task_ref = get_my_current_task().expect("BUG: task_wrapper: couldn't get_my_current_task().");
+        let curr_task_name = curr_task_ref.lock().name.clone();
+        let curr_task_id = curr_task_ref.lock().id.clone();
+        debug!("task_wrapper [2]: \"{}\" exited with return value {:?}", curr_task_name, debugit!(exit_value));
+
         // (0) disable preemption (currently just disabling interrupts altogether)
         let _held_interrupts = hold_interrupts();
         
