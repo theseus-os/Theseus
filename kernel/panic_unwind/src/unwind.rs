@@ -25,16 +25,29 @@ use gimli::{
 use registers::Registers;
 use fallible_iterator::FallibleIterator;
 use mod_mgmt::{
-    CrateNamespace, 
-    metadata::{StrongCrateRef, StrongSectionRef},
+    CrateNamespace,
+    metadata::{SectionType, StrongCrateRef, StrongSectionRef},
 };
 use memory::VirtualAddress;
+use lsda;
 
 
+/// This is the context/state that is used during unwinding and passed around
+/// to the callback functions in the various unwinding stages, such as in `_Unwind_Resume()`. 
+/// 
+/// Because those callbacks follow an extern "C" ABI, this structure is passed as a pointer 
+/// rather than directly by value or by reference.
+/// Thus, it must be manually freed when unwinding is finished (or if it fails in the middle)
+/// in order to avoid leaking memory, e.g., not dropping reference counts. 
+pub struct UnwindingContext {
+    stack_frame_iter: StackFrameIter,
+}
 
-pub type c_int = i32;
-pub type c_void = u64; // doesn't really matter
-pub type uintptr_t = usize;
+impl Drop for UnwindingContext {
+    fn drop(&mut self) {
+        warn!("DROPPING UnwindingContext!");
+    }
+}
 
 
 
@@ -159,7 +172,7 @@ pub struct StackFrameIter {
 
 impl Drop for StackFrameIter {
     fn drop(&mut self) {
-        error!("\nWHOA DROPPING STACK FRAME ITER!");
+        warn!("Dropping StackFrameIter!");
     }
 }
 
@@ -172,7 +185,7 @@ impl fmt::Debug for StackFrameIter {
 
 
 impl StackFrameIter {
-    pub fn new(unwinder: NamespaceUnwinder, registers: Registers) -> Self {
+    fn new(unwinder: NamespaceUnwinder, registers: Registers) -> Self {
         StackFrameIter {
             unwinder,
             registers,
@@ -248,7 +261,7 @@ impl FallibleIterator for StackFrameIter {
                 self.unwinder.starting_crate.as_ref(),
                 false,
             ).ok_or("couldn't get crate containing caller address")?;
-            let (eh_frame_sec_ref, base_addrs) = super::get_eh_frame_info(&crate_ref)
+            let (eh_frame_sec_ref, base_addrs) = get_eh_frame_info(&crate_ref)
                 .ok_or("couldn't get eh_frame section in caller's containing crate")?;
 
             let row_ref = UnwindRowReference { caller, eh_frame_sec_ref, base_addrs };
@@ -284,21 +297,20 @@ unsafe fn deref_ptr(ptr: Pointer) -> u64 {
 }
 
 
-type FuncWithUnwinderRegisters<'a> = &'a dyn Fn(NamespaceUnwinder, Registers);
+type FuncWithRegisters<'a> = &'a dyn Fn(Registers);
 
 
 /// This function saves the current CPU register values onto the stack (to preserve them)
-/// and then invokes the given closure with two arguments: (1) the given unwinder, and (2) those registers.
+/// and then invokes the given closure with those registers as the argument.
 /// 
 /// In general, this is useful for jumpstarting the unwinding procedure,
 /// since we have to start from the current call frame and work backwards up the call stack 
 /// while applying the rules for register value changes in each call frame
 /// in order to arrive at the proper register values for a prior call frame.
-pub fn invoke_with_current_registers<F>(unwinder: NamespaceUnwinder, f: F) where F: Fn(NamespaceUnwinder, Registers) {
-    let f: FuncWithUnwinderRegisters = &f;
-    let uw_ptr: *mut NamespaceUnwinder = Box::into_raw(Box::new(unwinder));
+pub fn invoke_with_current_registers<F>(f: F) where F: Fn(Registers) {
+    let f: FuncWithRegisters = &f;
     trace!("in invoke_with_current_registers(): calling unwind_trampoline...");
-    unsafe { unwind_trampoline(&f, uw_ptr) };
+    unsafe { unwind_trampoline(&f) };
     trace!("in invoke_with_current_registers(): returned from unwind_trampoline.");
     // this is the end of the code in this function, the following is just inner functions.
 
@@ -312,11 +324,9 @@ pub fn invoke_with_current_registers<F>(unwinder: NamespaceUnwinder, f: F) where
     /// The argument is a pointer to a function reference, so effectively a pointer to a pointer. 
     #[naked]
     #[inline(never)]
-    unsafe fn unwind_trampoline(_payload: *const FuncWithUnwinderRegisters, _unwinder: *mut NamespaceUnwinder, ) {
+    unsafe fn unwind_trampoline(_payload: *const FuncWithRegisters) {
         // DO NOT touch RDI register, which has the `_payload` function; it needs to be passed into unwind_recorder.
         asm!("
-            # move the _unwinder argument from arg 2 to arg 4
-            movq %rsi, %rcx
             # copy the stack pointer to RSI
             movq %rsp, %rsi
             pushq %rbp
@@ -349,13 +359,11 @@ pub fn invoke_with_current_registers<F>(unwinder: NamespaceUnwinder, f: F) where
     /// * second arg in `RSI` register, the stack pointer,
     /// * third arg in `RDX` register, the saved register values used to recover execution context
     ///   after we change the register values during unwinding,
-    /// * fourth arg in `RCX` register, the argument containing the Unwinder.
     #[no_mangle]
     unsafe extern "C" fn unwind_recorder(
-        payload: *const FuncWithUnwinderRegisters,
+        payload: *const FuncWithRegisters,
         stack: u64,
         saved_regs: *mut SavedRegs,
-        unwinder_ptr: *mut NamespaceUnwinder
     ) {
         trace!("unwind_recorder: payload {:#X}, stack: {:#X}, saved_regs: {:#X}",
             payload as usize, stack, saved_regs as usize,
@@ -364,7 +372,6 @@ pub fn invoke_with_current_registers<F>(unwinder: NamespaceUnwinder, f: F) where
         trace!("unwind_recorder: deref'd payload");
         let saved_regs = &*saved_regs;
         trace!("unwind_recorder: deref'd saved_regs: {:#X?}", saved_regs);
-        let unwinder = Box::from_raw(unwinder_ptr);
 
         let mut registers = Registers::default();
         registers[X86_64::RBX] = Some(saved_regs.rbx);
@@ -376,12 +383,9 @@ pub fn invoke_with_current_registers<F>(unwinder: NamespaceUnwinder, f: F) where
         registers[X86_64::R15] = Some(saved_regs.r15);
         registers[X86_64::RA]  = Some(*(stack as *const u64));
 
-        payload(*unwinder, registers);
+        payload(registers);
     }
 }
-
-
-
 
 
 #[derive(Debug)]
@@ -488,252 +492,211 @@ pub unsafe fn land(regs: &Registers, landing_pad_address: u64) {
 
 
 
-
-/// The type signature of the personality function, see `rust_eh_personality`.
-type PersonalityFunction = extern "C" fn(
-    version: c_int, 
-    actions: _Unwind_Action,
-    class: u64,
-    object: *mut _Unwind_Exception,
-    context: *mut _Unwind_Context
-) -> _Unwind_Reason_Code;
-
-
-#[cfg(not(test))]
-#[lang = "eh_personality"]
-#[no_mangle]
-#[doc(hidden)]
-/// This function will always be emitted as "rust_eh_personality" no matter what function name we give it here.
-unsafe extern "C" fn rust_eh_personality(
-    version: c_int, 
-    actions: _Unwind_Action,
-    class: u64,
-    object: *mut _Unwind_Exception,
-    context: *mut _Unwind_Context
-) -> _Unwind_Reason_Code {
-    error!("rust_eh_personality(): version: {:?}, actions: {:?}, class: {:?}, object: {:?}, context: {:?}",
-        version, actions, class, object, context
-    );
-
-    if version != 1 {
-        error!("rust_eh_personality(): version was {}, must be 1.", version);
-        return _Unwind_Reason_Code::_URC_FATAL_PHASE1_ERROR;
-    }
-
-    _Unwind_Reason_Code::_URC_END_OF_STACK
-}
-
-
-
-#[repr(C)]
-#[derive(Copy, Clone, PartialEq, Debug)]
-pub enum _Unwind_Action {
-    _UA_SEARCH_PHASE = 1,
-    _UA_CLEANUP_PHASE = 2,
-    _UA_HANDLER_FRAME = 4,
-    _UA_FORCE_UNWIND = 8,
-    _UA_END_OF_STACK = 16,
-}
-
-#[repr(C)]
-#[derive(Copy, Clone, PartialEq, Debug)]
-pub enum _Unwind_Reason_Code {
-    _URC_NO_REASON = 0,
-    _URC_FOREIGN_EXCEPTION_CAUGHT = 1,
-    _URC_FATAL_PHASE2_ERROR = 2,
-    _URC_FATAL_PHASE1_ERROR = 3,
-    _URC_NORMAL_STOP = 4,
-    _URC_END_OF_STACK = 5,
-    _URC_HANDLER_FOUND = 6,
-    _URC_INSTALL_CONTEXT = 7,
-    _URC_CONTINUE_UNWIND = 8,
-    _URC_FAILURE = 9, // used only by ARM EHABI
-}
-
-pub type _Unwind_Exception_Class = u64;
-pub type _Unwind_Exception_Cleanup_Fn = extern "C" fn(unwind_code: _Unwind_Reason_Code, exception: *mut _Unwind_Exception);
-
-
-#[cfg(target_arch = "x86_64")]
-pub const UNWINDER_PRIVATE_DATA_SIZE: usize = 6;
-#[cfg(target_arch = "aarch64")]
-pub const UNWINDER_PRIVATE_DATA_SIZE: usize = 2;
-
-
-#[repr(C)]
-pub struct _Unwind_Exception {
-    pub exception_class: _Unwind_Exception_Class,
-    pub exception_cleanup: _Unwind_Exception_Cleanup_Fn,
-    pub private_contptr: Option<u64>,
-    pub private: [_Unwind_Word; UNWINDER_PRIVATE_DATA_SIZE],
-}
-
-pub type _Unwind_Word = uintptr_t;
-pub type _Unwind_Ptr = uintptr_t;
-
-pub struct _Unwind_Context {
-    pub lsda: u64,
-    pub ip: u64,
-    pub initial_address: u64,
-    pub registers: *mut Registers,
-}
-
-pub type _Unwind_Trace_Fn = extern "C" fn(ctx: *mut _Unwind_Context, arg: *mut c_void) -> _Unwind_Reason_Code;
-
-#[no_mangle]
-pub unsafe extern "C" fn _Unwind_DeleteException(exception: *mut _Unwind_Exception) {
-    ((*exception).exception_cleanup)(_Unwind_Reason_Code::_URC_FOREIGN_EXCEPTION_CAUGHT, exception);
-    trace!("exception deleted.");
-}
-
-#[no_mangle]
-pub unsafe extern "C" fn _Unwind_GetRegionStart(ctx: *mut _Unwind_Context) -> _Unwind_Ptr {
-    (*ctx).initial_address as usize
-}
-
-#[no_mangle]
-pub unsafe extern "C" fn _Unwind_GetTextRelBase(ctx: *mut _Unwind_Context) -> _Unwind_Ptr {
-    unreachable!();
-}
-
-#[no_mangle]
-pub unsafe extern "C" fn _Unwind_GetDataRelBase(ctx: *mut _Unwind_Context) -> _Unwind_Ptr {
-    unreachable!();
-}
-
-#[no_mangle]
-pub unsafe extern "C" fn _Unwind_GetLanguageSpecificData(ctx: *mut _Unwind_Context) -> *mut c_void {
-    (*ctx).lsda as *mut c_void
-}
-
-#[no_mangle]
-pub unsafe extern "C" fn _Unwind_SetGR(ctx: *mut _Unwind_Context, reg_index: c_int, value: _Unwind_Word) {
-    (*(*ctx).registers)[reg_index as u16] = Some(value as u64);
-}
-
-#[no_mangle]
-pub unsafe extern "C" fn _Unwind_SetIP(ctx: *mut _Unwind_Context, value: _Unwind_Word) {
-    (*(*ctx).registers)[X86_64::RA] = Some(value as u64);
-}
-
-#[no_mangle]
-pub unsafe extern "C" fn _Unwind_GetIPInfo(ctx: *mut _Unwind_Context, ip_before_insn: *mut c_int) -> _Unwind_Word {
-    *ip_before_insn = 0;
-    (*ctx).ip as usize
-}
-
-#[no_mangle]
-pub unsafe extern "C" fn _Unwind_FindEnclosingFunction(pc: *mut c_void) -> *mut c_void {
-    pc // FIXME: implement this
-}
-
-
-
-
-/*
-/// Unwind_RaiseException is the first entry point invoked by Rust's panic handler in the std lib. 
-/// Obviously, the core lib doesn't do that, so we need to do it ourselves.
+/// Returns a tuple of .eh_frame section for the given `crate_ref`
+/// and the base addresses (its .text section address and .eh_frame section address).
 /// 
-// FIXME: Set `unwind(allowed)` because we need to be able to unwind this function as
-// part of its operation. But this means any panics in this function are undefined
-// behaviour, and we don't currently ensure it doesn't panic.
-#[unwind(allowed)]
-#[no_mangle]
-pub unsafe extern "C" fn _Unwind_RaiseException(exception: *mut _Unwind_Exception) -> _Unwind_Reason_Code {
-    (*exception).private_contptr = None;
-    invoke_with_current_registers(|registers| {
-        if let Some(registers) = unwind_tracer(registers, exception) {
-            land(&registers);
-        }
-    });
-    unreachable!();
+/// # Locking / Deadlock
+/// Obtains the lock on the given `crate_ref` 
+/// and the lock on all of its sections while iterating through them.
+/// 
+/// The latter lock on the crate's `rodata_pages` object will be held
+/// for the entire lifetime of the returned object. 
+fn get_eh_frame_info(crate_ref: &StrongCrateRef) -> Option<(StrongSectionRef, BaseAddresses)> {
+    let parent_crate = crate_ref.lock_as_ref();
+
+    let eh_frame_sec_ref = parent_crate.sections.values()
+        .filter(|s| s.lock().typ == SectionType::EhFrame)
+        .next()?;
+    
+    let eh_frame_vaddr = eh_frame_sec_ref.lock().start_address().value();
+    let text_pages_vaddr = parent_crate.text_pages.as_ref()?.1.start.value();
+    let base_addrs = BaseAddresses::default()
+        .set_eh_frame(eh_frame_vaddr as u64)
+        .set_text(text_pages_vaddr as u64);
+
+    Some((eh_frame_sec_ref.clone(), base_addrs))
 }
 
 
-
-// /// This function is automatically jumped to after each unwinding cleanup routine finishes executing,
-// /// so it's basically the return address of every cleanup routine.
-// /// Thus, this is a middle point in the unwinding execution flow; 
-// /// here we need to continue (*resume*) the unwinding procedure 
-// /// by basically figuring out where we just came from and picking up where we left off. 
-// /// That logic is performed in `unwind_tracer()`, see that function for more.
-// #[no_mangle]
-// pub unsafe extern "C" fn _Unwind_Resume(exception: *mut _Unwind_Exception) -> ! {
-//     invoke_with_current_registers(|registers| {
-//         if let Some(registers) = unwind_tracer(registers, exception) {
-//             land(&registers);
-//         }
-//     });
-//     unreachable!();
-// }
+fn print_stack_frames(stack_frames: &mut StackFrameIter) {
+    while let Some(frame) = stack_frames.next().expect("stack_frames.next() error") {
+        info!("StackFrame: {:#X?}", frame);
+        info!("  in func: {:?}", stack_frames.unwinder().namespace().get_section_containing_address(VirtualAddress::new_canonical(frame.initial_address() as usize), stack_frames.unwinder().starting_crate(), false));
+        if let Some(lsda) = frame.lsda() {
+            info!("  LSDA section: {:?}", stack_frames.unwinder().namespace().get_section_containing_address(VirtualAddress::new_canonical(lsda as usize), stack_frames.unwinder().starting_crate(), true));
+        }
+    }
+}
 
 
-unsafe fn unwind_tracer(registers: Registers, exception: *mut _Unwind_Exception) -> Option<Registers> {
-    let mut unwinder = {
-        let curr_task = task::get_my_current_task();
-        let t = curr_task.lock();
-        NamespaceUnwinder::new(t.namespace.clone(), t.app_crate.clone())
+/// Starts the unwinding procedure for the current task 
+/// by working backwards up the call stack starting from the current stack frame.
+pub fn start_unwinding() -> Result<(), &'static str> {
+    // Here we have to be careful to have no resources waiting to be dropped/freed/released on the stack. 
+    let unwinding_context_ptr = {
+        let curr_task = task::get_my_current_task().ok_or("get_my_current_task() failed")?;
+        let namespace = curr_task.get_namespace();
+        let (mmi_ref, app_crate_ref, _is_idle_task) = { 
+            let t = curr_task.lock();
+            (t.mmi.clone(), t.app_crate.as_ref().map(|a| a.clone_shallow()), t.is_an_idle_task)
+        };
+
+        panic_wrapper::stack_trace(
+            &mmi_ref.lock().page_table,
+            &|instruction_pointer: VirtualAddress| {
+                namespace.get_section_containing_address(instruction_pointer, app_crate_ref.as_ref(), false)
+                    .map(|(sec_ref, offset)| (sec_ref.lock().name.clone(), offset))
+            },
+        );
+
+        Box::into_raw(Box::new(
+            UnwindingContext {
+                stack_frame_iter: StackFrameIter::new(NamespaceUnwinder::new(namespace, app_crate_ref), Registers::default()),
+            }
+        ))
     };
-    let mut frames = StackFrameIter::new(&mut unwinder, registers);
 
-    // This first conditional is responsible for skipping all the frames 
-    // that we have already unwound, and iterating to the frame that should be unwound next.
-    // If we haven't unwound any frames yet, then this will be None.
-    if let Some(contptr) = (*exception).private_contptr {
-        loop {
-            if let Some(frame) = frames.next().unwrap() {
-                if frames.registers()[X86_64::RSP].unwrap() == contptr {
-                    break;
-                }
-            } else {
-                return None;
+    // From this point on, if there is a failure, we need to free the unwinding context pointer to avoid leaking things.
+    // We can accomplish this by calling cleanup_unwinding_context();
+
+
+    // We pass a pointer to the unwinding context to this closure. 
+    invoke_with_current_registers(|registers| {
+        // set the proper register values before we used the 
+        {
+            // SAFE: we just created this pointer above
+            let unwinding_context = unsafe { &mut *unwinding_context_ptr };
+            unwinding_context.stack_frame_iter.registers = registers;
+
+            // For now, skip the first three frames, which correspond to functions in the panic handlers themselves.
+            unwinding_context.stack_frame_iter.next().expect("error skipping call stack frame 0 in unwinder");
+            unwinding_context.stack_frame_iter.next().expect("error skipping call stack frame 1 in unwinder");
+            unwinding_context.stack_frame_iter.next().expect("error skipping call stack frame 2 in unwinder");
+        }
+
+        match continue_unwinding(unwinding_context_ptr) {
+            Ok(()) => {
+                debug!("unwinding procedure has reached the end of the stack.");
+            }
+            Err(e) => {
+                error!("BUG: unwinding the first stack frame returned unexpectedly. Error: {}", e);
             }
         }
-    }
+        cleanup_unwinding_context(unwinding_context_ptr);
+    });
 
-    while let Some(frame) = frames.next().unwrap() {
-        if let Some(personality_fn_vaddr) = frame.personality {
-            trace!("HAS PERSONALITY");
-            let personality_func: PersonalityFunction = core::mem::transmute(personality_fn_vaddr);
-
-            let mut ctx = _Unwind_Context {
-                lsda: frame.lsda.unwrap(),
-                ip: frames.registers()[X86_64::RA].unwrap(),
-                initial_address: frame.initial_address,
-                registers: frames.registers(),
-            };
-
-            // Set this call frame (its stack pointer) as the currently-handled one
-            // so that we know where to continue unwinding after the next invocation to _Unwind_Resume
-            (*exception).private_contptr = frames.registers()[X86_64::RSP];
-
-            // The gcc libunwind ABI specifies that phase 1 (searching for a landing pad) is optional,
-            // so we just skip directly to running phase 2 (cleanup)
-            match personality_func(1, _Unwind_Action::_UA_CLEANUP_PHASE, (*exception).exception_class, exception, &mut ctx) {
-                _Unwind_Reason_Code::_URC_CONTINUE_UNWIND => (),
-                _Unwind_Reason_Code::_URC_INSTALL_CONTEXT => return Some(frames.registers),
-                x => panic!("wtf reason code {:?}", x),
-            }
-        }
-    }
-    None
+    warn!("Looping at the end of start_unwinding(): TODO FIXME: return a result here instead!");
+    loop { }
 }
 
-*/
 
-// #[no_mangle]
-// pub unsafe extern "C" fn _Unwind_Backtrace(trace: _Unwind_Trace_Fn, trace_argument: *mut c_void) -> _Unwind_Reason_Code {
-//     DwarfUnwinder::default().trace(|frames| {
-//         while let Some(frame) = frames.next().unwrap() {
-//             let mut ctx = _Unwind_Context {
-//                 lsda: frame.lsda.unwrap_or(0),
-//                 ip: frames.registers()[X86_64::RA].unwrap(),
-//                 initial_address: frame.initial_address,
-//                 registers: frames.registers(),
-//             };
+/// Continues the unwinding process from the point it left off at, 
+/// which is defined by the given unwinding context.
+/// 
+/// This returns an error upon failure, 
+/// and an `Ok(())` when it reaches the end of the stack and there are no more frames to unwind.
+/// When either value is returned (upon a return of any kind),
+/// **the caller is responsible for cleaning up the given `UnwindingContext`.
+/// 
+/// Upon successfully continuing to iterate up the call stack, this function will actually not return at all. 
+fn continue_unwinding(unwinding_context_ptr: *mut UnwindingContext) -> Result<(), &'static str> {
+    let stack_frame_iter = unsafe { &mut (*unwinding_context_ptr).stack_frame_iter };
+    
+    trace!("continue_unwinding(): stack_frame_iter: {:#X?}", stack_frame_iter);
+    
+    let (mut regs, landing_pad_address) = if let Some(frame) = stack_frame_iter.next().map_err(|e| {
+        error!("continue_unwinding: error getting next stack frame in the call stack: {}", e);
+        "continue_unwinding: error getting next stack frame in the call stack"
+    })? {
+        info!("Unwinding StackFrame: {:#X?}", frame);
+        info!("  In func: {:?}", stack_frame_iter.unwinder().namespace().get_section_containing_address(VirtualAddress::new_canonical(frame.initial_address() as usize), stack_frame_iter.unwinder().starting_crate(), false));
+        info!("  Regs: {:?}", stack_frame_iter.registers());
 
-//             trace(&mut ctx, trace_argument);
-//         }
-//     });
-//     _Unwind_Reason_Code::_URC_END_OF_STACK
-// }
+        if let Some(lsda) = frame.lsda() {
+            let lsda = VirtualAddress::new_canonical(lsda as usize);
+            if let Some((lsda_sec_ref, _)) = stack_frame_iter.unwinder().namespace().get_section_containing_address(lsda, stack_frame_iter.unwinder().starting_crate(), true) {
+                info!("  parsing LSDA section: {:?}", lsda_sec_ref);
+                let sec = lsda_sec_ref.lock();
+                let starting_offset = sec.mapped_pages_offset + (lsda.value() - sec.address_range.start.value());
+                let length_til_end_of_mp = sec.address_range.end.value() - lsda.value();
+                let sec_mp = sec.mapped_pages.lock();
+                let lsda_slice = sec_mp.as_slice::<u8>(starting_offset, length_til_end_of_mp)
+                    .map_err(|_e| "continue_unwinding(): couldn't get LSDA pointer as a slice")?;
+                let table = lsda::GccExceptTable::new(lsda_slice, NativeEndian, frame.initial_address());
+
+                // let mut iter = table.call_site_table_entries().unwrap();
+                // while let Some(entry) = iter.next().unwrap() {
+                //     debug!("{:#X?}", entry);
+                // }
+
+                let entry = table.call_site_table_entry_for_address(frame.caller_address()).map_err(|e| {
+                    error!("continue_unwinding(): couldn't find a call site table entry for this stack frame's caller address. Error: {}", e);
+                    "continue_unwinding(): couldn't find a call site table entry for this stack frame's caller address."
+                })?;
+
+                debug!("Found call site entry for address {:#X}: {:#X?}", frame.caller_address(), entry);
+                (stack_frame_iter.registers().clone(), entry.landing_pad_address())
+            } else {
+                error!("  BUG: couldn't find LSDA section (.gcc_except_table) for LSDA address: {:#X}", lsda);
+                return Err("BUG: couldn't find LSDA section (.gcc_except_table) for LSDA address specified in stack frame");
+            }
+        } else {
+            trace!("continue_unwinding(): stack frame has no LSDA");
+            return continue_unwinding(unwinding_context_ptr);
+        }
+    } else {
+        trace!("continue_unwinding(): NO REMAINING STACK FRAMES");
+        return Ok(());
+    };
+
+    // Jump to the actual landing pad function, or rather, a function that will jump there after setting up register values properly.
+    debug!("*** JUMPING TO LANDING PAD FUNCTION AT {:#X}", landing_pad_address);
+    // Once the unwinding cleanup function is done, it will call _Unwind_Resume (technically, it jumps to it),
+    // and pass the value in the landing registers' RAX register as the argument to _Unwind_Resume. 
+    // So, whatever we put into RAX in the landing regs will be placed into the first arg (RDI) in _Unwind_Resume.
+    // This is arch-specific; for x86_64 the transfer is from RAX -> RDI, for ARM/AARCH64, the transfer is from R0 -> R1 or X0 -> X1.
+    // See this for more mappings: <https://github.com/rust-lang/rust/blob/master/src/libpanic_unwind/gcc.rs#L102>
+    regs[gimli::X86_64::RAX] = Some(unwinding_context_ptr as u64);
+    debug!("    set RAX value to {:#X?}", regs[gimli::X86_64::RAX]);
+    unsafe {
+        land(&regs, landing_pad_address);
+    }
+    error!("BUG: call to unwind::land() returned, which should never happen!");
+    Err("BUG: call to unwind::land() returned, which should never happen!")
+}
+
+
+/// This function is automatically jumped to after each unwinding cleanup routine finishes executing,
+/// so it's basically the return address of every cleanup routine.
+/// Thus, this is a middle point in the unwinding execution flow; 
+/// here we need to continue (*resume*) the unwinding procedure 
+/// by basically figuring out where we just came from and picking up where we left off. 
+/// That logic is performed in `unwind_tracer()`, see that function for more.
+#[no_mangle]
+pub unsafe extern "C" fn _Unwind_Resume(unwinding_context_ptr: *mut UnwindingContext) -> ! {
+    trace!("_Unwind_Resume: unwinding_context_ptr value: {:#X}", unwinding_context_ptr as usize);
+
+    match continue_unwinding(unwinding_context_ptr) {
+        Ok(()) => {
+            debug!("_Unwind_Resume: continue_unwinding() returned Ok(), meaning it's at the end of the call stack.");
+        }
+        Err(e) => {
+            error!("BUG: in _Unwind_Resume: continue_unwinding() returned an error: {}", e);
+        }
+    }
+    // here, cleanup the unwinding state and kill the task
+    cleanup_unwinding_context(unwinding_context_ptr);
+
+    warn!("Looping at the end of _Unwind_Resume()!");
+    loop { }
+}
+
+
+/// This just drops the given `UnwindingContext` object pointed to by then given pointer.
+/// 
+/// TODO: we should also probably kill the task here, since there's nothing more we can really do.
+fn cleanup_unwinding_context(unwinding_context_ptr: *mut UnwindingContext) {
+    unsafe {
+        let _ = Box::from_raw(unwinding_context_ptr);
+    }
+}

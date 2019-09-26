@@ -580,7 +580,8 @@ pub fn spawn_userspace(path: Path, name: Option<String>) -> Result<TaskRef, &'st
 
 
 
-/// The entry point for all new `Task`s that run in kernelspace. This does not return!
+/// The entry point for all new `Task`s that run in kernelspace. 
+/// This does not return, because it doesn't really have anywhere to return.
 fn task_wrapper<F, A, R>() -> !
     where A: Send + 'static, 
           R: Send + 'static,
@@ -590,33 +591,31 @@ fn task_wrapper<F, A, R>() -> !
     // when invoking the task's entry function, in order to simplify cleanup when unwinding.
     // Tthat is, only values on the stack are allowed, nothing can be allocated/locked.
     let (func, arg) = {
-        let curr_task_ref = get_my_current_task().expect("BUG: task_wrapper: couldn't get_my_current_task().");
+        let curr_task_ref = get_my_current_task().expect("BUG: task_wrapper: couldn't get current task (before task func).");
         let curr_task_name = curr_task_ref.lock().name.clone();
 
-        let kthread_call_stack_ptr: *mut KthreadCall<F, A, R> = {
+        // The pointer to the kthread_call struct (func and arg) was placed at the bottom of the stack when this task was spawned.
+        let kthread_call_ptr: *mut KthreadCall<F, A, R> = {
             let t = curr_task_ref.lock();
-            // when spawning a kernel task() above, we use the very bottom of the stack to hold the pointer to the kthread_call
-            // let off: isize = 0;
             unsafe {
                 // dereference it once to get the raw pointer (from the Box<KthreadCall>)
                 *(t.kstack.bottom().value() as *mut *mut KthreadCall<F, A, R>) as *mut KthreadCall<F, A, R>
             }
         };
 
-        // the pointer to the kthread_call struct (func and arg) was placed on the stack
-        let kthread_call: Box<KthreadCall<F, A, R>> = unsafe {
-            Box::from_raw(kthread_call_stack_ptr)
-        };
-        let kthread_call_val: KthreadCall<F, A, R> = *kthread_call;
-
-        let arg: A = {
-            // we do this to make sure the box is freed before calling the task func
-            let boxed_arg: Box<A> = unsafe {
-                Box::from_raw(kthread_call_val.arg)
+        let kthread_call: KthreadCall<F, A, R> = {
+            let kthread_call_box: Box<KthreadCall<F, A, R>> = unsafe {
+                Box::from_raw(kthread_call_ptr)
             };
-            *boxed_arg
+            *kthread_call_box
         };
-        let func = kthread_call_val.func;
+        let arg: A = {
+            let arg_box: Box<A> = unsafe {
+                Box::from_raw(kthread_call.arg)
+            };
+            *arg_box
+        };
+        let func = kthread_call.func;
         debug!("task_wrapper [1]: \"{}\" about to call kthread func {:?} with arg {:?}", curr_task_name, debugit!(func), debugit!(arg));
         (func, arg)
     };
@@ -643,9 +642,8 @@ fn task_wrapper<F, A, R>() -> !
     // Otherwise, this task could be marked as `Exited`, and then a context switch could occur to another task,
     // which would prevent this task from ever running again, so it would never get to remove itself from the runqueue.
     { 
-        let curr_task_ref = get_my_current_task().expect("BUG: task_wrapper: couldn't get_my_current_task().");
+        let curr_task_ref = get_my_current_task().expect("BUG: task_wrapper: couldn't get current task (after task func).");
         let curr_task_name = curr_task_ref.lock().name.clone();
-        let curr_task_id = curr_task_ref.lock().id.clone();
         debug!("task_wrapper [2]: \"{}\" exited with return value {:?}", curr_task_name, debugit!(exit_value));
 
         // (0) disable preemption (currently just disabling interrupts altogether)

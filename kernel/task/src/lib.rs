@@ -930,7 +930,7 @@ fn get_task_local_data() -> Option<&'static TaskLocalData> {
         // because it will always be valid for the life of a given Task's execution.
         unsafe { &*tld_ptr }
     };
-    Some(&tld)
+    Some(tld)
 }
 
 /// Returns a reference to the current task by using the `TaskLocalData` pointer
