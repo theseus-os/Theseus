@@ -35,19 +35,13 @@ GRUB_MKRESCUE = $(GRUB_CROSS)grub-mkrescue
 ### For ensuring that the host computer has the proper version of the Rust compiler
 ###################################################################################################
 
-RUSTC_CURRENT_SUPPORTED_VERSION := rustc 1.38.0-nightly (78ca1bda3 2019-07-08)
-RUSTC_CURRENT_INSTALL_VERSION := nightly-2019-07-09
-RUSTC_OUTPUT=$(shell rustc --version)
+RUSTC_OUTPUT=$(shell rustc --version > /dev/null; echo $$?)
 
 check_rustc: 	
 ifneq (${BYPASS_RUSTC_CHECK}, yes)
-ifneq (${RUSTC_CURRENT_SUPPORTED_VERSION}, ${RUSTC_OUTPUT})
-	@echo -e "\nError: your rustc version does not match our supported compiler version."
-	@echo -e "To install the proper version of rustc, run the following commands:\n"
-	@echo -e "   rustup toolchain install $(RUSTC_CURRENT_INSTALL_VERSION)"
-	@echo -e "   rustup component add rust-src"
-	@echo -e "   make clean\n"
-	@echo -e "Then you can retry building!\n"
+ifneq ($(RUSTC_OUTPUT), 0)
+	@echo -e "\nError: rustup is not installed on this system."
+	@echo -e "Please install rustup and try again.\n"
 	@exit 1
 else
 	@echo -e '\nFound proper rust compiler version, proceeding with build...\n'
