@@ -430,24 +430,20 @@ impl DirectoryEntry {
 /// Structure for a file in FAT32. This key information is used to transverse the
 /// drive to find the file data  
 pub struct PFSFile {
-    filesystem: Arc<Mutex<Filesystem>>,
-    pub name: String,
-    pub parent: WeakDirRef,
-    pub start_cluster: u32,
-    pub size: u32,
+    cc: ClusterChain,
 }
 
 impl PFSFile {
     /// Given an offset, returns the PFSPosition of the file
-    pub fn seek(&self, offset: usize) -> Result<PFSPosition, &'static str> {
-        let fs = self.filesystem.lock();
+    pub fn seek(&self, fs: &Filesystem, offset: usize) -> Result<PFSPosition, &'static str> {
         let mut position: usize = 0;
 
         let cluster_size_in_bytes: usize = fs.sectors_per_cluster() as usize * fs.bytes_per_sector as usize;
         let clusters_to_advance: usize =  offset/cluster_size_in_bytes;
         
+        // FIXME call cluster_advancer here.
         let mut counter: usize = 0;
-        let mut current_cluster = self.start_cluster;
+        let mut current_cluster = self.cc.cluster;
 
         while clusters_to_advance != counter {
             match fs.next_cluster(current_cluster) {
@@ -491,11 +487,11 @@ impl File for PFSFile {
 
         
         // Place a lock on the filesystem
-        let fs = self.filesystem.lock();
+        let fs = self.cc.filesystem.lock();
 
         let cluster_size_in_bytes: usize = fs.sectors_per_cluster() as usize * 512 as usize;
         let mut position: usize = 0;
-        let mut current_cluster = self.start_cluster;
+        let mut current_cluster = self.cc.cluster;
         let mut sector_offset: u32 = 0;
         let mut cluster_offset = 0;
 
@@ -525,7 +521,7 @@ impl File for PFSFile {
             }
 
             // Reaches end of file
-            if position >= self.size as usize {
+            if position >= self.cc.size as usize {
                 debug!("end of file");
                 break;
             }
@@ -574,8 +570,8 @@ impl File for PFSFile {
             
             sector_offset += fs.sectors_per_cluster;
             
-            if (position + sectors_read) > self.size as usize {
-                let bytes_read = self.size as usize - position;
+            if (position + sectors_read) > self.cc.size as usize {
+                let bytes_read = self.cc.size as usize - position;
                 return Ok(bytes_read as usize);
             } 
             else {
@@ -598,7 +594,7 @@ impl File for PFSFile {
 
     /// Returns the size of the file
     fn size(&self) -> usize {
-        (self.size as usize)
+        (self.cc.size as usize)
     }     
 
     fn as_mapping(&self) -> Result<&MappedPages, &'static str> {
@@ -608,11 +604,11 @@ impl File for PFSFile {
 
 impl FsNode for PFSFile {
     fn get_name(&self) -> String {
-        self.name.clone()
+        self.cc.name.clone()
     }
 
     fn get_parent_dir(&self) -> Option<DirRef> {
-        self.parent.upgrade()
+        self.cc.parent.upgrade()
     }
 
     fn set_parent_dir(&mut self, _new_parent: WeakDirRef) {
@@ -633,7 +629,9 @@ pub struct PFSPosition {
 #[derive(Clone)]
 /// Structure for a FAT32 directory.
 pub struct PFSDirectory {
-    cluster_dir: Arc<Mutex<ClusterDir>>,
+    cc: ClusterChain,
+    children: BTreeMap<String, FileOrDir>, // Incomplete list of children. TODO make DirRef into our internal type.
+    dot: WeakDirRef, // Self reference.
 }
 
 impl Directory for PFSDirectory {
@@ -652,7 +650,7 @@ impl Directory for PFSDirectory {
     fn get(&self, name: &str) -> Option<FileOrDir> {
 
         // TODO validate name is valid in Fat32. Otherwise we'll never find it so it seems not important.
-        match self.cluster_dir.lock().get(name) {
+        match self.fat32_get(name) {
             Ok(node) => {
                     // node.set_parent_dir(self.) FIXME we don't have a good way to get a reference to the parent.
                     Some(node)
@@ -667,10 +665,9 @@ impl Directory for PFSDirectory {
 
         let mut list_of_names: Vec<String> = Vec::new();
 
-        let dir = self.cluster_dir.lock();
-        let fs = dir.cc.filesystem.lock();
+        let fs = self.cc.filesystem.lock();
         // Returns a vector of the 32-byte directory structures
-        let entries = match dir.entries(&fs) {
+        let entries = match self.entries(&fs) {
             Ok(entries) => entries,
             Err(_) => {
                 warn!("Failed to read list of names from directory");
@@ -696,11 +693,11 @@ impl Directory for PFSDirectory {
 
 impl FsNode for PFSDirectory {
     fn get_name(&self) -> String {
-        self.cluster_dir.lock().cc.name.clone()
+        self.cc.name.clone()
     }
 
     fn get_parent_dir(&self) -> Option<DirRef> {
-        self.cluster_dir.lock().cc.parent.upgrade()
+        self.cc.parent.upgrade()
     }
 
     fn set_parent_dir(&mut self, _new_parent: WeakDirRef) {
@@ -710,16 +707,6 @@ impl FsNode for PFSDirectory {
 }
 
 impl PFSDirectory {    
-    
-}
-
-/// A Fat 32 directory underlying any public facing Fat32 directory.
-struct ClusterDir {
-    cc: ClusterChain,
-    children: BTreeMap<String, FileOrDir>, // Incomplete list of children. TODO make DirRef into our internal type.
-}
-
-impl ClusterDir {
     /// Returns a vector of all the directory entries in a directory without mutating the directory
     pub fn entries(&self, fs: &Filesystem) -> Result<Vec<DirectoryEntry>, Error> {
         debug!("Getting entries for {:?}", self.cc.name);
@@ -898,7 +885,7 @@ impl ClusterDir {
     }
 
     /// Internal insert function. TODO enforce type on arguments.
-    fn insert(&mut self, node: FileOrDir) -> Result<Option<FileOrDir>, Error> {
+    fn fat32_insert(&mut self, node: FileOrDir) -> Result<Option<FileOrDir>, Error> {
         let name = node.get_name();
 
 
@@ -915,7 +902,7 @@ impl ClusterDir {
     }
 
     /// Internal get function. TODO enforce returning PFSType?
-    fn get(&self, name: &str) -> Result<FileOrDir, Error> {
+    fn fat32_get(&self, name: &str) -> Result<FileOrDir, Error> {
 
         // TODO need some sort of string typing that ensure it's a valid fat32 name that will match the string we insert into the children list.
         match self.children.get(name) {
@@ -938,27 +925,34 @@ impl ClusterDir {
                     name: name.to_string(), // FIXME this is wrong.
                     on_disk_refcount: 1, // FIXME not true for directories. Should rename so that this is fine.
                     filesystem: self.cc.filesystem.clone(),
-                    parent: Weak::<Mutex<PFSDirectory>>::new(), // FIXME temporary workaround since we can't change the parent without a ref to the caller.
+                    parent: self.dot.clone(),
+                    size: entry.size,
                 };
 
                 match entry.file_type {
                     FileType::PFSDirectory => {
-                        // Intializes the different trait objects depedent on whether the file is a file or subdirectory
-                        let cluster_dir = ClusterDir {
-                            cc: cc,
-                            children: BTreeMap::new(),
-                        };
 
                         let dir = PFSDirectory {
-                            cluster_dir: Arc::new(Mutex::new(cluster_dir))
+                            cc: cc,
+                            children: BTreeMap::new(),
+                            dot: Weak::<Mutex<PFSDirectory>>::new(),
                         };
 
-                        let dir_ref = Arc::new(Mutex::new(dir)) as DirRef;
+                        // Dirty shenanigans to set dot weak loop.
+                        let dir_ref = Arc::new(Mutex::new(dir));
+                        dir_ref.lock().dot = Arc::downgrade(&dir_ref) as WeakDirRef;
+
                         return Ok(FileOrDir::Dir(dir_ref));
                     }
                     
                     FileType::PFSFile => {
-                        return Err(Error::Unsupported); // TODO need clusterFile type.
+                        
+                        let file = PFSFile {
+                            cc: cc,
+                        };
+
+                        let file_ref = Arc::new(Mutex::new(file));
+                        return Ok(FileOrDir::File(file_ref));
                     }
                 }
             }
@@ -968,6 +962,7 @@ impl ClusterDir {
     }
 }
 
+#[derive(Clone)]
 struct ClusterChain {
     filesystem: Arc<Mutex<Filesystem>>,
     cluster: u32,
@@ -975,6 +970,7 @@ struct ClusterChain {
     pub parent: WeakDirRef, // the directory that holds the metadata for this directory. The root directory's parent should be itself
     on_disk_refcount: usize, // Number of references on disk. For a file must always be one. For a directory this is variable.
     _num_clusters: Option<u32>, // Unknown without traversing FAT table. I consider this useful information, but I'm not sure if I'll ever use it.
+    pub size: u32,
 }
 
 impl ClusterChain {
@@ -1448,18 +1444,17 @@ pub fn root_dir(fs: Arc<Mutex<Filesystem>>) -> Result<RootDirectory, Error> {
         parent: Weak::<Mutex<PFSDirectory>>::new(),
         on_disk_refcount: 2 + 1, // TODO should this be the case?
         _num_clusters: None,
-    };
-
-    let cdir = ClusterDir {
-        cc: cc,
-        children: BTreeMap::new(),
+        size: 0, // According to wikipedia File size for directories is always 0.
     };
 
     let fatdir = PFSDirectory {
-        cluster_dir: Arc::new(Mutex::new(cdir)),
+        cc: cc,
+        children: BTreeMap::new(),
+        dot: Weak::<Mutex<PFSDirectory>>::new(),
     };
 
     let underlying_root = Arc::new(Mutex::new(fatdir));
+    underlying_root.lock().dot = Arc::downgrade(&underlying_root) as WeakDirRef;
 
     // fs.lock();
     let new_root_dir = RootDirectory {
@@ -1468,7 +1463,7 @@ pub fn root_dir(fs: Arc<Mutex<Filesystem>>) -> Result<RootDirectory, Error> {
 
     // This is pretty weird, but it seems to be necessary to set our own parent as ourselves.
     underlying_root.lock().set_parent_dir(Arc::downgrade(&(underlying_root.clone() 
-        as Arc<Mutex<dyn Directory + Send>>)));
+        as DirRef)));
 
     Ok(new_root_dir) 
         
