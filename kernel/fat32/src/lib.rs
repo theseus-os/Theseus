@@ -104,7 +104,7 @@ use zerocopy::{FromBytes, AsBytes};
 use byteorder::ByteOrder;
 use byteorder::LittleEndian;
 use alloc::collections::BTreeMap;
-use spin::Mutex;
+use spin::{Mutex, RwLock};
 use fs_node::{DirRef, WeakDirRef, FileRef, Directory, FileOrDir, File, FsNode};
 use alloc::sync::{Arc, Weak};
 use core::convert::TryInto;
@@ -484,7 +484,6 @@ impl File for PFSFile {
     /// 
     /// Returns the number of bytes read 
     fn read(&self, data: &mut [u8], offset: usize) -> Result<usize, &'static str> {
-
         
         // Place a lock on the filesystem
         let fs = self.cc.filesystem.lock();
@@ -501,10 +500,12 @@ impl File for PFSFile {
             entry_offset: 0,
         };
 
+        info!("Read called with buffer size {:}, position: {:}. File size: {:}", data.len(), offset, self.size());
+
         // The inserted buffer must be a multiple of the cluster size in bytes for clean reads.
         // clusters act as a sort of boundary in FAT for every file/directory and to minimize
         // disk requests, its best to read clusters at a time
-        if data.len() as usize % cluster_size_in_bytes != 0{
+        if data.len() as usize % cluster_size_in_bytes != 0 {
             return Err("data buffer size must be a multiple of the cluster size in bytes");
         }
 
@@ -626,11 +627,10 @@ pub struct PFSPosition {
     entry_offset: usize, 
 }
 
-#[derive(Clone)]
 /// Structure for a FAT32 directory.
 pub struct PFSDirectory {
     cc: ClusterChain,
-    children: BTreeMap<String, FileOrDir>, // Incomplete list of children. TODO make DirRef into our internal type.
+    children: RwLock<BTreeMap<String, FileOrDir>>, // Incomplete list of children. TODO make DirRef into our internal type.
     dot: WeakDirRef, // Self reference.
 }
 
@@ -905,7 +905,7 @@ impl PFSDirectory {
     fn fat32_get(&self, name: &str) -> Result<FileOrDir, Error> {
 
         // TODO need some sort of string typing that ensure it's a valid fat32 name that will match the string we insert into the children list.
-        match self.children.get(name) {
+        match self.children.read().get(name) {
             Some(child) => return Ok(child.clone()),
             None => {},
         };
@@ -929,18 +929,27 @@ impl PFSDirectory {
                     size: entry.size,
                 };
 
+                // Get a write lock for the children and check if it was found before creating a new object (since we dropped the read lock).
+                let mut children = self.children.write();
+                match children.get(name) {
+                    Some(child) => return Ok(child.clone()),
+                    None => {},
+                };
+
                 match entry.file_type {
                     FileType::PFSDirectory => {
 
+
                         let dir = PFSDirectory {
                             cc: cc,
-                            children: BTreeMap::new(),
+                            children: RwLock::new(BTreeMap::new()),
                             dot: Weak::<Mutex<PFSDirectory>>::new(),
                         };
 
                         // Dirty shenanigans to set dot weak loop.
                         let dir_ref = Arc::new(Mutex::new(dir));
                         dir_ref.lock().dot = Arc::downgrade(&dir_ref) as WeakDirRef;
+                        children.insert(name.to_string(), FileOrDir::Dir(dir_ref.clone()));
 
                         return Ok(FileOrDir::Dir(dir_ref));
                     }
@@ -952,6 +961,8 @@ impl PFSDirectory {
                         };
 
                         let file_ref = Arc::new(Mutex::new(file));
+                        children.insert(name.to_string(), FileOrDir::File(file_ref.clone()));
+
                         return Ok(FileOrDir::File(file_ref));
                     }
                 }
@@ -1449,7 +1460,7 @@ pub fn root_dir(fs: Arc<Mutex<Filesystem>>) -> Result<RootDirectory, Error> {
 
     let fatdir = PFSDirectory {
         cc: cc,
-        children: BTreeMap::new(),
+        children: RwLock::new(BTreeMap::new()),
         dot: Weak::<Mutex<PFSDirectory>>::new(),
     };
 

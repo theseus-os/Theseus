@@ -246,7 +246,7 @@ fn print_file(f: &dyn File) {
     print_data(&data);
 
     // Read until the end of file.
-    while bytes_read == size {
+    while bytes_read < size {
         bytes_read += match f.read(&mut data, pos) {
             Ok(bytes) => bytes,
             Err(_) => {
