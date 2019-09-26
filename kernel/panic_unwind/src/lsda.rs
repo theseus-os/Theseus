@@ -1,6 +1,8 @@
 //! Routines for parsing the gcc-style LSDA (Language-Specific Data Area) in an ELF object file, 
 //! which corresponds to a part of the `.gcc_except_table` section. 
 
+#![allow(nonstandard_style)]
+
 use core::ops::Range;
 use gimli::{Reader, DwEhPe, Section, SectionId, Endianity, EndianSlice, NativeEndian, constants::*, };
 use FallibleIterator;

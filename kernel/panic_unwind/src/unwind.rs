@@ -1,7 +1,6 @@
 //! Taken from the gimli/unwind-rs/src/glue.rs file
 //! 
 
-#![allow(nonstandard_style)]
 
 use core::fmt;
 use alloc::{
@@ -297,7 +296,8 @@ unsafe fn deref_ptr(ptr: Pointer) -> u64 {
 }
 
 
-type FuncWithRegisters<'a> = &'a dyn Fn(Registers);
+pub trait FuncWithRegisters = Fn(Registers) -> Result<(), &'static str>;
+type RefFuncWithRegisters<'a> = &'a dyn FuncWithRegisters;
 
 
 /// This function saves the current CPU register values onto the stack (to preserve them)
@@ -307,13 +307,19 @@ type FuncWithRegisters<'a> = &'a dyn Fn(Registers);
 /// since we have to start from the current call frame and work backwards up the call stack 
 /// while applying the rules for register value changes in each call frame
 /// in order to arrive at the proper register values for a prior call frame.
-pub fn invoke_with_current_registers<F>(f: F) where F: Fn(Registers) {
-    let f: FuncWithRegisters = &f;
+pub fn invoke_with_current_registers<F>(f: F) -> Result<(), &'static str> 
+    where F: FuncWithRegisters 
+{
+    let f: RefFuncWithRegisters = &f;
     trace!("in invoke_with_current_registers(): calling unwind_trampoline...");
-    unsafe { unwind_trampoline(&f) };
-    trace!("in invoke_with_current_registers(): returned from unwind_trampoline.");
+    let result = unsafe { 
+        let res_ptr = unwind_trampoline(&f);
+        let res_boxed = Box::from_raw(res_ptr);
+        *res_boxed
+    };
+    trace!("in invoke_with_current_registers(): returned from unwind_trampoline with retval: {:?}", result);
+    return result;
     // this is the end of the code in this function, the following is just inner functions.
-
 
     /// This is an internal assembly function used by `invoke_with_current_registers()` 
     /// that saves the current register values by pushing them onto the stack
@@ -324,8 +330,8 @@ pub fn invoke_with_current_registers<F>(f: F) where F: Fn(Registers) {
     /// The argument is a pointer to a function reference, so effectively a pointer to a pointer. 
     #[naked]
     #[inline(never)]
-    unsafe fn unwind_trampoline(_payload: *const FuncWithRegisters) {
-        // DO NOT touch RDI register, which has the `_payload` function; it needs to be passed into unwind_recorder.
+    unsafe fn unwind_trampoline(_func: *const RefFuncWithRegisters) -> *mut Result<(), &'static str> {
+        // DO NOT touch RDI register, which has the `_func` function; it needs to be passed into unwind_recorder.
         asm!("
             # copy the stack pointer to RSI
             movq %rsp, %rsi
@@ -336,7 +342,7 @@ pub fn invoke_with_current_registers<F>(f: F) where F: Fn(Registers) {
             pushq %r14
             pushq %r15
             # To invoke `unwind_recorder`, we need to put: 
-            # (1) the payload in RDI (it's already there, just don't overwrite it),
+            # (1) the func in RDI (it's already there, just don't overwrite it),
             # (2) the stack in RSI,
             # (3) a pointer to the saved registers in RDX.
             movq %rsp, %rdx   # pointer to saved regs (on the stack)
@@ -355,35 +361,31 @@ pub fn invoke_with_current_registers<F>(f: F) where F: Fn(Registers) {
 
 
     /// The calling convention dictates the following order of arguments: 
-    /// * first arg in `RDI` register, the payload function,
+    /// * first arg in `RDI` register, the function (or closure) to invoke with the saved registers arg,
     /// * second arg in `RSI` register, the stack pointer,
     /// * third arg in `RDX` register, the saved register values used to recover execution context
     ///   after we change the register values during unwinding,
     #[no_mangle]
     unsafe extern "C" fn unwind_recorder(
-        payload: *const FuncWithRegisters,
+        func: *const RefFuncWithRegisters,
         stack: u64,
         saved_regs: *mut SavedRegs,
-    ) {
-        trace!("unwind_recorder: payload {:#X}, stack: {:#X}, saved_regs: {:#X}",
-            payload as usize, stack, saved_regs as usize,
-        );
-        let payload = &*payload;
-        trace!("unwind_recorder: deref'd payload");
+    ) -> *mut Result<(), &'static str> {
+        let func = &*func;
         let saved_regs = &*saved_regs;
-        trace!("unwind_recorder: deref'd saved_regs: {:#X?}", saved_regs);
 
         let mut registers = Registers::default();
         registers[X86_64::RBX] = Some(saved_regs.rbx);
         registers[X86_64::RBP] = Some(saved_regs.rbp);
-        registers[X86_64::RSP] = Some(stack + 8); // the stack value passed in is one pointer width below the real RSP
+        registers[X86_64::RSP] = Some(stack + 8); // the stack value passed in is one pointer width before the real RSP
         registers[X86_64::R12] = Some(saved_regs.r12);
         registers[X86_64::R13] = Some(saved_regs.r13);
         registers[X86_64::R14] = Some(saved_regs.r14);
         registers[X86_64::R15] = Some(saved_regs.r15);
         registers[X86_64::RA]  = Some(*(stack as *const u64));
 
-        payload(registers);
+        let res = func(registers);
+        Box::into_raw(Box::new(res))
     }
 }
 
@@ -556,37 +558,44 @@ pub fn start_unwinding() -> Result<(), &'static str> {
         ))
     };
 
+    // IMPORTANT NOTE!!!!
     // From this point on, if there is a failure, we need to free the unwinding context pointer to avoid leaking things.
-    // We can accomplish this by calling cleanup_unwinding_context();
 
 
     // We pass a pointer to the unwinding context to this closure. 
-    invoke_with_current_registers(|registers| {
+    let res = invoke_with_current_registers(|registers| {
         // set the proper register values before we used the 
-        {
+        {  
             // SAFE: we just created this pointer above
             let unwinding_context = unsafe { &mut *unwinding_context_ptr };
             unwinding_context.stack_frame_iter.registers = registers;
 
-            // For now, skip the first three frames, which correspond to functions in the panic handlers themselves.
-            unwinding_context.stack_frame_iter.next().expect("error skipping call stack frame 0 in unwinder");
-            unwinding_context.stack_frame_iter.next().expect("error skipping call stack frame 1 in unwinder");
-            unwinding_context.stack_frame_iter.next().expect("error skipping call stack frame 2 in unwinder");
+            // Skip the first three frames, which correspond to functions in the panic handlers themselves.
+            unwinding_context.stack_frame_iter.next()
+                .map_err(|_e| "error skipping call stack frame 0 in unwinder")?
+                .ok_or("call stack frame 0 did not exist (we were trying to skip it)")?;
+            unwinding_context.stack_frame_iter.next()
+                .map_err(|_e| "error skipping call stack frame 1 in unwinder")?
+                .ok_or("call stack frame 1 did not exist (we were trying to skip it)")?;
+            unwinding_context.stack_frame_iter.next()
+                .map_err(|_e| "error skipping call stack frame 2 in unwinder")?
+                .ok_or("call stack frame 2 did not exist (we were trying to skip it)")?;
         }
 
-        match continue_unwinding(unwinding_context_ptr) {
-            Ok(()) => {
-                debug!("unwinding procedure has reached the end of the stack.");
-            }
-            Err(e) => {
-                error!("BUG: unwinding the first stack frame returned unexpectedly. Error: {}", e);
-            }
-        }
-        cleanup_unwinding_context(unwinding_context_ptr);
+        continue_unwinding(unwinding_context_ptr)
     });
 
-    warn!("Looping at the end of start_unwinding(): TODO FIXME: return a result here instead!");
-    loop { }
+    match &res {
+        &Ok(()) => {
+            debug!("unwinding procedure has reached the end of the stack.");
+        }
+        &Err(e) => {
+            error!("BUG: unwinding the first stack frame returned unexpectedly. Error: {}", e);
+        }
+    }
+    cleanup_unwinding_context(unwinding_context_ptr);
+
+    res
 }
 
 

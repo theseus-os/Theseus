@@ -10,6 +10,7 @@
 #![feature(panic_info_message)]
 #![feature(asm, naked_functions)]
 #![feature(unwind_attributes)]
+#![feature(trait_alias)]
 
 extern crate alloc;
 #[macro_use] extern crate log;
@@ -85,7 +86,7 @@ fn panic_unwind_test(info: &PanicInfo) -> ! {
 
     match unwind::start_unwinding() {
         Ok(_) => {
-            error!("BUG: start_unwinding() returned an Ok() value, which is unexpected. Task: {:?}.", task::get_my_current_task());
+            warn!("BUG: start_unwinding() returned an Ok() value, which is unexpected because it means no unwinding actually occurred. Task: {:?}.", task::get_my_current_task());
         }
         Err(e) => {
             error!("Task {:?} was unable to start unwinding procedure, error: {}.", task::get_my_current_task(), e);
