@@ -18,9 +18,13 @@ extern crate alloc;
 extern crate memory;
 extern crate panic_wrapper;
 extern crate mod_mgmt;
+extern crate irq_safety;
 extern crate task;
 extern crate gimli;
 extern crate fallible_iterator;
+extern crate scheduler;
+extern crate apic;
+extern crate runqueue;
 
 mod registers;
 mod unwind;
@@ -36,6 +40,8 @@ use mod_mgmt::{
     metadata::{StrongCrateRef, StrongSectionRef, SectionType},
 };
 use alloc::boxed::Box;
+use task::{PanicInfoOwned, KillReason};
+
 
 
 /// The singular entry point for a language-level panic.
@@ -45,6 +51,22 @@ use alloc::boxed::Box;
 fn panic_unwind_test(info: &PanicInfo) -> ! {
     trace!("panic_unwind_test() [top]: {:?}", info);
 
+    // Call this task's panic handler, if it has one.
+    // Note that we must consume and drop the Task's panic handler BEFORE that Task can possibly be dropped.
+    // This is because if the app sets a panic handler that is a closure/function in the text section of the app itself,
+    // then after the app crate is released the panic handler will be dropped AFTER the app crate has been freed.
+    // When it tries to drop the task's panic handler, causes a page fault because the text section of the app crate has been unmapped.
+    {
+        let panic_handler = task::get_my_current_task().and_then(|t| t.take_panic_handler());
+        if let Some(ref ph_func) = panic_handler {
+            debug!("Found panic handler callback to invoke in Task {:?}", task::get_my_current_task());
+            ph_func(info);
+        }
+        else {
+            debug!("No panic handler callback in Task {:?}", task::get_my_current_task());
+        }
+    }
+    
     // We should ensure that the lock on the curr_task isn't held here,
     // in order to allow the panic handler and other functions below to acquire it. 
 
@@ -83,8 +105,8 @@ fn panic_unwind_test(info: &PanicInfo) -> ! {
     //         trace!("   {:?}", &*s.lock());
     //     }
     // }
-
-    match unwind::start_unwinding() {
+    let cause = KillReason::Panic(PanicInfoOwned::from(info));
+    match unwind::start_unwinding(cause) {
         Ok(_) => {
             warn!("BUG: start_unwinding() returned an Ok() value, which is unexpected because it means no unwinding actually occurred. Task: {:?}.", task::get_my_current_task());
         }
@@ -158,17 +180,20 @@ fn panic_entry_point(info: &PanicInfo) -> ! {
 
 
 
+/// Typically this would be an entry point in the unwinding procedure, in which a stack frame is unwound. 
+/// However, in Theseus we use our own unwinding flow which is simpler.
+/// 
+/// This function will always be renamed to "rust_eh_personality" no matter what function name we give it here.
 #[cfg(not(test))]
 #[lang = "eh_personality"]
 #[no_mangle]
 #[doc(hidden)]
-/// This function will always be renamed to "rust_eh_personality" no matter what function name we give it here.
-unsafe extern "C" fn rust_eh_personality() {
+extern "C" fn rust_eh_personality() {
     error!("BUG: Theseus does not use rust_eh_personality. Why has it been invoked?");
 }
 
 
-
+/// This is the callback entry point that gets invoked when the heap allocator runs out of memory.
 #[alloc_error_handler]
 #[cfg(not(test))]
 fn oom(_layout: core::alloc::Layout) -> ! {

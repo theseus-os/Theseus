@@ -61,16 +61,16 @@ pub fn panic_wrapper(panic_info: &PanicInfo) -> Result<(), &'static str> {
         },
     );
     
-    // call this task's panic handler, if it has one. 
-    let panic_handler = curr_task.take_panic_handler();
-    if let Some(ref ph_func) = panic_handler {
-        ph_func(&PanicInfoOwned::from(panic_info));
-        error!("PANIC handled in task \"{}\" on core {:?}: {}", curr_task.lock().name, apic_id, panic_info);
-    }
-    else {
-        error!("PANIC was unhandled in task \"{}\" on core {:?} at {}", curr_task.lock().name, apic_id, panic_info);
-        // memory::stack_trace();
-    }
+    // // call this task's panic handler, if it has one. 
+    // let panic_handler = curr_task.take_panic_handler();
+    // if let Some(ref ph_func) = panic_handler {
+    //     ph_func(&PanicInfoOwned::from(panic_info));
+    //     error!("PANIC handled in task \"{}\" on core {:?}: {}", curr_task.lock().name, apic_id, panic_info);
+    // }
+    // else {
+    //     error!("PANIC was unhandled in task \"{}\" on core {:?} at {}", curr_task.lock().name, apic_id, panic_info);
+    //     // memory::stack_trace();
+    // }
 
     if !is_idle_task {
         // kill the offending task (the current task)
@@ -91,8 +91,8 @@ pub fn panic_wrapper(panic_info: &PanicInfo) -> Result<(), &'static str> {
 #[inline(never)]
 pub fn stack_trace(
     current_page_table: &PageTable,
-    addr_to_symbol: &dyn Fn(VirtualAddress) -> Option<(String, usize)>) 
-{
+    addr_to_symbol: &dyn Fn(VirtualAddress) -> Option<(String, usize)>
+) {
     // SAFETY: pointers are checked 
     // get the stack base pointer
     let mut rbp: usize;

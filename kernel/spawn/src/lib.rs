@@ -635,38 +635,40 @@ fn task_wrapper<F, A, R>() -> !
         
 
     // Here: now that the task is finished running, we must clean in up by doing three things:
-    // (1) Put the task into a non-runnable mode (exited), and set its exit value
-    // (2) Remove it from its runqueue
-    // (3) Yield the CPU
-    // The first two need to be done "atomically" (without interruption), so we must disable preemption.
+    // 1. Put the task into a non-runnable mode (exited), and set its exit value
+    // 2. Remove it from its runqueue
+    // 3. Yield the CPU
+    // The first two need to be done "atomically" (without interruption), so we must disable preemption before step 1.
     // Otherwise, this task could be marked as `Exited`, and then a context switch could occur to another task,
     // which would prevent this task from ever running again, so it would never get to remove itself from the runqueue.
-    { 
-        let curr_task_ref = get_my_current_task().expect("BUG: task_wrapper: couldn't get current task (after task func).");
-        let curr_task_name = curr_task_ref.lock().name.clone();
-        debug!("task_wrapper [2]: \"{}\" exited with return value {:?}", curr_task_name, debugit!(exit_value));
-
+    {
         // (0) disable preemption (currently just disabling interrupts altogether)
         let _held_interrupts = hold_interrupts();
-        
-        // (1) Put the task into a non-runnable mode (exited), and set its exit value
-        if curr_task_ref.exit(Box::new(exit_value)).is_err() {
-            warn!("task_wrapper: \"{}\" task could not set exit value, because it had already exited. Is this correct?", curr_task_name);
-        }
+    
+        { 
+            let curr_task_ref = get_my_current_task().expect("BUG: task_wrapper: couldn't get current task (after task func).");
+            let curr_task_name = curr_task_ref.lock().name.clone();
+            debug!("task_wrapper [2]: \"{}\" exited with return value {:?}", curr_task_name, debugit!(exit_value));
+            
+            // (1) Put the task into a non-runnable mode (exited), and set its exit value
+            if curr_task_ref.mark_as_exited(Box::new(exit_value)).is_err() {
+                warn!("task_wrapper: \"{}\" task could not set exit value, because it had already exited. Is this correct?", curr_task_name);
+            }
 
-        // (2) Remove it from its runqueue
-        #[cfg(not(runqueue_state_spill_evaluation))]  // the normal case
-        {
-            if let Err(e) = apic::get_my_apic_id()
-                .and_then(|id| runqueue::get_runqueue(id))
-                .ok_or("couldn't get this core's ID or runqueue to remove exited task from it")
-                .and_then(|rq| rq.write().remove_task(&curr_task_ref)) 
+            // (2) Remove it from its runqueue
+            #[cfg(not(runqueue_state_spill_evaluation))]  // the normal case
             {
-                error!("BUG: task_wrapper(): couldn't remove exited task from runqueue: {}", e);
+                if let Err(e) = apic::get_my_apic_id()
+                    .and_then(|id| runqueue::get_runqueue(id))
+                    .ok_or("couldn't get this core's ID or runqueue to remove exited task from it")
+                    .and_then(|rq| rq.write().remove_task(&curr_task_ref)) 
+                {
+                    error!("BUG: task_wrapper(): couldn't remove exited task from runqueue: {}", e);
+                }
             }
         }
-
-        // re-enabled preemption here (happens automatically when _held_interrupts is dropped)
+        
+        // re-enabled preemption/interrupts here (happens automatically when _held_interrupts is dropped)
     }
 
     // (3) Yield the CPU

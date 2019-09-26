@@ -29,6 +29,11 @@ use mod_mgmt::{
 };
 use memory::VirtualAddress;
 use lsda;
+use task::{TaskRef, KillReason};
+use scheduler;
+use irq_safety::hold_interrupts;
+use apic;
+use runqueue;
 
 
 /// This is the context/state that is used during unwinding and passed around
@@ -39,15 +44,14 @@ use lsda;
 /// Thus, it must be manually freed when unwinding is finished (or if it fails in the middle)
 /// in order to avoid leaking memory, e.g., not dropping reference counts. 
 pub struct UnwindingContext {
+    /// The iterator over the current call stack, in which the "next" item in the iterator
+    /// is the previous frame in the call stack (the caller frame).
     stack_frame_iter: StackFrameIter,
+    /// The reason why we're performing unwinding, which should be set in the panic entry point handler.
+    cause: KillReason,
+    /// A reference to the current task that is being unwound.
+    current_task: TaskRef,
 }
-
-impl Drop for UnwindingContext {
-    fn drop(&mut self) {
-        warn!("DROPPING UnwindingContext!");
-    }
-}
-
 
 
 /// Due to lifetime and locking issues, we cannot store a direct reference to an unwind table row. 
@@ -533,7 +537,7 @@ fn print_stack_frames(stack_frames: &mut StackFrameIter) {
 
 /// Starts the unwinding procedure for the current task 
 /// by working backwards up the call stack starting from the current stack frame.
-pub fn start_unwinding() -> Result<(), &'static str> {
+pub fn start_unwinding(reason: KillReason) -> Result<(), &'static str> {
     // Here we have to be careful to have no resources waiting to be dropped/freed/released on the stack. 
     let unwinding_context_ptr = {
         let curr_task = task::get_my_current_task().ok_or("get_my_current_task() failed")?;
@@ -554,6 +558,8 @@ pub fn start_unwinding() -> Result<(), &'static str> {
         Box::into_raw(Box::new(
             UnwindingContext {
                 stack_frame_iter: StackFrameIter::new(NamespaceUnwinder::new(namespace, app_crate_ref), Registers::default()),
+                cause: reason,
+                current_task: curr_task.clone(),
             }
         ))
     };
@@ -695,17 +701,65 @@ pub unsafe extern "C" fn _Unwind_Resume(unwinding_context_ptr: *mut UnwindingCon
     }
     // here, cleanup the unwinding state and kill the task
     cleanup_unwinding_context(unwinding_context_ptr);
-
-    warn!("Looping at the end of _Unwind_Resume()!");
-    loop { }
 }
 
 
-/// This just drops the given `UnwindingContext` object pointed to by then given pointer.
-/// 
-/// TODO: we should also probably kill the task here, since there's nothing more we can really do.
-fn cleanup_unwinding_context(unwinding_context_ptr: *mut UnwindingContext) {
-    unsafe {
-        let _ = Box::from_raw(unwinding_context_ptr);
+/// This function should be invoked when the unwinding procedure is finished, or cannot be continued any further.
+/// It cleans up the `UnwindingContext` object pointed to by the given pointer and marks the current task as killed.
+fn cleanup_unwinding_context(unwinding_context_ptr: *mut UnwindingContext) -> ! {
+
+    // Just like in `task_wrapper`, these functions need to be run atomically (without preemption)
+    // to ensure that they all get fully executed even after the task is killed.
+    // Here: now that the task is finished being unwound and cleaned up, we must do three things:
+    // 1. Put the task into a non-runnable mode (killed), and set its kill reason
+    // 2. Remove it from its runqueue
+    // 3. Yield the CPU
+    // The first two need to be done "atomically" (without interruption), so we must disable preemption before step 1.
+    // Otherwise, this task could be marked as `Killed`, and then a context switch could occur to another task,
+    // which would prevent this task from ever running again, so it would never get to remove itself from the runqueue.
+    {
+        // (0) disable preemption (currently just disabling interrupts altogether)
+        debug!("cleanup_unwinding_context(): interrupts are enabled? {}", irq_safety::interrupts_enabled());
+        let _held_interrupts = hold_interrupts();
+
+        {
+            // Recover ownership of the unwinding context from its pointer
+            let unwinding_context_boxed = unsafe { Box::from_raw(unwinding_context_ptr) };
+            let unwinding_context = *unwinding_context_boxed;
+            let UnwindingContext { current_task, cause, stack_frame_iter } = unwinding_context;
+
+            // (1) Put the task into a non-runnable mode (killed), and set its kill reason
+            match current_task.mark_as_killed(cause) {
+                Ok(()) => {
+                    debug!("cleanup_unwinding_context(): marked task as killed, {:?}", current_task);
+                }
+                Err(e) => {
+                    error!("BUG: in cleanup_unwinding_context(): marking the unwound task {:?} as killed failed with error: {}", current_task, e);
+                }
+            }
+
+            // (2) Remove it from its runqueue
+            #[cfg(not(runqueue_state_spill_evaluation))]  // the normal case
+            {
+                if let Err(e) = apic::get_my_apic_id()
+                    .and_then(|id| runqueue::get_runqueue(id))
+                    .ok_or("couldn't get this core's ID or runqueue to remove killed task from it")
+                    .and_then(|rq| rq.write().remove_task(&current_task)) 
+                {
+                    error!("BUG: cleanup_unwinding_context(): couldn't remove killed task from runqueue: {}", e);
+                }
+            }
+        }
+
+        // testing current task
+        debug!("end of cleanup_unwinding_context(): curr_task is {:?}", task::get_my_current_task());
+
+        // _held_interrupts are dropped here, which re-enables them (if initially enabled)
     }
+
+    scheduler::schedule();
+
+    error!("BUG: killed task was rescheduled! (in cleanup_unwinding_context())");
+    loop { }
+
 }
