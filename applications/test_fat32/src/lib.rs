@@ -23,7 +23,7 @@ use alloc::string::ToString;
 use alloc::sync::{Arc, Weak};
 use spin::Mutex;
 use fs_node::{File, Directory, FileOrDir, FsNode};
-use fat32::root_dir;
+use fat32::{root_dir, PFSDirectory};
 use path::Path;
 use getopts::Options;
 
@@ -172,6 +172,58 @@ fn print_dir(d : &dyn Directory) {
     println!("Done printing directory: {:?}", d.get_name())
 }
 
+// TODO this doesn't work yet. I think my issue is that there's not easy way to get partialEq for the refs get returns since they aren't sized.
+// We'd need some sort of type parameter to work around this I think. But I'm a bit shaky on doing that.
+// See if we can get a child multiple times and then try to compare them to see if they're both valid and not the same.
+fn check_singleton(d : &PFSDirectory) {
+
+    let entries = d.list();
+    //println!("Printing directory: {:?}: {:} entries.", d.get_name(), entries.len());
+
+    for entry in entries {
+        let node = match d.get(&entry) {
+            Some(node) => node,
+            None => {
+                debug!("Couldn't get entry {:}", entry);
+                continue;
+            }
+        };
+
+        // Don't need to want to get "dot" entries (or else we end up in a loop).
+        if node.get_name().chars().nth(0).unwrap_or('.') == '.' {
+            continue;
+        }
+
+        let node2 = match d.get(&entry) {
+            Some(node) => node,
+            None => {
+                debug!("Couldn't get entry twice {:}", entry);
+                continue;
+            }
+        };
+
+        // Really dumb code here, but I 
+        match (node, node2) {
+            (FileOrDir::File(f), FileOrDir::File(f2)) => {
+                
+            },
+            (FileOrDir::Dir(d), FileOrDir::Dir(d2)) => {
+
+            },
+            (_,_) => {
+                println!("Entries don't match in dir/file type.")
+            }
+        }
+
+        // Compare node and node2 and ensure that they are the same (since they're both )
+    }
+
+    //println!("Done checking singleton for directory: {:?}", d.get_name())
+    println!("Check singleton not yet working");
+    return;
+}
+
+
 fn print_file(f: &dyn File) {
     const SECTOR_SIZE : usize = 512; // FIXME not really a constant here.
 
@@ -194,7 +246,7 @@ fn print_file(f: &dyn File) {
     print_data(&data);
 
     // Read until the end of file.
-    while bytes_read <= size {
+    while bytes_read == size {
         bytes_read += match f.read(&mut data, pos) {
             Ok(bytes) => bytes,
             Err(_) => {

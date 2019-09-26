@@ -37,16 +37,6 @@
 //!                // Able to list out the names of the folder entries
 //!                println!("{:?}", root_dir.list());
 //!
-//!                // Reaches the root dir and able to go through each of the entries in the root folder using the next_entry()
-//!                // but next_entry should not be used to go through a folder because it mutates the folder
-//!                let de = root_dir.next_entry().unwrap();
-//!                println!("the name of the next entry is: {:?}", de.name);
-//!                println!("the name of the next_entry is: {:?}", core::str::from_utf8(&de.name));
-//!
-//!                let de = root_dir.next_entry().unwrap();
-//!                println!("the name of the next entry is: {:?}", de.name);
-//!                println!("the name of the next_entry is: {:?}", core::str::from_utf8(&de.name));
-//!
 //!                root_dir.get("test");
 //!
 //!                // Uses the path provided and reads the bytes of the file otherwise returns 0 if file can't be found
@@ -92,6 +82,8 @@
 //!Ok(())
 //! ```
 //! 
+
+// TODO the docs at the top of this crate aren't all that adviseable at this point. I'll try to make some fixes soon.
 
 #![no_std]
 #![feature(slice_concat_ext)]
@@ -320,7 +312,7 @@ impl RawFatDirectory {
     fn to_directory_entry(&self) -> DirectoryEntry {
         DirectoryEntry {
             name: self.name,
-            file_type: if self.flags & 0x10 == 0x10 {
+            file_type: if self.flags & FileAttributes::SUBDIRECTORY.bits == FileAttributes::SUBDIRECTORY.bits {
                 FileType::PFSDirectory
             } else {
                 FileType::PFSFile
@@ -344,8 +336,7 @@ impl RawFatDirectory {
     }
 }
 
-// TODO do we still need this type?
-/// The actual 32-byte FAT directory format that contains metadata about a file/subdirectory inside a FAT32
+// TODO do we still need this type? (haven't yet migrated away from it I suppose). May still be useful due to not wanting to do operations with RawFatDirectory.
 /// formatted filesystem
 struct FatDirectory {
     name: [u8; 11], // 8 letter entry with a 3 letter ext
@@ -447,26 +438,6 @@ pub struct PFSFile {
 }
 
 impl PFSFile {
-    /// Given an PFSFile Structure and the n number of clusters to advance through, returns the nth cluster number of where the file data
-    /// is stored 
-    pub fn cluster_advancer(&self, cluster_advance: usize) -> Result<u32, &'static str> {
-        
-        let mut counter: usize = 0;
-        let mut current_cluster = self.start_cluster;
-        while cluster_advance != counter {
-            match self.filesystem.lock().next_cluster(current_cluster) {
-                Err(_e) => {
-                    return Err("Error in moving to next clusters");
-                }
-                Ok(cluster) => {
-                    counter += 1;
-                    current_cluster = cluster;
-                }
-            }
-        }
-        return Ok(current_cluster);
-    }
-
     /// Given an offset, returns the PFSPosition of the file
     pub fn seek(&self, offset: usize) -> Result<PFSPosition, &'static str> {
         let fs = self.filesystem.lock();
@@ -492,7 +463,7 @@ impl PFSFile {
         
         let nth_cluster = current_cluster;
         let byte_difference = offset - (clusters_to_advance * cluster_size_in_bytes);
-        let reached_sector = byte_difference as u32/fs.bytes_per_sector;
+        let reached_sector = byte_difference / (fs.bytes_per_sector as usize);
         // debug!("cluster: {}", nth_cluster);
         // debug!("sector: {}", reached_sector);
         // debug!("byte_offset: {}", byte_difference - reached_sector as usize *fs.bytes_per_sector as usize);
@@ -523,7 +494,7 @@ impl File for PFSFile {
         let fs = self.filesystem.lock();
 
         let cluster_size_in_bytes: usize = fs.sectors_per_cluster() as usize * 512 as usize;
-        let mut position: u32 = 0;
+        let mut position: usize = 0;
         let mut current_cluster = self.start_cluster;
         let mut sector_offset: u32 = 0;
         let mut cluster_offset = 0;
@@ -548,13 +519,13 @@ impl File for PFSFile {
 
             // The position is used to track how far along the PFSfile it is, and if the position goes
             // beyond the size of the PFSfile OR the array is full, it returns end of PFSfile
-            if position >= (data.len() as u32) {
+            if position >= data.len() {
                 debug!("buffer is filled");
                 break;
             }
 
             // Reaches end of file
-            if position >= self.size {
+            if position >= self.size as usize {
                 debug!("end of file");
                 break;
             }
@@ -574,12 +545,12 @@ impl File for PFSFile {
             
             // the byte difference is the difference between the offset (the byte to begin reading at)
             // and the position(the current byte position based upon walking from cluster to cluster)
-            let byte_difference = offset as u32 - position;
-            let reached_sector = byte_difference/fs.bytes_per_sector;
+            let byte_difference = offset - position;
+            let reached_sector = byte_difference / fs.bytes_per_sector as usize;
 
             // this if statement determines wether moving on to the next cluster would cause it to move beyond the
             // specified offset and if it does, fills in the PFSPosition with info about the specific position of the offset
-            if position + cluster_size_in_bytes as u32 > offset as u32 {
+            if position + cluster_size_in_bytes > offset {
                 file_walk.cluster = current_cluster;
                 file_walk.sector_offset = reached_sector;
                 file_walk.entry_offset = byte_difference as usize - reached_sector as usize*fs.bytes_per_sector as usize;
@@ -591,7 +562,7 @@ impl File for PFSFile {
             let cluster_start = fs.first_sector_of_cluster(current_cluster);
 
             // the current sector thats to be read at
-            let current_sector = cluster_start + sector_offset;
+            let current_sector = cluster_start + sector_offset as usize;
 
             // Reads at the beginning sector of the cluster
             let sectors_read = match fs.header().drive.lock().read_sectors(
@@ -603,12 +574,12 @@ impl File for PFSFile {
             
             sector_offset += fs.sectors_per_cluster;
             
-            if (position + sectors_read as u32) > self.size {
-                let bytes_read = self.size - position;
+            if (position + sectors_read) > self.size as usize {
+                let bytes_read = self.size as usize - position;
                 return Ok(bytes_read as usize);
             } 
             else {
-                position += cluster_size_in_bytes as u32;
+                position += cluster_size_in_bytes;
             }
 
             cluster_offset += cluster_size_in_bytes as usize;
@@ -653,22 +624,16 @@ impl FsNode for PFSFile {
 pub struct PFSPosition {
     /// Cluster number of the current position.
     cluster: u32, 
-    /// Sector offset into the current cluster
-    sector_offset: u32, 
+    /// Sector offset into the current cluster (should this be 32 bits? Not sure if it really matters)
+    sector_offset: usize, 
     /// Entry offset into the current sector
     entry_offset: usize, 
 }
 
 #[derive(Clone)]
-/// Structure for a FAT32 directory. 
+/// Structure for a FAT32 directory.
 pub struct PFSDirectory {
-    filesystem: Arc<Mutex<Filesystem>>,
-    pub name: String,
-    pub parent: WeakDirRef, // the directory that holds the metadata for this directory. The root directory's parent should be itself
-    pub cluster: u32, // the cluster number that the directory is stored in
-    sector: u32,
-    offset: usize,
-    size: u32,
+    cluster_dir: Arc<Mutex<ClusterDir>>,
 }
 
 impl Directory for PFSDirectory {
@@ -680,68 +645,32 @@ impl Directory for PFSDirectory {
         
 
         // Validate that the name is less than the maximum length for a directory entry. TODO
-
-        // TODO this is wrong behavior. We should have an internal search that returns the pos
-        // of the file and then edit that file.
-        if self.get(&name).is_some() {
-            return Err("Matching item already exists.");
-        }
-
-        // Must lock after the call to get since that also locks the fs.
-        let fs = self.filesystem.lock();
-
-        // Find an empty node or grow the directory as needed. TODO different size.
-        let empty_pos = match self.find_empty_or_grow(&fs, 1) {
-            Ok(pos) => pos,
-            Err(_e) => return Err("Failed to grow directory and couldn't find empty space."), // TODO better errors.
-        };
-
-        //match self.write_fat_directory(&fs, pos, node.)
         
         Err("insert directory not implemented yet")
     }
 
     fn get(&self, name: &str) -> Option<FileOrDir> {
 
-        let entries = match self.entries() {
-            Ok(collection) => collection,
-            Err(_) => return Option::None,
-        };
-        
-        for entry in entries {
-            // Compares the name of the next entry in the current directory
-            if compare_name(name, &entry) {
-                match entry.file_type {
-                    FileType::PFSDirectory => {
-                        // Intializes the different trait objects depedent on whether the file is a file or subdirectory
-                        let dir = match self.filesystem.lock().get_directory(entry.cluster, name.to_string(), Arc::new(Mutex::new(self.clone())) as DirRef, self.filesystem.clone(), entry.size) {
-                            Ok(dir) => dir,
-                            Err(_) => return Option::None,
-                        };
-                        let dir_ref = Arc::new(Mutex::new(dir)) as DirRef;
-                        return Option::Some(FileOrDir::Dir(dir_ref));
-                    }
-                    
-                    FileType::PFSFile => {
-                        let file = match self.filesystem.lock().get_file(entry.cluster, entry.size, name.to_string(), Arc::new(Mutex::new(self.clone())) as DirRef, self.filesystem.clone()) {
-                            Ok(dir) => dir,
-                            Err(_) => return Option::None,
-                        };
-                        let file_ref = Arc::new(Mutex::new(file)) as FileRef;
-                        return Option::Some(FileOrDir::File(file_ref));
-                    }
-                }
-            }
+        // TODO validate name is valid in Fat32. Otherwise we'll never find it so it seems not important.
+        match self.cluster_dir.lock().get(name) {
+            Ok(node) => {
+                    // node.set_parent_dir(self.) FIXME we don't have a good way to get a reference to the parent.
+                    Some(node)
+                },
+            Err(_) => None,
         }
 
-        Option::None
+
     }
 
     fn list(&self) -> Vec<String> {
 
         let mut list_of_names: Vec<String> = Vec::new();
+
+        let dir = self.cluster_dir.lock();
+        let fs = dir.cc.filesystem.lock();
         // Returns a vector of the 32-byte directory structures
-        let entries = match self.entries2() {
+        let entries = match dir.entries(&fs) {
             Ok(entries) => entries,
             Err(_) => {
                 warn!("Failed to read list of names from directory");
@@ -767,11 +696,11 @@ impl Directory for PFSDirectory {
 
 impl FsNode for PFSDirectory {
     fn get_name(&self) -> String {
-        self.name.clone()
+        self.cluster_dir.lock().cc.name.clone()
     }
 
     fn get_parent_dir(&self) -> Option<DirRef> {
-        self.parent.upgrade()
+        self.cluster_dir.lock().cc.parent.upgrade()
     }
 
     fn set_parent_dir(&mut self, _new_parent: WeakDirRef) {
@@ -780,47 +709,47 @@ impl FsNode for PFSDirectory {
     }
 }
 
-impl PFSDirectory {
+impl PFSDirectory {    
     
-    // TODO abstract the state in these functions into some sort of directory walk structure?
-    // I think this is the best way forward that achieves both performance and general code cleanliness goals.
-    // Furthermore it would prevent state spill within the module.
-    
-    /// Sets the directory state to being the first entry in the directory (used by next_entry)
-    pub fn initial_pos(&self) -> PFSPosition {
-        PFSPosition {
-            cluster: self.cluster,
-            sector_offset: 0,
-            entry_offset: 0, 
+}
+
+/// A Fat 32 directory underlying any public facing Fat32 directory.
+struct ClusterDir {
+    cc: ClusterChain,
+    children: BTreeMap<String, FileOrDir>, // Incomplete list of children. TODO make DirRef into our internal type.
+}
+
+impl ClusterDir {
+    /// Returns a vector of all the directory entries in a directory without mutating the directory
+    pub fn entries(&self, fs: &Filesystem) -> Result<Vec<DirectoryEntry>, Error> {
+        debug!("Getting entries for {:?}", self.cc.name);
+
+        let mut entry_collection: Vec<DirectoryEntry> = Vec::new(); 
+        let mut pos = self.cc.initial_pos();
+        
+        loop {
+            let dir: FatDirectory = self.get_fat_directory(fs, &pos)?;
+            
+            // TODO VFAT long name check needs to be done correctly.
+            if !dir.is_free() && !dir.is_vfat() {
+                debug!("Found new entry {:?}", debug_name(&dir.name));
+                entry_collection.push(dir.to_directory_entry());
+            }
+
+            // If the first byte of the directory is 0 we have reached the end of allocated directory entries
+            if dir.name[0] == 0 {
+                return Ok(entry_collection);
+            }
+            
+            pos = match self.cc.advance_pos(fs, &pos, size_of::<RawFatDirectory>()) {
+                Err(Error::EndOfFile) => return Ok(entry_collection),
+                Ok(new_pos) => new_pos,
+                Err(e) => return Err(e),
+            };
+            debug!("New position: cluster: {}, sector_off: {}, byte off: {}", pos.cluster, pos.sector_offset, pos.entry_offset);
         }
     }
-    
-    // TODO this function can be abstracted onto the FS to simply take an offset (and this would call the FS implementation with offset=32)
-    /// Advances a PFSPosition by one entry and returns the new entry if successful.
-    /// Note that if EOC is reached the cluster is set to the EOC value found. I think this may not be ideal API design however so it potentially may need to change.
-    pub fn advance_pos(&self, fs: &Filesystem, pos: &PFSPosition) -> Result<PFSPosition, Error> {
-        
-        let mut new_pos = PFSPosition {
-            cluster : pos.cluster,
-            entry_offset : pos.entry_offset + 32, // TODO I'd like to pull this constant from FatDirectory. This size is only 32 if the type is #repr(packed) however so that's not really ideal unless we want the type to model directly reading from disk (in which case we'd want something to annotate the numbers as little endian).
-            sector_offset : pos.sector_offset, 
-        };
-        
-        if new_pos.entry_offset >= fs.bytes_per_sector as usize {
-            new_pos.entry_offset = 0;
-            new_pos.sector_offset = new_pos.sector_offset + 1;
-        }
-        
-        if new_pos.sector_offset >= fs.sectors_per_cluster {
-            new_pos.sector_offset = 0;
-            new_pos.cluster = fs.next_cluster(pos.cluster)?;
-            //new_pos.entry_offset = 0;
-        }
-        
-        Ok(new_pos)
-    }
-    
-    
+
     /// Returns the entry indicated by PFSPosition. TODO allow this to save reads and writes.
     /// the function is used and returns EndOfFile if the next PFSdirectory doesn't exist
     /// Note that this function will happily return unused directory entries since it simply provides a sequential view of the entries on disk.
@@ -858,7 +787,7 @@ impl PFSDirectory {
         // TODO this needs to ensure that unused directory entries are properly marked?
         Ok(fat_dir)
     }
-    
+
     // FIXME use sub byte transactions at some point?
     /// Writes the RawFatDirectory dir to the position pos in the file.
     fn write_fat_directory(&self, fs :&Filesystem, pos: &PFSPosition, dir: &RawFatDirectory) -> Result<usize, Error> {
@@ -896,116 +825,6 @@ impl PFSDirectory {
         Ok(size_of::<RawFatDirectory>())
     }
     
-
-    
-    
-    // TODO get rid of this function?
-    /// Note that the offset used by this function is different from the offset used by the other next entry function.
-    /// Returns the next FATDirectory entry in a FATdirectory while mutating the directory object to offset an entry each time 
-    /// the function is used and returns EndOfFile if the next PFSdirectory doesn't exist
-    #[deprecated]
-    pub fn next_entry(&mut self) -> Result<DirectoryEntry, Error> {
-        warn!("next_entry called. This corrupts the directory for future use");
-        let fs = self.filesystem.lock();
-        loop {
-            let sector = if self.cluster > 0 {
-                
-                // Identifies if the sector number is greater than the size of one cluster, and if it is
-                // it will move on to the next cluster
-                if self.sector >= fs.sectors_per_cluster {
-                    match fs.next_cluster(self.cluster) {
-                        Ok(new_cluster) => {
-                            self.cluster = new_cluster;
-                            self.sector = 0;
-                            self.offset = 0;
-                        }
-                        Err(e) => {
-                            return Err(e);
-                        }
-                    }
-                }
-                self.sector
-                    + fs.first_sector_of_cluster(self.cluster)
-            } else {
-                self.sector // TODO what does this section do?
-            };
-
-            // let fs = self.filesystem;
-
-            let mut data: Vec<u8> = vec![0; fs.header.drive.lock().sector_size_in_bytes()];
-            let _sectors_read = match fs.header.drive.lock().read_sectors(&mut data[..], (sector) as usize) {
-                Ok(bytes) => bytes,
-                Err(_) => return Err(Error::BlockError),
-            };
-            
-            let mut counter = 32;
-            let mut directory_entries: Vec<FatDirectory> = Vec::new(); 
-
-            // This goes through the 8 possible PFSdirectory entries in a PFSdirectory sector 
-            // A PFSdirectory entry is 32 bytes, so it simply jumps to the next PFSdirectory entry by adding 32 bytes to the counter
-            for _entries in 0..8 { 
-                let dir: FatDirectory = FatDirectory {
-                    name: match data[(0+counter)..(11+counter)].try_into() {
-                        Ok(array) => array,
-                        Err(_) => return Err(Error::BlockError),
-                    },
-                    flags: data[11+counter],
-                    _unused1: match data[(12+counter)..(20+counter)].try_into() {
-                        Ok(array) => array,
-                        Err(_) => return Err(Error::BlockError),
-                    },
-                    cluster_high: LittleEndian::read_u16(&mut data[(20+counter)..(22+counter)]) as u16,
-                    _unused2: match data[(22+counter)..(26+counter)].try_into() {
-                        Ok(array) => array,
-                        Err(_) => return Err(Error::BlockError),
-                    }, 
-                    cluster_low: LittleEndian::read_u16(&mut data[(26+counter)..(28+counter)]) as u16,
-                    size: LittleEndian::read_u32(&mut data[(28+counter)..(32+counter)]) as u32
-                };
-                counter += 64;
-                directory_entries.push(dir);
-            }
-
-            let dirs: Vec<FatDirectory> = directory_entries;            
-
-            // debug!("sector: {}", self.sector);
-            // debug!("offset: {}", self.offset);
-
-            // Loops through the PFSdirectory entries and creates the PFSDirectory Entry strcture based on the FatDirectory fields 
-            for i in self.offset..dirs.len() {
-                let d = &dirs[i];
-                // debug!("size of the PFSdirectory entry: {:?}", d.size);
-                // When you reach the last PFSdirectory entry in a PFSdirectory
-                if d.name[0] == 0x0 {
-                    return Err(Error::EndOfFile);
-                }
-                // PFSDirectory unused
-                if d.name[0] == 0xe5 {
-                    continue;
-                }
-                
-                let entry = DirectoryEntry {
-                    name: d.name,
-                    file_type: if d.flags & 0x10 == 0x10 {
-                        FileType::PFSDirectory
-                    } else {
-                        FileType::PFSFile
-                    },
-                    cluster: (u32::from(d.cluster_high)) << 16 | u32::from(d.cluster_low),
-                    size: d.size,
-                    long_name: [0; 255] // long names not supported
-                };
-
-                // Offset is the PFSdirectory entry number that you are looking at
-                self.offset = i + 1;
-                return Ok(entry);
-            }
-            // Once you reach the final PFSdirectory entry of the sector, you move up one sector and set the offset to 0
-            self.sector += 1;
-            self.offset = 0;
-        }
-    }
-    
     // TODO: support larger sizes (for placing long name directories)
     /// Walks the directory tables and finds an empty entry then returns a position where that entry can be placed.
     /// Currently does not support sizes larger than 1 entry.
@@ -1019,7 +838,7 @@ impl PFSDirectory {
         }
         let size_needed = 1;
         
-        let mut pos = self.initial_pos();
+        let mut pos = self.cc.initial_pos();
         
         loop {
             let dir: FatDirectory = self.get_fat_directory(fs, &pos)?;
@@ -1028,7 +847,7 @@ impl PFSDirectory {
                 return Ok(pos); // Pos is now set to the position of a free directory so we can continue.
             }
             
-            pos = match self.advance_pos(fs, &pos) {
+            pos = match self.cc.advance_pos(fs, &pos, size_of::<RawFatDirectory>()) {
                 Err(Error::EndOfFile) => return self.grow_directory(fs, &pos),
                 Ok(new_pos) => new_pos,
                 Err(e) => return Err(e),
@@ -1036,7 +855,6 @@ impl PFSDirectory {
         }
     }
     
-    // FIXME currently this is called by a function that locks the fs -> double lock?
     // I think the "best" solution is perhaps to make everything that's not part of the public interface pass the fs in as an argument.
     // Make FS an argument I suppose. Seems dumb though.
     /// Grows the directory given a PFSPosition in the last cluster of the file and returns a new position in the new_cluster.
@@ -1044,12 +862,6 @@ impl PFSDirectory {
         
         // Rename for convenience with other existing code.
         let pos = pos_end;
-        
-        // FIXME This code currently assumes that the size of the directory is always a multiple of cluster size.
-        // I don't really know if this is something we can assume in a real filesystem but it's definitely something that any self respecting implementation would want to maintain.
-        if self.size % fs.bytes_per_cluster() != 0 {
-            warn!("Directory growth assumes size is a multiple of cluster size");
-        }
         
         // TODO grow the node: 
         // Otherwise find an empty cluster.
@@ -1065,8 +877,8 @@ impl PFSDirectory {
         let unused_entry = RawFatDirectory::make_unused();
         
         loop {
-            self.write_fat_directory(fs, &pos, &unused_entry)?;
-            pos = match self.advance_pos(fs, &pos) {
+            self.write_fat_directory(fs, &pos, &unused_entry)?; // FIXME write an entry with 0 name instead of unused name.
+            pos = match self.cc.advance_pos(fs, &pos, size_of::<RawFatDirectory>()) {
                 Ok(p) => p,
                 Err(Error::EndOfFile) => break,
                 Err(e) => return Err(e),
@@ -1085,141 +897,133 @@ impl PFSDirectory {
         Ok(pos)
     }
 
-    /// TODO should replace the entries function
-    pub fn entries2(&self) -> Result<Vec<DirectoryEntry>, Error> {
-        debug!("Getting entries for {:?}", self.name);
-        let fs = self.filesystem.lock();
+    /// Internal insert function. TODO enforce type on arguments.
+    fn insert(&mut self, node: FileOrDir) -> Result<Option<FileOrDir>, Error> {
+        let name = node.get_name();
 
-        let mut entry_collection: Vec<DirectoryEntry> = Vec::new(); 
-        let mut pos = self.initial_pos();
+
+        // Must lock after the call to get since that also locks the fs.
+        let fs = self.cc.filesystem.lock();
+
+        // Find an empty node or grow the directory as needed. TODO different size.
+        let empty_pos = self.find_empty_or_grow(&fs, 1)?;
+
+        // TODO...
+        //match self.write_fat_directory(&fs, pos, node.)
         
-        loop {
-            let dir: FatDirectory = self.get_fat_directory(&fs, &pos)?;
-            
-            // TODO VFAT long name check needs to be done correctly.
-            if !dir.is_free() && !dir.is_vfat() {
-                debug!("Found new entry {:?}", debug_name(&dir.name));
-                entry_collection.push(dir.to_directory_entry());
-            }
-
-            // If the first byte of the directory is 0 we have reached the end of allocated directory entries
-            if dir.name[0] == 0 {
-                return Ok(entry_collection);
-            }
-            
-            pos = match self.advance_pos(&fs, &pos) {
-                Err(Error::EndOfFile) => return Ok(entry_collection),
-                Ok(new_pos) => new_pos,
-                Err(e) => return Err(e),
-            };
-            debug!("New position: cluster: {}, sector_off: {}, byte off: {}", pos.cluster, pos.sector_offset, pos.entry_offset);
-        }
+        Err(Error::Unsupported)
     }
 
-    /// Returns a vector of all the directory entries in a directory without mutating the directory
-    pub fn entries(&self) -> Result<Vec<DirectoryEntry>, Error> {
-         
-        let fs = self.filesystem.lock();
-        let mut cluster = self.cluster;
-        let mut self_sector = self.sector;
-        let mut entry_collection: Vec<DirectoryEntry> = Vec::new(); 
+    /// Internal get function. TODO enforce returning PFSType?
+    fn get(&self, name: &str) -> Result<FileOrDir, Error> {
 
-        loop {    
-            // Looks at current cluster number of the directory and moves to the exact sector
-            let sector = if cluster > 0 {
-                // Identifies if the sector number is greater than the size of one cluster, and if it is
-                // it will move on to the next cluster
-                if self_sector >= fs.sectors_per_cluster {
-                    match fs.next_cluster(cluster) {
-                        Ok(new_cluster) => {
-                            cluster = new_cluster;
-                            self_sector = 0;
-                        }
-                        Err(_e) => {
-                            return Ok(entry_collection);
-                        }
+        // TODO need some sort of string typing that ensure it's a valid fat32 name that will match the string we insert into the children list.
+        match self.children.get(name) {
+            Some(child) => return Ok(child.clone()),
+            None => {},
+        };
+
+        let fs = self.cc.filesystem.lock();
+
+        // FIXME: this can be written to only walk the directory once (and also add entries to children that aren't the ones we needed).
+        let entries = self.entries(&fs)?;
+        
+        for entry in entries {
+            // Compares the name of the next entry in the current directory
+            if compare_name(name, &entry) {
+                // Found the entry on disk. Need to create a new cluster chain for the object:
+                let cc = ClusterChain {
+                    cluster: entry.cluster,
+                    _num_clusters: None,
+                    name: name.to_string(), // FIXME this is wrong.
+                    on_disk_refcount: 1, // FIXME not true for directories. Should rename so that this is fine.
+                    filesystem: self.cc.filesystem.clone(),
+                    parent: Weak::<Mutex<PFSDirectory>>::new(), // FIXME temporary workaround since we can't change the parent without a ref to the caller.
+                };
+
+                match entry.file_type {
+                    FileType::PFSDirectory => {
+                        // Intializes the different trait objects depedent on whether the file is a file or subdirectory
+                        let cluster_dir = ClusterDir {
+                            cc: cc,
+                            children: BTreeMap::new(),
+                        };
+
+                        let dir = PFSDirectory {
+                            cluster_dir: Arc::new(Mutex::new(cluster_dir))
+                        };
+
+                        let dir_ref = Arc::new(Mutex::new(dir)) as DirRef;
+                        return Ok(FileOrDir::Dir(dir_ref));
+                    }
+                    
+                    FileType::PFSFile => {
+                        return Err(Error::Unsupported); // TODO need clusterFile type.
                     }
                 }
-                self_sector
-                    + fs.first_sector_of_cluster(cluster)
-            } else {
-                self_sector
-            };
-
-            let mut data: Vec<u8> = vec![0; fs.header.drive.lock().sector_size_in_bytes()];
-            let _sectors_read = match fs.header.drive.lock().read_sectors(&mut data[..], (sector) as usize) {
-                Ok(bytes) => bytes,
-                Err(_) => return Err(Error::BlockError),
-            };
-            
-            let mut counter = 32;
-            let mut directory_entries: Vec<FatDirectory> = Vec::new(); 
-
-            // This goes through the 8 possible directory entries in a FATdirectory sector 
-            // A PFSdirectory entry is 32 bytes, so it simply jumps to the next PFSdirectory entry by adding 64 bytes to the counter
-            for _entries in 0..8 { 
-                // Turns the bytes of data into FATDirectory structures 
-                let dir: FatDirectory = FatDirectory {
-                    name: match data[(0+counter)..(11+counter)].try_into() {
-                        Ok(array) => array,
-                        Err(_) => return Err(Error::BlockError),
-                    },
-                    flags: data[11+counter],
-                    _unused1: match data[(12+counter)..(20+counter)].try_into() {
-                        Ok(array) => array,
-                        Err(_) => return Err(Error::BlockError),
-                    },
-                    cluster_high: LittleEndian::read_u16(&mut data[(20+counter)..(22+counter)]) as u16,
-                    _unused2: match data[(22+counter)..(26+counter)].try_into() {
-                        Ok(array) => array,
-                        Err(_) => return Err(Error::BlockError),
-                    }, 
-                    cluster_low: LittleEndian::read_u16(&mut data[(26+counter)..(28+counter)]) as u16,
-                    size: LittleEndian::read_u32(&mut data[(28+counter)..(32+counter)]) as u32
-                };
-                counter += 64;
-                directory_entries.push(dir);
             }
+        }
 
-            let dirs: Vec<FatDirectory> = directory_entries;            
+        Err(Error::NotFound)
+    }
+}
 
-            // debug!("sector: {}", self.sector);
-            // debug!("offset: {}", self.offset);
+struct ClusterChain {
+    filesystem: Arc<Mutex<Filesystem>>,
+    cluster: u32,
+    pub name: String,
+    pub parent: WeakDirRef, // the directory that holds the metadata for this directory. The root directory's parent should be itself
+    on_disk_refcount: usize, // Number of references on disk. For a file must always be one. For a directory this is variable.
+    _num_clusters: Option<u32>, // Unknown without traversing FAT table. I consider this useful information, but I'm not sure if I'll ever use it.
+}
 
-            // Loops through the PFSdirectory entries and creates the PFSDirectory Entry strcture based on the FatDirectory fields 
-            for i in 0..dirs.len() {
-                let d = &dirs[i];
-
-                // When you reach the last PFSdirectory entry in a PFSdirectory
-                if d.name[0] == 0x0 {
-                    break;
-                }
-                // PFSDirectory unused
-                if d.name[0] == 0xe5 {
-                    continue;
-                }
-
-                let entry = DirectoryEntry {
-                    name: d.name,
-                    file_type: if d.flags & 0x10 == 0x10 {
-                        FileType::PFSDirectory
-                    } else {
-                        FileType::PFSFile
-                    },
-                    cluster: (u32::from(d.cluster_high)) << 16 | u32::from(d.cluster_low),
-                    size: d.size,
-                    long_name: [0; 255] // long names not supported
-                };
-
-                entry_collection.push(entry); 
-            }
-            // Once you reach the final PFSdirectory entry of the sector, you move up one sector
-            self_sector += 1;
+impl ClusterChain {
+    /// Returns a cluster walk position at the initial position.
+    pub fn initial_pos(&self) -> PFSPosition {
+        PFSPosition {
+            cluster: self.cluster,
+            sector_offset: 0,
+            entry_offset: 0, 
         }
     }
     
+    /// Advances a PFSPosition by offset and returns a new position if successful.
+    pub fn advance_pos(&self, fs: &Filesystem, pos: &PFSPosition, offset: usize) -> Result<PFSPosition, Error> {
+        
+        let mut new_pos = PFSPosition {
+            cluster : pos.cluster,
+            entry_offset : pos.entry_offset + offset,
+            sector_offset : pos.sector_offset, 
+        };
+        
+        if new_pos.entry_offset >= fs.bytes_per_sector as usize {
+            new_pos.sector_offset += new_pos.entry_offset / fs.bytes_per_sector as usize; // TODO need to be careful about this actually working.
+            new_pos.entry_offset = new_pos.entry_offset % fs.bytes_per_sector as usize;
+        }
+        
+        if new_pos.sector_offset >= fs.sectors_per_cluster as usize {
+            let cluster_advance = new_pos.sector_offset / fs.sectors_per_cluster as usize;
+            new_pos.cluster = self.cluster_advancer(fs, pos.cluster, cluster_advance)?;
+            new_pos.sector_offset = new_pos.sector_offset % fs.sectors_per_cluster as usize;
+        }
+        
+        Ok(new_pos)
+    }
+
+    /// Advance "cluster_advance" number of clusters.
+    pub fn cluster_advancer(&self, fs: &Filesystem, start_cluster: u32, cluster_advance: usize) -> Result<u32, Error> {
+        
+        let mut counter: usize = 0;
+        let mut current_cluster = start_cluster;
+        while cluster_advance != counter {
+            current_cluster = fs.next_cluster(current_cluster)?;
+            counter += 1;
+        }
+        return Ok(current_cluster);
+    }
 }
 
+// TODO I'd like to rethink this code so that it's easier to initialize and so that much of the public (and generally *immutable*) information is not behind a lock.
 /// Structure for the filesystem to be used to transverse the disk and run operations on the disk
 pub struct Filesystem {
     header: Header, // This is meant to read the first 512 bytes of the virtual drive in order to obtain device information
@@ -1314,37 +1118,9 @@ impl Filesystem {
     }
 
     /// This function allows you to jump to the data component when given a cluster number   
-    fn first_sector_of_cluster(&self, cluster: u32) -> u32 {
+    fn first_sector_of_cluster(&self, cluster: u32) -> usize {
         // The first sector of a cluster = first portion of data component + the amount of sectors/cluster + accounting for root cluster
-        ((cluster - 2) * self.sectors_per_cluster) + self.first_data_sector
-    }
-
-    // TODO: this method seems like it should be renamed.
-    /// Initializes a PFSDirectory strcuture based on the cluster that the PFSdirectory is stored in
-    fn get_directory(&self, cluster: u32, name: String, parent: DirRef, fs: Arc<Mutex<Filesystem>>, size: u32) -> Result<PFSDirectory, Error> {
-        // debug!("name of directory:{}", name);
-        Ok(PFSDirectory {
-            filesystem: fs,
-            name: name,
-            parent: Arc::downgrade(&parent),
-            cluster: cluster,
-            sector: 0,
-            offset: 0,
-            size: size,
-        })
-    }
-
-    // TODO: rename this method.
-    /// Initializes a PFSFile strcture based on the cluster that the PFSfile is stored as well as it's size
-    fn get_file(&self, cluster: u32, size: u32, name: String, parent: DirRef, fs: Arc<Mutex<Filesystem>> ) -> Result<PFSFile, Error> {
-        debug!("name of file:{}", name);
-        Ok(PFSFile {
-            filesystem: fs,
-            name: name,
-            parent: Arc::downgrade(&parent),
-            start_cluster: cluster,
-            size,
-        })
+        (((cluster - 2) * self.sectors_per_cluster) + self.first_data_sector) as usize
     }
 
     // TODO: document the behavior for EOF encountered (since this is useful).
@@ -1663,14 +1439,24 @@ fn compare_short_name(name: &str, de: &DirectoryEntry) -> bool {
 /// Returns the FATDirectory structure for the root directory 
 pub fn root_dir(fs: Arc<Mutex<Filesystem>>) -> Result<RootDirectory, Error> {
 
-    let fatdir = PFSDirectory {
+    // TODO right now this function can violate the singleton blahdy blah and risks making two cluster chains for this dir.
+
+    let cc = ClusterChain {
         filesystem: fs.clone(),
+        cluster: 2,
         name: "/".to_string(),
         parent: Weak::<Mutex<PFSDirectory>>::new(),
-        cluster: 2,
-        sector: 0,
-        offset: 0,
-        size: 0, // TODO this is wrong but this method also just doesn't make much sense because root should be backed by disk.
+        on_disk_refcount: 2 + 1, // TODO should this be the case?
+        _num_clusters: None,
+    };
+
+    let cdir = ClusterDir {
+        cc: cc,
+        children: BTreeMap::new(),
+    };
+
+    let fatdir = PFSDirectory {
+        cluster_dir: Arc::new(Mutex::new(cdir)),
     };
 
     let underlying_root = Arc::new(Mutex::new(fatdir));
@@ -1681,7 +1467,8 @@ pub fn root_dir(fs: Arc<Mutex<Filesystem>>) -> Result<RootDirectory, Error> {
     };
 
     // This is pretty weird, but it seems to be necessary to set our own parent as ourselves.
-    underlying_root.lock().parent = Arc::downgrade(&(underlying_root.clone() as Arc<Mutex<dyn Directory + Send>>));
+    underlying_root.lock().set_parent_dir(Arc::downgrade(&(underlying_root.clone() 
+        as Arc<Mutex<dyn Directory + Send>>)));
 
     Ok(new_root_dir) 
         
