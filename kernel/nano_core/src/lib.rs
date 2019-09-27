@@ -33,7 +33,7 @@ extern crate memory; // the virtual memory subsystem
 extern crate mod_mgmt;
 extern crate exceptions_early;
 extern crate captain;
-extern crate panic_unwind; // the panic/unwind lang items
+extern crate panic_entry; // the panic-related lang items
 
 #[macro_use] extern crate vga_buffer;
 

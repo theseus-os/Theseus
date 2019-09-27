@@ -19,12 +19,6 @@ extern crate mod_mgmt;
 extern crate task;
 
 use core::panic::PanicInfo;
-use alloc::boxed::Box;
-use mod_mgmt::{
-    CrateNamespace,
-    metadata::{StrongCrateRef, StrongSectionRef, SectionType},
-};
-
 
 /// The singular entry point for a language-level panic.
 /// 

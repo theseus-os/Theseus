@@ -1129,7 +1129,7 @@ dependencies = [
  "memory 0.1.0",
  "mod_mgmt 0.1.0",
  "multiboot2 0.7.1 (registry+https://github.com/rust-lang/crates.io-index)",
- "panic_unwind 0.1.0",
+ "panic_entry 0.1.0",
  "rlibc 1.0.0 (registry+https://github.com/rust-lang/crates.io-index)",
  "spin 0.4.10 (registry+https://github.com/rust-lang/crates.io-index)",
  "state_store 0.1.0",
@@ -1265,20 +1265,15 @@ dependencies = [
 ]
 
 [[package]]
-name = "panic_unwind"
+name = "panic_entry"
 version = "0.1.0"
 dependencies = [
- "apic 0.1.0",
- "fallible-iterator 0.2.0 (registry+https://github.com/rust-lang/crates.io-index)",
- "gimli 0.19.0 (registry+https://github.com/rust-lang/crates.io-index)",
- "irq_safety 0.1.1 (git+https://github.com/kevinaboos/irq_safety)",
  "log 0.3.9 (registry+https://github.com/rust-lang/crates.io-index)",
  "memory 0.1.0",
  "mod_mgmt 0.1.0",
  "panic_wrapper 0.1.0",
- "runqueue 0.1.0",
- "scheduler 0.1.0",
  "task 0.1.0",
+ "unwind 0.1.0",
  "vga_buffer 0.1.0",
 ]
 
@@ -1286,11 +1281,11 @@ dependencies = [
 name = "panic_wrapper"
 version = "0.1.0"
 dependencies = [
- "apic 0.1.0",
  "log 0.3.9 (registry+https://github.com/rust-lang/crates.io-index)",
  "memory 0.1.0",
  "runqueue 0.1.0",
  "task 0.1.0",
+ "unwind 0.1.0",
 ]
 
 [[package]]
@@ -2127,6 +2122,22 @@ version = "1.0.0"
 source = "registry+https://github.com/rust-lang/crates.io-index"
 dependencies = [
  "void 1.0.2 (registry+https://github.com/rust-lang/crates.io-index)",
+]
+
+[[package]]
+name = "unwind"
+version = "0.1.0"
+dependencies = [
+ "apic 0.1.0",
+ "fallible-iterator 0.2.0 (registry+https://github.com/rust-lang/crates.io-index)",
+ "gimli 0.19.0 (registry+https://github.com/rust-lang/crates.io-index)",
+ "irq_safety 0.1.1 (git+https://github.com/kevinaboos/irq_safety)",
+ "log 0.3.9 (registry+https://github.com/rust-lang/crates.io-index)",
+ "memory 0.1.0",
+ "mod_mgmt 0.1.0",
+ "runqueue 0.1.0",
+ "scheduler 0.1.0",
+ "task 0.1.0",
 ]
 
 [[package]]

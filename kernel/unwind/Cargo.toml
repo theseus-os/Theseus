@@ -1,7 +1,7 @@
 [package]
 authors = ["Kevin Boos <kevinaboos@gmail.com>"]
-name = "panic_unwind"
-description = "Entry points for panics and unwinding, as required by the Rust compiler."
+name = "unwind"
+description = "Routines for unwinding the call stack and running cleanup handlers for Theseus tasks"
 version = "0.1.0"
 build = "../../build.rs"
 
@@ -23,9 +23,6 @@ git = "https://github.com/kevinaboos/irq_safety"
 [dependencies.memory]
 path = "../memory"
 
-[dependencies.panic_wrapper]
-path = "../panic_wrapper"
-
 [dependencies.mod_mgmt]
 path = "../mod_mgmt"
 
@@ -40,9 +37,6 @@ path = "../runqueue"
 
 [dependencies.scheduler]
 path = "../scheduler"
-
-[dependencies.vga_buffer]
-path = "../vga_buffer"
 
 [lib]
 crate-type = ["rlib"]

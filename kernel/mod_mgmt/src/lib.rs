@@ -2692,7 +2692,7 @@ fn write_relocation(
 
     // Perform the actual relocation data writing here.
     // There is a great, succint table of relocation types here
-    // https://docs.rs/goblin/0.0.13/goblin/elf/reloc/index.html
+    // https://docs.rs/goblin/0.0.24/goblin/elf/reloc/index.html
     match relocation_entry.typ {
         R_X86_64_32 => {
             let target_ref: &mut u32 = target_sec_mapped_pages.as_type_mut(target_offset)?;
@@ -2706,7 +2706,8 @@ fn write_relocation(
             if verbose_log { trace!("                    target_ptr: {:#X}, source_val: {:#X} (from sec_vaddr {:#X})", target_ref as *mut _ as usize, source_val, source_sec_vaddr); }
             *target_ref = source_val as u64;
         }
-        R_X86_64_PC32 => {
+        R_X86_64_PC32 |
+        R_X86_64_PLT32 => {
             let target_ref: &mut u32 = target_sec_mapped_pages.as_type_mut(target_offset)?;
             let source_val = source_sec_vaddr.value().wrapping_add(relocation_entry.addend).wrapping_sub(target_ref as *mut _ as usize);
             if verbose_log { trace!("                    target_ptr: {:#X}, source_val: {:#X} (from sec_vaddr {:#X})", target_ref as *mut _ as usize, source_val, source_sec_vaddr); }

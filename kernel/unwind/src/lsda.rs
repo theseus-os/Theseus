@@ -4,7 +4,7 @@
 #![allow(nonstandard_style)]
 
 use core::ops::Range;
-use gimli::{Reader, DwEhPe, Section, SectionId, Endianity, EndianSlice, NativeEndian, constants::*, };
+use gimli::{Reader, DwEhPe, Endianity, EndianSlice, constants::*, };
 use FallibleIterator;
 
 /// `GccExceptTable` contains the contents of the Language-Specific Data Area (LSDA)
@@ -59,10 +59,11 @@ impl<R: Reader> GccExceptTable<R> {
 
         // First, parse the top-level header, which comes at the very beginning
         let lsda_header = LsdaHeader::parse(&mut reader)?;
-        debug!("{:#X?}", lsda_header);
+        // debug!("{:#X?}", lsda_header);
+
         // Second, parse the call site table header, which comes right after the top-level LSDA header
         let call_site_table_header = CallSiteTableHeader::parse(&mut reader)?;
-        debug!("{:#X?}", call_site_table_header);
+        // debug!("{:#X?}", call_site_table_header);
 
         Ok((lsda_header, call_site_table_header, reader))
     }

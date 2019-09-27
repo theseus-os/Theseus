@@ -9,9 +9,8 @@
 extern crate alloc;
 #[macro_use] extern crate log;
 extern crate memory;
-extern crate apic;
 extern crate task;
-extern crate runqueue;
+extern crate unwind;
 
 use core::panic::PanicInfo;
 use alloc::string::String;
@@ -20,76 +19,93 @@ use task::{KillReason, PanicInfoOwned};
 
 /// Performs the standard panic handling routine, which involves the following:
 /// 
-/// * Printing a basic panic message.
-/// * Getting the current `Task`.
-/// * Printing a backtrace of the call stack.
 /// * Invoking the current `Task`'s `panic_handler` routine, if it has registered one.
-/// * If there is no registered panic handler, then it prints a standard message.
-/// * Finally, it kills the panicked `Task`.
+/// * Printing a backtrace of the call stack.
+/// * Finally, it performs stack unwinding of this `Task'`s stack and kills it.
 /// 
+/// Returns `Ok(())` if everything ran successfully, and `Err` otherwise.
 pub fn panic_wrapper(panic_info: &PanicInfo) -> Result<(), &'static str> {
-    // Stuff for unwinding here, nothing working yet
-    // let curr_task_locked = curr_task.lock();
-    // let my_crate = curr_task_locked.app_crate.as_ref().expect("unwind_test's app_crate was None");
-    // for sec_ref in my_crate.lock_as_ref().sections.values() {
-    //     let sec = sec_ref.lock();
-    //     trace!("    section {:?}, vaddr: {:#X}, size: {:#X}", sec.name, sec.start_address(), sec.size());
-    // }
-    // namespace.handle_eh_frame(&my_crate, true).expect("handle_eh_frame failed");
-
-
     trace!("at top of panic_wrapper: {:?}", panic_info);
 
-    let apic_id = apic::get_my_apic_id();
-
-    // get current task to see if it has a panic_handler
-    let curr_task = task::get_my_current_task().ok_or("get_my_current_task() failed")?;
-    let namespace = curr_task.get_namespace();
-    let (mmi_ref, app_crate_ref, is_idle_task) = { 
-        let t = curr_task.lock();
-        (t.mmi.clone(), t.app_crate.clone(), t.is_an_idle_task)
-    };
-    // We should ensure that the lock on the curr_task isn't held here,
-    // in order to allow the panic handler and other functions below to acquire it. 
-
     // print a stack trace
-    stack_trace(
-        &mmi_ref.lock().page_table,
-        &|instruction_pointer: VirtualAddress| {
-            namespace.get_section_containing_address(instruction_pointer, app_crate_ref.as_ref(), false)
-                .map(|(sec_ref, offset)| (sec_ref.lock().name.clone(), offset))
-        },
-    );
+    {
+        let curr_task = task::get_my_current_task().ok_or("get_my_current_task() failed")?;
+        let namespace = curr_task.get_namespace();
+        let (mmi_ref, app_crate_ref, _is_idle_task) = { 
+            let t = curr_task.lock();
+            (t.mmi.clone(), t.app_crate.clone(), t.is_an_idle_task)
+        };
+
+        // // dump some info about the loaded app crate
+        // if let Some(ref app_crate) = app_crate_ref {
+        //     let krate = app_crate.lock_as_ref();
+        //     trace!("============== Crate {} =================", krate.crate_name);
+        //     for s in krate.sections.values() {
+        //         trace!("   {:?}", &*s.lock());
+        //     }
+        // }
+
+        stack_trace_using_frame_pointer(
+            &mmi_ref.lock().page_table,
+            &|instruction_pointer: VirtualAddress| {
+                namespace.get_section_containing_address(instruction_pointer, app_crate_ref.as_ref(), false)
+                    .map(|(sec_ref, offset)| (sec_ref.lock().name.clone(), offset))
+            },
+        );
+    }
+
+    // Call this task's panic handler, if it has one.
+    // Note that we must consume and drop the Task's panic handler BEFORE that Task can possibly be dropped.
+    // This is because if the app sets a panic handler that is a closure/function in the text section of the app itself,
+    // then after the app crate is released the panic handler will be dropped AFTER the app crate has been freed.
+    // When it tries to drop the task's panic handler, causes a page fault because the text section of the app crate has been unmapped.
+    {
+        let panic_handler = task::get_my_current_task().and_then(|t| t.take_panic_handler());
+        if let Some(ref ph_func) = panic_handler {
+            debug!("Found panic handler callback to invoke in Task {:?}", task::get_my_current_task());
+            ph_func(panic_info);
+        }
+        else {
+            debug!("No panic handler callback in Task {:?}", task::get_my_current_task());
+        }
+    }
+
+    // Start the unwinding process
+    {
+        let cause = KillReason::Panic(PanicInfoOwned::from(panic_info));
+        match unwind::start_unwinding(cause) {
+            Ok(_) => {
+                warn!("BUG: start_unwinding() returned an Ok() value, which is unexpected because it means no unwinding actually occurred. Task: {:?}.", task::get_my_current_task());
+                Ok(())
+            }
+            Err(e) => {
+                error!("Task {:?} was unable to start unwinding procedure, error: {}.", task::get_my_current_task(), e);
+                Err(e)
+            }
+        }
+    }
     
-    // // call this task's panic handler, if it has one. 
-    // let panic_handler = curr_task.take_panic_handler();
-    // if let Some(ref ph_func) = panic_handler {
-    //     ph_func(&PanicInfoOwned::from(panic_info));
-    //     error!("PANIC handled in task \"{}\" on core {:?}: {}", curr_task.lock().name, apic_id, panic_info);
+    // if !is_idle_task {
+    //     // kill the offending task (the current task)
+    //     error!("Killing panicked task \"{}\"", curr_task.lock().name);
+    //     curr_task.kill(KillReason::Panic(PanicInfoOwned::from(panic_info)))?;
+    //     runqueue::remove_task_from_all(curr_task)?;
+    //     Ok(())
     // }
     // else {
-    //     error!("PANIC was unhandled in task \"{}\" on core {:?} at {}", curr_task.lock().name, apic_id, panic_info);
-    //     // memory::stack_trace();
+    //     Err("")
     // }
-
-    if !is_idle_task {
-        // kill the offending task (the current task)
-        error!("Killing panicked task \"{}\"", curr_task.lock().name);
-        curr_task.kill(KillReason::Panic(PanicInfoOwned::from(panic_info)))?;
-        runqueue::remove_task_from_all(curr_task)?;
-        Ok(())
-    }
-    else {
-        Err("")
-    }
 }
 
 
 
 
-/// Get a stack trace, borrowed from Redox
+/// Get a stack trace using the frame pointer register (RBP on x86_64). 
+/// If the compiler didn't emit frame pointers, then this function will not work.
+/// 
+/// This was adapted from Redox's stack trace implementation.
 #[inline(never)]
-pub fn stack_trace(
+pub fn stack_trace_using_frame_pointer(
     current_page_table: &PageTable,
     addr_to_symbol: &dyn Fn(VirtualAddress) -> Option<(String, usize)>
 ) {
@@ -141,77 +157,14 @@ pub fn stack_trace(
 }
 
 
-/// Gets the first instruction pointer in the call stack
-/// that IS NOT part of the panicking code handling flow, 
-/// i.e., the first "application code" address that we should actually unwind. 
-/// 
-/// # Note
-/// This is for testing purposes, eventually we will likely need 
-/// to unwind all addresses including the call frames in the panic handling functions.
-#[inline(never)]
-pub fn get_first_non_panic_instruction_pointer(
-    current_page_table: &PageTable,
-    addr_to_symbol: &dyn Fn(VirtualAddress) -> Option<(String, usize)>
-) -> Option<VirtualAddress> {
-
-    // SAFETY: pointers are checked 
-    // get the stack base pointer
-    let mut rbp: usize;
-    let mut rsp: usize;
-    unsafe {
-        asm!("" : "={rbp}"(rbp), "={rsp}"(rsp) : : "memory" : "intel", "volatile");
-    }
-
-    if rbp == 0 {
-        error!("Frame pointers have been omitted in this build. \
-            Stack tracing/unwinding cannot be performed because we don't yet \
-            support using DWARF .debug_* sections to backtrace the stack. \
-            Make sure that the rustc option '-C force-frame-pointers=yes' is used."
-        );
-        return None;
-    }
-
-    // There are 3 function calls in the panic handling flow:
-    // * core::panicking::panic
-    // * core::panicking::panic_fmt
-    // * rust_begin_unwind
-    // As far as I can tell, that's a fixed number, so we can just ignore 
-    // the first three call frames, and return the fourth!
-
-    let mut call_stack_depth = 0;
-
-    for _frame in 0..64 {
-        if let Some(rip_rbp) = rbp.checked_add(core::mem::size_of::<usize>()) {
-            if let (Ok(rbp_vaddr), Ok(rip_rbp_vaddr)) = (VirtualAddress::new(rbp), VirtualAddress::new(rip_rbp)) {
-                if current_page_table.translate(rbp_vaddr).is_some() && current_page_table.translate(rip_rbp_vaddr).is_some() {
-                    let rip = unsafe { *(rip_rbp as *const usize) };
-                    if rip == 0 {
-                        // error!("  {:>#018X}: BEGINNING OF STACK", rbp);
-                        break;
-                    }
-                    if call_stack_depth == 3 {
-                        return VirtualAddress::new(rip).ok();
-                    }
-                    // if let Some((symbol_name, offset)) = addr_to_symbol(VirtualAddress::new_canonical(rip)) {
-                    //     error!("  {:>#018X}: {:>#018X} in {} + {:#X}", rbp, rip, symbol_name, offset);
-                    // } else {
-                    //     error!("  {:>#018X}: {:>#018X} in ??", rbp, rip);
-                    // }
-                    // move up the call stack to the previous frame
-                    call_stack_depth += 1;
-                    rbp = unsafe { *(rbp as *const usize) };
-                } else {
-                    // error!("  {:>#018X}: GUARD PAGE", rbp);
-                    break;
-                }
-            } else {
-                // error!(" {:>#018X}: INVALID VIRTUAL ADDRESS in RBP", rbp);
-                break;
-            }
-        } else {
-            // error!("  {:>#018X}: RBP OVERFLOW", rbp);
-        }
-    }
-
-    None
-}
+// // snippet to get the current instruction pointer RIP, stack pointer RSP, and RBP
+// let mut rbp: usize;
+// let mut rsp: usize;
+// let mut rip: usize;
+// unsafe {
+//     // On x86 you cannot directly read the value of the instruction pointer (RIP),
+//     // so we use a trick that exploits RIP-relateive addressing to read the current value of RIP (also gets RBP and RSP)
+//     asm!("lea $0, [rip]" : "=r"(rip), "={rbp}"(rbp), "={rsp}"(rsp) : : "memory" : "intel", "volatile");
+// }
+// debug!("register values: RIP: {:#X}, RSP: {:#X}, RBP: {:#X}", rip, rsp, rbp);
+// let _curr_instruction_pointer = VirtualAddress::new_canonical(rip);
