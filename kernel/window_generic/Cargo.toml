@@ -49,6 +49,10 @@ path = "../window_manager"
 [dependencies.text_display]
 path = "../../kernel/displayable/text_display"
 
+[dependencies.lazy_static]
+features = ["spin_no_std", "nightly"]
+version = "1.2.0"
+
 # [build]
 # rustflags = ["-C", "prefer-dynamic", "-C", "panic=abort"]
 

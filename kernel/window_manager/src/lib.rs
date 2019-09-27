@@ -50,47 +50,26 @@ pub fn init() -> Result<(), &'static str> {
     Ok(())
 }
 
-lazy_static! {
-    /// The list of all windows in the system.
-    pub static ref WINDOWLIST: Mutex<WindowList> = Mutex::new(
-        WindowList{
-            background_list: VecDeque::new(),
-            active: Weak::new(),
-        }
-    );
-}
-
 /// The window list structure.
 /// It contains a list of allocated window and a reference to the active window.
-pub struct WindowList {
-    // The list of inactive windows. Their order is based on the last time they were active. The first window is the window which was active most recently.
-    background_list: VecDeque<Weak<Mutex<Box<dyn Window>>>>,
-    // A weak pointer to the active window.
-    active: Weak<Mutex<Box<dyn Window>>>,
+pub struct WindowList<T: Window> {
+    /// The list of inactive windows. Their order is based on the last time they were active. The first window is the window which was active most recently.
+    pub background_list: VecDeque<Weak<Mutex<T>>>,
+    /// A weak pointer to the active window.
+    pub active: Weak<Mutex<T>>,
 }
 
-/// Puts an input event into the active window (i.e. a keypress event, resize event, etc.).
-pub fn send_event_to_active(event: Event) -> Result<(), &'static str> {
-    let window_list = WINDOWLIST.lock();
-    let active_ref = window_list.active.upgrade(); // grabs a pointer to the active WindowInner
-    if let Some(window) = active_ref {
-        let mut window = window.lock();
-        window.key_producer().enqueue(event);
-    }
-    Ok(())
-}
-
-impl WindowList {
+impl<T: Window> WindowList<T> {
     /// Adds a new window to the list and actives it.
     pub fn add_active(
         &mut self,
-        inner_ref: &Arc<Mutex<Box<dyn Window>>>,
+        inner_ref: &Arc<Mutex<T>>,
     ) -> Result<(), &'static str> {
         if let Some(current_active) = self.active.upgrade() {
             current_active.lock().active(false)?;
             let weak_ref = self.active.clone();
             self.background_list.push_front(weak_ref);
-        }
+        } 
 
         inner_ref.lock().active(true)?;
         self.active = Arc::downgrade(inner_ref);
@@ -99,11 +78,11 @@ impl WindowList {
     }
 
     /// Deletes a window from the list.
-    pub fn delete(&mut self, inner: &Arc<Mutex<Box<dyn Window>>>) -> Result<(), &'static str> {
+    pub fn delete(&mut self, inner: &Arc<Mutex<T>>) -> Result<(), &'static str> {
         // if the window is active, delete it and active the next top window
         if let Some(current_active) = self.active.upgrade() {
             if Arc::ptr_eq(&(current_active), inner) {
-                active_window(0, false)?;
+                self.set_active(0, false)?;
                 return Ok(());
             }
         }
@@ -125,7 +104,7 @@ impl WindowList {
     }
 
     // gets the index of an inactive window in the background window list.
-    fn get_bgwindow_index(&self, inner: &Arc<Mutex<Box<dyn Window>>>) -> Option<usize> {
+    fn get_bgwindow_index(&self, inner: &Arc<Mutex<T>>) -> Option<usize> {
         let mut i = 0;
         for item in self.background_list.iter() {
             if let Some(item_ptr) = item.upgrade() {
@@ -143,6 +122,59 @@ impl WindowList {
         }
     }
 
+    // Actives a window in the background list.
+    // # Arguments
+    // * `index`: the index of the window in the background list.
+    // * `set_current_back`: whether to keep current active window in the background list. Delete current window if `set_current_back` is false.
+    fn set_active(&mut self, index: usize, set_current_back: bool) -> Result<(), &'static str> {
+        if let Some(window) = self.active.upgrade() {
+            let mut current = window.lock();
+            if set_current_back {
+                (*current).active(false)?;
+                let old_active = self.active.clone();
+                self.background_list.push_front(old_active);
+            } else {
+                (*current).clean()?;
+            }
+        }
+
+        if let Some(active) = self.background_list.remove(index) {
+            self.active = active;
+            if let Some(window) = self.active.upgrade() {
+                let mut current = window.lock();
+                (*current).active(true)?;
+            }
+        }
+
+        Ok(())
+    }
+
+    /// Picks the next window in the background list and sets it as active.
+    /// The order of windows in the background is based on the last time they are active.
+    /// The next window is the one which was active most recently.
+    pub fn switch_to_next(&mut self) -> Result<(), &'static str> {
+        self.set_active(0, true)
+    }
+
+
+    /// Sets the specified window in the background list as active.
+    pub fn switch_to(&mut self, window: &Arc<Mutex<T>>) -> Result<(), &'static str> {
+        if let Some(index) = self.get_bgwindow_index(window) {
+            self.set_active(index, true)?;
+        }
+
+        Ok(())
+    }
+
+    /// Puts an input event into the active window (i.e. a keypress event, resize event, etc.).
+    pub fn send_event_to_active(&mut self, event: Event) -> Result<(), &'static str> {
+        let active_ref = self.active.upgrade(); // grabs a pointer to the active WindowInner
+        if let Some(window) = active_ref {
+            let mut window = window.lock();
+            window.key_producer().enqueue(event);
+        }
+        Ok(())
+    }
     /*// check if an area specified by (x, y, width, height) overlaps with an existing window
     fn check_overlap(&mut self, inner:&Arc<Mutex<WindowInner>>, x:usize, y:usize, width:usize, height:usize) -> bool {
         let mut len = self.allocated.len();
@@ -202,50 +234,6 @@ impl WindowList {
     
 }
 
-/// Picks the next window in the background list and sets it as active.
-/// The order of windows in the background is based on the last time they are active.
-/// The next window is the one which was active most recently.
-pub fn switch_to_next() -> Result<(), &'static str> {
-    active_window(0, true)
-}
-
-/// Sets the specified window in the background list as active.
-pub fn switch_to(window: &Arc<Mutex<Box<dyn Window>>>) -> Result<(), &'static str> {
-    if let Some(index) = WINDOWLIST.lock().get_bgwindow_index(window) {
-        active_window(index, true)?;
-    }
-
-    Ok(())
-}
-
-// Actives a window in the background list.
-// # Arguments
-// * `index`: the index of the window in the background list.
-// * `set_current_back`: whether to keep current active window in the background list. Delete current window if `set_current_back` is false.
-fn active_window(index: usize, set_current_back: bool) -> Result<(), &'static str> {
-    let mut window_list = WINDOWLIST.lock();
-
-    if let Some(window) = window_list.active.upgrade() {
-        let mut current = window.lock();
-        if set_current_back {
-            (*current).active(false)?;
-            let old_active = window_list.active.clone();
-            window_list.background_list.push_front(old_active);
-        } else {
-            (*current).clean()?;
-        }
-    }
-
-    if let Some(active) = window_list.background_list.remove(index) {
-        window_list.active = active;
-        if let Some(window) = window_list.active.upgrade() {
-            let mut current = window.lock();
-            (*current).active(true)?;
-        }
-    }
-
-    Ok(())
-}
 
 /*  Following two functions can be used to systematically resize windows forcibly
 /// Readjusts remaining windows after a window is deleted to maximize screen usage
@@ -295,3 +283,5 @@ pub fn adjust_windows_before_addition() -> Result<(usize, usize, usize), &'stati
 }
 
 */
+
+

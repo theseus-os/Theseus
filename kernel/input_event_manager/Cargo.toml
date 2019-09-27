@@ -18,8 +18,8 @@ version = "0.3.7"
 [dependencies.keycodes_ascii]
 path = "../../libs/keycodes_ascii"
 
-[dependencies.window_manager]
-path = "../window_manager"
+[dependencies.window_generic]
+path = "../window_generic"
 
 [dependencies.dfqueue]
 path = "../../libs/dfqueue"

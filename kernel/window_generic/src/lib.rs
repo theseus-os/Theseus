@@ -13,6 +13,8 @@ extern crate dfqueue;
 extern crate event_types;
 #[macro_use]
 extern crate log;
+#[macro_use]
+extern crate lazy_static;
 extern crate compositor;
 extern crate displayable;
 extern crate frame_buffer;
@@ -27,7 +29,8 @@ extern crate window_manager;
 use alloc::boxed::Box;
 use alloc::collections::BTreeMap;
 use alloc::string::{String, ToString};
-use alloc::sync::Arc;
+use alloc::sync::{Arc, Weak};
+use alloc::collections::VecDeque;
 use compositor::Compositor;
 use core::ops::{Deref, DerefMut};
 use dfqueue::{DFQueue, DFQueueConsumer, DFQueueProducer};
@@ -41,15 +44,25 @@ use spin::Mutex;
 use text_display::{Cursor, TextDisplay};
 use window::Window;
 use window_manager::{
-    SCREEN_BACKGROUND_COLOR, DESKTOP_FRAME_BUFFER, WINDOWLIST, WINDOW_ACTIVE_COLOR,
-    WINDOW_INACTIVE_COLOR, WINDOW_MARGIN, WINDOW_PADDING,
+    SCREEN_BACKGROUND_COLOR, DESKTOP_FRAME_BUFFER, WINDOW_ACTIVE_COLOR,
+    WINDOW_INACTIVE_COLOR, WINDOW_MARGIN, WINDOW_PADDING, WindowList
 };
+
+lazy_static! {
+    /// The list of all windows in the system.
+    pub static ref WINDOWLIST: Mutex<WindowList<WindowInner>> = Mutex::new(
+        WindowList{
+            background_list: VecDeque::new(),
+            active: Weak::new(),
+        }
+    );
+}
 
 /// A window contains a reference to its inner reference owned by the window manager,
 /// a consumer of inputs, a list of displayables and a framebuffer.
 pub struct WindowGeneric<Buffer: FrameBuffer> {
     /// The inner object of the window.
-    pub inner: Arc<Mutex<Box<dyn Window>>>,
+    pub inner: Arc<Mutex<WindowInner>>,
     /// The key input consumer.
     pub consumer: DFQueueConsumer<Event>,
     /// The components in the window.
@@ -261,6 +274,77 @@ impl<Buffer: FrameBuffer> WindowGeneric<Buffer> {
     }
 }
 
+/// Creates a new window. Currently the window is of `FrameBufferRGB`. In the future we will be able to create a window of any structure which implements `FrameBuffer`.
+/// (x, y) specify the coordinates of the top left corner of the window.
+/// (width, height) specify the size of the new window.
+pub fn new_window<'a>(
+    x: usize,
+    y: usize,
+    width: usize,
+    height: usize,
+) -> Result<WindowGeneric<FrameBufferRGB>, &'static str> {
+    // check the size of the window
+    if width < 2 * WINDOW_PADDING || height < 2 * WINDOW_PADDING {
+        return Err("Window size must be greater than the padding");
+    }
+    // init the key input producer and consumer
+    let consumer = DFQueue::new().into_consumer();
+    let producer = consumer.obtain_producer();
+    // init the frame buffer of the window
+    let framebuffer = FrameBufferRGB::new(
+        width - 2 * WINDOW_PADDING,
+        height - 2 * WINDOW_PADDING,
+        None,
+    )?;
+    let inner = WindowInner {
+        x: x,
+        y: y,
+        width: width,
+        height: height,
+        active: true,
+        padding: WINDOW_PADDING,
+        key_producer: producer,
+    };
+
+    // // Check if the window overlaps with others
+    // let inner_ref = Arc::new(Mutex::new(inner));
+    // let overlapped = self.check_overlap(&inner_ref, x, y, width, height);
+    // if overlapped  {
+    //     return Err("Request area is already allocated");
+    // }
+
+    let inner_ref = Arc::new(Mutex::new(inner));
+
+    // add the new window and active it
+    // initialize the content of the new window
+    inner_ref.lock().clean()?;
+    WINDOWLIST.lock().add_active(&inner_ref)?;
+
+    // return the window object
+    let window: WindowGeneric<FrameBufferRGB> = WindowGeneric {
+        inner: inner_ref,
+        consumer: consumer,
+        components: BTreeMap::new(),
+        framebuffer: framebuffer,
+    };
+
+    Ok(window)
+}
+
+/// Applications call this function to request a new window object with a default size (mostly fills screen with WINDOW_MARGIN around all borders).
+pub fn new_default_window() -> Result<WindowGeneric<FrameBufferRGB>, &'static str> {
+    let (window_width, window_height) = frame_buffer::get_screen_size()?;
+    match new_window(
+        WINDOW_MARGIN,
+        WINDOW_MARGIN,
+        window_width - 2 * WINDOW_MARGIN,
+        window_height - 2 * WINDOW_MARGIN,
+    ) {
+        Ok(new_window) => return Ok(new_window),
+        Err(err) => return Err(err),
+    }
+}
+
 /// The structure is owned by the window manager. It contains the information of a window but under the control of the manager
 pub struct WindowInner {
     /// the upper left x-coordinate of the window
@@ -395,80 +479,9 @@ fn get_border_color(active: bool) -> u32 {
     }
 }
 
-/// Creates a new window. Currently the window is of `FrameBufferRGB`. In the future we will be able to create a window of any structure which implements `FrameBuffer`.
-/// (x, y) specify the coordinates of the top left corner of the window.
-/// (width, height) specify the size of the new window.
-pub fn new_window<'a>(
-    x: usize,
-    y: usize,
-    width: usize,
-    height: usize,
-) -> Result<WindowGeneric<FrameBufferRGB>, &'static str> {
-    // check the size of the window
-    if width < 2 * WINDOW_PADDING || height < 2 * WINDOW_PADDING {
-        return Err("Window size must be greater than the padding");
-    }
-    // init the key input producer and consumer
-    let consumer = DFQueue::new().into_consumer();
-    let producer = consumer.obtain_producer();
-    // init the frame buffer of the window
-    let framebuffer = FrameBufferRGB::new(
-        width - 2 * WINDOW_PADDING,
-        height - 2 * WINDOW_PADDING,
-        None,
-    )?;
-    let inner = WindowInner {
-        x: x,
-        y: y,
-        width: width,
-        height: height,
-        active: true,
-        padding: WINDOW_PADDING,
-        key_producer: producer,
-    };
-
-    // // Check if the window overlaps with others
-    // let inner_ref = Arc::new(Mutex::new(inner));
-    // let overlapped = self.check_overlap(&inner_ref, x, y, width, height);
-    // if overlapped  {
-    //     return Err("Request area is already allocated");
-    // }
-
-    let inner_obj: Box<dyn Window> = Box::new(inner);
-    let inner_ref = Arc::new(Mutex::new(inner_obj));
-
-    // add the new window and active it
-    // initialize the content of the new window
-    inner_ref.lock().clean()?;
-    window_manager::WINDOWLIST.lock().add_active(&inner_ref)?;
-
-    // return the window object
-    let window: WindowGeneric<FrameBufferRGB> = WindowGeneric {
-        inner: inner_ref,
-        consumer: consumer,
-        components: BTreeMap::new(),
-        framebuffer: framebuffer,
-    };
-
-    Ok(window)
-}
-
-/// Applications call this function to request a new window object with a default size (mostly fills screen with WINDOW_MARGIN around all borders).
-pub fn new_default_window() -> Result<WindowGeneric<FrameBufferRGB>, &'static str> {
-    let (window_width, window_height) = frame_buffer::get_screen_size()?;
-    match new_window(
-        WINDOW_MARGIN,
-        WINDOW_MARGIN,
-        window_width - 2 * WINDOW_MARGIN,
-        window_height - 2 * WINDOW_MARGIN,
-    ) {
-        Ok(new_window) => return Ok(new_window),
-        Err(err) => return Err(err),
-    }
-}
-
+// Use a lazy drop scheme instead since window_generic cannot get access to the window_manager. When the window is dropped, the corresponding weak reference will be deleted from the window manager the next time the manager tries to get access to it.
 // delete the reference of a window in the manager when a window is dropped.
-impl<Buffer: FrameBuffer> Drop for WindowGeneric<Buffer> {
+/*impl<Buffer: FrameBuffer> Drop for WindowGeneric<Buffer> {
     fn drop(&mut self) {
         let mut window_list = WINDOWLIST.lock();
 
@@ -479,4 +492,4 @@ impl<Buffer: FrameBuffer> Drop for WindowGeneric<Buffer> {
             Err(err) => error!("Fail to schedule to the next window: {}", err),
         };
     }
-}
+}*/
