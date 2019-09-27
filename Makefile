@@ -28,7 +28,7 @@ else
 	USB_DRIVES = $(shell lsblk -O | grep -i usb | awk '{print $$2}' | grep --color=never '[^0-9]$$')
 endif
 GRUB_MKRESCUE = $(GRUB_CROSS)grub-mkrescue
-	
+
 
 
 ###################################################################################################
@@ -41,7 +41,7 @@ check_rustc:
 ifneq (${BYPASS_RUSTC_CHECK}, yes)
 ifneq ($(RUSTC_OUTPUT), 0)
 	@echo -e "\nError: rustup is not installed on this system."
-	@echo -e "Please install rustup and try again.\n"
+	@echo -e "Please install rustup, run `rustup component add rust-src` and try again.\n"
 	@exit 1
 else
 	@echo -e '\nFound proper rust compiler version, proceeding with build...\n'
