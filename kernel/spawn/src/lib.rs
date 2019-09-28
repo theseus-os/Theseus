@@ -589,7 +589,7 @@ fn task_wrapper<F, A, R>() -> !
 {
     // This is scoped to ensure that absolutely no resources that require dropping are held
     // when invoking the task's entry function, in order to simplify cleanup when unwinding.
-    // Tthat is, only values on the stack are allowed, nothing can be allocated/locked.
+    // That is, only non-droppable values on the stack are allowed, nothing can be allocated/locked.
     let (func, arg) = {
         let curr_task_ref = get_my_current_task().expect("BUG: task_wrapper: couldn't get current task (before task func).");
         let curr_task_name = curr_task_ref.lock().name.clone();

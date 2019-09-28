@@ -238,22 +238,22 @@ impl FallibleIterator for StackFrameIter {
             let mut newregs = registers.clone();
             newregs[X86_64::RA] = None;
             unwind_row_ref.with_unwind_info(|_fde, row| {
-                for &(reg, ref rule) in row.registers() {
-                    // trace!("rule {:?} {:?}", reg, rule);
+                for &(reg_num, ref rule) in row.registers() {
+                    // trace!("rule {:?} {:?}", reg_num, rule);
                     // The stack pointer (RSP) is given by the CFA calculated during the previous iteration;
                     // there should *not* be a register rule defining the value of the RSP directly.
-                    if reg == X86_64::RSP {
+                    if reg_num == X86_64::RSP {
                         return Err("BUG: a unwind row's register rule specified that RSP should be changed, which is invalid.");
                     }
-                    newregs[reg] = match *rule {
-                        RegisterRule::Undefined => unreachable!(), // registers[reg],
-                        RegisterRule::SameValue => Some(registers[reg].unwrap()), // not sure why this exists
-                        RegisterRule::Register(r) => registers[r],
+                    newregs[reg_num] = match *rule {
+                        RegisterRule::Undefined => return Err("StackFrameIter: encountered an unsupported RegisterRule::Undefined"), // registers[reg_num],
+                        RegisterRule::SameValue => registers[reg_num],
+                        RegisterRule::Register(other_reg_num) => registers[other_reg_num],
                         RegisterRule::Offset(n) => Some(unsafe { *((cfa.wrapping_add(n as u64)) as *const u64) }),
                         RegisterRule::ValOffset(n) => Some(cfa.wrapping_add(n as u64)),
-                        RegisterRule::Expression(_) => unimplemented!(),
-                        RegisterRule::ValExpression(_) => unimplemented!(),
-                        RegisterRule::Architectural => unreachable!(),
+                        RegisterRule::Expression(_) => return Err("StackFrameIter: encountered an unsupported RegisterRule::Expression"),
+                        RegisterRule::ValExpression(_) => return Err("StackFrameIter: encountered an unsupported RegisterRule::ValExpression"),
+                        RegisterRule::Architectural => return Err("StackFrameIter: encountered an unsupported RegisterRule::Architectural"),
                     };
                 }
                 Ok(())
@@ -696,11 +696,6 @@ fn continue_unwinding(unwinding_context_ptr: *mut UnwindingContext) -> Result<()
                 let lsda_slice = sec_mp.as_slice::<u8>(starting_offset, length_til_end_of_mp)
                     .map_err(|_e| "continue_unwinding(): couldn't get LSDA pointer as a slice")?;
                 let table = lsda::GccExceptTableArea::new(lsda_slice, NativeEndian, frame.initial_address());
-
-                // let mut iter = table.call_site_table_entries().unwrap();
-                // while let Some(entry) = iter.next().unwrap() {
-                //     debug!("{:#X?}", entry);
-                // }
 
                 let entry = table.call_site_table_entry_for_address(frame.caller_address()).map_err(|e| {
                     error!("continue_unwinding(): couldn't find a call site table entry for this stack frame's caller address. Error: {}", e);

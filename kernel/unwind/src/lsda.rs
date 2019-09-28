@@ -17,7 +17,7 @@ use FallibleIterator;
 #[derive(Clone, Copy, Debug, PartialEq, Eq)]
 pub struct GccExceptTableArea<R: Reader> {
     reader: R,
-    function_starting_vaddr: u64,
+    function_start_address: u64,
 }
 
 impl<'input, Endian: Endianity> GccExceptTableArea<EndianSlice<'input, Endian>> {
@@ -25,11 +25,13 @@ impl<'input, Endian: Endianity> GccExceptTableArea<EndianSlice<'input, Endian>> 
     /// which is a slice that typically begins at an LSDA pointer that was parsed
     /// from a `FrameDescriptionEntry` in the `EhFrame` section.
     /// 
-    /// The starting address of the function that it corresponds to must aso be provided.
-    pub fn new(data: &'input [u8], endian: Endian, function_starting_vaddr: u64) -> Self {
+    /// The starting address of the function that it corresponds to must aso be provided,
+    /// because this is often used as the default base address for the landing pad
+    /// from which all offsets are calculated.
+    pub fn new(data: &'input [u8], endian: Endian, function_start_address: u64) -> Self {
         GccExceptTableArea {
             reader: EndianSlice::new(data, endian),
-            function_starting_vaddr,
+            function_start_address,
         }
     }
 }
@@ -80,7 +82,7 @@ impl<R: Reader> GccExceptTableArea<R> {
         Ok(CallSiteTableIterator {
             call_site_table_encoding: call_site_table_header.encoding,
             end_of_call_site_table,
-            landing_pad_base: lsda_header.landing_pad_base.unwrap_or(self.function_starting_vaddr),
+            landing_pad_base: lsda_header.landing_pad_base.unwrap_or(self.function_start_address),
             reader, 
         })
     }

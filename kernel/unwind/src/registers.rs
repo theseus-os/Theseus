@@ -58,7 +58,7 @@ impl IndexMut<gimli::Register> for Registers {
 /// 
 /// # Important Note
 /// This should be kept in sync with the number of elements 
-/// in the `Registers` struct; it must have one less element.
+/// in the `Registers` struct; this must have one less element.
 #[derive(Debug)]
 #[repr(C)]
 pub struct LandingRegisters {
