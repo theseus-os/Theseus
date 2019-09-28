@@ -36,20 +36,6 @@ pub const WINDOW_INACTIVE_COLOR: u32 = 0x343C37;
 /// The background color of the screen
 pub const SCREEN_BACKGROUND_COLOR: u32 = 0x000000;
 
-/// A framebuffer owned by the window manager.
-/// This framebuffer is responsible for displaying borders and gaps between windows. Windows owned by applications cannot get access to their borders.
-/// All the display behaviors of borders are controled by the window manager.
-pub static DESKTOP_FRAME_BUFFER: Once<Arc<Mutex<FrameBufferRGB>>> = Once::new();
-
-/// Initializes the window manager. 
-/// Currently the framebuffer is of type `FrameBufferRGB`. In the future we would be able to have window manager of different `FrameBuffer`s.
-pub fn init() -> Result<(), &'static str> {
-    let (screen_width, screen_height) = frame_buffer::get_screen_size()?;
-    let framebuffer = FrameBufferRGB::new(screen_width, screen_height, None)?;
-    DESKTOP_FRAME_BUFFER.call_once(|| Arc::new(Mutex::new(framebuffer)));
-    Ok(())
-}
-
 /// The window list structure.
 /// It contains a list of allocated window and a reference to the active window.
 pub struct WindowList<T: Window> {

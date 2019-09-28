@@ -30,8 +30,8 @@ path = "../frame_buffer"
 [dependencies.frame_buffer_rgb]
 path = "../frame_buffer_rgb"
 
-[dependencies.window_manager]
-path = "../window_manager"
+[dependencies.window_manager_generic]
+path = "../window_manager_generic"
 
 [dependencies.input_event_manager]
 path = "../input_event_manager"

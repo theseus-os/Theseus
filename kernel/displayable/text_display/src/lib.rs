@@ -17,7 +17,7 @@ extern crate displayable;
 use alloc::string::String;
 use displayable::Displayable;
 use font::{CHARACTER_HEIGHT, CHARACTER_WIDTH};
-use frame_buffer::FrameBuffer;
+use frame_buffer::{AbsoluteCoord, FrameBuffer, RelativeCoord};
 use tsc::{tsc_ticks, TscTicks};
 
 const DEFAULT_CURSOR_FREQ: u64 = 400000000;
@@ -38,14 +38,12 @@ pub struct TextDisplay {
 impl Displayable for TextDisplay {
     fn display(
         &mut self,
-        x: usize,
-        y: usize,
+        location: AbsoluteCoord,
         framebuffer: &mut dyn FrameBuffer,
     ) -> Result<(), &'static str> {
         let (col, line) = frame_buffer_printer::print_by_bytes(
             framebuffer,
-            x,
-            y,
+            location,
             self.width,
             self.height,
             self.text.as_str(),
@@ -108,8 +106,7 @@ impl TextDisplay {
     pub fn display_cursor(
         &mut self,
         cursor: &mut Cursor,
-        x: usize,
-        y: usize,
+        location: RelativeCoord,
         col: usize,
         line: usize,
         framebuffer: &mut dyn FrameBuffer,
@@ -120,10 +117,13 @@ impl TextDisplay {
             } else {
                 self.bg_color
             };
+
+            let abs_location = AbsoluteCoord(
+                (location + (col * CHARACTER_WIDTH, line * CHARACTER_HEIGHT)).inner()
+            );
             frame_buffer_drawer::fill_rectangle(
                 framebuffer,
-                x + col * CHARACTER_WIDTH,
-                y + line * CHARACTER_HEIGHT,
+                abs_location,
                 CHARACTER_WIDTH,
                 CHARACTER_HEIGHT,
                 color,

@@ -19,8 +19,8 @@ version = "0.1.0"
 [dependencies.window_manager]
 path = "../window_manager"
 
-[dependencies.window_generic]
-path = "../window_generic"
+[dependencies.window_manager_generic]
+path = "../window_manager_generic"
 
 [dependencies.frame_buffer_rgb]
 path = "../frame_buffer_rgb"
@@ -42,6 +42,9 @@ path = "../../kernel/displayable/text_display"
 
 [dependencies.displayable]
 path = "../../kernel/displayable"
+
+[dependencies.frame_buffer]
+path = "../../kernel/frame_buffer"
 
 [lib]
 crate-type = ["rlib"]

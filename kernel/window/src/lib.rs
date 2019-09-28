@@ -5,9 +5,11 @@
 
 extern crate event_types;
 extern crate dfqueue;
+extern crate frame_buffer;
 
 use event_types::Event;
 use dfqueue::{DFQueueProducer};
+use frame_buffer::RelativeCoord;
 
 /// The `Window` trait.
 pub trait Window: Send {
@@ -15,7 +17,7 @@ pub trait Window: Send {
     fn clean(&self) -> Result<(), &'static str>;
 
     /// Checks if the pixel (x, y) is within the window exluding the border and padding.
-    fn check_in_content(&self, x: usize, y: usize) -> bool;
+    fn check_in_content(&self, point: RelativeCoord) -> bool;
 
     /// Actives or inactives a window.
     fn active(&mut self, active: bool) -> Result<(), &'static str>;

@@ -9,7 +9,7 @@ extern crate frame_buffer_rgb;
 
 use alloc::vec;
 use font::{CHARACTER_HEIGHT, CHARACTER_WIDTH, FONT_PIXEL};
-use frame_buffer::FrameBuffer;
+use frame_buffer::{FrameBuffer, AbsoluteCoord};
 
 /// Prints a string in a framebuffer.
 /// Returns (column, line) of the end, i.e. the position of the next symbol.
@@ -23,8 +23,7 @@ use frame_buffer::FrameBuffer;
 /// * `bg_color`: the background color of the text block.
 pub fn print_by_bytes(
     framebuffer: &mut dyn FrameBuffer,
-    x: usize,
-    y: usize,
+    location: AbsoluteCoord,
     width: usize,
     height: usize,
     slice: &str,
@@ -33,6 +32,7 @@ pub fn print_by_bytes(
 ) -> Result<(usize, usize), &'static str> {
     let buffer_width = width / CHARACTER_WIDTH;
     let buffer_height = height / CHARACTER_HEIGHT;
+    let (x, y) = location.coordinate();
 
     let mut curr_line = 0;
     let mut curr_column = 0;

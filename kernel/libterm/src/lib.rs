@@ -10,7 +10,7 @@
 #[macro_use] extern crate log;
 extern crate dfqueue;
 extern crate window_manager;
-extern crate window_generic;
+extern crate window_manager_generic;
 extern crate environment;
 extern crate print;
 extern crate event_types;
@@ -18,6 +18,7 @@ extern crate spin;
 extern crate text_display;
 extern crate displayable;
 extern crate frame_buffer_rgb;
+extern crate frame_buffer;
 
 use alloc::string::{String, ToString};
 use alloc::vec::Vec;
@@ -26,7 +27,8 @@ use event_types::Event;
 use text_display::{TextDisplay, Cursor};
 use displayable::Displayable;
 use frame_buffer_rgb::FrameBufferRGB;
-use window_generic::WindowGeneric;
+use frame_buffer::RelativeCoord;
+use window_manager_generic::WindowGeneric;
 
 pub const FONT_COLOR: u32 = 0x93ee90;
 pub const BACKGROUND_COLOR: u32 = 0x000000;
@@ -412,7 +414,7 @@ impl Terminal {
 impl Terminal {
     pub fn new() -> Result<Terminal, &'static str> {
         // Requests a new window object from the window manager
-        let window_object = match window_generic::new_default_window() {
+        let window_object = match window_manager_generic::new_default_window() {
             Ok(window_object) => window_object,
             Err(err) => {debug!("new window returned err"); return Err(err)}
         };
@@ -565,7 +567,7 @@ impl Terminal {
             let height = height - 2*window_manager::WINDOW_MARGIN;
             let text_display = TextDisplay::new(width, height, FONT_COLOR, BACKGROUND_COLOR)?;
             let displayable: Box<dyn Displayable> = Box::new(text_display);
-            self.window.add_displayable(&display_name, 0, 0, displayable)?;
+            self.window.add_displayable(&display_name, RelativeCoord::new(0, 0),displayable)?;
         }
         Ok(())
     }

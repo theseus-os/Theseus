@@ -5,7 +5,7 @@
 
 extern crate frame_buffer;
 
-use frame_buffer::FrameBuffer;
+use frame_buffer::{FrameBuffer, AbsoluteCoord};
 
 /// Draws a point in a framebuffer.
 /// The point is drawn at position (x, y) of the framebuffer with color.
@@ -124,19 +124,19 @@ pub fn draw_rectangle(
 /// The part exceeding the boundary of the framebuffer will be ignored.
 /// # Arguments
 /// * `framebuffer`: the framebuffer to draw in.
-/// * `(start_x, start_y)`: the left top point of the retangle.
+/// * `location`: the left top coordinate of the retangle.
 /// * `width`: the width of the rectangle.
 /// * `height`: the height of the rectangle.
 /// * `color`: the color of the rectangle.
 pub fn fill_rectangle(
     framebuffer: &mut dyn FrameBuffer,
-    start_x: usize,
-    start_y: usize,
+    location: AbsoluteCoord,
     width: usize,
     height: usize,
     color: u32,
 ) {
     let (buffer_width, buffer_height) = framebuffer.get_size();
+    let (start_x, start_y) = location.coordinate();
 
     let end_x: usize = {
         if start_x + width < buffer_width {

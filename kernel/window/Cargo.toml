@@ -14,6 +14,9 @@ version = "0.1.0"
 [dependencies.event_types]
 path = "../event_types"
 
+[dependencies.frame_buffer]
+path = "../frame_buffer"
+
 # [build]
 # rustflags = ["-C", "prefer-dynamic", "-C", "panic=abort"]
 
