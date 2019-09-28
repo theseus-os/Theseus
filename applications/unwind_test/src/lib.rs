@@ -8,6 +8,7 @@ extern crate task;
 
 
 use alloc::vec::Vec;
+use alloc::boxed::Box;
 use alloc::string::String;
 
 
@@ -20,6 +21,10 @@ impl Drop for MyStruct {
 
 #[inline(never)]
 fn foo() {
+    let _res = task::set_my_panic_handler(Box::new(|info| {
+        info!("Unwind test caught panic at {}", info);
+    }));
+    
     let _my_struct = MyStruct(10);
     panic!("intentional panic in unwind_test::foo()");
 }
