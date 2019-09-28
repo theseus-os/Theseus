@@ -33,7 +33,7 @@ use alloc::{
     sync::Arc,
     boxed::Box,
 };
-use irq_safety::{MutexIrqSafe, hold_interrupts, enable_interrupts, interrupts_enabled};
+use irq_safety::{MutexIrqSafe, hold_interrupts, enable_interrupts};
 use memory::{get_kernel_mmi_ref, MemoryManagementInfo, VirtualAddress};
 use task::{Task, TaskRef, get_my_current_task, RunState, TASKLIST, TASK_SWITCH_LOCKS};
 use mod_mgmt::CrateNamespace;
@@ -432,7 +432,7 @@ fn setup_context_trampoline(new_task: &mut Task, entry_point_function: fn() -> !
 pub fn spawn_userspace(path: Path, name: Option<String>) -> Result<TaskRef, &'static str> {
     return Err("this function has not yet been adapted to use the fs-based crate namespace system");
 
-    debug!("spawn_userspace [0]: Interrupts enabled: {}", interrupts_enabled());
+    debug!("spawn_userspace [0]: Interrupts enabled: {}", irq_safety::interrupts_enabled());
     
     let mut new_task = Task::new();
     new_task.name = String::from(name.unwrap_or(String::from(path.as_ref())));

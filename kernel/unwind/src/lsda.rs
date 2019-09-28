@@ -1,5 +1,5 @@
 //! Routines for parsing the gcc-style LSDA (Language-Specific Data Area) in an ELF object file, 
-//! which corresponds to a part of the `.gcc_except_table` section. 
+//! which corresponds to an area within the `.gcc_except_table` section. 
 
 #![allow(nonstandard_style)]
 
@@ -7,34 +7,34 @@ use core::ops::Range;
 use gimli::{Reader, DwEhPe, Endianity, EndianSlice, constants::*, };
 use FallibleIterator;
 
-/// `GccExceptTable` contains the contents of the Language-Specific Data Area (LSDA)
+/// `GccExceptTableArea` contains the contents of the Language-Specific Data Area (LSDA)
 /// that is used to locate cleanup (run destructors for) a given function during stack unwinding. 
 /// 
 /// Though an object file typically only includes a single `.gcc_except_table` section,
-/// this struct represents only one part of that section, the part that is for cleaning up a single function. 
+/// this struct represents only one area of that section, the area that is for cleaning up a single function. 
 /// There may exist multiple instances of this struct created as overlays 
-/// for different, non-overlapping parts of that one `.gcc_except_table` section.
+/// for different, non-overlapping areas of that one `.gcc_except_table` section.
 #[derive(Clone, Copy, Debug, PartialEq, Eq)]
-pub struct GccExceptTable<R: Reader> {
+pub struct GccExceptTableArea<R: Reader> {
     reader: R,
     function_starting_vaddr: u64,
 }
 
-impl<'input, Endian: Endianity> GccExceptTable<EndianSlice<'input, Endian>> {
-    /// Construct a new `GccExceptTable` instance from the given input data,
+impl<'input, Endian: Endianity> GccExceptTableArea<EndianSlice<'input, Endian>> {
+    /// Construct a new `GccExceptTableArea` instance from the given input data,
     /// which is a slice that typically begins at an LSDA pointer that was parsed
     /// from a `FrameDescriptionEntry` in the `EhFrame` section.
     /// 
     /// The starting address of the function that it corresponds to must aso be provided.
     pub fn new(data: &'input [u8], endian: Endian, function_starting_vaddr: u64) -> Self {
-        GccExceptTable {
+        GccExceptTableArea {
             reader: EndianSlice::new(data, endian),
             function_starting_vaddr,
         }
     }
 }
 
-// impl<R: Reader> Section<R> for GccExceptTable<R> {
+// impl<R: Reader> Section<R> for GccExceptTableArea<R> {
 //     // TODO FIXME: this is wrong (temporarily), 
 //     // once we incoporate it into Gimli itself, we can add a GccExceptFrame sectionid.
 //     fn id() -> SectionId { SectionId::EhFrameHdr }
@@ -46,7 +46,7 @@ impl<'input, Endian: Endianity> GccExceptTable<EndianSlice<'input, Endian>> {
 //     }
 // }
 
-impl<R: Reader> GccExceptTable<R> {
+impl<R: Reader> GccExceptTableArea<R> {
     /// Parses the .gcc_except_table entries from the very top of the LSDA area.
     /// This only parses the two headers that are guaranteed to exist,
     /// the other dynamically-sized entries should be parsed elsewhere using the result of this function.
@@ -68,9 +68,8 @@ impl<R: Reader> GccExceptTable<R> {
         Ok((lsda_header, call_site_table_header, reader))
     }
 
-
     /// Returns an iterator over all of the call site entries
-    /// found in this `GccExceptTable` part of the section.
+    /// found in this area of the gcc_except_table section.
     /// 
     /// Can be used with the `FallibleIterator` trait. 
     pub fn call_site_table_entries(&self) -> gimli::Result<CallSiteTableIterator<R>> {
@@ -99,6 +98,8 @@ impl<R: Reader> GccExceptTable<R> {
     }
 }
 
+/// The header of an LSDA section, which is at the very beginning of the area in the .gcc_except_table section
+/// that was pointed to by a stack frame's LSDA pointer. 
 #[derive(Debug)]
 struct LsdaHeader {
     /// The encoding used to read the next value `landing_pad_base`.
@@ -149,8 +150,9 @@ impl LsdaHeader {
 }
 
 
-
-
+/// The header of the call site table, which defines the length of the table 
+/// and the encoding format used to parse address values in the table.
+/// The call site table comes immediately after the `LsdaHeader`.
 #[derive(Debug)]
 struct CallSiteTableHeader {
     /// The encoding of items in the call site table.
@@ -171,17 +173,25 @@ impl CallSiteTableHeader {
 }
 
 
-
+/// An entry in the call site table, which defines landing pad functions and additional actions
+/// that should be executed when unwinding a given a stack frame. 
+/// The relevant entry for a particular stack frame can be found based on the range of addresses it covers.
 #[derive(Debug)]
 pub struct CallSiteTableEntry {
     /// An offset from the landing pad base address (top of function section)
-    /// that specifies the first (starting) address that is covered by this 
-    starting_ip_offset: u64,
+    /// that specifies the first (starting) address that is covered by this entry.
+    starting_offset: u64,
+    /// The length (from the above `starting_offset`) that specifies
+    /// the range of addresses covered by this entry.
     length: u64,
+    /// The offset from the `landing_pad_base` at which the landing pad entry function exists.
     landing_pad_offset: u64,
+    /// The offset into the action table that specifies what additional action to undertake.
+    /// If `0`, there is no action;
+    /// otherwise, this value plus 1 (`action_offset + 1`) should be used to locate the action table entry.
     action_offset: u64,
 
-    /// The starting address of the function that this GccExceptTable pertains to.
+    /// The starting address of the function that this GccExceptTableArea pertains to.
     /// This is not actually part of the table entry as defined in the gcc LSDA spec,
     /// it comes from the top-level LSDA header and is replicated here for convenience. 
     landing_pad_base: u64
@@ -197,7 +207,7 @@ impl CallSiteTableEntry {
         let cs_lp     = read_encoded_pointer(reader, call_site_encoding)?;
         let cs_action = read_encoded_pointer(reader, DW_EH_PE_uleb128)?;
         Ok(CallSiteTableEntry {
-            starting_ip_offset: cs_start,
+            starting_offset: cs_start,
             length: cs_length,
             landing_pad_offset: cs_lp,
             action_offset: cs_action,
@@ -207,10 +217,10 @@ impl CallSiteTableEntry {
 
     /// The range of addresses (instruction pointers) that are covered by this entry. 
     pub fn range_of_covered_addresses(&self) -> Range<u64> {
-        (self.landing_pad_base + self.starting_ip_offset) .. (self.landing_pad_base + self.starting_ip_offset + self.length)
+        (self.landing_pad_base + self.starting_offset) .. (self.landing_pad_base + self.starting_offset + self.length)
     }
 
-    /// The address of the actual landing pad, i.e., the cleanup routine that should run
+    /// The address of the actual landing pad, i.e., the cleanup routine that should run.
     pub fn landing_pad_address(&self) -> u64 {
         self.landing_pad_base + self.landing_pad_offset
     }
@@ -228,7 +238,7 @@ impl CallSiteTableEntry {
     }
 }
 
-/// An iterator over all of the entries in a GccExceptTable's call site table.
+/// An iterator over all of the entries in a GccExceptTableArea's call site table.
 /// 
 /// Can be used with the `FallibleIterator` trait.
 pub struct CallSiteTableIterator<R: Reader> {
@@ -237,7 +247,7 @@ pub struct CallSiteTableIterator<R: Reader> {
     /// This is the ending bound for the following `reader` to parse,
     /// i.e., the reader offset right after the final call site table entry.
     end_of_call_site_table: u64,
-    /// The starting address of the function that this GccExceptTable pertains to.
+    /// The starting address of the function that this GccExceptTableArea pertains to.
     landing_pad_base: u64,
     /// This reader must be queued up to the beginning of the first call site table entry,
     /// i.e., right after the end of the call site table header.
@@ -261,7 +271,7 @@ impl<R: Reader> FallibleIterator for CallSiteTableIterator<R> {
     }
 }
 
-/// Decodes the next pointer from the given `reader` using the given `encoding` format. 
+/// Decodes the next pointer from the given `reader` (a stream of bytes) using the given `encoding` format. 
 fn read_encoded_pointer<R: gimli::Reader>(reader: &mut R, encoding: DwEhPe) -> gimli::Result<u64> {
     match encoding {
         DW_EH_PE_omit     => Err(gimli::Error::CannotParseOmitPointerEncoding),
