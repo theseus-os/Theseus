@@ -100,13 +100,13 @@ impl TextDisplay {
     /// Display a cursor within the text displayable.
     /// # Arguments
     /// * `cursor`: the cursor to display.
-    /// * `(x, y)`: the position of the text displayable in the framebuffer.
+    /// * `location`: the location of the displayable in the framebuffer.
     /// * `(col, line):` the position of the cursor in the text displayable.
     /// * `framebuffer:` the framebuffer to display in.
     pub fn display_cursor(
         &mut self,
         cursor: &mut Cursor,
-        location: RelativeCoord,
+        location: AbsoluteCoord,
         col: usize,
         line: usize,
         framebuffer: &mut dyn FrameBuffer,
@@ -117,13 +117,10 @@ impl TextDisplay {
             } else {
                 self.bg_color
             };
-
-            let abs_location = AbsoluteCoord(
-                (location + (col * CHARACTER_WIDTH, line * CHARACTER_HEIGHT)).inner()
-            );
+            
             frame_buffer_drawer::fill_rectangle(
                 framebuffer,
-                abs_location,
+                location + (col * CHARACTER_WIDTH, line * CHARACTER_HEIGHT),
                 CHARACTER_WIDTH,
                 CHARACTER_HEIGHT,
                 color,

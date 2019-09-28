@@ -224,7 +224,13 @@ impl<Buffer: FrameBuffer> WindowGeneric<Buffer> {
 
         if let Some(text_display) = displayable.downcast_mut::<TextDisplay>() {
             let (col, line) = text_display.get_next_pos();
-            text_display.display_cursor(cursor, location, col, line, &mut self.framebuffer);
+            text_display.display_cursor(
+                cursor, 
+                AbsoluteCoord(location.inner()), 
+                col, 
+                line, 
+                &mut self.framebuffer
+            );
             self.render()?;
         } else {
             return Err("The displayable is not a text displayable");

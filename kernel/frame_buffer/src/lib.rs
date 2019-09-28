@@ -83,6 +83,15 @@ impl AbsoluteCoord {
     } 
 }
 
+impl Add<(usize, usize)> for AbsoluteCoord {
+    type Output = AbsoluteCoord;
+
+    fn add(self, rhs: (usize, usize)) -> AbsoluteCoord {
+        AbsoluteCoord::new(self.0.x + rhs.0, self.0.y + rhs.1)
+    }
+}
+
+
 #[derive(Clone, Copy)]
 pub struct RelativeCoord(Coord);
 
