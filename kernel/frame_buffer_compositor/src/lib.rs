@@ -14,7 +14,7 @@ extern crate lazy_static;
 use alloc::collections::BTreeMap;
 use alloc::vec::Vec;
 use compositor::Compositor;
-use frame_buffer::{FrameBuffer, FINAL_FRAME_BUFFER};
+use frame_buffer::{FrameBuffer, FINAL_FRAME_BUFFER, ICoord};
 use spin::Mutex;
 
 lazy_static! {
@@ -36,34 +36,33 @@ pub struct FrameCompositor {
 
 // The information of a cached framebuffer. It contains the position and size of the framebuffer.
 struct BufferCache {
-    x: i32,
-    y: i32,
+    location: ICoord,
     width: usize,
     height: usize,
 }
 
 impl BufferCache {
     // checks if the pixel is within the framebuffer
-    fn check_in_area(&self, x: i32, y: i32) -> bool {
-        return x >= self.x
-            && x <= self.x + self.width as i32
-            && y >= self.y
-            && y <= self.y + self.height as i32;
+    fn check_in_area(&self, location: ICoord) -> bool {
+        return location.x >= self.location.x
+            && location.x <= self.location.x + self.width as i32
+            && location.y >= self.location.y
+            && location.y <= self.location.y + self.height as i32;
     }
 
     // checks if the cached framebuffer overlaps with another one
     fn overlap(&self, cache: &BufferCache) -> bool {
-        self.check_in_area(cache.x, cache.y)
-            || self.check_in_area(cache.x + cache.width as i32, cache.y)
-            || self.check_in_area(cache.x, cache.y + cache.height as i32)
-            || self.check_in_area(cache.x + cache.width as i32, cache.y + cache.height as i32)
+        self.check_in_area(cache.location)
+            || self.check_in_area(cache.location + (cache.width as i32, 0))
+            || self.check_in_area(cache.location + (0, cache.height as i32))
+            || self.check_in_area(cache.location + (cache.width as i32, cache.height as i32))
     }
 }
 
 impl Compositor for FrameCompositor {
     fn compose(
         &mut self,
-        bufferlist: Vec<(&dyn FrameBuffer, i32, i32)>,
+        bufferlist: Vec<(&dyn FrameBuffer, ICoord)>,
     ) -> Result<(), &'static str> {
         let mut final_fb = FINAL_FRAME_BUFFER
             .try()
@@ -71,46 +70,44 @@ impl Compositor for FrameCompositor {
             .lock();
         let (final_width, final_height) = final_fb.get_size();
 
-        for (src_fb, offset_x, offset_y) in bufferlist {
+        for (src_fb, location) in bufferlist {
             // skip if already cached
-            if self.cached(src_fb, offset_x, offset_y) {
+            if self.cached(src_fb, location) {
                 continue;
             }
             let (src_width, src_height) = src_fb.get_size();
 
-            let final_x_end = offset_x + src_width as i32;
-            let final_y_end = offset_y + src_height as i32;
+            let location_end = location + (src_width as i32, src_height as i32);
 
             // skip if the framebuffer is not in the screen
-            if final_x_end < 0
-                || offset_x > final_width as i32
-                || final_y_end < 0
-                || offset_y > final_height as i32
+            if location_end.x < 0
+                || location.x > final_width as i32
+                || location_end.y < 0
+                || location.y > final_height as i32
             {
                 break;
             }
 
-            let final_x_start = core::cmp::max(0, offset_x) as usize;
-            let final_y_start = core::cmp::max(0, offset_y) as usize;
+            let final_x_start = core::cmp::max(0, location.x) as usize;
+            let final_y_start = core::cmp::max(0, location.y) as usize;
 
             // just compose the part which is within the final buffer
-            let width = core::cmp::min(final_x_end as usize, final_width) - final_x_start;
-            let height = core::cmp::min(final_y_end as usize, final_height) - final_y_start;
+            let width = core::cmp::min(location_end.x as usize, final_width) - final_x_start;
+            let height = core::cmp::min(location_end.y as usize, final_height) - final_y_start;
 
             // copy every line to the final framebuffer.
             let src_buffer = src_fb.buffer();
             for i in 0..height {
                 let dest_start = (final_y_start + i) * final_width + final_x_start;
-                let src_start = src_width * ((final_y_start + i) as i32 - offset_y) as usize
-                    + (final_x_start as i32 - offset_x) as usize;
+                let src_start = src_width * ((final_y_start + i) as i32 - location.y) as usize
+                    + (final_x_start as i32 - location.x) as usize;
                 let src_end = src_start + width;
                 final_fb.buffer_copy(&(src_buffer[src_start..src_end]), dest_start);
             }
 
             // cache the new framebuffer and remove all caches that are overlapped by it.
             let new_cache = BufferCache {
-                x: offset_x,
-                y: offset_y,
+                location: location,
                 width: src_width,
                 height: src_height,
             };
@@ -128,14 +125,10 @@ impl Compositor for FrameCompositor {
         Ok(())
     }
 
-    fn cached(&self, frame_buffer: &dyn FrameBuffer, x: i32, y: i32) -> bool {
+    fn cached(&self, frame_buffer: &dyn FrameBuffer, location: ICoord) -> bool {
         match self.cache.get(&(frame_buffer.get_hash())) {
             Some(cache) => {
-                if cache.x == x && cache.y == y {
-                    return true;
-                } else {
-                    return false;
-                }
+                return cache.location == location;
             }
             None => return false,
         }

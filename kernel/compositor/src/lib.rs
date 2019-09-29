@@ -7,7 +7,7 @@ extern crate alloc;
 extern crate frame_buffer;
 
 use alloc::vec::Vec;
-use frame_buffer::FrameBuffer;
+use frame_buffer::{FrameBuffer, ICoord};
 
 /// The compositor trait.
 /// A compositor composes a list of buffers to a single buffer.
@@ -16,13 +16,13 @@ pub trait Compositor {
     ///
     /// # Arguments
     ///
-    /// * `bufferlist` - A list of buffers in the form of (buffer:T, x:i32, y:i32).
-    /// For each tuple in the list, buffer is a buffer object to be composed. (x, y) specifies the location of the buffer to be composed in the final buffer.
+    /// * `bufferlist` - A list of buffers in the form of (buffer:T, location: ICoord).
+    /// For each tuple in the list, `buffer` is a buffer object to be composed. `location` specifies the relative location of the buffer in the final buffer.
     fn compose(
         &mut self,
-        bufferlist: Vec<(&dyn FrameBuffer, i32, i32)>,
+        bufferlist: Vec<(&dyn FrameBuffer, ICoord)>,
     ) -> Result<(), &'static str>;
 
     /// Checks if a buffer at (x, y) is already updated.
-    fn cached(&self, buffer: &dyn FrameBuffer, x: i32, y: i32) -> bool;
+    fn cached(&self, buffer: &dyn FrameBuffer, location: ICoord) -> bool;
 }

@@ -58,25 +58,44 @@ pub fn get_screen_size() -> Result<(usize, usize), &'static str> {
 }
 
 
+/// The coordinate of a point.
 #[derive(Clone, Copy)]
-pub struct Coord {
+pub struct UCoord {
     pub x: usize,
     pub y: usize,
 }
 
+/// The coordinate of a point.
+#[derive(Clone, Copy, PartialEq)]
+pub struct ICoord {
+    pub x: i32,
+    pub y: i32,
+}
+
+impl Add<(i32, i32)> for ICoord {
+    type Output = ICoord;
+
+    fn add(self, rhs: (i32, i32)) -> ICoord {
+        ICoord { x: self.x + rhs.0, y: self.y + rhs.1 }
+    }
+}
+
+/// The absolute coordinate of a point in a buffer. 
 #[derive(Clone, Copy)]
-pub struct AbsoluteCoord(pub Coord);
+pub struct AbsoluteCoord(pub UCoord);
 
 impl AbsoluteCoord {
+    /// Create an absolute coordinate.
     pub fn new(x: usize, y: usize) -> AbsoluteCoord {
         AbsoluteCoord(
-            Coord {
+            UCoord {
                 x: x,
                 y: y,
             }
         )
     }
 
+    /// Get the (x, y) value of the coordinate.
     #[inline]
     pub fn coordinate(&self) -> (usize, usize) {
         (self.0.x, self.0.y)
@@ -92,13 +111,14 @@ impl Add<(usize, usize)> for AbsoluteCoord {
 }
 
 
+/// The coordinate of a point relative to some 
 #[derive(Clone, Copy)]
-pub struct RelativeCoord(Coord);
+pub struct RelativeCoord(UCoord);
 
 impl RelativeCoord {
     pub fn new(x: usize, y: usize) -> RelativeCoord {
         RelativeCoord(
-            Coord {
+            UCoord {
                 x: x,
                 y: y,
             }
@@ -111,7 +131,7 @@ impl RelativeCoord {
     }
 
     #[inline]
-    pub fn inner(&self) -> Coord {
+    pub fn inner(&self) -> UCoord {
         self.0
     } 
 }

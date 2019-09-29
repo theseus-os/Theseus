@@ -36,7 +36,7 @@ use core::ops::{Deref, DerefMut};
 use dfqueue::{DFQueue, DFQueueConsumer, DFQueueProducer};
 use displayable::Displayable;
 use event_types::Event;
-use frame_buffer::{FrameBuffer, RelativeCoord, AbsoluteCoord};
+use frame_buffer::{FrameBuffer, RelativeCoord, AbsoluteCoord, ICoord};
 use frame_buffer_compositor::FRAME_COMPOSITOR;
 use frame_buffer_drawer::*;
 use frame_buffer_rgb::FrameBufferRGB;
@@ -183,10 +183,13 @@ impl<Buffer: FrameBuffer> WindowGeneric<Buffer> {
     /// Renders the content of the window to the screen.
     pub fn render(&mut self) -> Result<(), &'static str> {
         let (window_x, window_y) = { self.inner.lock().get_content_position() };
+        let location = ICoord {
+            x: window_x as i32,
+            y: window_y as i32,
+        };
         FRAME_COMPOSITOR.lock().compose(vec![(
             &mut self.framebuffer,
-            window_x as i32,
-            window_y as i32,
+            location
         )])
     }
 
@@ -399,7 +402,8 @@ impl Window for WindowInner {
             self.height,
             SCREEN_BACKGROUND_COLOR,
         );
-        FRAME_COMPOSITOR.lock().compose(vec![(buffer, 0, 0)])
+        let location = ICoord { x: 0, y: 0 };
+        FRAME_COMPOSITOR.lock().compose(vec![(buffer, location)])
     }
 
     fn check_in_content(&self, point: RelativeCoord) -> bool {
@@ -421,7 +425,8 @@ impl Window for WindowInner {
         let mut buffer_lock = buffer_ref.lock();
         let buffer = buffer_lock.deref_mut();
         draw_rectangle(buffer, self.x, self.y, self.width, self.height, color);
-        FRAME_COMPOSITOR.lock().compose(vec![(buffer, 0, 0)])
+        let location = ICoord { x: 0, y: 0 };
+        FRAME_COMPOSITOR.lock().compose(vec![(buffer, location)])
     }
 
     fn resize(
