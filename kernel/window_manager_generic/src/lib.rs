@@ -370,10 +370,8 @@ pub fn new_default_window() -> Result<WindowGeneric<FrameBufferRGB>, &'static st
 
 /// The structure is owned by the window manager. It contains the information of a window but under the control of the manager
 pub struct WindowInner {
-    /// the upper left x-coordinate of the window
-    pub x: usize,
-    /// the upper left y-coordinate of the window
-    pub y: usize,
+    /// the location of the window relative to the screen
+    pub location: RelativeCoord
     /// the width of the window
     pub width: usize,
     /// the height of the window
