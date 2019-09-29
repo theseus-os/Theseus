@@ -28,8 +28,7 @@ pub trait Window: Send {
     /// Adjusts the size (width, height) and position (x, y) of a window.
     fn resize(
         &mut self,
-        x: usize,
-        y: usize,
+        location: RelativeCoord,
         width: usize,
         height: usize,
     ) -> Result<(usize, usize), &'static str>;
@@ -38,7 +37,7 @@ pub trait Window: Send {
     fn get_content_size(&self) -> (usize, usize);
 
     /// Gets the position of content without padding.
-    fn get_content_position(&self) -> (usize, usize);
+    fn get_content_position(&self) -> RelativeCoord;
 
     /// Gets the producer of key inputs.
     fn key_producer(&mut self) -> &mut DFQueueProducer<Event>;

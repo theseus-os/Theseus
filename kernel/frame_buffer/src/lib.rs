@@ -34,17 +34,17 @@ pub trait FrameBuffer: Send {
     fn buffer_copy(&mut self, src: &[Pixel], dest_start: usize);
 
     /// Computes the index of pixel (x, y) in the buffer array.
-    fn index(&self, x: usize, y: usize) -> usize;
+    fn index(&self, location: AbsoluteCoord) -> usize;
 
     /// Checks if a pixel (x, y) is within the framebuffer.
-    fn check_in_buffer(&self, x: usize, y: usize) -> bool;
+    fn check_in_buffer(&self, location: AbsoluteCoord) -> bool;
 
     /// Gets the indentical hash of the framebuffer.
     /// The frame buffer compositor uses this hash to cache framebuffers.
     fn get_hash(&self) -> u64;
 
     /// Draws a pixel in the framebuffer.
-    fn draw_pixel(&mut self, x: usize, y: usize, color: Pixel);
+    fn draw_pixel(&mut self, location: AbsoluteCoord, color: Pixel);
 }
 
 /// Gets the size of the final framebuffer.

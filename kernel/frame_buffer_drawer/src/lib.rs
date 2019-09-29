@@ -9,9 +9,9 @@ use frame_buffer::{FrameBuffer, AbsoluteCoord};
 
 /// Draws a point in a framebuffer.
 /// The point is drawn at position (x, y) of the framebuffer with color.
-pub fn draw_point(framebuffer: &mut dyn FrameBuffer, x: usize, y: usize, color: u32) {
-    if framebuffer.check_in_buffer(x, y) {
-        framebuffer.draw_pixel(x, y, color);
+pub fn draw_point(framebuffer: &mut dyn FrameBuffer, location: AbsoluteCoord, color: u32) {
+    if framebuffer.check_in_buffer(location) {
+        framebuffer.draw_pixel(location, color);
     }
 }
 
@@ -44,8 +44,9 @@ pub fn draw_line(
                 break;
             }
             y = (x - start_x) * height / width + start_y;
-            if framebuffer.check_in_buffer(x as usize, y as usize) {
-                framebuffer.draw_pixel(x as usize, y as usize, color);
+            let location = AbsoluteCoord::new(x as usize, y as usize);
+            if framebuffer.check_in_buffer(location) {
+                framebuffer.draw_pixel(location, color);
             }
             x += step;
         }
@@ -58,8 +59,9 @@ pub fn draw_line(
                 break;
             }
             x = (y - start_y) * width / height + start_x;
-            if { framebuffer.check_in_buffer(x as usize, y as usize) } {
-                framebuffer.draw_pixel(x as usize, y as usize, color);
+            let location = AbsoluteCoord::new(x as usize, y as usize);
+            if { framebuffer.check_in_buffer(location) } {
+                framebuffer.draw_pixel(location, color);
             }
             y += step;
         }
@@ -76,47 +78,47 @@ pub fn draw_line(
 /// * `color`: the color of the rectangle's border.
 pub fn draw_rectangle(
     framebuffer: &mut dyn FrameBuffer,
-    start_x: usize,
-    start_y: usize,
+    location: AbsoluteCoord,
     width: usize,
     height: usize,
     color: u32,
 ) {
     let (buffer_width, buffer_height) = framebuffer.get_size();
-    let end_x: usize = {
+    let (start_x, start_y) = location.coordinate();
+    let end_x_offset: usize = {
         if start_x + width < buffer_width {
-            start_x + width
+            width - 1
         } else {
-            buffer_width
+            buffer_width - start_x - 1
         }
     };
-    let end_y: usize = {
+    let end_y_offset: usize = {
         if start_y + height < buffer_height {
-            start_y + height
+            height - 1
         } else {
-            buffer_height
+            buffer_height - start_y - 1
         }
     };
 
     // draw the four lines of the rectangle.
-    let mut x = start_x;
+    let mut top = location; 
     loop {
-        if x == end_x {
+        if top.0.x == start_x + end_x_offset + 1 {
             break;
         }
-        framebuffer.draw_pixel(x as usize, start_y as usize, color);
-        framebuffer.draw_pixel(x as usize, end_y - 1 as usize, color);
-        x += 1;
+        framebuffer.draw_pixel(top, color);
+        framebuffer.draw_pixel(top + (0, end_y_offset), color);
+        top = top + (1, 0);
     }
 
-    let mut y = start_y;
+    let mut left = location; 
     loop {
-        if y == end_y {
+        if left.0.y == start_y + end_y_offset + 1 {
             break;
         }
-        framebuffer.draw_pixel(start_x as usize, y as usize, color);
-        framebuffer.draw_pixel(end_x - 1 as usize, y as usize, color);
-        y += 1;
+        framebuffer.draw_pixel(left, color);
+        framebuffer.draw_pixel(left + (end_x_offset, 0), color);
+        left = left + (0, 1);
     }
 }
 
@@ -154,20 +156,19 @@ pub fn fill_rectangle(
     };
 
     // draw every pixel line by line
-    let mut x = start_x;
-    let mut y = start_y;
+    let mut location = AbsoluteCoord::new(start_x, start_y);
     loop {
         loop {
-            framebuffer.draw_pixel(x as usize, y as usize, color);
-            x += 1;
-            if x == end_x {
+            framebuffer.draw_pixel(location, color);
+            location = location + (1, 0);
+            if location.0.x == end_x {
                 break;
             }
         }
-        y += 1;
-        if y == end_y {
+        location = location + (0, 1);
+        if location.0.y == end_y {
             break;
         }
-        x = start_x;
+        location.0.x = start_x;
     }
 }

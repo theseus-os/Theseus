@@ -13,7 +13,7 @@ extern crate spin;
 use alloc::boxed::Box;
 use core::hash::{Hash, Hasher, SipHasher};
 use core::ops::DerefMut;
-use frame_buffer::{FrameBuffer, Pixel, FINAL_FRAME_BUFFER};
+use frame_buffer::{FrameBuffer, Pixel, FINAL_FRAME_BUFFER, AbsoluteCoord};
 use memory::{EntryFlags, FrameRange, MappedPages, PhysicalAddress, FRAME_ALLOCATOR};
 use owning_ref::BoxRefMut;
 use spin::Mutex;
@@ -117,7 +117,8 @@ impl FrameBuffer for FrameBufferRGB {
         (self.width, self.height)
     }
 
-    fn check_in_buffer(&self, x: usize, y: usize) -> bool {
+    fn check_in_buffer(&self, location: AbsoluteCoord) -> bool {
+        let (x, y) = location.coordinate();
         x < self.width && y < self.height
     }
 
@@ -133,12 +134,13 @@ impl FrameBuffer for FrameBufferRGB {
         s.finish()
     }
 
-    fn draw_pixel(&mut self, x: usize, y: usize, color: Pixel) {
-        let index = self.index(x, y);
+    fn draw_pixel(&mut self, location: AbsoluteCoord, color: Pixel) {
+        let index = self.index(location);
         self.buffer[index] = color;
     }
 
-    fn index(&self, x: usize, y: usize) -> usize {
+    fn index(&self, location: AbsoluteCoord) -> usize {
+        let (x, y) = location.coordinate();
         y * self.width + x
     }
 }

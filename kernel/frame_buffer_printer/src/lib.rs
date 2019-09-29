@@ -111,8 +111,10 @@ fn print_byte(
     line: usize,
     column: usize,
 ) -> Result<(), &'static str> {
-    let x = left + column * CHARACTER_WIDTH;
-    let y = top + line * CHARACTER_HEIGHT;
+    let start = AbsoluteCoord::new(
+        left + column * CHARACTER_WIDTH, 
+        top + line * CHARACTER_HEIGHT
+    );
     let fonts = FONT_PIXEL.lock();
 
     let mut i = 0;
@@ -120,7 +122,7 @@ fn print_byte(
     loop {
         let mask: u32 = fonts[byte as usize][i][j];
         let color = font_color & mask | bg_color & (!mask);
-        framebuffer.draw_pixel(x + j, y + i, color);
+        framebuffer.draw_pixel(start + (j, i), color);
         j += 1;
         if j == CHARACTER_WIDTH {
             i += 1;
@@ -146,13 +148,14 @@ fn fill_blank(
     }
 
     let fill = vec![color; right - left];
-    let mut y = top;
+    let mut line_start = AbsoluteCoord::new(left, top);
+    
     loop {
-        if y == bottom {
+        if line_start.0.y == bottom {
             return Ok(());
         }
-        let start = framebuffer.index(left, y);
+        let start = framebuffer.index(line_start);
         framebuffer.buffer_copy(&fill, start);
-        y += 1;
+        line_start = line_start + (0, 1);
     }
 }

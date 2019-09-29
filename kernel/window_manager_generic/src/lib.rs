@@ -176,13 +176,13 @@ impl<Buffer: FrameBuffer> WindowGeneric<Buffer> {
     }
 
     /// Gets the content position of the window excluding border and padding.
-    pub fn get_content_position(&self) -> (usize, usize) {
+    pub fn get_content_position(&self) -> RelativeCoord {
         self.inner.lock().get_content_position()
     }
 
     /// Renders the content of the window to the screen.
     pub fn render(&mut self) -> Result<(), &'static str> {
-        let (window_x, window_y) = { self.inner.lock().get_content_position() };
+        let (window_x, window_y) = { self.inner.lock().get_content_position().coordinate() };
         let location = ICoord {
             x: window_x as i32,
             y: window_y as i32,
@@ -246,8 +246,7 @@ impl<Buffer: FrameBuffer> WindowGeneric<Buffer> {
     /// Resizes a window as (width, height) at (x, y).
     pub fn resize(
         &mut self,
-        x: usize,
-        y: usize,
+        location: RelativeCoord,
         width: usize,
         height: usize,
     ) -> Result<(), &'static str> {
@@ -263,18 +262,21 @@ impl<Buffer: FrameBuffer> WindowGeneric<Buffer> {
 
         self.clean()?;
         let mut inner = self.inner.lock();
-        match inner.resize(x, y, width, height) {
+        match inner.resize(location, width, height) {
             Ok(percent) => {
                 for (_key, item) in self.components.iter_mut() {
                     let (x, y) = item.get_location().coordinate();
                     let (width, height) = item.get_displayable().get_size();
                     item.resize(
-                        x * percent.0 / 100,
-                        y * percent.1 / 100,
+                        RelativeCoord::new(
+                            x * percent.0 / 100,
+                            y * percent.1 / 100
+                        ),
                         width * percent.0 / 100,
                         height * percent.1 / 100,
                     );
                 }
+                let (x, y) = location.coordinate();
                 inner
                     .key_producer()
                     .enqueue(Event::new_resize_event(x, y, width, height));
@@ -301,8 +303,7 @@ impl<Buffer: FrameBuffer> WindowGeneric<Buffer> {
 /// (x, y) specify the coordinates of the top left corner of the window.
 /// (width, height) specify the size of the new window.
 pub fn new_window<'a>(
-    x: usize,
-    y: usize,
+    location: RelativeCoord,
     width: usize,
     height: usize,
 ) -> Result<WindowGeneric<FrameBufferRGB>, &'static str> {
@@ -320,8 +321,7 @@ pub fn new_window<'a>(
         None,
     )?;
     let inner = WindowInner {
-        x: x,
-        y: y,
+        location: location,
         width: width,
         height: height,
         active: true,
@@ -358,8 +358,7 @@ pub fn new_window<'a>(
 pub fn new_default_window() -> Result<WindowGeneric<FrameBufferRGB>, &'static str> {
     let (window_width, window_height) = frame_buffer::get_screen_size()?;
     match new_window(
-        WINDOW_MARGIN,
-        WINDOW_MARGIN,
+        RelativeCoord::new(WINDOW_MARGIN, WINDOW_MARGIN),
         window_width - 2 * WINDOW_MARGIN,
         window_height - 2 * WINDOW_MARGIN,
     ) {
@@ -371,7 +370,7 @@ pub fn new_default_window() -> Result<WindowGeneric<FrameBufferRGB>, &'static st
 /// The structure is owned by the window manager. It contains the information of a window but under the control of the manager
 pub struct WindowInner {
     /// the location of the window relative to the screen
-    pub location: RelativeCoord
+    pub location: RelativeCoord,
     /// the width of the window
     pub width: usize,
     /// the height of the window
@@ -394,8 +393,7 @@ impl Window for WindowInner {
         let buffer = buffer_lock.deref_mut();
         draw_rectangle(
             buffer,
-            self.x,
-            self.y,
+            AbsoluteCoord(self.location.inner()),
             self.width,
             self.height,
             SCREEN_BACKGROUND_COLOR,
@@ -422,15 +420,14 @@ impl Window for WindowInner {
         };
         let mut buffer_lock = buffer_ref.lock();
         let buffer = buffer_lock.deref_mut();
-        draw_rectangle(buffer, self.x, self.y, self.width, self.height, color);
+        draw_rectangle(buffer, AbsoluteCoord(self.location.inner()), self.width, self.height, color);
         let location = ICoord { x: 0, y: 0 };
         FRAME_COMPOSITOR.lock().compose(vec![(buffer, location)])
     }
 
     fn resize(
         &mut self,
-        x: usize,
-        y: usize,
+        location: RelativeCoord,
         width: usize,
         height: usize,
     ) -> Result<(usize, usize), &'static str> {
@@ -439,8 +436,7 @@ impl Window for WindowInner {
             (width - self.padding) * 100 / (self.width - self.padding),
             (height - self.padding) * 100 / (self.height - self.padding),
         );
-        self.x = x;
-        self.y = y;
+        self.location = location;
         self.width = width;
         self.height = height;
         self.draw_border(get_border_color(self.active))?;
@@ -454,8 +450,8 @@ impl Window for WindowInner {
         )
     }
 
-    fn get_content_position(&self) -> (usize, usize) {
-        (self.x + self.padding, self.y + self.padding)
+    fn get_content_position(&self) -> RelativeCoord {
+        self.location + (self.padding, self.padding)
     }
 
     fn key_producer(&mut self) -> &mut DFQueueProducer<Event> {
@@ -486,8 +482,8 @@ impl Component {
     }
 
     // resizes the displayable
-    fn resize(&mut self, x: usize, y: usize, width: usize, height: usize) {
-        self.location = RelativeCoord::new(x, y);
+    fn resize(&mut self, location: RelativeCoord, width: usize, height: usize) {
+        self.location = location;
         self.displayable.resize(width, height);
     }
 }
