@@ -260,9 +260,7 @@ impl<Buffer: FrameBuffer> WindowGeneric<Buffer> {
                     );
                 }
                 let (x, y) = coordinate.value();
-                inner
-                    .events_producer()
-                    .enqueue(Event::new_resize_event(x, y, width, height));
+                inner.events_producer().enqueue(Event::new_resize_event(x, y, width, height));
                 Ok(())
             }
             Err(err) => Err(err),
@@ -285,7 +283,7 @@ impl<Buffer: FrameBuffer> WindowGeneric<Buffer> {
 /// Creates a new window. Currently the window is of `FrameBufferRGB`. In the future we will be able to create a window of any structure which implements `FrameBuffer`.
 /// (x, y) specify the coordinates of the top left corner of the window.
 /// (width, height) specify the size of the new window.
-pub fn new_window<'a>(
+pub fn new_window(
     coordinate: RelativeCoord,
     width: usize,
     height: usize,

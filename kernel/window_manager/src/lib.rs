@@ -142,7 +142,6 @@ impl<T: Window> WindowList<T> {
         self.set_active(0, true)
     }
 
-
     /// Sets the specified window in the background list as active.
     pub fn switch_to(&mut self, window: &Arc<Mutex<T>>) -> Result<(), &'static str> {
         if let Some(index) = self.get_bgwindow_index(window) {
