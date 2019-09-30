@@ -12,8 +12,6 @@ extern crate alloc;
 extern crate dfqueue;
 extern crate event_types;
 #[macro_use]
-extern crate log;
-#[macro_use]
 extern crate lazy_static;
 extern crate compositor;
 extern crate displayable;
@@ -22,7 +20,6 @@ extern crate frame_buffer_compositor;
 extern crate frame_buffer_drawer;
 extern crate frame_buffer_printer;
 extern crate frame_buffer_rgb;
-extern crate text_display;
 extern crate window;
 extern crate window_manager;
 
@@ -41,7 +38,6 @@ use frame_buffer_compositor::FRAME_COMPOSITOR;
 use frame_buffer_drawer::*;
 use frame_buffer_rgb::FrameBufferRGB;
 use spin::{Mutex, Once};
-use text_display::{Cursor, TextDisplay};
 use window::Window;
 use window_manager::{
     SCREEN_BACKGROUND_COLOR, WINDOW_ACTIVE_COLOR,

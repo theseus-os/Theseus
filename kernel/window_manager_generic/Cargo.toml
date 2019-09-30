@@ -8,10 +8,6 @@ build = "../../build.rs"
 [dependencies]
 spin = "0.4.10"
 
-[dependencies.log]
-default-features = false
-version = "0.3.7"
-
 [dependencies.dfqueue]
 path = "../../libs/dfqueue"
 version = "0.1.0"
@@ -45,9 +41,6 @@ path = "../window"
 
 [dependencies.window_manager]
 path = "../window_manager"
-
-[dependencies.text_display]
-path = "../../kernel/displayable/text_display"
 
 [dependencies.lazy_static]
 features = ["spin_no_std", "nightly"]

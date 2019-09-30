@@ -20,13 +20,6 @@ path = "../window"
 [dependencies.frame_buffer]
 path = "../frame_buffer"
 
-[dependencies.frame_buffer_rgb]
-path = "../frame_buffer_rgb"
-
-[dependencies.lazy_static]
-features = ["spin_no_std", "nightly"]
-version = "1.2.0"
-
 # [build]
 # rustflags = ["-C", "prefer-dynamic", "-C", "panic=abort"]
 

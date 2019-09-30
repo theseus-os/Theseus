@@ -11,18 +11,13 @@ extern crate alloc;
 extern crate event_types;
 extern crate frame_buffer;
 extern crate frame_buffer_printer;
-extern crate frame_buffer_rgb;
 extern crate spin;
-#[macro_use]
-extern crate lazy_static;
 extern crate window;
 
-use alloc::boxed::Box;
 use alloc::collections::VecDeque;
 use alloc::sync::{Arc, Weak};
 use event_types::Event;
-use frame_buffer_rgb::FrameBufferRGB;
-use spin::{Mutex, Once};
+use spin::{Mutex};
 use window::Window;
 
 /// 10 pixel gap between windows

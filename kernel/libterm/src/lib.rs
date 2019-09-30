@@ -388,7 +388,7 @@ impl Terminal {
         let result  = self.scrollback_buffer.get(start_idx..=end_idx); // =end_idx includes the end index in the slice
         if let Some(slice) = result {
             {
-                let mut text_display = self.window.get_concrete_display_mut::<TextDisplay>(&self.display_name)?;
+                let text_display = self.window.get_concrete_display_mut::<TextDisplay>(&self.display_name)?;
                 text_display.set_text(slice);
             }
             self.window.display(&self.display_name)?;
@@ -407,7 +407,7 @@ impl Terminal {
 
         if let Some(slice) = result {
             {
-                let mut text_display = self.window.get_concrete_display_mut::<TextDisplay>(&self.display_name)?;
+                let text_display = self.window.get_concrete_display_mut::<TextDisplay>(&self.display_name)?;
                 text_display.set_text(slice);
             }
             self.window.display(&self.display_name)?;        

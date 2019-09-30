@@ -17,7 +17,7 @@ extern crate displayable;
 use alloc::string::String;
 use displayable::Displayable;
 use font::{CHARACTER_HEIGHT, CHARACTER_WIDTH};
-use frame_buffer::{AbsoluteCoord, FrameBuffer, RelativeCoord};
+use frame_buffer::{AbsoluteCoord, FrameBuffer};
 use tsc::{tsc_ticks, TscTicks};
 
 const DEFAULT_CURSOR_FREQ: u64 = 400000000;
@@ -170,11 +170,11 @@ impl Cursor {
     }
 }
 
-/// Display a cursor in a frame buffer.
+/// Display a cursor within a text area onto a frame buffer. 
 /// # Arguments
 /// * `cursor`: the cursor to display.
-/// * `coordinate`: the coordinate of the displayable in the framebuffer.
-/// * `(col, line):` the position of the cursor in the text displayable.
+/// * `coordinate`: the coordinate of the text area in the framebuffer.
+/// * `(col, line):` the position of the cursor in the text area.
 /// * bg_color: the background color of the area if the cursor is hidden.
 /// * `framebuffer:` the framebuffer to display in.
 pub fn display_cursor(
