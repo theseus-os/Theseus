@@ -34,17 +34,17 @@ pub trait FrameBuffer: Send {
     fn buffer_copy(&mut self, src: &[Pixel], dest_start: usize);
 
     /// Computes the index of pixel (x, y) in the buffer array.
-    fn index(&self, location: AbsoluteCoord) -> usize;
+    fn index(&self, coordinate: AbsoluteCoord) -> usize;
 
     /// Checks if a pixel (x, y) is within the framebuffer.
-    fn check_in_buffer(&self, location: AbsoluteCoord) -> bool;
+    fn contains_coordinate(&self, coordinate: AbsoluteCoord) -> bool;
 
     /// Gets the indentical hash of the framebuffer.
     /// The frame buffer compositor uses this hash to cache framebuffers.
     fn get_hash(&self) -> u64;
 
     /// Draws a pixel in the framebuffer.
-    fn draw_pixel(&mut self, location: AbsoluteCoord, color: Pixel);
+    fn draw_pixel(&mut self, coordinate: AbsoluteCoord, color: Pixel);
 }
 
 /// Gets the size of the final framebuffer.
@@ -97,7 +97,7 @@ impl AbsoluteCoord {
 
     /// Get the (x, y) value of the coordinate.
     #[inline]
-    pub fn coordinate(&self) -> (usize, usize) {
+    pub fn value(&self) -> (usize, usize) {
         (self.0.x, self.0.y)
     } 
 }
@@ -126,7 +126,7 @@ impl RelativeCoord {
     }
 
     #[inline]
-    pub fn coordinate(&self) -> (usize, usize) {
+    pub fn value(&self) -> (usize, usize) {
         (self.0.x, self.0.y)
     }
 

@@ -117,8 +117,8 @@ impl FrameBuffer for FrameBufferRGB {
         (self.width, self.height)
     }
 
-    fn check_in_buffer(&self, location: AbsoluteCoord) -> bool {
-        let (x, y) = location.coordinate();
+    fn contains_coordinate(&self, coordinate: AbsoluteCoord) -> bool {
+        let (x, y) = coordinate.value();
         x < self.width && y < self.height
     }
 
@@ -134,13 +134,13 @@ impl FrameBuffer for FrameBufferRGB {
         s.finish()
     }
 
-    fn draw_pixel(&mut self, location: AbsoluteCoord, color: Pixel) {
-        let index = self.index(location);
+    fn draw_pixel(&mut self, coordinate: AbsoluteCoord, color: Pixel) {
+        let index = self.index(coordinate);
         self.buffer[index] = color;
     }
 
-    fn index(&self, location: AbsoluteCoord) -> usize {
-        let (x, y) = location.coordinate();
+    fn index(&self, coordinate: AbsoluteCoord) -> usize {
+        let (x, y) = coordinate.value();
         y * self.width + x
     }
 }

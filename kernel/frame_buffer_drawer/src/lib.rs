@@ -10,7 +10,7 @@ use frame_buffer::{FrameBuffer, AbsoluteCoord, ICoord};
 /// Draws a point in a framebuffer.
 /// The point is drawn at position (x, y) of the framebuffer with color.
 pub fn draw_point(framebuffer: &mut dyn FrameBuffer, location: AbsoluteCoord, color: u32) {
-    if framebuffer.check_in_buffer(location) {
+    if framebuffer.contains_coordinate(location) {
         framebuffer.draw_pixel(location, color);
     }
 }
@@ -43,7 +43,7 @@ pub fn draw_line(
             }
             y = (x - start.x) * height / width + start.y;
             let location = AbsoluteCoord::new(x as usize, y as usize);
-            if framebuffer.check_in_buffer(location) {
+            if framebuffer.contains_coordinate(location) {
                 framebuffer.draw_pixel(location, color);
             }
             x += step;
@@ -58,7 +58,7 @@ pub fn draw_line(
             }
             x = (y - start.y) * width / height + start.x;
             let location = AbsoluteCoord::new(x as usize, y as usize);
-            if { framebuffer.check_in_buffer(location) } {
+            if { framebuffer.contains_coordinate(location) } {
                 framebuffer.draw_pixel(location, color);
             }
             y += step;
@@ -76,13 +76,13 @@ pub fn draw_line(
 /// * `color`: the color of the rectangle's border.
 pub fn draw_rectangle(
     framebuffer: &mut dyn FrameBuffer,
-    location: AbsoluteCoord,
+    coordinate: AbsoluteCoord,
     width: usize,
     height: usize,
     color: u32,
 ) {
     let (buffer_width, buffer_height) = framebuffer.get_size();
-    let (start_x, start_y) = location.coordinate();
+    let (start_x, start_y) = coordinate.value();
     let end_x_offset: usize = {
         if start_x + width < buffer_width {
             width - 1
@@ -99,7 +99,7 @@ pub fn draw_rectangle(
     };
 
     // draw the four lines of the rectangle.
-    let mut top = location; 
+    let mut top = coordinate; 
     loop {
         if top.0.x == start_x + end_x_offset + 1 {
             break;
@@ -109,7 +109,7 @@ pub fn draw_rectangle(
         top = top + (1, 0);
     }
 
-    let mut left = location; 
+    let mut left = coordinate; 
     loop {
         if left.0.y == start_y + end_y_offset + 1 {
             break;
@@ -124,19 +124,19 @@ pub fn draw_rectangle(
 /// The part exceeding the boundary of the framebuffer will be ignored.
 /// # Arguments
 /// * `framebuffer`: the framebuffer to draw in.
-/// * `location`: the left top coordinate of the retangle.
+/// * `coordinate`: the left top coordinate of the retangle.
 /// * `width`: the width of the rectangle.
 /// * `height`: the height of the rectangle.
 /// * `color`: the color of the rectangle.
 pub fn fill_rectangle(
     framebuffer: &mut dyn FrameBuffer,
-    location: AbsoluteCoord,
+    coordinate: AbsoluteCoord,
     width: usize,
     height: usize,
     color: u32,
 ) {
     let (buffer_width, buffer_height) = framebuffer.get_size();
-    let (start_x, start_y) = location.coordinate();
+    let (start_x, start_y) = coordinate.value();
 
     let end_x: usize = {
         if start_x + width < buffer_width {
@@ -154,19 +154,19 @@ pub fn fill_rectangle(
     };
 
     // draw every pixel line by line
-    let mut location = AbsoluteCoord::new(start_x, start_y);
+    let mut coordinate = AbsoluteCoord::new(start_x, start_y);
     loop {
         loop {
-            framebuffer.draw_pixel(location, color);
-            location = location + (1, 0);
-            if location.0.x == end_x {
+            framebuffer.draw_pixel(coordinate, color);
+            coordinate = coordinate + (1, 0);
+            if coordinate.0.x == end_x {
                 break;
             }
         }
-        location = location + (0, 1);
-        if location.0.y == end_y {
+        coordinate = coordinate + (0, 1);
+        if coordinate.0.y == end_y {
             break;
         }
-        location.0.x = start_x;
+        coordinate.0.x = start_x;
     }
 }

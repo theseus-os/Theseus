@@ -16,7 +16,7 @@ pub trait Compositor {
     ///
     /// # Arguments
     ///
-    /// * `bufferlist` - A list of buffers in the form of (buffer:T, location: ICoord).
+    /// * `bufferlist` - A list of buffers in the form of (buffer:T, coordinate: ICoord).
     /// For each tuple in the list, `buffer` is a buffer object to be composited. `location` specifies the relative location of the buffer in the final buffer.
     fn composite(
         &mut self,
@@ -24,5 +24,5 @@ pub trait Compositor {
     ) -> Result<(), &'static str>;
 
     /// Checks if a buffer at (x, y) is already updated.
-    fn cached(&self, buffer: &dyn FrameBuffer, location: ICoord) -> bool;
+    fn cached(&self, buffer: &dyn FrameBuffer, coordinate: ICoord) -> bool;
 }

@@ -20,7 +20,7 @@ pub trait Displayable: Downcast + Send {
     /// * `framebuffer`: the framebuffer to display in.
     fn display(
         &mut self,
-        location: AbsoluteCoord,
+        coordinate: AbsoluteCoord,
         framebuffer: &mut dyn FrameBuffer,
     ) -> Result<(), &'static str>;
 

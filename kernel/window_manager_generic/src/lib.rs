@@ -111,23 +111,23 @@ impl<Buffer: FrameBuffer> WindowGeneric<Buffer> {
     pub fn add_displayable(
         &mut self,
         key: &str,
-        location: RelativeCoord,
+        coordinate: RelativeCoord,
         displayable: Box<dyn Displayable>,
     ) -> Result<(), &'static str> {
         let key = key.to_string();
         let (width, height) = displayable.get_size();
         let inner = self.inner.lock();
 
-        if !inner.check_in_content(location)
-            || !inner.check_in_content(location + (width, 0))
-            || !inner.check_in_content(location + (0, height))
-            || !inner.check_in_content(location + (width, height))
+        if !inner.contains_coordinate(coordinate)
+            || !inner.contains_coordinate(coordinate + (width, 0))
+            || !inner.contains_coordinate(coordinate + (0, height))
+            || !inner.contains_coordinate(coordinate + (width, height))
         {
             return Err("The displayable does not fit the window size.");
         }
 
         let component = Component {
-            location: location,
+            coordinate: coordinate,
             displayable: displayable,
         };
 
@@ -143,12 +143,9 @@ impl<Buffer: FrameBuffer> WindowGeneric<Buffer> {
     /// Gets a mutable reference to a displayable by its name.
     pub fn get_displayable_mut(&mut self, name: &str) -> Option<&mut Box<dyn Displayable>> {
         let opt = self.components.get_mut(name);
-        match opt {
-            None => return None,
-            Some(component) => {
-                return Some(component.get_displayable_mut());
-            }
-        };
+        opt.map(|component| {
+            component.get_displayable_mut()
+        })
     }
 
     /// Gets a displayable by its name.
@@ -163,14 +160,14 @@ impl<Buffer: FrameBuffer> WindowGeneric<Buffer> {
     }
 
     /// Gets the position of a displayable in the window.
-    pub fn get_displayable_location(&self, key: &str) -> Result<RelativeCoord, &'static str> {
+    pub fn get_displayable_position(&self, key: &str) -> Result<RelativeCoord, &'static str> {
         let opt = self.components.get(key);
         match opt {
             None => {
                 return Err("No such displayable");
             }
             Some(component) => {
-                return Ok(component.get_location());
+                return Ok(component.get_position());
             }
         };
     }
@@ -182,21 +179,21 @@ impl<Buffer: FrameBuffer> WindowGeneric<Buffer> {
 
     /// Renders the content of the window to the screen.
     pub fn render(&mut self) -> Result<(), &'static str> {
-        let (window_x, window_y) = { self.inner.lock().get_content_position().coordinate() };
-        let location = ICoord {
+        let (window_x, window_y) = { self.inner.lock().get_content_position().value() };
+        let coordinate = ICoord {
             x: window_x as i32,
             y: window_y as i32,
         };
         FRAME_COMPOSITOR.lock().composite(vec![(
             &mut self.framebuffer,
-            location
+            coordinate
         )])
     }
 
     /// Prints a string in the window with a text displayable by its name.
     pub fn display_string(&mut self, display_name: &str, slice: &str) -> Result<(), &'static str> {
         let component = self.components.get_mut(display_name).ok_or("")?;
-        let location = component.get_location();
+        let coordinate = component.get_position();
         let displayable = component.get_displayable_mut();
 
         /* Optimization: if current string is the prefix of the new string, just print the appended characters. */
@@ -204,7 +201,7 @@ impl<Buffer: FrameBuffer> WindowGeneric<Buffer> {
         if let Some(text_display) = displayable.downcast_mut::<TextDisplay>() {
             text_display.set_text(slice);
             text_display.display(
-                AbsoluteCoord(location.inner()), 
+                AbsoluteCoord(coordinate.inner()), 
                 &mut self.framebuffer
             )?;
             self.render()?;
@@ -222,14 +219,14 @@ impl<Buffer: FrameBuffer> WindowGeneric<Buffer> {
         display_name: &str,
     ) -> Result<(), &'static str> {
         let component = self.components.get_mut(display_name).ok_or("")?;
-        let location = component.get_location();
+        let coordinate = component.get_position();
         let displayable = component.get_displayable_mut();
 
         if let Some(text_display) = displayable.downcast_mut::<TextDisplay>() {
             let (col, line) = text_display.get_next_pos();
             text_display.display_cursor(
                 cursor, 
-                AbsoluteCoord(location.inner()), 
+                AbsoluteCoord(coordinate.inner()), 
                 col, 
                 line, 
                 &mut self.framebuffer
@@ -246,7 +243,7 @@ impl<Buffer: FrameBuffer> WindowGeneric<Buffer> {
     /// Resizes a window as (width, height) at (x, y).
     pub fn resize(
         &mut self,
-        location: RelativeCoord,
+        coordinate: RelativeCoord,
         width: usize,
         height: usize,
     ) -> Result<(), &'static str> {
@@ -262,10 +259,10 @@ impl<Buffer: FrameBuffer> WindowGeneric<Buffer> {
 
         self.clear()?;
         let mut inner = self.inner.lock();
-        match inner.resize(location, width, height) {
+        match inner.resize(coordinate, width, height) {
             Ok(percent) => {
                 for (_key, item) in self.components.iter_mut() {
-                    let (x, y) = item.get_location().coordinate();
+                    let (x, y) = item.get_position().value();
                     let (width, height) = item.get_displayable().get_size();
                     item.resize(
                         RelativeCoord::new(
@@ -276,7 +273,7 @@ impl<Buffer: FrameBuffer> WindowGeneric<Buffer> {
                         height * percent.1 / 100,
                     );
                 }
-                let (x, y) = location.coordinate();
+                let (x, y) = coordinate.value();
                 inner
                     .events_producer()
                     .enqueue(Event::new_resize_event(x, y, width, height));
@@ -303,7 +300,7 @@ impl<Buffer: FrameBuffer> WindowGeneric<Buffer> {
 /// (x, y) specify the coordinates of the top left corner of the window.
 /// (width, height) specify the size of the new window.
 pub fn new_window<'a>(
-    location: RelativeCoord,
+    coordinate: RelativeCoord,
     width: usize,
     height: usize,
 ) -> Result<WindowGeneric<FrameBufferRGB>, &'static str> {
@@ -321,7 +318,7 @@ pub fn new_window<'a>(
         None,
     )?;
     let inner = WindowInner {
-        location: location,
+        coordinate: coordinate,
         width: width,
         height: height,
         active: true,
@@ -369,8 +366,8 @@ pub fn new_default_window() -> Result<WindowGeneric<FrameBufferRGB>, &'static st
 
 /// The structure is owned by the window manager. It contains the information of a window but under the control of the manager
 pub struct WindowInner {
-    /// the location of the window relative to the screen
-    pub location: RelativeCoord,
+    /// the coordinate of the window relative to the screen
+    pub coordinate: RelativeCoord,
     /// the width of the window
     pub width: usize,
     /// the height of the window
@@ -393,17 +390,17 @@ impl Window for WindowInner {
         let buffer = buffer_lock.deref_mut();
         draw_rectangle(
             buffer,
-            AbsoluteCoord(self.location.inner()),
+            AbsoluteCoord(self.coordinate.inner()),
             self.width,
             self.height,
             SCREEN_BACKGROUND_COLOR,
         );
-        let location = ICoord { x: 0, y: 0 };
-        FRAME_COMPOSITOR.lock().composite(vec![(buffer, location)])
+        let coordinate = ICoord { x: 0, y: 0 };
+        FRAME_COMPOSITOR.lock().composite(vec![(buffer, coordinate)])
     }
 
-    fn check_in_content(&self, point: RelativeCoord) -> bool {
-        let (x, y) = point.coordinate();
+    fn contains_coordinate(&self, point: RelativeCoord) -> bool {
+        let (x, y) = point.value();
         return x <= self.width - 2 * self.padding && y <= self.height - 2 * self.padding;
     }
 
@@ -420,14 +417,14 @@ impl Window for WindowInner {
         };
         let mut buffer_lock = buffer_ref.lock();
         let buffer = buffer_lock.deref_mut();
-        draw_rectangle(buffer, AbsoluteCoord(self.location.inner()), self.width, self.height, color);
-        let location = ICoord { x: 0, y: 0 };
-        FRAME_COMPOSITOR.lock().composite(vec![(buffer, location)])
+        draw_rectangle(buffer, AbsoluteCoord(self.coordinate.inner()), self.width, self.height, color);
+        let coordinate = ICoord { x: 0, y: 0 };
+        FRAME_COMPOSITOR.lock().composite(vec![(buffer, coordinate)])
     }
 
     fn resize(
         &mut self,
-        location: RelativeCoord,
+        coordinate: RelativeCoord,
         width: usize,
         height: usize,
     ) -> Result<(usize, usize), &'static str> {
@@ -436,7 +433,7 @@ impl Window for WindowInner {
             (width - self.padding) * 100 / (self.width - self.padding),
             (height - self.padding) * 100 / (self.height - self.padding),
         );
-        self.location = location;
+        self.coordinate = coordinate;
         self.width = width;
         self.height = height;
         self.draw_border(get_border_color(self.active))?;
@@ -451,7 +448,7 @@ impl Window for WindowInner {
     }
 
     fn get_content_position(&self) -> RelativeCoord {
-        self.location + (self.padding, self.padding)
+        self.coordinate + (self.padding, self.padding)
     }
 
     fn events_producer(&mut self) -> &mut DFQueueProducer<Event> {
@@ -461,7 +458,7 @@ impl Window for WindowInner {
 
 /// A component contains a displayable and its position.
 pub struct Component {
-    location: RelativeCoord,
+    coordinate: RelativeCoord,
     displayable: Box<dyn Displayable>,
 }
 
@@ -477,13 +474,13 @@ impl Component {
     }
 
     // gets the position of the displayable
-    fn get_location(&self) -> RelativeCoord {
-        self.location
+    fn get_position(&self) -> RelativeCoord {
+        self.coordinate
     }
 
     // resizes the displayable
-    fn resize(&mut self, location: RelativeCoord, width: usize, height: usize) {
-        self.location = location;
+    fn resize(&mut self, coordinate: RelativeCoord, width: usize, height: usize) {
+        self.coordinate = coordinate;
         self.displayable.resize(width, height);
     }
 }

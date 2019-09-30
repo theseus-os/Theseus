@@ -37,12 +37,12 @@ pub struct TextDisplay {
 impl Displayable for TextDisplay {
     fn display(
         &mut self,
-        location: AbsoluteCoord,
+        coordinate: AbsoluteCoord,
         framebuffer: &mut dyn FrameBuffer,
     ) -> Result<(), &'static str> {
         let (col, line) = frame_buffer_printer::print_by_bytes(
             framebuffer,
-            location,
+            coordinate,
             self.width,
             self.height,
             self.text.as_str(),
@@ -99,19 +99,19 @@ impl TextDisplay {
     /// Display a cursor within the text displayable.
     /// # Arguments
     /// * `cursor`: the cursor to display.
-    /// * `location`: the location of the displayable in the framebuffer.
+    /// * `coordinate`: the coordinate of the displayable in the framebuffer.
     /// * `(col, line):` the position of the cursor in the text displayable.
     /// * `framebuffer:` the framebuffer to display in.
     pub fn display_cursor(
         &mut self,
         cursor: &mut Cursor,
-        location: AbsoluteCoord,
+        coordinate: AbsoluteCoord,
         col: usize,
         line: usize,
         framebuffer: &mut dyn FrameBuffer,
     ) {
         if cursor.blink() {
-            let color = if cursor.show {
+            let color = if cursor.show() {
                 cursor.color
             } else {
                 self.bg_color
@@ -119,7 +119,7 @@ impl TextDisplay {
             
             frame_buffer_drawer::fill_rectangle(
                 framebuffer,
-                location + (col * CHARACTER_WIDTH, line * CHARACTER_HEIGHT),
+                coordinate + (col * CHARACTER_WIDTH, line * CHARACTER_HEIGHT),
                 CHARACTER_WIDTH,
                 CHARACTER_HEIGHT,
                 color,
@@ -187,7 +187,7 @@ impl Cursor {
                 }
             }
         }
-        false
+        true
     }
 
     /// Checks if the cursor should be shown.

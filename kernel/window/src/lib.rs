@@ -17,9 +17,9 @@ pub trait Window: Send {
     fn clear(&self) -> Result<(), &'static str>;
 
     /// Checks if the pixel (x, y) is within the window exluding the border and padding.
-    fn check_in_content(&self, point: RelativeCoord) -> bool;
+    fn contains_coordinate(&self, point: RelativeCoord) -> bool;
 
-    /// Actives or inactives a window.
+    /// Set the window as active or inactive.
     fn set_active(&mut self, active: bool) -> Result<(), &'static str>;
 
     /// Draws the border of the window.
@@ -28,7 +28,7 @@ pub trait Window: Send {
     /// Adjusts the size (width, height) and position (x, y) of a window.
     fn resize(
         &mut self,
-        location: RelativeCoord,
+        coordinate: RelativeCoord,
         width: usize,
         height: usize,
     ) -> Result<(usize, usize), &'static str>;

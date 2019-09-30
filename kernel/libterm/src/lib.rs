@@ -585,9 +585,3 @@ impl Terminal {
         self.get_displayable_dimensions(&self.display_name)
     }
 }
-
-impl Drop for Terminal {
-    fn drop(&mut self) {
-        /*The window object will invoke its drop method and be deleted from the window manager list*/
-    }
-}

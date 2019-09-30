@@ -32,7 +32,7 @@ pub fn print_by_bytes(
 ) -> Result<(usize, usize), &'static str> {
     let buffer_width = width / CHARACTER_WIDTH;
     let buffer_height = height / CHARACTER_HEIGHT;
-    let (x, y) = location.coordinate();
+    let (x, y) = location.value();
 
     let mut curr_line = 0;
     let mut curr_column = 0;
