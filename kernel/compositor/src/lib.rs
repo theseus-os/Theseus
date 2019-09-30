@@ -10,15 +10,15 @@ use alloc::vec::Vec;
 use frame_buffer::{FrameBuffer, ICoord};
 
 /// The compositor trait.
-/// A compositor composes a list of buffers to a single buffer.
+/// A compositor composites a list of buffers to a single buffer.
 pub trait Compositor {
-    /// Compose the buffers in the bufferlist.
+    /// Composites the buffers in the bufferlist.
     ///
     /// # Arguments
     ///
     /// * `bufferlist` - A list of buffers in the form of (buffer:T, location: ICoord).
-    /// For each tuple in the list, `buffer` is a buffer object to be composed. `location` specifies the relative location of the buffer in the final buffer.
-    fn compose(
+    /// For each tuple in the list, `buffer` is a buffer object to be composited. `location` specifies the relative location of the buffer in the final buffer.
+    fn composite(
         &mut self,
         bufferlist: Vec<(&dyn FrameBuffer, ICoord)>,
     ) -> Result<(), &'static str>;

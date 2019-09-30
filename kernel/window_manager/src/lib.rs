@@ -52,12 +52,12 @@ impl<T: Window> WindowList<T> {
         inner_ref: &Arc<Mutex<T>>,
     ) -> Result<(), &'static str> {
         if let Some(current_active) = self.active.upgrade() {
-            current_active.lock().active(false)?;
+            current_active.lock().set_active(false)?;
             let weak_ref = self.active.clone();
             self.background_list.push_front(weak_ref);
         } 
 
-        inner_ref.lock().active(true)?;
+        inner_ref.lock().set_active(true)?;
         self.active = Arc::downgrade(inner_ref);
 
         Ok(())
@@ -78,13 +78,13 @@ impl<T: Window> WindowList<T> {
                 let window_ref = &self.background_list[index];
                 let window = window_ref.upgrade();
                 if let Some(window) = window {
-                    window.lock().key_producer().enqueue(Event::ExitEvent);
+                    window.lock().events_producer().enqueue(Event::ExitEvent);
                 }
             }
             self.background_list.remove(index);
         }
 
-        inner.lock().clean()?;
+        inner.lock().clear()?;
 
         Ok(())
     }
@@ -116,11 +116,11 @@ impl<T: Window> WindowList<T> {
         if let Some(window) = self.active.upgrade() {
             let mut current = window.lock();
             if set_current_back {
-                (*current).active(false)?;
+                (*current).set_active(false)?;
                 let old_active = self.active.clone();
                 self.background_list.push_front(old_active);
             } else {
-                (*current).clean()?;
+                (*current).clear()?;
             }
         }
 
@@ -128,7 +128,7 @@ impl<T: Window> WindowList<T> {
             self.active = active;
             if let Some(window) = self.active.upgrade() {
                 let mut current = window.lock();
-                (*current).active(true)?;
+                (*current).set_active(true)?;
             }
         }
 
@@ -157,7 +157,7 @@ impl<T: Window> WindowList<T> {
         let active_ref = self.active.upgrade(); // grabs a pointer to the active WindowInner
         if let Some(window) = active_ref {
             let mut window = window.lock();
-            window.key_producer().enqueue(event);
+            window.events_producer().enqueue(event);
         }
         Ok(())
     }
@@ -237,7 +237,7 @@ pub fn adjust_window_after_deletion() -> Result<(), &'static str> {
         if let Some(window_inner_ptr) = strong_window_ptr {
             let mut locked_window_ptr = window_inner_ptr.lock();
             locked_window_ptr.resize(WINDOW_MARGIN, height_index, window_width, window_height)?;
-            locked_window_ptr.key_producer.enqueue(Event::DisplayEvent); // refreshes display after resize
+            locked_window_ptr.events_producer.enqueue(Event::DisplayEvent); // refreshes display after resize
             height_index += window_height + WINDOW_MARGIN; // advance to the height index of the next window
         }
     }
@@ -258,7 +258,7 @@ pub fn adjust_windows_before_addition() -> Result<(usize, usize, usize), &'stati
             if let Some(window_inner_ptr) = strong_ptr {
                 let mut locked_window_ptr = window_inner_ptr.lock();
                 locked_window_ptr.resize(WINDOW_MARGIN, height_index, window_width, window_height)?;
-                locked_window_ptr.key_producer.enqueue(Event::DisplayEvent); // refreshes window after
+                locked_window_ptr.events_producer.enqueue(Event::DisplayEvent); // refreshes window after
                 height_index += window_height + WINDOW_MARGIN; // advance to the height index of the next window
             }
         }

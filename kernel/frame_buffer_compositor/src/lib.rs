@@ -1,5 +1,5 @@
 //! This crate is a framebuffer compositor.
-//! A framebuffer compositor will compose a sequence of framebuffers and display them in the final framebuffer.
+//! A framebuffer compositor will composite a sequence of framebuffers and display them in the final framebuffer.
 
 #![no_std]
 #![feature(const_vec_new)]
@@ -51,7 +51,7 @@ impl BufferCache {
     }
 
     // checks if the cached framebuffer overlaps with another one
-    fn overlap(&self, cache: &BufferCache) -> bool {
+    fn overlaps_with(&self, cache: &BufferCache) -> bool {
         self.check_in_area(cache.location)
             || self.check_in_area(cache.location + (cache.width as i32, 0))
             || self.check_in_area(cache.location + (0, cache.height as i32))
@@ -60,7 +60,7 @@ impl BufferCache {
 }
 
 impl Compositor for FrameCompositor {
-    fn compose(
+    fn composite(
         &mut self,
         bufferlist: Vec<(&dyn FrameBuffer, ICoord)>,
     ) -> Result<(), &'static str> {
@@ -91,7 +91,7 @@ impl Compositor for FrameCompositor {
             let final_x_start = core::cmp::max(0, location.x) as usize;
             let final_y_start = core::cmp::max(0, location.y) as usize;
 
-            // just compose the part which is within the final buffer
+            // just draw the part which is within the final buffer
             let width = core::cmp::min(location_end.x as usize, final_width) - final_x_start;
             let height = core::cmp::min(location_end.y as usize, final_height) - final_y_start;
 
@@ -114,7 +114,7 @@ impl Compositor for FrameCompositor {
             let keys: Vec<_> = self.cache.keys().cloned().collect();
             for key in keys {
                 if let Some(cache) = self.cache.get(&key) {
-                    if cache.overlap(&new_cache) {
+                    if cache.overlaps_with(&new_cache) {
                         self.cache.remove(&key);
                     }
                 };

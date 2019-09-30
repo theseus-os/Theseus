@@ -10,6 +10,7 @@ pub const CHARACTER_WIDTH: usize = 9;
 pub const CHARACTER_HEIGHT: usize = 16;
 
 // The bitmap array of characters.
+// Copied from: https://github.com/goto456/linux-2.6.26/blob/6def53aec8e32bb58a3b50c52a8fb7c48ebef012/arch/ppc/boot/include/iso_font.h
 const FONT_BASIC: [[u8; CHARACTER_HEIGHT]; 256] = [
     [
         0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00,

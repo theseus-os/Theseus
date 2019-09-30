@@ -5,7 +5,7 @@
 
 extern crate frame_buffer;
 
-use frame_buffer::{FrameBuffer, AbsoluteCoord};
+use frame_buffer::{FrameBuffer, AbsoluteCoord, ICoord};
 
 /// Draws a point in a framebuffer.
 /// The point is drawn at position (x, y) of the framebuffer with color.
@@ -23,27 +23,25 @@ pub fn draw_point(framebuffer: &mut dyn FrameBuffer, location: AbsoluteCoord, co
 /// * `color`: the color of the line.
 pub fn draw_line(
     framebuffer: &mut dyn FrameBuffer,
-    start_x: i32,
-    start_y: i32,
-    end_x: i32,
-    end_y: i32,
+    start: ICoord,
+    end: ICoord,
     color: u32,
 ) {
-    let width: i32 = end_x - start_x;
-    let height: i32 = end_y - start_y;
+    let width: i32 = end.x - start.x;
+    let height: i32 = end.y - start.y;
 
     // compare the x distance and y distance. Increase/Decrease the longer one at every step.
     if width.abs() > height.abs() {
         let mut y;
-        let mut x = start_x;
+        let mut x = start.x;
 
-        // if the end_x is larger than start_x, increase x in the loop. Otherwise decrease it.
+        // if the end.x is larger than start.x, increase x in the loop. Otherwise decrease it.
         let step = if width > 0 { 1 } else { -1 };
         loop {
-            if x == end_x {
+            if x == end.x {
                 break;
             }
-            y = (x - start_x) * height / width + start_y;
+            y = (x - start.x) * height / width + start.y;
             let location = AbsoluteCoord::new(x as usize, y as usize);
             if framebuffer.check_in_buffer(location) {
                 framebuffer.draw_pixel(location, color);
@@ -52,13 +50,13 @@ pub fn draw_line(
         }
     } else {
         let mut x;
-        let mut y = start_y;
+        let mut y = start.y;
         let step = if height > 0 { 1 } else { -1 };
         loop {
-            if y == end_y {
+            if y == end.y {
                 break;
             }
-            x = (y - start_y) * width / height + start_x;
+            x = (y - start.y) * width / height + start.x;
             let location = AbsoluteCoord::new(x as usize, y as usize);
             if { framebuffer.check_in_buffer(location) } {
                 framebuffer.draw_pixel(location, color);

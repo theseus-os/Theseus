@@ -126,8 +126,7 @@ pub fn init(
     info!("Finished handling and booting up all {} AP cores.", ap_count);
 
     // init the display subsystem
-    // the final frame_buffer is set as FrameBufferRGB
-    // we are able to initialize the final framebuffer as any kind of FrameBuffer
+    // Currently we use a FrameBufferRGB as the final frame buffer, but other types of FrameBuffers could be used instead.
     frame_buffer_rgb::init()?;
     font::init()?;
     window_manager_generic::init()?;

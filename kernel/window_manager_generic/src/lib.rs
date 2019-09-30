@@ -86,8 +86,8 @@ pub struct WindowGeneric<Buffer: FrameBuffer> {
 }
 
 impl<Buffer: FrameBuffer> WindowGeneric<Buffer> {
-    /// Cleans the content of a window. The border and padding of the window remain showing.
-    pub fn clean(&mut self) -> Result<(), &'static str> {
+    /// Clears the content of a window. The border and padding of the window remain showing.
+    pub fn clear(&mut self) -> Result<(), &'static str> {
         let (width, height) = self.inner.lock().get_content_size();
         fill_rectangle(
             &mut self.framebuffer,
@@ -187,7 +187,7 @@ impl<Buffer: FrameBuffer> WindowGeneric<Buffer> {
             x: window_x as i32,
             y: window_y as i32,
         };
-        FRAME_COMPOSITOR.lock().compose(vec![(
+        FRAME_COMPOSITOR.lock().composite(vec![(
             &mut self.framebuffer,
             location
         )])
@@ -260,7 +260,7 @@ impl<Buffer: FrameBuffer> WindowGeneric<Buffer> {
         //     }
         // }
 
-        self.clean()?;
+        self.clear()?;
         let mut inner = self.inner.lock();
         match inner.resize(location, width, height) {
             Ok(percent) => {
@@ -278,7 +278,7 @@ impl<Buffer: FrameBuffer> WindowGeneric<Buffer> {
                 }
                 let (x, y) = location.coordinate();
                 inner
-                    .key_producer()
+                    .events_producer()
                     .enqueue(Event::new_resize_event(x, y, width, height));
                 Ok(())
             }
@@ -326,7 +326,7 @@ pub fn new_window<'a>(
         height: height,
         active: true,
         padding: WINDOW_PADDING,
-        key_producer: producer,
+        events_producer: producer,
     };
 
     // // Check if the window overlaps with others
@@ -340,7 +340,7 @@ pub fn new_window<'a>(
 
     // add the new window and active it
     // initialize the content of the new window
-    inner_ref.lock().clean()?;
+    inner_ref.lock().clear()?;
     WINDOWLIST.lock().add_active(&inner_ref)?;
 
     // return the window object
@@ -380,11 +380,11 @@ pub struct WindowInner {
     /// the padding outside the content of the window including the border.
     pub padding: usize,
     /// the producer accepting a key event
-    pub key_producer: DFQueueProducer<Event>,
+    pub events_producer: DFQueueProducer<Event>,
 }
 
 impl Window for WindowInner {
-    fn clean(&self) -> Result<(), &'static str> {
+    fn clear(&self) -> Result<(), &'static str> {
         let buffer_ref = match DESKTOP_FRAME_BUFFER.try() {
             Some(buffer) => buffer,
             None => return Err("Fail to get the virtual frame buffer"),
@@ -399,7 +399,7 @@ impl Window for WindowInner {
             SCREEN_BACKGROUND_COLOR,
         );
         let location = ICoord { x: 0, y: 0 };
-        FRAME_COMPOSITOR.lock().compose(vec![(buffer, location)])
+        FRAME_COMPOSITOR.lock().composite(vec![(buffer, location)])
     }
 
     fn check_in_content(&self, point: RelativeCoord) -> bool {
@@ -407,7 +407,7 @@ impl Window for WindowInner {
         return x <= self.width - 2 * self.padding && y <= self.height - 2 * self.padding;
     }
 
-    fn active(&mut self, active: bool) -> Result<(), &'static str> {
+    fn set_active(&mut self, active: bool) -> Result<(), &'static str> {
         self.active = active;
         self.draw_border(WINDOW_ACTIVE_COLOR)?;
         Ok(())
@@ -422,7 +422,7 @@ impl Window for WindowInner {
         let buffer = buffer_lock.deref_mut();
         draw_rectangle(buffer, AbsoluteCoord(self.location.inner()), self.width, self.height, color);
         let location = ICoord { x: 0, y: 0 };
-        FRAME_COMPOSITOR.lock().compose(vec![(buffer, location)])
+        FRAME_COMPOSITOR.lock().composite(vec![(buffer, location)])
     }
 
     fn resize(
@@ -454,8 +454,8 @@ impl Window for WindowInner {
         self.location + (self.padding, self.padding)
     }
 
-    fn key_producer(&mut self) -> &mut DFQueueProducer<Event> {
-        &mut self.key_producer
+    fn events_producer(&mut self) -> &mut DFQueueProducer<Event> {
+        &mut self.events_producer
     }
 }
 

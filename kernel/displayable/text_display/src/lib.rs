@@ -26,8 +26,7 @@ const DEFAULT_CURSOR_FREQ: u64 = 400000000;
 pub struct TextDisplay {
     width: usize,
     height: usize,
-    // the position of the next symbol
-    // the position is updated after display and they will be useful for optimization.
+    /// The position of the next symbol. It is updated after display and will be useful for optimization.
     next_col: usize,
     next_line: usize,
     text: String,

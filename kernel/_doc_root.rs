@@ -24,7 +24,7 @@
 //! * `ata_pio`: Support for ATA hard disks (IDE/PATA) using PIO (not DMA), and not SATA.
 //! * `captain`: The main driver of Theseus. Controls the loading and initialization of all subsystems and other crates.
 //! * `input_event_manager`: Handles input events from the keyboard and routes them to the correct application. ** Being phased out by window manager.
-//! * `compositor`: The trait of a compositor. It composes a list of buffers to a final buffer.
+//! * `compositor`: The trait of a compositor. It composites a list of buffers to a final buffer.
 //! * `event_types`: A temporary way to move the input_event_manager typedefs out of the input_event_manager crate.
 //! * `device_manager`: Code for handling the sequence required to initialize each driver.
 //! * `displayable`: Defines a displayable trait. A displayable can display itself in a framebuffer.
@@ -65,5 +65,5 @@
 //! * `vfs_node`: contains the structs VFSDirectory and VFSFile, which are the most basic, generic implementers of the traits Directory and File
 //! * `vga_buffer`: Simple routines for printing to the screen using the x86 VGA buffer text mode.
 //! * `window`: Defines a trait for window.
-//! * `window_manager_generic`: Defines a generic window structure which implements the Window trait.
+//! * `window_generic`: Defines a generic window structure which implements the Window trait.
 //! * `window_manager`: Maintains a list of existing windows.
