@@ -104,7 +104,7 @@ impl<Buffer: FrameBuffer> WindowGeneric<Buffer> {
         inner_locked.get_content_size()
     }
 
-    /// Adds a new displayable to the window.
+    /// Adds a new displayable at `coordinate` relative to the window.
     /// This function checks if the displayable is in the window, but does not check if it is overlapped with others.
     pub fn add_displayable(
         &mut self,
@@ -157,7 +157,7 @@ impl<Buffer: FrameBuffer> WindowGeneric<Buffer> {
         };
     }
 
-    /// Gets the position of a displayable in the window.
+    /// Gets the position of a displayable relative to the window.
     pub fn get_displayable_position(&self, key: &str) -> Result<RelativeCoord, &'static str> {
         let opt = self.components.get(key);
         match opt {
@@ -170,7 +170,7 @@ impl<Buffer: FrameBuffer> WindowGeneric<Buffer> {
         };
     }
 
-    /// Gets the content position of the window excluding border and padding.
+    /// Gets the content position relative to the window excluding border and padding relative.
     pub fn get_content_position(&self) -> RelativeCoord {
         self.inner.lock().get_content_position()
     }
@@ -230,7 +230,7 @@ impl<Buffer: FrameBuffer> WindowGeneric<Buffer> {
     }
 
     // @Andrew
-    /// Resizes a window as (width, height) at coordinate.
+    /// Resizes a window as (width, height) at coordinate relative to the screen.
     pub fn resize(
         &mut self,
         coordinate: RelativeCoord,
@@ -285,7 +285,7 @@ impl<Buffer: FrameBuffer> WindowGeneric<Buffer> {
 }
 
 /// Creates a new window. Currently the window is of `FrameBufferRGB`. In the future we will be able to create a window of any structure which implements `FrameBuffer`.
-/// `coordinate` specifies the coordinates relative to the top left corner of the window.
+/// `coordinate` specifies the coordinate relative to the top left corner of the window.
 /// (width, height) specify the size of the new window.
 pub fn new_window(
     coordinate: RelativeCoord,
@@ -444,7 +444,7 @@ impl Window for WindowInner {
     }
 }
 
-/// A component contains a displayable and its coordinate.
+/// A component contains a displayable and its coordinate relative to the window.
 pub struct Component {
     coordinate: RelativeCoord,
     displayable: Box<dyn Displayable>,
@@ -466,7 +466,7 @@ impl Component {
         self.coordinate
     }
 
-    // resizes the displayable
+    // resizes the displayable as (width, height) at `coordinate` relative to the window
     fn resize(&mut self, coordinate: RelativeCoord, width: usize, height: usize) {
         self.coordinate = coordinate;
         self.displayable.resize(width, height);
