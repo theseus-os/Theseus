@@ -130,7 +130,7 @@ fn input_event_loop(consumer:DFQueueConsumer<Event>) -> Result<(), &'static str>
 
                 // Switches between terminal windows
                 if key_input.modifiers.alt && key_input.keycode == Keycode::Tab && key_input.action == KeyAction::Pressed {
-                    window_manager_generic::WINDOWLIST.lock().switch_to_next()?;
+                    window_manager_generic::WINDOW_MANAGER_GENERIC.lock().switch_to_next()?;
                     meta_keypress = true;
                     event.mark_completed();
 
@@ -138,7 +138,7 @@ fn input_event_loop(consumer:DFQueueConsumer<Event>) -> Result<(), &'static str>
 
                 // Deletes the active window (whichever window Ctrl + W is logged in)
                 if key_input.modifiers.control && key_input.keycode == Keycode::W && key_input.action == KeyAction::Pressed {
-                    window_manager_generic::WINDOWLIST.lock().send_event_to_active(Event::ExitEvent)?; // tells application to exit
+                    window_manager_generic::WINDOW_MANAGER_GENERIC.lock().send_event_to_active(Event::ExitEvent)?; // tells application to exit
                 }
             }
             _ => { }
@@ -146,7 +146,7 @@ fn input_event_loop(consumer:DFQueueConsumer<Event>) -> Result<(), &'static str>
 
         // If the keyevent was not for control of the terminal windows, enqueues keycode into active window
         if !meta_keypress {
-            window_manager_generic::WINDOWLIST.lock().send_event_to_active(event.deref().clone())?;
+            window_manager_generic::WINDOW_MANAGER_GENERIC.lock().send_event_to_active(event.deref().clone())?;
             event.mark_completed();
 
         }

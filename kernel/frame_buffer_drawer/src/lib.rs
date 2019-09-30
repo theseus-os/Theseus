@@ -1,5 +1,5 @@
-//! This crate contains a series of basic draw functions to draw in a framebuffer.
-//! Displayables invoke these basic functions to display themselves in a framebuffer.
+//! This crate contains a series of basic draw functions to draw onto a framebuffer.
+//! Displayables invoke these basic functions to display themselves onto a framebuffer.
 
 #![no_std]
 
@@ -8,18 +8,18 @@ extern crate frame_buffer;
 use frame_buffer::{FrameBuffer, AbsoluteCoord, ICoord};
 
 /// Draws a point in a framebuffer.
-/// The point is drawn at position (x, y) of the framebuffer with color.
-pub fn draw_point(framebuffer: &mut dyn FrameBuffer, location: AbsoluteCoord, color: u32) {
-    if framebuffer.contains_coordinate(location) {
-        framebuffer.draw_pixel(location, color);
+/// The point is drawn at the coordinate of the framebuffer with color.
+pub fn draw_point(framebuffer: &mut dyn FrameBuffer, coordinate: AbsoluteCoord, color: u32) {
+    if framebuffer.contains_coordinate(coordinate) {
+        framebuffer.draw_pixel(coordinate, color);
     }
 }
 
 /// Draws a line in a framebuffer. The part exceeding the boundary of the framebuffer will be ignored.
 /// # Arguments
 /// * `framebuffer`: the framebuffer to draw in.
-/// * `(start_x, start_y)`: the start point of the line.
-/// * `(end_x, end_y)`: the end point of the line.
+/// * `start`: the start coordinate of the line.
+/// * `end`: the end coordinate of the line.
 /// * `color`: the color of the line.
 pub fn draw_line(
     framebuffer: &mut dyn FrameBuffer,
@@ -42,9 +42,9 @@ pub fn draw_line(
                 break;
             }
             y = (x - start.x) * height / width + start.y;
-            let location = AbsoluteCoord::new(x as usize, y as usize);
-            if framebuffer.contains_coordinate(location) {
-                framebuffer.draw_pixel(location, color);
+            let coordinate = AbsoluteCoord::new(x as usize, y as usize);
+            if framebuffer.contains_coordinate(coordinate) {
+                framebuffer.draw_pixel(coordinate, color);
             }
             x += step;
         }
@@ -57,9 +57,9 @@ pub fn draw_line(
                 break;
             }
             x = (y - start.y) * width / height + start.x;
-            let location = AbsoluteCoord::new(x as usize, y as usize);
-            if { framebuffer.contains_coordinate(location) } {
-                framebuffer.draw_pixel(location, color);
+            let coordinate = AbsoluteCoord::new(x as usize, y as usize);
+            if { framebuffer.contains_coordinate(coordinate) } {
+                framebuffer.draw_pixel(coordinate, color);
             }
             y += step;
         }
@@ -70,7 +70,7 @@ pub fn draw_line(
 /// The part exceeding the boundary of the framebuffer will be ignored.
 /// # Arguments
 /// * `framebuffer`: the framebuffer to draw in.
-/// * `(start_x, start_y)`: the left top point of the retangle.
+/// * `coordinate`: the left top coordinate of the retangle.
 /// * `width`: the width of the rectangle.
 /// * `height`: the height of the rectangle.
 /// * `color`: the color of the rectangle's border.

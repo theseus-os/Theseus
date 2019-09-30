@@ -2,7 +2,7 @@
 name = "window_manager_generic"
 version = "0.1.0"
 authors = ["Wenqiu Yu <yuwenqiuj@gmail.com>"]
-description = "define a generic window structure"
+description = "define a generic window structure and maintain a window manager of generic windows"
 build = "../../build.rs"
 
 [dependencies]

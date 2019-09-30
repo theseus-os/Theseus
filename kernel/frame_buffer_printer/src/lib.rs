@@ -15,7 +15,7 @@ use frame_buffer::{FrameBuffer, AbsoluteCoord};
 /// Returns (column, line) of the end, i.e. the position of the next symbol.
 /// # Arguments
 /// * `framebuffer`: the framebuffer to display in.
-/// * `(x, y)`: the left top point of the text block.
+/// * `coordinate`: the left top coordinate of the text block.
 /// * `width`: the width of the text block.
 /// * `height`: the height of the text block.
 /// * `slice`: the string to display.
@@ -23,7 +23,7 @@ use frame_buffer::{FrameBuffer, AbsoluteCoord};
 /// * `bg_color`: the background color of the text block.
 pub fn print_by_bytes(
     framebuffer: &mut dyn FrameBuffer,
-    location: AbsoluteCoord,
+    coordinate: AbsoluteCoord,
     width: usize,
     height: usize,
     slice: &str,
@@ -32,7 +32,7 @@ pub fn print_by_bytes(
 ) -> Result<(usize, usize), &'static str> {
     let buffer_width = width / CHARACTER_WIDTH;
     let buffer_height = height / CHARACTER_HEIGHT;
-    let (x, y) = location.value();
+    let (x, y) = coordinate.value();
 
     let mut curr_line = 0;
     let mut curr_column = 0;
@@ -66,8 +66,7 @@ pub fn print_by_bytes(
                 byte,
                 font_color,
                 bg_color,
-                x,
-                y,
+                coordinate,
                 curr_line,
                 curr_column,
             )?;
@@ -100,21 +99,17 @@ pub fn print_by_bytes(
 }
 
 // print a byte to the framebuffer at (line, column) in the text area.
-// (left, top) specifies the location of the text area in the framebuffer.
+// `coordinate` specifies the location of the text area in the framebuffer.
 fn print_byte(
     framebuffer: &mut dyn FrameBuffer,
     byte: u8,
     font_color: u32,
     bg_color: u32,
-    left: usize,
-    top: usize,
+    coordinate: AbsoluteCoord,
     line: usize,
     column: usize,
 ) -> Result<(), &'static str> {
-    let start = AbsoluteCoord::new(
-        left + column * CHARACTER_WIDTH, 
-        top + line * CHARACTER_HEIGHT
-    );
+    let start = coordinate + (column * CHARACTER_WIDTH, line * CHARACTER_HEIGHT);
     let fonts = FONT_PIXEL.lock();
 
     let mut i = 0;

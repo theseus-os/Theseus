@@ -68,15 +68,16 @@ pub struct Terminal {
 /// Privite methods of `Terminal`.
 impl Terminal {
     /// Get the width and height of the text display.
-    fn get_displayable_dimensions(&self, name:&str) -> (usize, usize){
-        if let Some(displayable) = self.window.get_displayable(name){
-            if let Some(text_display) = displayable.downcast_ref::<TextDisplay>() {
-                // return the dimensions only if the displayable is a text displayable
-                return text_display.get_dimensions()
+    fn get_displayable_dimensions(&self, name:&str) -> (usize, usize){        
+        match self.window.get_concrete_display::<TextDisplay>(&name) {
+            Ok(text_display) => {
+                return text_display.get_dimensions();
+            },
+            Err(err) => {
+                debug!("get_displayable_dimensions: {}", err);
+                return (0, 0);
             }
         }
-
-        (0, 0)
     }
 
     /// This function takes in the end index of some index in the scrollback buffer and calculates the starting index of the
@@ -580,27 +581,23 @@ impl Terminal {
         Ok(())
     }
 
-    pub fn blink_cursor(&mut self) -> Result<(), &'static str> {
-        self.display_cursor()
-    }
-
     /// Get a key event from the underlying window.
-    pub fn get_key_event(&self) -> Option<Event> {
-        self.window.get_key_event()
+    pub fn get_event(&self) -> Option<Event> {
+        self.window.get_event()
     }
 
     pub fn get_width_height(&self) -> (usize, usize) {
         self.get_displayable_dimensions(&self.display_name)
     }
 
+    /// Display the cursor of the terminal
     pub fn display_cursor(
         &mut self,
     ) -> Result<(), &'static str> {
         let coordinate = self.window.get_displayable_position(&self.display_name)?;
-        let ((col, line), bg_color) = {
-            let text_display = self.window.get_concrete_display::<TextDisplay>(&self.display_name)?;
-            (text_display.get_next_pos(), text_display.get_bg_color())
-        };
+        let text_display = self.window.get_concrete_display::<TextDisplay>(&self.display_name)?;
+        let (col, line) = text_display.get_next_pos();
+        let bg_color = text_display.get_bg_color();
         text_display::display_cursor(
             &mut self.cursor, 
             AbsoluteCoord(coordinate.inner()), 

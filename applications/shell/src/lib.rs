@@ -1264,7 +1264,7 @@ impl Shell {
         self.redisplay_prompt();
         self.terminal.lock().refresh_display();
         loop {
-            self.terminal.lock().blink_cursor()?;
+            self.terminal.lock().display_cursor()?;
 
             // If there is anything from running applications to be printed, it printed on the screen and then
             // return true, so that the loop continues, otherwise nothing happens and we keep on going with the
@@ -1291,7 +1291,7 @@ impl Shell {
             // Looks at the input queue from the window manager
             // If it has unhandled items, it handles them with the match
             // If it is empty, it proceeds directly to the next loop iteration
-            match self.terminal.lock().get_key_event() {
+            match self.terminal.lock().get_event() {
                 Some(ev) => {
                     match ev {
                         // Returns from the main loop.

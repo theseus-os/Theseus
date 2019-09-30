@@ -31,17 +31,17 @@ pub const WINDOW_INACTIVE_COLOR: u32 = 0x343C37;
 /// The background color of the screen
 pub const SCREEN_BACKGROUND_COLOR: u32 = 0x000000;
 
-/// The window list structure.
+/// The window manager structure.
 /// It contains a list of allocated window and a reference to the active window.
-pub struct WindowList<T: Window> {
+pub struct WindowManager<T: Window> {
     /// The list of inactive windows. Their order is based on the last time they were active. The first window is the window which was active most recently.
     pub background_list: VecDeque<Weak<Mutex<T>>>,
     /// A weak pointer to the active window.
     pub active: Weak<Mutex<T>>,
 }
 
-impl<T: Window> WindowList<T> {
-    /// Adds a new window to the list and actives it.
+impl<T: Window> WindowManager<T> {
+    /// Adds a new window to the list and sets it as active.
     pub fn add_active(
         &mut self,
         inner_ref: &Arc<Mutex<T>>,
@@ -103,7 +103,7 @@ impl<T: Window> WindowList<T> {
         }
     }
 
-    // Actives a window in the background list.
+    // Sets a window in the background list as active.
     // # Arguments
     // * `index`: the index of the window in the background list.
     // * `set_current_back`: whether to keep current active window in the background list. Delete current window if `set_current_back` is false.
@@ -146,7 +146,7 @@ impl<T: Window> WindowList<T> {
         Ok(())
     }
 
-    /// Puts an input event into the active window (i.e. a keypress event, resize event, etc.).
+    /// Puts an event into the active window (i.e. a keypress event, resize event, etc.).
     pub fn send_event_to_active(&mut self, event: Event) -> Result<(), &'static str> {
         let active_ref = self.active.upgrade(); // grabs a pointer to the active WindowInner
         if let Some(window) = active_ref {

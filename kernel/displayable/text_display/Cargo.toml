@@ -2,7 +2,7 @@
 name = "text_display"
 version = "0.1.0"
 authors = ["Wenqiu Yu <yuwenqiuj@gmail.com>"]
-description = "a text display is a block of text which can display in a framebuffer"
+description = "a text display is a block of text which can display onto a framebuffer"
 build = "../../../build.rs"
 
 [dependencies]

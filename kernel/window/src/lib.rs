@@ -13,19 +13,19 @@ use frame_buffer::RelativeCoord;
 
 /// The `Window` trait.
 pub trait Window: Send {
-    /// Cleans the window on the screen including the border and padding.
+    /// Clears the window on the screen including the border and padding.
     fn clear(&self) -> Result<(), &'static str>;
 
-    /// Checks if the pixel (x, y) is within the window exluding the border and padding.
+    /// Checks if the coordinate relative to the window is within the window exluding the border and padding.
     fn contains_coordinate(&self, point: RelativeCoord) -> bool;
 
-    /// Set the window as active or inactive.
+    /// Sets the window as active or not.
     fn set_active(&mut self, active: bool) -> Result<(), &'static str>;
 
     /// Draws the border of the window.
     fn draw_border(&self, color: u32) -> Result<(), &'static str>;
 
-    /// Adjusts the size (width, height) and position (x, y) of a window.
+    /// Adjusts the size (width, height) and coordinate of the window relative to the screen.
     fn resize(
         &mut self,
         coordinate: RelativeCoord,
@@ -36,9 +36,9 @@ pub trait Window: Send {
     /// Gets the size of content without padding.
     fn get_content_size(&self) -> (usize, usize);
 
-    /// Gets the position of content without padding.
+    /// Gets the coordinate of content relative to the window without padding.
     fn get_content_position(&self) -> RelativeCoord;
 
-    /// Gets the producer of key inputs.
+    /// Gets the producer of events.
     fn events_producer(&mut self) -> &mut DFQueueProducer<Event>;
 }

@@ -1,4 +1,4 @@
-//! This crate is a framebuffer compositor.
+//! This crate defines a framebuffer compositor.
 //! A framebuffer compositor will composite a sequence of framebuffers and display them in the final framebuffer.
 
 #![no_std]
@@ -34,7 +34,7 @@ pub struct FrameCompositor {
     cache: BTreeMap<u64, BufferCache>,
 }
 
-// The information of a cached framebuffer. It contains the position and size of the framebuffer.
+// The information of a cached framebuffer. It contains the location and size of the framebuffer.
 struct BufferCache {
     coordinate: ICoord,
     width: usize,
@@ -42,7 +42,7 @@ struct BufferCache {
 }
 
 impl BufferCache {
-    // checks if the pixel is within the framebuffer
+    // checks if the coordinate is within the framebuffer
     fn contains_coordinate(&self, coordinate: ICoord) -> bool {
         return coordinate.x >= self.coordinate.x
             && coordinate.x <= self.coordinate.x + self.width as i32

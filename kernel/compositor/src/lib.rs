@@ -17,12 +17,12 @@ pub trait Compositor {
     /// # Arguments
     ///
     /// * `bufferlist` - A list of buffers in the form of (buffer:T, coordinate: ICoord).
-    /// For each tuple in the list, `buffer` is a buffer object to be composited. `location` specifies the relative location of the buffer in the final buffer.
+    /// For each tuple in the list, `buffer` is a buffer object to be composited. `coordinate` specifies the relative location of the buffer in the final buffer.
     fn composite(
         &mut self,
         bufferlist: Vec<(&dyn FrameBuffer, ICoord)>,
     ) -> Result<(), &'static str>;
 
-    /// Checks if a buffer at (x, y) is already updated.
+    /// Checks if a buffer at (x, y) is already cached since last updating.
     fn cached(&self, buffer: &dyn FrameBuffer, coordinate: ICoord) -> bool;
 }

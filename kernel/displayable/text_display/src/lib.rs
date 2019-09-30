@@ -1,7 +1,7 @@
-//! This crate defines text displayable.
-//! A text displayable profiles a block of text to be displayed in a framebuffer.
+//! This crate defines a text displayable.
+//! A text displayable profiles a block of text to be displayed onto a framebuffer.
 //!
-//! This crate also defines a cursor structure. A cursor is a special symbol which can be displayed within a text displayable. The structure specifies the size and blink frequency and implement the blink method for a cursor.
+//! This crate also defines a cursor structure. A cursor is a special symbol which can be displayed. The structure specifies the size and blink frequency and implements the blink method for a cursor. It also provides a display function for the cursor.
 
 #![no_std]
 
@@ -11,7 +11,6 @@ extern crate frame_buffer;
 extern crate frame_buffer_drawer;
 extern crate frame_buffer_printer;
 extern crate tsc;
-
 extern crate displayable;
 
 use alloc::string::String;
@@ -65,7 +64,7 @@ impl Displayable for TextDisplay {
 }
 
 impl TextDisplay {
-    /// Create a new text displayable.
+    /// Creates a new text displayable.
     /// # Arguments
     /// * `(width, height)`: the size of the text area.
     /// * `(fg_color, bg_color)`: the foreground and background color of the text area.
@@ -91,7 +90,7 @@ impl TextDisplay {
         self.text = String::from(text);
     }
 
-    /// Gets the dimensions of the text area to display
+    /// Gets the dimensions of the text area to display.
     pub fn get_dimensions(&self) -> (usize, usize) {
         (self.width / CHARACTER_WIDTH, self.height / CHARACTER_HEIGHT)
     }
@@ -109,7 +108,7 @@ impl TextDisplay {
 
 /// A cursor structure. It contains whether it is enabled,
 /// the frequency it blinks, the last time it blinks, the current blink state show/hidden, and its color.
-/// A cursor is a special symbol which can be displayed within a text displayable.
+/// A cursor is a special symbol which can be displayed.
 pub struct Cursor {
     enabled: bool,
     freq: u64,
@@ -148,6 +147,7 @@ impl Cursor {
     }
 
     /// Changes the blink state show/hidden of a cursor based on its frequency. An application calls this function in a loop.
+    /// It returns whether the cursor should be re-display. If the cursor is enabled, it returns whether the show/hidden state has been changed. Otherwise it returns true because the cursor is disabled and should refresh.
     pub fn blink(&mut self) -> bool {
         if self.enabled {
             let time = tsc_ticks();
@@ -176,7 +176,7 @@ impl Cursor {
 /// * `coordinate`: the coordinate of the text area in the framebuffer.
 /// * `(col, line):` the position of the cursor in the text area.
 /// * bg_color: the background color of the area if the cursor is hidden.
-/// * `framebuffer:` the framebuffer to display in.
+/// * `framebuffer:` the framebuffer to display onto.
 pub fn display_cursor(
     cursor: &mut Cursor,
     coordinate: AbsoluteCoord,

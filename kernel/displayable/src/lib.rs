@@ -1,5 +1,5 @@
 //! This crate defines a trait of Displayable.
-//! A displayable is a block of content. It can display itself in a framebuffer.
+//! A displayable is a block of content. It can display itself onto a framebuffer.
 
 #![no_std]
 
@@ -16,8 +16,8 @@ use frame_buffer::{FrameBuffer, AbsoluteCoord};
 pub trait Displayable: Downcast + Send {
     /// Displays in a framebuffer.
     /// # Arguments
-    /// * `location`: the absolute location to display in the framebuffer.
-    /// * `framebuffer`: the framebuffer to display in.
+    /// * `coordinate`: the absolute location to display onto the framebuffer.
+    /// * `framebuffer`: the framebuffer to display onto.
     fn display(
         &mut self,
         coordinate: AbsoluteCoord,

@@ -1,5 +1,7 @@
 //! This crate defines a `WindowGeneric` structure. This structure contains a `WindowInner` structure which implements the `Window` trait.
 //!
+//! This crate holds a instance of a window manager which maintains a list of `WindowGeneric`s.
+//!
 //! The `new_window` function creates a new `WindowGeneric` object and adds its inner object to the window manager. The outer `WindowGeneric` object will be returned to the application who creates the window.
 //!
 //! When a window is dropped, its inner object will be deleted from the window manager.
@@ -41,7 +43,7 @@ use spin::{Mutex, Once};
 use window::Window;
 use window_manager::{
     SCREEN_BACKGROUND_COLOR, WINDOW_ACTIVE_COLOR,
-    WINDOW_INACTIVE_COLOR, WINDOW_MARGIN, WINDOW_PADDING, WindowList
+    WINDOW_INACTIVE_COLOR, WINDOW_MARGIN, WINDOW_PADDING, WindowManager
 };
 
 /// A framebuffer owned by the window manager.
@@ -59,9 +61,9 @@ pub fn init() -> Result<(), &'static str> {
 }
 
 lazy_static! {
-    /// The list of all windows in the system.
-    pub static ref WINDOWLIST: Mutex<WindowList<WindowInner>> = Mutex::new(
-        WindowList{
+    /// A window manager which maintains a list of generic windows.
+    pub static ref WINDOW_MANAGER_GENERIC: Mutex<WindowManager<WindowInner>> = Mutex::new(
+        WindowManager{
             background_list: VecDeque::new(),
             active: Weak::new(),
         }
@@ -186,30 +188,36 @@ impl<Buffer: FrameBuffer> WindowGeneric<Buffer> {
         )])
     }
 
+    /// Gets a reference to a displayable of type `T` which implements the `Displayable` trait by its name. Returns error if the displayable is not of type `T` or does not exist.
     pub fn get_concrete_display<T: Displayable>(&self, display_name: &str) -> Result<&T, &'static str> {
-        let component = self.components.get(display_name).ok_or("")?;
-        let displayable = component.get_displayable();
-        if let Some(concrete_display) = displayable.downcast_ref::<T>() {
-            return Ok(concrete_display)
+        if let Some(component) = self.components.get(display_name) {
+            let displayable = component.get_displayable();
+            if let Some(concrete_display) = displayable.downcast_ref::<T>() {
+                return Ok(concrete_display)
+            } else {
+                return Err("The displayable is not of this type");
+            }
         } else {
-            return Err("The displayable is not a text displayable");
+            return Err("The displayable does not exist");
         }
-    
     }
 
+    /// Gets a mutable reference to a displayable of type `T` which implements the `Displayable` trait by its name. Returns error if the displayable is not of type `T` or does not exist.
     pub fn get_concrete_display_mut<T: Displayable>(&mut self, display_name: &str) -> Result<&mut T, &'static str> {
-        let component = self.components.get_mut(display_name).ok_or("")?;
-        let displayable = component.get_displayable_mut();
-        if let Some(concrete_display) = displayable.downcast_mut::<T>() {
-            return Ok(concrete_display)
+        if let Some(component) = self.components.get_mut(display_name) {
+            let displayable = component.get_displayable_mut();
+            if let Some(concrete_display) = displayable.downcast_mut::<T>() {
+                return Ok(concrete_display)
+            } else {
+                return Err("The displayable is not of this type");
+            }
         } else {
-            return Err("The displayable is not a text displayable");
+            return Err("The displayable does not exist");
         }
-    
     }
 
 
-    /// Prints a string in the window with a text displayable by its name.
+    /// Display a displayable in the window by its name.
     pub fn display(&mut self, display_name: &str) -> Result<(), &'static str> {
         let component = self.components.get_mut(display_name).ok_or("")?;
         let coordinate = component.get_position();
@@ -222,7 +230,7 @@ impl<Buffer: FrameBuffer> WindowGeneric<Buffer> {
     }
 
     // @Andrew
-    /// Resizes a window as (width, height) at (x, y).
+    /// Resizes a window as (width, height) at coordinate.
     pub fn resize(
         &mut self,
         coordinate: RelativeCoord,
@@ -263,8 +271,8 @@ impl<Buffer: FrameBuffer> WindowGeneric<Buffer> {
         }
     }
 
-    /// Gets a key event of the window.
-    pub fn get_key_event(&self) -> Option<Event> {
+    /// Gets a event of the window.
+    pub fn get_event(&self) -> Option<Event> {
         let event_opt = self.consumer.peek();
         if let Some(event) = event_opt {
             event.mark_completed();
@@ -277,7 +285,7 @@ impl<Buffer: FrameBuffer> WindowGeneric<Buffer> {
 }
 
 /// Creates a new window. Currently the window is of `FrameBufferRGB`. In the future we will be able to create a window of any structure which implements `FrameBuffer`.
-/// (x, y) specify the coordinates of the top left corner of the window.
+/// `coordinate` specifies the coordinates relative to the top left corner of the window.
 /// (width, height) specify the size of the new window.
 pub fn new_window(
     coordinate: RelativeCoord,
@@ -318,7 +326,7 @@ pub fn new_window(
     // add the new window and active it
     // initialize the content of the new window
     inner_ref.lock().clear()?;
-    WINDOWLIST.lock().add_active(&inner_ref)?;
+    WINDOW_MANAGER_GENERIC.lock().add_active(&inner_ref)?;
 
     // return the window object
     let window: WindowGeneric<FrameBufferRGB> = WindowGeneric {
@@ -436,7 +444,7 @@ impl Window for WindowInner {
     }
 }
 
-/// A component contains a displayable and its position.
+/// A component contains a displayable and its coordinate.
 pub struct Component {
     coordinate: RelativeCoord,
     displayable: Box<dyn Displayable>,
@@ -453,7 +461,7 @@ impl Component {
         return &mut (self.displayable);
     }
 
-    // gets the position of the displayable
+    // gets the coordinate of the displayable relative to the window
     fn get_position(&self) -> RelativeCoord {
         self.coordinate
     }
@@ -478,7 +486,7 @@ fn get_border_color(active: bool) -> u32 {
 // delete the reference of a window in the manager when a window is dropped.
 /*impl<Buffer: FrameBuffer> Drop for WindowGeneric<Buffer> {
     fn drop(&mut self) {
-        let mut window_list = WINDOWLIST.lock();
+        let mut window_list = WINDOW_MANAGER_GENERIC.lock();
 
         // Switches to a new active window and sets
         // the active pointer field of the window allocator to the new active window

@@ -65,5 +65,5 @@
 //! * `vfs_node`: contains the structs VFSDirectory and VFSFile, which are the most basic, generic implementers of the traits Directory and File
 //! * `vga_buffer`: Simple routines for printing to the screen using the x86 VGA buffer text mode.
 //! * `window`: Defines a trait for window.
-//! * `window_generic`: Defines a generic window structure which implements the Window trait.
-//! * `window_manager`: Maintains a list of existing windows.
+//! * `window_manager`: Provides a structure of window manager.
+//! * `window_manager_generic`: Defines a generic window structure which implements the Window trait. Maintains a window manager which contains a list of generic window. 
