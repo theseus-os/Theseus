@@ -96,40 +96,14 @@ impl TextDisplay {
         (self.width / CHARACTER_WIDTH, self.height / CHARACTER_HEIGHT)
     }
 
-    /// Display a cursor within the text displayable.
-    /// # Arguments
-    /// * `cursor`: the cursor to display.
-    /// * `coordinate`: the coordinate of the displayable in the framebuffer.
-    /// * `(col, line):` the position of the cursor in the text displayable.
-    /// * `framebuffer:` the framebuffer to display in.
-    pub fn display_cursor(
-        &mut self,
-        cursor: &mut Cursor,
-        coordinate: AbsoluteCoord,
-        col: usize,
-        line: usize,
-        framebuffer: &mut dyn FrameBuffer,
-    ) {
-        if cursor.blink() {
-            let color = if cursor.show() {
-                cursor.color
-            } else {
-                self.bg_color
-            };
-            
-            frame_buffer_drawer::fill_rectangle(
-                framebuffer,
-                coordinate + (col * CHARACTER_WIDTH, line * CHARACTER_HEIGHT),
-                CHARACTER_WIDTH,
-                CHARACTER_HEIGHT,
-                color,
-            );
-        }
-    }
-
     /// Gets the (column, line) position of the next symbol.
     pub fn get_next_pos(&self) -> (usize, usize) {
         (self.next_col, self.next_line)
+    }
+
+    /// Gets the background color of the text area
+    pub fn get_bg_color(&self) -> u32 {
+        self.bg_color
     }
 }
 
@@ -193,5 +167,37 @@ impl Cursor {
     /// Checks if the cursor should be shown.
     pub fn show(&self) -> bool {
         self.enabled && self.show
+    }
+}
+
+/// Display a cursor in a frame buffer.
+/// # Arguments
+/// * `cursor`: the cursor to display.
+/// * `coordinate`: the coordinate of the displayable in the framebuffer.
+/// * `(col, line):` the position of the cursor in the text displayable.
+/// * bg_color: the background color of the area if the cursor is hidden.
+/// * `framebuffer:` the framebuffer to display in.
+pub fn display_cursor(
+    cursor: &mut Cursor,
+    coordinate: AbsoluteCoord,
+    col: usize,
+    line: usize,
+    bg_color: u32,
+    framebuffer: &mut dyn FrameBuffer,
+) {
+    if cursor.blink() {
+        let color = if cursor.show() {
+            cursor.color
+        } else {
+            bg_color
+        };
+        
+        frame_buffer_drawer::fill_rectangle(
+            framebuffer,
+            coordinate + (col * CHARACTER_WIDTH, line * CHARACTER_HEIGHT),
+            CHARACTER_WIDTH,
+            CHARACTER_HEIGHT,
+            color,
+        );
     }
 }

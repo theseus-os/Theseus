@@ -190,53 +190,39 @@ impl<Buffer: FrameBuffer> WindowGeneric<Buffer> {
         )])
     }
 
-    /// Prints a string in the window with a text displayable by its name.
-    pub fn display_string(&mut self, display_name: &str, slice: &str) -> Result<(), &'static str> {
-        let component = self.components.get_mut(display_name).ok_or("")?;
-        let coordinate = component.get_position();
-        let displayable = component.get_displayable_mut();
-
-        /* Optimization: if current string is the prefix of the new string, just print the appended characters. */
-
-        if let Some(text_display) = displayable.downcast_mut::<TextDisplay>() {
-            text_display.set_text(slice);
-            text_display.display(
-                AbsoluteCoord(coordinate.inner()), 
-                &mut self.framebuffer
-            )?;
-            self.render()?;
+    pub fn get_concrete_display<T: Displayable>(&self, display_name: &str) -> Result<&T, &'static str> {
+        let component = self.components.get(display_name).ok_or("")?;
+        let displayable = component.get_displayable();
+        if let Some(concrete_display) = displayable.downcast_ref::<T>() {
+            return Ok(concrete_display)
         } else {
             return Err("The displayable is not a text displayable");
         }
-
-        Ok(())
+    
     }
 
-    /// Displays a cursor in the window with a text displayable by its name.
-    pub fn display_end_cursor(
-        &mut self,
-        cursor: &mut Cursor,
-        display_name: &str,
-    ) -> Result<(), &'static str> {
+    pub fn get_concrete_display_mut<T: Displayable>(&mut self, display_name: &str) -> Result<&mut T, &'static str> {
         let component = self.components.get_mut(display_name).ok_or("")?;
-        let coordinate = component.get_position();
         let displayable = component.get_displayable_mut();
-
-        if let Some(text_display) = displayable.downcast_mut::<TextDisplay>() {
-            let (col, line) = text_display.get_next_pos();
-            text_display.display_cursor(
-                cursor, 
-                AbsoluteCoord(coordinate.inner()), 
-                col, 
-                line, 
-                &mut self.framebuffer
-            );
-            self.render()?;
+        if let Some(concrete_display) = displayable.downcast_mut::<T>() {
+            return Ok(concrete_display)
         } else {
             return Err("The displayable is not a text displayable");
         }
+    
+    }
 
-        Ok(())
+
+    /// Prints a string in the window with a text displayable by its name.
+    pub fn display(&mut self, display_name: &str) -> Result<(), &'static str> {
+        let component = self.components.get_mut(display_name).ok_or("")?;
+        let coordinate = component.get_position();
+        let displayable = component.get_displayable_mut();
+        displayable.display(
+            AbsoluteCoord(coordinate.inner()), 
+            &mut self.framebuffer
+        )?;
+        self.render()
     }
 
     // @Andrew
