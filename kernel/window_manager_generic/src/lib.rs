@@ -61,7 +61,7 @@ pub fn init() -> Result<(), &'static str> {
 }
 
 lazy_static! {
-    /// A window manager which maintains a list of generic windows.
+    /// A window manager which maintains a list of window profiles.
     pub static ref WINDOW_MANAGER_GENERIC: Mutex<WindowManager<WindowProfile>> = Mutex::new(
         WindowManager{
             background_list: VecDeque::new(),
@@ -285,7 +285,7 @@ impl<Buffer: FrameBuffer> WindowGeneric<Buffer> {
 }
 
 /// Creates a new window. Currently the window is of `FrameBufferRGB`. In the future we will be able to create a window of any structure which implements `FrameBuffer`.
-/// `coordinate` specifies the coordinate relative to the top left corner of the window.
+/// `coordinate` specifies the coordinate of the window relative to the screen.
 /// (width, height) specify the size of the new window.
 pub fn new_window(
     coordinate: RelativeCoord,
