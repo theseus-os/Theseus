@@ -68,7 +68,9 @@ pub struct UCoord {
 /// The signed coordinate of a point.
 #[derive(Clone, Copy, PartialEq)]
 pub struct ICoord {
+    /// The x coordinate
     pub x: i32,
+    /// The y coordinate
     pub y: i32,
 }
 

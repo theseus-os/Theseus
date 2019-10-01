@@ -23,6 +23,6 @@ pub trait Compositor {
         bufferlist: Vec<(&dyn FrameBuffer, ICoord)>,
     ) -> Result<(), &'static str>;
 
-    /// Checks if a buffer at (x, y) is already cached since last updating.
+    /// Checks if a buffer at coordinate is already cached since last updating.
     fn cached(&self, buffer: &dyn FrameBuffer, coordinate: ICoord) -> bool;
 }

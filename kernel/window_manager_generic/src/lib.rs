@@ -1,10 +1,10 @@
 //! This crate defines a `WindowGeneric` structure. This structure contains a `WindowProfile` structure which implements the `Window` trait.
 //!
-//! This crate holds a instance of a window manager which maintains a list of `WindowGeneric`s.
+//! This crate holds a instance of a window manager which maintains a list of `WindowProfile`s.
 //!
-//! The `new_window` function creates a new `WindowGeneric` object and adds its inner object to the window manager. The outer `WindowGeneric` object will be returned to the application who creates the window.
+//! The `new_window` function creates a new `WindowGeneric` object and adds its profile object to the window manager. The outer `WindowGeneric` object will be returned to the application who creates the window.
 //!
-//! When a window is dropped, its inner object will be deleted from the window manager.
+//! When a window is dropped, its profile object will be deleted from the window manager.
 
 #![no_std]
 
@@ -73,8 +73,8 @@ lazy_static! {
 /// A window contains a reference to its inner reference owned by the window manager,
 /// a consumer of inputs, a list of displayables and a framebuffer.
 pub struct WindowGeneric<Buffer: FrameBuffer> {
-    /// The inner object of the window.
-    pub inner: Arc<Mutex<WindowProfile>>,
+    /// The profile object of the window.
+    pub profile: Arc<Mutex<WindowProfile>>,
     /// The key input consumer.
     pub consumer: DFQueueConsumer<Event>,
     /// The components in the window.
@@ -86,7 +86,7 @@ pub struct WindowGeneric<Buffer: FrameBuffer> {
 impl<Buffer: FrameBuffer> WindowGeneric<Buffer> {
     /// Clears the content of a window. The border and padding of the window remain showing.
     pub fn clear(&mut self) -> Result<(), &'static str> {
-        let (width, height) = self.inner.lock().get_content_size();
+        let (width, height) = self.profile.lock().get_content_size();
         fill_rectangle(
             &mut self.framebuffer,
             AbsoluteCoord::new(0, 0),
@@ -100,8 +100,8 @@ impl<Buffer: FrameBuffer> WindowGeneric<Buffer> {
     /// Returns the content dimensions of this window,
     /// as a tuple of `(width, height)`. It does not include the padding.
     pub fn dimensions(&self) -> (usize, usize) {
-        let inner_locked = self.inner.lock();
-        inner_locked.get_content_size()
+        let profile_locked = self.profile.lock();
+        profile_locked.get_content_size()
     }
 
     /// Adds a new displayable at `coordinate` relative to the window.
@@ -114,12 +114,12 @@ impl<Buffer: FrameBuffer> WindowGeneric<Buffer> {
     ) -> Result<(), &'static str> {
         let key = key.to_string();
         let (width, height) = displayable.get_size();
-        let inner = self.inner.lock();
+        let profile = self.profile.lock();
 
-        if !inner.contains_coordinate(coordinate)
-            || !inner.contains_coordinate(coordinate + (width, 0))
-            || !inner.contains_coordinate(coordinate + (0, height))
-            || !inner.contains_coordinate(coordinate + (width, height))
+        if !profile.contains_coordinate(coordinate)
+            || !profile.contains_coordinate(coordinate + (width, 0))
+            || !profile.contains_coordinate(coordinate + (0, height))
+            || !profile.contains_coordinate(coordinate + (width, height))
         {
             return Err("The displayable does not fit the window size.");
         }
@@ -172,12 +172,12 @@ impl<Buffer: FrameBuffer> WindowGeneric<Buffer> {
 
     /// Gets the content position relative to the window excluding border and padding relative.
     pub fn get_content_position(&self) -> RelativeCoord {
-        self.inner.lock().get_content_position()
+        self.profile.lock().get_content_position()
     }
 
     /// Renders the content of the window to the screen.
     pub fn render(&mut self) -> Result<(), &'static str> {
-        let (window_x, window_y) = { self.inner.lock().get_content_position().value() };
+        let (window_x, window_y) = { self.profile.lock().get_content_position().value() };
         let coordinate = ICoord {
             x: window_x as i32,
             y: window_y as i32,
@@ -248,8 +248,8 @@ impl<Buffer: FrameBuffer> WindowGeneric<Buffer> {
         // }
 
         self.clear()?;
-        let mut inner = self.inner.lock();
-        match inner.resize(coordinate, width, height) {
+        let mut profile = self.profile.lock();
+        match profile.resize(coordinate, width, height) {
             Ok(percent) => {
                 for (_key, item) in self.components.iter_mut() {
                     let (x, y) = item.get_position().value();
@@ -264,7 +264,7 @@ impl<Buffer: FrameBuffer> WindowGeneric<Buffer> {
                     );
                 }
                 let (x, y) = coordinate.value();
-                inner.events_producer().enqueue(Event::new_resize_event(x, y, width, height));
+                profile.events_producer().enqueue(Event::new_resize_event(x, y, width, height));
                 Ok(())
             }
             Err(err) => Err(err),
@@ -305,7 +305,7 @@ pub fn new_window(
         height - 2 * WINDOW_PADDING,
         None,
     )?;
-    let inner = WindowProfile {
+    let profile = WindowProfile {
         coordinate: coordinate,
         width: width,
         height: height,
@@ -321,16 +321,16 @@ pub fn new_window(
     //     return Err("Request area is already allocated");
     // }
 
-    let inner_ref = Arc::new(Mutex::new(inner));
+    let profile_ref = Arc::new(Mutex::new(profile));
 
     // add the new window and active it
     // initialize the content of the new window
-    inner_ref.lock().clear()?;
-    WINDOW_MANAGER_GENERIC.lock().add_active(&inner_ref)?;
+    profile_ref.lock().clear()?;
+    WINDOW_MANAGER_GENERIC.lock().add_active(&profile_ref)?;
 
     // return the window object
     let window: WindowGeneric<FrameBufferRGB> = WindowGeneric {
-        inner: inner_ref,
+        profile: profile_ref,
         consumer: consumer,
         components: BTreeMap::new(),
         framebuffer: framebuffer,
@@ -364,7 +364,7 @@ pub struct WindowProfile {
     pub active: bool,
     /// the padding outside the content of the window including the border.
     pub padding: usize,
-    /// the producer accepting a key event
+    /// the producer accepting an event, i.e. a keypress event, resize event, etc.
     pub events_producer: DFQueueProducer<Event>,
 }
 
