@@ -43,9 +43,13 @@ fn panic_entry_point(info: &PanicInfo) -> ! {
             // We must make sure to not hold any locks when invoking the panic_wrapper function.
             fn invoke_panic_wrapper(info: &PanicInfo) -> Result<(), &'static str> {
                 type PanicWrapperFunc = fn(&PanicInfo) -> Result<(), &'static str>;
-                let section_ref = mod_mgmt::get_default_namespace()
-                    .and_then(|namespace| namespace.get_symbol_starting_with("panic_wrapper::panic_wrapper::").upgrade())
-                    .ok_or("Couldn't get single symbol matching \"panic_wrapper::panic_wrapper\"")?;
+                const PANIC_WRAPPER_SYMBOL: &'static str = "panic_wrapper::panic_wrapper::";
+                let section_ref = {
+                    task::get_my_current_task().map(|t| t.get_namespace()).as_ref()
+                        .or_else(|| mod_mgmt::get_default_namespace())
+                        .and_then(|namespace| namespace.get_symbol_starting_with(PANIC_WRAPPER_SYMBOL).upgrade())
+                        .ok_or("Couldn't get single symbol matching \"panic_wrapper::panic_wrapper::\"")?
+                };
                 let (mapped_pages, mapped_pages_offset) = { 
                     let section = section_ref.lock();
                     (section.mapped_pages.clone(), section.mapped_pages_offset)
@@ -112,9 +116,13 @@ extern "C" fn _Unwind_Resume(arg: usize) -> ! {
         // We must make sure to not hold any locks when invoking the function.
         fn invoke_unwind_resume(arg: usize) -> Result<(), &'static str> {
             type UnwindResumeFunc = unsafe fn(usize) -> !;
-            let section_ref = mod_mgmt::get_default_namespace()
-                .and_then(|namespace| namespace.get_symbol_starting_with("unwind::unwind_resume::").upgrade())
-                .ok_or("Couldn't get single symbol matching \"unwind::unwind_resume\"")?;
+            const UNWIND_RESUME_SYMBOL: &'static str = "unwind::unwind_resume::";
+            let section_ref = {
+                task::get_my_current_task().map(|t| t.get_namespace()).as_ref()
+                    .or_else(|| mod_mgmt::get_default_namespace())
+                    .and_then(|namespace| namespace.get_symbol_starting_with(UNWIND_RESUME_SYMBOL).upgrade())
+                    .ok_or("Couldn't get single symbol matching \"unwind::unwind_resume::\"")?
+            };
             let (mapped_pages, mapped_pages_offset) = { 
                 let section = section_ref.lock();
                 (section.mapped_pages.clone(), section.mapped_pages_offset)
