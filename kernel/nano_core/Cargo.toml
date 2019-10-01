@@ -54,9 +54,6 @@ path = "../panic_entry"
 path = "../vga_buffer"
 
 
-[features]
-loadable = []
-
 
 [lib]
 # staticlib is required to build a self-contained, fully-linked .a file 
