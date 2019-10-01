@@ -134,7 +134,7 @@ impl RelativeCoord {
 
     #[inline]
     /// Returns the inner unsigned coordinate of the relative coordinate
-    pub fn inner(&self) -> UCoord {
+    pub fn to_ucoord(&self) -> UCoord {
         self.0
     } 
 }

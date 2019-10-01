@@ -600,7 +600,7 @@ impl Terminal {
         let bg_color = text_display.get_bg_color();
         text_display::display_cursor(
             &mut self.cursor, 
-            AbsoluteCoord(coordinate.inner()), 
+            AbsoluteCoord(coordinate.to_ucoord()), 
             col, 
             line,
             bg_color,

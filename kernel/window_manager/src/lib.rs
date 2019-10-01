@@ -148,7 +148,7 @@ impl<T: Window> WindowManager<T> {
 
     /// Puts an event into the active window (i.e. a keypress event, resize event, etc.).
     pub fn send_event_to_active(&mut self, event: Event) -> Result<(), &'static str> {
-        let active_ref = self.active.upgrade(); // grabs a pointer to the active WindowInner
+        let active_ref = self.active.upgrade(); // grabs a pointer to the active WindowProfile
         if let Some(window) = active_ref {
             let mut window = window.lock();
             window.events_producer().enqueue(event);
@@ -156,7 +156,7 @@ impl<T: Window> WindowManager<T> {
         Ok(())
     }
     /*// check if an area specified by (x, y, width, height) overlaps with an existing window
-    fn check_overlap(&mut self, inner:&Arc<Mutex<WindowInner>>, x:usize, y:usize, width:usize, height:usize) -> bool {
+    fn check_overlap(&mut self, inner:&Arc<Mutex<WindowProfile>>, x:usize, y:usize, width:usize, height:usize) -> bool {
         let mut len = self.allocated.len();
         let mut i = 0;
         while i < len {
@@ -184,7 +184,7 @@ impl<T: Window> WindowManager<T> {
     }
 
     // return a reference to the next window of current active window
-    fn next(&mut self) -> Option<Arc<Mutex<WindowInner>>> {
+    fn next(&mut self) -> Option<Arc<Mutex<WindowProfile>>> {
         // let mut current_active = false;
         // for item in self.list.iter_mut(){
         //     let reference = item.upgrade();

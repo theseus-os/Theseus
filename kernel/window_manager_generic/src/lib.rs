@@ -1,4 +1,4 @@
-//! This crate defines a `WindowGeneric` structure. This structure contains a `WindowInner` structure which implements the `Window` trait.
+//! This crate defines a `WindowGeneric` structure. This structure contains a `WindowProfile` structure which implements the `Window` trait.
 //!
 //! This crate holds a instance of a window manager which maintains a list of `WindowGeneric`s.
 //!
@@ -62,7 +62,7 @@ pub fn init() -> Result<(), &'static str> {
 
 lazy_static! {
     /// A window manager which maintains a list of generic windows.
-    pub static ref WINDOW_MANAGER_GENERIC: Mutex<WindowManager<WindowInner>> = Mutex::new(
+    pub static ref WINDOW_MANAGER_GENERIC: Mutex<WindowManager<WindowProfile>> = Mutex::new(
         WindowManager{
             background_list: VecDeque::new(),
             active: Weak::new(),
@@ -74,7 +74,7 @@ lazy_static! {
 /// a consumer of inputs, a list of displayables and a framebuffer.
 pub struct WindowGeneric<Buffer: FrameBuffer> {
     /// The inner object of the window.
-    pub inner: Arc<Mutex<WindowInner>>,
+    pub inner: Arc<Mutex<WindowProfile>>,
     /// The key input consumer.
     pub consumer: DFQueueConsumer<Event>,
     /// The components in the window.
@@ -223,7 +223,7 @@ impl<Buffer: FrameBuffer> WindowGeneric<Buffer> {
         let coordinate = component.get_position();
         let displayable = component.get_displayable_mut();
         displayable.display(
-            AbsoluteCoord(coordinate.inner()), 
+            AbsoluteCoord(coordinate.to_ucoord()), 
             &mut self.framebuffer
         )?;
         self.render()
@@ -305,7 +305,7 @@ pub fn new_window(
         height - 2 * WINDOW_PADDING,
         None,
     )?;
-    let inner = WindowInner {
+    let inner = WindowProfile {
         coordinate: coordinate,
         width: width,
         height: height,
@@ -353,7 +353,7 @@ pub fn new_default_window() -> Result<WindowGeneric<FrameBufferRGB>, &'static st
 }
 
 /// The structure is owned by the window manager. It contains the information of a window but under the control of the manager
-pub struct WindowInner {
+pub struct WindowProfile {
     /// the coordinate of the window relative to the screen
     pub coordinate: RelativeCoord,
     /// the width of the window
@@ -368,7 +368,7 @@ pub struct WindowInner {
     pub events_producer: DFQueueProducer<Event>,
 }
 
-impl Window for WindowInner {
+impl Window for WindowProfile {
     fn clear(&self) -> Result<(), &'static str> {
         let buffer_ref = match DESKTOP_FRAME_BUFFER.try() {
             Some(buffer) => buffer,
@@ -378,7 +378,7 @@ impl Window for WindowInner {
         let buffer = buffer_lock.deref_mut();
         draw_rectangle(
             buffer,
-            AbsoluteCoord(self.coordinate.inner()),
+            AbsoluteCoord(self.coordinate.to_ucoord()),
             self.width,
             self.height,
             SCREEN_BACKGROUND_COLOR,
@@ -405,7 +405,7 @@ impl Window for WindowInner {
         };
         let mut buffer_lock = buffer_ref.lock();
         let buffer = buffer_lock.deref_mut();
-        draw_rectangle(buffer, AbsoluteCoord(self.coordinate.inner()), self.width, self.height, color);
+        draw_rectangle(buffer, AbsoluteCoord(self.coordinate.to_ucoord()), self.width, self.height, color);
         let coordinate = ICoord { x: 0, y: 0 };
         FRAME_COMPOSITOR.lock().composite(vec![(buffer, coordinate)])
     }
