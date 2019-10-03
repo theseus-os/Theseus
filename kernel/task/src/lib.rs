@@ -42,8 +42,8 @@ extern crate environment;
 extern crate root;
 extern crate x86_64;
 extern crate spin;
-extern crate fs_node;
 extern crate pause;
+extern crate kernel_config;
 
 
 
@@ -61,18 +61,21 @@ use alloc::{
 use pause::spin_loop_hint;
 
 use irq_safety::{MutexIrqSafe, MutexIrqSafeGuardRef, MutexIrqSafeGuardRefMut, interrupts_enabled};
-use memory::{Stack, MappedPages, PageRange, EntryFlags, MemoryManagementInfo, VirtualAddress};
+use memory::{Stack, MappedPages, PageRange, EntryFlags, MmiRef, VirtualAddress};
+use kernel_config::memory::KERNEL_STACK_SIZE_IN_PAGES;
 use atomic_linked_list::atomic_map::AtomicMap;
 use tss::tss_set_rsp0;
-use mod_mgmt::metadata::StrongCrateRef;
+use mod_mgmt::{
+    CrateNamespace,
+    metadata::StrongCrateRef,
+};
 use environment::Environment;
 use spin::Mutex;
 use x86_64::registers::msr::{rdmsr, wrmsr, IA32_FS_BASE};
-use fs_node::DirRef;
 
 
 /// The signature of the callback function that can hook into receiving a panic. 
-pub type PanicHandler = Box<Fn(&PanicInfoOwned) + Send>;
+pub type PanicHandler = Box<dyn Fn(&PanicInfo) + Send>;
 
 /// Just like `core::panic::PanicInfo`, but with owned String types instead of &str references.
 #[derive(Debug, Clone)]
@@ -151,7 +154,7 @@ pub enum ExitValue {
     /// The Task ran to completion and returned the enclosed `Any` value.
     /// The caller of this type should know what type this Task returned,
     /// and should therefore be able to downcast it appropriately.
-    Completed(Box<Any + Send>),
+    Completed(Box<dyn Any + Send>),
     /// The Task did NOT run to completion, and was instead killed.
     /// The reason for it being killed is enclosed. 
     Killed(KillReason),
@@ -217,13 +220,13 @@ pub struct Task {
     /// the virtual address of (a pointer to) the `TaskLocalData` struct, which refers back to this `Task` struct.
     task_local_data_ptr: VirtualAddress,
     /// Data that should be dropped after a task switch; for example, the previous Task's TaskLocalData.
-    drop_after_task_switch: Option<Box<Any + Send>>,
-    /// memory management details: page tables, mappings, allocators, etc.
-    /// Wrapped in an Arc & Mutex because it's shared between all other tasks in the same address space
-    pub mmi: Option<Arc<MutexIrqSafe<MemoryManagementInfo>>>, 
-    /// the kernelspace stack.  Wrapped in Option<> so we can initialize it to None.
-    pub kstack: Option<Stack>,
-    /// the userspace stack.  Wrapped in Option<> so we can initialize it to None.
+    drop_after_task_switch: Option<Box<dyn Any + Send>>,
+    /// Memory management details: page tables, mappings, allocators, etc.
+    /// This is shared among all other tasks in the same address space.
+    pub mmi: MmiRef, 
+    /// The kernel stack, which all `Task`s must have in order to execute.
+    pub kstack: Stack,
+    /// The userspace stack, which is `None` for tasks that do not run in userspace.
     pub ustack: Option<Stack>,
     /// for special behavior of new userspace task
     pub new_userspace_entry_addr: Option<VirtualAddress>, 
@@ -231,12 +234,17 @@ pub struct Task {
     /// The idle tasks (like idle_task) are always pinned to their respective cores
     pub pinned_core: Option<u8>,
     /// Whether this Task is an idle task, the task that runs by default when no other task is running.
-    /// There exists one idle task per core.
+    /// There exists one idle task per core, so this is `false` for most tasks.
     pub is_an_idle_task: bool,
     /// For application `Task`s, the [`LoadedCrate`](../mod_mgmt/metadata/struct.LoadedCrate.html)
-    /// that contains the backing memory regions and sections for running this `Task`'s object file 
+    /// that contains the backing memory regions and sections for running this `Task`'s object file.
+    /// The `app_crate` will contain the main function (entry point) for this `Task`, among other things.
     pub app_crate: Option<StrongCrateRef>,
-    /// The function that will be called when this `Task` panics
+    /// This `Task` is linked into and runs within the context of 
+    /// this [`CrateNamespace`](../mod_mgmt/struct.CrateNamespace.html).
+    pub namespace: Arc<CrateNamespace>,
+    /// The function that will be called when this `Task` panics;
+    /// it is invoked before the task is cleaned up via stack unwinding.
     pub panic_handler: Option<PanicHandler>,
     /// The environment of the task, Wrapped in an Arc & Mutex because it is shared among child and parent tasks
     pub env: Arc<Mutex<Environment>>,
@@ -255,20 +263,40 @@ impl fmt::Debug for Task {
 
 impl Task {
     /// Creates a new Task structure and initializes it to be non-Runnable.
+    /// By default, the new `Task` will inherit some of the same states from the currently-running `Task`:
+    /// its `Environment`, `MemoryManagementInfo`, and `CrateNamespace`.
+    /// If needed, those states can be changed by setting them for the returned `Task`.
+    /// 
+    /// # Arguments
+    /// * `kstack`: the optional kernel `Stack` for this `Task` to use.
+    ///    If not provided, a kernel stack of the default size will be allocated and used.
+    /// 
     /// # Note
     /// This does not run the task, schedule it in, or switch to it.
-    pub fn new() -> Task {
-        /// The counter of task IDs
+    pub fn new(kstack: Option<Stack>) -> Result<Task, &'static str> {
+        let curr_task = get_my_current_task().ok_or("Task::new(): couldn't get current task (not yet initialized)")?;
+        let (mmi, namespace, env) = {
+            let t = curr_task.lock();
+            (Arc::clone(&t.mmi), Arc::clone(&t.namespace), Arc::clone(&t.env))
+        };
+
+        let kstack = kstack
+            .or_else(|| mmi.lock().alloc_stack(KERNEL_STACK_SIZE_IN_PAGES))
+            .ok_or("couldn't allocate kernel stack!")?;
+
+        Ok(Task::new_internal(kstack, mmi, namespace, env))
+    }
+    
+    /// The internal routine for creating a `Task`, which does not make assumptions 
+    /// about whether a currently-running `Task` exists or whether the new `Task`
+    /// should inherit any states from it.
+    fn new_internal(kstack: Stack, mmi: MmiRef, namespace: Arc<CrateNamespace>, env: Arc<Mutex<Environment>>) -> Self {
+         /// The counter of task IDs
         static TASKID_COUNTER: AtomicUsize = AtomicUsize::new(0);
 
         // we should re-use old task IDs again, instead of simply blindly counting up
         // TODO FIXME: or use random values to avoid state spill
         let task_id = TASKID_COUNTER.fetch_add(1, Ordering::Acquire);
-
-        // TODO - change to option and initialize environment to none
-        let env = Environment {
-            working_dir: Arc::clone(root::get_root()), 
-        };
 
         Task {
             id: task_id,
@@ -281,16 +309,17 @@ impl Task {
             saved_sp: 0,
             task_local_data_ptr: VirtualAddress::zero(),
             drop_after_task_switch: None,
-            name: format!("task{}", task_id),
-            kstack: None,
+            name: format!("task_{}", task_id),
+            kstack: kstack,
             ustack: None,
-            mmi: None,
+            mmi: mmi,
             new_userspace_entry_addr: None,
             pinned_core: None,
             is_an_idle_task: false,
             app_crate: None,
+            namespace: namespace,
             panic_handler: None,
-            env: Arc::new(Mutex::new(env)),
+            env: env,
 
             #[cfg(simd_personality)]
             simd: SimdExt::None,
@@ -335,7 +364,8 @@ impl Task {
         self.ustack.is_some()
     }
 
-    /// Registers a function or closure that will be called if this `Task` panics.
+    /// Registers a function or closure that will be called if this `Task` panics,
+    /// invoked before the task is cleaned up via stack unwinding.
     pub fn set_panic_handler(&mut self, callback: PanicHandler) {
         self.panic_handler = Some(callback);
     }
@@ -448,8 +478,7 @@ impl Task {
         // We can safely skip setting the TSS RSP0 when switching to a kernel task, 
         // i.e., when `next` is not a userspace task
         if next.is_userspace() {
-            let next_kstack = next.kstack.as_ref().expect("BUG: task_switch(): error: next task's kstack was None!");
-            let new_tss_rsp0 = next_kstack.bottom() + (next_kstack.size() / 2); // the middle half of the stack
+            let new_tss_rsp0 = next.kstack.bottom() + (next.kstack.size() / 2); // the middle half of the stack
             if tss_set_rsp0(new_tss_rsp0).is_ok() { 
                 // debug!("task_switch [2]: new_tss_rsp = {:#X}", new_tss_rsp0);
             }
@@ -467,8 +496,8 @@ impl Task {
 
         // We now do the page table switching here, so we can use our higher-level PageTable abstractions
         {
-            let prev_mmi = self.mmi.as_ref().expect("task_switch: couldn't get prev task's MMI!");
-            let next_mmi = next.mmi.as_ref().expect("task_switch: couldn't get next task's MMI!");
+            let prev_mmi = &self.mmi;
+            let next_mmi = &next.mmi;
             
 
             if Arc::ptr_eq(prev_mmi, next_mmi) {
@@ -493,7 +522,7 @@ impl Task {
         // We store the removed TaskLocalData in the next Task struct so that we can access it after the context switch.
         if self.has_exited() {
             // trace!("task_switch(): preparing to drop TaskLocalData for running task {}", self);
-            next.drop_after_task_switch = self.take_task_local_data().map(|tld_box| tld_box as Box<Any + Send>);
+            next.drop_after_task_switch = self.take_task_local_data().map(|tld_box| tld_box as Box<dyn Any + Send>);
         }
 
         // release this core's task switch lock
@@ -714,9 +743,13 @@ impl TaskRef {
 
     /// Call this function to indicate that this task has successfully ran to completion,
     /// and that it has returned the given `exit_value`.
+    /// This task must be the currently executing task, 
+    /// you cannot invoke `mark_as_exited()` on a different task.
+    /// 
+    /// This should only be used at the end of the `task_wrapper` function once it has cleanly exited.
     /// 
     /// # Locking / Deadlock
-    /// This method obtains a writeable lock on the underlying Task in order to mutate its state.
+    /// This method obtains a writable lock on the underlying Task in order to mutate its state.
     /// 
     /// # Return
     /// * Returns `Ok` if the exit status was successfully set.     
@@ -725,16 +758,56 @@ impl TaskRef {
     /// # Note 
     /// The `Task` will not be halted immediately -- 
     /// it will finish running its current timeslice, and then never be run again.
-    pub fn exit(&self, exit_value: Box<Any + Send>) -> Result<(), &'static str> {
-        self.internal_exit(ExitValue::Completed(exit_value))
+    #[doc(hidden)]
+    pub fn mark_as_exited(&self, exit_value: Box<dyn Any + Send>) -> Result<(), &'static str> {
+        let curr_task = get_my_current_task().ok_or("mark_as_exited(): failed to check what the current task is")?;
+        if curr_task == self {
+            self.internal_exit(ExitValue::Completed(exit_value))
+        } else {
+            Err("`mark_as_exited()` can only be invoked on the current task, not on another task.")
+        }
     }
 
-
-    /// Kills this `Task` (not a clean exit) without allowing it to run to completion.
-    /// The given `KillReason` indicates why it was killed.
+    /// Call this function to indicate that this task has been cleaned up (e.g., by unwinding)
+    /// and it is ready to be marked as killed, i.e., it will never run again.
+    /// This task must be the currently executing task, 
+    /// you cannot invoke `mark_as_killed()` on a different task.
+    /// 
+    /// If you want to kill another task, use the [`kill()`](method.kill) method instead.
+    /// 
+    /// This should only be used by the unwinding routines once they have finished.
     /// 
     /// # Locking / Deadlock
-    /// This method obtains a writeable lock on the underlying Task in order to mutate its state.
+    /// This method obtains a writable lock on the underlying Task in order to mutate its state.
+    /// 
+    /// # Return
+    /// * Returns `Ok` if the exit status was successfully set.     
+    /// * Returns `Err` if this `Task` was already exited, and does not overwrite the existing exit status. 
+    ///  
+    /// # Note 
+    /// The `Task` will not be halted immediately -- 
+    /// it will finish running its current timeslice, and then never be run again.
+    #[doc(hidden)]
+    pub fn mark_as_killed(&self, reason: KillReason) -> Result<(), &'static str> {
+        let curr_task = get_my_current_task().ok_or("mark_as_exited(): failed to check what the current task is")?;
+        if curr_task == self {
+            self.internal_exit(ExitValue::Killed(reason))
+        } else {
+            Err("`mark_as_exited()` can only be invoked on the current task, not on another task.")
+        }
+    }
+
+    /// Kills this `Task` (not a clean exit) without allowing it to run to completion.
+    /// The provided `KillReason` indicates why it was killed.
+    /// 
+    /// **
+    /// Currently this immediately kills the task without performing any unwinding cleanup.
+    /// In the near future, the task will be unwound such that its resources are freed/dropped
+    /// to ensure proper cleanup before the task is actually fully killed.
+    /// **
+    /// 
+    /// # Locking / Deadlock
+    /// This method obtains a writable lock on the underlying Task in order to mutate its state.
     /// 
     /// # Return
     /// * Returns `Ok` if the exit status was successfully set to the given `KillReason`.     
@@ -744,6 +817,8 @@ impl TaskRef {
     /// The `Task` will not be halted immediately -- 
     /// it will finish running its current timeslice, and then never be run again.
     pub fn kill(&self, reason: KillReason) -> Result<(), &'static str> {
+        // TODO FIXME: cause a panic in this Task such that it will start the unwinding process
+        // instead of immediately causing it to exit
         self.internal_exit(ExitValue::Killed(reason))
     }
 
@@ -760,7 +835,13 @@ impl TaskRef {
         self.0.deref().0.lock().runstate = RunState::Blocked;
     }
 
-    /// Registers a function or closure that will be called if this `Task` panics.
+    /// Unblocks this `Task` by setting its `RunState` to runnable.
+    pub fn unblock(&self) {
+        self.0.deref().0.lock().runstate = RunState::Runnable;
+    }
+
+    /// Registers a function or closure that will be called if this `Task` panics,
+    /// invoked before the task is cleaned up via stack unwinding.
     /// # Locking / Deadlock
     /// Obtains a write lock on the enclosed `Task` in order to mutate its state.
     pub fn set_panic_handler(&self, callback: PanicHandler) {
@@ -794,8 +875,13 @@ impl TaskRef {
     pub fn get_env(&self) -> Arc<Mutex<Environment>> {
         Arc::clone(&self.0.deref().0.lock().env)
     }
+
+    /// Gets a reference to this task's `CrateNamespace`.
+    pub fn get_namespace(&self) -> Arc<CrateNamespace> {
+        Arc::clone(&self.0.deref().0.lock().namespace)
+    }
     
-    /// Obtains the lock on the underlying `Task` in a writeable, blocking fashion.
+    /// Obtains the lock on the underlying `Task` in a writable, blocking fashion.
     #[deprecated(note = "This method exposes inner Task details for debugging purposes. Do not use it.")]
     pub fn lock_mut(&self) -> MutexIrqSafeGuardRefMut<Task> {
         MutexIrqSafeGuardRefMut::new(self.0.deref().0.lock())
@@ -815,36 +901,37 @@ impl Eq for TaskRef { }
 /// Create and initialize an idle task, of which there is one per processor core/LocalApic.
 /// The idle task is a task that runs by default (one per core) when no other task is running.
 /// 
-/// Returns a reference to the `Task`, protected by a `RwLockIrqSafe`
+/// Returns a reference to the newly-created idle `Task`.
 /// 
 /// # Note
-/// This function does not make the new idle task runnable, nor add it to any runqueue.
+/// This function does not add the new idle task to any runqueue.
 pub fn create_idle_task(
     apic_id: u8, 
     stack_bottom: VirtualAddress, 
     stack_top: VirtualAddress,
-    kernel_mmi_ref: Arc<MutexIrqSafe<MemoryManagementInfo>>
+    kernel_mmi_ref: MmiRef,
 ) -> Result<TaskRef, &'static str> {
-
-    let mut idle_task = Task::new();
+    // Here, we cannot call `Task::new()` because tasking hasn't yet been set up for this core.
+    // Instead, we generate all of the `Task` states manually, and create an initial idle task directly.
+    let kstack = Stack::new( 
+        stack_top, 
+        stack_bottom, 
+        MappedPages::from_existing(
+            PageRange::from_virt_addr(stack_bottom, stack_top.value() - stack_bottom.value()),
+            EntryFlags::WRITABLE | EntryFlags::PRESENT
+        ),
+    );
+    let default_namespace = mod_mgmt::get_default_namespace()
+        .ok_or("The default CrateNamespace must be initialized before the tasking subsystem.")?
+        .clone();
+    let default_env = Arc::new(Mutex::new(Environment::default()));
+    let mut idle_task = Task::new_internal(kstack, kernel_mmi_ref, default_namespace, default_env);
     idle_task.name = format!("idle_task_ap{}", apic_id);
     idle_task.is_an_idle_task = true;
     idle_task.runstate = RunState::Runnable;
     idle_task.running_on_cpu = Some(apic_id); 
     idle_task.pinned_core = Some(apic_id); // can only run on this CPU core
-    idle_task.mmi = Some(kernel_mmi_ref);
     // debug!("IDLE TASK STACK (apic {}) at bottom={:#x} - top={:#x} ", apic_id, stack_bottom, stack_top);
-    idle_task.kstack = Some( 
-        Stack::new( 
-            stack_top, 
-            stack_bottom, 
-            MappedPages::from_existing(
-                PageRange::from_virt_addr(stack_bottom, stack_top.value() - stack_bottom.value()),
-                EntryFlags::WRITABLE | EntryFlags::PRESENT
-            ),
-        )
-    );
-
     let idle_task_id = idle_task.id;
     let task_ref = TaskRef::new(idle_task);
 
@@ -892,27 +979,17 @@ fn get_task_local_data() -> Option<&'static TaskLocalData> {
         // because it will always be valid for the life of a given Task's execution.
         unsafe { &*tld_ptr }
     };
-    Some(&tld)
+    Some(tld)
 }
 
-/// Returns a cloned reference to the current task id by using the `TaskLocalData` pointer
-/// stored in the FS base MSR register.
+/// Returns a reference to the current task by using the `TaskLocalData` pointer
+/// stored in the thread-local storage (FS base model-specific register).
 pub fn get_my_current_task() -> Option<&'static TaskRef> {
     get_task_local_data().map(|tld| &tld.current_taskref)
 }
 
 /// Returns the current Task's id by using the `TaskLocalData` pointer
-/// stored in the FS base MSR register.
+/// stored in the thread-local storage (FS base model-specific register).
 pub fn get_my_current_task_id() -> Option<usize> {
     get_task_local_data().map(|tld| tld.current_task_id)
-}
-
-/// Returns the current Task's working Directory
-/// from its `Environment` object.
-pub fn get_my_working_dir() -> Option<DirRef> {
-    get_my_current_task().map(|taskref| {
-        let env = taskref.get_env();
-        let env_locked = env.lock();
-        Arc::clone(&env_locked.working_dir)
-    })
 }

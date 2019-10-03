@@ -1,0 +1,25 @@
+[package]
+authors = ["Kevin Boos <kevinaboos@gmail.com>"]
+name = "storage_device"
+description = "Traits for storage devices and storage controllers"
+version = "0.1.0"
+build = "../../build.rs"
+
+[dependencies]
+spin = "0.4.10"
+owning_ref = { git = "https://github.com/kevinaboos/owning-ref-rs" }
+downcast-rs = "1.0.4"
+
+[dependencies.log]
+default-features = false
+version = "0.3.7"
+
+[dependencies.lazy_static]
+features = ["spin_no_std", "nightly"]
+version = "1.2.0"
+
+[dependencies.pci]
+path = "../pci"
+
+[lib]
+crate-type = ["rlib"]

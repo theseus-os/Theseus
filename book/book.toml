@@ -1,0 +1,6 @@
+[book]
+title = "The Theseus OS Book"
+authors = ["Kevin Boos", "Lin Zhong"]
+description = "The book-style documentation of the design and implementation of Theseus, a companion to its source-level documentation."
+multilingual = false
+src = "src"

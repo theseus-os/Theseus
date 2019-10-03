@@ -22,207 +22,11 @@ pub use self::temporary_page::TemporaryPage;
 pub use self::mapper::*;
 pub use self::virtual_address_allocator::*;
 
-
-use core::{
-    ops::{RangeInclusive, Add, AddAssign, Sub, SubAssign, Deref, DerefMut},
-    mem,
-    iter::Step,
-};
-use multiboot2;
+use core::fmt;
 use super::*;
 
-use x86_64::registers::control_regs;
-use x86_64::instructions::tlb;
-
-use kernel_config::memory::{PAGE_SIZE, MAX_PAGE_NUMBER, RECURSIVE_P4_INDEX};
+use kernel_config::memory::{RECURSIVE_P4_INDEX};
 use kernel_config::memory::{KERNEL_TEXT_P4_INDEX, KERNEL_HEAP_P4_INDEX, KERNEL_STACK_P4_INDEX};
-
-
-
-
-#[derive(Clone, Copy, PartialEq, Eq, PartialOrd, Ord)]
-pub struct Page {
-    number: usize, 
-}
-impl fmt::Debug for Page {
-    fn fmt(&self, f: &mut fmt::Formatter) -> fmt::Result {
-        write!(f, "Page(vaddr: {:#X})", self.start_address()) 
-    }
-}
-
-impl Page {
-    /// Returns the `Page` that contains the given `VirtualAddress`.
-    pub fn containing_address(virt_addr: VirtualAddress) -> Page {
-        Page { number: virt_addr.value() / PAGE_SIZE }
-    }
-
-	/// Returns the `VirtualAddress` as the start of this `Page`.
-    pub fn start_address(&self) -> VirtualAddress {
-        VirtualAddress(self.number * PAGE_SIZE)
-    }
-
-	/// Returns the 9-bit part of this page's virtual address that is the index into the P4 page table entries list.
-    fn p4_index(&self) -> usize {
-        (self.number >> 27) & 0x1FF
-    }
-
-    /// Returns the 9-bit part of this page's virtual address that is the index into the P3 page table entries list.
-    fn p3_index(&self) -> usize {
-        (self.number >> 18) & 0x1FF
-    }
-
-    /// Returns the 9-bit part of this page's virtual address that is the index into the P2 page table entries list.
-    fn p2_index(&self) -> usize {
-        (self.number >> 9) & 0x1FF
-    }
-
-    /// Returns the 9-bit part of this page's virtual address that is the index into the P2 page table entries list.
-    /// Using this returned `usize` value as an index into the P1 entries list will give you the final PTE, 
-    /// from which you can extract the mapped `Frame` (or its physical address) using `pointed_frame()`.
-    fn p1_index(&self) -> usize {
-        (self.number >> 0) & 0x1FF
-    }
-}
-
-impl Add<usize> for Page {
-    type Output = Page;
-
-    fn add(self, rhs: usize) -> Page {
-        // cannot exceed max page number
-        Page {
-            number: core::cmp::min(MAX_PAGE_NUMBER, self.number.saturating_add(rhs)),
-        }
-    }
-}
-
-impl AddAssign<usize> for Page {
-    fn add_assign(&mut self, rhs: usize) {
-        *self = Page {
-            number: core::cmp::min(MAX_PAGE_NUMBER, self.number.saturating_add(rhs)),
-        };
-    }
-}
-
-impl Sub<usize> for Page {
-    type Output = Page;
-
-    fn sub(self, rhs: usize) -> Page {
-        Page { number: self.number.saturating_sub(rhs) }
-    }
-}
-
-impl SubAssign<usize> for Page {
-    fn sub_assign(&mut self, rhs: usize) {
-        *self = Page {
-            number: self.number.saturating_sub(rhs),
-        };
-    }
-}
-
-// Implementing these functions allow `Page` to be in an `Iterator`.
-impl Step for Page {
-    #[inline]
-    fn steps_between(start: &Page, end: &Page) -> Option<usize> {
-        Step::steps_between(&start.number, &end.number)
-    }
-    #[inline]
-    fn replace_one(&mut self) -> Self {
-        mem::replace(self, Page { number: 1 })
-    }
-    #[inline]
-    fn replace_zero(&mut self) -> Self {
-        mem::replace(self, Page { number: 0 })
-    }
-    #[inline]
-    fn add_one(&self) -> Self {
-        Add::add(*self, 1)
-    }
-    #[inline]
-    fn sub_one(&self) -> Self {
-        Sub::sub(*self, 1)
-    }
-    #[inline]
-    fn add_usize(&self, n: usize) -> Option<Page> {
-        Some(*self + n)
-    }
-}
-
-
-
-/// A range of `Page`s that are contiguous in virtual memory.
-#[derive(Debug, Clone)]
-pub struct PageRange(RangeInclusive<Page>);
-
-impl PageRange {
-    /// Creates a new range of `Page`s that spans from `start` to `end`,
-    /// both inclusive bounds.
-    pub fn new(start: Page, end: Page) -> PageRange {
-        PageRange(RangeInclusive::new(start, end))
-    }
-
-    /// Creates a PageRange that will always yield `None`.
-    pub fn empty() -> PageRange {
-        PageRange::new(Page { number: 1 }, Page { number: 0 })
-    }
-    
-    /// A convenience method for creating a new `PageRange` 
-    /// that spans all `Page`s from the given virtual address 
-    /// to an end bound based on the given size.
-    pub fn from_virt_addr(starting_virt_addr: VirtualAddress, size_in_bytes: usize) -> PageRange {
-        let start_page = Page::containing_address(starting_virt_addr);
-        let end_page = Page::containing_address(starting_virt_addr + size_in_bytes - 1);
-        PageRange::new(start_page, end_page)
-    }
-
-    /// Returns the `VirtualAddress` of the starting `Page` in this `PageRange`.
-    pub fn start_address(&self) -> VirtualAddress {
-        self.0.start().start_address()
-    }
-
-    /// Returns the number of `Page`s covered by this iterator. 
-    /// Use this instead of the Iterator trait's `count()` method.
-    /// This is instant, because it doesn't need to iterate over each entry, unlike normal iterators.
-    pub fn size_in_pages(&self) -> usize {
-        // add 1 because it's an inclusive range
-        self.0.end().number + 1 - self.0.start().number
-    }
-
-    /// Whether this `PageRange` contains the given `VirtualAddress`.
-    pub fn contains_virt_addr(&self, virt_addr: VirtualAddress) -> bool {
-        self.0.contains(&Page::containing_address(virt_addr))
-    }
-
-    /// Returns the offset of the given `VirtualAddress` within this `PageRange`,
-    /// i.e., the difference between `virt_addr` and `self.start()`.
-    pub fn offset_from_start(&self, virt_addr: VirtualAddress) -> Option<usize> {
-        if self.contains_virt_addr(virt_addr) {
-            Some(virt_addr.value() - self.start_address().value())
-        } else {
-            None
-        }
-    }
-}
-
-impl Deref for PageRange {
-    type Target = RangeInclusive<Page>;
-    fn deref(&self) -> &RangeInclusive<Page> {
-        &self.0
-    }
-}
-impl DerefMut for PageRange {
-    fn deref_mut(&mut self) -> &mut RangeInclusive<Page> {
-        &mut self.0
-    }
-}
-
-impl IntoIterator for PageRange {
-    type Item = Page;
-    type IntoIter = RangeInclusive<Page>;
-
-    fn into_iter(self) -> Self::IntoIter {
-        self.0
-    }
-}
 
 
 /// A root (P4) page table.
@@ -317,7 +121,7 @@ impl PageTable {
 
         // overwrite recursive mapping
         self.p4_mut()[RECURSIVE_P4_INDEX].set(other_table.p4_table.clone(), EntryFlags::PRESENT | EntryFlags::WRITABLE); 
-        tlb::flush_all();
+        tlb_flush_all();
 
         // set mapper's target frame to reflect that future mappings will be mapped into the other_table
         self.mapper.target_p4 = other_table.p4_table.clone();
@@ -330,7 +134,7 @@ impl PageTable {
 
         // restore recursive mapping to original p4 table
         p4_table[RECURSIVE_P4_INDEX].set(backup, EntryFlags::PRESENT | EntryFlags::WRITABLE);
-        tlb::flush_all();
+        tlb_flush_all();
 
         // here, temporary_page is dropped, which auto unmaps it
         ret
@@ -343,10 +147,7 @@ impl PageTable {
         // debug!("PageTable::switch() old table: {:?}, new table: {:?}", self, new_table);
 
         // perform the actual page table switch
-        unsafe {
-            control_regs::cr3_write(x86_64::PhysicalAddress(new_table.p4_table.start_address().value() as u64));
-        }
-
+        unsafe { set_p4(new_table.p4_table.start_address()); }
         let current_table_after_switch = PageTable::from_current();
         current_table_after_switch
     }
@@ -359,9 +160,9 @@ impl PageTable {
 }
 
 
-/// Returns the current top-level page table frame, e.g., cr3 on x86
+/// Returns the current top-level page table frame
 pub fn get_current_p4() -> Frame {
-    Frame::containing_address(PhysicalAddress::new_canonical(control_regs::cr3().0 as usize))
+    Frame::containing_address(get_p4())
 }
 
 
@@ -385,9 +186,8 @@ pub fn init(allocator_mutex: &MutexIrqSafe<AreaFrameAllocator>, boot_info: &mult
     // bootstrap a PageTable from the currently-loaded page table
     let mut page_table = PageTable::from_current();
 
-    let boot_info_start_vaddr = VirtualAddress::new(boot_info.start_address())?;
+    let (boot_info_start_vaddr, boot_info_end_vaddr) = get_boot_info_vaddress(&boot_info)?;
     let boot_info_start_paddr = page_table.translate(boot_info_start_vaddr).ok_or("Couldn't get boot_info start physical address")?;
-    let boot_info_end_vaddr = VirtualAddress::new(boot_info.end_address())?;
     let boot_info_end_paddr = page_table.translate(boot_info_end_vaddr).ok_or("Couldn't get boot_info end physical address")?;
     let boot_info_size = boot_info.total_size();
     info!("multiboot start: {:#X}-->{:#X}, multiboot end: {:#X}-->{:#X}, size: {:#X}\n",
@@ -407,7 +207,6 @@ pub fn init(allocator_mutex: &MutexIrqSafe<AreaFrameAllocator>, boot_info: &mult
     };
     let mut new_table = PageTable::new_table(&mut page_table, new_frame, TemporaryPage::new(temp_frames1))?;
 
-    let elf_sections_tag = try!(boot_info.elf_sections_tag().ok_or("no Elf sections tag present!"));   
     let mut vmas: [VirtualMemoryArea; 32] = Default::default();
     let mut text_mapped_pages: Option<MappedPages> = None;
     let mut rodata_mapped_pages: Option<MappedPages> = None;
@@ -424,136 +223,45 @@ pub fn init(allocator_mutex: &MutexIrqSafe<AreaFrameAllocator>, boot_info: &mult
         mapper.p4_mut().clear_entry(KERNEL_HEAP_P4_INDEX);
         mapper.p4_mut().clear_entry(KERNEL_STACK_P4_INDEX);
 
-
-        let mut text_start:   Option<(VirtualAddress, PhysicalAddress)> = None;
-        let mut text_end:     Option<(VirtualAddress, PhysicalAddress)> = None;
-        let mut rodata_start: Option<(VirtualAddress, PhysicalAddress)> = None;
-        let mut rodata_end:   Option<(VirtualAddress, PhysicalAddress)> = None;
-        let mut data_start:   Option<(VirtualAddress, PhysicalAddress)> = None;
-        let mut data_end:     Option<(VirtualAddress, PhysicalAddress)> = None;
-
-        let mut text_flags:       Option<EntryFlags> = None;
-        let mut rodata_flags:     Option<EntryFlags> = None;
-        let mut data_flags:       Option<EntryFlags> = None;
-
-
         // scoped to release the frame allocator lock
         {
             let mut allocator = allocator_mutex.lock(); 
 
-            let mut index = 0;    
-            // map the allocated kernel text sections
-            for section in elf_sections_tag.sections() {
-                
-                // skip sections that don't need to be loaded into memory
-                if section.size() == 0 
-                    || !section.is_allocated() 
-                    || section.name().starts_with(".gcc")
-                    || section.name().starts_with(".eh_frame")
-                    || section.name().starts_with(".debug") 
-                {
-                    continue;
-                }
-                
-                debug!("Looking at loaded section {} at {:#X}, size {:#X}", section.name(), section.start_address(), section.size());
+            // add virtual memory areas occupied by kernel data and code sections
+            let (mut index, 
+                initial_sections_memory_bounds,
+                sections_memory_bounds) = add_sections_vmem_areas(&boot_info, &mut vmas)?;
 
-                if PhysicalAddress::new_canonical(section.start_address() as usize).frame_offset() != 0 {
-                    error!("Section {} at {:#X}, size {:#X} was not page-aligned!", section.name(), section.start_address(), section.size());
-                    return Err("Kernel ELF Section was not page-aligned");
-                }
-
-                let flags = EntryFlags::from_multiboot2_section_flags(&section) | EntryFlags::GLOBAL;
-
-                // even though the linker stipulates that the kernel sections have a higher-half virtual address,
-                // they are still loaded at a lower physical address, in which phys_addr = virt_addr - KERNEL_OFFSET.
-                // thus, we must map the zeroeth kernel section from its low address to a higher-half address,
-                // and we must map all the other sections from their higher given virtual address to the proper lower phys addr
-                let mut start_phys_addr = section.start_address() as usize;
-                if start_phys_addr >= KERNEL_OFFSET { 
-                    // true for all sections but the first section (inittext)
-                    start_phys_addr -= KERNEL_OFFSET;
-                }
-                
-                let mut start_virt_addr = section.start_address() as usize;
-                if start_virt_addr < KERNEL_OFFSET { 
-                    // special case to handle the first section only
-                    start_virt_addr += KERNEL_OFFSET;
-                }
-
-                let start_phys_addr = PhysicalAddress::new(start_phys_addr)?;
-                let start_virt_addr = VirtualAddress::new(start_virt_addr)?;
-                let end_virt_addr = start_virt_addr + (section.size() as usize);
-                let end_phys_addr = start_phys_addr + (section.size() as usize);
-
-
-                // the linker script (linker_higher_half.ld) defines the following order of sections:
-                //     .init (start) then .text (end)
-                //     .data (start) then .bss (end)
-                //     .rodata (start and end)
-                // Those are the only sections we care about.
-                let static_str_name = match section.name() {
-                    ".init" => {
-                        text_start = Some((start_virt_addr, start_phys_addr));
-                        "nano_core .init"
-                    } 
-                    ".text" => {
-                        text_end = Some((end_virt_addr, end_phys_addr));
-                        text_flags = Some(flags);
-                        "nano_core .text"
-                    }
-                    ".rodata" => {
-                        rodata_start = Some((start_virt_addr, start_phys_addr));
-                        rodata_end   = Some((end_virt_addr, end_phys_addr));
-                        rodata_flags = Some(flags);
-                        "nano_core .rodata"
-                    }
-                    ".data" => {
-                        data_start = Some((start_virt_addr, start_phys_addr));
-                        data_flags = Some(flags);
-                        "nano_core .data"
-                    }
-                    ".bss" => {
-                        data_end = Some((end_virt_addr, end_phys_addr));
-                        "nano_core .bss"
-                    }
-                    _ =>  {
-                        error!("Section {} at {:#X}, size {:#X} was not an expected section (.init, .text, .data, .bss, .rodata)", 
-                                section.name(), section.start_address(), section.size());
-                        return Err("Kernel ELF Section had an unexpected name (expected .init, .text, .data, .bss, .rodata)");
-                    }
-                };
-                vmas[index] = VirtualMemoryArea::new(start_virt_addr, section.size() as usize, flags, static_str_name);
-                debug!("     mapping kernel section: {} at addr: {:?}", section.name(), vmas[index]);
-
-
-                // to allow the APs to boot up, we identity map the kernel sections too.
-                // (lower half virtual addresses mapped to same lower half physical addresses)
-                // we will unmap these later before we start booting to userspace processes
-                identity_mapped_pages[index] = Some(
+            // to allow the APs to boot up, we identity map the kernel sections too.
+            // (lower half virtual addresses mapped to same lower half physical addresses)
+            // we will unmap these later before we start booting to userspace processes
+            for i in 0..index {
+                let sec = &sections_memory_bounds[i];
+                let (start_virt_addr, start_phys_addr) = sec.start;
+                let (_end_virt_addr, end_phys_addr) = sec.end;
+                let size = end_phys_addr.value() - start_phys_addr.value();
+                identity_mapped_pages[i] = Some(
                     mapper.map_frames(
-                        FrameRange::from_phys_addr(start_phys_addr, section.size() as usize), 
+                        FrameRange::from_phys_addr(start_phys_addr, size), 
                         Page::containing_address(start_virt_addr - KERNEL_OFFSET), 
-                        flags,
+                        sec.flags,
                         allocator.deref_mut()
                     )?
                 );
-                debug!("           also mapped vaddr {:#X} to paddr {:#x} (size {:#X})", start_virt_addr - KERNEL_OFFSET, start_phys_addr, section.size());
-
-                index += 1;      
-
-            } // end of section iterator
+                debug!("           also mapped vaddr {:#X} to paddr {:#x} (size {:#X})", start_virt_addr - KERNEL_OFFSET, start_phys_addr, size);
+            }
 
 
-            let (text_start_virt,    text_start_phys)    = text_start  .ok_or("Couldn't find start of .text section")?;
-            let (_text_end_virt,     text_end_phys)      = text_end    .ok_or("Couldn't find end of .text section")?;
-            let (rodata_start_virt,  rodata_start_phys)  = rodata_start.ok_or("Couldn't find start of .rodata section")?;
-            let (_rodata_end_virt,   rodata_end_phys)    = rodata_end  .ok_or("Couldn't find end of .rodata section")?;
-            let (data_start_virt,    data_start_phys)    = data_start  .ok_or("Couldn't find start of .data section")?;
-            let (_data_end_virt,     data_end_phys)      = data_end    .ok_or("Couldn't find start of .data section")?;
+            let (text_start_virt,    text_start_phys)    = initial_sections_memory_bounds.text.start;
+            let (_text_end_virt,     text_end_phys)      = initial_sections_memory_bounds.text.end;
+            let (rodata_start_virt,  rodata_start_phys)  = initial_sections_memory_bounds.rodata.start;
+            let (_rodata_end_virt,   rodata_end_phys)    = initial_sections_memory_bounds.rodata.end;
+            let (data_start_virt,    data_start_phys)    = initial_sections_memory_bounds.data.start;
+            let (_data_end_virt,     data_end_phys)      = initial_sections_memory_bounds.data.end;
 
-            let text_flags    = text_flags  .ok_or("Couldn't find .text section flags")?;
-            let rodata_flags  = rodata_flags.ok_or("Couldn't find .rodata section flags")?;
-            let data_flags    = data_flags  .ok_or("Couldn't find .data section flags")?;
+            let text_flags    = initial_sections_memory_bounds.text.flags;
+            let rodata_flags  = initial_sections_memory_bounds.rodata.flags;
+            let data_flags    = initial_sections_memory_bounds.data.flags;
 
 
             // now we map the 5 main sections into 3 groups according to flags
@@ -573,25 +281,21 @@ pub fn init(allocator_mutex: &MutexIrqSafe<AreaFrameAllocator>, boot_info: &mult
                 data_flags, allocator.deref_mut())
             ));
 
-            // map the VGA display memory as writable, which technically goes from 0xA_0000 - 0xC_0000 (exclusive),
-            // VGA text mode only goes from 0xB_8000 - 0XC_0000
-            const VGA_DISPLAY_PHYS_START: usize = 0xA_0000;
-            const VGA_DISPLAY_PHYS_END: usize = 0xC_0000;
-            const VGA_SIZE_IN_BYTES: usize = VGA_DISPLAY_PHYS_END - VGA_DISPLAY_PHYS_START;
-            let vga_display_virt_addr = VirtualAddress::new_canonical(VGA_DISPLAY_PHYS_START + KERNEL_OFFSET);
-            let vga_display_flags = EntryFlags::PRESENT | EntryFlags::WRITABLE | EntryFlags::GLOBAL | EntryFlags::NO_CACHE;
+            // map the VGA display memory as writable
+            let (vga_display_phys_addr, vga_size_in_bytes, vga_display_flags) = get_vga_mem_addr()?;
+            let vga_display_virt_addr = VirtualAddress::new_canonical(vga_display_phys_addr.value() + KERNEL_OFFSET);
             higher_half_mapped_pages[index] = Some( try!( mapper.map_frames(
-                FrameRange::from_phys_addr(PhysicalAddress::new(VGA_DISPLAY_PHYS_START)?, VGA_SIZE_IN_BYTES), 
+                FrameRange::from_phys_addr(vga_display_phys_addr, vga_size_in_bytes), 
                 Page::containing_address(vga_display_virt_addr), 
                 vga_display_flags,
                 allocator.deref_mut())
             ));
-            vmas[index] = VirtualMemoryArea::new(vga_display_virt_addr, VGA_SIZE_IN_BYTES, vga_display_flags, "Kernel VGA Display Memory");
+            vmas[index] = VirtualMemoryArea::new(vga_display_virt_addr, vga_size_in_bytes, vga_display_flags, "Kernel VGA Display Memory");
             debug!("mapped kernel section: vga_buffer at addr: {:?}", vmas[index]);
             // also do an identity mapping for APs that need it while booting
             identity_mapped_pages[index] = Some( try!( mapper.map_frames(
-                FrameRange::from_phys_addr(PhysicalAddress::new(VGA_DISPLAY_PHYS_START)?, VGA_SIZE_IN_BYTES), 
-                Page::containing_address(VirtualAddress::new_canonical(VGA_DISPLAY_PHYS_START)), 
+                FrameRange::from_phys_addr(vga_display_phys_addr, vga_size_in_bytes), 
+                Page::containing_address(VirtualAddress::new_canonical(vga_display_phys_addr.value())), 
                 vga_display_flags, allocator.deref_mut())
             ));
             index += 1;
@@ -678,52 +382,3 @@ pub fn init(allocator_mutex: &MutexIrqSafe<AreaFrameAllocator>, boot_info: &mult
     // Return the new_page_table because that's the one that should be used by the kernel in future mappings. 
     Ok((new_page_table, kernel_vmas, text_mapped_pages, rodata_mapped_pages, data_mapped_pages, higher_half, identity))
 }
-
-
-// /// Get a stack trace, borrowed from Redox
-// /// TODO: Check for stack being mapped before dereferencing
-// #[inline(never)]
-// pub fn stack_trace() {
-//     use core::mem;
-
-//     // SAFE, just a stack trace for debugging purposes, and pointers are checked. 
-//     unsafe {
-        
-//         // get the stack base pointer
-//         let mut rbp: usize;
-//         asm!("" : "={rbp}"(rbp) : : : "intel", "volatile");
-
-//         error!("STACK TRACE: {:>016X}", rbp);
-//         //Maximum 64 frames
-//         let page_table = PageTable::from_current();
-//         for _frame in 0..64 {
-//             if let Some(rip_rbp) = rbp.checked_add(mem::size_of::<usize>()) {
-//                 // TODO: is this the right condition?
-//                 match (VirtualAddress::new(rbp), VirtualAddress::new(rip_rbp)) {
-//                     (Ok(rbp_vaddr), Ok(rip_rbp_vaddr)) => {
-//                         if page_table.translate(rbp_vaddr).is_some() && page_table.translate(rip_rbp_vaddr).is_some() {
-//                             let rip = *(rip_rbp as *const usize);
-//                             if rip == 0 {
-//                                 error!(" {:>016X}: EMPTY RETURN", rbp);
-//                                 break;
-//                             }
-//                             error!("  {:>016X}: {:>016X}", rbp, rip);
-//                             rbp = *(rbp as *const usize);
-//                             // symbol_trace(rip);
-//                         } else {
-//                             error!("  {:>016X}: GUARD PAGE", rbp);
-//                             break;
-//                         }
-//                     }
-//                     _ => {
-//                         error!(" {:>016X}: INVALID_ADDRESS", rbp);
-//                         break;
-//                     }
-//                 }
-                
-//             } else {
-//                 error!("  {:>016X}: RBP OVERFLOW", rbp);
-//             }
-//         }
-//     }
-// }

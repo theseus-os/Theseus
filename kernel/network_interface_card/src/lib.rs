@@ -11,7 +11,7 @@ extern crate nic_buffers;
 
 use alloc::vec::Vec;
 use memory::{create_contiguous_mapping};
-use nic_initialization::{nic_mapping_flags};
+use nic_initialization::NIC_MAPPING_FLAGS;
 use intel_ethernet::descriptors:: {TxDescriptor, RxDescriptor};
 use nic_queues::{RxQueue, TxQueue};
 use nic_buffers::{TransmitBuffer, ReceiveBuffer, ReceivedFrame};
@@ -79,7 +79,7 @@ pub trait NetworkInterfaceCard {
                     warn!("NIC RX BUF POOL WAS EMPTY.... reallocating! This means that no task is consuming the accumulated received ethernet frames.");
                     // if the pool was empty, then we allocate a new receive buffer
                     let len = rx_buffer_size;
-                    let (mp, phys_addr) = create_contiguous_mapping(len as usize, nic_mapping_flags())?;
+                    let (mp, phys_addr) = create_contiguous_mapping(len as usize, NIC_MAPPING_FLAGS)?;
                     ReceiveBuffer::new(mp, phys_addr, len, rx_buffer_pool)
                 }
             };

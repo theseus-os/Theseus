@@ -39,7 +39,7 @@ use alloc::string::{String, ToString};
 use alloc::vec::Vec;
 use spin::Mutex;
 use alloc::sync::Arc;
-use fs_node::{DirRef, WeakDirRef, Directory, FileOrDir, File, FsNode};
+use fs_node::{DirRef, WeakDirRef, Directory, FileOrDir, File, FileRef, FsNode};
 use memory::MappedPages;
 use task::{TaskRef, TASKLIST, RunState};
 use path::Path;
@@ -66,16 +66,13 @@ pub struct TaskFs { }
 impl TaskFs {
     fn new() -> Result<DirRef, &'static str> {
         let root = root::get_root();
-        let dir_ref = Arc::new(Mutex::new(TaskFs { })) as Arc<Mutex<Directory + Send>>;
+        let dir_ref = Arc::new(Mutex::new(TaskFs { })) as DirRef;
         root.lock().insert(FileOrDir::Dir(dir_ref.clone()))?;
         Ok(dir_ref)
     }
 
     fn get_self_pointer(&self) -> Option<DirRef> {
-        match root::get_root().lock().get(&self.get_name()) {
-            Some(FileOrDir::Dir(dir)) => Some(dir),
-            _ => None,
-        }
+        root::get_root().lock().get_dir(&self.get_name())
     }
 
     fn get_internal(&self, node: &str) -> Result<FileOrDir, &'static str> {
@@ -85,7 +82,7 @@ impl TaskFs {
         let dir_name = task_ref.lock().id.to_string(); 
         // lazily compute a new TaskDir everytime the caller wants to get a TaskDir
         let task_dir = TaskDir::new(dir_name, &parent_dir, task_ref.clone())?;        
-        let boxed_task_dir = Arc::new(Mutex::new(task_dir)) as Arc<Mutex<Directory + Send>>;
+        let boxed_task_dir = Arc::new(Mutex::new(task_dir)) as DirRef;
         Ok(FileOrDir::Dir(boxed_task_dir))
     }
 }
@@ -176,12 +173,12 @@ impl Directory for TaskDir {
     fn get(&self, child_name: &str) -> Option<FileOrDir> {
         if child_name == "taskInfo" {
             let task_file = TaskFile::new(self.taskref.clone());
-            return Some(FileOrDir::File(Arc::new(Mutex::new(task_file)) as Arc<Mutex<File + Send>>));
+            return Some(FileOrDir::File(Arc::new(Mutex::new(task_file)) as FileRef));
         }
 
         if child_name == "mmi" {
             let mmi_dir = MmiDir::new(self.taskref.clone());
-            return Some(FileOrDir::Dir(Arc::new(Mutex::new(mmi_dir)) as Arc<Mutex<Directory + Send>>));
+            return Some(FileOrDir::Dir(Arc::new(Mutex::new(mmi_dir)) as DirRef));
         }
 
         None
@@ -350,7 +347,7 @@ impl Directory for MmiDir {
         if child_name == "MmiInfo" {
             // create the new mmi dir here on demand
             let task_file = MmiFile::new(self.taskref.clone());
-            Some(FileOrDir::File(Arc::new(Mutex::new(task_file)) as Arc<Mutex<File + Send>>))
+            Some(FileOrDir::File(Arc::new(Mutex::new(task_file)) as FileRef))
         } else {
             None
         }
@@ -412,19 +409,11 @@ impl MmiFile {
 
     /// Generates the mmi info string.
     fn generate(&self) -> String {
-        let mut output = String::new();
-        match self.taskref.lock().mmi {
-            Some(ref mmi_ref) => {
-                let mmi = mmi_ref.lock();
-                output = format!(
-                    "Page table:\n{:?}
-                     Virtual memory areas:\n{:?}\n",
-                     mmi.page_table, mmi.vmas
-                );
-            }
-            _ => output.push_str("MMI is uninitialized."),
-        }
-        output
+        let task = self.taskref.lock();
+        let mmi = task.mmi.lock();
+        format!("Page table:\n{:?}\nVirtual memory areas:\n{:?}\n",
+            mmi.page_table, mmi.vmas
+        )
     }
 }
 

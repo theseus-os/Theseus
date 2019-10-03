@@ -124,7 +124,7 @@ impl AcpiTables {
         // For example, if two frames were added, then we need to add (2 * frame size) = 8192 to each offset.
         if new_frames.start() < self.frames.start() {
             let diff = self.frames.start_address().value() - new_frames.start_address().value();
-            warn!("Adjusting mapping offsets +{}", diff);
+            trace!("ACPI table: adjusting mapping offsets +{}", diff);
             for mut loc in self.tables.values_mut() {
                 loc.offset += diff; 
                 if let Some((ref mut slice_offset, _)) = loc.slice_offset_and_length {

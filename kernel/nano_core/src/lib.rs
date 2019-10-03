@@ -16,6 +16,7 @@
 //! 
 
 #![no_std]
+#![feature(compiler_builtins_lib)]
 
 #[macro_use] extern crate log;
 extern crate alloc;
@@ -32,9 +33,14 @@ extern crate memory; // the virtual memory subsystem
 extern crate mod_mgmt;
 extern crate exceptions_early;
 extern crate captain;
-extern crate panic_unwind; // the panic/unwind lang items
+extern crate panic_entry; // the panic-related lang items
 
 #[macro_use] extern crate vga_buffer;
+
+/// This module is a hack to get around the lack of the 
+/// `__truncdfsf2` function in the `compiler_builtins` crate.
+/// See this: <https://github.com/rust-lang-nursery/compiler-builtins/pull/262>
+mod truncate;
 
 
 #[link_section = ".pre_init_array"] // "pre_init_array" is a section never removed by --gc-sections
@@ -154,8 +160,8 @@ pub extern "C" fn nano_core_start(multiboot_information_virtual_address: usize) 
         Ok((init_symbols, _num_new_syms)) => {
             // Get symbols from the boot assembly code that defines where the BSP stack and the ap_start code are.
             // The symbols in the ".init" section will be in init_symbols, all others will be in the regular namespace symbol tree.
-            bsp_stack_top     = try_exit!(default_namespace.get_symbol("initial_bsp_stack_top").upgrade().ok_or("Missing expected symbol from assembly code \"initial_bsp_stack_top\"")).lock().virt_addr();
-            bsp_stack_bottom  = try_exit!(default_namespace.get_symbol("initial_bsp_stack_bottom").upgrade().ok_or("Missing expected symbol from assembly code \"initial_bsp_stack_bottom\"")).lock().virt_addr();
+            bsp_stack_top     = try_exit!(default_namespace.get_symbol("initial_bsp_stack_top").upgrade().ok_or("Missing expected symbol from assembly code \"initial_bsp_stack_top\"")).lock().start_address();
+            bsp_stack_bottom  = try_exit!(default_namespace.get_symbol("initial_bsp_stack_bottom").upgrade().ok_or("Missing expected symbol from assembly code \"initial_bsp_stack_bottom\"")).lock().start_address();
             ap_realmode_begin = try_exit!(init_symbols.get("ap_start_realmode").ok_or("Missing expected symbol from assembly code \"ap_start_realmode\"").and_then(|v| VirtualAddress::new(*v + KERNEL_OFFSET)));
             ap_realmode_end   = try_exit!(init_symbols.get("ap_start_realmode_end").ok_or("Missing expected symbol from assembly code \"ap_start_realmode_end\"").and_then(|v| VirtualAddress::new(*v + KERNEL_OFFSET)));
             // debug!("bsp_stack_top: {:#X}, bsp_stack_bottom: {:#X}, ap_realmode_begin: {:#X}, ap_realmode_end: {:#X}", bsp_stack_top, bsp_stack_bottom, ap_realmode_begin, ap_realmode_end);
@@ -174,11 +180,11 @@ pub extern "C" fn nano_core_start(multiboot_information_virtual_address: usize) 
     #[cfg(loadable)] 
     {
         println_raw!("nano_core_start(): loading the \"captain\" crate...");     
-        let captain_path = try_exit!(default_namespace.get_kernel_file_starting_with("captain-").ok_or("couldn't find the singular \"captain\" kernel file"));
-        let _num_captain_syms = try_exit!(default_namespace.load_kernel_crate(&captain_path, None, &kernel_mmi_ref, false));
+        let captain_path = try_exit!(default_namespace.get_crate_file_starting_with("captain-").ok_or("couldn't find the singular \"captain\" crate object file"));
+        let _num_captain_syms = try_exit!(default_namespace.load_crate(&captain_path, None, &kernel_mmi_ref, false));
         
-        let panic_wrapper_path = try_exit!(default_namespace.get_kernel_file_starting_with("panic_wrapper-").ok_or("couldn't find the singular \"panic_wrapper\" kernel file"));
-        let _num_libcore_syms = try_exit!(default_namespace.load_kernel_crate(&panic_wrapper_path, None, &kernel_mmi_ref, false));
+        let panic_wrapper_path = try_exit!(default_namespace.get_crate_file_starting_with("panic_wrapper-").ok_or("couldn't find the singular \"panic_wrapper\" crate object file"));
+        let _num_libcore_syms = try_exit!(default_namespace.load_crate(&panic_wrapper_path, None, &kernel_mmi_ref, false));
     }
 
 
@@ -206,7 +212,7 @@ pub extern "C" fn nano_core_start(multiboot_information_virtual_address: usize) 
             .upgrade()
             .ok_or("no single symbol matching \"captain::init\"")
         );
-        info!("The nano_core is invoking the captain init function: {:?}", section_ref.lock().name);
+        info!("The nano_core (in loadable mode) is invoking the captain init function: {:?}", section_ref.lock().name);
 
         type CaptainInitFunc = fn(Arc<MutexIrqSafe<MemoryManagementInfo>>, Vec<MappedPages>, VirtualAddress, VirtualAddress, VirtualAddress, VirtualAddress) -> Result<(), &'static str>;
         let mut space = 0;
