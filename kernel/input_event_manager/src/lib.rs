@@ -88,6 +88,7 @@ pub fn init() -> Result<DFQueueProducer<Event>, &'static str> {
     // start the input event loop thread
     KernelTaskBuilder::new(input_event_loop, keyboard_event_handling_consumer)
         .name("input_event_loop".to_string())
+        .pin_on_core(0)
         .spawn()?;
 
     Ok(returned_keyboard_producer)
@@ -120,6 +121,7 @@ fn input_event_loop(consumer:DFQueueConsumer<Event>) -> Result<(), &'static str>
                     let args: Vec<String> = vec![]; // terminal::main() does not accept any arguments
                     ApplicationTaskBuilder::new(Path::new(String::from("shell")))
                         .argument(args)
+                        .pin_on_core(0)
                         .name(task_name)
                         .spawn()?;
                     terminal_id_counter += 1;

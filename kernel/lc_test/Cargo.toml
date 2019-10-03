@@ -1,5 +1,5 @@
 [package]
-name = "libc_test"
+name = "lc_test"
 version = "0.1.0"
 authors = ["Ramla-I <ijazramla@gmail.com>"]
 edition = "2018"
@@ -18,3 +18,6 @@ path = "../mod_mgmt"
 
 [dependencies.memory]
 path = "../memory"
+
+[dependencies.spawn]
+path = "../spawn"

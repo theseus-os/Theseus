@@ -10,21 +10,21 @@ extern crate libc;
 
 use alloc::vec::Vec;
 use alloc::string::String;
-use libc::{rmalloc};
+use libc::mman::{malloc};
 
 #[no_mangle]
 pub fn main(_args: Vec<String>) -> isize {
     println!("testing libc!!!");
 
-    let a = rmalloc(64);
+    unsafe {
+        let a = malloc(64) as *mut u8; 
 
-    unsafe{
         *a = 0xF;
         *a.offset(1) = 0xE;
         *a.offset(2) = 0xD;
 
 
-        println!("a = {:#X}, {:#X}, {:#X}", *a, *a.offset(1), *a.offset(2));
+        println!("a = {}, {}, {}", *a, *a.offset(1), *a.offset(2));
     }
      
     0

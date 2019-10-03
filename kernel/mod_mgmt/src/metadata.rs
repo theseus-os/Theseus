@@ -17,6 +17,15 @@ use path::Path;
 
 use qp_trie::{Trie, wrapper::BString};
 
+pub fn name_without_hash(sec_name: &str) -> &str {
+    // the hash identifier (delimiter) is "::h"
+    const HASH_DELIMITER: &'static str = "::h";
+    sec_name.rfind("::h")
+        // .and_then(|end| sec_name.get(0 .. (end + HASH_DELIMITER.len())))
+        .and_then(|end| sec_name.get(0 .. (end)))
+        .unwrap_or_else(|| &sec_name)
+}
+
 /// A Strong reference (`Arc`) to a `LoadedSection`.
 pub type StrongSectionRef  = Arc<Mutex<LoadedSection>>;
 /// A Weak reference (`Weak`) to a `LoadedSection`.
@@ -616,7 +625,6 @@ impl LoadedSection {
         Self::section_name_without_hash(&self.name)
     }
 
-
     /// Returns the substring of the given section's name that excludes the trailing hash,
     /// but includes the hash delimiter "`::h`". 
     /// If there is no hash, then it returns the full section name unchanged.
@@ -629,8 +637,10 @@ impl LoadedSection {
         const HASH_DELIMITER: &'static str = "::h";
         sec_name.rfind("::h")
             .and_then(|end| sec_name.get(0 .. (end + HASH_DELIMITER.len())))
+            // .and_then(|end| sec_name.get(0 .. (end)))
             .unwrap_or_else(|| &sec_name)
     }
+
 
     /// Returns the index of the first `WeakDependent` object with a section
     /// that matches the given `matching_section` in this `LoadedSection`'s `sections_dependent_on_me` list.
