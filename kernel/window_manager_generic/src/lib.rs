@@ -35,7 +35,7 @@ use core::ops::{Deref, DerefMut};
 use dfqueue::{DFQueue, DFQueueConsumer, DFQueueProducer};
 use displayable::Displayable;
 use event_types::Event;
-use frame_buffer::{FrameBuffer, RelativeCoord, AbsoluteCoord, ICoord};
+use frame_buffer::{FrameBuffer, Coord, Coord};
 use frame_buffer_compositor::FRAME_COMPOSITOR;
 use frame_buffer_drawer::*;
 use frame_buffer_rgb::FrameBufferRGB;
@@ -89,7 +89,7 @@ impl<Buffer: FrameBuffer> WindowGeneric<Buffer> {
         let (width, height) = self.profile.lock().get_content_size();
         fill_rectangle(
             &mut self.framebuffer,
-            AbsoluteCoord::new(0, 0),
+            Coord::new(0, 0),
             width,
             height,
             SCREEN_BACKGROUND_COLOR,
@@ -109,17 +109,17 @@ impl<Buffer: FrameBuffer> WindowGeneric<Buffer> {
     pub fn add_displayable(
         &mut self,
         key: &str,
-        coordinate: RelativeCoord,
+        coordinate: Coord,
         displayable: Box<dyn Displayable>,
     ) -> Result<(), &'static str> {
         let key = key.to_string();
         let (width, height) = displayable.get_size();
         let profile = self.profile.lock();
 
-        if !profile.contains_coordinate(coordinate)
-            || !profile.contains_coordinate(coordinate + (width, 0))
-            || !profile.contains_coordinate(coordinate + (0, height))
-            || !profile.contains_coordinate(coordinate + (width, height))
+        if !profile.contains(coordinate)
+            || !profile.contains(coordinate + (width, 0))
+            || !profile.contains(coordinate + (0, height))
+            || !profile.contains(coordinate + (width, height))
         {
             return Err("The displayable does not fit the window size.");
         }
@@ -158,7 +158,7 @@ impl<Buffer: FrameBuffer> WindowGeneric<Buffer> {
     }
 
     /// Gets the position of a displayable relative to the window.
-    pub fn get_displayable_position(&self, key: &str) -> Result<RelativeCoord, &'static str> {
+    pub fn get_displayable_position(&self, key: &str) -> Result<Coord, &'static str> {
         let opt = self.components.get(key);
         match opt {
             None => {
@@ -171,14 +171,14 @@ impl<Buffer: FrameBuffer> WindowGeneric<Buffer> {
     }
 
     /// Gets the content position relative to the window excluding border and padding relative.
-    pub fn get_content_position(&self) -> RelativeCoord {
+    pub fn get_content_position(&self) -> Coord {
         self.profile.lock().get_content_position()
     }
 
     /// Renders the content of the window to the screen.
     pub fn render(&mut self) -> Result<(), &'static str> {
         let (window_x, window_y) = { self.profile.lock().get_content_position().value() };
-        let coordinate = ICoord {
+        let coordinate = Coord {
             x: window_x as i32,
             y: window_y as i32,
         };
@@ -223,7 +223,7 @@ impl<Buffer: FrameBuffer> WindowGeneric<Buffer> {
         let coordinate = component.get_position();
         let displayable = component.get_displayable_mut();
         displayable.display(
-            AbsoluteCoord(coordinate.to_ucoord()), 
+            Coord(coordinate.to_ucoord()), 
             &mut self.framebuffer
         )?;
         self.render()
@@ -233,7 +233,7 @@ impl<Buffer: FrameBuffer> WindowGeneric<Buffer> {
     /// Resizes a window as (width, height) at coordinate relative to the screen.
     pub fn resize(
         &mut self,
-        coordinate: RelativeCoord,
+        coordinate: Coord,
         width: usize,
         height: usize,
     ) -> Result<(), &'static str> {
@@ -255,7 +255,7 @@ impl<Buffer: FrameBuffer> WindowGeneric<Buffer> {
                     let (x, y) = item.get_position().value();
                     let (width, height) = item.get_displayable().get_size();
                     item.resize(
-                        RelativeCoord::new(
+                        Coord::new(
                             x * percent.0 / 100,
                             y * percent.1 / 100
                         ),
@@ -288,7 +288,7 @@ impl<Buffer: FrameBuffer> WindowGeneric<Buffer> {
 /// `coordinate` specifies the coordinate of the window relative to the screen.
 /// (width, height) specify the size of the new window.
 pub fn new_window(
-    coordinate: RelativeCoord,
+    coordinate: Coord,
     width: usize,
     height: usize,
 ) -> Result<WindowGeneric<FrameBufferRGB>, &'static str> {
@@ -343,7 +343,7 @@ pub fn new_window(
 pub fn new_default_window() -> Result<WindowGeneric<FrameBufferRGB>, &'static str> {
     let (window_width, window_height) = frame_buffer::get_screen_size()?;
     match new_window(
-        RelativeCoord::new(WINDOW_MARGIN, WINDOW_MARGIN),
+        Coord::new(WINDOW_MARGIN, WINDOW_MARGIN),
         window_width - 2 * WINDOW_MARGIN,
         window_height - 2 * WINDOW_MARGIN,
     ) {
@@ -355,7 +355,7 @@ pub fn new_default_window() -> Result<WindowGeneric<FrameBufferRGB>, &'static st
 /// The structure is owned by the window manager. It contains the information of a window but under the control of the manager
 pub struct WindowProfile {
     /// the coordinate of the window relative to the screen
-    pub coordinate: RelativeCoord,
+    pub coordinate: Coord,
     /// the width of the window
     pub width: usize,
     /// the height of the window
@@ -378,16 +378,16 @@ impl Window for WindowProfile {
         let buffer = buffer_lock.deref_mut();
         draw_rectangle(
             buffer,
-            AbsoluteCoord(self.coordinate.to_ucoord()),
+            Coord(self.coordinate.to_ucoord()),
             self.width,
             self.height,
             SCREEN_BACKGROUND_COLOR,
         );
-        let coordinate = ICoord { x: 0, y: 0 };
+        let coordinate = Coord { x: 0, y: 0 };
         FRAME_COMPOSITOR.lock().composite(vec![(buffer, coordinate)])
     }
 
-    fn contains_coordinate(&self, point: RelativeCoord) -> bool {
+    fn contains(&self, point: Coord) -> bool {
         let (x, y) = point.value();
         return x <= self.width - 2 * self.padding && y <= self.height - 2 * self.padding;
     }
@@ -405,14 +405,14 @@ impl Window for WindowProfile {
         };
         let mut buffer_lock = buffer_ref.lock();
         let buffer = buffer_lock.deref_mut();
-        draw_rectangle(buffer, AbsoluteCoord(self.coordinate.to_ucoord()), self.width, self.height, color);
-        let coordinate = ICoord { x: 0, y: 0 };
+        draw_rectangle(buffer, Coord(self.coordinate.to_ucoord()), self.width, self.height, color);
+        let coordinate = Coord { x: 0, y: 0 };
         FRAME_COMPOSITOR.lock().composite(vec![(buffer, coordinate)])
     }
 
     fn resize(
         &mut self,
-        coordinate: RelativeCoord,
+        coordinate: Coord,
         width: usize,
         height: usize,
     ) -> Result<(usize, usize), &'static str> {
@@ -435,7 +435,7 @@ impl Window for WindowProfile {
         )
     }
 
-    fn get_content_position(&self) -> RelativeCoord {
+    fn get_content_position(&self) -> Coord {
         self.coordinate + (self.padding, self.padding)
     }
 
@@ -446,7 +446,7 @@ impl Window for WindowProfile {
 
 /// A component contains a displayable and its coordinate relative to the window.
 pub struct Component {
-    coordinate: RelativeCoord,
+    coordinate: Coord,
     displayable: Box<dyn Displayable>,
 }
 
@@ -462,12 +462,12 @@ impl Component {
     }
 
     // gets the coordinate of the displayable relative to the window
-    fn get_position(&self) -> RelativeCoord {
+    fn get_position(&self) -> Coord {
         self.coordinate
     }
 
     // resizes the displayable as (width, height) at `coordinate` relative to the window
-    fn resize(&mut self, coordinate: RelativeCoord, width: usize, height: usize) {
+    fn resize(&mut self, coordinate: Coord, width: usize, height: usize) {
         self.coordinate = coordinate;
         self.displayable.resize(width, height);
     }

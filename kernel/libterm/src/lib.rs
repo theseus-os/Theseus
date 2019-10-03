@@ -27,7 +27,7 @@ use event_types::Event;
 use text_display::{TextDisplay, Cursor};
 use displayable::Displayable;
 use frame_buffer_rgb::FrameBufferRGB;
-use frame_buffer::{RelativeCoord, AbsoluteCoord};
+use frame_buffer::{Coord};
 use window_manager_generic::WindowGeneric;
 
 pub const FONT_COLOR: u32 = 0x93ee90;
@@ -576,7 +576,7 @@ impl Terminal {
             let height = height - 2*window_manager::WINDOW_MARGIN;
             let text_display = TextDisplay::new(width, height, FONT_COLOR, BACKGROUND_COLOR)?;
             let displayable: Box<dyn Displayable> = Box::new(text_display);
-            self.window.add_displayable(&display_name, RelativeCoord::new(0, 0),displayable)?;
+            self.window.add_displayable(&display_name, Coord::new(0, 0),displayable)?;
         }
         Ok(())
     }
@@ -600,7 +600,7 @@ impl Terminal {
         let bg_color = text_display.get_bg_color();
         text_display::display_cursor(
             &mut self.cursor, 
-            AbsoluteCoord(coordinate.to_ucoord()), 
+            Coord(coordinate.to_ucoord()), 
             col, 
             line,
             bg_color,

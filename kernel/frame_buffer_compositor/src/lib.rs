@@ -14,7 +14,7 @@ extern crate lazy_static;
 use alloc::collections::BTreeMap;
 use alloc::vec::Vec;
 use compositor::Compositor;
-use frame_buffer::{FrameBuffer, FINAL_FRAME_BUFFER, ICoord};
+use frame_buffer::{FrameBuffer, FINAL_FRAME_BUFFER, Coord};
 use spin::Mutex;
 
 lazy_static! {
@@ -36,33 +36,33 @@ pub struct FrameCompositor {
 
 // The information of a cached framebuffer. It contains the location and size of the framebuffer.
 struct BufferCache {
-    coordinate: ICoord,
+    coordinate: Coord,
     width: usize,
     height: usize,
 }
 
 impl BufferCache {
     // checks if the coordinate is within the framebuffer
-    fn contains_coordinate(&self, coordinate: ICoord) -> bool {
+    fn contains(&self, coordinate: Coord) -> bool {
         return coordinate.x >= self.coordinate.x
-            && coordinate.x <= self.coordinate.x + self.width as i32
+            && coordinate.x <= self.coordinate.x + self.width as isize
             && coordinate.y >= self.coordinate.y
-            && coordinate.y <= self.coordinate.y + self.height as i32;
+            && coordinate.y <= self.coordinate.y + self.height as isize;
     }
 
     // checks if the cached framebuffer overlaps with another one
     fn overlaps_with(&self, cache: &BufferCache) -> bool {
-        self.contains_coordinate(cache.coordinate)
-            || self.contains_coordinate(cache.coordinate + (cache.width as i32, 0))
-            || self.contains_coordinate(cache.coordinate + (0, cache.height as i32))
-            || self.contains_coordinate(cache.coordinate + (cache.width as i32, cache.height as i32))
+        self.contains(cache.coordinate)
+            || self.contains(cache.coordinate + (cache.width as isize, 0))
+            || self.contains(cache.coordinate + (0, cache.height as isize))
+            || self.contains(cache.coordinate + (cache.width as isize, cache.height as isize))
     }
 }
 
 impl Compositor for FrameCompositor {
     fn composite(
         &mut self,
-        bufferlist: Vec<(&dyn FrameBuffer, ICoord)>,
+        bufferlist: Vec<(&dyn FrameBuffer, Coord)>,
     ) -> Result<(), &'static str> {
         let mut final_fb = FINAL_FRAME_BUFFER
             .try()
@@ -77,13 +77,13 @@ impl Compositor for FrameCompositor {
             }
             let (src_width, src_height) = src_fb.get_size();
 
-            let coordinate_end = coordinate + (src_width as i32, src_height as i32);
+            let coordinate_end = coordinate + (src_width as isize, src_height as isize);
 
             // skip if the framebuffer is not in the screen
             if coordinate_end.x < 0
-                || coordinate.x > final_width as i32
+                || coordinate.x > final_width as isize
                 || coordinate_end.y < 0
-                || coordinate.y > final_height as i32
+                || coordinate.y > final_height as isize
             {
                 break;
             }
@@ -99,8 +99,8 @@ impl Compositor for FrameCompositor {
             let src_buffer = src_fb.buffer();
             for i in 0..height {
                 let dest_start = (final_y_start + i) * final_width + final_x_start;
-                let src_start = src_width * ((final_y_start + i) as i32 - coordinate.y) as usize
-                    + (final_x_start as i32 - coordinate.x) as usize;
+                let src_start = src_width * ((final_y_start + i) as isize - coordinate.y) as usize
+                    + (final_x_start as isize - coordinate.x) as usize;
                 let src_end = src_start + width;
                 final_fb.buffer_copy(&(src_buffer[src_start..src_end]), dest_start);
             }
@@ -125,7 +125,7 @@ impl Compositor for FrameCompositor {
         Ok(())
     }
 
-    fn cached(&self, frame_buffer: &dyn FrameBuffer, coordinate: ICoord) -> bool {
+    fn cached(&self, frame_buffer: &dyn FrameBuffer, coordinate: Coord) -> bool {
         match self.cache.get(&(frame_buffer.get_hash())) {
             Some(cache) => {
                 return cache.coordinate == coordinate;

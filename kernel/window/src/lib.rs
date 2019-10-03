@@ -9,7 +9,7 @@ extern crate frame_buffer;
 
 use event_types::Event;
 use dfqueue::{DFQueueProducer};
-use frame_buffer::RelativeCoord;
+use frame_buffer::Coord;
 
 /// The `Window` trait.
 pub trait Window: Send {
@@ -17,7 +17,7 @@ pub trait Window: Send {
     fn clear(&self) -> Result<(), &'static str>;
 
     /// Checks if the coordinate relative to the window is within the window exluding the border and padding.
-    fn contains_coordinate(&self, point: RelativeCoord) -> bool;
+    fn contains(&self, point: Coord) -> bool;
 
     /// Sets the window as active or not.
     fn set_active(&mut self, active: bool) -> Result<(), &'static str>;
@@ -28,7 +28,7 @@ pub trait Window: Send {
     /// Adjusts the size (width, height) and coordinate of the window relative to the screen.
     fn resize(
         &mut self,
-        coordinate: RelativeCoord,
+        coordinate: Coord,
         width: usize,
         height: usize,
     ) -> Result<(usize, usize), &'static str>;
@@ -37,7 +37,7 @@ pub trait Window: Send {
     fn get_content_size(&self) -> (usize, usize);
 
     /// Gets the coordinate of content relative to the window without padding.
-    fn get_content_position(&self) -> RelativeCoord;
+    fn get_content_position(&self) -> Coord;
 
     /// Gets the producer of events.
     fn events_producer(&mut self) -> &mut DFQueueProducer<Event>;

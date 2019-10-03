@@ -10,7 +10,7 @@ extern crate downcast_rs;
 
 use alloc::boxed::Box;
 use downcast_rs::Downcast;
-use frame_buffer::{FrameBuffer, AbsoluteCoord};
+use frame_buffer::{FrameBuffer, Coord};
 
 /// The displayable trait.
 pub trait Displayable: Downcast + Send {
@@ -20,7 +20,7 @@ pub trait Displayable: Downcast + Send {
     /// * `framebuffer`: the framebuffer to display onto.
     fn display(
         &mut self,
-        coordinate: AbsoluteCoord,
+        coordinate: Coord,
         framebuffer: &mut dyn FrameBuffer,
     ) -> Result<(), &'static str>;
 

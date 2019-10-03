@@ -9,7 +9,7 @@ extern crate frame_buffer_rgb;
 
 use alloc::vec;
 use font::{CHARACTER_HEIGHT, CHARACTER_WIDTH, FONT_PIXEL};
-use frame_buffer::{FrameBuffer, AbsoluteCoord};
+use frame_buffer::{FrameBuffer, Coord};
 
 /// Prints a string in a framebuffer.
 /// Returns (column, line) of the end, i.e. the position of the next symbol.
@@ -23,7 +23,7 @@ use frame_buffer::{FrameBuffer, AbsoluteCoord};
 /// * `bg_color`: the background color of the text block.
 pub fn print_by_bytes(
     framebuffer: &mut dyn FrameBuffer,
-    coordinate: AbsoluteCoord,
+    coordinate: Coord,
     width: usize,
     height: usize,
     slice: &str,
@@ -32,7 +32,7 @@ pub fn print_by_bytes(
 ) -> Result<(usize, usize), &'static str> {
     let buffer_width = width / CHARACTER_WIDTH;
     let buffer_height = height / CHARACTER_HEIGHT;
-    let (x, y) = coordinate.value();
+    let (x, y) = (coordinate.x, coordinate.y);
 
     let mut curr_line = 0;
     let mut curr_column = 0;
@@ -41,10 +41,10 @@ pub fn print_by_bytes(
             // fill the remaining blank of current line and go to the next line
             fill_blank(
                 framebuffer,
-                x + curr_column * CHARACTER_WIDTH,
-                y + curr_line * CHARACTER_HEIGHT,
-                x + width,
-                y + (curr_line + 1) * CHARACTER_HEIGHT,
+                coordinate.x + (curr_column * CHARACTER_WIDTH) as isize,
+                coordinate.y + (curr_line * CHARACTER_HEIGHT) as isize,
+                coordinate.x + width as isize,
+                coordinate.y + ((curr_line + 1) * CHARACTER_HEIGHT) as isize,
                 bg_color,
             )?;
             curr_column = 0;
@@ -77,10 +77,10 @@ pub fn print_by_bytes(
     //fill the blank of the last line
     fill_blank(
         framebuffer,
-        x + curr_column * CHARACTER_WIDTH,
-        y + curr_line * CHARACTER_HEIGHT,
-        x + width,
-        y + (curr_line + 1) * CHARACTER_HEIGHT,
+        x + (curr_column * CHARACTER_WIDTH) as isize,
+        y + (curr_line * CHARACTER_HEIGHT) as isize,
+        x + width as isize,
+        y + ((curr_line + 1) * CHARACTER_HEIGHT) as isize,
         bg_color,
     )?;
 
@@ -88,9 +88,9 @@ pub fn print_by_bytes(
     fill_blank(
         framebuffer,
         x,
-        y + (curr_line + 1) * CHARACTER_HEIGHT,
-        x + width,
-        y + height,
+        y + ((curr_line + 1) * CHARACTER_HEIGHT) as isize,
+        x + width as isize,
+        y + height as isize,
         bg_color,
     )?;
 
@@ -105,19 +105,26 @@ fn print_byte(
     byte: u8,
     font_color: u32,
     bg_color: u32,
-    coordinate: AbsoluteCoord,
+    coordinate: Coord,
     line: usize,
     column: usize,
 ) -> Result<(), &'static str> {
-    let start = coordinate + (column * CHARACTER_WIDTH, line * CHARACTER_HEIGHT);
+    let start = coordinate + ((column * CHARACTER_WIDTH) as isize, (line * CHARACTER_HEIGHT) as isize);
+    if !framebuffer.overlaps_with(start, CHARACTER_WIDTH, CHARACTER_HEIGHT) {
+        return Ok(())
+    }
+
     let fonts = FONT_PIXEL.lock();
 
-    let mut i = 0;
-    let mut j = 0;
+    let mut i: usize = 0;
+    let mut j: usize = 0;
     loop {
-        let mask: u32 = fonts[byte as usize][i][j];
-        let color = font_color & mask | bg_color & (!mask);
-        framebuffer.draw_pixel(start + (j, i), color);
+        let point = start + (j as isize, i as isize);
+        if framebuffer.contains(point) {
+            let mask: u32 = fonts[byte as usize][i][j];
+            let color = font_color & mask | bg_color & (!mask);
+            framebuffer.draw_pixel(point, color)?;
+        }
         j += 1;
         if j == CHARACTER_WIDTH {
             i += 1;
@@ -132,25 +139,33 @@ fn print_byte(
 // fill a blank text area (left, top, right, bottom) with color.
 fn fill_blank(
     framebuffer: &mut dyn FrameBuffer,
-    left: usize,
-    top: usize,
-    right: usize,
-    bottom: usize,
+    left: isize,
+    top: isize,
+    right: isize,
+    bottom: isize,
     color: u32,
 ) -> Result<(), &'static str> {
+
+    let (width, height) = framebuffer.get_size();
+    // Only fill the part within the frame buffer
+    let left = core::cmp::max(0, left);
+    let right = core::cmp::min(right, width as isize);
+    let top = core::cmp::max(0, top);
+    let bottom = core::cmp::min(bottom, height as isize);
+
     if left >= right || top >= bottom {
         return Ok(());
     }
 
-    let fill = vec![color; right - left];
-    let mut line_start = AbsoluteCoord::new(left, top);
+    let fill = vec![color; (right - left) as usize];
+    let mut coordinate = Coord::new(left, top);
     
     loop {
-        if line_start.0.y == bottom {
+        if coordinate.y == bottom {
             return Ok(());
         }
-        let start = framebuffer.index(line_start);
+        let start = framebuffer.index(coordinate)?;
         framebuffer.buffer_copy(&fill, start);
-        line_start = line_start + (0, 1);
+        coordinate.y += 1;
     }
 }

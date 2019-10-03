@@ -34,17 +34,39 @@ pub trait FrameBuffer: Send {
     fn buffer_copy(&mut self, src: &[Pixel], dest_start: usize);
 
     /// Computes the index of a coordinate in the buffer array.
-    fn index(&self, coordinate: AbsoluteCoord) -> usize;
+    fn index(&self, coordinate: Coord) -> Result<usize, &'static str> {
+        let (width, _) = self.get_size();
+        if self.contains(coordinate) {
+            return Ok(coordinate.y as usize * width + coordinate.x as usize);
+        } else {
+            return Err("The coordinate is not in the framebuffer");
+        }
+    }
 
     /// Checks if a coordinate is within the framebuffer.
-    fn contains_coordinate(&self, coordinate: AbsoluteCoord) -> bool;
+    fn contains(&self, coordinate: Coord) -> bool{
+        let (width, height) = self.get_size();
+        coordinate.x >= 0 && coordinate.x < width as isize 
+            && coordinate.y >= 0 && coordinate.y < height as isize
+    }
 
     /// Gets the indentical hash of the framebuffer.
     /// The frame buffer compositor uses this hash to cache framebuffers.
     fn get_hash(&self) -> u64;
 
     /// Draws a pixel in the framebuffer at coordinate.
-    fn draw_pixel(&mut self, coordinate: AbsoluteCoord, color: Pixel);
+    fn draw_pixel(&mut self, coordinate: Coord, color: Pixel) -> Result<(), &'static str>;
+
+    /// Checks if a framebuffer overlaps with an area.
+    /// # Arguments
+    /// * `coordinate`: the left top coordinate of the area.
+    /// * `width`: the width of the area.
+    /// * `height`: the height of the area.
+    fn overlaps_with(&mut self, coordinate: Coord, width: usize, height: usize) -> bool {
+        let (buffer_width, buffer_height) = self.get_size();
+        coordinate.x < buffer_width as isize || coordinate.x + width as isize >= 0
+            || coordinate.y < buffer_height as isize || coordinate.y + height as isize>= 0
+    }
 }
 
 /// Gets the size of the final framebuffer.
@@ -57,94 +79,26 @@ pub fn get_screen_size() -> Result<(usize, usize), &'static str> {
     Ok(final_buffer.get_size())
 }
 
-
-/// The unsigned coordinate of a point.
-#[derive(Clone, Copy)]
-pub struct UCoord {
-    pub x: usize,
-    pub y: usize,
-}
-
-/// The signed coordinate of a point.
+/// The coordinate of a point.
 #[derive(Clone, Copy, PartialEq)]
-pub struct ICoord {
+pub struct Coord {
     /// The x coordinate
-    pub x: i32,
+    pub x: isize,
     /// The y coordinate
-    pub y: i32,
+    pub y: isize,
 }
 
-impl Add<(i32, i32)> for ICoord {
-    type Output = ICoord;
-
-    fn add(self, rhs: (i32, i32)) -> ICoord {
-        ICoord { x: self.x + rhs.0, y: self.y + rhs.1 }
+impl Coord {
+    /// Creates a new coordinate.
+    pub fn new(x: isize, y: isize) -> Coord {
+        Coord { x: x, y: y }
     }
 }
 
-/// The absolute coordinate in a buffer. 
-#[derive(Clone, Copy)]
-pub struct AbsoluteCoord(pub UCoord);
+impl Add<(isize, isize)> for Coord {
+    type Output = Coord;
 
-impl AbsoluteCoord {
-    /// Creates an absolute coordinate.
-    pub fn new(x: usize, y: usize) -> AbsoluteCoord {
-        AbsoluteCoord(
-            UCoord {
-                x: x,
-                y: y,
-            }
-        )
-    }
-
-    /// Gets the (x, y) value of the coordinate.
-    #[inline]
-    pub fn value(&self) -> (usize, usize) {
-        (self.0.x, self.0.y)
-    } 
-}
-
-impl Add<(usize, usize)> for AbsoluteCoord {
-    type Output = AbsoluteCoord;
-
-    fn add(self, rhs: (usize, usize)) -> AbsoluteCoord {
-        AbsoluteCoord::new(self.0.x + rhs.0, self.0.y + rhs.1)
-    }
-}
-
-
-/// The relative coordinate to some area.
-#[derive(Clone, Copy)]
-pub struct RelativeCoord(UCoord);
-
-impl RelativeCoord {
-    /// Create a relative coordinate.
-    pub fn new(x: usize, y: usize) -> RelativeCoord {
-        RelativeCoord(
-            UCoord {
-                x: x,
-                y: y,
-            }
-        )
-    }
-
-    #[inline]
-    /// Returns the (x, y) value of the coordinate.
-    pub fn value(&self) -> (usize, usize) {
-        (self.0.x, self.0.y)
-    }
-
-    #[inline]
-    /// Returns the inner unsigned coordinate of the relative coordinate
-    pub fn to_ucoord(&self) -> UCoord {
-        self.0
-    } 
-}
-
-impl Add<(usize, usize)> for RelativeCoord {
-    type Output = RelativeCoord;
-
-    fn add(self, rhs: (usize, usize)) -> RelativeCoord {
-        RelativeCoord::new(self.0.x + rhs.0, self.0.y + rhs.1)
+    fn add(self, rhs: (isize, isize)) -> Coord {
+        Coord { x: self.x + rhs.0, y: self.y + rhs.1 }
     }
 }
