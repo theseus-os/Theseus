@@ -1,40 +1,30 @@
 #![no_std]
+#![allow(non_camel_case_types)]
+#![feature(slice_internals)] //TODO: use rust memchr crate
+#![feature(const_raw_ptr_deref)]
+#![feature(core_intrinsics)]
 
 #[macro_use] extern crate log;
 extern crate alloc;
+extern crate kernel_config;
+extern crate hashbrown;
+extern crate memory;
+#[macro_use]extern crate lazy_static;
+extern crate spin;
+// extern crate memchr;
+extern crate libm;
+extern crate memfs;
+extern crate cbitset;
+extern crate rand;
+extern crate task;
 
-use alloc::alloc::Layout;
-use alloc::alloc::alloc;
-
-type off_t = i64;
-type size_t = usize;
-
-
-/// Creates a layout for the memory required and returns a pointer from the heap 
-/// void *malloc(size_t size);
-pub extern fn rmalloc (size: size_t) -> *mut u8 {
-    // we set the alignment to 1 byte, as there is noe pre-requisite in the malloc function
-    const alignment: usize = 1;
-
-    let layout = Layout::from_size_align(size, alignment).unwrap();
-
-    let mem = unsafe{ alloc(layout) };
-
-    unsafe {
-        // remove below just for testing
-        *mem = 3;
-        *mem.offset(1) = 4;
-
-        // remove above 
-    }
-
-    
-    return mem;
-}
-
-// void *mmap(void *addr, size_t length, int prot, int flags, int fd, off_t offset);
-// fn mmap(addr: *mut u8, length: size_t, prot: i32, flags: i32, fd: i32, offset: off_t) -> *mut u8 {
-
-// }
-
-// fn munmap
+pub mod mman;
+pub mod string;
+pub mod types;
+pub mod errno;
+pub mod c_str;
+pub mod file;
+pub mod stdio;
+pub mod stdlib;
+pub mod ctype;
+pub mod unistd;

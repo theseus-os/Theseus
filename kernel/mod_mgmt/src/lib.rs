@@ -640,6 +640,40 @@ impl CrateNamespace {
         // plc.temp_module_mapping is automatically unmapped when it falls out of scope here (frame allocator must not be locked)
     }
 
+    pub fn load_kernel_crate_wo_crate_name(
+        &self,
+        crate_file_path: &Path,
+        backup_namespace: Option<&CrateNamespace>, 
+        kernel_mmi_ref: &MmiRef, 
+        verbose_log: bool
+    ) -> Result<usize, &'static str> {
+
+        #[cfg(not(loscd_eval))]
+        debug!("load_kernel_crate: trying to load kernel crate at {}", crate_file_path);
+        let crate_file_ref = match crate_file_path.get(&self.dirs.kernel)
+            .or_else(|| Path::new(format!("{}.o", crate_file_path)).get(&self.dirs.kernel)) // retry with the ".o" extension
+        {
+            Some(FileOrDir::File(f)) => f,
+            _ => return Err("couldn't find specified kernel crate file path"),
+        };
+        let crate_file = crate_file_ref.lock();
+        let (new_crate_ref, elf_file) = self.load_crate_sections(crate_file.deref(), kernel_mmi_ref, verbose_log)?;
+        self.perform_relocations(&elf_file, &new_crate_ref, backup_namespace, kernel_mmi_ref, verbose_log)?;
+        let (new_crate_name, new_syms) = {
+            let new_crate = new_crate_ref.lock_as_ref();
+            let new_syms = self.add_symbols(new_crate.sections.values(), verbose_log);
+            (new_crate.crate_name.clone(), new_syms)
+        };
+            
+        #[cfg(not(loscd_eval))]
+        info!("loaded new kernel crate {:?}, {} new symbols.", new_crate_name, new_syms);
+        self.crate_tree.lock().insert(new_crate_name.into(), new_crate_ref);
+        Ok(new_syms)
+        
+        // plc.temp_module_mapping is automatically unmapped when it falls out of scope here (frame allocator must not be locked)
+    }
+
+
     
     /// This function first loads all of the given crates' sections and adds them to the symbol map,
     /// and only after *all* crates are loaded does it move on to linking/relocation calculations. 
@@ -1537,7 +1571,14 @@ impl CrateNamespace {
 
                 if sec_name.starts_with(TEXT_PREFIX) {
                     if let Some(name) = sec_name.get(TEXT_PREFIX.len() ..) {
-                        let demangled = demangle(name).to_string();
+                        let mut demangled = demangle(name).to_string();
+                        // if demangled.contains("libc") {
+                        //         debug!("a libc function: {:?}", demangled);
+                        //         demangled = demangled.split_off(6);
+                        //         debug!("a libc function: {:?}", demangled);
+                        //         demangled = name_without_hash(&demangled).to_string();
+                        //         debug!("a libc function: {:?}", demangled);
+                        //     }
                         if sec_flags & (SHF_ALLOC | SHF_WRITE | SHF_EXECINSTR) != (SHF_ALLOC | SHF_EXECINSTR) {
                             error!(".text section [{}], name: {:?} had the wrong flags {:#X}", shndx, name, sec_flags);
                             return Err(".text section had wrong flags!");

@@ -105,8 +105,8 @@ path = "../task_fs"
 [dependencies.pause]
 path = "../pause"
 
-[dependencies.libc_test]
-path = "../libc_test"
+[dependencies.lc_test]
+path = "../lc_test"
 
 [lib]
 crate-type = ["rlib"]

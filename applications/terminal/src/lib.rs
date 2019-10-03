@@ -202,6 +202,7 @@ impl Terminal {
         terminal.print_to_terminal(format!("Theseus Terminal Emulator\nPress Ctrl+C to quit a task\n{}", prompt_string))?;
         terminal.absolute_cursor_pos = terminal.scrollback_buffer.len();
         let task_ref = KernelTaskBuilder::new(terminal_loop, terminal)
+            .pin_on_core(0)
             .name("terminal_loop".to_string())
             .spawn()?;
         Ok(task_ref)
@@ -982,6 +983,7 @@ impl Terminal {
 
         let taskref = match ApplicationTaskBuilder::new(Path::new(command))
             .argument(args)
+            .pin_on_core(0)
             .spawn() {
                 Ok(taskref) => taskref, 
                 Err(e) => return Err(AppErr::SpawnErr(e.to_string()))

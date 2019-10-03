@@ -1,0 +1,22 @@
+[package]
+name = "test_ipc"
+version = "0.1.0"
+authors = ["Ramla Ijaz <ijazramla@gmail.com>"]
+build = "../../build.rs"
+
+[dependencies]
+
+
+[dependencies.log]
+default-features = false
+version = "0.3.7"
+
+
+[dependencies.terminal_print]
+path = "../terminal_print"
+
+[dependencies.ipc]
+path = "../../kernel/ipc"
+
+# [dependencies.application_main_fn]
+# path = "../../compiler_plugins"

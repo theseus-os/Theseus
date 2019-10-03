@@ -51,7 +51,7 @@ extern crate pause;
 
 #[cfg(simd_personality)] extern crate simd_personality;
 
-extern crate libc_test;
+extern crate lc_test;
 
 
 use alloc::sync::Arc;
@@ -167,7 +167,7 @@ pub fn init(
             .spawn()?;
     }
 
-    let rs = libc_test::test();
+    let rs = lc_test::test();
 
     match rs {
         Ok(_) => {

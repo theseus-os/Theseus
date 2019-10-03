@@ -42,16 +42,19 @@ pub fn init() -> Result<DFQueueProducer<Event>, &'static str> {
     // Spawns the terminal print crate so that we can print to the terminal
     ApplicationTaskBuilder::new(Path::new(String::from("terminal_print")))
         .name("terminal_print_singleton".to_string())
+        .pin_on_core(0)
         .singleton()
         .spawn()?;
 
     // Spawn the default terminal (will also start the windowing manager)
     ApplicationTaskBuilder::new(Path::new(String::from("terminal")))
         .name("default_terminal".to_string())
+        .pin_on_core(0)
         .spawn()?;
     // start the input event loop thread
     KernelTaskBuilder::new(input_event_loop, keyboard_event_handling_consumer)
         .name("input_event_loop".to_string())
+        .pin_on_core(0)
         .spawn()?;
 
     Ok(returned_keyboard_producer)
@@ -84,6 +87,7 @@ fn input_event_loop(consumer:DFQueueConsumer<Event>) -> Result<(), &'static str>
                     let args: Vec<String> = vec![]; // terminal::main() does not accept any arguments
                     ApplicationTaskBuilder::new(Path::new(String::from("terminal")))
                         .argument(args)
+                        .pin_on_core(0)
                         .name(task_name)
                         .spawn()?;
                     terminal_id_counter += 1;
