@@ -35,7 +35,7 @@ use core::ops::{Deref, DerefMut};
 use dfqueue::{DFQueue, DFQueueConsumer, DFQueueProducer};
 use displayable::Displayable;
 use event_types::Event;
-use frame_buffer::{FrameBuffer, Coord, Coord};
+use frame_buffer::{FrameBuffer, Coord};
 use frame_buffer_compositor::FRAME_COMPOSITOR;
 use frame_buffer_drawer::*;
 use frame_buffer_rgb::FrameBufferRGB;
@@ -93,7 +93,7 @@ impl<Buffer: FrameBuffer> WindowGeneric<Buffer> {
             width,
             height,
             SCREEN_BACKGROUND_COLOR,
-        );
+        )?;
         self.render()
     }
 
@@ -117,9 +117,9 @@ impl<Buffer: FrameBuffer> WindowGeneric<Buffer> {
         let profile = self.profile.lock();
 
         if !profile.contains(coordinate)
-            || !profile.contains(coordinate + (width, 0))
-            || !profile.contains(coordinate + (0, height))
-            || !profile.contains(coordinate + (width, height))
+            || !profile.contains(coordinate + (width as isize, 0))
+            || !profile.contains(coordinate + (0, height as isize))
+            || !profile.contains(coordinate + (width as isize, height as isize))
         {
             return Err("The displayable does not fit the window size.");
         }
@@ -177,11 +177,7 @@ impl<Buffer: FrameBuffer> WindowGeneric<Buffer> {
 
     /// Renders the content of the window to the screen.
     pub fn render(&mut self) -> Result<(), &'static str> {
-        let (window_x, window_y) = { self.profile.lock().get_content_position().value() };
-        let coordinate = Coord {
-            x: window_x as i32,
-            y: window_y as i32,
-        };
+        let coordinate = { self.profile.lock().get_content_position() };
         FRAME_COMPOSITOR.lock().composite(vec![(
             &mut self.framebuffer,
             coordinate
@@ -223,7 +219,7 @@ impl<Buffer: FrameBuffer> WindowGeneric<Buffer> {
         let coordinate = component.get_position();
         let displayable = component.get_displayable_mut();
         displayable.display(
-            Coord(coordinate.to_ucoord()), 
+            coordinate, 
             &mut self.framebuffer
         )?;
         self.render()
@@ -252,19 +248,18 @@ impl<Buffer: FrameBuffer> WindowGeneric<Buffer> {
         match profile.resize(coordinate, width, height) {
             Ok(percent) => {
                 for (_key, item) in self.components.iter_mut() {
-                    let (x, y) = item.get_position().value();
+                    let coordinate = item.get_position();
                     let (width, height) = item.get_displayable().get_size();
                     item.resize(
                         Coord::new(
-                            x * percent.0 / 100,
-                            y * percent.1 / 100
+                            coordinate.x * percent.0 as isize / 100,
+                            coordinate.y * percent.1 as isize / 100
                         ),
                         width * percent.0 / 100,
                         height * percent.1 / 100,
                     );
                 }
-                let (x, y) = coordinate.value();
-                profile.events_producer().enqueue(Event::new_resize_event(x, y, width, height));
+                profile.events_producer().enqueue(Event::new_resize_event(coordinate.x, coordinate.y, width, height));
                 Ok(())
             }
             Err(err) => Err(err),
@@ -343,7 +338,7 @@ pub fn new_window(
 pub fn new_default_window() -> Result<WindowGeneric<FrameBufferRGB>, &'static str> {
     let (window_width, window_height) = frame_buffer::get_screen_size()?;
     match new_window(
-        Coord::new(WINDOW_MARGIN, WINDOW_MARGIN),
+        Coord::new(WINDOW_MARGIN as isize, WINDOW_MARGIN as isize),
         window_width - 2 * WINDOW_MARGIN,
         window_height - 2 * WINDOW_MARGIN,
     ) {
@@ -378,18 +373,17 @@ impl Window for WindowProfile {
         let buffer = buffer_lock.deref_mut();
         draw_rectangle(
             buffer,
-            Coord(self.coordinate.to_ucoord()),
+            self.coordinate,
             self.width,
             self.height,
             SCREEN_BACKGROUND_COLOR,
-        );
+        )?;
         let coordinate = Coord { x: 0, y: 0 };
         FRAME_COMPOSITOR.lock().composite(vec![(buffer, coordinate)])
     }
 
-    fn contains(&self, point: Coord) -> bool {
-        let (x, y) = point.value();
-        return x <= self.width - 2 * self.padding && y <= self.height - 2 * self.padding;
+    fn contains(&self, coordinate: Coord) -> bool {
+        return coordinate.x <= (self.width - 2 * self.padding) as isize && coordinate.y <= (self.height - 2 * self.padding) as isize;
     }
 
     fn set_active(&mut self, active: bool) -> Result<(), &'static str> {
@@ -405,7 +399,7 @@ impl Window for WindowProfile {
         };
         let mut buffer_lock = buffer_ref.lock();
         let buffer = buffer_lock.deref_mut();
-        draw_rectangle(buffer, Coord(self.coordinate.to_ucoord()), self.width, self.height, color);
+        draw_rectangle(buffer, self.coordinate, self.width, self.height, color)?;
         let coordinate = Coord { x: 0, y: 0 };
         FRAME_COMPOSITOR.lock().composite(vec![(buffer, coordinate)])
     }
@@ -436,7 +430,7 @@ impl Window for WindowProfile {
     }
 
     fn get_content_position(&self) -> Coord {
-        self.coordinate + (self.padding, self.padding)
+        self.coordinate + (self.padding as isize, self.padding as isize)
     }
 
     fn events_producer(&mut self) -> &mut DFQueueProducer<Event> {

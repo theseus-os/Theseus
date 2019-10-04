@@ -17,7 +17,7 @@ pub trait Window: Send {
     fn clear(&self) -> Result<(), &'static str>;
 
     /// Checks if the coordinate relative to the window is within the window exluding the border and padding.
-    fn contains(&self, point: Coord) -> bool;
+    fn contains(&self, coordinate: Coord) -> bool;
 
     /// Sets the window as active or not.
     fn set_active(&mut self, active: bool) -> Result<(), &'static str>;

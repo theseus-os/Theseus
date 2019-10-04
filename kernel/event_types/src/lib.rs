@@ -28,7 +28,7 @@ impl Event {
         Event::OutputEvent(PrintOutputEvent::new(s.into()))
     }
 
-    pub fn new_resize_event(x: usize, y: usize, width: usize, height: usize) -> Event {
+    pub fn new_resize_event(x: isize, y: isize, width: usize, height: usize) -> Event {
         Event::ResizeEvent(WindowResizeEvent::new(x,y,width, height))
     }
 
@@ -65,13 +65,13 @@ impl PrintOutputEvent {
 //Use this to inform the window manager to adjust the sizes of existing windows
 #[derive(Debug, Clone)]
 pub struct WindowResizeEvent {
-    pub x: usize,
-    pub y: usize,
+    pub x: isize,
+    pub y: isize,
     pub width: usize, 
     pub height: usize, 
 }
  impl WindowResizeEvent {
-    pub fn new(x: usize, y: usize, width: usize, height:usize) -> WindowResizeEvent {
+    pub fn new(x: isize, y: isize, width: usize, height:usize) -> WindowResizeEvent {
         WindowResizeEvent {
             x: x,
             y: y,

@@ -109,29 +109,32 @@ fn print_byte(
     line: usize,
     column: usize,
 ) -> Result<(), &'static str> {
-    let start = coordinate + ((column * CHARACTER_WIDTH) as isize, (line * CHARACTER_HEIGHT) as isize);
+    let mut start = coordinate + ((column * CHARACTER_WIDTH) as isize, (line * CHARACTER_HEIGHT) as isize);
     if !framebuffer.overlaps_with(start, CHARACTER_WIDTH, CHARACTER_HEIGHT) {
         return Ok(())
     }
 
     let fonts = FONT_PIXEL.lock();
 
-    let mut i: usize = 0;
-    let mut j: usize = 0;
+    let (buffer_width, buffer_height) = framebuffer.get_size();
+    let off_set_x: usize = if start.x < 0 { -(start.x) as usize } else { 0 };
+    let off_set_y: usize = if start.y < 0 { -(start.y) as usize } else { 0 };    
+    let mut j = off_set_x;
+    let mut i = off_set_y;
     loop {
-        let point = start + (j as isize, i as isize);
-        if framebuffer.contains(point) {
+        let coordinate = start + (j as isize, i as isize);
+        if framebuffer.contains(coordinate) {
             let mask: u32 = fonts[byte as usize][i][j];
             let color = font_color & mask | bg_color & (!mask);
-            framebuffer.draw_pixel(point, color)?;
+            framebuffer.draw_pixel(coordinate, color)?;
         }
         j += 1;
-        if j == CHARACTER_WIDTH {
+        if j == CHARACTER_WIDTH || start.x + j as isize == buffer_width as isize {
             i += 1;
-            if i == CHARACTER_HEIGHT {
+            if i == CHARACTER_HEIGHT || start.y + i as isize == buffer_height as isize {
                 return Ok(());
             }
-            j = 0;
+            j = off_set_x;
         }
     }
 }

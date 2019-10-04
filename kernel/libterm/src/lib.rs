@@ -600,12 +600,12 @@ impl Terminal {
         let bg_color = text_display.get_bg_color();
         text_display::display_cursor(
             &mut self.cursor, 
-            Coord(coordinate.to_ucoord()), 
+            coordinate, 
             col, 
             line,
             bg_color,
             &mut self.window.framebuffer
-        );
+        )?;
         self.window.render()?;
         
         Ok(())

@@ -184,7 +184,7 @@ pub fn display_cursor(
     line: usize,
     bg_color: u32,
     framebuffer: &mut dyn FrameBuffer,
-) {
+) -> Result<(), &'static str> {
     if cursor.blink() {
         let color = if cursor.show() {
             cursor.color
@@ -194,10 +194,12 @@ pub fn display_cursor(
         
         frame_buffer_drawer::fill_rectangle(
             framebuffer,
-            coordinate + (col * CHARACTER_WIDTH, line * CHARACTER_HEIGHT),
+            coordinate + ((col * CHARACTER_WIDTH) as isize, (line * CHARACTER_HEIGHT) as isize),
             CHARACTER_WIDTH,
             CHARACTER_HEIGHT,
             color,
-        );
+        )?;
     }
+
+    Ok(())
 }
