@@ -258,7 +258,7 @@ impl<Buffer: FrameBuffer> WindowGeneric<Buffer> {
                         height * percent.1 / 100,
                     );
                 }
-                profile.events_producer().enqueue(Event::new_resize_event(coordinate.x, coordinate.y, width, height));
+                profile.events_producer().enqueue(Event::new_resize_event(coordinate, width, height));
                 Ok(())
             }
             Err(err) => Err(err),

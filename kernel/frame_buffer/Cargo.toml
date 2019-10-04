@@ -12,9 +12,6 @@ owning_ref = { git = "https://github.com/kevinaboos/owning-ref-rs" }
 [dependencies.memory]
 path = "../memory"
 
-[dependencies.multicore_bringup]
-path = "../multicore_bringup"
-
 # [build]
 # rustflags = ["-C", "prefer-dynamic", "-C", "panic=abort"]
 

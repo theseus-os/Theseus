@@ -206,7 +206,6 @@ dependencies = [
  "device_manager 0.1.0",
  "dfqueue 0.1.0",
  "e1000 0.1.0",
- "event_types 0.1.0",
  "exceptions_full 0.1.0",
  "font 0.1.0",
  "frame_buffer 0.1.0",
@@ -504,6 +503,7 @@ dependencies = [
 name = "event_types"
 version = "0.1.0"
 dependencies = [
+ "frame_buffer 0.1.0",
  "keycodes_ascii 0.1.0",
 ]
 
@@ -564,7 +564,6 @@ name = "frame_buffer"
 version = "0.1.0"
 dependencies = [
  "memory 0.1.0",
- "multicore_bringup 0.1.0",
  "owning_ref 0.4.0 (git+https://github.com/kevinaboos/owning-ref-rs)",
  "spin 0.4.10 (registry+https://github.com/rust-lang/crates.io-index)",
 ]
@@ -2218,7 +2217,6 @@ dependencies = [
 name = "vga_buffer"
 version = "0.1.0"
 dependencies = [
- "event_types 0.1.0",
  "kernel_config 0.1.0",
  "serial_port 0.1.0",
  "spin 0.4.10 (registry+https://github.com/rust-lang/crates.io-index)",

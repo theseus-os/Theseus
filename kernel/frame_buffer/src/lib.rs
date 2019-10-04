@@ -5,7 +5,6 @@
 
 extern crate alloc;
 extern crate memory;
-extern crate multicore_bringup;
 extern crate owning_ref;
 extern crate spin;
 
@@ -81,7 +80,7 @@ pub fn get_screen_size() -> Result<(usize, usize), &'static str> {
 
 /// The coordinate of a point.
 /// In the display subsystem, the coordinate of an area represents the location of its top-left corner.
-#[derive(Clone, Copy, PartialEq)]
+#[derive(Clone, Copy, PartialEq, Debug)]
 pub struct Coord {
     /// The x coordinate
     pub x: isize,

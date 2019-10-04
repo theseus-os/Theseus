@@ -36,9 +36,6 @@ path = "../window_manager_generic"
 [dependencies.input_event_manager]
 path = "../input_event_manager"
 
-[dependencies.event_types]
-path = "../event_types"
-
 [dependencies.memory]
 path = "../memory"
 
