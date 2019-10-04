@@ -112,10 +112,10 @@ impl<Buffer: FrameBuffer> WindowGeneric<Buffer> {
         displayable: Box<dyn Displayable>,
     ) -> Result<(), &'static str> {
         let key = key.to_string();
-        let (width, height) = displayable.get_size();
-        let profile = self.profile.lock();
 
-        /*if !profile.contains(coordinate)
+        /*let (width, height) = displayable.get_size();
+        let profile = self.profile.lock();
+        if !profile.contains(coordinate)
             || !profile.contains(coordinate + (width as isize, 0))
             || !profile.contains(coordinate + (0, height as isize))
             || !profile.contains(coordinate + (width as isize, height as isize))

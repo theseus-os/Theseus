@@ -110,7 +110,7 @@ fn print_byte(
     line: usize,
     column: usize,
 ) -> Result<(), &'static str> {
-    let mut start = coordinate + ((column * CHARACTER_WIDTH) as isize, (line * CHARACTER_HEIGHT) as isize);
+    let start = coordinate + ((column * CHARACTER_WIDTH) as isize, (line * CHARACTER_HEIGHT) as isize);
     if !framebuffer.overlaps_with(start, CHARACTER_WIDTH, CHARACTER_HEIGHT) {
         return Ok(())
     }
