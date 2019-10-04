@@ -605,9 +605,7 @@ impl Terminal {
             coordinate + ((col * CHARACTER_WIDTH) as isize, (line * CHARACTER_HEIGHT) as isize),
             bg_color,
             &mut self.window.framebuffer
-        )?;
-        self.window.render()?;
-        
-        Ok(())
+        );
+        self.window.render()
     }
 }

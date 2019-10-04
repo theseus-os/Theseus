@@ -93,7 +93,7 @@ impl<Buffer: FrameBuffer> WindowGeneric<Buffer> {
             width,
             height,
             SCREEN_BACKGROUND_COLOR,
-        )?;
+        );
         self.render()
     }
 
@@ -220,7 +220,7 @@ impl<Buffer: FrameBuffer> WindowGeneric<Buffer> {
         displayable.display(
             coordinate, 
             &mut self.framebuffer
-        )?;
+        );
         self.render()
     }
 
@@ -373,7 +373,7 @@ impl Window for WindowProfile {
             self.width,
             self.height,
             SCREEN_BACKGROUND_COLOR,
-        )?;
+        );
         let coordinate = Coord { x: 0, y: 0 };
         FRAME_COMPOSITOR.lock().composite(vec![(buffer, coordinate)])
     }
@@ -395,7 +395,7 @@ impl Window for WindowProfile {
         };
         let mut buffer_lock = buffer_ref.lock();
         let buffer = buffer_lock.deref_mut();
-        draw_rectangle(buffer, self.coordinate, self.width, self.height, color)?;
+        draw_rectangle(buffer, self.coordinate, self.width, self.height, color);
         let coordinate = Coord { x: 0, y: 0 };
         FRAME_COMPOSITOR.lock().composite(vec![(buffer, coordinate)])
     }

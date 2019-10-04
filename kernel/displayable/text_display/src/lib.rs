@@ -38,7 +38,7 @@ impl Displayable for TextDisplay {
         &mut self,
         coordinate: Coord,
         framebuffer: &mut dyn FrameBuffer,
-    ) -> Result<(), &'static str> {
+    ) {
         let (col, line) = frame_buffer_printer::print_by_bytes(
             framebuffer,
             coordinate,
@@ -47,10 +47,9 @@ impl Displayable for TextDisplay {
             self.text.as_str(),
             self.fg_color,
             self.bg_color,
-        )?;
+        );
         self.next_col = col;
         self.next_line = line;
-        Ok(())
     }
 
     fn resize(&mut self, width: usize, height: usize) {
@@ -181,7 +180,7 @@ pub fn display_cursor(
     coordinate: Coord,
     bg_color: u32,
     framebuffer: &mut dyn FrameBuffer,
-) -> Result<(), &'static str> {
+) {
     if cursor.blink() {
         let color = if cursor.show() {
             cursor.color
@@ -195,8 +194,6 @@ pub fn display_cursor(
             CHARACTER_WIDTH,
             CHARACTER_HEIGHT,
             color,
-        )?;
+        );
     }
-
-    Ok(())
 }

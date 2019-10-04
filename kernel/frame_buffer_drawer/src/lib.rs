@@ -10,12 +10,8 @@ use frame_buffer::{FrameBuffer, Coord};
 
 /// Draws a point in a framebuffer.
 /// The point is drawn at the coordinate relative to the framebuffer with color.
-pub fn draw_point(framebuffer: &mut dyn FrameBuffer, coordinate: Coord, color: u32) -> Result<(), &'static str> {
-    if framebuffer.contains(coordinate) {
-        framebuffer.draw_pixel(coordinate, color)?;
-    }
-
-    Ok(())
+pub fn draw_point(framebuffer: &mut dyn FrameBuffer, coordinate: Coord, color: u32) {
+    framebuffer.draw_pixel(coordinate, color);
 }
 
 /// Draws a line in a framebuffer. The part exceeding the boundary of the framebuffer will be ignored.
@@ -29,7 +25,7 @@ pub fn draw_line(
     start: Coord,
     end: Coord,
     color: u32,
-) -> Result<(), &'static str> {
+) {
     let width: isize = end.x - start.x;
     let height: isize = end.y - start.y;
 
@@ -50,7 +46,7 @@ pub fn draw_line(
             let coordinate = Coord::new(x, y);
             if framebuffer.contains(coordinate) {
                 line_in_buffer = true;
-                framebuffer.draw_pixel(coordinate, color)?;
+                framebuffer.draw_pixel(coordinate, color);
             } else if line_in_buffer {
                 // the part exceeds the buffer will be ignored
                 break;
@@ -69,7 +65,7 @@ pub fn draw_line(
             let coordinate = Coord::new(x, y);
             if framebuffer.contains(coordinate) {
                 line_in_buffer = true;
-                framebuffer.draw_pixel(coordinate, color)?;
+                framebuffer.draw_pixel(coordinate, color);
             } else if line_in_buffer {
                 // the part exceeds the buffer will be ignored
                 break;
@@ -77,8 +73,6 @@ pub fn draw_line(
             y += step;
         }
     }
-
-    Ok(())
 }
 
 /// Draws a rectangle in a framebuffer.
@@ -95,12 +89,12 @@ pub fn draw_rectangle(
     width: usize,
     height: usize,
     color: u32,
-) -> Result<(), &'static str> {
+) {
     let (buffer_width, buffer_height) = framebuffer.get_size();
 
     // return if the rectangle is not within the frame buffer
     if !framebuffer.overlaps_with(coordinate, width, height){
-        return Ok(())
+        return
     }
 
     // draw the part within the frame buffer
@@ -117,10 +111,10 @@ pub fn draw_rectangle(
             break;
         }
         if coordinate.y >= 0 {
-            framebuffer.draw_pixel(top, color)?;
+            framebuffer.draw_pixel(top, color);
         }
         if (coordinate.y + height as isize) < buffer_height as isize { 
-            framebuffer.draw_pixel(top + (0, end_y_offset), color)?;
+            framebuffer.draw_pixel(top + (0, end_y_offset), color);
         }
         top.x += 1;
     }
@@ -132,15 +126,13 @@ pub fn draw_rectangle(
             break;
         }
         if coordinate.x >= 0 {
-            framebuffer.draw_pixel(left, color)?;
+            framebuffer.draw_pixel(left, color);
         }
         if (coordinate.x + width as isize) < buffer_width as isize {
-            framebuffer.draw_pixel(left + (end_x_offset, 0), color)?;
+            framebuffer.draw_pixel(left + (end_x_offset, 0), color);
         }
         left.y += 1;
     }
-
-    Ok(())
 }
 
 /// Fills a rectangle in a framebuffer with color.
@@ -157,11 +149,11 @@ pub fn fill_rectangle(
     width: usize,
     height: usize,
     color: u32,
-) -> Result<(), &'static str> {
+) {
     let (buffer_width, buffer_height) = framebuffer.get_size();
     // return if the rectangle is not within the frame buffer
     if !framebuffer.overlaps_with(coordinate, width, height){
-        return Ok(())
+        return
     }
 
     // draw the part within the frame buffer
@@ -174,7 +166,7 @@ pub fn fill_rectangle(
     let mut coordinate = Coord::new(start_x, start_y);
     loop {
         loop {
-            framebuffer.draw_pixel(coordinate, color)?;
+            framebuffer.draw_pixel(coordinate, color);
             coordinate.x += 1;
             if coordinate.x == end_x {
                 break;
@@ -186,6 +178,4 @@ pub fn fill_rectangle(
         }
         coordinate.x = start_x;
     }
-
-    Ok(())
 }

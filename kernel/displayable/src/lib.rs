@@ -23,7 +23,7 @@ pub trait Displayable: Downcast + Send {
         &mut self,
         coordinate: Coord,
         framebuffer: &mut dyn FrameBuffer,
-    ) -> Result<(), &'static str>;
+    );
 
     /// Resizes the displayable area.
     fn resize(&mut self, width: usize, height: usize);

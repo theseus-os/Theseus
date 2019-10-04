@@ -129,11 +129,9 @@ impl FrameBuffer for FrameBufferRGB {
         s.finish()
     }
 
-    fn draw_pixel(&mut self, coordinate: Coord, color: Pixel) -> Result<(), &'static str> {
-        if self.contains(coordinate) {
-            let index = self.index(coordinate)?;
+    fn draw_pixel(&mut self, coordinate: Coord, color: Pixel) {
+        if let Some(index) = self.index(coordinate) {
             self.buffer[index] = color;
         }
-        Ok(())
     }
 }

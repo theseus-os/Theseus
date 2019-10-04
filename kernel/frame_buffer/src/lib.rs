@@ -33,12 +33,12 @@ pub trait FrameBuffer: Send {
     fn buffer_copy(&mut self, src: &[Pixel], dest_start: usize);
 
     /// Computes the index of a coordinate in the buffer array.
-    fn index(&self, coordinate: Coord) -> Result<usize, &'static str> {
+    fn index(&self, coordinate: Coord) -> Option<usize> {
         let (width, _) = self.get_size();
         if self.contains(coordinate) {
-            return Ok(coordinate.y as usize * width + coordinate.x as usize);
+            return Some(coordinate.y as usize * width + coordinate.x as usize);
         } else {
-            return Err("The coordinate is not in the framebuffer");
+            return None;
         }
     }
 
@@ -54,7 +54,7 @@ pub trait FrameBuffer: Send {
     fn get_hash(&self) -> u64;
 
     /// Draws a pixel at coordinate relative to the frame buffer.
-    fn draw_pixel(&mut self, coordinate: Coord, color: Pixel) -> Result<(), &'static str>;
+    fn draw_pixel(&mut self, coordinate: Coord, color: Pixel);
 
     /// Checks if a framebuffer overlaps with an area.
     /// # Arguments
