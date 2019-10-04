@@ -18,8 +18,5 @@ path = "../frame_buffer"
 [dependencies.multicore_bringup]
 path = "../multicore_bringup"
 
-# [build]
-# rustflags = ["-C", "prefer-dynamic", "-C", "panic=abort"]
-
 [lib]
 crate-type = ["rlib"]

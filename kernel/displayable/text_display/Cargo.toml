@@ -26,8 +26,5 @@ path = "../../tsc"
 [dependencies.frame_buffer_drawer]
 path = "../../frame_buffer_drawer"
 
-# [build]
-# rustflags = ["-C", "prefer-dynamic", "-C", "panic=abort"]
-
 [lib]
 crate-type = ["rlib"]

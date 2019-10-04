@@ -14,9 +14,5 @@ path = "../frame_buffer"
 [dependencies.font]
 path = "../font"
 
-# [build]
-# rustflags = ["-C", "prefer-dynamic", "-C", "panic=abort"]
-
-
 [lib]
 crate-type = ["rlib"]

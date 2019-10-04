@@ -12,16 +12,16 @@ use alloc::boxed::Box;
 use memory::MappedPages;
 use owning_ref::BoxRefMut;
 use spin::{Mutex, Once};
-use core::ops::Add;
+use core::ops::{Add, Sub};
 
 /// A pixel on the screen is mapped to a u32 integer.
 pub type Pixel = u32;
 
 /// The final framebuffer instance. It contains the pages which are mapped to the physical framebuffer.
-pub static FINAL_FRAME_BUFFER: Once<Mutex<Box<dyn FrameBuffer>>> = Once::new();
+pub static FINAL_FRAME_BUFFER: Once<Mutex<Box<dyn FrameBuffer + Send>>> = Once::new();
 
 /// The `FrameBuffer` trait.
-pub trait FrameBuffer: Send {
+pub trait FrameBuffer {
     /// Returns a reference to the mapped memory.
     fn buffer(&self) -> &BoxRefMut<MappedPages, [Pixel]>;
 

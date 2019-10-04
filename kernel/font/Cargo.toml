@@ -8,8 +8,5 @@ build = "../../build.rs"
 [dependencies]
 spin = "0.4.10"
 
-# [build]
-# rustflags = ["-C", "prefer-dynamic", "-C", "panic=abort"]
-
 [lib]
 crate-type = ["rlib"]

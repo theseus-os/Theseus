@@ -20,8 +20,5 @@ path = "../window"
 [dependencies.frame_buffer]
 path = "../frame_buffer"
 
-# [build]
-# rustflags = ["-C", "prefer-dynamic", "-C", "panic=abort"]
-
 [lib]
 crate-type = ["rlib"]

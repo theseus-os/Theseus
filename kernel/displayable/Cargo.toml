@@ -12,8 +12,5 @@ downcast-rs = "1.0.4"
 [dependencies.frame_buffer]
 path = "../frame_buffer"
 
-# [build]
-# rustflags = ["-C", "prefer-dynamic", "-C", "panic=abort"]
-
 [lib]
 crate-type = ["rlib"]

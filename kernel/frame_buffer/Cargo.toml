@@ -12,8 +12,5 @@ owning_ref = { git = "https://github.com/kevinaboos/owning-ref-rs" }
 [dependencies.memory]
 path = "../memory"
 
-# [build]
-# rustflags = ["-C", "prefer-dynamic", "-C", "panic=abort"]
-
 [lib]
 crate-type = ["rlib"]

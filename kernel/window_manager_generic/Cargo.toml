@@ -46,8 +46,5 @@ path = "../window_manager"
 features = ["spin_no_std", "nightly"]
 version = "1.2.0"
 
-# [build]
-# rustflags = ["-C", "prefer-dynamic", "-C", "panic=abort"]
-
 [lib]
 crate-type = ["rlib"]
