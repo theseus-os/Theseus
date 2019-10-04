@@ -1,5 +1,6 @@
 //! This crate contains a series of basic draw functions to draw onto a framebuffer.
 //! Displayables invoke these basic functions to display themselves onto a framebuffer.
+//! The coordinate in these interfaces is relative to the left-top corner of the frame buffer.
 
 #![no_std]
 
@@ -8,7 +9,7 @@ extern crate frame_buffer;
 use frame_buffer::{FrameBuffer, Coord};
 
 /// Draws a point in a framebuffer.
-/// The point is drawn at the coordinate of the framebuffer with color.
+/// The point is drawn at the coordinate relative to the framebuffer with color.
 pub fn draw_point(framebuffer: &mut dyn FrameBuffer, coordinate: Coord, color: u32) -> Result<(), &'static str> {
     if framebuffer.contains(coordinate) {
         framebuffer.draw_pixel(coordinate, color)?;
@@ -20,8 +21,8 @@ pub fn draw_point(framebuffer: &mut dyn FrameBuffer, coordinate: Coord, color: u
 /// Draws a line in a framebuffer. The part exceeding the boundary of the framebuffer will be ignored.
 /// # Arguments
 /// * `framebuffer`: the framebuffer to draw in.
-/// * `start`: the start coordinate of the line.
-/// * `end`: the end coordinate of the line.
+/// * `start`: the start coordinate of the line relative to the frame buffer.
+/// * `end`: the end coordinate of the line relative to the frame buffer.
 /// * `color`: the color of the line.
 pub fn draw_line(
     framebuffer: &mut dyn FrameBuffer,
@@ -32,6 +33,8 @@ pub fn draw_line(
     let width: isize = end.x - start.x;
     let height: isize = end.y - start.y;
 
+    let mut line_in_buffer = false;
+    
     // compare the x distance and y distance. Increase/Decrease the longer one at every step.
     if width.abs() > height.abs() {
         let mut y;
@@ -46,7 +49,11 @@ pub fn draw_line(
             y = (x - start.x) * height / width + start.y;
             let coordinate = Coord::new(x, y);
             if framebuffer.contains(coordinate) {
+                line_in_buffer = true;
                 framebuffer.draw_pixel(coordinate, color)?;
+            } else if line_in_buffer {
+                // the part exceeds the buffer will be ignored
+                break;
             }
             x += step;
         }
@@ -60,8 +67,12 @@ pub fn draw_line(
             }
             x = (y - start.y) * width / height + start.x;
             let coordinate = Coord::new(x, y);
-            if { framebuffer.contains(coordinate) } {
+            if framebuffer.contains(coordinate) {
+                line_in_buffer = true;
                 framebuffer.draw_pixel(coordinate, color)?;
+            } else if line_in_buffer {
+                // the part exceeds the buffer will be ignored
+                break;
             }
             y += step;
         }
@@ -74,7 +85,7 @@ pub fn draw_line(
 /// The part exceeding the boundary of the framebuffer will be ignored.
 /// # Arguments
 /// * `framebuffer`: the framebuffer to draw in.
-/// * `coordinate`: the left top coordinate of the rectangle relative to the left top point of the framebuffer.
+/// * `coordinate`: the left top coordinate of the rectangle relative to the framebuffer.
 /// * `width`: the width of the rectangle.
 /// * `height`: the height of the rectangle.
 /// * `color`: the color of the rectangle's border.
@@ -92,9 +103,9 @@ pub fn draw_rectangle(
         return Ok(())
     }
 
+    // draw the part within the frame buffer
     let start_x = core::cmp::max(coordinate.x, 0);
     let start_y = core::cmp::max(coordinate.y, 0);
-
     let end_x = core::cmp::min(coordinate.x + width as isize, buffer_width as isize);
     let end_y = core::cmp::min(coordinate.y + height as isize, buffer_height as isize);
 
@@ -105,8 +116,12 @@ pub fn draw_rectangle(
         if top.x == end_x {
             break;
         }
-        framebuffer.draw_pixel(top, color)?;
-        framebuffer.draw_pixel(top + (0, end_y_offset), color)?;
+        if coordinate.y >= 0 {
+            framebuffer.draw_pixel(top, color)?;
+        }
+        if (coordinate.y + height as isize) < buffer_height as isize { 
+            framebuffer.draw_pixel(top + (0, end_y_offset), color)?;
+        }
         top.x += 1;
     }
 
@@ -116,8 +131,12 @@ pub fn draw_rectangle(
         if left.y == end_y {
             break;
         }
-        framebuffer.draw_pixel(left, color)?;
-        framebuffer.draw_pixel(left + (end_x_offset, 0), color)?;
+        if coordinate.x >= 0 {
+            framebuffer.draw_pixel(left, color)?;
+        }
+        if (coordinate.x + width as isize) < buffer_width as isize {
+            framebuffer.draw_pixel(left + (end_x_offset, 0), color)?;
+        }
         left.y += 1;
     }
 
@@ -128,7 +147,7 @@ pub fn draw_rectangle(
 /// The part exceeding the boundary of the framebuffer will be ignored.
 /// # Arguments
 /// * `framebuffer`: the framebuffer to draw in.
-/// * `coordinate`: the left top coordinate of the retangle.
+/// * `coordinate`: the left top coordinate of the retangle relative to the frame buffer.
 /// * `width`: the width of the rectangle.
 /// * `height`: the height of the rectangle.
 /// * `color`: the color of the rectangle.
@@ -145,9 +164,9 @@ pub fn fill_rectangle(
         return Ok(())
     }
 
+    // draw the part within the frame buffer
     let start_x = core::cmp::max(coordinate.x, 0);
     let start_y = core::cmp::max(coordinate.y, 0);
-
     let end_x = core::cmp::min(coordinate.x + width as isize, buffer_width as isize);
     let end_y = core::cmp::min(coordinate.y + height as isize, buffer_height as isize);
 

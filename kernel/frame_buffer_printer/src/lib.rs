@@ -1,4 +1,5 @@
 //! This crate contains functions to print strings in a framebuffer.
+//! The coordinate in these functions is relative to the left-top corner of the frame buffer.
 
 #![no_std]
 
@@ -15,7 +16,7 @@ use frame_buffer::{FrameBuffer, Coord};
 /// Returns (column, line) of the end, i.e. the position of the next symbol.
 /// # Arguments
 /// * `framebuffer`: the framebuffer to display in.
-/// * `coordinate`: the left top coordinate of the text block.
+/// * `coordinate`: the left top coordinate of the text block relative to the frame buffer.
 /// * `width`: the width of the text block.
 /// * `height`: the height of the text block.
 /// * `slice`: the string to display.
@@ -99,7 +100,7 @@ pub fn print_by_bytes(
 }
 
 // print a byte to the framebuffer at (line, column) in the text area.
-// `coordinate` specifies the location of the text area in the framebuffer.
+// `coordinate` specifies the left-top corner of the text area relative to the framebuffer.
 fn print_byte(
     framebuffer: &mut dyn FrameBuffer,
     byte: u8,
@@ -116,6 +117,7 @@ fn print_byte(
 
     let fonts = FONT_PIXEL.lock();
 
+    // print from the offset within the frame buffer
     let (buffer_width, buffer_height) = framebuffer.get_size();
     let off_set_x: usize = if start.x < 0 { -(start.x) as usize } else { 0 };
     let off_set_y: usize = if start.y < 0 { -(start.y) as usize } else { 0 };    
@@ -139,7 +141,7 @@ fn print_byte(
     }
 }
 
-// fill a blank text area (left, top, right, bottom) with color.
+// fill a blank text area (left, top, right, bottom) relative to the frame buffer with color.
 fn fill_blank(
     framebuffer: &mut dyn FrameBuffer,
     left: isize,
@@ -150,7 +152,7 @@ fn fill_blank(
 ) -> Result<(), &'static str> {
 
     let (width, height) = framebuffer.get_size();
-    // Only fill the part within the frame buffer
+    // fill the part within the frame buffer
     let left = core::cmp::max(0, left);
     let right = core::cmp::min(right, width as isize);
     let top = core::cmp::max(0, top);

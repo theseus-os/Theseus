@@ -173,7 +173,7 @@ impl Cursor {
 /// Display a cursor within a text area onto a frame buffer. 
 /// # Arguments
 /// * `cursor`: the cursor to display.
-/// * `coordinate`: the coordinate of the text area in the framebuffer.
+/// * `coordinate`: the coordinate of the text area relative to the framebuffer. It represents the locations of its left-top corner.
 /// * `(col, line):` the position of the cursor in the text area.
 /// * bg_color: the background color of the area if the cursor is hidden.
 /// * `framebuffer:` the framebuffer to display onto.

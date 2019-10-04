@@ -1,5 +1,6 @@
 //! This crate defines a trait of `Compositor`  .
 //! A compositor composites a list of buffers to a single buffer.
+//! The coordinate of a frame buffer represents the location of its left-top corner.
 
 #![no_std]
 
@@ -17,7 +18,7 @@ pub trait Compositor {
     /// # Arguments
     ///
     /// * `bufferlist` - A list of buffers in the form of (buffer:T, coordinate: Coord).
-    /// For each tuple in the list, `buffer` is a buffer object to be composited. `coordinate` specifies the relative location of the buffer in the final buffer.
+    /// For each tuple in the list, `buffer` is a buffer object to be composited. `coordinate` specifies the buffer relative to the final buffer.
     fn composite(
         &mut self,
         bufferlist: Vec<(&dyn FrameBuffer, Coord)>,

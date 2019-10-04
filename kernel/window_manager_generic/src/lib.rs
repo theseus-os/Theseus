@@ -104,8 +104,7 @@ impl<Buffer: FrameBuffer> WindowGeneric<Buffer> {
         profile_locked.get_content_size()
     }
 
-    /// Adds a new displayable at `coordinate` relative to the window.
-    /// This function checks if the displayable is in the window, but does not check if it is overlapped with others.
+    /// Adds a new displayable at `coordinate` relative to the left-top corner of the window.
     pub fn add_displayable(
         &mut self,
         key: &str,
@@ -116,13 +115,13 @@ impl<Buffer: FrameBuffer> WindowGeneric<Buffer> {
         let (width, height) = displayable.get_size();
         let profile = self.profile.lock();
 
-        if !profile.contains(coordinate)
+        /*if !profile.contains(coordinate)
             || !profile.contains(coordinate + (width as isize, 0))
             || !profile.contains(coordinate + (0, height as isize))
             || !profile.contains(coordinate + (width as isize, height as isize))
         {
             return Err("The displayable does not fit the window size.");
-        }
+        }*/
 
         let component = Component {
             coordinate: coordinate,
@@ -349,7 +348,7 @@ pub fn new_default_window() -> Result<WindowGeneric<FrameBufferRGB>, &'static st
 
 /// The structure is owned by the window manager. It contains the information of a window but under the control of the manager
 pub struct WindowProfile {
-    /// the coordinate of the window relative to the screen
+    /// the left-top corner of window relative to the left-top corner of the screen
     pub coordinate: Coord,
     /// the width of the window
     pub width: usize,

@@ -1,5 +1,6 @@
 //! This crate defines a framebuffer compositor.
 //! A framebuffer compositor will composite a sequence of framebuffers and display them in the final framebuffer.
+//! The coordinate of a frame buffer represents the location of its left-top corner.
 
 #![no_std]
 #![feature(const_vec_new)]
@@ -34,7 +35,7 @@ pub struct FrameCompositor {
     cache: BTreeMap<u64, BufferCache>,
 }
 
-// The information of a cached framebuffer. It contains the location and size of the framebuffer.
+// The information of a cached framebuffer. It contains the location relative to the final buffer and the size of the framebuffer.
 struct BufferCache {
     coordinate: Coord,
     width: usize,
