@@ -16,13 +16,13 @@ use frame_buffer::{FrameBuffer, Coord};
 /// Returns (column, line) of the end, i.e. the position of the next symbol.
 /// # Arguments
 /// * `framebuffer`: the framebuffer to display in.
-/// * `coordinate`: the left top coordinate of the text block within the frame buffer. The coordinate is relative to the top-left corner (0, 0) of the frame buffer.
+/// * `coordinate`: the left top coordinate of the text block within the frame buffer. The coordinate is relative to the origin(top-left point) of the frame buffer.
 /// * `width`: the width of the text block.
 /// * `height`: the height of the text block.
 /// * `slice`: the string to display.
 /// * `font_color`: the color of the text.
 /// * `bg_color`: the background color of the text block.
-pub fn print_by_bytes(
+pub fn print_string(
     framebuffer: &mut dyn FrameBuffer,
     coordinate: Coord,
     width: usize,
@@ -62,7 +62,7 @@ pub fn print_by_bytes(
                     break;
                 }
             }
-            print_byte(
+            print_character(
                 framebuffer,
                 byte,
                 font_color,
@@ -100,10 +100,10 @@ pub fn print_by_bytes(
 }
 
 // print a byte to the framebuffer at (line, column) in the text area.
-// `coordinate` specifies the top-left corner of the text area relative to the top-left corner (0, 0) of the framebuffer.
-fn print_byte(
+// `coordinate` specifies the top-left corner of the text area relative to the origin(top-left point) of the framebuffer.
+fn print_character(
     framebuffer: &mut dyn FrameBuffer,
-    byte: u8,
+    character: u8,
     font_color: u32,
     bg_color: u32,
     coordinate: Coord,
@@ -126,7 +126,7 @@ fn print_byte(
     loop {
         let coordinate = start + (j as isize, i as isize);
         if framebuffer.contains(coordinate) {
-            let mask: u32 = fonts[byte as usize][i][j];
+            let mask: u32 = fonts[character as usize][i][j];
             let color = font_color & mask | bg_color & (!mask);
             framebuffer.draw_pixel(coordinate, color);
         }
@@ -141,7 +141,7 @@ fn print_byte(
     }
 }
 
-// fill a blank text area (left, top, right, bottom) with color. The tuple specifies the location of the area relative to the top-left corner (0, 0) of the frame buffer.
+// fill a blank text area (left, top, right, bottom) with color. The tuple specifies the location of the area relative to the origin(top-left point) of the frame buffer.
 fn fill_blank(
     framebuffer: &mut dyn FrameBuffer,
     left: isize,

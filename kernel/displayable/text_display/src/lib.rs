@@ -39,7 +39,7 @@ impl Displayable for TextDisplay {
         coordinate: Coord,
         framebuffer: &mut dyn FrameBuffer,
     ) {
-        let (col, line) = frame_buffer_printer::print_by_bytes(
+        let (col, line) = frame_buffer_printer::print_string(
             framebuffer,
             coordinate,
             self.width,
