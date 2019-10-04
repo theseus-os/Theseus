@@ -32,17 +32,18 @@ lazy_static! {
 /// Framebuffers which haven't updated since last compositing will be ignored.
 pub struct FrameCompositor {
     // Cache of updated framebuffers
-    cache: BTreeMap<u64, BufferCache>,
+    cache: BTreeMap<u64, FrameBufferCache>,
 }
 
-// The information of a cached framebuffer. It contains the location relative to the final buffer and the size of the framebuffer.
-struct BufferCache {
+/// Metadata that describes where a framebuffer was previously composited to the final framebuffer.
+struct FrameBufferCache {
+    /// The position at which the framebuffer was rendered, which is relative to the final framebuffer's coordinate system.
     coordinate: Coord,
     width: usize,
     height: usize,
 }
 
-impl BufferCache {
+impl FrameBufferCache {
     // checks if the coordinate is within the framebuffer
     fn contains(&self, coordinate: Coord) -> bool {
         return coordinate.x >= self.coordinate.x
@@ -52,7 +53,7 @@ impl BufferCache {
     }
 
     // checks if the cached framebuffer overlaps with another one
-    fn overlaps_with(&self, cache: &BufferCache) -> bool {
+    fn overlaps_with(&self, cache: &FrameBufferCache) -> bool {
         self.contains(cache.coordinate)
             || self.contains(cache.coordinate + (cache.width as isize, 0))
             || self.contains(cache.coordinate + (0, cache.height as isize))
@@ -107,7 +108,7 @@ impl Compositor for FrameCompositor {
             }
 
             // cache the new framebuffer and remove all caches that are overlapped by it.
-            let new_cache = BufferCache {
+            let new_cache = FrameBufferCache {
                 coordinate: coordinate,
                 width: src_width,
                 height: src_height,

@@ -53,7 +53,7 @@ pub trait FrameBuffer: Send {
     /// The frame buffer compositor uses this hash to cache framebuffers.
     fn get_hash(&self) -> u64;
 
-    /// Draws a pixel at coordinate relative to the frame buffer.
+    /// Draws a pixel at the given `coordinate` within the frame buffer. The `coordinate` is relative to the top-left corner (0, 0) of the frame buffer.
     fn draw_pixel(&mut self, coordinate: Coord, color: Pixel);
 
     /// Checks if a framebuffer overlaps with an area.
