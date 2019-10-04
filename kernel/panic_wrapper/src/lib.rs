@@ -45,6 +45,7 @@ pub fn panic_wrapper(panic_info: &PanicInfo) -> Result<(), &'static str> {
         //     }
         // }
 
+        #[cfg(frame_pointers)]
         stack_trace_using_frame_pointer(
             &mmi_ref.lock().page_table,
             &|instruction_pointer: VirtualAddress| {
@@ -104,6 +105,7 @@ pub fn panic_wrapper(panic_info: &PanicInfo) -> Result<(), &'static str> {
 /// If the compiler didn't emit frame pointers, then this function will not work.
 /// 
 /// This was adapted from Redox's stack trace implementation.
+#[cfg(frame_pointers)]
 #[inline(never)]
 pub fn stack_trace_using_frame_pointer(
     current_page_table: &PageTable,
