@@ -16,7 +16,7 @@ pub trait Window: Send {
     /// Clears the window on the screen including the border and padding.
     fn clear(&self) -> Result<(), &'static str>;
 
-    /// Checks if the coordinate relative to the left-top corner of the window is within it exluding the border and padding.
+    /// Checks if the coordinate relative to the top-left corner of the window is within it exluding the border and padding.
     fn contains(&self, coordinate: Coord) -> bool;
 
     /// Sets the window as active or not.
@@ -25,7 +25,7 @@ pub trait Window: Send {
     /// Draws the border of the window.
     fn draw_border(&self, color: u32) -> Result<(), &'static str>;
 
-    /// Adjusts the size (width, height) and coordinate of the window relative to the left-top corner of the screen.
+    /// Adjusts the size (width, height) and coordinate of the window relative to the top-left corner of the screen.
     fn resize(
         &mut self,
         coordinate: Coord,
@@ -36,7 +36,7 @@ pub trait Window: Send {
     /// Gets the size of content without padding.
     fn get_content_size(&self) -> (usize, usize);
 
-    /// Gets the coordinate of content relative to left-top corner of the window without padding.
+    /// Gets the coordinate of content relative to top-left corner of the window without padding.
     fn get_content_position(&self) -> Coord;
 
     /// Gets the producer of events.

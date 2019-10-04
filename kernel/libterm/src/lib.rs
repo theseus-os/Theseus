@@ -19,6 +19,7 @@ extern crate text_display;
 extern crate displayable;
 extern crate frame_buffer_rgb;
 extern crate frame_buffer;
+extern crate font;
 
 use alloc::string::{String, ToString};
 use alloc::vec::Vec;
@@ -29,6 +30,7 @@ use displayable::Displayable;
 use frame_buffer_rgb::FrameBufferRGB;
 use frame_buffer::{Coord};
 use window_manager_generic::WindowGeneric;
+use font::{CHARACTER_HEIGHT, CHARACTER_WIDTH};
 
 pub const FONT_COLOR: u32 = 0x93ee90;
 pub const BACKGROUND_COLOR: u32 = 0x000000;
@@ -600,9 +602,7 @@ impl Terminal {
         let bg_color = text_display.get_bg_color();
         text_display::display_cursor(
             &mut self.cursor, 
-            coordinate, 
-            col, 
-            line,
+            coordinate + ((col * CHARACTER_WIDTH) as isize, (line * CHARACTER_HEIGHT) as isize),
             bg_color,
             &mut self.window.framebuffer
         )?;

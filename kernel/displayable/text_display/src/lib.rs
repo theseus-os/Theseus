@@ -173,15 +173,12 @@ impl Cursor {
 /// Display a cursor within a text area onto a frame buffer. 
 /// # Arguments
 /// * `cursor`: the cursor to display.
-/// * `coordinate`: the coordinate of the text area relative to the framebuffer. It represents the locations of its left-top corner.
-/// * `(col, line):` the position of the cursor in the text area.
+/// * `coordinate`: the coordinate within the `framebuffer` where the cursor is displayed. It specifies the location of the top-left corner of the cursor. The `coordinate` is relative to the top-left corner `(0, 0)` of the `framebuffer`.
 /// * bg_color: the background color of the area if the cursor is hidden.
 /// * `framebuffer:` the framebuffer to display onto.
 pub fn display_cursor(
     cursor: &mut Cursor,
     coordinate: Coord,
-    col: usize,
-    line: usize,
     bg_color: u32,
     framebuffer: &mut dyn FrameBuffer,
 ) -> Result<(), &'static str> {
@@ -194,7 +191,7 @@ pub fn display_cursor(
         
         frame_buffer_drawer::fill_rectangle(
             framebuffer,
-            coordinate + ((col * CHARACTER_WIDTH) as isize, (line * CHARACTER_HEIGHT) as isize),
+            coordinate,
             CHARACTER_WIDTH,
             CHARACTER_HEIGHT,
             color,

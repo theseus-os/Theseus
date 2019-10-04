@@ -104,7 +104,7 @@ impl<Buffer: FrameBuffer> WindowGeneric<Buffer> {
         profile_locked.get_content_size()
     }
 
-    /// Adds a new displayable at `coordinate` relative to the left-top corner of the window.
+    /// Adds a new displayable at `coordinate` relative to the top-left corner of the window.
     pub fn add_displayable(
         &mut self,
         key: &str,
@@ -345,7 +345,7 @@ pub fn new_default_window() -> Result<WindowGeneric<FrameBufferRGB>, &'static st
 
 /// The structure is owned by the window manager. It contains the information of a window but under the control of the manager
 pub struct WindowProfile {
-    /// the left-top corner of window relative to the left-top corner of the screen
+    /// the top-left corner of window relative to the top-left corner of the screen
     pub coordinate: Coord,
     /// the width of the window
     pub width: usize,

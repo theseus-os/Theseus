@@ -1,6 +1,6 @@
 //! This crate contains a series of basic draw functions to draw onto a framebuffer.
 //! Displayables invoke these basic functions to display themselves onto a framebuffer.
-//! The coordinate in these interfaces is relative to the left-top corner of the frame buffer.
+//! The coordinate in these interfaces is relative to the top-left corner of the frame buffer.
 
 #![no_std]
 

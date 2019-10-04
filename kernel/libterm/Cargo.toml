@@ -38,13 +38,16 @@ path = "../print"
 path = "../event_types"
 
 [dependencies.text_display]
-path = "../../kernel/displayable/text_display"
+path = "../displayable/text_display"
 
 [dependencies.displayable]
-path = "../../kernel/displayable"
+path = "../displayable"
 
 [dependencies.frame_buffer]
-path = "../../kernel/frame_buffer"
+path = "../frame_buffer"
+
+[dependencies.font]
+path = "../font"
 
 [lib]
 crate-type = ["rlib"]

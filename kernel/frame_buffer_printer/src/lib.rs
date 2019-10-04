@@ -1,5 +1,5 @@
 //! This crate contains functions to print strings in a framebuffer.
-//! The coordinate in these functions is relative to the left-top corner of the frame buffer.
+//! The coordinate in these functions is relative to the top-left corner of the frame buffer.
 
 #![no_std]
 
@@ -100,7 +100,7 @@ pub fn print_by_bytes(
 }
 
 // print a byte to the framebuffer at (line, column) in the text area.
-// `coordinate` specifies the left-top corner of the text area relative to the framebuffer.
+// `coordinate` specifies the top-left corner of the text area relative to the framebuffer.
 fn print_byte(
     framebuffer: &mut dyn FrameBuffer,
     byte: u8,
