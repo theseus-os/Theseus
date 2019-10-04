@@ -9,7 +9,7 @@ extern crate frame_buffer;
 use frame_buffer::{FrameBuffer, Coord};
 
 /// Draws a point in a framebuffer.
-/// The point is drawn at the coordinate relative to the framebuffer with color.
+/// The point is drawn at the coordinate relative to top-left corner (0, 0) of the framebuffer with color.
 pub fn draw_point(framebuffer: &mut dyn FrameBuffer, coordinate: Coord, color: u32) {
     framebuffer.draw_pixel(coordinate, color);
 }
@@ -17,8 +17,8 @@ pub fn draw_point(framebuffer: &mut dyn FrameBuffer, coordinate: Coord, color: u
 /// Draws a line in a framebuffer. The part exceeding the boundary of the framebuffer will be ignored.
 /// # Arguments
 /// * `framebuffer`: the framebuffer to draw in.
-/// * `start`: the start coordinate of the line relative to the frame buffer.
-/// * `end`: the end coordinate of the line relative to the frame buffer.
+/// * `start`: the start coordinate of the line relative to the top-left corner (0, 0) of the frame buffer.
+/// * `end`: the end coordinate of the line relative to the top-left corner (0, 0) of the frame buffer.
 /// * `color`: the color of the line.
 pub fn draw_line(
     framebuffer: &mut dyn FrameBuffer,
@@ -79,7 +79,7 @@ pub fn draw_line(
 /// The part exceeding the boundary of the framebuffer will be ignored.
 /// # Arguments
 /// * `framebuffer`: the framebuffer to draw in.
-/// * `coordinate`: the left top coordinate of the rectangle relative to the framebuffer.
+/// * `coordinate`: the left top coordinate of the rectangle relative to the top-left corner (0, 0) of the framebuffer.
 /// * `width`: the width of the rectangle.
 /// * `height`: the height of the rectangle.
 /// * `color`: the color of the rectangle's border.
@@ -139,7 +139,7 @@ pub fn draw_rectangle(
 /// The part exceeding the boundary of the framebuffer will be ignored.
 /// # Arguments
 /// * `framebuffer`: the framebuffer to draw in.
-/// * `coordinate`: the left top coordinate of the retangle relative to the frame buffer.
+/// * `coordinate`: the left top coordinate of the retangle relative to the top-left corner (0, 0) of the frame buffer.
 /// * `width`: the width of the rectangle.
 /// * `height`: the height of the rectangle.
 /// * `color`: the color of the rectangle.

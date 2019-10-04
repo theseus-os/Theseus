@@ -16,7 +16,7 @@ use frame_buffer::{FrameBuffer, Coord};
 /// Returns (column, line) of the end, i.e. the position of the next symbol.
 /// # Arguments
 /// * `framebuffer`: the framebuffer to display in.
-/// * `coordinate`: the left top coordinate of the text block relative to the frame buffer.
+/// * `coordinate`: the left top coordinate of the text block within the frame buffer. The coordinate is relative to the top-left corner (0, 0) of the frame buffer.
 /// * `width`: the width of the text block.
 /// * `height`: the height of the text block.
 /// * `slice`: the string to display.
@@ -100,7 +100,7 @@ pub fn print_by_bytes(
 }
 
 // print a byte to the framebuffer at (line, column) in the text area.
-// `coordinate` specifies the top-left corner of the text area relative to the framebuffer.
+// `coordinate` specifies the top-left corner of the text area relative to the top-left corner (0, 0) of the framebuffer.
 fn print_byte(
     framebuffer: &mut dyn FrameBuffer,
     byte: u8,
@@ -141,7 +141,7 @@ fn print_byte(
     }
 }
 
-// fill a blank text area (left, top, right, bottom) relative to the frame buffer with color.
+// fill a blank text area (left, top, right, bottom) with color. The tuple specifies the location of the area relative to the top-left corner (0, 0) of the frame buffer.
 fn fill_blank(
     framebuffer: &mut dyn FrameBuffer,
     left: isize,

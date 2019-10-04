@@ -58,7 +58,7 @@ pub trait FrameBuffer: Send {
 
     /// Checks if a framebuffer overlaps with an area.
     /// # Arguments
-    /// * `coordinate`: the top-left corner of the area relative to the frame buffer.
+    /// * `coordinate`: the top-left corner of the area relative to the top-left corner (0, 0) of the frame buffer.
     /// * `width`: the width of the area.
     /// * `height`: the height of the area.
     fn overlaps_with(&mut self, coordinate: Coord, width: usize, height: usize) -> bool {
