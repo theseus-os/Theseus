@@ -102,3 +102,11 @@ impl Add<(isize, isize)> for Coord {
         Coord { x: self.x + rhs.0, y: self.y + rhs.1 }
     }
 }
+
+impl Sub<(isize, isize)> for Coord {
+    type Output = Coord;
+
+    fn sub(self, rhs: (isize, isize)) -> Coord {
+        Coord { x: self.x - rhs.0, y: self.y - rhs.1 }
+    }
+}

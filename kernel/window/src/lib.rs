@@ -12,7 +12,7 @@ use dfqueue::{DFQueueProducer};
 use frame_buffer::Coord;
 
 /// The `Window` trait.
-pub trait Window: Send {
+pub trait Window {
     /// Clears the window on the screen including the border and padding.
     fn clear(&self) -> Result<(), &'static str>;
 
