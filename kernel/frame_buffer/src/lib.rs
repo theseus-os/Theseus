@@ -64,8 +64,8 @@ pub trait FrameBuffer: Send {
     /// * `height`: the height of the area.
     fn overlaps_with(&mut self, coordinate: Coord, width: usize, height: usize) -> bool {
         let (buffer_width, buffer_height) = self.get_size();
-        coordinate.x < buffer_width as isize || coordinate.x + width as isize >= 0
-            || coordinate.y < buffer_height as isize || coordinate.y + height as isize>= 0
+        coordinate.x < buffer_width as isize && coordinate.x + width as isize >= 0
+            && coordinate.y < buffer_height as isize && coordinate.y + height as isize>= 0
     }
 }
 

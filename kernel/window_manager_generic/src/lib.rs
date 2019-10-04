@@ -336,14 +336,11 @@ pub fn new_window(
 /// Applications call this function to request a new window object with a default size (mostly fills screen with WINDOW_MARGIN around all borders).
 pub fn new_default_window() -> Result<WindowGeneric<FrameBufferRGB>, &'static str> {
     let (window_width, window_height) = frame_buffer::get_screen_size()?;
-    match new_window(
+    new_window(
         Coord::new(WINDOW_MARGIN as isize, WINDOW_MARGIN as isize),
         window_width - 2 * WINDOW_MARGIN,
         window_height - 2 * WINDOW_MARGIN,
-    ) {
-        Ok(new_window) => return Ok(new_window),
-        Err(err) => return Err(err),
-    }
+    )
 }
 
 /// The structure is owned by the window manager. It contains the information of a window but under the control of the manager
