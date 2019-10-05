@@ -11,6 +11,7 @@ extern crate alloc;
 extern crate memory;
 extern crate task;
 extern crate unwind;
+extern crate stack_trace;
 
 use core::panic::PanicInfo;
 use alloc::string::String;
@@ -45,14 +46,26 @@ pub fn panic_wrapper(panic_info: &PanicInfo) -> Result<(), &'static str> {
         //     }
         // }
 
-        #[cfg(frame_pointers)]
-        stack_trace_using_frame_pointer(
-            &mmi_ref.lock().page_table,
-            &|instruction_pointer: VirtualAddress| {
-                namespace.get_section_containing_address(instruction_pointer, app_crate_ref.as_ref(), false)
-                    .map(|(sec_ref, offset)| (sec_ref.lock().name.clone(), offset))
-            },
-        );
+        #[cfg(frame_pointers)] {
+            error!("-------------- Stack Trace --------------");
+            let res = stack_trace::stack_trace_using_frame_pointers(
+                &mmi_ref.lock().page_table,
+                &mut |frame_pointer, instruction_pointer: VirtualAddress| {
+                    let symbol_offset = namespace.get_section_containing_address(instruction_pointer, app_crate_ref.as_ref(), false)
+                        .map(|(sec_ref, offset)| (sec_ref.lock().name.clone(), offset));
+                    if let Some((symbol_name, offset)) = symbol_offset {
+                        error!("  {:>#018X}: {:>#018X} in {} + {:#X}", frame_pointer, instruction_pointer, symbol_name, offset);
+                    } else {
+                        error!("  {:>#018X}: {:>#018X} in ??", frame_pointer, instruction_pointer);
+                    }
+                    true
+                },
+            );
+            match res {
+                Ok(()) => error!("  Beginning of stack"),
+                Err(e) => error!("  {}", e),
+            }
+        }
     }
 
     // Call this task's panic handler, if it has one.
@@ -107,7 +120,7 @@ pub fn panic_wrapper(panic_info: &PanicInfo) -> Result<(), &'static str> {
 /// This was adapted from Redox's stack trace implementation.
 #[cfg(frame_pointers)]
 #[inline(never)]
-pub fn stack_trace_using_frame_pointer(
+pub fn stack_trace_using_frame_pointers(
     current_page_table: &PageTable,
     addr_to_symbol: &dyn Fn(VirtualAddress) -> Option<(String, usize)>
 ) {
