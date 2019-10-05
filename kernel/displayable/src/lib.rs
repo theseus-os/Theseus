@@ -13,7 +13,8 @@ use alloc::boxed::Box;
 use downcast_rs::Downcast;
 use frame_buffer::{FrameBuffer, Coord};
 
-/// The displayable trait.
+/// Trait for displayables. A displayable is a graph which can display itself onto a framebuffer. 
+/// It is usually a composition of basic graphs and can act as a component of a window such as a text box, a button, etc. 
 pub trait Displayable: Downcast + Send {
     /// Displays in a framebuffer.
     /// # Arguments
