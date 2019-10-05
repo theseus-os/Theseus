@@ -20,33 +20,36 @@ use spawn::KernelTaskBuilder;
 
 pub fn test() -> Result<u64, &'static str>{
 
-	let kernel_mmi_ref = memory::get_kernel_mmi_ref().ok_or_else(|| "couldn't get kernel mmi")?;
+	// let kernel_mmi_ref = memory::get_kernel_mmi_ref().ok_or_else(|| "couldn't get kernel mmi")?;
 
-   // we're going to manually load the crate and symbol
-	let backup_namespace = get_default_namespace().ok_or("default crate namespace wasn't yet initialized")?;
+   // // we're going to manually load the crate and symbol
+	// let backup_namespace = get_default_namespace().ok_or("default crate namespace wasn't yet initialized")?;
    
-   let libc = backup_namespace.get_kernel_file_starting_with("libc-").ok_or("couldn't find libc crate")?;
-   backup_namespace.load_kernel_crate(&libc, None, &kernel_mmi_ref, true)?;
+   // let libc = backup_namespace.get_kernel_file_starting_with("libc-").ok_or("couldn't find libc crate")?;
+   // backup_namespace.load_kernel_crate(&libc, None, &kernel_mmi_ref, true)?;
 
-   let my_c_program = backup_namespace.get_kernel_file_starting_with("my_c_program").ok_or("couldn't find c program crate")?;
-   backup_namespace.load_kernel_crate(&my_c_program, None, &kernel_mmi_ref, true)?;
+   // let my_c_program = backup_namespace.get_kernel_file_starting_with("my_c_program").ok_or("couldn't find c program crate")?;
+   // backup_namespace.load_kernel_crate(&my_c_program, None, &kernel_mmi_ref, true)?;
 
-   type SimdTestFunc = fn(i32)->i32;
-	let section_ref1 = backup_namespace.get_symbol_starting_with("testing_lc")
-		.upgrade()
-		.ok_or("no single symbol matching \"testing_lc\"")?;
-	let mut space1 = 0;	
-	let (mapped_pages1, mapped_pages_offset1) = { 
-		let section = section_ref1.lock();
-		(section.mapped_pages.clone(), section.mapped_pages_offset)
-	};
-   debug!("Mapped pages: {:#X}, Mapped pages offset: {}", mapped_pages1.lock().start_address(), mapped_pages_offset1);
-	let func1: &SimdTestFunc = mapped_pages1.lock().as_func(mapped_pages_offset1, &mut space1)?;
-   let res = func1(0);
-   // TODO: find out why spawning doesn't work!!!
-	// let task1 = KernelTaskBuilder::new(func1, 0)
-	// 	.spawn()?;
-	debug!("finished spawning my_c_program::testing_lc: {}", res);
+   // type SimdTestFunc = fn(i32)->i32;
+	// let section_ref1 = backup_namespace.get_symbol_starting_with("testing_lc")
+	// 	.upgrade()
+	// 	.ok_or("no single symbol matching \"testing_lc\"")?;
+	// let mut space1 = 0;	
+	// let (mapped_pages1, mapped_pages_offset1) = { 
+	// 	let section = section_ref1.lock();
+	// 	(section.mapped_pages.clone(), section.mapped_pages_offset)
+	// };
+   // debug!("Mapped pages: {:#X}, Mapped pages offset: {}", mapped_pages1.lock().start_address(), mapped_pages_offset1);
+	// let func1: &SimdTestFunc = mapped_pages1.lock().as_func(mapped_pages_offset1, &mut space1)?;
+   // let res = func1(0);
+   // // TODO: find out why spawning doesn't work!!!
+	// // let task1 = KernelTaskBuilder::new(func1, 0)
+	// // 	.spawn()?;
+	// debug!("finished spawning my_c_program::testing_lc: {}", res);
+   
+
+
    
    // unsafe{
    //    // let a = register_callback(libc::rmalloc);

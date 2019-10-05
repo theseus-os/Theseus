@@ -157,8 +157,9 @@ pub const EKEYREVOKED: c_int = 128; /* Key has been revoked */
 pub const EKEYREJECTED: c_int = 129; /* Key was rejected by service */
 pub const EOWNERDEAD: c_int = 130; /* Owner died */
 pub const ENOTRECOVERABLE: c_int = 131; /* State not recoverable */
+pub const EUNIMPLEMENTED: c_int = 132; /* Unimplemented functionality */
 
-pub static STR_ERROR: [&'static str; 132] = [
+pub static STR_ERROR: [&'static str; 133] = [
     "Success",
     "Operation not permitted",
     "No such file or directory",
@@ -291,4 +292,5 @@ pub static STR_ERROR: [&'static str; 132] = [
     "Key was rejected by service",
     "Owner died",
     "State not recoverable",
+    "Unimplemented functionality", // A Theseus flag 
 ];

@@ -138,7 +138,6 @@ fn parse_bootloader_modules_into_files(
         let dir_name = format!("{}{}", prefix, crate_type.namespace_name());
         let name = String::from(file_name);
 
-
         let pages = allocate_pages_by_bytes(size_in_bytes).ok_or("Couldn't allocate virtual pages for bootloader module area")?;
         let mp = kernel_mmi.page_table.map_allocated_pages_to(
             pages, 
@@ -147,8 +146,7 @@ fn parse_bootloader_modules_into_files(
             fa.lock().deref_mut()
         )?;
 
-        debug!("Module: {:?}, size {}, mp: {:?}", name, size_in_bytes, mp);
-
+        // debug!("Module: {:?}, size {}, mp: {:?}", name, size_in_bytes, mp);
 
         let create_file = |dir: &DirRef| {
             MemFile::from_mapped_pages(mp, name, size_in_bytes, dir)
@@ -622,40 +620,6 @@ impl CrateNamespace {
         self.perform_relocations(&elf_file, &new_crate_ref, temp_backup_namespace, kernel_mmi_ref, verbose_log)?;
         Ok(new_crate_ref)
     }
-
-    pub fn load_kernel_crate_wo_crate_name(
-        &self,
-        crate_file_path: &Path,
-        backup_namespace: Option<&CrateNamespace>, 
-        kernel_mmi_ref: &MmiRef, 
-        verbose_log: bool
-    ) -> Result<usize, &'static str> {
-
-        #[cfg(not(loscd_eval))]
-        debug!("load_kernel_crate: trying to load kernel crate at {}", crate_file_path);
-        let crate_file_ref = match crate_file_path.get(&self.dirs.kernel)
-            .or_else(|| Path::new(format!("{}.o", crate_file_path)).get(&self.dirs.kernel)) // retry with the ".o" extension
-        {
-            Some(FileOrDir::File(f)) => f,
-            _ => return Err("couldn't find specified kernel crate file path"),
-        };
-        let crate_file = crate_file_ref.lock();
-        let (new_crate_ref, elf_file) = self.load_crate_sections(crate_file.deref(), kernel_mmi_ref, verbose_log)?;
-        self.perform_relocations(&elf_file, &new_crate_ref, backup_namespace, kernel_mmi_ref, verbose_log)?;
-        let (new_crate_name, new_syms) = {
-            let new_crate = new_crate_ref.lock_as_ref();
-            let new_syms = self.add_symbols(new_crate.sections.values(), verbose_log);
-            (new_crate.crate_name.clone(), new_syms)
-        };
-            
-        #[cfg(not(loscd_eval))]
-        info!("loaded new kernel crate {:?}, {} new symbols.", new_crate_name, new_syms);
-        self.crate_tree.lock().insert(new_crate_name.into(), new_crate_ref);
-        Ok(new_syms)
-        
-        // plc.temp_module_mapping is automatically unmapped when it falls out of scope here (frame allocator must not be locked)
-    }
-
 
     
     /// This function first loads all of the given crates' sections and adds them to the symbol map,
