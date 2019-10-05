@@ -33,3 +33,6 @@ path = "../memfs"
 
 [dependencies.task]
 path = "../task"
+
+[dependencies.fs_node]
+path = "../fs_node"

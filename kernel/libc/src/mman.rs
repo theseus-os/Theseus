@@ -86,6 +86,10 @@ pub extern fn mmap(_addr: *mut c_void, length: size_t, prot: c_int, flags: c_int
         return addr.value() as *mut c_void;
     }
 
+    // else if flags & MAP_SHARED == MAP_SHARED {
+
+    // }
+
     else {
         error!("Unimplemented memory mapping!");
         return 0 as *mut c_void;
