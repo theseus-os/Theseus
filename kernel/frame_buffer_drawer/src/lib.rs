@@ -8,12 +8,6 @@ extern crate frame_buffer;
 
 use frame_buffer::{FrameBuffer, Coord};
 
-/// Draws a point in a framebuffer.
-/// The point is drawn at the coordinate relative to origin(top-left point) of the framebuffer with color.
-pub fn draw_point(framebuffer: &mut dyn FrameBuffer, coordinate: Coord, color: u32) {
-    framebuffer.draw_pixel(coordinate, color);
-}
-
 /// Draws a line in a framebuffer. The part exceeding the boundary of the framebuffer will be ignored.
 /// # Arguments
 /// * `framebuffer`: the framebuffer to draw in.
