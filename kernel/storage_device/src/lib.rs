@@ -50,6 +50,7 @@
 extern crate alloc;
 extern crate spin;
 #[macro_use] extern crate downcast_rs;
+#[macro_use] extern crate log;
 
 use core::ops::Range;
 use alloc::{
@@ -137,25 +138,8 @@ pub trait StorageDevice: Downcast {
     /// 
     /// Returns an error if the `offset` extends past the bounds of this storage device.
     fn block_bounds(&self, offset: usize, length: usize) -> Result<BlockBounds, &'static str> {
-        let block_size_in_bytes = self.sector_size_in_bytes();
-        if offset > self.size_in_bytes() {
-            return Err("offset was out of bounds");
-        }
-        let first_block = offset / block_size_in_bytes;
-        let first_block_offset = offset % block_size_in_bytes;
-        let last_block = core::cmp::min(
-            self.size_in_sectors(),
-            (offset + length + block_size_in_bytes - 1) / block_size_in_bytes, // round up to next sector
-        );
-        let last_block_offset = (first_block_offset + length) % block_size_in_bytes;
-        // trace!("block_bounds: offset: {}, length: {}, first_block: {}, last_block: {}",
-        //     offset, length, first_block, last_block
-        // );
-        Ok(BlockBounds {
-            range: first_block..last_block,
-            first_block_offset,
-            last_block_offset,
-        })
+        BlockBounds::block_bounds(offset, length, self.size_in_bytes(), 
+            self.size_in_sectors(), self.sector_size_in_bytes())
     }
 }
 impl_downcast!(StorageDevice);
@@ -191,5 +175,48 @@ impl BlockBounds {
     /// Returns true if the last block of the transfer is aligned to a block boundary.
     pub fn is_last_block_aligned(&self) -> bool {
         self.last_block_offset == 0
+    }
+
+    // TODO this API is useful so that we can create block bounds for files without them being storage devices.
+    // But it feels weird to just have it sitting around here.
+    /// Calculates block-wise bounds based on a byte-wise offset and buffer length for some block based device.
+    /// 
+    /// # Arguments
+    /// * `offset`: the absolute byte offset from the beginning of the block storage device
+    ///    at which the read/write starts.
+    /// * `length`: the number of bytes to be read/written.
+    /// * `size_in_bytes`: The size in bytes of the object.
+    /// * `size_in_sectors`: The size in sectors of the object.
+    /// 
+    /// # Return
+    /// Returns a `BlockBounds` object.
+    /// 
+    /// If `offset + length` extends past the bounds, the `Range` will be truncated
+    /// to the last block of the storage device (all the way to the end), 
+    /// and the `last_block_offset` will be `0`.
+    /// 
+    /// Returns an error if the `offset` extends past the bounds of this storage device.
+    pub fn block_bounds(offset: usize, length: usize, size_in_bytes: usize, size_in_sectors: usize, sector_size_in_bytes: usize) 
+            -> Result<BlockBounds, &'static str> {
+        
+        let block_size_in_bytes = sector_size_in_bytes;
+        if offset > size_in_bytes {
+            return Err("offset was out of bounds");
+        }
+        let first_block = offset / block_size_in_bytes;
+        let first_block_offset = offset % block_size_in_bytes;
+        let last_block = core::cmp::min(
+            size_in_sectors,
+            (offset + length + block_size_in_bytes - 1) / block_size_in_bytes, // round up to next sector
+        );
+        let last_block_offset = (first_block_offset + length) % block_size_in_bytes;
+        trace!("block_bounds: offset: {}, length: {}, first_block: {}, last_block: {}",
+            offset, length, first_block, last_block
+        );
+        Ok(BlockBounds {
+            range: first_block..last_block,
+            first_block_offset,
+            last_block_offset,
+        })
     }
 }

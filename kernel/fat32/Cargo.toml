@@ -29,6 +29,9 @@ path = "../storage_device"
 [dependencies.fs_node]
 path = "../fs_node"
 
+[dependencies.block_io]
+path = "../block_io"
+
 [dependencies.root]
 path = "../root"
 

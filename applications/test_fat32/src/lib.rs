@@ -141,6 +141,9 @@ pub fn main(_args: Vec<String>) -> isize {
 
 fn print_dir(d : &dyn Directory) {
     let entries = d.list();
+    if entries.len() <= 0 {
+        return; // Don't print empty directories to save some time.
+    };
     println!("Printing directory: {:?}: {:} entries.", d.get_name(), entries.len());
 
     for entry in entries {
@@ -178,7 +181,7 @@ fn print_dir(d : &dyn Directory) {
 fn check_singleton(d : &PFSDirectory) {
 
     let entries = d.list();
-    //println!("Printing directory: {:?}: {:} entries.", d.get_name(), entries.len());
+    println!("Printing directory: {:?}: {:} entries.", d.get_name(), entries.len());
 
     for entry in entries {
         let node = match d.get(&entry) {
@@ -228,6 +231,7 @@ fn print_file(f: &dyn File) {
     const SECTOR_SIZE : usize = 512; // FIXME not really a constant here.
 
     println!("Printing file: {:?}, {:} bytes.", f.get_name(), f.size());
+    trace!("Printing file {:?},. {} bytes", f.get_name(), f.size());
     // Now print the first 512 bytes. Might be shorter than this many bytes.
     let mut data = [0; SECTOR_SIZE];
     let mut pos = 0;
@@ -241,13 +245,14 @@ fn print_file(f: &dyn File) {
             return;
         }
     };
+    trace!("Read {} bytes", bytes_read);
     pos += bytes_read;
 
     print_data(&data);
 
     // Read until the end of file.
-    while bytes_read < size {
-        bytes_read += match f.read(&mut data, pos) {
+    while pos < size {
+        bytes_read = match f.read(&mut data, pos) {
             Ok(bytes) => bytes,
             Err(_) => {
                 println!("Failed to read from file");
@@ -255,6 +260,7 @@ fn print_file(f: &dyn File) {
             }
         };
         pos += bytes_read;
+        trace!("Read {} bytes. New pos {}", bytes_read, pos);
     }
 
     print_data(&data);

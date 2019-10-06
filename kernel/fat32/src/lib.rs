@@ -99,7 +99,9 @@ extern crate memory;
 extern crate root;
 extern crate byteorder;
 extern crate zerocopy;
+extern crate block_io;
 
+use storage_device::{BlockBounds};
 use zerocopy::{FromBytes, AsBytes};
 use byteorder::ByteOrder;
 use byteorder::LittleEndian;
@@ -113,6 +115,7 @@ use alloc::vec::Vec;
 use alloc::string::String;
 use alloc::string::ToString;
 use memory::MappedPages;
+use block_io::BlockIo;
 
 /// The end-of-cluster value written by this implementation of FAT32.
 /// Note that many implementations use different values for EOC
@@ -185,8 +188,6 @@ pub type ChildList = BTreeMap<String, FileOrDir>;
 
 /// The first 25 bytes of a FAT formatted disk BPB contains these fields and are used to know important information about the disk 
 pub struct Header {
-
-    drive: storage_device::StorageDeviceRef,
     data: Vec<u8>,
     bytes_per_sector: u16, // usually 512 bytes
     sectors_per_cluster: u8, // allowed values are 1,2,4,8...128 dependent on size of drive
@@ -220,7 +221,6 @@ impl Header {
         }
 
         let fatheader = Header {
-            drive: disk, 
             data: bpb_sector.clone(),
             bytes_per_sector: LittleEndian::read_u16(&bpb_sector[11..13]),
             sectors_per_cluster: bpb_sector[13],
@@ -438,7 +438,7 @@ pub struct PFSFile {
 
 impl PFSFile {
     /// Given an offset, returns the PFSPosition of the file
-    pub fn seek(&self, fs: &Filesystem, offset: usize) -> Result<PFSPosition, &'static str> {
+    pub fn seek(&self, fs: &mut Filesystem, offset: usize) -> Result<PFSPosition, &'static str> {
         let mut position: usize = 0;
 
         let cluster_size_in_bytes: usize = fs.sectors_per_cluster() as usize * fs.bytes_per_sector as usize;
@@ -489,106 +489,48 @@ impl File for PFSFile {
     fn read(&self, data: &mut [u8], offset: usize) -> Result<usize, &'static str> {
         
         // Place a lock on the filesystem
-        let fs = self.cc.filesystem.lock();
-
-        let cluster_size_in_bytes: usize = fs.sectors_per_cluster() as usize * 512 as usize;
-        let mut position: usize = 0;
-        let mut current_cluster = self.cc.cluster;
-        let mut sector_offset: u32 = 0;
-        let mut cluster_offset = 0;
-
-        let mut file_walk = PFSPosition{
-            cluster: current_cluster,
-            sector_offset: 0,
-            entry_offset: 0,
-        };
+        let mut fs = self.cc.filesystem.lock();
 
         info!("Read called with buffer size {:}, position: {:}. File size: {:}", data.len(), offset, self.size());
-
-        // The inserted buffer must be a multiple of the cluster size in bytes for clean reads.
-        // clusters act as a sort of boundary in FAT for every file/directory and to minimize
-        // disk requests, its best to read clusters at a time
-        if data.len() as usize % cluster_size_in_bytes != 0 {
-            return Err("data buffer size must be a multiple of the cluster size in bytes");
-        }
-
-        // Represents the number of clusters that must be read
-        let num_reads: usize = data.len() as usize/cluster_size_in_bytes;
-            
-        for _i in 0..num_reads{   
-
-            // The position is used to track how far along the PFSfile it is, and if the position goes
-            // beyond the size of the PFSfile OR the array is full, it returns end of PFSfile
-            if position >= data.len() {
-                debug!("buffer is filled");
-                break;
-            }
-
-            // Reaches end of file
-            if position >= self.cc.size as usize {
-                debug!("end of file");
-                break;
-            }
-            
-            // When the end of the cluster is reached in terms of sector, it will move onto the next cluster
-            if sector_offset == u32::from(fs.sectors_per_cluster()) {
-                match fs.next_cluster(current_cluster) {
-                    Err(_e) => {
-                        return Err("Error in moving to next clusters");
-                    }
-                    Ok(cluster) => {
-                        current_cluster = cluster;
-                        sector_offset = 0;
-                    }
-                }
-            }
-            
-            // the byte difference is the difference between the offset (the byte to begin reading at)
-            // and the position(the current byte position based upon walking from cluster to cluster)
-            let byte_difference = offset - position;
-            let reached_sector = byte_difference / fs.bytes_per_sector as usize;
-
-            // this if statement determines wether moving on to the next cluster would cause it to move beyond the
-            // specified offset and if it does, fills in the PFSPosition with info about the specific position of the offset
-            if position + cluster_size_in_bytes > offset {
-                file_walk.cluster = current_cluster;
-                file_walk.sector_offset = reached_sector;
-                file_walk.entry_offset = byte_difference as usize - reached_sector as usize*fs.bytes_per_sector as usize;
-                debug!("the PFSposition cluster: {:?}", file_walk.cluster);
-                debug!("the PFSposition sector offset: {:?}", file_walk.sector_offset);
-                debug!("the PFSposition entry_offset: {:?}", file_walk.entry_offset);
-            }
-
-            let cluster_start = fs.first_sector_of_cluster(current_cluster);
-
-            // the current sector thats to be read at
-            let current_sector = cluster_start + sector_offset as usize;
-
-            // Reads at the beginning sector of the cluster
-            let sectors_read = match fs.header().drive.lock().read_sectors(
-                &mut data[(0+cluster_offset)..(cluster_size_in_bytes as usize + cluster_offset as usize)], 
-                current_sector as usize) {
-                    Ok(bytes) => bytes,
-                    Err(_) => return Err("error reading sector"),
-            };
-            
-            sector_offset += fs.sectors_per_cluster;
-            
-            if (position + sectors_read) > self.cc.size as usize {
-                let bytes_read = self.cc.size as usize - position;
-                return Ok(bytes_read as usize);
-            } 
-            else {
-                position += cluster_size_in_bytes;
-            }
-
-            cluster_offset += cluster_size_in_bytes as usize;
-            // debug!("current cluster {}",current_cluster);
-            // debug!("current offset{}",sector_offset);
-            // debug!("current position{}",position);
-        }
         
-        Ok(position as usize)
+        // Treat our file like a sequence of clusters using the BlockBounds logic.
+        let BlockBounds { range, first_block_offset, .. } = BlockBounds::block_bounds(offset, data.len(), self.size(),
+            fs.size_in_clusters(self.size()), fs.cluster_size_in_bytes())?;
+        let block_size_in_bytes: usize = fs.cluster_size_in_bytes();
+
+        // Read the actual data, one block at a time.
+		let mut src_offset = first_block_offset; 
+		let mut dest_offset = 0;
+        let mut current_cluster = self.cc.cluster;
+        let mut current_offset = 0;
+        let mut bytes_copied = 0;
+
+		for cluster_offset in range { // Number of clusters into the file
+            // Jump to current cluster:
+            current_cluster = self.cc.cluster_advancer(&mut fs, current_cluster, cluster_offset - current_offset)
+                .map_err(|_| "Read failed")?;
+
+            current_offset = cluster_offset;
+
+			// don't copy past the end of `buffer`
+			let num_bytes_to_copy = core::cmp::min(block_size_in_bytes - src_offset, data.len() - dest_offset);
+
+            let temp_buffer = &mut data[dest_offset.. (dest_offset + num_bytes_to_copy)];
+
+            let first_sector = fs.first_sector_of_cluster(current_cluster);
+            let offset_of_sector = fs.sector_to_byte_offset(first_sector);
+
+            let _bytes_read = fs.io.read(temp_buffer, offset_of_sector)?;
+
+			trace!("fat32::read(): for cluster {}, copied bytes into buffer[{}..{}] from block[{}..{}]",
+				current_cluster, dest_offset, dest_offset + num_bytes_to_copy, src_offset, src_offset + num_bytes_to_copy,
+			);
+			dest_offset += num_bytes_to_copy;
+            bytes_copied += num_bytes_to_copy;
+			src_offset = 0;
+		}
+        
+        Ok(bytes_copied as usize)
     }
 
 
@@ -671,10 +613,10 @@ impl Directory for PFSDirectory {
     fn list(&self) -> Vec<String> {
 
         // Ensure we've walked the whole list:
-        let fs = self.cc.filesystem.lock();
+        let mut fs = self.cc.filesystem.lock();
         let mut children = self.children.write();
 
-        match self.walk_until(&fs, &mut children, None) {
+        match self.walk_until(&mut fs, &mut children, None) {
             Ok(_) => {}, // TODO this case doesn't happen when None is an argument.
             Err(Error::EndOfFile) | // Cases that represent a successful directory walk.
             Err(Error::NotFound) => {},
@@ -742,7 +684,7 @@ impl PFSDirectory {
 
     /// Walk the directory and adds all encountered entries into children tree.
     /// Returns Ok(Entry) if found. Otherwise returns Err(Error::NotFound) if not found (or no name given).
-    fn walk_until(&self, fs: &Filesystem, children: &mut ChildList, 
+    fn walk_until(&self, fs: &mut Filesystem, children: &mut ChildList, 
         name: Option<&str>) -> Result<DirectoryEntry, Error> {
         
         let mut pos = self.cc.initial_pos();
@@ -848,7 +790,7 @@ impl PFSDirectory {
     }
 
     /// Returns a vector of all the directory entries in a directory without mutating the directory
-    pub fn entries(&self, fs: &Filesystem) -> Result<Vec<DirectoryEntry>, Error> {
+    pub fn entries(&self, fs: &mut Filesystem) -> Result<Vec<DirectoryEntry>, Error> {
         debug!("Getting entries for {:?}", self.cc.name);
 
         let mut entry_collection: Vec<DirectoryEntry> = Vec::new(); 
@@ -880,35 +822,33 @@ impl PFSDirectory {
     /// Returns the entry indicated by PFSPosition. TODO allow this to save reads and writes.
     /// the function is used and returns EndOfFile if the next PFSdirectory doesn't exist
     /// Note that this function will happily return unused directory entries since it simply provides a sequential view of the entries on disk.
-    fn get_fat_directory(&self, fs: &Filesystem, pos: &PFSPosition) -> Result<FatDirectory, Error> {
+    fn get_fat_directory(&self, fs: &mut Filesystem, pos: &PFSPosition) -> Result<FatDirectory, Error> {
         
         let sector = fs.first_sector_of_cluster(pos.cluster) + pos.sector_offset;
         
         // Get the sector on disk corresponding to our sector and cluster:
-        let mut data: Vec<u8> = vec![0; fs.bytes_per_sector as usize];
-        let _sectors_read = match fs.header.drive.lock().read_sectors(&mut data[..], (sector) as usize) {
-            Ok(bytes) => bytes,
-            Err(_) => return Err(Error::BlockError),
-        };
+        let offset = fs.sector_to_byte_offset(sector) + pos.entry_offset;
+        let mut buf = [0; size_of::<RawFatDirectory>()];
+        let _bytes_read = fs.io.read(&mut buf, offset).map_err(|_| Error::BlockError)?;
         
         let entry_offset = pos.entry_offset;
         let fat_dir = FatDirectory {
-            name: match data[(entry_offset)..(11+entry_offset)].try_into() {
+            name: match buf[(0)..(11)].try_into() {
                         Ok(array) => array,
                         Err(_) => return Err(Error::BlockError),
             },
-            flags: data[11+entry_offset],
-            _unused1: match data[(12+entry_offset)..(20+entry_offset)].try_into() {
+            flags: buf[11],
+            _unused1: match buf[(12)..(20)].try_into() {
                         Ok(array) => array,
                         Err(_) => return Err(Error::BlockError),
             },
-            cluster_high: LittleEndian::read_u16(&mut data[(20+entry_offset)..(22+entry_offset)]) as u16,
-            _unused2: match data[(22+entry_offset)..(26+entry_offset)].try_into() {
+            cluster_high: LittleEndian::read_u16(&mut buf[(20)..(22)]) as u16,
+            _unused2: match buf[(22)..(26)].try_into() {
                 Ok(array) => array,
                 Err(_) => return Err(Error::BlockError),
             },
-            cluster_low: LittleEndian::read_u16(&mut data[(26+entry_offset)..(28+entry_offset)]) as u16,
-            size: LittleEndian::read_u32(&mut data[(28+entry_offset)..(32+entry_offset)]) as u32,
+            cluster_low: LittleEndian::read_u16(&mut buf[(26)..(28)]) as u16,
+            size: LittleEndian::read_u32(&mut buf[(28)..(32)]) as u32,
         };
         
         // TODO this needs to ensure that unused directory entries are properly marked?
@@ -917,7 +857,7 @@ impl PFSDirectory {
 
     // FIXME use sub byte transactions at some point?
     /// Writes the RawFatDirectory dir to the position pos in the file.
-    fn write_fat_directory(&self, fs :&Filesystem, pos: &PFSPosition, dir: &RawFatDirectory) -> Result<usize, Error> {
+    fn write_fat_directory(&self, fs :&mut Filesystem, pos: &PFSPosition, dir: &RawFatDirectory) -> Result<usize, Error> {
         let cluster = pos.cluster;
         let base_sector = fs.first_sector_of_cluster(cluster);
         let sector = pos.sector_offset + base_sector;
@@ -928,34 +868,15 @@ impl PFSDirectory {
             return Err(Error::IllegalArgument);
         }
         
-        // Fetch the data from the disk:
-        let mut data: Vec<u8> = vec![0; fs.bytes_per_sector as usize];
-        let _sectors_read = match fs.header.drive.lock().read_sectors(&mut data[..], sector as usize) {
-            Ok(bytes) => bytes,
-            Err(_) => {
-                return Err(Error::BlockError);
-            },
-        };
+        let offset = entry + fs.sector_to_byte_offset(sector);
         
-        // TODO needs to copy into byte array
-        data[entry..(entry + size_of::<RawFatDirectory>())].copy_from_slice(dir.as_bytes());
-        
-        // Write the old out:
-        let _sectors_written = match fs.header.drive.lock().write_sectors(&data, sector as usize) {
-            Ok(sectors) => sectors,
-            Err(_) => {
-                warn!("Fat32 disk is in an inconsistent state");
-                return Err(Error::BlockError);
-            },
-        };
-        
-        Ok(size_of::<RawFatDirectory>())
+        fs.io.write(dir.as_bytes(), offset).map_err(|_| Error::BlockError)
     }
     
     // TODO: support larger sizes (for placing long name directories)
     /// Walks the directory tables and finds an empty entry then returns a position where that entry can be placed.
     /// Currently does not support sizes larger than 1 entry.
-    pub fn find_empty_or_grow(&self, fs: &Filesystem, size_needed: usize) -> Result<PFSPosition, Error> {
+    pub fn find_empty_or_grow(&self, fs: &mut Filesystem, size_needed: usize) -> Result<PFSPosition, Error> {
         if size_needed == 0 {
             return Err(Error::IllegalArgument);
         }
@@ -985,7 +906,7 @@ impl PFSDirectory {
     // I think the "best" solution is perhaps to make everything that's not part of the public interface pass the fs in as an argument.
     // Make FS an argument I suppose. Seems dumb though.
     /// Grows the directory given a PFSPosition in the last cluster of the file and returns a new position in the new_cluster.
-    fn grow_directory(&self, fs: &Filesystem, pos_end: &PFSPosition) -> Result<PFSPosition, Error> {
+    fn grow_directory(&self, fs: &mut Filesystem, pos_end: &PFSPosition) -> Result<PFSPosition, Error> {
         
         // Rename for convenience with other existing code.
         let pos = pos_end;
@@ -1030,10 +951,10 @@ impl PFSDirectory {
 
 
         // Must lock after the call to get since that also locks the fs.
-        let fs = self.cc.filesystem.lock();
+        let mut fs = self.cc.filesystem.lock();
 
         // Find an empty node or grow the directory as needed. TODO different size.
-        let empty_pos = self.find_empty_or_grow(&fs, 1)?;
+        let empty_pos = self.find_empty_or_grow(&mut fs, 1)?;
 
         // TODO...
         //match self.write_fat_directory(&fs, pos, node.)
@@ -1050,10 +971,10 @@ impl PFSDirectory {
             None => {},
         };
 
-        let fs = self.cc.filesystem.lock();
+        let mut fs = self.cc.filesystem.lock();
 
         // FIXME: this can be written to only walk the directory once (and also add entries to children that aren't the ones we needed).
-        let entries = self.entries(&fs)?;
+        let entries = self.entries(&mut fs)?;
         
         for entry in entries {
             // Compares the name of the next entry in the current directory
@@ -1135,7 +1056,7 @@ impl ClusterChain {
     }
     
     /// Advances a PFSPosition by offset and returns a new position if successful.
-    pub fn advance_pos(&self, fs: &Filesystem, pos: &PFSPosition, offset: usize) -> Result<PFSPosition, Error> {
+    pub fn advance_pos(&self, fs: &mut Filesystem, pos: &PFSPosition, offset: usize) -> Result<PFSPosition, Error> {
         
         let mut new_pos = PFSPosition {
             cluster : pos.cluster,
@@ -1158,7 +1079,7 @@ impl ClusterChain {
     }
 
     /// Advance "cluster_advance" number of clusters.
-    pub fn cluster_advancer(&self, fs: &Filesystem, start_cluster: u32, cluster_advance: usize) -> Result<u32, Error> {
+    pub fn cluster_advancer(&self, fs: &mut Filesystem, start_cluster: u32, cluster_advance: usize) -> Result<u32, Error> {
         
         let mut counter: usize = 0;
         let mut current_cluster = start_cluster;
@@ -1174,6 +1095,7 @@ impl ClusterChain {
 /// Structure for the filesystem to be used to transverse the disk and run operations on the disk
 pub struct Filesystem {
     header: Header, // This is meant to read the first 512 bytes of the virtual drive in order to obtain device information
+    io: BlockIo, // Cached byte level reader and writer to and from disk.
     bytes_per_sector: u32, // default set to 512 // TODO why aren't we using this instead of the drive's value?
     sectors: u32, // depends on number of clusters and sectors per cluster
     fat_type: u8, // support for fat32 only
@@ -1192,10 +1114,13 @@ pub struct Filesystem {
 impl Filesystem {
     
     // Initiate a new FAT filesystem with all 0 values
-    pub fn new(header: Header) -> Filesystem {
+    pub fn new(header: Header, sd: storage_device::StorageDeviceRef) -> Result<Filesystem, &'static str> {
         debug!("filesystem started");
+        let io = BlockIo::new(sd);
+
         let fs = Filesystem {
             header,
+            io, 
             bytes_per_sector: 0,
             sectors: 0,
             fat_type: 0,
@@ -1210,11 +1135,12 @@ impl Filesystem {
             data_cluster_count: 0,
             root_cluster: 0,
         };
-        fs
+        
+        fs.init()
     }
 
     /// Reads the sector and fills in the filesystem fields using information from the specified fat headers
-    pub fn init(mut self) -> Result<Filesystem, &'static str> {
+    fn init(mut self) -> Result<Filesystem, &'static str> {
         const FAT12_MAX: u32 = 0xff5;
         const FAT16_MAX: u32 = 0xfff5;
 
@@ -1272,7 +1198,7 @@ impl Filesystem {
 
     // TODO: document the behavior for EOF encountered (since this is useful).
     /// Used to transverse to the next cluster of a PFSfile/PFSdirectory that spans multiple clusters by utlizing the FAT component
-    fn next_cluster(&self, cluster: u32) -> Result<u32, Error> {
+    fn next_cluster(&mut self, cluster: u32) -> Result<u32, Error> {
         match self.fat_type {
             32 => {
                 // FAT32 uses 32 bits per FAT entry, so 1 entry = 4 bytes
@@ -1280,20 +1206,19 @@ impl Filesystem {
                 let fat_sector = self.fat_sector_from_fat_entry(fat_entry);
                 let entry_offset = fat_entry % self.bytes_per_sector;
                 debug!("the current cluster is:{}, need to read sector: {}, offset from entry: {}, entry: {}", cluster, fat_sector, entry_offset, fat_entry);
-
-                let mut data: Vec<u8> = vec![0; self.header.drive.lock().sector_size_in_bytes()];
-                let _sectors_read = match self.header.drive.lock().read_sectors(&mut data[..], fat_sector as usize) {
-                    Ok(bytes) => bytes,
-                    Err(_) => return Err(Error::BlockError),
-                };
     
                 // Because FAT32 uses 4 bytes per cluster entry, to get to a cluster's exact byte entry in the FAT you can use the cluster number * 4
                 // And to get to the next cluster, the FAT must be read in little endian order using the mutliple_hex_to_int function 
                 // Read more here: https://en.wikipedia.org/wiki/Design_of_the_FAT_file_system#FAT
-                let next_cluster_raw = LittleEndian::read_u32(&mut data[entry_offset as usize..(entry_offset as usize +size_of::<u32>())]) as u32;
-                let next_cluster = cluster_from_raw(next_cluster_raw);
+                let mut buf = [0; 4];
+                let offset = fat_entry as usize + self.sector_to_byte_offset(self.first_fat_sector as usize);
+                match self.io.read(&mut buf, offset) {
+                    Ok(_) => (),
+                    Err(_) => return Err(Error::BlockError),
 
-                let data_test = &data[entry_offset as usize..(entry_offset as usize +size_of::<u32>())];
+                }
+                let next_cluster_raw = u32::from_le_bytes(buf);
+                let next_cluster = cluster_from_raw(next_cluster_raw);
 
                 debug!("the next cluster is: {:x}, raw: {:x}", next_cluster, next_cluster_raw);
                 
@@ -1312,7 +1237,7 @@ impl Filesystem {
     }
     
     /// Walks the FAT to find an empty cluster and returns the number of the first cluster found.
-    fn find_empty_cluster(&self) -> Result<u32,Error>{
+    fn find_empty_cluster(&mut self) -> Result<u32,Error>{
         
         // Magic number: first cluster that might not be root directory.
         let mut cluster = 3;
@@ -1323,11 +1248,10 @@ impl Filesystem {
             let fat_sector = self.fat_sector_from_fat_entry(fat_entry);
             // Fetch necessary fat_sector
             let mut data: Vec<u8> = vec![0; self.bytes_per_sector as usize];
-            let _sectors_read = match self.header.drive.lock().read_sectors(&mut data[..], fat_sector as usize) {
-                    Ok(bytes) => bytes,
-                    Err(_) => return Err(Error::BlockError),
+            let _bytes_read = match self.io.read(&mut data, self.sector_to_byte_offset(fat_sector as usize)) {
+                Ok(bytes_read) => Ok(bytes_read),
+                Err(_) => Err(Error::BlockError),
             };
-            
             // Read each of the clusters in the sector we fetched and see if any are empty.
             loop {
                 let fat_entry = Filesystem::fat_entry_from_cluster(cluster);
@@ -1355,20 +1279,10 @@ impl Filesystem {
     }
     
     /// Extends a cluster chain by one cluster and returns the new cluster of the extended chain.
-    fn extend_chain(&self, old_tail: u32) -> Result<u32, Error> {
-        // Fetch the FAT for the table entry and check if next entry is free.
-        let fat_entry = Filesystem::fat_entry_from_cluster(old_tail);
-        let fat_sector = self.fat_sector_from_fat_entry(fat_entry);
-        let mut data: Vec<u8> = vec![0; self.bytes_per_sector as usize];
-        let _sectors_read = match self.header.drive.lock().read_sectors(&mut data[..], fat_sector as usize) {
-                Ok(bytes) => bytes,
-                Err(_) => return Err(Error::BlockError),
-        };
+    fn extend_chain(&mut self, old_tail: u32) -> Result<u32, Error> {
         
-        // Verify that the current position is indeed EOC
-        let entry_offset = fat_entry % (self.bytes_per_sector / size_of::<u32>() as u32);
-        let cluster_value = LittleEndian::read_u32(
-            &mut data[entry_offset as usize..(entry_offset as usize +size_of::<u32>())]) as u32;
+        // Confirm that the old tail is actually the end of the chain.
+        let cluster_value = self.read_fat_cluster(old_tail)?;
         let cluster_value = cluster_from_raw(cluster_value);
             
         if !is_eoc(cluster_value) {
@@ -1377,88 +1291,64 @@ impl Filesystem {
         }
         
         let mut cluster_found = false;
-        
-        // TODO this sort of logic could easily be written with a PFSPosition struct?
-        // In general this code section is pretty ugly. Could be refactored.
-        
+
         // See if we can trivially extend the chain?
         let mut new_cluster_candidate = old_tail + 1;
-        let mut new_fat_entry = Filesystem::fat_entry_from_cluster(new_cluster_candidate);
-        let mut new_fat_sector = self.fat_sector_from_fat_entry(new_fat_entry);
-        let mut new_entry_offset = new_fat_entry % (self.bytes_per_sector / size_of::<u32>() as u32);
-        
-        // TODO also check in the case where the FAT is not split across a sector boundary.
-        if new_fat_sector == fat_sector {
-            let next_cluster_value = LittleEndian::read_u32(
-                &mut data[new_entry_offset as usize..(new_entry_offset as usize +size_of::<u32>())]) as u32;
-            let next_cluster_value = cluster_from_raw(next_cluster_value);
+
+        let next_cluster_value = self.read_fat_cluster(new_cluster_candidate)?;
+        let next_cluster_value = cluster_from_raw(next_cluster_value);
                 
-            if is_empty_cluster(next_cluster_value) {
-                cluster_found = true;
-            }
+        if is_empty_cluster(next_cluster_value) {
+            cluster_found = true;
         }
         
         // Handle the case where we need to walk the FAT to find a free cluster:
         if !cluster_found {
             new_cluster_candidate = self.find_empty_cluster()?;
-            // Recompute the fat entry,sector etc:
-            new_fat_entry = Filesystem::fat_entry_from_cluster(new_cluster_candidate);
-            new_fat_sector = self.fat_sector_from_fat_entry(new_fat_entry);
-            new_entry_offset = new_fat_entry % (self.bytes_per_sector / size_of::<u32>() as u32);
         }
         
-        // TODO the order may affect correctness in cases where disk accesses fail. Consider this at some point.
-        // FIXME this code would also greatly benefit from byte granularity transactions
-        // Update the disk segments and write to disk:
-        LittleEndian::write_u32(
-            &mut data[entry_offset as usize..(entry_offset as usize +size_of::<u32>())], new_cluster_candidate);
-        if new_fat_sector == fat_sector {
-            LittleEndian::write_u32(
-                &mut data[new_entry_offset as usize..(new_entry_offset as usize +size_of::<u32>())], 
-                EOC);
-                
-            // Write the data out:
-            let _sectors_written = match self.header.drive.lock().write_sectors(&data, fat_sector as usize) {
-                Ok(sectors) => sectors,
-                Err(_) => return Err(Error::BlockError),
-            };
-        } else {
-            // Write the old out:
-            let _sectors_written = match self.header.drive.lock().write_sectors(&data, fat_sector as usize) {
-                Ok(sectors) => sectors,
-                Err(_) => return Err(Error::BlockError),
-            };
-            
-            // Read the new sector in
-            let _sectors_read = match self.header.drive.lock().read_sectors(&mut data[..], new_fat_sector as usize) {
-                Ok(bytes) => bytes,
-                Err(_) => {
-                    warn!("Fat32 disk is in an inconsistent state");
-                    return Err(Error::BlockError);
-                },
-            };
-            
-            // Overwrite the old entry
-            LittleEndian::write_u32(
-                &mut data[new_entry_offset as usize..(new_entry_offset as usize +size_of::<u32>())], 
-                EOC);
-                
-            // Write the old out:
-            let _sectors_written = match self.header.drive.lock().write_sectors(&data, new_fat_sector as usize) {
-                Ok(sectors) => sectors,
-                Err(_) => {
-                    warn!("Fat32 disk is in an inconsistent state");
-                    return Err(Error::BlockError);
-                },
-            };
-        }
-        
+
+        // Write the old out:
+        self.write_fat_cluster(old_tail, new_cluster_candidate)?;
+        self.write_fat_cluster(new_cluster_candidate, EOC)?;
+
         Ok(new_cluster_candidate)
     }
-    
+
+    /// Reads the value at cluster from the FAT table:
+    fn read_fat_cluster(&mut self, cluster: u32) -> Result<u32, Error> {
+        let mut buf = [0; 4];
+        let fat_entry = Self::fat_entry_from_cluster(cluster);
+        let sector = self.fat_sector_from_fat_entry(fat_entry);
+        let offset = self.sector_to_byte_offset(self.first_fat_sector as usize) + fat_entry as usize;
+
+        return match self.io.read(&mut buf, offset as usize) {
+            Ok(_bytes) => {
+                Ok(u32::from_le_bytes(buf))
+            },
+            Err(_) => Err(Error::BlockError),
+        }
+    }
+
+    /// Writes the cluster in the FAT table with new_value.
+    fn write_fat_cluster(&mut self, cluster: u32, new_value: u32) -> Result<(), Error> {
+        let mut buf = u32::to_le_bytes(new_value);
+        let fat_entry = Self::fat_entry_from_cluster(cluster);
+        let sector = self.fat_sector_from_fat_entry(fat_entry);
+        let offset = self.sector_to_byte_offset(self.first_fat_sector as usize) + fat_entry as usize;
+
+        return match self.io.write(&mut buf, offset as usize) {
+            Ok(_bytes) => {
+                Ok(())
+            },
+            Err(_) => Err(Error::BlockError),
+        }
+    }
+
     #[inline]
-    fn bytes_per_cluster(&self) -> u32 {
-        return self.bytes_per_sector * self.sectors_per_cluster;
+    /// Computes the number of bytes per cluster.
+    fn cluster_size_in_bytes(&self) -> usize {
+        return (self.bytes_per_sector * self.sectors_per_cluster) as usize;
     }
     
     #[inline]
@@ -1466,11 +1356,23 @@ impl Filesystem {
     fn fat_entry_from_cluster(cluster: u32) -> u32 {
         cluster * 4
     }
+
+    #[inline]
+    /// Computes the offset from the start of the disk given a sector
+    fn sector_to_byte_offset(&self, sector: usize) -> usize {
+        sector * self.bytes_per_sector as usize
+    }
     
     #[inline]
     /// Computes the disk sector corresponding to a given fat entry to read the FAT.
     fn fat_sector_from_fat_entry(&self, fat_entry: u32) -> u32 {
-        self.first_fat_sector + (fat_entry / self.bytes_per_sector)
+        self.first_fat_sector + (fat_entry / self.bytes_per_sector) // TODO check against max size?
+    }
+
+    #[inline]
+    /// Computes the size of a file of size `size` in clusters (rounds up)
+    fn size_in_clusters(&self, size: usize) -> usize {
+        (size + self.cluster_size_in_bytes() - 1) / (self.cluster_size_in_bytes())
     }
 
     fn sectors_per_cluster(&self) -> u32 {
@@ -1493,19 +1395,18 @@ pub fn init(sd: storage_device::StorageDeviceRef) -> Result<Filesystem, &'static
     info!("Attempting to initialize a fat32 filesystem");
     // Once a FAT32 filesystem is detected, this will create the Filesystem structure from the drive
     if detect_fat(&sd) == true {
-        let header = match Header::new(sd){
+        let header = match Header::new(sd.clone()){
             Ok(header) => header,
             Err(_) => return Err("failed to intialize header"),
         };
-        let fatfs = Filesystem::new(header);
-        match fatfs.init() {
+        match Filesystem::new(header, sd) {
             Ok(fs) => {
                 // return Ok(Arc::new(Mutex::new(fs)));
                 return Ok(fs);
             } 
             Err(_) => return Err("failed to intialize fat filesystem for disk"),
-        }           
-    }    
+        };        
+    }   
     Err("failed to intialize fat filesystem for disk")
 }
 
