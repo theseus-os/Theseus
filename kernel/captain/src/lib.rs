@@ -39,7 +39,7 @@ extern crate interrupts;
 extern crate acpi;
 extern crate device_manager;
 extern crate e1000;
-extern crate window_manager_generic;
+extern crate window_manager;
 extern crate scheduler;
 extern crate frame_buffer;
 extern crate frame_buffer_rgb;
@@ -128,7 +128,7 @@ pub fn init(
     // Currently we use a FrameBufferRGB as the final frame buffer, but other types of FrameBuffers could be used instead.
     frame_buffer_rgb::init()?;
     font::init()?;
-    window_manager_generic::init()?;
+    window_manager::init()?;
     info!("Display subsystem initialized successfully.");
 
     // initialize the input event manager, which will start the default terminal 

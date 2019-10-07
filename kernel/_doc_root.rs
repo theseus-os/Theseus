@@ -66,4 +66,4 @@
 //! * `vga_buffer`: Simple routines for printing to the screen using the x86 VGA buffer text mode.
 //! * `window`: Defines a trait for window.
 //! * `window_manager`: Provides a structure of window manager.
-//! * `window_manager_generic`: Defines a generic window structure which implements the Window trait. Maintains a window manager which contains a list of generic window. 
+//! * `window_manager`: Defines a generic window structure which implements the Window trait. Maintains a window manager which contains a list of generic window. 

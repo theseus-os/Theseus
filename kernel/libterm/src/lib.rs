@@ -10,7 +10,6 @@
 #[macro_use] extern crate log;
 extern crate dfqueue;
 extern crate window_manager;
-extern crate window_manager_generic;
 extern crate environment;
 extern crate print;
 extern crate event_types;
@@ -29,7 +28,7 @@ use text_display::{TextDisplay, Cursor};
 use displayable::Displayable;
 use frame_buffer_rgb::FrameBufferRGB;
 use frame_buffer::{Coord};
-use window_manager_generic::WindowGeneric;
+use window_manager::WindowGeneric;
 use font::{CHARACTER_HEIGHT, CHARACTER_WIDTH};
 
 pub const FONT_COLOR: u32 = 0x93ee90;
@@ -425,7 +424,7 @@ impl Terminal {
 impl Terminal {
     pub fn new() -> Result<Terminal, &'static str> {
         // Requests a new window object from the window manager
-        let window_object = match window_manager_generic::new_default_window() {
+        let window_object = match window_manager::new_default_window() {
             Ok(window_object) => window_object,
             Err(err) => {debug!("new window returned err"); return Err(err)}
         };
