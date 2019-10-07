@@ -14,12 +14,19 @@ A `Displayable` is a graph which can display itself onto a framebuffer. It usual
 
 To add a text displayable to a window, an application creates a `TextDisplay` object, and invoke `WindowGeneric.add_displayable()` to add it as a component. The displayable is identfied by a string. 
 
-## Display in a window
+## Display in a Window
 
 The application can use the name to get the text displayable and set its content, or invoke `WindowGeneric.display(name)` to display it. These methods are generic and in the future they will work for other kinds of displayables.
 
 After a displayable displays itself in a window, the application should invoke `WindowGeneric.render()` to render the updates to the screen. A framebuffer compositor would composites a list of framebuffers and outputs the result to a final framebuffer which is mapped to the screen.
 
+## Switch among Windows
+
+The `window_manager` crates holds a list of reference to existing `WindowProfile`s. The list consists of a single active window and a list of background windows. It defines two functions `switch_to` and `switch_to_next` to switch to a specificed window or to the next window.
+
+The order of windows is based on the last time it becomes active. The one which was active most recently is at the top of the background list. The active window would show on top of all windows and get all the key input events passed to the window manager. Once an active window is deleted, the next window in the background list will become active.
+
+## An Example
 
 ```rust
 #[no_mangle]
