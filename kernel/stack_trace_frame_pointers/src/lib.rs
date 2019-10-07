@@ -17,8 +17,11 @@
 #![no_std]
 #![feature(asm)]
 
+// This entire crate depends upon the `frame_pointers` config option.
+#[macro_use] extern crate cfg_if;
+cfg_if! { if #[cfg(frame_pointers)] {
+
 extern crate alloc;
-// #[macro_use] extern crate log;
 extern crate memory;
 
 use memory::{PageTable, VirtualAddress};
@@ -43,7 +46,6 @@ use memory::{PageTable, VirtualAddress};
 /// * `max_recursion`: an optional maximum number of stack frames to recurse up the call stack.
 ///   If not provided, the default maximum will be `64` call stack frames.
 /// 
-#[cfg(frame_pointers)]
 #[inline(never)]
 pub fn stack_trace_using_frame_pointers(
     current_page_table: &PageTable,
@@ -101,3 +103,5 @@ pub fn stack_trace_using_frame_pointers(
 // }
 // debug!("register values: RIP: {:#X}, RSP: {:#X}, RBP: {:#X}", rip, rsp, rbp);
 // let _curr_instruction_pointer = VirtualAddress::new_canonical(rip);
+
+}} // end of cfg_if block

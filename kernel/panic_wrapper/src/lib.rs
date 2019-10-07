@@ -11,11 +11,12 @@ extern crate alloc;
 extern crate memory;
 extern crate task;
 extern crate unwind;
+extern crate stack_trace;
 extern crate stack_trace_frame_pointers;
 
 use core::panic::PanicInfo;
-use alloc::string::String;
-use memory::{PageTable, VirtualAddress};
+// use alloc::string::String;
+use memory::VirtualAddress;
 use task::{KillReason, PanicInfoOwned};
 
 /// Performs the standard panic handling routine, which involves the following:
@@ -29,45 +30,58 @@ pub fn panic_wrapper(panic_info: &PanicInfo) -> Result<(), &'static str> {
     trace!("at top of panic_wrapper: {:?}", panic_info);
 
     // print a stack trace
-    {
-        let curr_task = task::get_my_current_task().ok_or("get_my_current_task() failed")?;
-        let namespace = curr_task.get_namespace();
-        let (mmi_ref, app_crate_ref, _is_idle_task) = { 
-            let t = curr_task.lock();
-            (t.mmi.clone(), t.app_crate.clone(), t.is_an_idle_task)
-        };
-
-        // // dump some info about the loaded app crate
-        // if let Some(ref app_crate) = app_crate_ref {
-        //     let krate = app_crate.lock_as_ref();
-        //     trace!("============== Crate {} =================", krate.crate_name);
-        //     for s in krate.sections.values() {
-        //         trace!("   {:?}", &*s.lock());
-        //     }
-        // }
-
-        #[cfg(frame_pointers)] {
-            error!("-------------- Stack Trace --------------");
-            let res = stack_trace_frame_pointers::stack_trace_using_frame_pointers(
-                &mmi_ref.lock().page_table,
-                &mut |frame_pointer, instruction_pointer: VirtualAddress| {
-                    let symbol_offset = namespace.get_section_containing_address(instruction_pointer, app_crate_ref.as_ref(), false)
-                        .map(|(sec_ref, offset)| (sec_ref.lock().name.clone(), offset));
+    let stack_trace_result = {
+        // By default, we use DWARF-based debugging stack traces
+        #[cfg(not(frame_pointers))] {
+            error!("------------------ Stack Trace (DWARF) ---------------------------");
+            stack_trace::stack_trace(
+                &|stack_frame, stack_frame_iter| {
+                    let symbol_offset = stack_frame_iter.namespace().get_section_containing_address(
+                        VirtualAddress::new_canonical(stack_frame.call_site_address() as usize),
+                        stack_frame_iter.starting_crate(),
+                        false
+                    ).map(|(sec_ref, offset)| (sec_ref.lock().name.clone(), offset));
                     if let Some((symbol_name, offset)) = symbol_offset {
-                        error!("  {:>#018X}: {:>#018X} in {} + {:#X}", frame_pointer, instruction_pointer, symbol_name, offset);
+                        error!("  {:>#018X} in {} + {:#X}", stack_frame.call_site_address(), symbol_name, offset);
                     } else {
-                        error!("  {:>#018X}: {:>#018X} in ??", frame_pointer, instruction_pointer);
+                        error!("  {:>#018X} in ??", stack_frame.call_site_address());
                     }
                     true
                 },
                 None,
-            );
-            match res {
-                Ok(()) => error!("  Beginning of stack"),
-                Err(e) => error!("  {}", e),
-            }
+            )
         }
+        #[cfg(frame_pointers)] {
+            error!("------------------ Stack Trace (frame pointers) ------------------");
+            let curr_task = task::get_my_current_task().ok_or("get_my_current_task() failed")?;
+            let namespace = curr_task.get_namespace();
+            let (mmi_ref, app_crate_ref) = { 
+                let t = curr_task.lock();
+                (t.mmi.clone(), t.app_crate.clone())
+            };
+            let mmi = mmi_ref.lock();
+
+            stack_trace_frame_pointers::stack_trace_using_frame_pointers(
+                &mmi.page_table,
+                &mut |_frame_pointer, instruction_pointer: VirtualAddress| {
+                    let symbol_offset = namespace.get_section_containing_address(instruction_pointer, app_crate_ref.as_ref(), false)
+                        .map(|(sec_ref, offset)| (sec_ref.lock().name.clone(), offset));
+                    if let Some((symbol_name, offset)) = symbol_offset {
+                        error!("  {:>#018X} in {} + {:#X}", instruction_pointer, symbol_name, offset);
+                    } else {
+                        error!("  {:>#018X} in ??", instruction_pointer);
+                    }
+                    true
+                },
+                None,
+            )
+        }
+    };
+    match stack_trace_result {
+        Ok(()) => error!("  Beginning of stack"),
+        Err(e) => error!("  {}", e),
     }
+    error!("------------------------------------------------------------------");
 
     // Call this task's panic handler, if it has one.
     // Note that we must consume and drop the Task's panic handler BEFORE that Task can possibly be dropped.
