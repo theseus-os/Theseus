@@ -1,6 +1,6 @@
 # How to Create a Window
 
-A window is an object owned by an application. Compared to mainstream operating systems, the application owns the window and its states rather than the window manager, and the window would be dropped automatically when the application terminates. The window manager holds a list of reference to the profile states of every window, which is required for it to switch among windows. Theseus would minimize the profile states held by the window manager to reduce states spill.
+A window is an object owned by an application. Compared to mainstream operating systems, the application owns the states of a window rather than the window manager, and the window would be dropped automatically when the application terminates. The window manager holds a list of reference to the profile states of every window, which is required by it to switch among windows. Theseus would minimize the profile states held by the window manager to reduce states spill.
 
 ## Create a Window
 
@@ -16,7 +16,7 @@ To add a text displayable to a window, an application creates a `TextDisplay` ob
 
 ## Display in a Window
 
-The application can use the name to get the text displayable and set its content, or invoke `WindowGeneric.display(name)` to display it. These methods are generic and in the future they will work for other kinds of displayables.
+The application can invoke `WindowGeneric.display(name)` to display a displayable by its name. This method is generic and in the future it will work for other kinds of displayables. The application can also invoke `WindowGeneric.get_concrete_display_mut::<T>(name)` to get a displayable of a concrate type `T` and set its contents. The method returns error if the window does not have a displayable of `name` or the displayable is not of type `T`.
 
 After a displayable displays itself in a window, the application should invoke `WindowGeneric.render()` to render the updates to the screen. A framebuffer compositor would composites a list of framebuffers and outputs the result to a final framebuffer which is mapped to the screen.
 
@@ -30,5 +30,23 @@ The order of windows is based on the last time it becomes active. The one which 
 
 ```rust
 #[no_mangle]
-pub fn main(args: Vec<String>) -> isize { ... }
+use text_display::TextDisplay;
+use frame_buffer::Coord;
+
+let coordinate = Coord::new(800, 800);
+let width = 300;
+let height = 200;
+
+let window = window_manager::new_window(coordinate, width, height)?
+let text_display = TextDisplay::new(width, height, 0xFFFFFF, 0x000000)?
+let displayable: Box<dyn displayable::Displayable> = Box::new(text_display);
+
+let display_name = "text";
+window.add_displayable(&display_name, Coord::new(0, 0), displayable)?;
+
+let text_display_ref = window.get_concrete_display_mut::<TextDisplay>(&display_name)?;
+text_display_ref.set_text("Hello World");
+            
+window.display(&display_name)?;
+window.render()?;
 ```
