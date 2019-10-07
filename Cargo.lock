@@ -1284,6 +1284,8 @@ dependencies = [
  "log 0.3.9 (registry+https://github.com/rust-lang/crates.io-index)",
  "memory 0.1.0",
  "runqueue 0.1.0",
+ "stack_trace 0.1.0",
+ "stack_trace_frame_pointers 0.1.0",
  "task 0.1.0",
  "unwind 0.1.0",
 ]
@@ -1901,6 +1903,23 @@ dependencies = [
 name = "stable_deref_trait"
 version = "1.1.1"
 source = "registry+https://github.com/rust-lang/crates.io-index"
+
+[[package]]
+name = "stack_trace"
+version = "0.1.0"
+dependencies = [
+ "fallible-iterator 0.2.0 (registry+https://github.com/rust-lang/crates.io-index)",
+ "task 0.1.0",
+ "unwind 0.1.0",
+]
+
+[[package]]
+name = "stack_trace_frame_pointers"
+version = "0.1.0"
+dependencies = [
+ "cfg-if 0.1.9 (registry+https://github.com/rust-lang/crates.io-index)",
+ "memory 0.1.0",
+]
 
 [[package]]
 name = "state_store"

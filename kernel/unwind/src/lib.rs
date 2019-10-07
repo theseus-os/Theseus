@@ -110,7 +110,7 @@ pub struct StackFrame {
     personality: Option<u64>,
     lsda: Option<u64>,
     initial_address: u64,
-    caller_address: u64,
+    call_site_address: u64,
 }
 
 impl StackFrame {
@@ -134,13 +134,10 @@ impl StackFrame {
         self.lsda
     }
 
-    /// The address of the instruction that called the function 
-    /// corresponding to this stack frame.
-    /// In other words, the address that we were at right before this frame was called.
-    /// 
-    /// This is useful for moving up to the previous frame in the call stack.
-    pub fn caller_address(&self) -> u64 {
-        self.caller_address
+    /// The *call site* of this stack frame, i.e.,
+    /// the address of the instruction that called the next function in the call stack.
+    pub fn call_site_address(&self) -> u64 {
+        self.call_site_address
     }
 
     /// The address (starting instruction pointer) of the function
@@ -196,10 +193,13 @@ impl fmt::Debug for StackFrameIter {
 impl StackFrameIter {
     /// Create a new iterator over stack frames that starts from the current frame
     /// and uses the given `Registers` values as a starting point. 
-    /// THe given `NamespaceContext` is used for resolving symbol addresses into sections.
-    fn new(namespace_context: NamespaceContext, registers: Registers) -> Self {
+    /// The given `namespace` and `starting_crate` are used for resolving symbol addresses into sections.
+    /// 
+    /// Note: ideally, this shouldn't be public since it needs to be invoked with the correct initial register values.
+    #[doc(hidden)]
+    pub fn new(namespace: Arc<CrateNamespace>, app_crate: Option<StrongCrateRef>, registers: Registers) -> Self {
         StackFrameIter {
-            namespace_context,
+            namespace_context: NamespaceContext { namespace, starting_crate: app_crate },
             registers,
             state: None,
         }
@@ -277,12 +277,12 @@ impl FallibleIterator for StackFrameIter {
             // but we know that subtracting one will give us an address within that previous instruction.
             let caller = return_address - 1;
 
-            // Get unwind info for the caller address
+            // Get unwind info for the call site address
             let crate_ref = self.namespace_context.namespace.get_crate_containing_address(
                 VirtualAddress::new_canonical(caller as usize), 
                 self.namespace_context.starting_crate.as_ref(),
                 false,
-            ).ok_or("couldn't get crate containing caller address")?;
+            ).ok_or("couldn't get crate containing call site address")?;
             let (eh_frame_sec_ref, base_addrs) = get_eh_frame_info(&crate_ref)
                 .ok_or("couldn't get eh_frame section in caller's containing crate")?;
 
@@ -307,7 +307,7 @@ impl FallibleIterator for StackFrameIter {
                     personality: fde.personality().map(|x| unsafe { deref_ptr(x) }),
                     lsda: fde.lsda().map(|x| unsafe { deref_ptr(x) }),
                     initial_address: fde.initial_address(),
-                    caller_address: caller,
+                    call_site_address: caller,
                 };
                 Ok((cfa, frame))
             })?;
@@ -346,13 +346,11 @@ pub fn invoke_with_current_registers<F>(f: F) -> Result<(), &'static str>
     where F: FuncWithRegisters 
 {
     let f: RefFuncWithRegisters = &f;
-    trace!("in invoke_with_current_registers(): calling unwind_trampoline...");
     let result = unsafe { 
         let res_ptr = unwind_trampoline(&f);
         let res_boxed = Box::from_raw(res_ptr);
         *res_boxed
     };
-    trace!("in invoke_with_current_registers(): returned from unwind_trampoline with retval: {:?}", result);
     return result;
     // this is the end of the code in this function, the following is just inner functions.
 
@@ -608,7 +606,8 @@ pub fn start_unwinding(reason: KillReason) -> Result<(), &'static str> {
         Box::into_raw(Box::new(
             UnwindingContext {
                 stack_frame_iter: StackFrameIter::new(
-                    NamespaceContext { namespace, starting_crate: app_crate_ref }, 
+                    namespace,
+                    app_crate_ref,
                     // we will set the real register values later, in the `invoke_with_current_registers()` closure.
                     Registers::default()
                 ), 
@@ -697,12 +696,12 @@ fn continue_unwinding(unwinding_context_ptr: *mut UnwindingContext) -> Result<()
                     .map_err(|_e| "continue_unwinding(): couldn't get LSDA pointer as a slice")?;
                 let table = lsda::GccExceptTableArea::new(lsda_slice, NativeEndian, frame.initial_address());
 
-                let entry = table.call_site_table_entry_for_address(frame.caller_address()).map_err(|e| {
-                    error!("continue_unwinding(): couldn't find a call site table entry for this stack frame's caller address. Error: {}", e);
-                    "continue_unwinding(): couldn't find a call site table entry for this stack frame's caller address."
+                let entry = table.call_site_table_entry_for_address(frame.call_site_address()).map_err(|e| {
+                    error!("continue_unwinding(): couldn't find a call site table entry for this stack frame's call site address. Error: {}", e);
+                    "continue_unwinding(): couldn't find a call site table entry for this stack frame's call site address."
                 })?;
 
-                debug!("Found call site entry for address {:#X}: {:#X?}", frame.caller_address(), entry);
+                debug!("Found call site entry for address {:#X}: {:#X?}", frame.call_site_address(), entry);
                 (stack_frame_iter.registers().clone(), entry.landing_pad_address())
             } else {
                 error!("  BUG: couldn't find LSDA section (.gcc_except_table) for LSDA address: {:#X}", lsda);
