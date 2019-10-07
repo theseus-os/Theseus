@@ -11,7 +11,7 @@ extern crate alloc;
 extern crate memory;
 extern crate task;
 extern crate unwind;
-extern crate stack_trace;
+extern crate stack_trace_frame_pointers;
 
 use core::panic::PanicInfo;
 use alloc::string::String;
@@ -48,7 +48,7 @@ pub fn panic_wrapper(panic_info: &PanicInfo) -> Result<(), &'static str> {
 
         #[cfg(frame_pointers)] {
             error!("-------------- Stack Trace --------------");
-            let res = stack_trace::stack_trace_using_frame_pointers(
+            let res = stack_trace_frame_pointers::stack_trace_using_frame_pointers(
                 &mmi_ref.lock().page_table,
                 &mut |frame_pointer, instruction_pointer: VirtualAddress| {
                     let symbol_offset = namespace.get_section_containing_address(instruction_pointer, app_crate_ref.as_ref(), false)
@@ -60,6 +60,7 @@ pub fn panic_wrapper(panic_info: &PanicInfo) -> Result<(), &'static str> {
                     }
                     true
                 },
+                None,
             );
             match res {
                 Ok(()) => error!("  Beginning of stack"),
@@ -110,76 +111,3 @@ pub fn panic_wrapper(panic_info: &PanicInfo) -> Result<(), &'static str> {
     //     Err("")
     // }
 }
-
-
-
-
-/// Get a stack trace using the frame pointer register (RBP on x86_64). 
-/// If the compiler didn't emit frame pointers, then this function will not work.
-/// 
-/// This was adapted from Redox's stack trace implementation.
-#[cfg(frame_pointers)]
-#[inline(never)]
-pub fn stack_trace_using_frame_pointers(
-    current_page_table: &PageTable,
-    addr_to_symbol: &dyn Fn(VirtualAddress) -> Option<(String, usize)>
-) {
-    // SAFETY: pointers are checked 
-    // get the stack base pointer
-    let mut rbp: usize;
-    let mut rsp: usize;
-    unsafe {
-        asm!("" : "={rbp}"(rbp), "={rsp}"(rsp) : : "memory" : "intel", "volatile");
-    }
-
-    error!("STACK TRACE: RBP: {:>#018X}, RSP: {:>#018X}", rbp, rsp);
-    if rbp == 0 {
-        error!("Frame pointers have been omitted in this build. \
-            Stack tracing/unwinding cannot be performed because we don't yet \
-            support using DWARF .debug_* sections to backtrace the stack. \
-            Make sure that the rustc option '-C force-frame-pointers=yes' is used."
-        );
-    }
-    // set a recursion maximum of 64 stack frames
-    for _frame in 0..64 {
-        if let Some(rip_rbp) = rbp.checked_add(core::mem::size_of::<usize>()) {
-            if let (Ok(rbp_vaddr), Ok(rip_rbp_vaddr)) = (VirtualAddress::new(rbp), VirtualAddress::new(rip_rbp)) {
-                if current_page_table.translate(rbp_vaddr).is_some() && current_page_table.translate(rip_rbp_vaddr).is_some() {
-                    let rip = unsafe { *(rip_rbp as *const usize) };
-                    if rip == 0 {
-                        error!("  {:>#018X}: BEGINNING OF STACK", rbp);
-                        break;
-                    }
-                    if let Some((symbol_name, offset)) = addr_to_symbol(VirtualAddress::new_canonical(rip)) {
-                        error!("  {:>#018X}: {:>#018X} in {} + {:#X}", rbp, rip, symbol_name, offset);
-                    } else {
-                        error!("  {:>#018X}: {:>#018X} in ??", rbp, rip);
-                    }
-                    // move up the call stack to the previous frame
-                    rbp = unsafe { *(rbp as *const usize) };
-                } else {
-                    error!("  {:>#018X}: GUARD PAGE", rbp);
-                    break;
-                }
-            } else {
-                error!(" {:>#018X}: INVALID VIRTUAL ADDRESS in RBP", rbp);
-                break;
-            }
-        } else {
-            error!("  {:>#018X}: RBP OVERFLOW", rbp);
-        }
-    }
-}
-
-
-// // snippet to get the current instruction pointer RIP, stack pointer RSP, and RBP
-// let mut rbp: usize;
-// let mut rsp: usize;
-// let mut rip: usize;
-// unsafe {
-//     // On x86 you cannot directly read the value of the instruction pointer (RIP),
-//     // so we use a trick that exploits RIP-relateive addressing to read the current value of RIP (also gets RBP and RSP)
-//     asm!("lea $0, [rip]" : "=r"(rip), "={rbp}"(rbp), "={rsp}"(rsp) : : "memory" : "intel", "volatile");
-// }
-// debug!("register values: RIP: {:#X}, RSP: {:#X}, RBP: {:#X}", rip, rsp, rbp);
-// let _curr_instruction_pointer = VirtualAddress::new_canonical(rip);

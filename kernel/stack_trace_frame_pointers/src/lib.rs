@@ -1,16 +1,18 @@
-//! Stack trace (backtrace) functionality.
+//! Stack trace (backtrace) functionality using frame pointers.
 //! 
 //! There are two main ways of obtaining stack traces:
 //! 1. Using the frame pointer register to find the previous stack frame.
 //! 2. Using DWARF debugging information to understand the layout of each stack frame.
 //! 
 //! We support both ways, but prefer #2 because it doesn't suffer from the
-//! compatibility and performance drawbacks of #1.
+//! compatibility and performance drawbacks of #1. 
+//! See the `stack_trace` crate for the #2 functionality. 
 //! 
-//! Note that frame pointer-based stack traces are only available 
-//! 
-//! The functions below offer convenient ways to obtain a stack trace,
-//! iterate over the trace, print the trace, etc. 
+//! This crate offers support for #1. 
+//! The advantage of using this is that it doesn't require any significant dependencies.
+//! However, this crate's frame pointer-based stack traces are only available
+//! when the compiler has been configured to emit frame pointers,
+//! which in Rust is achieved via the `-C force-frame-pointers=yes` rust flags option.
 
 #![no_std]
 #![feature(asm)]
@@ -18,13 +20,8 @@
 extern crate alloc;
 // #[macro_use] extern crate log;
 extern crate memory;
-extern crate task;
-extern crate unwind;
 
-// use alloc::string::String;
 use memory::{PageTable, VirtualAddress};
-// use task::{KillReason, PanicInfoOwned};
-
 
 
 /// Get a stack trace using the frame pointer registers (RBP on x86_64).
@@ -43,12 +40,15 @@ use memory::{PageTable, VirtualAddress};
 ///   at that point in the call stack; the latter is useful for symbol resolution.
 ///   The function should return `true` if it wants to continue iterating up the call stack,
 ///   or `false` if it wants the iteration to stop.
+/// * `max_recursion`: an optional maximum number of stack frames to recurse up the call stack.
+///   If not provided, the default maximum will be `64` call stack frames.
 /// 
 #[cfg(frame_pointers)]
 #[inline(never)]
 pub fn stack_trace_using_frame_pointers(
     current_page_table: &PageTable,
     on_each_stack_frame: &mut dyn FnMut(usize, VirtualAddress) -> bool,
+    max_recursion: Option<usize>,
 ) -> Result<(), &'static str> {
 
     let mut rbp: usize;
@@ -57,8 +57,7 @@ pub fn stack_trace_using_frame_pointers(
         asm!("" : "={rbp}"(rbp) : : "memory" : "intel", "volatile");
     }
 
-    // set a recursion maximum of 64 stack frames
-    for _i in 0..64 {
+    for _i in 0 .. max_recursion.unwrap_or(64) {
         // the stack contains the return address (of the caller) right before the current frame pointer
         if let Some(rip_ptr) = rbp.checked_add(core::mem::size_of::<usize>()) {
             if let (Ok(rbp_vaddr), Ok(rip_ptr)) = (VirtualAddress::new(rbp), VirtualAddress::new(rip_ptr)) {
@@ -87,7 +86,7 @@ pub fn stack_trace_using_frame_pointers(
             return Err("frame pointer value in RBP was too large and overflowed.");
         }
     }
-    Err("reached maximum depth of 64 call stack frames")
+    Err("reached maximum recursion depth of call stack frames")
 }
 
 

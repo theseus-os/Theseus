@@ -1,0 +1,13 @@
+[package]
+authors = ["Kevin Boos <kevinaboos@gmail.com>"]
+name = "stack_trace_frame_pointers"
+description = "Stack trace (backtrace) functionality using frame pointers"
+version = "0.1.0"
+build = "../../build.rs"
+
+[dependencies.memory]
+path = "../memory"
+
+
+[lib]
+crate-type = ["rlib"]
