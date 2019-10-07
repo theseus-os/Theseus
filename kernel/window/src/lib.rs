@@ -12,7 +12,7 @@ use dfqueue::{DFQueueProducer};
 use frame_buffer::Coord;
 
 /// Trait for windows. A window manager holds a list of objects who implement the `Window` trait.
-/// Windows are able to get and modify the states required by the window manager such as the size, the loaction and the active state of windows.
+/// A `Window` provides states required by the window manager such as the size, the loaction and the active state of a window.
 pub trait Window {
     /// Clears the window on the screen including the border and padding.
     fn clear(&self) -> Result<(), &'static str>;

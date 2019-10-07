@@ -1,10 +1,8 @@
 //! This crate defines a `WindowGeneric` structure. This structure contains a `WindowProfile` structure which implements the `Window` trait.
 //!
-//! This crate holds a instance of a window manager which maintains a list of `WindowProfile`s.
+//! The `WindowProfile` structure contains information required by the window manager including the border, location and size of a window. The manager holds a `WindowList` instance which maintains a list of references to `WindowProfile`s. It can add new windows to the list and switch among them.
 //!
-//! The `new_window` function creates a new `WindowGeneric` object and adds its profile object to the window manager. The outer `WindowGeneric` object will be returned to the application who creates the window.
-//!
-//! When a window is dropped, its profile object will be deleted from the window manager.
+//! The `WindowGeneric` structure consists of its profile, components, framebuffer and events consumer. An application invokes the `new_window` function to create a new `WindowGeneric` object and get a reference to it. The function would add its profile to the window list in creating a new `WindowGeneric` object and the profile would be deleted when the object is dropped.
 
 #![no_std]
 

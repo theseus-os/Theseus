@@ -2,7 +2,7 @@
 name = "window_list"
 version = "0.1.0"
 authors = ["Wenqiu Yu <yuwenqiuj@gmail.com>"]
-description = "define a window manager structure"
+description = "define a window list structure"
 build = "../../build.rs"
 
 [dependencies]

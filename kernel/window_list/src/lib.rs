@@ -1,6 +1,6 @@
-//! Defines a window manager structure that simulates a desktop environment.
+//! Defines a window list structure that maintains a list of active and inactive windows.
 //!
-//! A manager maintains a list of background windows and an active window.
+//! A list contains background windows and an active window and provides methods to switch among them.
 //! Once an active window is deleted or set as inactive, the next window in the background list will become active.
 //!
 //! The order of windows is based on the last time it becomes active. The one which was active most recently is at the top of the background list.
