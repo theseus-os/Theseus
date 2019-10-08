@@ -1,9 +1,11 @@
-//! Defines a window list structure that maintains a list of active and inactive windows.
+//! Defines a `WindowList` structure that maintains a list of active and inactive windows.
 //!
-//! A list contains background windows and an active window and provides methods to switch among them.
+//! A window list contains a list of background windows and an active window. It provides methods to switch among them.
 //! Once an active window is deleted or set as inactive, the next window in the background list will become active.
 //!
 //! The order of windows is based on the last time it becomes active. The one which was active most recently is at the top of the background list.
+//!
+//! The `window_manager` crate holds an instance of `WindowList` for existing windows. In the future, we will implement different kinds of `WindowList` and therefore have different kinds of window manager in Theseus.
 
 #![no_std]
 
@@ -31,8 +33,8 @@ pub const WINDOW_INACTIVE_COLOR: u32 = 0x343C37;
 /// The background color of the screen
 pub const SCREEN_BACKGROUND_COLOR: u32 = 0x000000;
 
-/// The window manager structure.
-/// It contains a list of allocated window and a reference to the active window.
+/// The window list structure.
+/// It contains a list of reference to background windows and a reference to the active window.
 pub struct WindowList<T: Window> {
     /// The list of inactive windows. Their order is based on the last time they were active. The first window is the window which was active most recently.
     pub background_list: VecDeque<Weak<Mutex<T>>>,

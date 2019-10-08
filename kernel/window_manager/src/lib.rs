@@ -1,8 +1,10 @@
-//! This crate defines a `WindowGeneric` structure. This structure contains a `WindowProfile` structure which implements the `Window` trait.
+//! This crate acts as a manager of a list of windows. It defines a `WindowGeneric` structure. The structure contains a `WindowProfile` structure which implements the `Window` trait.
 //!
-//! The `WindowProfile` structure contains information required by the window manager including the border, location and size of a window. The manager holds a `WindowList` instance which maintains a list of references to `WindowProfile`s. It can add new windows to the list and switch among them.
+//! The `WindowProfile` structure wraps information required by the window manager including the border, location and size of a window. The manager holds a `WindowList` instance which maintains a list of references to `WindowProfile`s. It can add new windows to the list and switch among them.
 //!
-//! The `WindowGeneric` structure consists of its profile, components, framebuffer and events consumer. An application invokes the `new_window` function to create a new `WindowGeneric` object and get a reference to it. The function would add its profile to the window list in creating a new `WindowGeneric` object and the profile would be deleted when the object is dropped.
+//! The `WindowGeneric` structure consists of its profile, components, framebuffer and events consumer. An application invokes the `new_window` function to create a `WindowGeneric` object and get a reference to it. The window manager would add the profile to the window list in creating a new `WindowGeneric` object and the profile would be deleted when the object is dropped.
+//!
+//! An application can create displayables, add them to its window, and display them by their names. A displayable usually acts as a component of a window and can display itself in the window. For example, a text displayable is a block of text which can display with specific color and font in a window.
 
 #![no_std]
 
