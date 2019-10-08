@@ -26,7 +26,7 @@ The `window_manager` crates holds a list of reference to existing `WindowProfile
 
 The order of windows is based on the last time it becomes active. The one which was active most recently is at the top of the background list. The active window would show on top of all windows and get all the key input events passed to the window manager. Once an active window is deleted, the next window in the background list will become active.
 
-## An Example
+## Example
 
 ```rust
 #[no_mangle]
