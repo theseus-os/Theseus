@@ -2272,6 +2272,18 @@ dependencies = [
 ]
 
 [[package]]
+name = "windowapp"
+version = "0.1.0"
+dependencies = [
+ "displayable 0.1.0",
+ "frame_buffer 0.1.0",
+ "log 0.3.9 (registry+https://github.com/rust-lang/crates.io-index)",
+ "terminal_print 0.1.0",
+ "text_display 0.1.0",
+ "window_manager 0.1.0",
+]
+
+[[package]]
 name = "x86_64"
 version = "0.1.2"
 dependencies = [

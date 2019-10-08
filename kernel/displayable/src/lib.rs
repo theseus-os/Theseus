@@ -15,7 +15,7 @@ use frame_buffer::{FrameBuffer, Coord};
 
 /// Trait for displayables. A displayable is a graph which can display itself onto a framebuffer. 
 /// It is usually a composition of basic graphs and can act as a component of a window such as a text box, a button, etc. 
-pub trait Displayable: Downcast + Send {
+pub trait Displayable: Downcast {
     /// Displays in a framebuffer.
     /// # Arguments
     /// * `coordinate`: the coordinate within the given `framebuffer` where this displayable should render itself. The `coordinate` is relative to the top-left point `(0, 0)` of the `framebuffer`.
