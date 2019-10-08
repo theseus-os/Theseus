@@ -37,15 +37,13 @@ GRUB_MKRESCUE = $(GRUB_CROSS)grub-mkrescue
 
 RUSTC_OUTPUT=$(shell rustup component add rust-src; echo $$?)
 
-check_rustc: 	
+check_rustc:
 ifneq (${BYPASS_RUSTC_CHECK}, yes)
-ifneq ($(RUSTC_OUTPUT), 0)
-	@echo -e "\nError: rustup is not installed on this system."
-	@echo -e "Please install rustup and try again.\n"
-	@exit 1
-else
+	@rustup component add rust-src || (\
+	echo -e "\nError: rustup is not installed on this system.";\
+	echo -e "Please install rustup and try again.\n";\
+	exit 1)
 	@echo -e '\nFound proper rust compiler version, proceeding with build...\n'
-endif ## RUSTC_CURRENT_SUPPORTED_VERSION != RUSTC_OUTPUT
 endif ## BYPASS_RUSTC_CHECK
 
 
