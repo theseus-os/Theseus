@@ -74,7 +74,7 @@ impl Compositor for FrameCompositor {
 
         for (src_fb, coordinate) in bufferlist {
             // skip if already cached
-            if self.cached(src_fb, coordinate) {
+            if self.is_cached(src_fb, coordinate) {
                 continue;
             }
             let (src_width, src_height) = src_fb.get_size();
@@ -127,7 +127,7 @@ impl Compositor for FrameCompositor {
         Ok(())
     }
 
-    fn cached(&self, frame_buffer: &dyn FrameBuffer, coordinate: Coord) -> bool {
+    fn is_cached(&self, frame_buffer: &dyn FrameBuffer, coordinate: Coord) -> bool {
         match self.cache.get(&(frame_buffer.get_hash())) {
             Some(cache) => {
                 return cache.coordinate == coordinate;
