@@ -33,6 +33,7 @@ pub trait FrameBuffer {
     fn buffer_copy(&mut self, src: &[Pixel], dest_start: usize);
 
     /// Computes the index of a coordinate in the buffer array.
+    /// Return `None` is the coordinate is not in the frame buffer.
     fn index(&self, coordinate: Coord) -> Option<usize> {
         let (width, _) = self.get_size();
         if self.contains(coordinate) {
@@ -78,8 +79,8 @@ pub fn get_screen_size() -> Result<(usize, usize), &'static str> {
     Ok(final_buffer.get_size())
 }
 
-/// The coordinate of a point.
-/// In the display subsystem, the coordinate of an area represents the location of its top-left corner.
+/// The coordinate of a pixel.
+/// In the display subsystem, the origin of an area is its top-left point.
 #[derive(Clone, Copy, PartialEq, Debug)]
 pub struct Coord {
     /// The x coordinate

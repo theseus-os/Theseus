@@ -1,6 +1,6 @@
 //! This crate defines a framebuffer compositor.
 //! A framebuffer compositor will composite a sequence of framebuffers and display them in the final framebuffer.
-//! The coordinate of a frame buffer represents the location of its top-left corner.
+//! The coordinate of a frame buffer represents its origin (top-left point).
 
 #![no_std]
 #![feature(const_vec_new)]

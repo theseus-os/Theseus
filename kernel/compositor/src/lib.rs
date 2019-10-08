@@ -1,6 +1,6 @@
 //! This crate defines a trait of `Compositor`  .
 //! A compositor composites a list of buffers to a single buffer.
-//! The coordinate of a frame buffer represents the location of its top-left corner.
+//! The coordinate of a frame buffer represents the location of its origin (top-left point).
 
 #![no_std]
 

@@ -1,5 +1,5 @@
 //! This crate contains functions to print strings in a framebuffer.
-//! The coordinate in these functions is relative to the top-left corner of the frame buffer.
+//! The coordinate in these functions is relative to the origin(top-left point) of the frame buffer.
 
 #![no_std]
 
@@ -16,7 +16,7 @@ use frame_buffer::{FrameBuffer, Coord};
 /// Returns (column, line) of the end, i.e. the position of the next symbol.
 /// # Arguments
 /// * `framebuffer`: the framebuffer to display in.
-/// * `coordinate`: the left top coordinate of the text block within the frame buffer. The coordinate is relative to the origin(top-left point) of the frame buffer.
+/// * `coordinate`: the left top coordinate of the text block relative to the origin(top-left point) of the frame buffer.
 /// * `width`: the width of the text block.
 /// * `height`: the height of the text block.
 /// * `slice`: the string to display.
@@ -99,7 +99,7 @@ pub fn print_string(
     (curr_column, curr_line)
 }
 
-// print a byte to the framebuffer at (line, column) in the text area.
+// print a character to the framebuffer at position (line, column) of all characters in the text area.
 // `coordinate` specifies the top-left corner of the text area relative to the origin(top-left point) of the framebuffer.
 fn print_character(
     framebuffer: &mut dyn FrameBuffer,

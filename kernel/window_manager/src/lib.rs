@@ -223,7 +223,7 @@ impl<Buffer: FrameBuffer> WindowGeneric<Buffer> {
     }
 
     // @Andrew
-    /// Resizes a window as (width, height) at coordinate relative to the screen.
+    /// Resizes a window as (width, height) at coordinate relative to the top-left corner of the screen.
     pub fn resize(
         &mut self,
         coordinate: Coord,
@@ -277,7 +277,7 @@ impl<Buffer: FrameBuffer> WindowGeneric<Buffer> {
 }
 
 /// Creates a new window. Currently the window is of `FrameBufferRGB`. In the future we will be able to create a window of any structure which implements `FrameBuffer`.
-/// `coordinate` specifies the coordinate of the window relative to the screen.
+/// `coordinate` specifies the coordinate of the window relative to the top-left corner of the screen.
 /// (width, height) specify the size of the new window.
 pub fn new_window(
     coordinate: Coord,
@@ -432,7 +432,7 @@ impl Window for WindowProfile {
     }
 }
 
-/// A component contains a displayable and its coordinate relative to the window.
+/// A component contains a displayable and its coordinate relative to the top-left corner of the window.
 pub struct Component {
     coordinate: Coord,
     displayable: Box<dyn Displayable>,
@@ -449,12 +449,12 @@ impl Component {
         return &mut (self.displayable);
     }
 
-    // gets the coordinate of the displayable relative to the window
+    // gets the coordinate of the displayable relative to the top-left corner of the window
     fn get_position(&self) -> Coord {
         self.coordinate
     }
 
-    // resizes the displayable as (width, height) at `coordinate` relative to the window
+    // resizes the displayable as (width, height) at `coordinate` relative to the top-left corner of the window
     fn resize(&mut self, coordinate: Coord, width: usize, height: usize) {
         self.coordinate = coordinate;
         self.displayable.resize(width, height);
