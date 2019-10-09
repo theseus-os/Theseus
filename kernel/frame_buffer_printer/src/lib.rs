@@ -12,6 +12,8 @@ use alloc::vec;
 use font::{CHARACTER_HEIGHT, CHARACTER_WIDTH, FONT_PIXEL};
 use frame_buffer::{FrameBuffer, Coord};
 
+type ASCII = u8;
+
 /// Prints a string in a framebuffer.
 /// Returns (column, line) of the end, i.e. the position of the next symbol.
 /// # Arguments
@@ -62,7 +64,7 @@ pub fn print_string(
                     break;
                 }
             }
-            print_character(
+            print_ascii_character(
                 framebuffer,
                 byte,
                 font_color,
@@ -101,9 +103,9 @@ pub fn print_string(
 
 // print a character to the framebuffer at position (line, column) of all characters in the text area.
 // `coordinate` specifies the top-left corner of the text area relative to the origin(top-left point) of the framebuffer.
-fn print_character(
+fn print_ascii_character(
     framebuffer: &mut dyn FrameBuffer,
-    character: u8,
+    character: ASCII,
     font_color: u32,
     bg_color: u32,
     coordinate: Coord,

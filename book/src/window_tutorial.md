@@ -2,11 +2,13 @@
 
 ## Create a Window
 
-An application invokes the `new_window()` function in the `window_manager` crate to create a new window. The function would create a new `WindowGeneric`, and add a weak reference of its `WindowProfile` to the `WINDOWLIST`. It then returns a strong reference of this window to the application. Once the application terminates, the window it owns would be dropped automatically, and the weak reference in the `WINDOWLIST` would be deleted.
+An application invokes the `new_window()` function in the `window_manager` crate to create a new window. The function would create a new `WindowGeneric` object, and add a weak reference of its `WindowProfile` to the `WINDOWLIST` held by the manager. It then returns the window to the application. Once the application terminates, the window it owns would be dropped automatically, and the weak reference in the `WINDOWLIST` would be deleted.
 
 ## Add Displayables
 
 To add a text displayable to a window, an application creates a `TextDisplay` object, and invoke `WindowGeneric.add_displayable()` to add it as a component. The displayable is identified by a name of type `String`. 
+
+In the future, we will define other kinds of displayables which implement the `Displayable` trait.
 
 ## Display in a Window
 
@@ -17,7 +19,7 @@ The application can also invoke `WindowGeneric.get_concrete_display_mut::<T>(nam
 After a displayable displays itself in a window, the application should invoke `WindowGeneric.render()` to render the updates to the screen. A framebuffer compositor would composites a list of framebuffers and outputs the result to a final framebuffer which is mapped to the screen.
 
 ## Handle Key Inputs
-An application invokes `WindowGeneric.get_event()` to get the events sent to it. For example, an active window will receive all the key input events. An application can invoke `WindowGeneric.get_event()` in a loop to handle all these inputs.
+An application invokes `WindowGeneric.get_event()` to get the events sent to it. For example, an active window will receive all the key input events. An application can invoke `WindowGeneric.get_event()` in a loop to handle inputs from the keyboard.
 
 ## Example
 
