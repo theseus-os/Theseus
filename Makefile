@@ -35,16 +35,15 @@ GRUB_MKRESCUE = $(GRUB_CROSS)grub-mkrescue
 ### For ensuring that the host computer has the proper version of the Rust compiler
 ###################################################################################################
 
-RUSTC_OUTPUT=$(shell rustup component add rust-src; echo $$?)
-
 check_rustc:
-ifneq (${BYPASS_RUSTC_CHECK}, yes)
+ifdef RUSTUP_TOOLCHAIN
+	@echo -e 'Warning: You are overriding the Rust toolchain manually via RUSTUP_TOOLCHAIN.'
+	@echo -e 'This may lead to unwanted warnings and errors during compilation.\n'
+endif ## BYPASS_RUSTC_CHECK
 	@rustup component add rust-src || (\
 	echo -e "\nError: rustup is not installed on this system.";\
 	echo -e "Please install rustup and try again.\n";\
 	exit 1)
-	@echo -e '\nFound proper rust compiler version, proceeding with build...\n'
-endif ## BYPASS_RUSTC_CHECK
 
 
 
