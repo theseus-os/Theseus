@@ -16,4 +16,9 @@
 
 ## Application Development
 - [Developing an Application](app.md)
-    - [Create a Window](window.md)
+
+## Display Subsystem
+- [Display Subsystem](display.md)
+    - [How Window Manager Workds](window_manager.md)
+    - [Tutorial of the display subsystem](window_tutorial.md)
+
