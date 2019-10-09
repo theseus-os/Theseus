@@ -16,10 +16,10 @@ An application can invoke `WindowGeneric.display(name)` to display a displayable
 
 The application can also invoke `WindowGeneric.get_concrete_display_mut::<T>(name)` to get access to a displayable of a concrete type `T`. The method returns error if the window does not have a displayable of `name`, or the displayable is not of type `T`.
 
-After a displayable displays itself in a window, the application should invoke `WindowGeneric.render()` to render the updates to the screen. A framebuffer compositor would composite a list of framebuffers and output the result to a final framebuffer which is mapped to the screen.
+After a displayable displays itself in a window, the application should invoke `WindowGeneric.render()` to render the updates to the screen. A framebuffer compositor would composite a list of framebuffers and forward the result to a final framebuffer which is mapped to the screen.
 
 ## Handle Key Inputs
-An application invokes `WindowGeneric.get_event()` to get the events sent to it. For example, an active window will receive all the key input events. An application can invoke `WindowGeneric.get_event()` in a loop to handle inputs from the keyboard.
+An application invokes `WindowGeneric.get_event()` to get the events sent to it. For example, an active window will receive all the key input events. An application can invoke `WindowGeneric.get_event()` in a loop to handle these inputs from the keyboard.
 
 ## Example
 
