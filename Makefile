@@ -28,32 +28,22 @@ else
 	USB_DRIVES = $(shell lsblk -O | grep -i usb | awk '{print $$2}' | grep --color=never '[^0-9]$$')
 endif
 GRUB_MKRESCUE = $(GRUB_CROSS)grub-mkrescue
-	
+
 
 
 ###################################################################################################
 ### For ensuring that the host computer has the proper version of the Rust compiler
 ###################################################################################################
 
-RUSTC_CURRENT_SUPPORTED_VERSION := rustc 1.38.0-nightly (78ca1bda3 2019-07-08)
-RUSTC_CURRENT_INSTALL_VERSION := nightly-2019-07-09
-RUSTC_OUTPUT=$(shell rustc --version)
-
-check_rustc: 	
-ifneq (${BYPASS_RUSTC_CHECK}, yes)
-ifneq (${RUSTC_CURRENT_SUPPORTED_VERSION}, ${RUSTC_OUTPUT})
-	@echo -e "\nError: your rustc version does not match our supported compiler version."
-	@echo -e "To install the proper version of rustc, run the following commands:\n"
-	@echo -e "   rustup toolchain install $(RUSTC_CURRENT_INSTALL_VERSION)"
-	@echo -e "   rustup default $(RUSTC_CURRENT_INSTALL_VERSION)"
-	@echo -e "   rustup component add rust-src"
-	@echo -e "   make clean\n"
-	@echo -e "Then you can retry building!\n"
-	@exit 1
-else
-	@echo -e '\nFound proper rust compiler version, proceeding with build...\n'
-endif ## RUSTC_CURRENT_SUPPORTED_VERSION != RUSTC_OUTPUT
-endif ## BYPASS_RUSTC_CHECK
+check_rustc:
+ifdef RUSTUP_TOOLCHAIN
+	@echo -e 'Warning: You are overriding the Rust toolchain manually via RUSTUP_TOOLCHAIN.'
+	@echo -e 'This may lead to unwanted warnings and errors during compilation.\n'
+endif
+	@rustup component add rust-src || (\
+	echo -e "\nError: rustup is not installed on this system.";\
+	echo -e "Please install rustup and try again.\n";\
+	exit 1)
 
 
 
