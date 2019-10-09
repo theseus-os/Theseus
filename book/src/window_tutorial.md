@@ -1,6 +1,4 @@
-# How to Create a Window
-
-A window is an object owned by an application. Compared to mainstream operating systems, the application manipulates the states of a window rather than the window manager does it, and the window would be dropped automatically when the application terminates. The window manager holds a list of reference to the profile states of every window, which is required by it to switch among windows. Theseus would minimize the profile states held by the window manager to reduce states spill.
+# Tutorial of the display subsystem
 
 ## Create a Window
 

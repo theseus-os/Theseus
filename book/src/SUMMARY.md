@@ -19,6 +19,6 @@
 
 ## Display Subsystem
 - [Display Subsystem](display.md)
-    - [How Window Manager Workds](window_manager.md)
+    - [How Window Manager Works](window_manager.md)
     - [Tutorial of the display subsystem](window_tutorial.md)
 
