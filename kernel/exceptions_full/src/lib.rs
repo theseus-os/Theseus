@@ -5,13 +5,16 @@
 
 extern crate x86_64;
 extern crate task;
-extern crate runqueue;
-extern crate apic;
+// extern crate apic;
 extern crate tlb_shootdown;
 extern crate pmu_x86;
 // #[macro_use] extern crate log;
 #[macro_use] extern crate vga_buffer; // for println_raw!()
 #[macro_use] extern crate print; // for regular println!()
+extern crate unwind;
+
+extern crate memory;
+extern crate stack_trace;
 
 use x86_64::structures::idt::{LockedIdt, ExceptionStackFrame, PageFaultErrorCode};
 use x86_64::registers::msr::*;
@@ -65,25 +68,70 @@ macro_rules! println_both {
 }
 
 
-/// Kills the current task (the one that caused an exception)
-/// and then halts that task (another task should be scheduled in).
-fn kill_and_halt(exception_number: u8) -> ! {
-    if let Some(taskref) = task::get_my_current_task() {
-        match taskref.kill(task::KillReason::Exception(exception_number)) {
+/// Kills the current task (the one that caused an exception) by unwinding it.
+#[inline(never)]
+fn kill_and_halt(exception_number: u8) {
+//     println_both!("Killing task {:?} due to exception {}.", task::get_my_current_task(), exception_number);
+
+//     panic!("exception{}", exception_number);
+// }
+
+// #[cfg(old_shit)]
+// fn kill_and_halt_old(exception_number: u8) -> ! {
+
+    println_both!("Killing task {:?} due to exception {}.", task::get_my_current_task(), exception_number);
+
+    // print a stack trace
+    println_both!("------------------ Stack Trace (DWARF) ---------------------------");
+    let stack_trace_result = stack_trace::stack_trace(
+        &|stack_frame, stack_frame_iter| {
+            let symbol_offset = stack_frame_iter.namespace().get_section_containing_address(
+                memory::VirtualAddress::new_canonical(stack_frame.call_site_address() as usize),
+                stack_frame_iter.starting_crate(),
+                false
+            ).map(|(sec_ref, offset)| (sec_ref.lock().name.clone(), offset));
+            if let Some((symbol_name, offset)) = symbol_offset {
+                println_both!("  {:>#018X} in {} + {:#X}", stack_frame.call_site_address(), symbol_name, offset);
+                println_both!("      {:?}", stack_frame_iter.registers());
+            } else {
+                println_both!("  {:>#018X} in ??", stack_frame.call_site_address());
+            }
+            true
+        },
+        None,
+    );
+    match stack_trace_result {
+        Ok(()) => { println_both!("  Beginning of stack"); }
+        Err(e) => { println_both!("  {}", e); }
+    }
+    // println_both!("------------------------------------------------------------------");
+    println_both!("-------------------------LOOPING TASK------------------------------");
+    loop { }
+
+    // Unwind the current task that failed due to the given exception.
+    {
+        let cause = task::KillReason::Exception(exception_number);
+        match unwind::start_unwinding(cause, 1) {
             Ok(_) => {
-                println_both!("Killed task {:?} due to exception {}.", taskref, exception_number);
-                if let Err(e) = runqueue::remove_task_from_all(taskref) {
-                    println_both!("kill_and_halt(): killed task after exception, but could not remove it from runqueue: {}", e);
-                }
+                println_both!("BUG: when handling exception {}, start_unwinding() returned an Ok() value, \
+                    which is unexpected because it means no unwinding actually occurred. Task: {:?}.", 
+                    exception_number,
+                    task::get_my_current_task()
+                );
             }
             Err(e) => {
-                println_both!("kill_and_halt(): error killing current task {:?}: {}", taskref, e);
+                println_both!("Task {:?} was unable to start unwinding procedure after exception {}, error: {}.",
+                    task::get_my_current_task(), exception_number, e
+                );
             }
         }
-    } else {
-        println_both!("kill_and_halt(): couldn't get the current task after exception.");
     }
 
+    // If we failed to handle the exception and unwind the task, there's not really much we can do about it,
+    // other than just let the thread spin endlessly (which doesn't hurt correctness but is inefficient). 
+    // But in general, this task should have already been marked as killed and thus no longer schedulable,
+    // so it should not reach this point. 
+    // Only exceptions early on in the initialization process will get here, meaning that the OS will basically stop.
     loop { }
 }
 
@@ -228,3 +276,5 @@ pub extern "x86-interrupt" fn page_fault_handler(stack_frame: &mut ExceptionStac
     
     kill_and_halt(0xE)
 }
+
+// exception 0x0F is reserved on x86

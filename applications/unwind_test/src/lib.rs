@@ -20,19 +20,45 @@ impl Drop for MyStruct {
 }
 
 #[inline(never)]
-fn foo() {
+fn foo(cause_page_fault: bool) {
     let _res = task::set_my_panic_handler(Box::new(|info| {
         info!("Unwind test caught panic at {}", info);
     }));
     
     let _my_struct = MyStruct(10);
-    panic!("intentional panic in unwind_test::foo()");
+    if cause_page_fault {
+        // dereference random memory value
+        let x = unsafe { *(0xDEADBEEF as *const usize) };
+        warn!("READ x value from *0xDEADBEEF: {:#X}", x);
+        loop { }
+    } else {
+        panic!("intentional panic in unwind_test::foo()");
+    }
 }
 
 
 #[no_mangle]
 pub fn main(_args: Vec<String>) -> isize {
+
+    // dump some info about the this loaded app crate
+    {
+        let curr_task = task::get_my_current_task().unwrap();
+        let t = curr_task.lock();
+        let app_crate = t.app_crate.as_ref().unwrap();
+        let krate = app_crate.lock_as_ref();
+        trace!("============== Crate {} =================", krate.crate_name);
+        for s in krate.sections.values() {
+            trace!("   {:?}", &*s.lock());
+        }
+    }
+
     let _my_struct = MyStruct(5);
-    foo();
+
+    let cause_page_fault = match _args.get(0).map(|s| &**s) {
+        Some("-e") => true,
+        _ => false,
+    };
+
+    foo(cause_page_fault);
     0
 }

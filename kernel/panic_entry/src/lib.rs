@@ -77,10 +77,9 @@ fn panic_entry_point(info: &PanicInfo) -> ! {
 
     // If we failed to handle the panic, there's not really much we can do about it,
     // other than just let the thread spin endlessly (which doesn't hurt correctness but is inefficient). 
-    // But in general, the thread should be killed by the default panic handler, so it shouldn't reach here.
+    // But in general, this task should be killed by the panic_wrapper, so it shouldn't reach this point.
     // Only panics early on in the initialization process will get here, meaning that the OS will basically stop.
-    
-    loop {}
+    loop { }
 }
 
 

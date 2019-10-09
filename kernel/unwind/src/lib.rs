@@ -49,6 +49,7 @@ extern crate fallible_iterator;
 extern crate scheduler;
 extern crate apic;
 extern crate runqueue;
+extern crate interrupts;
 
 mod registers;
 mod lsda;
@@ -181,6 +182,12 @@ pub struct StackFrameIter {
     /// a reference to its row/entry in the unwinding table,
     /// and the Canonical Frame Address (CFA value) that is used to determine the next frame.
     state: Option<(UnwindRowReference, u64)>,
+    /// An extra offset that is used to augment the calculation of register rule values
+    /// in weird circumstances, such as when unwinding from an exception stack frame `B` 
+    /// to a frame `A` that caused the exception, even though frame `A` did not "call" frame `B`.
+    extra_cfa_offset: Option<i64>,
+
+    last_frame_was_exception_handler: bool,
 }
 
 impl fmt::Debug for StackFrameIter {
@@ -202,6 +209,8 @@ impl StackFrameIter {
             namespace_context: NamespaceContext { namespace, starting_crate: app_crate },
             registers,
             state: None,
+            extra_cfa_offset: None,
+            last_frame_was_exception_handler: false,
         }
     }
 
@@ -233,13 +242,33 @@ impl FallibleIterator for StackFrameIter {
 
     fn next(&mut self) -> Result<Option<Self::Item>, Self::Error> {
         let registers = &mut self.registers;
+        let prev_cfa_offset = self.extra_cfa_offset;
+        let last_frame_was_exception_handler = self.last_frame_was_exception_handler;
 
         if let Some((unwind_row_ref, cfa)) = self.state.take() {
             let mut newregs = registers.clone();
             newregs[X86_64::RA] = None;
+
             unwind_row_ref.with_unwind_info(|_fde, row| {
-                for &(reg_num, ref rule) in row.registers() {
-                    // trace!("rule {:?} {:?}", reg_num, rule);
+                // There is some strange behavior when moving up the call stack 
+                // from an exception handler function's frame `B` to a frame `A` that resulted in the exception,
+                // since frame `A` did not call frame `B` directly, 
+                // and since the CPU may have pushed an error code onto the stack,
+                // which messes up the DWARF info that calculates register values properly. 
+                //
+                // In this case, the `cfa` value must be modified to account for that error code 
+                // being pushed onto the stack (by adding an offset of `8` to the `cfa` value),
+                // and also the register rule calculations will be misaligned as follows:
+                // each rule calculates a resultant value that applies to the *next* register number in the list.
+                // Thus, we save the previous resultant value for use in the next iteration. 
+                //
+                // Note that the first register value is calculated using the same `cfa` offset (`8`)
+                // as an additional offset from the register rule's offset. I'm not sure whether it's 
+                // always the first register value, or the return address `RA` value that uses that extra offset,
+                // but so far in every case I've observed, the rule for the return address `RA` is first.
+                let mut prev_value: u64 = 0;
+                for (index, &(reg_num, ref rule)) in row.registers().enumerate() {
+                    debug!("Looking at register rule:  {:?} {:?}", reg_num, rule);
                     // The stack pointer (RSP) is given by the CFA calculated during the previous iteration;
                     // there should *not* be a register rule defining the value of the RSP directly.
                     if reg_num == X86_64::RSP {
@@ -249,8 +278,36 @@ impl FallibleIterator for StackFrameIter {
                         RegisterRule::Undefined => return Err("StackFrameIter: encountered an unsupported RegisterRule::Undefined"), // registers[reg_num],
                         RegisterRule::SameValue => registers[reg_num],
                         RegisterRule::Register(other_reg_num) => registers[other_reg_num],
-                        RegisterRule::Offset(n) => Some(unsafe { *((cfa.wrapping_add(n as u64)) as *const u64) }),
-                        RegisterRule::ValOffset(n) => Some(cfa.wrapping_add(n as u64)),
+                        // This is the most common register rule (in fact, the only one we've seen),
+                        // so we may have to adapt the logic herein for use in other rules. 
+                        RegisterRule::Offset(offset) => {
+                            let normal_value = unsafe { *(cfa.wrapping_add(offset as u64) as *const u64) };
+                            trace!("     cfa: {:#X}, addr: {:#X}, normal_value: {:#X}", cfa, cfa.wrapping_add(offset as u64), normal_value);
+                            if let Some(extra_offset) = prev_cfa_offset {
+                                let reg_value = if index == 0 {
+                                    let value_extra_offset = unsafe { *(cfa.wrapping_add((offset + extra_offset) as u64) as *const u64) };
+                                    trace!("     cfa: {:#X}, addr: {:#X}, extra_value: {:#X}", cfa, cfa.wrapping_add((offset + extra_offset) as u64), value_extra_offset);
+                                    value_extra_offset
+                                } else {
+                                    prev_value
+                                };
+                                prev_value = normal_value;
+
+                                trace!("     cfa: {:#X}, RETURNED value: {:#X}", cfa, reg_value);
+                                Some(reg_value)
+                            } else {
+                                // this is the regular case
+                                Some(normal_value)
+                            }
+                            // let addrO = (cfa.wrapping_add(offset as u64));
+                            // let valO = unsafe { *(addrO as *const u64) };
+                            // trace!("     cfa: {:#X}, addrO: {:#X}, valO: {:#X}", cfa, addrO, valO);
+                            // let addrN = (cfa.wrapping_add(offset + extra_offset as u64));
+                            // let valN = unsafe { *(addrN as *const u64) };
+                            // trace!("     cfa: {:#X}, addrN: {:#X}, valN: {:#X}", cfa, addrN, valN);
+                            // Some(valO)
+                        }
+                        RegisterRule::ValOffset(offset) => Some(cfa.wrapping_add(offset as u64)),
                         RegisterRule::Expression(_) => return Err("StackFrameIter: encountered an unsupported RegisterRule::Expression"),
                         RegisterRule::ValExpression(_) => return Err("StackFrameIter: encountered an unsupported RegisterRule::ValExpression"),
                         RegisterRule::Architectural => return Err("StackFrameIter: encountered an unsupported RegisterRule::Architectural"),
@@ -282,15 +339,21 @@ impl FallibleIterator for StackFrameIter {
                 VirtualAddress::new_canonical(caller as usize), 
                 self.namespace_context.starting_crate.as_ref(),
                 false,
-            ).ok_or("couldn't get crate containing call site address")?;
+            ).ok_or_else(|| {
+                error!("StackTraceIter::next(): couldn't get crate containing call site address: {:#X}", caller);
+                "couldn't get crate containing call site address"
+            })?;
             let (eh_frame_sec_ref, base_addrs) = get_eh_frame_info(&crate_ref)
                 .ok_or("couldn't get eh_frame section in caller's containing crate")?;
 
+            let mut extra_cfa_offset: Option<i64> = None;
+            let mut this_frame_is_exception_handler = false;
             let row_ref = UnwindRowReference { caller, eh_frame_sec_ref, base_addrs };
             let (cfa, frame) = row_ref.with_unwind_info(|fde, row| {
                 // trace!("ok: {:?} (0x{:x} - 0x{:x})", row.cfa(), row.start_address(), row.end_address());
-                let cfa = match *row.cfa() {
+                let mut cfa = match *row.cfa() {
                     CfaRule::RegisterAndOffset { register, offset } => {
+                        debug!("CfaRule:RegisterAndOffset: reg {:?}, offset: {:#X}", register, offset);
                         let reg_value = registers[register].ok_or_else(|| {
                             error!("CFA rule specified register {:?} with offset {:#X}, but register {:?}({}) had no value!", register, offset, register, register.0);
                             "CFA rule specified register with offset, but that register had no value."
@@ -302,7 +365,27 @@ impl FallibleIterator for StackFrameIter {
                         return Err("CFA rules based on Expressions are not yet supported.");
                     }
                 };
-                // trace!("cfa is 0x{:x}", cfa);
+                
+                trace!("initial_address: {:#X}", fde.initial_address());
+                extra_cfa_offset = if interrupts::is_exception_handler_with_error_code(fde.initial_address()) {
+                    warn!("FOUND EXCEPTION HANDLER WITH ERROR CODE!");
+                    let cfa_offset: i64 = core::mem::size_of::<usize>() as i64;
+                    cfa = cfa.wrapping_add(cfa_offset as u64);
+                    this_frame_is_exception_handler = true;
+                    Some(cfa_offset)
+                    // None
+                } else {
+                    None
+                };
+
+                if last_frame_was_exception_handler { 
+                    cfa = cfa.wrapping_add(5 * 8); // size of `ExceptionStackFrame`
+                    warn!("LAST FRAME was exception handler: adding {:#X} to cfa, new cfa: {:#X}", 5*8, cfa);
+                }
+
+                trace!("cfa is {:#X}", cfa);
+                trace!("call_site_address: {:#X}", caller);
+
                 let frame = StackFrame {
                     personality: fde.personality().map(|x| unsafe { deref_ptr(x) }),
                     lsda: fde.lsda().map(|x| unsafe { deref_ptr(x) }),
@@ -311,6 +394,10 @@ impl FallibleIterator for StackFrameIter {
                 };
                 Ok((cfa, frame))
             })?;
+
+            // since we can't double-borrow `self` in the above closure, we assign its state(s) here.
+            self.extra_cfa_offset = extra_cfa_offset;
+            self.last_frame_was_exception_handler = this_frame_is_exception_handler;
             self.state = Some((row_ref, cfa));
             Ok(Some(frame))
         } else {
@@ -592,8 +679,14 @@ fn get_eh_frame_info(crate_ref: &StrongCrateRef) -> Option<(StrongSectionRef, Ba
 
 /// Starts the unwinding procedure for the current task 
 /// by working backwards up the call stack starting from the current stack frame.
+/// 
+/// # Arguments
+/// * `reason`: the reason why the current task is being killed, e.g., due to a panic, exception, etc.
+/// * `stack_frames_to_skip`: the number of stack frames that should be skipped in order to avoid unwinding them.
+///   For example, for a panic, the first `5` frames in the call stack can be ignored.
+/// 
 #[doc(hidden)]
-pub fn start_unwinding(reason: KillReason) -> Result<(), &'static str> {
+pub fn start_unwinding(reason: KillReason, stack_frames_to_skip: usize) -> Result<(), &'static str> {
     // Here we have to be careful to have no resources waiting to be dropped/freed/released on the stack. 
     let unwinding_context_ptr = {
         let curr_task = task::get_my_current_task().ok_or("get_my_current_task() failed")?;
@@ -628,23 +721,16 @@ pub fn start_unwinding(reason: KillReason) -> Result<(), &'static str> {
             // SAFE: we just created this pointer above
             let unwinding_context = unsafe { &mut *unwinding_context_ptr };
             unwinding_context.stack_frame_iter.registers = registers;
-
-            // Skip the first several frames, which correspond to functions in the panic handlers themselves.
-            unwinding_context.stack_frame_iter.next()
-                .map_err(|_e| "error skipping call stack frame 0 in unwinder")?
-                .ok_or("call stack frame 0 did not exist (we were trying to skip it)")?;
-            unwinding_context.stack_frame_iter.next()
-                .map_err(|_e| "error skipping call stack frame 1 in unwinder")?
-                .ok_or("call stack frame 1 did not exist (we were trying to skip it)")?;
-            unwinding_context.stack_frame_iter.next()
-                .map_err(|_e| "error skipping call stack frame 2 in unwinder")?
-                .ok_or("call stack frame 2 did not exist (we were trying to skip it)")?;
-            unwinding_context.stack_frame_iter.next()
-                .map_err(|_e| "error skipping call stack frame 3 in unwinder")?
-                .ok_or("call stack frame 3 did not exist (we were trying to skip it)")?;
-            unwinding_context.stack_frame_iter.next()
-                .map_err(|_e| "error skipping call stack frame 4 in unwinder")?
-                .ok_or("call stack frame 4 did not exist (we were trying to skip it)")?;
+            
+            // Skip the first several frames, e.g., to skip unwinding functions in the panic handlers themselves.
+            for _i in 0..stack_frames_to_skip {
+                unwinding_context.stack_frame_iter.next()
+                    .map_err(|_e| {
+                        error!("error skipping call stack frame {} in unwinder", _i);
+                        "error skipping call stack frame in unwinder"
+                    })?
+                    .ok_or("call stack frame did not exist (we were trying to skip it)")?;
+            }
         }
 
         continue_unwinding(unwinding_context_ptr)
