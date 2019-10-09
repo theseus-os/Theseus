@@ -2,7 +2,7 @@
 
 ## The Window Trait
 
-The `window` crate defines a `Window` trait. It has basic methods of operations on a window such as setting its states or clear its contents. Any structure who implements the trait can act as a window. A window object is usually owned by an application or the window manager.
+The `window` crate defines a `Window` trait. It has basic methods of operations on a window such as setting its states or clear its contents. Any structure that implements the trait can act as a window. A window object is usually owned by an application or the window manager.
 
 ## The WindowList structure
 
@@ -18,9 +18,9 @@ A window manager holds an instance of the `WindowList` structure. In the future,
 
 The `window_manager` owns an instance of `WindowList` which contains all the existing windows. It invokes the methods of `WindowList` to manage these windows.
 
-In most of the cases, both an application and the window manager want to get access to the same window. The application needs to display in the window, and the window manager requires the information and order of windows to render them to the screen. In order to share a window among an application and the window manager, we wrap a `Window` object with `Mutex`. The application owns a strong reference to the window, while the window manager holds a weak reference since its life time is longer than the window.
+In most of the cases, both an application and the window manager want to get access to the same window. The application needs to display in the window, and the window manager requires the information and order of windows to render them to the screen. In order to share a window between an application and the window manager, we wrap a `Window` object with `Mutex`. The application owns a strong reference to the window, while the window manager holds a weak reference since its life time is longer than the window.
 
-However, `Mutex` introduces a danger of deadlock. When an application wants to get access to its window, it must lock it first, operates on it and release it. If an application does not release the locked window, the window manager cannot do most of the operations such as switching or deleting since it needs to traverse all the windows including the locked one. 
+However, `Mutex` introduces a danger of deadlocks. When an application wants to get access to its window, it must lock it first, operates on it and release it. If an application does not release the locked window, the window manager cannot do most of the operations such as switching or deleting since it needs to traverse all the windows including the locked one. 
 
 To solve this problem, we define two objects `WindowProfile` and `WindowGeneric`. `WindowProfile` only contains the information required by the window manager and implements the `Window` trait. The `WindowList` object in the window manager holds a list of reference to `WindowProfile`s. An application owns a `WindowGeneric` object which wraps a reference to a `WindowProfile` structure together with other states required by the application. 
 
@@ -34,6 +34,6 @@ The `WindowGeneric` object represents the window and is owned by an application.
 
 ## Displayables
 
-The `displayable` crate defines a `Displayable` trait. A `Displayable` is a graph which can display itself onto a framebuffer. It usually consists of basic graphs and acts as a component of a window such as a button or a text box. Currently we have implemeted a `TextDisplay` which is a block of text. In the future we will implement other kinds of displayables.
+The `displayable` crate defines a `Displayable` trait. A `Displayable` is a graph which can display itself onto a framebuffer. It usually consists of basic graphs and acts as a component of a window such as a button or a text box. Currently, we have implemented a `TextDisplay` which is a block of text. In the future we will implement other kinds of displayables.
 
 An application can add any `Displayable` object to a window and display it. The `WindowGeneric` structure identifies `Displayables` by their name. It implements generic methods to get access to different kinds of displayables or display them by their names.
