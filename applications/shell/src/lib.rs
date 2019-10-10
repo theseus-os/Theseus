@@ -99,17 +99,23 @@ struct Job {
 /// A main function that spawns a new shell and waits for the shell loop to exit before returning an exit value
 #[no_mangle]
 pub fn main(_args: Vec<String>) -> isize {
+    {
+        let _task_ref = match KernelTaskBuilder::new(shell_loop, ())
+            .name("shell_loop".to_string())
+            .spawn() {
+            Ok(task_ref) => { task_ref }
+            Err(err) => {
+                error!("{}", err);
+                error!("failed to spawn shell");
+                return -1; 
+            }
+        };
 
-    let _task_ref = match KernelTaskBuilder::new(shell_loop, ())
-        .name("shell_loop".to_string())
-        .spawn() {
-        Ok(task_ref) => { task_ref }
-        Err(err) => {
-            error!("{}", err);
-            error!("failed to spawn shell");
-            return -1; 
-        }
-    };
+        // since we don't properly support parent/child relationships between tasks, 
+        // we force the newly-spawned shell_loop task to also be an "app task" 
+        // by giving it joint ownership of the `shell` app crate.
+        _task_ref.lock_mut().app_crate = task::get_my_current_task().expect("shell::main(): failed to get current task").lock().app_crate.clone();
+    }
 
     loop {
         // block this task, because it never needs to actually run again
@@ -117,12 +123,16 @@ pub fn main(_args: Vec<String>) -> isize {
             my_task.block();
         }
     }
-    // TODO FIXME: once join() doesn't cause interrupts to be disabled, we can use join again instead of the above loop
-    // waits for the terminal loop to exit before exiting the main function
-    // match term_task_ref.join() {
+
+    // TODO: when `join` puts this task to sleep instead of spinning, we can re-enable it.
+    // Otherwise, right now it kills performance.
+    // match _task_ref.join() {
     //     Ok(_) => { }
     //     Err(err) => {error!("{}", err)}
     // }
+    // warn!("shell::main(): the `shell_loop` task exited unexpectedly.");
+    // warn!("SHELL_LOOP exit value: {:?}", _task_ref.take_exit_value());
+    // return 0;
 }
 
 /// Errors when attempting to invoke an application from the terminal. 

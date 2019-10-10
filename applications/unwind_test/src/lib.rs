@@ -28,10 +28,9 @@ fn foo(cause_page_fault: bool) {
     let _my_struct = MyStruct(10);
     if cause_page_fault {
         // dereference random memory value
-        let x = unsafe { *(0xDEADBEEF as *const usize) };
-        warn!("READ x value from *0xDEADBEEF: {:#X}", x);
-        loop { }
-    } else {
+        unsafe { *(0x5050DEADBEEF as *mut usize) = 0x5555_5555_5555; }
+    } 
+    else {
         panic!("intentional panic in unwind_test::foo()");
     }
 }
@@ -40,17 +39,17 @@ fn foo(cause_page_fault: bool) {
 #[no_mangle]
 pub fn main(_args: Vec<String>) -> isize {
 
-    // dump some info about the this loaded app crate
-    {
-        let curr_task = task::get_my_current_task().unwrap();
-        let t = curr_task.lock();
-        let app_crate = t.app_crate.as_ref().unwrap();
-        let krate = app_crate.lock_as_ref();
-        trace!("============== Crate {} =================", krate.crate_name);
-        for s in krate.sections.values() {
-            trace!("   {:?}", &*s.lock());
-        }
-    }
+    // // dump some info about the this loaded app crate
+    // {
+    //     let curr_task = task::get_my_current_task().unwrap();
+    //     let t = curr_task.lock();
+    //     let app_crate = t.app_crate.as_ref().unwrap();
+    //     let krate = app_crate.lock_as_ref();
+    //     trace!("============== Crate {} =================", krate.crate_name);
+    //     for s in krate.sections.values() {
+    //         trace!("   {:?}", &*s.lock());
+    //     }
+    // }
 
     let _my_struct = MyStruct(5);
 

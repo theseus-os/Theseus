@@ -69,17 +69,33 @@ macro_rules! println_both {
 
 
 /// Kills the current task (the one that caused an exception) by unwinding it.
+/// 
+/// # Important Note
+/// Currently, unwinding a task after an exception does not fully work like it does for panicked tasks.
+/// The problem is that unwinding cleanup routines (landing pads) are generated *only if* a panic can actually occur. 
+/// Since machine exceptions can occur anywhere at any time (beneath the language level),
+/// 
+/// Currently, what will happen is that all stack frames will be unwound properly **except**
+/// for the one during which the exception actually occurred; 
+/// the "excepted"/interrupted frame may be cleaned up properly, but it is unlikely. 
+/// 
+/// However, stack traces / backtraces work, so we are correctly traversing call stacks with exception frames.
+/// 
 #[inline(never)]
 fn kill_and_halt(exception_number: u8) {
-//     println_both!("Killing task {:?} due to exception {}.", task::get_my_current_task(), exception_number);
+    println_both!("Killing task {:?} due to exception {}. Unwinding will not occur unless compiled with cfg `unwind_exceptions`.", task::get_my_current_task(), exception_number);
 
-//     panic!("exception{}", exception_number);
-// }
-
-// #[cfg(old_shit)]
-// fn kill_and_halt_old(exception_number: u8) -> ! {
-
-    println_both!("Killing task {:?} due to exception {}.", task::get_my_current_task(), exception_number);
+    // // dump some info about the this loaded app crate
+    // {
+    //     let curr_task = task::get_my_current_task().expect("kill_and_halt: no current task");
+    //     let t = curr_task.lock();
+    //     let app_crate = t.app_crate.as_ref().expect("kill_and_halt: no app_crate");
+    //     let krate = app_crate.lock_as_ref();
+    //     trace!("============== Crate {} =================", krate.crate_name);
+    //     for s in krate.sections.values() {
+    //         trace!("   {:?}", &*s.lock());
+    //     }
+    // }
 
     // print a stack trace
     println_both!("------------------ Stack Trace (DWARF) ---------------------------");
@@ -92,7 +108,6 @@ fn kill_and_halt(exception_number: u8) {
             ).map(|(sec_ref, offset)| (sec_ref.lock().name.clone(), offset));
             if let Some((symbol_name, offset)) = symbol_offset {
                 println_both!("  {:>#018X} in {} + {:#X}", stack_frame.call_site_address(), symbol_name, offset);
-                println_both!("      {:?}", stack_frame_iter.registers());
             } else {
                 println_both!("  {:>#018X} in ??", stack_frame.call_site_address());
             }
@@ -104,14 +119,15 @@ fn kill_and_halt(exception_number: u8) {
         Ok(()) => { println_both!("  Beginning of stack"); }
         Err(e) => { println_both!("  {}", e); }
     }
-    // println_both!("------------------------------------------------------------------");
-    println_both!("-------------------------LOOPING TASK------------------------------");
-    loop { }
+    println_both!("---------------------- End of Stack Trace ------------------------");
+
+    let cause = task::KillReason::Exception(exception_number);
 
     // Unwind the current task that failed due to the given exception.
-    {
-        let cause = task::KillReason::Exception(exception_number);
-        match unwind::start_unwinding(cause, 1) {
+    // Currently this isn't working perfectly, so it's disabled by default.
+    #[cfg(unwind_exceptions)] {
+        // skip 2 frames: `start_unwinding` and `kill_and_halt`
+        match unwind::start_unwinding(cause, 2) {
             Ok(_) => {
                 println_both!("BUG: when handling exception {}, start_unwinding() returned an Ok() value, \
                     which is unexpected because it means no unwinding actually occurred. Task: {:?}.", 
@@ -124,6 +140,13 @@ fn kill_and_halt(exception_number: u8) {
                     task::get_my_current_task(), exception_number, e
                 );
             }
+        }
+    }
+    #[cfg(not(unwind_exceptions))] {
+        let res = task::get_my_current_task().ok_or("couldn't get current task").and_then(|taskref| taskref.kill(cause));
+        match res {
+            Ok(()) => { println_both!("Task {:?} killed itself successfully", task::get_my_current_task()); }
+            Err(e) => { println_both!("Task {:?} was unable to kill itself. Error: {:?}", task::get_my_current_task(), e); }
         }
     }
 
