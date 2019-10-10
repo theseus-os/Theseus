@@ -187,6 +187,7 @@ pub struct CallSiteTableEntry {
     /// the range of addresses covered by this entry.
     length: u64,
     /// The offset from the `landing_pad_base` at which the landing pad entry function exists.
+    /// If `0`, then there is no landing pad function that should be run.
     landing_pad_offset: u64,
     /// The offset into the action table that specifies what additional action to undertake.
     /// If `0`, there is no action;
@@ -222,9 +223,13 @@ impl CallSiteTableEntry {
         (self.landing_pad_base + self.starting_offset) .. (self.landing_pad_base + self.starting_offset + self.length)
     }
 
-    /// The address of the actual landing pad, i.e., the cleanup routine that should run.
-    pub fn landing_pad_address(&self) -> u64 {
-        self.landing_pad_base + self.landing_pad_offset
+    /// The address of the actual landing pad, i.e., the cleanup routine that should run, if one exists.
+    pub fn landing_pad_address(&self) -> Option<u64> {
+        if self.landing_pad_offset == 0 { 
+            None
+        } else {
+            Some(self.landing_pad_base + self.landing_pad_offset)
+        }
     }
 
     /// The offset into the action table that specifies which additional action should be undertaken

@@ -512,11 +512,14 @@ version = "0.1.0"
 dependencies = [
  "apic 0.1.0",
  "log 0.3.9 (registry+https://github.com/rust-lang/crates.io-index)",
+ "memory 0.1.0",
  "pmu_x86 0.1.0",
  "print 0.1.0",
  "runqueue 0.1.0",
+ "stack_trace 0.1.0",
  "task 0.1.0",
  "tlb_shootdown 0.1.0",
+ "unwind 0.1.0",
  "vga_buffer 0.1.0",
  "x86_64 0.1.2",
 ]
@@ -2150,6 +2153,7 @@ dependencies = [
  "apic 0.1.0",
  "fallible-iterator 0.2.0 (registry+https://github.com/rust-lang/crates.io-index)",
  "gimli 0.19.0 (registry+https://github.com/rust-lang/crates.io-index)",
+ "interrupts 0.1.0",
  "irq_safety 0.1.1 (git+https://github.com/kevinaboos/irq_safety)",
  "log 0.3.9 (registry+https://github.com/rust-lang/crates.io-index)",
  "memory 0.1.0",
