@@ -102,7 +102,7 @@ pub fn panic_wrapper(panic_info: &PanicInfo) -> Result<(), &'static str> {
     // Start the unwinding process
     {
         let cause = KillReason::Panic(PanicInfoOwned::from(panic_info));
-        match unwind::start_unwinding(cause) {
+        match unwind::start_unwinding(cause, 5) {
             Ok(_) => {
                 warn!("BUG: start_unwinding() returned an Ok() value, which is unexpected because it means no unwinding actually occurred. Task: {:?}.", task::get_my_current_task());
                 Ok(())

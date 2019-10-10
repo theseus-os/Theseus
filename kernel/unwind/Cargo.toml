@@ -35,6 +35,9 @@ path = "../apic"
 [dependencies.runqueue]
 path = "../runqueue"
 
+[dependencies.interrupts]
+path = "../interrupts"
+
 [dependencies.scheduler]
 path = "../scheduler"
 
