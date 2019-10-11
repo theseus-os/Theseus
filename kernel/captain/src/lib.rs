@@ -146,13 +146,16 @@ pub fn init(
     task_fs::init()?;
 
     
-    // Some janky fat32 code to quickly test something:
-    if let Some(controller) = storage_manager::STORAGE_CONTROLLERS.lock().iter().next() {
-        for sd in controller.lock().devices() {
-            /* println!("Got a drive"); */
-            fat32::detect_fat(&sd);
-        }
-    }
+    // // Some janky fat32 code to quickly test something:
+    // if let Some(controller) = storage_manager::STORAGE_CONTROLLERS.lock().iter().next() {
+    //     for sd in controller.lock().devices() {
+    //         /* println!("Got a drive"); */
+    //         if !fat32::detect_fat(&sd) {
+    //             continue
+    //         };
+    //     }
+    // }
+    fat32::test_module_init()?;
 
     // before we jump to userspace, we need to unmap the identity-mapped section of the kernel's page tables, at PML4[0]
     // unmap the kernel's original identity mapping (including multiboot2 boot_info) to clear the way for userspace mappings

@@ -3,7 +3,7 @@
 extern crate task;
 #[macro_use] extern crate terminal_print;
 #[macro_use] extern crate alloc;
-// #[macro_use] extern crate log;
+#[macro_use] extern crate log;
 extern crate fs_node;
 extern crate getopts;
 extern crate path;
@@ -20,6 +20,18 @@ use alloc::sync::Arc;
 pub fn main(args: Vec<String>) -> isize {
     let mut opts = Options::new();
     opts.optflag("h", "help", "print this help menu");
+
+    //dump some info about the this loaded app crate
+    {
+        let curr_task = task::get_my_current_task().unwrap();
+        let t = curr_task.lock();
+        let app_crate = t.app_crate.as_ref().unwrap();
+        let krate = app_crate.lock_as_ref();
+        trace!("============== Crate {} =================", krate.crate_name);
+        for s in krate.sections.values() {
+            trace!("   {:?}", &*s.lock());
+        }
+    }
 
     let matches = match opts.parse(&args) {
         Ok(m) => m,
@@ -76,7 +88,9 @@ pub fn main(args: Vec<String>) -> isize {
 
 fn print_children(dir: &DirRef) {
     let mut child_string = String::new();
-    let mut child_list = dir.lock().list(); 
+    let locked_dir = dir.lock();
+    println!("Got lock for directory");
+    let mut child_list = locked_dir.list(); 
     child_list.reverse();
     for child in child_list.iter() {
         child_string.push_str(&format!("{}\n", child));

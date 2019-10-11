@@ -38,6 +38,11 @@ path = "../root"
 [dependencies.storage_manager]
 path = "../storage_manager"
 
+[dependencies.spawn]
+path = "../spawn"
+
+[dependencies.task]
+path = "../task"
 
 [lib]
 crate-type = ["rlib"]

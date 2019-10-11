@@ -23,111 +23,102 @@ use alloc::string::ToString;
 use alloc::sync::{Arc, Weak};
 use spin::Mutex;
 use fs_node::{File, Directory, FileOrDir, FsNode};
-use fat32::{root_dir, PFSDirectory};
+use fat32::{root_dir, PFSDirectory, RootDirectory};
 use path::Path;
 use getopts::Options;
 
 #[no_mangle]
-pub fn main(_args: Vec<String>) -> isize {
+pub fn main(args: Vec<String>) -> isize {
 
-    // Some code that was here when this was a program that I intended to do a mount.
-    // I would probably remove it but it's potentially convenient albeit quite trivial code.
-    // let mut opts = Options::new();
-    // opts.optflag("h", "help", "print this help menu");
+    let mut opts = Options::new();
+    opts.optflag("h", "help", "print this help menu");
+    opts.optopt("m", "mount", "Attempt to mount the root directory to DIR.", "DIR");
+    opts.optflag("p", "print", "Walks the filesystem and prints the contents.");
 
     // Attempts to mount code as described in docs for fat32 crate.
     // Mounts to directory given in args.
-    // let matches = match opts.parse(&args) {
-    //     Ok(m) => m,
-    //     Err(_f) => {
-    //         println!("{}", _f);
-    //         return -1; 
-    //     }
-    // };
+    let matches = match opts.parse(&args) {
+        Ok(m) => m,
+        Err(_f) => {
+            println!("{}", _f);
+            return -1; 
+        }
+    };
+
+    if matches.opt_present("h") {
+        print_usage(&opts);
+        return 0;
+    }
     
-    // Verify we have a path to mount to:
-    // if matches.free.is_empty() {
-    //     println!("need path to mount");
-    //     return -1;
-    // }
+    let taskref = match task::get_my_current_task() {
+        Some(t) => t,
+        None => {
+            println!("failed to get current task");
+            return -1;
+        }
+    };
     
-    // let path = Path::new(matches.free[0].to_string());
+    // grabs the current working directory pointer; this is scoped so that we drop the lock on the "current" task
+    let curr_wd = {
+        let locked_task = taskref.lock();
+        let curr_env = locked_task.env.lock();
+        Arc::clone(&curr_env.working_dir)
+    };
+
     
-    // let taskref = match task::get_my_current_task() {
-    //     Some(t) => t,
-    //     None => {
-    //         println!("failed to get current task");
-    //         return -1;
-    //     }
-    // };
     
-    // grabs the current working directory pointer; this is scoped so that we drop the lock on the "cd" task
-    // let curr_wd = {
-    //     let locked_task = taskref.lock();
-    //     let curr_env = locked_task.env.lock();
-    //     Arc::clone(&curr_env.working_dir)
-    // };
-    
-    println!("Trying to mount a fat32 drive");
+    println!("Trying to find a fat32 drive");
     if let Some(controller) = storage_manager::STORAGE_CONTROLLERS.lock().iter().next() {
         for sd in controller.lock().devices() {
-            println!("Got a drive");
             match fat32::init(sd) {
                 Ok(fatfs) => {
+                    println!("Successfully initialized FAT32 FS for drive");
+
                     let fs = Arc::new(Mutex::new(fatfs));
                     // TODO if we change the root dir creation approach this will also change.
                     // Take as read only for now?
-                    let root_dir = root_dir(fs.clone()).unwrap();
+
+
+                    let (name, oPath) = if matches.opt_present("m") {
+                        let path = Path::new(matches.opt_str("m").unwrap());
+
+                        let name = path.basename().to_string();
+                        (name, Some(path.clone()))
+                    } else {
+                        ("/".to_string(), None)
+                    };
+
+
+                    let root: RootDirectory = root_dir(fs.clone(), name.clone()).unwrap();
                     
                     // Recursively print files and directories.
-                    print_dir(&root_dir);
-                    //println!("{:?}", root_dir.list());
-                    /*
-                    // Reaches the root dir and able to go through each of the entries in the root folder using the next_entry()
-                    // but next_entry should not be used to go through a folder because it mutates the folder
-                    let de = root_dir.next_entry().unwrap();
-                    println!("the name of the next entry is: {:?}", de.name);
-                    println!("the name of the next_entry is: {:?}", core::str::from_utf8(&de.name));
+                    if matches.opt_present("p") {
+                        print_dir(&root);
+                    };
 
-                    let de = root_dir.next_entry().unwrap();
-                    println!("the name of the next entry is: {:?}", de.name);
-                    println!("the name of the next_entry is: {:?}", core::str::from_utf8(&de.name));
-
-                    root_dir.get("test");
-
-                    // Uses the path provided and reads the bytes of the file otherwise returns 0 if file can't be found
-                    // The path can be in the format of /hello/poem.txt or \\hello\\poem.txt
-                    let path = format!("\\hello\\poem.txt"); // works for subdirectories and files that span beyond a single cluster
-                    
-                    // This open function create a file structure based on the path if it is found
-                    match fat32::open(fs.clone(), &path) {
-                        Ok(f) => {
-                            debug!("file size:{}", f.size);
-                            let mut bytes_so_far = 0;
-                            
-                            // the buffer provided must be a multiple of the cluster size in bytes, so if the cluster is 8 sectors
-                            // the buffer must be a multiple of 8*512 (4096 bytes)
-                            let mut data: [u8; 4096*2] = [0;4096*2];
-                            
-                            match f.read(&mut data, 0) {
-                                Ok(bytes) => {
-                                    bytes_so_far += bytes;
-                                }
-                                Err(_er) => panic!("the file failed to read"),
-                                }
-                            ;
-                            debug!("{:X?}", &data[..]);
-                            debug!("{:?}", core::str::from_utf8(&data));
-
-                            println!("bytes read: {}", bytes_so_far);
-                        }
-                        Err(_) => println!("file doesnt exist"),
+                    // If we have a mount point, then mount.
+                    match oPath {
+                        // FIXME: path Struct really needs a "strip the last element from path" function.
+                        // For now we're just going to hope the path is a basename...
+                        Some(path) => {
+                            if path.basename() != path.to_string() {
+                                warn!("Current mount code doesn't handle full paths");
                             }
 
-                    let path2 = format!("\\test");
-                    let file2 = fat32::open(fs.clone(), &path2);
-                    println!("name of second file is: {}", file2.unwrap().name);
-                    */
+                            // FIXME set root parent dir to appropriate value.
+                            let mut curr_dir = curr_wd.lock();
+                            let root = Arc::new(Mutex::new(root));
+                            match curr_dir.insert(FileOrDir::Dir(root)) {
+                                Ok(_) => println!("Successfully mounted fat32 FS"),
+                                Err(_) => println!("Failed to mount fat32 FS"),
+                            };
+
+                            // Now let's try a couple simple things:
+                            let test_root = curr_dir.get_dir(&name).unwrap();
+                            println!("Root directory entries: {:?}", test_root.lock().list());
+                        },
+                        None => {}
+                    };               
                 }
                 
                 Err(_) => {
@@ -270,4 +261,8 @@ fn print_file(f: &dyn File) {
 // TODO I'd like for this to behave the like the cat utility on Linux but I'm not very familiar with that functionality.
 fn print_data(data: &[u8]) {
     println!("{:?}", data);
+}
+
+fn print_usage(opts: &getopts::Options) {
+    print!("{:?}", opts.usage("Usage: test_fat32 [OPTIONS] [MOUNT POINT]"));
 }

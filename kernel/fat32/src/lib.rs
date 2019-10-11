@@ -1,6 +1,15 @@
 //! Support for the FAT32 Filesystem.
 //! Inspired by the [intel hypervisor firmware written in rust](https://github.com/intel/rust-hypervisor-firmware/)
 //! 
+//! Limitations (and other notes):
+//! Some key performance improvements for most FAT filesystem drivers are not implemented or are only partially implemented in this driver.
+//! As such, this crate is not suggested for any heavy workloads without adding some of those tricks.
+//! The first improvement would be to cache offset in file -> cluster lookup in memory somewhere. 
+//! Without this caching reading from a position in a file is O(position), which is unacceptable in practice.
+//! Furthermore, directories only partially implement a lazy reading strategy. 
+//! The lazy read will be repeated whenever we try to get a file that doesn't exist since we do not cache the state of the lazy
+//! read (instead we just restart if we don't find a file). This wouldn't be a hard fix, but it hasn't been done.
+//! 
 //! Below is a an example of detecting a fat storage, initializing the file system and doing open and read operations on a file.
 //! 
 //! ```rust
@@ -100,6 +109,8 @@ extern crate root;
 extern crate byteorder;
 extern crate zerocopy;
 extern crate block_io;
+extern crate spawn;
+extern crate task;
 
 use storage_device::{BlockBounds};
 use zerocopy::{FromBytes, AsBytes};
@@ -116,6 +127,8 @@ use alloc::string::String;
 use alloc::string::ToString;
 use memory::MappedPages;
 use block_io::BlockIo;
+use spawn::{KernelTaskBuilder, ApplicationTaskBuilder};
+use task::TaskRef;
 
 /// The end-of-cluster value written by this implementation of FAT32.
 /// Note that many implementations use different values for EOC
@@ -1478,21 +1491,23 @@ fn compare_short_name(name: &str, de: &DirectoryEntry) -> bool {
     true
 }
 
+// TODO is this mount name argument dumb?
 /// Creates a FATdirectory structure for the root directory
 /// 
 /// # Arguments 
 /// * `fs`: the filesystem structure wrapped in an Arc and Mutex
+/// * `mount_name`: the name to used to refer to the new entry. Set to / if not mounting.
 /// 
 /// # Returns
 /// Returns the FATDirectory structure for the root directory 
-pub fn root_dir(fs: Arc<Mutex<Filesystem>>) -> Result<RootDirectory, Error> {
+pub fn root_dir(fs: Arc<Mutex<Filesystem>>, mount_name: String) -> Result<RootDirectory, Error> {
 
     // TODO right now this function can violate the singleton blahdy blah and risks making two cluster chains for this dir.
 
     let cc = ClusterChain {
         filesystem: fs.clone(),
         cluster: 2,
-        name: "/".to_string(),
+        name: mount_name,
         parent: Weak::<Mutex<PFSDirectory>>::new(),
         on_disk_refcount: 2 + 1, // TODO should this be the case?
         _num_clusters: None,
@@ -1538,6 +1553,7 @@ impl Directory for RootDirectory {
     }
 
     fn list(&self) -> Vec<String> {
+        debug!("listing something");
         self.underlying_dir.lock().list()
     }
 
@@ -1578,4 +1594,82 @@ fn debug_name(byte_name: &[u8]) -> &str {
         Ok(name) => name,
         Err(_) => "Couldn't find name"
     }
+}
+
+// TODO move these functions elsewhere. Mostly for debugging some confusing issues.
+/// Spawns some applications processes to perform some mount operations and tests for FAT32 support.
+pub fn test_module_init() -> Result<(), &'static str> {
+
+    // start a task that tries to find the module in root.
+    let taskref = KernelTaskBuilder::new(test_find, ())
+        .name("fat32_find_test".to_string())
+        .block()
+        .spawn()?;
+
+    // start a task that tries to find the module in root.
+    KernelTaskBuilder::new(test_insert, taskref)
+        .name("fat32_insert_test".to_string())
+        .spawn()?;
+
+    Ok(())
+}
+
+fn test_insert(taskref: TaskRef) ->  Result<(), &'static str> {
+    //println!("Trying to find a fat32 drive");
+    if let Some(controller) = storage_manager::STORAGE_CONTROLLERS.lock().iter().next() {
+        for sd in controller.lock().devices() {
+            match init(sd) {
+                Ok(fatfs) => {
+                    //println!("Successfully initialized FAT32 FS for drive");
+
+                    let fs = Arc::new(Mutex::new(fatfs));
+                    // TODO if we change the root dir creation approach this will also change.
+                    // Take as read only for now?
+
+                    let name = "fat32";
+
+
+                    let root: RootDirectory = root_dir(fs.clone(), name.clone().to_string()).unwrap();
+
+
+                    let mut true_root = root::get_root().lock();
+
+                    // FIXME set root parent dir to appropriate value.
+                    let root = Arc::new(Mutex::new(root));
+                    match true_root.insert(FileOrDir::Dir(root)) {
+                        Ok(_) => trace!("Successfully mounted fat32 FS"),
+                        Err(_) => trace!("Failed to mount fat32 FS"),
+                    };
+
+                    // Now let's try a couple simple things:
+                    let test_root = true_root.get_dir(&name).unwrap();
+                    debug!("Root directory entries: {:?}", test_root.lock().list());    
+
+                    // Unblock the find task now that we've finished our insert.
+                    taskref.unblock();  
+
+                    return Ok(());      
+                }
+                
+                Err(_) => {
+                }
+            }
+        }
+    }
+    Err("Couldn't initialize FAT32 FS")
+}
+
+fn test_find(_: ()) ->  Result<(), &'static str> {
+    
+    let root = root::get_root().lock();
+
+    let dir = match root.get_dir("fat32") {
+        Some(dir) => dir,
+        None => return Err("Couldn't find fat32 FS"),
+    };
+
+    let entries = dir.lock().list();
+    debug!("Entries in fat32 dir: {:?}", entries);
+    debug!("Successfully found and printed fat32 dir");
+    Ok(())
 }
