@@ -1,5 +1,4 @@
 #![no_std]
-#![feature(alloc)]
 
 extern crate task;
 #[macro_use] extern crate terminal_print;

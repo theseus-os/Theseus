@@ -3,7 +3,6 @@
 
 
 #![no_std]
-#![feature(alloc)]
 #![feature(slice_concat_ext)]
 
 #[macro_use] extern crate alloc;
@@ -14,6 +13,7 @@ extern crate getopts;
 extern crate task;
 extern crate memory;
 extern crate mod_mgmt;
+extern crate crate_name_utils;
 extern crate spin;
 
 
@@ -28,6 +28,7 @@ use mod_mgmt::{
     metadata::{StrongCrateRef, StrongSectionRef},
     CrateNamespace,
 };
+use crate_name_utils::get_containing_crate_name;
 
 
 static VERBOSE: Once<bool> = Once::new();
@@ -171,10 +172,13 @@ fn find_section(section_name: &str) -> Result<StrongSectionRef, String> {
 
     // If it wasn't a global section in the symbol map, then we need to find its containing crate
     // and search that crate's symbols manually.
-    let containing_crate_ref = mod_mgmt::get_containing_crate_name(section_name).ok_or(String::new())
-        .and_then(|cname| namespace.get_crate_starting_with(cname).ok_or(String::new()))
+    let containing_crate_ref = get_containing_crate_name(section_name).get(0)
+        .and_then(|cname| namespace.get_crate_starting_with(&format!("{}-", cname)))
+        .or_else(|| get_containing_crate_name(section_name).get(1)
+            .and_then(|cname| namespace.get_crate_starting_with(&format!("{}-", cname)))
+        )
         .map(|(_cname, crate_ref)| crate_ref)
-        .map_err(|_e| format!("Couldn't find section {} in symbol map, and couldn't get its containing crate", section_name))?;
+        .ok_or_else(|| format!("Couldn't find section {} in symbol map, and couldn't get its containing crate", section_name))?;
 
     let mut matching_sections: Vec<(String, StrongSectionRef)> = containing_crate_ref.lock_as_ref().sections.values()
         .filter_map(|sec_ref| {
@@ -201,7 +205,7 @@ fn find_section(section_name: &str) -> Result<StrongSectionRef, String> {
 /// separated by the newline character `'\n'`.
 fn _find_crate(crate_name: &str) -> Result<StrongCrateRef, String> {
     let namespace = get_my_current_namespace();
-    let matching_crate_names: Vec<String> = namespace.crate_names()
+    let matching_crate_names: Vec<String> = namespace.crate_names(true)
         .into_iter()
         .filter(|name| name.starts_with(crate_name))
         .collect();

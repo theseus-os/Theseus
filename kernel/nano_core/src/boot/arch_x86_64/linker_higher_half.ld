@@ -26,6 +26,21 @@ SECTIONS {
 		*(.text .text.*)
 	}
 
+	.rodata ALIGN(4K) : AT(ADDR(.rodata) - KERNEL_OFFSET)
+	{
+		*(.rodata .rodata.*)
+	}
+
+	.eh_frame ALIGN(4K) : AT(ADDR(.eh_frame) - KERNEL_OFFSET)
+	{
+		*(.eh_frame)
+	}
+
+	.gcc_except_table ALIGN(4K) : AT(ADDR(.gcc_except_table) - KERNEL_OFFSET)
+	{
+		*(.gcc_except_table)
+	}
+
 	.data ALIGN(4K) : AT(ADDR(.data) - KERNEL_OFFSET)
 	{
 		*(.padata)
@@ -35,11 +50,6 @@ SECTIONS {
 	.bss ALIGN(4K) : AT(ADDR(.bss) - KERNEL_OFFSET)
 	{
 		*(.bss .bss.*)
-	}
-
-	.rodata ALIGN(4K) : AT(ADDR(.rodata) - KERNEL_OFFSET)
-	{
-		*(.rodata .rodata.*)
 	}
 
 	/* .got (Global Offset Table) section and its relocation types are currently unsupported */
@@ -62,10 +72,5 @@ SECTIONS {
 	.data.rel.ro ALIGN(4K) : AT(ADDR(.data.rel.ro) - KERNEL_OFFSET)
 	{
 		*(.data.rel.ro.local*) *(.data.rel.ro .data.rel.ro.*)
-	}
-
-	.gcc_except_table ALIGN(4K) : AT(ADDR(.gcc_except_table) - KERNEL_OFFSET)
-	{
-		*(.gcc_except_table)
 	}
 }

@@ -1,8 +1,7 @@
 #![no_std]
-#![feature(alloc)]
 /// This crate contains all the necessary functions for navigating the virtual filesystem / obtaining specific
 /// directories via the Path struct 
-#[macro_use] extern crate log;
+// #[macro_use] extern crate log;
 #[macro_use] extern crate alloc;
 extern crate spin;
 extern crate fs_node;
@@ -194,7 +193,7 @@ impl Path {
     /// Returns the file or directory specified by the given path, 
     /// which can either be absolute, or relative from the given the current working directory 
     pub fn get(&self, starting_dir: &DirRef) -> Option<FileOrDir> {
-        let current_path = { Path::new(starting_dir.lock().get_absolute_path()) };
+        // let current_path = { Path::new(starting_dir.lock().get_absolute_path()) };
         let mut curr_dir = {
             if self.is_absolute() {
                 Arc::clone(root::get_root())

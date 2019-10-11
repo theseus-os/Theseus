@@ -1,5 +1,4 @@
 #![no_std]
-#![feature(alloc)]
 
 extern crate alloc;
 #[macro_use] extern crate log;
@@ -56,7 +55,7 @@ pub fn prio_sched(old_namespace: &CrateNamespace, new_namespace: &CrateNamespace
     for sec_ref in krate.sections.values() {
         let sec = sec_ref.lock();
         if sec.name.contains("RUNQUEUES") {
-            warn!("Section {}\n\ttype: {:?}\n\tvaddr: {:#X}\n\tsize: {}\n", sec.name, sec.typ, sec.virt_addr(), sec.size);
+            warn!("Section {}\n\ttype: {:?}\n\tvaddr: {:#X}\n\tsize: {}\n", sec.name, sec.typ, sec.start_address(), sec.size());
         }
     }
 

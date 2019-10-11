@@ -17,21 +17,8 @@ pub const BYTES_PER_ADDR: usize = 8;
 
 /// The lower 12 bits of a virtual address correspond to the P1 page frame offset. 
 pub const PAGE_SHIFT: usize = 12;
-/// page size is 4096 bytes, 4KiB pages.
+/// Page size is 4096 bytes, 4KiB pages.
 pub const PAGE_SIZE: usize = (1 << PAGE_SHIFT);
-
-/// returns the offset of an address into a Page.
-#[inline(always)]
-pub fn address_page_offset(addr: usize) -> usize {
-    addr % PAGE_SIZE
-}
-
-/// returns true if an address is page-aligned
-#[inline(always)]
-pub fn address_is_page_aligned(addr: usize) -> bool {
-    address_page_offset(addr) == 0
-}
-
 
 /// Value: 0. Shift the Page number (not the address!) by this to get the P1 index.
 pub const P1_INDEX_SHIFT: usize = 0;

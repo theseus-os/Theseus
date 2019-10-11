@@ -1,0 +1,16 @@
+[package]
+name = "acpi_table"
+version = "0.1.0"
+authors = ["Kevin Boos <kevinaboos@gmail.com>"]
+description = "Definitions for ACPI tables bookkeeping"
+build = "../../build.rs"
+
+[dependencies.log]
+default-features = false
+version = "0.3.7"
+
+[dependencies.memory]
+path = "../memory"
+
+[dependencies.sdt]
+path = "../sdt"

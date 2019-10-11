@@ -2,8 +2,6 @@
 //! 
 
 #![no_std]
-#![feature(alloc)]
-#![feature(try_from)]
 #![feature(slice_concat_ext)]
 
 #[macro_use] extern crate log;
@@ -17,9 +15,9 @@ extern crate task;
 extern crate sha3;
 extern crate percent_encoding;
 extern crate rand;
-#[macro_use] extern crate http_client;
+extern crate http_client;
 extern crate itertools;
-
+#[macro_use] extern crate smoltcp_helper;
 
 
 use core::str;
@@ -31,8 +29,8 @@ use alloc::{
 use itertools::Itertools;
 use hpet::get_hpet;
 use smoltcp::{
-    wire::{IpAddress, Ipv4Address, IpEndpoint},
-    socket::{SocketSet, SocketHandle, TcpSocket, TcpSocketBuffer, TcpState},
+    wire::{Ipv4Address, IpEndpoint},
+    socket::{SocketSet, TcpSocket, TcpSocketBuffer, TcpState},
 };
 use sha3::{Digest, Sha3_512};
 use percent_encoding::{DEFAULT_ENCODE_SET, utf8_percent_encode};
@@ -42,8 +40,8 @@ use rand::{
     RngCore,
     rngs::SmallRng
 };
-use http_client::{HttpResponse, ConnectedTcpSocket, send_request, millis_since, check_http_request, poll_iface};
-
+use http_client::{HttpResponse, ConnectedTcpSocket, send_request, check_http_request};
+use smoltcp_helper::{STARTING_FREE_PORT, connect, millis_since, poll_iface};
 
 /// The IP address of the update server.
 // const DEFAULT_DESTINATION_IP_ADDR: [u8; 4] = [168, 7, 138, 84]; // the static IP of `kevin.recg.rice.edu`
@@ -60,12 +58,8 @@ pub fn default_remote_endpoint() -> IpEndpoint {
     )
 }
 
-/// The starting number for freely-available (non-reserved) standard TCP/UDP ports.
-const STARTING_FREE_PORT: u16 = 49152;
-
 /// The time limit in milliseconds to wait for a response to an HTTP request.
 const HTTP_REQUEST_TIMEOUT_MILLIS: u64 = 10000;
-
 
 /// The path of the update builds file, located at the root of the build server.
 /// This file contains the list of all update build instances available,
@@ -457,63 +451,12 @@ fn download_files<S: AsRef<str>>(
 }
 
 
-/// A convenience function that checks whether a socket is connected, 
-/// which is currently true when both `may_send()` and `may_recv()` are true.
-fn is_connected(sockets: &mut SocketSet, tcp_handle: SocketHandle) -> bool {
-    let socket = sockets.get::<TcpSocket>(tcp_handle);
-    socket.may_send() && socket.may_recv()
-}
-
-
-/// A convenience function for connecting a socket.
-/// If the given socket is already open, it is forcibly closed immediately and reconnected.
-fn connect(
-    iface: &NetworkInterfaceRef,
-    sockets: &mut SocketSet, 
-    tcp_handle: SocketHandle,
-    remote_endpoint: IpEndpoint,
-    local_port: u16, 
-    startup_time: u64,
-) -> Result<(), &'static str> {
-    if sockets.get::<TcpSocket>(tcp_handle).is_open() {
-        return Err("ota_update_client: when connecting socket, it was already open...");
-    }
-
-    let timeout_millis = 3000; // 3 second timeout
-    let start = hpet_ticks!();
-    
-    debug!("ota_update_client: connecting from {}:{} to {} ...",
-        iface.lock().ip_addrs().get(0).map(|ip| format!("{}", ip)).unwrap_or_else(|| format!("ERROR")), 
-        local_port, 
-        remote_endpoint,
-    );
-
-    let _packet_io_occurred = poll_iface(&iface, sockets, startup_time)?;
-
-    sockets.get::<TcpSocket>(tcp_handle).connect(remote_endpoint, local_port).map_err(|_e| {
-        error!("ota_update_client: failed to connect socket, error: {:?}", _e);
-        "ota_update_client: failed to connect socket"
-    })?;
-
-    loop {
-        let _packet_io_occurred = poll_iface(&iface, sockets, startup_time)?;
-        
-        // if the socket actually connected, it should be able to send/recv
-        let socket = sockets.get::<TcpSocket>(tcp_handle);
-        if socket.may_send() && socket.may_recv() {
-            break;
-        }
-
-        // check to make sure we haven't timed out
-        if millis_since(start)? > timeout_millis {
-            error!("ota_update_client: failed to connect to socket, timed out after {} ms", timeout_millis);
-            return Err("ota_update_client: failed to connect to socket, timed out.");
-        }
-    }
-
-    debug!("ota_update_client: connected!  (took {} ms)", millis_since(start)?);
-    Ok(())
-}
+// /// A convenience function that checks whether a socket is connected, 
+// /// which is currently true when both `may_send()` and `may_recv()` are true.
+// fn is_connected(sockets: &mut SocketSet, tcp_handle: SocketHandle) -> bool {
+//     let socket = sockets.get::<TcpSocket>(tcp_handle);
+//     socket.may_send() && socket.may_recv()
+// }
 
 
 /// Returns true if the SHA3 512-bit hash of the given `content` matches the given `hash` string.

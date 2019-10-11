@@ -32,8 +32,8 @@ path = "../memory"
 [dependencies.util]
 path = "../../libs/util"
 
-[dependencies.acpi]
-path = "../acpi"
+[dependencies.multicore_bringup]
+path = "../multicore_bringup"
 
 [dependencies.tsc]
 path = "../tsc"

@@ -1,11 +1,4 @@
 #![no_std]
-#![feature(alloc)]
-
-extern crate alloc;
-
-#[macro_use] pub mod try_opt;
-
-pub mod c_str;
 
 /// the log base 2 of an integer value
 pub fn log2(value: usize) -> usize {

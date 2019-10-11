@@ -1,4 +1,5 @@
 #![no_std]
+#![feature(const_fn)]
 
 #[macro_use] extern crate lazy_static;
 // #[macro_use] extern crate log;
@@ -11,9 +12,13 @@ extern crate tss;
 extern crate memory;
 
 use atomic_linked_list::atomic_map::AtomicMap;
-use x86_64::structures::tss::TaskStateSegment;
-use x86_64::structures::gdt::SegmentSelector;
-use x86_64::PrivilegeLevel;
+use x86_64::{
+    structures::{
+        tss::TaskStateSegment,
+        gdt::SegmentSelector,
+    },
+    PrivilegeLevel,
+};
 use spin::Once;
 use memory::VirtualAddress;
 
@@ -82,7 +87,6 @@ pub fn create_tss_gdt(apic_id: u8,
                   privilege_stack_top_unusable: VirtualAddress) {
     use x86_64::instructions::segmentation::{set_cs, load_ds, load_ss};
     use x86_64::instructions::tables::load_tss;
-    use x86_64::PrivilegeLevel;
 
     
     let tss_ref = tss::create_tss(apic_id, double_fault_stack_top_unusable, privilege_stack_top_unusable);
@@ -207,60 +211,57 @@ pub enum Descriptor {
 }
 
 impl Descriptor {
-    pub fn kernel_code_segment() -> Descriptor {
-        let flags = DescriptorFlags::LONG_MODE | 
-                    DescriptorFlags::PRESENT | 
-                    DescriptorFlags::PRIVILEGE_RING0 | 
-                    DescriptorFlags::USER_SEGMENT | 
-                    DescriptorFlags::EXECUTABLE | 
-                    DescriptorFlags::READ_WRITE;
-        Descriptor::UserSegment(flags.bits())
+    pub const fn kernel_code_segment() -> Descriptor {
+        let flags = DescriptorFlags::LONG_MODE.bits() | 
+                    DescriptorFlags::PRESENT.bits() | 
+                    DescriptorFlags::PRIVILEGE_RING0.bits() | 
+                    DescriptorFlags::USER_SEGMENT.bits() | 
+                    DescriptorFlags::EXECUTABLE.bits() | 
+                    DescriptorFlags::READ_WRITE.bits();
+        Descriptor::UserSegment(flags)
     }
 
-    pub fn kernel_data_segment() -> Descriptor {
-        let flags = DescriptorFlags::PRESENT | 
-                    DescriptorFlags::PRIVILEGE_RING0 | 
-                    DescriptorFlags::USER_SEGMENT | 
-                    DescriptorFlags::READ_WRITE; 
-                    // | DescriptorFlags::ACCESSED;
-        Descriptor::UserSegment(flags.bits())
+    pub const fn kernel_data_segment() -> Descriptor {
+        let flags = DescriptorFlags::PRESENT.bits() | 
+                    DescriptorFlags::PRIVILEGE_RING0.bits() | 
+                    DescriptorFlags::USER_SEGMENT.bits() | 
+                    DescriptorFlags::READ_WRITE.bits(); 
+        Descriptor::UserSegment(flags)
     }
 
-    pub fn user_code_32_segment() -> Descriptor {
-        let flags = DescriptorFlags::SIZE | 
-                    DescriptorFlags::PRESENT | 
-                    DescriptorFlags::PRIVILEGE_RING3 | 
-                    DescriptorFlags::USER_SEGMENT | 
-                    DescriptorFlags::EXECUTABLE;
-        Descriptor::UserSegment(flags.bits())
+    pub const fn user_code_32_segment() -> Descriptor {
+        let flags = DescriptorFlags::SIZE.bits() | 
+                    DescriptorFlags::PRESENT.bits() | 
+                    DescriptorFlags::PRIVILEGE_RING3.bits() | 
+                    DescriptorFlags::USER_SEGMENT.bits() | 
+                    DescriptorFlags::EXECUTABLE.bits();
+        Descriptor::UserSegment(flags)
     }
 
-    pub fn user_data_32_segment() -> Descriptor {
-        let flags = DescriptorFlags::SIZE | 
-                    DescriptorFlags::PRESENT | 
-                    DescriptorFlags::PRIVILEGE_RING3 | 
-                    DescriptorFlags::USER_SEGMENT | 
-                    DescriptorFlags::READ_WRITE; 
-                    // | DescriptorFlags::ACCESSED;
-        Descriptor::UserSegment(flags.bits())
+    pub const fn user_data_32_segment() -> Descriptor {
+        let flags = DescriptorFlags::SIZE.bits() | 
+                    DescriptorFlags::PRESENT.bits() | 
+                    DescriptorFlags::PRIVILEGE_RING3.bits() | 
+                    DescriptorFlags::USER_SEGMENT.bits() | 
+                    DescriptorFlags::READ_WRITE.bits(); 
+        Descriptor::UserSegment(flags)
     }
 
-    pub fn user_code_64_segment() -> Descriptor {
-        let flags = DescriptorFlags::LONG_MODE | 
-                    DescriptorFlags::PRESENT | 
-                    DescriptorFlags::PRIVILEGE_RING3 | 
-                    DescriptorFlags::USER_SEGMENT | 
-                    DescriptorFlags::EXECUTABLE;
-        Descriptor::UserSegment(flags.bits())
+    pub const fn user_code_64_segment() -> Descriptor {
+        let flags = DescriptorFlags::LONG_MODE.bits() | 
+                    DescriptorFlags::PRESENT.bits() | 
+                    DescriptorFlags::PRIVILEGE_RING3.bits() | 
+                    DescriptorFlags::USER_SEGMENT.bits() | 
+                    DescriptorFlags::EXECUTABLE.bits();
+        Descriptor::UserSegment(flags)
     }
 
-    pub fn user_data_64_segment() -> Descriptor {
-        let flags = DescriptorFlags::PRESENT | 
-                    DescriptorFlags::PRIVILEGE_RING3 | 
-                    DescriptorFlags::USER_SEGMENT | 
-                    DescriptorFlags::READ_WRITE; 
-                    // | DescriptorFlags::ACCESSED;
-        Descriptor::UserSegment(flags.bits())
+    pub const fn user_data_64_segment() -> Descriptor {
+        let flags = DescriptorFlags::PRESENT.bits() | 
+                    DescriptorFlags::PRIVILEGE_RING3.bits() | 
+                    DescriptorFlags::USER_SEGMENT.bits() | 
+                    DescriptorFlags::READ_WRITE.bits(); 
+        Descriptor::UserSegment(flags)
     }
     
 

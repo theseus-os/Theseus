@@ -28,13 +28,13 @@ lazy_static! {
 /// the x86_64 hardware automatically switches to when transitioning from Ring 3 -> Ring 0.
 /// Should be set to an address within the current userspace task's kernel stack.
 /// WARNING: If set incorrectly, the OS will crash upon an interrupt from userspace into kernel space!!
-pub fn tss_set_rsp0(new_privilege_stack_top: usize) -> Result<(), &'static str> {
+pub fn tss_set_rsp0(new_privilege_stack_top: VirtualAddress) -> Result<(), &'static str> {
     let my_apic_id = try!(apic::get_my_apic_id().ok_or("couldn't get_my_apic_id"));
     let mut tss_entry = try!(TSS.get(&my_apic_id).ok_or_else(|| {
         error!("tss_set_rsp0(): couldn't find TSS for apic {}", my_apic_id);
         "No TSS for the current core's apid id" 
     })).lock();
-    tss_entry.privilege_stack_table[0] = x86_64::VirtualAddress(new_privilege_stack_top);
+    tss_entry.privilege_stack_table[0] = x86_64::VirtualAddress(new_privilege_stack_top.value());
     // trace!("tss_set_rsp0: new TSS {:?}", tss_entry);
     Ok(())
 }
@@ -49,8 +49,8 @@ pub fn create_tss(apic_id: u8,
 {
     let mut tss = TaskStateSegment::new();
     // TSS.RSP0 is used in kernel space after a transition from Ring 3 -> Ring 0
-    tss.privilege_stack_table[0] = x86_64::VirtualAddress(privilege_stack_top_unusable);
-    tss.interrupt_stack_table[DOUBLE_FAULT_IST_INDEX] = x86_64::VirtualAddress(double_fault_stack_top_unusable);
+    tss.privilege_stack_table[0] = x86_64::VirtualAddress(privilege_stack_top_unusable.value());
+    tss.interrupt_stack_table[DOUBLE_FAULT_IST_INDEX] = x86_64::VirtualAddress(double_fault_stack_top_unusable.value());
 
     // insert into TSS list
     TSS.insert(apic_id, Mutex::new(tss));

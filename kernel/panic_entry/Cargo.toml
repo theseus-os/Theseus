@@ -1,0 +1,35 @@
+[package]
+authors = ["Kevin Boos <kevinaboos@gmail.com>"]
+name = "panic_entry"
+description = "Contains the lang items and entry points for panics and other errors/exceptions, as required by the Rust compiler."
+version = "0.1.0"
+build = "../../build.rs"
+
+[dependencies]
+
+
+[dependencies.log]
+default-features = false
+version = "0.3.7"
+
+[dependencies.memory]
+path = "../memory"
+
+[dependencies.mod_mgmt]
+path = "../mod_mgmt"
+
+[dependencies.task]
+path = "../task"
+
+[dependencies.vga_buffer]
+path = "../vga_buffer"
+
+[dependencies.panic_wrapper]
+path = "../panic_wrapper"
+
+[dependencies.unwind]
+path = "../unwind"
+
+
+[lib]
+crate-type = ["rlib"]

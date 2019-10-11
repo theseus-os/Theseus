@@ -8,13 +8,16 @@ build = "../../build.rs"
 
 [dependencies]
 spin = "0.4.10"
-# multiboot2 = { git = "https://github.com/kevinaboos/multiboot2-elf64"}
-multiboot2 = { path = "../../libs/multiboot2-elf64" } # currently using our local copy, forked from Phil Opp's crate
+multiboot2 = "0.7.1"
 rlibc = "1.0.0"
 # x86_64 = { git = "https://github.com/kevinaboos/x86_64" }
 x86_64 = { path = "../../libs/x86_64" } # currently using our local copy, forked from Phil Opp's crate
 
 
+# [dependencies.compiler_builtins]
+# git = "https://github.com/rust-lang-nursery/compiler-builtins"
+# default-features = false
+# features = [ "no-lang-items" ]
 
 [dependencies.log]
 default-features = false
@@ -44,15 +47,12 @@ path = "../exceptions_early"
 [dependencies.captain]
 path = "../captain"
 
-[dependencies.panic_unwind]
-path = "../panic_unwind"
+[dependencies.panic_entry]
+path = "../panic_entry"
 
 [dependencies.vga_buffer]
 path = "../vga_buffer"
 
-
-[features]
-loadable = []
 
 
 [lib]

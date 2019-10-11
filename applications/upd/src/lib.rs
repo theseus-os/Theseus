@@ -4,7 +4,6 @@
 
 
 #![no_std]
-#![feature(alloc)]
 #![feature(slice_concat_ext)]
 
 #[macro_use] extern crate alloc;
@@ -38,8 +37,9 @@ use network_manager::{NetworkInterfaceRef, NETWORK_INTERFACES};
 use smoltcp::wire::IpEndpoint;
 use mod_mgmt::{
     CrateNamespace,
-    NamespaceDirectorySet,
-    SwapRequest, SwapRequestList,
+    NamespaceDir,
+    SwapRequest,
+    SwapRequestList,
 };
 use memfs::MemFile;
 use path::Path;
@@ -185,23 +185,21 @@ fn download(remote_endpoint: IpEndpoint, update_build: &str, crate_list: Option<
     };
     
     // save each new crate to a file 
-    let curr_dir = task::get_my_working_dir().ok_or_else(|| format!("couldn't get my current working directory"))?;
-    let new_namespace_dir = make_unique_directory(update_build, &curr_dir)?;
-    let new_namespace_name = new_namespace_dir.lock().get_name();
-    let new_namespace = CrateNamespace::new(new_namespace_name, NamespaceDirectorySet::new(new_namespace_dir)?);
+    let curr_dir = task::get_my_current_task().map(|t| t.get_env().lock().working_dir.clone()).ok_or_else(|| format!("couldn't get my current working directory"))?;
+    let new_namespace_dir = NamespaceDir::new(make_unique_directory(update_build, &curr_dir)?);
     for df in crates.into_iter() {
         let content = df.content.as_result_err_str()?;
         let size = content.len();
         // The name of the crate file that we downloaded is something like: "/keyboard_log/k#keyboard-36be916209949cef.o".
         // We need to get just the basename of the file, then remove the crate type prefix ("k#").
         let df_path = Path::new(df.name);
-        let cfile = new_namespace.dirs().insert_crate_object_file(df_path.basename(), content)?;
+        let cfile = new_namespace_dir.insert_crate_object_file(df_path.basename(), content)?;
         println!("Downloaded crate: {:?}, size {}", cfile.lock().get_absolute_path(), size);
     }
 
     // if downloaded, save the diff file into the base directory
     if let Some(diffs) = diff_file_lines {
-        let cfile = MemFile::new(String::from(DIFF_FILE_NAME), new_namespace.dirs().base_directory())?;
+        let cfile = MemFile::new(String::from(DIFF_FILE_NAME), &new_namespace_dir)?;
         cfile.lock().write(diffs.join("\n").as_bytes(), 0)?;
     }
 
@@ -217,14 +215,12 @@ fn apply(base_dir_path: &Path) -> Result<(), String> {
     }
 
     let kernel_mmi_ref = memory::get_kernel_mmi_ref().ok_or_else(|| format!("couldn't get kernel MMI"))?;
-    let curr_dir = task::get_my_working_dir().ok_or_else(|| format!("couldn't get my current working directory"))?;
-    let base_dir = match base_dir_path.get(&curr_dir) {
-        Some(FileOrDir::Dir(d)) => d,
-        _ => return Err(format!("cannot find base directory at path {}", base_dir_path)),
+    let curr_dir = task::get_my_current_task().map(|t| t.get_env().lock().working_dir.clone()).ok_or_else(|| format!("couldn't get my current working directory"))?;
+    let new_namespace_dir = match base_dir_path.get(&curr_dir) {
+        Some(FileOrDir::Dir(d)) => NamespaceDir::new(d),
+        _ => return Err(format!("cannot find an update base directory at path {}", base_dir_path)),
     };
-    let new_namespace_dirs = NamespaceDirectorySet::from_existing_base_dir(base_dir.clone()).map_err(|e| e.to_string())?;
-
-    let diff_file = match base_dir.lock().get(DIFF_FILE_NAME) { 
+    let diff_file = match new_namespace_dir.lock().get(DIFF_FILE_NAME) { 
         Some(FileOrDir::File(f)) => f,
         _ => return Err(format!("cannot find diff file at {}/{}", base_dir_path, DIFF_FILE_NAME)),
     };
@@ -253,7 +249,7 @@ fn apply(base_dir_path: &Path) -> Result<(), String> {
             String::new() // skip checks for empty old crates (just the new crate will be loaded w/o replacing anything)
         } else {
             // check to make sure the old crate actually exists
-            let old_crate_file = curr_namespace.dirs().get_crate_object_file(old_crate_file_name)
+            let old_crate_file = curr_namespace.dir().get_crate_object_file(old_crate_file_name)
                 .ok_or_else(|| format!("cannot find old crate file {:?} in namespace {:?}", old_crate_file_name, curr_namespace.name))?;
             // the old needs to be swapped if it's currently loaded
             let old_crate_file_name = Path::new(old_crate_file.lock().get_name());
@@ -264,8 +260,8 @@ fn apply(base_dir_path: &Path) -> Result<(), String> {
             }
             old_crate_name
         };
-        let new_crate_file = new_namespace_dirs.get_crate_object_file(new_crate_file_name)
-            .ok_or_else(|| format!("cannot find new crate file {:?} in new namespace dirs {}", new_crate_file_name, base_dir_path))?;
+        let new_crate_file = new_namespace_dir.get_crate_object_file(new_crate_file_name)
+            .ok_or_else(|| format!("cannot find new crate file {:?} in new namespace dir {}", new_crate_file_name, base_dir_path))?;
         let swap_req = SwapRequest::new(old_crate_name, Path::new(new_crate_file.lock().get_absolute_path()), false)?;
         swap_requests.push(swap_req);
     }
@@ -273,11 +269,11 @@ fn apply(base_dir_path: &Path) -> Result<(), String> {
     // now do the actual live crate swap at runtime
     curr_namespace.swap_crates(
         swap_requests, 
-        Some(new_namespace_dirs), 
+        Some(new_namespace_dir), 
         diffs.state_transfer_functions, 
         &kernel_mmi_ref, 
-        false)
-        .map_err(|e| format!("crate swapping failed, error: {}", e))?;
+        false
+    ).map_err(|e| format!("crate swapping failed, error: {}", e))?;
 
     Ok(())
 }
@@ -342,5 +338,4 @@ Runs the given update-related COMMAND. Choices include:
         
     apply BASE_DIR
         Applies the evolutionary update specified by the diff file 
-        in the given BASE_DIR, which also must contain a set of 
-        CrateNamespace subdirectories: \"kernel\" and \"applications\", at the least.";
+        in the given BASE_DIR, which contains the new crate object files to be used.";

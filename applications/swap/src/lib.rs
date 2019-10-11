@@ -3,7 +3,6 @@
 
 
 #![no_std]
-#![feature(alloc)]
 #![feature(slice_concat_ext)]
 
 #[macro_use] extern crate alloc;
@@ -25,7 +24,7 @@ use alloc::{
     slice::SliceConcatExt,
 };
 use getopts::{Options, Matches};
-use mod_mgmt::{SwapRequest, NamespaceDirectorySet};
+use mod_mgmt::{NamespaceDir, SwapRequest};
 use hpet::get_hpet;
 use path::Path;
 use fs_node::{FileOrDir, FsNode, DirRef};
@@ -74,13 +73,13 @@ fn rmain(matches: Matches) -> Result<(), String> {
         Arc::clone(&curr_env.working_dir)
     };
 
-    let override_namespace_crate_dirs = if let Some(path) = matches.opt_str("d") {
+    let override_namespace_crate_dir = if let Some(path) = matches.opt_str("d") {
         let path = Path::new(path);
-        let base_dir = match path.get(&curr_dir) {
+        let dir = match path.get(&curr_dir) {
             Some(FileOrDir::Dir(dir)) => dir,
             _ => return Err(format!("Error: could not find specified namespace crate directory: {}.", path)),
         };
-        Some(NamespaceDirectorySet::from_existing_base_dir(base_dir).map_err(|e| e.to_string())?)
+        Some(NamespaceDir::new(dir))
     } else {
         None
     };
@@ -98,7 +97,7 @@ fn rmain(matches: Matches) -> Result<(), String> {
     swap_modules(
         tuples, 
         &curr_dir, 
-        override_namespace_crate_dirs,
+        override_namespace_crate_dir,
         state_transfer_functions,
         verbose
     )
@@ -153,7 +152,7 @@ fn parse_input_tuples<'a>(args: &'a str) -> Result<Vec<(&'a str, &'a str, bool)>
 fn swap_modules(
     tuples: Vec<(&str, &str, bool)>, 
     curr_dir: &DirRef, 
-    override_namespace_crate_dirs: Option<NamespaceDirectorySet>, 
+    override_namespace_crate_dir: Option<NamespaceDir>, 
     state_transfer_functions: Vec<String>,
     verbose_log: bool
 ) -> Result<(), String> {
@@ -170,8 +169,8 @@ fn swap_modules(
             // 2) check that the new crate file exists. It could be a regular path, or a prefix for a file in the namespace's kernel dir
             let new_crate_abs_path = match Path::new(String::from(n)).get(curr_dir) {
                 Some(FileOrDir::File(f)) => Ok(Path::new(f.lock().get_absolute_path())),
-                _ => namespace.get_kernel_file_starting_with(n)
-                        .and_then(|p| p.get(namespace.dirs().kernel_directory()).map(|f_or_d| Path::new(f_or_d.get_absolute_path())))
+                _ => namespace.get_crate_file_starting_with(n)
+                        .and_then(|p| p.get(namespace.dir()).map(|f_or_d| Path::new(f_or_d.get_absolute_path())))
                         .ok_or_else(|| format!("Couldn't find new kernel crate file {:?}.", n))
             }?;
             mods.push(
@@ -188,7 +187,7 @@ fn swap_modules(
 
     let swap_result = namespace.swap_crates(
         swap_requests, 
-        override_namespace_crate_dirs,
+        override_namespace_crate_dir,
         state_transfer_functions,
         &kernel_mmi_ref,
         verbose_log

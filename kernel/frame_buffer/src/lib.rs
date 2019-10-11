@@ -1,13 +1,12 @@
 //! This crate is a frame buffer for display on the screen in 2D mode
 
 #![no_std]
-#![feature(alloc)]
 #![feature(const_fn)]
 #![feature(ptr_internals)]
 #![feature(asm)]
 
 extern crate spin;
-extern crate acpi;
+extern crate multicore_bringup;
 
 extern crate volatile;
 extern crate serial_port;
@@ -16,16 +15,12 @@ extern crate memory;
 #[macro_use] extern crate log;
 extern crate util;
 extern crate alloc;
-#[macro_use] extern crate vga_buffer;
 
 
-use core::ptr::Unique;
 use spin::{Mutex};
-use memory::{FRAME_ALLOCATOR, Frame, PageTable, PhysicalAddress, 
-    EntryFlags, allocate_pages_by_bytes, MappedPages, MemoryManagementInfo,
-    get_kernel_mmi_ref};
+use memory::{FRAME_ALLOCATOR, FrameRange, PhysicalAddress, 
+    EntryFlags, allocate_pages_by_bytes, MappedPages, get_kernel_mmi_ref};
 use core::ops::DerefMut;
-use kernel_config::memory::KERNEL_OFFSET;
 use alloc::boxed::Box;
 
 //The buffer for text printing
@@ -34,8 +29,6 @@ pub mod text_buffer;
 pub mod font;
 
 const PIXEL_BYTES:usize = 4;
-
-static FRAME_BUFFER_PAGES:Mutex<Option<MappedPages>> = Mutex::new(None);
 
 /// Init the frame buffer. Allocate a block of memory and map it to the frame buffer frames.
 pub fn init() -> Result<(), &'static str > {
@@ -46,63 +39,34 @@ pub fn init() -> Result<(), &'static str > {
     let BUFFER_WIDTH:usize;
     let BUFFER_HEIGHT:usize;
     {
-        let graphic_info = acpi::madt::GRAPHIC_INFO.lock();
+        let graphic_info = multicore_bringup::GRAPHIC_INFO.lock();
         if graphic_info.physical_address == 0 {
             return Err("Fail to get graphic mode infomation!");
         }
-        VESA_DISPLAY_PHYS_START = graphic_info.physical_address as usize;
+        VESA_DISPLAY_PHYS_START = PhysicalAddress::new(graphic_info.physical_address as usize)?;
         BUFFER_WIDTH = graphic_info.width as usize;
         BUFFER_HEIGHT = graphic_info.height as usize;
         VESA_DISPLAY_PHYS_SIZE= BUFFER_WIDTH * BUFFER_HEIGHT * PIXEL_BYTES;
     };
 
     // init the font for text printing
-    let rs = font::init();
-    match font::init() {
-        Ok(_) => { trace!("frame_buffer text initialized."); },
-        Err(err) => { return Err(err); }
-    }    
+    font::init()?;
 
     // get a reference to the kernel's memory mapping information
     let kernel_mmi_ref = get_kernel_mmi_ref().expect("KERNEL_MMI was not yet initialized!");
     let mut kernel_mmi_locked = kernel_mmi_ref.lock();
+    let pages = allocate_pages_by_bytes(VESA_DISPLAY_PHYS_SIZE).ok_or("couldn't allocate framebuffer pages")?;
+    let vesa_display_flags = EntryFlags::PRESENT | EntryFlags::WRITABLE | EntryFlags::GLOBAL | EntryFlags::NO_CACHE;
+    let allocator = FRAME_ALLOCATOR.try().ok_or("Couldn't get frame allocator")?;
+    let mapped_frame_buffer = kernel_mmi_locked.page_table.map_allocated_pages_to(
+        pages, 
+        FrameRange::from_phys_addr(VESA_DISPLAY_PHYS_START, VESA_DISPLAY_PHYS_SIZE), 
+        vesa_display_flags, 
+        allocator.lock().deref_mut()
+    )?;
 
-    // destructure the kernel's MMI so we can access its page table
-    let MemoryManagementInfo { 
-        page_table: ref mut kernel_page_table, 
-        .. // don't need to access other stuff in kernel_mmi
-    } = *kernel_mmi_locked;
-    
-    match kernel_page_table {
-        &mut PageTable::Active(ref mut active_table) => {
-            let pages = match allocate_pages_by_bytes(VESA_DISPLAY_PHYS_SIZE) {
-                Some(pages) => { pages },
-                None => { return Err("frame_buffer::init() couldn't allocate pages."); }
-            };
-            
-            let vesa_display_flags = EntryFlags::PRESENT | EntryFlags::WRITABLE | EntryFlags::GLOBAL | EntryFlags::NO_CACHE;
-            let allocator_mutex = FRAME_ALLOCATOR.try();
-            match allocator_mutex {
-                Some(_) => { },
-                None => { return Err("framebuffer::init() couldn't get frame allocator"); }
-            }
-
-            let mut allocator = try!(allocator_mutex.ok_or("allocate frame buffer")).lock();
-            let mut mapped_frame_buffer = try!(active_table.map_allocated_pages_to(
-                pages, 
-                Frame::range_inclusive_addr(VESA_DISPLAY_PHYS_START, VESA_DISPLAY_PHYS_SIZE), 
-                vesa_display_flags, 
-                allocator.deref_mut())
-            );
-
-            FRAME_DRAWER.lock().set_mode_info(BUFFER_WIDTH, BUFFER_HEIGHT, mapped_frame_buffer);
-
-            Ok(())
-        }
-        _ => { 
-            return Err("framebuffer::init() Couldn't get kernel's active_table");
-        }
-    }
+    FRAME_DRAWER.lock().set_mode_info(BUFFER_WIDTH, BUFFER_HEIGHT, mapped_frame_buffer);
+    Ok(())
 }
 
 // Window manager uses this drawer to draw/print to the screen
@@ -148,15 +112,6 @@ pub struct Drawer {
 }
 
 impl Drawer {
-    /*unsafe fn set_background(&mut self, offset:usize, len:usize, color:u32) {
-        asm!("cld
-            rep stosd"
-            :
-            : "{rdi}"(self.start_address + offset), "{eax}"(color), "{rcx}"(len)
-            : "cc", "memory", "rdi", "rcx"
-            : "intel", "volatile");
-    }*/
-
     // set the graphic mode information of the buffer
     fn set_mode_info(&mut self, width:usize, height:usize, pages:MappedPages) {
         self.width = width;
@@ -174,7 +129,7 @@ impl Drawer {
         let buffer;
         match self.buffer() {
             Ok(rs) => {buffer = rs;},
-            Err(err) => { debug!("Fail to get frame buffer"); return; },
+            Err(err) => { error!("Failed to get frame buffer: {}", err); return; },
         }
         buffer[index(x, y)] = color;
     }
@@ -189,7 +144,7 @@ impl Drawer {
         match self.buffer() {
             Ok(rs) => {buffer = rs;},
             Err(err) => {
-                debug!("Fail to get frame buffer"); return;},
+                error!("Failed to get frame buffer: {}", err); return;},
         }
 
         if width.abs() > height.abs() {
@@ -235,7 +190,7 @@ impl Drawer {
         let buffer;
         match self.buffer() {
             Ok(rs) => {buffer = rs;},
-            Err(err) => { debug!("Fail to get frame buffer"); return;},
+            Err(err) => { error!("Fail to get frame buffer: {}", err); return;},
         }
   
         let mut x = start_x;
@@ -273,7 +228,7 @@ impl Drawer {
         let buffer;
         match self.buffer() {
             Ok(rs) => {buffer = rs;},
-            Err(err) => { debug!("Fail to get frame buffer"); return;},
+            Err(err) => { error!("Fail to get frame buffer: {}", err); return;},
         }
         
         loop {

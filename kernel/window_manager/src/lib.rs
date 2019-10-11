@@ -16,7 +16,6 @@
 //! The WINDOW_ALLOCATOR is used by the WindowManager itself to track and modify the existing windows
 
 #![no_std]
-#![feature(alloc)]
 #![feature(const_fn)]
 #![feature(asm)]
 
@@ -117,12 +116,12 @@ pub fn switch() -> Result<(), &'static str> {
 }
 
 /// delete a window object
-pub fn delete(window:WindowObj) -> Result<(), &'static str> {
+pub fn delete(window: &WindowObj) -> Result<(), &'static str> {
     let mut allocator = try!(WINDOW_ALLOCATOR.try().ok_or("The window allocator is not initialized")).lock();
     // Switches to a new active window and sets 
     // the active pointer field of the window allocator to the new active window
     allocator.switch(); 
-    allocator.delete(&(window.inner));
+    allocator.delete(&window.inner);
     Ok(())
 }
 
@@ -621,36 +620,3 @@ pub fn adjust_windows_before_addition() -> Result<(usize, usize, usize), &'stati
 }
 
 */
-
-
-//Test functions for performance evaluation
-/*pub fn set_time_start() {
-    let hpet_lock = get_hpet();
-    unsafe { STARTING_TIME = hpet_lock.as_ref().unwrap().get_counter(); }   
-}
-
-pub fn calculate_time_statistic() {
-    let statistic = STATISTIC.call_once(|| {
-        Mutex::new(Vec::new())
-    });
-
-  unsafe{
-
-    let hpet_lock = get_hpet();
-    let end_time = hpet_lock.as_ref().unwrap().get_counter();  
-
-   
-    let mut queue = statistic.lock();
-    queue.push(end_time - STARTING_TIME);
-
-    STARTING_TIME = 0;
-
-    COUNTER  = COUNTER+1;
-
-    if COUNTER == 1000 {
-        for i in 0..queue.len(){
-            trace!("Time\t{}", queue.pop().unwrap());
-        }
-        COUNTER = 0;
-    }
-}*/

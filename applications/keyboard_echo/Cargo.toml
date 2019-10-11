@@ -1,0 +1,24 @@
+[package]
+name = "keyboard_echo"
+version = "0.1.0"
+authors = ["Zhiyao Ma <zm16@pku.edu.cn>"]
+build = "../../build.rs"
+
+[dependencies]
+core_io = "0.1"
+
+[dependencies.scheduler]
+path = "../../kernel/scheduler"
+
+[dependencies.app_io]
+path = "../app_io"
+
+[dependencies.log]
+default-features = false
+version = "0.3.7"
+
+[dependencies.keycodes_ascii]
+path = "../../libs/keycodes_ascii"
+
+[lib]
+crate-type = ["rlib"]

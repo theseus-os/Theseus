@@ -1,7 +1,7 @@
 #![no_std]
-#![feature(alloc)]
 #![feature(rustc_private)]
 #![feature(slice_concat_ext)]
+#![feature(const_fn)]
 
 #[macro_use] extern crate alloc;
 #[macro_use] extern crate log;
@@ -13,6 +13,7 @@ extern crate multiboot2;
 extern crate kernel_config;
 extern crate goblin;
 extern crate util;
+extern crate crate_name_utils;
 extern crate rustc_demangle;
 extern crate owning_ref;
 extern crate cow_arc;
@@ -24,9 +25,9 @@ extern crate fs_node;
 extern crate path;
 extern crate memfs;
 extern crate hpet;
+extern crate cstr_core;
 
-
-use core::ops::{DerefMut, Deref};
+use core::ops::{DerefMut, Deref, Range};
 use alloc::{
     vec::Vec,
     collections::{BTreeMap, btree_map, BTreeSet},
@@ -43,7 +44,7 @@ use xmas_elf::{
 use goblin::elf::reloc::*;
 
 use util::round_up_power_of_two;
-use memory::{MmiRef, FRAME_ALLOCATOR, MemoryManagementInfo, Frame, PageTable, VirtualAddress, PhysicalAddress, MappedPages, EntryFlags, allocate_pages_by_bytes};
+use memory::{MmiRef, FRAME_ALLOCATOR, MemoryManagementInfo, FrameRange, VirtualAddress, PhysicalAddress, MappedPages, EntryFlags, allocate_pages_by_bytes};
 use multiboot2::BootInformation;
 use metadata::{StrongCrateRef, WeakSectionRef};
 use cow_arc::CowArc;
@@ -54,6 +55,7 @@ use fs_node::{FileOrDir, File, FileRef, DirRef};
 use vfs_node::VFSDirectory;
 use path::Path;
 use memfs::MemFile;
+use crate_name_utils::{get_containing_crate_name, replace_containing_crate_name};
 
 
 pub mod elf_executable;
@@ -67,60 +69,39 @@ use self::dependency::*;
 
 /// The name of the directory that contains all of the CrateNamespace files.
 pub const NAMESPACES_DIRECTORY_NAME: &'static str = "namespaces";
-/// The name of the default CrateNamespace, also the name of its directory.
-pub const DEFAULT_NAMESPACE_NAME: &'static str = "default";
-/// The name of the directory in each namespace directory that contains kernel crates.
-pub const KERNEL_CRATES_DIRECTORY_NAME: &'static str = "kernel";
-/// The name of the directory in each namespace directory that contains application crates.
-pub const APPLICATION_CRATES_DIRECTORY_NAME: &'static str = "applications";
-/// The name of the directory in each namespace directory that contains userspace files.
-pub const USERSPACE_FILES_DIRECTORY_NAME: &'static str = "userspace";
 
+/// The initial `CrateNamespace` that all kernel crates are added to by default.
+static DEFAULT_CRATE_NAMESPACE: Once<Arc<CrateNamespace>> = Once::new();
 
-/// The initial `CrateNamespace` that all crates are added to by default,
-/// unless otherwise specified for crate swapping purposes.
-static DEFAULT_CRATE_NAMESPACE: Once<CrateNamespace> = Once::new();
-
-/// Returns a reference to the default namespace, which will always exist. 
+/// Returns a reference to the default namespace, which must exist 
+/// because it contains the initially-loaded kernel crates. 
 /// Returns None if the default namespace hasn't yet been initialized.
-pub fn get_default_namespace() -> Option<&'static CrateNamespace> {
+pub fn get_default_namespace() -> Option<&'static Arc<CrateNamespace>> {
     DEFAULT_CRATE_NAMESPACE.try()
 }
 
 /// Returns the top-level directory that contains all of the namespaces. 
 pub fn get_namespaces_directory() -> Option<DirRef> {
-    match root::get_root().lock().get(NAMESPACES_DIRECTORY_NAME) {
-        Some(FileOrDir::Dir(dir)) => Some(dir),
-        _ => None,
-    }
+    root::get_root().lock().get_dir(NAMESPACES_DIRECTORY_NAME)
 }
 
 
-/// This should be a const, but Rust doesn't like OR-ing bitflags as a const expression.
-#[allow(non_snake_case)]
-pub fn TEXT_SECTION_FLAGS() -> EntryFlags {
-    EntryFlags::PRESENT
-}
-/// This should be a const, but Rust doesn't like OR-ing bitflags as a const expression.
-#[allow(non_snake_case)]
-pub fn RODATA_SECTION_FLAGS() -> EntryFlags {
-    EntryFlags::PRESENT | EntryFlags::NO_EXECUTE
-}
-/// This should be a const, but Rust doesn't like OR-ing bitflags as a const expression.
-#[allow(non_snake_case)]
-pub fn DATA_BSS_SECTION_FLAGS() -> EntryFlags {
-    EntryFlags::PRESENT | EntryFlags::NO_EXECUTE | EntryFlags::WRITABLE
-}
+/// `.text` sections are read-only and executable.
+const TEXT_SECTION_FLAGS:     EntryFlags = EntryFlags::PRESENT;
+/// `.rodata` sections are read-only and non-executable.
+const RODATA_SECTION_FLAGS:   EntryFlags = EntryFlags::from_bits_truncate(EntryFlags::PRESENT.bits() | EntryFlags::NO_EXECUTE.bits());
+/// `.data` and `.bss` sections are read-write and non-executable.
+const DATA_BSS_SECTION_FLAGS: EntryFlags = EntryFlags::from_bits_truncate(EntryFlags::PRESENT.bits() | EntryFlags::NO_EXECUTE.bits() | EntryFlags::WRITABLE.bits());
 
 
-
-/// Initializes the module management system based on the bootloader-provided modules, and
-/// creates and returns the default `CrateNamespace`.
-pub fn init(boot_info: &BootInformation, kernel_mmi: &mut MemoryManagementInfo) -> Result<&'static CrateNamespace, &'static str> {
-    let (_namespaces_dir, default_dirs) = parse_bootloader_modules_into_files(boot_info, kernel_mmi)?;
-    // create the default CrateNamespace based on the default namespace directory set
-    let default_namespace = CrateNamespace::new(DEFAULT_NAMESPACE_NAME.to_string(), default_dirs);
-    Ok(DEFAULT_CRATE_NAMESPACE.call_once(|| default_namespace))
+/// Initializes the module management system based on the bootloader-provided modules, 
+/// and creates and returns the default `CrateNamespace` for kernel crates.
+pub fn init(boot_info: &BootInformation, kernel_mmi: &mut MemoryManagementInfo) -> Result<&'static Arc<CrateNamespace>, &'static str> {
+    let (_namespaces_dir, default_kernel_namespace_dir) = parse_bootloader_modules_into_files(boot_info, kernel_mmi)?;
+    // Create the default CrateNamespace for kernel crates.
+    let name = default_kernel_namespace_dir.lock().get_name();
+    let default_namespace = CrateNamespace::new(name, default_kernel_namespace_dir, None);
+    Ok(DEFAULT_CRATE_NAMESPACE.call_once(|| Arc::new(default_namespace)))
 }
 
 
@@ -129,69 +110,59 @@ pub fn init(boot_info: &BootInformation, kernel_mmi: &mut MemoryManagementInfo) 
 /// This function does not create any namespaces, it just populates the files and directories
 /// such that namespaces can be created based on those files.
 /// 
-/// Returns a tuple of the top-level root "namespaces" directory that contains the base directories of all other namespaces 
+/// Returns a tuple of: 
+/// * the top-level root "namespaces" directory that contains all other namespace directories,
+/// * the directory of the default kernel crate namespace.
 fn parse_bootloader_modules_into_files(
     boot_info: &BootInformation, 
     kernel_mmi: &mut MemoryManagementInfo
-) -> Result<(DirRef, NamespaceDirectorySet), &'static str> {
+) -> Result<(DirRef, NamespaceDir), &'static str> {
 
-    // create the top-leve directory to hold all default namespaces
+    // create the top-level directory to hold all default namespaces
     let namespaces_dir = VFSDirectory::new(NAMESPACES_DIRECTORY_NAME.to_string(), root::get_root())?;
 
-    // a map that associates a prefix string (e.g., "sse" in "ksse#crate.o") to a set of namespace directories
-    let mut prefix_map: BTreeMap<String, NamespaceDirectorySet> = BTreeMap::new();
+    // a map that associates a prefix string (e.g., "sse" in "ksse#crate.o") to a namespace directory of object files 
+    let mut prefix_map: BTreeMap<String, NamespaceDir> = BTreeMap::new();
 
     let fa = FRAME_ALLOCATOR.try().ok_or("Couldn't get Frame Allocator")?;
-    if let PageTable::Active(ref mut active_table) = kernel_mmi.page_table {
 
-        // Closure to create the set of directories for a new namespace, returns the newly-created base directory. 
-        let create_dirs = |prefix: &str| -> Result<NamespaceDirectorySet, &'static str> {
-            let base_dir = VFSDirectory::new(prefix.to_string(), &namespaces_dir)?;
-            NamespaceDirectorySet::new(base_dir)
+    // Closure to create the directory for a new namespace.
+    let create_dir = |dir_name: &str| -> Result<NamespaceDir, &'static str> {
+        VFSDirectory::new(dir_name.to_string(), &namespaces_dir).map(|d| NamespaceDir(d))
+    };
+
+    for m in boot_info.module_tags() {
+        let size_in_bytes = (m.end_address() - m.start_address()) as usize;
+        let frames = FrameRange::from_phys_addr(PhysicalAddress::new(m.start_address() as usize)?, size_in_bytes);
+        let (crate_type, prefix, file_name) = CrateType::from_module_name(m.name())?;
+        let dir_name = format!("{}{}", prefix, crate_type.namespace_name());
+        let name = String::from(file_name);
+
+        let pages = allocate_pages_by_bytes(size_in_bytes).ok_or("Couldn't allocate virtual pages for bootloader module area")?;
+        let mp = kernel_mmi.page_table.map_allocated_pages_to(
+            pages, 
+            frames, 
+            EntryFlags::PRESENT, // we never need to write to bootloader-provided modules
+            fa.lock().deref_mut()
+        )?;
+
+        // debug!("Module: {:?}, size {}, mp: {:?}", name, size_in_bytes, mp);
+
+        let create_file = |dir: &DirRef| {
+            MemFile::from_mapped_pages(mp, name, size_in_bytes, dir)
         };
 
-        for m in boot_info.module_tags() {
-            let size_in_bytes = (m.end_address() - m.start_address()) as usize;
-            let frames = Frame::range_inclusive_addr(m.start_address() as PhysicalAddress, size_in_bytes);
-            let (crate_type, prefix, file_name) = CrateType::from_module_name(m.name())?;
-            let prefix = if prefix == "" { DEFAULT_NAMESPACE_NAME } else { prefix };
-            let name = String::from(file_name);
-
-            let pages = allocate_pages_by_bytes(size_in_bytes).ok_or("Couldn't allocate virtual pages for bootloader module area")?;
-            let mp = active_table.map_allocated_pages_to(
-                pages, 
-                frames, 
-                EntryFlags::PRESENT, // we never need to write to bootloader-provided modules
-                fa.lock().deref_mut()
-            )?;
-
-            // debug!("Module: {:?}, size {}, mp: {:?}", name, size_in_bytes, mp);
-
-            let create_file = |dirs: &NamespaceDirectorySet| {
-                let parent_dir = match crate_type { 
-                    CrateType::Kernel      => &dirs.kernel,
-                    CrateType::Application => &dirs.app,
-                    CrateType::Userspace   => &dirs.user,
-                };
-                MemFile::from_mapped_pages(mp, name, size_in_bytes, parent_dir)
-            };
-
-            // get the set of directories corresponding to the given prefix, or create it. 
-            let _new_file = match prefix_map.entry(prefix.to_string()) {
-                btree_map::Entry::Vacant(vacant) => create_file( vacant.insert(create_dirs(prefix)?) )?,
-                btree_map::Entry::Occupied(occ)  => create_file( occ.get() )?,
-            };
-        }
-    }
-    else {
-        return Err("Couldn't get kernel's ActivePageTable to parse and map bootloader modules");
+        // Get the existing (or create a new) namespace directory corresponding to the given directory name.
+        let _new_file = match prefix_map.entry(dir_name.clone()) {
+            btree_map::Entry::Vacant(vacant) => create_file( vacant.insert(create_dir(&dir_name)?) )?,
+            btree_map::Entry::Occupied(occ)  => create_file( occ.get() )?,
+        };
     }
 
     debug!("Created namespace directories: {:?}", prefix_map.keys().map(|s| &**s).collect::<Vec<&str>>().join(", "));
-
     Ok((
         namespaces_dir,
-        prefix_map.remove(DEFAULT_NAMESPACE_NAME).ok_or("BUG: no default namespace found")?,
+        prefix_map.remove(CrateType::Kernel.namespace_name()).ok_or("BUG: no default namespace found")?,
     ))
 }
 
@@ -271,96 +242,73 @@ pub type SymbolMap = Trie<BString, WeakSectionRef>;
 pub type SymbolMapIter<'a> = qp_trie::Iter<'a, &'a BString, &'a WeakSectionRef>;
 
 
-/// The set of directories that exist in each `CrateNamespace`. 
-#[derive(Clone)]
-pub struct NamespaceDirectorySet {
-    /// The `base` directory is the parent of the other directories,
-    /// and is generally found within the top-level namespaces directory.
-    base:   DirRef,
-    /// The directory that contains all kernel crate object files.
-    kernel: DirRef,
-    /// The directory that contains all application crate object files.
-    app:    DirRef,
-    /// The directory that contains all userspace object files.
-    user:   DirRef,
-    /// To ensure that no one accidentally constructs this object without using the `new()` fn.
-    _p:     core::marker::PhantomData<usize>,
+/// A state transfer function is an arbitrary function called when swapping crates. 
+/// See [`swap_crates()`](fn.CrateNamespace.swap_crates.html).
+pub type StateTransferFunction = fn(&CrateNamespace, &CrateNamespace) -> Result<(), &'static str>;
+
+
+/// A wrapper around a `Directory` reference that offers special convenience functions
+/// for getting and inserting crate object files into a directory.  
+/// 
+/// Auto-derefs into a `DirRef`.
+#[derive(Clone)] 
+pub struct NamespaceDir(DirRef);
+impl Deref for NamespaceDir {
+    type Target = DirRef;
+    fn deref(&self) -> &DirRef {
+        &self.0
+    }
 }
-impl NamespaceDirectorySet {
-    /// Create a new `NamespaceDirectorySet` with each directory 
-    pub fn new(base_dir: DirRef) -> Result<NamespaceDirectorySet, &'static str> {
-        let kernel = VFSDirectory::new(KERNEL_CRATES_DIRECTORY_NAME.to_string(),      &base_dir)?;
-        let app    = VFSDirectory::new(APPLICATION_CRATES_DIRECTORY_NAME.to_string(), &base_dir)?;
-        let user   = VFSDirectory::new(USERSPACE_FILES_DIRECTORY_NAME.to_string(),    &base_dir)?;
-        Ok(NamespaceDirectorySet {
-            base: base_dir, 
-            kernel, 
-            app, 
-            user, 
-            _p: core::marker::PhantomData 
-        })
+impl NamespaceDir {
+    /// Creates a new `NamespaceDir` that wraps the given `DirRef`.
+    pub fn new(dir: DirRef) -> NamespaceDir {
+        NamespaceDir(dir)
+    }    
+
+    /// Finds the single file in this directory whose name starts with the given `prefix`.
+    /// 
+    /// # Return
+    /// If a single file matches, then that file is returned. 
+    /// Otherwise, if no files or multiple files match, then `None` is returned.
+    pub fn get_file_starting_with(&self, prefix: &str) -> Option<FileRef> {
+        let mut matching_files = self.get_files_starting_with(prefix).into_iter();
+        matching_files.next()
+            .filter(|_| matching_files.next().is_none()) // ensure single element
     }
 
-    /// Creates a new `NamespaceDirectorySet` from existing directories 
-    pub fn from_existing_base_dir(base_dir: DirRef) -> Result<NamespaceDirectorySet, &'static str> {
-        let kernel_dir = match base_dir.lock().get(KERNEL_CRATES_DIRECTORY_NAME) {
-            Some(FileOrDir::Dir(d)) => d,
-            _ => return Err("couldn't find expected CrateNamespace kernel directory"),
-        };
-        let app_dir = match base_dir.lock().get(APPLICATION_CRATES_DIRECTORY_NAME) {
-            Some(FileOrDir::Dir(d)) => d,
-            _ => return Err("couldn't find expected CrateNamespace applications directory"),
-        };
-        let user_dir = match base_dir.lock().get(USERSPACE_FILES_DIRECTORY_NAME) {
-            Some(FileOrDir::Dir(d)) => d,
-            _ => return Err("couldn't find expected CrateNamespace userspace directory"),
-        };
-
-        Ok(NamespaceDirectorySet {
-            base: base_dir, 
-            kernel: kernel_dir, 
-            app: app_dir,
-            user: user_dir,
-            _p: core::marker::PhantomData 
-        })
+    /// Returns the list of files in this Directory whose name starts with the given `prefix`.
+    pub fn get_files_starting_with(&self, prefix: &str) -> Vec<FileRef> {
+        let children = { self.0.lock().list() };
+        children.into_iter().filter_map(|name| {
+            if name.starts_with(prefix) {
+                self.0.lock().get_file(&name)
+            } else {
+                None
+            }
+        }).collect()
     }
 
-    
+    /// Returns the list of file and directory names in this Directory whose name start with the given `prefix`.
+    pub fn get_file_and_dir_names_starting_with(&self, prefix: &str) -> Vec<String> {
+        let children = { self.0.lock().list() };
+        children.into_iter()
+            .filter(|name| name.starts_with(prefix))
+            .collect()
+    }
+
     /// Gets the given object file based on its crate name prefix. 
     /// 
     /// # Arguments
     /// * `crate_object_file_name`: the name of the object file to be returned, 
-    ///    with a preceding `CrateType` prefix.
+    ///    with or without a preceding `CrateType` prefix.
     /// 
     /// # Examples 
-    /// * The name "k#keyboard-36be916209949cef.o" will look for and return the file "./kernel/keyboard-36be916209949cef.o". 
-    /// * The name "a#ps.o" will look for and return the file "./applications/ps.o". 
+    /// * The name "k#keyboard-36be916209949cef.o" will look for and return the file "keyboard-36be916209949cef.o".
+    /// * The name "keyboard-36be916209949cef.o" will look for and return the file "keyboard-36be916209949cef.o".
+    /// * The name "a#ps.o" will look for and return the file "ps.o".
     pub fn get_crate_object_file(&self, crate_object_file_name: &str) -> Option<FileRef> {
-        let (crate_type, _prefix, objfilename) = CrateType::from_module_name(crate_object_file_name).ok()?;
-        let dest_dir = match crate_type {
-            CrateType::Kernel      => &self.kernel,
-            CrateType::Application => &self.app,
-            CrateType::Userspace   => &self.user,
-        };
-        match dest_dir.lock().get(objfilename) { 
-            Some(FileOrDir::File(f)) => Some(f),
-            _ => None,
-        }
-    }
-
-    /// Gets the kernel crate file by searching the kernel directory only. 
-    /// 
-    /// # Arguments
-    /// * `crate_file_name`: the name of the kernel crate file, e.g., 
-    ///   "keyboard-36be916209949cef" or "keyboard-36be916209949cef.o".
-    pub fn get_kernel_crate_file(&self, crate_file_name: &str) -> Option<FileRef> {
-        let kernel_dir = self.kernel.lock();
-        match kernel_dir.get(crate_file_name)
-            .or_else(|| kernel_dir.get(&format!("{}.o", crate_file_name))) // retry with the ".o" extension
-        { 
-            Some(FileOrDir::File(f)) => Some(f),
-            _ => None,
-        }
+        let (_crate_type, _prefix, objfilename) = CrateType::from_module_name(crate_object_file_name).ok()?;
+        self.0.lock().get_file(objfilename)
     }
 
     /// Insert the given crate object file based on its crate type prefix. 
@@ -368,66 +316,42 @@ impl NamespaceDirectorySet {
     /// # Arguments
     /// * `crate_object_file_name`: the name of the object file to be inserted, 
     ///    with a preceding `CrateType` prefix.
-    /// * `content`: the bytes that will be writte into the file.
+    /// * `content`: the bytes that will be written into the file.
     /// 
     /// # Examples 
-    /// * The file "k#keyboard-36be916209949cef.o" will be placed into "./kernel/keyboard-36be916209949cef.o". 
-    /// * The file "a#ps.o" will be placed into "./applications/ps.o". 
+    /// * The file "k#keyboard-36be916209949cef.o" will be written to "./keyboard-36be916209949cef.o". 
+    /// * The file "a#ps.o" will be placed into "./ps.o". 
     pub fn insert_crate_object_file(&self, crate_object_file_name: &str, content: &[u8]) -> Result<FileRef, &'static str> {
-        let (crate_type, _prefix, objfilename) = CrateType::from_module_name(crate_object_file_name)?;
-        let dest_dir = match crate_type {
-            CrateType::Kernel      => &self.kernel,
-            CrateType::Application => &self.app,
-            CrateType::Userspace   => &self.user,
-        };
-        let cfile = MemFile::new(String::from(objfilename), dest_dir)?;
+        let (_crate_type, _prefix, objfilename) = CrateType::from_module_name(crate_object_file_name)?;
+        let cfile = MemFile::new(String::from(objfilename), &self.0)?;
         cfile.lock().write(content, 0)?;
         Ok(cfile)
     }
-
-    /// Returns a reference to the base directory.
-    pub fn base_directory(&self) -> &DirRef {
-        &self.base
-    }
-
-    /// Returns a reference to the directory of kernel crates.
-    pub fn kernel_directory(&self) -> &DirRef {
-        &self.kernel
-    }
-
-    /// Returns a reference to the directory of application crates.
-    pub fn applications_directory(&self) -> &DirRef {
-        &self.app
-    }
-
-    /// Returns a reference to the directory of userspace programs.
-    pub fn userspace_directory(&self) -> &DirRef {
-        &self.user
-    }
 }
-
-
-/// A state transfer function is an arbitrary function called when swapping crates. 
-/// See [`swap_crates()`](fn.CrateNamespace.swap_crates.html).
-pub type StateTransferFunction = fn(&CrateNamespace, &CrateNamespace) -> Result<(), &'static str>;
 
 
 /// This struct represents a namespace of crates and their "global" (publicly-visible) symbols.
 /// A crate namespace struct is basically a container around many crates 
 /// that have all been loaded and linked against each other, 
 /// completely separate and in isolation from any other crate namespace 
-/// (although a given crate may be present in multiple namespaces).
+/// (although a given crate may be shared across multiple namespaces).
 /// 
 /// Each `CrateNamespace` can be treated as a separate OS personality, 
 /// but are significantly more efficient than library OS-style personalities. 
+/// A `CrateNamespace` is also useful to create a process (task group) abstraction.
+/// 
+/// `CrateNamespace`s can also optionally be recursive. 
+/// For example, a namespace that holds just application crates and symbols 
+/// can recursively rely upon (link against) the crates and symbols in a lower-level namespace
+/// that contains kernel crates and symbols. 
 pub struct CrateNamespace {
     /// An identifier for this namespace, just for convenience.
     pub name: String,
 
-    /// The directories owned by this namespace. 
+    /// The directory containing all crate object files owned by this namespace. 
     /// When this namespace is looking for a missing symbol or crate,
-    /// its search space is bounded by the crates contained in these directory.
-    dirs: NamespaceDirectorySet,
+    /// it searches in this directory first.
+    dir: NamespaceDir,
 
     /// The list of all the crates loaded into this namespace,
     /// stored as a map in which the crate's String name
@@ -444,6 +368,12 @@ pub struct CrateNamespace {
     /// which is guaranteed to be part of one of the crates in this `CrateNamespace`.  
     /// Symbols declared as "no_mangle" will appear in the map with no crate prefix, as expected.
     symbol_map: Mutex<SymbolMap>,
+
+    /// The `CrateNamespace` that lies below this namespace, and can also be used by this namespace
+    /// to resolve symbols and load crates that are relied on by other crates in this namespace.
+    /// So, for example, if this namespace contains a set of application crates,
+    /// its `recursive_namespace` could contain the set of kernel crates that these application crates rely on.
+    recursive_namespace: Option<Arc<CrateNamespace>>,
 
     /// The set of crates that have been previously unloaded (e.g., swapped out) from this namespace. 
     /// These are kept in memory as a performance optimization, such that if 
@@ -473,11 +403,14 @@ impl CrateNamespace {
     /// Creates a new `CrateNamespace` that is completely empty (no loaded crates).
     /// # Arguments
     /// * `name`: the name of this `CrateNamespace`, used only for convenience purposes.
-    /// * `dirs`: the set of directories crate object files for this namespace.
-    pub fn new(name: String, dirs: NamespaceDirectorySet) -> CrateNamespace {
+    /// * `dir`: the directory of crate object files for this namespace.
+    /// * `recursive_namespace`: another `CrateNamespace` that can optionally be used 
+    ///    to recursively resolve missing crates/symbols. 
+    pub fn new(name: String, dir: NamespaceDir, recursive_namespace: Option<Arc<CrateNamespace>>) -> CrateNamespace {
         CrateNamespace {
-            name: name,
-            dirs: dirs,
+            name,
+            dir,
+            recursive_namespace,
             crate_tree: Mutex::new(Trie::new()),
             symbol_map: Mutex::new(SymbolMap::new()),
             unloaded_crate_cache: Mutex::new(HashMap::new()),
@@ -485,10 +418,15 @@ impl CrateNamespace {
         }
     } 
 
-    /// Returns the set of directories that this `CrateNamespace` is based on,
-    /// which include its subdirectories of crate object files.
-    pub fn dirs(&self) -> &NamespaceDirectorySet {
-        &self.dirs
+    /// Returns the directory that this `CrateNamespace` is based on.
+    pub fn dir(&self) -> &NamespaceDir {
+        &self.dir
+    }
+
+    /// Returns the recursive namespace that this `CrateNamespace` is built atop,
+    /// if one exists.
+    pub fn recursive_namespace(&self) -> Option<&Arc<CrateNamespace>> {
+        self.recursive_namespace.as_ref()
     }
 
     pub fn enable_fuzzy_symbol_matching(&mut self) {
@@ -499,35 +437,63 @@ impl CrateNamespace {
         self.fuzzy_symbol_matching = false;
     }
 
-    /// Returns a list of all of the crate names currently loaded into this `CrateNamespace`.
+    /// Returns a list of all of the crate names currently loaded into this `CrateNamespace`,
+    /// including all crates in any recursive namespaces as well if `recursive` is `true`.
     /// This is a slow method mostly for debugging, since it allocates new Strings for each crate name.
-    pub fn crate_names(&self) -> Vec<String> {
-        self.crate_tree.lock().keys().map(|bstring| String::from(bstring.as_str())).collect()
+    pub fn crate_names(&self, recursive: bool) -> Vec<String> {
+        let mut crates: Vec<String> = self.crate_tree.lock().keys().map(|bstring| String::from(bstring.as_str())).collect();
+
+        if recursive {
+            if let Some(mut crates_recursive) = self.recursive_namespace.as_ref().map(|r_ns| r_ns.crate_names(recursive)) {
+                crates.append(&mut crates_recursive);
+            }
+        }
+        crates
     }
 
-
     /// Iterates over all crates in this namespace and calls the given function `f` on each crate.
-    /// The function `f` is called with two arguments: the name of the crate, and a reference to the crate. 
-    pub fn crate_iter<F: Fn(&str, &StrongCrateRef)>(&self, f: F) {
+    /// If `recursive` is true, crates in recursive namespaces are included in the iteration as well.
+    /// 
+    /// The function `f` is called with two arguments: the name of the crate, and a reference to the crate.
+    /// The function `f` must return a boolean value that indicates whether to continue iterating; 
+    /// if `true`, the iteration will continue, if `false`, the iteration will stop. 
+    pub fn for_each_crate<F>(
+        &self,
+        recursive: bool,
+        mut f: F
+    ) where F: FnMut(&str, &StrongCrateRef) -> bool {
         for (crate_name, crate_ref) in self.crate_tree.lock().iter() {
-            f(crate_name.as_str(), crate_ref);
+            let keep_going = f(crate_name.as_str(), crate_ref);
+            if !keep_going {
+                return;
+            }
+        }
+
+        if recursive {
+            if let Some(ref r_ns) = self.recursive_namespace {
+                r_ns.for_each_crate(recursive, f);
+            }
         }
     }
 
-    /// Acquires the lock on this `CrateNamespace`'s crate list and looks for the crate 
+    /// Acquires the lock on this `CrateNamespace`'s crate list and returns the crate 
     /// that matches the given `crate_name`, if it exists in this namespace.
+    /// If it does not exist in this namespace, then the recursive namespace is searched as well.
     /// 
     /// Returns a `StrongCrateReference` that **has not** been marked as a shared crate reference,
     /// so if the caller wants to keep the returned `StrongCrateRef` as a shared crate 
     /// that jointly exists in another namespace, they should invoke the 
     /// [`CowArc::share()`](cow_arc/CowArc.share.html) function on the returned value.
     pub fn get_crate(&self, crate_name: &str) -> Option<StrongCrateRef> {
-        self.crate_tree.lock().get_str(crate_name).map(|r| CowArc::clone_shallow(r))
+        self.crate_tree.lock().get_str(crate_name)
+            .map(|c| CowArc::clone_shallow(c))
+            .or_else(|| self.recursive_namespace.as_ref().and_then(|r_ns| r_ns.get_crate(crate_name)))
     }
 
-    /// Finds the `LoadedCrate` that corresponds to the given crate_name_prefix,
+    /// Finds the `LoadedCrate` that corresponds to the given `crate_name_prefix`,
     /// *if and only if* the list of `LoadedCrate`s only contains a single possible match,
     /// and returns a tuple of the crate's name and a reference to the crate.
+    /// If it does not exist in this namespace, then the recursive namespace is searched as well.
     /// 
     /// # Important Usage Note
     /// To avoid greedily matching more crates than expected, you may wish to end the `crate_name_prefix` with "`-`".
@@ -542,11 +508,18 @@ impl CrateNamespace {
     ///   To match only `my_crate`, call this function as `get_crate_starting_with("my_crate-")`
     ///   (note the trailing "`-`").
     pub fn get_crate_starting_with(&self, crate_name_prefix: &str) -> Option<(String, StrongCrateRef)> { 
+        // First, we see if there's a single matching crate in this namespace. 
         let crates = self.crate_tree.lock();
         let mut iter = crates.iter_prefix_str(crate_name_prefix);
-        iter.next()
+        let crate_in_this_namespace = iter.next()
             .filter(|_| iter.next().is_none()) // ensure single element
-            .map(|(key, val)| (key.clone().into(), val.clone()))
+            .map(|(key, val)| (key.clone().into(), val.clone()));
+
+        // Second, we see if there's a single matching crate in the recursive namespace.
+        let crate_in_recursive_namespace = self.recursive_namespace().as_ref().and_then(|r_ns| r_ns.get_crate_starting_with(crate_name_prefix));
+
+        // There can only be one matching crate across all recursive namespaces.
+        crate_in_this_namespace.xor(crate_in_recursive_namespace) 
     }
 
 
@@ -559,7 +532,7 @@ impl CrateNamespace {
     ///   allowing it to be loaded again in the future as a totally separate instance.
     /// 
     /// Returns a Result containing the new crate itself.
-    pub fn load_application_crate(
+    pub fn load_crate_as_application(
         &self, 
         crate_file_path: &Path, 
         kernel_mmi_ref: &MmiRef, 
@@ -567,18 +540,10 @@ impl CrateNamespace {
         verbose_log: bool
     ) -> Result<StrongCrateRef, &'static str> {
         
-        debug!("load_application_crate: trying to load application crate {:?}", crate_file_path);
-        let crate_file_ref = match crate_file_path.get(&self.dirs.app)
-            .or_else(|| Path::new(format!("{}.o", crate_file_path)).get(&self.dirs.app)) // retry with the ".o" extension
-        {
-            Some(FileOrDir::File(f)) => f,
-            _ => return Err("couldn't find specified application crate file path"),
-        };
-        let crate_file = crate_file_ref.lock();
-        let (new_crate_ref, elf_file) = self.load_crate_sections(crate_file.deref(), kernel_mmi_ref, verbose_log)?;
-        
-        // no backup namespace when loading applications, they must be able to find all symbols in only this namespace (&self)
-        self.perform_relocations(&elf_file, &new_crate_ref, None, kernel_mmi_ref, verbose_log)?;
+        debug!("load_crate_as_application: trying to load application crate {:?}", crate_file_path);
+        // Don't use a backup namespace when loading applications, 
+        // it must be able to find all symbols in only this namespace (&self) and its backing namespaces.
+        let new_crate_ref = self.load_crate_internal(crate_file_path, None, kernel_mmi_ref, verbose_log)?;
 
         if load_symbols_as_singleton {
             // if this is a singleton application, we add its public symbols (except "main")
@@ -596,38 +561,31 @@ impl CrateNamespace {
     }
 
 
-    /// Loads the specified kernel crate into memory, allowing it to be invoked.  
+    /// Loads the specified crate into memory, allowing it to be invoked.  
     /// Returns a Result containing the number of symbols that were added to the symbol map
     /// as a result of loading this crate.
     /// 
     /// # Arguments
     /// * `crate_file_path`: the path to the crate object file that will be loaded into this `CrateNamespace`.
-    /// * `backup_namespace`: the `CrateNamespace` that should be searched for missing symbols 
+    /// * `temp_backup_namespace`: the `CrateNamespace` that should be searched for missing symbols 
     ///   (for relocations) if a symbol cannot be found in this `CrateNamespace`. 
     ///   For example, the default namespace could be used by passing in `Some(get_default_namespace())`.
-    ///   If `backup_namespace` is `None`, then no other namespace will be searched, 
+    ///   If `temp_backup_namespace` is `None`, then no other namespace will be searched, 
     ///   and any missing symbols will return an `Err`. 
     /// * `kernel_mmi_ref`: a mutable reference to the kernel's `MemoryManagementInfo`.
     /// * `verbose_log`: a boolean value whether to enable verbose_log logging of crate loading actions.
-    pub fn load_kernel_crate(
+    pub fn load_crate(
         &self,
         crate_file_path: &Path,
-        backup_namespace: Option<&CrateNamespace>, 
+        temp_backup_namespace: Option<&CrateNamespace>, 
         kernel_mmi_ref: &MmiRef, 
         verbose_log: bool
     ) -> Result<usize, &'static str> {
 
         #[cfg(not(loscd_eval))]
-        debug!("load_kernel_crate: trying to load kernel crate at {}", crate_file_path);
-        let crate_file_ref = match crate_file_path.get(&self.dirs.kernel)
-            .or_else(|| Path::new(format!("{}.o", crate_file_path)).get(&self.dirs.kernel)) // retry with the ".o" extension
-        {
-            Some(FileOrDir::File(f)) => f,
-            _ => return Err("couldn't find specified kernel crate file path"),
-        };
-        let crate_file = crate_file_ref.lock();
-        let (new_crate_ref, elf_file) = self.load_crate_sections(crate_file.deref(), kernel_mmi_ref, verbose_log)?;
-        self.perform_relocations(&elf_file, &new_crate_ref, backup_namespace, kernel_mmi_ref, verbose_log)?;
+        debug!("load_crate: trying to load crate {}", crate_file_path);
+        let new_crate_ref = self.load_crate_internal(crate_file_path, temp_backup_namespace, kernel_mmi_ref, verbose_log)?;
+        
         let (new_crate_name, new_syms) = {
             let new_crate = new_crate_ref.lock_as_ref();
             let new_syms = self.add_symbols(new_crate.sections.values(), verbose_log);
@@ -635,11 +593,32 @@ impl CrateNamespace {
         };
             
         #[cfg(not(loscd_eval))]
-        info!("loaded new kernel crate {:?}, {} new symbols.", new_crate_name, new_syms);
+        info!("loaded new crate {:?}, {} new symbols.", new_crate_name, new_syms);
         self.crate_tree.lock().insert(new_crate_name.into(), new_crate_ref);
         Ok(new_syms)
-        
-        // plc.temp_module_mapping is automatically unmapped when it falls out of scope here (frame allocator must not be locked)
+    }
+
+
+    /// The internal function that does the work for loading crates,
+    /// but does not add the crate nor its symbols to this namespace. 
+    /// See [`load_crate`](#method.load_crate) and [`load_crate_as_application`](#method.load_crate_as_application).
+    fn load_crate_internal(&self,
+        crate_file_path: &Path,
+        temp_backup_namespace: Option<&CrateNamespace>, 
+        kernel_mmi_ref: &MmiRef, 
+        verbose_log: bool
+    ) -> Result<StrongCrateRef, &'static str> {
+
+        let crate_file_ref = match crate_file_path.get(&self.dir)
+            .or_else(|| Path::new(format!("{}.o", crate_file_path)).get(&self.dir)) // retry with the ".o" extension
+        {
+            Some(FileOrDir::File(f)) => f,
+            _ => return Err("couldn't find specified crate file path"),
+        };
+        let crate_file = crate_file_ref.lock();
+        let (new_crate_ref, elf_file) = self.load_crate_sections(crate_file.deref(), kernel_mmi_ref, verbose_log)?;
+        self.perform_relocations(&elf_file, &new_crate_ref, temp_backup_namespace, kernel_mmi_ref, verbose_log)?;
+        Ok(new_crate_ref)
     }
 
     
@@ -652,10 +631,10 @@ impl CrateNamespace {
     /// # Example
     /// If crate `A` depends on crate `B`, and crate `B` depends on crate `A`,
     /// this function will load both crate `A` and `B` before trying to resolve their dependencies individually. 
-    pub fn load_kernel_crates<'p, I>(
+    pub fn load_crates<'p, I>(
         &self,
         crate_file_paths: I,
-        backup_namespace: Option<&CrateNamespace>,
+        temp_backup_namespace: Option<&CrateNamespace>,
         kernel_mmi_ref: &MmiRef,
         verbose_log: bool,
     ) -> Result<(), &'static str> 
@@ -664,11 +643,11 @@ impl CrateNamespace {
         // first, validate all of the crate paths by turning them into direct file references
         let mut crate_files: Vec<FileRef> = Vec::new();
         for crate_file_path in crate_file_paths {
-            let crate_file_ref: FileRef = match crate_file_path.get(&self.dirs.kernel) {
+            let crate_file_ref: FileRef = match crate_file_path.get(&self.dir) {
                 Some(FileOrDir::File(f)) => f,
                 _ => {
-                    error!("Couldn't find specified kernel crate file path: {:?}", crate_file_path);
-                    return Err("couldn't find specified kernel crate file path");
+                    error!("Couldn't find specified crate file path: {:?}", crate_file_path);
+                    return Err("couldn't find specified crate file path");
                 }
             };
             crate_files.push(crate_file_ref);
@@ -690,7 +669,7 @@ impl CrateNamespace {
         
         // finally, we do all of the relocations 
         for (new_crate_ref, elf_file) in partially_loaded_crates {
-            self.perform_relocations(&elf_file, &new_crate_ref, backup_namespace, kernel_mmi_ref, verbose_log)?;
+            self.perform_relocations(&elf_file, &new_crate_ref, temp_backup_namespace, kernel_mmi_ref, verbose_log)?;
             let name = new_crate_ref.lock_as_ref().crate_name.clone();
             self.crate_tree.lock().insert(name.into(), new_crate_ref);
         }
@@ -723,7 +702,8 @@ impl CrateNamespace {
     pub fn clone_on_write(&self) -> CrateNamespace {
         CrateNamespace {
             name: self.name.clone(),
-            dirs: self.dirs.clone(),
+            dir: self.dir.clone(),
+            recursive_namespace: self.recursive_namespace.clone(),
             crate_tree: Mutex::new(self.crate_tree.lock().clone()),
             symbol_map: Mutex::new(self.symbol_map.lock().clone()),
             unloaded_crate_cache: Mutex::new(HashMap::new()),
@@ -752,7 +732,7 @@ impl CrateNamespace {
     ///   as a single "atomic" procedure, which prevents weird linking/relocation errors, 
     ///   such as a new crate linking against an old crate that already exists in this namespace
     ///   instead of linking against the new one that we want to replace that old crate with. 
-    /// * `override_namespace_dirs`: the set of directories of object files from which missing crates should be loaded.
+    /// * `override_namespace_dir`: the directories of object files from which missing crates should be loaded.
     ///   If a crate cannot be found in this directory set, the current namespace's (self's) directory set 
     ///   will be searched for the crate. 
     ///   If `None`, only this `CrateNamespace`'s directory set will be used to find missing crates to be loaded.
@@ -785,15 +765,15 @@ impl CrateNamespace {
     pub fn swap_crates(
         &self,
         swap_requests: SwapRequestList,
-        override_namespace_dirs: Option<NamespaceDirectorySet>,
+        override_namespace_dir: Option<NamespaceDir>,
         state_transfer_functions: Vec<String>,
         kernel_mmi_ref: &MmiRef,
         verbose_log: bool,
     ) -> Result<(), &'static str> {
 
         #[cfg(not(loscd_eval))]
-        debug!("swap_crates()[0]: override dirs: {:?}\nswap_requests: {:?}", 
-            override_namespace_dirs.as_ref().map(|d| d.base_directory().lock().get_name()), 
+        debug!("swap_crates()[0]: override dir: {:?}\nswap_requests: {:?}", 
+            override_namespace_dir.as_ref().map(|d| d.lock().get_name()), 
             swap_requests
         );
 
@@ -809,7 +789,7 @@ impl CrateNamespace {
                 // First, before we perform any expensive crate loading, let's try an optimization
                 // based on cached crates that were unloaded during a previous swap operation. 
                 if let Some(cached_crates) = self.unloaded_crate_cache.lock().remove(&swap_requests) {
-                    warn!("Using optimized swap routine to swap in cached crates: {:?}", cached_crates.crate_names());
+                    warn!("Using optimized swap routine to swap in cached crates: {:?}", cached_crates.crate_names(true));
                     (cached_crates, true)
                 } else {
                     // If no optimization is possible (no cached crates exist for this swap request), 
@@ -817,10 +797,11 @@ impl CrateNamespace {
                     let nn = CrateNamespace::new(
                         String::from("temp_swap"), // format!("temp_swap--{:?}", swap_requests), 
                         // use the optionally-provided directory of crates instead of the current namespace's directories.
-                        override_namespace_dirs.unwrap_or_else(|| self.dirs().clone()),
+                        override_namespace_dir.unwrap_or_else(|| self.dir.clone()),
+                        None,
                     );
                     let crate_file_iter = swap_requests.iter().map(|swap_req| &swap_req.new_crate_object_file_abs_path);
-                    nn.load_kernel_crates(crate_file_iter, Some(self), kernel_mmi_ref, verbose_log)?;
+                    nn.load_crates(crate_file_iter, Some(self), kernel_mmi_ref, verbose_log)?;
                     (nn, false)
                 }
             }
@@ -828,10 +809,11 @@ impl CrateNamespace {
                 let nn = CrateNamespace::new(
                     String::from("temp_swap"), // format!("temp_swap--{:?}", swap_requests), 
                     // use the optionally-provided directory of crates instead of the current namespace's directories.
-                    override_namespace_dirs.unwrap_or_else(|| self.dirs().clone()),
+                    override_namespace_dirs.unwrap_or_else(|| self.dir.clone()),
+                    None,
                 );
                 let crate_file_iter = swap_requests.iter().map(|swap_req| &swap_req.new_crate_object_file_abs_path);
-                nn.load_kernel_crates(crate_file_iter, Some(self), kernel_mmi_ref, verbose_log)?;
+                nn.load_crates(crate_file_iter, Some(self), kernel_mmi_ref, verbose_log)?;
                 (nn, false)
             }
         };
@@ -844,7 +826,8 @@ impl CrateNamespace {
         #[cfg(not(loscd_eval))]
         let cached_crates: CrateNamespace = CrateNamespace::new(
             format!("cached_crates--{:?}", swap_requests), 
-            self.dirs.clone(),
+            self.dir.clone(),
+            None
         );
 
 
@@ -919,7 +902,7 @@ impl CrateNamespace {
 
                     #[cfg(not(loscd_eval))]
                     debug!("swap_crates(): old_sec_name: {:?}, old_sec: {:?}", old_sec_name, old_sec_ref);
-                    let mut old_sec = old_sec_ref.lock();
+                    let old_sec = old_sec_ref.lock();
                     let old_sec_name_without_hash = old_sec.name_without_hash();
 
 
@@ -1009,19 +992,14 @@ impl CrateNamespace {
                             let mut target_sec_mapped_pages = target_sec.mapped_pages.lock();
                             let target_sec_initial_flags = target_sec_mapped_pages.flags();
                             if !target_sec_initial_flags.is_writable() {
-                                if let PageTable::Active(ref mut active_table) = kernel_mmi_ref.lock().page_table {
-                                    target_sec_mapped_pages.remap(active_table, target_sec_initial_flags | EntryFlags::WRITABLE)?;
-                                }
-                                else {
-                                    return Err("couldn't get kernel's active page table");
-                                }
+                                target_sec_mapped_pages.remap(&mut kernel_mmi_ref.lock().page_table, target_sec_initial_flags | EntryFlags::WRITABLE)?;
                             }
 
                             write_relocation(
                                 relocation_entry, 
                                 &mut target_sec_mapped_pages, 
                                 target_sec.mapped_pages_offset, 
-                                new_source_sec.virt_addr(), 
+                                new_source_sec.start_address(), 
                                 verbose_log
                             )?;
 
@@ -1033,12 +1011,7 @@ impl CrateNamespace {
                             #[cfg(not(loscd_eval))] {
                                 // If we temporarily remapped the target_sec's mapped pages as writable, undo that here
                                 if !target_sec_initial_flags.is_writable() {
-                                    if let PageTable::Active(ref mut active_table) = kernel_mmi_ref.lock().page_table {
-                                        target_sec_mapped_pages.remap(active_table, target_sec_initial_flags)?;
-                                    }
-                                    else {
-                                        return Err("couldn't get kernel's active page table");
-                                    }
+                                    target_sec_mapped_pages.remap(&mut kernel_mmi_ref.lock().page_table, target_sec_initial_flags)?;
                                 };
                             }
                         }
@@ -1211,7 +1184,7 @@ impl CrateNamespace {
         // We can't just move the crates in the swap request list, because we may have loaded other crates from their object files (for the first time).
         // Thus, we need to move all newly-loaded crates from the temp namespace into this namespace;
         // for this, we add only the non-shared (exclusive) crates, because shared crates are those that came from the backup namespace.
-        namespace_of_new_crates.crate_iter(|new_crate_name, new_crate_ref| {
+        namespace_of_new_crates.for_each_crate(true, |new_crate_name, new_crate_ref| {
             if new_crate_ref.is_shared() {
                 if self.get_crate(new_crate_name).is_none() { 
                     error!("BUG: shared crate {} was not already in the current (backup) namespace", new_crate_name);
@@ -1226,6 +1199,7 @@ impl CrateNamespace {
                 self.add_symbols(new_crate_ref.lock_as_ref().sections.values(), verbose_log); // TODO: later, when qp_trie supports `drain()`, we can improve this futher.
                 self.crate_tree.lock().insert_str(new_crate_name, new_crate_ref.clone());
             }
+            true
         });
 
         #[cfg(loscd_eval)]
@@ -1262,14 +1236,12 @@ impl CrateNamespace {
             }
             Ok(())
         };
-        copy_directory_contents(&namespace_of_new_crates.dirs.kernel, &self.dirs.kernel)?;
-        copy_directory_contents(&namespace_of_new_crates.dirs.app, &self.dirs.app)?;
-        // copy_directory_contents(&namespace_of_new_crates.dirs.user, &self.dirs.user)?; // not used currently
+        copy_directory_contents(&namespace_of_new_crates.dir, &self.dir)?;
 
         #[cfg(not(loscd_eval))]
         {
             debug!("swap_crates() [end]: adding old_crates to cache. \n   future_swap_requests: {:?}, \n   old_crates: {:?}", 
-                future_swap_requests, cached_crates.crate_names());
+                future_swap_requests, cached_crates.crate_names(true));
             self.unloaded_crate_cache.lock().insert(future_swap_requests, cached_crates);
         }
 
@@ -1326,30 +1298,20 @@ impl CrateNamespace {
                 let mut target_sec_mapped_pages = target_sec.mapped_pages.lock();
                 let target_sec_initial_flags = target_sec_mapped_pages.flags();
                 if !target_sec_initial_flags.is_writable() {
-                    if let PageTable::Active(ref mut active_table) = kernel_mmi_ref.lock().page_table {
-                        target_sec_mapped_pages.remap(active_table, target_sec_initial_flags | EntryFlags::WRITABLE)?;
-                    }
-                    else {
-                        return Err("couldn't get kernel's active page table");
-                    }
+                    target_sec_mapped_pages.remap(&mut kernel_mmi_ref.lock().page_table, target_sec_initial_flags | EntryFlags::WRITABLE)?;
                 }
 
                 write_relocation(
                     relocation_entry, 
                     &mut target_sec_mapped_pages, 
                     target_sec.mapped_pages_offset, 
-                    new_source_sec.virt_addr(), 
+                    new_source_sec.start_address(), 
                     false
                 )?;
 
                 // If we temporarily remapped the target_sec's mapped pages as writable, undo that here
                 if !target_sec_initial_flags.is_writable() {
-                    if let PageTable::Active(ref mut active_table) = kernel_mmi_ref.lock().page_table {
-                        target_sec_mapped_pages.remap(active_table, target_sec_initial_flags)?;
-                    }
-                    else {
-                        return Err("couldn't get kernel's active page table");
-                    }
+                    target_sec_mapped_pages.remap(&mut kernel_mmi_ref.lock().page_table, target_sec_initial_flags)?;
                 };
             }
             
@@ -1400,7 +1362,7 @@ impl CrateNamespace {
     /// * `verbose_log`: whether to log detailed messages for debugging.
     fn load_crate_sections<'f>(
         &self,
-        crate_file: &'f File,
+        crate_file: &'f dyn File,
         kernel_mmi_ref: &MmiRef,
         _verbose_log: bool
     ) -> Result<(StrongCrateRef, ElfFile<'f>), &'static str> {
@@ -1416,7 +1378,7 @@ impl CrateNamespace {
             return Err("the crate has already been loaded, cannot load it again in the same namespace");
         }
 
-        // Parse the given `mapped_pages` as an ELF file
+        // Parse the crate file as an ELF file
         let byte_slice: &[u8] = mapped_pages.as_slice(0, size_in_bytes)?;
         let elf_file = ElfFile::new(byte_slice)?; // returns Err(&str) if ELF parse fails
 
@@ -1424,7 +1386,7 @@ impl CrateNamespace {
         use xmas_elf::header::Type;
         let typ = elf_file.header.pt2.type_().as_type();
         if typ != Type::Relocatable {
-            error!("load_crate_sections(): crate \"{}\" was a {:?} Elf File, must be Relocatable!", crate_name, typ);
+            error!("load_crate_sections(): crate \"{}\" was a {:?} Elf File, must be Relocatable!", &crate_name, typ);
             return Err("not a relocatable elf file");
         }
 
@@ -1433,26 +1395,20 @@ impl CrateNamespace {
 
         // allocate enough space to load the sections
         let section_pages = allocate_section_pages(&elf_file, kernel_mmi_ref)?;
-        let text_pages    = section_pages.text_pages  .map(|tp| Arc::new(Mutex::new(tp)));
-        let rodata_pages  = section_pages.rodata_pages.map(|rp| Arc::new(Mutex::new(rp)));
-        let data_pages    = section_pages.data_pages  .map(|dp| Arc::new(Mutex::new(dp)));
+        let text_pages   = section_pages.executable_pages.map(|(tp, range)| (Arc::new(Mutex::new(tp)), range));
+        let rodata_pages = section_pages.read_only_pages.map( |(rp, range)| (Arc::new(Mutex::new(rp)), range));
+        let data_pages   = section_pages.read_write_pages.map(|(dp, range)| (Arc::new(Mutex::new(dp)), range));
 
-        let mut text_pages_locked   = text_pages  .as_ref().map(|tp| tp.lock());
-        let mut rodata_pages_locked = rodata_pages.as_ref().map(|rp| rp.lock());
-        let mut data_pages_locked   = data_pages  .as_ref().map(|dp| dp.lock());
-
-        // iterate through the symbol table so we can find which sections are global (publicly visible)
-        // we keep track of them here in a list
+        // Check the symbol table to get the set of sections that are global (publicly visible).
         let global_sections: BTreeSet<usize> = {
-            // For us to properly load the ELF file, it must NOT have been stripped,
+            // For us to properly load the ELF file, it must NOT have been fully stripped,
             // meaning that it must still have its symbol table section. Otherwise, relocations will not work.
             let symtab = find_symbol_table(&elf_file)?;
 
             let mut globals: BTreeSet<usize> = BTreeSet::new();
             use xmas_elf::symbol_table::Entry;
             for entry in symtab.iter() {
-                // Previously we were ignoring "GLOBAL" symbols with "HIDDEN" visibility, but that excluded some symbols. 
-                // So now, we include all symbols with "GLOBAL" binding, regardless of visibility.  
+                // Include all symbols with "GLOBAL" binding, regardless of visibility.  
                 if entry.get_binding() == Ok(xmas_elf::symbol_table::Binding::Global) {
                     if let Ok(typ) = entry.get_type() {
                         if typ == xmas_elf::symbol_table::Type::Func || typ == xmas_elf::symbol_table::Type::Object {
@@ -1464,24 +1420,45 @@ impl CrateNamespace {
             globals 
         };
 
+        // Since .text sections come at the beginning of the object file,
+        // we can simply directly copy all .text sections at once,
+        // ranging from the beginning of the file to the end of the last .text section.
+        // We actually must do it this way, though it has the following tradeoffs:
+        // (+) It's more correct than calculating the minimum required size of each individual .text section,
+        //     because other sections (e.g., eh_frame) rely on the layout of loaded .text sections 
+        //     to be identical to their layout (offsets) specified in the object file.
+        //     Otherwise, parsing debug/frame sections won't work properly.
+        // (+) It's way faster to load the sections, since we can just bulk copy all .text sections at once 
+        //     instead of copying them individually on a per-section basis (or just remap their pages directly).
+        // (-) It ends up wasting a few hundred bytes here and there, but almost always under 100 bytes.
+        if let Some((ref tp, ref tp_range)) = text_pages {
+            let text_size = tp_range.end.value() - tp_range.start.value();
+            let mut tp_locked = tp.lock();
+            let text_destination: &mut [u8] = tp_locked.as_slice_mut(0, text_size)?;
+            let text_source = elf_file.input.get(..text_size).ok_or("BUG: end of last .text section was miscalculated to be beyond ELF file bounds")?;
+            text_destination.copy_from_slice(text_source);
+        }
 
-        let mut text_offset:   usize = 0;
-        let mut rodata_offset: usize = 0;
-        let mut data_offset:   usize = 0;
+        // Because .rodata, .data, and .bss may be intermingled, 
+        // we copy them into their respective pages individually on a per-section basis, 
+        // keeping track of the offset into each of their MappedPages as we go.
+        let (mut rodata_offset, mut data_offset) = (0 , 0);
                     
-        const TEXT_PREFIX:   &'static str = ".text.";
-        const RODATA_PREFIX: &'static str = ".rodata.";
-        const DATA_PREFIX:   &'static str = ".data.";
-        const BSS_PREFIX:    &'static str = ".bss.";
-        const RELRO_PREFIX:  &'static str = "rel.ro.";
+        const TEXT_PREFIX:           &'static str = ".text.";
+        const RODATA_PREFIX:         &'static str = ".rodata.";
+        const DATA_PREFIX:           &'static str = ".data.";
+        const BSS_PREFIX:            &'static str = ".bss.";
+        const RELRO_PREFIX:          &'static str = "rel.ro.";
+        const GCC_EXCEPT_TABLE_NAME: &'static str = ".gcc_except_table";
+        const EH_FRAME_NAME:         &'static str = ".eh_frame";
 
         let new_crate = CowArc::new(LoadedCrate {
-            crate_name:              String::from(crate_name),
+            crate_name:              crate_name.clone(),
             object_file_abs_path:    abs_path,
             sections:                BTreeMap::new(),
-            text_pages:              text_pages  .as_ref().map(|r| Arc::clone(r)),
-            rodata_pages:            rodata_pages.as_ref().map(|r| Arc::clone(r)),
-            data_pages:              data_pages  .as_ref().map(|r| Arc::clone(r)),
+            text_pages:              text_pages.clone(),
+            rodata_pages:            rodata_pages.clone(),
+            data_pages:              data_pages.clone(),
             global_symbols:          BTreeSet::new(),
             bss_sections:            Trie::new(),
             reexported_symbols:      BTreeSet::new(),
@@ -1495,296 +1472,363 @@ impl CrateNamespace {
         // the map of BSS section names to the actual BSS section
         let mut bss_sections: Trie<BString, StrongSectionRef> = Trie::new();
 
+        let mut read_only_pages_locked  = rodata_pages.as_ref().map(|(rp, _)| (rp.clone(), rp.lock()));
+        let mut read_write_pages_locked = data_pages  .as_ref().map(|(dp, _)| (dp.clone(), dp.lock()));
+
+
+        // In this loop, we handle only "allocated" sections that occupy memory in the actual loaded object file.
+        // This includes .text, .rodata, .data, .bss, .gcc_except_table, .eh_frame, and potentially others.
         for (shndx, sec) in elf_file.section_iter().enumerate() {
-            // the PROGBITS sections (.text, .rodata, .data) and the NOBITS (.bss) sections are what we care about
-            let sec_typ = sec.get_type();
-            // look for PROGBITS (.text, .rodata, .data) and NOBITS (.bss) sections
-            if sec_typ == Ok(ShType::ProgBits) || sec_typ == Ok(ShType::NoBits) {
+            let sec_flags = sec.flags();
+            // Skip non-allocated sections, because they don't appear in the loaded object file.
+            if sec_flags & SHF_ALLOC == 0 {
+                continue; 
+            }
 
-                // even if we're using the next section's data (for a zero-sized section),
-                // we still want to use this current section's actual name and flags!
-                let sec_flags = sec.flags();
-                let sec_name = match sec.get_name(&elf_file) {
-                    Ok(name) => name,
-                    Err(_e) => {
-                        error!("load_crate_sections: couldn't get section name for section [{}]: {:?}\n    error: {}", shndx, sec, _e);
-                        return Err("couldn't get section name");
-                    }
-                };
-
-                
-                // some special sections are fine to ignore
-                if  sec_name.starts_with(".note")   ||   // ignore GNU note sections
-                    sec_name.starts_with(".gcc")    ||   // ignore gcc special sections for now
-                    sec_name.starts_with(".debug")  ||   // ignore debug special sections for now
-                    sec_name == ".text"                  // ignore the header .text section (with no content)
-                {
-                    continue;    
-                }            
-
-
-                let sec = if sec.size() == 0 {
-                    // This is a very rare case of a zero-sized section. 
-                    // A section of size zero shouldn't necessarily be removed, as they are sometimes referenced in relocations,
-                    // typically the zero-sized section itself is a reference to the next section in the list of section headers).
-                    // Thus, we need to use the *current* section's name with the *next* section's (the next section's) information,
-                    // i.e., its  size, alignment, and actual data
-                    match elf_file.section_header((shndx + 1) as u16) { // get the next section
-                        Ok(sec_hdr) => {
-                            // The next section must have the same offset as the current zero-sized one
-                            if sec_hdr.offset() == sec.offset() {
-                                // if it does, we can use it in place of the current section
-                                sec_hdr
-                            }
-                            else {
-                                // if it does not, we should NOT use it in place of the current section
-                                sec
-                            }
-                        }
-                        _ => {
-                            error!("load_crate_sections(): Couldn't get next section for zero-sized section {}", shndx);
-                            return Err("couldn't get next section for a zero-sized section");
-                        }
-                    }
+            // Even if we're using the next section's data (for a zero-sized section, as handled below),
+            // we still want to use this current section's actual name and flags!
+            let sec_name = match sec.get_name(&elf_file) {
+                Ok(name) => name,
+                Err(_e) => {
+                    error!("load_crate_sections: couldn't get section name for section [{}]: {:?}\n    error: {}", shndx, sec, _e);
+                    return Err("couldn't get section name");
                 }
-                else {
-                    // this is the normal case, a non-zero sized section, so just use the current section
-                    sec
-                };
+            };
 
-                // get the relevant section info, i.e., size, alignment, and data contents
-                let sec_size  = sec.size()  as usize;
-                let sec_align = sec.align() as usize;
+            // ignore the empty .text section at the start
+            if sec_name == ".text" {
+                continue;    
+            }
 
-
-                if sec_name.starts_with(TEXT_PREFIX) {
-                    if let Some(name) = sec_name.get(TEXT_PREFIX.len() ..) {
-                        let demangled = demangle(name).to_string();
-                        if sec_flags & (SHF_ALLOC | SHF_WRITE | SHF_EXECINSTR) != (SHF_ALLOC | SHF_EXECINSTR) {
-                            error!(".text section [{}], name: {:?} had the wrong flags {:#X}", shndx, name, sec_flags);
-                            return Err(".text section had wrong flags!");
-                        }
-
-                        if let (Some(ref tp_ref), Some(ref mut tp)) = (&text_pages, &mut text_pages_locked) {
-                            // here: we're ready to copy the text section to the proper address
-                            let dest_addr = tp.address_at_offset(text_offset)
-                                .ok_or_else(|| "BUG: text_offset wasn't within text_mapped_pages")?;
-                            let dest_slice: &mut [u8]  = try!(tp.as_slice_mut(text_offset, sec_size));
-                            match sec.get_data(&elf_file) {
-                                Ok(SectionData::Undefined(sec_data)) => dest_slice.copy_from_slice(sec_data),
-                                Ok(SectionData::Empty) => {
-                                    for b in dest_slice {
-                                        *b = 0;
-                                    }
-                                },
-                                _ => {
-                                    error!("load_crate_sections(): Couldn't get section data for .text section [{}] {}: {:?}", shndx, sec_name, sec.get_data(&elf_file));
-                                    return Err("couldn't get section data in .text section");
-                                }
-                            }
-
-                            let is_global = global_sections.contains(&shndx);
-                            if is_global {
-                                global_symbols.insert(demangled.clone().into());
-                            }
-
-                            loaded_sections.insert(shndx, 
-                                Arc::new(Mutex::new(LoadedSection::new(
-                                    SectionType::Text,
-                                    demangled,
-                                    Arc::clone(tp_ref),
-                                    text_offset,
-                                    dest_addr,
-                                    sec_size,
-                                    is_global,
-                                    new_crate_weak_ref.clone(),
-                                )))
-                            );
-
-                            text_offset += round_up_power_of_two(sec_size, sec_align);
+            // This handles the rare case of a zero-sized section. 
+            // A section of size zero shouldn't necessarily be removed, as they are sometimes referenced in relocations;
+            // typically the zero-sized section itself is a reference to the next section in the list of section headers.
+            // Thus, we need to use the *current* section's name with the *next* section's information,
+            // i.e., its  size, alignment, and actual data.
+            let sec = if sec.size() == 0 {
+                match elf_file.section_header((shndx + 1) as u16) { // get the next section
+                    Ok(sec_hdr) => {
+                        // The next section must have the same offset as the current zero-sized one
+                        if sec_hdr.offset() == sec.offset() {
+                            // if it does, we can use it in place of the current section
+                            sec_hdr
                         }
                         else {
-                            return Err("no text_pages were allocated");
+                            // if it does not, we should NOT use it in place of the current section
+                            sec
                         }
                     }
-                    else {
-                        error!("Failed to get the .text section's name after \".text.\": {:?}", sec_name);
-                        return Err("Failed to get the .text section's name after \".text.\"!");
-                    }
-                }
-
-                else if sec_name.starts_with(RODATA_PREFIX) {
-                    if let Some(name) = sec_name.get(RODATA_PREFIX.len() ..) {
-                        let demangled = demangle(name).to_string();
-                        if sec_flags & (SHF_ALLOC | SHF_WRITE | SHF_EXECINSTR) != (SHF_ALLOC) {
-                            error!(".rodata section [{}], name: {:?} had the wrong flags {:#X}", shndx, name, sec_flags);
-                            return Err(".rodata section had wrong flags!");
-                        }
-
-                        if let (Some(ref rp_ref), Some(ref mut rp)) = (&rodata_pages, &mut rodata_pages_locked) {
-                            // here: we're ready to copy the rodata section to the proper address
-                            let dest_addr = rp.address_at_offset(rodata_offset)
-                                .ok_or_else(|| "BUG: rodata_offset wasn't within rodata_mapped_pages")?;
-                            let dest_slice: &mut [u8]  = try!(rp.as_slice_mut(rodata_offset, sec_size));
-                            match sec.get_data(&elf_file) {
-                                Ok(SectionData::Undefined(sec_data)) => dest_slice.copy_from_slice(sec_data),
-                                Ok(SectionData::Empty) => {
-                                    for b in dest_slice {
-                                        *b = 0;
-                                    }
-                                },
-                                _ => {
-                                    error!("load_crate_sections(): Couldn't get section data for .rodata section [{}] {}: {:?}", shndx, sec_name, sec.get_data(&elf_file));
-                                    return Err("couldn't get section data in .rodata section");
-                                }
-                            }
-
-                            let is_global = global_sections.contains(&shndx);
-                            if is_global {
-                                global_symbols.insert(demangled.clone().into());
-                            }
-                            
-                            loaded_sections.insert(shndx, 
-                                Arc::new(Mutex::new(LoadedSection::new(
-                                    SectionType::Rodata,
-                                    demangled,
-                                    Arc::clone(rp_ref),
-                                    rodata_offset,
-                                    dest_addr,
-                                    sec_size,
-                                    is_global,
-                                    new_crate_weak_ref.clone(),
-                                )))
-                            );
-
-                            rodata_offset += round_up_power_of_two(sec_size, sec_align);
-                        }
-                        else {
-                            return Err("no rodata_pages were allocated");
-                        }
-                    }
-                    else {
-                        error!("Failed to get the .rodata section's name after \".rodata.\": {:?}", sec_name);
-                        return Err("Failed to get the .rodata section's name after \".rodata.\"!");
+                    _ => {
+                        error!("load_crate_sections(): Couldn't get next section for zero-sized section {}", shndx);
+                        return Err("couldn't get next section for a zero-sized section");
                     }
                 }
+            }
+            else {
+                // this is the normal case, a non-zero sized section, so just use the current section
+                sec
+            };
 
-                else if sec_name.starts_with(DATA_PREFIX) {
-                    if let Some(name) = sec_name.get(DATA_PREFIX.len() ..) {
-                        let name = if name.starts_with(RELRO_PREFIX) {
-                            let relro_name = try!(name.get(RELRO_PREFIX.len() ..).ok_or("Couldn't get name of .data.rel.ro. section"));
-                            relro_name
-                        }
-                        else {
-                            name
-                        };
-                        let demangled = demangle(name).to_string();
-                        if sec_flags & (SHF_ALLOC | SHF_WRITE | SHF_EXECINSTR) != (SHF_ALLOC | SHF_WRITE) {
-                            error!(".data section [{}], name: {:?} had the wrong flags {:#X}", shndx, name, sec_flags);
-                            return Err(".data section had wrong flags!");
-                        }
-                        
-                        if let (Some(ref dp_ref), Some(ref mut dp)) = (&data_pages, &mut data_pages_locked) {
-                            // here: we're ready to copy the data/bss section to the proper address
-                            let dest_addr = dp.address_at_offset(data_offset)
-                                .ok_or_else(|| "BUG: data_offset wasn't within data_pages")?;
-                            let dest_slice: &mut [u8]  = try!(dp.as_slice_mut(data_offset, sec_size));
-                            match sec.get_data(&elf_file) {
-                                Ok(SectionData::Undefined(sec_data)) => dest_slice.copy_from_slice(sec_data),
-                                Ok(SectionData::Empty) => {
-                                    for b in dest_slice {
-                                        *b = 0;
-                                    }
-                                },
-                                _ => {
-                                    error!("load_crate_sections(): Couldn't get section data for .data section [{}] {}: {:?}", shndx, sec_name, sec.get_data(&elf_file));
-                                    return Err("couldn't get section data in .data section");
-                                }
-                            }
+            // get the relevant section info, i.e., size, alignment, and data contents
+            let sec_size  = sec.size()  as usize;
+            let sec_align = sec.align() as usize;
 
-                            let is_global = global_sections.contains(&shndx);
-                            if is_global {
-                                global_symbols.insert(demangled.clone().into());
-                            }
-                            
-                            loaded_sections.insert(shndx, 
-                                Arc::new(Mutex::new(LoadedSection::new(
-                                    SectionType::Data,
-                                    demangled,
-                                    Arc::clone(dp_ref),
-                                    data_offset,
-                                    dest_addr,
-                                    sec_size,
-                                    is_global,
-                                    new_crate_weak_ref.clone(),
-                                )))
-                            );
+            let write: bool = sec.flags() & SHF_WRITE     == SHF_WRITE;
+            let exec:  bool = sec.flags() & SHF_EXECINSTR == SHF_EXECINSTR;
 
-                            data_offset += round_up_power_of_two(sec_size, sec_align);
-                        }
-                        else {
-                            return Err("no data_pages were allocated for .data section");
-                        }
-                    }
-                    else {
-                        error!("Failed to get the .data section's name after \".data.\": {:?}", sec_name);
-                        return Err("Failed to get the .data section's name after \".data.\"!");
-                    }
-                }
+            // First, check for executable sections, which can only be .text sections.
+            if exec && !write {
+                if let Some(name) = sec_name.get(TEXT_PREFIX.len() ..) {
+                    let demangled = demangle(name).to_string();
 
-                else if sec_name.starts_with(BSS_PREFIX) {
-                    if let Some(name) = sec_name.get(BSS_PREFIX.len() ..) {
-                        let demangled = demangle(name).to_string();
-                        if sec_flags & (SHF_ALLOC | SHF_WRITE | SHF_EXECINSTR) != (SHF_ALLOC | SHF_WRITE) {
-                            error!(".bss section [{}], name: {:?} had the wrong flags {:#X}", shndx, name, sec_flags);
-                            return Err(".bss section had wrong flags!");
+                    // We already copied the content of all .text sections above, 
+                    // so here we just record the metadata into a new `LoadedSection` object.
+                    if let Some((ref tp_ref, ref tp_range)) = text_pages {
+                        let is_global = global_sections.contains(&shndx);
+                        if is_global {
+                            global_symbols.insert(demangled.clone().into());
                         }
-                        
-                        // we still use DataSection to represent the .bss sections, since they have the same flags
-                        if let (Some(ref dp_ref), Some(ref mut dp)) = (&data_pages, &mut data_pages_locked) {
-                            // here: we're ready to fill the bss section with zeroes at the proper address
-                            let dest_addr = dp.address_at_offset(data_offset)
-                                .ok_or_else(|| "BUG: data_offset wasn't within data_pages")?;
-                            let dest_slice: &mut [u8]  = try!(dp.as_slice_mut(data_offset, sec_size));
-                            for b in dest_slice {
-                                *b = 0;
-                            };
 
-                            let is_global = global_sections.contains(&shndx);
-                            if is_global {
-                                global_symbols.insert(demangled.clone().into());
-                            }
-                            
-                            let sec_ref = Arc::new(Mutex::new(LoadedSection::new(
-                                SectionType::Bss,
-                                demangled.clone(),
-                                Arc::clone(dp_ref),
-                                data_offset,
-                                dest_addr,
+                        let text_offset = sec.offset() as usize;
+                        let dest_vaddr = tp_range.start + text_offset;
+
+                        loaded_sections.insert(shndx, 
+                            Arc::new(Mutex::new(LoadedSection::new(
+                                SectionType::Text,
+                                demangled,
+                                Arc::clone(tp_ref),
+                                text_offset,
+                                dest_vaddr,
                                 sec_size,
                                 is_global,
                                 new_crate_weak_ref.clone(),
-                            )));
-                            loaded_sections.insert(shndx, sec_ref.clone());
-                            bss_sections.insert(demangled.into(), sec_ref);
-
-                            data_offset += round_up_power_of_two(sec_size, sec_align);
-                        }
-                        else {
-                            return Err("no data_pages were allocated for .bss section");
-                        }
+                            )))
+                        );
                     }
                     else {
-                        error!("Failed to get the .bss section's name after \".bss.\": {:?}", sec_name);
-                        return Err("Failed to get the .bss section's name after \".bss.\"!");
+                        return Err("BUG: ELF file contained a .text* section, but no text_pages were allocated");
                     }
                 }
-
                 else {
-                    error!("unhandled PROGBITS/NOBITS section [{}], name: {}, sec: {:?}", shndx, sec_name, sec);
+                    error!("Failed to get the .text section's name after \".text.\": {:?}", sec_name);
+                    return Err("Failed to get the .text section's name after \".text.\"!");
+                }
+            }
+
+            // Second, if not executable, handle writable .data sections
+            else if write && sec_name.starts_with(DATA_PREFIX) {
+                if let Some(name) = sec_name.get(DATA_PREFIX.len() ..) {
+                    let name = if name.starts_with(RELRO_PREFIX) {
+                        let relro_name = name.get(RELRO_PREFIX.len() ..).ok_or("Couldn't get name of .data.rel.ro. section")?;
+                        relro_name
+                    }
+                    else {
+                        name
+                    };
+                    let demangled = demangle(name).to_string();
+                    
+                    if let Some((ref dp_ref, ref mut dp)) = read_write_pages_locked {
+                        // here: we're ready to copy the data/bss section to the proper address
+                        let dest_vaddr = dp.address_at_offset(data_offset)
+                            .ok_or_else(|| "BUG: data_offset wasn't within data_pages")?;
+                        let dest_slice: &mut [u8]  = dp.as_slice_mut(data_offset, sec_size)?;
+                        match sec.get_data(&elf_file) {
+                            Ok(SectionData::Undefined(sec_data)) => dest_slice.copy_from_slice(sec_data),
+                            Ok(SectionData::Empty) => {
+                                for b in dest_slice {
+                                    *b = 0;
+                                }
+                            },
+                            _ => {
+                                error!("load_crate_sections(): Couldn't get section data for .data section [{}] {}: {:?}", shndx, sec_name, sec.get_data(&elf_file));
+                                return Err("couldn't get section data in .data section");
+                            }
+                        }
+
+                        let is_global = global_sections.contains(&shndx);
+                        if is_global {
+                            global_symbols.insert(demangled.clone().into());
+                        }
+                        
+                        loaded_sections.insert(shndx, 
+                            Arc::new(Mutex::new(LoadedSection::new(
+                                SectionType::Data,
+                                demangled,
+                                Arc::clone(dp_ref),
+                                data_offset,
+                                dest_vaddr,
+                                sec_size,
+                                is_global,
+                                new_crate_weak_ref.clone(),
+                            )))
+                        );
+
+                        data_offset += round_up_power_of_two(sec_size, sec_align);
+                    }
+                    else {
+                        return Err("no data_pages were allocated for .data section");
+                    }
+                }
+                else {
+                    error!("Failed to get the .data section's name after \".data.\": {:?}", sec_name);
+                    return Err("Failed to get the .data section's name after \".data.\"!");
+                }
+            }
+
+            // Third, if not executable and not a writable .data section, handle writable .bss sections
+            else if write && sec_name.starts_with(BSS_PREFIX) {
+                if let Some(name) = sec_name.get(BSS_PREFIX.len() ..) {
+                    let demangled = demangle(name).to_string();
+                    
+                    // we still use DataSection to represent the .bss sections, since they have the same flags
+                    if let Some((ref dp_ref, ref mut dp)) = read_write_pages_locked {
+                        // here: we're ready to fill the bss section with zeroes at the proper address
+                        let dest_vaddr = dp.address_at_offset(data_offset)
+                            .ok_or_else(|| "BUG: data_offset wasn't within data_pages")?;
+                        let dest_slice: &mut [u8]  = dp.as_slice_mut(data_offset, sec_size)?;
+                        for b in dest_slice {
+                            *b = 0;
+                        };
+
+                        let is_global = global_sections.contains(&shndx);
+                        if is_global {
+                            global_symbols.insert(demangled.clone().into());
+                        }
+                        
+                        let sec_ref = Arc::new(Mutex::new(LoadedSection::new(
+                            SectionType::Bss,
+                            demangled.clone(),
+                            Arc::clone(dp_ref),
+                            data_offset,
+                            dest_vaddr,
+                            sec_size,
+                            is_global,
+                            new_crate_weak_ref.clone(),
+                        )));
+                        loaded_sections.insert(shndx, sec_ref.clone());
+                        bss_sections.insert(demangled.into(), sec_ref);
+
+                        data_offset += round_up_power_of_two(sec_size, sec_align);
+                    }
+                    else {
+                        return Err("no data_pages were allocated for .bss section");
+                    }
+                }
+                else {
+                    error!("Failed to get the .bss section's name after \".bss.\": {:?}", sec_name);
+                    return Err("Failed to get the .bss section's name after \".bss.\"!");
+                }
+            }
+
+            // Fourth, if neither executable nor writable, handle .rodata sections
+            else if sec_name.starts_with(RODATA_PREFIX) {
+                if let Some(name) = sec_name.get(RODATA_PREFIX.len() ..) {
+                    let demangled = demangle(name).to_string();
+
+                    if let Some((ref rp_ref, ref mut rp)) = read_only_pages_locked {
+                        // here: we're ready to copy the rodata section to the proper address
+                        let dest_vaddr = rp.address_at_offset(rodata_offset)
+                            .ok_or_else(|| "BUG: rodata_offset wasn't within rodata_mapped_pages")?;
+                        let dest_slice: &mut [u8]  = rp.as_slice_mut(rodata_offset, sec_size)?;
+                        match sec.get_data(&elf_file) {
+                            Ok(SectionData::Undefined(sec_data)) => dest_slice.copy_from_slice(sec_data),
+                            Ok(SectionData::Empty) => {
+                                for b in dest_slice {
+                                    *b = 0;
+                                }
+                            },
+                            _ => {
+                                error!("load_crate_sections(): Couldn't get section data for .rodata section [{}] {}: {:?}", shndx, sec_name, sec.get_data(&elf_file));
+                                return Err("couldn't get section data in .rodata section");
+                            }
+                        }
+
+                        let is_global = global_sections.contains(&shndx);
+                        if is_global {
+                            global_symbols.insert(demangled.clone().into());
+                        }
+                        
+                        loaded_sections.insert(shndx, 
+                            Arc::new(Mutex::new(LoadedSection::new(
+                                SectionType::Rodata,
+                                demangled,
+                                Arc::clone(rp_ref),
+                                rodata_offset,
+                                dest_vaddr,
+                                sec_size,
+                                is_global,
+                                new_crate_weak_ref.clone(),
+                            )))
+                        );
+
+                        rodata_offset += round_up_power_of_two(sec_size, sec_align);
+                    }
+                    else {
+                        return Err("no rodata_pages were allocated");
+                    }
+                }
+                else {
+                    error!("Failed to get the .rodata section's name after \".rodata.\": {:?}", sec_name);
+                    return Err("Failed to get the .rodata section's name after \".rodata.\"!");
+                }
+            }
+
+            // Fifth, if neither executable nor writable nor .rodata, handle the `.gcc_except_table` section
+            else if sec_name == GCC_EXCEPT_TABLE_NAME {
+                // The gcc_except_table section is read-only, so we put it in the .rodata pages
+                if let Some((ref rp_ref, ref mut rp)) = read_only_pages_locked {
+                    // here: we're ready to copy the rodata section to the proper address
+                    let dest_vaddr = rp.address_at_offset(rodata_offset)
+                        .ok_or_else(|| "BUG: rodata_offset wasn't within rodata_mapped_pages")?;
+                    let dest_slice: &mut [u8]  = rp.as_slice_mut(rodata_offset, sec_size)?;
+                    match sec.get_data(&elf_file) {
+                        Ok(SectionData::Undefined(sec_data)) => dest_slice.copy_from_slice(sec_data),
+                        Ok(SectionData::Empty) => {
+                            for b in dest_slice {
+                                *b = 0;
+                            }
+                        },
+                        _ => {
+                            error!("load_crate_sections(): Couldn't get section data for .gcc_except_table section [{}] {}: {:?}", shndx, sec_name, sec.get_data(&elf_file));
+                            return Err("couldn't get section data in .gcc_except_table section");
+                        }
+                    }
+
+                    // .gcc_except_table section is not globally visible
+                    let is_global = false;
+                    
+                    loaded_sections.insert(shndx, 
+                        Arc::new(Mutex::new(LoadedSection::new(
+                            SectionType::GccExceptTable,
+                            sec_name.to_string(),
+                            Arc::clone(rp_ref),
+                            rodata_offset,
+                            dest_vaddr,
+                            sec_size,
+                            is_global,
+                            new_crate_weak_ref.clone(),
+                        )))
+                    );
+
+                    rodata_offset += round_up_power_of_two(sec_size, sec_align);
+                }
+                else {
+                    return Err("no rodata_pages were allocated when handling .gcc_except_table");
+                }
+            }
+
+            // Sixth, if neither executable nor writable nor .rodata nor .gcc_except_table, handle the `.eh_frame` section
+            else if sec_name == EH_FRAME_NAME {
+                // The eh_frame section is read-only, so we put it in the .rodata pages
+                if let Some((ref rp_ref, ref mut rp)) = read_only_pages_locked {
+                    // here: we're ready to copy the rodata section to the proper address
+                    let dest_vaddr = rp.address_at_offset(rodata_offset)
+                        .ok_or_else(|| "BUG: rodata_offset wasn't within rodata_mapped_pages")?;
+                    let dest_slice: &mut [u8]  = rp.as_slice_mut(rodata_offset, sec_size)?;
+                    match sec.get_data(&elf_file) {
+                        Ok(SectionData::Undefined(sec_data)) => dest_slice.copy_from_slice(sec_data),
+                        Ok(SectionData::Empty) => {
+                            for b in dest_slice {
+                                *b = 0;
+                            }
+                        },
+                        _ => {
+                            error!("load_crate_sections(): Couldn't get section data for .eh_frame section [{}] {}: {:?}", shndx, sec_name, sec.get_data(&elf_file));
+                            return Err("couldn't get section data in .eh_frame section");
+                        }
+                    }
+
+                    // .gcc_except_table section is not globally visible
+                    let is_global = false;
+                    
+                    loaded_sections.insert(shndx, 
+                        Arc::new(Mutex::new(LoadedSection::new(
+                            SectionType::EhFrame,
+                            sec_name.to_string(),
+                            Arc::clone(rp_ref),
+                            rodata_offset,
+                            dest_vaddr,
+                            sec_size,
+                            is_global,
+                            new_crate_weak_ref.clone(),
+                        )))
+                    );
+
+                    rodata_offset += round_up_power_of_two(sec_size, sec_align);
+                }
+                else {
+                    return Err("no rodata_pages were allocated when handling .eh_frame");
+                }
+            }
+
+            // Finally, any other section type is considered unhandled, so return an error!
+            else {
+                // currently not using sections like ".debug_gdb_scripts"
+                if sec_name.starts_with(".debug") {
                     continue;
                 }
-
+                error!("unhandled section [{}], name: {}, sec: {:?}", shndx, sec_name, sec);
+                return Err("load_crate_sections(): section with unhandled type, name, or flags!");
             }
         }
 
@@ -1808,7 +1852,7 @@ impl CrateNamespace {
         &self,
         elf_file: &ElfFile,
         new_crate_ref: &StrongCrateRef,
-        backup_namespace: Option<&CrateNamespace>,
+        temp_backup_namespace: Option<&CrateNamespace>,
         kernel_mmi_ref: &MmiRef,
         verbose_log: bool
     ) -> Result<(), &'static str> {
@@ -1825,12 +1869,9 @@ impl CrateNamespace {
                 sec.get_name(&elf_file), sec.get_type(), sec.info()); 
             }
 
-            // currently not using eh_frame, gcc, note, and debug sections
+            // currently not using debug sections
             if let Ok(name) = sec.get_name(&elf_file) {
-                if  name.starts_with(".rela.eh_frame") || 
-                    name.starts_with(".rela.note")     ||   // ignore GNU note sections
-                    name.starts_with(".rela.gcc")      ||   // ignore gcc special sections for now
-                    name.starts_with(".rela.debug")         // ignore debug special sections for now
+                if name.starts_with(".rela.debug")         // ignore debug special sections for now
                 {
                     continue;
                 }
@@ -1870,7 +1911,8 @@ impl CrateNamespace {
                             rela_entry.get_offset(), rela_entry.get_addend(), rela_entry.get_symbol_table_index(), rela_entry.get_type());
                     }
 
-                    let source_sec_entry: &xmas_elf::symbol_table::Entry = &symtab[rela_entry.get_symbol_table_index() as usize];
+                    use xmas_elf::symbol_table::Entry;
+                    let source_sec_entry = &symtab[rela_entry.get_symbol_table_index() as usize];
                     let source_sec_shndx = source_sec_entry.shndx() as usize; 
                     if verbose_log { 
                         let source_sec_header_name = source_sec_entry.get_section_header(&elf_file, rela_entry.get_symbol_table_index() as usize)
@@ -1907,7 +1949,7 @@ impl CrateNamespace {
                                 let demangled = demangle(source_sec_name).to_string();
 
                                 // search for the symbol's demangled name in the kernel's symbol map
-                                self.get_symbol_or_load(&demangled, backup_namespace, kernel_mmi_ref, verbose_log)
+                                self.get_symbol_or_load(&demangled, temp_backup_namespace, kernel_mmi_ref, verbose_log)
                                     .upgrade()
                                     .ok_or("Couldn't get symbol for foreign relocation entry, nor load its containing crate")
                             }
@@ -1928,7 +1970,7 @@ impl CrateNamespace {
                         relocation_entry,
                         &mut target_sec_mapped_pages,
                         target_sec.mapped_pages_offset,
-                        if source_and_target_are_same_section { target_sec.virt_addr() } else { source_sec_ref.lock().virt_addr() },
+                        if source_and_target_are_same_section { target_sec.start_address() } else { source_sec_ref.lock().start_address() },
                         verbose_log
                     )?;
 
@@ -1966,18 +2008,13 @@ impl CrateNamespace {
 
         // Finally, remap each section's mapped pages to the proper permission bits, 
         // since we initially mapped them all as writable
-        if let PageTable::Active(ref mut active_table) = kernel_mmi_ref.lock().page_table {
-            if let Some(ref tp) = new_crate.text_pages { 
-                tp.lock().remap(active_table, TEXT_SECTION_FLAGS())?;
-            }
-            if let Some(ref rp) = new_crate.rodata_pages {
-                rp.lock().remap(active_table, RODATA_SECTION_FLAGS())?;
-            }
-            // data/bss sections are already mapped properly, since they're supposed to be writable
+        if let Some(ref tp) = new_crate.text_pages { 
+            tp.0.lock().remap(&mut kernel_mmi_ref.lock().page_table, TEXT_SECTION_FLAGS)?;
         }
-        else {
-            return Err("couldn't get kernel's active page table");
+        if let Some(ref rp) = new_crate.rodata_pages {
+            rp.0.lock().remap(&mut kernel_mmi_ref.lock().page_table, RODATA_SECTION_FLAGS)?;
         }
+        // data/bss sections are already mapped properly, since they're supposed to be writable
 
         Ok(())
     }
@@ -2000,8 +2037,8 @@ impl CrateNamespace {
                             // debug!("       add_symbol(): replacing section: old: {:?}, new: {:?}", old_sec_ref, new_section_ref);
                             let old_sec = old_sec_ref.lock();
                             let new_sec = new_section_ref.lock();
-                            if new_sec.size != old_sec.size {
-                                warn!("         add_symbol(): Unexpectedly replacing differently-sized section: old: ({}B) {:?}, new: ({}B) {:?}", old_sec.size, old_sec.name, new_sec.size, new_sec.name);
+                            if new_sec.size() != old_sec.size() {
+                                warn!("         add_symbol(): Unexpectedly replacing differently-sized section: old: ({}B) {:?}, new: ({}B) {:?}", old_sec.size(), old_sec.name, new_sec.size(), new_sec.name);
                             } 
                             else {
                                 warn!("         add_symbol(): Replacing new symbol already present: old {:?}, new: {:?}", old_sec.name, new_sec.name);
@@ -2083,16 +2120,160 @@ impl CrateNamespace {
         count
     }
 
+    
+    /// Finds the crate that contains the given `VirtualAddress` in its loaded code,
+    /// also searching any recursive namespaces as well.
+    /// 
+    /// By default, only executable sections (`.text`) are searched, since typically the only use case 
+    /// for this function is to search for an instruction pointer (program counter) address.
+    /// However, if `search_all_section_types` is `true`, both the read-only and read-write sections
+    /// will be included in the search, e.g., `.rodata`, `.data`, `.bss`. 
+    /// 
+    /// If a `starting_crate` is provided, the search will begin from that crate
+    /// and include all of its dependencies recursively. 
+    /// If no `starting_crate` is provided, all crates in this namespace will be searched, in no particular order.
+    /// 
+    /// TODO FIXME: currently starting_crate is searched non-recursively, meaning that its dependencies are excluded.
+    /// 
+    /// # Usage
+    /// This is mostly useful for printing symbol names for a stack trace (backtrace).
+    /// It is also similar in functionality to the tool `addr2line`, 
+    /// but gives the section itself rather than the line of code.
+    /// 
+    /// # Locking
+    /// This can obtain the lock on every crate and every section, 
+    /// so to avoid deadlock, please ensure that the caller task does not hold any such locks.
+    /// It does *not* need to obtain locks on the underlying `MappedPages` regions.
+    /// 
+    /// # Note
+    /// This is a slow procedure because, in the worst case,
+    /// it will iterate through **every** loaded crate.
+    pub fn get_crate_containing_address(
+        &self, 
+        virt_addr: VirtualAddress, 
+        starting_crate: Option<&StrongCrateRef>,
+        search_all_section_types: bool,
+    ) -> Option<StrongCrateRef> {
+
+        // A closure to test whether the given `crate_ref` contains the `virt_addr`.
+        let crate_contains_vaddr = |crate_ref: &StrongCrateRef| {
+            let krate = crate_ref.lock_as_ref();
+            if let Some(ref tp) = krate.text_pages {
+                if tp.1.contains(&virt_addr) { 
+                    return true;
+                }
+            }
+            if search_all_section_types {
+                if let Some(ref rp) = krate.rodata_pages {
+                    if rp.1.contains(&virt_addr) {
+                        return true;
+                    }
+                }
+                if let Some(ref dp) = krate.data_pages {
+                    if dp.1.contains(&virt_addr) {
+                        return true;
+                    }
+                }
+            }
+            false
+        };
+        
+        // If a starting crate was given, search that first. 
+        if let Some(crate_ref) = starting_crate {
+            if crate_contains_vaddr(crate_ref) {
+                return Some(crate_ref.clone());
+            }
+        }
+
+        let mut found_crate = None;
+
+        // Here, we didn't find the symbol when searching from the starting crate, 
+        // so perform a brute-force search of all crates in this namespace (recursively).
+        self.for_each_crate(true, |_crate_name, crate_ref| {
+            if crate_contains_vaddr(crate_ref) {
+                found_crate = Some(crate_ref.clone());
+                false // stop iterating, we've found it!
+            }
+            else {
+                true // keep searching
+            }
+        });
+
+        found_crate
+    }
+
+
+
+    /// Finds the section that contains the given `VirtualAddress` in its loaded code,
+    /// also searching any recursive namespaces as well.
+    /// 
+    /// By default, only executable sections (`.text`) are searched, since typically the only use case 
+    /// for this function is to search for an instruction pointer (program counter) address.
+    /// However, if `search_all_section_types` is `true`, both the read-only and read-write sections
+    /// will be included in the search, e.g., `.rodata`, `.data`, `.bss`. 
+    /// 
+    /// If a `starting_crate` is provided, the search will begin from that crate
+    /// and include all of its dependencies recursively. 
+    /// If no `starting_crate` is provided, all crates in this namespace will be searched, in no particular order.
+    /// 
+    /// TODO FIXME: currently starting_crate is searched non-recursively, meaning that its dependencies are excluded.
+    /// 
+    /// # Usage
+    /// This is mostly useful for printing symbol names for a stack trace (backtrace).
+    /// It is also similar in functionality to the tool `addr2line`, 
+    /// but gives the section itself rather than the line of code.
+    /// 
+    /// # Locking
+    /// This can obtain the lock on every crate and every section, 
+    /// so to avoid deadlock, please ensure that the caller task does not hold any such locks.
+    /// 
+    /// # Note
+    /// This is a slow procedure because, in the worst case,
+    /// it will iterate through **every** section in **every** loaded crate,
+    /// not just the publicly-visible (global) ones. 
+    pub fn get_section_containing_address(
+        &self, 
+        virt_addr: VirtualAddress, 
+        starting_crate: Option<&StrongCrateRef>,
+        search_all_section_types: bool,
+    ) -> Option<(StrongSectionRef, usize)> {
+
+        // First, we find the crate that contains the address, then later we narrow it down.
+        let containing_crate = self.get_crate_containing_address(virt_addr, starting_crate, search_all_section_types)?;
+        let crate_locked = containing_crate.lock_as_ref();
+
+        // Second, we find the section in that crate that contains the address.
+        for sec_ref in crate_locked.sections.values() {
+            // trace!("get_section_containing_address: locking sec_ref: {:?}", sec_ref);
+            let sec = sec_ref.lock();
+            // .text sections are always included, other sections are included if requested.
+            let eligible_section = sec.typ == SectionType::Text || search_all_section_types;
+            
+            // If the section's address bounds contain the address, then we've found it.
+            // Only a single section can contain the address, so it's safe to stop once we've found a match.
+            if eligible_section && sec.address_range.contains(&virt_addr) {
+                let offset = virt_addr.value() - sec.start_address().value();
+                return Some((sec_ref.clone(), offset));
+            }
+        }
+        None
+        
+    }
+
 
     /// A convenience function that returns a weak reference to the `LoadedSection`
-    /// that matches the given name (`demangled_full_symbol`), if it exists in the symbol map.
+    /// that matches the given name (`demangled_full_symbol`), 
+    /// if it exists in this namespace's or its recursive namespace's symbol map.
     /// Otherwise, it returns None if the symbol does not exist.
     fn get_symbol_internal(&self, demangled_full_symbol: &str) -> Option<WeakSectionRef> {
         self.symbol_map.lock().get_str(demangled_full_symbol).cloned()
+            // search the recursive namespace if the symbol cannot be found in this namespace
+            .or_else(|| self.recursive_namespace.as_ref().and_then(|rns| rns.get_symbol_internal(demangled_full_symbol)))
     }
 
 
     /// Finds the corresponding `LoadedSection` reference for the given fully-qualified symbol string.
+    /// Searches this namespace first, and then its recursive namespace as well.
     pub fn get_symbol(&self, demangled_full_symbol: &str) -> WeakSectionRef {
         self.get_symbol_internal(demangled_full_symbol)
             .unwrap_or_else(|| Weak::default())
@@ -2104,57 +2285,60 @@ impl CrateNamespace {
     /// automatically find and/or load the crate containing that symbol 
     /// (and does so recursively for any of its crate dependencies).
     /// 
-    /// (1) First, it looks up the symbol in this namespace's symbol map, and returns it if present. 
+    /// (1) First, it recursively searches this namespace's and its recursive namespaces' symbol maps, 
+    ///     and returns the symbol if already loaded.
     /// 
-    /// (2) Second, if the symbol is missing from this namespace, it looks in the `backup_namespace`. 
-    ///     If we find it there, then add that shared crate into this namespace.
+    /// (2) Second, if the symbol is missing from this namespace, it looks in the `temp_backup_namespace`. 
+    ///     If we find it there, then we add that symbol and its containing crate as a shared crate in this namespace.
     /// 
-    /// (3) Third, if the missing symbol isn't in the backup namespace either, 
-    ///     try to load its containing crate from the module file. 
+    /// (3) Third, if this namespace has `fuzzy_symbol_matching` enabled, it searches the backup namespace
+    ///     for symbols that match the given `demangled_full_symbol` without the hash suffix. 
+    /// 
+    /// (4) Fourth, if the missing symbol isn't in the backup namespace either, 
+    ///     try to load its containing crate from the object file. 
     ///     This can only be done for symbols that have a leading crate name, such as "my_crate::foo";
     ///     if a symbol was given the `no_mangle` attribute, then we will not be able to find it,
     ///     and that symbol's containing crate should be manually loaded before invoking this. 
     /// 
-    /// (4) Fourth, if this namespace has `fuzzy_symbol_matching` enabled, it searches the backup namespace
-    ///     for symbols that match the given `demangled_full_symbol` without the hash suffix. 
     /// 
     /// # Arguments
-    /// * `demangled_full_symbol`: a fully-qualified symbol string, e.g., "my_crate::MyStruct::do_foo::h843a9ea794da0c24".
-    /// * `backup_namespace`: the `CrateNamespace` that should be searched for missing symbols 
-    ///   if a symbol cannot be found in this `CrateNamespace`. 
-    ///   For example, the default namespace could be used by passing in `Some(get_default_namespace())`.
-    ///   If `backup_namespace` is `None`, then no other namespace will be searched.
+    /// * `demangled_full_symbol`: a fully-qualified symbol string, e.g., "my_crate::MyStruct::foo::h843a9ea794da0c24".
+    /// * `temp_backup_namespace`: the `CrateNamespace` that should be temporarily searched (just during this call)
+    ///   for the missing symbol.
+    ///   If `temp_backup_namespace` is `None`, then only this namespace (and its recursive namespaces) will be searched.
     /// * `kernel_mmi_ref`: a mutable reference to the kernel's `MemoryManagementInfo`.
     pub fn get_symbol_or_load(
         &self, 
         demangled_full_symbol: &str, 
-        backup_namespace: Option<&CrateNamespace>, 
+        temp_backup_namespace: Option<&CrateNamespace>, 
         kernel_mmi_ref: &MmiRef,
         verbose_log: bool
     ) -> WeakSectionRef {
         // First, see if the section for the given symbol is already available and loaded
+        // in either this namespace or the recursive namespace
         if let Some(sec) = self.get_symbol_internal(demangled_full_symbol) {
             return sec;
         }
 
-        // If not, our second option is to check the backup_namespace
+        // If not, our second option is to check the temp_backup_namespace
         // to see if that namespace already has the section we want
-        if let Some(backup) = backup_namespace {
+        if let Some(backup) = temp_backup_namespace {
             // info!("Symbol \"{}\" not initially found, attempting to load it from backup namespace {:?}", 
             //     demangled_full_symbol, backup.name);
             if let Some(weak_sec) = backup.get_symbol_internal(demangled_full_symbol) {
                 if let Some(sec) = weak_sec.upgrade() {
-                    // If we found it in the backup_namespace, then that saves us the effort of having to load the crate again.
+                    // If we found it in the temp_backup_namespace, then that saves us the effort of having to load the crate again.
                     // We need to add a shared reference to that section's parent crate to this namespace as well, 
                     // so it can't be dropped while this namespace is still relying on it.  
                     let pcref_opt = { sec.lock().parent_crate.upgrade() };
                     if let Some(parent_crate_ref) = pcref_opt {
                         let parent_crate_name = {
                             let parent_crate = parent_crate_ref.lock_as_ref();
-                            // Here, there is a potential for optimization: add all symbols from the parent_crate into the current namespace.
+                            // Here, there is a misguided potential for optimization: add all symbols from the parent_crate into the current namespace.
                             // While this would save lookup/loading time if future symbols were needed from this crate,
                             // we *cannot* do this because it violates the expectations of certain namespaces. 
                             // For example, some namespaces may want to use just *one* symbol from another namespace's crate, not all of them. 
+                            // Thus, we just add the one symbol for `sec` to this namespace.
                             self.add_symbols(Some(sec.clone()).iter(), verbose_log);
                             parent_crate.crate_name.clone()
                         };
@@ -2174,15 +2358,15 @@ impl CrateNamespace {
         }
 
         // Try to fuzzy match the symbol to see if a single match for it has already been loaded into the backup namespace.
-        // This is basically the same code as the above backup_namespace conditional, but checks to ensure there aren't multiple fuzzy matches.
+        // This is basically the same code as the above temp_backup_namespace conditional, but checks to ensure there aren't multiple fuzzy matches.
         if self.fuzzy_symbol_matching {
-            if let Some(backup) = backup_namespace {
+            if let Some(backup) = temp_backup_namespace {
                 let fuzzy_matches = backup.find_symbols_starting_with(LoadedSection::section_name_without_hash(demangled_full_symbol));
                 
                 if fuzzy_matches.len() == 1 {
                     let (_sec_name, weak_sec) = &fuzzy_matches[0];
                     if let Some(sec) = weak_sec.upgrade() {
-                        // If we found it in the backup_namespace, we need to add a shared reference to that section's parent crate
+                        // If we found it in the temp_backup_namespace, we need to add a shared reference to that section's parent crate
                         // to this namespace so it can't be dropped while this namespace is still relying on it.  
                         let pcref_opt = { sec.lock().parent_crate.upgrade() };
                         if let Some(parent_crate_ref) = pcref_opt {
@@ -2210,48 +2394,66 @@ impl CrateNamespace {
             }
         }
 
-        // If we couldn't get the symbol, then we attempt to load the kernel crate containing that symbol.
-        // We are only able to do this for mangled symbols that have a leading crate name, such as "my_crate::foo". 
+        // As a final attempt, we try to load the crate(s) containing the missing symbol.
+        // We are only able to do this for mangled symbols that contain a crate name, such as "my_crate::foo". 
         // If "foo()" was marked no_mangle, then we don't know which crate to load because there is no "my_crate::" before it.
-        if let Some(crate_dependency_name) = get_containing_crate_name(demangled_full_symbol) {
-            #[cfg(not(loscd_eval))]
-            info!("Symbol \"{}\" not initially found, attempting to load its containing crate {:?}", 
-                demangled_full_symbol, crate_dependency_name);
+        // There are multiple potential containing crates, so we try to load each one to find the missing symbol.
+        for crate_dependency_name in get_containing_crate_name(demangled_full_symbol) {
             let crate_dependency_name = format!("{}-", crate_dependency_name);
  
             // Try to find and load the missing crate object file from this namespace's directory set,
             // (or from the backup namespace's directory set).
-            if let Some(dependency_crate_file_path) = self.get_kernel_file_starting_with(&crate_dependency_name)
-                .or_else(|| backup_namespace.and_then(|backup| backup.get_kernel_file_starting_with(&crate_dependency_name)))
-            {
-                if let Ok(_num_new_syms) = self.load_kernel_crate(&dependency_crate_file_path, backup_namespace, kernel_mmi_ref, verbose_log) {
-                    // try again to find the missing symbol, now that we've loaded the missing crate
-                    if let Some(sec) = self.get_symbol_internal(demangled_full_symbol) {
-                        return sec;
-                    }
-                    else {
-                        error!("Symbol \"{}\" not found, even after loading its containing crate \"{}\". Is that symbol actually in the crate?", 
-                            demangled_full_symbol, crate_dependency_name);                                                        
-                    }
+            if let Some(dependency_crate_file_path) = self.get_crate_file_starting_with(&crate_dependency_name)
+                .or_else(|| temp_backup_namespace.and_then(|backup| backup.get_crate_file_starting_with(&crate_dependency_name)))
+            {   
+                // Check to make sure this crate is not already loaded into this namespace.
+                if self.crate_tree.lock().contains_key_str(dependency_crate_file_path.file_stem()) {
+                    trace!("  (skipping already-loaded crate {:?})", dependency_crate_file_path);
+                    continue;
                 }
-                else {
-                    error!("Found symbol's (\"{}\") containing crate, but couldn't load that crate file {:?}.",
-                        demangled_full_symbol, dependency_crate_file_path);
+                #[cfg(not(loscd_eval))]
+                info!("Symbol \"{}\" not initially found, attempting to load crate {:?} that may contain it.", 
+                    demangled_full_symbol, crate_dependency_name);
+
+                match self.load_crate(&dependency_crate_file_path, temp_backup_namespace, kernel_mmi_ref, verbose_log) {
+                    Ok(_num_new_syms) => {
+                        // try again to find the missing symbol, now that we've loaded the missing crate
+                        if let Some(sec) = self.get_symbol_internal(demangled_full_symbol) {
+                            return sec;
+                        } else {
+                            trace!("Loaded symbol's (\"{}\") containing crate {:?}, but still couldn't find the symbol.", 
+                                demangled_full_symbol, dependency_crate_file_path);
+                        }
+                    }
+                    Err(_e) => {
+                        error!("Found symbol's (\"{}\") containing crate, but couldn't load the crate file {:?}. Error: {:?}",
+                            demangled_full_symbol, dependency_crate_file_path, _e);
+                    }
                 }
             }
             else {
-                error!("Couldn't find a single containing crate for symbol \"{}\" (tried looking up crate {:?}).", 
+                warn!("Couldn't find a single containing crate for symbol \"{}\" (tried looking up crate {:?}).", 
                     demangled_full_symbol, crate_dependency_name);
             }
         }
 
-        error!("Symbol \"{}\" not found. Try loading the specific crate manually first.", demangled_full_symbol);
-        Weak::default() // same as returning None, since it must be upgraded to an Arc before being used
+
+        // Finally, try getting/loading the symbol from the recursive namespace instead
+        if let Some(sec) = self.recursive_namespace().as_ref().map(|r_ns|
+            r_ns.get_symbol_or_load(demangled_full_symbol, temp_backup_namespace, kernel_mmi_ref, verbose_log)
+        ) {
+            sec
+        }
+        else {
+            error!("Symbol \"{}\" not found. Try loading the specific crate manually first.", demangled_full_symbol);
+            Weak::default() // same as returning None, since it must be upgraded to an Arc before being used
+        }
     }
 
 
     /// Returns a copied list of the corresponding `LoadedSection`s 
     /// with names that start with the given `symbol_prefix`.
+    /// This will also search the recursive namespace's symbol map. 
     /// 
     /// This method causes allocation because it creates a copy
     /// of the matching entries in the symbol map.
@@ -2262,15 +2464,22 @@ impl CrateNamespace {
     /// Calling `find_symbols_starting_with("my_crate::foo")` will return 
     /// a vector containing both sections, which can then be iterated through.
     pub fn find_symbols_starting_with(&self, symbol_prefix: &str) -> Vec<(String, WeakSectionRef)> { 
-        self.symbol_map.lock()
+        let mut syms: Vec<(String, WeakSectionRef)> = self.symbol_map.lock()
             .iter_prefix_str(symbol_prefix)
             .map(|(k, v)| (String::from(k.as_str()), v.clone()))
-            .collect()
+            .collect();
+
+        if let Some(mut syms_recursive) = self.recursive_namespace().as_ref().map(|r_ns| r_ns.find_symbols_starting_with(symbol_prefix)) {
+            syms.append(&mut syms_recursive);
+        }
+
+        syms
     }
 
 
     /// Returns a weak reference to the `LoadedSection` whose name beings with the given `symbol_prefix`,
     /// *if and only if* the symbol map only contains a single possible matching symbol.
+    /// This will also search the recursive namespace's symbol map. 
     /// 
     /// # Important Usage Note
     /// To avoid greedily matching more symbols than expected, you may wish to end the `symbol_prefix` with "`::`".
@@ -2294,16 +2503,30 @@ impl CrateNamespace {
     ///   To match only `foo`, call this function as `get_symbol_starting_with("my_crate::foo::")`
     ///   (note the trailing "`::`").
     pub fn get_symbol_starting_with(&self, symbol_prefix: &str) -> WeakSectionRef { 
+        self.get_symbol_starting_with_internal(symbol_prefix)
+            .unwrap_or_default()
+    }
+
+    /// This is an internal version of method: [`get_symbol_starting_with()`](#method.get_symbol_starting_with) 
+    /// that returns an Option to allow easier recursive use.
+    fn get_symbol_starting_with_internal(&self, symbol_prefix: &str) -> Option<WeakSectionRef> { 
+        // First, we see if there's a single matching symbol in this namespace. 
         let map = self.symbol_map.lock();
         let mut iter = map.iter_prefix_str(symbol_prefix).map(|tuple| tuple.1);
-        iter.next()
+        let symbol_in_this_namespace = iter.next()
             .filter(|_| iter.next().is_none()) // ensure single element
-            .cloned()
-            .unwrap_or_default()
+            .cloned();
+        
+        // Second, we see if there's a single matching symbol in the recursive namespace.
+        let symbol_in_recursive_namespace = self.recursive_namespace().as_ref().and_then(|r_ns| r_ns.get_symbol_starting_with_internal(symbol_prefix));
+
+        // There can only be one matching crate across all recursive namespaces.
+        symbol_in_this_namespace.xor(symbol_in_recursive_namespace)
     }
 
     
     /// Simple debugging function that returns the entire symbol map as a String.
+    /// This includes only symbols from this namespace, and excludes symbols from recursive namespaces.
     pub fn dump_symbol_map(&self) -> String {
         use core::fmt::Write;
         let mut output: String = String::new();
@@ -2314,202 +2537,138 @@ impl CrateNamespace {
         }
     }
 
+    /// Same as [`dump_symbol_map()`](#method.dump_symbol_map), 
+    /// but includes symbols from recursive namespaces.
+    pub fn dump_symbol_map_recursive(&self) -> String {
+        let mut syms = self.dump_symbol_map();
 
-    /// Same as `get_kernel_files_starting_with()`, 
+        if let Some(ref r_ns) = self.recursive_namespace {
+            let syms_recursive = r_ns.dump_symbol_map_recursive();
+            syms = format!("{}\n{}", syms, syms_recursive);
+        }
+
+        syms
+    }
+
+
+    /// Same as `get_crate_files_starting_with()`, 
     /// but returns `Some(Path)` only if there is a single match.
     /// If there are multiple matches, `None` is returned.
     /// 
-    /// Returns the absolute `Path` of the matching kernel crate file.
-    pub fn get_kernel_file_starting_with(&self, prefix: &str) -> Option<Path> {
-        let children = { self.dirs.kernel.lock().list() };
-        let mut iter = children.into_iter().filter(|child_name| child_name.starts_with(prefix));
-        iter.next()
-            .filter(|_| iter.next().is_none()) // ensure single element
-            .and_then(|name| { 
-                let file_or_dir = { self.dirs.kernel.lock().get(&name) };
-                match file_or_dir {
-                    Some(FileOrDir::File(f)) => Some(Path::new(f.lock().get_absolute_path())),
-                    _ => None,
-                }
-            })
+    /// Returns the absolute `Path` of the matching crate file.
+    pub fn get_crate_file_starting_with(&self, prefix: &str) -> Option<Path> {
+        let cfile_in_this_namespace = self.dir.get_file_starting_with(prefix)
+            .map(|f| Path::new(f.lock().get_absolute_path()));
+        let cfile_in_recursive_namespace = self.recursive_namespace().as_ref().and_then(|r_ns| r_ns.get_crate_file_starting_with(prefix));
+
+        cfile_in_this_namespace.xor(cfile_in_recursive_namespace)
     }
 
 
-    /// Finds the kernel crate object files in this `CrateNamespace`'s directory of kernel crates
+    /// Finds the crate object files in this `CrateNamespace`'s directory 
     /// that start with the given `prefix`.
     /// 
-    /// Returns a list of the absolute `Path`s of matching kernel crate files.
-    pub fn get_kernel_files_starting_with(&self, prefix: &str) -> Vec<Path> {
-        let children = { self.dirs.kernel.lock().list() };
-        children.into_iter().filter_map(|name| {
-            if name.starts_with(prefix) {
-                let file_or_dir = { self.dirs.kernel.lock().get(&name) };
-                match file_or_dir {
-                    Some(FileOrDir::File(f)) => Some(Path::new(f.lock().get_absolute_path())),
-                    _ => None,
-                }
-            } else {
-                None // remove non-matches
-            }
-        }).collect()
+    /// Returns a list of the absolute `Path`s of matching kernel files.
+    pub fn get_crate_files_starting_with(&self, prefix: &str) -> Vec<Path> {
+        let mut cfiles: Vec<Path> = self.dir
+            .get_files_starting_with(prefix)
+            .into_iter()
+            .map(|f| Path::new(f.lock().get_absolute_path()))
+            .collect();
+
+        if let Some(mut cfiles_recursive) = self.recursive_namespace().as_ref().map(|r_ns| r_ns.get_crate_files_starting_with(prefix)) {
+            cfiles.append(&mut cfiles_recursive);
+        }
+
+        cfiles
     }
 
 }
-
-
-/// Crate names must be only alphanumeric characters, an underscore, or a dash. 
-/// See: <https://www.reddit.com/r/rust/comments/4rlom7/what_characters_are_allowed_in_a_crate_name/>
-fn is_valid_crate_name_char(c: char) -> bool {
-    char::is_alphanumeric(c) || 
-    c == '_' || 
-    c == '-'
-}
-
-/// Parses the given symbol string to try to find the contained parent crate
-/// that contains the symbol. 
-/// If the parent crate cannot be determined (e.g., a `no_mangle` symbol),
-/// then the input string is returned unchanged.
-/// # Examples
-/// ```
-/// <*const T as core::fmt::Debug>::fmt   -->  core 
-/// <alloc::boxed::Box<T>>::into_unique   -->  alloc
-/// keyboard::init                        -->  keyboard
-/// ```
-pub fn get_containing_crate_name<'a>(demangled_full_symbol: &'a str) -> Option<&'a str> {
-    demangled_full_symbol.split("::").next().and_then(|s| {
-        // Get the last word right before the first "::"
-        s.rsplit(|c| !is_valid_crate_name_char(c))
-            .next() // the first element of the iterator (last element before the "::")
-    })
-}
-
-
-/// Similar to [`get_containing_crate_name()`](#method.get_containing_crate_name),
-/// but replaces the parent crate name with the given `new_crate_name`, 
-/// if it can be found, and if the parent crate name matches the `old_crate_name`. 
-/// If the parent crate name can be found but does not match the expected `old_crate_name`,
-/// then None is returned.
-/// 
-/// This creates an entirely new String rather than performing an in-place replacement, 
-/// because the `new_crate_name` might be a different length than the original crate name.
-/// # Examples
-/// `keyboard::init  -->  keyboard_new::init`
-fn replace_containing_crate_name<'a>(demangled_full_symbol: &'a str, old_crate_name: &str, new_crate_name: &str) -> Option<String> {
-    // debug!("replace_containing_crate_name(dfs: {:?}, old: {:?}, new: {:?})", demangled_full_symbol, old_crate_name, new_crate_name);
-    demangled_full_symbol.match_indices("::").next().and_then(|(index_of_first_double_colon, _substr)| {
-        // Get the last word right before the first "::"
-        demangled_full_symbol.get(.. index_of_first_double_colon).and_then(|substr| {
-            // debug!("  replace_containing_crate_name(\"{}\"): substr: \"{}\" at index {}", demangled_full_symbol, substr, index_of_first_double_colon);
-            let start_idx = substr.rmatch_indices(|c| !is_valid_crate_name_char(c))
-                .next() // the first element right before the crate name starts
-                .map(|(index_right_before_parent_crate_name, _substr)| { index_right_before_parent_crate_name + 1 }) // advance to the actual start 
-                .unwrap_or(0); // if we didn't find any match, it means that everything since the beginning of the string was a valid char part of the parent_crate_name 
-
-            demangled_full_symbol.get(start_idx .. index_of_first_double_colon)
-                .filter(|&parent_crate_name| { parent_crate_name == old_crate_name })
-                .and_then(|_parent_crate_name| {
-                    // debug!("    replace_containing_crate_name(\"{}\"): parent_crate_name: \"{}\" at index [{}-{})", demangled_full_symbol, _parent_crate_name, start_idx, index_of_first_double_colon);
-                    demangled_full_symbol.get(.. start_idx).and_then(|before_crate_name| {
-                        demangled_full_symbol.get(index_of_first_double_colon ..).map(|after_crate_name| {
-                            format!("{}{}{}", before_crate_name, new_crate_name, after_crate_name)
-                        })
-                    })
-            })
-        })
-    })
-}
-
 
 
 /// A convenience wrapper for a set of the three possible types of `MappedPages`
 /// that can be allocated and mapped for a single `LoadedCrate`. 
 struct SectionPages {
-    /// MappedPages that cover all .text sections, if any exist.
-    text_pages:   Option<MappedPages>, //Option<Arc<Mutex<MappedPages>>>,
-    /// MappedPages that cover all .rodata sections, if any exist.
-    rodata_pages: Option<MappedPages>, //Option<Arc<Mutex<MappedPages>>>,
-    /// MappedPages that cover all .data and .bss sections, if any exist.
-    data_pages:   Option<MappedPages>, //Option<Arc<Mutex<MappedPages>>>,
+    /// MappedPages that will hold any and all executable sections: `.text`
+    /// and their bounds express in `VirtualAddress`es.
+    executable_pages: Option<(MappedPages, Range<VirtualAddress>)>,
+    /// MappedPages that will hold any and all read-only sections: `.rodata`, `.eh_frame`, `.gcc_except_table`
+    /// and their bounds express in `VirtualAddress`es.
+    read_only_pages: Option<(MappedPages, Range<VirtualAddress>)>,
+    /// MappedPages that will hold any and all read-write sections: `.data` and `.bss`
+    /// and their bounds express in `VirtualAddress`es.
+    read_write_pages: Option<(MappedPages, Range<VirtualAddress>)>,
 }
 
 
-/// Allocates enough space for the sections that are found in the given `ElfFile`.
-/// Returns a tuple of `MappedPages` for the .text, .rodata, and .data/.bss sections, in that order.
-fn allocate_section_pages(elf_file: &ElfFile, kernel_mmi_ref: &MmiRef) 
-    -> Result<SectionPages, &'static str> 
-{
-    // Calculate how many bytes (and thus how many pages) we need for each of the three section types,
-    // which are text (present | exec), rodata (present | noexec), data/bss (present | writable)
-    let (text_bytecount, rodata_bytecount, data_bytecount): (usize, usize, usize) = {
-        let (mut text, mut rodata, mut data) = (0, 0, 0);
+/// Allocates and maps memory sufficient to hold the sections that are found in the given `ElfFile`.
+/// Only sections that are marked "allocated" (`ALLOC`) in the ELF object file will contribute to the mappings' sizes.
+fn allocate_section_pages(elf_file: &ElfFile, kernel_mmi_ref: &MmiRef) -> Result<SectionPages, &'static str> {
+    // Calculate how many bytes (and thus how many pages) we need for each of the three section types.
+    //
+    // Since all executable .text sections come at the beginning of the object file, we can simply find 
+    // the end of the last .text section and then use it as the end bounds.
+    let (exec_bytes, ro_bytes, rw_bytes): (usize, usize, usize) = {
+        let mut text_max_offset = 0;
+        let mut ro_bytes = 0;
+        let mut rw_bytes = 0;
         for sec in elf_file.section_iter() {
-            let sec_typ = sec.get_type();
-            // look for .text, .rodata, .data, and .bss sections
-            if sec_typ == Ok(ShType::ProgBits) || sec_typ == Ok(ShType::NoBits) {
-                let size = sec.size() as usize;
-                if (size == 0) || (sec.flags() & SHF_ALLOC == 0) {
-                    continue; // skip non-allocated sections (they're useless)
-                }
-
-                let align = sec.align() as usize;
-                let addend = round_up_power_of_two(size, align);
-    
-                // filter flags for ones we care about (we already checked that it's loaded (SHF_ALLOC))
-                let write: bool = sec.flags() & SHF_WRITE     == SHF_WRITE;
-                let exec:  bool = sec.flags() & SHF_EXECINSTR == SHF_EXECINSTR;
-                if exec {
-                    // trace!("  Looking at sec with size {:#X} align {:#X} --> addend {:#X}", size, align, addend);
-                    text += addend;
-                }
-                else if write {
-                    // .bss sections have the same flags (write and alloc) as data, so combine them
-                    data += addend;
-                }
-                else {
-                    rodata += addend;
-                }
+            let size = sec.size() as usize;
+            // skip zero-sized sections and non-allocated sections (they're useless)
+            if (size == 0) || (sec.flags() & SHF_ALLOC == 0) {
+                continue;
             }
-        }
-        (text, rodata, data)
-    };
 
-    // create a closure here to allocate N contiguous virtual memory pages
-    // and map them to random frames as writable, returns Result<MappedPages, &'static str>
-    let (text_pages, rodata_pages, data_pages): (Option<MappedPages>, Option<MappedPages>, Option<MappedPages>) = {
-        use memory::FRAME_ALLOCATOR;
-        let mut frame_allocator = try!(FRAME_ALLOCATOR.try().ok_or("couldn't get FRAME_ALLOCATOR")).lock();
+            let align = sec.align() as usize;
+            let addend = round_up_power_of_two(size, align);
 
-        let mut allocate_pages_closure = |size_in_bytes: usize, flags: EntryFlags| {
-            let allocated_pages = try!(allocate_pages_by_bytes(size_in_bytes).ok_or("Couldn't allocate_pages_by_bytes, out of virtual address space"));
-
-            if let PageTable::Active(ref mut active_table) = kernel_mmi_ref.lock().page_table {
-                // Right now we're just simply copying small sections to the new memory,
-                // so we have to map those pages to real (randomly chosen) frames first. 
-                // because we're copying bytes to the newly allocated pages, we need to make them writable too, 
-                // and then change the page permissions (by using remap) later. 
-                active_table.map_allocated_pages(allocated_pages, flags | EntryFlags::PRESENT | EntryFlags::WRITABLE, frame_allocator.deref_mut())
+            // filter flags for ones we care about (we already checked that it's loaded (SHF_ALLOC))
+            let write: bool = sec.flags() & SHF_WRITE     == SHF_WRITE;
+            let exec:  bool = sec.flags() & SHF_EXECINSTR == SHF_EXECINSTR;
+            // trace!("  Looking at sec {:?}, size {:#X}, align {:#X} --> addend {:#X}", sec.get_name(elf_file), size, align, addend);
+            if exec {
+                // this includes only .text sections
+                text_max_offset = core::cmp::max(text_max_offset, (sec.offset() as usize) + addend);
+            }
+            else if write {
+                // this includes both .bss and .data sections
+                rw_bytes += addend;
             }
             else {
-                return Err("couldn't get kernel's active page table");
+                // this includes .rodata, plus special sections like .eh_frame and .gcc_except_table
+                ro_bytes += addend;
             }
-    
-        };
-
-        // we must allocate these pages separately because they will have different flags later
-        (
-            if text_bytecount   > 0 { allocate_pages_closure(text_bytecount,   TEXT_SECTION_FLAGS()).ok()     } else { None }, 
-            if rodata_bytecount > 0 { allocate_pages_closure(rodata_bytecount, RODATA_SECTION_FLAGS()).ok()   } else { None }, 
-            if data_bytecount   > 0 { allocate_pages_closure(data_bytecount,   DATA_BSS_SECTION_FLAGS()).ok() } else { None }
-        )
+        }
+        (text_max_offset, ro_bytes, rw_bytes)
     };
 
-    Ok(
-        SectionPages {
-            text_pages,
-            rodata_pages,
-            data_pages,
-        }
-    )
+    // Allocate contiguous virtual memory pages for each section and map them to random frames as writable.
+    // We must allocate these pages separately because they will have different flags later.
+    let executable_pages = if exec_bytes > 0 { Some(allocate_and_map_as_writable(exec_bytes, TEXT_SECTION_FLAGS,     kernel_mmi_ref)?) } else { None };
+    let read_only_pages =  if ro_bytes   > 0 { Some(allocate_and_map_as_writable(ro_bytes,   RODATA_SECTION_FLAGS,   kernel_mmi_ref)?) } else { None };
+    let read_write_pages = if rw_bytes   > 0 { Some(allocate_and_map_as_writable(rw_bytes,   DATA_BSS_SECTION_FLAGS, kernel_mmi_ref)?) } else { None };
+
+    let range_tuple = |mp: MappedPages, size_in_bytes: usize| {
+        let start = mp.start_address();
+        (mp, start..(start + size_in_bytes))
+    };
+
+    Ok(SectionPages {
+        executable_pages: executable_pages.map(|mp| range_tuple(mp, exec_bytes)),
+        read_only_pages:  read_only_pages .map(|mp| range_tuple(mp, ro_bytes)),
+        read_write_pages: read_write_pages.map(|mp| range_tuple(mp, rw_bytes)),
+    })
+}
+
+
+/// A convenience function for allocating contiguous virtual memory pages and mapping them to random physical frames. 
+/// 
+/// The returned `MappedPages` will be at least as large as `size_in_bytes`, rounded up to the nearest `Page` size, 
+/// and is mapped as writable along with the other specified `flags` to ensure we can copy content into it.
+fn allocate_and_map_as_writable(size_in_bytes: usize, flags: EntryFlags, kernel_mmi_ref: &MmiRef) -> Result<MappedPages, &'static str> {
+    let mut frame_allocator = FRAME_ALLOCATOR.try().ok_or("couldn't get FRAME_ALLOCATOR")?.lock();
+    let allocated_pages = allocate_pages_by_bytes(size_in_bytes).ok_or("Couldn't allocate_pages_by_bytes, out of virtual address space")?;
+    kernel_mmi_ref.lock().page_table.map_allocated_pages(allocated_pages, flags | EntryFlags::PRESENT | EntryFlags::WRITABLE, frame_allocator.deref_mut())
 }
 
 
@@ -2533,29 +2692,30 @@ fn write_relocation(
 
     // Perform the actual relocation data writing here.
     // There is a great, succint table of relocation types here
-    // https://docs.rs/goblin/0.0.13/goblin/elf/reloc/index.html
+    // https://docs.rs/goblin/0.0.24/goblin/elf/reloc/index.html
     match relocation_entry.typ {
         R_X86_64_32 => {
-            let target_ref: &mut u32 = try!(target_sec_mapped_pages.as_type_mut(target_offset));
-            let source_val = source_sec_vaddr.wrapping_add(relocation_entry.addend);
+            let target_ref: &mut u32 = target_sec_mapped_pages.as_type_mut(target_offset)?;
+            let source_val = source_sec_vaddr.value().wrapping_add(relocation_entry.addend);
             if verbose_log { trace!("                    target_ptr: {:#X}, source_val: {:#X} (from sec_vaddr {:#X})", target_ref as *mut _ as usize, source_val, source_sec_vaddr); }
             *target_ref = source_val as u32;
         }
         R_X86_64_64 => {
-            let target_ref: &mut u64 = try!(target_sec_mapped_pages.as_type_mut(target_offset));
-            let source_val = source_sec_vaddr.wrapping_add(relocation_entry.addend);
+            let target_ref: &mut u64 = target_sec_mapped_pages.as_type_mut(target_offset)?;
+            let source_val = source_sec_vaddr.value().wrapping_add(relocation_entry.addend);
             if verbose_log { trace!("                    target_ptr: {:#X}, source_val: {:#X} (from sec_vaddr {:#X})", target_ref as *mut _ as usize, source_val, source_sec_vaddr); }
             *target_ref = source_val as u64;
         }
-        R_X86_64_PC32 => {
-            let target_ref: &mut u32 = try!(target_sec_mapped_pages.as_type_mut(target_offset));
-            let source_val = source_sec_vaddr.wrapping_add(relocation_entry.addend).wrapping_sub(target_ref as *mut _ as usize);
+        R_X86_64_PC32 |
+        R_X86_64_PLT32 => {
+            let target_ref: &mut u32 = target_sec_mapped_pages.as_type_mut(target_offset)?;
+            let source_val = source_sec_vaddr.value().wrapping_add(relocation_entry.addend).wrapping_sub(target_ref as *mut _ as usize);
             if verbose_log { trace!("                    target_ptr: {:#X}, source_val: {:#X} (from sec_vaddr {:#X})", target_ref as *mut _ as usize, source_val, source_sec_vaddr); }
             *target_ref = source_val as u32;
         }
         R_X86_64_PC64 => {
-            let target_ref: &mut u64 = try!(target_sec_mapped_pages.as_type_mut(target_offset));
-            let source_val = source_sec_vaddr.wrapping_add(relocation_entry.addend).wrapping_sub(target_ref as *mut _ as usize);
+            let target_ref: &mut u64 = target_sec_mapped_pages.as_type_mut(target_offset)?;
+            let source_val = source_sec_vaddr.value().wrapping_add(relocation_entry.addend).wrapping_sub(target_ref as *mut _ as usize);
             if verbose_log { trace!("                    target_ptr: {:#X}, source_val: {:#X} (from sec_vaddr {:#X})", target_ref as *mut _ as usize, source_val, source_sec_vaddr); }
             *target_ref = source_val as u64;
         }

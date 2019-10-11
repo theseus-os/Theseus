@@ -1,7 +1,6 @@
 //! An implementation of in-memory files, backed by heap memory, i.e., `Vec`s.
 
 #![no_std]
-#![feature(alloc)]
 
 #[cfg(test)]
 #[macro_use] extern crate std;
@@ -47,7 +46,7 @@ impl HeapFile {
             vec: vec, 
             parent: Arc::downgrade(parent), 
         };
-        let file_ref = Arc::new(Mutex::new(hf)) as Arc<Mutex<File + Send>>;
+        let file_ref = Arc::new(Mutex::new(hf)) as FileRef;
         parent.lock().insert(FileOrDir::File(file_ref.clone()))?;
         Ok(file_ref)
     }
@@ -115,45 +114,4 @@ impl FsNode for HeapFile {
     fn set_parent_dir(&mut self, new_parent: WeakDirRef) {
         self.parent = new_parent;
     }
-}
-
-
-
-/******************** TESTS BELOW *******************/
-
-// To run this:  cargo test heapfile_test -- --nocapture
-#[test]
-pub fn heapfile_test() {
-    println!("in heapfile_test");
-
-    let mut hf = HeapFile {
-        name: String::from("test"),
-        vec: Vec::new(),
-        parent: unsafe { core::mem::uninitialized() },
-    };
-
-    println!("calling write1");
-    let count = hf.write(&[1, 2, 3], 0).unwrap();
-    println!("after write1: count {}, {:?}", count, hf.vec);
-
-    println!("calling write2");
-    let count = hf.write(&[2; 16], 3).unwrap();
-    println!("after write2: count {}, {:?}", count, hf.vec);
-
-    println!("calling write3");
-    let count = hf.write(&[9; 40], 7).unwrap();
-    println!("after write3: count {}, {:?}", count, hf.vec);
-
-    println!("calling write4");
-    let count = hf.write(&[10, 11, 12, 13], 27).unwrap();
-    println!("after write4: count {}, {:?}", count, hf.vec);
-
-    println!("calling write5");
-    let count = hf.write(&[20; 5], 45).unwrap();
-    println!("after write5: count {}, {:?}", count, hf.vec);
-
-    // the uninialized `parent` mem will cause a crash when dropped,
-    // so we must forget it to prevent it from being dropped.
-    let HeapFile { parent, .. } = hf;
-    core::mem::forget(parent);
 }

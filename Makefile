@@ -9,30 +9,41 @@ include cfg/Config.mk
 
 all: iso
 
+## test for Windows Subsystem for Linux (Linux on Windows)
+IS_WSL = $(shell grep -s 'Microsoft' /proc/version)
+
+
+## Tool names/locations for cross-compiling on a Mac OS / macOS host (Darwin).
+UNAME = $(shell uname -s)
+ifeq ($(UNAME),Darwin)
+	CROSS = x86_64-elf-
+	## The GRUB_CROSS variable must match the build output of "scripts/mac_os_build_setup.sh"
+	GRUB_CROSS = "$(HOME)"/theseus_tools_opt/bin/
+	## macOS uses a different unmounting utility
+	UNMOUNT = diskutil unmount
+	USB_DRIVES = $(shell diskutil list external | grep -s "/dev/" | awk '{print $$1}')
+else
+	## Just use normal umount on Linux/WSL
+	UNMOUNT = umount
+	USB_DRIVES = $(shell lsblk -O | grep -i usb | awk '{print $$2}' | grep --color=never '[^0-9]$$')
+endif
+GRUB_MKRESCUE = $(GRUB_CROSS)grub-mkrescue
+
+
 
 ###################################################################################################
 ### For ensuring that the host computer has the proper version of the Rust compiler
 ###################################################################################################
 
-RUSTC_CURRENT_SUPPORTED_VERSION := rustc 1.34.0-nightly (633d75ac1 2019-02-21)
-RUSTC_CURRENT_INSTALL_VERSION := nightly-2019-02-22
-RUSTC_OUTPUT=$(shell rustc --version)
-
-check_rustc: 	
-ifneq (${BYPASS_RUSTC_CHECK}, yes)
-ifneq (${RUSTC_CURRENT_SUPPORTED_VERSION}, ${RUSTC_OUTPUT})
-	@echo -e "\nError: your rustc version does not match our supported compiler version."
-	@echo -e "To install the proper version of rustc, run the following commands:\n"
-	@echo -e "   rustup toolchain install $(RUSTC_CURRENT_INSTALL_VERSION)"
-	@echo -e "   rustup default $(RUSTC_CURRENT_INSTALL_VERSION)"
-	@echo -e "   rustup component add rust-src"
-	@echo -e "   make clean\n"
-	@echo -e "Then you can retry building!\n"
-	@exit 1
-else
-	@echo -e '\nFound proper rust compiler version, proceeding with build...\n'
-endif ## RUSTC_CURRENT_SUPPORTED_VERSION != RUSTC_OUTPUT
-endif ## BYPASS_RUSTC_CHECK
+check_rustc:
+ifdef RUSTUP_TOOLCHAIN
+	@echo -e 'Warning: You are overriding the Rust toolchain manually via RUSTUP_TOOLCHAIN.'
+	@echo -e 'This may lead to unwanted warnings and errors during compilation.\n'
+endif
+	@rustup component add rust-src || (\
+	echo -e "\nError: rustup is not installed on this system.";\
+	echo -e "Please install rustup and try again.\n";\
+	exit 1)
 
 
 
@@ -85,22 +96,32 @@ assembly_object_files := $(patsubst $(NANO_CORE_SRC_DIR)/boot/arch_$(ARCH)/%.asm
 
 
 # get all the subdirectories in kernel/, i.e., the list of all kernel crates
-KERNEL_CRATES := $(notdir $(wildcard kernel/*))
+KERNEL_CRATE_NAMES := $(notdir $(wildcard kernel/*))
 # exclude the build directory 
-KERNEL_CRATES := $(filter-out build/. target/., $(KERNEL_CRATES))
+KERNEL_CRATE_NAMES := $(filter-out build/. target/., $(KERNEL_CRATE_NAMES))
 # exclude hidden directories starting with a "."
-KERNEL_CRATES := $(filter-out .*/, $(KERNEL_CRATES))
+KERNEL_CRATE_NAMES := $(filter-out .*/, $(KERNEL_CRATE_NAMES))
 # remove the trailing /. on each name
-KERNEL_CRATES := $(patsubst %/., %, $(KERNEL_CRATES))
+KERNEL_CRATE_NAMES := $(patsubst %/., %, $(KERNEL_CRATE_NAMES))
 
 # get all the subdirectories in applications/, i.e., the list of application crates
-APP_CRATES := $(notdir $(wildcard applications/*))
+APP_CRATE_NAMES := $(notdir $(wildcard applications/*))
 # exclude the build directory 
-APP_CRATES := $(filter-out build/. target/., $(APP_CRATES))
+APP_CRATE_NAMES := $(filter-out build/. target/., $(APP_CRATE_NAMES))
 # exclude hidden directories starting with a "."
-APP_CRATES := $(filter-out .*/, $(APP_CRATES))
+APP_CRATE_NAMES := $(filter-out .*/, $(APP_CRATE_NAMES))
 # remove the trailing /. on each name
-APP_CRATES := $(patsubst %/., %, $(APP_CRATES))
+APP_CRATE_NAMES := $(patsubst %/., %, $(APP_CRATE_NAMES))
+
+## Specify which crates are app libraries. 
+## These crates can be instantiated multiply (per-task) rather than once (system-wide);
+## they will only be multiply instantiated if they have data/bss sections
+## Ideally we would do this with a script that analyzes dependencies to see if a crate is only used by application crates,
+## but I haven't had time yet to develop that script. It would be fairly straightforward using a tool like `cargo deps`. 
+## So, for now, we just do it manually.
+## You can execute this to view dependencies to help you out:
+## `cd kernel/nano_core && cargo deps --include-orphans --no-transitive-deps | dot -Tpdf > /tmp/graph.pdf && xdg-open /tmp/graph.pdf`
+APP_CRATE_NAMES += getopts unicode_width
 
 
 ### PHONY is the list of targets that *always* get rebuilt regardless of dependent files' modification timestamps.
@@ -139,27 +160,34 @@ $(iso): build check_captain
 	@cp $(nano_core_binary) $(GRUB_ISOFILES)/boot/kernel.bin
 # autogenerate the grub.cfg file
 	cargo run --manifest-path $(ROOT_DIR)/tools/grub_cfg_generation/Cargo.toml -- $(GRUB_ISOFILES)/modules/ -o $(GRUB_ISOFILES)/boot/grub/grub.cfg
-	@grub-mkrescue -o $(iso) $(GRUB_ISOFILES)  2> /dev/null
+	$(GRUB_MKRESCUE) -o $(iso) $(GRUB_ISOFILES)  2> /dev/null
 
 
 ### Convenience target for building the ISO	using the above target
 iso: $(iso)
 
 
-## This first invokes the make target that runs the actual compiler, and then copies all object files into the build dir. 
-## It gives all object files the KERNEL_PREFIX, except for "executable" application object files that get the APP_PREFIX.
+## This first invokes the make target that runs the actual compiler, and then copies all object files into the build dir.
+## This also classifies crate object files into either "application" or "kernel" crates:
+## -- an application crate is any executable application in the `applications/` directory, or a library crate that is ONLY used by other applications,
+## -- a kernel crate is any crate in the `kernel/` directory, or any other crates that are used 
+## Obviously, if a crate is used by both other application crates and by kernel crates, it is still a kernel crate. 
+## Then, we give all kernel crate object files the KERNEL_PREFIX and all application crate object files the APP_PREFIX.
 build: $(nano_core_binary)
 ## Copy all object files into the main build directory and prepend the kernel prefix.
 ## All object files include those from the target/ directory, and the core, alloc, and compiler_builtins libraries
-	@for f in ./target/$(TARGET)/$(BUILD_MODE)/deps/*.o $(HOME)/.xargo/lib/rustlib/$(TARGET)/lib/*.o; do \
+	@for f in ./target/$(TARGET)/$(BUILD_MODE)/deps/*.o "$(HOME)"/.xargo/lib/rustlib/$(TARGET)/lib/*.o; do \
 		cp -vf  $${f}  $(OBJECT_FILES_BUILD_DIR)/`basename $${f} | sed -n -e 's/\(.*\)/$(KERNEL_PREFIX)\1/p'`   2> /dev/null ; \
 	done
 ## In the above loop, we gave all object files the kernel prefix, so we need to rename the application object files with the proper app prefix.
-## Currently, we remove the hash suffix from application object file names so they're easier to find, but we could change that later 
-## if we ever want to give applications specific versioning semantics (based on those hashes, like with kernel crates)
-	@for app in $(APP_CRATES) ; do  \
-		mv  $(OBJECT_FILES_BUILD_DIR)/$(KERNEL_PREFIX)$${app}-*.o  $(OBJECT_FILES_BUILD_DIR)/$(APP_PREFIX)$${app}.o ; \
-		strip --strip-debug  $(OBJECT_FILES_BUILD_DIR)/$(APP_PREFIX)$${app}.o ; \
+	@for app in $(APP_CRATE_NAMES) ; do  \
+		OLD_FILE_PATH=$(OBJECT_FILES_BUILD_DIR)/$(KERNEL_PREFIX)$${app}-*.o ; \
+		NEW_FILE_PATH=$(OBJECT_FILES_BUILD_DIR)/`basename $${OLD_FILE_PATH} | sed -n -e 's/$(KERNEL_PREFIX)\(.*\)/$(APP_PREFIX)\1/p'` ; \
+		mv  $${OLD_FILE_PATH}  $${NEW_FILE_PATH} ; \
+	done
+## Strip debug information (optional, just improves QEMU load times and reduces mem usage)
+	@for f in $(OBJECT_FILES_BUILD_DIR)/*.o ; do \
+		$(CROSS)strip  --strip-debug  $${f} ; \
 	done
 
 
@@ -170,28 +198,28 @@ cargo: check_rustc check_xargo
 	@echo -e "\t TARGET: \"$(TARGET)\""
 	@echo -e "\t KERNEL_PREFIX: \"$(KERNEL_PREFIX)\""
 	@echo -e "\t APP_PREFIX: \"$(APP_PREFIX)\""
-	@echo -e "\t THESEUS_CONFIG: \"$(THESEUS_CONFIG)\""
-	RUST_TARGET_PATH="$(CFG_DIR)" RUSTFLAGS="$(RUSTFLAGS)" xargo build  $(CARGO_OPTIONS)  $(RUST_FEATURES) --all --target $(TARGET)
+	@echo -e "\t THESEUS_CONFIG (before build.rs script): \"$(THESEUS_CONFIG)\""
+	RUST_TARGET_PATH="$(CFG_DIR)" RUSTFLAGS="$(RUSTFLAGS)" xargo build  $(CARGOFLAGS)  $(RUST_FEATURES) --all --target $(TARGET)
 
 ## We tried using the "xargo rustc" command here instead of "xargo build" to avoid xargo unnecessarily rebuilding core/alloc crates,
 ## But it doesn't really seem to work (it's not the cause of xargo rebuilding everything).
 ## For the "xargo rustc" command below, all of the arguments to cargo/xargo come before the "--",
 ## whereas all of the arguments to rustc come after the "--".
-# 	for kd in $(KERNEL_CRATES) ; do  \
+# 	for kd in $(KERNEL_CRATE_NAMES) ; do  \
 # 		cd $${kd} ; \
 # 		echo -e "\n========= BUILDING KERNEL CRATE $${kd} ==========\n" ; \
 # 		RUST_TARGET_PATH="$(CFG_DIR)" RUSTFLAGS="$(RUSTFLAGS)" \
 # 			xargo rustc \
-# 			$(CARGO_OPTIONS) \
+# 			$(CARGOFLAGS) \
 # 			$(RUST_FEATURES) \
 # 			--target $(TARGET) ; \
 # 		cd .. ; \
 # 	done
-# for app in $(APP_CRATES) ; do  \
+# for app in $(APP_CRATE_NAMES) ; do  \
 # 	cd $${app} ; \
 # 	RUST_TARGET_PATH="$(CFG_DIR)" RUSTFLAGS="$(RUSTFLAGS)" \
 # 		xargo rustc \
-# 		$(CARGO_OPTIONS) \
+# 		$(CARGOFLAGS) \
 # 		--target $(TARGET) \
 # 		-- \
 # 		$(COMPILER_LINTS) ; \
@@ -204,10 +232,10 @@ $(nano_core_binary): cargo $(nano_core_static_lib) $(assembly_object_files) $(li
 	@mkdir -p $(BUILD_DIR)
 	@mkdir -p $(NANO_CORE_BUILD_DIR)
 	@mkdir -p $(OBJECT_FILES_BUILD_DIR)
-	@ld -n -T $(linker_script) -o $(nano_core_binary) $(assembly_object_files) $(nano_core_static_lib)
-## run "readelf" on the nano_core binary, remove LOCAL and WEAK symbols from the ELF file, and then demangle it, and then output to a sym file
+	$(CROSS)ld -n -T $(linker_script) -o $(nano_core_binary) $(assembly_object_files) $(nano_core_static_lib)
+## run "readelf" on the nano_core binary, remove non-FUNC LOCAL symbols and WEAK symbols from the ELF file, and then demangle it, and then output to a sym file
 	@cargo run --manifest-path $(ROOT_DIR)/tools/demangle_readelf_file/Cargo.toml \
-		<(readelf -S -s -W $(nano_core_binary) | sed '/LOCAL  /d;/WEAK   /d') \
+		<($(CROSS)readelf -S -s -W $(nano_core_binary) | sed '/OBJECT  LOCAL  /d;/NOTYPE  LOCAL  /d;/FILE    LOCAL  /d;/SECTION LOCAL  /d;/WEAK   /d') \
 		>  $(OBJECT_FILES_BUILD_DIR)/$(KERNEL_PREFIX)nano_core.sym
 	@echo -n -e '\0' >> $(OBJECT_FILES_BUILD_DIR)/$(KERNEL_PREFIX)nano_core.sym
 
@@ -245,7 +273,7 @@ userspace:
 #
 # ## Builds our custom lints in the compiler plugins directory so we can use them here
 # compiler_plugins:
-# 	@cd $(COMPILER_PLUGINS_DIR) && cargo build $(CARGO_OPTIONS)
+# 	@cd $(COMPILER_PLUGINS_DIR) && cargo build $(CARGOFLAGS)
 
 
 
@@ -264,7 +292,7 @@ simd_personality_sse: build_sse build
 	@cp $(nano_core_binary) $(GRUB_ISOFILES)/boot/kernel.bin
 ## autogenerate the grub.cfg file
 	cargo run --manifest-path $(ROOT_DIR)/tools/grub_cfg_generation/Cargo.toml -- $(GRUB_ISOFILES)/modules/ -o $(GRUB_ISOFILES)/boot/grub/grub.cfg
-	@grub-mkrescue -o $(iso) $(GRUB_ISOFILES)  2> /dev/null
+	@$(GRUB_MKRESCUE) -o $(iso) $(GRUB_ISOFILES)  2> /dev/null
 ## run it in QEMU
 	qemu-system-x86_64 $(QEMU_FLAGS)
 
@@ -285,7 +313,7 @@ simd_personality_avx: build_avx build
 	@cp $(nano_core_binary) $(GRUB_ISOFILES)/boot/kernel.bin
 ## autogenerate the grub.cfg file
 	cargo run --manifest-path $(ROOT_DIR)/tools/grub_cfg_generation/Cargo.toml -- $(GRUB_ISOFILES)/modules/ -o $(GRUB_ISOFILES)/boot/grub/grub.cfg
-	@grub-mkrescue -o $(iso) $(GRUB_ISOFILES)  2> /dev/null
+	@$(GRUB_MKRESCUE) -o $(iso) $(GRUB_ISOFILES)  2> /dev/null
 ## run it in QEMU
 	qemu-system-x86_64 $(QEMU_FLAGS)
 
@@ -330,45 +358,67 @@ preserve_old_modules:
 
 
 ## The top-level (root) documentation file
-DOC_ROOT := "$(ROOT_DIR)/build/doc/___Theseus_Crates___/index.html"
+DOC_ROOT := $(ROOT_DIR)/build/doc/___Theseus_Crates___/index.html
 
 ## Builds Theseus's documentation.
 ## The entire project is built as normal using the "cargo doc" command.
+docs: doc
 doc: check_rustc
-	@cargo doc --no-deps
-	@rustdoc --output target/doc --crate-name "___Theseus_Crates___" kernel/documentation/src/_top.rs
+	@cargo doc --all --no-deps $(addprefix --exclude , $(APP_CRATE_NAMES))
+	@rustdoc --output target/doc --crate-name "___Theseus_Crates___" $(ROOT_DIR)/kernel/_doc_root.rs
 	@mkdir -p build
 	@rm -rf build/doc
 	@cp -rf target/doc ./build/
-	@echo -e "\n\nDocumentation is now available in the build/doc directory."
-	@echo -e "You can also run 'make view-doc' to view it."
-
-docs: doc
+	@echo -e "\nDocumentation is now available at: \"$(DOC_ROOT)\"."
 
 
 ## Opens the documentation root in the system's default browser. 
 ## the "powershell" command is used on Windows Subsystem for Linux
-view-doc: doc
-	@xdg-open $(DOC_ROOT) > /dev/null 2>&1 || powershell.exe -c $(DOC_ROOT) &
-
 view-docs: view-doc
+view-doc: doc
+	@echo -e "Opening documentation index file in your browser..."
+ifneq ($(IS_WSL), )
+## building on WSL
+	@cmd.exe /C start "$(shell wslpath -w $(DOC_ROOT))" &
+else
+## building on regular Linux or macOS
+	@xdg-open $(DOC_ROOT) > /dev/null 2>&1 || open $(DOC_ROOT) &
+endif
+
+
+## The top-level book file.
+BOOK_ROOT := $(ROOT_DIR)/book/book/index.html
+
+## Builds the Theseus book in the `book` directory.
+book: $(wildcard book/src/*)
+ifneq ($(shell mdbook --version > /dev/null 2>&1 && echo $$?), 0)
+	@echo -e "\nError: please install mdbook:"
+	@echo -e "  cargo install mdbook"
+	@exit 1
+endif
+	@cd book && mdbook build
+	@echo -e "\nThe Theseus Book is now available at \"$(BOOK_ROOT)\"."
+
+
+## Opens the top-level file of the Theseus book.
+view-book: book
 
 
 ## Removes all build files
 clean:
 	cargo clean
 	@rm -rf build
-	@$(MAKE) -C userspace clean
+#@$(MAKE) -C userspace clean
 	
 
 
 help: 
 	@echo -e "\nThe following make targets are available:"
 	@echo -e "   iso:"
-	@echo -e "\t The most basic target. Builds the full Theseus OS and creates a bootable ISO image."
+	@echo -e "\t The default and most basic target. Builds the full Theseus OS and creates a bootable ISO image."
 
 	@echo -e "   run:"
-	@echo -e "\t The most common target. Builds Theseus (like the 'iso' target) and runs it using QEMU."
+	@echo -e "\t Builds Theseus (like the 'iso' target) and runs it using QEMU."
 
 	@echo -e "   loadable:"
 	@echo -e "\t Same as 'run', but enables the 'loadable' configuration so that all crates are dynamically loaded."
@@ -407,24 +457,27 @@ help:
 	@echo -e "\t then checkout version 2 (or otherwise make some changes) and run 'make build_server'."
 	@echo -e "\t Then, a running instance of Theseus version 1 can contact this machine's build_server to update itself to version 2."
 	
-
-
-	@echo -e "   doc:"
-	@echo -e "\t Builds Theseus documentation from its Rust source code (rustdoc)."
-	@echo -e "   view-doc:"
-	@echo -e "\t Builds Theseus documentation and then opens it in your default browser."
-	
 	@echo -e "\nThe following key-value options are available for QEMU targets, like 'run' and 'debug':"
 	@echo -e "   net=user:"
 	@echo -e "\t Enable networking with an e1000 NIC in the guest and a userspace SLIRP-based interface in the host (QEMU default)."
 	@echo -e "   net=tap:"
 	@echo -e "\t Enable networking with an e1000 NIC in the guest and a TAP interface in the host."
-	@echo -e "   kvm=yes:"
-	@echo -e "\t Enable KVM acceleration (the host computer must support it)."
+# @echo -e "   kvm=yes:"
+# @echo -e "\t Enable KVM acceleration (the host computer must support it)."
 	@echo -e "   host=yes:"
 	@echo -e "\t Use the host CPU model, which is required for using certain x86 hardware, e.g., PMU, AVX. This also enables KVM."
 	@echo -e "   int=yes:"
 	@echo -e "\t Enable interrupt logging in QEMU console (-d int)."
+
+	@echo -e "\nThe following make targets exist for building documentation:"
+	@echo -e "   doc:"
+	@echo -e "\t Builds Theseus documentation from its Rust source code (rustdoc)."
+	@echo -e "   view-doc:"
+	@echo -e "\t Builds Theseus documentation and then opens it in your default browser."
+	@echo -e "   book:"
+	@echo -e "\t Builds the Theseus book using the mdbook Markdown tool."
+	@echo -e "   view-book:"
+	@echo -e "\t Builds the Theseus book and then opens it in your default browser."
 	@echo ""
 
 
@@ -443,8 +496,12 @@ QEMU_FLAGS += -smp 4
 ## QEMU's OUI dictates that the MAC addr start with "52:54:00:"
 MAC_ADDR ?= 52:54:00:d1:55:01
 
-## drive and devices commands from http://forum.osdev.org/viewtopic.php?f=1&t=26483 to use sata emulation
-QEMU_FLAGS += -drive format=raw,file=random_data2.img,if=none,id=mydisk -device ide-hd,drive=mydisk,bus=ide.0,serial=4696886396
+## Add a disk drive, a PATA drive over an IDE controller interface.
+QEMU_FLAGS += -drive format=raw,file=random_data2.img,if=ide
+
+## Add a disk drive, a SATA drive over the AHCI interface.
+## We don't yet have SATA support in Theseus.
+# QEMU_FLAGS += -drive id=my_disk,file=random_data2.img,if=none  -device ahci,id=ahci  -device ide-drive,drive=my_disk,bus=ahci.0
 
 ## Read about QEMU networking options here: https://www.qemu.org/2018/05/31/nic-parameter/
 ifeq ($(net),user)
@@ -478,9 +535,10 @@ else
 endif
 
 ## Currently, kvm by itself can cause problems, but it works with the "host" option (above).
-# ifeq ($(kvm),yes)
-# 	QEMU_FLAGS += -accel kvm
-# endif
+ifeq ($(kvm),yes)
+$(error Error: the 'kvm=yes' option is currently broken. Use 'host=yes' instead")
+	# QEMU_FLAGS += -accel kvm
+endif
 
 
 
@@ -531,28 +589,21 @@ bochs: $(iso)
 
 
 
-IS_WSL = $(shell grep 'Microsoft' /proc/version)
 
 ### Checks that the supplied usb device (for usage with the boot/pxe targets).
 ### Note: this is bypassed on WSL, because WSL doesn't support raw device files yet.
 check_usb:
-## on WSL, we bypass the check for USB, because burning the ISO to USB must be done with a Windows app
+## on WSL, we bypass the check for USB, because burning the ISO to USB must be done with a Windows app.
 ifeq ($(IS_WSL), ) ## if we're not on WSL...
-ifneq (,$(findstring sd, $(usb))) ## if the specified USB device properly contained "sd"...
-ifeq ("$(wildcard /dev/$(usb))", "") ## if a non-existent "/dev/sd*" drive was specified...
-	@echo -e "\nError: you specified usb drive /dev/$(usb), which does not exist.\n"
-	@exit 1
-endif 
-else 
-## if the specified USB device didn't contain "sd", then it wasn't a proper removable block device.
-	@echo -e "\nError: you need to specify a usb drive, e.g., \"sdc\"."
+## now we need to check that the user has specified a USB drive that actually exists, not a partition of a USB drive.
+ifeq (,$(findstring $(usb),$(USB_DRIVES)))
+	@echo -e "\nError: please specify a USB drive that exists, e.g., \"sdc\" (not a partition like \"sdc1\")."
 	@echo -e "For example, run the following command:"
 	@echo -e "   make boot usb=sdc\n"
-	@echo -e "The following usb drives are currently attached to this system:"
-	@lsblk -O | grep -i usb | awk '{print $$2}' | grep --color=never '[^0-9]$$'  # must escape '$' in makefile with '$$'
+	@echo -e "The following USB drives are currently attached to this system:\n$(USB_DRIVES)"
 	@echo ""
 	@exit 1
-endif  ## end of checking for "sd"
+endif  ## end of checking that the 'usb' variable is a USB drive that exists
 endif  ## end of checking for WSL
 
 
@@ -564,9 +615,9 @@ ifneq ($(IS_WSL), )
 	@echo -e "\n\033[1;32mThe build finished successfully\033[0m, but WSL is unable to access raw USB devices. Instead, you must burn the ISO to a USB drive yourself."
 	@echo -e "The ISO file is available at \"$(iso)\"."
 else
-## building on regular linux
-	@umount /dev/$(usb)* 2> /dev/null  |  true  # force it to return true
-	@sudo dd bs=4M if=$(iso) of=/dev/$(usb)
+## building on Linux or macOS
+	@$(UNMOUNT) /dev/$(usb)* 2> /dev/null  |  true  ## force it to return true
+	@sudo dd bs=4194304 if=$(iso) of=/dev/$(usb)    ## use 4194304 instead of 4M because macOS doesn't support 4M
 	@sync
 endif
 	
