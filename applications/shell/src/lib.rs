@@ -1264,8 +1264,6 @@ impl Shell {
         self.redisplay_prompt();
         self.terminal.lock().refresh_display();
         loop {
-            self.terminal.lock().display_cursor()?;
-
             // If there is anything from running applications to be printed, it printed on the screen and then
             // return true, so that the loop continues, otherwise nothing happens and we keep on going with the
             // loop body. We do so to ensure that printing is handled before keypresses.
@@ -1291,8 +1289,9 @@ impl Shell {
             // Looks at the input queue from the window manager
             // If it has unhandled items, it handles them with the match
             // If it is empty, it proceeds directly to the next loop iteration
-            match self.terminal.lock().get_event() {
-                Some(ev) => {
+            {
+                let mut terminal_locked = self.terminal.lock();
+                if let Some(ev) = terminal_locked.get_event() {
                     match ev {
                         // Returns from the main loop.
                         Event::ExitEvent => {
@@ -1310,9 +1309,10 @@ impl Shell {
                         }
                         _ => { }
                     };
-                },
-                _ => { }
-            };
+                } else {
+                    terminal_locked.display_cursor()?; 
+                }
+            }
 
             let mut need_refresh = false;
             loop {
