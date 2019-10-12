@@ -40,7 +40,7 @@ pub fn main(args: Vec<String>) -> isize {
     let matches = match opts.parse(&args) {
         Ok(m) => m,
         Err(_f) => {
-            println!("{}", _f);
+            info!("{}", _f);
             return -1; 
         }
     };
@@ -53,7 +53,7 @@ pub fn main(args: Vec<String>) -> isize {
     let taskref = match task::get_my_current_task() {
         Some(t) => t,
         None => {
-            println!("failed to get current task");
+            info!("failed to get current task");
             return -1;
         }
     };
@@ -67,7 +67,7 @@ pub fn main(args: Vec<String>) -> isize {
 
     
     
-    println!("Trying to find a fat32 drive");
+    info!("Trying to find a fat32 drive");
     if let Some(controller) = storage_manager::STORAGE_CONTROLLERS.lock().iter().next() {
         for sd in controller.lock().devices() {
             match fat32::init(sd) {
@@ -91,7 +91,7 @@ pub fn main(args: Vec<String>) -> isize {
 
                     let root: RootDirectory = root_dir(fs.clone(), name.clone()).unwrap();
                     
-                    // Recursively print files and directories.
+                    // // Recursively print files and directories.
                     if matches.opt_present("p") {
                         print_dir(&root);
                     };
@@ -107,7 +107,8 @@ pub fn main(args: Vec<String>) -> isize {
 
                             // FIXME set root parent dir to appropriate value.
                             let mut curr_dir = curr_wd.lock();
-                            let root = Arc::new(Mutex::new(root));
+                            //let root = Arc::new(Mutex::new(root)); // CAUSES ISSUE FIXME
+                            let root = fat32::make_dir_ref(root);
                             match curr_dir.insert(FileOrDir::Dir(root)) {
                                 Ok(_) => println!("Successfully mounted fat32 FS"),
                                 Err(_) => println!("Failed to mount fat32 FS"),

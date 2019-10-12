@@ -92,6 +92,9 @@
 //! ```
 //! 
 
+// TODO cat seems work weirdly with the bigfile example I've got -> doesn't print the last few characters.
+// ^ Should make some different examples to test with.
+
 // TODO the docs at the top of this crate aren't all that adviseable at this point. I'll try to make some fixes soon.
 
 #![no_std]
@@ -139,6 +142,7 @@ const FREE_DIRECTORY_ENTRY: u8 = 0xe5;
 
 /// Byte to mark entry as a "dot" entry.
 const DOT_DIRECTORY_ENTRY: u8 = 0x2e;
+//const FAT32_MAGIC: [u8: ] = b"FAT32   ";
 
 /// Empty cluster marked as 0.
 const EMPTY_CLUSTER: u32 = 0;
@@ -1423,6 +1427,7 @@ pub fn init(sd: storage_device::StorageDeviceRef) -> Result<Filesystem, &'static
     Err("failed to intialize fat filesystem for disk")
 }
 
+// FIXME use this for magic: let fat32_magic = b"FAT32   ";
 /// Detects whether the drive passed into the function is a FAT32 drive
 /// 
 /// # Arguments
@@ -1596,20 +1601,24 @@ fn debug_name(byte_name: &[u8]) -> &str {
     }
 }
 
+pub fn make_dir_ref(dir: RootDirectory) -> DirRef {
+    Arc::new(Mutex::new(dir))
+}
+
 // TODO move these functions elsewhere. Mostly for debugging some confusing issues.
 /// Spawns some applications processes to perform some mount operations and tests for FAT32 support.
 pub fn test_module_init() -> Result<(), &'static str> {
 
     // start a task that tries to find the module in root.
-    let taskref = KernelTaskBuilder::new(test_find, ())
-        .name("fat32_find_test".to_string())
-        .block()
-        .spawn()?;
+    // let taskref = KernelTaskBuilder::new(test_find, ())
+    //     .name("fat32_find_test".to_string())
+    //     .block()
+    //     .spawn()?;
 
-    // start a task that tries to find the module in root.
-    KernelTaskBuilder::new(test_insert, taskref)
-        .name("fat32_insert_test".to_string())
-        .spawn()?;
+    // // start a task that tries to find the module in root.
+    // KernelTaskBuilder::new(test_insert, taskref)
+    //     .name("fat32_insert_test".to_string())
+    //     .spawn()?;
 
     Ok(())
 }
