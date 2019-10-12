@@ -46,7 +46,7 @@ extern crate scheduler;
 extern crate frame_buffer;
 #[cfg(mirror_log_to_vga)] #[macro_use] extern crate print;
 extern crate input_event_manager;
-#[cfg(test_network)] extern crate exceptions_full;
+extern crate exceptions_full;
 extern crate network_manager;
 extern crate pause;
 extern crate fat32; // Only used for dummy code but needed to make fat32 work with gdb.
