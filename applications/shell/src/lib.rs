@@ -1264,13 +1264,13 @@ impl Shell {
         self.redisplay_prompt();
         self.terminal.lock().refresh_display();
         loop {
-                    self.terminal.lock().display_cursor()?; 
             // If there is anything from running applications to be printed, it printed on the screen and then
             // return true, so that the loop continues, otherwise nothing happens and we keep on going with the
             // loop body. We do so to ensure that printing is handled before keypresses.
             if self.check_and_print_app_output() {
                 need_refresh = true;
                 continue;
+
             }
 
             // Handles the cleanup of any application task that has finished running, returns whether we need

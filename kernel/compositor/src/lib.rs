@@ -25,5 +25,5 @@ pub trait Compositor {
     ) -> Result<(), &'static str>;
 
     /// Checks if a buffer at coordinate is already cached since last updating.
-    fn is_cached(&self, buffer: &dyn FrameBuffer, coordinate: Coord) -> bool;
+    fn is_cached(&self, block: &[u32], coordinate: Coord, width: usize) -> bool;
 }

@@ -11,7 +11,6 @@ extern crate owning_ref;
 extern crate spin;
 
 use alloc::boxed::Box;
-use core::hash::{Hash, Hasher, SipHasher};
 use core::ops::DerefMut;
 use frame_buffer::{FrameBuffer, Pixel, FINAL_FRAME_BUFFER, Coord};
 use memory::{EntryFlags, FrameRange, MappedPages, PhysicalAddress, FRAME_ALLOCATOR};
@@ -121,12 +120,6 @@ impl FrameBuffer for FrameBufferRGB {
         let len = src.len();
         let dest_end = dest_start + len;
         self.buffer_mut()[dest_start..dest_end].copy_from_slice(src);
-    }
-
-    fn get_hash(&self) -> u64 {
-        let mut s = SipHasher::new();
-        self.hash(&mut s);
-        s.finish()
     }
 
     fn draw_pixel(&mut self, coordinate: Coord, color: Pixel) {

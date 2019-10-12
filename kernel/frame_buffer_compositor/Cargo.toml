@@ -18,5 +18,9 @@ path = "../compositor"
 features = ["spin_no_std", "nightly"]
 version = "1.2.0"
 
+[dependencies.log]
+default-features = false
+version = "0.3.7"
+
 [lib]
 crate-type = ["rlib"]

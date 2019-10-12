@@ -49,11 +49,7 @@ pub trait FrameBuffer {
         coordinate.x >= 0 && coordinate.x < width as isize 
             && coordinate.y >= 0 && coordinate.y < height as isize
     }
-
-    /// Gets the indentical hash of the framebuffer.
-    /// The frame buffer compositor uses this hash to cache framebuffers.
-    fn get_hash(&self) -> u64;
-
+    
     /// Draws a pixel at the given `coordinate` within the frame buffer. The `coordinate` is relative to the origin(top-left point) of the frame buffer.
     fn draw_pixel(&mut self, coordinate: Coord, color: Pixel);
 

@@ -10,13 +10,18 @@ extern crate compositor;
 extern crate frame_buffer;
 extern crate spin;
 #[macro_use]
+extern crate log;
+#[macro_use]
 extern crate lazy_static;
 
 use alloc::collections::BTreeMap;
 use alloc::vec::Vec;
+use core::hash::{Hash, Hasher, SipHasher};
 use compositor::Compositor;
 use frame_buffer::{FrameBuffer, FINAL_FRAME_BUFFER, Coord};
 use spin::Mutex;
+
+const CACHE_BLOCK_HEIGHT:usize = 16;
 
 lazy_static! {
     /// The instance of the frame buffer compositor.
@@ -40,7 +45,6 @@ struct FrameBufferCache {
     /// The position at which the framebuffer was rendered, which is relative to the final framebuffer's coordinate system.
     coordinate: Coord,
     width: usize,
-    height: usize,
 }
 
 impl FrameBufferCache {
@@ -49,15 +53,15 @@ impl FrameBufferCache {
         return coordinate.x >= self.coordinate.x
             && coordinate.x <= self.coordinate.x + self.width as isize
             && coordinate.y >= self.coordinate.y
-            && coordinate.y <= self.coordinate.y + self.height as isize;
+            && coordinate.y <= self.coordinate.y + CACHE_BLOCK_HEIGHT as isize;
     }
 
     // checks if the cached framebuffer overlaps with another one
     fn overlaps_with(&self, cache: &FrameBufferCache) -> bool {
         self.contains(cache.coordinate)
             || self.contains(cache.coordinate + (cache.width as isize, 0))
-            || self.contains(cache.coordinate + (0, cache.height as isize))
-            || self.contains(cache.coordinate + (cache.width as isize, cache.height as isize))
+            || self.contains(cache.coordinate + (0, CACHE_BLOCK_HEIGHT as isize))
+            || self.contains(cache.coordinate + (cache.width as isize, CACHE_BLOCK_HEIGHT as isize))
     }
 }
 
@@ -73,64 +77,90 @@ impl Compositor for FrameCompositor {
         let (final_width, final_height) = final_fb.get_size();
 
         for (src_fb, coordinate) in bufferlist {
-            // skip if already cached
-            if self.is_cached(src_fb, coordinate) {
-                continue;
-            }
+            // Divide the framebuffer into 16 pixel tall blocks. 
+            let mut block_index = 0;
             let (src_width, src_height) = src_fb.get_size();
+            let block_pixels = CACHE_BLOCK_HEIGHT * src_width;
+ 
+            loop {
+                let src_buffer_len = src_width * src_height;
+                
+                // The start pixel of the block
+                let start_index = block_pixels * block_index;
+                if  start_index >= src_buffer_len {
+                    break;
+                }
+                let coordinate_start = coordinate + (0, (CACHE_BLOCK_HEIGHT * block_index) as isize);
+                
+                // The end pixel of the block
+                let mut end_index = start_index + block_pixels;
+                let coordinate_end;
+                if end_index <= src_buffer_len {
+                    coordinate_end = coordinate_start + (src_width as isize, CACHE_BLOCK_HEIGHT as isize);
+                } else {
+                    end_index = src_buffer_len;
+                    coordinate_end = coordinate + (src_width as isize, src_height as isize);
+                }
 
-            let coordinate_end = coordinate + (src_width as isize, src_height as isize);
+                let block = &src_fb.buffer()[start_index..end_index];
+                block_index += 1;
 
-            // skip if the framebuffer is not in the screen
-            if coordinate_end.x < 0
-                || coordinate.x > final_width as isize
-                || coordinate_end.y < 0
-                || coordinate.y > final_height as isize
-            {
-                break;
-            }
+                // Skip if a block is already cached
+                if self.is_cached(&block, coordinate_start, src_width) {
+                    continue;
+                }
 
-            let final_x_start = core::cmp::max(0, coordinate.x) as usize;
-            let final_y_start = core::cmp::max(0, coordinate.y) as usize;
+                // skip if the framebuffer is not in the screen
+                if coordinate_end.x < 0
+                    || coordinate_start.x > final_width as isize
+                    || coordinate_end.y < 0
+                    || coordinate_start.y > final_height as isize
+                {
+                    break;
+                }
 
-            // just draw the part which is within the final buffer
-            let width = core::cmp::min(coordinate_end.x as usize, final_width) - final_x_start;
-            let height = core::cmp::min(coordinate_end.y as usize, final_height) - final_y_start;
+                let final_x_start = core::cmp::max(0, coordinate_start.x) as usize;
+                let final_y_start = core::cmp::max(0, coordinate_start.y) as usize;
 
-            // copy every line to the final framebuffer.
-            let src_buffer = src_fb.buffer();
-            for i in 0..height {
-                let dest_start = (final_y_start + i) * final_width + final_x_start;
-                let src_start = src_width * ((final_y_start + i) as isize - coordinate.y) as usize
-                    + (final_x_start as isize - coordinate.x) as usize;
-                let src_end = src_start + width;
-                final_fb.buffer_copy(&(src_buffer[src_start..src_end]), dest_start);
-            }
+                // just draw the part which is within the final buffer
+                let width = core::cmp::min(coordinate_end.x as usize, final_width) - final_x_start;
+                let height = core::cmp::min(coordinate_end.y as usize, final_height) - final_y_start;
 
-            // cache the new framebuffer and remove all caches that are overlapped by it.
-            let new_cache = FrameBufferCache {
-                coordinate: coordinate,
-                width: src_width,
-                height: src_height,
-            };
-            let keys: Vec<_> = self.cache.keys().cloned().collect();
-            for key in keys {
-                if let Some(cache) = self.cache.get(&key) {
-                    if cache.overlaps_with(&new_cache) {
-                        self.cache.remove(&key);
-                    }
+                // copy every line to the final framebuffer.
+                // let src_buffer = src_fb.buffer();
+                for i in 0..height {
+                    let dest_start = (final_y_start + i) * final_width + final_x_start;
+                    let src_start = src_width * ((final_y_start + i) as isize - coordinate_start.y) as usize
+                        + (final_x_start as isize - coordinate_start.x) as usize;
+                    let src_end = src_start + width;
+                    final_fb.buffer_copy(&(block[src_start..src_end]), dest_start);
+                }
+
+                // cache the new framebuffer and remove all caches that are overlapped by it.
+                let new_cache = FrameBufferCache {
+                    coordinate: coordinate,
+                    width: src_width,
                 };
+                let keys: Vec<_> = self.cache.keys().cloned().collect();
+                for key in keys {
+                    if let Some(cache) = self.cache.get(&key) {
+                        if cache.overlaps_with(&new_cache) {
+                            self.cache.remove(&key);
+                        }
+                    };
+                }
+
+                self.cache.insert(hash(block), new_cache);
             }
-            self.cache.insert(src_fb.get_hash(), new_cache);
         }
 
         Ok(())
     }
 
-    fn is_cached(&self, frame_buffer: &dyn FrameBuffer, coordinate: Coord) -> bool {
-        match self.cache.get(&(frame_buffer.get_hash())) {
+    fn is_cached(&self, block: &[u32], coordinate: Coord, width: usize) -> bool {
+        match self.cache.get(&hash(block)) {
             Some(cache) => {
-                return cache.coordinate == coordinate;
+                return cache.coordinate == coordinate && cache.width == width;
             }
             None => return false,
         }
@@ -158,3 +188,9 @@ impl Compositor for FrameCompositor {
         }
     }
 }*/
+
+fn hash(block: &[u32]) -> u64 {
+    let mut s = SipHasher::new();
+    block.hash(&mut s);
+    s.finish()
+}
