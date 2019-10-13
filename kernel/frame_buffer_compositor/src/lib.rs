@@ -37,13 +37,15 @@ lazy_static! {
 /// Framebuffers which haven't updated since last compositing will be ignored.
 pub struct FrameCompositor {
     // Cache of updated framebuffers
-    cache: BTreeMap<u64, FrameBufferCache>,
+    cache: BTreeMap<Coord, FrameBufferCache>,
 }
 
-/// Metadata that describes where a framebuffer was previously composited to the final framebuffer.
+/// Metadata that describes the framebuffer.
 struct FrameBufferCache {
-    /// The position at which the framebuffer was rendered, which is relative to the final framebuffer's coordinate system.
+    /// The coordinate of the framebuffer where it is rendered to the final framebuffer
     coordinate: Coord,
+    /// The hash of the content in the frame buffer.
+    content_hash: u64,
     width: usize,
 }
 
@@ -51,9 +53,9 @@ impl FrameBufferCache {
     // checks if the coordinate is within the framebuffer
     fn contains(&self, coordinate: Coord) -> bool {
         return coordinate.x >= self.coordinate.x
-            && coordinate.x <= self.coordinate.x + self.width as isize
+            && coordinate.x < self.coordinate.x + self.width as isize
             && coordinate.y >= self.coordinate.y
-            && coordinate.y <= self.coordinate.y + CACHE_BLOCK_HEIGHT as isize;
+            && coordinate.y < self.coordinate.y + CACHE_BLOCK_HEIGHT as isize;
     }
 
     // checks if the cached framebuffer overlaps with another one
@@ -106,7 +108,7 @@ impl Compositor for FrameCompositor {
                 block_index += 1;
 
                 // Skip if a block is already cached
-                if self.is_cached(&block, coordinate_start, src_width) {
+                if self.is_cached(&block, &coordinate_start, src_width) {
                     continue;
                 }
 
@@ -138,8 +140,9 @@ impl Compositor for FrameCompositor {
 
                 // cache the new framebuffer and remove all caches that are overlapped by it.
                 let new_cache = FrameBufferCache {
-                    coordinate: coordinate,
+                    content_hash: hash(block),
                     width: src_width,
+                    coordinate: coordinate_start,
                 };
                 let keys: Vec<_> = self.cache.keys().cloned().collect();
                 for key in keys {
@@ -150,17 +153,25 @@ impl Compositor for FrameCompositor {
                     };
                 }
 
-                self.cache.insert(hash(block), new_cache);
+                let temp = Coord::new(0, 0);
+
+                self.cache.insert(coordinate_start, new_cache);
             }
         }
 
+        // for (k, v) in self.cache.iter() {
+        //     trace!("({} {}) ({}, {}) {} {}", k.x, k.y, v.coordinate.x, v.coordinate.y, v.content_hash, v.width);
+        // }
+
+        // loop {
+        // }
         Ok(())
     }
 
-    fn is_cached(&self, block: &[u32], coordinate: Coord, width: usize) -> bool {
-        match self.cache.get(&hash(block)) {
+    fn is_cached(&self, block: &[u32], coordinate: &Coord, width: usize) -> bool {
+        match self.cache.get(coordinate) {
             Some(cache) => {
-                return cache.coordinate == coordinate && cache.width == width;
+                return cache.content_hash == hash(block) && cache.width == width;
             }
             None => return false,
         }
@@ -189,8 +200,9 @@ impl Compositor for FrameCompositor {
     }
 }*/
 
-fn hash(block: &[u32]) -> u64 {
+// Get the hash of a cache block
+fn hash<T: Hash>(block: T) -> u64 {
     let mut s = SipHasher::new();
     block.hash(&mut s);
     s.finish()
-}
+} 

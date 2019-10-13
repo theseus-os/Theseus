@@ -13,6 +13,7 @@ use memory::MappedPages;
 use owning_ref::BoxRefMut;
 use spin::{Mutex, Once};
 use core::ops::{Add, Sub};
+use core::cmp::{Ord, Ordering};
 
 /// A pixel on the screen is mapped to a u32 integer.
 pub type Pixel = u32;
@@ -77,7 +78,7 @@ pub fn get_screen_size() -> Result<(usize, usize), &'static str> {
 
 /// The coordinate of a pixel.
 /// In the display subsystem, the origin of an area is its top-left point.
-#[derive(Clone, Copy, PartialEq, Debug)]
+#[derive(Clone, Copy, PartialEq, Debug, Hash)]
 pub struct Coord {
     /// The x coordinate
     pub x: isize,
@@ -107,3 +108,24 @@ impl Sub<(isize, isize)> for Coord {
         Coord { x: self.x - rhs.0, y: self.y - rhs.1 }
     }
 }
+
+impl Ord for Coord {
+    fn cmp(&self, other: &Self) -> Ordering {
+        if self.y > other.y {
+            return Ordering::Greater;
+        } else if self.y < other.y {
+            return Ordering::Less;
+        } else {
+            return self.x.cmp(&other.x);
+        }
+
+    }
+}
+
+impl PartialOrd for Coord {
+    fn partial_cmp(&self, other: &Self) -> Option<Ordering> {
+        Some(self.cmp(other))
+    }
+}
+
+impl Eq for Coord { }
