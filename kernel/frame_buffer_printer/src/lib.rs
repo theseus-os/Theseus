@@ -32,13 +32,15 @@ pub fn print_string(
     slice: &str,
     font_color: u32,
     bg_color: u32,
+    line: usize,
+    column: usize,
 ) -> (usize, usize) {
     let buffer_width = width / CHARACTER_WIDTH;
     let buffer_height = height / CHARACTER_HEIGHT;
     let (x, y) = (coordinate.x, coordinate.y);
 
-    let mut curr_line = 0;
-    let mut curr_column = 0;
+    let mut curr_line = line;
+    let mut curr_column = column;
     for byte in slice.bytes() {
         if byte == b'\n' {
             // fill the remaining blank of current line and go to the next line
@@ -88,14 +90,14 @@ pub fn print_string(
     );
 
     //fill the blank of remaining lines
-    fill_blank(
-        framebuffer,
-        x,
-        y + ((curr_line + 1) * CHARACTER_HEIGHT) as isize,
-        x + width as isize,
-        y + height as isize,
-        bg_color,
-    );
+    // fill_blank(
+    //     framebuffer,
+    //     x,
+    //     y + ((curr_line + 1) * CHARACTER_HEIGHT) as isize,
+    //     x + width as isize,
+    //     y + height as isize,
+    //     bg_color,
+    // );
 
     // return the position of the end.
     (curr_column, curr_line)

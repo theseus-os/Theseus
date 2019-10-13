@@ -3,7 +3,7 @@
 
 #![no_std]
 
-extern crate alloc;
+#[macro_use] extern crate alloc;
 extern crate frame_buffer;
 extern crate memory;
 extern crate multicore_bringup;
@@ -37,8 +37,10 @@ pub fn init() -> Result<(), &'static str> {
         buffer_height = graphic_info.height as usize;
     };
     // init the final framebuffer
-    let framebuffer =
+    let mut framebuffer =
         FrameBufferRGB::new(buffer_width, buffer_height, Some(vesa_display_phys_start))?;
+    let background = vec![0; buffer_width * buffer_height];
+    framebuffer.buffer_copy(background.as_slice(), 0);
     FINAL_FRAME_BUFFER.call_once(|| Mutex::new(Box::new(framebuffer)));
 
     Ok(())

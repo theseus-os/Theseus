@@ -26,5 +26,9 @@ path = "../../tsc"
 [dependencies.frame_buffer_drawer]
 path = "../../frame_buffer_drawer"
 
+[dependencies.log]
+default-features = false
+version = "0.3.7"
+
 [lib]
 crate-type = ["rlib"]

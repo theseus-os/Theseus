@@ -12,6 +12,7 @@ extern crate frame_buffer_drawer;
 extern crate frame_buffer_printer;
 extern crate tsc;
 extern crate displayable;
+#[macro_use]extern crate log;
 
 use alloc::string::String;
 use displayable::Displayable;
@@ -31,6 +32,8 @@ pub struct TextDisplay {
     text: String,
     fg_color: u32,
     bg_color: u32,
+    /// The text cached since last display
+    cache: String,
 }
 
 impl Displayable for TextDisplay {
@@ -39,17 +42,30 @@ impl Displayable for TextDisplay {
         coordinate: Coord,
         framebuffer: &mut dyn FrameBuffer,
     ) {
+        let (string, next_line, next_col) = if self.text.starts_with(self.cache.as_str()) {
+            (
+                &self.text.as_str()[self.cache.len()..self.text.len()],
+                self.next_line,
+                self.next_col,
+            )
+        } else {
+            (self.text.as_str(), 0, 0)
+        };
+
         let (col, line) = frame_buffer_printer::print_string(
             framebuffer,
             coordinate,
             self.width,
             self.height,
-            self.text.as_str(),
+            string,
             self.fg_color,
             self.bg_color,
+            next_line,
+            next_col
         );
         self.next_col = col;
         self.next_line = line;
+        self.cache = self.text.clone();
     }
 
     fn resize(&mut self, width: usize, height: usize) {
@@ -81,6 +97,7 @@ impl TextDisplay {
             text: String::new(),
             fg_color: fg_color,
             bg_color: bg_color,
+            cache: String::new(),
         })
     }
 
