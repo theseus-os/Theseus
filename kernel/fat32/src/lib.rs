@@ -255,13 +255,14 @@ impl Header {
             sectors: LittleEndian::read_u32(&bpb_sector[32..36]),
         };
 
-        // debug!("bytes per sector: {}", fatheader.bytes_per_sector);
-        // debug!("sectors per cluster: {}", fatheader.sectors_per_cluster);
-        // debug!("reserved sectors: {}", fatheader.reserved_sectors);
-        // debug!("legacy sectors: {}", fatheader.legacy_sectors);
-        // debug!("the media type, should be f8 for hardrive: {:X}", fatheader.media_type);
-        // debug!("sectors per track: {}", fatheader._sectors_per_track);
-        // debug!("number of sectors: {}", fatheader.sectors);
+        debug!("Disk header information:")
+        debug!("bytes per sector: {}", fatheader.bytes_per_sector);
+        debug!("sectors per cluster: {}", fatheader.sectors_per_cluster);
+        debug!("reserved sectors: {}", fatheader.reserved_sectors);
+        debug!("legacy sectors: {}", fatheader.legacy_sectors);
+        debug!("the media type, should be f8 for hardrive: {:X}", fatheader._media_type);
+        debug!("sectors per track: {}", fatheader._sectors_per_track);
+        debug!("number of sectors: {}", fatheader.sectors);
         
         Ok(fatheader)
     }
@@ -845,13 +846,13 @@ impl PFSDirectory {
     /// the function is used and returns EndOfFile if the next PFSdirectory doesn't exist
     /// Note that this function will happily return unused directory entries since it simply provides a sequential view of the entries on disk.
     fn get_fat_directory(&self, fs: &mut Filesystem, pos: &PFSPosition) -> Result<FatDirectory, Error> {
-        
         let sector = fs.first_sector_of_cluster(pos.cluster) + pos.sector_offset;
-        
+
+        debug!("Getting from cluster: {}, sector: {} (offset: {}), entry_offset: {}", pos.cluster, sector, pos.sector_offset, pos.entry_offset);
         // Get the sector on disk corresponding to our sector and cluster:
         let offset = fs.sector_to_byte_offset(sector) + pos.entry_offset;
         let mut buf = [0; size_of::<RawFatDirectory>()];
-        debug!("Trying to read");
+        debug!("Trying to read len: {}, from offset: {}", buf.len(), offset);
         let _bytes_read = fs.io.read(&mut buf, offset).map_err(|e| {
             warn!("Disk read failed: {:?}", e);
             Error::BlockError
@@ -1213,6 +1214,8 @@ impl Filesystem {
             self.first_fat_sector + (self.fat_count * self.sectors_per_fat) + self.root_dir_sectors;
         self.data_sector_count = self.sectors - self.first_data_sector;
         self.data_cluster_count = self.data_sector_count / self.bytes_per_sector;
+        //debug!("First data sector: {}", self.first_data_sector);
+        debug!("Bytes per sector: {}", self.bytes_per_sector);
         Ok(self)
     }
 
