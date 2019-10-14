@@ -70,7 +70,7 @@ impl FrameBufferCache {
 impl Compositor for FrameCompositor {
     fn composite(
         &mut self,
-        bufferlist: Vec<(&dyn FrameBuffer, Coord, Option<(usize, usize)>)>,
+        bufferlist: Vec<(&dyn FrameBuffer, Coord, Option<&[(usize, usize)]>)>,
     ) -> Result<(), &'static str> {
         let mut final_fb = FINAL_FRAME_BUFFER
             .try()
@@ -78,22 +78,27 @@ impl Compositor for FrameCompositor {
             .lock();
         let (final_width, final_height) = final_fb.get_size();
 
-        for (src_fb, coordinate, block_range) in bufferlist {
+        for (src_fb, coordinate, block_list) in bufferlist {
             // Divide the framebuffer into 16 pixel tall blocks.
             let (src_width, src_height) = src_fb.get_size();
             let block_pixels = CACHE_BLOCK_HEIGHT * src_width;
-            let (block_start, block_end) = match block_range {
-                Some(b) => { b },
-                None => { (0, (src_height - 1) / CACHE_BLOCK_HEIGHT + 1) }
-            };
             let src_buffer_len = src_width * src_height;
-                
+
+            let mut all_blocks = Vec::new();
+            let blocks = match block_list {
+                Some(blocks) => { blocks },
+                None => {
+                    let block_number = (src_height - 1) / CACHE_BLOCK_HEIGHT + 1;
+                    for i in 0.. block_number {
+                        all_blocks.push((i, src_width))
+                    }
+                    all_blocks.as_slice()
+                } 
+            };
+
             //trace!("WEnqiu: {} {}", block_start, block_end);
-            let mut block_index = 0;
-            loop {
-                if block_index >= block_end {
-                    break;
-                }               
+            for (block_index, update_width) in blocks {            
+
                 // The start pixel of the block
                 let start_index = block_pixels * block_index;
                 // if  start_index >= src_buffer_len {
@@ -112,27 +117,47 @@ impl Compositor for FrameCompositor {
                 }
 
                 let block = &src_fb.buffer()[start_index..end_index];
-                block_index += 1;
 
                 // Skip if a block is already cached
                 if self.is_cached(&block, &coordinate_start, src_width) {
                     continue;
                 }
 
-                // skip if the framebuffer is not in the screen
+                // cache the new framebuffer and remove all caches that are overlapped by it.
+                let new_cache = FrameBufferCache {
+                    content_hash: hash(block),
+                    width: *update_width,
+                    coordinate: coordinate_start,
+                };
+                let keys: Vec<_> = self.cache.keys().cloned().collect();
+                let mut draw_width = new_cache.width;
+                for key in keys {
+                    if let Some(cache) = self.cache.get(&key) {
+                        if cache.overlaps_with(&new_cache) {
+                            // trace!("WEnqiu: isit {}?", block_index);
+                            draw_width = core::cmp::max(draw_width, (cache.width as isize + cache.coordinate.x - new_cache.coordinate.x) as usize);
+                            self.cache.remove(&key);
+                        }
+                    };
+                }
+
+                // skip if the block is not in the screen
                 if coordinate_end.x < 0
                     || coordinate_start.x > final_width as isize
                     || coordinate_end.y < 0
                     || coordinate_start.y > final_height as isize
                 {
-                    break;
+                    continue;
                 }
 
                 let final_x_start = core::cmp::max(0, coordinate_start.x) as usize;
                 let final_y_start = core::cmp::max(0, coordinate_start.y) as usize;
 
                 // just draw the part which is within the final buffer
-                let width = core::cmp::min(coordinate_end.x as usize, final_width) - final_x_start;
+                let width = core::cmp::min(
+                    core::cmp::min(coordinate_end.x as usize, final_width) - final_x_start,
+                    draw_width,
+                );
                 let height = core::cmp::min(coordinate_end.y as usize, final_height) - final_y_start;
 
                 // copy every line to the final framebuffer.
@@ -145,24 +170,9 @@ impl Compositor for FrameCompositor {
                     final_fb.buffer_copy(&(block[src_start..src_end]), dest_start);
                 }
 
-                // cache the new framebuffer and remove all caches that are overlapped by it.
-                let new_cache = FrameBufferCache {
-                    content_hash: hash(block),
-                    width: src_width,
-                    coordinate: coordinate_start,
-                };
-                let keys: Vec<_> = self.cache.keys().cloned().collect();
-                for key in keys {
-                    if let Some(cache) = self.cache.get(&key) {
-                        if cache.overlaps_with(&new_cache) {
-                            self.cache.remove(&key);
-                        }
-                    };
-                }
-
-                let temp = Coord::new(0, 0);
-
+                // insert the cache
                 self.cache.insert(coordinate_start, new_cache);
+
             }
         }
 

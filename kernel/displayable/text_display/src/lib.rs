@@ -42,7 +42,7 @@ impl Displayable for TextDisplay {
         &mut self,
         coordinate: Coord,
         framebuffer: &mut dyn FrameBuffer,
-    ) -> (usize, usize) {
+    ) -> Vec<(usize, usize)> {
         let (string, col, line) = if self.text.starts_with(self.cache.as_str()) {
             (
                 &self.text.as_str()[self.cache.len()..self.text.len()],
@@ -53,7 +53,7 @@ impl Displayable for TextDisplay {
             (self.text.as_str(), 0, 0)
         };
 
-        let (next_col, next_line) = frame_buffer_printer::print_string(
+        let (next_col, next_line, blocks) = frame_buffer_printer::print_string(
             framebuffer,
             coordinate,
             self.width,
@@ -65,13 +65,13 @@ impl Displayable for TextDisplay {
             line,
         );
 
-        let block_range = (line, next_line + 1);
+
 
         self.next_col = next_col;
         self.next_line = next_line;
         self.cache = self.text.clone();
 
-        return block_range;
+        return blocks;
     }
 
     fn resize(&mut self, width: usize, height: usize) {

@@ -9,6 +9,7 @@ extern crate frame_buffer;
 extern crate frame_buffer_rgb;
 
 use alloc::vec;
+use alloc::vec::Vec;
 use font::{CHARACTER_HEIGHT, CHARACTER_WIDTH, FONT_PIXEL};
 use frame_buffer::{FrameBuffer, Coord};
 
@@ -34,13 +35,15 @@ pub fn print_string(
     bg_color: u32,
     column: usize,
     line: usize,
-) -> (usize, usize) {
+) -> (usize, usize, Vec<(usize, usize)>) {
     let buffer_width = width / CHARACTER_WIDTH;
     let buffer_height = height / CHARACTER_HEIGHT;
     let (x, y) = (coordinate.x, coordinate.y);
 
     let mut curr_line = line;
     let mut curr_column = column;
+
+    let mut blocks = Vec::new();
 
     for byte in slice.bytes() {
         if byte == b'\n' {
@@ -53,6 +56,7 @@ pub fn print_string(
                 coordinate.y + ((curr_line + 1) * CHARACTER_HEIGHT) as isize,
                 bg_color,
             );
+            blocks.push((curr_line, curr_column  * CHARACTER_WIDTH));
             curr_column = 0;
             curr_line += 1;
             if curr_line == buffer_height {
@@ -61,6 +65,7 @@ pub fn print_string(
         } else {
             // print the next character
             if curr_column == buffer_width {
+                blocks.push((curr_line, buffer_width));
                 curr_column = 0;
                 curr_line += 1;
                 if curr_line == buffer_height {
@@ -78,8 +83,8 @@ pub fn print_string(
             );
             curr_column += 1;
         }
-    }
-
+    }    
+    blocks.push((curr_line, curr_column * CHARACTER_WIDTH));
     //fill the blank of the last line
     fill_blank(
         framebuffer,
@@ -101,7 +106,7 @@ pub fn print_string(
     // );
 
     // return the position of the end.
-    (curr_column, curr_line)
+    (curr_column, curr_line, blocks)
 }
 
 // print a character to the framebuffer at position (line, column) of all characters in the text area.

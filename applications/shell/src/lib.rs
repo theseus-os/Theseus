@@ -1314,7 +1314,7 @@ impl Shell {
                 }
             }
 
-//            self.terminal.lock().display_cursor()?; 
+            self.terminal.lock().display_cursor()?; 
                 
             let mut need_refresh = false;
             loop {

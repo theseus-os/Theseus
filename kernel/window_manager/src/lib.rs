@@ -175,12 +175,12 @@ impl<Buffer: FrameBuffer> WindowGeneric<Buffer> {
     }
 
     /// Renders the content of the window to the screen.
-    pub fn render(&mut self, block_range: Option<(usize, usize)>) -> Result<(), &'static str> {
+    pub fn render(&mut self, blocks: Option<&[(usize, usize)]>) -> Result<(), &'static str> {
         let coordinate = { self.profile.lock().get_content_position() };
         FRAME_COMPOSITOR.lock().composite(vec![(
             &mut self.framebuffer,
             coordinate,
-            block_range
+            blocks
         )])
     }
 
@@ -218,11 +218,11 @@ impl<Buffer: FrameBuffer> WindowGeneric<Buffer> {
         let component = self.components.get_mut(display_name).ok_or("")?;
         let coordinate = component.get_position();
         let displayable = component.get_displayable_mut();
-        let block_range = displayable.display(
+        let blocks = displayable.display(
             coordinate, 
             &mut self.framebuffer
         );
-        self.render(Some(block_range))
+        self.render(Some(blocks.as_slice()))
     }
 
     // @Andrew
