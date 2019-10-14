@@ -2102,7 +2102,6 @@ dependencies = [
  "frame_buffer 0.1.0",
  "frame_buffer_drawer 0.1.0",
  "frame_buffer_printer 0.1.0",
- "log 0.3.9 (registry+https://github.com/rust-lang/crates.io-index)",
  "spin 0.4.10 (registry+https://github.com/rust-lang/crates.io-index)",
  "tsc 0.1.0",
 ]

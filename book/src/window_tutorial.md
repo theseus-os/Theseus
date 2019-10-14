@@ -22,6 +22,7 @@ After a displayable displays itself in a window, the application should invoke `
 An application invokes `WindowGeneric.get_event()` to get the events sent to it. For example, an active window will receive all the key input events. An application can invoke `WindowGeneric.get_event()` in a loop to handle these inputs from the keyboard.
 
 ## Example
+This example shows how to create a window, add a text displayable to it and print "Hello World" in the window with the text displayable.
 
 ```rust
 use text_display::TextDisplay;

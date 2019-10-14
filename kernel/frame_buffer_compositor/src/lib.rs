@@ -10,8 +10,6 @@ extern crate compositor;
 extern crate frame_buffer;
 extern crate spin;
 #[macro_use]
-extern crate log;
-#[macro_use]
 extern crate lazy_static;
 
 use alloc::collections::BTreeMap;

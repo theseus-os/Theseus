@@ -37,7 +37,7 @@ pub fn init() -> Result<(), &'static str> {
         buffer_height = graphic_info.height as usize;
     };
     // init the final framebuffer
-    let mut framebuffer =
+    let framebuffer =
         FrameBufferRGB::new(buffer_width, buffer_height, Some(vesa_display_phys_start))?;
     let background = vec![0; buffer_width * buffer_height];
     FINAL_FRAME_BUFFER.call_once(|| Mutex::new(Box::new(framebuffer)));

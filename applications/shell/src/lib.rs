@@ -1290,30 +1290,25 @@ impl Shell {
             // Looks at the input queue from the window manager
             // If it has unhandled items, it handles them with the match
             // If it is empty, it proceeds directly to the next loop iteration
-            loop {
-                if let Some(ev) = self.terminal.lock().get_event() {
-                    match ev {
-                        // Returns from the main loop.
-                        Event::ExitEvent => {
-                            trace!("exited terminal");
-                            return Ok(());
-                        }
+            while let Some(ev) = self.terminal.lock().get_event() {
+                match ev {
+                    // Returns from the main loop.
+                    Event::ExitEvent => {
+                        trace!("exited terminal");
+                        return Ok(());
+                    }
 
-                        Event::ResizeEvent(ref _rev) => {
-                            self.terminal.lock().refresh_display(); // application refreshes display after resize event is received
-                        }
+                    Event::ResizeEvent(ref _rev) => {
+                        self.terminal.lock().refresh_display(); // application refreshes display after resize event is received
+                    }
 
-                        // Handles ordinary keypresses
-                        Event::InputEvent(ref input_event) => {
-                            self.key_event_producer.write_one(input_event.key_event);
-                        }
-                        _ => { }
-                    };
-                } else {
-                    break;
-                }
-            }
-
+                    // Handles ordinary keypresses
+                    Event::InputEvent(ref input_event) => {
+                        self.key_event_producer.write_one(input_event.key_event);
+                    }
+                    _ => { }
+                };
+            }            
             self.terminal.lock().display_cursor()?; 
                 
             let mut need_refresh = false;
