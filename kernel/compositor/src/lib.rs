@@ -7,7 +7,7 @@
 extern crate alloc;
 extern crate frame_buffer;
 
-use alloc::vec::Vec;
+use alloc::vec::{Vec, IntoIter};
 use frame_buffer::{FrameBuffer, Coord};
 
 /// The compositor trait.
@@ -21,7 +21,7 @@ pub trait Compositor<Buffer> {
     /// For each tuple in the list, `buffer` is a buffer object to be composited. `coordinate` specifies the buffer relative to the final buffer.
     fn composite(
         &mut self,
-        bufferlist: Vec<&Buffer>,
+        mut bufferlist: IntoIter<Buffer>,
     ) -> Result<(), &'static str>;
 
     /// Checks if a buffer at coordinate is already cached since last updating.

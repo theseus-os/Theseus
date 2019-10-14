@@ -605,7 +605,7 @@ impl Terminal {
             bg_color,
             &mut self.window.framebuffer
         );
-        let block = [(line, (col + 1) * CHARACTER_WIDTH)];
-        self.window.render(Some(&block))
+        let block = vec![(line, (col + 1) * CHARACTER_WIDTH)];
+        self.window.render(Some(block.into_iter()))
     }
 }

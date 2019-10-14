@@ -15,7 +15,7 @@ extern crate log;
 extern crate lazy_static;
 
 use alloc::collections::BTreeMap;
-use alloc::vec::Vec;
+use alloc::vec::{Vec, IntoIter};
 use core::hash::{Hash, Hasher, SipHasher};
 use compositor::Compositor;
 use frame_buffer::{FrameBuffer, FINAL_FRAME_BUFFER, Coord};
@@ -43,7 +43,7 @@ pub struct FrameCompositor {
 pub struct FrameBufferBlocks<'a> {
     pub framebuffer: &'a dyn FrameBuffer,
     pub coordinate: Coord,
-    pub blocks: Option<&'a [(usize, usize)]>,
+    pub blocks: Option<IntoIter<(usize, usize)>>,
 }
 
 /// Metadata that describes the framebuffer.
@@ -76,7 +76,7 @@ impl FrameBufferCache {
 impl Compositor<FrameBufferBlocks<'_>> for FrameCompositor {
     fn composite(
         &mut self,
-        bufferlist: Vec<&FrameBufferBlocks>,
+        mut bufferlist: IntoIter<FrameBufferBlocks>,
     ) -> Result<(), &'static str> {
         let mut final_fb = FINAL_FRAME_BUFFER
             .try()
@@ -84,7 +84,7 @@ impl Compositor<FrameBufferBlocks<'_>> for FrameCompositor {
             .lock();
         let (final_width, final_height) = final_fb.get_size();
 
-        for frame_buffer_blocks in bufferlist {
+        while let Some(frame_buffer_blocks) = bufferlist.next() {
             // Divide the framebuffer into 16 pixel tall blocks.
             let src_fb = frame_buffer_blocks.framebuffer;
             let coordinate = frame_buffer_blocks.coordinate;
@@ -93,18 +93,18 @@ impl Compositor<FrameBufferBlocks<'_>> for FrameCompositor {
             let src_buffer_len = src_width * src_height;
 
             let mut all_blocks = Vec::new();
-            let blocks = match frame_buffer_blocks.blocks {
+            let mut blocks = match frame_buffer_blocks.blocks {
                 Some(blocks) => { blocks },
                 None => {
                     let block_number = (src_height - 1) / CACHE_BLOCK_HEIGHT + 1;
                     for i in 0.. block_number {
                         all_blocks.push((i, src_width))
                     }
-                    all_blocks.as_slice()
+                    all_blocks.into_iter()
                 } 
             };
 
-            for (block_index, update_width) in blocks {            
+            while let Some((block_index, block_width)) = blocks.next() {
                 // The start pixel of the block
                 let start_index = block_pixels * block_index;
                 // if  start_index >= src_buffer_len {
@@ -132,15 +132,15 @@ impl Compositor<FrameBufferBlocks<'_>> for FrameCompositor {
                 // cache the new framebuffer and remove all caches that are overlapped by it.
                 let new_cache = FrameBufferCache {
                     content_hash: hash(block),
-                    width: *update_width,
+                    width: block_width,
                     coordinate: coordinate_start,
                 };
                 let keys: Vec<_> = self.caches.keys().cloned().collect();
-                let mut draw_width = new_cache.width;
+                let mut update_width = new_cache.width;
                 for key in keys {
                     if let Some(cache) = self.caches.get(&key) {
                         if cache.overlaps_with(&new_cache) {
-                            draw_width = core::cmp::max(draw_width, (cache.width as isize + cache.coordinate.x - new_cache.coordinate.x) as usize);
+                            update_width = core::cmp::max(update_width, (cache.width as isize + cache.coordinate.x - new_cache.coordinate.x) as usize);
                         }
                         if cache.coordinate == new_cache.coordinate {
                             self.caches.remove(&key);
@@ -163,7 +163,7 @@ impl Compositor<FrameBufferBlocks<'_>> for FrameCompositor {
                 // just draw the part which is within the final buffer
                 let width = core::cmp::min(
                     core::cmp::min(coordinate_end.x as usize, final_width) - final_x_start,
-                    draw_width,
+                    update_width,
                 );
                 let height = core::cmp::min(coordinate_end.y as usize, final_height) - final_y_start;
 

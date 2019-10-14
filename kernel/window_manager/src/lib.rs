@@ -30,6 +30,7 @@ use alloc::collections::BTreeMap;
 use alloc::string::{String, ToString};
 use alloc::sync::{Arc, Weak};
 use alloc::collections::VecDeque;
+use alloc::vec::{IntoIter};
 use compositor::Compositor;
 use core::ops::{Deref, DerefMut};
 use dfqueue::{DFQueue, DFQueueConsumer, DFQueueProducer};
@@ -175,14 +176,14 @@ impl<Buffer: FrameBuffer> WindowGeneric<Buffer> {
     }
 
     /// Renders the content of the window to the screen.
-    pub fn render(&mut self, blocks: Option<&[(usize, usize)]>) -> Result<(), &'static str> {
+    pub fn render(&mut self, blocks: Option<IntoIter<(usize, usize)>>) -> Result<(), &'static str> {
         let coordinate = { self.profile.lock().get_content_position() };
         let frame_buffer_blocks = FrameBufferBlocks {
             framebuffer: &mut self.framebuffer,
             coordinate: coordinate,
             blocks: blocks
         };
-        FRAME_COMPOSITOR.lock().composite(vec![&frame_buffer_blocks])
+        FRAME_COMPOSITOR.lock().composite(vec![frame_buffer_blocks].into_iter())
     }
 
     /// Gets a reference to a displayable of type `T` which implements the `Displayable` trait by its name. Returns error if the displayable is not of type `T` or does not exist.
@@ -223,7 +224,7 @@ impl<Buffer: FrameBuffer> WindowGeneric<Buffer> {
             coordinate, 
             &mut self.framebuffer
         );
-        self.render(Some(blocks.as_slice()))
+        self.render(Some(blocks.into_iter()))
     }
 
     // @Andrew
@@ -381,7 +382,7 @@ impl Window for WindowProfile {
             coordinate: Coord { x: 0, y: 0 },
             blocks: None
         };
-        FRAME_COMPOSITOR.lock().composite(vec![&frame_buffer_blocks])
+        FRAME_COMPOSITOR.lock().composite(vec![frame_buffer_blocks].into_iter())
     }
 
     fn contains(&self, coordinate: Coord) -> bool {
@@ -407,7 +408,7 @@ impl Window for WindowProfile {
             coordinate: Coord { x: 0, y: 0 },
             blocks: None
         };        
-        FRAME_COMPOSITOR.lock().composite(vec![&frame_buffer_blocks])
+        FRAME_COMPOSITOR.lock().composite(vec![frame_buffer_blocks].into_iter())
     }
 
     fn resize(

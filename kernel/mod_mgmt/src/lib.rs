@@ -2170,7 +2170,7 @@ impl CrateNamespace {
     /// 
     /// # Note
     /// If a symbol already exists in the symbol map, this leaves the existing symbol intact and *does not* replace it.
-    pub fn sections<'a, I>(
+    pub fn add_symbols<'a, I>(
         &self, 
         sections: I,
         _log_replacements: bool,
