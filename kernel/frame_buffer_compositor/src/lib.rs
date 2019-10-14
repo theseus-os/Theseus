@@ -1,6 +1,20 @@
 //! This crate defines a framebuffer compositor.
 //! A framebuffer compositor will composite a sequence of framebuffers and display them in the final framebuffer.
 //! The coordinate of a frame buffer represents its origin (top-left point).
+//!
+//! The compositor caches framebuffer blocks for better performance. 
+//!
+//! First, it divides every incoming framebuffer into pieces. The height of every piece is a constant 16, which is the same as the height of a character. The width of a piece is the same as the width of the framebuffer it belongs to.
+//!
+//! Every piece contains a block. A `block` in a piece means the part which is updated since last display. It is specified by the index of the piece and its width. It starts from the left side of the piece it occupies. The right side of a block in a piece is blank. For example, in a terminal, every line is a piece, and the part from the beginning of the line to the right side of updated text in the line is a block.
+//!
+//! The compositor caches a list of displayed pieces and the width of the block in it. We use `piece` over `block` so that the compositor can cache the hash of a continuous array of pixels rather than the whole pixels of a block. If an incoming `FrameBufferBlocks` carries a list of updated blocks, the compositor compares every block with the caches.
+//! * If the two pieces are identical, ignore it.
+//! * If a new block overlaps with an existing one, display the block and clear the remaining part of the piece till the right side of the block in the cached piece.
+//! * If the two blocks are of the same location, remove the cached piece after the step above. We do not need to make sure the new block is larger than the cached one because the extra part is already cleared.
+//!
+//! If `FrameBufferBlocks` is `None`, the compositor will handle all of its blocks which occupy the whole pieces.
+//! The compositor minimizes the updated parts of a framebuffer and clears the blank parts. Even if the cache is lost or the updated blocks information is none, It guarantees the result is the same.
 
 #![no_std]
 #![feature(const_vec_new)]
@@ -31,30 +45,33 @@ lazy_static! {
 }
 
 /// The framebuffer compositor structure.
-/// It caches framebuffers as soft states for better performance.
-/// Framebuffers which haven't updated since last compositing will be ignored.
+/// It caches framebuffer blocks since last update as soft states for better performance.
 pub struct FrameCompositor {
     // Cache of updated framebuffers
-    caches: BTreeMap<Coord, FrameBufferCache>,
+    caches: BTreeMap<Coord, BlockCache>,
 }
 
+/// The framebuffers to be composited together with the information of their updated blocks.
 pub struct FrameBufferBlocks<'a> {
+    /// The framebuffer to be composited.
     pub framebuffer: &'a dyn FrameBuffer,
+    /// The coordinate of the framebuffer where it is rendered to the final framebuffer.
     pub coordinate: Coord,
+    /// The updated blocks of the framebuffer. If `blocks` is `None`, the compositor would copy all the blocks of the framebuffer.
     pub blocks: Option<IntoIter<(usize, usize)>>,
 }
 
 /// Metadata that describes the framebuffer.
-struct FrameBufferCache {
-    /// The coordinate of the framebuffer where it is rendered to the final framebuffer
+struct BlockCache {
+    /// The coordinate of the block where it is rendered to the final framebuffer.
     coordinate: Coord,
     /// The hash of the content in the frame buffer.
     content_hash: u64,
     width: usize,
 }
 
-impl FrameBufferCache {
-    // checks if the coordinate is within the framebuffer
+impl BlockCache {
+    // checks if the coordinate is within the block
     fn contains(&self, coordinate: Coord) -> bool {
         return coordinate.x >= self.coordinate.x
             && coordinate.x < self.coordinate.x + self.width as isize
@@ -62,8 +79,8 @@ impl FrameBufferCache {
             && coordinate.y < self.coordinate.y + CACHE_BLOCK_HEIGHT as isize;
     }
 
-    // checks if the cached framebuffer overlaps with another one
-    fn overlaps_with(&self, cache: &FrameBufferCache) -> bool {
+    // checks if the cached block overlaps with another one
+    fn overlaps_with(&self, cache: &BlockCache) -> bool {
         self.contains(cache.coordinate)
             || self.contains(cache.coordinate + (cache.width as isize - 1, 0))
             || self.contains(cache.coordinate + (0, CACHE_BLOCK_HEIGHT as isize - 1))
@@ -83,13 +100,13 @@ impl Compositor<FrameBufferBlocks<'_>> for FrameCompositor {
         let (final_width, final_height) = final_fb.get_size();
 
         while let Some(frame_buffer_blocks) = bufferlist.next() {
-            // Divide the framebuffer into 16 pixel tall blocks.
             let src_fb = frame_buffer_blocks.framebuffer;
             let coordinate = frame_buffer_blocks.coordinate;
             let (src_width, src_height) = src_fb.get_size();
-            let block_pixels = CACHE_BLOCK_HEIGHT * src_width;
+            let piece_pixels = CACHE_BLOCK_HEIGHT * src_width;
             let src_buffer_len = src_width * src_height;
 
+            // Handle all blocks if the incoming blocks parameter is None 
             let mut all_blocks = Vec::new();
             let mut blocks = match frame_buffer_blocks.blocks {
                 Some(blocks) => { blocks },
@@ -102,16 +119,13 @@ impl Compositor<FrameBufferBlocks<'_>> for FrameCompositor {
                 } 
             };
 
-            while let Some((block_index, block_width)) = blocks.next() {
-                // The start pixel of the block
-                let start_index = block_pixels * block_index;
-                // if  start_index >= src_buffer_len {
-                //     break;
-                // }
-                let coordinate_start = coordinate + (0, (CACHE_BLOCK_HEIGHT * block_index) as isize);
+            while let Some((piece_index, block_width)) = blocks.next() {
+                // The start pixel of the piece
+                let start_index = piece_pixels * piece_index;
+                let coordinate_start = coordinate + (0, (CACHE_BLOCK_HEIGHT * piece_index) as isize);
                 
-                // The end pixel of the block
-                let mut end_index = start_index + block_pixels;
+                // The end pixel of the piece
+                let mut end_index = start_index + piece_pixels;
                 let coordinate_end;
                 if end_index <= src_buffer_len {
                     coordinate_end = coordinate_start + (src_width as isize, CACHE_BLOCK_HEIGHT as isize);
@@ -120,16 +134,17 @@ impl Compositor<FrameBufferBlocks<'_>> for FrameCompositor {
                     coordinate_end = coordinate + (src_width as isize, src_height as isize);
                 }
 
-                let block = &src_fb.buffer()[start_index..end_index];
-
-                // Skip if a block is already cached
-                if self.is_cached(&block, &coordinate_start, src_width) {
+                let piece = &src_fb.buffer()[start_index..end_index];
+                // Skip if a piece is already cached
+                if self.is_cached(&piece, &coordinate_start, src_width) {
                     continue;
                 }
 
-                // cache the new framebuffer and remove all caches that are overlapped by it.
-                let new_cache = FrameBufferCache {
-                    content_hash: hash(block),
+                // find overlapped caches
+                // extend the width of the updated part to the right side of the cached block
+                // remove caches of the same location
+                let new_cache = BlockCache {
+                    content_hash: hash(piece),
                     width: block_width,
                     coordinate: coordinate_start,
                 };
@@ -165,28 +180,22 @@ impl Compositor<FrameBufferBlocks<'_>> for FrameCompositor {
                 );
                 let height = core::cmp::min(coordinate_end.y as usize, final_height) - final_y_start;
 
-                // copy every line to the final framebuffer.
+                // copy every line of the block to the final framebuffer.
                 // let src_buffer = src_fb.buffer();
                 for i in 0..height {
                     let dest_start = (final_y_start + i) * final_width + final_x_start;
                     let src_start = src_width * ((final_y_start + i) as isize - coordinate_start.y) as usize
                         + (final_x_start as isize - coordinate_start.x) as usize;
                     let src_end = src_start + width;
-                    final_fb.buffer_copy(&(block[src_start..src_end]), dest_start);
+                    final_fb.buffer_copy(&(piece[src_start..src_end]), dest_start);
                 }
 
-                // insert the cache
+                // insert the new cache
                 self.caches.insert(coordinate_start, new_cache);
 
             }
         }
 
-        // for (k, v) in self.cache.iter() {
-        //     trace!("({} {}) ({}, {}) {} {}", k.x, k.y, v.coordinate.x, v.coordinate.y, v.content_hash, v.width);
-        // }
-
-        // loop {
-        // }
         Ok(())
     }
 
@@ -199,28 +208,6 @@ impl Compositor<FrameBufferBlocks<'_>> for FrameCompositor {
         }
     }
 }
-
-// Copy a line of pixels from src framebuffer to the dest framebuffer in 3d mode.
-// We use 3d pixel drawer because we need to compare the depth of every pixel
-/*fn buffer_copy_3d(
-    dest_buffer: &mut BoxRefMut<MappedPages, [Pixel]>,
-    src_buffer: &BoxRefMut<MappedPages, [Pixel]>,
-    dest_start: usize,
-    src_start: usize,
-    len: usize,
-) {
-    let mut dest_index = dest_start;
-    let dest_end = dest_start + len;
-    let mut src_index = src_start;
-    loop {
-        frame_buffer_pixel_drawer::write_to_3d(dest_buffer, dest_index, src_buffer[src_index]);
-        dest_index += 1;
-        src_index += 1;
-        if dest_index == dest_end {
-            break;
-        }
-    }
-}*/
 
 // Get the hash of a cache block
 fn hash<T: Hash>(block: T) -> u64 {

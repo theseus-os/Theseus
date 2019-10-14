@@ -12,16 +12,15 @@ use frame_buffer::{Coord};
 
 /// The compositor trait.
 /// A compositor composites a list of buffers to a single buffer.
-pub trait Compositor<Buffer> {
+pub trait Compositor<BufferInfo> {
     /// Composites the buffers in the bufferlist.
     ///
     /// # Arguments
     ///
-    /// * `bufferlist` - A list of buffers in the form of (buffer:T, coordinate: Coord).
-    /// For each tuple in the list, `buffer` is a buffer object to be composited. `coordinate` specifies the buffer relative to the final buffer.
+    /// * `bufferlist` - A list of information of the buffers to be composited. The type for BufferInfo is generic so that we can implement various compositor with specific information
     fn composite(
         &mut self,
-        bufferlist: IntoIter<Buffer>,
+        bufferlist: IntoIter<BufferInfo>,
     ) -> Result<(), &'static str>;
 
     /// Checks if a buffer at coordinate is already cached since last updating.

@@ -1288,8 +1288,7 @@ impl Shell {
             }
 
             // Looks at the input queue from the window manager
-            // If it has unhandled items, it handles them with the match
-            // If it is empty, it proceeds directly to the next loop iteration
+            // It handles all the event items until the queue is empty
             while let Some(ev) = self.terminal.lock().get_event() {
                 match ev {
                     // Returns from the main loop.

@@ -16,7 +16,8 @@ use frame_buffer::{FrameBuffer, Coord};
 type ASCII = u8;
 
 /// Prints a string in a framebuffer.
-/// Returns (column, line) of the end, i.e. the position of the next symbol.
+/// Returns (column, line, blocks) of the end, i.e. the position of the next symbol and the information of updated blocks.
+/// A block (index, width) represents the index of line number and the width of charaters in this line as pixels. It can be viewed as a framebuffer block which is described in the `frame_buffer_compositor` crate
 /// # Arguments
 /// * `framebuffer`: the framebuffer to display in.
 /// * `coordinate`: the left top coordinate of the text block relative to the origin(top-left point) of the frame buffer.
@@ -25,6 +26,8 @@ type ASCII = u8;
 /// * `slice`: the string to display.
 /// * `font_color`: the color of the text.
 /// * `bg_color`: the background color of the text block.
+/// * `column`: the column of the text.
+/// * `line`: the line of the text in the text block.
 pub fn print_string(
     framebuffer: &mut dyn FrameBuffer,
     coordinate: Coord,

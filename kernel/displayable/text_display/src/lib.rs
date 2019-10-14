@@ -42,6 +42,7 @@ impl Displayable for TextDisplay {
         coordinate: Coord,
         framebuffer: &mut dyn FrameBuffer,
     ) -> Vec<(usize, usize)> {
+        // If the cache is the prefix of the new text, just print the additional characters.
         let (string, col, line) = if self.text.starts_with(self.cache.as_str()) {
             (
                 &self.text.as_str()[self.cache.len()..self.text.len()],
@@ -63,8 +64,6 @@ impl Displayable for TextDisplay {
             col,
             line,
         );
-
-
 
         self.next_col = next_col;
         self.next_line = next_line;
