@@ -40,8 +40,8 @@ pub fn init() -> Result<(), &'static str> {
     let mut framebuffer =
         FrameBufferRGB::new(buffer_width, buffer_height, Some(vesa_display_phys_start))?;
     let background = vec![0; buffer_width * buffer_height];
-    framebuffer.buffer_copy(background.as_slice(), 0);
     FINAL_FRAME_BUFFER.call_once(|| Mutex::new(Box::new(framebuffer)));
+    FINAL_FRAME_BUFFER.try().ok_or("").unwrap().lock().buffer_copy(background.as_slice(), 0);
 
     Ok(())
 }

@@ -605,6 +605,6 @@ impl Terminal {
             bg_color,
             &mut self.window.framebuffer
         );
-        self.window.render()
+        self.window.render(Some((line, line + 1)))
     }
 }

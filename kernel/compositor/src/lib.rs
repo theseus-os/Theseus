@@ -21,7 +21,7 @@ pub trait Compositor {
     /// For each tuple in the list, `buffer` is a buffer object to be composited. `coordinate` specifies the buffer relative to the final buffer.
     fn composite(
         &mut self,
-        bufferlist: Vec<(&dyn FrameBuffer, Coord)>,
+        bufferlist: Vec<(&dyn FrameBuffer, Coord, Option<(usize, usize)>)>,
     ) -> Result<(), &'static str>;
 
     /// Checks if a buffer at coordinate is already cached since last updating.

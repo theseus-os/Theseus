@@ -94,7 +94,7 @@ impl<Buffer: FrameBuffer> WindowGeneric<Buffer> {
             height,
             SCREEN_BACKGROUND_COLOR,
         );
-        self.render()
+        self.render(None)
     }
 
     /// Returns the content dimensions of this window,
@@ -175,11 +175,12 @@ impl<Buffer: FrameBuffer> WindowGeneric<Buffer> {
     }
 
     /// Renders the content of the window to the screen.
-    pub fn render(&mut self) -> Result<(), &'static str> {
+    pub fn render(&mut self, block_range: Option<(usize, usize)>) -> Result<(), &'static str> {
         let coordinate = { self.profile.lock().get_content_position() };
         FRAME_COMPOSITOR.lock().composite(vec![(
             &mut self.framebuffer,
-            coordinate
+            coordinate,
+            block_range
         )])
     }
 
@@ -217,11 +218,11 @@ impl<Buffer: FrameBuffer> WindowGeneric<Buffer> {
         let component = self.components.get_mut(display_name).ok_or("")?;
         let coordinate = component.get_position();
         let displayable = component.get_displayable_mut();
-        displayable.display(
+        let block_range = displayable.display(
             coordinate, 
             &mut self.framebuffer
         );
-        self.render()
+        self.render(Some(block_range))
     }
 
     // @Andrew
@@ -375,7 +376,7 @@ impl Window for WindowProfile {
             SCREEN_BACKGROUND_COLOR,
         );
         let coordinate = Coord { x: 0, y: 0 };
-        FRAME_COMPOSITOR.lock().composite(vec![(buffer, coordinate)])
+        FRAME_COMPOSITOR.lock().composite(vec![(buffer, coordinate, None)])
     }
 
     fn contains(&self, coordinate: Coord) -> bool {
@@ -397,7 +398,7 @@ impl Window for WindowProfile {
         let buffer = buffer_lock.deref_mut();
         draw_rectangle(buffer, self.coordinate, self.width, self.height, color);
         let coordinate = Coord { x: 0, y: 0 };
-        FRAME_COMPOSITOR.lock().composite(vec![(buffer, coordinate)])
+        FRAME_COMPOSITOR.lock().composite(vec![(buffer, coordinate, None)])
     }
 
     fn resize(

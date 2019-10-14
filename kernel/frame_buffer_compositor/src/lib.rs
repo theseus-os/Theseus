@@ -70,7 +70,7 @@ impl FrameBufferCache {
 impl Compositor for FrameCompositor {
     fn composite(
         &mut self,
-        bufferlist: Vec<(&dyn FrameBuffer, Coord)>,
+        bufferlist: Vec<(&dyn FrameBuffer, Coord, Option<(usize, usize)>)>,
     ) -> Result<(), &'static str> {
         let mut final_fb = FINAL_FRAME_BUFFER
             .try()
@@ -78,20 +78,27 @@ impl Compositor for FrameCompositor {
             .lock();
         let (final_width, final_height) = final_fb.get_size();
 
-        for (src_fb, coordinate) in bufferlist {
-            // Divide the framebuffer into 16 pixel tall blocks. 
-            let mut block_index = 0;
+        for (src_fb, coordinate, block_range) in bufferlist {
+            // Divide the framebuffer into 16 pixel tall blocks.
             let (src_width, src_height) = src_fb.get_size();
             let block_pixels = CACHE_BLOCK_HEIGHT * src_width;
- 
-            loop {
-                let src_buffer_len = src_width * src_height;
+            let (block_start, block_end) = match block_range {
+                Some(b) => { b },
+                None => { (0, (src_height - 1) / CACHE_BLOCK_HEIGHT + 1) }
+            };
+            let src_buffer_len = src_width * src_height;
                 
+            //trace!("WEnqiu: {} {}", block_start, block_end);
+            let mut block_index = 0;
+            loop {
+                if block_index >= block_end {
+                    break;
+                }               
                 // The start pixel of the block
                 let start_index = block_pixels * block_index;
-                if  start_index >= src_buffer_len {
-                    break;
-                }
+                // if  start_index >= src_buffer_len {
+                //     break;
+                // }
                 let coordinate_start = coordinate + (0, (CACHE_BLOCK_HEIGHT * block_index) as isize);
                 
                 // The end pixel of the block

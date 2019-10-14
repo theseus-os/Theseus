@@ -5,7 +5,7 @@
 
 #![no_std]
 
-extern crate alloc;
+#[macro_use]extern crate alloc;
 extern crate font;
 extern crate frame_buffer;
 extern crate frame_buffer_drawer;
@@ -15,6 +15,7 @@ extern crate displayable;
 #[macro_use]extern crate log;
 
 use alloc::string::String;
+use alloc::vec::Vec;
 use displayable::Displayable;
 use font::{CHARACTER_HEIGHT, CHARACTER_WIDTH};
 use frame_buffer::{Coord, FrameBuffer};
@@ -41,18 +42,18 @@ impl Displayable for TextDisplay {
         &mut self,
         coordinate: Coord,
         framebuffer: &mut dyn FrameBuffer,
-    ) {
-        let (string, next_line, next_col) = if self.text.starts_with(self.cache.as_str()) {
+    ) -> (usize, usize) {
+        let (string, col, line) = if self.text.starts_with(self.cache.as_str()) {
             (
                 &self.text.as_str()[self.cache.len()..self.text.len()],
-                self.next_line,
                 self.next_col,
+                self.next_line,
             )
         } else {
             (self.text.as_str(), 0, 0)
         };
 
-        let (col, line) = frame_buffer_printer::print_string(
+        let (next_col, next_line) = frame_buffer_printer::print_string(
             framebuffer,
             coordinate,
             self.width,
@@ -60,12 +61,17 @@ impl Displayable for TextDisplay {
             string,
             self.fg_color,
             self.bg_color,
-            next_line,
-            next_col
+            col,
+            line,
         );
-        self.next_col = col;
-        self.next_line = line;
+
+        let block_range = (line, next_line + 1);
+
+        self.next_col = next_col;
+        self.next_line = next_line;
         self.cache = self.text.clone();
+
+        return block_range;
     }
 
     fn resize(&mut self, width: usize, height: usize) {

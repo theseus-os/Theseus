@@ -10,6 +10,7 @@ extern crate frame_buffer;
 extern crate downcast_rs;
 
 use alloc::boxed::Box;
+use alloc::vec::Vec;
 use downcast_rs::Downcast;
 use frame_buffer::{FrameBuffer, Coord};
 
@@ -24,7 +25,7 @@ pub trait Displayable: Downcast + Send {
         &mut self,
         coordinate: Coord,
         framebuffer: &mut dyn FrameBuffer,
-    );
+    ) -> (usize, usize) ;
 
     /// Resizes the displayable area.
     fn resize(&mut self, width: usize, height: usize);

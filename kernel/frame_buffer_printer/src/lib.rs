@@ -32,8 +32,8 @@ pub fn print_string(
     slice: &str,
     font_color: u32,
     bg_color: u32,
-    line: usize,
     column: usize,
+    line: usize,
 ) -> (usize, usize) {
     let buffer_width = width / CHARACTER_WIDTH;
     let buffer_height = height / CHARACTER_HEIGHT;
@@ -41,6 +41,7 @@ pub fn print_string(
 
     let mut curr_line = line;
     let mut curr_column = column;
+
     for byte in slice.bytes() {
         if byte == b'\n' {
             // fill the remaining blank of current line and go to the next line
@@ -114,6 +115,11 @@ fn print_ascii_character(
     line: usize,
     column: usize,
 ) {
+
+    // Wenqiu: delete
+    // let mut framebuffer = frame_buffer::FINAL_FRAME_BUFFER.try().ok_or("").unwrap().lock();
+    // let coordinate = Coord::new(0, 0);
+    
     let start = coordinate + ((column * CHARACTER_WIDTH) as isize, (line * CHARACTER_HEIGHT) as isize);
     if !framebuffer.overlaps_with(start, CHARACTER_WIDTH, CHARACTER_HEIGHT) {
         return
