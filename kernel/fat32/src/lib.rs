@@ -255,7 +255,7 @@ impl Header {
             sectors: LittleEndian::read_u32(&bpb_sector[32..36]),
         };
 
-        debug!("Disk header information:")
+        debug!("Disk header information:");
         debug!("bytes per sector: {}", fatheader.bytes_per_sector);
         debug!("sectors per cluster: {}", fatheader.sectors_per_cluster);
         debug!("reserved sectors: {}", fatheader.reserved_sectors);
@@ -1454,7 +1454,6 @@ pub fn init(sd: storage_device::StorageDeviceRef) -> Result<Filesystem, &'static
 /// Returns true if the storage device passed into the function has a fat filesystem structure
 pub fn detect_fat(disk: &storage_device::StorageDeviceRef) -> bool {
     const fat32_magic: [u8; 8] = *b"FAT32   ";
-    let fat32_magic_slice: &[u8] = &fat32_magic[0..8];
     
     let mut initial_buf: Vec<u8> = vec![0; disk.lock().sector_size_in_bytes()];
     let _sectors_read = match disk.lock().read_sectors(&mut initial_buf[..], 0){
@@ -1463,10 +1462,7 @@ pub fn detect_fat(disk: &storage_device::StorageDeviceRef) -> bool {
     };
     info!("Magic sequence: {:X?}", &initial_buf[82..90]);
     // The offset at 0x52 in the extended FAT32 BPB is used to detect the Filesystem type ("FAT32   ")
-    match &initial_buf[82..90] {
-        fat32_magic_slice => return true,
-        _ => return false,
-    };    
+    initial_buf[82..90] == fat32_magic
 }
 
 
