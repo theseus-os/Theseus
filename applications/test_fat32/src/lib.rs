@@ -22,7 +22,7 @@ use alloc::string::String;
 use alloc::string::ToString;
 use alloc::sync::{Arc, Weak};
 use spin::Mutex;
-use fs_node::{File, Directory, FileOrDir, FsNode};
+use fs_node::{File, Directory, FileOrDir, FsNode, DirRef, FileRef};
 use fat32::{root_dir, PFSDirectory, RootDirectory};
 use path::Path;
 use getopts::Options;
@@ -89,11 +89,12 @@ pub fn main(args: Vec<String>) -> isize {
                     };
 
 
-                    let root: RootDirectory = root_dir(fs.clone(), name.clone()).unwrap();
+                    //let fat32_root: Arc<Mutex<RootDirectory>> = root_dir(fs.clone(), name.clone()).unwrap();
+                    let fat32_root: DirRef = root_dir(fs.clone(), name.clone()).unwrap();
                     
                     // // Recursively print files and directories.
                     if matches.opt_present("p") {
-                        print_dir(&root);
+                        print_dir(fat32_root.clone());
                     };
 
                     // If we have a mount point, then mount.
@@ -108,8 +109,8 @@ pub fn main(args: Vec<String>) -> isize {
                             // FIXME set root parent dir to appropriate value.
                             let mut curr_dir = curr_wd.lock();
                             //let root = Arc::new(Mutex::new(root)); // CAUSES ISSUE FIXME
-                            let root = fat32::make_dir_ref(root);
-                            match curr_dir.insert(FileOrDir::Dir(root)) {
+                            //let root = fat32::make_dir_ref(root);
+                            match curr_dir.insert(FileOrDir::Dir(fat32_root)) {
                                 Ok(_) => println!("Successfully mounted fat32 FS"),
                                 Err(_) => println!("Failed to mount fat32 FS"),
                             };
@@ -131,7 +132,8 @@ pub fn main(args: Vec<String>) -> isize {
     0
 }
 
-fn print_dir(d : &dyn Directory) {
+fn print_dir(dirref: DirRef) {
+    let d = dirref.lock();
     let entries = d.list();
     if entries.len() <= 0 {
         return; // Don't print empty directories to save some time.
@@ -153,13 +155,13 @@ fn print_dir(d : &dyn Directory) {
         }
 
         match node {
-            FileOrDir::File(f) => {
-                let f_locked: &dyn File = &(*f.lock()); // This looks pretty horrible, but it seems legitimate.
-                print_file(f_locked);
+            FileOrDir::File(fileref) => {
+                //let f_locked: &dyn File = &(*f.lock()); // This looks pretty horrible, but it seems legitimate.
+                print_file(fileref);
             },
-            FileOrDir::Dir(d) => {
-                let d_locked: &dyn Directory = &(*d.lock()); // This looks pretty horrible, but it seems legitimate.
-                print_dir(d_locked);
+            FileOrDir::Dir(dirref) => {
+                //let d_locked: &dyn Directory = &(*d.lock()); // This looks pretty horrible, but it seems legitimate.
+                print_dir(dirref);
             }
         }
     }
@@ -219,8 +221,10 @@ fn check_singleton(d : &PFSDirectory) {
 }
 
 
-fn print_file(f: &dyn File) {
+fn print_file(fileref: FileRef) {
     const SECTOR_SIZE : usize = 512; // FIXME not really a constant here.
+
+    let f = fileref.lock();
 
     println!("Printing file: {:?}, {:} bytes.", f.get_name(), f.size());
     trace!("Printing file {:?},. {} bytes", f.get_name(), f.size());

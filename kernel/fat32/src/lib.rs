@@ -133,20 +133,20 @@ use block_io::BlockIo;
 use spawn::{KernelTaskBuilder, ApplicationTaskBuilder};
 use task::TaskRef;
 
+// DO NOT UNDER ANY CIRCUMSTANCE CHECK THIS FOR EQUALITY TO DETERMINE EOC
 /// The end-of-cluster value written by this implementation of FAT32.
 /// Note that many implementations use different values for EOC
-/// DO NOT UNDER ANY CIRCUMSTANCE CHECK THIS FOR EQUALITY TO DETERMINE EOC
 const EOC: u32 = 0x0fff_ffff;
 /// Magic byte used to mark a directory table as free. Set as first byte of name field.
 const FREE_DIRECTORY_ENTRY: u8 = 0xe5;
 
 /// Byte to mark entry as a "dot" entry.
 const DOT_DIRECTORY_ENTRY: u8 = 0x2e;
-//const FAT32_MAGIC: [u8: ] = b"FAT32   ";
 
 /// Empty cluster marked as 0.
 const EMPTY_CLUSTER: u32 = 0;
 
+// TODO use these at some point.
 bitflags! {
     struct FileAttributes: u8 {
         const READ_ONLY = 0x1;
@@ -180,8 +180,9 @@ fn cluster_from_raw(cluster: u32) -> u32 {
     (cluster & 0x0fff_ffff)
 }
 
-
-
+// REVIEW I'm not sure if these are worth keeping around seeing as anything on the public interface will use static strings.
+// Internally EOF is used on non-error paths so it's non-trivial to get rid of this behavior unless we make the returns Result<Option<..>>
+/// Internal error types
 #[derive(Debug, PartialEq)]
 pub enum Error {
     BlockError,
@@ -200,9 +201,10 @@ enum FileType {
     PFSDirectory,
 }
 
-pub type ChildList = BTreeMap<String, FileOrDir>;
-//pub type WLockedChildList = spin::RwLockWriteGuard<'<empty>, ChildList>;
+/// Internal Directory storage type
+type ChildList = BTreeMap<String, FileOrDir>;
 
+// TODO rewrite this structure using zerocopy crate for simplicity of reading from disk.
 /// The first 25 bytes of a FAT formatted disk BPB contains these fields and are used to know important information about the disk 
 pub struct Header {
     data: Vec<u8>,
@@ -247,7 +249,7 @@ impl Header {
             legacy_sectors: LittleEndian::read_u16(&bpb_sector[19..21]),
             _media_type: bpb_sector[21],
             legacy_sectors_per_fat: bpb_sector[22],
-            _sectors_per_track: LittleEndian::read_u16(&bpb_sector[0x18..0x20]), // TODO why is this indexed with hex? It's not even two bytes
+            _sectors_per_track: LittleEndian::read_u16(&bpb_sector[0x18..0x20]), // TODO why is this indexed with hex?
             _head_count: LittleEndian::read_u16(&bpb_sector[26..28]),
             _hidden_sectors: LittleEndian::read_u32(&bpb_sector[28..32]),
             sectors: LittleEndian::read_u32(&bpb_sector[32..36]),
@@ -633,6 +635,8 @@ impl Directory for PFSDirectory {
         let mut fs = self.cc.filesystem.lock();
         let mut children = self.children.write();
 
+        //debug!("Listing directory entries");
+
         match self.walk_until(&mut fs, &mut children, None) {
             Ok(_) => {}, // TODO this case doesn't happen when None is an argument.
             Err(Error::EndOfFile) | // Cases that represent a successful directory walk.
@@ -708,6 +712,7 @@ impl PFSDirectory {
         
         loop {
             let dir: FatDirectory = self.get_fat_directory(fs, &pos)?;
+            //debug!("got fat directory");
             
             // TODO VFAT long name check needs to be done correctly.
             if !dir.is_free() && !dir.is_vfat() && !dir.is_dot() { // Don't add dot directories. Must be handled specially. FIXME
@@ -846,7 +851,11 @@ impl PFSDirectory {
         // Get the sector on disk corresponding to our sector and cluster:
         let offset = fs.sector_to_byte_offset(sector) + pos.entry_offset;
         let mut buf = [0; size_of::<RawFatDirectory>()];
-        let _bytes_read = fs.io.read(&mut buf, offset).map_err(|_| Error::BlockError)?;
+        debug!("Trying to read");
+        let _bytes_read = fs.io.read(&mut buf, offset).map_err(|e| {
+            warn!("Disk read failed: {:?}", e);
+            Error::BlockError
+        })?;
         
         let entry_offset = pos.entry_offset;
         let fat_dir = FatDirectory {
@@ -1109,7 +1118,7 @@ impl ClusterChain {
 }
 
 // TODO I'd like to rethink this code so that it's easier to initialize and so that much of the public (and generally *immutable*) information is not behind a lock.
-/// Structure for the filesystem to be used to transverse the disk and run operations on the disk
+/// Structure for the filesystem to be used to traverse the disk and run operations on the disk
 pub struct Filesystem {
     header: Header, // This is meant to read the first 512 bytes of the virtual drive in order to obtain device information
     io: BlockIo, // Cached byte level reader and writer to and from disk.
@@ -1213,8 +1222,8 @@ impl Filesystem {
         (((cluster - 2) * self.sectors_per_cluster) + self.first_data_sector) as usize
     }
 
-    // TODO: document the behavior for EOF encountered (since this is useful).
-    /// Used to transverse to the next cluster of a PFSfile/PFSdirectory that spans multiple clusters by utlizing the FAT component
+    /// Walks the FAT table to find the next cluster given the current cluster.
+    /// Returns Err(Error::EOF) if the next cluster is an EOC indicator.
     fn next_cluster(&mut self, cluster: u32) -> Result<u32, Error> {
         match self.fat_type {
             32 => {
@@ -1332,7 +1341,7 @@ impl Filesystem {
         Ok(new_cluster_candidate)
     }
 
-    /// Reads the value at cluster from the FAT table:
+    /// Reads the value at cluster from the FAT table
     fn read_fat_cluster(&mut self, cluster: u32) -> Result<u32, Error> {
         let mut buf = [0; 4];
         let fat_entry = Self::fat_entry_from_cluster(cluster);
@@ -1392,10 +1401,15 @@ impl Filesystem {
         (size + self.cluster_size_in_bytes() - 1) / (self.cluster_size_in_bytes())
     }
 
+
+    #[inline]
+    /// Returns the number of sectors per cluster as given by the header
     fn sectors_per_cluster(&self) -> u32 {
         self.sectors_per_cluster
     }
     
+    // TODO should this function even exist?
+    /// Returns a reference to the BPB derived header
     fn header(&self) -> &Header {
         &self.header
     }
@@ -1436,6 +1450,8 @@ pub fn init(sd: storage_device::StorageDeviceRef) -> Result<Filesystem, &'static
 /// # Return value
 /// Returns true if the storage device passed into the function has a fat filesystem structure
 pub fn detect_fat(disk: &storage_device::StorageDeviceRef) -> bool {
+    const fat32_magic: [u8; 8] = *b"FAT32   ";
+    let fat32_magic_slice: &[u8] = &fat32_magic[0..8];
     
     let mut initial_buf: Vec<u8> = vec![0; disk.lock().sector_size_in_bytes()];
     let _sectors_read = match disk.lock().read_sectors(&mut initial_buf[..], 0){
@@ -1444,11 +1460,12 @@ pub fn detect_fat(disk: &storage_device::StorageDeviceRef) -> bool {
     };
     info!("Magic sequence: {:X?}", &initial_buf[82..90]);
     // The offset at 0x52 in the extended FAT32 BPB is used to detect the Filesystem type ("FAT32   ")
-    match initial_buf[82..90] {
-        [0x46,0x41,0x54,0x33,0x32, 0x20, 0x20, 0x20] => return true,
+    match &initial_buf[82..90] {
+        fat32_magic_slice => return true,
         _ => return false,
     };    
 }
+
 
 /// A case-insenstive way to compare FATdirectory entry name which is in [u8;11] and a str literal to be able to 
 /// confirm whether the directory/file that you're looking at is the one specified 
@@ -1496,7 +1513,7 @@ fn compare_short_name(name: &str, de: &DirectoryEntry) -> bool {
     true
 }
 
-// TODO is this mount name argument dumb?
+// TODO is this mount name argument dumb? It seems like we want a semi-arbitrary name to support names for mount purposes.
 /// Creates a FATdirectory structure for the root directory
 /// 
 /// # Arguments 
@@ -1505,7 +1522,7 @@ fn compare_short_name(name: &str, de: &DirectoryEntry) -> bool {
 /// 
 /// # Returns
 /// Returns the FATDirectory structure for the root directory 
-pub fn root_dir(fs: Arc<Mutex<Filesystem>>, mount_name: String) -> Result<RootDirectory, Error> {
+pub fn root_dir(fs: Arc<Mutex<Filesystem>>, mount_name: String) -> Result<Arc<Mutex<RootDirectory>>, Error> {
 
     // TODO right now this function can violate the singleton blahdy blah and risks making two cluster chains for this dir.
 
@@ -1519,63 +1536,59 @@ pub fn root_dir(fs: Arc<Mutex<Filesystem>>, mount_name: String) -> Result<RootDi
         size: 0, // According to wikipedia File size for directories is always 0.
     };
 
-    let fatdir = PFSDirectory {
+    let mut underlying_root = PFSDirectory {
         cc: cc,
         children: RwLock::new(BTreeMap::new()),
         dot: Weak::<Mutex<PFSDirectory>>::new(),
     };
 
-    let underlying_root = Arc::new(Mutex::new(fatdir));
-    underlying_root.lock().dot = Arc::downgrade(&underlying_root) as WeakDirRef;
-
-    // fs.lock();
     let new_root_dir = RootDirectory {
-        underlying_dir: underlying_root.clone(),
+        underlying_dir: underlying_root,
     };
 
-    // This is pretty weird, but it seems to be necessary to set our own parent as ourselves.
-    underlying_root.lock().set_parent_dir(Arc::downgrade(&(underlying_root.clone() 
-        as DirRef)));
+    let true_root = Arc::new(Mutex::new(new_root_dir));
+    let true_root_as_dir: DirRef = true_root.clone();
 
-    Ok(new_root_dir) 
+    true_root.lock().underlying_dir.dot = Arc::downgrade(&true_root_as_dir);
+    true_root.lock().underlying_dir.set_parent_dir(Arc::downgrade(&true_root_as_dir));
+
+    Ok(true_root) 
         
 }
 
-// TODO this is a pretty dumb setup but it seems to work for now. I'll try to work out a better solution later.
-/// A struct and impl being used to represent the parent of the root directory in FAT, taken from the root kernel
+/// Root directory for FAT32 filesystem.
 pub struct RootDirectory {
-    /// A list of DirRefs or pointers to the child directories   
-    underlying_dir: Arc<Mutex<PFSDirectory>>, // TODO should I do something for the parent.
+    /// The PFSDirectory doing the work for the root directory.
+    underlying_dir: PFSDirectory,
 }
 
 impl Directory for RootDirectory {
     fn insert(&mut self, node: FileOrDir) -> Result<Option<FileOrDir>, &'static str> {
-        self.underlying_dir.lock().insert(node)
+        self.underlying_dir.insert(node)
     }
 
     fn get(&self, name: &str) -> Option<FileOrDir> {
-        self.underlying_dir.lock().get(name)
+        self.underlying_dir.get(name)
     }
 
     fn list(&self) -> Vec<String> {
-        debug!("listing something");
-        self.underlying_dir.lock().list()
+        self.underlying_dir.list()
     }
 
     fn remove(&mut self, node: &FileOrDir) -> Option<FileOrDir> {
-        self.underlying_dir.lock().remove(node)
+        self.underlying_dir.remove(node)
     }
 }
 
 // TODO these are most likely wrong implementations.
 impl FsNode for RootDirectory {
-    /// Recursively gets the absolute pathname as a String
-    fn get_absolute_path(&self) -> String {
-        format!("{}/", root::ROOT_DIRECTORY_NAME.to_string()).to_string()
-    }
+    // Recursively gets the absolute pathname as a String
+    //fn get_absolute_path(&self) -> String {
+    //    format!("{}/", root::ROOT_DIRECTORY_NAME.to_string()).to_string()
+    //}
 
     fn get_name(&self) -> String {
-        self.underlying_dir.lock().get_name()
+        self.underlying_dir.get_name()
     }
 
     // TODO I had to break this since the old implementation used the root from .
@@ -1601,6 +1614,9 @@ fn debug_name(byte_name: &[u8]) -> &str {
     }
 }
 
+#[deprecated]
+/// A debug function used to create a DirRef from the RootDirectory (since root_dir used to return a RootDirectory object)
+/// Exists because creating the Arc<Mutex<..>> in a user applications causes page faults for some reason.
 pub fn make_dir_ref(dir: RootDirectory) -> DirRef {
     Arc::new(Mutex::new(dir))
 }
@@ -1615,21 +1631,21 @@ pub fn test_module_init() -> Result<(), &'static str> {
     //     .block()
     //     .spawn()?;
 
-    // // start a task that tries to find the module in root.
-    // KernelTaskBuilder::new(test_insert, taskref)
-    //     .name("fat32_insert_test".to_string())
-    //     .spawn()?;
+    // start a task that tries to find the module in root.
+    KernelTaskBuilder::new(test_insert, None)
+        .name("fat32_insert_test".to_string())
+        .spawn()?;
 
     Ok(())
 }
 
-fn test_insert(taskref: TaskRef) ->  Result<(), &'static str> {
-    //println!("Trying to find a fat32 drive");
+/// Attempts to mount a fat32 FS and mount to the root directory as "fat32"
+/// Additionally unblocks a task that needs to wait until after the mount is complete.
+fn test_insert(taskref: Option<TaskRef>) ->  Result<(), &'static str> {
     if let Some(controller) = storage_manager::STORAGE_CONTROLLERS.lock().iter().next() {
         for sd in controller.lock().devices() {
             match init(sd) {
                 Ok(fatfs) => {
-                    //println!("Successfully initialized FAT32 FS for drive");
 
                     let fs = Arc::new(Mutex::new(fatfs));
                     // TODO if we change the root dir creation approach this will also change.
@@ -1638,14 +1654,14 @@ fn test_insert(taskref: TaskRef) ->  Result<(), &'static str> {
                     let name = "fat32";
 
 
-                    let root: RootDirectory = root_dir(fs.clone(), name.clone().to_string()).unwrap();
+                    let fat32_root = root_dir(fs.clone(), name.clone().to_string()).unwrap();
 
 
                     let mut true_root = root::get_root().lock();
 
                     // FIXME set root parent dir to appropriate value.
-                    let root = Arc::new(Mutex::new(root));
-                    match true_root.insert(FileOrDir::Dir(root)) {
+
+                    match true_root.insert(FileOrDir::Dir(fat32_root)) {
                         Ok(_) => trace!("Successfully mounted fat32 FS"),
                         Err(_) => trace!("Failed to mount fat32 FS"),
                     };
@@ -1655,7 +1671,7 @@ fn test_insert(taskref: TaskRef) ->  Result<(), &'static str> {
                     debug!("Root directory entries: {:?}", test_root.lock().list());    
 
                     // Unblock the find task now that we've finished our insert.
-                    taskref.unblock();  
+                    taskref.map(|x| x.unblock());  
 
                     return Ok(());      
                 }
@@ -1668,6 +1684,8 @@ fn test_insert(taskref: TaskRef) ->  Result<(), &'static str> {
     Err("Couldn't initialize FAT32 FS")
 }
 
+/// A debug method. Attempts to find the fat32 entry from the root directory (created by test_insert).
+/// Verifies that the fat32 entry exists and prints the contents.
 fn test_find(_: ()) ->  Result<(), &'static str> {
     
     let root = root::get_root().lock();

@@ -89,7 +89,7 @@ pub fn main(args: Vec<String>) -> isize {
 fn print_children(dir: &DirRef) {
     let mut child_string = String::new();
     let locked_dir = dir.lock();
-    println!("Got lock for directory");
+    //println!("Got lock for directory");
     let mut child_list = locked_dir.list(); 
     child_list.reverse();
     for child in child_list.iter() {
