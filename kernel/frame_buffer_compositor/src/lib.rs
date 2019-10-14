@@ -27,7 +27,7 @@ lazy_static! {
     /// The instance of the frame buffer compositor.
     pub static ref FRAME_COMPOSITOR: Mutex<FrameCompositor> = Mutex::new(
         FrameCompositor{
-            cache:BTreeMap::new()
+            caches: BTreeMap::new()
         }
     );
 }
@@ -37,7 +37,7 @@ lazy_static! {
 /// Framebuffers which haven't updated since last compositing will be ignored.
 pub struct FrameCompositor {
     // Cache of updated framebuffers
-    cache: BTreeMap<Coord, FrameBufferCache>,
+    caches: BTreeMap<Coord, FrameBufferCache>,
 }
 
 /// Metadata that describes the framebuffer.
@@ -61,9 +61,9 @@ impl FrameBufferCache {
     // checks if the cached framebuffer overlaps with another one
     fn overlaps_with(&self, cache: &FrameBufferCache) -> bool {
         self.contains(cache.coordinate)
-            || self.contains(cache.coordinate + (cache.width as isize, 0))
-            || self.contains(cache.coordinate + (0, CACHE_BLOCK_HEIGHT as isize))
-            || self.contains(cache.coordinate + (cache.width as isize, CACHE_BLOCK_HEIGHT as isize))
+            || self.contains(cache.coordinate + (cache.width as isize - 1, 0))
+            || self.contains(cache.coordinate + (0, CACHE_BLOCK_HEIGHT as isize - 1))
+            || self.contains(cache.coordinate + (cache.width as isize - 1, CACHE_BLOCK_HEIGHT as isize - 1))
     }
 }
 
@@ -98,7 +98,6 @@ impl Compositor for FrameCompositor {
 
             //trace!("WEnqiu: {} {}", block_start, block_end);
             for (block_index, update_width) in blocks {            
-
                 // The start pixel of the block
                 let start_index = block_pixels * block_index;
                 // if  start_index >= src_buffer_len {
@@ -129,14 +128,15 @@ impl Compositor for FrameCompositor {
                     width: *update_width,
                     coordinate: coordinate_start,
                 };
-                let keys: Vec<_> = self.cache.keys().cloned().collect();
+                let keys: Vec<_> = self.caches.keys().cloned().collect();
                 let mut draw_width = new_cache.width;
                 for key in keys {
-                    if let Some(cache) = self.cache.get(&key) {
+                    if let Some(cache) = self.caches.get(&key) {
                         if cache.overlaps_with(&new_cache) {
-                            // trace!("WEnqiu: isit {}?", block_index);
                             draw_width = core::cmp::max(draw_width, (cache.width as isize + cache.coordinate.x - new_cache.coordinate.x) as usize);
-                            self.cache.remove(&key);
+                        }
+                        if cache.coordinate == new_cache.coordinate {
+                            self.caches.remove(&key);
                         }
                     };
                 }
@@ -171,7 +171,7 @@ impl Compositor for FrameCompositor {
                 }
 
                 // insert the cache
-                self.cache.insert(coordinate_start, new_cache);
+                self.caches.insert(coordinate_start, new_cache);
 
             }
         }
@@ -186,7 +186,7 @@ impl Compositor for FrameCompositor {
     }
 
     fn is_cached(&self, block: &[u32], coordinate: &Coord, width: usize) -> bool {
-        match self.cache.get(coordinate) {
+        match self.caches.get(coordinate) {
             Some(cache) => {
                 return cache.content_hash == hash(block) && cache.width == width;
             }
