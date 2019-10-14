@@ -40,6 +40,12 @@ pub struct FrameCompositor {
     caches: BTreeMap<Coord, FrameBufferCache>,
 }
 
+pub struct FrameBufferBlocks<'a> {
+    pub framebuffer: &'a dyn FrameBuffer,
+    pub coordinate: Coord,
+    pub blocks: Option<&'a [(usize, usize)]>,
+}
+
 /// Metadata that describes the framebuffer.
 struct FrameBufferCache {
     /// The coordinate of the framebuffer where it is rendered to the final framebuffer
@@ -67,10 +73,10 @@ impl FrameBufferCache {
     }
 }
 
-impl Compositor for FrameCompositor {
+impl Compositor<FrameBufferBlocks<'_>> for FrameCompositor {
     fn composite(
         &mut self,
-        bufferlist: Vec<(&dyn FrameBuffer, Coord, Option<&[(usize, usize)]>)>,
+        bufferlist: Vec<&FrameBufferBlocks>,
     ) -> Result<(), &'static str> {
         let mut final_fb = FINAL_FRAME_BUFFER
             .try()
@@ -78,14 +84,16 @@ impl Compositor for FrameCompositor {
             .lock();
         let (final_width, final_height) = final_fb.get_size();
 
-        for (src_fb, coordinate, block_list) in bufferlist {
+        for frame_buffer_blocks in bufferlist {
             // Divide the framebuffer into 16 pixel tall blocks.
+            let src_fb = frame_buffer_blocks.framebuffer;
+            let coordinate = frame_buffer_blocks.coordinate;
             let (src_width, src_height) = src_fb.get_size();
             let block_pixels = CACHE_BLOCK_HEIGHT * src_width;
             let src_buffer_len = src_width * src_height;
 
             let mut all_blocks = Vec::new();
-            let blocks = match block_list {
+            let blocks = match frame_buffer_blocks.blocks {
                 Some(blocks) => { blocks },
                 None => {
                     let block_number = (src_height - 1) / CACHE_BLOCK_HEIGHT + 1;
@@ -96,7 +104,6 @@ impl Compositor for FrameCompositor {
                 } 
             };
 
-            //trace!("WEnqiu: {} {}", block_start, block_end);
             for (block_index, update_width) in blocks {            
                 // The start pixel of the block
                 let start_index = block_pixels * block_index;

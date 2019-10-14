@@ -12,7 +12,7 @@ use frame_buffer::{FrameBuffer, Coord};
 
 /// The compositor trait.
 /// A compositor composites a list of buffers to a single buffer.
-pub trait Compositor {
+pub trait Compositor<Buffer> {
     /// Composites the buffers in the bufferlist.
     ///
     /// # Arguments
@@ -21,7 +21,7 @@ pub trait Compositor {
     /// For each tuple in the list, `buffer` is a buffer object to be composited. `coordinate` specifies the buffer relative to the final buffer.
     fn composite(
         &mut self,
-        bufferlist: Vec<(&dyn FrameBuffer, Coord, Option<&[(usize, usize)]>)>,
+        bufferlist: Vec<&Buffer>,
     ) -> Result<(), &'static str>;
 
     /// Checks if a buffer at coordinate is already cached since last updating.

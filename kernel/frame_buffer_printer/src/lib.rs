@@ -120,11 +120,6 @@ fn print_ascii_character(
     line: usize,
     column: usize,
 ) {
-
-    // Wenqiu: delete
-    // let mut framebuffer = frame_buffer::FINAL_FRAME_BUFFER.try().ok_or("").unwrap().lock();
-    // let coordinate = Coord::new(0, 0);
-    
     let start = coordinate + ((column * CHARACTER_WIDTH) as isize, (line * CHARACTER_HEIGHT) as isize);
     if !framebuffer.overlaps_with(start, CHARACTER_WIDTH, CHARACTER_HEIGHT) {
         return

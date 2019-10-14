@@ -36,7 +36,7 @@ use dfqueue::{DFQueue, DFQueueConsumer, DFQueueProducer};
 use displayable::Displayable;
 use event_types::Event;
 use frame_buffer::{FrameBuffer, Coord};
-use frame_buffer_compositor::FRAME_COMPOSITOR;
+use frame_buffer_compositor::{FRAME_COMPOSITOR, FrameBufferBlocks};
 use frame_buffer_drawer::*;
 use frame_buffer_rgb::FrameBufferRGB;
 use spin::{Mutex, Once};
@@ -177,11 +177,12 @@ impl<Buffer: FrameBuffer> WindowGeneric<Buffer> {
     /// Renders the content of the window to the screen.
     pub fn render(&mut self, blocks: Option<&[(usize, usize)]>) -> Result<(), &'static str> {
         let coordinate = { self.profile.lock().get_content_position() };
-        FRAME_COMPOSITOR.lock().composite(vec![(
-            &mut self.framebuffer,
-            coordinate,
-            blocks
-        )])
+        let frame_buffer_blocks = FrameBufferBlocks {
+            framebuffer: &mut self.framebuffer,
+            coordinate: coordinate,
+            blocks: blocks
+        };
+        FRAME_COMPOSITOR.lock().composite(vec![&frame_buffer_blocks])
     }
 
     /// Gets a reference to a displayable of type `T` which implements the `Displayable` trait by its name. Returns error if the displayable is not of type `T` or does not exist.
@@ -375,8 +376,12 @@ impl Window for WindowProfile {
             self.height,
             SCREEN_BACKGROUND_COLOR,
         );
-        let coordinate = Coord { x: 0, y: 0 };
-        FRAME_COMPOSITOR.lock().composite(vec![(buffer, coordinate, None)])
+        let frame_buffer_blocks = FrameBufferBlocks {
+            framebuffer: buffer,
+            coordinate: Coord { x: 0, y: 0 },
+            blocks: None
+        };
+        FRAME_COMPOSITOR.lock().composite(vec![&frame_buffer_blocks])
     }
 
     fn contains(&self, coordinate: Coord) -> bool {
@@ -397,8 +402,12 @@ impl Window for WindowProfile {
         let mut buffer_lock = buffer_ref.lock();
         let buffer = buffer_lock.deref_mut();
         draw_rectangle(buffer, self.coordinate, self.width, self.height, color);
-        let coordinate = Coord { x: 0, y: 0 };
-        FRAME_COMPOSITOR.lock().composite(vec![(buffer, coordinate, None)])
+        let frame_buffer_blocks = FrameBufferBlocks {
+            framebuffer: buffer,
+            coordinate: Coord { x: 0, y: 0 },
+            blocks: None
+        };        
+        FRAME_COMPOSITOR.lock().composite(vec![&frame_buffer_blocks])
     }
 
     fn resize(
