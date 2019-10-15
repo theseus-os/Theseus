@@ -772,12 +772,12 @@ fn continue_unwinding(unwinding_context_ptr: *mut UnwindingContext) -> Result<()
                     .map_err(|_e| "continue_unwinding(): couldn't get LSDA pointer as a slice")?;
                 let table = lsda::GccExceptTableArea::new(lsda_slice, NativeEndian, frame.initial_address());
 
-                // {
-                //     let mut iter = table.call_site_table_entries().map_err(|_| "BAD TABLE")?;
-                //     while let Some(entry) = iter.next().map_err(|_| "BAD ITER")? {
-                //         debug!("    {:#X?}", entry);
-                //     }
-                // }
+                {
+                    let mut iter = table.call_site_table_entries().map_err(|_| "BAD TABLE")?;
+                    while let Some(entry) = iter.next().map_err(|_| "BAD ITER")? {
+                        debug!("    {:#X?}", entry);
+                    }
+                }
 
                 let entry = table.call_site_table_entry_for_address(frame.call_site_address()).map_err(|e| {
                     error!("continue_unwinding(): couldn't find a call site table entry for this stack frame's call site address {:#X}. Error: {}", frame.call_site_address(), e);
