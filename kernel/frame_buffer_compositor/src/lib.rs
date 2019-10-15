@@ -108,7 +108,7 @@ impl Compositor<FrameBufferBlocks<'_>> for FrameCompositor {
             let piece_pixels = CACHE_BLOCK_HEIGHT * src_width;
             let src_buffer_len = src_width * src_height;
 
-            // Handle all blocks if the incoming blocks parameter is None 
+            // Handle all blocks if the updated blocks parameter is None 
             let mut all_blocks = Vec::new();
             let mut blocks = match frame_buffer_blocks.blocks {
                 Some(blocks) => { blocks },
