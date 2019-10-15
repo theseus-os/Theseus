@@ -5,9 +5,9 @@
 //! # Cache
 //! The compositor caches framebuffer blocks for better performance. 
 //!
-//! First, it divides every incoming framebuffer into blocks. The height of every block is a constant 16, which is the same as the height of a character. The width of a block is the same as the width of the framebuffer it belongs to. A block as a continuous array so that we can compute its hash to compare the content of two blocks.
+//! First, it divides every incoming framebuffer into blocks. The height of every block is a constant 16, which is the same as the height of a character. The width of a block is the same as the width of the framebuffer it belongs to. A block is a continuous array so that we can compute its hash to compare the content of two blocks.
 //!
-//! The content of a block starts from its left side and ends at the most right side of the empty parts in it. The remaining part of the block is blank. For example, in a terminal, every line is a block, and the part from the beginning of the line to the last character in the line is its content.
+//! The content of a block starts from its left side and ends at the most right side of the non-empty parts in it. The remaining part of the block is blank. For example, in a terminal, every line is a block, and the part from the beginning of the line to the last character in the line is its content.
 //!
 //! The compositor caches a list of displayed blocks and the width of their contents. If an incoming `FrameBufferBlocks` carries a list of updated blocks, the compositor compares every block with a cached one:
 //! * If the two blocks are identical, ignore it.
@@ -161,10 +161,10 @@ impl Compositor<FrameBufferBlocks<'_>> for FrameCompositor {
                     if let Some(cache) = self.caches.get_mut(&key) {
                         if cache.overlaps_with(&new_cache) {
                             update_width = core::cmp::max(update_width, (cache.content_width as isize + cache.coordinate.x - new_cache.coordinate.x) as usize);
-                            // if the two caches are at the same location, one covers another and we can remove the cache.
-                            // Otherwise, we should keep the locations of the cache and clear its content. 
-                            // First, we need the right side location of it. If another block arrives, we should guarantee that the overlapped part with the second cache are cleared.
-                            // Second, if the same block arrives, we need to redraw the block because its overlapped part with current block is refreshed this time. 
+                            // if a block and a cached one are at the same locations, one covers another and we can remove the cache.
+                            // Otherwise, we should keep the locations of the cache and clear its content because: 
+                            // First, we need the right side location of the cache. If another block arrives, we should guarantee that the overlapped part with the second block will be cleared.
+                            // Second, if the same block of the cache arrives, we need to redraw the block because its overlapped part with current block is refreshed this time. 
                             if cache.coordinate == new_cache.coordinate {
                                 self.caches.remove(&key);
                             } else {
