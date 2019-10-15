@@ -86,7 +86,6 @@ pub fn print_string(
         }
     }    
     blocks.push((curr_line, curr_column * CHARACTER_WIDTH));
-    
     //fill the blank of the last line
     fill_blank(
         framebuffer,
@@ -94,6 +93,17 @@ pub fn print_string(
         y + (curr_line * CHARACTER_HEIGHT) as isize,
         x + width as isize,
         y + ((curr_line + 1) * CHARACTER_HEIGHT) as isize,
+        bg_color,
+    );
+
+    // fill the next line in case the page scrolls up
+    blocks.push((curr_line + 1, 0));
+    fill_blank(
+        framebuffer,
+        x,
+        y + ((curr_line + 1) * CHARACTER_HEIGHT) as isize,
+        x + width as isize,
+        y + ((curr_line + 2) * CHARACTER_HEIGHT) as isize,
         bg_color,
     );
 
