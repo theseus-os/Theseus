@@ -167,17 +167,17 @@ pub fn init(
             .spawn()?;
     }
 
-    let rs = lc_test::test();
+    // let rs = lc_test::test();
 
-    match rs {
-        Ok(_) => {
-            trace!("libc_test success.");
-        }
-        Err(err) => { 
-            error!("captain::init(): failed to find c program crate");
-            return Err(err);
-        }
-    }
+    // match rs {
+    //     Ok(_) => {
+    //         trace!("libc_test success.");
+    //     }
+    //     Err(err) => { 
+    //         error!("captain::init(): failed to find c program crate");
+    //         return Err(err);
+    //     }
+    // }
     
     info!("captain::init(): initialization done! Enabling interrupts and entering Task 0's idle loop...");
     enable_interrupts();

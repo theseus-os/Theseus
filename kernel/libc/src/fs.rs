@@ -1,146 +1,119 @@
-// use crate::{
-//     c_str::CStr,
-//     header::{
-//         fcntl::O_CREAT,
-//         unistd::{SEEK_CUR, SEEK_END, SEEK_SET},
-//     },
-//     io,
-//     platform::{types::*, Pal, Sys},
-// };
-// use core::ops::Deref;
+//! A compatibility layer for memfs files
+use memfs::*;
+use spin::Mutex;
+use hashbrown::HashMap;
+use alloc::sync::{Weak, Arc};
+use alloc::string::String;
+use alloc::borrow::ToOwned;
+use alloc::vec::Vec;
+use fs_node::{Directory, DirRef, FileRef, FileOrDir};
+use core::ops::DerefMut;
+use vfs_node::VFSDirectory;
 
-// pub struct File {
-//     pub fd: c_int,
-//     /// To avoid self referential FILE struct that needs both a reader and a writer,
-//     /// make "reference" files that share fd but don't close on drop.
-//     pub reference: bool,
-// }
+use crate:: {
+    types::*,
+    errno::*,
+    fcntl::*,
+    c_str::*,
+};
 
-// impl File {
-//     pub fn new(fd: c_int) -> Self {
-//         Self {
-//             fd,
-//             reference: false,
-//         }
-//     }
 
-//     pub fn open(path: &CStr, oflag: c_int) -> io::Result<Self> {
-//         match Sys::open(path, oflag, 0) {
-//             -1 => Err(io::last_os_error()),
-//             ok => Ok(Self::new(ok)),
-//         }
-//     }
+// TODO: Should this be in the kernel config crate?
+/// Max number of file descriptors available
+pub const MAX_FILE_DESCRIPTORS: u16 = 1024;
 
-//     pub fn create(path: &CStr, oflag: c_int, mode: mode_t) -> io::Result<Self> {
-//         match Sys::open(path, oflag | O_CREAT, mode) {
-//             -1 => Err(io::last_os_error()),
-//             ok => Ok(Self::new(ok)),
-//         }
-//     }
+lazy_static! {
+    /// File Descriptor Table. The index into the table refers the file descriptor and the value stored is a reference to the file.
+    pub static ref FILE_DESCRIPTORS: Mutex<Vec<Option<FileRef>>> = Mutex::new(Vec::new());
+    /// Stores the 1-to-1 mapping of paths to the files. 
+    /// This is used for quick searches for the file in open() as well as used to store all files created by the libc interface.
+    /// The key is the file name rather than the complete path since all files are created in the cwd.
+    pub static ref LIBC_DIRECTORY: DirRef = VFSDirectory::new_libc(String::from("libc"), root::get_root());
+}
 
-//     pub fn sync_all(&self) -> io::Result<()> {
-//         match Sys::fsync(self.fd) {
-//             -1 => Err(io::last_os_error()),
-//             _ok => Ok(()),
-//         }
-//     }
+/// Creates a file in the libc directory
+pub fn create_file(file_name: &String) -> FileRef {
+    MemFile::new(file_name.to_owned(), &LIBC_DIRECTORY).unwrap()
+}
 
-//     pub fn set_len(&self, size: u64) -> io::Result<()> {
-//         match Sys::ftruncate(self.fd, size as off_t) {
-//             -1 => Err(io::last_os_error()),
-//             _ok => Ok(()),
-//         }
-//     }
+/// Returns the smallest file descriptor that's available,
+/// or if there are none available, return error code "Quota exceeded"
+pub fn find_smallest_fd(descriptors: &[Option<FileRef>]) -> c_int {
+    let fd = descriptors.iter().position(|x| x.is_none());
+    let fd = match fd {
+            Some(x) => x as c_int,
+            None => -EDQUOT,
+        };
+    fd
+}
 
-//     pub fn try_clone(&self) -> io::Result<Self> {
-//         match Sys::dup(self.fd) {
-//             -1 => Err(io::last_os_error()),
-//             ok => Ok(Self::new(ok)),
-//         }
-//     }
+/// Assigns a file the minimum file descriptor available and stores a reference to the file in the file descriptor table
+pub fn associate_file_with_smallest_fd(file: &FileRef, descriptors: &mut [Option<FileRef>]) -> c_int{
+    let fd = find_smallest_fd(descriptors);
+    if fd >= 0 {
+        descriptors[fd as usize] = Some(file.clone());
+    }
 
-//     /// Create a new file pointing to the same underlying descriptor. This file
-//     /// will know it's a "reference" and won't close the fd. It will, however,
-//     /// not prevent the original file from closing the fd.
-//     pub unsafe fn get_ref(&self) -> Self {
-//         Self {
-//             fd: self.fd,
-//             reference: true,
-//         }
-//     }
-// }
+    fd
+}
 
-// impl io::Read for &File {
-//     fn read(&mut self, buf: &mut [u8]) -> io::Result<usize> {
-//         match Sys::read(self.fd, buf) {
-//             -1 => Err(io::last_os_error()),
-//             ok => Ok(ok as usize),
-//         }
-//     }
-// }
+/// Returns the file descriptor to the OS so that it can be reused
+pub fn return_fd_to_system(fd: c_int, descriptors: &mut [Option<FileRef>]) {
+    descriptors[fd as usize] = None;
+}
 
-// impl io::Write for &File {
-//     fn write(&mut self, buf: &[u8]) -> io::Result<usize> {
-//         match Sys::write(self.fd, buf) {
-//             -1 => Err(io::last_os_error()),
-//             ok => Ok(ok as usize),
-//         }
-//     }
+/// Opens and possibly creates a file.
+/// Right now only those files can be opened that were also created through the libc interface.
+/// The acceptable "path" values are currently just the file name. All files are created in the libc directory.
+#[no_mangle]
+pub extern "C" fn open(path: &CStr, oflag: c_int, mode: mode_t) -> c_int {
+    let mut directory = LIBC_DIRECTORY.lock();
+    let mut descriptors = FILE_DESCRIPTORS.lock();
 
-//     fn flush(&mut self) -> io::Result<()> {
-//         Ok(())
-//     }
-// }
+    let file_name = path.to_owned().into_string().unwrap();
+    let mut file_ref = directory.get_file(&file_name);
+    let ret = 
+        // check if this file is already created, and return file descriptor
+        if file_ref.is_some() {
+            associate_file_with_smallest_fd(&file_ref.unwrap(), descriptors.deref_mut())
+        }
+        // if the file is not created and the O_CREAT flag is set, create the file
+        else if oflag & O_CREAT == O_CREAT {
+            let file = create_file(&file_name);
+            let fd = associate_file_with_smallest_fd(&file, descriptors.deref_mut());
+            if fd >= 0 {
+                let _ = directory.insert(FileOrDir::File(file));
+            }
+            fd
+        }
+        else {
+            error!("Flag {} is not supported", oflag);
+            -EUNIMPLEMENTED
+        };    
+    
+    ret
+}
 
-// impl io::Seek for &File {
-//     fn seek(&mut self, pos: io::SeekFrom) -> io::Result<u64> {
-//         let (offset, whence) = match pos {
-//             io::SeekFrom::Start(start) => (start as off_t, SEEK_SET),
-//             io::SeekFrom::Current(current) => (current as off_t, SEEK_CUR),
-//             io::SeekFrom::End(end) => (end as off_t, SEEK_END),
-//         };
+/// Closes a file descriptor, so that it no longer refers to any file and may be reused.
+/// If this is the last file descriptor referring to a file, the file is deleted
+#[no_mangle]
+pub extern "C" fn close(fd: c_int) -> c_int {
+    let mut directory = LIBC_DIRECTORY.lock();
+    let mut descriptors = FILE_DESCRIPTORS.lock();
 
-//         match Sys::lseek(self.fd, offset, whence) {
-//             -1 => Err(io::last_os_error()),
-//             ok => Ok(ok as u64),
-//         }
-//     }
-// }
+    let count = Arc::strong_count(descriptors[fd as usize].as_ref().unwrap()); 
+    if count == 2 {
+        let file = descriptors[fd as usize].as_ref().unwrap().clone();
+        directory.remove(&FileOrDir::File(file));
+    }
 
-// impl io::Read for File {
-//     fn read(&mut self, buf: &mut [u8]) -> io::Result<usize> {
-//         (&mut &*self).read(buf)
-//     }
-// }
+    descriptors[fd as usize] = None;
+    return_fd_to_system(fd, descriptors.deref_mut());
 
-// impl io::Write for File {
-//     fn write(&mut self, buf: &[u8]) -> io::Result<usize> {
-//         (&mut &*self).write(buf)
-//     }
+    return 0;
+}
 
-//     fn flush(&mut self) -> io::Result<()> {
-//         (&mut &*self).flush()
-//     }
-// }
+// /// Deletes a name from the file system and possibly the file it refers to.
+// fn unlink(path: &CStr) -> c_int {
 
-// impl io::Seek for File {
-//     fn seek(&mut self, pos: io::SeekFrom) -> io::Result<u64> {
-//         (&mut &*self).seek(pos)
-//     }
-// }
-
-// impl Deref for File {
-//     type Target = c_int;
-
-//     fn deref(&self) -> &Self::Target {
-//         &self.fd
-//     }
-// }
-
-// impl Drop for File {
-//     fn drop(&mut self) {
-//         if !self.reference {
-//             let _ = Sys::close(self.fd);
-//         }
-//     }
 // }

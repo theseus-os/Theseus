@@ -44,6 +44,20 @@ impl VFSDirectory {
         parent.lock().insert(FileOrDir::Dir(dir_ref.clone()))?;
         Ok(dir_ref)
     }
+
+    pub fn new_libc(name: String, parent: &DirRef)  -> DirRef {
+        // creates a copy of the parent pointer so that we can add the newly created folder to the parent's children later
+        let directory = VFSDirectory {
+            name: name,
+            children: BTreeMap::new(),
+            parent: Arc::downgrade(parent),
+        };
+        let dir_ref = Arc::new(Mutex::new(directory)) as DirRef;
+        let _ = parent.lock().insert(FileOrDir::Dir(dir_ref.clone()));
+        dir_ref
+    }
+
+
 }
 
 impl Directory for VFSDirectory {
@@ -132,6 +146,7 @@ impl File for VFSFile {
     fn as_mapping(&self) -> Result<&MappedPages, &'static str> {
         Err("cannot treat a VFSFile as a memory mapped region")
     }
+
 }
 
 impl FsNode for VFSFile {
