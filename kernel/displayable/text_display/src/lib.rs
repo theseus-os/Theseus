@@ -211,9 +211,9 @@ pub fn display_cursor(
         
         frame_buffer_drawer::fill_rectangle(
             framebuffer,
-            coordinate,
+            coordinate + (0, 1),
             CHARACTER_WIDTH,
-            CHARACTER_HEIGHT,
+            CHARACTER_HEIGHT - 2,
             color,
         );
     }
