@@ -69,7 +69,10 @@ struct BlockCache {
     coordinate: Coord,
     /// The hash of the content in the frame buffer.
     content_hash: u64,
+    /// The width of the block
     width: usize,
+    /// The width of the content in the block from the left side
+    content_width: usize,
 }
 
 impl BlockCache {
@@ -105,7 +108,7 @@ impl Compositor<FrameBufferBlocks<'_>> for FrameCompositor {
             let src_fb = frame_buffer_blocks.framebuffer;
             let coordinate = frame_buffer_blocks.coordinate;
             let (src_width, src_height) = src_fb.get_size();
-            let piece_pixels = CACHE_BLOCK_HEIGHT * src_width;
+            let block_pixels = CACHE_BLOCK_HEIGHT * src_width;
             let src_buffer_len = src_width * src_height;
 
             // Handle all blocks if the updated blocks parameter is None 
@@ -121,13 +124,13 @@ impl Compositor<FrameBufferBlocks<'_>> for FrameCompositor {
                 } 
             };
 
-            while let Some((piece_index, block_width)) = blocks.next() {
-                // The start pixel of the piece
-                let start_index = piece_pixels * piece_index;
-                let coordinate_start = coordinate + (0, (CACHE_BLOCK_HEIGHT * piece_index) as isize);
+            while let Some((block_index, content_width)) = blocks.next() {
+                // The start pixel of the block
+                let start_index = block_pixels * block_index;
+                let coordinate_start = coordinate + (0, (CACHE_BLOCK_HEIGHT * block_index) as isize);
                 
-                // The end pixel of the piece
-                let mut end_index = start_index + piece_pixels;
+                // The end pixel of the block
+                let mut end_index = start_index + block_pixels;
                 let coordinate_end;
                 if end_index <= src_buffer_len {
                     coordinate_end = coordinate_start + (src_width as isize, CACHE_BLOCK_HEIGHT as isize);
@@ -136,29 +139,34 @@ impl Compositor<FrameBufferBlocks<'_>> for FrameCompositor {
                     coordinate_end = coordinate + (src_width as isize, src_height as isize);
                 }
 
-                let piece = &src_fb.buffer()[start_index..end_index];
-                // Skip if a piece is already cached
-                if self.is_cached(&piece, &coordinate_start, src_width) {
+                let block = &src_fb.buffer()[start_index..end_index];
+                // Skip if a block is already cached
+                if self.is_cached(&block, &coordinate_start, src_width) {
                     continue;
                 }
 
                 // find overlapped caches
-                // extend the width of the updated part to the right side of the cached block
+                // extend the width of the updated part to the right side of the cached block content
                 // remove caches of the same location
                 let new_cache = BlockCache {
-                    content_hash: hash(piece),
-                    width: block_width,
+                    content_hash: hash(block),
                     coordinate: coordinate_start,
+                    width: src_width,
+                    content_width: content_width,
                 };
                 let keys: Vec<_> = self.caches.keys().cloned().collect();
-                let mut update_width = new_cache.width;
+                let mut update_width = new_cache.content_width;
                 for key in keys {
-                    if let Some(cache) = self.caches.get(&key) {
+                    if let Some(cache) = self.caches.get_mut(&key) {
                         if cache.overlaps_with(&new_cache) {
-                            update_width = core::cmp::max(update_width, (cache.width as isize + cache.coordinate.x - new_cache.coordinate.x) as usize);
-                        }
-                        if cache.coordinate == new_cache.coordinate {
-                            self.caches.remove(&key);
+                            update_width = core::cmp::max(update_width, (cache.content_width as isize + cache.coordinate.x - new_cache.coordinate.x) as usize);
+                            // if the two caches are at the same location, one covers another and we can remove the cache.
+                            // Otherwise, we should keep the locations of the cache and clear its content. First, we need the right side location of it. If another block arrives, we should guarantee that the overlapped part with the second cache are cleared. Second, if the same block arrives, we need to redraw the block because its overlapped part with current block is refreshed this time. 
+                            if cache.coordinate == new_cache.coordinate {
+                                self.caches.remove(&key);
+                            } else {
+                                cache.content_hash = 0;
+                            }
                         }
                     };
                 }
@@ -189,7 +197,7 @@ impl Compositor<FrameBufferBlocks<'_>> for FrameCompositor {
                     let src_start = src_width * ((final_y_start + i) as isize - coordinate_start.y) as usize
                         + (final_x_start as isize - coordinate_start.x) as usize;
                     let src_end = src_start + width;
-                    final_fb.buffer_copy(&(piece[src_start..src_end]), dest_start);
+                    final_fb.buffer_copy(&(block[src_start..src_end]), dest_start);
                 }
 
                 // insert the new cache

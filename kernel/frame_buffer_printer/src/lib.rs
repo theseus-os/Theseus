@@ -65,14 +65,6 @@ pub fn print_string(
             }
         } else {
             // print the next character
-            if curr_column == buffer_width {
-                blocks.push((curr_line, buffer_width));
-                curr_column = 0;
-                curr_line += 1;
-                if curr_line == buffer_height {
-                    break;
-                }
-            }
             print_ascii_character(
                 framebuffer,
                 byte,
@@ -83,10 +75,18 @@ pub fn print_string(
                 curr_line,
             );
             curr_column += 1;
+            if curr_column == buffer_width {
+                blocks.push((curr_line, buffer_width));
+                curr_column = 0;
+                curr_line += 1;
+                if curr_line == buffer_height {
+                    break;
+                }
+            }
         }
     }    
-    blocks.push((curr_line, curr_column * CHARACTER_WIDTH));
     //fill the blank of the last line
+    blocks.push((curr_line, curr_column * CHARACTER_WIDTH));
     fill_blank(
         framebuffer,
         x + (curr_column * CHARACTER_WIDTH) as isize,

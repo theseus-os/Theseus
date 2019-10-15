@@ -1306,7 +1306,7 @@ impl Shell {
                     }
                     _ => { }
                 };
-            }            
+            }           
             self.terminal.lock().display_cursor()?; 
                 
             let mut need_refresh = false;
