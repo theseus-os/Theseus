@@ -1,20 +1,22 @@
 //! This crate defines a framebuffer compositor.
-//! A framebuffer compositor will composite a sequence of framebuffers and display them in the final framebuffer.
+//! A framebuffer compositor composites a sequence of framebuffers and display them in the final framebuffer.
 //! The coordinate of a frame buffer represents its origin (top-left point).
 //!
+//! # Cache
 //! The compositor caches framebuffer blocks for better performance. 
 //!
 //! First, it divides every incoming framebuffer into pieces. The height of every piece is a constant 16, which is the same as the height of a character. The width of a piece is the same as the width of the framebuffer it belongs to.
 //!
-//! Every piece contains a block. A `block` in a piece means the part which is updated since last display. It is specified by the index of the piece and its width. It starts from the left side of the piece it occupies. The right side of a block in a piece is blank. For example, in a terminal, every line is a piece, and the part from the beginning of the line to the right side of updated text in the line is a block.
+//! Every piece contains a block. A `block` means the updated part of a piece since last display. It starts from the left side of the piece and is specified by the index of the piece and its width. The remaining part of the piece piece is blank. For example, in a terminal, every line is a piece, and the part from the beginning of the line to the right side of the text in the line is a block.
 //!
-//! The compositor caches a list of displayed pieces and the width of the block in it. We use `piece` over `block` so that the compositor can cache the hash of a continuous array of pixels rather than the whole pixels of a block. If an incoming `FrameBufferBlocks` carries a list of updated blocks, the compositor compares every block with the caches.
+//! The compositor caches a list of displayed pieces and the width of the block in it. We use `piece` over `block` in cache because a piece consists of a continuous array so that the compositor can store its hash rather than all the pixels of a block. If an incoming `FrameBufferBlocks` carries a list of updated blocks, the compositor compares every piece and its block width with a cached one:
 //! * If the two pieces are identical, ignore it.
-//! * If a new block overlaps with an existing one, display the block and clear the remaining part of the piece till the right side of the block in the cached piece.
-//! * If the two blocks are of the same location, remove the cached piece after the step above. We do not need to make sure the new block is larger than the cached one because the extra part is already cleared.
+//! * If a new *block* overlaps with an existing one, display the block and clear the remaining part of the piece till the right side of the block in the cached piece.
+//! * If the two blocks are of the same location, remove the cached piece after the step above. We do not need to make sure the new block is larger than the cached one because the extra part is already cleared in the step above.
 //!
 //! If `FrameBufferBlocks` is `None`, the compositor will handle all of its blocks which occupy the whole pieces.
-//! The compositor minimizes the updated parts of a framebuffer and clears the blank parts. Even if the cache is lost or the updated blocks information is none, It guarantees the result is the same.
+//!
+//! The compositor minimizes the updated parts of a framebuffer and clears the blank parts. Even if the cache is lost or the updated blocks information is `None`, it guarantees the result is the same.
 
 #![no_std]
 #![feature(const_vec_new)]
@@ -57,11 +59,11 @@ pub struct FrameBufferBlocks<'a> {
     pub framebuffer: &'a dyn FrameBuffer,
     /// The coordinate of the framebuffer where it is rendered to the final framebuffer.
     pub coordinate: Coord,
-    /// The updated blocks of the framebuffer. If `blocks` is `None`, the compositor would copy all the blocks of the framebuffer.
+    /// The updated blocks of the framebuffer. If `blocks` is `None`, the compositor would handle all the blocks of the framebuffer.
     pub blocks: Option<IntoIter<(usize, usize)>>,
 }
 
-/// Metadata that describes the framebuffer.
+/// Metadata that describes the cached block.
 struct BlockCache {
     /// The coordinate of the block where it is rendered to the final framebuffer.
     coordinate: Coord,

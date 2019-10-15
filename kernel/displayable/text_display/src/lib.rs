@@ -190,7 +190,7 @@ impl Cursor {
     }
 }
 
-/// Display a cursor within a text area onto a frame buffer. 
+/// Display a cursor at `coordinate` onto a frame buffer. 
 /// # Arguments
 /// * `cursor`: the cursor to display.
 /// * `coordinate`: the coordinate within the `framebuffer` where the cursor is displayed. It specifies the location of the top-left point of the cursor. The `coordinate` is relative to the top-left point `(0, 0)` of the `framebuffer`.

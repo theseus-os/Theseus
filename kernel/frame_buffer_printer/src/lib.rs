@@ -16,18 +16,16 @@ use frame_buffer::{FrameBuffer, Coord};
 type ASCII = u8;
 
 /// Prints a string in a framebuffer.
-/// Returns (column, line, blocks) of the end, i.e. the position of the next symbol and the information of updated blocks.
-/// A block (index, width) represents the index of line number and the width of charaters in this line as pixels. It can be viewed as a framebuffer block which is described in the `frame_buffer_compositor` crate
+/// Returns (column, line, blocks), i.e. the position of the next symbol and the information of updated blocks.
+/// A block item (index, width) represents the index of line number and the width of charaters in this line as pixels. It can be viewed as a framebuffer block which is described in the `frame_buffer_compositor` crate.
 /// # Arguments
 /// * `framebuffer`: the framebuffer to display in.
 /// * `coordinate`: the left top coordinate of the text block relative to the origin(top-left point) of the frame buffer.
-/// * `width`: the width of the text block.
-/// * `height`: the height of the text block.
+/// * `(width, height)`: the size of the text block.
 /// * `slice`: the string to display.
 /// * `font_color`: the color of the text.
 /// * `bg_color`: the background color of the text block.
-/// * `column`: the column of the text.
-/// * `line`: the line of the text in the text block.
+/// * `(column, line)`: the location of the text in the text block as symbols.
 pub fn print_string(
     framebuffer: &mut dyn FrameBuffer,
     coordinate: Coord,
@@ -81,8 +79,8 @@ pub fn print_string(
                 font_color,
                 bg_color,
                 coordinate,
-                curr_line,
                 curr_column,
+                curr_line,
             );
             curr_column += 1;
         }
@@ -125,8 +123,8 @@ fn print_ascii_character(
     font_color: u32,
     bg_color: u32,
     coordinate: Coord,
-    line: usize,
     column: usize,
+    line: usize,
 ) {
     let start = coordinate + ((column * CHARACTER_WIDTH) as isize, (line * CHARACTER_HEIGHT) as isize);
     if !framebuffer.overlaps_with(start, CHARACTER_WIDTH, CHARACTER_HEIGHT) {

@@ -1270,7 +1270,6 @@ impl Shell {
             if self.check_and_print_app_output() {
                 need_refresh = true;
                 continue;
-
             }
 
             // Handles the cleanup of any application task that has finished running, returns whether we need
@@ -1288,7 +1287,7 @@ impl Shell {
             }
 
             // Looks at the input queue from the window manager
-            // It handles all the event items until the queue is empty
+            // Handles all the event items until the queue is empty
             while let Some(ev) = self.terminal.lock().get_event() {
                 match ev {
                     // Returns from the main loop.
