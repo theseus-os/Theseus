@@ -938,8 +938,10 @@ dependencies = [
  "memfs 0.1.0",
  "memory 0.1.0",
  "rand 0.5.6 (registry+https://github.com/rust-lang/crates.io-index)",
+ "root 0.1.0",
  "spin 0.4.10 (registry+https://github.com/rust-lang/crates.io-index)",
  "task 0.1.0",
+ "vfs_node 0.1.0",
 ]
 
 [[package]]

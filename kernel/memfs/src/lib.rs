@@ -136,8 +136,7 @@ impl File for MemFile {
 
     fn as_mapping(&self) -> Result<&MappedPages, &'static str> {
         Ok(&self.mp)
-    }
-    
+    }   
 }
 
 impl FsNode for MemFile {

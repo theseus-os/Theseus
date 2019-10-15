@@ -71,6 +71,7 @@ pub unsafe extern "C" fn free(ptr: *mut c_void) {
 /// Right now we only consider the case of anonymous mappings without a given address.
 #[no_mangle]
 pub extern fn mmap(_addr: *mut c_void, length: size_t, prot: c_int, flags: c_int, fd: c_int, offset: off_t) -> *mut c_void {
+    //anonymous mapping
     if flags & MAP_ANON == MAP_ANON {
         // allocate the number of pages
         let kernel_mmi_ref = memory::get_kernel_mmi_ref().unwrap();
@@ -86,10 +87,7 @@ pub extern fn mmap(_addr: *mut c_void, length: size_t, prot: c_int, flags: c_int
         return addr.value() as *mut c_void;
     }
 
-    // else if flags & MAP_SHARED == MAP_SHARED {
-
-    // }
-
+    // Most systems support MAP_ANON and MAP_FIXED
     else {
         error!("Unimplemented memory mapping!");
         return 0 as *mut c_void;

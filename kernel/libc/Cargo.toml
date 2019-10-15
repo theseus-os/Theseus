@@ -36,3 +36,9 @@ path = "../task"
 
 [dependencies.fs_node]
 path = "../fs_node"
+
+[dependencies.vfs_node]
+path = "../vfs_node"
+
+[dependencies.root]
+path = "../root"
