@@ -617,17 +617,11 @@ impl Directory for PFSDirectory {
     }
 
     fn get(&self, name: &str) -> Option<FileOrDir> {
-
-        // TODO validate name is valid in Fat32. Otherwise we'll never find it so it seems not important.
-        match self.fat32_get(name) {
-            Ok(node) => {
-                    // node.set_parent_dir(self.) FIXME we don't have a good way to get a reference to the parent.
-                    Some(node)
-                },
-            Err(_) => None,
+        match name {
+            "." => self.dot.upgrade().map(|x| FileOrDir::Dir(x)),
+            ".." => self.cc.parent.upgrade().map(|x| FileOrDir::Dir(x)),
+            name => self.fat32_get(name).ok(),
         }
-
-
     }
 
     fn list(&self) -> Vec<String> {
@@ -1061,6 +1055,8 @@ impl PFSDirectory {
     }
 }
 
+// TODO: should also consider how to relate these to directory entries for write.
+/// Underlying disk object that is common to Files and Directories. In many ways this maps to a directory entry.
 #[derive(Clone)]
 struct ClusterChain {
     filesystem: Arc<Mutex<Filesystem>>,
@@ -1444,7 +1440,6 @@ pub fn init(sd: storage_device::StorageDeviceRef) -> Result<Filesystem, &'static
     Err("failed to intialize fat filesystem for disk")
 }
 
-// FIXME use this for magic: let fat32_magic = b"FAT32   ";
 /// Detects whether the drive passed into the function is a FAT32 drive
 /// 
 /// # Arguments
@@ -1524,6 +1519,7 @@ fn compare_short_name(name: &str, de: &DirectoryEntry) -> bool {
 pub fn root_dir(fs: Arc<Mutex<Filesystem>>, mount_name: String) -> Result<Arc<Mutex<RootDirectory>>, Error> {
 
     // TODO right now this function can violate the singleton blahdy blah and risks making two cluster chains for this dir.
+    // We also can't just use something like a lazy static, since it's a per-FS basis. Maybe the FS needs some information to prevent this.
 
     let cc = ClusterChain {
         filesystem: fs.clone(),
@@ -1555,6 +1551,9 @@ pub fn root_dir(fs: Arc<Mutex<Filesystem>>, mount_name: String) -> Result<Arc<Mu
         
 }
 
+// Note that right now this additional structure does not really do much.
+// Likely this structure may be vestigial and will be remoovable.
+// But I'm inclined to leave it if we want to do any special treatments of mount points.
 /// Root directory for FAT32 filesystem.
 pub struct RootDirectory {
     /// The PFSDirectory doing the work for the root directory.
@@ -1579,29 +1578,20 @@ impl Directory for RootDirectory {
     }
 }
 
-// TODO these are most likely wrong implementations.
 impl FsNode for RootDirectory {
-    // Recursively gets the absolute pathname as a String
-    //fn get_absolute_path(&self) -> String {
-    //    format!("{}/", root::ROOT_DIRECTORY_NAME.to_string()).to_string()
-    //}
 
     fn get_name(&self) -> String {
         self.underlying_dir.get_name()
     }
 
-    // TODO I had to break this since the old implementation used the root from .
-    // I think during the creation of the root directory we'll want to save a DirRef to it?
-    // Could be another field I suppose.
-    // Maybe the best solution is to have root_dir return a DirRef and then have the root dir hold onto a weak dir Ref to itself.
-    // That sounds dumb but it might just work.
-    /// we just return the root itself because it is the top of the filesystem.
+    /// Since this might be a mount point we end up 
     fn get_parent_dir(&self) -> Option<DirRef> {
-        None
+        self.underlying_dir.get_parent_dir()
     }
 
-    fn set_parent_dir(&mut self, _: WeakDirRef) {
-        // do nothing
+    // In this case we want to update the parent dir, but don't do anything on disk:
+    fn set_parent_dir(&mut self, new_parent: WeakDirRef) {
+        self.underlying_dir.cc.parent = new_parent;
     }
 }
 
@@ -1656,14 +1646,16 @@ fn test_insert(taskref: Option<TaskRef>) ->  Result<(), &'static str> {
                     let fat32_root = root_dir(fs.clone(), name.clone().to_string()).unwrap();
 
 
-                    let mut true_root = root::get_root().lock();
+                    let true_root_ref = root::get_root();
+                    let mut true_root = true_root_ref.lock();
 
-                    // FIXME set root parent dir to appropriate value.
-
-                    match true_root.insert(FileOrDir::Dir(fat32_root)) {
+                    match true_root.insert(FileOrDir::Dir(fat32_root.clone())) {
                         Ok(_) => trace!("Successfully mounted fat32 FS"),
                         Err(_) => trace!("Failed to mount fat32 FS"),
                     };
+                    
+                    fat32_root.lock().set_parent_dir(Arc::downgrade(&true_root_ref));
+
 
                     // Now let's try a couple simple things:
                     let test_root = true_root.get_dir(&name).unwrap();
