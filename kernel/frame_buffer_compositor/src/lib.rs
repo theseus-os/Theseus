@@ -13,7 +13,7 @@
 //! * If the two blocks are identical, ignore it.
 //! * If a new block overlaps with an existing one, display the content and clear the remaining part of the block till the right side of the content in the cached block.
 //! * If the two blocks are of the same location, remove the cached block after the step above. We do not need to make sure the new block is larger than the cached one because the extra part is already cleared in the step above.
-//! * Otherwise, If the two blocks are overlapped, set the hash of the cache as 0. We do not remove it because we should keep its content location because when another block arrives, their overlapped parts must be cleared. We set its content as 0 so that the compositor will redraw it if the same block arrives.
+//! * Otherwise, If the two blocks are overlapped, set the hash of the cache as 0. We do not remove it because we should keep its content location and when another block arrives, their overlapped parts will be cleared. We set its content as 0 so that the compositor will redraw it if the same block arrives.
 //!
 //! If `FrameBufferBlocks` is `None`, the compositor will handle all of its blocks.
 //!
