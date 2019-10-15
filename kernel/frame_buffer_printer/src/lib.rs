@@ -96,16 +96,16 @@ pub fn print_string(
         bg_color,
     );
 
-    // fill the next line in case the page scrolls up
-    blocks.push((curr_line + 1, 0));
-    fill_blank(
-        framebuffer,
-        x,
-        y + ((curr_line + 1) * CHARACTER_HEIGHT) as isize,
-        x + width as isize,
-        y + ((curr_line + 2) * CHARACTER_HEIGHT) as isize,
-        bg_color,
-    );
+    // // fill the next line in case the page scrolls up
+    // blocks.push((curr_line + 1, 0));
+    // fill_blank(
+    //     framebuffer,
+    //     x,
+    //     y + ((curr_line + 1) * CHARACTER_HEIGHT) as isize,
+    //     x + width as isize,
+    //     y + ((curr_line + 2) * CHARACTER_HEIGHT) as isize,
+    //     bg_color,
+    // );
 
     // Fill the remaining lines. Without this the textdisplayable just refresh the part occupied by the new text
     // for i in (curr_line + 1)..(height - 1) / CHARACTER_HEIGHT + 1 {

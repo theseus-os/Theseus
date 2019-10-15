@@ -5,16 +5,17 @@
 //! # Cache
 //! The compositor caches framebuffer blocks for better performance. 
 //!
-//! First, it divides every incoming framebuffer into pieces. The height of every piece is a constant 16, which is the same as the height of a character. The width of a piece is the same as the width of the framebuffer it belongs to.
+//! First, it divides every incoming framebuffer into blocks. The height of every block is a constant 16, which is the same as the height of a character. The width of a block is the same as the width of the framebuffer it belongs to. A block as a continuous array so that we can compute its hash to compare the content of two blocks.
 //!
-//! Every piece contains a block. A `block` means the updated part of a piece since last display. It starts from the left side of the piece and is specified by the index of the piece and its width. The remaining part of the piece piece is blank. For example, in a terminal, every line is a piece, and the part from the beginning of the line to the right side of the text in the line is a block.
+//! The content of a block starts from its left side and ends at the most right side of the empty parts in it. The remaining part of the block is blank. For example, in a terminal, every line is a block, and the part from the beginning of the line to the last character in the line is its content.
 //!
-//! The compositor caches a list of displayed pieces and the width of the block in it. We use `piece` over `block` in cache because a piece consists of a continuous array so that the compositor can store its hash rather than all the pixels of a block. If an incoming `FrameBufferBlocks` carries a list of updated blocks, the compositor compares every piece and its block width with a cached one:
-//! * If the two pieces are identical, ignore it.
-//! * If a new *block* overlaps with an existing one, display the block and clear the remaining part of the piece till the right side of the block in the cached piece.
-//! * If the two blocks are of the same location, remove the cached piece after the step above. We do not need to make sure the new block is larger than the cached one because the extra part is already cleared in the step above.
+//! The compositor caches a list of displayed blocks and the width of their contents. If an incoming `FrameBufferBlocks` carries a list of updated blocks, the compositor compares every block with a cached one:
+//! * If the two blocks are identical, ignore it.
+//! * If a new block overlaps with an existing one, display the content and clear the remaining part of the block till the right side of the content in the cached block.
+//! * If the two blocks are of the same location, remove the cached block after the step above. We do not need to make sure the new block is larger than the cached one because the extra part is already cleared in the step above.
+//! * Otherwise, If the two blocks are overlapped, set the hash of the cache as 0. We do not remove it because we should keep its content location because when another block arrives, their overlapped parts must be cleared. We set its content as 0 so that the compositor will redraw it if the same block arrives.
 //!
-//! If `FrameBufferBlocks` is `None`, the compositor will handle all of its blocks which occupy the whole pieces.
+//! If `FrameBufferBlocks` is `None`, the compositor will handle all of its blocks.
 //!
 //! The compositor minimizes the updated parts of a framebuffer and clears the blank parts. Even if the cache is lost or the updated blocks information is `None`, it guarantees the result is the same.
 
@@ -161,7 +162,9 @@ impl Compositor<FrameBufferBlocks<'_>> for FrameCompositor {
                         if cache.overlaps_with(&new_cache) {
                             update_width = core::cmp::max(update_width, (cache.content_width as isize + cache.coordinate.x - new_cache.coordinate.x) as usize);
                             // if the two caches are at the same location, one covers another and we can remove the cache.
-                            // Otherwise, we should keep the locations of the cache and clear its content. First, we need the right side location of it. If another block arrives, we should guarantee that the overlapped part with the second cache are cleared. Second, if the same block arrives, we need to redraw the block because its overlapped part with current block is refreshed this time. 
+                            // Otherwise, we should keep the locations of the cache and clear its content. 
+                            // First, we need the right side location of it. If another block arrives, we should guarantee that the overlapped part with the second cache are cleared.
+                            // Second, if the same block arrives, we need to redraw the block because its overlapped part with current block is refreshed this time. 
                             if cache.coordinate == new_cache.coordinate {
                                 self.caches.remove(&key);
                             } else {
@@ -212,7 +215,8 @@ impl Compositor<FrameBufferBlocks<'_>> for FrameCompositor {
     fn is_cached(&self, block: &[u32], coordinate: &Coord, width: usize) -> bool {
         match self.caches.get(coordinate) {
             Some(cache) => {
-                return cache.content_hash == hash(block) && cache.width == width;
+                // The same hash means the array of two blocks are the same. Since all blocks are of the same height, two blocks of the same array must share the same width. And if their contents are the same, their content_width must be the same, too.
+                return cache.content_hash == hash(block)
             }
             None => return false,
         }
