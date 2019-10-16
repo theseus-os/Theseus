@@ -8,16 +8,16 @@ build = "../../build.rs"
 [dependencies]
 cfg-if = "0.1.6"
 
+## Only include the SIMD crates when any SIMD extensions are enabled
+[target.'cfg(target_feature = "sse2")'.dependencies.packed_simd]
+version = "0.3.1"
+
 [dependencies.pit_clock]
 path = "../pit_clock"
 
 [dependencies.log]
 default-features = false
 version = "0.3.7"
-
-## Only include the SIMD crates when any SIMD extensions are enabled
-[target.'cfg(target_feature = "sse2")'.dependencies.packed_simd]
-version = "0.3.1"
 
 
 [lib]
