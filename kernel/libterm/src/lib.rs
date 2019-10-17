@@ -14,11 +14,22 @@ extern crate environment;
 extern crate print;
 extern crate event_types;
 extern crate spin;
+extern crate text_display;
+extern crate displayable;
+extern crate frame_buffer_rgb;
+extern crate frame_buffer;
+extern crate font;
 
 use alloc::string::{String, ToString};
 use alloc::vec::Vec;
+use alloc::boxed::Box;
 use event_types::Event;
-use window_manager::displayable::text_display::TextDisplay;
+use text_display::{TextDisplay, Cursor};
+use displayable::Displayable;
+use frame_buffer_rgb::FrameBufferRGB;
+use frame_buffer::{Coord};
+use window_manager::WindowGeneric;
+use font::{CHARACTER_HEIGHT, CHARACTER_WIDTH};
 
 pub const FONT_COLOR: u32 = 0x93ee90;
 pub const BACKGROUND_COLOR: u32 = 0x000000;
@@ -42,7 +53,7 @@ pub enum ScrollError {
 ///     - Producer is the window manager. Window manager is responsible for enqueuing keyevents into the active application
 pub struct Terminal {
     /// The terminal's own window
-    window: window_manager::WindowObj,
+    window: WindowGeneric<FrameBufferRGB>,
     // Name of the displayable object of the terminal
     display_name: String,
     /// The terminal's scrollback buffer which stores a string to be displayed by the text display
@@ -51,19 +62,22 @@ pub struct Terminal {
     is_scroll_end: bool,
     /// The starting index of the scrollback buffer string slice that is currently being displayed on the text display
     scroll_start_idx: usize,
-    /// Indicates the rightmost position of the cursor ON THE text display, NOT IN THE SCROLLBACK BUFFER (i.e. one more than the position of the last non_whitespace character
-    /// being displayed on the text display)
-    absolute_cursor_pos: usize
+    /// The cursor of the terminal.
+    cursor: Cursor
 }
 
 /// Privite methods of `Terminal`.
 impl Terminal {
     /// Get the width and height of the text display.
-    fn get_displayable_dimensions(&self, name:&str) -> (usize, usize){
-        if let Some(text_display) = self.window.get_displayable(name){
-            text_display.get_dimensions()
-        } else {
-            (0, 0)
+    fn get_displayable_dimensions(&self, name:&str) -> (usize, usize){        
+        match self.window.get_concrete_display::<TextDisplay>(&name) {
+            Ok(text_display) => {
+                return text_display.get_dimensions();
+            },
+            Err(err) => {
+                debug!("get_displayable_dimensions: {}", err);
+                return (0, 0);
+            }
         }
     }
 
@@ -375,11 +389,11 @@ impl Terminal {
         };
         let result  = self.scrollback_buffer.get(start_idx..=end_idx); // =end_idx includes the end index in the slice
         if let Some(slice) = result {
-            if let Some(text_display) = self.window.get_displayable(&self.display_name){
-                text_display.display_string(&(self.window), slice, FONT_COLOR, BACKGROUND_COLOR)?;
-            } else {
-                return Err("faild to get the text displayable component")
+            {
+                let text_display = self.window.get_concrete_display_mut::<TextDisplay>(&self.display_name)?;
+                text_display.set_text(slice);
             }
+            self.window.display(&self.display_name)?;
         } else {
             return Err("could not get slice of scrollback buffer string");
         }
@@ -388,43 +402,21 @@ impl Terminal {
 
     /// Updates the text display by taking a string index and displaying as much as it can going backwards from the passed string index (i.e. starts from the bottom of the display and goes up)
     fn update_display_backwards(&mut self, end_idx: usize) -> Result<(), &'static str> {
-        let (start_idx, cursor_pos) = self.calc_start_idx(end_idx, &self.display_name);
+        let (start_idx, _cursor_pos) = self.calc_start_idx(end_idx, &self.display_name);
         self.scroll_start_idx = start_idx;
 
         let result = self.scrollback_buffer.get(start_idx..end_idx);
 
         if let Some(slice) = result {
-            if let Some(text_display) = self.window.get_displayable(&self.display_name){
-                text_display.display_string(&(self.window), slice, FONT_COLOR, BACKGROUND_COLOR)?;
-                self.absolute_cursor_pos = cursor_pos;          
-            } else {
-                return Err("faild to get the text displayable component")
+            {
+                let text_display = self.window.get_concrete_display_mut::<TextDisplay>(&self.display_name)?;
+                text_display.set_text(slice);
             }
+            self.window.display(&self.display_name)?;        
         } else {
             return Err("could not get slice of scrollback buffer string");
         }
         Ok(())
-    }
-
-    /// Updates the cursor to a new position and refreshes display
-    fn cursor_handler(&mut self, left_shift: usize) -> Result<(), &'static str> { 
-        let (buffer_width, buffer_height) = self.get_displayable_dimensions(&self.display_name);
-
-        // We have shifted the cursor out of the screen.
-        if left_shift / buffer_width > buffer_height {
-            self.disable_cursor();
-            return Ok(());
-        }
-
-        let new_x = (self.absolute_cursor_pos - left_shift) % buffer_width;
-        let new_y = (self.absolute_cursor_pos - left_shift) / buffer_width;
-
-        if let Some(text_display) = self.window.get_displayable(&self.display_name){
-            text_display.set_cursor(&(self.window), new_y as u16, new_x as u16, FONT_COLOR, true);
-        } else {
-            return Err("faild to get the text displayable component")
-        }
-        return Ok(());
     }
 }
 
@@ -444,12 +436,11 @@ impl Terminal {
             scrollback_buffer: String::new(),
             scroll_start_idx: 0,
             is_scroll_end: true,
-            absolute_cursor_pos: 0
+            cursor: Cursor::new(FONT_COLOR),
         };
 
         // Inserts a producer for the print queue into global list of terminal print producers
         terminal.print_to_terminal(format!("Theseus Terminal Emulator\nPress Ctrl+C to quit a task\n"));
-        terminal.absolute_cursor_pos = terminal.scrollback_buffer.len();
         Ok(terminal)
     }
 
@@ -460,7 +451,7 @@ impl Terminal {
     }
 
     /// Actually refresh the screen. Currently it's expensive.
-    pub fn refresh_display(&mut self, left_shift: usize) {
+    pub fn refresh_display(&mut self) {
         let start_idx = self.scroll_start_idx;
         // handling display refreshing errors here so that we don't clog the main loop of the terminal
         if self.is_scroll_end {
@@ -469,21 +460,11 @@ impl Terminal {
                 Ok(_) => { }
                 Err(err) => {error!("could not update display backwards: {}", err); return}
             }
-            match self.cursor_handler(left_shift) {
-                Ok(_) => { }
-                Err(err) => {error!("could not update cursor: {}", err); return}
-            }
         } else {
             match self.update_display_forwards(start_idx) {
                 Ok(_) => { }
                 Err(err) => {error!("could not update display forwards: {}", err); return}
             }
-        }
-    }
-
-    pub fn disable_cursor(&mut self) {
-        if let Some(text_display) = self.window.get_displayable(&self.display_name) {
-            text_display.disable_cursor();
         }
     }
 
@@ -515,68 +496,76 @@ impl Terminal {
     }
     
     /// Scroll the screen to the very beginning.
-    pub fn move_screen_to_begin(&mut self) {
+    pub fn move_screen_to_begin(&mut self) -> Result<(), &'static str> {
         // Home command only registers if the text display has the ability to scroll
         if self.scroll_start_idx != 0 {
             self.is_scroll_end = false;
             self.scroll_start_idx = 0; // takes us up to the start of the page
-            if let Some(text_display) = self.window.get_displayable(&self.display_name){
-                text_display.disable_cursor();
-            }
+            self.display_cursor()?;
         }
+        
+        Ok(())
     }
 
     /// Scroll the screen to the very end.
-    pub fn move_screen_to_end(&mut self) {
+    pub fn move_screen_to_end(&mut self) -> Result<(), &'static str> {
         if !self.is_scroll_end {
+            self.cursor.disable();
+            self.display_cursor()?;
             self.is_scroll_end = true;
             let buffer_len = self.scrollback_buffer.len();
             self.scroll_start_idx = self.calc_start_idx(buffer_len, &self.display_name).0;
+            self.cursor.enable();
         }
+        Ok(())
     }
 
     /// Scroll the screen a line up.
-    pub fn move_screen_line_up(&mut self) {
+    pub fn move_screen_line_up(&mut self) -> Result<(), &'static str> {
         if self.scroll_start_idx != 0 {
             self.scroll_up_one_line();
-            if let Some(text_display) = self.window.get_displayable(&self.display_name){
-                text_display.disable_cursor();
-            }
+            self.display_cursor()?;
         }
+        Ok(())
     }
 
     /// Scroll the screen a line down.
-    pub fn move_screen_line_down(&mut self) {
+    pub fn move_screen_line_down(&mut self) -> Result<(), &'static str> {
         if !self.is_scroll_end {
+            self.cursor.disable();
+            self.display_cursor()?;
             self.scroll_down_one_line();
+            self.cursor.enable();
         }
+        Ok(())
     }
 
     /// Scroll the screen a page up.
-    pub fn move_screen_page_up(&mut self) {
+    pub fn move_screen_page_up(&mut self) -> Result<(), &'static str> {
         if self.scroll_start_idx <= 1 {
-            return;
+            return Ok(());
         }
         self.page_up();
         self.is_scroll_end = false;
-        if let Some(text_display) = self.window.get_displayable(&self.display_name){
-            text_display.disable_cursor();
-        }
+        self.display_cursor()
     }
 
     /// Scroll the screen a page down.
-    pub fn move_screen_page_down(&mut self) {
+    pub fn move_screen_page_down(&mut self) -> Result<(), &'static str> {
         if self.is_scroll_end {
-            return;
+            return Ok(());
         }
+        self.cursor.disable();
+        self.display_cursor()?;
         self.page_down();
+        self.cursor.enable();
+        Ok(())
     }
 
     /// Clear all.
     pub fn clear(&mut self) {
         self.scrollback_buffer.clear();
         self.scroll_start_idx = 0;
-        self.absolute_cursor_pos = 0;
         self.is_scroll_end = true;
     }
 
@@ -586,35 +575,38 @@ impl Terminal {
             let (width, height) = self.window.dimensions();
             let width  = width  - 2*window_manager::WINDOW_MARGIN;
             let height = height - 2*window_manager::WINDOW_MARGIN;
-            match self.window.add_displayable(&display_name, 0, 0,
-                TextDisplay::new(&display_name, width, height)) {
-                    Ok(_) => { }
-                    Err(err) => {return Err(err);}
-            };
+            let text_display = TextDisplay::new(width, height, FONT_COLOR, BACKGROUND_COLOR)?;
+            let displayable: Box<dyn Displayable> = Box::new(text_display);
+            self.window.add_displayable(&display_name, Coord::new(0, 0),displayable)?;
         }
         Ok(())
     }
 
-    pub fn blink_cursor(&mut self) {
-        if let Some(text_display) = self.window.get_displayable(&self.display_name){
-            text_display.cursor_blink(&self.window, FONT_COLOR, BACKGROUND_COLOR);
-        }
-    }
-
     /// Get a key event from the underlying window.
-    pub fn get_key_event(&self) -> Option<Event> {
-        self.window.get_key_event()
+    pub fn get_event(&self) -> Option<Event> {
+        self.window.get_event()
     }
 
     pub fn get_width_height(&self) -> (usize, usize) {
         self.get_displayable_dimensions(&self.display_name)
     }
-}
 
-impl Drop for Terminal {
-    fn drop(&mut self) {
-        window_manager::delete(&self.window).unwrap_or_else(|e| {
-            error!("failed to delete window on terminal dropping, {}", e);
-        });
+    /// Display the cursor of the terminal
+    pub fn display_cursor(
+        &mut self,
+    ) -> Result<(), &'static str> {
+        let coordinate = self.window.get_displayable_position(&self.display_name)?;
+        let text_display = self.window.get_concrete_display::<TextDisplay>(&self.display_name)?;
+        let (col, line) = text_display.get_next_pos();
+        let bg_color = text_display.get_bg_color();
+
+        text_display::display_cursor(
+            &mut self.cursor, 
+            coordinate + ((col * CHARACTER_WIDTH) as isize, (line * CHARACTER_HEIGHT) as isize),
+            bg_color,
+            &mut self.window.framebuffer
+        );
+        let block = vec![(line, (col + 1) * CHARACTER_WIDTH)];
+        self.window.render(Some(block.into_iter()))
     }
 }
