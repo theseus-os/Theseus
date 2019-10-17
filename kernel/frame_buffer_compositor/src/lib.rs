@@ -28,10 +28,12 @@ extern crate frame_buffer;
 extern crate spin;
 #[macro_use]
 extern crate lazy_static;
+extern crate hashbrown;
 
 use alloc::collections::BTreeMap;
 use alloc::vec::{Vec, IntoIter};
-#[allow(deprecated)]use core::hash::{Hash, Hasher, SipHasher};
+use core::hash::{Hash, Hasher, BuildHasher};
+use hashbrown::hash_map::{DefaultHashBuilder};
 use compositor::Compositor;
 use frame_buffer::{FrameBuffer, FINAL_FRAME_BUFFER, Coord};
 use spin::Mutex;
@@ -225,8 +227,8 @@ impl Compositor<FrameBufferBlocks<'_>> for FrameCompositor {
 
 // Get the hash of a cache block
 fn hash<T: Hash>(block: T) -> u64 {
-    #[allow(deprecated)]
-    let mut s = SipHasher::new();
-    block.hash(&mut s);
-    s.finish()
+    let s = DefaultHashBuilder::default();
+    let mut a = s.build_hasher();
+    block.hash(&mut a);
+    a.finish()
 } 
