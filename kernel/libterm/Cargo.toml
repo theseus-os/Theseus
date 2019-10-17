@@ -19,6 +19,9 @@ version = "0.1.0"
 [dependencies.window_manager]
 path = "../window_manager"
 
+[dependencies.frame_buffer_rgb]
+path = "../frame_buffer_rgb"
+
 [dependencies.environment]
 path = "../environment"
 
@@ -30,6 +33,18 @@ path = "../print"
 
 [dependencies.event_types]
 path = "../event_types"
+
+[dependencies.text_display]
+path = "../displayable/text_display"
+
+[dependencies.displayable]
+path = "../displayable"
+
+[dependencies.frame_buffer]
+path = "../frame_buffer"
+
+[dependencies.font]
+path = "../font"
 
 [lib]
 crate-type = ["rlib"]

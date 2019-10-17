@@ -5,18 +5,14 @@
 //! spawns and manages tasks, and records the history of executed user commands.
 
 #![no_std]
-extern crate frame_buffer;
 extern crate keycodes_ascii;
 extern crate spin;
 extern crate dfqueue;
-extern crate mod_mgmt;
 extern crate spawn;
 extern crate task;
 extern crate runqueue;
-extern crate memory;
 extern crate event_types; 
 extern crate window_manager;
-extern crate text_display;
 extern crate path;
 extern crate root;
 extern crate scheduler;
@@ -536,7 +532,7 @@ impl Shell {
                 if self.is_internal_command() { // shell executes internal commands
                     self.execute_internal()?;
                     self.clear_cmdline(false)?;
-                    self.terminal.lock().refresh_display(0);
+                    self.terminal.lock().refresh_display();
                 } else { // shell invokes user programs
                     let new_job_num = self.build_new_job()?;
                     self.fg_job_num = Some(new_job_num);
@@ -562,30 +558,24 @@ impl Shell {
 
         // home, end, page up, page down, up arrow, down arrow for the input_event_manager
         if keyevent.keycode == Keycode::Home && keyevent.modifiers.control {
-            self.terminal.lock().move_screen_to_begin();
-            return Ok(());
+            return self.terminal.lock().move_screen_to_begin();
         }
         if keyevent.keycode == Keycode::End && keyevent.modifiers.control{
-            self.terminal.lock().move_screen_to_end();
-            return Ok(());
+            return self.terminal.lock().move_screen_to_end();
         }
         if keyevent.modifiers.control && keyevent.modifiers.shift && keyevent.keycode == Keycode::Up  {
-            self.terminal.lock().move_screen_line_up();
-            return Ok(());
+            return self.terminal.lock().move_screen_line_up();
         }
         if keyevent.modifiers.control && keyevent.modifiers.shift && keyevent.keycode == Keycode::Down  {
-            self.terminal.lock().move_screen_line_down();
-            return Ok(());
+            return self.terminal.lock().move_screen_line_down();
         }
 
         if keyevent.keycode == Keycode::PageUp && keyevent.modifiers.shift {
-            self.terminal.lock().move_screen_page_up();
-            return Ok(());
+            return self.terminal.lock().move_screen_page_up();
         }
 
         if keyevent.keycode == Keycode::PageDown && keyevent.modifiers.shift {
-            self.terminal.lock().move_screen_page_down();
-            return Ok(());
+            return self.terminal.lock().move_screen_page_down();
         }
 
         // Cycles to the next previous command
@@ -1213,7 +1203,7 @@ impl Shell {
 
                     // Sets this bool to true so that on the next iteration the TextDisplay will refresh AFTER the 
                     // task_handler() function has cleaned up, which does its own printing to the console
-                    self.terminal.lock().refresh_display(0);
+                    self.terminal.lock().refresh_display();
                 },
                 _ => { },
             }
@@ -1282,10 +1272,8 @@ impl Shell {
         let mut need_refresh = false;
         let mut need_prompt = false;
         self.redisplay_prompt();
-        self.terminal.lock().refresh_display(0);
+        self.terminal.lock().refresh_display();
         loop {
-            self.terminal.lock().blink_cursor();
-
             // If there is anything from running applications to be printed, it printed on the screen and then
             // return true, so that the loop continues, otherwise nothing happens and we keep on going with the
             // loop body. We do so to ensure that printing is handled before keypresses.
@@ -1304,36 +1292,33 @@ impl Shell {
                 need_prompt = false;
             }
             if need_refresh || need_refresh_on_task_event {
-                self.terminal.lock().refresh_display(0);
+                self.terminal.lock().refresh_display();
                 need_refresh = false;
             }
 
             // Looks at the input queue from the window manager
-            // If it has unhandled items, it handles them with the match
-            // If it is empty, it proceeds directly to the next loop iteration
-            match self.terminal.lock().get_key_event() {
-                Some(ev) => {
-                    match ev {
-                        // Returns from the main loop.
-                        Event::ExitEvent => {
-                            trace!("exited terminal");
-                            return Ok(());
-                        }
+            // Handles all the event items until the queue is empty
+            while let Some(ev) = self.terminal.lock().get_event() {
+                match ev {
+                    // Returns from the main loop.
+                    Event::ExitEvent => {
+                        trace!("exited terminal");
+                        return Ok(());
+                    }
 
-                        Event::ResizeEvent(ref _rev) => {
-                            self.terminal.lock().refresh_display(self.left_shift); // application refreshes display after resize event is received
-                        }
+                    Event::ResizeEvent(ref _rev) => {
+                        self.terminal.lock().refresh_display(); // application refreshes display after resize event is received
+                    }
 
-                        // Handles ordinary keypresses
-                        Event::InputEvent(ref input_event) => {
-                            self.key_event_producer.write_one(input_event.key_event);
-                        }
-                        _ => { }
-                    };
-                },
-                _ => { }
-            };
-
+                    // Handles ordinary keypresses
+                    Event::InputEvent(ref input_event) => {
+                        self.key_event_producer.write_one(input_event.key_event);
+                    }
+                    _ => { }
+                };
+            }           
+            self.terminal.lock().display_cursor()?; 
+                
             let mut need_refresh = false;
             loop {
                 let locked_consumer = self.key_event_consumer.lock();
@@ -1352,7 +1337,7 @@ impl Shell {
                 }
             }
             if need_refresh {
-                self.terminal.lock().refresh_display(self.left_shift);
+                self.terminal.lock().refresh_display();
             } else {
                 scheduler::schedule(); // yield the CPU if nothing to do
             }
