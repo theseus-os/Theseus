@@ -108,18 +108,20 @@ pub fn print_string(
     // );
 
     // Fill the remaining lines. Without this the textdisplayable just refresh the part occupied by the new text
-    // for i in (curr_line + 1)..(height - 1) / CHARACTER_HEIGHT + 1 {
-    //     blocks.push((i, 0));
-    // }
-    // fill the blank of remaining lines
-    // fill_blank(
-    //     framebuffer,
-    //     x,
-    //     y + ((curr_line + 1) * CHARACTER_HEIGHT) as isize,
-    //     x + width as isize,
-    //     y + height as isize,
-    //     bg_color,
-    // );
+    if column == 0 && line == 0 {
+        for i in (curr_line + 1)..(height - 1) / CHARACTER_HEIGHT + 1 {
+            blocks.push((i, 0));
+        }
+        // fill the blank of remaining lines
+        fill_blank(
+            framebuffer,
+            x,
+            y + ((curr_line + 1) * CHARACTER_HEIGHT) as isize,
+            x + width as isize,
+            y + height as isize,
+            bg_color,
+        );
+    }
 
     // return the position of next symbol and updated blocks.
     (curr_column, curr_line, blocks)
