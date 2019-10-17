@@ -227,8 +227,8 @@ impl Compositor<FrameBufferBlocks<'_>> for FrameCompositor {
 
 // Get the hash of a cache block
 fn hash<T: Hash>(block: T) -> u64 {
-    let s = DefaultHashBuilder::default();
-    let mut a = s.build_hasher();
-    block.hash(&mut a);
-    a.finish()
+    let builder = DefaultHashBuilder::default();
+    let mut hasher = builder.build_hasher();
+    block.hash(&mut hasher);
+    hasher.finish()
 } 
