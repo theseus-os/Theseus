@@ -690,6 +690,12 @@ impl FsNode for PFSDirectory {
     }
 }
 
+impl Drop for PFSDirectory {
+    fn drop(&mut self) {
+        warn!("PFSDirectory:drop(): {:?}", self.get_name());
+    }
+}
+
 impl PFSDirectory {
 
     // FIXME (parallelism improvements)
@@ -1595,6 +1601,12 @@ impl FsNode for RootDirectory {
     }
 }
 
+impl Drop for RootDirectory {
+    fn drop(&mut self) {
+        warn!("RootDirectory:drop(): {:?}", self.get_name());
+    }
+}
+
 /// Function to print the raw byte name as a string. TODO find a better way.
 fn debug_name(byte_name: &[u8]) -> &str {
     match core::str::from_utf8(byte_name) {
@@ -1621,9 +1633,9 @@ pub fn test_module_init() -> Result<(), &'static str> {
     //     .spawn()?;
 
     // start a task that tries to find the module in root.
-    KernelTaskBuilder::new(test_insert, None)
-        .name("fat32_insert_test".to_string())
-        .spawn()?;
+    // KernelTaskBuilder::new(test_insert, None)
+    //     .name("fat32_insert_test".to_string())
+    //     .spawn()?;
 
     Ok(())
 }

@@ -42,4 +42,8 @@ path = "../../kernel/task"
 [dependencies.path]
 path = "../../kernel/path"
 
+[dependencies.root]
+path = "../../kernel/root"
+
+
 

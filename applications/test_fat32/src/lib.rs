@@ -16,6 +16,7 @@ extern crate fs_node;
 extern crate getopts;
 extern crate path;
 extern crate task;
+extern crate root;
 
 use alloc::vec::Vec;
 use alloc::string::String;
@@ -24,6 +25,7 @@ use alloc::sync::{Arc, Weak};
 use spin::Mutex;
 use fs_node::{File, Directory, FileOrDir, FsNode, DirRef, FileRef};
 use fat32::{root_dir, PFSDirectory, RootDirectory};
+use root::get_root;
 use path::Path;
 use getopts::Options;
 
@@ -34,6 +36,7 @@ pub fn main(args: Vec<String>) -> isize {
     opts.optflag("h", "help", "print this help menu");
     opts.optopt("m", "mount", "Attempt to mount the root directory to DIR.", "DIR");
     opts.optflag("p", "print", "Walks the filesystem and prints the contents.");
+    opts.optflag("t", "test", "Look for a fat32 object at /fat32 and print it");
 
     // Attempts to mount code as described in docs for fat32 crate.
     // Mounts to directory given in args.
@@ -49,6 +52,14 @@ pub fn main(args: Vec<String>) -> isize {
         print_usage(&opts);
         return 0;
     }
+
+    // Dumb test TODO don't use this.
+    if matches.opt_present("t") {
+        
+        let names = get_root().lock().get_dir("fat32").unwrap().lock().list();
+        debug!("Found children of /fat32: {:?}", names);
+        return 0;
+    }    
     
     let taskref = match task::get_my_current_task() {
         Some(t) => t,
@@ -79,7 +90,7 @@ pub fn main(args: Vec<String>) -> isize {
                     // Take as read only for now?
 
 
-                    let (name, oPath) = if matches.opt_present("m") {
+                    let (name, o_path) = if matches.opt_present("m") {
                         let path = Path::new(matches.opt_str("m").unwrap());
 
                         let name = path.basename().to_string();
@@ -88,6 +99,7 @@ pub fn main(args: Vec<String>) -> isize {
                         ("/".to_string(), None)
                     };
 
+                    let name = "fat32".to_string();
 
                     //let fat32_root: Arc<Mutex<RootDirectory>> = root_dir(fs.clone(), name.clone()).unwrap();
                     let fat32_root: DirRef = root_dir(fs.clone(), name.clone()).unwrap();
@@ -98,7 +110,7 @@ pub fn main(args: Vec<String>) -> isize {
                     };
 
                     // If we have a mount point, then mount.
-                    match oPath {
+                    match o_path {
                         // FIXME: path Struct really needs a "strip the last element from path" function.
                         // For now we're just going to hope the path is a basename...
                         Some(path) => {
@@ -107,20 +119,26 @@ pub fn main(args: Vec<String>) -> isize {
                             }
 
                             // FIXME set root parent dir to appropriate value.
-                            let mut curr_dir = curr_wd.lock();
-                            //let root = Arc::new(Mutex::new(root)); // CAUSES ISSUE FIXME
-                            //let root = fat32::make_dir_ref(root);
-                            match curr_dir.insert(FileOrDir::Dir(fat32_root)) {
-                                Ok(_) => println!("Successfully mounted fat32 FS"),
-                                Err(_) => println!("Failed to mount fat32 FS"),
-                            };
+                            //let mut curr_dir = curr_wd.lock();
+                            //let parent = curr_wd;
+                            let parent = get_root();
+                            {
+                                let mut locked_parent = parent.lock();
+                                //let root = Arc::new(Mutex::new(root)); // CAUSES ISSUE FIXME
+                                //let root = fat32::make_dir_ref(root);
+                                match locked_parent.insert(FileOrDir::Dir(fat32_root.clone())) {
+                                    Ok(_) => println!("Successfully mounted fat32 FS"),
+                                    Err(_) => println!("Failed to mount fat32 FS"),
+                                };
 
-                            // Now let's try a couple simple things:
-                            let test_root = curr_dir.get_dir(&name).unwrap();
-                            println!("Root directory entries: {:?}", test_root.lock().list());
+                                // Now let's try a couple simple things:
+                                let test_root = locked_parent.get_dir(&name).unwrap();
+                                println!("Root directory entries: {:?}", test_root.lock().list());
+                            }
+                            fat32_root.lock().set_parent_dir(Arc::downgrade(parent));
                         },
                         None => {}
-                    };               
+                    };           
                 }
                 
                 Err(_) => {
