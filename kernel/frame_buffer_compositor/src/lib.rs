@@ -31,7 +31,7 @@ extern crate lazy_static;
 
 use alloc::collections::BTreeMap;
 use alloc::vec::{Vec, IntoIter};
-use core::hash::{Hash, Hasher, SipHasher};
+#[allow(deprecated)]use core::hash::{Hash, Hasher, SipHasher};
 use compositor::Compositor;
 use frame_buffer::{FrameBuffer, FINAL_FRAME_BUFFER, Coord};
 use spin::Mutex;
@@ -142,7 +142,7 @@ impl Compositor<FrameBufferBlocks<'_>> for FrameCompositor {
 
                 let block = &src_fb.buffer()[start_index..end_index];
                 // Skip if a block is already cached
-                if self.is_cached(&block, &coordinate_start, src_width) {
+                if self.is_cached(&block, &coordinate_start) {
                     continue;
                 }
 
@@ -212,7 +212,7 @@ impl Compositor<FrameBufferBlocks<'_>> for FrameCompositor {
         Ok(())
     }
 
-    fn is_cached(&self, block: &[u32], coordinate: &Coord, width: usize) -> bool {
+    fn is_cached(&self, block: &[u32], coordinate: &Coord) -> bool {
         match self.caches.get(coordinate) {
             Some(cache) => {
                 // The same hash means the array of two blocks are the same. Since all blocks are of the same height, two blocks of the same array must share the same width. And if their contents are the same, their content_width must be the same, too.
@@ -225,6 +225,7 @@ impl Compositor<FrameBufferBlocks<'_>> for FrameCompositor {
 
 // Get the hash of a cache block
 fn hash<T: Hash>(block: T) -> u64 {
+    #[allow(deprecated)]
     let mut s = SipHasher::new();
     block.hash(&mut s);
     s.finish()

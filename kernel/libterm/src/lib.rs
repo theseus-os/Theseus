@@ -597,7 +597,7 @@ impl Terminal {
     ) -> Result<(), &'static str> {
         let coordinate = self.window.get_displayable_position(&self.display_name)?;
         let text_display = self.window.get_concrete_display::<TextDisplay>(&self.display_name)?;
-        let (mut col, mut line) = text_display.get_next_pos();
+        let (col, line) = text_display.get_next_pos();
         let bg_color = text_display.get_bg_color();
 
         text_display::display_cursor(
