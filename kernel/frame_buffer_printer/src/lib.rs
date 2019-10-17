@@ -107,7 +107,9 @@ pub fn print_string(
     //     bg_color,
     // );
 
-    // Fill the remaining lines. Without this the textdisplayable just refresh the part occupied by the new text
+    // Fill the remaining lines if the offset is zero and the text displayable refreshes from the beginning.
+    // If the offset is not zero, it means the text to be printed is appended and just refresh the part occupied by the new text.
+    // In the future we may adjust the logic here to for the optimization of more displayables and applications
     if column == 0 && line == 0 {
         for i in (curr_line + 1)..(height - 1) / CHARACTER_HEIGHT + 1 {
             blocks.push((i, 0));
