@@ -48,8 +48,9 @@ pub fn find_smallest_fd(descriptors: &[Option<FileRef>]) -> c_int {
 }
 
 /// Assigns a file the minimum file descriptor available and stores a reference to the file in the file descriptor table
-pub fn associate_file_with_smallest_fd(file: &FileRef, descriptors: &mut [Option<FileRef>]) -> c_int{
-    let fd = find_smallest_fd(descriptors);
+pub fn associate_file_with_smallest_fd(file: &FileRef) -> c_int{
+    let mut descriptors = FILE_DESCRIPTORS.lock();
+    let fd = find_smallest_fd(descriptors.deref_mut());
     if fd >= 0 {
         descriptors[fd as usize] = Some(file.clone());
     }
@@ -58,8 +59,8 @@ pub fn associate_file_with_smallest_fd(file: &FileRef, descriptors: &mut [Option
 }
 
 /// Returns the file descriptor to the OS so that it can be reused
-pub fn return_fd_to_system(fd: c_int, descriptors: &mut [Option<FileRef>]) {
-    descriptors[fd as usize] = None;
+pub fn return_fd_to_system(fd: c_int) {
+    FILE_DESCRIPTORS.lock()[fd as usize] = None;
 }
 
 /// Opens and possibly creates a file.
@@ -67,22 +68,22 @@ pub fn return_fd_to_system(fd: c_int, descriptors: &mut [Option<FileRef>]) {
 /// The acceptable "path" values are currently just the file name. All files are created in the libc directory.
 #[no_mangle]
 pub extern "C" fn open(path: &CStr, oflag: c_int, mode: mode_t) -> c_int {
-    let mut directory = LIBC_DIRECTORY.lock();
-    let mut descriptors = FILE_DESCRIPTORS.lock();
+    debug!("open");
 
     let file_name = path.to_owned().into_string().unwrap();
-    let mut file_ref = directory.get_file(&file_name);
+    let mut file_ref = LIBC_DIRECTORY.lock().get_file(&file_name);
     let ret = 
         // check if this file is already created, and return file descriptor
         if file_ref.is_some() {
-            associate_file_with_smallest_fd(&file_ref.unwrap(), descriptors.deref_mut())
+            associate_file_with_smallest_fd(&file_ref.unwrap())
         }
         // if the file is not created and the O_CREAT flag is set, create the file
         else if oflag & O_CREAT == O_CREAT {
+            debug!("open: creating file");
             let file = create_file(&file_name);
-            let fd = associate_file_with_smallest_fd(&file, descriptors.deref_mut());
+            let fd = associate_file_with_smallest_fd(&file);
             if fd >= 0 {
-                let _ = directory.insert(FileOrDir::File(file));
+                let _ = LIBC_DIRECTORY.lock().insert(FileOrDir::File(file));
             }
             fd
         }
@@ -98,17 +99,19 @@ pub extern "C" fn open(path: &CStr, oflag: c_int, mode: mode_t) -> c_int {
 /// If this is the last file descriptor referring to a file, the file is deleted
 #[no_mangle]
 pub extern "C" fn close(fd: c_int) -> c_int {
-    let mut directory = LIBC_DIRECTORY.lock();
-    let mut descriptors = FILE_DESCRIPTORS.lock();
+    debug!("close");
+    {
+        let mut descriptors = FILE_DESCRIPTORS.lock();
 
-    let count = Arc::strong_count(descriptors[fd as usize].as_ref().unwrap()); 
-    if count == 2 {
-        let file = descriptors[fd as usize].as_ref().unwrap().clone();
-        directory.remove(&FileOrDir::File(file));
+        let count = Arc::strong_count(descriptors[fd as usize].as_ref().unwrap()); 
+        if count == 2 {
+            let file = descriptors[fd as usize].as_ref().unwrap().clone();
+            LIBC_DIRECTORY.lock().remove(&FileOrDir::File(file));
+        }
+
+        descriptors[fd as usize] = None;
     }
-
-    descriptors[fd as usize] = None;
-    return_fd_to_system(fd, descriptors.deref_mut());
+    return_fd_to_system(fd);
 
     return 0;
 }
