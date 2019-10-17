@@ -801,19 +801,6 @@ dependencies = [
 ]
 
 [[package]]
-name = "ipc"
-version = "0.1.0"
-dependencies = [
- "apic 0.1.0",
- "lazy_static 1.2.0 (registry+https://github.com/rust-lang/crates.io-index)",
- "log 0.3.9 (registry+https://github.com/rust-lang/crates.io-index)",
- "mpmc 0.1.6-pre",
- "pmu_x86 0.1.0",
- "spawn 0.1.0",
- "tsc 0.1.0",
-]
-
-[[package]]
 name = "irq_safety"
 version = "0.1.1"
 source = "git+https://github.com/kevinaboos/irq_safety#6a8c008994273603829bf83d30b41b315b5bb387"
@@ -2134,15 +2121,6 @@ dependencies = [
  "memfs 0.1.0",
  "memory 0.1.0",
  "root 0.1.0",
- "terminal_print 0.1.0",
-]
-
-[[package]]
-name = "test_ipc"
-version = "0.1.0"
-dependencies = [
- "ipc 0.1.0",
- "log 0.3.9 (registry+https://github.com/rust-lang/crates.io-index)",
  "terminal_print 0.1.0",
 ]
 
