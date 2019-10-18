@@ -63,7 +63,7 @@ pub struct Terminal {
     /// The starting index of the scrollback buffer string slice that is currently being displayed on the text display
     scroll_start_idx: usize,
     /// The cursor of the terminal.
-    cursor: Cursor
+    pub cursor: Cursor,
 }
 
 /// Privite methods of `Terminal`.
@@ -410,6 +410,7 @@ impl Terminal {
         if let Some(slice) = result {
             {
                 let text_display = self.window.get_concrete_display_mut::<TextDisplay>(&self.display_name)?;
+                trace!("Wenqiu {}", slice);
                 text_display.set_text(slice);
             }
             self.window.display(&self.display_name)?;        
@@ -496,22 +497,22 @@ impl Terminal {
     }
     
     /// Scroll the screen to the very beginning.
-    pub fn move_screen_to_begin(&mut self) -> Result<(), &'static str> {
+    pub fn move_screen_to_begin(&mut self, left_shift: usize) -> Result<(), &'static str> {
         // Home command only registers if the text display has the ability to scroll
         if self.scroll_start_idx != 0 {
             self.is_scroll_end = false;
             self.scroll_start_idx = 0; // takes us up to the start of the page
-            self.display_cursor()?;
+            self.display_cursor(left_shift)?;
         }
         
         Ok(())
     }
 
     /// Scroll the screen to the very end.
-    pub fn move_screen_to_end(&mut self) -> Result<(), &'static str> {
+    pub fn move_screen_to_end(&mut self, left_shift: usize) -> Result<(), &'static str> {
         if !self.is_scroll_end {
             self.cursor.disable();
-            self.display_cursor()?;
+            self.display_cursor(left_shift)?;
             self.is_scroll_end = true;
             let buffer_len = self.scrollback_buffer.len();
             self.scroll_start_idx = self.calc_start_idx(buffer_len, &self.display_name).0;
@@ -521,19 +522,19 @@ impl Terminal {
     }
 
     /// Scroll the screen a line up.
-    pub fn move_screen_line_up(&mut self) -> Result<(), &'static str> {
+    pub fn move_screen_line_up(&mut self, left_shift: usize) -> Result<(), &'static str> {
         if self.scroll_start_idx != 0 {
             self.scroll_up_one_line();
-            self.display_cursor()?;
+            self.display_cursor(left_shift)?;
         }
         Ok(())
     }
 
     /// Scroll the screen a line down.
-    pub fn move_screen_line_down(&mut self) -> Result<(), &'static str> {
+    pub fn move_screen_line_down(&mut self, left_shift: usize) -> Result<(), &'static str> {
         if !self.is_scroll_end {
             self.cursor.disable();
-            self.display_cursor()?;
+            self.display_cursor(left_shift)?;
             self.scroll_down_one_line();
             self.cursor.enable();
         }
@@ -541,22 +542,22 @@ impl Terminal {
     }
 
     /// Scroll the screen a page up.
-    pub fn move_screen_page_up(&mut self) -> Result<(), &'static str> {
+    pub fn move_screen_page_up(&mut self, left_shift: usize) -> Result<(), &'static str> {
         if self.scroll_start_idx <= 1 {
             return Ok(());
         }
         self.page_up();
         self.is_scroll_end = false;
-        self.display_cursor()
+        self.display_cursor(left_shift)
     }
 
     /// Scroll the screen a page down.
-    pub fn move_screen_page_down(&mut self) -> Result<(), &'static str> {
+    pub fn move_screen_page_down(&mut self, left_shift: usize) -> Result<(), &'static str> {
         if self.is_scroll_end {
             return Ok(());
         }
         self.cursor.disable();
-        self.display_cursor()?;
+        self.display_cursor(left_shift)?;
         self.page_down();
         self.cursor.enable();
         Ok(())
@@ -592,17 +593,19 @@ impl Terminal {
     }
 
     /// Display the cursor of the terminal
+    /// `left_shift` is the distance of the cursor to the end of the text in the terminal.
     pub fn display_cursor(
-        &mut self,
+        &mut self, left_shift: usize
     ) -> Result<(), &'static str> {
         let coordinate = self.window.get_displayable_position(&self.display_name)?;
         let text_display = self.window.get_concrete_display::<TextDisplay>(&self.display_name)?;
         let (col, line) = text_display.get_next_pos();
+        let col_cursor = col - left_shift;
         let bg_color = text_display.get_bg_color();
 
         text_display::display_cursor(
             &mut self.cursor, 
-            coordinate + ((col * CHARACTER_WIDTH) as isize, (line * CHARACTER_HEIGHT) as isize),
+            coordinate + ((col_cursor * CHARACTER_WIDTH) as isize, (line * CHARACTER_HEIGHT) as isize),
             bg_color,
             &mut self.window.framebuffer
         );

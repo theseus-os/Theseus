@@ -61,13 +61,12 @@ impl TemporaryPage {
         }
         
         self.mapped_page = Some( 
-            try!(page_table.map_to(page, frame, EntryFlags::WRITABLE, &mut self.allocator))
+            page_table.map_to(page, frame, EntryFlags::WRITABLE, &mut self.allocator)?
         );
         
-        let table: &mut Table<Level1> = try!( 
-            try!(self.mapped_page.as_mut().ok_or("mapped page error"))
-            .as_type_mut(0)  // no offset
-        );
+        let table: &mut Table<Level1> = self.mapped_page.as_mut()
+            .ok_or("mapped page error")?
+            .as_type_mut(0)?;  // no offset
         Ok(table)
     }
 }

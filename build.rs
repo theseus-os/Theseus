@@ -20,8 +20,16 @@ fn main() {
         println!("{}{}", CFG_PREFIX, s);
     }
 
-    eprintln!("ran build script, configs: {}", configs);
+    // Since there is no known way to obtain cfg values for codegen options,
+    // we must manually add the ones used in Theseus.
+    // Currently, the only codegen option we need to know about is force-frame-pointers
+    if let Ok(rustflags) = std::env::var("RUSTFLAGS") {
+        if rustflags.contains("force-frame-pointers=yes") {
+            println!("{}{}", CFG_PREFIX, "frame_pointers");
+        }
+    }
 
+    eprintln!("ran build script, configs: {}", configs);
 }
 
 

@@ -75,7 +75,7 @@ use x86_64::registers::msr::{rdmsr, wrmsr, IA32_FS_BASE};
 
 
 /// The signature of the callback function that can hook into receiving a panic. 
-pub type PanicHandler = Box<dyn Fn(&PanicInfoOwned) + Send>;
+pub type PanicHandler = Box<dyn Fn(&PanicInfo) + Send>;
 
 /// Just like `core::panic::PanicInfo`, but with owned String types instead of &str references.
 #[derive(Debug, Clone)]
@@ -243,7 +243,8 @@ pub struct Task {
     /// This `Task` is linked into and runs within the context of 
     /// this [`CrateNamespace`](../mod_mgmt/struct.CrateNamespace.html).
     pub namespace: Arc<CrateNamespace>,
-    /// The function that will be called when this `Task` panics
+    /// The function that will be called when this `Task` panics;
+    /// it is invoked before the task is cleaned up via stack unwinding.
     pub panic_handler: Option<PanicHandler>,
     /// The environment of the task, Wrapped in an Arc & Mutex because it is shared among child and parent tasks
     pub env: Arc<Mutex<Environment>>,
@@ -363,7 +364,8 @@ impl Task {
         self.ustack.is_some()
     }
 
-    /// Registers a function or closure that will be called if this `Task` panics.
+    /// Registers a function or closure that will be called if this `Task` panics,
+    /// invoked before the task is cleaned up via stack unwinding.
     pub fn set_panic_handler(&mut self, callback: PanicHandler) {
         self.panic_handler = Some(callback);
     }
@@ -741,9 +743,13 @@ impl TaskRef {
 
     /// Call this function to indicate that this task has successfully ran to completion,
     /// and that it has returned the given `exit_value`.
+    /// This task must be the currently executing task, 
+    /// you cannot invoke `mark_as_exited()` on a different task.
+    /// 
+    /// This should only be used at the end of the `task_wrapper` function once it has cleanly exited.
     /// 
     /// # Locking / Deadlock
-    /// This method obtains a writeable lock on the underlying Task in order to mutate its state.
+    /// This method obtains a writable lock on the underlying Task in order to mutate its state.
     /// 
     /// # Return
     /// * Returns `Ok` if the exit status was successfully set.     
@@ -752,16 +758,56 @@ impl TaskRef {
     /// # Note 
     /// The `Task` will not be halted immediately -- 
     /// it will finish running its current timeslice, and then never be run again.
-    pub fn exit(&self, exit_value: Box<dyn Any + Send>) -> Result<(), &'static str> {
-        self.internal_exit(ExitValue::Completed(exit_value))
+    #[doc(hidden)]
+    pub fn mark_as_exited(&self, exit_value: Box<dyn Any + Send>) -> Result<(), &'static str> {
+        let curr_task = get_my_current_task().ok_or("mark_as_exited(): failed to check what the current task is")?;
+        if curr_task == self {
+            self.internal_exit(ExitValue::Completed(exit_value))
+        } else {
+            Err("`mark_as_exited()` can only be invoked on the current task, not on another task.")
+        }
     }
 
-
-    /// Kills this `Task` (not a clean exit) without allowing it to run to completion.
-    /// The given `KillReason` indicates why it was killed.
+    /// Call this function to indicate that this task has been cleaned up (e.g., by unwinding)
+    /// and it is ready to be marked as killed, i.e., it will never run again.
+    /// This task must be the currently executing task, 
+    /// you cannot invoke `mark_as_killed()` on a different task.
+    /// 
+    /// If you want to kill another task, use the [`kill()`](method.kill) method instead.
+    /// 
+    /// This should only be used by the unwinding routines once they have finished.
     /// 
     /// # Locking / Deadlock
-    /// This method obtains a writeable lock on the underlying Task in order to mutate its state.
+    /// This method obtains a writable lock on the underlying Task in order to mutate its state.
+    /// 
+    /// # Return
+    /// * Returns `Ok` if the exit status was successfully set.     
+    /// * Returns `Err` if this `Task` was already exited, and does not overwrite the existing exit status. 
+    ///  
+    /// # Note 
+    /// The `Task` will not be halted immediately -- 
+    /// it will finish running its current timeslice, and then never be run again.
+    #[doc(hidden)]
+    pub fn mark_as_killed(&self, reason: KillReason) -> Result<(), &'static str> {
+        let curr_task = get_my_current_task().ok_or("mark_as_exited(): failed to check what the current task is")?;
+        if curr_task == self {
+            self.internal_exit(ExitValue::Killed(reason))
+        } else {
+            Err("`mark_as_exited()` can only be invoked on the current task, not on another task.")
+        }
+    }
+
+    /// Kills this `Task` (not a clean exit) without allowing it to run to completion.
+    /// The provided `KillReason` indicates why it was killed.
+    /// 
+    /// **
+    /// Currently this immediately kills the task without performing any unwinding cleanup.
+    /// In the near future, the task will be unwound such that its resources are freed/dropped
+    /// to ensure proper cleanup before the task is actually fully killed.
+    /// **
+    /// 
+    /// # Locking / Deadlock
+    /// This method obtains a writable lock on the underlying Task in order to mutate its state.
     /// 
     /// # Return
     /// * Returns `Ok` if the exit status was successfully set to the given `KillReason`.     
@@ -771,6 +817,8 @@ impl TaskRef {
     /// The `Task` will not be halted immediately -- 
     /// it will finish running its current timeslice, and then never be run again.
     pub fn kill(&self, reason: KillReason) -> Result<(), &'static str> {
+        // TODO FIXME: cause a panic in this Task such that it will start the unwinding process
+        // instead of immediately causing it to exit
         self.internal_exit(ExitValue::Killed(reason))
     }
 
@@ -792,7 +840,8 @@ impl TaskRef {
         self.0.deref().0.lock().runstate = RunState::Runnable;
     }
 
-    /// Registers a function or closure that will be called if this `Task` panics.
+    /// Registers a function or closure that will be called if this `Task` panics,
+    /// invoked before the task is cleaned up via stack unwinding.
     /// # Locking / Deadlock
     /// Obtains a write lock on the enclosed `Task` in order to mutate its state.
     pub fn set_panic_handler(&self, callback: PanicHandler) {
@@ -832,7 +881,7 @@ impl TaskRef {
         Arc::clone(&self.0.deref().0.lock().namespace)
     }
     
-    /// Obtains the lock on the underlying `Task` in a writeable, blocking fashion.
+    /// Obtains the lock on the underlying `Task` in a writable, blocking fashion.
     #[deprecated(note = "This method exposes inner Task details for debugging purposes. Do not use it.")]
     pub fn lock_mut(&self) -> MutexIrqSafeGuardRefMut<Task> {
         MutexIrqSafeGuardRefMut::new(self.0.deref().0.lock())
@@ -930,17 +979,17 @@ fn get_task_local_data() -> Option<&'static TaskLocalData> {
         // because it will always be valid for the life of a given Task's execution.
         unsafe { &*tld_ptr }
     };
-    Some(&tld)
+    Some(tld)
 }
 
-/// Returns a cloned reference to the current task id by using the `TaskLocalData` pointer
-/// stored in the FS base MSR register.
+/// Returns a reference to the current task by using the `TaskLocalData` pointer
+/// stored in the thread-local storage (FS base model-specific register).
 pub fn get_my_current_task() -> Option<&'static TaskRef> {
     get_task_local_data().map(|tld| &tld.current_taskref)
 }
 
 /// Returns the current Task's id by using the `TaskLocalData` pointer
-/// stored in the FS base MSR register.
+/// stored in the thread-local storage (FS base model-specific register).
 pub fn get_my_current_task_id() -> Option<usize> {
     get_task_local_data().map(|tld| tld.current_task_id)
 }

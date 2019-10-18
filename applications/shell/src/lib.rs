@@ -95,17 +95,23 @@ struct Job {
 /// A main function that spawns a new shell and waits for the shell loop to exit before returning an exit value
 #[no_mangle]
 pub fn main(_args: Vec<String>) -> isize {
+    {
+        let _task_ref = match KernelTaskBuilder::new(shell_loop, ())
+            .name("shell_loop".to_string())
+            .spawn() {
+            Ok(task_ref) => { task_ref }
+            Err(err) => {
+                error!("{}", err);
+                error!("failed to spawn shell");
+                return -1; 
+            }
+        };
 
-    let _task_ref = match KernelTaskBuilder::new(shell_loop, ())
-        .name("shell_loop".to_string())
-        .spawn() {
-        Ok(task_ref) => { task_ref }
-        Err(err) => {
-            error!("{}", err);
-            error!("failed to spawn shell");
-            return -1; 
-        }
-    };
+        // since we don't properly support parent/child relationships between tasks, 
+        // we force the newly-spawned shell_loop task to also be an "app task" 
+        // by giving it joint ownership of the `shell` app crate.
+        _task_ref.lock_mut().app_crate = task::get_my_current_task().expect("shell::main(): failed to get current task").lock().app_crate.clone();
+    }
 
     loop {
         // block this task, because it never needs to actually run again
@@ -113,12 +119,16 @@ pub fn main(_args: Vec<String>) -> isize {
             my_task.block();
         }
     }
-    // TODO FIXME: once join() doesn't cause interrupts to be disabled, we can use join again instead of the above loop
-    // waits for the terminal loop to exit before exiting the main function
-    // match term_task_ref.join() {
+
+    // TODO: when `join` puts this task to sleep instead of spinning, we can re-enable it.
+    // Otherwise, right now it kills performance.
+    // match _task_ref.join() {
     //     Ok(_) => { }
     //     Err(err) => {error!("{}", err)}
     // }
+    // warn!("shell::main(): the `shell_loop` task exited unexpectedly.");
+    // warn!("SHELL_LOOP exit value: {:?}", _task_ref.take_exit_value());
+    // return 0;
 }
 
 /// Errors when attempting to invoke an application from the terminal. 
@@ -291,29 +301,53 @@ impl Shell {
     }
 
     /// Move the cursor to the very beginning of the input command line.
-    fn move_cursor_leftmost(&mut self) {
+    fn move_cursor_leftmost(&mut self) -> Result<(), &'static str> {
+        let mut terminal = self.terminal.lock();
+        terminal.cursor.disable();
+        terminal.display_cursor(self.left_shift)?;
+        terminal.refresh_display();
         self.left_shift = self.cmdline.len();
+        terminal.cursor.enable();
+        Ok(())
     }
 
     /// Move the cursor to the very end of the input command line.
-    fn move_cursor_rightmost(&mut self) {
+    fn move_cursor_rightmost(&mut self) -> Result<(), &'static str> {
+        let mut terminal = self.terminal.lock();
+        terminal.cursor.disable();
+        terminal.display_cursor(self.left_shift)?;
+        terminal.refresh_display();
         self.left_shift = 0;
+        terminal.cursor.enable();
+        Ok(())
     }
 
     /// Move the cursor a character left. If the cursor is already at the beginning of the command line,
     /// it simply returns.
-    fn move_cursor_left(&mut self) {
+    fn move_cursor_left(&mut self) -> Result<(), &'static str> {
+        let mut terminal = self.terminal.lock();
+        terminal.cursor.disable();
+        terminal.display_cursor(self.left_shift)?;
         if self.left_shift < self.cmdline.len() {
             self.left_shift += 1;
         }
+        terminal.cursor.enable();
+        terminal.refresh_display();
+        Ok(())
     }
 
     /// Move the cursor a character to the right. If the cursor is already at the end of the command line,
     /// it simply returns.
-    fn move_cursor_right(&mut self) {
+    fn move_cursor_right(&mut self) -> Result<(), &'static str> {
+        let mut terminal = self.terminal.lock();
+        terminal.cursor.disable();
+        terminal.display_cursor(self.left_shift)?;
+        terminal.refresh_display();
         if self.left_shift > 0 {
             self.left_shift -= 1;
         }
+        terminal.cursor.enable();
+        Ok(())
     }
 
     /// Roll to the next previous command. If there is no more previous command, it does nothing.
@@ -548,24 +582,24 @@ impl Shell {
 
         // home, end, page up, page down, up arrow, down arrow for the input_event_manager
         if keyevent.keycode == Keycode::Home && keyevent.modifiers.control {
-            return self.terminal.lock().move_screen_to_begin();
+            return self.terminal.lock().move_screen_to_begin(self.left_shift);
         }
         if keyevent.keycode == Keycode::End && keyevent.modifiers.control{
-            return self.terminal.lock().move_screen_to_end();
+            return self.terminal.lock().move_screen_to_end(self.left_shift);
         }
         if keyevent.modifiers.control && keyevent.modifiers.shift && keyevent.keycode == Keycode::Up  {
-            return self.terminal.lock().move_screen_line_up();
+            return self.terminal.lock().move_screen_line_up(self.left_shift);
         }
         if keyevent.modifiers.control && keyevent.modifiers.shift && keyevent.keycode == Keycode::Down  {
-            return self.terminal.lock().move_screen_line_down();
+            return self.terminal.lock().move_screen_line_down(self.left_shift);
         }
 
         if keyevent.keycode == Keycode::PageUp && keyevent.modifiers.shift {
-            return self.terminal.lock().move_screen_page_up();
+            return self.terminal.lock().move_screen_page_up(self.left_shift);
         }
 
         if keyevent.keycode == Keycode::PageDown && keyevent.modifiers.shift {
-            return self.terminal.lock().move_screen_page_down();
+            return self.terminal.lock().move_screen_page_down(self.left_shift);
         }
 
         // Cycles to the next previous command
@@ -582,25 +616,21 @@ impl Shell {
 
         // Jumps to the beginning of the input string
         if keyevent.keycode == Keycode::Home {
-            self.move_cursor_leftmost();
-            return Ok(());
+            return self.move_cursor_leftmost()
         }
 
         // Jumps to the end of the input string
         if keyevent.keycode == Keycode::End {
-            self.move_cursor_rightmost();
-            return Ok(());
+            return self.move_cursor_rightmost()
         }
 
         // Adjusts the cursor tracking variables when the user presses the left and right arrow keys
         if keyevent.keycode == Keycode::Left {
-            self.move_cursor_left();
-            return Ok(());
+            return self.move_cursor_left()
         }
 
         if keyevent.keycode == Keycode::Right {
-            self.move_cursor_right();
-            return Ok(());
+            return self.move_cursor_right()
         }
 
         // Tracks what the user has typed so far, excluding any keypresses by the backspace and Enter key, which are special and are handled directly below
@@ -1307,7 +1337,7 @@ impl Shell {
                     _ => { }
                 };
             }           
-            self.terminal.lock().display_cursor()?; 
+            self.terminal.lock().display_cursor(self.left_shift)?; 
                 
             let mut need_refresh = false;
             loop {

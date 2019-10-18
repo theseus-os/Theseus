@@ -46,6 +46,25 @@ pub static IDT: LockedIdt = LockedIdt::new();
 static PIC: Once<pic::ChainedPics> = Once::new();
 
 
+/// Returns `true` if the given address is the exception handler in the current `IDT`
+/// for any exception in which the CPU pushes an error code onto the stack.
+/// 
+/// On x86, only these exceptions cause the CPU to push error codes: 8, 10, 11, 12, 13, 14, 17, 30.
+/// 
+/// Obtains a lock on the global `IDT` instance.
+pub fn is_exception_handler_with_error_code(address: u64) -> bool {
+    let idt = IDT.lock();
+    
+    idt.double_fault.handler_addr_eq(address) || 
+    idt.invalid_tss.handler_addr_eq(address) || 
+    idt.segment_not_present.handler_addr_eq(address) || 
+    idt.stack_segment_fault.handler_addr_eq(address) || 
+    idt.general_protection_fault.handler_addr_eq(address) || 
+    idt.page_fault.handler_addr_eq(address) || 
+    idt.alignment_check.handler_addr_eq(address) || 
+    idt.security_exception.handler_addr_eq(address)
+}
+
 
 /// initializes the interrupt subsystem and properly sets up safer early exception handlers, but no other IRQ handlers.
 /// # Arguments: 
@@ -54,7 +73,7 @@ static PIC: Once<pic::ChainedPics> = Once::new();
 pub fn init(double_fault_stack_top_unusable: VirtualAddress, privilege_stack_top_unusable: VirtualAddress) 
     -> Result<&'static LockedIdt, &'static str> 
 {
-    let bsp_id = try!(apic::get_bsp_id().ok_or("couldn't get BSP's id"));
+    let bsp_id = apic::get_bsp_id().ok_or("couldn't get BSP's id")?;
     info!("Setting up TSS & GDT for BSP (id {})", bsp_id);
     gdt::create_tss_gdt(bsp_id, double_fault_stack_top_unusable, privilege_stack_top_unusable);
 

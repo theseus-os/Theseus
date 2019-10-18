@@ -178,6 +178,7 @@ impl<Buffer: FrameBuffer> WindowGeneric<Buffer> {
     /// Renders the content of the window to the screen.
     /// `blocks` is the information of updated blocks in the form (block_index, block_width). If `blocks` is `None`, the whole window would be refreshed.
     /// The use of `blocks` is described in the `frame_buffer_compositor` crate. 
+    /// `refresh` represents if the whole window should be refreshed. If its true, the compositor will clear the other parts of the window
     pub fn render(&mut self, blocks: Option<IntoIter<(usize, usize)>>) -> Result<(), &'static str> {
         let coordinate = { self.profile.lock().get_content_position() };
         let frame_buffer_blocks = FrameBufferBlocks {
@@ -240,7 +241,7 @@ impl<Buffer: FrameBuffer> WindowGeneric<Buffer> {
         // checks for overlap
         // {
         //     let inner = self.inner.clone();
-        //     let mut allocator = try!(WINDOW_ALLOCATOR.try().ok_or("The window allocator is not initialized")).lock();
+        //     let mut allocator = WINDOW_ALLOCATOR.try().ok_or("The window allocator is not initialized")?.lock();
         //     match allocator.check_overlap(&inner, x,y,width,height) {
         //         true => {return Err("cannot resize because requested resize will cause overlap")}
         //         false => { }

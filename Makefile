@@ -13,6 +13,7 @@ all: iso
 IS_WSL = $(shell grep -s 'Microsoft' /proc/version)
 
 
+
 ## Tool names/locations for cross-compiling on a Mac OS / macOS host (Darwin).
 UNAME = $(shell uname -s)
 ifeq ($(UNAME),Darwin)
@@ -28,32 +29,24 @@ else
 	USB_DRIVES = $(shell lsblk -O | grep -i usb | awk '{print $$2}' | grep --color=never '[^0-9]$$')
 endif
 GRUB_MKRESCUE = $(GRUB_CROSS)grub-mkrescue
-	
+
 
 
 ###################################################################################################
 ### For ensuring that the host computer has the proper version of the Rust compiler
 ###################################################################################################
-
-RUSTC_CURRENT_SUPPORTED_VERSION := rustc 1.38.0-nightly (78ca1bda3 2019-07-08)
-RUSTC_CURRENT_INSTALL_VERSION := nightly-2019-07-09
-RUSTC_OUTPUT=$(shell rustc --version)
-
-check_rustc: 	
-ifneq (${BYPASS_RUSTC_CHECK}, yes)
-ifneq (${RUSTC_CURRENT_SUPPORTED_VERSION}, ${RUSTC_OUTPUT})
-	@echo -e "\nError: your rustc version does not match our supported compiler version."
-	@echo -e "To install the proper version of rustc, run the following commands:\n"
-	@echo -e "   rustup toolchain install $(RUSTC_CURRENT_INSTALL_VERSION)"
-	@echo -e "   rustup default $(RUSTC_CURRENT_INSTALL_VERSION)"
-	@echo -e "   rustup component add rust-src"
-	@echo -e "   make clean\n"
-	@echo -e "Then you can retry building!\n"
-	@exit 1
-else
-	@echo -e '\nFound proper rust compiler version, proceeding with build...\n'
-endif ## RUSTC_CURRENT_SUPPORTED_VERSION != RUSTC_OUTPUT
-endif ## BYPASS_RUSTC_CHECK
+RUSTC_VERSION := $(shell cat rust-toolchain)
+check_rustc:
+ifdef RUSTUP_TOOLCHAIN
+	@echo -e 'Warning: You are overriding the Rust toolchain manually via RUSTUP_TOOLCHAIN.'
+	@echo -e 'This may lead to unwanted warnings and errors during compilation.\n'
+endif
+## Building Theseus requires the 'rust-src' component. If we can't install that, install the required rust toolchain and retry.
+## If it still doesn't work, issue an error, since 'rustup' is probably missing.
+	@rustup component add rust-src || (rustup toolchain install $(RUSTC_VERSION) && rustup component add rust-src) || (\
+	echo -e "\nError: 'rustup' isn't installed.";\
+	echo -e "Please install rustup and try again.\n";\
+	exit 1)
 
 
 
@@ -208,7 +201,7 @@ cargo: check_rustc check_xargo
 	@echo -e "\t TARGET: \"$(TARGET)\""
 	@echo -e "\t KERNEL_PREFIX: \"$(KERNEL_PREFIX)\""
 	@echo -e "\t APP_PREFIX: \"$(APP_PREFIX)\""
-	@echo -e "\t THESEUS_CONFIG: \"$(THESEUS_CONFIG)\""
+	@echo -e "\t THESEUS_CONFIG (before build.rs script): \"$(THESEUS_CONFIG)\""
 	RUST_TARGET_PATH="$(CFG_DIR)" RUSTFLAGS="$(RUSTFLAGS)" xargo build  $(CARGOFLAGS)  $(RUST_FEATURES) --all --target $(TARGET)
 
 ## We tried using the "xargo rustc" command here instead of "xargo build" to avoid xargo unnecessarily rebuilding core/alloc crates,
