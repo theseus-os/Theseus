@@ -43,7 +43,7 @@ impl Displayable for TextDisplay {
         framebuffer: &mut dyn FrameBuffer,
     ) -> Vec<(usize, usize)> {
         // If the cache is the prefix of the new text, just print the additional characters.
-        let (string, col, line) = if self.text.starts_with(self.cache.as_str()) {
+        let (string, col, line) = if self.cache.len() > 0 && self.text.starts_with(self.cache.as_str()) {
             (
                 &self.text.as_str()[self.cache.len()..self.text.len()],
                 self.next_col,
@@ -124,6 +124,12 @@ impl TextDisplay {
     pub fn get_bg_color(&self) -> u32 {
         self.bg_color
     }
+    
+    /// Clear the cache of the text displayable.
+    pub fn reset_cache(&mut self) {
+        self.cache = String::new();
+    }
+
 }
 
 /// A cursor structure. It contains whether it is enabled,

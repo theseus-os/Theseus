@@ -410,7 +410,6 @@ impl Terminal {
         if let Some(slice) = result {
             {
                 let text_display = self.window.get_concrete_display_mut::<TextDisplay>(&self.display_name)?;
-                trace!("Wenqiu {}", slice);
                 text_display.set_text(slice);
             }
             self.window.display(&self.display_name)?;        
@@ -598,10 +597,14 @@ impl Terminal {
         &mut self, left_shift: usize
     ) -> Result<(), &'static str> {
         let coordinate = self.window.get_displayable_position(&self.display_name)?;
-        let text_display = self.window.get_concrete_display::<TextDisplay>(&self.display_name)?;
+        let text_display = self.window.get_concrete_display_mut::<TextDisplay>(&self.display_name)?;
         let (col, line) = text_display.get_next_pos();
         let col_cursor = col - left_shift;
         let bg_color = text_display.get_bg_color();
+
+        if left_shift > 0 {
+            text_display.reset_cache();
+        }
 
         text_display::display_cursor(
             &mut self.cursor, 
