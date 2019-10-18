@@ -5,7 +5,7 @@ authors = ["Christine Wang <chrissywang54@gmail.com>"]
 build = "../../build.rs"
 
 [dependencies]
-getopts = "0.2.18"
+getopts = "0.2.21"
 
 [dependencies.debugit]
 path = "../../libs/debugit"

@@ -79,7 +79,7 @@ impl PageTable {
         mut temporary_page: TemporaryPage,
     ) -> Result<PageTable, &'static str> {
         {
-            let table = try!(temporary_page.map_table_frame(new_p4_frame.clone(), current_page_table));
+            let table = temporary_page.map_table_frame(new_p4_frame.clone(), current_page_table)?;
             table.zero();
 
             table[RECURSIVE_P4_INDEX].set(new_p4_frame.clone(), EntryFlags::PRESENT | EntryFlags::WRITABLE);
@@ -215,7 +215,7 @@ pub fn init(allocator_mutex: &MutexIrqSafe<AreaFrameAllocator>, boot_info: &mult
     let mut identity_mapped_pages: [Option<MappedPages>; 32] = Default::default();
 
     // consumes and auto unmaps temporary page
-    try!( page_table.with(&mut new_table, TemporaryPage::new(temp_frames2), |mapper| {
+    page_table.with(&mut new_table, TemporaryPage::new(temp_frames2), |mapper| {
         
         // clear out the initially-mapped kernel entries of P4, since we're recreating kernel page tables from scratch.
         // (they were initialized in PageTable::new_table())
@@ -265,39 +265,39 @@ pub fn init(allocator_mutex: &MutexIrqSafe<AreaFrameAllocator>, boot_info: &mult
 
 
             // now we map the 5 main sections into 3 groups according to flags
-            text_mapped_pages = Some( try!( mapper.map_frames(
+            text_mapped_pages = Some(mapper.map_frames(
                 FrameRange::from_phys_addr(text_start_phys, text_end_phys.value() - text_start_phys.value()), 
                 Page::containing_address(text_start_virt), 
-                text_flags, allocator.deref_mut())
-            ));
-            rodata_mapped_pages = Some( try!( mapper.map_frames(
+                text_flags, allocator.deref_mut()
+            )?);
+            rodata_mapped_pages = Some(mapper.map_frames(
                 FrameRange::from_phys_addr(rodata_start_phys, rodata_end_phys.value() - rodata_start_phys.value()), 
                 Page::containing_address(rodata_start_virt), 
-                rodata_flags, allocator.deref_mut())
-            ));
-            data_mapped_pages = Some( try!( mapper.map_frames(
+                rodata_flags, allocator.deref_mut()
+            )?);
+            data_mapped_pages = Some(mapper.map_frames(
                 FrameRange::from_phys_addr(data_start_phys, data_end_phys.value() - data_start_phys.value()),
                 Page::containing_address(data_start_virt), 
-                data_flags, allocator.deref_mut())
-            ));
+                data_flags, allocator.deref_mut()
+            )?);
 
             // map the VGA display memory as writable
             let (vga_display_phys_addr, vga_size_in_bytes, vga_display_flags) = get_vga_mem_addr()?;
             let vga_display_virt_addr = VirtualAddress::new_canonical(vga_display_phys_addr.value() + KERNEL_OFFSET);
-            higher_half_mapped_pages[index] = Some( try!( mapper.map_frames(
+            higher_half_mapped_pages[index] = Some(mapper.map_frames(
                 FrameRange::from_phys_addr(vga_display_phys_addr, vga_size_in_bytes), 
                 Page::containing_address(vga_display_virt_addr), 
                 vga_display_flags,
-                allocator.deref_mut())
-            ));
+                allocator.deref_mut()
+            )?);
             vmas[index] = VirtualMemoryArea::new(vga_display_virt_addr, vga_size_in_bytes, vga_display_flags, "Kernel VGA Display Memory");
             debug!("mapped kernel section: vga_buffer at addr: {:?}", vmas[index]);
             // also do an identity mapping for APs that need it while booting
-            identity_mapped_pages[index] = Some( try!( mapper.map_frames(
+            identity_mapped_pages[index] = Some(mapper.map_frames(
                 FrameRange::from_phys_addr(vga_display_phys_addr, vga_size_in_bytes), 
                 Page::containing_address(VirtualAddress::new_canonical(vga_display_phys_addr.value())), 
-                vga_display_flags, allocator.deref_mut())
-            ));
+                vga_display_flags, allocator.deref_mut()
+            )?);
             index += 1;
             
 
@@ -311,14 +311,14 @@ pub fn init(allocator_mutex: &MutexIrqSafe<AreaFrameAllocator>, boot_info: &mult
                     // skip pages that are already mapped
                     continue;
                 }
-                higher_half_mapped_pages[index] = Some( try!( mapper.map_to(
-                    page, frame.clone(), EntryFlags::PRESENT | EntryFlags::GLOBAL, allocator.deref_mut())
-                ));
+                higher_half_mapped_pages[index] = Some(mapper.map_to(
+                    page, frame.clone(), EntryFlags::PRESENT | EntryFlags::GLOBAL, allocator.deref_mut()
+                )?);
                 // also do an identity mapping, if maybe we need it?
-                identity_mapped_pages[index] = Some( try!( mapper.map_to(
+                identity_mapped_pages[index] = Some(mapper.map_to(
                     Page::containing_address(page.start_address() - KERNEL_OFFSET), frame, 
-                    EntryFlags::PRESENT | EntryFlags::GLOBAL, allocator.deref_mut())
-                ));
+                    EntryFlags::PRESENT | EntryFlags::GLOBAL, allocator.deref_mut()
+                )?);
                 index += 1;
             }
 
@@ -328,12 +328,12 @@ pub fn init(allocator_mutex: &MutexIrqSafe<AreaFrameAllocator>, boot_info: &mult
 
         Ok(()) // mapping closure completed successfully
 
-    })); // TemporaryPage is dropped here
+    })?; // TemporaryPage is dropped here
 
 
-    let text_mapped_pages   = try!(text_mapped_pages  .ok_or("Couldn't map .text section"));
-    let rodata_mapped_pages = try!(rodata_mapped_pages.ok_or("Couldn't map .rodata section"));
-    let data_mapped_pages   = try!(data_mapped_pages  .ok_or("Couldn't map .data section"));
+    let text_mapped_pages   = text_mapped_pages  .ok_or("Couldn't map .text section")?;
+    let rodata_mapped_pages = rodata_mapped_pages.ok_or("Couldn't map .rodata section")?;
+    let data_mapped_pages   = data_mapped_pages  .ok_or("Couldn't map .data section")?;
 
 
     debug!("switching to new page table {:?}", new_table);

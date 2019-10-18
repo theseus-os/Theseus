@@ -141,7 +141,7 @@ impl MapperSpillful {
                 .and_then(|p2| p2.next_table_mut(page.p2_index()))
                 .ok_or("mapping code does not support huge pages")?;
             
-            let frame = try!(p1[page.p1_index()].pointed_frame().ok_or("remap(): page not mapped"));
+            let frame = p1[page.p1_index()].pointed_frame().ok_or("remap(): page not mapped")?;
             p1[page.p1_index()].set(frame, new_flags | EntryFlags::PRESENT);
 
             let vaddr = page.start_address();

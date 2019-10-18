@@ -303,7 +303,7 @@ fn handle_bsp_lapic_entry(madt_iter: MadtIter, page_table: &mut PageTable) -> Re
     use pic::PIC_MASTER_OFFSET;
 
     let all_lapics = get_lapics();
-    let me = try!(get_my_apic_id().ok_or("handle_bsp_lapic_entry(): Couldn't get_my_apic_id"));
+    let me = get_my_apic_id().ok_or("handle_bsp_lapic_entry(): Couldn't get_my_apic_id")?;
 
     for madt_entry in madt_iter.clone() {
         if let MadtEntry::LocalApic(lapic_entry) = madt_entry { 
@@ -352,7 +352,7 @@ fn handle_bsp_lapic_entry(madt_iter: MadtIter, page_table: &mut PageTable) -> Re
         }
     }
 
-    let bsp_id = try!(get_bsp_id().ok_or("handle_bsp_lapic_entry(): Couldn't find BSP LocalApic in Madt!"));
+    let bsp_id = get_bsp_id().ok_or("handle_bsp_lapic_entry(): Couldn't find BSP LocalApic in Madt!")?;
 
     // now that we've established the BSP,  go through the interrupt source override entries
     for madt_entry in madt_iter {

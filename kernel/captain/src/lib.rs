@@ -28,7 +28,6 @@ extern crate kernel_config; // our configuration options, just a set of const de
 extern crate irq_safety; // for irq-safe locking and interrupt utilities
 extern crate dfqueue; // decoupled, fault-tolerant queue
 
-extern crate event_types; // a temporary way to use input_event_manager types 
 extern crate logger;
 extern crate memory; // the virtual memory subsystem 
 extern crate apic; 
@@ -44,6 +43,8 @@ extern crate window_manager;
 extern crate storage_manager;
 extern crate scheduler;
 extern crate frame_buffer;
+extern crate frame_buffer_rgb;
+extern crate font;
 #[cfg(mirror_log_to_vga)] #[macro_use] extern crate print;
 extern crate input_event_manager;
 extern crate exceptions_full;
@@ -125,17 +126,12 @@ pub fn init(
     let ap_count = multicore_bringup::handle_ap_cores(kernel_mmi_ref.clone(), ap_start_realmode_begin, ap_start_realmode_end)?;
     info!("Finished handling and booting up all {} AP cores.", ap_count);
 
-    // //init frame_buffer
-    let rs = frame_buffer::init();
-    match rs {
-        Ok(_) => {
-            trace!("Frame_buffer initialized successfully.");
-        }
-        Err(err) => { 
-            error!("captain::init(): failed to initialize frame_buffer");
-            return Err(err);
-        }
-    }
+    // init the display subsystem
+    // Currently we use a FrameBufferRGB as the final frame buffer, but other types of FrameBuffers could be used instead.
+    frame_buffer_rgb::init()?;
+    font::init()?;
+    window_manager::init()?;
+    info!("Display subsystem initialized successfully.");
 
     // initialize the input event manager, which will start the default terminal 
     let input_event_queue_producer = input_event_manager::init()?;
