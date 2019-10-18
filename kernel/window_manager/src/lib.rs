@@ -240,7 +240,7 @@ impl<Buffer: FrameBuffer> WindowGeneric<Buffer> {
         // checks for overlap
         // {
         //     let inner = self.inner.clone();
-        //     let mut allocator = try!(WINDOW_ALLOCATOR.try().ok_or("The window allocator is not initialized")).lock();
+        //     let mut allocator = WINDOW_ALLOCATOR.try().ok_or("The window allocator is not initialized")?.lock();
         //     match allocator.check_overlap(&inner, x,y,width,height) {
         //         true => {return Err("cannot resize because requested resize will cause overlap")}
         //         false => { }

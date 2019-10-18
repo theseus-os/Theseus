@@ -166,15 +166,15 @@ fn map_apic(page_table: &mut PageTable) -> Result<MappedPages, &'static str> {
     unsafe { wrmsr(IA32_APIC_BASE, rdmsr(IA32_APIC_BASE) | IA32_APIC_XAPIC_ENABLE); }
     
     let phys_addr = PhysicalAddress::new(rdmsr(IA32_APIC_BASE) as usize)?;
-    let new_page = try!(allocate_pages(1).ok_or("out of virtual address space!"));
+    let new_page = allocate_pages(1).ok_or("out of virtual address space!")?;
     let frames = FrameRange::new(Frame::containing_address(phys_addr), Frame::containing_address(phys_addr));
-    let mut fa = try!(FRAME_ALLOCATOR.try().ok_or("apic::init(): couldn't get FRAME_ALLOCATOR")).lock();
-    let apic_mapped_page = try!(page_table.map_allocated_pages_to(
+    let mut fa = FRAME_ALLOCATOR.try().ok_or("apic::init(): couldn't get FRAME_ALLOCATOR")?.lock();
+    let apic_mapped_page = page_table.map_allocated_pages_to(
         new_page, 
         frames, 
         EntryFlags::PRESENT | EntryFlags::WRITABLE | EntryFlags::NO_CACHE | EntryFlags::NO_EXECUTE, 
-        fa.deref_mut())
-    );
+        fa.deref_mut()
+    )?;
 
     Ok(apic_mapped_page)
 }
