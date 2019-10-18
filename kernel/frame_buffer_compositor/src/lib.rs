@@ -20,7 +20,6 @@
 //! The compositor minimizes the updated parts of a framebuffer and clears the blank parts. Even if the cache is lost or the updated blocks information is `None`, it guarantees the result is the same.
 
 #![no_std]
-#![feature(const_vec_new)]
 
 extern crate alloc;
 extern crate compositor;

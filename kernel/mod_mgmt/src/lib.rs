@@ -1,6 +1,5 @@
 #![no_std]
 #![feature(rustc_private)]
-#![feature(slice_concat_ext)]
 #![feature(const_fn)]
 
 #[macro_use] extern crate alloc;
@@ -33,7 +32,6 @@ use alloc::{
     collections::{BTreeMap, btree_map, BTreeSet},
     string::{String, ToString},
     sync::{Arc, Weak},
-    slice::SliceConcatExt,
 };
 use spin::{Mutex, Once};
 
