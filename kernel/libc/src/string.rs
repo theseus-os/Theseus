@@ -1,38 +1,31 @@
-// //! string implementation for Redox, following http://pubs.opengroup.org/onlinepubs/7908799/xsh/string.h.html
+//! string implementation for Redox, following http://pubs.opengroup.org/onlinepubs/7908799/xsh/string.h.html
 
 use core::{mem, ptr, slice, usize};
 
 use cbitset::BitSet256;
-
-// // use crate::{
-// //     header::{errno::*, signal},
-// //     platform::{self, types::*},
-// // };
 
 use crate:: {
     errno::*,
     types::*,
 };
 
-// use memchr;
-
-// #[no_mangle]
-// pub unsafe extern "C" fn memccpy(
-//     dest: *mut c_void,
-//     src: *const c_void,
-//     c: c_int,
-//     n: size_t,
-// ) -> *mut c_void {
-//     let to = memchr(src, c, n);
-//     if to.is_null() {
-//         return to;
-//     }
-//     let dist = (to as usize) - (src as usize);
-//     if memcpy(dest, src, dist).is_null() {
-//         return ptr::null_mut();
-//     }
-//     (dest as *mut u8).add(dist + 1) as *mut c_void
-// }
+#[no_mangle]
+pub unsafe extern "C" fn memccpy(
+    dest: *mut c_void,
+    src: *const c_void,
+    c: c_int,
+    n: size_t,
+) -> *mut c_void {
+    let to = memchr(src, c, n);
+    if to.is_null() {
+        return to;
+    }
+    let dist = (to as usize) - (src as usize);
+    if memcpy(dest, src, dist).is_null() {
+        return ptr::null_mut();
+    }
+    (dest as *mut u8).add(dist + 1) as *mut c_void
+}
 
 #[no_mangle]
 pub unsafe extern "C" fn memchr(
