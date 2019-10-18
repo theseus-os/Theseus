@@ -1,20 +1,13 @@
-// //! string implementation for Redox, following http://pubs.opengroup.org/onlinepubs/7908799/xsh/string.h.html
+//! string implementation for Redox, following http://pubs.opengroup.org/onlinepubs/7908799/xsh/string.h.html
 
 use core::{mem, ptr, slice, usize};
 
 use cbitset::BitSet256;
 
-// // use crate::{
-// //     header::{errno::*, signal},
-// //     platform::{self, types::*},
-// // };
-
 use crate:: {
     errno::*,
     types::*,
 };
-
-// use memchr;
 
 #[no_mangle]
 pub unsafe extern "C" fn memccpy(

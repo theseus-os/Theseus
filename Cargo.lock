@@ -221,6 +221,7 @@ dependencies = [
  "kernel_config 0.1.0",
  "keycodes_ascii 0.1.0",
  "lc_test 0.1.0",
+ "libc 0.1.0",
  "log 0.3.9 (registry+https://github.com/rust-lang/crates.io-index)",
  "logger 0.1.0",
  "memory 0.1.0",

@@ -1,3 +1,5 @@
+//! libc implementation for Theseus
+
 #![no_std]
 #![allow(non_camel_case_types)]
 #![feature(slice_internals)] //TODO: use rust memchr crate
@@ -11,7 +13,6 @@ extern crate hashbrown;
 extern crate memory;
 #[macro_use]extern crate lazy_static;
 extern crate spin;
-// extern crate memchr;
 extern crate libm;
 extern crate memfs;
 extern crate cbitset;
@@ -33,19 +34,10 @@ pub mod ctype;
 pub mod unistd;
 pub mod fcntl;
 
-use self::fs::{MAX_FILE_DESCRIPTORS, FILE_DESCRIPTORS, create_file};
+use self::fs::{init_file_descriptors};
 use alloc::string::String;
 use core::ops::Deref;
 
 pub fn init_libc() {
-    let mut descriptors = FILE_DESCRIPTORS.lock();
-    // we don't use 0,1,2 because they're standard file descriptors
-    descriptors.push(Some(create_file(&String::from("stdin"))));
-    descriptors.push(Some(create_file(&String::from("stdout"))));
-    descriptors.push(Some(create_file(&String::from("stderr"))));
-
-    // initialize the empty table of file descriptors
-    for _ in 3..MAX_FILE_DESCRIPTORS {
-        descriptors.push(None);
-    }
+    init_file_descriptors();
 }

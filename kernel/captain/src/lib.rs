@@ -48,7 +48,7 @@ extern crate input_event_manager;
 #[cfg(test_network)] extern crate exceptions_full;
 extern crate network_manager;
 extern crate pause;
-
+extern crate libc;
 #[cfg(simd_personality)] extern crate simd_personality;
 
 extern crate lc_test;
@@ -178,6 +178,8 @@ pub fn init(
     //         return Err(err);
     //     }
     // }
+
+    libc::init_libc();
     
     info!("captain::init(): initialization done! Enabling interrupts and entering Task 0's idle loop...");
     enable_interrupts();

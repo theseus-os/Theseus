@@ -108,5 +108,8 @@ path = "../pause"
 [dependencies.lc_test]
 path = "../lc_test"
 
+[dependencies.libc]
+path = "../libc"
+
 [lib]
 crate-type = ["rlib"]
