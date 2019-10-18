@@ -13,6 +13,7 @@ all: iso
 IS_WSL = $(shell grep -s 'Microsoft' /proc/version)
 
 
+
 ## Tool names/locations for cross-compiling on a Mac OS / macOS host (Darwin).
 UNAME = $(shell uname -s)
 ifeq ($(UNAME),Darwin)
@@ -34,14 +35,16 @@ GRUB_MKRESCUE = $(GRUB_CROSS)grub-mkrescue
 ###################################################################################################
 ### For ensuring that the host computer has the proper version of the Rust compiler
 ###################################################################################################
-
+RUSTC_VERSION := $(shell cat rust-toolchain)
 check_rustc:
 ifdef RUSTUP_TOOLCHAIN
 	@echo -e 'Warning: You are overriding the Rust toolchain manually via RUSTUP_TOOLCHAIN.'
 	@echo -e 'This may lead to unwanted warnings and errors during compilation.\n'
 endif
-	@rustup component add rust-src || (\
-	echo -e "\nError: rustup is not installed on this system.";\
+## Building Theseus requires the 'rust-src' component. If we can't install that, install the required rust toolchain and retry.
+## If it still doesn't work, issue an error, since 'rustup' is probably missing.
+	@rustup component add rust-src || (rustup toolchain install $(RUSTC_VERSION) && rustup component add rust-src) || (\
+	echo -e "\nError: 'rustup' isn't installed.";\
 	echo -e "Please install rustup and try again.\n";\
 	exit 1)
 
