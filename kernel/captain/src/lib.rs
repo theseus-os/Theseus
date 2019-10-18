@@ -51,7 +51,6 @@ extern crate pause;
 extern crate libc;
 #[cfg(simd_personality)] extern crate simd_personality;
 
-extern crate lc_test;
 
 
 use alloc::sync::Arc;
@@ -166,18 +165,6 @@ pub fn init(
             .name(alloc::string::String::from("setup_simd_personality"))
             .spawn()?;
     }
-
-    // let rs = lc_test::test();
-
-    // match rs {
-    //     Ok(_) => {
-    //         trace!("libc_test success.");
-    //     }
-    //     Err(err) => { 
-    //         error!("captain::init(): failed to find c program crate");
-    //         return Err(err);
-    //     }
-    // }
 
     libc::init_libc();
     

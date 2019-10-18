@@ -105,9 +105,6 @@ path = "../task_fs"
 [dependencies.pause]
 path = "../pause"
 
-[dependencies.lc_test]
-path = "../lc_test"
-
 [dependencies.libc]
 path = "../libc"
 
