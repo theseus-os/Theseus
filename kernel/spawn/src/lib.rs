@@ -456,7 +456,7 @@ pub fn spawn_userspace(path: Path, name: Option<String>) -> Result<TaskRef, &'st
 
         
         // get frame allocator reference
-        let allocator_mutex = try!(FRAME_ALLOCATOR.try().ok_or("couldn't get FRAME ALLOCATOR"));
+        let allocator_mutex = FRAME_ALLOCATOR.try().ok_or("couldn't get FRAME ALLOCATOR")?;
 
         // new_frame is a single frame, and temp_frames1/2 are tuples of 3 Frames each.
         let (new_frame, temp_frames1, temp_frames2) = {
@@ -464,9 +464,9 @@ pub fn spawn_userspace(path: Path, name: Option<String>) -> Result<TaskRef, &'st
             // a quick closure to allocate one frame
             let mut alloc_frame = || allocator.allocate_frame().ok_or("couldn't allocate frame"); 
             (
-                try!(alloc_frame()),
-                (try!(alloc_frame()), try!(alloc_frame()), try!(alloc_frame())),
-                (try!(alloc_frame()), try!(alloc_frame()), try!(alloc_frame()))
+                alloc_frame()?,
+                (alloc_frame()?, alloc_frame()?, alloc_frame()?),
+                (alloc_frame()?, alloc_frame()?, alloc_frame()?)
             )
         };
 
@@ -489,7 +489,7 @@ pub fn spawn_userspace(path: Path, name: Option<String>) -> Result<TaskRef, &'st
         // first we need to temporarily map the module memory region into our address space, 
         // so we can then parse the module as an ELF file in the kernel. (Doesn't need to be USER_ACCESSIBLE). 
         let (elf_progs, entry_point) = {
-            let new_pages = try!(allocate_pages_by_bytes(module.size()).ok_or("couldn't allocate pages for module"));
+            let new_pages = allocate_pages_by_bytes(module.size()).ok_or("couldn't allocate pages for module")?;
             let temp_module_mapping = {
                 let mut allocator = allocator_mutex.lock();
                 kernel_mmi_locked.page_table.map_allocated_pages_to(
@@ -498,7 +498,7 @@ pub fn spawn_userspace(path: Path, name: Option<String>) -> Result<TaskRef, &'st
                 )?
             };
 
-            try!(mod_mgmt::elf_executable::parse_elf_executable(temp_module_mapping, module.size()))
+            mod_mgmt::elf_executable::parse_elf_executable(temp_module_mapping, module.size())?
             
             // temp_module_mapping is automatically unmapped when it falls out of scope here (frame allocator must not be locked)
         };
