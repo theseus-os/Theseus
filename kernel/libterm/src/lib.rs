@@ -63,7 +63,7 @@ pub struct Terminal {
     /// The starting index of the scrollback buffer string slice that is currently being displayed on the text display
     scroll_start_idx: usize,
     /// The cursor of the terminal.
-    pub cursor: Cursor,
+    pub cursor: Cursor
 }
 
 /// Privite methods of `Terminal`.
