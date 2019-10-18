@@ -13,6 +13,7 @@ all: iso
 IS_WSL = $(shell grep -s 'Microsoft' /proc/version)
 
 
+
 ## Tool names/locations for cross-compiling on a Mac OS / macOS host (Darwin).
 UNAME = $(shell uname -s)
 ifeq ($(UNAME),Darwin)
@@ -28,32 +29,24 @@ else
 	USB_DRIVES = $(shell lsblk -O | grep -i usb | awk '{print $$2}' | grep --color=never '[^0-9]$$')
 endif
 GRUB_MKRESCUE = $(GRUB_CROSS)grub-mkrescue
-	
+
 
 
 ###################################################################################################
 ### For ensuring that the host computer has the proper version of the Rust compiler
 ###################################################################################################
-
-RUSTC_CURRENT_SUPPORTED_VERSION := rustc 1.38.0-nightly (78ca1bda3 2019-07-08)
-RUSTC_CURRENT_INSTALL_VERSION := nightly-2019-07-09
-RUSTC_OUTPUT=$(shell rustc --version)
-
-check_rustc: 	
-ifneq (${BYPASS_RUSTC_CHECK}, yes)
-ifneq (${RUSTC_CURRENT_SUPPORTED_VERSION}, ${RUSTC_OUTPUT})
-	@echo -e "\nError: your rustc version does not match our supported compiler version."
-	@echo -e "To install the proper version of rustc, run the following commands:\n"
-	@echo -e "   rustup toolchain install $(RUSTC_CURRENT_INSTALL_VERSION)"
-	@echo -e "   rustup default $(RUSTC_CURRENT_INSTALL_VERSION)"
-	@echo -e "   rustup component add rust-src"
-	@echo -e "   make clean\n"
-	@echo -e "Then you can retry building!\n"
-	@exit 1
-else
-	@echo -e '\nFound proper rust compiler version, proceeding with build...\n'
-endif ## RUSTC_CURRENT_SUPPORTED_VERSION != RUSTC_OUTPUT
-endif ## BYPASS_RUSTC_CHECK
+RUSTC_VERSION := $(shell cat rust-toolchain)
+check_rustc:
+ifdef RUSTUP_TOOLCHAIN
+	@echo -e 'Warning: You are overriding the Rust toolchain manually via RUSTUP_TOOLCHAIN.'
+	@echo -e 'This may lead to unwanted warnings and errors during compilation.\n'
+endif
+## Building Theseus requires the 'rust-src' component. If we can't install that, install the required rust toolchain and retry.
+## If it still doesn't work, issue an error, since 'rustup' is probably missing.
+	@rustup component add rust-src || (rustup toolchain install $(RUSTC_VERSION) && rustup component add rust-src) || (\
+	echo -e "\nError: 'rustup' isn't installed.";\
+	echo -e "Please install rustup and try again.\n";\
+	exit 1)
 
 
 
@@ -91,7 +84,7 @@ iso := $(BUILD_DIR)/theseus-$(ARCH).iso
 GRUB_ISOFILES := $(BUILD_DIR)/grub-isofiles
 OBJECT_FILES_BUILD_DIR := $(GRUB_ISOFILES)/modules
 
-test_static_lib = static_libs/libtest.a
+
 ## This is the output path of the xargo command, defined by cargo (not our choice).
 nano_core_static_lib := $(ROOT_DIR)/target/$(TARGET)/$(BUILD_MODE)/libnano_core.a
 ## The directory where the nano_core source files are
@@ -186,7 +179,7 @@ iso: $(iso)
 build: $(nano_core_binary)
 ## Copy all object files into the main build directory and prepend the kernel prefix.
 ## All object files include those from the target/ directory, and the core, alloc, and compiler_builtins libraries
-	@for f in ./target/$(TARGET)/$(BUILD_MODE)/deps/*.o  ./external_bin/*.o "$(HOME)"/.xargo/lib/rustlib/$(TARGET)/lib/*.o; do \
+	@for f in ./target/$(TARGET)/$(BUILD_MODE)/deps/*.o "$(HOME)"/.xargo/lib/rustlib/$(TARGET)/lib/*.o; do \
 		cp -vf  $${f}  $(OBJECT_FILES_BUILD_DIR)/`basename $${f} | sed -n -e 's/\(.*\)/$(KERNEL_PREFIX)\1/p'`   2> /dev/null ; \
 	done
 ## In the above loop, we gave all object files the kernel prefix, so we need to rename the application object files with the proper app prefix.
@@ -208,7 +201,7 @@ cargo: check_rustc check_xargo
 	@echo -e "\t TARGET: \"$(TARGET)\""
 	@echo -e "\t KERNEL_PREFIX: \"$(KERNEL_PREFIX)\""
 	@echo -e "\t APP_PREFIX: \"$(APP_PREFIX)\""
-	@echo -e "\t THESEUS_CONFIG: \"$(THESEUS_CONFIG)\""
+	@echo -e "\t THESEUS_CONFIG (before build.rs script): \"$(THESEUS_CONFIG)\""
 	RUST_TARGET_PATH="$(CFG_DIR)" RUSTFLAGS="$(RUSTFLAGS)" xargo build  $(CARGOFLAGS)  $(RUST_FEATURES) --all --target $(TARGET)
 
 ## We tried using the "xargo rustc" command here instead of "xargo build" to avoid xargo unnecessarily rebuilding core/alloc crates,
@@ -238,7 +231,7 @@ cargo: check_rustc check_xargo
 
 
 ## This builds the nano_core binary itself, which is the fully-linked code that first runs right after the bootloader
-$(nano_core_binary): cargo $(nano_core_static_lib) $(assembly_object_files) $(linker_script) 
+$(nano_core_binary): cargo $(nano_core_static_lib) $(assembly_object_files) $(linker_script)
 	@mkdir -p $(BUILD_DIR)
 	@mkdir -p $(NANO_CORE_BUILD_DIR)
 	@mkdir -p $(OBJECT_FILES_BUILD_DIR)

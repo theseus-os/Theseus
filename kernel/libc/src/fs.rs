@@ -1,7 +1,7 @@
 //! A compatibility layer for memfs files
 
 use memfs::*;
-use spin::Mutex;
+use spin::{Once, Mutex};
 use hashbrown::HashMap;
 use alloc::sync::{Weak, Arc};
 use alloc::string::String;
@@ -28,10 +28,16 @@ lazy_static! {
     static ref FILE_DESCRIPTORS: Mutex<Vec<Option<FileRef>>> = Mutex::new(Vec::new());
     /// File Information Table. The index into the table refers to the file descriptor number and the value stored is the file information for that descriptor.
     static ref FILE_INFO: Mutex<[FileInfo; MAX_FILE_DESCRIPTORS]> = Mutex::new([FileInfo{offset:0}; MAX_FILE_DESCRIPTORS]);
-    /// The directory for all files created through the libc interface.
-    static ref LIBC_DIRECTORY: DirRef = VFSDirectory::new_libc(String::from("libc"), root::get_root());
 }
 
+/// The directory for all files created through the libc interface.
+static LIBC_DIRECTORY: Once<DirRef> = Once::new();
+
+/// Returns a reference to the libc directory wrapped in a Mutex,
+/// if it exists and has been initialized.
+pub fn get_libc_directory() -> Option<&'static DirRef> {
+    LIBC_DIRECTORY.try()
+}
 
 #[derive(Debug, Copy, Clone)]
 /// Struct that stores all additional information about a file.
@@ -49,22 +55,31 @@ impl FileInfo {
 }
 
 /// Initializes the file descriptor table
-pub fn init_file_descriptors() {
+pub fn init_file_descriptors() -> Result<(), &'static str>{
     let mut descriptors = FILE_DESCRIPTORS.lock();
     // we don't use 0,1,2 because they're standard file descriptors
-    descriptors.push(Some(create_file(&String::from("stdin"))));
-    descriptors.push(Some(create_file(&String::from("stdout"))));
-    descriptors.push(Some(create_file(&String::from("stderr"))));
+    descriptors.push(Some(create_file(&String::from("stdin"))?));
+    descriptors.push(Some(create_file(&String::from("stdout"))?));
+    descriptors.push(Some(create_file(&String::from("stderr"))?));
 
     // initialize the empty table of file descriptors with None 
     for _ in 3..MAX_FILE_DESCRIPTORS {
         descriptors.push(None);
     }
+
+    Ok(())
+}
+
+/// Continues to try to create a directory until succesful
+pub fn create_libc_directory() -> Result<(), &'static str> {
+    let libc_dir = VFSDirectory::new(String::from("libc"), root::get_root())?;
+    let dir_ref = LIBC_DIRECTORY.call_once(|| libc_dir);
+    Ok(())
 }
 
 /// Creates a file in the libc directory
-pub fn create_file(file_name: &String) -> FileRef {
-    MemFile::new(file_name.to_owned(), &LIBC_DIRECTORY).unwrap()
+pub fn create_file(file_name: &String) -> Result<FileRef, &'static str> {
+    MemFile::new(file_name.to_owned(), get_libc_directory().ok_or("libc directory not created")?)
 }
 
 /// Returns the smallest file descriptor that's available,
@@ -108,7 +123,14 @@ pub fn return_fd_to_system(fd: c_int) {
 #[no_mangle]
 pub extern "C" fn open(path: &CStr, oflag: c_int, mode: mode_t) -> c_int {
     let file_name = path.to_owned().into_string().unwrap();
-    let mut file_ref = LIBC_DIRECTORY.lock().get_file(&file_name);
+    let mut file_ref = match get_libc_directory() {
+        Some(dir) => dir.lock().get_file(&file_name),
+        None => {
+            error!("libc::fs::open(): libc directory not initialized");
+            return -1;
+        }
+    };
+
     let rt = 
         // check if this file is already created, and return file descriptor
         if file_ref.is_some() {
@@ -116,11 +138,18 @@ pub extern "C" fn open(path: &CStr, oflag: c_int, mode: mode_t) -> c_int {
         }
         // if the file is not created and the O_CREAT flag is set, create the file
         else if oflag & O_CREAT == O_CREAT {
-            let file = create_file(&file_name);
-            let fd = associate_file_with_smallest_fd(&file);
+            let (fd, file) = match create_file(&file_name){
+                Ok(x) => (associate_file_with_smallest_fd(&x), x),
+                Err(x) => {
+                    error!("libc::fs::open(): could not create file: {:?}", x);
+                    return -1
+                }
+            };
+            
             let ret = 
                 if fd >= 0 {
-                    match LIBC_DIRECTORY.lock().insert(FileOrDir::File(file)){
+                    // here unwrap is safe because to get to this point of the function, the libc directory must be initialized
+                    match get_libc_directory().unwrap().lock().insert(FileOrDir::File(file)){
                         Ok(x) => fd,
                         Err(x) => {
                             error!("libc::fs:open(): Could not add file to directory");
@@ -133,7 +162,7 @@ pub extern "C" fn open(path: &CStr, oflag: c_int, mode: mode_t) -> c_int {
             ret
         }
         else {
-            error!("Flag {} is not supported", oflag);
+            error!("libc::fs::open(): Flag {} is not supported", oflag);
             ERRNO.store(EINVAL, Ordering::Relaxed);
             -1
         };    
@@ -153,7 +182,13 @@ pub extern "C" fn close(fd: c_int) -> c_int {
     let rt = match FILE_DESCRIPTORS.lock()[fd as usize].as_ref() {
         Some(x) => {
             if Arc::strong_count(x) == STRONG_COUNT_TO_DELETE {
-                LIBC_DIRECTORY.lock().remove(&FileOrDir::File(x.clone()));
+                match get_libc_directory() {
+                    Some(dir) => dir.lock().remove(&FileOrDir::File(x.clone())),
+                    None => {
+                        error!("libc::fs::close(): libc directory not initialized!");
+                        return -1;
+                    } 
+                };
             }
             0
         },

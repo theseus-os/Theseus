@@ -34,10 +34,12 @@ pub mod ctype;
 pub mod unistd;
 pub mod fcntl;
 
-use self::fs::{init_file_descriptors};
+use self::fs::{init_file_descriptors, create_libc_directory};
 use alloc::string::String;
 use core::ops::Deref;
 
-pub fn init_libc() {
-    init_file_descriptors();
+pub fn init_libc() -> Result<(), &'static str> {
+    create_libc_directory()?;
+    init_file_descriptors()?;
+    Ok(())
 }

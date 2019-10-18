@@ -99,7 +99,7 @@ impl File for MemFile {
             
             let kernel_mmi_ref = get_kernel_mmi_ref().ok_or("KERNEL_MMI was not yet initialized!")?;
 			let mut kernel_mmi = kernel_mmi_ref.lock();
-            let allocator = try!(FRAME_ALLOCATOR.try().ok_or("Couldn't get Frame Allocator"));
+            let allocator = FRAME_ALLOCATOR.try().ok_or("Couldn't get Frame Allocator")?;
             let pages = allocate_pages_by_bytes(end).ok_or("could not allocate pages")?;
             let mut new_mapped_pages = kernel_mmi.page_table.map_allocated_pages(pages, prev_flags, allocator.lock().deref_mut())?;            
             
@@ -136,7 +136,8 @@ impl File for MemFile {
 
     fn as_mapping(&self) -> Result<&MappedPages, &'static str> {
         Ok(&self.mp)
-    }   
+    }
+    
 }
 
 impl FsNode for MemFile {

@@ -166,7 +166,12 @@ pub fn init(
             .spawn()?;
     }
 
-    libc::init_libc();
+    match libc::init_libc(){
+        Ok(x) => {},
+        Err(x) => {
+            warn!("Failed to initialize libc: {:?}", x)
+        }
+    };
     
     info!("captain::init(): initialization done! Enabling interrupts and entering Task 0's idle loop...");
     enable_interrupts();

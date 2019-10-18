@@ -80,7 +80,6 @@ static NUM_PMC: u32 = 4;
 
 
 /// Initialization function that retrieves the version ID number. Version ID of 0 means no 
-/// (Intel Nuc has a PMU version 4)
 /// performance monitoring is avaialable on the CPU (likely due to virtualization without hardware assistance).
 pub fn init() {
     let cpuid = CpuId::new();
@@ -88,7 +87,6 @@ pub fn init() {
         PMU_VERSION.call_once(||perf_mon_info.version_id() as u16);
         if let Some(pmu_ver) = PMU_VERSION.try() {  
             if pmu_ver > &0 {
-                warn!("PMU version is: {}", pmu_ver);
                 unsafe{
                     //clear values in counters and their settings
                     wrmsr(IA32_PERF_GLOBAL_CTRL, 0);
@@ -104,9 +102,6 @@ pub fn init() {
                     //enables all counters: each counter has another enable bit in other MSRs so these should likely never be cleared once first set
                     wrmsr(IA32_PERF_GLOBAL_CTRL, 0x07 << 32 | 0x0f);
                 }
-            }
-            else {
-                warn!("PMU is not available on this CPU");
             }
         }
     } 
@@ -376,7 +371,6 @@ pub fn retrieve_samples() -> Result<SampleResults, &'static str> {
 
 /// Simple function to print values from SampleResults in a form that the script "post-mortem pmu analysis.py" can parse. 
 pub fn print_samples(sample_results: &mut SampleResults) {
-    debug!("instruction pointers length = {}, task ids length = {}", sample_results.instruction_pointers.len(), sample_results.task_ids.len());
     while let Some(next_ip) = sample_results.instruction_pointers.pop() {
         if let Some(next_id) = sample_results.task_ids.pop() {
             debug!("{:x} {}", next_ip, next_id);
