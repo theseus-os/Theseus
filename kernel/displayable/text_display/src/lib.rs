@@ -130,6 +130,17 @@ impl TextDisplay {
         self.cache = String::new();
     }
 
+    /// Translate the index of a character in the text to the location of the text displayable. Return (column, line).
+    pub fn get_location(&self, index: usize) -> (usize, usize) {
+        let text_width = self.width / CHARACTER_WIDTH;
+        (index % text_width, index / text_width)
+    }
+
+    /// Translate the location of a character to its index in the text.
+    pub fn get_index(&self, column: usize, line: usize) -> usize {
+        let text_width = self.width / CHARACTER_WIDTH;
+        line * text_width + column
+    }
 }
 
 /// A cursor structure. It contains whether it is enabled,

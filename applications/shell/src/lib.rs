@@ -325,28 +325,28 @@ impl Shell {
     /// Move the cursor a character left. If the cursor is already at the beginning of the command line,
     /// it simply returns.
     fn move_cursor_left(&mut self) -> Result<(), &'static str> {
-        let mut terminal = self.terminal.lock();
-        terminal.cursor.disable();
-        terminal.display_cursor(self.left_shift)?;
         if self.left_shift < self.cmdline.len() {
+            let mut terminal = self.terminal.lock();
+            terminal.cursor.disable();
+            terminal.display_cursor(self.left_shift)?;
+            terminal.refresh_display();
             self.left_shift += 1;
+            terminal.cursor.enable();
         }
-        terminal.cursor.enable();
-        terminal.refresh_display();
         Ok(())
     }
 
     /// Move the cursor a character to the right. If the cursor is already at the end of the command line,
     /// it simply returns.
     fn move_cursor_right(&mut self) -> Result<(), &'static str> {
-        let mut terminal = self.terminal.lock();
-        terminal.cursor.disable();
-        terminal.display_cursor(self.left_shift)?;
-        terminal.refresh_display();
         if self.left_shift > 0 {
+            let mut terminal = self.terminal.lock();
+            terminal.cursor.disable();
+            terminal.display_cursor(self.left_shift)?;
+            terminal.refresh_display();
             self.left_shift -= 1;
+            terminal.cursor.enable();
         }
-        terminal.cursor.enable();
         Ok(())
     }
 
