@@ -24,6 +24,12 @@ path = "../runqueue"
 [dependencies.unwind]
 path = "../unwind"
 
+[dependencies.stack_trace]
+path = "../stack_trace"
+
+[dependencies.stack_trace_frame_pointers]
+path = "../stack_trace_frame_pointers"
+
 
 [lib]
 crate-type = ["rlib"]

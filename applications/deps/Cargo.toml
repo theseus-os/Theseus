@@ -6,7 +6,7 @@ description = "Allows a developer to explore dependencies in Theseus's crate man
 build = "../../build.rs"
 
 [dependencies]
-getopts = "0.2.18"
+getopts = "0.2.21"
 spin = "0.4.10"
 
 [dependencies.itertools]

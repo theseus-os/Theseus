@@ -34,5 +34,14 @@ path = "../runqueue"
 [dependencies.pmu_x86]
 path = "../pmu_x86"
 
+[dependencies.unwind]
+path = "../unwind"
+
+[dependencies.memory]
+path = "../memory"
+
+[dependencies.stack_trace]
+path = "../stack_trace"
+
 [lib]
 crate-type = ["rlib"]

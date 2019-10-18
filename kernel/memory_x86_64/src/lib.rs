@@ -168,9 +168,7 @@ pub fn add_sections_vmem_areas(
     boot_info: &BootInformation,
     vmas: &mut [VirtualMemoryArea; 32],
 ) -> Result<(usize, InitialSectionsMemoryBounds, [SectionMemoryBounds; 32]), &'static str> {
-    let elf_sections_tag = try!(boot_info
-        .elf_sections_tag()
-        .ok_or("no Elf sections tag present!"));
+    let elf_sections_tag = boot_info.elf_sections_tag().ok_or("no Elf sections tag present!")?;
 
     let mut index = 0;
     let mut text_start: Option<(VirtualAddress, PhysicalAddress)> = None;

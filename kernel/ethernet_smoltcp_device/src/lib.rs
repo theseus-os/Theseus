@@ -26,7 +26,7 @@ use smoltcp::{
 };
 use network_interface_card::NetworkInterfaceCard;
 use nic_buffers::{TransmitBuffer, ReceivedFrame};
-use owning_ref::BoxRef;
+use owning_ref::BoxRefMut;
 use network_manager::NetworkInterface;
 use core::str::FromStr;
 
@@ -193,8 +193,8 @@ impl<'d, N: NetworkInterfaceCard + 'static> smoltcp::phy::Device<'d> for Etherne
         }
 
         let first_buf_len = received_frame.0[0].length;
-        let rxbuf_byte_slice = BoxRef::new(Box::new(received_frame))
-            .try_map(|rxframe| rxframe.0[0].as_slice::<u8>(0, first_buf_len as usize))
+        let rxbuf_byte_slice = BoxRefMut::new(Box::new(received_frame))
+            .try_map_mut(|rxframe| rxframe.0[0].as_slice_mut::<u8>(0, first_buf_len as usize))
             .map_err(|e| {
                 error!("EthernetDevice::receive(): couldn't convert receive buffer of length {} into byte slice, error {:?}", first_buf_len, e);
                 e
@@ -268,12 +268,12 @@ impl<N: NetworkInterfaceCard + 'static> smoltcp::phy::TxToken for TxToken<N> {
 
 /// The receive token type used by smoltcp, 
 /// which contains only a `ReceivedFrame` to be consumed later.
-pub struct RxToken(BoxRef<ReceivedFrame, [u8]>);
+pub struct RxToken(BoxRefMut<ReceivedFrame, [u8]>);
 
 impl smoltcp::phy::RxToken for RxToken {
-    fn consume<R, F>(self, _timestamp: Instant, f: F) -> smoltcp::Result<R>
-        where F: FnOnce(&[u8]) -> smoltcp::Result<R>
+    fn consume<R, F>(mut self, _timestamp: Instant, f: F) -> smoltcp::Result<R>
+        where F: FnOnce(&mut [u8]) -> smoltcp::Result<R>
     {
-        f(self.0.as_ref())
+        f(self.0.as_mut())
     }
 }
