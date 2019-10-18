@@ -88,7 +88,7 @@ dependencies = [
 name = "app_io"
 version = "0.1.0"
 dependencies = [
- "core_io 0.1.20191014 (git+https://github.com/theseus-os/rust-core_io)",
+ "core_io 0.1.20191017 (git+https://github.com/theseus-os/rust-core_io)",
  "event_types 0.1.0",
  "keycodes_ascii 0.1.0",
  "lazy_static 1.2.0 (registry+https://github.com/rust-lang/crates.io-index)",
@@ -238,7 +238,7 @@ name = "cat"
 version = "0.1.0"
 dependencies = [
  "app_io 0.1.0",
- "core_io 0.1.20191014 (git+https://github.com/theseus-os/rust-core_io)",
+ "core_io 0.1.20191017 (git+https://github.com/theseus-os/rust-core_io)",
  "fs_node 0.1.0",
  "getopts 0.2.21 (git+https://github.com/kevinaboos/getopts)",
  "log 0.3.9 (registry+https://github.com/rust-lang/crates.io-index)",
@@ -306,8 +306,8 @@ dependencies = [
 
 [[package]]
 name = "core_io"
-version = "0.1.20191014"
-source = "git+https://github.com/theseus-os/rust-core_io#05ffa7c10837fcef89395710222c7945d0309df6"
+version = "0.1.20191017"
+source = "git+https://github.com/theseus-os/rust-core_io#b9c5a9b7513770a523f3e271c62c516a446fef72"
 dependencies = [
  "rustc_version 0.1.7 (registry+https://github.com/rust-lang/crates.io-index)",
 ]
@@ -746,7 +746,7 @@ name = "immediate_input_echo"
 version = "0.1.0"
 dependencies = [
  "app_io 0.1.0",
- "core_io 0.1.20191014 (git+https://github.com/theseus-os/rust-core_io)",
+ "core_io 0.1.20191017 (git+https://github.com/theseus-os/rust-core_io)",
  "log 0.3.9 (registry+https://github.com/rust-lang/crates.io-index)",
  "stdio 0.1.0",
 ]
@@ -756,7 +756,7 @@ name = "input_echo"
 version = "0.1.0"
 dependencies = [
  "app_io 0.1.0",
- "core_io 0.1.20191014 (git+https://github.com/theseus-os/rust-core_io)",
+ "core_io 0.1.20191017 (git+https://github.com/theseus-os/rust-core_io)",
  "log 0.3.9 (registry+https://github.com/rust-lang/crates.io-index)",
 ]
 
@@ -871,7 +871,7 @@ name = "keyboard_echo"
 version = "0.1.0"
 dependencies = [
  "app_io 0.1.0",
- "core_io 0.1.20191014 (git+https://github.com/theseus-os/rust-core_io)",
+ "core_io 0.1.20191017 (git+https://github.com/theseus-os/rust-core_io)",
  "keycodes_ascii 0.1.0",
  "log 0.3.9 (registry+https://github.com/rust-lang/crates.io-index)",
  "scheduler 0.1.0",
@@ -905,7 +905,7 @@ name = "less"
 version = "0.1.0"
 dependencies = [
  "app_io 0.1.0",
- "core_io 0.1.20191014 (git+https://github.com/theseus-os/rust-core_io)",
+ "core_io 0.1.20191017 (git+https://github.com/theseus-os/rust-core_io)",
  "fs_node 0.1.0",
  "getopts 0.2.21 (git+https://github.com/kevinaboos/getopts)",
  "keycodes_ascii 0.1.0",
@@ -1825,7 +1825,7 @@ name = "shell"
 version = "0.1.0"
 dependencies = [
  "app_io 0.1.0",
- "core_io 0.1.20191014 (git+https://github.com/theseus-os/rust-core_io)",
+ "core_io 0.1.20191017 (git+https://github.com/theseus-os/rust-core_io)",
  "dfqueue 0.1.0",
  "environment 0.1.0",
  "event_types 0.1.0",
@@ -1993,7 +1993,7 @@ dependencies = [
 name = "stdio"
 version = "0.1.0"
 dependencies = [
- "core_io 0.1.20191014 (git+https://github.com/theseus-os/rust-core_io)",
+ "core_io 0.1.20191017 (git+https://github.com/theseus-os/rust-core_io)",
  "keycodes_ascii 0.1.0",
  "spin 0.4.10 (registry+https://github.com/rust-lang/crates.io-index)",
 ]
@@ -2343,7 +2343,7 @@ source = "git+https://github.com/kevinaboos/zero.git#9fc7ff523138a21f40359b706d2
 "checksum byteorder 1.2.7 (registry+https://github.com/rust-lang/crates.io-index)" = "94f88df23a25417badc922ab0f5716cc1330e87f71ddd9203b3a3ccd9cedf75d"
 "checksum cc 1.0.28 (registry+https://github.com/rust-lang/crates.io-index)" = "bb4a8b715cb4597106ea87c7c84b2f1d452c7492033765df7f32651e66fcf749"
 "checksum cfg-if 0.1.9 (registry+https://github.com/rust-lang/crates.io-index)" = "b486ce3ccf7ffd79fdeb678eac06a9e6c09fc88d33836340becb8fffe87c5e33"
-"checksum core_io 0.1.20191014 (git+https://github.com/theseus-os/rust-core_io)" = "<none>"
+"checksum core_io 0.1.20191017 (git+https://github.com/theseus-os/rust-core_io)" = "<none>"
 "checksum cstr_core 0.1.2 (registry+https://github.com/rust-lang/crates.io-index)" = "6ebe7158ee57e848621d24d0ed87910edb97639cb94ad9977edf440e31226035"
 "checksum cty 0.1.5 (registry+https://github.com/rust-lang/crates.io-index)" = "c4e1d41c471573612df00397113557693b5bf5909666a8acb253930612b93312"
 "checksum derive_more 0.14.0 (registry+https://github.com/rust-lang/crates.io-index)" = "fbe9f11be34f800b3ecaaed0ec9ec2e015d1d0ba0c8644c1310f73d6e8994615"
