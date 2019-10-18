@@ -41,7 +41,7 @@ lazy_static! {
 /// * `fd`: file descriptor,
 /// * `offset`: offset in the file where the mapping will start. It must be a multiple of the page size. 
 /// 
-/// Right now this function only implements anonymous mappings without a given address, and ignores all protection flags.
+/// Currently this function only implements anonymous mappings without a given address, and ignores all protection flags.
 #[no_mangle]
 pub extern fn mmap(_addr: *mut c_void, length: size_t, prot: c_int, flags: c_int, fd: c_int, offset: off_t) -> *mut c_void {
     // Most systems support MAP_ANON and MAP_FIXED
@@ -68,7 +68,7 @@ pub extern fn mmap(_addr: *mut c_void, length: size_t, prot: c_int, flags: c_int
             },
             None => return NULL,
         };
-        // zero the memory?
+
         match mapped_pages {
             Ok(mp) => {
                 let addr = mp.start_address();

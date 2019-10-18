@@ -1,4 +1,4 @@
-//! A compatibility layer for memfs files
+//! A compatibility layer for memfs files to be created, read and written with libc functions
 
 use memfs::*;
 use spin::{Once, Mutex};
@@ -70,7 +70,7 @@ pub fn init_file_descriptors() -> Result<(), &'static str>{
     Ok(())
 }
 
-/// Continues to try to create a directory until succesful
+/// Creates a directory within the root directory for libc files
 pub fn create_libc_directory() -> Result<(), &'static str> {
     let libc_dir = VFSDirectory::new(String::from("libc"), root::get_root())?;
     let dir_ref = LIBC_DIRECTORY.call_once(|| libc_dir);
@@ -117,7 +117,7 @@ pub fn return_fd_to_system(fd: c_int) {
 /// Only those files can be opened that were also created through the libc interface.
 /// 
 /// # Arguments
-/// * `path`: The acceptable "path" values are currently just the file name. All files are created in the libc directory. 
+/// * `path`: The acceptable "path" value is currently just the file name. All files are created in the libc directory. 
 /// * `oflag`: Specifies different conditions for opening the file. Currently only the O_CREAT flag is supported.
 /// * `mode`: The file mode bits to be applied when a new file is created. Currently thse bits are ignored.
 #[no_mangle]
@@ -162,7 +162,7 @@ pub extern "C" fn open(path: &CStr, oflag: c_int, mode: mode_t) -> c_int {
             ret
         }
         else {
-            error!("libc::fs::open(): Flag {} is not supported", oflag);
+            error!("libc::fs::open(): Flag {:#X} is not supported", oflag);
             ERRNO.store(EINVAL, Ordering::Relaxed);
             -1
         };    
@@ -174,7 +174,7 @@ pub extern "C" fn open(path: &CStr, oflag: c_int, mode: mode_t) -> c_int {
 /// If this is the last file descriptor referring to a file, the file is deleted.
 #[no_mangle]
 pub extern "C" fn close(fd: c_int) -> c_int {
-    // The number of strong references a file must have to be deleted.
+    // The number of strong references a file will have when it should be deleted.
     // One reference is from the file descriptor "fd", and one is from where it is stored in the libc directory.
     // If there is more than one file descriptor opened for this file then the count will be greater than 2.
     const STRONG_COUNT_TO_DELETE: usize = 2;
@@ -203,7 +203,7 @@ pub extern "C" fn close(fd: c_int) -> c_int {
     rt
 }
 
-/// Reads bytes from a file into a buffer
+/// Reads bytes from a file into a buffer and returns the number of bytes read.
 /// 
 /// # Arguments
 /// * `fd`: file descriptor
@@ -235,19 +235,26 @@ pub extern "C" fn read(fd: c_int, buf: *mut c_void, count: size_t) -> ssize_t {
         }
     }
 }
+
+/// Writes bytes to a file from a buffer and returns the number of bytes written.
+/// 
+/// # Arguments
+/// * `fd`: file descriptor
+/// * `buf`: buffer to write bytes from
+/// * `count`: number of bytes to write
 pub extern "C" fn write(fd: c_int, buf: *const c_void, count: size_t) -> ssize_t {
     let mut file_info = FILE_INFO.lock();
     match FILE_DESCRIPTORS.lock()[fd as usize].as_ref() {
         Some(file) => {
             let mut buf = unsafe{ from_raw_parts(buf as *const u8, count as usize) };
             let offset = file_info[fd as usize].offset;
-                match file.lock().write(buf, offset) {
+            match file.lock().write(buf, offset) {
                 Ok(x) => {
                     file_info[fd as usize].offset += x;                    
                     x as ssize_t
                 },
                 Err(x) => {
-                    error!("libc::fs::read(): Could not read from file: {:?}", x);
+                    error!("libc::fs::read(): Could not write to file: {:?}", x);
                     ERRNO.store(EAGAIN, Ordering::Relaxed);
                     -1
                 }
