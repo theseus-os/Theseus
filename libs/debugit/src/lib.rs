@@ -36,9 +36,7 @@ pub struct DebugIt<T>(pub T);
 
 impl<T> fmt::Debug for DebugIt<T> {
     default fn fmt(&self, f: &mut fmt::Formatter) -> fmt::Result {
-        unsafe {
-            write!(f, "{{ non-Debug: {} }}", type_name::<T>())
-        }
+        write!(f, "{{ non-Debug: {} }}", type_name::<T>())
     }
 }
 

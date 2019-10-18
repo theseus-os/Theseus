@@ -21,7 +21,6 @@ use alloc::{
     string::{String, ToString},
     vec::Vec,
     sync::Arc,
-    slice::SliceConcatExt,
 };
 use getopts::{Options, Matches};
 use mod_mgmt::{NamespaceDir, SwapRequest};

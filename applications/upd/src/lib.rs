@@ -29,7 +29,6 @@ use alloc::{
     string::{String, ToString},
     vec::Vec,
     collections::BTreeSet,
-    slice::SliceConcatExt,
 };
 use spin::Once;
 use getopts::{Matches, Options};
