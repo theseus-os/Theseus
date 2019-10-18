@@ -78,18 +78,18 @@ impl FrameBufferRGB {
 
         let mapped_frame_buffer = if let Some(address) = physical_address {
             let frame = FrameRange::from_phys_addr(address, size);
-            try!(kernel_mmi_ref.lock().page_table.map_allocated_pages_to(
+            kernel_mmi_ref.lock().page_table.map_allocated_pages_to(
                 pages,
                 frame,
                 vesa_display_flags,
                 allocator.lock().deref_mut()
-            ))
+            )?
         } else {
-            try!(kernel_mmi_ref.lock().page_table.map_allocated_pages(
+            kernel_mmi_ref.lock().page_table.map_allocated_pages(
                 pages,
                 vesa_display_flags,
                 allocator.lock().deref_mut()
-            ))
+            )?
         };
 
         // create a refence to transmute the mapped frame buffer pages as a slice

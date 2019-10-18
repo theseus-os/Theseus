@@ -220,7 +220,7 @@ impl<T: Window> WindowList<T> {
 /*  Following two functions can be used to systematically resize windows forcibly
 /// Readjusts remaining windows after a window is deleted to maximize screen usage
 pub fn adjust_window_after_deletion() -> Result<(), &'static str> {
-    let mut allocator = try!(WINDOW_ALLOCATOR.try().ok_or("The window allocator is not initialized")).lock();
+    let mut allocator = WINDOW_ALLOCATOR.try().ok_or("The window allocator is not initialized")?.lock();
     let num_windows = allocator.deref_mut().allocated.len();
     // one gap between each window and one gap between the edge windows and the frame buffer boundary
     let window_height = (frame_buffer::FRAME_BUFFER_HEIGHT - WINDOW_MARGIN * (num_windows + 1))/(num_windows);
@@ -240,7 +240,7 @@ pub fn adjust_window_after_deletion() -> Result<(), &'static str> {
     Ok(())
 /// Adjusts the windows preemptively so that we can add a new window directly below the old ones to maximize screen usage without overlap
 pub fn adjust_windows_before_addition() -> Result<(usize, usize, usize), &'static str> {
-    let mut allocator = try!(WINDOW_ALLOCATOR.try().ok_or("The window allocator is not initialized")).lock();
+    let mut allocator = WINDOW_ALLOCATOR.try().ok_or("The window allocator is not initialized")?.lock();
     let num_windows = allocator.deref_mut().allocated.len();
     // one gap between each window and one gap between the edge windows and the frame buffer boundary
     let window_height = (display::FRAME_BUFFER_HEIGHT - WINDOW_MARGIN * (num_windows + 2))/(num_windows + 1);

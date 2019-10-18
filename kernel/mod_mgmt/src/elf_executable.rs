@@ -20,8 +20,8 @@ pub struct ElfProgramSegment {
 pub fn parse_elf_executable(mapped_pages: MappedPages, size_in_bytes: usize) -> Result<(Vec<ElfProgramSegment>, VirtualAddress), &'static str> {
     debug!("Parsing Elf executable: mapped_pages {:?}, size_in_bytes {:#x}({})", mapped_pages, size_in_bytes, size_in_bytes);
 
-    let byte_slice: &[u8] = try!(mapped_pages.as_slice(0, size_in_bytes));
-    let elf_file = try!(ElfFile::new(byte_slice));
+    let byte_slice: &[u8] = mapped_pages.as_slice(0, size_in_bytes)?;
+    let elf_file = ElfFile::new(byte_slice)?;
     // debug!("Elf File: {:?}", elf_file);
 
     // check that elf_file is an executable type 
