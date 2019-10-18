@@ -305,7 +305,6 @@ impl Shell {
         let mut terminal = self.terminal.lock();
         terminal.cursor.disable();
         terminal.display_cursor(self.left_shift)?;
-        terminal.refresh_display();
         self.left_shift = self.cmdline.len();
         terminal.cursor.enable();
         Ok(())
@@ -316,7 +315,6 @@ impl Shell {
         let mut terminal = self.terminal.lock();
         terminal.cursor.disable();
         terminal.display_cursor(self.left_shift)?;
-        terminal.refresh_display();
         self.left_shift = 0;
         terminal.cursor.enable();
         Ok(())
@@ -329,7 +327,6 @@ impl Shell {
             let mut terminal = self.terminal.lock();
             terminal.cursor.disable();
             terminal.display_cursor(self.left_shift)?;
-            terminal.refresh_display();
             self.left_shift += 1;
             terminal.cursor.enable();
         }
@@ -343,7 +340,6 @@ impl Shell {
             let mut terminal = self.terminal.lock();
             terminal.cursor.disable();
             terminal.display_cursor(self.left_shift)?;
-            terminal.refresh_display();
             self.left_shift -= 1;
             terminal.cursor.enable();
         }
