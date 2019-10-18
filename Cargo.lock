@@ -894,18 +894,8 @@ dependencies = [
 name = "libc"
 version = "0.1.0"
 dependencies = [
- "libc 0.1.0",
- "log 0.3.9 (registry+https://github.com/rust-lang/crates.io-index)",
- "memory 0.1.0",
- "mod_mgmt 0.1.0",
- "spawn 0.1.0",
-]
-
-[[package]]
-name = "libc"
-version = "0.1.0"
-dependencies = [
  "cbitset 0.1.0 (registry+https://github.com/rust-lang/crates.io-index)",
+ "fs_node 0.1.0",
  "hashbrown 0.1.8 (registry+https://github.com/rust-lang/crates.io-index)",
  "kernel_config 0.1.0",
  "lazy_static 1.2.0 (registry+https://github.com/rust-lang/crates.io-index)",
@@ -921,14 +911,11 @@ dependencies = [
 ]
 
 [[package]]
-<<<<<<< 6971f39671c60b803b83b6861c2ee77864755def
-=======
 name = "libm"
 version = "0.1.4"
 source = "registry+https://github.com/rust-lang/crates.io-index"
 
 [[package]]
->>>>>>> extended libc to support files
 name = "libterm"
 version = "0.1.0"
 dependencies = [
