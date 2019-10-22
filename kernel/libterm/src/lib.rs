@@ -468,52 +468,52 @@ impl Terminal {
         }
     }
 
-    /// Insert a character to the screen. The position is specified by parameter `cursor_draw_back`,
+    /// Insert a character to the screen. The position is specified by parameter `cursor_end_offset` as relative to the end of the text in units of number of characters,
     /// that is the relative distance to the end of the whole output on the screen.
-    /// cursor_draw_back == 0 means to append characters onto the screen, while cursor_draw_back == 1 means to
+    /// cursor_end_offset == 0 means to append characters onto the screen, while cursor_end_offset == 1 means to
     /// insert a character right before the exsiting last character.
     /// One must call `refresh_display` to get things actually showed.
-    pub fn insert_char_to_screen(&mut self, c: char, cursor_draw_back: usize) -> Result<(), &'static str> {
+    pub fn insert_char_to_screen(&mut self, c: char, cursor_end_offset: usize) -> Result<(), &'static str> {
         let buflen = self.scrollback_buffer.len();
-        if buflen < cursor_draw_back { return Err("cursor_draw_back is larger than length of scrollback buffer"); }
-        let insert_idx = buflen - cursor_draw_back;
+        if buflen < cursor_end_offset { return Err("cursor_end_offset is larger than length of scrollback buffer"); }
+        let insert_idx = buflen - cursor_end_offset;
         self.scrollback_buffer.insert_str(insert_idx, &c.to_string());
         Ok(())
     }
 
-    /// Remove a character from the screen. The position is specified by parameter `cursor_draw_back`,
+    /// Remove a character from the screen. The position is specified by parameter `cursor_end_offset` relative to the end of the text in units of number of characters,
     /// that is the relative distance to the end of the whole output on the screen.
-    /// cursor_draw_back == 1 means to remove the last character on the screen.
-    /// cursor_draw_back == 0 is INVALID here, since there's nothing at the "end" of the screen.
+    /// cursor_end_offset == 1 means to remove the last character on the screen.
+    /// cursor_end_offset == 0 is INVALID here, since there's nothing at the "end" of the screen.
     /// One must call `refresh_display` to get things actually removed on the screen.
-    pub fn remove_char_from_screen(&mut self, cursor_draw_back: usize) -> Result<(), &'static str> {
+    pub fn remove_char_from_screen(&mut self, cursor_end_offset: usize) -> Result<(), &'static str> {
         let buflen = self.scrollback_buffer.len();
-        if buflen < cursor_draw_back { return Err("cursor_draw_back is larger than length of scrollback buffer"); }
-        if cursor_draw_back == 0 { return Err("cannot remove character at cursor_draw_back == 0"); }
-        let remove_idx = buflen - cursor_draw_back;
+        if buflen < cursor_end_offset { return Err("cursor_end_offset is larger than length of scrollback buffer"); }
+        if cursor_end_offset == 0 { return Err("cannot remove character at cursor_end_offset == 0"); }
+        let remove_idx = buflen - cursor_end_offset;
         self.scrollback_buffer.remove(remove_idx);
         Ok(())
     }
     
     /// Scroll the screen to the very beginning.
-    /// `cursor_draw_back` is the distance of the cursor to the end of the text in the terminal
-    pub fn move_screen_to_begin(&mut self, cursor_draw_back: usize) -> Result<(), &'static str> {
+    /// `cursor_end_offset` is the position of the cursor relative to the end of the text in units of number of characters
+    pub fn move_screen_to_begin(&mut self, cursor_end_offset: usize) -> Result<(), &'static str> {
         // Home command only registers if the text display has the ability to scroll
         if self.scroll_start_idx != 0 {
             self.is_scroll_end = false;
             self.scroll_start_idx = 0; // takes us up to the start of the page
-            self.display_cursor(cursor_draw_back)?;
+            self.display_cursor(cursor_end_offset)?;
         }
         
         Ok(())
     }
 
     /// Scroll the screen to the very end.
-    /// `cursor_draw_back` is the distance of the cursor to the end of the text in the terminal
-    pub fn move_screen_to_end(&mut self, cursor_draw_back: usize) -> Result<(), &'static str> {
+    /// `cursor_end_offset` is the position of the cursor relative to the end of the text in units of number of characters
+    pub fn move_screen_to_end(&mut self, cursor_end_offset: usize) -> Result<(), &'static str> {
         if !self.is_scroll_end {
             self.cursor.disable();
-            self.display_cursor(cursor_draw_back)?;
+            self.display_cursor(cursor_end_offset)?;
             self.is_scroll_end = true;
             let buffer_len = self.scrollback_buffer.len();
             self.scroll_start_idx = self.calc_start_idx(buffer_len, &self.display_name).0;
@@ -523,21 +523,21 @@ impl Terminal {
     }
 
     /// Scroll the screen a line up.
-    /// `cursor_draw_back` is the distance of the cursor to the end of the text in the terminal
-    pub fn move_screen_line_up(&mut self, cursor_draw_back: usize) -> Result<(), &'static str> {
+    /// `cursor_end_offset` is the position of the cursor relative to the end of the text in units of number of characters
+    pub fn move_screen_line_up(&mut self, cursor_end_offset: usize) -> Result<(), &'static str> {
         if self.scroll_start_idx != 0 {
             self.scroll_up_one_line();
-            self.display_cursor(cursor_draw_back)?;
+            self.display_cursor(cursor_end_offset)?;
         }
         Ok(())
     }
 
     /// Scroll the screen a line down.
-    /// `cursor_draw_back` is the distance of the cursor to the end of the text in the terminal
-    pub fn move_screen_line_down(&mut self, cursor_draw_back: usize) -> Result<(), &'static str> {
+    /// `cursor_end_offset` is the position of the cursor relative to the end of the text in units of number of characters
+    pub fn move_screen_line_down(&mut self, cursor_end_offset: usize) -> Result<(), &'static str> {
         if !self.is_scroll_end {
             self.cursor.disable();
-            self.display_cursor(cursor_draw_back)?;
+            self.display_cursor(cursor_end_offset)?;
             self.scroll_down_one_line();
             self.cursor.enable();
         }
@@ -545,24 +545,24 @@ impl Terminal {
     }
 
     /// Scroll the screen a page up.
-    /// `cursor_draw_back` is the distance of the cursor to the end of the text in the terminal
-    pub fn move_screen_page_up(&mut self, cursor_draw_back: usize) -> Result<(), &'static str> {
+    /// `cursor_end_offset` is the position of the cursor relative to the end of the text in units of number of characters
+    pub fn move_screen_page_up(&mut self, cursor_end_offset: usize) -> Result<(), &'static str> {
         if self.scroll_start_idx <= 1 {
             return Ok(());
         }
         self.page_up();
         self.is_scroll_end = false;
-        self.display_cursor(cursor_draw_back)
+        self.display_cursor(cursor_end_offset)
     }
 
     /// Scroll the screen a page down.
-    /// `cursor_draw_back` is the distance of the cursor to the end of the text in the terminal
-    pub fn move_screen_page_down(&mut self, cursor_draw_back: usize) -> Result<(), &'static str> {
+    /// `cursor_end_offset` is the position of the cursor relative to the end of the text in units of number of characters
+    pub fn move_screen_page_down(&mut self, cursor_end_offset: usize) -> Result<(), &'static str> {
         if self.is_scroll_end {
             return Ok(());
         }
         self.cursor.disable();
-        self.display_cursor(cursor_draw_back)?;
+        self.display_cursor(cursor_end_offset)?;
         self.page_down();
         self.cursor.enable();
         Ok(())
@@ -598,9 +598,9 @@ impl Terminal {
     }
 
     /// Display the cursor of the terminal
-    /// `cursor_draw_back` is the distance of the cursor to the end of the text in the terminal.
+    /// `cursor_end_offset` is the position of the cursor relative to the end of the text in units of number of characters.
     pub fn display_cursor(
-        &mut self, cursor_draw_back: usize
+        &mut self, cursor_end_offset: usize
     ) -> Result<(), &'static str> {
         let coordinate = self.window.get_displayable_position(&self.display_name)?;
         let text_display = self.window.get_concrete_display_mut::<TextDisplay>(&self.display_name)?;
@@ -612,10 +612,10 @@ impl Terminal {
         }
         let bg_color = text_display.get_bg_color();
 
-        let (cursor_col, cursor_line) = if cursor_draw_back > 0 {
+        let (cursor_col, cursor_line) = if cursor_end_offset > 0 {
             text_display.reset_cache();
             let next_index = text_display.get_index(col, line);
-            let cursor_index = next_index - cursor_draw_back;
+            let cursor_index = next_index - cursor_end_offset;
             text_display.get_location(cursor_index)
         } else {
             (col, line)
