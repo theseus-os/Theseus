@@ -158,8 +158,8 @@ struct Shell {
     cmdline: String,
     /// This buffer stores characters before sending them to running application on `enter` key strike
     input_buffer: String,
-    /// Variable that tracks how far left the cursor is from the maximum rightmost position (above)
-    left_shift: usize,
+    /// Variable that tracks how far left the cursor is from the maximum rightmost position in units of number of characters(above)
+    cursor_end_offset: usize,
     /// Vector that stores the history of commands that the user has entered
     command_history: Vec<String>,
     /// Variable used to track the net number of times the user has pressed up/down to cycle through the commands
@@ -211,7 +211,7 @@ impl Shell {
             fg_job_num: None,
             cmdline: String::new(),
             input_buffer: String::new(),
-            left_shift: 0,
+            cursor_end_offset: 0,
             command_history: Vec::new(),
             history_index: 0,
             buffered_cmd_recorded: false,
@@ -223,33 +223,33 @@ impl Shell {
     }
 
     /// Insert a character to the command line buffer in the shell.
-    /// The position to insert is determined by the internal maintained variable `left_shift`,
+    /// The position to insert is determined by the internal maintained variable `cursor_end_offset`,
     /// which indicates the position counting from the end of the command line.
     /// `sync_terminal` indicates whether the terminal screen will be synchronically updated.
     fn insert_char_to_cmdline(&mut self, c: char, sync_terminal: bool) -> Result<(), &'static str> {
-        let insert_idx = self.cmdline.len() - self.left_shift;
+        let insert_idx = self.cmdline.len() - self.cursor_end_offset;
         self.cmdline.insert(insert_idx, c);
         if sync_terminal {
-            self.terminal.lock().insert_char_to_screen(c, self.left_shift)?;
+            self.terminal.lock().insert_char_to_screen(c, self.cursor_end_offset)?;
         }
         Ok(())
     }
 
     /// Remove a character from the command line buffer in the shell. If there is nothing to
     /// be removed, it does nothing and returns.
-    /// The position to insert is determined by the internal maintained variable `left_shift`,
+    /// The position to insert is determined by the internal maintained variable `cursor_end_offset`,
     /// which indicates the position counting from the end of the command line.
     /// `sync_terminal` indicates whether the terminal screen will be synchronically updated.
     fn remove_char_from_cmdline(&mut self, erase_left: bool, sync_terminal: bool) -> Result<(), &'static str> {
-        let mut left_shift = self.left_shift;
-        if erase_left { left_shift += 1; }
-        if left_shift > self.cmdline.len() || left_shift == 0 { return Ok(()); }
-        let erase_idx = self.cmdline.len() - left_shift;
+        let mut cursor_end_offset = self.cursor_end_offset;
+        if erase_left { cursor_end_offset += 1; }
+        if cursor_end_offset > self.cmdline.len() || cursor_end_offset == 0 { return Ok(()); }
+        let erase_idx = self.cmdline.len() - cursor_end_offset;
         self.cmdline.remove(erase_idx);
         if sync_terminal {
-            self.terminal.lock().remove_char_from_screen(left_shift)?;
+            self.terminal.lock().remove_char_from_screen(cursor_end_offset)?;
         }
-        if !erase_left { self.left_shift -= 1; }
+        if !erase_left { self.cursor_end_offset -= 1; }
         Ok(())
     }
 
@@ -262,7 +262,7 @@ impl Shell {
             }
         }
         self.cmdline.clear();
-        self.left_shift = 0;
+        self.cursor_end_offset = 0;
         Ok(())
     }
 
@@ -273,7 +273,7 @@ impl Shell {
             self.clear_cmdline(sync_terminal)?;
         }
         self.cmdline = s.clone();
-        self.left_shift = 0;
+        self.cursor_end_offset = 0;
         if sync_terminal {
             self.terminal.lock().print_to_terminal(s);
         }
@@ -301,29 +301,49 @@ impl Shell {
     }
 
     /// Move the cursor to the very beginning of the input command line.
-    fn move_cursor_leftmost(&mut self) {
-        self.left_shift = self.cmdline.len();
+    fn move_cursor_leftmost(&mut self) -> Result<(), &'static str> {
+        let mut terminal = self.terminal.lock();
+        terminal.cursor.disable();
+        terminal.display_cursor(self.cursor_end_offset)?;
+        self.cursor_end_offset = self.cmdline.len();
+        terminal.cursor.enable();
+        Ok(())
     }
 
     /// Move the cursor to the very end of the input command line.
-    fn move_cursor_rightmost(&mut self) {
-        self.left_shift = 0;
+    fn move_cursor_rightmost(&mut self) -> Result<(), &'static str> {
+        let mut terminal = self.terminal.lock();
+        terminal.cursor.disable();
+        terminal.display_cursor(self.cursor_end_offset)?;
+        self.cursor_end_offset = 0;
+        terminal.cursor.enable();
+        Ok(())
     }
 
     /// Move the cursor a character left. If the cursor is already at the beginning of the command line,
     /// it simply returns.
-    fn move_cursor_left(&mut self) {
-        if self.left_shift < self.cmdline.len() {
-            self.left_shift += 1;
+    fn move_cursor_left(&mut self) -> Result<(), &'static str> {
+        if self.cursor_end_offset < self.cmdline.len() {
+            let mut terminal = self.terminal.lock();
+            terminal.cursor.disable();
+            terminal.display_cursor(self.cursor_end_offset)?;
+            self.cursor_end_offset += 1;
+            terminal.cursor.enable();
         }
+        Ok(())
     }
 
     /// Move the cursor a character to the right. If the cursor is already at the end of the command line,
     /// it simply returns.
-    fn move_cursor_right(&mut self) {
-        if self.left_shift > 0 {
-            self.left_shift -= 1;
+    fn move_cursor_right(&mut self) -> Result<(), &'static str> {
+        if self.cursor_end_offset > 0 {
+            let mut terminal = self.terminal.lock();
+            terminal.cursor.disable();
+            terminal.display_cursor(self.cursor_end_offset)?;
+            self.cursor_end_offset -= 1;
+            terminal.cursor.enable();
         }
+        Ok(())
     }
 
     /// Roll to the next previous command. If there is no more previous command, it does nothing.
@@ -558,24 +578,24 @@ impl Shell {
 
         // home, end, page up, page down, up arrow, down arrow for the input_event_manager
         if keyevent.keycode == Keycode::Home && keyevent.modifiers.control {
-            return self.terminal.lock().move_screen_to_begin();
+            return self.terminal.lock().move_screen_to_begin(self.cursor_end_offset);
         }
         if keyevent.keycode == Keycode::End && keyevent.modifiers.control{
-            return self.terminal.lock().move_screen_to_end();
+            return self.terminal.lock().move_screen_to_end(self.cursor_end_offset);
         }
         if keyevent.modifiers.control && keyevent.modifiers.shift && keyevent.keycode == Keycode::Up  {
-            return self.terminal.lock().move_screen_line_up();
+            return self.terminal.lock().move_screen_line_up(self.cursor_end_offset);
         }
         if keyevent.modifiers.control && keyevent.modifiers.shift && keyevent.keycode == Keycode::Down  {
-            return self.terminal.lock().move_screen_line_down();
+            return self.terminal.lock().move_screen_line_down(self.cursor_end_offset);
         }
 
         if keyevent.keycode == Keycode::PageUp && keyevent.modifiers.shift {
-            return self.terminal.lock().move_screen_page_up();
+            return self.terminal.lock().move_screen_page_up(self.cursor_end_offset);
         }
 
         if keyevent.keycode == Keycode::PageDown && keyevent.modifiers.shift {
-            return self.terminal.lock().move_screen_page_down();
+            return self.terminal.lock().move_screen_page_down(self.cursor_end_offset);
         }
 
         // Cycles to the next previous command
@@ -592,25 +612,21 @@ impl Shell {
 
         // Jumps to the beginning of the input string
         if keyevent.keycode == Keycode::Home {
-            self.move_cursor_leftmost();
-            return Ok(());
+            return self.move_cursor_leftmost()
         }
 
         // Jumps to the end of the input string
         if keyevent.keycode == Keycode::End {
-            self.move_cursor_rightmost();
-            return Ok(());
+            return self.move_cursor_rightmost()
         }
 
         // Adjusts the cursor tracking variables when the user presses the left and right arrow keys
         if keyevent.keycode == Keycode::Left {
-            self.move_cursor_left();
-            return Ok(());
+            return self.move_cursor_left()
         }
 
         if keyevent.keycode == Keycode::Right {
-            self.move_cursor_right();
-            return Ok(());
+            return self.move_cursor_right()
         }
 
         // Tracks what the user has typed so far, excluding any keypresses by the backspace and Enter key, which are special and are handled directly below
@@ -995,7 +1011,7 @@ impl Shell {
     fn complete_cmdline(&mut self) -> Result<(), &'static str> {
 
         // Get the last string slice in the pipe chain.
-        let cmdline = self.cmdline[0..self.cmdline.len()-self.left_shift].to_string();
+        let cmdline = self.cmdline[0..self.cmdline.len()-self.cursor_end_offset].to_string();
         let last_cmd_in_pipe = match cmdline.split("|").last() {
             Some(cmd) => cmd,
             None => return Ok(())
@@ -1317,7 +1333,7 @@ impl Shell {
                     _ => { }
                 };
             }           
-            self.terminal.lock().display_cursor()?; 
+            self.terminal.lock().display_cursor(self.cursor_end_offset)?; 
                 
             let mut need_refresh = false;
             loop {
