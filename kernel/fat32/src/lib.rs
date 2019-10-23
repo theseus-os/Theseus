@@ -99,6 +99,7 @@
 
 #![no_std]
 #![feature(slice_concat_ext)]
+#![feature(option_flattening)]
 
 #[macro_use] extern crate alloc;
 #[macro_use] extern crate log;
@@ -116,15 +117,16 @@ extern crate spawn;
 extern crate task;
 
 use storage_device::{BlockBounds};
-use zerocopy::{FromBytes, AsBytes};
-use byteorder::ByteOrder;
-use byteorder::LittleEndian;
+use zerocopy::{FromBytes, AsBytes, LayoutVerified, ByteSlice};
+use zerocopy::byteorder::{U16, U32};
+use byteorder::{ByteOrder, LittleEndian};
 use alloc::collections::BTreeMap;
 use spin::{Mutex, RwLock};
 use fs_node::{DirRef, WeakDirRef, FileRef, Directory, FileOrDir, File, FsNode};
 use alloc::sync::{Arc, Weak};
 use core::convert::TryInto;
 use core::mem::size_of;
+use core::cmp::{Ord, Ordering, min};
 use alloc::vec::Vec;
 use alloc::string::String;
 use alloc::string::ToString;
@@ -202,7 +204,100 @@ enum FileType {
 }
 
 /// Internal Directory storage type
-type ChildList = BTreeMap<String, FileOrDir>;
+type ChildList = BTreeMap<DiskName, FileOrDir>;
+type ShortName = [u8; 11];
+
+// TODO I think this is a dumb construction, but it seems OK for now.
+// I think at a minimum treating this as an array of name extensions would be preferable
+// since the size must be bounded anyway.
+/// Generalized name struct that can be filled from and written onto disk easily.
+struct LongName {
+    short_name: ShortName,
+    remaining_parts: Vec<[u8; 11]>, // FIXME this is probably a wrong size for VFAT extension.
+}
+
+impl LongName {
+    // FIXME this doesn't handle the case where we read from a non-contiguous section of bytes.
+    // A dumb/janky way is to pass a byte iterator instead, but that sounds needlessly bad.
+    fn new(bytes: &[u8]) -> LongName {
+        let mut long_name = LongName {
+            short_name: [0; 11],
+            remaining_parts: vec!(),
+        };
+        let len_to_copy = min(long_name.short_name.len(), bytes.len());
+
+        long_name.short_name[0..len_to_copy].copy_from_slice(&bytes[0..len_to_copy]);
+
+        long_name
+    }
+}
+
+/// Subset of strings which are checked to be legal to write to disk.
+#[derive(Clone)]
+#[derive(Debug)]
+pub struct DiskName {
+    pub name: String,
+}
+
+impl DiskName {
+    fn to_comp_name(&self) -> String {
+        self.name.to_uppercase()
+    }
+
+    fn from_string(name: &str) -> Result<DiskName, &'static str> {
+        // FIXME validate string names:
+        // FIXME properly strip trailing spaces:
+        Ok(DiskName {
+            name: name.to_string()
+        })
+    }
+}
+
+impl PartialEq for DiskName {
+    fn eq(&self, other: &Self) -> bool {
+        self.to_comp_name().eq(&other.to_comp_name())
+    }
+}
+
+impl Eq for DiskName {}
+
+impl Ord for DiskName {
+    fn cmp(&self, other: &Self) -> Ordering {
+        self.to_comp_name().cmp(&other.to_comp_name())
+    }
+}
+
+impl PartialOrd for DiskName {
+    fn partial_cmp(&self, other: &Self) -> Option<Ordering> {
+        self.to_comp_name().partial_cmp(&other.to_comp_name())
+    }
+}
+
+impl ToString for DiskName {
+    fn to_string(&self) -> String {
+        self.name.clone()
+    }
+}
+
+// impl Eq for DiskName {
+//     fn cmp(&self, other: &Self) -> Ordering {
+//         self.to_comp_name().cmp(other.to_comp_name())
+//     }
+// }
+
+/// Strictly uppercase form of DiskName for use in name comparisons.
+/// Note that lowercase/uppercase does not ensure the number of characters/bytes is preserved.
+/// As such it may not be possible to legally write this name to disk.
+// #[derive(PartialEq, Eq, PartialOrd, Ord)]
+// struct CompName {
+//     name: String,
+// }
+
+// impl Ord for CompName {
+//     fn cmp(&self, other: &Self) -> Ordering {
+//         self.name.cmp(other.name)
+//     }
+// }
 
 // TODO rewrite this structure using zerocopy crate for simplicity of reading from disk.
 /// The first 25 bytes of a FAT formatted disk BPB contains these fields and are used to know important information about the disk 
@@ -304,6 +399,24 @@ impl Fat32Header {
     }
 }
 
+// TODO I'm not sure if there's a better way to do this, but it seems to work.
+/// A struct used to read RawFatDirectory directly from bytes safely.
+struct RawFatDirectoryBytes<B> {
+    fat_directory: LayoutVerified<B, RawFatDirectory>,
+}
+
+impl<B: ByteSlice> RawFatDirectoryBytes<B> {
+    pub fn parse(bytes: B) -> Option<RawFatDirectoryBytes<B>> {
+        let fat_directory = LayoutVerified::new(bytes)?;
+
+        Some(RawFatDirectoryBytes{fat_directory})
+    }
+}
+
+#[derive(Clone)] // FIXME this shouldn't be necessary, but our current API makes it necessary.
+                 // It seems like the only way to tranfer ownership of a RawFatDirectory made from the raw
+                 // bytes is to transfer ownership of the bytes. However this would reqire significant
+                 // refactoring.
 #[repr(packed)]
 #[derive(FromBytes, AsBytes)]
 // TODO I'd like to make cluster high and low not-vectors. But the endian-ness package we have only supports
@@ -313,37 +426,27 @@ struct RawFatDirectory {
     name: [u8; 11], // 8 letter entry with a 3 letter ext
     flags: u8, // designate the PFSdirectory as r,w,r/w
     _unused1: [u8; 8], // unused data
-    cluster_high: u16, // but contains permissions required to access the PFSfile
+    cluster_high: U16<LittleEndian>, // but contains permissions required to access the PFSfile
     _unused2: [u8; 4], // data including modified time
-    cluster_low: u16, // the starting cluster of the PFSfile
-    size: u32, // size of PFSfile in bytes, volume label or subdirectory flags should be set to 0
+    cluster_low: U16<LittleEndian>, // the starting cluster of the PFSfile
+    size: U32<LittleEndian>, // size of PFSfile in bytes, volume label or subdirectory flags should be set to 0
 }
 
-impl RawFatDirectory {
-    fn to_fat_directory(&self) -> FatDirectory {
-        FatDirectory {
-            name: self.name,
-            flags: self.flags,
-            _unused1: self._unused1,
-            cluster_high: u16::from_le(self.cluster_high),
-            _unused2: self._unused2,
-            cluster_low: u16::from_le(self.cluster_low),
-            size: u32::from_le(self.size),
-        }
-    }
-    
-    fn to_directory_entry(&self) -> DirectoryEntry {
-        DirectoryEntry {
-            name: self.name,
+impl RawFatDirectory {    
+    fn to_directory_entry(&self) -> Result<DirectoryEntry, Error> {
+        let name = String::from_utf8(self.name.to_vec()).map_err(|_| Error::IllegalArgument)?;
+        let name = DiskName {name};
+
+        Ok(DirectoryEntry {
+            name,
             file_type: if self.flags & FileAttributes::SUBDIRECTORY.bits == FileAttributes::SUBDIRECTORY.bits {
                 FileType::PFSDirectory
             } else {
                 FileType::PFSFile
             },
-            cluster: (u32::from(u16::from_le(self.cluster_high))) << 16 | u32::from(u16::from_le(self.cluster_low)),
-            size: u32::from_le(self.size),
-            long_name: [0; 255] // long names not supported. TODO
-        } 
+            cluster: (self.cluster_high.get() as u32) << 16 |(self.cluster_low.get() as u32),
+            size: self.size.get(),
+        })
     }
     
     fn make_unused() -> RawFatDirectory {
@@ -351,27 +454,13 @@ impl RawFatDirectory {
             name: [FREE_DIRECTORY_ENTRY; 11],
             flags: 0,
             _unused1: [0; 8],
-            cluster_high: 0,
+            cluster_high: U16::new(0),
             _unused2: [0; 4],
-            cluster_low: 0,
-            size: 0,
+            cluster_low: U16::new(0),
+            size: U32::new(0),
         }
     }
-}
 
-// TODO do we still need this type? (haven't yet migrated away from it I suppose). May still be useful due to not wanting to do operations with RawFatDirectory.
-/// formatted filesystem
-struct FatDirectory {
-    name: [u8; 11], // 8 letter entry with a 3 letter ext
-    flags: u8, // designate the PFSdirectory as r,w,r/w
-    _unused1: [u8; 8], // unused data
-    cluster_high: u16, // but contains permissions required to access the PFSfile
-    _unused2: [u8; 4], // data including modified time
-    cluster_low: u16, // the starting cluster of the PFSfile
-    size: u32, // size of PFSfile in bytes, volume label or subdirectory flags should be set to 0
-}
-
-impl FatDirectory {
     #[inline]
     fn is_free(&self) -> bool {
         self.name[0] == 0 ||
@@ -388,64 +477,36 @@ impl FatDirectory {
     fn is_vfat(&self) -> bool {
         self.flags & FileAttributes::VFAT.bits == FileAttributes::VFAT.bits
     }
-    
-    fn to_directory_entry(&self) -> DirectoryEntry {
-        DirectoryEntry {
-            name: self.name,
-            file_type: if self.flags & 0x10 == 0x10 {
-                FileType::PFSDirectory
-            } else {
-                FileType::PFSFile
-            },
-            cluster: (u32::from(self.cluster_high)) << 16 | u32::from(self.cluster_low),
-            size: self.size,
-            long_name: [0; 255] // long names not supported. TODO
-        } 
-    }
-    
-    fn to_raw_fat_directory(&self) -> RawFatDirectory {
-        RawFatDirectory {
-            name: self.name,
-            flags: self.flags,
-            _unused1: self._unused1,
-            cluster_high: u16::to_le(self.cluster_high),
-            _unused2: self._unused2,
-            cluster_low: u16::to_le(self.cluster_low),
-            size: u32::to_le(self.size),
-        }
-    }
 }
 
 /// Based on the FatDirectory structure and used to describe the files/subdirectories in a FAT32 
 /// formatted filesystem, used for convience purposes
 pub struct DirectoryEntry {
-    pub name: [u8; 11], // TODO note that mapping this to a rust string can be challenging.
-    long_name: [u8; 255], // Long-name format currently not supported
+    pub name: DiskName,
     file_type: FileType,
     pub size: u32,
     cluster: u32,
 }
 
 /// TODO these methods need to potentially generate a sequence of entries.
-impl DirectoryEntry {
-    fn to_directory_entry(&self) -> FatDirectory {
-        // Janky but I don't know if we want the fat_directory type for much longer anyway?
-        // FIXME
-        self.to_raw_fat_directory().to_fat_directory()
-    }
-    
+impl DirectoryEntry {    
+    /// FIXME method has wrong implementation for long names on disk.
     fn to_raw_fat_directory(&self) -> RawFatDirectory {
+        let name_bytes = self.name.name.as_bytes();
+        
+        let long_name = LongName::new(name_bytes);
+
         RawFatDirectory {
-            name: self.name,
+            name: long_name.short_name,
             flags: match self.file_type {
                 FileType::PFSFile => 0x0,
                 FileType::PFSDirectory => 0x10,
             }, // FIXME need to store more flags in DirectoryEntry type
             _unused1: [0; 8],
-            cluster_high: u16::to_le((self.cluster >> 16) as u16),
+            cluster_high: U16::new((self.cluster >> 16) as u16),
             _unused2: [0; 4],
-            cluster_low: u16::to_le((self.cluster) as u16),
-            size: u32::to_le(self.size),
+            cluster_low: U16::new((self.cluster) as u16),
+            size: U32::new(self.size)
         }
     }
 }
@@ -570,7 +631,7 @@ impl File for PFSFile {
 
 impl FsNode for PFSFile {
     fn get_name(&self) -> String {
-        self.cc.name.clone()
+        self.cc.name.to_string().clone()
     }
 
     fn get_parent_dir(&self) -> Option<DirRef> {
@@ -617,10 +678,14 @@ impl Directory for PFSDirectory {
     }
 
     fn get(&self, name: &str) -> Option<FileOrDir> {
-        match name {
+        let name = DiskName::from_string(name).ok()?;
+
+        debug!("PFSDirectory::get called for {:?}", name.to_comp_name());
+
+        match name.name.as_str() {
             "." => self.dot.upgrade().map(|x| FileOrDir::Dir(x)),
             ".." => self.cc.parent.upgrade().map(|x| FileOrDir::Dir(x)),
-            name => self.fat32_get(name).ok(),
+            _ => self.fat32_get(&name).ok(),
         }
     }
 
@@ -638,12 +703,12 @@ impl Directory for PFSDirectory {
             Err(Error::NotFound) => {},
             Err(_) => {
                 warn!("Failed to fully walk directory");
-                return children.keys().map(|x| x.clone()).collect::<Vec<String>>();
+                return children.keys().map(|x| x.name.clone()).collect::<Vec<String>>();
             }
 
         }
 
-        return children.keys().map(|x| x.clone()).collect::<Vec<String>>();
+        return children.keys().map(|x| x.name.clone()).collect::<Vec<String>>();
 
         /*
         let mut list_of_names: Vec<String> = Vec::new();
@@ -677,7 +742,7 @@ impl Directory for PFSDirectory {
 
 impl FsNode for PFSDirectory {
     fn get_name(&self) -> String {
-        self.cc.name.clone()
+        self.cc.name.to_string().clone()
     }
 
     fn get_parent_dir(&self) -> Option<DirRef> {
@@ -710,22 +775,24 @@ impl PFSDirectory {
         name: Option<&str>) -> Result<DirectoryEntry, Error> {
         
         let mut pos = self.cc.initial_pos();
+        // FIXME warn in case of invalid disk name
+        let name = name.map(|name| DiskName::from_string(name).ok()).flatten();
         
         loop {
-            let dir: FatDirectory = self.get_fat_directory(fs, &pos)?;
+            let dir = self.get_fat_directory(fs, &pos)?;
             //debug!("got fat directory");
             
             // TODO VFAT long name check needs to be done correctly.
             if !dir.is_free() && !dir.is_vfat() && !dir.is_dot() { // Don't add dot directories. Must be handled specially. FIXME
                 debug!("Found new entry {:?}", debug_name(&dir.name));
-                let entry = dir.to_directory_entry();
+                let entry = dir.to_directory_entry()?;
 
                 // While we're here let's add the entry to our children.
                 self.add_directory_entry(fs, children, &entry)?;
 
-                match name {
+                match &name {
                     Some(name) => {
-                        if compare_name(name, &entry) {
+                        if name == &entry.name {
                             return Ok(entry);
                         }
                     },
@@ -754,16 +821,10 @@ impl PFSDirectory {
         entry: &DirectoryEntry) -> Result<FileOrDir, Error> {
 
         // TODO actually check the name:
-        let name: String = match core::str::from_utf8(&entry.name) {
-            Ok(name) => name.to_string(),
-            Err(_) => {
-                warn!("Couldn't convert name {:?} to string", entry.name);
-                return Err(Error::IllegalArgument);
-            }
-        };
+        let name = &entry.name;
 
-        if children.contains_key(&name) {
-            return match children.get(&name) {
+        if children.contains_key(name) {
+            return match children.get(name) {
                 Some(node) => Ok(node.clone()),
                 None => Err(Error::Unsupported) // This should never happen.
             }
@@ -793,7 +854,7 @@ impl PFSDirectory {
                 // Dirty shenanigans to set dot weak loop.
                 let dir_ref = Arc::new(Mutex::new(dir));
                 dir_ref.lock().dot = Arc::downgrade(&dir_ref) as WeakDirRef;
-                children.insert(name, FileOrDir::Dir(dir_ref.clone()));
+                children.insert(name.clone(), FileOrDir::Dir(dir_ref.clone()));
 
                 return Ok(FileOrDir::Dir(dir_ref));
             }
@@ -805,7 +866,7 @@ impl PFSDirectory {
                 };
 
                 let file_ref = Arc::new(Mutex::new(file));
-                children.insert(name, FileOrDir::File(file_ref.clone()));
+                children.insert(name.clone(), FileOrDir::File(file_ref.clone()));
 
                 return Ok(FileOrDir::File(file_ref));
             }
@@ -820,12 +881,13 @@ impl PFSDirectory {
         let mut pos = self.cc.initial_pos();
         
         loop {
-            let dir: FatDirectory = self.get_fat_directory(fs, &pos)?;
+            let dir = self.get_fat_directory(fs, &pos)?;
             
             // TODO VFAT long name check needs to be done correctly.
             if !dir.is_free() && !dir.is_vfat() {
                 debug!("Found new entry {:?}", debug_name(&dir.name));
-                entry_collection.push(dir.to_directory_entry());
+                // FIXME also don't just fail if we can't make an entry
+                entry_collection.push(dir.to_directory_entry()?);
             }
 
             // If the first byte of the directory is 0 we have reached the end of allocated directory entries
@@ -845,7 +907,7 @@ impl PFSDirectory {
     /// Returns the entry indicated by PFSPosition. TODO allow this to save reads and writes.
     /// the function is used and returns EndOfFile if the next PFSdirectory doesn't exist
     /// Note that this function will happily return unused directory entries since it simply provides a sequential view of the entries on disk.
-    fn get_fat_directory(&self, fs: &mut Filesystem, pos: &PFSPosition) -> Result<FatDirectory, Error> {
+    fn get_fat_directory(&self, fs: &mut Filesystem, pos: &PFSPosition) -> Result<RawFatDirectory, Error> {
         let sector = fs.first_sector_of_cluster(pos.cluster) + pos.sector_offset;
 
         debug!("Getting from cluster: {}, sector: {} (offset: {}), entry_offset: {}", pos.cluster, sector, pos.sector_offset, pos.entry_offset);
@@ -858,28 +920,9 @@ impl PFSDirectory {
             Error::BlockError
         })?;
         
-        let entry_offset = pos.entry_offset;
-        let fat_dir = FatDirectory {
-            name: match buf[(0)..(11)].try_into() {
-                        Ok(array) => array,
-                        Err(_) => return Err(Error::BlockError),
-            },
-            flags: buf[11],
-            _unused1: match buf[(12)..(20)].try_into() {
-                        Ok(array) => array,
-                        Err(_) => return Err(Error::BlockError),
-            },
-            cluster_high: LittleEndian::read_u16(&mut buf[(20)..(22)]) as u16,
-            _unused2: match buf[(22)..(26)].try_into() {
-                Ok(array) => array,
-                Err(_) => return Err(Error::BlockError),
-            },
-            cluster_low: LittleEndian::read_u16(&mut buf[(26)..(28)]) as u16,
-            size: LittleEndian::read_u32(&mut buf[(28)..(32)]) as u32,
-        };
+        let fat_dir = RawFatDirectoryBytes::parse(&buf[..]).ok_or(Error::BlockError)?;
         
-        // TODO this needs to ensure that unused directory entries are properly marked?
-        Ok(fat_dir)
+        Ok(fat_dir.fat_directory.clone())
     }
 
     // FIXME use sub byte transactions at some point?
@@ -916,7 +959,7 @@ impl PFSDirectory {
         let mut pos = self.cc.initial_pos();
         
         loop {
-            let dir: FatDirectory = self.get_fat_directory(fs, &pos)?;
+            let dir = self.get_fat_directory(fs, &pos)?;
             
             if dir.is_free() {
                 return Ok(pos); // Pos is now set to the position of a free directory so we can continue.
@@ -990,7 +1033,7 @@ impl PFSDirectory {
     }
 
     /// Internal get function. TODO enforce returning PFSType?
-    fn fat32_get(&self, name: &str) -> Result<FileOrDir, Error> {
+    fn fat32_get(&self, name: &DiskName) -> Result<FileOrDir, Error> {
 
         // TODO need some sort of string typing that ensure it's a valid fat32 name that will match the string we insert into the children list.
         match self.children.read().get(name) {
@@ -1005,12 +1048,12 @@ impl PFSDirectory {
         
         for entry in entries {
             // Compares the name of the next entry in the current directory
-            if compare_name(name, &entry) {
+            if name == &entry.name {
                 // Found the entry on disk. Need to create a new cluster chain for the object:
                 let cc = ClusterChain {
                     cluster: entry.cluster,
                     _num_clusters: None,
-                    name: name.to_string(), // FIXME this is wrong.
+                    name: name.clone(), // FIXME this is wrong.
                     on_disk_refcount: 1, // FIXME not true for directories. Should rename so that this is fine.
                     filesystem: self.cc.filesystem.clone(),
                     parent: self.dot.clone(),
@@ -1019,7 +1062,7 @@ impl PFSDirectory {
 
                 // Get a write lock for the children and check if it was found before creating a new object (since we dropped the read lock).
                 let mut children = self.children.write();
-                match children.get(name) {
+                match children.get(&name) {
                     Some(child) => return Ok(child.clone()),
                     None => {},
                 };
@@ -1037,7 +1080,7 @@ impl PFSDirectory {
                         // Dirty shenanigans to set dot weak loop.
                         let dir_ref = Arc::new(Mutex::new(dir));
                         dir_ref.lock().dot = Arc::downgrade(&dir_ref) as WeakDirRef;
-                        children.insert(name.to_string(), FileOrDir::Dir(dir_ref.clone()));
+                        children.insert(name.clone(), FileOrDir::Dir(dir_ref.clone()));
 
                         return Ok(FileOrDir::Dir(dir_ref));
                     }
@@ -1049,7 +1092,7 @@ impl PFSDirectory {
                         };
 
                         let file_ref = Arc::new(Mutex::new(file));
-                        children.insert(name.to_string(), FileOrDir::File(file_ref.clone()));
+                        children.insert(name.clone(), FileOrDir::File(file_ref.clone()));
 
                         return Ok(FileOrDir::File(file_ref));
                     }
@@ -1067,7 +1110,7 @@ impl PFSDirectory {
 struct ClusterChain {
     filesystem: Arc<Mutex<Filesystem>>,
     cluster: u32,
-    pub name: String,
+    pub name: DiskName,
     pub parent: WeakDirRef, // the directory that holds the metadata for this directory. The root directory's parent should be itself
     on_disk_refcount: usize, // Number of references on disk. For a file must always be one. For a directory this is variable.
     _num_clusters: Option<u32>, // Unknown without traversing FAT table. I consider this useful information, but I'm not sure if I'll ever use it.
@@ -1467,6 +1510,7 @@ pub fn detect_fat(disk: &storage_device::StorageDeviceRef) -> bool {
 }
 
 
+// FIXME need to move some of this logic into the DiskName type.
 /// A case-insenstive way to compare FATdirectory entry name which is in [u8;11] and a str literal to be able to 
 /// confirm whether the directory/file that you're looking at is the one specified 
 /// 
@@ -1480,38 +1524,38 @@ pub fn detect_fat(disk: &storage_device::StorageDeviceRef) -> bool {
 /// let de.name: [u8;11] = [0x46, 0x41, 0x54, 0x33, 0x32, 0x20, 0x20, 0x20, 0x20, 0x20, 0x20];
 /// assert_eq!(compare_name(&str, de), true)
 /// ```
-pub fn compare_name(name: &str, de: &DirectoryEntry) -> bool {
-    compare_short_name(name, de) || &de.long_name[0..name.len()] == name.as_bytes()
-}
+// pub fn compare_name(name: &str, de: &DirectoryEntry) -> bool {
+//     compare_short_name(name, de) || &de.long_name[0..name.len()] == name.as_bytes()
+// }
 
-fn compare_short_name(name: &str, de: &DirectoryEntry) -> bool {
-    // 8.3 (plus 1 for the separator)
-    if name.len() > 12 {
-        return false;
-    }
+// fn compare_short_name(name: &str, de: &DirectoryEntry) -> bool {
+//     // 8.3 (plus 1 for the separator)
+//     if name.len() > 12 {
+//         return false;
+//     }
 
-    let mut i = 0;
-    for (_, a) in name.as_bytes().iter().enumerate() {
-        // Handle cases which are 11 long but not 8.3 (e.g "loader.conf")
-        if i == 11 {
-            return false;
-        }
+//     let mut i = 0;
+//     for (_, a) in name.as_bytes().iter().enumerate() {
+//         // Handle cases which are 11 long but not 8.3 (e.g "loader.conf")
+//         if i == 11 {
+//             return false;
+//         }
 
-        // Jump to the extension
-        if *a == b'.' {
-            i = 8;
-            continue;
-        }
+//         // Jump to the extension
+//         if *a == b'.' {
+//             i = 8;
+//             continue;
+//         }
 
-        let b = de.name[i];
-        if a.to_ascii_uppercase() != b.to_ascii_uppercase() {
-            return false;
-        }
+//         let b = de.name[i];
+//         if a.to_ascii_uppercase() != b.to_ascii_uppercase() {
+//             return false;
+//         }
 
-        i += 1;
-    }
-    true
-}
+//         i += 1;
+//     }
+//     true
+// }
 
 // TODO is this mount name argument dumb? It seems like we want a semi-arbitrary name to support names for mount purposes.
 /// Creates a FATdirectory structure for the root directory
@@ -1522,15 +1566,16 @@ fn compare_short_name(name: &str, de: &DirectoryEntry) -> bool {
 /// 
 /// # Returns
 /// Returns the FATDirectory structure for the root directory 
-pub fn root_dir(fs: Arc<Mutex<Filesystem>>, mount_name: String) -> Result<Arc<Mutex<RootDirectory>>, Error> {
+pub fn root_dir(fs: Arc<Mutex<Filesystem>>, mount_name: &str) -> Result<Arc<Mutex<RootDirectory>>, &'static str> {
 
     // TODO right now this function can violate the singleton blahdy blah and risks making two cluster chains for this dir.
     // We also can't just use something like a lazy static, since it's a per-FS basis. Maybe the FS needs some information to prevent this.
 
+
     let cc = ClusterChain {
         filesystem: fs.clone(),
         cluster: 2,
-        name: mount_name,
+        name: DiskName::from_string(mount_name)?,
         parent: Weak::<Mutex<PFSDirectory>>::new(),
         on_disk_refcount: 2 + 1, // TODO should this be the case?
         _num_clusters: None,
@@ -1596,6 +1641,9 @@ impl FsNode for RootDirectory {
     }
 
     // In this case we want to update the parent dir, but don't do anything on disk:
+    // As such we have to bypass any sort of on-disk changes that might be used from a
+    // set parent dir method in cc.
+    // TODO make cc parent dir method that works well for this.
     fn set_parent_dir(&mut self, new_parent: WeakDirRef) {
         self.underlying_dir.cc.parent = new_parent;
     }
@@ -1633,9 +1681,9 @@ pub fn test_module_init() -> Result<(), &'static str> {
     //     .spawn()?;
 
     // start a task that tries to find the module in root.
-    // KernelTaskBuilder::new(test_insert, None)
-    //     .name("fat32_insert_test".to_string())
-    //     .spawn()?;
+    KernelTaskBuilder::new(test_insert, None)
+        .name("fat32_insert_test".to_string())
+        .spawn()?;
 
     Ok(())
 }
@@ -1655,7 +1703,7 @@ fn test_insert(taskref: Option<TaskRef>) ->  Result<(), &'static str> {
                     let name = "fat32";
 
 
-                    let fat32_root = root_dir(fs.clone(), name.clone().to_string()).unwrap();
+                    let fat32_root = root_dir(fs.clone(), name.clone()).unwrap();
 
 
                     let true_root_ref = root::get_root();
@@ -1670,8 +1718,8 @@ fn test_insert(taskref: Option<TaskRef>) ->  Result<(), &'static str> {
 
 
                     // Now let's try a couple simple things:
-                    let test_root = true_root.get_dir(&name).unwrap();
-                    debug!("Root directory entries: {:?}", test_root.lock().list());    
+                    //let test_root = true_root.get_dir(&name).unwrap();
+                    //debug!("Root directory entries: {:?}", test_root.lock().list());    
 
                     // Unblock the find task now that we've finished our insert.
                     taskref.map(|x| x.unblock());  

@@ -102,7 +102,7 @@ pub fn main(args: Vec<String>) -> isize {
                     let name = "fat32".to_string();
 
                     //let fat32_root: Arc<Mutex<RootDirectory>> = root_dir(fs.clone(), name.clone()).unwrap();
-                    let fat32_root: DirRef = root_dir(fs.clone(), name.clone()).unwrap();
+                    let fat32_root: DirRef = root_dir(fs.clone(), &name).unwrap();
                     
                     // // Recursively print files and directories.
                     if matches.opt_present("p") {
