@@ -248,8 +248,12 @@ impl DiskName {
         // FIXME validate string names:
         // FIXME properly strip trailing spaces:
         Ok(DiskName {
-            name: name.to_string()
+            name: name.trim_right().to_string()
         })
+    }
+
+    fn from_long_name(long_name: LongName) -> Result<DiskName, &'static str> {
+        Err("Unsupported")
     }
 }
 
@@ -435,7 +439,7 @@ struct RawFatDirectory {
 impl RawFatDirectory {    
     fn to_directory_entry(&self) -> Result<DirectoryEntry, Error> {
         let name = String::from_utf8(self.name.to_vec()).map_err(|_| Error::IllegalArgument)?;
-        let name = DiskName {name};
+        let name = DiskName::from_string(&name).map_err(|_| Error::IllegalArgument)?;
 
         Ok(DirectoryEntry {
             name,
