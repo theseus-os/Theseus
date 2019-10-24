@@ -14,81 +14,91 @@
 //! 
 //! ```rust
 //! #![no_std]
-// #![feature(slice_concat_ext)]
-
-//! #[macro_use] extern crate alloc;
 //! #[macro_use] extern crate terminal_print;
-//! extern crate device_manager;
 //! #[macro_use] extern crate log;
+//! 
+//! extern crate device_manager;
 //! extern crate fat32;
 //! extern crate ata;
 //! extern crate storage_device;
 //! extern crate spin;
 //! extern crate fs_node;
-//!
-//! use alloc::sync::{Arc, Weak};
-//! use spin::Mutex;
+//! extern crate path;
+//! extern crate alloc;
+//! 
 //! use alloc::vec::Vec;
 //! use alloc::string::String;
-//! use fs_node::File;
-//! use fs_node::Directory;
-//! use fat32::root_dir;
-//!
-//!
-//!if let Some(controller) = storage_manager::STORAGE_CONTROLLERS.lock().iter().next() {
-//!    for sd in controller.lock().devices() {
-//!        match fat32::init(sd) {
-//!            Ok(fatfs) => {
-//!                let fs = Arc::new(Mutex::new(fatfs));
-//!                // Creating the root directory first
-//!                let mut root_dir = root_dir(fs.clone()).unwrap();
-//!                
-//!                // Able to list out the names of the folder entries
-//!                println!("{:?}", root_dir.list());
-//!
-//!                root_dir.get("test");
-//!
-//!                // Uses the path provided and reads the bytes of the file otherwise returns 0 if file can't be found
-//!                // The path can be in the format of /hello/poem.txt or \\hello\\poem.txt
-//!                let path = format!("\\hello\\poem.txt"); // works for subdirectories and files that span beyond a single cluster
-//!                
-//!                // This open function create a file structure based on the path if it is found
-//!                match fat32::open(fs.clone(), &path) {
-//!                    Ok(f) => {
-//!                        debug!("file size:{}", f.size);
-//!                        let mut bytes_so_far = 0;
-//!                        
-//!                        // the buffer provided must be a multiple of the cluster size in bytes, so if the cluster is 8 sectors
-//!                        // the buffer must be a multiple of 8*512 (4096 bytes)
-//!                        let mut data: [u8; 4096*2] = [0;4096*2];
-//!                        
-//!                        match f.read(&mut data, 0) {
-//!                            Ok(bytes) => {
-//!                                bytes_so_far += bytes;
-//!                            }
-//!                            Err(_er) => panic!("the file failed to read"),
-//!                            }
-//!                        ;
-//!                        debug!("{:X?}", &data[..]);
-//!                        debug!("{:?}", core::str::from_utf8(&data));
-//!
-//!                        println!("bytes read: {}", bytes_so_far);
-//!                    }
-//!                    Err(_) => println!("file doesnt exist"),
-//!                        }
-//!
-//!                let path2 = format!("\\test");
-//!                let file2 = fat32::open(fs.clone(), &path2);
-//!                println!("name of second file is: {}", file2.unwrap().name);
-//!            }
-//!            
-//!            Err(_) => {
-//!                ();
-//!            }
-//!        }
-//!    }
-//!}
-//!Ok(())
+//! use alloc::string::ToString;
+//! use alloc::sync::{Arc};
+//! use spin::Mutex;
+//! use fs_node::{FileOrDir, DirRef};
+//! use fat32::{root_dir};
+//! use path::Path;
+//! 
+//! #[no_mangle]
+//! pub fn main(_args: Vec<String>) -> isize {
+//!     
+//!     // Itereate through list of storage devices to find a storage device with a FAT32 filesystem.
+//!     if let Some(controller) = storage_manager::STORAGE_CONTROLLERS.lock().iter().next() {
+//!         for sd in controller.lock().devices() {
+//!             match fat32::init(sd) {
+//!                 Ok(fatfs) => {
+//!                     let fs = Arc::new(Mutex::new(fatfs));
+//! 
+//!                     // Since the root_dir function is meant to support creating a RootDirectory for a potential mount point
+//!                     // we can give it a name. For now
+//!                     let name = "/".to_string();
+//! 
+//!                     // Since this root is a DirRef, the read-only parts of the FsNode API works for the fat32 crate.
+//!                     let fat32_root: DirRef = root_dir(fs.clone(), &name).unwrap();
+//! 
+//!                     // Note that FAT32 is typically case insensitive with case preserving rules.
+//!                     // We'll try to read from this file (on the test disk).
+//!                     let path_to_get = Path::new("bigfile/BIGFILE".to_string());
+//! 
+//!                     // Remember that the path crate only recognizes the system root so we must get relative to our root.
+//!                     let file_or_dir = match path_to_get.get(&fat32_root) {
+//!                         Some(file_or_dir) => file_or_dir,
+//!                         None => {
+//!                             warn!("bigfile/BIGFILE not found in fat32 ");
+//!                             return 1;
+//!                         }
+//!                     };
+//! 
+//!                     let big_file = match file_or_dir {
+//!                         FileOrDir::File(f) => {
+//!                             f
+//!                         },
+//!                         FileOrDir::Dir(_) => {
+//!                             warn!("bigfile/BIGFILE was a directory. Expected file.");
+//!                             return 1;
+//!                         }
+//!                     };
+//! 
+//!                     let mut buf = [0; 16];
+//!                     let bytes_read = match big_file.lock().read(&mut buf, 0) {
+//!                         Ok(bytes) => bytes,
+//!                         Err(e) => {
+//!                             warn!("Disk read failed: {:?}", e);
+//!                             return 1;
+//!                         },
+//!                     };
+//! 
+//!                     println!("Read {} bytes. Found text: {:?}", bytes_read, 
+//!                         String::from_utf8(buf.to_vec()).unwrap_or("INVALID_UTF8".to_string()));
+//!                     return 0;
+//!                 }
+//!                 
+//!                 Err(_) => {
+//!                     // Don't need to do anything because not all storage devices contain a FAT32 FS.
+//!                     1;
+//!                 }
+//!             }
+//!         }
+//!     }
+//!     warn!("No valid FAT32 filesystems found.");
+//!     0
+//! }
 //! ```
 //! 
 
@@ -132,7 +142,7 @@ use alloc::string::String;
 use alloc::string::ToString;
 use memory::MappedPages;
 use block_io::BlockIo;
-use spawn::{KernelTaskBuilder, ApplicationTaskBuilder};
+use spawn::{KernelTaskBuilder};
 use task::TaskRef;
 
 // DO NOT UNDER ANY CIRCUMSTANCE CHECK THIS FOR EQUALITY TO DETERMINE EOC
@@ -148,7 +158,8 @@ const DOT_DIRECTORY_ENTRY: u8 = 0x2e;
 /// Empty cluster marked as 0.
 const EMPTY_CLUSTER: u32 = 0;
 
-// TODO use these at some point.
+// TODO enforce more fo these (primarily ensure things are files before making PFSFile)
+/// Directory entry flags. Mostly ignored in this implementation.
 bitflags! {
     struct FileAttributes: u8 {
         const READ_ONLY = 0x1;
@@ -175,7 +186,6 @@ fn is_empty_cluster(cluster: u32) -> bool {
     cluster_from_raw(cluster) == EMPTY_CLUSTER
 }
 
-// TODO misleading name makes it sound like we're handling the endian-ness
 /// Converts a cluster number read raw from disk into the value used for computation.
 #[inline]
 fn cluster_from_raw(cluster: u32) -> u32 {
@@ -194,8 +204,10 @@ pub enum Error {
     InvalidOffset,
     IllegalArgument,
     DiskFull,
+    InconsistentDisk,
 }
 
+// Likely we'll want to add some sort of entry for non-file or directory types. TODO
 /// Indicates whether the PFSDirectory entry is a PFSFile or a PFSDirectory
 #[derive(Debug, PartialEq)]
 enum FileType {
@@ -207,28 +219,36 @@ enum FileType {
 type ChildList = BTreeMap<DiskName, FileOrDir>;
 type ShortName = [u8; 11];
 
-// TODO I think this is a dumb construction, but it seems OK for now.
-// I think at a minimum treating this as an array of name extensions would be preferable
-// since the size must be bounded anyway.
+// May be better to replace the Vec with an array of extensions?
+// TODO: May want a method to validate the LongName struct too.
 /// Generalized name struct that can be filled from and written onto disk easily.
 struct LongName {
     short_name: ShortName,
-    remaining_parts: Vec<[u8; 11]>, // FIXME this is probably a wrong size for VFAT extension.
+    long_name: Vec<[u16; 13]>, // FIXME this is probably a wrong size for VFAT extension.
 }
 
 impl LongName {
-    // FIXME this doesn't handle the case where we read from a non-contiguous section of bytes.
-    // A dumb/janky way is to pass a byte iterator instead, but that sounds needlessly bad.
-    fn new(bytes: &[u8]) -> LongName {
-        let mut long_name = LongName {
+    /// Construct a new long name from a sequence of on disk directory entries.
+    fn new(entries: Vec<&RawFatDirectory>) -> Result<LongName, Error> {
+        let mut long_name = LongName::empty();
+        // Last entry must contain the short_name bytes.
+        let last = entries[entries.len() - 1];
+        if last.is_vfat() {
+            // VFAT long name extension entries do not contain the short name.
+            // As such this is an illegal sequence of directories.
+            return Err(Error::InconsistentDisk)
+        }
+
+        long_name.short_name = last.name;
+
+        Ok(long_name)
+    }
+
+    fn empty() -> LongName {
+        LongName {
             short_name: [0; 11],
-            remaining_parts: vec!(),
-        };
-        let len_to_copy = min(long_name.short_name.len(), bytes.len());
-
-        long_name.short_name[0..len_to_copy].copy_from_slice(&bytes[0..len_to_copy]);
-
-        long_name
+            long_name: vec!(),
+        }
     }
 }
 
@@ -240,20 +260,74 @@ pub struct DiskName {
 }
 
 impl DiskName {
+    /// Convert to a string that compares consistently for 
     fn to_comp_name(&self) -> String {
         self.name.to_uppercase()
     }
 
     fn from_string(name: &str) -> Result<DiskName, &'static str> {
         // FIXME validate string names:
+        if name.is_empty() {
+            return Err("Name cannot be empty");
+        }
+
         // FIXME properly strip trailing spaces:
         Ok(DiskName {
-            name: name.trim_right().to_string()
+            name: name.trim_end().to_string()
         })
     }
 
     fn from_long_name(long_name: LongName) -> Result<DiskName, &'static str> {
         Err("Unsupported")
+    }
+
+    // TODO support constructing the long_name field using a UCS-2 encoding.
+    // ALSO TODO if we construct the canonical short name, it depends on the number of
+    // duplicates on disk, so we'll need to figure that out somehow, which is quite
+    // a bit outside of the scope of how we're currently doing things.
+    // For now I'm probably going to just make things ~1 for all short names if truncated.
+    // Another option is to manually modify the long name after construction to account for
+    // the number of aliases? Seems less awful, but leads to some less idiomatic code.
+    // I think that the most effective solution is to either set a flag or simply
+    // check that the long_name field is not empty and then overwrite the short name
+    // before interacting with disk based on the number of duplicates.
+    fn to_long_name(&self) -> LongName {
+        let mut long_name = LongName::empty();
+
+        // Check for . and .. entries separately
+
+
+        //let bytes_to_copy = min(long_name.short_name.len(), name_bytes.len());
+        //long_name.short_name[0..bytes_to_copy].copy_from_slice(&name_bytes[0..bytes_to_copy]);
+        // Construct the canonical short name:
+        long_name.short_name = match self.name.rsplitn(1, |x| x == '.').collect::<Vec<&str>>()[0..2] {
+            [name_without_extension] => {
+                let mut short_name: [u8; 11] = *b"           ";
+                let num_bytes_to_copy = min(8, name_without_extension.as_bytes().len());
+                short_name[0..num_bytes_to_copy].copy_from_slice(&name_without_extension.as_bytes()[0..num_bytes_to_copy]);
+                short_name[8..11].copy_from_slice(b"   ");
+                short_name
+            },
+            [base, extension]        => {
+                let mut short_name: [u8; 11] = *b"           ";
+                let num_bytes_to_copy = min(8, base.as_bytes().len());
+                short_name[0..num_bytes_to_copy].copy_from_slice(&base.as_bytes()[0..num_bytes_to_copy]);
+
+                let num_bytes_to_copy = min(3, extension.as_bytes().len());
+                short_name[8..(8+num_bytes_to_copy)].copy_from_slice(&extension.as_bytes()[0..num_bytes_to_copy]);
+
+                short_name
+            },
+            // Cases that should not be possible given behavior for rsplitn
+            _ => {
+                error!("fat32::DiskName::to_long_name encountered unexpected return from rsplitn");
+                *b"           "
+            }
+        };
+
+        // TODO encode the name into UCS-2 and split into small buffers
+        // to construct the UCS-2 encoded long name.
+        long_name
     }
 }
 
@@ -496,9 +570,8 @@ pub struct DirectoryEntry {
 impl DirectoryEntry {    
     /// FIXME method has wrong implementation for long names on disk.
     fn to_raw_fat_directory(&self) -> RawFatDirectory {
-        let name_bytes = self.name.name.as_bytes();
-        
-        let long_name = LongName::new(name_bytes);
+
+        let long_name = self.name.to_long_name();
 
         RawFatDirectory {
             name: long_name.short_name,
