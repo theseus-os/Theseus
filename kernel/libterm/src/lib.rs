@@ -475,7 +475,7 @@ impl Terminal {
 
     /// Insert a character to the screen. The position is specified by parameter `cursor_end_offset` as relative to the end of the text in units of number of characters,
     /// that is the relative distance to the end of the whole output on the screen.
-    /// cursor_end_offset == 0 means to append characters onto the screen, while cursor_end_offset == 1 means to
+    /// end_offset == 0 means to append characters onto the screen, while end_offset == 1 means to
     /// insert a character right before the exsiting last character.
     /// One must call `refresh_display` to get things actually showed.
     pub fn insert_char_to_screen(&mut self, c: char, end_offset: usize) -> Result<(), &'static str> {

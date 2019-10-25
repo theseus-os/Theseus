@@ -224,12 +224,12 @@ impl Shell {
     /// which indicates the position counting from the end of the command line.
     /// `sync_terminal` indicates whether the terminal screen will be synchronically updated.
     fn insert_char_to_cmdline(&mut self, c: char, sync_terminal: bool) -> Result<(), &'static str> {
-        let end_offset = self.terminal.lock().get_cursor_end_offset();
+        let mut terminal = self.terminal.lock();
+        let end_offset = terminal.get_cursor_end_offset();
         let insert_idx = self.cmdline.len() - end_offset;
         self.cmdline.insert(insert_idx, c);
         if sync_terminal {
             // disable cursor before updating in case the cursor is not at the end and the old text is the prefix of the new one
-            let mut terminal = self.terminal.lock();
             terminal.cursor.disable();
             terminal.display_cursor()?;
             terminal.insert_char_to_screen(c, end_offset)?;
@@ -253,9 +253,9 @@ impl Shell {
             self.terminal.lock().remove_char_from_screen(cursor_end_offset)?;
         }
         if !erase_left { 
-            let new_offset = self.terminal.lock().get_cursor_end_offset() - 1;
-            if new_offset > 0 {
-                self.terminal.lock().update_cursor_pos(new_offset, self.cmdline.as_bytes()[self.cmdline.len() - new_offset]);
+            cursor_end_offset -= 1;
+            if cursor_end_offset > 0 {
+                self.terminal.lock().update_cursor_pos(cursor_end_offset, self.cmdline.as_bytes()[self.cmdline.len() - cursor_end_offset]);
             } else {
                 self.terminal.lock().update_cursor_pos(0, 0);
             }
