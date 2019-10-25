@@ -473,35 +473,34 @@ impl Terminal {
         }
     }
 
-    /// Insert a character to the screen. The position is specified by parameter `cursor_end_offset` as relative to the end of the text in units of number of characters,
+    /// Insert a character to the screen. The position is specified by parameter `end_offset` as relative to the end of the text in units of number of characters,
     /// that is the relative distance to the end of the whole output on the screen.
     /// end_offset == 0 means to append characters onto the screen, while end_offset == 1 means to
     /// insert a character right before the exsiting last character.
     /// One must call `refresh_display` to get things actually showed.
     pub fn insert_char_to_screen(&mut self, c: char, end_offset: usize) -> Result<(), &'static str> {
         let buflen = self.scrollback_buffer.len();
-        if buflen < self.cursor.end_offset { return Err("cursor_end_offset is larger than length of scrollback buffer"); }
+        if buflen < end_offset { return Err("end_offset is larger than length of scrollback buffer"); }
         let insert_idx = buflen - end_offset;
         self.scrollback_buffer.insert_str(insert_idx, &c.to_string());
         Ok(())
     }
 
-    /// Remove a character from the screen. The position is specified by parameter `cursor_end_offset` relative to the end of the text in units of number of characters,
+    /// Remove a character from the screen. The position is specified by parameter `end_offset` relative to the end of the text in units of number of characters,
     /// that is the relative distance to the end of the whole output on the screen.
-    /// cursor_end_offset == 1 means to remove the last character on the screen.
-    /// cursor_end_offset == 0 is INVALID here, since there's nothing at the "end" of the screen.
+    /// end_offset == 1 means to remove the last character on the screen.
+    /// end_offset == 0 is INVALID here, since there's nothing at the "end" of the screen.
     /// One must call `refresh_display` to get things actually removed on the screen.
     pub fn remove_char_from_screen(&mut self, end_offset: usize) -> Result<(), &'static str> {
         let buflen = self.scrollback_buffer.len();
-        if buflen < end_offset { return Err("cursor_end_offset is larger than length of scrollback buffer"); }
-        if end_offset == 0 { return Err("cannot remove character at cursor_end_offset == 0"); }
+        if buflen < end_offset { return Err("end_offset is larger than length of scrollback buffer"); }
+        if end_offset == 0 { return Err("cannot remove character at end_offset == 0"); }
         let remove_idx = buflen - end_offset;
         self.scrollback_buffer.remove(remove_idx);
         Ok(())
     }
     
     /// Scroll the screen to the very beginning.
-    /// `cursor_end_offset` is the position of the cursor relative to the end of the text in units of number of characters
     pub fn move_screen_to_begin(&mut self) -> Result<(), &'static str> {
         // Home command only registers if the text display has the ability to scroll
         if self.scroll_start_idx != 0 {
@@ -514,7 +513,6 @@ impl Terminal {
     }
 
     /// Scroll the screen to the very end.
-    /// `cursor_end_offset` is the position of the cursor relative to the end of the text in units of number of characters
     pub fn move_screen_to_end(&mut self) -> Result<(), &'static str> {
         if !self.is_scroll_end {
             self.cursor.disable();
@@ -528,7 +526,6 @@ impl Terminal {
     }
 
     /// Scroll the screen a line up.
-    /// `cursor_end_offset` is the position of the cursor relative to the end of the text in units of number of characters
     pub fn move_screen_line_up(&mut self) -> Result<(), &'static str> {
         if self.scroll_start_idx != 0 {
             self.scroll_up_one_line();
@@ -538,7 +535,6 @@ impl Terminal {
     }
 
     /// Scroll the screen a line down.
-    /// `cursor_end_offset` is the position of the cursor relative to the end of the text in units of number of characters
     pub fn move_screen_line_down(&mut self) -> Result<(), &'static str> {
         if !self.is_scroll_end {
             self.cursor.disable();
@@ -550,7 +546,6 @@ impl Terminal {
     }
 
     /// Scroll the screen a page up.
-    /// `cursor_end_offset` is the position of the cursor relative to the end of the text in units of number of characters
     pub fn move_screen_page_up(&mut self) -> Result<(), &'static str> {
         if self.scroll_start_idx <= 1 {
             return Ok(());
@@ -561,7 +556,6 @@ impl Terminal {
     }
 
     /// Scroll the screen a page down.
-    /// `cursor_end_offset` is the position of the cursor relative to the end of the text in units of number of characters
     pub fn move_screen_page_down(&mut self) -> Result<(), &'static str> {
         if self.is_scroll_end {
             return Ok(());
@@ -602,8 +596,7 @@ impl Terminal {
         self.get_displayable_dimensions(&self.display_name)
     }
 
-    /// Display the cursor of the terminal
-    /// `cursor_end_offset` is the position of the cursor relative to the end of the text in units of number of characters.
+    /// Display the cursor of the terminal.
     pub fn display_cursor(
         &mut self
     ) -> Result<(), &'static str> {
@@ -626,8 +619,7 @@ impl Terminal {
         let cursor_pos = text_next_pos - self.cursor.end_offset;
         let cursor_line = cursor_pos / col_num;
         let cursor_col = cursor_pos % col_num;
-        
-        
+                
         self.cursor.display(
             coordinate,
             cursor_col,
@@ -639,10 +631,15 @@ impl Terminal {
         self.window.render(Some(block.into_iter()))
     }
 
+    /// Get the position of the cursor relative to the end of text in units of characters.
     pub fn get_cursor_end_offset(&self) -> usize {
         self.cursor.end_offset
     }
 
+    /// Update the position of a cursor.
+    /// # Arguments
+    /// * `end_offset`: the position of the cursor relative to the end of text in units of characters.
+    /// * `back_char`: the ASCII code of the underlying character when the cursor is unseen.
     pub fn update_cursor_pos(&mut self, end_offset: usize, back_char: u8) {
         self.cursor.end_offset = end_offset;
         self.cursor.back_char = back_char;
@@ -650,14 +647,17 @@ impl Terminal {
 
 }
 
-/// A cursor structure. It contains whether it is enabled,
-/// the frequency it blinks, the last time it blinks, the current blink state show/hidden, and its color.
-/// A cursor is a special symbol which can be displayed.
+/// A cursor structure. It is a special symbol which can be displayed.
 pub struct Cursor {
+    /// Whether the cursor is enabled in the terminal.
     enabled: bool,
+    /// The blinking frequency.
     freq: u64,
+    /// The last time it blinks.
     time: TscTicks,
+    /// The current blinking state show/hidden
     show: bool,
+    /// The color of the cursor
     color: u32,
     /// The position of the cursor relative to the end of terminal text in units of number of characters.
     end_offset: usize,
@@ -720,18 +720,17 @@ impl Cursor {
         self.enabled && self.show
     }
 
-    /// Display a cursor at `coordinate` onto a frame buffer. 
+    /// Display a cursor in a text block onto a frame buffer. 
     /// # Arguments
-    /// * `cursor`: the cursor to display.
-    /// * `coordinate`: the coordinate within the `framebuffer` where the cursor is displayed. It specifies the location of the top-left point of the cursor. The `coordinate` is relative to the top-left point `(0, 0)` of the `framebuffer`.
-    /// * bg_color: the background color of the area if the cursor is hidden.
-    /// * `framebuffer:` the framebuffer to display onto.
-    pub fn display(&mut self, coordinate: Coord, col: usize, line: usize, framebuffer: &mut dyn FrameBuffer) {
+    /// * `coordinate`: the left top coordinate of the text block relative to the origin(top-left point) of the frame buffer.
+    /// * `(column, line)`: the location of the cursor in the text block as symbols.
+    /// * `framebuffer`: the framebuffer to display onto.
+    pub fn display(&mut self, coordinate: Coord, column: usize, line: usize, framebuffer: &mut dyn FrameBuffer) {
         if self.blink() {
             if self.show() {
                 frame_buffer_drawer::fill_rectangle(
                     framebuffer,
-                    coordinate + ((col * CHARACTER_WIDTH) as isize, (line * CHARACTER_HEIGHT) as isize) + (0, 1),
+                    coordinate + ((column * CHARACTER_WIDTH) as isize, (line * CHARACTER_HEIGHT) as isize) + (0, 1),
                     CHARACTER_WIDTH,
                     CHARACTER_HEIGHT - 2,
                     self.color,
@@ -743,7 +742,7 @@ impl Cursor {
                     FONT_COLOR,
                     BACKGROUND_COLOR,
                     coordinate,
-                    col,
+                    column,
                     line,
                 )
             }

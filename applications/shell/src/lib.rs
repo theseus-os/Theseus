@@ -220,8 +220,7 @@ impl Shell {
     }
 
     /// Insert a character to the command line buffer in the shell.
-    /// The position to insert is determined by the internal maintained variable `cursor_end_offset`,
-    /// which indicates the position counting from the end of the command line.
+    /// The position to insert is determined by the position of the cursor in the terminal. 
     /// `sync_terminal` indicates whether the terminal screen will be synchronically updated.
     fn insert_char_to_cmdline(&mut self, c: char, sync_terminal: bool) -> Result<(), &'static str> {
         let mut terminal = self.terminal.lock();
@@ -240,8 +239,7 @@ impl Shell {
 
     /// Remove a character from the command line buffer in the shell. If there is nothing to
     /// be removed, it does nothing and returns.
-    /// The position to insert is determined by the internal maintained variable `cursor_end_offset`,
-    /// which indicates the position counting from the end of the command line.
+    /// The position to remove is determined by the position of the cursor in the terminal.
     /// `sync_terminal` indicates whether the terminal screen will be synchronically updated.
     fn remove_char_from_cmdline(&mut self, erase_left: bool, sync_terminal: bool) -> Result<(), &'static str> {
         let mut cursor_end_offset = self.terminal.lock().get_cursor_end_offset();
@@ -252,13 +250,8 @@ impl Shell {
         if sync_terminal {
             self.terminal.lock().remove_char_from_screen(cursor_end_offset)?;
         }
-        if !erase_left { 
-            cursor_end_offset -= 1;
-            if cursor_end_offset > 0 {
-                self.terminal.lock().update_cursor_pos(cursor_end_offset, self.cmdline.as_bytes()[self.cmdline.len() - cursor_end_offset]);
-            } else {
-                self.terminal.lock().update_cursor_pos(0, 0);
-            }
+        if !erase_left {            
+            self.update_cursor_pos(cursor_end_offset - 1)?;
         }
         Ok(())
     }
@@ -272,7 +265,7 @@ impl Shell {
             }
         }
         self.cmdline.clear();
-        self.terminal.lock().update_cursor_pos(0, 0);
+        self.update_cursor_pos(0)?;
         Ok(())
     }
 
@@ -283,7 +276,7 @@ impl Shell {
             self.clear_cmdline(sync_terminal)?;
         }
         self.cmdline = s.clone();
-        self.terminal.lock().update_cursor_pos(0, 0);
+        self.update_cursor_pos(0)?;
         if sync_terminal {
             self.terminal.lock().print_to_terminal(s);
         }
@@ -342,6 +335,7 @@ impl Shell {
         Ok(())
     }
 
+    // Update the position of cursor. `end_offset` specifies the position relative to the end of the text in units of characters.
     fn update_cursor_pos(&mut self, end_offset: usize) -> Result<(), &'static str> {
         let mut terminal = self.terminal.lock();
         terminal.cursor.disable();

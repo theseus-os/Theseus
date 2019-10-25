@@ -129,8 +129,14 @@ pub fn print_string(
     (curr_column, curr_line, blocks)
 }
 
-// print a character to the framebuffer at position (line, column) of all characters in the text area.
-// `coordinate` specifies the top-left corner of the text area relative to the origin(top-left point) of the framebuffer.
+/// Print a character to the framebuffer at position (line, column) of all characters in the text area.
+/// # Arguments
+/// * `framebuffer`: the framebuffer to display in.
+/// * `character`: the ASCII code of the character to display.
+/// * `font_color`: the color of the character.
+/// * `bg_color`: the background color of the character.
+/// * `coordinate`: the left top coordinate of the text block relative to the origin(top-left point) of the frame buffer.
+/// * `(column, line)`: the location of the character in the text block as symbols.
 pub fn print_ascii_character(
     framebuffer: &mut dyn FrameBuffer,
     character: ASCII,

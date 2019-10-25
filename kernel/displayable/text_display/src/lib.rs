@@ -112,7 +112,7 @@ impl TextDisplay {
         (self.width / CHARACTER_WIDTH, self.height / CHARACTER_HEIGHT)
     }
 
-    /// Gets the (column, line) position of the next symbol.
+    /// Gets the position of the next symbol as index in units of characters.
     pub fn get_next_pos(&self) -> usize {
         let col_num = self.width / CHARACTER_WIDTH;
         self.next_line * col_num + self.next_col
