@@ -312,41 +312,22 @@ impl Shell {
 
     /// Move the cursor to the very beginning of the input command line.
     fn move_cursor_leftmost(&mut self) -> Result<(), &'static str> {
-        let mut terminal = self.terminal.lock();
-        terminal.cursor.disable();
-        terminal.display_cursor()?;
-
-        let new_offset = self.cmdline.len();
-        if new_offset > 0 {
-            terminal.update_cursor_pos(new_offset, self.cmdline.as_bytes()[0]);
-        } else {
-            terminal.update_cursor_pos(0, 0);
-        }
-
-        terminal.cursor.enable();
+        self.update_cursor_pos(self.cmdline.len())?;
         Ok(())
     }
 
     /// Move the cursor to the very end of the input command line.
     fn move_cursor_rightmost(&mut self) -> Result<(), &'static str> {
-        let mut terminal = self.terminal.lock();
-        terminal.cursor.disable();
-        terminal.display_cursor()?;
-        terminal.update_cursor_pos(0, 0);
-        terminal.cursor.enable();
+        self.update_cursor_pos(0)?;
         Ok(())
     }
 
     /// Move the cursor a character left. If the cursor is already at the beginning of the command line,
     /// it simply returns.
     fn move_cursor_left(&mut self) -> Result<(), &'static str> {
-        let mut terminal = self.terminal.lock();
-        if terminal.get_cursor_end_offset() < self.cmdline.len() {
-            terminal.cursor.disable();
-            terminal.display_cursor()?;
-            let new_offset = terminal.get_cursor_end_offset() + 1;
-            terminal.update_cursor_pos(new_offset, self.cmdline.as_bytes()[self.cmdline.len() - new_offset]);
-            terminal.cursor.enable();
+        let end_offset = self.terminal.lock().get_cursor_end_offset();
+        if end_offset < self.cmdline.len() {
+            self.update_cursor_pos(end_offset + 1)?;
         }
         Ok(())
     }
@@ -354,19 +335,24 @@ impl Shell {
     /// Move the cursor a character to the right. If the cursor is already at the end of the command line,
     /// it simply returns.
     fn move_cursor_right(&mut self) -> Result<(), &'static str> {
-        let mut terminal = self.terminal.lock();
-        if terminal.get_cursor_end_offset() > 0 {
-            terminal.cursor.disable();
-            terminal.display_cursor()?;
-            
-            let new_offset = terminal.get_cursor_end_offset() - 1;
-            if new_offset > 0 {
-                terminal.update_cursor_pos(new_offset, self.cmdline.as_bytes()[self.cmdline.len() - new_offset]);
-            } else {
-                terminal.update_cursor_pos(0, 0);
-            }
-            terminal.cursor.enable();
+        let end_offset = self.terminal.lock().get_cursor_end_offset();
+        if end_offset > 0 {
+            self.update_cursor_pos(end_offset - 1)?;
         }
+        Ok(())
+    }
+
+    fn update_cursor_pos(&mut self, end_offset: usize) -> Result<(), &'static str> {
+        let mut terminal = self.terminal.lock();
+        terminal.cursor.disable();
+        terminal.display_cursor()?;
+        if end_offset == 0 {
+            terminal.update_cursor_pos(0, 0)
+        } else if end_offset <= self.cmdline.len() {
+            terminal.update_cursor_pos(end_offset, self.cmdline.as_bytes()[self.cmdline.len() - end_offset]);
+        }
+        terminal.cursor.enable();
+        
         Ok(())
     }
 
