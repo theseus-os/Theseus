@@ -627,7 +627,14 @@ impl Terminal {
             &mut self.window.framebuffer,
         );
 
-        let block = vec![(cursor_line, col_num * CHARACTER_WIDTH)];
+        // update to the end of the text if the cursor is at the last line
+        let text_width = if text_next_pos / col_num == cursor_line {
+            text_next_pos % col_num
+        } else {
+            col_num * CHARACTER_WIDTH
+        };
+
+        let block = vec![(cursor_line, text_width)];
         self.window.render(Some(block.into_iter()))
     }
 
@@ -697,7 +704,7 @@ impl Cursor {
         self.enabled = false;
     }
 
-    /// Changes the blink state show/hidden of a cursor based on its frequency. An application calls this function in a loop.
+    /// Changes the blink state show/hidden of a cursor based on its frequency.
     /// It returns whether the cursor should be re-display. If the cursor is enabled, it returns whether the show/hidden state has been changed. Otherwise it returns true because the cursor is disabled and should refresh.
     pub fn blink(&mut self) -> bool {
         if self.enabled {
@@ -720,10 +727,10 @@ impl Cursor {
         self.enabled && self.show
     }
 
-    /// Display a cursor in a text block onto a frame buffer. 
+    /// Display a cursor in a text block onto a frame buffer. An application calls this function in a loop to make it blinking.
     /// # Arguments
     /// * `coordinate`: the left top coordinate of the text block relative to the origin(top-left point) of the frame buffer.
-    /// * `(column, line)`: the location of the cursor in the text block as symbols.
+    /// * `(column, line)`: the location of the cursor in the text block in units of characters.
     /// * `framebuffer`: the framebuffer to display onto.
     pub fn display(&mut self, coordinate: Coord, column: usize, line: usize, framebuffer: &mut dyn FrameBuffer) {
         if self.blink() {
