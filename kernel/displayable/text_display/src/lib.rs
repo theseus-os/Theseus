@@ -10,7 +10,6 @@ extern crate font;
 extern crate frame_buffer;
 extern crate frame_buffer_drawer;
 extern crate frame_buffer_printer;
-extern crate tsc;
 extern crate displayable;
 
 use alloc::string::String;
@@ -18,7 +17,6 @@ use alloc::vec::Vec;
 use displayable::Displayable;
 use font::{CHARACTER_HEIGHT, CHARACTER_WIDTH};
 use frame_buffer::{Coord, FrameBuffer};
-use tsc::{tsc_ticks, TscTicks};
 
 
 /// A text displayable profiles the size and color of a block of text. It can display in a framebuffer.

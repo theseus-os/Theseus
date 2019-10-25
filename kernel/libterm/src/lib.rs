@@ -632,7 +632,6 @@ impl Terminal {
             coordinate,
             cursor_col,
             cursor_line,
-            BACKGROUND_COLOR,
             &mut self.window.framebuffer,
         );
 
@@ -727,7 +726,7 @@ impl Cursor {
     /// * `coordinate`: the coordinate within the `framebuffer` where the cursor is displayed. It specifies the location of the top-left point of the cursor. The `coordinate` is relative to the top-left point `(0, 0)` of the `framebuffer`.
     /// * bg_color: the background color of the area if the cursor is hidden.
     /// * `framebuffer:` the framebuffer to display onto.
-    pub fn display(&mut self, coordinate: Coord, col: usize, line: usize, bg_color: u32, framebuffer: &mut dyn FrameBuffer) {
+    pub fn display(&mut self, coordinate: Coord, col: usize, line: usize, framebuffer: &mut dyn FrameBuffer) {
         if self.blink() {
             if self.show() {
                 frame_buffer_drawer::fill_rectangle(
