@@ -168,7 +168,7 @@ fn print_dir(dirref: DirRef) {
         };
 
         // Don't need to want to get "dot" entries (or else we end up in a loop).
-        if node.get_name().chars().nth(0).unwrap_or('.') == '.' {
+        if entry.chars().nth(0).unwrap_or('.') == '.' {
             continue;
         }
 

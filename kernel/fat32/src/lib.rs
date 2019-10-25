@@ -218,6 +218,7 @@ enum FileType {
 /// Internal Directory storage type
 type ChildList = BTreeMap<DiskName, FileOrDir>;
 type ShortName = [u8; 11];
+type FSRef = Arc<Mutex<Filesystem>>;
 
 // May be better to replace the Vec with an array of extensions?
 // TODO: May want a method to validate the LongName struct too.
@@ -357,26 +358,6 @@ impl ToString for DiskName {
     }
 }
 
-// impl Eq for DiskName {
-//     fn cmp(&self, other: &Self) -> Ordering {
-//         self.to_comp_name().cmp(other.to_comp_name())
-//     }
-// }
-
-/// Strictly uppercase form of DiskName for use in name comparisons.
-/// Note that lowercase/uppercase does not ensure the number of characters/bytes is preserved.
-/// As such it may not be possible to legally write this name to disk.
-// #[derive(PartialEq, Eq, PartialOrd, Ord)]
-// struct CompName {
-//     name: String,
-// }
-
-// impl Ord for CompName {
-//     fn cmp(&self, other: &Self) -> Ordering {
-//         self.name.cmp(other.name)
-//     }
-// }
-
 // TODO rewrite this structure using zerocopy crate for simplicity of reading from disk.
 /// The first 25 bytes of a FAT formatted disk BPB contains these fields and are used to know important information about the disk 
 pub struct Header {
@@ -497,9 +478,7 @@ impl<B: ByteSlice> RawFatDirectoryBytes<B> {
                  // refactoring.
 #[repr(packed)]
 #[derive(FromBytes, AsBytes)]
-// TODO I'd like to make cluster high and low not-vectors. But the endian-ness package we have only supports
-// this sort of operation.
-/// A raw 32-byte FAT directory which is packed and has little endian fields.
+/// A raw 32-byte FAT directory as it exists on disk.
 struct RawFatDirectory {
     name: [u8; 11], // 8 letter entry with a 3 letter ext
     flags: u8, // designate the PFSdirectory as r,w,r/w
@@ -557,6 +536,11 @@ impl RawFatDirectory {
     }
 }
 
+// REVIEW: I think at some point this type needs a mapping to and from ClusterChain
+// but once that happens it almost seems like this type might be a bit redundant.
+// In practice the only information this struct doesn't need is some of the caching that CC contains.
+// So I'm not realy sure.
+
 /// Based on the FatDirectory structure and used to describe the files/subdirectories in a FAT32 
 /// formatted filesystem, used for convience purposes
 pub struct DirectoryEntry {
@@ -566,9 +550,15 @@ pub struct DirectoryEntry {
     cluster: u32,
 }
 
-/// TODO these methods need to potentially generate a sequence of entries.
+// TODO these methods need to potentially generate a sequence of entries.
 impl DirectoryEntry {    
-    /// FIXME method has wrong implementation for long names on disk.
+    // FIXME method has wrong implementation for long names on disk.
+    // Once DiskName::to_long_name is preopery done then this will be pretty straightforward.
+    // I think what we can do is rename this method to convert a Directory Entry into
+    // the on disk Directory entry that isn't used for the VFAT long name and add another method
+    // to deal with the long name.
+    /// Converts this directory entry to the RawFatDirectory that will represent this object on disk.
+    /// Note that this function will not return the sequence of entries used for the VFAT long name.
     fn to_raw_fat_directory(&self) -> RawFatDirectory {
 
         let long_name = self.name.to_long_name();
@@ -588,16 +578,17 @@ impl DirectoryEntry {
     }
 }
 
-/// Structure for a file in FAT32. This key information is used to transverse the
-/// drive to find the file data  
+/// A wrapper around a FAT32 file object.
 pub struct PFSFile {
     cc: ClusterChain,
 }
 
 impl PFSFile {
-    /// Given an offset, returns the PFSPosition of the file
+    // TODO I don't remember if this method works.
+    // It isn't used and doesn't really serve any purpose right now since PFSPosition isn't a part
+    // of the rest of the public facing API I think and the relevant logic is used elsewhere.
+    /// Converts a position in a file into a current_cluster-sector_offset-byte_offset struct.
     pub fn seek(&self, fs: &mut Filesystem, offset: usize) -> Result<PFSPosition, &'static str> {
-        let mut position: usize = 0;
 
         let cluster_size_in_bytes: usize = fs.sectors_per_cluster() as usize * fs.bytes_per_sector as usize;
         let clusters_to_advance: usize =  offset/cluster_size_in_bytes;
@@ -660,15 +651,12 @@ impl File for PFSFile {
 		let mut src_offset = first_block_offset; 
 		let mut dest_offset = 0;
         let mut current_cluster = self.cc.cluster;
-        let mut current_offset = 0;
         let mut bytes_copied = 0;
 
 		for cluster_offset in range { // Number of clusters into the file
             // Jump to current cluster:
-            current_cluster = self.cc.cluster_advancer(&mut fs, current_cluster, cluster_offset - current_offset)
+            current_cluster = self.cc.cluster_advancer(&mut fs, cluster_offset)
                 .map_err(|_| "Read failed")?;
-
-            current_offset = cluster_offset;
 
 			// don't copy past the end of `buffer`
 			let num_bytes_to_copy = core::cmp::min(block_size_in_bytes - src_offset, data.len() - dest_offset);
@@ -724,9 +712,9 @@ impl FsNode for PFSFile {
 pub struct PFSPosition {
     /// Cluster number of the current position.
     cluster: u32, 
-    /// Sector offset into the current cluster (should this be 32 bits? Not sure if it really matters)
+    /// Sector offset into the current cluster
     sector_offset: usize, 
-    /// Entry offset into the current sector
+    /// Byte offset into the current sector
     entry_offset: usize, 
 }
 
@@ -735,7 +723,7 @@ pub struct PFSDirectory {
     /// Underlying strucuture on disk containing the Directory data. 
     cc: ClusterChain,
     // TODO: children should maybe incude some directory entry like information?
-    /// Potentially incomplete list of children. TODO make DirRef into our internal type.
+    /// Potentially incomplete list of children.
     children: RwLock<ChildList>,
     /// Self reference to simplify construction of children.
     dot: WeakDirRef,
@@ -760,6 +748,7 @@ impl Directory for PFSDirectory {
         debug!("PFSDirectory::get called for {:?}", name.to_comp_name());
 
         match name.name.as_str() {
+            // 
             "." => self.dot.upgrade().map(|x| FileOrDir::Dir(x)),
             ".." => self.cc.parent.upgrade().map(|x| FileOrDir::Dir(x)),
             _ => self.fat32_get(&name).ok(),
@@ -785,31 +774,10 @@ impl Directory for PFSDirectory {
 
         }
 
-        return children.keys().map(|x| x.name.clone()).collect::<Vec<String>>();
-
-        /*
-        let mut list_of_names: Vec<String> = Vec::new();
-
-        let fs = self.cc.filesystem.lock();
-        // Returns a vector of the 32-byte directory structures
-        let entries = match self.entries(&fs) {
-            Ok(entries) => entries,
-            Err(_) => {
-                warn!("Failed to read list of names from directory");
-                return list_of_names;
-            },
-        };
-
-        // Iterates through the 32-byte directory structures and pushes the name of each one into the list
-        for entry in entries {
-            list_of_names.push(match core::str::from_utf8(&entry.name) {
-                Ok(name) => name.to_string(),
-                Err(_) => return list_of_names,
-            })
-        }
-        
-        list_of_names
-        */
+        let mut entries = children.keys().map(|x| x.name.clone()).collect::<Vec<String>>();
+        entries.push(".".to_string());
+        entries.push("..".to_string());
+        entries
     }
 
     fn remove(&mut self, _node: &FileOrDir) -> Option<FileOrDir> {
@@ -883,6 +851,8 @@ impl PFSDirectory {
                 return Err(Error::NotFound);
             }
             
+            // FIXME this method is now broken. I think advance pos is just unfixable
+            // unless we path a PFS_POS to also include a cluster offset.
             pos = match self.cc.advance_pos(fs, &pos, size_of::<RawFatDirectory>()) {
                 Err(Error::EndOfFile) => return Err(Error::NotFound),
                 Ok(new_pos) => new_pos,
@@ -900,23 +870,23 @@ impl PFSDirectory {
         // TODO actually check the name:
         let name = &entry.name;
 
-        if children.contains_key(name) {
-            return match children.get(name) {
-                Some(node) => Ok(node.clone()),
-                None => Err(Error::Unsupported) // This should never happen.
-            }
+        match children.get(name) {
+                Some(node) => return Ok(node.clone()),
+                None => {},
         };
 
         // Create FileOrDir and insert:
-        let cc = ClusterChain {
-            cluster: entry.cluster,
-            _num_clusters: None,
-            name: name.clone(), // FIXME this is wrong.
-            on_disk_refcount: 1, // FIXME not true for directories. Should rename so that this is fine.
-            filesystem: self.cc.filesystem.clone(),
-            parent: self.dot.clone(),
-            size: entry.size,
-        };
+        let cc = ClusterChain::new(entry.cluster, self.cc.filesystem.clone(), 
+            name.clone(), self.dot.clone(), entry.size);
+        // let cc = ClusterChain {
+        //     cluster: entry.cluster,
+        //     _num_clusters: None,
+        //     name: name.clone(), // FIXME this is wrong.
+        //     parent_count: 1, // FIXME not true for directories. Should rename so that this is fine.
+        //     filesystem: self.cc.filesystem.clone(),
+        //     parent: self.dot.clone(),
+        //     size: entry.size,
+        // };
 
         match entry.file_type {
             FileType::PFSDirectory => {
@@ -981,7 +951,7 @@ impl PFSDirectory {
         }
     }
 
-    /// Returns the entry indicated by PFSPosition. TODO allow this to save reads and writes.
+    /// Returns the entry indicated by PFSPosition.
     /// the function is used and returns EndOfFile if the next PFSdirectory doesn't exist
     /// Note that this function will happily return unused directory entries since it simply provides a sequential view of the entries on disk.
     fn get_fat_directory(&self, fs: &mut Filesystem, pos: &PFSPosition) -> Result<RawFatDirectory, Error> {
@@ -1002,7 +972,6 @@ impl PFSDirectory {
         Ok(fat_dir.fat_directory.clone())
     }
 
-    // FIXME use sub byte transactions at some point?
     /// Writes the RawFatDirectory dir to the position pos in the file.
     fn write_fat_directory(&self, fs :&mut Filesystem, pos: &PFSPosition, dir: &RawFatDirectory) -> Result<usize, Error> {
         let cluster = pos.cluster;
@@ -1050,8 +1019,6 @@ impl PFSDirectory {
         }
     }
     
-    // I think the "best" solution is perhaps to make everything that's not part of the public interface pass the fs in as an argument.
-    // Make FS an argument I suppose. Seems dumb though.
     /// Grows the directory given a PFSPosition in the last cluster of the file and returns a new position in the new_cluster.
     fn grow_directory(&self, fs: &mut Filesystem, pos_end: &PFSPosition) -> Result<PFSPosition, Error> {
         
@@ -1109,10 +1076,9 @@ impl PFSDirectory {
         Err(Error::Unsupported)
     }
 
-    /// Internal get function. TODO enforce returning PFSType?
+    /// Internal get function.
     fn fat32_get(&self, name: &DiskName) -> Result<FileOrDir, Error> {
 
-        // TODO need some sort of string typing that ensure it's a valid fat32 name that will match the string we insert into the children list.
         match self.children.read().get(name) {
             Some(child) => return Ok(child.clone()),
             None => {},
@@ -1126,17 +1092,6 @@ impl PFSDirectory {
         for entry in entries {
             // Compares the name of the next entry in the current directory
             if name == &entry.name {
-                // Found the entry on disk. Need to create a new cluster chain for the object:
-                let cc = ClusterChain {
-                    cluster: entry.cluster,
-                    _num_clusters: None,
-                    name: name.clone(), // FIXME this is wrong.
-                    on_disk_refcount: 1, // FIXME not true for directories. Should rename so that this is fine.
-                    filesystem: self.cc.filesystem.clone(),
-                    parent: self.dot.clone(),
-                    size: entry.size,
-                };
-
                 // Get a write lock for the children and check if it was found before creating a new object (since we dropped the read lock).
                 let mut children = self.children.write();
                 match children.get(&name) {
@@ -1144,9 +1099,20 @@ impl PFSDirectory {
                     None => {},
                 };
 
+                let cc = ClusterChain::new(entry.cluster, self.cc.filesystem.clone(), entry.name, self.dot.clone(), entry.size);
+                // Found the entry on disk. Need to create a new cluster chain for the object:
+                // let cc = ClusterChain {
+                //     cluster: entry.cluster,
+                //     _num_clusters: None,
+                //     name: name.clone(),
+                //     parent_count: 1, // FIXME not true for directories. Should rename so that this represents a "parent count"
+                //     filesystem: self.cc.filesystem.clone(),
+                //     parent: self.dot.clone(),
+                //     size: entry.size,
+                // };
+
                 match entry.file_type {
                     FileType::PFSDirectory => {
-
 
                         let dir = PFSDirectory {
                             cc: cc,
@@ -1183,19 +1149,37 @@ impl PFSDirectory {
 
 // TODO: should also consider how to relate these to directory entries for write.
 /// Underlying disk object that is common to Files and Directories. In many ways this maps to a directory entry.
-#[derive(Clone)]
+//#[derive(Clone)]
 struct ClusterChain {
     filesystem: Arc<Mutex<Filesystem>>,
     cluster: u32,
     pub name: DiskName,
-    pub parent: WeakDirRef, // the directory that holds the metadata for this directory. The root directory's parent should be itself
-    on_disk_refcount: usize, // Number of references on disk. For a file must always be one. For a directory this is variable.
+    pub parent: WeakDirRef, // the directory that holds the metadata for this directory.
+    parent_count: usize, // Number of references on disk. For a file must always be one. For a directory this is variable.
     _num_clusters: Option<u32>, // Unknown without traversing FAT table. I consider this useful information, but I'm not sure if I'll ever use it.
     pub size: u32,
+    cluster_cache: Mutex<Vec<u32>>, // Cache of cluster offset to on_disk clusters. REVIEW: if we allow shrinking a file this is sketchy but this isn't legal as best I can tell.
 }
 
 impl ClusterChain {
-    /// Returns a cluster walk position at the initial position.
+    pub fn new(cluster: u32, fs: FSRef, name: DiskName, parent: WeakDirRef, size: u32) -> ClusterChain {
+        ClusterChain {
+            filesystem: fs,
+            cluster,
+            name,
+            parent: parent.clone(),
+            parent_count: parent.upgrade().map(|_| 1).unwrap_or(0), // REVIEW this seems sketchy, but I think it's fair to do.
+                                    // Downside is that this approach obscures the fact that a parent ref could in theory be dropped
+                                    // while the disk reference still exists. Maybe passing an Option<DirRef> would be better.
+                                    // However if the parent is dropped it causes other severe issues for the FS and I think 
+                                    // that our FS structure cannot possibly be in a valid state if the parent has been dropped.
+            _num_clusters: None,
+            size,
+            cluster_cache: Mutex::new(vec![cluster]),
+        }
+    }
+
+    /// Returns a cluster walk position for the start of this CC.
     pub fn initial_pos(&self) -> PFSPosition {
         PFSPosition {
             cluster: self.cluster,
@@ -1220,7 +1204,7 @@ impl ClusterChain {
         
         if new_pos.sector_offset >= fs.sectors_per_cluster as usize {
             let cluster_advance = new_pos.sector_offset / fs.sectors_per_cluster as usize;
-            new_pos.cluster = self.cluster_advancer(fs, pos.cluster, cluster_advance)?;
+            new_pos.cluster = self.cluster_advancer(fs, cluster_advance)?;
             new_pos.sector_offset = new_pos.sector_offset % fs.sectors_per_cluster as usize;
         }
         
@@ -1228,12 +1212,20 @@ impl ClusterChain {
     }
 
     /// Advance "cluster_advance" number of clusters.
-    pub fn cluster_advancer(&self, fs: &mut Filesystem, start_cluster: u32, cluster_advance: usize) -> Result<u32, Error> {
-        
-        let mut counter: usize = 0;
-        let mut current_cluster = start_cluster;
+    /// Acquires lock for an on-disk cache of cluster positions.
+    pub fn cluster_advancer(&self, fs: &mut Filesystem, cluster_advance: usize) -> Result<u32, Error> {
+
+        // IMPROVEMENT: in theory we could only lock the tail of the cluster cache, but I'm not sure
+        // about the best way to do that in Rust and it's not a critical improvment.
+        let mut cluster_cache = self.cluster_cache.lock();
+
+        let mut counter = min(cluster_advance, cluster_cache.len() - 1); // Guaranteed to be at least 1.
+        let mut current_cluster = cluster_cache[counter]; // Guaranteed to exist since we're bounded by len.
+
+
         while cluster_advance != counter {
             current_cluster = fs.next_cluster(current_cluster)?;
+            cluster_cache.push(current_cluster);
             counter += 1;
         }
         return Ok(current_cluster);
@@ -1647,17 +1639,20 @@ pub fn root_dir(fs: Arc<Mutex<Filesystem>>, mount_name: &str) -> Result<Arc<Mute
 
     // TODO right now this function can violate the singleton blahdy blah and risks making two cluster chains for this dir.
     // We also can't just use something like a lazy static, since it's a per-FS basis. Maybe the FS needs some information to prevent this.
-
-
-    let cc = ClusterChain {
-        filesystem: fs.clone(),
-        cluster: 2,
-        name: DiskName::from_string(mount_name)?,
-        parent: Weak::<Mutex<PFSDirectory>>::new(),
-        on_disk_refcount: 2 + 1, // TODO should this be the case?
-        _num_clusters: None,
-        size: 0, // According to wikipedia File size for directories is always 0.
-    };
+    let new_name = DiskName::from_string(mount_name)?;
+    let mut cc = ClusterChain::new(2, fs.clone(), new_name, 
+        Weak::<Mutex<PFSDirectory>>::new(), 0);
+    cc.parent_count = 2; // TODO what number to choose. We definitely don't want the on disk
+                         // resources getting dropped
+    // let cc = ClusterChain {
+    //     filesystem: fs.clone(),
+    //     cluster: 2,
+    //     name: DiskName::from_string(mount_name)?,
+    //     parent: Weak::<Mutex<PFSDirectory>>::new(),
+    //     parent_count: 2 + 1, // TODO should this be the case?
+    //     _num_clusters: None,
+    //     size: 0, // According to wikipedia File size for directories is always 0.
+    // };
 
     let mut underlying_root = PFSDirectory {
         cc: cc,
