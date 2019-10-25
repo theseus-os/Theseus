@@ -2,11 +2,7 @@
 //! Inspired by the [intel hypervisor firmware written in rust](https://github.com/intel/rust-hypervisor-firmware/)
 //! 
 //! Limitations (and other notes):
-//! Some key performance improvements for most FAT filesystem drivers are not implemented or are only partially implemented in this driver.
-//! As such, this crate is not suggested for any heavy workloads without adding some of those tricks.
-//! The first improvement would be to cache offset in file -> cluster lookup in memory somewhere. 
-//! Without this caching reading from a position in a file is O(position), which is unacceptable in practice.
-//! Furthermore, directories only partially implement a lazy reading strategy. 
+//! Directories only partially implement a lazy reading strategy. This slightly limits performance for weird use cases.
 //! The lazy read will be repeated whenever we try to get a file that doesn't exist since we do not cache the state of the lazy
 //! read (instead we just restart if we don't find a file). This wouldn't be a hard fix, but it hasn't been done.
 //! 
@@ -104,8 +100,6 @@
 
 // TODO cat seems work weirdly with the bigfile example I've got -> doesn't print the last few characters.
 // ^ Should make some different examples to test with.
-
-// TODO the docs at the top of this crate aren't all that adviseable at this point. I'll try to make some fixes soon.
 
 #![no_std]
 #![feature(slice_concat_ext)]
@@ -225,7 +219,7 @@ type FSRef = Arc<Mutex<Filesystem>>;
 /// Generalized name struct that can be filled from and written onto disk easily.
 struct LongName {
     short_name: ShortName,
-    long_name: Vec<[u16; 13]>, // FIXME this is probably a wrong size for VFAT extension.
+    long_name: Vec<[u16; 13]>,
 }
 
 impl LongName {
@@ -403,7 +397,7 @@ impl Header {
             legacy_sectors: LittleEndian::read_u16(&bpb_sector[19..21]),
             _media_type: bpb_sector[21],
             legacy_sectors_per_fat: bpb_sector[22],
-            _sectors_per_track: LittleEndian::read_u16(&bpb_sector[0x18..0x20]), // TODO why is this indexed with hex?
+            _sectors_per_track: LittleEndian::read_u16(&bpb_sector[0x18..0x20]),
             _head_count: LittleEndian::read_u16(&bpb_sector[26..28]),
             _hidden_sectors: LittleEndian::read_u32(&bpb_sector[28..32]),
             sectors: LittleEndian::read_u32(&bpb_sector[32..36]),
@@ -522,7 +516,6 @@ impl RawFatDirectory {
     fn is_free(&self) -> bool {
         self.name[0] == 0 ||
             self.name[0] == FREE_DIRECTORY_ENTRY 
-            // TODO looks like this doesn't seem to match the implementation that generated my code
     }
 
     #[inline]
@@ -592,6 +585,7 @@ impl PFSFile {
 
         let cluster_size_in_bytes: usize = fs.sectors_per_cluster() as usize * fs.bytes_per_sector as usize;
         let clusters_to_advance: usize =  offset/cluster_size_in_bytes;
+        // TODO validate that clusters to advance fits in u32 (since a number of clusters must be u32)
         
         // FIXME call cluster_advancer here.
         let mut counter: usize = 0;
@@ -617,6 +611,7 @@ impl PFSFile {
         // debug!("byte_offset: {}", byte_difference - reached_sector as usize *fs.bytes_per_sector as usize);
         return Ok(PFSPosition{
             cluster: nth_cluster,
+            cluster_offset: clusters_to_advance,
             sector_offset: reached_sector,
             entry_offset: byte_difference - reached_sector as usize *fs.bytes_per_sector as usize
         })
@@ -711,7 +706,9 @@ impl FsNode for PFSFile {
 /// Structure to store the position of a fat32 directory during a walk.
 pub struct PFSPosition {
     /// Cluster number of the current position.
-    cluster: u32, 
+    cluster: u32,
+    /// Offset number of clusters
+    cluster_offset: usize,
     /// Sector offset into the current cluster
     sector_offset: usize, 
     /// Byte offset into the current sector
@@ -764,7 +761,7 @@ impl Directory for PFSDirectory {
         //debug!("Listing directory entries");
 
         match self.walk_until(&mut fs, &mut children, None) {
-            Ok(_) => {}, // TODO this case doesn't happen when None is an argument.
+            Ok(_) => {}, // NOTE: this case doesn't happen when None is an argument.
             Err(Error::EndOfFile) | // Cases that represent a successful directory walk.
             Err(Error::NotFound) => {},
             Err(_) => {
@@ -808,7 +805,7 @@ impl Drop for PFSDirectory {
 
 impl PFSDirectory {
 
-    // FIXME (parallelism improvements)
+    // IMPROVEMENT (parallelism improvements)
     // Note that these next methods require holding a mutable reference to the children tree.
     // And so using them prevents any changes to the children tree, I think a good solution
     // if performance/parallelism were desired would be to build a list during the walk and then
@@ -817,18 +814,16 @@ impl PFSDirectory {
     /// Walk the directory and adds all encountered entries into children tree.
     /// Returns Ok(Entry) if found. Otherwise returns Err(Error::NotFound) if not found (or no name given).
     fn walk_until(&self, fs: &mut Filesystem, children: &mut ChildList, 
-        name: Option<&str>) -> Result<DirectoryEntry, Error> {
+        name: Option<DiskName>) -> Result<DirectoryEntry, Error> {
         
         let mut pos = self.cc.initial_pos();
-        // FIXME warn in case of invalid disk name
-        let name = name.map(|name| DiskName::from_string(name).ok()).flatten();
         
         loop {
             let dir = self.get_fat_directory(fs, &pos)?;
             //debug!("got fat directory");
             
             // TODO VFAT long name check needs to be done correctly.
-            if !dir.is_free() && !dir.is_vfat() && !dir.is_dot() { // Don't add dot directories. Must be handled specially. FIXME
+            if !dir.is_free() && !dir.is_vfat() && !dir.is_dot() {
                 debug!("Found new entry {:?}", debug_name(&dir.name));
                 let entry = dir.to_directory_entry()?;
 
@@ -849,10 +844,8 @@ impl PFSDirectory {
             if dir.name[0] == 0 {
                 debug!("Reached end of used files on directory.");
                 return Err(Error::NotFound);
-            }
+            };
             
-            // FIXME this method is now broken. I think advance pos is just unfixable
-            // unless we path a PFS_POS to also include a cluster offset.
             pos = match self.cc.advance_pos(fs, &pos, size_of::<RawFatDirectory>()) {
                 Err(Error::EndOfFile) => return Err(Error::NotFound),
                 Ok(new_pos) => new_pos,
@@ -867,7 +860,6 @@ impl PFSDirectory {
     fn add_directory_entry(&self, fs: &Filesystem, children: &mut ChildList, 
         entry: &DirectoryEntry) -> Result<FileOrDir, Error> {
 
-        // TODO actually check the name:
         let name = &entry.name;
 
         match children.get(name) {
@@ -878,15 +870,6 @@ impl PFSDirectory {
         // Create FileOrDir and insert:
         let cc = ClusterChain::new(entry.cluster, self.cc.filesystem.clone(), 
             name.clone(), self.dot.clone(), entry.size);
-        // let cc = ClusterChain {
-        //     cluster: entry.cluster,
-        //     _num_clusters: None,
-        //     name: name.clone(), // FIXME this is wrong.
-        //     parent_count: 1, // FIXME not true for directories. Should rename so that this is fine.
-        //     filesystem: self.cc.filesystem.clone(),
-        //     parent: self.dot.clone(),
-        //     size: entry.size,
-        // };
 
         match entry.file_type {
             FileType::PFSDirectory => {
@@ -933,8 +916,10 @@ impl PFSDirectory {
             // TODO VFAT long name check needs to be done correctly.
             if !dir.is_free() && !dir.is_vfat() {
                 debug!("Found new entry {:?}", debug_name(&dir.name));
-                // FIXME also don't just fail if we can't make an entry
-                entry_collection.push(dir.to_directory_entry()?);
+                match dir.to_directory_entry() {
+                    Ok(entry) => entry_collection.push(entry),
+                    Err(_) => warn!("Failed to convert on disk entry to DirectoryEntry"),
+                }
             }
 
             // If the first byte of the directory is 0 we have reached the end of allocated directory entries
@@ -1032,6 +1017,7 @@ impl PFSDirectory {
         // Now write all the entries in that cluster to be unused and return a PFSPosition with those entries.
         let mut pos = PFSPosition {
             cluster: new_cluster,
+            cluster_offset: pos.cluster_offset + 1,
             sector_offset: 0,
             entry_offset: 0,
         };
@@ -1100,16 +1086,6 @@ impl PFSDirectory {
                 };
 
                 let cc = ClusterChain::new(entry.cluster, self.cc.filesystem.clone(), entry.name, self.dot.clone(), entry.size);
-                // Found the entry on disk. Need to create a new cluster chain for the object:
-                // let cc = ClusterChain {
-                //     cluster: entry.cluster,
-                //     _num_clusters: None,
-                //     name: name.clone(),
-                //     parent_count: 1, // FIXME not true for directories. Should rename so that this represents a "parent count"
-                //     filesystem: self.cc.filesystem.clone(),
-                //     parent: self.dot.clone(),
-                //     size: entry.size,
-                // };
 
                 match entry.file_type {
                     FileType::PFSDirectory => {
@@ -1183,6 +1159,7 @@ impl ClusterChain {
     pub fn initial_pos(&self) -> PFSPosition {
         PFSPosition {
             cluster: self.cluster,
+            cluster_offset: 0,
             sector_offset: 0,
             entry_offset: 0, 
         }
@@ -1193,6 +1170,7 @@ impl ClusterChain {
         
         let mut new_pos = PFSPosition {
             cluster : pos.cluster,
+            cluster_offset: pos.cluster_offset,
             entry_offset : pos.entry_offset + offset,
             sector_offset : pos.sector_offset, 
         };
@@ -1204,7 +1182,8 @@ impl ClusterChain {
         
         if new_pos.sector_offset >= fs.sectors_per_cluster as usize {
             let cluster_advance = new_pos.sector_offset / fs.sectors_per_cluster as usize;
-            new_pos.cluster = self.cluster_advancer(fs, cluster_advance)?;
+            new_pos.cluster = self.cluster_advancer(fs, cluster_advance + new_pos.cluster_offset)?;
+            new_pos.cluster_offset = cluster_advance + new_pos.cluster_offset;
             new_pos.sector_offset = new_pos.sector_offset % fs.sectors_per_cluster as usize;
         }
         
@@ -1769,8 +1748,6 @@ fn test_insert(taskref: Option<TaskRef>) ->  Result<(), &'static str> {
                 Ok(fatfs) => {
 
                     let fs = Arc::new(Mutex::new(fatfs));
-                    // TODO if we change the root dir creation approach this will also change.
-                    // Take as read only for now?
 
                     let name = "fat32";
 
