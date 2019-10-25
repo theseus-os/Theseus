@@ -131,7 +131,7 @@ pub fn print_string(
 
 // print a character to the framebuffer at position (line, column) of all characters in the text area.
 // `coordinate` specifies the top-left corner of the text area relative to the origin(top-left point) of the framebuffer.
-fn print_ascii_character(
+pub fn print_ascii_character(
     framebuffer: &mut dyn FrameBuffer,
     character: ASCII,
     font_color: u32,
