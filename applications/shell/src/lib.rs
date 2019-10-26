@@ -1299,7 +1299,6 @@ impl Shell {
             // loop body. We do so to ensure that printing is handled before keypresses.
             if self.check_and_print_app_output() {
                 need_refresh = true;
-                need_prompt = true;
                 continue;
             }
 

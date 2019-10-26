@@ -638,12 +638,12 @@ impl Terminal {
         self.window.render(Some(block.into_iter()))
     }
 
-    /// Get the position of the cursor relative to the end of text in units of characters.
+    /// Gets the position of the cursor relative to the end of text in units of characters.
     pub fn get_cursor_end_offset(&self) -> usize {
         self.cursor.end_offset
     }
 
-    /// Update the position of a cursor.
+    /// Updates the position of a cursor.
     /// # Arguments
     /// * `end_offset`: the position of the cursor relative to the end of text in units of characters.
     /// * `back_char`: the ASCII code of the underlying character when the cursor is unseen.
@@ -727,7 +727,7 @@ impl Cursor {
         self.enabled && self.show
     }
 
-    /// Display a cursor in a text block onto a frame buffer. An application calls this function in a loop to make it blinking.
+    /// Displays a cursor in a text block onto a frame buffer. An application calls this function in a loop to make it blinking.
     /// # Arguments
     /// * `coordinate`: the left top coordinate of the text block relative to the origin(top-left point) of the frame buffer.
     /// * `(column, line)`: the location of the cursor in the text block in units of characters.

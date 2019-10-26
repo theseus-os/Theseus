@@ -129,7 +129,7 @@ pub fn print_string(
     (curr_column, curr_line, blocks)
 }
 
-/// Print a character to the framebuffer at position (line, column) of all characters in the text area.
+/// Prints a character to the framebuffer at position (line, column) of all characters in the text area.
 /// # Arguments
 /// * `framebuffer`: the framebuffer to display in.
 /// * `character`: the ASCII code of the character to display.
