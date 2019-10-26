@@ -319,7 +319,8 @@ impl DiskName {
 
         let chars_raw = long_name.long_name.iter().map(
             |chars| chars.iter().map(|x| *x)
-        ).flatten();
+        ).flatten()
+        .take_while(|x| *x != 0 && *x != 0xffff);
 
         // Currently we fail if any char fails to decode. Not ideal, but it's OK.
         let utf16_name = decode_utf16(chars_raw).collect::<Result<String, _>>()
@@ -1149,6 +1150,8 @@ impl PFSDirectory {
         }
     }
 
+    #[deprecated]
+    // Does not support long names right now. Will probably remove this function soon.
     /// Returns a vector of all the directory entries in a directory without mutating the directory
     pub fn entries(&self, fs: &mut Filesystem) -> Result<Vec<DirectoryEntry>, Error> {
         debug!("Getting entries for {:?}", self.cc.name);
