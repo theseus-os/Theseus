@@ -121,7 +121,7 @@ extern crate spawn;
 extern crate task;
 
 use storage_device::{BlockBounds};
-use zerocopy::{FromBytes, AsBytes, LayoutVerified, ByteSlice};
+use zerocopy::{FromBytes, AsBytes, LayoutVerified, ByteSlice, Unaligned};
 use zerocopy::byteorder::{U16, U32};
 use byteorder::{ByteOrder, LittleEndian};
 use alloc::collections::BTreeMap;
@@ -199,6 +199,7 @@ pub enum Error {
     IllegalArgument,
     DiskFull,
     InconsistentDisk,
+    InternalError,
 }
 
 // Likely we'll want to add some sort of entry for non-file or directory types. TODO
@@ -224,17 +225,16 @@ struct LongName {
 
 impl LongName {
     /// Construct a new long name from a sequence of on disk directory entries.
-    fn new(entries: Vec<&RawFatDirectory>) -> Result<LongName, Error> {
+    fn new(vfat_array: Vec<&VFATEntry>, entry: &RawFatDirectory) -> Result<LongName, Error> {
         let mut long_name = LongName::empty();
         // Last entry must contain the short_name bytes.
-        let last = entries[entries.len() - 1];
-        if last.is_vfat() {
+        if entry.is_vfat() {
             // VFAT long name extension entries do not contain the short name.
             // As such this is an illegal sequence of directories.
             return Err(Error::InconsistentDisk)
         }
 
-        long_name.short_name = last.name;
+        long_name.short_name = entry.name;
 
         Ok(long_name)
     }
@@ -272,8 +272,8 @@ impl DiskName {
         })
     }
 
-    fn from_long_name(long_name: LongName) -> Result<DiskName, &'static str> {
-        Err("Unsupported")
+    fn from_long_name(long_name: LongName) -> Result<DiskName, Error> {
+        Err(Error::Unsupported)
     }
 
     // TODO support constructing the long_name field using a UCS-2 encoding.
@@ -458,11 +458,37 @@ struct RawFatDirectoryBytes<B> {
     fat_directory: LayoutVerified<B, RawFatDirectory>,
 }
 
+struct VFATEntryBytes<B> {
+    vfat_entry: LayoutVerified<B, VFATEntry>,
+}
+
 impl<B: ByteSlice> RawFatDirectoryBytes<B> {
     pub fn parse(bytes: B) -> Option<RawFatDirectoryBytes<B>> {
         let fat_directory = LayoutVerified::new(bytes)?;
 
         Some(RawFatDirectoryBytes{fat_directory})
+    }
+
+    /// Convert a bytearray of entries into an array of entries.
+    pub fn parse_array(bytes: B, num_entries: usize) -> Option<(Vec<VFATEntryBytes<B>>, 
+        RawFatDirectoryBytes<B>)> {
+        
+        let mut vfat_array = Vec::new();
+        let mut byte_suffix = bytes;
+        for _ in 0..num_entries {
+            //let vfat_entry: LayoutVerified<B, VFATEntry>;
+            let (vfat_entry, remainder): (LayoutVerified<B, VFATEntry>, B) = 
+                LayoutVerified::new_unaligned_from_prefix(byte_suffix)?;
+            byte_suffix = remainder;
+
+            //let vfat_entry_ref: &VFATEntry = &vfat_entry;
+
+            vfat_array.push(VFATEntryBytes{vfat_entry});
+        }
+
+        let fat_directory = RawFatDirectoryBytes::parse(byte_suffix)?;
+
+        Some((vfat_array, fat_directory))
     }
 }
 
@@ -483,11 +509,31 @@ struct RawFatDirectory {
     size: U32<LittleEndian>, // size of PFSfile in bytes, volume label or subdirectory flags should be set to 0
 }
 
+#[repr(packed)]
+#[derive(FromBytes, AsBytes, Unaligned)]
+/// A raw 32-byte FAT directory as it exists on disk -> Interpreted as a VFAT name
+struct VFATEntry {
+    sequence_number: u8,
+    name1: [U16<LittleEndian>; 5],
+    attributes: u8,
+    filetype: u8,
+    checksum: u8,
+    name2: [U16<LittleEndian>; 6],
+    first_cluster: U16<LittleEndian>,
+    name3: [U16<LittleEndian>; 2],
+}
+
+
+
 impl RawFatDirectory {    
     fn to_directory_entry(&self) -> Result<DirectoryEntry, Error> {
         let name = String::from_utf8(self.name.to_vec()).map_err(|_| Error::IllegalArgument)?;
         let name = DiskName::from_string(&name).map_err(|_| Error::IllegalArgument)?;
 
+        self.to_directory_entry_with_name(name)
+    }
+
+    fn to_directory_entry_with_name(&self, name: DiskName) -> Result<DirectoryEntry, Error> {
         Ok(DirectoryEntry {
             name,
             file_type: if self.flags & FileAttributes::SUBDIRECTORY.bits == FileAttributes::SUBDIRECTORY.bits {
@@ -636,44 +682,45 @@ impl File for PFSFile {
         let mut fs = self.cc.filesystem.lock();
 
         info!("Read called with buffer size {:}, position: {:}. File size: {:}", data.len(), offset, self.size());
+
+        self.cc.read(&mut fs, data, offset, Some(self.size())).map_err(|_| "Read Failed")
         
-        // Treat our file like a sequence of clusters using the BlockBounds logic.
-        let BlockBounds { range, first_block_offset, .. } = BlockBounds::block_bounds(offset, data.len(), self.size(),
-            fs.size_in_clusters(self.size()), fs.cluster_size_in_bytes())?;
-        let block_size_in_bytes: usize = fs.cluster_size_in_bytes();
+        // // Treat our file like a sequence of clusters using the BlockBounds logic.
+        // let BlockBounds { range, first_block_offset, .. } = BlockBounds::block_bounds(offset, data.len(), self.size(),
+        //     fs.size_in_clusters(self.size()), fs.cluster_size_in_bytes())?;
+        // let block_size_in_bytes: usize = fs.cluster_size_in_bytes();
 
-        // Read the actual data, one block at a time.
-		let mut src_offset = first_block_offset; 
-		let mut dest_offset = 0;
-        let mut current_cluster = self.cc.cluster;
-        let mut bytes_copied = 0;
+        // // Read the actual data, one block at a time.
+		// let mut src_offset = first_block_offset; 
+		// let mut dest_offset = 0;
+        // let mut current_cluster = self.cc.cluster;
+        // let mut bytes_copied = 0;
 
-		for cluster_offset in range { // Number of clusters into the file
-            // Jump to current cluster:
-            current_cluster = self.cc.cluster_advancer(&mut fs, cluster_offset)
-                .map_err(|_| "Read failed")?;
+		// for cluster_offset in range { // Number of clusters into the file
+        //     // Jump to current cluster:
+        //     current_cluster = self.cc.cluster_advancer(&mut fs, cluster_offset)
+        //         .map_err(|_| "Read failed")?;
 
-			// don't copy past the end of `buffer`
-			let num_bytes_to_copy = core::cmp::min(block_size_in_bytes - src_offset, data.len() - dest_offset);
+		// 	// don't copy past the end of `buffer`
+		// 	let num_bytes_to_copy = core::cmp::min(block_size_in_bytes - src_offset, data.len() - dest_offset);
 
-            let temp_buffer = &mut data[dest_offset.. (dest_offset + num_bytes_to_copy)];
+        //     let temp_buffer = &mut data[dest_offset.. (dest_offset + num_bytes_to_copy)];
 
-            let first_sector = fs.first_sector_of_cluster(current_cluster);
-            let offset_of_sector = fs.sector_to_byte_offset(first_sector);
+        //     let first_sector = fs.first_sector_of_cluster(current_cluster);
+        //     let offset_of_sector = fs.sector_to_byte_offset(first_sector);
 
-            let _bytes_read = fs.io.read(temp_buffer, offset_of_sector)?;
+        //     let _bytes_read = fs.io.read(temp_buffer, offset_of_sector)?;
 
-			trace!("fat32::read(): for cluster {}, copied bytes into buffer[{}..{}] from block[{}..{}]",
-				current_cluster, dest_offset, dest_offset + num_bytes_to_copy, src_offset, src_offset + num_bytes_to_copy,
-			);
-			dest_offset += num_bytes_to_copy;
-            bytes_copied += num_bytes_to_copy;
-			src_offset = 0;
-		}
+		// 	trace!("fat32::read(): for cluster {}, copied bytes into buffer[{}..{}] from block[{}..{}]",
+		// 		current_cluster, dest_offset, dest_offset + num_bytes_to_copy, src_offset, src_offset + num_bytes_to_copy,
+		// 	);
+		// 	dest_offset += num_bytes_to_copy;
+        //     bytes_copied += num_bytes_to_copy;
+		// 	src_offset = 0;
+		// }
         
-        Ok(bytes_copied as usize)
+        //Ok(bytes_copied as usize)
     }
-
 
     fn write(&mut self, _buffer: &[u8], _offset: usize) -> Result<usize, &'static str> {
         Err("write not implemeneted yet")
@@ -817,8 +864,10 @@ impl PFSDirectory {
         name: Option<DiskName>) -> Result<DirectoryEntry, Error> {
         
         let mut pos = self.cc.initial_pos();
+        let mut offset = 0; // FIXME need to deal with pos vs offset.
         
         loop {
+            let tmp = self.get_directory_entry(fs, &pos); // FIXME return this instead
             let dir = self.get_fat_directory(fs, &pos)?;
             //debug!("got fat directory");
             
@@ -840,6 +889,12 @@ impl PFSDirectory {
                 }
             }
 
+            // Handle VFAT case:
+            if !dir.is_free() && dir.is_vfat() {
+                //let entry = self.collect_vfat_directory;
+                // FIXME implement this properly
+            };
+
             // If the first byte of the directory is 0 we have reached the end of allocated directory entries
             if dir.name[0] == 0 {
                 debug!("Reached end of used files on directory.");
@@ -853,6 +908,98 @@ impl PFSDirectory {
             };
             debug!("New position: cluster: {}, sector_off: {}, byte off: {}", pos.cluster, pos.sector_offset, pos.entry_offset);
         }
+    }
+
+    /// Gets a directory entry from the position. 
+    fn get_directory_entry(&self, fs: &mut Filesystem, pos: &PFSPosition) -> Result<DirectoryEntry, Error> {
+
+        // Weird return type, but we want to worry about the case where the new position is valid, but the directory isn't
+        // and the directory is valid but the new position is EOF.
+
+        // Must first grab the directory to determine possible cases.
+        let dir = self.get_fat_directory(fs, &pos)?;
+
+        // If the first byte of the directory is 0 we have reached the end of allocated directory entries
+        if dir.name[0] == 0 {
+            debug!("Reached end of used files on directory.");
+            return Err(Error::EndOfFile);
+        };
+
+        if dir.is_free() {
+            debug!("Found free directory entry.");
+            return Err(Error::NotFound);
+        }
+
+        if !dir.is_vfat() {
+            return dir.to_directory_entry();
+        }
+
+        // IMPROVEMENT: don't do this in a dumb way
+        // Seems like bitfields crate would be good solution.
+        // Read the sequence number from the directory.
+        let sequence_number_raw = dir.name[0];
+        let sequence_number = sequence_number_raw & 0x1f; // lowest 5 bits are seq number.
+        let sequence_end = sequence_number_raw & 0x20 != 0; // bit 6 is set if this is the final sequence number
+        if sequence_number_raw & 0xB0 != 0 || !sequence_end {
+            warn!("Sequence number {:x} invalid", sequence_number_raw);
+            return Err(Error::InconsistentDisk);
+        }
+
+        return self.collect_vfat_directory(fs, pos, sequence_number)
+    }
+
+    /// Given the initial position of a vfat directory and the number of entries that make up the entry.
+    /// Collect all the entries in that directory and construct the DirectoryEntry that the entry corresponds to.
+    fn collect_vfat_directory(&self, fs: &mut Filesystem, pos: &PFSPosition, 
+        sequence_number: u8) -> Result<DirectoryEntry, Error> {
+        let sequence_number = sequence_number as usize;
+
+        if sequence_number > 20 {
+            warn!("PFSDirectory::collect_vfat_directory called with too large of a sequence number");
+        }
+
+        // Construct a long_name object to hold the name:
+        let mut long_name = LongName::empty();
+        long_name.long_name.reserve(sequence_number);
+
+        let byte_offset = fs.pos_to_byte_offset(pos);
+        
+        let bytes_to_read = (sequence_number + 1) as usize * 
+            size_of::<RawFatDirectory>();
+
+        // Will read in all the enties including the real directory entry at once.
+        let mut buf: Vec<u8> = vec![0; bytes_to_read];
+
+        let bytes_read = self.cc.read(fs, &mut buf, byte_offset, None)?;
+
+        if bytes_read != bytes_to_read {
+            warn!("Truncated VFAT directory encountered");
+            return Err(Error::InconsistentDisk);
+        }
+
+        let byte_array_ref = &buf[..];
+
+        let (vfat_array, entry) = match RawFatDirectoryBytes::parse_array(byte_array_ref, sequence_number) {
+            Some(x) => x,
+            None => {
+                warn!("FAT32::Invalid number of bytes to split byte array for VFAT.");
+                return Err(Error::InternalError)
+            }
+        };
+
+        let entry = &entry.fat_directory;
+
+        // REVIEW I spent a while wrestling with rust's type checker here to make this work.
+        // Not sure why it was so hard.
+        let long_name = LongName::new(
+            vfat_array.iter().map(|x| {
+                let vfat_entry_ref: &VFATEntry = &x.vfat_entry;
+                vfat_entry_ref
+            }).collect::<Vec<&VFATEntry>>(), 
+            entry)?;
+        
+        let disk_name = DiskName::from_long_name(long_name)?;
+        entry.to_directory_entry_with_name(disk_name)
     }
 
     /// Add a directory entry into the children list. Does nothing if entry is already in child list.
@@ -1209,6 +1356,68 @@ impl ClusterChain {
         }
         return Ok(current_cluster);
     }
+
+    /// Presents a contiguous byte-oriented view of the cluster chain.
+    /// 
+    /// # Arguments 
+    /// * `data`: the destination buffer
+    /// * `offset`: the offset in the chain
+    /// * `o_size`: The size of the file or None if a directory.
+    /// 
+    /// # Returns
+    /// 
+    /// Returns the number of bytes read 
+    pub fn read(&self, fs: &mut Filesystem, data: &mut [u8], offset: usize, o_size: Option<usize>) -> Result<usize, Error> {
+
+        // Since directories have size of 0 we want to allow them to pass an arbitrary size that is instead bounded while using cluster advancer.
+        let size = o_size.unwrap_or(offset + data.len());
+
+        info!("Read called with buffer size {:}, position: {:?}. File size: {:}", data.len(), offset, size);
+        
+        // Treat our file like a sequence of clusters using the BlockBounds logic.
+        let BlockBounds { range, first_block_offset, .. } = BlockBounds::block_bounds(offset, data.len(), size,
+            fs.size_in_clusters(size), fs.cluster_size_in_bytes()).map_err(|_| Error::InvalidOffset)?;
+        let block_size_in_bytes: usize = fs.cluster_size_in_bytes();
+
+        // Read the actual data, one block at a time.
+		let mut src_offset = first_block_offset; 
+		let mut dest_offset = 0;
+        let mut current_cluster;
+        let mut bytes_copied = 0;
+
+		for cluster_offset in range { // Number of clusters into the file
+            // Jump to current cluster:
+            current_cluster = match self.cluster_advancer(fs, cluster_offset) {
+                Ok(x) => x,
+                // I think this only ever happens if a directory on disk gets truncated for some weird reason.
+                // In that case I think that this issue should instead by handled by the directory entry construction code.
+                Err(Error::EndOfFile) => {
+                    warn!("ClusterChain::read tried to read past end of file. Likely caused by truncated directory.");
+                    return Ok(bytes_copied);
+                },
+                Err(e) => return Err(e),
+            };
+
+			// don't copy past the end of `buffer`
+			let num_bytes_to_copy = core::cmp::min(block_size_in_bytes - src_offset, data.len() - dest_offset);
+
+            let temp_buffer = &mut data[dest_offset.. (dest_offset + num_bytes_to_copy)];
+
+            let first_sector = fs.first_sector_of_cluster(current_cluster);
+            let offset_of_sector = fs.sector_to_byte_offset(first_sector);
+
+            let _bytes_read = fs.io.read(temp_buffer, offset_of_sector).map_err(|_| Error::BlockError);
+
+			trace!("ClusterChain::read(): for cluster {}, copied bytes into buffer[{}..{}] from block[{}..{}]",
+				current_cluster, dest_offset, dest_offset + num_bytes_to_copy, src_offset, src_offset + num_bytes_to_copy,
+			);
+			dest_offset += num_bytes_to_copy;
+            bytes_copied += num_bytes_to_copy;
+			src_offset = 0;
+		}
+        
+        Ok(bytes_copied as usize)
+    }
 }
 
 // TODO I'd like to rethink this code so that it's easier to initialize and so that much of the public (and generally *immutable*) information is not behind a lock.
@@ -1356,6 +1565,11 @@ impl Filesystem {
                 Err(Error::Unsupported)
             },
         }
+    }
+
+    fn pos_to_byte_offset(&self, pos: &PFSPosition) -> usize {
+        pos.entry_offset + pos.sector_offset * self.bytes_per_sector as usize +
+            pos.cluster_offset * self.cluster_size_in_bytes()
     }
     
     /// Walks the FAT to find an empty cluster and returns the number of the first cluster found.
