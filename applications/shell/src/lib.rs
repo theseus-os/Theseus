@@ -556,7 +556,7 @@ impl Shell {
                 if self.is_internal_command() { // shell executes internal commands
                     self.execute_internal()?;
                     self.clear_cmdline(false)?;
-                    self.terminal.lock().refresh_display();
+                    // self.terminal.lock().refresh_display();
                 } else { // shell invokes user programs
                     let new_job_num = self.build_new_job()?;
                     self.fg_job_num = Some(new_job_num);
@@ -1223,7 +1223,7 @@ impl Shell {
 
                     // Sets this bool to true so that on the next iteration the TextDisplay will refresh AFTER the 
                     // task_handler() function has cleaned up, which does its own printing to the console
-                    self.terminal.lock().refresh_display();
+                    // self.terminal.lock().refresh_display();
                 },
                 _ => { },
             }
@@ -1299,6 +1299,7 @@ impl Shell {
             // loop body. We do so to ensure that printing is handled before keypresses.
             if self.check_and_print_app_output() {
                 need_refresh = true;
+                need_prompt = true;
                 continue;
             }
 
@@ -1310,10 +1311,6 @@ impl Shell {
             if need_prompt || need_prompt_on_task_event {
                 self.redisplay_prompt();
                 need_prompt = false;
-            }
-            if need_refresh || need_refresh_on_task_event {
-                self.terminal.lock().refresh_display();
-                need_refresh = false;
             }
 
             // Looks at the input queue from the window manager
@@ -1327,7 +1324,7 @@ impl Shell {
                     }
 
                     Event::ResizeEvent(ref _rev) => {
-                        self.terminal.lock().refresh_display(); // application refreshes display after resize event is received
+                        need_refresh = true; // application refreshes display after resize event is received
                     }
 
                     // Handles ordinary keypresses
@@ -1336,10 +1333,15 @@ impl Shell {
                     }
                     _ => { }
                 };
-            }           
-            self.terminal.lock().display_cursor()?; 
-                
-            let mut need_refresh = false;
+            }          
+            if need_refresh || need_refresh_on_task_event {
+                // update if there are outputs from applications
+                self.terminal.lock().refresh_display();
+            }
+            self.terminal.lock().display_cursor()?;
+
+            // handle inputs
+            need_refresh = false;
             loop {
                 let locked_consumer = self.key_event_consumer.lock();
                 if let Some(ref key_event_consumer) = locked_consumer.deref() {
@@ -1357,6 +1359,7 @@ impl Shell {
                 }
             }
             if need_refresh {
+                // update if there are inputs
                 self.terminal.lock().refresh_display();
             } else {
                 scheduler::schedule(); // yield the CPU if nothing to do
