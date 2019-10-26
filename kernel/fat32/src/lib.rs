@@ -100,6 +100,8 @@
 
 // TODO cat seems work weirdly with the bigfile example I've got -> doesn't print the last few characters.
 // ^ Should make some different examples to test with.
+// IMPROVEMENT: many pieces of this code could perhaps be rewritten with iterators instead of Vec
+// Not sure if it affects any quality/performance however.
 
 #![no_std]
 #![feature(slice_concat_ext)]
@@ -131,6 +133,8 @@ use alloc::sync::{Arc, Weak};
 use core::convert::TryInto;
 use core::mem::size_of;
 use core::cmp::{Ord, Ordering, min};
+use core::char::decode_utf16;
+use core::str::from_utf8;
 use alloc::vec::Vec;
 use alloc::string::String;
 use alloc::string::ToString;
@@ -236,7 +240,39 @@ impl LongName {
 
         long_name.short_name = entry.name;
 
+        // Note that we must reverse the iterator, since end of string is stored 
+        // in the first VFAT entry.
+        // IMPROVEMENT validate sequence numbers and checksum
+        long_name.long_name = vfat_array.iter().rev().map(
+            |vfat_entry| {
+                let mut entry_chars = [0; 13];
+                // Unsure of order may need to switch this.
+                let mut offset = 0;
+                for i in 0..5 {
+                    entry_chars[offset] = vfat_entry.name1[i].get();
+                    offset += 1;
+                };
+
+                for i in 0..6 {
+                    entry_chars[offset] = vfat_entry.name2[i].get();
+                    offset += 1;
+                };
+
+                for i in 0..2 {
+                    entry_chars[offset] = vfat_entry.name3[i].get();
+                    offset += 1;
+                };
+                entry_chars
+            }
+        ).collect::<Vec<_>>();
+
         Ok(long_name)
+    }
+
+    fn from_short_name(short_name: ShortName) -> LongName {
+        let mut long_name = LongName::empty();
+        long_name.short_name = short_name;
+        long_name
     }
 
     fn empty() -> LongName {
@@ -260,10 +296,10 @@ impl DiskName {
         self.name.to_uppercase()
     }
 
-    fn from_string(name: &str) -> Result<DiskName, &'static str> {
+    fn from_string(name: &str) -> Result<DiskName, Error> {
         // FIXME validate string names:
         if name.is_empty() {
-            return Err("Name cannot be empty");
+            return Err(Error::IllegalArgument);
         }
 
         // FIXME properly strip trailing spaces:
@@ -273,7 +309,31 @@ impl DiskName {
     }
 
     fn from_long_name(long_name: LongName) -> Result<DiskName, Error> {
-        Err(Error::Unsupported)
+        // If the long name is empty emit a short name:
+        if long_name.long_name.is_empty() {
+            // REVIEW this is kind of an overly permissive way to read the name.
+            // Although it should never cause a valid short name to be rejected.
+            let name = from_utf8(&long_name.short_name).map_err(|_| Error::InconsistentDisk)?;
+            return DiskName::from_string(&name);
+        }
+
+        let chars_raw = long_name.long_name.iter().map(
+            |chars| chars.iter().map(|x| *x)
+        ).flatten();
+
+        // Currently we fail if any char fails to decode. Not ideal, but it's OK.
+        let utf16_name = decode_utf16(chars_raw).collect::<Result<String, _>>()
+            .map_err(|_| Error::IllegalArgument)?;
+
+        if utf16_name.len() > 255 {
+            warn!("Found on-disk long name that was over 255 characters: {:}.", utf16_name.len());
+            return Err(Error::InconsistentDisk);
+        };
+
+        // TODO this name is safe to not check so I should just return it
+        // (Although it might not be valid UCS-16 so I could use this function to check the UCS-16)
+        // encoding.
+        DiskName::from_string(&utf16_name)
     }
 
     // TODO support constructing the long_name field using a UCS-2 encoding.
@@ -527,15 +587,22 @@ struct VFATEntry {
 
 impl RawFatDirectory {    
     fn to_directory_entry(&self) -> Result<DirectoryEntry, Error> {
-        let name = String::from_utf8(self.name.to_vec()).map_err(|_| Error::IllegalArgument)?;
-        let name = DiskName::from_string(&name).map_err(|_| Error::IllegalArgument)?;
+        //let name = String::from_utf8(self.name.to_vec()).map_err(|_| Error::IllegalArgument)?;
+        let name = LongName::from_short_name(self.name);
 
         self.to_directory_entry_with_name(name)
     }
 
-    fn to_directory_entry_with_name(&self, name: DiskName) -> Result<DirectoryEntry, Error> {
+
+    fn to_directory_entry_with_name(&self, name: LongName) -> Result<DirectoryEntry, Error> {
+        
+        let num_entries = name.long_name.len() + 1;
+        if num_entries > 20 + 1 { // Max number of on-disk entries is 20 VFAT + 1 normal entry
+            return Err(Error::InconsistentDisk);
+        }
+        
         Ok(DirectoryEntry {
-            name,
+            name: DiskName::from_long_name(name)?,
             file_type: if self.flags & FileAttributes::SUBDIRECTORY.bits == FileAttributes::SUBDIRECTORY.bits {
                 FileType::PFSDirectory
             } else {
@@ -543,6 +610,7 @@ impl RawFatDirectory {
             },
             cluster: (self.cluster_high.get() as u32) << 16 |(self.cluster_low.get() as u32),
             size: self.size.get(),
+            num_entries: num_entries as u8,
         })
     }
     
@@ -587,6 +655,7 @@ pub struct DirectoryEntry {
     file_type: FileType,
     pub size: u32,
     cluster: u32,
+    num_entries: u8, // Number of table entries that this entry spans.
 }
 
 // TODO these methods need to potentially generate a sequence of entries.
@@ -614,6 +683,10 @@ impl DirectoryEntry {
             cluster_low: U16::new((self.cluster) as u16),
             size: U32::new(self.size)
         }
+    }
+
+    fn is_dot(&self) -> bool {
+        self.name.name == "." || self.name.name == ".."
     }
 }
 
@@ -867,41 +940,68 @@ impl PFSDirectory {
         let mut offset = 0; // FIXME need to deal with pos vs offset.
         
         loop {
-            let tmp = self.get_directory_entry(fs, &pos); // FIXME return this instead
-            let dir = self.get_fat_directory(fs, &pos)?;
-            //debug!("got fat directory");
+            // let tmp = self.get_directory_entry(fs, &pos); // FIXME return this instead
+            // let dir = self.get_fat_directory(fs, &pos)?;
+            // //debug!("got fat directory");
             
-            // TODO VFAT long name check needs to be done correctly.
-            if !dir.is_free() && !dir.is_vfat() && !dir.is_dot() {
-                debug!("Found new entry {:?}", debug_name(&dir.name));
-                let entry = dir.to_directory_entry()?;
+            // // TODO VFAT long name check needs to be done correctly.
+            // if !dir.is_free() && !dir.is_vfat() && !dir.is_dot() {
+            //     debug!("Found new entry {:?}", debug_name(&dir.name));
+            //     let entry = dir.to_directory_entry()?;
 
-                // While we're here let's add the entry to our children.
-                self.add_directory_entry(fs, children, &entry)?;
+            //     // While we're here let's add the entry to our children.
+            //     self.add_directory_entry(fs, children, &entry)?;
 
-                match &name {
-                    Some(name) => {
-                        if name == &entry.name {
-                            return Ok(entry);
+            //     match &name {
+            //         Some(name) => {
+            //             if name == &entry.name {
+            //                 return Ok(entry);
+            //             }
+            //         },
+            //         None => {},
+            //     }
+            // }
+
+            // // Handle VFAT case:
+            // if !dir.is_free() && dir.is_vfat() {
+            //     //let entry = self.collect_vfat_directory();
+            // };
+
+            // // If the first byte of the directory is 0 we have reached the end of allocated directory entries
+            // if dir.name[0] == 0 {
+            //     debug!("Reached end of used files on directory.");
+            //     return Err(Error::NotFound);
+            // };
+            let num_entries = match self.get_directory_entry(fs, &pos) {
+                Err(Error::NotFound) |
+                Err(Error::EndOfFile) => {
+                    1
+                },
+                Err(e) => return Err(e),
+                Ok(entry) => {
+                    // Verify that the entry is not a dot entry:
+                    debug!("Found new entry {:?}", entry.name);
+                    if !entry.is_dot() {
+                        self.add_directory_entry(fs, children, &entry)?;
+                    } else {
+                        debug!("Skipping dot entry");
+                    }
+
+                    match &name {
+                        None => {},
+                        Some(disk_name) => {
+                            if &entry.name == disk_name {
+                                return Ok(entry);
+                            }
                         }
-                    },
-                    None => {},
+                    }
+
+                    entry.num_entries
                 }
-            }
 
-            // Handle VFAT case:
-            if !dir.is_free() && dir.is_vfat() {
-                //let entry = self.collect_vfat_directory;
-                // FIXME implement this properly
-            };
-
-            // If the first byte of the directory is 0 we have reached the end of allocated directory entries
-            if dir.name[0] == 0 {
-                debug!("Reached end of used files on directory.");
-                return Err(Error::NotFound);
             };
             
-            pos = match self.cc.advance_pos(fs, &pos, size_of::<RawFatDirectory>()) {
+            pos = match self.cc.advance_pos(fs, &pos, num_entries as usize * size_of::<RawFatDirectory>()) {
                 Err(Error::EndOfFile) => return Err(Error::NotFound),
                 Ok(new_pos) => new_pos,
                 Err(e) => return Err(e),
@@ -938,10 +1038,10 @@ impl PFSDirectory {
         // Seems like bitfields crate would be good solution.
         // Read the sequence number from the directory.
         let sequence_number_raw = dir.name[0];
-        let sequence_number = sequence_number_raw & 0x1f; // lowest 5 bits are seq number.
-        let sequence_end = sequence_number_raw & 0x20 != 0; // bit 6 is set if this is the final sequence number
-        if sequence_number_raw & 0xB0 != 0 || !sequence_end {
-            warn!("Sequence number {:x} invalid", sequence_number_raw);
+        let sequence_number = sequence_number_raw & 0x1f; // bits 0-4 are seq number.
+        let sequence_end = sequence_number_raw & 0x40 != 0; // bit 6 is set if this is the final sequence number
+        if sequence_number_raw & (0x80 | 0x20) != 0 || !sequence_end {
+            warn!("Sequence number 0b{:08b} invalid", sequence_number_raw);
             return Err(Error::InconsistentDisk);
         }
 
@@ -998,8 +1098,7 @@ impl PFSDirectory {
             }).collect::<Vec<&VFATEntry>>(), 
             entry)?;
         
-        let disk_name = DiskName::from_long_name(long_name)?;
-        entry.to_directory_entry_with_name(disk_name)
+        entry.to_directory_entry_with_name(long_name)
     }
 
     /// Add a directory entry into the children list. Does nothing if entry is already in child list.
@@ -1832,7 +1931,7 @@ pub fn root_dir(fs: Arc<Mutex<Filesystem>>, mount_name: &str) -> Result<Arc<Mute
 
     // TODO right now this function can violate the singleton blahdy blah and risks making two cluster chains for this dir.
     // We also can't just use something like a lazy static, since it's a per-FS basis. Maybe the FS needs some information to prevent this.
-    let new_name = DiskName::from_string(mount_name)?;
+    let new_name = DiskName::from_string(mount_name).map_err(|_| "Invalid mount name")?;
     let mut cc = ClusterChain::new(2, fs.clone(), new_name, 
         Weak::<Mutex<PFSDirectory>>::new(), 0);
     cc.parent_count = 2; // TODO what number to choose. We definitely don't want the on disk
