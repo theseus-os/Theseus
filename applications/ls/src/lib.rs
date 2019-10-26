@@ -21,18 +21,6 @@ pub fn main(args: Vec<String>) -> isize {
     let mut opts = Options::new();
     opts.optflag("h", "help", "print this help menu");
 
-    //dump some info about the this loaded app crate
-    {
-        let curr_task = task::get_my_current_task().unwrap();
-        let t = curr_task.lock();
-        let app_crate = t.app_crate.as_ref().unwrap();
-        let krate = app_crate.lock_as_ref();
-        trace!("============== Crate {} =================", krate.crate_name);
-        for s in krate.sections.values() {
-            trace!("   {:?}", &*s.lock());
-        }
-    }
-
     let matches = match opts.parse(&args) {
         Ok(m) => m,
         Err(_f) => {

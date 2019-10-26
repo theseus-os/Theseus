@@ -973,8 +973,8 @@ impl PFSDirectory {
             //     return Err(Error::NotFound);
             // };
             let num_entries = match self.get_directory_entry(fs, &pos) {
-                Err(Error::NotFound) |
-                Err(Error::EndOfFile) => {
+                Err(Error::EndOfFile) => {return Err(Error::NotFound)},
+                Err(Error::NotFound) => {
                     1
                 },
                 Err(e) => return Err(e),
@@ -1505,7 +1505,7 @@ impl ClusterChain {
             let first_sector = fs.first_sector_of_cluster(current_cluster);
             let offset_of_sector = fs.sector_to_byte_offset(first_sector);
 
-            let _bytes_read = fs.io.read(temp_buffer, offset_of_sector).map_err(|_| Error::BlockError);
+            let _bytes_read = fs.io.read(temp_buffer, offset_of_sector + src_offset).map_err(|_| Error::BlockError);
 
 			trace!("ClusterChain::read(): for cluster {}, copied bytes into buffer[{}..{}] from block[{}..{}]",
 				current_cluster, dest_offset, dest_offset + num_bytes_to_copy, src_offset, src_offset + num_bytes_to_copy,
