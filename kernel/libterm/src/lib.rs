@@ -473,29 +473,43 @@ impl Terminal {
         }
     }
 
-    /// Insert a character to the screen. The position is specified by parameter `end_offset` as relative to the end of the text in units of number of characters,
-    /// that is the relative distance to the end of the whole output on the screen.
-    /// end_offset == 0 means to append characters onto the screen, while end_offset == 1 means to
-    /// insert a character right before the exsiting last character.
-    /// One must call `refresh_display` to get things actually showed.
-    pub fn insert_char_to_screen(&mut self, c: char, end_offset: usize) -> Result<(), &'static str> {
+    /// Insert a character to the screen.
+    ///
+    /// # Arguments
+    ///
+    /// * `c`: the new character to insert.
+    /// * `offset_from_end`: the position to insert the character. It represents the distance relative to the end of the whole output on the screen in units of characters.
+    /// 
+    /// # Examples
+    ///
+    /// * `terminal.insert_char_to_screen(char, 0)` will append `char` to the end of existing text.
+    /// * `terminal.insert_char_to_screen(char, 5)` will insert `char` right before the last 5 characters.
+    ///
+    /// After invoke this function, one must call `refresh_display` to get things actually showed.
+    pub fn insert_char_to_screen(&mut self, c: char, offset_from_end: usize) -> Result<(), &'static str> {
         let buflen = self.scrollback_buffer.len();
-        if buflen < end_offset { return Err("end_offset is larger than length of scrollback buffer"); }
-        let insert_idx = buflen - end_offset;
+        if buflen < offset_from_end { return Err("offset_from_end is larger than length of scrollback buffer"); }
+        let insert_idx = buflen - offset_from_end;
         self.scrollback_buffer.insert_str(insert_idx, &c.to_string());
         Ok(())
     }
 
-    /// Remove a character from the screen. The position is specified by parameter `end_offset` relative to the end of the text in units of number of characters,
-    /// that is the relative distance to the end of the whole output on the screen.
-    /// end_offset == 1 means to remove the last character on the screen.
-    /// end_offset == 0 is INVALID here, since there's nothing at the "end" of the screen.
-    /// One must call `refresh_display` to get things actually removed on the screen.
-    pub fn remove_char_from_screen(&mut self, end_offset: usize) -> Result<(), &'static str> {
+    /// Remove a character from the screen.
+    ///
+    /// # Arguments
+    ///
+    /// * `offset_from_end`: the position of the character to remove. It represents the distance relative to the end of the whole output on the screen in units of characters. `offset_from_end == 0` is *invalid* here.
+    /// 
+    /// # Examples
+    ///
+    /// * `terminal.remove_char_from_screen(1)` will remove the last character in the screen.
+    ///
+    /// After invoke this function, one must call `refresh_display` to get things actually showed.
+    pub fn remove_char_from_screen(&mut self, offset_from_end: usize) -> Result<(), &'static str> {
         let buflen = self.scrollback_buffer.len();
-        if buflen < end_offset { return Err("end_offset is larger than length of scrollback buffer"); }
-        if end_offset == 0 { return Err("cannot remove character at end_offset == 0"); }
-        let remove_idx = buflen - end_offset;
+        if buflen < offset_from_end { return Err("offset_from_end is larger than length of scrollback buffer"); }
+        if offset_from_end == 0 { return Err("cannot remove character at offset_from_end == 0"); }
+        let remove_idx = buflen - offset_from_end;
         self.scrollback_buffer.remove(remove_idx);
         Ok(())
     }
@@ -616,7 +630,7 @@ impl Terminal {
         }
 
         // calculate the cursor position
-        let cursor_pos = text_next_pos - self.cursor.end_offset;
+        let cursor_pos = text_next_pos - self.cursor.offset_from_end;
         let cursor_line = cursor_pos / col_num;
         let cursor_col = cursor_pos % col_num;
                 
@@ -639,22 +653,24 @@ impl Terminal {
     }
 
     /// Gets the position of the cursor relative to the end of text in units of characters.
-    pub fn get_cursor_end_offset(&self) -> usize {
-        self.cursor.end_offset
+    pub fn get_cursor_offset_from_end(&self) -> usize {
+        self.cursor.offset_from_end
     }
 
     /// Updates the position of a cursor.
     /// # Arguments
-    /// * `end_offset`: the position of the cursor relative to the end of text in units of characters.
-    /// * `back_char`: the ASCII code of the underlying character when the cursor is unseen.
-    pub fn update_cursor_pos(&mut self, end_offset: usize, back_char: u8) {
-        self.cursor.end_offset = end_offset;
-        self.cursor.back_char = back_char;
+    /// * `offset_from_end`: the position of the cursor relative to the end of text in units of characters.
+    /// * `underlying_char`: the ASCII code of the underlying character when the cursor is unseen.
+    pub fn update_cursor_pos(&mut self, offset_from_end: usize, underlying_char: u8) {
+        self.cursor.offset_from_end = offset_from_end;
+        self.cursor.underlying_char = underlying_char;
     }
 
 }
 
-/// A cursor structure. It is a special symbol which can be displayed.
+/// The cursor structure.
+/// A cursor is a special symbol shown in the text box of a terminal. It indicates the position of character where the next input would be put or the delete operation works on.
+/// Terminal invokes its `display` method in a loop to let a cursor blink.
 pub struct Cursor {
     /// Whether the cursor is enabled in the terminal.
     enabled: bool,
@@ -667,14 +683,14 @@ pub struct Cursor {
     /// The color of the cursor
     color: u32,
     /// The position of the cursor relative to the end of terminal text in units of number of characters.
-    end_offset: usize,
+    offset_from_end: usize,
     /// The underlying character at the position of the cursor.
     /// It is shown when the cursor is unseen.
-    back_char: u8,
+    underlying_char: u8,
 }
 
 impl Cursor {
-    /// Creates a new cursor structure.
+    /// Creates a new cursor structure with a default offset to the end of the text as 0 and the underlying character as `\0`. The initial `show` state is  `true` and the blinking frequency is defined as `libterm::DEFAULT_CURSOR_FREQ`. The parameter `color` specifies the color of the cursor.
     pub fn new(color: u32) -> Cursor {
         Cursor {
             enabled: true,
@@ -682,8 +698,8 @@ impl Cursor {
             time: tsc_ticks(),
             show: true,
             color: color,
-            end_offset: 0,
-            back_char: 0,
+            offset_from_end: 0,
+            underlying_char: 0,
         }
     }
 
@@ -745,7 +761,7 @@ impl Cursor {
             } else {
                 frame_buffer_printer::print_ascii_character(
                     framebuffer,
-                    self.back_char,
+                    self.underlying_char,
                     FONT_COLOR,
                     BACKGROUND_COLOR,
                     coordinate,

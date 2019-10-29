@@ -224,14 +224,14 @@ impl Shell {
     /// `sync_terminal` indicates whether the terminal screen will be synchronically updated.
     fn insert_char_to_cmdline(&mut self, c: char, sync_terminal: bool) -> Result<(), &'static str> {
         let mut terminal = self.terminal.lock();
-        let end_offset = terminal.get_cursor_end_offset();
-        let insert_idx = self.cmdline.len() - end_offset;
+        let offset_from_end = terminal.get_cursor_offset_from_end();
+        let insert_idx = self.cmdline.len() - offset_from_end;
         self.cmdline.insert(insert_idx, c);
         if sync_terminal {
             // disable cursor before updating in case the cursor is not at the end and the old text is the prefix of the new one
             terminal.cursor.disable();
             terminal.display_cursor()?;
-            terminal.insert_char_to_screen(c, end_offset)?;
+            terminal.insert_char_to_screen(c, offset_from_end)?;
             terminal.cursor.enable();
         }
         Ok(())
@@ -242,16 +242,16 @@ impl Shell {
     /// The position to remove is determined by the position of the cursor in the terminal.
     /// `sync_terminal` indicates whether the terminal screen will be synchronically updated.
     fn remove_char_from_cmdline(&mut self, erase_left: bool, sync_terminal: bool) -> Result<(), &'static str> {
-        let mut cursor_end_offset = self.terminal.lock().get_cursor_end_offset();
-        if erase_left { cursor_end_offset += 1; }
-        if cursor_end_offset > self.cmdline.len() || cursor_end_offset == 0 { return Ok(()); }
-        let erase_idx = self.cmdline.len() - cursor_end_offset;
+        let mut cursor_offset_from_end = self.terminal.lock().get_cursor_offset_from_end();
+        if erase_left { cursor_offset_from_end += 1; }
+        if cursor_offset_from_end > self.cmdline.len() || cursor_offset_from_end == 0 { return Ok(()); }
+        let erase_idx = self.cmdline.len() - cursor_offset_from_end;
         self.cmdline.remove(erase_idx);
         if sync_terminal {
-            self.terminal.lock().remove_char_from_screen(cursor_end_offset)?;
+            self.terminal.lock().remove_char_from_screen(cursor_offset_from_end)?;
         }
         if !erase_left {            
-            self.update_cursor_pos(cursor_end_offset - 1)?;
+            self.update_cursor_pos(cursor_offset_from_end - 1)?;
         }
         Ok(())
     }
@@ -318,9 +318,9 @@ impl Shell {
     /// Move the cursor a character left. If the cursor is already at the beginning of the command line,
     /// it simply returns.
     fn move_cursor_left(&mut self) -> Result<(), &'static str> {
-        let end_offset = self.terminal.lock().get_cursor_end_offset();
-        if end_offset < self.cmdline.len() {
-            self.update_cursor_pos(end_offset + 1)?;
+        let offset_from_end = self.terminal.lock().get_cursor_offset_from_end();
+        if offset_from_end < self.cmdline.len() {
+            self.update_cursor_pos(offset_from_end + 1)?;
         }
         Ok(())
     }
@@ -328,22 +328,22 @@ impl Shell {
     /// Move the cursor a character to the right. If the cursor is already at the end of the command line,
     /// it simply returns.
     fn move_cursor_right(&mut self) -> Result<(), &'static str> {
-        let end_offset = self.terminal.lock().get_cursor_end_offset();
-        if end_offset > 0 {
-            self.update_cursor_pos(end_offset - 1)?;
+        let offset_from_end = self.terminal.lock().get_cursor_offset_from_end();
+        if offset_from_end > 0 {
+            self.update_cursor_pos(offset_from_end - 1)?;
         }
         Ok(())
     }
 
-    // Update the position of cursor. `end_offset` specifies the position relative to the end of the text in units of characters.
-    fn update_cursor_pos(&mut self, end_offset: usize) -> Result<(), &'static str> {
+    /// Update the position of cursor. `offset_from_end` specifies the position relative to the end of the text in units of characters.
+    fn update_cursor_pos(&mut self, offset_from_end: usize) -> Result<(), &'static str> {
         let mut terminal = self.terminal.lock();
         terminal.cursor.disable();
         terminal.display_cursor()?;
-        if end_offset == 0 {
+        if offset_from_end == 0 {
             terminal.update_cursor_pos(0, 0)
-        } else if end_offset <= self.cmdline.len() {
-            terminal.update_cursor_pos(end_offset, self.cmdline.as_bytes()[self.cmdline.len() - end_offset]);
+        } else if offset_from_end <= self.cmdline.len() {
+            terminal.update_cursor_pos(offset_from_end, self.cmdline.as_bytes()[self.cmdline.len() - offset_from_end]);
         }
         terminal.cursor.enable();
         
@@ -556,7 +556,6 @@ impl Shell {
                 if self.is_internal_command() { // shell executes internal commands
                     self.execute_internal()?;
                     self.clear_cmdline(false)?;
-                    // self.terminal.lock().refresh_display();
                 } else { // shell invokes user programs
                     let new_job_num = self.build_new_job()?;
                     self.fg_job_num = Some(new_job_num);
@@ -1015,7 +1014,7 @@ impl Shell {
     fn complete_cmdline(&mut self) -> Result<(), &'static str> {
 
         // Get the last string slice in the pipe chain.
-        let cmdline = self.cmdline[0..self.cmdline.len()-self.terminal.lock().get_cursor_end_offset()].to_string();
+        let cmdline = self.cmdline[0..self.cmdline.len()-self.terminal.lock().get_cursor_offset_from_end()].to_string();
         let last_cmd_in_pipe = match cmdline.split("|").last() {
             Some(cmd) => cmd,
             None => return Ok(())
@@ -1220,10 +1219,6 @@ impl Shell {
             match print_event.deref() {
                 &Event::OutputEvent(ref s) => {
                     self.terminal.lock().print_to_terminal(s.text.clone());
-
-                    // Sets this bool to true so that on the next iteration the TextDisplay will refresh AFTER the 
-                    // task_handler() function has cleaned up, which does its own printing to the console
-                    // self.terminal.lock().refresh_display();
                 },
                 _ => { },
             }
