@@ -473,20 +473,20 @@ impl Terminal {
         }
     }
 
-    /// Insert a character to the screen.
+    /// Insert a character to the terminal.
     ///
     /// # Arguments
     ///
     /// * `c`: the new character to insert.
-    /// * `offset_from_end`: the position to insert the character. It represents the distance relative to the end of the whole output on the screen in units of characters.
+    /// * `offset_from_end`: the position to insert the character. It represents the distance relative to the end of the whole output in the terminal in units of characters.
     /// 
     /// # Examples
     ///
-    /// * `terminal.insert_char_to_screen(char, 0)` will append `char` to the end of existing text.
-    /// * `terminal.insert_char_to_screen(char, 5)` will insert `char` right before the last 5 characters.
+    /// * `terminal.insert_char(char, 0)` will append `char` to the end of existing text.
+    /// * `terminal.insert_char(char, 5)` will insert `char` right before the last 5 characters.
     ///
-    /// After invoke this function, one must call `refresh_display` to get things actually showed.
-    pub fn insert_char_to_screen(&mut self, c: char, offset_from_end: usize) -> Result<(), &'static str> {
+    /// After invoke this function, one must call `refresh_display` to get the updates actually showed on the screen.
+    pub fn insert_char(&mut self, c: char, offset_from_end: usize) -> Result<(), &'static str> {
         let buflen = self.scrollback_buffer.len();
         if buflen < offset_from_end { return Err("offset_from_end is larger than length of scrollback buffer"); }
         let insert_idx = buflen - offset_from_end;
@@ -494,18 +494,18 @@ impl Terminal {
         Ok(())
     }
 
-    /// Remove a character from the screen.
+    /// Remove a character from the terminal.
     ///
     /// # Arguments
     ///
-    /// * `offset_from_end`: the position of the character to remove. It represents the distance relative to the end of the whole output on the screen in units of characters. `offset_from_end == 0` is *invalid* here.
+    /// * `offset_from_end`: the position of the character to remove. It represents the distance relative to the end of the whole output in the terminal in units of characters. `offset_from_end == 0` is *invalid* here.
     /// 
     /// # Examples
     ///
-    /// * `terminal.remove_char_from_screen(1)` will remove the last character in the screen.
+    /// * `terminal.remove_char(1)` will remove the last character in the screen.
     ///
-    /// After invoke this function, one must call `refresh_display` to get things actually showed.
-    pub fn remove_char_from_screen(&mut self, offset_from_end: usize) -> Result<(), &'static str> {
+    /// After invoke this function, one must call `refresh_display` to get the updates actually showed on the screen.
+    pub fn remove_char(&mut self, offset_from_end: usize) -> Result<(), &'static str> {
         let buflen = self.scrollback_buffer.len();
         if buflen < offset_from_end { return Err("offset_from_end is larger than length of scrollback buffer"); }
         if offset_from_end == 0 { return Err("cannot remove character at offset_from_end == 0"); }

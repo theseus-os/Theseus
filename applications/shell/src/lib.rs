@@ -231,7 +231,7 @@ impl Shell {
             // disable cursor before updating in case the cursor is not at the end and the old text is the prefix of the new one
             terminal.cursor.disable();
             terminal.display_cursor()?;
-            terminal.insert_char_to_screen(c, offset_from_end)?;
+            terminal.insert_char(c, offset_from_end)?;
             terminal.cursor.enable();
         }
         Ok(())
@@ -248,7 +248,7 @@ impl Shell {
         let erase_idx = self.cmdline.len() - cursor_offset_from_end;
         self.cmdline.remove(erase_idx);
         if sync_terminal {
-            self.terminal.lock().remove_char_from_screen(cursor_offset_from_end)?;
+            self.terminal.lock().remove_char(cursor_offset_from_end)?;
         }
         if !erase_left {            
             self.update_cursor_pos(cursor_offset_from_end - 1)?;
@@ -261,7 +261,7 @@ impl Shell {
     fn clear_cmdline(&mut self, sync_terminal: bool) -> Result<(), &'static str> {
         if sync_terminal {
             for _i in 0..self.cmdline.len() {
-                self.terminal.lock().remove_char_from_screen(1)?;
+                self.terminal.lock().remove_char(1)?;
             }
         }
         self.cmdline.clear();
@@ -288,7 +288,7 @@ impl Shell {
     fn insert_char_to_input_buff(&mut self, c: char, sync_terminal: bool) -> Result<(), &'static str> {
         self.input_buffer.push(c);
         if sync_terminal {
-            self.terminal.lock().insert_char_to_screen(c, 0)?;
+            self.terminal.lock().insert_char(c, 0)?;
         }
         Ok(())
     }
@@ -298,7 +298,7 @@ impl Shell {
     fn remove_char_from_input_buff(&mut self, sync_terminal: bool) -> Result<(), &'static str> {
         let popped = self.input_buffer.pop();
         if popped.is_some() && sync_terminal {
-            self.terminal.lock().remove_char_from_screen(1)?;
+            self.terminal.lock().remove_char(1)?;
         }
         Ok(())
     }
