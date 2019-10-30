@@ -3,7 +3,7 @@
 extern crate task;
 #[macro_use] extern crate terminal_print;
 #[macro_use] extern crate alloc;
-#[macro_use] extern crate log;
+// #[macro_use] extern crate log;
 extern crate fs_node;
 extern crate getopts;
 extern crate path;
@@ -76,9 +76,7 @@ pub fn main(args: Vec<String>) -> isize {
 
 fn print_children(dir: &DirRef) {
     let mut child_string = String::new();
-    let locked_dir = dir.lock();
-    //println!("Got lock for directory");
-    let mut child_list = locked_dir.list(); 
+    let mut child_list = dir.lock().list(); 
     child_list.reverse();
     for child in child_list.iter() {
         child_string.push_str(&format!("{}\n", child));
