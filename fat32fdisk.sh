@@ -1,5 +1,7 @@
 #!/usr/bin/env bash
-# Automate creation of a fat32 disk.
+# Automate creation of a blank fat32 disk.
+# Note that one will still want to compress the disk for adding to github and 
+# that we currently have no automation for creating test disks that are not blank.
 #
 # The sed script strips off all the comments so that we can 
 # document what we're doing in-line with the actual commands
@@ -8,6 +10,8 @@
 # Commands adapted from here: http://fejlesztek.hu/create-a-fat-file-system-image-on-linux/
 # See https://superuser.com/questions/332252/how-to-create-and-format-a-partition-using-a-bash-script/1132834
 #  as well (used for the sed trick).
+dd if=/dev/zero of=fat32.img count=50 bs=1M
+
 sed -e 's/\s*\([\+0-9a-zA-Z]*\).*/\1/' <<EOF| fdisk ./fat32.img
 	o # clear the in memory partition table
 	n # new partition
@@ -19,3 +23,6 @@ sed -e 's/\s*\([\+0-9a-zA-Z]*\).*/\1/' <<EOF| fdisk ./fat32.img
 	c # Code for fat32
 	w # sync to disk and end
 EOF
+
+# Format the disk with fat32.
+mkfs.vfat -F 32 fat32.img

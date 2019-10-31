@@ -122,7 +122,7 @@ extern crate block_io;
 extern crate spawn;
 extern crate task;
 
-use storage_device::{BlockBounds};
+use storage_device::BlockBounds;
 use zerocopy::{FromBytes, AsBytes, LayoutVerified, ByteSlice, Unaligned};
 use zerocopy::byteorder::{U16, U32};
 use byteorder::{ByteOrder, LittleEndian};
@@ -139,7 +139,7 @@ use alloc::vec::Vec;
 use alloc::string::String;
 use alloc::string::ToString;
 use memory::MappedPages;
-use block_io::BlockIo;
+use block_io::{BlockIo};
 use spawn::{KernelTaskBuilder};
 use task::TaskRef;
 
@@ -190,7 +190,6 @@ fn cluster_from_raw(cluster: u32) -> u32 {
     (cluster & 0x0fff_ffff)
 }
 
-// REVIEW I'm not sure if these are worth keeping around seeing as anything on the public interface will use static strings.
 // Internally EOF is used on non-error paths so it's non-trivial to get rid of this behavior unless we make the returns Result<Option<..>>
 /// Internal error types
 #[derive(Debug, PartialEq)]
@@ -1090,8 +1089,8 @@ impl PFSDirectory {
 
         let entry = &entry.fat_directory;
 
-        // REVIEW I spent a while wrestling with rust's type checker here to make this work.
-        // Not sure why it was so hard.
+        // Some weirdness with type declarations to convice the checker 
+        // that these LayoutVerified types are also valid refs to RawFatDirectory structs.
         let long_name = LongName::new(
             vfat_array.iter().map(|x| {
                 let vfat_entry_ref: &VFATEntry = &x.vfat_entry;
@@ -1383,7 +1382,7 @@ struct ClusterChain {
     parent_count: usize, // Number of references on disk. For a file must always be one. For a directory this is variable.
     _num_clusters: Option<u32>, // Unknown without traversing FAT table. I consider this useful information, but I'm not sure if I'll ever use it.
     pub size: u32,
-    cluster_cache: Mutex<Vec<u32>>, // Cache of cluster offset to on_disk clusters. REVIEW: if we allow shrinking a file this is sketchy but this isn't legal as best I can tell.
+    cluster_cache: Mutex<Vec<u32>>, // Cache of cluster offset to on_disk clusters.
 }
 
 impl ClusterChain {
