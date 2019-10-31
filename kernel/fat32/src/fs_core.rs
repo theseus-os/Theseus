@@ -1,10 +1,3 @@
-#![no_std]
-#![feature(slice_concat_ext)]
-#![feature(option_flattening)]
-
-// #[macro_use] extern crate alloc;
-// #[macro_use] extern crate log;
-
 extern crate alloc;
 extern crate log;
 extern crate storage_device;
@@ -14,10 +7,8 @@ extern crate zerocopy;
 extern crate memory;
 extern crate block_io;
 
-use storage_device::BlockBounds;
 use byteorder::{ByteOrder, LittleEndian};
 use core::mem::size_of;
-use core::str::from_utf8;
 use alloc::vec::Vec;
 use block_io::{BlockIo};
 
