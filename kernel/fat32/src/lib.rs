@@ -382,7 +382,7 @@ impl PFSDirectory {
     /// Walk the directory and adds all encountered entries into children tree.
     /// Returns Ok(Entry) if found. Otherwise returns Err(Error::NotFound) if not found (or no name given).
     fn walk_until(&self, fs: &mut Filesystem, children: &mut ChildList, 
-        name: Option<DiskName>) -> Result<DirectoryEntry, Error> {
+        name: Option<&DiskName>) -> Result<DirectoryEntry, Error> {
         
         let mut pos = self.cc.initial_pos();
         let mut offset = 0; // FIXME need to deal with pos vs offset (since there's some duplicate info).
@@ -403,7 +403,7 @@ impl PFSDirectory {
                         debug!("Skipping dot entry");
                     }
 
-                    match &name {
+                    match name {
                         None => {},
                         Some(disk_name) => {
                             if &entry.name == disk_name {
@@ -565,42 +565,6 @@ impl PFSDirectory {
         }
     }
 
-    #[deprecated]
-    // Does not support long names right now. Will probably remove this function soon.
-    /// Returns a vector of all the directory entries in a directory without mutating the directory
-    pub fn entries(&self, fs: &mut Filesystem) -> Result<Vec<DirectoryEntry>, Error> {
-        debug!("Getting entries for {:?}", self.cc.name);
-
-        let mut entry_collection: Vec<DirectoryEntry> = Vec::new(); 
-        let mut pos = self.cc.initial_pos();
-        
-        loop {
-            let dir = self.get_fat_directory(fs, &pos)?;
-            
-            // TODO VFAT long name check needs to be done correctly.
-            if !dir.is_free() && !dir.is_vfat() {
-                // NOTE: might be good to fix this so that we can debug print a name here.
-                //debug!("Found new entry {:?}", debug_name(&dir.name));
-                match dir.to_directory_entry() {
-                    Ok(entry) => entry_collection.push(entry),
-                    Err(_) => warn!("Failed to convert on disk entry to DirectoryEntry"),
-                }
-            }
-
-            // If the first byte of the directory is 0 we have reached the end of allocated directory entries
-            if dir.is_end() {
-                return Ok(entry_collection);
-            }
-            
-            pos = match self.cc.advance_pos(fs, &pos, size_of::<RawFatDirectory>()) {
-                Err(Error::EndOfFile) => return Ok(entry_collection),
-                Ok(new_pos) => new_pos,
-                Err(e) => return Err(e),
-            };
-            debug!("New position: cluster: {}, sector_off: {}, byte off: {}", pos.cluster, pos.sector_offset, pos.entry_offset);
-        }
-    }
-
     /// Returns the entry indicated by PFSPosition.
     /// the function is used and returns EndOfFile if the next PFSdirectory doesn't exist
     /// Note that this function will happily return unused directory entries since it simply provides a sequential view of the entries on disk.
@@ -737,54 +701,15 @@ impl PFSDirectory {
 
         let mut fs = self.cc.filesystem.lock();
 
-        // FIXME: this can be written to only walk the directory once (and also add entries to children that aren't the ones we needed).
-        let entries = self.entries(&mut fs)?;
-        
-        for entry in entries {
-            // Compares the name of the next entry in the current directory
-            if name == &entry.name {
-                // Get a write lock for the children and check if it was found before creating a new object (since we dropped the read lock).
-                let mut children = self.children.write();
-                match children.get(&name) {
-                    Some(child) => return Ok(child.clone()),
-                    None => {},
-                };
+        let mut children = self.children.write();
 
-                let cc = ClusterChain::new(entry.cluster, self.cc.filesystem.clone(), entry.name, self.dot.clone(), entry.size);
+        // If this returns a non-error result, then we found the entry and can get from children.
+        self.walk_until(&mut fs, &mut children, Some(name))?;
 
-                match entry.file_type {
-                    FileType::PFSDirectory => {
-
-                        let dir = PFSDirectory {
-                            cc: cc,
-                            children: RwLock::new(BTreeMap::new()),
-                            dot: Weak::<Mutex<PFSDirectory>>::new(),
-                        };
-
-                        // Dirty shenanigans to set dot weak loop.
-                        let dir_ref = Arc::new(Mutex::new(dir));
-                        dir_ref.lock().dot = Arc::downgrade(&dir_ref) as WeakDirRef;
-                        children.insert(name.clone(), FileOrDir::Dir(dir_ref.clone()));
-
-                        return Ok(FileOrDir::Dir(dir_ref));
-                    }
-                    
-                    FileType::PFSFile => {
-                        
-                        let file = PFSFile {
-                            cc: cc,
-                        };
-
-                        let file_ref = Arc::new(Mutex::new(file));
-                        children.insert(name.clone(), FileOrDir::File(file_ref.clone()));
-
-                        return Ok(FileOrDir::File(file_ref));
-                    }
-                }
-            }
+        match children.get(name) {
+            Some(child) => Ok(child.clone()),
+            None => Err(Error::NotFound)
         }
-
-        Err(Error::NotFound)
     }
 }
 
