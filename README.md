@@ -1,10 +1,10 @@
 # Theseus OS
 
-Theseus is a new runtime-composable OS that tackles the problem of *state spill*, the harmful yet ubiquitous phenomenon described in our [research paper from EuroSys 2017 here](http://kevinaboos.web.rice.edu/statespy.html).
+Theseus is a new runtime-morphable OS with a variety of design goals, but primarily we tackle the problem of *state spill*, the harmful yet ubiquitous phenomenon described in our [research paper from EuroSys 2017 here](http://kevinaboos.web.rice.edu/statespy.html).
 
 We have designed and built Theseus from scratch using Rust to completely rethink state management in an OS, with the intention of avoiding state spill or mitigating its effects to the fullest extent possible. 
 
-More details are provided in Theseus's [documentation](#Documentation).
+More details are provided in Theseus's [documentation](#Documentation), especially its book.
 
 
 
@@ -70,7 +70,67 @@ To investigate the state of the running QEMU entity, you can switch to the QEMU 
 While not strictly required, KVM will speed up the execution of QEMU.
 To install KVM, run the following command:    
 `sudo apt-get install kvm`.     
-To enable KVM support, add `kvm=yes` to your make command, e.g., `make run kvm=yes`.
+To enable KVM support, add `host=yes` to your make command, e.g.,    
+`make run host=yes`    
+Currently this option is only supported on native Linux hosts.
+
+
+## Debugging 
+GDB has built-in support for QEMU, but it doesn't play nicely with OSes that run in long mode. In order to get it working properly with our OS in Rust, we need to patch it and build it locally. The hard part has already been done for us ([details here](http://os.phil-opp.com/set-up-gdb.html)), so we can just quickly set it up with the following commands.  
+
+First, install the following packages:  
+`sudo apt-get install texinfo flex bison python-dev ncurses-dev`
+
+Then, from the base directory of the Theseus project, run this command to easily download and build it from an existing patched repo:  
+`curl -sf https://raw.githubusercontent.com/phil-opp/binutils-gdb/rust-os/build-rust-os-gdb.sh | sh`  
+
+After that, you should have a `rust-os-gdb` directory that contains the `gdb` executables and scripts. 
+
+Then, simply run `make debug` to build and run Theseus in QEMU, which will pause the OS's execution until we attach our patched GDB instance.   
+To attach the debugger to our paused QEMU instance, run `make gdb` in another terminal. QEMU will be paused until we move the debugger forward, with `n` to step through or `c` to continue running the debugger.  
+Try setting a breakpoint at the kernel's entry function using `b nano_core::nano_core_start` or at a specific file/line, e.g., `b scheduler.rs:40`.
+
+
+## Documentation
+Theseus, like the Rust language itself, includes two forms of documentation: a "book" for high-level overviews of design concepts, and the source-level documentation within the code itself. The former is a work in progress but may still be useful, while the latter is more useful for developing in Thesues.
+
+Once your build environment is fully set up, you can generate Theseus's documentation in standard Rust docs.rs format. 
+To do so, simply run:     
+`make doc`
+
+To view the documentation in a browser on your local machine, run:     
+`make view-doc`
+
+There are similar commands for building the Theseus book:    
+`make book`
+
+
+## IDE Setup  
+Our personal preference is to use Visual Studio Code (VS Code), which has excellent, official support from the Rust language team. Other options are available [here](https://areweideyet.com/), but we don't recommend them.
+
+For VS Code, recommended plugins are:
+ * Rust (rls), by rust-lang
+ * Better TOML, by bungcip
+ * x86 and x86_64 Assembly, by 13xforever
+
+### Fixing RLS Problems
+Sometimes RLS just doesn't want to behave. In that case, try the following steps to fix it:
+ * Set your default Rust toolchain to the one version in the `rust-toolchain` file, for example:     
+ `rustup default nightly-2019-07-09`.
+ * With your newly-set default toolchain, add the necessary components:    
+ `rustup component add rls rust-analysis rust-src`.
+ * In VS Code (or whatever IDE you're using), uninstall and reinstall the RLS extension, reloading the IDE each time.
+ * Check your IDE's settings to make sure that no weird rust or RLS settings have been set; building Theseus doesn't require any special RLS settings. 
+ * If you're still having lots of issues, remove all other toolchains besides the default one and try again.     
+ You can see other installed toolchains with `rustup toolchain list`.
+
+
+## License
+The source code is licensed under the MIT License. See the LICENSE-MIT file for more. 
+
+
+# Other stuff
+
 
 
 ## Loading Theseus Through PXE
@@ -168,40 +228,3 @@ On the target computer, boot into the BIOS, turn on Legacy boot mode, and select
 ### Subsequent PXE Uses
 After setting up PXE the first time, you can run `make pxe` to make an updated ISO, remove the old one, and copy the new one over into the TFTP boot folder. At that point, you should be able to boot that new version of Theseus by restarting the target computer. If there are issues restarting the DHCP server after it worked the first time, one possible solution may be to confirm that the IP address is the one you intended it to be with the command from earlier: 
 `sudo ifconfig <network-device-name> 192.168.1.105` 
-
-## Debugging 
-GDB has built-in support for QEMU, but it doesn't play nicely with OSes that run in long mode. In order to get it working properly with our OS in Rust, we need to patch it and build it locally. The hard part has already been done for us ([details here](http://os.phil-opp.com/set-up-gdb.html)), so we can just quickly set it up with the following commands.  
-
-First, install the following packages:  
-`sudo apt-get install texinfo flex bison python-dev ncurses-dev`
-
-Then, from the base directory of the Theseus project, run this command to easily download and build it from an existing patched repo:  
-`curl -sf https://raw.githubusercontent.com/phil-opp/binutils-gdb/rust-os/build-rust-os-gdb.sh | sh`  
-
-After that, you should have a `rust-os-gdb` directory that contains the `gdb` executables and scripts. 
-
-Then, simply run `make debug` to build and run Theseus in QEMU, which will pause the OS's execution until we attach our patched GDB instance.   
-To attach the debugger to our paused QEMU instance, run `make gdb` in another terminal. QEMU will be paused until we move the debugger forward, with `n` to step through or `c` to continue running the debugger.  
-Try setting a breakpoint at the kernel's entry function using `b nano_core::nano_core_start` or at a specific file/line, e.g., `b scheduler.rs:40`.
-
-
-## Documentation
-Once your build environment is fully set up, you can generate Theseus's documentation in standard Rust docs.rs format. 
-To do so, simply run:     
-`make doc`
-
-To view the documentation in a browser on your local machine, run:     
-`make view-doc`
-
-
-## IDE Setup  
-Our personal preference is to use Visual Studio Code (VS Code), which has excellent, official support from the Rust language team. Other options are available [here](https://areweideyet.com/), but we don't recommend them.
-
-For VS Code, recommended plugins are:
- * Rust (rls), by rust-lang
- * Better TOML, by bungcip
- * x86 and x86_64 Assembly, by 13xforever
-
-
-## License
-The source code is licensed under the MIT License. See the LICENSE-MIT file for more. 
