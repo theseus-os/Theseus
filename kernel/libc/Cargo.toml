@@ -10,6 +10,7 @@ libm = "0.1.4"
 # memchr = { version = "2.2.0", default-features = false }
 rand = { version = "0.5.5", default-features = false }
 
+
 [dependencies.log]
 default-features = false
 version = "0.3.7"
@@ -42,3 +43,11 @@ path = "../vfs_node"
 
 [dependencies.root]
 path = "../root"
+
+[dependencies.libc]
+git = "https://github.com/Ramla-I/libc.git"
+default-features = false
+
+[dependencies.cstr_core]
+version = "0.1.2"
+features = ["alloc"]

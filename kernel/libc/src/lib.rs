@@ -5,6 +5,7 @@
 #![feature(slice_internals)] //TODO: use rust memchr crate
 #![feature(const_raw_ptr_deref)]
 #![feature(core_intrinsics)]
+// #![feature(alloc)]
 
 #[macro_use] extern crate log;
 extern crate alloc;
@@ -21,18 +22,15 @@ extern crate task;
 extern crate fs_node;
 extern crate vfs_node;
 extern crate root;
+extern crate cstr_core;
+extern crate libc as rlibc;
 
-pub mod mman;
-pub mod string;
-pub mod types;
 pub mod errno;
-pub mod c_str;
 pub mod fs;
+pub mod mman;
 pub mod stdio;
 pub mod stdlib;
-pub mod ctype;
 pub mod unistd;
-pub mod fcntl;
 
 use self::fs::{init_file_descriptors, create_libc_directory};
 use alloc::string::String;

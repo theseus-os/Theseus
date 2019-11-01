@@ -1,9 +1,14 @@
 //! stdio implementation for Redox, following http://pubs.opengroup.org/onlinepubs/7908799/xsh/stdio.h.html
 //! modified Redox implementation
 
-use crate::{c_str::*, types::*, errno::*};
+use crate::{errno::ERRNO};
+use cstr_core::CStr;
 use core::str;
 use core::sync::atomic::Ordering;
+use rlibc::{
+    errno::*,
+    *
+};
 
 //for now we don't print to a standard error output, we just use the normal log printing
 #[no_mangle]

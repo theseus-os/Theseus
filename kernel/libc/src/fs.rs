@@ -12,13 +12,15 @@ use core::ops::DerefMut;
 use vfs_node::VFSDirectory;
 use core::sync::atomic::{AtomicI32, Ordering};
 use core::slice::{from_raw_parts, from_raw_parts_mut};
-
-use crate:: {
-    types::*,
+use rlibc::{
     errno::*,
-    fcntl::*,
-    c_str::*,
+    *
 };
+use cstr_core::{CStr, CString};
+
+use crate::errno::ERRNO;
+
+
 
 /// Max number of file descriptors available
 pub const MAX_FILE_DESCRIPTORS: usize = 1024;
