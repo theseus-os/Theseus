@@ -103,7 +103,7 @@ path = "../task_fs"
 path = "../pause"
 
 [dependencies.libc]
-path = "../libc"
+path = "../../posix/libc"
 
 [lib]
 crate-type = ["rlib"]

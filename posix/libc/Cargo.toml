@@ -15,34 +15,13 @@ rand = { version = "0.5.5", default-features = false }
 default-features = false
 version = "0.3.7"
 
-[dependencies.kernel_config]
-path = "../kernel_config"
-
 [dependencies.hashbrown]
 version = "0.1.8"
 features = ["nightly"]
 
-[dependencies.memory]
-path = "../memory"
-
 [dependencies.lazy_static]
 features = ["spin_no_std", "nightly"]
 version = "1.2.0"
-
-[dependencies.memfs]
-path = "../memfs"
-
-[dependencies.task]
-path = "../task"
-
-[dependencies.fs_node]
-path = "../fs_node"
-
-[dependencies.vfs_node]
-path = "../vfs_node"
-
-[dependencies.root]
-path = "../root"
 
 [dependencies.libc]
 git = "https://github.com/Ramla-I/libc.git"
@@ -51,3 +30,25 @@ default-features = false
 [dependencies.cstr_core]
 version = "0.1.2"
 features = ["alloc"]
+
+[dependencies.kernel_config]
+path = "../../kernel/kernel_config"
+
+[dependencies.memory]
+path = "../../kernel/memory"
+
+[dependencies.memfs]
+path = "../../kernel/memfs"
+
+[dependencies.task]
+path = "../../kernel/task"
+
+[dependencies.fs_node]
+path = "../../kernel/fs_node"
+
+[dependencies.vfs_node]
+path = "../../kernel/vfs_node"
+
+[dependencies.root]
+path = "../../kernel/root"
+
