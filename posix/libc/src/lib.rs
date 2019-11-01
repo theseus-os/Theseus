@@ -25,6 +25,8 @@ extern crate root;
 extern crate cstr_core;
 extern crate libc as rlibc;
 
+pub use rlibc::*;
+
 pub mod errno;
 pub mod fs;
 pub mod mman;
