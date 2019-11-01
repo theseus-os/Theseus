@@ -529,6 +529,11 @@ dependencies = [
 ]
 
 [[package]]
+name = "fallible-iterator"
+version = "0.2.0"
+source = "registry+https://github.com/rust-lang/crates.io-index"
+
+[[package]]
 name = "font"
 version = "0.1.0"
 dependencies = [
@@ -543,11 +548,6 @@ dependencies = [
  "util 0.1.0",
  "volatile 0.2.5 (registry+https://github.com/rust-lang/crates.io-index)",
 ]
-
-[[package]]
-name = "fallible-iterator"
-version = "0.2.0"
-source = "registry+https://github.com/rust-lang/crates.io-index"
 
 [[package]]
 name = "frame_buffer"
