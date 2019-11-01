@@ -1,0 +1,18 @@
+[package]
+name = "test_restartable"
+version = "0.1.0"
+authors = ["Namitha Liyanage <namithaliyanage@gmail.com>"]
+build = "../../build.rs"
+
+[dependencies]
+
+
+[dependencies.log]
+default-features = false
+version = "0.3.7"
+
+# [dependencies.application_main_fn]
+# path = "../../compiler_plugins"
+
+[dependencies.spawn]
+path = "../../kernel/spawn"

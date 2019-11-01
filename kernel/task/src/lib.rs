@@ -252,6 +252,13 @@ pub struct Task {
     #[cfg(simd_personality)]
     /// Whether this Task is SIMD enabled and what level of SIMD extensions it uses.
     pub simd: SimdExt,
+
+    /// Stores the argument of the task for restartable tasks
+    pub argument: Option<Box<dyn Any + Send>>,
+    /// Stores the function of the task for restartable tasks
+    pub func: Option<Box<dyn Any + Send>>,
+    /// Indicates whether task is restartable
+    pub restartable : bool,
 }
 
 impl fmt::Debug for Task {
@@ -323,6 +330,10 @@ impl Task {
 
             #[cfg(simd_personality)]
             simd: SimdExt::None,
+
+            argument: None,
+            func: None,
+            restartable: false,
         }
     }
 
@@ -368,6 +379,16 @@ impl Task {
     /// invoked before the task is cleaned up via stack unwinding.
     pub fn set_panic_handler(&mut self, callback: PanicHandler) {
         self.panic_handler = Some(callback);
+    }
+
+    /// Sets the argument of the task
+    pub fn set_argument(&mut self, argument : Box<dyn Any + Send>){
+        self.argument = Some(argument);
+    }
+
+    /// Sets the function to be called when invoking the task
+    pub fn set_func(&mut self, func : Option<Box<dyn Any + Send>>){
+        self.func = func;
     }
 
     /// Takes ownership of this `Task`'s `PanicHandler` closure/function if one exists,
@@ -869,6 +890,21 @@ impl TaskRef {
     /// Sets the `Environment` of this Task.
     pub fn set_env(&self, new_env: Arc<Mutex<Environment>>) {
         self.0.deref().0.lock().set_env(new_env);
+    }
+    
+    /// Takes ownership of the argument of this task
+    pub fn get_argument(&self) -> Option<Box<dyn Any + Send>> {
+       self.0.deref().0.lock().argument.take()
+    }
+
+    /// Takes ownership of the function of this task
+    pub fn get_func(&self) -> Option<Box<dyn Any + Send>> {
+       self.0.deref().0.lock().func.take()
+    }
+
+    /// Returns whether the task is restartable or not
+    pub fn is_restartable(&self) -> bool {
+        self.0.deref().0.lock().restartable
     }
 
     /// Gets a reference to this task's `Environment`.
