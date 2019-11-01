@@ -54,7 +54,7 @@ pub fn cluster_from_raw(cluster: u32) -> u32 {
 }
 
 /// Structure to store the position of a fat32 directory during a walk.
-pub struct PFSPosition {
+pub struct FATPosition {
     /// Cluster number of the current position.
     pub cluster: u32,
     /// Offset number of clusters
@@ -313,7 +313,7 @@ impl Filesystem {
         }
     }
 
-    pub fn pos_to_byte_offset(&self, pos: &PFSPosition) -> usize {
+    pub fn pos_to_byte_offset(&self, pos: &FATPosition) -> usize {
         pos.entry_offset + pos.sector_offset * self.bytes_per_sector as usize +
             pos.cluster_offset * self.cluster_size_in_bytes()
     }

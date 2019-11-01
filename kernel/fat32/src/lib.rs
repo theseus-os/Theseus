@@ -145,7 +145,7 @@ use task::TaskRef;
 // Filesystem core components that have little bearing on public interface.
 mod fs_core;
 use fs_core::{Filesystem, is_eoc, is_empty_cluster, cluster_from_raw, Error};
-pub use fs_core::{init, PFSPosition, detect_fat};
+pub use fs_core::{init, FATPosition, detect_fat};
 
 // Largely composed of name manipulation and directory name construction.
 mod util;
@@ -158,7 +158,7 @@ const FREE_DIRECTORY_ENTRY: u8 = 0xe5;
 /// Byte to mark entry as a "dot" entry.
 const DOT_DIRECTORY_ENTRY: u8 = 0x2e;
 
-// TODO enforce more fo these (primarily ensure things are files before making PFSFile)
+// TODO enforce more fo these (primarily ensure things are files before making FATFile)
 bitflags! {
     /// Directory entry flags. Mostly ignored in this implementation.
     struct FileAttributes: u8 {
@@ -175,11 +175,11 @@ bitflags! {
 }
 
 // Likely we'll want to add some sort of entry for non-file or directory types. TODO
-/// Indicates whether the PFSDirectory entry is a PFSFile or a PFSDirectory
+/// Indicates whether the FATDirectory entry is a FATFile or a FATDirectory
 #[derive(Debug, PartialEq)]
 pub enum FileType {
-    PFSFile,
-    PFSDirectory,
+    FATFile,
+    FATDirectory,
 }
 
 /// Internal Directory storage type
@@ -187,16 +187,16 @@ type ChildList = BTreeMap<DiskName, FileOrDir>;
 type FSRef = Arc<Mutex<Filesystem>>;
 
 /// A wrapper around a FAT32 file object.
-pub struct PFSFile {
+pub struct FATFile {
     cc: ClusterChain,
 }
 
-impl PFSFile {
+impl FATFile {
     // TODO I don't remember if this method works.
-    // It isn't used and doesn't really serve any purpose right now since PFSPosition isn't a part
+    // It isn't used and doesn't really serve any purpose right now since FATPosition isn't a part
     // of the rest of the public facing API I think and the relevant logic is used elsewhere.
     /// Converts a position in a file into a current_cluster-sector_offset-byte_offset struct.
-    pub fn seek(&self, fs: &mut Filesystem, offset: usize) -> Result<PFSPosition, &'static str> {
+    pub fn seek(&self, fs: &mut Filesystem, offset: usize) -> Result<FATPosition, &'static str> {
 
         let cluster_size_in_bytes: usize = fs.sectors_per_cluster() as usize * fs.bytes_per_sector as usize;
         let clusters_to_advance: usize =  offset/cluster_size_in_bytes;
@@ -224,7 +224,7 @@ impl PFSFile {
         // debug!("cluster: {}", nth_cluster);
         // debug!("sector: {}", reached_sector);
         // debug!("byte_offset: {}", byte_difference - reached_sector as usize *fs.bytes_per_sector as usize);
-        return Ok(PFSPosition{
+        return Ok(FATPosition{
             cluster: nth_cluster,
             cluster_offset: clusters_to_advance,
             sector_offset: reached_sector,
@@ -233,7 +233,7 @@ impl PFSFile {
     }
 }
 
-impl File for PFSFile {
+impl File for FATFile {
     /// Given an empty data buffer and a FATfile structure, will read off the bytes of that FATfile and place the data into the data buffer
     /// If the given buffer is less than the size of the file, read will return the first bytes read unless
     /// 
@@ -269,7 +269,7 @@ impl File for PFSFile {
     }  
 }
 
-impl FsNode for PFSFile {
+impl FsNode for FATFile {
     fn get_name(&self) -> String {
         self.cc.name.to_string().clone()
     }
@@ -284,7 +284,7 @@ impl FsNode for PFSFile {
 }
 
 /// Structure for a FAT32 directory.
-pub struct PFSDirectory {
+pub struct FATDirectory {
     /// Underlying strucuture on disk containing the Directory data. 
     cc: ClusterChain,
     // TODO: children should maybe incude some directory entry like information?
@@ -294,11 +294,11 @@ pub struct PFSDirectory {
     dot: WeakDirRef,
 }
 
-impl Directory for PFSDirectory {
+impl Directory for FATDirectory {
     fn insert(&mut self, node: FileOrDir) -> Result<Option<FileOrDir>, &'static str> {
         let name = node.get_name();
 
-        // TODO validate that the node is actually an instance of a PFS type.
+        // TODO validate that the node is actually an instance of a FAT type.
         // if not then we will not have sufficient information to actually make it.
         
 
@@ -310,7 +310,7 @@ impl Directory for PFSDirectory {
     fn get(&self, name: &str) -> Option<FileOrDir> {
         let name = DiskName::from_string(name).ok()?;
 
-        debug!("PFSDirectory::get called for {:?}", name.to_string());
+        debug!("FATDirectory::get called for {:?}", name.to_string());
 
         match name.name.as_str() {
             // 
@@ -350,7 +350,7 @@ impl Directory for PFSDirectory {
     }
 }
 
-impl FsNode for PFSDirectory {
+impl FsNode for FATDirectory {
     fn get_name(&self) -> String {
         self.cc.name.to_string().clone()
     }
@@ -365,13 +365,13 @@ impl FsNode for PFSDirectory {
     }
 }
 
-impl Drop for PFSDirectory {
+impl Drop for FATDirectory {
     fn drop(&mut self) {
-        warn!("PFSDirectory:drop(): {:?}", self.get_name());
+        warn!("FATDirectory:drop(): {:?}", self.get_name());
     }
 }
 
-impl PFSDirectory {
+impl FATDirectory {
 
     // IMPROVEMENT (parallelism improvements)
     // Note that these next methods require holding a mutable reference to the children tree.
@@ -385,8 +385,7 @@ impl PFSDirectory {
         name: Option<&DiskName>) -> Result<DirectoryEntry, Error> {
         
         let mut pos = self.cc.initial_pos();
-        let mut offset = 0; // FIXME need to deal with pos vs offset (since there's some duplicate info).
-        
+
         loop {
             let num_entries = match self.get_directory_entry(fs, &pos) {
                 Err(Error::EndOfFile) => {return Err(Error::NotFound)},
@@ -427,7 +426,7 @@ impl PFSDirectory {
     }
 
     /// Gets a directory entry from the position. 
-    fn get_directory_entry(&self, fs: &mut Filesystem, pos: &PFSPosition) -> Result<DirectoryEntry, Error> {
+    fn get_directory_entry(&self, fs: &mut Filesystem, pos: &FATPosition) -> Result<DirectoryEntry, Error> {
 
         // Weird return type, but we want to worry about the case where the new position is valid, but the directory isn't
         // and the directory is valid but the new position is EOF.
@@ -466,12 +465,12 @@ impl PFSDirectory {
 
     /// Given the initial position of a vfat directory and the number of entries that make up the entry.
     /// Collect all the entries in that directory and construct the DirectoryEntry that the entry corresponds to.
-    fn collect_vfat_directory(&self, fs: &mut Filesystem, pos: &PFSPosition, 
+    fn collect_vfat_directory(&self, fs: &mut Filesystem, pos: &FATPosition, 
         sequence_number: u8) -> Result<DirectoryEntry, Error> {
         let sequence_number = sequence_number as usize;
 
         if sequence_number > 20 {
-            warn!("PFSDirectory::collect_vfat_directory called with too large of a sequence number");
+            warn!("FATDirectory::collect_vfat_directory called with too large of a sequence number");
         }
 
         // Construct a long_name object to hold the name:
@@ -534,13 +533,13 @@ impl PFSDirectory {
             name.clone(), self.dot.clone(), entry.size);
 
         match entry.file_type {
-            FileType::PFSDirectory => {
+            FileType::FATDirectory => {
 
 
-                let dir = PFSDirectory {
+                let dir = FATDirectory {
                     cc: cc,
                     children: RwLock::new(BTreeMap::new()),
-                    dot: Weak::<Mutex<PFSDirectory>>::new(),
+                    dot: Weak::<Mutex<FATDirectory>>::new(),
                 };
 
                 // Dirty shenanigans to set dot weak loop.
@@ -551,9 +550,9 @@ impl PFSDirectory {
                 return Ok(FileOrDir::Dir(dir_ref));
             }
             
-            FileType::PFSFile => {
+            FileType::FATFile => {
                 
-                let file = PFSFile {
+                let file = FATFile {
                     cc: cc,
                 };
 
@@ -565,10 +564,10 @@ impl PFSDirectory {
         }
     }
 
-    /// Returns the entry indicated by PFSPosition.
-    /// the function is used and returns EndOfFile if the next PFSdirectory doesn't exist
+    /// Returns the entry indicated by FATPosition.
+    /// the function is used and returns EndOfFile if the next FATdirectory doesn't exist
     /// Note that this function will happily return unused directory entries since it simply provides a sequential view of the entries on disk.
-    fn get_fat_directory(&self, fs: &mut Filesystem, pos: &PFSPosition) -> Result<RawFatDirectory, Error> {
+    fn get_fat_directory(&self, fs: &mut Filesystem, pos: &FATPosition) -> Result<RawFatDirectory, Error> {
         let sector = fs.first_sector_of_cluster(pos.cluster) + pos.sector_offset;
 
         debug!("Getting from cluster: {}, sector: {} (offset: {}), entry_offset: {}", pos.cluster, sector, pos.sector_offset, pos.entry_offset);
@@ -587,7 +586,7 @@ impl PFSDirectory {
     }
 
     /// Writes the RawFatDirectory dir to the position pos in the file.
-    fn write_fat_directory(&self, fs :&mut Filesystem, pos: &PFSPosition, dir: &RawFatDirectory) -> Result<usize, Error> {
+    fn write_fat_directory(&self, fs :&mut Filesystem, pos: &FATPosition, dir: &RawFatDirectory) -> Result<usize, Error> {
         let cluster = pos.cluster;
         let base_sector = fs.first_sector_of_cluster(cluster);
         let sector = pos.sector_offset + base_sector;
@@ -606,7 +605,7 @@ impl PFSDirectory {
     // TODO: support larger sizes (for placing long name directories)
     /// Walks the directory tables and finds an empty entry then returns a position where that entry can be placed.
     /// Currently does not support sizes larger than 1 entry.
-    pub fn find_empty_or_grow(&self, fs: &mut Filesystem, size_needed: usize) -> Result<PFSPosition, Error> {
+    pub fn find_empty_or_grow(&self, fs: &mut Filesystem, size_needed: usize) -> Result<FATPosition, Error> {
         if size_needed == 0 {
             return Err(Error::IllegalArgument);
         }
@@ -633,8 +632,8 @@ impl PFSDirectory {
         }
     }
     
-    /// Grows the directory given a PFSPosition in the last cluster of the file and returns a new position in the new_cluster.
-    fn grow_directory(&self, fs: &mut Filesystem, pos_end: &PFSPosition) -> Result<PFSPosition, Error> {
+    /// Grows the directory given a FATPosition in the last cluster of the file and returns a new position in the new_cluster.
+    fn grow_directory(&self, fs: &mut Filesystem, pos_end: &FATPosition) -> Result<FATPosition, Error> {
         
         // Rename for convenience with other existing code.
         let pos = pos_end;
@@ -643,8 +642,8 @@ impl PFSDirectory {
         // Otherwise find an empty cluster.
         let new_cluster = fs.extend_chain(pos.cluster)?;
         
-        // Now write all the entries in that cluster to be unused and return a PFSPosition with those entries.
-        let mut pos = PFSPosition {
+        // Now write all the entries in that cluster to be unused and return a FATPosition with those entries.
+        let mut pos = FATPosition {
             cluster: new_cluster,
             cluster_offset: pos.cluster_offset + 1,
             sector_offset: 0,
@@ -746,8 +745,8 @@ impl ClusterChain {
     }
 
     /// Returns a cluster walk position for the start of this CC.
-    pub fn initial_pos(&self) -> PFSPosition {
-        PFSPosition {
+    pub fn initial_pos(&self) -> FATPosition {
+        FATPosition {
             cluster: self.cluster,
             cluster_offset: 0,
             sector_offset: 0,
@@ -755,10 +754,10 @@ impl ClusterChain {
         }
     }
     
-    /// Advances a PFSPosition by offset and returns a new position if successful.
-    pub fn advance_pos(&self, fs: &mut Filesystem, pos: &PFSPosition, offset: usize) -> Result<PFSPosition, Error> {
+    /// Advances a FATPosition by offset and returns a new position if successful.
+    pub fn advance_pos(&self, fs: &mut Filesystem, pos: &FATPosition, offset: usize) -> Result<FATPosition, Error> {
         
-        let mut new_pos = PFSPosition {
+        let mut new_pos = FATPosition {
             cluster : pos.cluster,
             cluster_offset: pos.cluster_offset,
             entry_offset : pos.entry_offset + offset,
@@ -926,23 +925,23 @@ pub fn root_dir(fs: Arc<Mutex<Filesystem>>, mount_name: &str) -> Result<Arc<Mute
     // We also can't just use something like a lazy static, since it's a per-FS basis. Maybe the FS needs some information to prevent this.
     let new_name = DiskName::from_string(mount_name).map_err(|_| "Invalid mount name")?;
     let mut cc = ClusterChain::new(2, fs.clone(), new_name, 
-        Weak::<Mutex<PFSDirectory>>::new(), 0);
+        Weak::<Mutex<FATDirectory>>::new(), 0);
     cc.parent_count = 2; // TODO what number to choose. We definitely don't want the on disk
                          // resources getting dropped
     // let cc = ClusterChain {
     //     filesystem: fs.clone(),
     //     cluster: 2,
     //     name: DiskName::from_string(mount_name)?,
-    //     parent: Weak::<Mutex<PFSDirectory>>::new(),
+    //     parent: Weak::<Mutex<FATDirectory>>::new(),
     //     parent_count: 2 + 1, // TODO should this be the case?
     //     _num_clusters: None,
     //     size: 0, // According to wikipedia File size for directories is always 0.
     // };
 
-    let mut underlying_root = PFSDirectory {
+    let mut underlying_root = FATDirectory {
         cc: cc,
         children: RwLock::new(BTreeMap::new()),
-        dot: Weak::<Mutex<PFSDirectory>>::new(),
+        dot: Weak::<Mutex<FATDirectory>>::new(),
     };
 
     let new_root_dir = RootDirectory {
@@ -964,8 +963,8 @@ pub fn root_dir(fs: Arc<Mutex<Filesystem>>, mount_name: &str) -> Result<Arc<Mute
 // But I'm inclined to leave it if we want to do any special treatments of mount points.
 /// Root directory for FAT32 filesystem.
 pub struct RootDirectory {
-    /// The PFSDirectory doing the work for the root directory.
-    underlying_dir: PFSDirectory,
+    /// The FATDirectory doing the work for the root directory.
+    underlying_dir: FATDirectory,
 }
 
 impl Directory for RootDirectory {

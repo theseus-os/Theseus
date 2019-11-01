@@ -268,12 +268,12 @@ impl<B: ByteSlice> VFATEntryBytes<B> {
 /// A raw 32-byte FAT directory as it exists on disk.
 pub struct RawFatDirectory {
     pub name: [u8; 11], // 8 letter entry with a 3 letter ext
-    flags: u8, // designate the PFSdirectory as r,w,r/w
+    flags: u8, // designate the FATdirectory as r,w,r/w
     _unused1: [u8; 8], // unused data
-    cluster_high: U16<LittleEndian>, // but contains permissions required to access the PFSfile
+    cluster_high: U16<LittleEndian>, // but contains permissions required to access the FATfile
     _unused2: [u8; 4], // data including modified time
-    cluster_low: U16<LittleEndian>, // the starting cluster of the PFSfile
-    size: U32<LittleEndian>, // size of PFSfile in bytes, volume label or subdirectory flags should be set to 0
+    cluster_low: U16<LittleEndian>, // the starting cluster of the FATfile
+    size: U32<LittleEndian>, // size of FATfile in bytes, volume label or subdirectory flags should be set to 0
 }
 
 #[repr(packed)]
@@ -309,9 +309,9 @@ impl RawFatDirectory {
         Ok(DirectoryEntry {
             name: DiskName::from_long_name(name)?,
             file_type: if self.flags & FileAttributes::SUBDIRECTORY.bits == FileAttributes::SUBDIRECTORY.bits {
-                FileType::PFSDirectory
+                FileType::FATDirectory
             } else {
-                FileType::PFSFile
+                FileType::FATFile
             },
             cluster: (self.cluster_high.get() as u32) << 16 |(self.cluster_low.get() as u32),
             size: self.size.get(),
@@ -386,8 +386,8 @@ impl DirectoryEntry {
         RawFatDirectory {
             name: long_name.short_name,
             flags: match self.file_type {
-                FileType::PFSFile => 0x0,
-                FileType::PFSDirectory => 0x10,
+                FileType::FATFile => 0x0,
+                FileType::FATDirectory => FileAttributes::SUBDIRECTORY.bits,
             }, // FIXME need to store more flags in DirectoryEntry type
             _unused1: [0; 8],
             cluster_high: U16::new((self.cluster >> 16) as u16),

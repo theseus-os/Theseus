@@ -24,7 +24,7 @@ use alloc::string::ToString;
 use alloc::sync::{Arc, Weak};
 use spin::Mutex;
 use fs_node::{File, Directory, FileOrDir, FsNode, DirRef, FileRef};
-use fat32::{root_dir, PFSDirectory, RootDirectory};
+use fat32::{root_dir, FATDirectory, RootDirectory};
 use root::get_root;
 use path::Path;
 use getopts::Options;
@@ -190,7 +190,7 @@ fn print_dir(dirref: DirRef) {
 // TODO this doesn't work yet. I think my issue is that there's not easy way to get partialEq for the refs get returns since they aren't sized.
 // We'd need some sort of type parameter to work around this I think. But I'm a bit shaky on doing that.
 // See if we can get a child multiple times and then try to compare them to see if they're both valid and not the same.
-fn check_singleton(d : &PFSDirectory) {
+fn check_singleton(d : &FATDirectory) {
 
     let entries = d.list();
     println!("Printing directory: {:?}: {:} entries.", d.get_name(), entries.len());
