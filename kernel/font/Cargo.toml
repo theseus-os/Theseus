@@ -7,40 +7,6 @@ build = "../../build.rs"
 
 [dependencies]
 spin = "0.4.10"
-volatile = "0.2.5"
-
-
-[dependencies.lazy_static]
-features = ["spin_no_std", "nightly"]
-version = "1.2.0"
-
-[dependencies.serial_port]
-path = "../serial_port"
-
-[dependencies.state_store]
-path = "../state_store"
-
-[dependencies.log]
-default-features = false
-version = "0.3.7"
-
-[dependencies.memory]
-path = "../memory"
-
-[dependencies.util]
-path = "../../libs/util"
-
-[dependencies.acpi]
-path = "../acpi"
-
-[dependencies.tsc]
-path = "../tsc"
-
-
-
-# [build]
-# rustflags = ["-C", "prefer-dynamic", "-C", "panic=abort"]
-
 
 [lib]
 crate-type = ["rlib"]

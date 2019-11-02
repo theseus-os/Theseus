@@ -4,11 +4,13 @@ extern crate spin;
 use core::ops::DerefMut;
 use spin::Mutex;
 
-///The width of a character
+/// The width of a character.
 pub const CHARACTER_WIDTH: usize = 9;
-///The height of a character
+/// The height of a character.
 pub const CHARACTER_HEIGHT: usize = 16;
-///The bit graph array of characters
+
+// The bitmap array of characters.
+// Copied from: https://github.com/goto456/linux-2.6.26/blob/6def53aec8e32bb58a3b50c52a8fb7c48ebef012/arch/ppc/boot/include/iso_font.h
 pub const FONT_BASIC: [[u8; CHARACTER_HEIGHT]; 256] = [
     [
         0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00,
@@ -1036,12 +1038,12 @@ pub const FONT_BASIC: [[u8; CHARACTER_HEIGHT]; 256] = [
     ],
 ];
 
-///The font mask array.
-///FONT_PIXEL[ascii][y][x] = 0xFFFFFFFF/0x00000000 in which ascii is the ascii code of a character, and (x, y) represents its coordinate
+/// The font mask array.
+/// FONT_PIXEL[ascii][y][x] = 0xFFFFFFFF/0x00000000 in which `ascii` is the ASCII code of a character, and (x, y) represents its coordinate.
 pub static FONT_PIXEL: Mutex<[[[u32; CHARACTER_WIDTH]; CHARACTER_HEIGHT]; 256]> =
     Mutex::new([[[0; CHARACTER_WIDTH]; CHARACTER_HEIGHT]; 256]);
 
-///initialize the font bitmaps array
+/// Initializes the font bitmaps array.
 pub fn init() -> Result<(), &'static str> {
     let mut fonts_locked = FONT_PIXEL.lock();
     let fonts = fonts_locked.deref_mut();

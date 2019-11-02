@@ -21,8 +21,8 @@ CFG_DIR := $(ROOT_DIR)/cfg
 KERNEL_PREFIX ?= k\#
 APP_PREFIX    ?= a\#
 
-### NOTE: CURRENTLY FORCING RELEASE MODE UNTIL HASH-BASED SYMBOL RESOLUTION IS WORKING
-## Build modes:  debug is default (dev mode), release is release with full optimizations.
+## Build modes: debug is development mode, release is with full optimizations.
+## We build using release mode by default, because running in debug mode is prohibitively slow.
 ## You can set these on the command line like so: "make run BUILD_MODE=release"
 # BUILD_MODE ?= debug
 BUILD_MODE ?= release
@@ -60,7 +60,9 @@ RUSTFLAGS += -Z share-generics=no
 
 ## This forces frame pointers to be generated, i.e., the stack base pointer (RBP register on x86_64)
 ## will be used to store the starting address of the current stack frame.
-## This is used for stack unwinding purposes, in order to trace back up the call stack.
-## If/when we support using DWARF .debug_* sections to obtain the size of the current stack frame,
-## we can remove/disable this, since we won't need to use RBP anymore. 
-RUSTFLAGS += -C force-frame-pointers=yes
+## This can be used for obtaining a backtrace/stack trace,
+## but isn't necessary because Theseus supports parsing DWARF .debug_* sections to handle stack unwinding.
+## Note that this reduces the number of registers available to the compiler (by reserving RBP),
+## so it often results in slightly lowered performance. 
+## By default, this is not enabled.
+# RUSTFLAGS += -C force-frame-pointers=yes

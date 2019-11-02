@@ -34,20 +34,8 @@ path = "../../kernel/task"
 [dependencies.runqueue]
 path = "../../kernel/runqueue"
 
-[dependencies.memory]
-path  = "../../kernel/memory"
-
-[dependencies.mod_mgmt]
-path = "../../kernel/mod_mgmt"
-
-[dependencies.frame_buffer_alpha]
-path = "../../kernel/frame_buffer_alpha"
-
-[dependencies.window_manager_alpha]
-path = "../../kernel/window_manager_alpha"
-
-[dependencies.window_components]
-path = "../../kernel/window_components"
+[dependencies.window_manager]
+path = "../../kernel/window_manager"
 
 [dependencies.terminal_print]
 path = "../terminal_print"

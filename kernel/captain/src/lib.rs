@@ -28,7 +28,6 @@ extern crate kernel_config; // our configuration options, just a set of const de
 extern crate irq_safety; // for irq-safe locking and interrupt utilities
 extern crate dfqueue; // decoupled, fault-tolerant queue
 
-extern crate event_types; // a temporary way to use input_event_manager types 
 extern crate logger;
 extern crate memory; // the virtual memory subsystem 
 extern crate apic; 
@@ -41,9 +40,12 @@ extern crate acpi;
 extern crate device_manager;
 extern crate e1000;
 extern crate scheduler;
+extern crate frame_buffer;
+extern crate frame_buffer_rgb;
+extern crate font;
 #[cfg(mirror_log_to_vga)] #[macro_use] extern crate print;
 extern crate input_event_manager;
-#[cfg(test_network)] extern crate exceptions_full;
+extern crate exceptions_full;
 extern crate network_manager;
 extern crate pause;
 
@@ -123,10 +125,23 @@ pub fn init(
 
     // initialize the input event manager, which will start window manager and the default terminal 
     let (key_producer, mouse_producer) = input_event_manager::init()?;
+    trace!("Wenqiu:Inital the key board");
 
+    // Wenqiu:
+    // init the display subsystem
+    // Currently we use a FrameBufferRGB as the final frame buffer, but other types of FrameBuffers could be used instead.
+    //frame_buffer_rgb::init()?;
+    font::init()?;
+    //window_manager::init()?;
+    //info!("Display subsystem initialized successfully.");
+
+    // initialize the input event manager, which will start the default terminal 
+    // let input_event_queue_producer = input_event_manager::init()?;
+
+    trace!("Wenqiu:Inital the key board");
     // initialize the rest of our drivers
     device_manager::init(key_producer, mouse_producer)?;
-
+    trace!("Wenqiu:Inital the key board");
     task_fs::init()?;
 
 

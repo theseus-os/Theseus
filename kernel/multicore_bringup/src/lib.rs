@@ -125,7 +125,7 @@ pub fn handle_ap_cores(
             .ok_or("BUG: couldn't get the default CrateNamespace")
             .and_then(|namespace| namespace.get_crate("nano_core").ok_or("BUG: couldn't get the 'nano_core' crate"))
             .and_then(|nano_core_crate| nano_core_crate.lock_as_ref().text_pages.clone().ok_or("BUG: nano_core crate had no text pages"))?;
-        let kernel_text_pages = kernel_text_pages_ref.lock();
+        let kernel_text_pages = kernel_text_pages_ref.0.lock();
         // Second, perform the actual copy.
         let source_slice: &[u8] = kernel_text_pages.offset_of_address(ap_start_realmode_begin)
             .ok_or("BUG: the 'ap_start_realmode_begin' virtual address was not covered by the kernel's text pages")

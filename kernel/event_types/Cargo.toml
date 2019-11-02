@@ -8,8 +8,11 @@ build = "../../build.rs"
 [dependencies.keycodes_ascii]
 path = "../../libs/keycodes_ascii"
 
-[lib]
-crate-type = ["rlib"]
+[dependencies.frame_buffer]
+path = "../frame_buffer"
 
 [dependencies.mouse_data]
 path = "../../libs/mouse_data"
+
+[lib]
+crate-type = ["rlib"]

@@ -2,10 +2,12 @@
 
 extern crate keycodes_ascii;
 extern crate alloc;
+extern crate frame_buffer;
 extern crate mouse_data;
 
 use keycodes_ascii::{KeyEvent};
 use alloc::string::String;
+use frame_buffer::Coord;
 use mouse_data::MouseEvent;
 
 /// A event describe mouse position rather than movement differential from last event. 
@@ -53,8 +55,8 @@ impl Event {
         Event::OutputEvent(PrintOutputEvent::new(s.into()))
     }
 
-    pub fn new_resize_event(x: usize, y: usize, width: usize, height: usize) -> Event {
-        Event::WindowResizeEvent(WindowResizeEvent::new(x,y,width, height))
+    pub fn new_resize_event(coordinate: Coord, width: usize, height: usize) -> Event {
+        Event::WindowResizeEvent(WindowResizeEvent::new(coordinate, width, height))
     }
 
 }
@@ -90,16 +92,14 @@ impl PrintOutputEvent {
 //Use this to inform the window manager to adjust the sizes of existing windows
 #[derive(Debug, Clone)]
 pub struct WindowResizeEvent {
-    pub x: usize,
-    pub y: usize,
+    pub coordinate: Coord,
     pub width: usize, 
     pub height: usize, 
 }
  impl WindowResizeEvent {
-    pub fn new(x: usize, y: usize, width: usize, height:usize) -> WindowResizeEvent {
+    pub fn new(coordinate: Coord, width: usize, height:usize) -> WindowResizeEvent {
         WindowResizeEvent {
-            x: x,
-            y: y,
+            coordinate: coordinate,
             width: width, 
             height: height,
         }

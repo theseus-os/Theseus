@@ -8,12 +8,11 @@
 extern crate keycodes_ascii;
 extern crate spin;
 extern crate dfqueue;
-extern crate mod_mgmt;
 extern crate spawn;
 extern crate task;
 extern crate runqueue;
-extern crate memory;
-extern crate event_types;
+extern crate event_types; 
+extern crate window_manager;
 extern crate path;
 extern crate root;
 extern crate scheduler;
@@ -96,17 +95,23 @@ struct Job {
 /// A main function that spawns a new shell and waits for the shell loop to exit before returning an exit value
 #[no_mangle]
 pub fn main(_args: Vec<String>) -> isize {
+    {
+        let _task_ref = match KernelTaskBuilder::new(shell_loop, ())
+            .name("shell_loop".to_string())
+            .spawn() {
+            Ok(task_ref) => { task_ref }
+            Err(err) => {
+                error!("{}", err);
+                error!("failed to spawn shell");
+                return -1; 
+            }
+        };
 
-    let _task_ref = match KernelTaskBuilder::new(shell_loop, ())
-        .name("shell_loop".to_string())
-        .spawn() {
-        Ok(task_ref) => { task_ref }
-        Err(err) => {
-            error!("{}", err);
-            error!("failed to spawn shell");
-            return -1; 
-        }
-    };
+        // since we don't properly support parent/child relationships between tasks, 
+        // we force the newly-spawned shell_loop task to also be an "app task" 
+        // by giving it joint ownership of the `shell` app crate.
+        _task_ref.lock_mut().app_crate = task::get_my_current_task().expect("shell::main(): failed to get current task").lock().app_crate.clone();
+    }
 
     loop {
         // block this task, because it never needs to actually run again
@@ -114,12 +119,16 @@ pub fn main(_args: Vec<String>) -> isize {
             my_task.block();
         }
     }
-    // TODO FIXME: once join() doesn't cause interrupts to be disabled, we can use join again instead of the above loop
-    // waits for the terminal loop to exit before exiting the main function
-    // match term_task_ref.join() {
+
+    // TODO: when `join` puts this task to sleep instead of spinning, we can re-enable it.
+    // Otherwise, right now it kills performance.
+    // match _task_ref.join() {
     //     Ok(_) => { }
     //     Err(err) => {error!("{}", err)}
     // }
+    // warn!("shell::main(): the `shell_loop` task exited unexpectedly.");
+    // warn!("SHELL_LOOP exit value: {:?}", _task_ref.take_exit_value());
+    // return 0;
 }
 
 /// Errors when attempting to invoke an application from the terminal. 
@@ -149,8 +158,6 @@ struct Shell {
     cmdline: String,
     /// This buffer stores characters before sending them to running application on `enter` key strike
     input_buffer: String,
-    /// Variable that tracks how far left the cursor is from the maximum rightmost position (above)
-    left_shift: usize,
     /// Vector that stores the history of commands that the user has entered
     command_history: Vec<String>,
     /// Variable used to track the net number of times the user has pressed up/down to cycle through the commands
@@ -201,7 +208,6 @@ impl Shell {
             fg_job_num: None,
             cmdline: String::new(),
             input_buffer: String::new(),
-            left_shift: 0,
             command_history: Vec::new(),
             history_index: 0,
             buffered_cmd_recorded: false,
@@ -213,33 +219,39 @@ impl Shell {
     }
 
     /// Insert a character to the command line buffer in the shell.
-    /// The position to insert is determined by the internal maintained variable `left_shift`,
-    /// which indicates the position counting from the end of the command line.
+    /// The position to insert is determined by the position of the cursor in the terminal. 
     /// `sync_terminal` indicates whether the terminal screen will be synchronically updated.
     fn insert_char_to_cmdline(&mut self, c: char, sync_terminal: bool) -> Result<(), &'static str> {
-        let insert_idx = self.cmdline.len() - self.left_shift;
+        let mut terminal = self.terminal.lock();
+        let offset_from_end = terminal.get_cursor_offset_from_end();
+        let insert_idx = self.cmdline.len() - offset_from_end;
         self.cmdline.insert(insert_idx, c);
         if sync_terminal {
-            self.terminal.lock().insert_char_to_screen(c, self.left_shift)?;
+            // disable cursor before updating in case the cursor is not at the end and the old text is the prefix of the new one
+            terminal.cursor.disable();
+            terminal.display_cursor()?;
+            terminal.insert_char(c, offset_from_end)?;
+            terminal.cursor.enable();
         }
         Ok(())
     }
 
     /// Remove a character from the command line buffer in the shell. If there is nothing to
     /// be removed, it does nothing and returns.
-    /// The position to insert is determined by the internal maintained variable `left_shift`,
-    /// which indicates the position counting from the end of the command line.
+    /// The position to remove is determined by the position of the cursor in the terminal.
     /// `sync_terminal` indicates whether the terminal screen will be synchronically updated.
     fn remove_char_from_cmdline(&mut self, erase_left: bool, sync_terminal: bool) -> Result<(), &'static str> {
-        let mut left_shift = self.left_shift;
-        if erase_left { left_shift += 1; }
-        if left_shift > self.cmdline.len() || left_shift == 0 { return Ok(()); }
-        let erase_idx = self.cmdline.len() - left_shift;
+        let mut cursor_offset_from_end = self.terminal.lock().get_cursor_offset_from_end();
+        if erase_left { cursor_offset_from_end += 1; }
+        if cursor_offset_from_end > self.cmdline.len() || cursor_offset_from_end == 0 { return Ok(()); }
+        let erase_idx = self.cmdline.len() - cursor_offset_from_end;
         self.cmdline.remove(erase_idx);
         if sync_terminal {
-            self.terminal.lock().remove_char_from_screen(left_shift)?;
+            self.terminal.lock().remove_char(cursor_offset_from_end)?;
         }
-        if !erase_left { self.left_shift -= 1; }
+        if !erase_left {            
+            self.update_cursor_pos(cursor_offset_from_end - 1)?;
+        }
         Ok(())
     }
 
@@ -248,11 +260,11 @@ impl Shell {
     fn clear_cmdline(&mut self, sync_terminal: bool) -> Result<(), &'static str> {
         if sync_terminal {
             for _i in 0..self.cmdline.len() {
-                self.terminal.lock().remove_char_from_screen(1)?;
+                self.terminal.lock().remove_char(1)?;
             }
         }
         self.cmdline.clear();
-        self.left_shift = 0;
+        self.update_cursor_pos(0)?;
         Ok(())
     }
 
@@ -263,7 +275,7 @@ impl Shell {
             self.clear_cmdline(sync_terminal)?;
         }
         self.cmdline = s.clone();
-        self.left_shift = 0;
+        self.update_cursor_pos(0)?;
         if sync_terminal {
             self.terminal.lock().print_to_terminal(s);
         }
@@ -275,7 +287,7 @@ impl Shell {
     fn insert_char_to_input_buff(&mut self, c: char, sync_terminal: bool) -> Result<(), &'static str> {
         self.input_buffer.push(c);
         if sync_terminal {
-            self.terminal.lock().insert_char_to_screen(c, 0)?;
+            self.terminal.lock().insert_char(c, 0)?;
         }
         Ok(())
     }
@@ -285,35 +297,56 @@ impl Shell {
     fn remove_char_from_input_buff(&mut self, sync_terminal: bool) -> Result<(), &'static str> {
         let popped = self.input_buffer.pop();
         if popped.is_some() && sync_terminal {
-            self.terminal.lock().remove_char_from_screen(1)?;
+            self.terminal.lock().remove_char(1)?;
         }
         Ok(())
     }
 
     /// Move the cursor to the very beginning of the input command line.
-    fn move_cursor_leftmost(&mut self) {
-        self.left_shift = self.cmdline.len();
+    fn move_cursor_leftmost(&mut self) -> Result<(), &'static str> {
+        self.update_cursor_pos(self.cmdline.len())?;
+        Ok(())
     }
 
     /// Move the cursor to the very end of the input command line.
-    fn move_cursor_rightmost(&mut self) {
-        self.left_shift = 0;
+    fn move_cursor_rightmost(&mut self) -> Result<(), &'static str> {
+        self.update_cursor_pos(0)?;
+        Ok(())
     }
 
     /// Move the cursor a character left. If the cursor is already at the beginning of the command line,
     /// it simply returns.
-    fn move_cursor_left(&mut self) {
-        if self.left_shift < self.cmdline.len() {
-            self.left_shift += 1;
+    fn move_cursor_left(&mut self) -> Result<(), &'static str> {
+        let offset_from_end = self.terminal.lock().get_cursor_offset_from_end();
+        if offset_from_end < self.cmdline.len() {
+            self.update_cursor_pos(offset_from_end + 1)?;
         }
+        Ok(())
     }
 
     /// Move the cursor a character to the right. If the cursor is already at the end of the command line,
     /// it simply returns.
-    fn move_cursor_right(&mut self) {
-        if self.left_shift > 0 {
-            self.left_shift -= 1;
+    fn move_cursor_right(&mut self) -> Result<(), &'static str> {
+        let offset_from_end = self.terminal.lock().get_cursor_offset_from_end();
+        if offset_from_end > 0 {
+            self.update_cursor_pos(offset_from_end - 1)?;
         }
+        Ok(())
+    }
+
+    /// Update the position of cursor. `offset_from_end` specifies the position relative to the end of the text in units of characters.
+    fn update_cursor_pos(&mut self, offset_from_end: usize) -> Result<(), &'static str> {
+        let mut terminal = self.terminal.lock();
+        terminal.cursor.disable();
+        terminal.display_cursor()?;
+        if offset_from_end == 0 {
+            terminal.update_cursor_pos(0, 0)
+        } else if offset_from_end <= self.cmdline.len() {
+            terminal.update_cursor_pos(offset_from_end, self.cmdline.as_bytes()[self.cmdline.len() - offset_from_end]);
+        }
+        terminal.cursor.enable();
+        
+        Ok(())
     }
 
     /// Roll to the next previous command. If there is no more previous command, it does nothing.
@@ -522,7 +555,6 @@ impl Shell {
                 if self.is_internal_command() { // shell executes internal commands
                     self.execute_internal()?;
                     self.clear_cmdline(false)?;
-                    self.terminal.lock().refresh_display(0);
                 } else { // shell invokes user programs
                     let new_job_num = self.build_new_job()?;
                     self.fg_job_num = Some(new_job_num);
@@ -548,30 +580,24 @@ impl Shell {
 
         // home, end, page up, page down, up arrow, down arrow for the input_event_manager
         if keyevent.keycode == Keycode::Home && keyevent.modifiers.control {
-            self.terminal.lock().move_screen_to_begin();
-            return Ok(());
+            return self.terminal.lock().move_screen_to_begin();
         }
         if keyevent.keycode == Keycode::End && keyevent.modifiers.control{
-            self.terminal.lock().move_screen_to_end();
-            return Ok(());
+            return self.terminal.lock().move_screen_to_end();
         }
         if keyevent.modifiers.control && keyevent.modifiers.shift && keyevent.keycode == Keycode::Up  {
-            self.terminal.lock().move_screen_line_up();
-            return Ok(());
+            return self.terminal.lock().move_screen_line_up();
         }
         if keyevent.modifiers.control && keyevent.modifiers.shift && keyevent.keycode == Keycode::Down  {
-            self.terminal.lock().move_screen_line_down();
-            return Ok(());
+            return self.terminal.lock().move_screen_line_down();
         }
 
         if keyevent.keycode == Keycode::PageUp && keyevent.modifiers.shift {
-            self.terminal.lock().move_screen_page_up();
-            return Ok(());
+            return self.terminal.lock().move_screen_page_up();
         }
 
         if keyevent.keycode == Keycode::PageDown && keyevent.modifiers.shift {
-            self.terminal.lock().move_screen_page_down();
-            return Ok(());
+            return self.terminal.lock().move_screen_page_down();
         }
 
         // Cycles to the next previous command
@@ -588,25 +614,21 @@ impl Shell {
 
         // Jumps to the beginning of the input string
         if keyevent.keycode == Keycode::Home {
-            self.move_cursor_leftmost();
-            return Ok(());
+            return self.move_cursor_leftmost()
         }
 
         // Jumps to the end of the input string
         if keyevent.keycode == Keycode::End {
-            self.move_cursor_rightmost();
-            return Ok(());
+            return self.move_cursor_rightmost()
         }
 
         // Adjusts the cursor tracking variables when the user presses the left and right arrow keys
         if keyevent.keycode == Keycode::Left {
-            self.move_cursor_left();
-            return Ok(());
+            return self.move_cursor_left()
         }
 
         if keyevent.keycode == Keycode::Right {
-            self.move_cursor_right();
-            return Ok(());
+            return self.move_cursor_right()
         }
 
         // Tracks what the user has typed so far, excluding any keypresses by the backspace and Enter key, which are special and are handled directly below
@@ -991,7 +1013,7 @@ impl Shell {
     fn complete_cmdline(&mut self) -> Result<(), &'static str> {
 
         // Get the last string slice in the pipe chain.
-        let cmdline = self.cmdline[0..self.cmdline.len()-self.left_shift].to_string();
+        let cmdline = self.cmdline[0..self.cmdline.len()-self.terminal.lock().get_cursor_offset_from_end()].to_string();
         let last_cmd_in_pipe = match cmdline.split("|").last() {
             Some(cmd) => cmd,
             None => return Ok(())
@@ -1196,10 +1218,6 @@ impl Shell {
             match print_event.deref() {
                 &Event::OutputEvent(ref s) => {
                     self.terminal.lock().print_to_terminal(s.text.clone());
-
-                    // Sets this bool to true so that on the next iteration the TextDisplay will refresh AFTER the 
-                    // task_handler() function has cleaned up, which does its own printing to the console
-                    self.terminal.lock().refresh_display(0);
                 },
                 _ => { },
             }
@@ -1268,10 +1286,8 @@ impl Shell {
         let mut need_refresh = false;
         let mut need_prompt = false;
         self.redisplay_prompt();
-        self.terminal.lock().refresh_display(0);
+        self.terminal.lock().refresh_display();
         loop {
-            self.terminal.lock().blink_cursor(self.left_shift)?;
-
             // If there is anything from running applications to be printed, it printed on the screen and then
             // return true, so that the loop continues, otherwise nothing happens and we keep on going with the
             // loop body. We do so to ensure that printing is handled before keypresses.
@@ -1289,38 +1305,36 @@ impl Shell {
                 self.redisplay_prompt();
                 need_prompt = false;
             }
-            if need_refresh || need_refresh_on_task_event {
-                self.terminal.lock().refresh_display(0);
-                need_refresh = false;
-            }
 
             // Looks at the input queue from the window manager
-            // If it has unhandled items, it handles them with the match
-            // If it is empty, it proceeds directly to the next loop iteration
-            match self.terminal.lock().get_key_event() {
-                Some(ev) => {
-                    match ev {
-                        // Returns from the main loop.
-                        Event::ExitEvent => {
-                            trace!("exited terminal");
-                            return Ok(());
-                        }
+            // Handles all the event items until the queue is empty
+            while let Some(ev) = self.terminal.lock().get_key_event() {
+                match ev {
+                    // Returns from the main loop.
+                    Event::ExitEvent => {
+                        trace!("exited terminal");
+                        return Ok(());
+                    }
 
-                        Event::WindowResizeEvent(ref _rev) => {
-                            self.terminal.lock().refresh_display(self.left_shift); // application refreshes display after resize event is received
-                        }
+                    Event::WindowResizeEvent(ref _rev) => {
+                        need_refresh = true; // application refreshes display after resize event is received
+                    }
 
-                        // Handles ordinary keypresses
-                        Event::KeyboardEvent(ref input_event) => {
-                            self.key_event_producer.write_one(input_event.key_event);
-                        }
-                        _ => { }
-                    };
-                },
-                _ => { }
-            };
+                    // Handles ordinary keypresses
+                    Event::KeyboardEvent(ref input_event) => {
+                        self.key_event_producer.write_one(input_event.key_event);
+                    }
+                    _ => { }
+                };
+            }          
+            if need_refresh || need_refresh_on_task_event {
+                // update if there are outputs from applications
+                self.terminal.lock().refresh_display();
+            }
+            self.terminal.lock().display_cursor()?;
 
-            let mut need_refresh = false;
+            // handle inputs
+            need_refresh = false;
             loop {
                 let locked_consumer = self.key_event_consumer.lock();
                 if let Some(ref key_event_consumer) = locked_consumer.deref() {
@@ -1338,7 +1352,8 @@ impl Shell {
                 }
             }
             if need_refresh {
-                self.terminal.lock().refresh_display(self.left_shift);
+                // update if there are inputs
+                self.terminal.lock().refresh_display();
             } else {
                 scheduler::schedule(); // yield the CPU if nothing to do
             }

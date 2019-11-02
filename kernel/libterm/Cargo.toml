@@ -25,6 +25,9 @@ path = "../../kernel/window_manager_alpha"
 [dependencies.window_components]
 path = "../../kernel/window_components"
 
+[dependencies.frame_buffer_rgb]
+path = "../frame_buffer_rgb"
+
 [dependencies.environment]
 path = "../environment"
 
@@ -37,8 +40,29 @@ path = "../print"
 [dependencies.event_types]
 path = "../event_types"
 
-[lib]
-crate-type = ["rlib"]
+[dependencies.text_display]
+path = "../displayable/text_display"
+
+[dependencies.displayable]
+path = "../displayable"
+
+[dependencies.frame_buffer]
+path = "../frame_buffer"
+
+[dependencies.frame_buffer_drawer]
+path = "../frame_buffer_drawer"
+
+[dependencies.frame_buffer_printer]
+path = "../frame_buffer_printer"
+
+[dependencies.window_manager]
+path = "../window_manager"
 
 [dependencies.tsc]
-path = "../../kernel/tsc"
+path = "../tsc"
+
+[dependencies.font]
+path = "../font"
+
+[lib]
+crate-type = ["rlib"]
