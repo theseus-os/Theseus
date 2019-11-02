@@ -1,6 +1,6 @@
 //! miscellaneous symbolic constants, types, and functions
 
-use rlibc::{c_void, c_int, pid_t};
+use libc::{c_void, c_int, pid_t};
 
 use task;
 

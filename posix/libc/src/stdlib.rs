@@ -1,5 +1,4 @@
-//! adapted from Redox's stdlib implementation
-//! stdlib implementation for Redox, following http://pubs.opengroup.org/onlinepubs/7908799/xsh/stdlib.h.html
+//! stdlib implementation for Theseus, following http://pubs.opengroup.org/onlinepubs/7908799/xsh/stdlib.h.html
 
 use core::{convert::TryFrom, intrinsics, iter, mem, ptr, slice};
 use rand::{
@@ -12,14 +11,9 @@ use alloc::alloc::{Layout, alloc, dealloc};
 use spin::Mutex;
 use hashbrown::HashMap;
 use memory::VirtualAddress;
-use rlibc::{
-    errno::*,
-    *
-};
+use libc::*;
 
-use crate::{
-    unistd::NULL,
-};
+use crate::unistd::NULL;
 
 
 lazy_static! {

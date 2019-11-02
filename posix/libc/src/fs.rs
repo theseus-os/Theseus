@@ -12,13 +12,10 @@ use core::ops::DerefMut;
 use vfs_node::VFSDirectory;
 use core::sync::atomic::{AtomicI32, Ordering};
 use core::slice::{from_raw_parts, from_raw_parts_mut};
-use rlibc::{
-    errno::*,
-    *
-};
+use libc::*;
 use cstr_core::{CStr, CString};
 
-use crate::errno::ERRNO;
+use crate::error::ERRNO;
 
 
 

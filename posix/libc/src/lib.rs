@@ -5,6 +5,7 @@
 #![feature(slice_internals)] //TODO: use rust memchr crate
 #![feature(const_raw_ptr_deref)]
 #![feature(core_intrinsics)]
+#![feature(thread_local)]
 // #![feature(alloc)]
 
 #[macro_use] extern crate log;
@@ -23,11 +24,14 @@ extern crate fs_node;
 extern crate vfs_node;
 extern crate root;
 extern crate cstr_core;
-extern crate libc as rlibc;
+extern crate libc;
 
-pub use rlibc::*;
+#[doc(no_inline)]
+pub use libc::*;
+#[doc(no_inline)]
+pub use cstr_core::*;
 
-pub mod errno;
+pub mod error;
 pub mod fs;
 pub mod mman;
 pub mod stdio;

@@ -7,7 +7,7 @@ use spin::Mutex;
 use libm::ceil;
 use core::ops::DerefMut;
 use core::sync::atomic::{AtomicI32, Ordering};
-use rlibc::*;
+use libc::*;
 
 use crate::unistd::NULL;
 

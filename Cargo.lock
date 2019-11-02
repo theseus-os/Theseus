@@ -956,7 +956,7 @@ dependencies = [
 [[package]]
 name = "libc"
 version = "0.2.48"
-source = "git+https://github.com/Ramla-I/libc.git#b86f8120447f6ebc57690c418520c7fcca2637fd"
+source = "git+https://github.com/Ramla-I/libc.git#7220eedd097f1ddad78e6e7c9911d691f8b6b6e0"
 
 [[package]]
 name = "libm"
@@ -2165,6 +2165,15 @@ dependencies = [
  "memfs 0.1.0",
  "memory 0.1.0",
  "root 0.1.0",
+ "terminal_print 0.1.0",
+]
+
+[[package]]
+name = "test_libc"
+version = "0.1.0"
+dependencies = [
+ "libc 0.1.0",
+ "log 0.3.9 (registry+https://github.com/rust-lang/crates.io-index)",
  "terminal_print 0.1.0",
 ]
 
