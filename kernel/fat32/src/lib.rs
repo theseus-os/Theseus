@@ -10,9 +10,9 @@
 //! 
 //! ```rust
 //! #![no_std]
+//! 
 //! #[macro_use] extern crate terminal_print;
 //! #[macro_use] extern crate log;
-//! 
 //! extern crate device_manager;
 //! extern crate fat32;
 //! extern crate ata;
@@ -28,7 +28,7 @@
 //! use alloc::sync::{Arc};
 //! use spin::Mutex;
 //! use fs_node::{FileOrDir, DirRef};
-//! use fat32::{root_dir};
+//! use fat32::{init};
 //! use path::Path;
 //! 
 //! #[no_mangle]
@@ -37,20 +37,12 @@
 //!     // Itereate through list of storage devices to find a storage device with a FAT32 filesystem.
 //!     if let Some(controller) = storage_manager::STORAGE_CONTROLLERS.lock().iter().next() {
 //!         for sd in controller.lock().devices() {
-//!             match fat32::init(sd) {
-//!                 Ok(fatfs) => {
-//!                     let fs = Arc::new(Mutex::new(fatfs));
-//! 
-//!                     // Since the root_dir function is meant to support creating a RootDirectory for a potential mount point
-//!                     // we can give it a name. For now
-//!                     let name = "/".to_string();
-//! 
-//!                     // Since this root is a DirRef, the read-only parts of the FsNode API works for the fat32 crate.
-//!                     let fat32_root: DirRef = root_dir(fs.clone(), &name).unwrap();
-//! 
+//!             match fat32::init(sd, "/") {
+//!                 Ok(fat32_root) => {
 //!                     // Note that FAT32 is typically case insensitive with case preserving rules.
 //!                     // We'll try to read from this file (on the test disk).
 //!                     let path_to_get = Path::new("bigfile/BIGFILE".to_string());
+//!                     let fat32_root: DirRef = fat32_root;
 //! 
 //!                     // Remember that the path crate only recognizes the system root so we must get relative to our root.
 //!                     let file_or_dir = match path_to_get.get(&fat32_root) {
@@ -144,8 +136,8 @@ use task::TaskRef;
 
 // Filesystem core components that have little bearing on public interface.
 mod fs_core;
-use fs_core::{Filesystem, is_eoc, is_empty_cluster, cluster_from_raw, Error};
-pub use fs_core::{init, FATPosition, detect_fat};
+use fs_core::{Filesystem, is_eoc, is_empty_cluster, cluster_from_raw, Error, init_fs};
+pub use fs_core::{FATPosition, detect_fat};
 
 // Largely composed of name manipulation and directory name construction.
 mod util;
@@ -909,6 +901,20 @@ impl ClusterChain {
 //     true
 // }
 
+/// Takes in a drive for a filesystem and initializes it if it contains a FAT32 filesystem.
+/// 
+/// # Arguments
+/// * `sd`: the storage device that contains the FAT32 filesystem structure
+/// * `root_name`: the name to call the root directory. Useful for mounting.
+/// 
+/// # Return
+/// If the drive passed in contains a fat filesystem, this returns a reference to the root of the filesystem.
+pub fn init(sd: storage_device::StorageDeviceRef, root_name: &str) -> Result<Arc<Mutex<RootDirectory>>, &'static str> {
+
+    let fs = init_fs(sd)?;
+    root_dir(Arc::new(Mutex::new(fs)), root_name)
+}
+
 // TODO merge with init
 // TODO is this mount name argument dumb? It seems like we want a semi-arbitrary name to support names for mount purposes.
 /// Creates a FATdirectory structure for the root directory
@@ -919,7 +925,7 @@ impl ClusterChain {
 /// 
 /// # Returns
 /// Returns the FATDirectory structure for the root directory 
-pub fn root_dir(fs: Arc<Mutex<Filesystem>>, mount_name: &str) -> Result<Arc<Mutex<RootDirectory>>, &'static str> {
+fn root_dir(fs: Arc<Mutex<Filesystem>>, mount_name: &str) -> Result<Arc<Mutex<RootDirectory>>, &'static str> {
 
     // TODO right now this function can violate the singleton blahdy blah and risks making two cluster chains for this dir.
     // We also can't just use something like a lazy static, since it's a per-FS basis. Maybe the FS needs some information to prevent this.
@@ -1049,16 +1055,8 @@ pub fn test_module_init() -> Result<(), &'static str> {
 fn test_insert(taskref: Option<TaskRef>) ->  Result<(), &'static str> {
     if let Some(controller) = storage_manager::STORAGE_CONTROLLERS.lock().iter().next() {
         for sd in controller.lock().devices() {
-            match init(sd) {
-                Ok(fatfs) => {
-
-                    let fs = Arc::new(Mutex::new(fatfs));
-
-                    let name = "fat32";
-
-
-                    let fat32_root = root_dir(fs.clone(), name.clone()).unwrap();
-
+            match init(sd, "fat32") {
+                Ok(fat32_root) => {
 
                     let true_root_ref = root::get_root();
                     let mut true_root = true_root_ref.lock();

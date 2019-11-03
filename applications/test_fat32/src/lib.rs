@@ -24,7 +24,7 @@ use alloc::string::ToString;
 use alloc::sync::{Arc, Weak};
 use spin::Mutex;
 use fs_node::{File, Directory, FileOrDir, FsNode, DirRef, FileRef};
-use fat32::{root_dir, FATDirectory, RootDirectory};
+use fat32::{init, FATDirectory, RootDirectory};
 use root::get_root;
 use path::Path;
 use getopts::Options;
@@ -34,7 +34,6 @@ pub fn main(args: Vec<String>) -> isize {
 
     let mut opts = Options::new();
     opts.optflag("h", "help", "print this help menu");
-    opts.optopt("m", "mount", "Attempt to mount the root directory to DIR.", "DIR");
     opts.optflag("p", "print", "Walks the filesystem and prints the contents.");
     opts.optflag("t", "test", "Look for a fat32 object at /fat32 and print it");
 
@@ -76,69 +75,18 @@ pub fn main(args: Vec<String>) -> isize {
         Arc::clone(&curr_env.working_dir)
     };
 
-    
-    
     info!("Trying to find a fat32 drive");
+
     if let Some(controller) = storage_manager::STORAGE_CONTROLLERS.lock().iter().next() {
         for sd in controller.lock().devices() {
-            match fat32::init(sd) {
-                Ok(fatfs) => {
+            match fat32::init(sd, "fat32") {
+                Ok(fat32_root) => {
                     println!("Successfully initialized FAT32 FS for drive");
-
-                    let fs = Arc::new(Mutex::new(fatfs));
-                    // TODO if we change the root dir creation approach this will also change.
-                    // Take as read only for now?
-
-
-                    let (name, o_path) = if matches.opt_present("m") {
-                        let path = Path::new(matches.opt_str("m").unwrap());
-
-                        let name = path.basename().to_string();
-                        (name, Some(path.clone()))
-                    } else {
-                        ("/".to_string(), None)
-                    };
-
-                    let name = "fat32".to_string();
-
-                    //let fat32_root: Arc<Mutex<RootDirectory>> = root_dir(fs.clone(), name.clone()).unwrap();
-                    let fat32_root: DirRef = root_dir(fs.clone(), &name).unwrap();
-                    
+               
                     // // Recursively print files and directories.
                     if matches.opt_present("p") {
                         print_dir(fat32_root.clone());
-                    };
-
-                    // If we have a mount point, then mount.
-                    match o_path {
-                        // FIXME: path Struct really needs a "strip the last element from path" function.
-                        // For now we're just going to hope the path is a basename...
-                        Some(path) => {
-                            if path.basename() != path.to_string() {
-                                warn!("Current mount code doesn't handle full paths");
-                            }
-
-                            // FIXME set root parent dir to appropriate value.
-                            //let mut curr_dir = curr_wd.lock();
-                            //let parent = curr_wd;
-                            let parent = get_root();
-                            {
-                                let mut locked_parent = parent.lock();
-                                //let root = Arc::new(Mutex::new(root)); // CAUSES ISSUE FIXME
-                                //let root = fat32::make_dir_ref(root);
-                                match locked_parent.insert(FileOrDir::Dir(fat32_root.clone())) {
-                                    Ok(_) => println!("Successfully mounted fat32 FS"),
-                                    Err(_) => println!("Failed to mount fat32 FS"),
-                                };
-
-                                // Now let's try a couple simple things:
-                                let test_root = locked_parent.get_dir(&name).unwrap();
-                                println!("Root directory entries: {:?}", test_root.lock().list());
-                            }
-                            fat32_root.lock().set_parent_dir(Arc::downgrade(parent));
-                        },
-                        None => {}
-                    };           
+                    };       
                 }
                 
                 Err(_) => {

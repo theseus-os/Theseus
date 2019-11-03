@@ -471,7 +471,6 @@ impl Filesystem {
     }
 }
 
-// FIXME we don't want this as the public facing init function.
 /// Takes in a drive for a filesystem and initializes it if it's FAT32 
 /// 
 /// # Arguments
@@ -479,7 +478,7 @@ impl Filesystem {
 /// 
 /// # Return
 /// If the drive passed in contains a fat filesystem, this returns the filesystem structure needed to run operations on the disk 
-pub fn init(sd: storage_device::StorageDeviceRef) -> Result<Filesystem, &'static str>  {
+pub fn init_fs(sd: storage_device::StorageDeviceRef) -> Result<Filesystem, &'static str>  {
     info!("Attempting to initialize a fat32 filesystem");
     // Once a FAT32 filesystem is detected, this will create the Filesystem structure from the drive
     if detect_fat(&sd) == true {
