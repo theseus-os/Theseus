@@ -10,7 +10,7 @@ use alloc::string::String;
 use alloc::string::ToString;
 
 use fs_core::{Error};
-use crate::{FREE_DIRECTORY_ENTRY, FileAttributes, FileType, DOT_DIRECTORY_ENTRY};
+use crate::{FREE_DIRECTORY_ENTRY, FileAttributes, DOT_DIRECTORY_ENTRY};
 
 pub type ShortName = [u8; 11];
 // TODO: May want a method to validate the LongName struct too.
@@ -18,6 +18,13 @@ pub type ShortName = [u8; 11];
 pub struct LongName {
     pub short_name: ShortName,
     pub long_name: Vec<[u16; 13]>,
+}
+
+/// Indicates whether the FATDirectory entry is a FATFile or a FATDirectory
+#[derive(Debug, PartialEq)]
+pub enum FileType {
+    FATFile,
+    FATDirectory,
 }
 
 impl LongName {

@@ -115,22 +115,16 @@ extern crate task;
 
 use storage_device::BlockBounds;
 use zerocopy::{FromBytes, AsBytes, LayoutVerified, ByteSlice, Unaligned};
-use zerocopy::byteorder::{U16, U32};
-use byteorder::{ByteOrder, LittleEndian};
 use alloc::collections::BTreeMap;
 use spin::{Mutex, RwLock};
-use fs_node::{DirRef, WeakDirRef, FileRef, Directory, FileOrDir, File, FsNode};
+use fs_node::{DirRef, WeakDirRef, Directory, FileOrDir, File, FsNode};
 use alloc::sync::{Arc, Weak};
-use core::convert::TryInto;
 use core::mem::size_of;
 use core::cmp::{Ord, Ordering, min};
-use core::char::decode_utf16;
-use core::str::from_utf8;
 use alloc::vec::Vec;
 use alloc::string::String;
 use alloc::string::ToString;
 use memory::MappedPages;
-use block_io::{BlockIo};
 use spawn::{KernelTaskBuilder};
 use task::TaskRef;
 
@@ -141,7 +135,7 @@ pub use fs_core::{FATPosition, detect_fat};
 
 // Largely composed of name manipulation and directory name construction.
 mod util;
-use util::{DiskName, LongName, 
+use util::{DiskName, LongName, FileType,
     RawFatDirectory, RawFatDirectoryBytes, VFATEntry, DirectoryEntry};
 
 /// Magic byte used to mark a directory table as free. Set as first byte of name field.
@@ -164,14 +158,6 @@ bitflags! {
         // Combinations of flags that are useful:
         const VFAT = Self::READ_ONLY.bits | Self::HIDDEN.bits | Self::SYSTEM.bits | Self::VOLUME_LABEL.bits;
     }
-}
-
-// Likely we'll want to add some sort of entry for non-file or directory types. TODO
-/// Indicates whether the FATDirectory entry is a FATFile or a FATDirectory
-#[derive(Debug, PartialEq)]
-pub enum FileType {
-    FATFile,
-    FATDirectory,
 }
 
 /// Internal Directory storage type
@@ -912,11 +898,9 @@ impl ClusterChain {
 pub fn init(sd: storage_device::StorageDeviceRef, root_name: &str) -> Result<Arc<Mutex<RootDirectory>>, &'static str> {
 
     let fs = init_fs(sd)?;
-    root_dir(Arc::new(Mutex::new(fs)), root_name)
+    root_dir(fs, root_name)
 }
 
-// TODO merge with init
-// TODO is this mount name argument dumb? It seems like we want a semi-arbitrary name to support names for mount purposes.
 /// Creates a FATdirectory structure for the root directory
 /// 
 /// # Arguments 
@@ -925,24 +909,13 @@ pub fn init(sd: storage_device::StorageDeviceRef, root_name: &str) -> Result<Arc
 /// 
 /// # Returns
 /// Returns the FATDirectory structure for the root directory 
-fn root_dir(fs: Arc<Mutex<Filesystem>>, mount_name: &str) -> Result<Arc<Mutex<RootDirectory>>, &'static str> {
+fn root_dir(fs: Filesystem, mount_name: &str) -> Result<Arc<Mutex<RootDirectory>>, &'static str> {
 
-    // TODO right now this function can violate the singleton blahdy blah and risks making two cluster chains for this dir.
-    // We also can't just use something like a lazy static, since it's a per-FS basis. Maybe the FS needs some information to prevent this.
     let new_name = DiskName::from_string(mount_name).map_err(|_| "Invalid mount name")?;
-    let mut cc = ClusterChain::new(2, fs.clone(), new_name, 
+    let mut cc = ClusterChain::new(2, Arc::new(Mutex::new(fs)), new_name, 
         Weak::<Mutex<FATDirectory>>::new(), 0);
     cc.parent_count = 2; // TODO what number to choose. We definitely don't want the on disk
                          // resources getting dropped
-    // let cc = ClusterChain {
-    //     filesystem: fs.clone(),
-    //     cluster: 2,
-    //     name: DiskName::from_string(mount_name)?,
-    //     parent: Weak::<Mutex<FATDirectory>>::new(),
-    //     parent_count: 2 + 1, // TODO should this be the case?
-    //     _num_clusters: None,
-    //     size: 0, // According to wikipedia File size for directories is always 0.
-    // };
 
     let mut underlying_root = FATDirectory {
         cc: cc,
@@ -1023,13 +996,6 @@ fn debug_name(byte_name: &[u8]) -> &str {
         Ok(name) => name,
         Err(_) => "Couldn't find name"
     }
-}
-
-#[deprecated]
-/// A debug function used to create a DirRef from the RootDirectory (since root_dir used to return a RootDirectory object)
-/// Exists because creating the Arc<Mutex<..>> in a user applications causes page faults for some reason.
-pub fn make_dir_ref(dir: RootDirectory) -> DirRef {
-    Arc::new(Mutex::new(dir))
 }
 
 // TODO move these functions elsewhere. Mostly for debugging some confusing issues.

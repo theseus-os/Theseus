@@ -20,13 +20,10 @@ extern crate root;
 
 use alloc::vec::Vec;
 use alloc::string::String;
-use alloc::string::ToString;
-use alloc::sync::{Arc, Weak};
-use spin::Mutex;
-use fs_node::{File, Directory, FileOrDir, FsNode, DirRef, FileRef};
-use fat32::{init, FATDirectory, RootDirectory};
+use alloc::sync::{Arc};
+use fs_node::{Directory, FileOrDir, FsNode, DirRef, FileRef};
+use fat32::{FATDirectory};
 use root::get_root;
-use path::Path;
 use getopts::Options;
 
 #[no_mangle]
