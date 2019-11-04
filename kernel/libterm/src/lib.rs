@@ -539,6 +539,10 @@ impl Terminal {
                 Ok(_) => { }
                 Err(err) => {error!("could not update display backwards: {}", err); return}
             }
+            match self.display_cursor() {
+                Ok(_) => { }
+                Err(err) => {error!("could not update cursor: {}", err); return}
+            }
         } else {
             match self.update_display_forwards(start_idx) {
                 Ok(_) => { }
@@ -672,11 +676,6 @@ impl Terminal {
         self.is_scroll_end = true;
     }
 
-    /// Wenqiu
-    pub fn display_cursor(&self) -> Result<(), &'static str> {
-        Ok(())
-    }
-
     pub fn blink_cursor(&mut self, left_shift: usize) -> Result<(), &'static str> {
         let buffer_width = self.get_displayable_dimensions().0;
         let mut new_x = self.absolute_cursor_pos % buffer_width;
@@ -742,19 +741,20 @@ impl Terminal {
 
     // Display the cursor of the terminal.
     //Wenqiu
-    /*pub fn display_cursor(
+    pub fn display_cursor(
         &mut self
     ) -> Result<(), &'static str> {
-        let coordinate = self.window.get_displayable_position(&self.display_name)?;
+        // let coordinate = self.window.get_displayable_position(&self.display_name)?;
         
         // get info about the text displayable
-        let (col_num, line_num, text_next_pos) = {
+        /*let (col_num, line_num, text_next_pos) = {
             let text_display = self.window.get_concrete_display::<TextDisplay>(&self.display_name)?;
             let text_next_pos = text_display.get_next_pos();
             let (col_num, line_num) = text_display.get_dimensions();
             (col_num, line_num, text_next_pos)
-        };
+        };*/
         
+        let (col_num, line_num, text_next_pos) = (10, 10 ,0);
         // return if the cursor is not in the screen
         if text_next_pos >= col_num * line_num {
             return Ok(())
@@ -765,23 +765,26 @@ impl Terminal {
         let cursor_line = cursor_pos / col_num;
         let cursor_col = cursor_pos % col_num;
                 
+        
+        let cursor_line = 10;
+        let cursor_col = 10;
+        
         self.cursor.display(
-            coordinate,
             cursor_col,
             cursor_line,
-            &mut self.window.framebuffer,
-        );
+            &mut self.textarea
+        )
 
         // update to the end of the text if the cursor is at the last line
-        let text_width = if text_next_pos / col_num == cursor_line {
+        /*let text_width = if text_next_pos / col_num == cursor_line {
             text_next_pos % col_num
         } else {
             col_num * CHARACTER_WIDTH
         };
 
         let block = vec![(cursor_line, text_width)];
-        self.window.render(Some(block.into_iter()))
-    }*/
+        self.window.render(Some(block.into_iter()))*/
+    }
 
     /// Gets the position of the cursor relative to the end of text in units of characters.
     // Wenqiu
@@ -808,25 +811,26 @@ impl Terminal {
 pub struct Cursor {
     /// Terminal will set this variable to enable blink or not. When this is not enabled, function `blink` will always return `false` which means do not refresh the cursor
     enabled: bool,
-    /// The time of blinking interval. Initially set to `DEFAULT_CURSOR_BLINK_INTERVAL`, however, can be changed during run-time
-    blink_interval: u64,
-    /// Record the time of last blink state change. This variable is updated when `reset` is called or `blink` is called and the time duration is larger than `DEFAULT_CURSOR_BLINK_INTERVAL`
+    /// The time of blinking interval. Initially set to `DEFAULT_CURSOR_FREQ`, however, can be changed during run-time
+    freq: u64,
+    /// Record the time of last blink state change. This variable is updated when `reset` is called or `blink` is called and the time duration is larger than `DEFAULT_CURSOR_FREQ`
     time: TscTicks,
     /// If function `blink` returns true, then this variable indicates whether display the cursor or not. To fully determine whether to display the cursor, user should call `is_show` function
     show: bool,
     offset_from_end: usize,
+    underlying_char: u8,
 }
 
-const DEFAULT_CURSOR_BLINK_INTERVAL: u64 = 400000000;
 impl Cursor {
-    /// Create a new cursor object which is initially enabled. The `blink_interval` is initialized as `DEFAULT_CURSOR_BLINK_INTERVAL` however one can change this at any time. `time` is set to current time.
+    /// Create a new cursor object which is initially enabled. The `blink_interval` is initialized as `DEFAULT_CURSOR_FREQ` however one can change this at any time. `time` is set to current time.
     pub fn new() -> Cursor {
         Cursor {
             enabled: true,
-            blink_interval: DEFAULT_CURSOR_BLINK_INTERVAL,
+            freq: DEFAULT_CURSOR_FREQ,
             time: tsc_ticks(),
             show: true,
             offset_from_end: 0,
+            underlying_char: 0,
         }
     }
 
@@ -853,7 +857,7 @@ impl Cursor {
             let time = tsc_ticks();
             if let Some(duration) = time.sub(&(self.time)) {
                 if let Some(ns) = duration.to_ns() {
-                    if ns >= self.blink_interval {
+                    if ns >= self.freq {
                         self.time = time;
                         self.show = !self.show;
                         return true;
@@ -862,6 +866,46 @@ impl Cursor {
             }
         }
         false
+    }
+
+    /// Changes the blink state show/hidden of a cursor based on its frequency.
+    /// It returns whether the cursor should be re-display. If the cursor is enabled, it returns whether the show/hidden state has been changed. Otherwise it returns true because the cursor is disabled and should refresh.
+    pub fn blink(&mut self) -> bool {
+        if self.enabled {
+            let time = tsc_ticks();
+            if let Some(duration) = time.sub(&(self.time)) {
+                if let Some(ns) = duration.to_ns() {
+                    if ns >= self.freq {
+                        self.time = time;
+                        self.show = !self.show;
+                        return true;
+                    }
+                }
+            }
+        }
+        true
+    }
+
+    /// Checks if the cursor should be shown.
+    pub fn show(&self) -> bool {
+        self.enabled && self.show
+    }
+
+    pub fn display(
+        &mut self, 
+        col: usize, 
+        line: usize, 
+        textarea: &mut alloc::sync::Arc<spin::Mutex<window_components::TextArea>>
+    ) -> Result<(), &'static str> {
+        if self.blink() {
+            if self.show() {
+                textarea.lock().set_char(col, line, 221)?;
+            } else {
+                textarea.lock().set_char(col, line, self.underlying_char)?;
+            }
+        }
+
+        Ok(())
     }
 
 }

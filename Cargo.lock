@@ -2400,6 +2400,7 @@ name = "x86_64"
 version = "0.1.2"
 dependencies = [
  "bit_field 0.7.0 (registry+https://github.com/rust-lang/crates.io-index)",
+ "bitflags 1.1.0 (registry+https://github.com/rust-lang/crates.io-index)",
  "irq_safety 0.1.1 (git+https://github.com/kevinaboos/irq_safety)",
 ]
 
