@@ -492,7 +492,7 @@ help:
 ### This section has QEMU arguments and configuration
 ###################################################################################################
 QEMU_MEMORY ?= 512M
-QEMU_FLAGS := -cdrom $(iso) -no-reboot -no-shutdown -s -m $(QEMU_MEMORY) -serial stdio 
+QEMU_FLAGS := -cdrom $(iso) -boot d -no-reboot -no-shutdown -s -m $(QEMU_MEMORY) -serial stdio
 ## multicore 
 QEMU_FLAGS += -smp 4
 
@@ -500,7 +500,10 @@ QEMU_FLAGS += -smp 4
 MAC_ADDR ?= 52:54:00:d1:55:01
 
 ## Add a disk drive, a PATA drive over an IDE controller interface.
-QEMU_FLAGS += -drive format=raw,file=random_data2.img,if=ide -drive format=raw,file=fat32.img,if=ide
+QEMU_FLAGS += -drive format=raw,file=fat32.img,if=ide
+
+## Debug flags for SeaBIOS (must comment out -serial stdio from previous line to use)
+# QEMU_FLAGS += -chardev stdio,id=seabios -device isa-debugcon,iobase=0x402,chardev=seabios
 
 ## Add a disk drive, a SATA drive over the AHCI interface.
 ## We don't yet have SATA support in Theseus.
