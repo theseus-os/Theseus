@@ -125,7 +125,6 @@ pub fn init(
 
     // initialize the input event manager, which will start window manager and the default terminal 
     let (key_producer, mouse_producer) = input_event_manager::init()?;
-    trace!("Wenqiu:Inital the key board");
 
     // Wenqiu:
     // init the display subsystem
@@ -138,10 +137,8 @@ pub fn init(
     // initialize the input event manager, which will start the default terminal 
     // let input_event_queue_producer = input_event_manager::init()?;
 
-    trace!("Wenqiu:Inital the key board");
     // initialize the rest of our drivers
     device_manager::init(key_producer, mouse_producer)?;
-    trace!("Wenqiu:Inital the key board");
     task_fs::init()?;
 
 

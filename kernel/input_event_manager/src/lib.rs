@@ -99,7 +99,6 @@ pub fn init() -> Result<(DFQueueProducer<Event>, DFQueueProducer<Event>), &'stat
         }
     }
 
-    trace!("Wenqiu: 11");
     // Spawns the terminal print crate so that we can print to the terminal
     ApplicationTaskBuilder::new(terminal_print_path)
         .name("terminal_print_singleton".to_string())
@@ -107,20 +106,17 @@ pub fn init() -> Result<(DFQueueProducer<Event>, DFQueueProducer<Event>), &'stat
         .singleton()
         .spawn()?;
 
-    trace!("Wenqiu: remove temporarily");
     ApplicationTaskBuilder::new(app_io_path)
         .name("application_io_manager".to_string())
         .singleton()
         .spawn()?;
 
     // Spawn the default terminal (will also start the windowing manager)
-    trace!("Wenqiu: 13");
     ApplicationTaskBuilder::new(shell_path)
         .name("default_terminal".to_string())
         .namespace(default_app_namespace)
         .spawn()?;
 
-    trace!("Wenqiu: 14");
     Ok((returned_keyboard_producer, returned_mouse_producer))
 }
 

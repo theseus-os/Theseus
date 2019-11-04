@@ -539,10 +539,6 @@ impl Terminal {
                 Ok(_) => { }
                 Err(err) => {error!("could not update display backwards: {}", err); return}
             }
-            match self.display_cursor() {
-                Ok(_) => { }
-                Err(err) => {error!("could not update cursor: {}", err); return}
-            }
         } else {
             match self.update_display_forwards(start_idx) {
                 Ok(_) => { }
@@ -599,8 +595,7 @@ impl Terminal {
             self.is_scroll_end = false;
             self.scroll_start_idx = 0; // takes us up to the start of the page
             self.cursor.disable();
-            //Wenqiu
-            //self.display_cursor()?;
+            self.display_cursor()?;
         }
         
         Ok(())
@@ -614,9 +609,7 @@ impl Terminal {
             self.is_scroll_end = true;
             let buffer_len = self.scrollback_buffer.len();
             self.scroll_start_idx = self.calc_start_idx(buffer_len).0;
-            //Wenqiu
-            /*self.scroll_start_idx = self.calc_start_idx(buffer_len, &self.display_name).0;
-            self.cursor.enable();*/
+            self.cursor.enable();
         }
         Ok(())
     }
@@ -626,8 +619,7 @@ impl Terminal {
         if self.scroll_start_idx != 0 {
             self.scroll_up_one_line();
             self.cursor.disable();
-            //Wenqiu
-            //self.display_cursor()?;
+            self.display_cursor()?;
         }
         Ok(())
     }
@@ -651,9 +643,7 @@ impl Terminal {
         self.page_up();
         self.is_scroll_end = false;
         self.cursor.disable();
-        Ok(())
-        //Wenqiu
-        //self.display_cursor()
+        self.display_cursor()
     }
 
     /// Scroll the screen a page down.
@@ -661,11 +651,10 @@ impl Terminal {
         if self.is_scroll_end {
             return Ok(());
         }
-        // Wenqiu
-        // self.cursor.disable();
-        // self.display_cursor()?;
+        self.cursor.disable();
+        self.display_cursor()?;
         self.page_down();
-        //self.cursor.enable();
+        self.cursor.enable();
         Ok(())
     }
 
@@ -796,7 +785,7 @@ impl Terminal {
         self.cursor.offset_from_end
     }
 
-    /*/// WEnqiu
+    /// WEnqiu
     /// Updates the position of a cursor.
     /// # Arguments
     /// * `offset_from_end`: the position of the cursor relative to the end of text in units of characters.
@@ -804,9 +793,6 @@ impl Terminal {
     pub fn update_cursor_pos(&mut self, offset_from_end: usize, underlying_char: u8) {
         self.cursor.offset_from_end = offset_from_end;
         self.cursor.underlying_char = underlying_char;
-    } */
-
-    pub fn update_cursor_pos(&mut self, offset_from_end: usize, underlying_char: u8) {
     }
 }
 
@@ -903,7 +889,7 @@ impl Cursor {
     ) -> Result<(), &'static str> {
         if self.blink() {
             if self.show() {
-                textarea.lock().set_char(col, line, 221)?;
+                textarea.lock().set_char(col, line, 219)?;
             } else {
                 textarea.lock().set_char(col, line, self.underlying_char)?;
             }

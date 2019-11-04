@@ -111,7 +111,6 @@ pub fn handle_keyboard_input(scan_code: u8, _extended: bool) -> Result<(), &'sta
                 Some(keycode) => { // this re-scopes (shadows) keycode
                     let event = Event::new_keyboard_event(KeyEvent::new(keycode, action, modifiers.clone()));
                     if let Some(producer) = KEYBOARD_PRODUCER.try() {
-                        trace!("Wenqiu; {:?}", event);
                         producer.enqueue(event);
                         Ok(()) // successfully queued up KeyEvent 
                     }
