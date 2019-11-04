@@ -411,6 +411,7 @@ dependencies = [
  "e1000 0.1.0",
  "ethernet_smoltcp_device 0.1.0",
  "event_types 0.1.0",
+ "fat32 0.1.0",
  "keyboard 0.1.0",
  "log 0.3.9 (registry+https://github.com/rust-lang/crates.io-index)",
  "memory 0.1.0",

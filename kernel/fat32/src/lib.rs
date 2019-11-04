@@ -998,30 +998,17 @@ fn debug_name(byte_name: &[u8]) -> &str {
     }
 }
 
-// TODO move these functions elsewhere. Mostly for debugging some confusing issues.
-/// Spawns some applications processes to perform some mount operations and tests for FAT32 support.
-pub fn test_module_init() -> Result<(), &'static str> {
+// REVIEW: to ensure any sort of sane behavior we need some way to ensure that each storage controller cannot be used
+// a second time otherwise we end up with multiple objects representing the same on disk object, which is bad.
+// Not sure of a good way to work around this without digging into the storage controller type?
+/// Searches all storage controlers and attempts to mount each valid fat32 drive as "fat32_drive_{}"
+pub fn test_insert() ->  Result<(), &'static str> {
+    let mut num_drives = 0;
+    let mut name = format!("fat32_drive_{}", num_drives);
 
-    // start a task that tries to find the module in root.
-    // let taskref = KernelTaskBuilder::new(test_find, ())
-    //     .name("fat32_find_test".to_string())
-    //     .block()
-    //     .spawn()?;
-
-    // start a task that tries to find the module in root.
-    KernelTaskBuilder::new(test_insert, None)
-        .name("fat32_insert_test".to_string())
-        .spawn()?;
-
-    Ok(())
-}
-
-/// Attempts to mount a fat32 FS and mount to the root directory as "fat32"
-/// Additionally unblocks a task that needs to wait until after the mount is complete.
-fn test_insert(taskref: Option<TaskRef>) ->  Result<(), &'static str> {
     if let Some(controller) = storage_manager::STORAGE_CONTROLLERS.lock().iter().next() {
         for sd in controller.lock().devices() {
-            match init(sd, "fat32") {
+            match init(sd, &name) {
                 Ok(fat32_root) => {
 
                     let true_root_ref = root::get_root();
@@ -1034,15 +1021,9 @@ fn test_insert(taskref: Option<TaskRef>) ->  Result<(), &'static str> {
                     
                     fat32_root.lock().set_parent_dir(Arc::downgrade(&true_root_ref));
 
-
-                    // Now let's try a couple simple things:
-                    //let test_root = true_root.get_dir(&name).unwrap();
-                    //debug!("Root directory entries: {:?}", test_root.lock().list());    
-
-                    // Unblock the find task now that we've finished our insert.
-                    taskref.map(|x| x.unblock());  
-
-                    return Ok(());      
+                    //return Ok(());
+                    num_drives += 1;
+                    name = format!("fat32_drive_{}", num_drives);
                 }
                 
                 Err(_) => {
@@ -1050,22 +1031,7 @@ fn test_insert(taskref: Option<TaskRef>) ->  Result<(), &'static str> {
             }
         }
     }
-    Err("Couldn't initialize FAT32 FS")
-}
 
-/// A debug method. Attempts to find the fat32 entry from the root directory (created by test_insert).
-/// Verifies that the fat32 entry exists and prints the contents.
-fn test_find(_: ()) ->  Result<(), &'static str> {
-    
-    let root = root::get_root().lock();
-
-    let dir = match root.get_dir("fat32") {
-        Some(dir) => dir,
-        None => return Err("Couldn't find fat32 FS"),
-    };
-
-    let entries = dir.lock().list();
-    debug!("Entries in fat32 dir: {:?}", entries);
-    debug!("Successfully found and printed fat32 dir");
+    // Finished checking storage controllers
     Ok(())
 }

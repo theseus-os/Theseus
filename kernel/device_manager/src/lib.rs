@@ -14,6 +14,7 @@ extern crate mouse;
 extern crate storage_manager;
 extern crate network_manager;
 extern crate ethernet_smoltcp_device;
+extern crate fat32;
 
 
 use dfqueue::DFQueueProducer;
@@ -91,6 +92,9 @@ pub fn init(keyboard_producer: DFQueueProducer<Event>) -> Result<(), &'static st
 
         warn!("Ignoring PCI device with no handler. {:?}", dev);
     }
+
+    // Iterate through found storage devices to search for FAT32 filesystems.
+    fat32::test_insert()?;
 
     // Convenience notification for developers to inform them of no networking devices
     if network_manager::NETWORK_INTERFACES.lock().is_empty() {

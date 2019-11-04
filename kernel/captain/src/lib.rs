@@ -141,8 +141,6 @@ pub fn init(
 
     task_fs::init()?;
 
-    fat32::test_module_init()?;
-
     // before we jump to userspace, we need to unmap the identity-mapped section of the kernel's page tables, at PML4[0]
     // unmap the kernel's original identity mapping (including multiboot2 boot_info) to clear the way for userspace mappings
     // we cannot do this until we have booted up all the APs

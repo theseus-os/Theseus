@@ -41,6 +41,9 @@ path = "../mouse"
 [dependencies.storage_manager]
 path = "../storage_manager"
 
+[dependencies.fat32]
+path = "../fat32"
+
 [dependencies.network_manager]
 path = "../network_manager"
 
