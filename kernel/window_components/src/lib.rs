@@ -405,6 +405,7 @@ pub struct TextArea {
     y_cnt: usize,
     char_matrix: Vec<u8>,
     winobj: Weak<Mutex<WindowObjAlpha>>,
+    next_index: usize,
 }
 
 impl TextArea {
@@ -447,6 +448,7 @@ impl TextArea {
             y_cnt: 0,  // will modify later
             char_matrix: Vec::new(),
             winobj: Arc::downgrade(winobj),
+            next_index: 0,
         };
 
         // compute x_cnt and y_cnt and remain constant
@@ -468,6 +470,10 @@ impl TextArea {
     /// get the y dimension char count
     pub fn get_y_cnt(& self) -> usize {
         self.y_cnt
+    }
+
+    pub fn get_next_index(&self) -> usize {
+        self.next_index
     }
 
     /// compute the index of char, does not check bound. one can use this to compute index as argument for `set_char_absolute`.
@@ -558,6 +564,9 @@ impl TextArea {
             }
             if j >= self.y_cnt { break; }
         }
+
+        self.next_index = self.index(i, j);
+        
         if j < self.y_cnt {
             for x in i .. self.x_cnt {
                 self.set_char(x, j, ' ' as u8)?;

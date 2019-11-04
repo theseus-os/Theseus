@@ -754,7 +754,15 @@ impl Terminal {
             (col_num, line_num, text_next_pos)
         };*/
         
-        let (col_num, line_num, text_next_pos) = (10, 10 ,0);
+        let (col_num, line_num, text_next_pos) = {
+            let textarea = self.textarea.lock();
+            (
+                textarea.get_x_cnt(),
+                textarea.get_y_cnt(),
+                textarea.get_next_index()
+            )
+        };
+
         // return if the cursor is not in the screen
         if text_next_pos >= col_num * line_num {
             return Ok(())
@@ -764,11 +772,7 @@ impl Terminal {
         let cursor_pos = text_next_pos - self.cursor.offset_from_end;
         let cursor_line = cursor_pos / col_num;
         let cursor_col = cursor_pos % col_num;
-                
-        
-        let cursor_line = 10;
-        let cursor_col = 10;
-        
+
         self.cursor.display(
             cursor_col,
             cursor_line,
