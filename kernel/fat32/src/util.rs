@@ -12,7 +12,81 @@ use alloc::string::ToString;
 use fs_core::{Error};
 use crate::{FREE_DIRECTORY_ENTRY, FileAttributes, DOT_DIRECTORY_ENTRY};
 
-pub type ShortName = [u8; 11];
+#[repr(packed)]
+pub struct ShortName {
+    pub name: [u8; 11],
+}
+
+impl ShortName {
+
+    pub fn new(name: [u8; 11]) -> ShortName {
+        ShortName {
+            name
+        }
+    }
+
+    /// Converts a short name into the canonical name that windows would display.
+    /// Note that the primary step this code performs is to insert implicit dot
+    /// characters and ignore whitespace.
+    /// Slight error in implementation (FIXME): I think that I don't properly handle names like "myfile."
+    /// where according to spec we should treat as "myfile". This isn't worth it though.
+    pub fn canonical_string(&self) -> String {
+        // Peek to see if an extension is present:
+        let b = self.name[8];
+        let c = char::from(b);
+        let ext_present = !c.is_ascii_whitespace();
+
+        let b = self.name[0];
+        let is_dot = b == b'.';
+
+        let mut chars = Vec::new();
+        for i in 0..8 {
+            let b = self.name[i];
+            let c = char::from(b);
+
+            //debug!("Got new char at pos {:}: {:}", i, c);
+
+            // FIXME actually the spec might allow spaces in a name instead of treating as padding...
+            // So instead we need to remove trailing spaces, blah
+            if c.is_ascii_whitespace() {
+                break
+            }
+
+            if c == '.' && !ext_present && !is_dot {
+                break;
+            }
+
+            chars.push(c);
+
+            if c == '.' && !is_dot {
+                break;
+            }
+
+            // Implicit '.' to support 12 character and truncated long names.
+            if i == 7 && ext_present {
+                chars.push('.');
+            }
+        }
+
+        for i in 0..3 {
+            let b = self.name[i + 8];
+            let c = char::from(b);
+            if c.is_ascii_whitespace() {
+                break
+            }
+
+            // No '.' allowed in extension.
+            if c == '.' {
+                break;
+            }
+
+            chars.push(c);
+        }
+
+        chars.iter().collect()
+    }
+}
+
 // TODO: May want a method to validate the LongName struct too.
 /// Generalized name struct that can be filled from and written onto disk easily.
 pub struct LongName {
@@ -38,7 +112,7 @@ impl LongName {
             return Err(Error::InconsistentDisk)
         }
 
-        long_name.short_name = entry.name;
+        long_name.short_name = ShortName::new(entry.name);
 
         // Note that we must reverse the iterator, since end of string is stored 
         // in the first VFAT entry.
@@ -77,7 +151,7 @@ impl LongName {
 
     pub fn empty() -> LongName {
         LongName {
-            short_name: [0; 11],
+            short_name: ShortName::new([0; 11]),
             long_name: vec!(),
         }
     }
@@ -99,6 +173,7 @@ impl DiskName {
     pub fn from_string(name: &str) -> Result<DiskName, Error> {
         // FIXME validate string names:
         if name.is_empty() {
+            warn!("DiskName::from_string called with empty string");
             return Err(Error::IllegalArgument);
         }
 
@@ -112,11 +187,10 @@ impl DiskName {
 
     pub fn from_long_name(long_name: LongName) -> Result<DiskName, Error> {
         // If the long name is empty emit a short name:
+        // This requires following some specific rules as given in 
+        // https://en.wikipedia.org/wiki/8.3_filename
         if long_name.long_name.is_empty() {
-            // REVIEW this is kind of an overly permissive way to read the name.
-            // Although it should never cause a valid short name to be rejected.
-            let name = from_utf8(&long_name.short_name).map_err(|_| Error::InconsistentDisk)?;
-            return DiskName::from_string(&name);
+            return DiskName::from_string(&long_name.short_name.canonical_string());
         }
 
         let chars_raw = long_name.long_name.iter().map(
@@ -158,7 +232,9 @@ impl DiskName {
         //let bytes_to_copy = min(long_name.short_name.len(), name_bytes.len());
         //long_name.short_name[0..bytes_to_copy].copy_from_slice(&name_bytes[0..bytes_to_copy]);
         // Construct the canonical short name:
-        long_name.short_name = match self.name.rsplitn(1, |x| x == '.').collect::<Vec<&str>>()[0..2] {
+        long_name.short_name = 
+        ShortName::new(
+        match self.name.rsplitn(1, |x| x == '.').collect::<Vec<&str>>()[0..2] {
             [name_without_extension] => {
                 let mut short_name: [u8; 11] = *b"           ";
                 let num_bytes_to_copy = min(8, name_without_extension.as_bytes().len());
@@ -181,7 +257,7 @@ impl DiskName {
                 error!("fat32::DiskName::to_long_name encountered unexpected return from rsplitn");
                 *b"           "
             }
-        };
+        });
 
         // TODO encode the name into UCS-2 and split into small buffers
         // to construct the UCS-2 encoded long name.
@@ -300,7 +376,7 @@ pub struct VFATEntry {
 impl RawFatDirectory {   
     pub fn to_directory_entry(&self) -> Result<DirectoryEntry, Error> {
         //let name = String::from_utf8(self.name.to_vec()).map_err(|_| Error::IllegalArgument)?;
-        let name = LongName::from_short_name(self.name);
+        let name = LongName::from_short_name(ShortName::new(self.name));
 
         self.to_directory_entry_with_name(name)
     }
@@ -326,9 +402,23 @@ impl RawFatDirectory {
         })
     }
     
+    /// Make a directory entry that is free (but not necessarily end of allocated entries)
     pub fn make_unused() -> RawFatDirectory {
         RawFatDirectory {
             name: [FREE_DIRECTORY_ENTRY; 11],
+            flags: 0,
+            _unused1: [0; 8],
+            cluster_high: U16::new(0),
+            _unused2: [0; 4],
+            cluster_low: U16::new(0),
+            size: U32::new(0),
+        }
+    }
+
+    /// Make a directory entry that marks the end of allocated entries.
+    pub fn make_end() -> RawFatDirectory {
+        RawFatDirectory {
+            name: [0; 11],
             flags: 0,
             _unused1: [0; 8],
             cluster_high: U16::new(0),
@@ -391,7 +481,7 @@ impl DirectoryEntry {
         let long_name = self.name.to_long_name();
 
         RawFatDirectory {
-            name: long_name.short_name,
+            name: long_name.short_name.name,
             flags: match self.file_type {
                 FileType::FATFile => 0x0,
                 FileType::FATDirectory => FileAttributes::SUBDIRECTORY.bits,

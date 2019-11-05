@@ -73,7 +73,7 @@ pub struct Header {
     sectors_per_cluster: u8, // allowed values are 1,2,4,8...128 dependent on size of drive
     reserved_sectors: u8, // the number of reserved sectors, usually 32 for FAT32
     fat_count: u8, // #of FATs, almost always 2
-    _root_dir_count: u16, // the max number of root directors... should be 0 for FAT32 bc root is stored in data
+    _root_dir_count: u16, // the max number of root directories... should be 0 for FAT32 bc root is stored in data
     legacy_sectors: u16, // total logical sectors, can be set to 0 and instead use the sector count at the end of this struc
     _media_type: u8, // defines the type of media, f8 for hard disks
     legacy_sectors_per_fat: u8, // fat32 sets this to 0 and uses sectors per fat on the fat32 header

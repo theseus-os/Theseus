@@ -169,48 +169,6 @@ pub struct FATFile {
     cc: ClusterChain,
 }
 
-impl FATFile {
-    // TODO I don't remember if this method works.
-    // It isn't used and doesn't really serve any purpose right now since FATPosition isn't a part
-    // of the rest of the public facing API I think and the relevant logic is used elsewhere.
-    /// Converts a position in a file into a current_cluster-sector_offset-byte_offset struct.
-    pub fn seek(&self, fs: &mut Filesystem, offset: usize) -> Result<FATPosition, &'static str> {
-
-        let cluster_size_in_bytes: usize = fs.sectors_per_cluster() as usize * fs.bytes_per_sector as usize;
-        let clusters_to_advance: usize =  offset/cluster_size_in_bytes;
-        // TODO validate that clusters to advance fits in u32 (since a number of clusters must be u32)
-        
-        // FIXME call cluster_advancer here.
-        let mut counter: usize = 0;
-        let mut current_cluster = self.cc.cluster;
-
-        while clusters_to_advance != counter {
-            match fs.next_cluster(current_cluster) {
-                Err(_e) => {
-                    return Err("Error in moving to next clusters");
-                }
-                Ok(cluster) => {
-                    counter += 1;
-                    current_cluster = cluster;
-                }
-            }
-        }
-        
-        let nth_cluster = current_cluster;
-        let byte_difference = offset - (clusters_to_advance * cluster_size_in_bytes);
-        let reached_sector = byte_difference / (fs.bytes_per_sector as usize);
-        // debug!("cluster: {}", nth_cluster);
-        // debug!("sector: {}", reached_sector);
-        // debug!("byte_offset: {}", byte_difference - reached_sector as usize *fs.bytes_per_sector as usize);
-        return Ok(FATPosition{
-            cluster: nth_cluster,
-            cluster_offset: clusters_to_advance,
-            sector_offset: reached_sector,
-            entry_offset: byte_difference - reached_sector as usize *fs.bytes_per_sector as usize
-        })
-    }
-}
-
 impl File for FATFile {
     /// Given an empty data buffer and a FATfile structure, will read off the bytes of that FATfile and place the data into the data buffer
     /// If the given buffer is less than the size of the file, read will return the first bytes read unless
@@ -361,6 +319,7 @@ impl FATDirectory {
     /// Returns Ok(Entry) if found. Otherwise returns Err(Error::NotFound) if not found (or no name given).
     fn walk_until(&self, fs: &mut Filesystem, children: &mut ChildList, 
         name: Option<&DiskName>) -> Result<DirectoryEntry, Error> {
+        debug!("fat32::FATDirectory::walk_until called for {:?}", self.cc.name);
         
         let mut pos = self.cc.initial_pos();
 
@@ -612,6 +571,7 @@ impl FATDirectory {
     
     /// Grows the directory given a FATPosition in the last cluster of the file and returns a new position in the new_cluster.
     fn grow_directory(&self, fs: &mut Filesystem, pos_end: &FATPosition) -> Result<FATPosition, Error> {
+        return Err(Error::Unsupported);
         
         // Rename for convenience with other existing code.
         let pos = pos_end;
@@ -628,10 +588,10 @@ impl FATDirectory {
             entry_offset: 0,
         };
         
-        let unused_entry = RawFatDirectory::make_unused();
+        let unused_entry = RawFatDirectory::make_end();
         
         loop {
-            self.write_fat_directory(fs, &pos, &unused_entry)?; // FIXME write an entry with 0 name instead of unused name.
+            self.write_fat_directory(fs, &pos, &unused_entry)?;
             pos = match self.cc.advance_pos(fs, &pos, size_of::<RawFatDirectory>()) {
                 Ok(p) => p,
                 Err(Error::EndOfFile) => break,
@@ -839,53 +799,6 @@ impl ClusterChain {
         Ok(bytes_copied as usize)
     }
 }
-
-// FIXME need to move some of this logic into the DiskName type.
-/// A case-insenstive way to compare FATdirectory entry name which is in [u8;11] and a str literal to be able to 
-/// confirm whether the directory/file that you're looking at is the one specified 
-/// 
-/// # Arguments
-/// * `name`: the name of the next destination in the path
-/// * `de`: the directory entry that's currently being looked at
-/// 
-/// # Examples
-/// ```rust
-/// let str = "fat32";
-/// let de.name: [u8;11] = [0x46, 0x41, 0x54, 0x33, 0x32, 0x20, 0x20, 0x20, 0x20, 0x20, 0x20];
-/// assert_eq!(compare_name(&str, de), true)
-/// ```
-// pub fn compare_name(name: &str, de: &DirectoryEntry) -> bool {
-//     compare_short_name(name, de) || &de.long_name[0..name.len()] == name.as_bytes()
-// }
-
-// fn compare_short_name(name: &str, de: &DirectoryEntry) -> bool {
-//     // 8.3 (plus 1 for the separator)
-//     if name.len() > 12 {
-//         return false;
-//     }
-
-//     let mut i = 0;
-//     for (_, a) in name.as_bytes().iter().enumerate() {
-//         // Handle cases which are 11 long but not 8.3 (e.g "loader.conf")
-//         if i == 11 {
-//             return false;
-//         }
-
-//         // Jump to the extension
-//         if *a == b'.' {
-//             i = 8;
-//             continue;
-//         }
-
-//         let b = de.name[i];
-//         if a.to_ascii_uppercase() != b.to_ascii_uppercase() {
-//             return false;
-//         }
-
-//         i += 1;
-//     }
-//     true
-// }
 
 /// Takes in a drive for a filesystem and initializes it if it contains a FAT32 filesystem.
 /// 
