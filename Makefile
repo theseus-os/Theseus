@@ -569,13 +569,13 @@ loadable: run
 
 
 ### builds and runs Theseus in QEMU
-run: $(iso) 
+run: $(iso) fat32.img
 	# @qemu-img resize random_data2.img 100K
 	qemu-system-x86_64 $(QEMU_FLAGS)
 
 
 ### builds and runs Theseus in QEMU, but pauses execution until a GDB instance is connected.
-debug: $(iso)
+debug: $(iso) fat32.img
 	@qemu-system-x86_64 $(QEMU_FLAGS) -S
 #-monitor stdio
 
@@ -596,7 +596,7 @@ bochs: $(iso)
 
 ### Creates a fat32 filesystem that we can mount and test with:
 fat32.img:
-	./fat32fdisk.sh
+	tar -xvf fat32_test_disk.tar.bz2
 
 ### Checks that the supplied usb device (for usage with the boot/pxe targets).
 ### Note: this is bypassed on WSL, because WSL doesn't support raw device files yet.
