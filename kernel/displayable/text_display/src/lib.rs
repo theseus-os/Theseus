@@ -10,7 +10,6 @@ extern crate font;
 extern crate frame_buffer;
 extern crate frame_buffer_drawer;
 extern crate frame_buffer_printer;
-extern crate tsc;
 extern crate displayable;
 
 use alloc::string::String;
@@ -18,9 +17,7 @@ use alloc::vec::Vec;
 use displayable::Displayable;
 use font::{CHARACTER_HEIGHT, CHARACTER_WIDTH};
 use frame_buffer::{Coord, FrameBuffer};
-use tsc::{tsc_ticks, TscTicks};
 
-const DEFAULT_CURSOR_FREQ: u64 = 400000000;
 
 /// A text displayable profiles the size and color of a block of text. It can display in a framebuffer.
 pub struct TextDisplay {
@@ -115,9 +112,10 @@ impl TextDisplay {
         (self.width / CHARACTER_WIDTH, self.height / CHARACTER_HEIGHT)
     }
 
-    /// Gets the (column, line) position of the next symbol.
-    pub fn get_next_pos(&self) -> (usize, usize) {
-        (self.next_col, self.next_line)
+    /// Gets the position of the next symbol as index in units of characters.
+    pub fn get_next_pos(&self) -> usize {
+        let col_num = self.width / CHARACTER_WIDTH;
+        self.next_line * col_num + self.next_col
     }
 
     /// Gets the background color of the text area
@@ -140,98 +138,5 @@ impl TextDisplay {
     pub fn get_index(&self, column: usize, line: usize) -> usize {
         let text_width = self.width / CHARACTER_WIDTH;
         line * text_width + column
-    }
-}
-
-/// A cursor structure. It contains whether it is enabled,
-/// the frequency it blinks, the last time it blinks, the current blink state show/hidden, and its color.
-/// A cursor is a special symbol which can be displayed.
-pub struct Cursor {
-    enabled: bool,
-    freq: u64,
-    time: TscTicks,
-    show: bool,
-    color: u32,
-}
-
-impl Cursor {
-    /// Creates a new cursor structure.
-    pub fn new(color: u32) -> Cursor {
-        Cursor {
-            enabled: true,
-            freq: DEFAULT_CURSOR_FREQ,
-            time: tsc_ticks(),
-            show: true,
-            color: color,
-        }
-    }
-
-    /// Resets the blink state of the cursor.
-    pub fn reset(&mut self) {
-        self.show = true;
-        self.time = tsc_ticks();
-    }
-
-    /// Enables a cursor.
-    pub fn enable(&mut self) {
-        self.enabled = true;
-        self.reset();
-    }
-
-    /// Disables a cursor.
-    pub fn disable(&mut self) {
-        self.enabled = false;
-    }
-
-    /// Changes the blink state show/hidden of a cursor based on its frequency. An application calls this function in a loop.
-    /// It returns whether the cursor should be re-display. If the cursor is enabled, it returns whether the show/hidden state has been changed. Otherwise it returns true because the cursor is disabled and should refresh.
-    pub fn blink(&mut self) -> bool {
-        if self.enabled {
-            let time = tsc_ticks();
-            if let Some(duration) = time.sub(&(self.time)) {
-                if let Some(ns) = duration.to_ns() {
-                    if ns >= self.freq {
-                        self.time = time;
-                        self.show = !self.show;
-                        return true;
-                    }
-                }
-            }
-        }
-        true
-    }
-
-    /// Checks if the cursor should be shown.
-    pub fn show(&self) -> bool {
-        self.enabled && self.show
-    }
-}
-
-/// Display a cursor at `coordinate` onto a frame buffer. 
-/// # Arguments
-/// * `cursor`: the cursor to display.
-/// * `coordinate`: the coordinate within the `framebuffer` where the cursor is displayed. It specifies the location of the top-left point of the cursor. The `coordinate` is relative to the top-left point `(0, 0)` of the `framebuffer`.
-/// * bg_color: the background color of the area if the cursor is hidden.
-/// * `framebuffer:` the framebuffer to display onto.
-pub fn display_cursor(
-    cursor: &mut Cursor,
-    coordinate: Coord,
-    bg_color: u32,
-    framebuffer: &mut dyn FrameBuffer,
-) {
-    if cursor.blink() {
-        let color = if cursor.show() {
-            cursor.color
-        } else {
-            bg_color
-        };
-        
-        frame_buffer_drawer::fill_rectangle(
-            framebuffer,
-            coordinate + (0, 1),
-            CHARACTER_WIDTH,
-            CHARACTER_HEIGHT - 2,
-            color,
-        );
     }
 }

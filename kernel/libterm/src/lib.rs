@@ -19,20 +19,25 @@ extern crate displayable;
 extern crate frame_buffer_rgb;
 extern crate frame_buffer;
 extern crate font;
+extern crate tsc;
+extern crate frame_buffer_drawer;
+extern crate frame_buffer_printer;
 
 use alloc::string::{String, ToString};
 use alloc::vec::Vec;
 use alloc::boxed::Box;
 use event_types::Event;
-use text_display::{TextDisplay, Cursor};
+use text_display::{TextDisplay};
 use displayable::Displayable;
 use frame_buffer_rgb::FrameBufferRGB;
-use frame_buffer::{Coord};
+use frame_buffer::{Coord, FrameBuffer};
 use window_manager::WindowGeneric;
 use font::{CHARACTER_HEIGHT, CHARACTER_WIDTH};
+use tsc::{tsc_ticks, TscTicks};
 
 pub const FONT_COLOR: u32 = 0x93ee90;
 pub const BACKGROUND_COLOR: u32 = 0x000000;
+const DEFAULT_CURSOR_FREQ: u64 = 400000000;
 
 /// Error type for tracking different scroll errors that a terminal
 /// application could encounter.
@@ -468,52 +473,64 @@ impl Terminal {
         }
     }
 
-    /// Insert a character to the screen. The position is specified by parameter `cursor_end_offset` as relative to the end of the text in units of number of characters,
-    /// that is the relative distance to the end of the whole output on the screen.
-    /// cursor_end_offset == 0 means to append characters onto the screen, while cursor_end_offset == 1 means to
-    /// insert a character right before the exsiting last character.
-    /// One must call `refresh_display` to get things actually showed.
-    pub fn insert_char_to_screen(&mut self, c: char, cursor_end_offset: usize) -> Result<(), &'static str> {
+    /// Insert a character to the terminal.
+    ///
+    /// # Arguments
+    ///
+    /// * `c`: the new character to insert.
+    /// * `offset_from_end`: the position to insert the character. It represents the distance relative to the end of the whole output in the terminal in units of characters.
+    /// 
+    /// # Examples
+    ///
+    /// * `terminal.insert_char(char, 0)` will append `char` to the end of existing text.
+    /// * `terminal.insert_char(char, 5)` will insert `char` right before the last 5 characters.
+    ///
+    /// After invoke this function, one must call `refresh_display` to get the updates actually showed on the screen.
+    pub fn insert_char(&mut self, c: char, offset_from_end: usize) -> Result<(), &'static str> {
         let buflen = self.scrollback_buffer.len();
-        if buflen < cursor_end_offset { return Err("cursor_end_offset is larger than length of scrollback buffer"); }
-        let insert_idx = buflen - cursor_end_offset;
+        if buflen < offset_from_end { return Err("offset_from_end is larger than length of scrollback buffer"); }
+        let insert_idx = buflen - offset_from_end;
         self.scrollback_buffer.insert_str(insert_idx, &c.to_string());
         Ok(())
     }
 
-    /// Remove a character from the screen. The position is specified by parameter `cursor_end_offset` relative to the end of the text in units of number of characters,
-    /// that is the relative distance to the end of the whole output on the screen.
-    /// cursor_end_offset == 1 means to remove the last character on the screen.
-    /// cursor_end_offset == 0 is INVALID here, since there's nothing at the "end" of the screen.
-    /// One must call `refresh_display` to get things actually removed on the screen.
-    pub fn remove_char_from_screen(&mut self, cursor_end_offset: usize) -> Result<(), &'static str> {
+    /// Remove a character from the terminal.
+    ///
+    /// # Arguments
+    ///
+    /// * `offset_from_end`: the position of the character to remove. It represents the distance relative to the end of the whole output in the terminal in units of characters. `offset_from_end == 0` is *invalid* here.
+    /// 
+    /// # Examples
+    ///
+    /// * `terminal.remove_char(1)` will remove the last character in the screen.
+    ///
+    /// After invoke this function, one must call `refresh_display` to get the updates actually showed on the screen.
+    pub fn remove_char(&mut self, offset_from_end: usize) -> Result<(), &'static str> {
         let buflen = self.scrollback_buffer.len();
-        if buflen < cursor_end_offset { return Err("cursor_end_offset is larger than length of scrollback buffer"); }
-        if cursor_end_offset == 0 { return Err("cannot remove character at cursor_end_offset == 0"); }
-        let remove_idx = buflen - cursor_end_offset;
+        if buflen < offset_from_end { return Err("offset_from_end is larger than length of scrollback buffer"); }
+        if offset_from_end == 0 { return Err("cannot remove character at offset_from_end == 0"); }
+        let remove_idx = buflen - offset_from_end;
         self.scrollback_buffer.remove(remove_idx);
         Ok(())
     }
     
     /// Scroll the screen to the very beginning.
-    /// `cursor_end_offset` is the position of the cursor relative to the end of the text in units of number of characters
-    pub fn move_screen_to_begin(&mut self, cursor_end_offset: usize) -> Result<(), &'static str> {
+    pub fn move_screen_to_begin(&mut self) -> Result<(), &'static str> {
         // Home command only registers if the text display has the ability to scroll
         if self.scroll_start_idx != 0 {
             self.is_scroll_end = false;
             self.scroll_start_idx = 0; // takes us up to the start of the page
-            self.display_cursor(cursor_end_offset)?;
+            self.display_cursor()?;
         }
         
         Ok(())
     }
 
     /// Scroll the screen to the very end.
-    /// `cursor_end_offset` is the position of the cursor relative to the end of the text in units of number of characters
-    pub fn move_screen_to_end(&mut self, cursor_end_offset: usize) -> Result<(), &'static str> {
+    pub fn move_screen_to_end(&mut self) -> Result<(), &'static str> {
         if !self.is_scroll_end {
             self.cursor.disable();
-            self.display_cursor(cursor_end_offset)?;
+            self.display_cursor()?;
             self.is_scroll_end = true;
             let buffer_len = self.scrollback_buffer.len();
             self.scroll_start_idx = self.calc_start_idx(buffer_len, &self.display_name).0;
@@ -523,21 +540,19 @@ impl Terminal {
     }
 
     /// Scroll the screen a line up.
-    /// `cursor_end_offset` is the position of the cursor relative to the end of the text in units of number of characters
-    pub fn move_screen_line_up(&mut self, cursor_end_offset: usize) -> Result<(), &'static str> {
+    pub fn move_screen_line_up(&mut self) -> Result<(), &'static str> {
         if self.scroll_start_idx != 0 {
             self.scroll_up_one_line();
-            self.display_cursor(cursor_end_offset)?;
+            self.display_cursor()?;
         }
         Ok(())
     }
 
     /// Scroll the screen a line down.
-    /// `cursor_end_offset` is the position of the cursor relative to the end of the text in units of number of characters
-    pub fn move_screen_line_down(&mut self, cursor_end_offset: usize) -> Result<(), &'static str> {
+    pub fn move_screen_line_down(&mut self) -> Result<(), &'static str> {
         if !self.is_scroll_end {
             self.cursor.disable();
-            self.display_cursor(cursor_end_offset)?;
+            self.display_cursor()?;
             self.scroll_down_one_line();
             self.cursor.enable();
         }
@@ -545,24 +560,22 @@ impl Terminal {
     }
 
     /// Scroll the screen a page up.
-    /// `cursor_end_offset` is the position of the cursor relative to the end of the text in units of number of characters
-    pub fn move_screen_page_up(&mut self, cursor_end_offset: usize) -> Result<(), &'static str> {
+    pub fn move_screen_page_up(&mut self) -> Result<(), &'static str> {
         if self.scroll_start_idx <= 1 {
             return Ok(());
         }
         self.page_up();
         self.is_scroll_end = false;
-        self.display_cursor(cursor_end_offset)
+        self.display_cursor()
     }
 
     /// Scroll the screen a page down.
-    /// `cursor_end_offset` is the position of the cursor relative to the end of the text in units of number of characters
-    pub fn move_screen_page_down(&mut self, cursor_end_offset: usize) -> Result<(), &'static str> {
+    pub fn move_screen_page_down(&mut self) -> Result<(), &'static str> {
         if self.is_scroll_end {
             return Ok(());
         }
         self.cursor.disable();
-        self.display_cursor(cursor_end_offset)?;
+        self.display_cursor()?;
         self.page_down();
         self.cursor.enable();
         Ok(())
@@ -597,44 +610,165 @@ impl Terminal {
         self.get_displayable_dimensions(&self.display_name)
     }
 
-    /// Display the cursor of the terminal
-    /// `cursor_end_offset` is the position of the cursor relative to the end of the text in units of number of characters.
+    /// Display the cursor of the terminal.
     pub fn display_cursor(
-        &mut self, cursor_end_offset: usize
+        &mut self
     ) -> Result<(), &'static str> {
         let coordinate = self.window.get_displayable_position(&self.display_name)?;
-        let text_display = self.window.get_concrete_display_mut::<TextDisplay>(&self.display_name)?;
-        let line_width = text_display.get_size().0;
-        let (col, line) = text_display.get_next_pos();
+        
+        // get info about the text displayable
+        let (col_num, line_num, text_next_pos) = {
+            let text_display = self.window.get_concrete_display::<TextDisplay>(&self.display_name)?;
+            let text_next_pos = text_display.get_next_pos();
+            let (col_num, line_num) = text_display.get_dimensions();
+            (col_num, line_num, text_next_pos)
+        };
+        
         // return if the cursor is not in the screen
-        if line >= text_display.get_dimensions().1 {
+        if text_next_pos >= col_num * line_num {
             return Ok(())
         }
-        let bg_color = text_display.get_bg_color();
 
-        let (cursor_col, cursor_line) = if cursor_end_offset > 0 {
-            text_display.reset_cache();
-            let next_index = text_display.get_index(col, line);
-            let cursor_index = next_index - cursor_end_offset;
-            text_display.get_location(cursor_index)
-        } else {
-            (col, line)
-        };
-
-        text_display::display_cursor(
-            &mut self.cursor, 
-            coordinate + ((cursor_col * CHARACTER_WIDTH) as isize, (cursor_line * CHARACTER_HEIGHT) as isize),
-            bg_color,
-            &mut self.window.framebuffer
+        // calculate the cursor position
+        let cursor_pos = text_next_pos - self.cursor.offset_from_end;
+        let cursor_line = cursor_pos / col_num;
+        let cursor_col = cursor_pos % col_num;
+                
+        self.cursor.display(
+            coordinate,
+            cursor_col,
+            cursor_line,
+            &mut self.window.framebuffer,
         );
 
-        let text_width = if line == cursor_line {
-            (col + 1) * CHARACTER_WIDTH
+        // update to the end of the text if the cursor is at the last line
+        let text_width = if text_next_pos / col_num == cursor_line {
+            text_next_pos % col_num
         } else {
-            line_width
+            col_num * CHARACTER_WIDTH
         };
 
         let block = vec![(cursor_line, text_width)];
         self.window.render(Some(block.into_iter()))
+    }
+
+    /// Gets the position of the cursor relative to the end of text in units of characters.
+    pub fn get_cursor_offset_from_end(&self) -> usize {
+        self.cursor.offset_from_end
+    }
+
+    /// Updates the position of a cursor.
+    /// # Arguments
+    /// * `offset_from_end`: the position of the cursor relative to the end of text in units of characters.
+    /// * `underlying_char`: the ASCII code of the underlying character when the cursor is unseen.
+    pub fn update_cursor_pos(&mut self, offset_from_end: usize, underlying_char: u8) {
+        self.cursor.offset_from_end = offset_from_end;
+        self.cursor.underlying_char = underlying_char;
+    }
+
+}
+
+/// The cursor structure.
+/// A cursor is a special symbol shown in the text box of a terminal. It indicates the position of character where the next input would be put or the delete operation works on.
+/// Terminal invokes its `display` method in a loop to let a cursor blink.
+pub struct Cursor {
+    /// Whether the cursor is enabled in the terminal.
+    enabled: bool,
+    /// The blinking frequency.
+    freq: u64,
+    /// The last time it blinks.
+    time: TscTicks,
+    /// The current blinking state show/hidden
+    show: bool,
+    /// The color of the cursor
+    color: u32,
+    /// The position of the cursor relative to the end of terminal text in units of number of characters.
+    offset_from_end: usize,
+    /// The underlying character at the position of the cursor.
+    /// It is shown when the cursor is unseen.
+    underlying_char: u8,
+}
+
+impl Cursor {
+    /// Creates a new cursor structure with a default offset to the end of the text as 0 and the underlying character as `\0`. The initial `show` state is  `true` and the blinking frequency is defined as `libterm::DEFAULT_CURSOR_FREQ`. The parameter `color` specifies the color of the cursor.
+    pub fn new(color: u32) -> Cursor {
+        Cursor {
+            enabled: true,
+            freq: DEFAULT_CURSOR_FREQ,
+            time: tsc_ticks(),
+            show: true,
+            color: color,
+            offset_from_end: 0,
+            underlying_char: 0,
+        }
+    }
+
+    /// Resets the blink state of the cursor.
+    pub fn reset(&mut self) {
+        self.show = true;
+        self.time = tsc_ticks();
+    }
+
+    /// Enables a cursor.
+    pub fn enable(&mut self) {
+        self.enabled = true;
+        self.reset();
+    }
+
+    /// Disables a cursor.
+    pub fn disable(&mut self) {
+        self.enabled = false;
+    }
+
+    /// Changes the blink state show/hidden of a cursor based on its frequency.
+    /// It returns whether the cursor should be re-display. If the cursor is enabled, it returns whether the show/hidden state has been changed. Otherwise it returns true because the cursor is disabled and should refresh.
+    pub fn blink(&mut self) -> bool {
+        if self.enabled {
+            let time = tsc_ticks();
+            if let Some(duration) = time.sub(&(self.time)) {
+                if let Some(ns) = duration.to_ns() {
+                    if ns >= self.freq {
+                        self.time = time;
+                        self.show = !self.show;
+                        return true;
+                    }
+                }
+            }
+        }
+        true
+    }
+
+    /// Checks if the cursor should be shown.
+    pub fn show(&self) -> bool {
+        self.enabled && self.show
+    }
+
+    /// Displays a cursor in a text block onto a frame buffer. An application calls this function in a loop to make it blinking.
+    /// # Arguments
+    /// * `coordinate`: the left top coordinate of the text block relative to the origin(top-left point) of the frame buffer.
+    /// * `(column, line)`: the location of the cursor in the text block in units of characters.
+    /// * `framebuffer`: the framebuffer to display onto.
+    pub fn display(&mut self, coordinate: Coord, column: usize, line: usize, framebuffer: &mut dyn FrameBuffer) {
+        if self.blink() {
+            if self.show() {
+                frame_buffer_drawer::fill_rectangle(
+                    framebuffer,
+                    coordinate + ((column * CHARACTER_WIDTH) as isize, (line * CHARACTER_HEIGHT) as isize) + (0, 1),
+                    CHARACTER_WIDTH,
+                    CHARACTER_HEIGHT - 2,
+                    self.color,
+                );
+            } else {
+                frame_buffer_printer::print_ascii_character(
+                    framebuffer,
+                    self.underlying_char,
+                    FONT_COLOR,
+                    BACKGROUND_COLOR,
+                    coordinate,
+                    column,
+                    line,
+                )
+            }
+        }
     }
 }
