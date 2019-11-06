@@ -31,7 +31,7 @@ use alloc::vec::Vec;
 use core::ops::{Deref};
 use dfqueue::{DFQueue, DFQueueConsumer, DFQueueProducer};
 use event_types::{Event, MousePositionEvent};
-use frame_buffer_alpha::{ AlphaPixel, BLACK, PixelCompositor };
+use frame_buffer_alpha::{ AlphaPixel, BLACK, PixelMixer };
 use spin::{Mutex};
 use window_manager_alpha::WindowObjAlpha;
 use frame_buffer::{Coord, FrameBuffer};

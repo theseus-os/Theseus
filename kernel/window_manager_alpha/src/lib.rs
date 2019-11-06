@@ -36,7 +36,7 @@ use alloc::vec::Vec;
 use core::ops::Deref;
 use dfqueue::{DFQueue, DFQueueConsumer, DFQueueProducer};
 use event_types::{Event, MousePositionEvent};
-use frame_buffer_alpha::{ FrameBufferAlpha, AlphaPixel, BLACK, PixelCompositor };
+use frame_buffer_alpha::{ FrameBufferAlpha, AlphaPixel, BLACK, PixelMixer };
 use spin::{Mutex, Once};
 use spawn::{KernelTaskBuilder, ApplicationTaskBuilder};
 use mouse_data::MouseEvent;

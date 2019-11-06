@@ -233,7 +233,7 @@ impl FrameBuffer for FrameBufferAlpha {
     }
 }
 
-pub trait PixelCompositor {
+pub trait PixelMixer {
    /// mix two color using alpha channel composition, supposing `self` is on the top of `other` pixel.
     fn alpha_mix(self, other: Self) -> Self;
 
@@ -249,7 +249,7 @@ pub trait PixelCompositor {
     fn get_blue(&self) -> u8;
 }
 
-impl PixelCompositor for AlphaPixel {
+impl PixelMixer for AlphaPixel {
     /// mix two color using alpha channel composition, supposing `self` is on the top of `other` pixel.
     fn alpha_mix(self, other: Self) -> Self {
         let alpha = self.get_alpha() as u16;
@@ -278,7 +278,7 @@ impl PixelCompositor for AlphaPixel {
     }
 
     fn get_alpha(&self) -> u8 {
-        (self >> 42) as u8
+        (self >> 24) as u8
     }
 
     fn get_red(&self) -> u8 {
