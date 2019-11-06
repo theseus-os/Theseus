@@ -15,11 +15,13 @@ extern crate alloc;
 extern crate memory;
 extern crate owning_ref;
 extern crate font;
+extern crate frame_buffer;
 
 use alloc::boxed::Box;
 use core::ops::DerefMut;
 use memory::{EntryFlags, FrameRange, MappedPages,PhysicalAddress, FRAME_ALLOCATOR};
 use owning_ref::BoxRefMut;
+use frame_buffer::{FrameBuffer, Pixel, Coord};
 
 /// A `Pixel` is a `u32` broken down into four bytes. 
 /// The lower 24 bits of a Pixel specify its RGB color values, while the upper 8bit is an `alpha` channel,
@@ -27,7 +29,7 @@ use owning_ref::BoxRefMut;
 /// The `alpha` value is used in an alpha-blending compositor that supports transparency.
 #[repr(C, packed)]
 #[derive(Hash, Debug, Clone, Copy)]
-pub struct Pixel {
+pub struct AlphaPixel {
     pub blue: u8,
     pub green: u8,
     pub red: u8,
@@ -35,12 +37,12 @@ pub struct Pixel {
 }
 
 /// predefined opaque black
-pub const BLACK: Pixel = Pixel{ alpha: 0, red: 0, green: 0, blue: 0};
+pub const BLACK: AlphaPixel = AlphaPixel{ alpha: 0, red: 0, green: 0, blue: 0};
 /// predefined opaque white
-pub const WHITE: Pixel = Pixel{ alpha: 0, red: 255, green: 255, blue: 255};
+pub const WHITE: AlphaPixel = AlphaPixel{ alpha: 0, red: 255, green: 255, blue: 255};
 
 // Every pixel is of `Pixel` type, which is 4 byte as defined in `Pixel`
-const PIXEL_BYTES: usize = core::mem::size_of::<Pixel>();
+const PIXEL_BYTES: usize = core::mem::size_of::<AlphaPixel>();
 
 /// Initialize the final frame buffer by allocating a block of memory and map it to the physical framebuffer frames.
 pub fn init() -> Result<FrameBufferAlpha, &'static str> {
@@ -134,73 +136,76 @@ impl FrameBufferAlpha {
         (self.width, self.height)
     }
 
-    /// compute the index of pixel (x, y) in the buffer array
-    pub fn index(&self, x: usize, y: usize) -> usize {
-        y * self.width + x
-    }
-
-    /// check if a pixel (x,y) is within the framebuffer
-    pub fn check_in_buffer(&self, x: usize, y: usize) -> bool {
-        x < self.width && y < self.height
-    }
-
     /// get one pixel at given position
-    pub fn get_pixel(& self, x: usize, y: usize) -> Result<Pixel, &'static str> {
-        if ! self.check_in_buffer(x, y) {
-            return Err("get pixel out of bound");
-        }
-        Ok(self.buffer[self.index(x, y)])
+    pub fn get_pixel(& self, coordinate: Coord) -> Result<AlphaPixel, &'static str> {
+        let idx = match self.index(coordinate) {
+            Some(index) => { index },
+            None => { return Err("get pixel out of bound"); }
+        };
+        Ok(AlphaPixel::from(self.buffer[idx]))
     }
 
     /// fill the entire frame buffer with given `color`
-    pub fn fill_color(&mut self, color: Pixel) {
+    pub fn fill_color(&mut self, color: AlphaPixel) {
         for y in 0..self.height {
             for x in 0..self.width {
-                self.draw_point(x, y, color);
+                let coordinate = Coord::new(x as isize, y as isize);
+                self.draw_point(coordinate, color);
             }
         }
     }
 
     /// draw a point on this framebuffer
-    pub fn draw_point(&mut self, x: usize, y: usize, color: Pixel) {
-        let idx = self.index(x, y);
-        self.buffer[idx] = color;
+    pub fn draw_point(&mut self, coordinate: Coord, color: AlphaPixel) {
+        let idx = match self.index(coordinate) {
+            Some(index) => { index },
+            None => { return }
+        };
+        self.buffer[idx] = color.to_pixel();
     }
 
     /// draw a point on this framebuffer with alpha
-    pub fn draw_point_alpha(&mut self, x: usize, y: usize, color: Pixel) {
-        let idx = self.index(x, y);
-        self.buffer[idx] = color.alpha_mix(self.buffer[idx]);
+    pub fn draw_point_alpha(&mut self, coordinate: Coord, color: AlphaPixel) {
+        let idx = match self.index(coordinate) {
+            Some(index) => { index },
+            None => { return }
+        };
+        let origin = AlphaPixel::from(self.buffer[idx]);
+        self.buffer[idx] = AlphaPixel::from(color).alpha_mix(origin).to_pixel();
     }
 
     /// draw a rectangle on this framebuffer
-    pub fn draw_rect(&mut self, xs: usize, xe: usize, ys: usize, ye: usize, color: Pixel) {
+    pub fn draw_rect(&mut self, xs: usize, xe: usize, ys: usize, ye: usize, color: AlphaPixel) {
         for y in ys..ye {
             for x in xs..xe {
-                self.draw_point(x, y, color);
+                let coordinate = Coord::new(x as isize, y as isize);
+                self.draw_point(coordinate, color);
             }
         }
     }
 
     /// draw a rectangle on this framebuffer with alpha
-    pub fn draw_rect_alpha(&mut self, xs: usize, xe: usize, ys: usize, ye: usize, color: Pixel) {
+    pub fn draw_rect_alpha(&mut self, xs: usize, xe: usize, ys: usize, ye: usize, color: AlphaPixel) {
+        // Wenqiu: TODO use coordinate
         for y in ys..ye {
             for x in xs..xe {
-                self.draw_point_alpha(x, y, color);
+                let coordinate = Coord::new(x as isize, y as isize);
+                self.draw_point_alpha(coordinate, color);
             }
         }
     }
 
     /// draw a circle on the screen with alpha. (`xc`, `yc`) is the position of the center of the circle, and `r` is the radius
-    pub fn draw_circle_alpha(&mut self, xc: usize, yc: usize, r: usize, color: Pixel) {
+    pub fn draw_circle_alpha(&mut self, xc: usize, yc: usize, r: usize, color: AlphaPixel) {
         let r2 = (r*r) as isize;
         for y in yc-r..yc+r {
             for x in xc-r..xc+r {
-                if self.check_in_buffer(x, y) {
+                let coordinate = Coord::new(x as isize, y as isize);
+                if self.contains(coordinate) {
                     let xd = x as isize - xc as isize;
                     let yd = y as isize - yc as isize;
                     if xd*xd + yd*yd <= r2 {
-                        self.draw_point_alpha(x, y, color);
+                        self.draw_point_alpha(Coord::new(x as isize, y as isize), color);
                     }
                 }
             }
@@ -208,20 +213,44 @@ impl FrameBufferAlpha {
     }
 
     /// draw a char on the screen with alpha
-    pub fn draw_char_8x16(&mut self, x: usize, y: usize, c: u8, color: Pixel) {
+    pub fn draw_char_8x16(&mut self, coordinate: Coord, c: u8, color: AlphaPixel) {
         for yi in 0..16 {
             let char_font: u8 = font::FONT_BASIC[c as usize][yi];
             for xi in 0..8 {
                 const HIGHEST_BIT: u8 = 0x80;
                 if char_font & (HIGHEST_BIT >> xi) != 0 {
-                    self.draw_point_alpha(x+xi, y+yi, color);
+                    self.draw_point_alpha(coordinate + (xi as isize, yi as isize), color);
                 }
             }
         }
     }
 }
 
-impl Pixel {
+
+impl FrameBuffer for FrameBufferAlpha {
+    // Wenqiu: TODO move to trait
+    fn buffer(&self) -> &BoxRefMut<MappedPages, [Pixel]> {
+        return &self.buffer;
+    }
+
+    fn get_size(&self) -> (usize, usize) {
+        (self.width, self.height)
+    }
+
+    fn buffer_copy(&mut self, src: &[Pixel], dest_start: usize) {
+        let len = src.len();
+        let dest_end = dest_start + len;
+        self.buffer_mut()[dest_start..dest_end].copy_from_slice(src);
+    }
+
+    fn draw_pixel(&mut self, coordinate: Coord, color: Pixel) {
+        if let Some(index) = self.index(coordinate) {
+            self.buffer[index] = color;
+        }
+    }
+}
+
+impl AlphaPixel {
     /// mix two color using alpha channel composition, supposing `self` is on the top of `other` pixel.
     pub fn alpha_mix(self, other: Self) -> Self {
         let alpha = self.alpha as u16;
@@ -251,18 +280,25 @@ impl Pixel {
         let new_red = ((self.red as f32) * mix + (other.red as f32) * (1f32-mix)) as u8;
         let new_green = ((self.green as f32) * mix + (other.green as f32) * (1f32-mix)) as u8;
         let new_blue = ((self.blue as f32) * mix + (other.blue as f32) * (1f32-mix)) as u8;
-        Pixel {
+        AlphaPixel {
             alpha: new_alpha, 
             red: new_red,
             green: new_green,
             blue: new_blue
         }
     }
+
+    pub fn to_pixel(&self) -> Pixel {
+        ((self.alpha as u32) << 24) +
+            ((self.red as u32) << 16) +
+            ((self.green as u32) << 8) +
+            (self.blue as u32)
+    }
 }
 
-impl From<u32> for Pixel {
-    fn from(item: u32) -> Self {
-        Pixel {
+impl From<Pixel> for AlphaPixel {
+    fn from(item: Pixel) -> Self {
+        AlphaPixel {
             alpha: (item >> 24) as u8,
             red: (item >> 16) as u8,
             green: (item >> 8) as u8,

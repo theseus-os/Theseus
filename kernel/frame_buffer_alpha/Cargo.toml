@@ -18,6 +18,9 @@ path = "../../libs/util"
 [dependencies.multicore_bringup]
 path = "../multicore_bringup"
 
+[dependencies.frame_buffer]
+path = "../frame_buffer"
+
 [dependencies.log]
 default-features = false
 version = "0.3.7"

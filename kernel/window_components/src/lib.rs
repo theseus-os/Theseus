@@ -24,15 +24,17 @@ extern crate frame_buffer_alpha;
 extern crate font;
 extern crate mouse;
 extern crate window_manager_alpha;
+extern crate frame_buffer;
 
 use alloc::sync::{Arc, Weak};
 use alloc::vec::Vec;
 use core::ops::{Deref};
 use dfqueue::{DFQueue, DFQueueConsumer, DFQueueProducer};
 use event_types::{Event, MousePositionEvent};
-use frame_buffer_alpha::{ Pixel, BLACK };
+use frame_buffer_alpha::{ AlphaPixel, BLACK };
 use spin::{Mutex};
 use window_manager_alpha::WindowObjAlpha;
+use frame_buffer::{Coord};
 
 /// The title bar size, in number of pixels
 const WINDOW_TITLE_BAR: usize = 15;
@@ -41,19 +43,19 @@ const WINDOW_BORDER: usize = 2;
 /// border radius, in number of pixels
 const WINDOW_RADIUS: usize = 5;
 /// default background color
-const WINDOW_BACKGROUND: Pixel = Pixel { alpha: 0x40, red: 0xFF, green: 0xFF, blue: 0xFF };
+const WINDOW_BACKGROUND: AlphaPixel = AlphaPixel { alpha: 0x40, red: 0xFF, green: 0xFF, blue: 0xFF };
 /// border and title bar color when window is inactive
-const WINDOW_BORDER_COLOR_INACTIVE: Pixel = Pixel { alpha: 0x00, red: 0x33, green: 0x33, blue: 0x33 };
+const WINDOW_BORDER_COLOR_INACTIVE: AlphaPixel = AlphaPixel { alpha: 0x00, red: 0x33, green: 0x33, blue: 0x33 };
 /// border and title bar color when window is active, the top part color
-const WINDOW_BORDER_COLOR_ACTIVE_TOP: Pixel = Pixel { alpha: 0x00, red: 0xBB, green: 0xBB, blue: 0xBB };
+const WINDOW_BORDER_COLOR_ACTIVE_TOP: AlphaPixel = AlphaPixel { alpha: 0x00, red: 0xBB, green: 0xBB, blue: 0xBB };
 /// border and title bar color when window is active, the bottom part color
-const WINDOW_BORDER_COLOR_ACTIVE_BOTTOM: Pixel = Pixel { alpha: 0x00, red: 0x66, green: 0x66, blue: 0x66 };
+const WINDOW_BORDER_COLOR_ACTIVE_BOTTOM: AlphaPixel = AlphaPixel { alpha: 0x00, red: 0x66, green: 0x66, blue: 0x66 };
 /// window button color: red
-const WINDOW_BUTTON_COLOR_CLOSE: Pixel = Pixel { alpha: 0x00, red: 0xE7, green: 0x4C, blue: 0x3C };
+const WINDOW_BUTTON_COLOR_CLOSE: AlphaPixel = AlphaPixel { alpha: 0x00, red: 0xE7, green: 0x4C, blue: 0x3C };
 /// window button color: green
-const WINDOW_BUTTON_COLOR_MINIMIZE_MAMIMIZE: Pixel = Pixel { alpha: 0x00, red: 0x23, green: 0x9B, blue: 0x56 };
+const WINDOW_BUTTON_COLOR_MINIMIZE_MAMIMIZE: AlphaPixel = AlphaPixel { alpha: 0x00, red: 0x23, green: 0x9B, blue: 0x56 };
 /// window button color: purple
-const WINDOW_BUTTON_COLOR_HIDE: Pixel = Pixel { alpha: 0x00, red: 0x7D, green: 0x3C, blue: 0x98 };
+const WINDOW_BUTTON_COLOR_HIDE: AlphaPixel = AlphaPixel { alpha: 0x00, red: 0x7D, green: 0x3C, blue: 0x98 };
 /// window button margin from left, in number of pixels
 const WINDOW_BUTTON_BIAS_X: usize = 12;
 /// the interval between buttons, in number of pixels
@@ -91,7 +93,7 @@ pub struct WindowComponents {
     /// the height of title bar in pixel, init as WINDOW_TITLE_BAR. it is render inside the window so user shouldn't use this area anymore
     title_size: usize,
     /// the background of this window, init as WINDOW_BACKGROUND
-    background: Pixel,
+    background: AlphaPixel,
     /// application could get events from this consumer
     pub consumer: DFQueueConsumer<Event>,
     /// event output used by window manager, private variable
@@ -188,8 +190,8 @@ impl WindowComponents {
                 let dx1 = WINDOW_RADIUS - i;
                 let dy1 = WINDOW_RADIUS - j;
                 if dx1*dx1 + dy1*dy1 > r2 {  // draw this to transparent
-                    winobj.framebuffer.draw_point(i, j, 0xFFFFFFFF.into());
-                    winobj.framebuffer.draw_point(width-i-1, j, 0xFFFFFFFF.into());
+                    winobj.framebuffer.draw_point(Coord::new(i as isize, j as isize), 0xFFFFFFFF.into());
+                    winobj.framebuffer.draw_point(Coord::new((width-i-1) as isize, j as isize), 0xFFFFFFFF.into());
                 }
             }
         }
@@ -376,7 +378,7 @@ impl WindowComponents {
     pub fn get_title_size(&self) -> usize { self.title_size }
 
     /// get background color
-    pub fn get_background(&self) -> Pixel { self.background }
+    pub fn get_background(&self) -> AlphaPixel { self.background }
 }
 
 impl Drop for WindowComponents {
@@ -397,8 +399,8 @@ pub struct TextArea {
     // height: usize,
     line_spacing: usize,
     column_spacing: usize,
-    background_color: Pixel,
-    text_color: Pixel,
+    background_color: AlphaPixel,
+    text_color: AlphaPixel,
     /// the x dimension char count
     x_cnt: usize,
     /// the y dimension char count
@@ -420,7 +422,7 @@ impl TextArea {
     /// * `text_color`: the color of text, default to opaque black
     pub fn new(x: usize, y: usize, width: usize, height: usize, winobj: &Arc<Mutex<WindowObjAlpha>>
             , line_spacing: Option<usize>, column_spacing: Option<usize>
-            , background_color: Option<Pixel>, text_color: Option<Pixel>)
+            , background_color: Option<AlphaPixel>, text_color: Option<AlphaPixel>)
         -> Result<Arc<Mutex<TextArea>>, &'static str> {
 
         let mut textarea: TextArea = TextArea {
@@ -507,9 +509,9 @@ impl TextArea {
                             let nx = wx + i;
                             let ny = wy + j;
                             if char_font & (0x80u8 >> i) != 0 {
-                                winobj.framebuffer.draw_point(nx, ny, self.text_color);
+                                winobj.framebuffer.draw_point(Coord::new(nx as isize, ny as isize), self.text_color);
                             } else {
-                                winobj.framebuffer.draw_point(nx, ny, self.background_color);
+                                winobj.framebuffer.draw_point(Coord::new(nx as isize, ny as isize), self.background_color);
                             }
                         }
                     }
