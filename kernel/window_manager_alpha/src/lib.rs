@@ -36,7 +36,7 @@ use alloc::vec::Vec;
 use core::ops::Deref;
 use dfqueue::{DFQueue, DFQueueConsumer, DFQueueProducer};
 use event_types::{Event, MousePositionEvent};
-use frame_buffer_alpha::{ FrameBufferAlpha, AlphaPixel, BLACK };
+use frame_buffer_alpha::{ FrameBufferAlpha, AlphaPixel, BLACK, PixelCompositor };
 use spin::{Mutex, Once};
 use spawn::{KernelTaskBuilder, ApplicationTaskBuilder};
 use mouse_data::MouseEvent;
@@ -44,16 +44,16 @@ use keycodes_ascii::{KeyEvent, Keycode, KeyAction};
 use path::Path;
 use frame_buffer::{FrameBuffer, Coord};
 
-static WINDOW_MANAGER: Once<Mutex<WindowManagerAlpha>> = Once::new();
+static WINDOW_MANAGER: Once<Mutex<WindowManagerAlpha<FrameBufferAlpha>>> = Once::new();
 
 /// The half size of mouse in number of pixels, the actual size of pointer is 1+2*`MOUSE_POINTER_HALF_SIZE`
 const MOUSE_POINTER_HALF_SIZE: usize = 7;
 /// Transparent pixel
-const T: AlphaPixel = AlphaPixel { alpha: 0xFF, red: 0x00, green: 0x00, blue: 0x00 };
+const T: AlphaPixel = 0xFF000000;
 /// Opaque white
-const O: AlphaPixel = AlphaPixel { alpha: 0x00, red: 0xFF, green: 0xFF, blue: 0xFF };
+const O: AlphaPixel = 0x00FFFFFF;
 /// Opaque blue
-const B: AlphaPixel = AlphaPixel { alpha: 0x00, red: 0x00, green: 0x00, blue: 0xFF };
+const B: AlphaPixel = 0x00000FF;
 /// the mouse picture
 static MOUSE_BASIC: [[AlphaPixel; 2*MOUSE_POINTER_HALF_SIZE+1]; 2*MOUSE_POINTER_HALF_SIZE+1] = [
     [ T, T, T, T, T, T, T, T, T, T, T, T, T, T, T ],
@@ -76,9 +76,9 @@ static MOUSE_BASIC: [[AlphaPixel; 2*MOUSE_POINTER_HALF_SIZE+1]; 2*MOUSE_POINTER_
 /// the border indicating new window position and size
 const WINDOW_BORDER_SIZE: usize = 3;
 /// border's inner color
-const WINDOW_BORDER_COLOR_INNER: AlphaPixel = AlphaPixel { alpha: 0x00, red: 0xCA, green: 0x6F, blue: 0x1E };
+const WINDOW_BORDER_COLOR_INNER: AlphaPixel = 0x00CA6F1E;
 /// border's outer color
-const WINDOW_BORDER_COLOR_OUTTER: AlphaPixel = AlphaPixel { alpha: 0xFF, red: 0xFF, green: 0xFF, blue: 0xFF };
+const WINDOW_BORDER_COLOR_OUTTER: AlphaPixel = 0xFFFFFFFF;
 
 /// a 2D point
 struct Point {
@@ -99,7 +99,7 @@ struct RectRegion {
 }
 
 /// window manager with overlapping and alpha enabled
-struct WindowManagerAlpha {
+struct WindowManagerAlpha<T: FrameBuffer> {
     /// those window currently not shown on screen
     hide_list: VecDeque<Weak<Mutex<WindowObjAlpha>>>,
     /// those window shown on screen that may overlapping each other
@@ -111,12 +111,12 @@ struct WindowManagerAlpha {
     /// If a window is being repositioned (e.g., by dragging it), this is the position of that window's border
     repositioned_border: Option<RectRegion>,
     /// the frame buffer that it should print on
-    final_fb: FrameBufferAlpha,
+    final_fb: T,
     /// if it this is true, do not refresh whole screen until someone calls "refresh_area_absolute"
     delay_refresh_first_time: bool,
 }
 
-impl WindowManagerAlpha {
+impl <T: FrameBuffer> WindowManagerAlpha<T> {
 
     /// set one window to active, push last active (if exists) to top of show_list. if `refresh` is `true`, will then refresh the window's area
     pub fn set_active(&mut self, objref: &Arc<Mutex<WindowObjAlpha>>, refresh: bool) -> Result<(), &'static str> {
@@ -235,7 +235,7 @@ impl WindowManagerAlpha {
                         Ok(m) => m,
                         Err(_) => T,  // transparent
                     };
-                    if top.alpha == 0 {  // totally opaque, so not waste computation
+                    if top.get_alpha() == 0 {  // totally opaque, so not waste computation
                         return top;
                     }
                     ret = top;
@@ -263,20 +263,21 @@ impl WindowManagerAlpha {
             let relative_y = (sy - current_active_win.y) as usize;
             if current_active_win.framebuffer.contains(Coord::new(relative_x as isize,  relative_y as isize)) {
                 let top = current_active_win.framebuffer.get_pixel(Coord::new(relative_x as isize,  relative_y as isize))?;
-                if top.alpha == 0 {  // totally opaque, so not waste computation
-                    self.final_fb.draw_point(Coord::new(x as isize, y as isize), top);
+                if top.get_alpha() == 0 {  // totally opaque, so not waste computation
+                    self.final_fb.draw_pixel(Coord::new(x as isize, y as isize), top);
                 } else {
                     let bottom = self.recompute_single_pixel_show_list(x, y, 0);
-                    self.final_fb.draw_point(Coord::new(x as isize, y as isize), top.alpha_mix(bottom));
+                    self.final_fb.draw_pixel(Coord::new(x as isize, y as isize), top.alpha_mix(bottom));
                 }
             } else {
                 let pixel = self.recompute_single_pixel_show_list(x, y, 0);
-                self.final_fb.draw_point(Coord::new(x as isize, y as isize), pixel);
+                self.final_fb.draw_pixel(Coord::new(x as isize, y as isize), pixel);
             }
         } else {  // nothing is active now
             let pixel = self.recompute_single_pixel_show_list(x, y, 0);
-            self.final_fb.draw_point(Coord::new(x as isize, y as isize), pixel);
+            self.final_fb.draw_pixel(Coord::new(x as isize, y as isize), pixel);
         }
+
         // then draw border
         if let Some(repositioned_border) = &self.repositioned_border {
             let (x_start, x_end, y_start, y_end) = {
@@ -293,45 +294,46 @@ impl WindowManagerAlpha {
             let top = (y_start - sy) as usize <= WINDOW_BORDER_SIZE && x_in;
             let bottom = (sy - sy_end_1) as usize <= WINDOW_BORDER_SIZE && x_in;
             let f32_window_border_size = WINDOW_BORDER_SIZE as f32;
+
             if left {
                 if top {  // left-top
                     let dx = x_start - sx; let dy = y_start - sy;
                     if (dx+dy) as usize <= WINDOW_BORDER_SIZE {
-                        self.final_fb.draw_point_alpha(Coord::new(x as isize, y as isize), WINDOW_BORDER_COLOR_OUTTER.color_mix(
+                        self.final_fb.draw_pixel_alpha(Coord::new(x as isize, y as isize), WINDOW_BORDER_COLOR_OUTTER.color_mix(
                             WINDOW_BORDER_COLOR_INNER, (dx+dy) as usize as f32 / f32_window_border_size));
                     }
                 } else if bottom {  // left-bottom
                     let dx = x_start - sx; let dy = sy - sy_end_1;
                     if (dx+dy) as usize <= WINDOW_BORDER_SIZE {
-                        self.final_fb.draw_point_alpha(Coord::new(x as isize, y as isize), WINDOW_BORDER_COLOR_OUTTER.color_mix(
+                        self.final_fb.draw_pixel_alpha(Coord::new(x as isize, y as isize), WINDOW_BORDER_COLOR_OUTTER.color_mix(
                             WINDOW_BORDER_COLOR_INNER, (dx+dy) as usize as f32 / f32_window_border_size));
                     }
                 } else {  // only left
-                    self.final_fb.draw_point_alpha(Coord::new(x as isize, y as isize), WINDOW_BORDER_COLOR_OUTTER.color_mix(
+                    self.final_fb.draw_pixel_alpha(Coord::new(x as isize, y as isize), WINDOW_BORDER_COLOR_OUTTER.color_mix(
                         WINDOW_BORDER_COLOR_INNER, (x_start - sx) as usize as f32 / f32_window_border_size));
                 }
             } else if right {
                 if top {  // right-top
                     let dx = sx - sx_end_1; let dy = y_start - sy;
                     if (dx+dy) as usize <= WINDOW_BORDER_SIZE {
-                        self.final_fb.draw_point_alpha(Coord::new(x as isize, y as isize), WINDOW_BORDER_COLOR_OUTTER.color_mix(
+                        self.final_fb.draw_pixel_alpha(Coord::new(x as isize, y as isize), WINDOW_BORDER_COLOR_OUTTER.color_mix(
                             WINDOW_BORDER_COLOR_INNER, (dx+dy) as usize as f32 / f32_window_border_size));
                     }
                 } else if bottom {  // right-bottom
                     let dx = sx - sx_end_1; let dy = sy - sy_end_1;
                     if (dx+dy) as usize <= WINDOW_BORDER_SIZE {
-                        self.final_fb.draw_point_alpha(Coord::new(x as isize, y as isize), WINDOW_BORDER_COLOR_OUTTER.color_mix(
+                        self.final_fb.draw_pixel_alpha(Coord::new(x as isize, y as isize), WINDOW_BORDER_COLOR_OUTTER.color_mix(
                             WINDOW_BORDER_COLOR_INNER, (dx+dy) as usize as f32 / f32_window_border_size));
                     }
                 } else {  // only right
-                    self.final_fb.draw_point_alpha(Coord::new(x as isize, y as isize), WINDOW_BORDER_COLOR_OUTTER.color_mix(
+                    self.final_fb.draw_pixel_alpha(Coord::new(x as isize, y as isize), WINDOW_BORDER_COLOR_OUTTER.color_mix(
                         WINDOW_BORDER_COLOR_INNER, (sx - sx_end_1) as usize as f32 / f32_window_border_size));
                 }
             } else if top {  // only top
-                self.final_fb.draw_point_alpha(Coord::new(x as isize, y as isize), WINDOW_BORDER_COLOR_OUTTER.color_mix(
+                self.final_fb.draw_pixel_alpha(Coord::new(x as isize, y as isize), WINDOW_BORDER_COLOR_OUTTER.color_mix(
                     WINDOW_BORDER_COLOR_INNER, (y_start - sy) as usize as f32 / f32_window_border_size));
             } else if bottom {  // only bottom
-                self.final_fb.draw_point_alpha(Coord::new(x as isize, y as isize), WINDOW_BORDER_COLOR_OUTTER.color_mix(
+                self.final_fb.draw_pixel_alpha(Coord::new(x as isize, y as isize), WINDOW_BORDER_COLOR_OUTTER.color_mix(
                     WINDOW_BORDER_COLOR_INNER, (sy - sy_end_1) as usize as f32 / f32_window_border_size));
             }
         }
@@ -341,15 +343,14 @@ impl WindowManagerAlpha {
             (m.x as isize, m.y as isize)
         };
         if ((sx-cx) as usize <= MOUSE_POINTER_HALF_SIZE || (cx-sx) as usize <= MOUSE_POINTER_HALF_SIZE) && ((sy-cy) as usize <= MOUSE_POINTER_HALF_SIZE || (cy-sy) as usize <= MOUSE_POINTER_HALF_SIZE) {
-            self.final_fb.draw_point_alpha(Coord::new(x as isize, y as isize), MOUSE_BASIC[MOUSE_POINTER_HALF_SIZE + x - cx as usize][MOUSE_POINTER_HALF_SIZE + y - cy as usize]);
+            self.final_fb.draw_pixel_alpha(Coord::new(x as isize, y as isize), MOUSE_BASIC[MOUSE_POINTER_HALF_SIZE + x - cx as usize][MOUSE_POINTER_HALF_SIZE + y - cy as usize]);
         }
         Ok(())
     }
 
     /// recompute single pixel value and refresh it on screen
     pub fn refresh_single_pixel(&mut self, x: isize, y: isize) -> Result<(), &'static str> {
-        let width = self.final_fb.width;
-        let height = self.final_fb.height;
+        let (width, height) = self.final_fb.get_size();
         if (x as usize) < width && (y as usize) < height {
             return self.refresh_single_pixel_with_buffer(x as usize, y as usize);
         }
@@ -358,10 +359,11 @@ impl WindowManagerAlpha {
 
     /// refresh an area by recompute every pixel in this region and update on the screen
     fn refresh_area(&mut self, x_start: isize, x_end: isize, y_start: isize, y_end: isize) -> Result<(), &'static str> {
+        let (width, height) = self.final_fb.get_size();
         let x_start = core::cmp::max(x_start, 0);
-        let x_end = core::cmp::min(x_end, self.final_fb.width as isize);
+        let x_end = core::cmp::min(x_end, width as isize);
         let y_start = core::cmp::max(y_start, 0);
-        let y_end = core::cmp::min(y_end, self.final_fb.height as isize);
+        let y_end = core::cmp::min(y_end, height as isize);
         if x_start <= x_end && y_start <= y_end {
             for y in y_start .. y_end {
                 for x in x_start .. x_end {
@@ -374,12 +376,13 @@ impl WindowManagerAlpha {
 
     /// refresh an rectangle border
     fn refresh_rect_border(&mut self, x_start: isize, x_end: isize, y_start: isize, y_end: isize) -> Result<(), &'static str> {
+        let (width, height) = self.final_fb.get_size();
         let x_start = core::cmp::max(x_start, 0);
-        let x_end = core::cmp::min(x_end, self.final_fb.width as isize);
+        let x_end = core::cmp::min(x_end, width as isize);
         let y_start = core::cmp::max(y_start, 0);
-        let y_end = core::cmp::min(y_end, self.final_fb.height as isize);
+        let y_end = core::cmp::min(y_end, height as isize);
         if x_start <= x_end {
-            if y_start < self.final_fb.height as isize {
+            if y_start < height as isize {
                 for x in x_start .. x_end {
                     self.refresh_single_pixel_with_buffer(x as usize, y_start as usize)?;
                 }
@@ -391,7 +394,7 @@ impl WindowManagerAlpha {
             }
         }
         if y_start <= y_end {
-            if x_start < self.final_fb.width as isize {
+            if x_start < width as isize {
                 for y in y_start .. y_end {
                     self.refresh_single_pixel_with_buffer(x_start as usize, y as usize)?;
                 }
@@ -917,7 +920,7 @@ pub fn new_window<'a>(
 
     // Init the frame buffer of the window
     let mut framebuffer = FrameBufferAlpha::new(width, height, None)?;
-    framebuffer.fill_color(0x80FFFFFF.into());  // draw with half transparent white
+    framebuffer.fill_color(0x80FFFFFF);  // draw with half transparent white
 
     // new window object
     let window: WindowObjAlpha = WindowObjAlpha {

@@ -27,19 +27,12 @@ use frame_buffer::{FrameBuffer, Pixel, Coord};
 /// The lower 24 bits of a Pixel specify its RGB color values, while the upper 8bit is an `alpha` channel,
 /// in which an `alpha` value of `0` represents an opaque pixel and `0xFF` represents a completely transparent pixel. 
 /// The `alpha` value is used in an alpha-blending compositor that supports transparency.
-#[repr(C, packed)]
-#[derive(Hash, Debug, Clone, Copy)]
-pub struct AlphaPixel {
-    pub blue: u8,
-    pub green: u8,
-    pub red: u8,
-    pub alpha: u8
-}
+pub type AlphaPixel = u32;
 
 /// predefined opaque black
-pub const BLACK: AlphaPixel = AlphaPixel{ alpha: 0, red: 0, green: 0, blue: 0};
+pub const BLACK: AlphaPixel = 0;
 /// predefined opaque white
-pub const WHITE: AlphaPixel = AlphaPixel{ alpha: 0, red: 255, green: 255, blue: 255};
+pub const WHITE: AlphaPixel = 0x00FFFFFF;
 
 // Every pixel is of `Pixel` type, which is 4 byte as defined in `Pixel`
 const PIXEL_BYTES: usize = core::mem::size_of::<AlphaPixel>();
@@ -150,28 +143,9 @@ impl FrameBufferAlpha {
         for y in 0..self.height {
             for x in 0..self.width {
                 let coordinate = Coord::new(x as isize, y as isize);
-                self.draw_point(coordinate, color);
+                self.draw_pixel(coordinate, color);
             }
         }
-    }
-
-    /// draw a point on this framebuffer
-    pub fn draw_point(&mut self, coordinate: Coord, color: AlphaPixel) {
-        let idx = match self.index(coordinate) {
-            Some(index) => { index },
-            None => { return }
-        };
-        self.buffer[idx] = color.to_pixel();
-    }
-
-    /// draw a point on this framebuffer with alpha
-    pub fn draw_point_alpha(&mut self, coordinate: Coord, color: AlphaPixel) {
-        let idx = match self.index(coordinate) {
-            Some(index) => { index },
-            None => { return }
-        };
-        let origin = AlphaPixel::from(self.buffer[idx]);
-        self.buffer[idx] = AlphaPixel::from(color).alpha_mix(origin).to_pixel();
     }
 
     /// draw a rectangle on this framebuffer
@@ -179,7 +153,7 @@ impl FrameBufferAlpha {
         for y in ys..ye {
             for x in xs..xe {
                 let coordinate = Coord::new(x as isize, y as isize);
-                self.draw_point(coordinate, color);
+                self.draw_pixel(coordinate, color);
             }
         }
     }
@@ -190,7 +164,7 @@ impl FrameBufferAlpha {
         for y in ys..ye {
             for x in xs..xe {
                 let coordinate = Coord::new(x as isize, y as isize);
-                self.draw_point_alpha(coordinate, color);
+                self.draw_pixel_alpha(coordinate, color);
             }
         }
     }
@@ -205,7 +179,7 @@ impl FrameBufferAlpha {
                     let xd = x as isize - xc as isize;
                     let yd = y as isize - yc as isize;
                     if xd*xd + yd*yd <= r2 {
-                        self.draw_point_alpha(Coord::new(x as isize, y as isize), color);
+                        self.draw_pixel_alpha(Coord::new(x as isize, y as isize), color);
                     }
                 }
             }
@@ -219,7 +193,7 @@ impl FrameBufferAlpha {
             for xi in 0..8 {
                 const HIGHEST_BIT: u8 = 0x80;
                 if char_font & (HIGHEST_BIT >> xi) != 0 {
-                    self.draw_point_alpha(coordinate + (xi as isize, yi as isize), color);
+                    self.draw_pixel_alpha(coordinate + (xi as isize, yi as isize), color);
                 }
             }
         }
@@ -244,65 +218,85 @@ impl FrameBuffer for FrameBufferAlpha {
     }
 
     fn draw_pixel(&mut self, coordinate: Coord, color: Pixel) {
-        if let Some(index) = self.index(coordinate) {
-            self.buffer[index] = color;
-        }
+        if let Some(idx) = self.index(coordinate) {
+            self.buffer[idx] = color;
+        };
+    }
+
+    fn draw_pixel_alpha(&mut self, coordinate: Coord, color: AlphaPixel) {
+        let idx = match self.index(coordinate) {
+            Some(index) => { index },
+            None => { return }
+        };
+        let origin = AlphaPixel::from(self.buffer[idx]);
+        self.buffer[idx] = AlphaPixel::from(color).alpha_mix(origin);
     }
 }
 
-impl AlphaPixel {
+pub trait PixelCompositor {
+   /// mix two color using alpha channel composition, supposing `self` is on the top of `other` pixel.
+    fn alpha_mix(self, other: Self) -> Self;
+
+    /// mix two color linearly with a float number, with mix `self` and (1-mix) `other`. If mix is outside range of [0, 1], black will be returned
+    fn color_mix(self, other: Self, mix: f32) -> Self;
+
+    fn get_alpha(&self) -> u8;
+
+    fn get_red(&self) -> u8;
+
+    fn get_green(&self) -> u8;
+
+    fn get_blue(&self) -> u8;
+}
+
+impl PixelCompositor for AlphaPixel {
     /// mix two color using alpha channel composition, supposing `self` is on the top of `other` pixel.
-    pub fn alpha_mix(self, other: Self) -> Self {
-        let alpha = self.alpha as u16;
-        let red = self.red;
-        let green = self.green;
-        let blue = self.blue;
-        let ori_red = other.red;
-        let ori_green = other.green;
-        let ori_blue = other.blue;
+    fn alpha_mix(self, other: Self) -> Self {
+        let alpha = self.get_alpha() as u16;
+        let red = self.get_red();
+        let green = self.get_green();
+        let blue = self.get_blue();
+        let ori_red = other.get_red();
+        let ori_green = other.get_green();
+        let ori_blue = other.get_blue();
         let new_red = (((red as u16) * (255 - alpha) + (ori_red as u16) * alpha) / 255) as u8;
         let new_green = (((green as u16) * (255 - alpha) + (ori_green as u16) * alpha) / 255) as u8;
         let new_blue = (((blue as u16) * (255 - alpha) + (ori_blue as u16) * alpha) / 255) as u8;
-        Self {
-            alpha: other.alpha, 
-            red: new_red,
-            green: new_green,
-            blue: new_blue
-        }
+        return new_alpha_pixel(other.get_alpha(), new_red, new_green, new_blue);
     }
 
     /// mix two color linearly with a float number, with mix `self` and (1-mix) `other`. If mix is outside range of [0, 1], black will be returned
-    pub fn color_mix(self, other: Self, mix: f32) -> Self {
+    fn color_mix(self, other: Self, mix: f32) -> Self {
         if mix < 0f32 || mix > 1f32 {  // cannot mix value outside [0, 1]
             return BLACK;
         }
-        let new_alpha = ((self.alpha as f32) * mix + (other.alpha as f32) * (1f32-mix)) as u8;
-        let new_red = ((self.red as f32) * mix + (other.red as f32) * (1f32-mix)) as u8;
-        let new_green = ((self.green as f32) * mix + (other.green as f32) * (1f32-mix)) as u8;
-        let new_blue = ((self.blue as f32) * mix + (other.blue as f32) * (1f32-mix)) as u8;
-        AlphaPixel {
-            alpha: new_alpha, 
-            red: new_red,
-            green: new_green,
-            blue: new_blue
-        }
+        let new_alpha = ((self.get_alpha() as f32) * mix + (other.get_alpha() as f32) * (1f32-mix)) as u8;
+        let new_red = ((self.get_red() as f32) * mix + (other.get_red() as f32) * (1f32-mix)) as u8;
+        let new_green = ((self.get_green() as f32) * mix + (other.get_green() as f32) * (1f32-mix)) as u8;
+        let new_blue = ((self.get_blue() as f32) * mix + (other.get_blue() as f32) * (1f32-mix)) as u8;
+        return new_alpha_pixel(new_alpha, new_red, new_green, new_blue);
     }
 
-    pub fn to_pixel(&self) -> Pixel {
-        ((self.alpha as u32) << 24) +
-            ((self.red as u32) << 16) +
-            ((self.green as u32) << 8) +
-            (self.blue as u32)
+    fn get_alpha(&self) -> u8 {
+        (self >> 42) as u8
+    }
+
+    fn get_red(&self) -> u8 {
+        (self >> 16) as u8
+    }
+
+    fn get_green(&self) -> u8 {
+        (self >> 8) as u8
+    }
+
+    fn get_blue(&self) -> u8 {
+        self.clone() as u8
     }
 }
 
-impl From<Pixel> for AlphaPixel {
-    fn from(item: Pixel) -> Self {
-        AlphaPixel {
-            alpha: (item >> 24) as u8,
-            red: (item >> 16) as u8,
-            green: (item >> 8) as u8,
-            blue: item as u8
-        }
-    }
+pub fn new_alpha_pixel(alpha: u8, red: u8, green: u8, blue: u8) -> AlphaPixel {
+    return ((alpha as u32) << 24) +
+        ((red as u32) << 16) +
+        ((green as u32) << 8) +
+        (blue as u32) 
 }

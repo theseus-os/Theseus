@@ -31,10 +31,10 @@ use alloc::vec::Vec;
 use core::ops::{Deref};
 use dfqueue::{DFQueue, DFQueueConsumer, DFQueueProducer};
 use event_types::{Event, MousePositionEvent};
-use frame_buffer_alpha::{ AlphaPixel, BLACK };
+use frame_buffer_alpha::{ AlphaPixel, BLACK, PixelCompositor };
 use spin::{Mutex};
 use window_manager_alpha::WindowObjAlpha;
-use frame_buffer::{Coord};
+use frame_buffer::{Coord, FrameBuffer};
 
 /// The title bar size, in number of pixels
 const WINDOW_TITLE_BAR: usize = 15;
@@ -43,19 +43,19 @@ const WINDOW_BORDER: usize = 2;
 /// border radius, in number of pixels
 const WINDOW_RADIUS: usize = 5;
 /// default background color
-const WINDOW_BACKGROUND: AlphaPixel = AlphaPixel { alpha: 0x40, red: 0xFF, green: 0xFF, blue: 0xFF };
+const WINDOW_BACKGROUND: AlphaPixel = 0x40FFFFFF;
 /// border and title bar color when window is inactive
-const WINDOW_BORDER_COLOR_INACTIVE: AlphaPixel = AlphaPixel { alpha: 0x00, red: 0x33, green: 0x33, blue: 0x33 };
+const WINDOW_BORDER_COLOR_INACTIVE: AlphaPixel = 0x00333333;
 /// border and title bar color when window is active, the top part color
-const WINDOW_BORDER_COLOR_ACTIVE_TOP: AlphaPixel = AlphaPixel { alpha: 0x00, red: 0xBB, green: 0xBB, blue: 0xBB };
+const WINDOW_BORDER_COLOR_ACTIVE_TOP: AlphaPixel = 0x00BBBBBB;
 /// border and title bar color when window is active, the bottom part color
-const WINDOW_BORDER_COLOR_ACTIVE_BOTTOM: AlphaPixel = AlphaPixel { alpha: 0x00, red: 0x66, green: 0x66, blue: 0x66 };
+const WINDOW_BORDER_COLOR_ACTIVE_BOTTOM: AlphaPixel = 0x00666666;
 /// window button color: red
-const WINDOW_BUTTON_COLOR_CLOSE: AlphaPixel = AlphaPixel { alpha: 0x00, red: 0xE7, green: 0x4C, blue: 0x3C };
+const WINDOW_BUTTON_COLOR_CLOSE: AlphaPixel = 0x00E74C3C;
 /// window button color: green
-const WINDOW_BUTTON_COLOR_MINIMIZE_MAMIMIZE: AlphaPixel = AlphaPixel { alpha: 0x00, red: 0x23, green: 0x9B, blue: 0x56 };
+const WINDOW_BUTTON_COLOR_MINIMIZE_MAMIMIZE: AlphaPixel = 0x00239B56;
 /// window button color: purple
-const WINDOW_BUTTON_COLOR_HIDE: AlphaPixel = AlphaPixel { alpha: 0x00, red: 0x7D, green: 0x3C, blue: 0x98 };
+const WINDOW_BUTTON_COLOR_HIDE: AlphaPixel = 0x007D3C98;
 /// window button margin from left, in number of pixels
 const WINDOW_BUTTON_BIAS_X: usize = 12;
 /// the interval between buttons, in number of pixels
@@ -190,8 +190,8 @@ impl WindowComponents {
                 let dx1 = WINDOW_RADIUS - i;
                 let dy1 = WINDOW_RADIUS - j;
                 if dx1*dx1 + dy1*dy1 > r2 {  // draw this to transparent
-                    winobj.framebuffer.draw_point(Coord::new(i as isize, j as isize), 0xFFFFFFFF.into());
-                    winobj.framebuffer.draw_point(Coord::new((width-i-1) as isize, j as isize), 0xFFFFFFFF.into());
+                    winobj.framebuffer.draw_pixel(Coord::new(i as isize, j as isize), 0xFFFFFFFF);
+                    winobj.framebuffer.draw_pixel(Coord::new((width-i-1) as isize, j as isize), 0xFFFFFFFF);
                 }
             }
         }
@@ -440,11 +440,11 @@ impl TextArea {
             },
             background_color: match background_color {
                 Some(m) => m,
-                _ => 0xFFFFFFFF.into(),  // default is a transparent one
+                _ => 0xFFFFFFFF,  // default is a transparent one
             },
             text_color: match text_color {
                 Some(m) => m,
-                _ => 0x00000000.into(),  // default is an opaque black
+                _ => 0x00000000,  // default is an opaque black
             },
             x_cnt: 0,  // will modify later
             y_cnt: 0,  // will modify later
@@ -509,9 +509,9 @@ impl TextArea {
                             let nx = wx + i;
                             let ny = wy + j;
                             if char_font & (0x80u8 >> i) != 0 {
-                                winobj.framebuffer.draw_point(Coord::new(nx as isize, ny as isize), self.text_color);
+                                winobj.framebuffer.draw_pixel(Coord::new(nx as isize, ny as isize), self.text_color);
                             } else {
-                                winobj.framebuffer.draw_point(Coord::new(nx as isize, ny as isize), self.background_color);
+                                winobj.framebuffer.draw_pixel(Coord::new(nx as isize, ny as isize), self.background_color);
                             }
                         }
                     }

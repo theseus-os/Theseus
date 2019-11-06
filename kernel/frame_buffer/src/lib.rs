@@ -64,6 +64,8 @@ pub trait FrameBuffer {
         coordinate.x < buffer_width as isize && coordinate.x + width as isize >= 0
             && coordinate.y < buffer_height as isize && coordinate.y + height as isize>= 0
     }
+
+    fn draw_pixel_alpha(&mut self, coordinate: Coord, color: Pixel);
 }
 
 /// Gets the size of the final framebuffer.

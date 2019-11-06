@@ -129,4 +129,8 @@ impl FrameBuffer for FrameBufferRGB {
             self.buffer[index] = color;
         }
     }
+
+    fn draw_pixel_alpha(&mut self, coordinate: Coord, color: Pixel) {
+        self.draw_pixel(coordinate, color)
+    }
 }
