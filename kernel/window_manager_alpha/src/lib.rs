@@ -29,6 +29,7 @@ extern crate scheduler;
 extern crate frame_buffer;
 extern crate frame_buffer_compositor;
 extern crate compositor;
+extern crate window;
 
 mod background;
 use alloc::collections::VecDeque;
@@ -47,6 +48,7 @@ use path::Path;
 use frame_buffer::{FrameBuffer, Coord};
 use compositor::Compositor;
 use frame_buffer_compositor::{FrameBufferBlocks, FRAME_COMPOSITOR};
+use window::Window;
 
 static WINDOW_MANAGER: Once<Mutex<WindowManagerAlpha<FrameBufferAlpha>>> = Once::new();
 
@@ -83,6 +85,7 @@ const WINDOW_BORDER_SIZE: usize = 3;
 const WINDOW_BORDER_COLOR_INNER: AlphaPixel = 0x00CA6F1E;
 /// border's outer color
 const WINDOW_BORDER_COLOR_OUTTER: AlphaPixel = 0xFFFFFFFF;
+const WINDOW_BACKGROUND: AlphaPixel = 0x40FFFFFF;
 
 /// a 2D point
 struct Point {
@@ -105,11 +108,11 @@ struct RectRegion {
 /// window manager with overlapping and alpha enabled
 struct WindowManagerAlpha<T: FrameBuffer> {
     /// those window currently not shown on screen
-    hide_list: VecDeque<Weak<Mutex<WindowObjAlpha>>>,
+    hide_list: VecDeque<Weak<Mutex<WindowAlpha>>>,
     /// those window shown on screen that may overlapping each other
-    show_list: VecDeque<Weak<Mutex<WindowObjAlpha>>>,
+    show_list: VecDeque<Weak<Mutex<WindowAlpha>>>,
     /// the only active window, receiving all keyboard events (except for those remained for WM)
-    active: Weak<Mutex<WindowObjAlpha>>,  // this one is not in show_list
+    active: Weak<Mutex<WindowAlpha>>,  // this one is not in show_list
     /// current mouse position
     mouse: Point,
     /// If a window is being repositioned (e.g., by dragging it), this is the position of that window's border
@@ -123,7 +126,7 @@ struct WindowManagerAlpha<T: FrameBuffer> {
 impl <T: FrameBuffer> WindowManagerAlpha<T> {
 
     /// set one window to active, push last active (if exists) to top of show_list. if `refresh` is `true`, will then refresh the window's area
-    pub fn set_active(&mut self, objref: &Arc<Mutex<WindowObjAlpha>>, refresh: bool) -> Result<(), &'static str> {
+    pub fn set_active(&mut self, objref: &Arc<Mutex<WindowAlpha>>, refresh: bool) -> Result<(), &'static str> {
         let (x_start, x_end, y_start, y_end) = {
             let winobj = objref.lock();
             let x_start = winobj.x; let y_start = winobj.y;
@@ -158,7 +161,7 @@ impl <T: FrameBuffer> WindowManagerAlpha<T> {
     }
 
     /// judge whether this window is in hide list and return the index of it
-    fn is_window_in_show_list(&mut self, objref: &Arc<Mutex<WindowObjAlpha>>) -> Option<usize> {
+    fn is_window_in_show_list(&mut self, objref: &Arc<Mutex<WindowAlpha>>) -> Option<usize> {
         let mut i = 0_usize;
         for item in self.show_list.iter() {
             if let Some(item_ptr) = item.upgrade() {
@@ -172,7 +175,7 @@ impl <T: FrameBuffer> WindowManagerAlpha<T> {
     }
 
     /// judge whether this window is in hide list and return the index of it
-    fn is_window_in_hide_list(&mut self, objref: &Arc<Mutex<WindowObjAlpha>>) -> Option<usize> {
+    fn is_window_in_hide_list(&mut self, objref: &Arc<Mutex<WindowAlpha>>) -> Option<usize> {
         let mut i = 0_usize;
         for item in self.hide_list.iter() {
             if let Some(item_ptr) = item.upgrade() {
@@ -186,7 +189,7 @@ impl <T: FrameBuffer> WindowManagerAlpha<T> {
     }
 
     /// delete one window if exists, refresh its region then
-    fn delete_window(&mut self, objref: &Arc<Mutex<WindowObjAlpha>>) -> Result<(), &'static str> {
+    fn delete_window(&mut self, objref: &Arc<Mutex<WindowAlpha>>) -> Result<(), &'static str> {
         let (x_start, x_end, y_start, y_end) = {
             let winobj = objref.lock();
             let x_start = winobj.x; let y_start = winobj.y;
@@ -593,19 +596,19 @@ impl <T: FrameBuffer> WindowManagerAlpha<T> {
 }
 
 /// delete the given window by removing it from any lists, then refresh the region so that it is deleted on screen
-pub fn delete_window(objref: &Arc<Mutex<WindowObjAlpha>>) -> Result<(), &'static str> {
+pub fn delete_window(objref: &Arc<Mutex<WindowAlpha>>) -> Result<(), &'static str> {
     let mut win = WINDOW_MANAGER.try().ok_or("The static window manager was not yet initialized")?.lock();
     win.delete_window(objref)
 }
 
 /// set window as active, the active window is always at top, so it will refresh the region of this window
-pub fn set_active(objref: &Arc<Mutex<WindowObjAlpha>>) -> Result<(), &'static str> {
+pub fn set_active(objref: &Arc<Mutex<WindowAlpha>>) -> Result<(), &'static str> {
     let mut win = WINDOW_MANAGER.try().ok_or("The static window manager was not yet initialized")?.lock();
     win.set_active(objref, true)
 }
 
 /// whether a window is active
-pub fn is_active(objref: &Arc<Mutex<WindowObjAlpha>>) -> bool {
+pub fn is_active(objref: &Arc<Mutex<WindowAlpha>>) -> bool {
     match WINDOW_MANAGER.try().ok_or("The static window manager was not yet initialized") {
         Ok(mtx) => {
             let win = mtx.lock();
@@ -731,7 +734,7 @@ pub fn init(
 }
 
 /// Window object that should be owned by application
-pub struct WindowObjAlpha {
+pub struct WindowAlpha {
     /// absolute position of this window, the number of pixels to the left of the screen
     pub x: isize,
     /// absolute position of this window, the number of pixels to the top of the screen
@@ -753,6 +756,53 @@ pub struct WindowObjAlpha {
     pub is_moving: bool,
     /// the base position of window moving action, should be the mouse position when `is_moving` is set to true
     pub moving_base: (isize, isize),
+}
+
+impl Window for WindowAlpha {
+    // Wenqiu: TODO implement the methods
+    fn clear(&mut self) -> Result<(), &'static str> {
+        self.framebuffer.fill_color(0x80FFFFFF);
+        Ok(())
+    }
+
+    fn contains(&self, coordinate: Coord) -> bool {
+        true
+    }
+    
+    fn set_active(&mut self, active: bool) -> Result<(), &'static str> {
+        Ok(())
+    }
+
+    fn draw_border(&self, color: u32) -> Result<(), &'static str> {
+        Ok(())
+    }
+
+    /// Adjusts the size (width, height) and coordinate of the window relative to the top-left corner of the screen.
+    fn resize(
+        &mut self,
+        coordinate: Coord,
+        width: usize,
+        height: usize,
+    ) -> Result<(usize, usize), &'static str> {
+        // TODO
+        Ok((0, 0))
+    }
+
+    /// Gets the size of content without padding.
+    fn get_content_size(&self) -> (usize, usize) {
+        (self.width, self.height)
+    }
+
+    /// Gets the coordinate of content relative to top-left corner of the window without padding.
+    fn get_content_position(&self) -> Coord {
+        // TODO
+        Coord::new(0, 0)
+    }
+
+    /// Gets the producer of events.
+    fn events_producer(&mut self) -> &mut DFQueueProducer<Event> {
+        &mut self.producer
+    }
 }
 
 /// handles all keyboard and mouse movement in this window manager
@@ -928,7 +978,7 @@ fn move_cursor_to(nx: usize, ny: usize) -> Result<(), &'static str> {
 /// new window object with given position and size
 pub fn new_window<'a>(
     x: isize, y: isize, width: usize, height: usize,
-) -> Result<Arc<Mutex<WindowObjAlpha>>, &'static str> {
+) -> Result<Arc<Mutex<WindowAlpha>>, &'static str> {
 
     // Init the key input producer and consumer
     let consumer = DFQueue::new().into_consumer();
@@ -936,10 +986,9 @@ pub fn new_window<'a>(
 
     // Init the frame buffer of the window
     let mut framebuffer = FrameBufferAlpha::new(width, height, None)?;
-    framebuffer.fill_color(0x80FFFFFF);  // draw with half transparent white
 
     // new window object
-    let window: WindowObjAlpha = WindowObjAlpha {
+    let mut window: WindowAlpha = WindowAlpha {
         x: x,
         y: y,
         width: width,
@@ -952,6 +1001,7 @@ pub fn new_window<'a>(
         moving_base: (0, 0),  // the point as a base to start moving
     };
 
+    window.clear()?;
     let window_ref = Arc::new(Mutex::new(window));
     let mut win = WINDOW_MANAGER.try().ok_or("The static window manager was not yet initialized")?.lock();
     win.set_active(&window_ref, false)?;  // do not refresh now for better speed

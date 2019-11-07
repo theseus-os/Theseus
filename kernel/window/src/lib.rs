@@ -15,7 +15,7 @@ use frame_buffer::Coord;
 /// A `Window` provides states required by the window manager such as the size, the loaction and the active state of a window.
 pub trait Window {
     /// Clears the window on the screen including the border and padding.
-    fn clear(&self) -> Result<(), &'static str>;
+    fn clear(&mut self) -> Result<(), &'static str>;
 
     /// Checks if the coordinate relative to the top-left corner of the window is within it exluding the border and padding.
     fn contains(&self, coordinate: Coord) -> bool;

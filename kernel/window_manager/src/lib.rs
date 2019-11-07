@@ -365,7 +365,7 @@ pub struct WindowProfile {
 }
 
 impl Window for WindowProfile {
-    fn clear(&self) -> Result<(), &'static str> {
+    fn clear(&mut self) -> Result<(), &'static str> {
         let buffer_ref = match DESKTOP_FRAME_BUFFER.try() {
             Some(buffer) => buffer,
             None => return Err("Fail to get the virtual frame buffer"),

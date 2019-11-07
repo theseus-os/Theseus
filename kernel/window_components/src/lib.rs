@@ -33,7 +33,7 @@ use dfqueue::{DFQueue, DFQueueConsumer, DFQueueProducer};
 use event_types::{Event, MousePositionEvent};
 use frame_buffer_alpha::{ AlphaPixel, BLACK, PixelMixer };
 use spin::{Mutex};
-use window_manager_alpha::WindowObjAlpha;
+use window_manager_alpha::WindowAlpha;
 use frame_buffer::{Coord, FrameBuffer};
 
 /// The title bar size, in number of pixels
@@ -87,7 +87,7 @@ impl From<usize> for TopButton {
 /// abstraction of a window, providing title bar which helps user moving, close, maximize or minimize window
 pub struct WindowComponents {
     /// the window object that could be used to initialize components
-    pub winobj: Arc<Mutex<WindowObjAlpha>>,
+    pub winobj: Arc<Mutex<WindowAlpha>>,
     /// the width of border, init as WINDOW_BORDER. the border is still part of the window and remains flexibility for user to change border style or remove border. However, for most application a border is useful for user to identify the region.
     border_size: usize,
     /// the height of title bar in pixel, init as WINDOW_TITLE_BAR. it is render inside the window so user shouldn't use this area anymore
@@ -215,7 +215,7 @@ impl WindowComponents {
     }
 
     /// show three button with status. state = 0,1,2 for three different color
-    fn show_button(& self, button: TopButton, state: usize, winobj: &mut WindowObjAlpha) {
+    fn show_button(& self, button: TopButton, state: usize, winobj: &mut WindowAlpha) {
         let y = self.title_size / 2;
         let x = WINDOW_BUTTON_BIAS_X + WINDOW_BUTTON_BETWEEN * match button {
             TopButton::Close => 0,
@@ -407,7 +407,7 @@ pub struct TextArea {
     /// the y dimension char count
     y_cnt: usize,
     char_matrix: Vec<u8>,
-    winobj: Weak<Mutex<WindowObjAlpha>>,
+    winobj: Weak<Mutex<WindowAlpha>>,
     next_index: usize,
 }
 
@@ -421,7 +421,7 @@ impl TextArea {
     /// * `column_spacing`: the spacing between chars, default to 1
     /// * `background_color`: the background color, default to transparent
     /// * `text_color`: the color of text, default to opaque black
-    pub fn new(x: usize, y: usize, width: usize, height: usize, winobj: &Arc<Mutex<WindowObjAlpha>>
+    pub fn new(x: usize, y: usize, width: usize, height: usize, winobj: &Arc<Mutex<WindowAlpha>>
             , line_spacing: Option<usize>, column_spacing: Option<usize>
             , background_color: Option<AlphaPixel>, text_color: Option<AlphaPixel>)
         -> Result<Arc<Mutex<TextArea>>, &'static str> {
