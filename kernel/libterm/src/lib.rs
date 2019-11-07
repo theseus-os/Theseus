@@ -774,9 +774,7 @@ impl Terminal {
         } else {
             col_num * CHARACTER_WIDTH
         };
-
-        let block = vec![(cursor_line, text_width)];
-        self.window.render(Some(block.into_iter()))*/
+        */
     }
 
     /// Gets the position of the cursor relative to the end of text in units of characters.
@@ -893,8 +891,8 @@ impl Cursor {
             } else {
                 textarea.lock().set_char(col, line, self.underlying_char)?;
             }
+            window_manager_alpha::render(None)?
         }
-
         Ok(())
     }
 

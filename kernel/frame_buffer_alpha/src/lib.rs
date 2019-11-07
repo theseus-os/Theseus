@@ -21,7 +21,8 @@ use alloc::boxed::Box;
 use core::ops::DerefMut;
 use memory::{EntryFlags, FrameRange, MappedPages,PhysicalAddress, FRAME_ALLOCATOR};
 use owning_ref::BoxRefMut;
-use frame_buffer::{FrameBuffer, Pixel, Coord};
+use frame_buffer::{FrameBuffer, Pixel, Coord, FINAL_FRAME_BUFFER};
+use spin::Mutex;
 
 /// A `Pixel` is a `u32` broken down into four bytes. 
 /// The lower 24 bits of a Pixel specify its RGB color values, while the upper 8bit is an `alpha` channel,
@@ -38,7 +39,7 @@ pub const WHITE: AlphaPixel = 0x00FFFFFF;
 const PIXEL_BYTES: usize = core::mem::size_of::<AlphaPixel>();
 
 /// Initialize the final frame buffer by allocating a block of memory and map it to the physical framebuffer frames.
-pub fn init() -> Result<FrameBufferAlpha, &'static str> {
+pub fn init() -> Result<(usize, usize), &'static str> {
     // Get the graphic mode information
     let vesa_display_phys_start: PhysicalAddress;
     let buffer_width: usize;
@@ -54,11 +55,12 @@ pub fn init() -> Result<FrameBufferAlpha, &'static str> {
     };
 
     debug!("frame_buffer_alpha init with width({}) height({})", buffer_width, buffer_height);
+    // init the final framebuffer
+    let framebuffer =
+        FrameBufferAlpha::new(buffer_width, buffer_height, Some(vesa_display_phys_start))?;
+    FINAL_FRAME_BUFFER.call_once(|| Mutex::new(Box::new(framebuffer)));
 
-    // Initialize the final framebuffer
-    let framebuffer = FrameBufferAlpha::new(buffer_width, buffer_height, Some(vesa_display_phys_start))?;
-
-    Ok(framebuffer)
+    Ok((buffer_width, buffer_height))
 }
 
 /// The frame buffer struct of either virtual frame buffer or physical frame buffer. It contains the size of the buffer and a buffer array

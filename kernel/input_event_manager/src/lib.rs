@@ -75,29 +75,10 @@ pub fn init() -> Result<(DFQueueProducer<Event>, DFQueueProducer<Event>), &'stat
         .ok_or("Couldn't find terminal application in default app namespace")?;
 
     // init frame_buffer_alpha
-    let rs = frame_buffer_alpha::init();
-    let final_fb = match rs {
-        Ok(final_fb) => {
-            trace!("Frame_buffer_alpha initialized successfully.");
-            final_fb
-        }
-        Err(err) => { 
-            error!("captain::init(): failed to initialize frame_buffer_alpha");
-            return Err(err);
-        }
-    };
+    let (width, height) = frame_buffer_alpha::init()?;
 
     // init window manager_alpha
-    let rs = window_manager_alpha::init(keyboard_event_handling_consumer, mouse_event_handling_consumer, final_fb);
-    match rs {
-        Ok(_) => {
-            trace!("window manager alpha initialized successfully.");
-        }
-        Err(err) => { 
-            error!("captain::init(): failed to initialize window manager alpha");
-            return Err(err);
-        }
-    }
+    window_manager_alpha::init(keyboard_event_handling_consumer, mouse_event_handling_consumer, width, height)?;
 
     // Spawns the terminal print crate so that we can print to the terminal
     ApplicationTaskBuilder::new(terminal_print_path)

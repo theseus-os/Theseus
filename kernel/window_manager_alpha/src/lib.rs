@@ -27,12 +27,14 @@ extern crate keycodes_ascii;
 extern crate path;
 extern crate scheduler;
 extern crate frame_buffer;
+extern crate frame_buffer_compositor;
+extern crate compositor;
 
 mod background;
 use alloc::collections::VecDeque;
 use alloc::string::{String, ToString};
 use alloc::sync::{Arc, Weak};
-use alloc::vec::Vec;
+use alloc::vec::{Vec, IntoIter};
 use core::ops::Deref;
 use dfqueue::{DFQueue, DFQueueConsumer, DFQueueProducer};
 use event_types::{Event, MousePositionEvent};
@@ -43,6 +45,8 @@ use mouse_data::MouseEvent;
 use keycodes_ascii::{KeyEvent, Keycode, KeyAction};
 use path::Path;
 use frame_buffer::{FrameBuffer, Coord};
+use compositor::Compositor;
+use frame_buffer_compositor::{FrameBufferBlocks, FRAME_COMPOSITOR};
 
 static WINDOW_MANAGER: Once<Mutex<WindowManagerAlpha<FrameBufferAlpha>>> = Once::new();
 
@@ -678,16 +682,28 @@ pub fn refresh_area_absolute(x_start: isize, x_end: isize, y_start: isize, y_end
     }
 }
 
+pub fn render(blocks: Option<IntoIter<(usize, usize)>>) -> Result<(), &'static str> {
+    let mut win = WINDOW_MANAGER.try().ok_or("The static window manager was not yet initialized")?.lock();
+    let frame_buffer_blocks = FrameBufferBlocks {
+        framebuffer: &win.final_fb,
+        coordinate: Coord::new(0, 0),
+        blocks: blocks
+    };
+    FRAME_COMPOSITOR.lock().composite(vec![frame_buffer_blocks].into_iter())
+}
+
 /// Initialize the window manager, should provide the consumer of keyboard and mouse event, as well as a frame buffer to draw
 pub fn init(
     key_consumer: DFQueueConsumer<Event>,
     mouse_consumer: DFQueueConsumer<Event>,
-    final_fb: FrameBufferAlpha
+    width: usize,
+    height: usize,
 ) -> Result<(), &'static str> {
     debug!("Initializing the window manager alpha (transparency)...");
 
     // initialize static window manager
     let delay_refresh_first_time = true;
+    let final_fb = FrameBufferAlpha::new(width, height, None)?;
     let window_manager = WindowManagerAlpha {
         hide_list: VecDeque::new(),
         show_list: VecDeque::new(),
@@ -705,12 +721,12 @@ pub fn init(
     win.mouse = Point { x: screen_width/2, y: screen_height/2 };  // set mouse to middle
     if ! delay_refresh_first_time {
         win.refresh_area(0, screen_width as isize, 0, screen_height as isize)?;
+        //TODO: render it if necessary
     }
 
     KernelTaskBuilder::new(window_manager_loop, (key_consumer, mouse_consumer) )
         .name("window_manager_loop".to_string())
         .spawn()?;
-
     Ok(())
 }
 

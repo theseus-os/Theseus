@@ -366,7 +366,8 @@ impl WindowComponents {
                 error!("do_move_active_window failed {}", err);
             }
         }
-        Ok(())
+
+        window_manager_alpha::render(None)
     }
 
     /// get space remained for border, in number of pixel. There is border on the left, right and bottom. 
@@ -579,6 +580,6 @@ impl TextArea {
                 }
             }
         }
-        Ok(())
+        window_manager_alpha::render(None)
     }
 }
