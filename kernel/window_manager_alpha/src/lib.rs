@@ -674,7 +674,6 @@ pub fn refresh_pixel_absolute(x: isize, y: isize) -> Result<(), &'static str> {
 /// refresh an area using abosolute position, will lock WINDOW_MANAGER
 pub fn refresh_area_absolute(x_start: isize, x_end: isize, y_start: isize, y_end: isize) -> Result<(), &'static str> {
     let mut win = WINDOW_MANAGER.try().ok_or("The static window manager was not yet initialized")?.lock();
-    trace!("Wenqiu: {}", win.delay_refresh_first_time);
     if win.delay_refresh_first_time {
         win.delay_refresh_first_time = false;
         let width = win.final_fb.width as isize;
