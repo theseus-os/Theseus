@@ -1295,7 +1295,6 @@ impl Shell {
                 need_refresh = true;
                 continue;
             }
-
             // Handles the cleanup of any application task that has finished running, returns whether we need
             // a new prompt or need to refresh the screen.
             let (need_refresh_on_task_event, need_prompt_on_task_event) = self.task_handler()?;

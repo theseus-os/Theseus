@@ -25,6 +25,7 @@ extern crate font;
 extern crate mouse;
 extern crate window_manager_alpha;
 extern crate frame_buffer;
+extern crate window;
 
 use alloc::sync::{Arc, Weak};
 use alloc::vec::Vec;
@@ -33,8 +34,9 @@ use dfqueue::{DFQueue, DFQueueConsumer, DFQueueProducer};
 use event_types::{Event, MousePositionEvent};
 use frame_buffer_alpha::{ AlphaPixel, BLACK, PixelMixer };
 use spin::{Mutex};
-use window_manager_alpha::WindowAlpha;
+use window_manager_alpha::{WindowAlpha, WINDOW_MANAGER};
 use frame_buffer::{Coord, FrameBuffer};
+use window::Window;
 
 /// The title bar size, in number of pixels
 const WINDOW_TITLE_BAR: usize = 15;
@@ -139,9 +141,10 @@ impl WindowComponents {
         let (x_start, x_end, y_start, y_end) = {
             let mut winobj = wincomps.winobj.lock();
             winobj.framebuffer.fill_color(wincomps.background);
-            let x_start = winobj.x;
+            let coordinate = winobj.get_content_position();
+            let x_start = coordinate.x;
             let x_end = x_start + winobj.width as isize;
-            let y_start = winobj.y;
+            let y_start = coordinate.y;
             let y_end = y_start + winobj.height as isize;
             (x_start, x_end, y_start, y_end)
         };
@@ -261,8 +264,9 @@ impl WindowComponents {
             self.last_is_active = is_active;
             let (bx, by) = {
                 let mut winobj = self.winobj.lock();
-                let bx = winobj.x;
-                let by = winobj.y;
+                let coordinate = winobj.get_content_position();
+                let bx = coordinate.x;
+                let by = coordinate.y;
                 self.show_button(TopButton::Close, 1, &mut winobj);
                 self.show_button(TopButton::MinimizeMaximize, 1, &mut winobj);
                 self.show_button(TopButton::Hide, 1, &mut winobj);
@@ -279,8 +283,9 @@ impl WindowComponents {
                 Some(ev) => ev,
                 _ => { return Ok(()); }
             };
-            let bx = winobj.x;
-            let by = winobj.y;
+            let coordinate = winobj.get_content_position();
+            let bx = coordinate.x;
+            let by = coordinate.y;
             match event.deref() {
                 &Event::KeyboardEvent(ref input_event) => {
                     let key_input = input_event.key_event;
@@ -288,10 +293,10 @@ impl WindowComponents {
                 }
                 &Event::MousePositionEvent(ref mouse_event) => {
                     // debug!("mouse_event: {:?}", mouse_event);
-                    if winobj.is_moving {  // only wait for left button up to exit this mode
+                    if winobj.is_moving() {  // only wait for left button up to exit this mode
                         if ! mouse_event.left_button_hold {
-                            winobj.is_moving = false;
-                            winobj.give_all_mouse_event = false;
+                            winobj.set_is_moving(false);
+                            winobj.set_give_all_mouse_event(false);
                             self.last_mouse_position_event = mouse_event.clone();
                             call_later_do_refresh_floating_border = true;
                             call_later_do_move_active_window = true;
@@ -325,9 +330,9 @@ impl WindowComponents {
                             }
                             // check if user push the title bar, which means user willing to move the window
                             if !is_three_button && !self.last_mouse_position_event.left_button_hold && mouse_event.left_button_hold {
-                                winobj.is_moving = true;
-                                winobj.give_all_mouse_event = true;
-                                winobj.moving_base = (mouse_event.gx, mouse_event.gy);
+                                winobj.set_is_moving(true);
+                                winobj.set_give_all_mouse_event(true);
+                                winobj.moving_base = Coord::new(mouse_event.gx, mouse_event.gy);
                                 call_later_do_refresh_floating_border = true;
                             }
                         } else {  // the region of components
@@ -384,9 +389,17 @@ impl WindowComponents {
 
 impl Drop for WindowComponents {
     fn drop(&mut self) {
-        if let Err(err) = window_manager_alpha::delete_window(&self.winobj) {
-            error!("delete_window failed {}", err);
+        match WINDOW_MANAGER.try().ok_or("The static window manager was not yet initialized") {
+            Ok(wm) => {
+                if let Err(err) = wm.lock().delete_window(&self.winobj) {
+                    error!("delete_window failed {}", err);
+                }
+            },
+            Err(err) => {
+                error!("delete_window failed {}", err);
+            }
         }
+       
     }
 }
 
@@ -502,8 +515,9 @@ impl TextArea {
                 let wy = self.y + y * (16 + self.line_spacing);
                 let (winx, winy) = {
                     let mut winobj = winobj_mutex.lock();
-                    let winx = winobj.x;
-                    let winy = winobj.y;
+                    let coordinate = winobj.get_content_position();
+                    let winx = coordinate.x;
+                    let winy = coordinate.y;
                     for j in 0..16 {
                         let char_font: u8 = font::FONT_BASIC[c as usize][j];
                         for i in 0..8 {

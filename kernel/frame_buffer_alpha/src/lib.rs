@@ -132,7 +132,7 @@ impl FrameBufferAlpha {
     }
 
     /// get one pixel at given position
-    pub fn get_pixel(& self, coordinate: Coord) -> Result<AlphaPixel, &'static str> {
+    pub fn get_pixel(& self, coordinate: Coord) -> Result<Pixel, &'static str> {
         let idx = match self.index(coordinate) {
             Some(index) => { index },
             None => { return Err("get pixel out of bound"); }

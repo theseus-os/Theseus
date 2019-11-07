@@ -45,12 +45,12 @@ use spawn::{KernelTaskBuilder, ApplicationTaskBuilder};
 use mouse_data::MouseEvent;
 use keycodes_ascii::{KeyEvent, Keycode, KeyAction};
 use path::Path;
-use frame_buffer::{FrameBuffer, Coord};
+use frame_buffer::{FrameBuffer, Coord, Pixel};
 use compositor::Compositor;
 use frame_buffer_compositor::{FrameBufferBlocks, FRAME_COMPOSITOR};
 use window::Window;
 
-static WINDOW_MANAGER: Once<Mutex<WindowManagerAlpha<FrameBufferAlpha>>> = Once::new();
+pub static WINDOW_MANAGER: Once<Mutex<WindowManagerAlpha<FrameBufferAlpha, WindowAlpha>>> = Once::new();
 
 /// The half size of mouse in number of pixels, the actual size of pointer is 1+2*`MOUSE_POINTER_HALF_SIZE`
 const MOUSE_POINTER_HALF_SIZE: usize = 7;
@@ -106,13 +106,13 @@ struct RectRegion {
 }
 
 /// window manager with overlapping and alpha enabled
-struct WindowManagerAlpha<T: FrameBuffer> {
+pub struct WindowManagerAlpha<T: FrameBuffer, U: Window> {
     /// those window currently not shown on screen
-    hide_list: VecDeque<Weak<Mutex<WindowAlpha>>>,
+    hide_list: VecDeque<Weak<Mutex<U>>>,
     /// those window shown on screen that may overlapping each other
-    show_list: VecDeque<Weak<Mutex<WindowAlpha>>>,
+    show_list: VecDeque<Weak<Mutex<U>>>,
     /// the only active window, receiving all keyboard events (except for those remained for WM)
-    active: Weak<Mutex<WindowAlpha>>,  // this one is not in show_list
+    active: Weak<Mutex<U>>,  // this one is not in show_list
     /// current mouse position
     mouse: Point,
     /// If a window is being repositioned (e.g., by dragging it), this is the position of that window's border
@@ -123,15 +123,17 @@ struct WindowManagerAlpha<T: FrameBuffer> {
     delay_refresh_first_time: bool,
 }
 
-impl <T: FrameBuffer> WindowManagerAlpha<T> {
+impl <T: FrameBuffer, U: Window> WindowManagerAlpha<T, U> {
 
     /// set one window to active, push last active (if exists) to top of show_list. if `refresh` is `true`, will then refresh the window's area
-    pub fn set_active(&mut self, objref: &Arc<Mutex<WindowAlpha>>, refresh: bool) -> Result<(), &'static str> {
+    pub fn set_active(&mut self, objref: &Arc<Mutex<U>>, refresh: bool) -> Result<(), &'static str> {
         let (x_start, x_end, y_start, y_end) = {
             let winobj = objref.lock();
-            let x_start = winobj.x; let y_start = winobj.y;
-            let x_end = x_start + winobj.width as isize;
-            let y_end = y_start + winobj.height as isize;
+            let coordinate = winobj.get_content_position();
+            let x_start = coordinate.x; let y_start = coordinate.y;
+            let (width, height) = winobj.get_content_size();
+            let x_end = x_start + width as isize;
+            let y_end = y_start + height as isize;
             (x_start, x_end, y_start, y_end)
         };
         // if it is currently actived, just return
@@ -161,7 +163,7 @@ impl <T: FrameBuffer> WindowManagerAlpha<T> {
     }
 
     /// judge whether this window is in hide list and return the index of it
-    fn is_window_in_show_list(&mut self, objref: &Arc<Mutex<WindowAlpha>>) -> Option<usize> {
+    fn is_window_in_show_list(&mut self, objref: &Arc<Mutex<U>>) -> Option<usize> {
         let mut i = 0_usize;
         for item in self.show_list.iter() {
             if let Some(item_ptr) = item.upgrade() {
@@ -175,7 +177,7 @@ impl <T: FrameBuffer> WindowManagerAlpha<T> {
     }
 
     /// judge whether this window is in hide list and return the index of it
-    fn is_window_in_hide_list(&mut self, objref: &Arc<Mutex<WindowAlpha>>) -> Option<usize> {
+    fn is_window_in_hide_list(&mut self, objref: &Arc<Mutex<U>>) -> Option<usize> {
         let mut i = 0_usize;
         for item in self.hide_list.iter() {
             if let Some(item_ptr) = item.upgrade() {
@@ -189,11 +191,13 @@ impl <T: FrameBuffer> WindowManagerAlpha<T> {
     }
 
     /// delete one window if exists, refresh its region then
-    fn delete_window(&mut self, objref: &Arc<Mutex<WindowAlpha>>) -> Result<(), &'static str> {
+    pub fn delete_window(&mut self, objref: &Arc<Mutex<U>>) -> Result<(), &'static str> {
         let (x_start, x_end, y_start, y_end) = {
             let winobj = objref.lock();
-            let x_start = winobj.x; let y_start = winobj.y;
-            let x_end = x_start + winobj.width as isize; let y_end = y_start + winobj.height as isize;
+            let coordinate = winobj.get_content_position();
+            let x_start = coordinate.x; let y_start = coordinate.y;
+            let (width, height) = winobj.get_content_size();
+            let x_end = x_start + width as isize; let y_end = y_start + height as isize;
             (x_start, x_end, y_start, y_end)
         };
         if let Some(current_active) = self.active.upgrade() {
@@ -234,11 +238,12 @@ impl <T: FrameBuffer> WindowManagerAlpha<T> {
             // first get current color, to determine whether further get colors below   
             let top = {
                 let winobj = now_winobj.lock();
-                let relative_x = (x as isize - winobj.x) as usize;
-                let relative_y = (y as isize - winobj.y) as usize;
+                let coordinate = winobj.get_content_position();
+                let relative_x = (x as isize - coordinate.x) as usize;
+                let relative_y = (y as isize - coordinate.y) as usize;
                 let mut ret = T;  // defult is transparent
-                if winobj.framebuffer.contains(Coord::new(relative_x as isize, relative_y as isize)) {
-                    let top = match winobj.framebuffer.get_pixel(Coord::new(relative_x as isize, relative_y as isize)) {
+                if winobj.contains(Coord::new(relative_x as isize, relative_y as isize)) {
+                    let top = match winobj.get_pixel(Coord::new(relative_x as isize, relative_y as isize)) {
                         Ok(m) => m,
                         Err(_) => T,  // transparent
                     };
@@ -266,10 +271,12 @@ impl <T: FrameBuffer> WindowManagerAlpha<T> {
         let sy = y as isize;
         if let Some(current_active) = self.active.upgrade() {
             let current_active_win = current_active.lock();
-            let relative_x = (sx - current_active_win.x) as usize;
-            let relative_y = (sy - current_active_win.y) as usize;
-            if current_active_win.framebuffer.contains(Coord::new(relative_x as isize,  relative_y as isize)) {
-                let top = current_active_win.framebuffer.get_pixel(Coord::new(relative_x as isize,  relative_y as isize))?;
+            let coordinate = current_active_win.get_content_position();
+
+            let relative_x = (sx - coordinate.x) as usize;
+            let relative_y = (sy - coordinate.y) as usize;
+            if current_active_win.contains(Coord::new(relative_x as isize,  relative_y as isize)) {
+                let top = current_active_win.get_pixel(Coord::new(relative_x as isize,  relative_y as isize))?;
                 if top.get_alpha() == 0 {  // totally opaque, so not waste computation
                     self.final_fb.draw_pixel(Coord::new(x as isize, y as isize), top);
                 } else {
@@ -418,8 +425,8 @@ impl <T: FrameBuffer> WindowManagerAlpha<T> {
     /// pass keyboard event to currently active window
     fn pass_keyboard_event_to_window(& self, key_event: KeyEvent) -> Result<(), &'static str> {
         if let Some(current_active) = self.active.upgrade() {
-            let current_active_win = current_active.lock();
-            current_active_win.producer.enqueue(Event::new_keyboard_event(key_event));
+            let mut current_active_win = current_active.lock();
+            current_active_win.events_producer().enqueue(Event::new_keyboard_event(key_event));
         }
         Err("cannot find window to pass key event")
     }
@@ -445,55 +452,59 @@ impl <T: FrameBuffer> WindowManagerAlpha<T> {
         // check if some application want all mouse_event
         // active
         if let Some(current_active) = self.active.upgrade() {
-            let current_active_win = current_active.lock();
-            let cx = current_active_win.x;
-            let cy = current_active_win.y;
-            if current_active_win.give_all_mouse_event {
+            let mut current_active_win = current_active.lock();
+            let coordinate = current_active_win.get_content_position();            
+            let cx = coordinate.x;
+            let cy = coordinate.y;
+            if current_active_win.give_all_mouse_event() {
                 event.x = x - cx;
                 event.y = y - cy;
-                current_active_win.producer.enqueue(Event::MousePositionEvent(event.clone()));
+                current_active_win.events_producer().enqueue(Event::MousePositionEvent(event.clone()));
             }
         }
         // show list
         for i in 0..self.show_list.len() {
             if let Some(now_winobj_mutex) = self.show_list[i].upgrade() {
-                let now_winobj = now_winobj_mutex.lock();
-                let cx = now_winobj.x;
-                let cy = now_winobj.y;
-                if now_winobj.give_all_mouse_event {
+                let mut now_winobj = now_winobj_mutex.lock();
+                let coordinate = now_winobj.get_content_position();
+                let cx = coordinate.x;
+                let cy = coordinate.y;
+                if now_winobj.give_all_mouse_event() {
                     event.x = x - cx;
                     event.y = y - cy;
-                    now_winobj.producer.enqueue(Event::MousePositionEvent(event.clone()));
+                    now_winobj.events_producer().enqueue(Event::MousePositionEvent(event.clone()));
                 }
             }
         }
 
         // first check the active one
         if let Some(current_active) = self.active.upgrade() {
-            let current_active_win = current_active.lock();
-            let cx = current_active_win.x;
-            let cy = current_active_win.y;
-            if current_active_win.framebuffer.contains(Coord::new((x - cx) as isize, (y - cy) as isize)) {
+            let mut current_active_win = current_active.lock();
+            let coordinate = current_active_win.get_content_position();
+            let cx = coordinate.x;
+            let cy = coordinate.y;
+            if current_active_win.contains(Coord::new((x - cx) as isize, (y - cy) as isize)) {
                 event.x = x - cx;
                 event.y = y - cy;
                 // debug!("pass to active: {}, {}", event.x, event.y);
-                current_active_win.producer.enqueue(Event::MousePositionEvent(event));
+                current_active_win.events_producer().enqueue(Event::MousePositionEvent(event));
                 return Ok(());
             }
-            if current_active_win.is_moving {  // do not pass the movement event to other windows
+            if current_active_win.is_moving() {  // do not pass the movement event to other windows
                 return Ok(());
             }
         }
         // then check show_list
         for i in 0..self.show_list.len() {
             if let Some(now_winobj_mutex) = self.show_list[i].upgrade() {
-                let now_winobj = now_winobj_mutex.lock();
-                let cx = now_winobj.x;
-                let cy = now_winobj.y;
-                if now_winobj.framebuffer.contains(Coord::new((x - cx) as isize, (y - cy) as isize)) {
+                let mut now_winobj = now_winobj_mutex.lock();
+                let coordinate = now_winobj.get_content_position();
+                let cx = coordinate.x;
+                let cy = coordinate.y;
+                if now_winobj.contains(Coord::new((x - cx) as isize, (y - cy) as isize)) {
                     event.x = x - cx;
                     event.y = y - cy;
-                    now_winobj.producer.enqueue(Event::MousePositionEvent(event));
+                    now_winobj.events_producer().enqueue(Event::MousePositionEvent(event));
                     return Ok(());
                 }
             }
@@ -575,15 +586,15 @@ impl <T: FrameBuffer> WindowManagerAlpha<T> {
                     let m = &self.mouse;
                     (m.x as isize, m.y as isize)
                 };
-                let (base_x, base_y) = current_active_win.moving_base;
-                let old_x = current_active_win.x;
-                let old_y = current_active_win.y;
+                let base = current_active_win.get_moving_base();
+                let (base_x, base_y) = (base.x, base.y);
+                let coordinate = current_active_win.get_content_position();
+                let old_x = coordinate.x;
+                let old_y = coordinate.y;
                 let new_x = old_x + (current_x - base_x);
                 let new_y = old_y + (current_y - base_y);
-                let width = current_active_win.width;
-                let height = current_active_win.height;
-                current_active_win.x = new_x;
-                current_active_win.y = new_y;
+                let (width, height) = current_active_win.get_content_size();
+                current_active_win.set_position(Coord::new(new_x, new_y));
                 (old_x, old_x + width as isize, old_y, old_y + height as isize, new_x, new_x + width as isize, new_y, new_y + height as isize)
             };
             // then try to reduce time on refresh old ones
@@ -596,10 +607,10 @@ impl <T: FrameBuffer> WindowManagerAlpha<T> {
 }
 
 /// delete the given window by removing it from any lists, then refresh the region so that it is deleted on screen
-pub fn delete_window(objref: &Arc<Mutex<WindowAlpha>>) -> Result<(), &'static str> {
+/*pub fn delete_window(objref: &Arc<Mutex<Window>>) -> Result<(), &'static str> {
     let mut win = WINDOW_MANAGER.try().ok_or("The static window manager was not yet initialized")?.lock();
     win.delete_window(objref)
-}
+}*/
 
 /// set window as active, the active window is always at top, so it will refresh the region of this window
 pub fn set_active(objref: &Arc<Mutex<WindowAlpha>>) -> Result<(), &'static str> {
@@ -635,11 +646,12 @@ pub fn do_refresh_floating_border() -> Result<(), &'static str> {
     if let Some(current_active) = win.active.upgrade() {
         let (is_draw, border_x_start, border_x_end, border_y_start, border_y_end) = {
             let current_active_win = current_active.lock();
-            if current_active_win.is_moving {  // move this window
+            if current_active_win.is_moving() {  // move this window
                 // for better performance, while moving window, only border is shown for indication
-                let current_x = current_active_win.x;
-                let current_y = current_active_win.y;
-                let (base_x, base_y) = current_active_win.moving_base;
+                let coordinate = current_active_win.get_content_position();
+                let (current_x, current_y) = (coordinate.x, coordinate.y);
+                let base = current_active_win.get_moving_base();
+                let (base_x, base_y) = (base.x, base.y);
                 let width = current_active_win.width;
                 let height = current_active_win.height;
                 let border_x_start = current_x + (new_x - base_x);
@@ -734,10 +746,7 @@ pub fn init(
 
 /// Window object that should be owned by application
 pub struct WindowAlpha {
-    /// absolute position of this window, the number of pixels to the left of the screen
-    pub x: isize,
-    /// absolute position of this window, the number of pixels to the top of the screen
-    pub y: isize,
+    pub coordinate: Coord,
     pub width: usize,
     pub height: usize,
     /// event consumer that could be used to get event input given to this window
@@ -754,7 +763,8 @@ pub struct WindowAlpha {
     /// and keeping mouse pressed when moving the mouse.
     pub is_moving: bool,
     /// the base position of window moving action, should be the mouse position when `is_moving` is set to true
-    pub moving_base: (isize, isize),
+    pub moving_base: Coord,
+    // Wenqiu: TODO add a moving base to the old window
 }
 
 impl Window for WindowAlpha {
@@ -765,7 +775,12 @@ impl Window for WindowAlpha {
     }
 
     fn draw_border(&self, color: u32) -> Result<(), &'static str> {
+        // this window uses component instead of border
         Ok(())
+    }
+
+    fn contains(&self, coordinate: Coord) -> bool {
+        self.framebuffer.contains(coordinate)
     }
 
     /// Adjusts the size (width, height) and coordinate of the window relative to the top-left corner of the screen.
@@ -779,7 +794,6 @@ impl Window for WindowAlpha {
         Ok((0, 0))
     }
 
-    /// Gets the size of content without padding.
     fn get_content_size(&self) -> (usize, usize) {
         (self.width, self.height)
     }
@@ -787,12 +801,44 @@ impl Window for WindowAlpha {
     /// Gets the coordinate of content relative to top-left corner of the window without padding.
     fn get_content_position(&self) -> Coord {
         // TODO
-        Coord::new(0, 0)
+        self.coordinate
     }
 
     /// Gets the producer of events.
     fn events_producer(&mut self) -> &mut DFQueueProducer<Event> {
         &mut self.producer
+    }
+
+    fn set_position(&mut self, coordinate: Coord) {
+        self.coordinate = coordinate;       
+    }
+
+    fn get_moving_base(&self) -> Coord {
+        self.moving_base
+    }
+
+    fn set_moving_base(&mut self, coordinate: Coord) {
+        self.moving_base = coordinate
+    }
+
+    fn is_moving(&self) -> bool {
+        self.is_moving
+    }
+
+    fn set_is_moving(&mut self, moving: bool) {
+        // TODO
+    }
+
+    fn set_give_all_mouse_event(&mut self, flag: bool) {
+        // TODO
+    }
+
+    fn give_all_mouse_event(&mut self) -> bool {
+        false
+    }
+
+    fn get_pixel(&self, coordinate: Coord) -> Result<Pixel, &'static str> {
+        self.framebuffer.get_pixel(coordinate)
     }
 }
 
@@ -980,8 +1026,7 @@ pub fn new_window<'a>(
 
     // new window object
     let mut window: WindowAlpha = WindowAlpha {
-        x: x,
-        y: y,
+        coordinate: Coord::new(x, y),
         width: width,
         height: height,
         consumer: consumer,
@@ -989,7 +1034,7 @@ pub fn new_window<'a>(
         framebuffer: framebuffer,
         give_all_mouse_event: false,
         is_moving: false,
-        moving_base: (0, 0),  // the point as a base to start moving
+        moving_base: Coord::new(0, 0),  // the point as a base to start moving
     };
 
     window.clear()?;

@@ -384,9 +384,9 @@ impl Window for WindowProfile {
         FRAME_COMPOSITOR.lock().composite(vec![frame_buffer_blocks].into_iter())
     }
 
-/*    fn contains(&self, coordinate: Coord) -> bool {
+    fn contains(&self, coordinate: Coord) -> bool {
         return coordinate.x <= (self.width - 2 * self.padding) as isize && coordinate.y <= (self.height - 2 * self.padding) as isize;
-    }*/
+    }
 
 /*    fn set_active(&mut self, active: bool) -> Result<(), &'static str> {
         self.active = active;
@@ -440,6 +440,34 @@ impl Window for WindowProfile {
 
     fn events_producer(&mut self) -> &mut DFQueueProducer<Event> {
         &mut self.events_producer
+    }
+    
+    fn set_position(&mut self, coordinate: Coord) {
+        self.coordinate = coordinate;       
+    }
+
+    fn get_moving_base(&self) -> Coord {
+        Coord::new(0, 0)
+    }
+
+    fn is_moving(&self) -> bool {
+        false
+    }
+
+    fn set_give_all_mouse_event(&mut self, flag: bool) {
+        // TODO
+    }
+
+    fn give_all_mouse_event(&mut self) -> bool {
+        false
+    }
+
+    fn set_moving_base(&mut self, coordinate: Coord) {
+        // TODO
+    }
+
+    fn set_is_moving(&mut self, moving: bool) {
+        // TODO
     }
 }
 
