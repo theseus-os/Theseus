@@ -20,8 +20,8 @@ pub trait Window {
     // Checks if the coordinate relative to the top-left corner of the window is within it exluding the border and padding.
     //fn contains(&self, coordinate: Coord) -> bool;
 
-    /// Sets the window as active or not.
-    fn set_active(&mut self, active: bool) -> Result<(), &'static str>;
+    // Sets the window as active or not.
+    //fn set_active(&mut self, active: bool) -> Result<(), &'static str>;
 
     /// Draws the border of the window.
     fn draw_border(&self, color: u32) -> Result<(), &'static str>;

@@ -308,7 +308,6 @@ pub fn new_window(
         coordinate: coordinate,
         width: width,
         height: height,
-        active: true,
         padding: WINDOW_PADDING,
         events_producer: producer,
     };
@@ -356,8 +355,6 @@ pub struct WindowProfile {
     pub width: usize,
     /// the height of the window
     pub height: usize,
-    /// whether the window is active
-    pub active: bool,
     /// the padding outside the content of the window including the border.
     pub padding: usize,
     /// the producer accepting an event, i.e. a keypress event, resize event, etc.
@@ -391,11 +388,10 @@ impl Window for WindowProfile {
         return coordinate.x <= (self.width - 2 * self.padding) as isize && coordinate.y <= (self.height - 2 * self.padding) as isize;
     }*/
 
-    fn set_active(&mut self, active: bool) -> Result<(), &'static str> {
+/*    fn set_active(&mut self, active: bool) -> Result<(), &'static str> {
         self.active = active;
-        self.draw_border(WINDOW_ACTIVE_COLOR)?;
         Ok(())
-    }
+    }*/
 
     fn draw_border(&self, color: u32) -> Result<(), &'static str> {
         let buffer_ref = match DESKTOP_FRAME_BUFFER.try() {
@@ -427,7 +423,7 @@ impl Window for WindowProfile {
         self.coordinate = coordinate;
         self.width = width;
         self.height = height;
-        self.draw_border(get_border_color(self.active))?;
+        self.draw_border(WINDOW_ACTIVE_COLOR)?;
         Ok(percent)
     }
 
@@ -476,14 +472,6 @@ impl Component {
     }
 }
 
-// gets the border color according to the active state
-fn get_border_color(active: bool) -> u32 {
-    if active {
-        WINDOW_ACTIVE_COLOR
-    } else {
-        WINDOW_INACTIVE_COLOR
-    }
-}
 
 // Use a lazy drop scheme instead since window_manager cannot get access to the window_manager. When the window is dropped, the corresponding weak reference will be deleted from the window manager the next time the manager tries to get access to it.
 // delete the reference of a window in the manager when a window is dropped.

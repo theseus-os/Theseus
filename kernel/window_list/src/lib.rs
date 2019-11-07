@@ -49,12 +49,12 @@ impl<T: Window> WindowList<T> {
         inner_ref: &Arc<Mutex<T>>,
     ) -> Result<(), &'static str> {
         if let Some(current_active) = self.active.upgrade() {
-            current_active.lock().set_active(false)?;
+            current_active.lock().draw_border(get_border_color(false))?;
             let weak_ref = self.active.clone();
             self.background_list.push_front(weak_ref);
         } 
 
-        inner_ref.lock().set_active(true)?;
+        inner_ref.lock().draw_border(get_border_color(true))?;
         self.active = Arc::downgrade(inner_ref);
 
         Ok(())
@@ -113,7 +113,7 @@ impl<T: Window> WindowList<T> {
         if let Some(window) = self.active.upgrade() {
             let mut current = window.lock();
             if set_current_back {
-                (*current).set_active(false)?;
+                (*current).draw_border(get_border_color(false))?;
                 let old_active = self.active.clone();
                 self.background_list.push_front(old_active);
             } else {
@@ -125,7 +125,7 @@ impl<T: Window> WindowList<T> {
             self.active = active;
             if let Some(window) = self.active.upgrade() {
                 let mut current = window.lock();
-                (*current).set_active(true)?;
+                (*current).draw_border(get_border_color(true))?;
             }
         }
 
@@ -266,4 +266,11 @@ pub fn adjust_windows_before_addition() -> Result<(usize, usize, usize), &'stati
 
 */
 
-
+// gets the border color according to the active state
+fn get_border_color(active: bool) -> u32 {
+    if active {
+        WINDOW_ACTIVE_COLOR
+    } else {
+        WINDOW_INACTIVE_COLOR
+    }
+}

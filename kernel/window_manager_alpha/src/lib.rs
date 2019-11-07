@@ -765,10 +765,6 @@ impl Window for WindowAlpha {
         Ok(())
     }
 
-    fn set_active(&mut self, active: bool) -> Result<(), &'static str> {
-        Ok(())
-    }
-
     fn draw_border(&self, color: u32) -> Result<(), &'static str> {
         Ok(())
     }
