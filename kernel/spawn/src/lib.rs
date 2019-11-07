@@ -2,6 +2,7 @@
 #![feature(asm)]
 #![feature(core_intrinsics)]
 #![feature(stmt_expr_attributes)]
+#![feature(manually_drop_take)]
 
 extern crate alloc;
 #[macro_use] extern crate log;
@@ -624,14 +625,56 @@ fn task_wrapper<F, A, R>() -> !
     enable_interrupts(); // we must enable interrupts for the new task, otherwise we won't be able to preempt it.
     compiler_fence(Ordering::SeqCst); // I don't think this is necessary...    
 
-    // Now we're ready to actually invoke the entry point function that this Task was spawned for
-    let exit_value = func(arg);
 
-    // let mut panic_cause: u64 = 0;
-    // let result = unsafe {
-    //     core::instrinsics::try(fn_ptr, arg_ptr, cause_ptr)
-    // };
-    // debug!("task_wrapper [2.5]: result {:?}", debugit!(result));
+    // Now we're ready to actually invoke the entry point function that this Task was spawned for
+    let result = unsafe {
+        use core::mem::ManuallyDrop;
+
+        /// An internal struct to accommodate the signature of `core::intrinsics::try`.
+        struct Data<F, A, R> where A: Send + 'static, R: Send + 'static, F: FnOnce(A) -> R, {
+            f_ptr: ManuallyDrop<F>,
+            a_ptr: ManuallyDrop<A>,
+            r_ptr: ManuallyDrop<R>,
+        }
+
+        // the `try` intrinsic requires a `fn` ptr, so we can't just directly call `F` here because it's a `FnOnce` trait.
+        fn call_func<F, A, R>(data: *mut u8) where A: Send + 'static, R: Send + 'static, F: FnOnce(A) -> R, {
+            unsafe {
+                let data = data as *mut Data<F, A, R>;
+                let data = &mut *data;
+                let f = ManuallyDrop::take(&mut data.f_ptr);
+                let a = ManuallyDrop::take(&mut data.a_ptr);
+                data.r_ptr = ManuallyDrop::new(
+                    f(a) // actually invoke the function
+                );
+            }
+        }
+
+        let mut panic_cause_ptr: usize = 0;
+        let result: Result<R, &'static str> = {
+            let mut d = Data {
+                f_ptr: ManuallyDrop::new(func),
+                a_ptr: ManuallyDrop::new(arg),
+                r_ptr: core::mem::MaybeUninit::uninit().assume_init(),
+            };
+            let try_val = core::intrinsics::r#try(
+                call_func::<F, A, R>,
+                &mut d as *mut _ as *mut u8,
+                &mut panic_cause_ptr as *mut _ as *mut u8,
+            );
+            match try_val {
+                0 => Ok(ManuallyDrop::into_inner(d.r_ptr)), // success, no panic
+                x => {
+                    // a panic occurred
+                    // TODO FIXME: recover the cause from the `panic_cause_ptr`
+                    warn!("task_wrapper(): caught panic (try_val {}) in {:?}, panic_cause_ptr: {:#X}", x, get_my_current_task(), panic_cause_ptr);
+                    Err("panic")
+                }
+            }
+        };
+        debug!("task_wrapper [2.5]: result {:?}", debugit!(result));
+        result
+    };
         
 
     // Here: now that the task is finished running, we must clean in up by doing three things:
@@ -648,12 +691,21 @@ fn task_wrapper<F, A, R>() -> !
         { 
             let curr_task_ref = get_my_current_task().expect("BUG: task_wrapper: couldn't get current task (after task func).");
             let curr_task_name = curr_task_ref.lock().name.clone();
-            debug!("task_wrapper [2]: \"{}\" exited with return value {:?}", curr_task_name, debugit!(exit_value));
             
-            // (1) Put the task into a non-runnable mode (exited), and set its exit value
-            if curr_task_ref.mark_as_exited(Box::new(exit_value)).is_err() {
-                warn!("task_wrapper: \"{}\" task could not set exit value, because it had already exited. Is this correct?", curr_task_name);
-            }
+            // (1) Put the task into a non-runnable mode (exited or killed), and set its exit value accordingly
+            match result {
+                Ok(exit_value) => {
+                    // task exited properly
+                    debug!("task_wrapper [2]: \"{}\" exited with return value {:?}", curr_task_name, debugit!(exit_value));
+                    if curr_task_ref.mark_as_exited(Box::new(exit_value)).is_err() {
+                        warn!("task_wrapper: \"{}\" task could not set exit value, because it had already exited. Is this correct?", curr_task_name);
+                    }
+                }
+                Err(e) => {
+                    // task panicked, and we caught it above
+                    debug!("task_wrapper [2]: \"{}\" panicked with return value {:?}", curr_task_name, e);
+                }
+            }            
 
             // (2) Remove it from its runqueue
             #[cfg(not(runqueue_state_spill_evaluation))]  // the normal case
