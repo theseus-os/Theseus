@@ -17,8 +17,8 @@ pub trait Window {
     /// Clears the window on the screen including the border and padding.
     fn clear(&mut self) -> Result<(), &'static str>;
 
-    /// Checks if the coordinate relative to the top-left corner of the window is within it exluding the border and padding.
-    fn contains(&self, coordinate: Coord) -> bool;
+    // Checks if the coordinate relative to the top-left corner of the window is within it exluding the border and padding.
+    //fn contains(&self, coordinate: Coord) -> bool;
 
     /// Sets the window as active or not.
     fn set_active(&mut self, active: bool) -> Result<(), &'static str>;

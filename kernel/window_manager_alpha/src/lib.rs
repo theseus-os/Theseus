@@ -765,10 +765,6 @@ impl Window for WindowAlpha {
         Ok(())
     }
 
-    fn contains(&self, coordinate: Coord) -> bool {
-        true
-    }
-    
     fn set_active(&mut self, active: bool) -> Result<(), &'static str> {
         Ok(())
     }

@@ -387,9 +387,9 @@ impl Window for WindowProfile {
         FRAME_COMPOSITOR.lock().composite(vec![frame_buffer_blocks].into_iter())
     }
 
-    fn contains(&self, coordinate: Coord) -> bool {
+/*    fn contains(&self, coordinate: Coord) -> bool {
         return coordinate.x <= (self.width - 2 * self.padding) as isize && coordinate.y <= (self.height - 2 * self.padding) as isize;
-    }
+    }*/
 
     fn set_active(&mut self, active: bool) -> Result<(), &'static str> {
         self.active = active;
