@@ -222,10 +222,10 @@ impl<Buffer: FrameBuffer> WindowGeneric<Buffer> {
         let component = self.components.get_mut(display_name).ok_or("")?;
         let coordinate = component.get_position();
         let displayable = component.get_displayable_mut();
-        let blocks = displayable.display(
+        let blocks = displayable.display_in(
             coordinate, 
             &mut self.framebuffer
-        );
+        )?;
         self.render(Some(blocks.into_iter()))
     }
 

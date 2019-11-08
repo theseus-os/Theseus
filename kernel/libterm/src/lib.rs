@@ -414,7 +414,10 @@ impl Terminal {
         };
         let result  = self.scrollback_buffer.get(start_idx..=end_idx); // =end_idx includes the end index in the slice
         if let Some(slice) = result {
-            self.textarea.lock().display_string_basic(slice)?;
+            let mut textarea = 
+            self.textarea.lock();
+            textarea.set_text(slice);
+            textarea.display()?;
         //Wenqiu
         /*    {
                 let text_display = self.window.get_concrete_display_mut::<TextDisplay>(&self.display_name)?;
@@ -437,8 +440,12 @@ impl Terminal {
         let result = self.scrollback_buffer.get(start_idx..end_idx);
 
         if let Some(slice) = result {
-            self.textarea.lock().display_string_basic(slice)?;
-            self.absolute_cursor_pos = cursor_pos;
+             let mut textarea = 
+            self.textarea.lock();
+            textarea.set_text(slice);
+            textarea.display()?;
+//            self.textarea.lock().display_string_basic(slice)?;
+//            self.absolute_cursor_pos = cursor_pos;
             //Wenqiu
             /*{
                 let text_display = self.window.get_concrete_display_mut::<TextDisplay>(&self.display_name)?;
@@ -547,6 +554,9 @@ impl Terminal {
                 Err(err) => {error!("could not update display forwards: {}", err); return}
             }
         }
+
+        // Wenqiu: TODO
+        let _ = window_manager_alpha::render(None);
     }
 
     /// Insert a character to the terminal.

@@ -34,11 +34,11 @@ pub struct TextDisplay {
 }
 
 impl Displayable for TextDisplay {
-    fn display(
+    fn display_in(
         &mut self,
         coordinate: Coord,
         framebuffer: &mut dyn FrameBuffer,
-    ) -> Vec<(usize, usize)> {
+    ) -> Result<Vec<(usize, usize)>, &'static str> {
         // If the cache is the prefix of the new text, just print the additional characters.
         let (string, col, line) = if self.cache.len() > 0 && self.text.starts_with(self.cache.as_str()) {
             (
@@ -66,8 +66,13 @@ impl Displayable for TextDisplay {
         self.next_line = next_line;
         self.cache = self.text.clone();
 
-        return blocks;
+        return Ok(blocks);
     }
+
+    fn display(&mut self,) -> Result<(), &'static str> {
+        Err("There is no default framebuffer to display in")
+    }
+
 
     fn resize(&mut self, width: usize, height: usize) {
         self.width = width;

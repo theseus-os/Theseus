@@ -23,12 +23,13 @@ pub trait Displayable: Downcast + Send {
     /// * `framebuffer`: the framebuffer to display onto.
     ///
     /// Returns a list of updated blocks. The tuple (index, width) represents the index of the block in the framebuffer and its width. The use of `block` is described in the `frame_buffer_compositor` crate.
-    fn display(
+    fn display_in(
         &mut self,
         coordinate: Coord,
         framebuffer: &mut dyn FrameBuffer,
-    ) -> Vec<(usize, usize)> ;
+    ) -> Result<Vec<(usize, usize)>, &'static str> ;
 
+    fn display(&mut self) -> Result<(), &'static str>;
     /// Resizes the displayable area.
     fn resize(&mut self, width: usize, height: usize);
 
