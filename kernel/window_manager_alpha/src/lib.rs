@@ -50,7 +50,7 @@ use compositor::Compositor;
 use frame_buffer_compositor::{FrameBufferBlocks, FRAME_COMPOSITOR};
 use window::Window;
 
-pub static WINDOW_MANAGER: Once<Mutex<WindowManagerAlpha<FrameBufferAlpha, WindowAlpha>>> = Once::new();
+pub static WINDOW_MANAGER: Once<Mutex<WindowManagerAlpha<FrameBufferAlpha, WindowProfileAlpha>>> = Once::new();
 
 /// The half size of mouse in number of pixels, the actual size of pointer is 1+2*`MOUSE_POINTER_HALF_SIZE`
 const MOUSE_POINTER_HALF_SIZE: usize = 7;
@@ -613,13 +613,13 @@ impl <T: FrameBuffer, U: Window> WindowManagerAlpha<T, U> {
 }*/
 
 /// set window as active, the active window is always at top, so it will refresh the region of this window
-pub fn set_active(objref: &Arc<Mutex<WindowAlpha>>) -> Result<(), &'static str> {
+pub fn set_active(objref: &Arc<Mutex<WindowProfileAlpha>>) -> Result<(), &'static str> {
     let mut win = WINDOW_MANAGER.try().ok_or("The static window manager was not yet initialized")?.lock();
     win.set_active(objref, true)
 }
 
 /// whether a window is active
-pub fn is_active(objref: &Arc<Mutex<WindowAlpha>>) -> bool {
+pub fn is_active(objref: &Arc<Mutex<WindowProfileAlpha>>) -> bool {
     match WINDOW_MANAGER.try().ok_or("The static window manager was not yet initialized") {
         Ok(mtx) => {
             let win = mtx.lock();
@@ -745,7 +745,7 @@ pub fn init(
 }
 
 /// Window object that should be owned by application
-pub struct WindowAlpha {
+pub struct WindowProfileAlpha {
     pub coordinate: Coord,
     pub width: usize,
     pub height: usize,
@@ -767,7 +767,7 @@ pub struct WindowAlpha {
     // Wenqiu: TODO add a moving base to the old window
 }
 
-impl Window for WindowAlpha {
+impl Window for WindowProfileAlpha {
     // Wenqiu: TODO implement the methods
     fn clear(&mut self) -> Result<(), &'static str> {
         self.framebuffer.fill_color(0x80FFFFFF);
@@ -1015,7 +1015,7 @@ fn move_cursor_to(nx: usize, ny: usize) -> Result<(), &'static str> {
 /// new window object with given position and size
 pub fn new_window<'a>(
     x: isize, y: isize, width: usize, height: usize,
-) -> Result<Arc<Mutex<WindowAlpha>>, &'static str> {
+) -> Result<Arc<Mutex<WindowProfileAlpha>>, &'static str> {
 
     // Init the key input producer and consumer
     let consumer = DFQueue::new().into_consumer();
@@ -1025,7 +1025,7 @@ pub fn new_window<'a>(
     let mut framebuffer = FrameBufferAlpha::new(width, height, None)?;
 
     // new window object
-    let mut window: WindowAlpha = WindowAlpha {
+    let mut window: WindowProfileAlpha = WindowProfileAlpha {
         coordinate: Coord::new(x, y),
         width: width,
         height: height,

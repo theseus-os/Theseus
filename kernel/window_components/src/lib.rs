@@ -34,7 +34,7 @@ use dfqueue::{DFQueue, DFQueueConsumer, DFQueueProducer};
 use event_types::{Event, MousePositionEvent};
 use frame_buffer_alpha::{ AlphaPixel, BLACK, PixelMixer };
 use spin::{Mutex};
-use window_manager_alpha::{WindowAlpha, WINDOW_MANAGER};
+use window_manager_alpha::{WindowProfileAlpha, WINDOW_MANAGER};
 use frame_buffer::{Coord, FrameBuffer};
 use window::Window;
 
@@ -89,7 +89,7 @@ impl From<usize> for TopButton {
 /// abstraction of a window, providing title bar which helps user moving, close, maximize or minimize window
 pub struct WindowComponents {
     /// the window object that could be used to initialize components
-    pub winobj: Arc<Mutex<WindowAlpha>>,
+    pub winobj: Arc<Mutex<WindowProfileAlpha>>,
     /// the width of border, init as WINDOW_BORDER. the border is still part of the window and remains flexibility for user to change border style or remove border. However, for most application a border is useful for user to identify the region.
     border_size: usize,
     /// the height of title bar in pixel, init as WINDOW_TITLE_BAR. it is render inside the window so user shouldn't use this area anymore
@@ -218,7 +218,7 @@ impl WindowComponents {
     }
 
     /// show three button with status. state = 0,1,2 for three different color
-    fn show_button(& self, button: TopButton, state: usize, winobj: &mut WindowAlpha) {
+    fn show_button(& self, button: TopButton, state: usize, winobj: &mut WindowProfileAlpha) {
         let y = self.title_size / 2;
         let x = WINDOW_BUTTON_BIAS_X + WINDOW_BUTTON_BETWEEN * match button {
             TopButton::Close => 0,
@@ -403,197 +403,3 @@ impl Drop for WindowComponents {
     }
 }
 
-/// a textarea with fixed size, showing matrix of chars.
-///
-/// The chars are allowed to be modified and update, however, one cannot change the matrix size during run-time.
-pub struct TextArea {
-    x: usize,
-    y: usize,
-    // width: usize,
-    // height: usize,
-    line_spacing: usize,
-    column_spacing: usize,
-    background_color: AlphaPixel,
-    text_color: AlphaPixel,
-    /// the x dimension char count
-    x_cnt: usize,
-    /// the y dimension char count
-    y_cnt: usize,
-    char_matrix: Vec<u8>,
-    winobj: Weak<Mutex<WindowAlpha>>,
-    next_index: usize,
-}
-
-impl TextArea {
-    /// create new textarea with all characters initialized as ' ' (space character which shows nothing).
-    /// after initialization, this textarea has a weak reference to the window object, 
-    /// and calling the API to change textarea will immediately update display on screen
-    ///
-    /// * `x`, `y`, `width`, `height`: the position and size of this textarea. Note that position is relative to window
-    /// * `line_spacing`: the spacing between lines, default to 2
-    /// * `column_spacing`: the spacing between chars, default to 1
-    /// * `background_color`: the background color, default to transparent
-    /// * `text_color`: the color of text, default to opaque black
-    pub fn new(x: usize, y: usize, width: usize, height: usize, winobj: &Arc<Mutex<WindowAlpha>>
-            , line_spacing: Option<usize>, column_spacing: Option<usize>
-            , background_color: Option<AlphaPixel>, text_color: Option<AlphaPixel>)
-        -> Result<Arc<Mutex<TextArea>>, &'static str> {
-
-        let mut textarea: TextArea = TextArea {
-            x: x,
-            y: y,
-            // width: width,
-            // height: height,
-            line_spacing: match line_spacing {
-                Some(m) => m,
-                _ => 2,
-            },
-            column_spacing: match column_spacing {
-                Some(m) => m,
-                _ => 1,
-            },
-            background_color: match background_color {
-                Some(m) => m,
-                _ => 0xFFFFFFFF,  // default is a transparent one
-            },
-            text_color: match text_color {
-                Some(m) => m,
-                _ => 0x00000000,  // default is an opaque black
-            },
-            x_cnt: 0,  // will modify later
-            y_cnt: 0,  // will modify later
-            char_matrix: Vec::new(),
-            winobj: Arc::downgrade(winobj),
-            next_index: 0,
-        };
-
-        // compute x_cnt and y_cnt and remain constant
-        if height < (16 + textarea.line_spacing) || width < (8 + textarea.column_spacing) {
-            return Err("textarea too small to put even one char");
-        }
-        textarea.x_cnt = width / (8 + textarea.column_spacing);
-        textarea.y_cnt = height / (16 + textarea.line_spacing);
-        textarea.char_matrix.resize(textarea.x_cnt * textarea.y_cnt, ' ' as u8);  // first fill with blank char
-
-        Ok(Arc::new(Mutex::new(textarea)))
-    }
-
-    /// get the x dimension char count
-    pub fn get_x_cnt(& self) -> usize {
-        self.x_cnt
-    }
-
-    /// get the y dimension char count
-    pub fn get_y_cnt(& self) -> usize {
-        self.y_cnt
-    }
-
-    pub fn get_next_index(&self) -> usize {
-        self.next_index
-    }
-
-    /// compute the index of char, does not check bound. one can use this to compute index as argument for `set_char_absolute`.
-    pub fn index(& self, x: usize, y: usize) -> usize {  // does not check bound
-        return x + y * self.x_cnt;
-    }
-
-    /// set char at given index, for example, if you want to modify the char at (i, j), the `idx` should be `self.index(i, j)`
-    pub fn set_char_absolute(&mut self, idx: usize, c: u8) -> Result<(), &'static str> {
-        if idx >= self.x_cnt * self.y_cnt { return Err("x out of range"); }
-        self.set_char(idx % self.x_cnt, idx / self.x_cnt, c)
-    }
-
-    /// set char at given position, where i < self.x_cnt, j < self.y_cnt
-    pub fn set_char(&mut self, x: usize, y: usize, c: u8) -> Result<(), &'static str> {
-        if x >= self.x_cnt { return Err("x out of range"); }
-        if y >= self.y_cnt { return Err("y out of range"); }
-        if let Some(winobj_mutex) = self.winobj.upgrade() {
-            if self.char_matrix[self.index(x, y)] != c {  // need to redraw
-                let idx = self.index(x, y);
-                self.char_matrix[idx] = c;
-                let wx = self.x + x * (8 + self.column_spacing);
-                let wy = self.y + y * (16 + self.line_spacing);
-                let (winx, winy) = {
-                    let mut winobj = winobj_mutex.lock();
-                    let coordinate = winobj.get_content_position();
-                    let winx = coordinate.x;
-                    let winy = coordinate.y;
-                    for j in 0..16 {
-                        let char_font: u8 = font::FONT_BASIC[c as usize][j];
-                        for i in 0..8 {
-                            let nx = wx + i;
-                            let ny = wy + j;
-                            if char_font & (0x80u8 >> i) != 0 {
-                                winobj.framebuffer.draw_pixel(Coord::new(nx as isize, ny as isize), self.text_color);
-                            } else {
-                                winobj.framebuffer.draw_pixel(Coord::new(nx as isize, ny as isize), self.background_color);
-                            }
-                        }
-                    }
-                    (winx, winy)
-                };
-                for j in 0..16 {
-                    for i in 0..8 {
-                        window_manager_alpha::refresh_pixel_absolute(winx + wx as isize + i, winy + wy as isize + j)?;
-                    }
-                }
-            }
-        } else {
-            return Err("winobj not existed, perhaps calling this function after window is destoryed");
-        }
-        Ok(())
-    }
-
-    /// update char matrix with a new one, must be equal size of current one
-    pub fn set_char_matrix(&mut self, char_matrix: &Vec<u8>) -> Result<(), &'static str> {
-        if char_matrix.len() != self.char_matrix.len() {
-            return Err("char matrix size not match");
-        }
-        for i in 0 .. self.x_cnt {
-            for j in 0 .. self.y_cnt {
-                self.set_char(i, j, char_matrix[self.index(i, j)])?;
-            }
-        }
-        Ok(())
-    }
-
-    /// display a basic string, only support normal chars and `\n`
-    pub fn display_string_basic(&mut self, string: &str) -> Result<(), &'static str> {
-        let a = string.as_bytes();
-        let mut i = 0;
-        let mut j = 0;
-        for k in 0 .. a.len() {
-            let c = a[k] as u8;
-            // debug!("{}", a[k] as u8);
-            if c == '\n' as u8 {
-                for x in i .. self.x_cnt {
-                    self.set_char(x, j, ' ' as u8)?;
-                }
-                j += 1;
-                i = 0;
-            } else {
-                self.set_char(i, j, c)?;
-                i += 1;
-                if i >= self.x_cnt {
-                    j += 1;
-                    i = 0;
-                }
-            }
-            if j >= self.y_cnt { break; }
-        }
-
-        self.next_index = self.index(i, j);
-        
-        if j < self.y_cnt {
-            for x in i .. self.x_cnt {
-                self.set_char(x, j, ' ' as u8)?;
-            }
-            for y in j+1 .. self.y_cnt {
-                for x in 0 .. self.x_cnt {
-                    self.set_char(x, y, ' ' as u8)?;
-                }
-            }
-        }
-        window_manager_alpha::render(None)
-    }
-}

@@ -57,6 +57,9 @@ path = "../../kernel/root"
 [dependencies.path]
 path = "../../kernel/path"
 
+[dependencies.text_area]
+path = "../../kernel/displayable/text_area"
+
 [lib]
 crate-type = ["rlib"]
 

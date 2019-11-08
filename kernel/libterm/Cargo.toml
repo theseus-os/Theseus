@@ -43,6 +43,9 @@ path = "../event_types"
 [dependencies.text_display]
 path = "../displayable/text_display"
 
+[dependencies.text_area]
+path = "../displayable/text_area"
+
 [dependencies.displayable]
 path = "../displayable"
 

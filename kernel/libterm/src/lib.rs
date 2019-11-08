@@ -25,6 +25,7 @@ extern crate frame_buffer;
 extern crate font;
 extern crate frame_buffer_drawer;
 extern crate frame_buffer_printer;
+extern crate text_area;
 
 use alloc::string::{String, ToString};
 use alloc::vec::Vec;
@@ -39,6 +40,7 @@ use frame_buffer::{Coord, FrameBuffer};
 use window_manager::WindowGeneric;
 use font::{CHARACTER_HEIGHT, CHARACTER_WIDTH};
 use tsc::{tsc_ticks, TscTicks};
+use text_area::TextArea;
 
 pub const FONT_COLOR: u32 = 0x93ee90;
 pub const BACKGROUND_COLOR: u32 = 0x000000;
@@ -65,7 +67,7 @@ pub struct Terminal {
     /// The terminal's own window, this is a WindowComponents object which handles the events of user input properly like moving window and close window
     window: Arc<Mutex<window_components::WindowComponents>>,
     // textarea object of the terminal, it has a weak reference to the window object so that calling function of this object will draw on the screen
-    textarea: Arc<Mutex<window_components::TextArea>>,
+    textarea: Arc<Mutex<TextArea>>,
     /// The terminal's own window
     // Wenqiu:
     // window: WindowGeneric<FrameBufferRGB>,
@@ -495,7 +497,7 @@ impl Terminal {
             debug!("new window done width: {}, height: {}", width_inner, height_inner);
             // next add textarea to wincomps
             const TEXTAREA_BORDER: usize = 4;
-            match window_components::TextArea::new(
+            match TextArea::new(
                 wincomps.get_border_size() + TEXTAREA_BORDER, wincomps.get_title_size() + TEXTAREA_BORDER,
                 width_inner - 2*TEXTAREA_BORDER, height_inner - 2*TEXTAREA_BORDER,
                 &wincomps.winobj, None, None, Some(wincomps.get_background()), None
@@ -883,7 +885,7 @@ impl Cursor {
         &mut self, 
         col: usize, 
         line: usize, 
-        textarea: &mut alloc::sync::Arc<spin::Mutex<window_components::TextArea>>
+        textarea: &mut alloc::sync::Arc<spin::Mutex<TextArea>>
     ) -> Result<(), &'static str> {
         if self.blink() {
             if self.show() {

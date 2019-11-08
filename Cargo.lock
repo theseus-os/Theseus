@@ -952,6 +952,7 @@ dependencies = [
  "print 0.1.0",
  "root 0.1.0",
  "spin 0.4.10 (registry+https://github.com/rust-lang/crates.io-index)",
+ "text_area 0.1.0",
  "text_display 0.1.0",
  "tsc 0.1.0",
  "window_components 0.1.0",
@@ -1261,6 +1262,7 @@ dependencies = [
  "spin 0.4.10 (registry+https://github.com/rust-lang/crates.io-index)",
  "task 0.1.0",
  "terminal_print 0.1.0",
+ "text_area 0.1.0",
  "window_components 0.1.0",
  "window_manager_alpha 0.1.0",
  "x86_64 0.1.2",
@@ -2164,6 +2166,21 @@ dependencies = [
  "log 0.3.9 (registry+https://github.com/rust-lang/crates.io-index)",
  "task 0.1.0",
  "terminal_print 0.1.0",
+]
+
+[[package]]
+name = "text_area"
+version = "0.1.0"
+dependencies = [
+ "displayable 0.1.0",
+ "font 0.1.0",
+ "frame_buffer 0.1.0",
+ "frame_buffer_alpha 0.1.0",
+ "frame_buffer_drawer 0.1.0",
+ "frame_buffer_printer 0.1.0",
+ "spin 0.4.10 (registry+https://github.com/rust-lang/crates.io-index)",
+ "window 0.1.0",
+ "window_manager_alpha 0.1.0",
 ]
 
 [[package]]

@@ -28,6 +28,7 @@ extern crate print;
 extern crate window_components;
 
 extern crate scheduler;
+extern crate text_area;
 
 use event_types::{Event};
 use keycodes_ascii::{Keycode, KeyAction};
@@ -35,6 +36,7 @@ use alloc::string::{String};
 use alloc::vec::Vec;
 use core::ops::{Deref};
 use hpet::get_hpet;
+use text_area::TextArea;
 
 #[no_mangle]
 pub fn main(_args: Vec<String>) -> isize {
@@ -65,7 +67,7 @@ pub fn main(_args: Vec<String>) -> isize {
     debug!("new window done width: {}, height: {}", width_inner, height_inner);
 
     // add textarea to WindowComponents
-    let textarea_mutex = match window_components::TextArea::new(
+    let textarea_mutex = match TextArea::new(
         wincomps.get_border_size() + 4, wincomps.get_title_size() + 4, width_inner - 8, height_inner - 8,  // position and size of textarea
         &wincomps.winobj,  // bind this textarea to WindowComponents
         None, None, Some(wincomps.get_background()), None  // use default parameters
