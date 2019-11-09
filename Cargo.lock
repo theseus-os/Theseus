@@ -247,6 +247,15 @@ dependencies = [
 ]
 
 [[package]]
+name = "catch_unwind"
+version = "0.1.0"
+dependencies = [
+ "log 0.3.9 (registry+https://github.com/rust-lang/crates.io-index)",
+ "task 0.1.0",
+ "unwind 0.1.0",
+]
+
+[[package]]
 name = "cc"
 version = "1.0.28"
 source = "registry+https://github.com/rust-lang/crates.io-index"
@@ -1913,6 +1922,7 @@ dependencies = [
  "apic 0.1.0",
  "atomic 0.4.4 (registry+https://github.com/rust-lang/crates.io-index)",
  "atomic_linked_list 0.1.0",
+ "catch_unwind 0.1.0",
  "context_switch 0.1.0",
  "debugit 0.1.0",
  "gdt 0.1.0",
@@ -2318,6 +2328,7 @@ name = "x86_64"
 version = "0.1.2"
 dependencies = [
  "bit_field 0.7.0 (registry+https://github.com/rust-lang/crates.io-index)",
+ "bitflags 1.1.0 (registry+https://github.com/rust-lang/crates.io-index)",
  "irq_safety 0.1.1 (git+https://github.com/kevinaboos/irq_safety)",
 ]
 

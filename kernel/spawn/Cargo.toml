@@ -43,6 +43,9 @@ path = "../tss"
 [dependencies.task]
 path = "../task"
 
+[dependencies.catch_unwind]
+path = "../catch_unwind"
+
 [dependencies.runqueue]
 path = "../runqueue"
 
