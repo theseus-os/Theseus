@@ -67,7 +67,7 @@ pub fn main(_args: Vec<String>) -> isize {
     debug!("new window done width: {}, height: {}", width_inner, height_inner);
 
     // add textarea to WindowComponents
-    let textarea_mutex = match TextArea::new(
+    let mut textarea = match TextArea::new(
         wincomps.get_border_size() + 4, wincomps.get_title_size() + 4, width_inner - 8, height_inner - 8,  // position and size of textarea
         &wincomps.winobj,  // bind this textarea to WindowComponents
         None, None, Some(wincomps.get_background()), None  // use default parameters
@@ -75,7 +75,6 @@ pub fn main(_args: Vec<String>) -> isize {
         Ok(m) => m,
         Err(err) => { error!("new textarea returned err: {}", err); return -3; }
     };
-    let mut textarea = textarea_mutex.lock();
 
     // refresh all the characters to test performance,
     // for c in ('a' as u8) .. ('z' as u8 + 1) {

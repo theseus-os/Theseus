@@ -26,9 +26,13 @@ extern crate mouse;
 extern crate window_manager_alpha;
 extern crate frame_buffer;
 extern crate window;
+extern crate displayable;
 
 use alloc::sync::{Arc, Weak};
 use alloc::vec::Vec;
+use alloc::string::{String, ToString};
+use alloc::collections::BTreeMap;
+use alloc::boxed::Box;
 use core::ops::{Deref};
 use dfqueue::{DFQueue, DFQueueConsumer, DFQueueProducer};
 use event_types::{Event, MousePositionEvent};
@@ -37,6 +41,7 @@ use spin::{Mutex};
 use window_manager_alpha::{WindowProfileAlpha, WINDOW_MANAGER};
 use frame_buffer::{Coord, FrameBuffer};
 use window::Window;
+use displayable::Displayable;
 
 /// The title bar size, in number of pixels
 const WINDOW_TITLE_BAR: usize = 15;
@@ -105,6 +110,7 @@ pub struct WindowComponents {
     last_mouse_position_event: MousePositionEvent,
     /// record last result of whether this window is active, to reduce redraw overhead
     last_is_active: bool,
+    pub components: BTreeMap<String, Box<dyn Displayable>>,
 }
 
 impl WindowComponents {
@@ -136,6 +142,7 @@ impl WindowComponents {
                 fourth_button_hold: false, fifth_button_hold: false,
             },
             last_is_active: true,  // new window is by default active
+            components: BTreeMap::new(),
         };
 
         let (x_start, x_end, y_start, y_end) = {
@@ -385,6 +392,44 @@ impl WindowComponents {
 
     /// get background color
     pub fn get_background(&self) -> AlphaPixel { self.background }
+
+    /// Gets a reference to a displayable of type `T` which implements the `Displayable` trait by its name. Returns error if the displayable is not of type `T` or does not exist.
+    pub fn get_concrete_display<T: Displayable>(&self, display_name: &str) -> Result<&T, &'static str> {
+        if let Some(component) = self.components.get(display_name) {
+            if let Some(display) = component.downcast_ref::<T>() {
+                return Ok(display)
+            } else {
+                return Err("The displayable is not of this type");
+            }
+        } else {
+            return Err("The displayable does not exist");
+        }
+    }
+    
+    /// Gets a reference to a displayable of type `T` which implements the `Displayable` trait by its name. Returns error if the displayable is not of type `T` or does not exist.
+    pub fn get_concrete_display_mut<T: Displayable>(&mut self, display_name: &str) -> Result<&mut T, &'static str> {
+        if let Some(component) = self.components.get_mut(display_name) {
+            if let Some(display) = component.downcast_mut::<T>() {
+                return Ok(display)
+            } else {
+                return Err("The displayable is not of this type");
+            }
+        } else {
+            return Err("The displayable does not exist");
+        }
+    }
+
+        /// Adds a new displayable at `coordinate` relative to the top-left corner of the window.
+    pub fn add_displayable(
+        &mut self,
+        key: &str,
+        coordinate: Coord,
+        displayable: Box<dyn Displayable>,
+    ) -> Result<(), &'static str> {
+        let key = key.to_string();
+        self.components.insert(key, displayable);
+        Ok(())
+    }
 }
 
 impl Drop for WindowComponents {

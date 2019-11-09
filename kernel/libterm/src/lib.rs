@@ -67,13 +67,13 @@ pub struct Terminal {
     /// The terminal's own window, this is a WindowComponents object which handles the events of user input properly like moving window and close window
     window: Arc<Mutex<window_components::WindowComponents>>,
     // textarea object of the terminal, it has a weak reference to the window object so that calling function of this object will draw on the screen
-    textarea: Arc<Mutex<TextArea>>,
     /// The terminal's own window
     // Wenqiu:
     // window: WindowGeneric<FrameBufferRGB>,
     // Name of the displayable object of the terminal
     // display_name: String,
     /// The terminal's scrollback buffer which stores a string to be displayed by the text display
+    display_name: String,
     scrollback_buffer: String,
     /// Indicates whether the text display is displaying the last part of the scrollback buffer slice
     is_scroll_end: bool,
@@ -90,7 +90,14 @@ pub struct Terminal {
 impl Terminal {
     /// Get the width and height of the text display.
     fn get_displayable_dimensions(&self) -> (usize, usize){
-        let textarea = self.textarea.lock();
+        let window = self.window.lock();
+        let textarea = match window.get_concrete_display::<TextArea>(&self.display_name) {
+            Ok(textarea) => {textarea},
+            Err(err) => {
+                debug!("get_displayable_dimensions(): {}", err);
+                return (0, 0);
+            }
+        };
         (textarea.get_x_cnt(), textarea.get_y_cnt())
     }
     //Wenqiu:
@@ -414,8 +421,8 @@ impl Terminal {
         };
         let result  = self.scrollback_buffer.get(start_idx..=end_idx); // =end_idx includes the end index in the slice
         if let Some(slice) = result {
-            let mut textarea = 
-            self.textarea.lock();
+            let mut window = self.window.lock();
+            let textarea = window.get_concrete_display_mut::<TextArea>(&self.display_name)?;
             textarea.set_text(slice);
             textarea.display()?;
         //Wenqiu
@@ -440,8 +447,9 @@ impl Terminal {
         let result = self.scrollback_buffer.get(start_idx..end_idx);
 
         if let Some(slice) = result {
-             let mut textarea = 
-            self.textarea.lock();
+            let mut window = self.window.lock();
+            let textarea = window.get_concrete_display_mut::<TextArea>(&self.display_name)?;
+
             textarea.set_text(slice);
             textarea.display()?;
 //            self.textarea.lock().display_string_basic(slice)?;
@@ -474,11 +482,13 @@ impl Terminal {
         
         self.cursor.check_time();
         // debug!("absolute_cursor_pos: {}", self.absolute_cursor_pos);
+        let mut window = self.window.lock();
+        let textarea = window.get_concrete_display_mut::<TextArea>(&self.display_name)?;
         if self.cursor.enabled {
             if self.cursor.show {
-                self.textarea.lock().set_char(new_x, new_y, 221)?;
+                textarea.set_char(new_x, new_y, 221)?;
             } else {
-                self.textarea.lock().set_char(new_x, new_y, ' ' as u8)?;
+                textarea.set_char(new_x, new_y, ' ' as u8)?;
             }
         }
         Ok(())
@@ -515,9 +525,10 @@ impl Terminal {
         };
 
         // let mut prompt_string = root.lock().get_absolute_path(); // ref numbers are 0-indexed
+        let display_name = "textarea";
         let mut terminal = Terminal {
             window: window_object,
-            textarea: textarea_object,
+            display_name: String::from(display_name),
             scrollback_buffer: String::new(),
             scroll_start_idx: 0,
             is_scroll_end: true,
@@ -526,6 +537,7 @@ impl Terminal {
             //Wenqiu
             //cursor: Cursor::new(FONT_COLOR),
         };
+        terminal.window.lock().add_displayable(&display_name, Coord::new(0, 0),Box::new(textarea_object))?;
 
         // Inserts a producer for the print queue into global list of terminal print producers
         terminal.print_to_terminal(format!("Theseus Terminal Emulator\nPress Ctrl+C to quit a task\n"));
@@ -691,11 +703,13 @@ impl Terminal {
 
         self.cursor.check_time();
         // debug!("absolute_cursor_pos: {}", self.absolute_cursor_pos);
+        let mut window = self.window.lock();
+        let textarea = window.get_concrete_display_mut::<TextArea>(&self.display_name)?;
         if self.cursor.enabled {
             if self.cursor.show {
-                self.textarea.lock().set_char(new_x, new_y, 221)?;
+                textarea.set_char(new_x, new_y, 221)?;
             } else {
-                self.textarea.lock().set_char(new_x, new_y, ' ' as u8)?;
+                textarea.set_char(new_x, new_y, ' ' as u8)?;
             }
         }
         Ok(())
@@ -755,8 +769,9 @@ impl Terminal {
             (col_num, line_num, text_next_pos)
         };*/
         
+        let mut window = self.window.lock();
+        let mut textarea = window.get_concrete_display_mut::<TextArea>(&self.display_name)?;
         let (col_num, line_num, text_next_pos) = {
-            let textarea = self.textarea.lock();
             (
                 textarea.get_x_cnt(),
                 textarea.get_y_cnt(),
@@ -777,7 +792,7 @@ impl Terminal {
         self.cursor.display(
             cursor_col,
             cursor_line,
-            &mut self.textarea
+            &mut textarea
         )
 
         // update to the end of the text if the cursor is at the last line
@@ -895,13 +910,13 @@ impl Cursor {
         &mut self, 
         col: usize, 
         line: usize, 
-        textarea: &mut alloc::sync::Arc<spin::Mutex<TextArea>>
+        textarea: &mut TextArea
     ) -> Result<(), &'static str> {
         if self.blink() {
             if self.show() {
-                textarea.lock().set_char(col, line, 219)?;
+                textarea.set_char(col, line, 219)?;
             } else {
-                textarea.lock().set_char(col, line, self.underlying_char)?;
+                textarea.set_char(col, line, self.underlying_char)?;
             }
             window_manager_alpha::render(None)?
         }
