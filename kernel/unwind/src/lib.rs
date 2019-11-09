@@ -839,7 +839,7 @@ fn continue_unwinding(unwinding_context_ptr: *mut UnwindingContext) -> Result<()
 /// here we need to continue (*resume*) the unwinding procedure 
 /// by basically figuring out where we just came from and picking up where we left off. 
 #[doc(hidden)]
-pub unsafe fn unwind_resume(unwinding_context_ptr: usize) -> ! {
+pub fn unwind_resume(unwinding_context_ptr: usize) -> ! {
     // trace!("unwind_resume(): unwinding_context_ptr value: {:#X}", unwinding_context_ptr);
     let unwinding_context_ptr = unwinding_context_ptr as *mut UnwindingContext;
 
@@ -912,4 +912,14 @@ fn cleanup_unwinding_context(unwinding_context_ptr: *mut UnwindingContext) -> ! 
 
     error!("BUG: killed task was rescheduled! (in cleanup_unwinding_context())");
     loop { }
+}
+
+
+/// Retakes ownership of the given `unwinding_context_ptr`, which is a pointer to a `Box<UnwindingContext>` struct, 
+/// and then unboxes it and returns the reason/cause of unwinding, dropping all other fields in the `UnwindingContext`.
+#[doc(hidden)]
+pub unsafe fn unwinding_context_ptr_into_cause(unwinding_context_ptr: *mut UnwindingContext) -> task::KillReason {
+    let unwinding_context_boxed = Box::from_raw(unwinding_context_ptr);
+    let unwinding_context = *unwinding_context_boxed;
+    unwinding_context.cause
 }

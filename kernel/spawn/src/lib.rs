@@ -1,8 +1,6 @@
 #![no_std]
 #![feature(asm)]
-#![feature(core_intrinsics)]
 #![feature(stmt_expr_attributes)]
-#![feature(manually_drop_take)]
 
 extern crate alloc;
 #[macro_use] extern crate log;
@@ -21,6 +19,7 @@ extern crate apic;
 extern crate context_switch;
 extern crate path;
 extern crate type_name;
+extern crate catch_unwind;
 
 
 use core::{
@@ -626,59 +625,12 @@ fn task_wrapper<F, A, R>() -> !
     compiler_fence(Ordering::SeqCst); // I don't think this is necessary...    
 
 
-    // Now we're ready to actually invoke the entry point function that this Task was spawned for
-    let result = unsafe {
-        use core::mem::ManuallyDrop;
-
-        /// An internal struct to accommodate the signature of `core::intrinsics::try`.
-        struct Data<F, A, R> where A: Send + 'static, R: Send + 'static, F: FnOnce(A) -> R, {
-            f_ptr: ManuallyDrop<F>,
-            a_ptr: ManuallyDrop<A>,
-            r_ptr: ManuallyDrop<R>,
-        }
-
-        // the `try` intrinsic requires a `fn` ptr, so we can't just directly call `F` here because it's a `FnOnce` trait.
-        fn call_func<F, A, R>(data: *mut u8) where A: Send + 'static, R: Send + 'static, F: FnOnce(A) -> R, {
-            unsafe {
-                let data = data as *mut Data<F, A, R>;
-                let data = &mut *data;
-                let f = ManuallyDrop::take(&mut data.f_ptr);
-                let a = ManuallyDrop::take(&mut data.a_ptr);
-                data.r_ptr = ManuallyDrop::new(
-                    f(a) // actually invoke the function
-                );
-            }
-        }
-
-        let mut panic_cause_ptr: usize = 0;
-        let result: Result<R, &'static str> = {
-            let mut d = Data {
-                f_ptr: ManuallyDrop::new(func),
-                a_ptr: ManuallyDrop::new(arg),
-                r_ptr: core::mem::MaybeUninit::uninit().assume_init(),
-            };
-            let try_val = core::intrinsics::r#try(
-                call_func::<F, A, R>,
-                &mut d as *mut _ as *mut u8,
-                &mut panic_cause_ptr as *mut _ as *mut u8,
-            );
-            match try_val {
-                0 => Ok(ManuallyDrop::into_inner(d.r_ptr)), // success, no panic
-                x => {
-                    // a panic occurred
-                    // TODO FIXME: recover the cause from the `panic_cause_ptr`
-                    warn!("task_wrapper(): caught panic (try_val {}) in {:?}, panic_cause_ptr: {:#X}", x, get_my_current_task(), panic_cause_ptr);
-                    Err("panic")
-                }
-            }
-        };
-        debug!("task_wrapper [2.5]: result {:?}", debugit!(result));
-        result
-    };
-        
+    // Now we actually invoke the entry point function that this Task was spawned for, catching a panic if one occurs.
+    let result = catch_unwind::catch_unwind_with_arg(func, arg);
+    
 
     // Here: now that the task is finished running, we must clean in up by doing three things:
-    // 1. Put the task into a non-runnable mode (exited), and set its exit value
+    // 1. Put the task into a non-runnable mode (exited or killed), and set its exit value
     // 2. Remove it from its runqueue
     // 3. Yield the CPU
     // The first two need to be done "atomically" (without interruption), so we must disable preemption before step 1.
@@ -694,16 +646,19 @@ fn task_wrapper<F, A, R>() -> !
             
             // (1) Put the task into a non-runnable mode (exited or killed), and set its exit value accordingly
             match result {
+                // task exited properly
                 Ok(exit_value) => {
-                    // task exited properly
                     debug!("task_wrapper [2]: \"{}\" exited with return value {:?}", curr_task_name, debugit!(exit_value));
                     if curr_task_ref.mark_as_exited(Box::new(exit_value)).is_err() {
-                        warn!("task_wrapper: \"{}\" task could not set exit value, because it had already exited. Is this correct?", curr_task_name);
+                        error!("task_wrapper: \"{}\" task could not set exit value, because task had already exited. Is this correct?", curr_task_name);
                     }
                 }
-                Err(e) => {
-                    // task panicked, and we caught it above
-                    debug!("task_wrapper [2]: \"{}\" panicked with return value {:?}", curr_task_name, e);
+                // task panicked, and we caught it above
+                Err(cause) => {
+                    debug!("task_wrapper [2]: \"{}\" panicked with {:?}", curr_task_name, cause);
+                    if curr_task_ref.mark_as_killed(cause).is_err() {
+                        error!("task_wrapper: \"{}\" task could not set kill reason, because task had already exited. Is this correct?", curr_task_name);
+                    }
                 }
             }            
 
