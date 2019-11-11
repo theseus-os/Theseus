@@ -40,7 +40,7 @@ use frame_buffer_alpha::{ AlphaPixel, BLACK, PixelMixer };
 use spin::{Mutex};
 use window_manager_alpha::{WindowProfileAlpha, WINDOW_MANAGER};
 use frame_buffer::{Coord, FrameBuffer};
-use window::Window;
+use window::WindowProfile;
 use displayable::Displayable;
 
 /// The title bar size, in number of pixels

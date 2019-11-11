@@ -41,7 +41,7 @@ use frame_buffer_compositor::{FRAME_COMPOSITOR, FrameBufferBlocks};
 use frame_buffer_drawer::*;
 use frame_buffer_rgb::FrameBufferRGB;
 use spin::{Mutex, Once};
-use window::Window;
+use window::WindowProfile;
 pub use window_list::{
     SCREEN_BACKGROUND_COLOR, WINDOW_ACTIVE_COLOR,
     WINDOW_INACTIVE_COLOR, WINDOW_MARGIN, WINDOW_PADDING, WindowList
@@ -63,7 +63,7 @@ pub fn init() -> Result<(), &'static str> {
 
 lazy_static! {
     /// A window manager which maintains a list of window profiles.
-    pub static ref WINDOWLIST: Mutex<WindowList<WindowProfile>> = Mutex::new(
+    pub static ref WINDOWLIST: Mutex<WindowList<WindowProfileGeneric>> = Mutex::new(
         WindowList{
             background_list: VecDeque::new(),
             active: Weak::new(),
@@ -75,7 +75,7 @@ lazy_static! {
 /// a consumer of inputs, a list of displayables and a framebuffer.
 pub struct WindowGeneric<Buffer: FrameBuffer> {
     /// The profile object of the window.
-    pub profile: Arc<Mutex<WindowProfile>>,
+    pub profile: Arc<Mutex<WindowProfileGeneric>>,
     /// The key input consumer.
     pub consumer: DFQueueConsumer<Event>,
     /// The components in the window.
@@ -304,7 +304,7 @@ pub fn new_window(
         height - 2 * WINDOW_PADDING,
         None,
     )?;
-    let profile = WindowProfile {
+    let profile = WindowProfileGeneric {
         coordinate: coordinate,
         width: width,
         height: height,
@@ -348,7 +348,7 @@ pub fn new_default_window() -> Result<WindowGeneric<FrameBufferRGB>, &'static st
 }
 
 /// The structure is owned by the window manager. It contains the information of a window but under the control of the manager
-pub struct WindowProfile {
+pub struct WindowProfileGeneric {
     /// the top-left corner of window relative to the top-left corner of the screen
     pub coordinate: Coord,
     /// the width of the window
@@ -361,7 +361,7 @@ pub struct WindowProfile {
     pub events_producer: DFQueueProducer<Event>,
 }
 
-impl Window for WindowProfile {
+impl WindowProfile for WindowProfileGeneric {
     fn clear(&mut self) -> Result<(), &'static str> {
         let buffer_ref = match DESKTOP_FRAME_BUFFER.try() {
             Some(buffer) => buffer,

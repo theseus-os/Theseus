@@ -26,7 +26,7 @@ use frame_buffer::{Coord, FrameBuffer};
 use spin::{Mutex, Once};
 use frame_buffer_alpha::AlphaPixel;
 use window_manager_alpha::WindowProfileAlpha;
-use window::Window;
+use window::WindowProfile;
 
 
 /// a textarea with fixed size, showing matrix of chars.

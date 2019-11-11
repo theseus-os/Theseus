@@ -20,7 +20,7 @@ use alloc::collections::VecDeque;
 use alloc::sync::{Arc, Weak};
 use event_types::Event;
 use spin::{Mutex};
-use window::Window;
+use window::WindowProfile;
 
 /// 10 pixel gap between windows
 pub const WINDOW_MARGIN: usize = 10;
@@ -35,14 +35,14 @@ pub const SCREEN_BACKGROUND_COLOR: u32 = 0x000000;
 
 /// The window list structure.
 /// It contains a list of reference to background windows and a reference to the active window.
-pub struct WindowList<T: Window> {
+pub struct WindowList<T: WindowProfile> {
     /// The list of inactive windows. Their order is based on the last time they were active. The first window is the window which was active most recently.
     pub background_list: VecDeque<Weak<Mutex<T>>>,
     /// A weak pointer to the active window.
     pub active: Weak<Mutex<T>>,
 }
 
-impl<T: Window> WindowList<T> {
+impl<T: WindowProfile> WindowList<T> {
     /// Adds a new window to the list and sets it as active.
     pub fn add_active(
         &mut self,

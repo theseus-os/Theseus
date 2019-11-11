@@ -48,7 +48,7 @@ use path::Path;
 use frame_buffer::{FrameBuffer, Coord, Pixel};
 use compositor::Compositor;
 use frame_buffer_compositor::{FrameBufferBlocks, FRAME_COMPOSITOR};
-use window::Window;
+use window::WindowProfile;
 
 pub static WINDOW_MANAGER: Once<Mutex<WindowManagerAlpha<FrameBufferAlpha, WindowProfileAlpha>>> = Once::new();
 
@@ -106,7 +106,7 @@ struct RectRegion {
 }
 
 /// window manager with overlapping and alpha enabled
-pub struct WindowManagerAlpha<T: FrameBuffer, U: Window> {
+pub struct WindowManagerAlpha<T: FrameBuffer, U: WindowProfile> {
     /// those window currently not shown on screen
     hide_list: VecDeque<Weak<Mutex<U>>>,
     /// those window shown on screen that may overlapping each other
@@ -123,7 +123,7 @@ pub struct WindowManagerAlpha<T: FrameBuffer, U: Window> {
     delay_refresh_first_time: bool,
 }
 
-impl <T: FrameBuffer, U: Window> WindowManagerAlpha<T, U> {
+impl <T: FrameBuffer, U: WindowProfile> WindowManagerAlpha<T, U> {
 
     /// set one window to active, push last active (if exists) to top of show_list. if `refresh` is `true`, will then refresh the window's area
     pub fn set_active(&mut self, objref: &Arc<Mutex<U>>, refresh: bool) -> Result<(), &'static str> {
@@ -767,7 +767,7 @@ pub struct WindowProfileAlpha {
     // Wenqiu: TODO add a moving base to the old window
 }
 
-impl Window for WindowProfileAlpha {
+impl WindowProfile for WindowProfileAlpha {
     // Wenqiu: TODO implement the methods
     fn clear(&mut self) -> Result<(), &'static str> {
         self.framebuffer.fill_color(0x80FFFFFF);

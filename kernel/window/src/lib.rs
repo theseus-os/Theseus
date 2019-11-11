@@ -13,7 +13,7 @@ use frame_buffer::{Coord, Pixel};
 
 /// Trait for windows. A window manager holds a list of objects who implement the `Window` trait.
 /// A `Window` provides states required by the window manager such as the size, the loaction and the active state of a window.
-pub trait Window {
+pub trait WindowProfile {
     /// Clears the window on the screen including the border and padding.
     fn clear(&mut self) -> Result<(), &'static str>;
 
