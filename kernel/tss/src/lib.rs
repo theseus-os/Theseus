@@ -29,11 +29,11 @@ lazy_static! {
 /// Should be set to an address within the current userspace task's kernel stack.
 /// WARNING: If set incorrectly, the OS will crash upon an interrupt from userspace into kernel space!!
 pub fn tss_set_rsp0(new_privilege_stack_top: VirtualAddress) -> Result<(), &'static str> {
-    let my_apic_id = try!(apic::get_my_apic_id().ok_or("couldn't get_my_apic_id"));
-    let mut tss_entry = try!(TSS.get(&my_apic_id).ok_or_else(|| {
+    let my_apic_id = apic::get_my_apic_id().ok_or("couldn't get_my_apic_id")?;
+    let mut tss_entry = TSS.get(&my_apic_id).ok_or_else(|| {
         error!("tss_set_rsp0(): couldn't find TSS for apic {}", my_apic_id);
         "No TSS for the current core's apid id" 
-    })).lock();
+    })?.lock();
     tss_entry.privilege_stack_table[0] = x86_64::VirtualAddress(new_privilege_stack_top.value());
     // trace!("tss_set_rsp0: new TSS {:?}", tss_entry);
     Ok(())
