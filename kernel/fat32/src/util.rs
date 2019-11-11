@@ -1,20 +1,19 @@
 use zerocopy::{FromBytes, AsBytes, LayoutVerified, ByteSlice, Unaligned};
 use zerocopy::byteorder::{U16, U32};
 use byteorder::{ByteOrder, LittleEndian};
-use core::mem::size_of;
 use core::cmp::{Ord, Ordering, min};
 use core::char::decode_utf16;
-use core::str::from_utf8;
 use alloc::vec::Vec;
 use alloc::string::String;
 use alloc::string::ToString;
+use core::convert::{From, TryFrom};
 
 use fs_core::{Error};
 use crate::{FREE_DIRECTORY_ENTRY, FileAttributes, DOT_DIRECTORY_ENTRY};
 
 #[repr(packed)]
 pub struct ShortName {
-    pub name: [u8; 11],
+    name: [u8; 11],
 }
 
 impl ShortName {
@@ -87,11 +86,43 @@ impl ShortName {
     }
 }
 
-// TODO: May want a method to validate the LongName struct too.
-/// Generalized name struct that can be filled from and written onto disk easily.
-pub struct LongName {
-    pub short_name: ShortName,
-    pub long_name: Vec<[u16; 13]>,
+// TODO if we construct the canonical short name, it depends on the number of
+// duplicates on disk, so we'll need to figure that out somehow, which is quite
+// a bit outside of the scope of how we're currently doing things.
+// For now I'm probably going to just make things ~1 for all short names if truncated.
+// Another option is to manually modify the long name after construction to account for
+// the number of aliases? Seems less awful, but leads to some less idiomatic code.
+// I think that the most effective solution is to either set a flag or simply
+// check that the long_name field is not empty and then overwrite the short name
+// before interacting with disk based on the number of duplicates.
+impl From<DiskName> for ShortName {
+    fn from(name: DiskName) -> ShortName {
+        ShortName::new(
+        match name.name.rsplitn(1, |x| x == '.').collect::<Vec<&str>>()[0..2] {
+            [name_without_extension] => {
+                let mut short_name: [u8; 11] = *b"           ";
+                let num_bytes_to_copy = min(8, name_without_extension.as_bytes().len());
+                short_name[0..num_bytes_to_copy].copy_from_slice(&name_without_extension.as_bytes()[0..num_bytes_to_copy]);
+                short_name[8..11].copy_from_slice(b"   ");
+                short_name
+            },
+            [base, extension]        => {
+                let mut short_name: [u8; 11] = *b"           ";
+                let num_bytes_to_copy = min(8, base.as_bytes().len());
+                short_name[0..num_bytes_to_copy].copy_from_slice(&base.as_bytes()[0..num_bytes_to_copy]);
+
+                let num_bytes_to_copy = min(3, extension.as_bytes().len());
+                short_name[8..(8+num_bytes_to_copy)].copy_from_slice(&extension.as_bytes()[0..num_bytes_to_copy]);
+
+                short_name
+            },
+            // Cases that should not be possible given behavior for rsplitn
+            _ => {
+                error!("fat32::DiskName::to_long_name encountered unexpected return from rsplitn");
+                *b"           "
+            }
+        })
+    }
 }
 
 /// Indicates whether the FATDirectory entry is a FATFile or a FATDirectory
@@ -99,6 +130,13 @@ pub struct LongName {
 pub enum FileType {
     FATFile,
     FATDirectory,
+}
+
+// TODO: May want a method to validate the LongName struct too.
+/// Generalized name struct that can be filled from and written onto disk easily.
+pub struct LongName {
+    short_name: ShortName,
+    long_name: Vec<[u16; 13]>,
 }
 
 impl LongName {
@@ -143,17 +181,38 @@ impl LongName {
         Ok(long_name)
     }
 
-    pub fn from_short_name(short_name: ShortName) -> LongName {
+    pub fn empty() -> LongName {
+        LongName {
+            short_name: ShortName::new([0; 11]),
+            long_name: Vec::new(),
+        }
+    }
+
+    pub fn with_capacity(capacity: usize) -> LongName {
+        LongName {
+            short_name: ShortName::new([0; 11]),
+            long_name: Vec::with_capacity(capacity)
+        }
+    }
+}
+
+impl From<ShortName> for LongName {
+    fn from(short_name: ShortName) -> LongName {
         let mut long_name = LongName::empty();
         long_name.short_name = short_name;
         long_name
     }
+}
 
-    pub fn empty() -> LongName {
-        LongName {
-            short_name: ShortName::new([0; 11]),
-            long_name: vec!(),
-        }
+impl From<DiskName> for LongName {
+    // FIXME this is implementation is mostly what we'd need for 
+    fn from(name: DiskName) -> LongName {
+        let long_name = LongName::from(ShortName::from(name));
+
+        // TODO encode the name into UCS-2 and split into small buffers
+        // to construct the UCS-2 encoded long name.
+
+        unimplemented!();
     }
 }
 
@@ -161,7 +220,7 @@ impl LongName {
 #[derive(Clone)]
 #[derive(Debug)]
 pub struct DiskName {
-    pub name: String,
+    name: String,
 }
 
 impl DiskName {
@@ -169,28 +228,17 @@ impl DiskName {
     fn to_comp_name(&self) -> String {
         self.name.to_uppercase()
     }
+}
 
-    pub fn from_string(name: &str) -> Result<DiskName, Error> {
-        // FIXME validate string names:
-        if name.is_empty() {
-            warn!("DiskName::from_string called with empty string");
-            return Err(Error::IllegalArgument);
-        }
+impl TryFrom<LongName> for DiskName {
+    type Error = Error;
 
-        // TODO this actually needs to go in the to_long_name method
-        // since the short name bytes are the only part where trailing spaces get stripped.
-        // FIXME properly strip trailing spaces:
-        Ok(DiskName {
-            name: name.trim_end().to_string()
-        })
-    }
-
-    pub fn from_long_name(long_name: LongName) -> Result<DiskName, Error> {
-        // If the long name is empty emit a short name:
+    fn try_from(long_name: LongName) -> Result<DiskName, Error> {
+                // If the long name is empty emit a short name:
         // This requires following some specific rules as given in 
         // https://en.wikipedia.org/wiki/8.3_filename
         if long_name.long_name.is_empty() {
-            return DiskName::from_string(&long_name.short_name.canonical_string());
+            return DiskName::try_from(&long_name.short_name.canonical_string() as &str);
         }
 
         let chars_raw = long_name.long_name.iter().map(
@@ -210,58 +258,26 @@ impl DiskName {
         // TODO this name is safe to not check so I should just return it
         // (Although it might not be valid UCS-16 so I could use this function to check the UCS-16)
         // encoding.
-        DiskName::from_string(&utf16_name)
+        DiskName::try_from(&utf16_name as &str)
     }
+}
 
-    // TODO support constructing the long_name field using a UCS-2 encoding.
-    // ALSO TODO if we construct the canonical short name, it depends on the number of
-    // duplicates on disk, so we'll need to figure that out somehow, which is quite
-    // a bit outside of the scope of how we're currently doing things.
-    // For now I'm probably going to just make things ~1 for all short names if truncated.
-    // Another option is to manually modify the long name after construction to account for
-    // the number of aliases? Seems less awful, but leads to some less idiomatic code.
-    // I think that the most effective solution is to either set a flag or simply
-    // check that the long_name field is not empty and then overwrite the short name
-    // before interacting with disk based on the number of duplicates.
-    pub fn to_long_name(&self) -> LongName {
-        let mut long_name = LongName::empty();
+impl TryFrom<&str> for DiskName {
+    type Error = Error;
 
-        // Check for . and .. entries separately
+    fn try_from(name: &str) -> Result<DiskName, Error> {
+        // FIXME better validate string names:
+        if name.is_empty() {
+            warn!("DiskName::from_string called with empty string");
+            return Err(Error::IllegalArgument);
+        }
 
-
-        //let bytes_to_copy = min(long_name.short_name.len(), name_bytes.len());
-        //long_name.short_name[0..bytes_to_copy].copy_from_slice(&name_bytes[0..bytes_to_copy]);
-        // Construct the canonical short name:
-        long_name.short_name = 
-        ShortName::new(
-        match self.name.rsplitn(1, |x| x == '.').collect::<Vec<&str>>()[0..2] {
-            [name_without_extension] => {
-                let mut short_name: [u8; 11] = *b"           ";
-                let num_bytes_to_copy = min(8, name_without_extension.as_bytes().len());
-                short_name[0..num_bytes_to_copy].copy_from_slice(&name_without_extension.as_bytes()[0..num_bytes_to_copy]);
-                short_name[8..11].copy_from_slice(b"   ");
-                short_name
-            },
-            [base, extension]        => {
-                let mut short_name: [u8; 11] = *b"           ";
-                let num_bytes_to_copy = min(8, base.as_bytes().len());
-                short_name[0..num_bytes_to_copy].copy_from_slice(&base.as_bytes()[0..num_bytes_to_copy]);
-
-                let num_bytes_to_copy = min(3, extension.as_bytes().len());
-                short_name[8..(8+num_bytes_to_copy)].copy_from_slice(&extension.as_bytes()[0..num_bytes_to_copy]);
-
-                short_name
-            },
-            // Cases that should not be possible given behavior for rsplitn
-            _ => {
-                error!("fat32::DiskName::to_long_name encountered unexpected return from rsplitn");
-                *b"           "
-            }
-        });
-
-        // TODO encode the name into UCS-2 and split into small buffers
-        // to construct the UCS-2 encoded long name.
-        long_name
+        // TODO this actually needs to go in the to_long_name method
+        // since the short name bytes are the only part where trailing spaces get stripped.
+        // FIXME properly strip trailing spaces:
+        Ok(DiskName {
+            name: name.trim_end().to_string()
+        })
     }
 }
 
@@ -359,24 +375,19 @@ pub struct RawFatDirectory {
     size: U32<LittleEndian>, // size of FATfile in bytes, volume label or subdirectory flags should be set to 0
 }
 
-#[repr(packed)]
-#[derive(FromBytes, AsBytes, Unaligned)]
-/// A raw 32-byte FAT directory as it exists on disk -> Interpreted as a VFAT name
-pub struct VFATEntry {
-    sequence_number: u8,
-    name1: [U16<LittleEndian>; 5],
-    attributes: u8,
-    filetype: u8,
-    checksum: u8,
-    name2: [U16<LittleEndian>; 6],
-    first_cluster: U16<LittleEndian>,
-    name3: [U16<LittleEndian>; 2],
-}
-
-impl RawFatDirectory {   
+impl RawFatDirectory {
+    /// Create a directory entry from this raw entry. Note that this method should not be called for 
+    /// entries which have a VFAT long name, but right now there is no check in the code for this.
     pub fn to_directory_entry(&self) -> Result<DirectoryEntry, Error> {
         //let name = String::from_utf8(self.name.to_vec()).map_err(|_| Error::IllegalArgument)?;
-        let name = LongName::from_short_name(ShortName::new(self.name));
+        let name: LongName = ShortName::new(self.name).into();
+
+        // Note that this doesn't detect if this is part of a VFAT entry, but unfortunately there isn't much of a check.
+        // (Although we could check for a trimmed name)
+        // TODO
+        if self.is_vfat() {
+            warn!("RawFatDirectory::to_directory_entry called for VFAT directory.")
+        }
 
         self.to_directory_entry_with_name(name)
     }
@@ -390,7 +401,7 @@ impl RawFatDirectory {
         }
         
         Ok(DirectoryEntry {
-            name: DiskName::from_long_name(name)?,
+            name: DiskName::try_from(name)?,
             file_type: if self.flags & FileAttributes::SUBDIRECTORY.bits == FileAttributes::SUBDIRECTORY.bits {
                 FileType::FATDirectory
             } else {
@@ -451,6 +462,35 @@ impl RawFatDirectory {
     }
 }
 
+#[repr(packed)]
+#[derive(FromBytes, AsBytes, Unaligned)]
+/// A raw 32-byte FAT directory as it exists on disk -> Interpreted as a VFAT name
+pub struct VFATEntry {
+    sequence_number: u8,
+    name1: [U16<LittleEndian>; 5],
+    attributes: u8,
+    filetype: u8,
+    checksum: u8,
+    name2: [U16<LittleEndian>; 6],
+    first_cluster: U16<LittleEndian>,
+    name3: [U16<LittleEndian>; 2],
+}
+
+impl VFATEntry {
+    fn empty() -> VFATEntry {
+        VFATEntry {
+            sequence_number: 0,
+            name1: [U16::new(0); 5],
+            attributes: 0x0F, // Always the attribute according to wikipedia
+            filetype: 0, // Generally 0, may have some reserved meaning
+            checksum: 0, // Need to compute this and fill it in. FIXME
+            name2: [U16::new(0); 6],
+            first_cluster: U16::new(0),
+            name3: [U16::new(0); 2],
+        }
+    }
+}
+
 
 // REVIEW: I think at some point this type needs a mapping to and from ClusterChain
 // but once that happens it almost seems like this type might be a bit redundant.
@@ -469,18 +509,15 @@ pub struct DirectoryEntry {
 
 // TODO these methods need to potentially generate a sequence of entries.
 impl DirectoryEntry {    
-    // FIXME method has wrong implementation for long names on disk.
-    // Once DiskName::to_long_name is preopery done then this will be pretty straightforward.
-    // I think what we can do is rename this method to convert a Directory Entry into
-    // the on disk Directory entry that isn't used for the VFAT long name and add another method
-    // to deal with the long name.
-    /// Converts this directory entry to the RawFatDirectory that will represent this object on disk.
-    /// Note that this function will not return the sequence of entries used for the VFAT long name.
-    pub fn to_raw_fat_directory(&self) -> RawFatDirectory {
 
-        let long_name = self.name.to_long_name();
+    /// NOTE That the unimplemented checksum in theory requires the long name that we use
+    /// to be the known on disk one. Which is sort of out of the scope of our current type setup.
+    /// Converts this directory entry to the raw entries that will represent this object on disk.
+    // I think in the long run we'll have to have DiskNames carry around the long name as well.
+    pub fn to_raw_entries(&self) -> (RawFatDirectory, Vec<VFATEntry>) {
+        let long_name: LongName = self.name.clone().into();
 
-        RawFatDirectory {
+        let short_name_entry = RawFatDirectory {
             name: long_name.short_name.name,
             flags: match self.file_type {
                 FileType::FATFile => 0x0,
@@ -491,7 +528,50 @@ impl DirectoryEntry {
             _unused2: [0; 4],
             cluster_low: U16::new((self.cluster) as u16),
             size: U32::new(self.size)
-        }
+        };
+
+        // Spec requires at most 20 entries (for a length 255 name).
+        // In theory this has already been checked, but is relatively recoverable.
+        let dir_count: u8 = if long_name.long_name.len() > 20 {
+            error!("DirectoryEntry::to_raw_entries called with long name having more than 20 entries");
+            20
+        } else {
+            long_name.long_name.len() as u8
+        };
+
+        let mut vfat_entries = Vec::with_capacity(dir_count as usize);
+
+        let checksum = 0; // FIXME need LongName::checksum first...
+
+        // Want entries in order we write onto disk. So sequence number counts down:
+        for (i, name_segment) in long_name.long_name.iter().take(dir_count as usize).enumerate() {
+            let sequence_number: u8 = dir_count - i as u8;
+            let sequence_number_raw = if sequence_number == dir_count {
+                // FIXME bitfields here
+                sequence_number | 0x40
+            } else {
+                sequence_number
+            };
+
+            let mut entry = VFATEntry::empty();
+            entry.sequence_number = sequence_number_raw;
+            entry.checksum = checksum;
+
+            // FIXME do this idiomatically:
+            for i in 0..5 {
+                entry.name1[i] = U16::new(name_segment[i]);
+            }
+            for i in 0..6 {
+                entry.name2[i] = U16::new(name_segment[i + 5]);
+            }
+            for i in 0..2 {
+                entry.name3[i] = U16::new(name_segment[i + 11]);
+            }
+
+            vfat_entries.push(entry);           
+        };
+
+        (short_name_entry, vfat_entries)
     }
 
     pub fn is_dot(&self) -> bool {

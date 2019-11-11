@@ -121,6 +121,7 @@ use fs_node::{DirRef, WeakDirRef, Directory, FileOrDir, File, FsNode};
 use alloc::sync::{Arc, Weak};
 use core::mem::size_of;
 use core::cmp::{Ord, Ordering, min};
+use core::convert::{TryFrom};
 use alloc::vec::Vec;
 use alloc::string::String;
 use alloc::string::ToString;
@@ -244,15 +245,14 @@ impl Directory for FATDirectory {
     }
 
     fn get(&self, name: &str) -> Option<FileOrDir> {
-        let name = DiskName::from_string(name).ok()?;
+        let validated_name = DiskName::try_from(name).ok()?;
 
         debug!("FATDirectory::get called for {:?}", name.to_string());
 
-        match name.name.as_str() {
-            // 
+        match name {
             "." => self.dot.upgrade().map(|x| FileOrDir::Dir(x)),
             ".." => self.cc.parent.upgrade().map(|x| FileOrDir::Dir(x)),
-            _ => self.fat32_get(&name).ok(),
+            _ => self.fat32_get(&validated_name).ok(),
         }
     }
 
@@ -270,12 +270,12 @@ impl Directory for FATDirectory {
             Err(Error::NotFound) => {},
             Err(_) => {
                 warn!("Failed to fully walk directory");
-                return children.keys().map(|x| x.name.clone()).collect::<Vec<String>>();
+                return children.keys().map(|x| x.to_string()).collect::<Vec<String>>();
             }
 
         }
 
-        let mut entries = children.keys().map(|x| x.name.clone()).collect::<Vec<String>>();
+        let mut entries = children.keys().map(|x| x.to_string()).collect::<Vec<String>>();
         entries.push(".".to_string());
         entries.push("..".to_string());
         entries
@@ -411,8 +411,7 @@ impl FATDirectory {
         }
 
         // Construct a long_name object to hold the name:
-        let mut long_name = LongName::empty();
-        long_name.long_name.reserve(sequence_number);
+        let mut long_name = LongName::with_capacity(sequence_number);
 
         let byte_offset = fs.pos_to_byte_offset(pos);
         
@@ -824,7 +823,7 @@ pub fn init(sd: storage_device::StorageDeviceRef, root_name: &str) -> Result<Arc
 /// Returns the FATDirectory structure for the root directory 
 fn root_dir(fs: Filesystem, mount_name: &str) -> Result<Arc<Mutex<RootDirectory>>, &'static str> {
 
-    let new_name = DiskName::from_string(mount_name).map_err(|_| "Invalid mount name")?;
+    let new_name = DiskName::try_from(mount_name).map_err(|_| "Invalid mount name")?;
     let mut cc = ClusterChain::new(2, Arc::new(Mutex::new(fs)), new_name, 
         Weak::<Mutex<FATDirectory>>::new(), 0);
     cc.parent_count = 2; // TODO what number to choose. We definitely don't want the on disk
@@ -904,18 +903,16 @@ impl Drop for RootDirectory {
 }
 
 /// Function to print the raw byte name as a string. TODO find a better way.
-fn debug_name(byte_name: &[u8]) -> &str {
-    match core::str::from_utf8(byte_name) {
-        Ok(name) => name,
-        Err(_) => "Couldn't find name"
-    }
+fn debug_name(byte_name: &[u8]) -> String {
+    let name = String::from_utf8_lossy(byte_name);
+    name.to_string()
 }
 
 // REVIEW: to ensure any sort of sane behavior we need some way to ensure that each storage controller cannot be used
 // a second time otherwise we end up with multiple objects representing the same on disk object, which is bad.
 // Not sure of a good way to work around this without digging into the storage controller type?
 /// Searches all storage controlers and attempts to mount each valid fat32 drive as "fat32_drive_{}"
-pub fn test_insert() ->  Result<(), &'static str> {
+pub fn probe_and_init_drives() ->  Result<(), &'static str> {
     let mut num_drives = 0;
     let mut name = format!("fat32_drive_{}", num_drives);
 

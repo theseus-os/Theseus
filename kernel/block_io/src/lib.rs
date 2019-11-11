@@ -3,6 +3,8 @@
 //! For example, these wrappers can expose a storage device that transfers 512-byte blocks at a time
 //! as a device that can transfer arbitrary bytes at a time (as little as one byte). 
 //! 
+//! Furthermore, these reads and writes are cached using the `block_cache` crate.
+//! 
 //! # Limitations
 //! Currently, the `BlockIo` struct is hardcoded to use a `StorageDevice` reference,
 //! when in reality it should just use anything that implements traits like `BlockReader + BlockWriter`. 
@@ -10,10 +12,6 @@
 //! The read and write functions are implemented such that if the backing storage device
 //! needs to be accessed, it is done so by transferring only one block at a time. 
 //! This is quite inefficient, and we should instead transfer multiple blocks at once. 
-//! 
-//! Cached blocks are stored as vectors of bytes on the heap, 
-//! we should do something else such as separate mapped regions. 
-//! Cached blocks cannot yet be dropped to relieve memory pressure. 
 
 #![no_std]
 

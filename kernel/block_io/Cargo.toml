@@ -2,7 +2,7 @@
 authors = ["Kevin Boos <kevinaboos@gmail.com>"]
 name = "block_io"
 description = "A generic layer for converting between IO streams of different block sizes, with caching"
-version = "0.1.1"
+version = "0.1.0"
 build = "../../build.rs"
 
 [dependencies]

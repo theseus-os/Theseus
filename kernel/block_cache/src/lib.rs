@@ -1,19 +1,24 @@
-//! Wrappers for converting block I/O operations from one block size to another.
+//! A caching layer for block based storage devices.
 //! 
-//! For example, these wrappers can expose a storage device that transfers 512-byte blocks at a time
-//! as a device that can transfer arbitrary bytes at a time (as little as one byte). 
+//! For many storage devices, calls to the backing medium are quite expensive. This layer intends to reduce those calls,
+//! improving efficiency in exchange for additional memory usage. Note that this crate is intended to be used as a part of
+//! `block_io`, but should work on its own.
 //! 
 //! # Limitations
-//! Currently, the `BlockIo` struct is hardcoded to use a `StorageDevice` reference,
+//! Currently, the `BlockCache` struct is hardcoded to use a `StorageDevice` reference,
 //! when in reality it should just use anything that implements traits like `BlockReader + BlockWriter`. 
 //! 
-//! The read and write functions are implemented such that if the backing storage device
-//! needs to be accessed, it is done so by transferring only one block at a time. 
-//! This is quite inefficient, and we should instead transfer multiple blocks at once. 
+//! The read and write functions currently only support reading/writing individual blocks from disk even
+//! when the caller might prefer reading a larger number of contiguous blocks. This is inneficient and an
+//! optimized implementation should read multiple blocks at once if possible.
 //! 
 //! Cached blocks are stored as vectors of bytes on the heap, 
 //! we should do something else such as separate mapped regions. 
 //! Cached blocks cannot yet be dropped to relieve memory pressure. 
+//! 
+//! Currently this crate takes a reference to a storage device as an argument to its methods. However because the object
+//! does not hold onto ownership of the device, there is no way for Rust to guarantee that actions from other entities invalidate
+//! the contents of the storage device. In practice this object should hold the storage device so no-others can change it.
 
 #![no_std]
 
@@ -29,13 +34,7 @@ use hashbrown::{
 };
 use storage_device::{StorageDevice};
 
-/// A wrapper around a `StorageDevice` that supports reads and writes of arbitrary byte lengths
-/// (down to a single byte) by issuing commands to the underlying storage device.
-/// This is needed because most storage devices only allow reads/writes of larger blocks, 
-/// e.g., a 512-byte sector or 4KB cluster.  
-/// 
-/// It also contains a cache for the blocks in the backing storage device,
-/// in order to improve performance by avoiding actual storage device access.
+/// A cache to store read and written blocks from a storage device.
 pub struct BlockCache {
     /// The cache of blocks (sectors) read from the storage device,
     /// a map from sector number to data byte array.
@@ -43,7 +42,7 @@ pub struct BlockCache {
 }
 
 impl BlockCache {
-    /// Creates a new `BlockIo` device 
+    /// Creates a new `BlockCache` device 
     pub fn new() -> BlockCache {
         BlockCache {
             cache: HashMap::new(),

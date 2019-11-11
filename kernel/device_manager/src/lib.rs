@@ -94,7 +94,7 @@ pub fn init(keyboard_producer: DFQueueProducer<Event>) -> Result<(), &'static st
     }
 
     // Iterate through found storage devices to search for FAT32 filesystems.
-    fat32::test_insert()?;
+    fat32::probe_and_init_drives()?;
 
     // Convenience notification for developers to inform them of no networking devices
     if network_manager::NETWORK_INTERFACES.lock().is_empty() {
