@@ -130,7 +130,7 @@ pub fn init(
     // init the display subsystem
     // Currently we use a FrameBufferRGB as the final frame buffer, but other types of FrameBuffers could be used instead.
     //frame_buffer_rgb::init()?;
-    font::init()?;
+    //font::init()?;
     //window_manager::init()?;
     //info!("Display subsystem initialized successfully.");
 
@@ -138,6 +138,7 @@ pub fn init(
     // let input_event_queue_producer = input_event_manager::init()?;
 
     // initialize the rest of our drivers
+    // Wenqiu
     device_manager::init(key_producer, mouse_producer)?;
     task_fs::init()?;
 

@@ -116,7 +116,7 @@ pub struct WindowComponents {
 impl WindowComponents {
     /// create new WindowComponents by given position and size, return the Mutex of it for ease of sharing
     /// x, y is the distance in pixel relative to left-top of window
-    pub fn new(x: isize, y: isize, width: usize, height: usize) -> Result<Arc<Mutex<WindowComponents>>, &'static str> {
+    pub fn new(x: isize, y: isize, width: usize, height: usize) -> Result<WindowComponents, &'static str> {
 
         if width <= 2 * WINDOW_TITLE_BAR || height <= WINDOW_TITLE_BAR + WINDOW_BORDER {
             return Err("window too small to even draw border");
@@ -167,7 +167,7 @@ impl WindowComponents {
         window_manager_alpha::refresh_area_absolute(x_start, x_end, y_start, y_end)?;
         debug!("after refresh");
 
-        Ok(Arc::new(Mutex::new(wincomps)))
+        Ok(wincomps)
     }
 
     /// draw the border of this window, with argument of whether this window is active now

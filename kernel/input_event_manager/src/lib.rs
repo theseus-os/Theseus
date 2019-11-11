@@ -78,7 +78,8 @@ pub fn init() -> Result<(DFQueueProducer<Event>, DFQueueProducer<Event>), &'stat
     let (width, height) = frame_buffer_alpha::init()?;
 
     // init window manager_alpha
-    window_manager_alpha::init(keyboard_event_handling_consumer, mouse_event_handling_consumer, width, height)?;
+    // Wenqiu
+     window_manager_alpha::init(keyboard_event_handling_consumer, mouse_event_handling_consumer, width, height)?;
 
     // Spawns the terminal print crate so that we can print to the terminal
     ApplicationTaskBuilder::new(terminal_print_path)

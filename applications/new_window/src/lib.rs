@@ -54,13 +54,12 @@ pub fn main(_args: Vec<String>) -> isize {
     debug!("parameters {:?}", (x, y, width, height));
 
     // create the instance of WindowComponents, which provides basic drawing of a window and basic response to user input
-    let wincomps_mutex = match window_components::WindowComponents::new(
+    let mut wincomps = match window_components::WindowComponents::new(
         x, y, width, height  // the position and size of window, including the title bar and border
     ) {
         Ok(m) => m,
         Err(err) => { error!("new window components returned err: {}", err); return -2; }
     };
-    let mut wincomps = wincomps_mutex.lock();
 
     // get the actual inner size for user to put components
     let (width_inner, height_inner) = wincomps.inner_size();
