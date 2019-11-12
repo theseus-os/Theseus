@@ -1,6 +1,5 @@
 #![no_std]
 #![feature(asm)]
-#![feature(core_intrinsics)]
 #![feature(stmt_expr_attributes)]
 
 extern crate alloc;
@@ -20,6 +19,7 @@ extern crate apic;
 extern crate context_switch;
 extern crate path;
 extern crate type_name;
+extern crate catch_unwind;
 
 
 use core::{
@@ -606,7 +606,7 @@ pub fn spawn_userspace(path: Path, name: Option<String>) -> Result<TaskRef, &'st
 
         
         // get frame allocator reference
-        let allocator_mutex = try!(FRAME_ALLOCATOR.try().ok_or("couldn't get FRAME ALLOCATOR"));
+        let allocator_mutex = FRAME_ALLOCATOR.try().ok_or("couldn't get FRAME ALLOCATOR")?;
 
         // new_frame is a single frame, and temp_frames1/2 are tuples of 3 Frames each.
         let (new_frame, temp_frames1, temp_frames2) = {
@@ -614,9 +614,9 @@ pub fn spawn_userspace(path: Path, name: Option<String>) -> Result<TaskRef, &'st
             // a quick closure to allocate one frame
             let mut alloc_frame = || allocator.allocate_frame().ok_or("couldn't allocate frame"); 
             (
-                try!(alloc_frame()),
-                (try!(alloc_frame()), try!(alloc_frame()), try!(alloc_frame())),
-                (try!(alloc_frame()), try!(alloc_frame()), try!(alloc_frame()))
+                alloc_frame()?,
+                (alloc_frame()?, alloc_frame()?, alloc_frame()?),
+                (alloc_frame()?, alloc_frame()?, alloc_frame()?)
             )
         };
 
@@ -639,7 +639,7 @@ pub fn spawn_userspace(path: Path, name: Option<String>) -> Result<TaskRef, &'st
         // first we need to temporarily map the module memory region into our address space, 
         // so we can then parse the module as an ELF file in the kernel. (Doesn't need to be USER_ACCESSIBLE). 
         let (elf_progs, entry_point) = {
-            let new_pages = try!(allocate_pages_by_bytes(module.size()).ok_or("couldn't allocate pages for module"));
+            let new_pages = allocate_pages_by_bytes(module.size()).ok_or("couldn't allocate pages for module")?;
             let temp_module_mapping = {
                 let mut allocator = allocator_mutex.lock();
                 kernel_mmi_locked.page_table.map_allocated_pages_to(
@@ -648,7 +648,7 @@ pub fn spawn_userspace(path: Path, name: Option<String>) -> Result<TaskRef, &'st
                 )?
             };
 
-            try!(mod_mgmt::elf_executable::parse_elf_executable(temp_module_mapping, module.size()))
+            mod_mgmt::elf_executable::parse_elf_executable(temp_module_mapping, module.size())?
             
             // temp_module_mapping is automatically unmapped when it falls out of scope here (frame allocator must not be locked)
         };
@@ -774,18 +774,13 @@ fn task_wrapper<F, A, R>() -> !
     enable_interrupts(); // we must enable interrupts for the new task, otherwise we won't be able to preempt it.
     compiler_fence(Ordering::SeqCst); // I don't think this is necessary...    
 
-    // Now we're ready to actually invoke the entry point function that this Task was spawned for
-    let exit_value = func(arg);
 
-    // let mut panic_cause: u64 = 0;
-    // let result = unsafe {
-    //     core::instrinsics::try(fn_ptr, arg_ptr, cause_ptr)
-    // };
-    // debug!("task_wrapper [2.5]: result {:?}", debugit!(result));
-        
+    // Now we actually invoke the entry point function that this Task was spawned for, catching a panic if one occurs.
+    let result = catch_unwind::catch_unwind_with_arg(func, arg);
+    
 
     // Here: now that the task is finished running, we must clean in up by doing three things:
-    // 1. Put the task into a non-runnable mode (exited), and set its exit value
+    // 1. Put the task into a non-runnable mode (exited or killed), and set its exit value
     // 2. Remove it from its runqueue
     // 3. Yield the CPU
     // The first two need to be done "atomically" (without interruption), so we must disable preemption before step 1.
@@ -798,12 +793,24 @@ fn task_wrapper<F, A, R>() -> !
         { 
             let curr_task_ref = get_my_current_task().expect("BUG: task_wrapper: couldn't get current task (after task func).");
             let curr_task_name = curr_task_ref.lock().name.clone();
-            debug!("task_wrapper [2]: \"{}\" exited with return value {:?}", curr_task_name, debugit!(exit_value));
             
-            // (1) Put the task into a non-runnable mode (exited), and set its exit value
-            if curr_task_ref.mark_as_exited(Box::new(exit_value)).is_err() {
-                warn!("task_wrapper: \"{}\" task could not set exit value, because it had already exited. Is this correct?", curr_task_name);
-            }
+            // (1) Put the task into a non-runnable mode (exited or killed), and set its exit value accordingly
+            match result {
+                // task exited properly
+                Ok(exit_value) => {
+                    debug!("task_wrapper [2]: \"{}\" exited with return value {:?}", curr_task_name, debugit!(exit_value));
+                    if curr_task_ref.mark_as_exited(Box::new(exit_value)).is_err() {
+                        error!("task_wrapper: \"{}\" task could not set exit value, because task had already exited. Is this correct?", curr_task_name);
+                    }
+                }
+                // task panicked, and we caught it above
+                Err(cause) => {
+                    debug!("task_wrapper [2]: \"{}\" panicked with {:?}", curr_task_name, cause);
+                    if curr_task_ref.mark_as_killed(cause).is_err() {
+                        error!("task_wrapper: \"{}\" task could not set kill reason, because task had already exited. Is this correct?", curr_task_name);
+                    }
+                }
+            }            
 
             // (2) Remove it from its runqueue
             #[cfg(not(runqueue_state_spill_evaluation))]  // the normal case

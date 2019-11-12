@@ -20,7 +20,6 @@ extern crate spin;
 use alloc::{
     string::{String},
     vec::Vec,
-    slice::SliceConcatExt,
 };
 use spin::Once;
 use getopts::{Matches, Options};

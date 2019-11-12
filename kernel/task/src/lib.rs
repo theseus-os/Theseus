@@ -161,6 +161,8 @@ pub enum ExitValue {
 }
 
 
+/// The set of possible runstates that a task can be in, e.g.,
+/// runnable, blocked, exited, etc. 
 #[derive(Debug)]
 pub enum RunState {
     /// in the midst of setting up the task

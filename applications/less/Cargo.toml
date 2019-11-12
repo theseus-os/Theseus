@@ -5,7 +5,7 @@ authors = ["Zhiyao Ma <zm16@pku.edu.cn>"]
 build = "../../build.rs"
 
 [dependencies]
-getopts = { git = "https://github.com/kevinaboos/getopts" }
+getopts = "0.2.21"
 spin = "0.4.10"
 core_io = "0.1"
 

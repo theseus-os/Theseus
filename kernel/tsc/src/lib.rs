@@ -63,10 +63,10 @@ pub fn get_tsc_frequency() -> Result<u64, &'static str> {
         // a freq of zero means it hasn't yet been initialized.
         let start = tsc_ticks();
         // wait 10000 us (10 ms)
-        try!(pit_clock::pit_wait(10000));
+        pit_clock::pit_wait(10000)?;
         let end = tsc_ticks(); 
 
-        let diff = try!(end.sub(&start).ok_or("couldn't subtract end-start TSC tick values"));
+        let diff = end.sub(&start).ok_or("couldn't subtract end-start TSC tick values")?;
         let tsc_freq = diff.into() * 100; // multiplied by 100 because we measured a 10ms interval
         info!("TSC frequency calculated by PIT is: {}", tsc_freq);
         TSC_FREQUENCY.store(tsc_freq as usize, Ordering::Release);

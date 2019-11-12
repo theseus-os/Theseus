@@ -73,7 +73,7 @@ pub fn is_exception_handler_with_error_code(address: u64) -> bool {
 pub fn init(double_fault_stack_top_unusable: VirtualAddress, privilege_stack_top_unusable: VirtualAddress) 
     -> Result<&'static LockedIdt, &'static str> 
 {
-    let bsp_id = try!(apic::get_bsp_id().ok_or("couldn't get BSP's id"));
+    let bsp_id = apic::get_bsp_id().ok_or("couldn't get BSP's id")?;
     info!("Setting up TSS & GDT for BSP (id {})", bsp_id);
     gdt::create_tss_gdt(bsp_id, double_fault_stack_top_unusable, privilege_stack_top_unusable);
 
