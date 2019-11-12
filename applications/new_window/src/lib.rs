@@ -29,14 +29,17 @@ extern crate window_components;
 
 extern crate scheduler;
 extern crate text_area;
+extern crate frame_buffer_alpha;
 
 use event_types::{Event};
 use keycodes_ascii::{Keycode, KeyAction};
 use alloc::string::{String};
 use alloc::vec::Vec;
+use alloc::boxed::Box;
 use core::ops::{Deref};
 use hpet::get_hpet;
 use text_area::TextArea;
+use frame_buffer_alpha::FrameBufferAlpha;
 
 #[no_mangle]
 pub fn main(_args: Vec<String>) -> isize {
@@ -54,8 +57,12 @@ pub fn main(_args: Vec<String>) -> isize {
     debug!("parameters {:?}", (x, y, width, height));
 
     // create the instance of WindowComponents, which provides basic drawing of a window and basic response to user input
+    let framebuffer = match FrameBufferAlpha::new(width, height, None) {
+        Ok(fb) => { fb },
+        Err(err) => { error!("{}", err); return -2; }
+    };
     let mut wincomps = match window_components::WindowComponents::new(
-        x, y, width, height  // the position and size of window, including the title bar and border
+        x, y, Box::new(framebuffer)  // the position and size of window, including the title bar and border
     ) {
         Ok(m) => m,
         Err(err) => { error!("new window components returned err: {}", err); return -2; }
@@ -66,7 +73,7 @@ pub fn main(_args: Vec<String>) -> isize {
     debug!("new window done width: {}, height: {}", width_inner, height_inner);
 
     // add textarea to WindowComponents
-    let mut textarea = match TextArea::new(
+    let mut textarea: TextArea = match TextArea::new(
         wincomps.get_border_size() + 4, wincomps.get_title_size() + 4, width_inner - 8, height_inner - 8,  // position and size of textarea
         &wincomps.winobj,  // bind this textarea to WindowComponents
         None, None, Some(wincomps.get_background()), None  // use default parameters

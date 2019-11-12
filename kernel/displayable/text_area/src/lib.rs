@@ -17,6 +17,7 @@ extern crate frame_buffer_alpha;
 extern crate window_manager_alpha;
 extern crate window;
 
+use core::ops::DerefMut;
 use alloc::string::String;
 use alloc::vec::Vec;
 use alloc::sync::{Arc, Weak};
@@ -144,7 +145,7 @@ impl TextArea {
                     let coordinate = winobj.get_content_position();
                     let winx = coordinate.x;
                     let winy = coordinate.y;
-                    self.set_char_in(x, y, c, &mut winobj.framebuffer)?;
+                    self.set_char_in(x, y, c, winobj.framebuffer.deref_mut())?;
                     (winx, winy)
                 };
                 let wx = self.x + x * (8 + self.column_spacing);

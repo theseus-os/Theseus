@@ -60,6 +60,9 @@ path = "../../kernel/path"
 [dependencies.text_area]
 path = "../../kernel/displayable/text_area"
 
+[dependencies.frame_buffer_alpha]
+path = "../../kernel/frame_buffer_alpha"
+
 [lib]
 crate-type = ["rlib"]
 

@@ -567,6 +567,7 @@ dependencies = [
 name = "frame_buffer"
 version = "0.1.0"
 dependencies = [
+ "downcast-rs 1.0.4 (git+https://github.com/theseus-os/downcast-rs)",
  "memory 0.1.0",
  "owning_ref 0.4.0 (git+https://github.com/kevinaboos/owning-ref-rs)",
  "spin 0.4.10 (registry+https://github.com/rust-lang/crates.io-index)",
@@ -1249,6 +1250,7 @@ dependencies = [
  "dfqueue 0.1.0",
  "environment 0.1.0",
  "event_types 0.1.0",
+ "frame_buffer_alpha 0.1.0",
  "fs_node 0.1.0",
  "hpet 0.1.0",
  "keycodes_ascii 0.1.0",
@@ -2404,6 +2406,7 @@ version = "0.1.0"
 dependencies = [
  "compositor 0.1.0",
  "dfqueue 0.1.0",
+ "downcast-rs 1.0.4 (git+https://github.com/theseus-os/downcast-rs)",
  "event_types 0.1.0",
  "font 0.1.0",
  "frame_buffer 0.1.0",

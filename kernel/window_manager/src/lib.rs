@@ -41,7 +41,7 @@ use frame_buffer_compositor::{FRAME_COMPOSITOR, FrameBufferBlocks};
 use frame_buffer_drawer::*;
 use frame_buffer_rgb::FrameBufferRGB;
 use spin::{Mutex, Once};
-use window::WindowProfile;
+use window::{Window, WindowProfile};
 pub use window_list::{
     SCREEN_BACKGROUND_COLOR, WINDOW_ACTIVE_COLOR,
     WINDOW_INACTIVE_COLOR, WINDOW_MARGIN, WINDOW_PADDING, WindowList
@@ -82,6 +82,10 @@ pub struct WindowGeneric<Buffer: FrameBuffer> {
     pub components: BTreeMap<String, Component>,
     /// The framebuffer owned by the window.
     pub framebuffer: Buffer,
+}
+
+impl<Buffer: FrameBuffer> Window for WindowGeneric<Buffer> {
+    
 }
 
 impl<Buffer: FrameBuffer> WindowGeneric<Buffer> {

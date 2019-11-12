@@ -37,10 +37,10 @@ use core::ops::{Deref};
 use dfqueue::{DFQueue, DFQueueConsumer, DFQueueProducer};
 use event_types::{Event, MousePositionEvent};
 use frame_buffer_alpha::{ AlphaPixel, BLACK, PixelMixer };
-use spin::{Mutex};
-use window_manager_alpha::{WindowProfileAlpha, WINDOW_MANAGER};
+use spin::{Mutex, Once};
+use window_manager_alpha::{WindowManagerAlpha, WindowProfileAlpha, WINDOW_MANAGER};
 use frame_buffer::{Coord, FrameBuffer};
-use window::WindowProfile;
+use window::{Window, WindowProfile};
 use displayable::Displayable;
 
 /// The title bar size, in number of pixels
@@ -113,16 +113,22 @@ pub struct WindowComponents {
     pub components: BTreeMap<String, Box<dyn Displayable>>,
 }
 
+
+impl Window for WindowComponents {
+    
+}
+
 impl WindowComponents {
     /// create new WindowComponents by given position and size, return the Mutex of it for ease of sharing
     /// x, y is the distance in pixel relative to left-top of window
-    pub fn new(x: isize, y: isize, width: usize, height: usize) -> Result<WindowComponents, &'static str> {
+    pub fn new(x: isize, y: isize, framebuffer: Box<dyn FrameBuffer>) -> Result<WindowComponents, &'static str> {
 
+        let (width, height) = framebuffer.get_size();
         if width <= 2 * WINDOW_TITLE_BAR || height <= WINDOW_TITLE_BAR + WINDOW_BORDER {
             return Err("window too small to even draw border");
         }
 
-        let winobj_mutex = window_manager_alpha::new_window(x, y, width, height)?;
+        let winobj_mutex = window_manager_alpha::new_window(x, y, framebuffer)?;
 
         // create event queue for components
         let consumer = DFQueue::new().into_consumer();
@@ -265,6 +271,7 @@ impl WindowComponents {
         let mut call_later_do_move_active_window = false;
         let mut need_to_set_active = false;
         let mut need_refresh_three_button = false;
+
         let is_active = window_manager_alpha::is_active(&self.winobj);
         if is_active != self.last_is_active {
             self.draw_border(is_active);
@@ -359,9 +366,7 @@ impl WindowComponents {
             (bx, by)
         };
         if need_to_set_active {
-            if let Err(err) = window_manager_alpha::set_active(&self.winobj) {
-                error!("cannot set to active {}", err);
-            }
+            window_manager_alpha::set_active(&self.winobj)?;
         }
         if need_refresh_three_button {  // if border has been refreshed, no need to refresh buttons
             if let Err(err) = self.refresh_three_button(bx as usize, by as usize) {

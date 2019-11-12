@@ -41,6 +41,7 @@ use window_manager::WindowGeneric;
 use font::{CHARACTER_HEIGHT, CHARACTER_WIDTH};
 use tsc::{tsc_ticks, TscTicks};
 use text_area::TextArea;
+use frame_buffer_alpha::FrameBufferAlpha;
 
 pub const FONT_COLOR: u32 = 0x93ee90;
 pub const BACKGROUND_COLOR: u32 = 0x000000;
@@ -493,13 +494,13 @@ impl Terminal {
 
 /// Public methods of `Terminal`.
 impl Terminal {
-    pub fn new() -> Result<Terminal, &'static str> {
+        pub fn new() -> Result<Terminal, &'static str> {
         // Requests a new window object from the window manager
         let (window_width, window_height) = window_manager_alpha::get_screen_size()?;
         const WINDOW_MARGIN: usize = 20;
+        let framebuffer = FrameBufferAlpha::new(window_width - 2*WINDOW_MARGIN, window_height - 2*WINDOW_MARGIN, None)?;
         let window_object = match window_components::WindowComponents::new(
-            WINDOW_MARGIN as isize, WINDOW_MARGIN as isize, window_width - 2*WINDOW_MARGIN, window_height - 2*WINDOW_MARGIN
-        ) {
+            WINDOW_MARGIN as isize, WINDOW_MARGIN as isize, Box::new(framebuffer)) {
             Ok(window_object) => window_object,
             Err(err) => {debug!("new window returned err"); return Err(err)}
         };

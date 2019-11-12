@@ -133,4 +133,22 @@ impl FrameBuffer for FrameBufferRGB {
     fn draw_pixel_alpha(&mut self, coordinate: Coord, color: Pixel) {
         self.draw_pixel(coordinate, color)
     }
+
+    fn get_pixel(& self, coordinate: Coord) -> Result<Pixel, &'static str> {
+        if let Some(index) = self.index(coordinate) {
+            return Ok(self.buffer[index]);
+        } else {
+            return Err("No pixel");
+        }
+    }
+
+            /// fill the entire frame buffer with given `color`
+    fn fill_color(&mut self, color: Pixel) {
+        for y in 0..self.height {
+            for x in 0..self.width {
+                let coordinate = Coord::new(x as isize, y as isize);
+                self.draw_pixel(coordinate, color);
+            }
+        }
+    }
 }

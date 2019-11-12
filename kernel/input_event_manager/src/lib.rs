@@ -38,6 +38,7 @@ use mod_mgmt::{
 };
 use spawn::ApplicationTaskBuilder;
 use path::Path;
+use frame_buffer_alpha::FrameBufferAlpha;
 
 /// Initializes the keyinput queue and the default display
 pub fn init() -> Result<(DFQueueProducer<Event>, DFQueueProducer<Event>), &'static str> {
@@ -79,7 +80,8 @@ pub fn init() -> Result<(DFQueueProducer<Event>, DFQueueProducer<Event>), &'stat
 
     // init window manager_alpha
     // Wenqiu
-     window_manager_alpha::init(keyboard_event_handling_consumer, mouse_event_handling_consumer, width, height)?;
+    let framebuffer = FrameBufferAlpha::new(width, height, None)?;
+     window_manager_alpha::init(keyboard_event_handling_consumer, mouse_event_handling_consumer, framebuffer)?;
 
     // Spawns the terminal print crate so that we can print to the terminal
     ApplicationTaskBuilder::new(terminal_print_path)

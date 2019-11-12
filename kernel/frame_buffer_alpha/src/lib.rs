@@ -131,25 +131,6 @@ impl FrameBufferAlpha {
         (self.width, self.height)
     }
 
-    /// get one pixel at given position
-    pub fn get_pixel(& self, coordinate: Coord) -> Result<Pixel, &'static str> {
-        let idx = match self.index(coordinate) {
-            Some(index) => { index },
-            None => { return Err("get pixel out of bound"); }
-        };
-        Ok(AlphaPixel::from(self.buffer[idx]))
-    }
-
-    /// fill the entire frame buffer with given `color`
-    pub fn fill_color(&mut self, color: AlphaPixel) {
-        for y in 0..self.height {
-            for x in 0..self.width {
-                let coordinate = Coord::new(x as isize, y as isize);
-                self.draw_pixel(coordinate, color);
-            }
-        }
-    }
-
     /// draw a rectangle on this framebuffer
     pub fn draw_rect(&mut self, xs: usize, xe: usize, ys: usize, ye: usize, color: AlphaPixel) {
         for y in ys..ye {
@@ -167,23 +148,6 @@ impl FrameBufferAlpha {
             for x in xs..xe {
                 let coordinate = Coord::new(x as isize, y as isize);
                 self.draw_pixel_alpha(coordinate, color);
-            }
-        }
-    }
-
-    /// draw a circle on the screen with alpha. (`xc`, `yc`) is the position of the center of the circle, and `r` is the radius
-    pub fn draw_circle_alpha(&mut self, xc: usize, yc: usize, r: usize, color: AlphaPixel) {
-        let r2 = (r*r) as isize;
-        for y in yc-r..yc+r {
-            for x in xc-r..xc+r {
-                let coordinate = Coord::new(x as isize, y as isize);
-                if self.contains(coordinate) {
-                    let xd = x as isize - xc as isize;
-                    let yd = y as isize - yc as isize;
-                    if xd*xd + yd*yd <= r2 {
-                        self.draw_pixel_alpha(Coord::new(x as isize, y as isize), color);
-                    }
-                }
             }
         }
     }
@@ -232,6 +196,25 @@ impl FrameBuffer for FrameBufferAlpha {
         };
         let origin = AlphaPixel::from(self.buffer[idx]);
         self.buffer[idx] = AlphaPixel::from(color).alpha_mix(origin);
+    }
+
+    /// get one pixel at given position
+    fn get_pixel(& self, coordinate: Coord) -> Result<Pixel, &'static str> {
+        let idx = match self.index(coordinate) {
+            Some(index) => { index },
+            None => { return Err("get pixel out of bound"); }
+        };
+        Ok(AlphaPixel::from(self.buffer[idx]))
+    }
+
+        /// fill the entire frame buffer with given `color`
+    fn fill_color(&mut self, color: Pixel) {
+        for y in 0..self.height {
+            for x in 0..self.width {
+                let coordinate = Coord::new(x as isize, y as isize);
+                self.draw_pixel(coordinate, color);
+            }
+        }
     }
 }
 

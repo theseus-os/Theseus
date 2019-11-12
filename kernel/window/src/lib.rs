@@ -61,3 +61,7 @@ pub trait WindowProfile {
         Err("get_pixel() is not implement for this window")
     }
 }
+
+pub trait Window {
+
+}

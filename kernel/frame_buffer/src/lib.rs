@@ -7,6 +7,7 @@ extern crate alloc;
 extern crate memory;
 extern crate owning_ref;
 extern crate spin;
+#[macro_use] extern crate downcast_rs;
 
 use alloc::boxed::Box;
 use memory::MappedPages;
@@ -14,6 +15,7 @@ use owning_ref::BoxRefMut;
 use spin::{Mutex, Once};
 use core::ops::{Add, Sub};
 use core::cmp::{Ord, Ordering};
+use downcast_rs::Downcast;
 
 /// A pixel on the screen is mapped to a u32 integer.
 pub type Pixel = u32;
@@ -22,7 +24,7 @@ pub type Pixel = u32;
 pub static FINAL_FRAME_BUFFER: Once<Mutex<Box<dyn FrameBuffer + Send>>> = Once::new();
 
 /// The `FrameBuffer` trait.
-pub trait FrameBuffer {
+pub trait FrameBuffer: Downcast + Send {
     /// Returns a reference to the mapped memory.
     fn buffer(&self) -> &BoxRefMut<MappedPages, [Pixel]>;
 
@@ -32,6 +34,10 @@ pub trait FrameBuffer {
 
     /// Copies a buffer of pixels to the framebuffer from index `dest_start`.
     fn buffer_copy(&mut self, src: &[Pixel], dest_start: usize);
+
+    fn get_pixel(& self, coordinate: Coord) -> Result<Pixel, &'static str>;
+
+    fn fill_color(&mut self, color: Pixel);
 
     /// Computes the index of a coordinate in the buffer array.
     /// Return `None` is the coordinate is not in the frame buffer.
@@ -66,7 +72,35 @@ pub trait FrameBuffer {
     }
 
     fn draw_pixel_alpha(&mut self, coordinate: Coord, color: Pixel);
+
+    /// draw a circle on the screen with alpha. (`xc`, `yc`) is the position of the center of the circle, and `r` is the radius
+    fn draw_circle_alpha(&mut self, xc: usize, yc: usize, r: usize, color: Pixel) {
+        let r2 = (r*r) as isize;
+        for y in yc-r..yc+r {
+            for x in xc-r..xc+r {
+                let coordinate = Coord::new(x as isize, y as isize);
+                if self.contains(coordinate) {
+                    let xd = x as isize - xc as isize;
+                    let yd = y as isize - yc as isize;
+                    if xd*xd + yd*yd <= r2 {
+                        self.draw_pixel_alpha(Coord::new(x as isize, y as isize), color);
+                    }
+                }
+            }
+        }
+    }
+
+    /// draw a rectangle on this framebuffer
+    fn draw_rect(&mut self, xs: usize, xe: usize, ys: usize, ye: usize, color: Pixel) {
+        for y in ys..ye {
+            for x in xs..xe {
+                let coordinate = Coord::new(x as isize, y as isize);
+                self.draw_pixel(coordinate, color);
+            }
+        }
+    }
 }
+impl_downcast!(FrameBuffer);
 
 /// Gets the size of the final framebuffer.
 /// Returns (width, height).

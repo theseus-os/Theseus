@@ -30,13 +30,15 @@ extern crate frame_buffer;
 extern crate frame_buffer_compositor;
 extern crate compositor;
 extern crate window;
+extern crate downcast_rs;
 
 mod background;
 use alloc::collections::VecDeque;
 use alloc::string::{String, ToString};
 use alloc::sync::{Arc, Weak};
 use alloc::vec::{Vec, IntoIter};
-use core::ops::Deref;
+use alloc::boxed::{Box};
+use core::ops::{Deref, DerefMut};
 use dfqueue::{DFQueue, DFQueueConsumer, DFQueueProducer};
 use event_types::{Event, MousePositionEvent};
 use frame_buffer_alpha::{ FrameBufferAlpha, AlphaPixel, BLACK, PixelMixer };
@@ -49,8 +51,9 @@ use frame_buffer::{FrameBuffer, Coord, Pixel};
 use compositor::Compositor;
 use frame_buffer_compositor::{FrameBufferBlocks, FRAME_COMPOSITOR};
 use window::WindowProfile;
+use downcast_rs::Downcast;
 
-pub static WINDOW_MANAGER: Once<Mutex<WindowManagerAlpha<FrameBufferAlpha, WindowProfileAlpha>>> = Once::new();
+pub static WINDOW_MANAGER: Once<Mutex<WindowManagerAlpha<WindowProfileAlpha>>> = Once::new();
 
 /// The half size of mouse in number of pixels, the actual size of pointer is 1+2*`MOUSE_POINTER_HALF_SIZE`
 const MOUSE_POINTER_HALF_SIZE: usize = 7;
@@ -106,7 +109,7 @@ struct RectRegion {
 }
 
 /// window manager with overlapping and alpha enabled
-pub struct WindowManagerAlpha<T: FrameBuffer, U: WindowProfile> {
+pub struct WindowManagerAlpha<U: WindowProfile> {
     /// those window currently not shown on screen
     hide_list: VecDeque<Weak<Mutex<U>>>,
     /// those window shown on screen that may overlapping each other
@@ -118,12 +121,12 @@ pub struct WindowManagerAlpha<T: FrameBuffer, U: WindowProfile> {
     /// If a window is being repositioned (e.g., by dragging it), this is the position of that window's border
     repositioned_border: Option<RectRegion>,
     /// the frame buffer that it should print on
-    final_fb: T,
+    final_fb: Box<FrameBuffer>,
     /// if it this is true, do not refresh whole screen until someone calls "refresh_area_absolute"
     delay_refresh_first_time: bool,
 }
 
-impl <T: FrameBuffer, U: WindowProfile> WindowManagerAlpha<T, U> {
+impl <U: WindowProfile> WindowManagerAlpha<U> {
 
     /// set one window to active, push last active (if exists) to top of show_list. if `refresh` is `true`, will then refresh the window's area
     pub fn set_active(&mut self, objref: &Arc<Mutex<U>>, refresh: bool) -> Result<(), &'static str> {
@@ -618,6 +621,7 @@ pub fn set_active(objref: &Arc<Mutex<WindowProfileAlpha>>) -> Result<(), &'stati
     win.set_active(objref, true)
 }
 
+// Wenqiu: TODO: rewrite set_active. leave only one generic type in window manager
 /// whether a window is active
 pub fn is_active(objref: &Arc<Mutex<WindowProfileAlpha>>) -> bool {
     match WINDOW_MANAGER.try().ok_or("The static window manager was not yet initialized") {
@@ -688,9 +692,8 @@ pub fn refresh_area_absolute(x_start: isize, x_end: isize, y_start: isize, y_end
     let mut win = WINDOW_MANAGER.try().ok_or("The static window manager was not yet initialized")?.lock();
     if win.delay_refresh_first_time {
         win.delay_refresh_first_time = false;
-        let width = win.final_fb.width as isize;
-        let height = win.final_fb.height as isize;
-        win.refresh_area_with_old_new(0, width, 0, height, x_start, x_end, y_start, y_end)
+        let (width, height) = win.final_fb.get_size();
+        win.refresh_area_with_old_new(0, width as isize, 0, height as isize, x_start, x_end, y_start, y_end)
     } else {
         win.refresh_area(x_start, x_end, y_start, y_end)   
     }
@@ -699,7 +702,7 @@ pub fn refresh_area_absolute(x_start: isize, x_end: isize, y_start: isize, y_end
 pub fn render(blocks: Option<IntoIter<(usize, usize)>>) -> Result<(), &'static str> {
     let mut win = WINDOW_MANAGER.try().ok_or("The static window manager was not yet initialized")?.lock();
     let frame_buffer_blocks = FrameBufferBlocks {
-        framebuffer: &win.final_fb,
+        framebuffer: win.final_fb.deref_mut(),
         coordinate: Coord::new(0, 0),
         blocks: blocks
     };
@@ -707,31 +710,28 @@ pub fn render(blocks: Option<IntoIter<(usize, usize)>>) -> Result<(), &'static s
 }
 
 /// Initialize the window manager, should provide the consumer of keyboard and mouse event, as well as a frame buffer to draw
-pub fn init(
+pub fn init<Buffer: FrameBuffer>(
     key_consumer: DFQueueConsumer<Event>,
     mouse_consumer: DFQueueConsumer<Event>,
-    width: usize,
-    height: usize,
+    framebuffer: Buffer
 ) -> Result<(), &'static str> {
     debug!("Initializing the window manager alpha (transparency)...");
 
     // initialize static window manager
     let delay_refresh_first_time = true;
-    let final_fb = FrameBufferAlpha::new(width, height, None)?;
     let window_manager = WindowManagerAlpha {
         hide_list: VecDeque::new(),
         show_list: VecDeque::new(),
         active: Weak::new(),
         mouse: Point { x: 0, y: 0 },
         repositioned_border: None,
-        final_fb: final_fb,
+        final_fb: Box::new(framebuffer),
         delay_refresh_first_time: delay_refresh_first_time,
     };
     WINDOW_MANAGER.call_once(|| Mutex::new(window_manager));
 
     let mut win = WINDOW_MANAGER.try().ok_or("The static window manager was not yet initialized")?.lock();
-    let screen_width = win.final_fb.width;
-    let screen_height = win.final_fb.height;
+    let (screen_width, screen_height) = win.final_fb.get_size();
     win.mouse = Point { x: screen_width/2, y: screen_height/2 };  // set mouse to middle
     if ! delay_refresh_first_time {
         win.refresh_area(0, screen_width as isize, 0, screen_height as isize)?;
@@ -753,7 +753,7 @@ pub struct WindowProfileAlpha {
     pub consumer: DFQueueConsumer<Event>,  // event input
     producer: DFQueueProducer<Event>,  // event output used by window manager
     /// frame buffer of this window
-    pub framebuffer: FrameBufferAlpha,
+    pub framebuffer: Box<dyn FrameBuffer>,
 
     /// if true, window manager will send all mouse event to this window, otherwise only when mouse is on this window does it send. 
     /// This is extremely helpful when application wants to know mouse movement outside itself, because by default window manager only sends mouse event 
@@ -967,7 +967,7 @@ fn cursor_handle_application(mouse_event: MouseEvent) -> Result<(), &'static str
 /// return the screen size of current window manager, (width, height)
 pub fn get_screen_size() -> Result<(usize, usize), &'static str> {
     let win = WINDOW_MANAGER.try().ok_or("The static window manager was not yet initialized")?.lock();
-    Ok((win.final_fb.width, win.final_fb.height))
+    Ok(win.final_fb.get_size())
 }
 
 /// return current absolute position of mouse, (x, y)
@@ -1014,15 +1014,13 @@ fn move_cursor_to(nx: usize, ny: usize) -> Result<(), &'static str> {
 
 /// new window object with given position and size
 pub fn new_window<'a>(
-    x: isize, y: isize, width: usize, height: usize,
-) -> Result<Arc<Mutex<WindowProfileAlpha>>, &'static str> {
+    x: isize, y: isize, framebuffer: Box<dyn FrameBuffer>) -> Result<Arc<Mutex<WindowProfileAlpha>>, &'static str> {
 
     // Init the key input producer and consumer
     let consumer = DFQueue::new().into_consumer();
     let producer = consumer.obtain_producer();
 
-    // Init the frame buffer of the window
-    let mut framebuffer = FrameBufferAlpha::new(width, height, None)?;
+    let (width, height) = framebuffer.get_size();
 
     // new window object
     let mut window: WindowProfileAlpha = WindowProfileAlpha {
