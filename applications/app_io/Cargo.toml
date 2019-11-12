@@ -24,11 +24,17 @@ path = "../../kernel/frame_buffer_alpha"
 [dependencies.window]
 path = "../../kernel/window"
 
+[dependencies.window_manager]
+path = "../../kernel/window_manager"
+
 [dependencies.window_manager_alpha]
 path = "../../kernel/window_manager_alpha"
 
 [dependencies.text_area]
 path = "../../kernel/displayable/text_area"
+
+[dependencies.text_display]
+path = "../../kernel/displayable/text_display"
 
 [dependencies.window_components]
 path = "../../kernel/window_components"

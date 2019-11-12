@@ -292,6 +292,10 @@ impl Displayable for TextArea {
         return Ok(vec!());
     }
 
+    fn get_position(&self) -> Coord {
+        Coord::new(self.x as isize, self.y as isize)
+    }
+    
     /// display a basic string, only support normal chars and `\n`
     fn display(&mut self) -> Result<(), &'static str> {
         let a = self.text.clone();

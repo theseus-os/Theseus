@@ -90,7 +90,45 @@ impl<Buffer: FrameBuffer> Window for WindowGeneric<Buffer> {
         &mut self.consumer
     }
 
+    fn framebuffer(&mut self) -> Option<&mut dyn FrameBuffer> {
+        Some(&mut self.framebuffer)
+    }
+
     fn get_background(&self) -> Pixel { SCREEN_BACKGROUND_COLOR }
+
+    fn get_displayable_mut(&mut self, display_name: &str) -> Result<&mut Box<dyn Displayable>, &'static str>{
+        let component = self.components.get_mut(display_name).ok_or("The displayable does not exist")?;
+        Ok(component.get_displayable_mut())
+    }
+
+    fn get_displayable(&self, display_name: &str) -> Result<&Box<dyn Displayable>, &'static str>{
+        let component = self.components.get(display_name).ok_or("The displayable does not exist")?;
+        Ok(component.get_displayable())
+    }
+
+    /// Gets the position of a displayable relative to the window.
+    fn get_displayable_position(&self, key: &str) -> Result<Coord, &'static str> {
+        let opt = self.components.get(key);
+        match opt {
+            None => {
+                return Err("No such displayable");
+            }
+            Some(component) => {
+                return Ok(component.get_position());
+            }
+        };
+    }
+        /// Display a displayable in the window by its name.
+    fn display(&mut self, display_name: &str) -> Result<(), &'static str> {
+        let component = self.components.get_mut(display_name).ok_or("")?;
+        let coordinate = component.get_position();
+        let displayable = component.get_displayable_mut();
+        let blocks = displayable.display_in(
+            coordinate, 
+            &mut self.framebuffer
+        )?;
+        self.render(Some(blocks.into_iter()))
+    }
 
     /// Adds a new displayable at `coordinate` relative to the top-left corner of the window.
     fn add_displayable(
@@ -123,6 +161,19 @@ impl<Buffer: FrameBuffer> Window for WindowGeneric<Buffer> {
     fn handle_event(&mut self) -> Result<(), &'static str> {
         //wenqiu: Todo
         Ok(())
+    }
+
+        /// Renders the content of the window to the screen.
+    /// `blocks` is the information of updated blocks in the form (block_index, block_width). If `blocks` is `None`, the whole window would be refreshed.
+    /// The use of `blocks` is described in the `frame_buffer_compositor` crate. 
+    fn render(&mut self, blocks: Option<IntoIter<(usize, usize)>>) -> Result<(), &'static str> {
+        let coordinate = { self.profile.lock().get_content_position() };
+        let frame_buffer_blocks = FrameBufferBlocks {
+            framebuffer: &mut self.framebuffer,
+            coordinate: coordinate,
+            blocks: blocks
+        };
+        FRAME_COMPOSITOR.lock().composite(vec![frame_buffer_blocks].into_iter())
     }
 }
 
@@ -200,47 +251,9 @@ impl<Buffer: FrameBuffer> WindowGeneric<Buffer> {
         };
     }
 
-    /// Gets the position of a displayable relative to the window.
-    pub fn get_displayable_position(&self, key: &str) -> Result<Coord, &'static str> {
-        let opt = self.components.get(key);
-        match opt {
-            None => {
-                return Err("No such displayable");
-            }
-            Some(component) => {
-                return Ok(component.get_position());
-            }
-        };
-    }
-
     /// Gets the content position relative to the window excluding border and padding relative.
     pub fn get_content_position(&self) -> Coord {
         self.profile.lock().get_content_position()
-    }
-
-    /// Renders the content of the window to the screen.
-    /// `blocks` is the information of updated blocks in the form (block_index, block_width). If `blocks` is `None`, the whole window would be refreshed.
-    /// The use of `blocks` is described in the `frame_buffer_compositor` crate. 
-    pub fn render(&mut self, blocks: Option<IntoIter<(usize, usize)>>) -> Result<(), &'static str> {
-        let coordinate = { self.profile.lock().get_content_position() };
-        let frame_buffer_blocks = FrameBufferBlocks {
-            framebuffer: &mut self.framebuffer,
-            coordinate: coordinate,
-            blocks: blocks
-        };
-        FRAME_COMPOSITOR.lock().composite(vec![frame_buffer_blocks].into_iter())
-    }
-
-    /// Display a displayable in the window by its name.
-    pub fn display(&mut self, display_name: &str) -> Result<(), &'static str> {
-        let component = self.components.get_mut(display_name).ok_or("")?;
-        let coordinate = component.get_position();
-        let displayable = component.get_displayable_mut();
-        let blocks = displayable.display_in(
-            coordinate, 
-            &mut self.framebuffer
-        )?;
-        self.render(Some(blocks.into_iter()))
     }
 
     // @Andrew

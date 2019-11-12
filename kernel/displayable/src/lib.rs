@@ -35,5 +35,9 @@ pub trait Displayable: Downcast + Send {
 
     /// Gets the size of the area occupied by the displayable.
     fn get_size(&self) -> (usize, usize);
+
+    fn get_position(&self) -> Coord {
+        Coord::new(0, 0)
+    }
 }
 impl_downcast!(Displayable);

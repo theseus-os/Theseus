@@ -101,7 +101,7 @@ impl Terminal {
                 return (0, 0);
             }
         };
-        (textarea.get_x_cnt(), textarea.get_y_cnt())
+        textarea.get_dimensions()
     }
     //Wenqiu:
     /*fn get_displayable_dimensions(&self, name:&str) -> (usize, usize){        
@@ -426,7 +426,7 @@ impl Terminal {
         if let Some(slice) = result {
             let textarea = get_text_area_mut(&mut self.window, &self.display_name)?;
             textarea.set_text(slice);
-            textarea.display()?;
+            self.window.display(&self.display_name)?;
         //Wenqiu
         /*    {
                 let text_display = self.window.get_concrete_display_mut::<TextDisplay>(&self.display_name)?;
@@ -449,10 +449,12 @@ impl Terminal {
         let result = self.scrollback_buffer.get(start_idx..end_idx);
 
         if let Some(slice) = result {
-            let textarea = get_text_area_mut(&mut self.window, &self.display_name)?;
+            {
+                let textarea = get_text_area_mut(&mut self.window, &self.display_name)?;
 
-            textarea.set_text(slice);
-            textarea.display()?;
+                textarea.set_text(slice);
+            }
+            self.window.display(&self.display_name)?;
 //            self.textarea.lock().display_string_basic(slice)?;
 //            self.absolute_cursor_pos = cursor_pos;
             //Wenqiu
@@ -467,7 +469,7 @@ impl Terminal {
         Ok(())
     }
 
-    /// Updates the cursor to a new position and refreshes display
+    /*/// Updates the cursor to a new position and refreshes display
     fn cursor_handler(&mut self, left_shift: usize) -> Result<(), &'static str> { 
         let (buffer_width, buffer_height) = self.get_displayable_dimensions();
 
@@ -492,7 +494,7 @@ impl Terminal {
             }
         }
         Ok(())
-    }
+    }*/
 }
 
 /// Public methods of `Terminal`.
@@ -664,7 +666,7 @@ impl Terminal {
         self.is_scroll_end = true;
     }
 
-    pub fn blink_cursor(&mut self, left_shift: usize) -> Result<(), &'static str> {
+    /*pub fn blink_cursor(&mut self, left_shift: usize) -> Result<(), &'static str> {
         let buffer_width = self.get_displayable_dimensions().0;
         let mut new_x = self.absolute_cursor_pos % buffer_width;
         let mut new_y = self.absolute_cursor_pos / buffer_width;
@@ -687,7 +689,7 @@ impl Terminal {
             }
         }
         Ok(())
-    }
+    }*/
 
     /*pub fn initialize_screen(&mut self) -> Result<(), &'static str> {
         let display_name = self.display_name.clone();
@@ -732,25 +734,24 @@ impl Terminal {
     pub fn display_cursor(
         &mut self
     ) -> Result<(), &'static str> {
-        // let coordinate = self.window.get_displayable_position(&self.display_name)?;
+        let coordinate = self.window.get_displayable_position(&self.display_name)?;
         
         // get info about the text displayable
-        /*let (col_num, line_num, text_next_pos) = {
-            let text_display = self.window.get_concrete_display::<TextDisplay>(&self.display_name)?;
+        let (col_num, line_num, text_next_pos) = {
+            let mut text_display = get_text_area_mut(&mut self.window, &self.display_name)?;
             let text_next_pos = text_display.get_next_pos();
             let (col_num, line_num) = text_display.get_dimensions();
             (col_num, line_num, text_next_pos)
-        };*/
+        };
         
-        let mut textarea = get_text_area_mut(&mut self.window, &self.display_name)?;
-
-        let (col_num, line_num, text_next_pos) = {
+        
+        /*let (col_num, line_num, text_next_pos) = {
             (
                 textarea.get_x_cnt(),
                 textarea.get_y_cnt(),
                 textarea.get_next_index()
             )
-        };
+        };*/
 
         // return if the cursor is not in the screen
         if text_next_pos >= col_num * line_num {
@@ -762,19 +763,27 @@ impl Terminal {
         let cursor_line = cursor_pos / col_num;
         let cursor_col = cursor_pos % col_num;
 
-        self.cursor.display(
+        /*self.cursor.display(
             cursor_col,
             cursor_line,
             &mut textarea
-        )
+        )*/
+
+        self.cursor.display(
+            coordinate,
+            cursor_col,
+            cursor_line,
+            self.window.framebuffer()
+        )?;
 
         // update to the end of the text if the cursor is at the last line
-        /*let text_width = if text_next_pos / col_num == cursor_line {
+        let text_width = if text_next_pos / col_num == cursor_line {
             text_next_pos % col_num
         } else {
             col_num * CHARACTER_WIDTH
         };
-        */
+        let blocks = vec![(cursor_line, text_width)];
+        self.window.render(Some(blocks.into_iter()))
     }
 
     /// Gets the position of the cursor relative to the end of text in units of characters.
@@ -795,17 +804,20 @@ impl Terminal {
 
 }
 
-fn get_text_area_mut<'a>(window: &'a mut Box<Window>, name: &str) -> Result<(&'a mut TextArea), &'static str>{
-    window.downcast_mut::<WindowComponents>().ok_or("Fail to get the window")?.get_concrete_display_mut::<TextArea>(name)
+fn get_text_area_mut<'a>(window: &'a mut Box<Window>, name: &str) -> Result<(&'a mut TextDisplay), &'static str>{
+    let text_display = window.get_displayable_mut(name)?;
+    text_display.downcast_mut::<TextDisplay>().ok_or("Fail to get the text displayable")
 }
 
-fn get_text_area<'a>(window: &'a Box<Window>, name: &str) -> Result<(&'a TextArea), &'static str>{
-    window.downcast_ref::<WindowComponents>().ok_or("Fail to get the window")?.get_concrete_display::<TextArea>(name)
+//Wenqiu: TODO move to methods
+fn get_text_area<'a>(window: &'a Box<Window>, name: &str) -> Result<(&'a TextDisplay), &'static str>{
+    let text_display = window.get_displayable(name)?;
+    text_display.downcast_ref::<TextDisplay>().ok_or("Fail to get the text displayable")
 }
 
 /// The cursor structure is mainly a timer for cursor to blink properly, which also has multiple status recorded. 
 /// When `enabled` is false, it should remain the original word. When `enabled` is true and `show` is false, it should display blank character, only when `enabled` is true, and `show` is true, it should display cursor character.
-pub struct Cursor {
+pub struct CursorComponent {
     /// Terminal will set this variable to enable blink or not. When this is not enabled, function `blink` will always return `false` which means do not refresh the cursor
     enabled: bool,
     /// The time of blinking interval. Initially set to `DEFAULT_CURSOR_FREQ`, however, can be changed during run-time
@@ -818,10 +830,10 @@ pub struct Cursor {
     underlying_char: u8,
 }
 
-impl Cursor {
+impl CursorComponent {
     /// Create a new cursor object which is initially enabled. The `blink_interval` is initialized as `DEFAULT_CURSOR_FREQ` however one can change this at any time. `time` is set to current time.
-    pub fn new() -> Cursor {
-        Cursor {
+    pub fn new() -> CursorComponent {
+        CursorComponent {
             enabled: true,
             freq: DEFAULT_CURSOR_FREQ,
             time: tsc_ticks(),
@@ -907,7 +919,7 @@ impl Cursor {
 
 }
 
-/*
+
 /// The cursor structure.
 /// A cursor is a special symbol shown in the text box of a terminal. It indicates the position of character where the next input would be put or the delete operation works on.
 /// Terminal invokes its `display` method in a loop to let a cursor blink.
@@ -931,13 +943,13 @@ pub struct Cursor {
 
 impl Cursor {
     /// Creates a new cursor structure with a default offset to the end of the text as 0 and the underlying character as `\0`. The initial `show` state is  `true` and the blinking frequency is defined as `libterm::DEFAULT_CURSOR_FREQ`. The parameter `color` specifies the color of the cursor.
-    pub fn new(color: u32) -> Cursor {
+    pub fn new() -> Cursor {
         Cursor {
             enabled: true,
             freq: DEFAULT_CURSOR_FREQ,
             time: tsc_ticks(),
             show: true,
-            color: color,
+            color: FONT_COLOR,
             offset_from_end: 0,
             underlying_char: 0,
         }
@@ -988,7 +1000,8 @@ impl Cursor {
     /// * `coordinate`: the left top coordinate of the text block relative to the origin(top-left point) of the frame buffer.
     /// * `(column, line)`: the location of the cursor in the text block in units of characters.
     /// * `framebuffer`: the framebuffer to display onto.
-    pub fn display(&mut self, coordinate: Coord, column: usize, line: usize, framebuffer: &mut dyn FrameBuffer) {
+    pub fn display(&mut self, coordinate: Coord, column: usize, line: usize, framebuffer: Option<&mut dyn FrameBuffer>) -> Result<(), &'static str> {
+        let framebuffer = framebuffer.ok_or("No framebuffer for cursor to display in")?;
         if self.blink() {
             if self.show() {
                 frame_buffer_drawer::fill_rectangle(
@@ -1010,5 +1023,7 @@ impl Cursor {
                 )
             }
         }
+
+        Ok(())
     }
-}*/
+}

@@ -11,11 +11,12 @@ extern crate alloc;
 #[macro_use] extern crate downcast_rs;
 
 use event_types::Event;
-use frame_buffer::{Coord, Pixel};
+use frame_buffer::{Coord, Pixel, FrameBuffer};
 use displayable::Displayable;
 use dfqueue::{DFQueueConsumer, DFQueueProducer};
 use alloc::boxed::Box;
 use downcast_rs::Downcast;
+use alloc::vec::IntoIter;
 
 /// Trait for windows. A window manager holds a list of objects who implement the `Window` trait.
 /// A `Window` provides states required by the window manager such as the size, the loaction and the active state of a window.
@@ -74,6 +75,18 @@ pub trait Window: Downcast + Send {
     fn handle_event(&mut self) -> Result<(), &'static str>;
 
     fn get_background(&self) -> Pixel;
+    
+    fn get_displayable_mut(&mut self, display_name: &str) -> Result<&mut Box<dyn Displayable>, &'static str>;
+
+    fn get_displayable(&self, display_name: &str) -> Result<&Box<dyn Displayable>, &'static str>;
+
+    fn framebuffer(&mut self) -> Option<&mut dyn FrameBuffer>;
+
+    fn display(&mut self, display_name: &str) -> Result<(), &'static str>;
+
+    fn get_displayable_position(&self, key: &str) -> Result<Coord, &'static str>;
+
+    fn render(&mut self, blocks: Option<IntoIter<(usize, usize)>>) -> Result<(), &'static str>;
 
     fn add_displayable(
         &mut self,

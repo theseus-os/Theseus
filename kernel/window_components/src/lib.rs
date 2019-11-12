@@ -29,7 +29,7 @@ extern crate window;
 extern crate displayable;
 
 use alloc::sync::{Arc, Weak};
-use alloc::vec::Vec;
+use alloc::vec::{Vec, IntoIter};
 use alloc::string::{String, ToString};
 use alloc::collections::BTreeMap;
 use alloc::boxed::Box;
@@ -119,6 +119,10 @@ impl Window for WindowComponents {
         &mut self.consumer
     }
 
+    fn framebuffer(&mut self) -> Option<&mut dyn FrameBuffer> {
+        None
+    }
+
     /// get background color
     fn get_background(&self) -> Pixel { self.background }
 
@@ -132,6 +136,36 @@ impl Window for WindowComponents {
         let key = key.to_string();
         self.components.insert(key, displayable);
         Ok(())
+    }
+
+    fn get_displayable_mut(&mut self, display_name: &str) -> Result<&mut Box<dyn Displayable>, &'static str>{
+        self.components.get_mut(display_name).ok_or("The displayable does not exist")
+    }
+
+    fn get_displayable(&self, display_name: &str) -> Result<&Box<dyn Displayable>, &'static str>{
+        self.components.get(display_name).ok_or("The displayable does not exist")
+    }
+
+    /// Gets the position of a displayable relative to the window.
+    fn get_displayable_position(&self, key: &str) -> Result<Coord, &'static str> {
+        let opt = self.components.get(key);
+        match opt {
+            None => {
+                return Err("No such displayable");
+            }
+            Some(component) => {
+                return Ok(component.get_position());
+            }
+        };
+    }
+
+    fn display(&mut self, display_name: &str) -> Result<(), &'static str> {
+        let component = self.components.get_mut(display_name).ok_or("")?;
+        component.display()
+    }
+
+    fn render(&mut self, blocks: Option<IntoIter<(usize, usize)>>) -> Result<(), &'static str> {
+        window_manager_alpha::render(None)
     }
 
     /// event handler that should be called periodically by applications. This will handle user events as well as produce 

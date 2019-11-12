@@ -29,10 +29,13 @@ extern crate window;
 extern crate frame_buffer_alpha;
 extern crate window_components;
 extern crate window_manager_alpha;
+extern crate window_manager;
 extern crate text_area;
+extern crate text_display;
 
 use window::Window;
 use text_area::TextArea;
+use text_display::TextDisplay;
 use frame_buffer_alpha::FrameBufferAlpha;
 use stdio::{StdioReader, StdioWriter, KeyEventReadGuard,
             KeyEventQueueReader};
@@ -144,7 +147,7 @@ lazy_static! {
     static ref DEFAULT_TERMINAL: Option<Arc<Mutex<Terminal>>> = {
 
         // Requests a new window object from the window manager
-        let (window_width, window_height) = match window_manager_alpha::get_screen_size(){
+/*        let (window_width, window_height) = match window_manager_alpha::get_screen_size(){
             Ok(size) => size,
             Err(err) => { debug!("Fail to create the framebuffer"); return None; }
         };
@@ -177,10 +180,23 @@ lazy_static! {
                 Err(err) => { debug!("new textarea returned err");  return None; }
             }
         };
+*/
+        let window = match window_manager::new_default_window() {
+            Ok(window_object) => window_object,
+            Err(err) => { return None }
+        };
+
+        let (width, height) = window.dimensions();
+        let width = width - 2 * window_manager::WINDOW_MARGIN;
+        let height = height - 2 * window_manager::WINDOW_MARGIN;
+        let textarea_object = match TextDisplay::new(width, height, libterm::FONT_COLOR, libterm::BACKGROUND_COLOR) {
+            Ok(text) => text,
+            Err(_) => { return None }
+        };
 
         match Terminal::new(Box::new(window), Box::new(textarea_object)) {
             Ok(terminal) => Some(Arc::new(Mutex::new(terminal))),
-            Err(_) => None
+            Err(_) => {trace!("Err"); None}
         }
     };
 }
@@ -201,7 +217,9 @@ pub fn get_terminal_or_default() -> Result<Arc<Mutex<Terminal>>, &'static str> {
     loop {
         match *DEFAULT_TERMINAL {
             Some(ref terminal) => return Ok(Arc::clone(&terminal)),
-            _ => { error!("Failed to get default terminal, retrying..."); }
+            _ => { 
+                error!("Failed to get default terminal, retrying...");
+            }
         }
         scheduler::schedule(); // yield the CPU and try again later
     }

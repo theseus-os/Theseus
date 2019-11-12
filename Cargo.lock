@@ -102,8 +102,10 @@ dependencies = [
  "stdio 0.1.0",
  "task 0.1.0",
  "text_area 0.1.0",
+ "text_display 0.1.0",
  "window 0.1.0",
  "window_components 0.1.0",
+ "window_manager 0.1.0",
  "window_manager_alpha 0.1.0",
  "x86_64 0.1.2",
 ]

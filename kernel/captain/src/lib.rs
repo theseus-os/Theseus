@@ -129,9 +129,9 @@ pub fn init(
     // Wenqiu:
     // init the display subsystem
     // Currently we use a FrameBufferRGB as the final frame buffer, but other types of FrameBuffers could be used instead.
-    //frame_buffer_rgb::init()?;
-    //font::init()?;
-    //window_manager::init()?;
+    frame_buffer_rgb::init()?;
+    font::init()?;
+    window_manager::init()?;
     //info!("Display subsystem initialized successfully.");
 
     // initialize the input event manager, which will start the default terminal 
