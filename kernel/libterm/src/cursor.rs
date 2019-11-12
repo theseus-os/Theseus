@@ -1,5 +1,43 @@
 use super::*;
 
+pub trait Cursor: Send {
+    /// Reset the cursor by setting `show` to true and `time` to current time. This doesn't effect `enabled` variable. This will not effect the display unless terminal application refresh the textarea by using the status of `Cursor` object
+    fn reset(&mut self);
+
+    /// Enable a cursor and call `reset` internally to make sure the behavior is the same after enable it (same initial state and same interval to change)
+    fn enable(&mut self);
+
+    /// Disable a cursor by setting `enabled` to false
+    fn disable(&mut self);
+
+    ///// Change the blink state shown/hidden of a cursor. The terminal calls this function in a loop. It does not effect the cursor directly, see doc of `Cursor` about how to use this.
+    //fn check_time(&mut self) -> bool;
+
+    /// Changes the blink state show/hidden of a cursor based on its frequency.
+    /// It returns whether the cursor should be re-display. If the cursor is enabled, it returns whether the show/hidden state has been changed. Otherwise it returns true because the cursor is disabled and should refresh.
+    fn blink(&mut self) -> bool;
+
+    /// Checks if the cursor should be shown.
+    fn show(&self) -> bool;
+
+    fn display(
+        &mut self, 
+        coordinate: Coord,
+        col: usize, 
+        line: usize, 
+        textarea: Option<&mut TextArea>,
+        framebuffer: Option<&mut FrameBuffer>,
+    ) -> Result<(), &'static str>;
+
+    fn set_offset_from_end(&mut self, offset: usize);
+
+    fn offset_from_end(&self) -> usize;
+
+    fn set_underlying_char(&mut self, c: u8);
+
+    fn underlying_char(&self) -> u8;
+}
+
 /// The cursor structure is mainly a timer for cursor to blink properly, which also has multiple status recorded. 
 /// When `enabled` is false, it should remain the original word. When `enabled` is true and `show` is false, it should display blank character, only when `enabled` is true, and `show` is true, it should display cursor character.
 pub struct CursorComponent {
@@ -17,7 +55,7 @@ pub struct CursorComponent {
 
 impl CursorComponent {
     /// Create a new cursor object which is initially enabled. The `blink_interval` is initialized as `DEFAULT_CURSOR_FREQ` however one can change this at any time. `time` is set to current time.
-    pub fn new() -> CursorComponent {
+    fn new() -> CursorComponent {
         CursorComponent {
             enabled: true,
             freq: DEFAULT_CURSOR_FREQ,
@@ -27,26 +65,28 @@ impl CursorComponent {
             underlying_char: 0,
         }
     }
+}
 
+impl Cursor for CursorComponent {
     /// Reset the cursor by setting `show` to true and `time` to current time. This doesn't effect `enabled` variable. This will not effect the display unless terminal application refresh the textarea by using the status of `Cursor` object
-    pub fn reset(&mut self) {
+    fn reset(&mut self) {
         self.show = true;
         self.time = tsc_ticks();
     }
 
     /// Enable a cursor and call `reset` internally to make sure the behavior is the same after enable it (same initial state and same interval to change)
-    pub fn enable(&mut self) {
+    fn enable(&mut self) {
         self.enabled = true;
         self.reset();
     }
 
     /// Disable a cursor by setting `enabled` to false
-    pub fn disable(&mut self) {
+    fn disable(&mut self) {
         self.enabled = false;
     }
 
-    /// Change the blink state shown/hidden of a cursor. The terminal calls this function in a loop. It does not effect the cursor directly, see doc of `Cursor` about how to use this.
-    pub fn check_time(&mut self) -> bool {
+    /*/// Change the blink state shown/hidden of a cursor. The terminal calls this function in a loop. It does not effect the cursor directly, see doc of `Cursor` about how to use this.
+    fn check_time(&mut self) -> bool {
         if self.enabled {
             let time = tsc_ticks();
             if let Some(duration) = time.sub(&(self.time)) {
@@ -60,11 +100,11 @@ impl CursorComponent {
             }
         }
         false
-    }
+    }*/
 
     /// Changes the blink state show/hidden of a cursor based on its frequency.
     /// It returns whether the cursor should be re-display. If the cursor is enabled, it returns whether the show/hidden state has been changed. Otherwise it returns true because the cursor is disabled and should refresh.
-    pub fn blink(&mut self) -> bool {
+    fn blink(&mut self) -> bool {
         if self.enabled {
             let time = tsc_ticks();
             if let Some(duration) = time.sub(&(self.time)) {
@@ -81,16 +121,19 @@ impl CursorComponent {
     }
 
     /// Checks if the cursor should be shown.
-    pub fn show(&self) -> bool {
+    fn show(&self) -> bool {
         self.enabled && self.show
     }
 
-    pub fn display(
-        &mut self, 
+    fn display(
+        &mut self,
+        coordinate: Coord, 
         col: usize, 
         line: usize, 
-        textarea: &mut TextArea
+        textarea: Option<&mut TextArea>,
+        framebuffer: Option<&mut FrameBuffer>,
     ) -> Result<(), &'static str> {
+        let textarea = textarea.ok_or("There is no textarea to display in")?;
         if self.blink() {
             if self.show() {
                 textarea.set_char(col, line, 219)?;
@@ -102,13 +145,29 @@ impl CursorComponent {
         Ok(())
     }
 
+    fn set_offset_from_end(&mut self, offset: usize) {
+        self.offset_from_end = offset;
+    }
+
+    fn offset_from_end(&self) -> usize {
+        self.offset_from_end
+    }
+
+    fn set_underlying_char(&mut self, c: u8) {
+        self.underlying_char = c;
+    }
+
+    fn underlying_char(&self) -> u8 {
+        self.underlying_char
+    }
+
 }
 
 
 /// The cursor structure.
 /// A cursor is a special symbol shown in the text box of a terminal. It indicates the position of character where the next input would be put or the delete operation works on.
 /// Terminal invokes its `display` method in a loop to let a cursor blink.
-pub struct Cursor {
+pub struct CursorGeneric {
     /// Whether the cursor is enabled in the terminal.
     enabled: bool,
     /// The blinking frequency.
@@ -126,10 +185,10 @@ pub struct Cursor {
     pub underlying_char: u8,
 }
 
-impl Cursor {
-    /// Creates a new cursor structure with a default offset to the end of the text as 0 and the underlying character as `\0`. The initial `show` state is  `true` and the blinking frequency is defined as `libterm::DEFAULT_CURSOR_FREQ`. The parameter `color` specifies the color of the cursor.
-    pub fn new() -> Cursor {
-        Cursor {
+impl CursorGeneric {
+    /// Create a new cursor object which is initially enabled. The `blink_interval` is initialized as `DEFAULT_CURSOR_FREQ` however one can change this at any time. `time` is set to current time.
+    pub fn new() -> CursorGeneric {
+        CursorGeneric {
             enabled: true,
             freq: DEFAULT_CURSOR_FREQ,
             time: tsc_ticks(),
@@ -140,26 +199,29 @@ impl Cursor {
         }
     }
 
+}
+
+impl Cursor for CursorGeneric {
     /// Resets the blink state of the cursor.
-    pub fn reset(&mut self) {
+    fn reset(&mut self) {
         self.show = true;
         self.time = tsc_ticks();
     }
 
     /// Enables a cursor.
-    pub fn enable(&mut self) {
+    fn enable(&mut self) {
         self.enabled = true;
         self.reset();
     }
 
     /// Disables a cursor.
-    pub fn disable(&mut self) {
+    fn disable(&mut self) {
         self.enabled = false;
     }
 
     /// Changes the blink state show/hidden of a cursor based on its frequency.
     /// It returns whether the cursor should be re-display. If the cursor is enabled, it returns whether the show/hidden state has been changed. Otherwise it returns true because the cursor is disabled and should refresh.
-    pub fn blink(&mut self) -> bool {
+    fn blink(&mut self) -> bool {
         if self.enabled {
             let time = tsc_ticks();
             if let Some(duration) = time.sub(&(self.time)) {
@@ -176,7 +238,7 @@ impl Cursor {
     }
 
     /// Checks if the cursor should be shown.
-    pub fn show(&self) -> bool {
+    fn show(&self) -> bool {
         self.enabled && self.show
     }
 
@@ -185,7 +247,14 @@ impl Cursor {
     /// * `coordinate`: the left top coordinate of the text block relative to the origin(top-left point) of the frame buffer.
     /// * `(column, line)`: the location of the cursor in the text block in units of characters.
     /// * `framebuffer`: the framebuffer to display onto.
-    pub fn display(&mut self, coordinate: Coord, column: usize, line: usize, framebuffer: Option<&mut dyn FrameBuffer>) -> Result<(), &'static str> {
+    fn display(
+        &mut self, 
+        coordinate: Coord, 
+        column: usize, 
+        line: usize, 
+        textarea: Option<&mut TextArea>,
+        framebuffer: Option<&mut dyn FrameBuffer>,
+    ) -> Result<(), &'static str> {
         let framebuffer = framebuffer.ok_or("No framebuffer for cursor to display in")?;
         if self.blink() {
             if self.show() {
@@ -211,4 +280,21 @@ impl Cursor {
 
         Ok(())
     }
+
+    fn set_offset_from_end(&mut self, offset: usize) {
+        self.offset_from_end = offset;
+    }
+
+    fn offset_from_end(&self) -> usize {
+        self.offset_from_end
+    }
+
+    fn set_underlying_char(&mut self, c: u8) {
+        self.underlying_char = c;
+    }
+
+    fn underlying_char(&self) -> u8 {
+        self.underlying_char
+    }
+
 }

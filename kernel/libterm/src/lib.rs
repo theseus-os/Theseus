@@ -47,7 +47,7 @@ use window::Window;
 use window_components::WindowComponents;
 use cursor::*;
 
-mod cursor;
+pub mod cursor;
 
 pub const FONT_COLOR: u32 = 0x93ee90;
 pub const BACKGROUND_COLOR: u32 = 0x000000;
@@ -90,7 +90,7 @@ pub struct Terminal {
     /// being displayed on the text display)
     absolute_cursor_pos: usize,
     /// The cursor object owned by the terminal. It contains the current blinking states of the cursor
-    pub cursor: Cursor
+    pub cursor: Box<dyn Cursor>
 }
 
 /// Privite methods of `Terminal`.
@@ -502,7 +502,7 @@ impl Terminal {
 
 /// Public methods of `Terminal`.
 impl Terminal {
-        pub fn new(window: Box<dyn Window>, textarea_object: Box<dyn Displayable>) -> Result<Terminal, &'static str> {
+        pub fn new(window: Box<dyn Window>, textarea_object: Box<dyn Displayable>, cursor: Box<dyn Cursor>) -> Result<Terminal, &'static str> {
 
         // let mut prompt_string = root.lock().get_absolute_path(); // ref numbers are 0-indexed
         let display_name = "textarea";
@@ -513,7 +513,7 @@ impl Terminal {
             scroll_start_idx: 0,
             is_scroll_end: true,
             absolute_cursor_pos: 0,
-            cursor: Cursor::new()
+            cursor: cursor
             //Wenqiu
             //cursor: Cursor::new(FONT_COLOR),
         };
@@ -762,7 +762,7 @@ impl Terminal {
         }
 
         // calculate the cursor position
-        let cursor_pos = text_next_pos - self.cursor.offset_from_end;
+        let cursor_pos = text_next_pos - self.cursor.offset_from_end();
         let cursor_line = cursor_pos / col_num;
         let cursor_col = cursor_pos % col_num;
 
@@ -776,6 +776,7 @@ impl Terminal {
             coordinate,
             cursor_col,
             cursor_line,
+            None,
             self.window.framebuffer()
         )?;
 
@@ -792,7 +793,7 @@ impl Terminal {
     /// Gets the position of the cursor relative to the end of text in units of characters.
     // Wenqiu
     pub fn get_cursor_offset_from_end(&self) -> usize {
-        self.cursor.offset_from_end
+        self.cursor.offset_from_end()
     }
 
     /// WEnqiu
@@ -801,8 +802,8 @@ impl Terminal {
     /// * `offset_from_end`: the position of the cursor relative to the end of text in units of characters.
     /// * `underlying_char`: the ASCII code of the underlying character when the cursor is unseen.
     pub fn update_cursor_pos(&mut self, offset_from_end: usize, underlying_char: u8) {
-        self.cursor.offset_from_end = offset_from_end;
-        self.cursor.underlying_char = underlying_char;
+        self.cursor.set_offset_from_end(offset_from_end);
+        self.cursor.set_underlying_char(underlying_char);
     }
 
 }

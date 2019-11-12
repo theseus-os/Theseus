@@ -45,7 +45,8 @@ use alloc::boxed::Box;
 use alloc::sync::Arc;
 use alloc::string::String;
 use alloc::vec::Vec;
-use libterm::Terminal;
+use libterm::{Terminal};
+use libterm::cursor::{Cursor, CursorGeneric, CursorComponent};
 use window_components::WindowComponents;
 
 /// Stores the stdio queues, key event queue and the pointer to the terminal
@@ -194,7 +195,13 @@ lazy_static! {
             Err(_) => { return None }
         };
 
-        match Terminal::new(Box::new(window), Box::new(textarea_object)) {
+        let cursor = CursorGeneric::new();
+
+        match Terminal::new(
+            Box::new(window), 
+            Box::new(textarea_object),
+            Box::new(cursor),
+        ) {
             Ok(terminal) => Some(Arc::new(Mutex::new(terminal))),
             Err(_) => {trace!("Err"); None}
         }
