@@ -36,7 +36,7 @@ use core::ops::{Deref, DerefMut};
 use dfqueue::{DFQueue, DFQueueConsumer, DFQueueProducer};
 use displayable::Displayable;
 use event_types::Event;
-use frame_buffer::{FrameBuffer, Coord};
+use frame_buffer::{FrameBuffer, Coord, Pixel};
 use frame_buffer_compositor::{FRAME_COMPOSITOR, FrameBufferBlocks};
 use frame_buffer_drawer::*;
 use frame_buffer_rgb::FrameBufferRGB;
@@ -85,32 +85,15 @@ pub struct WindowGeneric<Buffer: FrameBuffer> {
 }
 
 impl<Buffer: FrameBuffer> Window for WindowGeneric<Buffer> {
-    
-}
 
-impl<Buffer: FrameBuffer> WindowGeneric<Buffer> {
-    /// Clears the content of a window. The border and padding of the window remain showing.
-    pub fn clear(&mut self) -> Result<(), &'static str> {
-        let (width, height) = self.profile.lock().get_content_size();
-        fill_rectangle(
-            &mut self.framebuffer,
-            Coord::new(0, 0),
-            width,
-            height,
-            SCREEN_BACKGROUND_COLOR,
-        );
-        self.render(None)
+    fn consumer(&mut self) -> &mut DFQueueConsumer<Event> {
+        &mut self.consumer
     }
 
-    /// Returns the content dimensions of this window,
-    /// as a tuple of `(width, height)`. It does not include the padding.
-    pub fn dimensions(&self) -> (usize, usize) {
-        let profile_locked = self.profile.lock();
-        profile_locked.get_content_size()
-    }
+    fn get_background(&self) -> Pixel { SCREEN_BACKGROUND_COLOR }
 
     /// Adds a new displayable at `coordinate` relative to the top-left corner of the window.
-    pub fn add_displayable(
+    fn add_displayable(
         &mut self,
         key: &str,
         coordinate: Coord,
@@ -136,6 +119,62 @@ impl<Buffer: FrameBuffer> WindowGeneric<Buffer> {
         self.components.insert(key, component);
         Ok(())
     }
+
+    fn handle_event(&mut self) -> Result<(), &'static str> {
+        //wenqiu: Todo
+        Ok(())
+    }
+}
+
+impl<Buffer: FrameBuffer> WindowGeneric<Buffer> {
+    /// Clears the content of a window. The border and padding of the window remain showing.
+    pub fn clear(&mut self) -> Result<(), &'static str> {
+        let (width, height) = self.profile.lock().get_content_size();
+        fill_rectangle(
+            &mut self.framebuffer,
+            Coord::new(0, 0),
+            width,
+            height,
+            SCREEN_BACKGROUND_COLOR,
+        );
+        self.render(None)
+    }
+
+    /// Gets a reference to a displayable of type `T` which implements the `Displayable` trait by its name. Returns error if the displayable is not of type `T` or does not exist.
+    pub fn get_concrete_display<T: Displayable>(&self, display_name: &str) -> Result<&T, &'static str> {
+        if let Some(component) = self.components.get(display_name) {
+            let displayable = component.get_displayable();
+            if let Some(concrete_display) = displayable.downcast_ref::<T>() {
+                return Ok(concrete_display)
+            } else {
+                return Err("The displayable is not of this type");
+            }
+        } else {
+            return Err("The displayable does not exist");
+        }
+    }
+
+    /// Gets a mutable reference to a displayable of type `T` which implements the `Displayable` trait by its name. Returns error if the displayable is not of type `T` or does not exist.
+    pub fn get_concrete_display_mut<T: Displayable>(&mut self, display_name: &str) -> Result<&mut T, &'static str> {
+        if let Some(component) = self.components.get_mut(display_name) {
+            let displayable = component.get_displayable_mut();
+            if let Some(concrete_display) = displayable.downcast_mut::<T>() {
+                return Ok(concrete_display)
+            } else {
+                return Err("The displayable is not of this type");
+            }
+        } else {
+            return Err("The displayable does not exist");
+        }
+    }    
+    
+        /// Returns the content dimensions of this window,
+    /// as a tuple of `(width, height)`. It does not include the padding.
+    pub fn dimensions(&self) -> (usize, usize) {
+        let profile_locked = self.profile.lock();
+        profile_locked.get_content_size()
+    }
+
 
     /// Removes a displayable by its name.
     pub fn remove_displayable(&mut self, name: &str) {
@@ -191,35 +230,6 @@ impl<Buffer: FrameBuffer> WindowGeneric<Buffer> {
         };
         FRAME_COMPOSITOR.lock().composite(vec![frame_buffer_blocks].into_iter())
     }
-
-    /// Gets a reference to a displayable of type `T` which implements the `Displayable` trait by its name. Returns error if the displayable is not of type `T` or does not exist.
-    pub fn get_concrete_display<T: Displayable>(&self, display_name: &str) -> Result<&T, &'static str> {
-        if let Some(component) = self.components.get(display_name) {
-            let displayable = component.get_displayable();
-            if let Some(concrete_display) = displayable.downcast_ref::<T>() {
-                return Ok(concrete_display)
-            } else {
-                return Err("The displayable is not of this type");
-            }
-        } else {
-            return Err("The displayable does not exist");
-        }
-    }
-
-    /// Gets a mutable reference to a displayable of type `T` which implements the `Displayable` trait by its name. Returns error if the displayable is not of type `T` or does not exist.
-    pub fn get_concrete_display_mut<T: Displayable>(&mut self, display_name: &str) -> Result<&mut T, &'static str> {
-        if let Some(component) = self.components.get_mut(display_name) {
-            let displayable = component.get_displayable_mut();
-            if let Some(concrete_display) = displayable.downcast_mut::<T>() {
-                return Ok(concrete_display)
-            } else {
-                return Err("The displayable is not of this type");
-            }
-        } else {
-            return Err("The displayable does not exist");
-        }
-    }
-
 
     /// Display a displayable in the window by its name.
     pub fn display(&mut self, display_name: &str) -> Result<(), &'static str> {

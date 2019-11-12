@@ -27,6 +27,7 @@ extern crate libterm;
 
 #[macro_use] extern crate alloc;
 #[macro_use] extern crate log;
+extern crate window;
 
 use event_types::{Event};
 use keycodes_ascii::{Keycode, KeyAction, KeyEvent};
@@ -48,6 +49,7 @@ use core_io::Write;
 use core::ops::Deref;
 use app_io::{IoStreams, IoControlFlags};
 use fs_node::FileOrDir;
+use window::Window;
 
 /// The status of a job.
 #[derive(PartialEq)]

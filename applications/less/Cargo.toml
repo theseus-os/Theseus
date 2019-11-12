@@ -18,6 +18,9 @@ path = "../../kernel/path"
 [dependencies.fs_node]
 path = "../../kernel/fs_node"
 
+[dependencies.window]
+path = "../../kernel/window"
+
 [dependencies.keycodes_ascii]
 path = "../../libs/keycodes_ascii"
 

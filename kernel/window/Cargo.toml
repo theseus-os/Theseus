@@ -6,6 +6,7 @@ description = "define a Window trait"
 build = "../../build.rs"
 
 [dependencies]
+downcast-rs = "1.0.4"
 
 [dependencies.dfqueue]
 path = "../../libs/dfqueue"
@@ -16,6 +17,9 @@ path = "../event_types"
 
 [dependencies.frame_buffer]
 path = "../frame_buffer"
+
+[dependencies.displayable]
+path = "../displayable"
 
 [lib]
 crate-type = ["rlib"]

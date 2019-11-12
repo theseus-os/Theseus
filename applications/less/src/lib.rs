@@ -13,6 +13,7 @@ extern crate spin;
 extern crate app_io;
 extern crate stdio;
 extern crate core_io;
+extern crate window;
 #[macro_use] extern crate log;
 
 use keycodes_ascii::{Keycode, KeyAction};
@@ -30,6 +31,7 @@ use libterm::Terminal;
 use spin::Mutex;
 use stdio::{StdioWriter, KeyEventQueueReader};
 use core_io::Write;
+use window::Window;
 
 /// The metadata for each line in the file.
 struct LineSlice {

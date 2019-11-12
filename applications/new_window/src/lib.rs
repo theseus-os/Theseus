@@ -23,6 +23,7 @@ extern crate runqueue;
 extern crate event_types; 
 extern crate window_manager_alpha;
 extern crate hpet;
+extern crate window;
 
 extern crate print;
 extern crate window_components;
@@ -40,6 +41,7 @@ use core::ops::{Deref};
 use hpet::get_hpet;
 use text_area::TextArea;
 use frame_buffer_alpha::FrameBufferAlpha;
+use window::Window;
 
 #[no_mangle]
 pub fn main(_args: Vec<String>) -> isize {

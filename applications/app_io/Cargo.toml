@@ -18,6 +18,21 @@ version = "0.3.7"
 [dependencies.keycodes_ascii]
 path = "../../libs/keycodes_ascii"
 
+[dependencies.frame_buffer_alpha]
+path = "../../kernel/frame_buffer_alpha"
+
+[dependencies.window]
+path = "../../kernel/window"
+
+[dependencies.window_manager_alpha]
+path = "../../kernel/window_manager_alpha"
+
+[dependencies.text_area]
+path = "../../kernel/displayable/text_area"
+
+[dependencies.window_components]
+path = "../../kernel/window_components"
+
 [dependencies.event_types]
 path = "../../kernel/event_types"
 

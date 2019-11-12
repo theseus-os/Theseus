@@ -26,6 +26,7 @@ extern crate font;
 extern crate frame_buffer_drawer;
 extern crate frame_buffer_printer;
 extern crate text_area;
+extern crate window;
 
 use alloc::string::{String, ToString};
 use alloc::vec::Vec;
@@ -42,6 +43,8 @@ use font::{CHARACTER_HEIGHT, CHARACTER_WIDTH};
 use tsc::{tsc_ticks, TscTicks};
 use text_area::TextArea;
 use frame_buffer_alpha::FrameBufferAlpha;
+use window::Window;
+use window_components::WindowComponents;
 
 pub const FONT_COLOR: u32 = 0x93ee90;
 pub const BACKGROUND_COLOR: u32 = 0x000000;
@@ -66,7 +69,7 @@ pub enum ScrollError {
 ///     - Producer is the window manager. Window manager is responsible for enqueuing keyevents into the active application
 pub struct Terminal {
     /// The terminal's own window, this is a WindowComponents object which handles the events of user input properly like moving window and close window
-    window: window_components::WindowComponents,
+    window: Box<Window>,
     // textarea object of the terminal, it has a weak reference to the window object so that calling function of this object will draw on the screen
     /// The terminal's own window
     // Wenqiu:
@@ -91,7 +94,7 @@ pub struct Terminal {
 impl Terminal {
     /// Get the width and height of the text display.
     fn get_displayable_dimensions(&self) -> (usize, usize){
-        let textarea = match self.window.get_concrete_display::<TextArea>(&self.display_name) {
+        let textarea = match get_text_area(&self.window, &self.display_name) {
             Ok(textarea) => {textarea},
             Err(err) => {
                 debug!("get_displayable_dimensions(): {}", err);
@@ -421,7 +424,7 @@ impl Terminal {
         };
         let result  = self.scrollback_buffer.get(start_idx..=end_idx); // =end_idx includes the end index in the slice
         if let Some(slice) = result {
-            let textarea = self.window.get_concrete_display_mut::<TextArea>(&self.display_name)?;
+            let textarea = get_text_area_mut(&mut self.window, &self.display_name)?;
             textarea.set_text(slice);
             textarea.display()?;
         //Wenqiu
@@ -446,7 +449,7 @@ impl Terminal {
         let result = self.scrollback_buffer.get(start_idx..end_idx);
 
         if let Some(slice) = result {
-            let textarea = self.window.get_concrete_display_mut::<TextArea>(&self.display_name)?;
+            let textarea = get_text_area_mut(&mut self.window, &self.display_name)?;
 
             textarea.set_text(slice);
             textarea.display()?;
@@ -480,7 +483,7 @@ impl Terminal {
         
         self.cursor.check_time();
         // debug!("absolute_cursor_pos: {}", self.absolute_cursor_pos);
-        let textarea = self.window.get_concrete_display_mut::<TextArea>(&self.display_name)?;
+        let textarea = get_text_area_mut(&mut self.window, &self.display_name)?;
         if self.cursor.enabled {
             if self.cursor.show {
                 textarea.set_char(new_x, new_y, 221)?;
@@ -494,36 +497,12 @@ impl Terminal {
 
 /// Public methods of `Terminal`.
 impl Terminal {
-        pub fn new() -> Result<Terminal, &'static str> {
-        // Requests a new window object from the window manager
-        let (window_width, window_height) = window_manager_alpha::get_screen_size()?;
-        const WINDOW_MARGIN: usize = 20;
-        let framebuffer = FrameBufferAlpha::new(window_width - 2*WINDOW_MARGIN, window_height - 2*WINDOW_MARGIN, None)?;
-        let window_object = match window_components::WindowComponents::new(
-            WINDOW_MARGIN as isize, WINDOW_MARGIN as isize, Box::new(framebuffer)) {
-            Ok(window_object) => window_object,
-            Err(err) => {debug!("new window returned err"); return Err(err)}
-        };
-
-        let textarea_object = {
-            let (width_inner, height_inner) = window_object.inner_size();
-            debug!("new window done width: {}, height: {}", width_inner, height_inner);
-            // next add textarea to wincomps
-            const TEXTAREA_BORDER: usize = 4;
-            match TextArea::new(
-                window_object.get_border_size() + TEXTAREA_BORDER, window_object.get_title_size() + TEXTAREA_BORDER,
-                width_inner - 2*TEXTAREA_BORDER, height_inner - 2*TEXTAREA_BORDER,
-                &window_object.winobj, None, None, Some(window_object.get_background()), None
-            ) {
-                Ok(m) => m,
-                Err(err) => { debug!("new textarea returned err"); return Err(err); }
-            }
-        };
+        pub fn new(window: Box<dyn Window>, textarea_object: Box<dyn Displayable>) -> Result<Terminal, &'static str> {
 
         // let mut prompt_string = root.lock().get_absolute_path(); // ref numbers are 0-indexed
         let display_name = "textarea";
         let mut terminal = Terminal {
-            window: window_object,
+            window: window,
             display_name: String::from(display_name),
             scrollback_buffer: String::new(),
             scroll_start_idx: 0,
@@ -533,7 +512,7 @@ impl Terminal {
             //Wenqiu
             //cursor: Cursor::new(FONT_COLOR),
         };
-        terminal.window.add_displayable(&display_name, Coord::new(0, 0),Box::new(textarea_object))?;
+        terminal.window.add_displayable(&display_name, Coord::new(0, 0), textarea_object)?;
 
         // Inserts a producer for the print queue into global list of terminal print producers
         terminal.print_to_terminal(format!("Theseus Terminal Emulator\nPress Ctrl+C to quit a task\n"));
@@ -699,7 +678,7 @@ impl Terminal {
 
         self.cursor.check_time();
         // debug!("absolute_cursor_pos: {}", self.absolute_cursor_pos);
-        let textarea = self.window.get_concrete_display_mut::<TextArea>(&self.display_name)?;
+        let textarea = get_text_area_mut(&mut self.window, &self.display_name)?;
         if self.cursor.enabled {
             if self.cursor.show {
                 textarea.set_char(new_x, new_y, 221)?;
@@ -729,7 +708,7 @@ impl Terminal {
             Err(_e) => { return Some(Event::ExitEvent); }
             _ => {}
         };
-        let _event = match self.window.consumer.peek() {
+        let _event = match self.window.consumer().peek() {
             Some(ev) => ev,
             _ => { return None; }
         };
@@ -763,7 +742,8 @@ impl Terminal {
             (col_num, line_num, text_next_pos)
         };*/
         
-        let mut textarea = self.window.get_concrete_display_mut::<TextArea>(&self.display_name)?;
+        let mut textarea = get_text_area_mut(&mut self.window, &self.display_name)?;
+
         let (col_num, line_num, text_next_pos) = {
             (
                 textarea.get_x_cnt(),
@@ -812,6 +792,15 @@ impl Terminal {
         self.cursor.offset_from_end = offset_from_end;
         self.cursor.underlying_char = underlying_char;
     }
+
+}
+
+fn get_text_area_mut<'a>(window: &'a mut Box<Window>, name: &str) -> Result<(&'a mut TextArea), &'static str>{
+    window.downcast_mut::<WindowComponents>().ok_or("Fail to get the window")?.get_concrete_display_mut::<TextArea>(name)
+}
+
+fn get_text_area<'a>(window: &'a Box<Window>, name: &str) -> Result<(&'a TextArea), &'static str>{
+    window.downcast_ref::<WindowComponents>().ok_or("Fail to get the window")?.get_concrete_display::<TextArea>(name)
 }
 
 /// The cursor structure is mainly a timer for cursor to blink properly, which also has multiple status recorded. 

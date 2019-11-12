@@ -25,7 +25,15 @@ extern crate libterm;
 extern crate scheduler;
 extern crate serial_port;
 extern crate core_io;
+extern crate window;
+extern crate frame_buffer_alpha;
+extern crate window_components;
+extern crate window_manager_alpha;
+extern crate text_area;
 
+use window::Window;
+use text_area::TextArea;
+use frame_buffer_alpha::FrameBufferAlpha;
 use stdio::{StdioReader, StdioWriter, KeyEventReadGuard,
             KeyEventQueueReader};
 use spin::{Mutex, MutexGuard};
@@ -35,6 +43,7 @@ use alloc::sync::Arc;
 use alloc::string::String;
 use alloc::vec::Vec;
 use libterm::Terminal;
+use window_components::WindowComponents;
 
 /// Stores the stdio queues, key event queue and the pointer to the terminal
 /// for applications. This structure is provided for application's use and only
@@ -92,6 +101,7 @@ mod shared_maps {
     use alloc::collections::BTreeMap;
     use IoControlFlags;
     use IoStreams;
+    use window_components::WindowComponents;
 
     lazy_static! {
         /// Map applications to their IoControlFlags structure. Here the key is the task_id
@@ -124,19 +134,55 @@ mod shared_maps {
     /// Lock two maps `APP_IO_CTRL_FLAGS` and `APP_IO_STREAMS` at the same time and returns a
     /// tuple containing their `MutexGuard`s. This function exerts a sequence of locking when
     /// we need to lock more than one of them. This prevents deadlock.
-    pub fn lock_all_maps() -> (MutexGuard<'static, BTreeMap<usize, IoControlFlags>>,
-                               MutexGuard<'static, BTreeMap<usize, IoStreams>>) {
+    pub fn lock_all_maps() -> (MutexGuard<'static, BTreeMap<usize, IoControlFlags>>, MutexGuard<'static, BTreeMap<usize, IoStreams>>) {
         (APP_IO_CTRL_FLAGS.lock(), APP_IO_STREAMS.lock())
     }
 }
 
 lazy_static! {
     /// The default terminal.
-    static ref DEFAULT_TERMINAL: Option<Arc<Mutex<Terminal>>> =
-        match Terminal::new() {
+    static ref DEFAULT_TERMINAL: Option<Arc<Mutex<Terminal>>> = {
+
+        // Requests a new window object from the window manager
+        let (window_width, window_height) = match window_manager_alpha::get_screen_size(){
+            Ok(size) => size,
+            Err(err) => { debug!("Fail to create the framebuffer"); return None; }
+        };
+
+        const WINDOW_MARGIN: usize = 20;
+        let framebuffer = match FrameBufferAlpha::new(window_width - 2*WINDOW_MARGIN, window_height - 2*WINDOW_MARGIN, None){
+            Ok(fb) => fb,
+            Err(err) => { debug!("Fail to create the framebuffer"); return None; }
+        };
+        let window = match window_components::WindowComponents::new(
+            WINDOW_MARGIN as isize, WINDOW_MARGIN as isize, Box::new(framebuffer)) {
+            Ok(window_object) => { window_object },
+            Err(err) => {
+                debug!("new window returned err"); 
+                return None;
+            }
+        };
+
+        let textarea_object = {
+            let (width_inner, height_inner) = window.inner_size();
+            debug!("new window done width: {}, height: {}", width_inner, height_inner);
+            // next add textarea to wincomps
+            const TEXTAREA_BORDER: usize = 4;
+            match TextArea::new(
+                window.get_border_size() + TEXTAREA_BORDER, window.get_title_size() + TEXTAREA_BORDER,
+                width_inner - 2*TEXTAREA_BORDER, height_inner - 2*TEXTAREA_BORDER,
+                &window.winobj, None, None, Some(window.get_background()), None
+            ) {
+                Ok(m) => m,
+                Err(err) => { debug!("new textarea returned err");  return None; }
+            }
+        };
+
+        match Terminal::new(Box::new(window), Box::new(textarea_object)) {
             Ok(terminal) => Some(Arc::new(Mutex::new(terminal))),
             Err(_) => None
-        };
+        }
+    };
 }
 
 /// Applications call this function to get the terminal to which it should print.

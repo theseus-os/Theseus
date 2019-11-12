@@ -6,10 +6,16 @@
 extern crate event_types;
 extern crate dfqueue;
 extern crate frame_buffer;
+extern crate displayable;
+extern crate alloc;
+#[macro_use] extern crate downcast_rs;
 
 use event_types::Event;
-use dfqueue::{DFQueueProducer};
 use frame_buffer::{Coord, Pixel};
+use displayable::Displayable;
+use dfqueue::{DFQueueConsumer, DFQueueProducer};
+use alloc::boxed::Box;
+use downcast_rs::Downcast;
 
 /// Trait for windows. A window manager holds a list of objects who implement the `Window` trait.
 /// A `Window` provides states required by the window manager such as the size, the loaction and the active state of a window.
@@ -62,6 +68,19 @@ pub trait WindowProfile {
     }
 }
 
-pub trait Window {
+pub trait Window: Downcast + Send {
+    fn consumer(&mut self) -> &mut DFQueueConsumer<Event>;
+
+    fn handle_event(&mut self) -> Result<(), &'static str>;
+
+    fn get_background(&self) -> Pixel;
+
+    fn add_displayable(
+        &mut self,
+        key: &str,
+        coordinate: Coord,
+        displayable: Box<dyn Displayable>,
+    ) -> Result<(), &'static str>;
 
 }
+impl_downcast!(Window);

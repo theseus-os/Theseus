@@ -25,6 +25,9 @@ path = "../../kernel/window_components"
 [dependencies.frame_buffer_rgb]
 path = "../frame_buffer_rgb"
 
+[dependencies.window]
+path = "../window"
+
 [dependencies.environment]
 path = "../environment"
 

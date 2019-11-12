@@ -17,6 +17,9 @@ version = "0.3.7"
 [dependencies.keycodes_ascii]
 path = "../../libs/keycodes_ascii"
 
+[dependencies.window]
+path = "../../kernel/window"
+
 [dependencies.dfqueue]
 path = "../../libs/dfqueue"
 version = "0.1.0"
