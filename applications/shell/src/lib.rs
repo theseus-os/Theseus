@@ -1336,7 +1336,7 @@ impl Shell {
 
             // handle inputs
             need_refresh = false;
-            loop {
+            loop {                
                 let locked_consumer = self.key_event_consumer.lock();
                 if let Some(ref key_event_consumer) = locked_consumer.deref() {
                     if let Some(key_event) = key_event_consumer.read_one() {

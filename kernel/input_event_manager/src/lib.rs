@@ -36,7 +36,7 @@ use mod_mgmt::{
     NamespaceDir,
     metadata::CrateType,
 };
-use spawn::ApplicationTaskBuilder;
+use spawn::{KernelTaskBuilder, ApplicationTaskBuilder};
 use path::Path;
 use frame_buffer_alpha::FrameBufferAlpha;
 
@@ -82,6 +82,8 @@ pub fn init() -> Result<(DFQueueProducer<Event>, DFQueueProducer<Event>), &'stat
     // Wenqiu
     let framebuffer = FrameBufferAlpha::new(width, height, None)?;
     // window_manager_alpha::init(keyboard_event_handling_consumer, mouse_event_handling_consumer, framebuffer)?;
+
+    KernelTaskBuilder::new(input_event_loop, keyboard_event_handling_consumer).name("input_event_loop".to_string()).spawn()?;
 
     // Spawns the terminal print crate so that we can print to the terminal
     ApplicationTaskBuilder::new(terminal_print_path)
