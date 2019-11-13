@@ -106,11 +106,6 @@ pub fn main(_args: Vec<String>) -> isize {
                 return -1; 
             }
         };
-
-        // since we don't properly support parent/child relationships between tasks, 
-        // we force the newly-spawned shell_loop task to also be an "app task" 
-        // by giving it joint ownership of the `shell` app crate.
-        _task_ref.lock_mut().app_crate = task::get_my_current_task().expect("shell::main(): failed to get current task").lock().app_crate.clone();
     }
 
     loop {
