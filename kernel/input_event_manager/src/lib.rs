@@ -34,7 +34,7 @@ use mod_mgmt::{
     NamespaceDir,
     metadata::CrateType,
 };
-use spawn::{KernelTaskBuilder, KernelRestartableTaskBuilder, ApplicationTaskBuilder};
+use spawn::{KernelTaskBuilder, ApplicationTaskBuilder};
 use path::Path;
 
 /// Initializes the keyinput queue and the default display
@@ -86,7 +86,7 @@ pub fn init() -> Result<DFQueueProducer<Event>, &'static str> {
         .spawn()?;
 
     // start the input event loop thread
-    KernelRestartableTaskBuilder::new(input_event_loop, keyboard_event_handling_consumer)
+    KernelTaskBuilder::new(input_event_loop, keyboard_event_handling_consumer)
         .name("input_event_loop".to_string())
         .spawn()?;
 
@@ -139,13 +139,6 @@ fn input_event_loop(consumer:DFQueueConsumer<Event>) -> Result<(), &'static str>
                 // Deletes the active window (whichever window Ctrl + W is logged in)
                 if key_input.modifiers.control && key_input.keycode == Keycode::W && key_input.action == KeyAction::Pressed {
                     window_manager::WINDOWLIST.lock().send_event_to_active(Event::ExitEvent)?; // tells application to exit
-                }
-                
-                if key_input.modifiers.control && key_input.keycode == Keycode::N && key_input.action == KeyAction::Pressed {
-                    debug!("Somebody pressed Ctrl + N");
-                    event.mark_completed();
-                    panic!("salt happened!\n")
-                    //return Ok(()); 
                 }
             }
             _ => { }
