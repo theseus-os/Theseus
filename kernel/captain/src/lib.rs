@@ -167,9 +167,6 @@ pub fn init(
         if(arg > 3){
             panic!("paniced");
         }
-        loop {
-
-        }
         return Ok(()); 
     }
 
