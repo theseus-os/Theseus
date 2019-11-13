@@ -273,7 +273,7 @@ impl fmt::Debug for Task {
 impl Task {
     /// Creates a new Task structure and initializes it to be non-Runnable.
     /// By default, the new `Task` will inherit some of the same states from the currently-running `Task`:
-    /// its `Environment`, `MemoryManagementInfo`, and `CrateNamespace`.
+    /// its `Environment`, `MemoryManagementInfo`, `CrateNamespace`, and `app_crate` reference (`StrongCrateRef`).
     /// If needed, those states can be changed by setting them for the returned `Task`.
     /// 
     /// # Arguments
@@ -284,22 +284,27 @@ impl Task {
     /// This does not run the task, schedule it in, or switch to it.
     pub fn new(kstack: Option<Stack>) -> Result<Task, &'static str> {
         let curr_task = get_my_current_task().ok_or("Task::new(): couldn't get current task (not yet initialized)")?;
-        let (mmi, namespace, env) = {
+        let (mmi, namespace, env, app_crate) = {
             let t = curr_task.lock();
-            (Arc::clone(&t.mmi), Arc::clone(&t.namespace), Arc::clone(&t.env))
+            (Arc::clone(&t.mmi), Arc::clone(&t.namespace), Arc::clone(&t.env), t.app_crate.clone())
         };
 
         let kstack = kstack
             .or_else(|| mmi.lock().alloc_stack(KERNEL_STACK_SIZE_IN_PAGES))
             .ok_or("couldn't allocate kernel stack!")?;
 
-        Ok(Task::new_internal(kstack, mmi, namespace, env))
+        Ok(Task::new_internal(kstack, mmi, namespace, env, app_crate))
     }
     
     /// The internal routine for creating a `Task`, which does not make assumptions 
     /// about whether a currently-running `Task` exists or whether the new `Task`
     /// should inherit any states from it.
-    fn new_internal(kstack: Stack, mmi: MmiRef, namespace: Arc<CrateNamespace>, env: Arc<Mutex<Environment>>) -> Self {
+    fn new_internal(
+        kstack: Stack, 
+        mmi: MmiRef, namespace: Arc<CrateNamespace>,
+        env: Arc<Mutex<Environment>>,
+        app_crate: Option<StrongCrateRef>
+    ) -> Self {
          /// The counter of task IDs
         static TASKID_COUNTER: AtomicUsize = AtomicUsize::new(0);
 
@@ -325,7 +330,7 @@ impl Task {
             new_userspace_entry_addr: None,
             pinned_core: None,
             is_an_idle_task: false,
-            app_crate: None,
+            app_crate: app_crate,
             namespace: namespace,
             panic_handler: None,
             env: env,
@@ -367,7 +372,9 @@ impl Task {
         }
     }
 
-    /// Returns true if this is an application `Task`.
+    /// Returns `true` if this is an application `Task`. 
+    /// This will also return `true` if this task was spawned by an application task,
+    /// since a task inherits the "application crate" field from its "parent" who spawned it.
     pub fn is_application(&self) -> bool {
         self.app_crate.is_some()
     }
@@ -963,7 +970,7 @@ pub fn create_idle_task(
         .ok_or("The default CrateNamespace must be initialized before the tasking subsystem.")?
         .clone();
     let default_env = Arc::new(Mutex::new(Environment::default()));
-    let mut idle_task = Task::new_internal(kstack, kernel_mmi_ref, default_namespace, default_env);
+    let mut idle_task = Task::new_internal(kstack, kernel_mmi_ref, default_namespace, default_env, None);
     idle_task.name = format!("idle_task_ap{}", apic_id);
     idle_task.is_an_idle_task = true;
     idle_task.runstate = RunState::Runnable;
