@@ -55,7 +55,7 @@ pub struct CursorComponent {
 
 impl CursorComponent {
     /// Create a new cursor object which is initially enabled. The `blink_interval` is initialized as `DEFAULT_CURSOR_FREQ` however one can change this at any time. `time` is set to current time.
-    fn new() -> CursorComponent {
+    pub fn new() -> CursorComponent {
         CursorComponent {
             enabled: true,
             freq: DEFAULT_CURSOR_FREQ,

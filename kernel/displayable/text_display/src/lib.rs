@@ -20,7 +20,7 @@ use frame_buffer::{Coord, FrameBuffer};
 
 
 /// A text displayable profiles the size and color of a block of text. It can display in a framebuffer.
-pub struct TextBox {
+pub struct TextGeneric {
     width: usize,
     height: usize,
     /// The position of the next symbol. It is updated after display and will be useful for optimization.
@@ -33,7 +33,7 @@ pub struct TextBox {
     cache: String,
 }
 
-impl TextDisplayable for TextBox {
+impl TextDisplayable for TextGeneric {
     /// Gets the dimensions of the text area to display.
     fn get_dimensions(&self) -> (usize, usize) {
         (self.width / CHARACTER_WIDTH, self.height / CHARACTER_HEIGHT)
@@ -50,13 +50,14 @@ impl TextDisplayable for TextBox {
     }
 }
 
-impl Displayable for TextBox {
-    fn display_in(
+impl Displayable for TextGeneric {
+    fn display(
         &mut self,
         coordinate: Coord,
-        framebuffer: &mut dyn FrameBuffer,
+        framebuffer: Option<&mut dyn FrameBuffer>,
     ) -> Result<Vec<(usize, usize)>, &'static str> {
         // If the cache is the prefix of the new text, just print the additional characters.
+        let framebuffer = framebuffer.ok_or("There is no framebuffer to display in")?;
         let (string, col, line) = if self.cache.len() > 0 && self.text.starts_with(self.cache.as_str()) {
             (
                 &self.text.as_str()[self.cache.len()..self.text.len()],
@@ -86,11 +87,6 @@ impl Displayable for TextBox {
         return Ok(blocks);
     }
 
-    fn display(&mut self,) -> Result<(), &'static str> {
-        Err("There is no default framebuffer to display in")
-    }
-
-
     fn resize(&mut self, width: usize, height: usize) {
         self.width = width;
         self.height = height;
@@ -103,9 +99,13 @@ impl Displayable for TextBox {
     fn as_text_mut(&mut self) -> Result<&mut TextDisplayable, &'static str> {
         Ok(self)
     }
+
+    fn as_text(&self) -> Result<&TextDisplayable, &'static str> {
+        Ok(self)
+    }
 }
 
-impl TextBox {
+impl TextGeneric {
     /// Creates a new text displayable.
     /// # Arguments
     /// * `(width, height)`: the size of the text area.
@@ -115,8 +115,8 @@ impl TextBox {
         height: usize,
         fg_color: u32,
         bg_color: u32,
-    ) -> Result<TextBox, &'static str> {
-        Ok(TextBox {
+    ) -> Result<TextGeneric, &'static str> {
+        Ok(TextGeneric {
             width: width,
             height: height,
             next_col: 0,

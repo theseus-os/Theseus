@@ -66,3 +66,6 @@ RUSTFLAGS += -Z share-generics=no
 ## so it often results in slightly lowered performance. 
 ## By default, this is not enabled.
 # RUSTFLAGS += -C force-frame-pointers=yes
+
+#DISPLAY ?= generic
+DISPLAY ?= wincomp

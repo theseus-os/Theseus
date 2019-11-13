@@ -123,15 +123,9 @@ pub fn init(
     let ap_count = multicore_bringup::handle_ap_cores(kernel_mmi_ref.clone(), ap_start_realmode_begin, ap_start_realmode_end)?;
     info!("Finished handling and booting up all {} AP cores.", ap_count);
 
-    // initialize the input event manager, which will start window manager and the default terminal 
+    // initialize the i/o subsystem, which will start window manager and the default terminal 
     let (key_producer, mouse_producer) = input_event_manager::init()?;
 
-    // Wenqiu:
-    // init the display subsystem
-    // Currently we use a FrameBufferRGB as the final frame buffer, but other types of FrameBuffers could be used instead.
-    frame_buffer_rgb::init()?;
-    font::init()?;
-    window_manager::init()?;
     //info!("Display subsystem initialized successfully.");
 
     // initialize the input event manager, which will start the default terminal 

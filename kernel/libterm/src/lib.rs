@@ -34,7 +34,7 @@ use alloc::boxed::Box;
 use event_types::Event;
 use alloc::sync::Arc;
 use spin::Mutex;
-use text_display::{TextBox};
+use text_display::{TextGeneric};
 use displayable::{Displayable, TextDisplayable};
 use frame_buffer_rgb::FrameBufferRGB;
 use frame_buffer::{Coord, FrameBuffer};
@@ -108,7 +108,7 @@ impl Terminal {
     }
     //Wenqiu:
     /*fn get_displayable_dimensions(&self, name:&str) -> (usize, usize){        
-        match self.window.get_concrete_display::<TextBox>(&name) {
+        match self.window.get_concrete_display::<TextGeneric>(&name) {
             Ok(text_display) => {
                 return text_display.get_dimensions();
             },
@@ -132,6 +132,7 @@ impl Terminal {
         let mut start_idx = end_idx;
         let result;
         // Grabs a max-size slice of the scrollback buffer (usually does not totally fit because of newlines)
+        trace!("Wenqiu {} {} buffer", buffer_width, buffer_height);
         if end_idx > buffer_width * buffer_height {
             result = self.scrollback_buffer.get(end_idx - buffer_width*buffer_height..end_idx);
         } else {
@@ -425,14 +426,16 @@ impl Terminal {
                 new_end_idx
             },
         };
-        let result  = self.scrollback_buffer.get(start_idx..=end_idx); // =end_idx includes the end index in the slice
+        let result  = self.scrollback_buffer.get(start_idx..end_idx); // =end_idx includes the end index in the slice
         if let Some(slice) = result {
-            let textarea = get_text_area_mut(&mut self.window, &self.display_name)?;
-            textarea.set_text(slice);
+            {
+                let textarea = get_text_area_mut(&mut self.window, &self.display_name)?;
+                textarea.set_text(slice);
+            }
             self.window.display(&self.display_name)?;
         //Wenqiu
         /*    {
-                let text_display = self.window.get_concrete_display_mut::<TextBox>(&self.display_name)?;
+                let text_display = self.window.get_concrete_display_mut::<TextGeneric>(&self.display_name)?;
                 text_display.set_text(slice);
             }
             self.window.display(&self.display_name)?;*/
@@ -457,12 +460,14 @@ impl Terminal {
 
                 textarea.set_text(slice);
             }
-            self.window.display(&self.display_name)?;
+             trace!("Wenqiu: {} {} {}", self.scrollback_buffer, start_idx, end_idx);
+             self.window.display(&self.display_name)?;
+             trace!("Wenqiu wrong");
 //            self.textarea.lock().display_string_basic(slice)?;
 //            self.absolute_cursor_pos = cursor_pos;
             //Wenqiu
             /*{
-                let text_display = self.window.get_concrete_display_mut::<TextBox>(&self.display_name)?;
+                let text_display = self.window.get_concrete_display_mut::<TextGeneric>(&self.display_name)?;
                 text_display.set_text(slice);
             }
             self.window.display(&self.display_name)?;        */
@@ -546,9 +551,9 @@ impl Terminal {
                 Err(err) => {error!("could not update display forwards: {}", err); return}
             }
         }
-
+        
         // Wenqiu: TODO
-        let _ = window_manager_alpha::render(None);
+        let _ = self.window.render(None);
     }
 
     /// Insert a character to the terminal.
@@ -700,7 +705,7 @@ impl Terminal {
             let (width, height) = self.window.dimensions();
             let width  = width  - 2*window_manager::WINDOW_MARGIN;
             let height = height - 2*window_manager::WINDOW_MARGIN;
-            let text_display = TextBox::new(width, height, FONT_COLOR, BACKGROUND_COLOR)?;
+            let text_display = TextGeneric::new(width, height, FONT_COLOR, BACKGROUND_COLOR)?;
             let displayable: Box<dyn Displayable> = Box::new(text_display);
             self.window.add_displayable(&display_name, Coord::new(0, 0),displayable)?;
         }
@@ -738,7 +743,6 @@ impl Terminal {
         &mut self
     ) -> Result<(), &'static str> {
         let coordinate = self.window.get_displayable_position(&self.display_name)?;
-        
         // get info about the text displayable
         let (col_num, line_num, text_next_pos) = {
             let mut text_display = get_text_area_mut(&mut self.window, &self.display_name)?;
@@ -772,14 +776,22 @@ impl Terminal {
             &mut textarea
         )*/
 
+        let text_display = get_text_area_mut(&mut self.window, &self.display_name)?.downcast_mut::<TextArea>();
+
+        let (text_display, framebuffer) = if text_display.is_none() {
+            (None, self.window.framebuffer())
+        } else {
+            (text_display, None)
+        };
+
         self.cursor.display(
             coordinate,
             cursor_col,
             cursor_line,
-            None,
-            self.window.framebuffer()
+            text_display,
+            framebuffer,
         )?;
-
+ 
         // update to the end of the text if the cursor is at the last line
         let text_width = if text_next_pos / col_num == cursor_line {
             text_next_pos % col_num
@@ -814,7 +826,7 @@ fn get_text_area_mut<'a>(window: &'a mut Box<Window>, name: &str) -> Result<(&'a
 }
 
 //Wenqiu: TODO move to methods
-fn get_text_area<'a>(window: &'a Box<Window>, name: &str) -> Result<(&'a TextBox), &'static str>{
+fn get_text_area<'a>(window: &'a Box<Window>, name: &str) -> Result<(&'a TextDisplayable), &'static str>{
     let text_display = window.get_displayable(name)?;
-    text_display.downcast_ref::<TextBox>().ok_or("Fail to get the text displayable")
+    text_display.as_text()
 }

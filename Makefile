@@ -637,3 +637,6 @@ endif
 	@sudo cp -vf $(iso) /var/lib/tftpboot/theseus/
 	@sudo systemctl restart isc-dhcp-server 
 	@sudo systemctl restart tftpd-hpa
+
+generic: export override THESEUS_CONFIG += generic_display_sys
+generic: run

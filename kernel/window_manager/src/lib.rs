@@ -123,9 +123,9 @@ impl<Buffer: FrameBuffer> Window for WindowGeneric<Buffer> {
         let component = self.components.get_mut(display_name).ok_or("")?;
         let coordinate = component.get_position();
         let displayable = component.get_displayable_mut();
-        let blocks = displayable.display_in(
+        let blocks = displayable.display(
             coordinate, 
-            &mut self.framebuffer
+            Some(&mut self.framebuffer)
         )?;
         self.render(Some(blocks.into_iter()))
     }

@@ -23,13 +23,12 @@ pub trait Displayable: Downcast + Send {
     /// * `framebuffer`: the framebuffer to display onto.
     ///
     /// Returns a list of updated blocks. The tuple (index, width) represents the index of the block in the framebuffer and its width. The use of `block` is described in the `frame_buffer_compositor` crate.
-    fn display_in(
+    fn display(
         &mut self,
         coordinate: Coord,
-        framebuffer: &mut dyn FrameBuffer,
+        framebuffer: Option<&mut dyn FrameBuffer>,
     ) -> Result<Vec<(usize, usize)>, &'static str> ;
 
-    fn display(&mut self) -> Result<(), &'static str>;
     /// Resizes the displayable area.
     fn resize(&mut self, width: usize, height: usize);
 
@@ -43,6 +42,11 @@ pub trait Displayable: Downcast + Send {
     fn as_text_mut(&mut self) -> Result<&mut TextDisplayable, &'static str> {
         Err("The displayable is not a text displayable")
     }
+
+    fn as_text(&self) -> Result<&TextDisplayable, &'static str> {
+        Err("The displayable is not a text displayable")
+    }
+
 }
 impl_downcast!(Displayable);
 
@@ -52,5 +56,6 @@ pub trait TextDisplayable: Displayable {
         /// Gets the position of the next symbol as index in units of characters.
     fn get_next_index(&self) -> usize;
 
-    fn set_text(&mut self, slice: &str);
+    fn set_text(&mut self, text: &str);
 }
+impl_downcast!(TextDisplayable);

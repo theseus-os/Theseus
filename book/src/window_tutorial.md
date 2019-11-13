@@ -6,7 +6,7 @@ An application invokes the `new_window()` function in the `window_manager` crate
 
 ## Add Displayables
 
-To add a text displayable to a window, an application creates a `TextBox` object and invokes `WindowGeneric.add_displayable()` to add it as a component. The displayable is identified by a name of type `String`. 
+To add a text displayable to a window, an application creates a `TextGeneric` object and invokes `WindowGeneric.add_displayable()` to add it as a component. The displayable is identified by a name of type `String`. 
 
 In the future, we will define other kinds of displayables which implement the `Displayable` trait.
 
@@ -25,7 +25,7 @@ An application invokes `WindowGeneric.get_event()` to get the events sent to it.
 This example shows how to create a window, add a text displayable to it and print "Hello World" in the window with the text displayable.
 
 ```rust
-use text_display::TextBox;
+use text_display::TextGeneric;
 use frame_buffer::Coord;
 
 let coordinate = Coord::new(800, 800);
@@ -33,13 +33,13 @@ let width = 300;
 let height = 200;
 
 let window = window_manager::new_window(coordinate, width, height)?
-let text_display = TextBox::new(width, height, 0xFFFFFF, 0x000000)?
+let text_display = TextGeneric::new(width, height, 0xFFFFFF, 0x000000)?
 let displayable: Box<dyn displayable::Displayable> = Box::new(text_display);
 
 let display_name = "text";
 window.add_displayable(&display_name, Coord::new(0, 0), displayable)?;
 
-let text_display_ref = window.get_concrete_display_mut::<TextBox>(&display_name)?;
+let text_display_ref = window.get_concrete_display_mut::<TextGeneric>(&display_name)?;
 text_display_ref.set_text("Hello World");
             
 window.display(&display_name)?;

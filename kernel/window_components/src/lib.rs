@@ -33,7 +33,7 @@ use alloc::vec::{Vec, IntoIter};
 use alloc::string::{String, ToString};
 use alloc::collections::BTreeMap;
 use alloc::boxed::Box;
-use core::ops::{Deref};
+use core::ops::{Deref, DerefMut};
 use dfqueue::{DFQueue, DFQueueConsumer, DFQueueProducer};
 use event_types::{Event, MousePositionEvent};
 use frame_buffer_alpha::{ AlphaPixel, BLACK, PixelMixer };
@@ -161,10 +161,25 @@ impl Window for WindowComponents {
 
     fn display(&mut self, display_name: &str) -> Result<(), &'static str> {
         let component = self.components.get_mut(display_name).ok_or("")?;
-        component.display()
+        let coordinate = component.get_position();
+        component.display(coordinate, None)?;
+        Ok(())
     }
 
     fn render(&mut self, blocks: Option<IntoIter<(usize, usize)>>) -> Result<(), &'static str> {
+        // let (coordinate, width, height) = {
+        //     let window = self.winobj.lock();
+        //     let coordinate = window.get_content_position();
+        //     let (width, height) = window.framebuffer.get_size();
+        //     (coordinate, width, height)
+        // };
+        // let winx = coordinate.x;
+        // let winy = coordinate.y;
+        // for j in 0..height as isize {
+        //     for i in 0..width as isize {
+        //         window_manager_alpha::refresh_pixel_absolute(winx as isize + i, winy as isize + j)?;
+        //     }
+        // }
         window_manager_alpha::render(None)
     }
 

@@ -21,6 +21,8 @@ extern crate path;
 #[macro_use] extern crate alloc;
 extern crate window_manager_alpha;
 extern crate frame_buffer_alpha;
+extern crate frame_buffer_rgb;
+extern crate font;
 
 use alloc::{
     string::ToString,
@@ -76,15 +78,20 @@ pub fn init() -> Result<(DFQueueProducer<Event>, DFQueueProducer<Event>), &'stat
         .ok_or("Couldn't find terminal application in default app namespace")?;
 
     // init frame_buffer_alpha
-    let (width, height) = frame_buffer_alpha::init()?;
+    #[cfg(not(generic_display_sys))]       
+    {
+        let (width, height) = frame_buffer_alpha::init()?;
+        let framebuffer = FrameBufferAlpha::new(width, height, None)?;
+        window_manager_alpha::init(keyboard_event_handling_consumer, mouse_event_handling_consumer, framebuffer)?;
+    }
 
-    // init window manager_alpha
-    // Wenqiu
-    let framebuffer = FrameBufferAlpha::new(width, height, None)?;
-    // window_manager_alpha::init(keyboard_event_handling_consumer, mouse_event_handling_consumer, framebuffer)?;
-
-    KernelTaskBuilder::new(input_event_loop, keyboard_event_handling_consumer).name("input_event_loop".to_string()).spawn()?;
-
+    #[cfg(generic_display_sys)] {
+        font::init()?;
+        frame_buffer_rgb::init()?;
+        window_manager::init()?;
+        KernelTaskBuilder::new(input_event_loop, keyboard_event_handling_consumer).name("input_event_loop".to_string()).spawn()?;
+    } 
+      
     // Spawns the terminal print crate so that we can print to the terminal
     ApplicationTaskBuilder::new(terminal_print_path)
         .name("terminal_print_singleton".to_string())

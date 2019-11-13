@@ -258,57 +258,9 @@ impl TextDisplayable for TextArea {
 
 impl Displayable for TextArea {
     /// display a basic string, only support normal chars and `\n`
-    fn display_in(&mut self, coordinate: Coord, framebuffer: &mut dyn FrameBuffer) -> Result<Vec<(usize, usize)>, &'static str> {
+    fn display(&mut self, coordinate: Coord, framebuffer: Option<&mut dyn FrameBuffer>) -> Result<Vec<(usize, usize)>, &'static str> {
         self.x = coordinate.x as usize;
         self.y = coordinate.y as usize;
-        let a = self.text.clone();
-        let a = a.as_bytes();
-        let mut i = 0;
-        let mut j = 0;
-        for k in 0 .. a.len() {
-            let c = a[k] as u8;
-            // debug!("{}", a[k] as u8);
-            if c == '\n' as u8 {
-                for x in i .. self.x_cnt {
-                    self.set_char_in(x, j, ' ' as u8, framebuffer)?;
-                }
-                j += 1;
-                i = 0;
-            } else {
-                self.set_char_in(i, j, c, framebuffer)?;
-                i += 1;
-                if i >= self.x_cnt {
-                    j += 1;
-                    i = 0;
-                }
-            }
-            if j >= self.y_cnt { break; }
-        }
-
-        self.next_index = self.index(i, j);
-        
-        if j < self.y_cnt {
-            for x in i .. self.x_cnt {
-                self.set_char_in(x, j, ' ' as u8, framebuffer)?;
-            }
-            for y in j+1 .. self.y_cnt {
-                for x in 0 .. self.x_cnt {
-                    self.set_char_in(x, y, ' ' as u8, framebuffer)?;
-                }
-            }
-        }
-        trace!("Wenqiu display end");
-        trace!("Wenqiu display done");
-
-        return Ok(vec!());
-    }
-
-    fn get_position(&self) -> Coord {
-        Coord::new(self.x as isize, self.y as isize)
-    }
-    
-    /// display a basic string, only support normal chars and `\n`
-    fn display(&mut self) -> Result<(), &'static str> {
         let a = self.text.clone();
         let a = a.as_bytes();
         let mut i = 0;
@@ -345,7 +297,14 @@ impl Displayable for TextArea {
                 }
             }
         }
-        Ok(())
+        trace!("Wenqiu display end {}", self.text);
+        trace!("Wenqiu display done");
+
+        return Ok(vec!());
+    }
+
+    fn get_position(&self) -> Coord {
+        Coord::new(self.x as isize, self.y as isize)
     }
 
     fn resize(&mut self, x_cnt: usize, y_cnt: usize) {
@@ -358,6 +317,10 @@ impl Displayable for TextArea {
     }
 
     fn as_text_mut(&mut self) -> Result<&mut TextDisplayable, &'static str> {
+        Ok(self)
+    }
+
+    fn as_text(&self) -> Result<&TextDisplayable, &'static str> {
         Ok(self)
     }
 }

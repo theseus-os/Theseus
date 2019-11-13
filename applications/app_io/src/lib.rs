@@ -35,7 +35,7 @@ extern crate text_display;
 
 use window::Window;
 use text_area::TextArea;
-use text_display::TextBox;
+use text_display::TextGeneric;
 use frame_buffer_alpha::FrameBufferAlpha;
 use stdio::{StdioReader, StdioWriter, KeyEventReadGuard,
             KeyEventQueueReader};
@@ -148,58 +148,70 @@ lazy_static! {
     static ref DEFAULT_TERMINAL: Option<Arc<Mutex<Terminal>>> = {
 
         // Requests a new window object from the window manager
-/*        let (window_width, window_height) = match window_manager_alpha::get_screen_size(){
-            Ok(size) => size,
-            Err(err) => { debug!("Fail to create the framebuffer"); return None; }
-        };
+        #[cfg(not(generic_display_sys))]       
+        let (window, textarea, cursor) = { 
+            trace!("Wenqiu: define config");       
+            let (window_width, window_height) = match window_manager_alpha::get_screen_size(){
+                Ok(size) => size,
+                Err(err) => { debug!("Fail to create the framebuffer"); return None; }
+            };
 
-        const WINDOW_MARGIN: usize = 20;
-        let framebuffer = match FrameBufferAlpha::new(window_width - 2*WINDOW_MARGIN, window_height - 2*WINDOW_MARGIN, None){
-            Ok(fb) => fb,
-            Err(err) => { debug!("Fail to create the framebuffer"); return None; }
-        };
-        let window = match window_components::WindowComponents::new(
-            WINDOW_MARGIN as isize, WINDOW_MARGIN as isize, Box::new(framebuffer)) {
-            Ok(window_object) => { window_object },
-            Err(err) => {
-                debug!("new window returned err"); 
-                return None;
-            }
-        };
+            const WINDOW_MARGIN: usize = 20;
+            let framebuffer = match FrameBufferAlpha::new(window_width - 2*WINDOW_MARGIN, window_height - 2*WINDOW_MARGIN, None){
+                Ok(fb) => fb,
+                Err(err) => { debug!("Fail to create the framebuffer"); return None; }
+            };
+            let window = match window_components::WindowComponents::new(
+                WINDOW_MARGIN as isize, WINDOW_MARGIN as isize, Box::new(framebuffer)) {
+                Ok(window_object) => { window_object },
+                Err(err) => {
+                    debug!("new window returned err"); 
+                    return None;
+                }
+            };
+            let textarea = {
+                let (width_inner, height_inner) = window.inner_size();
+                debug!("new window done width: {}, height: {}", width_inner, height_inner);
+                // next add textarea to wincomps
+                const TEXTAREA_BORDER: usize = 4;
+                match TextArea::new(
+                    window.get_border_size() + TEXTAREA_BORDER, window.get_title_size() + TEXTAREA_BORDER,
+                    width_inner - 2*TEXTAREA_BORDER, height_inner - 2*TEXTAREA_BORDER,
+                    &window.winobj, None, None, Some(window.get_background()), None
+                ) {
+                    Ok(m) => m,
+                    Err(err) => { debug!("new textarea returned err");  return None; }
+                }
+            };
 
-        let textarea_object = {
-            let (width_inner, height_inner) = window.inner_size();
-            debug!("new window done width: {}, height: {}", width_inner, height_inner);
-            // next add textarea to wincomps
-            const TEXTAREA_BORDER: usize = 4;
-            match TextArea::new(
-                window.get_border_size() + TEXTAREA_BORDER, window.get_title_size() + TEXTAREA_BORDER,
-                width_inner - 2*TEXTAREA_BORDER, height_inner - 2*TEXTAREA_BORDER,
-                &window.winobj, None, None, Some(window.get_background()), None
-            ) {
-                Ok(m) => m,
-                Err(err) => { debug!("new textarea returned err");  return None; }
-            }
+            let cursor = CursorComponent::new();
+
+            (window, textarea, cursor)
         };
-*/
-        let window = match window_manager::new_default_window() {
+        
+        #[cfg(generic_display_sys)]       
+        let (window, textarea, cursor) = {
+            let window = match window_manager::new_default_window() {
             Ok(window_object) => window_object,
             Err(err) => { return None }
-        };
+            };
 
-        let (width, height) = window.dimensions();
-        let width = width - 2 * window_manager::WINDOW_MARGIN;
-        let height = height - 2 * window_manager::WINDOW_MARGIN;
-        let textarea_object = match TextBox::new(width, height, libterm::FONT_COLOR, libterm::BACKGROUND_COLOR) {
-            Ok(text) => text,
-            Err(_) => { return None }
-        };
+            let (width, height) = window.dimensions();
+            let width = width - 2 * window_manager::WINDOW_MARGIN;
+            let height = height - 2 * window_manager::WINDOW_MARGIN;
+            let textarea = match TextGeneric::new(width, height, libterm::FONT_COLOR, libterm::BACKGROUND_COLOR) {
+                Ok(text) => text,
+                Err(_) => { return None }
+            };
 
-        let cursor = CursorGeneric::new();
+            let cursor = CursorGeneric::new();
+
+            (window, textarea, cursor)
+        };
 
         match Terminal::new(
             Box::new(window), 
-            Box::new(textarea_object),
+            Box::new(textarea),
             Box::new(cursor),
         ) {
             Ok(terminal) => Some(Arc::new(Mutex::new(terminal))),
