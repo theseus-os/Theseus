@@ -35,7 +35,7 @@ extern crate text_display;
 
 use window::Window;
 use text_area::TextArea;
-use text_display::TextDisplay;
+use text_display::TextBox;
 use frame_buffer_alpha::FrameBufferAlpha;
 use stdio::{StdioReader, StdioWriter, KeyEventReadGuard,
             KeyEventQueueReader};
@@ -190,7 +190,7 @@ lazy_static! {
         let (width, height) = window.dimensions();
         let width = width - 2 * window_manager::WINDOW_MARGIN;
         let height = height - 2 * window_manager::WINDOW_MARGIN;
-        let textarea_object = match TextDisplay::new(width, height, libterm::FONT_COLOR, libterm::BACKGROUND_COLOR) {
+        let textarea_object = match TextBox::new(width, height, libterm::FONT_COLOR, libterm::BACKGROUND_COLOR) {
             Ok(text) => text,
             Err(_) => { return None }
         };

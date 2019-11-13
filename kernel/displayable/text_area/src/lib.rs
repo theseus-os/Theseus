@@ -21,7 +21,7 @@ use core::ops::DerefMut;
 use alloc::string::String;
 use alloc::vec::Vec;
 use alloc::sync::{Arc, Weak};
-use displayable::Displayable;
+use displayable::{TextDisplayable, Displayable};
 use font::{CHARACTER_HEIGHT, CHARACTER_WIDTH};
 use frame_buffer::{Coord, FrameBuffer};
 use spin::{Mutex, Once};
@@ -115,10 +115,6 @@ impl TextArea {
     /// get the y dimension char count
     pub fn get_y_cnt(& self) -> usize {
         self.y_cnt
-    }
-
-    pub fn get_next_index(&self) -> usize {
-        self.next_index
     }
 
     /// compute the index of char, does not check bound. one can use this to compute index as argument for `set_char_absolute`.
@@ -235,14 +231,29 @@ impl TextArea {
         window_manager_alpha::render(None)
     }
 */
-        /// display a basic string, only support normal chars and `\n`
-    pub fn set_text(&mut self, text: &str) {
-        self.text = String::from(text);
-    }
 
     pub fn display_string_basic(&mut self) {
 
     }
+
+}
+
+impl TextDisplayable for TextArea {
+        /// Gets the dimensions of the text area to display.
+    fn get_dimensions(&self) -> (usize, usize) {
+        (self.x_cnt, self.y_cnt)
+    }
+
+    fn get_next_index(&self) -> usize {
+        self.next_index
+    }
+
+        /// display a basic string, only support normal chars and `\n`
+    fn set_text(&mut self, text: &str) {
+        self.text = String::from(text);
+    }
+
+
 }
 
 impl Displayable for TextArea {
@@ -344,5 +355,9 @@ impl Displayable for TextArea {
 
     fn get_size(&self) -> (usize, usize) {
         (self.x_cnt, self.y_cnt)
+    }
+
+    fn as_text_mut(&mut self) -> Result<&mut TextDisplayable, &'static str> {
+        Ok(self)
     }
 }

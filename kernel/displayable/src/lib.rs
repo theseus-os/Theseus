@@ -19,7 +19,7 @@ use frame_buffer::{FrameBuffer, Coord};
 pub trait Displayable: Downcast + Send {
     /// Displays in a framebuffer.
     /// # Arguments
-    /// * `coordinate`: the coordinate within the given `framebuffer` where this displayable should render itself. The `coordinate` is relative to the top-left point `(0, 0)` of the `framebuffer`.
+    /// * `coordinate`: the coordinate within the given `framebuffer` where this dis    playable should render itself. The `coordinate` is relative to the top-left point `(0, 0)` of the `framebuffer`.
     /// * `framebuffer`: the framebuffer to display onto.
     ///
     /// Returns a list of updated blocks. The tuple (index, width) represents the index of the block in the framebuffer and its width. The use of `block` is described in the `frame_buffer_compositor` crate.
@@ -39,5 +39,18 @@ pub trait Displayable: Downcast + Send {
     fn get_position(&self) -> Coord {
         Coord::new(0, 0)
     }
+
+    fn as_text_mut(&mut self) -> Result<&mut TextDisplayable, &'static str> {
+        Err("The displayable is not a text displayable")
+    }
 }
 impl_downcast!(Displayable);
+
+
+pub trait TextDisplayable: Displayable {
+    fn get_dimensions(&self) -> (usize, usize);
+        /// Gets the position of the next symbol as index in units of characters.
+    fn get_next_index(&self) -> usize;
+
+    fn set_text(&mut self, slice: &str);
+}

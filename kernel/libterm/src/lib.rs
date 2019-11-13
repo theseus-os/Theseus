@@ -34,8 +34,8 @@ use alloc::boxed::Box;
 use event_types::Event;
 use alloc::sync::Arc;
 use spin::Mutex;
-use text_display::{TextDisplay};
-use displayable::Displayable;
+use text_display::{TextBox};
+use displayable::{Displayable, TextDisplayable};
 use frame_buffer_rgb::FrameBufferRGB;
 use frame_buffer::{Coord, FrameBuffer};
 use window_manager::WindowGeneric;
@@ -108,7 +108,7 @@ impl Terminal {
     }
     //Wenqiu:
     /*fn get_displayable_dimensions(&self, name:&str) -> (usize, usize){        
-        match self.window.get_concrete_display::<TextDisplay>(&name) {
+        match self.window.get_concrete_display::<TextBox>(&name) {
             Ok(text_display) => {
                 return text_display.get_dimensions();
             },
@@ -432,7 +432,7 @@ impl Terminal {
             self.window.display(&self.display_name)?;
         //Wenqiu
         /*    {
-                let text_display = self.window.get_concrete_display_mut::<TextDisplay>(&self.display_name)?;
+                let text_display = self.window.get_concrete_display_mut::<TextBox>(&self.display_name)?;
                 text_display.set_text(slice);
             }
             self.window.display(&self.display_name)?;*/
@@ -462,7 +462,7 @@ impl Terminal {
 //            self.absolute_cursor_pos = cursor_pos;
             //Wenqiu
             /*{
-                let text_display = self.window.get_concrete_display_mut::<TextDisplay>(&self.display_name)?;
+                let text_display = self.window.get_concrete_display_mut::<TextBox>(&self.display_name)?;
                 text_display.set_text(slice);
             }
             self.window.display(&self.display_name)?;        */
@@ -700,7 +700,7 @@ impl Terminal {
             let (width, height) = self.window.dimensions();
             let width  = width  - 2*window_manager::WINDOW_MARGIN;
             let height = height - 2*window_manager::WINDOW_MARGIN;
-            let text_display = TextDisplay::new(width, height, FONT_COLOR, BACKGROUND_COLOR)?;
+            let text_display = TextBox::new(width, height, FONT_COLOR, BACKGROUND_COLOR)?;
             let displayable: Box<dyn Displayable> = Box::new(text_display);
             self.window.add_displayable(&display_name, Coord::new(0, 0),displayable)?;
         }
@@ -742,7 +742,7 @@ impl Terminal {
         // get info about the text displayable
         let (col_num, line_num, text_next_pos) = {
             let mut text_display = get_text_area_mut(&mut self.window, &self.display_name)?;
-            let text_next_pos = text_display.get_next_pos();
+            let text_next_pos = text_display.get_next_index();
             let (col_num, line_num) = text_display.get_dimensions();
             (col_num, line_num, text_next_pos)
         };
@@ -808,13 +808,13 @@ impl Terminal {
 
 }
 
-fn get_text_area_mut<'a>(window: &'a mut Box<Window>, name: &str) -> Result<(&'a mut TextDisplay), &'static str>{
+fn get_text_area_mut<'a>(window: &'a mut Box<Window>, name: &str) -> Result<(&'a mut TextDisplayable), &'static str>{
     let text_display = window.get_displayable_mut(name)?;
-    text_display.downcast_mut::<TextDisplay>().ok_or("Fail to get the text displayable")
+    text_display.as_text_mut()
 }
 
 //Wenqiu: TODO move to methods
-fn get_text_area<'a>(window: &'a Box<Window>, name: &str) -> Result<(&'a TextDisplay), &'static str>{
+fn get_text_area<'a>(window: &'a Box<Window>, name: &str) -> Result<(&'a TextBox), &'static str>{
     let text_display = window.get_displayable(name)?;
-    text_display.downcast_ref::<TextDisplay>().ok_or("Fail to get the text displayable")
+    text_display.downcast_ref::<TextBox>().ok_or("Fail to get the text displayable")
 }

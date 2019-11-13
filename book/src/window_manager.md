@@ -34,6 +34,6 @@ The `WindowGeneric` object represents the whole window and is owned by an applic
 
 ## Displayables
 
-The `displayable` crate defines a `Displayable` trait. A `Displayable` is an item which can display itself onto a framebuffer. It usually consists of basic graphs and acts as a component of a window such as a button or a text box. Currently, we have implemented a `TextDisplay` which is a block of text. In the future we will implement other kinds of displayables.
+The `displayable` crate defines a `Displayable` trait. A `Displayable` is an item which can display itself onto a framebuffer. It usually consists of basic graphs and acts as a component of a window such as a button or a text box. Currently, we have implemented a `TextBox` which is a block of text. In the future we will implement other kinds of displayables.
 
 An application can add any `Displayable` object to a window and display it. The `WindowGeneric` structure identifies `Displayables` by their name. It implements generic methods to get access to different kinds of displayables or display them by their names.

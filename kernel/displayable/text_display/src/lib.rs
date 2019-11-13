@@ -14,13 +14,13 @@ extern crate displayable;
 
 use alloc::string::String;
 use alloc::vec::Vec;
-use displayable::Displayable;
+use displayable::{Displayable, TextDisplayable};
 use font::{CHARACTER_HEIGHT, CHARACTER_WIDTH};
 use frame_buffer::{Coord, FrameBuffer};
 
 
 /// A text displayable profiles the size and color of a block of text. It can display in a framebuffer.
-pub struct TextDisplay {
+pub struct TextBox {
     width: usize,
     height: usize,
     /// The position of the next symbol. It is updated after display and will be useful for optimization.
@@ -33,7 +33,24 @@ pub struct TextDisplay {
     cache: String,
 }
 
-impl Displayable for TextDisplay {
+impl TextDisplayable for TextBox {
+    /// Gets the dimensions of the text area to display.
+    fn get_dimensions(&self) -> (usize, usize) {
+        (self.width / CHARACTER_WIDTH, self.height / CHARACTER_HEIGHT)
+    }
+
+        /// Gets the position of the next symbol as index in units of characters.
+    fn get_next_index(&self) -> usize {
+        let col_num = self.width / CHARACTER_WIDTH;
+        self.next_line * col_num + self.next_col
+    }
+    /// Sets the content of the text displayable.
+    fn set_text(&mut self, text: &str) {
+        self.text = String::from(text);
+    }
+}
+
+impl Displayable for TextBox {
     fn display_in(
         &mut self,
         coordinate: Coord,
@@ -82,9 +99,13 @@ impl Displayable for TextDisplay {
     fn get_size(&self) -> (usize, usize) {
         (self.width, self.height)
     }
+
+    fn as_text_mut(&mut self) -> Result<&mut TextDisplayable, &'static str> {
+        Ok(self)
+    }
 }
 
-impl TextDisplay {
+impl TextBox {
     /// Creates a new text displayable.
     /// # Arguments
     /// * `(width, height)`: the size of the text area.
@@ -94,8 +115,8 @@ impl TextDisplay {
         height: usize,
         fg_color: u32,
         bg_color: u32,
-    ) -> Result<TextDisplay, &'static str> {
-        Ok(TextDisplay {
+    ) -> Result<TextBox, &'static str> {
+        Ok(TextBox {
             width: width,
             height: height,
             next_col: 0,
@@ -105,22 +126,6 @@ impl TextDisplay {
             bg_color: bg_color,
             cache: String::new(),
         })
-    }
-
-    /// Sets the content of the text displayable.
-    pub fn set_text(&mut self, text: &str) {
-        self.text = String::from(text);
-    }
-
-    /// Gets the dimensions of the text area to display.
-    pub fn get_dimensions(&self) -> (usize, usize) {
-        (self.width / CHARACTER_WIDTH, self.height / CHARACTER_HEIGHT)
-    }
-
-    /// Gets the position of the next symbol as index in units of characters.
-    pub fn get_next_pos(&self) -> usize {
-        let col_num = self.width / CHARACTER_WIDTH;
-        self.next_line * col_num + self.next_col
     }
 
     /// Gets the background color of the text area
