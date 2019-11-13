@@ -173,12 +173,12 @@ pub fn init(
         return Ok(()); 
     }
 
-    // let taskref1  = spawn::KernelRestartableTaskBuilder::new(restartable_loop, 11)
-    //     .name(alloc::string::String::from("restartable_loop"))
-    //     .spawn()
-    //     .expect("Couldn't start the restartable task"); 
+    let taskref1  = spawn::KernelTaskBuilder::new(restartable_loop, 11)
+        .name(alloc::string::String::from("restartable_loop"))
+        .spawn()
+        .expect("Couldn't start the restartable task"); 
 
-    // taskref1.join().expect("Task 1 join failed");
+    taskref1.join().expect("Task 1 join failed");
 
     info!("captain::init(): initialization done! Enabling interrupts and entering Task 0's idle loop...");
     enable_interrupts();
