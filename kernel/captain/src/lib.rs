@@ -162,6 +162,23 @@ pub fn init(
             .spawn()?;
     }
 
+    fn restartable_loop(arg :usize) -> Result<(), &'static str> {
+        debug!("Hi, I'm restartable kernel function with arg {}", arg);
+        if(arg > 3){
+            panic!("paniced");
+        }
+        loop {
+
+        }
+        return Ok(()); 
+    }
+
+    // let taskref1  = spawn::KernelRestartableTaskBuilder::new(restartable_loop, 11)
+    //     .name(alloc::string::String::from("restartable_loop"))
+    //     .spawn()
+    //     .expect("Couldn't start the restartable task"); 
+
+    // taskref1.join().expect("Task 1 join failed");
 
     info!("captain::init(): initialization done! Enabling interrupts and entering Task 0's idle loop...");
     enable_interrupts();

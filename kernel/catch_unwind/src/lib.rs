@@ -4,6 +4,7 @@
 #![feature(core_intrinsics)]
 #![feature(manually_drop_take)]
 
+#[macro_use] extern crate log;
 extern crate alloc; 
 extern crate task;
 
@@ -30,6 +31,7 @@ pub fn catch_unwind_with_arg<F, A, R>(f: F, arg: A) -> Result<R, task::KillReaso
     // which in Theseus is the pointer to the uwninding context.
     let mut unwind_context_ptr_out: usize = 0;
 
+    debug!("We are calling a try!\n");
     // Invoke the actual try() intrinsic, which will jump to `call_func_with_arg`
     let try_val = unsafe { 
         core::intrinsics::r#try(
@@ -38,11 +40,14 @@ pub fn catch_unwind_with_arg<F, A, R>(f: F, arg: A) -> Result<R, task::KillReaso
             &mut unwind_context_ptr_out as *mut _ as *mut u8,
         )
     };
+
+    debug!("We returned from try!\n");
     match try_val {
         // When `try` returns zero, it means the function ran successfully without panicking.
         0 => Ok(ManuallyDrop::into_inner(ti_arg.ret)),
         // When `try` returns non-zero, it means the function panicked.
         _ => {
+            debug!("Function panicked!\n");
             let cause = unsafe { 
                 unwind::unwinding_context_ptr_into_cause(unwind_context_ptr_out as *mut unwind::UnwindingContext) };
             Err(cause)
