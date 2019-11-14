@@ -34,8 +34,7 @@ use window::WindowProfile;
 ///
 /// The chars are allowed to be modified and update, however, one cannot change the matrix size during run-time.
 pub struct TextArea {
-    pub x: usize,
-    pub y: usize,
+    pub coordinate: Coord,
     // width: usize,
     // height: usize,
     line_spacing: usize,
@@ -62,14 +61,13 @@ impl TextArea {
     /// * `column_spacing`: the spacing between chars, default to 1
     /// * `background_color`: the background color, default to transparent
     /// * `text_color`: the color of text, default to opaque black
-    pub fn new(x: usize, y: usize, width: usize, height: usize, winobj: &Arc<Mutex<WindowProfileAlpha>>
+    pub fn new(coordinate: Coord, width: usize, height: usize, winobj: &Arc<Mutex<WindowProfileAlpha>>
             , line_spacing: Option<usize>, column_spacing: Option<usize>
             , background_color: Option<AlphaPixel>, text_color: Option<AlphaPixel>)
         -> Result<TextArea, &'static str> {
 
         let mut textarea: TextArea = TextArea {
-            x: x,
-            y: y,
+            coordinate: coordinate,
             // width: width,
             // height: height,
             line_spacing: match line_spacing {
@@ -118,8 +116,8 @@ impl TextArea {
     }
 
     /// compute the index of char, does not check bound. one can use this to compute index as argument for `set_char_absolute`.
-    pub fn index(& self, x: usize, y: usize) -> usize {  // does not check bound
-        return x + y * self.x_cnt;
+    pub fn index(& self, col: usize, line: usize) -> usize {  // does not check bound
+        return col + line * self.x_cnt;
     }
 
     /// set char at given index, for example, if you want to modify the char at (i, j), the `idx` should be `self.index(i, j)`
@@ -129,26 +127,25 @@ impl TextArea {
     }
 
     /// set char at given position, where i < self.x_cnt, j < self.y_cnt
-    pub fn set_char(&mut self, x: usize, y: usize, c: u8) -> Result<(), &'static str> {
-        if x >= self.x_cnt { return Err("x out of range"); }
-        if y >= self.y_cnt { return Err("y out of range"); }
+    pub fn set_char(&mut self, col:usize, line: usize, c: u8) -> Result<(), &'static str> {
+        if col >= self.x_cnt { return Err("x out of range"); }
+        if line >= self.y_cnt { return Err("y out of range"); }
         if let Some(winobj_mutex) = self.winobj.upgrade() {
-            if self.char_matrix[self.index(x, y)] != c {  // need to redraw
-                let idx = self.index(x, y);
+            if self.char_matrix[self.index(col, line)] != c {  // need to redraw
+                let idx = self.index(col, line);
                 self.char_matrix[idx] = c;
-                let (winx, winy) = {
+                let (win_coordinate) = {
                     let mut winobj = winobj_mutex.lock();
-                    let coordinate = winobj.get_content_position();
-                    let winx = coordinate.x;
-                    let winy = coordinate.y;
-                    self.set_char_in(x, y, c, winobj.framebuffer.deref_mut())?;
-                    (winx, winy)
+                    let win_coordinate = winobj.get_content_position();
+                    self.set_char_in(col, line, c, winobj.framebuffer.deref_mut())?;
+                    win_coordinate
                 };
-                let wx = self.x + x * (8 + self.column_spacing);
-                let wy = self.y + y * (16 + self.line_spacing);
+                let wcoordinate = self.coordinate + ((col * (8 + self.column_spacing)) as isize, (line * (16 + self.line_spacing)) as isize);
                 for j in 0..16 {
                     for i in 0..8 {
-                        window_manager_alpha::refresh_pixel_absolute(winx + wx as isize + i, winy + wy as isize + j)?;
+                        window_manager_alpha::refresh_pixel_absolute(
+                            win_coordinate + wcoordinate + (i, j)
+                        )?;
                     }
                 }
             }
@@ -160,18 +157,16 @@ impl TextArea {
 
 
         /// set char at given position, where i < self.x_cnt, j < self.y_cnt
-    pub fn set_char_in(&mut self, x: usize, y: usize, c: u8, framebuffer: &mut FrameBuffer) -> Result<(), &'static str> {
-        let wx = self.x + x * (8 + self.column_spacing);
-        let wy = self.y + y * (16 + self.line_spacing);
+    pub fn set_char_in(&mut self, col: usize, line: usize, c: u8, framebuffer: &mut FrameBuffer) -> Result<(), &'static str> {
+        let wcoordinate = self.coordinate + ((col * (8 + self.column_spacing)) as isize, (line * (16 + self.line_spacing)) as isize);
         for j in 0..16 {
             let char_font: u8 = font::FONT_BASIC[c as usize][j];
             for i in 0..8 {
-                let nx = wx + i;
-                let ny = wy + j;
+                let ncoordinate = wcoordinate + (i as isize, j as isize);
                 if char_font & (0x80u8 >> i) != 0 {
-                    framebuffer.draw_pixel(Coord::new(nx as isize, ny as isize), self.text_color);
+                    framebuffer.draw_pixel(ncoordinate, self.text_color);
                 } else {
-                    framebuffer.draw_pixel(Coord::new(nx as isize, ny as isize), self.background_color);
+                    framebuffer.draw_pixel(ncoordinate, self.background_color);
                 }
             }
         }
@@ -259,8 +254,7 @@ impl TextDisplayable for TextArea {
 impl Displayable for TextArea {
     /// display a basic string, only support normal chars and `\n`
     fn display(&mut self, coordinate: Coord, framebuffer: Option<&mut dyn FrameBuffer>) -> Result<Vec<(usize, usize)>, &'static str> {
-        self.x = coordinate.x as usize;
-        self.y = coordinate.y as usize;
+        self.coordinate = coordinate;
         let a = self.text.clone();
         let a = a.as_bytes();
         let mut i = 0;
@@ -297,14 +291,11 @@ impl Displayable for TextArea {
                 }
             }
         }
-        trace!("Wenqiu display end {}", self.text);
-        trace!("Wenqiu display done");
-
         return Ok(vec!());
     }
 
     fn get_position(&self) -> Coord {
-        Coord::new(self.x as isize, self.y as isize)
+        self.coordinate
     }
 
     fn resize(&mut self, x_cnt: usize, y_cnt: usize) {

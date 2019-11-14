@@ -145,6 +145,22 @@ impl Sub<(isize, isize)> for Coord {
     }
 }
 
+impl Add<Coord> for Coord {
+    type Output = Coord;
+
+    fn add(self, rhs: Coord) -> Coord {
+        Coord { x: self.x + rhs.x, y: self.y + rhs.y }
+    }
+}
+
+impl Sub<Coord> for Coord {
+    type Output = Coord;
+
+    fn sub(self, rhs: Coord) -> Coord {
+        Coord { x: self.x - rhs.x, y: self.y - rhs.y }
+    }
+}
+
 impl Ord for Coord {
     fn cmp(&self, other: &Self) -> Ordering {
         if self.y > other.y {

@@ -32,8 +32,10 @@ extern crate window_manager_alpha;
 extern crate window_manager;
 extern crate text_area;
 extern crate text_display;
+extern crate frame_buffer;
 
 use window::Window;
+use frame_buffer::Coord;
 use text_area::TextArea;
 use text_display::TextGeneric;
 use frame_buffer_alpha::FrameBufferAlpha;
@@ -150,7 +152,6 @@ lazy_static! {
         // Requests a new window object from the window manager
         #[cfg(not(generic_display_sys))]       
         let (window, textarea, cursor) = { 
-            trace!("Wenqiu: define config");       
             let (window_width, window_height) = match window_manager_alpha::get_screen_size(){
                 Ok(size) => size,
                 Err(err) => { debug!("Fail to create the framebuffer"); return None; }
@@ -162,7 +163,7 @@ lazy_static! {
                 Err(err) => { debug!("Fail to create the framebuffer"); return None; }
             };
             let window = match window_components::WindowComponents::new(
-                WINDOW_MARGIN as isize, WINDOW_MARGIN as isize, Box::new(framebuffer)) {
+                Coord::new(WINDOW_MARGIN as isize, WINDOW_MARGIN as isize), Box::new(framebuffer)) {
                 Ok(window_object) => { window_object },
                 Err(err) => {
                     debug!("new window returned err"); 
@@ -175,7 +176,7 @@ lazy_static! {
                 // next add textarea to wincomps
                 const TEXTAREA_BORDER: usize = 4;
                 match TextArea::new(
-                    window.get_border_size() + TEXTAREA_BORDER, window.get_title_size() + TEXTAREA_BORDER,
+                    Coord::new((window.get_border_size() + TEXTAREA_BORDER) as isize, (window.get_title_size() + TEXTAREA_BORDER) as isize),
                     width_inner - 2*TEXTAREA_BORDER, height_inner - 2*TEXTAREA_BORDER,
                     &window.winobj, None, None, Some(window.get_background()), None
                 ) {

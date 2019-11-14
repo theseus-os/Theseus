@@ -15,13 +15,10 @@ use mouse_data::MouseEvent;
 #[derive(Debug, Clone)]
 pub struct MousePositionEvent {  // tells window application of the cursor information
     /// the relative position in window
-    pub x: isize,
-    /// the relative position in window
-    pub y: isize,
+    pub coordinate: Coord,
     /// the global position in window
-    pub gx: isize,
+    pub gcoordinate: Coord,
     /// the global position in window
-    pub gy: isize,
     pub scrolling_up: bool,
     pub scrolling_down: bool,
     pub left_button_hold: bool,

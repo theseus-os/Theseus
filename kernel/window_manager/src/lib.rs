@@ -279,12 +279,12 @@ impl<Buffer: FrameBuffer> WindowGeneric<Buffer> {
         match profile.resize(coordinate, width, height) {
             Ok(percent) => {
                 for (_key, item) in self.components.iter_mut() {
-                    let coordinate = item.get_position();
+                    let current_coordinate = item.get_position();
                     let (width, height) = item.get_displayable().get_size();
                     item.resize(
                         Coord::new(
-                            coordinate.x * percent.0 as isize / 100,
-                            coordinate.y * percent.1 as isize / 100
+                            current_coordinate.x * percent.0 as isize / 100,
+                            current_coordinate.y * percent.1 as isize / 100
                         ),
                         width * percent.0 / 100,
                         height * percent.1 / 100,

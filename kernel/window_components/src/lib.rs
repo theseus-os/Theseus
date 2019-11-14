@@ -195,21 +195,20 @@ impl Window for WindowComponents {
         if is_active != self.last_is_active {
             self.draw_border(is_active);
             self.last_is_active = is_active;
-            let (bx, by) = {
+            let bcoordinate = {
                 let mut winobj = self.winobj.lock();
                 let coordinate = winobj.get_content_position();
-                let bx = coordinate.x;
-                let by = coordinate.y;
+                let bcoordinate = coordinate;
                 self.show_button(TopButton::Close, 1, &mut winobj);
                 self.show_button(TopButton::MinimizeMaximize, 1, &mut winobj);
                 self.show_button(TopButton::Hide, 1, &mut winobj);
-                (bx, by)
+                bcoordinate
             };
-            if let Err(err) = self.refresh_border(bx, by) {
+            if let Err(err) = self.refresh_border(bcoordinate) {
                 error!("refresh_border failed {}", err);
             }
         }
-        let (bx, by) = {
+        let bcoordinate = {
             let mut winobj = self.winobj.lock();
             let consumer = &winobj.consumer;
             let event = match consumer.peek() {
@@ -217,8 +216,7 @@ impl Window for WindowComponents {
                 _ => { return Ok(()); }
             };
             let coordinate = winobj.get_content_position();
-            let bx = coordinate.x;
-            let by = coordinate.y;
+            let bcoordinate = coordinate;
             match event.deref() {
                 &Event::KeyboardEvent(ref input_event) => {
                     let key_input = input_event.key_event;
@@ -235,13 +233,12 @@ impl Window for WindowComponents {
                             call_later_do_move_active_window = true;
                         }
                     } else {
-                        if (mouse_event.y as usize) < self.title_size && (mouse_event.x as usize) < winobj.width {  // the region of title bar
+                        if (mouse_event.coordinate.y as usize) < self.title_size && (mouse_event.coordinate.x as usize) < winobj.width {  // the region of title bar
                             let r2 = WINDOW_RADIUS * WINDOW_RADIUS;
                             let mut is_three_button = false;
                             for i in 0..3 {
-                                let dx = mouse_event.x - WINDOW_BUTTON_BIAS_X as isize - (i as isize) * WINDOW_BUTTON_BETWEEN as isize;
-                                let dy = mouse_event.y - self.title_size as isize / 2;
-                                if dx*dx + dy*dy <= r2 as isize {
+                                let dcoordinate = Coord::new(mouse_event.coordinate.x - WINDOW_BUTTON_BIAS_X as isize - (i as isize) * WINDOW_BUTTON_BETWEEN as isize, mouse_event.coordinate.y - self.title_size as isize / 2);
+                                if dcoordinate.x * dcoordinate.x + dcoordinate.y*dcoordinate.y <= r2 as isize {
                                     is_three_button = true;
                                     if mouse_event.left_button_hold {
                                         self.show_button(TopButton::from(i), 2, &mut winobj);
@@ -265,14 +262,14 @@ impl Window for WindowComponents {
                             if !is_three_button && !self.last_mouse_position_event.left_button_hold && mouse_event.left_button_hold {
                                 winobj.set_is_moving(true);
                                 winobj.set_give_all_mouse_event(true);
-                                winobj.moving_base = Coord::new(mouse_event.gx, mouse_event.gy);
+                                winobj.moving_base = mouse_event.gcoordinate;
                                 call_later_do_refresh_floating_border = true;
                             }
                         } else {  // the region of components
                             // TODO: if any components want this event? ask them!
                             self.producer.enqueue(Event::MousePositionEvent(mouse_event.clone()));
                         }
-                        if (mouse_event.y as usize) < winobj.height && (mouse_event.x as usize) < winobj.width &&
+                        if (mouse_event.coordinate.y as usize) < winobj.height && (mouse_event.coordinate.x as usize) < winobj.width &&
                                 !self.last_mouse_position_event.left_button_hold && mouse_event.left_button_hold {
                             need_to_set_active = true;
                         }
@@ -282,13 +279,13 @@ impl Window for WindowComponents {
                 _ => { return Ok(()); }
             };
             event.mark_completed();
-            (bx, by)
+            bcoordinate
         };
         if need_to_set_active {
             window_manager_alpha::set_active(&self.winobj)?;
         }
         if need_refresh_three_button {  // if border has been refreshed, no need to refresh buttons
-            if let Err(err) = self.refresh_three_button(bx as usize, by as usize) {
+            if let Err(err) = self.refresh_three_button(bcoordinate) {
                 error!("refresh_three_button failed {}", err);
             }
         }
@@ -312,14 +309,14 @@ impl Window for WindowComponents {
 impl WindowComponents {
     /// create new WindowComponents by given position and size, return the Mutex of it for ease of sharing
     /// x, y is the distance in pixel relative to left-top of window
-    pub fn new(x: isize, y: isize, framebuffer: Box<dyn FrameBuffer>) -> Result<WindowComponents, &'static str> {
+    pub fn new(coordinate: Coord, framebuffer: Box<dyn FrameBuffer>) -> Result<WindowComponents, &'static str> {
 
         let (width, height) = framebuffer.get_size();
         if width <= 2 * WINDOW_TITLE_BAR || height <= WINDOW_TITLE_BAR + WINDOW_BORDER {
             return Err("window too small to even draw border");
         }
 
-        let winobj_mutex = window_manager_alpha::new_window(x, y, framebuffer)?;
+        let winobj_mutex = window_manager_alpha::new_window(coordinate, framebuffer)?;
 
         // create event queue for components
         let consumer = DFQueue::new().into_consumer();
@@ -333,7 +330,8 @@ impl WindowComponents {
             consumer: consumer,
             producer: producer,
             last_mouse_position_event: MousePositionEvent {
-                x: 0, y: 0, gx: 0, gy: 0,
+                coordinate: Coord::new(0, 0), 
+                gcoordinate: Coord::new(0, 0),
                 scrolling_up: false, scrolling_down: false,
                 left_button_hold: false, right_button_hold: false,
                 fourth_button_hold: false, fifth_button_hold: false,
@@ -342,15 +340,13 @@ impl WindowComponents {
             components: BTreeMap::new(),
         };
 
-        let (x_start, x_end, y_start, y_end) = {
+        let (start, end) = {
             let mut winobj = wincomps.winobj.lock();
             winobj.framebuffer.fill_color(wincomps.background);
             let coordinate = winobj.get_content_position();
-            let x_start = coordinate.x;
-            let x_end = x_start + winobj.width as isize;
-            let y_start = coordinate.y;
-            let y_end = y_start + winobj.height as isize;
-            (x_start, x_end, y_start, y_end)
+            let start = coordinate;
+            let end = start + (winobj.width as isize, winobj.height as isize);
+            (start, end)
         };
         wincomps.draw_border(true);  // draw window with active border
         // draw three buttons
@@ -361,7 +357,7 @@ impl WindowComponents {
             wincomps.show_button(TopButton::Hide, 1, &mut winobj);
         }
         debug!("before refresh");
-        window_manager_alpha::refresh_area_absolute(x_start, x_end, y_start, y_end)?;
+        window_manager_alpha::refresh_area_absolute(start, end)?;
         debug!("after refresh");
 
         Ok(wincomps)
@@ -431,7 +427,7 @@ impl WindowComponents {
     }
 
     /// refresh border, telling window manager to refresh 
-    fn refresh_border(& self, bx: isize, by: isize) -> Result<(), &'static str> {
+    fn refresh_border(& self, bcoordinate: Coord) -> Result<(), &'static str> {
         let (width, height) = {
             let winobj = self.winobj.lock();
             let width = winobj.width;
@@ -440,10 +436,22 @@ impl WindowComponents {
         };
         let border_size = self.border_size as isize;
         let title_size = self.title_size as isize;
-        window_manager_alpha::refresh_area_absolute(bx, bx+border_size, by+title_size, by+height)?;
-        window_manager_alpha::refresh_area_absolute(bx, bx+width, by+height - border_size, by+height)?;
-        window_manager_alpha::refresh_area_absolute(bx+width - border_size, bx+width, by+title_size, by+height)?;
-        window_manager_alpha::refresh_area_absolute(bx, bx+width, by, by+title_size)?;
+        window_manager_alpha::refresh_area_absolute(
+            bcoordinate + (0, title_size),
+            bcoordinate + (border_size, height)
+        )?;
+        window_manager_alpha::refresh_area_absolute(
+            bcoordinate + (0, height - border_size),
+            bcoordinate + (width, height),
+        )?;
+        window_manager_alpha::refresh_area_absolute(
+            bcoordinate + (width - border_size, title_size),
+            bcoordinate + (width, height)
+        )?;
+        window_manager_alpha::refresh_area_absolute(
+            bcoordinate,
+            bcoordinate + (width, title_size)
+        )?;
         Ok(())
     }
 
@@ -465,12 +473,14 @@ impl WindowComponents {
     }
 
     /// refresh the top left three button's appearance
-    fn refresh_three_button(& self, bx: usize, by: usize) -> Result<(), &'static str> {
+    fn refresh_three_button(& self, bcoordinate: Coord) -> Result<(), &'static str> {
         for i in 0..3 {
-            let y = by + self.title_size / 2;
-            let x = bx + WINDOW_BUTTON_BIAS_X + i * WINDOW_BUTTON_BETWEEN;
-            let r = WINDOW_RADIUS;
-            window_manager_alpha::refresh_area_absolute((x-r) as isize, (x+r+1) as isize, (y-r) as isize, (y+r+1) as isize)?;
+            let coordinate = bcoordinate + (WINDOW_BUTTON_BIAS_X as isize + i * WINDOW_BUTTON_BETWEEN as isize, self.title_size as isize/ 2);
+            let r = WINDOW_RADIUS as isize;
+            window_manager_alpha::refresh_area_absolute(
+                coordinate - (r, r),
+                coordinate + (r+1, r+1)
+            )?;
         }
         Ok(())
     }

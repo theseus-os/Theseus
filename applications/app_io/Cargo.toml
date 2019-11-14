@@ -30,6 +30,9 @@ path = "../../kernel/window_manager"
 [dependencies.window_manager_alpha]
 path = "../../kernel/window_manager_alpha"
 
+[dependencies.frame_buffer]
+path = "../../kernel/frame_buffer"
+
 [dependencies.text_area]
 path = "../../kernel/displayable/text_area"
 

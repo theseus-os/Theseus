@@ -132,7 +132,6 @@ impl Terminal {
         let mut start_idx = end_idx;
         let result;
         // Grabs a max-size slice of the scrollback buffer (usually does not totally fit because of newlines)
-        trace!("Wenqiu {} {} buffer", buffer_width, buffer_height);
         if end_idx > buffer_width * buffer_height {
             result = self.scrollback_buffer.get(end_idx - buffer_width*buffer_height..end_idx);
         } else {
@@ -460,9 +459,7 @@ impl Terminal {
 
                 textarea.set_text(slice);
             }
-             trace!("Wenqiu: {} {} {}", self.scrollback_buffer, start_idx, end_idx);
              self.window.display(&self.display_name)?;
-             trace!("Wenqiu wrong");
 //            self.textarea.lock().display_string_basic(slice)?;
 //            self.absolute_cursor_pos = cursor_pos;
             //Wenqiu

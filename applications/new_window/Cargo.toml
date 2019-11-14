@@ -20,6 +20,9 @@ path = "../../libs/keycodes_ascii"
 [dependencies.window]
 path = "../../kernel/window"
 
+[dependencies.frame_buffer]
+path = "../../kernel/frame_buffer"
+
 [dependencies.dfqueue]
 path = "../../libs/dfqueue"
 version = "0.1.0"

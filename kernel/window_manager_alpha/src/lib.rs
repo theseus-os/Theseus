@@ -98,14 +98,8 @@ struct Point {
 
 /// a rectangle region
 struct RectRegion {
-    /// x start 
-    x_start: isize,
-    /// x end (exclusive)
-    x_end: isize,
-    /// y start
-    y_start: isize,
-    /// y end (exclusive)
-    y_end: isize,
+    start: Coord,
+    end: Coord,
 }
 
 /// window manager with overlapping and alpha enabled
@@ -117,7 +111,7 @@ pub struct WindowManagerAlpha<U: WindowProfile> {
     /// the only active window, receiving all keyboard events (except for those remained for WM)
     active: Weak<Mutex<U>>,  // this one is not in show_list
     /// current mouse position
-    mouse: Point,
+    mouse: Coord,
     /// If a window is being repositioned (e.g., by dragging it), this is the position of that window's border
     repositioned_border: Option<RectRegion>,
     /// the frame buffer that it should print on
@@ -130,14 +124,12 @@ impl <U: WindowProfile> WindowManagerAlpha<U> {
 
     /// set one window to active, push last active (if exists) to top of show_list. if `refresh` is `true`, will then refresh the window's area
     pub fn set_active(&mut self, objref: &Arc<Mutex<U>>, refresh: bool) -> Result<(), &'static str> {
-        let (x_start, x_end, y_start, y_end) = {
+        let (start, end) = {
             let winobj = objref.lock();
-            let coordinate = winobj.get_content_position();
-            let x_start = coordinate.x; let y_start = coordinate.y;
+            let start = winobj.get_content_position();
             let (width, height) = winobj.get_content_size();
-            let x_end = x_start + width as isize;
-            let y_end = y_start + height as isize;
-            (x_start, x_end, y_start, y_end)
+            let end = start + (width as isize, height as isize);
+            (start, end)
         };
         // if it is currently actived, just return
         if let Some(current_active) = self.active.upgrade() {
@@ -160,7 +152,7 @@ impl <U: WindowProfile> WindowManagerAlpha<U> {
         }
         self.active = Arc::downgrade(objref);
         if refresh {
-            self.refresh_area(x_start, x_end, y_start, y_end)?;
+            self.refresh_area(start, end)?;
         }
         Ok(())
     }
@@ -195,32 +187,31 @@ impl <U: WindowProfile> WindowManagerAlpha<U> {
 
     /// delete one window if exists, refresh its region then
     pub fn delete_window(&mut self, objref: &Arc<Mutex<U>>) -> Result<(), &'static str> {
-        let (x_start, x_end, y_start, y_end) = {
+        let (start, end) = {
             let winobj = objref.lock();
-            let coordinate = winobj.get_content_position();
-            let x_start = coordinate.x; let y_start = coordinate.y;
+            let start = winobj.get_content_position();
             let (width, height) = winobj.get_content_size();
-            let x_end = x_start + width as isize; let y_end = y_start + height as isize;
-            (x_start, x_end, y_start, y_end)
+            let end = start + (width as isize, height as isize);
+            (start, end)
         };
         if let Some(current_active) = self.active.upgrade() {
             if Arc::ptr_eq(&(current_active), objref) {
                 self.active = Weak::new();  // delete reference
-                self.refresh_area(x_start, x_end, y_start, y_end)?;
+                self.refresh_area(start, end)?;
                 return Ok(())
             }
         }
         match self.is_window_in_show_list(&objref) {
             Some(i) => {
                 self.show_list.remove(i);
-                self.refresh_area(x_start, x_end, y_start, y_end)?;
+                self.refresh_area(start, end)?;
                 return Ok(())
             }, None => {}
         }
         match self.is_window_in_hide_list(&objref) {
             Some(i) => {
                 self.hide_list.remove(i);
-                self.refresh_area(x_start, x_end, y_start, y_end)?;
+                self.refresh_area(start, end)?;
                 return Ok(())
             }, None => {}
         }
@@ -228,12 +219,12 @@ impl <U: WindowProfile> WindowManagerAlpha<U> {
     }
 
     /// Recompute single pixel within show_list in a reduced complexity, by compute pixels under it only if it is not opaque
-    fn recompute_single_pixel_show_list(& self, x: usize, y: usize, idx: usize) -> AlphaPixel {
+    fn recompute_single_pixel_show_list(& self, coordinate: Coord, idx: usize) -> AlphaPixel {
         if idx >= self.show_list.len() {
             // screen should be 1280*1080 but background figure is just 640*540
             // larger screen size will be black border and smaller screen size will see part of the background picture
-            if x < 2 * background::BACKGROUND_WIDTH && y < 2 * background::BACKGROUND_HEIGHT {
-                return background::BACKGROUND[y/2][x/2].into();
+            if (coordinate.x as usize) < 2 * background::BACKGROUND_WIDTH && (coordinate.y as usize) < 2 * background::BACKGROUND_HEIGHT {
+                return background::BACKGROUND[coordinate.y as usize/2][coordinate.x as usize/2].into();
             }
             return BLACK;  // return black
         }
@@ -241,12 +232,11 @@ impl <U: WindowProfile> WindowManagerAlpha<U> {
             // first get current color, to determine whether further get colors below   
             let top = {
                 let winobj = now_winobj.lock();
-                let coordinate = winobj.get_content_position();
-                let relative_x = (x as isize - coordinate.x) as usize;
-                let relative_y = (y as isize - coordinate.y) as usize;
+                let win_coord = winobj.get_content_position();
+                let relative = coordinate - win_coord;
                 let mut ret = T;  // defult is transparent
-                if winobj.contains(Coord::new(relative_x as isize, relative_y as isize)) {
-                    let top = match winobj.get_pixel(Coord::new(relative_x as isize, relative_y as isize)) {
+                if winobj.contains(relative) {
+                    let top = match winobj.get_pixel(relative) {
                         Ok(m) => m,
                         Err(_) => T,  // transparent
                     };
@@ -257,134 +247,132 @@ impl <U: WindowProfile> WindowManagerAlpha<U> {
                 }
                 ret
             };
-            let bottom = self.recompute_single_pixel_show_list(x, y, idx+1);
+            let bottom = self.recompute_single_pixel_show_list(coordinate, idx+1);
             return top.alpha_mix(bottom);
         } else {  // need to delete this one, since the owner has been dropped, but here is immutable >.<
             // self.show_list.remove(idx);
-            return self.recompute_single_pixel_show_list(x, y, idx+1);
+            return self.recompute_single_pixel_show_list(coordinate, idx+1);
         }
     }
 
     /// refresh one pixel on frame buffer
-    fn refresh_single_pixel_with_buffer(&mut self, x: usize, y: usize) -> Result<(), &'static str> {
-        if ! self.final_fb.contains(Coord::new(x as isize, y as isize)) {
+    fn refresh_single_pixel_with_buffer(&mut self, coordinate: Coord) -> Result<(), &'static str> {
+        if ! self.final_fb.contains(coordinate) {
             return Ok(());
         }
-        let sx = x as isize;
-        let sy = y as isize;
+        let scoordinate = coordinate;
         if let Some(current_active) = self.active.upgrade() {
             let current_active_win = current_active.lock();
-            let coordinate = current_active_win.get_content_position();
+            let current_coord = current_active_win.get_content_position();
 
-            let relative_x = (sx - coordinate.x) as usize;
-            let relative_y = (sy - coordinate.y) as usize;
-            if current_active_win.contains(Coord::new(relative_x as isize,  relative_y as isize)) {
-                let top = current_active_win.get_pixel(Coord::new(relative_x as isize,  relative_y as isize))?;
+            let relative = scoordinate - current_coord;
+            if current_active_win.contains(relative) {
+                let top = current_active_win.get_pixel(relative)?;
                 if top.get_alpha() == 0 {  // totally opaque, so not waste computation
-                    self.final_fb.draw_pixel(Coord::new(x as isize, y as isize), top);
+                    self.final_fb.draw_pixel(coordinate, top);
                 } else {
-                    let bottom = self.recompute_single_pixel_show_list(x, y, 0);
-                    self.final_fb.draw_pixel(Coord::new(x as isize, y as isize), top.alpha_mix(bottom));
+                    let bottom = self.recompute_single_pixel_show_list(coordinate, 0);
+                    self.final_fb.draw_pixel(coordinate, top.alpha_mix(bottom));
                 }
             } else {
-                let pixel = self.recompute_single_pixel_show_list(x, y, 0);
-                self.final_fb.draw_pixel(Coord::new(x as isize, y as isize), pixel);
+                let pixel = self.recompute_single_pixel_show_list(coordinate, 0);
+                self.final_fb.draw_pixel(coordinate, pixel);
             }
         } else {  // nothing is active now
-            let pixel = self.recompute_single_pixel_show_list(x, y, 0);
-            self.final_fb.draw_pixel(Coord::new(x as isize, y as isize), pixel);
+            let pixel = self.recompute_single_pixel_show_list(coordinate, 0);
+            self.final_fb.draw_pixel(coordinate, pixel);
         }
 
         // then draw border
         if let Some(repositioned_border) = &self.repositioned_border {
-            let (x_start, x_end, y_start, y_end) = {
+            let (start, end) = {
                 let r = &repositioned_border;
-                (r.x_start, r.x_end, r.y_start, r.y_end)
+                (r.start, r.end)
             };
-            let sx_end_1 = x_end - 1;
-            let sy_end_1 = y_end - 1;
+            let s_end_1 = end - (1, 1);
             let window_border_size = WINDOW_BORDER_SIZE as isize;
-            let x_in = sx >= x_start - window_border_size && sx <= sx_end_1 + window_border_size;
-            let y_in = sy >= y_start - window_border_size && sy <= sy_end_1 + window_border_size;
-            let left = (x_start - sx) as usize <= WINDOW_BORDER_SIZE && y_in;
-            let right = (sx - sx_end_1) as usize <= WINDOW_BORDER_SIZE && y_in;
-            let top = (y_start - sy) as usize <= WINDOW_BORDER_SIZE && x_in;
-            let bottom = (sy - sy_end_1) as usize <= WINDOW_BORDER_SIZE && x_in;
+            
+            let x_in = scoordinate.x >= start.x - window_border_size && scoordinate.x <= s_end_1.x + window_border_size;
+            let y_in = scoordinate.y >= start.y - window_border_size && scoordinate.y <= s_end_1.y + window_border_size;
+            let left = (start.x - scoordinate.x) as usize <= WINDOW_BORDER_SIZE && y_in;
+            let right = (scoordinate.x - s_end_1.x) as usize <= WINDOW_BORDER_SIZE && y_in;
+            let top = (start.y - scoordinate.y) as usize <= WINDOW_BORDER_SIZE && x_in;
+            let bottom = (scoordinate.y - s_end_1.y) as usize <= WINDOW_BORDER_SIZE && x_in;
             let f32_window_border_size = WINDOW_BORDER_SIZE as f32;
 
             if left {
                 if top {  // left-top
-                    let dx = x_start - sx; let dy = y_start - sy;
-                    if (dx+dy) as usize <= WINDOW_BORDER_SIZE {
-                        self.final_fb.draw_pixel_alpha(Coord::new(x as isize, y as isize), WINDOW_BORDER_COLOR_OUTTER.color_mix(
-                            WINDOW_BORDER_COLOR_INNER, (dx+dy) as usize as f32 / f32_window_border_size));
+                    let dcoordinate = start - scoordinate;
+                    // let dx = x_start - sx; let dy = y_start - sy;
+                    if (dcoordinate.x+dcoordinate.y) as usize <= WINDOW_BORDER_SIZE {
+                        self.final_fb.draw_pixel_alpha(coordinate, WINDOW_BORDER_COLOR_OUTTER.color_mix(
+                            WINDOW_BORDER_COLOR_INNER, (dcoordinate.x+dcoordinate.y) as usize as f32 / f32_window_border_size));
                     }
                 } else if bottom {  // left-bottom
-                    let dx = x_start - sx; let dy = sy - sy_end_1;
-                    if (dx+dy) as usize <= WINDOW_BORDER_SIZE {
-                        self.final_fb.draw_pixel_alpha(Coord::new(x as isize, y as isize), WINDOW_BORDER_COLOR_OUTTER.color_mix(
-                            WINDOW_BORDER_COLOR_INNER, (dx+dy) as usize as f32 / f32_window_border_size));
+                    let dcoordinate = Coord::new(start.x - scoordinate.x, scoordinate.y - s_end_1.y);
+                    if (dcoordinate.x+dcoordinate.y) as usize <= WINDOW_BORDER_SIZE {
+                        self.final_fb.draw_pixel_alpha(coordinate, WINDOW_BORDER_COLOR_OUTTER.color_mix(
+                            WINDOW_BORDER_COLOR_INNER, (dcoordinate.x+dcoordinate.y) as usize as f32 / f32_window_border_size));
                     }
                 } else {  // only left
-                    self.final_fb.draw_pixel_alpha(Coord::new(x as isize, y as isize), WINDOW_BORDER_COLOR_OUTTER.color_mix(
-                        WINDOW_BORDER_COLOR_INNER, (x_start - sx) as usize as f32 / f32_window_border_size));
+                    self.final_fb.draw_pixel_alpha(coordinate, WINDOW_BORDER_COLOR_OUTTER.color_mix(
+                        WINDOW_BORDER_COLOR_INNER, (start.x - scoordinate.x) as usize as f32 / f32_window_border_size));
                 }
             } else if right {
                 if top {  // right-top
-                    let dx = sx - sx_end_1; let dy = y_start - sy;
-                    if (dx+dy) as usize <= WINDOW_BORDER_SIZE {
-                        self.final_fb.draw_pixel_alpha(Coord::new(x as isize, y as isize), WINDOW_BORDER_COLOR_OUTTER.color_mix(
-                            WINDOW_BORDER_COLOR_INNER, (dx+dy) as usize as f32 / f32_window_border_size));
+                    let dcoordinate = Coord::new(scoordinate.x - s_end_1.x, start.y - scoordinate.y);
+                    if (dcoordinate.x+dcoordinate.y) as usize <= WINDOW_BORDER_SIZE {
+                        self.final_fb.draw_pixel_alpha(coordinate, WINDOW_BORDER_COLOR_OUTTER.color_mix(
+                            WINDOW_BORDER_COLOR_INNER, (dcoordinate.x+dcoordinate.y) as usize as f32 / f32_window_border_size));
                     }
                 } else if bottom {  // right-bottom
-                    let dx = sx - sx_end_1; let dy = sy - sy_end_1;
-                    if (dx+dy) as usize <= WINDOW_BORDER_SIZE {
-                        self.final_fb.draw_pixel_alpha(Coord::new(x as isize, y as isize), WINDOW_BORDER_COLOR_OUTTER.color_mix(
-                            WINDOW_BORDER_COLOR_INNER, (dx+dy) as usize as f32 / f32_window_border_size));
+                    let dcoordinate = scoordinate - s_end_1;
+                    if (dcoordinate.x+dcoordinate.y) as usize <= WINDOW_BORDER_SIZE {
+                        self.final_fb.draw_pixel_alpha(coordinate, WINDOW_BORDER_COLOR_OUTTER.color_mix(
+                            WINDOW_BORDER_COLOR_INNER, (dcoordinate.x+dcoordinate.y) as usize as f32 / f32_window_border_size));
                     }
                 } else {  // only right
-                    self.final_fb.draw_pixel_alpha(Coord::new(x as isize, y as isize), WINDOW_BORDER_COLOR_OUTTER.color_mix(
-                        WINDOW_BORDER_COLOR_INNER, (sx - sx_end_1) as usize as f32 / f32_window_border_size));
+                    self.final_fb.draw_pixel_alpha(coordinate, WINDOW_BORDER_COLOR_OUTTER.color_mix(
+                        WINDOW_BORDER_COLOR_INNER, (scoordinate.x - s_end_1.x) as usize as f32 / f32_window_border_size));
                 }
             } else if top {  // only top
-                self.final_fb.draw_pixel_alpha(Coord::new(x as isize, y as isize), WINDOW_BORDER_COLOR_OUTTER.color_mix(
-                    WINDOW_BORDER_COLOR_INNER, (y_start - sy) as usize as f32 / f32_window_border_size));
+                self.final_fb.draw_pixel_alpha(coordinate, WINDOW_BORDER_COLOR_OUTTER.color_mix(
+                    WINDOW_BORDER_COLOR_INNER, (start.y - scoordinate.y) as usize as f32 / f32_window_border_size));
             } else if bottom {  // only bottom
-                self.final_fb.draw_pixel_alpha(Coord::new(x as isize, y as isize), WINDOW_BORDER_COLOR_OUTTER.color_mix(
-                    WINDOW_BORDER_COLOR_INNER, (sy - sy_end_1) as usize as f32 / f32_window_border_size));
+                self.final_fb.draw_pixel_alpha(coordinate, WINDOW_BORDER_COLOR_OUTTER.color_mix(
+                    WINDOW_BORDER_COLOR_INNER, (coordinate.y - s_end_1.y) as usize as f32 / f32_window_border_size));
             }
         }
         // finally draw mouse
-        let (cx, cy) = {
-            let m = &self.mouse;
-            (m.x as isize, m.y as isize)
+        let mcoordinate = {
+            &self.mouse
         };
-        if ((sx-cx) as usize <= MOUSE_POINTER_HALF_SIZE || (cx-sx) as usize <= MOUSE_POINTER_HALF_SIZE) && ((sy-cy) as usize <= MOUSE_POINTER_HALF_SIZE || (cy-sy) as usize <= MOUSE_POINTER_HALF_SIZE) {
-            self.final_fb.draw_pixel_alpha(Coord::new(x as isize, y as isize), MOUSE_BASIC[MOUSE_POINTER_HALF_SIZE + x - cx as usize][MOUSE_POINTER_HALF_SIZE + y - cy as usize]);
+        if ((scoordinate.x-mcoordinate.x) as usize <= MOUSE_POINTER_HALF_SIZE || (mcoordinate.x-scoordinate.x) as usize <= MOUSE_POINTER_HALF_SIZE) && ((scoordinate.y-mcoordinate.y) as usize <= MOUSE_POINTER_HALF_SIZE || (mcoordinate.y-scoordinate.y) as usize <= MOUSE_POINTER_HALF_SIZE) {
+            self.final_fb.draw_pixel_alpha(coordinate, MOUSE_BASIC[(MOUSE_POINTER_HALF_SIZE as isize + coordinate.x - mcoordinate.x) as usize][(MOUSE_POINTER_HALF_SIZE as isize + coordinate.y - mcoordinate.y) as usize]);
         }
         Ok(())
     }
 
     /// recompute single pixel value and refresh it on screen
-    pub fn refresh_single_pixel(&mut self, x: isize, y: isize) -> Result<(), &'static str> {
+    pub fn refresh_single_pixel(&mut self, coordinate: Coord) -> Result<(), &'static str> {
         let (width, height) = self.final_fb.get_size();
-        if (x as usize) < width && (y as usize) < height {
-            return self.refresh_single_pixel_with_buffer(x as usize, y as usize);
+        if (coordinate.x as usize) < width && (coordinate.y as usize) < height {
+            return self.refresh_single_pixel_with_buffer(coordinate);
         }
         return Ok(())  // don't need to update this pixel because it is not displayed on the screen
     }
 
     /// refresh an area by recompute every pixel in this region and update on the screen
-    fn refresh_area(&mut self, x_start: isize, x_end: isize, y_start: isize, y_end: isize) -> Result<(), &'static str> {
+    fn refresh_area(&mut self, mut start: Coord, mut end: Coord) -> Result<(), &'static str> {
         let (width, height) = self.final_fb.get_size();
-        let x_start = core::cmp::max(x_start, 0);
-        let x_end = core::cmp::min(x_end, width as isize);
-        let y_start = core::cmp::max(y_start, 0);
-        let y_end = core::cmp::min(y_end, height as isize);
-        if x_start <= x_end && y_start <= y_end {
-            for y in y_start .. y_end {
-                for x in x_start .. x_end {
-                    self.refresh_single_pixel_with_buffer(x as usize, y as usize)?;
+        start.x = core::cmp::max(start.x, 0);
+        end.x = core::cmp::min(end.x, width as isize);
+        start.y = core::cmp::max(start.y, 0);
+        end.y = core::cmp::min(end.y, height as isize);
+        if start.x <= end.x && start.y <= end.y {
+            for y in start.y .. end.y {
+                for x in start.x .. end.x {
+                    self.refresh_single_pixel_with_buffer(Coord::new(x, y))?;
                 }
             }
         }
@@ -392,33 +380,33 @@ impl <U: WindowProfile> WindowManagerAlpha<U> {
     }
 
     /// refresh an rectangle border
-    fn refresh_rect_border(&mut self, x_start: isize, x_end: isize, y_start: isize, y_end: isize) -> Result<(), &'static str> {
+    fn refresh_rect_border(&mut self, mut start: Coord, mut end: Coord) -> Result<(), &'static str> {
         let (width, height) = self.final_fb.get_size();
-        let x_start = core::cmp::max(x_start, 0);
-        let x_end = core::cmp::min(x_end, width as isize);
-        let y_start = core::cmp::max(y_start, 0);
-        let y_end = core::cmp::min(y_end, height as isize);
-        if x_start <= x_end {
-            if y_start < height as isize {
-                for x in x_start .. x_end {
-                    self.refresh_single_pixel_with_buffer(x as usize, y_start as usize)?;
+        start.x = core::cmp::max(start.x, 0);
+        end.x = core::cmp::min(end.x, width as isize);
+        start.y = core::cmp::max(start.y, 0);
+        end.y = core::cmp::min(end.y, height as isize);
+        if start.x <= end.x {
+            if start.y < height as isize {
+                for x in start.x .. end.x {
+                    self.refresh_single_pixel_with_buffer(Coord::new(x, start.y))?;
                 }
             }
-            if y_end > 0 {
-                for x in x_start .. x_end {
-                    self.refresh_single_pixel_with_buffer(x as usize, y_end as usize - 1)?;
+            if end.y > 0 {
+                for x in start.x .. end.x {
+                    self.refresh_single_pixel_with_buffer(Coord::new(x, end.y - 1))?;
                 }
             }
         }
-        if y_start <= y_end {
-            if x_start < width as isize {
-                for y in y_start .. y_end {
-                    self.refresh_single_pixel_with_buffer(x_start as usize, y as usize)?;
+        if start.y <= end.y {
+            if start.x < width as isize {
+                for y in start.y .. end.y {
+                    self.refresh_single_pixel_with_buffer(Coord::new(start.x, y))?;
                 }
             }
-            if x_end > 0 {
-                for y in y_start .. y_end {
-                    self.refresh_single_pixel_with_buffer(x_end as usize - 1, y as usize)?;
+            if end.x > 0 {
+                for y in start.y .. end.y {
+                    self.refresh_single_pixel_with_buffer(Coord::new(end.x - 1, y))?;
                 }
             }
         }
@@ -436,15 +424,12 @@ impl <U: WindowProfile> WindowManagerAlpha<U> {
 
     /// pass mouse event to the top window that mouse on, may also transfer to those want all events
     fn pass_mouse_event_to_window(& self, mouse_event: MouseEvent) -> Result<(), &'static str> {
-        let (x, y) = {
-            let m = &self.mouse;
-            (m.x as isize, m.y as isize)
+        let coordinate = {
+            &self.mouse
         };
         let mut event: MousePositionEvent = MousePositionEvent {
-            x: 0,
-            y: 0,
-            gx: x,
-            gy: y,
+            coordinate: Coord::new(0, 0),
+            gcoordinate: coordinate.clone(),
             scrolling_up: mouse_event.mousemove.scrolling_up,
             scrolling_down: mouse_event.mousemove.scrolling_down,
             left_button_hold: mouse_event.buttonact.left_button_hold,
@@ -456,12 +441,9 @@ impl <U: WindowProfile> WindowManagerAlpha<U> {
         // active
         if let Some(current_active) = self.active.upgrade() {
             let mut current_active_win = current_active.lock();
-            let coordinate = current_active_win.get_content_position();            
-            let cx = coordinate.x;
-            let cy = coordinate.y;
+            let current_coordinate = current_active_win.get_content_position();            
             if current_active_win.give_all_mouse_event() {
-                event.x = x - cx;
-                event.y = y - cy;
+                event.coordinate = *coordinate - current_coordinate;
                 current_active_win.events_producer().enqueue(Event::MousePositionEvent(event.clone()));
             }
         }
@@ -469,12 +451,9 @@ impl <U: WindowProfile> WindowManagerAlpha<U> {
         for i in 0..self.show_list.len() {
             if let Some(now_winobj_mutex) = self.show_list[i].upgrade() {
                 let mut now_winobj = now_winobj_mutex.lock();
-                let coordinate = now_winobj.get_content_position();
-                let cx = coordinate.x;
-                let cy = coordinate.y;
+                let current_coordinate = now_winobj.get_content_position();
                 if now_winobj.give_all_mouse_event() {
-                    event.x = x - cx;
-                    event.y = y - cy;
+                    event.coordinate = *coordinate - current_coordinate;
                     now_winobj.events_producer().enqueue(Event::MousePositionEvent(event.clone()));
                 }
             }
@@ -483,12 +462,9 @@ impl <U: WindowProfile> WindowManagerAlpha<U> {
         // first check the active one
         if let Some(current_active) = self.active.upgrade() {
             let mut current_active_win = current_active.lock();
-            let coordinate = current_active_win.get_content_position();
-            let cx = coordinate.x;
-            let cy = coordinate.y;
-            if current_active_win.contains(Coord::new((x - cx) as isize, (y - cy) as isize)) {
-                event.x = x - cx;
-                event.y = y - cy;
+            let current_coordinate = current_active_win.get_content_position();
+            if current_active_win.contains(*coordinate - current_coordinate) {
+                event.coordinate = *coordinate - current_coordinate;
                 // debug!("pass to active: {}, {}", event.x, event.y);
                 current_active_win.events_producer().enqueue(Event::MousePositionEvent(event));
                 return Ok(());
@@ -501,12 +477,9 @@ impl <U: WindowProfile> WindowManagerAlpha<U> {
         for i in 0..self.show_list.len() {
             if let Some(now_winobj_mutex) = self.show_list[i].upgrade() {
                 let mut now_winobj = now_winobj_mutex.lock();
-                let coordinate = now_winobj.get_content_position();
-                let cx = coordinate.x;
-                let cy = coordinate.y;
-                if now_winobj.contains(Coord::new((x - cx) as isize, (y - cy) as isize)) {
-                    event.x = x - cx;
-                    event.y = y - cy;
+                let current_coordinate = now_winobj.get_content_position();
+                if now_winobj.contains(*coordinate - current_coordinate) {
+                    event.coordinate = *coordinate - current_coordinate;
                     now_winobj.events_producer().enqueue(Event::MousePositionEvent(event));
                     return Ok(());
                 }
@@ -519,28 +492,34 @@ impl <U: WindowProfile> WindowManagerAlpha<U> {
     /// (x_start, x_end, y_start, y_end) indicates the position and size of this border.
     /// if this is not clear, you can simply try this attribute by pressing left mouse on the top bar of any window and move the mouse, then you should see a thin border
     /// this is extremely useful when performance is not enough for re-render the whole window when moving the mouse
-    fn refresh_floating_border(& mut self, show: bool, x_start: isize, x_end: isize, y_start: isize, y_end: isize) -> Result<(), &'static str> {
+    fn refresh_floating_border(& mut self, show: bool, start: Coord, end: Coord) -> Result<(), &'static str> {
         if self.repositioned_border.is_none() && !show { return Ok(()) }
         // first clear old border if exists
         if let Some(repositioned_border) = &self.repositioned_border {
-            let (old_x_start, old_x_end, old_y_start, old_y_end) = {
+            let (old_start, old_end) = {
                 let r = &repositioned_border;
-                (r.x_start, r.x_end, r.y_start, r.y_end)
+                (r.start, r.end)
             };
             if show {  // otherwise don't change position
-                self.repositioned_border = Some(RectRegion { x_start, x_end, y_start, y_end });
+                self.repositioned_border = Some(RectRegion { start, end });
             } else {
                 self.repositioned_border = None;
             }
             for i in 0..(WINDOW_BORDER_SIZE+1) as isize {
-                self.refresh_rect_border(old_x_start-i, old_x_end+i, old_y_start-i, old_y_end+i)?;
+                self.refresh_rect_border(
+                    old_start + (-i, -i),
+                    old_end + (i, i)
+                )?;
             }
         }
         // then draw current border
         if show {
-            self.repositioned_border = Some(RectRegion { x_start, x_end, y_start, y_end });
+            self.repositioned_border = Some(RectRegion { start, end });
             for i in 0..(WINDOW_BORDER_SIZE+1) as isize {
-                self.refresh_rect_border(x_start-i, x_end+i, y_start-i, y_end+i)?;
+                self.refresh_rect_border(
+                    start + (-i, -i),
+                    end + (i, i)
+                )?;
             }
         }
         Ok(())
@@ -550,31 +529,41 @@ impl <U: WindowProfile> WindowManagerAlpha<U> {
     /// it works like this: first refresh all the region of new position, which let user see the new content faster
     /// then it try to reduce computation by only refresh the region that is in old one but NOT in new one.
     fn refresh_area_with_old_new(&mut self, 
-            old_x_start: isize, old_x_end: isize, old_y_start: isize, old_y_end: isize, 
-            new_x_start: isize, new_x_end: isize, new_y_start: isize, new_y_end: isize) -> Result<(), &'static str> {
+            old_start: Coord, old_end: Coord, 
+            new_start: Coord, new_end: Coord
+    ) -> Result<(), &'static str> {
         // first refresh new area for better user experience
-        self.refresh_area(new_x_start, new_x_end, new_y_start, new_y_end)?;
+        self.refresh_area(new_start, new_end)?;
         // then refresh old area that not overlapped by new one
-        let x_not_overlapped = new_x_start >= old_x_end || new_x_end <= old_x_start;
-        let y_not_overlapped = new_y_start >= old_y_end || new_y_end <= old_y_start;
+        let x_not_overlapped = new_start.x >= old_end.x || new_end.x <= old_start.x;
+        let y_not_overlapped = new_start.y >= old_end.y || new_end.y <= old_start.y;
         if x_not_overlapped || y_not_overlapped {  // have to refresh all
-            self.refresh_area(old_x_start, old_x_end, old_y_start, old_y_end)?;
+            self.refresh_area(old_start, old_end)?;
         } else {  // there existes overlapped region, optimize them!
-            let mut greater_x_start = old_x_start;  // this should be the larger one between `old_x_start` and `new_x_start`
-            let mut smaller_x_end = old_x_end;  // this should be the smaller one between `old_x_end` and `new_x_end`
-            if old_x_start < new_x_start {
-                self.refresh_area(old_x_start, new_x_start, old_y_start, old_y_end)?;
-                greater_x_start = new_x_start;
+            let mut greater_x_start = old_start.x;  // this should be the larger one between `old_x_start` and `new_x_start`
+            let mut smaller_x_end = old_end.x;  // this should be the smaller one between `old_x_end` and `new_x_end`
+            if old_start.x < new_start.x {
+                self.refresh_area(old_start, old_end)?;
+                greater_x_start = new_start.x;
             }
-            if old_x_end > new_x_end {
-                self.refresh_area(new_x_end, old_x_end, old_y_start, old_y_end)?;
-                smaller_x_end = new_x_end;
+            if old_end.x > new_end.x {
+                self.refresh_area(
+                    Coord::new(new_end.x, old_start.y),
+                    Coord::new(old_end.x, old_end.y)
+                )?;
+                smaller_x_end = new_end.x;
             }
-            if old_y_start < new_y_start {
-                self.refresh_area(greater_x_start, smaller_x_end, old_y_start, new_y_start)?;
+            if old_start.y < new_start.y {
+                self.refresh_area(
+                    Coord::new(greater_x_start, old_start.y),
+                    Coord::new(smaller_x_end, new_start.y)
+                )?;
             }
-            if old_y_end > new_y_end {
-                self.refresh_area(greater_x_start, smaller_x_end, new_y_end, old_y_end)?;
+            if old_end.y > new_end.y {
+                self.refresh_area(
+                    Coord::new(greater_x_start, new_end.y),
+                    Coord::new(smaller_x_end, old_end.y)
+                )?;
             }
         }
         Ok(())
@@ -583,7 +572,7 @@ impl <U: WindowProfile> WindowManagerAlpha<U> {
     /// private function: take active window's base position and current mouse, move the window with delta
     fn move_active_window(&mut self) -> Result<(), &'static str> {
         if let Some(current_active) = self.active.upgrade() {
-            let (old_x_start, old_x_end, old_y_start, old_y_end, new_x_start, new_x_end, new_y_start, new_y_end) = {
+            let (old_start, old_end, new_start, new_end) = {
                 let mut current_active_win = current_active.lock();
                 let (current_x, current_y) = {
                     let m = &self.mouse;
@@ -591,17 +580,16 @@ impl <U: WindowProfile> WindowManagerAlpha<U> {
                 };
                 let base = current_active_win.get_moving_base();
                 let (base_x, base_y) = (base.x, base.y);
-                let coordinate = current_active_win.get_content_position();
-                let old_x = coordinate.x;
-                let old_y = coordinate.y;
-                let new_x = old_x + (current_x - base_x);
-                let new_y = old_y + (current_y - base_y);
+                let old_start = current_active_win.get_content_position();
+                let new_start = old_start + ((current_x - base_x), (current_y - base_y));
                 let (width, height) = current_active_win.get_content_size();
-                current_active_win.set_position(Coord::new(new_x, new_y));
-                (old_x, old_x + width as isize, old_y, old_y + height as isize, new_x, new_x + width as isize, new_y, new_y + height as isize)
+                let old_end = old_start + (width as isize, height as isize);
+                let new_end = new_start + (width as isize, height as isize);
+                current_active_win.set_position(new_start);
+                (old_start, old_end, new_start, new_end)
             };
             // then try to reduce time on refresh old ones
-            self.refresh_area_with_old_new(old_x_start, old_x_end, old_y_start, old_y_end, new_x_start, new_x_end, new_y_start, new_y_end)?;
+            self.refresh_area_with_old_new(old_start, old_end, new_start, new_end)?;
         } else {
             return Err("cannot fid active window to move");
         }
@@ -648,29 +636,31 @@ pub fn do_refresh_floating_border() -> Result<(), &'static str> {
         (m.x as isize, m.y as isize)
     };
     if let Some(current_active) = win.active.upgrade() {
-        let (is_draw, border_x_start, border_x_end, border_y_start, border_y_end) = {
+        let (is_draw, border_start, border_end) = {
             let current_active_win = current_active.lock();
             if current_active_win.is_moving() {  // move this window
                 // for better performance, while moving window, only border is shown for indication
                 let coordinate = current_active_win.get_content_position();
-                let (current_x, current_y) = (coordinate.x, coordinate.y);
+                // let (current_x, current_y) = (coordinate.x, coordinate.y);
                 let base = current_active_win.get_moving_base();
                 let (base_x, base_y) = (base.x, base.y);
                 let width = current_active_win.width;
                 let height = current_active_win.height;
-                let border_x_start = current_x + (new_x - base_x);
-                let border_x_end = border_x_start + width as isize;
-                let border_y_start = current_y + (new_y - base_y);
-                let border_y_end = border_y_start + height as isize;
+                let border_start = coordinate + (new_x - base_x, new_y - base_y);
+                let border_end = coordinate + (width as isize, height as isize);
+                //let border_x_start = current_x + (new_x - base_x);
+                // let border_x_end = border_x_start + width as isize;
+                //let border_y_start = current_y + (new_y - base_y);
+                // let border_y_end = border_y_start + height as isize;
                 // debug!("drawing border: {:?}", (border_x_start, border_x_end, border_y_start, border_y_end));
-                (true, border_x_start, border_x_end, border_y_start, border_y_end)
+                (true, border_start, border_end)
             } else {
-                (false, 0, 0, 0, 0)
+                (false, Coord::new(0, 0), Coord::new(0, 0))
             }
         };
-        win.refresh_floating_border(is_draw, border_x_start, border_x_end, border_y_start, border_y_end)?;  // refresh current border position
+        win.refresh_floating_border(is_draw, border_start, border_end)?;  // refresh current border position
     } else {
-        win.refresh_floating_border(false, 0, 0, 0, 0)?;  // hide border
+        win.refresh_floating_border(false, Coord::new(0, 0), Coord::new(0, 0))?;  // hide border
     }
     Ok(())
 }
@@ -682,20 +672,23 @@ pub fn do_move_active_window() -> Result<(), &'static str> {
 }
 
 /// refresh one pixel using absolute position, will lock WINDOW_MANAGER
-pub fn refresh_pixel_absolute(x: isize, y: isize) -> Result<(), &'static str> {
+pub fn refresh_pixel_absolute(coordinate: Coord) -> Result<(), &'static str> {
     let mut win = WINDOW_MANAGER.try().ok_or("The static window manager was not yet initialized")?.lock();
-    win.refresh_single_pixel(x, y)
+    win.refresh_single_pixel(coordinate)
 }
 
 /// refresh an area using abosolute position, will lock WINDOW_MANAGER
-pub fn refresh_area_absolute(x_start: isize, x_end: isize, y_start: isize, y_end: isize) -> Result<(), &'static str> {
+pub fn refresh_area_absolute(start: Coord, end: Coord) -> Result<(), &'static str> {
     let mut win = WINDOW_MANAGER.try().ok_or("The static window manager was not yet initialized")?.lock();
     if win.delay_refresh_first_time {
         win.delay_refresh_first_time = false;
         let (width, height) = win.final_fb.get_size();
-        win.refresh_area_with_old_new(0, width as isize, 0, height as isize, x_start, x_end, y_start, y_end)
+        win.refresh_area_with_old_new(
+            Coord::new(0, 0), Coord::new(width as isize, height as isize), 
+            start, end
+        )
     } else {
-        win.refresh_area(x_start, x_end, y_start, y_end)   
+        win.refresh_area(start, end)   
     }
 }
 
@@ -723,7 +716,7 @@ pub fn init<Buffer: FrameBuffer>(
         hide_list: VecDeque::new(),
         show_list: VecDeque::new(),
         active: Weak::new(),
-        mouse: Point { x: 0, y: 0 },
+        mouse: Coord { x: 0, y: 0 },
         repositioned_border: None,
         final_fb: Box::new(framebuffer),
         delay_refresh_first_time: delay_refresh_first_time,
@@ -732,10 +725,10 @@ pub fn init<Buffer: FrameBuffer>(
 
     let mut win = WINDOW_MANAGER.try().ok_or("The static window manager was not yet initialized")?.lock();
     let (screen_width, screen_height) = win.final_fb.get_size();
-    win.mouse = Point { x: screen_width/2, y: screen_height/2 };  // set mouse to middle
+    win.mouse = Coord { x: screen_width as isize / 2, y: screen_height as isize / 2 };  // set mouse to middle
     if ! delay_refresh_first_time {
-        win.refresh_area(0, screen_width as isize, 0, screen_height as isize)?;
-        //TODO: render it if necessary
+        win.refresh_area(Coord::new(0, 0), Coord::new(screen_width as isize, screen_height as isize))?;
+        //Wenqiu: TODO: render it if necessary
     }
 
     KernelTaskBuilder::new(window_manager_loop, (key_consumer, mouse_consumer) )
@@ -971,42 +964,39 @@ pub fn get_screen_size() -> Result<(usize, usize), &'static str> {
 }
 
 /// return current absolute position of mouse, (x, y)
-pub fn get_cursor() -> Result<(usize, usize), &'static str> {
+pub fn get_cursor() -> Result<Coord, &'static str> {
     let win = WINDOW_MANAGER.try().ok_or("The static window manager was not yet initialized")?.lock();
-    let x = win.mouse.x;
-    let y = win.mouse.y;
-    Ok((x, y))
+    Ok(win.mouse)
 }
 
 /// move mouse with delta, this will refresh mouse position
 fn move_cursor(x: isize, y: isize) -> Result<(), &'static str> {
-    let (ox, oy) = get_cursor()?;
-    let mut nx = (ox as isize) + (x as isize);
-    let mut ny = (oy as isize) + (y as isize);
+    let old = get_cursor()?;
+    let mut new = old + (x, y);
     let (screen_width, screen_height) = get_screen_size()?;
-    if nx < 0 { nx = 0; }
-    if ny < 0 { ny = 0; }
-    if nx >= (screen_width as isize) { nx = (screen_width as isize)-1; }
-    if ny >= (screen_height as isize) { ny = (screen_height as isize)-1; }
-    move_cursor_to(nx as usize, ny as usize)?;
+    if new.x < 0 { new.x = 0; }
+    if new.y < 0 { new.y = 0; }
+    if new.x >= (screen_width as isize) { new.x = (screen_width as isize)-1; }
+    if new.y >= (screen_height as isize) { new.y = (screen_height as isize)-1; }
+    move_cursor_to(new)?;
     Ok(())
 }
 
 /// move mouse to absolute position
-fn move_cursor_to(nx: usize, ny: usize) -> Result<(), &'static str> {
-    let (ox, oy) = get_cursor()?;
+fn move_cursor_to(new: Coord) -> Result<(), &'static str> {
+    let old = get_cursor()?;
     let mut win = WINDOW_MANAGER.try().ok_or("The static window manager was not yet initialized")?.lock();
-    win.mouse = Point { x: nx, y: ny };
+    win.mouse = new;
     // then update region of old mouse
-    for y in oy as isize - MOUSE_POINTER_HALF_SIZE as isize .. (oy+MOUSE_POINTER_HALF_SIZE+1) as isize {
-        for x in ox as isize - MOUSE_POINTER_HALF_SIZE as isize .. (ox+MOUSE_POINTER_HALF_SIZE+1) as isize {
-            win.refresh_single_pixel(x, y)?;
+    for y in old.y - MOUSE_POINTER_HALF_SIZE as isize .. old.y+MOUSE_POINTER_HALF_SIZE as isize + 1 {
+        for x in old.x - MOUSE_POINTER_HALF_SIZE as isize..old.x+MOUSE_POINTER_HALF_SIZE as isize + 1 {
+            win.refresh_single_pixel(Coord::new(x, y))?;
         }
     }
     // draw new mouse in the new position
-    for y in ny as isize - MOUSE_POINTER_HALF_SIZE as isize .. (ny+MOUSE_POINTER_HALF_SIZE+1) as isize {
-        for x in nx as isize -MOUSE_POINTER_HALF_SIZE as isize .. (nx+MOUSE_POINTER_HALF_SIZE+1) as isize {
-            win.refresh_single_pixel(x, y)?;
+    for y in new.y - MOUSE_POINTER_HALF_SIZE as isize..new.y+ MOUSE_POINTER_HALF_SIZE as isize + 1 {
+        for x in new.x -MOUSE_POINTER_HALF_SIZE as isize..new.x+MOUSE_POINTER_HALF_SIZE as isize + 1 {
+            win.refresh_single_pixel(Coord::new(x, y))?;
         }
     }
     Ok(())
@@ -1014,7 +1004,7 @@ fn move_cursor_to(nx: usize, ny: usize) -> Result<(), &'static str> {
 
 /// new window object with given position and size
 pub fn new_window<'a>(
-    x: isize, y: isize, framebuffer: Box<dyn FrameBuffer>) -> Result<Arc<Mutex<WindowProfileAlpha>>, &'static str> {
+    coordinate: Coord, framebuffer: Box<dyn FrameBuffer>) -> Result<Arc<Mutex<WindowProfileAlpha>>, &'static str> {
 
     // Init the key input producer and consumer
     let consumer = DFQueue::new().into_consumer();
@@ -1024,7 +1014,7 @@ pub fn new_window<'a>(
 
     // new window object
     let mut window: WindowProfileAlpha = WindowProfileAlpha {
-        coordinate: Coord::new(x, y),
+        coordinate: coordinate,
         width: width,
         height: height,
         consumer: consumer,

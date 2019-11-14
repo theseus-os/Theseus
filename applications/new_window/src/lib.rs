@@ -31,6 +31,7 @@ extern crate window_components;
 extern crate scheduler;
 extern crate text_area;
 extern crate frame_buffer_alpha;
+extern crate frame_buffer;
 
 use event_types::{Event};
 use keycodes_ascii::{Keycode, KeyAction};
@@ -42,6 +43,7 @@ use hpet::get_hpet;
 use text_area::TextArea;
 use frame_buffer_alpha::FrameBufferAlpha;
 use window::Window;
+use frame_buffer::Coord;
 
 #[no_mangle]
 pub fn main(_args: Vec<String>) -> isize {
@@ -52,11 +54,10 @@ pub fn main(_args: Vec<String>) -> isize {
     }
 
     // take arguments as the parameter to create a window
-    let x = _args[0].parse::<isize>().unwrap();
-    let y = _args[1].parse::<isize>().unwrap();
+    let coordinate = Coord::new(_args[0].parse::<isize>().unwrap(),_args[1].parse::<isize>().unwrap());
     let width = _args[2].parse::<usize>().unwrap();
     let height = _args[3].parse::<usize>().unwrap();
-    debug!("parameters {:?}", (x, y, width, height));
+    debug!("parameters {:?}", (coordinate, width, height));
 
     // create the instance of WindowComponents, which provides basic drawing of a window and basic response to user input
     let framebuffer = match FrameBufferAlpha::new(width, height, None) {
@@ -64,7 +65,7 @@ pub fn main(_args: Vec<String>) -> isize {
         Err(err) => { error!("{}", err); return -2; }
     };
     let mut wincomps = match window_components::WindowComponents::new(
-        x, y, Box::new(framebuffer)  // the position and size of window, including the title bar and border
+        coordinate, Box::new(framebuffer)  // the position and size of window, including the title bar and border
     ) {
         Ok(m) => m,
         Err(err) => { error!("new window components returned err: {}", err); return -2; }
@@ -76,7 +77,7 @@ pub fn main(_args: Vec<String>) -> isize {
 
     // add textarea to WindowComponents
     let mut textarea: TextArea = match TextArea::new(
-        wincomps.get_border_size() + 4, wincomps.get_title_size() + 4, width_inner - 8, height_inner - 8,  // position and size of textarea
+        Coord::new(wincomps.get_border_size() as isize + 4, wincomps.get_title_size() as isize + 4), width_inner - 8, height_inner - 8,  // position and size of textarea
         &wincomps.winobj,  // bind this textarea to WindowComponents
         None, None, Some(wincomps.get_background()), None  // use default parameters
     ) {

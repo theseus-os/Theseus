@@ -132,9 +132,9 @@ impl FrameBufferAlpha {
     }
 
     /// draw a rectangle on this framebuffer
-    pub fn draw_rect(&mut self, xs: usize, xe: usize, ys: usize, ye: usize, color: AlphaPixel) {
-        for y in ys..ye {
-            for x in xs..xe {
+    pub fn draw_rect(&mut self, start: Coord, end: Coord, color: AlphaPixel) {
+        for y in start.y..end.y {
+            for x in start.x..end.x {
                 let coordinate = Coord::new(x as isize, y as isize);
                 self.draw_pixel(coordinate, color);
             }
@@ -142,10 +142,10 @@ impl FrameBufferAlpha {
     }
 
     /// draw a rectangle on this framebuffer with alpha
-    pub fn draw_rect_alpha(&mut self, xs: usize, xe: usize, ys: usize, ye: usize, color: AlphaPixel) {
+    pub fn draw_rect_alpha(&mut self, start: Coord, end: Coord, color: AlphaPixel) {
         // Wenqiu: TODO use coordinate
-        for y in ys..ye {
-            for x in xs..xe {
+        for y in start.y..end.y {
+            for x in start.x..end.x {
                 let coordinate = Coord::new(x as isize, y as isize);
                 self.draw_pixel_alpha(coordinate, color);
             }
