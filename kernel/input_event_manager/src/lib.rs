@@ -10,7 +10,6 @@
 #![no_std]
 extern crate keycodes_ascii;
 extern crate spin;
-extern crate dfqueue;
 extern crate mpmc;
 extern crate spawn;
 extern crate task;

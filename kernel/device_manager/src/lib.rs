@@ -5,7 +5,6 @@
 extern crate event_types;
 extern crate e1000;
 extern crate memory;
-extern crate dfqueue; 
 extern crate apic;
 extern crate acpi;
 extern crate keyboard;

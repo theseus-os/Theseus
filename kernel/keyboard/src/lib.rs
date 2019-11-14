@@ -2,7 +2,6 @@
 
 extern crate keycodes_ascii;
 extern crate spin;
-extern crate dfqueue;
 extern crate event_types;
 extern crate ps2;
 extern crate mpmc;
