@@ -11,6 +11,7 @@
 extern crate keycodes_ascii;
 extern crate spin;
 extern crate dfqueue;
+extern crate mpmc;
 extern crate spawn;
 extern crate task;
 extern crate mod_mgmt;
@@ -28,21 +29,21 @@ use alloc::{
 };
 use event_types::{Event};
 use keycodes_ascii::{Keycode, KeyAction};
-use dfqueue::{DFQueue, DFQueueConsumer, DFQueueProducer};
+use mpmc::Queue;
 use mod_mgmt::{
     CrateNamespace,
     NamespaceDir,
     metadata::CrateType,
 };
-use spawn::{KernelTaskBuilder, ApplicationTaskBuilder};
+use spawn::{KernelRestartableTaskBuilder, ApplicationTaskBuilder};
 use path::Path;
 
 /// Initializes the keyinput queue and the default display
-pub fn init() -> Result<DFQueueProducer<Event>, &'static str> {
+pub fn init() -> Result<Queue<Event>, &'static str> {
     // keyinput queue initialization
-    let keyboard_event_handling_queue: DFQueue<Event> = DFQueue::new();
-    let keyboard_event_handling_consumer = keyboard_event_handling_queue.into_consumer();
-    let returned_keyboard_producer = keyboard_event_handling_consumer.obtain_producer();
+    let keyboard_event_handling_queue: Queue<Event> = Queue::with_capacity(100);
+    let keyboard_event_handling_consumer = keyboard_event_handling_queue.clone();
+    let returned_keyboard_producer = keyboard_event_handling_queue.clone();
 
     // Create the first application CrateNamespace via the following steps:
     // (1) get the default kernel CrateNamespace, which will serve as the new app namespace's recursive namespace,
@@ -86,7 +87,7 @@ pub fn init() -> Result<DFQueueProducer<Event>, &'static str> {
         .spawn()?;
 
     // start the input event loop thread
-    KernelTaskBuilder::new(input_event_loop, keyboard_event_handling_consumer)
+    KernelRestartableTaskBuilder::new(input_event_loop, keyboard_event_handling_consumer)
         .name("input_event_loop".to_string())
         .spawn()?;
 
@@ -94,24 +95,23 @@ pub fn init() -> Result<DFQueueProducer<Event>, &'static str> {
 }
 
 /// Handles all key inputs to the system
-fn input_event_loop(consumer:DFQueueConsumer<Event>) -> Result<(), &'static str> {
+fn input_event_loop(consumer:Queue<Event>) -> Result<(), &'static str> {
     let mut terminal_id_counter: usize = 1; 
     loop {
-        let mut meta_keypress = false; // bool prevents keypresses to control the terminals themselves from getting logged to the active terminal
-        use core::ops::Deref;   
+        let mut meta_keypress = false; // bool prevents keypresses to control the terminals themselves from getting logged to the active terminal 
 
         // Pops events off the keyboard queue and redirects to the appropriate terminal input queue producer
-        let event = match consumer.peek() {
+        let event = match consumer.pop() {
             Some(ev) => ev,
             _ => { continue; }
         };
-        match event.deref() {
-            &Event::ExitEvent => {
+        match event {
+            Event::ExitEvent => {
                 trace!("exiting the main loop of the input event manager");
                 return Ok(()); 
             }
 
-            &Event::InputEvent(ref input_event) => {
+            Event::InputEvent(ref input_event) => {
                 let key_input = input_event.key_event;
                 // The following are keypresses for control over the windowing system
                 // Creates new terminal window
@@ -124,7 +124,7 @@ fn input_event_loop(consumer:DFQueueConsumer<Event>) -> Result<(), &'static str>
                         .spawn()?;
                     terminal_id_counter += 1;
                     meta_keypress = true;
-                    event.mark_completed();
+                    //event.mark_completed();
                   
                 }
 
@@ -132,7 +132,7 @@ fn input_event_loop(consumer:DFQueueConsumer<Event>) -> Result<(), &'static str>
                 if key_input.modifiers.alt && key_input.keycode == Keycode::Tab && key_input.action == KeyAction::Pressed {
                     window_manager::WINDOWLIST.lock().switch_to_next()?;
                     meta_keypress = true;
-                    event.mark_completed();
+                   // event.mark_completed();
 
                 }
 
@@ -146,8 +146,8 @@ fn input_event_loop(consumer:DFQueueConsumer<Event>) -> Result<(), &'static str>
 
         // If the keyevent was not for control of the terminal windows, enqueues keycode into active window
         if !meta_keypress {
-            window_manager::WINDOWLIST.lock().send_event_to_active(event.deref().clone())?;
-            event.mark_completed();
+            window_manager::WINDOWLIST.lock().send_event_to_active(event.clone())?;
+            //event.mark_completed();
 
         }
     }    

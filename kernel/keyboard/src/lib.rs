@@ -5,12 +5,13 @@ extern crate spin;
 extern crate dfqueue;
 extern crate event_types;
 extern crate ps2;
+extern crate mpmc;
 #[macro_use] extern crate log;
 
 
 use keycodes_ascii::{Keycode, KeyboardModifiers, KEY_RELEASED_OFFSET, KeyAction, KeyEvent};
 use spin::Once;
-use dfqueue::DFQueueProducer;
+use mpmc::Queue;
 use event_types::Event;
 use ps2::{init_ps2_port1,test_ps2_port1,keyboard_led,keyboard_detect,KeyboardType};
 
@@ -19,7 +20,7 @@ use ps2::{init_ps2_port1,test_ps2_port1,keyboard_led,keyboard_detect,KeyboardTyp
 static mut KBD_MODIFIERS: KeyboardModifiers = KeyboardModifiers::default();
 
 
-static KEYBOARD_PRODUCER: Once<DFQueueProducer<Event>> = Once::new();
+static KEYBOARD_PRODUCER: Once<Queue<Event>> = Once::new();
 
 /// Bitmask for the Scroll Lock keyboard LED
 const SCROLL_LED: u8 = 0b001;
@@ -30,7 +31,7 @@ const CAPS_LED: u8 = 0b100;
 
 /// Initialize the keyboard driver. 
 /// Arguments: a reference to a queue onto which keyboard events should be enqueued. 
-pub fn init(keyboard_queue_producer: DFQueueProducer<Event>) { 
+pub fn init(keyboard_queue_producer: Queue<Event>) { 
     // set keyboard to scancode set 1
 
     //init the first ps2 port for keyboard
@@ -111,7 +112,7 @@ pub fn handle_keyboard_input(scan_code: u8, _extended: bool) -> Result<(), &'sta
                 Some(keycode) => { // this re-scopes (shadows) keycode
                     let event = Event::new_input_event(KeyEvent::new(keycode, action, modifiers.clone()));
                     if let Some(producer) = KEYBOARD_PRODUCER.try() {
-                        producer.enqueue(event);
+                        producer.push(event).expect("can't push to the queue");
                         Ok(()) // successfully queued up KeyEvent 
                     }
                     else {

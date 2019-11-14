@@ -412,6 +412,7 @@ dependencies = [
  "log 0.3.9 (registry+https://github.com/rust-lang/crates.io-index)",
  "memory 0.1.0",
  "mouse 0.1.0",
+ "mpmc 0.1.6-pre",
  "network_manager 0.1.0",
  "pci 0.1.0",
  "storage_manager 0.1.0",
@@ -778,6 +779,7 @@ dependencies = [
  "keycodes_ascii 0.1.0",
  "log 0.3.9 (registry+https://github.com/rust-lang/crates.io-index)",
  "mod_mgmt 0.1.0",
+ "mpmc 0.1.6-pre",
  "path 0.1.0",
  "spawn 0.1.0",
  "spin 0.4.10 (registry+https://github.com/rust-lang/crates.io-index)",
@@ -871,6 +873,7 @@ dependencies = [
  "event_types 0.1.0",
  "keycodes_ascii 0.1.0",
  "log 0.3.9 (registry+https://github.com/rust-lang/crates.io-index)",
+ "mpmc 0.1.6-pre",
  "ps2 0.1.0",
  "spin 0.4.10 (registry+https://github.com/rust-lang/crates.io-index)",
 ]
