@@ -11,9 +11,6 @@ build = "../../build.rs"
 default-features = false
 version = "0.3.7"
 
-[dependencies.dfqueue]
-path = "../../libs/dfqueue"
-
 [dependencies.mpmc]
 path = "../../libs/mpmc"
 

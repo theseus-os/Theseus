@@ -21,10 +21,6 @@ path = "../../libs/keycodes_ascii"
 [dependencies.window_manager]
 path = "../window_manager"
 
-[dependencies.dfqueue]
-path = "../../libs/dfqueue"
-version = "0.1.0"
-
 [dependencies.mpmc]
 path = "../../libs/mpmc"
 
