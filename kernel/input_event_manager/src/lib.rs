@@ -35,7 +35,7 @@ use mod_mgmt::{
     NamespaceDir,
     metadata::CrateType,
 };
-use spawn::{KernelRestartableTaskBuilder, ApplicationTaskBuilder};
+use spawn::{KernelTaskBuilder, ApplicationTaskBuilder};
 use path::Path;
 
 /// Initializes the keyinput queue and the default display
@@ -87,7 +87,7 @@ pub fn init() -> Result<Queue<Event>, &'static str> {
         .spawn()?;
 
     // start the input event loop thread
-    KernelRestartableTaskBuilder::new(input_event_loop, keyboard_event_handling_consumer)
+    KernelTaskBuilder::new(input_event_loop, keyboard_event_handling_consumer)
         .name("input_event_loop".to_string())
         .spawn()?;
 
