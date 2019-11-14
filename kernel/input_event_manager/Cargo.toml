@@ -25,6 +25,9 @@ path = "../window_manager"
 path = "../../libs/dfqueue"
 version = "0.1.0"
 
+[dependencies.mpmc]
+path = "../../libs/mpmc"
+
 [dependencies.event_types]
 path = "../event_types"
 
