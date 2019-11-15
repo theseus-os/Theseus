@@ -25,8 +25,7 @@ pub trait Cursor: Send {
         coordinate: Coord,
         col: usize,
         line: usize,
-        textarea: Option<&mut TextArea>,
-        framebuffer: Option<&mut FrameBuffer>,
+        area: CursorArea,
     ) -> Result<(), &'static str>;
 
     fn set_offset_from_end(&mut self, offset: usize);
@@ -127,13 +126,19 @@ impl Cursor for CursorComponent {
 
     fn display(
         &mut self,
-        coordinate: Coord,
+        _coordinate: Coord,
         col: usize,
         line: usize,
-        textarea: Option<&mut TextArea>,
-        framebuffer: Option<&mut FrameBuffer>,
+        area: CursorArea
     ) -> Result<(), &'static str> {
-        let textarea = textarea.ok_or("There is no textarea to display in")?;
+        let textarea = match area {
+            CursorArea::Text(textarea) => { 
+                textarea.downcast_mut::<text_area::TextArea>().ok_or("The text displayable is not a TextArea")?
+            },
+            CursorArea::Frame(_) => {
+                return Err("The cursor should display in a text area");
+            }
+        };
         if self.blink() {
             if self.show() {
                 textarea.set_char(col, line, 219)?;
@@ -249,10 +254,12 @@ impl Cursor for CursorGeneric {
         coordinate: Coord,
         column: usize,
         line: usize,
-        textarea: Option<&mut TextArea>,
-        framebuffer: Option<&mut dyn FrameBuffer>,
+        area: CursorArea,
     ) -> Result<(), &'static str> {
-        let framebuffer = framebuffer.ok_or("No framebuffer for cursor to display in")?;
+        let framebuffer = match area {
+            CursorArea::Text(_) => { return Err("The cursor should display in a framebuffer") },
+            CursorArea::Frame(fb) => fb
+        };
         if self.blink() {
             if self.show() {
                 frame_buffer_drawer::fill_rectangle(
@@ -298,4 +305,9 @@ impl Cursor for CursorGeneric {
     fn underlying_char(&self) -> u8 {
         self.underlying_char
     }
+}
+
+pub enum CursorArea<'a> {
+    Text(&'a mut dyn TextDisplayable),
+    Frame(&'a mut dyn FrameBuffer),
 }

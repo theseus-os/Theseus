@@ -49,9 +49,6 @@ path = "../../kernel/environment"
 [dependencies.root]
 path = "../../kernel/root"
 
-[dependencies.window]
-path = "../../kernel/window"
-
 [dependencies.path]
 path = "../../kernel/path"
 

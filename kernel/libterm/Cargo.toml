@@ -5,7 +5,6 @@ authors = ["Andrew Pham <apham727@gmail.com>", "Zhiyao Ma <zm16@pku.edu.cn>"]
 build = "../../build.rs"
 
 [dependencies]
-spin = "0.4.10"
 
 [dependencies.log]
 default-features = false
@@ -15,15 +14,6 @@ version = "0.3.7"
 [dependencies.dfqueue]
 path = "../../libs/dfqueue"
 version = "0.1.0"
-
-[dependencies.window_manager_alpha]
-path = "../../kernel/window_manager_alpha"
-
-[dependencies.window_components]
-path = "../../kernel/window_components"
-
-[dependencies.frame_buffer_rgb]
-path = "../frame_buffer_rgb"
 
 [dependencies.window]
 path = "../window"
@@ -40,12 +30,6 @@ path = "../print"
 [dependencies.event_types]
 path = "../event_types"
 
-[dependencies.text_display]
-path = "../displayable/text_display"
-
-[dependencies.frame_buffer_alpha]
-path = "../frame_buffer_alpha"
-
 [dependencies.text_area]
 path = "../displayable/text_area"
 
@@ -61,8 +45,8 @@ path = "../frame_buffer_drawer"
 [dependencies.frame_buffer_printer]
 path = "../frame_buffer_printer"
 
-[dependencies.window_manager]
-path = "../window_manager"
+[dependencies.window_manager_alpha]
+path = "../window_manager_alpha"
 
 [dependencies.tsc]
 path = "../tsc"

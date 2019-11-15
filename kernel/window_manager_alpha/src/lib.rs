@@ -953,11 +953,11 @@ impl WindowProfile for WindowProfileAlpha {
     }
 
     fn set_is_moving(&mut self, moving: bool) {
-        // TODO
+        self.is_moving = moving;   
     }
 
     fn set_give_all_mouse_event(&mut self, flag: bool) {
-        // TODO
+        self.give_all_mouse_event = flag;
     }
 
     fn give_all_mouse_event(&mut self) -> bool {

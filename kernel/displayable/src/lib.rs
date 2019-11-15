@@ -43,7 +43,7 @@ pub trait Displayable: Downcast + Send {
         Err("The displayable is not a text displayable")
     }
 
-    fn as_text(&self) -> Result<&TextDisplayable, &'static str> {
+    fn as_text(&self) -> Result<&dyn TextDisplayable, &'static str> {
         Err("The displayable is not a text displayable")
     }
 

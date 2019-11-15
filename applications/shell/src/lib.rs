@@ -29,7 +29,6 @@ extern crate window_manager;
 extern crate alloc;
 #[macro_use]
 extern crate log;
-extern crate window;
 
 use alloc::collections::BTreeMap;
 use alloc::string::{String, ToString};
@@ -52,7 +51,6 @@ use stdio::{
     KeyEventQueue, KeyEventQueueReader, KeyEventQueueWriter, Stdio, StdioReader, StdioWriter,
 };
 use task::{ExitValue, KillReason, TaskRef};
-use window::Window;
 
 /// The status of a job.
 #[derive(PartialEq)]

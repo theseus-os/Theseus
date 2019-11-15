@@ -304,7 +304,7 @@ impl Displayable for TextArea {
         Ok(self)
     }
 
-    fn as_text(&self) -> Result<&TextDisplayable, &'static str> {
+    fn as_text(&self) -> Result<&dyn TextDisplayable, &'static str> {
         Ok(self)
     }
 }

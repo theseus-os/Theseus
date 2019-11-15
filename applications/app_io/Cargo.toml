@@ -21,14 +21,14 @@ path = "../../libs/keycodes_ascii"
 [dependencies.frame_buffer_alpha]
 path = "../../kernel/frame_buffer_alpha"
 
-[dependencies.window]
-path = "../../kernel/window"
-
 [dependencies.window_manager]
 path = "../../kernel/window_manager"
 
 [dependencies.window_manager_alpha]
 path = "../../kernel/window_manager_alpha"
+
+[dependencies.window]
+path = "../../kernel/window"
 
 [dependencies.frame_buffer]
 path = "../../kernel/frame_buffer"
@@ -36,8 +36,8 @@ path = "../../kernel/frame_buffer"
 [dependencies.text_area]
 path = "../../kernel/displayable/text_area"
 
-[dependencies.text_display]
-path = "../../kernel/displayable/text_display"
+[dependencies.text_generic]
+path = "../../kernel/displayable/text_generic"
 
 [dependencies.window_components]
 path = "../../kernel/window_components"

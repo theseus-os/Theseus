@@ -33,7 +33,9 @@ use frame_buffer_alpha::FrameBufferAlpha;
 use keycodes_ascii::{KeyAction, Keycode};
 use mod_mgmt::{metadata::CrateType, CrateNamespace, NamespaceDir};
 use path::Path;
-use spawn::{ApplicationTaskBuilder, KernelTaskBuilder};
+use spawn::{ApplicationTaskBuilder};
+#[cfg(generic_display_sys)]
+use spawn::{KernelTaskBuilder};
 
 /// Initializes the keyinput queue and the default display
 pub fn init() -> Result<(DFQueueProducer<Event>, DFQueueProducer<Event>), &'static str> {
@@ -117,6 +119,7 @@ pub fn init() -> Result<(DFQueueProducer<Event>, DFQueueProducer<Event>), &'stat
 }
 
 /// Handles all key inputs to the system
+#[cfg(generic_display_sys)]
 fn input_event_loop(consumer: DFQueueConsumer<Event>) -> Result<(), &'static str> {
     let mut terminal_id_counter: usize = 1;
     loop {

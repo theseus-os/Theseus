@@ -28,7 +28,7 @@
 //! * `event_types`: A temporary way to move the input_event_manager typedefs out of the input_event_manager crate.
 //! * `device_manager`: Code for handling the sequence required to initialize each driver.
 //! * `displayable`: Defines a displayable trait. A displayable can display itself in a framebuffer.
-//! * `text_display`: A text display is a displayable. It contains a block of text and can display in a framebuffer.
+//! * `text_generic`: A text display is a displayable. It contains a block of text and can display in a framebuffer.
 //! * `e1000`: Support for the e1000 NIC and driver.
 //! * `exceptions_early`: Early exception handlers that do nothing but print an error and hang.
 //! * `exceptions_full`: Exception handlers that are more fully-featured, i.e., kills tasks on an exception.

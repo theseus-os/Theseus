@@ -16,38 +16,24 @@ extern crate environment;
 extern crate event_types;
 extern crate font;
 extern crate frame_buffer;
-extern crate frame_buffer_alpha;
 extern crate frame_buffer_drawer;
 extern crate frame_buffer_printer;
-extern crate frame_buffer_rgb;
 extern crate print;
-extern crate spin;
-extern crate text_area;
-extern crate text_display;
 extern crate tsc;
 extern crate window;
-extern crate window_components;
-extern crate window_manager;
 extern crate window_manager_alpha;
+extern crate text_area;
 
 use alloc::boxed::Box;
 use alloc::string::{String, ToString};
-use alloc::sync::Arc;
 use alloc::vec::Vec;
 use cursor::*;
 use displayable::{Displayable, TextDisplayable};
 use event_types::Event;
 use font::{CHARACTER_HEIGHT, CHARACTER_WIDTH};
 use frame_buffer::{Coord, FrameBuffer};
-use frame_buffer_alpha::FrameBufferAlpha;
-use frame_buffer_rgb::FrameBufferRGB;
-use spin::Mutex;
-use text_area::TextArea;
-use text_display::TextGeneric;
 use tsc::{tsc_ticks, TscTicks};
 use window::Window;
-use window_components::WindowComponents;
-use window_manager::WindowGeneric;
 
 pub mod cursor;
 
@@ -74,7 +60,7 @@ pub enum ScrollError {
 ///     - Producer is the window manager. Window manager is responsible for enqueuing keyevents into the active application
 pub struct Terminal {
     /// The terminal's own window, this is a `Window` tra object which handles the events of user input properly like moving window and close window
-    window: Box<Window>,
+    window: Box<dyn Window>,
     /// Name of the text displayable of the terminal
     display_name: String,
     /// The terminal's scrollback buffer which stores a string to be displayed by the text display
@@ -83,9 +69,6 @@ pub struct Terminal {
     is_scroll_end: bool,
     /// The starting index of the scrollback buffer string slice that is currently being displayed on the text display
     scroll_start_idx: usize,
-    /// Indicates the rightmost position of the cursor ON THE text display, NOT IN THE SCROLLBACK BUFFER (i.e. one more than the position of the last non_whitespace character
-    /// being displayed on the text display)
-    absolute_cursor_pos: usize,
     /// The cursor object owned by the terminal. It contains the current blinking states of the cursor
     pub cursor: Box<dyn Cursor>,
 }
@@ -449,7 +432,7 @@ impl Terminal {
 
     /// Updates the text display by taking a string index and displaying as much as it can going backwards from the passed string index (i.e. starts from the bottom of the display and goes up)
     fn update_display_backwards(&mut self, end_idx: usize) -> Result<(), &'static str> {
-        let (start_idx, cursor_pos) = self.calc_start_idx(end_idx);
+        let (start_idx, _cursor_pos) = self.calc_start_idx(end_idx);
         self.scroll_start_idx = start_idx;
 
         let result = self.scrollback_buffer.get(start_idx..end_idx);
@@ -470,14 +453,14 @@ impl Terminal {
         Ok(())
     }
 
-    fn get_text_area(&self) -> Result<(&TextDisplayable), &'static str> {
-        let text_display = self.window.get_displayable(&self.display_name)?;
-        text_display.as_text()
+    fn get_text_area(&self) -> Result<(&dyn TextDisplayable), &'static str> {
+        let text_generic = self.window.get_displayable(&self.display_name)?;
+        text_generic.as_text()
     }
 
-    fn get_text_area_mut(&mut self) -> Result<(&mut TextDisplayable), &'static str> {
-        let text_display = self.window.get_displayable_mut(&self.display_name)?;
-        text_display.as_text_mut()
+    fn get_text_area_mut(&mut self) -> Result<(&mut dyn TextDisplayable), &'static str> {
+        let text_generic = self.window.get_displayable_mut(&self.display_name)?;
+        text_generic.as_text_mut()
     }
 }
 
@@ -496,7 +479,6 @@ impl Terminal {
             scrollback_buffer: String::new(),
             scroll_start_idx: 0,
             is_scroll_end: true,
-            absolute_cursor_pos: 0,
             cursor: cursor,
         };
         terminal
@@ -683,9 +665,9 @@ impl Terminal {
         let coordinate = self.window.get_displayable_position(&self.display_name)?;
         // get info about the text displayable
         let (col_num, line_num, text_next_pos) = {
-            let mut text_display = self.get_text_area_mut()?;
-            let text_next_pos = text_display.get_next_index();
-            let (col_num, line_num) = text_display.get_dimensions();
+            let text_generic = self.get_text_area_mut()?;
+            let text_next_pos = text_generic.get_next_index();
+            let (col_num, line_num) = text_generic.get_dimensions();
             (col_num, line_num, text_next_pos)
         };
 
@@ -705,25 +687,18 @@ impl Terminal {
             &mut textarea
         )*/
 
-        let text_display = {
-            self.window
-                .get_displayable_mut(&self.display_name)?
-                .as_text_mut()?
-                .downcast_mut::<TextArea>()
-        };
-
-        let (text_display, framebuffer) = if text_display.is_none() {
-            (None, self.window.framebuffer())
-        } else {
-            (text_display, None)
+        let cursor_area = match self.window.framebuffer() {
+            Some(framebuffer) => CursorArea::Frame(framebuffer),
+            None => CursorArea::Text(
+                self.window.get_displayable_mut(&self.display_name)?.as_text_mut()?
+            )
         };
 
         self.cursor.display(
             coordinate,
             cursor_col,
             cursor_line,
-            text_display,
-            framebuffer,
+            cursor_area
         )?;
 
         // update to the end of the text if the cursor is at the last line

@@ -30,12 +30,18 @@ extern crate keycodes_ascii;
 extern crate libterm;
 extern crate scheduler;
 extern crate serial_port;
+#[cfg(not(generic_display_sys))]
 extern crate text_area;
-extern crate text_display;
-extern crate window;
-extern crate window_components;
+#[cfg(generic_display_sys)]
+extern crate text_generic;
+#[cfg(generic_display_sys)]
 extern crate window_manager;
+#[cfg(not(generic_display_sys))]
 extern crate window_manager_alpha;
+#[cfg(not(generic_display_sys))]
+extern crate window_components;
+#[cfg(not(generic_display_sys))]
+extern crate window;
 
 use alloc::boxed::Box;
 use alloc::collections::BTreeMap;
@@ -44,15 +50,19 @@ use alloc::sync::Arc;
 use alloc::vec::Vec;
 use frame_buffer::Coord;
 use frame_buffer_alpha::FrameBufferAlpha;
-use libterm::cursor::{Cursor, CursorComponent, CursorGeneric};
+#[cfg(not(generic_display_sys))]
+use libterm::cursor::{CursorComponent};
+#[cfg(generic_display_sys)]
+use libterm::cursor::CursorGeneric;
 use libterm::Terminal;
 use spin::{Mutex, MutexGuard};
 use stdio::{KeyEventQueueReader, KeyEventReadGuard, StdioReader, StdioWriter};
+#[cfg(not(generic_display_sys))]
 use text_area::TextArea;
-use text_display::TextGeneric;
+#[cfg(generic_display_sys)]
+use text_generic::TextGeneric;
+#[cfg(not(generic_display_sys))]
 use window::Window;
-use window_components::WindowComponents;
-
 /// Stores the stdio queues, key event queue and the pointer to the terminal
 /// for applications. This structure is provided for application's use and only
 /// contains necessary one-end readers/writers to queues. On the shell side, we have
@@ -110,7 +120,6 @@ impl IoStreams {
 mod shared_maps {
     use alloc::collections::BTreeMap;
     use spin::{Mutex, MutexGuard};
-    use window_components::WindowComponents;
     use IoControlFlags;
     use IoStreams;
 
@@ -162,19 +171,19 @@ lazy_static! {
         let (window, textarea, cursor) = {
             let (window_width, window_height) = match window_manager_alpha::get_screen_size(){
                 Ok(size) => size,
-                Err(err) => { debug!("Fail to create the framebuffer"); return None; }
+                Err(err) => { debug!("Fail to create the framebuffer: {}", err); return None; }
             };
 
             const WINDOW_MARGIN: usize = 20;
             let framebuffer = match FrameBufferAlpha::new(window_width - 2*WINDOW_MARGIN, window_height - 2*WINDOW_MARGIN, None){
                 Ok(fb) => fb,
-                Err(err) => { debug!("Fail to create the framebuffer"); return None; }
+                Err(err) => { debug!("Fail to create the framebuffer: {}", err); return None; }
             };
             let window = match window_components::WindowComponents::new(
                 Coord::new(WINDOW_MARGIN as isize, WINDOW_MARGIN as isize), Box::new(framebuffer)) {
                 Ok(window_object) => { window_object },
                 Err(err) => {
-                    debug!("new window returned err");
+                    debug!("new window returned err: {}", err);
                     return None;
                 }
             };
@@ -189,7 +198,7 @@ lazy_static! {
                     &window.winobj, None, None, Some(window.get_background()), None
                 ) {
                     Ok(m) => m,
-                    Err(err) => { debug!("new textarea returned err");  return None; }
+                    Err(err) => { debug!("new textarea returned err: {}", err);  return None; }
                 }
             };
 
@@ -201,8 +210,11 @@ lazy_static! {
         #[cfg(generic_display_sys)]
         let (window, textarea, cursor) = {
             let window = match window_manager::new_default_window() {
-            Ok(window_object) => window_object,
-            Err(err) => { return None }
+                Ok(window_object) => window_object,
+                Err(err) => { 
+                    debug!("Fail to create the generic window: {}", err);
+                    return None;
+                }
             };
 
             let (width, height) = window.dimensions();
@@ -210,7 +222,10 @@ lazy_static! {
             let height = height - 2 * window_manager::WINDOW_MARGIN;
             let textarea = match TextGeneric::new(width, height, libterm::FONT_COLOR, libterm::BACKGROUND_COLOR) {
                 Ok(text) => text,
-                Err(_) => { return None }
+                Err(err) => { 
+                    debug!("Fail to create the generic window: {}", err);
+                    return None;
+                }
             };
 
             let cursor = CursorGeneric::new();
@@ -224,7 +239,10 @@ lazy_static! {
             Box::new(cursor),
         ) {
             Ok(terminal) => Some(Arc::new(Mutex::new(terminal))),
-            Err(_) => {trace!("Err"); None}
+            Err(err) => { 
+                debug!("Fail to create the generic window: {}", err);
+                return None;
+            }
         }
     };
 }
