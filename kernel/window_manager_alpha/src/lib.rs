@@ -20,7 +20,6 @@ extern crate event_types;
 #[macro_use]
 extern crate log;
 extern crate compositor;
-extern crate downcast_rs;
 extern crate frame_buffer;
 extern crate frame_buffer_alpha;
 extern crate frame_buffer_compositor;
@@ -41,10 +40,9 @@ use alloc::vec::{IntoIter, Vec};
 use compositor::Compositor;
 use core::ops::{Deref, DerefMut};
 use dfqueue::{DFQueue, DFQueueConsumer, DFQueueProducer};
-use downcast_rs::Downcast;
 use event_types::{Event, MousePositionEvent};
 use frame_buffer::{Coord, FrameBuffer, Pixel};
-use frame_buffer_alpha::{AlphaPixel, FrameBufferAlpha, PixelMixer, BLACK};
+use frame_buffer_alpha::{AlphaPixel, PixelMixer, BLACK};
 use frame_buffer_compositor::{FrameBufferBlocks, FRAME_COMPOSITOR};
 use keycodes_ascii::{KeyAction, KeyEvent, Keycode};
 use mouse_data::MouseEvent;
@@ -89,13 +87,6 @@ const WINDOW_BORDER_SIZE: usize = 3;
 const WINDOW_BORDER_COLOR_INNER: AlphaPixel = 0x00CA6F1E;
 /// border's outer color
 const WINDOW_BORDER_COLOR_OUTTER: AlphaPixel = 0xFFFFFFFF;
-const WINDOW_BACKGROUND: AlphaPixel = 0x40FFFFFF;
-
-/// a 2D point
-struct Point {
-    x: usize,
-    y: usize,
-}
 
 /// a rectangle region
 struct RectRegion {
@@ -116,7 +107,7 @@ pub struct WindowManagerAlpha<U: WindowProfile> {
     /// If a window is being repositioned (e.g., by dragging it), this is the position of that window's border
     repositioned_border: Option<RectRegion>,
     /// the frame buffer that it should print on
-    final_fb: Box<FrameBuffer>,
+    final_fb: Box<dyn FrameBuffer>,
     /// if it this is true, do not refresh whole screen until someone calls "refresh_area_absolute"
     delay_refresh_first_time: bool,
 }
@@ -901,7 +892,7 @@ impl WindowProfile for WindowProfileAlpha {
         Ok(())
     }
 
-    fn draw_border(&self, color: u32) -> Result<(), &'static str> {
+    fn draw_border(&self, _color: u32) -> Result<(), &'static str> {
         // this window uses WindowComponents instead of border
         Ok(())
     }
@@ -913,11 +904,11 @@ impl WindowProfile for WindowProfileAlpha {
     /// Adjusts the size (width, height) and coordinate of the window relative to the top-left corner of the screen.
     fn resize(
         &mut self,
-        coordinate: Coord,
-        width: usize,
-        height: usize,
+        _coordinate: Coord,
+        _width: usize,
+        _height: usize,
     ) -> Result<(usize, usize), &'static str> {
-        // TODO
+        // TODO: This system has not implemented resize
         Ok((0, 0))
     }
 

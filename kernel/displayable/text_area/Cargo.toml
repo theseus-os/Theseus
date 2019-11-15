@@ -32,9 +32,5 @@ path = "../../frame_buffer_drawer"
 [dependencies.frame_buffer_alpha]
 path = "../../frame_buffer_alpha"
 
-[dependencies.log]
-default-features = false
-version = "0.3.7"
-
 [lib]
 crate-type = ["rlib"]

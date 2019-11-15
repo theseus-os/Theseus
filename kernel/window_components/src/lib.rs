@@ -171,11 +171,12 @@ impl Window for WindowComponents {
         let component = self.components.get_mut(display_name).ok_or("")?;
         let coordinate = component.get_position();
         component.display(coordinate, None)?;
-        Ok(())
+        self.render(None)
     }
 
     fn render(&mut self, blocks: Option<IntoIter<(usize, usize)>>) -> Result<(), &'static str> {
-        window_manager_alpha::render(None)
+        // TODO optimize for better performance
+        window_manager_alpha::render(blocks)
     }
 
     /// event handler that should be called periodically by applications. This will handle user events as well as produce

@@ -501,19 +501,19 @@ impl WindowProfile for WindowProfileGeneric {
     }
 
     fn set_give_all_mouse_event(&mut self, flag: bool) {
-        // TODO
+        // TODO: this system cannot react to mouse event now
     }
 
     fn give_all_mouse_event(&mut self) -> bool {
         false
     }
 
-    fn set_moving_base(&mut self, coordinate: Coord) {
-        // TODO
+    fn set_moving_base(&mut self, _coordinate: Coord) {
+        // TODO: this display subsystem cannot react to mouse event to move now
     }
 
-    fn set_is_moving(&mut self, moving: bool) {
-        // TODO
+    fn set_is_moving(&mut self, _moving: bool) {
+        // TODO: this display subsystem cannot react to mouse event to move now
     }
 }
 

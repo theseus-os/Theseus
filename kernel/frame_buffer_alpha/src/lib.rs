@@ -95,7 +95,7 @@ impl FrameBufferAlpha {
 
         let mapped_frame_buffer = if let Some(address) = physical_address {
             let frame = FrameRange::from_phys_addr(address, size);
-            try!(kernel_mmi_ref.lock().page_table.map_allocated_pages_to(
+            kernel_mmi_ref.lock().page_table.map_allocated_pages_to(
                 pages,
                 frame,
                 EntryFlags::PRESENT
@@ -103,13 +103,13 @@ impl FrameBufferAlpha {
                     | EntryFlags::GLOBAL
                     | EntryFlags::NO_CACHE,
                 allocator.lock().deref_mut()
-            ))
+            )?
         } else {
-            try!(kernel_mmi_ref.lock().page_table.map_allocated_pages(
+            kernel_mmi_ref.lock().page_table.map_allocated_pages(
                 pages,
                 EntryFlags::PRESENT | EntryFlags::WRITABLE | EntryFlags::GLOBAL, // | EntryFlags::NO_CACHE,
                 allocator.lock().deref_mut()
-            ))
+            )?
         };
 
         // create a refence to transmute the mapped frame buffer pages as a slice

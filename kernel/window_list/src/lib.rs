@@ -121,7 +121,7 @@ impl<T: WindowProfile> WindowList<T> {
         if let Some(active) = self.background_list.remove(index) {
             self.active = active;
             if let Some(window) = self.active.upgrade() {
-                let mut current = window.lock();
+                let current = window.lock();
                 (*current).draw_border(get_border_color(true))?;
             }
         }

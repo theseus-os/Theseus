@@ -8,31 +8,24 @@
 //! In the future, the input event manager will handle other forms of input to the OS
 
 #![no_std]
-#[macro_use]
-extern crate log;
 extern crate dfqueue;
 extern crate event_types;
-extern crate keycodes_ascii;
 extern crate mod_mgmt;
-extern crate path;
 extern crate spawn;
 extern crate spin;
 extern crate task;
 extern crate window_manager;
-#[macro_use]
 extern crate alloc;
 extern crate font;
 extern crate frame_buffer_alpha;
 extern crate frame_buffer_rgb;
 extern crate window_manager_alpha;
 
-use alloc::{string::String, string::ToString, sync::Arc, vec::Vec};
-use dfqueue::{DFQueue, DFQueueConsumer, DFQueueProducer};
+use alloc::{string::ToString, sync::Arc};
+use dfqueue::{DFQueue, DFQueueProducer};
 use event_types::Event;
 use frame_buffer_alpha::FrameBufferAlpha;
-use keycodes_ascii::{KeyAction, Keycode};
 use mod_mgmt::{metadata::CrateType, CrateNamespace, NamespaceDir};
-use path::Path;
 use spawn::{ApplicationTaskBuilder};
 #[cfg(generic_display_sys)]
 use spawn::{KernelTaskBuilder};

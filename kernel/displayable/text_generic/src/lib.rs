@@ -96,7 +96,7 @@ impl Displayable for TextGeneric {
         (self.width, self.height)
     }
 
-    fn as_text_mut(&mut self) -> Result<&mut TextDisplayable, &'static str> {
+    fn as_text_mut(&mut self) -> Result<&mut dyn TextDisplayable, &'static str> {
         Ok(self)
     }
 

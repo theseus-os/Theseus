@@ -65,7 +65,7 @@ pub trait WindowProfile {
 
     fn give_all_mouse_event(&mut self) -> bool;
 
-    fn get_pixel(&self, coordinate: Coord) -> Result<Pixel, &'static str> {
+    fn get_pixel(&self, _coordinate: Coord) -> Result<Pixel, &'static str> {
         Err("get_pixel() is not implement for this window")
     }
 }

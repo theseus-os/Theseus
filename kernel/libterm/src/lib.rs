@@ -508,7 +508,9 @@ impl Terminal {
         } else {
             self.update_display_forwards(start_idx)?;
         }
-        self.window.render(None)
+
+        Ok(())
+        //self.window.render(None)
     }
 
     /// Insert a character to the terminal.

@@ -39,7 +39,7 @@ pub trait Displayable: Downcast + Send {
         Coord::new(0, 0)
     }
 
-    fn as_text_mut(&mut self) -> Result<&mut TextDisplayable, &'static str> {
+    fn as_text_mut(&mut self) -> Result<&mut dyn TextDisplayable, &'static str> {
         Err("The displayable is not a text displayable")
     }
 

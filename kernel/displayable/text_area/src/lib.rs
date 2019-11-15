@@ -7,8 +7,6 @@
 
 #[macro_use]
 extern crate alloc;
-#[macro_use]
-extern crate log;
 extern crate displayable;
 extern crate font;
 extern crate frame_buffer;
@@ -27,7 +25,7 @@ use displayable::{Displayable, TextDisplayable};
 use font::{CHARACTER_HEIGHT, CHARACTER_WIDTH};
 use frame_buffer::{Coord, FrameBuffer};
 use frame_buffer_alpha::AlphaPixel;
-use spin::{Mutex, Once};
+use spin::{Mutex};
 use window::WindowProfile;
 use window_manager_alpha::WindowProfileAlpha;
 
@@ -152,7 +150,7 @@ impl TextArea {
                 // need to redraw
                 let idx = self.index(col, line);
                 self.char_matrix[idx] = c;
-                let (win_coordinate) = {
+                let win_coordinate = {
                     let mut winobj = winobj_mutex.lock();
                     let win_coordinate = winobj.get_content_position();
                     self.set_char_in(col, line, c, winobj.framebuffer.deref_mut())?;
@@ -185,7 +183,7 @@ impl TextArea {
         col: usize,
         line: usize,
         c: u8,
-        framebuffer: &mut FrameBuffer,
+        framebuffer: &mut dyn FrameBuffer,
     ) -> Result<(), &'static str> {
         let wcoordinate = self.coordinate
             + (
@@ -300,7 +298,7 @@ impl Displayable for TextArea {
         (self.x_cnt, self.y_cnt)
     }
 
-    fn as_text_mut(&mut self) -> Result<&mut TextDisplayable, &'static str> {
+    fn as_text_mut(&mut self) -> Result<&mut dyn TextDisplayable, &'static str> {
         Ok(self)
     }
 
