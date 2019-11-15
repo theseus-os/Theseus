@@ -19,7 +19,7 @@ extern crate window;
 use alloc::collections::VecDeque;
 use alloc::sync::{Arc, Weak};
 use event_types::Event;
-use spin::{Mutex};
+use spin::Mutex;
 use window::WindowProfile;
 
 /// 10 pixel gap between windows
@@ -44,15 +44,12 @@ pub struct WindowList<T: WindowProfile> {
 
 impl<T: WindowProfile> WindowList<T> {
     /// Adds a new window to the list and sets it as active.
-    pub fn add_active(
-        &mut self,
-        inner_ref: &Arc<Mutex<T>>,
-    ) -> Result<(), &'static str> {
+    pub fn add_active(&mut self, inner_ref: &Arc<Mutex<T>>) -> Result<(), &'static str> {
         if let Some(current_active) = self.active.upgrade() {
             current_active.lock().draw_border(get_border_color(false))?;
             let weak_ref = self.active.clone();
             self.background_list.push_front(weak_ref);
-        } 
+        }
 
         inner_ref.lock().draw_border(get_border_color(true))?;
         self.active = Arc::downgrade(inner_ref);
@@ -213,9 +210,7 @@ impl<T: WindowProfile> WindowList<T> {
 
         None
     }*/
-    
 }
-
 
 /*  Following two functions can be used to systematically resize windows forcibly
 /// Readjusts remaining windows after a window is deleted to maximize screen usage

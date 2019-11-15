@@ -1,47 +1,47 @@
 //! This Window Components is designated to help user to build easy-to-use GUI applications
-//! 
+//!
 //! The `window_components` object should be owned by application, see `applications/new_window` as a demo to use this library
-//! 
-//! This library will create a window with default title bar and border. It handles the commonly used interactions like moving 
-//! the window or close the window. Also, it is responsible to show title bar differently when window is active. The library 
-//! frees applications from handling the complicated interaction with window manager, however, advanced users could learn from 
+//!
+//! This library will create a window with default title bar and border. It handles the commonly used interactions like moving
+//! the window or close the window. Also, it is responsible to show title bar differently when window is active. The library
+//! frees applications from handling the complicated interaction with window manager, however, advanced users could learn from
 //! this library about how to use window manager APIs directly.
-//! 
-//! Currently the component only supports `textarea` which is a fixed size area to display matrix of characters. User could implement 
-//! other components in other crate, means this library has not a centralized control of all components, leaving flexibility to user. 
-//! Basically, `textarea` is initialized with the Arc of window object which is initialized by `window_components`, means, 
+//!
+//! Currently the component only supports `textarea` which is a fixed size area to display matrix of characters. User could implement
+//! other components in other crate, means this library has not a centralized control of all components, leaving flexibility to user.
+//! Basically, `textarea` is initialized with the Arc of window object which is initialized by `window_components`, means,
 //! `window_components` and `textarea` are in the same level, except for the priority to handle events.
 
 #![no_std]
 
-extern crate spin;
 extern crate alloc;
 extern crate dfqueue;
 extern crate event_types;
+extern crate spin;
 #[macro_use]
 extern crate log;
-extern crate frame_buffer_alpha;
-extern crate font;
-extern crate mouse;
-extern crate window_manager_alpha;
-extern crate frame_buffer;
-extern crate window;
 extern crate displayable;
+extern crate font;
+extern crate frame_buffer;
+extern crate frame_buffer_alpha;
+extern crate mouse;
+extern crate window;
+extern crate window_manager_alpha;
 
-use alloc::sync::{Arc, Weak};
-use alloc::vec::{Vec, IntoIter};
-use alloc::string::{String, ToString};
-use alloc::collections::BTreeMap;
 use alloc::boxed::Box;
+use alloc::collections::BTreeMap;
+use alloc::string::{String, ToString};
+use alloc::sync::{Arc, Weak};
+use alloc::vec::{IntoIter, Vec};
 use core::ops::{Deref, DerefMut};
 use dfqueue::{DFQueue, DFQueueConsumer, DFQueueProducer};
-use event_types::{Event, MousePositionEvent};
-use frame_buffer_alpha::{ AlphaPixel, BLACK, PixelMixer };
-use spin::{Mutex, Once};
-use window_manager_alpha::{WindowManagerAlpha, WindowProfileAlpha, WINDOW_MANAGER};
-use frame_buffer::{Coord, FrameBuffer, Pixel};
-use window::{Window, WindowProfile};
 use displayable::Displayable;
+use event_types::{Event, MousePositionEvent};
+use frame_buffer::{Coord, FrameBuffer, Pixel};
+use frame_buffer_alpha::{AlphaPixel, PixelMixer, BLACK};
+use spin::{Mutex, Once};
+use window::{Window, WindowProfile};
+use window_manager_alpha::{WindowManagerAlpha, WindowProfileAlpha, WINDOW_MANAGER};
 
 /// The title bar size, in number of pixels
 const WINDOW_TITLE_BAR: usize = 15;
@@ -86,7 +86,7 @@ impl From<usize> for TopButton {
             0 => TopButton::Close,
             1 => TopButton::MinimizeMaximize,
             2 => TopButton::Hide,
-            _ => TopButton::Close
+            _ => TopButton::Close,
         }
     }
 }
@@ -113,7 +113,6 @@ pub struct WindowComponents {
     pub components: BTreeMap<String, Box<dyn Displayable>>,
 }
 
-
 impl Window for WindowComponents {
     fn consumer(&mut self) -> &mut DFQueueConsumer<Event> {
         &mut self.consumer
@@ -124,9 +123,11 @@ impl Window for WindowComponents {
     }
 
     /// get background color
-    fn get_background(&self) -> Pixel { self.background }
+    fn get_background(&self) -> Pixel {
+        self.background
+    }
 
-        /// Adds a new displayable at `coordinate` relative to the top-left corner of the window.
+    /// Adds a new displayable at `coordinate` relative to the top-left corner of the window.
     fn add_displayable(
         &mut self,
         key: &str,
@@ -138,12 +139,19 @@ impl Window for WindowComponents {
         Ok(())
     }
 
-    fn get_displayable_mut(&mut self, display_name: &str) -> Result<&mut Box<dyn Displayable>, &'static str>{
-        self.components.get_mut(display_name).ok_or("The displayable does not exist")
+    fn get_displayable_mut(
+        &mut self,
+        display_name: &str,
+    ) -> Result<&mut Box<dyn Displayable>, &'static str> {
+        self.components
+            .get_mut(display_name)
+            .ok_or("The displayable does not exist")
     }
 
-    fn get_displayable(&self, display_name: &str) -> Result<&Box<dyn Displayable>, &'static str>{
-        self.components.get(display_name).ok_or("The displayable does not exist")
+    fn get_displayable(&self, display_name: &str) -> Result<&Box<dyn Displayable>, &'static str> {
+        self.components
+            .get(display_name)
+            .ok_or("The displayable does not exist")
     }
 
     /// Gets the position of a displayable relative to the window.
@@ -170,7 +178,7 @@ impl Window for WindowComponents {
         window_manager_alpha::render(None)
     }
 
-    /// event handler that should be called periodically by applications. This will handle user events as well as produce 
+    /// event handler that should be called periodically by applications. This will handle user events as well as produce
     /// the unhandled ones for other components to handle.
     fn handle_event(&mut self) -> Result<(), &'static str> {
         let mut call_later_do_refresh_floating_border = false;
@@ -200,7 +208,9 @@ impl Window for WindowComponents {
             let consumer = &winobj.consumer;
             let event = match consumer.peek() {
                 Some(ev) => ev,
-                _ => { return Ok(()); }
+                _ => {
+                    return Ok(());
+                }
             };
             let coordinate = winobj.get_content_position();
             let bcoordinate = coordinate;
@@ -211,8 +221,9 @@ impl Window for WindowComponents {
                 }
                 &Event::MousePositionEvent(ref mouse_event) => {
                     // debug!("mouse_event: {:?}", mouse_event);
-                    if winobj.is_moving() {  // only wait for left button up to exit this mode
-                        if ! mouse_event.left_button_hold {
+                    if winobj.is_moving() {
+                        // only wait for left button up to exit this mode
+                        if !mouse_event.left_button_hold {
                             winobj.set_is_moving(false);
                             winobj.set_give_all_mouse_event(false);
                             self.last_mouse_position_event = mouse_event.clone();
@@ -220,12 +231,22 @@ impl Window for WindowComponents {
                             call_later_do_move_active_window = true;
                         }
                     } else {
-                        if (mouse_event.coordinate.y as usize) < self.title_size && (mouse_event.coordinate.x as usize) < winobj.width {  // the region of title bar
+                        if (mouse_event.coordinate.y as usize) < self.title_size
+                            && (mouse_event.coordinate.x as usize) < winobj.width
+                        {
+                            // the region of title bar
                             let r2 = WINDOW_RADIUS * WINDOW_RADIUS;
                             let mut is_three_button = false;
                             for i in 0..3 {
-                                let dcoordinate = Coord::new(mouse_event.coordinate.x - WINDOW_BUTTON_BIAS_X as isize - (i as isize) * WINDOW_BUTTON_BETWEEN as isize, mouse_event.coordinate.y - self.title_size as isize / 2);
-                                if dcoordinate.x * dcoordinate.x + dcoordinate.y*dcoordinate.y <= r2 as isize {
+                                let dcoordinate = Coord::new(
+                                    mouse_event.coordinate.x
+                                        - WINDOW_BUTTON_BIAS_X as isize
+                                        - (i as isize) * WINDOW_BUTTON_BETWEEN as isize,
+                                    mouse_event.coordinate.y - self.title_size as isize / 2,
+                                );
+                                if dcoordinate.x * dcoordinate.x + dcoordinate.y * dcoordinate.y
+                                    <= r2 as isize
+                                {
                                     is_three_button = true;
                                     if mouse_event.left_button_hold {
                                         self.show_button(TopButton::from(i), 2, &mut winobj);
@@ -233,10 +254,12 @@ impl Window for WindowComponents {
                                     } else {
                                         self.show_button(TopButton::from(i), 0, &mut winobj);
                                         need_refresh_three_button = true;
-                                        if self.last_mouse_position_event.left_button_hold {  // click event
+                                        if self.last_mouse_position_event.left_button_hold {
+                                            // click event
                                             if i == 0 {
                                                 debug!("close window");
-                                                return Err("user close window");  // window will not close until app drop self
+                                                return Err("user close window");
+                                                // window will not close until app drop self
                                             }
                                         }
                                     }
@@ -246,24 +269,34 @@ impl Window for WindowComponents {
                                 }
                             }
                             // check if user push the title bar, which means user willing to move the window
-                            if !is_three_button && !self.last_mouse_position_event.left_button_hold && mouse_event.left_button_hold {
+                            if !is_three_button
+                                && !self.last_mouse_position_event.left_button_hold
+                                && mouse_event.left_button_hold
+                            {
                                 winobj.set_is_moving(true);
                                 winobj.set_give_all_mouse_event(true);
                                 winobj.moving_base = mouse_event.gcoordinate;
                                 call_later_do_refresh_floating_border = true;
                             }
-                        } else {  // the region of components
+                        } else {
+                            // the region of components
                             // TODO: if any components want this event? ask them!
-                            self.producer.enqueue(Event::MousePositionEvent(mouse_event.clone()));
+                            self.producer
+                                .enqueue(Event::MousePositionEvent(mouse_event.clone()));
                         }
-                        if (mouse_event.coordinate.y as usize) < winobj.height && (mouse_event.coordinate.x as usize) < winobj.width &&
-                                !self.last_mouse_position_event.left_button_hold && mouse_event.left_button_hold {
+                        if (mouse_event.coordinate.y as usize) < winobj.height
+                            && (mouse_event.coordinate.x as usize) < winobj.width
+                            && !self.last_mouse_position_event.left_button_hold
+                            && mouse_event.left_button_hold
+                        {
                             need_to_set_active = true;
                         }
                         self.last_mouse_position_event = mouse_event.clone();
                     }
                 }
-                _ => { return Ok(()); }
+                _ => {
+                    return Ok(());
+                }
             };
             event.mark_completed();
             bcoordinate
@@ -271,7 +304,8 @@ impl Window for WindowComponents {
         if need_to_set_active {
             window_manager_alpha::set_active(&self.winobj)?;
         }
-        if need_refresh_three_button {  // if border has been refreshed, no need to refresh buttons
+        if need_refresh_three_button {
+            // if border has been refreshed, no need to refresh buttons
             if let Err(err) = self.refresh_three_button(bcoordinate) {
                 error!("refresh_three_button failed {}", err);
             }
@@ -288,15 +322,15 @@ impl Window for WindowComponents {
         }
         Ok(())
     }
-
-    
 }
 
 impl WindowComponents {
     /// create new WindowComponents by given position and size, return the Mutex of it for ease of sharing
     /// x, y is the distance in pixel relative to left-top of window
-    pub fn new(coordinate: Coord, framebuffer: Box<dyn FrameBuffer>) -> Result<WindowComponents, &'static str> {
-
+    pub fn new(
+        coordinate: Coord,
+        framebuffer: Box<dyn FrameBuffer>,
+    ) -> Result<WindowComponents, &'static str> {
         let (width, height) = framebuffer.get_size();
         if width <= 2 * WINDOW_TITLE_BAR || height <= WINDOW_TITLE_BAR + WINDOW_BORDER {
             return Err("window too small to even draw border");
@@ -316,13 +350,16 @@ impl WindowComponents {
             consumer: consumer,
             producer: producer,
             last_mouse_position_event: MousePositionEvent {
-                coordinate: Coord::new(0, 0), 
+                coordinate: Coord::new(0, 0),
                 gcoordinate: Coord::new(0, 0),
-                scrolling_up: false, scrolling_down: false,
-                left_button_hold: false, right_button_hold: false,
-                fourth_button_hold: false, fifth_button_hold: false,
+                scrolling_up: false,
+                scrolling_down: false,
+                left_button_hold: false,
+                right_button_hold: false,
+                fourth_button_hold: false,
+                fifth_button_hold: false,
             },
-            last_is_active: true,  // new window is by default active
+            last_is_active: true, // new window is by default active
             components: BTreeMap::new(),
         };
 
@@ -334,8 +371,8 @@ impl WindowComponents {
             let end = start + (winobj.width as isize, winobj.height as isize);
             (start, end)
         };
-        wincomps.draw_border(true);  // draw window with active border
-        // draw three buttons
+        wincomps.draw_border(true); // draw window with active border
+                                    // draw three buttons
         {
             let mut winobj = wincomps.winobj.lock();
             wincomps.show_button(TopButton::Close, 1, &mut winobj);
@@ -350,10 +387,13 @@ impl WindowComponents {
     }
 
     /// Gets a reference to a displayable of type `T` which implements the `Displayable` trait by its name. Returns error if the displayable is not of type `T` or does not exist.
-    pub fn get_concrete_display<T: Displayable>(&self, display_name: &str) -> Result<&T, &'static str> {
+    pub fn get_concrete_display<T: Displayable>(
+        &self,
+        display_name: &str,
+    ) -> Result<&T, &'static str> {
         if let Some(component) = self.components.get(display_name) {
             if let Some(display) = component.downcast_ref::<T>() {
-                return Ok(display)
+                return Ok(display);
             } else {
                 return Err("The displayable is not of this type");
             }
@@ -361,12 +401,15 @@ impl WindowComponents {
             return Err("The displayable does not exist");
         }
     }
-    
+
     /// Gets a reference to a displayable of type `T` which implements the `Displayable` trait by its name. Returns error if the displayable is not of type `T` or does not exist.
-    pub fn get_concrete_display_mut<T: Displayable>(&mut self, display_name: &str) -> Result<&mut T, &'static str> {
+    pub fn get_concrete_display_mut<T: Displayable>(
+        &mut self,
+        display_name: &str,
+    ) -> Result<&mut T, &'static str> {
         if let Some(component) = self.components.get_mut(display_name) {
             if let Some(display) = component.downcast_mut::<T>() {
-                return Ok(display)
+                return Ok(display);
             } else {
                 return Err("The displayable is not of this type");
             }
@@ -385,18 +428,37 @@ impl WindowComponents {
         }
         let width = winobj.width;
         let height = winobj.height;
-        winobj.framebuffer.draw_rect(0, self.border_size, self.title_size, height, border_color);
-        winobj.framebuffer.draw_rect(0, width, height - self.border_size, height, border_color);
-        winobj.framebuffer.draw_rect(width - self.border_size, width, self.title_size, height, border_color);
+        winobj
+            .framebuffer
+            .draw_rect(0, self.border_size, self.title_size, height, border_color);
+        winobj
+            .framebuffer
+            .draw_rect(0, width, height - self.border_size, height, border_color);
+        winobj.framebuffer.draw_rect(
+            width - self.border_size,
+            width,
+            self.title_size,
+            height,
+            border_color,
+        );
         // then draw the title bar
         if active {
             for i in 0..self.title_size {
-                winobj.framebuffer.draw_rect(0, width, i, i+1, WINDOW_BORDER_COLOR_ACTIVE_BOTTOM.color_mix(
-                    WINDOW_BORDER_COLOR_ACTIVE_TOP, (i as f32) / (self.title_size as f32)
-                ));
+                winobj.framebuffer.draw_rect(
+                    0,
+                    width,
+                    i,
+                    i + 1,
+                    WINDOW_BORDER_COLOR_ACTIVE_BOTTOM.color_mix(
+                        WINDOW_BORDER_COLOR_ACTIVE_TOP,
+                        (i as f32) / (self.title_size as f32),
+                    ),
+                );
             }
         } else {
-            winobj.framebuffer.draw_rect(0, width, 0, self.title_size, border_color);
+            winobj
+                .framebuffer
+                .draw_rect(0, width, 0, self.title_size, border_color);
         }
         // draw radius finally
         let r2 = WINDOW_RADIUS * WINDOW_RADIUS;
@@ -404,16 +466,21 @@ impl WindowComponents {
             for j in 0..WINDOW_RADIUS {
                 let dx1 = WINDOW_RADIUS - i;
                 let dy1 = WINDOW_RADIUS - j;
-                if dx1*dx1 + dy1*dy1 > r2 {  // draw this to transparent
-                    winobj.framebuffer.draw_pixel(Coord::new(i as isize, j as isize), 0xFFFFFFFF);
-                    winobj.framebuffer.draw_pixel(Coord::new((width-i-1) as isize, j as isize), 0xFFFFFFFF);
+                if dx1 * dx1 + dy1 * dy1 > r2 {
+                    // draw this to transparent
+                    winobj
+                        .framebuffer
+                        .draw_pixel(Coord::new(i as isize, j as isize), 0xFFFFFFFF);
+                    winobj
+                        .framebuffer
+                        .draw_pixel(Coord::new((width - i - 1) as isize, j as isize), 0xFFFFFFFF);
                 }
             }
         }
     }
 
-    /// refresh border, telling window manager to refresh 
-    fn refresh_border(& self, bcoordinate: Coord) -> Result<(), &'static str> {
+    /// refresh border, telling window manager to refresh
+    fn refresh_border(&self, bcoordinate: Coord) -> Result<(), &'static str> {
         let (width, height) = {
             let winobj = self.winobj.lock();
             let width = winobj.width;
@@ -424,7 +491,7 @@ impl WindowComponents {
         let title_size = self.title_size as isize;
         window_manager_alpha::refresh_area_absolute(
             bcoordinate + (0, title_size),
-            bcoordinate + (border_size, height)
+            bcoordinate + (border_size, height),
         )?;
         window_manager_alpha::refresh_area_absolute(
             bcoordinate + (0, height - border_size),
@@ -432,74 +499,93 @@ impl WindowComponents {
         )?;
         window_manager_alpha::refresh_area_absolute(
             bcoordinate + (width - border_size, title_size),
-            bcoordinate + (width, height)
+            bcoordinate + (width, height),
         )?;
         window_manager_alpha::refresh_area_absolute(
             bcoordinate,
-            bcoordinate + (width, title_size)
+            bcoordinate + (width, title_size),
         )?;
         Ok(())
     }
 
     /// show three button with status. state = 0,1,2 for three different color
-    fn show_button(& self, button: TopButton, state: usize, winobj: &mut WindowProfileAlpha) {
+    fn show_button(&self, button: TopButton, state: usize, winobj: &mut WindowProfileAlpha) {
         let y = self.title_size / 2;
-        let x = WINDOW_BUTTON_BIAS_X + WINDOW_BUTTON_BETWEEN * match button {
-            TopButton::Close => 0,
-            TopButton::MinimizeMaximize => 1,
-            TopButton::Hide => 2,
-        };
-        winobj.framebuffer.draw_circle_alpha(x, y, WINDOW_BUTTON_SIZE, BLACK.color_mix(
-            match button {
-                TopButton::Close => WINDOW_BUTTON_COLOR_CLOSE,
-                TopButton::MinimizeMaximize => WINDOW_BUTTON_COLOR_MINIMIZE_MAMIMIZE,
-                TopButton::Hide => WINDOW_BUTTON_COLOR_HIDE,
-            }, 0.2f32 * (state as f32)
-        ));
+        let x = WINDOW_BUTTON_BIAS_X
+            + WINDOW_BUTTON_BETWEEN
+                * match button {
+                    TopButton::Close => 0,
+                    TopButton::MinimizeMaximize => 1,
+                    TopButton::Hide => 2,
+                };
+        winobj.framebuffer.draw_circle_alpha(
+            x,
+            y,
+            WINDOW_BUTTON_SIZE,
+            BLACK.color_mix(
+                match button {
+                    TopButton::Close => WINDOW_BUTTON_COLOR_CLOSE,
+                    TopButton::MinimizeMaximize => WINDOW_BUTTON_COLOR_MINIMIZE_MAMIMIZE,
+                    TopButton::Hide => WINDOW_BUTTON_COLOR_HIDE,
+                },
+                0.2f32 * (state as f32),
+            ),
+        );
     }
 
     /// refresh the top left three button's appearance
-    fn refresh_three_button(& self, bcoordinate: Coord) -> Result<(), &'static str> {
+    fn refresh_three_button(&self, bcoordinate: Coord) -> Result<(), &'static str> {
         for i in 0..3 {
-            let coordinate = bcoordinate + (WINDOW_BUTTON_BIAS_X as isize + i * WINDOW_BUTTON_BETWEEN as isize, self.title_size as isize/ 2);
+            let coordinate = bcoordinate
+                + (
+                    WINDOW_BUTTON_BIAS_X as isize + i * WINDOW_BUTTON_BETWEEN as isize,
+                    self.title_size as isize / 2,
+                );
             let r = WINDOW_RADIUS as isize;
             window_manager_alpha::refresh_area_absolute(
                 coordinate - (r, r),
-                coordinate + (r+1, r+1)
+                coordinate + (r + 1, r + 1),
             )?;
         }
         Ok(())
     }
 
     /// return the available inner size, excluding title bar and border
-    pub fn inner_size(& self) -> (usize, usize) {
+    pub fn inner_size(&self) -> (usize, usize) {
         let winobj = self.winobj.lock();
-        (winobj.width - 2 * self.border_size, winobj.height - self.border_size - self.title_size)
+        (
+            winobj.width - 2 * self.border_size,
+            winobj.height - self.border_size - self.title_size,
+        )
     }
 
-    /// get space remained for border, in number of pixel. There is border on the left, right and bottom. 
+    /// get space remained for border, in number of pixel. There is border on the left, right and bottom.
     /// When user add their components, should margin its area to avoid overlapping these borders.
-    pub fn get_border_size(&self) -> usize { self.border_size }
+    pub fn get_border_size(&self) -> usize {
+        self.border_size
+    }
 
-    /// get space remained for title bar, in number of pixel. The title bar is on the top of the window, so when user 
+    /// get space remained for title bar, in number of pixel. The title bar is on the top of the window, so when user
     /// add their components, should margin its area to avoid overlapping the title bar.
-    pub fn get_title_size(&self) -> usize { self.title_size }
-
+    pub fn get_title_size(&self) -> usize {
+        self.title_size
+    }
 }
 
 impl Drop for WindowComponents {
     fn drop(&mut self) {
-        match WINDOW_MANAGER.try().ok_or("The static window manager was not yet initialized") {
+        match WINDOW_MANAGER
+            .try()
+            .ok_or("The static window manager was not yet initialized")
+        {
             Ok(wm) => {
                 if let Err(err) = wm.lock().delete_window(&self.winobj) {
                     error!("delete_window failed {}", err);
                 }
-            },
+            }
             Err(err) => {
                 error!("delete_window failed {}", err);
             }
         }
-       
     }
 }
-

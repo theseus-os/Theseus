@@ -1,32 +1,33 @@
 //! Framebuffer with alpha channel composition
-//! 
-//! It defines a FrameBufferAlpha structure and creates new framebuffers for applications, 
+//!
+//! It defines a FrameBufferAlpha structure and creates new framebuffers for applications,
 //! also defines the color format which is composed of blue, green, red and alpha.
 //!
 //! Several predefined functions can help to manipulate the framebuffer objects and single pixel.
 
 #![no_std]
 
-#[macro_use] extern crate log;
+#[macro_use]
+extern crate log;
 
-extern crate multicore_bringup;
-extern crate spin;
 extern crate alloc;
-extern crate memory;
-extern crate owning_ref;
 extern crate font;
 extern crate frame_buffer;
+extern crate memory;
+extern crate multicore_bringup;
+extern crate owning_ref;
+extern crate spin;
 
 use alloc::boxed::Box;
 use core::ops::DerefMut;
-use memory::{EntryFlags, FrameRange, MappedPages,PhysicalAddress, FRAME_ALLOCATOR};
+use frame_buffer::{Coord, FrameBuffer, Pixel, FINAL_FRAME_BUFFER};
+use memory::{EntryFlags, FrameRange, MappedPages, PhysicalAddress, FRAME_ALLOCATOR};
 use owning_ref::BoxRefMut;
-use frame_buffer::{FrameBuffer, Pixel, Coord, FINAL_FRAME_BUFFER};
 use spin::Mutex;
 
-/// A `Pixel` is a `u32` broken down into four bytes. 
+/// A `Pixel` is a `u32` broken down into four bytes.
 /// The lower 24 bits of a Pixel specify its RGB color values, while the upper 8bit is an `alpha` channel,
-/// in which an `alpha` value of `0` represents an opaque pixel and `0xFF` represents a completely transparent pixel. 
+/// in which an `alpha` value of `0` represents an opaque pixel and `0xFF` represents a completely transparent pixel.
 /// The `alpha` value is used in an alpha-blending compositor that supports transparency.
 pub type AlphaPixel = u32;
 
@@ -54,7 +55,10 @@ pub fn init() -> Result<(usize, usize), &'static str> {
         buffer_height = graphic_info.height as usize;
     };
 
-    debug!("frame_buffer_alpha init with width({}) height({})", buffer_width, buffer_height);
+    debug!(
+        "frame_buffer_alpha init with width({}) height({})",
+        buffer_width, buffer_height
+    );
     // init the final framebuffer
     let framebuffer =
         FrameBufferAlpha::new(buffer_width, buffer_height, Some(vesa_display_phys_start))?;
@@ -71,8 +75,8 @@ pub struct FrameBufferAlpha {
 }
 
 impl FrameBufferAlpha {
-    /// Create a new frame buffer with specified size. 
-    /// If the physical_address is specified, the new frame buffer will be mapped to hardware's physical memory at that address. 
+    /// Create a new frame buffer with specified size.
+    /// If the physical_address is specified, the new frame buffer will be mapped to hardware's physical memory at that address.
     /// If the physical_address is none, the new function will allocate a block of physical memory at a random address and map the new frame buffer to that memory, which is a virtual frame buffer.
     pub fn new(
         width: usize,
@@ -94,7 +98,10 @@ impl FrameBufferAlpha {
             try!(kernel_mmi_ref.lock().page_table.map_allocated_pages_to(
                 pages,
                 frame,
-                EntryFlags::PRESENT | EntryFlags::WRITABLE | EntryFlags::GLOBAL | EntryFlags::NO_CACHE,
+                EntryFlags::PRESENT
+                    | EntryFlags::WRITABLE
+                    | EntryFlags::GLOBAL
+                    | EntryFlags::NO_CACHE,
                 allocator.lock().deref_mut()
             ))
         } else {
@@ -165,7 +172,6 @@ impl FrameBufferAlpha {
     }
 }
 
-
 impl FrameBuffer for FrameBufferAlpha {
     fn buffer(&self) -> &BoxRefMut<MappedPages, [Pixel]> {
         return &self.buffer;
@@ -189,23 +195,25 @@ impl FrameBuffer for FrameBufferAlpha {
 
     fn draw_pixel_alpha(&mut self, coordinate: Coord, color: AlphaPixel) {
         let idx = match self.index(coordinate) {
-            Some(index) => { index },
-            None => { return }
+            Some(index) => index,
+            None => return,
         };
         let origin = AlphaPixel::from(self.buffer[idx]);
         self.buffer[idx] = AlphaPixel::from(color).alpha_mix(origin);
     }
 
     /// get one pixel at given position
-    fn get_pixel(& self, coordinate: Coord) -> Result<Pixel, &'static str> {
+    fn get_pixel(&self, coordinate: Coord) -> Result<Pixel, &'static str> {
         let idx = match self.index(coordinate) {
-            Some(index) => { index },
-            None => { return Err("get pixel out of bound"); }
+            Some(index) => index,
+            None => {
+                return Err("get pixel out of bound");
+            }
         };
         Ok(AlphaPixel::from(self.buffer[idx]))
     }
 
-        /// fill the entire frame buffer with given `color`
+    /// fill the entire frame buffer with given `color`
     fn fill_color(&mut self, color: Pixel) {
         for y in 0..self.height {
             for x in 0..self.width {
@@ -217,7 +225,7 @@ impl FrameBuffer for FrameBufferAlpha {
 }
 
 pub trait PixelMixer {
-   /// mix two color using alpha channel composition, supposing `self` is on the top of `other` pixel.
+    /// mix two color using alpha channel composition, supposing `self` is on the top of `other` pixel.
     fn alpha_mix(self, other: Self) -> Self;
 
     /// mix two color linearly with a float number, with mix `self` and (1-mix) `other`. If mix is outside range of [0, 1], black will be returned
@@ -250,13 +258,18 @@ impl PixelMixer for AlphaPixel {
 
     /// mix two color linearly with a float number, with mix `self` and (1-mix) `other`. If mix is outside range of [0, 1], black will be returned
     fn color_mix(self, other: Self, mix: f32) -> Self {
-        if mix < 0f32 || mix > 1f32 {  // cannot mix value outside [0, 1]
+        if mix < 0f32 || mix > 1f32 {
+            // cannot mix value outside [0, 1]
             return BLACK;
         }
-        let new_alpha = ((self.get_alpha() as f32) * mix + (other.get_alpha() as f32) * (1f32-mix)) as u8;
-        let new_red = ((self.get_red() as f32) * mix + (other.get_red() as f32) * (1f32-mix)) as u8;
-        let new_green = ((self.get_green() as f32) * mix + (other.get_green() as f32) * (1f32-mix)) as u8;
-        let new_blue = ((self.get_blue() as f32) * mix + (other.get_blue() as f32) * (1f32-mix)) as u8;
+        let new_alpha =
+            ((self.get_alpha() as f32) * mix + (other.get_alpha() as f32) * (1f32 - mix)) as u8;
+        let new_red =
+            ((self.get_red() as f32) * mix + (other.get_red() as f32) * (1f32 - mix)) as u8;
+        let new_green =
+            ((self.get_green() as f32) * mix + (other.get_green() as f32) * (1f32 - mix)) as u8;
+        let new_blue =
+            ((self.get_blue() as f32) * mix + (other.get_blue() as f32) * (1f32 - mix)) as u8;
         return new_alpha_pixel(new_alpha, new_red, new_green, new_blue);
     }
 
@@ -278,8 +291,5 @@ impl PixelMixer for AlphaPixel {
 }
 
 pub fn new_alpha_pixel(alpha: u8, red: u8, green: u8, blue: u8) -> AlphaPixel {
-    return ((alpha as u32) << 24) +
-        ((red as u32) << 16) +
-        ((green as u32) << 8) +
-        (blue as u32) 
+    return ((alpha as u32) << 24) + ((red as u32) << 16) + ((green as u32) << 8) + (blue as u32);
 }

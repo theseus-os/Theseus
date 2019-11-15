@@ -21,10 +21,10 @@ pub trait Cursor: Send {
     fn show(&self) -> bool;
 
     fn display(
-        &mut self, 
+        &mut self,
         coordinate: Coord,
-        col: usize, 
-        line: usize, 
+        col: usize,
+        line: usize,
         textarea: Option<&mut TextArea>,
         framebuffer: Option<&mut FrameBuffer>,
     ) -> Result<(), &'static str>;
@@ -38,7 +38,7 @@ pub trait Cursor: Send {
     fn underlying_char(&self) -> u8;
 }
 
-/// The cursor structure is mainly a timer for cursor to blink properly, which also has multiple status recorded. 
+/// The cursor structure is mainly a timer for cursor to blink properly, which also has multiple status recorded.
 /// When `enabled` is false, it should remain the original word. When `enabled` is true and `show` is false, it should display blank character, only when `enabled` is true, and `show` is true, it should display cursor character.
 pub struct CursorComponent {
     /// Terminal will set this variable to enable blink or not. When this is not enabled, function `blink` will always return `false` which means do not refresh the cursor
@@ -127,9 +127,9 @@ impl Cursor for CursorComponent {
 
     fn display(
         &mut self,
-        coordinate: Coord, 
-        col: usize, 
-        line: usize, 
+        coordinate: Coord,
+        col: usize,
+        line: usize,
         textarea: Option<&mut TextArea>,
         framebuffer: Option<&mut FrameBuffer>,
     ) -> Result<(), &'static str> {
@@ -160,9 +160,7 @@ impl Cursor for CursorComponent {
     fn underlying_char(&self) -> u8 {
         self.underlying_char
     }
-
 }
-
 
 /// The cursor structure.
 /// A cursor is a special symbol shown in the text box of a terminal. It indicates the position of character where the next input would be put or the delete operation works on.
@@ -198,7 +196,6 @@ impl CursorGeneric {
             underlying_char: 0,
         }
     }
-
 }
 
 impl Cursor for CursorGeneric {
@@ -248,10 +245,10 @@ impl Cursor for CursorGeneric {
     /// * `(column, line)`: the location of the cursor in the text block in units of characters.
     /// * `framebuffer`: the framebuffer to display onto.
     fn display(
-        &mut self, 
-        coordinate: Coord, 
-        column: usize, 
-        line: usize, 
+        &mut self,
+        coordinate: Coord,
+        column: usize,
+        line: usize,
         textarea: Option<&mut TextArea>,
         framebuffer: Option<&mut dyn FrameBuffer>,
     ) -> Result<(), &'static str> {
@@ -260,7 +257,12 @@ impl Cursor for CursorGeneric {
             if self.show() {
                 frame_buffer_drawer::fill_rectangle(
                     framebuffer,
-                    coordinate + ((column * CHARACTER_WIDTH) as isize, (line * CHARACTER_HEIGHT) as isize) + (0, 1),
+                    coordinate
+                        + (
+                            (column * CHARACTER_WIDTH) as isize,
+                            (line * CHARACTER_HEIGHT) as isize,
+                        )
+                        + (0, 1),
                     CHARACTER_WIDTH,
                     CHARACTER_HEIGHT - 2,
                     self.color,
@@ -296,5 +298,4 @@ impl Cursor for CursorGeneric {
     fn underlying_char(&self) -> u8 {
         self.underlying_char
     }
-
 }

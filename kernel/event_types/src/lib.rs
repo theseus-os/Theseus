@@ -1,19 +1,20 @@
 #![no_std]
 
-extern crate keycodes_ascii;
 extern crate alloc;
 extern crate frame_buffer;
+extern crate keycodes_ascii;
 extern crate mouse_data;
 
-use keycodes_ascii::{KeyEvent};
 use alloc::string::String;
 use frame_buffer::Coord;
+use keycodes_ascii::KeyEvent;
 use mouse_data::MouseEvent;
 
-/// A event describe mouse position rather than movement differential from last event. 
+/// A event describe mouse position rather than movement differential from last event.
 /// It contains two position, (x,y) for the relative position in each window, and (gx,gy) for global absolute position of the screen.
 #[derive(Debug, Clone)]
-pub struct MousePositionEvent {  // tells window application of the cursor information
+pub struct MousePositionEvent {
+    // tells window application of the cursor information
     /// the relative position in window
     pub coordinate: Coord,
     /// the global position in window
@@ -48,14 +49,16 @@ impl Event {
         Event::KeyboardEvent(KeyboardInputEvent::new(kev))
     }
 
-    pub fn new_output_event<S>(s: S) -> Event where S: Into<String> {
+    pub fn new_output_event<S>(s: S) -> Event
+    where
+        S: Into<String>,
+    {
         Event::OutputEvent(PrintOutputEvent::new(s.into()))
     }
 
     pub fn new_resize_event(coordinate: Coord, width: usize, height: usize) -> Event {
         Event::WindowResizeEvent(WindowResizeEvent::new(coordinate, width, height))
     }
-
 }
 
 /// use this to deliver input events (such as keyboard input) to the input_event_manager.
@@ -66,13 +69,11 @@ pub struct KeyboardInputEvent {
 
 impl KeyboardInputEvent {
     pub fn new(kev: KeyEvent) -> KeyboardInputEvent {
-        KeyboardInputEvent {
-            key_event: kev,
-        }
+        KeyboardInputEvent { key_event: kev }
     }
 }
 
-/// use this to queue up a formatted string that should be printed to the input_event_manager. 
+/// use this to queue up a formatted string that should be printed to the input_event_manager.
 #[derive(Debug, Clone)]
 pub struct PrintOutputEvent {
     pub text: String,
@@ -80,9 +81,7 @@ pub struct PrintOutputEvent {
 
 impl PrintOutputEvent {
     pub fn new(s: String) -> PrintOutputEvent {
-        PrintOutputEvent {
-            text: s,
-        }
+        PrintOutputEvent { text: s }
     }
 }
 
@@ -90,15 +89,15 @@ impl PrintOutputEvent {
 #[derive(Debug, Clone)]
 pub struct WindowResizeEvent {
     pub coordinate: Coord,
-    pub width: usize, 
-    pub height: usize, 
+    pub width: usize,
+    pub height: usize,
 }
- impl WindowResizeEvent {
-    pub fn new(coordinate: Coord, width: usize, height:usize) -> WindowResizeEvent {
+impl WindowResizeEvent {
+    pub fn new(coordinate: Coord, width: usize, height: usize) -> WindowResizeEvent {
         WindowResizeEvent {
             coordinate: coordinate,
-            width: width, 
+            width: width,
             height: height,
         }
     }
-} 
+}

@@ -27,24 +27,24 @@ extern crate window_list;
 
 use alloc::boxed::Box;
 use alloc::collections::BTreeMap;
+use alloc::collections::VecDeque;
 use alloc::string::{String, ToString};
 use alloc::sync::{Arc, Weak};
-use alloc::collections::VecDeque;
-use alloc::vec::{IntoIter};
+use alloc::vec::IntoIter;
 use compositor::Compositor;
 use core::ops::{Deref, DerefMut};
 use dfqueue::{DFQueue, DFQueueConsumer, DFQueueProducer};
 use displayable::Displayable;
 use event_types::Event;
-use frame_buffer::{FrameBuffer, Coord, Pixel};
-use frame_buffer_compositor::{FRAME_COMPOSITOR, FrameBufferBlocks};
+use frame_buffer::{Coord, FrameBuffer, Pixel};
+use frame_buffer_compositor::{FrameBufferBlocks, FRAME_COMPOSITOR};
 use frame_buffer_drawer::*;
 use frame_buffer_rgb::FrameBufferRGB;
 use spin::{Mutex, Once};
 use window::{Window, WindowProfile};
 pub use window_list::{
-    SCREEN_BACKGROUND_COLOR, WINDOW_ACTIVE_COLOR,
-    WINDOW_INACTIVE_COLOR, WINDOW_MARGIN, WINDOW_PADDING, WindowList
+    WindowList, SCREEN_BACKGROUND_COLOR, WINDOW_ACTIVE_COLOR, WINDOW_INACTIVE_COLOR, WINDOW_MARGIN,
+    WINDOW_PADDING,
 };
 
 /// A framebuffer owned by the window manager.
@@ -52,7 +52,7 @@ pub use window_list::{
 /// All the display behaviors of borders are controled by the window manager.
 pub static DESKTOP_FRAME_BUFFER: Once<Arc<Mutex<FrameBufferRGB>>> = Once::new();
 
-/// Initializes the window manager. 
+/// Initializes the window manager.
 /// Currently the framebuffer is of type `FrameBufferRGB`. In the future we would be able to have window manager of different `FrameBuffer`s.
 pub fn init() -> Result<(), &'static str> {
     let (screen_width, screen_height) = frame_buffer::get_screen_size()?;
@@ -85,7 +85,6 @@ pub struct WindowGeneric<Buffer: FrameBuffer> {
 }
 
 impl<Buffer: FrameBuffer> Window for WindowGeneric<Buffer> {
-
     fn consumer(&mut self) -> &mut DFQueueConsumer<Event> {
         &mut self.consumer
     }
@@ -94,15 +93,26 @@ impl<Buffer: FrameBuffer> Window for WindowGeneric<Buffer> {
         Some(&mut self.framebuffer)
     }
 
-    fn get_background(&self) -> Pixel { SCREEN_BACKGROUND_COLOR }
+    fn get_background(&self) -> Pixel {
+        SCREEN_BACKGROUND_COLOR
+    }
 
-    fn get_displayable_mut(&mut self, display_name: &str) -> Result<&mut Box<dyn Displayable>, &'static str>{
-        let component = self.components.get_mut(display_name).ok_or("The displayable does not exist")?;
+    fn get_displayable_mut(
+        &mut self,
+        display_name: &str,
+    ) -> Result<&mut Box<dyn Displayable>, &'static str> {
+        let component = self
+            .components
+            .get_mut(display_name)
+            .ok_or("The displayable does not exist")?;
         Ok(component.get_displayable_mut())
     }
 
-    fn get_displayable(&self, display_name: &str) -> Result<&Box<dyn Displayable>, &'static str>{
-        let component = self.components.get(display_name).ok_or("The displayable does not exist")?;
+    fn get_displayable(&self, display_name: &str) -> Result<&Box<dyn Displayable>, &'static str> {
+        let component = self
+            .components
+            .get(display_name)
+            .ok_or("The displayable does not exist")?;
         Ok(component.get_displayable())
     }
 
@@ -118,15 +128,12 @@ impl<Buffer: FrameBuffer> Window for WindowGeneric<Buffer> {
             }
         };
     }
-        /// Display a displayable in the window by its name.
+    /// Display a displayable in the window by its name.
     fn display(&mut self, display_name: &str) -> Result<(), &'static str> {
         let component = self.components.get_mut(display_name).ok_or("")?;
         let coordinate = component.get_position();
         let displayable = component.get_displayable_mut();
-        let blocks = displayable.display(
-            coordinate, 
-            Some(&mut self.framebuffer)
-        )?;
+        let blocks = displayable.display(coordinate, Some(&mut self.framebuffer))?;
         self.render(Some(blocks.into_iter()))
     }
 
@@ -159,21 +166,23 @@ impl<Buffer: FrameBuffer> Window for WindowGeneric<Buffer> {
     }
 
     fn handle_event(&mut self) -> Result<(), &'static str> {
-        //TODO: This window cannot react to window related events such as mouse operations now. 
+        //TODO: This window cannot react to window related events such as mouse operations now.
         Ok(())
     }
 
-        /// Renders the content of the window to the screen.
+    /// Renders the content of the window to the screen.
     /// `blocks` is the information of updated blocks in the form (block_index, block_width). If `blocks` is `None`, the whole window would be refreshed.
-    /// The use of `blocks` is described in the `frame_buffer_compositor` crate. 
+    /// The use of `blocks` is described in the `frame_buffer_compositor` crate.
     fn render(&mut self, blocks: Option<IntoIter<(usize, usize)>>) -> Result<(), &'static str> {
         let coordinate = { self.profile.lock().get_content_position() };
         let frame_buffer_blocks = FrameBufferBlocks {
             framebuffer: &mut self.framebuffer,
             coordinate: coordinate,
-            blocks: blocks
+            blocks: blocks,
         };
-        FRAME_COMPOSITOR.lock().composite(vec![frame_buffer_blocks].into_iter())
+        FRAME_COMPOSITOR
+            .lock()
+            .composite(vec![frame_buffer_blocks].into_iter())
     }
 }
 
@@ -192,11 +201,14 @@ impl<Buffer: FrameBuffer> WindowGeneric<Buffer> {
     }
 
     /// Gets a reference to a displayable of type `T` which implements the `Displayable` trait by its name. Returns error if the displayable is not of type `T` or does not exist.
-    pub fn get_concrete_display<T: Displayable>(&self, display_name: &str) -> Result<&T, &'static str> {
+    pub fn get_concrete_display<T: Displayable>(
+        &self,
+        display_name: &str,
+    ) -> Result<&T, &'static str> {
         if let Some(component) = self.components.get(display_name) {
             let displayable = component.get_displayable();
             if let Some(concrete_display) = displayable.downcast_ref::<T>() {
-                return Ok(concrete_display)
+                return Ok(concrete_display);
             } else {
                 return Err("The displayable is not of this type");
             }
@@ -206,26 +218,28 @@ impl<Buffer: FrameBuffer> WindowGeneric<Buffer> {
     }
 
     /// Gets a mutable reference to a displayable of type `T` which implements the `Displayable` trait by its name. Returns error if the displayable is not of type `T` or does not exist.
-    pub fn get_concrete_display_mut<T: Displayable>(&mut self, display_name: &str) -> Result<&mut T, &'static str> {
+    pub fn get_concrete_display_mut<T: Displayable>(
+        &mut self,
+        display_name: &str,
+    ) -> Result<&mut T, &'static str> {
         if let Some(component) = self.components.get_mut(display_name) {
             let displayable = component.get_displayable_mut();
             if let Some(concrete_display) = displayable.downcast_mut::<T>() {
-                return Ok(concrete_display)
+                return Ok(concrete_display);
             } else {
                 return Err("The displayable is not of this type");
             }
         } else {
             return Err("The displayable does not exist");
         }
-    }    
-    
-        /// Returns the content dimensions of this window,
+    }
+
+    /// Returns the content dimensions of this window,
     /// as a tuple of `(width, height)`. It does not include the padding.
     pub fn dimensions(&self) -> (usize, usize) {
         let profile_locked = self.profile.lock();
         profile_locked.get_content_size()
     }
-
 
     /// Removes a displayable by its name.
     pub fn remove_displayable(&mut self, name: &str) {
@@ -235,9 +249,7 @@ impl<Buffer: FrameBuffer> WindowGeneric<Buffer> {
     /// Gets a mutable reference to a displayable by its name.
     pub fn get_displayable_mut(&mut self, name: &str) -> Option<&mut Box<dyn Displayable>> {
         let opt = self.components.get_mut(name);
-        opt.map(|component| {
-            component.get_displayable_mut()
-        })
+        opt.map(|component| component.get_displayable_mut())
     }
 
     /// Gets a displayable by its name.
@@ -284,13 +296,15 @@ impl<Buffer: FrameBuffer> WindowGeneric<Buffer> {
                     item.resize(
                         Coord::new(
                             current_coordinate.x * percent.0 as isize / 100,
-                            current_coordinate.y * percent.1 as isize / 100
+                            current_coordinate.y * percent.1 as isize / 100,
                         ),
                         width * percent.0 / 100,
                         height * percent.1 / 100,
                     );
                 }
-                profile.events_producer().enqueue(Event::new_resize_event(coordinate, width, height));
+                profile
+                    .events_producer()
+                    .enqueue(Event::new_resize_event(coordinate, width, height));
                 Ok(())
             }
             Err(err) => Err(err),
@@ -406,16 +420,19 @@ impl WindowProfile for WindowProfileGeneric {
         let frame_buffer_blocks = FrameBufferBlocks {
             framebuffer: buffer,
             coordinate: Coord { x: 0, y: 0 },
-            blocks: None
+            blocks: None,
         };
-        FRAME_COMPOSITOR.lock().composite(vec![frame_buffer_blocks].into_iter())
+        FRAME_COMPOSITOR
+            .lock()
+            .composite(vec![frame_buffer_blocks].into_iter())
     }
 
     fn contains(&self, coordinate: Coord) -> bool {
-        return coordinate.x <= (self.width - 2 * self.padding) as isize && coordinate.y <= (self.height - 2 * self.padding) as isize;
+        return coordinate.x <= (self.width - 2 * self.padding) as isize
+            && coordinate.y <= (self.height - 2 * self.padding) as isize;
     }
 
-/*    fn set_active(&mut self, active: bool) -> Result<(), &'static str> {
+    /*    fn set_active(&mut self, active: bool) -> Result<(), &'static str> {
         self.active = active;
         Ok(())
     }*/
@@ -431,9 +448,11 @@ impl WindowProfile for WindowProfileGeneric {
         let frame_buffer_blocks = FrameBufferBlocks {
             framebuffer: buffer,
             coordinate: Coord { x: 0, y: 0 },
-            blocks: None
-        };        
-        FRAME_COMPOSITOR.lock().composite(vec![frame_buffer_blocks].into_iter())
+            blocks: None,
+        };
+        FRAME_COMPOSITOR
+            .lock()
+            .composite(vec![frame_buffer_blocks].into_iter())
     }
 
     fn resize(
@@ -468,9 +487,9 @@ impl WindowProfile for WindowProfileGeneric {
     fn events_producer(&mut self) -> &mut DFQueueProducer<Event> {
         &mut self.events_producer
     }
-    
+
     fn set_position(&mut self, coordinate: Coord) {
-        self.coordinate = coordinate;       
+        self.coordinate = coordinate;
     }
 
     fn get_moving_base(&self) -> Coord {
@@ -526,7 +545,6 @@ impl Component {
         self.displayable.resize(width, height);
     }
 }
-
 
 // Use a lazy drop scheme instead since window_manager cannot get access to the window_manager. When the window is dropped, the corresponding weak reference will be deleted from the window manager the next time the manager tries to get access to it.
 // delete the reference of a window in the manager when a window is dropped.

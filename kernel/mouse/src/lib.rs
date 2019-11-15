@@ -2,15 +2,15 @@
 #[macro_use]
 extern crate log;
 
+extern crate dfqueue;
+extern crate event_types;
 extern crate mouse_data;
 extern crate ps2;
 extern crate spin;
-extern crate event_types;
-extern crate dfqueue;
 
-use spin::Once;
-use event_types::Event;
 use dfqueue::DFQueueProducer;
+use event_types::Event;
+use spin::Once;
 
 use mouse_data::{ButtonAction, Displacement, MouseEvent, MouseMovement};
 use ps2::{check_mouse_id, init_ps2_port2, set_mouse_id, test_ps2_port2};
@@ -40,9 +40,7 @@ pub fn init(mouse_queue_producer: DFQueueProducer<Event>) {
         }
     }
 
-    MOUSE_PRODUCER.call_once(|| {
-        mouse_queue_producer
-    });
+    MOUSE_PRODUCER.call_once(|| mouse_queue_producer);
 }
 
 /// print the mouse actions
@@ -112,12 +110,12 @@ pub fn handle_mouse_input(readdata: u32) -> Result<(), &'static str> {
     dis.read_from_data(readdata);
 
     let mouse_event = MouseEvent::new(*action, *mmove, *dis);
-    // mouse_to_print(&mouse_event);  // use this to debug  
+    // mouse_to_print(&mouse_event);  // use this to debug
     let event = Event::MouseMovementEvent(mouse_event);
 
     if let Some(producer) = MOUSE_PRODUCER.try() {
         producer.enqueue(event);
-        Ok(()) // successfully queued up MouseEvent 
+        Ok(()) // successfully queued up MouseEvent
     } else {
         warn!("handle_keyboard_input(): MOUSE_PRODUCER wasn't yet initialized, dropping keyboard event {:?}.", event);
         Err("keyboard event queue not ready")

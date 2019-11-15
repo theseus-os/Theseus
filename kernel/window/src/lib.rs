@@ -3,20 +3,21 @@
 
 #![no_std]
 
-extern crate event_types;
-extern crate dfqueue;
-extern crate frame_buffer;
-extern crate displayable;
 extern crate alloc;
-#[macro_use] extern crate downcast_rs;
+extern crate dfqueue;
+extern crate displayable;
+extern crate event_types;
+extern crate frame_buffer;
+#[macro_use]
+extern crate downcast_rs;
 
-use event_types::Event;
-use frame_buffer::{Coord, Pixel, FrameBuffer};
-use displayable::Displayable;
-use dfqueue::{DFQueueConsumer, DFQueueProducer};
 use alloc::boxed::Box;
-use downcast_rs::Downcast;
 use alloc::vec::IntoIter;
+use dfqueue::{DFQueueConsumer, DFQueueProducer};
+use displayable::Displayable;
+use downcast_rs::Downcast;
+use event_types::Event;
+use frame_buffer::{Coord, FrameBuffer, Pixel};
 
 /// Trait for windows. A window manager holds a list of objects who implement the `Window` trait.
 /// A `Window` provides states required by the window manager such as the size, the loaction and the active state of a window.
@@ -64,7 +65,7 @@ pub trait WindowProfile {
 
     fn give_all_mouse_event(&mut self) -> bool;
 
-    fn get_pixel(& self, coordinate: Coord) -> Result<Pixel, &'static str> {
+    fn get_pixel(&self, coordinate: Coord) -> Result<Pixel, &'static str> {
         Err("get_pixel() is not implement for this window")
     }
 }
@@ -76,8 +77,11 @@ pub trait Window: Downcast + Send {
     fn handle_event(&mut self) -> Result<(), &'static str>;
 
     fn get_background(&self) -> Pixel;
-    
-    fn get_displayable_mut(&mut self, display_name: &str) -> Result<&mut Box<dyn Displayable>, &'static str>;
+
+    fn get_displayable_mut(
+        &mut self,
+        display_name: &str,
+    ) -> Result<&mut Box<dyn Displayable>, &'static str>;
 
     fn get_displayable(&self, display_name: &str) -> Result<&Box<dyn Displayable>, &'static str>;
 
@@ -95,6 +99,5 @@ pub trait Window: Downcast + Send {
         coordinate: Coord,
         displayable: Box<dyn Displayable>,
     ) -> Result<(), &'static str>;
-
 }
 impl_downcast!(Window);

@@ -6,46 +6,48 @@
 
 #![no_std]
 
-#[macro_use] extern crate alloc;
-#[macro_use] extern crate log;
+#[macro_use]
+extern crate alloc;
+#[macro_use]
+extern crate log;
 extern crate dfqueue;
-extern crate environment;
-extern crate print;
-extern crate event_types;
-extern crate spin;
-extern crate frame_buffer_alpha;
-extern crate window_manager_alpha;
-extern crate window_manager;
-extern crate window_components;
-extern crate tsc;
-extern crate text_display;
 extern crate displayable;
-extern crate frame_buffer_rgb;
-extern crate frame_buffer;
+extern crate environment;
+extern crate event_types;
 extern crate font;
+extern crate frame_buffer;
+extern crate frame_buffer_alpha;
 extern crate frame_buffer_drawer;
 extern crate frame_buffer_printer;
+extern crate frame_buffer_rgb;
+extern crate print;
+extern crate spin;
 extern crate text_area;
+extern crate text_display;
+extern crate tsc;
 extern crate window;
+extern crate window_components;
+extern crate window_manager;
+extern crate window_manager_alpha;
 
-use alloc::string::{String, ToString};
-use alloc::vec::Vec;
 use alloc::boxed::Box;
-use event_types::Event;
+use alloc::string::{String, ToString};
 use alloc::sync::Arc;
-use spin::Mutex;
-use text_display::{TextGeneric};
+use alloc::vec::Vec;
+use cursor::*;
 use displayable::{Displayable, TextDisplayable};
-use frame_buffer_rgb::FrameBufferRGB;
-use frame_buffer::{Coord, FrameBuffer};
-use window_manager::WindowGeneric;
+use event_types::Event;
 use font::{CHARACTER_HEIGHT, CHARACTER_WIDTH};
-use tsc::{tsc_ticks, TscTicks};
-use text_area::TextArea;
+use frame_buffer::{Coord, FrameBuffer};
 use frame_buffer_alpha::FrameBufferAlpha;
+use frame_buffer_rgb::FrameBufferRGB;
+use spin::Mutex;
+use text_area::TextArea;
+use text_display::TextGeneric;
+use tsc::{tsc_ticks, TscTicks};
 use window::Window;
 use window_components::WindowComponents;
-use cursor::*;
+use window_manager::WindowGeneric;
 
 pub mod cursor;
 
@@ -56,9 +58,9 @@ const DEFAULT_CURSOR_FREQ: u64 = 400000000;
 /// Error type for tracking different scroll errors that a terminal
 /// application could encounter.
 pub enum ScrollError {
-    /// Occurs when a index-calculation returns an index that is outside of the 
+    /// Occurs when a index-calculation returns an index that is outside of the
     /// bounds of the scroll buffer
-    OffEndBound
+    OffEndBound,
 }
 
 /// Terminal Structure that allows multiple terminals to be individually run.
@@ -66,7 +68,7 @@ pub enum ScrollError {
 /// 1) The terminal print queue that handles printing from external applications
 ///     - Consumer is the main terminal loop
 ///     - Producers are any external application trying to print to the terminal's stdout
-/// 
+///
 /// 2) The input queue (in the window manager) that handles keypresses and resize events
 ///     - Consumer is the main terminal loop
 ///     - Producer is the window manager. Window manager is responsible for enqueuing keyevents into the active application
@@ -85,15 +87,15 @@ pub struct Terminal {
     /// being displayed on the text display)
     absolute_cursor_pos: usize,
     /// The cursor object owned by the terminal. It contains the current blinking states of the cursor
-    pub cursor: Box<dyn Cursor>
+    pub cursor: Box<dyn Cursor>,
 }
 
 /// Privite methods of `Terminal`.
 impl Terminal {
     /// Get the width and height of the text displayable in the unit of characters.
-    fn get_text_dimensions(&self) -> (usize, usize){
+    fn get_text_dimensions(&self) -> (usize, usize) {
         let textarea = match self.get_text_area() {
-            Ok(textarea) => { textarea },
+            Ok(textarea) => textarea,
             Err(err) => {
                 debug!("get_text_dimensions(): {}", err);
                 return (0, 0);
@@ -103,12 +105,12 @@ impl Terminal {
     }
 
     /// This function takes in the end index of some index in the scrollback buffer and calculates the starting index of the
-    /// scrollback buffer so that a slice containing the starting and ending index would perfectly fit inside the dimensions of 
-    /// text display. 
-    /// If the text display's first line will display a continuation of a syntactical line in the scrollback buffer, this function 
+    /// scrollback buffer so that a slice containing the starting and ending index would perfectly fit inside the dimensions of
+    /// text display.
+    /// If the text display's first line will display a continuation of a syntactical line in the scrollback buffer, this function
     /// calculates the starting index so that when displayed on the text display, it preserves that line so that it looks the same
     /// as if the whole physical line is displayed on the buffer
-    /// 
+    ///
     /// Return: starting index of the string and the cursor position(with respect to position on the screen, not in the scrollback buffer) in that order
     fn calc_start_idx(&self, end_idx: usize) -> (usize, usize) {
         let (buffer_width, buffer_height) = self.get_text_dimensions();
@@ -116,7 +118,9 @@ impl Terminal {
         let result;
         // Grabs a max-size slice of the scrollback buffer (usually does not totally fit because of newlines)
         if end_idx > buffer_width * buffer_height {
-            result = self.scrollback_buffer.get(end_idx - buffer_width*buffer_height..end_idx);
+            result = self
+                .scrollback_buffer
+                .get(end_idx - buffer_width * buffer_height..end_idx);
         } else {
             result = self.scrollback_buffer.get(0..end_idx);
         }
@@ -131,44 +135,46 @@ impl Terminal {
                     return (0, end_idx);
                 } else {
                     start_idx -= buffer_height * buffer_width; // text with no newlines will fill the entire buffer
-                    return (start_idx, buffer_height * buffer_width -1);
+                    return (start_idx, buffer_height * buffer_width - 1);
                 }
             }
 
             let mut last_line_chars = 0;
             // Case where the last newline does not occur at the end of the slice
             if new_line_indices[0].0 != slice.len() - 1 {
-                start_idx -= slice.len() -1 - new_line_indices[0].0;
-                total_lines += (slice.len()-1 - new_line_indices[0].0)/buffer_width + 1;
-                last_line_chars = (slice.len() -1 - new_line_indices[0].0) % buffer_width; // fix: account for more than one line
-            }
-            else {
+                start_idx -= slice.len() - 1 - new_line_indices[0].0;
+                total_lines += (slice.len() - 1 - new_line_indices[0].0) / buffer_width + 1;
+                last_line_chars = (slice.len() - 1 - new_line_indices[0].0) % buffer_width;
+            // fix: account for more than one line
+            } else {
                 start_idx -= 1;
                 total_lines += 1;
             }
 
             // covers everything *up to* the characters between the beginning of the slice and the first new line character
-            for i in 0..new_line_indices.len()-1 {
+            for i in 0..new_line_indices.len() - 1 {
                 if total_lines >= buffer_height {
                     break;
                 }
-                let num_chars = new_line_indices[i].0 - new_line_indices[i+1].0;
-                let num_lines = if (num_chars-1)%buffer_width != 0 || (num_chars -1) == 0 {
-                                    (num_chars-1) / buffer_width + 1 
-                                } else {
-                                    (num_chars-1)/buffer_width}; // using (num_chars -1) because that's the number of characters that actually show up on the screen
-                if num_chars > start_idx { // prevents subtraction overflow
+                let num_chars = new_line_indices[i].0 - new_line_indices[i + 1].0;
+                let num_lines = if (num_chars - 1) % buffer_width != 0 || (num_chars - 1) == 0 {
+                    (num_chars - 1) / buffer_width + 1
+                } else {
+                    (num_chars - 1) / buffer_width
+                }; // using (num_chars -1) because that's the number of characters that actually show up on the screen
+                if num_chars > start_idx {
+                    // prevents subtraction overflow
                     return (0, total_lines * buffer_width + last_line_chars);
-                }  
+                }
                 start_idx -= num_chars;
                 total_lines += num_lines;
             }
 
             // tracks the characters between the beginning of the slice and the first new line character
-            let first_chars = new_line_indices[new_line_indices.len() -1].0;
-            let first_chars_lines = first_chars/buffer_width + 1;
+            let first_chars = new_line_indices[new_line_indices.len() - 1].0;
+            let first_chars_lines = first_chars / buffer_width + 1;
 
-            // covers the case where the text inside the new_lines_indices array overflow the text buffer 
+            // covers the case where the text inside the new_lines_indices array overflow the text buffer
             if total_lines > buffer_height {
                 start_idx += (total_lines - buffer_height) * buffer_width; // adds back the overcounted lines to the starting index
                 total_lines = buffer_height;
@@ -187,26 +193,32 @@ impl Terminal {
             }
 
             // If the previous loop overcounted, this cuts off the excess string from string. Happens when there are many charcters between newlines at the beginning of the slice
-            return (start_idx, (total_lines - 1) * buffer_width + last_line_chars);
-
+            return (
+                start_idx,
+                (total_lines - 1) * buffer_width + last_line_chars,
+            );
         } else {
-            return (0,0); /* WARNING: should change to Option<> rather than returning (0, 0) */
-        }   
+            return (0, 0); /* WARNING: should change to Option<> rather than returning (0, 0) */
+        }
     }
 
     /// This function takes in the start index of some index in the scrollback buffer and calculates the end index of the
-    /// scrollback buffer so that a slice containing the starting and ending index would perfectly fit inside the dimensions of 
-    /// text display. 
+    /// scrollback buffer so that a slice containing the starting and ending index would perfectly fit inside the dimensions of
+    /// text display.
     fn calc_end_idx(&self, start_idx: usize) -> Result<usize, ScrollError> {
-        let (buffer_width,buffer_height) = self.get_text_dimensions();
+        let (buffer_width, buffer_height) = self.get_text_dimensions();
         let scrollback_buffer_len = self.scrollback_buffer.len();
         let mut end_idx = start_idx;
         let result;
         // Grabs a max-size slice of the scrollback buffer (usually does not totally fit because of newlines)
         if start_idx + buffer_width * buffer_height > scrollback_buffer_len {
-            result = self.scrollback_buffer.get(start_idx..scrollback_buffer_len-1);
+            result = self
+                .scrollback_buffer
+                .get(start_idx..scrollback_buffer_len - 1);
         } else {
-            result = self.scrollback_buffer.get(start_idx..start_idx + buffer_width * buffer_height);
+            result = self
+                .scrollback_buffer
+                .get(start_idx..start_idx + buffer_width * buffer_height);
         }
 
         // calculate the starting index for the slice
@@ -218,36 +230,36 @@ impl Terminal {
             if new_line_indices.len() == 0 {
                 // indicates that the text is just one continuous string with no newlines and will therefore fill the buffer completely
                 end_idx += buffer_height * buffer_width;
-                if end_idx <= self.scrollback_buffer.len() -1 {
-                    return Ok(end_idx); 
+                if end_idx <= self.scrollback_buffer.len() - 1 {
+                    return Ok(end_idx);
                 } else {
                     return Err(ScrollError::OffEndBound);
                 }
             }
 
             let mut counter = 0;
-            // Covers the case where the start idx argument corresponds to a string that does not start on a newline 
+            // Covers the case where the start idx argument corresponds to a string that does not start on a newline
             if new_line_indices[0].0 != 0 {
                 end_idx += new_line_indices[0].0;
-                total_lines += new_line_indices[0].0/buffer_width + 1;
+                total_lines += new_line_indices[0].0 / buffer_width + 1;
             }
             // the characters between the last newline and the end of the slice
-            let last_line_chars = slice.len() -1 - new_line_indices[new_line_indices.len() -1].0;  
-            let num_last_lines = last_line_chars%buffer_width + 1; // +1 to account for the physical line that the last characters will take up
+            let last_line_chars = slice.len() - 1 - new_line_indices[new_line_indices.len() - 1].0;
+            let num_last_lines = last_line_chars % buffer_width + 1; // +1 to account for the physical line that the last characters will take up
 
-            for i in 0..new_line_indices.len()-1 {
+            for i in 0..new_line_indices.len() - 1 {
                 if total_lines >= buffer_height {
                     break;
                 }
-                let num_chars = new_line_indices[i+1].0 - new_line_indices[i].0;
-                let num_lines = num_chars/buffer_width + 1;
+                let num_chars = new_line_indices[i + 1].0 - new_line_indices[i].0;
+                let num_lines = num_chars / buffer_width + 1;
                 end_idx += num_chars;
                 total_lines += num_lines;
                 counter += 1;
             }
-            // covers the case where the text inside the new_line_indices array overflows the text buffer capacity            
+            // covers the case where the text inside the new_line_indices array overflows the text buffer capacity
             if total_lines > buffer_height {
-                let num_chars = new_line_indices[counter].0 - new_line_indices[counter -1].0;
+                let num_chars = new_line_indices[counter].0 - new_line_indices[counter - 1].0;
                 end_idx -= num_chars;
                 end_idx += buffer_width;
             // covers the case where the characters between the last newline and the end of the slice overflow the text buffer capacity
@@ -259,13 +271,13 @@ impl Terminal {
                 end_idx += last_line_chars;
             }
 
-            if end_idx <= self.scrollback_buffer.len() -1 {
-                return Ok(end_idx); 
+            if end_idx <= self.scrollback_buffer.len() - 1 {
+                return Ok(end_idx);
             } else {
                 return Err(ScrollError::OffEndBound);
             }
         } else {
-            return Ok(self.scrollback_buffer.len() - 1) /* WARNING: maybe should return Error? */
+            return Ok(self.scrollback_buffer.len() - 1); /* WARNING: maybe should return Error? */
         }
     }
 
@@ -275,7 +287,7 @@ impl Terminal {
         let mut start_idx = self.scroll_start_idx;
         //indicates that the user has scrolled to the top of the page
         if start_idx < 1 {
-            return; 
+            return;
         } else {
             start_idx -= 1;
         }
@@ -283,19 +295,22 @@ impl Terminal {
         let result;
         let slice_len;
         if buffer_width < start_idx {
-            result = self.scrollback_buffer.as_str().get(start_idx - buffer_width .. start_idx);
+            result = self
+                .scrollback_buffer
+                .as_str()
+                .get(start_idx - buffer_width..start_idx);
             slice_len = buffer_width;
         } else {
-            result = self.scrollback_buffer.as_str().get(0 .. start_idx);
+            result = self.scrollback_buffer.as_str().get(0..start_idx);
             slice_len = start_idx;
         }
         // Searches this slice for a newline
 
         if let Some(slice) = result {
-            let index = slice.rfind('\n');   
+            let index = slice.rfind('\n');
             new_start_idx = match index {
-                Some(index) => { start_idx - slice_len + index }, // Moves the starting index back to the position of the nearest newline back
-                None => { start_idx - slice_len}, // If no newline is found, moves the start index back by the buffer width value
+                Some(index) => start_idx - slice_len + index, // Moves the starting index back to the position of the nearest newline back
+                None => start_idx - slice_len, // If no newline is found, moves the start index back by the buffer width value
             }; // we're moving the cursor one position to the right relative to the end of the input string
         } else {
             return;
@@ -311,16 +326,17 @@ impl Terminal {
         let prev_start_idx;
         // Prevents the user from scrolling down if already at the bottom of the page
         if self.is_scroll_end == true {
-            return;} 
+            return;
+        }
         prev_start_idx = self.scroll_start_idx;
         let result = self.calc_end_idx(prev_start_idx);
         let mut end_idx = match result {
             Ok(end_idx) => end_idx,
-            Err(ScrollError::OffEndBound) => self.scrollback_buffer.len() -1,
+            Err(ScrollError::OffEndBound) => self.scrollback_buffer.len() - 1,
         };
 
         // If the newly calculated end index is the bottom of the scrollback buffer, recalculates the start index and returns
-        if end_idx == self.scrollback_buffer.len() -1 {
+        if end_idx == self.scrollback_buffer.len() - 1 {
             self.is_scroll_end = true;
             let new_start = self.calc_start_idx(end_idx).0;
             self.scroll_start_idx = new_start;
@@ -331,21 +347,27 @@ impl Terminal {
         {
             let result;
             let slice_len; // specifies the length of the grabbed slice
-            // Grabs a slice (the size of the buffer width at most) of the scrollback buffer that is directly below the current slice being displayed on the text display
+                           // Grabs a slice (the size of the buffer width at most) of the scrollback buffer that is directly below the current slice being displayed on the text display
             if self.scrollback_buffer.len() > end_idx + buffer_width {
                 slice_len = buffer_width;
-                result = self.scrollback_buffer.as_str().get(end_idx .. end_idx + buffer_width);
+                result = self
+                    .scrollback_buffer
+                    .as_str()
+                    .get(end_idx..end_idx + buffer_width);
             } else {
-                slice_len = self.scrollback_buffer.len() - end_idx -1; 
-                result = self.scrollback_buffer.as_str().get(end_idx .. self.scrollback_buffer.len());
+                slice_len = self.scrollback_buffer.len() - end_idx - 1;
+                result = self
+                    .scrollback_buffer
+                    .as_str()
+                    .get(end_idx..self.scrollback_buffer.len());
             }
             // Searches the grabbed slice for a newline
             if let Some(slice) = result {
-                let index = slice.find('\n');   
+                let index = slice.find('\n');
                 new_end_idx = match index {
-                    Some(index) => { end_idx + index + 1}, // Moves end index forward to the next newline
-                    None => { end_idx + slice_len}, // If no newline is found, moves the end index forward by the buffer width value
-                }; 
+                    Some(index) => end_idx + index + 1, // Moves end index forward to the next newline
+                    None => end_idx + slice_len, // If no newline is found, moves the end index forward by the buffer width value
+                };
             } else {
                 return;
             }
@@ -367,14 +389,14 @@ impl Terminal {
         let start_idx = self.scroll_start_idx;
         let result = self.calc_end_idx(start_idx);
         let new_start_idx = match result {
-            Ok(idx) => idx+ 1, 
+            Ok(idx) => idx + 1,
             Err(ScrollError::OffEndBound) => {
                 let scrollback_buffer_len = self.scrollback_buffer.len();
                 let new_start_idx = self.calc_start_idx(scrollback_buffer_len).0;
                 self.scroll_start_idx = new_start_idx;
                 self.is_scroll_end = true;
                 return;
-            },
+            }
         };
         let result = self.calc_end_idx(new_start_idx);
         let new_end_idx = match result {
@@ -385,9 +407,9 @@ impl Terminal {
                 self.scroll_start_idx = new_start_idx;
                 self.is_scroll_end = true;
                 return;
-            },
+            }
         };
-        if new_end_idx == self.scrollback_buffer.len() -1 {
+        if new_end_idx == self.scrollback_buffer.len() - 1 {
             // if the user page downs near the bottom of the page so only gets a partial shift
             self.is_scroll_end = true;
             return;
@@ -398,22 +420,23 @@ impl Terminal {
     /// Updates the text display by taking a string index and displaying as much as it starting from the passed string index (i.e. starts from the top of the display and goes down)
     fn update_display_forwards(&mut self, start_idx: usize) -> Result<(), &'static str> {
         self.scroll_start_idx = start_idx;
-        let result= self.calc_end_idx(start_idx); 
+        let result = self.calc_end_idx(start_idx);
         let end_idx = match result {
             Ok(end_idx) => end_idx,
             Err(ScrollError::OffEndBound) => {
-                let new_end_idx = self.scrollback_buffer.len() -1;
+                let new_end_idx = self.scrollback_buffer.len() - 1;
                 let new_start_idx = self.calc_start_idx(new_end_idx).0;
                 self.scroll_start_idx = new_start_idx;
                 new_end_idx
-            },
+            }
         };
-        let result  = self.scrollback_buffer.get(start_idx..end_idx); // =end_idx includes the end index in the slice
+        let result = self.scrollback_buffer.get(start_idx..end_idx); // =end_idx includes the end index in the slice
         if let Some(slice) = result {
             {
                 let textarea = {
-                    self.window.get_displayable_mut(&self.display_name)?
-                    .as_text_mut()?
+                    self.window
+                        .get_displayable_mut(&self.display_name)?
+                        .as_text_mut()?
                 };
                 textarea.set_text(slice);
             }
@@ -434,8 +457,9 @@ impl Terminal {
         if let Some(slice) = result {
             {
                 let textarea = {
-                    self.window.get_displayable_mut(&self.display_name)?
-                    .as_text_mut()?
+                    self.window
+                        .get_displayable_mut(&self.display_name)?
+                        .as_text_mut()?
                 };
                 textarea.set_text(slice);
             }
@@ -446,12 +470,12 @@ impl Terminal {
         Ok(())
     }
 
-    fn get_text_area(&self) -> Result<(&TextDisplayable), &'static str>{
+    fn get_text_area(&self) -> Result<(&TextDisplayable), &'static str> {
         let text_display = self.window.get_displayable(&self.display_name)?;
         text_display.as_text()
     }
 
-    fn get_text_area_mut(&mut self) -> Result<(&mut TextDisplayable), &'static str>{
+    fn get_text_area_mut(&mut self) -> Result<(&mut TextDisplayable), &'static str> {
         let text_display = self.window.get_displayable_mut(&self.display_name)?;
         text_display.as_text_mut()
     }
@@ -459,8 +483,11 @@ impl Terminal {
 
 /// Public methods of `Terminal`.
 impl Terminal {
-        pub fn new(window: Box<dyn Window>, textarea_object: Box<dyn Displayable>, cursor: Box<dyn Cursor>) -> Result<Terminal, &'static str> {
-
+    pub fn new(
+        window: Box<dyn Window>,
+        textarea_object: Box<dyn Displayable>,
+        cursor: Box<dyn Cursor>,
+    ) -> Result<Terminal, &'static str> {
         // let mut prompt_string = root.lock().get_absolute_path(); // ref numbers are 0-indexed
         let display_name = "textarea";
         let mut terminal = Terminal {
@@ -470,17 +497,21 @@ impl Terminal {
             scroll_start_idx: 0,
             is_scroll_end: true,
             absolute_cursor_pos: 0,
-            cursor: cursor
+            cursor: cursor,
         };
-        terminal.window.add_displayable(&display_name, Coord::new(0, 0), textarea_object)?;
+        terminal
+            .window
+            .add_displayable(&display_name, Coord::new(0, 0), textarea_object)?;
 
         // Inserts a producer for the print queue into global list of terminal print producers
-        terminal.print_to_terminal(format!("Theseus Terminal Emulator\nPress Ctrl+C to quit a task\n"));
+        terminal.print_to_terminal(format!(
+            "Theseus Terminal Emulator\nPress Ctrl+C to quit a task\n"
+        ));
         Ok(terminal)
     }
 
     /// Adds a string to be printed to the terminal to the terminal scrollback buffer.
-    /// Note that one needs to call `refresh_display` to get things actually printed. 
+    /// Note that one needs to call `refresh_display` to get things actually printed.
     pub fn print_to_terminal(&mut self, s: String) {
         self.scrollback_buffer.push_str(&s);
     }
@@ -504,7 +535,7 @@ impl Terminal {
     ///
     /// * `c`: the new character to insert.
     /// * `offset_from_end`: the position to insert the character. It represents the distance relative to the end of the whole output in the terminal in units of characters.
-    /// 
+    ///
     /// # Examples
     ///
     /// * `terminal.insert_char(char, 0)` will append `char` to the end of existing text.
@@ -513,9 +544,12 @@ impl Terminal {
     /// After invoke this function, one must call `refresh_display` to get the updates actually showed on the screen.
     pub fn insert_char(&mut self, c: char, offset_from_end: usize) -> Result<(), &'static str> {
         let buflen = self.scrollback_buffer.len();
-        if buflen < offset_from_end { return Err("offset_from_end is larger than length of scrollback buffer"); }
+        if buflen < offset_from_end {
+            return Err("offset_from_end is larger than length of scrollback buffer");
+        }
         let insert_idx = buflen - offset_from_end;
-        self.scrollback_buffer.insert_str(insert_idx, &c.to_string());
+        self.scrollback_buffer
+            .insert_str(insert_idx, &c.to_string());
         Ok(())
     }
 
@@ -524,7 +558,7 @@ impl Terminal {
     /// # Arguments
     ///
     /// * `offset_from_end`: the position of the character to remove. It represents the distance relative to the end of the whole output in the terminal in units of characters. `offset_from_end == 0` is *invalid* here.
-    /// 
+    ///
     /// # Examples
     ///
     /// * `terminal.remove_char(1)` will remove the last character in the screen.
@@ -532,13 +566,17 @@ impl Terminal {
     /// After invoke this function, one must call `refresh_display` to get the updates actually showed on the screen.
     pub fn remove_char(&mut self, offset_from_end: usize) -> Result<(), &'static str> {
         let buflen = self.scrollback_buffer.len();
-        if buflen < offset_from_end { return Err("offset_from_end is larger than length of scrollback buffer"); }
-        if offset_from_end == 0 { return Err("cannot remove character at offset_from_end == 0"); }
+        if buflen < offset_from_end {
+            return Err("offset_from_end is larger than length of scrollback buffer");
+        }
+        if offset_from_end == 0 {
+            return Err("cannot remove character at offset_from_end == 0");
+        }
         let remove_idx = buflen - offset_from_end;
         self.scrollback_buffer.remove(remove_idx);
         Ok(())
     }
-    
+
     /// Scroll the screen to the very beginning.
     pub fn move_screen_to_begin(&mut self) -> Result<(), &'static str> {
         // Home command only registers if the text display has the ability to scroll
@@ -548,7 +586,7 @@ impl Terminal {
             self.cursor.disable();
             self.display_cursor()?;
         }
-        
+
         Ok(())
     }
 
@@ -619,12 +657,16 @@ impl Terminal {
     /// Get a key event from the underlying window.
     pub fn get_event(&mut self) -> Option<Event> {
         match self.window.handle_event() {
-            Err(_e) => { return Some(Event::ExitEvent); }
+            Err(_e) => {
+                return Some(Event::ExitEvent);
+            }
             _ => {}
         };
         let _event = match self.window.consumer().peek() {
             Some(ev) => ev,
-            _ => { return None; }
+            _ => {
+                return None;
+            }
         };
         let event = _event.clone();
         _event.mark_completed();
@@ -637,9 +679,7 @@ impl Terminal {
     }
 
     /// Display the cursor of the terminal.
-    pub fn display_cursor(
-        &mut self
-    ) -> Result<(), &'static str> {
+    pub fn display_cursor(&mut self) -> Result<(), &'static str> {
         let coordinate = self.window.get_displayable_position(&self.display_name)?;
         // get info about the text displayable
         let (col_num, line_num, text_next_pos) = {
@@ -648,10 +688,10 @@ impl Terminal {
             let (col_num, line_num) = text_display.get_dimensions();
             (col_num, line_num, text_next_pos)
         };
- 
+
         // return if the cursor is not in the screen
         if text_next_pos >= col_num * line_num {
-            return Ok(())
+            return Ok(());
         }
 
         // calculate the cursor position
@@ -666,9 +706,10 @@ impl Terminal {
         )*/
 
         let text_display = {
-            self.window.get_displayable_mut(&self.display_name)?
-            .as_text_mut()?
-            .downcast_mut::<TextArea>()
+            self.window
+                .get_displayable_mut(&self.display_name)?
+                .as_text_mut()?
+                .downcast_mut::<TextArea>()
         };
 
         let (text_display, framebuffer) = if text_display.is_none() {
@@ -684,7 +725,7 @@ impl Terminal {
             text_display,
             framebuffer,
         )?;
- 
+
         // update to the end of the text if the cursor is at the last line
         let text_width = if text_next_pos / col_num == cursor_line {
             text_next_pos % col_num
@@ -708,5 +749,4 @@ impl Terminal {
         self.cursor.set_offset_from_end(offset_from_end);
         self.cursor.set_underlying_char(underlying_char);
     }
-
 }

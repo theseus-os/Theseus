@@ -31,7 +31,6 @@ endif
 GRUB_MKRESCUE = $(GRUB_CROSS)grub-mkrescue
 
 
-
 ###################################################################################################
 ### For ensuring that the host computer has the proper version of the Rust compiler
 ###################################################################################################
