@@ -125,14 +125,7 @@ pub fn init(
 
     // initialize the i/o subsystem, which will start window manager and the default terminal 
     let (key_producer, mouse_producer) = input_event_manager::init()?;
-
-    //info!("Display subsystem initialized successfully.");
-
-    // initialize the input event manager, which will start the default terminal 
-    // let input_event_queue_producer = input_event_manager::init()?;
-
     // initialize the rest of our drivers
-    // Wenqiu
     device_manager::init(key_producer, mouse_producer)?;
     task_fs::init()?;
 

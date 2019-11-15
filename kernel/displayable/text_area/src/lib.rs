@@ -95,11 +95,11 @@ impl TextArea {
         };
 
         // compute x_cnt and y_cnt and remain constant
-        if height < (16 + textarea.line_spacing) || width < (8 + textarea.column_spacing) {
+        if height < (CHARACTER_HEIGHT + textarea.line_spacing) || width < (CHARACTER_WIDTH - 1 + textarea.column_spacing) {
             return Err("textarea too small to put even one char");
         }
-        textarea.x_cnt = width / (8 + textarea.column_spacing);
-        textarea.y_cnt = height / (16 + textarea.line_spacing);
+        textarea.x_cnt = width / (CHARACTER_WIDTH - 1 + textarea.column_spacing);
+        textarea.y_cnt = height / (CHARACTER_HEIGHT + textarea.line_spacing);
         textarea.char_matrix.resize(textarea.x_cnt * textarea.y_cnt, ' ' as u8);  // first fill with blank char
 
         Ok(textarea)
@@ -140,11 +140,11 @@ impl TextArea {
                     self.set_char_in(col, line, c, winobj.framebuffer.deref_mut())?;
                     win_coordinate
                 };
-                let wcoordinate = self.coordinate + ((col * (8 + self.column_spacing)) as isize, (line * (16 + self.line_spacing)) as isize);
-                for j in 0..16 {
-                    for i in 0..8 {
+                let wcoordinate = self.coordinate + ((col * (CHARACTER_WIDTH - 1 + self.column_spacing)) as isize, (line * (CHARACTER_HEIGHT + self.line_spacing)) as isize);
+                for j in 0..CHARACTER_HEIGHT {
+                    for i in 0..CHARACTER_WIDTH - 1 {
                         window_manager_alpha::refresh_pixel_absolute(
-                            win_coordinate + wcoordinate + (i, j)
+                            win_coordinate + wcoordinate + (i as isize, j as isize)
                         )?;
                     }
                 }
@@ -158,10 +158,10 @@ impl TextArea {
 
         /// set char at given position, where i < self.x_cnt, j < self.y_cnt
     pub fn set_char_in(&mut self, col: usize, line: usize, c: u8, framebuffer: &mut FrameBuffer) -> Result<(), &'static str> {
-        let wcoordinate = self.coordinate + ((col * (8 + self.column_spacing)) as isize, (line * (16 + self.line_spacing)) as isize);
-        for j in 0..16 {
+        let wcoordinate = self.coordinate + ((col * (CHARACTER_WIDTH - 1 + self.column_spacing)) as isize, (line * (CHARACTER_HEIGHT + self.line_spacing)) as isize);
+        for j in 0..CHARACTER_HEIGHT {
             let char_font: u8 = font::FONT_BASIC[c as usize][j];
-            for i in 0..8 {
+            for i in 0..CHARACTER_WIDTH - 1 {
                 let ncoordinate = wcoordinate + (i as isize, j as isize);
                 if char_font & (0x80u8 >> i) != 0 {
                     framebuffer.draw_pixel(ncoordinate, self.text_color);
@@ -185,47 +185,6 @@ impl TextArea {
         }
         Ok(())
     }
-
-/*    /// display a basic string, only support normal chars and `\n`
-    pub fn display_string_basic(&mut self, string: &str) -> Result<(), &'static str> {
-        let a = string.as_bytes();
-        let mut i = 0;
-        let mut j = 0;
-        for k in 0 .. a.len() {
-            let c = a[k] as u8;
-            // debug!("{}", a[k] as u8);
-            if c == '\n' as u8 {
-                for x in i .. self.x_cnt {
-                    self.set_char(x, j, ' ' as u8)?;
-                }
-                j += 1;
-                i = 0;
-            } else {
-                self.set_char(i, j, c)?;
-                i += 1;
-                if i >= self.x_cnt {
-                    j += 1;
-                    i = 0;
-                }
-            }
-            if j >= self.y_cnt { break; }
-        }
-
-        self.next_index = self.index(i, j);
-        
-        if j < self.y_cnt {
-            for x in i .. self.x_cnt {
-                self.set_char(x, j, ' ' as u8)?;
-            }
-            for y in j+1 .. self.y_cnt {
-                for x in 0 .. self.x_cnt {
-                    self.set_char(x, y, ' ' as u8)?;
-                }
-            }
-        }
-        window_manager_alpha::render(None)
-    }
-*/
 
     pub fn display_string_basic(&mut self) {
 

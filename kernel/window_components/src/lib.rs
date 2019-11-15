@@ -167,19 +167,6 @@ impl Window for WindowComponents {
     }
 
     fn render(&mut self, blocks: Option<IntoIter<(usize, usize)>>) -> Result<(), &'static str> {
-        // let (coordinate, width, height) = {
-        //     let window = self.winobj.lock();
-        //     let coordinate = window.get_content_position();
-        //     let (width, height) = window.framebuffer.get_size();
-        //     (coordinate, width, height)
-        // };
-        // let winx = coordinate.x;
-        // let winy = coordinate.y;
-        // for j in 0..height as isize {
-        //     for i in 0..width as isize {
-        //         window_manager_alpha::refresh_pixel_absolute(winx as isize + i, winy as isize + j)?;
-        //     }
-        // }
         window_manager_alpha::render(None)
     }
 
@@ -299,8 +286,7 @@ impl Window for WindowComponents {
                 error!("do_move_active_window failed {}", err);
             }
         }
-
-        window_manager_alpha::render(None)
+        Ok(())
     }
 
     

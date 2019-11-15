@@ -159,7 +159,7 @@ impl<Buffer: FrameBuffer> Window for WindowGeneric<Buffer> {
     }
 
     fn handle_event(&mut self) -> Result<(), &'static str> {
-        //wenqiu: Todo
+        //TODO: This window cannot react to window related events such as mouse operations now. 
         Ok(())
     }
 

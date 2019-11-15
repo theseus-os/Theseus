@@ -72,6 +72,7 @@ pub trait WindowProfile {
 pub trait Window: Downcast + Send {
     fn consumer(&mut self) -> &mut DFQueueConsumer<Event>;
 
+    /// React to window relative events such as move the window
     fn handle_event(&mut self) -> Result<(), &'static str>;
 
     fn get_background(&self) -> Pixel;

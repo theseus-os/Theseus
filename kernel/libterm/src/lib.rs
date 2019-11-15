@@ -71,16 +71,11 @@ pub enum ScrollError {
 ///     - Consumer is the main terminal loop
 ///     - Producer is the window manager. Window manager is responsible for enqueuing keyevents into the active application
 pub struct Terminal {
-    /// The terminal's own window, this is a WindowComponents object which handles the events of user input properly like moving window and close window
+    /// The terminal's own window, this is a `Window` tra object which handles the events of user input properly like moving window and close window
     window: Box<Window>,
-    // textarea object of the terminal, it has a weak reference to the window object so that calling function of this object will draw on the screen
-    /// The terminal's own window
-    // Wenqiu:
-    // window: WindowGeneric<FrameBufferRGB>,
-    // Name of the displayable object of the terminal
-    // display_name: String,
-    /// The terminal's scrollback buffer which stores a string to be displayed by the text display
+    /// Name of the text displayable of the terminal
     display_name: String,
+    /// The terminal's scrollback buffer which stores a string to be displayed by the text display
     scrollback_buffer: String,
     /// Indicates whether the text display is displaying the last part of the scrollback buffer slice
     is_scroll_end: bool,
@@ -95,29 +90,17 @@ pub struct Terminal {
 
 /// Privite methods of `Terminal`.
 impl Terminal {
-    /// Get the width and height of the text display.
-    fn get_displayable_dimensions(&self) -> (usize, usize){
-        let textarea = match get_text_area(&self.window, &self.display_name) {
-            Ok(textarea) => {textarea},
+    /// Get the width and height of the text displayable in the unit of characters.
+    fn get_text_dimensions(&self) -> (usize, usize){
+        let textarea = match self.get_text_area() {
+            Ok(textarea) => { textarea },
             Err(err) => {
-                debug!("get_displayable_dimensions(): {}", err);
+                debug!("get_text_dimensions(): {}", err);
                 return (0, 0);
             }
         };
         textarea.get_dimensions()
     }
-    //Wenqiu:
-    /*fn get_displayable_dimensions(&self, name:&str) -> (usize, usize){        
-        match self.window.get_concrete_display::<TextGeneric>(&name) {
-            Ok(text_display) => {
-                return text_display.get_dimensions();
-            },
-            Err(err) => {
-                debug!("get_displayable_dimensions: {}", err);
-                return (0, 0);
-            }
-        }
-    }*/
 
     /// This function takes in the end index of some index in the scrollback buffer and calculates the starting index of the
     /// scrollback buffer so that a slice containing the starting and ending index would perfectly fit inside the dimensions of 
@@ -128,7 +111,7 @@ impl Terminal {
     /// 
     /// Return: starting index of the string and the cursor position(with respect to position on the screen, not in the scrollback buffer) in that order
     fn calc_start_idx(&self, end_idx: usize) -> (usize, usize) {
-        let (buffer_width, buffer_height) = self.get_displayable_dimensions();
+        let (buffer_width, buffer_height) = self.get_text_dimensions();
         let mut start_idx = end_idx;
         let result;
         // Grabs a max-size slice of the scrollback buffer (usually does not totally fit because of newlines)
@@ -215,7 +198,7 @@ impl Terminal {
     /// scrollback buffer so that a slice containing the starting and ending index would perfectly fit inside the dimensions of 
     /// text display. 
     fn calc_end_idx(&self, start_idx: usize) -> Result<usize, ScrollError> {
-        let (buffer_width,buffer_height) = self.get_displayable_dimensions();
+        let (buffer_width,buffer_height) = self.get_text_dimensions();
         let scrollback_buffer_len = self.scrollback_buffer.len();
         let mut end_idx = start_idx;
         let result;
@@ -288,7 +271,7 @@ impl Terminal {
 
     /// Scrolls the text display up one line
     fn scroll_up_one_line(&mut self) {
-        let buffer_width = self.get_displayable_dimensions().0;
+        let buffer_width = self.get_text_dimensions().0;
         let mut start_idx = self.scroll_start_idx;
         //indicates that the user has scrolled to the top of the page
         if start_idx < 1 {
@@ -324,7 +307,7 @@ impl Terminal {
 
     /// Scrolls the text display down one line
     fn scroll_down_one_line(&mut self) {
-        let buffer_width = self.get_displayable_dimensions().0;
+        let buffer_width = self.get_text_dimensions().0;
         let prev_start_idx;
         // Prevents the user from scrolling down if already at the bottom of the page
         if self.is_scroll_end == true {
@@ -428,16 +411,13 @@ impl Terminal {
         let result  = self.scrollback_buffer.get(start_idx..end_idx); // =end_idx includes the end index in the slice
         if let Some(slice) = result {
             {
-                let textarea = get_text_area_mut(&mut self.window, &self.display_name)?;
+                let textarea = {
+                    self.window.get_displayable_mut(&self.display_name)?
+                    .as_text_mut()?
+                };
                 textarea.set_text(slice);
             }
             self.window.display(&self.display_name)?;
-        //Wenqiu
-        /*    {
-                let text_display = self.window.get_concrete_display_mut::<TextGeneric>(&self.display_name)?;
-                text_display.set_text(slice);
-            }
-            self.window.display(&self.display_name)?;*/
         } else {
             return Err("could not get slice of scrollback buffer string");
         }
@@ -447,59 +427,34 @@ impl Terminal {
     /// Updates the text display by taking a string index and displaying as much as it can going backwards from the passed string index (i.e. starts from the bottom of the display and goes up)
     fn update_display_backwards(&mut self, end_idx: usize) -> Result<(), &'static str> {
         let (start_idx, cursor_pos) = self.calc_start_idx(end_idx);
-        //Wenqiu
-        /*let (start_idx, _cursor_pos) = self.calc_start_idx(end_idx, &self.display_name);*/
         self.scroll_start_idx = start_idx;
 
         let result = self.scrollback_buffer.get(start_idx..end_idx);
 
         if let Some(slice) = result {
             {
-                let textarea = get_text_area_mut(&mut self.window, &self.display_name)?;
-
+                let textarea = {
+                    self.window.get_displayable_mut(&self.display_name)?
+                    .as_text_mut()?
+                };
                 textarea.set_text(slice);
             }
-             self.window.display(&self.display_name)?;
-//            self.textarea.lock().display_string_basic(slice)?;
-//            self.absolute_cursor_pos = cursor_pos;
-            //Wenqiu
-            /*{
-                let text_display = self.window.get_concrete_display_mut::<TextGeneric>(&self.display_name)?;
-                text_display.set_text(slice);
-            }
-            self.window.display(&self.display_name)?;        */
+            self.window.display(&self.display_name)?;
         } else {
             return Err("could not get slice of scrollback buffer string");
         }
         Ok(())
     }
 
-    /*/// Updates the cursor to a new position and refreshes display
-    fn cursor_handler(&mut self, left_shift: usize) -> Result<(), &'static str> { 
-        let (buffer_width, buffer_height) = self.get_displayable_dimensions();
+    fn get_text_area(&self) -> Result<(&TextDisplayable), &'static str>{
+        let text_display = self.window.get_displayable(&self.display_name)?;
+        text_display.as_text()
+    }
 
-        // We have shifted the cursor out of the screen.
-        if left_shift / buffer_width > buffer_height {
-            self.cursor.disable();
-            return Ok(());
-        }
-
-        let new_x = (self.absolute_cursor_pos - left_shift) % buffer_width;
-        let new_y = (self.absolute_cursor_pos - left_shift) / buffer_width;
-
-        
-        self.cursor.check_time();
-        // debug!("absolute_cursor_pos: {}", self.absolute_cursor_pos);
-        let textarea = get_text_area_mut(&mut self.window, &self.display_name)?;
-        if self.cursor.enabled {
-            if self.cursor.show {
-                textarea.set_char(new_x, new_y, 221)?;
-            } else {
-                textarea.set_char(new_x, new_y, ' ' as u8)?;
-            }
-        }
-        Ok(())
-    }*/
+    fn get_text_area_mut(&mut self) -> Result<(&mut TextDisplayable), &'static str>{
+        let text_display = self.window.get_displayable_mut(&self.display_name)?;
+        text_display.as_text_mut()
+    }
 }
 
 /// Public methods of `Terminal`.
@@ -516,8 +471,6 @@ impl Terminal {
             is_scroll_end: true,
             absolute_cursor_pos: 0,
             cursor: cursor
-            //Wenqiu
-            //cursor: Cursor::new(FONT_COLOR),
         };
         terminal.window.add_displayable(&display_name, Coord::new(0, 0), textarea_object)?;
 
@@ -533,24 +486,16 @@ impl Terminal {
     }
 
     /// Actually refresh the screen. Currently it's expensive.
-    pub fn refresh_display(&mut self) {
+    pub fn refresh_display(&mut self) -> Result<(), &'static str> {
         let start_idx = self.scroll_start_idx;
         // handling display refreshing errors here so that we don't clog the main loop of the terminal
         if self.is_scroll_end {
             let buffer_len = self.scrollback_buffer.len();
-            match self.update_display_backwards(buffer_len) {
-                Ok(_) => { }
-                Err(err) => {error!("could not update display backwards: {}", err); return}
-            }
+            self.update_display_backwards(buffer_len)?;
         } else {
-            match self.update_display_forwards(start_idx) {
-                Ok(_) => { }
-                Err(err) => {error!("could not update display forwards: {}", err); return}
-            }
+            self.update_display_forwards(start_idx)?;
         }
-        
-        // Wenqiu: TODO
-        let _ = self.window.render(None);
+        self.window.render(None)
     }
 
     /// Insert a character to the terminal.
@@ -671,46 +616,8 @@ impl Terminal {
         self.is_scroll_end = true;
     }
 
-    /*pub fn blink_cursor(&mut self, left_shift: usize) -> Result<(), &'static str> {
-        let buffer_width = self.get_displayable_dimensions().0;
-        let mut new_x = self.absolute_cursor_pos % buffer_width;
-        let mut new_y = self.absolute_cursor_pos / buffer_width;
-        // adjusts to the correct position relative to the max rightmost absolute cursor position
-        if new_x >= left_shift  {
-            new_x -= left_shift;
-        } else {
-            new_x = buffer_width + new_x - left_shift;
-            new_y -= 1;
-        }
-
-        self.cursor.check_time();
-        // debug!("absolute_cursor_pos: {}", self.absolute_cursor_pos);
-        let textarea = get_text_area_mut(&mut self.window, &self.display_name)?;
-        if self.cursor.enabled {
-            if self.cursor.show {
-                textarea.set_char(new_x, new_y, 221)?;
-            } else {
-                textarea.set_char(new_x, new_y, ' ' as u8)?;
-            }
-        }
-        Ok(())
-    }*/
-
-    /*pub fn initialize_screen(&mut self) -> Result<(), &'static str> {
-        let display_name = self.display_name.clone();
-        { 
-            let (width, height) = self.window.dimensions();
-            let width  = width  - 2*window_manager::WINDOW_MARGIN;
-            let height = height - 2*window_manager::WINDOW_MARGIN;
-            let text_display = TextGeneric::new(width, height, FONT_COLOR, BACKGROUND_COLOR)?;
-            let displayable: Box<dyn Displayable> = Box::new(text_display);
-            self.window.add_displayable(&display_name, Coord::new(0, 0),displayable)?;
-        }
-        Ok(())
-    }*/
-    
     /// Get a key event from the underlying window.
-    pub fn get_key_event(&mut self) -> Option<Event> {
+    pub fn get_event(&mut self) -> Option<Event> {
         match self.window.handle_event() {
             Err(_e) => { return Some(Event::ExitEvent); }
             _ => {}
@@ -724,39 +631,24 @@ impl Terminal {
         Some(event)
     }
 
-    /*/// Get a key event from the underlying window.
-    // Wenqiu
-    pub fn get_event(&self) -> Option<Event> {
-        self.window.get_event()
-    }*/
-
-    pub fn get_width_height(&self) -> (usize, usize) {
-        self.get_displayable_dimensions()
+    /// Get (width, height) of the text area in units of characters
+    pub fn get_text_area_size(&self) -> (usize, usize) {
+        self.get_text_dimensions()
     }
 
-    // Display the cursor of the terminal.
-    //Wenqiu
+    /// Display the cursor of the terminal.
     pub fn display_cursor(
         &mut self
     ) -> Result<(), &'static str> {
         let coordinate = self.window.get_displayable_position(&self.display_name)?;
         // get info about the text displayable
         let (col_num, line_num, text_next_pos) = {
-            let mut text_display = get_text_area_mut(&mut self.window, &self.display_name)?;
+            let mut text_display = self.get_text_area_mut()?;
             let text_next_pos = text_display.get_next_index();
             let (col_num, line_num) = text_display.get_dimensions();
             (col_num, line_num, text_next_pos)
         };
-        
-        
-        /*let (col_num, line_num, text_next_pos) = {
-            (
-                textarea.get_x_cnt(),
-                textarea.get_y_cnt(),
-                textarea.get_next_index()
-            )
-        };*/
-
+ 
         // return if the cursor is not in the screen
         if text_next_pos >= col_num * line_num {
             return Ok(())
@@ -773,7 +665,11 @@ impl Terminal {
             &mut textarea
         )*/
 
-        let text_display = get_text_area_mut(&mut self.window, &self.display_name)?.downcast_mut::<TextArea>();
+        let text_display = {
+            self.window.get_displayable_mut(&self.display_name)?
+            .as_text_mut()?
+            .downcast_mut::<TextArea>()
+        };
 
         let (text_display, framebuffer) = if text_display.is_none() {
             (None, self.window.framebuffer())
@@ -800,12 +696,10 @@ impl Terminal {
     }
 
     /// Gets the position of the cursor relative to the end of text in units of characters.
-    // Wenqiu
     pub fn get_cursor_offset_from_end(&self) -> usize {
         self.cursor.offset_from_end()
     }
 
-    /// WEnqiu
     /// Updates the position of a cursor.
     /// # Arguments
     /// * `offset_from_end`: the position of the cursor relative to the end of text in units of characters.
@@ -815,15 +709,4 @@ impl Terminal {
         self.cursor.set_underlying_char(underlying_char);
     }
 
-}
-
-fn get_text_area_mut<'a>(window: &'a mut Box<Window>, name: &str) -> Result<(&'a mut TextDisplayable), &'static str>{
-    let text_display = window.get_displayable_mut(name)?;
-    text_display.as_text_mut()
-}
-
-//Wenqiu: TODO move to methods
-fn get_text_area<'a>(window: &'a Box<Window>, name: &str) -> Result<(&'a TextDisplayable), &'static str>{
-    let text_display = window.get_displayable(name)?;
-    text_display.as_text()
 }

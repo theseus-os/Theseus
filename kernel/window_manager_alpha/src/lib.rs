@@ -609,7 +609,6 @@ pub fn set_active(objref: &Arc<Mutex<WindowProfileAlpha>>) -> Result<(), &'stati
     win.set_active(objref, true)
 }
 
-// Wenqiu: TODO: rewrite set_active. leave only one generic type in window manager
 /// whether a window is active
 pub fn is_active(objref: &Arc<Mutex<WindowProfileAlpha>>) -> bool {
     match WINDOW_MANAGER.try().ok_or("The static window manager was not yet initialized") {
@@ -728,7 +727,6 @@ pub fn init<Buffer: FrameBuffer>(
     win.mouse = Coord { x: screen_width as isize / 2, y: screen_height as isize / 2 };  // set mouse to middle
     if ! delay_refresh_first_time {
         win.refresh_area(Coord::new(0, 0), Coord::new(screen_width as isize, screen_height as isize))?;
-        //Wenqiu: TODO: render it if necessary
     }
 
     KernelTaskBuilder::new(window_manager_loop, (key_consumer, mouse_consumer) )
@@ -757,18 +755,16 @@ pub struct WindowProfileAlpha {
     pub is_moving: bool,
     /// the base position of window moving action, should be the mouse position when `is_moving` is set to true
     pub moving_base: Coord,
-    // Wenqiu: TODO add a moving base to the old window
 }
 
 impl WindowProfile for WindowProfileAlpha {
-    // Wenqiu: TODO implement the methods
     fn clear(&mut self) -> Result<(), &'static str> {
         self.framebuffer.fill_color(0x80FFFFFF);
         Ok(())
     }
 
     fn draw_border(&self, color: u32) -> Result<(), &'static str> {
-        // this window uses component instead of border
+        // this window uses WindowComponents instead of border
         Ok(())
     }
 

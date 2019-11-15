@@ -945,7 +945,7 @@ impl Shell {
         if possible_names.is_empty() { return Ok(()); }
 
         // Get terminal screen width.
-        let (width, _) = self.terminal.lock().get_width_height();
+        let (width, _) = self.terminal.lock().get_text_area_size();
 
         // Find the length of the longest string.
         let longest_len = match possible_names.iter().map(|name| name.len()).max() {
@@ -1288,7 +1288,7 @@ impl Shell {
         let mut need_refresh = false;
         let mut need_prompt = false;
         self.redisplay_prompt();
-        self.terminal.lock().refresh_display();
+        self.terminal.lock().refresh_display()?;
         loop {
             // If there is anything from running applications to be printed, it printed on the screen and then
             // return true, so that the loop continues, otherwise nothing happens and we keep on going with the
@@ -1309,7 +1309,7 @@ impl Shell {
 
             // Looks at the input queue from the window manager
             // Handles all the event items until the queue is empty
-            while let Some(ev) = self.terminal.lock().get_key_event() {
+            while let Some(ev) = self.terminal.lock().get_event() {
                 match ev {
                     // Returns from the main loop.
                     Event::ExitEvent => {
@@ -1330,7 +1330,7 @@ impl Shell {
             }          
             if need_refresh || need_refresh_on_task_event {
                 // update if there are outputs from applications
-                self.terminal.lock().refresh_display();
+                self.terminal.lock().refresh_display()?;
             }
             self.terminal.lock().display_cursor()?;
 
@@ -1354,7 +1354,7 @@ impl Shell {
             }
             if need_refresh {
                 // update if there are inputs
-                self.terminal.lock().refresh_display();
+                self.terminal.lock().refresh_display()?;
             } else {
                 scheduler::schedule(); // yield the CPU if nothing to do
             }

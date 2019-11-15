@@ -143,7 +143,6 @@ impl FrameBufferAlpha {
 
     /// draw a rectangle on this framebuffer with alpha
     pub fn draw_rect_alpha(&mut self, start: Coord, end: Coord, color: AlphaPixel) {
-        // Wenqiu: TODO use coordinate
         for y in start.y..end.y {
             for x in start.x..end.x {
                 let coordinate = Coord::new(x as isize, y as isize);
@@ -168,7 +167,6 @@ impl FrameBufferAlpha {
 
 
 impl FrameBuffer for FrameBufferAlpha {
-    // Wenqiu: TODO move to trait
     fn buffer(&self) -> &BoxRefMut<MappedPages, [Pixel]> {
         return &self.buffer;
     }
