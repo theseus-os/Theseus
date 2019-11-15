@@ -111,8 +111,13 @@ pub fn handle_keyboard_input(scan_code: u8, _extended: bool) -> Result<(), &'sta
                 Some(keycode) => { // this re-scopes (shadows) keycode
                     let event = Event::new_input_event(KeyEvent::new(keycode, action, modifiers.clone()));
                     if let Some(producer) = KEYBOARD_PRODUCER.try() {
-                        producer.push(event).expect("can't push to the queue");
-                        Ok(()) // successfully queued up KeyEvent 
+                        let result = match producer.push(event) {
+                            Ok(result)  => Ok(()),
+                            Err(e) => Err("keyboard event queue full"),
+                        };
+                        result
+                        // producer.push(event).expect("can't push to the queue");
+                        // Ok(()) // successfully queued up KeyEvent 
                     }
                     else {
                         warn!("handle_keyboard_input(): KEYBOARD_PRODUCER wasn't yet initialized, dropping keyboard event {:?}.", event);
