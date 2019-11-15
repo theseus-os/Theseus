@@ -500,8 +500,8 @@ impl WindowProfile for WindowProfileGeneric {
         false
     }
 
-    fn set_give_all_mouse_event(&mut self, flag: bool) {
-        // TODO: this system cannot react to mouse event now
+    fn set_give_all_mouse_event(&mut self, _flag: bool) {
+        // TODO: this display subsystem cannot react to mouse event now
     }
 
     fn give_all_mouse_event(&mut self) -> bool {

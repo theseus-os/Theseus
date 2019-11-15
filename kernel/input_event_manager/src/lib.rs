@@ -15,15 +15,30 @@ extern crate spawn;
 extern crate spin;
 extern crate task;
 extern crate window_manager;
-extern crate alloc;
+#[macro_use] extern crate alloc;
 extern crate font;
 extern crate frame_buffer_alpha;
 extern crate frame_buffer_rgb;
 extern crate window_manager_alpha;
+#[cfg(generic_display_sys)]
+extern crate keycodes_ascii;
+#[cfg(generic_display_sys)]
+extern crate path;
+#[cfg(generic_display_sys)]
+#[macro_use] extern crate log;
 
 use alloc::{string::ToString, sync::Arc};
+#[cfg(generic_display_sys)]
+use alloc::{vec::Vec, string::String};
 use dfqueue::{DFQueue, DFQueueProducer};
+#[cfg(generic_display_sys)]
+use dfqueue::{DFQueueConsumer};
+#[cfg(generic_display_sys)]
+use keycodes_ascii::{KeyAction, Keycode};
+#[cfg(generic_display_sys)]
+use path::Path;
 use event_types::Event;
+#[cfg(not(generic_display_sys))]
 use frame_buffer_alpha::FrameBufferAlpha;
 use mod_mgmt::{metadata::CrateType, CrateNamespace, NamespaceDir};
 use spawn::{ApplicationTaskBuilder};

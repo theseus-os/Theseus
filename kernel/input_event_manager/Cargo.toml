@@ -11,6 +11,10 @@ spin = "0.4.10"
 # x86_64 = { git = "https://github.com/kevinaboos/x86_64" }
 x86_64 = { path = "../../libs/x86_64" }
 
+[dependencies.log]
+default-features = false
+version = "0.3.7"
+
 [dependencies.window_manager]
 path = "../window_manager"
 
@@ -32,6 +36,12 @@ path = "../spawn"
 
 [dependencies.task]
 path = "../task"
+
+[dependencies.path]
+path = "../path"
+
+[dependencies.keycodes_ascii]
+path = "../../libs/keycodes_ascii"
 
 [dependencies.mod_mgmt]
 path  = "../mod_mgmt"

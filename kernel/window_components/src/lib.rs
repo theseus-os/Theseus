@@ -31,17 +31,17 @@ extern crate window_manager_alpha;
 use alloc::boxed::Box;
 use alloc::collections::BTreeMap;
 use alloc::string::{String, ToString};
-use alloc::sync::{Arc, Weak};
-use alloc::vec::{IntoIter, Vec};
-use core::ops::{Deref, DerefMut};
+use alloc::sync::{Arc};
+use alloc::vec::{IntoIter};
+use core::ops::{Deref};
 use dfqueue::{DFQueue, DFQueueConsumer, DFQueueProducer};
 use displayable::Displayable;
 use event_types::{Event, MousePositionEvent};
 use frame_buffer::{Coord, FrameBuffer, Pixel};
 use frame_buffer_alpha::{AlphaPixel, PixelMixer, BLACK};
-use spin::{Mutex, Once};
+use spin::{Mutex};
 use window::{Window, WindowProfile};
-use window_manager_alpha::{WindowManagerAlpha, WindowProfileAlpha, WINDOW_MANAGER};
+use window_manager_alpha::{WindowProfileAlpha, WINDOW_MANAGER};
 
 /// The title bar size, in number of pixels
 const WINDOW_TITLE_BAR: usize = 15;
@@ -131,7 +131,7 @@ impl Window for WindowComponents {
     fn add_displayable(
         &mut self,
         key: &str,
-        coordinate: Coord,
+        _coordinate: Coord,
         displayable: Box<dyn Displayable>,
     ) -> Result<(), &'static str> {
         let key = key.to_string();

@@ -48,7 +48,9 @@ use alloc::collections::BTreeMap;
 use alloc::string::String;
 use alloc::sync::Arc;
 use alloc::vec::Vec;
+#[cfg(not(generic_display_sys))]
 use frame_buffer::Coord;
+#[cfg(not(generic_display_sys))]
 use frame_buffer_alpha::FrameBufferAlpha;
 #[cfg(not(generic_display_sys))]
 use libterm::cursor::{CursorComponent};

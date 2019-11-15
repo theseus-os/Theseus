@@ -243,6 +243,9 @@ impl Displayable for TextArea {
         coordinate: Coord,
         framebuffer: Option<&mut dyn FrameBuffer>,
     ) -> Result<Vec<(usize, usize)>, &'static str> {
+        if framebuffer.is_some() {
+            return Err("TextArea can only display in its default framebuffer");
+        }
         self.coordinate = coordinate;
         let a = self.text.clone();
         let a = a.as_bytes();
