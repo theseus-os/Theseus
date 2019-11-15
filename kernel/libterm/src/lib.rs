@@ -658,7 +658,7 @@ impl Terminal {
     }
 
     /// Get (width, height) of the text area in units of characters
-    pub fn get_text_area_size(&self) -> (usize, usize) {
+    pub fn get_width_height(&self) -> (usize, usize) {
         self.get_text_dimensions()
     }
 

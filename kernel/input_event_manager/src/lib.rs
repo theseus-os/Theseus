@@ -15,7 +15,9 @@ extern crate spawn;
 extern crate spin;
 extern crate task;
 extern crate window_manager;
-#[macro_use] extern crate alloc;
+#[cfg(generic_display_sys)]
+#[macro_use] 
+extern crate alloc;
 extern crate font;
 extern crate frame_buffer_alpha;
 extern crate frame_buffer_rgb;

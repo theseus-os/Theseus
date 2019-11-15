@@ -250,6 +250,7 @@ lazy_static! {
 /// terminal is returned. Otherwise, the default terminal is assigned to the calling application
 /// and then returned.
 pub fn get_terminal_or_default() -> Result<Arc<Mutex<Terminal>>, &'static str> {
+
     let task_id = task::get_my_current_task_id()
                       .ok_or("Cannot get task ID for getting default terminal")?;
 
@@ -273,8 +274,7 @@ pub fn get_terminal_or_default() -> Result<Arc<Mutex<Terminal>>, &'static str> {
 /// lock will never get a chance to be released. Since we currently don't have stack unwinding.
 pub fn lock_and_execute<'a, F>(f: &F)
     where F: Fn(MutexGuard<'a, BTreeMap<usize, IoControlFlags>>,
-                MutexGuard<'a, BTreeMap<usize, IoStreams>>),
-{
+                MutexGuard<'a, BTreeMap<usize, IoStreams>>) {
     let (locked_flags, locked_streams) = shared_maps::lock_all_maps();
     f(locked_flags, locked_streams);
 }
@@ -295,7 +295,7 @@ pub fn remove_child_streams(task_id: &usize) -> Option<IoStreams> {
 }
 
 /// Applications call this function to acquire a reader to its stdin queue.
-///
+/// 
 /// Errors can occur in two cases. One is when it fails to get the task_id of the calling
 /// task, and the second is that there's no stdin reader stored in the map. Shells should
 /// make sure to store IoStreams for the newly spawned app first, and then unblocks the app
@@ -305,7 +305,7 @@ pub fn stdin() -> Result<StdioReader, &'static str> {
     let locked_streams = shared_maps::lock_stream_map();
     match locked_streams.get(&task_id) {
         Some(queues) => Ok(queues.stdin.clone()),
-        None => Err("no stdin for this task"),
+        None => Err("no stdin for this task")
     }
 }
 
@@ -349,17 +349,14 @@ pub fn stderr() -> Result<StdioWriter, &'static str> {
 /// already been taken by some other task, which may be running simultaneously, or be killed
 /// prematurely so that it cannot return the key event reader on exit.
 pub fn take_key_event_queue() -> Result<KeyEventReadGuard, &'static str> {
-    let task_id =
-        task::get_my_current_task_id().ok_or("failed to get task_id to take key event queue")?;
+    let task_id = task::get_my_current_task_id().ok_or("failed to get task_id to take key event queue")?;
     let locked_streams = shared_maps::lock_stream_map();
     match locked_streams.get(&task_id) {
         Some(queues) => {
             match queues.key_event_reader.lock().take() {
                 Some(reader) => Ok(KeyEventReadGuard::new(
                     reader,
-                    Box::new(|reader: &mut Option<KeyEventQueueReader>| {
-                        return_event_queue(reader);
-                    }),
+                    Box::new(|reader: &mut Option<KeyEventQueueReader>| { return_event_queue(reader); }),
                 )),
                 None => Err("currently the reader to key event queue is not available")
             }
@@ -463,7 +460,7 @@ pub fn print_to_stdout_args(fmt_args: fmt::Arguments) {
             // infinite loops on an error. Instead, we write directly to the serial port. 
             let _ = serial_port::write_fmt_log(
                 "\x1b[31m", "[E] ",
-                format_args!("error in print!/println! macro: failed to get current task id"), "\x1b[0m\n",
+                format_args!("error in print!/println! macro: failed to get current task id"), "\x1b[0m\n"
             );
             return;
         }
@@ -473,10 +470,10 @@ pub fn print_to_stdout_args(fmt_args: fmt::Arguments) {
     let locked_streams = shared_maps::lock_stream_map();
     match locked_streams.get(&task_id) {
         Some(queues) => {
-            if let Err(_) = queues.stdout.lock().write_all(format!("{}", fmt_args).as_bytes()){
+            if let Err(_) = queues.stdout.lock().write_all(format!("{}", fmt_args).as_bytes()) {
                 let _ = serial_port::write_fmt_log(
                     "\x1b[31m", "[E] ",
-                    format_args!("failed to write to stdout"), "\x1b[0m\n",
+                    format_args!("failed to write to stdout"), "\x1b[0m\n"
                 );
             }
         },

@@ -1,56 +1,53 @@
 //! Shell with event-driven architecture
 //! Commands that can be run are the names of the crates in the applications directory
-//!
+//! 
 //! The shell has the following responsibilities: handles key events delivered from terminal, manages terminal display,
 //! spawns and manages tasks, and records the history of executed user commands.
 
 #![no_std]
-extern crate app_io;
-extern crate core_io;
-extern crate dfqueue;
-extern crate environment;
-extern crate event_types;
-extern crate fs_node;
 extern crate keycodes_ascii;
-extern crate libterm;
-extern crate path;
-extern crate print;
-extern crate root;
-extern crate runqueue;
-extern crate scheduler;
-extern crate spawn;
 extern crate spin;
-extern crate stdio;
+extern crate dfqueue;
+extern crate spawn;
 extern crate task;
-extern crate terminal_print;
+extern crate runqueue;
+extern crate event_types; 
 extern crate window_manager;
+extern crate path;
+extern crate root;
+extern crate scheduler;
+extern crate stdio;
+extern crate core_io;
+extern crate app_io;
+extern crate fs_node;
+extern crate terminal_print;
+extern crate print;
+extern crate environment;
+extern crate libterm;
 
-#[macro_use]
-extern crate alloc;
-#[macro_use]
-extern crate log;
+#[macro_use] extern crate alloc;
+#[macro_use] extern crate log;
 
-use alloc::collections::BTreeMap;
+use event_types::{Event};
+use keycodes_ascii::{Keycode, KeyAction, KeyEvent};
 use alloc::string::{String, ToString};
-use alloc::sync::Arc;
 use alloc::vec::Vec;
-use app_io::{IoControlFlags, IoStreams};
-use core::mem;
-use core::ops::Deref;
-use core_io::Write;
-use dfqueue::{DFQueue, DFQueueConsumer, DFQueueProducer};
-use environment::Environment;
-use event_types::Event;
-use fs_node::FileOrDir;
-use keycodes_ascii::{KeyAction, KeyEvent, Keycode};
-use libterm::Terminal;
-use path::Path;
 use spawn::{ApplicationTaskBuilder, KernelTaskBuilder};
+use path::Path;
+use task::{TaskRef, ExitValue, KillReason};
+use libterm::Terminal;
+use dfqueue::{DFQueue, DFQueueConsumer, DFQueueProducer};
+use alloc::sync::Arc;
 use spin::{Mutex, MutexGuard};
-use stdio::{
-    KeyEventQueue, KeyEventQueueReader, KeyEventQueueWriter, Stdio, StdioReader, StdioWriter,
-};
-use task::{ExitValue, KillReason, TaskRef};
+use environment::Environment;
+use core::mem;
+use alloc::collections::BTreeMap;
+use stdio::{Stdio, KeyEventQueue, KeyEventQueueReader, KeyEventQueueWriter,
+            StdioReader, StdioWriter};
+use core_io::Write;
+use core::ops::Deref;
+use app_io::{IoStreams, IoControlFlags};
+use fs_node::FileOrDir;
 
 /// The status of a job.
 #[derive(PartialEq)]
@@ -59,7 +56,7 @@ enum JobStatus {
     Running,
     /// The job is suspended (but not killed), e.g. upon ctrl-Z.
     /// All the tasks in this job are either blocked or exited.
-    Stopped,
+    Stopped
 }
 
 /// This structure is used by shell to track its spawned applications. Each successfully
@@ -92,7 +89,7 @@ struct Job {
     /// The output reader of the job. It is the reader of `pipe_queues[N]`.
     stdout_reader: StdioReader,
     /// Command line that was used to create the job.
-    cmd: String,
+    cmd: String
 }
 
 /// A main function that spawns a new shell and waits for the shell loop to exit before returning an exit value
@@ -101,24 +98,14 @@ pub fn main(_args: Vec<String>) -> isize {
     {
         let _task_ref = match KernelTaskBuilder::new(shell_loop, ())
             .name("shell_loop".to_string())
-            .spawn()
-        {
-            Ok(task_ref) => task_ref,
+            .spawn() {
+            Ok(task_ref) => { task_ref }
             Err(err) => {
                 error!("{}", err);
                 error!("failed to spawn shell");
-                return -1;
+                return -1; 
             }
         };
-
-        // since we don't properly support parent/child relationships between tasks,
-        // we force the newly-spawned shell_loop task to also be an "app task"
-        // by giving it joint ownership of the `shell` app crate.
-        _task_ref.lock_mut().app_crate = task::get_my_current_task()
-            .expect("shell::main(): failed to get current task")
-            .lock()
-            .app_crate
-            .clone();
     }
 
     loop {
@@ -139,16 +126,16 @@ pub fn main(_args: Vec<String>) -> isize {
     // return 0;
 }
 
-/// Errors when attempting to invoke an application from the terminal.
+/// Errors when attempting to invoke an application from the terminal. 
 enum AppErr {
-    /// The command does not match the name of any existing application in the
-    /// application namespace directory.
+    /// The command does not match the name of any existing application in the 
+    /// application namespace directory. 
     NotFound(String),
-    /// The terminal could not find the application namespace due to a filesystem error.
+    /// The terminal could not find the application namespace due to a filesystem error. 
     NamespaceErr,
     /// The terminal could not spawn a new task to run the new application.
     /// Includes the String error returned from the task spawn function.
-    SpawnErr(String),
+    SpawnErr(String)
 }
 
 struct Shell {
@@ -181,7 +168,7 @@ struct Shell {
     /// The terminal's current environment
     env: Arc<Mutex<Environment>>,
     /// the terminal that is bind with the shell instance
-    terminal: Arc<Mutex<Terminal>>,
+    terminal: Arc<Mutex<Terminal>>
 }
 
 impl Shell {
@@ -191,7 +178,7 @@ impl Shell {
         // Initialize a dfqueue for the terminal object to handle printing from applications.
         // Note that this is only to support legacy output. Newly developed applications should
         // turn to use `stdio` provided by the `stdio` crate together with the support of `app_io`.
-        let terminal_print_dfq: DFQueue<Event> = DFQueue::new();
+        let terminal_print_dfq: DFQueue<Event>  = DFQueue::new();
         let print_consumer = terminal_print_dfq.into_consumer();
         let print_producer = print_consumer.obtain_producer();
 
@@ -203,7 +190,7 @@ impl Shell {
         print::set_default_print_output(print_producer.obtain_producer());
 
         let env = Environment {
-            working_dir: Arc::clone(root::get_root()),
+            working_dir: Arc::clone(root::get_root()), 
         };
 
         let terminal = app_io::get_terminal_or_default()?;
@@ -222,12 +209,12 @@ impl Shell {
             print_consumer,
             print_producer,
             env: Arc::new(Mutex::new(env)),
-            terminal,
+            terminal
         })
     }
 
     /// Insert a character to the command line buffer in the shell.
-    /// The position to insert is determined by the position of the cursor in the terminal.
+    /// The position to insert is determined by the position of the cursor in the terminal. 
     /// `sync_terminal` indicates whether the terminal screen will be synchronically updated.
     fn insert_char_to_cmdline(&mut self, c: char, sync_terminal: bool) -> Result<(), &'static str> {
         let mut terminal = self.terminal.lock();
@@ -248,24 +235,16 @@ impl Shell {
     /// be removed, it does nothing and returns.
     /// The position to remove is determined by the position of the cursor in the terminal.
     /// `sync_terminal` indicates whether the terminal screen will be synchronically updated.
-    fn remove_char_from_cmdline(
-        &mut self,
-        erase_left: bool,
-        sync_terminal: bool,
-    ) -> Result<(), &'static str> {
+    fn remove_char_from_cmdline(&mut self, erase_left: bool, sync_terminal: bool) -> Result<(), &'static str> {
         let mut cursor_offset_from_end = self.terminal.lock().get_cursor_offset_from_end();
-        if erase_left {
-            cursor_offset_from_end += 1;
-        }
-        if cursor_offset_from_end > self.cmdline.len() || cursor_offset_from_end == 0 {
-            return Ok(());
-        }
+        if erase_left { cursor_offset_from_end += 1; }
+        if cursor_offset_from_end > self.cmdline.len() || cursor_offset_from_end == 0 { return Ok(()); }
         let erase_idx = self.cmdline.len() - cursor_offset_from_end;
         self.cmdline.remove(erase_idx);
         if sync_terminal {
             self.terminal.lock().remove_char(cursor_offset_from_end)?;
         }
-        if !erase_left {
+        if !erase_left {            
             self.update_cursor_pos(cursor_offset_from_end - 1)?;
         }
         Ok(())
@@ -300,11 +279,7 @@ impl Shell {
 
     /// Insert a character to the input buffer to the application.
     /// `sync_terminal` indicates whether the terminal screen will be synchronically updated.
-    fn insert_char_to_input_buff(
-        &mut self,
-        c: char,
-        sync_terminal: bool,
-    ) -> Result<(), &'static str> {
+    fn insert_char_to_input_buff(&mut self, c: char, sync_terminal: bool) -> Result<(), &'static str> {
         self.input_buffer.push(c);
         if sync_terminal {
             self.terminal.lock().insert_char(c, 0)?;
@@ -362,13 +337,10 @@ impl Shell {
         if offset_from_end == 0 {
             terminal.update_cursor_pos(0, 0)
         } else if offset_from_end <= self.cmdline.len() {
-            terminal.update_cursor_pos(
-                offset_from_end,
-                self.cmdline.as_bytes()[self.cmdline.len() - offset_from_end],
-            );
+            terminal.update_cursor_pos(offset_from_end, self.cmdline.as_bytes()[self.cmdline.len() - offset_from_end]);
         }
         terminal.cursor.enable();
-
+        
         Ok(())
     }
 
@@ -386,8 +358,7 @@ impl Shell {
             }
         }
         self.history_index += 1;
-        let selected_command =
-            self.command_history[self.command_history.len() - self.history_index].clone();
+        let selected_command = self.command_history[self.command_history.len() - self.history_index].clone();
         self.set_cmdline(selected_command, true)?;
         Ok(())
     }
@@ -407,28 +378,27 @@ impl Shell {
                 return Ok(());
             }
         }
-        self.history_index -= 1;
+        self.history_index -=1;
         if self.history_index == 0 {
             self.clear_cmdline(true)?;
             return Ok(());
         }
-        let selected_command =
-            self.command_history[self.command_history.len() - self.history_index].clone();
+        let selected_command = self.command_history[self.command_history.len() - self.history_index].clone();
         self.set_cmdline(selected_command, true)?;
         Ok(())
     }
 
-    fn handle_key_event(&mut self, keyevent: KeyEvent) -> Result<(), &'static str> {
+    fn handle_key_event(&mut self, keyevent: KeyEvent) -> Result<(), &'static str> {       
         // EVERYTHING BELOW HERE WILL ONLY OCCUR ON A KEY PRESS (not key release)
         if keyevent.action != KeyAction::Pressed {
-            return Ok(());
+            return Ok(()); 
         }
 
         // Ctrl+C signals the shell to exit the job
         if keyevent.modifiers.control && keyevent.keycode == Keycode::C {
             if let Some(ref fg_job_num) = self.fg_job_num {
                 let task_refs = match self.jobs.get(fg_job_num) {
-                    Some(job) => job.tasks.clone(),
+                    Some(job) => job.tasks.clone(), 
                     None => {
                         self.clear_cmdline(true)?;
                         self.input_buffer.clear();
@@ -439,24 +409,16 @@ impl Shell {
                 };
 
                 // Lock the shared structure in `app_io` and then kill the running application
-                app_io::lock_and_execute(&move |_flags_guard: MutexGuard<
-                    BTreeMap<usize, IoControlFlags>,
-                >,
-                                                _streamss_guard: MutexGuard<
-                    BTreeMap<usize, IoStreams>,
-                >| {
+                app_io::lock_and_execute(&move |_flags_guard: MutexGuard<BTreeMap<usize, IoControlFlags>>,
+                                                _streamss_guard: MutexGuard<BTreeMap<usize, IoStreams>>| {
+
                     // Kill all tasks in the job.
                     for task_ref in &task_refs {
-                        if task_ref.lock().has_exited() {
-                            continue;
-                        }
+                        if task_ref.lock().has_exited() { continue; }
                         match task_ref.kill(KillReason::Requested) {
                             Ok(_) => {
                                 if let Err(e) = runqueue::remove_task_from_all(&task_ref) {
-                                    error!(
-                                        "Killed task but could not remove it from runqueue: {}",
-                                        e
-                                    );
+                                    error!("Killed task but could not remove it from runqueue: {}", e);
                                 }
                             }
                             Err(e) => error!("Could not kill task, error: {}", e),
@@ -492,24 +454,19 @@ impl Shell {
 
             if let Some(ref fg_job_num) = self.fg_job_num {
                 let task_refs = match self.jobs.get(fg_job_num) {
-                    Some(job) => job.tasks.clone(),
+                    Some(job) => job.tasks.clone(), 
                     None => {
                         return Ok(());
                     }
                 };
 
                 // Lock the shared structure in `app_io` and then stop the running application
-                app_io::lock_and_execute(&move |_flags_guard: MutexGuard<
-                    BTreeMap<usize, IoControlFlags>,
-                >,
-                                                _streams_guard: MutexGuard<
-                    BTreeMap<usize, IoStreams>,
-                >| {
+                app_io::lock_and_execute(&move |_flags_guard: MutexGuard<BTreeMap<usize, IoControlFlags>>,
+                                                _streams_guard: MutexGuard<BTreeMap<usize, IoStreams>>| {
+                    
                     // Stop all tasks in the job.
                     for task_ref in &task_refs {
-                        if task_ref.lock().has_exited() {
-                            continue;
-                        }
+                        if task_ref.lock().has_exited() { continue; }
                         task_ref.block();
 
                         // Here we must wait for the running application to stop before releasing the lock,
@@ -549,7 +506,7 @@ impl Shell {
         }
 
         // Tracks what the user does whenever she presses the backspace button
-        if keyevent.keycode == Keycode::Backspace {
+        if keyevent.keycode == Keycode::Backspace  {
             if self.fg_job_num.is_some() {
                 self.remove_char_from_input_buff(true)?;
             } else {
@@ -563,45 +520,37 @@ impl Shell {
             return Ok(());
         }
 
-        // Attempts to run the command whenever the user presses enter and updates the cursor tracking variables
-        if keyevent.keycode == Keycode::Enter
-            && keyevent.keycode.to_ascii(keyevent.modifiers).is_some()
-        {
+        // Attempts to run the command whenever the user presses enter and updates the cursor tracking variables 
+        if keyevent.keycode == Keycode::Enter && keyevent.keycode.to_ascii(keyevent.modifiers).is_some() {
             let cmdline = self.cmdline.clone();
             if cmdline.len() == 0 && self.fg_job_num.is_none() {
                 // reprints the prompt on the next line if the user presses enter and hasn't typed anything into the prompt
                 self.terminal.lock().print_to_terminal("\n".to_string());
                 self.redisplay_prompt();
                 return Ok(());
-            } else if let Some(ref fg_job_num) = self.fg_job_num {
-                // send buffered characters to the running application
+            } else if let Some(ref fg_job_num) = self.fg_job_num { // send buffered characters to the running application
                 match self.jobs.get(fg_job_num) {
                     Some(job) => {
                         self.terminal.lock().print_to_terminal("\n".to_string());
                         let mut buffered_string = String::new();
                         mem::swap(&mut buffered_string, &mut self.input_buffer);
                         buffered_string.push('\n');
-                        job.stdin_writer
-                            .lock()
-                            .write_all(buffered_string.as_bytes())
+                        job.stdin_writer.lock().write_all(buffered_string.as_bytes())
                             .or(Err("shell failed to write to stdin"))?;
-                    }
+                    },
                     _ => {}
                 }
                 return Ok(());
-            } else {
-                // start a new job
+            } else { // start a new job
                 self.terminal.lock().print_to_terminal("\n".to_string());
                 self.command_history.push(cmdline.clone());
                 self.command_history.dedup(); // Removes any duplicates
                 self.history_index = 0;
 
-                if self.is_internal_command() {
-                    // shell executes internal commands
+                if self.is_internal_command() { // shell executes internal commands
                     self.execute_internal()?;
                     self.clear_cmdline(false)?;
-                } else {
-                    // shell invokes user programs
+                } else { // shell invokes user programs
                     let new_job_num = self.build_new_job()?;
                     self.fg_job_num = Some(new_job_num);
 
@@ -610,7 +559,7 @@ impl Shell {
                         if last == "&" {
                             self.terminal.lock().print_to_terminal(
                                 format!("[{}] [running] {}\n", new_job_num, self.cmdline)
-                                    .to_string(),
+                                .to_string()
                             );
                             self.fg_job_num = None;
                             self.clear_cmdline(false)?;
@@ -628,17 +577,13 @@ impl Shell {
         if keyevent.keycode == Keycode::Home && keyevent.modifiers.control {
             return self.terminal.lock().move_screen_to_begin();
         }
-        if keyevent.keycode == Keycode::End && keyevent.modifiers.control {
+        if keyevent.keycode == Keycode::End && keyevent.modifiers.control{
             return self.terminal.lock().move_screen_to_end();
         }
-        if keyevent.modifiers.control && keyevent.modifiers.shift && keyevent.keycode == Keycode::Up
-        {
+        if keyevent.modifiers.control && keyevent.modifiers.shift && keyevent.keycode == Keycode::Up  {
             return self.terminal.lock().move_screen_line_up();
         }
-        if keyevent.modifiers.control
-            && keyevent.modifiers.shift
-            && keyevent.keycode == Keycode::Down
-        {
+        if keyevent.modifiers.control && keyevent.modifiers.shift && keyevent.keycode == Keycode::Down  {
             return self.terminal.lock().move_screen_line_down();
         }
 
@@ -651,7 +596,7 @@ impl Shell {
         }
 
         // Cycles to the next previous command
-        if keyevent.keycode == Keycode::Up {
+        if  keyevent.keycode == Keycode::Up {
             self.goto_previous_command()?;
             return Ok(());
         }
@@ -664,21 +609,21 @@ impl Shell {
 
         // Jumps to the beginning of the input string
         if keyevent.keycode == Keycode::Home {
-            return self.move_cursor_leftmost();
+            return self.move_cursor_leftmost()
         }
 
         // Jumps to the end of the input string
         if keyevent.keycode == Keycode::End {
-            return self.move_cursor_rightmost();
+            return self.move_cursor_rightmost()
         }
 
         // Adjusts the cursor tracking variables when the user presses the left and right arrow keys
         if keyevent.keycode == Keycode::Left {
-            return self.move_cursor_left();
+            return self.move_cursor_left()
         }
 
         if keyevent.keycode == Keycode::Right {
-            return self.move_cursor_right();
+            return self.move_cursor_right()
         }
 
         // Tracks what the user has typed so far, excluding any keypresses by the backspace and Enter key, which are special and are handled directly below
@@ -691,18 +636,17 @@ impl Shell {
                         self.insert_char_to_input_buff(c, true)?;
                         if let Some(job) = self.jobs.get(&fg_job_num) {
                             if app_io::is_requesting_instant_flush(&job.task_ids[0])? {
-                                job.stdin_writer
-                                    .lock()
-                                    .write_all(self.input_buffer.as_bytes())
+                                job.stdin_writer.lock().write_all(self.input_buffer.as_bytes())
                                     .or(Err("shell failed to write to stdin"))?;
                                 self.input_buffer.clear();
                             }
                         }
                         return Ok(());
-                    } else {
+                    }
+                    else {
                         self.insert_char_to_cmdline(c, true)?;
                     }
-                }
+                },
                 None => {
                     return Err("Couldn't get key event");
                 }
@@ -714,30 +658,27 @@ impl Shell {
     /// Create a single task. `cmd` is the name of the application. `args` are the provided
     /// arguments. It returns a task reference on success.
     fn create_single_task(&mut self, cmd: String, args: Vec<String>) -> Result<TaskRef, AppErr> {
+
         // Check that the application actually exists
         let namespace_dir = task::get_my_current_task()
             .map(|t| t.get_namespace().dir().clone())
             .ok_or(AppErr::NamespaceErr)?;
         let cmd_crate_name = format!("{}-", cmd);
-        let mut matching_apps = namespace_dir
-            .get_files_starting_with(&cmd_crate_name)
-            .into_iter();
+        let mut matching_apps = namespace_dir.get_files_starting_with(&cmd_crate_name).into_iter();
         let app_file = matching_apps.next();
-        let second_match = matching_apps.next(); // return an error if there are multiple matching apps
-        let app_path = app_file
-            .xor(second_match)
+        let second_match = matching_apps.next(); // return an error if there are multiple matching apps 
+        let app_path = app_file.xor(second_match)
             .map(|f| Path::new(f.lock().get_absolute_path()))
             .ok_or(AppErr::NotFound(cmd))?;
 
         let taskref = match ApplicationTaskBuilder::new(app_path)
             .argument(args)
             .block()
-            .spawn()
-        {
-            Ok(taskref) => taskref,
-            Err(e) => return Err(AppErr::SpawnErr(e.to_string())),
-        };
-
+            .spawn() {
+                Ok(taskref) => taskref, 
+                Err(e) => return Err(AppErr::SpawnErr(e.to_string()))
+            };
+        
         taskref.set_env(self.env.clone()); // Set environment variable of application to the same as terminal task
 
         // Gets the task id so we can reference this task if we need to kill it with Ctrl+C
@@ -748,14 +689,12 @@ impl Shell {
     /// pipe the output from one to the next, and finally back to the shell. If any task fails to start up,
     /// all tasks that have already been spawned will be killed immeidately before returning error.
     fn eval_cmdline(&mut self) -> Result<Vec<TaskRef>, AppErr> {
+
         let cmdline = self.cmdline.clone();
         let mut task_refs = Vec::new();
 
         for single_task_cmd in cmdline.split("|") {
-            let mut args: Vec<String> = single_task_cmd
-                .split_whitespace()
-                .map(|s| s.to_string())
-                .collect();
+            let mut args: Vec<String> = single_task_cmd.split_whitespace().map(|s| s.to_string()).collect();
             let command = args.remove(0);
 
             // If the last arg is `&`, remove it.
@@ -785,6 +724,7 @@ impl Shell {
     fn build_new_job(&mut self) -> Result<isize, &'static str> {
         match self.eval_cmdline() {
             Ok(task_refs) => {
+
                 let mut task_ids = Vec::new();
                 let mut pipe_queues = Vec::new();
                 let mut stderr_queues = Vec::new();
@@ -808,7 +748,7 @@ impl Shell {
                         stdio_queue_for_stdin_and_stdout.get_writer(),
                         stdio_queue_for_stderr.get_writer(),
                         self.key_event_consumer.clone(),
-                        terminal,
+                        terminal
                     );
                     app_io::insert_child_streams(*task_id, streams);
 
@@ -817,12 +757,8 @@ impl Shell {
                     pipe_queues.push(stdio_queue_for_stdin_and_stdout);
 
                     // Insert print event producer to `terminal_print` to support legacy output.
-                    if let Err(msg) =
-                        terminal_print::add_child(*task_id, self.print_producer.obtain_producer())
-                    {
-                        self.terminal
-                            .lock()
-                            .print_to_terminal(format!("{}\n", msg).to_string());
+                    if let Err(msg) = terminal_print::add_child(*task_id, self.print_producer.obtain_producer()) {
+                        self.terminal.lock().print_to_terminal(format!("{}\n", msg).to_string());
                         return Err(msg);
                     }
                 }
@@ -837,7 +773,7 @@ impl Shell {
                     stderr_queues,
                     stdin_writer: job_stdin_writer,
                     stdout_reader: job_stdout_reader,
-                    cmd: self.cmdline.clone(),
+                    cmd: self.cmdline.clone()
                 };
 
                 // All IO streams have been set up for the new tasks. Safe to unblock them now.
@@ -862,22 +798,16 @@ impl Shell {
 
                 self.jobs.insert(new_job_num, new_job);
                 Ok(new_job_num)
-            }
+            },
             Err(err) => {
                 let err_msg = match err {
                     AppErr::NotFound(command) => format!("{:?} command not found.\n", command),
-                    AppErr::NamespaceErr => {
-                        format!("Failed to find directory of application executables.\n")
-                    }
-                    AppErr::SpawnErr(e) => {
-                        format!("Failed to spawn new task to run command. Error: {}.\n", e)
-                    }
+                    AppErr::NamespaceErr      => format!("Failed to find directory of application executables.\n"),
+                    AppErr::SpawnErr(e)       => format!("Failed to spawn new task to run command. Error: {}.\n", e),
                 };
                 self.terminal.lock().print_to_terminal(err_msg);
                 if let Err(msg) = self.clear_cmdline(false) {
-                    self.terminal
-                        .lock()
-                        .print_to_terminal(format!("{}\n", msg).to_string());
+                    self.terminal.lock().print_to_terminal(format!("{}\n", msg).to_string());
                 }
                 self.redisplay_prompt();
                 Err("Failed to evaluate command line.")
@@ -887,10 +817,7 @@ impl Shell {
 
     /// Try to match the incomplete command against all internal commands. Returns a
     /// vector that contains all matching results.
-    fn find_internal_cmd_match(
-        &mut self,
-        incomplete_cmd: &String,
-    ) -> Result<Vec<String>, &'static str> {
+    fn find_internal_cmd_match(&mut self, incomplete_cmd: &String) -> Result<Vec<String>, &'static str> {
         let internal_cmds = vec!["fg", "bg", "jobs", "clear"];
         let mut match_cmds = Vec::new();
         for cmd in internal_cmds.iter() {
@@ -903,14 +830,10 @@ impl Shell {
 
     /// Try to match the incomplete command against all applications in the same namespace.
     /// Returns a vector that contains all matching results.
-    fn find_app_name_match(
-        &mut self,
-        incomplete_cmd: &String,
-    ) -> Result<Vec<String>, &'static str> {
+    fn find_app_name_match(&mut self, incomplete_cmd: &String) -> Result<Vec<String>, &'static str> {
         let namespace_dir = match task::get_my_current_task()
             .map(|t| t.get_namespace().dir().clone())
-            .ok_or(AppErr::NamespaceErr)
-        {
+            .ok_or(AppErr::NamespaceErr) {
             Ok(dir) => dir,
             Err(_) => {
                 return Err("Failed to get namespace_dir while completing cmdline.");
@@ -937,16 +860,14 @@ impl Shell {
     /// current command is `foo/bar/examp`, it first tries to walk the directory of `foo/bar`. If
     /// it succeeds, it then lists all filenames under `foo/bar` and tries to match `examp` against
     /// those filenames. It returns a vector that contains all matching results.
-    fn find_file_path_match(
-        &mut self,
-        incomplete_cmd: &String,
-    ) -> Result<Vec<String>, &'static str> {
+    fn find_file_path_match(&mut self, incomplete_cmd: &String) -> Result<Vec<String>, &'static str> {
+
         // Stores all possible matches.
         let mut match_list = Vec::new();
 
         let taskref = match task::get_my_current_task() {
             Some(t) => t,
-            None => return Err("Failed to get task reference while completing cmdline."),
+            None => return Err("Failed to get task reference while completing cmdline.")
         };
 
         // Get current working dir.
@@ -959,14 +880,11 @@ impl Shell {
         // Check if the last character is a slash.
         let slash_ending = match incomplete_cmd.chars().last() {
             Some('/') => true,
-            _ => false,
+            _ => false
         };
 
         // Split the path by slash and filter out consecutive slashes.
-        let mut nodes: Vec<_> = incomplete_cmd
-            .split("/")
-            .filter(|node| node.len() > 0)
-            .collect();
+        let mut nodes: Vec<_> = incomplete_cmd.split("/").filter(|node| { node.len() > 0 }).collect();
 
         // Get the last node in the path, which is to be completed.
         let incomplete_node = {
@@ -977,7 +895,7 @@ impl Shell {
             } else {
                 match nodes.pop() {
                     Some(node) => node,
-                    None => "",
+                    None => ""
                 }
             }
         };
@@ -986,29 +904,25 @@ impl Shell {
         for node in &nodes {
             let path = Path::new(node.to_string());
             match path.get(&curr_wd) {
-                Some(file_dir_enum) => match file_dir_enum {
-                    FileOrDir::Dir(dir) => {
-                        curr_wd = dir;
-                    }
-                    FileOrDir::File(_file) => {
-                        return Ok(match_list);
+                Some(file_dir_enum) => {
+                    match file_dir_enum {
+                        FileOrDir::Dir(dir) => { curr_wd = dir; },
+                        FileOrDir::File(_file) => { return Ok(match_list); }
                     }
                 },
-                _ => {
-                    return Ok(match_list);
-                }
+                _ => { return Ok(match_list); }
             };
         }
 
         // Try to match the name of the file.
         let locked_working_dir = curr_wd.lock();
-        let mut child_list = locked_working_dir.list();
+        let mut child_list = locked_working_dir.list(); 
         child_list.reverse();
         for child in child_list.iter() {
             if child.starts_with(&incomplete_node) {
                 if let Some(_) = locked_working_dir.get_file(&child) {
                     match_list.push(child.clone());
-                } else if let Some(_) = locked_working_dir.get_dir(&child) {
+                } else if let Some (_) = locked_working_dir.get_dir(&child) {
                     let mut cloned = child.clone();
                     cloned.push('/');
                     match_list.push(cloned);
@@ -1021,17 +935,15 @@ impl Shell {
 
     // Print all command line choices in aligned colomns.
     fn aligned_print_match(&mut self, possible_names: Vec<String>) -> Result<(), &'static str> {
-        if possible_names.is_empty() {
-            return Ok(());
-        }
+        if possible_names.is_empty() { return Ok(()); }
 
         // Get terminal screen width.
-        let (width, _) = self.terminal.lock().get_text_area_size();
+        let (width, _) = self.terminal.lock().get_width_height();
 
         // Find the length of the longest string.
         let longest_len = match possible_names.iter().map(|name| name.len()).max() {
             Some(length) => length,
-            None => return Ok(()),
+            None => return Ok(())
         };
 
         // Calculate how many we can put on each line. We use four spaces to separate
@@ -1055,11 +967,10 @@ impl Shell {
             let mut current_in_line = 0;
             let mut first_in_line = true;
             for name in possible_names {
+
                 // Pad every string to the same length, same as the longest.
                 let mut padded = name.clone();
-                for _ in 0..(longest_len - name.len()) {
-                    padded.push(' ');
-                }
+                for _ in 0..(longest_len-name.len()) { padded.push(' '); }
 
                 // Write to the terminal buffer.
                 if !first_in_line {
@@ -1095,19 +1006,18 @@ impl Shell {
     /// Otherwise, it does nothing. It tries to match against all internal commands,
     /// all applications in the namespace, and all valid file paths.
     fn complete_cmdline(&mut self) -> Result<(), &'static str> {
+
         // Get the last string slice in the pipe chain.
-        let cmdline = self.cmdline
-            [0..self.cmdline.len() - self.terminal.lock().get_cursor_offset_from_end()]
-            .to_string();
+        let cmdline = self.cmdline[0..self.cmdline.len()-self.terminal.lock().get_cursor_offset_from_end()].to_string();
         let last_cmd_in_pipe = match cmdline.split("|").last() {
             Some(cmd) => cmd,
-            None => return Ok(()),
+            None => return Ok(())
         };
 
         // Get the last word in the args (or maybe the command name itself).
         let last_word_in_cmd = match last_cmd_in_pipe.split(" ").last() {
             Some(word) => word.to_string(),
-            None => return Ok(()),
+            None => return Ok(())
         };
 
         // Try to find matches. Only match against internal commands and applications
@@ -1116,18 +1026,14 @@ impl Shell {
         let mut possible_names = self.find_internal_cmd_match(&last_word_in_cmd)?;
         possible_names.extend(self.find_app_name_match(&last_word_in_cmd)?.iter().cloned());
         if !last_cmd_in_pipe.trim().is_empty() {
-            possible_names.extend(
-                self.find_file_path_match(&last_word_in_cmd)?
-                    .iter()
-                    .cloned(),
-            );
+            possible_names.extend(self.find_file_path_match(&last_word_in_cmd)?.iter().cloned());
         }
 
         // If there is only one possiblity, complete the command line.
         if possible_names.len() == 1 {
             let char_num_to_pop = match last_word_in_cmd.split('/').last() {
                 Some(incomplete_basename) => incomplete_basename.len(),
-                None => last_word_in_cmd.len(),
+                None => last_word_in_cmd.len()
             };
             for _ in 0..char_num_to_pop {
                 self.remove_char_from_cmdline(true, true)?;
@@ -1135,8 +1041,7 @@ impl Shell {
             for c in possible_names[0].chars() {
                 self.insert_char_to_cmdline(c, true)?;
             }
-        } else {
-            // Print our choice to the terminal.
+        } else { // Print our choice to the terminal.
             self.aligned_print_match(possible_names)?;
         }
 
@@ -1151,13 +1056,12 @@ impl Shell {
         // Iterate through all jobs. If any job has exited, remove its stdio queues and remove it from
         // the job list. If any job has just stopped, mark it as stopped in the job list.
         for (job_num, job) in self.jobs.iter_mut() {
-            let mut has_alive = false; // mark if there is still non-exited task in the job
+            let mut has_alive = false;  // mark if there is still non-exited task in the job
             let mut is_stopped = false; // mark if any one of the task has been stopped in this job
 
             let task_refs = job.tasks.clone();
             for task_ref in task_refs {
-                if task_ref.lock().has_exited() {
-                    // a task has exited
+                if task_ref.lock().has_exited() { // a task has exited
                     let exited_task_id = task_ref.lock().id;
                     if let Some(exit_val) = task_ref.take_exit_value() {
                         match exit_val {
@@ -1166,33 +1070,25 @@ impl Shell {
                                 // we know the return type of this task is `isize`,
                                 // so we need to downcast it from Any to isize.
                                 let val: Option<&isize> = exit_status.downcast_ref::<isize>();
-                                info!(
-                                    "terminal: task [{}] returned exit value: {:?}",
-                                    exited_task_id, val
-                                );
+                                info!("terminal: task [{}] returned exit value: {:?}", exited_task_id, val);
                                 if let Some(val) = val {
                                     if *val < 0 {
-                                        self.terminal.lock().print_to_terminal(format!(
-                                            "task [{}] returned error value {:?}\n",
-                                            exited_task_id, val
-                                        ));
+                                        self.terminal.lock().print_to_terminal(
+                                            format!("task [{}] returned error value {:?}\n", exited_task_id, val)
+                                        );
                                     }
                                 }
-                            }
+                            },
 
                             ExitValue::Killed(KillReason::Requested) => {
                                 // Nothing to do. We have already print "^C" while handling keyboard event.
-                            }
+                            },
                             // If the user manually aborts the task
                             ExitValue::Killed(kill_reason) => {
-                                warn!(
-                                    "task [{}] was killed because {:?}",
-                                    exited_task_id, kill_reason
+                                warn!("task [{}] was killed because {:?}", exited_task_id, kill_reason);
+                                self.terminal.lock().print_to_terminal(
+                                    format!("task [{}] was killed because {:?}\n", exited_task_id, kill_reason)
                                 );
-                                self.terminal.lock().print_to_terminal(format!(
-                                    "task [{}] was killed because {:?}\n",
-                                    exited_task_id, kill_reason
-                                ));
                             }
                         }
 
@@ -1205,13 +1101,12 @@ impl Shell {
                         let mut pipe_queue_iter = job.pipe_queues.iter();
                         let mut stderr_queue_iter = job.stderr_queues.iter();
                         let mut task_id_iter = job.task_ids.iter();
-                        while let (Some(pipe_queue), Some(stderr_queue), Some(task_id)) = (
-                            pipe_queue_iter.next(),
-                            stderr_queue_iter.next(),
-                            task_id_iter.next(),
-                        ) {
+                        while let (Some(pipe_queue), Some(stderr_queue), Some(task_id))
+                            = (pipe_queue_iter.next(), stderr_queue_iter.next(), task_id_iter.next()) {
+
                             // Find the exited task by matching task id.
                             if *task_id == exited_task_id {
+
                                 // Set the EOF flag of its `stdin`, which effectively prevents it's
                                 // producer from writing more. (It returns an error upon writing to
                                 // the queue which has the EOF flag set.)
@@ -1230,8 +1125,8 @@ impl Shell {
                             }
                         }
                     }
-                } else if !task_ref.lock().is_runnable() && job.status != JobStatus::Stopped {
-                    // task has just stopped
+
+                } else if !task_ref.lock().is_runnable() && job.status != JobStatus::Stopped { // task has just stopped
 
                     // One task in this job is stopped, but the status of the Job has not been set to
                     // `Stopped`. Let's set it now.
@@ -1244,17 +1139,18 @@ impl Shell {
                     }
 
                     need_refresh = true;
-                    has_alive = true; // This task is stopped, but yet alive.
+                    has_alive = true;  // This task is stopped, but yet alive.
                     is_stopped = true; // Mark that this task is just stopped.
                 } else {
-                    has_alive = true; // This is a running task, which is alive.
+                    has_alive = true;  // This is a running task, which is alive.
                 }
             }
 
             // If the job is stopped (e.g. by ctrl-Z), print an noticifation to the terminal.
             if is_stopped {
                 self.terminal.lock().print_to_terminal(
-                    format!("[{}] [stopped] {}\n", job_num, job.cmd).to_string(),
+                    format!("[{}] [stopped] {}\n", job_num, job.cmd)
+                    .to_string()
                 );
             }
 
@@ -1267,7 +1163,8 @@ impl Shell {
                     need_prompt = true;
                 } else {
                     self.terminal.lock().print_to_terminal(
-                        format!("[{}] [finished] {}\n", job_num, job.cmd).to_string(),
+                        format!("[{}] [finished] {}\n", job_num, job.cmd)
+                        .to_string()
                     );
                 }
             }
@@ -1302,7 +1199,7 @@ impl Shell {
     fn redisplay_prompt(&mut self) {
         let curr_env = self.env.lock();
         let mut prompt = curr_env.working_dir.lock().get_absolute_path();
-        prompt = format!("{}: ", prompt);
+        prompt = format!("{}: ",prompt);
         self.terminal.lock().print_to_terminal(prompt);
         self.terminal.lock().print_to_terminal(self.cmdline.clone());
     }
@@ -1316,18 +1213,19 @@ impl Shell {
             match print_event.deref() {
                 &Event::OutputEvent(ref s) => {
                     self.terminal.lock().print_to_terminal(s.text.clone());
-                }
-                _ => {}
+                },
+                _ => { },
             }
             print_event.mark_completed();
             // Goes to the next iteration of the loop after processing print event to ensure that printing is handled before keypresses
-            need_refresh = true;
+            need_refresh =  true;
         }
 
         let mut buf: [u8; 256] = [0; 256];
 
         // iterate through all jobs to see if they have something to print
         for (_job_num, job) in self.jobs.iter() {
+
             // Deal with all stdout output.
             let mut stdout = job.stdout_reader.lock();
             match stdout.try_read(&mut buf) {
@@ -1336,10 +1234,8 @@ impl Shell {
                     let s = String::from_utf8_lossy(&buf[0..cnt]);
                     let mut locked_terminal = self.terminal.lock();
                     locked_terminal.print_to_terminal(s.to_string());
-                    if cnt != 0 {
-                        need_refresh = true;
-                    }
-                }
+                    if cnt != 0 { need_refresh = true; }
+                },
                 Err(_) => {
                     mem::drop(stdout);
                     error!("failed to read from stdout");
@@ -1356,10 +1252,8 @@ impl Shell {
                         let s = String::from_utf8_lossy(&buf[0..cnt]);
                         let mut locked_terminal = self.terminal.lock();
                         locked_terminal.print_to_terminal(s.to_string());
-                        if cnt != 0 {
-                            need_refresh = true;
-                        }
-                    }
+                        if cnt != 0 { need_refresh = true; }
+                    },
                     Err(_) => {
                         mem::drop(stderr);
                         error!("failed to read from stderr");
@@ -1373,15 +1267,15 @@ impl Shell {
 
     /// This main loop is the core component of the shell's event-driven architecture. The shell receives events
     /// from two queues
-    ///
+    /// 
     /// 1) The print queue handles print events from applications. The producer to this queue
     ///    is any EXTERNAL application that prints to the terminal.
-    ///
+    /// 
     /// 2) The input queue (provided by the window manager when the temrinal request a window) gives key events
     ///    and resize event to the application.
-    ///
+    /// 
     /// The print queue is handled first inside the loop iteration, which means that all print events in the print
-    /// queue will always be printed to the text display before input events or any other managerial functions are handled.
+    /// queue will always be printed to the text display before input events or any other managerial functions are handled. 
     /// This allows for clean appending to the scrollback buffer and prevents interleaving of text.
     fn start(mut self) -> Result<(), &'static str> {
         let mut need_refresh = false;
@@ -1396,6 +1290,7 @@ impl Shell {
                 need_refresh = true;
                 continue;
             }
+
             // Handles the cleanup of any application task that has finished running, returns whether we need
             // a new prompt or need to refresh the screen.
             let (need_refresh_on_task_event, need_prompt_on_task_event) = self.task_handler()?;
@@ -1424,9 +1319,9 @@ impl Shell {
                     Event::KeyboardEvent(ref input_event) => {
                         self.key_event_producer.write_one(input_event.key_event);
                     }
-                    _ => {}
+                    _ => { }
                 };
-            }
+            }          
             if need_refresh || need_refresh_on_task_event {
                 // update if there are outputs from applications
                 self.terminal.lock().refresh_display()?;
@@ -1443,15 +1338,11 @@ impl Shell {
                         if let Err(e) = self.handle_key_event(key_event) {
                             error!("{}", e);
                         }
-                        if key_event.action == KeyAction::Pressed {
-                            need_refresh = true;
-                        }
-                    } else {
-                        // currently the key event queue is empty, break the loop
+                        if key_event.action == KeyAction::Pressed { need_refresh = true; }
+                    } else { // currently the key event queue is empty, break the loop
                         break;
                     }
-                } else {
-                    // currently the key event queue is taken by an application
+                } else { // currently the key event queue is taken by an application
                     break;
                 }
             }
@@ -1476,7 +1367,7 @@ impl Shell {
                 "fg" => return true,
                 "bg" => return true,
                 "clear" => return true,
-                _ => return false,
+                _ => return false
             }
         }
         false
@@ -1493,7 +1384,7 @@ impl Shell {
                 "fg" => self.execute_internal_fg(),
                 "bg" => self.execute_internal_bg(),
                 "clear" => self.execute_internal_clear(),
-                _ => Ok(()),
+                _ => Ok(())
             }
         } else {
             Ok(())
@@ -1514,9 +1405,7 @@ impl Shell {
         iter.next();
         let args: Vec<&str> = iter.collect();
         if args.len() != 1 {
-            self.terminal
-                .lock()
-                .print_to_terminal("Usage: bg %job_num\n".to_string());
+            self.terminal.lock().print_to_terminal("Usage: bg %job_num\n".to_string());
             return Ok(());
         }
         if let Some('%') = args[0].chars().nth(0) {
@@ -1533,15 +1422,11 @@ impl Shell {
                     self.redisplay_prompt();
                     return Ok(());
                 }
-                self.terminal
-                    .lock()
-                    .print_to_terminal(format!("No job number {} found!\n", job_num).to_string());
+                self.terminal.lock().print_to_terminal(format!("No job number {} found!\n", job_num).to_string());
                 return Ok(());
             }
         }
-        self.terminal
-            .lock()
-            .print_to_terminal("Usage: bg %job_num\n".to_string());
+        self.terminal.lock().print_to_terminal("Usage: bg %job_num\n".to_string());
         Ok(())
     }
 
@@ -1552,9 +1437,7 @@ impl Shell {
         iter.next();
         let args: Vec<&str> = iter.collect();
         if args.len() != 1 {
-            self.terminal
-                .lock()
-                .print_to_terminal("Usage: fg %job_num\n".to_string());
+            self.terminal.lock().print_to_terminal("Usage: fg %job_num\n".to_string());
             return Ok(());
         }
         if let Some('%') = args[0].chars().nth(0) {
@@ -1570,15 +1453,11 @@ impl Shell {
                     }
                     return Ok(());
                 }
-                self.terminal
-                    .lock()
-                    .print_to_terminal(format!("No job number {} found!\n", job_num).to_string());
+                self.terminal.lock().print_to_terminal(format!("No job number {} found!\n", job_num).to_string());
                 return Ok(());
             }
         }
-        self.terminal
-            .lock()
-            .print_to_terminal("Usage: fg %job_num\n".to_string());
+        self.terminal.lock().print_to_terminal("Usage: fg %job_num\n".to_string());
         Ok(())
     }
 
@@ -1587,22 +1466,19 @@ impl Shell {
         for (job_num, job_ref) in self.jobs.iter() {
             let status = match &job_ref.status {
                 JobStatus::Running => "running",
-                JobStatus::Stopped => "stopped",
+                JobStatus::Stopped => "stopped"
             };
-            self.terminal.lock().print_to_terminal(
-                format!("[{}] [{}] {}\n", job_num, status, job_ref.cmd).to_string(),
-            );
+            self.terminal.lock().print_to_terminal(format!("[{}] [{}] {}\n", job_num, status, job_ref.cmd).to_string());
         }
         if self.jobs.is_empty() {
-            self.terminal
-                .lock()
-                .print_to_terminal("No running or stopped jobs.\n".to_string());
+            self.terminal.lock().print_to_terminal("No running or stopped jobs.\n".to_string());
         }
         self.clear_cmdline(false)?;
         self.redisplay_prompt();
         Ok(())
     }
 }
+
 
 /// Start a new shell. Shell::start() is an infinite loop, so normally we do not return from this function.
 fn shell_loop(mut _dummy: ()) -> Result<(), &'static str> {
