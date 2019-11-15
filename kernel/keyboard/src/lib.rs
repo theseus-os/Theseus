@@ -115,9 +115,7 @@ pub fn handle_keyboard_input(scan_code: u8, _extended: bool) -> Result<(), &'sta
                             Ok(result)  => Ok(()),
                             Err(e) => Err("keyboard event queue full"),
                         };
-                        result
-                        // producer.push(event).expect("can't push to the queue");
-                        // Ok(()) // successfully queued up KeyEvent 
+                        result 
                     }
                     else {
                         warn!("handle_keyboard_input(): KEYBOARD_PRODUCER wasn't yet initialized, dropping keyboard event {:?}.", event);
