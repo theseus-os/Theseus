@@ -25,7 +25,7 @@ use memory::{EntryFlags, FrameRange, MappedPages, PhysicalAddress, FRAME_ALLOCAT
 use owning_ref::BoxRefMut;
 use spin::Mutex;
 
-/// A `Pixel` is a `u32` broken down into four bytes.
+/// An `AlphaPixel` is a `u32` broken down into four bytes.
 /// The lower 24 bits of a Pixel specify its RGB color values, while the upper 8bit is an `alpha` channel,
 /// in which an `alpha` value of `0` represents an opaque pixel and `0xFF` represents a completely transparent pixel.
 /// The `alpha` value is used in an alpha-blending compositor that supports transparency.
@@ -69,8 +69,11 @@ pub fn init() -> Result<(usize, usize), &'static str> {
 
 /// The frame buffer struct of either virtual frame buffer or physical frame buffer. It contains the size of the buffer and a buffer array
 pub struct FrameBufferAlpha {
+    /// The width of the framebuffer
     pub width: usize,
+    /// The height of the framebuffer
     pub height: usize,
+    /// The memory buffer
     pub buffer: BoxRefMut<MappedPages, [Pixel]>,
 }
 
@@ -139,7 +142,7 @@ impl FrameBufferAlpha {
     }
 
     /// draw a rectangle on this framebuffer
-    pub fn draw_rect(&mut self, start: Coord, end: Coord, color: AlphaPixel) {
+    pub fn overwrite_rect(&mut self, start: Coord, end: Coord, color: AlphaPixel) {
         for y in start.y..end.y {
             for x in start.x..end.x {
                 let coordinate = Coord::new(x as isize, y as isize);
@@ -148,17 +151,7 @@ impl FrameBufferAlpha {
         }
     }
 
-    /// draw a rectangle on this framebuffer with alpha
-    pub fn draw_rect_alpha(&mut self, start: Coord, end: Coord, color: AlphaPixel) {
-        for y in start.y..end.y {
-            for x in start.x..end.x {
-                let coordinate = Coord::new(x as isize, y as isize);
-                self.draw_pixel(coordinate, color);
-            }
-        }
-    }
-
-    /// draw a char on the screen with alpha
+    /// draw a char onto the framebuffer
     pub fn draw_char_8x16(&mut self, coordinate: Coord, c: u8, color: AlphaPixel) {
         for yi in 0..16 {
             let char_font: u8 = font::FONT_BASIC[c as usize][yi];
@@ -211,18 +204,9 @@ impl FrameBuffer for FrameBufferAlpha {
         };
         Ok(AlphaPixel::from(self.buffer[idx]))
     }
-
-    /// fill the entire frame buffer with given `color`
-    fn fill_color(&mut self, color: Pixel) {
-        for y in 0..self.height {
-            for x in 0..self.width {
-                let coordinate = Coord::new(x as isize, y as isize);
-                self.overwrite_pixel(coordinate, color);
-            }
-        }
-    }
 }
 
+/// A pixel Mixer provides methods to mix two pixels
 pub trait PixelMixer {
     /// mix two color using alpha channel composition, supposing `self` is on the top of `other` pixel.
     fn alpha_mix(self, other: Self) -> Self;
@@ -230,17 +214,20 @@ pub trait PixelMixer {
     /// mix two color linearly with a float number, with mix `self` and (1-mix) `other`. If mix is outside range of [0, 1], black will be returned
     fn color_mix(self, other: Self, mix: f32) -> Self;
 
+    /// Gets the alpha channel of the pixel
     fn get_alpha(&self) -> u8;
 
+    /// Gets the red byte of the pixel
     fn get_red(&self) -> u8;
 
+    /// Gets the green byte of the pixel
     fn get_green(&self) -> u8;
 
+    /// Gets the blue byte of the pixel
     fn get_blue(&self) -> u8;
 }
 
 impl PixelMixer for AlphaPixel {
-    /// mix two color using alpha channel composition, supposing `self` is on the top of `other` pixel.
     fn alpha_mix(self, other: Self) -> Self {
         let alpha = self.get_alpha() as u16;
         let red = self.get_red();
@@ -255,7 +242,6 @@ impl PixelMixer for AlphaPixel {
         return new_alpha_pixel(other.get_alpha(), new_red, new_green, new_blue);
     }
 
-    /// mix two color linearly with a float number, with mix `self` and (1-mix) `other`. If mix is outside range of [0, 1], black will be returned
     fn color_mix(self, other: Self, mix: f32) -> Self {
         if mix < 0f32 || mix > 1f32 {
             // cannot mix value outside [0, 1]
@@ -289,6 +275,7 @@ impl PixelMixer for AlphaPixel {
     }
 }
 
+/// Create a new AlphaPixel from `alpha`, `red`, `green` and `blue` bytes
 pub fn new_alpha_pixel(alpha: u8, red: u8, green: u8, blue: u8) -> AlphaPixel {
     return ((alpha as u32) << 24) + ((red as u32) << 16) + ((green as u32) << 8) + (blue as u32);
 }
