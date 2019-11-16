@@ -15,6 +15,9 @@ x86_64 = { path = "../../libs/x86_64" }
 default-features = false
 version = "0.3.7"
 
+[dependencies.keycodes_ascii]
+path = "../../libs/keycodes_ascii"
+
 [dependencies.window_manager]
 path = "../window_manager"
 
@@ -37,14 +40,11 @@ path = "../spawn"
 [dependencies.task]
 path = "../task"
 
-[dependencies.path]
-path = "../path"
-
-[dependencies.keycodes_ascii]
-path = "../../libs/keycodes_ascii"
-
 [dependencies.mod_mgmt]
 path  = "../mod_mgmt"
+
+[dependencies.path]
+path = "../path"
 
 [dependencies.frame_buffer_alpha]
 path = "../frame_buffer_alpha"

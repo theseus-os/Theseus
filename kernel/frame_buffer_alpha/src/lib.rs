@@ -204,6 +204,15 @@ impl FrameBuffer for FrameBufferAlpha {
         };
         Ok(AlphaPixel::from(self.buffer[idx]))
     }
+
+    fn fill_color(&mut self, color: Pixel) {
+        for y in 0..self.height {
+            for x in 0..self.width {
+                let coordinate = Coord::new(x as isize, y as isize);
+                self.overwrite_pixel(coordinate, color);
+            }
+        }
+    }
 }
 
 /// A pixel Mixer provides methods to mix two pixels
@@ -275,7 +284,7 @@ impl PixelMixer for AlphaPixel {
     }
 }
 
-/// Create a new AlphaPixel from `alpha`, `red`, `green` and `blue` bytes
+/// Create a new AlphaPixel from `alpha`, `red`, `green` and `blue` bytes.
 pub fn new_alpha_pixel(alpha: u8, red: u8, green: u8, blue: u8) -> AlphaPixel {
     return ((alpha as u32) << 24) + ((red as u32) << 16) + ((green as u32) << 8) + (blue as u32);
 }

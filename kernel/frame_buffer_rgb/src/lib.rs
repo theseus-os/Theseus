@@ -3,8 +3,7 @@
 
 #![no_std]
 
-#[macro_use]
-extern crate alloc;
+#[macro_use] extern crate alloc;
 extern crate frame_buffer;
 extern crate memory;
 extern crate multicore_bringup;
@@ -13,7 +12,7 @@ extern crate spin;
 
 use alloc::boxed::Box;
 use core::ops::DerefMut;
-use frame_buffer::{Coord, FrameBuffer, Pixel, FINAL_FRAME_BUFFER};
+use frame_buffer::{FrameBuffer, Pixel, FINAL_FRAME_BUFFER, Coord};
 use memory::{EntryFlags, FrameRange, MappedPages, PhysicalAddress, FRAME_ALLOCATOR};
 use owning_ref::BoxRefMut;
 use spin::Mutex;
@@ -42,12 +41,7 @@ pub fn init() -> Result<(), &'static str> {
         FrameBufferRGB::new(buffer_width, buffer_height, Some(vesa_display_phys_start))?;
     let background = vec![0; buffer_width * buffer_height];
     FINAL_FRAME_BUFFER.call_once(|| Mutex::new(Box::new(framebuffer)));
-    FINAL_FRAME_BUFFER
-        .try()
-        .ok_or("")
-        .unwrap()
-        .lock()
-        .buffer_copy(background.as_slice(), 0);
+    FINAL_FRAME_BUFFER.try().ok_or("").unwrap().lock().buffer_copy(background.as_slice(), 0);
 
     Ok(())
 }
@@ -88,13 +82,13 @@ impl FrameBufferRGB {
                 pages,
                 frame,
                 vesa_display_flags,
-                allocator.lock().deref_mut(),
+                allocator.lock().deref_mut()
             )?
         } else {
             kernel_mmi_ref.lock().page_table.map_allocated_pages(
                 pages,
                 vesa_display_flags,
-                allocator.lock().deref_mut(),
+                allocator.lock().deref_mut()
             )?
         };
 
@@ -148,7 +142,6 @@ impl FrameBuffer for FrameBufferRGB {
         }
     }
 
-    /// fill the entire frame buffer with given `color`
     fn fill_color(&mut self, color: Pixel) {
         for y in 0..self.height {
             for x in 0..self.width {
