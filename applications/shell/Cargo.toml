@@ -34,8 +34,8 @@ path = "../../kernel/task"
 [dependencies.runqueue]
 path = "../../kernel/runqueue"
 
-[dependencies.window_manager]
-path = "../../kernel/window_manager"
+[dependencies.window_manager_primitive]
+path = "../../kernel/window_manager_primitive"
 
 [dependencies.terminal_print]
 path = "../terminal_print"

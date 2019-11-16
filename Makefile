@@ -638,5 +638,5 @@ endif
 	@sudo systemctl restart isc-dhcp-server 
 	@sudo systemctl restart tftpd-hpa
 
-generic: export override THESEUS_CONFIG += generic_display_sys
-generic: run
+primitive: export override THESEUS_CONFIG += primitive_display_sys
+primitive: run

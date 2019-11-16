@@ -14,34 +14,34 @@ extern crate spawn;
 extern crate task;
 extern crate mod_mgmt;
 extern crate event_types;
-extern crate window_manager;
+extern crate window_manager_primitive;
 extern crate font;
 extern crate frame_buffer_alpha;
 extern crate frame_buffer_rgb;
 extern crate window_manager_alpha;
-#[cfg(generic_display_sys)]
+#[cfg(primitive_display_sys)]
 extern crate keycodes_ascii;
-#[cfg(generic_display_sys)]
+#[cfg(primitive_display_sys)]
 extern crate path;
-#[cfg(generic_display_sys)]
+#[cfg(primitive_display_sys)]
 #[macro_use] extern crate log;
-#[cfg(generic_display_sys)]
+#[cfg(primitive_display_sys)]
 #[macro_use] extern crate alloc;
-#[cfg(not(generic_display_sys))]
+#[cfg(not(primitive_display_sys))]
 extern crate alloc;
 
 
-#[cfg(generic_display_sys)]
+#[cfg(primitive_display_sys)]
 use alloc::{vec::Vec, string::String};
-#[cfg(generic_display_sys)]
+#[cfg(primitive_display_sys)]
 use dfqueue::{DFQueueConsumer};
-#[cfg(generic_display_sys)]
+#[cfg(primitive_display_sys)]
 use keycodes_ascii::{KeyAction, Keycode};
-#[cfg(generic_display_sys)]
+#[cfg(primitive_display_sys)]
 use path::Path;
-#[cfg(generic_display_sys)]
+#[cfg(primitive_display_sys)]
 use spawn::{KernelTaskBuilder};
-#[cfg(not(generic_display_sys))]
+#[cfg(not(primitive_display_sys))]
 use frame_buffer_alpha::FrameBufferAlpha;
 
 use alloc::{string::ToString, sync::Arc};
@@ -86,7 +86,7 @@ pub fn init() -> Result<(DFQueueProducer<Event>, DFQueueProducer<Event>), &'stat
         .ok_or("Couldn't find terminal application in default app namespace")?;
 
     // initialize two kinds of display subsystem
-    #[cfg(not(generic_display_sys))]
+    #[cfg(not(primitive_display_sys))]
     {
         let (width, height) = frame_buffer_alpha::init()?;
         let framebuffer = FrameBufferAlpha::new(width, height, None)?;
@@ -97,11 +97,11 @@ pub fn init() -> Result<(DFQueueProducer<Event>, DFQueueProducer<Event>), &'stat
         )?;
     }
 
-    #[cfg(generic_display_sys)]
+    #[cfg(primitive_display_sys)]
     {
         font::init()?;
         frame_buffer_rgb::init()?;
-        window_manager::init()?;
+        window_manager_primitive::init()?;
         KernelTaskBuilder::new(input_event_loop, keyboard_event_handling_consumer)
             .name("input_event_loop".to_string())
             .spawn()?;
@@ -129,7 +129,7 @@ pub fn init() -> Result<(DFQueueProducer<Event>, DFQueueProducer<Event>), &'stat
 }
 
 /// Handles all key inputs to the system
-#[cfg(generic_display_sys)]
+#[cfg(primitive_display_sys)]
 fn input_event_loop(consumer: DFQueueConsumer<Event>) -> Result<(), &'static str> {
     let mut terminal_id_counter: usize = 1;
     loop {
@@ -166,14 +166,14 @@ fn input_event_loop(consumer: DFQueueConsumer<Event>) -> Result<(), &'static str
 
                 // Switches between terminal windows
                 if key_input.modifiers.alt && key_input.keycode == Keycode::Tab && key_input.action == KeyAction::Pressed {
-                    window_manager::WINDOWLIST.lock().switch_to_next()?;
+                    window_manager_primitive::WINDOWLIST.lock().switch_to_next()?;
                     meta_keypress = true;
                     event.mark_completed();
                 }
 
                 // Deletes the active window (whichever window Ctrl + W is logged in)
                 if key_input.modifiers.control && key_input.keycode == Keycode::W && key_input.action == KeyAction::Pressed {
-                    window_manager::WINDOWLIST.lock().send_event_to_active(Event::ExitEvent)?; // tells application to exit
+                    window_manager_primitive::WINDOWLIST.lock().send_event_to_active(Event::ExitEvent)?; // tells application to exit
                 }
             }
             _ => { }
@@ -181,9 +181,9 @@ fn input_event_loop(consumer: DFQueueConsumer<Event>) -> Result<(), &'static str
 
         // If the keyevent was not for control of the terminal windows, enqueues keycode into active window
         if !meta_keypress {
-            window_manager::WINDOWLIST.lock().send_event_to_active(event.deref().clone())?;
+            window_manager_primitive::WINDOWLIST.lock().send_event_to_active(event.deref().clone())?;
             event.mark_completed();
-            
+
         }
     }
 }

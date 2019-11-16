@@ -28,19 +28,19 @@ extern crate libterm;
 extern crate scheduler;
 extern crate serial_port;
 
-#[cfg(not(generic_display_sys))]
+#[cfg(not(primitive_display_sys))]
 extern crate text_area;
-#[cfg(not(generic_display_sys))]
+#[cfg(not(primitive_display_sys))]
 extern crate window_manager_alpha;
-#[cfg(not(generic_display_sys))]
+#[cfg(not(primitive_display_sys))]
 extern crate window_components;
-#[cfg(not(generic_display_sys))]
+#[cfg(not(primitive_display_sys))]
 extern crate window;
 
-#[cfg(generic_display_sys)]
+#[cfg(primitive_display_sys)]
 extern crate text_generic;
-#[cfg(generic_display_sys)]
-extern crate window_manager;
+#[cfg(primitive_display_sys)]
+extern crate window_manager_primitive;
 
 use alloc::boxed::Box;
 use alloc::collections::BTreeMap;
@@ -50,20 +50,20 @@ use alloc::vec::Vec;
 use libterm::Terminal;
 use spin::{Mutex, MutexGuard};
 use stdio::{KeyEventQueueReader, KeyEventReadGuard, StdioReader, StdioWriter};
-#[cfg(not(generic_display_sys))]
+#[cfg(not(primitive_display_sys))]
 use text_area::TextArea;
-#[cfg(not(generic_display_sys))]
+#[cfg(not(primitive_display_sys))]
 use frame_buffer::Coord;
-#[cfg(not(generic_display_sys))]
+#[cfg(not(primitive_display_sys))]
 use frame_buffer_alpha::FrameBufferAlpha;
-#[cfg(not(generic_display_sys))]
+#[cfg(not(primitive_display_sys))]
 use libterm::cursor::{CursorComponent};
-#[cfg(not(generic_display_sys))]
+#[cfg(not(primitive_display_sys))]
 use window::Window;
 
-#[cfg(generic_display_sys)]
+#[cfg(primitive_display_sys)]
 use text_generic::TextGeneric;
-#[cfg(generic_display_sys)]
+#[cfg(primitive_display_sys)]
 use libterm::cursor::CursorGeneric;
 /// Stores the stdio queues, key event queue and the pointer to the terminal
 /// for applications. This structure is provided for application's use and only
@@ -165,7 +165,7 @@ lazy_static! {
     static ref DEFAULT_TERMINAL: Option<Arc<Mutex<Terminal>>> = {
         // Create a new window, a text area, a cursor.
         // For different display subsystem, the objects above are of different implementation.
-        #[cfg(not(generic_display_sys))]
+        #[cfg(not(primitive_display_sys))]
         let (window, textarea, cursor) = {
             let (window_width, window_height) = match window_manager_alpha::get_screen_size(){
                 Ok(size) => size,
@@ -204,9 +204,9 @@ lazy_static! {
             (window, textarea, cursor)
         };
 
-        #[cfg(generic_display_sys)]
+        #[cfg(primitive_display_sys)]
         let (window, textarea, cursor) = {
-            let window = match window_manager::new_default_window() {
+            let window = match window_manager_primitive::new_default_window() {
                 Ok(window_object) => window_object,
                 Err(err) => { 
                     debug!("Fail to create the generic window: {}", err);
@@ -215,8 +215,8 @@ lazy_static! {
             };
 
             let (width, height) = window.dimensions();
-            let width = width - 2 * window_manager::WINDOW_MARGIN;
-            let height = height - 2 * window_manager::WINDOW_MARGIN;
+            let width = width - 2 * window_manager_primitive::WINDOW_MARGIN;
+            let height = height - 2 * window_manager_primitive::WINDOW_MARGIN;
             let textarea = match TextGeneric::new(width, height, libterm::FONT_COLOR, libterm::BACKGROUND_COLOR) {
                 Ok(text) => text,
                 Err(err) => { 

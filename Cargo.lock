@@ -106,8 +106,8 @@ dependencies = [
  "text_generic 0.1.0",
  "window 0.1.0",
  "window_components 0.1.0",
- "window_manager 0.1.0",
  "window_manager_alpha 0.1.0",
+ "window_manager_primitive 0.1.0",
  "x86_64 0.1.2",
 ]
 
@@ -238,7 +238,7 @@ dependencies = [
  "task 0.1.0",
  "task_fs 0.1.0",
  "tsc 0.1.0",
- "window_manager 0.1.0",
+ "window_manager_primitive 0.1.0",
 ]
 
 [[package]]
@@ -800,8 +800,8 @@ dependencies = [
  "spawn 0.1.0",
  "spin 0.4.10 (registry+https://github.com/rust-lang/crates.io-index)",
  "task 0.1.0",
- "window_manager 0.1.0",
  "window_manager_alpha 0.1.0",
+ "window_manager_primitive 0.1.0",
  "x86_64 0.1.2",
 ]
 
@@ -1906,7 +1906,7 @@ dependencies = [
  "task 0.1.0",
  "terminal_print 0.1.0",
  "tsc 0.1.0",
- "window_manager 0.1.0",
+ "window_manager_primitive 0.1.0",
  "x86_64 0.1.2",
 ]
 
@@ -2379,7 +2379,7 @@ dependencies = [
 ]
 
 [[package]]
-name = "window_list"
+name = "window_list_primitive"
 version = "0.1.0"
 dependencies = [
  "event_types 0.1.0",
@@ -2387,25 +2387,6 @@ dependencies = [
  "frame_buffer_printer 0.1.0",
  "spin 0.4.10 (registry+https://github.com/rust-lang/crates.io-index)",
  "window 0.1.0",
-]
-
-[[package]]
-name = "window_manager"
-version = "0.1.0"
-dependencies = [
- "compositor 0.1.0",
- "dfqueue 0.1.0",
- "displayable 0.1.0",
- "event_types 0.1.0",
- "frame_buffer 0.1.0",
- "frame_buffer_compositor 0.1.0",
- "frame_buffer_drawer 0.1.0",
- "frame_buffer_printer 0.1.0",
- "frame_buffer_rgb 0.1.0",
- "lazy_static 1.2.0 (registry+https://github.com/rust-lang/crates.io-index)",
- "spin 0.4.10 (registry+https://github.com/rust-lang/crates.io-index)",
- "window 0.1.0",
- "window_list 0.1.0",
 ]
 
 [[package]]
@@ -2429,6 +2410,25 @@ dependencies = [
  "spawn 0.1.0",
  "spin 0.4.10 (registry+https://github.com/rust-lang/crates.io-index)",
  "window 0.1.0",
+]
+
+[[package]]
+name = "window_manager_primitive"
+version = "0.1.0"
+dependencies = [
+ "compositor 0.1.0",
+ "dfqueue 0.1.0",
+ "displayable 0.1.0",
+ "event_types 0.1.0",
+ "frame_buffer 0.1.0",
+ "frame_buffer_compositor 0.1.0",
+ "frame_buffer_drawer 0.1.0",
+ "frame_buffer_printer 0.1.0",
+ "frame_buffer_rgb 0.1.0",
+ "lazy_static 1.2.0 (registry+https://github.com/rust-lang/crates.io-index)",
+ "spin 0.4.10 (registry+https://github.com/rust-lang/crates.io-index)",
+ "window 0.1.0",
+ "window_list_primitive 0.1.0",
 ]
 
 [[package]]
