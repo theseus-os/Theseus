@@ -314,7 +314,7 @@ impl<U: WindowProfile> WindowManagerAlpha<U> {
 
             if left {
                 if top {
-                    // left-top
+                    // top-left
                     let dcoordinate = start - scoordinate;
                     // let dx = x_start - sx; let dy = y_start - sy;
                     if (dcoordinate.x + dcoordinate.y) as usize <= WINDOW_BORDER_SIZE {

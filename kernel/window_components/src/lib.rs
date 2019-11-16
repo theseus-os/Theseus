@@ -327,7 +327,7 @@ impl Window for WindowComponents {
 
 impl WindowComponents {
     /// create new WindowComponents by given position and size, return the Mutex of it for ease of sharing
-    /// x, y is the distance in pixel relative to left-top of window
+    /// x, y is the distance in pixel relative to top-left of window
     pub fn new(
         coordinate: Coord,
         framebuffer: Box<dyn FrameBuffer>,
