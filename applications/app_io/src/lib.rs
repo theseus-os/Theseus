@@ -38,7 +38,7 @@ extern crate window_components;
 extern crate window;
 
 #[cfg(primitive_display_sys)]
-extern crate text_generic;
+extern crate text_primitive;
 #[cfg(primitive_display_sys)]
 extern crate window_manager_primitive;
 
@@ -62,7 +62,7 @@ use libterm::cursor::{CursorComponent};
 use window::Window;
 
 #[cfg(primitive_display_sys)]
-use text_generic::TextGeneric;
+use text_primitive::TextPrimitive;
 #[cfg(primitive_display_sys)]
 use libterm::cursor::CursorGeneric;
 /// Stores the stdio queues, key event queue and the pointer to the terminal
@@ -216,7 +216,7 @@ lazy_static! {
             let (width, height) = window.dimensions();
             let width = width - 2 * window_manager_primitive::WINDOW_MARGIN;
             let height = height - 2 * window_manager_primitive::WINDOW_MARGIN;
-            let textarea = match TextGeneric::new(width, height, libterm::FONT_COLOR, libterm::BACKGROUND_COLOR) {
+            let textarea = match TextPrimitive::new(width, height, libterm::FONT_COLOR, libterm::BACKGROUND_COLOR) {
                 Ok(text) => text,
                 Err(err) => { 
                     debug!("Fail to create the generic window: {}", err);

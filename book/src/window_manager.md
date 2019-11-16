@@ -16,7 +16,7 @@ A window manager holds an instance of the `WindowListPrimitive` structure. In th
 
 ## The Window Manager
 
-The `window_manager` owns a `WINDOWLIST` instance which contains all the existing windows. It invokes the methods of `WindowListPrimitive` to manage these windows.
+The `window_manager_primitve` owns a `WINDOWLIST` instance which contains all the existing windows. It invokes the methods of `WindowListPrimitive` to manage these windows.
 
 In most of the cases, both an application and the window manager want to get access to the same window. The application needs to display in the window, and the window manager requires the information and order of windows to render them to the screen. In order to share a window between an application and the window manager, we wrap a `Window` object with `Mutex`. The application owns a strong reference to the window, while the window manager holds a weak reference since its lifetime is longer than the window.
 
@@ -34,6 +34,6 @@ The `WindowPrimitive` object represents the whole window and is owned by an appl
 
 ## Displayables
 
-The `displayable` crate defines a `Displayable` trait. A `Displayable` is an item which can display itself onto a framebuffer. It usually consists of basic graphs and acts as a component of a window such as a button or a text box. Currently, we have implemented a `TextGeneric` which is a block of text. In the future we will implement other kinds of displayables.
+The `displayable` crate defines a `Displayable` trait. A `Displayable` is an item which can display itself onto a framebuffer. It usually consists of basic graphs and acts as a component of a window such as a button or a text box. Currently, we have implemented a `TextPrimitive` which is a block of text. In the future we will implement other kinds of displayables.
 
 An application can add any `Displayable` object to a window and display it. The `WindowPrimitive` structure identifies `Displayables` by their name. It implements generic methods to get access to different kinds of displayables or display them by their names.

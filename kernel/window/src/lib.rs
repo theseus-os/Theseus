@@ -18,8 +18,8 @@ use downcast_rs::Downcast;
 use event_types::Event;
 use frame_buffer::{Coord, FrameBuffer, Pixel};
 
-/// Trait for windows. A window manager holds a list of objects who implement the `WindowProfile` trait.
-/// A `Window` provides states required by the window manager such as the size, the loaction and the active state of a window.
+/// Trait for window profile. A window manager holds a list of objects who implement the `WindowProfile` trait.
+/// A `WindowProfile` provides states required by the window manager such as the size, the loaction and the active state of a window.
 pub trait WindowProfile {
     /// Clears the window on the screen including the border and padding.
     fn clear(&mut self) -> Result<(), &'static str>;

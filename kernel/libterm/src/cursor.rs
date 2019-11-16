@@ -153,7 +153,7 @@ impl Cursor for CursorComponent {
     }
 }
 
-/// The cursor structure used in the primitive display subsystem.
+/// The generic cursor structure used in the primitive display subsystem.
 /// A cursor is a special symbol shown in the text box of a terminal. It indicates the position of character where the next input would be put or the delete operation works on.
 /// Terminal invokes its `display` method in a loop to let a cursor blink.
 pub struct CursorGeneric {

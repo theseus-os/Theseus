@@ -28,7 +28,8 @@
 //! * `event_types`: A temporary way to move the input_event_manager typedefs out of the input_event_manager crate.
 //! * `device_manager`: Code for handling the sequence required to initialize each driver.
 //! * `displayable`: Defines a displayable trait. A displayable can display itself in a framebuffer.
-//! * `text_generic`: A text display is a displayable. It contains a block of text and can display in a framebuffer.
+//! * `text_primitive`: Defines a primitive text displayable. It contains a block of text and can display in a framebuffer.
+//! * `text_area`: Defines a primitive text displayable used in the alpha window manager. It contains a block of text and can display in its default window.
 //! * `e1000`: Support for the e1000 NIC and driver.
 //! * `exceptions_early`: Early exception handlers that do nothing but print an error and hang.
 //! * `exceptions_full`: Exception handlers that are more fully-featured, i.e., kills tasks on an exception.
@@ -65,5 +66,7 @@
 //! * `vfs_node`: contains the structs VFSDirectory and VFSFile, which are the most basic, generic implementers of the traits Directory and File
 //! * `vga_buffer`: Simple routines for printing to the screen using the x86 VGA buffer text mode.
 //! * `window`: Defines a trait for window.
-//! * `window_manager`: Provides a structure of window manager.
-//! * `window_manager`: Defines a generic window structure which implements the Window trait. Maintains a window manager which contains a list of generic window. 
+//! * `window_list_primitve`: Provides a structure of the primitive window manager.
+//! * `window_manager_primitve`: Defines a primitive window structure which implements the `Window` trait. Maintains a window manager which contains a list of generic window. 
+//! * `window_components`: Defines a `WindowComponents` structure which implements the `Window` trait. Used in the alpha window manager.
+//! * `window_manager_alpha`: Maintains a window manager which handles the alpha channel

@@ -11,12 +11,12 @@ extern crate spin;
 extern crate downcast_rs;
 
 use alloc::boxed::Box;
-use core::cmp::{Ord, Ordering};
-use core::ops::{Add, Sub};
 use downcast_rs::Downcast;
 use memory::MappedPages;
 use owning_ref::BoxRefMut;
 use spin::{Mutex, Once};
+use core::ops::{Add, Sub};
+use core::cmp::{Ord, Ordering};
 
 /// A pixel on the screen is mapped to a u32 integer.
 pub type Pixel = u32;
@@ -29,14 +29,14 @@ pub trait FrameBuffer: Downcast + Send {
     /// Returns a reference to the mapped memory.
     fn buffer(&self) -> &BoxRefMut<MappedPages, [Pixel]>;
 
-    /// Gets the size of the framebuffer.
+    /// Gets the size of the framebuffer. 
     /// Returns (width, height).
     fn get_size(&self) -> (usize, usize);
 
     /// Copies a buffer of pixels to the framebuffer from index `dest_start`.
     fn buffer_copy(&mut self, src: &[Pixel], dest_start: usize);
 
-    /// Get the pixel at `coordinate`
+    /// Get the pixel at `coordinate` relative to the top-left point of the framebuffer
     fn get_pixel(&self, coordinate: Coord) -> Result<Pixel, &'static str>;
 
     /// Fill the framebuffer with `color`
@@ -56,10 +56,8 @@ pub trait FrameBuffer: Downcast + Send {
     /// Checks if a coordinate is within the framebuffer.
     fn contains(&self, coordinate: Coord) -> bool {
         let (width, height) = self.get_size();
-        coordinate.x >= 0
-            && coordinate.x < width as isize
-            && coordinate.y >= 0
-            && coordinate.y < height as isize
+        coordinate.x >= 0 && coordinate.x < width as isize
+            && coordinate.y >= 0 && coordinate.y < height as isize
     }
 
     /// Draws a pixel at the given `coordinate` within the frame buffer. The `coordinate` is relative to the origin(top-left point) of the frame buffer.  The new pixel will overwrite the previous one.
@@ -72,16 +70,14 @@ pub trait FrameBuffer: Downcast + Send {
     /// * `height`: the height of the area.
     fn overlaps_with(&mut self, coordinate: Coord, width: usize, height: usize) -> bool {
         let (buffer_width, buffer_height) = self.get_size();
-        coordinate.x < buffer_width as isize
-            && coordinate.x + width as isize >= 0
-            && coordinate.y < buffer_height as isize
-            && coordinate.y + height as isize >= 0
+        coordinate.x < buffer_width as isize && coordinate.x + width as isize >= 0
+            && coordinate.y < buffer_height as isize && coordinate.y + height as isize >= 0
     }
 
     /// Draws a pixel at the given `coordinate` relative to the origin(top-left point) of the frame buffer. The new pixel is a mix of original pixel and `color` according to the type of the framebuffer.
     fn draw_pixel(&mut self, coordinate: Coord, color: Pixel);
 
-    /// Draw a circles in the framebuffer. `coordinate` is the position of the center of the circle, and `r` is the radius
+    /// Draw a circles in the framebuffer. `coordinate` is the position of the center of the circle relative to the top-left corner of the framebuffer and `r` is the radius
     fn draw_circle(&mut self, center: Coord, r: usize, color: Pixel) {
         let r2 = (r * r) as isize;
         for y in center.y - r as isize..center.y + r as isize {
@@ -140,10 +136,7 @@ impl Add<(isize, isize)> for Coord {
     type Output = Coord;
 
     fn add(self, rhs: (isize, isize)) -> Coord {
-        Coord {
-            x: self.x + rhs.0,
-            y: self.y + rhs.1,
-        }
+        Coord { x: self.x + rhs.0, y: self.y + rhs.1 }
     }
 }
 
@@ -151,10 +144,7 @@ impl Sub<(isize, isize)> for Coord {
     type Output = Coord;
 
     fn sub(self, rhs: (isize, isize)) -> Coord {
-        Coord {
-            x: self.x - rhs.0,
-            y: self.y - rhs.1,
-        }
+        Coord { x: self.x - rhs.0, y: self.y - rhs.1 }
     }
 }
 
@@ -189,6 +179,7 @@ impl Ord for Coord {
         } else {
             return self.x.cmp(&other.x);
         }
+
     }
 }
 
@@ -198,4 +189,4 @@ impl PartialOrd for Coord {
     }
 }
 
-impl Eq for Coord {}
+impl Eq for Coord { }

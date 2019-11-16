@@ -5,7 +5,7 @@
 //!
 //! The order of windows is based on the last time it becomes active. The one which was active most recently is at the top of the background list.
 //!
-//! The `window_manager` crate holds an instance of `WindowListPrimitive` for existing windows. In the future, we will implement different kinds of `WindowListPrimitive` and therefore have different kinds of window manager in Theseus.
+//! The `window_manager_primitve` crate holds an instance of `WindowListPrimitive` for existing windows. In the future, we will implement different kinds of `WindowListPrimitive` and therefore have different kinds of window manager in Theseus.
 
 #![no_std]
 
@@ -210,6 +210,7 @@ impl<T: WindowProfile> WindowListPrimitive<T> {
 
         None
     }*/
+
     
 }
 

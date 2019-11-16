@@ -69,13 +69,13 @@ const WINDOW_BUTTON_BETWEEN: usize = 15;
 /// the button size, in number of pixels
 const WINDOW_BUTTON_SIZE: usize = 6;
 
-/// The buttons shown in title bar
+// The buttons shown in title bar
 enum TopButton {
-    /// Button to close the window
+    // Button to close the window
     Close,
-    /// Button to minimize/maximize the window (depends on the current state)
+    // Button to minimize/maximize the window (depends on the current state)
     MinimizeMaximize,
-    /// Button to hide the window
+    // Button to hide the window
     Hide,
 }
 

@@ -36,8 +36,8 @@ path = "../../kernel/frame_buffer"
 [dependencies.text_area]
 path = "../../kernel/displayable/text_area"
 
-[dependencies.text_generic]
-path = "../../kernel/displayable/text_generic"
+[dependencies.text_primitive]
+path = "../../kernel/displayable/text_primitive"
 
 [dependencies.window_components]
 path = "../../kernel/window_components"

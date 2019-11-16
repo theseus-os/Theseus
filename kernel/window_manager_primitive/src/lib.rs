@@ -423,7 +423,7 @@ impl WindowProfile for WindowProfilePrimitive {
             framebuffer: buffer,
             coordinate: Coord { x: 0, y: 0 },
             blocks: None
-        };
+        };        
         FRAME_COMPOSITOR.lock().composite(vec![frame_buffer_blocks].into_iter())
     }
 

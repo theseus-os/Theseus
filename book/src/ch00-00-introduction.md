@@ -43,7 +43,7 @@ One-line summaries of what each crate includes (may be incomplete):
 * `serial_port`: simple driver for writing to the serial_port, used mostly for debugging.
 * `spawn`: Functions and wrappers for spawning new Tasks.
 * `task`: Task types and structure definitions, a Task is a thread of execution.
-* `text_generic` : Defines a trait for anything that can display text to the screen
+* `text_display` : Defines a trait for anything that can display text to the screen
 * `tsc`: TSC (TimeStamp Counter) support for performance counters on x86. Basically a wrapper around rdtsc.
 * `tss`: TSS (Task State Segment support (x86 only) for Theseus.
 * `vfs_node`: contains the structs VFSDirectory and VFSFile, which are the most basic, generic implementers of the traits Directory and File

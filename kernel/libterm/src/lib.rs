@@ -57,7 +57,7 @@ pub enum ScrollError {
 ///     - Consumer is the main terminal loop
 ///     - Producer is the window manager. Window manager is responsible for enqueuing keyevents into the active application
 pub struct Terminal {
-    /// The terminal's own window, this is a `Window` trait object which handles the events of user input properly like moving window and close window
+    /// The terminal's own window. This is a `Window` trait object which handles the events of user input properly like moving window and close window
     window: Box<dyn Window>,
     /// Name of the text displayable of the terminal
     display_name: String,
@@ -121,9 +121,9 @@ impl Terminal {
             let mut last_line_chars = 0;
             // Case where the last newline does not occur at the end of the slice
             if new_line_indices[0].0 != slice.len() - 1 {
-                start_idx -= slice.len() - 1 - new_line_indices[0].0;
-                total_lines += (slice.len() - 1 - new_line_indices[0].0) / buffer_width + 1;
-                last_line_chars = (slice.len() - 1 - new_line_indices[0].0) % buffer_width; // fix: account for more than one line
+                start_idx -= slice.len() -1 - new_line_indices[0].0;
+                total_lines += (slice.len() -1 - new_line_indices[0].0)/buffer_width + 1;
+                last_line_chars = (slice.len() -1 - new_line_indices[0].0) % buffer_width; // fix: account for more than one line
             }
             else {
                 start_idx -= 1;
@@ -170,10 +170,7 @@ impl Terminal {
             }
 
             // If the previous loop overcounted, this cuts off the excess string from string. Happens when there are many charcters between newlines at the beginning of the slice
-            return (
-                start_idx,
-                (total_lines - 1) * buffer_width + last_line_chars,
-            );
+            return (start_idx, (total_lines - 1) * buffer_width + last_line_chars);
         } else {
             return (0,0); /* WARNING: should change to Option<> rather than returning (0, 0) */
         }   
@@ -189,7 +186,7 @@ impl Terminal {
         let result;
         // Grabs a max-size slice of the scrollback buffer (usually does not totally fit because of newlines)
         if start_idx + buffer_width * buffer_height > scrollback_buffer_len {
-            result = self.scrollback_buffer.get(start_idx..scrollback_buffer_len - 1);
+            result = self.scrollback_buffer.get(start_idx..scrollback_buffer_len-1);
         } else {
             result = self.scrollback_buffer.get(start_idx..start_idx + buffer_width * buffer_height);
         }
@@ -203,7 +200,7 @@ impl Terminal {
             if new_line_indices.len() == 0 {
                 // indicates that the text is just one continuous string with no newlines and will therefore fill the buffer completely
                 end_idx += buffer_height * buffer_width;
-                if end_idx <= self.scrollback_buffer.len() - 1 {
+                if end_idx <= self.scrollback_buffer.len() -1 {
                     return Ok(end_idx); 
                 } else {
                     return Err(ScrollError::OffEndBound);
@@ -244,7 +241,7 @@ impl Terminal {
                 end_idx += last_line_chars;
             }
 
-            if end_idx <= self.scrollback_buffer.len() - 1 {
+            if end_idx <= self.scrollback_buffer.len() -1 {
                 return Ok(end_idx); 
             } else {
                 return Err(ScrollError::OffEndBound);
@@ -280,7 +277,7 @@ impl Terminal {
             let index = slice.rfind('\n');   
             new_start_idx = match index {
                 Some(index) => { start_idx - slice_len + index }, // Moves the starting index back to the position of the nearest newline back
-                None => { start_idx - slice_len }, // If no newline is found, moves the start index back by the buffer width value
+                None => { start_idx - slice_len}, // If no newline is found, moves the start index back by the buffer width value
             }; // we're moving the cursor one position to the right relative to the end of the input string
         } else {
             return;
@@ -319,10 +316,10 @@ impl Terminal {
             // Grabs a slice (the size of the buffer width at most) of the scrollback buffer that is directly below the current slice being displayed on the text display
             if self.scrollback_buffer.len() > end_idx + buffer_width {
                 slice_len = buffer_width;
-                result = self.scrollback_buffer.as_str().get(end_idx..end_idx + buffer_width);
+                result = self.scrollback_buffer.as_str().get(end_idx .. end_idx + buffer_width);
             } else {
-                slice_len = self.scrollback_buffer.len() - end_idx - 1;
-                result = self.scrollback_buffer.as_str().get(end_idx..self.scrollback_buffer.len());
+                slice_len = self.scrollback_buffer.len() - end_idx -1;
+                result = self.scrollback_buffer.as_str().get(end_idx .. self.scrollback_buffer.len());
             }
             // Searches the grabbed slice for a newline
             if let Some(slice) = result {
@@ -425,16 +422,16 @@ impl Terminal {
         Ok(())
     }
 
-    // Gets a refrence to the text displayable of this terminal
+    /// Gets a refrence to the text displayable of this terminal
     fn get_text_display(&self) -> Result<(&dyn TextDisplayable), &'static str> {
-        let text_generic = self.window.get_displayable(&self.display_name)?;
-        text_generic.as_text()
+        let text_primitive = self.window.get_displayable(&self.display_name)?;
+        text_primitive.as_text()
     }
 
-    // Gets a mutable refrence to the text displayable of this terminal
+    /// Gets a mutable refrence to the text displayable of this terminal
     fn get_text_display_mut(&mut self) -> Result<(&mut dyn TextDisplayable), &'static str> {
-        let text_generic = self.window.get_displayable_mut(&self.display_name)?;
-        text_generic.as_text_mut()
+        let text_primitive = self.window.get_displayable_mut(&self.display_name)?;
+        text_primitive.as_text_mut()
     }
 }
 
@@ -637,9 +634,9 @@ impl Terminal {
         let coordinate = self.window.get_displayable_position(&self.display_name)?;
         // get info about the text displayable
         let (col_num, line_num, text_next_pos) = {
-            let text_generic = self.get_text_display_mut()?;
-            let text_next_pos = text_generic.get_next_index();
-            let (col_num, line_num) = text_generic.get_dimensions();
+            let text_primitive = self.get_text_display_mut()?;
+            let text_next_pos = text_primitive.get_next_index();
+            let (col_num, line_num) = text_primitive.get_dimensions();
             (col_num, line_num, text_next_pos)
         };
 

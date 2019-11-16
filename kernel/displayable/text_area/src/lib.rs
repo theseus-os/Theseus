@@ -1,7 +1,5 @@
-//! This crate defines a text displayable.
-//! A text displayable profiles a block of text to be displayed onto a framebuffer.
-//!
-//! This crate also defines a cursor structure. A cursor is a special symbol which can be displayed. The structure specifies the size and blink frequency and implements the blink method for a cursor. It also provides a display function for the cursor.
+//! This crate defines `TextArea` as a text displayable.
+//! A text area profiles a block of text and contains a reference to its default window. It is able to display in its window.
 
 #![no_std]
 

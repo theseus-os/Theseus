@@ -1,6 +1,6 @@
 //! Input event manager responsible for handling user input into Theseus
 //! 
-//! Input event manager spawns a default terminal
+//! Input event manager spawns a default terminal 
 //! Currently, this default terminal cannot be closed because it is the log point for all messages from the kernel
 //! 
 //! Input event manager takes keyinputs from the keyboard crate, handles any meta-keypresses (i.e. those for
@@ -85,7 +85,7 @@ pub fn init() -> Result<(DFQueueProducer<Event>, DFQueueProducer<Event>), &'stat
     let app_io_path = default_app_namespace.get_crate_file_starting_with("app_io-")
         .ok_or("Couldn't find terminal application in default app namespace")?;
 
-    // initialize two kinds of display subsystem
+    // initialize alpha display subsystem
     #[cfg(not(primitive_display_sys))]
     {
         let (width, height) = frame_buffer_alpha::init()?;
@@ -97,6 +97,7 @@ pub fn init() -> Result<(DFQueueProducer<Event>, DFQueueProducer<Event>), &'stat
         )?;
     }
 
+    // initialize primitive display subsystem
     #[cfg(primitive_display_sys)]
     {
         font::init()?;

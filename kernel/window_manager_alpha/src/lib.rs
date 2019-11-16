@@ -158,7 +158,7 @@ impl<U: WindowProfile> WindowManagerAlpha<U> {
         Ok(())
     }
 
-    // Return the index of a window if it is in the show list
+    /// Return the index of a window if it is in the show list
     fn is_window_in_show_list(&mut self, objref: &Arc<Mutex<U>>) -> Option<usize> {
         let mut i = 0_usize;
         for item in self.show_list.iter() {
@@ -172,7 +172,7 @@ impl<U: WindowProfile> WindowManagerAlpha<U> {
         None
     }
 
-    // Return the index of a window if it is in the hide list
+    /// Return the index of a window if it is in the hide list
     fn is_window_in_hide_list(&mut self, objref: &Arc<Mutex<U>>) -> Option<usize> {
         let mut i = 0_usize;
         for item in self.hide_list.iter() {
@@ -221,7 +221,7 @@ impl<U: WindowProfile> WindowManagerAlpha<U> {
         Err("cannot find this window")
     }
 
-    // Recompute single pixel within show_list in a reduced complexity, by compute pixels under it only if it is not opaque
+    /// Recompute single pixel within show_list in a reduced complexity, by compute pixels under it only if it is not opaque
     fn recompute_single_pixel_show_list(&self, coordinate: Coord, idx: usize) -> AlphaPixel {
         if idx >= self.show_list.len() {
             // screen should be 1280*1080 but background figure is just 640*540
@@ -264,7 +264,7 @@ impl<U: WindowProfile> WindowManagerAlpha<U> {
         }
     }
 
-    // refresh one pixel on frame buffer
+    /// refresh one pixel on frame buffer
     fn refresh_single_pixel_with_buffer(&mut self, coordinate: Coord) -> Result<(), &'static str> {
         if !self.final_fb.contains(coordinate) {
             return Ok(());
@@ -436,7 +436,7 @@ impl<U: WindowProfile> WindowManagerAlpha<U> {
         return Ok(()); // don't need to update this pixel because it is not displayed on the screen
     }
 
-    // refresh an area by recompute every pixel in this region and update on the screen
+    /// refresh an area by recompute every pixel in this region and update on the screen
     fn refresh_area(&mut self, mut start: Coord, mut end: Coord) -> Result<(), &'static str> {
         let (width, height) = self.final_fb.get_size();
         start.x = core::cmp::max(start.x, 0);
@@ -453,7 +453,7 @@ impl<U: WindowProfile> WindowManagerAlpha<U> {
         Ok(())
     }
 
-    // refresh an rectangle border
+    /// refresh an rectangle border
     fn refresh_rect_border(
         &mut self,
         mut start: Coord,
@@ -491,7 +491,7 @@ impl<U: WindowProfile> WindowManagerAlpha<U> {
         Ok(())
     }
 
-    // pass keyboard event to currently active window
+    /// pass keyboard event to currently active window
     fn pass_keyboard_event_to_window(&self, key_event: KeyEvent) -> Result<(), &'static str> {
         if let Some(current_active) = self.active.upgrade() {
             let mut current_active_win = current_active.lock();
@@ -502,7 +502,7 @@ impl<U: WindowProfile> WindowManagerAlpha<U> {
         Err("cannot find window to pass key event")
     }
 
-    // pass mouse event to the top window that mouse on, may also transfer to those want all events
+    /// pass mouse event to the top window that mouse on, may also transfer to those want all events
     fn pass_mouse_event_to_window(&self, mouse_event: MouseEvent) -> Result<(), &'static str> {
         let coordinate = { &self.mouse };
         let mut event: MousePositionEvent = MousePositionEvent {
@@ -575,10 +575,10 @@ impl<U: WindowProfile> WindowManagerAlpha<U> {
         Err("cannot find window to pass")
     }
 
-    // refresh the floating border indicating user of new window position and size. `show` indicates whether to show the border or not.
-    // (x_start, x_end, y_start, y_end) indicates the position and size of this border.
-    // if this is not clear, you can simply try this attribute by pressing left mouse on the top bar of any window and move the mouse, then you should see a thin border
-    // this is extremely useful when performance is not enough for re-render the whole window when moving the mouse
+    /// refresh the floating border indicating user of new window position and size. `show` indicates whether to show the border or not.
+    /// (x_start, x_end, y_start, y_end) indicates the position and size of this border.
+    /// if this is not clear, you can simply try this attribute by pressing left mouse on the top bar of any window and move the mouse, then you should see a thin border
+    /// this is extremely useful when performance is not enough for re-render the whole window when moving the mouse
     fn refresh_floating_border(
         &mut self,
         show: bool,
@@ -614,9 +614,9 @@ impl<U: WindowProfile> WindowManagerAlpha<U> {
         Ok(())
     }
 
-    // optimized refresh area for less computation up to 2x
-    // it works like this: first refresh all the region of new position, which let user see the new content faster
-    // then it try to reduce computation by only refresh the region that is in old one but NOT in new one.
+    /// optimized refresh area for less computation up to 2x
+    /// it works like this: first refresh all the region of new position, which let user see the new content faster
+    /// then it try to reduce computation by only refresh the region that is in old one but NOT in new one.
     fn refresh_area_with_old_new(
         &mut self,
         old_start: Coord,
@@ -663,7 +663,7 @@ impl<U: WindowProfile> WindowManagerAlpha<U> {
         Ok(())
     }
 
-    // private function: take active window's base position and current mouse, move the window with delta
+    /// private function: take active window's base position and current mouse, move the window with delta
     fn move_active_window(&mut self) -> Result<(), &'static str> {
         if let Some(current_active) = self.active.upgrade() {
             let (old_start, old_end, new_start, new_end) = {
@@ -956,7 +956,7 @@ impl WindowProfile for WindowProfileAlpha {
     }
 }
 
-/// handles all keyboard and mouse movement in this window manager
+// handles all keyboard and mouse movement in this window manager
 fn window_manager_loop(
     consumer: (DFQueueConsumer<Event>, DFQueueConsumer<Event>),
 ) -> Result<(), &'static str> {
