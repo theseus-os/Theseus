@@ -17,8 +17,8 @@
 
 #[macro_use] extern crate lazy_static;
 #[macro_use] extern crate log;
-extern crate spin;
 extern crate stdio;
+extern crate spin;
 #[macro_use] extern crate alloc;
 extern crate core_io;
 extern crate frame_buffer;
@@ -44,8 +44,8 @@ extern crate window_manager_primitive;
 
 use alloc::boxed::Box;
 use alloc::collections::BTreeMap;
-use alloc::string::String;
 use alloc::sync::Arc;
+use alloc::string::String;
 use alloc::vec::Vec;
 use libterm::Terminal;
 use spin::{Mutex, MutexGuard};
@@ -102,8 +102,7 @@ impl IoControlFlags {
 }
 
 impl IoStreams {
-    pub fn new(stdin: StdioReader,
-               stdout: StdioWriter,
+    pub fn new(stdin: StdioReader, stdout: StdioWriter,
                stderr: StdioWriter,
                key_event_reader: Arc<Mutex<Option<KeyEventQueueReader>>>,
                terminal: Arc<Mutex<Terminal>>) -> IoStreams {
@@ -163,8 +162,8 @@ mod shared_maps {
 lazy_static! {
     /// The default terminal.
     static ref DEFAULT_TERMINAL: Option<Arc<Mutex<Terminal>>> = {
-        // Create a new window, a text area, a cursor.
-        // For different display subsystem, the objects above are of different implementation.
+        // Create a new window, a text area and a cursor.
+        // In different display subsystems, the objects above are of different implementation.
         #[cfg(not(primitive_display_sys))]
         let (window, textarea, cursor) = {
             let (window_width, window_height) = match window_manager_alpha::get_screen_size(){
@@ -172,7 +171,7 @@ lazy_static! {
                 Err(err) => { debug!("Fail to create the framebuffer: {}", err); return None; }
             };
             const WINDOW_MARGIN: usize = 20;
-            let framebuffer = match FrameBufferAlpha::new(window_width - 2*WINDOW_MARGIN, window_height - 2*WINDOW_MARGIN, None){
+            let framebuffer = match FrameBufferAlpha::new(window_width - 2 * WINDOW_MARGIN, window_height - 2 * WINDOW_MARGIN, None){
                 Ok(fb) => fb,
                 Err(err) => { debug!("Fail to create the framebuffer: {}", err); return None; }
             };
@@ -191,7 +190,7 @@ lazy_static! {
                 const TEXTAREA_BORDER: usize = 4;
                 match TextArea::new(
                     Coord::new((window.get_border_size() + TEXTAREA_BORDER) as isize, (window.get_title_size() + TEXTAREA_BORDER) as isize),
-                    width_inner - 2*TEXTAREA_BORDER, height_inner - 2*TEXTAREA_BORDER,
+                    width_inner - 2 * TEXTAREA_BORDER, height_inner - 2 * TEXTAREA_BORDER,
                     &window.winobj, None, None, Some(window.get_background()), None
                 ) {
                     Ok(m) => m,
@@ -250,7 +249,7 @@ lazy_static! {
 /// terminal is returned. Otherwise, the default terminal is assigned to the calling application
 /// and then returned.
 pub fn get_terminal_or_default() -> Result<Arc<Mutex<Terminal>>, &'static str> {
-
+    
     let task_id = task::get_my_current_task_id()
                       .ok_or("Cannot get task ID for getting default terminal")?;
 
@@ -356,7 +355,7 @@ pub fn take_key_event_queue() -> Result<KeyEventReadGuard, &'static str> {
             match queues.key_event_reader.lock().take() {
                 Some(reader) => Ok(KeyEventReadGuard::new(
                     reader,
-                    Box::new(|reader: &mut Option<KeyEventQueueReader>| { return_event_queue(reader); }),
+                    Box::new(|reader: &mut Option<KeyEventQueueReader>|  { return_event_queue(reader); }),
                 )),
                 None => Err("currently the reader to key event queue is not available")
             }

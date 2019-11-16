@@ -481,6 +481,8 @@ help:
 	@echo -e "\t Builds the Theseus book using the mdbook Markdown tool."
 	@echo -e "   view-book:"
 	@echo -e "\t Builds the Theseus book and then opens it in your default browser."
+	@echo -e "   primitive:"
+	@echo -e "\t Runs Theseus with the primitive display subsystem"
 	@echo ""
 
 

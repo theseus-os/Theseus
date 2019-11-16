@@ -257,7 +257,7 @@ pub fn main(_args: Vec<String>) -> isize {
     }
 }
 
-/// get current time for cursor blinking
+// get current time for cursor blinking
 fn get_time() -> u64 {
     match get_hpet().as_ref() {
         Some(m) => m.get_counter(),
@@ -268,7 +268,7 @@ fn get_time() -> u64 {
     }
 }
 
-/// set cursor to a new position and restore the old one
+// set cursor to a new position and restore the old one
 fn move_cursor_restore_old(
     char_matrix: &mut Vec<u8>,
     text_cursor: &mut usize,
