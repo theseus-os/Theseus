@@ -431,25 +431,29 @@ impl WindowComponents {
         let height = winobj.height;
         winobj
             .framebuffer
-            .draw_rect(0, self.border_size, self.title_size, height, border_color);
+            .draw_rect(
+                Coord::new(0, self.title_size as isize),
+                Coord::new(self.border_size as isize, height as isize),
+                border_color
+            );
         winobj
             .framebuffer
-            .draw_rect(0, width, height - self.border_size, height, border_color);
+            .draw_rect(
+                Coord::new(0, (height - self.border_size) as isize),
+                Coord::new(width as isize, height as isize),
+                border_color
+            );
         winobj.framebuffer.draw_rect(
-            width - self.border_size,
-            width,
-            self.title_size,
-            height,
+            Coord::new((width - self.border_size) as isize, self.title_size as isize),
+            Coord::new(width as isize, height as isize),
             border_color,
         );
         // then draw the title bar
         if active {
             for i in 0..self.title_size {
                 winobj.framebuffer.draw_rect(
-                    0,
-                    width,
-                    i,
-                    i + 1,
+                    Coord::new(0, i as isize),
+                    Coord::new(width as isize, i as isize + 1),
                     WINDOW_BORDER_COLOR_ACTIVE_BOTTOM.color_mix(
                         WINDOW_BORDER_COLOR_ACTIVE_TOP,
                         (i as f32) / (self.title_size as f32),
@@ -459,7 +463,11 @@ impl WindowComponents {
         } else {
             winobj
                 .framebuffer
-                .draw_rect(0, width, 0, self.title_size, border_color);
+                .draw_rect(
+                    Coord::new(0, 0),
+                    Coord::new(width as isize, self.title_size as isize),
+                    border_color
+                );
         }
         // draw radius finally
         let r2 = WINDOW_RADIUS * WINDOW_RADIUS;

@@ -97,12 +97,12 @@ pub trait FrameBuffer: Downcast + Send {
         }
     }
 
-    /// draw a rectangle on this framebuffer
-    fn draw_rect(&mut self, xs: usize, xe: usize, ys: usize, ye: usize, color: Pixel) {
-        for y in ys..ye {
-            for x in xs..xe {
-                let coordinate = Coord::new(x as isize, y as isize);
-                self.overwrite_pixel(coordinate, color);
+    /// Draws a rectangle on this framebuffer.
+    fn draw_rect(&mut self, start: Coord, end: Coord, color: Pixel) {
+        for y in start.y..end.y {
+            for x in start.x..end.x {
+                let coordinate = Coord::new(x, y);
+                self.draw_pixel(coordinate, color);
             }
         }
     }
