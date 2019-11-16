@@ -1,0 +1,24 @@
+[package]
+name = "window_list_primitive"
+version = "0.1.0"
+authors = ["Wenqiu Yu <yuwenqiuj@gmail.com>"]
+description = "define a window list structure"
+build = "../../build.rs"
+
+[dependencies]
+spin = "0.4.10"
+
+[dependencies.frame_buffer_printer]
+path = "../frame_buffer_printer"
+
+[dependencies.event_types]
+path = "../event_types"
+
+[dependencies.window]
+path = "../window"
+
+[dependencies.frame_buffer]
+path = "../frame_buffer"
+
+[lib]
+crate-type = ["rlib"]
