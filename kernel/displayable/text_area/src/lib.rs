@@ -42,6 +42,7 @@ pub struct TextArea {
     /// the y dimension char count
     y_cnt: usize,
     char_matrix: Vec<u8>,
+    /// The default window of the text area
     pub winobj: Weak<Mutex<WindowProfileAlpha>>,
     next_index: usize,
     text: String,

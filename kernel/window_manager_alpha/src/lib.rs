@@ -860,7 +860,7 @@ pub fn init<Buffer: FrameBuffer>(
     Ok(())
 }
 
-/// Window object that should be owned by application
+/// Window object that should be owned by the manager. It implements the `WindowProfile` trait.
 pub struct WindowProfileAlpha {
     /// The position of the top-left corner of the window.
     /// It is relative to the top-left corner of the screen.

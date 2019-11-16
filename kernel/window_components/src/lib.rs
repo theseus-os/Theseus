@@ -1,6 +1,6 @@
 //! This Window Components is designated to help user to build easy-to-use GUI applications
 //!
-//! The `window_components` object should be owned by application, see `applications/new_window` as a demo to use this library
+//! The `window_components` object implements the `Window` trait. It should be owned by application, see `applications/new_window` as a demo to use this library
 //!
 //! This library will create a window with default title bar and border. It handles the commonly used interactions like moving
 //! the window or close the window. Also, it is responsible to show title bar differently when window is active. The library

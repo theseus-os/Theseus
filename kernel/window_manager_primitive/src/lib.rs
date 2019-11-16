@@ -1,6 +1,6 @@
-//! This crate acts as a manager of a list of windows. It defines a `WindowPrimitive` structure. The structure contains a `WindowProfile` structure which implements the `Window` trait.
+//! This crate acts as a manager of a list of windows. It defines a `WindowPrimitive` structure. The structure contains a `WindowProfilePrimitive` structure which implements the `WindowProfile` trait.
 //!
-//! The `WindowProfile` structure wraps information required by the window manager including the border, location and size of a window. The manager holds a `WindowListPrimitive` instance which maintains a list of references to `WindowProfile`s. It can add new windows to the list and switch among them.
+//! The `WindowProfilePrimitive` structure wraps information required by the window manager including the border, location and size of a window. The manager holds a `WindowListPrimitive` instance which maintains a list of references to `WindowProfile`s. It can add new windows to the list and switch among them.
 //!
 //! The `WindowPrimitive` structure consists of its profile, components, framebuffer and events consumer. An application invokes the `new_window` function to create a `WindowPrimitive` object and get a reference to it. The window manager would add the profile to the window list in creating a new `WindowPrimitive` object and the profile would be deleted when the object is dropped.
 //!

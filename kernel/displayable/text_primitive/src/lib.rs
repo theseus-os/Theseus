@@ -39,7 +39,7 @@ impl TextDisplayable for TextPrimitive {
         let col_num = self.width / CHARACTER_WIDTH;
         self.next_line * col_num + self.next_col
     }
-    
+
     fn set_text(&mut self, text: &str) {
         self.text = String::from(text);
     }
@@ -102,7 +102,7 @@ impl Displayable for TextPrimitive {
 }
 
 impl TextPrimitive {
-    /// Creates a new text displayable.
+    /// Creates a new primitive text displayable.
     /// # Arguments
     /// * `(width, height)`: the size of the text area.
     /// * `(fg_color, bg_color)`: the foreground and background color of the text area.

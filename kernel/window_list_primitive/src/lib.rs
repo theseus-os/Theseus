@@ -1,6 +1,6 @@
 //! Defines a `WindowListPrimitive` structure that maintains a list of active and inactive windows.
 //!
-//! A window list contains a list of background windows and an active window. It provides methods to switch among them.
+//! A primitive window list contains a list of background windows and an active window. It provides methods to switch among them.
 //! Once an active window is deleted or set as inactive, the next window in the background list will become active.
 //!
 //! The order of windows is based on the last time it becomes active. The one which was active most recently is at the top of the background list.
@@ -211,7 +211,7 @@ impl<T: WindowProfile> WindowListPrimitive<T> {
         None
     }*/
 
-    
+
 }
 
 /*  Following two functions can be used to systematically resize windows forcibly
