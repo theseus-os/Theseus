@@ -51,17 +51,18 @@ use spawn::{ApplicationTaskBuilder, KernelTaskBuilder};
 use spin::{Mutex, Once};
 use window::WindowProfile;
 
+/// The alpha window manager
 pub static WINDOW_MANAGER: Once<Mutex<WindowManagerAlpha<WindowProfileAlpha>>> = Once::new();
 
-/// The half size of mouse in number of pixels, the actual size of pointer is 1+2*`MOUSE_POINTER_HALF_SIZE`
+// The half size of mouse in number of pixels, the actual size of pointer is 1+2*`MOUSE_POINTER_HALF_SIZE`
 const MOUSE_POINTER_HALF_SIZE: usize = 7;
-/// Transparent pixel
+// Transparent pixel
 const T: AlphaPixel = 0xFF000000;
-/// Opaque white
+// Opaque white
 const O: AlphaPixel = 0x00FFFFFF;
-/// Opaque blue
+// Opaque blue
 const B: AlphaPixel = 0x00000FF;
-/// the mouse picture
+// the mouse picture
 static MOUSE_BASIC: [[AlphaPixel; 2 * MOUSE_POINTER_HALF_SIZE + 1];
     2 * MOUSE_POINTER_HALF_SIZE + 1] = [
     [T, T, T, T, T, T, T, T, T, T, T, T, T, T, T],
@@ -81,14 +82,14 @@ static MOUSE_BASIC: [[AlphaPixel; 2 * MOUSE_POINTER_HALF_SIZE + 1];
     [T, T, T, T, T, T, B, T, T, T, T, T, T, B, B],
 ];
 
-/// the border indicating new window position and size
+// the border indicating new window position and size
 const WINDOW_BORDER_SIZE: usize = 3;
-/// border's inner color
+// border's inner color
 const WINDOW_BORDER_COLOR_INNER: AlphaPixel = 0x00CA6F1E;
-/// border's outer color
+// border's outer color
 const WINDOW_BORDER_COLOR_OUTTER: AlphaPixel = 0xFFFFFFFF;
 
-/// a rectangle region
+// a rectangle region
 struct RectRegion {
     start: Coord,
     end: Coord,
@@ -157,7 +158,7 @@ impl<U: WindowProfile> WindowManagerAlpha<U> {
         Ok(())
     }
 
-    /// judge whether this window is in hide list and return the index of it
+    // Return the index of a window if it is in the show list
     fn is_window_in_show_list(&mut self, objref: &Arc<Mutex<U>>) -> Option<usize> {
         let mut i = 0_usize;
         for item in self.show_list.iter() {
@@ -171,7 +172,7 @@ impl<U: WindowProfile> WindowManagerAlpha<U> {
         None
     }
 
-    /// judge whether this window is in hide list and return the index of it
+    // Return the index of a window if it is in the hide list
     fn is_window_in_hide_list(&mut self, objref: &Arc<Mutex<U>>) -> Option<usize> {
         let mut i = 0_usize;
         for item in self.hide_list.iter() {
@@ -185,7 +186,7 @@ impl<U: WindowProfile> WindowManagerAlpha<U> {
         None
     }
 
-    /// delete one window if exists, refresh its region then
+    /// delete a window and refresh its region
     pub fn delete_window(&mut self, objref: &Arc<Mutex<U>>) -> Result<(), &'static str> {
         let (start, end) = {
             let winobj = objref.lock();
@@ -220,7 +221,7 @@ impl<U: WindowProfile> WindowManagerAlpha<U> {
         Err("cannot find this window")
     }
 
-    /// Recompute single pixel within show_list in a reduced complexity, by compute pixels under it only if it is not opaque
+    // Recompute single pixel within show_list in a reduced complexity, by compute pixels under it only if it is not opaque
     fn recompute_single_pixel_show_list(&self, coordinate: Coord, idx: usize) -> AlphaPixel {
         if idx >= self.show_list.len() {
             // screen should be 1280*1080 but background figure is just 640*540
@@ -263,7 +264,7 @@ impl<U: WindowProfile> WindowManagerAlpha<U> {
         }
     }
 
-    /// refresh one pixel on frame buffer
+    // refresh one pixel on frame buffer
     fn refresh_single_pixel_with_buffer(&mut self, coordinate: Coord) -> Result<(), &'static str> {
         if !self.final_fb.contains(coordinate) {
             return Ok(());
@@ -353,7 +354,7 @@ impl<U: WindowProfile> WindowManagerAlpha<U> {
                 }
             } else if right {
                 if top {
-                    // right-top
+                    // top-right
                     let dcoordinate =
                         Coord::new(scoordinate.x - s_end_1.x, start.y - scoordinate.y);
                     if (dcoordinate.x + dcoordinate.y) as usize <= WINDOW_BORDER_SIZE {
@@ -367,7 +368,7 @@ impl<U: WindowProfile> WindowManagerAlpha<U> {
                         );
                     }
                 } else if bottom {
-                    // right-bottom
+                    // bottom-right
                     let dcoordinate = scoordinate - s_end_1;
                     if (dcoordinate.x + dcoordinate.y) as usize <= WINDOW_BORDER_SIZE {
                         self.final_fb.draw_pixel(
@@ -435,7 +436,7 @@ impl<U: WindowProfile> WindowManagerAlpha<U> {
         return Ok(()); // don't need to update this pixel because it is not displayed on the screen
     }
 
-    /// refresh an area by recompute every pixel in this region and update on the screen
+    // refresh an area by recompute every pixel in this region and update on the screen
     fn refresh_area(&mut self, mut start: Coord, mut end: Coord) -> Result<(), &'static str> {
         let (width, height) = self.final_fb.get_size();
         start.x = core::cmp::max(start.x, 0);
@@ -452,7 +453,7 @@ impl<U: WindowProfile> WindowManagerAlpha<U> {
         Ok(())
     }
 
-    /// refresh an rectangle border
+    // refresh an rectangle border
     fn refresh_rect_border(
         &mut self,
         mut start: Coord,
@@ -490,7 +491,7 @@ impl<U: WindowProfile> WindowManagerAlpha<U> {
         Ok(())
     }
 
-    /// pass keyboard event to currently active window
+    // pass keyboard event to currently active window
     fn pass_keyboard_event_to_window(&self, key_event: KeyEvent) -> Result<(), &'static str> {
         if let Some(current_active) = self.active.upgrade() {
             let mut current_active_win = current_active.lock();
@@ -501,7 +502,7 @@ impl<U: WindowProfile> WindowManagerAlpha<U> {
         Err("cannot find window to pass key event")
     }
 
-    /// pass mouse event to the top window that mouse on, may also transfer to those want all events
+    // pass mouse event to the top window that mouse on, may also transfer to those want all events
     fn pass_mouse_event_to_window(&self, mouse_event: MouseEvent) -> Result<(), &'static str> {
         let coordinate = { &self.mouse };
         let mut event: MousePositionEvent = MousePositionEvent {
@@ -574,10 +575,10 @@ impl<U: WindowProfile> WindowManagerAlpha<U> {
         Err("cannot find window to pass")
     }
 
-    /// refresh the floating border indicating user of new window position and size. `show` indicates whether to show the border or not.
-    /// (x_start, x_end, y_start, y_end) indicates the position and size of this border.
-    /// if this is not clear, you can simply try this attribute by pressing left mouse on the top bar of any window and move the mouse, then you should see a thin border
-    /// this is extremely useful when performance is not enough for re-render the whole window when moving the mouse
+    // refresh the floating border indicating user of new window position and size. `show` indicates whether to show the border or not.
+    // (x_start, x_end, y_start, y_end) indicates the position and size of this border.
+    // if this is not clear, you can simply try this attribute by pressing left mouse on the top bar of any window and move the mouse, then you should see a thin border
+    // this is extremely useful when performance is not enough for re-render the whole window when moving the mouse
     fn refresh_floating_border(
         &mut self,
         show: bool,
@@ -613,9 +614,9 @@ impl<U: WindowProfile> WindowManagerAlpha<U> {
         Ok(())
     }
 
-    /// optimized refresh area for less computation up to 2x
-    /// it works like this: first refresh all the region of new position, which let user see the new content faster
-    /// then it try to reduce computation by only refresh the region that is in old one but NOT in new one.
+    // optimized refresh area for less computation up to 2x
+    // it works like this: first refresh all the region of new position, which let user see the new content faster
+    // then it try to reduce computation by only refresh the region that is in old one but NOT in new one.
     fn refresh_area_with_old_new(
         &mut self,
         old_start: Coord,
@@ -662,7 +663,7 @@ impl<U: WindowProfile> WindowManagerAlpha<U> {
         Ok(())
     }
 
-    /// private function: take active window's base position and current mouse, move the window with delta
+    // private function: take active window's base position and current mouse, move the window with delta
     fn move_active_window(&mut self) -> Result<(), &'static str> {
         if let Some(current_active) = self.active.upgrade() {
             let (old_start, old_end, new_start, new_end) = {
@@ -689,12 +690,6 @@ impl<U: WindowProfile> WindowManagerAlpha<U> {
         Ok(())
     }
 }
-
-/// delete the given window by removing it from any lists, then refresh the region so that it is deleted on screen
-/*pub fn delete_window(objref: &Arc<Mutex<Window>>) -> Result<(), &'static str> {
-    let mut win = WINDOW_MANAGER.try().ok_or("The static window manager was not yet initialized")?.lock();
-    win.delete_window(objref)
-}*/
 
 /// set window as active, the active window is always at top, so it will refresh the region of this window
 pub fn set_active(objref: &Arc<Mutex<WindowProfileAlpha>>) -> Result<(), &'static str> {
@@ -806,6 +801,7 @@ pub fn refresh_area_absolute(start: Coord, end: Coord) -> Result<(), &'static st
     }
 }
 
+/// Render the framebuffer of the window manager to the final buffer. Invoke this function after updating a window.
 pub fn render(blocks: Option<IntoIter<(usize, usize)>>) -> Result<(), &'static str> {
     let mut win = WINDOW_MANAGER
         .try()
@@ -866,8 +862,12 @@ pub fn init<Buffer: FrameBuffer>(
 
 /// Window object that should be owned by application
 pub struct WindowProfileAlpha {
+    /// The position of the top-left corner of the window.
+    /// It is relative to the top-left corner of the screen.
     pub coordinate: Coord,
+    /// The width of the window.
     pub width: usize,
+    /// The height of the window.
     pub height: usize,
     /// event consumer that could be used to get event input given to this window
     pub consumer: DFQueueConsumer<Event>, // event input
@@ -901,14 +901,13 @@ impl WindowProfile for WindowProfileAlpha {
         self.framebuffer.contains(coordinate)
     }
 
-    /// Adjusts the size (width, height) and coordinate of the window relative to the top-left corner of the screen.
     fn resize(
         &mut self,
         _coordinate: Coord,
         _width: usize,
         _height: usize,
     ) -> Result<(usize, usize), &'static str> {
-        // TODO: This system has not implemented resize
+        // TODO: This system hasn't implemented resize
         Ok((0, 0))
     }
 
@@ -916,13 +915,10 @@ impl WindowProfile for WindowProfileAlpha {
         (self.width, self.height)
     }
 
-    /// Gets the coordinate of content relative to top-left corner of the window without padding.
     fn get_content_position(&self) -> Coord {
-        // TODO
         self.coordinate
     }
 
-    /// Gets the producer of events.
     fn events_producer(&mut self) -> &mut DFQueueProducer<Event> {
         &mut self.producer
     }
@@ -1041,7 +1037,7 @@ fn window_manager_loop(
     }
 }
 
-/// handle keyboard event, push it to the active window if exists
+// handle keyboard event, push it to the active window if exists
 fn keyboard_handle_application(key_input: KeyEvent) -> Result<(), &'static str> {
     // Check for WM-level actions here, e.g., spawning a new terminal via Ctrl+Alt+T
     if key_input.modifiers.control
@@ -1088,7 +1084,7 @@ fn keyboard_handle_application(key_input: KeyEvent) -> Result<(), &'static str> 
     Ok(())
 }
 
-/// handle mouse event, push it to related window or anyone asked for it
+// handle mouse event, push it to related window or anyone asked for it
 fn cursor_handle_application(mouse_event: MouseEvent) -> Result<(), &'static str> {
     do_refresh_floating_border()?;
     let win = WINDOW_MANAGER
@@ -1104,7 +1100,7 @@ fn cursor_handle_application(mouse_event: MouseEvent) -> Result<(), &'static str
     Ok(())
 }
 
-/// return the screen size of current window manager, (width, height)
+/// return the screen size of current window manager as (width, height)
 pub fn get_screen_size() -> Result<(usize, usize), &'static str> {
     let win = WINDOW_MANAGER
         .try()
@@ -1113,7 +1109,7 @@ pub fn get_screen_size() -> Result<(usize, usize), &'static str> {
     Ok(win.final_fb.get_size())
 }
 
-/// return current absolute position of mouse, (x, y)
+/// return current absolute position of mouse as (x, y)
 pub fn get_cursor() -> Result<Coord, &'static str> {
     let win = WINDOW_MANAGER
         .try()
@@ -1122,7 +1118,7 @@ pub fn get_cursor() -> Result<Coord, &'static str> {
     Ok(win.mouse)
 }
 
-/// move mouse with delta, this will refresh mouse position
+// move mouse with delta, this will refresh mouse position
 fn move_cursor(x: isize, y: isize) -> Result<(), &'static str> {
     let old = get_cursor()?;
     let mut new = old + (x, y);
@@ -1143,7 +1139,7 @@ fn move_cursor(x: isize, y: isize) -> Result<(), &'static str> {
     Ok(())
 }
 
-/// move mouse to absolute position
+// move mouse to absolute position
 fn move_cursor_to(new: Coord) -> Result<(), &'static str> {
     let old = get_cursor()?;
     let mut win = WINDOW_MANAGER
@@ -1172,7 +1168,7 @@ fn move_cursor_to(new: Coord) -> Result<(), &'static str> {
     Ok(())
 }
 
-/// new window object with given position and size
+/// Creates a new window object with given position and size
 pub fn new_window<'a>(
     coordinate: Coord,
     framebuffer: Box<dyn FrameBuffer>,

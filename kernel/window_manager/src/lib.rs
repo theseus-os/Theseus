@@ -27,24 +27,24 @@ extern crate window_list;
 
 use alloc::boxed::Box;
 use alloc::collections::BTreeMap;
-use alloc::collections::VecDeque;
 use alloc::string::{String, ToString};
 use alloc::sync::{Arc, Weak};
+use alloc::collections::VecDeque;
 use alloc::vec::IntoIter;
 use compositor::Compositor;
 use core::ops::{Deref, DerefMut};
 use dfqueue::{DFQueue, DFQueueConsumer, DFQueueProducer};
 use displayable::Displayable;
 use event_types::Event;
-use frame_buffer::{Coord, FrameBuffer, Pixel};
+use frame_buffer::{FrameBuffer, Coord, Pixel};
 use frame_buffer_compositor::{FrameBufferBlocks, FRAME_COMPOSITOR};
 use frame_buffer_drawer::*;
 use frame_buffer_rgb::FrameBufferRGB;
 use spin::{Mutex, Once};
 use window::{Window, WindowProfile};
 pub use window_list::{
-    WindowList, SCREEN_BACKGROUND_COLOR, WINDOW_ACTIVE_COLOR, WINDOW_INACTIVE_COLOR, WINDOW_MARGIN,
-    WINDOW_PADDING,
+    SCREEN_BACKGROUND_COLOR, WINDOW_ACTIVE_COLOR, 
+    WINDOW_INACTIVE_COLOR, WINDOW_MARGIN, WINDOW_PADDING, WindowList, 
 };
 
 /// A framebuffer owned by the window manager.
@@ -52,7 +52,7 @@ pub use window_list::{
 /// All the display behaviors of borders are controled by the window manager.
 pub static DESKTOP_FRAME_BUFFER: Once<Arc<Mutex<FrameBufferRGB>>> = Once::new();
 
-/// Initializes the window manager.
+/// Initializes the window manager. 
 /// Currently the framebuffer is of type `FrameBufferRGB`. In the future we would be able to have window manager of different `FrameBuffer`s.
 pub fn init() -> Result<(), &'static str> {
     let (screen_width, screen_height) = frame_buffer::get_screen_size()?;
@@ -116,7 +116,6 @@ impl<Buffer: FrameBuffer> Window for WindowGeneric<Buffer> {
         Ok(component.get_displayable())
     }
 
-    /// Gets the position of a displayable relative to the window.
     fn get_displayable_position(&self, key: &str) -> Result<Coord, &'static str> {
         let opt = self.components.get(key);
         match opt {
@@ -128,7 +127,7 @@ impl<Buffer: FrameBuffer> Window for WindowGeneric<Buffer> {
             }
         };
     }
-    /// Display a displayable in the window by its name.
+
     fn display(&mut self, display_name: &str) -> Result<(), &'static str> {
         let component = self.components.get_mut(display_name).ok_or("")?;
         let coordinate = component.get_position();
@@ -137,7 +136,6 @@ impl<Buffer: FrameBuffer> Window for WindowGeneric<Buffer> {
         self.render(Some(blocks.into_iter()))
     }
 
-    /// Adds a new displayable at `coordinate` relative to the top-left corner of the window.
     fn add_displayable(
         &mut self,
         key: &str,
@@ -170,15 +168,12 @@ impl<Buffer: FrameBuffer> Window for WindowGeneric<Buffer> {
         Ok(())
     }
 
-    /// Renders the content of the window to the screen.
-    /// `blocks` is the information of updated blocks in the form (block_index, block_width). If `blocks` is `None`, the whole window would be refreshed.
-    /// The use of `blocks` is described in the `frame_buffer_compositor` crate.
     fn render(&mut self, blocks: Option<IntoIter<(usize, usize)>>) -> Result<(), &'static str> {
         let coordinate = { self.profile.lock().get_content_position() };
         let frame_buffer_blocks = FrameBufferBlocks {
             framebuffer: &mut self.framebuffer,
             coordinate: coordinate,
-            blocks: blocks,
+            blocks: blocks
         };
         FRAME_COMPOSITOR
             .lock()
@@ -201,14 +196,11 @@ impl<Buffer: FrameBuffer> WindowGeneric<Buffer> {
     }
 
     /// Gets a reference to a displayable of type `T` which implements the `Displayable` trait by its name. Returns error if the displayable is not of type `T` or does not exist.
-    pub fn get_concrete_display<T: Displayable>(
-        &self,
-        display_name: &str,
-    ) -> Result<&T, &'static str> {
+    pub fn get_concrete_display<T: Displayable>(&self, display_name: &str) -> Result<&T, &'static str> {
         if let Some(component) = self.components.get(display_name) {
             let displayable = component.get_displayable();
             if let Some(concrete_display) = displayable.downcast_ref::<T>() {
-                return Ok(concrete_display);
+                return Ok(concrete_display)
             } else {
                 return Err("The displayable is not of this type");
             }
@@ -218,14 +210,11 @@ impl<Buffer: FrameBuffer> WindowGeneric<Buffer> {
     }
 
     /// Gets a mutable reference to a displayable of type `T` which implements the `Displayable` trait by its name. Returns error if the displayable is not of type `T` or does not exist.
-    pub fn get_concrete_display_mut<T: Displayable>(
-        &mut self,
-        display_name: &str,
-    ) -> Result<&mut T, &'static str> {
+    pub fn get_concrete_display_mut<T: Displayable>(&mut self, display_name: &str) -> Result<&mut T, &'static str> {
         if let Some(component) = self.components.get_mut(display_name) {
             let displayable = component.get_displayable_mut();
             if let Some(concrete_display) = displayable.downcast_mut::<T>() {
-                return Ok(concrete_display);
+                return Ok(concrete_display)
             } else {
                 return Err("The displayable is not of this type");
             }
@@ -263,11 +252,6 @@ impl<Buffer: FrameBuffer> WindowGeneric<Buffer> {
         };
     }
 
-    /// Gets the content position relative to the window excluding border and padding relative.
-    pub fn get_content_position(&self) -> Coord {
-        self.profile.lock().get_content_position()
-    }
-
     // @Andrew
     /// Resizes a window as (width, height) at coordinate relative to the top-left corner of the screen.
     pub fn resize(
@@ -302,9 +286,7 @@ impl<Buffer: FrameBuffer> WindowGeneric<Buffer> {
                         height * percent.1 / 100,
                     );
                 }
-                profile
-                    .events_producer()
-                    .enqueue(Event::new_resize_event(coordinate, width, height));
+                profile.events_producer().enqueue(Event::new_resize_event(coordinate, width, height));
                 Ok(())
             }
             Err(err) => Err(err),
@@ -420,22 +402,14 @@ impl WindowProfile for WindowProfileGeneric {
         let frame_buffer_blocks = FrameBufferBlocks {
             framebuffer: buffer,
             coordinate: Coord { x: 0, y: 0 },
-            blocks: None,
+            blocks: None
         };
-        FRAME_COMPOSITOR
-            .lock()
-            .composite(vec![frame_buffer_blocks].into_iter())
+        FRAME_COMPOSITOR.lock().composite(vec![frame_buffer_blocks].into_iter())
     }
 
     fn contains(&self, coordinate: Coord) -> bool {
-        return coordinate.x <= (self.width - 2 * self.padding) as isize
-            && coordinate.y <= (self.height - 2 * self.padding) as isize;
+        return coordinate.x <= (self.width - 2 * self.padding) as isize && coordinate.y <= (self.height - 2 * self.padding) as isize;
     }
-
-    /*    fn set_active(&mut self, active: bool) -> Result<(), &'static str> {
-        self.active = active;
-        Ok(())
-    }*/
 
     fn draw_border(&self, color: u32) -> Result<(), &'static str> {
         let buffer_ref = match DESKTOP_FRAME_BUFFER.try() {
@@ -448,11 +422,9 @@ impl WindowProfile for WindowProfileGeneric {
         let frame_buffer_blocks = FrameBufferBlocks {
             framebuffer: buffer,
             coordinate: Coord { x: 0, y: 0 },
-            blocks: None,
+            blocks: None
         };
-        FRAME_COMPOSITOR
-            .lock()
-            .composite(vec![frame_buffer_blocks].into_iter())
+        FRAME_COMPOSITOR.lock().composite(vec![frame_buffer_blocks].into_iter())
     }
 
     fn resize(
@@ -497,6 +469,7 @@ impl WindowProfile for WindowProfileGeneric {
     }
 
     fn is_moving(&self) -> bool {
+        // TODO: this display subsystem cannot react to mouse event now
         false
     }
 
@@ -505,6 +478,7 @@ impl WindowProfile for WindowProfileGeneric {
     }
 
     fn give_all_mouse_event(&mut self) -> bool {
+        // TODO: this display subsystem cannot react to mouse event now
         false
     }
 

@@ -18,8 +18,7 @@ extern crate alloc;
 extern crate dfqueue;
 extern crate event_types;
 extern crate spin;
-#[macro_use]
-extern crate log;
+#[macro_use] extern crate log;
 extern crate displayable;
 extern crate font;
 extern crate frame_buffer;
@@ -105,11 +104,11 @@ pub struct WindowComponents {
     pub consumer: DFQueueConsumer<Event>,
     /// event output used by window manager, private variable
     producer: DFQueueProducer<Event>,
-
     /// last mouse position event, used to judge click and press-moving event
     last_mouse_position_event: MousePositionEvent,
     /// record last result of whether this window is active, to reduce redraw overhead
     last_is_active: bool,
+    /// The displayable in the window as components.
     pub components: BTreeMap<String, Box<dyn Displayable>>,
 }
 
@@ -122,12 +121,10 @@ impl Window for WindowComponents {
         None
     }
 
-    /// get background color
     fn get_background(&self) -> Pixel {
         self.background
     }
 
-    /// Adds a new displayable at `coordinate` relative to the top-left corner of the window.
     fn add_displayable(
         &mut self,
         key: &str,
@@ -154,7 +151,6 @@ impl Window for WindowComponents {
             .ok_or("The displayable does not exist")
     }
 
-    /// Gets the position of a displayable relative to the window.
     fn get_displayable_position(&self, key: &str) -> Result<Coord, &'static str> {
         let opt = self.components.get(key);
         match opt {
@@ -179,8 +175,6 @@ impl Window for WindowComponents {
         window_manager_alpha::render(blocks)
     }
 
-    /// event handler that should be called periodically by applications. This will handle user events as well as produce
-    /// the unhandled ones for other components to handle.
     fn handle_event(&mut self) -> Result<(), &'static str> {
         let mut call_later_do_refresh_floating_border = false;
         let mut call_later_do_move_active_window = false;

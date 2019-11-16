@@ -1,6 +1,8 @@
 extern crate frame_buffer_alpha;
 
+/// The width of the background picture
 pub const BACKGROUND_WIDTH: usize = 640;
+/// The height of the background picture
 pub const BACKGROUND_HEIGHT: usize = 540;
 
 /// the default background picture, these numbers are actually Pixels, could be converted using trait From
