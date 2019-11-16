@@ -122,7 +122,7 @@ impl Terminal {
             // Case where the last newline does not occur at the end of the slice
             if new_line_indices[0].0 != slice.len() - 1 {
                 start_idx -= slice.len() -1 - new_line_indices[0].0;
-                total_lines += (slice.len() -1 - new_line_indices[0].0)/buffer_width + 1;
+                total_lines += (slice.len()-1 - new_line_indices[0].0)/buffer_width + 1;
                 last_line_chars = (slice.len() -1 - new_line_indices[0].0) % buffer_width; // fix: account for more than one line
             }
             else {
@@ -171,6 +171,7 @@ impl Terminal {
 
             // If the previous loop overcounted, this cuts off the excess string from string. Happens when there are many charcters between newlines at the beginning of the slice
             return (start_idx, (total_lines - 1) * buffer_width + last_line_chars);
+
         } else {
             return (0,0); /* WARNING: should change to Option<> rather than returning (0, 0) */
         }   
@@ -293,7 +294,7 @@ impl Terminal {
         let prev_start_idx;
         // Prevents the user from scrolling down if already at the bottom of the page
         if self.is_scroll_end == true {
-            return;}
+            return;} 
         prev_start_idx = self.scroll_start_idx;
         let result = self.calc_end_idx(prev_start_idx);
         let mut end_idx = match result {
@@ -318,7 +319,7 @@ impl Terminal {
                 slice_len = buffer_width;
                 result = self.scrollback_buffer.as_str().get(end_idx .. end_idx + buffer_width);
             } else {
-                slice_len = self.scrollback_buffer.len() - end_idx -1;
+                slice_len = self.scrollback_buffer.len() - end_idx -1; 
                 result = self.scrollback_buffer.as_str().get(end_idx .. self.scrollback_buffer.len());
             }
             // Searches the grabbed slice for a newline
@@ -415,7 +416,7 @@ impl Terminal {
                 let text_display = self.window.get_displayable_mut(&self.display_name)?.as_text_mut()?;
                 text_display.set_text(slice);
             }
-            self.window.display(&self.display_name)?;       
+            self.window.display(&self.display_name)?;        
         } else {
             return Err("could not get slice of scrollback buffer string");
         }
@@ -525,7 +526,7 @@ impl Terminal {
         self.scrollback_buffer.remove(remove_idx);
         Ok(())
     }
-
+    
     /// Scroll the screen to the very beginning.
     pub fn move_screen_to_begin(&mut self) -> Result<(), &'static str> {
         // Home command only registers if the text display has the ability to scroll
@@ -535,7 +536,7 @@ impl Terminal {
             self.cursor.disable();
             self.display_cursor()?;
         }
-
+        
         Ok(())
     }
 

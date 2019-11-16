@@ -59,7 +59,7 @@ pub trait FrameBuffer: Downcast + Send {
         coordinate.x >= 0 && coordinate.x < width as isize
             && coordinate.y >= 0 && coordinate.y < height as isize
     }
-
+    
     /// Draws a pixel at the given `coordinate` within the frame buffer. The `coordinate` is relative to the origin(top-left point) of the frame buffer.  The new pixel will overwrite the previous one.
     fn overwrite_pixel(&mut self, coordinate: Coord, color: Pixel);
 

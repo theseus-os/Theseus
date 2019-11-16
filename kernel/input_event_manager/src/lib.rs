@@ -186,5 +186,5 @@ fn input_event_loop(consumer: DFQueueConsumer<Event>) -> Result<(), &'static str
             event.mark_completed();
 
         }
-    }
+    }    
 }

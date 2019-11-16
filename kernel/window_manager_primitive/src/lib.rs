@@ -30,7 +30,7 @@ use alloc::collections::BTreeMap;
 use alloc::string::{String, ToString};
 use alloc::sync::{Arc, Weak};
 use alloc::collections::VecDeque;
-use alloc::vec::IntoIter;
+use alloc::vec::{IntoIter};
 use compositor::Compositor;
 use core::ops::{Deref, DerefMut};
 use dfqueue::{DFQueue, DFQueueConsumer, DFQueueProducer};
