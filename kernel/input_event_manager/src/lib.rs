@@ -15,9 +15,6 @@ extern crate spawn;
 extern crate spin;
 extern crate task;
 extern crate window_manager;
-#[cfg(generic_display_sys)]
-#[macro_use] 
-extern crate alloc;
 extern crate font;
 extern crate frame_buffer_alpha;
 extern crate frame_buffer_rgb;
@@ -28,24 +25,30 @@ extern crate keycodes_ascii;
 extern crate path;
 #[cfg(generic_display_sys)]
 #[macro_use] extern crate log;
+#[cfg(generic_display_sys)]
+#[macro_use] extern crate alloc;
+#[cfg(not(generic_display_sys))]
+extern crate alloc;
 
-use alloc::{string::ToString, sync::Arc};
+
 #[cfg(generic_display_sys)]
 use alloc::{vec::Vec, string::String};
-use dfqueue::{DFQueue, DFQueueProducer};
 #[cfg(generic_display_sys)]
 use dfqueue::{DFQueueConsumer};
 #[cfg(generic_display_sys)]
 use keycodes_ascii::{KeyAction, Keycode};
 #[cfg(generic_display_sys)]
 use path::Path;
-use event_types::Event;
-#[cfg(not(generic_display_sys))]
-use frame_buffer_alpha::FrameBufferAlpha;
-use mod_mgmt::{metadata::CrateType, CrateNamespace, NamespaceDir};
-use spawn::{ApplicationTaskBuilder};
 #[cfg(generic_display_sys)]
 use spawn::{KernelTaskBuilder};
+#[cfg(not(generic_display_sys))]
+use frame_buffer_alpha::FrameBufferAlpha;
+
+use alloc::{string::ToString, sync::Arc};
+use dfqueue::{DFQueue, DFQueueProducer};
+use event_types::Event;
+use mod_mgmt::{metadata::CrateType, CrateNamespace, NamespaceDir};
+use spawn::{ApplicationTaskBuilder};
 
 /// Initializes the keyinput queue and the default display
 pub fn init() -> Result<(DFQueueProducer<Event>, DFQueueProducer<Event>), &'static str> {

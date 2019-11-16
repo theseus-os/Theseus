@@ -278,19 +278,19 @@ impl<U: WindowProfile> WindowManagerAlpha<U> {
                 let top = current_active_win.get_pixel(relative)?;
                 if top.get_alpha() == 0 {
                     // totally opaque, so not waste computation
-                    self.final_fb.draw_pixel(coordinate, top);
+                    self.final_fb.overwrite_pixel(coordinate, top);
                 } else {
                     let bottom = self.recompute_single_pixel_show_list(coordinate, 0);
-                    self.final_fb.draw_pixel(coordinate, top.alpha_mix(bottom));
+                    self.final_fb.overwrite_pixel(coordinate, top.alpha_mix(bottom));
                 }
             } else {
                 let pixel = self.recompute_single_pixel_show_list(coordinate, 0);
-                self.final_fb.draw_pixel(coordinate, pixel);
+                self.final_fb.overwrite_pixel(coordinate, pixel);
             }
         } else {
             // nothing is active now
             let pixel = self.recompute_single_pixel_show_list(coordinate, 0);
-            self.final_fb.draw_pixel(coordinate, pixel);
+            self.final_fb.overwrite_pixel(coordinate, pixel);
         }
 
         // then draw border
@@ -318,7 +318,7 @@ impl<U: WindowProfile> WindowManagerAlpha<U> {
                     let dcoordinate = start - scoordinate;
                     // let dx = x_start - sx; let dy = y_start - sy;
                     if (dcoordinate.x + dcoordinate.y) as usize <= WINDOW_BORDER_SIZE {
-                        self.final_fb.draw_pixel_alpha(
+                        self.final_fb.draw_pixel(
                             coordinate,
                             WINDOW_BORDER_COLOR_OUTTER.color_mix(
                                 WINDOW_BORDER_COLOR_INNER,
@@ -332,7 +332,7 @@ impl<U: WindowProfile> WindowManagerAlpha<U> {
                     let dcoordinate =
                         Coord::new(start.x - scoordinate.x, scoordinate.y - s_end_1.y);
                     if (dcoordinate.x + dcoordinate.y) as usize <= WINDOW_BORDER_SIZE {
-                        self.final_fb.draw_pixel_alpha(
+                        self.final_fb.draw_pixel(
                             coordinate,
                             WINDOW_BORDER_COLOR_OUTTER.color_mix(
                                 WINDOW_BORDER_COLOR_INNER,
@@ -343,7 +343,7 @@ impl<U: WindowProfile> WindowManagerAlpha<U> {
                     }
                 } else {
                     // only left
-                    self.final_fb.draw_pixel_alpha(
+                    self.final_fb.draw_pixel(
                         coordinate,
                         WINDOW_BORDER_COLOR_OUTTER.color_mix(
                             WINDOW_BORDER_COLOR_INNER,
@@ -357,7 +357,7 @@ impl<U: WindowProfile> WindowManagerAlpha<U> {
                     let dcoordinate =
                         Coord::new(scoordinate.x - s_end_1.x, start.y - scoordinate.y);
                     if (dcoordinate.x + dcoordinate.y) as usize <= WINDOW_BORDER_SIZE {
-                        self.final_fb.draw_pixel_alpha(
+                        self.final_fb.draw_pixel(
                             coordinate,
                             WINDOW_BORDER_COLOR_OUTTER.color_mix(
                                 WINDOW_BORDER_COLOR_INNER,
@@ -370,7 +370,7 @@ impl<U: WindowProfile> WindowManagerAlpha<U> {
                     // right-bottom
                     let dcoordinate = scoordinate - s_end_1;
                     if (dcoordinate.x + dcoordinate.y) as usize <= WINDOW_BORDER_SIZE {
-                        self.final_fb.draw_pixel_alpha(
+                        self.final_fb.draw_pixel(
                             coordinate,
                             WINDOW_BORDER_COLOR_OUTTER.color_mix(
                                 WINDOW_BORDER_COLOR_INNER,
@@ -381,7 +381,7 @@ impl<U: WindowProfile> WindowManagerAlpha<U> {
                     }
                 } else {
                     // only right
-                    self.final_fb.draw_pixel_alpha(
+                    self.final_fb.draw_pixel(
                         coordinate,
                         WINDOW_BORDER_COLOR_OUTTER.color_mix(
                             WINDOW_BORDER_COLOR_INNER,
@@ -391,7 +391,7 @@ impl<U: WindowProfile> WindowManagerAlpha<U> {
                 }
             } else if top {
                 // only top
-                self.final_fb.draw_pixel_alpha(
+                self.final_fb.draw_pixel(
                     coordinate,
                     WINDOW_BORDER_COLOR_OUTTER.color_mix(
                         WINDOW_BORDER_COLOR_INNER,
@@ -400,7 +400,7 @@ impl<U: WindowProfile> WindowManagerAlpha<U> {
                 );
             } else if bottom {
                 // only bottom
-                self.final_fb.draw_pixel_alpha(
+                self.final_fb.draw_pixel(
                     coordinate,
                     WINDOW_BORDER_COLOR_OUTTER.color_mix(
                         WINDOW_BORDER_COLOR_INNER,
@@ -416,7 +416,7 @@ impl<U: WindowProfile> WindowManagerAlpha<U> {
             && ((scoordinate.y - mcoordinate.y) as usize <= MOUSE_POINTER_HALF_SIZE
                 || (mcoordinate.y - scoordinate.y) as usize <= MOUSE_POINTER_HALF_SIZE)
         {
-            self.final_fb.draw_pixel_alpha(
+            self.final_fb.draw_pixel(
                 coordinate,
                 MOUSE_BASIC
                     [(MOUSE_POINTER_HALF_SIZE as isize + coordinate.x - mcoordinate.x) as usize]

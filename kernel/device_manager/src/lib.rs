@@ -51,7 +51,6 @@ pub fn init(key_producer: DFQueueProducer<Event>, mouse_producer: DFQueueProduce
     keyboard::init(key_producer);
     mouse::init(mouse_producer);
 
-
     // Initialize/scan the PCI bus to discover PCI devices
     for dev in pci::pci_device_iter() {
         debug!("Found pci device: {:?}", dev);

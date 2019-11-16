@@ -1,30 +1,34 @@
 #![no_std]
 
-extern crate alloc;
-extern crate frame_buffer;
 extern crate keycodes_ascii;
 extern crate mouse_data;
+extern crate alloc;
+extern crate frame_buffer;
 
-use alloc::string::String;
-use frame_buffer::Coord;
 use keycodes_ascii::KeyEvent;
 use mouse_data::MouseEvent;
+use alloc::string::String;
+use frame_buffer::Coord;
 
-/// A event describe mouse position rather than movement differential from last event.
-/// It contains two position, (x,y) for the relative position in each window, and (gx,gy) for global absolute position of the screen.
+/// An event describing mouse position rather than movement differential from last event.
+/// It contains two position, `coodinate` for the relative position in each window, and `gcoordinate` for global absolute position of the screen.
 #[derive(Debug, Clone)]
 pub struct MousePositionEvent {
-    // tells window application of the cursor information
     /// the relative position in window
     pub coordinate: Coord,
     /// the global position in window
     pub gcoordinate: Coord,
-    /// the global position in window
+    /// whether the mouse is scrolling up
     pub scrolling_up: bool,
+    /// whether the mouse is scrolling down
     pub scrolling_down: bool,
+    /// whether the left button holds
     pub left_button_hold: bool,
+    /// whether the right button holds
     pub right_button_hold: bool,
+    /// whether the fourth button holds
     pub fourth_button_hold: bool,
+    /// whether the fifth button holds
     pub fifth_button_hold: bool,
 }
 
@@ -45,17 +49,17 @@ pub enum Event {
 }
 
 impl Event {
+    /// Create a new keyboard event
     pub fn new_keyboard_event(kev: KeyEvent) -> Event {
         Event::KeyboardEvent(KeyboardInputEvent::new(kev))
     }
 
-    pub fn new_output_event<S>(s: S) -> Event
-    where
-        S: Into<String>,
-    {
+    /// Create a new output event
+    pub fn new_output_event<S>(s: S) -> Event where S: Into<String> {
         Event::OutputEvent(PrintOutputEvent::new(s.into()))
     }
 
+    /// Create a new window resize event
     pub fn new_resize_event(coordinate: Coord, width: usize, height: usize) -> Event {
         Event::WindowResizeEvent(WindowResizeEvent::new(coordinate, width, height))
     }
@@ -64,39 +68,52 @@ impl Event {
 /// use this to deliver input events (such as keyboard input) to the input_event_manager.
 #[derive(Debug, Clone)]
 pub struct KeyboardInputEvent {
+    /// The key input event from i/o device
     pub key_event: KeyEvent,
 }
 
 impl KeyboardInputEvent {
-    pub fn new(kev: KeyEvent) -> KeyboardInputEvent {
-        KeyboardInputEvent { key_event: kev }
+    /// Create a new key board input event. `key` is the key input from the i/o device
+    pub fn new(key: KeyEvent) -> KeyboardInputEvent {
+        KeyboardInputEvent { 
+            key_event: key 
+        }
     }
 }
 
-/// use this to queue up a formatted string that should be printed to the input_event_manager.
+/// use this to queue up a formatted string that should be printed to the input_event_manager. 
 #[derive(Debug, Clone)]
 pub struct PrintOutputEvent {
+    /// The text to print
     pub text: String,
 }
 
 impl PrintOutputEvent {
+    /// Create a new print output event. `s` is the string to print
     pub fn new(s: String) -> PrintOutputEvent {
-        PrintOutputEvent { text: s }
+        PrintOutputEvent {
+            text: s 
+        }
     }
 }
 
-//Use this to inform the window manager to adjust the sizes of existing windows
+/// Use this to inform the window manager to adjust the sizes of existing windows
 #[derive(Debug, Clone)]
 pub struct WindowResizeEvent {
+    /// the new position of the window
     pub coordinate: Coord,
-    pub width: usize,
-    pub height: usize,
+    /// the new width of the window
+    pub width: usize, 
+    /// the new height of the window
+    pub height: usize, 
 }
+
 impl WindowResizeEvent {
+    /// Create a new window resize event. `coordinate` is the new position and `(width, height)` is the new size of the window.
     pub fn new(coordinate: Coord, width: usize, height: usize) -> WindowResizeEvent {
         WindowResizeEvent {
             coordinate: coordinate,
-            width: width,
+            width: width, 
             height: height,
         }
     }

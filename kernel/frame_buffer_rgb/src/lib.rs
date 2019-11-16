@@ -136,7 +136,7 @@ impl FrameBuffer for FrameBufferRGB {
         }
     }
 
-    fn draw_pixel_alpha(&mut self, coordinate: Coord, color: Pixel) {
+    fn overwrite_pixel(&mut self, coordinate: Coord, color: Pixel) {
         self.draw_pixel(coordinate, color)
     }
 

@@ -143,7 +143,7 @@ impl FrameBufferAlpha {
         for y in start.y..end.y {
             for x in start.x..end.x {
                 let coordinate = Coord::new(x as isize, y as isize);
-                self.draw_pixel(coordinate, color);
+                self.overwrite_pixel(coordinate, color);
             }
         }
     }
@@ -153,7 +153,7 @@ impl FrameBufferAlpha {
         for y in start.y..end.y {
             for x in start.x..end.x {
                 let coordinate = Coord::new(x as isize, y as isize);
-                self.draw_pixel_alpha(coordinate, color);
+                self.draw_pixel(coordinate, color);
             }
         }
     }
@@ -165,7 +165,7 @@ impl FrameBufferAlpha {
             for xi in 0..8 {
                 const HIGHEST_BIT: u8 = 0x80;
                 if char_font & (HIGHEST_BIT >> xi) != 0 {
-                    self.draw_pixel_alpha(coordinate + (xi as isize, yi as isize), color);
+                    self.draw_pixel(coordinate + (xi as isize, yi as isize), color);
                 }
             }
         }
@@ -187,13 +187,13 @@ impl FrameBuffer for FrameBufferAlpha {
         self.buffer_mut()[dest_start..dest_end].copy_from_slice(src);
     }
 
-    fn draw_pixel(&mut self, coordinate: Coord, color: Pixel) {
+    fn overwrite_pixel(&mut self, coordinate: Coord, color: Pixel) {
         if let Some(idx) = self.index(coordinate) {
             self.buffer[idx] = color;
         };
     }
 
-    fn draw_pixel_alpha(&mut self, coordinate: Coord, color: AlphaPixel) {
+    fn draw_pixel(&mut self, coordinate: Coord, color: AlphaPixel) {
         let idx = match self.index(coordinate) {
             Some(index) => index,
             None => return,
@@ -202,7 +202,6 @@ impl FrameBuffer for FrameBufferAlpha {
         self.buffer[idx] = AlphaPixel::from(color).alpha_mix(origin);
     }
 
-    /// get one pixel at given position
     fn get_pixel(&self, coordinate: Coord) -> Result<Pixel, &'static str> {
         let idx = match self.index(coordinate) {
             Some(index) => index,
@@ -218,7 +217,7 @@ impl FrameBuffer for FrameBufferAlpha {
         for y in 0..self.height {
             for x in 0..self.width {
                 let coordinate = Coord::new(x as isize, y as isize);
-                self.draw_pixel(coordinate, color);
+                self.overwrite_pixel(coordinate, color);
             }
         }
     }

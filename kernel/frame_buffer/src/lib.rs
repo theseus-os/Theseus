@@ -7,15 +7,16 @@ extern crate alloc;
 extern crate memory;
 extern crate owning_ref;
 extern crate spin;
-#[macro_use] extern crate downcast_rs;
+#[macro_use]
+extern crate downcast_rs;
 
 use alloc::boxed::Box;
+use core::cmp::{Ord, Ordering};
+use core::ops::{Add, Sub};
+use downcast_rs::Downcast;
 use memory::MappedPages;
 use owning_ref::BoxRefMut;
 use spin::{Mutex, Once};
-use core::ops::{Add, Sub};
-use core::cmp::{Ord, Ordering};
-use downcast_rs::Downcast;
 
 /// A pixel on the screen is mapped to a u32 integer.
 pub type Pixel = u32;
@@ -28,19 +29,21 @@ pub trait FrameBuffer: Downcast + Send {
     /// Returns a reference to the mapped memory.
     fn buffer(&self) -> &BoxRefMut<MappedPages, [Pixel]>;
 
-    /// Gets the size of the framebuffer. 
+    /// Gets the size of the framebuffer.
     /// Returns (width, height).
     fn get_size(&self) -> (usize, usize);
 
     /// Copies a buffer of pixels to the framebuffer from index `dest_start`.
     fn buffer_copy(&mut self, src: &[Pixel], dest_start: usize);
 
-    fn get_pixel(& self, coordinate: Coord) -> Result<Pixel, &'static str>;
+    /// Get the pixel at `coordinate`
+    fn get_pixel(&self, coordinate: Coord) -> Result<Pixel, &'static str>;
 
+    /// Fill the framebuffer with `color`
     fn fill_color(&mut self, color: Pixel);
 
     /// Computes the index of a coordinate in the buffer array.
-    /// Return `None` is the coordinate is not in the frame buffer.
+    /// Return `None` if the coordinate is not in the frame buffer.
     fn index(&self, coordinate: Coord) -> Option<usize> {
         let (width, _) = self.get_size();
         if self.contains(coordinate) {
@@ -51,14 +54,16 @@ pub trait FrameBuffer: Downcast + Send {
     }
 
     /// Checks if a coordinate is within the framebuffer.
-    fn contains(&self, coordinate: Coord) -> bool{
+    fn contains(&self, coordinate: Coord) -> bool {
         let (width, height) = self.get_size();
-        coordinate.x >= 0 && coordinate.x < width as isize 
-            && coordinate.y >= 0 && coordinate.y < height as isize
+        coordinate.x >= 0
+            && coordinate.x < width as isize
+            && coordinate.y >= 0
+            && coordinate.y < height as isize
     }
-    
-    /// Draws a pixel at the given `coordinate` within the frame buffer. The `coordinate` is relative to the origin(top-left point) of the frame buffer.
-    fn draw_pixel(&mut self, coordinate: Coord, color: Pixel);
+
+    /// Draws a pixel at the given `coordinate` within the frame buffer. The `coordinate` is relative to the origin(top-left point) of the frame buffer.  The new pixel will overwrite the previous one.
+    fn overwrite_pixel(&mut self, coordinate: Coord, color: Pixel);
 
     /// Checks if a framebuffer overlaps with an area.
     /// # Arguments
@@ -67,23 +72,25 @@ pub trait FrameBuffer: Downcast + Send {
     /// * `height`: the height of the area.
     fn overlaps_with(&mut self, coordinate: Coord, width: usize, height: usize) -> bool {
         let (buffer_width, buffer_height) = self.get_size();
-        coordinate.x < buffer_width as isize && coordinate.x + width as isize >= 0
-            && coordinate.y < buffer_height as isize && coordinate.y + height as isize>= 0
+        coordinate.x < buffer_width as isize
+            && coordinate.x + width as isize >= 0
+            && coordinate.y < buffer_height as isize
+            && coordinate.y + height as isize >= 0
     }
 
-    fn draw_pixel_alpha(&mut self, coordinate: Coord, color: Pixel);
+    /// Draws a pixel at the given `coordinate` relative to the origin(top-left point) of the frame buffer. The new pixel is a mix of original pixel and `color` according to the type of the framebuffer.
+    fn draw_pixel(&mut self, coordinate: Coord, color: Pixel);
 
-    /// draw a circle on the screen with alpha. (`xc`, `yc`) is the position of the center of the circle, and `r` is the radius
-    fn draw_circle_alpha(&mut self, xc: usize, yc: usize, r: usize, color: Pixel) {
-        let r2 = (r*r) as isize;
-        for y in yc-r..yc+r {
-            for x in xc-r..xc+r {
-                let coordinate = Coord::new(x as isize, y as isize);
+    /// Draw a circles in the framebuffer. `coordinate` is the position of the center of the circle, and `r` is the radius
+    fn draw_circle(&mut self, center: Coord, r: usize, color: Pixel) {
+        let r2 = (r * r) as isize;
+        for y in center.y - r as isize..center.y + r as isize {
+            for x in center.x - r as isize..center.x + r as isize {
+                let coordinate = Coord::new(x, y);
                 if self.contains(coordinate) {
-                    let xd = x as isize - xc as isize;
-                    let yd = y as isize - yc as isize;
-                    if xd*xd + yd*yd <= r2 {
-                        self.draw_pixel_alpha(Coord::new(x as isize, y as isize), color);
+                    let d = coordinate - center;
+                    if d.x * d.x + d.y * d.y <= r2 {
+                        self.draw_pixel(coordinate, color);
                     }
                 }
             }
@@ -95,7 +102,7 @@ pub trait FrameBuffer: Downcast + Send {
         for y in ys..ye {
             for x in xs..xe {
                 let coordinate = Coord::new(x as isize, y as isize);
-                self.draw_pixel(coordinate, color);
+                self.overwrite_pixel(coordinate, color);
             }
         }
     }
@@ -133,7 +140,10 @@ impl Add<(isize, isize)> for Coord {
     type Output = Coord;
 
     fn add(self, rhs: (isize, isize)) -> Coord {
-        Coord { x: self.x + rhs.0, y: self.y + rhs.1 }
+        Coord {
+            x: self.x + rhs.0,
+            y: self.y + rhs.1,
+        }
     }
 }
 
@@ -141,7 +151,10 @@ impl Sub<(isize, isize)> for Coord {
     type Output = Coord;
 
     fn sub(self, rhs: (isize, isize)) -> Coord {
-        Coord { x: self.x - rhs.0, y: self.y - rhs.1 }
+        Coord {
+            x: self.x - rhs.0,
+            y: self.y - rhs.1,
+        }
     }
 }
 
@@ -149,7 +162,10 @@ impl Add<Coord> for Coord {
     type Output = Coord;
 
     fn add(self, rhs: Coord) -> Coord {
-        Coord { x: self.x + rhs.x, y: self.y + rhs.y }
+        Coord {
+            x: self.x + rhs.x,
+            y: self.y + rhs.y,
+        }
     }
 }
 
@@ -157,7 +173,10 @@ impl Sub<Coord> for Coord {
     type Output = Coord;
 
     fn sub(self, rhs: Coord) -> Coord {
-        Coord { x: self.x - rhs.x, y: self.y - rhs.y }
+        Coord {
+            x: self.x - rhs.x,
+            y: self.y - rhs.y,
+        }
     }
 }
 
@@ -170,7 +189,6 @@ impl Ord for Coord {
         } else {
             return self.x.cmp(&other.x);
         }
-
     }
 }
 
@@ -180,4 +198,4 @@ impl PartialOrd for Coord {
     }
 }
 
-impl Eq for Coord { }
+impl Eq for Coord {}

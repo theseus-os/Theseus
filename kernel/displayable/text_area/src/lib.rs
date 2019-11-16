@@ -33,9 +33,8 @@ use window_manager_alpha::WindowProfileAlpha;
 ///
 /// The chars are allowed to be modified and update, however, one cannot change the matrix size during run-time.
 pub struct TextArea {
+    /// The position of the textarea in a window
     pub coordinate: Coord,
-    // width: usize,
-    // height: usize,
     line_spacing: usize,
     column_spacing: usize,
     background_color: AlphaPixel,
@@ -55,7 +54,8 @@ impl TextArea {
     /// after initialization, this textarea has a weak reference to the window object,
     /// and calling the API to change textarea will immediately update display on screen
     ///
-    /// * `x`, `y`, `width`, `height`: the position and size of this textarea. Note that position is relative to window
+    /// * `coordinate`, `width`, `height`: the position and size of this textarea. Note that position is relative to window
+    /// * `winobj`: the window which the textarea is in
     /// * `line_spacing`: the spacing between lines, default to 2
     /// * `column_spacing`: the spacing between chars, default to 1
     /// * `background_color`: the background color, default to transparent
@@ -72,8 +72,6 @@ impl TextArea {
     ) -> Result<TextArea, &'static str> {
         let mut textarea: TextArea = TextArea {
             coordinate: coordinate,
-            // width: width,
-            // height: height,
             line_spacing: match line_spacing {
                 Some(m) => m,
                 _ => 2,
@@ -177,7 +175,7 @@ impl TextArea {
         Ok(())
     }
 
-    /// set char at given position, where i < self.x_cnt, j < self.y_cnt
+    /// set char at given position in a framebuffer, where i < self.x_cnt, j < self.y_cnt
     pub fn set_char_in(
         &mut self,
         col: usize,
@@ -195,9 +193,9 @@ impl TextArea {
             for i in 0..CHARACTER_WIDTH - 1 {
                 let ncoordinate = wcoordinate + (i as isize, j as isize);
                 if char_font & (0x80u8 >> i) != 0 {
-                    framebuffer.draw_pixel(ncoordinate, self.text_color);
+                    framebuffer.overwrite_pixel(ncoordinate, self.text_color);
                 } else {
-                    framebuffer.draw_pixel(ncoordinate, self.background_color);
+                    framebuffer.overwrite_pixel(ncoordinate, self.background_color);
                 }
             }
         }
@@ -216,12 +214,9 @@ impl TextArea {
         }
         Ok(())
     }
-
-    pub fn display_string_basic(&mut self) {}
 }
 
 impl TextDisplayable for TextArea {
-    /// Gets the dimensions of the text area to display.
     fn get_dimensions(&self) -> (usize, usize) {
         (self.x_cnt, self.y_cnt)
     }
@@ -230,14 +225,12 @@ impl TextDisplayable for TextArea {
         self.next_index
     }
 
-    /// display a basic string, only support normal chars and `\n`
     fn set_text(&mut self, text: &str) {
         self.text = String::from(text);
     }
 }
 
 impl Displayable for TextArea {
-    /// display a basic string, only support normal chars and `\n`
     fn display(
         &mut self,
         coordinate: Coord,
@@ -253,7 +246,6 @@ impl Displayable for TextArea {
         let mut j = 0;
         for k in 0..a.len() {
             let c = a[k] as u8;
-            // debug!("{}", a[k] as u8);
             if c == '\n' as u8 {
                 for x in i..self.x_cnt {
                     self.set_char(x, j, ' ' as u8)?;

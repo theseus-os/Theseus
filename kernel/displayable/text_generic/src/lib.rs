@@ -18,7 +18,7 @@ use displayable::{Displayable, TextDisplayable};
 use font::{CHARACTER_HEIGHT, CHARACTER_WIDTH};
 use frame_buffer::{Coord, FrameBuffer};
 
-/// A text displayable profiles the size and color of a block of text. It can display in a framebuffer.
+/// A generic text displayable profiles the size and color of a block of text. It can display in a framebuffer.
 pub struct TextGeneric {
     width: usize,
     height: usize,

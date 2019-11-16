@@ -471,10 +471,10 @@ impl WindowComponents {
                     // draw this to transparent
                     winobj
                         .framebuffer
-                        .draw_pixel(Coord::new(i as isize, j as isize), 0xFFFFFFFF);
+                        .overwrite_pixel(Coord::new(i as isize, j as isize), 0xFFFFFFFF);
                     winobj
                         .framebuffer
-                        .draw_pixel(Coord::new((width - i - 1) as isize, j as isize), 0xFFFFFFFF);
+                        .overwrite_pixel(Coord::new((width - i - 1) as isize, j as isize), 0xFFFFFFFF);
                 }
             }
         }
@@ -519,9 +519,8 @@ impl WindowComponents {
                     TopButton::MinimizeMaximize => 1,
                     TopButton::Hide => 2,
                 };
-        winobj.framebuffer.draw_circle_alpha(
-            x,
-            y,
+        winobj.framebuffer.draw_circle(
+            Coord::new(x as isize, y as isize),
             WINDOW_BUTTON_SIZE,
             BLACK.color_mix(
                 match button {
