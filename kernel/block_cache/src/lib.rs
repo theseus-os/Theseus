@@ -16,9 +16,13 @@
 //! we should do something else such as separate mapped regions. 
 //! Cached blocks cannot yet be dropped to relieve memory pressure. 
 //! 
-//! Currently this crate takes a reference to a storage device as an argument to its methods. However because the object
-//! does not hold onto ownership of the device, there is no way for Rust to guarantee that actions from other entities invalidate
-//! the contents of the storage device. In practice this object should hold the storage device so no-others can change it.
+//! Note that this cache only holds a reference to the underlying block device.
+//! As such if any other system crates perform writes to the underlying device,
+//! in that case the cache will give incorrect and potentially inconsistent results.
+//! In the long run, the only way around this would be to only expose a `BlockCache`
+//! instead of exposing a `StorageDevice`. I suppose the least disruptive way to implement this
+//! might be with a layer of indirection to an implementor of a BlockReader like trait,
+//! so that the underlying block reader can be switched out when a cache is enabled.
 
 #![no_std]
 
@@ -32,27 +36,32 @@ use hashbrown::{
     HashMap,
     hash_map::Entry,
 };
-use storage_device::{StorageDevice};
+use storage_device::{StorageDevice, StorageDeviceRef};
+use alloc::borrow::{Cow, ToOwned};
 
 /// A cache to store read and written blocks from a storage device.
 pub struct BlockCache {
     /// The cache of blocks (sectors) read from the storage device,
     /// a map from sector number to data byte array.
     cache: InternalCache,
+    /// The underlying storage device from where the blocks are read/written.
+    storage_device: StorageDeviceRef,
 }
 
 impl BlockCache {
     /// Creates a new `BlockCache` device 
-    pub fn new() -> BlockCache {
+    pub fn new(storage_device: StorageDeviceRef) -> BlockCache {
         BlockCache {
             cache: HashMap::new(),
+            storage_device,
         }
     }
 
     /// Flushes the given block to the backing storage device. 
     /// If the `block_to_flush` is None, all blocks in the entire cache
     /// will be written back to the storage device.
-    pub fn flush(&mut self, locked_device: &mut dyn StorageDevice, block_num: Option<usize>) -> Result<(), &'static str> {
+    pub fn flush(&mut self, block_num: Option<usize>) -> Result<(), &'static str> {
+        let mut locked_device = self.storage_device.lock();
         if let Some(bn) = block_num {
             // Flush just one block
             if let Some(cached_block) = self.cache.get_mut(&bn) {
@@ -73,7 +82,8 @@ impl BlockCache {
     /// in order to avoid reading from the storage device.
     /// If that block exists in the cache, it is copied into the buffer. 
     /// If not, it is read from the storage device into the cache, and then copied into the buffer.
-    pub fn read_block<'c>(cache: &'c mut BlockCache, locked_device: &mut dyn StorageDevice, block: usize) -> Result<&'c [u8], &'static str> {
+    pub fn read_block<'c>(cache: &'c mut BlockCache, block: usize) -> Result<&'c [u8], &'static str> {
+        let mut locked_device = cache.storage_device.lock();
         match cache.cache.entry(block) {
             Entry::Occupied(occ) => {
                 // An existing entry in the cache can be used directly (without going to the backing store)
@@ -104,11 +114,19 @@ impl BlockCache {
         }
     }
 
-    pub fn write_block(&mut self, locked_device: &mut dyn StorageDevice, block_num: usize, buffer_to_write: Vec<u8>) 
-        -> Result<(), &'static str> {
-        
+    pub fn write_block(&mut self, block_num: usize, buffer_to_write: Cow<[u8]>)
+    //pub fn write_block(&mut self, block_num: usize, buffer_to_write: Cow<[u8]>)
+        -> Result<(), &'static str> 
+        {
+            let mut locked_device = self.storage_device.lock();
+
+            let owned_buffer: Vec<u8> = match buffer_to_write {
+                Cow::Borrowed(slice_ref) => slice_ref.to_owned(),
+                Cow::Owned(vec_owned) => vec_owned, 
+            };
+
             let mut new_cached_block = CachedBlock {
-                block: buffer_to_write,
+                block: owned_buffer,
                 state: CacheState::Modified,
             };
             // Currently using a write-through policy right now, so flush the block immediately

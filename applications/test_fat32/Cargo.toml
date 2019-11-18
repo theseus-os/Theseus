@@ -5,7 +5,7 @@ authors = ["RJ Cunningham <cunningham.rjc@gmail.com>, Barry Shiberu <bereketshib
 build = "../../build.rs"
 
 [dependencies]
-getopts = { git = "https://github.com/kevinaboos/getopts" }
+getopts = "0.2.21"
 
 [dependencies.spin]
 default-features = false

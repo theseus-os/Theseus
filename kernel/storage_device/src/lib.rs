@@ -44,6 +44,12 @@
 //!     }
 //! }
 //! ```
+//! 
+//! # Limitations
+//! 
+//! Note that if other crates are using a storage device through a block cache, 
+//! the cache does not own the storage device and cache validity is questionable.
+//! Be careful in that case. See the warning in the [block_cache](../block_cache/index.html) module.
 
 #![no_std]
 
@@ -121,102 +127,9 @@ pub trait StorageDevice: Downcast {
     fn size_in_bytes(&self) -> usize {
         self.sector_size_in_bytes() * self.size_in_sectors()
     }
-    
-    /// Calculates block-wise bounds based on a byte-wise offset and buffer length. 
-    /// 
-    /// # Arguments
-    /// * `offset`: the absolute byte offset from the beginning of the block storage device
-    ///    at which the read/write starts.
-    /// * `length`: the number of bytes to be read/written.
-    /// 
-    /// # Return
-    /// Returns a `BlockBounds` object.
-    /// 
-    /// If `offset + length` extends past the bounds, the `Range` will be truncated
-    /// to the last block of the storage device (all the way to the end), 
-    /// and the `last_block_offset` will be `0`.
-    /// 
-    /// Returns an error if the `offset` extends past the bounds of this storage device.
-    fn block_bounds(&self, offset: usize, length: usize) -> Result<BlockBounds, &'static str> {
-        BlockBounds::block_bounds(offset, length, self.size_in_bytes(), 
-            self.size_in_sectors(), self.sector_size_in_bytes())
-    }
 }
 impl_downcast!(StorageDevice);
 
 /// A trait object wrapped in an Arc and Mutex that allows 
 /// arbitrary storage devices to be shared in a thread-safe manner.
 pub type StorageDeviceRef = Arc<Mutex<dyn StorageDevice + Send>>;
-
-
-/// Block-wise bounds information for a data transfer (read or write)
-/// that has been calculated from a byte-wise offset and buffer length. 
-/// 
-/// See the [`block_bounds()`](trait.StorageDevice.html#method.block_bounds) method.
-pub struct BlockBounds {
-    /// A `Range` from the first block to the last block of the transfer.
-    pub range: Range<usize>,
-    /// The offset into the first block (beginning bound) where the transfer starts.
-    pub first_block_offset: usize,
-    /// The offset into the last block (ending bound) where the transfer ends.
-    pub last_block_offset: usize,
-}
-impl BlockBounds {
-    /// The total number of blocks to be transferred, i.e., `last block - first block`.
-    pub fn block_count(&self) -> usize {
-        self.range.end - self.range.start
-    }
-
-    /// Returns true if the first block of the transfer is aligned to a block boundary.
-    pub fn is_first_block_aligned(&self) -> bool {
-        self.first_block_offset == 0
-    }
-
-    /// Returns true if the last block of the transfer is aligned to a block boundary.
-    pub fn is_last_block_aligned(&self) -> bool {
-        self.last_block_offset == 0
-    }
-
-    // TODO this API is useful so that we can create block bounds for files without them being storage devices.
-    // But it feels weird to just have it sitting around here.
-    /// Calculates block-wise bounds based on a byte-wise offset and buffer length for some block based device.
-    /// 
-    /// # Arguments
-    /// * `offset`: the absolute byte offset from the beginning of the block storage device
-    ///    at which the read/write starts.
-    /// * `length`: the number of bytes to be read/written.
-    /// * `size_in_bytes`: The size in bytes of the object.
-    /// * `size_in_sectors`: The size in sectors of the object.
-    /// 
-    /// # Return
-    /// Returns a `BlockBounds` object.
-    /// 
-    /// If `offset + length` extends past the bounds, the `Range` will be truncated
-    /// to the last block of the storage device (all the way to the end), 
-    /// and the `last_block_offset` will be `0`.
-    /// 
-    /// Returns an error if the `offset` extends past the bounds of this storage device.
-    pub fn block_bounds(offset: usize, length: usize, size_in_bytes: usize, size_in_sectors: usize, sector_size_in_bytes: usize) 
-            -> Result<BlockBounds, &'static str> {
-        
-        let block_size_in_bytes = sector_size_in_bytes;
-        if offset > size_in_bytes {
-            return Err("offset was out of bounds");
-        }
-        let first_block = offset / block_size_in_bytes;
-        let first_block_offset = offset % block_size_in_bytes;
-        let last_block = core::cmp::min(
-            size_in_sectors,
-            (offset + length + block_size_in_bytes - 1) / block_size_in_bytes, // round up to next sector
-        );
-        let last_block_offset = (first_block_offset + length) % block_size_in_bytes;
-        trace!("block_bounds: offset: {}, length: {}, first_block: {}, last_block: {}",
-            offset, length, first_block, last_block
-        );
-        Ok(BlockBounds {
-            range: first_block..last_block,
-            first_block_offset,
-            last_block_offset,
-        })
-    }
-}

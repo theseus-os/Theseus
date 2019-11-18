@@ -113,7 +113,7 @@ extern crate block_io;
 extern crate spawn;
 extern crate task;
 
-use storage_device::BlockBounds;
+use block_io::{BlockBounds, BlockSize};
 use zerocopy::{FromBytes, AsBytes, LayoutVerified, ByteSlice, Unaligned};
 use alloc::collections::BTreeMap;
 use spin::{Mutex, RwLock};
@@ -753,9 +753,15 @@ impl ClusterChain {
 
         info!("Read called with buffer size {:}, position: {:?}. File size: {:}", data.len(), offset, size);
         
+        let block_size = BlockSize{
+            block_size_in_bytes: fs.cluster_size_in_bytes(),
+            size_in_blocks: fs.size_in_clusters(size),
+            size_in_bytes: size,
+        };
+
         // Treat our file like a sequence of clusters using the BlockBounds logic.
-        let BlockBounds { range, first_block_offset, .. } = BlockBounds::block_bounds(offset, data.len(), size,
-            fs.size_in_clusters(size), fs.cluster_size_in_bytes()).map_err(|_| Error::InvalidOffset)?;
+        let BlockBounds { range, first_block_offset, .. } = BlockBounds::block_bounds(offset, 
+            data.len(), &block_size).map_err(|_| Error::InvalidOffset)?;
         let block_size_in_bytes: usize = fs.cluster_size_in_bytes();
 
         // Read the actual data, one block at a time.
