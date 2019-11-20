@@ -2,7 +2,7 @@
 #![feature(asm)]
 #![feature(stmt_expr_attributes)]
 
-extern crate alloc;
+#[macro_use] extern crate alloc;
 #[macro_use] extern crate log;
 #[macro_use] extern crate debugit;
 extern crate irq_safety;
@@ -39,6 +39,7 @@ use memory::{get_kernel_mmi_ref, MemoryManagementInfo, VirtualAddress};
 use task::{Task, TaskRef, get_my_current_task, RunState, TASKLIST, TASK_SWITCH_LOCKS};
 use mod_mgmt::CrateNamespace;
 use path::Path;
+use apic::get_my_apic_id;
 
 #[cfg(spawn_userspace)]
 use core::ops::DerefMut;
@@ -88,6 +89,7 @@ pub struct KernelTaskBuilder<F, A, R> {
     name: Option<String>,
     pin_on_core: Option<u8>,
     blocked: bool,
+    idle: bool,
 
     #[cfg(simd_personality)]
     simd: SimdExt,
@@ -108,6 +110,7 @@ impl<F, A, R> KernelTaskBuilder<F, A, R>
             name: None,
             pin_on_core: None,
             blocked: false,
+            idle: false,
 
             #[cfg(simd_personality)]
             simd: SimdExt::None,
@@ -141,6 +144,13 @@ impl<F, A, R> KernelTaskBuilder<F, A, R>
     /// Note that the new Task will not be `Runnable` until it is explicitly set as such.
     pub fn block(mut self) -> KernelTaskBuilder<F, A, R> {
         self.blocked = true;
+        self
+    }
+
+    /// Set the new Task's is_an_idle_task to true.
+    /// This allows the creation of an idle task using KernelTaskbuilder
+    pub fn set_idle(mut self) -> KernelTaskBuilder<F, A, R> {
+        self.idle = true;
         self
     }
 
@@ -188,6 +198,11 @@ impl<F, A, R> KernelTaskBuilder<F, A, R>
             new_task.runstate = RunState::Blocked;
         } else {
             new_task.runstate = RunState::Runnable;
+        }
+
+        // The new task is marked as idle
+        if self.idle {
+            new_task.is_an_idle_task = true;
         }
 
         // If the caller provided a post-build function, invoke that now before finalizing the task and adding it to runqueues  
@@ -728,7 +743,11 @@ pub fn spawn_userspace(path: Path, name: Option<String>) -> Result<TaskRef, &'st
     Ok(task_ref)
 }
 
+fn idle_task(_a: u32)->(){
+    loop {
 
+    }
+}
 
 /// The entry point for all new `Task`s except restartable tasks that run in kernelspace. 
 /// This does not return, because it doesn't really have anywhere to return.
@@ -829,8 +848,27 @@ fn task_wrapper<F, A, R>() -> !
     }
 
     // (3) Yield the CPU
-    scheduler::schedule();
+    let success = scheduler::schedule();
+    if !success {
+        
+        let apic_id = match get_my_apic_id() {
+            Some(id) => id,
+                _ => {
+                    error!("BUG: Couldn't get apic_id in restart()");
+                    0
+                },
+        };
 
+        debug!("Idle task not found on core{}",apic_id);
+
+        let idle_taskref = KernelTaskBuilder::new(idle_task ,0)
+			.name(String::from(format!("idle_task_ap{}", apic_id)))
+			.pin_on_core(apic_id)
+            .set_idle()
+			.spawn().expect("failed to initiate idle task");
+       
+    }
+    scheduler::schedule();
     // nothing below here should ever run again, we should never ever reach this point
 
     error!("BUG: task_wrapper WAS RESCHEDULED AFTER BEING DEAD!");
@@ -957,6 +995,26 @@ fn task_wrapper_restartable<F, A, R>() -> !
     }
 
     // (3) Yield the CPU
+    let success = scheduler::schedule();
+    if !success {
+        
+        let apic_id = match get_my_apic_id() {
+            Some(id) => id,
+                _ => {
+                    error!("BUG: Couldn't get apic_id in restart()");
+                    0
+                },
+        };
+
+        debug!("Idle task not found on core{}",apic_id);
+
+        let idle_taskref = KernelTaskBuilder::new(idle_task ,0)
+			.name(String::from(format!("idle_task_ap{}", apic_id)))
+			.pin_on_core(apic_id)
+            .set_idle()
+			.spawn().expect("failed to initiate idle task");
+       
+    }
     scheduler::schedule();
 
     // nothing below here should ever run again, we should never ever reach this point
