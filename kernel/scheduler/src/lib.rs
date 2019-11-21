@@ -35,6 +35,10 @@ pub fn schedule() -> bool {
         }
     };
 
+    if(apic_id == 3){
+        debug!("Scheduler called {}", apic_id);
+    }
+
     {
         if let Some(selected_next_task) = select_next_task(apic_id) {
             next_task = selected_next_task.lock().deref() as *const Task as *mut Task;

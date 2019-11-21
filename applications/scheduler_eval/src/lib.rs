@@ -15,7 +15,7 @@ use alloc::vec::Vec;
 pub fn main(_args: Vec<String>) -> (){
     let taskref1 = KernelTaskBuilder::new(test1 ,1)
         .name(String::from("test1"))
-        .pin_on_core(1)
+        .pin_on_core(3)
         .spawn().expect("failed to initiate task");
 
     if let Err(e) = scheduler::set_priority(&taskref1, 30) {
@@ -26,7 +26,7 @@ pub fn main(_args: Vec<String>) -> (){
 
     let taskref2 = KernelTaskBuilder::new(test2 ,2)
         .name(String::from("test2"))
-        .pin_on_core(1)
+        .pin_on_core(3)
         .spawn().expect("failed to initiate task");
 
     if let Err(e) = scheduler::set_priority(&taskref2, 20) {
@@ -37,7 +37,7 @@ pub fn main(_args: Vec<String>) -> (){
 
     let taskref3 = KernelTaskBuilder::new(test3 ,3)
         .name(String::from("test3"))
-        .pin_on_core(1)
+        .pin_on_core(3)
         .spawn().expect("failed to initiate task");
 
     if let Err(e) = scheduler::set_priority(&taskref3, 10) {

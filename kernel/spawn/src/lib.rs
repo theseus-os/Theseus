@@ -223,7 +223,8 @@ impl<F, A, R> KernelTaskBuilder<F, A, R>
             runqueue::add_task_to_specific_runqueue(core, task_ref.clone())?;
         }
         else {
-            runqueue::add_task_to_any_runqueue(task_ref.clone())?;
+            // runqueue::add_task_to_any_runqueue(task_ref.clone())?;
+            runqueue::add_task_to_specific_runqueue(1, task_ref.clone())?;
         }
 
         Ok(task_ref)
