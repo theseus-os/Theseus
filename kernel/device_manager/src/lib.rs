@@ -5,7 +5,6 @@
 extern crate event_types;
 extern crate e1000;
 extern crate memory;
-extern crate dfqueue; 
 extern crate apic;
 extern crate acpi;
 extern crate keyboard;
@@ -14,9 +13,10 @@ extern crate mouse;
 extern crate storage_manager;
 extern crate network_manager;
 extern crate ethernet_smoltcp_device;
+extern crate mpmc;
 
 
-use dfqueue::DFQueueProducer;
+use mpmc::Queue;
 use event_types::Event;
 use memory::MemoryManagementInfo;
 use ethernet_smoltcp_device::EthernetNetworkInterface;
@@ -47,7 +47,7 @@ pub fn early_init(kernel_mmi: &mut MemoryManagementInfo) -> Result<(), &'static 
 
 /// Initializes all other devices, such as the keyboard and mouse
 /// as well as all devices discovered on the PCI bus.
-pub fn init(keyboard_producer: DFQueueProducer<Event>) -> Result<(), &'static str>  {
+pub fn init(keyboard_producer: Queue<Event>) -> Result<(), &'static str>  {
     keyboard::init(keyboard_producer);
     mouse::init();
 
