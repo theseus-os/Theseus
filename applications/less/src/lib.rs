@@ -184,7 +184,7 @@ fn event_handler_loop(content: &String, map: &BTreeMap<usize, LineSlice>,
                     Keycode::Q => {
                         let mut locked_terminal = terminal.lock();
                         locked_terminal.clear();
-                        locked_terminal.refresh_display()
+                        return locked_terminal.refresh_display()
                     },
                     // Scroll down a line on "Down".
                     Keycode::Down => {

@@ -37,7 +37,7 @@ use compositor::Compositor;
 use frame_buffer::{FrameBuffer, FINAL_FRAME_BUFFER, Coord};
 use spin::Mutex;
 
-const CACHE_BLOCK_HEIGHT:usize = 16;
+pub const CACHE_BLOCK_HEIGHT:usize = 16;
 
 lazy_static! {
     /// The instance of the frame buffer compositor.

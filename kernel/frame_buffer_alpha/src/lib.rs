@@ -177,7 +177,14 @@ impl FrameBuffer for FrameBufferAlpha {
     fn buffer_copy(&mut self, src: &[Pixel], dest_start: usize) {
         let len = src.len();
         let dest_end = dest_start + len;
-        self.buffer_mut()[dest_start..dest_end].copy_from_slice(src);
+        for i in 0..len {
+            let index = dest_start + i;
+            let coordinate = Coord::new(
+                (index % self.width) as isize, 
+                (index / self.width) as isize
+            );
+            self.draw_pixel(coordinate, src[i]);
+        }
     }
 
     fn overwrite_pixel(&mut self, coordinate: Coord, color: Pixel) {

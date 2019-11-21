@@ -109,6 +109,8 @@ pub struct WindowManagerAlpha<U: WindowProfile> {
     repositioned_border: Option<RectRegion>,
     /// the frame buffer that it should print on
     final_fb: Box<dyn FrameBuffer>,
+    /// the frame buffer that it should print on
+    top_fb: Box<dyn FrameBuffer>,
     /// if it this is true, do not refresh whole screen until someone calls "refresh_area_absolute"
     delay_refresh_first_time: bool,
 }
@@ -410,23 +412,46 @@ impl<U: WindowProfile> WindowManagerAlpha<U> {
                 );
             }
         }
-        // finally draw mouse
-        let mcoordinate = { &self.mouse };
-        if ((scoordinate.x - mcoordinate.x) as usize <= MOUSE_POINTER_HALF_SIZE
-            || (mcoordinate.x - scoordinate.x) as usize <= MOUSE_POINTER_HALF_SIZE)
-            && ((scoordinate.y - mcoordinate.y) as usize <= MOUSE_POINTER_HALF_SIZE
-                || (mcoordinate.y - scoordinate.y) as usize <= MOUSE_POINTER_HALF_SIZE)
-        {
-            self.final_fb.draw_pixel(
-                coordinate,
-                MOUSE_BASIC
-                    [(MOUSE_POINTER_HALF_SIZE as isize + coordinate.x - mcoordinate.x) as usize]
-                    [(MOUSE_POINTER_HALF_SIZE as isize + coordinate.y - mcoordinate.y) as usize],
-            );
-        }
+ 
+        // // finally draw mouse
+        // let mcoordinate = { &self.mouse };
+        // if ((scoordinate.x - mcoordinate.x) as usize <= MOUSE_POINTER_HALF_SIZE
+        //     || (mcoordinate.x - scoordinate.x) as usize <= MOUSE_POINTER_HALF_SIZE)
+        //     && ((scoordinate.y - mcoordinate.y) as usize <= MOUSE_POINTER_HALF_SIZE
+        //         || (mcoordinate.y - scoordinate.y) as usize <= MOUSE_POINTER_HALF_SIZE)
+        // {
+        //     self.final_fb.draw_pixel(
+        //         coordinate,
+        //         MOUSE_BASIC
+        //             [(MOUSE_POINTER_HALF_SIZE as isize + coordinate.x - mcoordinate.x) as usize]
+        //             [(MOUSE_POINTER_HALF_SIZE as isize + coordinate.y - mcoordinate.y) as usize],
+        //     );
+        // }
         Ok(())
     }
 
+    pub fn refresh_desktop_top_pixel(&mut self, coordinate: Coord, new: bool) {
+        // finally draw mouse
+        let mcoordinate = { &self.mouse };
+        if ((coordinate.x - mcoordinate.x) as usize <= MOUSE_POINTER_HALF_SIZE
+            || (mcoordinate.x - coordinate.x) as usize <= MOUSE_POINTER_HALF_SIZE)
+            && ((coordinate.y - mcoordinate.y) as usize <= MOUSE_POINTER_HALF_SIZE
+                || (mcoordinate.y - coordinate.y) as usize <= MOUSE_POINTER_HALF_SIZE)
+        {
+            
+            if new {
+                self.top_fb.overwrite_pixel(
+                    coordinate,
+                    MOUSE_BASIC
+                        [(MOUSE_POINTER_HALF_SIZE as isize + coordinate.x - mcoordinate.x) as usize]
+                        [(MOUSE_POINTER_HALF_SIZE as isize + coordinate.y - mcoordinate.y) as usize],
+                );
+            } else {
+                self.top_fb.overwrite_pixel(coordinate, 0xFF000000);
+            }
+        } 
+    }
+    
     /// recompute single pixel value and refresh it on screen
     pub fn refresh_single_pixel(&mut self, coordinate: Coord) -> Result<(), &'static str> {
         let (width, height) = self.final_fb.get_size();
@@ -689,6 +714,35 @@ impl<U: WindowProfile> WindowManagerAlpha<U> {
         }
         Ok(())
     }
+
+
+    fn get_cursor_cache_block(&self) -> Vec<(usize, usize)>{
+        let index = self.mouse.y as usize / frame_buffer_compositor::CACHE_BLOCK_HEIGHT;
+        let width = self.mouse.x as usize;
+        let mut mouse_blocks = vec![(index, width)];
+        if (index + 1) * frame_buffer_compositor::CACHE_BLOCK_HEIGHT <= self.mouse.y as usize + 15 {
+            mouse_blocks.push(((index + 1), width));
+        }
+
+        mouse_blocks
+    }
+
+    fn render(&self, framebuffer: &dyn FrameBuffer, blocks: Option<IntoIter<(usize, usize)>>) -> Result<(), &'static str>{
+        let mut bufferlist = Vec::new();
+        bufferlist.push(
+            FrameBufferBlocks {
+                framebuffer: framebuffer,
+                coordinate: Coord::new(0, 0),
+                blocks: blocks,
+            }
+        );
+
+        FRAME_COMPOSITOR
+            .lock()
+            .composite(bufferlist.into_iter())
+
+    }
+
 }
 
 /// set window as active, the active window is always at top, so it will refresh the region of this window
@@ -807,21 +861,34 @@ pub fn render(blocks: Option<IntoIter<(usize, usize)>>) -> Result<(), &'static s
         .try()
         .ok_or("The static window manager was not yet initialized")?
         .lock();
-    let frame_buffer_blocks = FrameBufferBlocks {
-        framebuffer: win.final_fb.deref_mut(),
-        coordinate: Coord::new(0, 0),
-        blocks: blocks,
-    };
+    let mut bufferlist = Vec::new();
+    bufferlist.push(
+        FrameBufferBlocks {
+            framebuffer: win.final_fb.deref(),
+            coordinate: Coord::new(0, 0),
+            blocks: blocks,
+        }
+    );
+
+    bufferlist.push(
+        FrameBufferBlocks {
+            framebuffer: win.top_fb.deref(),
+            coordinate: Coord::new(0, 0),
+            blocks: Some(win.get_cursor_cache_block().into_iter()),
+        }
+    );
+
     FRAME_COMPOSITOR
         .lock()
-        .composite(vec![frame_buffer_blocks].into_iter())
+        .composite(bufferlist.into_iter())
 }
 
 /// Initialize the window manager, should provide the consumer of keyboard and mouse event, as well as a frame buffer to draw
 pub fn init<Buffer: FrameBuffer>(
     key_consumer: DFQueueConsumer<Event>,
     mouse_consumer: DFQueueConsumer<Event>,
-    framebuffer: Buffer,
+    bg_framebuffer: Buffer,
+    top_framebuffer: Buffer,
 ) -> Result<(), &'static str> {
     debug!("Initializing the window manager alpha (transparency)...");
 
@@ -833,7 +900,8 @@ pub fn init<Buffer: FrameBuffer>(
         active: Weak::new(),
         mouse: Coord { x: 0, y: 0 },
         repositioned_border: None,
-        final_fb: Box::new(framebuffer),
+        final_fb: Box::new(bg_framebuffer),
+        top_fb: Box::new(top_framebuffer),
         delay_refresh_first_time: delay_refresh_first_time,
     };
     WINDOW_MANAGER.call_once(|| Mutex::new(window_manager));
@@ -1146,25 +1214,31 @@ fn move_cursor_to(new: Coord) -> Result<(), &'static str> {
         .try()
         .ok_or("The static window manager was not yet initialized")?
         .lock();
-    win.mouse = new;
     // then update region of old mouse
     for y in old.y - MOUSE_POINTER_HALF_SIZE as isize..old.y + MOUSE_POINTER_HALF_SIZE as isize + 1
     {
         for x in
             old.x - MOUSE_POINTER_HALF_SIZE as isize..old.x + MOUSE_POINTER_HALF_SIZE as isize + 1
         {
-            win.refresh_single_pixel(Coord::new(x, y))?;
+            win.refresh_desktop_top_pixel(Coord::new(x, y), false);
         }
     }
+
+    let mut blocks = win.get_cursor_cache_block();
+
+    win.mouse = new;
     // draw new mouse in the new position
     for y in new.y - MOUSE_POINTER_HALF_SIZE as isize..new.y + MOUSE_POINTER_HALF_SIZE as isize + 1
     {
         for x in
             new.x - MOUSE_POINTER_HALF_SIZE as isize..new.x + MOUSE_POINTER_HALF_SIZE as isize + 1
         {
-            win.refresh_single_pixel(Coord::new(x, y))?;
+            win.refresh_desktop_top_pixel(Coord::new(x, y), true);
         }
     }
+    blocks.append(&mut win.get_cursor_cache_block());
+    win.render(win.top_fb.deref(), Some(blocks.into_iter()))?;
+
     Ok(())
 }
 

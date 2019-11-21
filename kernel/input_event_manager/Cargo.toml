@@ -24,6 +24,9 @@ path = "../window_manager_primitive"
 [dependencies.frame_buffer_rgb]
 path = "../frame_buffer_rgb"
 
+[dependencies.frame_buffer]
+path = "../frame_buffer"
+
 [dependencies.font]
 path = "../font"
 

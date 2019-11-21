@@ -29,6 +29,7 @@ extern crate path;
 #[macro_use] extern crate alloc;
 #[cfg(not(primitive_display_sys))]
 extern crate alloc;
+extern crate frame_buffer;
 
 
 #[cfg(primitive_display_sys)]
@@ -43,7 +44,7 @@ use path::Path;
 use spawn::{KernelTaskBuilder};
 #[cfg(not(primitive_display_sys))]
 use frame_buffer_alpha::FrameBufferAlpha;
-
+use frame_buffer::FrameBuffer;
 use alloc::{string::ToString, sync::Arc};
 use event_types::Event;
 use dfqueue::{DFQueue, DFQueueProducer};
@@ -89,11 +90,14 @@ pub fn init() -> Result<(DFQueueProducer<Event>, DFQueueProducer<Event>), &'stat
     #[cfg(not(primitive_display_sys))]
     {
         let (width, height) = frame_buffer_alpha::init()?;
-        let framebuffer = FrameBufferAlpha::new(width, height, None)?;
+        let bg_framebuffer = FrameBufferAlpha::new(width, height, None)?;
+        let mut top_framebuffer = FrameBufferAlpha::new(width, height, None)?;
+        top_framebuffer.fill_color(0xFF000000); 
         window_manager_alpha::init(
             keyboard_event_handling_consumer,
             mouse_event_handling_consumer,
-            framebuffer,
+            bg_framebuffer,
+            top_framebuffer
         )?;
     }
 

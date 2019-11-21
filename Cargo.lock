@@ -791,6 +791,7 @@ dependencies = [
  "dfqueue 0.1.0",
  "event_types 0.1.0",
  "font 0.1.0",
+ "frame_buffer 0.1.0",
  "frame_buffer_alpha 0.1.0",
  "frame_buffer_rgb 0.1.0",
  "keycodes_ascii 0.1.0",
