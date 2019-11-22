@@ -155,7 +155,17 @@ impl<U: WindowProfile> WindowManagerAlpha<U> {
         }
         self.active = Arc::downgrade(objref);
         if refresh {
-            self.refresh_area(start, end)?;
+            let window = objref.lock();
+            
+            // Wenqiu
+            // self.refresh_area(start, end)?;
+            let frame_buffer_blocks = FrameBufferBlocks {
+                framebuffer: window.framebuffer(),
+                coordinate: window.coordinate(),
+                blocks: None
+            };
+            FRAME_COMPOSITOR.lock().composite(vec![frame_buffer_blocks].into_iter())?;
+            // self.refresh_area(start, end)?;
         }
         Ok(())
     }
@@ -462,8 +472,18 @@ impl<U: WindowProfile> WindowManagerAlpha<U> {
     }
 
     /// refresh an area by recompute every pixel in this region and update on the screen
-    fn refresh_area(&mut self, mut start: Coord, mut end: Coord) -> Result<(), &'static str> {
-        let (width, height) = self.final_fb.get_size();
+    pub fn refresh_area(&mut self, mut start: Coord, mut end: Coord) -> Result<(), &'static str> {
+        trace!("Wenqiu: Refresh"); 
+        let frame_buffer_blocks = FrameBufferBlocks {
+            framebuffer: self.final_fb.deref(),
+            coordinate: Coord::new(0, 0),
+            blocks: None
+        };
+        FRAME_COMPOSITOR.lock().composite(vec![frame_buffer_blocks].into_iter())
+
+
+        
+/*        let (width, height) = self.final_fb.get_size();
         start.x = core::cmp::max(start.x, 0);
         end.x = core::cmp::min(end.x, width as isize);
         start.y = core::cmp::max(start.y, 0);
@@ -475,7 +495,7 @@ impl<U: WindowProfile> WindowManagerAlpha<U> {
                 }
             }
         }
-        Ok(())
+        Ok(())*/
     }
 
     /// refresh an rectangle border
@@ -862,13 +882,13 @@ pub fn render(blocks: Option<IntoIter<(usize, usize)>>) -> Result<(), &'static s
         .ok_or("The static window manager was not yet initialized")?
         .lock();
     let mut bufferlist = Vec::new();
-    bufferlist.push(
-        FrameBufferBlocks {
-            framebuffer: win.final_fb.deref(),
-            coordinate: Coord::new(0, 0),
-            blocks: blocks,
-        }
-    );
+    // bufferlist.push(
+    //     FrameBufferBlocks {
+    //         framebuffer: win.final_fb.deref(),
+    //         coordinate: Coord::new(0, 0),
+    //         blocks: blocks,
+    //     }
+    // );
 
     bufferlist.push(
         FrameBufferBlocks {
@@ -887,10 +907,20 @@ pub fn render(blocks: Option<IntoIter<(usize, usize)>>) -> Result<(), &'static s
 pub fn init<Buffer: FrameBuffer>(
     key_consumer: DFQueueConsumer<Event>,
     mouse_consumer: DFQueueConsumer<Event>,
-    bg_framebuffer: Buffer,
+    mut bg_framebuffer: Buffer,
     top_framebuffer: Buffer,
 ) -> Result<(), &'static str> {
     debug!("Initializing the window manager alpha (transparency)...");
+
+    let (screen_width, screen_height) = bg_framebuffer.get_size();
+    for x in 0..screen_width{
+        for y in 0..screen_height {
+            bg_framebuffer.draw_pixel(
+                Coord::new(x as isize, y as isize),
+                background::BACKGROUND[y / 2][x / 2]
+            )
+        }
+    }
 
     // initialize static window manager
     let delay_refresh_first_time = true;
@@ -910,7 +940,6 @@ pub fn init<Buffer: FrameBuffer>(
         .try()
         .ok_or("The static window manager was not yet initialized")?
         .lock();
-    let (screen_width, screen_height) = win.final_fb.get_size();
     win.mouse = Coord {
         x: screen_width as isize / 2,
         y: screen_height as isize / 2,
@@ -1021,6 +1050,14 @@ impl WindowProfile for WindowProfileAlpha {
 
     fn get_pixel(&self, coordinate: Coord) -> Result<Pixel, &'static str> {
         self.framebuffer.get_pixel(coordinate)
+    }
+
+    fn framebuffer(&self) -> &dyn FrameBuffer {
+        self.framebuffer.deref()
+    }
+
+    fn coordinate(&self) -> Coord {
+        self.coordinate
     }
 }
 

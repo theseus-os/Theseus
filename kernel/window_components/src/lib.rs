@@ -14,7 +14,7 @@
 
 #![no_std]
 
-extern crate alloc;
+#[macro_use] extern crate alloc;
 extern crate dfqueue;
 extern crate event_types;
 extern crate spin;
@@ -26,7 +26,11 @@ extern crate frame_buffer_alpha;
 extern crate mouse;
 extern crate window;
 extern crate window_manager_alpha;
+extern crate frame_buffer_compositor;
+extern crate compositor;
 
+use compositor::Compositor;
+use frame_buffer_compositor::{FRAME_COMPOSITOR, FrameBufferBlocks};
 use alloc::boxed::Box;
 use alloc::collections::BTreeMap;
 use alloc::string::{String, ToString};
@@ -194,9 +198,10 @@ impl Window for WindowComponents {
                 self.show_button(TopButton::Hide, 1, &mut winobj);
                 bcoordinate
             };
-            if let Err(err) = self.refresh_border(bcoordinate) {
+            
+            /*if let Err(err) = self.refresh_border(bcoordinate) {
                 error!("refresh_border failed {}", err);
-            }
+            }*/
         }
         let bcoordinate = {
             let mut winobj = self.winobj.lock();
@@ -375,7 +380,22 @@ impl WindowComponents {
             wincomps.show_button(TopButton::Hide, 1, &mut winobj);
         }
         debug!("before refresh");
-        window_manager_alpha::refresh_area_absolute(start, end)?;
+        {
+            let mut wm = window_manager_alpha::WINDOW_MANAGER
+                .try()
+                .ok_or("The static window manager was not yet initialized")?
+                .lock();
+            wm.refresh_area(start, end)?;
+            let window = wincomps.winobj.lock();
+            let frame_buffer_blocks = FrameBufferBlocks {
+                framebuffer: window.framebuffer(),
+                coordinate: window.coordinate(),
+                blocks: None
+            };
+            FRAME_COMPOSITOR.lock().composite(vec![frame_buffer_blocks].into_iter())?;
+        }
+    
+        // window_manager_alpha::refresh_area_absolute(start, end)?;
         debug!("after refresh");
 
         Ok(wincomps)
@@ -544,10 +564,19 @@ impl WindowComponents {
                     self.title_size as isize / 2,
                 );
             let r = WINDOW_RADIUS as isize;
-            window_manager_alpha::refresh_area_absolute(
+
+            let profile = self.winobj.lock();
+            let frame_buffer_blocks = FrameBufferBlocks {
+                framebuffer: profile.framebuffer.deref(),
+                coordinate: profile.coordinate,
+                blocks: None
+            };
+            FRAME_COMPOSITOR.lock().composite(vec![frame_buffer_blocks].into_iter())?;
+
+            /* window_manager_alpha::refresh_area_absolute(
                 coordinate - (r, r),
                 coordinate + (r + 1, r + 1),
-            )?;
+            )?;*/
         }
         Ok(())
     }

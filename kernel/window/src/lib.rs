@@ -73,6 +73,10 @@ pub trait WindowProfile {
     fn get_pixel(&self, _coordinate: Coord) -> Result<Pixel, &'static str> {
         Err("get_pixel() is not implement for this window")
     }
+
+    fn framebuffer(&self) -> &dyn FrameBuffer;
+
+    fn coordinate(&self) -> Coord;
 }
 
 /// A `Window` is owned by an appliction. Usually it has a reference to the corresponding `WindowProfile` in the window manager.

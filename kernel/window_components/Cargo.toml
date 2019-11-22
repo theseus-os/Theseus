@@ -19,6 +19,12 @@ version = "0.1.0"
 [dependencies.frame_buffer_alpha]
 path = "../frame_buffer_alpha"
 
+[dependencies.compositor]
+path = "../compositor"
+
+[dependencies.frame_buffer_compositor]
+path = "../frame_buffer_compositor"
+
 [dependencies.displayable]
 path = "../displayable"
 

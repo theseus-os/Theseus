@@ -327,12 +327,20 @@ pub fn new_window(
         height - 2 * WINDOW_PADDING,
         None,
     )?;
+
+    let temp = FrameBufferRGB::new(
+        width - 2 * WINDOW_PADDING,
+        height - 2 * WINDOW_PADDING,
+        None,
+    )?;
+
     let profile = WindowProfilePrimitive {
         coordinate: coordinate,
         width: width,
         height: height,
         padding: WINDOW_PADDING,
         events_producer: producer,
+        framebuffer: Box::new(temp)
     };
 
     // // Check if the window overlaps with others
@@ -382,6 +390,8 @@ pub struct WindowProfilePrimitive {
     pub padding: usize,
     /// the producer accepting an event, i.e. a keypress event, resize event, etc.
     pub events_producer: DFQueueProducer<Event>,
+
+    pub framebuffer: Box<dyn FrameBuffer>,
 }
 
 impl WindowProfile for WindowProfilePrimitive {
@@ -488,6 +498,14 @@ impl WindowProfile for WindowProfilePrimitive {
 
     fn set_is_moving(&mut self, _moving: bool) {
         // TODO: this display subsystem cannot react to mouse event to move now
+    }
+
+    fn framebuffer(&self) -> &dyn FrameBuffer{
+        self.framebuffer.deref()
+    }
+
+    fn coordinate(&self) -> Coord {
+        self.coordinate
     }
 }
 
