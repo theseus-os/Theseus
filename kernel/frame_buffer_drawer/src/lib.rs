@@ -173,3 +173,19 @@ pub fn fill_rectangle(
         coordinate.x = start_x;
     }
 }
+
+/// Draw a circle in the framebuffer. `coordinate` is the position of the center of the circle relative to the top-left corner of the framebuffer and `r` is the radius
+pub fn draw_circle(framebuffer: &mut dyn FrameBuffer, center: Coord, r: usize, color: u32) {
+    let r2 = (r * r) as isize;
+    for y in center.y - r as isize..center.y + r as isize {
+        for x in center.x - r as isize..center.x + r as isize {
+            let coordinate = Coord::new(x, y);
+            if framebuffer.contains(coordinate) {
+                let d = coordinate - center;
+                if d.x * d.x + d.y * d.y <= r2 {
+                    framebuffer.draw_pixel(coordinate, color);
+                }
+            }
+        }
+    }
+}

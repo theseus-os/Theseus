@@ -141,28 +141,28 @@ impl FrameBufferAlpha {
         (self.width, self.height)
     }
 
-    /// draw a rectangle on this framebuffer
-    pub fn overwrite_rect(&mut self, start: Coord, end: Coord, color: AlphaPixel) {
-        for y in start.y..end.y {
-            for x in start.x..end.x {
-                let coordinate = Coord::new(x as isize, y as isize);
-                self.overwrite_pixel(coordinate, color);
-            }
-        }
-    }
+    // /// draw a rectangle on this framebuffer
+    // pub fn overwrite_rect(&mut self, start: Coord, end: Coord, color: AlphaPixel) {
+    //     for y in start.y..end.y {
+    //         for x in start.x..end.x {
+    //             let coordinate = Coord::new(x as isize, y as isize);
+    //             self.overwrite_pixel(coordinate, color);
+    //         }
+    //     }
+    // }
 
-    /// draw a char onto the framebuffer
-    pub fn draw_char_8x16(&mut self, coordinate: Coord, c: u8, color: AlphaPixel) {
-        for yi in 0..16 {
-            let char_font: u8 = font::FONT_BASIC[c as usize][yi];
-            for xi in 0..8 {
-                const HIGHEST_BIT: u8 = 0x80;
-                if char_font & (HIGHEST_BIT >> xi) != 0 {
-                    self.draw_pixel(coordinate + (xi as isize, yi as isize), color);
-                }
-            }
-        }
-    }
+    // /// draw a char onto the framebuffer
+    // pub fn draw_char_8x16(&mut self, coordinate: Coord, c: u8, color: AlphaPixel) {
+    //     for yi in 0..16 {
+    //         let char_font: u8 = font::FONT_BASIC[c as usize][yi];
+    //         for xi in 0..8 {
+    //             const HIGHEST_BIT: u8 = 0x80;
+    //             if char_font & (HIGHEST_BIT >> xi) != 0 {
+    //                 self.draw_pixel(coordinate + (xi as isize, yi as isize), color);
+    //             }
+    //         }
+    //     }
+    // }
 }
 
 impl FrameBuffer for FrameBufferAlpha {

@@ -14,35 +14,39 @@
 
 #![no_std]
 
-#[macro_use] extern crate alloc;
+#[macro_use]
+extern crate alloc;
 extern crate dfqueue;
 extern crate event_types;
 extern crate spin;
-#[macro_use] extern crate log;
+#[macro_use]
+extern crate log;
+extern crate compositor;
 extern crate displayable;
 extern crate font;
 extern crate frame_buffer;
 extern crate frame_buffer_alpha;
+extern crate frame_buffer_compositor;
+extern crate frame_buffer_drawer;
 extern crate mouse;
 extern crate window;
 extern crate window_manager_alpha;
-extern crate frame_buffer_compositor;
-extern crate compositor;
 
-use compositor::Compositor;
-use frame_buffer_compositor::{FRAME_COMPOSITOR, FrameBufferBlocks};
 use alloc::boxed::Box;
 use alloc::collections::BTreeMap;
 use alloc::string::{String, ToString};
-use alloc::sync::{Arc};
-use alloc::vec::{IntoIter};
-use core::ops::{Deref};
+use alloc::sync::Arc;
+use alloc::vec::IntoIter;
+use compositor::Compositor;
+use core::ops::Deref;
+use core::ops::DerefMut;
 use dfqueue::{DFQueue, DFQueueConsumer, DFQueueProducer};
 use displayable::Displayable;
 use event_types::{Event, MousePositionEvent};
 use frame_buffer::{Coord, FrameBuffer, Pixel};
 use frame_buffer_alpha::{AlphaPixel, PixelMixer, BLACK};
-use spin::{Mutex};
+use frame_buffer_compositor::{FrameBufferBlocks, FRAME_COMPOSITOR};
+use spin::Mutex;
 use window::{Window, WindowProfile};
 use window_manager_alpha::{WindowProfileAlpha, WINDOW_MANAGER};
 
@@ -175,7 +179,10 @@ impl Window for WindowComponents {
         self.render(None)
     }
 
-    fn render(&mut self, blocks: Option<IntoIter<(usize, usize, usize)>>) -> Result<(), &'static str> {
+    fn render(
+        &mut self,
+        blocks: Option<IntoIter<(usize, usize, usize)>>,
+    ) -> Result<(), &'static str> {
         // TODO optimize for better performance
         window_manager_alpha::render(blocks)
     }
@@ -199,7 +206,7 @@ impl Window for WindowComponents {
                 self.show_button(TopButton::Hide, 1, &mut winobj);
                 bcoordinate
             };
-            
+
             /*if let Err(err) = self.refresh_border(bcoordinate) {
                 error!("refresh_border failed {}", err);
             }*/
@@ -391,11 +398,13 @@ impl WindowComponents {
             let frame_buffer_blocks = FrameBufferBlocks {
                 framebuffer: window.framebuffer(),
                 coordinate: window.coordinate(),
-                blocks: None
+                blocks: None,
             };
-            FRAME_COMPOSITOR.lock().composite(vec![frame_buffer_blocks].into_iter())?;
+            FRAME_COMPOSITOR
+                .lock()
+                .composite(vec![frame_buffer_blocks].into_iter())?;
         }
-    
+
         // window_manager_alpha::refresh_area_absolute(start, end)?;
         debug!("after refresh");
 
@@ -444,45 +453,88 @@ impl WindowComponents {
         }
         let width = winobj.width;
         let height = winobj.height;
-        winobj
-            .framebuffer
-            .draw_rect(
-                Coord::new(0, self.title_size as isize),
-                Coord::new(self.border_size as isize, height as isize),
-                border_color
-            );
-        winobj
-            .framebuffer
-            .draw_rect(
-                Coord::new(0, (height - self.border_size) as isize),
-                Coord::new(width as isize, height as isize),
-                border_color
-            );
-        winobj.framebuffer.draw_rect(
-            Coord::new((width - self.border_size) as isize, self.title_size as isize),
-            Coord::new(width as isize, height as isize),
+
+        frame_buffer_drawer::draw_rectangle(
+            winobj.framebuffer.deref_mut(),
+            Coord::new(0, self.title_size as isize),
+            self.border_size,
+            height - self.title_size,
             border_color,
         );
+
+        frame_buffer_drawer::draw_rectangle(
+            winobj.framebuffer.deref_mut(),
+            Coord::new(0, (height - self.border_size) as isize),
+            width,
+            self.border_size,
+            border_color,
+        );
+        frame_buffer_drawer::draw_rectangle(
+            winobj.framebuffer.deref_mut(),
+            Coord::new(
+                (width - self.border_size) as isize,
+                self.title_size as isize,
+            ),
+            self.border_size,
+            height - self.title_size,
+            border_color,
+        );
+
+        // winobj
+        //     .framebuffer
+        //     .draw_rect(
+        //         Coord::new(0, self.title_size as isize),
+        //         Coord::new(self.border_size as isize, height as isize),
+        //         border_color
+        //     );
+        // winobj
+        //     .framebuffer
+        //     .draw_rect(
+        //         Coord::new(0, (height - self.border_size) as isize),
+        //         Coord::new(width as isize, height as isize),
+        //         border_color
+        //     );
+        // winobj.framebuffer.draw_rect(
+        //     Coord::new((width - self.border_size) as isize, self.title_size as isize),
+        //     Coord::new(width as isize, height as isize),
+        //     border_color,
+        // );
         // then draw the title bar
         if active {
             for i in 0..self.title_size {
-                winobj.framebuffer.draw_rect(
+                frame_buffer_drawer::draw_rectangle(
+                    winobj.framebuffer.deref_mut(),
                     Coord::new(0, i as isize),
-                    Coord::new(width as isize, i as isize + 1),
+                    width,
+                    1,
                     WINDOW_BORDER_COLOR_ACTIVE_BOTTOM.color_mix(
                         WINDOW_BORDER_COLOR_ACTIVE_TOP,
                         (i as f32) / (self.title_size as f32),
                     ),
-                );
+                ); // winobj.framebuffer.draw_rect(
+                   //     Coord::new(0, i as isize),
+                   //     Coord::new(width as isize, i as isize + 1),
+                   //     WINDOW_BORDER_COLOR_ACTIVE_BOTTOM.color_mix(
+                   //         WINDOW_BORDER_COLOR_ACTIVE_TOP,
+                   //         (i as f32) / (self.title_size as f32),
+                   //     ),
+                   // );
             }
         } else {
-            winobj
-                .framebuffer
-                .draw_rect(
-                    Coord::new(0, 0),
-                    Coord::new(width as isize, self.title_size as isize),
-                    border_color
-                );
+            frame_buffer_drawer::draw_rectangle(
+                winobj.framebuffer.deref_mut(),
+                Coord::new(0, 0),
+                width,
+                self.title_size,
+                border_color,
+            );
+            // winobj
+            //     .framebuffer
+            //     .draw_rect(
+            //         Coord::new(0, 0),
+            //         Coord::new(width as isize, self.title_size as isize),
+            //         border_color
+            //     );
         }
         // draw radius finally
         let r2 = WINDOW_RADIUS * WINDOW_RADIUS;
@@ -495,9 +547,10 @@ impl WindowComponents {
                     winobj
                         .framebuffer
                         .overwrite_pixel(Coord::new(i as isize, j as isize), 0xFFFFFFFF);
-                    winobj
-                        .framebuffer
-                        .overwrite_pixel(Coord::new((width - i - 1) as isize, j as isize), 0xFFFFFFFF);
+                    winobj.framebuffer.overwrite_pixel(
+                        Coord::new((width - i - 1) as isize, j as isize),
+                        0xFFFFFFFF,
+                    );
                 }
             }
         }
@@ -542,7 +595,8 @@ impl WindowComponents {
                     TopButton::MinimizeMaximize => 1,
                     TopButton::Hide => 2,
                 };
-        winobj.framebuffer.draw_circle(
+        frame_buffer_drawer::draw_circle(
+            winobj.framebuffer.deref_mut(),
             Coord::new(x as isize, y as isize),
             WINDOW_BUTTON_SIZE,
             BLACK.color_mix(
@@ -570,9 +624,11 @@ impl WindowComponents {
             let frame_buffer_blocks = FrameBufferBlocks {
                 framebuffer: profile.framebuffer.deref(),
                 coordinate: profile.coordinate,
-                blocks: None
+                blocks: None,
             };
-            FRAME_COMPOSITOR.lock().composite(vec![frame_buffer_blocks].into_iter())?;
+            FRAME_COMPOSITOR
+                .lock()
+                .composite(vec![frame_buffer_blocks].into_iter())?;
 
             /* window_manager_alpha::refresh_area_absolute(
                 coordinate - (r, r),

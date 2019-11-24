@@ -77,31 +77,15 @@ pub trait FrameBuffer: Downcast + Send {
     /// Draws a pixel at the given `coordinate` relative to the origin(top-left point) of the frame buffer. The new pixel is a mix of original pixel and `color` according to the type of the framebuffer.
     fn draw_pixel(&mut self, coordinate: Coord, color: Pixel);
 
-    /// Draw a circles in the framebuffer. `coordinate` is the position of the center of the circle relative to the top-left corner of the framebuffer and `r` is the radius
-    fn draw_circle(&mut self, center: Coord, r: usize, color: Pixel) {
-        let r2 = (r * r) as isize;
-        for y in center.y - r as isize..center.y + r as isize {
-            for x in center.x - r as isize..center.x + r as isize {
-                let coordinate = Coord::new(x, y);
-                if self.contains(coordinate) {
-                    let d = coordinate - center;
-                    if d.x * d.x + d.y * d.y <= r2 {
-                        self.draw_pixel(coordinate, color);
-                    }
-                }
-            }
-        }
-    }
-
-    /// Draws a rectangle on this framebuffer.
-    fn draw_rect(&mut self, start: Coord, end: Coord, color: Pixel) {
-        for y in start.y..end.y {
-            for x in start.x..end.x {
-                let coordinate = Coord::new(x, y);
-                self.draw_pixel(coordinate, color);
-            }
-        }
-    }
+    // /// Draws a rectangle on this framebuffer.
+    // fn draw_rect(&mut self, start: Coord, end: Coord, color: Pixel) {
+    //     for y in start.y..end.y {
+    //         for x in start.x..end.x {
+    //             let coordinate = Coord::new(x, y);
+    //             self.draw_pixel(coordinate, color);
+    //         }
+    //     }
+    // }
 }
 impl_downcast!(FrameBuffer);
 
