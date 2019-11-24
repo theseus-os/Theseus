@@ -224,6 +224,25 @@ impl Compositor<FrameBufferBlocks<'_>> for FrameCompositor {
         Ok(())
     }
 
+    fn composite_pixels(&mut self, mut bufferlist: IntoIter<FrameBufferBlocks>, abs_coord: &[Coord]) -> Result<(), &'static str> {
+        let mut final_fb = FINAL_FRAME_BUFFER
+            .try()
+            .ok_or("FrameCompositor fails to get the final frame buffer")?
+            .lock();
+        let (final_width, final_height) = final_fb.get_size();
+
+        while let Some(frame_buffer_blocks) = bufferlist.next() {
+            for i in 0..abs_coord.len() {
+                let coordinate = abs_coord[i];
+                let relative_coord = coordinate - frame_buffer_blocks.coordinate;
+                let pixel = frame_buffer_blocks.framebuffer.get_pixel(relative_coord)?;
+                final_fb.draw_pixel(coordinate, pixel);
+            }
+        }
+
+        Ok(())
+    }
+    
     fn is_cached(&self, block: &[u32], coordinate: &Coord) -> bool {
         match self.caches.get(coordinate) {
             Some(cache) => {

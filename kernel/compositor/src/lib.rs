@@ -23,6 +23,8 @@ pub trait Compositor<T> {
         bufferlist: IntoIter<T>,
     ) -> Result<(), &'static str>;
 
+    fn composite_pixels(&mut self, bufferlist: IntoIter<T>, abs_coord: &[Coord]) -> Result<(), &'static str>;
+
     /// Checks if a buffer block at `coordinate` is already cached since last updating.
     fn is_cached(&self, block: &[u32], coordinate: &Coord) -> bool;
  

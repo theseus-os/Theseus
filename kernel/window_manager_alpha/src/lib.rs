@@ -499,44 +499,51 @@ impl<U: WindowProfile> WindowManagerAlpha<U> {
     }
 
     fn refresh_window(&self) -> Result<(), &'static str> {
+        let update_coords = self.get_cursor_coords();
+        let update_coords = update_coords.as_slice();
+
+
+        let (width, height) = self.final_fb.get_size();
+        
         let background_fb = FrameBufferBlocks {
             framebuffer: self.final_fb.deref(),
             coordinate: Coord::new(0, 0),
-            blocks: Some(
-                self.get_cursor_cache_block(Coord::new(0, 0)).into_iter()
-            )
+            blocks: None
         };
 
-        // FRAME_COMPOSITOR.lock().composite(vec![background_fb].into_iter())?;
+        FRAME_COMPOSITOR.lock().composite_pixels(vec![background_fb].into_iter(), update_coords)?;
         
-        if let Some(window_mutex) = self.active.upgrade() {
-            let window = window_mutex.lock();
-            let framebuffer = window.framebuffer();
-            let buffer_blocks = FrameBufferBlocks {
-                framebuffer: framebuffer.deref(),
-                coordinate: window.coordinate(),
-                // blocks: Some(
-                //     self.get_cursor_cache_block(window.get_content_position()).into_iter()
-                // )
-                blocks: None
-            }; 
-
-            FRAME_COMPOSITOR.lock().composite(vec![buffer_blocks].into_iter())?;
-        }
-       
         for window_ref in &self.show_list {
             if let Some(window_mutex) = window_ref.upgrade() {
                 let window = window_mutex.lock();
                 let framebuffer = window.framebuffer();
+                let (width, height) = window.get_content_size();
                 let buffer_blocks = FrameBufferBlocks {
                     framebuffer: framebuffer.deref(),
                     coordinate: window.coordinate(),
                     blocks: None
                 };
 
-                FRAME_COMPOSITOR.lock().composite(vec![buffer_blocks].into_iter())?;
+                FRAME_COMPOSITOR.lock().composite_pixels(vec![buffer_blocks].into_iter(), update_coords)?;
            }
         }
+
+        if let Some(window_mutex) = self.active.upgrade() {
+            let window = window_mutex.lock();
+            let framebuffer = window.framebuffer();
+            let (width, height) = window.get_content_size();
+            let buffer_blocks = FrameBufferBlocks {
+                framebuffer: framebuffer.deref(),
+                coordinate: window.coordinate(),
+                // blocks: Some(
+                //     self.get_cursor_cache_block(window.get_content_position(), width, height).into_iter()
+                // )
+                blocks: None
+            }; 
+
+            FRAME_COMPOSITOR.lock().composite_pixels(vec![buffer_blocks].into_iter(), update_coords)?;
+        }
+       
 
         Ok(())
 
@@ -779,15 +786,46 @@ impl<U: WindowProfile> WindowManagerAlpha<U> {
         Ok(())
     }
 
+    fn get_cursor_coords(&self) -> Vec<Coord> {
+        let mut result = Vec::new();
+        for i in 6..15 {
+            for j in 6..15 {
+                if MOUSE_BASIC[i][j] != T {
+                    let coordinate = self.mouse - (7, 7) + (j as isize, i as isize);
+                    if self.top_fb.contains(coordinate) {
+                        result.push(coordinate)
+                    }
+                }
+            }
+        }
 
-    fn get_cursor_cache_block(&self, origin: Coord) -> Vec<(usize, usize, usize)>{
+        result
+    }
+
+    fn get_cursor_cache_block(&self, origin: Coord, width: usize, height: usize) -> Vec<(usize, usize, usize)>{
         let coordinate = self.mouse - origin;
-        let index = (coordinate.y as usize -1 )/ frame_buffer_compositor::CACHE_BLOCK_HEIGHT;
-        let start = coordinate.x as usize - 1;
-        let width = 9;
-        let mut mouse_blocks = vec![(index, start, width)];
-        if (index + 1) * frame_buffer_compositor::CACHE_BLOCK_HEIGHT <= coordinate.y as usize + 9 {
-            mouse_blocks.push(((index + 1), start, width));
+
+        let (start_x, start_y) = {
+            let x = coordinate.x - 1;
+            let y = coordinate.y - 1;
+            (
+                core::cmp::max(x, 0) as usize,
+                core::cmp::max(y, 0) as usize,
+            )
+        };
+        
+        let mut mouse_blocks = Vec::new();
+
+        if start_y >= height || start_y >= width {
+            return mouse_blocks;
+        }
+
+        let index = start_y as usize / frame_buffer_compositor::CACHE_BLOCK_HEIGHT;
+        let width = core::cmp::min(start_x + 9, width) - start_x;
+        
+        mouse_blocks.push((index, start_x, width));
+        if (index + 1) * frame_buffer_compositor::CACHE_BLOCK_HEIGHT <= start_y + 9 {
+            mouse_blocks.push(((index + 1), start_x, width));
         }
 
         mouse_blocks
@@ -936,11 +974,12 @@ pub fn render(blocks: Option<IntoIter<(usize, usize, usize)>>) -> Result<(), &'s
     //     }
     // );
 
+    let (width, height) = win.top_fb.get_size();
     bufferlist.push(
         FrameBufferBlocks {
             framebuffer: win.top_fb.deref(),
             coordinate: Coord::new(0, 0),
-            blocks: Some(win.get_cursor_cache_block(Coord::new(0, 0)).into_iter()),
+            blocks: Some(win.get_cursor_cache_block(Coord::new(0, 0), width, height).into_iter()),
         }
     );
 
@@ -1298,9 +1337,6 @@ fn move_cursor_to(new: Coord) -> Result<(), &'static str> {
         .try()
         .ok_or("The static window manager was not yet initialized")?
         .lock();
-    
-    win.refresh_window()?;
-
 
     // then update region of old mouse
     for y in old.y - MOUSE_POINTER_HALF_SIZE as isize..old.y + MOUSE_POINTER_HALF_SIZE as isize + 1
@@ -1312,6 +1348,7 @@ fn move_cursor_to(new: Coord) -> Result<(), &'static str> {
         }
     }
 
+    win.refresh_window()?;
 
     win.mouse = new;
     // draw new mouse in the new position
@@ -1323,7 +1360,8 @@ fn move_cursor_to(new: Coord) -> Result<(), &'static str> {
             win.refresh_desktop_top_pixel(Coord::new(x, y), true);
         }
     }
-    let new_blocks = win.get_cursor_cache_block(Coord::new(0, 0));
+    let (width, height) = win.top_fb.get_size();
+    let new_blocks = win.get_cursor_cache_block(Coord::new(0, 0), width, height);
     win.render(win.top_fb.deref(), Some(new_blocks.into_iter()))?;
 
     Ok(())
