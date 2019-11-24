@@ -168,7 +168,7 @@ impl<Buffer: FrameBuffer> Window for WindowPrimitive<Buffer> {
         Ok(())
     }
 
-    fn render(&mut self, blocks: Option<IntoIter<(usize, usize)>>) -> Result<(), &'static str> {
+    fn render(&mut self, blocks: Option<IntoIter<(usize, usize, usize)>>) -> Result<(), &'static str> {
         let coordinate = { self.profile.lock().get_content_position() };
         let frame_buffer_blocks = FrameBufferBlocks {
             framebuffer: &mut self.framebuffer,
@@ -503,7 +503,7 @@ impl WindowProfile for WindowProfilePrimitive {
     fn framebuffer(&self) -> &dyn FrameBuffer{
         self.framebuffer.deref()
     }
-
+    
     fn coordinate(&self) -> Coord {
         self.coordinate
     }

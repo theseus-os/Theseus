@@ -473,15 +473,15 @@ impl<U: WindowProfile> WindowManagerAlpha<U> {
 
     /// refresh an area by recompute every pixel in this region and update on the screen
     pub fn refresh_area(&mut self, mut start: Coord, mut end: Coord) -> Result<(), &'static str> {
-        trace!("Wenqiu: Refresh"); 
-        let frame_buffer_blocks = FrameBufferBlocks {
+        let background_fb = FrameBufferBlocks {
             framebuffer: self.final_fb.deref(),
             coordinate: Coord::new(0, 0),
             blocks: None
         };
-        FRAME_COMPOSITOR.lock().composite(vec![frame_buffer_blocks].into_iter())
 
-
+        FRAME_COMPOSITOR.lock().composite(vec![background_fb].into_iter())?;
+               
+    Ok(())
         
 /*        let (width, height) = self.final_fb.get_size();
         start.x = core::cmp::max(start.x, 0);
@@ -496,6 +496,50 @@ impl<U: WindowProfile> WindowManagerAlpha<U> {
             }
         }
         Ok(())*/
+    }
+
+    fn refresh_window(&self) -> Result<(), &'static str> {
+        let background_fb = FrameBufferBlocks {
+            framebuffer: self.final_fb.deref(),
+            coordinate: Coord::new(0, 0),
+            blocks: Some(
+                self.get_cursor_cache_block(Coord::new(0, 0)).into_iter()
+            )
+        };
+
+        // FRAME_COMPOSITOR.lock().composite(vec![background_fb].into_iter())?;
+        
+        if let Some(window_mutex) = self.active.upgrade() {
+            let window = window_mutex.lock();
+            let framebuffer = window.framebuffer();
+            let buffer_blocks = FrameBufferBlocks {
+                framebuffer: framebuffer.deref(),
+                coordinate: window.coordinate(),
+                // blocks: Some(
+                //     self.get_cursor_cache_block(window.get_content_position()).into_iter()
+                // )
+                blocks: None
+            }; 
+
+            FRAME_COMPOSITOR.lock().composite(vec![buffer_blocks].into_iter())?;
+        }
+       
+        for window_ref in &self.show_list {
+            if let Some(window_mutex) = window_ref.upgrade() {
+                let window = window_mutex.lock();
+                let framebuffer = window.framebuffer();
+                let buffer_blocks = FrameBufferBlocks {
+                    framebuffer: framebuffer.deref(),
+                    coordinate: window.coordinate(),
+                    blocks: None
+                };
+
+                FRAME_COMPOSITOR.lock().composite(vec![buffer_blocks].into_iter())?;
+           }
+        }
+
+        Ok(())
+
     }
 
     /// refresh an rectangle border
@@ -736,18 +780,20 @@ impl<U: WindowProfile> WindowManagerAlpha<U> {
     }
 
 
-    fn get_cursor_cache_block(&self) -> Vec<(usize, usize)>{
-        let index = self.mouse.y as usize / frame_buffer_compositor::CACHE_BLOCK_HEIGHT;
-        let width = self.mouse.x as usize;
-        let mut mouse_blocks = vec![(index, width)];
-        if (index + 1) * frame_buffer_compositor::CACHE_BLOCK_HEIGHT <= self.mouse.y as usize + 15 {
-            mouse_blocks.push(((index + 1), width));
+    fn get_cursor_cache_block(&self, origin: Coord) -> Vec<(usize, usize, usize)>{
+        let coordinate = self.mouse - origin;
+        let index = (coordinate.y as usize -1 )/ frame_buffer_compositor::CACHE_BLOCK_HEIGHT;
+        let start = coordinate.x as usize - 1;
+        let width = 9;
+        let mut mouse_blocks = vec![(index, start, width)];
+        if (index + 1) * frame_buffer_compositor::CACHE_BLOCK_HEIGHT <= coordinate.y as usize + 9 {
+            mouse_blocks.push(((index + 1), start, width));
         }
 
         mouse_blocks
     }
 
-    fn render(&self, framebuffer: &dyn FrameBuffer, blocks: Option<IntoIter<(usize, usize)>>) -> Result<(), &'static str>{
+    fn render(&self, framebuffer: &dyn FrameBuffer, blocks: Option<IntoIter<(usize, usize, usize)>>) -> Result<(), &'static str>{
         let mut bufferlist = Vec::new();
         bufferlist.push(
             FrameBufferBlocks {
@@ -876,7 +922,7 @@ pub fn refresh_area_absolute(start: Coord, end: Coord) -> Result<(), &'static st
 }
 
 /// Render the framebuffer of the window manager to the final buffer. Invoke this function after updating a window.
-pub fn render(blocks: Option<IntoIter<(usize, usize)>>) -> Result<(), &'static str> {
+pub fn render(blocks: Option<IntoIter<(usize, usize, usize)>>) -> Result<(), &'static str> {
     let mut win = WINDOW_MANAGER
         .try()
         .ok_or("The static window manager was not yet initialized")?
@@ -894,7 +940,7 @@ pub fn render(blocks: Option<IntoIter<(usize, usize)>>) -> Result<(), &'static s
         FrameBufferBlocks {
             framebuffer: win.top_fb.deref(),
             coordinate: Coord::new(0, 0),
-            blocks: Some(win.get_cursor_cache_block().into_iter()),
+            blocks: Some(win.get_cursor_cache_block(Coord::new(0, 0)).into_iter()),
         }
     );
 
@@ -1059,6 +1105,7 @@ impl WindowProfile for WindowProfileAlpha {
     fn coordinate(&self) -> Coord {
         self.coordinate
     }
+
 }
 
 // handles all keyboard and mouse movement in this window manager
@@ -1251,6 +1298,10 @@ fn move_cursor_to(new: Coord) -> Result<(), &'static str> {
         .try()
         .ok_or("The static window manager was not yet initialized")?
         .lock();
+    
+    win.refresh_window()?;
+
+
     // then update region of old mouse
     for y in old.y - MOUSE_POINTER_HALF_SIZE as isize..old.y + MOUSE_POINTER_HALF_SIZE as isize + 1
     {
@@ -1261,7 +1312,6 @@ fn move_cursor_to(new: Coord) -> Result<(), &'static str> {
         }
     }
 
-    let mut blocks = win.get_cursor_cache_block();
 
     win.mouse = new;
     // draw new mouse in the new position
@@ -1273,8 +1323,8 @@ fn move_cursor_to(new: Coord) -> Result<(), &'static str> {
             win.refresh_desktop_top_pixel(Coord::new(x, y), true);
         }
     }
-    blocks.append(&mut win.get_cursor_cache_block());
-    win.render(win.top_fb.deref(), Some(blocks.into_iter()))?;
+    let new_blocks = win.get_cursor_cache_block(Coord::new(0, 0));
+    win.render(win.top_fb.deref(), Some(new_blocks.into_iter()))?;
 
     Ok(())
 }

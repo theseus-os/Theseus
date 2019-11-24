@@ -672,7 +672,7 @@ impl Terminal {
         } else {
             col_num * CHARACTER_WIDTH
         };
-        let blocks = vec![(cursor_line, text_width)];
+        let blocks = vec![(cursor_line, 0, text_width)];
         self.window.render(Some(blocks.into_iter()))
     }
 

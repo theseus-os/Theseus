@@ -109,7 +109,7 @@ pub trait Window: Downcast + Send {
     fn get_displayable_position(&self, key: &str) -> Result<Coord, &'static str>;
 
     /// Renders the window to the final framebuffer. `blocks` represent the block which should be updated. The definition of `block` is described in `frame_buffer_compositor`. If this argument is `None`, the whole window will be updated.
-    fn render(&mut self, blocks: Option<IntoIter<(usize, usize)>>) -> Result<(), &'static str>;
+    fn render(&mut self, blocks: Option<IntoIter<(usize, usize, usize)>>) -> Result<(), &'static str>;
 
     /// Adds a displayable at `coordinate` relative to the top-left corner of the window.
     fn add_displayable(

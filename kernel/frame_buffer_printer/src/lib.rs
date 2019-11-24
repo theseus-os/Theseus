@@ -36,7 +36,7 @@ pub fn print_string(
     bg_color: u32,
     column: usize,
     line: usize,
-) -> (usize, usize, Vec<(usize, usize)>) {
+) -> (usize, usize, Vec<(usize, usize, usize)>) {
     let buffer_width = width / CHARACTER_WIDTH;
     let buffer_height = height / CHARACTER_HEIGHT;
     let (x, y) = (coordinate.x, coordinate.y);
@@ -57,7 +57,7 @@ pub fn print_string(
                 coordinate.y + ((curr_line + 1) * CHARACTER_HEIGHT) as isize,
                 bg_color,
             );
-            blocks.push((curr_line, curr_column  * CHARACTER_WIDTH));
+            blocks.push((curr_line, 0, curr_column  * CHARACTER_WIDTH));
             curr_column = 0;
             curr_line += 1;
             if curr_line == buffer_height {
@@ -76,7 +76,7 @@ pub fn print_string(
             );
             curr_column += 1;
             if curr_column == buffer_width {
-                blocks.push((curr_line, buffer_width));
+                blocks.push((curr_line, 0, buffer_width));
                 curr_column = 0;
                 curr_line += 1;
                 if curr_line == buffer_height {
@@ -86,7 +86,7 @@ pub fn print_string(
         }
     }    
     //fill the blank of the last line
-    blocks.push((curr_line, curr_column * CHARACTER_WIDTH));
+    blocks.push((curr_line, 0, curr_column * CHARACTER_WIDTH));
     fill_blank(
         framebuffer,
         x + (curr_column * CHARACTER_WIDTH) as isize,
@@ -112,7 +112,7 @@ pub fn print_string(
     // In the future we may adjust the logic here to for the optimization of more displayables and applications
     if column == 0 && line == 0 {
         for i in (curr_line + 1)..(height - 1) / CHARACTER_HEIGHT + 1 {
-            blocks.push((i, 0));
+            blocks.push((i, 0, 0));
         }
         // fill the blank of remaining lines
         fill_blank(

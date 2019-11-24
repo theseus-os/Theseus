@@ -53,7 +53,8 @@ const WINDOW_BORDER: usize = 2;
 /// border radius, in number of pixels
 const WINDOW_RADIUS: usize = 5;
 /// default background color
-const WINDOW_BACKGROUND: AlphaPixel = 0x40FFFFFF;
+// const WINDOW_BACKGROUND: AlphaPixel = 0x40FFFFFF;
+const WINDOW_BACKGROUND: AlphaPixel = 0x00FFFFFF;
 /// border and title bar color when window is inactive
 const WINDOW_BORDER_COLOR_INACTIVE: AlphaPixel = 0x00333333;
 /// border and title bar color when window is active, the top part color
@@ -174,7 +175,7 @@ impl Window for WindowComponents {
         self.render(None)
     }
 
-    fn render(&mut self, blocks: Option<IntoIter<(usize, usize)>>) -> Result<(), &'static str> {
+    fn render(&mut self, blocks: Option<IntoIter<(usize, usize, usize)>>) -> Result<(), &'static str> {
         // TODO optimize for better performance
         window_manager_alpha::render(blocks)
     }

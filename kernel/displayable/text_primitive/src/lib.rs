@@ -50,7 +50,7 @@ impl Displayable for TextPrimitive {
         &mut self,
         coordinate: Coord,
         framebuffer: Option<&mut dyn FrameBuffer>,
-    ) -> Result<Vec<(usize, usize)>, &'static str> {
+    ) -> Result<Vec<(usize, usize, usize)>, &'static str> {
         // If the cache is the prefix of the new text, just print the additional characters.
         let framebuffer = framebuffer.ok_or("There is no framebuffer to display in")?;
         let (string, col, line) =

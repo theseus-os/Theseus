@@ -234,7 +234,7 @@ impl Displayable for TextArea {
         &mut self,
         coordinate: Coord,
         framebuffer: Option<&mut dyn FrameBuffer>,
-    ) -> Result<Vec<(usize, usize)>, &'static str> {
+    ) -> Result<Vec<(usize, usize, usize)>, &'static str> {
         if framebuffer.is_some() {
             return Err("TextArea can only display in its default framebuffer");
         }
