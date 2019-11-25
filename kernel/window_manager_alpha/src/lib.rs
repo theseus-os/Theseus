@@ -919,7 +919,9 @@ impl<U: WindowProfile> WindowManagerAlpha<U> {
                 (old_start, old_end, new_start, new_end)
             };
             // then try to reduce time on refresh old ones
-            self.refresh_area_with_old_new(old_start, old_end, new_start, new_end)?;
+            // self.refresh_area_with_old_new(old_start, old_end, new_start, new_end)?;
+            self.refresh_background(None)?;
+            self.refresh_window(None)?;
         } else {
             return Err("cannot fid active window to move");
         }
