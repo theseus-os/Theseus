@@ -651,6 +651,7 @@ impl<U: WindowProfile> WindowManagerAlpha<U> {
         end.x = core::cmp::min(end.x, width as isize);
         start.y = core::cmp::max(start.y, 0);
         end.y = core::cmp::min(end.y, height as isize);
+
         if start.x <= end.x {
             if start.y < height as isize {
                 for x in start.x..end.x {
