@@ -29,6 +29,12 @@ pub trait Displayable: Downcast + Send {
         framebuffer: Option<&mut dyn FrameBuffer>,
     ) -> Result<Vec<(usize, usize, usize)>, &'static str> ;
 
+    fn clear(
+        &mut self,
+        coordinate: Coord,
+        framebuffer: Option<&mut dyn FrameBuffer>,
+    ) -> Result<(), &'static str> ;
+
     /// Resizes the displayable area.
     fn resize(&mut self, width: usize, height: usize);
 
@@ -63,5 +69,6 @@ pub trait TextDisplayable: Displayable {
 
     /// Set `text` as the inner content of the text displayable
     fn set_text(&mut self, text: &str);
+
 }
 impl_downcast!(TextDisplayable);

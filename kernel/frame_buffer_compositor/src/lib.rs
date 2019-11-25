@@ -64,7 +64,7 @@ pub struct FrameBufferBlocks<'a> {
     /// The coordinate of the framebuffer where it is rendered to the final framebuffer.
     pub coordinate: Coord,
     /// The updated blocks of the framebuffer. If `blocks` is `None`, the compositor would handle all the blocks of the framebuffer.
-    pub blocks: Option<IntoIter<(usize, usize, usize)>>,
+    pub blocks: Option<IntoIter<Block>>,
 }
 
 /// Metadata that describes the cached block.
@@ -75,9 +75,7 @@ struct BlockCache {
     content_hash: u64,
     /// The width of the block
     width: usize,
-    /// The width of the content in the block from the left side
-    content_width: usize,
-    content_start: usize,
+    block: Block,
 }
 
 impl BlockCache {
@@ -98,6 +96,22 @@ impl BlockCache {
 
     fn overlaps_with(&self, cache: &BlockCache) -> bool {
         self.contains_corner(cache) || cache.contains_corner(self)
+    }
+}
+
+pub struct Block {
+    index: usize,
+    start: usize,
+    width: usize,
+}
+
+impl Block {
+    pub fn new(index: usize, start: usize, width: usize) -> Block {
+        Block {
+            index: index,
+            start: start,
+            width: width,
+        }
     }
 }
 
@@ -126,17 +140,23 @@ impl Compositor<FrameBufferBlocks<'_>> for FrameCompositor {
                 None => {
                     let block_number = (src_height - 1) / CACHE_BLOCK_HEIGHT + 1;
                     for i in 0.. block_number {
-                        all_blocks.push((i, 0, src_width))
+                        all_blocks.push(
+                            Block {
+                                index: i, 
+                                start: 0, 
+                                width: src_width
+                            }
+                        )
                     }
                     all_blocks.into_iter()
                 } 
             };
 
-            while let Some((block_index, content_start, content_width)) = blocks.next() {
+            while let Some(block) = blocks.next() {
 
                 // The start pixel of the block
-                let start_index = block_pixels * block_index;
-                let coordinate_start = coordinate + (0, (CACHE_BLOCK_HEIGHT * block_index) as isize);
+                let start_index = block_pixels * block.index;
+                let coordinate_start = coordinate + (0, (CACHE_BLOCK_HEIGHT * block.index) as isize);
                 
                 // The end pixel of the block
                 let mut end_index = start_index + block_pixels;
@@ -148,11 +168,9 @@ impl Compositor<FrameBufferBlocks<'_>> for FrameCompositor {
                     coordinate_end = coordinate + (src_width as isize, src_height as isize);
                 }
 
-                let block = &src_fb.buffer()[start_index..end_index];
+                let block_content = &src_fb.buffer()[start_index..end_index];
                 // Skip if a block is already cached
-                if self.is_cached(&block, &coordinate_start) {
-                                    if frame_buffer_blocks.coordinate.x > 0 {
-                }
+                if self.is_cached(&block_content, &coordinate_start) {
                     continue;
                 }
 
@@ -160,14 +178,17 @@ impl Compositor<FrameBufferBlocks<'_>> for FrameCompositor {
                 // extend the width of the updated part to the right side of the cached block content
                 // remove caches of the same location
                 let new_cache = BlockCache {
-                    content_hash: hash(block),
+                    content_hash: hash(block_content),
                     coordinate: coordinate_start,
                     width: src_width,
-                    content_width: content_width,
-                    content_start: content_start,
+                    block: Block {
+                        index: 0,
+                        start: block.start,
+                        width: block.width,
+                    }
                 };
                 let keys: Vec<_> = self.caches.keys().cloned().collect();
-                let mut update_width = new_cache.content_width;
+                let mut update_width = new_cache.block.width;
                 for key in keys {
                     if let Some(cache) = self.caches.get_mut(&key) {
                         if cache.overlaps_with(&new_cache) {
@@ -201,18 +222,18 @@ impl Compositor<FrameBufferBlocks<'_>> for FrameCompositor {
                 // Wenqiu: TODO Optimize Later
                 let width = core::cmp::min(
                     core::cmp::min(coordinate_end.x as usize, final_width) - final_x_start,
-                    update_width + new_cache.content_start,
-                ) - new_cache.content_start;
+                    update_width + new_cache.block.start,
+                ) - new_cache.block.start;
                 let height = core::cmp::min(coordinate_end.y as usize, final_height) - final_y_start;
 
                 // copy every line of the block to the final framebuffer.
                 // let src_buffer = src_fb.buffer();
                 for i in 0..height {
-                    let dest_start = (final_y_start + i) * final_width + final_x_start + new_cache.content_start;
+                    let dest_start = (final_y_start + i) * final_width + final_x_start + new_cache.block.start;
                     let src_start = src_width * ((final_y_start + i) as isize - coordinate_start.y) as usize
-                        + (final_x_start as isize - coordinate_start.x) as usize + new_cache.content_start;
+                        + (final_x_start as isize - coordinate_start.x) as usize + new_cache.block.start;
                     let src_end = src_start + width;
-                    final_fb.buffer_copy(&(block[src_start..src_end]), dest_start);
+                    final_fb.buffer_copy(&(block_content[src_start..src_end]), dest_start);
                 }
 
                 // insert the new cache

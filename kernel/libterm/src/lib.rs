@@ -21,6 +21,8 @@ extern crate tsc;
 extern crate window;
 extern crate window_manager_alpha;
 extern crate text_area;
+extern crate window_components;
+extern crate frame_buffer_compositor;
 
 use alloc::string::{String, ToString};
 use alloc::vec::Vec;
@@ -30,8 +32,10 @@ use displayable::{Displayable, TextDisplayable};
 use event_types::Event;
 use font::{CHARACTER_HEIGHT, CHARACTER_WIDTH};
 use frame_buffer::{Coord, FrameBuffer};
+use frame_buffer_compositor::{Block};
 use tsc::{tsc_ticks, TscTicks};
-use window::Window;
+use window::{Window, WindowProfile};
+use window_components::WindowComponents;
 
 pub mod cursor;
 
@@ -58,7 +62,7 @@ pub enum ScrollError {
 ///     - Producer is the window manager. Window manager is responsible for enqueuing keyevents into the active application
 pub struct Terminal {
     /// The terminal's own window. This is a `Window` trait object which handles the events of user input properly like moving window and close window
-    window: Box<dyn Window>,
+    window: WindowComponents,
     /// Name of the text displayable of the terminal
     display_name: String,
     /// The terminal's scrollback buffer which stores a string to be displayed by the text display
@@ -68,7 +72,7 @@ pub struct Terminal {
     /// The starting index of the scrollback buffer string slice that is currently being displayed on the text display
     scroll_start_idx: usize,
     /// The cursor of the terminal.
-    pub cursor: Box<dyn Cursor>,
+    pub cursor: Cursor,
 }
 
 /// Privite methods of `Terminal`.
@@ -439,14 +443,12 @@ impl Terminal {
 /// Public methods of `Terminal`.
 impl Terminal {
     pub fn new(
-        window: Box<dyn Window>,
-        text_display: Box<dyn Displayable>,
-        cursor: Box<dyn Cursor>,
+        window: WindowComponents,
+        mut text_display: Box<dyn Displayable>
     ) -> Result<Terminal, &'static str> {
         if text_display.as_text().is_err() {
             return Err("Terminal::new(): the displayable is not a text displayable");
         }
-
         // let mut prompt_string = root.lock().get_absolute_path(); // ref numbers are 0-indexed
         let display_name = "text_display";
         let mut terminal = Terminal {
@@ -455,11 +457,14 @@ impl Terminal {
             scrollback_buffer: String::new(),
             scroll_start_idx: 0,
             is_scroll_end: true,
-            cursor: cursor,
+            cursor: Cursor::new(),
         };
         terminal
             .window
             .add_displayable(&display_name, Coord::new(0, 0), text_display)?;
+        terminal.window.init_displayable(&display_name)?;
+
+        // terminal.window.render(None)?;
 
         // Inserts a producer for the print queue into global list of terminal print producers
         terminal.print_to_terminal(format!("Theseus Terminal Emulator\nPress Ctrl+C to quit a task\n"));
@@ -652,19 +657,15 @@ impl Terminal {
         let cursor_col = cursor_pos % col_num;
 
         // Get the container to display the cursor in
-        let cursor_area = match self.window.framebuffer() {
-            Some(framebuffer) => CursorArea::Frame(framebuffer),
-            None => CursorArea::Text(
-                self.window.get_displayable_mut(&self.display_name)?.as_text_mut()?
-            )
-        };
-
-        self.cursor.display(
-            coordinate,
-            cursor_col,
-            cursor_line,
-            cursor_area
-        )?;
+        {
+            let mut window = self.window.winobj.lock();
+            self.cursor.display(
+                coordinate,
+                cursor_col,
+                cursor_line,
+                window.framebuffer_mut(),
+            )?;
+        }
 
         // update to the end of the text if the cursor is at the last line
         let text_width = if text_next_pos / col_num == cursor_line {
@@ -672,7 +673,9 @@ impl Terminal {
         } else {
             col_num * CHARACTER_WIDTH
         };
-        let blocks = vec![(cursor_line, 0, text_width)];
+        let blocks = vec![
+            Block::new(cursor_line, 0, text_width)
+        ];
         self.window.render(Some(blocks.into_iter()))
     }
 

@@ -279,6 +279,14 @@ impl Displayable for TextArea {
         return Ok(vec![]);
     }
 
+    fn clear(
+        &mut self,
+        coordinate: Coord,
+        framebuffer: Option<&mut dyn FrameBuffer>,
+    ) -> Result<(), &'static str>{
+        Ok(())
+    }
+
     fn get_position(&self) -> Coord {
         self.coordinate
     }

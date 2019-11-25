@@ -8,6 +8,7 @@ extern crate dfqueue;
 extern crate displayable;
 extern crate event_types;
 extern crate frame_buffer;
+extern crate frame_buffer_compositor;
 #[macro_use] extern crate downcast_rs;
 
 use alloc::boxed::Box;
@@ -17,6 +18,7 @@ use displayable::Displayable;
 use downcast_rs::Downcast;
 use event_types::Event;
 use frame_buffer::{Coord, FrameBuffer, Pixel};
+use frame_buffer_compositor::{Block};
 
 /// Trait for window profile. A window manager holds a list of objects who implement the `WindowProfile` trait.
 /// A `WindowProfile` provides states required by the window manager such as the size, the loaction and the active state of a window.
@@ -76,6 +78,8 @@ pub trait WindowProfile {
 
     fn framebuffer(&self) -> &dyn FrameBuffer;
 
+    fn framebuffer_mut(&mut self) -> &mut dyn FrameBuffer;
+
     fn coordinate(&self) -> Coord;
 }
 
@@ -109,7 +113,7 @@ pub trait Window: Downcast + Send {
     fn get_displayable_position(&self, key: &str) -> Result<Coord, &'static str>;
 
     /// Renders the window to the final framebuffer. `blocks` represent the block which should be updated. The definition of `block` is described in `frame_buffer_compositor`. If this argument is `None`, the whole window will be updated.
-    fn render(&mut self, blocks: Option<IntoIter<(usize, usize, usize)>>) -> Result<(), &'static str>;
+    fn render(&mut self, blocks: Option<IntoIter<Block>>) -> Result<(), &'static str>;
 
     /// Adds a displayable at `coordinate` relative to the top-left corner of the window.
     fn add_displayable(

@@ -9,6 +9,7 @@ extern crate font;
 extern crate frame_buffer;
 extern crate frame_buffer_drawer;
 extern crate frame_buffer_printer;
+#[macro_use] extern crate log;
 
 use alloc::string::String;
 use alloc::vec::Vec;
@@ -43,6 +44,7 @@ impl TextDisplayable for TextPrimitive {
     fn set_text(&mut self, text: &str) {
         self.text = String::from(text);
     }
+
 }
 
 impl Displayable for TextPrimitive {
@@ -51,6 +53,7 @@ impl Displayable for TextPrimitive {
         coordinate: Coord,
         framebuffer: Option<&mut dyn FrameBuffer>,
     ) -> Result<Vec<(usize, usize, usize)>, &'static str> {
+
         // If the cache is the prefix of the new text, just print the additional characters.
         let framebuffer = framebuffer.ok_or("There is no framebuffer to display in")?;
         let (string, col, line) =
@@ -82,6 +85,38 @@ impl Displayable for TextPrimitive {
 
         return Ok(blocks);
     }
+
+    fn clear(
+        &mut self,
+        coordinate: Coord,
+        framebuffer: Option<&mut dyn FrameBuffer>,
+    ) -> Result<(), &'static str> {
+        self.text = String::new();
+        self.cache = String::new();
+        // If the cache is the prefix of the new text, just print the additional characters.
+        let framebuffer = framebuffer.ok_or("There is no framebuffer to display in")?;
+        let (string, col, line) =
+            if self.cache.len() > 0 && self.text.starts_with(self.cache.as_str()) {
+                (
+                    &self.text.as_str()[self.cache.len()..self.text.len()],
+                    self.next_col,
+                    self.next_line,
+                )
+            } else {
+                (self.text.as_str(), 0, 0)
+            };
+
+        frame_buffer_drawer::fill_rectangle(
+            framebuffer,
+            coordinate,
+            self.width,
+            self.height,
+            self.bg_color,
+        );
+
+        Ok(())
+    }
+
 
     fn resize(&mut self, width: usize, height: usize) {
         self.width = width;

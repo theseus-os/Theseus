@@ -37,7 +37,7 @@ use dfqueue::{DFQueue, DFQueueConsumer, DFQueueProducer};
 use displayable::Displayable;
 use event_types::Event;
 use frame_buffer::{FrameBuffer, Coord, Pixel};
-use frame_buffer_compositor::{FrameBufferBlocks, FRAME_COMPOSITOR};
+use frame_buffer_compositor::{FrameBufferBlocks, FRAME_COMPOSITOR, Block};
 use frame_buffer_drawer::*;
 use frame_buffer_rgb::FrameBufferRGB;
 use spin::{Mutex, Once};
@@ -84,7 +84,7 @@ pub struct WindowPrimitive<Buffer: FrameBuffer> {
     pub framebuffer: Buffer,
 }
 
-impl<Buffer: FrameBuffer> Window for WindowPrimitive<Buffer> {
+/*impl<Buffer: FrameBuffer> Window for WindowPrimitive<Buffer> {
     fn consumer(&mut self) -> &mut DFQueueConsumer<Event> {
         &mut self.consumer
     }
@@ -128,13 +128,14 @@ impl<Buffer: FrameBuffer> Window for WindowPrimitive<Buffer> {
         };
     }
 
-    fn display(&mut self, display_name: &str) -> Result<(), &'static str> {
-        let component = self.components.get_mut(display_name).ok_or("")?;
-        let coordinate = component.get_position();
-        let displayable = component.get_displayable_mut();
-        let blocks = displayable.display(coordinate, Some(&mut self.framebuffer))?;
-        self.render(Some(blocks.into_iter()))
-    }
+    // fn display(&mut self, display_name: &str) -> Result<(), &'static str> {
+    //     let component = self.components.get_mut(display_name).ok_or("")?;
+    //     let coordinate = component.get_position();
+    //     let displayable = component.get_displayable_mut();
+    //     let blocks = displayable.display(coordinate, Some(&mut self.framebuffer))?;
+    //     self.render(Some(blocks.into_iter()))
+    // }
+
 
     fn add_displayable(
         &mut self,
@@ -168,7 +169,7 @@ impl<Buffer: FrameBuffer> Window for WindowPrimitive<Buffer> {
         Ok(())
     }
 
-    fn render(&mut self, blocks: Option<IntoIter<(usize, usize, usize)>>) -> Result<(), &'static str> {
+    fn render(&mut self, blocks: Option<IntoIter<Block>>) -> Result<(), &'static str> {
         let coordinate = { self.profile.lock().get_content_position() };
         let frame_buffer_blocks = FrameBufferBlocks {
             framebuffer: &mut self.framebuffer,
@@ -179,9 +180,9 @@ impl<Buffer: FrameBuffer> Window for WindowPrimitive<Buffer> {
             .lock()
             .composite(vec![frame_buffer_blocks].into_iter())
     }
-}
+}*/
 
-impl<Buffer: FrameBuffer> WindowPrimitive<Buffer> {
+/*impl<Buffer: FrameBuffer> WindowPrimitive<Buffer> {
     /// Clears the content of a window. The border and padding of the window remain showing.
     pub fn clear(&mut self) -> Result<(), &'static str> {
         let (width, height) = self.profile.lock().get_content_size();
@@ -304,7 +305,7 @@ impl<Buffer: FrameBuffer> WindowPrimitive<Buffer> {
             None
         }
     }
-}
+}*/
 
 /// Creates a new window. Currently the window is of `FrameBufferRGB`. In the future we will be able to create a window of any structure which implements `FrameBuffer`.
 /// `coordinate` specifies the coordinate of the window relative to the top-left corner of the screen.
@@ -504,6 +505,10 @@ impl WindowProfile for WindowProfilePrimitive {
         self.framebuffer.deref()
     }
     
+    fn framebuffer_mut(&mut self) -> &mut dyn FrameBuffer {
+        self.framebuffer.deref_mut()
+    }
+
     fn coordinate(&self) -> Coord {
         self.coordinate
     }

@@ -89,6 +89,7 @@ pub fn init() -> Result<(DFQueueProducer<Event>, DFQueueProducer<Event>), &'stat
     // initialize alpha display subsystem
     #[cfg(not(primitive_display_sys))]
     {
+        font::init()?;
         let (width, height) = frame_buffer_alpha::init()?;
         let bg_framebuffer = FrameBufferAlpha::new(width, height, None)?;
         let mut top_framebuffer = FrameBufferAlpha::new(width, height, None)?;

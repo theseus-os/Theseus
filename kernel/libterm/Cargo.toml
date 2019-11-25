@@ -45,8 +45,14 @@ path = "../frame_buffer_drawer"
 [dependencies.frame_buffer_printer]
 path = "../frame_buffer_printer"
 
+[dependencies.frame_buffer_compositor]
+path = "../frame_buffer_compositor"
+
 [dependencies.window_manager_alpha]
 path = "../window_manager_alpha"
+
+[dependencies.window_components]
+path = "../window_components"
 
 [dependencies.tsc]
 path = "../tsc"

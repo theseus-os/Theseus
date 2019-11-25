@@ -1322,10 +1322,12 @@ impl Shell {
                     _ => { }
                 };
             }          
+            
             if need_refresh || need_refresh_on_task_event {
                 // update if there are outputs from applications
                 self.terminal.lock().refresh_display()?;
             }
+            
             self.terminal.lock().display_cursor()?;
 
             // handle inputs

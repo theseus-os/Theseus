@@ -43,7 +43,7 @@ use dfqueue::{DFQueue, DFQueueConsumer, DFQueueProducer};
 use event_types::{Event, MousePositionEvent};
 use frame_buffer::{Coord, FrameBuffer, Pixel};
 use frame_buffer_alpha::{AlphaPixel, PixelMixer, BLACK};
-use frame_buffer_compositor::{FrameBufferBlocks, FRAME_COMPOSITOR};
+use frame_buffer_compositor::{FrameBufferBlocks, FRAME_COMPOSITOR, Block};
 use keycodes_ascii::{KeyAction, KeyEvent, Keycode};
 use mouse_data::MouseEvent;
 use path::Path;
@@ -512,21 +512,6 @@ impl<U: WindowProfile> WindowManagerAlpha<U> {
         };
 
         FRAME_COMPOSITOR.lock().composite_pixels(vec![background_fb].into_iter(), update_coords)?;
-        
-        for window_ref in &self.show_list {
-            if let Some(window_mutex) = window_ref.upgrade() {
-                let window = window_mutex.lock();
-                let framebuffer = window.framebuffer();
-                let (width, height) = window.get_content_size();
-                let buffer_blocks = FrameBufferBlocks {
-                    framebuffer: framebuffer.deref(),
-                    coordinate: window.coordinate(),
-                    blocks: None
-                };
-
-                FRAME_COMPOSITOR.lock().composite_pixels(vec![buffer_blocks].into_iter(), update_coords)?;
-           }
-        }
 
         if let Some(window_mutex) = self.active.upgrade() {
             let window = window_mutex.lock();
@@ -544,6 +529,20 @@ impl<U: WindowProfile> WindowManagerAlpha<U> {
             FRAME_COMPOSITOR.lock().composite_pixels(vec![buffer_blocks].into_iter(), update_coords)?;
         }
        
+        for window_ref in &self.show_list {
+            if let Some(window_mutex) = window_ref.upgrade() {
+                let window = window_mutex.lock();
+                let framebuffer = window.framebuffer();
+                let (width, height) = window.get_content_size();
+                let buffer_blocks = FrameBufferBlocks {
+                    framebuffer: framebuffer.deref(),
+                    coordinate: window.coordinate(),
+                    blocks: None
+                };
+
+                FRAME_COMPOSITOR.lock().composite_pixels(vec![buffer_blocks].into_iter(), update_coords)?;
+           }
+        }
 
         Ok(())
 
@@ -802,7 +801,7 @@ impl<U: WindowProfile> WindowManagerAlpha<U> {
         result
     }
 
-    fn get_cursor_cache_block(&self, origin: Coord, width: usize, height: usize) -> Vec<(usize, usize, usize)>{
+    fn get_cursor_cache_block(&self, origin: Coord, width: usize, height: usize) -> Vec<Block>{
         let coordinate = self.mouse - origin;
 
         let (start_x, start_y) = {
@@ -823,15 +822,19 @@ impl<U: WindowProfile> WindowManagerAlpha<U> {
         let index = start_y as usize / frame_buffer_compositor::CACHE_BLOCK_HEIGHT;
         let width = core::cmp::min(start_x + 9, width) - start_x;
         
-        mouse_blocks.push((index, start_x, width));
+        mouse_blocks.push(
+            Block::new(index, start_x, width)
+        );
         if (index + 1) * frame_buffer_compositor::CACHE_BLOCK_HEIGHT <= start_y + 9 {
-            mouse_blocks.push(((index + 1), start_x, width));
+            mouse_blocks.push(
+                Block::new((index + 1), start_x, width)
+            );
         }
 
         mouse_blocks
     }
 
-    fn render(&self, framebuffer: &dyn FrameBuffer, blocks: Option<IntoIter<(usize, usize, usize)>>) -> Result<(), &'static str>{
+    fn render(&self, framebuffer: &dyn FrameBuffer, blocks: Option<IntoIter<Block>>) -> Result<(), &'static str>{
         let mut bufferlist = Vec::new();
         bufferlist.push(
             FrameBufferBlocks {
@@ -960,7 +963,7 @@ pub fn refresh_area_absolute(start: Coord, end: Coord) -> Result<(), &'static st
 }
 
 /// Render the framebuffer of the window manager to the final buffer. Invoke this function after updating a window.
-pub fn render(blocks: Option<IntoIter<(usize, usize, usize)>>) -> Result<(), &'static str> {
+pub fn render(blocks: Option<IntoIter<Block>>) -> Result<(), &'static str> {
     let mut win = WINDOW_MANAGER
         .try()
         .ok_or("The static window manager was not yet initialized")?
@@ -1029,13 +1032,12 @@ pub fn init<Buffer: FrameBuffer>(
         x: screen_width as isize / 2,
         y: screen_height as isize / 2,
     }; // set mouse to middle
-    if !delay_refresh_first_time {
-        win.refresh_area(
-            Coord::new(0, 0),
-            Coord::new(screen_width as isize, screen_height as isize),
-        )?;
-    }
-
+    //if !delay_refresh_first_time {
+    win.refresh_area(
+        Coord::new(0, 0),
+        Coord::new(screen_width as isize, screen_height as isize),
+    )?;
+    
     KernelTaskBuilder::new(window_manager_loop, (key_consumer, mouse_consumer))
         .name("window_manager_loop".to_string())
         .spawn()?;
@@ -1139,6 +1141,10 @@ impl WindowProfile for WindowProfileAlpha {
 
     fn framebuffer(&self) -> &dyn FrameBuffer {
         self.framebuffer.deref()
+    }
+
+    fn framebuffer_mut(&mut self) -> &mut dyn FrameBuffer {
+        self.framebuffer.deref_mut()
     }
 
     fn coordinate(&self) -> Coord {

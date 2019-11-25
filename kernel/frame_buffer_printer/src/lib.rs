@@ -178,7 +178,7 @@ pub fn print_ascii_character(
 }
 
 // fill a blank text area (left, top, right, bottom) with color. The tuple specifies the location of the area relative to the origin(top-left point) of the frame buffer.
-fn fill_blank(
+pub fn fill_blank(
     framebuffer: &mut dyn FrameBuffer,
     left: isize,
     top: isize,

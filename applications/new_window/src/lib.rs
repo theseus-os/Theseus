@@ -46,6 +46,7 @@ use keycodes_ascii::{KeyAction, Keycode};
 use text_area::TextArea;
 use window::Window;
 
+const WINDOW_BACKGROUND: u32 = 0x40FFFFFF;
 #[no_mangle]
 pub fn main(_args: Vec<String>) -> isize {
     if _args.len() != 4 {
@@ -73,6 +74,7 @@ pub fn main(_args: Vec<String>) -> isize {
     let mut wincomps = match window_components::WindowComponents::new(
         coordinate,
         Box::new(framebuffer), // the position and size of window, including the title bar and border
+        WINDOW_BACKGROUND
     ) {
         Ok(m) => m,
         Err(err) => {

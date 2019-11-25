@@ -50,7 +50,7 @@ use frame_buffer_alpha::FrameBufferAlpha;
 use window::Window;
 
 use text_primitive::TextPrimitive;
-use libterm::cursor::{CursorGeneric, CursorComponent};
+use libterm::cursor::Cursor;
 /// Stores the stdio queues, key event queue and the pointer to the terminal
 /// for applications. This structure is provided for application's use and only
 /// contains necessary one-end readers/writers to queues. On the shell side, we have
@@ -151,8 +151,9 @@ lazy_static! {
         // Create a new window, a text area and a cursor.
         // In different display subsystems, the objects above are of different implementation.
         #[cfg(not(primitive_display_sys))]
-        let (window, textarea, cursor) = {
-            let (window_width, window_height) = match window_manager_alpha::get_screen_size(){
+        let (window, textarea) = {
+
+             let (window_width, window_height) = match window_manager_alpha::get_screen_size(){
                 Ok(size) => size,
                 Err(err) => { debug!("Fail to create the framebuffer: {}", err); return None; }
             };
@@ -162,7 +163,7 @@ lazy_static! {
                 Err(err) => { debug!("Fail to create the framebuffer: {}", err); return None; }
             };
             let window = match window_components::WindowComponents::new(
-                Coord::new(WINDOW_MARGIN as isize, WINDOW_MARGIN as isize), Box::new(framebuffer)) {
+                Coord::new(WINDOW_MARGIN as isize, WINDOW_MARGIN as isize), Box::new(framebuffer), 0) {
                 Ok(window_object) => { window_object },
                 Err(err) => {
                     debug!("new window returned err: {}", err);
@@ -170,18 +171,16 @@ lazy_static! {
                 }
             };
             
-            /*let (width_inner, height_inner) = window.inner_size();
-            let textarea = match TextPrimitive::new(width_inner, height_inner, libterm::FONT_COLOR, libterm::BACKGROUND_COLOR) {
+            let (width_inner, height_inner) = window.inner_size();
+            let mut textarea = match TextPrimitive::new(width_inner, height_inner, libterm::FONT_COLOR, libterm::BACKGROUND_COLOR) {
                 Ok(text) => text,
                 Err(err) => { 
                     debug!("Fail to create the generic window: {}", err);
                     return None;
                 }
             };
-
-            // let cursor = CursorGeneric::new();
-*/
-            let textarea = {
+            
+/*            let textarea = {
                 let (width_inner, height_inner) = window.inner_size();
                 debug!("new window done width: {}, height: {}", width_inner, height_inner);
                 const TEXTAREA_BORDER: usize = 4;
@@ -193,15 +192,15 @@ lazy_static! {
                     Ok(m) => m,
                     Err(err) => { debug!("new textarea returned err: {}", err);  return None; }
                 }
-            };
+            };*/
 
-            let cursor = CursorComponent::new();
+ //           let cursor = CursorComponent::new();
 
-            (window, textarea, cursor)
+            (window, textarea)
         };
 
         #[cfg(primitive_display_sys)]
-        let (window, textarea, cursor) = {
+        let (window, textarea) = {
             let window = match window_manager_primitive::new_default_window() {
                 Ok(window_object) => window_object,
                 Err(err) => { 
@@ -221,16 +220,13 @@ lazy_static! {
                 }
             };
 
-            let cursor = CursorGeneric::new();
+            let cursor = Cursor::new();
 
-            (window, textarea, cursor)
+            (window, textarea)
         };
 
         // initialize the default terminal with the components created above.
-        match Terminal::new(
-            Box::new(window),
-            Box::new(textarea),
-            Box::new(cursor),
+        match Terminal::new(window, Box::new(textarea)
         ) {
             Ok(terminal) => Some(Arc::new(Mutex::new(terminal))),
             Err(err) => { 

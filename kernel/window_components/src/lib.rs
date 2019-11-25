@@ -45,7 +45,7 @@ use displayable::Displayable;
 use event_types::{Event, MousePositionEvent};
 use frame_buffer::{Coord, FrameBuffer, Pixel};
 use frame_buffer_alpha::{AlphaPixel, PixelMixer, BLACK};
-use frame_buffer_compositor::{FrameBufferBlocks, FRAME_COMPOSITOR};
+use frame_buffer_compositor::{FrameBufferBlocks, FRAME_COMPOSITOR, Block};
 use spin::Mutex;
 use window::{Window, WindowProfile};
 use window_manager_alpha::{WindowProfileAlpha, WINDOW_MANAGER};
@@ -56,9 +56,6 @@ const WINDOW_TITLE_BAR: usize = 15;
 const WINDOW_BORDER: usize = 2;
 /// border radius, in number of pixels
 const WINDOW_RADIUS: usize = 5;
-/// default background color
-const WINDOW_BACKGROUND: AlphaPixel = 0x40FFFFFF;
-//const WINDOW_BACKGROUND: AlphaPixel = 0x00FFFFFF;
 /// border and title bar color when window is inactive
 const WINDOW_BORDER_COLOR_INACTIVE: AlphaPixel = 0x00333333;
 /// border and title bar color when window is active, the top part color
@@ -118,10 +115,11 @@ pub struct WindowComponents {
     /// record last result of whether this window is active, to reduce redraw overhead
     last_is_active: bool,
     /// The displayable in the window as components.
-    pub components: BTreeMap<String, Box<dyn Displayable>>,
+    components: BTreeMap<String, Component>,
 }
 
 impl Window for WindowComponents {
+
     fn consumer(&mut self) -> &mut DFQueueConsumer<Event> {
         &mut self.consumer
     }
@@ -137,11 +135,15 @@ impl Window for WindowComponents {
     fn add_displayable(
         &mut self,
         key: &str,
-        _coordinate: Coord,
+        coordinate: Coord,
         displayable: Box<dyn Displayable>,
     ) -> Result<(), &'static str> {
         let key = key.to_string();
-        self.components.insert(key, displayable);
+        let component = Component {
+            coordinate: coordinate + self.inner_position(),
+            displayable: displayable
+        };
+        self.components.insert(key, component);
         Ok(())
     }
 
@@ -149,15 +151,19 @@ impl Window for WindowComponents {
         &mut self,
         display_name: &str,
     ) -> Result<&mut Box<dyn Displayable>, &'static str> {
-        self.components
+        Ok(&mut self.components
             .get_mut(display_name)
-            .ok_or("The displayable does not exist")
+            .ok_or("The displayable does not exist")?
+            .displayable
+        )
     }
 
     fn get_displayable(&self, display_name: &str) -> Result<&Box<dyn Displayable>, &'static str> {
-        self.components
+        Ok(&self.components
             .get(display_name)
-            .ok_or("The displayable does not exist")
+            .ok_or("The displayable does not exist")?
+            .displayable
+        )
     }
 
     fn get_displayable_position(&self, key: &str) -> Result<Coord, &'static str> {
@@ -175,32 +181,35 @@ impl Window for WindowComponents {
     fn display(&mut self, display_name: &str) -> Result<(), &'static str> {
         let component = self.components.get_mut(display_name).ok_or("")?;
         let coordinate = component.get_position();
-        component.display(coordinate, None)?;
 
+        {
+            let mut window = self.winobj.lock();
+            let blocks = component.displayable.display(
+                coordinate, 
+                Some(window.framebuffer_mut())
+            )?;
+        }
 
-        let window = self.winobj.lock();
-        let buffer_position = window.get_content_position();
-        let background_fb = FrameBufferBlocks {
-            framebuffer: window.framebuffer(),
-            coordinate: buffer_position,
-            blocks: None
-        };
-
-        FRAME_COMPOSITOR.lock().composite(vec![background_fb].into_iter())
-
-
-    //        self.render(None)
+        self.render(None)
     }
 
     fn render(
         &mut self,
-        blocks: Option<IntoIter<(usize, usize, usize)>>,
+        blocks: Option<IntoIter<Block>>,
     ) -> Result<(), &'static str> {
-        // TODO optimize for better performance
-        window_manager_alpha::render(blocks)
+        let mut window = self.winobj.lock();
+        let buffer_position = window.get_content_position();
+        let buffer = FrameBufferBlocks {
+            framebuffer: window.framebuffer(),
+            coordinate: buffer_position,
+            blocks: blocks
+        };
+
+        FRAME_COMPOSITOR.lock().composite(vec![buffer].into_iter())
     }
 
     fn handle_event(&mut self) -> Result<(), &'static str> {
+        
         let mut call_later_do_refresh_floating_border = false;
         let mut call_later_do_move_active_window = false;
         let mut need_to_set_active = false;
@@ -351,6 +360,7 @@ impl WindowComponents {
     pub fn new(
         coordinate: Coord,
         framebuffer: Box<dyn FrameBuffer>,
+        background: u32
     ) -> Result<WindowComponents, &'static str> {
         let (width, height) = framebuffer.get_size();
         if width <= 2 * WINDOW_TITLE_BAR || height <= WINDOW_TITLE_BAR + WINDOW_BORDER {
@@ -367,7 +377,7 @@ impl WindowComponents {
             winobj: winobj_mutex,
             border_size: WINDOW_BORDER,
             title_size: WINDOW_TITLE_BAR,
-            background: WINDOW_BACKGROUND,
+            background: background,
             consumer: consumer,
             producer: producer,
             last_mouse_position_event: MousePositionEvent {
@@ -402,11 +412,11 @@ impl WindowComponents {
         }
         debug!("before refresh");
         {
-            let mut wm = window_manager_alpha::WINDOW_MANAGER
-                .try()
-                .ok_or("The static window manager was not yet initialized")?
-                .lock();
-            wm.refresh_area(start, end)?;
+            // let mut wm = window_manager_alpha::WINDOW_MANAGER
+            //     .try()
+            //     .ok_or("The static window manager was not yet initialized")?
+            //     .lock();
+            // //wm.refresh_area(start, end)?;
             let window = wincomps.winobj.lock();
             let frame_buffer_blocks = FrameBufferBlocks {
                 framebuffer: window.framebuffer(),
@@ -424,13 +434,28 @@ impl WindowComponents {
         Ok(wincomps)
     }
 
+    pub fn init_displayable(&mut self, display_name: &str) -> Result<(), &'static str> {
+        let component = self.components.get_mut(display_name).ok_or("")?;
+        let coordinate = component.get_position();
+
+        {
+            let mut window = self.winobj.lock();
+            component.displayable.clear(
+                coordinate, 
+                Some(window.framebuffer_mut())
+            )?;
+        }
+
+        self.render(None)
+    }
+
     /// Gets a reference to a displayable of type `T` which implements the `Displayable` trait by its name. Returns error if the displayable is not of type `T` or does not exist.
     pub fn get_concrete_display<T: Displayable>(
         &self,
         display_name: &str,
     ) -> Result<&T, &'static str> {
         if let Some(component) = self.components.get(display_name) {
-            if let Some(display) = component.downcast_ref::<T>() {
+            if let Some(display) = component.displayable.downcast_ref::<T>() {
                 return Ok(display);
             } else {
                 return Err("The displayable is not of this type");
@@ -446,7 +471,7 @@ impl WindowComponents {
         display_name: &str,
     ) -> Result<&mut T, &'static str> {
         if let Some(component) = self.components.get_mut(display_name) {
-            if let Some(display) = component.downcast_mut::<T>() {
+            if let Some(display) = component.displayable.downcast_mut::<T>() {
                 return Ok(display);
             } else {
                 return Err("The displayable is not of this type");
@@ -660,6 +685,11 @@ impl WindowComponents {
         )
     }
 
+    /// return the available inner size, excluding title bar and border
+    pub fn inner_position(&self) -> Coord {
+        Coord::new(self.border_size as isize, self.title_size as isize)
+    }
+
     /// get space remained for border, in number of pixel. There is border on the left, right and bottom.
     /// When user add their components, should margin its area to avoid overlapping these borders.
     pub fn get_border_size(&self) -> usize {
@@ -688,5 +718,35 @@ impl Drop for WindowComponents {
                 error!("delete_window failed {}", err);
             }
         }
+    }
+}
+
+
+/// A component contains a displayable and its coordinate relative to the top-left corner of the window.
+struct Component {
+    coordinate: Coord,
+    displayable: Box<dyn Displayable>,
+}
+
+impl Component {
+    // gets the displayable
+    fn get_displayable(&self) -> &Box<dyn Displayable> {
+        return &(self.displayable);
+    }
+
+    // gets a mutable reference to the displayable
+    fn get_displayable_mut(&mut self) -> &mut Box<dyn Displayable> {
+        return &mut (self.displayable);
+    }
+
+    // gets the coordinate of the displayable relative to the top-left corner of the window
+    fn get_position(&self) -> Coord {
+        self.coordinate
+    }
+
+    // resizes the displayable as (width, height) at `coordinate` relative to the top-left corner of the window
+    fn resize(&mut self, coordinate: Coord, width: usize, height: usize) {
+        self.coordinate = coordinate;
+        self.displayable.resize(width, height);
     }
 }
