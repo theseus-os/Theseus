@@ -148,7 +148,7 @@ fn input_event_loop(consumer: DFQueueConsumer<Event>) -> Result<(), &'static str
             _ => { continue; }
         };
         match event.deref() {
-            &Event::ExitEvent => {
+            &Event => {
                 trace!("exiting the main loop of the input event manager");
                 return Ok(()); 
             }

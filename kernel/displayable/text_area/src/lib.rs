@@ -21,7 +21,7 @@ use alloc::vec::Vec;
 use core::ops::DerefMut;
 use displayable::{Displayable, TextDisplayable};
 use font::{CHARACTER_HEIGHT, CHARACTER_WIDTH};
-use frame_buffer::{Coord, FrameBuffer};
+use frame_buffer::{Coord, FrameBuffer, RectArea};
 use frame_buffer_alpha::AlphaPixel;
 use spin::{Mutex};
 use window::WindowProfile;
@@ -149,7 +149,7 @@ impl TextArea {
                 self.char_matrix[idx] = c;
                 let win_coordinate = {
                     let mut winobj = winobj_mutex.lock();
-                    let win_coordinate = winobj.get_content_position();
+                    let win_coordinate = winobj.get_position();
                     self.set_char_in(col, line, c, winobj.framebuffer.deref_mut())?;
                     win_coordinate
                 };
@@ -215,7 +215,7 @@ impl TextArea {
     }
 }
 
-impl TextDisplayable for TextArea {
+/*impl TextDisplayable for TextArea {
     fn get_dimensions(&self) -> (usize, usize) {
         (self.x_cnt, self.y_cnt)
     }
@@ -227,14 +227,14 @@ impl TextDisplayable for TextArea {
     fn set_text(&mut self, text: &str) {
         self.text = String::from(text);
     }
-}
+}*/
 
-impl Displayable for TextArea {
+/*impl Displayable for TextArea {
     fn display(
         &mut self,
         coordinate: Coord,
         framebuffer: Option<&mut dyn FrameBuffer>,
-    ) -> Result<Vec<(usize, usize, usize)>, &'static str> {
+    ) -> Result<RectArea, &'static str> {
         if framebuffer.is_some() {
             return Err("TextArea can only display in its default framebuffer");
         }
@@ -307,4 +307,4 @@ impl Displayable for TextArea {
     fn as_text(&self) -> Result<&dyn TextDisplayable, &'static str> {
         Ok(self)
     }
-}
+}*/

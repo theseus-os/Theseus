@@ -31,7 +31,7 @@ use cursor::*;
 use displayable::{Displayable, TextDisplayable};
 use event_types::Event;
 use font::{CHARACTER_HEIGHT, CHARACTER_WIDTH};
-use frame_buffer::{Coord, FrameBuffer};
+use frame_buffer::{Coord, FrameBuffer, RectArea};
 use frame_buffer_compositor::{Block};
 use tsc::{tsc_ticks, TscTicks};
 use window::{Window, WindowProfile};
@@ -62,7 +62,7 @@ pub enum ScrollError {
 ///     - Producer is the window manager. Window manager is responsible for enqueuing keyevents into the active application
 pub struct Terminal {
     /// The terminal's own window. This is a `Window` trait object which handles the events of user input properly like moving window and close window
-    window: WindowComponents,
+    pub window: WindowComponents,
     /// Name of the text displayable of the terminal
     display_name: String,
     /// The terminal's scrollback buffer which stores a string to be displayed by the text display
@@ -657,15 +657,16 @@ impl Terminal {
         let cursor_col = cursor_pos % col_num;
 
         // Get the container to display the cursor in
-        {
+        let update_area = {
             let mut window = self.window.winobj.lock();
-            self.cursor.display(
+            let area = self.cursor.display(
                 coordinate,
                 cursor_col,
                 cursor_line,
                 window.framebuffer_mut(),
             )?;
-        }
+            area
+        };   
 
         // update to the end of the text if the cursor is at the last line
         let text_width = if text_next_pos / col_num == cursor_line {
@@ -673,10 +674,9 @@ impl Terminal {
         } else {
             col_num * CHARACTER_WIDTH
         };
-        let blocks = vec![
-            Block::new(cursor_line, 0, text_width)
-        ];
-        self.window.render(Some(blocks.into_iter()))
+
+        // TODO: optimize with block
+        self.window.render(Some(update_area))
     }
 
     /// Gets the position of the cursor relative to the end of text in units of characters.

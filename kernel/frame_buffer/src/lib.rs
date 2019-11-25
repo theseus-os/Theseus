@@ -174,3 +174,33 @@ impl PartialOrd for Coord {
 }
 
 impl Eq for Coord { }
+
+
+// a rectangle region
+#[derive(Clone, Copy, PartialEq, Debug, Hash)]
+pub struct RectArea {
+    pub start: Coord,
+    pub end: Coord,
+}
+
+impl Add<Coord> for RectArea {
+    type Output = RectArea;
+
+    fn add(self, rhs: Coord) -> RectArea {
+        RectArea{
+            start: self.start + rhs,
+            end: self.end + rhs,
+        }
+    }
+}
+
+impl Sub<Coord> for RectArea {
+    type Output = RectArea;
+
+    fn sub(self, rhs: Coord) -> RectArea {
+        RectArea{
+            start: self.start - rhs,
+            end: self.end - rhs,
+        }
+    }
+}

@@ -36,7 +36,7 @@ use alloc::vec::{Vec, IntoIter};
 use core::hash::{Hash, Hasher, BuildHasher};
 use hashbrown::hash_map::{DefaultHashBuilder};
 use compositor::Compositor;
-use frame_buffer::{FrameBuffer, FINAL_FRAME_BUFFER, Coord};
+use frame_buffer::{FrameBuffer, FINAL_FRAME_BUFFER, Coord, RectArea};
 use spin::Mutex;
 
 pub const CACHE_BLOCK_HEIGHT:usize = 16;
@@ -275,6 +275,37 @@ impl Compositor<FrameBufferBlocks<'_>> for FrameCompositor {
             None => return false,
         }
     }
+}
+
+pub fn get_blocks(framebuffer: &dyn FrameBuffer, area: RectArea) -> Vec<Block> {
+    let mut blocks = Vec::new();
+    let (width, height) = framebuffer.get_size();
+
+    let start_x = core::cmp::max(area.start.x, 0);
+    let end_x = core::cmp::min(area.end.x, width as isize);
+    if start_x >= end_x {
+        return blocks;
+    }
+    let width = (end_x - start_x) as usize;        
+    
+    let start_y = core::cmp::max(area.start.y, 0);
+    let end_y = core::cmp::min(area.end.y, height as isize);
+    if start_y >= end_y {
+        return blocks;
+    }
+
+
+    let mut index = start_y as usize / CACHE_BLOCK_HEIGHT;
+    loop {
+        if index * CACHE_BLOCK_HEIGHT >= end_y as usize {
+            break;
+        }
+        let block = Block::new(index, start_x as usize, width);
+        blocks.push(block);
+        index += 1;
+    }
+
+    blocks
 }
 
 // Get the hash of a cache block

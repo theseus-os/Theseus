@@ -17,7 +17,7 @@ use dfqueue::{DFQueueConsumer, DFQueueProducer};
 use displayable::Displayable;
 use downcast_rs::Downcast;
 use event_types::Event;
-use frame_buffer::{Coord, FrameBuffer, Pixel};
+use frame_buffer::{Coord, FrameBuffer, Pixel, RectArea};
 use frame_buffer_compositor::{Block};
 
 /// Trait for window profile. A window manager holds a list of objects who implement the `WindowProfile` trait.
@@ -44,7 +44,7 @@ pub trait WindowProfile {
     fn get_content_size(&self) -> (usize, usize);
 
     /// Gets the coordinate of content relative to top-left corner of the window without padding.
-    fn get_content_position(&self) -> Coord;
+    fn get_position(&self) -> Coord;
 
     /// Gets the producer of events.
     fn events_producer(&mut self) -> &mut DFQueueProducer<Event>;
@@ -113,7 +113,7 @@ pub trait Window: Downcast + Send {
     fn get_displayable_position(&self, key: &str) -> Result<Coord, &'static str>;
 
     /// Renders the window to the final framebuffer. `blocks` represent the block which should be updated. The definition of `block` is described in `frame_buffer_compositor`. If this argument is `None`, the whole window will be updated.
-    fn render(&mut self, blocks: Option<IntoIter<Block>>) -> Result<(), &'static str>;
+    fn render(&mut self, area: Option<RectArea>) -> Result<(), &'static str>;
 
     /// Adds a displayable at `coordinate` relative to the top-left corner of the window.
     fn add_displayable(

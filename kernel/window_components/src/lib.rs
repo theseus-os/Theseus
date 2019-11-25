@@ -43,7 +43,7 @@ use core::ops::DerefMut;
 use dfqueue::{DFQueue, DFQueueConsumer, DFQueueProducer};
 use displayable::Displayable;
 use event_types::{Event, MousePositionEvent};
-use frame_buffer::{Coord, FrameBuffer, Pixel};
+use frame_buffer::{Coord, FrameBuffer, Pixel, RectArea};
 use frame_buffer_alpha::{AlphaPixel, PixelMixer, BLACK};
 use frame_buffer_compositor::{FrameBufferBlocks, FRAME_COMPOSITOR, Block};
 use spin::Mutex;
@@ -182,34 +182,43 @@ impl Window for WindowComponents {
         let component = self.components.get_mut(display_name).ok_or("")?;
         let coordinate = component.get_position();
 
-        {
+        let area = {
             let mut window = self.winobj.lock();
-            let blocks = component.displayable.display(
+            let area = component.displayable.display(
                 coordinate, 
                 Some(window.framebuffer_mut())
             )?;
-        }
+            area
+        };
 
-        self.render(None)
+        self.render(Some(area))
     }
 
     fn render(
         &mut self,
-        blocks: Option<IntoIter<Block>>,
+        mut area: Option<RectArea>,
     ) -> Result<(), &'static str> {
-        let mut window = self.winobj.lock();
-        let buffer_position = window.get_content_position();
-        let buffer = FrameBufferBlocks {
-            framebuffer: window.framebuffer(),
-            coordinate: buffer_position,
-            blocks: blocks
+        let coordinate = {
+            let mut window = self.winobj.lock();
+            window.get_position()
         };
 
-        FRAME_COMPOSITOR.lock().composite(vec![buffer].into_iter())
+        let mut wm = WINDOW_MANAGER
+            .try()
+            .ok_or("The static window manager was not yet initialized")?
+            .lock();
+
+        let absolute_area = match area {
+            Some(area) => {
+                Some(area + coordinate)
+            },
+            None => None
+        };
+        wm.refresh_window(absolute_area)
     }
 
     fn handle_event(&mut self) -> Result<(), &'static str> {
-        
+       
         let mut call_later_do_refresh_floating_border = false;
         let mut call_later_do_move_active_window = false;
         let mut need_to_set_active = false;
@@ -221,7 +230,7 @@ impl Window for WindowComponents {
             self.last_is_active = is_active;
             let bcoordinate = {
                 let mut winobj = self.winobj.lock();
-                let coordinate = winobj.get_content_position();
+                let coordinate = winobj.get_position();
                 let bcoordinate = coordinate;
                 self.show_button(TopButton::Close, 1, &mut winobj);
                 self.show_button(TopButton::MinimizeMaximize, 1, &mut winobj);
@@ -233,6 +242,7 @@ impl Window for WindowComponents {
                 error!("refresh_border failed {}", err);
             }*/
         }
+
         let bcoordinate = {
             let mut winobj = self.winobj.lock();
             let consumer = &winobj.consumer;
@@ -242,7 +252,8 @@ impl Window for WindowComponents {
                     return Ok(());
                 }
             };
-            let coordinate = winobj.get_content_position();
+
+            let coordinate = winobj.get_position();
             let bcoordinate = coordinate;
             match event.deref() {
                 &Event::KeyboardEvent(ref input_event) => {
@@ -261,6 +272,7 @@ impl Window for WindowComponents {
                             call_later_do_move_active_window = true;
                         }
                     } else {
+
                         if (mouse_event.coordinate.y as usize) < self.title_size
                             && (mouse_event.coordinate.x as usize) < winobj.width
                         {
@@ -397,7 +409,7 @@ impl WindowComponents {
         let (start, end) = {
             let mut winobj = wincomps.winobj.lock();
             winobj.framebuffer.fill_color(wincomps.background);
-            let coordinate = winobj.get_content_position();
+            let coordinate = winobj.get_position();
             let start = coordinate;
             let end = start + (winobj.width as isize, winobj.height as isize);
             (start, end)
@@ -411,23 +423,7 @@ impl WindowComponents {
             wincomps.show_button(TopButton::Hide, 1, &mut winobj);
         }
         debug!("before refresh");
-        {
-            // let mut wm = window_manager_alpha::WINDOW_MANAGER
-            //     .try()
-            //     .ok_or("The static window manager was not yet initialized")?
-            //     .lock();
-            // //wm.refresh_area(start, end)?;
-            let window = wincomps.winobj.lock();
-            let frame_buffer_blocks = FrameBufferBlocks {
-                framebuffer: window.framebuffer(),
-                coordinate: window.coordinate(),
-                blocks: None,
-            };
-            FRAME_COMPOSITOR
-                .lock()
-                .composite(vec![frame_buffer_blocks].into_iter())?;
-        }
-
+        wincomps.render(None)?;
         // window_manager_alpha::refresh_area_absolute(start, end)?;
         debug!("after refresh");
 
@@ -712,6 +708,8 @@ impl Drop for WindowComponents {
             Ok(wm) => {
                 if let Err(err) = wm.lock().delete_window(&self.winobj) {
                     error!("delete_window failed {}", err);
+                } else {
+                    trace!("delete window succeed");
                 }
             }
             Err(err) => {

@@ -32,7 +32,7 @@ extern crate window_components;
 extern crate frame_buffer;
 extern crate frame_buffer_alpha;
 extern crate scheduler;
-extern crate text_area;
+extern crate text_primitive;
 
 use alloc::boxed::Box;
 use alloc::string::String;
@@ -43,8 +43,8 @@ use frame_buffer::Coord;
 use frame_buffer_alpha::FrameBufferAlpha;
 use hpet::get_hpet;
 use keycodes_ascii::{KeyAction, Keycode};
-use text_area::TextArea;
 use window::Window;
+use text_primitive::TextPrimitive;
 
 const WINDOW_BACKGROUND: u32 = 0x40FFFFFF;
 #[no_mangle]
@@ -90,26 +90,30 @@ pub fn main(_args: Vec<String>) -> isize {
         width_inner, height_inner
     );
 
-    // add textarea to WindowComponents
-    let mut textarea: TextArea = match TextArea::new(
-        Coord::new(
-            wincomps.get_border_size() as isize + 4,
-            wincomps.get_title_size() as isize + 4,
-        ),
-        width_inner - 8,
-        height_inner - 8, // position and size of textarea
-        &wincomps.winobj, // bind this textarea to WindowComponents
-        None,
-        None,
-        Some(wincomps.get_background()),
-        None, // use default parameters
-    ) {
-        Ok(m) => m,
-        Err(err) => {
-            error!("new textarea returned err: {}", err);
-            return -3;
+    // let mut textarea = match TextPrimitive::new(
+    //     width_inner - 8, 
+    //     height_inner - 8, 
+    //     0xFFFFFF, 
+    //     0xFFFFFF
+    // ) {
+    //     Ok(text) => text,
+    //     Err(err) => { 
+    //         debug!("Fail to create the generic window: {}", err);
+    //         return -3;
+    //     }
+    // };
+
+    // let _ = wincomps.add_displayable("text", Coord::new(0, 0), Box::new(textarea));
+
+    
+    loop {
+        // first let WindowComponents to handle basic user inputs, and leaves those unhandled events
+        if let Err(err) = wincomps.handle_event() {
+            debug!("{}", err); // when user click close button, this will trigger, and simply exit the program
+            return 0;
         }
-    };
+    }
+}
 
     // refresh all the characters to test performance,
     // for c in ('a' as u8) .. ('z' as u8 + 1) {
@@ -123,161 +127,161 @@ pub fn main(_args: Vec<String>) -> isize {
     //     }
     // }
 
-    // prepare for display chars
-    let mut char_matrix: Vec<u8> = Vec::new(); // the text that should be displayed
-    let text_cnt: usize = textarea.get_x_cnt() * textarea.get_y_cnt(); // the total count of chars in textarea
-    char_matrix.resize(text_cnt, ' ' as u8); // fill in the textarea with blank char
+//     // prepare for display chars
+//     let mut char_matrix: Vec<u8> = Vec::new(); // the text that should be displayed
+//     let text_cnt: usize = textarea.get_x_cnt() * textarea.get_y_cnt(); // the total count of chars in textarea
+//     char_matrix.resize(text_cnt, ' ' as u8); // fill in the textarea with blank char
 
-    // prepare for user-friendly cursor display
-    let mut text_cursor: usize = 0; // the current cursor position
-    const CURSOR_CHAR: u8 = 221; // cursor char, refer to font.rs
-    const BLINK_INTERVAL: u64 = 50000000; // the interval to display a blink of cursor, for better user experience
-    let start_time: u64 = get_time(); // used to compute blink of cursor
-    let mut cursor_last_char: u8 = ' ' as u8; // store the char that is overwritten by cursor, to support arbitrary cursor movement
+//     // prepare for user-friendly cursor display
+//     let mut text_cursor: usize = 0; // the current cursor position
+//     const CURSOR_CHAR: u8 = 221; // cursor char, refer to font.rs
+//     const BLINK_INTERVAL: u64 = 50000000; // the interval to display a blink of cursor, for better user experience
+//     let start_time: u64 = get_time(); // used to compute blink of cursor
+//     let mut cursor_last_char: u8 = ' ' as u8; // store the char that is overwritten by cursor, to support arbitrary cursor movement
 
-    loop {
-        // first let WindowComponents to handle basic user inputs, and leaves those unhandled events
-        if let Err(err) = wincomps.handle_event() {
-            debug!("{}", err); // when user click close button, this will trigger, and simply exit the program
-            return 0;
-        }
+//     loop {
+//         // first let WindowComponents to handle basic user inputs, and leaves those unhandled events
+//         if let Err(err) = wincomps.handle_event() {
+//             debug!("{}", err); // when user click close button, this will trigger, and simply exit the program
+//             return 0;
+//         }
 
-        // handle events of application, like user input text, moving cursor, etc.
-        loop {
-            let _event = match wincomps.consumer.peek() {
-                Some(ev) => ev,
-                _ => {
-                    break;
-                }
-            };
-            match _event.deref() {
-                &Event::KeyboardEvent(ref input_event) => {
-                    let key_event = input_event.key_event;
-                    if key_event.action == KeyAction::Pressed {
-                        // first handle special keys that allows user to move the cursor and delete chars
-                        if key_event.keycode == Keycode::Backspace {
-                            let new_cursor = (text_cursor + text_cnt - 1) % text_cnt;
-                            char_matrix[new_cursor] = ' ' as u8; // set last char to ' '
-                            move_cursor_restore_old(
-                                &mut char_matrix,
-                                &mut text_cursor,
-                                &mut cursor_last_char,
-                                new_cursor,
-                            );
-                        } else if key_event.keycode == Keycode::Enter {
-                            let new_cursor = ((text_cursor / textarea.get_x_cnt() + 1)
-                                * textarea.get_x_cnt())
-                                % text_cnt;
-                            move_cursor_restore_old(
-                                &mut char_matrix,
-                                &mut text_cursor,
-                                &mut cursor_last_char,
-                                new_cursor,
-                            );
-                        } else if key_event.keycode == Keycode::Up {
-                            let new_cursor =
-                                ((text_cursor / textarea.get_x_cnt() + textarea.get_y_cnt() - 1)
-                                    * textarea.get_x_cnt()
-                                    + (text_cursor % textarea.get_x_cnt()))
-                                    % text_cnt;
-                            move_cursor_restore_old(
-                                &mut char_matrix,
-                                &mut text_cursor,
-                                &mut cursor_last_char,
-                                new_cursor,
-                            );
-                        } else if key_event.keycode == Keycode::Down {
-                            let new_cursor = ((text_cursor / textarea.get_x_cnt() + 1)
-                                * textarea.get_x_cnt()
-                                + (text_cursor % textarea.get_x_cnt()))
-                                % text_cnt;
-                            move_cursor_restore_old(
-                                &mut char_matrix,
-                                &mut text_cursor,
-                                &mut cursor_last_char,
-                                new_cursor,
-                            );
-                        } else if key_event.keycode == Keycode::Left {
-                            let new_cursor = ((text_cursor / textarea.get_x_cnt())
-                                * textarea.get_x_cnt()
-                                + (((text_cursor % textarea.get_x_cnt()) + textarea.get_x_cnt()
-                                    - 1)
-                                    % textarea.get_x_cnt()))
-                                % text_cnt;
-                            move_cursor_restore_old(
-                                &mut char_matrix,
-                                &mut text_cursor,
-                                &mut cursor_last_char,
-                                new_cursor,
-                            );
-                        } else if key_event.keycode == Keycode::Right {
-                            let new_cursor = ((text_cursor / textarea.get_x_cnt())
-                                * textarea.get_x_cnt()
-                                + (((text_cursor % textarea.get_x_cnt()) + 1)
-                                    % textarea.get_x_cnt()))
-                                % text_cnt;
-                            move_cursor_restore_old(
-                                &mut char_matrix,
-                                &mut text_cursor,
-                                &mut cursor_last_char,
-                                new_cursor,
-                            );
-                        } else {
-                            match key_event.keycode.to_ascii(key_event.modifiers) {
-                                Some(c) => {
-                                    // for normal keys, just display them and move the cursor forward
-                                    char_matrix[text_cursor] = c as u8;
-                                    text_cursor = (text_cursor + 1) % text_cnt;
-                                    cursor_last_char = char_matrix[text_cursor]
-                                }
-                                _ => {}
-                            }
-                        }
-                    }
-                }
-                _ => {}
-            }
-            _event.mark_completed(); // always consume the event, and ignore those unknown ones
-        }
+//         // handle events of application, like user input text, moving cursor, etc.
+//         loop {
+//             let _event = match wincomps.consumer.peek() {
+//                 Some(ev) => ev,
+//                 _ => {
+//                     break;
+//                 }
+//             };
+//             match _event.deref() {
+//                 &Event::KeyboardEvent(ref input_event) => {
+//                     let key_event = input_event.key_event;
+//                     if key_event.action == KeyAction::Pressed {
+//                         // first handle special keys that allows user to move the cursor and delete chars
+//                         if key_event.keycode == Keycode::Backspace {
+//                             let new_cursor = (text_cursor + text_cnt - 1) % text_cnt;
+//                             char_matrix[new_cursor] = ' ' as u8; // set last char to ' '
+//                             move_mouse_restore_old(
+//                                 &mut char_matrix,
+//                                 &mut text_cursor,
+//                                 &mut cursor_last_char,
+//                                 new_cursor,
+//                             );
+//                         } else if key_event.keycode == Keycode::Enter {
+//                             let new_cursor = ((text_cursor / textarea.get_x_cnt() + 1)
+//                                 * textarea.get_x_cnt())
+//                                 % text_cnt;
+//                             move_mouse_restore_old(
+//                                 &mut char_matrix,
+//                                 &mut text_cursor,
+//                                 &mut cursor_last_char,
+//                                 new_cursor,
+//                             );
+//                         } else if key_event.keycode == Keycode::Up {
+//                             let new_cursor =
+//                                 ((text_cursor / textarea.get_x_cnt() + textarea.get_y_cnt() - 1)
+//                                     * textarea.get_x_cnt()
+//                                     + (text_cursor % textarea.get_x_cnt()))
+//                                     % text_cnt;
+//                             move_mouse_restore_old(
+//                                 &mut char_matrix,
+//                                 &mut text_cursor,
+//                                 &mut cursor_last_char,
+//                                 new_cursor,
+//                             );
+//                         } else if key_event.keycode == Keycode::Down {
+//                             let new_cursor = ((text_cursor / textarea.get_x_cnt() + 1)
+//                                 * textarea.get_x_cnt()
+//                                 + (text_cursor % textarea.get_x_cnt()))
+//                                 % text_cnt;
+//                             move_mouse_restore_old(
+//                                 &mut char_matrix,
+//                                 &mut text_cursor,
+//                                 &mut cursor_last_char,
+//                                 new_cursor,
+//                             );
+//                         } else if key_event.keycode == Keycode::Left {
+//                             let new_cursor = ((text_cursor / textarea.get_x_cnt())
+//                                 * textarea.get_x_cnt()
+//                                 + (((text_cursor % textarea.get_x_cnt()) + textarea.get_x_cnt()
+//                                     - 1)
+//                                     % textarea.get_x_cnt()))
+//                                 % text_cnt;
+//                             move_mouse_restore_old(
+//                                 &mut char_matrix,
+//                                 &mut text_cursor,
+//                                 &mut cursor_last_char,
+//                                 new_cursor,
+//                             );
+//                         } else if key_event.keycode == Keycode::Right {
+//                             let new_cursor = ((text_cursor / textarea.get_x_cnt())
+//                                 * textarea.get_x_cnt()
+//                                 + (((text_cursor % textarea.get_x_cnt()) + 1)
+//                                     % textarea.get_x_cnt()))
+//                                 % text_cnt;
+//                             move_mouse_restore_old(
+//                                 &mut char_matrix,
+//                                 &mut text_cursor,
+//                                 &mut cursor_last_char,
+//                                 new_cursor,
+//                             );
+//                         } else {
+//                             match key_event.keycode.to_ascii(key_event.modifiers) {
+//                                 Some(c) => {
+//                                     // for normal keys, just display them and move the cursor forward
+//                                     char_matrix[text_cursor] = c as u8;
+//                                     text_cursor = (text_cursor + 1) % text_cnt;
+//                                     cursor_last_char = char_matrix[text_cursor]
+//                                 }
+//                                 _ => {}
+//                             }
+//                         }
+//                     }
+//                 }
+//                 _ => {}
+//             }
+//             _event.mark_completed(); // always consume the event, and ignore those unknown ones
+//         }
 
-        // make cursor blink by computing the time from start
-        let timidx = (get_time() - start_time) / BLINK_INTERVAL;
-        if timidx % 2 == 0 {
-            char_matrix[text_cursor] = CURSOR_CHAR;
-        } else {
-            char_matrix[text_cursor] = ' ' as u8;
-        }
+//         // make cursor blink by computing the time from start
+//         let timidx = (get_time() - start_time) / BLINK_INTERVAL;
+//         if timidx % 2 == 0 {
+//             char_matrix[text_cursor] = CURSOR_CHAR;
+//         } else {
+//             char_matrix[text_cursor] = ' ' as u8;
+//         }
 
-        // update char matrix for textarea to display, this is efficient that will only redraw the changed chars
-        if let Err(err) = textarea.set_char_matrix(&char_matrix) {
-            error!("set char matrix failed: {}", err);
-            return -5;
-        }
+//         // update char matrix for textarea to display, this is efficient that will only redraw the changed chars
+//         if let Err(err) = textarea.set_char_matrix(&char_matrix) {
+//             error!("set char matrix failed: {}", err);
+//             return -5;
+//         }
 
-        // be nice to other applications
-        scheduler::schedule();
-    }
-}
+//         // be nice to other applications
+//         scheduler::schedule();
+//     }
+// }
 
-// get current time for cursor blinking
-fn get_time() -> u64 {
-    match get_hpet().as_ref() {
-        Some(m) => m.get_counter(),
-        _ => {
-            error!("couldn't get HPET timer");
-            0
-        }
-    }
-}
+// // get current time for cursor blinking
+// fn get_time() -> u64 {
+//     match get_hpet().as_ref() {
+//         Some(m) => m.get_counter(),
+//         _ => {
+//             error!("couldn't get HPET timer");
+//             0
+//         }
+//     }
+// }
 
-// set cursor to a new position and restore the old one
-fn move_cursor_restore_old(
-    char_matrix: &mut Vec<u8>,
-    text_cursor: &mut usize,
-    cursor_last_char: &mut u8,
-    new_cursor: usize,
-) {
-    char_matrix[*text_cursor] = *cursor_last_char; // first restore the previous char
-    *text_cursor = new_cursor; // update new cursor
-    *cursor_last_char = char_matrix[*text_cursor]; // record the current char for later restore
-}
+// // set cursor to a new position and restore the old one
+// fn move_mouse_restore_old(
+//     char_matrix: &mut Vec<u8>,
+//     text_cursor: &mut usize,
+//     cursor_last_char: &mut u8,
+//     new_cursor: usize,
+// ) {
+//     char_matrix[*text_cursor] = *cursor_last_char; // first restore the previous char
+//     *text_cursor = new_cursor; // update new cursor
+//     *cursor_last_char = char_matrix[*text_cursor]; // record the current char for later restore
+// }

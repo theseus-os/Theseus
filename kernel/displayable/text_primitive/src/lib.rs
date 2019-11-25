@@ -15,7 +15,7 @@ use alloc::string::String;
 use alloc::vec::Vec;
 use displayable::{Displayable, TextDisplayable};
 use font::{CHARACTER_HEIGHT, CHARACTER_WIDTH};
-use frame_buffer::{Coord, FrameBuffer};
+use frame_buffer::{Coord, FrameBuffer, RectArea};
 
 /// A generic text displayable profiles the size and color of a block of text. It can display in a framebuffer.
 pub struct TextPrimitive {
@@ -52,7 +52,7 @@ impl Displayable for TextPrimitive {
         &mut self,
         coordinate: Coord,
         framebuffer: Option<&mut dyn FrameBuffer>,
-    ) -> Result<Vec<(usize, usize, usize)>, &'static str> {
+    ) -> Result<RectArea, &'static str> {
 
         // If the cache is the prefix of the new text, just print the additional characters.
         let framebuffer = framebuffer.ok_or("There is no framebuffer to display in")?;
@@ -67,7 +67,7 @@ impl Displayable for TextPrimitive {
                 (self.text.as_str(), 0, 0)
             };
 
-        let (next_col, next_line, blocks) = frame_buffer_printer::print_string(
+        let (next_col, next_line, update_area) = frame_buffer_printer::print_string(
             framebuffer,
             coordinate,
             self.width,
@@ -83,7 +83,7 @@ impl Displayable for TextPrimitive {
         self.next_line = next_line;
         self.cache = self.text.clone();
 
-        return Ok(blocks);
+        return Ok(update_area + coordinate);
     }
 
     fn clear(

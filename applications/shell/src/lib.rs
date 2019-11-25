@@ -24,6 +24,7 @@ extern crate terminal_print;
 extern crate print;
 extern crate environment;
 extern crate libterm;
+extern crate window_manager_alpha;
 
 #[macro_use] extern crate alloc;
 #[macro_use] extern crate log;
@@ -298,20 +299,20 @@ impl Shell {
     }
 
     /// Move the cursor to the very beginning of the input command line.
-    fn move_cursor_leftmost(&mut self) -> Result<(), &'static str> {
+    fn move_mouse_leftmost(&mut self) -> Result<(), &'static str> {
         self.update_cursor_pos(self.cmdline.len())?;
         Ok(())
     }
 
     /// Move the cursor to the very end of the input command line.
-    fn move_cursor_rightmost(&mut self) -> Result<(), &'static str> {
+    fn move_mouse_rightmost(&mut self) -> Result<(), &'static str> {
         self.update_cursor_pos(0)?;
         Ok(())
     }
 
     /// Move the cursor a character left. If the cursor is already at the beginning of the command line,
     /// it simply returns.
-    fn move_cursor_left(&mut self) -> Result<(), &'static str> {
+    fn move_mouse_left(&mut self) -> Result<(), &'static str> {
         let offset_from_end = self.terminal.lock().get_cursor_offset_from_end();
         if offset_from_end < self.cmdline.len() {
             self.update_cursor_pos(offset_from_end + 1)?;
@@ -321,7 +322,7 @@ impl Shell {
 
     /// Move the cursor a character to the right. If the cursor is already at the end of the command line,
     /// it simply returns.
-    fn move_cursor_right(&mut self) -> Result<(), &'static str> {
+    fn move_mouse_right(&mut self) -> Result<(), &'static str> {
         let offset_from_end = self.terminal.lock().get_cursor_offset_from_end();
         if offset_from_end > 0 {
             self.update_cursor_pos(offset_from_end - 1)?;
@@ -609,21 +610,21 @@ impl Shell {
 
         // Jumps to the beginning of the input string
         if keyevent.keycode == Keycode::Home {
-            return self.move_cursor_leftmost()
+            return self.move_mouse_leftmost()
         }
 
         // Jumps to the end of the input string
         if keyevent.keycode == Keycode::End {
-            return self.move_cursor_rightmost()
+            return self.move_mouse_rightmost()
         }
 
         // Adjusts the cursor tracking variables when the user presses the left and right arrow keys
         if keyevent.keycode == Keycode::Left {
-            return self.move_cursor_left()
+            return self.move_mouse_left()
         }
 
         if keyevent.keycode == Keycode::Right {
-            return self.move_cursor_right()
+            return self.move_mouse_right()
         }
 
         // Tracks what the user has typed so far, excluding any keypresses by the backspace and Enter key, which are special and are handled directly below
@@ -1328,7 +1329,9 @@ impl Shell {
                 self.terminal.lock().refresh_display()?;
             }
             
-            self.terminal.lock().display_cursor()?;
+            if window_manager_alpha::is_active(&self.terminal.lock().window.winobj) {
+                self.terminal.lock().display_cursor()?;
+            }
 
             // handle inputs
             need_refresh = false;

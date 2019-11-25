@@ -11,7 +11,7 @@ extern crate frame_buffer_rgb;
 use alloc::vec;
 use alloc::vec::Vec;
 use font::{CHARACTER_HEIGHT, CHARACTER_WIDTH, FONT_PIXEL};
-use frame_buffer::{FrameBuffer, Coord};
+use frame_buffer::{FrameBuffer, Coord, RectArea};
 
 type ASCII = u8;
 
@@ -36,7 +36,7 @@ pub fn print_string(
     bg_color: u32,
     column: usize,
     line: usize,
-) -> (usize, usize, Vec<(usize, usize, usize)>) {
+) -> (usize, usize, RectArea) {
     let buffer_width = width / CHARACTER_WIDTH;
     let buffer_height = height / CHARACTER_HEIGHT;
     let (x, y) = (coordinate.x, coordinate.y);
@@ -44,7 +44,7 @@ pub fn print_string(
     let mut curr_line = line;
     let mut curr_column = column;
 
-    let mut blocks = Vec::new();
+    let start_point = Coord::new(0, (curr_line * CHARACTER_HEIGHT) as isize);
 
     for byte in slice.bytes() {
         if byte == b'\n' {
@@ -57,7 +57,7 @@ pub fn print_string(
                 coordinate.y + ((curr_line + 1) * CHARACTER_HEIGHT) as isize,
                 bg_color,
             );
-            blocks.push((curr_line, 0, curr_column  * CHARACTER_WIDTH));
+            //blocks.push((curr_line, 0, curr_column  * CHARACTER_WIDTH));
             curr_column = 0;
             curr_line += 1;
             if curr_line == buffer_height {
@@ -76,7 +76,7 @@ pub fn print_string(
             );
             curr_column += 1;
             if curr_column == buffer_width {
-                blocks.push((curr_line, 0, buffer_width));
+                //blocks.push((curr_line, 0, buffer_width));
                 curr_column = 0;
                 curr_line += 1;
                 if curr_line == buffer_height {
@@ -86,7 +86,7 @@ pub fn print_string(
         }
     }    
     //fill the blank of the last line
-    blocks.push((curr_line, 0, curr_column * CHARACTER_WIDTH));
+    //blocks.push((curr_line, 0, curr_column * CHARACTER_WIDTH));
     fill_blank(
         framebuffer,
         x + (curr_column * CHARACTER_WIDTH) as isize,
@@ -96,6 +96,15 @@ pub fn print_string(
         bg_color,
     );
 
+    let end_point = Coord::new(
+        (buffer_width * CHARACTER_WIDTH) as isize, 
+        ((curr_line + 1) * CHARACTER_HEIGHT) as isize
+    );
+
+    let update_area = RectArea {
+        start: start_point,
+        end: end_point,
+    };
     // // fill the next line in case the page scrolls up
     // blocks.push((curr_line + 1, 0));
     // fill_blank(
@@ -110,23 +119,23 @@ pub fn print_string(
     // Fill the remaining lines if the offset is zero and the text displayable refreshes from the beginning.
     // If the offset is not zero, it means the text to be printed is appended and just refresh the part occupied by the new text.
     // In the future we may adjust the logic here to for the optimization of more displayables and applications
-    if column == 0 && line == 0 {
-        for i in (curr_line + 1)..(height - 1) / CHARACTER_HEIGHT + 1 {
-            blocks.push((i, 0, 0));
-        }
-        // fill the blank of remaining lines
-        fill_blank(
-            framebuffer,
-            x,
-            y + ((curr_line + 1) * CHARACTER_HEIGHT) as isize,
-            x + width as isize,
-            y + height as isize,
-            bg_color,
-        );
-    }
+    // if column == 0 && line == 0 {
+    //     for i in (curr_line + 1)..(height - 1) / CHARACTER_HEIGHT + 1 {
+    //         blocks.push((i, 0, 0));
+    //     }
+    //     // fill the blank of remaining lines
+    //     fill_blank(
+    //         framebuffer,
+    //         x,
+    //         y + ((curr_line + 1) * CHARACTER_HEIGHT) as isize,
+    //         x + width as isize,
+    //         y + height as isize,
+    //         bg_color,
+    //     );
+    // }
 
     // return the position of next symbol and updated blocks.
-    (curr_column, curr_line, blocks)
+    (curr_column, curr_line, update_area)
 }
 
 /// Prints a character to the framebuffer at position (line, column) of all characters in the text area.

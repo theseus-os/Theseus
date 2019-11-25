@@ -12,7 +12,7 @@ extern crate downcast_rs;
 use alloc::boxed::Box;
 use alloc::vec::Vec;
 use downcast_rs::Downcast;
-use frame_buffer::{FrameBuffer, Coord};
+use frame_buffer::{FrameBuffer, Coord, RectArea};
 
 /// Trait for displayables. A displayable is an item which can display itself onto a framebuffer. 
 /// It is usually a composition of basic graphs and can act as a component such as a text box, a button belonging to a window, etc. 
@@ -27,7 +27,7 @@ pub trait Displayable: Downcast + Send {
         &mut self,
         coordinate: Coord,
         framebuffer: Option<&mut dyn FrameBuffer>,
-    ) -> Result<Vec<(usize, usize, usize)>, &'static str> ;
+    ) -> Result<RectArea, &'static str> ;
 
     fn clear(
         &mut self,

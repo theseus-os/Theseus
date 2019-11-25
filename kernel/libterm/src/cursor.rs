@@ -75,7 +75,7 @@ impl Cursor {
         column: usize,
         line: usize,
         framebuffer: &mut dyn FrameBuffer,
-    ) -> Result<(), &'static str> {
+    ) -> Result<RectArea, &'static str> {
         if self.blink() {
             if self.show() {
                 frame_buffer_drawer::fill_rectangle(
@@ -103,7 +103,16 @@ impl Cursor {
             }
         }
 
-        Ok(())
+        let start = coordinate + (
+            (column * CHARACTER_WIDTH) as isize, 
+            (line * CHARACTER_HEIGHT) as isize
+        );
+        let update_area = RectArea {
+            start: start,
+            end: start + (CHARACTER_WIDTH as isize, CHARACTER_HEIGHT as isize)
+        };
+
+        Ok(update_area)
     }
 
     pub fn set_offset_from_end(&mut self, offset: usize) {

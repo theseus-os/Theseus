@@ -170,7 +170,7 @@ pub struct WindowPrimitive<Buffer: FrameBuffer> {
     }
 
     fn render(&mut self, blocks: Option<IntoIter<Block>>) -> Result<(), &'static str> {
-        let coordinate = { self.profile.lock().get_content_position() };
+        let coordinate = { self.profile.lock().get_position() };
         let frame_buffer_blocks = FrameBufferBlocks {
             framebuffer: &mut self.framebuffer,
             coordinate: coordinate,
@@ -463,7 +463,7 @@ impl WindowProfile for WindowProfilePrimitive {
         )
     }
 
-    fn get_content_position(&self) -> Coord {
+    fn get_position(&self) -> Coord {
         self.coordinate + (self.padding as isize, self.padding as isize)
     }
 
