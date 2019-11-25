@@ -235,8 +235,10 @@ impl Compositor<FrameBufferBlocks<'_>> for FrameCompositor {
             for i in 0..abs_coord.len() {
                 let coordinate = abs_coord[i];
                 let relative_coord = coordinate - frame_buffer_blocks.coordinate;
-                let pixel = frame_buffer_blocks.framebuffer.get_pixel(relative_coord)?;
-                final_fb.draw_pixel(coordinate, pixel);
+                if frame_buffer_blocks.framebuffer.contains(relative_coord) {
+                    let pixel = frame_buffer_blocks.framebuffer.get_pixel(relative_coord)?;
+                    final_fb.draw_pixel(coordinate, pixel);
+                }
             }
         }
 

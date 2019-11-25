@@ -28,18 +28,12 @@ extern crate libterm;
 extern crate scheduler;
 extern crate serial_port;
 
-#[cfg(not(primitive_display_sys))]
 extern crate text_area;
-#[cfg(not(primitive_display_sys))]
 extern crate window_manager_alpha;
-#[cfg(not(primitive_display_sys))]
 extern crate window_components;
-#[cfg(not(primitive_display_sys))]
 extern crate window;
 
-#[cfg(primitive_display_sys)]
 extern crate text_primitive;
-#[cfg(primitive_display_sys)]
 extern crate window_manager_primitive;
 
 use alloc::boxed::Box;
@@ -50,21 +44,13 @@ use alloc::vec::Vec;
 use libterm::Terminal;
 use spin::{Mutex, MutexGuard};
 use stdio::{KeyEventQueueReader, KeyEventReadGuard, StdioReader, StdioWriter};
-#[cfg(not(primitive_display_sys))]
 use text_area::TextArea;
-#[cfg(not(primitive_display_sys))]
 use frame_buffer::Coord;
-#[cfg(not(primitive_display_sys))]
 use frame_buffer_alpha::FrameBufferAlpha;
-#[cfg(not(primitive_display_sys))]
-use libterm::cursor::{CursorComponent};
-#[cfg(not(primitive_display_sys))]
 use window::Window;
 
-#[cfg(primitive_display_sys)]
 use text_primitive::TextPrimitive;
-#[cfg(primitive_display_sys)]
-use libterm::cursor::CursorGeneric;
+use libterm::cursor::{CursorGeneric, CursorComponent};
 /// Stores the stdio queues, key event queue and the pointer to the terminal
 /// for applications. This structure is provided for application's use and only
 /// contains necessary one-end readers/writers to queues. On the shell side, we have
@@ -183,7 +169,18 @@ lazy_static! {
                     return None;
                 }
             };
+            
+            /*let (width_inner, height_inner) = window.inner_size();
+            let textarea = match TextPrimitive::new(width_inner, height_inner, libterm::FONT_COLOR, libterm::BACKGROUND_COLOR) {
+                Ok(text) => text,
+                Err(err) => { 
+                    debug!("Fail to create the generic window: {}", err);
+                    return None;
+                }
+            };
 
+            // let cursor = CursorGeneric::new();
+*/
             let textarea = {
                 let (width_inner, height_inner) = window.inner_size();
                 debug!("new window done width: {}, height: {}", width_inner, height_inner);

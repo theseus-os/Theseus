@@ -57,8 +57,8 @@ const WINDOW_BORDER: usize = 2;
 /// border radius, in number of pixels
 const WINDOW_RADIUS: usize = 5;
 /// default background color
-// const WINDOW_BACKGROUND: AlphaPixel = 0x40FFFFFF;
-const WINDOW_BACKGROUND: AlphaPixel = 0x00FFFFFF;
+const WINDOW_BACKGROUND: AlphaPixel = 0x40FFFFFF;
+//const WINDOW_BACKGROUND: AlphaPixel = 0x00FFFFFF;
 /// border and title bar color when window is inactive
 const WINDOW_BORDER_COLOR_INACTIVE: AlphaPixel = 0x00333333;
 /// border and title bar color when window is active, the top part color
@@ -176,7 +176,20 @@ impl Window for WindowComponents {
         let component = self.components.get_mut(display_name).ok_or("")?;
         let coordinate = component.get_position();
         component.display(coordinate, None)?;
-        self.render(None)
+
+
+        let window = self.winobj.lock();
+        let buffer_position = window.get_content_position();
+        let background_fb = FrameBufferBlocks {
+            framebuffer: window.framebuffer(),
+            coordinate: buffer_position,
+            blocks: None
+        };
+
+        FRAME_COMPOSITOR.lock().composite(vec![background_fb].into_iter())
+
+
+    //        self.render(None)
     }
 
     fn render(
