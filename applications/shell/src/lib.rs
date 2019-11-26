@@ -23,7 +23,7 @@ extern crate terminal_print;
 extern crate print;
 extern crate environment;
 extern crate libterm;
-extern crate window_manager_alpha;
+extern crate window_manager;
 
 #[macro_use] extern crate alloc;
 #[macro_use] extern crate log;
@@ -1328,7 +1328,7 @@ impl Shell {
                 self.terminal.lock().refresh_display()?;
             }
             
-            if window_manager_alpha::is_active(&self.terminal.lock().window.winobj) {
+            if window_manager::is_active(&self.terminal.lock().window.winobj) {
                 self.terminal.lock().display_cursor()?;
             }
 

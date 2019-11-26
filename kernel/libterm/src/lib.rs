@@ -19,7 +19,7 @@ extern crate frame_buffer_drawer;
 extern crate frame_buffer_printer;
 extern crate tsc;
 extern crate window;
-extern crate window_manager_alpha;
+extern crate window_manager;
 extern crate text_area;
 extern crate window_components;
 extern crate frame_buffer_compositor;

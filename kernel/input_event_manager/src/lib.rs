@@ -17,7 +17,7 @@ extern crate event_types;
 extern crate font;
 extern crate frame_buffer_alpha;
 extern crate frame_buffer_rgb;
-extern crate window_manager_alpha;
+extern crate window_manager;
 #[cfg(primitive_display_sys)]
 extern crate keycodes_ascii;
 #[cfg(primitive_display_sys)]
@@ -93,7 +93,7 @@ pub fn init() -> Result<(DFQueueProducer<Event>, DFQueueProducer<Event>), &'stat
         let bg_framebuffer = FrameBufferAlpha::new(width, height, None)?;
         let mut top_framebuffer = FrameBufferAlpha::new(width, height, None)?;
         top_framebuffer.fill_color(0xFF000000); 
-        window_manager_alpha::init(
+        window_manager::init(
             keyboard_event_handling_consumer,
             mouse_event_handling_consumer,
             bg_framebuffer,

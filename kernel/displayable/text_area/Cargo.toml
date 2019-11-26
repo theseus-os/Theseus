@@ -20,8 +20,8 @@ path = "../../frame_buffer_printer"
 [dependencies.window]
 path = "../../window"
 
-[dependencies.window_manager_alpha]
-path = "../../window_manager_alpha"
+[dependencies.window_manager]
+path = "../../window_manager"
 
 [dependencies.font]
 path = "../../font"

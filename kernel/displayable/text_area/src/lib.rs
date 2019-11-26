@@ -13,7 +13,7 @@ extern crate frame_buffer_drawer;
 extern crate frame_buffer_printer;
 extern crate spin;
 extern crate window;
-extern crate window_manager_alpha;
+extern crate window_manager;
 
 use alloc::string::String;
 use alloc::sync::{Arc, Weak};
@@ -25,7 +25,7 @@ use frame_buffer::{Coord, FrameBuffer, RectArea};
 use frame_buffer_alpha::AlphaPixel;
 use spin::{Mutex};
 use window::WindowProfile;
-use window_manager_alpha::WindowProfileAlpha;
+use window_manager::WindowProfileAlpha;
 
 /// a textarea with fixed size, showing matrix of chars.
 ///
@@ -160,7 +160,7 @@ impl TextArea {
                     );
                 for j in 0..CHARACTER_HEIGHT {
                     for i in 0..CHARACTER_WIDTH - 1 {
-                        window_manager_alpha::refresh_pixel_absolute(
+                        window_manager::refresh_pixel_absolute(
                             win_coordinate + wcoordinate + (i as isize, j as isize),
                         )?;
                     }

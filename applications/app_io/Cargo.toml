@@ -21,8 +21,8 @@ path = "../../libs/keycodes_ascii"
 [dependencies.frame_buffer_rgb]
 path = "../../kernel/frame_buffer_rgb"
 
-[dependencies.window_manager_alpha]
-path = "../../kernel/window_manager_alpha"
+[dependencies.window_manager]
+path = "../../kernel/window_manager"
 
 [dependencies.window]
 path = "../../kernel/window"

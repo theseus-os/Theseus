@@ -48,8 +48,8 @@ path = "../frame_buffer_printer"
 [dependencies.frame_buffer_compositor]
 path = "../frame_buffer_compositor"
 
-[dependencies.window_manager_alpha]
-path = "../window_manager_alpha"
+[dependencies.window_manager]
+path = "../window_manager"
 
 [dependencies.window_components]
 path = "../window_components"

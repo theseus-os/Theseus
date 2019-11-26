@@ -30,7 +30,7 @@ extern crate frame_buffer_compositor;
 extern crate frame_buffer_drawer;
 extern crate mouse;
 extern crate window;
-extern crate window_manager_alpha;
+extern crate window_manager;
 extern crate memory_structs;
 
 use alloc::boxed::Box;
@@ -50,7 +50,7 @@ use frame_buffer_compositor::{FrameBufferBlocks, FRAME_COMPOSITOR, Block};
 use spin::Mutex;
 use memory_structs::PhysicalAddress;
 use window::{Window, WindowProfile};
-use window_manager_alpha::{WindowProfileAlpha, WINDOW_MANAGER};
+use window_manager::{WindowProfileAlpha, WINDOW_MANAGER};
 
 /// The title bar size, in number of pixels
 const WINDOW_TITLE_BAR: usize = 15;
@@ -225,7 +225,7 @@ impl Window for WindowComponents {
         let mut need_to_set_active = false;
         let mut need_refresh_three_button = false;
 
-        let is_active = window_manager_alpha::is_active(&self.winobj);
+        let is_active = window_manager::is_active(&self.winobj);
         if is_active != self.last_is_active {
             self.draw_border(is_active);
             self.last_is_active = is_active;
@@ -344,7 +344,7 @@ impl Window for WindowComponents {
             bcoordinate
         };
         if need_to_set_active {
-            window_manager_alpha::set_active(&self.winobj)?;
+            window_manager::set_active(&self.winobj)?;
         }
         if need_refresh_three_button {
             // if border has been refreshed, no need to refresh buttons
@@ -354,17 +354,17 @@ impl Window for WindowComponents {
         }
 
         if call_later_do_refresh_floating_border {
-            window_manager_alpha::do_refresh_floating_border()?;
+            window_manager::do_refresh_floating_border()?;
         }
 
         if call_later_do_move_active_window {
-            if let Err(err) = window_manager_alpha::do_move_active_window() {
+            if let Err(err) = window_manager::do_move_active_window() {
                 error!("do_move_active_window failed {}", err);
             }
         }
 
         // if call_later_do_refresh_floating_border || call_later_do_move_active_window {
-        //     let wm = window_manager_alpha::WINDOW_MANAGER.try().ok_or("The window manager is not initialized")?.lock();
+        //     let wm = window_manager::WINDOW_MANAGER.try().ok_or("The window manager is not initialized")?.lock();
         //     wm.refresh_bg_windows(None)?;
         //     wm.refresh_windows(None)?;
         //     wm.refresh_top(None)?;
@@ -390,7 +390,7 @@ impl WindowComponents {
             return Err("window too small to even draw border");
         }
 
-        let winobj_mutex = window_manager_alpha::new_window(coordinate, framebuffer)?;
+        let winobj_mutex = window_manager::new_window(coordinate, framebuffer)?;
 
         // create event queue for components
         let consumer = DFQueue::new().into_consumer();
@@ -435,7 +435,7 @@ impl WindowComponents {
         }
         debug!("before refresh");
         wincomps.render(None)?;
-        // window_manager_alpha::refresh_area_absolute(start, end)?;
+        // window_manager::refresh_area_absolute(start, end)?;
         debug!("after refresh");
 
         Ok(wincomps)
@@ -611,19 +611,19 @@ impl WindowComponents {
         };
         let border_size = self.border_size as isize;
         let title_size = self.title_size as isize;
-        window_manager_alpha::refresh_area_absolute(
+        window_manager::refresh_area_absolute(
             bcoordinate + (0, title_size),
             bcoordinate + (border_size, height),
         )?;
-        window_manager_alpha::refresh_area_absolute(
+        window_manager::refresh_area_absolute(
             bcoordinate + (0, height - border_size),
             bcoordinate + (width, height),
         )?;
-        window_manager_alpha::refresh_area_absolute(
+        window_manager::refresh_area_absolute(
             bcoordinate + (width - border_size, title_size),
             bcoordinate + (width, height),
         )?;
-        window_manager_alpha::refresh_area_absolute(
+        window_manager::refresh_area_absolute(
             bcoordinate,
             bcoordinate + (width, title_size),
         )?;
@@ -675,7 +675,7 @@ impl WindowComponents {
                 .lock()
                 .composite(vec![frame_buffer_blocks].into_iter())?;
 
-            /* window_manager_alpha::refresh_area_absolute(
+            /* window_manager::refresh_area_absolute(
                 coordinate - (r, r),
                 coordinate + (r + 1, r + 1),
             )?;*/

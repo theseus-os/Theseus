@@ -40,8 +40,8 @@ path = "../window"
 [dependencies.frame_buffer]
 path = "../frame_buffer"
 
-[dependencies.window_manager_alpha]
-path = "../window_manager_alpha"
+[dependencies.window_manager]
+path = "../window_manager"
 
 [dependencies.event_types]
 path = "../event_types"

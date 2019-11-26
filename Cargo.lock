@@ -106,7 +106,7 @@ dependencies = [
  "text_primitive 0.1.0",
  "window 0.1.0",
  "window_components 0.1.0",
- "window_manager_alpha 0.1.0",
+ "window_manager 0.1.0",
  "x86_64 0.1.2",
 ]
 
@@ -800,7 +800,7 @@ dependencies = [
  "spawn 0.1.0",
  "spin 0.4.10 (registry+https://github.com/rust-lang/crates.io-index)",
  "task 0.1.0",
- "window_manager_alpha 0.1.0",
+ "window_manager 0.1.0",
  "x86_64 0.1.2",
 ]
 
@@ -964,7 +964,7 @@ dependencies = [
  "tsc 0.1.0",
  "window 0.1.0",
  "window_components 0.1.0",
- "window_manager_alpha 0.1.0",
+ "window_manager 0.1.0",
 ]
 
 [[package]]
@@ -1274,7 +1274,7 @@ dependencies = [
  "text_primitive 0.1.0",
  "window 0.1.0",
  "window_components 0.1.0",
- "window_manager_alpha 0.1.0",
+ "window_manager 0.1.0",
  "x86_64 0.1.2",
 ]
 
@@ -1907,7 +1907,7 @@ dependencies = [
  "task 0.1.0",
  "terminal_print 0.1.0",
  "tsc 0.1.0",
- "window_manager_alpha 0.1.0",
+ "window_manager 0.1.0",
  "x86_64 0.1.2",
 ]
 
@@ -2190,7 +2190,7 @@ dependencies = [
  "frame_buffer_printer 0.1.0",
  "spin 0.4.10 (registry+https://github.com/rust-lang/crates.io-index)",
  "window 0.1.0",
- "window_manager_alpha 0.1.0",
+ "window_manager 0.1.0",
 ]
 
 [[package]]
@@ -2382,7 +2382,7 @@ dependencies = [
  "spawn 0.1.0",
  "spin 0.4.10 (registry+https://github.com/rust-lang/crates.io-index)",
  "window 0.1.0",
- "window_manager_alpha 0.1.0",
+ "window_manager 0.1.0",
 ]
 
 [[package]]
@@ -2397,7 +2397,7 @@ dependencies = [
 ]
 
 [[package]]
-name = "window_manager_alpha"
+name = "window_manager"
 version = "0.1.0"
 dependencies = [
  "compositor 0.1.0",

@@ -24,7 +24,7 @@ extern crate keycodes_ascii;
 extern crate runqueue;
 extern crate spawn;
 extern crate window;
-extern crate window_manager_alpha;
+extern crate window_manager;
 
 extern crate print;
 extern crate window_components;

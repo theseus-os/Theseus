@@ -69,4 +69,4 @@
 //! * `window_list_primitve`: Provides a structure of the primitive window manager.
 //! * `window_manager_primitve`: Defines a primitive window structure which implements the `Window` trait. Maintains a window manager which contains a list of generic window. 
 //! * `window_components`: Defines a `WindowComponents` structure which implements the `Window` trait. Used in the alpha window manager.
-//! * `window_manager_alpha`: Maintains a window manager which handles the alpha channel
+//! * `window_manager`: Maintains a window manager which handles the alpha channel

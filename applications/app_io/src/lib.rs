@@ -29,7 +29,7 @@ extern crate scheduler;
 extern crate serial_port;
 
 extern crate text_area;
-extern crate window_manager_alpha;
+extern crate window_manager;
 extern crate window_components;
 extern crate window;
 
@@ -151,7 +151,7 @@ lazy_static! {
         // In different display subsystems, the objects above are of different implementation.
         let (window, textarea) = {
 
-             let (window_width, window_height) = match window_manager_alpha::get_screen_size(){
+             let (window_width, window_height) = match window_manager::get_screen_size(){
                 Ok(size) => size,
                 Err(err) => { debug!("Fail to create the framebuffer: {}", err); return None; }
             };
