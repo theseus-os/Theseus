@@ -562,7 +562,7 @@ impl<U: WindowProfile> WindowManagerAlpha<U> {
     }
 
     pub fn refresh_background(&self, area: Option<RectArea>) -> Result<(), &'static str> {
-            let blocks = match area.as_ref() {
+        let blocks = match area.as_ref() {
             Some(area_ref) => {
                 Some(
                 frame_buffer_compositor::get_blocks(self.final_fb.deref(), *area_ref).into_iter()
@@ -578,6 +578,25 @@ impl<U: WindowProfile> WindowManagerAlpha<U> {
         }; 
 
         FRAME_COMPOSITOR.lock().composite(vec![bg_buffer].into_iter())
+    }
+
+    pub fn refresh_top(&self, area: Option<RectArea>) -> Result<(), &'static str> {
+        let blocks = match area.as_ref() {
+            Some(area_ref) => {
+                Some(
+                frame_buffer_compositor::get_blocks(self.top_fb.deref(), *area_ref).into_iter()
+                )
+            },
+            None => None
+        };
+
+        let top_buffer = FrameBufferBlocks {
+            framebuffer: self.top_fb.deref(),
+            coordinate: Coord::new(0, 0),
+            blocks: blocks
+        }; 
+
+        FRAME_COMPOSITOR.lock().composite(vec![top_buffer].into_iter())
     }
 
     pub fn refresh_window(&self, area: Option<RectArea>) -> Result<(), &'static str> {
@@ -836,18 +855,32 @@ impl<U: WindowProfile> WindowManagerAlpha<U> {
             } else {
                 self.repositioned_border = None;
             }
-            for i in 0..(WINDOW_BORDER_SIZE + 1) as isize {
-                self.refresh_rect_border(old_start + (-i, -i), old_end + (i, i))?;
-            }
+            self.draw_floating_border(old_start, old_end, T);
         }
         // then draw current border
         if show {
             self.repositioned_border = Some(RectArea { start, end });
-            for i in 0..(WINDOW_BORDER_SIZE + 1) as isize {
-                self.refresh_rect_border(start + (-i, -i), end + (i, i))?;
-            }
+            self.draw_floating_border(start, end, WINDOW_BORDER_COLOR_INNER);
         }
         Ok(())
+    }
+
+    fn draw_floating_border(&mut self, start: Coord, end: Coord, color: Pixel) {
+        for i in 0..(WINDOW_BORDER_SIZE) as isize {
+            let width = (end.x - start.x) - 2 * i;
+            let height = (end.y - start.y) - 2 * i;
+            if width <= 0 || height <= 0 {
+                break;
+            }
+
+            frame_buffer_drawer::draw_rectangle(
+                self.top_fb.deref_mut(), 
+                start + (i as isize, i as isize), 
+                width as usize, 
+                height as usize, 
+                color
+            );            
+        }
     }
 
     /// optimized refresh area for less computation up to 2x
@@ -920,8 +953,6 @@ impl<U: WindowProfile> WindowManagerAlpha<U> {
             };
             // then try to reduce time on refresh old ones
             // self.refresh_area_with_old_new(old_start, old_end, new_start, new_end)?;
-            self.refresh_background(None)?;
-            self.refresh_window(None)?;
         } else {
             return Err("cannot fid active window to move");
         }

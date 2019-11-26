@@ -255,7 +255,8 @@ impl PixelMixer for AlphaPixel {
         let new_red = (((red as u16) * (255 - alpha) + (ori_red as u16) * alpha) / 255) as u8;
         let new_green = (((green as u16) * (255 - alpha) + (ori_green as u16) * alpha) / 255) as u8;
         let new_blue = (((blue as u16) * (255 - alpha) + (ori_blue as u16) * alpha) / 255) as u8;
-        return new_alpha_pixel(other.get_alpha(), new_red, new_green, new_blue);
+        // return new_alpha_pixel(other.get_alpha(), new_red, new_green, new_blue);
+        return new_alpha_pixel(alpha as u8, new_red, new_green, new_blue);
     }
 
     fn color_mix(self, other: Self, mix: f32) -> Self {

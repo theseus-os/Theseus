@@ -352,16 +352,24 @@ impl Window for WindowComponents {
                 error!("refresh_three_button failed {}", err);
             }
         }
+
         if call_later_do_refresh_floating_border {
-            if let Err(err) = window_manager_alpha::do_refresh_floating_border() {
-                error!("do_refresh_floating_border failed {}", err);
-            }
+            window_manager_alpha::do_refresh_floating_border()?;
         }
+
         if call_later_do_move_active_window {
             if let Err(err) = window_manager_alpha::do_move_active_window() {
                 error!("do_move_active_window failed {}", err);
             }
         }
+
+        if call_later_do_refresh_floating_border || call_later_do_move_active_window {
+            let wm = window_manager_alpha::WINDOW_MANAGER.try().ok_or("The window manager is not initialized")?.lock();
+            wm.refresh_background(None)?;
+            wm.refresh_window(None)?;
+            wm.refresh_top(None)?;
+        }
+        
         Ok(())
     }
 }
