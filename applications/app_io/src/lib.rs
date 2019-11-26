@@ -34,7 +34,6 @@ extern crate window_components;
 extern crate window;
 
 extern crate text_primitive;
-extern crate window_manager_primitive;
 
 use alloc::boxed::Box;
 use alloc::collections::BTreeMap;
@@ -150,7 +149,6 @@ lazy_static! {
     static ref DEFAULT_TERMINAL: Option<Arc<Mutex<Terminal>>> = {
         // Create a new window, a text area and a cursor.
         // In different display subsystems, the objects above are of different implementation.
-        #[cfg(not(primitive_display_sys))]
         let (window, textarea) = {
 
              let (window_width, window_height) = match window_manager_alpha::get_screen_size(){
@@ -196,32 +194,6 @@ lazy_static! {
             };*/
 
  //           let cursor = CursorComponent::new();
-
-            (window, textarea)
-        };
-
-        #[cfg(primitive_display_sys)]
-        let (window, textarea) = {
-            let window = match window_manager_primitive::new_default_window() {
-                Ok(window_object) => window_object,
-                Err(err) => { 
-                    debug!("Fail to create the generic window: {}", err);
-                    return None;
-                }
-            };
-
-            let (width, height) = window.dimensions();
-            let width = width - 2 * window_manager_primitive::WINDOW_MARGIN;
-            let height = height - 2 * window_manager_primitive::WINDOW_MARGIN;
-            let textarea = match TextPrimitive::new(width, height, libterm::FONT_COLOR, libterm::BACKGROUND_COLOR) {
-                Ok(text) => text,
-                Err(err) => { 
-                    debug!("Fail to create the generic window: {}", err);
-                    return None;
-                }
-            };
-
-            let cursor = Cursor::new();
 
             (window, textarea)
         };

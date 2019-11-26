@@ -12,7 +12,6 @@ extern crate spawn;
 extern crate task;
 extern crate runqueue;
 extern crate event_types; 
-extern crate window_manager_primitive;
 extern crate path;
 extern crate root;
 extern crate scheduler;

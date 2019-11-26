@@ -14,7 +14,6 @@ extern crate spawn;
 extern crate task;
 extern crate mod_mgmt;
 extern crate event_types;
-extern crate window_manager_primitive;
 extern crate font;
 extern crate frame_buffer_alpha;
 extern crate frame_buffer_rgb;
@@ -102,17 +101,6 @@ pub fn init() -> Result<(DFQueueProducer<Event>, DFQueueProducer<Event>), &'stat
         )?;
     }
 
-    // initialize primitive display subsystem
-    #[cfg(primitive_display_sys)]
-    {
-        font::init()?;
-        frame_buffer_rgb::init()?;
-        window_manager_primitive::init()?;
-        KernelTaskBuilder::new(input_event_loop, keyboard_event_handling_consumer)
-            .name("input_event_loop".to_string())
-            .spawn()?;
-    }
-
     // Spawns the terminal print crate so that we can print to the terminal
     ApplicationTaskBuilder::new(terminal_print_path)
         .name("terminal_print_singleton".to_string())
@@ -132,64 +120,4 @@ pub fn init() -> Result<(DFQueueProducer<Event>, DFQueueProducer<Event>), &'stat
         .spawn()?;
 
     Ok((returned_keyboard_producer, returned_mouse_producer))
-}
-
-/// Handles all key inputs to the system
-#[cfg(primitive_display_sys)]
-fn input_event_loop(consumer: DFQueueConsumer<Event>) -> Result<(), &'static str> {
-    let mut terminal_id_counter: usize = 1;
-    loop {
-        let mut meta_keypress = false; // bool prevents keypresses to control the terminals themselves from getting logged to the active terminal
-        use core::ops::Deref;   
-
-        // Pops events off the keyboard queue and redirects to the appropriate terminal input queue producer
-        let event = match consumer.peek() {
-            Some(ev) => ev,
-            _ => { continue; }
-        };
-        match event.deref() {
-            &Event => {
-                trace!("exiting the main loop of the input event manager");
-                return Ok(()); 
-            }
-
-            &Event::KeyboardEvent(ref input_event) => {
-                let key_input = input_event.key_event;
-                // The following are keypresses for control over the windowing system
-                // Creates new terminal window
-                if key_input.modifiers.control && key_input.keycode == Keycode::T && key_input.action == KeyAction::Pressed {
-                    let task_name: String = format!("terminal {}", terminal_id_counter);
-                    let args: Vec<String> = vec![]; // terminal::main() does not accept any arguments
-                    ApplicationTaskBuilder::new(Path::new(String::from("shell")))
-                        .argument(args)
-                        .name(task_name)
-                        .spawn()?;
-                    terminal_id_counter += 1;
-                    meta_keypress = true;
-                    event.mark_completed();
-
-                }
-
-                // Switches between terminal windows
-                if key_input.modifiers.alt && key_input.keycode == Keycode::Tab && key_input.action == KeyAction::Pressed {
-                    window_manager_primitive::WINDOWLIST.lock().switch_to_next()?;
-                    meta_keypress = true;
-                    event.mark_completed();
-                }
-
-                // Deletes the active window (whichever window Ctrl + W is logged in)
-                if key_input.modifiers.control && key_input.keycode == Keycode::W && key_input.action == KeyAction::Pressed {
-                    window_manager_primitive::WINDOWLIST.lock().send_event_to_active(Event::ExitEvent)?; // tells application to exit
-                }
-            }
-            _ => { }
-        }
-
-        // If the keyevent was not for control of the terminal windows, enqueues keycode into active window
-        if !meta_keypress {
-            window_manager_primitive::WINDOWLIST.lock().send_event_to_active(event.deref().clone())?;
-            event.mark_completed();
-
-        }
-    }    
 }
