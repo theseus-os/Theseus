@@ -43,7 +43,6 @@ use frame_buffer::Coord;
 use frame_buffer_alpha::FrameBufferAlpha;
 use hpet::get_hpet;
 use keycodes_ascii::{KeyAction, Keycode};
-use window::Window;
 use text_primitive::TextPrimitive;
 
 const WINDOW_BACKGROUND: u32 = 0x40FFFFFF;

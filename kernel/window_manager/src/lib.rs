@@ -43,28 +43,28 @@ use core::ops::{Deref, DerefMut};
 use dfqueue::{DFQueue, DFQueueConsumer, DFQueueProducer};
 use event_types::{Event, MousePositionEvent};
 use frame_buffer::{Coord, FrameBuffer, Pixel, RectArea};
-use frame_buffer_alpha::{AlphaPixel, PixelMixer, BLACK};
+use frame_buffer_alpha::{PixelMixer, BLACK};
 use frame_buffer_compositor::{FrameBufferBlocks, FRAME_COMPOSITOR, Block};
 use keycodes_ascii::{KeyAction, KeyEvent, Keycode};
 use mouse_data::MouseEvent;
 use path::Path;
 use spawn::{ApplicationTaskBuilder, KernelTaskBuilder};
 use spin::{Mutex, Once};
-use window::WindowProfile;
+use window::Window;
 
 /// The alpha window manager
-pub static WINDOW_MANAGER: Once<Mutex<WindowManagerAlpha<WindowProfileAlpha>>> = Once::new();
+pub static WINDOW_MANAGER: Once<Mutex<WindowManagerAlpha<WindowGeneric>>> = Once::new();
 
 // The half size of mouse in number of pixels, the actual size of pointer is 1+2*`MOUSE_POINTER_HALF_SIZE`
 const MOUSE_POINTER_HALF_SIZE: usize = 7;
 // Transparent pixel
-const T: AlphaPixel = 0xFF000000;
+const T: Pixel = 0xFF000000;
 // Opaque white
-const O: AlphaPixel = 0x00FFFFFF;
+const O: Pixel = 0x00FFFFFF;
 // Opaque blue
-const B: AlphaPixel = 0x00000FF;
+const B: Pixel = 0x00000FF;
 // the mouse picture
-static MOUSE_BASIC: [[AlphaPixel; 2 * MOUSE_POINTER_HALF_SIZE + 1];
+static MOUSE_BASIC: [[Pixel; 2 * MOUSE_POINTER_HALF_SIZE + 1];
     2 * MOUSE_POINTER_HALF_SIZE + 1] = [
     [T, T, T, T, T, T, T, T, T, T, T, T, T, T, T],
     [T, T, T, T, T, T, T, T, T, T, T, T, T, T, T],
@@ -86,12 +86,12 @@ static MOUSE_BASIC: [[AlphaPixel; 2 * MOUSE_POINTER_HALF_SIZE + 1];
 // the border indicating new window position and size
 const WINDOW_BORDER_SIZE: usize = 3;
 // border's inner color
-const WINDOW_BORDER_COLOR_INNER: AlphaPixel = 0x00CA6F1E;
+const WINDOW_BORDER_COLOR_INNER: Pixel = 0x00CA6F1E;
 // border's outer color
-const WINDOW_BORDER_COLOR_OUTTER: AlphaPixel = 0xFFFFFFFF;
+const WINDOW_BORDER_COLOR_OUTTER: Pixel = 0xFFFFFFFF;
 
 /// window manager with overlapping and alpha enabled
-pub struct WindowManagerAlpha<U: WindowProfile> {
+pub struct WindowManagerAlpha<U: Window> {
     /// those window currently not shown on screen
     hide_list: VecDeque<Weak<Mutex<U>>>,
     /// those window shown on screen that may overlapping each other
@@ -110,7 +110,7 @@ pub struct WindowManagerAlpha<U: WindowProfile> {
     delay_refresh_first_time: bool,
 }
 
-impl<U: WindowProfile> WindowManagerAlpha<U> {
+impl<U: Window> WindowManagerAlpha<U> {
     /// set one window to active, push last active (if exists) to top of show_list. if `refresh` is `true`, will then refresh the window's area
     pub fn set_active(
         &mut self,
@@ -241,7 +241,7 @@ impl<U: WindowProfile> WindowManagerAlpha<U> {
     }
 
     /// Recompute single pixel within show_list in a reduced complexity, by compute pixels under it only if it is not opaque
-    fn recompute_single_pixel_show_list(&self, coordinate: Coord, idx: usize) -> AlphaPixel {
+    fn recompute_single_pixel_show_list(&self, coordinate: Coord, idx: usize) -> Pixel {
         if idx >= self.show_list.len() {
             // screen should be 1280*1080 but background figure is just 640*540
             // larger screen size will be black border and smaller screen size will see part of the background picture
@@ -1186,7 +1186,7 @@ impl<U: WindowProfile> WindowManagerAlpha<U> {
 }
 
 /// set window as active, the active window is always at top, so it will refresh the region of this window
-pub fn set_active(objref: &Arc<Mutex<WindowProfileAlpha>>) -> Result<(), &'static str> {
+pub fn set_active(objref: &Arc<Mutex<WindowGeneric>>) -> Result<(), &'static str> {
     let mut win = WINDOW_MANAGER
         .try()
         .ok_or("The static window manager was not yet initialized")?
@@ -1195,7 +1195,7 @@ pub fn set_active(objref: &Arc<Mutex<WindowProfileAlpha>>) -> Result<(), &'stati
 }
 
 /// whether a window is active
-pub fn is_active(objref: &Arc<Mutex<WindowProfileAlpha>>) -> bool {
+pub fn is_active(objref: &Arc<Mutex<WindowGeneric>>) -> bool {
     match WINDOW_MANAGER
         .try()
         .ok_or("The static window manager was not yet initialized")
@@ -1371,8 +1371,8 @@ pub fn init<Buffer: FrameBuffer>(
     Ok(())
 }
 
-/// Window object that should be owned by the manager. It implements the `WindowProfile` trait.
-pub struct WindowProfileAlpha {
+/// Window object that should be owned by the manager. It implements the `Window` trait.
+pub struct WindowGeneric {
     /// The position of the top-left corner of the window.
     /// It is relative to the top-left corner of the screen.
     pub coordinate: Coord,
@@ -1397,7 +1397,7 @@ pub struct WindowProfileAlpha {
     pub moving_base: Coord,
 }
 
-impl WindowProfile for WindowProfileAlpha {
+impl Window for WindowGeneric {
     fn clear(&mut self) -> Result<(), &'static str> {
         self.framebuffer.fill_color(0x80FFFFFF);
         Ok(())
@@ -1710,7 +1710,7 @@ fn move_mouse_to(new: Coord) -> Result<(), &'static str> {
 pub fn new_window<'a>(
     coordinate: Coord,
     framebuffer: Box<dyn FrameBuffer>,
-) -> Result<Arc<Mutex<WindowProfileAlpha>>, &'static str> {
+) -> Result<Arc<Mutex<WindowGeneric>>, &'static str> {
     // Init the key input producer and consumer
     let consumer = DFQueue::new().into_consumer();
     let producer = consumer.obtain_producer();
@@ -1718,7 +1718,7 @@ pub fn new_window<'a>(
     let (width, height) = framebuffer.get_size();
 
     // new window object
-    let mut window: WindowProfileAlpha = WindowProfileAlpha {
+    let mut window: WindowGeneric = WindowGeneric {
         coordinate: coordinate,
         width: width,
         height: height,

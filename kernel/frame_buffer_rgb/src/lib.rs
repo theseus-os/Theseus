@@ -19,6 +19,7 @@ use spin::Mutex;
 
 // Every pixel is of u32 type
 const PIXEL_BYTES: usize = 4;
+const RGB_PIXEL_MASK: Pixel = 0x00FFFFFF;
 
 /// Initialize the final frame buffer.
 /// Allocates a block of memory and map it to the physical framebuffer frames.
@@ -126,7 +127,7 @@ impl FrameBuffer for FrameBufferRGB {
 
     fn draw_pixel(&mut self, coordinate: Coord, color: Pixel) {
         if let Some(index) = self.index(coordinate) {
-            self.buffer[index] = color;
+            self.buffer[index] = color & RGB_PIXEL_MASK;
         }
     }
 
@@ -136,7 +137,7 @@ impl FrameBuffer for FrameBufferRGB {
 
     fn get_pixel(&self, coordinate: Coord) -> Result<Pixel, &'static str> {
         if let Some(index) = self.index(coordinate) {
-            return Ok(self.buffer[index]);
+            return Ok(self.buffer[index] & RGB_PIXEL_MASK);
         } else {
             return Err("No pixel");
         }

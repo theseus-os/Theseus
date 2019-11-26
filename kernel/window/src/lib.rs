@@ -20,9 +20,9 @@ use event_types::Event;
 use frame_buffer::{Coord, FrameBuffer, Pixel, RectArea};
 use frame_buffer_compositor::{Block};
 
-/// Trait for window profile. A window manager holds a list of objects who implement the `WindowProfile` trait.
-/// A `WindowProfile` provides states required by the window manager such as the size, the loaction and the active state of a window.
-pub trait WindowProfile {
+/// Trait for window profile. A window manager holds a list of objects who implement the `Window` trait.
+/// A `Window` provides states required by the window manager such as the size, the loaction and the active state of a window.
+pub trait Window {
     /// Clears the window on the screen including the border and padding.
     fn clear(&mut self) -> Result<(), &'static str>;
 
@@ -82,45 +82,3 @@ pub trait WindowProfile {
 
     fn coordinate(&self) -> Coord;
 }
-
-/// A `Window` is owned by an appliction. Usually it has a reference to the corresponding `WindowProfile` in the window manager.
-pub trait Window: Downcast + Send {
-    /// The consumer of window relative events.
-    fn consumer(&mut self) -> &mut DFQueueConsumer<Event>;
-
-    /// Reacts to window relative events such as move the window.
-    fn handle_event(&mut self) -> Result<(), &'static str>;
-
-    /// Gets the background color of the window.
-    fn get_background(&self) -> Pixel;
-
-    /// Gets a mutable reference to a displayable by its name.
-    fn get_displayable_mut(
-        &mut self,
-        display_name: &str,
-    ) -> Result<&mut Box<dyn Displayable>, &'static str>;
-
-    /// Gets a reference to a displayable by its name.
-    fn get_displayable(&self, display_name: &str) -> Result<&Box<dyn Displayable>, &'static str>;
-
-    /// Gets the framebuffer of a window.
-    fn framebuffer(&mut self) -> Option<&mut dyn FrameBuffer>;
-
-    /// Displays a displayable in this window by its name.
-    fn display(&mut self, display_name: &str) -> Result<(), &'static str>;
-
-    /// Gets the position of a displayable relative to the top-left corner of the window by its name.
-    fn get_displayable_position(&self, key: &str) -> Result<Coord, &'static str>;
-
-    /// Renders the window to the final framebuffer. `blocks` represent the block which should be updated. The definition of `block` is described in `frame_buffer_compositor`. If this argument is `None`, the whole window will be updated.
-    fn render(&mut self, area: Option<RectArea>) -> Result<(), &'static str>;
-
-    /// Adds a displayable at `coordinate` relative to the top-left corner of the window.
-    fn add_displayable(
-        &mut self,
-        key: &str,
-        coordinate: Coord,
-        displayable: Box<dyn Displayable>,
-    ) -> Result<(), &'static str>;
-}
-impl_downcast!(Window);

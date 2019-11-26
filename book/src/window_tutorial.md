@@ -2,7 +2,7 @@
 
 ## Create a Window
 
-An application invokes the `new_window()` function in the `window_manager_primitve` crate to create a new window. The function would create a new `WindowPrimitive` object and add a weak reference of its `WindowProfile` to the `WINDOWLIST` held by the manager. It then returns the window to the application. Once the application terminates, the window it owns would be dropped automatically, and the weak reference in the `WINDOWLIST` would be deleted.
+An application invokes the `new_window()` function in the `window_manager_primitve` crate to create a new window. The function would create a new `WindowPrimitive` object and add a weak reference of its `Window` to the `WINDOWLIST` held by the manager. It then returns the window to the application. Once the application terminates, the window it owns would be dropped automatically, and the weak reference in the `WINDOWLIST` would be deleted.
 
 ## Add Displayables
 

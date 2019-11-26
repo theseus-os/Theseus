@@ -21,11 +21,10 @@ use alloc::vec::Vec;
 use core::ops::DerefMut;
 use displayable::{Displayable, TextDisplayable};
 use font::{CHARACTER_HEIGHT, CHARACTER_WIDTH};
-use frame_buffer::{Coord, FrameBuffer, RectArea};
-use frame_buffer_alpha::AlphaPixel;
+use frame_buffer::{Pixel, Coord, FrameBuffer, RectArea};
 use spin::{Mutex};
-use window::WindowProfile;
-use window_manager::WindowProfileAlpha;
+use window::Window;
+use window_manager::WindowGeneric;
 
 /// a textarea with fixed size, showing matrix of chars.
 ///
@@ -35,15 +34,15 @@ pub struct TextArea {
     pub coordinate: Coord,
     line_spacing: usize,
     column_spacing: usize,
-    background_color: AlphaPixel,
-    text_color: AlphaPixel,
+    background_color: Pixel,
+    text_color: Pixel,
     /// the x dimension char count
     x_cnt: usize,
     /// the y dimension char count
     y_cnt: usize,
     char_matrix: Vec<u8>,
     /// The default window of the text area
-    pub winobj: Weak<Mutex<WindowProfileAlpha>>,
+    pub winobj: Weak<Mutex<WindowGeneric>>,
     next_index: usize,
     text: String,
 }
@@ -63,11 +62,11 @@ impl TextArea {
         coordinate: Coord,
         width: usize,
         height: usize,
-        winobj: &Arc<Mutex<WindowProfileAlpha>>,
+        winobj: &Arc<Mutex<WindowGeneric>>,
         line_spacing: Option<usize>,
         column_spacing: Option<usize>,
-        background_color: Option<AlphaPixel>,
-        text_color: Option<AlphaPixel>,
+        background_color: Option<Pixel>,
+        text_color: Option<Pixel>,
     ) -> Result<TextArea, &'static str> {
         let mut textarea: TextArea = TextArea {
             coordinate: coordinate,

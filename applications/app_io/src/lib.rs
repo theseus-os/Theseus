@@ -46,7 +46,6 @@ use stdio::{KeyEventQueueReader, KeyEventReadGuard, StdioReader, StdioWriter};
 use text_area::TextArea;
 use frame_buffer::Coord;
 use frame_buffer_rgb::FrameBufferRGB;
-use window::Window;
 
 use text_primitive::TextPrimitive;
 use libterm::cursor::Cursor;

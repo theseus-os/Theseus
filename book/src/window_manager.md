@@ -22,11 +22,11 @@ In most of the cases, both an application and the window manager want to get acc
 
 However, `Mutex` introduces a danger of deadlocks. When an application wants to get access to its window, it must lock it first, operates on it and then release it. If an application does not release the locked window, the window manager will be blocked in most of the operations such as switching or deleting since it needs to traverse all the windows including the locked one. 
 
-To solve this problem, we define two objects `WindowProfile` and `WindowPrimitive`. `WindowProfile` only contains the information required by the window manager and implements the `Window` trait. `WINDOWLIST` in the window manager holds a list of reference to `WindowProfile`s. An application owns a `WindowPrimitive` object which wraps a reference to its `WindowProfile` structure together with other states required by the application. 
+To solve this problem, we define two objects `Window` and `WindowPrimitive`. `Window` only contains the information required by the window manager and implements the `Window` trait. `WINDOWLIST` in the window manager holds a list of reference to `Window`s. An application owns a `WindowPrimitive` object which wraps a reference to its `Window` structure together with other states required by the application. 
 
-## WindowProfile
+## Window
 
-The `WindowProfile` structure contains the location, the size, the padding, the active state of a window and an event producer. Window manager uses the profile information to render all the windows to the screen. Once an event arrives, the window manager will push it into the producer of the active window so that the owner of the corresponding `WindowPrimitive` object can handle it.
+The `Window` structure contains the location, the size, the padding, the active state of a window and an event producer. Window manager uses the profile information to render all the windows to the screen. Once an event arrives, the window manager will push it into the producer of the active window so that the owner of the corresponding `WindowPrimitive` object can handle it.
 
 ## WindowPrimitive
 

@@ -23,18 +23,20 @@ extern crate window_manager;
 extern crate text_area;
 extern crate window_components;
 extern crate frame_buffer_compositor;
+extern crate text_primitive;
 
 use alloc::string::{String, ToString};
 use alloc::vec::Vec;
 use alloc::boxed::Box;
 use cursor::*;
 use displayable::{Displayable, TextDisplayable};
+use text_primitive::TextPrimitive;
 use event_types::Event;
 use font::{CHARACTER_HEIGHT, CHARACTER_WIDTH};
 use frame_buffer::{Coord, FrameBuffer, RectArea};
 use frame_buffer_compositor::{Block};
 use tsc::{tsc_ticks, TscTicks};
-use window::{Window, WindowProfile};
+use window::{Window};
 use window_components::WindowComponents;
 
 pub mod cursor;
@@ -79,7 +81,7 @@ pub struct Terminal {
 impl Terminal {
     /// Get the width and height of the text displayable in the unit of characters.
     fn get_text_dimensions(&self) -> (usize, usize) {
-        let text_display = match self.get_text_display() {
+        let text_display = match self.window.get_concrete_display::<TextPrimitive>(&self.display_name) {
             Ok(text_display) => text_display,
             Err(err) => {
                 debug!("get_text_dimensions(): {}", err);
@@ -398,7 +400,7 @@ impl Terminal {
         let result  = self.scrollback_buffer.get(start_idx..=end_idx); // =end_idx includes the end index in the slice
         if let Some(slice) = result {
             {
-                let text_display = self.window.get_displayable_mut(&self.display_name)?.as_text_mut()?;
+                let text_display = self.window.get_concrete_display_mut::<TextPrimitive>(&self.display_name)?;
                 text_display.set_text(slice);
             }
             self.window.display(&self.display_name)?;
@@ -417,7 +419,7 @@ impl Terminal {
 
         if let Some(slice) = result {
             {
-                let text_display = self.window.get_displayable_mut(&self.display_name)?.as_text_mut()?;
+                let text_display = self.window.get_concrete_display_mut::<TextPrimitive>(&self.display_name)?;
                 text_display.set_text(slice);
             }
             self.window.display(&self.display_name)?;        
@@ -427,17 +429,17 @@ impl Terminal {
         Ok(())
     }
 
-    /// Gets a refrence to the text displayable of this terminal
-    fn get_text_display(&self) -> Result<(&dyn TextDisplayable), &'static str> {
-        let text_primitive = self.window.get_displayable(&self.display_name)?;
-        text_primitive.as_text()
-    }
+    // /// Gets a refrence to the text displayable of this terminal
+    // fn get_text_display(&self) -> Result<(&dyn TextDisplayable), &'static str> {
+    //     let text_primitive = self.window.get_displayable(&self.display_name)?;
+    //     text_primitive.as_text()
+    // }
 
-    /// Gets a mutable refrence to the text displayable of this terminal
-    fn get_text_display_mut(&mut self) -> Result<(&mut dyn TextDisplayable), &'static str> {
-        let text_primitive = self.window.get_displayable_mut(&self.display_name)?;
-        text_primitive.as_text_mut()
-    }
+    // /// Gets a mutable refrence to the text displayable of this terminal
+    // fn get_text_display_mut(&mut self) -> Result<(&mut dyn TextDisplayable), &'static str> {
+    //     let text_primitive = self.window.get_displayable_mut(&self.display_name)?;
+    //     text_primitive.as_text_mut()
+    // }
 }
 
 /// Public methods of `Terminal`.
@@ -462,7 +464,7 @@ impl Terminal {
         terminal
             .window
             .add_displayable(&display_name, Coord::new(0, 0), text_display)?;
-        terminal.window.init_displayable(&display_name)?;
+        terminal.window.clear_displayable(&display_name)?;
 
         // terminal.window.render(None)?;
 
@@ -617,7 +619,7 @@ impl Terminal {
             }
             _ => {}
         };
-        let _event = match self.window.consumer().peek() {
+        let _event = match self.window.consumer.peek() {
             Some(ev) => ev,
             _ => {
                 return None;
@@ -640,9 +642,9 @@ impl Terminal {
         let coordinate = self.window.get_displayable_position(&self.display_name)?;
         // get info about the text displayable
         let (col_num, line_num, text_next_pos) = {
-            let text_primitive = self.get_text_display_mut()?;
-            let text_next_pos = text_primitive.get_next_index();
-            let (col_num, line_num) = text_primitive.get_dimensions();
+            let text_display = self.window.get_concrete_display::<TextPrimitive>(&self.display_name)?;
+            let text_next_pos = text_display.get_next_index();
+            let (col_num, line_num) = text_display.get_dimensions();
             (col_num, line_num, text_next_pos)
         };
 

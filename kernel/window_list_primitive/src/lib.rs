@@ -20,7 +20,7 @@ use alloc::collections::VecDeque;
 use alloc::sync::{Arc, Weak};
 use event_types::Event;
 use spin::{Mutex};
-use window::WindowProfile;
+use window::Window;
 
 /// 10 pixel gap between windows
 pub const WINDOW_MARGIN: usize = 10;
@@ -35,14 +35,14 @@ pub const SCREEN_BACKGROUND_COLOR: u32 = 0x000000;
 
 /// The window list structure.
 /// It contains a list of reference to background windows and a reference to the active window.
-pub struct WindowListPrimitive<T: WindowProfile> {
+pub struct WindowListPrimitive<T: Window> {
     /// The list of inactive windows. Their order is based on the last time they were active. The first window is the window which was active most recently.
     pub background_list: VecDeque<Weak<Mutex<T>>>,
     /// A weak pointer to the active window.
     pub active: Weak<Mutex<T>>,
 }
 
-impl<T: WindowProfile> WindowListPrimitive<T> {
+impl<T: Window> WindowListPrimitive<T> {
     /// Adds a new window to the list and sets it as active.
     pub fn add_active(&mut self, inner_ref: &Arc<Mutex<T>>) -> Result<(), &'static str> {
         if let Some(current_active) = self.active.upgrade() {
@@ -147,7 +147,7 @@ impl<T: WindowProfile> WindowListPrimitive<T> {
 
     /// Puts an event into the active window (i.e. a keypress event, resize event, etc.).
     pub fn send_event_to_active(&mut self, event: Event) -> Result<(), &'static str> {
-        let active_ref = self.active.upgrade(); // grabs a pointer to the active WindowProfile
+        let active_ref = self.active.upgrade(); // grabs a pointer to the active Window
         if let Some(window) = active_ref {
             let mut window = window.lock();
             window.events_producer().enqueue(event);
@@ -155,7 +155,7 @@ impl<T: WindowProfile> WindowListPrimitive<T> {
         Ok(())
     }
     /*// check if an area specified by (x, y, width, height) overlaps with an existing window
-    fn check_overlap(&mut self, inner:&Arc<Mutex<WindowProfile>>, x:usize, y:usize, width:usize, height:usize) -> bool {
+    fn check_overlap(&mut self, inner:&Arc<Mutex<Window>>, x:usize, y:usize, width:usize, height:usize) -> bool {
         let mut len = self.allocated.len();
         let mut i = 0;
         while i < len {
@@ -183,7 +183,7 @@ impl<T: WindowProfile> WindowListPrimitive<T> {
     }
 
     // return a reference to the next window of current active window
-    fn next(&mut self) -> Option<Arc<Mutex<WindowProfile>>> {
+    fn next(&mut self) -> Option<Arc<Mutex<Window>>> {
         // let mut current_active = false;
         // for item in self.list.iter_mut(){
         //     let reference = item.upgrade();

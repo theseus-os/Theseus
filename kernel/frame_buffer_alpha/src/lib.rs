@@ -25,19 +25,18 @@ use memory::{EntryFlags, FrameRange, MappedPages, PhysicalAddress, FRAME_ALLOCAT
 use owning_ref::BoxRefMut;
 use spin::Mutex;
 
-/// An `AlphaPixel` is a `u32` broken down into four bytes.
+/// An `Pixel` is a `u32` broken down into four bytes.
 /// The lower 24 bits of a Pixel specify its RGB color values, while the upper 8bit is an `alpha` channel,
 /// in which an `alpha` value of `0` represents an opaque pixel and `0xFF` represents a completely transparent pixel.
 /// The `alpha` value is used in an alpha-blending compositor that supports transparency.
-pub type AlphaPixel = u32;
 
 /// predefined opaque black
-pub const BLACK: AlphaPixel = 0;
+pub const BLACK: Pixel = 0;
 /// predefined opaque white
-pub const WHITE: AlphaPixel = 0x00FFFFFF;
+pub const WHITE: Pixel = 0x00FFFFFF;
 
 // Every pixel is of `Pixel` type, which is 4 byte as defined in `Pixel`
-const PIXEL_BYTES: usize = core::mem::size_of::<AlphaPixel>();
+const PIXEL_BYTES: usize = core::mem::size_of::<Pixel>();
 
 /// Initialize the final frame buffer by allocating a block of memory and map it to the physical framebuffer frames.
 pub fn init() -> Result<(usize, usize), &'static str> {
@@ -142,7 +141,7 @@ impl FrameBufferAlpha {
     }
 
     // /// draw a rectangle on this framebuffer
-    // pub fn overwrite_rect(&mut self, start: Coord, end: Coord, color: AlphaPixel) {
+    // pub fn overwrite_rect(&mut self, start: Coord, end: Coord, color: Pixel) {
     //     for y in start.y..end.y {
     //         for x in start.x..end.x {
     //             let coordinate = Coord::new(x as isize, y as isize);
@@ -152,7 +151,7 @@ impl FrameBufferAlpha {
     // }
 
     // /// draw a char onto the framebuffer
-    // pub fn draw_char_8x16(&mut self, coordinate: Coord, c: u8, color: AlphaPixel) {
+    // pub fn draw_char_8x16(&mut self, coordinate: Coord, c: u8, color: Pixel) {
     //     for yi in 0..16 {
     //         let char_font: u8 = font::FONT_BASIC[c as usize][yi];
     //         for xi in 0..8 {
@@ -193,13 +192,13 @@ impl FrameBuffer for FrameBufferAlpha {
         };
     }
 
-    fn draw_pixel(&mut self, coordinate: Coord, color: AlphaPixel) {
+    fn draw_pixel(&mut self, coordinate: Coord, color: Pixel) {
         let idx = match self.index(coordinate) {
             Some(index) => index,
             None => return,
         };
-        let origin = AlphaPixel::from(self.buffer[idx]);
-        self.buffer[idx] = AlphaPixel::from(color).alpha_mix(origin);
+        let origin = Pixel::from(self.buffer[idx]);
+        self.buffer[idx] = Pixel::from(color).alpha_mix(origin);
     }
 
     fn get_pixel(&self, coordinate: Coord) -> Result<Pixel, &'static str> {
@@ -209,14 +208,14 @@ impl FrameBuffer for FrameBufferAlpha {
                 return Err("get pixel out of bound");
             }
         };
-        Ok(AlphaPixel::from(self.buffer[idx]))
+        Ok(Pixel::from(self.buffer[idx]))
     }
 
     fn fill_color(&mut self, color: Pixel) {
         for y in 0..self.height {
             for x in 0..self.width {
                 let coordinate = Coord::new(x as isize, y as isize);
-                self.overwrite_pixel(coordinate, color);
+                self.draw_pixel(coordinate, color);
             }
         }
     }
@@ -243,7 +242,7 @@ pub trait PixelMixer {
     fn get_blue(&self) -> u8;
 }
 
-impl PixelMixer for AlphaPixel {
+impl PixelMixer for Pixel {
     fn alpha_mix(self, other: Self) -> Self {
         let alpha = self.get_alpha() as u16;
         let red = self.get_red();
@@ -292,8 +291,8 @@ impl PixelMixer for AlphaPixel {
     }
 }
 
-/// Create a new AlphaPixel from `alpha`, `red`, `green` and `blue` bytes.
-pub fn new_alpha_pixel(alpha: u8, red: u8, green: u8, blue: u8) -> AlphaPixel {
+/// Create a new Pixel from `alpha`, `red`, `green` and `blue` bytes.
+pub fn new_alpha_pixel(alpha: u8, red: u8, green: u8, blue: u8) -> Pixel {
     return ((alpha as u32) << 24) + ((red as u32) << 16) + ((green as u32) << 8) + (blue as u32);
 }
 

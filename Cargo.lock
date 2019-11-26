@@ -961,6 +961,7 @@ dependencies = [
  "print 0.1.0",
  "root 0.1.0",
  "text_area 0.1.0",
+ "text_primitive 0.1.0",
  "tsc 0.1.0",
  "window 0.1.0",
  "window_components 0.1.0",
