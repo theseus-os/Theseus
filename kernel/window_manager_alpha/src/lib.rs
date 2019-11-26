@@ -879,11 +879,14 @@ impl<U: WindowProfile> WindowManagerAlpha<U> {
             fourth_button_hold: mouse_event.buttonact.fourth_button_hold,
             fifth_button_hold: mouse_event.buttonact.fifth_button_hold,
         };
+
+
         // check if some application want all mouse_event
         // active
         if let Some(current_active) = self.active.upgrade() {
             let mut current_active_win = current_active.lock();
             let current_coordinate = current_active_win.get_position();
+            trace!("Wenqiu: left button {} get event {}", event.left_button_hold, current_active_win.give_all_mouse_event());
             if current_active_win.give_all_mouse_event() {
                 event.coordinate = *coordinate - current_coordinate;
                 current_active_win
@@ -1428,7 +1431,7 @@ impl WindowProfile for WindowProfileAlpha {
     }
 
     fn give_all_mouse_event(&mut self) -> bool {
-        false
+        self.give_all_mouse_event
     }
 
     fn get_pixel(&self, coordinate: Coord) -> Result<Pixel, &'static str> {
@@ -1580,7 +1583,6 @@ fn keyboard_handle_application(key_input: KeyEvent) -> Result<(), &'static str> 
 // handle mouse event, push it to related window or anyone asked for it
 fn cursor_handle_application(mouse_event: MouseEvent) -> Result<(), &'static str> {
     do_refresh_floating_border()?;
-
     let wm = WINDOW_MANAGER
         .try()
         .ok_or("The static window manager was not yet initialized")?

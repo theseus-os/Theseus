@@ -217,8 +217,7 @@ impl Window for WindowComponents {
         wm.refresh_window(absolute_area)
     }
 
-    fn handle_event(&mut self) -> Result<(), &'static str> {
-       
+    fn handle_event(&mut self) -> Result<(), &'static str> {       
         let mut call_later_do_refresh_floating_border = false;
         let mut call_later_do_move_active_window = false;
         let mut need_to_set_active = false;
@@ -261,10 +260,12 @@ impl Window for WindowComponents {
                     self.producer.enqueue(Event::new_keyboard_event(key_input));
                 }
                 &Event::MousePositionEvent(ref mouse_event) => {
-                    // debug!("mouse_event: {:?}", mouse_event);
+                    trace!("Wenqiu: \n1 \n2 \n3");
                     if winobj.is_moving() {
+                        trace!("Wenqiu:1 t:" );
                         // only wait for left button up to exit this mode
                         if !mouse_event.left_button_hold {
+                            trace!("Wenqiu: 2mouse_event: ");
                             winobj.set_is_moving(false);
                             winobj.set_give_all_mouse_event(false);
                             self.last_mouse_position_event = mouse_event.clone();
