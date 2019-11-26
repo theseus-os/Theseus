@@ -15,6 +15,7 @@ extern crate event_types;
 extern crate displayable;
 extern crate font;
 extern crate frame_buffer;
+extern crate frame_buffer_rgb;
 extern crate frame_buffer_drawer;
 extern crate frame_buffer_printer;
 extern crate tsc;
@@ -444,14 +445,20 @@ impl Terminal {
 
 /// Public methods of `Terminal`.
 impl Terminal {
-    pub fn new(
-        window: WindowComponents,
-        mut text_display: Box<dyn Displayable>
-    ) -> Result<Terminal, &'static str> {
-        if text_display.as_text().is_err() {
-            return Err("Terminal::new(): the displayable is not a text displayable");
-        }
-        // let mut prompt_string = root.lock().get_absolute_path(); // ref numbers are 0-indexed
+    pub fn new() -> Result<Terminal, &'static str> {
+        let (window_width, window_height) = window_manager::get_screen_size()?;
+        const WINDOW_MARGIN: usize = 20;
+        let window = window_components::WindowComponents::new(
+            Coord::new(WINDOW_MARGIN as isize, WINDOW_MARGIN as isize), 
+            window_width - 2 * WINDOW_MARGIN, 
+            window_height - 2 * WINDOW_MARGIN,
+            0,
+            &frame_buffer_rgb::new
+        )?;
+        
+        let (width_inner, height_inner) = window.inner_size();
+        let text_display = TextPrimitive::new(width_inner, height_inner, FONT_COLOR, BACKGROUND_COLOR)?;
+
         let display_name = "text_display";
         let mut terminal = Terminal {
             window: window,
@@ -463,7 +470,7 @@ impl Terminal {
         };
         terminal
             .window
-            .add_displayable(&display_name, Coord::new(0, 0), text_display)?;
+            .add_displayable(&display_name, Coord::new(0, 0), Box::new(text_display))?;
         terminal.window.clear_displayable(&display_name)?;
 
         // terminal.window.render(None)?;

@@ -248,13 +248,15 @@ impl PixelMixer for Pixel {
         let red = self.get_red();
         let green = self.get_green();
         let blue = self.get_blue();
+        let ori_alpha = other.get_alpha();
         let ori_red = other.get_red();
         let ori_green = other.get_green();
         let ori_blue = other.get_blue();
+        let new_alpha = (((alpha as u16) * (255 - alpha) + (ori_alpha as u16) * alpha) / 255) as u8;
         let new_red = (((red as u16) * (255 - alpha) + (ori_red as u16) * alpha) / 255) as u8;
         let new_green = (((green as u16) * (255 - alpha) + (ori_green as u16) * alpha) / 255) as u8;
         let new_blue = (((blue as u16) * (255 - alpha) + (ori_blue as u16) * alpha) / 255) as u8;
-        // return new_alpha_pixel(other.get_alpha(), new_red, new_green, new_blue);
+        // return new_alpha_pixel(, new_red, new_green, new_blue);
         return new_alpha_pixel(alpha as u8, new_red, new_green, new_blue);
     }
 

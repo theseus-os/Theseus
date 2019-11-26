@@ -45,7 +45,7 @@ use hpet::get_hpet;
 use keycodes_ascii::{KeyAction, Keycode};
 use text_primitive::TextPrimitive;
 
-const WINDOW_BACKGROUND: u32 = 0x40FFFFFF;
+const WINDOW_BACKGROUND: u32 = 0x20FFFFFF;
 #[no_mangle]
 pub fn main(_args: Vec<String>) -> isize {
     if _args.len() != 4 {
@@ -62,14 +62,6 @@ pub fn main(_args: Vec<String>) -> isize {
     let height = _args[3].parse::<usize>().unwrap();
     debug!("parameters {:?}", (coordinate, width, height));
 
-    // create the instance of WindowComponents, which provides basic drawing of a window and basic response to user input
-    let framebuffer = match FrameBufferAlpha::new(width, height, None) {
-        Ok(fb) => fb,
-        Err(err) => {
-            error!("{}", err);
-            return -2;
-        }
-    };
     let mut wincomps = match window_components::WindowComponents::new(
         coordinate,
         width,

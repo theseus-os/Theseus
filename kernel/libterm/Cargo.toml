@@ -45,6 +45,9 @@ path = "../frame_buffer"
 [dependencies.frame_buffer_drawer]
 path = "../frame_buffer_drawer"
 
+[dependencies.frame_buffer_rgb]
+path = "../frame_buffer_rgb"
+
 [dependencies.frame_buffer_printer]
 path = "../frame_buffer_printer"
 

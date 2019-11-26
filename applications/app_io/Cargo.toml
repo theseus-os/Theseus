@@ -18,9 +18,6 @@ version = "0.3.7"
 [dependencies.keycodes_ascii]
 path = "../../libs/keycodes_ascii"
 
-[dependencies.frame_buffer_rgb]
-path = "../../kernel/frame_buffer_rgb"
-
 [dependencies.window_manager]
 path = "../../kernel/window_manager"
 
@@ -30,11 +27,11 @@ path = "../../kernel/window"
 [dependencies.frame_buffer]
 path = "../../kernel/frame_buffer"
 
-[dependencies.text_area]
-path = "../../kernel/displayable/text_area"
-
 [dependencies.text_primitive]
 path = "../../kernel/displayable/text_primitive"
+
+[dependencies.libterm]
+path = "../../kernel/libterm"
 
 [dependencies.window_components]
 path = "../../kernel/window_components"
@@ -47,9 +44,6 @@ path = "../../kernel/task"
 
 [dependencies.print]
 path = "../../kernel/print"
-
-[dependencies.libterm]
-path = "../../kernel/libterm"
 
 [dependencies.lazy_static]
 features = ["spin_no_std", "nightly"]

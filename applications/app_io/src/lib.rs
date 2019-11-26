@@ -22,18 +22,16 @@ extern crate spin;
 #[macro_use] extern crate alloc;
 extern crate core_io;
 extern crate frame_buffer;
-extern crate frame_buffer_rgb;
 extern crate keycodes_ascii;
-extern crate libterm;
 extern crate scheduler;
 extern crate serial_port;
 
-extern crate text_area;
 extern crate window_manager;
 extern crate window_components;
 extern crate window;
 
 extern crate text_primitive;
+extern crate libterm;
 
 use alloc::boxed::Box;
 use alloc::collections::BTreeMap;
@@ -43,12 +41,9 @@ use alloc::vec::Vec;
 use libterm::Terminal;
 use spin::{Mutex, MutexGuard};
 use stdio::{KeyEventQueueReader, KeyEventReadGuard, StdioReader, StdioWriter};
-use text_area::TextArea;
 use frame_buffer::Coord;
-use frame_buffer_rgb::FrameBufferRGB;
 
 use text_primitive::TextPrimitive;
-use libterm::cursor::Cursor;
 /// Stores the stdio queues, key event queue and the pointer to the terminal
 /// for applications. This structure is provided for application's use and only
 /// contains necessary one-end readers/writers to queues. On the shell side, we have
@@ -146,60 +141,7 @@ mod shared_maps {
 lazy_static! {
     /// The default terminal.
     static ref DEFAULT_TERMINAL: Option<Arc<Mutex<Terminal>>> = {
-        // Create a new window, a text area and a cursor.
-        // In different display subsystems, the objects above are of different implementation.
-        let (window, textarea) = {
-
-             let (window_width, window_height) = match window_manager::get_screen_size(){
-                Ok(size) => size,
-                Err(err) => { debug!("Fail to create the framebuffer: {}", err); return None; }
-            };
-            const WINDOW_MARGIN: usize = 20;
-            let window = match window_components::WindowComponents::new(
-                Coord::new(WINDOW_MARGIN as isize, WINDOW_MARGIN as isize), 
-                window_width - 2 * WINDOW_MARGIN, 
-                window_height - 2 * WINDOW_MARGIN,
-                0,
-                &frame_buffer_rgb::new
-            ) {
-                Ok(window_object) => { window_object },
-                Err(err) => {
-                    debug!("new window returned err: {}", err);
-                    return None;
-                }
-            };
-            
-            let (width_inner, height_inner) = window.inner_size();
-            let mut textarea = match TextPrimitive::new(width_inner, height_inner, libterm::FONT_COLOR, libterm::BACKGROUND_COLOR) {
-                Ok(text) => text,
-                Err(err) => { 
-                    debug!("Fail to create the generic window: {}", err);
-                    return None;
-                }
-            };
-            
-/*            let textarea = {
-                let (width_inner, height_inner) = window.inner_size();
-                debug!("new window done width: {}, height: {}", width_inner, height_inner);
-                const TEXTAREA_BORDER: usize = 4;
-                match TextArea::new(
-                    Coord::new((window.get_border_size() + TEXTAREA_BORDER) as isize, (window.get_title_size() + TEXTAREA_BORDER) as isize),
-                    width_inner - 2 * TEXTAREA_BORDER, height_inner - 2 * TEXTAREA_BORDER,
-                    &window.winobj, None, None, Some(window.get_background()), None
-                ) {
-                    Ok(m) => m,
-                    Err(err) => { debug!("new textarea returned err: {}", err);  return None; }
-                }
-            };*/
-
- //           let cursor = CursorComponent::new();
-
-            (window, textarea)
-        };
-
-        // initialize the default terminal with the components created above.
-        match Terminal::new(window, Box::new(textarea)
-        ) {
+        match Terminal::new() {
             Ok(terminal) => Some(Arc::new(Mutex::new(terminal))),
             Err(err) => { 
                 debug!("Fail to create the generic window: {}", err);
