@@ -363,12 +363,12 @@ impl Window for WindowComponents {
             }
         }
 
-        if call_later_do_refresh_floating_border || call_later_do_move_active_window {
-            let wm = window_manager_alpha::WINDOW_MANAGER.try().ok_or("The window manager is not initialized")?.lock();
-            wm.refresh_background(None)?;
-            wm.refresh_window(None)?;
-            wm.refresh_top(None)?;
-        }
+        // if call_later_do_refresh_floating_border || call_later_do_move_active_window {
+        //     let wm = window_manager_alpha::WINDOW_MANAGER.try().ok_or("The window manager is not initialized")?.lock();
+        //     wm.refresh_background(None)?;
+        //     wm.refresh_window(None)?;
+        //     wm.refresh_top(None)?;
+        // }
         
         Ok(())
     }
