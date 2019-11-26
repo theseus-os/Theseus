@@ -151,3 +151,12 @@ impl FrameBuffer for FrameBufferRGB {
         }
     }
 }
+
+pub fn new(        
+    width: usize,
+    height: usize,
+    physical_address: Option<PhysicalAddress>,
+) -> Result<Box<FrameBuffer>, &'static str> {
+    let framebuffer = FrameBufferRGB::new(width, height, physical_address)?;
+    Ok(Box::new(framebuffer))
+}

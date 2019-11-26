@@ -31,6 +31,7 @@ extern crate frame_buffer_drawer;
 extern crate mouse;
 extern crate window;
 extern crate window_manager_alpha;
+extern crate memory_structs;
 
 use alloc::boxed::Box;
 use alloc::collections::BTreeMap;
@@ -47,6 +48,7 @@ use frame_buffer::{Coord, FrameBuffer, Pixel, RectArea};
 use frame_buffer_alpha::{AlphaPixel, PixelMixer, BLACK};
 use frame_buffer_compositor::{FrameBufferBlocks, FRAME_COMPOSITOR, Block};
 use spin::Mutex;
+use memory_structs::PhysicalAddress;
 use window::{Window, WindowProfile};
 use window_manager_alpha::{WindowProfileAlpha, WINDOW_MANAGER};
 
@@ -377,9 +379,12 @@ impl WindowComponents {
     /// x, y is the distance in pixel relative to top-left of window
     pub fn new(
         coordinate: Coord,
-        framebuffer: Box<dyn FrameBuffer>,
-        background: u32
+        width: usize,
+        height: usize,
+        background: u32,
+        new_framebuffer: &dyn Fn(usize, usize, Option<PhysicalAddress>) -> Result<Box<FrameBuffer>, &'static str>,
     ) -> Result<WindowComponents, &'static str> {
+        let framebuffer = new_framebuffer(width, height, None)?;
         let (width, height) = framebuffer.get_size();
         if width <= 2 * WINDOW_TITLE_BAR || height <= WINDOW_TITLE_BAR + WINDOW_BORDER {
             return Err("window too small to even draw border");

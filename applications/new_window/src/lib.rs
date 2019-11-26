@@ -73,8 +73,10 @@ pub fn main(_args: Vec<String>) -> isize {
     };
     let mut wincomps = match window_components::WindowComponents::new(
         coordinate,
-        Box::new(framebuffer), // the position and size of window, including the title bar and border
-        WINDOW_BACKGROUND
+        width,
+        height, // the position and size of window, including the title bar and border
+        WINDOW_BACKGROUND,
+        &frame_buffer_alpha::new
     ) {
         Ok(m) => m,
         Err(err) => {

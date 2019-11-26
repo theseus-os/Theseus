@@ -22,7 +22,7 @@ extern crate spin;
 #[macro_use] extern crate alloc;
 extern crate core_io;
 extern crate frame_buffer;
-extern crate frame_buffer_alpha;
+extern crate frame_buffer_rgb;
 extern crate keycodes_ascii;
 extern crate libterm;
 extern crate scheduler;
@@ -46,7 +46,7 @@ use spin::{Mutex, MutexGuard};
 use stdio::{KeyEventQueueReader, KeyEventReadGuard, StdioReader, StdioWriter};
 use text_area::TextArea;
 use frame_buffer::Coord;
-use frame_buffer_alpha::FrameBufferAlpha;
+use frame_buffer_rgb::FrameBufferRGB;
 use window::Window;
 
 use text_primitive::TextPrimitive;
@@ -158,12 +158,13 @@ lazy_static! {
                 Err(err) => { debug!("Fail to create the framebuffer: {}", err); return None; }
             };
             const WINDOW_MARGIN: usize = 20;
-            let framebuffer = match FrameBufferAlpha::new(window_width - 2 * WINDOW_MARGIN, window_height - 2 * WINDOW_MARGIN, None){
-                Ok(fb) => fb,
-                Err(err) => { debug!("Fail to create the framebuffer: {}", err); return None; }
-            };
             let window = match window_components::WindowComponents::new(
-                Coord::new(WINDOW_MARGIN as isize, WINDOW_MARGIN as isize), Box::new(framebuffer), 0) {
+                Coord::new(WINDOW_MARGIN as isize, WINDOW_MARGIN as isize), 
+                window_width - 2 * WINDOW_MARGIN, 
+                window_height - 2 * WINDOW_MARGIN,
+                0,
+                &frame_buffer_rgb::new
+            ) {
                 Ok(window_object) => { window_object },
                 Err(err) => {
                     debug!("new window returned err: {}", err);

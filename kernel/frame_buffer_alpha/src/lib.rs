@@ -296,3 +296,12 @@ impl PixelMixer for AlphaPixel {
 pub fn new_alpha_pixel(alpha: u8, red: u8, green: u8, blue: u8) -> AlphaPixel {
     return ((alpha as u32) << 24) + ((red as u32) << 16) + ((green as u32) << 8) + (blue as u32);
 }
+
+pub fn new(        
+    width: usize,
+    height: usize,
+    physical_address: Option<PhysicalAddress>,
+) -> Result<Box<FrameBuffer>, &'static str> {
+    let framebuffer = FrameBufferAlpha::new(width, height, physical_address)?;
+    Ok(Box::new(framebuffer))
+}

@@ -18,8 +18,8 @@ version = "0.3.7"
 [dependencies.keycodes_ascii]
 path = "../../libs/keycodes_ascii"
 
-[dependencies.frame_buffer_alpha]
-path = "../../kernel/frame_buffer_alpha"
+[dependencies.frame_buffer_rgb]
+path = "../../kernel/frame_buffer_rgb"
 
 [dependencies.window_manager_primitive]
 path = "../../kernel/window_manager_primitive"

@@ -210,7 +210,7 @@ impl<U: WindowProfile> WindowManagerAlpha<U> {
         );
         if let Some(current_active) = self.active.upgrade() {
             if Arc::ptr_eq(&(current_active), objref) {
-                self.refresh_windows(area, false)?;
+                self.refresh_bg_windows(area, false)?;
                 if let Some(window) = self.show_list.remove(0) {
                     self.active = window;
                 } else if let Some(window) = self.hide_list.remove(0) {
@@ -1108,7 +1108,8 @@ impl<U: WindowProfile> WindowManagerAlpha<U> {
             };
             self.refresh_bg_windows(Some(RectArea{start: old_start, end: old_end}), false)?;
             self.refresh_bg_windows(Some(RectArea{start: new_start, end: new_end}), true)?;
-            // self.refresh_top(None)?;
+            let update_coords = self.get_cursor_coords();
+            self.refresh_cursor(update_coords.as_slice())?;            // self.refresh_top(None)?;
             // then try to reduce time on refresh old ones
             // self.refresh_area_with_old_new(old_start, old_end, new_start, new_end)?;
         } else {
