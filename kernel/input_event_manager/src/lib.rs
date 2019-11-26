@@ -18,30 +18,9 @@ extern crate font;
 extern crate frame_buffer_alpha;
 extern crate frame_buffer_rgb;
 extern crate window_manager;
-#[cfg(primitive_display_sys)]
-extern crate keycodes_ascii;
-#[cfg(primitive_display_sys)]
-extern crate path;
-#[cfg(primitive_display_sys)]
-#[macro_use] extern crate log;
-#[cfg(primitive_display_sys)]
-#[macro_use] extern crate alloc;
-#[cfg(not(primitive_display_sys))]
 extern crate alloc;
 extern crate frame_buffer;
 
-
-#[cfg(primitive_display_sys)]
-use alloc::{vec::Vec, string::String};
-#[cfg(primitive_display_sys)]
-use dfqueue::{DFQueueConsumer};
-#[cfg(primitive_display_sys)]
-use keycodes_ascii::{KeyAction, Keycode};
-#[cfg(primitive_display_sys)]
-use path::Path;
-#[cfg(primitive_display_sys)]
-use spawn::{KernelTaskBuilder};
-#[cfg(not(primitive_display_sys))]
 use frame_buffer_alpha::FrameBufferAlpha;
 use frame_buffer::FrameBuffer;
 use alloc::{string::ToString, sync::Arc};
