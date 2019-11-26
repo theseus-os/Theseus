@@ -277,7 +277,7 @@ impl Compositor<FrameBufferBlocks<'_>> for FrameCompositor {
     }
 }
 
-pub fn get_blocks(framebuffer: &dyn FrameBuffer, area: RectArea) -> Vec<Block> {
+pub fn get_blocks(framebuffer: &dyn FrameBuffer, area: &mut RectArea) -> Vec<Block> {
     let mut blocks = Vec::new();
     let (width, height) = framebuffer.get_size();
 
@@ -296,6 +296,7 @@ pub fn get_blocks(framebuffer: &dyn FrameBuffer, area: RectArea) -> Vec<Block> {
 
 
     let mut index = start_y as usize / CACHE_BLOCK_HEIGHT;
+    area.start.y = core::cmp::min((index * CACHE_BLOCK_HEIGHT) as isize, area.start.y);
     loop {
         if index * CACHE_BLOCK_HEIGHT >= end_y as usize {
             break;
@@ -304,6 +305,7 @@ pub fn get_blocks(framebuffer: &dyn FrameBuffer, area: RectArea) -> Vec<Block> {
         blocks.push(block);
         index += 1;
     }
+    area.end.y = core::cmp::max((index * CACHE_BLOCK_HEIGHT) as isize, area.end.y);
 
     blocks
 }

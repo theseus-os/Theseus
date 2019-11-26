@@ -214,7 +214,7 @@ impl Window for WindowComponents {
             },
             None => None
         };
-        wm.refresh_window(absolute_area)
+        wm.refresh_windows(absolute_area, true)
     }
 
     fn handle_event(&mut self) -> Result<(), &'static str> {       
@@ -260,12 +260,9 @@ impl Window for WindowComponents {
                     self.producer.enqueue(Event::new_keyboard_event(key_input));
                 }
                 &Event::MousePositionEvent(ref mouse_event) => {
-                    trace!("Wenqiu: \n1 \n2 \n3");
                     if winobj.is_moving() {
-                        trace!("Wenqiu:1 t:" );
                         // only wait for left button up to exit this mode
                         if !mouse_event.left_button_hold {
-                            trace!("Wenqiu: 2mouse_event: ");
                             winobj.set_is_moving(false);
                             winobj.set_give_all_mouse_event(false);
                             self.last_mouse_position_event = mouse_event.clone();
@@ -366,8 +363,8 @@ impl Window for WindowComponents {
 
         // if call_later_do_refresh_floating_border || call_later_do_move_active_window {
         //     let wm = window_manager_alpha::WINDOW_MANAGER.try().ok_or("The window manager is not initialized")?.lock();
-        //     wm.refresh_background(None)?;
-        //     wm.refresh_window(None)?;
+        //     wm.refresh_bg_windows(None)?;
+        //     wm.refresh_windows(None)?;
         //     wm.refresh_top(None)?;
         // }
         

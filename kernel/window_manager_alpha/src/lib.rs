@@ -210,6 +210,7 @@ impl<U: WindowProfile> WindowManagerAlpha<U> {
         );
         if let Some(current_active) = self.active.upgrade() {
             if Arc::ptr_eq(&(current_active), objref) {
+                self.refresh_windows(area, false)?;
                 if let Some(window) = self.show_list.remove(0) {
                     self.active = window;
                 } else if let Some(window) = self.hide_list.remove(0) {
@@ -217,14 +218,13 @@ impl<U: WindowProfile> WindowManagerAlpha<U> {
                 } else {
                     self.active = Weak::new(); // delete reference
                 }
-                self.refresh_window(area)?;
                 return Ok(());
             }
         }
         match self.is_window_in_show_list(&objref) {
             Some(i) => {
                 self.show_list.remove(i);
-                self.refresh_window(area)?;
+                self.refresh_windows(area, true)?;
                 return Ok(());
             }
             None => {}
@@ -232,7 +232,7 @@ impl<U: WindowProfile> WindowManagerAlpha<U> {
         match self.is_window_in_hide_list(&objref) {
             Some(i) => {
                 self.hide_list.remove(i);
-                self.refresh_window(area)?;
+                self.refresh_windows(area, true)?;
                 return Ok(());
             }
             None => {}
@@ -561,11 +561,19 @@ impl<U: WindowProfile> WindowManagerAlpha<U> {
 
     }
 
-    pub fn refresh_background(&self, area: Option<RectArea>) -> Result<(), &'static str> {
-        let blocks = match area.as_ref() {
-            Some(area_ref) => {
+    pub fn refresh_bg_windows(&self, area: Option<RectArea>, active: bool) -> Result<(), &'static str> {
+        let update_all = area.is_none();
+
+        let mut update_area = RectArea{
+            start: Coord::new(0, 0),
+            end: Coord::new(0, 0),
+        };
+
+        let blocks = match area {
+            Some(a) => {
+                update_area = a;
                 Some(
-                frame_buffer_compositor::get_blocks(self.final_fb.deref(), *area_ref).into_iter()
+                    frame_buffer_compositor::get_blocks(self.final_fb.deref(), &mut update_area).into_iter()
                 )
             },
             None => None
@@ -577,10 +585,18 @@ impl<U: WindowProfile> WindowManagerAlpha<U> {
             blocks: blocks
         }; 
 
-        FRAME_COMPOSITOR.lock().composite(vec![bg_buffer].into_iter())
+        FRAME_COMPOSITOR.lock().composite(vec![bg_buffer].into_iter())?;
+
+        let area_obj = if update_all{
+            None
+        } else {
+            Some(update_area)
+        };
+
+        self.refresh_windows(area_obj, active)
     }
 
-    pub fn refresh_background_pixels(&self, pixels: &[Coord]) -> Result<(), &'static str> {
+    pub fn refresh_bg_windows_pixels(&self, pixels: &[Coord]) -> Result<(), &'static str> {
         let bg_buffer = FrameBufferBlocks {
             framebuffer: self.final_fb.deref(),
             coordinate: Coord::new(0, 0),
@@ -591,10 +607,11 @@ impl<U: WindowProfile> WindowManagerAlpha<U> {
     }
 
     pub fn refresh_top(&self, area: Option<RectArea>) -> Result<(), &'static str> {
-        let blocks = match area.as_ref() {
-            Some(area_ref) => {
+        let blocks = match area {
+            Some(area) => {
+                let mut update_area = area;
                 Some(
-                frame_buffer_compositor::get_blocks(self.top_fb.deref(), *area_ref).into_iter()
+                frame_buffer_compositor::get_blocks(self.top_fb.deref(), &mut update_area).into_iter()
                 )
             },
             None => None
@@ -619,7 +636,19 @@ impl<U: WindowProfile> WindowManagerAlpha<U> {
         FRAME_COMPOSITOR.lock().composite_pixels(vec![top_buffer].into_iter(), pixels)
     }
 
-    pub fn refresh_window(&self, area: Option<RectArea>) -> Result<(), &'static str> {
+    pub fn refresh_windows(&self, area: Option<RectArea>, active: bool) -> Result<(), &'static str> {
+        let update_all = area.is_none();
+
+        let mut max_update_area = match area {
+            Some(area) => {area},
+            None => {
+                RectArea{
+                    start: Coord::new(0, 0),
+                    end: Coord::new(0, 0),
+                }
+            }
+        };
+
         for window_ref in &self.hide_list {
             if let Some(window_mutex) = window_ref.upgrade() {
                 let window = window_mutex.lock();
@@ -627,14 +656,13 @@ impl<U: WindowProfile> WindowManagerAlpha<U> {
                 //let (width, height) = window.get_content_size();
 
                 let win_coordinate = window.coordinate();
-                let blocks = match area.as_ref() {
-                    Some(area_ref) => {
-                        let relative_area = *area_ref - win_coordinate;
-                        Some(
-                        frame_buffer_compositor::get_blocks(framebuffer.deref(), relative_area).into_iter()
-                        )
-                    },
-                    None => None
+                let blocks = if !update_all {
+                    let mut relative_area = max_update_area - win_coordinate;
+                    let blocks = frame_buffer_compositor::get_blocks(framebuffer.deref(), &mut relative_area).into_iter();
+                    max_update_area = relative_area + win_coordinate;
+                    Some(blocks)
+                } else {
+                    None
                 };
 
                 let buffer_blocks = FrameBufferBlocks {
@@ -654,14 +682,13 @@ impl<U: WindowProfile> WindowManagerAlpha<U> {
                 //let (width, height) = window.get_content_size();
 
                 let win_coordinate = window.coordinate();
-                let blocks = match area.as_ref() {
-                    Some(area_ref) => {
-                        let relative_area = *area_ref - win_coordinate;
-                        Some(
-                        frame_buffer_compositor::get_blocks(framebuffer.deref(), relative_area).into_iter()
-                        )
-                    },
-                    None => None
+                let blocks = if !update_all {
+                    let mut relative_area = max_update_area - win_coordinate;
+                    let blocks = frame_buffer_compositor::get_blocks(framebuffer.deref(), &mut relative_area).into_iter();
+                    max_update_area = relative_area + win_coordinate;
+                    Some(blocks)
+                } else {
+                    None
                 };
 
                 let buffer_blocks = FrameBufferBlocks {
@@ -674,31 +701,32 @@ impl<U: WindowProfile> WindowManagerAlpha<U> {
            }
         }
 
-        if let Some(window_mutex) = self.active.upgrade() {
-            let window = window_mutex.lock();
-            let framebuffer = window.framebuffer();
-            
-            let win_coordinate = window.coordinate();
-            let blocks = match area.as_ref() {
-                Some(area_ref) => {
-                    let relative_area = *area_ref - win_coordinate;
-                    Some(
-                    frame_buffer_compositor::get_blocks(framebuffer.deref(), relative_area).into_iter()
-                    )
-                },
-                None => None
-            };
+        if active {
+            if let Some(window_mutex) = self.active.upgrade() {
+                let window = window_mutex.lock();
+                let framebuffer = window.framebuffer();
+                
+                let win_coordinate = window.coordinate();
+                let blocks = if !update_all {
+                    let mut relative_area = max_update_area - win_coordinate;
+                    let blocks = frame_buffer_compositor::get_blocks(framebuffer.deref(), &mut relative_area).into_iter();
+                    max_update_area = relative_area + win_coordinate;
+                    Some(blocks)
+                } else {
+                    None
+                };
 
-            let buffer_blocks = FrameBufferBlocks {
-                framebuffer: framebuffer.deref(),
-                coordinate: window.coordinate(),
-                // blocks: Some(
-                //     self.get_cursor_cache_block(window.get_position(), width, height).into_iter()
-                // )
-                blocks: blocks
-            }; 
+                let buffer_blocks = FrameBufferBlocks {
+                    framebuffer: framebuffer.deref(),
+                    coordinate: window.coordinate(),
+                    // blocks: Some(
+                    //     self.get_cursor_cache_block(window.get_position(), width, height).into_iter()
+                    // )
+                    blocks: blocks
+                }; 
 
-            FRAME_COMPOSITOR.lock().composite(vec![buffer_blocks].into_iter())?;
+                FRAME_COMPOSITOR.lock().composite(vec![buffer_blocks].into_iter())?;
+            }
         }
        
 
@@ -706,7 +734,7 @@ impl<U: WindowProfile> WindowManagerAlpha<U> {
 
     }
 
-    pub fn refresh_window_pixels(&self, pixels: &[Coord]) -> Result<(), &'static str> {
+    pub fn refresh_windows_pixels(&self, pixels: &[Coord]) -> Result<(), &'static str> {
         for window_ref in &self.hide_list {
             if let Some(window_mutex) = window_ref.upgrade() {
                 let window = window_mutex.lock();
@@ -886,7 +914,6 @@ impl<U: WindowProfile> WindowManagerAlpha<U> {
         if let Some(current_active) = self.active.upgrade() {
             let mut current_active_win = current_active.lock();
             let current_coordinate = current_active_win.get_position();
-            trace!("Wenqiu: left button {} get event {}", event.left_button_hold, current_active_win.give_all_mouse_event());
             if current_active_win.give_all_mouse_event() {
                 event.coordinate = *coordinate - current_coordinate;
                 current_active_win
@@ -963,8 +990,8 @@ impl<U: WindowProfile> WindowManagerAlpha<U> {
             //     self.repositioned_border = None;
             // }
             let pixels = self.draw_floating_border(repositioned_border.start, repositioned_border.end, T);
-            self.refresh_background_pixels(pixels.as_slice())?;
-            self.refresh_window_pixels(pixels.as_slice())?;
+            self.refresh_bg_windows_pixels(pixels.as_slice())?;
+            self.refresh_windows_pixels(pixels.as_slice())?;
         }
 
         // then draw current border
@@ -1079,9 +1106,9 @@ impl<U: WindowProfile> WindowManagerAlpha<U> {
                 current_active_win.set_position(new_start);
                 (old_start, old_end, new_start, new_end)
             };
-            self.refresh_background(None)?;
-            self.refresh_window(None)?;
-            self.refresh_top(None)?;
+            self.refresh_bg_windows(Some(RectArea{start: old_start, end: old_end}), false)?;
+            self.refresh_bg_windows(Some(RectArea{start: new_start, end: new_end}), true)?;
+            // self.refresh_top(None)?;
             // then try to reduce time on refresh old ones
             // self.refresh_area_with_old_new(old_start, old_end, new_start, new_end)?;
         } else {
@@ -1335,7 +1362,7 @@ pub fn init<Buffer: FrameBuffer>(
     }; // set mouse to middle
     
     //if !delay_refresh_first_time {
-    win.refresh_background(None)?;
+    win.refresh_bg_windows(None, false)?;
     
     KernelTaskBuilder::new(window_manager_loop, (key_consumer, mouse_consumer))
         .name("window_manager_loop".to_string())
