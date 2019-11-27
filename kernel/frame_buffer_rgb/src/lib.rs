@@ -17,7 +17,7 @@ use memory::{EntryFlags, FrameRange, MappedPages, PhysicalAddress, FRAME_ALLOCAT
 use owning_ref::BoxRefMut;
 use spin::Mutex;
 
-// Every pixel is of u32 type
+/// Every pixel is of u32 type
 const PIXEL_BYTES: usize = 4;
 const RGB_PIXEL_MASK: Pixel = 0x00FFFFFF;
 
@@ -153,6 +153,7 @@ impl FrameBuffer for FrameBufferRGB {
     }
 }
 
+/// Create a new framebuffer. Useful for generic
 pub fn new(        
     width: usize,
     height: usize,

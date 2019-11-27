@@ -25,11 +25,6 @@ use memory::{EntryFlags, FrameRange, MappedPages, PhysicalAddress, FRAME_ALLOCAT
 use owning_ref::BoxRefMut;
 use spin::Mutex;
 
-/// An `Pixel` is a `u32` broken down into four bytes.
-/// The lower 24 bits of a Pixel specify its RGB color values, while the upper 8bit is an `alpha` channel,
-/// in which an `alpha` value of `0` represents an opaque pixel and `0xFF` represents a completely transparent pixel.
-/// The `alpha` value is used in an alpha-blending compositor that supports transparency.
-
 /// predefined opaque black
 pub const BLACK: Pixel = 0;
 /// predefined opaque white
@@ -104,13 +99,13 @@ impl FrameBufferAlpha {
                     | EntryFlags::WRITABLE
                     | EntryFlags::GLOBAL
                     | EntryFlags::NO_CACHE,
-                allocator.lock().deref_mut()
+                allocator.lock().deref_mut(),
             )?
         } else {
             kernel_mmi_ref.lock().page_table.map_allocated_pages(
                 pages,
                 EntryFlags::PRESENT | EntryFlags::WRITABLE | EntryFlags::GLOBAL, // | EntryFlags::NO_CACHE,
-                allocator.lock().deref_mut()
+                allocator.lock().deref_mut(),
             )?
         };
 
@@ -139,29 +134,6 @@ impl FrameBufferAlpha {
     pub fn get_size(&self) -> (usize, usize) {
         (self.width, self.height)
     }
-
-    // /// draw a rectangle on this framebuffer
-    // pub fn overwrite_rect(&mut self, start: Coord, end: Coord, color: Pixel) {
-    //     for y in start.y..end.y {
-    //         for x in start.x..end.x {
-    //             let coordinate = Coord::new(x as isize, y as isize);
-    //             self.overwrite_pixel(coordinate, color);
-    //         }
-    //     }
-    // }
-
-    // /// draw a char onto the framebuffer
-    // pub fn draw_char_8x16(&mut self, coordinate: Coord, c: u8, color: Pixel) {
-    //     for yi in 0..16 {
-    //         let char_font: u8 = font::FONT_BASIC[c as usize][yi];
-    //         for xi in 0..8 {
-    //             const HIGHEST_BIT: u8 = 0x80;
-    //             if char_font & (HIGHEST_BIT >> xi) != 0 {
-    //                 self.draw_pixel(coordinate + (xi as isize, yi as isize), color);
-    //             }
-    //         }
-    //     }
-    // }
 }
 
 impl FrameBuffer for FrameBufferAlpha {
@@ -177,10 +149,8 @@ impl FrameBuffer for FrameBufferAlpha {
         let len = src.len();
         for i in 0..len {
             let index = dest_start + i;
-            let coordinate = Coord::new(
-                (index % self.width) as isize, 
-                (index / self.width) as isize
-            );
+            let coordinate =
+                Coord::new((index % self.width) as isize, (index / self.width) as isize);
             self.draw_pixel(coordinate, src[i]);
         }
     }
@@ -225,7 +195,7 @@ pub trait PixelMixer {
     /// mix two color using alpha channel composition, supposing `self` is on the top of `other` pixel.
     fn alpha_mix(self, other: Self) -> Self;
 
-    /// mix two color linearly with a float number, with mix `self` and (1-mix) `other`. If mix is outside range of [0, 1], black will be returned
+    /// mix two color linearly with weights, as `mix` for `self` and (1-`mix`) for `other`. It returns black if mix is outside range of [0, 1].
     fn color_mix(self, other: Self, mix: f32) -> Self;
 
     /// Gets the alpha channel of the pixel
@@ -260,7 +230,6 @@ impl PixelMixer for Pixel {
 
     fn color_mix(self, other: Self, mix: f32) -> Self {
         if mix < 0f32 || mix > 1f32 {
-            // cannot mix value outside [0, 1]
             return BLACK;
         }
         let new_alpha =
@@ -296,7 +265,8 @@ pub fn new_alpha_pixel(alpha: u8, red: u8, green: u8, blue: u8) -> Pixel {
     return ((alpha as u32) << 24) + ((red as u32) << 16) + ((green as u32) << 8) + (blue as u32);
 }
 
-pub fn new(        
+/// Create a new alpha framebuffer. Useful for generic.
+pub fn new(
     width: usize,
     height: usize,
     physical_address: Option<PhysicalAddress>,

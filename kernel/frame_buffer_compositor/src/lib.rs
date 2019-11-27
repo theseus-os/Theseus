@@ -5,18 +5,19 @@
 //! # Cache
 //! The compositor caches framebuffer blocks for better performance. 
 //!
-//! First, it divides every incoming framebuffer into blocks. The height of every block is a constant 16, which is the same as the height of a character. The width of a block is the same as the width of the framebuffer it belongs to. A block is a continuous array so that we can compute its hash to compare the content of two blocks.
+//! First, it divides every incoming framebuffer into blocks. The height of every block is a constant 16. The width of a block is the same as the width of the framebuffer it belongs to. A block is a continuous array so that we can compute its hash to compare the content of two blocks.
 //!
-//! The content of a block starts from its left side and ends at the most right side of the non-empty parts in it. The remaining part of the block is blank. For example, in a terminal, every line is a block, and the part from the beginning of the line to the last character in the line is its content.
+//! The `start` and `width` parameter represents the updated area in this block.
 //!
-//! The compositor caches a list of displayed blocks and the width of their contents. If an incoming `FrameBufferBlocks` carries a list of updated blocks, the compositor compares every block with a cached one:
+//! The compositor caches a list of displayed blocks and their updated area. If an incoming `FrameBufferBlocks` carries a list of updated blocks, the compositor compares every block with a cached one:
 //! * If the two blocks are identical, ignore it.
-//! * If a new block overlaps with an existing one, display the content and clear the remaining part of the block till the right side of the content in the cached block.
-//! * If the two blocks are of the same location, remove the cached block after the step above. We do not need to make sure the new block is larger than the cached one because the extra part is already cleared in the step above.
-//! * Otherwise, If the two blocks are overlapped, set the hash of the cache as 0. We do not remove it because we should keep its content location and when another block arrives, their overlapped parts will be cleared. We set its content as 0 so that the compositor will redraw it if the same block arrives.
+//! * If a new block overlaps with an existing one, display the contentand caches it.
+//! * Then we set the hash of the cache as 0. We do not remove it because we should keep its content location and when another block arrives, their overlapped parts will be cleared. We set its content as 0 so that the compositor will redraw it if the same block arrives.
 //!
 //! If `FrameBufferBlocks` is `None`, the compositor will handle all of its blocks.
 //!
+//! The `composite_pixles` method will update the pixels relative to the top-left of the screen. It computes the relative coordinate in every framebuffer, composites them and write the result to the screen.
+//! 
 //! The compositor minimizes the updated parts of a framebuffer and clears the blank parts. Even if the cache is lost or the updated blocks information is `None`, it guarantees the result is the same.
 
 #![no_std]
@@ -73,6 +74,7 @@ struct BlockCache {
     content_hash: u64,
     /// The width of the block
     width: usize,
+    /// The block which is cached
     block: Block,
 }
 
@@ -85,6 +87,7 @@ impl BlockCache {
             && coordinate.y < self.coordinate.y + CACHE_BLOCK_HEIGHT as isize;
     }
 
+    // checks if this block cotains any of the four corners of `cache`.
     fn contains_corner(&self, cache: &BlockCache) -> bool {
         self.contains(cache.coordinate)
             || self.contains(cache.coordinate + (cache.width as isize - 1, 0))
@@ -92,18 +95,24 @@ impl BlockCache {
             || self.contains(cache.coordinate + (cache.width as isize - 1, CACHE_BLOCK_HEIGHT as isize - 1))
     }
 
+    // checks if the block overlaps with another one.
     fn overlaps_with(&self, cache: &BlockCache) -> bool {
         self.contains_corner(cache) || cache.contains_corner(self)
     }
 }
 
+/// A block for cache
 pub struct Block {
+    /// The index of the block in a framebuffer
     index: usize,
+    /// The left bound of the block
     start: usize,
+    /// The width of the block
     width: usize,
 }
 
 impl Block {
+    /// Creates a new block
     pub fn new(index: usize, start: usize, width: usize) -> Block {
         Block {
             index: index,
@@ -267,6 +276,11 @@ impl Compositor<FrameBufferBlocks<'_>> for FrameCompositor {
     }
 }
 
+/// Compute a list of cache blocks which represent the updated area. A caller can get the block list and pass them to the compositor for better performance. 
+/// 
+/// # Arguments
+/// * `framebuffer`: the framebuffer to composite.
+/// * `area`: the updated area in this framebuffer.
 pub fn get_blocks(framebuffer: &dyn FrameBuffer, area: &mut RectArea) -> Vec<Block> {
     let mut blocks = Vec::new();
     let (width, height) = framebuffer.get_size();

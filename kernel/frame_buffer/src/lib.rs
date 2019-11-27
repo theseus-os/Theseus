@@ -7,11 +7,10 @@ extern crate alloc;
 extern crate memory;
 extern crate owning_ref;
 extern crate spin;
-#[macro_use]
 extern crate downcast_rs;
 
-use alloc::boxed::Box;
 use downcast_rs::Downcast;
+use alloc::boxed::Box;
 use memory::MappedPages;
 use owning_ref::BoxRefMut;
 use spin::{Mutex, Once};
@@ -60,6 +59,9 @@ pub trait FrameBuffer: Downcast + Send {
             && coordinate.y >= 0 && coordinate.y < height as isize
     }
     
+    /// Draws a pixel at the given `coordinate` relative to the origin(top-left point) of the frame buffer. The new pixel is a mix of original pixel and `color` according to the type of the framebuffer.
+    fn draw_pixel(&mut self, coordinate: Coord, color: Pixel);
+
     /// Draws a pixel at the given `coordinate` within the frame buffer. The `coordinate` is relative to the origin(top-left point) of the frame buffer.  The new pixel will overwrite the previous one.
     fn overwrite_pixel(&mut self, coordinate: Coord, color: Pixel);
 
@@ -73,21 +75,7 @@ pub trait FrameBuffer: Downcast + Send {
         coordinate.x < buffer_width as isize && coordinate.x + width as isize >= 0
             && coordinate.y < buffer_height as isize && coordinate.y + height as isize >= 0
     }
-
-    /// Draws a pixel at the given `coordinate` relative to the origin(top-left point) of the frame buffer. The new pixel is a mix of original pixel and `color` according to the type of the framebuffer.
-    fn draw_pixel(&mut self, coordinate: Coord, color: Pixel);
-
-    // /// Draws a rectangle on this framebuffer.
-    // fn draw_rect(&mut self, start: Coord, end: Coord, color: Pixel) {
-    //     for y in start.y..end.y {
-    //         for x in start.x..end.x {
-    //             let coordinate = Coord::new(x, y);
-    //             self.draw_pixel(coordinate, color);
-    //         }
-    //     }
-    // }
 }
-impl_downcast!(FrameBuffer);
 
 /// Gets the size of the final framebuffer.
 /// Returns (width, height).
@@ -176,10 +164,12 @@ impl PartialOrd for Coord {
 impl Eq for Coord { }
 
 
-// a rectangle region
+/// a rectangle region
 #[derive(Clone, Copy, PartialEq, Debug, Hash)]
 pub struct RectArea {
+    /// The top-left point
     pub start: Coord,
+    /// The bottom-right point
     pub end: Coord,
 }
 

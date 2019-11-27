@@ -22,13 +22,13 @@ extern crate tsc;
 extern crate window;
 extern crate window_manager;
 extern crate window_components;
-extern crate text_primitive;
+extern crate text_display;
 
 use alloc::string::{String, ToString};
 use alloc::vec::Vec;
 use alloc::boxed::Box;
 use cursor::*;
-use text_primitive::TextDisplay;
+use text_display::TextDisplay;
 use event_types::Event;
 use font::{CHARACTER_HEIGHT, CHARACTER_WIDTH};
 use frame_buffer::{Coord, FrameBuffer, RectArea};
@@ -60,7 +60,7 @@ pub enum ScrollError {
 ///     - Consumer is the main terminal loop
 ///     - Producer is the window manager. Window manager is responsible for enqueuing keyevents into the active application
 pub struct Terminal {
-    /// The terminal's own window. This is a `Window` trait object which handles the events of user input properly like moving window and close window
+    /// The terminal's own window.
     pub window: WindowComponents,
     /// Name of the text displayable of the terminal
     display_name: String,
@@ -71,7 +71,7 @@ pub struct Terminal {
     /// The starting index of the scrollback buffer string slice that is currently being displayed on the text display
     scroll_start_idx: usize,
     /// The cursor of the terminal.
-    pub cursor: Cursor,
+    pub cursor: Cursor
 }
 
 /// Privite methods of `Terminal`.
@@ -616,15 +616,15 @@ impl Terminal {
             }
             _ => {}
         };
-        let _event = match self.window.consumer.peek() {
+        let event = match self.window.consumer.peek() {
             Some(ev) => ev,
-            _ => {
+            None => {
                 return None;
             }
         };
-        let event = _event.clone();
-        _event.mark_completed();
-        Some(event)
+        let event_copy = event.clone();
+        event.mark_completed();
+        Some(event_copy)
     }
 
     /// Get (width, height) of the text area in units of characters

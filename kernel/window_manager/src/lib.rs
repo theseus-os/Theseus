@@ -1,14 +1,10 @@
-//! A window manager that simulates a basic desktop environment with an alpha (transparency) channel.
+//! This crate acts as a manager of a list of windows. It defines a `WindowManager` structure and an instance of it. 
 //!
-//! Multiple windows that overlap each other will be show according to conventional alpha blending techniques,
-//! e.g., a transparent window will be rendered with the windows "beneath" it also being visible.
+//! A window manager holds a set of `Window` object, including an active window, a list of shown windows and a list of hidden windows. The hidden windows are totally overlapped by others.
 //!
-//! Applications can create new window objects for themselves by invoking the `new_window()` function.
-//! There are three groups that each window can be in: `active`, `show_list` and `hide_list`:
-//! - `active`: not really a group, just a single window that is currently "active", i.e., receives all keyboard input events.
-//! - `show_list`: windows that are currently shown on screen, ordered by their z-axis depth.
-//! - `hide_list`: windows that are currently not being shown on screen, but may be shown later.
+//! A window contains a bottom framebuffer and a top framebuffer. The bottom is the background of the desktop and the top framebuffer contains a floating window border and a mouse arrow. In refreshing, the manager will render all the framebuffers in order: bottom -> hide list -> showlist -> active -> top.
 //!
+//! The window manager provides methods to update a rectangle area or several pixels for better performance.
 
 #![no_std]
 
@@ -17,8 +13,6 @@ extern crate spin;
 extern crate alloc;
 extern crate dfqueue;
 extern crate event_types;
-#[macro_use]
-extern crate log;
 extern crate compositor;
 extern crate frame_buffer;
 extern crate frame_buffer_compositor;
@@ -40,7 +34,7 @@ use alloc::sync::{Arc, Weak};
 use alloc::vec::Vec;
 use compositor::Compositor;
 use core::ops::{Deref, DerefMut};
-use dfqueue::{DFQueue, DFQueueConsumer};
+use dfqueue::{DFQueueConsumer};
 use event_types::{Event, MousePositionEvent};
 use frame_buffer::{Coord, FrameBuffer, Pixel, RectArea};
 use frame_buffer_compositor::{FrameBufferBlocks, FRAME_COMPOSITOR};
@@ -228,14 +222,15 @@ impl<U: Window> WindowManager<U> {
         Err("cannot find this window")
     }
 
-    pub fn refresh_bottom_windows_pixels(&self, update_coords: &[Coord]) -> Result<(), &'static str> {
+    /// Refresh the pixels in `update_coords`. Only render the bottom final framebuffer and windows. Ignore the top buffer.
+    pub fn refresh_bottom_windows_pixels(&self, pixels: &[Coord]) -> Result<(), &'static str> {
         let bottom_fb = FrameBufferBlocks {
             framebuffer: self.bottom_fb.deref(),
             coordinate: Coord::new(0, 0),
             blocks: None
         };
 
-        FRAME_COMPOSITOR.lock().composite_pixels(vec![bottom_fb].into_iter(), update_coords)?;
+        FRAME_COMPOSITOR.lock().composite_pixels(vec![bottom_fb].into_iter(), pixels)?;
 
         for window_ref in &self.hide_list {
             if let Some(window_mutex) = window_ref.upgrade() {
@@ -243,11 +238,11 @@ impl<U: Window> WindowManager<U> {
                 let framebuffer = window.framebuffer();
                 let buffer_blocks = FrameBufferBlocks {
                     framebuffer: framebuffer.deref(),
-                    coordinate: window.coordinate(),
+                    coordinate: window.get_position(),
                     blocks: None
                 };
 
-                FRAME_COMPOSITOR.lock().composite_pixels(vec![buffer_blocks].into_iter(), update_coords)?;
+                FRAME_COMPOSITOR.lock().composite_pixels(vec![buffer_blocks].into_iter(), pixels)?;
            }
         }
 
@@ -257,11 +252,11 @@ impl<U: Window> WindowManager<U> {
                 let framebuffer = window.framebuffer();
                 let buffer_blocks = FrameBufferBlocks {
                     framebuffer: framebuffer.deref(),
-                    coordinate: window.coordinate(),
+                    coordinate: window.get_position(),
                     blocks: None
                 };
 
-                FRAME_COMPOSITOR.lock().composite_pixels(vec![buffer_blocks].into_iter(), update_coords)?;
+                FRAME_COMPOSITOR.lock().composite_pixels(vec![buffer_blocks].into_iter(), pixels)?;
            }
         }
 
@@ -270,16 +265,17 @@ impl<U: Window> WindowManager<U> {
             let framebuffer = window.framebuffer();
             let buffer_blocks = FrameBufferBlocks {
                 framebuffer: framebuffer.deref(),
-                coordinate: window.coordinate(),
+                coordinate: window.get_position(),
                 blocks: None
             }; 
 
-            FRAME_COMPOSITOR.lock().composite_pixels(vec![buffer_blocks].into_iter(), update_coords)?;
+            FRAME_COMPOSITOR.lock().composite_pixels(vec![buffer_blocks].into_iter(), pixels)?;
         }
 
         Ok(())
     }
 
+    /// Refresh the pixels in the top framebuffer
     pub fn refresh_top_pixels(&self, pixels: &[Coord]) -> Result<(), &'static str> {
         let top_buffer = FrameBufferBlocks {
             framebuffer: self.top_fb.deref(),
@@ -290,12 +286,14 @@ impl<U: Window> WindowManager<U> {
         FRAME_COMPOSITOR.lock().composite_pixels(vec![top_buffer].into_iter(), pixels)
     }
 
+    /// Refresh the all the pixels including the bottom framebuffer, the windows and the top framebuffer.
     pub fn refresh_pixels(&self, pixels: &[Coord]) -> Result<(), &'static str> {
         self.refresh_bottom_windows_pixels(pixels)?;
         self.refresh_top_pixels(pixels)?;
         Ok(())
     }
 
+    /// Refresh the part of every window in `area`. Refresh the whole screen if area is None. 
     pub fn refresh_windows(&self, area: Option<RectArea>, active: bool) -> Result<(), &'static str> {
         let update_all = area.is_none();
 
@@ -315,7 +313,7 @@ impl<U: Window> WindowManager<U> {
                 let framebuffer = window.framebuffer();
                 //let (width, height) = window.get_content_size();
 
-                let win_coordinate = window.coordinate();
+                let win_coordinate = window.get_position();
                 let blocks = if !update_all {
                     let mut relative_area = max_update_area - win_coordinate;
                     let blocks = frame_buffer_compositor::get_blocks(framebuffer.deref(), &mut relative_area).into_iter();
@@ -341,7 +339,7 @@ impl<U: Window> WindowManager<U> {
                 let framebuffer = window.framebuffer();
                 //let (width, height) = window.get_content_size();
 
-                let win_coordinate = window.coordinate();
+                let win_coordinate = window.get_position();
                 let blocks = if !update_all {
                     let mut relative_area = max_update_area - win_coordinate;
                     let blocks = frame_buffer_compositor::get_blocks(framebuffer.deref(), &mut relative_area).into_iter();
@@ -366,7 +364,7 @@ impl<U: Window> WindowManager<U> {
                 let window = window_mutex.lock();
                 let framebuffer = window.framebuffer();
                 
-                let win_coordinate = window.coordinate();
+                let win_coordinate = window.get_position();
                 let blocks = if !update_all {
                     let mut relative_area = max_update_area - win_coordinate;
                     let blocks = frame_buffer_compositor::get_blocks(framebuffer.deref(), &mut relative_area).into_iter();
@@ -378,7 +376,7 @@ impl<U: Window> WindowManager<U> {
 
                 let buffer_blocks = FrameBufferBlocks {
                     framebuffer: framebuffer.deref(),
-                    coordinate: window.coordinate(),
+                    coordinate: window.get_position(),
                     blocks: blocks
                 }; 
 
@@ -390,6 +388,7 @@ impl<U: Window> WindowManager<U> {
 
     }
 
+    /// Refresh the part of bottom framebuffer and every window in `area`. Refresh the whole screen if area is None. 
     pub fn refresh_bottom_windows(&self, area: Option<RectArea>, active: bool) -> Result<(), &'static str> {
         let update_all = area.is_none();
         let mut update_area = RectArea{
@@ -531,9 +530,7 @@ impl<U: Window> WindowManager<U> {
     }
 
     /// refresh the floating border indicating user of new window position and size. `show` indicates whether to show the border or not.
-    /// (x_start, x_end, y_start, y_end) indicates the position and size of this border.
-    /// if this is not clear, you can simply try this attribute by pressing left mouse on the top bar of any window and move the mouse, then you should see a thin border
-    /// this is extremely useful when performance is not enough for re-render the whole window when moving the mouse
+    /// `start` and `end` indicates the top-left and bottom-right corner of the border.
     fn refresh_floating_border(
         &mut self,
         show: bool,
@@ -562,6 +559,8 @@ impl<U: Window> WindowManager<U> {
         Ok(())
     }
 
+    /// draw the floating border with color. Return pixels of the border.
+    /// `start` and `end` indicates the top-left and bottom-right corner of the border.
     fn draw_floating_border(&mut self, start: Coord, end: Coord, color: Pixel) -> Vec<Coord> {
         let mut pixels = Vec::new();
 
@@ -615,7 +614,7 @@ impl<U: Window> WindowManager<U> {
             };
             self.refresh_bottom_windows(Some(RectArea{start: old_start, end: old_end}), false)?;
             self.refresh_bottom_windows(Some(RectArea{start: new_start, end: new_end}), true)?;
-            let update_coords = self.get_cursor_coords();
+            let update_coords = self.get_mouse_coords();
             self.refresh_pixels(update_coords.as_slice())?;            // self.refresh_top(None)?;
             // then try to reduce time on refresh old ones
             // self.refresh_area_with_old_new(old_start, old_end, new_start, new_end)?;
@@ -625,6 +624,7 @@ impl<U: Window> WindowManager<U> {
         Ok(())
     }
 
+    /// Move mouse. `relative` indicates the new position relative to current position.
     fn move_mouse(&mut self, relative: Coord) -> Result<(), &'static str> {
         let old = self.mouse;
         let mut new = old + relative;
@@ -645,44 +645,44 @@ impl<U: Window> WindowManager<U> {
         self.move_mouse_to(new)
     }
     
-    // move mouse to absolute position
+    // Move mouse to absolute position `new`
     fn move_mouse_to(&mut self, new: Coord) -> Result<(), &'static str> {
         // clear old mouse
-        let mut update_coords = Vec::new();
         for y in self.mouse.y - MOUSE_POINTER_HALF_SIZE as isize..self.mouse.y + MOUSE_POINTER_HALF_SIZE as isize + 1 {
             for x in
                 self.mouse.x - MOUSE_POINTER_HALF_SIZE as isize..self.mouse.x + MOUSE_POINTER_HALF_SIZE as isize + 1
             {
                 let coordinate = Coord::new(x, y);
                 self.top_fb.overwrite_pixel(coordinate, T);
-                update_coords.push(coordinate);
             }
         }
+        let update_coords = self.get_mouse_coords();
         self.refresh_bottom_windows_pixels(update_coords.as_slice())?;
 
         // draw new mouse
         self.mouse = new;
-        update_coords = Vec::new();
         for y in new.y - MOUSE_POINTER_HALF_SIZE as isize..new.y + MOUSE_POINTER_HALF_SIZE as isize + 1
         {
             for x in
                 new.x - MOUSE_POINTER_HALF_SIZE as isize..new.x + MOUSE_POINTER_HALF_SIZE as isize + 1
             {
                 let coordinate = Coord::new(x, y);
+                let pixel = MOUSE_BASIC
+                            [(MOUSE_POINTER_HALF_SIZE as isize + x - new.x) as usize]
+                            [(MOUSE_POINTER_HALF_SIZE as isize + y - new.y) as usize];
                 self.top_fb.overwrite_pixel(
                         coordinate,
-                        MOUSE_BASIC
-                            [(MOUSE_POINTER_HALF_SIZE as isize + x - new.x) as usize]
-                            [(MOUSE_POINTER_HALF_SIZE as isize + y - new.y) as usize],
+                        pixel,
                 );
-                update_coords.push(coordinate)
             }
         }
-        self.refresh_pixels(update_coords.as_slice())?;
+        let update_coords = self.get_mouse_coords();
+        self.refresh_top_pixels(update_coords.as_slice())?;
 
         Ok(())
     }
 
+    /// Move the floating border when a window is moving.
     pub fn move_floating_border(&mut self) -> Result<(), &'static str> {
         let (new_x, new_y) = {
             let m = &self.mouse;
@@ -715,7 +715,7 @@ impl<U: Window> WindowManager<U> {
         Ok(())
     }
 
-    /// whether a window is active
+    /// Whether a window is active
     pub fn is_active(&self, objref: &Arc<Mutex<U>>) -> bool {
         if let Some(current_active) = self.active.upgrade() {
             if Arc::ptr_eq(&(current_active), objref) {
@@ -725,11 +725,13 @@ impl<U: Window> WindowManager<U> {
         false
     }
 
+    /// Get the screen size of the desktop
     pub fn get_screen_size(&self) -> (usize, usize) {
         self.bottom_fb.get_size()
     }
 
-    fn get_cursor_coords(&self) -> Vec<Coord> {
+    /// Get the pixels occupied by current mouse.
+    fn get_mouse_coords(&self) -> Vec<Coord> {
         let mut result = Vec::new();
         for i in 6..15 {
             for j in 6..15 {
@@ -753,8 +755,6 @@ pub fn init<Buffer: FrameBuffer>(
     mut bg_framebuffer: Buffer,
     top_framebuffer: Buffer,
 ) -> Result<(), &'static str> {
-    debug!("Initializing the window manager alpha (transparency)...");
-
     let (screen_width, screen_height) = bg_framebuffer.get_size();
     for x in 0..screen_width{
         for y in 0..screen_height {
@@ -794,7 +794,7 @@ pub fn init<Buffer: FrameBuffer>(
     Ok(())
 }
 
-// handles all keyboard and mouse movement in this window manager
+/// handles all keyboard and mouse movement in this window manager
 fn window_manager_loop(
     consumer: (DFQueueConsumer<Event>, DFQueueConsumer<Event>),
 ) -> Result<(), &'static str> {
@@ -820,7 +820,6 @@ fn window_manager_loop(
         // event could be either key input or mouse input
         match event {
             Event::ExitEvent => {
-                trace!("exiting the main loop of the window manager loop");
                 return Ok(());
             }
             Event::KeyboardEvent(ref input_event) => {
@@ -881,7 +880,7 @@ fn window_manager_loop(
     }
 }
 
-// handle keyboard event, push it to the active window if exists
+/// handle keyboard event, push it to the active window if exists
 fn keyboard_handle_application(key_input: KeyEvent) -> Result<(), &'static str> {
     // Check for WM-level actions here, e.g., spawning a new terminal via Ctrl+Alt+T
     if key_input.modifiers.control
@@ -928,7 +927,7 @@ fn keyboard_handle_application(key_input: KeyEvent) -> Result<(), &'static str> 
     Ok(())
 }
 
-// handle mouse event, push it to related window or anyone asked for it
+/// handle mouse event, push it to related window or anyone asked for it
 fn cursor_handle_application(mouse_event: MouseEvent) -> Result<(), &'static str> {
     let mut wm = WINDOW_MANAGER
         .try()
@@ -943,32 +942,4 @@ fn cursor_handle_application(mouse_event: MouseEvent) -> Result<(), &'static str
         // if no window is found in this position, that is system background area. Add logic to handle those events later
     }
     Ok(())
-}
-
-/// Creates a new window object with given position and size
-pub fn new_window<'a>(
-    coordinate: Coord,
-    framebuffer: Box<dyn FrameBuffer>,
-) -> Result<Arc<Mutex<WindowGeneric>>, &'static str> {
-    // Init the key input producer and consumer
-    let consumer = DFQueue::new().into_consumer();
-    let producer = consumer.obtain_producer();
-
-    let (width, height) = framebuffer.get_size();
-
-    // new window object
-    let window: WindowGeneric = WindowGeneric {
-        coordinate: coordinate,
-        width: width,
-        height: height,
-        consumer: consumer,
-        producer: producer,
-        framebuffer: framebuffer,
-        give_all_mouse_event: false,
-        is_moving: false,
-        moving_base: Coord::new(0, 0), // the point as a base to start moving
-    };
-
-    let window_ref = Arc::new(Mutex::new(window));
-    Ok(window_ref)
 }

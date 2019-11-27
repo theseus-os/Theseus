@@ -65,20 +65,17 @@ pub fn init() -> Result<(DFQueueProducer<Event>, DFQueueProducer<Event>), &'stat
         .ok_or("Couldn't find terminal application in default app namespace")?;
 
     // initialize alpha display subsystem
-    #[cfg(not(primitive_display_sys))]
-    {
-        font::init()?;
-        let (width, height) = frame_buffer_alpha::init()?;
-        let bg_framebuffer = FrameBufferAlpha::new(width, height, None)?;
-        let mut top_framebuffer = FrameBufferAlpha::new(width, height, None)?;
-        top_framebuffer.fill_color(0xFF000000); 
-        window_manager::init(
-            keyboard_event_handling_consumer,
-            mouse_event_handling_consumer,
-            bg_framebuffer,
-            top_framebuffer
-        )?;
-    }
+    font::init()?;
+    let (width, height) = frame_buffer_alpha::init()?;
+    let bg_framebuffer = FrameBufferAlpha::new(width, height, None)?;
+    let mut top_framebuffer = FrameBufferAlpha::new(width, height, None)?;
+    top_framebuffer.fill_color(0xFF000000); 
+    window_manager::init(
+        keyboard_event_handling_consumer,
+        mouse_event_handling_consumer,
+        bg_framebuffer,
+        top_framebuffer
+    )?;
 
     // Spawns the terminal print crate so that we can print to the terminal
     ApplicationTaskBuilder::new(terminal_print_path)

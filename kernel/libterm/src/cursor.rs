@@ -1,6 +1,6 @@
 use super::*;
 
-/// The generic cursor structure used in the primitive display subsystem.
+/// The cursor structure used in the terminal.
 /// A cursor is a special symbol shown in the text box of a terminal. It indicates the position of character where the next input would be put or the delete operation works on.
 /// Terminal invokes its `display` method in a loop to let a cursor blink.
 pub struct Cursor {
@@ -22,7 +22,7 @@ pub struct Cursor {
 }
 
 impl Cursor {
-    /// Create a new cursor object which is initially enabled. The `blink_interval` is initialized as `DEFAULT_CURSOR_FREQ` however one can change this at any time. `time` is set to current time.
+    /// Creates a new cursor object which is initially enabled. The `blink_interval` is initialized as `DEFAULT_CURSOR_FREQ` however one can change this at any time. `time` is set to current time.
     pub fn new() -> Cursor {
         Cursor {
             enabled: true,
@@ -35,20 +35,24 @@ impl Cursor {
         }
     }
 
+    /// Reset the state of the cursor as unseen
     pub fn reset(&mut self) {
         self.show = true;
         self.time = tsc_ticks();
     }
 
+    /// Enable a cursor
     pub fn enable(&mut self) {
         self.enabled = true;
         self.reset();
     }
 
+    /// Disable a cursor
     pub fn disable(&mut self) {
         self.enabled = false;
     }
 
+    /// Let a cursor blink. It is invoked in a loop.
     pub fn blink(&mut self) -> bool {
         if self.enabled {
             let time = tsc_ticks();
@@ -65,10 +69,17 @@ impl Cursor {
         true
     }
 
+    /// Whether a cursor is seen
     pub fn show(&self) -> bool {
         self.enabled && self.show
     }
 
+    /// Display a cursor in a framebuffer
+    /// # Arguments
+    /// * `coordinate`: the start point of a textarea in the framebuffer.
+    /// * `column`: the column of the cursor in the textarea.
+    /// * `line`: the line of the cursor in the textarea.
+    /// * `framebuffer`: the framebuffer to display the cursor in.
     pub fn display(
         &mut self,
         coordinate: Coord,
@@ -103,30 +114,35 @@ impl Cursor {
             }
         }
 
-        let start = coordinate + (
-            (column * CHARACTER_WIDTH) as isize, 
-            (line * CHARACTER_HEIGHT) as isize
-        );
+        let start = coordinate
+            + (
+                (column * CHARACTER_WIDTH) as isize,
+                (line * CHARACTER_HEIGHT) as isize,
+            );
         let update_area = RectArea {
             start: start,
-            end: start + (CHARACTER_WIDTH as isize, CHARACTER_HEIGHT as isize)
+            end: start + (CHARACTER_WIDTH as isize, CHARACTER_HEIGHT as isize),
         };
 
         Ok(update_area)
     }
 
+    /// Sets the position of the cursor relative to the end of the command
     pub fn set_offset_from_end(&mut self, offset: usize) {
         self.offset_from_end = offset;
     }
 
+    /// Gets the position of the cursor relative to the end of the command
     pub fn offset_from_end(&self) -> usize {
         self.offset_from_end
     }
 
+    /// Sets the character at the position of the cursor
     pub fn set_underlying_char(&mut self, c: u8) {
         self.underlying_char = c;
     }
 
+    /// Gets the character at the position of the cursor
     pub fn underlying_char(&self) -> u8 {
         self.underlying_char
     }

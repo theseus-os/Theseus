@@ -56,7 +56,6 @@ pub fn print_string(
                 coordinate.y + ((curr_line + 1) * CHARACTER_HEIGHT) as isize,
                 bg_color,
             );
-            //blocks.push((curr_line, 0, curr_column  * CHARACTER_WIDTH));
             curr_column = 0;
             curr_line += 1;
             if curr_line == buffer_height {
@@ -75,7 +74,6 @@ pub fn print_string(
             );
             curr_column += 1;
             if curr_column == buffer_width {
-                //blocks.push((curr_line, 0, buffer_width));
                 curr_column = 0;
                 curr_line += 1;
                 if curr_line == buffer_height {
@@ -83,9 +81,9 @@ pub fn print_string(
                 }
             }
         }
-    }    
-    //fill the blank of the last line
-    //blocks.push((curr_line, 0, curr_column * CHARACTER_WIDTH));
+    }  
+
+    // fill the blank of the remaing part
     fill_blank(
         framebuffer,
         x + (curr_column * CHARACTER_WIDTH) as isize,
@@ -166,7 +164,7 @@ pub fn print_ascii_character(
     }
 }
 
-// fill a blank text area (left, top, right, bottom) with color. The tuple specifies the location of the area relative to the origin(top-left point) of the frame buffer.
+/// Fill a blank text area (left, top, right, bottom) with color. The tuple specifies the location of the area relative to the origin(top-left point) of the frame buffer.
 pub fn fill_blank(
     framebuffer: &mut dyn FrameBuffer,
     left: isize,
