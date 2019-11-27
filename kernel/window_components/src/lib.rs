@@ -38,7 +38,6 @@ use alloc::boxed::Box;
 use alloc::collections::BTreeMap;
 use alloc::string::{String, ToString};
 use alloc::sync::Arc;
-use alloc::vec::IntoIter;
 use compositor::Compositor;
 use core::ops::Deref;
 use core::ops::DerefMut;
@@ -47,7 +46,7 @@ use displayable::Displayable;
 use event_types::{Event, MousePositionEvent};
 use frame_buffer::{Coord, FrameBuffer, Pixel, RectArea};
 use frame_buffer_alpha::{PixelMixer, BLACK};
-use frame_buffer_compositor::{FrameBufferBlocks, FRAME_COMPOSITOR, Block};
+use frame_buffer_compositor::{FrameBufferBlocks, FRAME_COMPOSITOR};
 use spin::Mutex;
 use memory_structs::PhysicalAddress;
 use window::{Window};
@@ -130,7 +129,7 @@ impl WindowComponents {
         width: usize,
         height: usize,
         background: u32,
-        new_framebuffer: &dyn Fn(usize, usize, Option<PhysicalAddress>) -> Result<Box<FrameBuffer>, &'static str>,
+        new_framebuffer: &dyn Fn(usize, usize, Option<PhysicalAddress>) -> Result<Box<dyn FrameBuffer>, &'static str>,
     ) -> Result<WindowComponents, &'static str> {
         let framebuffer = new_framebuffer(width, height, None)?;
         let (width, height) = framebuffer.get_size();
@@ -165,14 +164,14 @@ impl WindowComponents {
             components: BTreeMap::new(),
         };
 
-        let (start, end) = {
+        {
             let mut winobj = wincomps.winobj.lock();
             winobj.framebuffer.fill_color(wincomps.background);
             let coordinate = winobj.get_position();
             let start = coordinate;
             let end = start + (winobj.width as isize, winobj.height as isize);
-            (start, end)
-        };
+        }
+
         wincomps.draw_border(true); // draw window with active border
                                     // draw three buttons
         {
@@ -181,10 +180,7 @@ impl WindowComponents {
             wincomps.show_button(TopButton::MinimizeMaximize, 1, &mut winobj);
             wincomps.show_button(TopButton::Hide, 1, &mut winobj);
         }
-        debug!("before refresh");
         wincomps.render(None)?;
-        // window_manager::refresh_area_absolute(start, end)?;
-        debug!("after refresh");
 
         Ok(wincomps)
     }
@@ -294,22 +290,15 @@ impl WindowComponents {
         if is_active != self.last_is_active {
             self.draw_border(is_active);
             self.last_is_active = is_active;
-            let bcoordinate = {
-                let mut winobj = self.winobj.lock();
-                let coordinate = winobj.get_position();
-                let bcoordinate = coordinate;
-                self.show_button(TopButton::Close, 1, &mut winobj);
-                self.show_button(TopButton::MinimizeMaximize, 1, &mut winobj);
-                self.show_button(TopButton::Hide, 1, &mut winobj);
-                bcoordinate
-            };
-
-            /*if let Err(err) = self.refresh_border(bcoordinate) {
-                error!("refresh_border failed {}", err);
-            }*/
+            let mut winobj = self.winobj.lock();
+            let coordinate = winobj.get_position();
+            let bcoordinate = coordinate;
+            self.show_button(TopButton::Close, 1, &mut winobj);
+            self.show_button(TopButton::MinimizeMaximize, 1, &mut winobj);
+            self.show_button(TopButton::Hide, 1, &mut winobj);
         }
 
-        let bcoordinate = {
+        {
             let mut winobj = self.winobj.lock();
             let consumer = &winobj.consumer;
             let event = match consumer.peek() {
@@ -320,7 +309,6 @@ impl WindowComponents {
             };
 
             let coordinate = winobj.get_position();
-            let bcoordinate = coordinate;
             match event.deref() {
                 &Event::KeyboardEvent(ref input_event) => {
                     let key_input = input_event.key_event;
@@ -406,14 +394,10 @@ impl WindowComponents {
                 }
             };
             event.mark_completed();
-            bcoordinate
-        };
+        }
         
         if need_refresh_three_button {
-            // if border has been refreshed, no need to refresh buttons
-            if let Err(err) = self.refresh_three_button(bcoordinate) {
-                error!("refresh_three_button failed {}", err);
-            }
+            self.refresh_three_button()?;
         }
 
         let mut wm = WINDOW_MANAGER
@@ -431,13 +415,6 @@ impl WindowComponents {
         if call_later_do_move_active_window {
             wm.move_active_window()?;
         }
-
-        // if call_later_do_refresh_floating_border || call_later_do_move_active_window {
-        //     let wm = window_manager::WINDOW_MANAGER.try().ok_or("The window manager is not initialized")?.lock();
-        //     wm.refresh_bg_windows(None)?;
-        //     wm.refresh_windows(None)?;
-        //     wm.refresh_top(None)?;
-        // }
         
         Ok(())
     }
@@ -633,28 +610,17 @@ impl WindowComponents {
     }
 
     /// refresh the top left three button's appearance
-    fn refresh_three_button(&mut self, bcoordinate: Coord) -> Result<(), &'static str> {
-        for i in 0..3 {
-            let coordinate = bcoordinate
-                + (
-                    WINDOW_BUTTON_BIAS_X as isize + i * WINDOW_BUTTON_BETWEEN as isize,
-                    self.title_size as isize / 2,
-                );
-            
-            
-            // let profile = self.winobj.lock();
-            
-            
-            // let frame_buffer_blocks = FrameBufferBlocks {
-            //     framebuffer: profile.framebuffer.deref(),
-            //     coordinate: profile.coordinate,
-            //     blocks: None,
-            // };
-            // FRAME_COMPOSITOR
-            //     .lock()
-            //     .composite(vec![frame_buffer_blocks].into_iter())?;
-        }
-        self.render(None)?;
+    fn refresh_three_button(&self) -> Result<(), &'static str> {
+        let profile = self.winobj.lock();
+        let frame_buffer_blocks = FrameBufferBlocks {
+            framebuffer: profile.framebuffer.deref(),
+            coordinate: profile.coordinate,
+            blocks: None,
+        };
+        FRAME_COMPOSITOR
+            .lock()
+            .composite(vec![frame_buffer_blocks].into_iter())?;
+    
         Ok(())
     }
 

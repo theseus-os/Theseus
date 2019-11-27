@@ -67,7 +67,7 @@ impl Displayable for TextPrimitive {
                 (self.text.as_str(), 0, 0)
             };
 
-        let (next_col, next_line, update_area) = frame_buffer_printer::print_string(
+        let (next_col, next_line, mut update_area) = frame_buffer_printer::print_string(
             framebuffer,
             coordinate,
             self.width,
@@ -78,6 +78,10 @@ impl Displayable for TextPrimitive {
             col,
             line,
         );
+
+        if next_line < self.next_line {
+            update_area.end.y = ((self.next_line + 1 ) * CHARACTER_HEIGHT) as isize
+        }
 
         self.next_col = next_col;
         self.next_line = next_line;
