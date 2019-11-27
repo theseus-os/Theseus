@@ -633,14 +633,14 @@ impl WindowComponents {
     }
 
     /// refresh the top left three button's appearance
-    fn refresh_three_button(&self, bcoordinate: Coord) -> Result<(), &'static str> {
+    fn refresh_three_button(&mut self, bcoordinate: Coord) -> Result<(), &'static str> {
         for i in 0..3 {
             let coordinate = bcoordinate
                 + (
                     WINDOW_BUTTON_BIAS_X as isize + i * WINDOW_BUTTON_BETWEEN as isize,
                     self.title_size as isize / 2,
                 );
-            self.render()?;
+            
             
             // let profile = self.winobj.lock();
             
@@ -654,6 +654,7 @@ impl WindowComponents {
             //     .lock()
             //     .composite(vec![frame_buffer_blocks].into_iter())?;
         }
+        self.render(None)?;
         Ok(())
     }
 
