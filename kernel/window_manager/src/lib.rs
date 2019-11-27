@@ -957,7 +957,7 @@ pub fn new_window<'a>(
     let (width, height) = framebuffer.get_size();
 
     // new window object
-    let mut window: WindowGeneric = WindowGeneric {
+    let window: WindowGeneric = WindowGeneric {
         coordinate: coordinate,
         width: width,
         height: height,

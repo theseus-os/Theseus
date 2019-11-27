@@ -59,7 +59,6 @@ pub fn main(_args: Vec<String>) -> isize {
     ) {
         Ok(m) => m,
         Err(err) => {
-            loop{}
             error!("new window components returned err: {}", err);
             return -2;
         }

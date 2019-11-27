@@ -247,7 +247,7 @@ impl PixelMixer for Pixel {
         let red = self.get_red();
         let green = self.get_green();
         let blue = self.get_blue();
-        let ori_alpha = other.get_alpha();
+        // let ori_alpha = other.get_alpha();
         let ori_red = other.get_red();
         let ori_green = other.get_green();
         let ori_blue = other.get_blue();

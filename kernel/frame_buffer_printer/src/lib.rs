@@ -9,7 +9,6 @@ extern crate frame_buffer;
 extern crate frame_buffer_rgb;
 
 use alloc::vec;
-use alloc::vec::Vec;
 use font::{CHARACTER_HEIGHT, CHARACTER_WIDTH, FONT_PIXEL};
 use frame_buffer::{FrameBuffer, Coord, RectArea};
 
