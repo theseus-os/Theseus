@@ -14,27 +14,21 @@ x86_64 = { path = "../../libs/x86_64" }
 default-features = false
 version = "0.3.7"
 
-[dependencies.keycodes_ascii]
-path = "../../libs/keycodes_ascii"
-
 [dependencies.window]
 path = "../../kernel/window"
 
 [dependencies.frame_buffer]
 path = "../../kernel/frame_buffer"
 
+[dependencies.frame_buffer_alpha]
+path = "../../kernel/frame_buffer_alpha"
+
 [dependencies.dfqueue]
 path = "../../libs/dfqueue"
 version = "0.1.0"
 
-[dependencies.event_types]
-path = "../../kernel/event_types"
-
 [dependencies.spawn]
 path = "../../kernel/spawn"
-
-[dependencies.task]
-path = "../../kernel/task"
 
 [dependencies.runqueue]
 path = "../../kernel/runqueue"
@@ -45,38 +39,14 @@ path = "../../kernel/window_manager"
 [dependencies.window_components]
 path = "../../kernel/window_components"
 
-[dependencies.terminal_print]
-path = "../terminal_print"
+[dependencies.scheduler]
+path = "../../kernel/scheduler"
 
 [dependencies.print]
 path = "../../kernel/print"
 
-[dependencies.fs_node]
-path = "../../kernel/fs_node"
-
-[dependencies.environment]
-path = "../../kernel/environment"
-
-[dependencies.root]
-path = "../../kernel/root"
-
-[dependencies.path]
-path = "../../kernel/path"
-
-[dependencies.text_primitive]
-path = "../../kernel/displayable/text_primitive"
-
-[dependencies.frame_buffer_alpha]
-path = "../../kernel/frame_buffer_alpha"
-
 [lib]
 crate-type = ["rlib"]
-
-[dependencies.scheduler]
-path = "../../kernel/scheduler"
-
-[dependencies.hpet]
-path = "../../kernel/hpet"
 
 
 

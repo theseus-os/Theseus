@@ -1253,24 +1253,14 @@ name = "new_window"
 version = "0.1.0"
 dependencies = [
  "dfqueue 0.1.0",
- "environment 0.1.0",
- "event_types 0.1.0",
  "frame_buffer 0.1.0",
  "frame_buffer_alpha 0.1.0",
- "fs_node 0.1.0",
- "hpet 0.1.0",
- "keycodes_ascii 0.1.0",
  "log 0.3.9 (registry+https://github.com/rust-lang/crates.io-index)",
- "path 0.1.0",
  "print 0.1.0",
- "root 0.1.0",
  "runqueue 0.1.0",
  "scheduler 0.1.0",
  "spawn 0.1.0",
  "spin 0.4.10 (registry+https://github.com/rust-lang/crates.io-index)",
- "task 0.1.0",
- "terminal_print 0.1.0",
- "text_primitive 0.1.0",
  "window 0.1.0",
  "window_components 0.1.0",
  "window_manager 0.1.0",
@@ -2339,11 +2329,8 @@ name = "window"
 version = "0.1.0"
 dependencies = [
  "dfqueue 0.1.0",
- "displayable 0.1.0",
- "downcast-rs 1.0.4 (git+https://github.com/theseus-os/downcast-rs)",
  "event_types 0.1.0",
  "frame_buffer 0.1.0",
- "frame_buffer_compositor 0.1.0",
 ]
 
 [[package]]

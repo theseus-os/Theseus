@@ -3,22 +3,13 @@
 
 #![no_std]
 
-extern crate alloc;
 extern crate dfqueue;
-extern crate displayable;
 extern crate event_types;
 extern crate frame_buffer;
-extern crate frame_buffer_compositor;
-#[macro_use] extern crate downcast_rs;
 
-use alloc::boxed::Box;
-use alloc::vec::IntoIter;
-use dfqueue::{DFQueueConsumer, DFQueueProducer};
-use displayable::Displayable;
-use downcast_rs::Downcast;
+use dfqueue::{DFQueueProducer};
 use event_types::Event;
-use frame_buffer::{Coord, FrameBuffer, Pixel, RectArea};
-use frame_buffer_compositor::{Block};
+use frame_buffer::{Coord, FrameBuffer, Pixel};
 
 /// Trait for window profile. A window manager holds a list of objects who implement the `Window` trait.
 /// A `Window` provides states required by the window manager such as the size, the loaction and the active state of a window.

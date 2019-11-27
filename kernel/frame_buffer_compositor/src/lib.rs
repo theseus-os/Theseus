@@ -28,8 +28,6 @@ extern crate spin;
 #[macro_use]
 extern crate lazy_static;
 extern crate hashbrown;
-#[macro_use]
-extern crate log;
 
 use alloc::collections::BTreeMap;
 use alloc::vec::{Vec, IntoIter};
@@ -188,15 +186,9 @@ impl Compositor<FrameBufferBlocks<'_>> for FrameCompositor {
                     }
                 };
                 let keys: Vec<_> = self.caches.keys().cloned().collect();
-                let mut update_width = new_cache.block.width;
                 for key in keys {
                     if let Some(cache) = self.caches.get_mut(&key) {
                         if cache.overlaps_with(&new_cache) {
-                            // update_width = core::cmp::max(update_width, (cache.content_width as isize + cache.coordinate.x - new_cache.coordinate.x) as usize);
-                            // // if a block and a cached one are at the same locations, one covers another and we can remove the cache.
-                            // Otherwise, we should keep the locations of the cache and clear its content because: 
-                            // First, we need the right side location of the cache. If another block arrives, we should guarantee that the overlapped part with the second block will be cleared.
-                            // Second, if the same block of the cache arrives, we need to redraw the block because its overlapped part with current block is refreshed this time. 
                             if cache.coordinate == new_cache.coordinate  && cache.width == new_cache.width {
                                 self.caches.remove(&key);
                             } else {
@@ -222,7 +214,7 @@ impl Compositor<FrameBufferBlocks<'_>> for FrameCompositor {
                 // Wenqiu: TODO Optimize Later
                 let width = core::cmp::min(
                     core::cmp::min(coordinate_end.x as usize, final_width) - final_x_start,
-                    update_width + new_cache.block.start,
+                    new_cache.block.width + new_cache.block.start,
                 ) - new_cache.block.start;
                 let height = core::cmp::min(coordinate_end.y as usize, final_height) - final_y_start;
 
@@ -250,8 +242,6 @@ impl Compositor<FrameBufferBlocks<'_>> for FrameCompositor {
             .try()
             .ok_or("FrameCompositor fails to get the final frame buffer")?
             .lock();
-        let (final_width, final_height) = final_fb.get_size();
-
         while let Some(frame_buffer_blocks) = bufferlist.next() {
             for i in 0..abs_coord.len() {
                 let coordinate = abs_coord[i];
