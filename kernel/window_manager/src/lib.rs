@@ -89,8 +89,6 @@ static MOUSE_BASIC: [[Pixel; 2 * MOUSE_POINTER_HALF_SIZE + 1];
 const WINDOW_BORDER_SIZE: usize = 3;
 // border's inner color
 const WINDOW_BORDER_COLOR_INNER: Pixel = 0x00CA6F1E;
-// border's outer color
-const WINDOW_BORDER_COLOR_OUTTER: Pixel = 0xFFFFFFFF;
 
 /// window manager with overlapping and alpha enabled
 pub struct WindowManagerAlpha<U: Window> {
@@ -108,8 +106,6 @@ pub struct WindowManagerAlpha<U: Window> {
     bottom_fb: Box<dyn FrameBuffer>,
     /// the frame buffer that it should print on
     top_fb: Box<dyn FrameBuffer>,
-    /// if it this is true, do not refresh whole screen until someone calls "refresh_area_absolute"
-    delay_refresh_first_time: bool,
 }
 
 impl<U: Window> WindowManagerAlpha<U> {
@@ -564,16 +560,19 @@ impl<U: Window> WindowManagerAlpha<U> {
         // Update if the old floating border is to be cleared or there is a new floating border
         let old_area = self.repositioned_border.clone();
         // first clear old border if exists
-        if let Some(repositioned_border) = &self.repositioned_border {
+        match old_area {
+            Some(border) => {
+                let pixels = self.draw_floating_border(border.start, border.end, T);
+                self.refresh_bottom_windows_pixels(pixels.as_slice())?;
+            },
+            None =>{}
+        }
             // if show {
             //     // otherwise don't change position
             //     self.repositioned_border = Some(RectArea { start, end });
             // } else {
             //     self.repositioned_border = None;
             // }
-            let pixels = self.draw_floating_border(repositioned_border.start, repositioned_border.end, T);
-            self.refresh_bottom_windows_pixels(pixels.as_slice())?;
-        }
 
         // then draw current border
         if show {
@@ -791,7 +790,6 @@ pub fn init<Buffer: FrameBuffer>(
     }
 
     // initialize static window manager
-    let delay_refresh_first_time = true;
     let window_manager = WindowManagerAlpha {
         hide_list: VecDeque::new(),
         show_list: VecDeque::new(),
@@ -800,7 +798,6 @@ pub fn init<Buffer: FrameBuffer>(
         repositioned_border: None,
         bottom_fb: Box::new(bg_framebuffer),
         top_fb: Box::new(top_framebuffer),
-        delay_refresh_first_time: delay_refresh_first_time,
     };
     WINDOW_MANAGER.call_once(|| Mutex::new(window_manager));
 

@@ -9,10 +9,8 @@ extern crate font;
 extern crate frame_buffer;
 extern crate frame_buffer_drawer;
 extern crate frame_buffer_printer;
-#[macro_use] extern crate log;
 
 use alloc::string::String;
-use alloc::vec::Vec;
 use displayable::{Displayable, TextDisplayable};
 use font::{CHARACTER_HEIGHT, CHARACTER_WIDTH};
 use frame_buffer::{Coord, FrameBuffer, RectArea};
@@ -97,19 +95,10 @@ impl Displayable for TextPrimitive {
     ) -> Result<(), &'static str> {
         self.text = String::new();
         self.cache = String::new();
+        self.next_col = 0;
+        self.next_line = 0;
         // If the cache is the prefix of the new text, just print the additional characters.
         let framebuffer = framebuffer.ok_or("There is no framebuffer to display in")?;
-        let (string, col, line) =
-            if self.cache.len() > 0 && self.text.starts_with(self.cache.as_str()) {
-                (
-                    &self.text.as_str()[self.cache.len()..self.text.len()],
-                    self.next_col,
-                    self.next_line,
-                )
-            } else {
-                (self.text.as_str(), 0, 0)
-            };
-
         frame_buffer_drawer::fill_rectangle(
             framebuffer,
             coordinate,

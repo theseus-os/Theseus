@@ -167,9 +167,6 @@ impl WindowComponents {
         {
             let mut winobj = wincomps.winobj.lock();
             winobj.framebuffer.fill_color(wincomps.background);
-            let coordinate = winobj.get_position();
-            let start = coordinate;
-            let end = start + (winobj.width as isize, winobj.height as isize);
         }
 
         wincomps.draw_border(true); // draw window with active border
@@ -292,7 +289,6 @@ impl WindowComponents {
             self.last_is_active = is_active;
             let mut winobj = self.winobj.lock();
             let coordinate = winobj.get_position();
-            let bcoordinate = coordinate;
             self.show_button(TopButton::Close, 1, &mut winobj);
             self.show_button(TopButton::MinimizeMaximize, 1, &mut winobj);
             self.show_button(TopButton::Hide, 1, &mut winobj);
@@ -308,7 +304,6 @@ impl WindowComponents {
                 }
             };
 
-            let coordinate = winobj.get_position();
             match event.deref() {
                 &Event::KeyboardEvent(ref input_event) => {
                     let key_input = input_event.key_event;
