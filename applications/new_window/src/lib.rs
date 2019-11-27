@@ -1,16 +1,9 @@
-//! This application is to create a new window with given size, and user could edit text on it
+//! This application is to create a new window with given size.
 //!
 //! usage:      x y width height (unit is pixel)
 //!
-//! This simple application is to test `WindowManager` with multiple window overlapping each other,
+//! The new window has a half-transparent background. This simple application is to test `WindowManager` with multiple window overlapping each other,
 //! as well as test `WindowComponents` which provides easy-to-use interface for application to enable GUI.
-//!
-//! User could edit text in this window. Special keys are supported in this simple editor, such as moving up, down, left and right.
-//! Other basic operations like backspace and new-line is also supported.
-//!
-//! This application could also be used to test performance, by uncomment the code block that refreshing chars from `a` to `z`.
-//! You would notice that even if refreshing all the chars is slow, it is quite fast when you editing texts, thanks to partial refreshing
-//! mechanism supported by both `WindowManager` and `WindowComponents`
 
 #![no_std]
 #[macro_use]
@@ -67,7 +60,6 @@ pub fn main(_args: Vec<String>) -> isize {
     loop {
         if let Err(err) = wincomps.handle_event() {
             debug!("{}", err); 
-            // when user click close button, this will trigger, and simply exit the program
             return 0;
         }
     }

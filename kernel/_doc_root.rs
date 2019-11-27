@@ -28,8 +28,7 @@
 //! * `event_types`: A temporary way to move the input_event_manager typedefs out of the input_event_manager crate.
 //! * `device_manager`: Code for handling the sequence required to initialize each driver.
 //! * `displayable`: Defines a displayable trait. A displayable can display itself in a framebuffer.
-//! * `text_primitive`: Defines a primitive text displayable. It contains a block of text and can display in a framebuffer.
-//! * `text_area`: Defines a primitive text displayable used in the alpha window manager. It contains a block of text and can display in its default window.
+//! * `text_display`: A text display is a displayable. It contains a block of text and can display in a framebuffer.
 //! * `e1000`: Support for the e1000 NIC and driver.
 //! * `exceptions_early`: Early exception handlers that do nothing but print an error and hang.
 //! * `exceptions_full`: Exception handlers that are more fully-featured, i.e., kills tasks on an exception.
@@ -39,6 +38,7 @@
 //! * `frame_drawer`: Basic draw functions.
 //! * `frame_printer`: Prints a string in a frame buffer.
 //! * `frame_buffer_rgb`: The RGB FrameBuffer. It contains pixels without the alpha channel.
+//! * `frame_buffer_alpha`: The RGB FrameBuffer. It contains pixels with the alpha channel.
 //! * `fs_node`: defines the traits for File and Directory. These files and directories mimic that of a standard unix virtual filesystem
 //! * `gdt`: GDT (Global Descriptor Table) support (x86 only) for Theseus.
 //! * `interrupts`: Interrupt configuration and handlers for Theseus. 
@@ -66,7 +66,6 @@
 //! * `vfs_node`: contains the structs VFSDirectory and VFSFile, which are the most basic, generic implementers of the traits Directory and File
 //! * `vga_buffer`: Simple routines for printing to the screen using the x86 VGA buffer text mode.
 //! * `window`: Defines a trait for window.
-//! * `window_list_primitve`: Provides a structure of the primitive window manager.
-//! * `window_manager_primitve`: Defines a primitive window structure which implements the `Window` trait. Maintains a window manager which contains a list of generic window. 
-//! * `window_components`: Defines a `WindowComponents` structure which implements the `Window` trait. Used in the alpha window manager.
-//! * `window_manager`: Maintains a window manager which handles the alpha channel
+//! * `window_manager`: A window manager maintains a list of existing windows.
+//! * `window_generic`: Defines a `WindowGeneric` structure which implements the `Window` trait.
+//! * `window_components`: Defines a `WindowComponents` structure which wraps a window generic object. An application can own its window componenent object.

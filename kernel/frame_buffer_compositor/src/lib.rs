@@ -237,14 +237,14 @@ impl Compositor<FrameBufferBlocks<'_>> for FrameCompositor {
         Ok(())
     }
 
-    fn composite_pixels(&mut self, mut bufferlist: IntoIter<FrameBufferBlocks>, abs_coord: &[Coord]) -> Result<(), &'static str> {
+    fn composite_pixels(&mut self, mut bufferlist: IntoIter<FrameBufferBlocks>, abs_coords: &[Coord]) -> Result<(), &'static str> {
         let mut final_fb = FINAL_FRAME_BUFFER
             .try()
             .ok_or("FrameCompositor fails to get the final frame buffer")?
             .lock();
         while let Some(frame_buffer_blocks) = bufferlist.next() {
-            for i in 0..abs_coord.len() {
-                let coordinate = abs_coord[i];
+            for i in 0..abs_coords.len() {
+                let coordinate = abs_coords[i];
                 let relative_coord = coordinate - frame_buffer_blocks.coordinate;
                 if frame_buffer_blocks.framebuffer.contains(relative_coord) {
                     let pixel = frame_buffer_blocks.framebuffer.get_pixel(relative_coord)?;

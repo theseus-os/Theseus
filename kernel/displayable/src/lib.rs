@@ -18,8 +18,8 @@ use frame_buffer::{FrameBuffer, Coord, RectArea};
 pub trait Displayable: Downcast + Send {
     /// Displays in a framebuffer.
     /// # Arguments
-    /// * `coordinate`: the coordinate within the given `framebuffer` where this dis    playable should render itself. The `coordinate` is relative to the top-left point `(0, 0)` of the `framebuffer`.
-    /// * `framebuffer`: the framebuffer to display onto. Display in default framebuffer of the displayable if this argument is `None`.
+    /// * `coordinate`: the coordinate within the given `framebuffer` where this displayable should render itself. The `coordinate` is relative to the top-left point `(0, 0)` of the `framebuffer`.
+    /// * `framebuffer`: the framebuffer to display onto.
     ///
     /// Returns a list of updated blocks. The tuple (index, width) represents the index of the block in the framebuffer and its width. The use of `block` is described in the `frame_buffer_compositor` crate.
     fn display(
@@ -28,6 +28,9 @@ pub trait Displayable: Downcast + Send {
         framebuffer: Option<&mut dyn FrameBuffer>,
     ) -> Result<RectArea, &'static str> ;
 
+    /// Clear the displayable onto the framebuffer.
+    /// * `coordinate`: the coordinate relative to the top-left point `(0, 0)` of the `framebuffer`.
+    /// * `framebuffer`: the framebuffer where the displayable is displayed.
     fn clear(
         &mut self,
         coordinate: Coord,
@@ -39,35 +42,5 @@ pub trait Displayable: Downcast + Send {
 
     /// Gets the size of the area occupied by the displayable.
     fn get_size(&self) -> (usize, usize);
-
-    /// Get the position of the displayable in its container.
-    fn get_position(&self) -> Coord {
-        Coord::new(0, 0)
-    }
-
-    /// Transmute the displayable to a mutable text displayable. Return error if the object does not implement `TextDisplayable`.
-    fn as_text_mut(&mut self) -> Result<&mut dyn TextDisplayable, &'static str> {
-        Err("The displayable is not a text displayable")
-    }
-
-    /// Transmute the displayable to a text displayable. Return error if the object does not implement `TextDisplayable`.
-    fn as_text(&self) -> Result<&dyn TextDisplayable, &'static str> {
-        Err("The displayable is not a text displayable")
-    }
-
 }
 impl_downcast!(Displayable);
-
-/// Trait for text displayables. A text displayable is a box of text. It can display its inner content onto a framebuffer like other displayables.
-pub trait TextDisplayable: Displayable {
-    /// Get the size of the text displayable in units of characters.
-    fn get_dimensions(&self) -> (usize, usize);
-    
-    /// Gets the position of the next symbol as index in units of characters.
-    fn get_next_index(&self) -> usize;
-
-    /// Set `text` as the inner content of the text displayable
-    fn set_text(&mut self, text: &str);
-
-}
-impl_downcast!(TextDisplayable);

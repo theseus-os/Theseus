@@ -131,9 +131,3 @@ impl Cursor {
         self.underlying_char
     }
 }
-
-/// An area in which a cursor can display in. It can be a `TextDisplayable` or a `FrameBuffer` for different display subsystem.
-pub enum CursorArea<'a> {
-    Text(&'a mut dyn TextDisplayable),
-    Frame(&'a mut dyn FrameBuffer),
-}

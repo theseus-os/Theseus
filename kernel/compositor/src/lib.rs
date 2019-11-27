@@ -23,7 +23,12 @@ pub trait Compositor<T> {
         bufferlist: IntoIter<T>,
     ) -> Result<(), &'static str>;
 
-    fn composite_pixels(&mut self, bufferlist: IntoIter<T>, abs_coord: &[Coord]) -> Result<(), &'static str>;
+    /// Composites the pixels in these bufferlist
+    /// # Arguments
+    ///
+    /// * `bufferlist` - A list of information about the buffers to be composited. The list is of generic type so that we can implement various compositor with different information
+    /// * `abs_coords` - A list of coordinates relative to the origin (top-left) of the screen. The compositor will get the relative position of these pixels in every framebuffer and composites them.
+    fn composite_pixels(&mut self, bufferlist: IntoIter<T>, abs_coords: &[Coord]) -> Result<(), &'static str>;
 
     /// Checks if a buffer block at `coordinate` is already cached since last updating.
     fn is_cached(&self, block: &[u32], coordinate: &Coord) -> bool;

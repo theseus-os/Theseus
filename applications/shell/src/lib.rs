@@ -12,6 +12,7 @@ extern crate spawn;
 extern crate task;
 extern crate runqueue;
 extern crate event_types; 
+extern crate window_manager;
 extern crate path;
 extern crate root;
 extern crate scheduler;
@@ -23,7 +24,6 @@ extern crate terminal_print;
 extern crate print;
 extern crate environment;
 extern crate libterm;
-extern crate window_manager;
 
 #[macro_use] extern crate alloc;
 #[macro_use] extern crate log;
