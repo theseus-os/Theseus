@@ -566,34 +566,34 @@ impl WindowComponents {
         }
     }
 
-    /// refresh border, telling window manager to refresh
-    fn refresh_border(&self, bcoordinate: Coord) -> Result<(), &'static str> {
-        let (width, height) = {
-            let winobj = self.winobj.lock();
-            let width = winobj.width;
-            let height = winobj.height;
-            (width as isize, height as isize)
-        };
-        let border_size = self.border_size as isize;
-        let title_size = self.title_size as isize;
-        window_manager::refresh_area_absolute(
-            bcoordinate + (0, title_size),
-            bcoordinate + (border_size, height),
-        )?;
-        window_manager::refresh_area_absolute(
-            bcoordinate + (0, height - border_size),
-            bcoordinate + (width, height),
-        )?;
-        window_manager::refresh_area_absolute(
-            bcoordinate + (width - border_size, title_size),
-            bcoordinate + (width, height),
-        )?;
-        window_manager::refresh_area_absolute(
-            bcoordinate,
-            bcoordinate + (width, title_size),
-        )?;
-        Ok(())
-    }
+    // /// refresh border, telling window manager to refresh
+    // fn refresh_border(&self, bcoordinate: Coord) -> Result<(), &'static str> {
+    //     let (width, height) = {
+    //         let winobj = self.winobj.lock();
+    //         let width = winobj.width;
+    //         let height = winobj.height;
+    //         (width as isize, height as isize)
+    //     };
+    //     let border_size = self.border_size as isize;
+    //     let title_size = self.title_size as isize;
+    //     window_manager::refresh_area_absolute(
+    //         bcoordinate + (0, title_size),
+    //         bcoordinate + (border_size, height),
+    //     )?;
+    //     window_manager::refresh_area_absolute(
+    //         bcoordinate + (0, height - border_size),
+    //         bcoordinate + (width, height),
+    //     )?;
+    //     window_manager::refresh_area_absolute(
+    //         bcoordinate + (width - border_size, title_size),
+    //         bcoordinate + (width, height),
+    //     )?;
+    //     window_manager::refresh_area_absolute(
+    //         bcoordinate,
+    //         bcoordinate + (width, title_size),
+    //     )?;
+    //     Ok(())
+    // }
 
     /// show three button with status. state = 0,1,2 for three different color
     fn show_button(&self, button: TopButton, state: usize, winobj: &mut WindowGeneric) {
