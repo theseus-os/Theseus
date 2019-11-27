@@ -43,6 +43,9 @@ path = "../frame_buffer"
 [dependencies.window_manager]
 path = "../window_manager"
 
+[dependencies.window_generic]
+path = "../window_generic"
+
 [dependencies.event_types]
 path = "../event_types"
 

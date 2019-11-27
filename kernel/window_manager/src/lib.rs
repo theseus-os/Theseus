@@ -31,6 +31,7 @@ extern crate path;
 extern crate scheduler;
 extern crate spawn;
 extern crate window;
+extern crate window_generic;
 
 mod background;
 use alloc::boxed::Box;
@@ -51,6 +52,7 @@ use path::Path;
 use spawn::{ApplicationTaskBuilder, KernelTaskBuilder};
 use spin::{Mutex, Once};
 use window::Window;
+use window_generic::WindowGeneric;
 
 /// The alpha window manager
 pub static WINDOW_MANAGER: Once<Mutex<WindowManagerAlpha<WindowGeneric>>> = Once::new();
@@ -745,64 +747,6 @@ impl<U: Window> WindowManagerAlpha<U> {
     }
 }
 
-// /// refresh one pixel using absolute position, will lock WINDOW_MANAGER
-// pub fn refresh_pixel_absolute(coordinate: Coord) -> Result<(), &'static str> {
-//     let mut win = WINDOW_MANAGER
-//         .try()
-//         .ok_or("The static window manager was not yet initialized")?
-//         .lock();
-//     win.refresh_single_pixel(coordinate)
-// }
-
-// /// refresh an area using abosolute position, will lock WINDOW_MANAGER
-// pub fn refresh_area_absolute(start: Coord, end: Coord) -> Result<(), &'static str> {
-//     let mut win = WINDOW_MANAGER
-//         .try()
-//         .ok_or("The static window manager was not yet initialized")?
-//         .lock();
-//     if win.delay_refresh_first_time {
-//         win.delay_refresh_first_time = false;
-//         let (width, height) = win.bottom_fb.get_size();
-//         win.refresh_area_with_old_new(
-//             Coord::new(0, 0),
-//             Coord::new(width as isize, height as isize),
-//             start,
-//             end,
-//         )
-//     } else {
-//         win.refresh_area(start, end)
-//     }
-// }
-
-// /// Render the framebuffer of the window manager to the final buffer. Invoke this function after updating a window.
-// pub fn render(blocks: Option<IntoIter<Block>>) -> Result<(), &'static str> {
-//     let mut win = WINDOW_MANAGER
-//         .try()
-//         .ok_or("The static window manager was not yet initialized")?
-//         .lock();
-//     let mut bufferlist = Vec::new();
-//     // bufferlist.push(
-//     //     FrameBufferBlocks {
-//     //         framebuffer: win.bottom_fb.deref(),
-//     //         coordinate: Coord::new(0, 0),
-//     //         blocks: blocks,
-//     //     }
-//     // );
-
-//     let (width, height) = win.top_fb.get_size();
-//     bufferlist.push(
-//         FrameBufferBlocks {
-//             framebuffer: win.top_fb.deref(),
-//             coordinate: Coord::new(0, 0),
-//             blocks: Some(win.get_cursor_cache_block(Coord::new(0, 0), width, height).into_iter()),
-//         }
-//     );
-
-//     FRAME_COMPOSITOR
-//         .lock()
-//         .composite(bufferlist.into_iter())
-// }
-
 /// Initialize the window manager, should provide the consumer of keyboard and mouse event, as well as a frame buffer to draw
 pub fn init<Buffer: FrameBuffer>(
     key_consumer: DFQueueConsumer<Event>,
@@ -843,124 +787,14 @@ pub fn init<Buffer: FrameBuffer>(
     win.mouse = Coord {
         x: screen_width as isize / 2,
         y: screen_height as isize / 2,
-    }; // set mouse to middle
+    }; 
     
-    //if !delay_refresh_first_time {
     win.refresh_bottom_windows(None, false)?;
     
     KernelTaskBuilder::new(window_manager_loop, (key_consumer, mouse_consumer))
         .name("window_manager_loop".to_string())
         .spawn()?;
     Ok(())
-}
-
-/// Window object that should be owned by the manager. It implements the `Window` trait.
-pub struct WindowGeneric {
-    /// The position of the top-left corner of the window.
-    /// It is relative to the top-left corner of the screen.
-    pub coordinate: Coord,
-    /// The width of the window.
-    pub width: usize,
-    /// The height of the window.
-    pub height: usize,
-    /// event consumer that could be used to get event input given to this window
-    pub consumer: DFQueueConsumer<Event>, // event input
-    producer: DFQueueProducer<Event>, // event output used by window manager
-    /// frame buffer of this window
-    pub framebuffer: Box<dyn FrameBuffer>,
-
-    /// if true, window manager will send all mouse event to this window, otherwise only when mouse is on this window does it send.
-    /// This is extremely helpful when application wants to know mouse movement outside itself, because by default window manager only sends mouse event
-    /// when mouse is in the window's region. This is used when user move the window, to receive mouse event when mouse is out of the current window.
-    pub give_all_mouse_event: bool,
-    /// whether in moving state, only available when it is active. This is set when user press on the title bar (except for the buttons),
-    /// and keeping mouse pressed when moving the mouse.
-    pub is_moving: bool,
-    /// the base position of window moving action, should be the mouse position when `is_moving` is set to true
-    pub moving_base: Coord,
-}
-
-impl Window for WindowGeneric {
-    fn clear(&mut self) -> Result<(), &'static str> {
-        self.framebuffer.fill_color(0x80FFFFFF);
-        Ok(())
-    }
-
-    fn draw_border(&self, _color: u32) -> Result<(), &'static str> {
-        // this window uses WindowComponents instead of border
-        Ok(())
-    }
-
-    fn contains(&self, coordinate: Coord) -> bool {
-        self.framebuffer.contains(coordinate)
-    }
-
-    fn resize(
-        &mut self,
-        _coordinate: Coord,
-        _width: usize,
-        _height: usize,
-    ) -> Result<(usize, usize), &'static str> {
-        // TODO: This system hasn't implemented resize
-        Ok((0, 0))
-    }
-
-    fn get_content_size(&self) -> (usize, usize) {
-        (self.width, self.height)
-    }
-
-    fn get_position(&self) -> Coord {
-        self.coordinate
-    }
-
-    fn events_producer(&mut self) -> &mut DFQueueProducer<Event> {
-        &mut self.producer
-    }
-
-    fn set_position(&mut self, coordinate: Coord) {
-        self.coordinate = coordinate;
-    }
-
-    fn get_moving_base(&self) -> Coord {
-        self.moving_base
-    }
-
-    fn set_moving_base(&mut self, coordinate: Coord) {
-        self.moving_base = coordinate
-    }
-
-    fn is_moving(&self) -> bool {
-        self.is_moving
-    }
-
-    fn set_is_moving(&mut self, moving: bool) {
-        self.is_moving = moving;   
-    }
-
-    fn set_give_all_mouse_event(&mut self, flag: bool) {
-        self.give_all_mouse_event = flag;
-    }
-
-    fn give_all_mouse_event(&mut self) -> bool {
-        self.give_all_mouse_event
-    }
-
-    fn get_pixel(&self, coordinate: Coord) -> Result<Pixel, &'static str> {
-        self.framebuffer.get_pixel(coordinate)
-    }
-
-    fn framebuffer(&self) -> &dyn FrameBuffer {
-        self.framebuffer.deref()
-    }
-
-    fn framebuffer_mut(&mut self) -> &mut dyn FrameBuffer {
-        self.framebuffer.deref_mut()
-    }
-
-    fn coordinate(&self) -> Coord {
-        self.coordinate
-    }
-
 }
 
 // handles all keyboard and mouse movement in this window manager

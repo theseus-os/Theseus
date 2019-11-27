@@ -25,6 +25,9 @@ path = "../frame_buffer_drawer"
 [dependencies.window]
 path = "../window"
 
+[dependencies.window_generic]
+path = "../window_generic"
+
 [dependencies.compositor]
 path = "../compositor"
 

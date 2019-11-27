@@ -32,6 +32,7 @@ extern crate mouse;
 extern crate window;
 extern crate window_manager;
 extern crate memory_structs;
+extern crate window_generic;
 
 use alloc::boxed::Box;
 use alloc::collections::BTreeMap;
@@ -50,7 +51,8 @@ use frame_buffer_compositor::{FrameBufferBlocks, FRAME_COMPOSITOR, Block};
 use spin::Mutex;
 use memory_structs::PhysicalAddress;
 use window::{Window};
-use window_manager::{WindowGeneric, WINDOW_MANAGER};
+use window_manager::{WINDOW_MANAGER};
+use window_generic::WindowGeneric;
 
 /// The title bar size, in number of pixels
 const WINDOW_TITLE_BAR: usize = 15;
