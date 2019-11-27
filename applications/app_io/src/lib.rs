@@ -20,25 +20,20 @@
 extern crate stdio;
 extern crate spin;
 #[macro_use] extern crate alloc;
-extern crate core_io;
 extern crate keycodes_ascii;
+extern crate libterm;
 extern crate scheduler;
 extern crate serial_port;
+extern crate core_io;
 
-extern crate window_manager;
-extern crate window_components;
-extern crate window;
-
-extern crate libterm;
-
+use stdio::{KeyEventQueueReader, KeyEventReadGuard, StdioReader, StdioWriter};
+use spin::{Mutex, MutexGuard};
 use alloc::boxed::Box;
 use alloc::collections::BTreeMap;
 use alloc::sync::Arc;
 use alloc::string::String;
 use alloc::vec::Vec;
 use libterm::Terminal;
-use spin::{Mutex, MutexGuard};
-use stdio::{KeyEventQueueReader, KeyEventReadGuard, StdioReader, StdioWriter};
 
 /// Stores the stdio queues, key event queue and the pointer to the terminal
 /// for applications. This structure is provided for application's use and only
@@ -136,15 +131,11 @@ mod shared_maps {
 
 lazy_static! {
     /// The default terminal.
-    static ref DEFAULT_TERMINAL: Option<Arc<Mutex<Terminal>>> = {
+    static ref DEFAULT_TERMINAL: Option<Arc<Mutex<Terminal>>> =
         match Terminal::new() {
             Ok(terminal) => Some(Arc::new(Mutex::new(terminal))),
-            Err(err) => { 
-                debug!("Fail to create the generic window: {}", err);
-                return None;
-            }
-        }
-    };
+            Err(err) => None
+        };
 }
 
 /// Applications call this function to get the terminal to which it should print.

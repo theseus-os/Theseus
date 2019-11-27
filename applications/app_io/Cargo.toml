@@ -24,9 +24,6 @@ path = "../../kernel/window_manager"
 [dependencies.window]
 path = "../../kernel/window"
 
-[dependencies.libterm]
-path = "../../kernel/libterm"
-
 [dependencies.window_components]
 path = "../../kernel/window_components"
 
@@ -38,6 +35,9 @@ path = "../../kernel/task"
 
 [dependencies.print]
 path = "../../kernel/print"
+
+[dependencies.libterm]
+path = "../../kernel/libterm"
 
 [dependencies.lazy_static]
 features = ["spin_no_std", "nightly"]
