@@ -48,9 +48,6 @@ path = "../frame_buffer_rgb"
 [dependencies.frame_buffer_printer]
 path = "../frame_buffer_printer"
 
-[dependencies.frame_buffer_compositor]
-path = "../frame_buffer_compositor"
-
 [dependencies.window_manager]
 path = "../window_manager"
 

@@ -1329,7 +1329,7 @@ impl Shell {
             }
 
             let is_active = {
-                let mut wm = window_manager::WINDOW_MANAGER
+                let wm = window_manager::WINDOW_MANAGER
                     .try()
                     .ok_or("The static window manager was not yet initialized")?
                     .lock();

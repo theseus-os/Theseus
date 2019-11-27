@@ -22,19 +22,17 @@ extern crate tsc;
 extern crate window;
 extern crate window_manager;
 extern crate window_components;
-extern crate frame_buffer_compositor;
 extern crate text_primitive;
 
 use alloc::string::{String, ToString};
 use alloc::vec::Vec;
 use alloc::boxed::Box;
 use cursor::*;
-use displayable::{Displayable, TextDisplayable};
+use displayable::{TextDisplayable};
 use text_primitive::TextPrimitive;
 use event_types::Event;
 use font::{CHARACTER_HEIGHT, CHARACTER_WIDTH};
 use frame_buffer::{Coord, FrameBuffer, RectArea};
-use frame_buffer_compositor::{Block};
 use tsc::{tsc_ticks, TscTicks};
 use window::{Window};
 use window_components::WindowComponents;
@@ -682,14 +680,6 @@ impl Terminal {
             area
         };   
 
-        // update to the end of the text if the cursor is at the last line
-        let text_width = if text_next_pos / col_num == cursor_line {
-            text_next_pos % col_num
-        } else {
-            col_num * CHARACTER_WIDTH
-        };
-
-        // TODO: optimize with block
         self.window.render(Some(update_area))
     }
 

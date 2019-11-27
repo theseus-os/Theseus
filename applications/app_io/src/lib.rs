@@ -21,7 +21,6 @@ extern crate stdio;
 extern crate spin;
 #[macro_use] extern crate alloc;
 extern crate core_io;
-extern crate frame_buffer;
 extern crate keycodes_ascii;
 extern crate scheduler;
 extern crate serial_port;
@@ -30,7 +29,6 @@ extern crate window_manager;
 extern crate window_components;
 extern crate window;
 
-extern crate text_primitive;
 extern crate libterm;
 
 use alloc::boxed::Box;
@@ -41,9 +39,7 @@ use alloc::vec::Vec;
 use libterm::Terminal;
 use spin::{Mutex, MutexGuard};
 use stdio::{KeyEventQueueReader, KeyEventReadGuard, StdioReader, StdioWriter};
-use frame_buffer::Coord;
 
-use text_primitive::TextPrimitive;
 /// Stores the stdio queues, key event queue and the pointer to the terminal
 /// for applications. This structure is provided for application's use and only
 /// contains necessary one-end readers/writers to queues. On the shell side, we have

@@ -285,7 +285,7 @@ impl WindowComponents {
         let mut need_refresh_three_button = false;
 
         let is_active = {
-            let mut wm = window_manager::WINDOW_MANAGER
+            let wm = window_manager::WINDOW_MANAGER
                 .try()
                 .ok_or("The static window manager was not yet initialized")?
                 .lock();
@@ -444,14 +444,14 @@ impl WindowComponents {
 
     pub fn render(
         &mut self,
-        mut area: Option<RectArea>,
+        area: Option<RectArea>,
     ) -> Result<(), &'static str> {
         let coordinate = {
-            let mut window = self.winobj.lock();
+            let window = self.winobj.lock();
             window.get_position()
         };
 
-        let mut wm = WINDOW_MANAGER
+        let wm = WINDOW_MANAGER
             .try()
             .ok_or("The static window manager was not yet initialized")?
             .lock();
@@ -640,22 +640,19 @@ impl WindowComponents {
                     WINDOW_BUTTON_BIAS_X as isize + i * WINDOW_BUTTON_BETWEEN as isize,
                     self.title_size as isize / 2,
                 );
-            let r = WINDOW_RADIUS as isize;
-
-            let profile = self.winobj.lock();
-            let frame_buffer_blocks = FrameBufferBlocks {
-                framebuffer: profile.framebuffer.deref(),
-                coordinate: profile.coordinate,
-                blocks: None,
-            };
-            FRAME_COMPOSITOR
-                .lock()
-                .composite(vec![frame_buffer_blocks].into_iter())?;
-
-            /* window_manager::refresh_area_absolute(
-                coordinate - (r, r),
-                coordinate + (r + 1, r + 1),
-            )?;*/
+            self.render()?;
+            
+            // let profile = self.winobj.lock();
+            
+            
+            // let frame_buffer_blocks = FrameBufferBlocks {
+            //     framebuffer: profile.framebuffer.deref(),
+            //     coordinate: profile.coordinate,
+            //     blocks: None,
+            // };
+            // FRAME_COMPOSITOR
+            //     .lock()
+            //     .composite(vec![frame_buffer_blocks].into_iter())?;
         }
         Ok(())
     }
@@ -715,24 +712,8 @@ struct Component {
 }
 
 impl Component {
-    // gets the displayable
-    fn get_displayable(&self) -> &Box<dyn Displayable> {
-        return &(self.displayable);
-    }
-
-    // gets a mutable reference to the displayable
-    fn get_displayable_mut(&mut self) -> &mut Box<dyn Displayable> {
-        return &mut (self.displayable);
-    }
-
     // gets the coordinate of the displayable relative to the top-left corner of the window
     fn get_position(&self) -> Coord {
         self.coordinate
-    }
-
-    // resizes the displayable as (width, height) at `coordinate` relative to the top-left corner of the window
-    fn resize(&mut self, coordinate: Coord, width: usize, height: usize) {
-        self.coordinate = coordinate;
-        self.displayable.resize(width, height);
     }
 }

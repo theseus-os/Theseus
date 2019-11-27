@@ -24,12 +24,6 @@ path = "../../kernel/window_manager"
 [dependencies.window]
 path = "../../kernel/window"
 
-[dependencies.frame_buffer]
-path = "../../kernel/frame_buffer"
-
-[dependencies.text_primitive]
-path = "../../kernel/displayable/text_primitive"
-
 [dependencies.libterm]
 path = "../../kernel/libterm"
 
