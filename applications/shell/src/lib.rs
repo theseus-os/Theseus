@@ -938,7 +938,7 @@ impl Shell {
         if possible_names.is_empty() { return Ok(()); }
 
         // Get terminal screen width.
-        let (width, _) = self.terminal.lock().get_width_height();
+        let (width, _) = self.terminal.lock().get_text_dimensions();
 
         // Find the length of the longest string.
         let longest_len = match possible_names.iter().map(|name| name.len()).max() {

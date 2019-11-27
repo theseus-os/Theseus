@@ -1,6 +1,6 @@
 //! This crate acts as a manager of a list of windows. It defines a `WindowManager` structure and an instance of it. 
 //!
-//! A window manager holds a set of `Window` object, including an active window, a list of shown windows and a list of hidden windows. The hidden windows are totally overlapped by others.
+//! A window manager holds a set of `Window` objects, including an active window, a list of shown windows and a list of hidden windows. The hidden windows are totally overlapped by others.
 //!
 //! A window contains a bottom framebuffer and a top framebuffer. The bottom is the background of the desktop and the top framebuffer contains a floating window border and a mouse arrow. In refreshing, the manager will render all the framebuffers in order: bottom -> hide list -> showlist -> active -> top.
 //!
@@ -46,7 +46,7 @@ use spin::{Mutex, Once};
 use window::Window;
 use window_generic::WindowGeneric;
 
-/// The alpha window manager
+/// The instance of the default window manager
 pub static WINDOW_MANAGER: Once<Mutex<WindowManager<WindowGeneric>>> = Once::new();
 
 // The half size of mouse in number of pixels, the actual size of pointer is 1+2*`MOUSE_POINTER_HALF_SIZE`
@@ -82,7 +82,7 @@ const WINDOW_BORDER_SIZE: usize = 3;
 // border's inner color
 const WINDOW_BORDER_COLOR_INNER: Pixel = 0x00CA6F1E;
 
-/// window manager with overlapping and alpha enabled
+/// Window manager structure which maintains a list of windows and a mouse.
 pub struct WindowManager<U: Window> {
     /// those window currently not shown on screen
     hide_list: VecDeque<Weak<Mutex<U>>>,

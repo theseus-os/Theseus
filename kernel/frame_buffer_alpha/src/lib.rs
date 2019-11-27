@@ -1,7 +1,7 @@
 //! Framebuffer with alpha channel composition
 //!
-//! It defines a FrameBufferAlpha structure and creates new framebuffers for applications,
-//! also defines the color format which is composed of blue, green, red and alpha.
+//! It defines a `FrameBufferAlpha` structure and creates new framebuffers for applications.
+//! It also defines the color format which is composed of blue, green, red and alpha.
 //!
 //! Several predefined functions can help to manipulate the framebuffer objects and single pixel.
 
@@ -30,7 +30,7 @@ pub const BLACK: Pixel = 0;
 /// predefined opaque white
 pub const WHITE: Pixel = 0x00FFFFFF;
 
-// Every pixel is of `Pixel` type, which is 4 byte as defined in `Pixel`
+/// Every pixel is of `Pixel` type, which is 4 byte as defined in `Pixel`
 const PIXEL_BYTES: usize = core::mem::size_of::<Pixel>();
 
 /// Initialize the final frame buffer by allocating a block of memory and map it to the physical framebuffer frames.
@@ -61,7 +61,7 @@ pub fn init() -> Result<(usize, usize), &'static str> {
     Ok((buffer_width, buffer_height))
 }
 
-/// The frame buffer struct of either virtual frame buffer or physical frame buffer. It contains the size of the buffer and a buffer array
+/// The frame buffer struct of either virtual frame buffer or physical frame buffer. It contains the size of the buffer and a buffer array. Pixels in this buffer have alpha channel.
 pub struct FrameBufferAlpha {
     /// The width of the framebuffer
     pub width: usize,
@@ -265,7 +265,7 @@ pub fn new_alpha_pixel(alpha: u8, red: u8, green: u8, blue: u8) -> Pixel {
     return ((alpha as u32) << 24) + ((red as u32) << 16) + ((green as u32) << 8) + (blue as u32);
 }
 
-/// Create a new alpha framebuffer. Useful for generic.
+/// Create a new alpha framebuffer. useful for generalization.
 pub fn new(
     width: usize,
     height: usize,

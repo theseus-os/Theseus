@@ -28,7 +28,7 @@ pub trait Displayable: Downcast + Send {
         framebuffer: Option<&mut dyn FrameBuffer>,
     ) -> Result<RectArea, &'static str> ;
 
-    /// Clear the displayable onto the framebuffer.
+    /// Clear the displayable in the framebuffer.
     /// * `coordinate`: the coordinate relative to the top-left point `(0, 0)` of the `framebuffer`.
     /// * `framebuffer`: the framebuffer where the displayable is displayed.
     fn clear(

@@ -77,7 +77,7 @@ pub struct Terminal {
 /// Privite methods of `Terminal`.
 impl Terminal {
     /// Get the width and height of the text displayable in the unit of characters.
-    fn get_text_dimensions(&self) -> (usize, usize) {
+    pub fn get_text_dimensions(&self) -> (usize, usize) {
         let text_display = match self.window.get_concrete_display::<TextDisplay>(&self.display_name) {
             Ok(text_display) => text_display,
             Err(err) => {
@@ -625,11 +625,6 @@ impl Terminal {
         let event_copy = event.clone();
         event.mark_completed();
         Some(event_copy)
-    }
-
-    /// Get (width, height) of the text area in units of characters
-    pub fn get_width_height(&self) -> (usize, usize) {
-        self.get_text_dimensions()
     }
 
     /// Display the cursor of the terminal.

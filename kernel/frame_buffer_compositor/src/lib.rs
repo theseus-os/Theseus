@@ -11,12 +11,12 @@
 //!
 //! The compositor caches a list of displayed blocks and their updated area. If an incoming `FrameBufferBlocks` carries a list of updated blocks, the compositor compares every block with a cached one:
 //! * If the two blocks are identical, ignore it.
-//! * If a new block overlaps with an existing one, display the contentand caches it.
-//! * Then we set the hash of the cache as 0. We do not remove it because we should keep its content location and when another block arrives, their overlapped parts will be cleared. We set its content as 0 so that the compositor will redraw it if the same block arrives.
+//! * If a new block overlaps with an existing one, display the content and caches it.
+//! * Then we set the hash of the old cache as 0. We do not remove it because we should keep its content location and when another block arrives, their overlapped parts will be cleared. We set its content as 0 so that the compositor will redraw it if the same block arrives.
 //!
 //! If `FrameBufferBlocks` is `None`, the compositor will handle all of its blocks.
 //!
-//! The `composite_pixles` method will update the pixels relative to the top-left of the screen. It computes the relative coordinate in every framebuffer, composites them and write the result to the screen.
+//! The `composite_pixles` method will update the pixels relative to the top-left of the screen. It computes the relative coordinates in every framebuffer, composites them and write the result to the screen.
 //! 
 //! The compositor minimizes the updated parts of a framebuffer and clears the blank parts. Even if the cache is lost or the updated blocks information is `None`, it guarantees the result is the same.
 
@@ -38,6 +38,7 @@ use compositor::Compositor;
 use frame_buffer::{FrameBuffer, FINAL_FRAME_BUFFER, Coord, RectArea};
 use spin::Mutex;
 
+/// The height of a cache block of the compositor
 pub const CACHE_BLOCK_HEIGHT:usize = 16;
 
 lazy_static! {

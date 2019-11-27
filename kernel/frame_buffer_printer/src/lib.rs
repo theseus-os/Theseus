@@ -83,7 +83,7 @@ pub fn print_string(
         }
     }  
 
-    // fill the blank of the remaing part
+    // fill the blank of the last line
     fill_blank(
         framebuffer,
         x + (curr_column * CHARACTER_WIDTH) as isize,
@@ -103,6 +103,7 @@ pub fn print_string(
         end: end_point,
     };
 
+    // fill the blank of the remaining part
     fill_blank(
         framebuffer,
         x,

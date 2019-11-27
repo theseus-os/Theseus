@@ -98,7 +98,7 @@ fn get_content_string(file_path: String) -> Result<String, String> {
 /// not to cause panic.
 fn parse_content(content: &String) -> Result<BTreeMap<usize, LineSlice>, &'static str> {
     // Get the width and height of the terminal screen.
-    let (width, _height) = app_io::get_terminal_or_default()?.lock().get_width_height();
+    let (width, _height) = app_io::get_terminal_or_default()?.lock().get_text_dimensions();
 
     // Record the slice index of each line.
     let mut map: BTreeMap<usize, LineSlice> = BTreeMap::new();
@@ -140,7 +140,7 @@ fn display_content(content: &String, map: &BTreeMap<usize, LineSlice>,
     let mut locked_terminal = terminal.lock();
 
     // Calculate the last line to display. Make sure we don't extend over the end of the file.
-    let (_width, height) = locked_terminal.get_width_height();
+    let (_width, height) = locked_terminal.get_text_dimensions();
     let mut line_end: usize = line_start + height;
     if line_end > map.len() {
         line_end = map.len();

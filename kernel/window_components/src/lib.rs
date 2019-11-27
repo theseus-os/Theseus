@@ -607,8 +607,6 @@ impl Drop for WindowComponents {
             Ok(wm) => {
                 if let Err(err) = wm.lock().delete_window(&self.winobj) {
                     error!("delete_window failed {}", err);
-                } else {
-                    trace!("delete window succeed");
                 }
             }
             Err(err) => {
