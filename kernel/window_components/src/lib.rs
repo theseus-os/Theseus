@@ -408,22 +408,20 @@ impl WindowComponents {
             }
         }
 
+        let mut wm = WINDOW_MANAGER
+            .try()
+            .ok_or("The static window manager was not yet initialized")?
+            .lock();
         if need_to_set_active {
-            let mut wm = WINDOW_MANAGER
-                .try()
-                .ok_or("The static window manager was not yet initialized")?
-                .lock();
             wm.set_active(&self.winobj, true)?;
         }
 
         if call_later_do_refresh_floating_border {
-            window_manager::do_refresh_floating_border()?;
+            wm.move_floating_border()?;
         }
 
         if call_later_do_move_active_window {
-            if let Err(err) = window_manager::do_move_active_window() {
-                error!("do_move_active_window failed {}", err);
-            }
+            wm.move_active_window()?;
         }
 
         // if call_later_do_refresh_floating_border || call_later_do_move_active_window {

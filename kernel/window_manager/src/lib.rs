@@ -618,7 +618,7 @@ impl<U: Window> WindowManagerAlpha<U> {
     }
 
     /// take active window's base position and current mouse, move the window with delta
-    fn move_active_window(&mut self) -> Result<(), &'static str> {
+    pub fn move_active_window(&mut self) -> Result<(), &'static str> {
         if let Some(current_active) = self.active.upgrade() {
             let (old_start, old_end, new_start, new_end) = {
                 let mut current_active_win = current_active.lock();
@@ -686,6 +686,39 @@ impl<U: Window> WindowManagerAlpha<U> {
         Ok(())
     }
 
+    pub fn move_floating_border(&mut self) -> Result<(), &'static str> {
+        let (new_x, new_y) = {
+            let m = &self.mouse;
+            (m.x as isize, m.y as isize)
+        };
+        
+        if let Some(current_active) = self.active.upgrade() {
+            let (is_draw, border_start, border_end) = {
+                let current_active_win = current_active.lock();
+                if current_active_win.is_moving() {
+                    // move this window
+                    // for better performance, while moving window, only border is shown for indication
+                    let coordinate = current_active_win.get_position();
+                    // let (current_x, current_y) = (coordinate.x, coordinate.y);
+                    let base = current_active_win.get_moving_base();
+                    let (base_x, base_y) = (base.x, base.y);
+                    let (width, height) = current_active_win.get_content_size();
+                    let border_start = coordinate + (new_x - base_x, new_y - base_y);
+                    let border_end = border_start + (width as isize, height as isize);
+                    (true, border_start, border_end)
+                } else {
+                    (false, Coord::new(0, 0), Coord::new(0, 0))
+                }
+            };
+            self.refresh_floating_border(is_draw, border_start, border_end)?;
+        } else {
+            self.refresh_floating_border(false, Coord::new(0, 0), Coord::new(0, 0))?;
+        }
+
+        Ok(())
+    }
+
+
     fn get_cursor_coords(&self) -> Vec<Coord> {
         let mut result = Vec::new();
         for i in 6..15 {
@@ -725,42 +758,6 @@ pub fn is_active(objref: &Arc<Mutex<WindowGeneric>>) -> bool {
 /// refresh the floating border display, will lock WINDOW_MANAGER. This is useful to show the window size and position without much computation,
 /// means only a thin border is updated and shown. The size and position of floating border is set inside active window by `moving_base`. Only moving
 /// is supported now, which means the relative position of current mouse and `moving_base` is actually the new position of border
-pub fn do_refresh_floating_border() -> Result<(), &'static str> {
-    let mut win = WINDOW_MANAGER
-        .try()
-        .ok_or("The static window manager was not yet initialized")?
-        .lock();
-    let (new_x, new_y) = {
-        let m = &win.mouse;
-        (m.x as isize, m.y as isize)
-    };
-    
-    if let Some(current_active) = win.active.upgrade() {
-        let (is_draw, border_start, border_end) = {
-            let current_active_win = current_active.lock();
-            if current_active_win.is_moving() {
-                // move this window
-                // for better performance, while moving window, only border is shown for indication
-                let coordinate = current_active_win.get_position();
-                // let (current_x, current_y) = (coordinate.x, coordinate.y);
-                let base = current_active_win.get_moving_base();
-                let (base_x, base_y) = (base.x, base.y);
-                let width = current_active_win.width;
-                let height = current_active_win.height;
-                let border_start = coordinate + (new_x - base_x, new_y - base_y);
-                let border_end = border_start + (width as isize, height as isize);
-                (true, border_start, border_end)
-            } else {
-                (false, Coord::new(0, 0), Coord::new(0, 0))
-            }
-        };
-        win.refresh_floating_border(is_draw, border_start, border_end)?;
-    } else {
-        win.refresh_floating_border(false, Coord::new(0, 0), Coord::new(0, 0))?;
-    }
-
-    Ok(())
-}
 
 /// execute moving active window action, this will lock WINDOW_MANAGER
 pub fn do_move_active_window() -> Result<(), &'static str> {
@@ -1119,11 +1116,11 @@ fn keyboard_handle_application(key_input: KeyEvent) -> Result<(), &'static str> 
 
 // handle mouse event, push it to related window or anyone asked for it
 fn cursor_handle_application(mouse_event: MouseEvent) -> Result<(), &'static str> {
-    do_refresh_floating_border()?;
-    let wm = WINDOW_MANAGER
+    let mut wm = WINDOW_MANAGER
         .try()
         .ok_or("The static window manager was not yet initialized")?
         .lock();
+    wm.move_floating_border()?;
 
     if let Err(_) = wm.pass_mouse_event_to_window(mouse_event) {
         // the mouse event should be passed to the window that satisfies:
