@@ -718,6 +718,15 @@ impl<U: Window> WindowManagerAlpha<U> {
         Ok(())
     }
 
+    /// whether a window is active
+    pub fn is_active(&self, objref: &Arc<Mutex<U>>) -> bool {
+        if let Some(current_active) = self.active.upgrade() {
+            if Arc::ptr_eq(&(current_active), objref) {
+                return true;
+            }
+        }
+        false
+    }
 
     fn get_cursor_coords(&self) -> Vec<Coord> {
         let mut result = Vec::new();
@@ -734,38 +743,6 @@ impl<U: Window> WindowManagerAlpha<U> {
 
         result
     }
-}
-
-/// whether a window is active
-pub fn is_active(objref: &Arc<Mutex<WindowGeneric>>) -> bool {
-    match WINDOW_MANAGER
-        .try()
-        .ok_or("The static window manager was not yet initialized")
-    {
-        Ok(mtx) => {
-            let win = mtx.lock();
-            if let Some(current_active) = win.active.upgrade() {
-                if Arc::ptr_eq(&(current_active), objref) {
-                    return true;
-                }
-            }
-        }
-        _ => {}
-    }
-    false
-}
-
-/// refresh the floating border display, will lock WINDOW_MANAGER. This is useful to show the window size and position without much computation,
-/// means only a thin border is updated and shown. The size and position of floating border is set inside active window by `moving_base`. Only moving
-/// is supported now, which means the relative position of current mouse and `moving_base` is actually the new position of border
-
-/// execute moving active window action, this will lock WINDOW_MANAGER
-pub fn do_move_active_window() -> Result<(), &'static str> {
-    let mut win = WINDOW_MANAGER
-        .try()
-        .ok_or("The static window manager was not yet initialized")?
-        .lock();
-    win.move_active_window()
 }
 
 // /// refresh one pixel using absolute position, will lock WINDOW_MANAGER

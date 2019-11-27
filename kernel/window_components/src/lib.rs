@@ -282,7 +282,13 @@ impl WindowComponents {
         let mut need_to_set_active = false;
         let mut need_refresh_three_button = false;
 
-        let is_active = window_manager::is_active(&self.winobj);
+        let is_active = {
+            let mut wm = window_manager::WINDOW_MANAGER
+                .try()
+                .ok_or("The static window manager was not yet initialized")?
+                .lock();
+            wm.is_active(&self.winobj)
+        };
         if is_active != self.last_is_active {
             self.draw_border(is_active);
             self.last_is_active = is_active;

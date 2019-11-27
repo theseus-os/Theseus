@@ -1327,8 +1327,16 @@ impl Shell {
                 // update if there are outputs from applications
                 self.terminal.lock().refresh_display()?;
             }
+
+            let is_active = {
+                let mut wm = window_manager::WINDOW_MANAGER
+                    .try()
+                    .ok_or("The static window manager was not yet initialized")?
+                    .lock();
+                wm.is_active(&self.terminal.lock().window.winobj)
+            };
             
-            if window_manager::is_active(&self.terminal.lock().window.winobj) {
+            if is_active {
                 self.terminal.lock().display_cursor()?;
             }
 
