@@ -21,7 +21,6 @@ extern crate frame_buffer_printer;
 extern crate tsc;
 extern crate window;
 extern crate window_manager;
-extern crate text_area;
 extern crate window_components;
 extern crate frame_buffer_compositor;
 extern crate text_primitive;
