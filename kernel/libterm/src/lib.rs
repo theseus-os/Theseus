@@ -445,7 +445,13 @@ impl Terminal {
 /// Public methods of `Terminal`.
 impl Terminal {
     pub fn new() -> Result<Terminal, &'static str> {
-        let (window_width, window_height) = window_manager::get_screen_size()?;
+        let (window_width, window_height) = {
+            let wm = window_manager::WINDOW_MANAGER
+                .try()
+                .ok_or("The static window manager was not yet initialized")?
+                .lock();
+            wm.get_screen_size()
+        };
         const WINDOW_MARGIN: usize = 20;
         let window = window_components::WindowComponents::new(
             Coord::new(WINDOW_MARGIN as isize, WINDOW_MARGIN as isize), 

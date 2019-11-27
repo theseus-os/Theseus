@@ -650,6 +650,26 @@ impl<U: Window> WindowManagerAlpha<U> {
         Ok(())
     }
 
+    fn move_mouse(&mut self, relative: Coord) -> Result<(), &'static str> {
+        let old = self.mouse;
+        let mut new = old + relative;
+        
+        let (screen_width, screen_height) = self.get_screen_size();
+        if new.x < 0 {
+            new.x = 0;
+        }
+        if new.y < 0 {
+            new.y = 0;
+        }
+        if new.x >= (screen_width as isize) {
+            new.x = (screen_width as isize) - 1;
+        }
+        if new.y >= (screen_height as isize) {
+            new.y = (screen_height as isize) - 1;
+        }
+        self.move_mouse_to(new)
+    }
+    
     // move mouse to absolute position
     fn move_mouse_to(&mut self, new: Coord) -> Result<(), &'static str> {
         // clear old mouse
@@ -728,6 +748,10 @@ impl<U: Window> WindowManagerAlpha<U> {
             }
         }
         false
+    }
+
+    pub fn get_screen_size(&self) -> (usize, usize) {
+        self.bottom_fb.get_size()
     }
 
     fn get_cursor_coords(&self) -> Vec<Coord> {
@@ -869,7 +893,13 @@ fn window_manager_loop(
                     next_event.mark_completed();
                 }
                 if x != 0 || y != 0 {
-                    move_mouse(x as isize, -(y as isize))?;
+                    let mut wm = WINDOW_MANAGER
+                        .try()
+                        .ok_or("The static window manager was not yet initialized")?
+                        .lock();
+                    wm.move_mouse(
+                        Coord::new(x as isize, -(y as isize))
+                    )?;
                 }
                 cursor_handle_application(*mouse_event)?; // tell the event to application, or moving window
             }
@@ -939,50 +969,6 @@ fn cursor_handle_application(mouse_event: MouseEvent) -> Result<(), &'static str
         // 2. the window is the top one (active window or show_list windows) under the mouse pointer
         // if no window is found in this position, that is system background area. Add logic to handle those events later
     }
-    Ok(())
-}
-
-/// return the screen size of current window manager as (width, height)
-pub fn get_screen_size() -> Result<(usize, usize), &'static str> {
-    let win = WINDOW_MANAGER
-        .try()
-        .ok_or("The static window manager was not yet initialized")?
-        .lock();
-    Ok(win.bottom_fb.get_size())
-}
-
-/// return current absolute position of mouse as (x, y)
-pub fn get_cursor() -> Result<Coord, &'static str> {
-    let win = WINDOW_MANAGER
-        .try()
-        .ok_or("The static window manager was not yet initialized")?
-        .lock();
-    Ok(win.mouse)
-}
-
-// move mouse with delta, this will refresh mouse position
-fn move_mouse(x: isize, y: isize) -> Result<(), &'static str> {
-    let old = get_cursor()?;
-    let mut new = old + (x, y);
-    let (screen_width, screen_height) = get_screen_size()?;
-    if new.x < 0 {
-        new.x = 0;
-    }
-    if new.y < 0 {
-        new.y = 0;
-    }
-    if new.x >= (screen_width as isize) {
-        new.x = (screen_width as isize) - 1;
-    }
-    if new.y >= (screen_height as isize) {
-        new.y = (screen_height as isize) - 1;
-    }
-    
-    let mut win = WINDOW_MANAGER
-        .try()
-        .ok_or("The static window manager was not yet initialized")?
-        .lock();
-    win.move_mouse_to(new)?;
     Ok(())
 }
 
