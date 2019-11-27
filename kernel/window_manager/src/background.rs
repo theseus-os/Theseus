@@ -1,5 +1,3 @@
-extern crate frame_buffer_alpha;
-
 /// The width of the background picture
 pub const BACKGROUND_WIDTH: usize = 640;
 /// The height of the background picture

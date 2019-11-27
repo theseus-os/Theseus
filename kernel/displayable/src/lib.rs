@@ -10,7 +10,6 @@ extern crate frame_buffer;
 extern crate downcast_rs;
 
 use alloc::boxed::Box;
-use alloc::vec::Vec;
 use downcast_rs::Downcast;
 use frame_buffer::{FrameBuffer, Coord, RectArea};
 

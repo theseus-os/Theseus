@@ -2,7 +2,7 @@
 //!
 //! usage:      x y width height (unit is pixel)
 //!
-//! This simple application is to test `WindowManagerAlpha` with multiple window overlapping each other,
+//! This simple application is to test `WindowManager` with multiple window overlapping each other,
 //! as well as test `WindowComponents` which provides easy-to-use interface for application to enable GUI.
 //!
 //! User could edit text in this window. Special keys are supported in this simple editor, such as moving up, down, left and right.
@@ -10,7 +10,7 @@
 //!
 //! This application could also be used to test performance, by uncomment the code block that refreshing chars from `a` to `z`.
 //! You would notice that even if refreshing all the chars is slow, it is quite fast when you editing texts, thanks to partial refreshing
-//! mechanism supported by both `WindowManagerAlpha` and `WindowComponents`
+//! mechanism supported by both `WindowManager` and `WindowComponents`
 
 #![no_std]
 #[macro_use]
@@ -32,7 +32,7 @@ use alloc::string::String;
 use alloc::vec::Vec;
 use frame_buffer::Coord;
 
-const WINDOW_BACKGROUND: u32 = 0x20FFFFFF;
+const WINDOW_BACKGROUND: u32 = 0x40FFFFFF;
 
 #[no_mangle]
 pub fn main(_args: Vec<String>) -> isize {
@@ -59,6 +59,7 @@ pub fn main(_args: Vec<String>) -> isize {
     ) {
         Ok(m) => m,
         Err(err) => {
+            loop{}
             error!("new window components returned err: {}", err);
             return -2;
         }

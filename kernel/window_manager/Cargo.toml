@@ -16,9 +16,6 @@ version = "0.3.7"
 path = "../../libs/dfqueue"
 version = "0.1.0"
 
-[dependencies.frame_buffer_alpha]
-path = "../frame_buffer_alpha"
-
 [dependencies.frame_buffer_drawer]
 path = "../frame_buffer_drawer"
 

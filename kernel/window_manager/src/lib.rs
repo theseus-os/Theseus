@@ -21,14 +21,13 @@ extern crate event_types;
 extern crate log;
 extern crate compositor;
 extern crate frame_buffer;
-extern crate frame_buffer_alpha;
 extern crate frame_buffer_compositor;
 extern crate frame_buffer_drawer;
 extern crate keycodes_ascii;
 extern crate mod_mgmt;
 extern crate mouse_data;
 extern crate path;
-extern crate scheduler;
+extern crate scheduler; 
 extern crate spawn;
 extern crate window;
 extern crate window_generic;
@@ -38,14 +37,13 @@ use alloc::boxed::Box;
 use alloc::collections::VecDeque;
 use alloc::string::{String, ToString};
 use alloc::sync::{Arc, Weak};
-use alloc::vec::{IntoIter, Vec};
+use alloc::vec::Vec;
 use compositor::Compositor;
 use core::ops::{Deref, DerefMut};
-use dfqueue::{DFQueue, DFQueueConsumer, DFQueueProducer};
+use dfqueue::{DFQueue, DFQueueConsumer};
 use event_types::{Event, MousePositionEvent};
 use frame_buffer::{Coord, FrameBuffer, Pixel, RectArea};
-use frame_buffer_alpha::{PixelMixer, BLACK};
-use frame_buffer_compositor::{FrameBufferBlocks, FRAME_COMPOSITOR, Block};
+use frame_buffer_compositor::{FrameBufferBlocks, FRAME_COMPOSITOR};
 use keycodes_ascii::{KeyAction, KeyEvent, Keycode};
 use mouse_data::MouseEvent;
 use path::Path;
@@ -55,7 +53,7 @@ use window::Window;
 use window_generic::WindowGeneric;
 
 /// The alpha window manager
-pub static WINDOW_MANAGER: Once<Mutex<WindowManagerAlpha<WindowGeneric>>> = Once::new();
+pub static WINDOW_MANAGER: Once<Mutex<WindowManager<WindowGeneric>>> = Once::new();
 
 // The half size of mouse in number of pixels, the actual size of pointer is 1+2*`MOUSE_POINTER_HALF_SIZE`
 const MOUSE_POINTER_HALF_SIZE: usize = 7;
@@ -91,7 +89,7 @@ const WINDOW_BORDER_SIZE: usize = 3;
 const WINDOW_BORDER_COLOR_INNER: Pixel = 0x00CA6F1E;
 
 /// window manager with overlapping and alpha enabled
-pub struct WindowManagerAlpha<U: Window> {
+pub struct WindowManager<U: Window> {
     /// those window currently not shown on screen
     hide_list: VecDeque<Weak<Mutex<U>>>,
     /// those window shown on screen that may overlapping each other
@@ -108,20 +106,13 @@ pub struct WindowManagerAlpha<U: Window> {
     top_fb: Box<dyn FrameBuffer>,
 }
 
-impl<U: Window> WindowManagerAlpha<U> {
+impl<U: Window> WindowManager<U> {
     /// set one window to active, push last active (if exists) to top of show_list. if `refresh` is `true`, will then refresh the window's area
     pub fn set_active(
         &mut self,
         objref: &Arc<Mutex<U>>,
         refresh: bool,
     ) -> Result<(), &'static str> {
-        let (start, end) = {
-            let winobj = objref.lock();
-            let start = winobj.get_position();
-            let (width, height) = winobj.get_content_size();
-            let end = start + (width as isize, height as isize);
-            (start, end)
-        };
         // if it is currently actived, just return
         if let Some(current_active) = self.active.upgrade() {
             if Arc::ptr_eq(&(current_active), objref) {
@@ -147,18 +138,17 @@ impl<U: Window> WindowManagerAlpha<U> {
             None => {}
         }
         self.active = Arc::downgrade(objref);
-        if refresh {
+        let area = {
             let window = objref.lock();
-            
-            // Wenqiu
-            // self.refresh_area(start, end)?;
-            let frame_buffer_blocks = FrameBufferBlocks {
-                framebuffer: window.framebuffer(),
-                coordinate: window.coordinate(),
-                blocks: None
-            };
-            FRAME_COMPOSITOR.lock().composite(vec![frame_buffer_blocks].into_iter())?;
-            // self.refresh_area(start, end)?;
+            let start = window.get_position();
+            let (width, height) = window.get_content_size();          
+            RectArea {
+                start: start,
+                end: start + (width as isize, height as isize)
+            }
+        };
+        if refresh {
+            self.refresh_bottom_windows(Some(area), true)?;
         }
         Ok(())
     }
@@ -239,7 +229,6 @@ impl<U: Window> WindowManagerAlpha<U> {
     }
 
     pub fn refresh_bottom_windows_pixels(&self, update_coords: &[Coord]) -> Result<(), &'static str> {
-        let (width, height) = self.bottom_fb.get_size();        
         let bottom_fb = FrameBufferBlocks {
             framebuffer: self.bottom_fb.deref(),
             coordinate: Coord::new(0, 0),
@@ -252,7 +241,6 @@ impl<U: Window> WindowManagerAlpha<U> {
             if let Some(window_mutex) = window_ref.upgrade() {
                 let window = window_mutex.lock();
                 let framebuffer = window.framebuffer();
-                let (width, height) = window.get_content_size();
                 let buffer_blocks = FrameBufferBlocks {
                     framebuffer: framebuffer.deref(),
                     coordinate: window.coordinate(),
@@ -267,7 +255,6 @@ impl<U: Window> WindowManagerAlpha<U> {
             if let Some(window_mutex) = window_ref.upgrade() {
                 let window = window_mutex.lock();
                 let framebuffer = window.framebuffer();
-                let (width, height) = window.get_content_size();
                 let buffer_blocks = FrameBufferBlocks {
                     framebuffer: framebuffer.deref(),
                     coordinate: window.coordinate(),
@@ -281,7 +268,6 @@ impl<U: Window> WindowManagerAlpha<U> {
         if let Some(window_mutex) = self.active.upgrade() {
             let window = window_mutex.lock();
             let framebuffer = window.framebuffer();
-            let (width, height) = window.get_content_size();
             let buffer_blocks = FrameBufferBlocks {
                 framebuffer: framebuffer.deref(),
                 coordinate: window.coordinate(),
@@ -384,7 +370,7 @@ impl<U: Window> WindowManagerAlpha<U> {
                 let blocks = if !update_all {
                     let mut relative_area = max_update_area - win_coordinate;
                     let blocks = frame_buffer_compositor::get_blocks(framebuffer.deref(), &mut relative_area).into_iter();
-                    max_update_area = relative_area + win_coordinate;
+                    // max_update_area = relative_area + win_coordinate;
                     Some(blocks)
                 } else {
                     None
@@ -393,9 +379,6 @@ impl<U: Window> WindowManagerAlpha<U> {
                 let buffer_blocks = FrameBufferBlocks {
                     framebuffer: framebuffer.deref(),
                     coordinate: window.coordinate(),
-                    // blocks: Some(
-                    //     self.get_cursor_cache_block(window.get_position(), width, height).into_iter()
-                    // )
                     blocks: blocks
                 }; 
 
@@ -557,9 +540,8 @@ impl<U: Window> WindowManagerAlpha<U> {
         start: Coord,
         end: Coord,
     ) -> Result<(), &'static str> {
-        // Update if the old floating border is to be cleared or there is a new floating border
-        let old_area = self.repositioned_border.clone();
         // first clear old border if exists
+        let old_area = self.repositioned_border.clone();
         match old_area {
             Some(border) => {
                 let pixels = self.draw_floating_border(border.start, border.end, T);
@@ -567,12 +549,6 @@ impl<U: Window> WindowManagerAlpha<U> {
             },
             None =>{}
         }
-            // if show {
-            //     // otherwise don't change position
-            //     self.repositioned_border = Some(RectArea { start, end });
-            // } else {
-            //     self.repositioned_border = None;
-            // }
 
         // then draw current border
         if show {
@@ -790,7 +766,7 @@ pub fn init<Buffer: FrameBuffer>(
     }
 
     // initialize static window manager
-    let window_manager = WindowManagerAlpha {
+    let window_manager = WindowManager {
         hide_list: VecDeque::new(),
         show_list: VecDeque::new(),
         active: Weak::new(),
@@ -993,13 +969,6 @@ pub fn new_window<'a>(
         moving_base: Coord::new(0, 0), // the point as a base to start moving
     };
 
-    window.clear()?;
     let window_ref = Arc::new(Mutex::new(window));
-    let mut win = WINDOW_MANAGER
-        .try()
-        .ok_or("The static window manager was not yet initialized")?
-        .lock();
-    win.set_active(&window_ref, false)?; // do not refresh now for better speed
-
     Ok(window_ref)
 }

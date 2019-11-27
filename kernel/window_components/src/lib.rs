@@ -169,6 +169,14 @@ impl WindowComponents {
             winobj.framebuffer.fill_color(wincomps.background);
         }
 
+        {
+            let mut win = WINDOW_MANAGER
+                .try()
+                .ok_or("The static window manager was not yet initialized")?
+                .lock();
+            win.set_active(&wincomps.winobj, false)?; // do not refresh now for 
+        }
+
         wincomps.draw_border(true); // draw window with active border
                                     // draw three buttons
         {
@@ -176,8 +184,14 @@ impl WindowComponents {
             wincomps.show_button(TopButton::Close, 1, &mut winobj);
             wincomps.show_button(TopButton::MinimizeMaximize, 1, &mut winobj);
             wincomps.show_button(TopButton::Hide, 1, &mut winobj);
+            let buffer_blocks = FrameBufferBlocks {
+                framebuffer: winobj.framebuffer.deref(),
+                coordinate: coordinate,
+                blocks: None
+            }; 
+
+            FRAME_COMPOSITOR.lock().composite(vec![buffer_blocks].into_iter())?;
         }
-        wincomps.render(None)?;
 
         Ok(wincomps)
     }
@@ -288,7 +302,6 @@ impl WindowComponents {
             self.draw_border(is_active);
             self.last_is_active = is_active;
             let mut winobj = self.winobj.lock();
-            let coordinate = winobj.get_position();
             self.show_button(TopButton::Close, 1, &mut winobj);
             self.show_button(TopButton::MinimizeMaximize, 1, &mut winobj);
             self.show_button(TopButton::Hide, 1, &mut winobj);
