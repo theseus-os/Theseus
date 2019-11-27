@@ -400,14 +400,20 @@ impl WindowComponents {
             event.mark_completed();
             bcoordinate
         };
-        if need_to_set_active {
-            window_manager::set_active(&self.winobj)?;
-        }
+        
         if need_refresh_three_button {
             // if border has been refreshed, no need to refresh buttons
             if let Err(err) = self.refresh_three_button(bcoordinate) {
                 error!("refresh_three_button failed {}", err);
             }
+        }
+
+        if need_to_set_active {
+            let mut wm = WINDOW_MANAGER
+                .try()
+                .ok_or("The static window manager was not yet initialized")?
+                .lock();
+            wm.set_active(&self.winobj, true)?;
         }
 
         if call_later_do_refresh_floating_border {

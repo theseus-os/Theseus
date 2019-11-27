@@ -703,15 +703,6 @@ impl<U: Window> WindowManagerAlpha<U> {
     }
 }
 
-/// set window as active, the active window is always at top, so it will refresh the region of this window
-pub fn set_active(objref: &Arc<Mutex<WindowGeneric>>) -> Result<(), &'static str> {
-    let mut win = WINDOW_MANAGER
-        .try()
-        .ok_or("The static window manager was not yet initialized")?
-        .lock();
-    win.set_active(objref, true)
-}
-
 /// whether a window is active
 pub fn is_active(objref: &Arc<Mutex<WindowGeneric>>) -> bool {
     match WINDOW_MANAGER
