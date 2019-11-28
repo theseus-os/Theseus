@@ -28,7 +28,7 @@ extern crate frame_buffer_drawer;
 extern crate memory_structs;
 extern crate mouse;
 extern crate window_profile;
-extern crate window_generic;
+extern crate window_profile_generic;
 extern crate window_manager;
 
 use alloc::boxed::Box;
@@ -47,7 +47,7 @@ use frame_buffer_compositor::{FrameBufferBlocks, FRAME_COMPOSITOR};
 use memory_structs::PhysicalAddress;
 use spin::Mutex;
 use window_profile::WindowProfile;
-use window_generic::WindowProfileGeneric;
+use window_profile_generic::WindowProfileGeneric;
 use window_manager::WINDOW_MANAGER;
 
 // The title bar size, in number of pixels
@@ -138,7 +138,7 @@ impl Window {
             return Err("window too small to even draw border");
         }
 
-        let winobj_mutex = window_generic::new_window(coordinate, framebuffer)?;
+        let winobj_mutex = window_profile_generic::new_window(coordinate, framebuffer)?;
 
         // create event queue for components
         let consumer = DFQueue::new().into_consumer();

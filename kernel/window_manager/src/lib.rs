@@ -24,7 +24,7 @@ extern crate path;
 extern crate scheduler; 
 extern crate spawn;
 extern crate window_profile;
-extern crate window_generic;
+extern crate window_profile_generic;
 
 mod background;
 use alloc::boxed::Box;
@@ -44,7 +44,7 @@ use path::Path;
 use spawn::{ApplicationTaskBuilder, KernelTaskBuilder};
 use spin::{Mutex, Once};
 use window_profile::WindowProfile;
-use window_generic::WindowProfileGeneric;
+use window_profile_generic::WindowProfileGeneric;
 
 /// The instance of the default window manager
 pub static WINDOW_MANAGER: Once<Mutex<WindowManager<WindowProfileGeneric>>> = Once::new();

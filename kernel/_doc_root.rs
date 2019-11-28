@@ -67,5 +67,5 @@
 //! * `vga_buffer`: Simple routines for printing to the screen using the x86 VGA buffer text mode.
 //! * `window`: Defines a trait for window.
 //! * `window_manager`: A window manager maintains a list of existing windows.
-//! * `window_generic`: Defines a `WindowProfileGeneric` structure which implements the `Window` trait.
+//! * `window_profile_generic`: Defines a `WindowProfileGeneric` structure which implements the `Window` trait.
 //! * `window`: Defines a `Window` structure which wraps a window generic object. An application can own its window componenent object.
