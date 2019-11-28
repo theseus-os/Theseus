@@ -1,8 +1,8 @@
 //! This crate acts as a manager of a list of windows. It defines a `WindowManager` structure and an instance of it. 
 //!
-//! A window manager holds a set of `Window` objects, including an active window, a list of shown windows and a list of hidden windows. The hidden windows are totally overlapped by others.
+//! A window manager holds a set of `WindowProfile` objects, including an active window, a list of shown windows and a list of hidden windows. The hidden windows are totally overlapped by others.
 //!
-//! A window contains a bottom framebuffer and a top framebuffer. The bottom is the background of the desktop and the top framebuffer contains a floating window border and a mouse arrow. In refreshing, the manager will render all the framebuffers in order: bottom -> hide list -> showlist -> active -> top.
+//! A window manager owns a bottom framebuffer and a top framebuffer. The bottom is the background of the desktop and the top framebuffer contains a floating window border and a mouse arrow. In refreshing an area, the manager will render all the framebuffers in order: bottom -> hide list -> showlist -> active -> top.
 //!
 //! The window manager provides methods to update a rectangle area or several pixels for better performance.
 
@@ -23,7 +23,7 @@ extern crate mouse_data;
 extern crate path;
 extern crate scheduler; 
 extern crate spawn;
-extern crate window;
+extern crate window_profile;
 extern crate window_generic;
 
 mod background;
@@ -43,11 +43,11 @@ use mouse_data::MouseEvent;
 use path::Path;
 use spawn::{ApplicationTaskBuilder, KernelTaskBuilder};
 use spin::{Mutex, Once};
-use window::Window;
-use window_generic::WindowGeneric;
+use window_profile::WindowProfile;
+use window_generic::WindowProfileGeneric;
 
 /// The instance of the default window manager
-pub static WINDOW_MANAGER: Once<Mutex<WindowManager<WindowGeneric>>> = Once::new();
+pub static WINDOW_MANAGER: Once<Mutex<WindowManager<WindowProfileGeneric>>> = Once::new();
 
 // The half size of mouse in number of pixels, the actual size of pointer is 1+2*`MOUSE_POINTER_HALF_SIZE`
 const MOUSE_POINTER_HALF_SIZE: usize = 7;
@@ -83,7 +83,7 @@ const WINDOW_BORDER_SIZE: usize = 3;
 const WINDOW_BORDER_COLOR_INNER: Pixel = 0x00CA6F1E;
 
 /// Window manager structure which maintains a list of windows and a mouse.
-pub struct WindowManager<U: Window> {
+pub struct WindowManager<U: WindowProfile> {
     /// those window currently not shown on screen
     hide_list: VecDeque<Weak<Mutex<U>>>,
     /// those window shown on screen that may overlapping each other
@@ -100,7 +100,7 @@ pub struct WindowManager<U: Window> {
     top_fb: Box<dyn FrameBuffer>,
 }
 
-impl<U: Window> WindowManager<U> {
+impl<U: WindowProfile> WindowManager<U> {
     /// set one window to active, push last active (if exists) to top of show_list. if `refresh` is `true`, will then refresh the window's area
     pub fn set_active(
         &mut self,

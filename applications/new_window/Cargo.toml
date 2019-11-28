@@ -14,8 +14,8 @@ x86_64 = { path = "../../libs/x86_64" }
 default-features = false
 version = "0.3.7"
 
-[dependencies.window]
-path = "../../kernel/window"
+[dependencies.window_profile]
+path = "../../kernel/window_profile"
 
 [dependencies.frame_buffer]
 path = "../../kernel/frame_buffer"
@@ -36,8 +36,8 @@ path = "../../kernel/runqueue"
 [dependencies.window_manager]
 path = "../../kernel/window_manager"
 
-[dependencies.window_components]
-path = "../../kernel/window_components"
+[dependencies.window]
+path = "../../kernel/window"
 
 [dependencies.scheduler]
 path = "../../kernel/scheduler"

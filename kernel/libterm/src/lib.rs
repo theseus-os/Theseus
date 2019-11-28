@@ -19,9 +19,9 @@ extern crate frame_buffer_rgb;
 extern crate frame_buffer_drawer;
 extern crate frame_buffer_printer;
 extern crate tsc;
-extern crate window;
+extern crate window_profile;
 extern crate window_manager;
-extern crate window_components;
+extern crate window;
 extern crate text_display;
 
 use alloc::string::{String, ToString};
@@ -33,8 +33,8 @@ use event_types::Event;
 use font::{CHARACTER_HEIGHT, CHARACTER_WIDTH};
 use frame_buffer::{Coord, FrameBuffer, RectArea};
 use tsc::{tsc_ticks, TscTicks};
-use window::{Window};
-use window_components::WindowComponents;
+use window_profile::WindowProfile;
+use window::Window;
 
 pub mod cursor;
 
@@ -61,7 +61,7 @@ pub enum ScrollError {
 ///     - Producer is the window manager. Window manager is responsible for enqueuing keyevents into the active application
 pub struct Terminal {
     /// The terminal's own window.
-    pub window: WindowComponents,
+    pub window: Window,
     /// Name of the text displayable of the terminal
     display_name: String,
     /// The terminal's scrollback buffer which stores a string to be displayed by the text display
@@ -438,7 +438,7 @@ impl Terminal {
             wm.get_screen_size()
         };
         const WINDOW_MARGIN: usize = 20;
-        let window = window_components::WindowComponents::new(
+        let window = window::Window::new(
             Coord::new(WINDOW_MARGIN as isize, WINDOW_MARGIN as isize), 
             window_width - 2 * WINDOW_MARGIN, 
             window_height - 2 * WINDOW_MARGIN,

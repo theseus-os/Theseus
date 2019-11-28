@@ -15,8 +15,8 @@ version = "0.3.7"
 path = "../../libs/dfqueue"
 version = "0.1.0"
 
-[dependencies.window]
-path = "../window"
+[dependencies.window_profile]
+path = "../window_profile"
 
 [dependencies.environment]
 path = "../environment"
@@ -51,8 +51,8 @@ path = "../frame_buffer_printer"
 [dependencies.window_manager]
 path = "../window_manager"
 
-[dependencies.window_components]
-path = "../window_components"
+[dependencies.window]
+path = "../window"
 
 [dependencies.tsc]
 path = "../tsc"

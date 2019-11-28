@@ -955,8 +955,8 @@ dependencies = [
  "text_display 0.1.0",
  "tsc 0.1.0",
  "window 0.1.0",
- "window_components 0.1.0",
  "window_manager 0.1.0",
+ "window_profile 0.1.0",
 ]
 
 [[package]]
@@ -1255,8 +1255,8 @@ dependencies = [
  "spawn 0.1.0",
  "spin 0.4.10 (registry+https://github.com/rust-lang/crates.io-index)",
  "window 0.1.0",
- "window_components 0.1.0",
  "window_manager 0.1.0",
+ "window_profile 0.1.0",
  "x86_64 0.1.2",
 ]
 
@@ -2319,15 +2319,6 @@ source = "registry+https://github.com/rust-lang/crates.io-index"
 name = "window"
 version = "0.1.0"
 dependencies = [
- "dfqueue 0.1.0",
- "event_types 0.1.0",
- "frame_buffer 0.1.0",
-]
-
-[[package]]
-name = "window_components"
-version = "0.1.0"
-dependencies = [
  "compositor 0.1.0",
  "dfqueue 0.1.0",
  "displayable 0.1.0",
@@ -2343,9 +2334,9 @@ dependencies = [
  "path 0.1.0",
  "spawn 0.1.0",
  "spin 0.4.10 (registry+https://github.com/rust-lang/crates.io-index)",
- "window 0.1.0",
  "window_generic 0.1.0",
  "window_manager 0.1.0",
+ "window_profile 0.1.0",
 ]
 
 [[package]]
@@ -2356,7 +2347,7 @@ dependencies = [
  "event_types 0.1.0",
  "frame_buffer 0.1.0",
  "spin 0.4.10 (registry+https://github.com/rust-lang/crates.io-index)",
- "window 0.1.0",
+ "window_profile 0.1.0",
 ]
 
 [[package]]
@@ -2378,8 +2369,17 @@ dependencies = [
  "scheduler 0.1.0",
  "spawn 0.1.0",
  "spin 0.4.10 (registry+https://github.com/rust-lang/crates.io-index)",
- "window 0.1.0",
  "window_generic 0.1.0",
+ "window_profile 0.1.0",
+]
+
+[[package]]
+name = "window_profile"
+version = "0.1.0"
+dependencies = [
+ "dfqueue 0.1.0",
+ "event_types 0.1.0",
+ "frame_buffer 0.1.0",
 ]
 
 [[package]]

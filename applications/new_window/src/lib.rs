@@ -3,7 +3,7 @@
 //! usage:      x y width height (unit is pixel)
 //!
 //! The new window has a half-transparent background. This simple application is to test `WindowManager` with multiple window overlapping each other,
-//! as well as test `WindowComponents` which provides easy-to-use interface for application to enable GUI.
+//! as well as test `Window` which provides easy-to-use interface for application to enable GUI.
 
 #![no_std]
 #[macro_use]
@@ -13,11 +13,11 @@ extern crate alloc;
 extern crate dfqueue;
 extern crate runqueue;
 extern crate spawn;
-extern crate window;
+extern crate window_profile;
 extern crate window_manager;
 extern crate frame_buffer_alpha;
 extern crate print;
-extern crate window_components;
+extern crate window;
 extern crate frame_buffer;
 extern crate scheduler;
 
@@ -43,7 +43,7 @@ pub fn main(_args: Vec<String>) -> isize {
     let height = _args[3].parse::<usize>().unwrap();
     debug!("parameters {:?}", (coordinate, width, height));
 
-    let mut wincomps = match window_components::WindowComponents::new(
+    let mut wincomps = match window::Window::new(
         coordinate,
         width,
         height,

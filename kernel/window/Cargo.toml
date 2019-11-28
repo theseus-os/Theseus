@@ -1,21 +1,65 @@
 [package]
 name = "window"
 version = "0.1.0"
-authors = ["Wenqiu Yu <yuwenqiuj@gmail.com>"]
-description = "define a Window trait"
+authors = ["Yue Wu <wuyue16@pku.edu.cn>", "Wenqiu Yu <yuwenqiuj@gmail.com>"]
+description = "an easy-to-use window object owned by application"
 build = "../../build.rs"
 
 [dependencies]
+spin = "0.4.10"
+
+[dependencies.log]
+default-features = false
+version = "0.3.7"
 
 [dependencies.dfqueue]
 path = "../../libs/dfqueue"
 version = "0.1.0"
 
-[dependencies.event_types]
-path = "../event_types"
+[dependencies.frame_buffer_alpha]
+path = "../frame_buffer_alpha"
+
+[dependencies.memory_structs]
+path = "../memory_structs"
+
+[dependencies.frame_buffer_drawer]
+path = "../frame_buffer_drawer"
+
+[dependencies.compositor]
+path = "../compositor"
+
+[dependencies.frame_buffer_compositor]
+path = "../frame_buffer_compositor"
+
+[dependencies.displayable]
+path = "../displayable"
+
+[dependencies.window_profile]
+path = "../window_profile"
 
 [dependencies.frame_buffer]
 path = "../frame_buffer"
+
+[dependencies.window_manager]
+path = "../window_manager"
+
+[dependencies.window_generic]
+path = "../window_generic"
+
+[dependencies.event_types]
+path = "../event_types"
+
+[dependencies.font]
+path = "../font"
+
+[dependencies.spawn]
+path = "../spawn"
+
+[dependencies.mouse]
+path = "../mouse"
+
+[dependencies.path]
+path = "../../kernel/path"
 
 [lib]
 crate-type = ["rlib"]

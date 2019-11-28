@@ -1,7 +1,7 @@
 [package]
 name = "window_manager"
 version = "0.1.0"
-authors = ["Yue Wu <wuyue16@pku.edu.cn>"]
+authors = ["Yue Wu <wuyue16@pku.edu.cn>", "Wenqiu Yu <yuwenqiuj@gmail.com>"]
 description = "allocate new windows and manage a list of existing windows"
 build = "../../build.rs"
 
@@ -15,8 +15,8 @@ version = "0.1.0"
 [dependencies.frame_buffer_drawer]
 path = "../frame_buffer_drawer"
 
-[dependencies.window]
-path = "../window"
+[dependencies.window_profile]
+path = "../window_profile"
 
 [dependencies.window_generic]
 path = "../window_generic"
