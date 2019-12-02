@@ -17,8 +17,7 @@ use memory::{EntryFlags, FrameRange, MappedPages, PhysicalAddress, FRAME_ALLOCAT
 use owning_ref::BoxRefMut;
 use spin::Mutex;
 
-// Every pixel is of u32 type
-const PIXEL_BYTES: usize = 4;
+/// Used in reseting the alpha channel of RGB pixel.
 const RGB_PIXEL_MASK: Pixel = 0x00FFFFFF;
 
 /// Initialize the final frame buffer.

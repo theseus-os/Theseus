@@ -31,7 +31,7 @@ pub const BLACK: Pixel = 0;
 pub const WHITE: Pixel = 0x00FFFFFF;
 
 /// Every pixel is of `Pixel` type, which is 4 byte as defined in `Pixel`
-const PIXEL_BYTES: usize = core::mem::size_of::<Pixel>();
+const PIXEL_SIZE: usize = core::mem::size_of::<Pixel>();
 
 /// Initialize the final frame buffer by allocating a block of memory and map it to the physical framebuffer frames.
 pub fn init() -> Result<(usize, usize), &'static str> {
