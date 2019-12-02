@@ -130,7 +130,7 @@ impl Window {
             usize,
             usize,
             Option<PhysicalAddress>,
-        ) -> Result<Box<dyn FrameBuffer>, &'static str>,
+        ) -> Result<Box<dyn FrameBuffer + Send>, &'static str>,
     ) -> Result<Window, &'static str> {
         let framebuffer = new_framebuffer(width, height, None)?;
         let (width, height) = framebuffer.get_size();
@@ -222,9 +222,8 @@ impl Window {
 
         {
             let mut window = self.winobj.lock();
-            component
-                .displayable
-                .clear(coordinate, window.framebuffer_mut())?;
+            component.displayable.reset()?;
+            component.displayable.display(coordinate, window.framebuffer_mut())?;
         }
 
         self.render(None)

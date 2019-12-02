@@ -95,9 +95,9 @@ pub struct WindowManager<U: WindowProfile> {
     /// If a window is being repositioned (e.g., by dragging it), this is the position of that window's border
     repositioned_border: Option<RectArea>,
     /// the frame buffer that it should print on
-    bottom_fb: Box<dyn FrameBuffer>,
+    bottom_fb: Box<dyn FrameBuffer + Send>,
     /// the frame buffer that it should print on
-    top_fb: Box<dyn FrameBuffer>,
+    top_fb: Box<dyn FrameBuffer + Send>,
 }
 
 impl<U: WindowProfile> WindowManager<U> {
@@ -749,7 +749,7 @@ impl<U: WindowProfile> WindowManager<U> {
 }
 
 /// Initialize the window manager, should provide the consumer of keyboard and mouse event, as well as a frame buffer to draw
-pub fn init<Buffer: FrameBuffer>(
+pub fn init<Buffer: FrameBuffer + Send>(
     key_consumer: DFQueueConsumer<Event>,
     mouse_consumer: DFQueueConsumer<Event>,
     mut bg_framebuffer: Buffer,

@@ -24,7 +24,7 @@ pub type Pixel = u32;
 pub static FINAL_FRAME_BUFFER: Once<Mutex<Box<dyn FrameBuffer + Send>>> = Once::new();
 
 /// The `FrameBuffer` trait.
-pub trait FrameBuffer: Downcast + Send {
+pub trait FrameBuffer: Downcast {
     /// Returns a reference to the mapped memory.
     fn buffer(&self) -> &BoxRefMut<MappedPages, [Pixel]>;
 

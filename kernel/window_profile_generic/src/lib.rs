@@ -33,7 +33,7 @@ pub struct WindowProfileGeneric {
     pub consumer: DFQueueConsumer<Event>, // event input
     pub producer: DFQueueProducer<Event>, // event output used by window manager
     /// frame buffer of this window
-    pub framebuffer: Box<dyn FrameBuffer>,
+    pub framebuffer: Box<dyn FrameBuffer + Send>,
     /// if true, window manager will send all mouse event to this window, otherwise only when mouse is on this window does it send.
     /// This is extremely helpful when application wants to know mouse movement outside itself, because by default window manager only sends mouse event
     /// when mouse is in the window's region. This is used when user move the window, to receive mouse event when mouse is out of the current window.
@@ -116,7 +116,7 @@ impl WindowProfile for WindowProfileGeneric {
 /// Creates a new window object with given position and size
 pub fn new_window<'a>(
     coordinate: Coord,
-    framebuffer: Box<dyn FrameBuffer>,
+    framebuffer: Box<dyn FrameBuffer + Send>,
 ) -> Result<Arc<Mutex<WindowProfileGeneric>>, &'static str> {
     // Init the key input producer and consumer
     let consumer = DFQueue::new().into_consumer();

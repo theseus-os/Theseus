@@ -69,22 +69,11 @@ impl Displayable for TextDisplay {
         return Ok(update_area + coordinate);
     }
 
-    fn clear(
-        &mut self,
-        coordinate: Coord,
-        framebuffer: &mut dyn FrameBuffer,
-    ) -> Result<(), &'static str> {
+    fn reset(&mut self) -> Result<(), &'static str> {
         self.text = String::new();
         self.cache = String::new();
         self.next_col = 0;
         self.next_line = 0;
-        frame_buffer_drawer::fill_rectangle(
-            framebuffer,
-            coordinate,
-            self.width,
-            self.height,
-            self.bg_color,
-        );
 
         Ok(())
     }
@@ -101,7 +90,7 @@ impl Displayable for TextDisplay {
 }
 
 impl TextDisplay {
-    /// Creates a new primitive text displayable.
+    /// Creates a new text displayable.
     /// # Arguments
     /// * `(width, height)`: the size of the text area.
     /// * `(fg_color, bg_color)`: the foreground and background color of the text area.
@@ -145,15 +134,18 @@ impl TextDisplay {
         line * text_width + column
     }
 
+    /// Gets the size of a text displayable in units of character.
     pub fn get_dimensions(&self) -> (usize, usize) {
         (self.width / CHARACTER_WIDTH, self.height / CHARACTER_HEIGHT)
     }
 
+    /// Gets the index of next character to be displayabled. It is the position next to existing printed characters in the text displayable.
     pub fn get_next_index(&self) -> usize {
         let col_num = self.width / CHARACTER_WIDTH;
         self.next_line * col_num + self.next_col
     }
 
+    /// Sets the text of the text displayable
     pub fn set_text(&mut self, text: &str) {
         self.text = String::from(text);
     }

@@ -43,7 +43,7 @@ pub enum Event {
     /// Tells an application that the window manager has resized that application's window
     /// so that it knows to perform any necessary tasks related to window size, such as text reflow.
     WindowResizeEvent(WindowResizeEvent),
-    /// The event tells application about cursor's position currently (including relative to a window and relative to a screen)
+    /// The event tells application about mouse's position currently (including relative to a window and relative to a screen)
     MousePositionEvent(MousePositionEvent),
     ExitEvent,
 }
@@ -73,7 +73,7 @@ pub struct KeyboardInputEvent {
 }
 
 impl KeyboardInputEvent {
-    /// Create a new key board input event. `key` is the key input from the i/o device
+    /// Create a new key board input event. `key` is the key input from the keyboard
     pub fn new(key: KeyEvent) -> KeyboardInputEvent {
         KeyboardInputEvent { 
             key_event: key 
