@@ -51,8 +51,8 @@ path = "../frame_buffer_printer"
 [dependencies.window_manager]
 path = "../window_manager"
 
-[dependencies.window_generic]
-path = "../window_generic"
+[dependencies.window]
+path = "../window"
 
 [dependencies.tsc]
 path = "../tsc"
