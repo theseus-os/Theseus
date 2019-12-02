@@ -18,8 +18,8 @@ path = "../frame_buffer_drawer"
 [dependencies.window_profile]
 path = "../window_profile"
 
-[dependencies.window_generic]
-path = "../window_generic"
+[dependencies.window_profile_generic]
+path = "../window_profile_generic"
 
 [dependencies.compositor]
 path = "../compositor"

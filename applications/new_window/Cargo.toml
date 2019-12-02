@@ -36,8 +36,8 @@ path = "../../kernel/runqueue"
 [dependencies.window_manager]
 path = "../../kernel/window_manager"
 
-[dependencies.window]
-path = "../../kernel/window"
+[dependencies.window_generic]
+path = "../../kernel/window_generic"
 
 [dependencies.scheduler]
 path = "../../kernel/scheduler"

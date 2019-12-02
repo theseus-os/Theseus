@@ -21,7 +21,7 @@ extern crate frame_buffer_printer;
 extern crate tsc;
 extern crate window_profile;
 extern crate window_manager;
-extern crate window;
+extern crate window_generic;
 extern crate text_display;
 
 use alloc::string::{String, ToString};
@@ -34,7 +34,7 @@ use font::{CHARACTER_HEIGHT, CHARACTER_WIDTH};
 use frame_buffer::{Coord, FrameBuffer, RectArea};
 use tsc::{tsc_ticks, TscTicks};
 use window_profile::WindowProfile;
-use window::Window;
+use window_generic::Window;
 
 pub mod cursor;
 
@@ -438,7 +438,7 @@ impl Terminal {
             wm.get_screen_size()
         };
         const WINDOW_MARGIN: usize = 20;
-        let window = window::Window::new(
+        let window = window_generic::Window::new(
             Coord::new(WINDOW_MARGIN as isize, WINDOW_MARGIN as isize), 
             window_width - 2 * WINDOW_MARGIN, 
             window_height - 2 * WINDOW_MARGIN,

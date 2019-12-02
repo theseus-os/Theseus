@@ -17,7 +17,7 @@ extern crate window_profile;
 extern crate window_manager;
 extern crate frame_buffer_alpha;
 extern crate print;
-extern crate window;
+extern crate window_generic;
 extern crate frame_buffer;
 extern crate scheduler;
 
@@ -43,7 +43,7 @@ pub fn main(_args: Vec<String>) -> isize {
     let height = _args[3].parse::<usize>().unwrap();
     debug!("parameters {:?}", (coordinate, width, height));
 
-    let mut wincomps = match window::Window::new(
+    let mut wincomps = match window_generic::Window::new(
         coordinate,
         width,
         height,
