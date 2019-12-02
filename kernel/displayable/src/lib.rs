@@ -25,7 +25,7 @@ pub trait Displayable: Downcast + Send {
     fn display(
         &mut self,
         coordinate: Coord,
-        framebuffer: Option<&mut dyn FrameBuffer>,
+        framebuffer: &mut dyn FrameBuffer,
     ) -> Result<RectArea, &'static str> ;
 
     /// Clear the displayable in the framebuffer.
@@ -34,7 +34,7 @@ pub trait Displayable: Downcast + Send {
     fn clear(
         &mut self,
         coordinate: Coord,
-        framebuffer: Option<&mut dyn FrameBuffer>,
+        framebuffer: &mut dyn FrameBuffer,
     ) -> Result<(), &'static str> ;
 
     /// Resizes the displayable area.

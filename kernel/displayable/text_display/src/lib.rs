@@ -33,11 +33,8 @@ impl Displayable for TextDisplay {
     fn display(
         &mut self,
         coordinate: Coord,
-        framebuffer: Option<&mut dyn FrameBuffer>,
+        framebuffer: &mut dyn FrameBuffer,
     ) -> Result<RectArea, &'static str> {
-
-        // If the cache is the prefix of the new text, just print the additional characters.
-        let framebuffer = framebuffer.ok_or("There is no framebuffer to display in")?;
         let (string, col, line) =
             if self.cache.len() > 0 && self.text.starts_with(self.cache.as_str()) {
                 (
@@ -75,14 +72,12 @@ impl Displayable for TextDisplay {
     fn clear(
         &mut self,
         coordinate: Coord,
-        framebuffer: Option<&mut dyn FrameBuffer>,
+        framebuffer: &mut dyn FrameBuffer,
     ) -> Result<(), &'static str> {
         self.text = String::new();
         self.cache = String::new();
         self.next_col = 0;
         self.next_line = 0;
-        // If the cache is the prefix of the new text, just print the additional characters.
-        let framebuffer = framebuffer.ok_or("There is no framebuffer to display in")?;
         frame_buffer_drawer::fill_rectangle(
             framebuffer,
             coordinate,

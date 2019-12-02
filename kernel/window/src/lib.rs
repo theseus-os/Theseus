@@ -224,7 +224,7 @@ impl Window {
             let mut window = self.winobj.lock();
             component
                 .displayable
-                .clear(coordinate, Some(window.framebuffer_mut()))?;
+                .clear(coordinate, window.framebuffer_mut())?;
         }
 
         self.render(None)
@@ -284,7 +284,7 @@ impl Window {
             let mut window = self.winobj.lock();
             let area = component
                 .displayable
-                .display(coordinate, Some(window.framebuffer_mut()))?;
+                .display(coordinate, window.framebuffer_mut())?;
             area
         };
 
