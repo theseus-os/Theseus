@@ -20,7 +20,7 @@ extern crate spin;
 
 use alloc::boxed::Box;
 use core::ops::DerefMut;
-use frame_buffer::{Coord, FrameBuffer, Pixel, FINAL_FRAME_BUFFER};
+use frame_buffer::{Coord, FrameBuffer, Pixel, PIXEL_SIZE, FINAL_FRAME_BUFFER};
 use memory::{EntryFlags, FrameRange, MappedPages, PhysicalAddress, FRAME_ALLOCATOR};
 use owning_ref::BoxRefMut;
 use spin::Mutex;
@@ -29,9 +29,6 @@ use spin::Mutex;
 pub const BLACK: Pixel = 0;
 /// predefined opaque white
 pub const WHITE: Pixel = 0x00FFFFFF;
-
-/// Every pixel is of `Pixel` type, which is 4 byte as defined in `Pixel`
-const PIXEL_SIZE: usize = core::mem::size_of::<Pixel>();
 
 /// Initialize the final frame buffer by allocating a block of memory and map it to the physical framebuffer frames.
 pub fn init() -> Result<(usize, usize), &'static str> {
@@ -87,7 +84,7 @@ impl FrameBufferAlpha {
             .try()
             .ok_or("Couldn't get Frame Allocator")?;
 
-        let size = width * height * PIXEL_BYTES;
+        let size = width * height * PIXEL_SIZE;
         let pages = memory::allocate_pages_by_bytes(size).ok_or("could not allocate pages")?;
 
         let mapped_frame_buffer = if let Some(address) = physical_address {

@@ -12,7 +12,7 @@ extern crate spin;
 
 use alloc::boxed::Box;
 use core::ops::DerefMut;
-use frame_buffer::{FrameBuffer, Pixel, FINAL_FRAME_BUFFER, Coord};
+use frame_buffer::{FrameBuffer, Pixel, PIXEL_SIZE, FINAL_FRAME_BUFFER, Coord};
 use memory::{EntryFlags, FrameRange, MappedPages, PhysicalAddress, FRAME_ALLOCATOR};
 use owning_ref::BoxRefMut;
 use spin::Mutex;
@@ -73,7 +73,7 @@ impl FrameBufferRGB {
         let vesa_display_flags: EntryFlags =
             EntryFlags::PRESENT | EntryFlags::WRITABLE | EntryFlags::GLOBAL | EntryFlags::NO_CACHE;
 
-        let size = width * height * PIXEL_BYTES;
+        let size = width * height * PIXEL_SIZE;
         let pages = memory::allocate_pages_by_bytes(size).ok_or("could not allocate pages")?;
 
         let mapped_frame_buffer = if let Some(address) = physical_address {

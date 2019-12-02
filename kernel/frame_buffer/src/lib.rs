@@ -19,6 +19,8 @@ use core::cmp::{Ord, Ordering};
 
 /// A pixel on the screen is mapped to a u32 integer.
 pub type Pixel = u32;
+/// Every pixel is of `Pixel` type, which is 4 byte as defined in `Pixel`
+pub const PIXEL_SIZE: usize = core::mem::size_of::<Pixel>();
 
 /// The final framebuffer instance. It contains the pages which are mapped to the physical framebuffer.
 pub static FINAL_FRAME_BUFFER: Once<Mutex<Box<dyn FrameBuffer + Send>>> = Once::new();
