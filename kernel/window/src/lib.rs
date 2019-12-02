@@ -41,7 +41,7 @@ use core::ops::DerefMut;
 use dfqueue::{DFQueue, DFQueueConsumer, DFQueueProducer};
 use displayable::Displayable;
 use event_types::{Event, MousePositionEvent};
-use frame_buffer::{Coord, FrameBuffer, Pixel, RectArea};
+use frame_buffer::{Coord, FrameBuffer, Pixel, Rectangle};
 use frame_buffer_alpha::{PixelMixer, BLACK};
 use frame_buffer_compositor::{FrameBufferBlocks, FRAME_COMPOSITOR};
 use memory_structs::PhysicalAddress;
@@ -433,7 +433,7 @@ impl Window {
     }
 
     /// Render a window to the screen. Should be invoked after updating.
-    pub fn render(&mut self, area: Option<RectArea>) -> Result<(), &'static str> {
+    pub fn render(&mut self, area: Option<Rectangle>) -> Result<(), &'static str> {
         let coordinate = {
             let window = self.winobj.lock();
             window.get_position()

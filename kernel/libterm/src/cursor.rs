@@ -86,7 +86,7 @@ impl Cursor {
         column: usize,
         line: usize,
         framebuffer: &mut dyn FrameBuffer,
-    ) -> Result<RectArea, &'static str> {
+    ) -> Result<Rectangle, &'static str> {
         if self.blink() {
             if self.show() {
                 frame_buffer_drawer::fill_rectangle(
@@ -114,14 +114,14 @@ impl Cursor {
             }
         }
 
-        let start = coordinate
+        let top_left = coordinate
             + (
                 (column * CHARACTER_WIDTH) as isize,
                 (line * CHARACTER_HEIGHT) as isize,
             );
-        let update_area = RectArea {
-            start: start,
-            end: start + (CHARACTER_WIDTH as isize, CHARACTER_HEIGHT as isize),
+        let update_area = Rectangle {
+            top_left: top_left,
+            bottom_right: top_left + (CHARACTER_WIDTH as isize, CHARACTER_HEIGHT as isize),
         };
 
         Ok(update_area)

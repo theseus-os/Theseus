@@ -35,7 +35,7 @@ use alloc::vec::{Vec, IntoIter};
 use core::hash::{Hash, Hasher, BuildHasher};
 use hashbrown::hash_map::{DefaultHashBuilder};
 use compositor::Compositor;
-use frame_buffer::{FrameBuffer, FINAL_FRAME_BUFFER, Coord, RectArea};
+use frame_buffer::{FrameBuffer, FINAL_FRAME_BUFFER, Coord, Rectangle};
 use spin::Mutex;
 
 /// The height of a cache block of the compositor
@@ -282,26 +282,26 @@ impl Compositor<FrameBufferBlocks<'_>> for FrameCompositor {
 /// # Arguments
 /// * `framebuffer`: the framebuffer to composite.
 /// * `area`: the updated area in this framebuffer.
-pub fn get_blocks(framebuffer: &dyn FrameBuffer, area: &mut RectArea) -> Vec<Block> {
+pub fn get_blocks(framebuffer: &dyn FrameBuffer, area: &mut Rectangle) -> Vec<Block> {
     let mut blocks = Vec::new();
     let (width, height) = framebuffer.get_size();
 
-    let start_x = core::cmp::max(area.start.x, 0);
-    let end_x = core::cmp::min(area.end.x, width as isize);
+    let start_x = core::cmp::max(area.top_left.x, 0);
+    let end_x = core::cmp::min(area.bottom_right.x, width as isize);
     if start_x >= end_x {
         return blocks;
     }
     let width = (end_x - start_x) as usize;        
     
-    let start_y = core::cmp::max(area.start.y, 0);
-    let end_y = core::cmp::min(area.end.y, height as isize);
+    let start_y = core::cmp::max(area.top_left.y, 0);
+    let end_y = core::cmp::min(area.bottom_right.y, height as isize);
     if start_y >= end_y {
         return blocks;
     }
 
 
     let mut index = start_y as usize / CACHE_BLOCK_HEIGHT;
-    area.start.y = core::cmp::min((index * CACHE_BLOCK_HEIGHT) as isize, area.start.y);
+    area.top_left.y = core::cmp::min((index * CACHE_BLOCK_HEIGHT) as isize, area.top_left.y);
     loop {
         if index * CACHE_BLOCK_HEIGHT >= end_y as usize {
             break;
@@ -310,7 +310,7 @@ pub fn get_blocks(framebuffer: &dyn FrameBuffer, area: &mut RectArea) -> Vec<Blo
         blocks.push(block);
         index += 1;
     }
-    area.end.y = core::cmp::max((index * CACHE_BLOCK_HEIGHT) as isize, area.end.y);
+    area.bottom_right.y = core::cmp::max((index * CACHE_BLOCK_HEIGHT) as isize, area.bottom_right.y);
 
     blocks
 }

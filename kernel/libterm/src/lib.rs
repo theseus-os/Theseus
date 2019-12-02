@@ -31,7 +31,7 @@ use cursor::*;
 use text_display::TextDisplay;
 use event_types::Event;
 use font::{CHARACTER_HEIGHT, CHARACTER_WIDTH};
-use frame_buffer::{Coord, FrameBuffer, RectArea};
+use frame_buffer::{Coord, FrameBuffer, Rectangle};
 use tsc::{tsc_ticks, TscTicks};
 use window_profile::WindowProfile;
 use window::Window;

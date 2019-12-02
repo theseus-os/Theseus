@@ -166,31 +166,31 @@ impl Eq for Coord { }
 
 /// a rectangle region
 #[derive(Clone, Copy, PartialEq, Debug, Hash)]
-pub struct RectArea {
+pub struct Rectangle {
     /// The top-left point
-    pub start: Coord,
+    pub top_left: Coord,
     /// The bottom-right point
-    pub end: Coord,
+    pub bottom_right: Coord,
 }
 
-impl Add<Coord> for RectArea {
-    type Output = RectArea;
+impl Add<Coord> for Rectangle {
+    type Output = Rectangle;
 
-    fn add(self, rhs: Coord) -> RectArea {
-        RectArea{
-            start: self.start + rhs,
-            end: self.end + rhs,
+    fn add(self, rhs: Coord) -> Rectangle {
+        Rectangle {
+            top_left: self.top_left + rhs,
+            bottom_right: self.bottom_right + rhs,
         }
     }
 }
 
-impl Sub<Coord> for RectArea {
-    type Output = RectArea;
+impl Sub<Coord> for Rectangle {
+    type Output = Rectangle;
 
-    fn sub(self, rhs: Coord) -> RectArea {
-        RectArea{
-            start: self.start - rhs,
-            end: self.end - rhs,
+    fn sub(self, rhs: Coord) -> Rectangle {
+        Rectangle {
+            top_left: self.top_left - rhs,
+            bottom_right: self.bottom_right - rhs,
         }
     }
 }

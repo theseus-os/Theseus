@@ -10,7 +10,7 @@ extern crate frame_buffer_rgb;
 
 use alloc::vec;
 use font::{CHARACTER_HEIGHT, CHARACTER_WIDTH, FONT_PIXEL};
-use frame_buffer::{FrameBuffer, Coord, RectArea};
+use frame_buffer::{FrameBuffer, Coord, Rectangle};
 
 type ASCII = u8;
 
@@ -35,7 +35,7 @@ pub fn print_string(
     bg_color: u32,
     column: usize,
     line: usize,
-) -> (usize, usize, RectArea) {
+) -> (usize, usize, Rectangle) {
     let buffer_width = width / CHARACTER_WIDTH;
     let buffer_height = height / CHARACTER_HEIGHT;
     let (x, y) = (coordinate.x, coordinate.y);
@@ -43,7 +43,7 @@ pub fn print_string(
     let mut curr_line = line;
     let mut curr_column = column;
 
-    let start_point = Coord::new(0, (curr_line * CHARACTER_HEIGHT) as isize);
+    let top_left = Coord::new(0, (curr_line * CHARACTER_HEIGHT) as isize);
 
     for byte in slice.bytes() {
         if byte == b'\n' {
@@ -93,14 +93,14 @@ pub fn print_string(
         bg_color,
     );
 
-    let end_point = Coord::new(
+    let bottom_right = Coord::new(
         (buffer_width * CHARACTER_WIDTH) as isize, 
         ((curr_line + 1) * CHARACTER_HEIGHT) as isize
     );
 
-    let update_area = RectArea {
-        start: start_point,
-        end: end_point,
+    let update_area = Rectangle {
+        top_left: top_left,
+        bottom_right: bottom_right,
     };
 
     // fill the blank of the remaining part

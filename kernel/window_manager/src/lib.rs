@@ -36,7 +36,7 @@ use compositor::Compositor;
 use core::ops::{Deref, DerefMut};
 use dfqueue::{DFQueueConsumer};
 use event_types::{Event, MousePositionEvent};
-use frame_buffer::{Coord, FrameBuffer, Pixel, RectArea};
+use frame_buffer::{Coord, FrameBuffer, Pixel, Rectangle};
 use frame_buffer_compositor::{FrameBufferBlocks, FRAME_COMPOSITOR};
 use keycodes_ascii::{KeyAction, KeyEvent, Keycode};
 use mouse_data::MouseEvent;
@@ -93,7 +93,7 @@ pub struct WindowManager<U: WindowProfile> {
     /// current mouse position
     mouse: Coord,
     /// If a window is being repositioned (e.g., by dragging it), this is the position of that window's border
-    repositioned_border: Option<RectArea>,
+    repositioned_border: Option<Rectangle>,
     /// the frame buffer that it should print on
     bottom_fb: Box<dyn FrameBuffer + Send>,
     /// the frame buffer that it should print on
@@ -134,11 +134,11 @@ impl<U: WindowProfile> WindowManager<U> {
         self.active = Arc::downgrade(objref);
         let area = {
             let window = objref.lock();
-            let start = window.get_position();
+            let top_left = window.get_position();
             let (width, height) = window.get_content_size();          
-            RectArea {
-                start: start,
-                end: start + (width as isize, height as isize)
+            Rectangle {
+                top_left: top_left,
+                bottom_right: top_left + (width as isize, height as isize)
             }
         };
         if refresh {
@@ -177,17 +177,17 @@ impl<U: WindowProfile> WindowManager<U> {
 
     /// delete a window and refresh its region
     pub fn delete_window(&mut self, objref: &Arc<Mutex<U>>) -> Result<(), &'static str> {
-        let (start, end) = {
+        let (top_left, bottom_right) = {
             let winobj = objref.lock();
-            let start = winobj.get_position();
+            let top_left = winobj.get_position();
             let (width, height) = winobj.get_content_size();
-            let end = start + (width as isize, height as isize);
-            (start, end)
+            let bottom_right = top_left + (width as isize, height as isize);
+            (top_left, bottom_right)
         };
         let area = Some(
-            RectArea {
-                start: start,
-                end: end
+            Rectangle {
+                top_left: top_left,
+                bottom_right: bottom_right
             }
         );
         if let Some(current_active) = self.active.upgrade() {
@@ -294,15 +294,15 @@ impl<U: WindowProfile> WindowManager<U> {
     }
 
     /// Refresh the part of every window in `area`. Refresh the whole screen if area is None. 
-    pub fn refresh_windows(&self, area: Option<RectArea>, active: bool) -> Result<(), &'static str> {
+    pub fn refresh_windows(&self, area: Option<Rectangle>, active: bool) -> Result<(), &'static str> {
         let update_all = area.is_none();
 
         let mut max_update_area = match area {
             Some(area) => {area},
             None => {
-                RectArea{
-                    start: Coord::new(0, 0),
-                    end: Coord::new(0, 0),
+                Rectangle {
+                    top_left: Coord::new(0, 0),
+                    bottom_right: Coord::new(0, 0),
                 }
             }
         };
@@ -389,11 +389,11 @@ impl<U: WindowProfile> WindowManager<U> {
     }
 
     /// Refresh the part of bottom framebuffer and every window in `area`. Refresh the whole screen if area is None. 
-    pub fn refresh_bottom_windows(&self, area: Option<RectArea>, active: bool) -> Result<(), &'static str> {
+    pub fn refresh_bottom_windows(&self, area: Option<Rectangle>, active: bool) -> Result<(), &'static str> {
         let update_all = area.is_none();
-        let mut update_area = RectArea{
-            start: Coord::new(0, 0),
-            end: Coord::new(0, 0),
+        let mut update_area = Rectangle {
+            top_left: Coord::new(0, 0),
+            bottom_right: Coord::new(0, 0),
         };
 
         let blocks = match area {
@@ -423,7 +423,7 @@ impl<U: WindowProfile> WindowManager<U> {
         self.refresh_windows(area_obj, active)
     }
 
-    pub fn refresh_top(&self, area: Option<RectArea>) -> Result<(), &'static str> {
+    pub fn refresh_top(&self, area: Option<Rectangle>) -> Result<(), &'static str> {
         let blocks = match area {
             Some(area) => {
                 let mut update_area = area;
@@ -534,14 +534,14 @@ impl<U: WindowProfile> WindowManager<U> {
     fn refresh_floating_border(
         &mut self,
         show: bool,
-        start: Coord,
-        end: Coord,
+        top_left: Coord,
+        bottom_right: Coord,
     ) -> Result<(), &'static str> {
         // first clear old border if exists
-        let old_area = self.repositioned_border.clone();
-        match old_area {
+        let old_border = self.repositioned_border.clone();
+        match old_border {
             Some(border) => {
-                let pixels = self.draw_floating_border(border.start, border.end, T);
+                let pixels = self.draw_floating_border(border.top_left, border.bottom_right, T);
                 self.refresh_bottom_windows_pixels(pixels.as_slice())?;
             },
             None =>{}
@@ -549,8 +549,8 @@ impl<U: WindowProfile> WindowManager<U> {
 
         // then draw current border
         if show {
-            self.repositioned_border = Some(RectArea { start, end });
-            let pixels = self.draw_floating_border(start, end, WINDOW_BORDER_COLOR_INNER);
+            self.repositioned_border = Some(Rectangle { top_left, bottom_right });
+            let pixels = self.draw_floating_border(top_left, bottom_right, WINDOW_BORDER_COLOR_INNER);
             self.refresh_top_pixels(pixels.as_slice())?;
         } else {
             self.repositioned_border = None;
@@ -561,13 +561,13 @@ impl<U: WindowProfile> WindowManager<U> {
 
     /// draw the floating border with color. Return pixels of the border.
     /// `start` and `end` indicates the top-left and bottom-right corner of the border.
-    fn draw_floating_border(&mut self, start: Coord, end: Coord, color: Pixel) -> Vec<Coord> {
+    fn draw_floating_border(&mut self, top_left: Coord, bottom_right: Coord, color: Pixel) -> Vec<Coord> {
         let mut pixels = Vec::new();
 
         for i in 0..(WINDOW_BORDER_SIZE) as isize {
-            let width = (end.x - start.x) - 2 * i;
-            let height = (end.y - start.y) - 2 * i;
-            let coordinate = start + (i as isize, i as isize);
+            let width = (bottom_right.x - top_left.x) - 2 * i;
+            let height = (bottom_right.y - top_left.y) - 2 * i;
+            let coordinate = top_left + (i as isize, i as isize);
             if width <= 0 || height <= 0 {
                 break;
             }
@@ -596,7 +596,7 @@ impl<U: WindowProfile> WindowManager<U> {
     /// take active window's base position and current mouse, move the window with delta
     pub fn move_active_window(&mut self) -> Result<(), &'static str> {
         if let Some(current_active) = self.active.upgrade() {
-            let (old_start, old_end, new_start, new_end) = {
+            let (old_top_left, old_bottom_right, new_top_left, new_bottom_right) = {
                 let mut current_active_win = current_active.lock();
                 let (current_x, current_y) = {
                     let m = &self.mouse;
@@ -604,20 +604,18 @@ impl<U: WindowProfile> WindowManager<U> {
                 };
                 let base = current_active_win.get_moving_base();
                 let (base_x, base_y) = (base.x, base.y);
-                let old_start = current_active_win.get_position();
-                let new_start = old_start + ((current_x - base_x), (current_y - base_y));
+                let old_top_left = current_active_win.get_position();
+                let new_top_left = old_top_left + ((current_x - base_x), (current_y - base_y));
                 let (width, height) = current_active_win.get_content_size();
-                let old_end = old_start + (width as isize, height as isize);
-                let new_end = new_start + (width as isize, height as isize);
-                current_active_win.set_position(new_start);
-                (old_start, old_end, new_start, new_end)
+                let old_bottom_right = old_top_left + (width as isize, height as isize);
+                let new_bottom_right = new_top_left + (width as isize, height as isize);
+                current_active_win.set_position(new_top_left);
+                (old_top_left, old_bottom_right, new_top_left, new_bottom_right)
             };
-            self.refresh_bottom_windows(Some(RectArea{start: old_start, end: old_end}), false)?;
-            self.refresh_bottom_windows(Some(RectArea{start: new_start, end: new_end}), true)?;
+            self.refresh_bottom_windows(Some(Rectangle{top_left: old_top_left, bottom_right: old_bottom_right}), false)?;
+            self.refresh_bottom_windows(Some(Rectangle{top_left: new_top_left, bottom_right: new_bottom_right}), true)?;
             let update_coords = self.get_mouse_coords();
-            self.refresh_pixels(update_coords.as_slice())?;            // self.refresh_top(None)?;
-            // then try to reduce time on refresh old ones
-            // self.refresh_area_with_old_new(old_start, old_end, new_start, new_end)?;
+            self.refresh_pixels(update_coords.as_slice())?;
         } else {
             return Err("cannot fid active window to move");
         }

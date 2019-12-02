@@ -13,7 +13,7 @@ extern crate frame_buffer_printer;
 use alloc::string::String;
 use displayable::{Displayable};
 use font::{CHARACTER_HEIGHT, CHARACTER_WIDTH};
-use frame_buffer::{Coord, FrameBuffer, RectArea};
+use frame_buffer::{Coord, FrameBuffer, Rectangle};
 
 /// A generic text displayable profiles the size and color of a block of text. It can display in a framebuffer.
 pub struct TextDisplay {
@@ -34,7 +34,7 @@ impl Displayable for TextDisplay {
         &mut self,
         coordinate: Coord,
         framebuffer: &mut dyn FrameBuffer,
-    ) -> Result<RectArea, &'static str> {
+    ) -> Result<Rectangle, &'static str> {
         let (string, col, line) =
             if self.cache.len() > 0 && self.text.starts_with(self.cache.as_str()) {
                 (
@@ -59,7 +59,7 @@ impl Displayable for TextDisplay {
         );
 
         if next_line < self.next_line {
-            update_area.end.y = ((self.next_line + 1 ) * CHARACTER_HEIGHT) as isize
+            update_area.bottom_right.y = ((self.next_line + 1 ) * CHARACTER_HEIGHT) as isize
         }
 
         self.next_col = next_col;
