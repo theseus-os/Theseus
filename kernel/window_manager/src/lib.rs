@@ -1,6 +1,6 @@
 //! This crate acts as a manager of a list of windows. It defines a `WindowManager` structure and an instance of it. 
 //!
-//! A window manager holds a set of `WindowProfile` objects, including an active window, a list of shown windows and a list of hidden windows. The hidden windows are totally overlapped by others.
+//! A window manager holds a set of `WindowProfileGeneric` objects, including an active window, a list of shown windows and a list of hidden windows. The hidden windows are totally overlapped by others.
 //!
 //! A window manager owns a bottom framebuffer and a top framebuffer. The bottom is the background of the desktop and the top framebuffer contains a floating window border and a mouse arrow. In refreshing an area, the manager will render all the framebuffers in order: bottom -> hide list -> showlist -> active -> top.
 //!
@@ -23,7 +23,6 @@ extern crate mouse_data;
 extern crate path;
 extern crate scheduler; 
 extern crate spawn;
-extern crate window_profile;
 extern crate window_profile_generic;
 
 mod background;
@@ -43,11 +42,10 @@ use mouse_data::MouseEvent;
 use path::Path;
 use spawn::{ApplicationTaskBuilder, KernelTaskBuilder};
 use spin::{Mutex, Once};
-use window_profile::WindowProfile;
 use window_profile_generic::WindowProfileGeneric;
 
 /// The instance of the default window manager
-pub static WINDOW_MANAGER: Once<Mutex<WindowManager<WindowProfileGeneric>>> = Once::new();
+pub static WINDOW_MANAGER: Once<Mutex<WindowManager>> = Once::new();
 
 // The half size of mouse in number of pixels, the actual size of pointer is 1+2*`MOUSE_POINTER_HALF_SIZE`
 const MOUSE_POINTER_HALF_SIZE: usize = 7;
@@ -83,13 +81,13 @@ const WINDOW_BORDER_SIZE: usize = 3;
 const WINDOW_BORDER_COLOR_INNER: Pixel = 0x00CA6F1E;
 
 /// Window manager structure which maintains a list of windows and a mouse.
-pub struct WindowManager<U: WindowProfile> {
+pub struct WindowManager {
     /// those window currently not shown on screen
-    hide_list: VecDeque<Weak<Mutex<U>>>,
+    hide_list: VecDeque<Weak<Mutex<WindowProfileGeneric>>>,
     /// those window shown on screen that may overlapping each other
-    show_list: VecDeque<Weak<Mutex<U>>>,
+    show_list: VecDeque<Weak<Mutex<WindowProfileGeneric>>>,
     /// the only active window, receiving all keyboard events (except for those remained for WM)
-    active: Weak<Mutex<U>>, // this one is not in show_list
+    active: Weak<Mutex<WindowProfileGeneric>>, // this one is not in show_list
     /// current mouse position
     mouse: Coord,
     /// If a window is being repositioned (e.g., by dragging it), this is the position of that window's border
@@ -100,11 +98,11 @@ pub struct WindowManager<U: WindowProfile> {
     top_fb: Box<dyn FrameBuffer + Send>,
 }
 
-impl<U: WindowProfile> WindowManager<U> {
+impl WindowManager {
     /// set one window to active, push last active (if exists) to top of show_list. if `refresh` is `true`, will then refresh the window's area
     pub fn set_active(
         &mut self,
-        objref: &Arc<Mutex<U>>,
+        objref: &Arc<Mutex<WindowProfileGeneric>>,
         refresh: bool,
     ) -> Result<(), &'static str> {
         // if it is currently actived, just return
@@ -135,7 +133,7 @@ impl<U: WindowProfile> WindowManager<U> {
         let area = {
             let window = objref.lock();
             let top_left = window.get_position();
-            let (width, height) = window.get_content_size();          
+            let (width, height) = window.get_size();          
             Rectangle {
                 top_left: top_left,
                 bottom_right: top_left + (width as isize, height as isize)
@@ -148,7 +146,7 @@ impl<U: WindowProfile> WindowManager<U> {
     }
 
     /// Return the index of a window if it is in the show list
-    fn is_window_in_show_list(&mut self, objref: &Arc<Mutex<U>>) -> Option<usize> {
+    fn is_window_in_show_list(&mut self, objref: &Arc<Mutex<WindowProfileGeneric>>) -> Option<usize> {
         let mut i = 0_usize;
         for item in self.show_list.iter() {
             if let Some(item_ptr) = item.upgrade() {
@@ -162,7 +160,7 @@ impl<U: WindowProfile> WindowManager<U> {
     }
 
     /// Return the index of a window if it is in the hide list
-    fn is_window_in_hide_list(&mut self, objref: &Arc<Mutex<U>>) -> Option<usize> {
+    fn is_window_in_hide_list(&mut self, objref: &Arc<Mutex<WindowProfileGeneric>>) -> Option<usize> {
         let mut i = 0_usize;
         for item in self.hide_list.iter() {
             if let Some(item_ptr) = item.upgrade() {
@@ -176,11 +174,11 @@ impl<U: WindowProfile> WindowManager<U> {
     }
 
     /// delete a window and refresh its region
-    pub fn delete_window(&mut self, objref: &Arc<Mutex<U>>) -> Result<(), &'static str> {
+    pub fn delete_window(&mut self, objref: &Arc<Mutex<WindowProfileGeneric>>) -> Result<(), &'static str> {
         let (top_left, bottom_right) = {
             let winobj = objref.lock();
             let top_left = winobj.get_position();
-            let (width, height) = winobj.get_content_size();
+            let (width, height) = winobj.get_size();
             let bottom_right = top_left + (width as isize, height as isize);
             (top_left, bottom_right)
         };
@@ -235,7 +233,7 @@ impl<U: WindowProfile> WindowManager<U> {
         for window_ref in &self.hide_list {
             if let Some(window_mutex) = window_ref.upgrade() {
                 let window = window_mutex.lock();
-                let framebuffer = window.framebuffer();
+                let framebuffer = window.framebuffer.deref();
                 let buffer_blocks = FrameBufferBlocks {
                     framebuffer: framebuffer.deref(),
                     coordinate: window.get_position(),
@@ -249,7 +247,7 @@ impl<U: WindowProfile> WindowManager<U> {
         for window_ref in &self.show_list {
             if let Some(window_mutex) = window_ref.upgrade() {
                 let window = window_mutex.lock();
-                let framebuffer = window.framebuffer();
+                let framebuffer = window.framebuffer.deref();
                 let buffer_blocks = FrameBufferBlocks {
                     framebuffer: framebuffer.deref(),
                     coordinate: window.get_position(),
@@ -262,7 +260,7 @@ impl<U: WindowProfile> WindowManager<U> {
 
         if let Some(window_mutex) = self.active.upgrade() {
             let window = window_mutex.lock();
-            let framebuffer = window.framebuffer();
+            let framebuffer = window.framebuffer.deref();
             let buffer_blocks = FrameBufferBlocks {
                 framebuffer: framebuffer.deref(),
                 coordinate: window.get_position(),
@@ -310,8 +308,8 @@ impl<U: WindowProfile> WindowManager<U> {
         for window_ref in &self.hide_list {
             if let Some(window_mutex) = window_ref.upgrade() {
                 let window = window_mutex.lock();
-                let framebuffer = window.framebuffer();
-                //let (width, height) = window.get_content_size();
+                let framebuffer = window.framebuffer.deref();
+                //let (width, height) = window.get_size();
 
                 let win_coordinate = window.get_position();
                 let blocks = if !update_all {
@@ -336,8 +334,8 @@ impl<U: WindowProfile> WindowManager<U> {
         for window_ref in &self.show_list {
             if let Some(window_mutex) = window_ref.upgrade() {
                 let window = window_mutex.lock();
-                let framebuffer = window.framebuffer();
-                //let (width, height) = window.get_content_size();
+                let framebuffer = window.framebuffer.deref();
+                //let (width, height) = window.get_size();
 
                 let win_coordinate = window.get_position();
                 let blocks = if !update_all {
@@ -362,7 +360,7 @@ impl<U: WindowProfile> WindowManager<U> {
         if active {
             if let Some(window_mutex) = self.active.upgrade() {
                 let window = window_mutex.lock();
-                let framebuffer = window.framebuffer();
+                let framebuffer = window.framebuffer.deref();
                 
                 let win_coordinate = window.get_position();
                 let blocks = if !update_all {
@@ -448,7 +446,7 @@ impl<U: WindowProfile> WindowManager<U> {
         if let Some(current_active) = self.active.upgrade() {
             let mut current_active_win = current_active.lock();
             current_active_win
-                .events_producer()
+                .producer
                 .enqueue(Event::new_keyboard_event(key_event));
         }
         Err("cannot find window to pass key event")
@@ -474,10 +472,10 @@ impl<U: WindowProfile> WindowManager<U> {
         if let Some(current_active) = self.active.upgrade() {
             let mut current_active_win = current_active.lock();
             let current_coordinate = current_active_win.get_position();
-            if current_active_win.give_all_mouse_event() {
+            if current_active_win.give_all_mouse_event {
                 event.coordinate = *coordinate - current_coordinate;
                 current_active_win
-                    .events_producer()
+                    .producer
                     .enqueue(Event::MousePositionEvent(event.clone()));
             }
         }
@@ -486,10 +484,10 @@ impl<U: WindowProfile> WindowManager<U> {
             if let Some(now_winobj_mutex) = self.show_list[i].upgrade() {
                 let mut now_winobj = now_winobj_mutex.lock();
                 let current_coordinate = now_winobj.get_position();
-                if now_winobj.give_all_mouse_event() {
+                if now_winobj.give_all_mouse_event {
                     event.coordinate = *coordinate - current_coordinate;
                     now_winobj
-                        .events_producer()
+                        .producer
                         .enqueue(Event::MousePositionEvent(event.clone()));
                 }
             }
@@ -503,11 +501,11 @@ impl<U: WindowProfile> WindowManager<U> {
                 event.coordinate = *coordinate - current_coordinate;
                 // debug!("pass to active: {}, {}", event.x, event.y);
                 current_active_win
-                    .events_producer()
+                    .producer
                     .enqueue(Event::MousePositionEvent(event));
                 return Ok(());
             }
-            if current_active_win.is_moving() {
+            if current_active_win.is_moving {
                 // do not pass the movement event to other windows
                 return Ok(());
             }
@@ -520,7 +518,7 @@ impl<U: WindowProfile> WindowManager<U> {
                 if now_winobj.contains(*coordinate - current_coordinate) {
                     event.coordinate = *coordinate - current_coordinate;
                     now_winobj
-                        .events_producer()
+                        .producer
                         .enqueue(Event::MousePositionEvent(event));
                     return Ok(());
                 }
@@ -602,11 +600,11 @@ impl<U: WindowProfile> WindowManager<U> {
                     let m = &self.mouse;
                     (m.x as isize, m.y as isize)
                 };
-                let base = current_active_win.get_moving_base();
+                let base = current_active_win.moving_base;
                 let (base_x, base_y) = (base.x, base.y);
                 let old_top_left = current_active_win.get_position();
                 let new_top_left = old_top_left + ((current_x - base_x), (current_y - base_y));
-                let (width, height) = current_active_win.get_content_size();
+                let (width, height) = current_active_win.get_size();
                 let old_bottom_right = old_top_left + (width as isize, height as isize);
                 let new_bottom_right = new_top_left + (width as isize, height as isize);
                 current_active_win.set_position(new_top_left);
@@ -690,14 +688,14 @@ impl<U: WindowProfile> WindowManager<U> {
         if let Some(current_active) = self.active.upgrade() {
             let (is_draw, border_start, border_end) = {
                 let current_active_win = current_active.lock();
-                if current_active_win.is_moving() {
+                if current_active_win.is_moving {
                     // move this window
                     // for better performance, while moving window, only border is shown for indication
                     let coordinate = current_active_win.get_position();
                     // let (current_x, current_y) = (coordinate.x, coordinate.y);
-                    let base = current_active_win.get_moving_base();
+                    let base = current_active_win.moving_base;
                     let (base_x, base_y) = (base.x, base.y);
-                    let (width, height) = current_active_win.get_content_size();
+                    let (width, height) = current_active_win.get_size();
                     let border_start = coordinate + (new_x - base_x, new_y - base_y);
                     let border_end = border_start + (width as isize, height as isize);
                     (true, border_start, border_end)
@@ -714,7 +712,7 @@ impl<U: WindowProfile> WindowManager<U> {
     }
 
     /// Whether a window is active
-    pub fn is_active(&self, objref: &Arc<Mutex<U>>) -> bool {
+    pub fn is_active(&self, objref: &Arc<Mutex<WindowProfileGeneric>>) -> bool {
         if let Some(current_active) = self.active.upgrade() {
             if Arc::ptr_eq(&(current_active), objref) {
                 return true;

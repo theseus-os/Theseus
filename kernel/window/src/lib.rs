@@ -27,7 +27,6 @@ extern crate frame_buffer_compositor;
 extern crate frame_buffer_drawer;
 extern crate memory_structs;
 extern crate mouse;
-extern crate window_profile;
 extern crate window_profile_generic;
 extern crate window_manager;
 
@@ -46,7 +45,6 @@ use frame_buffer_alpha::{PixelMixer, BLACK};
 use frame_buffer_compositor::{FrameBufferBlocks, FRAME_COMPOSITOR};
 use memory_structs::PhysicalAddress;
 use spin::Mutex;
-use window_profile::WindowProfile;
 use window_profile_generic::WindowProfileGeneric;
 use window_manager::WINDOW_MANAGER;
 
@@ -144,7 +142,7 @@ impl Window {
         let consumer = DFQueue::new().into_consumer();
         let producer = consumer.obtain_producer();
 
-        let mut wincomps: Window = Window {
+        let mut window: Window = Window {
             winobj: winobj_mutex,
             border_size: WINDOW_BORDER,
             title_size: WINDOW_TITLE_BAR,
@@ -166,8 +164,8 @@ impl Window {
         };
 
         {
-            let mut winobj = wincomps.winobj.lock();
-            winobj.framebuffer.fill_color(wincomps.background);
+            let mut winobj = window.winobj.lock();
+            winobj.framebuffer.fill_color(window.background);
         }
 
         {
@@ -175,28 +173,26 @@ impl Window {
                 .try()
                 .ok_or("The static window manager was not yet initialized")?
                 .lock();
-            win.set_active(&wincomps.winobj, false)?; // do not refresh now for
+            win.set_active(&window.winobj, false)?; // do not refresh now for
         }
 
-        wincomps.draw_border(true); // draw window with active border
+        window.draw_border(true); // draw window with active border
                                     // draw three buttons
         {
-            let mut winobj = wincomps.winobj.lock();
-            wincomps.show_button(TopButton::Close, 1, &mut winobj);
-            wincomps.show_button(TopButton::MinimizeMaximize, 1, &mut winobj);
-            wincomps.show_button(TopButton::Hide, 1, &mut winobj);
+            let mut winobj = window.winobj.lock();
+            window.show_button(TopButton::Close, 1, &mut winobj);
+            window.show_button(TopButton::MinimizeMaximize, 1, &mut winobj);
+            window.show_button(TopButton::Hide, 1, &mut winobj);
             let buffer_blocks = FrameBufferBlocks {
                 framebuffer: winobj.framebuffer.deref(),
                 coordinate: coordinate,
                 blocks: None,
             };
 
-            FRAME_COMPOSITOR
-                .lock()
-                .composite(vec![buffer_blocks].into_iter())?;
+            FRAME_COMPOSITOR.lock().composite(vec![buffer_blocks].into_iter())?;
         }
 
-        Ok(wincomps)
+        Ok(window)
     }
 
     /// Add a new displayable to the window at the coordinate relative to the top-left of the window.
@@ -213,20 +209,6 @@ impl Window {
         };
         self.components.insert(key, component);
         Ok(())
-    }
-
-    /// Clear a displayable in the window.
-    pub fn clear_displayable(&mut self, display_name: &str) -> Result<(), &'static str> {
-        let component = self.components.get_mut(display_name).ok_or("")?;
-        let coordinate = component.get_position();
-
-        {
-            let mut window = self.winobj.lock();
-            component.displayable.reset()?;
-            component.displayable.display(coordinate, window.framebuffer_mut())?;
-        }
-
-        self.render(None)
     }
 
     /// Gets the position of a displayable relative to the top-left of the window
@@ -276,14 +258,14 @@ impl Window {
 
     /// Display a displayable by its name.
     pub fn display(&mut self, display_name: &str) -> Result<(), &'static str> {
-        let component = self.components.get_mut(display_name).ok_or("")?;
+        let component = self.components.get_mut(display_name).ok_or("The displayable does not exist")?;
         let coordinate = component.get_position();
 
         let area = {
             let mut window = self.winobj.lock();
             let area = component
                 .displayable
-                .display(coordinate, window.framebuffer_mut())?;
+                .display(coordinate, window.framebuffer.deref_mut())?;
             area
         };
 
@@ -329,11 +311,11 @@ impl Window {
                     self.producer.enqueue(Event::new_keyboard_event(key_input));
                 }
                 &Event::MousePositionEvent(ref mouse_event) => {
-                    if winobj.is_moving() {
+                    if winobj.is_moving {
                         // only wait for left button up to exit this mode
                         if !mouse_event.left_button_hold {
-                            winobj.set_is_moving(false);
-                            winobj.set_give_all_mouse_event(false);
+                            winobj.is_moving = false;
+                            winobj.give_all_mouse_event = false;
                             self.last_mouse_position_event = mouse_event.clone();
                             call_later_do_refresh_floating_border = true;
                             call_later_do_move_active_window = true;
@@ -381,8 +363,8 @@ impl Window {
                                 && !self.last_mouse_position_event.left_button_hold
                                 && mouse_event.left_button_hold
                             {
-                                winobj.set_is_moving(true);
-                                winobj.set_give_all_mouse_event(true);
+                                winobj.is_moving = true;
+                                winobj.give_all_mouse_event = true;
                                 winobj.moving_base = mouse_event.gcoordinate;
                                 call_later_do_refresh_floating_border = true;
                             }

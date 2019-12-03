@@ -15,9 +15,6 @@ version = "0.3.7"
 path = "../../libs/dfqueue"
 version = "0.1.0"
 
-[dependencies.window_profile]
-path = "../window_profile"
-
 [dependencies.environment]
 path = "../environment"
 

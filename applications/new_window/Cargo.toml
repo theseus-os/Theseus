@@ -14,9 +14,6 @@ x86_64 = { path = "../../libs/x86_64" }
 default-features = false
 version = "0.3.7"
 
-[dependencies.window_profile]
-path = "../../kernel/window_profile"
-
 [dependencies.frame_buffer]
 path = "../../kernel/frame_buffer"
 

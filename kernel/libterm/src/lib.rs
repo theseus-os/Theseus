@@ -19,11 +19,11 @@ extern crate frame_buffer_rgb;
 extern crate frame_buffer_drawer;
 extern crate frame_buffer_printer;
 extern crate tsc;
-extern crate window_profile;
 extern crate window_manager;
 extern crate window;
 extern crate text_display;
 
+use core::ops::DerefMut;
 use alloc::string::{String, ToString};
 use alloc::vec::Vec;
 use alloc::boxed::Box;
@@ -33,7 +33,6 @@ use event_types::Event;
 use font::{CHARACTER_HEIGHT, CHARACTER_WIDTH};
 use frame_buffer::{Coord, FrameBuffer, Rectangle};
 use tsc::{tsc_ticks, TscTicks};
-use window_profile::WindowProfile;
 use window::Window;
 
 pub mod cursor;
@@ -458,14 +457,9 @@ impl Terminal {
             is_scroll_end: true,
             cursor: Cursor::new(),
         };
-        terminal
-            .window
-            .add_displayable(&display_name, Coord::new(0, 0), Box::new(text_display))?;
-        terminal.window.clear_displayable(&display_name)?;
+        terminal.window.add_displayable(&display_name, Coord::new(0, 0), Box::new(text_display))?;
+        terminal.window.display(&display_name)?;
 
-        // terminal.window.render(None)?;
-
-        // Inserts a producer for the print queue into global list of terminal print producers
         terminal.print_to_terminal(format!("Theseus Terminal Emulator\nPress Ctrl+C to quit a task\n"));
         Ok(terminal)
     }
@@ -657,7 +651,7 @@ impl Terminal {
                 coordinate,
                 cursor_col,
                 cursor_line,
-                window.framebuffer_mut(),
+                window.framebuffer.deref_mut(),
             )?;
             area
         };   

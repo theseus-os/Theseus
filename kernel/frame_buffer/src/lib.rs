@@ -35,7 +35,7 @@ pub trait FrameBuffer: Downcast {
     fn get_size(&self) -> (usize, usize);
 
     /// Copies a buffer of pixels to the framebuffer from index `dest_start`.
-    fn buffer_copy(&mut self, src: &[Pixel], dest_start: usize);
+    fn composite_buffer(&mut self, src: &[Pixel], dest_start: usize);
 
     /// Get the pixel at `coordinate` relative to the top-left point of the framebuffer
     fn get_pixel(&self, coordinate: Coord) -> Result<Pixel, &'static str>;

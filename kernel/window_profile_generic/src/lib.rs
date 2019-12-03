@@ -1,4 +1,4 @@
-//! This crate defines a `WindowProfileGeneric` struct which implements the `WindowProfile` trait.
+//! This crate defines a `WindowProfileGeneric` struct which implements the `WindowProfileGeneric` trait.
 //!
 //! A `WindowProfileGeneric` object profiles the basic information of a window such as its size, position and other states. It owns a framebuffer which it can display in and render to the final framebuffer via a compositor.
 
@@ -8,7 +8,6 @@ extern crate alloc;
 extern crate dfqueue;
 extern crate event_types;
 extern crate frame_buffer;
-extern crate window_profile;
 extern crate spin;
 
 use alloc::boxed::Box;
@@ -17,8 +16,10 @@ use core::ops::{Deref, DerefMut};
 use dfqueue::{DFQueue, DFQueueConsumer, DFQueueProducer};
 use event_types::{Event};
 use frame_buffer::{Coord, FrameBuffer, Pixel};
-use window_profile::WindowProfile;
 use spin::{Mutex};
+
+// The default color of a window;
+const WINDOW_DEFAULT_COLOR: Pixel = 0x80FFFFFF;
 
 /// Window object that should be owned by the manager. It implements the `Window` trait.
 pub struct WindowProfileGeneric {
@@ -45,71 +46,42 @@ pub struct WindowProfileGeneric {
     pub moving_base: Coord,
 }
 
-impl WindowProfile for WindowProfileGeneric {
-    fn clear(&mut self) -> Result<(), &'static str> {
-        self.framebuffer.fill_color(0x80FFFFFF);
+impl WindowProfileGeneric {
+
+    /// Clear the content of a window
+    pub fn clear(&mut self) -> Result<(), &'static str> {
+        self.framebuffer.fill_color(WINDOW_DEFAULT_COLOR);
         Ok(())
     }
 
-    fn draw_border(&self, _color: u32) -> Result<(), &'static str> {
+    /// Draw the border of a window
+    pub fn draw_border(&self, _color: u32) -> Result<(), &'static str> {
         // this window uses Window instead of border
         Ok(())
     }
 
-    fn contains(&self, coordinate: Coord) -> bool {
+    /// Checks if a coordinate relative to the top-left corner of a window is in the window
+    pub fn contains(&self, coordinate: Coord) -> bool {
         self.framebuffer.contains(coordinate)
     }
 
-    fn get_content_size(&self) -> (usize, usize) {
+    /// Gets the size of a window in pixels
+    pub fn get_size(&self) -> (usize, usize) {
         (self.width, self.height)
     }
 
-    fn get_position(&self) -> Coord {
+    /// Gets the top-left position of the window relative to the top-left of the screen
+    pub fn get_position(&self) -> Coord {
         self.coordinate
     }
 
-    fn events_producer(&mut self) -> &mut DFQueueProducer<Event> {
-        &mut self.producer
-    }
-
-    fn set_position(&mut self, coordinate: Coord) {
+    /// Sets the top-left position of the window relative to the top-left of the screen
+    pub fn set_position(&mut self, coordinate: Coord) {
         self.coordinate = coordinate;
     }
 
-    fn get_moving_base(&self) -> Coord {
-        self.moving_base
-    }
-
-    fn set_moving_base(&mut self, coordinate: Coord) {
-        self.moving_base = coordinate
-    }
-
-    fn is_moving(&self) -> bool {
-        self.is_moving
-    }
-
-    fn set_is_moving(&mut self, moving: bool) {
-        self.is_moving = moving;   
-    }
-
-    fn set_give_all_mouse_event(&mut self, flag: bool) {
-        self.give_all_mouse_event = flag;
-    }
-
-    fn give_all_mouse_event(&mut self) -> bool {
-        self.give_all_mouse_event
-    }
-
-    fn get_pixel(&self, coordinate: Coord) -> Result<Pixel, &'static str> {
+    pub fn get_pixel(&self, coordinate: Coord) -> Result<Pixel, &'static str> {
         self.framebuffer.get_pixel(coordinate)
-    }
-
-    fn framebuffer(&self) -> &dyn FrameBuffer {
-        self.framebuffer.deref()
-    }
-
-    fn framebuffer_mut(&mut self) -> &mut dyn FrameBuffer {
-        self.framebuffer.deref_mut()
     }
 }
 

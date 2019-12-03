@@ -142,7 +142,7 @@ impl FrameBuffer for FrameBufferAlpha {
         (self.width, self.height)
     }
 
-    fn buffer_copy(&mut self, src: &[Pixel], dest_start: usize) {
+    fn composite_buffer(&mut self, src: &[Pixel], dest_start: usize) {
         let len = src.len();
         for i in 0..len {
             let index = dest_start + i;

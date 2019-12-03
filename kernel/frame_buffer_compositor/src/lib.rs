@@ -235,7 +235,7 @@ impl Compositor<FrameBufferBlocks<'_>> for FrameCompositor {
                     let src_start = src_width * ((final_y_start + i) as isize - coordinate_start.y) as usize
                         + (final_x_start as isize - coordinate_start.x) as usize + new_cache.block.start;
                     let src_end = src_start + width;
-                    final_fb.buffer_copy(&(block_content[src_start..src_end]), dest_start);
+                    final_fb.composite_buffer(&(block_content[src_start..src_end]), dest_start);
                 }
 
                 // insert the new cache

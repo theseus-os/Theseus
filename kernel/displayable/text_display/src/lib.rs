@@ -69,16 +69,6 @@ impl Displayable for TextDisplay {
         return Ok(update_area + coordinate);
     }
 
-    fn reset(&mut self) -> Result<(), &'static str> {
-        self.text = String::new();
-        self.cache = String::new();
-        self.next_col = 0;
-        self.next_line = 0;
-
-        Ok(())
-    }
-
-
     fn resize(&mut self, width: usize, height: usize) {
         self.width = width;
         self.height = height;

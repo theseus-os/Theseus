@@ -41,7 +41,7 @@ pub fn init() -> Result<(), &'static str> {
         FrameBufferRGB::new(buffer_width, buffer_height, Some(vesa_display_phys_start))?;
     let background = vec![0; buffer_width * buffer_height];
     FINAL_FRAME_BUFFER.call_once(|| Mutex::new(Box::new(framebuffer)));
-    FINAL_FRAME_BUFFER.try().ok_or("").unwrap().lock().buffer_copy(background.as_slice(), 0);
+    FINAL_FRAME_BUFFER.try().ok_or("").unwrap().lock().composite_buffer(background.as_slice(), 0);
 
     Ok(())
 }
@@ -118,7 +118,7 @@ impl FrameBuffer for FrameBufferRGB {
         (self.width, self.height)
     }
 
-    fn buffer_copy(&mut self, src: &[Pixel], dest_start: usize) {
+    fn composite_buffer(&mut self, src: &[Pixel], dest_start: usize) {
         let len = src.len();
         let dest_end = dest_start + len;
         self.buffer_mut()[dest_start..dest_end].copy_from_slice(src);

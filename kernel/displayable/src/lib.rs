@@ -28,11 +28,6 @@ pub trait Displayable: Downcast + Send {
         framebuffer: &mut dyn FrameBuffer,
     ) -> Result<Rectangle, &'static str> ;
 
-    /// Clear the displayable in the framebuffer.
-    /// * `coordinate`: the coordinate relative to the top-left point `(0, 0)` of the `framebuffer`.
-    /// * `framebuffer`: the framebuffer where the displayable is displayed.
-    fn reset(&mut self) -> Result<(), &'static str> ;
-
     /// Resizes the displayable area.
     fn resize(&mut self, width: usize, height: usize);
 

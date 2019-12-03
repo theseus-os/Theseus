@@ -194,7 +194,7 @@ pub fn fill_blank(
             return
         }
         if let Some(start) = framebuffer.index(coordinate) {
-            framebuffer.buffer_copy(&fill, start);
+            framebuffer.composite_buffer(&fill, start);
         }
         coordinate.y += 1;
     }

@@ -12,9 +12,6 @@ spin = "0.4.10"
 path = "../../libs/dfqueue"
 version = "0.1.0"
 
-[dependencies.window_profile]
-path = "../window_profile"
-
 [dependencies.frame_buffer]
 path = "../frame_buffer"
 

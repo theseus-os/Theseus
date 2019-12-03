@@ -13,7 +13,6 @@ extern crate alloc;
 extern crate dfqueue;
 extern crate runqueue;
 extern crate spawn;
-extern crate window_profile;
 extern crate window_manager;
 extern crate frame_buffer_alpha;
 extern crate print;
@@ -43,7 +42,7 @@ pub fn main(_args: Vec<String>) -> isize {
     let height = _args[3].parse::<usize>().unwrap();
     debug!("parameters {:?}", (coordinate, width, height));
 
-    let mut wincomps = match window::Window::new(
+    let mut window = match window::Window::new(
         coordinate,
         width,
         height,
@@ -58,7 +57,7 @@ pub fn main(_args: Vec<String>) -> isize {
     };
 
     loop {
-        if let Err(err) = wincomps.handle_event() {
+        if let Err(err) = window.handle_event() {
             debug!("{}", err); 
             return 0;
         }

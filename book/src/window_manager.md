@@ -6,15 +6,15 @@ In most of the cases, both an application and the window manager want to get acc
 
 However, `Mutex` introduces a danger of deadlocks. When an application wants to get access to its window, it must lock it first, operate on it and then release it. If an application does not release the locked window, the window manager will be blocked in most of the operations such as switching or deleting since it needs to traverse all the windows including the locked one. 
 
-To solve this problem, we define two objects `Window` and `WindowProfileGeneric`. `WindowProfileGeneric` only contains the information required by the window manager and implements the `WindowProfile` trait. A window manager holds a list of reference to `WindowProfile`s. An application owns a `Window` object which wraps a reference to its `WindowProfile` object together with other states required by the application. 
+To solve this problem, we define two objects `Window` and `WindowProfileGeneric`. `WindowProfileGeneric` only contains the information required by the window manager and implements the `WindowProfileGeneric` trait. A window manager holds a list of reference to `WindowProfileGeneric`s. An application owns a `Window` object which wraps a reference to its `WindowProfileGeneric` object together with other states required by the application. 
 
-## The WindowProfile Trait
+## The WindowProfileGeneric Trait
 
-The `window_profile` crate defines a `WindowProfile` trait. It has basic methods of operations on a window's information such as setting or getting its states. Any structure that implements the trait can act as the profile of a window. It is owned by a window and a window manager concurrently. The window can operate on the profile information while the manager can render it to the screen according to these informations.
+The `window_profile` crate defines a `WindowProfileGeneric` trait. It has basic methods of operations on a window's information such as setting or getting its states. Any structure that implements the trait can act as the profile of a window. It is owned by a window and a window manager concurrently. The window can operate on the profile information while the manager can render it to the screen according to these informations.
 
 ## The WindowProfileGeneric structure
 
-`WindowProfileGeneric` implements the `WindowProfile` trait. It contains the basic information of the window and an event producer. The window manager gets events from I/O devices such as keyboards and push them to the active producer.
+`WindowProfileGeneric` implements the `WindowProfileGeneric` trait. It contains the basic information of the window and an event producer. The window manager gets events from I/O devices such as keyboards and push them to the active producer.
 
 A `WindowProfileGeneric` has a framebuffer in which it can display the content of the window. The framebuffer is an object which implements the `FrameBuffer` trait. When the window is rendered to the screen, a compositor may render it with different principles according to the type of its framebuffer. Currently, we have implemented a normal framebuffer and one with the alpha channel.
 

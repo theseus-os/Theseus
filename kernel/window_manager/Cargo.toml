@@ -15,9 +15,6 @@ version = "0.1.0"
 [dependencies.frame_buffer_drawer]
 path = "../frame_buffer_drawer"
 
-[dependencies.window_profile]
-path = "../window_profile"
-
 [dependencies.window_profile_generic]
 path = "../window_profile_generic"
 
