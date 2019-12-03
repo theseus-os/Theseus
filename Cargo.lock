@@ -1964,6 +1964,7 @@ name = "stack_trace"
 version = "0.1.0"
 dependencies = [
  "fallible-iterator 0.2.0 (registry+https://github.com/rust-lang/crates.io-index)",
+ "log 0.3.9 (registry+https://github.com/rust-lang/crates.io-index)",
  "task 0.1.0",
  "unwind 0.1.0",
 ]
