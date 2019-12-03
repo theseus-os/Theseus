@@ -30,6 +30,12 @@ path = "../frame_buffer"
 [dependencies.frame_buffer_rgb]
 path = "../frame_buffer_rgb"
 
+[dependencies.frame_buffer_alpha]
+path = "../frame_buffer_alpha"
+
+[dependencies.window_manager]
+path = "../window_manager"
+
 [dependencies.input_event_manager]
 path = "../input_event_manager"
 

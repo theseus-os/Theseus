@@ -19,10 +19,8 @@ extern crate frame_buffer_alpha;
 extern crate frame_buffer_rgb;
 extern crate window_manager;
 extern crate alloc;
-extern crate frame_buffer;
 
 use frame_buffer_alpha::FrameBufferAlpha;
-use frame_buffer::FrameBuffer;
 use alloc::{string::ToString, sync::Arc};
 use event_types::Event;
 use dfqueue::{DFQueue, DFQueueProducer};
@@ -30,17 +28,7 @@ use mod_mgmt::{metadata::CrateType, CrateNamespace, NamespaceDir};
 use spawn::{ApplicationTaskBuilder};
 
 /// Initializes the keyinput queue and the default display
-pub fn init() -> Result<(DFQueueProducer<Event>, DFQueueProducer<Event>), &'static str> {
-    // keyinput queue initialization
-    let keyboard_event_handling_queue: DFQueue<Event> = DFQueue::new();
-    let keyboard_event_handling_consumer = keyboard_event_handling_queue.into_consumer();
-    let returned_keyboard_producer = keyboard_event_handling_consumer.obtain_producer();
-
-    // mouse input queue initialization
-    let mouse_event_handling_queue: DFQueue<Event> = DFQueue::new();
-    let mouse_event_handling_consumer = mouse_event_handling_queue.into_consumer();
-    let returned_mouse_producer = mouse_event_handling_consumer.obtain_producer();
-
+pub fn init() -> Result<(), &'static str> {
     // Create the first application CrateNamespace via the following steps:
     // (1) get the default kernel CrateNamespace, which will serve as the new app namespace's recursive namespace,
     // (2) get the directory where the default app namespace should have been populated when mod_mgmt was init'd,
@@ -64,19 +52,6 @@ pub fn init() -> Result<(DFQueueProducer<Event>, DFQueueProducer<Event>), &'stat
     let app_io_path = default_app_namespace.get_crate_file_starting_with("app_io-")
         .ok_or("Couldn't find terminal application in default app namespace")?;
 
-    // initialize alpha display subsystem
-    font::init()?;
-    let (width, height) = frame_buffer_alpha::init()?;
-    let bg_framebuffer = FrameBufferAlpha::new(width, height, None)?;
-    let mut top_framebuffer = FrameBufferAlpha::new(width, height, None)?;
-    top_framebuffer.fill_color(0xFF000000); 
-    window_manager::init(
-        keyboard_event_handling_consumer,
-        mouse_event_handling_consumer,
-        bg_framebuffer,
-        top_framebuffer
-    )?;
-
     // Spawns the terminal print crate so that we can print to the terminal
     ApplicationTaskBuilder::new(terminal_print_path)
         .name("terminal_print_singleton".to_string())
@@ -95,5 +70,5 @@ pub fn init() -> Result<(DFQueueProducer<Event>, DFQueueProducer<Event>), &'stat
         .namespace(default_app_namespace)
         .spawn()?;
 
-    Ok((returned_keyboard_producer, returned_mouse_producer))
+    Ok(())
 }

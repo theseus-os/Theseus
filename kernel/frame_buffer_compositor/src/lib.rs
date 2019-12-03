@@ -88,7 +88,7 @@ impl BlockCache {
             && coordinate.y < self.coordinate.y + CACHE_BLOCK_HEIGHT as isize;
     }
 
-    // checks if this block cotains any of the four corners of `cache`.
+    // checks if this block contains any of the four corners of `cache`.
     fn contains_corner(&self, cache: &BlockCache) -> bool {
         self.contains(cache.coordinate)
             || self.contains(cache.coordinate + (cache.width as isize - 1, 0))

@@ -42,12 +42,14 @@ extern crate e1000;
 extern crate scheduler;
 extern crate frame_buffer;
 extern crate frame_buffer_rgb;
+extern crate frame_buffer_alpha;
 extern crate font;
 #[cfg(mirror_log_to_vga)] #[macro_use] extern crate print;
 extern crate input_event_manager;
 extern crate exceptions_full;
 extern crate network_manager;
 extern crate pause;
+extern crate window_manager;
 
 #[cfg(simd_personality)] extern crate simd_personality;
 
@@ -60,6 +62,7 @@ use memory::{VirtualAddress, MemoryManagementInfo, MappedPages};
 use kernel_config::memory::KERNEL_STACK_SIZE_IN_PAGES;
 use irq_safety::{MutexIrqSafe, enable_interrupts};
 use pause::spin_loop_hint;
+use frame_buffer_alpha::FrameBufferAlpha;
 
 
 
@@ -123,8 +126,19 @@ pub fn init(
     let ap_count = multicore_bringup::handle_ap_cores(kernel_mmi_ref.clone(), ap_start_realmode_begin, ap_start_realmode_end)?;
     info!("Finished handling and booting up all {} AP cores.", ap_count);
 
+    // initialize display subsystem. In current implementation, the default window manager is an alpha framebuffer-based one.
+    font::init()?;
+    let (width, height) = frame_buffer_alpha::init()?;
+    let bg_framebuffer = FrameBufferAlpha::new(width, height, None)?;
+    let top_framebuffer = FrameBufferAlpha::new(width, height, None)?;
+    let (key_producer, mouse_producer) = window_manager::init(
+        bg_framebuffer,
+        top_framebuffer
+    )?;
+
     // initialize the i/o subsystem, which will start window manager and the default terminal 
-    let (key_producer, mouse_producer) = input_event_manager::init()?;
+    input_event_manager::init()?;
+
     // initialize the rest of our drivers
     device_manager::init(key_producer, mouse_producer)?;
     task_fs::init()?;

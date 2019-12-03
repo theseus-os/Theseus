@@ -34,7 +34,7 @@ use alloc::sync::{Arc, Weak};
 use alloc::vec::Vec;
 use compositor::Compositor;
 use core::ops::{Deref, DerefMut};
-use dfqueue::{DFQueueConsumer};
+use dfqueue::{DFQueueConsumer, DFQueue, DFQueueProducer};
 use event_types::{Event, MousePositionEvent};
 use frame_buffer::{Coord, FrameBuffer, Pixel, Rectangle};
 use frame_buffer_compositor::{FrameBufferBlocks, FRAME_COMPOSITOR};
@@ -748,11 +748,10 @@ impl<U: WindowProfile> WindowManager<U> {
 
 /// Initialize the window manager, should provide the consumer of keyboard and mouse event, as well as a frame buffer to draw
 pub fn init<Buffer: FrameBuffer + Send>(
-    key_consumer: DFQueueConsumer<Event>,
-    mouse_consumer: DFQueueConsumer<Event>,
     mut bg_framebuffer: Buffer,
-    top_framebuffer: Buffer,
-) -> Result<(), &'static str> {
+    mut top_framebuffer: Buffer,
+) -> Result<(DFQueueProducer<Event>, DFQueueProducer<Event>), &'static str> {
+    // initialize the framebuffer
     let (screen_width, screen_height) = bg_framebuffer.get_size();
     for x in 0..screen_width{
         for y in 0..screen_height {
@@ -762,6 +761,7 @@ pub fn init<Buffer: FrameBuffer + Send>(
             )
         }
     }
+    top_framebuffer.fill_color(T); 
 
     // initialize static window manager
     let window_manager = WindowManager {
@@ -785,11 +785,21 @@ pub fn init<Buffer: FrameBuffer + Send>(
     }; 
     
     win.refresh_bottom_windows(None, false)?;
-    
+
+    // keyinput queue initialization
+    let keyboard_event_handling_queue: DFQueue<Event> = DFQueue::new();
+    let key_consumer = keyboard_event_handling_queue.into_consumer();
+    let key_producer = key_consumer.obtain_producer();
+
+    // mouse input queue initialization
+    let mouse_event_handling_queue: DFQueue<Event> = DFQueue::new();
+    let mouse_consumer = mouse_event_handling_queue.into_consumer();
+    let mouse_producer = mouse_consumer.obtain_producer();
+
     KernelTaskBuilder::new(window_manager_loop, (key_consumer, mouse_consumer))
         .name("window_manager_loop".to_string())
         .spawn()?;
-    Ok(())
+    Ok((key_producer, mouse_producer))
 }
 
 /// handles all keyboard and mouse movement in this window manager

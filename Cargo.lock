@@ -209,6 +209,7 @@ dependencies = [
  "exceptions_full 0.1.0",
  "font 0.1.0",
  "frame_buffer 0.1.0",
+ "frame_buffer_alpha 0.1.0",
  "frame_buffer_rgb 0.1.0",
  "input_event_manager 0.1.0",
  "interrupts 0.1.0",
@@ -230,6 +231,7 @@ dependencies = [
  "task 0.1.0",
  "task_fs 0.1.0",
  "tsc 0.1.0",
+ "window_manager 0.1.0",
 ]
 
 [[package]]
