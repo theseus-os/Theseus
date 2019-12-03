@@ -78,9 +78,6 @@ pub fn kstart_ap(processor_id: u8, apic_id: u8,
     loop { 
         spin_loop_hint();
         // TODO: put this core into a low-power state
-        if(apic_id == 3){
-            panic!("Just panicing {}",apic_id);
-        }
     }
 
 }

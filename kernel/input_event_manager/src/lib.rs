@@ -139,11 +139,6 @@ fn input_event_loop(consumer:Queue<Event>) -> Result<(), &'static str> {
                 if key_input.modifiers.control && key_input.keycode == Keycode::W && key_input.action == KeyAction::Pressed {
                     window_manager::WINDOWLIST.lock().send_event_to_active(Event::ExitEvent)?; // tells application to exit
                 }
-
-                // Deletes the active window (whichever window Ctrl + W is logged in)
-                if key_input.modifiers.control && key_input.keycode == Keycode::N && key_input.action == KeyAction::Pressed {
-                    panic!("Input queue just paniced");
-                }
             }
             _ => { }
         }
