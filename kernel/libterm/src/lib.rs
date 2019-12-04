@@ -646,7 +646,7 @@ impl Terminal {
 
         // Get the container to display the cursor in
         let update_area = {
-            let mut window = self.window.winobj.lock();
+            let mut window = self.window.view.lock();
             let area = self.cursor.display(
                 coordinate,
                 cursor_col,

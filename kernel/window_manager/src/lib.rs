@@ -1,6 +1,6 @@
 //! This crate acts as a manager of a list of windows. It defines a `WindowManager` structure and an instance of it. 
 //!
-//! A window manager holds a set of `WindowProfileGeneric` objects, including an active window, a list of shown windows and a list of hidden windows. The hidden windows are totally overlapped by others.
+//! A window manager holds a set of `WindowView` objects, including an active window, a list of shown windows and a list of hidden windows. The hidden windows are totally overlapped by others.
 //!
 //! A window manager owns a bottom framebuffer and a top framebuffer. The bottom is the background of the desktop and the top framebuffer contains a floating window border and a mouse arrow. In refreshing an area, the manager will render all the framebuffers in order: bottom -> hide list -> showlist -> active -> top.
 //!
@@ -23,7 +23,7 @@ extern crate mouse_data;
 extern crate path;
 extern crate scheduler; 
 extern crate spawn;
-extern crate window_profile_generic;
+extern crate window_view;
 
 mod background;
 use alloc::boxed::Box;
@@ -42,7 +42,7 @@ use mouse_data::MouseEvent;
 use path::Path;
 use spawn::{ApplicationTaskBuilder, KernelTaskBuilder};
 use spin::{Mutex, Once};
-use window_profile_generic::WindowProfileGeneric;
+use window_view::WindowView;
 
 /// The instance of the default window manager
 pub static WINDOW_MANAGER: Once<Mutex<WindowManager>> = Once::new();
@@ -83,11 +83,11 @@ const WINDOW_BORDER_COLOR_INNER: Pixel = 0x00CA6F1E;
 /// Window manager structure which maintains a list of windows and a mouse.
 pub struct WindowManager {
     /// those window currently not shown on screen
-    hide_list: VecDeque<Weak<Mutex<WindowProfileGeneric>>>,
+    hide_list: VecDeque<Weak<Mutex<WindowView>>>,
     /// those window shown on screen that may overlapping each other
-    show_list: VecDeque<Weak<Mutex<WindowProfileGeneric>>>,
+    show_list: VecDeque<Weak<Mutex<WindowView>>>,
     /// the only active window, receiving all keyboard events (except for those remained for WM)
-    active: Weak<Mutex<WindowProfileGeneric>>, // this one is not in show_list
+    active: Weak<Mutex<WindowView>>, // this one is not in show_list
     /// current mouse position
     mouse: Coord,
     /// If a window is being repositioned (e.g., by dragging it), this is the position of that window's border
@@ -102,7 +102,7 @@ impl WindowManager {
     /// set one window to active, push last active (if exists) to top of show_list. if `refresh` is `true`, will then refresh the window's area
     pub fn set_active(
         &mut self,
-        objref: &Arc<Mutex<WindowProfileGeneric>>,
+        objref: &Arc<Mutex<WindowView>>,
         refresh: bool,
     ) -> Result<(), &'static str> {
         // if it is currently actived, just return
@@ -146,7 +146,7 @@ impl WindowManager {
     }
 
     /// Return the index of a window if it is in the show list
-    fn is_window_in_show_list(&mut self, objref: &Arc<Mutex<WindowProfileGeneric>>) -> Option<usize> {
+    fn is_window_in_show_list(&mut self, objref: &Arc<Mutex<WindowView>>) -> Option<usize> {
         let mut i = 0_usize;
         for item in self.show_list.iter() {
             if let Some(item_ptr) = item.upgrade() {
@@ -160,7 +160,7 @@ impl WindowManager {
     }
 
     /// Return the index of a window if it is in the hide list
-    fn is_window_in_hide_list(&mut self, objref: &Arc<Mutex<WindowProfileGeneric>>) -> Option<usize> {
+    fn is_window_in_hide_list(&mut self, objref: &Arc<Mutex<WindowView>>) -> Option<usize> {
         let mut i = 0_usize;
         for item in self.hide_list.iter() {
             if let Some(item_ptr) = item.upgrade() {
@@ -174,11 +174,11 @@ impl WindowManager {
     }
 
     /// delete a window and refresh its region
-    pub fn delete_window(&mut self, objref: &Arc<Mutex<WindowProfileGeneric>>) -> Result<(), &'static str> {
+    pub fn delete_window(&mut self, objref: &Arc<Mutex<WindowView>>) -> Result<(), &'static str> {
         let (top_left, bottom_right) = {
-            let winobj = objref.lock();
-            let top_left = winobj.get_position();
-            let (width, height) = winobj.get_size();
+            let view = objref.lock();
+            let top_left = view.get_position();
+            let (width, height) = view.get_size();
             let bottom_right = top_left + (width as isize, height as isize);
             (top_left, bottom_right)
         };
@@ -481,12 +481,12 @@ impl WindowManager {
         }
         // show list
         for i in 0..self.show_list.len() {
-            if let Some(now_winobj_mutex) = self.show_list[i].upgrade() {
-                let mut now_winobj = now_winobj_mutex.lock();
-                let current_coordinate = now_winobj.get_position();
-                if now_winobj.give_all_mouse_event {
+            if let Some(now_view_mutex) = self.show_list[i].upgrade() {
+                let mut now_view = now_view_mutex.lock();
+                let current_coordinate = now_view.get_position();
+                if now_view.give_all_mouse_event {
                     event.coordinate = *coordinate - current_coordinate;
-                    now_winobj
+                    now_view
                         .producer
                         .enqueue(Event::MousePositionEvent(event.clone()));
                 }
@@ -512,12 +512,12 @@ impl WindowManager {
         }
         // then check show_list
         for i in 0..self.show_list.len() {
-            if let Some(now_winobj_mutex) = self.show_list[i].upgrade() {
-                let mut now_winobj = now_winobj_mutex.lock();
-                let current_coordinate = now_winobj.get_position();
-                if now_winobj.contains(*coordinate - current_coordinate) {
+            if let Some(now_view_mutex) = self.show_list[i].upgrade() {
+                let mut now_view = now_view_mutex.lock();
+                let current_coordinate = now_view.get_position();
+                if now_view.contains(*coordinate - current_coordinate) {
                     event.coordinate = *coordinate - current_coordinate;
-                    now_winobj
+                    now_view
                         .producer
                         .enqueue(Event::MousePositionEvent(event));
                     return Ok(());
@@ -712,7 +712,7 @@ impl WindowManager {
     }
 
     /// Whether a window is active
-    pub fn is_active(&self, objref: &Arc<Mutex<WindowProfileGeneric>>) -> bool {
+    pub fn is_active(&self, objref: &Arc<Mutex<WindowView>>) -> bool {
         if let Some(current_active) = self.active.upgrade() {
             if Arc::ptr_eq(&(current_active), objref) {
                 return true;

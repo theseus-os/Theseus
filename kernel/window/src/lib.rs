@@ -27,7 +27,7 @@ extern crate frame_buffer_compositor;
 extern crate frame_buffer_drawer;
 extern crate memory_structs;
 extern crate mouse;
-extern crate window_profile_generic;
+extern crate window_view;
 extern crate window_manager;
 
 use alloc::boxed::Box;
@@ -45,7 +45,7 @@ use frame_buffer_alpha::{PixelMixer, BLACK};
 use frame_buffer_compositor::{FrameBufferBlocks, FRAME_COMPOSITOR};
 use memory_structs::PhysicalAddress;
 use spin::Mutex;
-use window_profile_generic::WindowProfileGeneric;
+use window_view::WindowView;
 use window_manager::WINDOW_MANAGER;
 
 // The title bar size, in number of pixels
@@ -97,7 +97,7 @@ impl From<usize> for TopButton {
 /// Abstraction of a window which owns a list of components and the window's handler. It provides title bar which helps user moving, close, maximize or minimize window
 pub struct Window {
     /// the window object that could be used to initialize components
-    pub winobj: Arc<Mutex<WindowProfileGeneric>>,
+    pub view: Arc<Mutex<WindowView>>,
     /// the width of border, init as WINDOW_BORDER. the border is still part of the window and remains flexibility for user to change border style or remove border. However, for most application a border is useful for user to identify the region.
     border_size: usize,
     /// the height of title bar in pixel, init as WINDOW_TITLE_BAR. it is render inside the window so user shouldn't use this area anymore
@@ -136,14 +136,14 @@ impl Window {
             return Err("window too small to even draw border");
         }
 
-        let winobj_mutex = window_profile_generic::new_window(coordinate, framebuffer)?;
+        let view_mutex = window_view::new_window(coordinate, framebuffer)?;
 
         // create event queue for components
         let consumer = DFQueue::new().into_consumer();
         let producer = consumer.obtain_producer();
 
         let mut window: Window = Window {
-            winobj: winobj_mutex,
+            view: view_mutex,
             border_size: WINDOW_BORDER,
             title_size: WINDOW_TITLE_BAR,
             background: background,
@@ -164,8 +164,8 @@ impl Window {
         };
 
         {
-            let mut winobj = window.winobj.lock();
-            winobj.framebuffer.fill_color(window.background);
+            let mut view = window.view.lock();
+            view.framebuffer.fill_color(window.background);
         }
 
         {
@@ -173,18 +173,18 @@ impl Window {
                 .try()
                 .ok_or("The static window manager was not yet initialized")?
                 .lock();
-            win.set_active(&window.winobj, false)?; // do not refresh now for
+            win.set_active(&window.view, false)?; // do not refresh now for
         }
 
         window.draw_border(true); // draw window with active border
                                     // draw three buttons
         {
-            let mut winobj = window.winobj.lock();
-            window.show_button(TopButton::Close, 1, &mut winobj);
-            window.show_button(TopButton::MinimizeMaximize, 1, &mut winobj);
-            window.show_button(TopButton::Hide, 1, &mut winobj);
+            let mut view = window.view.lock();
+            window.show_button(TopButton::Close, 1, &mut view);
+            window.show_button(TopButton::MinimizeMaximize, 1, &mut view);
+            window.show_button(TopButton::Hide, 1, &mut view);
             let buffer_blocks = FrameBufferBlocks {
-                framebuffer: winobj.framebuffer.deref(),
+                framebuffer: view.framebuffer.deref(),
                 coordinate: coordinate,
                 blocks: None,
             };
@@ -262,7 +262,7 @@ impl Window {
         let coordinate = component.get_position();
 
         let area = {
-            let mut window = self.winobj.lock();
+            let mut window = self.view.lock();
             let area = component
                 .displayable
                 .display(coordinate, window.framebuffer.deref_mut())?;
@@ -284,20 +284,20 @@ impl Window {
                 .try()
                 .ok_or("The static window manager was not yet initialized")?
                 .lock();
-            wm.is_active(&self.winobj)
+            wm.is_active(&self.view)
         };
         if is_active != self.last_is_active {
             self.draw_border(is_active);
             self.last_is_active = is_active;
-            let mut winobj = self.winobj.lock();
-            self.show_button(TopButton::Close, 1, &mut winobj);
-            self.show_button(TopButton::MinimizeMaximize, 1, &mut winobj);
-            self.show_button(TopButton::Hide, 1, &mut winobj);
+            let mut view = self.view.lock();
+            self.show_button(TopButton::Close, 1, &mut view);
+            self.show_button(TopButton::MinimizeMaximize, 1, &mut view);
+            self.show_button(TopButton::Hide, 1, &mut view);
         }
 
         {
-            let mut winobj = self.winobj.lock();
-            let consumer = &winobj.consumer;
+            let mut view = self.view.lock();
+            let consumer = &view.consumer;
             let event = match consumer.peek() {
                 Some(ev) => ev,
                 _ => {
@@ -311,18 +311,18 @@ impl Window {
                     self.producer.enqueue(Event::new_keyboard_event(key_input));
                 }
                 &Event::MousePositionEvent(ref mouse_event) => {
-                    if winobj.is_moving {
+                    if view.is_moving {
                         // only wait for left button up to exit this mode
                         if !mouse_event.left_button_hold {
-                            winobj.is_moving = false;
-                            winobj.give_all_mouse_event = false;
+                            view.is_moving = false;
+                            view.give_all_mouse_event = false;
                             self.last_mouse_position_event = mouse_event.clone();
                             call_later_do_refresh_floating_border = true;
                             call_later_do_move_active_window = true;
                         }
                     } else {
                         if (mouse_event.coordinate.y as usize) < self.title_size
-                            && (mouse_event.coordinate.x as usize) < winobj.width
+                            && (mouse_event.coordinate.x as usize) < view.width
                         {
                             // the region of title bar
                             let r2 = WINDOW_RADIUS * WINDOW_RADIUS;
@@ -339,10 +339,10 @@ impl Window {
                                 {
                                     is_three_button = true;
                                     if mouse_event.left_button_hold {
-                                        self.show_button(TopButton::from(i), 2, &mut winobj);
+                                        self.show_button(TopButton::from(i), 2, &mut view);
                                         need_refresh_three_button = true;
                                     } else {
-                                        self.show_button(TopButton::from(i), 0, &mut winobj);
+                                        self.show_button(TopButton::from(i), 0, &mut view);
                                         need_refresh_three_button = true;
                                         if self.last_mouse_position_event.left_button_hold {
                                             // click event
@@ -354,7 +354,7 @@ impl Window {
                                         }
                                     }
                                 } else {
-                                    self.show_button(TopButton::from(i), 1, &mut winobj);
+                                    self.show_button(TopButton::from(i), 1, &mut view);
                                     need_refresh_three_button = true;
                                 }
                             }
@@ -363,9 +363,9 @@ impl Window {
                                 && !self.last_mouse_position_event.left_button_hold
                                 && mouse_event.left_button_hold
                             {
-                                winobj.is_moving = true;
-                                winobj.give_all_mouse_event = true;
-                                winobj.moving_base = mouse_event.gcoordinate;
+                                view.is_moving = true;
+                                view.give_all_mouse_event = true;
+                                view.moving_base = mouse_event.gcoordinate;
                                 call_later_do_refresh_floating_border = true;
                             }
                         } else {
@@ -374,8 +374,8 @@ impl Window {
                             self.producer
                                 .enqueue(Event::MousePositionEvent(mouse_event.clone()));
                         }
-                        if (mouse_event.coordinate.y as usize) < winobj.height
-                            && (mouse_event.coordinate.x as usize) < winobj.width
+                        if (mouse_event.coordinate.y as usize) < view.height
+                            && (mouse_event.coordinate.x as usize) < view.width
                             && !self.last_mouse_position_event.left_button_hold
                             && mouse_event.left_button_hold
                         {
@@ -400,7 +400,7 @@ impl Window {
             .ok_or("The static window manager was not yet initialized")?
             .lock();
         if need_to_set_active {
-            wm.set_active(&self.winobj, true)?;
+            wm.set_active(&self.view, true)?;
         }
 
         if call_later_do_refresh_floating_border {
@@ -417,7 +417,7 @@ impl Window {
     /// Render a window to the screen. Should be invoked after updating.
     pub fn render(&mut self, area: Option<Rectangle>) -> Result<(), &'static str> {
         let coordinate = {
-            let window = self.winobj.lock();
+            let window = self.view.lock();
             window.get_position()
         };
 
@@ -435,17 +435,17 @@ impl Window {
 
     /// Draw the border of this window, with argument of whether this window is active now
     fn draw_border(&mut self, active: bool) {
-        let mut winobj = self.winobj.lock();
+        let mut view = self.view.lock();
         // first draw left, bottom, right border
         let mut border_color = WINDOW_BORDER_COLOR_INACTIVE;
         if active {
             border_color = WINDOW_BORDER_COLOR_ACTIVE_BOTTOM;
         }
-        let width = winobj.width;
-        let height = winobj.height;
+        let width = view.width;
+        let height = view.height;
 
         frame_buffer_drawer::draw_rectangle(
-            winobj.framebuffer.deref_mut(),
+            view.framebuffer.deref_mut(),
             Coord::new(0, self.title_size as isize),
             self.border_size,
             height - self.title_size,
@@ -453,14 +453,14 @@ impl Window {
         );
 
         frame_buffer_drawer::draw_rectangle(
-            winobj.framebuffer.deref_mut(),
+            view.framebuffer.deref_mut(),
             Coord::new(0, (height - self.border_size) as isize),
             width,
             self.border_size,
             border_color,
         );
         frame_buffer_drawer::draw_rectangle(
-            winobj.framebuffer.deref_mut(),
+            view.framebuffer.deref_mut(),
             Coord::new(
                 (width - self.border_size) as isize,
                 self.title_size as isize,
@@ -474,7 +474,7 @@ impl Window {
         if active {
             for i in 0..self.title_size {
                 frame_buffer_drawer::draw_rectangle(
-                    winobj.framebuffer.deref_mut(),
+                    view.framebuffer.deref_mut(),
                     Coord::new(0, i as isize),
                     width,
                     1,
@@ -486,7 +486,7 @@ impl Window {
             }
         } else {
             frame_buffer_drawer::draw_rectangle(
-                winobj.framebuffer.deref_mut(),
+                view.framebuffer.deref_mut(),
                 Coord::new(0, 0),
                 width,
                 self.title_size,
@@ -502,10 +502,10 @@ impl Window {
                 let dy1 = WINDOW_RADIUS - j;
                 if dx1 * dx1 + dy1 * dy1 > r2 {
                     // draw this to transparent
-                    winobj
+                    view
                         .framebuffer
                         .overwrite_pixel(Coord::new(i as isize, j as isize), 0xFFFFFFFF);
-                    winobj.framebuffer.overwrite_pixel(
+                    view.framebuffer.overwrite_pixel(
                         Coord::new((width - i - 1) as isize, j as isize),
                         0xFFFFFFFF,
                     );
@@ -515,7 +515,7 @@ impl Window {
     }
 
     /// show three button with status. state = 0,1,2 for three different color
-    fn show_button(&self, button: TopButton, state: usize, winobj: &mut WindowProfileGeneric) {
+    fn show_button(&self, button: TopButton, state: usize, view: &mut WindowView) {
         let y = self.title_size / 2;
         let x = WINDOW_BUTTON_BIAS_X
             + WINDOW_BUTTON_BETWEEN
@@ -525,7 +525,7 @@ impl Window {
                     TopButton::Hide => 2,
                 };
         frame_buffer_drawer::draw_circle(
-            winobj.framebuffer.deref_mut(),
+            view.framebuffer.deref_mut(),
             Coord::new(x as isize, y as isize),
             WINDOW_BUTTON_SIZE,
             BLACK.color_mix(
@@ -541,7 +541,7 @@ impl Window {
 
     /// refresh the top left three button's appearance
     fn refresh_three_button(&self) -> Result<(), &'static str> {
-        let profile = self.winobj.lock();
+        let profile = self.view.lock();
         let frame_buffer_blocks = FrameBufferBlocks {
             framebuffer: profile.framebuffer.deref(),
             coordinate: profile.coordinate,
@@ -556,10 +556,10 @@ impl Window {
 
     /// return the available inner size, excluding title bar and border
     pub fn inner_size(&self) -> (usize, usize) {
-        let winobj = self.winobj.lock();
+        let view = self.view.lock();
         (
-            winobj.width - 2 * self.border_size,
-            winobj.height - self.border_size - self.title_size,
+            view.width - 2 * self.border_size,
+            view.height - self.border_size - self.title_size,
         )
     }
 
@@ -588,7 +588,7 @@ impl Drop for Window {
             .ok_or("The static window manager was not yet initialized")
         {
             Ok(wm) => {
-                if let Err(err) = wm.lock().delete_window(&self.winobj) {
+                if let Err(err) = wm.lock().delete_window(&self.view) {
                     error!("delete_window failed {}", err);
                 }
             }

@@ -1333,7 +1333,7 @@ impl Shell {
                     .try()
                     .ok_or("The static window manager was not yet initialized")?
                     .lock();
-                wm.is_active(&self.terminal.lock().window.winobj)
+                wm.is_active(&self.terminal.lock().window.view)
             };
             
             if is_active {

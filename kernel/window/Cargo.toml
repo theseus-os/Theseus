@@ -34,8 +34,8 @@ path = "../frame_buffer_compositor"
 [dependencies.displayable]
 path = "../displayable"
 
-[dependencies.window_profile_generic]
-path = "../window_profile_generic"
+[dependencies.window_view]
+path = "../window_view"
 
 [dependencies.window_manager]
 path = "../window_manager"

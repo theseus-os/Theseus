@@ -15,8 +15,8 @@ version = "0.1.0"
 [dependencies.frame_buffer_drawer]
 path = "../frame_buffer_drawer"
 
-[dependencies.window_profile_generic]
-path = "../window_profile_generic"
+[dependencies.window_view]
+path = "../window_view"
 
 [dependencies.compositor]
 path = "../compositor"

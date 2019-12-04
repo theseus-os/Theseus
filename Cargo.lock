@@ -2335,7 +2335,7 @@ dependencies = [
  "spawn 0.1.0",
  "spin 0.4.10 (registry+https://github.com/rust-lang/crates.io-index)",
  "window_manager 0.1.0",
- "window_profile_generic 0.1.0",
+ "window_view 0.1.0",
 ]
 
 [[package]]
@@ -2357,11 +2357,11 @@ dependencies = [
  "scheduler 0.1.0",
  "spawn 0.1.0",
  "spin 0.4.10 (registry+https://github.com/rust-lang/crates.io-index)",
- "window_profile_generic 0.1.0",
+ "window_view 0.1.0",
 ]
 
 [[package]]
-name = "window_profile_generic"
+name = "window_view"
 version = "0.1.0"
 dependencies = [
  "dfqueue 0.1.0",
