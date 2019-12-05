@@ -9,12 +9,12 @@
 //!
 //! The `start` and `width` parameter represents the updated area in this block.
 //!
-//! The compositor caches a list of displayed blocks and their updated area. If an incoming `FrameBufferBlocks` carries a list of updated blocks, the compositor compares every block with a cached one:
+//! The compositor caches a list of displayed blocks and their updated area. If an incoming `FrameBufferUpdates` carries a list of updated blocks, the compositor compares every block with a cached one:
 //! * If the two blocks are identical, ignore it.
 //! * If a new block overlaps with an existing one, display the content and caches it.
 //! * Then we set the hash of the old cache as 0. We do not remove it because we should keep its content location and when another block arrives, their overlapped parts will be cleared. We set its content as 0 so that the compositor will redraw it if the same block arrives.
 //!
-//! If `FrameBufferBlocks` is `None`, the compositor will handle all of its blocks.
+//! If `FrameBufferUpdates` is `None`, the compositor will handle all of its blocks.
 //!
 //! The `composite_pixles` method will update the pixels relative to the top-left of the screen. It computes the relative coordinates in every framebuffer, composites them and write the result to the screen.
 //! 
@@ -34,7 +34,7 @@ use alloc::collections::BTreeMap;
 use alloc::vec::{Vec, IntoIter};
 use core::hash::{Hash, Hasher, BuildHasher};
 use hashbrown::hash_map::{DefaultHashBuilder};
-use compositor::{Compositor, FrameBufferBlocks, Mixer, Cache};
+use compositor::{Compositor, FrameBufferUpdates, Mixer, Cache};
 use frame_buffer::{FrameBuffer, FINAL_FRAME_BUFFER, Coord, Rectangle};
 use spin::Mutex;
 
@@ -70,14 +70,13 @@ pub struct BlockCache {
 }
 
 impl Cache for BlockCache {
-    // checks if the block overlaps with another one.
     fn overlaps_with(&self, cache: &BlockCache) -> bool {
         self.contains_corner(cache) || cache.contains_corner(self)
     }
 }
 
 impl BlockCache {
-    // checks if the coordinate is within the block
+    /// checks if the coordinate is within the block
     fn contains(&self, coordinate: Coord) -> bool {
         return coordinate.x >= self.coordinate.x
             && coordinate.x < self.coordinate.x + self.width as isize
@@ -85,7 +84,7 @@ impl BlockCache {
             && coordinate.y < self.coordinate.y + CACHE_BLOCK_HEIGHT as isize;
     }
 
-    // checks if this block contains any of the four corners of `cache`.
+    /// checks if this block contains any of the four corners of `cache`.
     fn contains_corner(&self, cache: &BlockCache) -> bool {
         self.contains(cache.coordinate)
             || self.contains(cache.coordinate + (cache.width as isize - 1, 0))
@@ -121,10 +120,10 @@ impl Block {
     }
 }
 
-impl Compositor<'_ , BlockCache> for FrameCompositor {
+impl Compositor<BlockCache> for FrameCompositor {
     fn composite<T: Mixer<BlockCache>>(
         &mut self,
-        mut bufferlist: IntoIter<FrameBufferBlocks<T>>,
+        mut bufferlist: IntoIter<FrameBufferUpdates<T>>,
     ) -> Result<(), &'static str> {
 
         while let Some(frame_buffer_blocks) = bufferlist.next() {
@@ -133,7 +132,7 @@ impl Compositor<'_ , BlockCache> for FrameCompositor {
             let (src_width, src_height) = src_fb.get_size();
 
             // Handle all blocks if the updated blocks parameter is None 
-            if frame_buffer_blocks.blocks.is_none() {
+            if frame_buffer_blocks.updates.is_none() {
                 let block_number = (src_height - 1) / CACHE_BLOCK_HEIGHT + 1;
                 for i in 0.. block_number {
                     let block = Block {
@@ -144,7 +143,7 @@ impl Compositor<'_ , BlockCache> for FrameCompositor {
                     block.mix_with_final(src_fb, coordinate, &mut self.caches)?;
                 }
             } else {
-                let mut blocks = match frame_buffer_blocks.blocks {
+                let mut blocks = match frame_buffer_blocks.updates {
                     Some(blocks) => { blocks },
                     None => {
                         continue;
@@ -203,7 +202,7 @@ pub fn get_blocks(framebuffer: &dyn FrameBuffer, area: &mut Rectangle) -> Vec<Bl
     blocks
 }
 
-// Get the hash of a cache block
+/// Get the hash of a cache block
 fn hash<T: Hash>(block: T) -> u64 {
     let builder = DefaultHashBuilder::default();
     let mut hasher = builder.build_hasher();
@@ -211,6 +210,7 @@ fn hash<T: Hash>(block: T) -> u64 {
     hasher.finish()
 }
 
+/// Checks if a coordinate is in the cache list.
 fn is_in_cache(block: &[u32], coordinate: &Coord, caches: &BTreeMap<Coord, BlockCache>) -> bool {
     match caches.get(coordinate) {
         Some(cache) => {
@@ -220,8 +220,6 @@ fn is_in_cache(block: &[u32], coordinate: &Coord, caches: &BTreeMap<Coord, Block
         None => return false,
     }
 }
-
-
 
 impl Mixer<BlockCache> for Block {
     fn mix_with_final(

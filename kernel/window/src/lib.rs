@@ -34,7 +34,7 @@ use alloc::boxed::Box;
 use alloc::collections::BTreeMap;
 use alloc::string::{String, ToString};
 use alloc::sync::Arc;
-use compositor::{Compositor, FrameBufferBlocks};
+use compositor::{Compositor, FrameBufferUpdates};
 use core::ops::Deref;
 use core::ops::DerefMut;
 use mpmc::Queue;
@@ -174,10 +174,10 @@ impl Window {
             window.show_button(TopButton::Close, 1, &mut view);
             window.show_button(TopButton::MinimizeMaximize, 1, &mut view);
             window.show_button(TopButton::Hide, 1, &mut view);
-            let buffer_blocks = FrameBufferBlocks {
+            let buffer_blocks = FrameBufferUpdates {
                 framebuffer: view.framebuffer.deref(),
                 coordinate: coordinate,
-                blocks: None,
+                updates: None,
             };
 
             FRAME_COMPOSITOR.lock().composite::<Block>(vec![buffer_blocks].into_iter())?;
@@ -533,10 +533,10 @@ impl Window {
     /// refresh the top left three button's appearance
     fn refresh_three_button(&self) -> Result<(), &'static str> {
         let profile = self.view.lock();
-        let frame_buffer_blocks = FrameBufferBlocks {
+        let frame_buffer_blocks = FrameBufferUpdates {
             framebuffer: profile.framebuffer.deref(),
             coordinate: profile.coordinate,
-            blocks: None,
+            updates: None,
         };
         FRAME_COMPOSITOR
             .lock()

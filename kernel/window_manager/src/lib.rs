@@ -31,7 +31,7 @@ use alloc::collections::VecDeque;
 use alloc::string::{String, ToString};
 use alloc::sync::{Arc, Weak};
 use alloc::vec::{Vec, IntoIter};
-use compositor::{Compositor, FrameBufferBlocks};
+use compositor::{Compositor, FrameBufferUpdates};
 use core::ops::{Deref, DerefMut};
 use mpmc::Queue;
 use event_types::{Event, MousePositionEvent};
@@ -222,10 +222,10 @@ impl WindowManager {
 
     /// Refresh the pixels in `update_coords`. Only render the bottom final framebuffer and windows. Ignore the top buffer.
     pub fn refresh_bottom_windows_pixels(&self, pixels: IntoIter<Coord>) -> Result<(), &'static str> {
-        let bottom_fb = FrameBufferBlocks {
+        let bottom_fb = FrameBufferUpdates {
             framebuffer: self.bottom_fb.deref(),
             coordinate: Coord::new(0, 0),
-            blocks: Some(pixels.clone())
+            updates: Some(pixels.clone())
         };
 
         FRAME_COMPOSITOR.lock().composite::<Coord>(vec![bottom_fb].into_iter())?;
@@ -234,10 +234,10 @@ impl WindowManager {
             if let Some(window_mutex) = window_ref.upgrade() {
                 let window = window_mutex.lock();
                 let framebuffer = window.framebuffer.deref();
-                let buffer_blocks = FrameBufferBlocks {
+                let buffer_blocks = FrameBufferUpdates {
                     framebuffer: framebuffer.deref(),
                     coordinate: window.get_position(),
-                    blocks: Some(pixels.clone())
+                    updates: Some(pixels.clone())
                 };
 
                 FRAME_COMPOSITOR.lock().composite::<Coord>(vec![buffer_blocks].into_iter())?;
@@ -248,10 +248,10 @@ impl WindowManager {
             if let Some(window_mutex) = window_ref.upgrade() {
                 let window = window_mutex.lock();
                 let framebuffer = window.framebuffer.deref();
-                let buffer_blocks = FrameBufferBlocks {
+                let buffer_blocks = FrameBufferUpdates {
                     framebuffer: framebuffer.deref(),
                     coordinate: window.get_position(),
-                    blocks: Some(pixels.clone())
+                    updates: Some(pixels.clone())
                 };
 
                 FRAME_COMPOSITOR.lock().composite::<Coord>(vec![buffer_blocks].into_iter())?;
@@ -261,10 +261,10 @@ impl WindowManager {
         if let Some(window_mutex) = self.active.upgrade() {
             let window = window_mutex.lock();
             let framebuffer = window.framebuffer.deref();
-            let buffer_blocks = FrameBufferBlocks {
+            let buffer_blocks = FrameBufferUpdates {
                 framebuffer: framebuffer.deref(),
                 coordinate: window.get_position(),
-                blocks: Some(pixels)
+                updates: Some(pixels)
             }; 
 
             FRAME_COMPOSITOR.lock().composite::<Coord>(vec![buffer_blocks].into_iter())?;
@@ -275,10 +275,10 @@ impl WindowManager {
 
     /// Refresh the pixels in the top framebuffer
     pub fn refresh_top_pixels(&self, pixels: IntoIter<Coord>) -> Result<(), &'static str> {
-        let top_buffer = FrameBufferBlocks {
+        let top_buffer = FrameBufferUpdates {
             framebuffer: self.top_fb.deref(),
             coordinate: Coord::new(0, 0),
-            blocks: Some(pixels)
+            updates: Some(pixels)
         }; 
 
         FRAME_COMPOSITOR.lock().composite::<Coord>(vec![top_buffer].into_iter())
@@ -321,10 +321,10 @@ impl WindowManager {
                     None
                 };
 
-                let buffer_blocks = FrameBufferBlocks {
+                let buffer_blocks = FrameBufferUpdates {
                     framebuffer: framebuffer.deref(),
                     coordinate: win_coordinate,
-                    blocks: blocks
+                    updates: blocks
                 };
 
                 FRAME_COMPOSITOR.lock().composite::<Block>(vec![buffer_blocks].into_iter())?;
@@ -347,10 +347,10 @@ impl WindowManager {
                     None
                 };
 
-                let buffer_blocks = FrameBufferBlocks {
+                let buffer_blocks = FrameBufferUpdates {
                     framebuffer: framebuffer.deref(),
                     coordinate: win_coordinate,
-                    blocks: blocks
+                    updates: blocks
                 };
 
                 FRAME_COMPOSITOR.lock().composite::<Block>(vec![buffer_blocks].into_iter())?;
@@ -372,10 +372,10 @@ impl WindowManager {
                     None
                 };
 
-                let buffer_blocks = FrameBufferBlocks {
+                let buffer_blocks = FrameBufferUpdates {
                     framebuffer: framebuffer.deref(),
                     coordinate: window.get_position(),
-                    blocks: blocks
+                    updates: blocks
                 }; 
 
                 FRAME_COMPOSITOR.lock().composite::<Block>(vec![buffer_blocks].into_iter())?;
@@ -404,10 +404,10 @@ impl WindowManager {
             None => None
         };
 
-        let bg_buffer = FrameBufferBlocks {
+        let bg_buffer = FrameBufferUpdates {
             framebuffer: self.bottom_fb.deref(),
             coordinate: Coord::new(0, 0),
-            blocks: blocks
+            updates: blocks
         }; 
 
         FRAME_COMPOSITOR.lock().composite::<Block>(vec![bg_buffer].into_iter())?;
@@ -432,10 +432,10 @@ impl WindowManager {
             None => None
         };
 
-        let top_buffer = FrameBufferBlocks {
+        let top_buffer = FrameBufferUpdates {
             framebuffer: self.top_fb.deref(),
             coordinate: Coord::new(0, 0),
-            blocks: blocks
+            updates: blocks
         }; 
 
         FRAME_COMPOSITOR.lock().composite::<Block>(vec![top_buffer].into_iter())
