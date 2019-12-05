@@ -30,7 +30,7 @@ use alloc::boxed::Box;
 use alloc::collections::VecDeque;
 use alloc::string::{String, ToString};
 use alloc::sync::{Arc, Weak};
-use alloc::vec::Vec;
+use alloc::vec::{Vec, IntoIter};
 use compositor::{Compositor, FrameBufferBlocks};
 use core::ops::{Deref, DerefMut};
 use mpmc::Queue;
@@ -221,14 +221,14 @@ impl WindowManager {
     }
 
     /// Refresh the pixels in `update_coords`. Only render the bottom final framebuffer and windows. Ignore the top buffer.
-    pub fn refresh_bottom_windows_pixels(&self, pixels: &[Coord]) -> Result<(), &'static str> {
+    pub fn refresh_bottom_windows_pixels(&self, pixels: IntoIter<Coord>) -> Result<(), &'static str> {
         let bottom_fb = FrameBufferBlocks {
             framebuffer: self.bottom_fb.deref(),
             coordinate: Coord::new(0, 0),
-            blocks: None
+            blocks: Some(pixels.clone())
         };
 
-        FRAME_COMPOSITOR.lock().composite_pixels(vec![bottom_fb].into_iter(), pixels)?;
+        FRAME_COMPOSITOR.lock().composite_pixels(vec![bottom_fb].into_iter())?;
 
         for window_ref in &self.hide_list {
             if let Some(window_mutex) = window_ref.upgrade() {
@@ -237,10 +237,10 @@ impl WindowManager {
                 let buffer_blocks = FrameBufferBlocks {
                     framebuffer: framebuffer.deref(),
                     coordinate: window.get_position(),
-                    blocks: None
+                    blocks: Some(pixels.clone())
                 };
 
-                FRAME_COMPOSITOR.lock().composite_pixels(vec![buffer_blocks].into_iter(), pixels)?;
+                FRAME_COMPOSITOR.lock().composite_pixels(vec![buffer_blocks].into_iter())?;
            }
         }
 
@@ -251,10 +251,10 @@ impl WindowManager {
                 let buffer_blocks = FrameBufferBlocks {
                     framebuffer: framebuffer.deref(),
                     coordinate: window.get_position(),
-                    blocks: None
+                    blocks: Some(pixels.clone())
                 };
 
-                FRAME_COMPOSITOR.lock().composite_pixels(vec![buffer_blocks].into_iter(), pixels)?;
+                FRAME_COMPOSITOR.lock().composite_pixels(vec![buffer_blocks].into_iter())?;
            }
         }
 
@@ -264,29 +264,29 @@ impl WindowManager {
             let buffer_blocks = FrameBufferBlocks {
                 framebuffer: framebuffer.deref(),
                 coordinate: window.get_position(),
-                blocks: None
+                blocks: Some(pixels)
             }; 
 
-            FRAME_COMPOSITOR.lock().composite_pixels(vec![buffer_blocks].into_iter(), pixels)?;
+            FRAME_COMPOSITOR.lock().composite_pixels(vec![buffer_blocks].into_iter())?;
         }
 
         Ok(())
     }
 
     /// Refresh the pixels in the top framebuffer
-    pub fn refresh_top_pixels(&self, pixels: &[Coord]) -> Result<(), &'static str> {
+    pub fn refresh_top_pixels(&self, pixels: IntoIter<Coord>) -> Result<(), &'static str> {
         let top_buffer = FrameBufferBlocks {
             framebuffer: self.top_fb.deref(),
             coordinate: Coord::new(0, 0),
-            blocks: None
+            blocks: Some(pixels)
         }; 
 
-        FRAME_COMPOSITOR.lock().composite_pixels(vec![top_buffer].into_iter(), pixels)
+        FRAME_COMPOSITOR.lock().composite_pixels(vec![top_buffer].into_iter())
     }
 
     /// Refresh the all the pixels including the bottom framebuffer, the windows and the top framebuffer.
-    pub fn refresh_pixels(&self, pixels: &[Coord]) -> Result<(), &'static str> {
-        self.refresh_bottom_windows_pixels(pixels)?;
+    pub fn refresh_pixels(&self, pixels: IntoIter<Coord>) -> Result<(), &'static str> {
+        self.refresh_bottom_windows_pixels(pixels.clone())?;
         self.refresh_top_pixels(pixels)?;
         Ok(())
     }
@@ -536,7 +536,7 @@ impl WindowManager {
         match old_border {
             Some(border) => {
                 let pixels = self.draw_floating_border(border.top_left, border.bottom_right, T);
-                self.refresh_bottom_windows_pixels(pixels.as_slice())?;
+                self.refresh_bottom_windows_pixels(pixels.into_iter())?;
             },
             None =>{}
         }
@@ -545,7 +545,7 @@ impl WindowManager {
         if show {
             self.repositioned_border = Some(Rectangle { top_left, bottom_right });
             let pixels = self.draw_floating_border(top_left, bottom_right, WINDOW_BORDER_COLOR_INNER);
-            self.refresh_top_pixels(pixels.as_slice())?;
+            self.refresh_top_pixels(pixels.into_iter())?;
         } else {
             self.repositioned_border = None;
         }
@@ -609,7 +609,7 @@ impl WindowManager {
             self.refresh_bottom_windows(Some(Rectangle{top_left: old_top_left, bottom_right: old_bottom_right}), false)?;
             self.refresh_bottom_windows(Some(Rectangle{top_left: new_top_left, bottom_right: new_bottom_right}), true)?;
             let update_coords = self.get_mouse_coords();
-            self.refresh_pixels(update_coords.as_slice())?;
+            self.refresh_pixels(update_coords.into_iter())?;
         } else {
             return Err("cannot fid active window to move");
         }
@@ -649,7 +649,7 @@ impl WindowManager {
             }
         }
         let update_coords = self.get_mouse_coords();
-        self.refresh_bottom_windows_pixels(update_coords.as_slice())?;
+        self.refresh_bottom_windows_pixels(update_coords.into_iter())?;
 
         // draw new mouse
         self.mouse = new;
@@ -669,7 +669,7 @@ impl WindowManager {
             }
         }
         let update_coords = self.get_mouse_coords();
-        self.refresh_top_pixels(update_coords.as_slice())?;
+        self.refresh_top_pixels(update_coords.into_iter())?;
 
         Ok(())
     }
