@@ -124,18 +124,11 @@ impl Compositor<'_ , Block> for FrameCompositor {
         &mut self,
         mut bufferlist: IntoIter<FrameBufferBlocks<Block>>,
     ) -> Result<(), &'static str> {
-        let mut final_fb = FINAL_FRAME_BUFFER
-            .try()
-            .ok_or("FrameCompositor fails to get the final frame buffer")?
-            .lock();
-        let (final_width, final_height) = final_fb.get_size();
 
         while let Some(frame_buffer_blocks) = bufferlist.next() {
             let src_fb = frame_buffer_blocks.framebuffer;
             let coordinate = frame_buffer_blocks.coordinate;
             let (src_width, src_height) = src_fb.get_size();
-            let block_pixels = CACHE_BLOCK_HEIGHT * src_width;
-            let src_buffer_len = src_width * src_height;
 
             // Handle all blocks if the updated blocks parameter is None 
             let mut all_blocks = Vec::new();
@@ -158,85 +151,7 @@ impl Compositor<'_ , Block> for FrameCompositor {
 
             while let Some(block) = blocks.next() {
 
-                // The start pixel of the block
-                let start_index = block_pixels * block.index;
-                let coordinate_start = coordinate + (0, (CACHE_BLOCK_HEIGHT * block.index) as isize);
-                
-                // The end pixel of the block
-                let mut end_index = start_index + block_pixels;
-                let coordinate_end;
-                if end_index <= src_buffer_len {
-                    coordinate_end = coordinate_start + (src_width as isize, CACHE_BLOCK_HEIGHT as isize);
-                } else {
-                    end_index = src_buffer_len;
-                    coordinate_end = coordinate + (src_width as isize, src_height as isize);
-                }
-
-                let block_content = &src_fb.buffer()[start_index..end_index];
-                // Skip if a block is already cached
-                if self.is_cached(&block_content, &coordinate_start) {
-                    continue;
-                }
-
-                // find overlapped caches
-                // extend the width of the updated part to the right side of the cached block content
-                // remove caches of the same location
-                let new_cache = BlockCache {
-                    content_hash: hash(block_content),
-                    coordinate: coordinate_start,
-                    width: src_width,
-                    block: Block {
-                        index: 0,
-                        start: block.start,
-                        width: block.width,
-                    }
-                };
-                let keys: Vec<_> = self.caches.keys().cloned().collect();
-                for key in keys {
-                    if let Some(cache) = self.caches.get_mut(&key) {
-                        if cache.overlaps_with(&new_cache) {
-                            if cache.coordinate == new_cache.coordinate  && cache.width == new_cache.width {
-                                self.caches.remove(&key);
-                            } else {
-                                cache.content_hash = 0;
-                            }
-                        }
-                    };
-                }
-
-                // skip if the block is not in the screen
-                if coordinate_end.x < 0
-                    || coordinate_start.x > final_width as isize
-                    || coordinate_end.y < 0
-                    || coordinate_start.y > final_height as isize
-                {
-                    continue;
-                }
-
-                let final_x_start = core::cmp::max(0, coordinate_start.x) as usize;
-                let final_y_start = core::cmp::max(0, coordinate_start.y) as usize;
-
-                // just draw the part which is within the final buffer
-                // Wenqiu: TODO Optimize Later
-                let width = core::cmp::min(
-                    core::cmp::min(coordinate_end.x as usize, final_width) - final_x_start,
-                    new_cache.block.width + new_cache.block.start,
-                ) - new_cache.block.start;
-                let height = core::cmp::min(coordinate_end.y as usize, final_height) - final_y_start;
-
-                // copy every line of the block to the final framebuffer.
-                // let src_buffer = src_fb.buffer();
-                for i in 0..height {
-                    let dest_start = (final_y_start + i) * final_width + final_x_start + new_cache.block.start;
-                    let src_start = src_width * ((final_y_start + i) as isize - coordinate_start.y) as usize
-                        + (final_x_start as isize - coordinate_start.x) as usize + new_cache.block.start;
-                    let src_end = src_start + width;
-                    final_fb.composite_buffer(&(block_content[src_start..src_end]), dest_start);
-                }
-
-                // insert the new cache
-                self.caches.insert(coordinate_start, new_cache);
-
+                block.mix_with_final(src_fb, coordinate, &mut self.caches)?;
             }
         }
 
@@ -260,16 +175,6 @@ impl Compositor<'_ , Block> for FrameCompositor {
         }
 
         Ok(())
-    }
-    
-    fn is_cached(&self, block: &[u32], coordinate: &Coord) -> bool {
-        match self.caches.get(coordinate) {
-            Some(cache) => {
-                // The same hash means the array of two blocks are the same. Since all blocks are of the same height, two blocks of the same array must share the same width. And if their contents are the same, their content_width must be the same, too.
-                return cache.content_hash == hash(block)
-            }
-            None => return false,
-        }
     }
 }
 
@@ -317,4 +222,123 @@ fn hash<T: Hash>(block: T) -> u64 {
     let mut hasher = builder.build_hasher();
     block.hash(&mut hasher);
     hasher.finish()
-} 
+}
+
+fn is_in_cache(block: &[u32], coordinate: &Coord, caches: &BTreeMap<Coord, BlockCache>) -> bool {
+    match caches.get(coordinate) {
+        Some(cache) => {
+            // The same hash means the array of two blocks are the same. Since all blocks are of the same height, two blocks of the same array must share the same width. And if their contents are the same, their content_width must be the same, too.
+            return cache.content_hash == hash(block)
+        }
+        None => return false,
+    }
+}
+
+trait Mixer {
+    fn mix_with_final(
+        &self, 
+        framebuffer: &dyn FrameBuffer, 
+        coordinate: Coord,        
+        cache: &mut BTreeMap<Coord, BlockCache>
+    ) -> Result<(), &'static str>;
+}
+
+impl Mixer for Block {
+    fn mix_with_final(
+        &self, 
+        src_fb: &dyn FrameBuffer, 
+        coordinate: Coord,
+        caches: &mut BTreeMap<Coord, BlockCache>
+    ) -> Result<(), &'static str> {
+        let mut final_fb = FINAL_FRAME_BUFFER
+            .try()
+            .ok_or("FrameCompositor fails to get the final frame buffer")?
+            .lock();
+        let (final_width, final_height) = final_fb.get_size();
+        let (src_width, src_height) = src_fb.get_size();
+        let src_buffer_len = src_width * src_height;
+        let block_pixels = CACHE_BLOCK_HEIGHT * src_width;
+
+        // The start pixel of the block
+        let start_index = block_pixels * self.index;
+        let coordinate_start = coordinate + (0, (CACHE_BLOCK_HEIGHT * self.index) as isize);
+        
+        // The end pixel of the block
+        let mut end_index = start_index + block_pixels;
+        let coordinate_end;
+        if end_index <= src_buffer_len {
+            coordinate_end = coordinate_start + (src_width as isize, CACHE_BLOCK_HEIGHT as isize);
+        } else {
+            end_index = src_buffer_len;
+            coordinate_end = coordinate + (src_width as isize, src_height as isize);
+        }
+
+        let block_content = &src_fb.buffer()[start_index..end_index];
+        // Skip if a block is already cached
+        if is_in_cache(&block_content, &coordinate_start, caches) {
+            return Ok(());
+        }
+
+        // find overlapped caches
+        // extend the width of the updated part to the right side of the cached block content
+        // remove caches of the same location
+        let new_cache = BlockCache {
+            content_hash: hash(block_content),
+            coordinate: coordinate_start,
+            width: src_width,
+            block: Block {
+                index: 0,
+                start: self.start,
+                width: self.width,
+            }
+        };
+        let keys: Vec<_> = caches.keys().cloned().collect();
+        for key in keys {
+            if let Some(cache) = caches.get_mut(&key) {
+                if cache.overlaps_with(&new_cache) {
+                    if cache.coordinate == new_cache.coordinate  && cache.width == new_cache.width {
+                        caches.remove(&key);
+                    } else {
+                        cache.content_hash = 0;
+                    }
+                }
+            };
+        }
+
+        // skip if the block is not in the screen
+        if coordinate_end.x < 0
+            || coordinate_start.x > final_width as isize
+            || coordinate_end.y < 0
+            || coordinate_start.y > final_height as isize
+        {
+            return Ok(());
+        }
+
+        let final_x_start = core::cmp::max(0, coordinate_start.x) as usize;
+        let final_y_start = core::cmp::max(0, coordinate_start.y) as usize;
+
+        // just draw the part which is within the final buffer
+        // Wenqiu: TODO Optimize Later
+        let width = core::cmp::min(
+            core::cmp::min(coordinate_end.x as usize, final_width) - final_x_start,
+            new_cache.block.width + new_cache.block.start,
+        ) - new_cache.block.start;
+        let height = core::cmp::min(coordinate_end.y as usize, final_height) - final_y_start;
+
+        // copy every line of the block to the final framebuffer.
+        // let src_buffer = src_fb.buffer();
+        for i in 0..height {
+            let dest_start = (final_y_start + i) * final_width + final_x_start + new_cache.block.start;
+            let src_start = src_width * ((final_y_start + i) as isize - coordinate_start.y) as usize
+                + (final_x_start as isize - coordinate_start.x) as usize + new_cache.block.start;
+            let src_end = src_start + width;
+            final_fb.composite_buffer(&(block_content[src_start..src_end]), dest_start);
+        }
+
+        // insert the new cache
+        caches.insert(coordinate_start, new_cache);
+
+        Ok(())
+    }
+}
+
