@@ -159,10 +159,6 @@ impl Compositor<'_ , Block> for FrameCompositor {
     }
 
     fn composite_pixels(&mut self, mut bufferlist: IntoIter<FrameBufferBlocks<Coord>>) -> Result<(), &'static str> {
-        let mut final_fb = FINAL_FRAME_BUFFER
-            .try()
-            .ok_or("FrameCompositor fails to get the final frame buffer")?
-            .lock();
         while let Some(frame_buffer_blocks) = bufferlist.next() {
             let mut blocks = match frame_buffer_blocks.blocks {
                 Some(blocks) => { blocks },
@@ -171,11 +167,11 @@ impl Compositor<'_ , Block> for FrameCompositor {
                 } 
             };
             while let Some(coordinate) = blocks.next() {
-                let relative_coord = coordinate - frame_buffer_blocks.coordinate;
-                if frame_buffer_blocks.framebuffer.contains(relative_coord) {
-                    let pixel = frame_buffer_blocks.framebuffer.get_pixel(relative_coord)?;
-                    final_fb.draw_pixel(coordinate, pixel);
-                }
+                coordinate.mix_with_final(
+                    frame_buffer_blocks.framebuffer,
+                    frame_buffer_blocks.coordinate,
+                    &mut self.caches
+                )?;
             }
         }
 
@@ -242,8 +238,8 @@ fn is_in_cache(block: &[u32], coordinate: &Coord, caches: &BTreeMap<Coord, Block
 trait Mixer {
     fn mix_with_final(
         &self, 
-        framebuffer: &dyn FrameBuffer, 
-        coordinate: Coord,        
+        src_fb: &dyn FrameBuffer, 
+        src_coord: Coord,        
         cache: &mut BTreeMap<Coord, BlockCache>
     ) -> Result<(), &'static str>;
 }
@@ -252,7 +248,7 @@ impl Mixer for Block {
     fn mix_with_final(
         &self, 
         src_fb: &dyn FrameBuffer, 
-        coordinate: Coord,
+        src_coord: Coord,
         caches: &mut BTreeMap<Coord, BlockCache>
     ) -> Result<(), &'static str> {
         let mut final_fb = FINAL_FRAME_BUFFER
@@ -266,7 +262,7 @@ impl Mixer for Block {
 
         // The start pixel of the block
         let start_index = block_pixels * self.index;
-        let coordinate_start = coordinate + (0, (CACHE_BLOCK_HEIGHT * self.index) as isize);
+        let coordinate_start = src_coord + (0, (CACHE_BLOCK_HEIGHT * self.index) as isize);
         
         // The end pixel of the block
         let mut end_index = start_index + block_pixels;
@@ -275,7 +271,7 @@ impl Mixer for Block {
             coordinate_end = coordinate_start + (src_width as isize, CACHE_BLOCK_HEIGHT as isize);
         } else {
             end_index = src_buffer_len;
-            coordinate_end = coordinate + (src_width as isize, src_height as isize);
+            coordinate_end = src_coord + (src_width as isize, src_height as isize);
         }
 
         let block_content = &src_fb.buffer()[start_index..end_index];
@@ -343,6 +339,26 @@ impl Mixer for Block {
         // insert the new cache
         caches.insert(coordinate_start, new_cache);
 
+        Ok(())
+    }
+}
+
+impl Mixer for Coord {
+    fn mix_with_final(
+        &self, 
+        src_fb: &dyn FrameBuffer, 
+        src_coord: Coord,        
+        cache: &mut BTreeMap<Coord, BlockCache>
+    ) -> Result<(), &'static str>{
+        let relative_coord = self.clone() - src_coord;
+        if src_fb.contains(relative_coord) {
+            let pixel = src_fb.get_pixel(relative_coord)?;
+            let mut final_fb = FINAL_FRAME_BUFFER
+                .try()
+                .ok_or("FrameCompositor fails to get the final frame buffer")?
+                .lock();
+            final_fb.draw_pixel(self.clone(), pixel);
+        }
         Ok(())
     }
 }
