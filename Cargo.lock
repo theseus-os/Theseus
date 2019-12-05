@@ -248,6 +248,15 @@ dependencies = [
 ]
 
 [[package]]
+name = "catch_unwind"
+version = "0.1.0"
+dependencies = [
+ "log 0.3.9 (registry+https://github.com/rust-lang/crates.io-index)",
+ "task 0.1.0",
+ "unwind 0.1.0",
+]
+
+[[package]]
 name = "cc"
 version = "1.0.28"
 source = "registry+https://github.com/rust-lang/crates.io-index"
@@ -396,7 +405,6 @@ version = "0.1.0"
 dependencies = [
  "acpi 0.1.0",
  "apic 0.1.0",
- "dfqueue 0.1.0",
  "e1000 0.1.0",
  "ethernet_smoltcp_device 0.1.0",
  "event_types 0.1.0",
@@ -404,6 +412,7 @@ dependencies = [
  "log 0.3.9 (registry+https://github.com/rust-lang/crates.io-index)",
  "memory 0.1.0",
  "mouse 0.1.0",
+ "mpmc 0.1.6-pre",
  "network_manager 0.1.0",
  "pci 0.1.0",
  "storage_manager 0.1.0",
@@ -868,10 +877,10 @@ version = "0.1.0"
 name = "keyboard"
 version = "0.1.0"
 dependencies = [
- "dfqueue 0.1.0",
  "event_types 0.1.0",
  "keycodes_ascii 0.1.0",
  "log 0.3.9 (registry+https://github.com/rust-lang/crates.io-index)",
+ "mpmc 0.1.6-pre",
  "ps2 0.1.0",
  "spin 0.4.10 (registry+https://github.com/rust-lang/crates.io-index)",
 ]
@@ -1134,10 +1143,10 @@ dependencies = [
 name = "mouse"
 version = "0.1.0"
 dependencies = [
- "dfqueue 0.1.0",
  "event_types 0.1.0",
  "log 0.3.9 (registry+https://github.com/rust-lang/crates.io-index)",
  "mouse_data 0.1.0",
+ "mpmc 0.1.6-pre",
  "ps2 0.1.0",
  "spin 0.4.10 (registry+https://github.com/rust-lang/crates.io-index)",
 ]
@@ -1867,6 +1876,7 @@ dependencies = [
  "lazy_static 1.2.0 (registry+https://github.com/rust-lang/crates.io-index)",
  "libterm 0.1.0",
  "log 0.3.9 (registry+https://github.com/rust-lang/crates.io-index)",
+ "mpmc 0.1.6-pre",
  "path 0.1.0",
  "print 0.1.0",
  "root 0.1.0",
@@ -1943,6 +1953,7 @@ dependencies = [
  "apic 0.1.0",
  "atomic 0.4.4 (registry+https://github.com/rust-lang/crates.io-index)",
  "atomic_linked_list 0.1.0",
+ "catch_unwind 0.1.0",
  "context_switch 0.1.0",
  "debugit 0.1.0",
  "gdt 0.1.0",
@@ -2309,7 +2320,6 @@ name = "window"
 version = "0.1.0"
 dependencies = [
  "compositor 0.1.0",
- "dfqueue 0.1.0",
  "displayable 0.1.0",
  "event_types 0.1.0",
  "font 0.1.0",
@@ -2320,6 +2330,7 @@ dependencies = [
  "log 0.3.9 (registry+https://github.com/rust-lang/crates.io-index)",
  "memory_structs 0.1.0",
  "mouse 0.1.0",
+ "mpmc 0.1.6-pre",
  "path 0.1.0",
  "spawn 0.1.0",
  "spin 0.4.10 (registry+https://github.com/rust-lang/crates.io-index)",
@@ -2332,7 +2343,6 @@ name = "window_manager"
 version = "0.1.0"
 dependencies = [
  "compositor 0.1.0",
- "dfqueue 0.1.0",
  "event_types 0.1.0",
  "font 0.1.0",
  "frame_buffer 0.1.0",
@@ -2342,6 +2352,7 @@ dependencies = [
  "lazy_static 1.2.0 (registry+https://github.com/rust-lang/crates.io-index)",
  "mod_mgmt 0.1.0",
  "mouse_data 0.1.0",
+ "mpmc 0.1.6-pre",
  "path 0.1.0",
  "scheduler 0.1.0",
  "spawn 0.1.0",
@@ -2353,9 +2364,9 @@ dependencies = [
 name = "window_view"
 version = "0.1.0"
 dependencies = [
- "dfqueue 0.1.0",
  "event_types 0.1.0",
  "frame_buffer 0.1.0",
+ "mpmc 0.1.6-pre",
  "spin 0.4.10 (registry+https://github.com/rust-lang/crates.io-index)",
 ]
 

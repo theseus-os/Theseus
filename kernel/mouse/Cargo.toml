@@ -24,14 +24,11 @@ path = "../../libs/mouse_data"
 [dependencies.ps2]
 path = "../ps2"
 
-
-
-[lib]
-crate-type = ["rlib"]
-
 [dependencies.event_types]
 path = "../event_types"
 
-[dependencies.dfqueue]
-path = "../../libs/dfqueue"
-version = "0.1.0"
+[dependencies.mpmc]
+path = "../../libs/mpmc"
+
+[lib]
+crate-type = ["rlib"]

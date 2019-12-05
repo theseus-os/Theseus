@@ -5,7 +5,6 @@
 extern crate event_types;
 extern crate e1000;
 extern crate memory;
-extern crate dfqueue; 
 extern crate apic;
 extern crate acpi;
 extern crate keyboard;
@@ -14,14 +13,13 @@ extern crate mouse;
 extern crate storage_manager;
 extern crate network_manager;
 extern crate ethernet_smoltcp_device;
+extern crate mpmc;
 
-
-use dfqueue::DFQueueProducer;
+use mpmc::Queue;
 use event_types::Event;
 use memory::MemoryManagementInfo;
 use ethernet_smoltcp_device::EthernetNetworkInterface;
 use network_manager::add_to_network_interfaces;
-
 
 /// A randomly chosen IP address that must be outside of the DHCP range.. // TODO FIXME: use DHCP to acquire IP
 const DEFAULT_LOCAL_IP: &'static str = "10.0.2.15/24"; // the default QEMU user-slirp network gives IP addresses of "10.0.2.*"
@@ -47,7 +45,7 @@ pub fn early_init(kernel_mmi: &mut MemoryManagementInfo) -> Result<(), &'static 
 
 /// Initializes all other devices, such as the keyboard and mouse
 /// as well as all devices discovered on the PCI bus.
-pub fn init(key_producer: DFQueueProducer<Event>, mouse_producer: DFQueueProducer<Event>) -> Result<(), &'static str>  {
+pub fn init(key_producer: Queue<Event>, mouse_producer: Queue<Event>) -> Result<(), &'static str>  {
     keyboard::init(key_producer);
     mouse::init(mouse_producer);
 

@@ -18,9 +18,11 @@ version = "0.3.7"
 [dependencies.keycodes_ascii]
 path = "../../libs/keycodes_ascii"
 
+[dependencies.mpmc]
+path = "../../libs/mpmc"
+
 [dependencies.dfqueue]
 path = "../../libs/dfqueue"
-version = "0.1.0"
 
 [dependencies.event_types]
 path = "../../kernel/event_types"

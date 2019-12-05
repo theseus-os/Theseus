@@ -2,13 +2,13 @@
 #[macro_use]
 extern crate log;
 
-extern crate dfqueue;
+extern crate mpmc;
 extern crate event_types;
 extern crate mouse_data;
 extern crate ps2;
 extern crate spin;
 
-use dfqueue::DFQueueProducer;
+use mpmc::Queue;
 use event_types::Event;
 use spin::Once;
 
@@ -19,10 +19,10 @@ static mut MOUSE_MOVE: MouseMovement = MouseMovement::default();
 static mut BUTTON_ACT: ButtonAction = ButtonAction::default();
 static mut DISPLACEMENT: Displacement = Displacement::default();
 
-static MOUSE_PRODUCER: Once<DFQueueProducer<Event>> = Once::new();
+static MOUSE_PRODUCER: Once<Queue<Event>> = Once::new();
 
 /// Initialize the mouse driver.
-pub fn init(mouse_queue_producer: DFQueueProducer<Event>) {
+pub fn init(mouse_queue_producer: Queue<Event>) {
     // init the second ps2 port for mouse
     init_ps2_port2();
     // test the second ps2 port
@@ -114,8 +114,7 @@ pub fn handle_mouse_input(readdata: u32) -> Result<(), &'static str> {
     let event = Event::MouseMovementEvent(mouse_event);
 
     if let Some(producer) = MOUSE_PRODUCER.try() {
-        producer.enqueue(event);
-        Ok(()) // successfully queued up MouseEvent
+        producer.push(event).map_err(|_e| "Fail to enqueue the mouse event")
     } else {
         warn!("handle_keyboard_input(): MOUSE_PRODUCER wasn't yet initialized, dropping keyboard event {:?}.", event);
         Err("keyboard event queue not ready")

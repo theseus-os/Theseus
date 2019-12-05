@@ -54,7 +54,7 @@ endif
 ### For ensuring that the host computer has the proper version of xargo
 ###################################################################################################
 
-XARGO_CURRENT_SUPPORTED_VERSION := 0.3.13
+XARGO_CURRENT_SUPPORTED_VERSION := 0.3.17
 XARGO_OUTPUT=$(shell xargo --version 2>&1 | head -n 1)
 
 check_xargo: 	
@@ -63,6 +63,7 @@ ifneq (xargo ${XARGO_CURRENT_SUPPORTED_VERSION}, ${XARGO_OUTPUT})
 	@echo -e "\nError: your xargo version does not match our supported xargo version."
 	@echo -e "To install the proper version of xargo, run the following commands:\n"
 	@echo -e "   cargo uninstall xargo"
+	@echo -e '   rm -rf $$HOME/.xargo'   ## use single quotes to escape dollar sign
 	@echo -e "   cargo install --vers $(XARGO_CURRENT_SUPPORTED_VERSION) xargo"
 	@echo -e "   make clean\n"
 	@echo -e "Then you can retry building!\n"

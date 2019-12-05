@@ -107,14 +107,14 @@ extern "C" fn rust_eh_personality() -> ! {
 extern "C" fn _Unwind_Resume(arg: usize) -> ! {
     #[cfg(not(loadable))]
     {
-        unsafe { unwind::unwind_resume(arg) }
+        unwind::unwind_resume(arg)
     }
     #[cfg(loadable)]
     {
         // An internal function for calling the real unwind_resume function, but returning errors along the way.
         // We must make sure to not hold any locks when invoking the function.
         fn invoke_unwind_resume(arg: usize) -> Result<(), &'static str> {
-            type UnwindResumeFunc = unsafe fn(usize) -> !;
+            type UnwindResumeFunc = fn(usize) -> !;
             const UNWIND_RESUME_SYMBOL: &'static str = "unwind::unwind_resume::";
             let section_ref = {
                 task::get_my_current_task().map(|t| t.get_namespace()).as_ref()
@@ -131,7 +131,7 @@ extern "C" fn _Unwind_Resume(arg: usize) -> ! {
                 mapped_pages.lock().as_func(mapped_pages_offset, &mut space)?
             };
             trace!("[LOADABLE MODE]: invoking unwind::unwind_resume()...");
-            unsafe { func(arg) }
+            func(arg)
         }
 
         match invoke_unwind_resume(arg) {
@@ -146,7 +146,5 @@ extern "C" fn _Unwind_Resume(arg: usize) -> ! {
 #[alloc_error_handler]
 #[cfg(not(test))]
 fn oom(_layout: core::alloc::Layout) -> ! {
-    println_raw!("\nOut of Heap Memory! requested allocation: {:?}", _layout);
-    error!("Out of Heap Memory! requested allocation: {:?}", _layout);
-    loop {}
+    panic!("\n(oom) Out of Heap Memory! requested allocation: {:?}", _layout);
 }

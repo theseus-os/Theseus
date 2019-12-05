@@ -1,6 +1,5 @@
 #![no_std]
 #![feature(asm)]
-#![feature(core_intrinsics)]
 #![feature(stmt_expr_attributes)]
 
 extern crate alloc;
@@ -20,6 +19,7 @@ extern crate apic;
 extern crate context_switch;
 extern crate path;
 extern crate type_name;
+extern crate catch_unwind;
 
 
 use core::{
@@ -624,18 +624,13 @@ fn task_wrapper<F, A, R>() -> !
     enable_interrupts(); // we must enable interrupts for the new task, otherwise we won't be able to preempt it.
     compiler_fence(Ordering::SeqCst); // I don't think this is necessary...    
 
-    // Now we're ready to actually invoke the entry point function that this Task was spawned for
-    let exit_value = func(arg);
 
-    // let mut panic_cause: u64 = 0;
-    // let result = unsafe {
-    //     core::instrinsics::try(fn_ptr, arg_ptr, cause_ptr)
-    // };
-    // debug!("task_wrapper [2.5]: result {:?}", debugit!(result));
-        
+    // Now we actually invoke the entry point function that this Task was spawned for, catching a panic if one occurs.
+    let result = catch_unwind::catch_unwind_with_arg(func, arg);
+    
 
     // Here: now that the task is finished running, we must clean in up by doing three things:
-    // 1. Put the task into a non-runnable mode (exited), and set its exit value
+    // 1. Put the task into a non-runnable mode (exited or killed), and set its exit value
     // 2. Remove it from its runqueue
     // 3. Yield the CPU
     // The first two need to be done "atomically" (without interruption), so we must disable preemption before step 1.
@@ -648,12 +643,24 @@ fn task_wrapper<F, A, R>() -> !
         { 
             let curr_task_ref = get_my_current_task().expect("BUG: task_wrapper: couldn't get current task (after task func).");
             let curr_task_name = curr_task_ref.lock().name.clone();
-            debug!("task_wrapper [2]: \"{}\" exited with return value {:?}", curr_task_name, debugit!(exit_value));
             
-            // (1) Put the task into a non-runnable mode (exited), and set its exit value
-            if curr_task_ref.mark_as_exited(Box::new(exit_value)).is_err() {
-                warn!("task_wrapper: \"{}\" task could not set exit value, because it had already exited. Is this correct?", curr_task_name);
-            }
+            // (1) Put the task into a non-runnable mode (exited or killed), and set its exit value accordingly
+            match result {
+                // task exited properly
+                Ok(exit_value) => {
+                    debug!("task_wrapper [2]: \"{}\" exited with return value {:?}", curr_task_name, debugit!(exit_value));
+                    if curr_task_ref.mark_as_exited(Box::new(exit_value)).is_err() {
+                        error!("task_wrapper: \"{}\" task could not set exit value, because task had already exited. Is this correct?", curr_task_name);
+                    }
+                }
+                // task panicked, and we caught it above
+                Err(cause) => {
+                    debug!("task_wrapper [2]: \"{}\" panicked with {:?}", curr_task_name, cause);
+                    if curr_task_ref.mark_as_killed(cause).is_err() {
+                        error!("task_wrapper: \"{}\" task could not set kill reason, because task had already exited. Is this correct?", curr_task_name);
+                    }
+                }
+            }            
 
             // (2) Remove it from its runqueue
             #[cfg(not(runqueue_state_spill_evaluation))]  // the normal case

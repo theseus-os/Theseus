@@ -11,7 +11,7 @@
 extern crate spin;
 #[macro_use]
 extern crate alloc;
-extern crate dfqueue;
+extern crate mpmc;
 extern crate event_types;
 extern crate compositor;
 extern crate frame_buffer;
@@ -33,7 +33,7 @@ use alloc::sync::{Arc, Weak};
 use alloc::vec::Vec;
 use compositor::{Compositor, FrameBufferBlocks};
 use core::ops::{Deref, DerefMut};
-use dfqueue::{DFQueueConsumer, DFQueue, DFQueueProducer};
+use mpmc::Queue;
 use event_types::{Event, MousePositionEvent};
 use frame_buffer::{Coord, FrameBuffer, Pixel, Rectangle};
 use frame_buffer_compositor::{FRAME_COMPOSITOR};
@@ -447,7 +447,7 @@ impl WindowManager {
             let current_active_win = current_active.lock();
             current_active_win
                 .producer
-                .enqueue(Event::new_keyboard_event(key_event));
+                .push(Event::new_keyboard_event(key_event)).map_err(|_e| "Fail to enqueue the mouse position event")?;
         }
         Err("cannot find window to pass key event")
     }
@@ -474,9 +474,7 @@ impl WindowManager {
             let current_coordinate = current_active_win.get_position();
             if current_active_win.give_all_mouse_event {
                 event.coordinate = *coordinate - current_coordinate;
-                current_active_win
-                    .producer
-                    .enqueue(Event::MousePositionEvent(event.clone()));
+                current_active_win.producer.push(Event::MousePositionEvent(event.clone())).map_err(|_e| "Fail to enqueue the mouse position event")?;
             }
         }
         // show list
@@ -486,9 +484,7 @@ impl WindowManager {
                 let current_coordinate = now_view.get_position();
                 if now_view.give_all_mouse_event {
                     event.coordinate = *coordinate - current_coordinate;
-                    now_view
-                        .producer
-                        .enqueue(Event::MousePositionEvent(event.clone()));
+                    now_view.producer.push(Event::MousePositionEvent(event.clone())).map_err(|_e| "Fail to enqueue the mouse position event")?;
                 }
             }
         }
@@ -502,7 +498,7 @@ impl WindowManager {
                 // debug!("pass to active: {}, {}", event.x, event.y);
                 current_active_win
                     .producer
-                    .enqueue(Event::MousePositionEvent(event));
+                    .push(Event::MousePositionEvent(event)).map_err(|_e| "Fail to enqueue the mouse position event")?;
                 return Ok(());
             }
             if current_active_win.is_moving {
@@ -519,7 +515,7 @@ impl WindowManager {
                     event.coordinate = *coordinate - current_coordinate;
                     now_view
                         .producer
-                        .enqueue(Event::MousePositionEvent(event));
+                        .push(Event::MousePositionEvent(event)).map_err(|_e| "Fail to enqueue the mouse position event")?;
                     return Ok(());
                 }
             }
@@ -748,7 +744,7 @@ impl WindowManager {
 pub fn init<Buffer: FrameBuffer + Send>(
     mut bg_framebuffer: Buffer,
     mut top_framebuffer: Buffer,
-) -> Result<(DFQueueProducer<Event>, DFQueueProducer<Event>), &'static str> {
+) -> Result<(Queue<Event>, Queue<Event>), &'static str> {
     // initialize the framebuffer
     let (screen_width, screen_height) = bg_framebuffer.get_size();
     for x in 0..screen_width{
@@ -785,14 +781,14 @@ pub fn init<Buffer: FrameBuffer + Send>(
     win.refresh_bottom_windows(None, false)?;
 
     // keyinput queue initialization
-    let keyboard_event_handling_queue: DFQueue<Event> = DFQueue::new();
-    let key_consumer = keyboard_event_handling_queue.into_consumer();
-    let key_producer = key_consumer.obtain_producer();
+    let keyboard_event_handling_queue: Queue<Event> = Queue::with_capacity(100);
+    let key_consumer = keyboard_event_handling_queue.clone();
+    let key_producer = key_consumer.clone();
 
     // mouse input queue initialization
-    let mouse_event_handling_queue: DFQueue<Event> = DFQueue::new();
-    let mouse_consumer = mouse_event_handling_queue.into_consumer();
-    let mouse_producer = mouse_consumer.obtain_producer();
+    let mouse_event_handling_queue: Queue<Event> = Queue::with_capacity(100);
+    let mouse_consumer = mouse_event_handling_queue.clone();
+    let mouse_producer = mouse_consumer.clone();
 
     KernelTaskBuilder::new(window_manager_loop, (key_consumer, mouse_consumer))
         .name("window_manager_loop".to_string())
@@ -802,15 +798,15 @@ pub fn init<Buffer: FrameBuffer + Send>(
 
 /// handles all keyboard and mouse movement in this window manager
 fn window_manager_loop(
-    consumer: (DFQueueConsumer<Event>, DFQueueConsumer<Event>),
+    consumer: (Queue<Event>, Queue<Event>),
 ) -> Result<(), &'static str> {
     let (key_consumer, mouse_consumer) = consumer;
 
     loop {
         let event = {
-            let ev = match key_consumer.peek() {
+            let ev = match key_consumer.pop() {
                 Some(ev) => ev,
-                _ => match mouse_consumer.peek() {
+                _ => match mouse_consumer.pop() {
                     Some(ev) => ev,
                     _ => {
                         scheduler::schedule(); // yield the CPU and try again later
@@ -819,7 +815,7 @@ fn window_manager_loop(
                 },
             };
             let event = ev.clone();
-            ev.mark_completed();
+            //ev.mark_completed();
             event
         };
 
@@ -839,14 +835,14 @@ fn window_manager_loop(
                 let mut y = (mouse_displacement.y as i8) as isize;
                 // need to combine mouse events if there pending a lot
                 loop {
-                    let next_event = match mouse_consumer.peek() {
+                    let next_event = match mouse_consumer.pop() {
                         Some(ev) => ev,
                         _ => {
                             break;
                         }
                     };
-                    match next_event.deref() {
-                        &Event::MouseMovementEvent(ref next_mouse_event) => {
+                    match next_event {
+                        Event::MouseMovementEvent(ref next_mouse_event) => {
                             if next_mouse_event.mousemove.scrolling_up
                                 == mouse_event.mousemove.scrolling_up
                                 && next_mouse_event.mousemove.scrolling_down
@@ -868,7 +864,7 @@ fn window_manager_loop(
                             break;
                         }
                     }
-                    next_event.mark_completed();
+                    // next_event.mark_completed();
                 }
                 if x != 0 || y != 0 {
                     let mut wm = WINDOW_MANAGER

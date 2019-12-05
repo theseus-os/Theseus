@@ -13,7 +13,7 @@
 #![no_std]
 #[macro_use]
 extern crate alloc;
-extern crate dfqueue;
+extern crate mpmc;
 extern crate event_types;
 extern crate spin;
 #[macro_use]
@@ -37,7 +37,7 @@ use alloc::sync::Arc;
 use compositor::{Compositor, FrameBufferBlocks};
 use core::ops::Deref;
 use core::ops::DerefMut;
-use dfqueue::{DFQueue, DFQueueConsumer, DFQueueProducer};
+use mpmc::Queue;
 use displayable::Displayable;
 use event_types::{Event, MousePositionEvent};
 use frame_buffer::{Coord, FrameBuffer, Pixel, Rectangle};
@@ -105,9 +105,9 @@ pub struct Window {
     /// the background of this window, init as WINDOW_BACKGROUND
     background: Pixel,
     /// application could get events from this consumer
-    pub consumer: DFQueueConsumer<Event>,
+    pub consumer: Queue<Event>,
     /// event output used by window manager, private variable
-    producer: DFQueueProducer<Event>,
+    producer: Queue<Event>,
     /// last mouse position event, used to judge click and press-moving event
     last_mouse_position_event: MousePositionEvent,
     /// record last result of whether this window is active, to reduce redraw overhead
@@ -139,8 +139,8 @@ impl Window {
         let view_mutex = window_view::new_window(coordinate, framebuffer)?;
 
         // create event queue for components
-        let consumer = DFQueue::new().into_consumer();
-        let producer = consumer.obtain_producer();
+        let consumer = Queue::with_capacity(100);
+        let producer = consumer.clone();
 
         let mut window: Window = Window {
             view: view_mutex,
@@ -289,19 +289,19 @@ impl Window {
         {
             let mut view = self.view.lock();
             let consumer = &view.consumer;
-            let event = match consumer.peek() {
+            let event = match consumer.pop() {
                 Some(ev) => ev,
                 _ => {
                     return Ok(());
                 }
             };
 
-            match event.deref() {
-                &Event::KeyboardEvent(ref input_event) => {
+            match event {
+                Event::KeyboardEvent(ref input_event) => {
                     let key_input = input_event.key_event;
-                    self.producer.enqueue(Event::new_keyboard_event(key_input));
+                    self.producer.push(Event::new_keyboard_event(key_input)).map_err(|_e| "Fail to push the keyboard event")?;
                 }
-                &Event::MousePositionEvent(ref mouse_event) => {
+                Event::MousePositionEvent(ref mouse_event) => {
                     if view.is_moving {
                         // only wait for left button up to exit this mode
                         if !mouse_event.left_button_hold {
@@ -363,7 +363,7 @@ impl Window {
                             // the region of components
                             // TODO: if any components want this event? ask them!
                             self.producer
-                                .enqueue(Event::MousePositionEvent(mouse_event.clone()));
+                                .push(Event::MousePositionEvent(mouse_event.clone())).map_err(|_e| "Fail to push the keyboard event")?;
                         }
                         if (mouse_event.coordinate.y as usize) < view.height
                             && (mouse_event.coordinate.x as usize) < view.width
@@ -379,7 +379,7 @@ impl Window {
                     return Ok(());
                 }
             };
-            event.mark_completed();
+            // event.mark_completed();
         }
 
         if need_refresh_three_button {

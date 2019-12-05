@@ -5,14 +5,14 @@
 #![no_std]
 
 extern crate alloc;
-extern crate dfqueue;
+extern crate mpmc;
 extern crate event_types;
 extern crate frame_buffer;
 extern crate spin;
 
 use alloc::boxed::Box;
 use alloc::sync::Arc;
-use dfqueue::{DFQueue, DFQueueConsumer, DFQueueProducer};
+use mpmc::Queue;
 use event_types::{Event};
 use frame_buffer::{Coord, FrameBuffer, Pixel};
 use spin::{Mutex};
@@ -30,8 +30,8 @@ pub struct WindowView {
     /// The height of the window.
     pub height: usize,
     /// event consumer that could be used to get event input given to this window
-    pub consumer: DFQueueConsumer<Event>, // event input
-    pub producer: DFQueueProducer<Event>, // event output used by window manager
+    pub consumer: Queue<Event>, // event input
+    pub producer: Queue<Event>, // event output used by window manager
     /// frame buffer of this window
     pub framebuffer: Box<dyn FrameBuffer + Send>,
     /// if true, window manager will send all mouse event to this window, otherwise only when mouse is on this window does it send.
@@ -90,8 +90,8 @@ pub fn new_window<'a>(
     framebuffer: Box<dyn FrameBuffer + Send>,
 ) -> Result<Arc<Mutex<WindowView>>, &'static str> {
     // Init the key input producer and consumer
-    let consumer = DFQueue::new().into_consumer();
-    let producer = consumer.obtain_producer();
+    let consumer = Queue::with_capacity(100);
+    let producer = consumer.clone();
 
     let (width, height) = framebuffer.get_size();
 

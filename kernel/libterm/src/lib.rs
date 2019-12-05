@@ -610,14 +610,14 @@ impl Terminal {
             }
             _ => {}
         };
-        let event = match self.window.consumer.peek() {
+        let event = match self.window.consumer.pop() {
             Some(ev) => ev,
             None => {
                 return None;
             }
         };
         let event_copy = event.clone();
-        event.mark_completed();
+        // event.mark_completed();
         Some(event_copy)
     }
 
@@ -640,7 +640,7 @@ impl Terminal {
         }
 
         // calculate the cursor position
-        let cursor_pos = text_next_pos - self.cursor.offset_from_end();
+        let cursor_pos = text_next_pos - self.cursor.offset_from_end;
         let cursor_line = cursor_pos / col_num;
         let cursor_col = cursor_pos % col_num;
 
@@ -661,7 +661,7 @@ impl Terminal {
 
     /// Gets the position of the cursor relative to the end of text in units of characters.
     pub fn get_cursor_offset_from_end(&self) -> usize {
-        self.cursor.offset_from_end()
+        self.cursor.offset_from_end
     }
 
     /// Updates the position of a cursor.
@@ -669,7 +669,8 @@ impl Terminal {
     /// * `offset_from_end`: the position of the cursor relative to the end of text in units of characters.
     /// * `underlying_char`: the ASCII code of the underlying character when the cursor is unseen.
     pub fn update_cursor_pos(&mut self, offset_from_end: usize, underlying_char: u8) {
-        self.cursor.set_offset_from_end(offset_from_end);
-        self.cursor.set_underlying_char(underlying_char);
+        self.cursor.offset_from_end = offset_from_end;
+        self.cursor.underlying_char = underlying_char;
     }
+
 }
