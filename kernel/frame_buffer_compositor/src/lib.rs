@@ -34,7 +34,7 @@ use alloc::collections::BTreeMap;
 use alloc::vec::{Vec, IntoIter};
 use core::hash::{Hash, Hasher, BuildHasher};
 use hashbrown::hash_map::{DefaultHashBuilder};
-use compositor::{Compositor, FrameBufferBlocks};
+use compositor::{Compositor, FrameBufferBlocks, Mixer, Cache};
 use frame_buffer::{FrameBuffer, FINAL_FRAME_BUFFER, Coord, Rectangle};
 use spin::Mutex;
 
@@ -58,7 +58,7 @@ pub struct FrameCompositor {
 }
 
 /// Metadata that describes the cached block.
-struct BlockCache {
+pub struct BlockCache {
     /// The coordinate of the block where it is rendered to the final framebuffer.
     coordinate: Coord,
     /// The hash of the content in the frame buffer.
@@ -67,6 +67,13 @@ struct BlockCache {
     width: usize,
     /// The block which is cached
     block: Block,
+}
+
+impl Cache for BlockCache {
+    // checks if the block overlaps with another one.
+    fn overlaps_with(&self, cache: &BlockCache) -> bool {
+        self.contains_corner(cache) || cache.contains_corner(self)
+    }
 }
 
 impl BlockCache {
@@ -84,11 +91,6 @@ impl BlockCache {
             || self.contains(cache.coordinate + (cache.width as isize - 1, 0))
             || self.contains(cache.coordinate + (0, CACHE_BLOCK_HEIGHT as isize - 1))
             || self.contains(cache.coordinate + (cache.width as isize - 1, CACHE_BLOCK_HEIGHT as isize - 1))
-    }
-
-    // checks if the block overlaps with another one.
-    fn overlaps_with(&self, cache: &BlockCache) -> bool {
-        self.contains_corner(cache) || cache.contains_corner(self)
     }
 }
 
@@ -119,10 +121,10 @@ impl Block {
     }
 }
 
-impl Compositor<'_ , Block> for FrameCompositor {
-    fn composite(
+impl Compositor<'_ , BlockCache> for FrameCompositor {
+    fn composite<T: Mixer<BlockCache>>(
         &mut self,
-        mut bufferlist: IntoIter<FrameBufferBlocks<Block>>,
+        mut bufferlist: IntoIter<FrameBufferBlocks<T>>,
     ) -> Result<(), &'static str> {
 
         while let Some(frame_buffer_blocks) = bufferlist.next() {
@@ -131,48 +133,32 @@ impl Compositor<'_ , Block> for FrameCompositor {
             let (src_width, src_height) = src_fb.get_size();
 
             // Handle all blocks if the updated blocks parameter is None 
-            let mut all_blocks = Vec::new();
-            let mut blocks = match frame_buffer_blocks.blocks {
-                Some(blocks) => { blocks },
-                None => {
-                    let block_number = (src_height - 1) / CACHE_BLOCK_HEIGHT + 1;
-                    for i in 0.. block_number {
-                        all_blocks.push(
-                            Block {
-                                index: i, 
-                                start: 0, 
-                                width: src_width
-                            }
-                        )
-                    }
-                    all_blocks.into_iter()
-                } 
-            };
-
-            while let Some(block) = blocks.next() {
-
-                block.mix_with_final(src_fb, coordinate, &mut self.caches)?;
+            if frame_buffer_blocks.blocks.is_none() {
+                let block_number = (src_height - 1) / CACHE_BLOCK_HEIGHT + 1;
+                for i in 0.. block_number {
+                    let block = Block {
+                        index: i, 
+                        start: 0, 
+                        width: src_width
+                    };
+                    block.mix_with_final(src_fb, coordinate, &mut self.caches)?;
+                }
+            } else {
+                let mut blocks = match frame_buffer_blocks.blocks {
+                    Some(blocks) => { blocks },
+                    None => {
+                        continue;
+                    } 
+                };
+                while let Some(coordinate) = blocks.next() {
+                    coordinate.mix_with_final(
+                        frame_buffer_blocks.framebuffer,
+                        frame_buffer_blocks.coordinate,
+                        &mut self.caches
+                    )?;
+                }
             }
-        }
 
-        Ok(())
-    }
-
-    fn composite_pixels(&mut self, mut bufferlist: IntoIter<FrameBufferBlocks<Coord>>) -> Result<(), &'static str> {
-        while let Some(frame_buffer_blocks) = bufferlist.next() {
-            let mut blocks = match frame_buffer_blocks.blocks {
-                Some(blocks) => { blocks },
-                None => {
-                    continue;
-                } 
-            };
-            while let Some(coordinate) = blocks.next() {
-                coordinate.mix_with_final(
-                    frame_buffer_blocks.framebuffer,
-                    frame_buffer_blocks.coordinate,
-                    &mut self.caches
-                )?;
-            }
         }
 
         Ok(())
@@ -235,16 +221,9 @@ fn is_in_cache(block: &[u32], coordinate: &Coord, caches: &BTreeMap<Coord, Block
     }
 }
 
-trait Mixer {
-    fn mix_with_final(
-        &self, 
-        src_fb: &dyn FrameBuffer, 
-        src_coord: Coord,        
-        cache: &mut BTreeMap<Coord, BlockCache>
-    ) -> Result<(), &'static str>;
-}
 
-impl Mixer for Block {
+
+impl Mixer<BlockCache> for Block {
     fn mix_with_final(
         &self, 
         src_fb: &dyn FrameBuffer, 
@@ -343,12 +322,12 @@ impl Mixer for Block {
     }
 }
 
-impl Mixer for Coord {
+impl Mixer<BlockCache> for Coord {
     fn mix_with_final(
         &self, 
         src_fb: &dyn FrameBuffer, 
         src_coord: Coord,        
-        cache: &mut BTreeMap<Coord, BlockCache>
+        _caches: &mut BTreeMap<Coord, BlockCache>
     ) -> Result<(), &'static str>{
         let relative_coord = self.clone() - src_coord;
         if src_fb.contains(relative_coord) {
@@ -359,6 +338,18 @@ impl Mixer for Coord {
                 .lock();
             final_fb.draw_pixel(self.clone(), pixel);
         }
+
+        // remove the cache containing the pixel
+        // let keys: Vec<_> = caches.keys().cloned().collect();
+        // for key in keys {
+        //     if let Some(cache) = caches.get_mut(&key) {
+        //         if cache.contains(self.clone()) {
+        //             caches.remove(&key);
+        //             break;
+        //         }
+        //     };
+        // }
+
         Ok(())
     }
 }

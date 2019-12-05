@@ -7,7 +7,6 @@
 #![no_std]
 extern crate keycodes_ascii;
 extern crate spin;
-extern crate mpmc;
 extern crate dfqueue;
 extern crate spawn;
 extern crate task;
@@ -38,7 +37,6 @@ use path::Path;
 use task::{TaskRef, ExitValue, KillReason};
 use libterm::Terminal;
 use dfqueue::{DFQueue, DFQueueConsumer, DFQueueProducer};
-use mpmc::Queue;
 use alloc::sync::Arc;
 use spin::{Mutex, MutexGuard};
 use environment::Environment;

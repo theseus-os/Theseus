@@ -1876,7 +1876,6 @@ dependencies = [
  "lazy_static 1.2.0 (registry+https://github.com/rust-lang/crates.io-index)",
  "libterm 0.1.0",
  "log 0.3.9 (registry+https://github.com/rust-lang/crates.io-index)",
- "mpmc 0.1.6-pre",
  "path 0.1.0",
  "print 0.1.0",
  "root 0.1.0",

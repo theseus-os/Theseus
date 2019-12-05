@@ -9,26 +9,20 @@ extern crate frame_buffer;
 
 use alloc::vec::{IntoIter};
 use frame_buffer::{Coord, FrameBuffer};
+use alloc::collections::BTreeMap;
 
 /// The compositor trait.
 /// A compositor composites a list of buffers to a single buffer. It caches the information of incoming buffers for better performance.
-pub trait Compositor<'a, T> {
+pub trait Compositor<'a, T: Cache> {
     /// Composites the buffers in the bufferlist.
     ///
     /// # Arguments
     ///
     /// * `bufferlist` - A list of information about the buffers to be composited. The list is of generic type so that we can implement various compositor with different information
-    fn composite(
+    fn composite<U: Mixer<T>>(
         &mut self,
-        bufferlist: IntoIter<FrameBufferBlocks<'a, T>>,
+        bufferlist: IntoIter<FrameBufferBlocks<'a, U>>,
     ) -> Result<(), &'static str>;
-
-    /// Composites the pixels in these bufferlist
-    /// # Arguments
-    ///
-    /// * `bufferlist` - A list of information about the buffers to be composited. The list is of generic type so that we can implement various compositor with different information
-    /// * `abs_coords` - A list of coordinates relative to the origin (top-left) of the screen. The compositor will get the relative position of these pixels in every framebuffer and composites them.
-    fn composite_pixels(&mut self, bufferlist: IntoIter<FrameBufferBlocks<'a, Coord>>) -> Result<(), &'static str>; 
 }
 
 
@@ -40,4 +34,17 @@ pub struct FrameBufferBlocks<'a, T> {
     pub coordinate: Coord,
     /// The updated blocks of the framebuffer. If `blocks` is `None`, the compositor would handle all the blocks of the framebuffer.
     pub blocks: Option<IntoIter<T>>,
+}
+
+pub trait Mixer<T: Cache> {
+    fn mix_with_final(
+        &self, 
+        src_fb: &dyn FrameBuffer, 
+        src_coord: Coord,        
+        cache: &mut BTreeMap<Coord, T>
+    ) -> Result<(), &'static str>;
+}
+
+pub trait Cache {
+    fn overlaps_with(&self, cache: &Self) -> bool;
 }

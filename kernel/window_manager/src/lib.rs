@@ -36,7 +36,7 @@ use core::ops::{Deref, DerefMut};
 use mpmc::Queue;
 use event_types::{Event, MousePositionEvent};
 use frame_buffer::{Coord, FrameBuffer, Pixel, Rectangle};
-use frame_buffer_compositor::{FRAME_COMPOSITOR};
+use frame_buffer_compositor::{FRAME_COMPOSITOR, Block};
 use keycodes_ascii::{KeyAction, KeyEvent, Keycode};
 use mouse_data::MouseEvent;
 use path::Path;
@@ -228,7 +228,7 @@ impl WindowManager {
             blocks: Some(pixels.clone())
         };
 
-        FRAME_COMPOSITOR.lock().composite_pixels(vec![bottom_fb].into_iter())?;
+        FRAME_COMPOSITOR.lock().composite::<Coord>(vec![bottom_fb].into_iter())?;
 
         for window_ref in &self.hide_list {
             if let Some(window_mutex) = window_ref.upgrade() {
@@ -240,7 +240,7 @@ impl WindowManager {
                     blocks: Some(pixels.clone())
                 };
 
-                FRAME_COMPOSITOR.lock().composite_pixels(vec![buffer_blocks].into_iter())?;
+                FRAME_COMPOSITOR.lock().composite::<Coord>(vec![buffer_blocks].into_iter())?;
            }
         }
 
@@ -254,7 +254,7 @@ impl WindowManager {
                     blocks: Some(pixels.clone())
                 };
 
-                FRAME_COMPOSITOR.lock().composite_pixels(vec![buffer_blocks].into_iter())?;
+                FRAME_COMPOSITOR.lock().composite::<Coord>(vec![buffer_blocks].into_iter())?;
            }
         }
 
@@ -267,7 +267,7 @@ impl WindowManager {
                 blocks: Some(pixels)
             }; 
 
-            FRAME_COMPOSITOR.lock().composite_pixels(vec![buffer_blocks].into_iter())?;
+            FRAME_COMPOSITOR.lock().composite::<Coord>(vec![buffer_blocks].into_iter())?;
         }
 
         Ok(())
@@ -281,7 +281,7 @@ impl WindowManager {
             blocks: Some(pixels)
         }; 
 
-        FRAME_COMPOSITOR.lock().composite_pixels(vec![top_buffer].into_iter())
+        FRAME_COMPOSITOR.lock().composite::<Coord>(vec![top_buffer].into_iter())
     }
 
     /// Refresh the all the pixels including the bottom framebuffer, the windows and the top framebuffer.
@@ -327,7 +327,7 @@ impl WindowManager {
                     blocks: blocks
                 };
 
-                FRAME_COMPOSITOR.lock().composite(vec![buffer_blocks].into_iter())?;
+                FRAME_COMPOSITOR.lock().composite::<Block>(vec![buffer_blocks].into_iter())?;
            }
         }
 
@@ -353,7 +353,7 @@ impl WindowManager {
                     blocks: blocks
                 };
 
-                FRAME_COMPOSITOR.lock().composite(vec![buffer_blocks].into_iter())?;
+                FRAME_COMPOSITOR.lock().composite::<Block>(vec![buffer_blocks].into_iter())?;
            }
         }
 
@@ -378,7 +378,7 @@ impl WindowManager {
                     blocks: blocks
                 }; 
 
-                FRAME_COMPOSITOR.lock().composite(vec![buffer_blocks].into_iter())?;
+                FRAME_COMPOSITOR.lock().composite::<Block>(vec![buffer_blocks].into_iter())?;
             }
         }
        
@@ -410,7 +410,7 @@ impl WindowManager {
             blocks: blocks
         }; 
 
-        FRAME_COMPOSITOR.lock().composite(vec![bg_buffer].into_iter())?;
+        FRAME_COMPOSITOR.lock().composite::<Block>(vec![bg_buffer].into_iter())?;
 
         let area_obj = if update_all{
             None
@@ -438,7 +438,7 @@ impl WindowManager {
             blocks: blocks
         }; 
 
-        FRAME_COMPOSITOR.lock().composite(vec![top_buffer].into_iter())
+        FRAME_COMPOSITOR.lock().composite::<Block>(vec![top_buffer].into_iter())
     }
     
     /// pass keyboard event to currently active window
