@@ -34,7 +34,7 @@ use alloc::collections::BTreeMap;
 use alloc::vec::{Vec, IntoIter};
 use core::hash::{Hash, Hasher, BuildHasher};
 use hashbrown::hash_map::{DefaultHashBuilder};
-use compositor::Compositor;
+use compositor::{Compositor, FrameBufferBlocks};
 use frame_buffer::{FrameBuffer, FINAL_FRAME_BUFFER, Coord, Rectangle};
 use spin::Mutex;
 
@@ -55,16 +55,6 @@ lazy_static! {
 pub struct FrameCompositor {
     // Cache of updated framebuffers
     caches: BTreeMap<Coord, BlockCache>,
-}
-
-/// The framebuffers to be composited together with the information of their updated blocks.
-pub struct FrameBufferBlocks<'a> {
-    /// The framebuffer to be composited.
-    pub framebuffer: &'a dyn FrameBuffer,
-    /// The coordinate of the framebuffer where it is rendered to the final framebuffer.
-    pub coordinate: Coord,
-    /// The updated blocks of the framebuffer. If `blocks` is `None`, the compositor would handle all the blocks of the framebuffer.
-    pub blocks: Option<IntoIter<Block>>,
 }
 
 /// Metadata that describes the cached block.
@@ -102,13 +92,19 @@ impl BlockCache {
     }
 }
 
-/// A block for cache
+/// A block for cache. 
+///
+/// In order to composite a framebuffer, the compositor will first divide it into blocks. 
+/// The height of every block is a constant 16. Blocks are aligned along the y-axis and `index` indicates the order of a block.
+/// `start` and `width` marks the area to be updated in a block in which `start` is an x coordinate relative to the leftside of the framebuffer. It the compositor gets a framebuffer together with some blocks, it just composite the area specified by these blocks.
+///
+/// After compositing, the compositor will cache the updated blocks. In the next time, for every block in a framebuffer, the compositor will ignore it if it is alreday cached.
 pub struct Block {
     /// The index of the block in a framebuffer
     index: usize,
-    /// The left bound of the block
+    /// The left bound of the updated area
     start: usize,
-    /// The width of the block
+    /// The width of the 
     width: usize,
 }
 
@@ -123,10 +119,10 @@ impl Block {
     }
 }
 
-impl Compositor<FrameBufferBlocks<'_>> for FrameCompositor {
+impl Compositor<'_ , Block> for FrameCompositor {
     fn composite(
         &mut self,
-        mut bufferlist: IntoIter<FrameBufferBlocks>,
+        mut bufferlist: IntoIter<FrameBufferBlocks<Block>>,
     ) -> Result<(), &'static str> {
         let mut final_fb = FINAL_FRAME_BUFFER
             .try()
@@ -247,7 +243,7 @@ impl Compositor<FrameBufferBlocks<'_>> for FrameCompositor {
         Ok(())
     }
 
-    fn composite_pixels(&mut self, mut bufferlist: IntoIter<FrameBufferBlocks>, abs_coords: &[Coord]) -> Result<(), &'static str> {
+    fn composite_pixels(&mut self, mut bufferlist: IntoIter<FrameBufferBlocks<Block>>, abs_coords: &[Coord]) -> Result<(), &'static str> {
         let mut final_fb = FINAL_FRAME_BUFFER
             .try()
             .ok_or("FrameCompositor fails to get the final frame buffer")?

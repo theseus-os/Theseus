@@ -34,7 +34,7 @@ use alloc::boxed::Box;
 use alloc::collections::BTreeMap;
 use alloc::string::{String, ToString};
 use alloc::sync::Arc;
-use compositor::Compositor;
+use compositor::{Compositor, FrameBufferBlocks};
 use core::ops::Deref;
 use core::ops::DerefMut;
 use dfqueue::{DFQueue, DFQueueConsumer, DFQueueProducer};
@@ -42,7 +42,7 @@ use displayable::Displayable;
 use event_types::{Event, MousePositionEvent};
 use frame_buffer::{Coord, FrameBuffer, Pixel, Rectangle};
 use frame_buffer_alpha::{PixelMixer, BLACK};
-use frame_buffer_compositor::{FrameBufferBlocks, FRAME_COMPOSITOR};
+use frame_buffer_compositor::{FRAME_COMPOSITOR};
 use memory_structs::PhysicalAddress;
 use spin::Mutex;
 use window_view::WindowView;
@@ -96,7 +96,7 @@ impl From<usize> for TopButton {
 
 /// Abstraction of a window which owns a list of components and the window's handler. It provides title bar which helps user moving, close, maximize or minimize window
 pub struct Window {
-    /// the window object that could be used to initialize components
+    /// this object contains states and methods related to display the window on the screen
     pub view: Arc<Mutex<WindowView>>,
     /// the width of border, init as WINDOW_BORDER. the border is still part of the window and remains flexibility for user to change border style or remove border. However, for most application a border is useful for user to identify the region.
     border_size: usize,
@@ -149,16 +149,7 @@ impl Window {
             background: background,
             consumer: consumer,
             producer: producer,
-            last_mouse_position_event: MousePositionEvent {
-                coordinate: Coord::new(0, 0),
-                gcoordinate: Coord::new(0, 0),
-                scrolling_up: false,
-                scrolling_down: false,
-                left_button_hold: false,
-                right_button_hold: false,
-                fourth_button_hold: false,
-                fifth_button_hold: false,
-            },
+            last_mouse_position_event: MousePositionEvent::default(),
             last_is_active: true, // new window is by default active
             components: BTreeMap::new(),
         };

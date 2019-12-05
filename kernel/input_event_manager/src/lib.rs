@@ -9,21 +9,12 @@
 
 #![no_std]
 extern crate spin;
-extern crate dfqueue;
 extern crate spawn;
 extern crate task;
 extern crate mod_mgmt;
-extern crate event_types;
-extern crate font;
-extern crate frame_buffer_alpha;
-extern crate frame_buffer_rgb;
-extern crate window_manager;
 extern crate alloc;
 
-use frame_buffer_alpha::FrameBufferAlpha;
 use alloc::{string::ToString, sync::Arc};
-use event_types::Event;
-use dfqueue::{DFQueue, DFQueueProducer};
 use mod_mgmt::{metadata::CrateType, CrateNamespace, NamespaceDir};
 use spawn::{ApplicationTaskBuilder};
 

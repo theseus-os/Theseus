@@ -12,7 +12,6 @@ extern crate spin;
 
 use alloc::boxed::Box;
 use alloc::sync::Arc;
-use core::ops::{Deref, DerefMut};
 use dfqueue::{DFQueue, DFQueueConsumer, DFQueueProducer};
 use event_types::{Event};
 use frame_buffer::{Coord, FrameBuffer, Pixel};
@@ -21,7 +20,7 @@ use spin::{Mutex};
 // The default color of a window;
 const WINDOW_DEFAULT_COLOR: Pixel = 0x80FFFFFF;
 
-/// Window object that should be owned by the manager. It implements the `Window` trait.
+/// WindowView object that should be owned by the manager. It is usually owned by both an application's window and the manager so that the application can modify it and the manager can re-display it when necessary.
 pub struct WindowView {
     /// The position of the top-left corner of the window.
     /// It is relative to the top-left corner of the screen.

@@ -31,12 +31,12 @@ use alloc::collections::VecDeque;
 use alloc::string::{String, ToString};
 use alloc::sync::{Arc, Weak};
 use alloc::vec::Vec;
-use compositor::Compositor;
+use compositor::{Compositor, FrameBufferBlocks};
 use core::ops::{Deref, DerefMut};
 use dfqueue::{DFQueueConsumer, DFQueue, DFQueueProducer};
 use event_types::{Event, MousePositionEvent};
 use frame_buffer::{Coord, FrameBuffer, Pixel, Rectangle};
-use frame_buffer_compositor::{FrameBufferBlocks, FRAME_COMPOSITOR};
+use frame_buffer_compositor::{FRAME_COMPOSITOR};
 use keycodes_ascii::{KeyAction, KeyEvent, Keycode};
 use mouse_data::MouseEvent;
 use path::Path;
@@ -444,7 +444,7 @@ impl WindowManager {
     /// pass keyboard event to currently active window
     fn pass_keyboard_event_to_window(&self, key_event: KeyEvent) -> Result<(), &'static str> {
         if let Some(current_active) = self.active.upgrade() {
-            let mut current_active_win = current_active.lock();
+            let current_active_win = current_active.lock();
             current_active_win
                 .producer
                 .enqueue(Event::new_keyboard_event(key_event));
@@ -470,7 +470,7 @@ impl WindowManager {
         // check if some application want all mouse_event
         // active
         if let Some(current_active) = self.active.upgrade() {
-            let mut current_active_win = current_active.lock();
+            let current_active_win = current_active.lock();
             let current_coordinate = current_active_win.get_position();
             if current_active_win.give_all_mouse_event {
                 event.coordinate = *coordinate - current_coordinate;
@@ -482,7 +482,7 @@ impl WindowManager {
         // show list
         for i in 0..self.show_list.len() {
             if let Some(now_view_mutex) = self.show_list[i].upgrade() {
-                let mut now_view = now_view_mutex.lock();
+                let now_view = now_view_mutex.lock();
                 let current_coordinate = now_view.get_position();
                 if now_view.give_all_mouse_event {
                     event.coordinate = *coordinate - current_coordinate;
@@ -495,7 +495,7 @@ impl WindowManager {
 
         // first check the active one
         if let Some(current_active) = self.active.upgrade() {
-            let mut current_active_win = current_active.lock();
+            let current_active_win = current_active.lock();
             let current_coordinate = current_active_win.get_position();
             if current_active_win.contains(*coordinate - current_coordinate) {
                 event.coordinate = *coordinate - current_coordinate;
@@ -513,7 +513,7 @@ impl WindowManager {
         // then check show_list
         for i in 0..self.show_list.len() {
             if let Some(now_view_mutex) = self.show_list[i].upgrade() {
-                let mut now_view = now_view_mutex.lock();
+                let now_view = now_view_mutex.lock();
                 let current_coordinate = now_view.get_position();
                 if now_view.contains(*coordinate - current_coordinate) {
                     event.coordinate = *coordinate - current_coordinate;

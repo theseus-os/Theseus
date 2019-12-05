@@ -32,6 +32,21 @@ pub struct MousePositionEvent {
     pub fifth_button_hold: bool,
 }
 
+impl Default for MousePositionEvent  {
+    fn default() -> Self {
+        MousePositionEvent {
+            coordinate: Coord::new(0, 0),
+            gcoordinate: Coord::new(0, 0),
+            scrolling_up: false,
+            scrolling_down: false,
+            left_button_hold: false,
+            right_button_hold: false,
+            fourth_button_hold: false,
+            fifth_button_hold: false,
+        }
+    }
+}
+
 #[derive(Debug, Clone)]
 pub enum Event {
     /// An input event from a keyboard
