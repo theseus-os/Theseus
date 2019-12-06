@@ -187,16 +187,16 @@ impl Mixer for Block {
         // Wenqiu: TODO Optimize Later
         let width = core::cmp::min(
             core::cmp::min(coordinate_end.x as usize, final_width) - final_x_start,
-            new_cache.block.width + new_cache.block.start,
-        ) - new_cache.block.start;
+            self.width + self.start,
+        ) - self.start;
         let height = core::cmp::min(coordinate_end.y as usize, final_height) - final_y_start;
 
         // copy every line of the block to the final framebuffer.
         // let src_buffer = src_fb.buffer();
         for i in 0..height {
-            let dest_start = (final_y_start + i) * final_width + final_x_start + new_cache.block.start;
+            let dest_start = (final_y_start + i) * final_width + final_x_start + self.start;
             let src_start = src_width * ((final_y_start + i) as isize - coordinate_start.y) as usize
-                + (final_x_start as isize - coordinate_start.x) as usize + new_cache.block.start;
+                + (final_x_start as isize - coordinate_start.x) as usize + self.start;
             let src_end = src_start + width;
             final_fb.composite_buffer(&(block_content[src_start..src_end]), dest_start);
         }
