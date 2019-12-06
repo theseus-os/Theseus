@@ -616,9 +616,7 @@ impl Terminal {
                 return None;
             }
         };
-        let event_copy = event.clone();
-        // event.mark_completed();
-        Some(event_copy)
+        Some(event)
     }
 
     /// Display the cursor of the terminal.

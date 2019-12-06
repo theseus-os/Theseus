@@ -34,7 +34,8 @@ use alloc::boxed::Box;
 use alloc::collections::BTreeMap;
 use alloc::string::{String, ToString};
 use alloc::sync::Arc;
-use compositor::{Compositor, FrameBufferUpdates};
+use alloc::vec::Vec;
+use compositor::{Compositor, FrameBufferUpdates, Mixer};
 use core::ops::Deref;
 use core::ops::DerefMut;
 use mpmc::Queue;
@@ -42,7 +43,7 @@ use displayable::Displayable;
 use event_types::{Event, MousePositionEvent};
 use frame_buffer::{Coord, FrameBuffer, Pixel, Rectangle};
 use frame_buffer_alpha::{PixelMixer, BLACK};
-use frame_buffer_compositor::{FRAME_COMPOSITOR};
+use frame_buffer_compositor::{FRAME_COMPOSITOR, Block, BlockCache};
 use memory_structs::PhysicalAddress;
 use spin::Mutex;
 use window_view::WindowView;
@@ -286,13 +287,14 @@ impl Window {
             self.show_button(TopButton::Hide, 1, &mut view);
         }
 
-        {
+        loop {
             let mut view = self.view.lock();
             let consumer = &view.consumer;
             let event = match consumer.pop() {
                 Some(ev) => ev,
                 _ => {
-                    return Ok(());
+                    break;
+                    //return Ok(());
                 }
             };
 
@@ -308,9 +310,9 @@ impl Window {
                             view.is_moving = false;
                             view.give_all_mouse_event = false;
                             self.last_mouse_position_event = mouse_event.clone();
-                            call_later_do_refresh_floating_border = true;
                             call_later_do_move_active_window = true;
                         }
+                        call_later_do_refresh_floating_border = true;
                     } else {
                         if (mouse_event.coordinate.y as usize) < self.title_size
                             && (mouse_event.coordinate.x as usize) < view.width
@@ -386,10 +388,7 @@ impl Window {
             self.refresh_three_button()?;
         }
 
-        let mut wm = WINDOW_MANAGER
-            .try()
-            .ok_or("The static window manager was not yet initialized")?
-            .lock();
+        let mut wm = WINDOW_MANAGER.try().ok_or("The static window manager was not yet initialized")?.lock();
         if need_to_set_active {
             wm.set_active(&self.view, true)?;
         }
@@ -532,11 +531,14 @@ impl Window {
 
     /// refresh the top left three button's appearance
     fn refresh_three_button(&self) -> Result<(), &'static str> {
-        let profile = self.view.lock();
+        let view = self.view.lock();
+        let block: Vec<Box<dyn Mixer<BlockCache>>> = vec![Box::new(
+            Block::new(0, 0, view.get_size().0)
+        )];
         let frame_buffer_blocks = FrameBufferUpdates {
-            framebuffer: profile.framebuffer.deref(),
-            coordinate: profile.coordinate,
-            updates: None,
+            framebuffer: view.framebuffer.deref(),
+            coordinate: view.coordinate,
+            updates: Some(block.as_slice()),
         };
         FRAME_COMPOSITOR.lock().composite(vec![frame_buffer_blocks].as_slice())?;
 

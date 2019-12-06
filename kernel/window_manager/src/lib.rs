@@ -312,16 +312,11 @@ impl WindowManager {
                 //let (width, height) = window.get_size();
 
                 let win_coordinate = window.get_position();
-                let blocks = if !update_all {
-                    let mut relative_area = max_update_area - win_coordinate;
-                    let blocks = frame_buffer_compositor::get_blocks(framebuffer.deref(), &mut relative_area);
-                    max_update_area = relative_area + win_coordinate;
-                    blocks
-                } else {
-                    Vec::new()
-                };
-
-                let updates = if blocks.len() > 0 {
+                let mut relative_area = max_update_area - win_coordinate;
+                let blocks = frame_buffer_compositor::get_blocks(framebuffer.deref(), &mut relative_area);
+                max_update_area = relative_area + win_coordinate;
+                
+                let updates = if !update_all {
                     Some(blocks.as_slice())
                 } else {
                     None
@@ -344,16 +339,10 @@ impl WindowManager {
                 //let (width, height) = window.get_size();
 
                 let win_coordinate = window.get_position();
-                let blocks = if !update_all {
-                    let mut relative_area = max_update_area - win_coordinate;
-                    let blocks = frame_buffer_compositor::get_blocks(framebuffer.deref(), &mut relative_area);
-                    max_update_area = relative_area + win_coordinate;
-                    blocks
-                } else {
-                    Vec::new()
-                };
-
-                let updates = if blocks.len() > 0 {
+                let mut relative_area = max_update_area - win_coordinate;
+                let blocks = frame_buffer_compositor::get_blocks(framebuffer.deref(), &mut relative_area);
+                max_update_area = relative_area + win_coordinate;
+                let updates = if !update_all {
                     Some(blocks.as_slice())
                 } else {
                     None
@@ -375,14 +364,10 @@ impl WindowManager {
                 let framebuffer = window.framebuffer.deref();
                 
                 let win_coordinate = window.get_position();
-                let blocks = if !update_all {
-                    let mut relative_area = max_update_area - win_coordinate;
-                    frame_buffer_compositor::get_blocks(framebuffer.deref(), &mut relative_area)
-                } else {
-                    Vec::new()
-                };
+                let mut relative_area = max_update_area - win_coordinate;
+                let blocks = frame_buffer_compositor::get_blocks(framebuffer.deref(), &mut relative_area);
 
-                let updates = if blocks.len() > 0 {
+                let updates = if !update_all {
                     Some(blocks.as_slice())
                 } else {
                     None
@@ -405,14 +390,14 @@ impl WindowManager {
     /// Refresh the part of bottom framebuffer and every window in `area`. Refresh the whole screen if area is None. 
     pub fn refresh_bottom_windows(&self, area: Option<Rectangle>, active: bool) -> Result<(), &'static str> {
         let update_all = area.is_none();
-        let update_area = Rectangle {
+        let mut update_area = Rectangle {
             top_left: Coord::new(0, 0),
             bottom_right: Coord::new(0, 0),
         };
 
         let blocks = match area {
             Some(area) => {
-                let mut update_area = area;
+                update_area = area;
                 frame_buffer_compositor::get_blocks(self.bottom_fb.deref(), &mut update_area)
             },
             None => Vec::new()
@@ -950,12 +935,10 @@ fn keyboard_handle_application(key_input: KeyEvent) -> Result<(), &'static str> 
 
 /// handle mouse event, push it to related window or anyone asked for it
 fn cursor_handle_application(mouse_event: MouseEvent) -> Result<(), &'static str> {
-    let mut wm = WINDOW_MANAGER
+    let wm = WINDOW_MANAGER
         .try()
         .ok_or("The static window manager was not yet initialized")?
         .lock();
-    wm.move_floating_border()?;
-
     if let Err(_) = wm.pass_mouse_event_to_window(mouse_event) {
         // the mouse event should be passed to the window that satisfies:
         // 1. the mouse position is currently in the window area
