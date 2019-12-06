@@ -8,5 +8,9 @@ build = "../../build.rs"
 [dependencies.frame_buffer]
 path = "../frame_buffer"
 
+[dependencies.hashbrown]
+version = "0.1.8"
+features = ["nightly"]
+
 [lib]
 crate-type = ["rlib"]

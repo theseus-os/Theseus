@@ -35,7 +35,7 @@ use alloc::collections::BTreeMap;
 use alloc::string::{String, ToString};
 use alloc::sync::Arc;
 use alloc::vec::Vec;
-use compositor::{Compositor, FrameBufferUpdates, Mixer};
+use compositor::{Compositor, FrameBufferUpdates, Mixer, Block};
 use core::ops::Deref;
 use core::ops::DerefMut;
 use mpmc::Queue;
@@ -43,7 +43,7 @@ use displayable::Displayable;
 use event_types::{Event, MousePositionEvent};
 use frame_buffer::{Coord, FrameBuffer, Pixel, Rectangle};
 use frame_buffer_alpha::{PixelMixer, BLACK};
-use frame_buffer_compositor::{FRAME_COMPOSITOR, Block, BlockCache};
+use frame_buffer_compositor::{FRAME_COMPOSITOR};
 use memory_structs::PhysicalAddress;
 use spin::Mutex;
 use window_view::WindowView;
@@ -532,7 +532,7 @@ impl Window {
     /// refresh the top left three button's appearance
     fn refresh_three_button(&self) -> Result<(), &'static str> {
         let view = self.view.lock();
-        let block: Vec<Box<dyn Mixer<BlockCache>>> = vec![Box::new(
+        let block: Vec<Box<dyn Mixer>> = vec![Box::new(
             Block::new(0, 0, view.get_size().0)
         )];
         let frame_buffer_blocks = FrameBufferUpdates {

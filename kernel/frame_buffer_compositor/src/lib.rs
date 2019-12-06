@@ -34,13 +34,11 @@ use alloc::collections::BTreeMap;
 use alloc::vec::{Vec};
 use alloc::boxed::Box;
 use core::hash::{Hash, Hasher, BuildHasher};
+use core::ops::DerefMut;
 use hashbrown::hash_map::{DefaultHashBuilder};
-use compositor::{Compositor, FrameBufferUpdates, Mixer, Cache};
+use compositor::{Compositor, FrameBufferUpdates, Mixer, Block, BlockCache, CACHE_BLOCK_HEIGHT};
 use frame_buffer::{FrameBuffer, FINAL_FRAME_BUFFER, Coord, Rectangle};
 use spin::Mutex;
-
-/// The height of a cache block of the compositor
-pub const CACHE_BLOCK_HEIGHT:usize = 16;
 
 lazy_static! {
     /// The instance of the frame buffer compositor.
@@ -58,42 +56,6 @@ pub struct FrameCompositor {
     caches: BTreeMap<Coord, BlockCache>,
 }
 
-/// Metadata that describes the cached block.
-pub struct BlockCache {
-    /// The coordinate of the block where it is rendered to the final framebuffer.
-    coordinate: Coord,
-    /// The hash of the content in the frame buffer.
-    content_hash: u64,
-    /// The width of the block
-    width: usize,
-    /// The block which is cached
-    block: Block,
-}
-
-impl Cache for BlockCache {
-    fn overlaps_with(&self, cache: &BlockCache) -> bool {
-        self.contains_corner(cache) || cache.contains_corner(self)
-    }
-}
-
-impl BlockCache {
-    /// checks if the coordinate is within the block
-    fn contains(&self, coordinate: Coord) -> bool {
-        return coordinate.x >= self.coordinate.x
-            && coordinate.x < self.coordinate.x + self.width as isize
-            && coordinate.y >= self.coordinate.y
-            && coordinate.y < self.coordinate.y + CACHE_BLOCK_HEIGHT as isize;
-    }
-
-    /// checks if this block contains any of the four corners of `cache`.
-    fn contains_corner(&self, cache: &BlockCache) -> bool {
-        self.contains(cache.coordinate)
-            || self.contains(cache.coordinate + (cache.width as isize - 1, 0))
-            || self.contains(cache.coordinate + (0, CACHE_BLOCK_HEIGHT as isize - 1))
-            || self.contains(cache.coordinate + (cache.width as isize - 1, CACHE_BLOCK_HEIGHT as isize - 1))
-    }
-}
-
 /// A block for cache. 
 ///
 /// In order to composite a framebuffer, the compositor will first divide it into blocks. 
@@ -101,31 +63,16 @@ impl BlockCache {
 /// `start` and `width` marks the area to be updated in a block in which `start` is an x coordinate relative to the leftside of the framebuffer. It the compositor gets a framebuffer together with some blocks, it just composite the area specified by these blocks.
 ///
 /// After compositing, the compositor will cache the updated blocks. In the next time, for every block in a framebuffer, the compositor will ignore it if it is alreday cached.
-pub struct Block {
-    /// The index of the block in a framebuffer
-    index: usize,
-    /// The left bound of the updated area
-    start: usize,
-    /// The width of the 
-    width: usize,
-}
 
-impl Block {
-    /// Creates a new block
-    pub fn new(index: usize, start: usize, width: usize) -> Block {
-        Block {
-            index: index,
-            start: start,
-            width: width,
-        }
-    }
-}
-
-impl Compositor<BlockCache> for FrameCompositor {
+impl Compositor for FrameCompositor {
     fn composite(
         &mut self,
-        bufferlist: &[FrameBufferUpdates<'_, BlockCache>],
+        bufferlist: &[FrameBufferUpdates<'_>],
     ) -> Result<(), &'static str> {
+        let mut final_fb = FINAL_FRAME_BUFFER
+            .try()
+            .ok_or("FrameCompositor fails to get the final frame buffer")?
+            .lock();
 
         for frame_buffer_updates in bufferlist {
             let src_fb = frame_buffer_updates.framebuffer;
@@ -136,12 +83,8 @@ impl Compositor<BlockCache> for FrameCompositor {
             if frame_buffer_updates.updates.is_none() {
                 let block_number = (src_height - 1) / CACHE_BLOCK_HEIGHT + 1;
                 for i in 0.. block_number {
-                    let block = Block {
-                        index: i, 
-                        start: 0, 
-                        width: src_width
-                    };
-                    block.mix_with_final(src_fb, coordinate, &mut self.caches)?;
+                    let block = Block::new(i, 0, src_width);
+                    block.mix_with(src_fb, final_fb.deref_mut(), coordinate, &mut self.caches)?;
                 }
             } else {
                 let updates = match frame_buffer_updates.updates {
@@ -151,8 +94,9 @@ impl Compositor<BlockCache> for FrameCompositor {
                     } 
                 };
                 for item in updates {
-                    item.mix_with_final(
+                    item.mix_with(
                         frame_buffer_updates.framebuffer,
+                        final_fb.deref_mut(),
                         frame_buffer_updates.coordinate,
                         &mut self.caches
                     )?;
@@ -170,7 +114,7 @@ impl Compositor<BlockCache> for FrameCompositor {
 /// # Arguments
 /// * `framebuffer`: the framebuffer to composite.
 /// * `area`: the updated area in this framebuffer.
-pub fn get_blocks(framebuffer: &dyn FrameBuffer, area: &mut Rectangle) -> Vec<Box<dyn Mixer<BlockCache>>> {
+pub fn get_blocks(framebuffer: &dyn FrameBuffer, area: &mut Rectangle) -> Vec<Box<dyn Mixer>> {
     let mut blocks = Vec::new();
     let (width, height) = framebuffer.get_size();
 
@@ -209,147 +153,5 @@ fn hash<T: Hash>(block: T) -> u64 {
     let mut hasher = builder.build_hasher();
     block.hash(&mut hasher);
     hasher.finish()
-}
-
-/// Checks if a coordinate is in the cache list.
-fn is_in_cache(block: &[u32], coordinate: &Coord, caches: &BTreeMap<Coord, BlockCache>) -> bool {
-    match caches.get(coordinate) {
-        Some(cache) => {
-            // The same hash means the array of two blocks are the same. Since all blocks are of the same height, two blocks of the same array must share the same width. And if their contents are the same, their content_width must be the same, too.
-            return cache.content_hash == hash(block)
-        }
-        None => return false,
-    }
-}
-
-impl Mixer<BlockCache> for Block {
-    fn mix_with_final(
-        &self, 
-        src_fb: &dyn FrameBuffer, 
-        src_coord: Coord,
-        caches: &mut BTreeMap<Coord, BlockCache>
-    ) -> Result<(), &'static str> {
-        let mut final_fb = FINAL_FRAME_BUFFER
-            .try()
-            .ok_or("FrameCompositor fails to get the final frame buffer")?
-            .lock();
-        let (final_width, final_height) = final_fb.get_size();
-        let (src_width, src_height) = src_fb.get_size();
-        let src_buffer_len = src_width * src_height;
-        let block_pixels = CACHE_BLOCK_HEIGHT * src_width;
-
-        // The start pixel of the block
-        let start_index = block_pixels * self.index;
-        let coordinate_start = src_coord + (0, (CACHE_BLOCK_HEIGHT * self.index) as isize);
-        
-        // The end pixel of the block
-        let mut end_index = start_index + block_pixels;
-        let coordinate_end;
-        if end_index <= src_buffer_len {
-            coordinate_end = coordinate_start + (src_width as isize, CACHE_BLOCK_HEIGHT as isize);
-        } else {
-            end_index = src_buffer_len;
-            coordinate_end = src_coord + (src_width as isize, src_height as isize);
-        }
-
-        let block_content = &src_fb.buffer()[start_index..end_index];
-        // Skip if a block is already cached
-        if is_in_cache(&block_content, &coordinate_start, caches) {
-            return Ok(());
-        }
-
-        // find overlapped caches
-        // extend the width of the updated part to the right side of the cached block content
-        // remove caches of the same location
-        let new_cache = BlockCache {
-            content_hash: hash(block_content),
-            coordinate: coordinate_start,
-            width: src_width,
-            block: Block {
-                index: 0,
-                start: self.start,
-                width: self.width,
-            }
-        };
-        let keys: Vec<_> = caches.keys().cloned().collect();
-        for key in keys {
-            if let Some(cache) = caches.get_mut(&key) {
-                if cache.overlaps_with(&new_cache) {
-                    if cache.coordinate == new_cache.coordinate  && cache.width == new_cache.width {
-                        caches.remove(&key);
-                    } else {
-                        cache.content_hash = 0;
-                    }
-                }
-            };
-        }
-
-        // skip if the block is not in the screen
-        if coordinate_end.x < 0
-            || coordinate_start.x > final_width as isize
-            || coordinate_end.y < 0
-            || coordinate_start.y > final_height as isize
-        {
-            return Ok(());
-        }
-
-        let final_x_start = core::cmp::max(0, coordinate_start.x) as usize;
-        let final_y_start = core::cmp::max(0, coordinate_start.y) as usize;
-
-        // just draw the part which is within the final buffer
-        // Wenqiu: TODO Optimize Later
-        let width = core::cmp::min(
-            core::cmp::min(coordinate_end.x as usize, final_width) - final_x_start,
-            new_cache.block.width + new_cache.block.start,
-        ) - new_cache.block.start;
-        let height = core::cmp::min(coordinate_end.y as usize, final_height) - final_y_start;
-
-        // copy every line of the block to the final framebuffer.
-        // let src_buffer = src_fb.buffer();
-        for i in 0..height {
-            let dest_start = (final_y_start + i) * final_width + final_x_start + new_cache.block.start;
-            let src_start = src_width * ((final_y_start + i) as isize - coordinate_start.y) as usize
-                + (final_x_start as isize - coordinate_start.x) as usize + new_cache.block.start;
-            let src_end = src_start + width;
-            final_fb.composite_buffer(&(block_content[src_start..src_end]), dest_start);
-        }
-
-        // insert the new cache
-        caches.insert(coordinate_start, new_cache);
-
-        Ok(())
-    }
-}
-
-impl Mixer<BlockCache> for Coord {
-    fn mix_with_final(
-        &self, 
-        src_fb: &dyn FrameBuffer, 
-        src_coord: Coord,        
-        _caches: &mut BTreeMap<Coord, BlockCache>
-    ) -> Result<(), &'static str>{
-        let relative_coord = self.clone() - src_coord;
-        if src_fb.contains(relative_coord) {
-            let pixel = src_fb.get_pixel(relative_coord)?;
-            let mut final_fb = FINAL_FRAME_BUFFER
-                .try()
-                .ok_or("FrameCompositor fails to get the final frame buffer")?
-                .lock();
-            final_fb.draw_pixel(self.clone(), pixel);
-        }
-
-        // remove the cache containing the pixel
-        // let keys: Vec<_> = caches.keys().cloned().collect();
-        // for key in keys {
-        //     if let Some(cache) = caches.get_mut(&key) {
-        //         if cache.contains(self.clone()) {
-        //             caches.remove(&key);
-        //             break;
-        //         }
-        //     };
-        // }
-
-        Ok(())
-    }
 }
 

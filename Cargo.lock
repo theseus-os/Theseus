@@ -284,6 +284,7 @@ name = "compositor"
 version = "0.1.0"
 dependencies = [
  "frame_buffer 0.1.0",
+ "hashbrown 0.1.8 (registry+https://github.com/rust-lang/crates.io-index)",
 ]
 
 [[package]]

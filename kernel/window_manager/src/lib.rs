@@ -31,12 +31,12 @@ use alloc::collections::VecDeque;
 use alloc::string::{String, ToString};
 use alloc::sync::{Arc, Weak};
 use alloc::vec::{Vec};
-use compositor::{Compositor, FrameBufferUpdates, Mixer};
+use compositor::{Compositor, FrameBufferUpdates, Mixer, Block};
 use core::ops::{Deref, DerefMut};
 use mpmc::Queue;
 use event_types::{Event, MousePositionEvent};
 use frame_buffer::{Coord, FrameBuffer, Pixel, Rectangle};
-use frame_buffer_compositor::{FRAME_COMPOSITOR, BlockCache};
+use frame_buffer_compositor::{FRAME_COMPOSITOR};
 use keycodes_ascii::{KeyAction, KeyEvent, Keycode};
 use mouse_data::MouseEvent;
 use path::Path;
@@ -221,7 +221,7 @@ impl WindowManager {
     }
 
     /// Refresh the pixels in `update_coords`. Only render the bottom final framebuffer and windows. Ignore the top buffer.
-    pub fn refresh_bottom_windows_pixels(&self, pixels: &[Box<dyn Mixer<BlockCache>>]) -> Result<(), &'static str> {
+    pub fn refresh_bottom_windows_pixels(&self, pixels: &[Box<dyn Mixer>]) -> Result<(), &'static str> {
         let bottom_fb = FrameBufferUpdates {
             framebuffer: self.bottom_fb.deref(),
             coordinate: Coord::new(0, 0),
@@ -274,7 +274,7 @@ impl WindowManager {
     }
 
     /// Refresh the pixels in the top framebuffer
-    pub fn refresh_top_pixels(&self, pixels: &[Box<dyn Mixer<BlockCache>>]) -> Result<(), &'static str> {
+    pub fn refresh_top_pixels(&self, pixels: &[Box<dyn Mixer>]) -> Result<(), &'static str> {
         let top_buffer = FrameBufferUpdates {
             framebuffer: self.top_fb.deref(),
             coordinate: Coord::new(0, 0),
@@ -285,7 +285,7 @@ impl WindowManager {
     }
 
     /// Refresh the all the pixels including the bottom framebuffer, the windows and the top framebuffer.
-    pub fn refresh_pixels(&self, pixels: &[Box<dyn Mixer<BlockCache>>]) -> Result<(), &'static str> {
+    pub fn refresh_pixels(&self, pixels: &[Box<dyn Mixer>]) -> Result<(), &'static str> {
         self.refresh_bottom_windows_pixels(pixels)?;
         self.refresh_top_pixels(pixels)?;
         Ok(())
@@ -563,8 +563,8 @@ impl WindowManager {
 
     /// draw the floating border with color. Return pixels of the border.
     /// `start` and `end` indicates the top-left and bottom-right corner of the border.
-    fn draw_floating_border(&mut self, top_left: Coord, bottom_right: Coord, color: Pixel) -> Vec<Box<dyn Mixer<BlockCache>>> {
-        let mut pixels: Vec<Box<dyn Mixer<BlockCache>>> = Vec::new();
+    fn draw_floating_border(&mut self, top_left: Coord, bottom_right: Coord, color: Pixel) -> Vec<Box<dyn Mixer>> {
+        let mut pixels: Vec<Box<dyn Mixer>> = Vec::new();
 
         for i in 0..(WINDOW_BORDER_SIZE) as isize {
             let width = (bottom_right.x - top_left.x) - 2 * i;
@@ -731,8 +731,8 @@ impl WindowManager {
     }
 
     /// Get the pixels occupied by current mouse.
-    fn get_mouse_coords(&self) -> Vec<Box<dyn Mixer<BlockCache>>> {
-        let mut result: Vec<Box<dyn Mixer<BlockCache>>> = Vec::new();
+    fn get_mouse_coords(&self) -> Vec<Box<dyn Mixer>> {
+        let mut result: Vec<Box<dyn Mixer>> = Vec::new();
         for i in 6..15 {
             for j in 6..15 {
                 if MOUSE_BASIC[i][j] != T {
