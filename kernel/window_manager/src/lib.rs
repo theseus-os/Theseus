@@ -30,13 +30,13 @@ use alloc::boxed::Box;
 use alloc::collections::VecDeque;
 use alloc::string::{String, ToString};
 use alloc::sync::{Arc, Weak};
-use alloc::vec::{Vec, IntoIter};
+use alloc::vec::{Vec};
 use compositor::{Compositor, FrameBufferUpdates, Mixer};
 use core::ops::{Deref, DerefMut};
 use mpmc::Queue;
 use event_types::{Event, MousePositionEvent};
 use frame_buffer::{Coord, FrameBuffer, Pixel, Rectangle};
-use frame_buffer_compositor::{FRAME_COMPOSITOR, Block, BlockCache};
+use frame_buffer_compositor::{FRAME_COMPOSITOR, BlockCache};
 use keycodes_ascii::{KeyAction, KeyEvent, Keycode};
 use mouse_data::MouseEvent;
 use path::Path;
@@ -221,14 +221,14 @@ impl WindowManager {
     }
 
     /// Refresh the pixels in `update_coords`. Only render the bottom final framebuffer and windows. Ignore the top buffer.
-    pub fn refresh_bottom_windows_pixels(&self, pixels: &[Box<Mixer<BlockCache>>]) -> Result<(), &'static str> {
+    pub fn refresh_bottom_windows_pixels(&self, pixels: &[Box<dyn Mixer<BlockCache>>]) -> Result<(), &'static str> {
         let bottom_fb = FrameBufferUpdates {
             framebuffer: self.bottom_fb.deref(),
             coordinate: Coord::new(0, 0),
-            updates: Some(pixels.clone())
+            updates: Some(pixels)
         };
 
-        FRAME_COMPOSITOR.lock().composite(vec![bottom_fb].into_iter())?;
+        FRAME_COMPOSITOR.lock().composite(vec![bottom_fb].as_slice())?;
 
         for window_ref in &self.hide_list {
             if let Some(window_mutex) = window_ref.upgrade() {
@@ -237,10 +237,10 @@ impl WindowManager {
                 let buffer_blocks = FrameBufferUpdates {
                     framebuffer: framebuffer.deref(),
                     coordinate: window.get_position(),
-                    updates: Some(pixels.clone())
+                    updates: Some(pixels)
                 };
 
-                FRAME_COMPOSITOR.lock().composite(vec![buffer_blocks].into_iter())?;
+                FRAME_COMPOSITOR.lock().composite(vec![buffer_blocks].as_slice())?;
            }
         }
 
@@ -251,10 +251,10 @@ impl WindowManager {
                 let buffer_blocks = FrameBufferUpdates {
                     framebuffer: framebuffer.deref(),
                     coordinate: window.get_position(),
-                    updates: Some(pixels.clone())
+                    updates: Some(pixels)
                 };
 
-                FRAME_COMPOSITOR.lock().composite(vec![buffer_blocks].into_iter())?;
+                FRAME_COMPOSITOR.lock().composite(vec![buffer_blocks].as_slice())?;
            }
         }
 
@@ -267,25 +267,25 @@ impl WindowManager {
                 updates: Some(pixels)
             }; 
 
-            FRAME_COMPOSITOR.lock().composite(vec![buffer_blocks].into_iter())?;
+            FRAME_COMPOSITOR.lock().composite(vec![buffer_blocks].as_slice())?;
         }
 
         Ok(())
     }
 
     /// Refresh the pixels in the top framebuffer
-    pub fn refresh_top_pixels(&self, pixels: &[Box<Mixer<BlockCache>>]) -> Result<(), &'static str> {
+    pub fn refresh_top_pixels(&self, pixels: &[Box<dyn Mixer<BlockCache>>]) -> Result<(), &'static str> {
         let top_buffer = FrameBufferUpdates {
             framebuffer: self.top_fb.deref(),
             coordinate: Coord::new(0, 0),
             updates: Some(pixels)
         }; 
 
-        FRAME_COMPOSITOR.lock().composite(vec![top_buffer].into_iter())
+        FRAME_COMPOSITOR.lock().composite(vec![top_buffer].as_slice())
     }
 
     /// Refresh the all the pixels including the bottom framebuffer, the windows and the top framebuffer.
-    pub fn refresh_pixels(&self, pixels: &[Box<Mixer<BlockCache>>]) -> Result<(), &'static str> {
+    pub fn refresh_pixels(&self, pixels: &[Box<dyn Mixer<BlockCache>>]) -> Result<(), &'static str> {
         self.refresh_bottom_windows_pixels(pixels)?;
         self.refresh_top_pixels(pixels)?;
         Ok(())
@@ -333,7 +333,7 @@ impl WindowManager {
                     updates: updates
                 };
 
-                FRAME_COMPOSITOR.lock().composite(vec![buffer_blocks].into_iter())?;
+                FRAME_COMPOSITOR.lock().composite(vec![buffer_blocks].as_slice())?;
            }
         }
 
@@ -365,7 +365,7 @@ impl WindowManager {
                     updates: updates
                 };
 
-                FRAME_COMPOSITOR.lock().composite(vec![buffer_blocks].into_iter())?;
+                FRAME_COMPOSITOR.lock().composite(vec![buffer_blocks].as_slice())?;
            }
         }
 
@@ -394,7 +394,7 @@ impl WindowManager {
                     updates: updates
                 }; 
 
-                FRAME_COMPOSITOR.lock().composite(vec![buffer_blocks].into_iter())?;
+                FRAME_COMPOSITOR.lock().composite(vec![buffer_blocks].as_slice())?;
             }
         }
        
@@ -405,7 +405,7 @@ impl WindowManager {
     /// Refresh the part of bottom framebuffer and every window in `area`. Refresh the whole screen if area is None. 
     pub fn refresh_bottom_windows(&self, area: Option<Rectangle>, active: bool) -> Result<(), &'static str> {
         let update_all = area.is_none();
-        let mut update_area = Rectangle {
+        let update_area = Rectangle {
             top_left: Coord::new(0, 0),
             bottom_right: Coord::new(0, 0),
         };
@@ -430,7 +430,7 @@ impl WindowManager {
             updates: updates
         }; 
 
-        FRAME_COMPOSITOR.lock().composite(vec![bg_buffer].into_iter())?;
+        FRAME_COMPOSITOR.lock().composite(vec![bg_buffer].as_slice())?;
 
         let area_obj = if update_all{
             None
@@ -462,7 +462,7 @@ impl WindowManager {
             updates: updates
         }; 
 
-        FRAME_COMPOSITOR.lock().composite(vec![top_buffer].into_iter())
+        FRAME_COMPOSITOR.lock().composite(vec![top_buffer].as_slice())
     }
     
     /// pass keyboard event to currently active window
@@ -556,8 +556,7 @@ impl WindowManager {
         bottom_right: Coord,
     ) -> Result<(), &'static str> {
         // first clear old border if exists
-        let old_border = self.repositioned_border.clone();
-        match old_border {
+        match self.repositioned_border {
             Some(border) => {
                 let pixels = self.draw_floating_border(border.top_left, border.bottom_right, T);
                 self.refresh_bottom_windows_pixels(pixels.as_slice())?;
@@ -579,8 +578,8 @@ impl WindowManager {
 
     /// draw the floating border with color. Return pixels of the border.
     /// `start` and `end` indicates the top-left and bottom-right corner of the border.
-    fn draw_floating_border(&mut self, top_left: Coord, bottom_right: Coord, color: Pixel) -> Vec<Box<Mixer<BlockCache>>> {
-        let mut pixels: Vec<Box<Mixer<BlockCache>>> = Vec::new();
+    fn draw_floating_border(&mut self, top_left: Coord, bottom_right: Coord, color: Pixel) -> Vec<Box<dyn Mixer<BlockCache>>> {
+        let mut pixels: Vec<Box<dyn Mixer<BlockCache>>> = Vec::new();
 
         for i in 0..(WINDOW_BORDER_SIZE) as isize {
             let width = (bottom_right.x - top_left.x) - 2 * i;
@@ -747,8 +746,8 @@ impl WindowManager {
     }
 
     /// Get the pixels occupied by current mouse.
-    fn get_mouse_coords(&self) -> Vec<Box<Mixer<BlockCache>>> {
-        let mut result: Vec<Box<Mixer<BlockCache>>> = Vec::new();
+    fn get_mouse_coords(&self) -> Vec<Box<dyn Mixer<BlockCache>>> {
+        let mut result: Vec<Box<dyn Mixer<BlockCache>>> = Vec::new();
         for i in 6..15 {
             for j in 6..15 {
                 if MOUSE_BASIC[i][j] != T {
@@ -805,13 +804,11 @@ pub fn init<Buffer: FrameBuffer + Send>(
     win.refresh_bottom_windows(None, false)?;
 
     // keyinput queue initialization
-    let keyboard_event_handling_queue: Queue<Event> = Queue::with_capacity(100);
-    let key_consumer = keyboard_event_handling_queue.clone();
+    let key_consumer: Queue<Event> = Queue::with_capacity(100);
     let key_producer = key_consumer.clone();
 
     // mouse input queue initialization
-    let mouse_event_handling_queue: Queue<Event> = Queue::with_capacity(100);
-    let mouse_consumer = mouse_event_handling_queue.clone();
+    let mouse_consumer: Queue<Event> = Queue::with_capacity(100);
     let mouse_producer = mouse_consumer.clone();
 
     KernelTaskBuilder::new(window_manager_loop, (key_consumer, mouse_consumer))
@@ -838,9 +835,7 @@ fn window_manager_loop(
                     }
                 },
             };
-            let event = ev.clone();
-            //ev.mark_completed();
-            event
+            ev
         };
 
         // event could be either key input or mouse input

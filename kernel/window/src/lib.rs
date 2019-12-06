@@ -42,7 +42,7 @@ use displayable::Displayable;
 use event_types::{Event, MousePositionEvent};
 use frame_buffer::{Coord, FrameBuffer, Pixel, Rectangle};
 use frame_buffer_alpha::{PixelMixer, BLACK};
-use frame_buffer_compositor::{FRAME_COMPOSITOR, Block};
+use frame_buffer_compositor::{FRAME_COMPOSITOR};
 use memory_structs::PhysicalAddress;
 use spin::Mutex;
 use window_view::WindowView;
@@ -180,7 +180,7 @@ impl Window {
                 updates: None,
             };
 
-            FRAME_COMPOSITOR.lock().composite(vec![buffer_blocks].into_iter())?;
+            FRAME_COMPOSITOR.lock().composite(vec![buffer_blocks].as_slice())?;
         }
 
         Ok(window)
@@ -538,7 +538,7 @@ impl Window {
             coordinate: profile.coordinate,
             updates: None,
         };
-        FRAME_COMPOSITOR.lock().composite(vec![frame_buffer_blocks].into_iter())?;
+        FRAME_COMPOSITOR.lock().composite(vec![frame_buffer_blocks].as_slice())?;
 
         Ok(())
     }

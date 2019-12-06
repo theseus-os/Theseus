@@ -31,7 +31,7 @@ extern crate lazy_static;
 extern crate hashbrown;
 
 use alloc::collections::BTreeMap;
-use alloc::vec::{Vec, IntoIter};
+use alloc::vec::{Vec};
 use alloc::boxed::Box;
 use core::hash::{Hash, Hasher, BuildHasher};
 use hashbrown::hash_map::{DefaultHashBuilder};
@@ -124,16 +124,16 @@ impl Block {
 impl Compositor<BlockCache> for FrameCompositor {
     fn composite(
         &mut self,
-        mut bufferlist: IntoIter<FrameBufferUpdates<'_, BlockCache>>,
+        bufferlist: &[FrameBufferUpdates<'_, BlockCache>],
     ) -> Result<(), &'static str> {
 
-        while let Some(frame_buffer_blocks) = bufferlist.next() {
-            let src_fb = frame_buffer_blocks.framebuffer;
-            let coordinate = frame_buffer_blocks.coordinate;
+        for frame_buffer_updates in bufferlist {
+            let src_fb = frame_buffer_updates.framebuffer;
+            let coordinate = frame_buffer_updates.coordinate;
             let (src_width, src_height) = src_fb.get_size();
 
             // Handle all blocks if the updated blocks parameter is None 
-            if frame_buffer_blocks.updates.is_none() {
+            if frame_buffer_updates.updates.is_none() {
                 let block_number = (src_height - 1) / CACHE_BLOCK_HEIGHT + 1;
                 for i in 0.. block_number {
                     let block = Block {
@@ -144,7 +144,7 @@ impl Compositor<BlockCache> for FrameCompositor {
                     block.mix_with_final(src_fb, coordinate, &mut self.caches)?;
                 }
             } else {
-                let mut updates = match frame_buffer_blocks.updates {
+                let updates = match frame_buffer_updates.updates {
                     Some(updates) => { updates },
                     None => {
                         continue;
@@ -152,8 +152,8 @@ impl Compositor<BlockCache> for FrameCompositor {
                 };
                 for item in updates {
                     item.mix_with_final(
-                        frame_buffer_blocks.framebuffer,
-                        frame_buffer_blocks.coordinate,
+                        frame_buffer_updates.framebuffer,
+                        frame_buffer_updates.coordinate,
                         &mut self.caches
                     )?;
                 }
@@ -170,7 +170,7 @@ impl Compositor<BlockCache> for FrameCompositor {
 /// # Arguments
 /// * `framebuffer`: the framebuffer to composite.
 /// * `area`: the updated area in this framebuffer.
-pub fn get_blocks(framebuffer: &dyn FrameBuffer, area: &mut Rectangle) -> Vec<Box<Mixer<BlockCache>>> {
+pub fn get_blocks(framebuffer: &dyn FrameBuffer, area: &mut Rectangle) -> Vec<Box<dyn Mixer<BlockCache>>> {
     let mut blocks = Vec::new();
     let (width, height) = framebuffer.get_size();
 
