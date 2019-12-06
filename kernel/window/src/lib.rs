@@ -180,7 +180,7 @@ impl Window {
                 updates: None,
             };
 
-            FRAME_COMPOSITOR.lock().composite::<Block>(vec![buffer_blocks].into_iter())?;
+            FRAME_COMPOSITOR.lock().composite(vec![buffer_blocks].into_iter())?;
         }
 
         Ok(window)
@@ -538,9 +538,7 @@ impl Window {
             coordinate: profile.coordinate,
             updates: None,
         };
-        FRAME_COMPOSITOR
-            .lock()
-            .composite::<Block>(vec![frame_buffer_blocks].into_iter())?;
+        FRAME_COMPOSITOR.lock().composite(vec![frame_buffer_blocks].into_iter())?;
 
         Ok(())
     }

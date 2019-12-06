@@ -32,6 +32,7 @@ extern crate hashbrown;
 
 use alloc::collections::BTreeMap;
 use alloc::vec::{Vec, IntoIter};
+use alloc::boxed::Box;
 use core::hash::{Hash, Hasher, BuildHasher};
 use hashbrown::hash_map::{DefaultHashBuilder};
 use compositor::{Compositor, FrameBufferUpdates, Mixer, Cache};
@@ -121,9 +122,9 @@ impl Block {
 }
 
 impl Compositor<BlockCache> for FrameCompositor {
-    fn composite<T: Mixer<BlockCache>>(
+    fn composite(
         &mut self,
-        mut bufferlist: IntoIter<FrameBufferUpdates<T>>,
+        mut bufferlist: IntoIter<FrameBufferUpdates<'_, BlockCache>>,
     ) -> Result<(), &'static str> {
 
         while let Some(frame_buffer_blocks) = bufferlist.next() {
@@ -143,14 +144,14 @@ impl Compositor<BlockCache> for FrameCompositor {
                     block.mix_with_final(src_fb, coordinate, &mut self.caches)?;
                 }
             } else {
-                let mut blocks = match frame_buffer_blocks.updates {
-                    Some(blocks) => { blocks },
+                let mut updates = match frame_buffer_blocks.updates {
+                    Some(updates) => { updates },
                     None => {
                         continue;
                     } 
                 };
-                while let Some(coordinate) = blocks.next() {
-                    coordinate.mix_with_final(
+                for item in updates {
+                    item.mix_with_final(
                         frame_buffer_blocks.framebuffer,
                         frame_buffer_blocks.coordinate,
                         &mut self.caches
@@ -169,7 +170,7 @@ impl Compositor<BlockCache> for FrameCompositor {
 /// # Arguments
 /// * `framebuffer`: the framebuffer to composite.
 /// * `area`: the updated area in this framebuffer.
-pub fn get_blocks(framebuffer: &dyn FrameBuffer, area: &mut Rectangle) -> Vec<Block> {
+pub fn get_blocks(framebuffer: &dyn FrameBuffer, area: &mut Rectangle) -> Vec<Box<Mixer<BlockCache>>> {
     let mut blocks = Vec::new();
     let (width, height) = framebuffer.get_size();
 
@@ -194,7 +195,7 @@ pub fn get_blocks(framebuffer: &dyn FrameBuffer, area: &mut Rectangle) -> Vec<Bl
             break;
         }
         let block = Block::new(index, start_x as usize, width);
-        blocks.push(block);
+        blocks.push(Box::new(block));
         index += 1;
     }
     area.bottom_right.y = core::cmp::max((index * CACHE_BLOCK_HEIGHT) as isize, area.bottom_right.y);

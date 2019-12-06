@@ -10,6 +10,7 @@ extern crate frame_buffer;
 use alloc::vec::{IntoIter};
 use frame_buffer::{Coord, FrameBuffer};
 use alloc::collections::BTreeMap;
+use alloc::boxed::Box;
 
 /// The compositor trait.
 /// A compositor composites a list of buffers to a single buffer. It caches the information of incoming buffers for better performance.
@@ -20,21 +21,21 @@ pub trait Compositor<T: Cache> {
     /// # Arguments
     ///
     /// * `bufferlist` - A list of information about the buffers to be composited. The list is of generic type so that we can implement various compositor with different information. `U` specifices the type of item to update in compositing. It can be a rectangle block or a point.
-    fn composite<U: Mixer<T>>(
+    fn composite(
         &mut self,
-        bufferlist: IntoIter<FrameBufferUpdates<'_, U>>,
+        bufferlist: IntoIter<FrameBufferUpdates<'_, T>>,
     ) -> Result<(), &'static str>;
 }
 
 
 /// The framebuffers to be composited together with the information of their updated blocks.
-pub struct FrameBufferUpdates<'a, T> {
+pub struct FrameBufferUpdates<'a, T: Cache> {
     /// The framebuffer to be composited.
     pub framebuffer: &'a dyn FrameBuffer,
     /// The coordinate of the framebuffer where it is rendered to the final framebuffer.
     pub coordinate: Coord,
     /// The updated blocks of the framebuffer. If `blocks` is `None`, the compositor would handle all the blocks of the framebuffer.
-    pub updates: Option<IntoIter<T>>,
+    pub updates: Option<&'a [Box<Mixer<T>>]>,
 }
 
 /// A mixer is an item that can be mixed with the final framebuffer. A compositor can mix a list of shaped items with the final framebuffer rather than mix the whole framebuffer for better performance.
