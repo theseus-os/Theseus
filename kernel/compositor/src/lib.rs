@@ -21,7 +21,7 @@ pub const CACHE_BLOCK_HEIGHT:usize = 16;
 /// The compositor trait.
 /// A compositor composites a list of buffers to a single buffer. It caches the information of incoming buffers for better performance.
 /// `T` is the type of cache used in this framebuffer.
-pub trait Compositor {
+pub trait Compositor<T: Mixer> {
     /// Composites the buffers in the bufferlist.
     ///
     /// # Arguments
@@ -29,19 +29,19 @@ pub trait Compositor {
     /// * `bufferlist` - A list of information about the buffers to be composited. The list is of generic type so that we can implement various compositor with different information. `U` specifices the type of item to update in compositing. It can be a rectangle block or a point.
     fn composite(
         &mut self,
-        bufferlist: &[FrameBufferUpdates<'_>],
+        bufferlist: &[FrameBufferUpdates<'_, T>],
     ) -> Result<(), &'static str>;
 }
 
 
 /// The framebuffers to be composited together with the information of their updated blocks.
-pub struct FrameBufferUpdates<'a> {
+pub struct FrameBufferUpdates<'a, T: Mixer> {
     /// The framebuffer to be composited.
     pub framebuffer: &'a dyn FrameBuffer,
     /// The coordinate of the framebuffer where it is rendered to the final framebuffer.
     pub coordinate: Coord,
     /// The updated blocks of the framebuffer. If `blocks` is `None`, the compositor would handle all the blocks of the framebuffer.
-    pub updates: Option<&'a [Box<dyn Mixer>]>,
+    pub updates: Option<&'a [T]>,
 }
 
 impl Block {

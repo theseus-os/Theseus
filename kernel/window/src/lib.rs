@@ -175,7 +175,7 @@ impl Window {
             window.show_button(TopButton::Close, 1, &mut view);
             window.show_button(TopButton::MinimizeMaximize, 1, &mut view);
             window.show_button(TopButton::Hide, 1, &mut view);
-            let buffer_blocks = FrameBufferUpdates {
+            let buffer_blocks: FrameBufferUpdates<Block> = FrameBufferUpdates {
                 framebuffer: view.framebuffer.deref(),
                 coordinate: coordinate,
                 updates: None,
@@ -532,9 +532,7 @@ impl Window {
     /// refresh the top left three button's appearance
     fn refresh_three_button(&self) -> Result<(), &'static str> {
         let view = self.view.lock();
-        let block: Vec<Box<dyn Mixer>> = vec![Box::new(
-            Block::new(0, 0, view.get_size().0)
-        )];
+        let block: Vec<Block> = vec![Block::new(0, 0, view.get_size().0)];
         let frame_buffer_blocks = FrameBufferUpdates {
             framebuffer: view.framebuffer.deref(),
             coordinate: view.coordinate,

@@ -64,10 +64,55 @@ pub struct FrameCompositor {
 ///
 /// After compositing, the compositor will cache the updated blocks. In the next time, for every block in a framebuffer, the compositor will ignore it if it is alreday cached.
 
-impl Compositor for FrameCompositor {
+impl Compositor<Block> for FrameCompositor {
     fn composite(
         &mut self,
-        bufferlist: &[FrameBufferUpdates<'_>],
+        bufferlist: &[FrameBufferUpdates<'_, Block>],
+    ) -> Result<(), &'static str> {
+        let mut final_fb = FINAL_FRAME_BUFFER
+            .try()
+            .ok_or("FrameCompositor fails to get the final frame buffer")?
+            .lock();
+
+        for frame_buffer_updates in bufferlist {
+            let src_fb = frame_buffer_updates.framebuffer;
+            let coordinate = frame_buffer_updates.coordinate;
+            let (src_width, src_height) = src_fb.get_size();
+
+            // Handle all blocks if the updated blocks parameter is None 
+            if frame_buffer_updates.updates.is_none() {
+                let block_number = (src_height - 1) / CACHE_BLOCK_HEIGHT + 1;
+                for i in 0.. block_number {
+                    let block = Block::new(i, 0, src_width);
+                    block.mix_with(src_fb, final_fb.deref_mut(), coordinate, &mut self.caches)?;
+                }
+            } else {
+                let updates = match frame_buffer_updates.updates {
+                    Some(updates) => { updates },
+                    None => {
+                        continue;
+                    } 
+                };
+                for item in updates {
+                    item.mix_with(
+                        frame_buffer_updates.framebuffer,
+                        final_fb.deref_mut(),
+                        frame_buffer_updates.coordinate,
+                        &mut self.caches
+                    )?;
+                }
+            }
+
+        }
+
+        Ok(())
+    }
+}
+
+impl Compositor<Coord> for FrameCompositor {
+    fn composite(
+        &mut self,
+        bufferlist: &[FrameBufferUpdates<'_, Coord>],
     ) -> Result<(), &'static str> {
         let mut final_fb = FINAL_FRAME_BUFFER
             .try()
@@ -114,7 +159,7 @@ impl Compositor for FrameCompositor {
 /// # Arguments
 /// * `framebuffer`: the framebuffer to composite.
 /// * `area`: the updated area in this framebuffer.
-pub fn get_blocks(framebuffer: &dyn FrameBuffer, area: &mut Rectangle) -> Vec<Box<dyn Mixer>> {
+pub fn get_blocks(framebuffer: &dyn FrameBuffer, area: &mut Rectangle) -> Vec<Block> {
     let mut blocks = Vec::new();
     let (width, height) = framebuffer.get_size();
 
@@ -139,19 +184,11 @@ pub fn get_blocks(framebuffer: &dyn FrameBuffer, area: &mut Rectangle) -> Vec<Bo
             break;
         }
         let block = Block::new(index, start_x as usize, width);
-        blocks.push(Box::new(block));
+        blocks.push(block);
         index += 1;
     }
     area.bottom_right.y = core::cmp::max((index * CACHE_BLOCK_HEIGHT) as isize, area.bottom_right.y);
 
     blocks
-}
-
-/// Get the hash of a cache block
-fn hash<T: Hash>(block: T) -> u64 {
-    let builder = DefaultHashBuilder::default();
-    let mut hasher = builder.build_hasher();
-    block.hash(&mut hasher);
-    hasher.finish()
 }
 
