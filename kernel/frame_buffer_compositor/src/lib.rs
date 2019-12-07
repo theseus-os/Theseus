@@ -142,7 +142,7 @@ impl<'a> Compositor<'a, Block> for FrameCompositor {
         let mut final_fb = FINAL_FRAME_BUFFER.try().ok_or("FrameCompositor fails to get the final frame buffer")?.lock();
         let (final_width, final_height) = final_fb.get_size();
 
-        // Define a closure to check the cache of every block and render it. We need to reuse it in different branches.
+        // Define a closure to check if a block is cached and render it. We need to reuse it in different branches.
         let mut cache_check_and_mix = |src_fb: &dyn FrameBuffer, coordinate, item: Block| -> Result<(), &'static str> {
             let (src_width, src_height) = src_fb.get_size();
             let src_buffer_len = src_width * src_height;
@@ -205,7 +205,6 @@ impl<'a> Compositor<'a, Block> for FrameCompositor {
             let src_fb = frame_buffer_updates.framebuffer;
             let coordinate = frame_buffer_updates.coordinate;
 
-            // Handle all blocks if the updated blocks parameter is None 
             let updates = match frame_buffer_updates.updates {
                 Some(updates) => { 
                     for item in updates {
@@ -213,6 +212,7 @@ impl<'a> Compositor<'a, Block> for FrameCompositor {
                     } 
                 },
                 None => {
+                    // Update the whole screen if the caller does not specify the blocks
                     let (src_width, src_height) = frame_buffer_updates.framebuffer.get_size();
                     let block_number = (src_height - 1) / CACHE_BLOCK_HEIGHT + 1;
                     for i in 0.. block_number {
