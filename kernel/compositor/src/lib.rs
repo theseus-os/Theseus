@@ -9,6 +9,7 @@ extern crate frame_buffer;
 extern crate hashbrown;
 
 use core::hash::{Hash, Hasher, BuildHasher};
+use core::iter::Iterator;
 use hashbrown::hash_map::{DefaultHashBuilder};
 use frame_buffer::{Coord, FrameBuffer};
 use alloc::collections::BTreeMap;
@@ -18,7 +19,7 @@ use alloc::vec::Vec;
 /// The compositor trait.
 /// A compositor composites a list of buffers to a single buffer. It caches the information of incoming buffers for better performance.
 /// `T` is the type of cache used in this framebuffer.
-pub trait Compositor<T: Mixer> {
+pub trait Compositor<'a, T: 'a + Mixer> {
     /// Composites the buffers in the bufferlist.
     ///
     /// # Arguments
@@ -26,7 +27,7 @@ pub trait Compositor<T: Mixer> {
     /// * `bufferlist` - A list of information about the buffers to be composited. The list is of generic type so that we can implement various compositor with different information. `U` specifices the type of item to update in compositing. It can be a rectangle block or a point.
     fn composite(
         &mut self,
-        bufferlist: &[FrameBufferUpdates<'_, T>],
+        mut bufferlist: impl Iterator<Item = FrameBufferUpdates<'a, T>>,
     ) -> Result<(), &'static str>;
 }
 

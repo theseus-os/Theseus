@@ -181,7 +181,7 @@ impl Window {
                 updates: None,
             };
 
-            FRAME_COMPOSITOR.lock().composite(vec![buffer_blocks].as_slice())?;
+            FRAME_COMPOSITOR.lock().composite(vec![buffer_blocks].into_iter())?;
         }
 
         Ok(window)
@@ -538,7 +538,7 @@ impl Window {
             coordinate: view.coordinate,
             updates: Some(block.as_slice()),
         };
-        FRAME_COMPOSITOR.lock().composite(vec![frame_buffer_blocks].as_slice())?;
+        FRAME_COMPOSITOR.lock().composite(vec![frame_buffer_blocks].into_iter())?;
 
         Ok(())
     }

@@ -134,17 +134,17 @@ impl FrameCompositor {
     }
 }
 
-impl Compositor<Block> for FrameCompositor {
+impl<'a> Compositor<'a, Block> for FrameCompositor {
     fn composite(
         &mut self,
-        bufferlist: &[FrameBufferUpdates<'_, Block>],
+        mut bufferlist: impl Iterator<Item = FrameBufferUpdates<'a, Block>>,
     ) -> Result<(), &'static str> {
         let mut final_fb = FINAL_FRAME_BUFFER
             .try()
             .ok_or("FrameCompositor fails to get the final frame buffer")?
             .lock();
 
-        for frame_buffer_updates in bufferlist {
+        while let Some(frame_buffer_updates) = bufferlist.next() {
             let src_fb = frame_buffer_updates.framebuffer;
             let coordinate = frame_buffer_updates.coordinate;
             let (src_width, src_height) = src_fb.get_size();
@@ -225,10 +225,10 @@ impl Compositor<Block> for FrameCompositor {
     }
 }
 
-impl Compositor<Coord> for FrameCompositor {
+impl<'a> Compositor<'a, Coord> for FrameCompositor {
     fn composite(
         &mut self,
-        bufferlist: &[FrameBufferUpdates<'_, Coord>],
+        mut bufferlist: impl Iterator<Item = FrameBufferUpdates<'a, Coord>>,
     ) -> Result<(), &'static str> {
         let mut final_fb = FINAL_FRAME_BUFFER
             .try()

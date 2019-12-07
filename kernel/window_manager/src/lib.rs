@@ -228,7 +228,7 @@ impl WindowManager {
             updates: Some(pixels)
         };
 
-        FRAME_COMPOSITOR.lock().composite(vec![bottom_fb].as_slice())?;
+        FRAME_COMPOSITOR.lock().composite(vec![bottom_fb].into_iter())?;
 
         for window_ref in &self.hide_list {
             if let Some(window_mutex) = window_ref.upgrade() {
@@ -240,7 +240,7 @@ impl WindowManager {
                     updates: Some(pixels)
                 };
 
-                FRAME_COMPOSITOR.lock().composite(vec![buffer_blocks].as_slice())?;
+                FRAME_COMPOSITOR.lock().composite(vec![buffer_blocks].into_iter())?;
            }
         }
 
@@ -254,7 +254,7 @@ impl WindowManager {
                     updates: Some(pixels)
                 };
 
-                FRAME_COMPOSITOR.lock().composite(vec![buffer_blocks].as_slice())?;
+                FRAME_COMPOSITOR.lock().composite(vec![buffer_blocks].into_iter())?;
            }
         }
 
@@ -267,7 +267,7 @@ impl WindowManager {
                 updates: Some(pixels)
             }; 
 
-            FRAME_COMPOSITOR.lock().composite(vec![buffer_blocks].as_slice())?;
+            FRAME_COMPOSITOR.lock().composite(vec![buffer_blocks].into_iter())?;
         }
 
         Ok(())
@@ -281,7 +281,7 @@ impl WindowManager {
             updates: Some(pixels)
         }; 
 
-        FRAME_COMPOSITOR.lock().composite(vec![top_buffer].as_slice())
+        FRAME_COMPOSITOR.lock().composite(vec![top_buffer].into_iter())
     }
 
     /// Refresh the all the pixels including the bottom framebuffer, the windows and the top framebuffer.
@@ -328,7 +328,7 @@ impl WindowManager {
                     updates: updates
                 };
 
-                FRAME_COMPOSITOR.lock().composite(vec![buffer_blocks].as_slice())?;
+                FRAME_COMPOSITOR.lock().composite(vec![buffer_blocks].into_iter())?;
            }
         }
 
@@ -354,7 +354,7 @@ impl WindowManager {
                     updates: updates
                 };
 
-                FRAME_COMPOSITOR.lock().composite(vec![buffer_blocks].as_slice())?;
+                FRAME_COMPOSITOR.lock().composite(vec![buffer_blocks].into_iter())?;
            }
         }
 
@@ -379,7 +379,7 @@ impl WindowManager {
                     updates: updates
                 }; 
 
-                FRAME_COMPOSITOR.lock().composite(vec![buffer_blocks].as_slice())?;
+                FRAME_COMPOSITOR.lock().composite(vec![buffer_blocks].into_iter())?;
             }
         }
        
@@ -415,7 +415,7 @@ impl WindowManager {
             updates: updates
         }; 
 
-        FRAME_COMPOSITOR.lock().composite(vec![bg_buffer].as_slice())?;
+        FRAME_COMPOSITOR.lock().composite(vec![bg_buffer].into_iter())?;
 
         let area_obj = if update_all{
             None
@@ -447,7 +447,7 @@ impl WindowManager {
             updates: updates
         }; 
 
-        FRAME_COMPOSITOR.lock().composite(vec![top_buffer].as_slice())
+        FRAME_COMPOSITOR.lock().composite(vec![top_buffer].into_iter())
     }
     
     /// pass keyboard event to currently active window
