@@ -33,7 +33,7 @@ pub trait Compositor<'a, T: Mixer> {
 
 
 /// The framebuffers to be composited together with the information of their updated blocks.
-/// `T` specifies the type of items to update and `U` is the iterator of `T`. `T` can be any shape which implements the `Mixer` trait such as a block or a point.
+/// `T` specifies the type of items to update and `U` is an iterator on `T`. `T` can be any shape that implements the `Mixer` trait such as a rectangle block or a point coordinate.
 pub struct FrameBufferUpdates<'a, T: Mixer, U: IntoIterator<Item = T>> {
     /// The framebuffer to be composited.
     pub framebuffer: &'a dyn FrameBuffer,

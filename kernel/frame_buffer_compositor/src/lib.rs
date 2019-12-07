@@ -139,15 +139,11 @@ impl<'a> Compositor<'a, Block> for FrameCompositor {
         &mut self,
         mut bufferlist: impl IntoIterator<Item = FrameBufferUpdates<'a, Block, U>>,
     ) -> Result<(), &'static str> {
-        let mut final_fb = FINAL_FRAME_BUFFER
-            .try()
-            .ok_or("FrameCompositor fails to get the final frame buffer")?
-            .lock();
+        let mut final_fb = FINAL_FRAME_BUFFER.try().ok_or("FrameCompositor fails to get the final frame buffer")?.lock();
+        let (final_width, final_height) = final_fb.get_size();
 
+        // Define a closure to check the cache of every block and render it. We need to reuse it in different branches.
         let mut cache_check_and_mix = |src_fb: &dyn FrameBuffer, coordinate, item: Block| -> Result<(), &'static str> {
-            let (src_width, src_height) = src_fb.get_size();
-
-            let (final_width, final_height) = final_fb.get_size();
             let (src_width, src_height) = src_fb.get_size();
             let src_buffer_len = src_width * src_height;
             let block_pixels = CACHE_BLOCK_HEIGHT * src_width;
@@ -192,6 +188,7 @@ impl<'a> Compositor<'a, Block> for FrameCompositor {
                 };
             }
 
+            // render to the final framebuffer
             item.mix_buffers(
                 src_fb,
                 final_fb.deref_mut(),
@@ -236,29 +233,23 @@ impl<'a> Compositor<'a, Coord> for FrameCompositor {
         &mut self,
         mut bufferlist: impl IntoIterator<Item = FrameBufferUpdates<'a, Coord, U>>,
     ) -> Result<(), &'static str> {
-        let mut final_fb = FINAL_FRAME_BUFFER
-            .try()
-            .ok_or("FrameCompositor fails to get the final frame buffer")?
-            .lock();
+        let mut final_fb = FINAL_FRAME_BUFFER.try().ok_or("FrameCompositor fails to get the final frame buffer")?.lock();
 
-        for frame_buffer_updates in bufferlist.into_iter() {
-            let src_fb = frame_buffer_updates.framebuffer;
-            let coordinate = frame_buffer_updates.coordinate;
-            let (src_width, src_height) = src_fb.get_size();
-
+        for frame_buffer_updates in bufferlist {
             let updates = match frame_buffer_updates.updates {
-                Some(updates) => { updates },
+                Some(updates) => { 
+                    for item in updates {
+                        item.mix_buffers(
+                            frame_buffer_updates.framebuffer,
+                            final_fb.deref_mut(),
+                            frame_buffer_updates.coordinate,
+                        )?;
+                    }
+                },
                 None => {
                     continue;
                 } 
             };
-            for item in updates {
-                item.mix_buffers(
-                    frame_buffer_updates.framebuffer,
-                    final_fb.deref_mut(),
-                    frame_buffer_updates.coordinate,
-                )?;
-            }
         }
         Ok(())
     }
@@ -276,21 +267,17 @@ impl Mixer for Block {
         let src_buffer_len = src_width * src_height;
         let block_pixels = CACHE_BLOCK_HEIGHT * src_width;
 
-        // The start pixel of the block
+        // The coordinate of the block relative to the screen
         let start_index = block_pixels * self.index;
         let coordinate_start = src_coord + (0, (CACHE_BLOCK_HEIGHT * self.index) as isize);
-
-        // The end pixel of the block
         let end_index = start_index + block_pixels;
         
         let block_content = &src_fb.buffer()[start_index..core::cmp::min(end_index, src_buffer_len)];
 
-        let coordinate_end;
-        if end_index <= src_buffer_len {
-            coordinate_end = coordinate_start + (src_width as isize, CACHE_BLOCK_HEIGHT as isize);
+        let coordinate_end = if end_index <= src_buffer_len {
+            coordinate_start + (src_width as isize, CACHE_BLOCK_HEIGHT as isize);
         } else {
-            // end_index = src_buffer_len;
-            coordinate_end = src_coord + (src_width as isize, src_height as isize);
+            src_coord + (src_width as isize, src_height as isize);
         }
 
         // skip if the block is not in the screen
@@ -306,7 +293,6 @@ impl Mixer for Block {
         let final_y_start = core::cmp::max(0, coordinate_start.y) as usize;
 
         // just draw the part which is within the final buffer
-        // Wenqiu: TODO Optimize Later
         let width = core::cmp::min(
             core::cmp::min(coordinate_end.x as usize, final_width) - final_x_start,
             self.width + self.start,
