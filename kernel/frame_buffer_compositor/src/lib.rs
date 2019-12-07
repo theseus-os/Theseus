@@ -159,7 +159,7 @@ impl<'a> Compositor<'a, Block> for FrameCompositor {
                         let block = Block::new(i, 0, src_width);
                         temp.push(block);
                     };
-                    temp.as_slice()
+                    temp.into_iter()
                 } 
             };
             for item in updates {

@@ -30,7 +30,7 @@ use alloc::boxed::Box;
 use alloc::collections::VecDeque;
 use alloc::string::{String, ToString};
 use alloc::sync::{Arc, Weak};
-use alloc::vec::{Vec};
+use alloc::vec::{Vec, IntoIter};
 use compositor::{Compositor, FrameBufferUpdates, Mixer};
 use core::ops::{Deref, DerefMut};
 use mpmc::Queue;
@@ -221,11 +221,11 @@ impl WindowManager {
     }
 
     /// Refresh the pixels in `update_coords`. Only render the bottom final framebuffer and windows. Ignore the top buffer.
-    pub fn refresh_bottom_windows_pixels(&self, pixels: &[Coord]) -> Result<(), &'static str> {
+    pub fn refresh_bottom_windows_pixels(&self, pixels: IntoIter<Coord>) -> Result<(), &'static str> {
         let bottom_fb = FrameBufferUpdates {
             framebuffer: self.bottom_fb.deref(),
             coordinate: Coord::new(0, 0),
-            updates: Some(pixels)
+            updates: Some(pixels.clone())
         };
 
         FRAME_COMPOSITOR.lock().composite(vec![bottom_fb].into_iter())?;
@@ -237,7 +237,7 @@ impl WindowManager {
                 let buffer_blocks = FrameBufferUpdates {
                     framebuffer: framebuffer.deref(),
                     coordinate: window.get_position(),
-                    updates: Some(pixels)
+                    updates: Some(pixels.clone())
                 };
 
                 FRAME_COMPOSITOR.lock().composite(vec![buffer_blocks].into_iter())?;
@@ -251,7 +251,7 @@ impl WindowManager {
                 let buffer_blocks = FrameBufferUpdates {
                     framebuffer: framebuffer.deref(),
                     coordinate: window.get_position(),
-                    updates: Some(pixels)
+                    updates: Some(pixels.clone())
                 };
 
                 FRAME_COMPOSITOR.lock().composite(vec![buffer_blocks].into_iter())?;
@@ -274,7 +274,7 @@ impl WindowManager {
     }
 
     /// Refresh the pixels in the top framebuffer
-    pub fn refresh_top_pixels(&self, pixels: &[Coord]) -> Result<(), &'static str> {
+    pub fn refresh_top_pixels(&self, pixels: IntoIter<Coord>) -> Result<(), &'static str> {
         let top_buffer = FrameBufferUpdates {
             framebuffer: self.top_fb.deref(),
             coordinate: Coord::new(0, 0),
@@ -285,8 +285,8 @@ impl WindowManager {
     }
 
     /// Refresh the all the pixels including the bottom framebuffer, the windows and the top framebuffer.
-    pub fn refresh_pixels(&self, pixels: &[Coord]) -> Result<(), &'static str> {
-        self.refresh_bottom_windows_pixels(pixels)?;
+    pub fn refresh_pixels(&self, pixels: IntoIter<Coord>) -> Result<(), &'static str> {
+        self.refresh_bottom_windows_pixels(pixels.clone())?;
         self.refresh_top_pixels(pixels)?;
         Ok(())
     }
@@ -317,7 +317,7 @@ impl WindowManager {
                 max_update_area = relative_area + win_coordinate;
                 
                 let updates = if !update_all {
-                    Some(blocks.as_slice())
+                    Some(blocks.into_iter())
                 } else {
                     None
                 };
@@ -343,7 +343,7 @@ impl WindowManager {
                 let blocks = frame_buffer_compositor::get_blocks(framebuffer.deref(), &mut relative_area);
                 max_update_area = relative_area + win_coordinate;
                 let updates = if !update_all {
-                    Some(blocks.as_slice())
+                    Some(blocks.into_iter())
                 } else {
                     None
                 };
@@ -368,7 +368,7 @@ impl WindowManager {
                 let blocks = frame_buffer_compositor::get_blocks(framebuffer.deref(), &mut relative_area);
 
                 let updates = if !update_all {
-                    Some(blocks.as_slice())
+                    Some(blocks.into_iter())
                 } else {
                     None
                 };
@@ -404,7 +404,7 @@ impl WindowManager {
         };
 
         let updates = if blocks.len() > 0 {
-            Some(blocks.as_slice())
+            Some(blocks.into_iter())
         } else {
             None
         };
@@ -436,7 +436,7 @@ impl WindowManager {
         };
 
         let updates = if blocks.len() > 0 {
-            Some(blocks.as_slice())
+            Some(blocks.into_iter())
         } else {
             None
         };
@@ -544,7 +544,7 @@ impl WindowManager {
         match self.repositioned_border {
             Some(border) => {
                 let pixels = self.draw_floating_border(border.top_left, border.bottom_right, T);
-                self.refresh_bottom_windows_pixels(pixels.as_slice())?;
+                self.refresh_bottom_windows_pixels(pixels.into_iter())?;
             },
             None =>{}
         }
@@ -553,7 +553,7 @@ impl WindowManager {
         if show {
             self.repositioned_border = Some(Rectangle { top_left, bottom_right });
             let pixels = self.draw_floating_border(top_left, bottom_right, WINDOW_BORDER_COLOR_INNER);
-            self.refresh_top_pixels(pixels.as_slice())?;
+            self.refresh_top_pixels(pixels.into_iter())?;
         } else {
             self.repositioned_border = None;
         }
@@ -617,7 +617,7 @@ impl WindowManager {
             self.refresh_bottom_windows(Some(Rectangle{top_left: old_top_left, bottom_right: old_bottom_right}), false)?;
             self.refresh_bottom_windows(Some(Rectangle{top_left: new_top_left, bottom_right: new_bottom_right}), true)?;
             let update_coords = self.get_mouse_coords();
-            self.refresh_pixels(update_coords.as_slice())?;
+            self.refresh_pixels(update_coords.into_iter())?;
         } else {
             return Err("cannot fid active window to move");
         }
@@ -657,7 +657,7 @@ impl WindowManager {
             }
         }
         let update_coords = self.get_mouse_coords();
-        self.refresh_bottom_windows_pixels(update_coords.as_slice())?;
+        self.refresh_bottom_windows_pixels(update_coords.into_iter())?;
 
         // draw new mouse
         self.mouse = new;
@@ -677,7 +677,7 @@ impl WindowManager {
             }
         }
         let update_coords = self.get_mouse_coords();
-        self.refresh_top_pixels(update_coords.as_slice())?;
+        self.refresh_top_pixels(update_coords.into_iter())?;
 
         Ok(())
     }

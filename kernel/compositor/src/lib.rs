@@ -14,7 +14,7 @@ use hashbrown::hash_map::{DefaultHashBuilder};
 use frame_buffer::{Coord, FrameBuffer};
 use alloc::collections::BTreeMap;
 use alloc::boxed::Box;
-use alloc::vec::Vec;
+use alloc::vec::{Vec, IntoIter};
 
 /// The compositor trait.
 /// A compositor composites a list of buffers to a single buffer. It caches the information of incoming buffers for better performance.
@@ -39,7 +39,7 @@ pub struct FrameBufferUpdates<'a, T: Mixer> {
     /// The coordinate of the framebuffer where it is rendered to the final framebuffer.
     pub coordinate: Coord,
     /// The updated blocks of the framebuffer. If `blocks` is `None`, the compositor would handle all the blocks of the framebuffer.
-    pub updates: Option<&'a [T]>,
+    pub updates: Option<alloc::vec::IntoIter<T>>,
 }
 
 /// A mixer is an item that can be mixed with the final framebuffer. A compositor can mix a list of shaped items with the final framebuffer rather than mix the whole framebuffer for better performance.

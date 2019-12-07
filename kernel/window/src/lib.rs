@@ -536,7 +536,7 @@ impl Window {
         let frame_buffer_blocks = FrameBufferUpdates {
             framebuffer: view.framebuffer.deref(),
             coordinate: view.coordinate,
-            updates: Some(block.as_slice()),
+            updates: Some(block.into_iter()),
         };
         FRAME_COMPOSITOR.lock().composite(vec![frame_buffer_blocks].into_iter())?;
 
