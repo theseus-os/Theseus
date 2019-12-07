@@ -128,18 +128,11 @@ impl Mixer for Block {
         // The start pixel of the block
         let start_index = block_pixels * self.index;
         let coordinate_start = src_coord + (0, (CACHE_BLOCK_HEIGHT * self.index) as isize);
-        
-        // The end pixel of the block
-        let mut end_index = start_index + block_pixels;
-        let coordinate_end;
-        if end_index <= src_buffer_len {
-            coordinate_end = coordinate_start + (src_width as isize, CACHE_BLOCK_HEIGHT as isize);
-        } else {
-            end_index = src_buffer_len;
-            coordinate_end = src_coord + (src_width as isize, src_height as isize);
-        }
 
-        let block_content = &src_fb.buffer()[start_index..end_index];
+        // The end pixel of the block
+        let end_index = start_index + block_pixels;
+        
+        let block_content = &src_fb.buffer()[start_index..core::cmp::min(end_index, src_buffer_len)];
         // Skip if a block is already cached
         if is_in_cache(&block_content, &coordinate_start, caches) {
             return Ok(());
@@ -169,6 +162,14 @@ impl Mixer for Block {
                     }
                 }
             };
+        }
+
+        let coordinate_end;
+        if end_index <= src_buffer_len {
+            coordinate_end = coordinate_start + (src_width as isize, CACHE_BLOCK_HEIGHT as isize);
+        } else {
+            // end_index = src_buffer_len;
+            coordinate_end = src_coord + (src_width as isize, src_height as isize);
         }
 
         // skip if the block is not in the screen
