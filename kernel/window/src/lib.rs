@@ -532,7 +532,12 @@ impl Window {
     /// refresh the top left three button's appearance
     fn refresh_three_button(&self) -> Result<(), &'static str> {
         let view = self.view.lock();
-        let block: Vec<Block> = vec![Block::new(0, 0, view.get_size().0)];
+        let mut block = Vec::new();
+        let width = view.get_size().0;
+        for i in 0..self.title_size / frame_buffer_compositor::CACHE_BLOCK_HEIGHT {
+            block.push(Block::new(i, 0, width));
+        }
+
         let frame_buffer_blocks = FrameBufferUpdates {
             framebuffer: view.framebuffer.deref(),
             coordinate: view.coordinate,

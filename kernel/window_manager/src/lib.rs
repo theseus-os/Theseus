@@ -314,6 +314,9 @@ impl WindowManager {
                 let win_coordinate = window.get_position();
                 let mut relative_area = max_update_area - win_coordinate;
                 let blocks = frame_buffer_compositor::get_blocks(framebuffer.deref(), &mut relative_area);
+                if blocks.len() == 0 {
+                    continue;
+                }
                 max_update_area = relative_area + win_coordinate;
                 
                 let updates = if !update_all {
@@ -341,6 +344,9 @@ impl WindowManager {
                 let win_coordinate = window.get_position();
                 let mut relative_area = max_update_area - win_coordinate;
                 let blocks = frame_buffer_compositor::get_blocks(framebuffer.deref(), &mut relative_area);
+                if blocks.len() == 0 {
+                    continue;
+                }
                 max_update_area = relative_area + win_coordinate;
                 let updates = if !update_all {
                     Some(blocks.into_iter())
@@ -366,6 +372,9 @@ impl WindowManager {
                 let win_coordinate = window.get_position();
                 let mut relative_area = max_update_area - win_coordinate;
                 let blocks = frame_buffer_compositor::get_blocks(framebuffer.deref(), &mut relative_area);
+                if blocks.len() == 0 {
+                    return Ok(());
+                }
 
                 let updates = if !update_all {
                     Some(blocks.into_iter())
@@ -395,18 +404,16 @@ impl WindowManager {
             bottom_right: Coord::new(0, 0),
         };
 
-        let blocks = match area {
+        let updates = match area {
             Some(area) => {
                 update_area = area;
-                frame_buffer_compositor::get_blocks(self.bottom_fb.deref(), &mut update_area)
+                let blocks = frame_buffer_compositor::get_blocks(self.bottom_fb.deref(), &mut update_area);
+                if blocks.len() == 0 {
+                    return Ok(())
+                }
+                Some(blocks.into_iter())
             },
-            None => Vec::new()
-        };
-
-        let updates = if blocks.len() > 0 {
-            Some(blocks.into_iter())
-        } else {
-            None
+            None => None
         };
 
         let bg_buffer = FrameBufferUpdates {
@@ -427,18 +434,17 @@ impl WindowManager {
     }
 
     pub fn refresh_top(&self, area: Option<Rectangle>) -> Result<(), &'static str> {
-        let blocks = match area {
+        let updates = match area {
             Some(area) => {
                 let mut update_area = area;
-                frame_buffer_compositor::get_blocks(self.top_fb.deref(), &mut update_area)
-            },
-            None => Vec::new()
-        };
+                let blocks = frame_buffer_compositor::get_blocks(self.top_fb.deref(), &mut update_area);
+                if blocks.len() == 0 {
+                    return Ok(())
+                }
+                Some(blocks.into_iter())
 
-        let updates = if blocks.len() > 0 {
-            Some(blocks.into_iter())
-        } else {
-            None
+            },
+            None => None
         };
 
         let top_buffer = FrameBufferUpdates {
