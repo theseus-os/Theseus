@@ -19,12 +19,12 @@ use alloc::vec::{Vec, IntoIter};
 /// The compositor trait.
 /// A compositor composites a list of buffers to a single buffer. It caches the information of incoming buffers for better performance.
 /// `T` is the type of cache used in this framebuffer.
-pub trait Compositor<'a, T: 'a + Mixer> {
+pub trait Compositor<'a, T: Mixer> {
     /// Composites the buffers in the bufferlist.
     ///
     /// # Arguments
     ///
-    /// * `bufferlist` - A list of information about the buffers to be composited. The list is of generic type so that we can implement various compositor with different information. `U` specifices the type of item to update in compositing. It can be a rectangle block or a point.
+    /// * `bufferlist` - A list of information about the buffers to be composited. The list is of generic type so that we can implement various compositor with different information. `U` specifices the type of item iterator and `T` is the item type to update in compositing. It can be a rectangle block or a point coordinate.
     fn composite<U: IntoIterator<Item = T>>(
         &mut self,
         mut bufferlist: impl IntoIterator<Item = FrameBufferUpdates<'a, T, U>>,
@@ -33,6 +33,7 @@ pub trait Compositor<'a, T: 'a + Mixer> {
 
 
 /// The framebuffers to be composited together with the information of their updated blocks.
+/// `T` specifies the type of items to update and `U` is the iterator of `T`. `T` can be any shape which implements the `Mixer` trait such as a block or a point.
 pub struct FrameBufferUpdates<'a, T: Mixer, U: IntoIterator<Item = T>> {
     /// The framebuffer to be composited.
     pub framebuffer: &'a dyn FrameBuffer,
@@ -44,7 +45,7 @@ pub struct FrameBufferUpdates<'a, T: Mixer, U: IntoIterator<Item = T>> {
 
 /// A mixer is an item that can be mixed with the final framebuffer. A compositor can mix a list of shaped items with the final framebuffer rather than mix the whole framebuffer for better performance.
 pub trait Mixer {
-    /// Mix the item in the `src_fb` framebuffer with the final framebuffer. `src_coord` is the position of the source framebuffer relative to the top-left of the screen and `cache` is the cache of the compositor.
+    /// Mix the item in the `src_fb` framebuffer with the final framebuffer. `src_coord` is the position of the source framebuffer relative to the top-left of the final buffer.
     fn mix_buffers(
         &self, 
         src_fb: &dyn FrameBuffer, 

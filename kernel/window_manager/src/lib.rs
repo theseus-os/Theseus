@@ -30,7 +30,7 @@ use alloc::boxed::Box;
 use alloc::collections::VecDeque;
 use alloc::string::{String, ToString};
 use alloc::sync::{Arc, Weak};
-use alloc::vec::{Vec, IntoIter};
+use alloc::vec::{Vec};
 use compositor::{Compositor, FrameBufferUpdates, Mixer};
 use core::ops::{Deref, DerefMut};
 use mpmc::Queue;
@@ -221,7 +221,7 @@ impl WindowManager {
     }
 
     /// Refresh the pixels in `update_coords`. Only render the bottom final framebuffer and windows. Ignore the top buffer.
-    pub fn refresh_bottom_windows_pixels(&self, pixels: IntoIter<Coord>) -> Result<(), &'static str> {
+    pub fn refresh_bottom_windows_pixels(&self, pixels: impl IntoIterator<Item = Coord> + Clone) -> Result<(), &'static str> {
         let bottom_fb = FrameBufferUpdates {
             framebuffer: self.bottom_fb.deref(),
             coordinate: Coord::new(0, 0),
@@ -274,7 +274,7 @@ impl WindowManager {
     }
 
     /// Refresh the pixels in the top framebuffer
-    pub fn refresh_top_pixels(&self, pixels: IntoIter<Coord>) -> Result<(), &'static str> {
+    pub fn refresh_top_pixels(&self, pixels: impl IntoIterator<Item = Coord>) -> Result<(), &'static str> {
         let top_buffer = FrameBufferUpdates {
             framebuffer: self.top_fb.deref(),
             coordinate: Coord::new(0, 0),
@@ -285,7 +285,7 @@ impl WindowManager {
     }
 
     /// Refresh the all the pixels including the bottom framebuffer, the windows and the top framebuffer.
-    pub fn refresh_pixels(&self, pixels: IntoIter<Coord>) -> Result<(), &'static str> {
+    pub fn refresh_pixels(&self, pixels: impl IntoIterator<Item = Coord> + Clone) -> Result<(), &'static str> {
         self.refresh_bottom_windows_pixels(pixels.clone())?;
         self.refresh_top_pixels(pixels)?;
         Ok(())
