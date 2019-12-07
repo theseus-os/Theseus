@@ -36,7 +36,7 @@ use alloc::boxed::Box;
 use core::hash::{Hash, Hasher, BuildHasher};
 use core::ops::DerefMut;
 use hashbrown::hash_map::{DefaultHashBuilder};
-use compositor::{Compositor, FrameBufferUpdates, Mixer, Block, BlockCache, CACHE_BLOCK_HEIGHT};
+use compositor::{Compositor, FrameBufferUpdates, Mixer, Block, BlockCache, CACHE_BLOCK_HEIGHT, is_in_cache, hash};
 use frame_buffer::{FrameBuffer, FINAL_FRAME_BUFFER, Coord, Rectangle};
 use spin::Mutex;
 
@@ -63,6 +63,18 @@ pub struct FrameCompositor {
 /// `start` and `width` marks the area to be updated in a block in which `start` is an x coordinate relative to the leftside of the framebuffer. It the compositor gets a framebuffer together with some blocks, it just composite the area specified by these blocks.
 ///
 /// After compositing, the compositor will cache the updated blocks. In the next time, for every block in a framebuffer, the compositor will ignore it if it is alreday cached.
+impl FrameCompositor {
+    /// Checks if a coordinate is in the cache list.
+    pub fn is_cached(&self, block: &[u32], coordinate: &Coord) -> bool {
+        match self.caches.get(coordinate) {
+            Some(cache) => {
+                // The same hash means the array of two blocks are the same. Since all blocks are of the same height, two blocks of the same array must share the same width. And if their contents are the same, their content_width must be the same, too.
+                return cache.content_hash == hash(block)
+            }
+            None => return false,
+        }
+    }
+}
 
 impl Compositor<Block> for FrameCompositor {
     fn composite(
@@ -94,6 +106,27 @@ impl Compositor<Block> for FrameCompositor {
                     } 
                 };
                 for item in updates {
+                    let (final_width, final_height) = final_fb.get_size();
+                    let (src_width, src_height) = src_fb.get_size();
+                    let src_buffer_len = src_width * src_height;
+                    let block_pixels = CACHE_BLOCK_HEIGHT * src_width;
+
+                    // The start pixel of the block
+                    let start_index = block_pixels * item.index;
+                    let coordinate_start = frame_buffer_updates.coordinate + (0, (CACHE_BLOCK_HEIGHT * item.index) as isize);
+
+                    // The end pixel of the block
+                    let end_index = start_index + block_pixels;
+                    
+                    {
+                        let block_content = &src_fb.buffer()[start_index..core::cmp::min(end_index, src_buffer_len)];
+
+                        // Skip if a block is already cached
+                        if self.is_cached(&block_content, &coordinate_start) {
+                            continue;
+                        }
+                    }
+
                     item.mix_with(
                         frame_buffer_updates.framebuffer,
                         final_fb.deref_mut(),

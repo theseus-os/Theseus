@@ -60,7 +60,7 @@ pub struct BlockCache {
     /// The coordinate of the block where it is rendered to the final framebuffer.
     coordinate: Coord,
     /// The hash of the content in the frame buffer.
-    content_hash: u64,
+    pub content_hash: u64,
     /// The width of the block
     width: usize,
     /// The block which is cached
@@ -104,11 +104,11 @@ pub trait Mixer {
 
 pub struct Block {
     /// The index of the block in a framebuffer
-    index: usize,
+    pub index: usize,
     /// The left bound of the updated area
-    start: usize,
+    pub start: usize,
     /// The width of the 
-    width: usize,
+    pub width: usize,
 }
 
 
@@ -133,6 +133,7 @@ impl Mixer for Block {
         let end_index = start_index + block_pixels;
         
         let block_content = &src_fb.buffer()[start_index..core::cmp::min(end_index, src_buffer_len)];
+
         // Skip if a block is already cached
         if is_in_cache(&block_content, &coordinate_start, caches) {
             return Ok(());
@@ -239,7 +240,7 @@ impl Mixer for Coord {
 }
 
 /// Get the hash of a cache block
-fn hash<T: Hash>(block: T) -> u64 {
+pub fn hash<T: Hash>(block: T) -> u64 {
     let builder = DefaultHashBuilder::default();
     let mut hasher = builder.build_hasher();
     block.hash(&mut hasher);
@@ -247,7 +248,7 @@ fn hash<T: Hash>(block: T) -> u64 {
 }
 
 /// Checks if a coordinate is in the cache list.
-fn is_in_cache(block: &[u32], coordinate: &Coord, caches: &BTreeMap<Coord, BlockCache>) -> bool {
+pub fn is_in_cache(block: &[u32], coordinate: &Coord, caches: &BTreeMap<Coord, BlockCache>) -> bool {
     match caches.get(coordinate) {
         Some(cache) => {
             // The same hash means the array of two blocks are the same. Since all blocks are of the same height, two blocks of the same array must share the same width. And if their contents are the same, their content_width must be the same, too.
