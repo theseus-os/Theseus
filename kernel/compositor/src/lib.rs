@@ -25,21 +25,21 @@ pub trait Compositor<'a, T: 'a + Mixer> {
     /// # Arguments
     ///
     /// * `bufferlist` - A list of information about the buffers to be composited. The list is of generic type so that we can implement various compositor with different information. `U` specifices the type of item to update in compositing. It can be a rectangle block or a point.
-    fn composite(
+    fn composite<U: IntoIterator<Item = T>>(
         &mut self,
-        mut bufferlist: impl IntoIterator<Item = FrameBufferUpdates<'a, T>>,
+        mut bufferlist: impl IntoIterator<Item = FrameBufferUpdates<'a, T, U>>,
     ) -> Result<(), &'static str>;
 }
 
 
 /// The framebuffers to be composited together with the information of their updated blocks.
-pub struct FrameBufferUpdates<'a, T: Mixer> {
+pub struct FrameBufferUpdates<'a, T: Mixer, U: IntoIterator<Item = T>> {
     /// The framebuffer to be composited.
     pub framebuffer: &'a dyn FrameBuffer,
     /// The coordinate of the framebuffer where it is rendered to the final framebuffer.
     pub coordinate: Coord,
     /// The updated blocks of the framebuffer. If `blocks` is `None`, the compositor would handle all the blocks of the framebuffer.
-    pub updates: Option<alloc::vec::IntoIter<T>>,
+    pub updates: Option<U>,
 }
 
 /// A mixer is an item that can be mixed with the final framebuffer. A compositor can mix a list of shaped items with the final framebuffer rather than mix the whole framebuffer for better performance.

@@ -135,90 +135,96 @@ impl FrameCompositor {
 }
 
 impl<'a> Compositor<'a, Block> for FrameCompositor {
-    fn composite(
+    fn composite<U: IntoIterator<Item = Block>>(
         &mut self,
-        mut bufferlist: impl IntoIterator<Item = FrameBufferUpdates<'a, Block>>,
+        mut bufferlist: impl IntoIterator<Item = FrameBufferUpdates<'a, Block, U>>,
     ) -> Result<(), &'static str> {
         let mut final_fb = FINAL_FRAME_BUFFER
             .try()
             .ok_or("FrameCompositor fails to get the final frame buffer")?
             .lock();
 
+        let mut cache_check_and_mix = |src_fb: &dyn FrameBuffer, coordinate, item: Block| -> Result<(), &'static str> {
+            let (src_width, src_height) = src_fb.get_size();
+
+            let (final_width, final_height) = final_fb.get_size();
+            let (src_width, src_height) = src_fb.get_size();
+            let src_buffer_len = src_width * src_height;
+            let block_pixels = CACHE_BLOCK_HEIGHT * src_width;
+
+            // The start pixel of the block
+            let start_index = block_pixels * item.index;
+            let coordinate_start = coordinate + (0, (CACHE_BLOCK_HEIGHT * item.index) as isize);
+
+            // The end pixel of the block
+            let end_index = start_index + block_pixels;
+            
+            let block_content = &src_fb.buffer()[start_index..core::cmp::min(end_index, src_buffer_len)];
+            
+            // Skip if a block is already cached
+            if self.is_cached(&block_content, &coordinate_start) {
+                return Ok(());
+            }
+
+            // find overlapped caches
+            // extend the width of the updated part to the right side of the cached block content
+            // remove caches of the same location
+            let new_cache = BlockCache {
+                content_hash: hash(block_content),
+                coordinate: coordinate_start,
+                width: src_width,
+                block: Block {
+                    index: 0,
+                    start: item.start,
+                    width: item.width,
+                }
+            };
+            let keys: Vec<_> = self.caches.keys().cloned().collect();
+            for key in keys {
+                if let Some(cache) = self.caches.get_mut(&key) {
+                    if cache.overlaps_with(&new_cache) {
+                        if cache.coordinate == new_cache.coordinate  && cache.width == new_cache.width {
+                            self.caches.remove(&key);
+                        } else {
+                            cache.content_hash = 0;
+                        }
+                    }
+                };
+            }
+
+            item.mix_buffers(
+                src_fb,
+                final_fb.deref_mut(),
+                coordinate,
+            )?;
+
+            // insert the new cache
+            self.caches.insert(coordinate_start, new_cache);
+
+            Ok(())
+        };
+
         for frame_buffer_updates in bufferlist.into_iter() {
             let src_fb = frame_buffer_updates.framebuffer;
             let coordinate = frame_buffer_updates.coordinate;
-            let (src_width, src_height) = src_fb.get_size();
 
             // Handle all blocks if the updated blocks parameter is None 
-            let mut temp = Vec::new();
             let updates = match frame_buffer_updates.updates {
-                Some(updates) => { updates },
+                Some(updates) => { 
+                    for item in updates {
+                        cache_check_and_mix(src_fb, coordinate, item)?;
+                    } 
+                },
                 None => {
+                    let (src_width, src_height) = frame_buffer_updates.framebuffer.get_size();
                     let block_number = (src_height - 1) / CACHE_BLOCK_HEIGHT + 1;
                     for i in 0.. block_number {
                         let block = Block::new(i, 0, src_width);
-                        temp.push(block);
-                    };
-                    temp.into_iter()
+                        cache_check_and_mix(src_fb, coordinate, block)?;
+                    }
                 } 
             };
-            for item in updates {
-                let (final_width, final_height) = final_fb.get_size();
-                let (src_width, src_height) = src_fb.get_size();
-                let src_buffer_len = src_width * src_height;
-                let block_pixels = CACHE_BLOCK_HEIGHT * src_width;
-
-                // The start pixel of the block
-                let start_index = block_pixels * item.index;
-                let coordinate_start = frame_buffer_updates.coordinate + (0, (CACHE_BLOCK_HEIGHT * item.index) as isize);
-
-                // The end pixel of the block
-                let end_index = start_index + block_pixels;
-                
-                let block_content = &src_fb.buffer()[start_index..core::cmp::min(end_index, src_buffer_len)];
-                
-                // Skip if a block is already cached
-                if self.is_cached(&block_content, &coordinate_start) {
-                    continue;
-                }
-
-                // find overlapped caches
-                // extend the width of the updated part to the right side of the cached block content
-                // remove caches of the same location
-                let new_cache = BlockCache {
-                    content_hash: hash(block_content),
-                    coordinate: coordinate_start,
-                    width: src_width,
-                    block: Block {
-                        index: 0,
-                        start: item.start,
-                        width: item.width,
-                    }
-                };
-                let keys: Vec<_> = self.caches.keys().cloned().collect();
-                for key in keys {
-                    if let Some(cache) = self.caches.get_mut(&key) {
-                        if cache.overlaps_with(&new_cache) {
-                            if cache.coordinate == new_cache.coordinate  && cache.width == new_cache.width {
-                                self.caches.remove(&key);
-                            } else {
-                                cache.content_hash = 0;
-                            }
-                        }
-                    };
-                }
-
-                item.mix_buffers(
-                    frame_buffer_updates.framebuffer,
-                    final_fb.deref_mut(),
-                    frame_buffer_updates.coordinate,
-                )?;
-
-                // insert the new cache
-                self.caches.insert(coordinate_start, new_cache);
-            }
-        
-
+      
         }
 
         Ok(())
@@ -226,9 +232,9 @@ impl<'a> Compositor<'a, Block> for FrameCompositor {
 }
 
 impl<'a> Compositor<'a, Coord> for FrameCompositor {
-    fn composite(
+    fn composite<U: IntoIterator<Item = Coord>>(
         &mut self,
-        mut bufferlist: impl IntoIterator<Item = FrameBufferUpdates<'a, Coord>>,
+        mut bufferlist: impl IntoIterator<Item = FrameBufferUpdates<'a, Coord, U>>,
     ) -> Result<(), &'static str> {
         let mut final_fb = FINAL_FRAME_BUFFER
             .try()

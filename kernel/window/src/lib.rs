@@ -175,7 +175,7 @@ impl Window {
             window.show_button(TopButton::Close, 1, &mut view);
             window.show_button(TopButton::MinimizeMaximize, 1, &mut view);
             window.show_button(TopButton::Hide, 1, &mut view);
-            let buffer_blocks: FrameBufferUpdates<Block> = FrameBufferUpdates {
+            let buffer_blocks: FrameBufferUpdates<Block, Option<Block>> = FrameBufferUpdates {
                 framebuffer: view.framebuffer.deref(),
                 coordinate: coordinate,
                 updates: None,
