@@ -44,32 +44,21 @@ pub struct FrameBufferUpdates<'a, T: Mixer> {
     pub updates: Option<&'a [T]>,
 }
 
-impl Block {
-    /// Creates a new block
-    pub fn new(index: usize, start: usize, width: usize) -> Block {
-        Block {
-            index: index,
-            start: start,
-            width: width,
-        }
-    }
-}
-
 /// Metadata that describes the cached block.
 pub struct BlockCache {
     /// The coordinate of the block where it is rendered to the final framebuffer.
-    coordinate: Coord,
+    pub coordinate: Coord,
     /// The hash of the content in the frame buffer.
     pub content_hash: u64,
     /// The width of the block
-    width: usize,
+    pub width: usize,
     /// The block which is cached
-    block: Block,
+    pub block: Block,
 }
 
 impl BlockCache {
     /// Checks if a block cache overlaps with another one
-    fn overlaps_with(&self, cache: &BlockCache) -> bool {
+    pub fn overlaps_with(&self, cache: &BlockCache) -> bool {
         self.contains_corner(cache) || cache.contains_corner(self)
     }
 
@@ -111,6 +100,16 @@ pub struct Block {
     pub width: usize,
 }
 
+impl Block {
+    /// Creates a new block
+    pub fn new(index: usize, start: usize, width: usize) -> Block {
+        Block {
+            index: index,
+            start: start,
+            width: width,
+        }
+    }
+}
 
 impl Mixer for Block {
     fn mix_with(
@@ -133,37 +132,6 @@ impl Mixer for Block {
         let end_index = start_index + block_pixels;
         
         let block_content = &src_fb.buffer()[start_index..core::cmp::min(end_index, src_buffer_len)];
-
-        // Skip if a block is already cached
-        if is_in_cache(&block_content, &coordinate_start, caches) {
-            return Ok(());
-        }
-
-        // find overlapped caches
-        // extend the width of the updated part to the right side of the cached block content
-        // remove caches of the same location
-        let new_cache = BlockCache {
-            content_hash: hash(block_content),
-            coordinate: coordinate_start,
-            width: src_width,
-            block: Block {
-                index: 0,
-                start: self.start,
-                width: self.width,
-            }
-        };
-        let keys: Vec<_> = caches.keys().cloned().collect();
-        for key in keys {
-            if let Some(cache) = caches.get_mut(&key) {
-                if cache.overlaps_with(&new_cache) {
-                    if cache.coordinate == new_cache.coordinate  && cache.width == new_cache.width {
-                        caches.remove(&key);
-                    } else {
-                        cache.content_hash = 0;
-                    }
-                }
-            };
-        }
 
         let coordinate_end;
         if end_index <= src_buffer_len {
@@ -202,9 +170,6 @@ impl Mixer for Block {
             let src_end = src_start + width;
             final_fb.composite_buffer(&(block_content[src_start..src_end]), dest_start);
         }
-
-        // insert the new cache
-        caches.insert(coordinate_start, new_cache);
 
         Ok(())
     }

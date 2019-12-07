@@ -118,13 +118,37 @@ impl Compositor<Block> for FrameCompositor {
                     // The end pixel of the block
                     let end_index = start_index + block_pixels;
                     
-                    {
-                        let block_content = &src_fb.buffer()[start_index..core::cmp::min(end_index, src_buffer_len)];
+                    let block_content = &src_fb.buffer()[start_index..core::cmp::min(end_index, src_buffer_len)];
+                    
+                    // Skip if a block is already cached
+                    if self.is_cached(&block_content, &coordinate_start) {
+                        continue;
+                    }
 
-                        // Skip if a block is already cached
-                        if self.is_cached(&block_content, &coordinate_start) {
-                            continue;
+                    // find overlapped caches
+                    // extend the width of the updated part to the right side of the cached block content
+                    // remove caches of the same location
+                    let new_cache = BlockCache {
+                        content_hash: hash(block_content),
+                        coordinate: coordinate_start,
+                        width: src_width,
+                        block: Block {
+                            index: 0,
+                            start: item.start,
+                            width: item.width,
                         }
+                    };
+                    let keys: Vec<_> = self.caches.keys().cloned().collect();
+                    for key in keys {
+                        if let Some(cache) = self.caches.get_mut(&key) {
+                            if cache.overlaps_with(&new_cache) {
+                                if cache.coordinate == new_cache.coordinate  && cache.width == new_cache.width {
+                                    self.caches.remove(&key);
+                                } else {
+                                    cache.content_hash = 0;
+                                }
+                            }
+                        };
                     }
 
                     item.mix_with(
@@ -133,6 +157,9 @@ impl Compositor<Block> for FrameCompositor {
                         frame_buffer_updates.coordinate,
                         &mut self.caches
                     )?;
+
+                    // insert the new cache
+                    self.caches.insert(coordinate_start, new_cache);
                 }
             }
 
