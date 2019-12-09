@@ -32,7 +32,7 @@ extern crate hashbrown;
 
 use alloc::collections::BTreeMap;
 use alloc::vec::{Vec};
-use alloc::boxed::Box;
+use alloc::boxed::Box;  
 use core::hash::{Hash, Hasher, BuildHasher};
 use core::ops::DerefMut;
 use hashbrown::hash_map::{DefaultHashBuilder};
@@ -87,8 +87,6 @@ pub struct BlockCache {
     content_hash: u64,
     /// The width of the block
     width: usize,
-    /// The block which is cached
-    block: Block,
 }
 
 impl BlockCache {
@@ -134,13 +132,12 @@ impl FrameCompositor {
     }
 }
 
-impl<'a> Compositor<'a, Block> for FrameCompositor {
-    fn composite<U: IntoIterator<Item = Block>>(
+impl Compositor<Block> for FrameCompositor {
+    fn composite<'a, U: IntoIterator<Item = Block>>(
         &mut self,
-        mut bufferlist: impl IntoIterator<Item = FrameBufferUpdates<'a, Block, U>>,
+        bufferlist: impl IntoIterator<Item = FrameBufferUpdates<'a, Block, U>>,
     ) -> Result<(), &'static str> {
         let mut final_fb = FINAL_FRAME_BUFFER.try().ok_or("FrameCompositor fails to get the final frame buffer")?.lock();
-        let (final_width, final_height) = final_fb.get_size();
 
         // Define a closure to check if a block is cached and render it. We need to reuse it in different branches.
         let mut cache_check_and_mix = |src_fb: &dyn FrameBuffer, coordinate, item: Block| -> Result<(), &'static str> {
@@ -169,11 +166,6 @@ impl<'a> Compositor<'a, Block> for FrameCompositor {
                 content_hash: hash(block_content),
                 coordinate: coordinate_start,
                 width: src_width,
-                block: Block {
-                    index: 0,
-                    start: item.start,
-                    width: item.width,
-                }
             };
             let keys: Vec<_> = self.caches.keys().cloned().collect();
             for key in keys {
@@ -205,7 +197,7 @@ impl<'a> Compositor<'a, Block> for FrameCompositor {
             let src_fb = frame_buffer_updates.framebuffer;
             let coordinate = frame_buffer_updates.coordinate;
 
-            let updates = match frame_buffer_updates.updates {
+            match frame_buffer_updates.updates {
                 Some(updates) => { 
                     for item in updates {
                         cache_check_and_mix(src_fb, coordinate, item)?;
@@ -228,15 +220,15 @@ impl<'a> Compositor<'a, Block> for FrameCompositor {
     }
 }
 
-impl<'a> Compositor<'a, Coord> for FrameCompositor {
-    fn composite<U: IntoIterator<Item = Coord>>(
+impl Compositor<Coord> for FrameCompositor {
+    fn composite<'a, U: IntoIterator<Item = Coord>>(
         &mut self,
-        mut bufferlist: impl IntoIterator<Item = FrameBufferUpdates<'a, Coord, U>>,
+        bufferlist: impl IntoIterator<Item = FrameBufferUpdates<'a, Coord, U>>,
     ) -> Result<(), &'static str> {
         let mut final_fb = FINAL_FRAME_BUFFER.try().ok_or("FrameCompositor fails to get the final frame buffer")?.lock();
 
         for frame_buffer_updates in bufferlist {
-            let updates = match frame_buffer_updates.updates {
+            match frame_buffer_updates.updates {
                 Some(updates) => { 
                     for item in updates {
                         item.mix_buffers(
@@ -275,10 +267,10 @@ impl Mixer for Block {
         let block_content = &src_fb.buffer()[start_index..core::cmp::min(end_index, src_buffer_len)];
 
         let coordinate_end = if end_index <= src_buffer_len {
-            coordinate_start + (src_width as isize, CACHE_BLOCK_HEIGHT as isize);
+            coordinate_start + (src_width as isize, CACHE_BLOCK_HEIGHT as isize)
         } else {
-            src_coord + (src_width as isize, src_height as isize);
-        }
+            src_coord + (src_width as isize, src_height as isize)
+        };
 
         // skip if the block is not in the screen
         if coordinate_end.x < 0

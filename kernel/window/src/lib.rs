@@ -11,7 +11,6 @@
 //!
 
 #![no_std]
-#[macro_use]
 extern crate alloc;
 extern crate mpmc;
 extern crate event_types;
@@ -35,7 +34,7 @@ use alloc::collections::BTreeMap;
 use alloc::string::{String, ToString};
 use alloc::sync::Arc;
 use alloc::vec::Vec;
-use compositor::{Compositor, FrameBufferUpdates, Mixer};
+use compositor::{Compositor, FrameBufferUpdates};
 use core::ops::Deref;
 use core::ops::DerefMut;
 use mpmc::Queue;

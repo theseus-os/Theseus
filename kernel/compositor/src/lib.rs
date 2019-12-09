@@ -6,28 +6,23 @@
 
 extern crate alloc;
 extern crate frame_buffer;
-extern crate hashbrown;
 
-use core::hash::{Hash, Hasher, BuildHasher};
 use core::iter::IntoIterator;
-use hashbrown::hash_map::{DefaultHashBuilder};
 use frame_buffer::{Coord, FrameBuffer};
-use alloc::collections::BTreeMap;
 use alloc::boxed::Box;
-use alloc::vec::{Vec, IntoIter};
 
 /// The compositor trait.
 /// A compositor composites a list of buffers to a single buffer. It caches the information of incoming buffers for better performance.
 /// `T` is the type of cache used in this framebuffer.
-pub trait Compositor<'a, T: Mixer> {
+pub trait Compositor<T: Mixer> {
     /// Composites the buffers in the bufferlist.
     ///
     /// # Arguments
     ///
     /// * `bufferlist` - A list of information about the buffers to be composited. The list is of generic type so that we can implement various compositor with different information. `U` specifices the type of item iterator and `T` is the item type to update in compositing. It can be a rectangle block or a point coordinate.
-    fn composite<U: IntoIterator<Item = T>>(
+    fn composite<'a, U: IntoIterator<Item = T>>(
         &mut self,
-        mut bufferlist: impl IntoIterator<Item = FrameBufferUpdates<'a, T, U>>,
+        bufferlist: impl IntoIterator<Item = FrameBufferUpdates<'a, T, U>>,
     ) -> Result<(), &'static str>;
 }
 
