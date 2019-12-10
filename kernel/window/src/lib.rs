@@ -41,7 +41,7 @@ use mpmc::Queue;
 use displayable::Displayable;
 use event_types::{Event, MousePositionEvent};
 use frame_buffer::{Coord, FrameBuffer, Pixel, Rectangle};
-use frame_buffer_alpha::{PixelMixer, BLACK};
+use frame_buffer_alpha::{PixelMixable, BLACK};
 use frame_buffer_compositor::{FRAME_COMPOSITOR, Block};
 use memory_structs::PhysicalAddress;
 use spin::Mutex;

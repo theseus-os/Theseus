@@ -187,8 +187,8 @@ impl FrameBuffer for FrameBufferAlpha {
     }
 }
 
-/// A pixel Mixer provides methods to mix two pixels
-pub trait PixelMixer {
+/// A pixel Mixable provides methods to mix two pixels
+pub trait PixelMixable {
     /// mix two color using alpha channel composition, supposing `self` is on the top of `other` pixel.
     fn alpha_mix(self, other: Self) -> Self;
 
@@ -208,7 +208,7 @@ pub trait PixelMixer {
     fn get_blue(&self) -> u8;
 }
 
-impl PixelMixer for Pixel {
+impl PixelMixable for Pixel {
     fn alpha_mix(self, other: Self) -> Self {
         let alpha = self.get_alpha() as u16;
         let red = self.get_red();
