@@ -52,13 +52,12 @@ lazy_static! {
     );
 }
 
-/// A block for cache. 
+/// A block profiles a rectangle area in a framebuffer. A compositor will first divide a framebuffer into blocks and only update the ones which are not cached before.
 ///
-/// In order to composite a framebuffer, the compositor will first divide it into blocks. 
-/// The height of every block is a constant 16. Blocks are aligned along the y-axis and `index` indicates the order of a block.
-/// `start` and `width` marks the area to be updated in a block in which `start` is an x coordinate relative to the leftside of the framebuffer. It the compositor gets a framebuffer together with some blocks, it just composite the area specified by these blocks.
+/// The height of every block is a constant 16. Blocks are aligned along the y-axis and `index` indicates the order of a block in the framebuffer.
+/// `start` and `width` marks the area to be updated in a block in which `start` is an x coordinate relative to the leftside of the framebuffer.
 ///
-/// After compositing, the compositor will cache the updated blocks. In the next time, for every block in a framebuffer, the compositor will ignore it if it is alreday cached.
+/// After compositing, the compositor will cache the position of an updated block and the hash of its content. In the next time, for every block in a framebuffer, the compositor will ignore it if it is alreday cached.
 pub struct Block {
     /// The index of the block in a framebuffer
     index: usize,
@@ -124,7 +123,7 @@ impl FrameCompositor {
     pub fn is_cached(&self, block: &[u32], coordinate: &Coord) -> bool {
         match self.caches.get(coordinate) {
             Some(cache) => {
-                // The same hash means the array of two blocks are the same. Since all blocks are of the same height, two blocks of the same array must share the same width. And if their contents are the same, their content_width must be the same, too.
+                // The same hash means the array of two blocks are the same. Since all blocks are of the same height, two blocks of the same array must share the same width. Therefore, the coordinate and content_hash can identify a block.
                 return cache.content_hash == hash(block)
             }
             None => return false,

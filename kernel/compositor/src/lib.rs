@@ -13,13 +13,13 @@ use alloc::boxed::Box;
 
 /// The compositor trait.
 /// A compositor composites a list of buffers to a single buffer. It caches the information of incoming buffers for better performance.
-/// `T` is the type of cache used in this framebuffer.
+/// The incoming list contains framebuffers and an iterator on shaped areas to be updated of every framebuffer. 
+/// `T` specifies the type of a shape. It implements a `Mixer` which can mix a shaped area in the source framebuffer to the final one.
 pub trait Compositor<T: Mixer> {
     /// Composites the buffers in the bufferlist.
     ///
-    /// # Arguments
-    ///
-    /// * `bufferlist` - A list of information about the buffers to be composited. The list is of generic type so that we can implement various compositor with different information. `U` specifices the type of item iterator and `T` is the item type to update in compositing. It can be a rectangle block or a point coordinate.
+    ///`bufferlist is a list of information about the buffers to be composited. An item in the list contains an interator on `Mixer` so that we can just update the areas specified by the mixers. The compositor will update the whole framebuffer if the interator of mixers is `None`. See the definition of `FrameBufferUpdates`.
+    /// A compositor will cache the updated areas for better performance.
     fn composite<'a, U: IntoIterator<Item = T>>(
         &mut self,
         bufferlist: impl IntoIterator<Item = FrameBufferUpdates<'a, T, U>>,
@@ -27,8 +27,9 @@ pub trait Compositor<T: Mixer> {
 }
 
 
-/// The framebuffers to be composited together with the information of their updated blocks.
-/// `T` specifies the type of items to update and `U` is an iterator on `T`. `T` can be any shape that implements the `Mixer` trait such as a rectangle block or a point coordinate.
+/// The framebuffers to be composited together with the information of their updated areas.
+/// `T` specifies the shape of area to update and `U` is an iterator on `T`. `T` can be any shape that implements the `Mixer` trait such as a rectangle block or a point coordinate.
+/// If the updates field is `None`, the compositor will update the whole framebuffer.
 pub struct FrameBufferUpdates<'a, T: Mixer, U: IntoIterator<Item = T>> {
     /// The framebuffer to be composited.
     pub framebuffer: &'a dyn FrameBuffer,
