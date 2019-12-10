@@ -24,6 +24,7 @@ extern crate path;
 extern crate scheduler; 
 extern crate spawn;
 extern crate window_view;
+extern crate owning_ref;
 
 mod background;
 use alloc::boxed::Box;
@@ -43,6 +44,7 @@ use path::Path;
 use spawn::{ApplicationTaskBuilder, KernelTaskBuilder};
 use spin::{Mutex, Once};
 use window_view::WindowView;
+use owning_ref::{MutexGuardRef, MutexGuardRefMut};
 
 /// The instance of the default window manager
 pub static WINDOW_MANAGER: Once<Mutex<WindowManager>> = Once::new();
@@ -291,6 +293,7 @@ impl WindowManager {
         Ok(())
     }
 
+
     /// Refresh the part of every window in `area`. Refresh the whole screen if area is None. 
     pub fn refresh_windows(&self, area: Option<Rectangle>, active: bool) -> Result<(), &'static str> {
         let update_all = area.is_none();
@@ -334,19 +337,108 @@ impl WindowManager {
                 FRAME_COMPOSITOR.lock().composite(Some(buffer_blocks))?;
            }
         }
-
+        
+        let mut windowlist = Vec::new();
         for window_ref in &self.show_list {
+            if let Some(window_mutex) = window_ref.upgrade() {
+                windowlist.push(window_mutex);
+            }
+        }
+
+        // let mut temp = Vec::new();
+        // for arcref in &bufferlist {
+        //     temp.push(arcref.deref());
+        // }
+        let mut windowlocklist = Vec::new();
+        for window_ref in &windowlist {
+            windowlocklist.push(window_ref.lock());
+        }
+
+        // let mut temp = Vec::new();
+        // for arcref in &bufferlist {
+        //     temp.push(arcref.deref());
+        // }
+        let mut fblist = Vec::new();
+        for window in &windowlocklist {
+            fblist.push(window.framebuffer.deref());
+        }
+
+        let mut bufferlist = Vec::new();
+        let mut i = 0;
+        for framebuffer in &fblist {
+            //let framebuffer = window_locked.framebuffer.deref();
+            let win_coordinate = windowlocklist.get(i).unwrap().get_position();
+            let mut relative_area = max_update_area - win_coordinate;
+            let blocks = frame_buffer_compositor::get_blocks(framebuffer.deref(), &mut relative_area);
+            if blocks.len() == 0 {
+                continue;
+            }
+            max_update_area = relative_area + win_coordinate;
+            
+            let updates = if !update_all {
+                Some(blocks.into_iter())
+            } else {
+                None
+            };
+
+            let buffer = FrameBufferUpdates {
+                framebuffer: framebuffer.deref(),
+                coordinate: win_coordinate,
+                updates: updates
+            };           
+            bufferlist.push(buffer);
+            i+=1;
+        }
+        
+        // let temp:i32 = bufferlist.iter().as_slice();;
+        // {
+        //     let a:i32 = temp[0];
+        // }
+        // for block in slice {
+
+        //     let block1 = block.upgrade().unwrap();
+        //     let block2 = block1.lock();
+        //     let block3 = MutexGuardRefMut::new(block2);
+        //     {bufferlist.push(block3)};
+        // }
+
+
+        // for window_ref in &self.show_list {
+        //     if let Some(window_mutex) = window_ref.upgrade() {
+        //         bufferlist.push(&window_mutex);
+        //     }
+        // };
+        // let mut newlist = Vec::new();
+
+        // let mut iterator = bufferlist.into_iter();
+        // for mut left in iterator.next() {
+        //     let locked = Arc::get_mut(&mut left);
+        //     newlist.push(locked);
+        // }
+
+        // for window_mut in bufferlist.pop(); {
+        //     let temp = 
+        //     if temp.is_some() {
+        //         let window_mut = temp.unwrap();
+        //         let locked = try.lock();
+        //         //let mut guard = MutexGuardRefMut::new(locked);
+        //         newlist.push(locked);
+        //     }else {
+        //         break;
+        //     }
+
+        // }
+
+        /*let mut iterator = &self.show_list.iter().map(|window_ref|{
             if let Some(window_mutex) = window_ref.upgrade() {
                 let window = window_mutex.lock();
                 let framebuffer = window.framebuffer.deref();
-                //let (width, height) = window.get_size();
-
                 let win_coordinate = window.get_position();
                 let mut relative_area = max_update_area - win_coordinate;
                 let blocks = frame_buffer_compositor::get_blocks(framebuffer.deref(), &mut relative_area);
-                if blocks.len() == 0 {
-                    continue;
-                }
+                /*if blocks.len() == 0 {
+                    return None;
+                }*/
                 max_update_area = relative_area + win_coordinate;
                 let updates = if !update_all {
                     Some(blocks.into_iter())
@@ -354,15 +446,17 @@ impl WindowManager {
                     None
                 };
 
-                let buffer_blocks = FrameBufferUpdates {
+                Some(FrameBufferUpdates {
                     framebuffer: framebuffer.deref(),
                     coordinate: win_coordinate,
                     updates: updates
-                };
-
-                FRAME_COMPOSITOR.lock().composite(Some(buffer_blocks))?;
-           }
-        }
+                })
+            } else {
+                None      
+            }
+        });*/
+        
+        FRAME_COMPOSITOR.lock().composite(bufferlist)?;
 
         if active {
             if let Some(window_mutex) = self.active.upgrade() {
@@ -432,6 +526,7 @@ impl WindowManager {
 
         self.refresh_windows(area_obj, active)
     }
+    
 
     pub fn refresh_top(&self, area: Option<Rectangle>) -> Result<(), &'static str> {
         let updates = match area {

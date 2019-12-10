@@ -2352,6 +2352,7 @@ dependencies = [
  "mod_mgmt 0.1.0",
  "mouse_data 0.1.0",
  "mpmc 0.1.6-pre",
+ "owning_ref 0.4.0 (git+https://github.com/kevinaboos/owning-ref-rs)",
  "path 0.1.0",
  "scheduler 0.1.0",
  "spawn 0.1.0",
