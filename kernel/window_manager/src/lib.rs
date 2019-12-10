@@ -338,156 +338,63 @@ impl WindowManager {
            }
         }
         
-        let mut windowlist = Vec::new();
+        let mut window_mutex_list = Vec::new();
+        for window_ref in &self.hide_list {
+            if let Some(window_mutex) = window_ref.upgrade() {
+                window_mutex_list.push(window_mutex);
+            }
+        }
         for window_ref in &self.show_list {
             if let Some(window_mutex) = window_ref.upgrade() {
-                windowlist.push(window_mutex);
+                window_mutex_list.push(window_mutex);
+            }
+        }
+        if active {
+            if let Some(window_mutex) = self.active.upgrade() {
+                window_mutex_list.push(window_mutex)
             }
         }
 
-        // let mut temp = Vec::new();
-        // for arcref in &bufferlist {
-        //     temp.push(arcref.deref());
-        // }
-        let mut windowlocklist = Vec::new();
-        for window_ref in &windowlist {
-            windowlocklist.push(window_ref.lock());
+        let mut window_locked_list = Vec::new();
+        for window_mutex in &window_mutex_list {
+            window_locked_list.push(window_mutex.lock());
         }
 
-        // let mut temp = Vec::new();
-        // for arcref in &bufferlist {
-        //     temp.push(arcref.deref());
-        // }
-        let mut fblist = Vec::new();
-        for window in &windowlocklist {
-            fblist.push(window.framebuffer.deref());
+        let mut fb_list = Vec::new();
+        for window in &window_locked_list {
+            fb_list.push(window.framebuffer.deref());
         }
 
         let mut bufferlist = Vec::new();
         let mut i = 0;
-        for framebuffer in &fblist {
+        for framebuffer in &fb_list {
             //let framebuffer = window_locked.framebuffer.deref();
-            let win_coordinate = windowlocklist.get(i).unwrap().get_position();
-            let mut relative_area = max_update_area - win_coordinate;
-            let blocks = frame_buffer_compositor::get_blocks(framebuffer.deref(), &mut relative_area);
-            if blocks.len() == 0 {
-                continue;
-            }
-            max_update_area = relative_area + win_coordinate;
-            
-            let updates = if !update_all {
-                Some(blocks.into_iter())
-            } else {
-                None
-            };
-
-            let buffer = FrameBufferUpdates {
-                framebuffer: framebuffer.deref(),
-                coordinate: win_coordinate,
-                updates: updates
-            };           
-            bufferlist.push(buffer);
-            i+=1;
-        }
-        
-        // let temp:i32 = bufferlist.iter().as_slice();;
-        // {
-        //     let a:i32 = temp[0];
-        // }
-        // for block in slice {
-
-        //     let block1 = block.upgrade().unwrap();
-        //     let block2 = block1.lock();
-        //     let block3 = MutexGuardRefMut::new(block2);
-        //     {bufferlist.push(block3)};
-        // }
-
-
-        // for window_ref in &self.show_list {
-        //     if let Some(window_mutex) = window_ref.upgrade() {
-        //         bufferlist.push(&window_mutex);
-        //     }
-        // };
-        // let mut newlist = Vec::new();
-
-        // let mut iterator = bufferlist.into_iter();
-        // for mut left in iterator.next() {
-        //     let locked = Arc::get_mut(&mut left);
-        //     newlist.push(locked);
-        // }
-
-        // for window_mut in bufferlist.pop(); {
-        //     let temp = 
-        //     if temp.is_some() {
-        //         let window_mut = temp.unwrap();
-        //         let locked = try.lock();
-        //         //let mut guard = MutexGuardRefMut::new(locked);
-        //         newlist.push(locked);
-        //     }else {
-        //         break;
-        //     }
-
-        // }
-
-        /*let mut iterator = &self.show_list.iter().map(|window_ref|{
-            if let Some(window_mutex) = window_ref.upgrade() {
-                let window = window_mutex.lock();
-                let framebuffer = window.framebuffer.deref();
-                let win_coordinate = window.get_position();
-                let mut relative_area = max_update_area - win_coordinate;
-                let blocks = frame_buffer_compositor::get_blocks(framebuffer.deref(), &mut relative_area);
-                /*if blocks.len() == 0 {
-                    return None;
-                }*/
-                max_update_area = relative_area + win_coordinate;
-                let updates = if !update_all {
-                    Some(blocks.into_iter())
-                } else {
-                    None
-                };
-
-                Some(FrameBufferUpdates {
-                    framebuffer: framebuffer.deref(),
-                    coordinate: win_coordinate,
-                    updates: updates
-                })
-            } else {
-                None      
-            }
-        });*/
-        
-        FRAME_COMPOSITOR.lock().composite(bufferlist)?;
-
-        if active {
-            if let Some(window_mutex) = self.active.upgrade() {
-                let window = window_mutex.lock();
-                let framebuffer = window.framebuffer.deref();
-                
+            if let Some(window) = window_locked_list.get(i) { 
                 let win_coordinate = window.get_position();
                 let mut relative_area = max_update_area - win_coordinate;
                 let blocks = frame_buffer_compositor::get_blocks(framebuffer.deref(), &mut relative_area);
                 if blocks.len() == 0 {
-                    return Ok(());
+                    continue;
                 }
-
+                max_update_area = relative_area + win_coordinate;
+                
                 let updates = if !update_all {
                     Some(blocks.into_iter())
                 } else {
                     None
                 };
 
-                let buffer_blocks = FrameBufferUpdates {
+                let buffer = FrameBufferUpdates {
                     framebuffer: framebuffer.deref(),
-                    coordinate: window.get_position(),
+                    coordinate: win_coordinate,
                     updates: updates
-                }; 
-
-                FRAME_COMPOSITOR.lock().composite(Some(buffer_blocks))?;
+                };           
+                bufferlist.push(buffer);
+                i+=1;
             }
         }
-       
-        Ok(())
-
+        
+        FRAME_COMPOSITOR.lock().composite(bufferlist)
     }
 
     /// Refresh the part of bottom framebuffer and every window in `area`. Refresh the whole screen if area is None. 
