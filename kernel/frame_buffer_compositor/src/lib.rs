@@ -5,20 +5,11 @@
 //! # Cache
 //! The compositor caches framebuffer blocks for better performance. 
 //!
-//! First, it divides every incoming framebuffer into blocks. The height of every block is a constant 16. The width of a block is the same as the width of the framebuffer it belongs to. A block is a continuous array so that we can compute its hash to compare the content of two blocks.
+//! First, it divides every incoming framebuffer into blocks. The height of every block is a constant 16 except for the last one. The width of a block is the same as the width of the framebuffer it belongs to. A block is a continuous array so that we can compute its hash to compare the content of two blocks.
 //!
-//! The `start` and `width` parameter represents the updated area in this block.
+//! In the next step, the compsitor checks if a block overlaps with the shape to be updated and if it is already cached. If the answer is yes, the compositor will refresh the intersection of the block with the updated shape.
 //!
-//! The compositor caches a list of displayed blocks and their updated area. If an incoming `FrameBufferUpdates` carries a list of updated blocks, the compositor compares every block with a cached one:
-//! * If the two blocks are identical, ignore it.
-//! * If a new block overlaps with an existing one, display the content and caches it.
-//! * Then we set the hash of the old cache as 0. We do not remove it because we should keep its content location and when another block arrives, their overlapped parts will be cleared. We set its content as 0 so that the compositor will redraw it if the same block arrives.
-//!
-//! If `FrameBufferUpdates` is `None`, the compositor will handle all of its blocks.
-//!
-//! The `composite_pixles` method will update the pixels relative to the top-left of the screen. It computes the relative coordinates in every framebuffer, composites them and write the result to the screen.
-//! 
-//! The compositor minimizes the updated parts of a framebuffer and clears the blank parts. Even if the cache is lost or the updated blocks information is `None`, it guarantees the result is the same.
+//! Once a block is updated, the compositor will remove all the existing caches overlap with it and cache the new one.
 
 #![no_std]
 
@@ -39,7 +30,7 @@ use compositor::{Compositor, FrameBufferUpdates, Mixable};
 use frame_buffer::{FrameBuffer, FINAL_FRAME_BUFFER, Coord, Rectangle};
 use spin::Mutex;
 
-/// The height of a cache block of the compositor
+/// The height of a cache block. See the definition of `BlockCache`.
 pub const CACHE_BLOCK_HEIGHT:usize = 16;
 
 lazy_static! {
@@ -49,47 +40,6 @@ lazy_static! {
             caches: BTreeMap::new()
         }
     );
-}
-
-/// A block profiles a rectangle area in a framebuffer. A compositor will first divide a framebuffer into blocks and only update the ones which are not cached before.
-///
-/// The height of every block is a constant 16. Blocks are aligned along the y-axis and `index` indicates the order of a block in the framebuffer.
-/// `start` and `width` marks the area to be updated in a block in which `start` is an x coordinate relative to the leftside of the framebuffer.
-///
-/// After compositing, the compositor will cache the position of an updated block and the hash of its content. In the next time, for every block in a framebuffer, the compositor will ignore it if it is alreday cached.
-pub struct Block {
-    /// The index of the block in a framebuffer
-    index: usize,
-    /// The left bound of the updated area
-    start: usize,
-    /// The width of the 
-    width: usize,
-}
-
-impl Block {
-    /// Creates a new block
-    pub fn new(index: usize, start: usize, width: usize) -> Block {
-        Block {
-            index: index,
-            start: start,
-            width: width,
-        }
-    }
-
-    /// Turn the block into a rectangle. `width` is the width of framebuffer the block is in
-    pub fn into_rectangle(self, coordinate: Coord, width: usize) -> Rectangle {
-        let rect = Rectangle {
-            top_left: Coord::new(
-                self.start as isize, 
-                (self.index * CACHE_BLOCK_HEIGHT) as isize
-            ),
-            bottom_right: Coord::new(
-                (self.start + self.width) as isize, 
-                ((self.index + 1) * CACHE_BLOCK_HEIGHT) as isize
-            )
-        };
-        rect + coordinate
-    }
 }
 
 /// Metadata that describes the cached block.
@@ -144,6 +94,15 @@ impl FrameCompositor {
         }
     }
 
+    /// Checks if a block is already cached and update the new blocks.
+    /// This function will get the `index`_th block in the framebuffer and check if it is cached. If not, it will update the intersection of the block and the update are.
+    /// It then removes the cache overlaps with the block and caches the new one. 
+    /// # Arguments
+    /// * `src_fb`: the updated source framebuffer.
+    /// * `final_fn`: the final framebuffer mapped to the screen.
+    /// * `coordinate`: the position of the source framebuffer relative to the final one.
+    /// * `index`: the index of the block to be rendered. The framebuffer are divided into y-aligned blocks and index indicates the order of the block.
+    /// * `area`: the rectangle to be updated.
     fn check_cache_and_mix(&mut self, src_fb: &dyn FrameBuffer, final_fb: &mut dyn FrameBuffer, coordinate: Coord, index: usize, area: &Rectangle) -> Result<(), &'static str> {
         let (src_width, src_height) = src_fb.get_size();
         let src_buffer_len = src_width * src_height;
@@ -162,6 +121,7 @@ impl FrameCompositor {
         if self.is_cached(&block_content, &coordinate_start) {
             return Ok(());
         }
+
         // find overlapped caches
         // extend the width of the updated part to the right side of the cached block content
         // remove caches of the same location
@@ -217,15 +177,15 @@ impl Compositor<Rectangle> for FrameCompositor {
     ) -> Result<(), &'static str> {
         let mut final_fb_locked = FINAL_FRAME_BUFFER.try().ok_or("FrameCompositor fails to get the final frame buffer")?.lock();
         let final_fb = final_fb_locked.deref_mut();
-        let mut update_area = updates.into_iter().next();
+        let update_area = updates.into_iter().next();
         for frame_buffer_updates in bufferlist.into_iter() {
             let src_fb = frame_buffer_updates.framebuffer;
             let coordinate = frame_buffer_updates.coordinate;
-            match &mut update_area {
+            match &update_area {
                 Some(area) => {
-                    let blocks = get_blocks(src_fb, coordinate, area);
+                    let blocks = get_block_index_iter(src_fb, coordinate, area);
                     for block in blocks {
-                        self.check_cache_and_mix(src_fb, final_fb.deref_mut(), coordinate, block.index, &area)?;
+                        self.check_cache_and_mix(src_fb, final_fb.deref_mut(), coordinate, block, &area)?;
                     } 
                 },
                 None => {
@@ -237,8 +197,7 @@ impl Compositor<Rectangle> for FrameCompositor {
                         bottom_right: coordinate + (src_width as isize, src_height as isize)
                     };
                     for i in 0.. block_number {
-                        let block = Block::new(i, 0, src_width);
-                        self.check_cache_and_mix(src_fb, final_fb.deref_mut(), coordinate, block.index, &area)?;
+                        self.check_cache_and_mix(src_fb, final_fb.deref_mut(), coordinate, i, &area)?;
                     }
                 } 
             };
@@ -271,47 +230,30 @@ impl Compositor<Coord> for FrameCompositor {
     }
 }
 
-/// Compute a list of cache blocks which represent the updated area. A caller can get the block list and pass them to the compositor for better performance. 
-/// 
+/// Gets a iterator over the block indexes to be updated in the framebuffer.
 /// # Arguments
 /// * `framebuffer`: the framebuffer to composite.
 /// * `coordinate`: the coordinate of the framebuffer relative to the origin(top-left) of the screen.
-/// * `area`: the updated area relative to the origin(top-left) of the screen.
-pub fn get_blocks(framebuffer: &dyn FrameBuffer, coordinate: Coord, abs_area: &mut Rectangle) -> Vec<Block> {
-    let mut relative_area = *abs_area - coordinate;
-
-    let mut blocks = Vec::new();
+/// * `area`: the updated area relative to the origin(top-left) of the screen. The returned indexes represent the blocks overlap with this area.
+pub fn get_block_index_iter(framebuffer: &dyn FrameBuffer, coordinate: Coord, abs_area: &Rectangle) -> core::ops::Range<usize> {
+    let relative_area = *abs_area - coordinate;
     let (width, height) = framebuffer.get_size();
 
     let start_x = core::cmp::max(relative_area.top_left.x, 0);
     let end_x = core::cmp::min(relative_area.bottom_right.x, width as isize);
     if start_x >= end_x {
-        return blocks;
+        return 0..0;
     }
-    let width = (end_x - start_x) as usize;        
     
     let start_y = core::cmp::max(relative_area.top_left.y, 0);
     let end_y = core::cmp::min(relative_area.bottom_right.y, height as isize);
     if start_y >= end_y {
-        return blocks;
+        return 0..0;
     }
-
-
-    let mut index = start_y as usize / CACHE_BLOCK_HEIGHT;
-    relative_area.top_left.y = core::cmp::min((index * CACHE_BLOCK_HEIGHT) as isize, relative_area.top_left.y);
-    loop {
-        if index * CACHE_BLOCK_HEIGHT >= end_y as usize {
-            break;
-        }
-        let block = Block::new(index, start_x as usize, width);
-        blocks.push(block);
-        index += 1;
-    }
-    relative_area.bottom_right.y = core::cmp::max((index * CACHE_BLOCK_HEIGHT) as isize, relative_area.bottom_right.y);
-
-    //*abs_area = relative_area + coordinate;
-
-    blocks
+    let start_index = start_y as usize / CACHE_BLOCK_HEIGHT;
+    let end_index = end_y as usize / CACHE_BLOCK_HEIGHT + 1;
+    
+    return start_index..end_index
 }
 
 /// Get the hash of a cache block

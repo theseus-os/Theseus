@@ -7,11 +7,6 @@ build = "../../build.rs"
 
 [dependencies]
 spin = "0.4.10"
-owning_ref = { git = "https://github.com/kevinaboos/owning-ref-rs" }
-
-[dependencies.log]
-default-features = false
-version = "0.3.7"
 
 [dependencies.mpmc]
 path = "../../libs/mpmc"

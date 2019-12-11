@@ -12,12 +12,14 @@ use frame_buffer::{Coord, FrameBuffer, Rectangle};
 /// The compositor trait.
 /// A compositor composites a list of buffers to a single buffer. It caches the information of incoming buffers for better performance.
 /// The incoming list contains framebuffers and an iterator on shaped areas to be updated of every framebuffer. 
-/// `T` specifies the type of a shape. It implements a `Mixable` which can mix a shaped area in the source framebuffer to the final one.
+/// `T` specifies the type of a shape. It implements `Mixable` which can mix a shaped area in the source framebuffer to the final one.
 pub trait Compositor<T: Mixable> {
     /// Composites the buffers in the bufferlist.
     ///
-    ///`bufferlist is a list of information about the buffers to be composited. An item in the list contains an interator on `Mixable` so that we can just update the areas specified by the mixers. The compositor will update the whole framebuffer if the interator of mixers is `None`. See the definition of `FrameBufferUpdates`.
-    /// A compositor will cache the updated areas for better performance.
+    /// # Arguments
+    /// * `bufferlist`: an iterator over the buffers to be composited. Every item is a framebuffer and its position relative to the top-left of the screen. 
+    /// * `updates`: a interator over the shaped to be updated. The compositor will update the shape in every framebuffer in order or the whole framebuffer if it is `None`.
+    /// A compositor can cache the updated areas for better performance.
     fn composite<'a, U: IntoIterator<Item = T> + Clone>(
         &mut self,
         bufferlist: impl IntoIterator<Item = FrameBufferUpdates<'a>>,
@@ -26,7 +28,7 @@ pub trait Compositor<T: Mixable> {
 }
 
 
-/// The framebuffers to be composited together with the position of them.
+/// The framebuffers to be composited together with the positions.
 pub struct FrameBufferUpdates<'a> {
     /// The framebuffer to be composited.
     pub framebuffer: &'a dyn FrameBuffer,
@@ -34,7 +36,7 @@ pub struct FrameBufferUpdates<'a> {
     pub coordinate: Coord,
 }
 
-/// A mixer is an item that can be mixed with the final framebuffer. A compositor can mix a list of shaped items with the final framebuffer rather than mix the whole framebuffer for better performance.
+/// A `Mixable` is an item that can be mixed with the final framebuffer. A compositor can mix a list of shaped items with the final framebuffer rather than mix the whole framebuffer for better performance.
 pub trait Mixable {
     /// Mix the item in the `src_fb` framebuffer with the final framebuffer. `src_coord` is the position of the source framebuffer relative to the top-left of the final buffer.
     fn mix_buffers(
@@ -82,21 +84,7 @@ impl Mixable for Rectangle {
     ) -> Result<(), &'static str> {
         let (final_width, final_height) = final_fb.get_size();
         let (src_width, src_height) = src_fb.get_size();
-        // let src_buffer_len = src_width * src_height;
-        // let (width, height) = self.get_size();
-        // let block_pixels = height * src_width;
-
-        // // The coordinate of the block relative to the screen
-        // let start_index = self.top_left.y * src_height;
-        // let coordinate_start = src_coord + (0, (CACHE_BLOCK_HEIGHT * self.index) as isize);
-        // let end_index = start_index + block_pixels;
-        
-
-        // let coordinate_end = if end_index <= src_buffer_len {
-        //     coordinate_start + (src_width as isize, CACHE_BLOCK_HEIGHT as isize)
-        // } else {
-        //     src_coord + (src_width as isize, src_height as isize)
-        // };
+ 
         let final_start = Coord::new(
             core::cmp::max(0, self.top_left.x),
             core::cmp::max(0, self.top_left.y)
@@ -111,7 +99,7 @@ impl Mixable for Rectangle {
 
         let src_buffer = &src_fb.buffer();
 
-        // skip if the block is not in the screen
+        // skip if the updated area is not in the source framebuffer
         if coordinate_end.x < 0
             || coordinate_start.x > final_width as isize
             || coordinate_end.y < 0
@@ -123,12 +111,11 @@ impl Mixable for Rectangle {
         let src_x_start = core::cmp::max(0, coordinate_start.x) as usize;
         let src_y_start = core::cmp::max(0, coordinate_start.y) as usize;
 
-        // just draw the part which is within the final buffer
+        // just draw the part within the final buffer
         let width = core::cmp::min(coordinate_end.x as usize, src_width) - src_x_start;
         let height = core::cmp::min(coordinate_end.y as usize, src_height) - src_y_start;
 
         // copy every line of the block to the final framebuffer.
-        // let src_buffer = src_fb.buffer();
         for i in 0..height {
             let src_start = Coord::new(src_x_start as isize, (src_y_start + i) as isize);
             let src_start_index = match src_fb.index(src_start) {

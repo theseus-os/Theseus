@@ -11,8 +11,6 @@
 extern crate spin;
 #[macro_use]
 extern crate alloc;
-#[macro_use]
-extern crate log;
 extern crate mpmc;
 extern crate event_types;
 extern crate compositor;
@@ -26,7 +24,6 @@ extern crate path;
 extern crate scheduler; 
 extern crate spawn;
 extern crate window_view;
-extern crate owning_ref;
 
 mod background;
 use alloc::boxed::Box;
@@ -44,9 +41,8 @@ use keycodes_ascii::{KeyAction, KeyEvent, Keycode};
 use mouse_data::MouseEvent;
 use path::Path;
 use spawn::{ApplicationTaskBuilder, KernelTaskBuilder};
-use spin::{Mutex, MutexGuard, Once};
+use spin::{Mutex, Once};
 use window_view::WindowView;
-use owning_ref::{MutexGuardRef, MutexGuardRefMut};
 
 /// The instance of the default window manager
 pub static WINDOW_MANAGER: Once<Mutex<WindowManager>> = Once::new();
@@ -232,7 +228,7 @@ impl WindowManager {
             coordinate: Coord::new(0, 0),
         };
 
-        // reference of windows
+        // list of windows to be updated
         let mut window_ref_list = Vec::new();
         for window in &self.hide_list {
             if let Some(window_ref) = window.upgrade() {
@@ -252,7 +248,7 @@ impl WindowManager {
         let locked_window_list = &window_ref_list.iter().map(|x| x.lock()).collect::<Vec<_>>();
 
         // create updated framebuffer info objects
-        let mut window_bufferlist = locked_window_list.iter().map(|window| {
+        let window_bufferlist = locked_window_list.iter().map(|window| {
             FrameBufferUpdates {
                 framebuffer: window.framebuffer.deref(),
                 coordinate: window.get_position(),
@@ -275,20 +271,9 @@ impl WindowManager {
         FRAME_COMPOSITOR.lock().composite(Some(top_buffer), pixels)
     }
 
-    /// Refresh the part of every window in `area`. Refresh the whole screen if area is None. 
+    /// Refresh `area` in every window. `area` is a rectangle relative to the top-left of the screen. Refresh the whole screen if area is None.
+    /// Ignore the active window if `active` is false.
     pub fn refresh_windows(&self, area: Option<Rectangle>, active: bool) -> Result<(), &'static str> {
-        let update_all = area.is_none();
-
-        let mut max_update_area = match area {
-            Some(area) => {area},
-            None => {
-                Rectangle {
-                    top_left: Coord::new(0, 0),
-                    bottom_right: Coord::new(0, 0),
-                }
-            }
-        };
-        
         // reference of windows
         let mut window_ref_list = Vec::new();
         for window in &self.hide_list {
@@ -309,80 +294,33 @@ impl WindowManager {
 
         // lock windows
         let locked_window_list = &window_ref_list.iter().map(|x| x.lock()).collect::<Vec<_>>();
-
         // create updated framebuffer info objects
         let bufferlist = locked_window_list.iter().map(|window| {
-            let framebuffer = window.framebuffer.deref();
-            let win_coordinate = window.get_position();
-            let mut relative_area = max_update_area - win_coordinate;
-            let blocks = frame_buffer_compositor::get_blocks(framebuffer.deref(), Coord::new(0, 0), &mut relative_area);
-            max_update_area = relative_area + win_coordinate;
-            
-            let updates = if !update_all {
-                Some(blocks.into_iter())
-            } else {
-                None
-            };
-
             FrameBufferUpdates {
                 framebuffer: window.framebuffer.deref(),
-                coordinate: win_coordinate,
+                coordinate: window.get_position(),
             }
         }).collect::<Vec<_>>();
         
         FRAME_COMPOSITOR.lock().composite(bufferlist.into_iter(), area)
     }
 
-    /// Refresh the part of bottom framebuffer and every window in `area`. Refresh the whole screen if area is None. 
+    /// Refresh `area` in the background and in every window. 
+    /// `area` is a rectangle relative to the top-left of the screen. Refresh the whole screen if area is None. 
+    /// Ignore the active window if `active` is false.
     pub fn refresh_bottom_windows(&self, area: Option<Rectangle>, active: bool) -> Result<(), &'static str> {
-        let update_all = area.is_none();
-        let mut update_area = Rectangle {
-            top_left: Coord::new(0, 0),
-            bottom_right: Coord::new(0, 0),
-        };
-
-        let updates = match area {
-            Some(area) => {
-                update_area = area;
-                let blocks = frame_buffer_compositor::get_blocks(self.bottom_fb.deref(), Coord::new(0, 0), &mut update_area);
-                if blocks.len() == 0 {
-                    return Ok(())
-                }
-                Some(blocks.into_iter())
-            },
-            None => None
-        };
-
         let bg_buffer = FrameBufferUpdates {
             framebuffer: self.bottom_fb.deref(),
             coordinate: Coord::new(0, 0),
         }; 
 
-        FRAME_COMPOSITOR.lock().composite(Some(bg_buffer), area)?;
-
-        let area_obj = if update_all{
-            None
-        } else {
-            Some(update_area)
-        };
-
-        self.refresh_windows(area_obj, active)
+        FRAME_COMPOSITOR.lock().composite(Some(bg_buffer), area.into_iter())?;
+        self.refresh_windows(area, active)
     }
     
+    /// Refresh `area` in the top framebuffer of the window manager. It contains the mouse and moving floating window border.
+    /// `area` is a rectangle relative to the top-left of the screen. Update the whole screen if `area` is `None`.
     pub fn refresh_top(&self, area: Option<Rectangle>) -> Result<(), &'static str> {
-        let updates = match area {
-            Some(area) => {
-                let mut update_area = area;
-                let blocks = frame_buffer_compositor::get_blocks(self.top_fb.deref(),Coord::new(0, 0), &mut update_area);
-                if blocks.len() == 0 {
-                    return Ok(())
-                }
-                Some(blocks.into_iter())
-
-            },
-            None => None
-        };
-
         let top_buffer = FrameBufferUpdates {
             framebuffer: self.top_fb.deref(),
             coordinate: Coord::new(0, 0),
@@ -555,7 +493,6 @@ impl WindowManager {
                 current_active_win.set_position(new_top_left);
                 (old_top_left, old_bottom_right, new_top_left, new_bottom_right)
             };
-            trace!("Wenqiu: try");
             self.refresh_bottom_windows(Some(Rectangle{top_left: old_top_left, bottom_right: old_bottom_right}), false)?;
             self.refresh_bottom_windows(Some(Rectangle{top_left: new_top_left, bottom_right: new_bottom_right}), true)?;
             let update_coords = self.get_mouse_coords();

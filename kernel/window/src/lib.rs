@@ -33,7 +33,6 @@ use alloc::boxed::Box;
 use alloc::collections::BTreeMap;
 use alloc::string::{String, ToString};
 use alloc::sync::Arc;
-use alloc::vec::Vec;
 use compositor::{Compositor, FrameBufferUpdates};
 use core::ops::Deref;
 use core::ops::DerefMut;
@@ -42,7 +41,7 @@ use displayable::Displayable;
 use event_types::{Event, MousePositionEvent};
 use frame_buffer::{Coord, FrameBuffer, Pixel, Rectangle};
 use frame_buffer_alpha::{PixelMixable, BLACK};
-use frame_buffer_compositor::{FRAME_COMPOSITOR, Block};
+use frame_buffer_compositor::{FRAME_COMPOSITOR};
 use memory_structs::PhysicalAddress;
 use spin::Mutex;
 use window_view::WindowView;
@@ -535,11 +534,7 @@ impl Window {
     /// refresh the top left three button's appearance
     fn refresh_three_button(&self) -> Result<(), &'static str> {
         let view = self.view.lock();
-        let mut block = Vec::new();
         let width = view.get_size().0;
-        for i in 0..self.title_size / frame_buffer_compositor::CACHE_BLOCK_HEIGHT {
-            block.push(Block::new(i, 0, width));
-        }
 
         let frame_buffer_blocks = FrameBufferUpdates {
             framebuffer: view.framebuffer.deref(),
