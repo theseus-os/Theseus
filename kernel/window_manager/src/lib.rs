@@ -260,7 +260,7 @@ impl WindowManager {
         }).rev().collect::<Vec<_>>();
         
         let buffer_iter = Some(bottom_fb).into_iter().chain(window_bufferlist.into_iter());
-        FRAME_COMPOSITOR.lock().composite(buffer_iter)?;
+        FRAME_COMPOSITOR.lock().composite(buffer_iter, None)?;
         
         Ok(())
     }
@@ -273,16 +273,8 @@ impl WindowManager {
             updates: Some(pixels)
         }; 
 
-        FRAME_COMPOSITOR.lock().composite(Some(top_buffer))
+        FRAME_COMPOSITOR.lock().composite(Some(top_buffer), None)
     }
-
-    /// Refresh the all the pixels including the bottom framebuffer, the windows and the top framebuffer.
-    pub fn refresh_pixels(&self, pixels: impl IntoIterator<Item = Coord> + Clone) -> Result<(), &'static str> {
-        self.refresh_bottom_windows_pixels(pixels.clone())?;
-        self.refresh_top_pixels(pixels)?;
-        Ok(())
-    }
-
 
     /// Refresh the part of every window in `area`. Refresh the whole screen if area is None. 
     pub fn refresh_windows(&self, area: Option<Rectangle>, active: bool) -> Result<(), &'static str> {
@@ -324,7 +316,7 @@ impl WindowManager {
             let framebuffer = window.framebuffer.deref();
             let win_coordinate = window.get_position();
             let mut relative_area = max_update_area - win_coordinate;
-            let blocks = frame_buffer_compositor::get_blocks(framebuffer.deref(), &mut relative_area);
+            let blocks = frame_buffer_compositor::get_blocks(framebuffer.deref(), Coord::new(0, 0), &mut relative_area);
             max_update_area = relative_area + win_coordinate;
             
             let updates = if !update_all {
@@ -340,7 +332,7 @@ impl WindowManager {
             }
         }).rev().collect::<Vec<_>>();
         
-        FRAME_COMPOSITOR.lock().composite(bufferlist.into_iter())
+        FRAME_COMPOSITOR.lock().composite(bufferlist.into_iter(), area)
     }
 
     /// Refresh the part of bottom framebuffer and every window in `area`. Refresh the whole screen if area is None. 
@@ -354,7 +346,7 @@ impl WindowManager {
         let updates = match area {
             Some(area) => {
                 update_area = area;
-                let blocks = frame_buffer_compositor::get_blocks(self.bottom_fb.deref(), &mut update_area);
+                let blocks = frame_buffer_compositor::get_blocks(self.bottom_fb.deref(), Coord::new(0, 0), &mut update_area);
                 if blocks.len() == 0 {
                     return Ok(())
                 }
@@ -369,7 +361,7 @@ impl WindowManager {
             updates: updates
         }; 
 
-        FRAME_COMPOSITOR.lock().composite(Some(bg_buffer))?;
+        FRAME_COMPOSITOR.lock().composite(Some(bg_buffer), area)?;
 
         let area_obj = if update_all{
             None
@@ -380,12 +372,11 @@ impl WindowManager {
         self.refresh_windows(area_obj, active)
     }
     
-
     pub fn refresh_top(&self, area: Option<Rectangle>) -> Result<(), &'static str> {
         let updates = match area {
             Some(area) => {
                 let mut update_area = area;
-                let blocks = frame_buffer_compositor::get_blocks(self.top_fb.deref(), &mut update_area);
+                let blocks = frame_buffer_compositor::get_blocks(self.top_fb.deref(),Coord::new(0, 0), &mut update_area);
                 if blocks.len() == 0 {
                     return Ok(())
                 }
@@ -401,7 +392,7 @@ impl WindowManager {
             updates: updates
         }; 
 
-        FRAME_COMPOSITOR.lock().composite(Some(top_buffer))
+        FRAME_COMPOSITOR.lock().composite(Some(top_buffer), area)
     }
     
     /// pass keyboard event to currently active window
@@ -571,7 +562,7 @@ impl WindowManager {
             self.refresh_bottom_windows(Some(Rectangle{top_left: old_top_left, bottom_right: old_bottom_right}), false)?;
             self.refresh_bottom_windows(Some(Rectangle{top_left: new_top_left, bottom_right: new_bottom_right}), true)?;
             let update_coords = self.get_mouse_coords();
-            self.refresh_pixels(update_coords.into_iter())?;
+            self.refresh_top_pixels(update_coords.into_iter())?;
         } else {
             return Err("cannot fid active window to move");
         }

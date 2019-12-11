@@ -188,17 +188,19 @@ impl Compositor<Block> for FrameCompositor {
     fn composite<'a, U: IntoIterator<Item = Block>>(
         &mut self,
         bufferlist: impl IntoIterator<Item = FrameBufferUpdates<'a, Block, U>>,
+        updates: impl IntoIterator<Item = Rectangle>
     ) -> Result<(), &'static str> {
         let mut final_fb_locked = FINAL_FRAME_BUFFER.try().ok_or("FrameCompositor fails to get the final frame buffer")?.lock();
         let final_fb = final_fb_locked.deref_mut();
+        let mut update_area = updates.into_iter().next();
 
         for frame_buffer_updates in bufferlist.into_iter() {
             let src_fb = frame_buffer_updates.framebuffer;
             let coordinate = frame_buffer_updates.coordinate;
-
-            match frame_buffer_updates.updates {
-                Some(updates) => { 
-                    for block in updates {
+            match &mut update_area {
+                Some(area) => {
+                    let blocks = get_blocks(src_fb, coordinate, area);
+                    for block in blocks {
                         self.check_cache_and_mix(src_fb, final_fb.deref_mut(), coordinate, block)?;
                     } 
                 },
@@ -223,6 +225,7 @@ impl Compositor<Coord> for FrameCompositor {
     fn composite<'a, U: IntoIterator<Item = Coord>>(
         &mut self,
         bufferlist: impl IntoIterator<Item = FrameBufferUpdates<'a, Coord, U>>,
+        updates: impl IntoIterator<Item = Rectangle>
     ) -> Result<(), &'static str> {
         let mut final_fb_locked = FINAL_FRAME_BUFFER.try().ok_or("FrameCompositor fails to get the final frame buffer")?.lock();
         let final_fb = final_fb_locked.deref_mut();
@@ -309,27 +312,30 @@ impl Mixable for Block {
 /// 
 /// # Arguments
 /// * `framebuffer`: the framebuffer to composite.
-/// * `area`: the updated area in this framebuffer.
-pub fn get_blocks(framebuffer: &dyn FrameBuffer, area: &mut Rectangle) -> Vec<Block> {
+/// * `coordinate`: the coordinate of the framebuffer relative to the origin(top-left) of the screen.
+/// * `area`: the updated area relative to the origin(top-left) of the screen.
+pub fn get_blocks(framebuffer: &dyn FrameBuffer, coordinate: Coord, area: &mut Rectangle) -> Vec<Block> {
+    let mut relative_area = *area - coordinate;
+
     let mut blocks = Vec::new();
     let (width, height) = framebuffer.get_size();
 
-    let start_x = core::cmp::max(area.top_left.x, 0);
-    let end_x = core::cmp::min(area.bottom_right.x, width as isize);
+    let start_x = core::cmp::max(relative_area.top_left.x, 0);
+    let end_x = core::cmp::min(relative_area.bottom_right.x, width as isize);
     if start_x >= end_x {
         return blocks;
     }
     let width = (end_x - start_x) as usize;        
     
-    let start_y = core::cmp::max(area.top_left.y, 0);
-    let end_y = core::cmp::min(area.bottom_right.y, height as isize);
+    let start_y = core::cmp::max(relative_area.top_left.y, 0);
+    let end_y = core::cmp::min(relative_area.bottom_right.y, height as isize);
     if start_y >= end_y {
         return blocks;
     }
 
 
     let mut index = start_y as usize / CACHE_BLOCK_HEIGHT;
-    area.top_left.y = core::cmp::min((index * CACHE_BLOCK_HEIGHT) as isize, area.top_left.y);
+    relative_area.top_left.y = core::cmp::min((index * CACHE_BLOCK_HEIGHT) as isize, relative_area.top_left.y);
     loop {
         if index * CACHE_BLOCK_HEIGHT >= end_y as usize {
             break;
@@ -338,7 +344,9 @@ pub fn get_blocks(framebuffer: &dyn FrameBuffer, area: &mut Rectangle) -> Vec<Bl
         blocks.push(block);
         index += 1;
     }
-    area.bottom_right.y = core::cmp::max((index * CACHE_BLOCK_HEIGHT) as isize, area.bottom_right.y);
+    relative_area.bottom_right.y = core::cmp::max((index * CACHE_BLOCK_HEIGHT) as isize, relative_area.bottom_right.y);
+
+    *area = relative_area + coordinate;
 
     blocks
 }

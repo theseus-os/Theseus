@@ -180,7 +180,7 @@ impl Window {
                 updates: None,
             };
 
-            FRAME_COMPOSITOR.lock().composite(Some(buffer_blocks))?;
+            FRAME_COMPOSITOR.lock().composite(Some(buffer_blocks), None)?;
         }
 
         Ok(window)
@@ -542,7 +542,13 @@ impl Window {
             coordinate: view.coordinate,
             updates: Some(block.into_iter()),
         };
-        FRAME_COMPOSITOR.lock().composite(Some(frame_buffer_blocks))?;
+
+        let update_area = Rectangle {
+            top_left: Coord::new(0, 0),
+            bottom_right: Coord::new(width as isize, self.title_size as isize)
+        };
+
+        FRAME_COMPOSITOR.lock().composite(Some(frame_buffer_blocks), Some(update_area))?;
 
         Ok(())
     }

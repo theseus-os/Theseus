@@ -7,7 +7,7 @@
 extern crate frame_buffer;
 
 use core::iter::IntoIterator;
-use frame_buffer::{Coord, FrameBuffer};
+use frame_buffer::{Coord, FrameBuffer, Rectangle};
 
 /// The compositor trait.
 /// A compositor composites a list of buffers to a single buffer. It caches the information of incoming buffers for better performance.
@@ -21,6 +21,7 @@ pub trait Compositor<T: Mixable> {
     fn composite<'a, U: IntoIterator<Item = T>>(
         &mut self,
         bufferlist: impl IntoIterator<Item = FrameBufferUpdates<'a, T, U>>,
+        updates: impl IntoIterator<Item = Rectangle>,
     ) -> Result<(), &'static str>;
 }
 
