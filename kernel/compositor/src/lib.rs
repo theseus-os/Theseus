@@ -85,6 +85,7 @@ impl Mixable for Rectangle {
         let (final_width, final_height) = final_fb.get_size();
         let (src_width, src_height) = src_fb.get_size();
  
+        // skip if the updated area is not in the final framebuffer
         let final_start = Coord::new(
             core::cmp::max(0, self.top_left.x),
             core::cmp::max(0, self.top_left.y)
@@ -94,16 +95,21 @@ impl Mixable for Rectangle {
             core::cmp::min(final_width as isize, self.bottom_right.x),
             core::cmp::min(final_height as isize, self.bottom_right.y)
         );
+        if final_end.x < 0
+            || final_start.x > final_width as isize
+            || final_end.y < 0
+            || final_start.y > final_height as isize
+        {
+            return Ok(());
+        }
+                
+        // skip if the updated area is not in the source framebuffer
         let coordinate_start = final_start - src_coord;
         let coordinate_end = final_end - src_coord;
-
-        let src_buffer = &src_fb.buffer();
-
-        // skip if the updated area is not in the source framebuffer
         if coordinate_end.x < 0
-            || coordinate_start.x > final_width as isize
+            || coordinate_start.x > src_width as isize
             || coordinate_end.y < 0
-            || coordinate_start.y > final_height as isize
+            || coordinate_start.y > src_height as isize
         {
             return Ok(());
         }
@@ -116,6 +122,7 @@ impl Mixable for Rectangle {
         let height = core::cmp::min(coordinate_end.y as usize, src_height) - src_y_start;
 
         // copy every line of the block to the final framebuffer.
+        let src_buffer = &src_fb.buffer();
         for i in 0..height {
             let src_start = Coord::new(src_x_start as isize, (src_y_start + i) as isize);
             let src_start_index = match src_fb.index(src_start) {
