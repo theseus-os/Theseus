@@ -11,6 +11,8 @@
 extern crate spin;
 #[macro_use]
 extern crate alloc;
+#[macro_use]
+extern crate log;
 extern crate mpmc;
 extern crate event_types;
 extern crate compositor;
@@ -324,11 +326,12 @@ impl WindowManager {
             } else {
                 None
             };
+        let a: Option<Option<Rectangle>> = None;
 
             FrameBufferUpdates {
                 framebuffer: window.framebuffer.deref(),
                 coordinate: win_coordinate,
-                updates: updates
+                updates: a
             }
         }).rev().collect::<Vec<_>>();
         
@@ -355,10 +358,11 @@ impl WindowManager {
             None => None
         };
 
+        let a: Option<Option<Rectangle>> = None;
         let bg_buffer = FrameBufferUpdates {
             framebuffer: self.bottom_fb.deref(),
             coordinate: Coord::new(0, 0),
-            updates: updates
+            updates: a
         }; 
 
         FRAME_COMPOSITOR.lock().composite(Some(bg_buffer), area)?;
@@ -386,10 +390,11 @@ impl WindowManager {
             None => None
         };
 
+        let a: Option<Option<Rectangle>> = None;
         let top_buffer = FrameBufferUpdates {
             framebuffer: self.top_fb.deref(),
             coordinate: Coord::new(0, 0),
-            updates: updates
+            updates: a
         }; 
 
         FRAME_COMPOSITOR.lock().composite(Some(top_buffer), area)
@@ -559,6 +564,7 @@ impl WindowManager {
                 current_active_win.set_position(new_top_left);
                 (old_top_left, old_bottom_right, new_top_left, new_bottom_right)
             };
+            trace!("Wenqiu: try");
             self.refresh_bottom_windows(Some(Rectangle{top_left: old_top_left, bottom_right: old_bottom_right}), false)?;
             self.refresh_bottom_windows(Some(Rectangle{top_left: new_top_left, bottom_right: new_bottom_right}), true)?;
             let update_coords = self.get_mouse_coords();

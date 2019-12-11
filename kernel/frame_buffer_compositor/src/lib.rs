@@ -75,6 +75,15 @@ impl Block {
             width: width,
         }
     }
+
+    /// Turn the block into a rectangle. `width` is the width of framebuffer the block is in
+    pub fn into_rectangle(self, coordinate: Coord, width: usize) -> Rectangle {
+        let rect = Rectangle {
+            top_left: Coord::new(0, (self.index * CACHE_BLOCK_HEIGHT) as isize),
+            bottom_right: Coord::new(width as isize, ((self.index + 1) * CACHE_BLOCK_HEIGHT) as isize)
+        };
+        rect + coordinate
+    }
 }
 
 /// Metadata that describes the cached block.
@@ -147,7 +156,6 @@ impl FrameCompositor {
         if self.is_cached(&block_content, &coordinate_start) {
             return Ok(());
         }
-
         // find overlapped caches
         // extend the width of the updated part to the right side of the cached block content
         // remove caches of the same location
@@ -170,7 +178,7 @@ impl FrameCompositor {
         }
 
         // render to the final framebuffer
-        item.mix_buffers(
+        item.into_rectangle(coordinate, src_width).mix_buffers(
             src_fb,
             final_fb,
             coordinate,
@@ -184,16 +192,15 @@ impl FrameCompositor {
 
 }
 
-impl Compositor<Block> for FrameCompositor {
-    fn composite<'a, U: IntoIterator<Item = Block>>(
+impl Compositor<Rectangle> for FrameCompositor {
+    fn composite<'a, U: IntoIterator<Item = Rectangle>>(
         &mut self,
-        bufferlist: impl IntoIterator<Item = FrameBufferUpdates<'a, Block, U>>,
+        bufferlist: impl IntoIterator<Item = FrameBufferUpdates<'a, Rectangle, U>>,
         updates: impl IntoIterator<Item = Rectangle>
     ) -> Result<(), &'static str> {
         let mut final_fb_locked = FINAL_FRAME_BUFFER.try().ok_or("FrameCompositor fails to get the final frame buffer")?.lock();
         let final_fb = final_fb_locked.deref_mut();
         let mut update_area = updates.into_iter().next();
-
         for frame_buffer_updates in bufferlist.into_iter() {
             let src_fb = frame_buffer_updates.framebuffer;
             let coordinate = frame_buffer_updates.coordinate;
@@ -250,72 +257,14 @@ impl Compositor<Coord> for FrameCompositor {
     }
 }
 
-impl Mixable for Block {
-    fn mix_buffers(
-        &self, 
-        src_fb: &dyn FrameBuffer, 
-        final_fb: &mut dyn FrameBuffer,
-        src_coord: Coord,
-    ) -> Result<(), &'static str> {
-        let (final_width, final_height) = final_fb.get_size();
-        let (src_width, src_height) = src_fb.get_size();
-        let src_buffer_len = src_width * src_height;
-        let block_pixels = CACHE_BLOCK_HEIGHT * src_width;
-
-        // The coordinate of the block relative to the screen
-        let start_index = block_pixels * self.index;
-        let coordinate_start = src_coord + (0, (CACHE_BLOCK_HEIGHT * self.index) as isize);
-        let end_index = start_index + block_pixels;
-        
-        let block_content = &src_fb.buffer()[start_index..core::cmp::min(end_index, src_buffer_len)];
-
-        let coordinate_end = if end_index <= src_buffer_len {
-            coordinate_start + (src_width as isize, CACHE_BLOCK_HEIGHT as isize)
-        } else {
-            src_coord + (src_width as isize, src_height as isize)
-        };
-
-        // skip if the block is not in the screen
-        if coordinate_end.x < 0
-            || coordinate_start.x > final_width as isize
-            || coordinate_end.y < 0
-            || coordinate_start.y > final_height as isize
-        {
-            return Ok(());
-        }
-
-        let final_x_start = core::cmp::max(0, coordinate_start.x) as usize;
-        let final_y_start = core::cmp::max(0, coordinate_start.y) as usize;
-
-        // just draw the part which is within the final buffer
-        let width = core::cmp::min(
-            core::cmp::min(coordinate_end.x as usize, final_width) - final_x_start,
-            self.width + self.start,
-        ) - self.start;
-        let height = core::cmp::min(coordinate_end.y as usize, final_height) - final_y_start;
-
-        // copy every line of the block to the final framebuffer.
-        // let src_buffer = src_fb.buffer();
-        for i in 0..height {
-            let dest_start = (final_y_start + i) * final_width + final_x_start + self.start;
-            let src_start = src_width * ((final_y_start + i) as isize - coordinate_start.y) as usize
-                + (final_x_start as isize - coordinate_start.x) as usize + self.start;
-            let src_end = src_start + width;
-            final_fb.composite_buffer(&(block_content[src_start..src_end]), dest_start);
-        }
-
-        Ok(())
-    }
-}
-
 /// Compute a list of cache blocks which represent the updated area. A caller can get the block list and pass them to the compositor for better performance. 
 /// 
 /// # Arguments
 /// * `framebuffer`: the framebuffer to composite.
 /// * `coordinate`: the coordinate of the framebuffer relative to the origin(top-left) of the screen.
 /// * `area`: the updated area relative to the origin(top-left) of the screen.
-pub fn get_blocks(framebuffer: &dyn FrameBuffer, coordinate: Coord, area: &mut Rectangle) -> Vec<Block> {
-    let mut relative_area = *area - coordinate;
+pub fn get_blocks(framebuffer: &dyn FrameBuffer, coordinate: Coord, abs_area: &mut Rectangle) -> Vec<Block> {
+    let mut relative_area = *abs_area - coordinate;
 
     let mut blocks = Vec::new();
     let (width, height) = framebuffer.get_size();
@@ -346,7 +295,7 @@ pub fn get_blocks(framebuffer: &dyn FrameBuffer, coordinate: Coord, area: &mut R
     }
     relative_area.bottom_right.y = core::cmp::max((index * CACHE_BLOCK_HEIGHT) as isize, relative_area.bottom_right.y);
 
-    *area = relative_area + coordinate;
+    *abs_area = relative_area + coordinate;
 
     blocks
 }

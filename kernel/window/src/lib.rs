@@ -174,7 +174,7 @@ impl Window {
             window.show_button(TopButton::Close, 1, &mut view);
             window.show_button(TopButton::MinimizeMaximize, 1, &mut view);
             window.show_button(TopButton::Hide, 1, &mut view);
-            let buffer_blocks: FrameBufferUpdates<Block, Option<Block>> = FrameBufferUpdates {
+            let buffer_blocks: FrameBufferUpdates<Rectangle, Option<Rectangle>> = FrameBufferUpdates {
                 framebuffer: view.framebuffer.deref(),
                 coordinate: coordinate,
                 updates: None,
@@ -536,11 +536,12 @@ impl Window {
         for i in 0..self.title_size / frame_buffer_compositor::CACHE_BLOCK_HEIGHT {
             block.push(Block::new(i, 0, width));
         }
+        let a: Option<Option<Rectangle>> = None;
 
         let frame_buffer_blocks = FrameBufferUpdates {
             framebuffer: view.framebuffer.deref(),
             coordinate: view.coordinate,
-            updates: Some(block.into_iter()),
+            updates: a,
         };
 
         let update_area = Rectangle {

@@ -76,3 +76,70 @@ impl Mixable for Coord {
         Ok(())
     }
 }
+
+impl Mixable for Rectangle {
+    fn mix_buffers(
+        &self, 
+        src_fb: &dyn FrameBuffer, 
+        final_fb: &mut dyn FrameBuffer,
+        src_coord: Coord,
+    ) -> Result<(), &'static str> {
+        let (final_width, final_height) = final_fb.get_size();
+        let (src_width, src_height) = src_fb.get_size();
+        // let src_buffer_len = src_width * src_height;
+        // let (width, height) = self.get_size();
+        // let block_pixels = height * src_width;
+
+        // // The coordinate of the block relative to the screen
+        // let start_index = self.top_left.y * src_height;
+        // let coordinate_start = src_coord + (0, (CACHE_BLOCK_HEIGHT * self.index) as isize);
+        // let end_index = start_index + block_pixels;
+        
+
+        // let coordinate_end = if end_index <= src_buffer_len {
+        //     coordinate_start + (src_width as isize, CACHE_BLOCK_HEIGHT as isize)
+        // } else {
+        //     src_coord + (src_width as isize, src_height as isize)
+        // };
+
+        let coordinate_start = self.top_left - src_coord;
+        let coordinate_end = self.bottom_right - src_coord;
+
+        let src_buffer = &src_fb.buffer();
+
+        // skip if the block is not in the screen
+        if coordinate_end.x < 0
+            || coordinate_start.x > final_width as isize
+            || coordinate_end.y < 0
+            || coordinate_start.y > final_height as isize
+        {
+            return Ok(());
+        }
+
+        let src_x_start = core::cmp::max(0, coordinate_start.x) as usize;
+        let src_y_start = core::cmp::max(0, coordinate_start.y) as usize;
+
+        // just draw the part which is within the final buffer
+        let width = core::cmp::min(coordinate_end.x as usize, src_width) - src_x_start;
+        let height = core::cmp::min(coordinate_end.y as usize, src_height) - src_y_start;
+
+        // copy every line of the block to the final framebuffer.
+        // let src_buffer = src_fb.buffer();
+        for i in 0..height {
+            let src_start = Coord::new(src_x_start as isize, (src_y_start + i) as isize);
+            let src_start_index = match src_fb.index(src_start) {
+                Some(index) => index,
+                None => {continue;}
+            };
+            let src_end_index = src_start_index + width;
+            let dest_start = src_start + src_coord;
+            let dest_start_index =  match final_fb.index(dest_start) {
+                Some(index) => index,
+                None => {continue;}
+            };
+            final_fb.composite_buffer(&(src_buffer[src_start_index..src_end_index]), dest_start_index as usize);
+        }
+
+        Ok(())
+    }
+}
