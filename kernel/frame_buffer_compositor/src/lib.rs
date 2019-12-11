@@ -79,8 +79,14 @@ impl Block {
     /// Turn the block into a rectangle. `width` is the width of framebuffer the block is in
     pub fn into_rectangle(self, coordinate: Coord, width: usize) -> Rectangle {
         let rect = Rectangle {
-            top_left: Coord::new(0, (self.index * CACHE_BLOCK_HEIGHT) as isize),
-            bottom_right: Coord::new(width as isize, ((self.index + 1) * CACHE_BLOCK_HEIGHT) as isize)
+            top_left: Coord::new(
+                self.start as isize, 
+                (self.index * CACHE_BLOCK_HEIGHT) as isize
+            ),
+            bottom_right: Coord::new(
+                (self.start + self.width) as isize, 
+                ((self.index + 1) * CACHE_BLOCK_HEIGHT) as isize
+            )
         };
         rect + coordinate
     }
