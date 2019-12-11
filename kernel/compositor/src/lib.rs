@@ -101,9 +101,17 @@ impl Mixable for Rectangle {
         // } else {
         //     src_coord + (src_width as isize, src_height as isize)
         // };
+        let final_start = Coord::new(
+            core::cmp::max(0, self.top_left.x),
+            core::cmp::max(0, self.top_left.y)
+        );
 
-        let coordinate_start = self.top_left - src_coord;
-        let coordinate_end = self.bottom_right - src_coord;
+        let final_end = Coord::new(
+            core::cmp::min(final_width as isize, self.bottom_right.x),
+            core::cmp::min(final_height as isize, self.bottom_right.y)
+        );
+        let coordinate_start = final_start - src_coord;
+        let coordinate_end = final_end - src_coord;
 
         let src_buffer = &src_fb.buffer();
 
