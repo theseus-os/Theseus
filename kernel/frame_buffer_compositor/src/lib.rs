@@ -144,14 +144,14 @@ impl FrameCompositor {
         }
     }
 
-    fn check_cache_and_mix(&mut self, src_fb: &dyn FrameBuffer, final_fb: &mut dyn FrameBuffer, coordinate: Coord, item: Block) -> Result<(), &'static str> {
+    fn check_cache_and_mix(&mut self, src_fb: &dyn FrameBuffer, final_fb: &mut dyn FrameBuffer, coordinate: Coord, index: usize, area: &Rectangle) -> Result<(), &'static str> {
         let (src_width, src_height) = src_fb.get_size();
         let src_buffer_len = src_width * src_height;
         let block_pixels = CACHE_BLOCK_HEIGHT * src_width;
 
         // The start pixel of the block
-        let start_index = block_pixels * item.index;
-        let coordinate_start = coordinate + (0, (CACHE_BLOCK_HEIGHT * item.index) as isize);
+        let start_index = block_pixels * index;
+        let coordinate_start = coordinate + (0, (CACHE_BLOCK_HEIGHT * index) as isize);
 
         // The end pixel of the block
         let end_index = start_index + block_pixels;
@@ -183,8 +183,19 @@ impl FrameCompositor {
             };
         }
 
+        let update_rect = Rectangle {
+            top_left: Coord::new(
+                area.top_left.x,
+                core::cmp::max((index * CACHE_BLOCK_HEIGHT) as isize + coordinate.y, area.top_left.y),
+            ),
+            bottom_right: Coord::new(
+                area.bottom_right.x,
+                core::cmp::min(((index + 1) * CACHE_BLOCK_HEIGHT) as isize + coordinate.y, area.bottom_right.y)
+            )
+        };
+
         // render to the final framebuffer
-        item.into_rectangle(coordinate, src_width).mix_buffers(
+        update_rect.mix_buffers(
             src_fb,
             final_fb,
             coordinate,
@@ -214,16 +225,20 @@ impl Compositor<Rectangle> for FrameCompositor {
                 Some(area) => {
                     let blocks = get_blocks(src_fb, coordinate, area);
                     for block in blocks {
-                        self.check_cache_and_mix(src_fb, final_fb.deref_mut(), coordinate, block)?;
+                        self.check_cache_and_mix(src_fb, final_fb.deref_mut(), coordinate, block.index, &area)?;
                     } 
                 },
                 None => {
                     // Update the whole screen if the caller does not specify the blocks
                     let (src_width, src_height) = frame_buffer_updates.framebuffer.get_size();
                     let block_number = (src_height - 1) / CACHE_BLOCK_HEIGHT + 1;
+                    let area = Rectangle {
+                        top_left: coordinate,
+                        bottom_right: coordinate + (src_width as isize, src_height as isize)
+                    };
                     for i in 0.. block_number {
                         let block = Block::new(i, 0, src_width);
-                        self.check_cache_and_mix(src_fb, final_fb.deref_mut(), coordinate, block)?;
+                        self.check_cache_and_mix(src_fb, final_fb.deref_mut(), coordinate, block.index, &area)?;
                     }
                 } 
             };
