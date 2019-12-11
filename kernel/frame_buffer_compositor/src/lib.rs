@@ -309,7 +309,7 @@ pub fn get_blocks(framebuffer: &dyn FrameBuffer, coordinate: Coord, abs_area: &m
     }
     relative_area.bottom_right.y = core::cmp::max((index * CACHE_BLOCK_HEIGHT) as isize, relative_area.bottom_right.y);
 
-    *abs_area = relative_area + coordinate;
+    //*abs_area = relative_area + coordinate;
 
     blocks
 }
