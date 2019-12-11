@@ -18,10 +18,10 @@ pub trait Compositor<T: Mixable> {
     ///
     ///`bufferlist is a list of information about the buffers to be composited. An item in the list contains an interator on `Mixable` so that we can just update the areas specified by the mixers. The compositor will update the whole framebuffer if the interator of mixers is `None`. See the definition of `FrameBufferUpdates`.
     /// A compositor will cache the updated areas for better performance.
-    fn composite<'a, U: IntoIterator<Item = T>>(
+    fn composite<'a, U: IntoIterator<Item = T> + Clone>(
         &mut self,
         bufferlist: impl IntoIterator<Item = FrameBufferUpdates<'a, T, U>>,
-        updates: impl IntoIterator<Item = Rectangle>,
+        updates: U
     ) -> Result<(), &'static str>;
 }
 

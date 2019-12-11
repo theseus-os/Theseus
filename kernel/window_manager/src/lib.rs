@@ -250,7 +250,7 @@ impl WindowManager {
         }
 
         // lock windows
-        let locked_window_list = &window_ref_list.iter().map(|x| x.lock()).rev().collect::<Vec<_>>();
+        let locked_window_list = &window_ref_list.iter().map(|x| x.lock()).collect::<Vec<_>>();
 
         // create updated framebuffer info objects
         let mut window_bufferlist = locked_window_list.iter().map(|window| {
@@ -259,23 +259,23 @@ impl WindowManager {
                 coordinate: window.get_position(),
                 updates: Some(pixels.clone())
             }
-        }).rev().collect::<Vec<_>>();
+        }).collect::<Vec<_>>();
         
         let buffer_iter = Some(bottom_fb).into_iter().chain(window_bufferlist.into_iter());
-        FRAME_COMPOSITOR.lock().composite(buffer_iter, None)?;
+        FRAME_COMPOSITOR.lock().composite(buffer_iter, pixels.clone())?;
         
         Ok(())
     }
 
     /// Refresh the pixels in the top framebuffer
-    pub fn refresh_top_pixels(&self, pixels: impl IntoIterator<Item = Coord>) -> Result<(), &'static str> {
+    pub fn refresh_top_pixels(&self, pixels: impl IntoIterator<Item = Coord> + Clone) -> Result<(), &'static str> {
         let top_buffer = FrameBufferUpdates {
             framebuffer: self.top_fb.deref(),
             coordinate: Coord::new(0, 0),
-            updates: Some(pixels)
+            updates: None
         }; 
 
-        FRAME_COMPOSITOR.lock().composite(Some(top_buffer), None)
+        FRAME_COMPOSITOR.lock().composite(Some(top_buffer), pixels)
     }
 
     /// Refresh the part of every window in `area`. Refresh the whole screen if area is None. 
@@ -311,7 +311,7 @@ impl WindowManager {
         }
 
         // lock windows
-        let locked_window_list = &window_ref_list.iter().map(|x| x.lock()).rev().collect::<Vec<_>>();
+        let locked_window_list = &window_ref_list.iter().map(|x| x.lock()).collect::<Vec<_>>();
 
         // create updated framebuffer info objects
         let bufferlist = locked_window_list.iter().map(|window| {
@@ -333,7 +333,7 @@ impl WindowManager {
                 coordinate: win_coordinate,
                 updates: a
             }
-        }).rev().collect::<Vec<_>>();
+        }).collect::<Vec<_>>();
         
         FRAME_COMPOSITOR.lock().composite(bufferlist.into_iter(), area)
     }

@@ -199,10 +199,10 @@ impl FrameCompositor {
 }
 
 impl Compositor<Rectangle> for FrameCompositor {
-    fn composite<'a, U: IntoIterator<Item = Rectangle>>(
+    fn composite<'a, U: IntoIterator<Item = Rectangle> + Clone>(
         &mut self,
         bufferlist: impl IntoIterator<Item = FrameBufferUpdates<'a, Rectangle, U>>,
-        updates: impl IntoIterator<Item = Rectangle>
+        updates: U
     ) -> Result<(), &'static str> {
         let mut final_fb_locked = FINAL_FRAME_BUFFER.try().ok_or("FrameCompositor fails to get the final frame buffer")?.lock();
         let final_fb = final_fb_locked.deref_mut();
@@ -235,29 +235,22 @@ impl Compositor<Rectangle> for FrameCompositor {
 }
 
 impl Compositor<Coord> for FrameCompositor {
-    fn composite<'a, U: IntoIterator<Item = Coord>>(
+    fn composite<'a, U: IntoIterator<Item = Coord> + Clone>(
         &mut self,
         bufferlist: impl IntoIterator<Item = FrameBufferUpdates<'a, Coord, U>>,
-        updates: impl IntoIterator<Item = Rectangle>
+        updates: U
     ) -> Result<(), &'static str> {
         let mut final_fb_locked = FINAL_FRAME_BUFFER.try().ok_or("FrameCompositor fails to get the final frame buffer")?.lock();
         let final_fb = final_fb_locked.deref_mut();
 
         for frame_buffer_updates in bufferlist {
-            match frame_buffer_updates.updates {
-                Some(updates) => { 
-                    for item in updates {
-                        item.mix_buffers(
-                            frame_buffer_updates.framebuffer,
-                            final_fb.deref_mut(),
-                            frame_buffer_updates.coordinate,
-                        )?;
-                    }
-                },
-                None => {
-                    continue;
-                } 
-            };
+            for pixel in updates.clone() {
+                pixel.mix_buffers(
+                    frame_buffer_updates.framebuffer,
+                    final_fb.deref_mut(),
+                    frame_buffer_updates.coordinate,
+                )?;
+            }
         }
         Ok(())
     }
