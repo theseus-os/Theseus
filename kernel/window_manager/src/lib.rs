@@ -230,7 +230,6 @@ impl WindowManager {
         let bottom_fb = FrameBufferUpdates {
             framebuffer: self.bottom_fb.deref(),
             coordinate: Coord::new(0, 0),
-            updates: Some(pixels.clone())
         };
 
         // reference of windows
@@ -257,12 +256,11 @@ impl WindowManager {
             FrameBufferUpdates {
                 framebuffer: window.framebuffer.deref(),
                 coordinate: window.get_position(),
-                updates: Some(pixels.clone())
             }
         }).collect::<Vec<_>>();
         
         let buffer_iter = Some(bottom_fb).into_iter().chain(window_bufferlist.into_iter());
-        FRAME_COMPOSITOR.lock().composite(buffer_iter, pixels.clone())?;
+        FRAME_COMPOSITOR.lock().composite(buffer_iter, pixels)?;
         
         Ok(())
     }
@@ -272,7 +270,6 @@ impl WindowManager {
         let top_buffer = FrameBufferUpdates {
             framebuffer: self.top_fb.deref(),
             coordinate: Coord::new(0, 0),
-            updates: None
         }; 
 
         FRAME_COMPOSITOR.lock().composite(Some(top_buffer), pixels)
@@ -326,12 +323,10 @@ impl WindowManager {
             } else {
                 None
             };
-        let a: Option<Option<Rectangle>> = None;
 
             FrameBufferUpdates {
                 framebuffer: window.framebuffer.deref(),
                 coordinate: win_coordinate,
-                updates: a
             }
         }).collect::<Vec<_>>();
         
@@ -358,11 +353,9 @@ impl WindowManager {
             None => None
         };
 
-        let a: Option<Option<Rectangle>> = None;
         let bg_buffer = FrameBufferUpdates {
             framebuffer: self.bottom_fb.deref(),
             coordinate: Coord::new(0, 0),
-            updates: a
         }; 
 
         FRAME_COMPOSITOR.lock().composite(Some(bg_buffer), area)?;
@@ -390,11 +383,9 @@ impl WindowManager {
             None => None
         };
 
-        let a: Option<Option<Rectangle>> = None;
         let top_buffer = FrameBufferUpdates {
             framebuffer: self.top_fb.deref(),
             coordinate: Coord::new(0, 0),
-            updates: a
         }; 
 
         FRAME_COMPOSITOR.lock().composite(Some(top_buffer), area)

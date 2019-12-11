@@ -20,22 +20,18 @@ pub trait Compositor<T: Mixable> {
     /// A compositor will cache the updated areas for better performance.
     fn composite<'a, U: IntoIterator<Item = T> + Clone>(
         &mut self,
-        bufferlist: impl IntoIterator<Item = FrameBufferUpdates<'a, T, U>>,
+        bufferlist: impl IntoIterator<Item = FrameBufferUpdates<'a>>,
         updates: U
     ) -> Result<(), &'static str>;
 }
 
 
-/// The framebuffers to be composited together with the information of their updated areas.
-/// `T` specifies the shape of area to update and `U` is an iterator on `T`. `T` can be any shape that implements the `Mixable` trait such as a rectangle block or a point coordinate.
-/// If the updates field is `None`, the compositor will update the whole framebuffer.
-pub struct FrameBufferUpdates<'a, T: Mixable, U: IntoIterator<Item = T>> {
+/// The framebuffers to be composited together with the position of them.
+pub struct FrameBufferUpdates<'a> {
     /// The framebuffer to be composited.
     pub framebuffer: &'a dyn FrameBuffer,
     /// The coordinate of the framebuffer where it is rendered to the final framebuffer.
     pub coordinate: Coord,
-    /// The updated blocks of the framebuffer. If `blocks` is `None`, the compositor would handle all the blocks of the framebuffer.
-    pub updates: Option<U>,
 }
 
 /// A mixer is an item that can be mixed with the final framebuffer. A compositor can mix a list of shaped items with the final framebuffer rather than mix the whole framebuffer for better performance.

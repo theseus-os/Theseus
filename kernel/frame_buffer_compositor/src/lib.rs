@@ -201,7 +201,7 @@ impl FrameCompositor {
 impl Compositor<Rectangle> for FrameCompositor {
     fn composite<'a, U: IntoIterator<Item = Rectangle> + Clone>(
         &mut self,
-        bufferlist: impl IntoIterator<Item = FrameBufferUpdates<'a, Rectangle, U>>,
+        bufferlist: impl IntoIterator<Item = FrameBufferUpdates<'a>>,
         updates: U
     ) -> Result<(), &'static str> {
         let mut final_fb_locked = FINAL_FRAME_BUFFER.try().ok_or("FrameCompositor fails to get the final frame buffer")?.lock();
@@ -237,7 +237,7 @@ impl Compositor<Rectangle> for FrameCompositor {
 impl Compositor<Coord> for FrameCompositor {
     fn composite<'a, U: IntoIterator<Item = Coord> + Clone>(
         &mut self,
-        bufferlist: impl IntoIterator<Item = FrameBufferUpdates<'a, Coord, U>>,
+        bufferlist: impl IntoIterator<Item = FrameBufferUpdates<'a>>,
         updates: U
     ) -> Result<(), &'static str> {
         let mut final_fb_locked = FINAL_FRAME_BUFFER.try().ok_or("FrameCompositor fails to get the final frame buffer")?.lock();
