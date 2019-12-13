@@ -15,6 +15,9 @@ path = "../../kernel/task"
 [dependencies.path]
 path = "../../kernel/path"
 
+[dependencies.frame_buffer]
+path = "../../kernel/frame_buffer"
+
 [dependencies.fs_node]
 path = "../../kernel/fs_node"
 

@@ -8,14 +8,16 @@ extern crate alloc;
 extern crate frame_buffer;
 #[macro_use]
 extern crate downcast_rs;
+extern crate shapes;
 
 use alloc::boxed::Box;
 use downcast_rs::Downcast;
-use frame_buffer::{FrameBuffer, Coord, Rectangle};
+use frame_buffer::{FrameBuffer, Pixel};
+use shapes::{Coord, Rectangle};
 
 /// Trait for displayables. A displayable is an item which can display itself onto a framebuffer. 
 /// It is usually a composition of basic graphs and can act as a component such as a text box, a button belonging to a window, etc. 
-pub trait Displayable: Downcast + Send {
+pub trait Displayable<T: Pixel + Copy> {
     /// Displays in a framebuffer.
     /// # Arguments
     /// * `coordinate`: the coordinate within the given `framebuffer` where this displayable should render itself. The `coordinate` is relative to the top-left point `(0, 0)` of the `framebuffer`.
@@ -25,7 +27,7 @@ pub trait Displayable: Downcast + Send {
     fn display(
         &mut self,
         coordinate: Coord,
-        framebuffer: &mut dyn FrameBuffer,
+        framebuffer: &mut FrameBuffer<T>,
     ) -> Result<Rectangle, &'static str> ;
 
     /// Resizes the displayable area.
@@ -34,4 +36,3 @@ pub trait Displayable: Downcast + Send {
     /// Gets the size of the area occupied by the displayable.
     fn get_size(&self) -> (usize, usize);
 }
-impl_downcast!(Displayable);

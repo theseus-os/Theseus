@@ -25,6 +25,7 @@ extern crate path;
 extern crate scheduler; 
 extern crate spawn;
 extern crate window_view;
+extern crate shapes;
 
 mod background;
 use alloc::boxed::Box;
@@ -36,9 +37,10 @@ use compositor::{Compositor, FrameBufferUpdates};
 use core::ops::{Deref, DerefMut};
 use mpmc::Queue;
 use event_types::{Event, MousePositionEvent};
-use frame_buffer::{Coord, FrameBuffer, Pixel, Rectangle};
+use frame_buffer::{FrameBuffer, Pixel, AlphaPixel, PixelColor};
+use shapes::{Coord, Rectangle};
 use frame_buffer_compositor::{FRAME_COMPOSITOR};
-use frame_buffer_alpha::FrameBufferAlpha;
+////
 use keycodes_ascii::{KeyAction, KeyEvent, Keycode};
 use mouse_data::MouseEvent;
 use path::Path;
@@ -47,18 +49,18 @@ use spin::{Mutex, Once};
 use window_view::WindowView;
 
 /// The instance of the default window manager
-pub static WINDOW_MANAGER: Once<Mutex<WindowManager>> = Once::new();
+pub static WINDOW_MANAGER: Once<Mutex<WindowManager<AlphaPixel>>> = Once::new();
 
 // The half size of mouse in number of pixels, the actual size of pointer is 1+2*`MOUSE_POINTER_HALF_SIZE`
 const MOUSE_POINTER_HALF_SIZE: usize = 7;
 // Transparent pixel
-const T: Pixel = 0xFF000000;
+const T: PixelColor = 0xFF000000;
 // Opaque white
-const O: Pixel = 0x00FFFFFF;
+const O: PixelColor = 0x00FFFFFF;
 // Opaque blue
-const B: Pixel = 0x00000FF;
+const B: PixelColor = 0x00000FF;
 // the mouse picture
-static MOUSE_BASIC: [[Pixel; 2 * MOUSE_POINTER_HALF_SIZE + 1];
+static MOUSE_BASIC: [[PixelColor; 2 * MOUSE_POINTER_HALF_SIZE + 1];
     2 * MOUSE_POINTER_HALF_SIZE + 1] = [
     [T, T, T, T, T, T, T, T, T, T, T, T, T, T, T],
     [T, T, T, T, T, T, T, T, T, T, T, T, T, T, T],
@@ -80,31 +82,31 @@ static MOUSE_BASIC: [[Pixel; 2 * MOUSE_POINTER_HALF_SIZE + 1];
 // the border indicating new window position and size
 const WINDOW_BORDER_SIZE: usize = 3;
 // border's inner color
-const WINDOW_BORDER_COLOR_INNER: Pixel = 0x00CA6F1E;
+const WINDOW_BORDER_COLOR_INNER: PixelColor = 0x00CA6F1E;
 
 /// Window manager structure which maintains a list of windows and a mouse.
-pub struct WindowManager {
+pub struct WindowManager<U: Pixel + Copy> {
     /// those window currently not shown on screen
-    hide_list: VecDeque<Weak<Mutex<WindowView>>>,
+    hide_list: VecDeque<Weak<Mutex<WindowView<U>>>>,
     /// those window shown on screen that may overlapping each other
-    show_list: VecDeque<Weak<Mutex<WindowView>>>,
+    show_list: VecDeque<Weak<Mutex<WindowView<U>>>>,
     /// the only active window, receiving all keyboard events (except for those remained for WM)
-    active: Weak<Mutex<WindowView>>, // this one is not in show_list
+    active: Weak<Mutex<WindowView<U>>>, // this one is not in show_list
     /// current mouse position
     mouse: Coord,
     /// If a window is being repositioned (e.g., by dragging it), this is the position of that window's border
     repositioned_border: Option<Rectangle>,
     /// the frame buffer that it should print on
-    bottom_fb: Box<dyn FrameBuffer + Send>,
+    bottom_fb: FrameBuffer<U>,
     /// the frame buffer that it should print on
-    top_fb: Box<dyn FrameBuffer + Send>,
+    top_fb: FrameBuffer<U>,
 }
 
-impl WindowManager {
+impl<U: Pixel + Copy> WindowManager<U> {
     /// set one window to active, push last active (if exists) to top of show_list. if `refresh` is `true`, will then refresh the window's area
     pub fn set_active(
         &mut self,
-        objref: &Arc<Mutex<WindowView>>,
+        objref: &Arc<Mutex<WindowView<U>>>,
         refresh: bool,
     ) -> Result<(), &'static str> {
         // if it is currently actived, just return
@@ -148,7 +150,7 @@ impl WindowManager {
     }
 
     /// Return the index of a window if it is in the show list
-    fn is_window_in_show_list(&mut self, objref: &Arc<Mutex<WindowView>>) -> Option<usize> {
+    fn is_window_in_show_list(&mut self, objref: &Arc<Mutex<WindowView<U>>>) -> Option<usize> {
         let mut i = 0_usize;
         for item in self.show_list.iter() {
             if let Some(item_ptr) = item.upgrade() {
@@ -162,7 +164,7 @@ impl WindowManager {
     }
 
     /// Return the index of a window if it is in the hide list
-    fn is_window_in_hide_list(&mut self, objref: &Arc<Mutex<WindowView>>) -> Option<usize> {
+    fn is_window_in_hide_list(&mut self, objref: &Arc<Mutex<WindowView<U>>>) -> Option<usize> {
         let mut i = 0_usize;
         for item in self.hide_list.iter() {
             if let Some(item_ptr) = item.upgrade() {
@@ -176,7 +178,7 @@ impl WindowManager {
     }
 
     /// delete a window and refresh its region
-    pub fn delete_window(&mut self, objref: &Arc<Mutex<WindowView>>) -> Result<(), &'static str> {
+    pub fn delete_window(&mut self, objref: &Arc<Mutex<WindowView<U>>>) -> Result<(), &'static str> {
         let (top_left, bottom_right) = {
             let view = objref.lock();
             let top_left = view.get_position();
@@ -226,7 +228,7 @@ impl WindowManager {
     pub fn refresh_bottom_windows_pixels(&self, pixels: impl IntoIterator<Item = Coord> + Clone) -> Result<(), &'static str> {
         // bottom framebuffer
         let bottom_fb = FrameBufferUpdates {
-            framebuffer: self.bottom_fb.deref(),
+            framebuffer: &self.bottom_fb,
             coordinate: Coord::new(0, 0),
         };
 
@@ -252,7 +254,7 @@ impl WindowManager {
         // create updated framebuffer info objects
         let window_bufferlist = locked_window_list.iter().map(|window| {
             FrameBufferUpdates {
-                framebuffer: window.framebuffer.deref(),
+                framebuffer: &window.framebuffer,
                 coordinate: window.get_position(),
             }
         }).collect::<Vec<_>>();
@@ -266,7 +268,7 @@ impl WindowManager {
     /// Refresh the pixels in the top framebuffer
     pub fn refresh_top_pixels(&self, pixels: impl IntoIterator<Item = Coord> + Clone) -> Result<(), &'static str> {
         let top_buffer = FrameBufferUpdates {
-            framebuffer: self.top_fb.deref(),
+            framebuffer: &self.top_fb,
             coordinate: Coord::new(0, 0),
         }; 
 
@@ -299,7 +301,7 @@ impl WindowManager {
         // create updated framebuffer info objects
         let bufferlist = locked_window_list.iter().map(|window| {
             FrameBufferUpdates {
-                framebuffer: window.framebuffer.deref(),
+                framebuffer: &window.framebuffer,
                 coordinate: window.get_position(),
             }
         }).collect::<Vec<_>>();
@@ -312,7 +314,7 @@ impl WindowManager {
     /// Ignore the active window if `active` is false.
     pub fn refresh_bottom_windows(&self, area: Option<Rectangle>, active: bool) -> Result<(), &'static str> {
         let bg_buffer = FrameBufferUpdates {
-            framebuffer: self.bottom_fb.deref(),
+            framebuffer: &self.bottom_fb,
             coordinate: Coord::new(0, 0),
         }; 
 
@@ -324,7 +326,7 @@ impl WindowManager {
     /// `area` is a rectangle relative to the top-left of the screen. Update the whole screen if `area` is `None`.
     pub fn refresh_top(&self, area: Option<Rectangle>) -> Result<(), &'static str> {
         let top_buffer = FrameBufferUpdates {
-            framebuffer: self.top_fb.deref(),
+            framebuffer: &self.top_fb,
             coordinate: Coord::new(0, 0),
         }; 
 
@@ -444,7 +446,7 @@ impl WindowManager {
 
     /// draw the floating border with color. Return pixels of the border.
     /// `start` and `end` indicates the top-left and bottom-right corner of the border.
-    fn draw_floating_border(&mut self, top_left: Coord, bottom_right: Coord, color: Pixel) -> Vec<Coord> {
+    fn draw_floating_border(&mut self, top_left: Coord, bottom_right: Coord, color: PixelColor) -> Vec<Coord> {
         let mut pixels = Vec::new();
 
         for i in 0..(WINDOW_BORDER_SIZE) as isize {
@@ -455,7 +457,7 @@ impl WindowManager {
                 break;
             }
             frame_buffer_drawer::draw_rectangle(
-                self.top_fb.deref_mut(), 
+                &mut self.top_fb, 
                 coordinate, 
                 width as usize, 
                 height as usize, 
@@ -534,7 +536,7 @@ impl WindowManager {
                 self.mouse.x - MOUSE_POINTER_HALF_SIZE as isize..self.mouse.x + MOUSE_POINTER_HALF_SIZE as isize + 1
             {
                 let coordinate = Coord::new(x, y);
-                self.top_fb.overwrite_pixel(coordinate, T);
+                self.top_fb.overwrite_pixel(coordinate, U::from(T));
             }
         }
         let update_coords = self.get_mouse_coords();
@@ -553,7 +555,7 @@ impl WindowManager {
                             [(MOUSE_POINTER_HALF_SIZE as isize + y - new.y) as usize];
                 self.top_fb.overwrite_pixel(
                         coordinate,
-                        pixel,
+                        U::from(pixel),
                 );
             }
         }
@@ -597,7 +599,7 @@ impl WindowManager {
     }
 
     /// Whether a window is active
-    pub fn is_active(&self, objref: &Arc<Mutex<WindowView>>) -> bool {
+    pub fn is_active(&self, objref: &Arc<Mutex<WindowView<U>>>) -> bool {
         if let Some(current_active) = self.active.upgrade() {
             if Arc::ptr_eq(&(current_active), objref) {
                 return true;
@@ -632,9 +634,9 @@ impl WindowManager {
 /// Initialize the window manager, should provide the consumer of keyboard and mouse event, as well as a frame buffer to draw
 pub fn init() -> Result<(Queue<Event>, Queue<Event>), &'static str> {
     font::init()?;
-    let (width, height) = frame_buffer_alpha::init()?;
-    let mut bg_framebuffer = FrameBufferAlpha::new(width, height, None)?;
-    let mut top_framebuffer = FrameBufferAlpha::new(width, height, None)?;
+    let (width, height) = frame_buffer::init()?;
+    let mut bg_framebuffer = FrameBuffer::new(width, height, None)?;
+    let mut top_framebuffer = FrameBuffer::new(width, height, None)?;
 
     // initialize the framebuffer
     let (screen_width, screen_height) = bg_framebuffer.get_size();
@@ -642,21 +644,21 @@ pub fn init() -> Result<(Queue<Event>, Queue<Event>), &'static str> {
         for y in 0..screen_height {
             bg_framebuffer.draw_pixel(
                 Coord::new(x as isize, y as isize),
-                background::BACKGROUND[y / 2][x / 2]
+                Pixel::from(background::BACKGROUND[y / 2][x / 2])
             )
         }
     }
-    top_framebuffer.fill_color(T); 
+    top_framebuffer.fill_color(Pixel::from(T)); 
 
     // initialize static window manager
-    let window_manager = WindowManager {
+    let window_manager: WindowManager<AlphaPixel> = WindowManager {
         hide_list: VecDeque::new(),
         show_list: VecDeque::new(),
         active: Weak::new(),
         mouse: Coord { x: 0, y: 0 },
         repositioned_border: None,
-        bottom_fb: Box::new(bg_framebuffer),
-        top_fb: Box::new(top_framebuffer),
+        bottom_fb: bg_framebuffer,
+        top_fb: top_framebuffer,
     };
     WINDOW_MANAGER.call_once(|| Mutex::new(window_manager));
 

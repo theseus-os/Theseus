@@ -15,13 +15,14 @@ extern crate event_types;
 extern crate displayable;
 extern crate font;
 extern crate frame_buffer;
-extern crate frame_buffer_rgb;
 extern crate frame_buffer_drawer;
 extern crate frame_buffer_printer;
 extern crate tsc;
 extern crate window_manager;
 extern crate window;
 extern crate text_display;
+extern crate shapes;
+extern crate spin;
 
 use core::ops::DerefMut;
 use alloc::string::{String, ToString};
@@ -31,9 +32,12 @@ use cursor::*;
 use text_display::TextDisplay;
 use event_types::Event;
 use font::{CHARACTER_HEIGHT, CHARACTER_WIDTH};
-use frame_buffer::{Coord, FrameBuffer, Rectangle};
+use frame_buffer::{FrameBuffer, Pixel};
+use shapes::{Coord, Rectangle};
 use tsc::{tsc_ticks, TscTicks};
 use window::Window;
+use window_manager::WindowManager;
+use spin::Mutex;
 
 pub mod cursor;
 
@@ -58,9 +62,9 @@ pub enum ScrollError {
 /// 2) The input queue (in the window manager) that handles keypresses and resize events
 ///     - Consumer is the main terminal loop
 ///     - Producer is the window manager. Window manager is responsible for enqueuing keyevents into the active application
-pub struct Terminal {
+pub struct Terminal<T: Pixel + Copy> {
     /// The terminal's own window.
-    pub window: Window,
+    pub window: Window<T>,
     /// Name of the text displayable of the terminal
     display_name: String,
     /// The terminal's scrollback buffer which stores a string to be displayed by the text display
@@ -69,22 +73,23 @@ pub struct Terminal {
     is_scroll_end: bool,
     /// The starting index of the scrollback buffer string slice that is currently being displayed on the text display
     scroll_start_idx: usize,
+    text_display: TextDisplay,
     /// The cursor of the terminal.
     pub cursor: Cursor
 }
 
 /// Privite methods of `Terminal`.
-impl Terminal {
+impl<T: Pixel + Copy> Terminal<T> {
     /// Get the width and height of the text displayable in the unit of characters.
     pub fn get_text_dimensions(&self) -> (usize, usize) {
-        let text_display = match self.window.get_concrete_display::<TextDisplay>(&self.display_name) {
+        /*let text_display = match self.window.get_concrete_display::<TextDisplay>(&self.display_name) {
             Ok(text_display) => text_display,
             Err(err) => {
                 debug!("get_text_dimensions(): {}", err);
                 return (0, 0);
             }
-        };
-        text_display.get_dimensions()
+        };*/
+        self.text_display.get_dimensions()
     }
 
     /// This function takes in the end index of some index in the scrollback buffer and calculates the starting index of the
@@ -396,10 +401,10 @@ impl Terminal {
         let result  = self.scrollback_buffer.get(start_idx..=end_idx); // =end_idx includes the end index in the slice
         if let Some(slice) = result {
             {
-                let text_display = self.window.get_concrete_display_mut::<TextDisplay>(&self.display_name)?;
-                text_display.set_text(slice);
+                //let text_display = self.window.get_concrete_display_mut::<TextDisplay>(&self.display_name)?;
+                self.text_display.set_text(slice);
             }
-            self.window.display(&self.display_name)?;
+            self.window.display(&mut self.text_display, Coord::new(0, 0))?;
         } else {
             return Err("could not get slice of scrollback buffer string");
         }
@@ -415,10 +420,10 @@ impl Terminal {
 
         if let Some(slice) = result {
             {
-                let text_display = self.window.get_concrete_display_mut::<TextDisplay>(&self.display_name)?;
-                text_display.set_text(slice);
+                //let text_display = self.window.get_concrete_display_mut::<TextDisplay>(&self.display_name)?;
+                self.text_display.set_text(slice);
             }
-            self.window.display(&self.display_name)?;        
+            self.window.display(&mut self.text_display, Coord::new(0, 0))?;        
         } else {
             return Err("could not get slice of scrollback buffer string");
         }
@@ -427,13 +432,14 @@ impl Terminal {
 }
 
 /// Public methods of `Terminal`.
-impl Terminal {
-    pub fn new() -> Result<Terminal, &'static str> {
+impl<T: Pixel + Copy> Terminal<T> {
+    pub fn new(wm_mutex: &Mutex<WindowManager<T>>) -> Result<Terminal<T>, &'static str> {
         let (window_width, window_height) = {
-            let wm = window_manager::WINDOW_MANAGER
-                .try()
-                .ok_or("The static window manager was not yet initialized")?
-                .lock();
+            // let wm = window_manager::WINDOW_MANAGER
+            //     .try()
+            //     .ok_or("The static window manager was not yet initialized")?
+            //     .lock();
+            let wm = wm_mutex.lock();
             wm.get_screen_size()
         };
         const WINDOW_MARGIN: usize = 20;
@@ -442,7 +448,7 @@ impl Terminal {
             window_width - 2 * WINDOW_MARGIN, 
             window_height - 2 * WINDOW_MARGIN,
             0,
-            &frame_buffer_rgb::new
+            wm_mutex//&frame_buffer_rgb::new
         )?;
         
         let (width_inner, height_inner) = window.inner_size();
@@ -455,10 +461,11 @@ impl Terminal {
             scrollback_buffer: String::new(),
             scroll_start_idx: 0,
             is_scroll_end: true,
+            text_display: text_display,
             cursor: Cursor::new(),
         };
-        terminal.window.add_displayable(&display_name, Coord::new(0, 0), Box::new(text_display))?;
-        terminal.window.display(&display_name)?;
+        //terminal.window.add_displayable(&display_name, Coord::new(0, 0), Box::new(text_display))?;
+        terminal.window.display(&mut terminal.text_display, Coord::new(0, 0))?;
 
         terminal.print_to_terminal(format!("Theseus Terminal Emulator\nPress Ctrl+C to quit a task\n"));
         Ok(terminal)
@@ -603,8 +610,8 @@ impl Terminal {
     }
 
     /// Get a key event from the underlying window.
-    pub fn get_event(&mut self) -> Option<Event> {
-        match self.window.handle_event() {
+    pub fn get_event(&mut self, wm: &Mutex<WindowManager<T>>) -> Option<Event> {
+        match self.window.handle_event(wm) {
             Err(_e) => {
                 return Some(Event::ExitEvent);
             }
@@ -623,12 +630,12 @@ impl Terminal {
     pub fn display_cursor(
         &mut self
     ) -> Result<(), &'static str> {
-        let coordinate = self.window.get_displayable_position(&self.display_name)?;
+        let coordinate = self.window.inner_position();//self.window.get_displayable_position(&self.display_name)?;
         // get info about the text displayable
         let (col_num, line_num, text_next_pos) = {
-            let text_display = self.window.get_concrete_display::<TextDisplay>(&self.display_name)?;
-            let text_next_pos = text_display.get_next_index();
-            let (col_num, line_num) = text_display.get_dimensions();
+            //let text_display = self.window.get_concrete_display::<TextDisplay>(&self.display_name)?;
+            let text_next_pos = self.text_display.get_next_index();
+            let (col_num, line_num) = self.text_display.get_dimensions();
             (col_num, line_num, text_next_pos)
         };
 
@@ -649,7 +656,7 @@ impl Terminal {
                 coordinate,
                 cursor_col,
                 cursor_line,
-                window.framebuffer.deref_mut(),
+                &mut window.framebuffer,
             )?;
             area
         };   

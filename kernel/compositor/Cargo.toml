@@ -8,5 +8,8 @@ build = "../../build.rs"
 [dependencies.frame_buffer]
 path = "../frame_buffer"
 
+[dependencies.shapes]
+path = "../shapes"
+
 [lib]
 crate-type = ["rlib"]

@@ -11,6 +11,9 @@ spin = "0.4.10"
 [dependencies.frame_buffer]
 path = "../frame_buffer"
 
+[dependencies.shapes]
+path = "../shapes"
+
 [dependencies.compositor]
 path = "../compositor"
 

@@ -23,6 +23,9 @@ path = "../compositor"
 [dependencies.frame_buffer_compositor]
 path = "../frame_buffer_compositor"
 
+[dependencies.shapes]
+path = "../shapes"
+
 [dependencies.frame_buffer]
 path = "../frame_buffer"
 

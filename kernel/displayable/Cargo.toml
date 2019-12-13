@@ -12,5 +12,8 @@ downcast-rs = "1.0.4"
 [dependencies.frame_buffer]
 path = "../frame_buffer"
 
+[dependencies.shapes]
+path = "../shapes"
+
 [lib]
 crate-type = ["rlib"]

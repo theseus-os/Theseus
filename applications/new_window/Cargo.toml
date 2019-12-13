@@ -14,8 +14,8 @@ x86_64 = { path = "../../libs/x86_64" }
 default-features = false
 version = "0.3.7"
 
-[dependencies.frame_buffer]
-path = "../../kernel/frame_buffer"
+[dependencies.shapes]
+path = "../../kernel/shapes"
 
 [dependencies.frame_buffer_alpha]
 path = "../../kernel/frame_buffer_alpha"

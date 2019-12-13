@@ -41,7 +41,6 @@ extern crate device_manager;
 extern crate e1000;
 extern crate scheduler;
 extern crate frame_buffer;
-extern crate frame_buffer_rgb;
 extern crate frame_buffer_alpha;
 extern crate font;
 #[cfg(mirror_log_to_vga)] #[macro_use] extern crate print;
@@ -62,7 +61,6 @@ use memory::{VirtualAddress, MemoryManagementInfo, MappedPages};
 use kernel_config::memory::KERNEL_STACK_SIZE_IN_PAGES;
 use irq_safety::{MutexIrqSafe, enable_interrupts};
 use pause::spin_loop_hint;
-use frame_buffer_alpha::FrameBufferAlpha;
 
 
 

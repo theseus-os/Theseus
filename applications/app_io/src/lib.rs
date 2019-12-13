@@ -25,6 +25,8 @@ extern crate libterm;
 extern crate scheduler;
 extern crate serial_port;
 extern crate core_io;
+extern crate frame_buffer;
+extern crate window_manager;
 
 use stdio::{StdioReader, StdioWriter, KeyEventReadGuard,
             KeyEventQueueReader};
@@ -35,6 +37,7 @@ use alloc::sync::Arc;
 use alloc::string::String;
 use alloc::vec::Vec;
 use libterm::Terminal;
+use frame_buffer::pixel::AlphaPixel;
 
 /// Stores the stdio queues, key event queue and the pointer to the terminal
 /// for applications. This structure is provided for application's use and only
@@ -51,7 +54,7 @@ pub struct IoStreams {
     /// shell. Apps can take this reader to directly access keyboard events.
     key_event_reader: Arc<Mutex<Option<KeyEventQueueReader>>>,
     /// Points to the terminal.
-    terminal: Arc<Mutex<Terminal>>
+    terminal: Arc<Mutex<Terminal<AlphaPixel>>>
 }
 
 /// Applications set the flags in this structure to inform the parent shell to
@@ -76,7 +79,7 @@ impl IoStreams {
     pub fn new(stdin: StdioReader, stdout: StdioWriter,
                stderr: StdioWriter,
                key_event_reader: Arc<Mutex<Option<KeyEventQueueReader>>>,
-               terminal: Arc<Mutex<Terminal>>) -> IoStreams {
+               terminal: Arc<Mutex<Terminal<AlphaPixel>>>) -> IoStreams {
         IoStreams {
             stdin,
             stdout,
@@ -132,21 +135,29 @@ mod shared_maps {
 
 lazy_static! {
     /// The default terminal.
-    static ref DEFAULT_TERMINAL: Option<Arc<Mutex<Terminal>>> =
-        match Terminal::new() {
-            Ok(terminal) => Some(Arc::new(Mutex::new(terminal))),
-            Err(err) => {
-                debug!("Fail to create the default terminal: {}", err);
-                None
-            }
-        };
+    static ref DEFAULT_TERMINAL: Option<Arc<Mutex<Terminal<AlphaPixel>>>> = {
+
+        match window_manager::WINDOW_MANAGER.try() {
+            Some(wm) => {
+                match Terminal::new(wm) {
+                    Ok(terminal) => Some(Arc::new(Mutex::new(terminal))),
+                    Err(err) => {
+                        debug!("Fail to create the default terminal: {}", err);
+                        None
+                    }
+                }
+            },
+            None => None
+        }
+    };
+        
 }
 
 /// Applications call this function to get the terminal to which it should print.
 /// If the calling application has already been assigned a terminal to print, that assigned
 /// terminal is returned. Otherwise, the default terminal is assigned to the calling application
 /// and then returned.
-pub fn get_terminal_or_default() -> Result<Arc<Mutex<Terminal>>, &'static str> {
+pub fn get_terminal_or_default() -> Result<Arc<Mutex<Terminal<AlphaPixel>>>, &'static str> {
     
     let task_id = task::get_my_current_task_id()
                       .ok_or("Cannot get task ID for getting default terminal")?;

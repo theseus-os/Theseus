@@ -80,12 +80,12 @@ impl Cursor {
     /// * `column`: the column of the cursor in the textarea.
     /// * `line`: the line of the cursor in the textarea.
     /// * `framebuffer`: the framebuffer to display the cursor in.
-    pub fn display(
+    pub fn display<T: Pixel + Copy>(
         &mut self,
         coordinate: Coord,
         column: usize,
         line: usize,
-        framebuffer: &mut dyn FrameBuffer,
+        framebuffer: &mut FrameBuffer<T>,
     ) -> Result<Rectangle, &'static str> {
         if self.blink() {
             if self.show() {

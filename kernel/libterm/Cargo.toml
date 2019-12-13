@@ -5,6 +5,7 @@ authors = ["Andrew Pham <apham727@gmail.com>", "Zhiyao Ma <zm16@pku.edu.cn>"]
 build = "../../build.rs"
 
 [dependencies]
+spin = "0.4.10"
 
 [dependencies.log]
 default-features = false
@@ -36,11 +37,11 @@ path = "../displayable"
 [dependencies.frame_buffer]
 path = "../frame_buffer"
 
+[dependencies.shapes]
+path = "../shapes"
+
 [dependencies.frame_buffer_drawer]
 path = "../frame_buffer_drawer"
-
-[dependencies.frame_buffer_rgb]
-path = "../frame_buffer_rgb"
 
 [dependencies.frame_buffer_printer]
 path = "../frame_buffer_printer"

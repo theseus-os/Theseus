@@ -9,19 +9,21 @@ extern crate mpmc;
 extern crate event_types;
 extern crate frame_buffer;
 extern crate spin;
+extern crate shapes;
 
 use alloc::boxed::Box;
 use alloc::sync::Arc;
 use mpmc::Queue;
 use event_types::{Event};
-use frame_buffer::{Coord, FrameBuffer, Pixel};
+use frame_buffer::{FrameBuffer, Pixel, PixelColor};
+use shapes::Coord;
 use spin::{Mutex};
 
 // The default color of a window;
-const WINDOW_DEFAULT_COLOR: Pixel = 0x80FFFFFF;
+const WINDOW_DEFAULT_COLOR: PixelColor = 0x80FFFFFF;
 
 /// WindowView object that should be owned by the manager. It is usually owned by both an application's window and the manager so that the application can modify it and the manager can re-display it when necessary.
-pub struct WindowView {
+pub struct WindowView<T: Pixel + Copy> {
     /// The position of the top-left corner of the window.
     /// It is relative to the top-left corner of the screen.
     pub coordinate: Coord,
@@ -33,7 +35,7 @@ pub struct WindowView {
     pub consumer: Queue<Event>, // event input
     pub producer: Queue<Event>, // event output used by window manager
     /// frame buffer of this window
-    pub framebuffer: Box<dyn FrameBuffer + Send>,
+    pub framebuffer: FrameBuffer<T>,
     /// if true, window manager will send all mouse event to this window, otherwise only when mouse is on this window does it send.
     /// This is extremely helpful when application wants to know mouse movement outside itself, because by default window manager only sends mouse event
     /// when mouse is in the window's region. This is used when user move the window, to receive mouse event when mouse is out of the current window.
@@ -45,11 +47,11 @@ pub struct WindowView {
     pub moving_base: Coord,
 }
 
-impl WindowView {
+impl<T: Pixel + Copy> WindowView<T> {
 
     /// Clear the content of a window
     pub fn clear(&mut self) -> Result<(), &'static str> {
-        self.framebuffer.fill_color(WINDOW_DEFAULT_COLOR);
+        self.framebuffer.fill_color(T::from(WINDOW_DEFAULT_COLOR));
         Ok(())
     }
 
@@ -79,16 +81,16 @@ impl WindowView {
         self.coordinate = coordinate;
     }
 
-    pub fn get_pixel(&self, coordinate: Coord) -> Result<Pixel, &'static str> {
+    pub fn get_pixel(&self, coordinate: Coord) -> Result<T, &'static str> {
         self.framebuffer.get_pixel(coordinate)
     }
 }
 
 /// Creates a new window object with given position and size
-pub fn new_window<'a>(
+pub fn new_window<'a, T: Pixel + Copy>(
     coordinate: Coord,
-    framebuffer: Box<dyn FrameBuffer + Send>,
-) -> Result<Arc<Mutex<WindowView>>, &'static str> {
+    framebuffer: FrameBuffer<T>,
+) -> Result<Arc<Mutex<WindowView<T>>>, &'static str> {
     // Init the key input producer and consumer
     let consumer = Queue::with_capacity(100);
     let producer = consumer.clone();
@@ -96,7 +98,7 @@ pub fn new_window<'a>(
     let (width, height) = framebuffer.get_size();
 
     // new window object
-    let window: WindowView = WindowView {
+    let window: WindowView<T> = WindowView {
         coordinate: coordinate,
         width: width,
         height: height,

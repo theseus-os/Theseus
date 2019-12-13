@@ -9,11 +9,13 @@ extern crate font;
 extern crate frame_buffer;
 extern crate frame_buffer_drawer;
 extern crate frame_buffer_printer;
+extern crate shapes;
 
 use alloc::string::String;
 use displayable::{Displayable};
 use font::{CHARACTER_HEIGHT, CHARACTER_WIDTH};
-use frame_buffer::{Coord, FrameBuffer, Rectangle};
+use frame_buffer::{Pixel, FrameBuffer};
+use shapes::{Coord, Rectangle};
 
 /// A generic text displayable profiles the size and color of a block of text. It can display in a framebuffer.
 pub struct TextDisplay {
@@ -29,11 +31,11 @@ pub struct TextDisplay {
     cache: String,
 }
 
-impl Displayable for TextDisplay {
+impl<T: Pixel + Copy> Displayable<T> for TextDisplay {
     fn display(
         &mut self,
         coordinate: Coord,
-        framebuffer: &mut dyn FrameBuffer,
+        framebuffer: &mut FrameBuffer<T>,
     ) -> Result<Rectangle, &'static str> {
         let (string, col, line) =
             if self.cache.len() > 0 && self.text.starts_with(self.cache.as_str()) {

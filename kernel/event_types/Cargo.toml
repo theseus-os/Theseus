@@ -8,8 +8,8 @@ build = "../../build.rs"
 [dependencies.keycodes_ascii]
 path = "../../libs/keycodes_ascii"
 
-[dependencies.frame_buffer]
-path = "../frame_buffer"
+[dependencies.shapes]
+path = "../shapes"
 
 [dependencies.mouse_data]
 path = "../../libs/mouse_data"

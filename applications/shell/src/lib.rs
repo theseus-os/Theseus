@@ -24,6 +24,7 @@ extern crate terminal_print;
 extern crate print;
 extern crate environment;
 extern crate libterm;
+extern crate frame_buffer;
 
 #[macro_use] extern crate alloc;
 #[macro_use] extern crate log;
@@ -48,6 +49,8 @@ use core_io::Write;
 use core::ops::Deref;
 use app_io::{IoStreams, IoControlFlags};
 use fs_node::FileOrDir;
+use frame_buffer::{AlphaPixel, Pixel};
+use window_manager::WindowManager;
 
 /// The status of a job.
 #[derive(PartialEq)]
@@ -138,7 +141,7 @@ enum AppErr {
     SpawnErr(String)
 }
 
-struct Shell {
+struct Shell<T:Pixel + Copy> {
     /// Variable that stores the task id of any application manually spawned from the terminal
     jobs: BTreeMap<isize, Job>,
     /// Map task number to job number.
@@ -168,13 +171,13 @@ struct Shell {
     /// The terminal's current environment
     env: Arc<Mutex<Environment>>,
     /// the terminal that is bind with the shell instance
-    terminal: Arc<Mutex<Terminal>>
+    terminal: Arc<Mutex<Terminal<T>>>
 }
 
-impl Shell {
+impl<T: Pixel + Copy> Shell<T> {
     /// Create a new shell. Currently the shell will bind to the default terminal instance provided
     /// by the `app_io` crate.
-    fn new() -> Result<Shell, &'static str> {
+    fn new() -> Result<Shell<AlphaPixel>, &'static str> {
         // Initialize a dfqueue for the terminal object to handle printing from applications.
         // Note that this is only to support legacy output. Newly developed applications should
         // turn to use `stdio` provided by the `stdio` crate together with the support of `app_io`.
@@ -1279,7 +1282,7 @@ impl Shell {
     /// The print queue is handled first inside the loop iteration, which means that all print events in the print
     /// queue will always be printed to the text display before input events or any other managerial functions are handled. 
     /// This allows for clean appending to the scrollback buffer and prevents interleaving of text.
-    fn start(mut self) -> Result<(), &'static str> {
+    fn start(mut self, wm_mutex: &Mutex<WindowManager<T>>) -> Result<(), &'static str> {
         let mut need_refresh = false;
         let mut need_prompt = false;
         self.redisplay_prompt();
@@ -1305,7 +1308,7 @@ impl Shell {
 
             // Looks at the input queue from the window manager
             // Handles all the event items until the queue is empty
-            while let Some(ev) = self.terminal.lock().get_event() {
+            while let Some(ev) = self.terminal.lock().get_event(wm_mutex) {
                 match ev {
                     // Returns from the main loop.
                     Event::ExitEvent => {
@@ -1331,10 +1334,7 @@ impl Shell {
             }
 
             let is_active = {
-                let wm = window_manager::WINDOW_MANAGER
-                    .try()
-                    .ok_or("The static window manager was not yet initialized")?
-                    .lock();
+                let wm = wm_mutex.lock();
                 wm.is_active(&self.terminal.lock().window.view)
             };
             
@@ -1371,7 +1371,7 @@ impl Shell {
 }
 
 /// Shell internal command related methods.
-impl Shell {
+impl<T: Pixel + Copy> Shell<T> {
     /// Check if the current command line is a shell internal command.
     fn is_internal_command(&self) -> bool {
         let mut iter = self.cmdline.split_whitespace();
@@ -1496,6 +1496,7 @@ impl Shell {
 
 /// Start a new shell. Shell::start() is an infinite loop, so normally we do not return from this function.
 fn shell_loop(mut _dummy: ()) -> Result<(), &'static str> {
-    Shell::new()?.start()?;
+    let wm = window_manager::WINDOW_MANAGER.try().ok_or("The window manager is not initialized")?;
+    Shell::<AlphaPixel>::new()?.start(wm)?;
     Ok(())
 }

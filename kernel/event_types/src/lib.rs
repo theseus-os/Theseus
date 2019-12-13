@@ -3,12 +3,12 @@
 extern crate keycodes_ascii;
 extern crate mouse_data;
 extern crate alloc;
-extern crate frame_buffer;
+extern crate shapes;
 
 use keycodes_ascii::KeyEvent;
 use mouse_data::MouseEvent;
 use alloc::string::String;
-use frame_buffer::Coord;
+use shapes::Coord;
 
 /// An event describing mouse position rather than movement differential from last event.
 /// It contains two position, `coodinate` for the relative position in each window, and `gcoordinate` for global absolute position of the screen.

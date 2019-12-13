@@ -6,11 +6,12 @@
 extern crate alloc;
 extern crate font;
 extern crate frame_buffer;
-extern crate frame_buffer_rgb;
+extern crate shapes;
 
 use alloc::vec;
 use font::{CHARACTER_HEIGHT, CHARACTER_WIDTH, FONT_PIXEL};
-use frame_buffer::{FrameBuffer, Coord, Rectangle};
+use frame_buffer::{FrameBuffer, Pixel};
+use shapes::{Coord, Rectangle};
 
 type ASCII = u8;
 
@@ -25,8 +26,8 @@ type ASCII = u8;
 /// * `font_color`: the color of the text.
 /// * `bg_color`: the background color of the text block.
 /// * `(column, line)`: the location of the text in the text block as symbols.
-pub fn print_string(
-    framebuffer: &mut dyn FrameBuffer,
+pub fn print_string<T: Pixel + Copy>(
+    framebuffer: &mut FrameBuffer<T>,
     coordinate: Coord,
     width: usize,
     height: usize,
@@ -125,8 +126,8 @@ pub fn print_string(
 /// * `bg_color`: the background color of the character.
 /// * `coordinate`: the left top coordinate of the text block relative to the origin(top-left point) of the frame buffer.
 /// * `(column, line)`: the location of the character in the text block as symbols.
-pub fn print_ascii_character(
-    framebuffer: &mut dyn FrameBuffer,
+pub fn print_ascii_character<T: Pixel + Copy>(
+    framebuffer: &mut FrameBuffer<T>,
     character: ASCII,
     font_color: u32,
     bg_color: u32,
@@ -141,6 +142,7 @@ pub fn print_ascii_character(
 
     let fonts = FONT_PIXEL.lock();
 
+    // Wenqiu: TODO impl from From trait
     // print from the offset within the frame buffer
     let (buffer_width, buffer_height) = framebuffer.get_size();
     let off_set_x: usize = if start.x < 0 { -(start.x) as usize } else { 0 };
@@ -152,7 +154,7 @@ pub fn print_ascii_character(
         if framebuffer.contains(coordinate) {
             let mask: u32 = fonts[character as usize][i][j];
             let color = font_color & mask | bg_color & (!mask);
-            framebuffer.draw_pixel(coordinate, color);
+            framebuffer.draw_pixel(coordinate, T::from(color));
         }
         j += 1;
         if j == CHARACTER_WIDTH || start.x + j as isize == buffer_width as isize {
@@ -166,8 +168,8 @@ pub fn print_ascii_character(
 }
 
 /// Fill a blank text area (left, top, right, bottom) with color. The tuple specifies the location of the area relative to the origin(top-left point) of the frame buffer.
-pub fn fill_blank(
-    framebuffer: &mut dyn FrameBuffer,
+pub fn fill_blank<T: Pixel + Copy>(
+    framebuffer: &mut FrameBuffer<T>,
     left: isize,
     top: isize,
     right: isize,

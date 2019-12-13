@@ -2,16 +2,21 @@
 name = "frame_buffer"
 version = "0.1.0"
 authors = ["Wenqiu Yu <yuwenqiuj@gmail.com>"]
-description = "define a frame buffer trait"
+description = "a framebuffer as a buffer of pixels which can be composited to the screen"
 build = "../../build.rs"
 
 [dependencies]
 spin = "0.4.10"
 owning_ref = { git = "https://github.com/kevinaboos/owning-ref-rs" }
-downcast-rs = "1.0.4"
 
 [dependencies.memory]
 path = "../memory"
+
+[dependencies.multicore_bringup]
+path = "../multicore_bringup"
+
+[dependencies.shapes]
+path = "../shapes"
 
 [lib]
 crate-type = ["rlib"]

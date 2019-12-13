@@ -17,12 +17,13 @@ extern crate window_manager;
 extern crate frame_buffer_alpha;
 extern crate print;
 extern crate window;
-extern crate frame_buffer;
+extern crate shapes;
 extern crate scheduler;
 
 use alloc::string::String;
 use alloc::vec::Vec;
-use frame_buffer::Coord;
+//use frame_buffer::Coord;
+use shapes::Coord;
 
 const WINDOW_BACKGROUND: u32 = 0x40FFFFFF;
 
@@ -42,12 +43,20 @@ pub fn main(_args: Vec<String>) -> isize {
     let height = _args[3].parse::<usize>().unwrap();
     debug!("parameters {:?}", (coordinate, width, height));
 
+    let wm = match window_manager::WINDOW_MANAGER.try() {
+        Some(wm) => wm,
+        None => {
+            debug!("The window manager is not initialized");
+            return -1;
+        }
+    };
     let mut window = match window::Window::new(
         coordinate,
         width,
         height,
         WINDOW_BACKGROUND,
-        &frame_buffer_alpha::new,
+        wm
+        //&frame_buffer_alpha::new,
     ) {
         Ok(m) => m,
         Err(err) => {
@@ -57,7 +66,7 @@ pub fn main(_args: Vec<String>) -> isize {
     };
 
     loop {
-        if let Err(err) = window.handle_event() {
+        if let Err(err) = window.handle_event(wm) {
             debug!("{}", err); 
             return 0;
         }

@@ -5,9 +5,11 @@
 #![no_std]
 
 extern crate frame_buffer;
+extern crate shapes;
 
 use core::iter::IntoIterator;
-use frame_buffer::{Coord, FrameBuffer, Rectangle};
+use frame_buffer::{FrameBuffer, Pixel};
+use shapes::{Coord, Rectangle};
 
 /// The compositor trait.
 /// A compositor composites a list of buffers to a single buffer. It caches the information of incoming buffers for better performance.
@@ -20,18 +22,18 @@ pub trait Compositor<T: Mixable> {
     /// * `bufferlist`: an iterator over the buffers to be composited. Every item is a framebuffer and its position relative to the top-left of the screen. 
     /// * `updates`: a interator over the shaped to be updated. The compositor will update the shape in every framebuffer in order or the whole framebuffer if it is `None`.
     /// A compositor can cache the updated areas for better performance.
-    fn composite<'a, U: IntoIterator<Item = T> + Clone>(
+    fn composite<'a, U: IntoIterator<Item = T> + Clone, P: 'a + Pixel + Copy>(
         &mut self,
-        bufferlist: impl IntoIterator<Item = FrameBufferUpdates<'a>>,
+        bufferlist: impl IntoIterator<Item = FrameBufferUpdates<'a, P>>,
         updates: U
     ) -> Result<(), &'static str>;
 }
 
 
 /// The framebuffers to be composited together with the positions.
-pub struct FrameBufferUpdates<'a> {
+pub struct FrameBufferUpdates<'a, T: Pixel + Copy> {
     /// The framebuffer to be composited.
-    pub framebuffer: &'a dyn FrameBuffer,
+    pub framebuffer: &'a FrameBuffer<T>,
     /// The coordinate of the framebuffer where it is rendered to the final framebuffer.
     pub coordinate: Coord,
 }
@@ -39,25 +41,25 @@ pub struct FrameBufferUpdates<'a> {
 /// A `Mixable` is an item that can be mixed with the final framebuffer. A compositor can mix a list of shaped items with the final framebuffer rather than mix the whole framebuffer for better performance.
 pub trait Mixable {
     /// Mix the item in the `src_fb` framebuffer with the final framebuffer. `src_coord` is the position of the source framebuffer relative to the top-left of the final buffer.
-    fn mix_buffers(
+    fn mix_buffers<T: Pixel + Copy, U: Pixel + Copy>(
         &self, 
-        src_fb: &dyn FrameBuffer, 
-        final_fb: &mut dyn FrameBuffer, 
+        src_fb: &FrameBuffer<T>, 
+        final_fb: &mut FrameBuffer<U>, 
         src_coord: Coord,        
     ) -> Result<(), &'static str>;
 }
 
 impl Mixable for Coord {
-    fn mix_buffers(
+    fn mix_buffers<T: Pixel + Copy, U: Pixel + Copy>(
         &self, 
-        src_fb: &dyn FrameBuffer,
-        final_fb: &mut dyn FrameBuffer, 
+        src_fb: &FrameBuffer<T>,
+        final_fb: &mut FrameBuffer<U>, 
         src_coord: Coord,        
     ) -> Result<(), &'static str>{
         let relative_coord = self.clone() - src_coord;
         if src_fb.contains(relative_coord) {
             let pixel = src_fb.get_pixel(relative_coord)?;
-            final_fb.draw_pixel(self.clone(), pixel);
+            final_fb.draw_pixel(self.clone(), U::from(pixel.color()));
         }
 
         // remove the cache containing the pixel
@@ -76,10 +78,10 @@ impl Mixable for Coord {
 }
 
 impl Mixable for Rectangle {
-    fn mix_buffers(
+    fn mix_buffers<T: Pixel + Copy, U: Pixel + Copy>(
         &self, 
-        src_fb: &dyn FrameBuffer, 
-        final_fb: &mut dyn FrameBuffer,
+        src_fb: &FrameBuffer<T>, 
+        final_fb: &mut FrameBuffer<U>,
         src_coord: Coord,
     ) -> Result<(), &'static str> {
         let (final_width, final_height) = final_fb.get_size();
