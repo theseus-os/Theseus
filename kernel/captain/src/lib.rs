@@ -126,15 +126,8 @@ pub fn init(
     let ap_count = multicore_bringup::handle_ap_cores(kernel_mmi_ref.clone(), ap_start_realmode_begin, ap_start_realmode_end)?;
     info!("Finished handling and booting up all {} AP cores.", ap_count);
 
-    // initialize display subsystem. In current implementation, the default window manager is an alpha framebuffer-based one.
-    font::init()?;
-    let (width, height) = frame_buffer_alpha::init()?;
-    let bg_framebuffer = FrameBufferAlpha::new(width, height, None)?;
-    let top_framebuffer = FrameBufferAlpha::new(width, height, None)?;
-    let (key_producer, mouse_producer) = window_manager::init(
-        bg_framebuffer,
-        top_framebuffer
-    )?;
+    // initialize window manager.
+    let (key_producer, mouse_producer) = window_manager::init()?;
 
     // initialize the i/o subsystem, which will start window manager and the default terminal 
     input_event_manager::init()?;

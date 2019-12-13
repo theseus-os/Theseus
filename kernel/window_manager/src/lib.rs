@@ -17,6 +17,7 @@ extern crate compositor;
 extern crate frame_buffer;
 extern crate frame_buffer_compositor;
 extern crate frame_buffer_drawer;
+extern crate frame_buffer_alpha;
 extern crate keycodes_ascii;
 extern crate mod_mgmt;
 extern crate mouse_data;
@@ -37,6 +38,7 @@ use mpmc::Queue;
 use event_types::{Event, MousePositionEvent};
 use frame_buffer::{Coord, FrameBuffer, Pixel, Rectangle};
 use frame_buffer_compositor::{FRAME_COMPOSITOR};
+use frame_buffer_alpha::FrameBufferAlpha;
 use keycodes_ascii::{KeyAction, KeyEvent, Keycode};
 use mouse_data::MouseEvent;
 use path::Path;
@@ -628,10 +630,12 @@ impl WindowManager {
 }
 
 /// Initialize the window manager, should provide the consumer of keyboard and mouse event, as well as a frame buffer to draw
-pub fn init<Buffer: FrameBuffer + Send>(
-    mut bg_framebuffer: Buffer,
-    mut top_framebuffer: Buffer,
-) -> Result<(Queue<Event>, Queue<Event>), &'static str> {
+pub fn init() -> Result<(Queue<Event>, Queue<Event>), &'static str> {
+    font::init()?;
+    let (width, height) = frame_buffer_alpha::init()?;
+    let mut bg_framebuffer = FrameBufferAlpha::new(width, height, None)?;
+    let mut top_framebuffer = FrameBufferAlpha::new(width, height, None)?;
+
     // initialize the framebuffer
     let (screen_width, screen_height) = bg_framebuffer.get_size();
     for x in 0..screen_width{
