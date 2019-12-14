@@ -126,7 +126,7 @@ impl TextDisplay {
         line * text_width + column
     }
 
-    /// Gets the size of a text displayable in units of character.
+    /// Gets the size of a text displayable in number of characters.
     pub fn get_dimensions(&self) -> (usize, usize) {
         (self.width / CHARACTER_WIDTH, self.height / CHARACTER_HEIGHT)
     }

@@ -334,7 +334,7 @@ impl<T: Pixel + Copy> Shell<T> {
         Ok(())
     }
 
-    /// Update the position of cursor. `offset_from_end` specifies the position relative to the end of the text in units of characters.
+    /// Update the position of cursor. `offset_from_end` specifies the position relative to the end of the text in number of characterss.
     fn update_cursor_pos(&mut self, offset_from_end: usize) -> Result<(), &'static str> {
         let mut terminal = self.terminal.lock();
         terminal.cursor.disable();
@@ -1335,7 +1335,7 @@ impl<T: Pixel + Copy> Shell<T> {
 
             let is_active = {
                 let wm = wm_mutex.lock();
-                wm.is_active(&self.terminal.lock().window.view)
+                wm.is_active(&self.terminal.lock().window.inner)
             };
             
             if is_active {

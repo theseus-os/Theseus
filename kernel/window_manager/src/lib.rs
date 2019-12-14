@@ -1,6 +1,6 @@
 //! This crate acts as a manager of a list of windows. It defines a `WindowManager` structure and an instance of it. 
 //!
-//! A window manager holds a set of `WindowView` objects, including an active window, a list of shown windows and a list of hidden windows. The hidden windows are totally overlapped by others.
+//! A window manager holds a set of `WindowInner` objects, including an active window, a list of shown windows and a list of hidden windows. The hidden windows are totally overlapped by others.
 //!
 //! A window manager owns a bottom framebuffer and a top framebuffer. The bottom is the background of the desktop and the top framebuffer contains a floating window border and a mouse arrow. In refreshing an area, the manager will render all the framebuffers in order: bottom -> hide list -> showlist -> active -> top.
 //!
@@ -24,7 +24,7 @@ extern crate mouse_data;
 extern crate path;
 extern crate scheduler; 
 extern crate spawn;
-extern crate window_view;
+extern crate window_inner;
 extern crate shapes;
 
 mod background;
@@ -46,7 +46,7 @@ use mouse_data::MouseEvent;
 use path::Path;
 use spawn::{ApplicationTaskBuilder, KernelTaskBuilder};
 use spin::{Mutex, Once};
-use window_view::WindowView;
+use window_inner::WindowInner;
 
 /// The instance of the default window manager
 pub static WINDOW_MANAGER: Once<Mutex<WindowManager<AlphaPixel>>> = Once::new();
@@ -87,11 +87,11 @@ const WINDOW_BORDER_COLOR_INNER: PixelColor = 0x00CA6F1E;
 /// Window manager structure which maintains a list of windows and a mouse.
 pub struct WindowManager<U: Pixel + Copy> {
     /// those window currently not shown on screen
-    hide_list: VecDeque<Weak<Mutex<WindowView<U>>>>,
+    hide_list: VecDeque<Weak<Mutex<WindowInner<U>>>>,
     /// those window shown on screen that may overlapping each other
-    show_list: VecDeque<Weak<Mutex<WindowView<U>>>>,
+    show_list: VecDeque<Weak<Mutex<WindowInner<U>>>>,
     /// the only active window, receiving all keyboard events (except for those remained for WM)
-    active: Weak<Mutex<WindowView<U>>>, // this one is not in show_list
+    active: Weak<Mutex<WindowInner<U>>>, // this one is not in show_list
     /// current mouse position
     mouse: Coord,
     /// If a window is being repositioned (e.g., by dragging it), this is the position of that window's border
@@ -106,7 +106,7 @@ impl<U: Pixel + Copy> WindowManager<U> {
     /// set one window to active, push last active (if exists) to top of show_list. if `refresh` is `true`, will then refresh the window's area
     pub fn set_active(
         &mut self,
-        objref: &Arc<Mutex<WindowView<U>>>,
+        objref: &Arc<Mutex<WindowInner<U>>>,
         refresh: bool,
     ) -> Result<(), &'static str> {
         // if it is currently actived, just return
@@ -150,7 +150,7 @@ impl<U: Pixel + Copy> WindowManager<U> {
     }
 
     /// Return the index of a window if it is in the show list
-    fn is_window_in_show_list(&mut self, objref: &Arc<Mutex<WindowView<U>>>) -> Option<usize> {
+    fn is_window_in_show_list(&mut self, objref: &Arc<Mutex<WindowInner<U>>>) -> Option<usize> {
         let mut i = 0_usize;
         for item in self.show_list.iter() {
             if let Some(item_ptr) = item.upgrade() {
@@ -164,7 +164,7 @@ impl<U: Pixel + Copy> WindowManager<U> {
     }
 
     /// Return the index of a window if it is in the hide list
-    fn is_window_in_hide_list(&mut self, objref: &Arc<Mutex<WindowView<U>>>) -> Option<usize> {
+    fn is_window_in_hide_list(&mut self, objref: &Arc<Mutex<WindowInner<U>>>) -> Option<usize> {
         let mut i = 0_usize;
         for item in self.hide_list.iter() {
             if let Some(item_ptr) = item.upgrade() {
@@ -178,11 +178,11 @@ impl<U: Pixel + Copy> WindowManager<U> {
     }
 
     /// delete a window and refresh its region
-    pub fn delete_window(&mut self, objref: &Arc<Mutex<WindowView<U>>>) -> Result<(), &'static str> {
+    pub fn delete_window(&mut self, objref: &Arc<Mutex<WindowInner<U>>>) -> Result<(), &'static str> {
         let (top_left, bottom_right) = {
-            let view = objref.lock();
-            let top_left = view.get_position();
-            let (width, height) = view.get_size();
+            let inner = objref.lock();
+            let top_left = inner.get_position();
+            let (width, height) = inner.get_size();
             let bottom_right = top_left + (width as isize, height as isize);
             (top_left, bottom_right)
         };
@@ -386,12 +386,12 @@ impl<U: Pixel + Copy> WindowManager<U> {
         // }
         // // show list
         // for i in 0..self.show_list.len() {
-        //     if let Some(now_view_mutex) = self.show_list[i].upgrade() {
-        //         let now_view = now_view_mutex.lock();
-        //         let current_coordinate = now_view.get_position();
-        //         if now_view.is_moving {
+        //     if let Some(now_inner_mutex) = self.show_list[i].upgrade() {
+        //         let now_inner = now_inner_mutex.lock();
+        //         let current_coordinate = now_inner.get_position();
+        //         if now_inner.is_moving {
         //             event.coordinate = *coordinate - current_coordinate;
-        //             now_view.producer.push(Event::MousePositionEvent(event.clone())).map_err(|_e| "Fail to enqueue the mouse position event")?;
+        //             now_inner.producer.push(Event::MousePositionEvent(event.clone())).map_err(|_e| "Fail to enqueue the mouse position event")?;
         //         }
         //     }
         // }
@@ -411,12 +411,12 @@ impl<U: Pixel + Copy> WindowManager<U> {
         }
         // then check show_list
         for i in 0..self.show_list.len() {
-            if let Some(now_view_mutex) = self.show_list[i].upgrade() {
-                let now_view = now_view_mutex.lock();
-                let current_coordinate = now_view.get_position();
-                if now_view.contains(*coordinate - current_coordinate) {
+            if let Some(now_inner_mutex) = self.show_list[i].upgrade() {
+                let now_inner = now_inner_mutex.lock();
+                let current_coordinate = now_inner.get_position();
+                if now_inner.contains(*coordinate - current_coordinate) {
                     event.coordinate = *coordinate - current_coordinate;
-                    now_view
+                    now_inner
                         .producer
                         .push(Event::MousePositionEvent(event)).map_err(|_e| "Fail to enqueue the mouse position event")?;
                     return Ok(());
@@ -610,7 +610,7 @@ impl<U: Pixel + Copy> WindowManager<U> {
     }
 
     /// Whether a window is active
-    pub fn is_active(&self, objref: &Arc<Mutex<WindowView<U>>>) -> bool {
+    pub fn is_active(&self, objref: &Arc<Mutex<WindowInner<U>>>) -> bool {
         if let Some(current_active) = self.active.upgrade() {
             if Arc::ptr_eq(&(current_active), objref) {
                 return true;

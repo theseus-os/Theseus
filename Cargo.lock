@@ -2343,8 +2343,19 @@ dependencies = [
  "shapes 0.1.0",
  "spawn 0.1.0",
  "spin 0.4.10 (registry+https://github.com/rust-lang/crates.io-index)",
+ "window_inner 0.1.0",
  "window_manager 0.1.0",
- "window_view 0.1.0",
+]
+
+[[package]]
+name = "window_inner"
+version = "0.1.0"
+dependencies = [
+ "event_types 0.1.0",
+ "frame_buffer 0.1.0",
+ "mpmc 0.1.6-pre",
+ "shapes 0.1.0",
+ "spin 0.4.10 (registry+https://github.com/rust-lang/crates.io-index)",
 ]
 
 [[package]]
@@ -2368,18 +2379,7 @@ dependencies = [
  "shapes 0.1.0",
  "spawn 0.1.0",
  "spin 0.4.10 (registry+https://github.com/rust-lang/crates.io-index)",
- "window_view 0.1.0",
-]
-
-[[package]]
-name = "window_view"
-version = "0.1.0"
-dependencies = [
- "event_types 0.1.0",
- "frame_buffer 0.1.0",
- "mpmc 0.1.6-pre",
- "shapes 0.1.0",
- "spin 0.4.10 (registry+https://github.com/rust-lang/crates.io-index)",
+ "window_inner 0.1.0",
 ]
 
 [[package]]

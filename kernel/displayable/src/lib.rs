@@ -23,7 +23,7 @@ pub trait Displayable<T: Pixel + Copy> {
     /// * `coordinate`: the coordinate within the given `framebuffer` where this displayable should render itself. The `coordinate` is relative to the top-left point `(0, 0)` of the `framebuffer`.
     /// * `framebuffer`: the framebuffer to display onto.
     ///
-    /// Returns a list of updated blocks. The tuple (index, width) represents the index of the block in the framebuffer and its width. The use of `block` is described in the `frame_buffer_compositor` crate.
+    /// Returns a rectangle that covers the updated area.
     fn display(
         &mut self,
         coordinate: Coord,

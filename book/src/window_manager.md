@@ -6,15 +6,15 @@ In most of the cases, both an application and the window manager want to get acc
 
 However, `Mutex` introduces a danger of deadlocks. When an application wants to get access to its window, it must lock it first, operate on it and then release it. If an application does not release the locked window, the window manager will be blocked in most of the operations such as switching or deleting since it needs to traverse all the windows including the locked one. 
 
-To solve this problem, we define two objects `Window` and `WindowView`. `WindowView` only contains the information required by the window manager and implements the `WindowView` trait. A window manager holds a list of reference to `WindowView`s. An application owns a `Window` object which wraps a reference to its `WindowView` object together with other states required by the application. 
+To solve this problem, we define two objects `Window` and `WindowInner`. `WindowInner` only contains the information required by the window manager and implements the `WindowInner` trait. A window manager holds a list of reference to `WindowInner`s. An application owns a `Window` object which wraps a reference to its `WindowInner` object together with other states required by the application. 
 
-## The WindowView structure
+## The WindowInner structure
 
-The `window_view` crate defines a `WindowView` trait. It has states and methods of displaying the window on the screen. 
+The `window_inner` crate defines a `WindowInner` trait. It has states and methods of displaying the window on the screen. 
 
-A `WindowView` has a framebuffer in which it can display the content of the window. The framebuffer is an object which implements the `FrameBuffer` trait. When the window is rendered to the screen, a compositor may render it with different principles according to the type of its framebuffer. Currently, we have implemented a normal framebuffer and one with the alpha channel.
+A `WindowInner` has a framebuffer in which it can display the content of the window. The framebuffer is an object which implements the `FrameBuffer` trait. When the window is rendered to the screen, a compositor may render it with different principles according to the type of its framebuffer. Currently, we have implemented a normal framebuffer and one with the alpha channel.
 
-Both an application's window and the window manager has a reference to the same `WindowView` object. The application can configure and draw in the framebuffer and the manager can display and composite the window with others.
+Both an application's window and the window manager has a reference to the same `WindowInner` object. The application can configure and draw in the framebuffer and the manager can display and composite the window with others.
 
 This structure also has an event producer. The window manager gets events from I/O devices such as keyboards and push them to the corresponding producer.
 
