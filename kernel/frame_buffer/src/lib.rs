@@ -152,7 +152,7 @@ impl<T: Pixel + Copy> FrameBuffer<T> {
 
     pub fn draw_pixel(&mut self, coordinate: Coord, pixel: T) {
         if let Some(index) = self.index(coordinate) {
-            self.buffer[index] = pixel.color();
+            self.buffer[index] = pixel.alpha_mix(T::from(self.buffer[index])).color();
         }
     }
 
