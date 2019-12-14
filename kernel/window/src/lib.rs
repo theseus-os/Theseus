@@ -301,7 +301,6 @@ impl<T: Pixel + Copy> Window<T> {
                         // only wait for left button up to exit this mode
                         if !mouse_event.left_button_hold {
                             view.is_moving = false;
-                            view.give_all_mouse_event = false;
                             self.last_mouse_position_event = mouse_event.clone();
                             call_later_do_move_active_window = true;
                         }
@@ -350,7 +349,6 @@ impl<T: Pixel + Copy> Window<T> {
                                 && mouse_event.left_button_hold
                             {
                                 view.is_moving = true;
-                                view.give_all_mouse_event = true;
                                 view.moving_base = mouse_event.gcoordinate;
                                 call_later_do_refresh_floating_border = true;
                             }

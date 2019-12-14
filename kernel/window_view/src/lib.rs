@@ -38,8 +38,6 @@ pub struct WindowView<T: Pixel + Copy> {
     pub framebuffer: FrameBuffer<T>,
     /// if true, window manager will send all mouse event to this window, otherwise only when mouse is on this window does it send.
     /// This is extremely helpful when application wants to know mouse movement outside itself, because by default window manager only sends mouse event
-    /// when mouse is in the window's region. This is used when user move the window, to receive mouse event when mouse is out of the current window.
-    pub give_all_mouse_event: bool,
     /// whether in moving state, only available when it is active. This is set when user press on the title bar (except for the buttons),
     /// and keeping mouse pressed when moving the mouse.
     pub is_moving: bool,
@@ -105,7 +103,7 @@ pub fn new_window<'a, T: Pixel + Copy>(
         consumer: consumer,
         producer: producer,
         framebuffer: framebuffer,
-        give_all_mouse_event: false,
+        //give_all_mouse_event: false,
         is_moving: false,
         moving_base: Coord::new(0, 0), // the point as a base to start moving
     };

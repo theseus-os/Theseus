@@ -309,6 +309,21 @@ impl<U: Pixel + Copy> WindowManager<U> {
         FRAME_COMPOSITOR.lock().composite(bufferlist.into_iter(), area)
     }
 
+
+    /// Refresh `area` in the active window. `area` is a rectangle relative to the top-left of the screen. Refresh the whole screen if area is None.
+    pub fn refresh_active_window(&self, area: Option<Rectangle>) -> Result<(), &'static str> {
+        if let Some(window_ref) = self.active.upgrade() {
+            let window = window_ref.lock();
+            let buffer_update = FrameBufferUpdates {
+                framebuffer: &window.framebuffer,
+                coordinate: window.get_position(),
+            };
+            FRAME_COMPOSITOR.lock().composite(Some(buffer_update), area)
+        } else {
+            Ok(())
+        }
+    }
+
     /// Refresh `area` in the background and in every window. 
     /// `area` is a rectangle relative to the top-left of the screen. Refresh the whole screen if area is None. 
     /// Ignore the active window if `active` is false.
@@ -359,42 +374,38 @@ impl<U: Pixel + Copy> WindowManager<U> {
         };
 
 
-        // check if some application want all mouse_event
+        // check if some window is moving and needs the event
         // active
-        if let Some(current_active) = self.active.upgrade() {
-            let current_active_win = current_active.lock();
-            let current_coordinate = current_active_win.get_position();
-            if current_active_win.give_all_mouse_event {
-                event.coordinate = *coordinate - current_coordinate;
-                current_active_win.producer.push(Event::MousePositionEvent(event.clone())).map_err(|_e| "Fail to enqueue the mouse position event")?;
-            }
-        }
-        // show list
-        for i in 0..self.show_list.len() {
-            if let Some(now_view_mutex) = self.show_list[i].upgrade() {
-                let now_view = now_view_mutex.lock();
-                let current_coordinate = now_view.get_position();
-                if now_view.give_all_mouse_event {
-                    event.coordinate = *coordinate - current_coordinate;
-                    now_view.producer.push(Event::MousePositionEvent(event.clone())).map_err(|_e| "Fail to enqueue the mouse position event")?;
-                }
-            }
-        }
+        // if let Some(current_active) = self.active.upgrade() {
+        //     let current_active_win = current_active.lock();
+        //     let current_coordinate = current_active_win.get_position();
+        //     if current_active_win.is_moving {
+        //         event.coordinate = *coordinate - current_coordinate;
+        //         current_active_win.producer.push(Event::MousePositionEvent(event.clone())).map_err(|_e| "Fail to enqueue the mouse position event")?;
+        //     }
+        // }
+        // // show list
+        // for i in 0..self.show_list.len() {
+        //     if let Some(now_view_mutex) = self.show_list[i].upgrade() {
+        //         let now_view = now_view_mutex.lock();
+        //         let current_coordinate = now_view.get_position();
+        //         if now_view.is_moving {
+        //             event.coordinate = *coordinate - current_coordinate;
+        //             now_view.producer.push(Event::MousePositionEvent(event.clone())).map_err(|_e| "Fail to enqueue the mouse position event")?;
+        //         }
+        //     }
+        // }
 
         // first check the active one
         if let Some(current_active) = self.active.upgrade() {
             let current_active_win = current_active.lock();
             let current_coordinate = current_active_win.get_position();
-            if current_active_win.contains(*coordinate - current_coordinate) {
+            if current_active_win.contains(*coordinate - current_coordinate) || current_active_win.is_moving {
                 event.coordinate = *coordinate - current_coordinate;
                 // debug!("pass to active: {}, {}", event.x, event.y);
                 current_active_win
                     .producer
                     .push(Event::MousePositionEvent(event)).map_err(|_e| "Fail to enqueue the mouse position event")?;
-                return Ok(());
-            }
-            if current_active_win.is_moving {
-                // do not pass the movement event to other windows
                 return Ok(());
             }
         }
@@ -498,7 +509,7 @@ impl<U: Pixel + Copy> WindowManager<U> {
                 (old_top_left, old_bottom_right, new_top_left, new_bottom_right)
             };
             self.refresh_bottom_windows(Some(Rectangle{top_left: old_top_left, bottom_right: old_bottom_right}), false)?;
-            self.refresh_bottom_windows(Some(Rectangle{top_left: new_top_left, bottom_right: new_bottom_right}), true)?;
+            self.refresh_active_window(Some(Rectangle{top_left: new_top_left, bottom_right: new_bottom_right}))?;
             let update_coords = self.get_mouse_coords();
             self.refresh_top_pixels(update_coords.into_iter())?;
         } else {
