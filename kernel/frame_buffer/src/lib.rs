@@ -133,22 +133,22 @@ impl<T: Pixel + Copy> FrameBuffer<T> {
         (self.width, self.height)
     }
 
-    // fn composite_buffer(&mut self, src: &[T], dest_start: usize) {
-    //     let len = src.len();
-    //     let dest_end = dest_start + len;
-    //     self.buffer_mut()[dest_start..dest_end].copy_from_slice(src);
-    // }
-
-    /// Wenqiu: TODO get pixel function is specific for RGB
     pub fn composite_buffer(&mut self, src: &[PixelColor], dest_start: usize) {
         let len = src.len();
-        for i in 0..len {
-            let index = dest_start + i;
-            let coordinate =
-                Coord::new((index % self.width) as isize, (index / self.width) as isize);
-            self.draw_pixel(coordinate, T::from(src[i]));
-        }
+        let dest_end = dest_start + len;
+        T::composite_buffer(src, &mut self.buffer_mut()[dest_start..dest_end]);
     }
+
+    // /// Wenqiu: TODO get pixel function is specific for RGB
+    // pub fn composite_buffer(&mut self, src: &[PixelColor], dest_start: usize) {
+    //     let len = src.len();
+    //     for i in 0..len {
+    //         let index = dest_start + i;
+    //         let coordinate =
+    //             Coord::new((index % self.width) as isize, (index / self.width) as isize);
+    //         self.draw_pixel(coordinate, T::from(src[i]));
+    //     }
+    // }
 
     pub fn draw_pixel(&mut self, coordinate: Coord, pixel: T) {
         if let Some(index) = self.index(coordinate) {
