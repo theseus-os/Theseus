@@ -100,6 +100,7 @@ pub struct WindowManager<U: Pixel + Copy> {
     bottom_fb: FrameBuffer<U>,
     /// the frame buffer that it should print on
     top_fb: FrameBuffer<U>,
+    pub final_fb: FrameBuffer<U>,
 }
 
 impl<U: Pixel + Copy> WindowManager<U> {
@@ -225,7 +226,7 @@ impl<U: Pixel + Copy> WindowManager<U> {
     }
 
     /// Refresh the pixels in `update_coords`. Only render the bottom final framebuffer and windows. Ignore the top buffer.
-    pub fn refresh_bottom_windows_pixels(&self, pixels: impl IntoIterator<Item = Coord> + Clone) -> Result<(), &'static str> {
+    pub fn refresh_bottom_windows_pixels(&mut self, pixels: impl IntoIterator<Item = Coord> + Clone) -> Result<(), &'static str> {
         // bottom framebuffer
         let bottom_fb = FrameBufferUpdates {
             framebuffer: &self.bottom_fb,
@@ -260,24 +261,24 @@ impl<U: Pixel + Copy> WindowManager<U> {
         }).collect::<Vec<_>>();
         
         let buffer_iter = Some(bottom_fb).into_iter().chain(window_bufferlist.into_iter());
-        FRAME_COMPOSITOR.lock().composite(buffer_iter, pixels)?;
+        FRAME_COMPOSITOR.lock().composite(buffer_iter, &mut self.final_fb, pixels)?;
         
         Ok(())
     }
 
     /// Refresh the pixels in the top framebuffer
-    pub fn refresh_top_pixels(&self, pixels: impl IntoIterator<Item = Coord> + Clone) -> Result<(), &'static str> {
+    pub fn refresh_top_pixels(&mut self, pixels: impl IntoIterator<Item = Coord> + Clone) -> Result<(), &'static str> {
         let top_buffer = FrameBufferUpdates {
             framebuffer: &self.top_fb,
             coordinate: Coord::new(0, 0),
         }; 
 
-        FRAME_COMPOSITOR.lock().composite(Some(top_buffer), pixels)
+        FRAME_COMPOSITOR.lock().composite(Some(top_buffer), &mut self.final_fb, pixels)
     }
 
     /// Refresh `area` in every window. `area` is a rectangle relative to the top-left of the screen. Refresh the whole screen if area is None.
     /// Ignore the active window if `active` is false.
-    pub fn refresh_windows(&self, area: Option<Rectangle>, active: bool) -> Result<(), &'static str> {
+    pub fn refresh_windows(&mut self, area: Option<Rectangle>, active: bool) -> Result<(), &'static str> {
         // reference of windows
         let mut window_ref_list = Vec::new();
         for window in &self.hide_list {
@@ -306,19 +307,19 @@ impl<U: Pixel + Copy> WindowManager<U> {
             }
         }).collect::<Vec<_>>();
         
-        FRAME_COMPOSITOR.lock().composite(bufferlist.into_iter(), area)
+        FRAME_COMPOSITOR.lock().composite(bufferlist.into_iter(), &mut self.final_fb, area)
     }
 
 
     /// Refresh `area` in the active window. `area` is a rectangle relative to the top-left of the screen. Refresh the whole screen if area is None.
-    pub fn refresh_active_window(&self, area: Option<Rectangle>) -> Result<(), &'static str> {
+    pub fn refresh_active_window(&mut self, area: Option<Rectangle>) -> Result<(), &'static str> {
         if let Some(window_ref) = self.active.upgrade() {
             let window = window_ref.lock();
             let buffer_update = FrameBufferUpdates {
                 framebuffer: &window.framebuffer,
                 coordinate: window.get_position(),
             };
-            FRAME_COMPOSITOR.lock().composite(Some(buffer_update), area)
+            FRAME_COMPOSITOR.lock().composite(Some(buffer_update), &mut self.final_fb, area)
         } else {
             Ok(())
         }
@@ -327,25 +328,25 @@ impl<U: Pixel + Copy> WindowManager<U> {
     /// Refresh `area` in the background and in every window. 
     /// `area` is a rectangle relative to the top-left of the screen. Refresh the whole screen if area is None. 
     /// Ignore the active window if `active` is false.
-    pub fn refresh_bottom_windows(&self, area: Option<Rectangle>, active: bool) -> Result<(), &'static str> {
+    pub fn refresh_bottom_windows(&mut self, area: Option<Rectangle>, active: bool) -> Result<(), &'static str> {
         let bg_buffer = FrameBufferUpdates {
             framebuffer: &self.bottom_fb,
             coordinate: Coord::new(0, 0),
         }; 
 
-        FRAME_COMPOSITOR.lock().composite(Some(bg_buffer), area.into_iter())?;
+        FRAME_COMPOSITOR.lock().composite(Some(bg_buffer), &mut self.final_fb, area.into_iter())?;
         self.refresh_windows(area, active)
     }
     
     /// Refresh `area` in the top framebuffer of the window manager. It contains the mouse and moving floating window border.
     /// `area` is a rectangle relative to the top-left of the screen. Update the whole screen if `area` is `None`.
-    pub fn refresh_top(&self, area: Option<Rectangle>) -> Result<(), &'static str> {
+    pub fn refresh_top(&mut self, area: Option<Rectangle>) -> Result<(), &'static str> {
         let top_buffer = FrameBufferUpdates {
             framebuffer: &self.top_fb,
             coordinate: Coord::new(0, 0),
         }; 
 
-        FRAME_COMPOSITOR.lock().composite(Some(top_buffer), area)
+        FRAME_COMPOSITOR.lock().composite(Some(top_buffer), &mut self.final_fb, area)
     }
     
     /// pass keyboard event to currently active window
@@ -645,10 +646,12 @@ impl<U: Pixel + Copy> WindowManager<U> {
 /// Initialize the window manager, should provide the consumer of keyboard and mouse event, as well as a frame buffer to draw
 pub fn init() -> Result<(Queue<Event>, Queue<Event>), &'static str> {
     font::init()?;
-    let (width, height) = frame_buffer::init()?;
+    // let (width, height) = frame_buffer::init()?;
+    let mut final_framebuffer = frame_buffer::init()?;
+    let (width, height) = final_framebuffer.get_size();
     let mut bg_framebuffer = FrameBuffer::new(width, height, None)?;
     let mut top_framebuffer = FrameBuffer::new(width, height, None)?;
-
+    
     // initialize the framebuffer
     let (screen_width, screen_height) = bg_framebuffer.get_size();
     for x in 0..screen_width{
@@ -670,6 +673,7 @@ pub fn init() -> Result<(Queue<Event>, Queue<Event>), &'static str> {
         repositioned_border: None,
         bottom_fb: bg_framebuffer,
         top_fb: top_framebuffer,
+        final_fb: final_framebuffer,
     };
     WINDOW_MANAGER.call_once(|| Mutex::new(window_manager));
 

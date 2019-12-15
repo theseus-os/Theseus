@@ -28,7 +28,7 @@ use core::hash::{Hash, Hasher, BuildHasher};
 use core::ops::DerefMut;
 use hashbrown::hash_map::{DefaultHashBuilder};
 use compositor::{Compositor, FrameBufferUpdates, Mixable};
-use frame_buffer::{FrameBuffer, FINAL_FRAME_BUFFER, Pixel};
+use frame_buffer::{FrameBuffer, Pixel};
 use shapes::{Coord, Rectangle};
 use spin::Mutex;
 
@@ -105,10 +105,10 @@ impl FrameCompositor {
     /// * `coordinate`: the position of the source framebuffer relative to the final one.
     /// * `index`: the index of the block to be rendered. The framebuffer are divided into y-aligned blocks and index indicates the order of the block.
     /// * `area`: the rectangle to be updated.
-    fn check_cache_and_mix<T: Pixel + Copy, U: Pixel + Copy>(
+    fn check_cache_and_mix<T: Pixel + Copy>(
         &mut self, 
         src_fb: &FrameBuffer<T>, 
-        final_fb: &mut FrameBuffer<U>, 
+        final_fb: &mut FrameBuffer<T>, 
         coordinate: Coord, 
         index: usize, 
         area: &Rectangle
@@ -182,9 +182,10 @@ impl Compositor<Rectangle> for FrameCompositor {
     fn composite<'a, U: IntoIterator<Item = Rectangle> + Clone, P: 'a + Pixel + Copy>(
         &mut self,
         bufferlist: impl IntoIterator<Item = FrameBufferUpdates<'a, P>>,
+        final_fb: &mut FrameBuffer<P>,
         updates: U
     ) -> Result<(), &'static str> {
-        let mut final_fb = FINAL_FRAME_BUFFER.try().ok_or("FrameCompositor fails to get the final frame buffer")?.lock();
+        //let mut final_fb = FINAL_FRAME_BUFFER.try().ok_or("FrameCompositor fails to get the final frame buffer")?.lock();
         //let final_fb = final_fb_locked.deref_mut();
         let update_area = updates.into_iter().next();
         for frame_buffer_updates in bufferlist.into_iter() {
@@ -194,7 +195,7 @@ impl Compositor<Rectangle> for FrameCompositor {
                 Some(area) => {
                     let blocks = get_block_index_iter(src_fb, coordinate, area);
                     for block in blocks {
-                        self.check_cache_and_mix(src_fb, final_fb.deref_mut(), coordinate, block, &area)?;
+                        self.check_cache_and_mix(src_fb, final_fb, coordinate, block, &area)?;
                     } 
                 },
                 None => {
@@ -206,7 +207,7 @@ impl Compositor<Rectangle> for FrameCompositor {
                         bottom_right: coordinate + (src_width as isize, src_height as isize)
                     };
                     for i in 0.. block_number {
-                        self.check_cache_and_mix(src_fb, final_fb.deref_mut(), coordinate, i, &area)?;
+                        self.check_cache_and_mix(src_fb, final_fb, coordinate, i, &area)?;
                     }
                 } 
             };
@@ -221,15 +222,16 @@ impl Compositor<Coord> for FrameCompositor {
     fn composite<'a, U: IntoIterator<Item = Coord> + Clone, P: 'a + Pixel + Copy>(
         &mut self,
         bufferlist: impl IntoIterator<Item = FrameBufferUpdates<'a, P>>,
+        final_fb: &mut FrameBuffer<P>,
         updates: U
     ) -> Result<(), &'static str> {
-        let mut final_fb = FINAL_FRAME_BUFFER.try().ok_or("FrameCompositor fails to get the final frame buffer")?.lock();
+        //let mut final_fb = FINAL_FRAME_BUFFER.try().ok_or("FrameCompositor fails to get the final frame buffer")?.lock();
 
         for frame_buffer_updates in bufferlist {
             for pixel in updates.clone() {
                 pixel.mix_buffers(
                     frame_buffer_updates.framebuffer,
-                    final_fb.deref_mut(),
+                    final_fb,
                     frame_buffer_updates.coordinate,
                 )?;
             }

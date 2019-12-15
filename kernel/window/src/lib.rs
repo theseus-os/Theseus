@@ -177,7 +177,9 @@ impl<T: Pixel + Copy> Window<T> {
                 bottom_right: coordinate + (width as isize, height as isize)
             };
 
-            FRAME_COMPOSITOR.lock().composite(Some(buffer_blocks), Some(area))?;
+            // Wenqiu: use WM
+            let mut wm = wm_mutex.lock();
+            FRAME_COMPOSITOR.lock().composite(Some(buffer_blocks), &mut wm.final_fb, Some(area))?;
         }
 
         Ok(window)
@@ -375,8 +377,10 @@ impl<T: Pixel + Copy> Window<T> {
             // event.mark_completed();
         }
 
+        // Wenqiu: optimize
         if need_refresh_three_button {
-            self.refresh_three_button()?;
+            let mut wm = wm_mut.lock();
+            self.refresh_three_button(wm.deref_mut())?;
         }
 
         let mut wm = wm_mut.lock();
@@ -402,7 +406,7 @@ impl<T: Pixel + Copy> Window<T> {
             window.get_position()
         };
 
-        let wm = WINDOW_MANAGER
+        let mut wm = WINDOW_MANAGER
             .try()
             .ok_or("The static window manager was not yet initialized")?
             .lock();
@@ -520,7 +524,7 @@ impl<T: Pixel + Copy> Window<T> {
     }
 
     /// refresh the top left three button's appearance
-    fn refresh_three_button(&self) -> Result<(), &'static str> {
+    fn refresh_three_button(&self, wm: &mut WindowManager<T>) -> Result<(), &'static str> {
         let inner = self.inner.lock();
         let width = inner.get_size().0;
 
@@ -534,7 +538,7 @@ impl<T: Pixel + Copy> Window<T> {
             bottom_right: Coord::new(width as isize, self.title_size as isize)
         };
 
-        FRAME_COMPOSITOR.lock().composite(Some(frame_buffer_blocks), Some(update_area))?;
+        FRAME_COMPOSITOR.lock().composite(Some(frame_buffer_blocks), &mut wm.final_fb, Some(update_area))?;
 
         Ok(())
     }

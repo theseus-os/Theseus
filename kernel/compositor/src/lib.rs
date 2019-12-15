@@ -25,6 +25,7 @@ pub trait Compositor<T: Mixable> {
     fn composite<'a, U: IntoIterator<Item = T> + Clone, P: 'a + Pixel + Copy>(
         &mut self,
         bufferlist: impl IntoIterator<Item = FrameBufferUpdates<'a, P>>,
+        final_fb: &mut FrameBuffer<P>,
         updates: U
     ) -> Result<(), &'static str>;
 }
@@ -41,25 +42,25 @@ pub struct FrameBufferUpdates<'a, T: Pixel + Copy> {
 /// A `Mixable` is an item that can be mixed with the final framebuffer. A compositor can mix a list of shaped items with the final framebuffer rather than mix the whole framebuffer for better performance.
 pub trait Mixable {
     /// Mix the item in the `src_fb` framebuffer with the final framebuffer. `src_coord` is the position of the source framebuffer relative to the top-left of the final buffer.
-    fn mix_buffers<T: Pixel + Copy, U: Pixel + Copy>(
+    fn mix_buffers<T: Pixel + Copy>(
         &self, 
         src_fb: &FrameBuffer<T>, 
-        final_fb: &mut FrameBuffer<U>, 
+        final_fb: &mut FrameBuffer<T>, 
         src_coord: Coord,        
     ) -> Result<(), &'static str>;
 }
 
 impl Mixable for Coord {
-    fn mix_buffers<T: Pixel + Copy, U: Pixel + Copy>(
+    fn mix_buffers<T: Pixel + Copy>(
         &self, 
         src_fb: &FrameBuffer<T>,
-        final_fb: &mut FrameBuffer<U>, 
+        final_fb: &mut FrameBuffer<T>, 
         src_coord: Coord,        
     ) -> Result<(), &'static str>{
         let relative_coord = self.clone() - src_coord;
         if src_fb.contains(relative_coord) {
             let pixel = src_fb.get_pixel(relative_coord)?;
-            final_fb.draw_pixel(self.clone(), U::from(pixel.color()));
+            final_fb.draw_pixel(self.clone(), T::from(pixel.color()));
         }
 
         // remove the cache containing the pixel
@@ -78,10 +79,10 @@ impl Mixable for Coord {
 }
 
 impl Mixable for Rectangle {
-    fn mix_buffers<T: Pixel + Copy, U: Pixel + Copy>(
+    fn mix_buffers<T: Pixel + Copy>(
         &self, 
         src_fb: &FrameBuffer<T>, 
-        final_fb: &mut FrameBuffer<U>,
+        final_fb: &mut FrameBuffer<T>,
         src_coord: Coord,
     ) -> Result<(), &'static str> {
         let (final_width, final_height) = final_fb.get_size();

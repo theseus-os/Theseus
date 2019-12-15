@@ -20,13 +20,13 @@ use shapes::Coord;
 use core::marker::PhantomData;
 pub use pixel::*;
 
-/// The final framebuffer instance. It contains the pages which are mapped to the physical framebuffer.
-pub static FINAL_FRAME_BUFFER: Once<Mutex<FrameBuffer<AlphaPixel>>> = Once::new();
+// /// The final framebuffer instance. It contains the pages which are mapped to the physical framebuffer.
+// pub static FINAL_FRAME_BUFFER: Once<Mutex<FrameBuffer<AlphaPixel>>> = Once::new();
 
 /// Initialize the final frame buffer.
 /// Allocates a block of memory and map it to the physical framebuffer frames.
 /// Returns (width, height) of the screen.
-pub fn init() -> Result<(usize, usize), &'static str> {
+pub fn init<T: Pixel + Copy>() -> Result<FrameBuffer<T>, &'static str> {
     // get the graphic mode information
     let vesa_display_phys_start: PhysicalAddress;
     let buffer_width: usize;
@@ -41,25 +41,24 @@ pub fn init() -> Result<(usize, usize), &'static str> {
         buffer_height = graphic_info.height as usize;
     };
 
-    // // init the final framebuffer
-    let framebuffer =
-        FrameBuffer::new(buffer_width, buffer_height, Some(vesa_display_phys_start))?;
+    // init the final framebuffer
+    let mut framebuffer = FrameBuffer::new(buffer_width, buffer_height, Some(vesa_display_phys_start))?;
     let background = vec![0; buffer_width * buffer_height];
-    FINAL_FRAME_BUFFER.call_once(|| Mutex::new(framebuffer));
-    // FINAL_FRAME_BUFFER.try().ok_or("")?.lock().composite_buffer(background.as_slice(), AlphaPixel(0));
+    // FINAL_FRAME_BUFFER.call_once(|| Mutex::new(framebuffer));
+    framebuffer.composite_buffer(background.as_slice(), 0);
 
-    Ok((buffer_width, buffer_height))
+    Ok(framebuffer)
 }
 
-/// Gets the size of the final framebuffer.
-/// Returns (width, height).
-pub fn get_screen_size() -> Result<(usize, usize), &'static str> {
-    let final_buffer = FINAL_FRAME_BUFFER
-        .try()
-        .ok_or("The final frame buffer was not yet initialized")?
-        .lock();
-    Ok(final_buffer.get_size())
-}
+// /// Gets the size of the final framebuffer.
+// /// Returns (width, height).
+// pub fn get_screen_size() -> Result<(usize, usize), &'static str> {
+//     let final_buffer = FINAL_FRAME_BUFFER
+//         .try()
+//         .ok_or("The final frame buffer was not yet initialized")?
+//         .lock();
+//     Ok(final_buffer.get_size())
+// }
 
 /// The RGB frame buffer structure. It implements the `FrameBuffer` trait.
 #[derive(Hash)]
