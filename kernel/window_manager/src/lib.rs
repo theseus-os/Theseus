@@ -2,9 +2,10 @@
 //!
 //! A window manager holds a set of `WindowInner` objects, including an active window, a list of shown windows and a list of hidden windows. The hidden windows are totally overlapped by others.
 //!
-//! A window manager owns a bottom framebuffer and a top framebuffer. The bottom is the background of the desktop and the top framebuffer contains a floating window border and a mouse arrow. In refreshing an area, the manager will render all the framebuffers in order: bottom -> hide list -> showlist -> active -> top.
+//! A window manager owns a bottom framebuffer and a top framebuffer. The bottom is the background of the desktop and the top framebuffer contains a floating window border and a mouse arrow. 
+//! A window manager also contains a final framebuffer which is mapped to the screen. In refreshing an area, the manager will render all the framebuffers to the final one in order: bottom -> hide list -> showlist -> active -> top.
 //!
-//! The window manager provides methods to update a rectangle area or several pixels for better performance.
+//! The window manager provides methods to update a shaped rather than the whole screen for better performance. See crate `shape`.
 
 #![no_std]
 
@@ -102,7 +103,7 @@ pub struct WindowManager<U: Pixel> {
 }
 
 impl<U: Pixel> WindowManager<U> {
-    /// set one window to active, push last active (if exists) to top of show_list. if `refresh` is `true`, will then refresh the window's area
+    /// set one window as active, push last active (if exists) to top of show_list. if `refresh` is `true`, will then refresh the window's area
     pub fn set_active(
         &mut self,
         objref: &Arc<Mutex<WindowInner<U>>>,
@@ -640,7 +641,7 @@ impl<U: Pixel> WindowManager<U> {
     }
 }
 
-/// Initialize the window manager, should provide the consumer of keyboard and mouse event, as well as a frame buffer to draw
+/// Initialize the window manager. It returns (keyboard_producer, mouse_producer) for the I/O devices.
 pub fn init() -> Result<(Queue<Event>, Queue<Event>), &'static str> {
     font::init()?;
     let final_framebuffer = frame_buffer::init()?;

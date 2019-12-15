@@ -1,6 +1,4 @@
-//! This crate defines a `WindowInner` struct which implements the `WindowInner` trait.
-//!
-//! A `WindowInner` object profiles the basic information of a window such as its size, position and other states. It owns a framebuffer which it can display in and render to the final framebuffer via a compositor.
+//! This crate defines a `WindowInner` struct. It profiles the basic information of a window such as its size, position and other states. It owns a framebuffer which it can display in and render to the final framebuffer via a compositor.
 
 #![no_std]
 
@@ -19,7 +17,7 @@ use shapes::Coord;
 use spin::{Mutex};
 
 
-// The default color of a window;
+/// The default color of a window;
 const WINDOW_DEFAULT_COLOR: PixelColor = 0x80FFFFFF;
 
 /// The status about whether a window is moving
@@ -41,13 +39,11 @@ pub struct WindowInner<T: Pixel> {
     pub height: usize,
     /// event consumer that could be used to get event input given to this window
     pub consumer: Queue<Event>, // event input
+    /// event producer that could be used to send events to the `Window` object.
     pub producer: Queue<Event>, // event output used by window manager
     /// frame buffer of this window
     pub framebuffer: FrameBuffer<T>,
-    /// if true, window manager will send all mouse event to this window, otherwise only when mouse is on this window does it send.
-    /// This is extremely helpful when application wants to know mouse movement outside itself, because by default window manager only sends mouse event
-    /// whether in moving state, only available when it is active. This is set when user press on the title bar (except for the buttons),
-    /// and keeping mouse pressed when moving the mouse.
+    /// Whether a window is moving and the position before a window starts to move.
     pub moving: WindowMovingStatus,
 }
 

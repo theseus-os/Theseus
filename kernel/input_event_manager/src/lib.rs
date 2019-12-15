@@ -18,7 +18,7 @@ use alloc::{string::ToString, sync::Arc};
 use mod_mgmt::{metadata::CrateType, CrateNamespace, NamespaceDir};
 use spawn::{ApplicationTaskBuilder};
 
-/// Initializes the keyinput queue and the default display
+/// Initializes the i/o related tasks.
 pub fn init() -> Result<(), &'static str> {
     // Create the first application CrateNamespace via the following steps:
     // (1) get the default kernel CrateNamespace, which will serve as the new app namespace's recursive namespace,

@@ -1,4 +1,4 @@
-//! A `Window` object should be owned by an application. It contains a list of displayables which can display in the window. See `applications/new_window` as a demo to use this library.
+//! A `Window` object should be owned by an application. It can display a `Displayable` object in its framebuffer. See `applications/new_window` as a demo to use this library.
 //!
 //! This library will create a window with default title bar and border. It handles the commonly used interactions like moving
 //! the window or close the window. Also, it is responsible to show title bar differently when window is active. 
@@ -82,9 +82,9 @@ impl From<usize> for TopButton {
     }
 }
 
-/// Abstraction of a window which owns a list of components and the window's handler. It provides title bar which helps user moving, close, maximize or minimize window
+/// Abstraction of a window which owns a framebuffer and the window's handler. It provides title bar which helps user moving, close, maximize or minimize window
 pub struct Window<T: Pixel> {
-    /// this object contains states and methods related to display the window on the screen
+    /// this object contains states and methods required by the window manager
     pub inner: Arc<Mutex<WindowInner<T>>>,
     /// the width of border, init as WINDOW_BORDER. the border is still part of the window and remains flexibility for user to change border style or remove border. However, for most application a border is useful for user to identify the region.
     border_size: usize,
@@ -103,7 +103,7 @@ pub struct Window<T: Pixel> {
 }
 
 impl<T: Pixel> Window<T> {
-    /// Creates a new Window at `coordinate` relative to the top-left of the screenand add it to the window manager `wm_mutex`.
+    /// Creates a new Window at `coordinate` relative to the top-left of the screenand and adds it to the window manager `wm_mutex`.
     /// `(width, height)` is the size of the window and `background` is the background color of the window.
     pub fn new(
         coordinate: Coord,
@@ -162,7 +162,7 @@ impl<T: Pixel> Window<T> {
         Ok(window)
     }
 
-    /// Display a displayable by its name.
+    /// Display a displayable in the window at `coordinate`.
     pub fn display(&mut self, displayable: &mut dyn Displayable<T>, coordinate: Coord) -> Result<(), &'static str> {
         let area = {
             let mut window = self.inner.lock();
