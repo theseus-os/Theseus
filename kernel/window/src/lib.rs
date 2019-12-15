@@ -33,7 +33,7 @@ use event_types::{Event, MousePositionEvent};
 use frame_buffer::{FrameBuffer, Pixel, pixel::{BLACK, PixelColor}};
 use shapes::{Coord, Rectangle};
 use spin::Mutex;
-use window_inner::WindowInner;
+use window_inner::{WindowInner, WindowMovingStatus};
 use window_manager::{WINDOW_MANAGER, WindowManager};
 
 // The title bar size, in number of pixels
@@ -100,18 +100,16 @@ pub struct Window<T: Pixel> {
     last_mouse_position_event: MousePositionEvent,
     /// record last result of whether this window is active, to reduce redraw overhead
     last_is_active: bool,
-    // /// The displayable in the window as components.
-    // components: BTreeMap<String, Component>,
 }
 
 impl<T: Pixel> Window<T> {
-    /// create new Window by given position and size, return the Mutex of it for ease of sharing
-    /// x, y is the distance in pixel relative to top-left of window
+    /// Creates a new Window at `coordinate` relative to the top-left of the screenand add it to the window manager `wm_mutex`.
+    /// `(width, height)` is the size of the window and `background` is the background color of the window.
     pub fn new(
         coordinate: Coord,
         width: usize,
         height: usize,
-        background: u32,
+        background: PixelColor,
         wm_mutex: &Mutex<WindowManager<T>>
     ) -> Result<Window<T>, &'static str> {
         let framebuffer: FrameBuffer<T> = FrameBuffer::new(width, height, None)?;
@@ -143,11 +141,6 @@ impl<T: Pixel> Window<T> {
             inner.framebuffer.fill_color(T::from(window.background));
         }
 
-        {
-            let mut wm = wm_mutex.lock();
-            wm.set_active(&window.inner, false)?; // do not refresh now for
-        }
-
         window.draw_border(true); // draw window with active border
                                     // draw three buttons
         {
@@ -162,7 +155,9 @@ impl<T: Pixel> Window<T> {
             bottom_right: coordinate + (width as isize, height as isize)
         };
 
-        wm_mutex.lock().refresh_active_window(Some(area))?;
+        let mut wm = wm_mutex.lock();
+        wm.set_active(&window.inner, false)?; // do not refresh now for
+        wm.refresh_active_window(Some(area))?;
 
         Ok(window)
     }
@@ -218,75 +213,76 @@ impl<T: Pixel> Window<T> {
                     self.producer.push(Event::new_keyboard_event(key_input)).map_err(|_e| "Fail to push the keyboard event")?;
                 }
                 Event::MousePositionEvent(ref mouse_event) => {
-                    if inner.is_moving {
-                        // only wait for left button up to exit this mode
-                        if !mouse_event.left_button_hold {
-                            inner.is_moving = false;
-                            self.last_mouse_position_event = mouse_event.clone();
-                            call_later_do_move_active_window = true;
-                        }
-                        call_later_do_refresh_floating_border = true;
-                    } else {
-                        if (mouse_event.coordinate.y as usize) < self.title_size
-                            && (mouse_event.coordinate.x as usize) < inner.width
-                        {
-                            // the region of title bar
-                            let r2 = WINDOW_RADIUS * WINDOW_RADIUS;
-                            let mut is_three_button = false;
-                            for i in 0..3 {
-                                let dcoordinate = Coord::new(
-                                    mouse_event.coordinate.x
-                                        - WINDOW_BUTTON_BIAS_X as isize
-                                        - (i as isize) * WINDOW_BUTTON_BETWEEN as isize,
-                                    mouse_event.coordinate.y - self.title_size as isize / 2,
-                                );
-                                if dcoordinate.x * dcoordinate.x + dcoordinate.y * dcoordinate.y
-                                    <= r2 as isize
-                                {
-                                    is_three_button = true;
-                                    if mouse_event.left_button_hold {
-                                        self.show_button(TopButton::from(i), 2, &mut inner);
-                                        need_refresh_three_button = true;
-                                    } else {
-                                        self.show_button(TopButton::from(i), 0, &mut inner);
-                                        need_refresh_three_button = true;
-                                        if self.last_mouse_position_event.left_button_hold {
-                                            // click event
-                                            if i == 0 {
-                                                debug!("close window");
-                                                return Err("user close window");
-                                                // window will not close until app drop self
+                    match inner.moving {
+                        WindowMovingStatus::Moving(_) => {
+                            // only wait for left button up to exit this mode
+                            if !mouse_event.left_button_hold {
+                                self.last_mouse_position_event = mouse_event.clone();
+                                call_later_do_move_active_window = true;
+                            }
+                            call_later_do_refresh_floating_border = true;
+                        },
+                        WindowMovingStatus::Stationary => {
+                            if (mouse_event.coordinate.y as usize) < self.title_size
+                                && (mouse_event.coordinate.x as usize) < inner.width
+                            {
+                                // the region of title bar
+                                let r2 = WINDOW_RADIUS * WINDOW_RADIUS;
+                                let mut is_three_button = false;
+                                for i in 0..3 {
+                                    let dcoordinate = Coord::new(
+                                        mouse_event.coordinate.x
+                                            - WINDOW_BUTTON_BIAS_X as isize
+                                            - (i as isize) * WINDOW_BUTTON_BETWEEN as isize,
+                                        mouse_event.coordinate.y - self.title_size as isize / 2,
+                                    );
+                                    if dcoordinate.x * dcoordinate.x + dcoordinate.y * dcoordinate.y
+                                        <= r2 as isize
+                                    {
+                                        is_three_button = true;
+                                        if mouse_event.left_button_hold {
+                                            self.show_button(TopButton::from(i), 2, &mut inner);
+                                            need_refresh_three_button = true;
+                                        } else {
+                                            self.show_button(TopButton::from(i), 0, &mut inner);
+                                            need_refresh_three_button = true;
+                                            if self.last_mouse_position_event.left_button_hold {
+                                                // click event
+                                                if i == 0 {
+                                                    debug!("close window");
+                                                    return Err("user close window");
+                                                    // window will not close until app drop self
+                                                }
                                             }
                                         }
+                                    } else {
+                                        self.show_button(TopButton::from(i), 1, &mut inner);
+                                        need_refresh_three_button = true;
                                     }
-                                } else {
-                                    self.show_button(TopButton::from(i), 1, &mut inner);
-                                    need_refresh_three_button = true;
                                 }
+                                // check if user push the title bar, which means user willing to move the window
+                                if !is_three_button
+                                    && !self.last_mouse_position_event.left_button_hold
+                                    && mouse_event.left_button_hold
+                                {
+                                    inner.moving = WindowMovingStatus::Moving(mouse_event.gcoordinate);
+                                    call_later_do_refresh_floating_border = true;
+                                }
+                            } else {
+                                // the region of components
+                                // TODO: if any components want this event? ask them!
+                                self.producer
+                                    .push(Event::MousePositionEvent(mouse_event.clone())).map_err(|_e| "Fail to push the keyboard event")?;
                             }
-                            // check if user push the title bar, which means user willing to move the window
-                            if !is_three_button
+                            if (mouse_event.coordinate.y as usize) < inner.height
+                                && (mouse_event.coordinate.x as usize) < inner.width
                                 && !self.last_mouse_position_event.left_button_hold
                                 && mouse_event.left_button_hold
                             {
-                                inner.is_moving = true;
-                                inner.moving_base = mouse_event.gcoordinate;
-                                call_later_do_refresh_floating_border = true;
+                                need_to_set_active = true;
                             }
-                        } else {
-                            // the region of components
-                            // TODO: if any components want this event? ask them!
-                            self.producer
-                                .push(Event::MousePositionEvent(mouse_event.clone())).map_err(|_e| "Fail to push the keyboard event")?;
+                            self.last_mouse_position_event = mouse_event.clone();
                         }
-                        if (mouse_event.coordinate.y as usize) < inner.height
-                            && (mouse_event.coordinate.x as usize) < inner.width
-                            && !self.last_mouse_position_event.left_button_hold
-                            && mouse_event.left_button_hold
-                        {
-                            need_to_set_active = true;
-                        }
-                        self.last_mouse_position_event = mouse_event.clone();
                     }
                 }
                 _ => {
@@ -312,6 +308,7 @@ impl<T: Pixel> Window<T> {
 
         if call_later_do_move_active_window {
             wm.move_active_window()?;
+            self.inner.lock().moving = WindowMovingStatus::Stationary;
         }
 
         Ok(())

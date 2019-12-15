@@ -75,7 +75,7 @@ pub struct Terminal<T: Pixel> {
 
 /// Privite methods of `Terminal`.
 impl<T: Pixel> Terminal<T> {
-    /// Get the width and height of the text displayable in the unit of characters.
+    /// Gets the width and height of the text displayable in number of characters.
     pub fn get_text_dimensions(&self) -> (usize, usize) {
         self.text_display.get_dimensions()
     }

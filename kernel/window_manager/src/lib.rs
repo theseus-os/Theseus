@@ -44,7 +44,7 @@ use mouse_data::MouseEvent;
 use path::Path;
 use spawn::{ApplicationTaskBuilder, KernelTaskBuilder};
 use spin::{Mutex, Once};
-use window_inner::WindowInner;
+use window_inner::{WindowInner, WindowMovingStatus};
 
 /// The instance of the default window manager
 pub static WINDOW_MANAGER: Once<Mutex<WindowManager<AlphaPixel>>> = Once::new();
@@ -387,34 +387,14 @@ impl<U: Pixel> WindowManager<U> {
             fifth_button_hold: mouse_event.buttonact.fifth_button_hold,
         };
 
-
-        // check if some window is moving and needs the event
-        // active
-        // if let Some(current_active) = self.active.upgrade() {
-        //     let current_active_win = current_active.lock();
-        //     let current_coordinate = current_active_win.get_position();
-        //     if current_active_win.is_moving {
-        //         event.coordinate = *coordinate - current_coordinate;
-        //         current_active_win.producer.push(Event::MousePositionEvent(event.clone())).map_err(|_e| "Fail to enqueue the mouse position event")?;
-        //     }
-        // }
-        // // show list
-        // for i in 0..self.show_list.len() {
-        //     if let Some(now_inner_mutex) = self.show_list[i].upgrade() {
-        //         let now_inner = now_inner_mutex.lock();
-        //         let current_coordinate = now_inner.get_position();
-        //         if now_inner.is_moving {
-        //             event.coordinate = *coordinate - current_coordinate;
-        //             now_inner.producer.push(Event::MousePositionEvent(event.clone())).map_err(|_e| "Fail to enqueue the mouse position event")?;
-        //         }
-        //     }
-        // }
-
         // first check the active one
         if let Some(current_active) = self.active.upgrade() {
             let current_active_win = current_active.lock();
             let current_coordinate = current_active_win.get_position();
-            if current_active_win.contains(*coordinate - current_coordinate) || current_active_win.is_moving {
+            if current_active_win.contains(*coordinate - current_coordinate) || match current_active_win.moving {
+                WindowMovingStatus::Moving(_) => true,
+                _ => false,
+            }{
                 event.coordinate = *coordinate - current_coordinate;
                 // debug!("pass to active: {}, {}", event.x, event.y);
                 current_active_win
@@ -512,15 +492,20 @@ impl<U: Pixel> WindowManager<U> {
                     let m = &self.mouse;
                     (m.x as isize, m.y as isize)
                 };
-                let base = current_active_win.moving_base;
-                let (base_x, base_y) = (base.x, base.y);
-                let old_top_left = current_active_win.get_position();
-                let new_top_left = old_top_left + ((current_x - base_x), (current_y - base_y));
-                let (width, height) = current_active_win.get_size();
-                let old_bottom_right = old_top_left + (width as isize, height as isize);
-                let new_bottom_right = new_top_left + (width as isize, height as isize);
-                current_active_win.set_position(new_top_left);
-                (old_top_left, old_bottom_right, new_top_left, new_bottom_right)
+                match current_active_win.moving {
+                    WindowMovingStatus::Moving(base) => {
+                        let old_top_left = current_active_win.get_position();
+                        let new_top_left = old_top_left + ((current_x - base.x), (current_y - base.y));
+                        let (width, height) = current_active_win.get_size();
+                        let old_bottom_right = old_top_left + (width as isize, height as isize);
+                        let new_bottom_right = new_top_left + (width as isize, height as isize);
+                        current_active_win.set_position(new_top_left);
+                        (old_top_left, old_bottom_right, new_top_left, new_bottom_right)        
+                    },
+                    WindowMovingStatus::Stationary => {
+                        return Err("The window is not moving");
+                    }
+                }
             };
             self.refresh_bottom_windows(Some(Rectangle{top_left: old_top_left, bottom_right: old_bottom_right}), false)?;
             self.refresh_active_window(Some(Rectangle{top_left: new_top_left, bottom_right: new_bottom_right}))?;
@@ -600,19 +585,18 @@ impl<U: Pixel> WindowManager<U> {
         if let Some(current_active) = self.active.upgrade() {
             let (is_draw, border_start, border_end) = {
                 let current_active_win = current_active.lock();
-                if current_active_win.is_moving {
-                    // move this window
-                    // for better performance, while moving window, only border is shown for indication
-                    let coordinate = current_active_win.get_position();
-                    // let (current_x, current_y) = (coordinate.x, coordinate.y);
-                    let base = current_active_win.moving_base;
-                    let (base_x, base_y) = (base.x, base.y);
-                    let (width, height) = current_active_win.get_size();
-                    let border_start = coordinate + (new_x - base_x, new_y - base_y);
-                    let border_end = border_start + (width as isize, height as isize);
-                    (true, border_start, border_end)
-                } else {
-                    (false, Coord::new(0, 0), Coord::new(0, 0))
+                match current_active_win.moving {
+                    WindowMovingStatus::Moving(base) => {
+                        // move this window
+                        // for better performance, while moving window, only border is shown for indication
+                        let coordinate = current_active_win.get_position();
+                        // let (current_x, current_y) = (coordinate.x, coordinate.y);
+                        let (width, height) = current_active_win.get_size();
+                        let border_start = coordinate + (new_x - base.x, new_y - base.y);
+                        let border_end = border_start + (width as isize, height as isize);
+                        (true, border_start, border_end)
+                    }
+                    WindowMovingStatus::Stationary => (false, Coord::new(0, 0), Coord::new(0, 0)),
                 }
             };
             self.refresh_floating_border(is_draw, border_start, border_end)?;
@@ -721,79 +705,74 @@ fn window_manager_loop(
     let (key_consumer, mouse_consumer) = consumer;
 
     loop {
-        let event = {
-            let ev = match key_consumer.pop() {
-                Some(ev) => ev,
-                _ => match mouse_consumer.pop() {
-                    Some(ev) => ev,
-                    _ => {
-                        scheduler::schedule(); // yield the CPU and try again later
-                        continue;
-                    }
-                },
-            };
-            ev
-        };
+        let event_opt = key_consumer.pop()
+            .or_else(||mouse_consumer.pop())
+            .or_else(||{
+                scheduler::schedule();
+                None
+            });
 
-        // event could be either key input or mouse input
-        match event {
-            Event::ExitEvent => {
-                return Ok(());
-            }
-            Event::KeyboardEvent(ref input_event) => {
-                let key_input = input_event.key_event;
-                keyboard_handle_application(key_input)?;
-            }
-            Event::MouseMovementEvent(ref mouse_event) => {
-                // mouse::mouse_to_print(&mouse_event);
-                let mouse_displacement = &mouse_event.displacement;
-                let mut x = (mouse_displacement.x as i8) as isize;
-                let mut y = (mouse_displacement.y as i8) as isize;
-                // need to combine mouse events if there pending a lot
-                loop {
-                    let next_event = match mouse_consumer.pop() {
-                        Some(ev) => ev,
-                        _ => {
-                            break;
-                        }
-                    };
-                    match next_event {
-                        Event::MouseMovementEvent(ref next_mouse_event) => {
-                            if next_mouse_event.mousemove.scrolling_up
-                                == mouse_event.mousemove.scrolling_up
-                                && next_mouse_event.mousemove.scrolling_down
-                                    == mouse_event.mousemove.scrolling_down
-                                && next_mouse_event.buttonact.left_button_hold
-                                    == mouse_event.buttonact.left_button_hold
-                                && next_mouse_event.buttonact.right_button_hold
-                                    == mouse_event.buttonact.right_button_hold
-                                && next_mouse_event.buttonact.fourth_button_hold
-                                    == mouse_event.buttonact.fourth_button_hold
-                                && next_mouse_event.buttonact.fifth_button_hold
-                                    == mouse_event.buttonact.fifth_button_hold
-                            {
-                                x += (next_mouse_event.displacement.x as i8) as isize;
-                                y += (next_mouse_event.displacement.y as i8) as isize;
+        if let Some(event) = event_opt {
+            // event could be either key input or mouse input
+            match event {
+                Event::ExitEvent => {
+                    return Ok(());
+                }
+                Event::KeyboardEvent(ref input_event) => {
+                    let key_input = input_event.key_event;
+                    keyboard_handle_application(key_input)?;
+                }
+                Event::MouseMovementEvent(ref mouse_event) => {
+                    // mouse::mouse_to_print(&mouse_event);
+                    let mouse_displacement = &mouse_event.displacement;
+                    let mut x = (mouse_displacement.x as i8) as isize;
+                    let mut y = (mouse_displacement.y as i8) as isize;
+                    // need to combine mouse events if there pending a lot
+                    loop {
+                        let next_event = match mouse_consumer.pop() {
+                            Some(ev) => ev,
+                            _ => {
+                                break;
+                            }
+                        };
+                        match next_event {
+                            Event::MouseMovementEvent(ref next_mouse_event) => {
+                                if next_mouse_event.mousemove.scrolling_up
+                                    == mouse_event.mousemove.scrolling_up
+                                    && next_mouse_event.mousemove.scrolling_down
+                                        == mouse_event.mousemove.scrolling_down
+                                    && next_mouse_event.buttonact.left_button_hold
+                                        == mouse_event.buttonact.left_button_hold
+                                    && next_mouse_event.buttonact.right_button_hold
+                                        == mouse_event.buttonact.right_button_hold
+                                    && next_mouse_event.buttonact.fourth_button_hold
+                                        == mouse_event.buttonact.fourth_button_hold
+                                    && next_mouse_event.buttonact.fifth_button_hold
+                                        == mouse_event.buttonact.fifth_button_hold
+                                {
+                                    x += (next_mouse_event.displacement.x as i8) as isize;
+                                    y += (next_mouse_event.displacement.y as i8) as isize;
+                                }
+                            }
+                            _ => {
+                                break;
                             }
                         }
-                        _ => {
-                            break;
-                        }
+                        // next_event.mark_completed();
                     }
-                    // next_event.mark_completed();
+                    if x != 0 || y != 0 {
+                        let mut wm = WINDOW_MANAGER
+                            .try()
+                            .ok_or("The static window manager was not yet initialized")?
+                            .lock();
+                        wm.move_mouse(
+                            Coord::new(x as isize, -(y as isize))
+                        )?;
+                    }
+                    cursor_handle_application(*mouse_event)?; // tell the event to application, or moving window
                 }
-                if x != 0 || y != 0 {
-                    let mut wm = WINDOW_MANAGER
-                        .try()
-                        .ok_or("The static window manager was not yet initialized")?
-                        .lock();
-                    wm.move_mouse(
-                        Coord::new(x as isize, -(y as isize))
-                    )?;
-                }
-                cursor_handle_application(*mouse_event)?; // tell the event to application, or moving window
+                _ => {}
             }
-            _ => {}
         }
     }
 }

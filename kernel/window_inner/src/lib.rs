@@ -22,6 +22,14 @@ use spin::{Mutex};
 // The default color of a window;
 const WINDOW_DEFAULT_COLOR: PixelColor = 0x80FFFFFF;
 
+/// The status about whether a window is moving
+pub enum WindowMovingStatus {
+    /// marks a non-moving window.
+    Stationary,
+    /// marks a moving window. The inner coordinate is the position before the window starts to move.
+    Moving(Coord),
+}
+
 /// WindowInner object that should be owned by the manager. It is usually owned by both an application's window and the manager so that the application can modify it and the manager can re-display it when necessary.
 pub struct WindowInner<T: Pixel> {
     /// The position of the top-left corner of the window.
@@ -40,9 +48,7 @@ pub struct WindowInner<T: Pixel> {
     /// This is extremely helpful when application wants to know mouse movement outside itself, because by default window manager only sends mouse event
     /// whether in moving state, only available when it is active. This is set when user press on the title bar (except for the buttons),
     /// and keeping mouse pressed when moving the mouse.
-    pub is_moving: bool,
-    /// the base position of window moving action, should be the mouse position when `is_moving` is set to true
-    pub moving_base: Coord,
+    pub moving: WindowMovingStatus,
 }
 
 impl<T: Pixel> WindowInner<T> {
@@ -103,9 +109,7 @@ pub fn new_window<'a, T: Pixel>(
         consumer: consumer,
         producer: producer,
         framebuffer: framebuffer,
-        //give_all_mouse_event: false,
-        is_moving: false,
-        moving_base: Coord::new(0, 0), // the point as a base to start moving
+        moving: WindowMovingStatus::Stationary,
     };
 
     let window_ref = Arc::new(Mutex::new(window));

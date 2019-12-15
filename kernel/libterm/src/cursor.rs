@@ -14,7 +14,7 @@ pub struct Cursor {
     show: bool,
     /// The color of the cursor
     color: PixelColor,
-    /// The position of the cursor relative to the end of terminal text in units of number of characters.
+    /// The position of the cursor relative to the end of terminal text in number of characters.
     pub offset_from_end: usize,
     /// The underlying character at the position of the cursor.
     /// It is shown when the cursor is unseen.
