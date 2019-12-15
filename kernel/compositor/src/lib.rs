@@ -14,7 +14,7 @@ use shapes::{Coord, Rectangle};
 
 /// The compositor trait.
 /// A compositor composites a list of buffers to a single buffer. It caches the information of incoming buffers for better performance.
-/// The incoming list contains framebuffers and an iterator on shaped areas to be updated of every framebuffer. 
+/// The incoming list contains framebuffers and an iterator on shaped areas to update. The compositor will refresh the shape in every framebuffer.
 /// `T` specifies the type of a shape. It implements `Mixable` which can mix a shaped area in the source framebuffer to the final one.
 pub trait Compositor<T: Mixable> {
     /// Composites the buffers in the bufferlist.
@@ -63,17 +63,6 @@ impl Mixable for Coord {
             let pixel = src_fb.get_pixel(relative_coord)?;
             final_fb.draw_pixel(self.clone(), pixel);
         }
-
-        // remove the cache containing the pixel
-        // let keys: Vec<_> = caches.keys().cloned().collect();
-        // for key in keys {
-        //     if let Some(cache) = caches.get_mut(&key) {
-        //         if cache.contains(self.clone()) {
-        //             caches.remove(&key);
-        //             break;
-        //         }
-        //     };
-        // }
 
         Ok(())
     }

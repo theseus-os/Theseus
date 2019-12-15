@@ -175,7 +175,7 @@ struct Shell<T:Pixel> {
 }
 
 impl<T: Pixel> Shell<T> {
-    /// Create a new shell. Currently the shell will bind to the default terminal instance provided
+    /// Create a new shell. It will prints to the given terminal.
     /// by the `app_io` crate.
     fn new(terminal: Arc<Mutex<Terminal<T>>>) -> Result<Shell<T>, &'static str> {
         // Initialize a dfqueue for the terminal object to handle printing from applications.
@@ -1281,6 +1281,7 @@ impl<T: Pixel> Shell<T> {
     /// The print queue is handled first inside the loop iteration, which means that all print events in the print
     /// queue will always be printed to the text display before input events or any other managerial functions are handled. 
     /// This allows for clean appending to the scrollback buffer and prevents interleaving of text.
+    /// The application will gets inputs sent by the window manager `wm_mutex`.
     fn start(mut self, wm_mutex: &Mutex<WindowManager<T>>) -> Result<(), &'static str> {
         let mut need_refresh = false;
         let mut need_prompt = false;
@@ -1325,8 +1326,7 @@ impl<T: Pixel> Shell<T> {
                     }
                     _ => { }
                 };
-            }          
-            
+            }                      
             if need_refresh || need_refresh_on_task_event {
                 // update if there are outputs from applications
                 self.terminal.lock().refresh_display()?;
