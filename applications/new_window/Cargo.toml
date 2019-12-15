@@ -17,9 +17,6 @@ version = "0.3.7"
 [dependencies.shapes]
 path = "../../kernel/shapes"
 
-[dependencies.frame_buffer_alpha]
-path = "../../kernel/frame_buffer_alpha"
-
 [dependencies.dfqueue]
 path = "../../libs/dfqueue"
 version = "0.1.0"

@@ -3,59 +3,8 @@
 
 #![no_std]
 
-extern crate alloc;
-extern crate memory;
-extern crate owning_ref;
-extern crate spin;
-extern crate downcast_rs;
-
-use downcast_rs::Downcast;
-use alloc::boxed::Box;
-use memory::MappedPages;
-use owning_ref::BoxRefMut;
-use spin::{Mutex, Once};
 use core::ops::{Add, Sub};
 use core::cmp::{Ord, Ordering};
-
-
-// /// The `FrameBuffer` trait.
-// pub trait FrameBuffer: Downcast {
-//     /// Returns a reference to the mapped memory.
-//     fn buffer(&self) -> &BoxRefMut<MappedPages, [Pixel]>;
-
-//     /// Gets the size of the framebuffer. 
-//     /// Returns (width, height).
-//     fn get_size(&self) -> (usize, usize);
-
-//     /// Copies a buffer of pixels to the framebuffer from index `dest_start`.
-//     fn composite_buffer(&mut self, src: &[Pixel], dest_start: usize);
-
-//     /// Get the pixel at `coordinate` relative to the top-left point of the framebuffer
-//     fn get_pixel(&self, coordinate: Coord) -> Result<Pixel, &'static str>;
-
-//     /// Fill the framebuffer with `color`
-//     fn fill_color(&mut self, color: Pixel);
-
-//     /// Computes the index of a coordinate in the buffer array.
-//     /// Return `None` if the coordinate is not in the frame buffer.
-//     fn index(&self, coordinate: Coord) -> Option<usize> {
-//         let (width, _) = self.get_size();
-//         if self.contains(coordinate) {
-//             return Some(coordinate.y as usize * width + coordinate.x as usize);
-//         } else {
-//             return None;
-//         }
-//     }
-
-
-    
-//     /// Draws a pixel at the given `coordinate` relative to the origin(top-left point) of the frame buffer. The new pixel is a mix of original pixel and `color` according to the type of the framebuffer.
-//     fn draw_pixel(&mut self, coordinate: Coord, color: Pixel);
-
-//     /// Draws a pixel at the given `coordinate` within the frame buffer. The `coordinate` is relative to the origin(top-left point) of the frame buffer.  The new pixel will overwrite the previous one.
-//     fn overwrite_pixel(&mut self, coordinate: Coord, color: Pixel);
-
-
 
 /// The coordinate of a pixel.
 /// In the display subsystem, the origin of an area is its top-left point.

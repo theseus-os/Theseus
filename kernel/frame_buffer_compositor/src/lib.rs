@@ -25,7 +25,6 @@ extern crate shapes;
 use alloc::collections::BTreeMap;
 use alloc::vec::{Vec};
 use core::hash::{Hash, Hasher, BuildHasher};
-use core::ops::DerefMut;
 use hashbrown::hash_map::{DefaultHashBuilder};
 use compositor::{Compositor, FrameBufferUpdates, Mixable};
 use frame_buffer::{FrameBuffer, Pixel};

@@ -14,7 +14,6 @@ extern crate dfqueue;
 extern crate runqueue;
 extern crate spawn;
 extern crate window_manager;
-extern crate frame_buffer_alpha;
 extern crate print;
 extern crate window;
 extern crate shapes;
@@ -56,7 +55,6 @@ pub fn main(_args: Vec<String>) -> isize {
         height,
         WINDOW_BACKGROUND,
         wm
-        //&frame_buffer_alpha::new,
     ) {
         Ok(m) => m,
         Err(err) => {

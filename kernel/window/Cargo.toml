@@ -18,20 +18,8 @@ path = "../../libs/mpmc"
 [dependencies.shapes]
 path = "../shapes"
 
-[dependencies.frame_buffer_alpha]
-path = "../frame_buffer_alpha"
-
-[dependencies.memory_structs]
-path = "../memory_structs"
-
 [dependencies.frame_buffer_drawer]
 path = "../frame_buffer_drawer"
-
-[dependencies.compositor]
-path = "../compositor"
-
-[dependencies.frame_buffer_compositor]
-path = "../frame_buffer_compositor"
 
 [dependencies.displayable]
 path = "../displayable"

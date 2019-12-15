@@ -9,7 +9,7 @@ extern crate shapes;
 
 use frame_buffer::{FrameBuffer, Pixel};
 use shapes::Coord;
-use core::hash::Hash;
+
 
 /// Draws a line in a framebuffer. The part exceeding the boundary of the framebuffer will be ignored.
 /// # Arguments

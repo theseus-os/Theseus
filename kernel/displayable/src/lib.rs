@@ -4,15 +4,9 @@
 
 #![no_std]
 
-extern crate alloc;
 extern crate frame_buffer;
-#[macro_use]
-extern crate downcast_rs;
 extern crate shapes;
 
-use alloc::boxed::Box;
-use core::hash::Hash;
-use downcast_rs::Downcast;
 use frame_buffer::{FrameBuffer, Pixel};
 use shapes::{Coord, Rectangle};
 

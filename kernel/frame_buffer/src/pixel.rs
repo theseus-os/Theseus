@@ -1,12 +1,10 @@
-use super::*;
+use core::hash::Hash;
 
 pub type PixelColor = u32;
 /// Every pixel is of `Pixel` type, which is 4 byte as defined in `Pixel`
-pub const PIXEL_SIZE: usize = 4;//core::mem::size_of::<Pixel>();
+pub const PIXEL_SIZE: usize = core::mem::size_of::<PixelColor>();
 
 
-/// Used in reseting the alpha channel of RGB pixel.
-const RGB_PIXEL_MASK: u32 = 0x00FFFFFF;
 /// predefined opaque black
 pub const BLACK: u32 = 0;
 /// predefined opaque white
@@ -23,18 +21,6 @@ pub trait Pixel: Sized + From<PixelColor> + Copy + Hash {
 
     /// mix two color linearly with weights, as `mix` for `self` and (1-`mix`) for `other`. It returns black if mix is outside range of [0, 1].
     fn weight_mix(self, other: Self, mix: f32) -> Self;
-
-    // /// Gets the alpha channel of the pixel
-    // fn get_alpha(&self) -> u8;
-
-    // /// Gets the red byte of the pixel
-    // fn get_red(&self) -> u8;
-
-    // /// Gets the green byte of the pixel
-    // fn get_green(&self) -> u8;
-
-    // /// Gets the blue byte of the pixel
-    // fn get_blue(&self) -> u8;
 }
 
 #[repr(C, packed)]
@@ -89,13 +75,26 @@ impl Pixel for RGBPixel {
     }
     
     #[inline]
-    fn mix(self, other: Self) -> Self {
+    fn mix(self, _other: Self) -> Self {
         self
     }
 
-    #[inline]
     fn weight_mix(self, other: Self, mix: f32) -> Self {
-        self
+        if mix < 0f32 || mix > 1f32 {
+            return RGBPixel::from(BLACK);
+        }
+        let new_red =
+            ((self.red as f32) * mix + (other.red as f32) * (1f32 - mix)) as u8;
+        let new_green =
+            ((self.green as f32) * mix + (other.green as f32) * (1f32 - mix)) as u8;
+        let new_blue =
+            ((self.blue as f32) * mix + (other.blue as f32) * (1f32 - mix)) as u8;
+        RGBPixel {
+            channel: 0, 
+            red: new_red, 
+            green: new_green, 
+            blue: new_blue
+        }
     }
 
 }

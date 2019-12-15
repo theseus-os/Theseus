@@ -11,14 +11,13 @@ extern crate frame_buffer;
 extern crate spin;
 extern crate shapes;
 
-use alloc::boxed::Box;
 use alloc::sync::Arc;
 use mpmc::Queue;
 use event_types::{Event};
 use frame_buffer::{FrameBuffer, Pixel, PixelColor};
 use shapes::Coord;
 use spin::{Mutex};
-use core::hash::Hash;
+
 
 // The default color of a window;
 const WINDOW_DEFAULT_COLOR: PixelColor = 0x80FFFFFF;

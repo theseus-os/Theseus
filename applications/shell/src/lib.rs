@@ -51,7 +51,6 @@ use app_io::{IoStreams, IoControlFlags};
 use fs_node::FileOrDir;
 use frame_buffer::{AlphaPixel, Pixel};
 use window_manager::WindowManager;
-use core::hash::Hash;
 
 /// The status of a job.
 #[derive(PartialEq)]

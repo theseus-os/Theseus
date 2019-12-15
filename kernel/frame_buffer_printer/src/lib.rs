@@ -12,7 +12,7 @@ use alloc::vec;
 use font::{CHARACTER_HEIGHT, CHARACTER_WIDTH, FONT_PIXEL};
 use frame_buffer::{FrameBuffer, Pixel, PixelColor};
 use shapes::{Coord, Rectangle};
-use core::hash::Hash;
+
 
 type ASCII = u8;
 

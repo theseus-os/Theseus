@@ -7,7 +7,6 @@
 #![no_std]
 
 #[macro_use] extern crate alloc;
-#[macro_use] extern crate log;
 extern crate dfqueue;
 extern crate environment;
 extern crate print;
@@ -24,11 +23,8 @@ extern crate text_display;
 extern crate shapes;
 extern crate spin;
 
-use core::ops::DerefMut;
-use core::hash::Hash;
 use alloc::string::{String, ToString};
 use alloc::vec::Vec;
-use alloc::boxed::Box;
 use cursor::*;
 use text_display::TextDisplay;
 use event_types::Event;
@@ -66,8 +62,6 @@ pub enum ScrollError {
 pub struct Terminal<T: Pixel> {
     /// The terminal's own window.
     pub window: Window<T>,
-    /// Name of the text displayable of the terminal
-    display_name: String,
     /// The terminal's scrollback buffer which stores a string to be displayed by the text display
     scrollback_buffer: String,
     /// Indicates whether the text display is displaying the last part of the scrollback buffer slice
@@ -83,13 +77,6 @@ pub struct Terminal<T: Pixel> {
 impl<T: Pixel> Terminal<T> {
     /// Get the width and height of the text displayable in the unit of characters.
     pub fn get_text_dimensions(&self) -> (usize, usize) {
-        /*let text_display = match self.window.get_concrete_display::<TextDisplay>(&self.display_name) {
-            Ok(text_display) => text_display,
-            Err(err) => {
-                debug!("get_text_dimensions(): {}", err);
-                return (0, 0);
-            }
-        };*/
         self.text_display.get_dimensions()
     }
 
@@ -401,10 +388,7 @@ impl<T: Pixel> Terminal<T> {
         };
         let result  = self.scrollback_buffer.get(start_idx..=end_idx); // =end_idx includes the end index in the slice
         if let Some(slice) = result {
-            {
-                //let text_display = self.window.get_concrete_display_mut::<TextDisplay>(&self.display_name)?;
-                self.text_display.set_text(slice);
-            }
+            self.text_display.set_text(&slice);
             self.window.display(&mut self.text_display, Coord::new(0, 0))?;
         } else {
             return Err("could not get slice of scrollback buffer string");
@@ -420,10 +404,7 @@ impl<T: Pixel> Terminal<T> {
         let result = self.scrollback_buffer.get(start_idx..end_idx);
 
         if let Some(slice) = result {
-            {
-                //let text_display = self.window.get_concrete_display_mut::<TextDisplay>(&self.display_name)?;
-                self.text_display.set_text(slice);
-            }
+            self.text_display.set_text(slice);
             self.window.display(&mut self.text_display, Coord::new(0, 0))?;        
         } else {
             return Err("could not get slice of scrollback buffer string");
@@ -455,17 +436,14 @@ impl<T: Pixel> Terminal<T> {
         let (width_inner, height_inner) = window.inner_size();
         let text_display = TextDisplay::new(width_inner, height_inner, FONT_COLOR, BACKGROUND_COLOR)?;
 
-        let display_name = "text_display";
         let mut terminal = Terminal {
             window: window,
-            display_name: String::from(display_name),
             scrollback_buffer: String::new(),
             scroll_start_idx: 0,
             is_scroll_end: true,
             text_display: text_display,
             cursor: Cursor::new(),
         };
-        //terminal.window.add_displayable(&display_name, Coord::new(0, 0), Box::new(text_display))?;
         terminal.window.display(&mut terminal.text_display, Coord::new(0, 0))?;
 
         terminal.print_to_terminal(format!("Theseus Terminal Emulator\nPress Ctrl+C to quit a task\n"));
@@ -631,12 +609,11 @@ impl<T: Pixel> Terminal<T> {
     pub fn display_cursor(
         &mut self
     ) -> Result<(), &'static str> {
-        let coordinate = self.window.inner_position();//self.window.get_displayable_position(&self.display_name)?;
+        let coordinate = self.window.inner_position();
         // get info about the text displayable
         let (col_num, line_num, text_next_pos) = {
-            //let text_display = self.window.get_concrete_display::<TextDisplay>(&self.display_name)?;
             let text_next_pos = self.text_display.get_next_index();
-            let (col_num, line_num) = self.text_display.get_dimensions();
+            let (col_num, line_num) = self.get_text_dimensions();
             (col_num, line_num, text_next_pos)
         };
 

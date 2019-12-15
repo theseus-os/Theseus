@@ -32,7 +32,6 @@ use libterm::Terminal;
 use spin::Mutex;
 use stdio::{StdioWriter, KeyEventQueueReader};
 use core_io::Write;
-use core::hash::Hash;
 
 /// The metadata for each line in the file.
 struct LineSlice {

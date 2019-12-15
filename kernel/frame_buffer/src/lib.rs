@@ -3,20 +3,18 @@
 
 #![no_std]
 
-#[macro_use] extern crate alloc;
+extern crate alloc;
 extern crate memory;
 extern crate multicore_bringup;
 extern crate owning_ref;
-extern crate spin;
 extern crate shapes;
 
 pub mod pixel;
 use alloc::boxed::Box;
 use core::ops::DerefMut;
-use core::hash::Hash;
+
 use memory::{EntryFlags, FrameRange, MappedPages, PhysicalAddress, FRAME_ALLOCATOR};
 use owning_ref::BoxRefMut;
-use spin::{Mutex, Once};
 use shapes::Coord;
 use core::marker::PhantomData;
 pub use pixel::*;

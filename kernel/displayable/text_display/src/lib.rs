@@ -16,7 +16,7 @@ use displayable::{Displayable};
 use font::{CHARACTER_HEIGHT, CHARACTER_WIDTH};
 use frame_buffer::{Pixel, FrameBuffer};
 use shapes::{Coord, Rectangle};
-use core::hash::Hash;
+
 
 /// A generic text displayable profiles the size and color of a block of text. It can display in a framebuffer.
 pub struct TextDisplay {

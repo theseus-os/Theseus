@@ -17,34 +17,21 @@ extern crate event_types;
 extern crate spin;
 #[macro_use]
 extern crate log;
-extern crate compositor;
 extern crate displayable;
 extern crate font;
 extern crate frame_buffer;
-extern crate frame_buffer_alpha;
-extern crate frame_buffer_compositor;
 extern crate frame_buffer_drawer;
-extern crate memory_structs;
 extern crate mouse;
 extern crate window_inner;
 extern crate window_manager;
 extern crate shapes;
 
-use alloc::boxed::Box;
-use alloc::collections::BTreeMap;
-use alloc::string::{String, ToString};
 use alloc::sync::Arc;
-use compositor::{Compositor, FrameBufferUpdates};
-use core::ops::Deref;
-use core::ops::DerefMut;
-use core::hash::Hash;
 use mpmc::Queue;
 use displayable::Displayable;
 use event_types::{Event, MousePositionEvent};
-use frame_buffer::{FrameBuffer, Pixel, AlphaPixel, pixel::{BLACK, PixelColor}};
+use frame_buffer::{FrameBuffer, Pixel, pixel::{BLACK, PixelColor}};
 use shapes::{Coord, Rectangle};
-use frame_buffer_compositor::{FRAME_COMPOSITOR};
-use memory_structs::PhysicalAddress;
 use spin::Mutex;
 use window_inner::WindowInner;
 use window_manager::{WINDOW_MANAGER, WindowManager};
@@ -168,11 +155,8 @@ impl<T: Pixel> Window<T> {
             window.show_button(TopButton::Close, 1, &mut inner);
             window.show_button(TopButton::MinimizeMaximize, 1, &mut inner);
             window.show_button(TopButton::Hide, 1, &mut inner);
-            let buffer_blocks: FrameBufferUpdates<T> = FrameBufferUpdates {
-                framebuffer: &inner.framebuffer,
-                coordinate: coordinate,
-            };
         }
+
         let area = Rectangle {
             top_left: coordinate,
             bottom_right: coordinate + (width as isize, height as isize)
@@ -183,71 +167,8 @@ impl<T: Pixel> Window<T> {
         Ok(window)
     }
 
-/*    /// Add a new displayable to the window at the coordinate relative to the top-left of the window.
-    pub fn add_displayable(
-        &mut self,
-        key: &str,
-        coordinate: Coord,
-        displayable: Box<dyn Displayable>,
-    ) -> Result<(), &'static str> {
-        let key = key.to_string();
-        let component = Component {
-            coordinate: coordinate + self.inner_position(),
-            displayable: displayable,
-        };
-        self.components.insert(key, component);
-        Ok(())
-    }
-
-    /// Gets the position of a displayable relative to the top-left of the window
-    pub fn get_displayable_position(&self, key: &str) -> Result<Coord, &'static str> {
-        let opt = self.components.get(key);
-        match opt {
-            None => {
-                return Err("No such displayable");
-            }
-            Some(component) => {
-                return Ok(component.get_position());
-            }
-        };
-    }
-
-    /// Gets a reference to a displayable of type `T` which implements the `Displayable` trait by its name. Returns error if the displayable is not of type `T` or does not exist.
-    pub fn get_concrete_display<U: Displayable>(
-        &self,
-        display_name: &str,
-    ) -> Result<&U, &'static str> {
-        if let Some(component) = self.components.get(display_name) {
-            if let Some(display) = component.displayable.downcast_ref::<U>() {
-                return Ok(display);
-            } else {
-                return Err("The displayable is not of this type");
-            }
-        } else {
-            return Err("The displayable does not exist");
-        }
-    }
-
-    /// Gets a reference to a displayable of type `T` which implements the `Displayable` trait by its name. Returns error if the displayable is not of type `T` or does not exist.
-    pub fn get_concrete_display_mut<U: Displayable>(
-        &mut self,
-        display_name: &str,
-    ) -> Result<&mut U, &'static str> {
-        if let Some(component) = self.components.get_mut(display_name) {
-            if let Some(display) = component.displayable.downcast_mut::<U>() {
-                return Ok(display);
-            } else {
-                return Err("The displayable is not of this type");
-            }
-        } else {
-            return Err("The displayable does not exist");
-        }
-    }
-*/
     /// Display a displayable by its name.
-    pub fn display(&mut self, displayable: &mut Displayable<T>, coordinate: Coord) -> Result<(), &'static str> {
-        // let component = self.components.get_mut(display_name).ok_or("The displayable does not exist")?;
-        // let coordinate = component.get_position();
+    pub fn display(&mut self, displayable: &mut dyn Displayable<T>, coordinate: Coord) -> Result<(), &'static str> {
         let area = {
             let mut window = self.inner.lock();
             let area = displayable.display(
@@ -520,16 +441,10 @@ impl<T: Pixel> Window<T> {
         );
     }
 
-    /// refresh the top left three button's appearance
+    /// Gets the rectangle occupied by the three buttons
     fn get_button_area(&self) -> Rectangle {
         let inner = self.inner.lock();
         let width = inner.get_size().0;
-
-        let frame_buffer_blocks = FrameBufferUpdates {
-            framebuffer: &inner.framebuffer,
-            coordinate: inner.coordinate,
-        };
-
         Rectangle {
             top_left: Coord::new(0, 0),
             bottom_right: Coord::new(width as isize, self.title_size as isize)
@@ -566,14 +481,6 @@ impl<T: Pixel> Window<T> {
 
 impl<T: Pixel> Drop for Window<T>{
     fn drop(&mut self){
-        
-        // Wenqiu: remove
-        // let inner = self.inner.lock();
-        // let area = Rectangle {
-        //     top_left: inner.coordinate,
-        //     bottom_right: inner.coordinate + (inner.width as isize, inner.height as isize)
-        // };
-
         match WINDOW_MANAGER
             .try()
             .ok_or("The static window manager was not yet initialized")
@@ -589,15 +496,3 @@ impl<T: Pixel> Drop for Window<T>{
         }
     }
 }
-// /// A component contains a displayable and its coordinate relative to the top-left corner of the window.
-// struct Component {
-//     coordinate: Coord,
-//     displayable: Box<dyn Displayable>,
-// }
-
-// impl Component {
-//     /// gets the coordinate of the displayable relative to the top-left corner of the window
-//     fn get_position(&self) -> Coord {
-//         self.coordinate
-//     }
-// }

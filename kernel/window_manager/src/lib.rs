@@ -17,7 +17,6 @@ extern crate compositor;
 extern crate frame_buffer;
 extern crate frame_buffer_compositor;
 extern crate frame_buffer_drawer;
-extern crate frame_buffer_alpha;
 extern crate keycodes_ascii;
 extern crate mod_mgmt;
 extern crate mouse_data;
@@ -28,14 +27,12 @@ extern crate window_inner;
 extern crate shapes;
 
 mod background;
-use alloc::boxed::Box;
 use alloc::collections::VecDeque;
 use alloc::string::{String, ToString};
 use alloc::sync::{Arc, Weak};
 use alloc::vec::{Vec};
 use compositor::{Compositor, FrameBufferUpdates};
-use core::ops::{Deref, DerefMut};
-use core::hash::Hash;
+
 use mpmc::Queue;
 use event_types::{Event, MousePositionEvent};
 use frame_buffer::{FrameBuffer, Pixel, AlphaPixel, PixelColor};
@@ -662,8 +659,7 @@ impl<U: Pixel> WindowManager<U> {
 /// Initialize the window manager, should provide the consumer of keyboard and mouse event, as well as a frame buffer to draw
 pub fn init() -> Result<(Queue<Event>, Queue<Event>), &'static str> {
     font::init()?;
-    // let (width, height) = frame_buffer::init()?;
-    let mut final_framebuffer = frame_buffer::init()?;
+    let final_framebuffer = frame_buffer::init()?;
     let (width, height) = final_framebuffer.get_size();
     let mut bg_framebuffer = FrameBuffer::new(width, height, None)?;
     let mut top_framebuffer = FrameBuffer::new(width, height, None)?;

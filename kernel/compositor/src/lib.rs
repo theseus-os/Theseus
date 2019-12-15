@@ -8,7 +8,7 @@ extern crate frame_buffer;
 extern crate shapes;
 
 use core::iter::IntoIterator;
-use core::hash::Hash;
+
 use frame_buffer::{FrameBuffer, Pixel};
 use shapes::{Coord, Rectangle};
 
