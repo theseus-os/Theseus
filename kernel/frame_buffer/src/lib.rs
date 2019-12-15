@@ -1,5 +1,7 @@
 //! This crate defines a `FrameBuffer` structure.
-//! The structure implements the `FrameBuffer` trait. Every pixel in it is a RGB pixel without alpha channel.
+//! The structure contains a buffer of pixels. A compositor can composite a list of framebuffers to a final one. 
+//!
+//! `pixel.rs` defines two type of pixels which implement the `Pixel` trait. The lower three bytes represent the color of a pixel and the 4th byte is an extra channel. `RGBPixel` is a normal pixel without channel and `AlphaPixel` has an alpha channel. The pixels to be mixed together should be of the same type in case the semantic of their channels are different.
 
 #![no_std]
 
@@ -18,9 +20,6 @@ use owning_ref::BoxRefMut;
 use shapes::Coord;
 use core::marker::PhantomData;
 pub use pixel::*;
-
-// /// The final framebuffer instance. It contains the pages which are mapped to the physical framebuffer.
-// pub static FINAL_FRAME_BUFFER: Once<Mutex<FrameBuffer<AlphaPixel>>> = Once::new();
 
 /// Initialize the final frame buffer and returns it.
 /// The final framebuffer contains a block of memory which is mapped to the physical framebuffer frames.
@@ -44,16 +43,6 @@ pub fn init<T: Pixel>() -> Result<FrameBuffer<T>, &'static str> {
 
     Ok(framebuffer)
 }
-
-// /// Gets the size of the final framebuffer.
-// /// Returns (width, height).
-// pub fn get_screen_size() -> Result<(usize, usize), &'static str> {
-//     let final_buffer = FINAL_FRAME_BUFFER
-//         .try()
-//         .ok_or("The final frame buffer was not yet initialized")?
-//         .lock();
-//     Ok(final_buffer.get_size())
-// }
 
 /// The RGB frame buffer structure. It implements the `FrameBuffer` trait.
 #[derive(Hash)]
@@ -119,30 +108,36 @@ impl<T: Pixel> FrameBuffer<T> {
         return &mut self.buffer;
     }
 
+    /// Returns a referece to the mapped memory of the buffer
     pub fn buffer(&self) -> &BoxRefMut<MappedPages, [T]> {
         return &self.buffer;
     }
 
+    /// Returns (width, height) of the framebuffer
     pub fn get_size(&self) -> (usize, usize) {
         (self.width, self.height)
     }
 
-    pub fn composite_buffer(&mut self, src: &[T], dest_start: usize) {
+    /// Composites `src` to the buffer starting from `index`.
+    pub fn composite_buffer(&mut self, src: &[T], index: usize) {
         let len = src.len();
-        let dest_end = dest_start + len;
-        T::composite_buffer(src, &mut self.buffer_mut()[dest_start..dest_end]);
+        let dest_end = index + len;
+        T::composite_buffer(src, &mut self.buffer_mut()[index..dest_end]);
     }
 
+    /// Draw a pixel at the given coordinate. The pixel will mix with the original one at the coordinate.
     pub fn draw_pixel(&mut self, coordinate: Coord, pixel: T) {
         if let Some(index) = self.index(coordinate) {
             self.buffer[index] = pixel.mix(self.buffer[index]).into();
         }
     }
 
+    /// Overwites a pixel at the given coordinate.
     pub fn overwrite_pixel(&mut self, coordinate: Coord, color: T) {
         self.draw_pixel(coordinate, color)
     }
 
+    /// Returns a pixel at coordinate.
     pub fn get_pixel(&self, coordinate: Coord) -> Result<T, &'static str> {
         if let Some(index) = self.index(coordinate) {
             return Ok(self.buffer[index]);
@@ -151,6 +146,7 @@ impl<T: Pixel> FrameBuffer<T> {
         }
     }
 
+    /// Fills the framebuffer with color.
     pub fn fill_color(&mut self, color: T) {
         for y in 0..self.height {
             for x in 0..self.width {
@@ -187,14 +183,4 @@ impl<T: Pixel> FrameBuffer<T> {
             && coordinate.y < buffer_height as isize && coordinate.y + height as isize >= 0
     }
 
-}
-
-/// Create a new framebuffer. useful for generalization
-pub fn new<T: Pixel>(        
-    width: usize,
-    height: usize,
-    physical_address: Option<PhysicalAddress>,
-) -> Result<FrameBuffer<T>, &'static str> {
-    let framebuffer = FrameBuffer::new(width, height, physical_address)?;
-    Ok(framebuffer)
 }

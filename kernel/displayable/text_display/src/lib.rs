@@ -18,7 +18,7 @@ use frame_buffer::{Pixel, FrameBuffer};
 use shapes::{Coord, Rectangle};
 
 
-/// A generic text displayable profiles the size and color of a block of text. It can display in a framebuffer.
+/// A text displayable profiles the size and color of a block of text. It can display in a framebuffer.
 pub struct TextDisplay {
     width: usize,
     height: usize,
@@ -38,16 +38,15 @@ impl<T: Pixel> Displayable<T> for TextDisplay {
         coordinate: Coord,
         framebuffer: &mut FrameBuffer<T>,
     ) -> Result<Rectangle, &'static str> {
-        let (string, col, line) =
-            if self.cache.len() > 0 && self.text.starts_with(self.cache.as_str()) {
-                (
-                    &self.text.as_str()[self.cache.len()..self.text.len()],
-                    self.next_col,
-                    self.next_line,
-                )
-            } else {
-                (self.text.as_str(), 0, 0)
-            };
+        let (string, col, line) = if self.cache.len() > 0 && self.text.starts_with(self.cache.as_str()) {
+            (
+                &self.text.as_str()[self.cache.len()..self.text.len()],
+                self.next_col,
+                self.next_line,
+            )
+        } else {
+            (self.text.as_str(), 0, 0)
+        };
 
         let (next_col, next_line, mut update_area) = frame_buffer_printer::print_string(
             framebuffer,
@@ -109,7 +108,7 @@ impl TextDisplay {
     pub fn get_bg_color(&self) -> u32 {
         self.bg_color
     }
-
+    
     /// Clear the cache of the text displayable.
     pub fn reset_cache(&mut self) {
         self.cache = String::new();
