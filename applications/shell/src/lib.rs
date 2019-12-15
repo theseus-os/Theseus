@@ -49,7 +49,7 @@ use core_io::Write;
 use core::ops::Deref;
 use app_io::{IoStreams, IoControlFlags};
 use fs_node::FileOrDir;
-use frame_buffer::{AlphaPixel, Pixel};
+use frame_buffer::{Pixel};
 use window_manager::WindowManager;
 
 /// The status of a job.
@@ -177,7 +177,7 @@ struct Shell<T:Pixel> {
 impl<T: Pixel> Shell<T> {
     /// Create a new shell. Currently the shell will bind to the default terminal instance provided
     /// by the `app_io` crate.
-    fn new() -> Result<Shell<AlphaPixel>, &'static str> {
+    fn new(terminal: Arc<Mutex<Terminal<T>>>) -> Result<Shell<T>, &'static str> {
         // Initialize a dfqueue for the terminal object to handle printing from applications.
         // Note that this is only to support legacy output. Newly developed applications should
         // turn to use `stdio` provided by the `stdio` crate together with the support of `app_io`.
@@ -196,7 +196,7 @@ impl<T: Pixel> Shell<T> {
             working_dir: Arc::clone(root::get_root()), 
         };
 
-        let terminal = app_io::get_terminal_or_default()?;
+        // let terminal = app_io::get_terminal_or_default()?;
 
         Ok(Shell {
             jobs: BTreeMap::new(),
@@ -212,7 +212,7 @@ impl<T: Pixel> Shell<T> {
             print_consumer,
             print_producer,
             env: Arc::new(Mutex::new(env)),
-            terminal
+            terminal: terminal,
         })
     }
 
@@ -747,14 +747,13 @@ impl<T: Pixel> Shell<T> {
                 for task_id in &task_ids {
                     let stdio_queue_for_stdin_and_stdout = Stdio::new();
                     let stdio_queue_for_stderr = Stdio::new();
-                    let terminal = app_io::get_terminal_or_default()?;
+                    // let terminal = app_io::get_terminal_or_default()?;
                     let streams = IoStreams::new(
                         previous_queue_reader,
                         stdio_queue_for_stdin_and_stdout.get_writer(),
                         stdio_queue_for_stderr.get_writer(),
                         self.key_event_consumer.clone(),
-                        terminal
-                    );
+                    )?;
                     app_io::insert_child_streams(*task_id, streams);
 
                     previous_queue_reader = stdio_queue_for_stdin_and_stdout.get_reader();
@@ -1497,6 +1496,7 @@ impl<T: Pixel> Shell<T> {
 /// Start a new shell. Shell::start() is an infinite loop, so normally we do not return from this function.
 fn shell_loop(mut _dummy: ()) -> Result<(), &'static str> {
     let wm = window_manager::WINDOW_MANAGER.try().ok_or("The window manager is not initialized")?;
-    Shell::<AlphaPixel>::new()?.start(wm)?;
+    let terminal = app_io::get_terminal_or_default()?;
+    Shell::new(terminal)?.start(wm)?;
     Ok(())
 }

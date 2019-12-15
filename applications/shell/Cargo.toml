@@ -20,6 +20,7 @@ path = "../../libs/keycodes_ascii"
 
 [dependencies.dfqueue]
 path = "../../libs/dfqueue"
+version = "0.1.0"
 
 [dependencies.event_types]
 path = "../../kernel/event_types"

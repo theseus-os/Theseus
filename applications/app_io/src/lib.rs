@@ -78,15 +78,15 @@ impl IoControlFlags {
 impl IoStreams {
     pub fn new(stdin: StdioReader, stdout: StdioWriter,
                stderr: StdioWriter,
-               key_event_reader: Arc<Mutex<Option<KeyEventQueueReader>>>,
-               terminal: Arc<Mutex<Terminal<AlphaPixel>>>) -> IoStreams {
-        IoStreams {
+               key_event_reader: Arc<Mutex<Option<KeyEventQueueReader>>>) -> Result<IoStreams, &'static str> {
+        let terminal = get_terminal_or_default()?;
+        Ok(IoStreams {
             stdin,
             stdout,
             stderr,
             key_event_reader,
             terminal
-        }
+        })
     }
 }
 
