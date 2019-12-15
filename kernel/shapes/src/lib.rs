@@ -1,5 +1,4 @@
-//! This crate defines the `FrameBuffer` trait and maintains the final framebuffer.
-//! A `FrameBuffer` contains fundamental display interfaces including displaying a single pixel and copying a buffer of pixels.
+//! This crate defines the basic shapes used in the framebuffer compositor.
 
 #![no_std]
 

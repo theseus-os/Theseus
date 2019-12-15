@@ -17,7 +17,7 @@ use shapes::{Coord, Rectangle};
 type ASCII = u8;
 
 /// Prints a string in a framebuffer.
-/// Returns (column, line, blocks), i.e. the position of the next symbol and the information of updated blocks.
+/// Returns (column, line, rectangle), i.e. the position of the next symbol and an rectangle which covers the updated area.
 /// A block item (index, width) represents the index of line number and the width of charaters in this line as pixels. It can be viewed as a framebuffer block which is described in the `frame_buffer_compositor` crate.
 /// # Arguments
 /// * `framebuffer`: the framebuffer to display in.

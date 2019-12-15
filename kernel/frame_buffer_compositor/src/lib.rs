@@ -269,8 +269,8 @@ pub fn get_block_index_iter<T: Pixel>(
     return start_index..end_index
 }
 
-/// Get the hash of a cache block
-pub fn hash<T: Hash>(block: T) -> u64 {
+/// Gets the hash of a cache block
+fn hash<T: Hash>(block: T) -> u64 {
     let builder = DefaultHashBuilder::default();
     let mut hasher = builder.build_hasher();
     block.hash(&mut hasher);

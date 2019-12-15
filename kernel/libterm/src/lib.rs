@@ -68,6 +68,7 @@ pub struct Terminal<T: Pixel> {
     is_scroll_end: bool,
     /// The starting index of the scrollback buffer string slice that is currently being displayed on the text display
     scroll_start_idx: usize,
+    /// The text displayable which the terminal prints to.
     text_display: TextDisplay,
     /// The cursor of the terminal.
     pub cursor: Cursor
@@ -415,12 +416,9 @@ impl<T: Pixel> Terminal<T> {
 
 /// Public methods of `Terminal`.
 impl<T: Pixel> Terminal<T> {
+    /// Creates a new terminal and adds it to the window manager `wm_mutex`
     pub fn new(wm_mutex: &Mutex<WindowManager<T>>) -> Result<Terminal<T>, &'static str> {
         let (window_width, window_height) = {
-            // let wm = window_manager::WINDOW_MANAGER
-            //     .try()
-            //     .ok_or("The static window manager was not yet initialized")?
-            //     .lock();
             let wm = wm_mutex.lock();
             wm.get_screen_size()
         };
@@ -619,7 +617,7 @@ impl<T: Pixel> Terminal<T> {
 
         // return if the cursor is not in the screen
         if text_next_pos >= col_num * line_num {
-            return Ok(());
+            return Ok(())
         }
 
         // calculate the cursor position
