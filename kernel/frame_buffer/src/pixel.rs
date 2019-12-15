@@ -1,7 +1,8 @@
 use core::hash::Hash;
 
+/// A pixel is basically a u32 of 4 bytes.
 pub type PixelColor = u32;
-/// Every pixel is of `Pixel` type, which is 4 byte as defined in `Pixel`
+/// The size of a pixel.
 pub const PIXEL_SIZE: usize = core::mem::size_of::<PixelColor>();
 
 
@@ -10,32 +11,32 @@ pub const BLACK: u32 = 0;
 /// predefined opaque white
 pub const WHITE: u32 = 0x00FFFFFF;
 
-/// A pixel provides methods to mix two pixels
+/// A pixel provides methods to mix with others.
 pub trait Pixel: Sized + From<PixelColor> + Copy + Hash {
+    /// Composites the `src` pixel slice to the `dest` pixel slice.
     fn composite_buffer(src: &[Self], dest: &mut[Self]);
     
-    // fn color(&self) -> PixelColor;
-
-    /// mix two color using alpha channel composition, supposing `self` is on the top of `other` pixel.
+    /// mix with another pixel considering their extra channel.
     fn mix(self, other: Self) -> Self;
 
-    /// mix two color linearly with weights, as `mix` for `self` and (1-`mix`) for `other`. It returns black if mix is outside range of [0, 1].
+    /// mix with another pixel linearly with weights, as `mix` for `self` and (1-`mix`) for `other`. It returns black if mix is outside range of [0, 1].
     fn weight_mix(self, other: Self, mix: f32) -> Self;
 }
 
 #[repr(C, packed)]
 #[derive(Hash, Debug, Clone, Copy)]
+/// An RGB Pixel is a pixel with no extra channel.
 pub struct RGBPixel {
     pub blue: u8,
     pub green: u8,
     pub red: u8,
-    pub channel: u8,
+    pub _channel: u8,
 }
 
 impl From<PixelColor> for RGBPixel {
     fn from(color: PixelColor) -> Self {
         RGBPixel {
-            channel: 0,
+            _channel: 0,
             red: (color >> 16) as u8,
             green: (color >> 8) as u8,
             blue: color as u8
@@ -45,6 +46,7 @@ impl From<PixelColor> for RGBPixel {
 
 #[repr(C, packed)]
 #[derive(Hash, Debug, Clone, Copy)]
+/// An Alpha Pixel is a pixel with an alpha channel
 pub struct AlphaPixel {
     pub blue: u8,
     pub green: u8,
@@ -90,7 +92,7 @@ impl Pixel for RGBPixel {
         let new_blue =
             ((self.blue as f32) * mix + (other.blue as f32) * (1f32 - mix)) as u8;
         RGBPixel {
-            channel: 0, 
+            _channel: 0, 
             red: new_red, 
             green: new_green, 
             blue: new_blue

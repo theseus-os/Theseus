@@ -44,7 +44,7 @@ pub fn init<T: Pixel>() -> Result<FrameBuffer<T>, &'static str> {
     Ok(framebuffer)
 }
 
-/// The RGB frame buffer structure. It implements the `FrameBuffer` trait.
+/// The frame buffer structure. It is a buffer of pixels that an application can display in. `T` specifies the type of pixels in this framebuffer.
 #[derive(Hash)]
 pub struct FrameBuffer<T: Pixel> {
     width: usize,
@@ -54,7 +54,7 @@ pub struct FrameBuffer<T: Pixel> {
 } 
 
 impl<T: Pixel> FrameBuffer<T> {
-    /// Creates a new RGB frame buffer with specified size.
+    /// Creates a new frame buffer with specified size.
     /// If the `physical_address` is specified, the new virtual frame buffer will be mapped to hardware's physical memory at that address.
     /// If the `physical_address` is none, the new function will allocate a block of physical memory at a random address and map the new frame buffer to that memory.
     pub fn new(

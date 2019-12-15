@@ -107,7 +107,7 @@ impl PrintOutputEvent {
     /// Create a new print output event. `s` is the string to print
     pub fn new(s: String) -> PrintOutputEvent {
         PrintOutputEvent {
-            text: s 
+            text: s,
         }
     }
 }

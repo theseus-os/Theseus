@@ -15,11 +15,13 @@ extern crate network_manager;
 extern crate ethernet_smoltcp_device;
 extern crate mpmc;
 
+
 use mpmc::Queue;
 use event_types::Event;
 use memory::MemoryManagementInfo;
 use ethernet_smoltcp_device::EthernetNetworkInterface;
 use network_manager::add_to_network_interfaces;
+
 
 /// A randomly chosen IP address that must be outside of the DHCP range.. // TODO FIXME: use DHCP to acquire IP
 const DEFAULT_LOCAL_IP: &'static str = "10.0.2.15/24"; // the default QEMU user-slirp network gives IP addresses of "10.0.2.*"

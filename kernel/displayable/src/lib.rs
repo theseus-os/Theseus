@@ -11,7 +11,7 @@ use frame_buffer::{FrameBuffer, Pixel};
 use shapes::{Coord, Rectangle};
 
 /// Trait for displayables. A displayable is an item which can display itself onto a framebuffer. 
-/// It is usually a composition of basic graphs and can act as a component such as a text box, a button, etc. belonging to a window.
+/// It is usually a composition of basic graphs and can display in a window as a component such as a text box, a button, etc.
 pub trait Displayable<T: Pixel> {
     /// Displays in a framebuffer.
     /// # Arguments
