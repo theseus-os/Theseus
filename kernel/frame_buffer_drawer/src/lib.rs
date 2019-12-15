@@ -21,7 +21,7 @@ pub fn draw_line<T: Pixel>(
     framebuffer: &mut FrameBuffer<T>,
     start: Coord,
     end: Coord,
-    color: u32,
+    color: T,
 ) {
     let width: isize = end.x - start.x;
     let height: isize = end.y - start.y;
@@ -43,7 +43,7 @@ pub fn draw_line<T: Pixel>(
             let coordinate = Coord::new(x, y);
             if framebuffer.contains(coordinate) {
                 line_in_buffer = true;
-                framebuffer.draw_pixel(coordinate, T::from(color));
+                framebuffer.draw_pixel(coordinate, color);
             } else if line_in_buffer {
                 // the part exceeds the buffer will be ignored
                 break;
@@ -62,7 +62,7 @@ pub fn draw_line<T: Pixel>(
             let coordinate = Coord::new(x, y);
             if framebuffer.contains(coordinate) {
                 line_in_buffer = true;
-                framebuffer.draw_pixel(coordinate, T::from(color));
+                framebuffer.draw_pixel(coordinate, color);
             } else if line_in_buffer {
                 // the part exceeds the buffer will be ignored
                 break;
@@ -132,8 +132,6 @@ pub fn draw_rectangle<T: Pixel>(
     }
 }
 
-//Wenqiu: remove all color: u32
-
 /// Fills a rectangle in a framebuffer with color.
 /// The part exceeding the boundary of the framebuffer will be ignored.
 /// # Arguments
@@ -147,7 +145,7 @@ pub fn fill_rectangle<T: Pixel>(
     coordinate: Coord,
     width: usize,
     height: usize,
-    color: u32,
+    color: T,
 ) {
     let (buffer_width, buffer_height) = framebuffer.get_size();
     // return if the rectangle is not within the frame buffer
@@ -165,7 +163,7 @@ pub fn fill_rectangle<T: Pixel>(
     let mut coordinate = Coord::new(start_x, start_y);
     loop {
         loop {
-            framebuffer.draw_pixel(coordinate, T::from(color));
+            framebuffer.draw_pixel(coordinate, color);
             coordinate.x += 1;
             if coordinate.x == end_x {
                 break;

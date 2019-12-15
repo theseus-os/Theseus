@@ -13,7 +13,7 @@ pub struct Cursor {
     /// The current blinking state show/hidden
     show: bool,
     /// The color of the cursor
-    color: u32,
+    color: PixelColor,
     /// The position of the cursor relative to the end of terminal text in units of number of characters.
     pub offset_from_end: usize,
     /// The underlying character at the position of the cursor.
@@ -99,7 +99,7 @@ impl Cursor {
                         + (0, 1),
                     CHARACTER_WIDTH,
                     CHARACTER_HEIGHT - 2,
-                    self.color,
+                    T::from(self.color),
                 );
             } else {
                 frame_buffer_printer::print_ascii_character(

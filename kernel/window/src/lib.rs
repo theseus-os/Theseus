@@ -172,16 +172,13 @@ impl<T: Pixel> Window<T> {
                 framebuffer: &inner.framebuffer,
                 coordinate: coordinate,
             };
-
-            let area = Rectangle {
-                top_left: coordinate,
-                bottom_right: coordinate + (width as isize, height as isize)
-            };
-
-            // Wenqiu: use WM
-            let mut wm = wm_mutex.lock();
-            FRAME_COMPOSITOR.lock().composite(Some(buffer_blocks), &mut wm.final_fb, Some(area))?;
         }
+        let area = Rectangle {
+            top_left: coordinate,
+            bottom_right: coordinate + (width as isize, height as isize)
+        };
+
+        wm_mutex.lock().refresh_active_window(Some(area))?;
 
         Ok(window)
     }
@@ -378,15 +375,14 @@ impl<T: Pixel> Window<T> {
             // event.mark_completed();
         }
 
-        // Wenqiu: optimize
-        if need_refresh_three_button {
-            let mut wm = wm_mut.lock();
-            self.refresh_three_button(wm.deref_mut())?;
-        }
-
         let mut wm = wm_mut.lock();
         if need_to_set_active {
             wm.set_active(&self.inner, true)?;
+        }
+
+        if need_refresh_three_button {
+            let area = self.get_button_area();
+            wm.refresh_active_window(Some(area))?;
         }
 
         if call_later_do_refresh_floating_border {
@@ -464,7 +460,7 @@ impl<T: Pixel> Window<T> {
                     Coord::new(0, i as isize),
                     width,
                     1,
-                    T::from(WINDOW_BORDER_COLOR_ACTIVE_BOTTOM).color_mix(
+                    T::from(WINDOW_BORDER_COLOR_ACTIVE_BOTTOM).weight_mix(
                         T::from(WINDOW_BORDER_COLOR_ACTIVE_TOP),
                         (i as f32) / (self.title_size as f32),
                     ),
@@ -513,7 +509,7 @@ impl<T: Pixel> Window<T> {
             &mut inner.framebuffer,
             Coord::new(x as isize, y as isize),
             WINDOW_BUTTON_SIZE,
-            T::from(BLACK).color_mix(
+            T::from(BLACK).weight_mix(
                 T::from(match button {
                     TopButton::Close => WINDOW_BUTTON_COLOR_CLOSE,
                     TopButton::MinimizeMaximize => WINDOW_BUTTON_COLOR_MINIMIZE_MAMIMIZE,
@@ -525,7 +521,7 @@ impl<T: Pixel> Window<T> {
     }
 
     /// refresh the top left three button's appearance
-    fn refresh_three_button(&self, wm: &mut WindowManager<T>) -> Result<(), &'static str> {
+    fn get_button_area(&self) -> Rectangle {
         let inner = self.inner.lock();
         let width = inner.get_size().0;
 
@@ -534,14 +530,10 @@ impl<T: Pixel> Window<T> {
             coordinate: inner.coordinate,
         };
 
-        let update_area = Rectangle {
+        Rectangle {
             top_left: Coord::new(0, 0),
             bottom_right: Coord::new(width as isize, self.title_size as isize)
-        };
-
-        FRAME_COMPOSITOR.lock().composite(Some(frame_buffer_blocks), &mut wm.final_fb, Some(update_area))?;
-
-        Ok(())
+        }
     }
 
     /// return the available inner size, excluding title bar and border
@@ -571,26 +563,32 @@ impl<T: Pixel> Window<T> {
     }
 }
 
-impl<T: Pixel> Drop for Window<T> {
-    fn drop(&mut self) {
-// Wenqiu: remove
 
-        // match WINDOW_MANAGER
-        //     .try()
-        //     .ok_or("The static window manager was not yet initialized")
-        // {
-        //     Ok(wm) => {
-        //         if let Err(err) = wm.lock().delete_window(&self.inner) {
-        //             error!("delete_window failed {}", err);
-        //         }
-        //     }
-        //     Err(err) => {
-        //         error!("delete_window failed {}", err);
-        //     }
-        // }
+impl<T: Pixel> Drop for Window<T>{
+    fn drop(&mut self){
+        
+        // Wenqiu: remove
+        // let inner = self.inner.lock();
+        // let area = Rectangle {
+        //     top_left: inner.coordinate,
+        //     bottom_right: inner.coordinate + (inner.width as isize, inner.height as isize)
+        // };
+
+        match WINDOW_MANAGER
+            .try()
+            .ok_or("The static window manager was not yet initialized")
+        {
+            Ok(wm) => {
+                if let Err(err) = wm.lock().delete_window(&self.inner){
+                    error!("delete_window failed {}", err);
+                }
+            }
+            Err(err) => {
+                error!("delete_window failed {}", err);
+            }
+        }
     }
 }
-
 // /// A component contains a displayable and its coordinate relative to the top-left corner of the window.
 // struct Component {
 //     coordinate: Coord,

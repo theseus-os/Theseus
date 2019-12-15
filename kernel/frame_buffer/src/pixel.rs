@@ -19,22 +19,22 @@ pub trait Pixel: Sized + From<PixelColor> + Copy + Hash {
     // fn color(&self) -> PixelColor;
 
     /// mix two color using alpha channel composition, supposing `self` is on the top of `other` pixel.
-    fn alpha_mix(self, other: Self) -> Self;
+    fn mix(self, other: Self) -> Self;
 
     /// mix two color linearly with weights, as `mix` for `self` and (1-`mix`) for `other`. It returns black if mix is outside range of [0, 1].
-    fn color_mix(self, other: Self, mix: f32) -> Self;
+    fn weight_mix(self, other: Self, mix: f32) -> Self;
 
-    /// Gets the alpha channel of the pixel
-    fn get_alpha(&self) -> u8;
+    // /// Gets the alpha channel of the pixel
+    // fn get_alpha(&self) -> u8;
 
-    /// Gets the red byte of the pixel
-    fn get_red(&self) -> u8;
+    // /// Gets the red byte of the pixel
+    // fn get_red(&self) -> u8;
 
-    /// Gets the green byte of the pixel
-    fn get_green(&self) -> u8;
+    // /// Gets the green byte of the pixel
+    // fn get_green(&self) -> u8;
 
-    /// Gets the blue byte of the pixel
-    fn get_blue(&self) -> u8;
+    // /// Gets the blue byte of the pixel
+    // fn get_blue(&self) -> u8;
 }
 
 #[repr(C, packed)]
@@ -89,103 +89,63 @@ impl Pixel for RGBPixel {
     }
     
     #[inline]
-    fn alpha_mix(self, other: Self) -> Self {
+    fn mix(self, other: Self) -> Self {
         self
     }
 
-    fn color_mix(self, other: Self, mix: f32) -> Self {
+    #[inline]
+    fn weight_mix(self, other: Self, mix: f32) -> Self {
         self
     }
 
-    //Wenqiu: TODO Use channel instead
-    fn get_alpha(&self) -> u8 {
-        self.channel
-    }
-
-    fn get_red(&self) -> u8 {
-        self.red
-    }
-
-    fn get_green(&self) -> u8 {
-        self.green
-    }
-
-    fn get_blue(&self) -> u8 {
-        self.blue
-    }
 }
 
-/// Create a new Pixel from `alpha`, `red`, `green` and `blue` bytes.
-pub fn new_alpha_pixel(alpha: u8, red: u8, green: u8, blue: u8) -> AlphaPixel {
-    AlphaPixel {
-        alpha: alpha,
-        red: red,
-        green: green,
-        blue: blue,
-    }
-}
-
-// Wenqiu: TODO draw pixel for alpha framebuffer
-impl Pixel for AlphaPixel {
-    // #[inline]
-    // fn from(pixel: PixelColor) -> AlphaPixel {
-    //     AlphaPixel(pixel)
-    // }
-
-    // fn color(&self) -> PixelColor {
-    //     self.0
-    // }
-    
+impl Pixel for AlphaPixel {   
     fn composite_buffer(src: &[Self], dest: &mut[Self]) {
         for i in 0..src.len() {
-            dest[i] = AlphaPixel::from(src[i]).alpha_mix(AlphaPixel::from(dest[i])).into();
+            dest[i] = AlphaPixel::from(src[i]).mix(AlphaPixel::from(dest[i])).into();
         }
     }
 
-    fn alpha_mix(self, other: Self) -> Self {
-        let alpha = self.get_alpha() as u16;
-        let red = self.get_red();
-        let green = self.get_green();
-        let blue = self.get_blue();
-        // let ori_alpha = other.get_alpha();
-        let ori_red = other.get_red();
-        let ori_green = other.get_green();
-        let ori_blue = other.get_blue();
+    fn mix(self, other: Self) -> Self {
+        let alpha = self.alpha as u16;
+        let red = self.red;
+        let green = self.green;
+        let blue = self.blue;
+        // let ori_alpha = other.alpha;
+        let ori_red = other.red;
+        let ori_green = other.green;
+        let ori_blue = other.blue;
         // let new_alpha = (((alpha as u16) * (255 - alpha) + (ori_alpha as u16) * alpha) / 255) as u8;
         let new_red = (((red as u16) * (255 - alpha) + (ori_red as u16) * alpha) / 255) as u8;
         let new_green = (((green as u16) * (255 - alpha) + (ori_green as u16) * alpha) / 255) as u8;
         let new_blue = (((blue as u16) * (255 - alpha) + (ori_blue as u16) * alpha) / 255) as u8;
-        return new_alpha_pixel(alpha as u8, new_red, new_green, new_blue);
+        AlphaPixel {
+            alpha: alpha as u8,
+            red: new_red,
+            green: new_green,
+            blue: new_blue
+        }
     }
 
-    fn color_mix(self, other: Self, mix: f32) -> Self {
+    fn weight_mix(self, other: Self, mix: f32) -> Self {
         if mix < 0f32 || mix > 1f32 {
             return AlphaPixel::from(BLACK);
         }
         let new_alpha =
-            ((self.get_alpha() as f32) * mix + (other.get_alpha() as f32) * (1f32 - mix)) as u8;
+            ((self.alpha as f32) * mix + (other.alpha as f32) * (1f32 - mix)) as u8;
         let new_red =
-            ((self.get_red() as f32) * mix + (other.get_red() as f32) * (1f32 - mix)) as u8;
+            ((self.red as f32) * mix + (other.red as f32) * (1f32 - mix)) as u8;
         let new_green =
-            ((self.get_green() as f32) * mix + (other.get_green() as f32) * (1f32 - mix)) as u8;
+            ((self.green as f32) * mix + (other.green as f32) * (1f32 - mix)) as u8;
         let new_blue =
-            ((self.get_blue() as f32) * mix + (other.get_blue() as f32) * (1f32 - mix)) as u8;
-        return new_alpha_pixel(new_alpha, new_red, new_green, new_blue);
+            ((self.blue as f32) * mix + (other.blue as f32) * (1f32 - mix)) as u8;
+        AlphaPixel {
+            alpha: new_alpha, 
+            red: new_red, 
+            green: new_green, 
+            blue: new_blue
+        }
     }
 
-    fn get_alpha(&self) -> u8 {
-        self.alpha
-    }
-
-    fn get_red(&self) -> u8 {
-        self.red
-    }
-
-    fn get_green(&self) -> u8 {
-        self.green
-    }
-
-    fn get_blue(&self) -> u8 {
-        self.blue
-    }
 }

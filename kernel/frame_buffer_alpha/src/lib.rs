@@ -159,7 +159,7 @@
 //             None => return,
 //         };
 //         let origin = Pixel::from(self.buffer[idx]);
-//         self.buffer[idx] = Pixel::from(color).alpha_mix(origin);
+//         self.buffer[idx] = Pixel::from(color).mix(origin);
 //     }
 
 //     fn get_pixel(&self, coordinate: Coord) -> Result<Pixel, &'static str> {

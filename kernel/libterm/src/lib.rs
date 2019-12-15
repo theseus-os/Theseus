@@ -33,7 +33,7 @@ use cursor::*;
 use text_display::TextDisplay;
 use event_types::Event;
 use font::{CHARACTER_HEIGHT, CHARACTER_WIDTH};
-use frame_buffer::{FrameBuffer, Pixel};
+use frame_buffer::{FrameBuffer, Pixel, PixelColor};
 use shapes::{Coord, Rectangle};
 use tsc::{tsc_ticks, TscTicks};
 use window::Window;

@@ -180,7 +180,7 @@ impl<U: Pixel> WindowManager<U> {
     }
 
     /// delete a window and refresh its region
-    pub fn delete_window(&mut self, objref: &Arc<Mutex<WindowInner<U>>>) -> Result<(), &'static str> {
+    pub fn delete_window<P: Pixel>(&mut self, objref: &Arc<Mutex<WindowInner<P>>>) -> Result<(), &'static str> {
         let (top_left, bottom_right) = {
             let inner = objref.lock();
             let top_left = inner.get_position();
@@ -194,8 +194,9 @@ impl<U: Pixel> WindowManager<U> {
                 bottom_right: bottom_right
             }
         );
+        let window_ref = Arc::into_raw(objref.clone()) as usize;
         if let Some(current_active) = self.active.upgrade() {
-            if Arc::ptr_eq(&(current_active), objref) {
+            if Arc::into_raw(current_active.clone()) as usize == window_ref {
                 self.refresh_bottom_windows(area, false)?;
                 if let Some(window) = self.show_list.remove(0) {
                     self.active = window;
@@ -207,21 +208,35 @@ impl<U: Pixel> WindowManager<U> {
                 return Ok(());
             }
         }
-        match self.is_window_in_show_list(&objref) {
-            Some(i) => {
-                self.show_list.remove(i);
-                self.refresh_windows(area, true)?;
-                return Ok(());
+        
+        let mut i = 0;
+        for item in &self.show_list {
+            if let Some(item_ref) = item.upgrade() {
+                if Arc::into_raw(item_ref.clone()) as usize == window_ref {
+                    break;
+                } 
             }
-            None => {}
+            i += 1;
         }
-        match self.is_window_in_hide_list(&objref) {
-            Some(i) => {
-                self.hide_list.remove(i);
-                self.refresh_windows(area, true)?;
-                return Ok(());
+        if i < self.show_list.len() {
+            self.show_list.remove(i);
+            self.refresh_windows(area, true)?;
+            return Ok(())        
+        }
+
+        i = 0;
+        for item in &self.hide_list {
+            if let Some(item_ref) = item.upgrade() {
+                if Arc::into_raw(item_ref.clone()) as usize == window_ref {
+                    break;
+                } 
             }
-            None => {}
+            i += 1;
+        }
+        if i < self.hide_list.len() {
+            self.hide_list.remove(i);
+            self.refresh_windows(area, true)?;
+            return Ok(())        
         }
         Err("cannot find this window")
     }

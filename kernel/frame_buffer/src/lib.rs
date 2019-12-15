@@ -139,20 +139,9 @@ impl<T: Pixel> FrameBuffer<T> {
         T::composite_buffer(src, &mut self.buffer_mut()[dest_start..dest_end]);
     }
 
-    // /// Wenqiu: TODO get pixel function is specific for RGB
-    // pub fn composite_buffer(&mut self, src: &[PixelColor], dest_start: usize) {
-    //     let len = src.len();
-    //     for i in 0..len {
-    //         let index = dest_start + i;
-    //         let coordinate =
-    //             Coord::new((index % self.width) as isize, (index / self.width) as isize);
-    //         self.draw_pixel(coordinate, T::from(src[i]));
-    //     }
-    // }
-
     pub fn draw_pixel(&mut self, coordinate: Coord, pixel: T) {
         if let Some(index) = self.index(coordinate) {
-            self.buffer[index] = pixel.alpha_mix(self.buffer[index]).into();
+            self.buffer[index] = pixel.mix(self.buffer[index]).into();
         }
     }
 

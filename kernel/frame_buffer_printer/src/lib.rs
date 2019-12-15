@@ -10,7 +10,7 @@ extern crate shapes;
 
 use alloc::vec;
 use font::{CHARACTER_HEIGHT, CHARACTER_WIDTH, FONT_PIXEL};
-use frame_buffer::{FrameBuffer, Pixel};
+use frame_buffer::{FrameBuffer, Pixel, PixelColor};
 use shapes::{Coord, Rectangle};
 use core::hash::Hash;
 
@@ -130,8 +130,8 @@ pub fn print_string<T: Pixel>(
 pub fn print_ascii_character<T: Pixel>(
     framebuffer: &mut FrameBuffer<T>,
     character: ASCII,
-    font_color: u32,
-    bg_color: u32,
+    font_color: PixelColor,
+    bg_color: PixelColor,
     coordinate: Coord,
     column: usize,
     line: usize,
@@ -143,7 +143,6 @@ pub fn print_ascii_character<T: Pixel>(
 
     let fonts = FONT_PIXEL.lock();
 
-    // Wenqiu: TODO impl from From trait
     // print from the offset within the frame buffer
     let (buffer_width, buffer_height) = framebuffer.get_size();
     let off_set_x: usize = if start.x < 0 { -(start.x) as usize } else { 0 };
