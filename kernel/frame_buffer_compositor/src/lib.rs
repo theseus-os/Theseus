@@ -86,7 +86,7 @@ pub struct FrameCompositor {
 
 impl FrameCompositor {
     /// Checks if a coordinate is in the cache list.
-    fn is_cached(&self, block: &[u32], coordinate: &Coord) -> bool {
+    fn is_cached<T: Pixel>(&self, block: &[T], coordinate: &Coord) -> bool {
         match self.caches.get(coordinate) {
             Some(cache) => {
                 // The same hash means the array of two blocks are the same. Since all blocks are of the same height, two blocks of the same array must share the same width. Therefore, the coordinate and content_hash can identify a block.
@@ -105,7 +105,7 @@ impl FrameCompositor {
     /// * `coordinate`: the position of the source framebuffer relative to the final one.
     /// * `index`: the index of the block to be rendered. The framebuffer are divided into y-aligned blocks and index indicates the order of the block.
     /// * `area`: the rectangle to be updated.
-    fn check_cache_and_mix<T: Pixel + Copy>(
+    fn check_cache_and_mix<T: Pixel>(
         &mut self, 
         src_fb: &FrameBuffer<T>, 
         final_fb: &mut FrameBuffer<T>, 
@@ -179,7 +179,7 @@ impl FrameCompositor {
 }
 
 impl Compositor<Rectangle> for FrameCompositor {
-    fn composite<'a, U: IntoIterator<Item = Rectangle> + Clone, P: 'a + Pixel + Copy>(
+    fn composite<'a, U: IntoIterator<Item = Rectangle> + Clone, P: 'a + Pixel>(
         &mut self,
         bufferlist: impl IntoIterator<Item = FrameBufferUpdates<'a, P>>,
         final_fb: &mut FrameBuffer<P>,
@@ -219,7 +219,7 @@ impl Compositor<Rectangle> for FrameCompositor {
 }
 
 impl Compositor<Coord> for FrameCompositor {
-    fn composite<'a, U: IntoIterator<Item = Coord> + Clone, P: 'a + Pixel + Copy>(
+    fn composite<'a, U: IntoIterator<Item = Coord> + Clone, P: 'a + Pixel>(
         &mut self,
         bufferlist: impl IntoIterator<Item = FrameBufferUpdates<'a, P>>,
         final_fb: &mut FrameBuffer<P>,
@@ -245,7 +245,7 @@ impl Compositor<Coord> for FrameCompositor {
 /// * `framebuffer`: the framebuffer to composite.
 /// * `coordinate`: the coordinate of the framebuffer relative to the origin(top-left) of the screen.
 /// * `area`: the updated area relative to the origin(top-left) of the screen. The returned indexes represent the blocks overlap with this area.
-pub fn get_block_index_iter<T: Pixel + Copy>(
+pub fn get_block_index_iter<T: Pixel>(
     framebuffer: &FrameBuffer<T>, 
     coordinate: Coord, 
     abs_area: &Rectangle

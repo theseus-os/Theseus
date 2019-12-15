@@ -32,6 +32,7 @@ use libterm::Terminal;
 use spin::Mutex;
 use stdio::{StdioWriter, KeyEventQueueReader};
 use core_io::Write;
+use core::hash::Hash;
 
 /// The metadata for each line in the file.
 struct LineSlice {
@@ -134,7 +135,7 @@ fn parse_content(content: &String) -> Result<BTreeMap<usize, LineSlice>, &'stati
 
 /// Display part of the file (may be whole file if the file is short) to the terminal, starting
 /// at line number `line_start`.
-fn display_content<T: Pixel + Copy>(content: &String, map: &BTreeMap<usize, LineSlice>,
+fn display_content<T: Pixel>(content: &String, map: &BTreeMap<usize, LineSlice>,
                    line_start: usize, terminal: &Arc<Mutex<Terminal<T>>>)
                    -> Result<(), &'static str> {
     // Get exclusive control of the terminal. It is locked through the whole function to

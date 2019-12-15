@@ -18,12 +18,13 @@ use event_types::{Event};
 use frame_buffer::{FrameBuffer, Pixel, PixelColor};
 use shapes::Coord;
 use spin::{Mutex};
+use core::hash::Hash;
 
 // The default color of a window;
 const WINDOW_DEFAULT_COLOR: PixelColor = 0x80FFFFFF;
 
 /// WindowInner object that should be owned by the manager. It is usually owned by both an application's window and the manager so that the application can modify it and the manager can re-display it when necessary.
-pub struct WindowInner<T: Pixel + Copy> {
+pub struct WindowInner<T: Pixel> {
     /// The position of the top-left corner of the window.
     /// It is relative to the top-left corner of the screen.
     pub coordinate: Coord,
@@ -45,7 +46,7 @@ pub struct WindowInner<T: Pixel + Copy> {
     pub moving_base: Coord,
 }
 
-impl<T: Pixel + Copy> WindowInner<T> {
+impl<T: Pixel> WindowInner<T> {
 
     /// Clear the content of a window
     pub fn clear(&mut self) -> Result<(), &'static str> {
@@ -85,7 +86,7 @@ impl<T: Pixel + Copy> WindowInner<T> {
 }
 
 /// Creates a new window object with given position and size
-pub fn new_window<'a, T: Pixel + Copy>(
+pub fn new_window<'a, T: Pixel>(
     coordinate: Coord,
     framebuffer: FrameBuffer<T>,
 ) -> Result<Arc<Mutex<WindowInner<T>>>, &'static str> {

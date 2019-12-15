@@ -11,13 +11,14 @@ extern crate downcast_rs;
 extern crate shapes;
 
 use alloc::boxed::Box;
+use core::hash::Hash;
 use downcast_rs::Downcast;
 use frame_buffer::{FrameBuffer, Pixel};
 use shapes::{Coord, Rectangle};
 
 /// Trait for displayables. A displayable is an item which can display itself onto a framebuffer. 
 /// It is usually a composition of basic graphs and can act as a component such as a text box, a button belonging to a window, etc. 
-pub trait Displayable<T: Pixel + Copy> {
+pub trait Displayable<T: Pixel> {
     /// Displays in a framebuffer.
     /// # Arguments
     /// * `coordinate`: the coordinate within the given `framebuffer` where this displayable should render itself. The `coordinate` is relative to the top-left point `(0, 0)` of the `framebuffer`.

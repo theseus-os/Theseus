@@ -25,6 +25,7 @@ extern crate shapes;
 extern crate spin;
 
 use core::ops::DerefMut;
+use core::hash::Hash;
 use alloc::string::{String, ToString};
 use alloc::vec::Vec;
 use alloc::boxed::Box;
@@ -62,7 +63,7 @@ pub enum ScrollError {
 /// 2) The input queue (in the window manager) that handles keypresses and resize events
 ///     - Consumer is the main terminal loop
 ///     - Producer is the window manager. Window manager is responsible for enqueuing keyevents into the active application
-pub struct Terminal<T: Pixel + Copy> {
+pub struct Terminal<T: Pixel> {
     /// The terminal's own window.
     pub window: Window<T>,
     /// Name of the text displayable of the terminal
@@ -79,7 +80,7 @@ pub struct Terminal<T: Pixel + Copy> {
 }
 
 /// Privite methods of `Terminal`.
-impl<T: Pixel + Copy> Terminal<T> {
+impl<T: Pixel> Terminal<T> {
     /// Get the width and height of the text displayable in the unit of characters.
     pub fn get_text_dimensions(&self) -> (usize, usize) {
         /*let text_display = match self.window.get_concrete_display::<TextDisplay>(&self.display_name) {
@@ -432,7 +433,7 @@ impl<T: Pixel + Copy> Terminal<T> {
 }
 
 /// Public methods of `Terminal`.
-impl<T: Pixel + Copy> Terminal<T> {
+impl<T: Pixel> Terminal<T> {
     pub fn new(wm_mutex: &Mutex<WindowManager<T>>) -> Result<Terminal<T>, &'static str> {
         let (window_width, window_height) = {
             // let wm = window_manager::WINDOW_MANAGER

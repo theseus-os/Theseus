@@ -12,6 +12,7 @@ use alloc::vec;
 use font::{CHARACTER_HEIGHT, CHARACTER_WIDTH, FONT_PIXEL};
 use frame_buffer::{FrameBuffer, Pixel};
 use shapes::{Coord, Rectangle};
+use core::hash::Hash;
 
 type ASCII = u8;
 
@@ -26,7 +27,7 @@ type ASCII = u8;
 /// * `font_color`: the color of the text.
 /// * `bg_color`: the background color of the text block.
 /// * `(column, line)`: the location of the text in the text block as symbols.
-pub fn print_string<T: Pixel + Copy>(
+pub fn print_string<T: Pixel>(
     framebuffer: &mut FrameBuffer<T>,
     coordinate: Coord,
     width: usize,
@@ -126,7 +127,7 @@ pub fn print_string<T: Pixel + Copy>(
 /// * `bg_color`: the background color of the character.
 /// * `coordinate`: the left top coordinate of the text block relative to the origin(top-left point) of the frame buffer.
 /// * `(column, line)`: the location of the character in the text block as symbols.
-pub fn print_ascii_character<T: Pixel + Copy>(
+pub fn print_ascii_character<T: Pixel>(
     framebuffer: &mut FrameBuffer<T>,
     character: ASCII,
     font_color: u32,
@@ -168,7 +169,7 @@ pub fn print_ascii_character<T: Pixel + Copy>(
 }
 
 /// Fill a blank text area (left, top, right, bottom) with color. The tuple specifies the location of the area relative to the origin(top-left point) of the frame buffer.
-pub fn fill_blank<T: Pixel + Copy>(
+pub fn fill_blank<T: Pixel>(
     framebuffer: &mut FrameBuffer<T>,
     left: isize,
     top: isize,
@@ -188,7 +189,7 @@ pub fn fill_blank<T: Pixel + Copy>(
         return
     }
 
-    let fill = vec![color; (right - left) as usize];
+    let fill = vec![T::from(color); (right - left) as usize];
     let mut coordinate = Coord::new(left, top);
     
     loop {

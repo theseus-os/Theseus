@@ -9,6 +9,7 @@ extern crate shapes;
 
 use frame_buffer::{FrameBuffer, Pixel};
 use shapes::Coord;
+use core::hash::Hash;
 
 /// Draws a line in a framebuffer. The part exceeding the boundary of the framebuffer will be ignored.
 /// # Arguments
@@ -16,7 +17,7 @@ use shapes::Coord;
 /// * `start`: the start coordinate of the line relative to the origin(top-left point) of the frame buffer.
 /// * `end`: the end coordinate of the line relative to the origin(top-left point) of the frame buffer.
 /// * `color`: the color of the line.
-pub fn draw_line<T: Pixel + Copy>(
+pub fn draw_line<T: Pixel>(
     framebuffer: &mut FrameBuffer<T>,
     start: Coord,
     end: Coord,
@@ -79,12 +80,12 @@ pub fn draw_line<T: Pixel + Copy>(
 /// * `width`: the width of the rectangle.
 /// * `height`: the height of the rectangle.
 /// * `color`: the color of the rectangle's border.
-pub fn draw_rectangle<T: Pixel + Copy>(
+pub fn draw_rectangle<T: Pixel>(
     framebuffer: &mut FrameBuffer<T>,
     coordinate: Coord,
     width: usize,
     height: usize,
-    color: u32,
+    color: T,
 ) {
     let (buffer_width, buffer_height) = framebuffer.get_size();
 
@@ -107,10 +108,10 @@ pub fn draw_rectangle<T: Pixel + Copy>(
             break;
         }
         if coordinate.y >= 0 {
-            framebuffer.draw_pixel(top, T::from(color));
+            framebuffer.draw_pixel(top, color);
         }
         if (coordinate.y + height as isize) < buffer_height as isize { 
-            framebuffer.draw_pixel(top + (0, end_y_offset), T::from(color));
+            framebuffer.draw_pixel(top + (0, end_y_offset), color);
         }
         top.x += 1;
     }
@@ -122,14 +123,16 @@ pub fn draw_rectangle<T: Pixel + Copy>(
             break;
         }
         if coordinate.x >= 0 {
-            framebuffer.draw_pixel(left, T::from(color));
+            framebuffer.draw_pixel(left, color);
         }
         if (coordinate.x + width as isize) < buffer_width as isize {
-            framebuffer.draw_pixel(left + (end_x_offset, 0), T::from(color));
+            framebuffer.draw_pixel(left + (end_x_offset, 0), color);
         }
         left.y += 1;
     }
 }
+
+//Wenqiu: remove all color: u32
 
 /// Fills a rectangle in a framebuffer with color.
 /// The part exceeding the boundary of the framebuffer will be ignored.
@@ -139,7 +142,7 @@ pub fn draw_rectangle<T: Pixel + Copy>(
 /// * `width`: the width of the rectangle.
 /// * `height`: the height of the rectangle.
 /// * `color`: the color of the rectangle.
-pub fn fill_rectangle<T: Pixel + Copy>(
+pub fn fill_rectangle<T: Pixel>(
     framebuffer: &mut FrameBuffer<T>,
     coordinate: Coord,
     width: usize,
@@ -177,7 +180,7 @@ pub fn fill_rectangle<T: Pixel + Copy>(
 }
 
 /// Draw a circle in the framebuffer. `coordinate` is the position of the center of the circle relative to the top-left corner of the framebuffer and `r` is the radius
-pub fn draw_circle<T: Pixel + Copy>(framebuffer: &mut FrameBuffer<T>, center: Coord, r: usize, color: u32) {
+pub fn draw_circle<T: Pixel>(framebuffer: &mut FrameBuffer<T>, center: Coord, r: usize, color: T) {
     let r2 = (r * r) as isize;
     for y in center.y - r as isize..center.y + r as isize {
         for x in center.x - r as isize..center.x + r as isize {
@@ -185,7 +188,7 @@ pub fn draw_circle<T: Pixel + Copy>(framebuffer: &mut FrameBuffer<T>, center: Co
             if framebuffer.contains(coordinate) {
                 let d = coordinate - center;
                 if d.x * d.x + d.y * d.y <= r2 {
-                    framebuffer.draw_pixel(coordinate, T::from(color));
+                    framebuffer.draw_pixel(coordinate, color);
                 }
             }
         }

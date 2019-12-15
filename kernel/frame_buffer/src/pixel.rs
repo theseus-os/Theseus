@@ -1,12 +1,9 @@
 use super::*;
 
 pub type PixelColor = u32;
-#[derive(Copy, Clone)]
-pub struct RGBPixel(PixelColor);
-#[derive(Copy, Clone)]
-pub struct AlphaPixel(PixelColor);
 /// Every pixel is of `Pixel` type, which is 4 byte as defined in `Pixel`
 pub const PIXEL_SIZE: usize = 4;//core::mem::size_of::<Pixel>();
+
 
 /// Used in reseting the alpha channel of RGB pixel.
 const RGB_PIXEL_MASK: u32 = 0x00FFFFFF;
@@ -16,12 +13,10 @@ pub const BLACK: u32 = 0;
 pub const WHITE: u32 = 0x00FFFFFF;
 
 /// A pixel provides methods to mix two pixels
-pub trait Pixel {
-    fn from(pixel: PixelColor) -> Self;
-
-    fn composite_buffer(src: &[PixelColor], dest: &mut[PixelColor]);
+pub trait Pixel: Sized + From<PixelColor> + Copy + Hash {
+    fn composite_buffer(src: &[Self], dest: &mut[Self]);
     
-    fn color(&self) -> PixelColor;
+    // fn color(&self) -> PixelColor;
 
     /// mix two color using alpha channel composition, supposing `self` is on the top of `other` pixel.
     fn alpha_mix(self, other: Self) -> Self;
@@ -42,19 +37,54 @@ pub trait Pixel {
     fn get_blue(&self) -> u8;
 }
 
+#[repr(C, packed)]
+#[derive(Hash, Debug, Clone, Copy)]
+pub struct RGBPixel {
+    pub blue: u8,
+    pub green: u8,
+    pub red: u8,
+    pub channel: u8,
+}
+
+impl From<PixelColor> for RGBPixel {
+    fn from(color: PixelColor) -> Self {
+        RGBPixel {
+            channel: 0,
+            red: (color >> 16) as u8,
+            green: (color >> 8) as u8,
+            blue: color as u8
+        }
+    }
+}
+
+#[repr(C, packed)]
+#[derive(Hash, Debug, Clone, Copy)]
+pub struct AlphaPixel {
+    pub blue: u8,
+    pub green: u8,
+    pub red: u8,
+    pub alpha: u8
+}
+
+impl From<PixelColor> for AlphaPixel {
+    fn from(color: PixelColor) -> Self {
+        AlphaPixel {
+            alpha: (color >> 24) as u8,
+            red: (color >> 16) as u8,
+            green: (color >> 8) as u8,
+            blue: color as u8
+        }
+    }
+}
+
 impl Pixel for RGBPixel {
-    #[inline]
-    fn from(pixel: PixelColor) -> RGBPixel {
-        RGBPixel(pixel)
-    }
+    // #[inline]
+    // fn color(&self) -> PixelColor {
+    //     self.0
+    // }
 
     #[inline]
-    fn color(&self) -> PixelColor {
-        self.0
-    }
-
-    #[inline]
-    fn composite_buffer(src: &[PixelColor], dest: &mut[PixelColor]) {
+    fn composite_buffer(src: &[Self], dest: &mut[Self]) {
         dest.copy_from_slice(src)
     }
     
@@ -64,58 +94,51 @@ impl Pixel for RGBPixel {
     }
 
     fn color_mix(self, other: Self, mix: f32) -> Self {
-        if mix < 0f32 || mix > 1f32 {
-            return RGBPixel(BLACK);
-        }
-        let new_alpha =
-            ((self.get_alpha() as f32) * mix + (other.get_alpha() as f32) * (1f32 - mix)) as u8;
-        let new_red =
-            ((self.get_red() as f32) * mix + (other.get_red() as f32) * (1f32 - mix)) as u8;
-        let new_green =
-            ((self.get_green() as f32) * mix + (other.get_green() as f32) * (1f32 - mix)) as u8;
-        let new_blue =
-            ((self.get_blue() as f32) * mix + (other.get_blue() as f32) * (1f32 - mix)) as u8;
-        return RGBPixel(new_alpha_pixel(new_alpha, new_red, new_green, new_blue).0);
+        self
     }
 
+    //Wenqiu: TODO Use channel instead
     fn get_alpha(&self) -> u8 {
-        (self.0 >> 24) as u8
+        self.channel
     }
 
     fn get_red(&self) -> u8 {
-        (self.0 >> 16) as u8
+        self.red
     }
 
     fn get_green(&self) -> u8 {
-        (self.0 >> 8) as u8
+        self.green
     }
 
     fn get_blue(&self) -> u8 {
-        self.0 as u8
+        self.blue
     }
 }
 
 /// Create a new Pixel from `alpha`, `red`, `green` and `blue` bytes.
 pub fn new_alpha_pixel(alpha: u8, red: u8, green: u8, blue: u8) -> AlphaPixel {
-    AlphaPixel(
-        ((alpha as u32) << 24) + ((red as u32) << 16) + ((green as u32) << 8) + (blue as u32)
-    )
+    AlphaPixel {
+        alpha: alpha,
+        red: red,
+        green: green,
+        blue: blue,
+    }
 }
 
 // Wenqiu: TODO draw pixel for alpha framebuffer
 impl Pixel for AlphaPixel {
-    #[inline]
-    fn from(pixel: PixelColor) -> AlphaPixel {
-        AlphaPixel(pixel)
-    }
+    // #[inline]
+    // fn from(pixel: PixelColor) -> AlphaPixel {
+    //     AlphaPixel(pixel)
+    // }
 
-    fn color(&self) -> PixelColor {
-        self.0
-    }
+    // fn color(&self) -> PixelColor {
+    //     self.0
+    // }
     
-    fn composite_buffer(src: &[PixelColor], dest: &mut[PixelColor]) {
+    fn composite_buffer(src: &[Self], dest: &mut[Self]) {
         for i in 0..src.len() {
-            dest[i] = AlphaPixel(src[i]).alpha_mix(AlphaPixel(dest[i])).color();
+            dest[i] = AlphaPixel::from(src[i]).alpha_mix(AlphaPixel::from(dest[i])).into();
         }
     }
 
@@ -137,7 +160,7 @@ impl Pixel for AlphaPixel {
 
     fn color_mix(self, other: Self, mix: f32) -> Self {
         if mix < 0f32 || mix > 1f32 {
-            return AlphaPixel(BLACK);
+            return AlphaPixel::from(BLACK);
         }
         let new_alpha =
             ((self.get_alpha() as f32) * mix + (other.get_alpha() as f32) * (1f32 - mix)) as u8;
@@ -151,18 +174,18 @@ impl Pixel for AlphaPixel {
     }
 
     fn get_alpha(&self) -> u8 {
-        (self.0 >> 24) as u8
+        self.alpha
     }
 
     fn get_red(&self) -> u8 {
-        (self.0 >> 16) as u8
+        self.red
     }
 
     fn get_green(&self) -> u8 {
-        (self.0 >> 8) as u8
+        self.green
     }
 
     fn get_blue(&self) -> u8 {
-        self.0 as u8
+        self.blue
     }
 }

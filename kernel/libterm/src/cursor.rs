@@ -80,7 +80,7 @@ impl Cursor {
     /// * `column`: the column of the cursor in the textarea.
     /// * `line`: the line of the cursor in the textarea.
     /// * `framebuffer`: the framebuffer to display the cursor in.
-    pub fn display<T: Pixel + Copy>(
+    pub fn display<T: Pixel>(
         &mut self,
         coordinate: Coord,
         column: usize,

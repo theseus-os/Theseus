@@ -37,6 +37,7 @@ use alloc::sync::Arc;
 use compositor::{Compositor, FrameBufferUpdates};
 use core::ops::Deref;
 use core::ops::DerefMut;
+use core::hash::Hash;
 use mpmc::Queue;
 use displayable::Displayable;
 use event_types::{Event, MousePositionEvent};
@@ -95,7 +96,7 @@ impl From<usize> for TopButton {
 }
 
 /// Abstraction of a window which owns a list of components and the window's handler. It provides title bar which helps user moving, close, maximize or minimize window
-pub struct Window<T: Pixel + Copy> {
+pub struct Window<T: Pixel> {
     /// this object contains states and methods related to display the window on the screen
     pub inner: Arc<Mutex<WindowInner<T>>>,
     /// the width of border, init as WINDOW_BORDER. the border is still part of the window and remains flexibility for user to change border style or remove border. However, for most application a border is useful for user to identify the region.
@@ -116,7 +117,7 @@ pub struct Window<T: Pixel + Copy> {
     // components: BTreeMap<String, Component>,
 }
 
-impl<T: Pixel + Copy> Window<T> {
+impl<T: Pixel> Window<T> {
     /// create new Window by given position and size, return the Mutex of it for ease of sharing
     /// x, y is the distance in pixel relative to top-left of window
     pub fn new(
@@ -434,7 +435,7 @@ impl<T: Pixel + Copy> Window<T> {
             Coord::new(0, self.title_size as isize),
             self.border_size,
             height - self.title_size,
-            border_color,
+            T::from(border_color),
         );
 
         frame_buffer_drawer::draw_rectangle(
@@ -442,7 +443,7 @@ impl<T: Pixel + Copy> Window<T> {
             Coord::new(0, (height - self.border_size) as isize),
             width,
             self.border_size,
-            border_color,
+            T::from(border_color),
         );
         frame_buffer_drawer::draw_rectangle(
             &mut inner.framebuffer,
@@ -452,7 +453,7 @@ impl<T: Pixel + Copy> Window<T> {
             ),
             self.border_size,
             height - self.title_size,
-            border_color,
+            T::from(border_color),
         );
 
         // then draw the title bar
@@ -466,7 +467,7 @@ impl<T: Pixel + Copy> Window<T> {
                     T::from(WINDOW_BORDER_COLOR_ACTIVE_BOTTOM).color_mix(
                         T::from(WINDOW_BORDER_COLOR_ACTIVE_TOP),
                         (i as f32) / (self.title_size as f32),
-                    ).color(),
+                    ),
                 ); 
             }
         } else {
@@ -475,7 +476,7 @@ impl<T: Pixel + Copy> Window<T> {
                 Coord::new(0, 0),
                 width,
                 self.title_size,
-                border_color,
+                T::from(border_color),
             );
         }
 
@@ -519,7 +520,7 @@ impl<T: Pixel + Copy> Window<T> {
                     TopButton::Hide => WINDOW_BUTTON_COLOR_HIDE,
                 }),
                 0.2f32 * (state as f32),
-            ).color(),
+            ),
         );
     }
 
@@ -570,7 +571,7 @@ impl<T: Pixel + Copy> Window<T> {
     }
 }
 
-impl<T: Pixel + Copy> Drop for Window<T> {
+impl<T: Pixel> Drop for Window<T> {
     fn drop(&mut self) {
 // Wenqiu: remove
 

@@ -13,6 +13,7 @@ extern crate shapes;
 pub mod pixel;
 use alloc::boxed::Box;
 use core::ops::DerefMut;
+use core::hash::Hash;
 use memory::{EntryFlags, FrameRange, MappedPages, PhysicalAddress, FRAME_ALLOCATOR};
 use owning_ref::BoxRefMut;
 use spin::{Mutex, Once};
@@ -26,7 +27,7 @@ pub use pixel::*;
 /// Initialize the final frame buffer.
 /// Allocates a block of memory and map it to the physical framebuffer frames.
 /// Returns (width, height) of the screen.
-pub fn init<T: Pixel + Copy>() -> Result<FrameBuffer<T>, &'static str> {
+pub fn init<T: Pixel>() -> Result<FrameBuffer<T>, &'static str> {
     // get the graphic mode information
     let vesa_display_phys_start: PhysicalAddress;
     let buffer_width: usize;
@@ -42,10 +43,10 @@ pub fn init<T: Pixel + Copy>() -> Result<FrameBuffer<T>, &'static str> {
     };
 
     // init the final framebuffer
-    let mut framebuffer = FrameBuffer::new(buffer_width, buffer_height, Some(vesa_display_phys_start))?;
-    let background = vec![0; buffer_width * buffer_height];
+    let framebuffer = FrameBuffer::new(buffer_width, buffer_height, Some(vesa_display_phys_start))?;
+    // let background = vec![0; buffer_width * buffer_height];
     // FINAL_FRAME_BUFFER.call_once(|| Mutex::new(framebuffer));
-    framebuffer.composite_buffer(background.as_slice(), 0);
+    // framebuffer.composite_buffer(background.as_slice(), 0);
 
     Ok(framebuffer)
 }
@@ -62,14 +63,14 @@ pub fn init<T: Pixel + Copy>() -> Result<FrameBuffer<T>, &'static str> {
 
 /// The RGB frame buffer structure. It implements the `FrameBuffer` trait.
 #[derive(Hash)]
-pub struct FrameBuffer<T: Pixel + Copy> {
+pub struct FrameBuffer<T: Pixel> {
     width: usize,
     height: usize,
-    buffer: BoxRefMut<MappedPages, [PixelColor]>,
+    buffer: BoxRefMut<MappedPages, [T]>,
     _phantom: PhantomData<T>,
 } 
 
-impl<T: Pixel + Copy> FrameBuffer<T> {
+impl<T: Pixel> FrameBuffer<T> {
     /// Creates a new RGB frame buffer with specified size.
     /// If the `physical_address` is specified, the new virtual frame buffer will be mapped to hardware's physical memory at that address.
     /// If the `physical_address` is none, the new function will allocate a block of physical memory at a random address and map the new frame buffer to that memory.
@@ -120,11 +121,11 @@ impl<T: Pixel + Copy> FrameBuffer<T> {
     }
 
     /// Returns a mutable reference to the mapped memory of the buffer.
-    pub fn buffer_mut(&mut self) -> &mut BoxRefMut<MappedPages, [PixelColor]> {
+    pub fn buffer_mut(&mut self) -> &mut BoxRefMut<MappedPages, [T]> {
         return &mut self.buffer;
     }
 
-    pub fn buffer(&self) -> &BoxRefMut<MappedPages, [PixelColor]> {
+    pub fn buffer(&self) -> &BoxRefMut<MappedPages, [T]> {
         return &self.buffer;
     }
 
@@ -132,7 +133,7 @@ impl<T: Pixel + Copy> FrameBuffer<T> {
         (self.width, self.height)
     }
 
-    pub fn composite_buffer(&mut self, src: &[PixelColor], dest_start: usize) {
+    pub fn composite_buffer(&mut self, src: &[T], dest_start: usize) {
         let len = src.len();
         let dest_end = dest_start + len;
         T::composite_buffer(src, &mut self.buffer_mut()[dest_start..dest_end]);
@@ -151,7 +152,7 @@ impl<T: Pixel + Copy> FrameBuffer<T> {
 
     pub fn draw_pixel(&mut self, coordinate: Coord, pixel: T) {
         if let Some(index) = self.index(coordinate) {
-            self.buffer[index] = pixel.alpha_mix(T::from(self.buffer[index])).color();
+            self.buffer[index] = pixel.alpha_mix(self.buffer[index]).into();
         }
     }
 
@@ -161,7 +162,7 @@ impl<T: Pixel + Copy> FrameBuffer<T> {
 
     pub fn get_pixel(&self, coordinate: Coord) -> Result<T, &'static str> {
         if let Some(index) = self.index(coordinate) {
-            return Ok(T::from(self.buffer[index]));
+            return Ok(self.buffer[index]);
         } else {
             return Err("No pixel");
         }
@@ -206,7 +207,7 @@ impl<T: Pixel + Copy> FrameBuffer<T> {
 }
 
 /// Create a new framebuffer. useful for generalization
-pub fn new<T: Pixel + Copy>(        
+pub fn new<T: Pixel>(        
     width: usize,
     height: usize,
     physical_address: Option<PhysicalAddress>,

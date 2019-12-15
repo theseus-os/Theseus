@@ -51,6 +51,7 @@ use app_io::{IoStreams, IoControlFlags};
 use fs_node::FileOrDir;
 use frame_buffer::{AlphaPixel, Pixel};
 use window_manager::WindowManager;
+use core::hash::Hash;
 
 /// The status of a job.
 #[derive(PartialEq)]
@@ -141,7 +142,7 @@ enum AppErr {
     SpawnErr(String)
 }
 
-struct Shell<T:Pixel + Copy> {
+struct Shell<T:Pixel> {
     /// Variable that stores the task id of any application manually spawned from the terminal
     jobs: BTreeMap<isize, Job>,
     /// Map task number to job number.
@@ -174,7 +175,7 @@ struct Shell<T:Pixel + Copy> {
     terminal: Arc<Mutex<Terminal<T>>>
 }
 
-impl<T: Pixel + Copy> Shell<T> {
+impl<T: Pixel> Shell<T> {
     /// Create a new shell. Currently the shell will bind to the default terminal instance provided
     /// by the `app_io` crate.
     fn new() -> Result<Shell<AlphaPixel>, &'static str> {
@@ -1371,7 +1372,7 @@ impl<T: Pixel + Copy> Shell<T> {
 }
 
 /// Shell internal command related methods.
-impl<T: Pixel + Copy> Shell<T> {
+impl<T: Pixel> Shell<T> {
     /// Check if the current command line is a shell internal command.
     fn is_internal_command(&self) -> bool {
         let mut iter = self.cmdline.split_whitespace();

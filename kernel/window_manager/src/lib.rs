@@ -35,6 +35,7 @@ use alloc::sync::{Arc, Weak};
 use alloc::vec::{Vec};
 use compositor::{Compositor, FrameBufferUpdates};
 use core::ops::{Deref, DerefMut};
+use core::hash::Hash;
 use mpmc::Queue;
 use event_types::{Event, MousePositionEvent};
 use frame_buffer::{FrameBuffer, Pixel, AlphaPixel, PixelColor};
@@ -85,7 +86,7 @@ const WINDOW_BORDER_SIZE: usize = 3;
 const WINDOW_BORDER_COLOR_INNER: PixelColor = 0x00CA6F1E;
 
 /// Window manager structure which maintains a list of windows and a mouse.
-pub struct WindowManager<U: Pixel + Copy> {
+pub struct WindowManager<U: Pixel> {
     /// those window currently not shown on screen
     hide_list: VecDeque<Weak<Mutex<WindowInner<U>>>>,
     /// those window shown on screen that may overlapping each other
@@ -103,7 +104,7 @@ pub struct WindowManager<U: Pixel + Copy> {
     pub final_fb: FrameBuffer<U>,
 }
 
-impl<U: Pixel + Copy> WindowManager<U> {
+impl<U: Pixel> WindowManager<U> {
     /// set one window to active, push last active (if exists) to top of show_list. if `refresh` is `true`, will then refresh the window's area
     pub fn set_active(
         &mut self,
@@ -473,7 +474,7 @@ impl<U: Pixel + Copy> WindowManager<U> {
                 coordinate, 
                 width as usize, 
                 height as usize, 
-                color
+                U::from(color)
             );
 
             for m in 0..width {
@@ -658,11 +659,11 @@ pub fn init() -> Result<(Queue<Event>, Queue<Event>), &'static str> {
         for y in 0..screen_height {
             bg_framebuffer.draw_pixel(
                 Coord::new(x as isize, y as isize),
-                Pixel::from(background::BACKGROUND[y / 2][x / 2])
+                AlphaPixel::from(background::BACKGROUND[y / 2][x / 2])
             )
         }
     }
-    top_framebuffer.fill_color(Pixel::from(T)); 
+    top_framebuffer.fill_color(AlphaPixel::from(T)); 
 
     // initialize static window manager
     let window_manager: WindowManager<AlphaPixel> = WindowManager {
