@@ -10,9 +10,11 @@ extern crate memory;
 extern crate multicore_bringup;
 extern crate owning_ref;
 extern crate shapes;
+extern crate spin;
 
 pub mod pixel;
 use alloc::boxed::Box;
+use spin::{Mutex, Once};
 use core::ops::DerefMut;
 
 use memory::{EntryFlags, FrameRange, MappedPages, PhysicalAddress, FRAME_ALLOCATOR};
@@ -21,7 +23,10 @@ use shapes::Coord;
 use core::marker::PhantomData;
 pub use pixel::*;
 
-/// Initialize the final frame buffer and returns it.
+// /// The final framebuffer instance. It contains the pages which are mapped to the physical framebuffer.
+// pub static FINAL_FRAME_BUFFER: Once<Mutex<FrameBuffer<AlphaPixel>>> = Once::new();
+
+/// Initialize the final frame buffer.
 /// The final framebuffer contains a block of memory which is mapped to the physical framebuffer frames.
 pub fn init<T: Pixel>() -> Result<FrameBuffer<T>, &'static str> {
     // get the graphic mode information
@@ -46,11 +51,10 @@ pub fn init<T: Pixel>() -> Result<FrameBuffer<T>, &'static str> {
 
 /// The frame buffer structure. It is a buffer of pixels that an application can display in. `T` specifies the type of pixels in this framebuffer.
 #[derive(Hash)]
-pub struct FrameBuffer<T: Pixel> {
+pub struct FrameBuffer<T> {
     width: usize,
     height: usize,
     buffer: BoxRefMut<MappedPages, [T]>,
-    _phantom: PhantomData<T>,
 } 
 
 impl<T: Pixel> FrameBuffer<T> {
@@ -99,7 +103,6 @@ impl<T: Pixel> FrameBuffer<T> {
             width: width,
             height: height,
             buffer: buffer,
-            _phantom: PhantomData
         })
     }
 
@@ -133,8 +136,8 @@ impl<T: Pixel> FrameBuffer<T> {
     }
 
     /// Overwites a pixel at the given coordinate.
-    pub fn overwrite_pixel(&mut self, coordinate: Coord, color: T) {
-        self.draw_pixel(coordinate, color)
+    pub fn overwrite_pixel(&mut self, coordinate: Coord, color: PixelColor) {
+        self.draw_pixel(coordinate, T::from(color))
     }
 
     /// Returns a pixel at coordinate.
@@ -147,11 +150,11 @@ impl<T: Pixel> FrameBuffer<T> {
     }
 
     /// Fills the framebuffer with color.
-    pub fn fill_color(&mut self, color: T) {
+    pub fn fill_color(&mut self, color: PixelColor) {
         for y in 0..self.height {
             for x in 0..self.width {
                 let coordinate = Coord::new(x as isize, y as isize);
-                self.draw_pixel(coordinate, color);
+                self.draw_pixel(coordinate, T::from(color));
             }
         }
     }

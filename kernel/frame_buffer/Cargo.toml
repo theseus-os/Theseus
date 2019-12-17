@@ -6,6 +6,7 @@ description = "a framebuffer as a buffer of pixels which can be composited to th
 build = "../../build.rs"
 
 [dependencies]
+spin = "0.4.10"
 owning_ref = { git = "https://github.com/kevinaboos/owning-ref-rs" }
 
 [dependencies.memory]

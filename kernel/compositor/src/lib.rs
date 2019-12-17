@@ -21,6 +21,7 @@ pub trait Compositor<T: Mixable> {
     ///
     /// # Arguments
     /// * `bufferlist`: an iterator over the buffers to be composited. Every item is a framebuffer and its position relative to the top-left of the screen. 
+    /// * `final_fb`: the final framebuffer that the compositor will composite the bufferlist with.
     /// * `updates`: a interator over the shaped to be updated. The compositor will update the shape in every framebuffer in order or the whole framebuffer if it is `None`.
     /// A compositor can cache the updated areas for better performance.
     fn composite<'a, U: IntoIterator<Item = T> + Clone, P: 'a + Pixel>(
@@ -63,7 +64,6 @@ impl Mixable for Coord {
             let pixel = src_fb.get_pixel(relative_coord)?;
             final_fb.draw_pixel(self.clone(), pixel);
         }
-
         Ok(())
     }
 }

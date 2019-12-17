@@ -12,7 +12,7 @@ extern crate shapes;
 use alloc::sync::Arc;
 use mpmc::Queue;
 use event_types::{Event};
-use frame_buffer::{FrameBuffer, Pixel, PixelColor};
+use frame_buffer::{FrameBuffer, AlphaPixel, PixelColor};
 use shapes::Coord;
 use spin::{Mutex};
 
@@ -29,7 +29,7 @@ pub enum WindowMovingStatus {
 }
 
 /// WindowInner object that should be owned by the manager. It is usually owned by both an application's window and the manager so that the application can modify it and the manager can re-display it when necessary.
-pub struct WindowInner<T: Pixel> {
+pub struct WindowInner {
     /// The position of the top-left corner of the window.
     /// It is relative to the top-left corner of the screen.
     pub coordinate: Coord,
@@ -42,16 +42,16 @@ pub struct WindowInner<T: Pixel> {
     /// event producer that could be used to send events to the `Window` object.
     pub producer: Queue<Event>, // event output used by window manager
     /// frame buffer of this window
-    pub framebuffer: FrameBuffer<T>,
+    pub framebuffer: FrameBuffer<AlphaPixel>,
     /// Whether a window is moving and the position before a window starts to move.
     pub moving: WindowMovingStatus,
 }
 
-impl<T: Pixel> WindowInner<T> {
+impl WindowInner {
 
     /// Clear the content of a window
     pub fn clear(&mut self) -> Result<(), &'static str> {
-        self.framebuffer.fill_color(T::from(WINDOW_DEFAULT_COLOR));
+        self.framebuffer.fill_color(WINDOW_DEFAULT_COLOR);
         Ok(())
     }
 
@@ -81,16 +81,22 @@ impl<T: Pixel> WindowInner<T> {
         self.coordinate = coordinate;
     }
 
-    pub fn get_pixel(&self, coordinate: Coord) -> Result<T, &'static str> {
+    /// Returns the mutable framebuffer of the window inner
+    pub fn buffer_mut(&mut self) -> &mut FrameBuffer<AlphaPixel> {
+        &mut self.framebuffer
+    }
+
+    /// Returns the pixel at the coordinate
+    pub fn get_pixel(&self, coordinate: Coord) -> Result<AlphaPixel, &'static str> {
         self.framebuffer.get_pixel(coordinate)
     }
 }
 
 /// Creates a new window object with given position and size
-pub fn new_window<'a, T: Pixel>(
+pub fn new_window<'a>(
     coordinate: Coord,
-    framebuffer: FrameBuffer<T>,
-) -> Result<Arc<Mutex<WindowInner<T>>>, &'static str> {
+    framebuffer: FrameBuffer<AlphaPixel>,
+) -> Result<Arc<Mutex<WindowInner>>, &'static str> {
     // Init the key input producer and consumer
     let consumer = Queue::with_capacity(100);
     let producer = consumer.clone();
@@ -98,7 +104,7 @@ pub fn new_window<'a, T: Pixel>(
     let (width, height) = framebuffer.get_size();
 
     // new window object
-    let window: WindowInner<T> = WindowInner {
+    let window: WindowInner = WindowInner {
         coordinate: coordinate,
         width: width,
         height: height,

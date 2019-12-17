@@ -1282,7 +1282,7 @@ impl<T: Pixel> Shell<T> {
     /// queue will always be printed to the text display before input events or any other managerial functions are handled. 
     /// This allows for clean appending to the scrollback buffer and prevents interleaving of text.
     /// The application will gets inputs sent by the window manager `wm_mutex`.
-    fn start(mut self, wm_mutex: &Mutex<WindowManager<T>>) -> Result<(), &'static str> {
+    fn start(mut self, wm_mutex: &Mutex<WindowManager>) -> Result<(), &'static str> {
         let mut need_refresh = false;
         let mut need_prompt = false;
         self.redisplay_prompt();

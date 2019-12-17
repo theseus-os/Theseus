@@ -12,14 +12,14 @@ use shapes::{Coord, Rectangle};
 
 /// Trait for displayables. A displayable is an item which can display itself onto a framebuffer. 
 /// It is usually a composition of basic graphs and can display in a window as a component such as a text box, a button, etc.
-pub trait Displayable<T: Pixel> {
+pub trait Displayable {
     /// Displays in a framebuffer.
     /// # Arguments
     /// * `coordinate`: the coordinate within the given `framebuffer` where this displayable should render itself. The `coordinate` is relative to the top-left point `(0, 0)` of the `framebuffer`.
     /// * `framebuffer`: the framebuffer to display onto.
     ///
     /// Returns a rectangle that covers the updated area.
-    fn display(
+    fn display<T: Pixel>(
         &mut self,
         coordinate: Coord,
         framebuffer: &mut FrameBuffer<T>,

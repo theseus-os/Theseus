@@ -19,8 +19,34 @@ pub trait Pixel: Sized + From<PixelColor> + Copy + Hash {
     /// mix with another pixel considering their extra channel.
     fn mix(self, other: Self) -> Self;
 
-    /// mix with another pixel linearly with weights, as `mix` for `self` and (1-`mix`) for `other`. It returns black if mix is outside range of [0, 1].
-    fn weight_mix(self, other: Self, mix: f32) -> Self;
+    /// mix two pixels linearly with weights, as `mix` for `origin` and (1-`mix`) for `other`. It returns black if mix is outside range of [0, 1].
+    fn weight_mix(origin: PixelColor, other: PixelColor, mix: f32) -> Self {
+        if mix < 0f32 || mix > 1f32 {
+            return Self::from(BLACK);
+        }
+        let new_channel =
+            (((origin >> 24) as f32) * mix + ((other >> 24) as f32) * (1f32 - mix)) as u32;
+        let new_red =
+            ((((origin >> 16) as u8) as f32) * mix + (((other >> 16) as u8) as f32) * (1f32 - mix)) as u32;
+        let new_green =
+            ((((origin >> 8) as u8) as f32) * mix + (((other >> 8) as u8) as f32) * (1f32 - mix)) as u32;
+        let new_blue =
+            (((origin as u8) as f32) * mix + ((other as u8) as f32) * (1f32 - mix)) as u32;
+        let color = new_channel <<24 | new_red << 16 | new_green << 8 | new_blue;
+        Self::from(color)
+    }
+
+    /// Gets the value of the red byte
+    fn get_red(&self) -> u8;
+
+    /// Gets the value of the green byte
+    fn get_green(&self) -> u8;
+
+    /// Gets the value of the blue byte
+    fn get_blue(&self) -> u8;
+
+    /// Gets the value of the extra channel
+    fn get_channel(&self) -> u8;
 }
 
 #[repr(C, packed)]
@@ -30,13 +56,13 @@ pub struct RGBPixel {
     pub blue: u8,
     pub green: u8,
     pub red: u8,
-    pub _channel: u8,
+    pub channel: u8,
 }
 
 impl From<PixelColor> for RGBPixel {
     fn from(color: PixelColor) -> Self {
         RGBPixel {
-            _channel: 0,
+            channel: 0,
             red: (color >> 16) as u8,
             green: (color >> 8) as u8,
             blue: color as u8
@@ -81,22 +107,20 @@ impl Pixel for RGBPixel {
         self
     }
 
-    fn weight_mix(self, other: Self, mix: f32) -> Self {
-        if mix < 0f32 || mix > 1f32 {
-            return RGBPixel::from(BLACK);
-        }
-        let new_red =
-            ((self.red as f32) * mix + (other.red as f32) * (1f32 - mix)) as u8;
-        let new_green =
-            ((self.green as f32) * mix + (other.green as f32) * (1f32 - mix)) as u8;
-        let new_blue =
-            ((self.blue as f32) * mix + (other.blue as f32) * (1f32 - mix)) as u8;
-        RGBPixel {
-            _channel: 0, 
-            red: new_red, 
-            green: new_green, 
-            blue: new_blue
-        }
+    fn get_red(&self) -> u8 {
+        self.red
+    }
+
+    fn get_green(&self) -> u8 {
+        self.green
+    }
+
+    fn get_blue(&self) -> u8 {
+        self.blue
+    }
+
+    fn get_channel(&self) -> u8 {
+        self.channel
     }
 
 }
@@ -129,24 +153,21 @@ impl Pixel for AlphaPixel {
         }
     }
 
-    fn weight_mix(self, other: Self, mix: f32) -> Self {
-        if mix < 0f32 || mix > 1f32 {
-            return AlphaPixel::from(BLACK);
-        }
-        let new_alpha =
-            ((self.alpha as f32) * mix + (other.alpha as f32) * (1f32 - mix)) as u8;
-        let new_red =
-            ((self.red as f32) * mix + (other.red as f32) * (1f32 - mix)) as u8;
-        let new_green =
-            ((self.green as f32) * mix + (other.green as f32) * (1f32 - mix)) as u8;
-        let new_blue =
-            ((self.blue as f32) * mix + (other.blue as f32) * (1f32 - mix)) as u8;
-        AlphaPixel {
-            alpha: new_alpha, 
-            red: new_red, 
-            green: new_green, 
-            blue: new_blue
-        }
+    fn get_red(&self) -> u8 {
+        self.red
     }
+
+    fn get_green(&self) -> u8 {
+        self.green
+    }
+
+    fn get_blue(&self) -> u8 {
+        self.blue
+    }
+
+    fn get_channel(&self) -> u8 {
+        self.alpha
+    }
+
 
 }

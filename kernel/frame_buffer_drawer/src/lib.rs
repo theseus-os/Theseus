@@ -7,7 +7,7 @@
 extern crate frame_buffer;
 extern crate shapes;
 
-use frame_buffer::{FrameBuffer, Pixel};
+use frame_buffer::{FrameBuffer, Pixel, PixelColor};
 use shapes::Coord;
 
 
@@ -85,8 +85,9 @@ pub fn draw_rectangle<T: Pixel>(
     coordinate: Coord,
     width: usize,
     height: usize,
-    color: T,
+    color: PixelColor,
 ) {
+    let pixel = T::from(color);
     let (buffer_width, buffer_height) = framebuffer.get_size();
 
     // return if the rectangle is not within the frame buffer
@@ -108,10 +109,10 @@ pub fn draw_rectangle<T: Pixel>(
             break;
         }
         if coordinate.y >= 0 {
-            framebuffer.draw_pixel(top, color);
+            framebuffer.draw_pixel(top, pixel);
         }
         if (coordinate.y + height as isize) < buffer_height as isize { 
-            framebuffer.draw_pixel(top + (0, end_y_offset), color);
+            framebuffer.draw_pixel(top + (0, end_y_offset), pixel);
         }
         top.x += 1;
     }
@@ -123,10 +124,10 @@ pub fn draw_rectangle<T: Pixel>(
             break;
         }
         if coordinate.x >= 0 {
-            framebuffer.draw_pixel(left, color);
+            framebuffer.draw_pixel(left, pixel);
         }
         if (coordinate.x + width as isize) < buffer_width as isize {
-            framebuffer.draw_pixel(left + (end_x_offset, 0), color);
+            framebuffer.draw_pixel(left + (end_x_offset, 0), pixel);
         }
         left.y += 1;
     }

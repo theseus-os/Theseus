@@ -48,7 +48,7 @@ use spin::{Mutex, Once};
 use window_inner::{WindowInner, WindowMovingStatus};
 
 /// The instance of the default window manager
-pub static WINDOW_MANAGER: Once<Mutex<WindowManager<AlphaPixel>>> = Once::new();
+pub static WINDOW_MANAGER: Once<Mutex<WindowManager>> = Once::new();
 
 // The half size of mouse in number of pixels, the actual size of pointer is 1+2*`MOUSE_POINTER_HALF_SIZE`
 const MOUSE_POINTER_HALF_SIZE: usize = 7;
@@ -84,29 +84,30 @@ const WINDOW_BORDER_SIZE: usize = 3;
 const WINDOW_BORDER_COLOR_INNER: PixelColor = 0x00CA6F1E;
 
 /// Window manager structure which maintains a list of windows and a mouse.
-pub struct WindowManager<U: Pixel> {
+pub struct WindowManager {
     /// those window currently not shown on screen
-    hide_list: VecDeque<Weak<Mutex<WindowInner<U>>>>,
+    hide_list: VecDeque<Weak<Mutex<WindowInner>>>,
     /// those window shown on screen that may overlapping each other
-    show_list: VecDeque<Weak<Mutex<WindowInner<U>>>>,
+    show_list: VecDeque<Weak<Mutex<WindowInner>>>,
     /// the only active window, receiving all keyboard events (except for those remained for WM)
-    active: Weak<Mutex<WindowInner<U>>>, // this one is not in show_list
+    active: Weak<Mutex<WindowInner>>, // this one is not in show_list
     /// current mouse position
     mouse: Coord,
     /// If a window is being repositioned (e.g., by dragging it), this is the position of that window's border
     repositioned_border: Option<Rectangle>,
     /// the frame buffer that it should print on
-    bottom_fb: FrameBuffer<U>,
+    bottom_fb: FrameBuffer<AlphaPixel>,
     /// the frame buffer that it should print on
-    top_fb: FrameBuffer<U>,
-    pub final_fb: FrameBuffer<U>,
+    top_fb: FrameBuffer<AlphaPixel>,
+    /// The final framebuffer which is mapped to the screen;
+    pub final_fb: FrameBuffer<AlphaPixel>,
 }
 
-impl<U: Pixel> WindowManager<U> {
+impl WindowManager {
     /// set one window as active, push last active (if exists) to top of show_list. if `refresh` is `true`, will then refresh the window's area
     pub fn set_active(
         &mut self,
-        objref: &Arc<Mutex<WindowInner<U>>>,
+        objref: &Arc<Mutex<WindowInner>>,
         refresh: bool,
     ) -> Result<(), &'static str> {
         // if it is currently actived, just return
@@ -150,7 +151,7 @@ impl<U: Pixel> WindowManager<U> {
     }
 
     /// Return the index of a window if it is in the show list
-    fn is_window_in_show_list(&mut self, objref: &Arc<Mutex<WindowInner<U>>>) -> Option<usize> {
+    fn is_window_in_show_list(&mut self, objref: &Arc<Mutex<WindowInner>>) -> Option<usize> {
         let mut i = 0_usize;
         for item in self.show_list.iter() {
             if let Some(item_ptr) = item.upgrade() {
@@ -164,7 +165,7 @@ impl<U: Pixel> WindowManager<U> {
     }
 
     /// Return the index of a window if it is in the hide list
-    fn is_window_in_hide_list(&mut self, objref: &Arc<Mutex<WindowInner<U>>>) -> Option<usize> {
+    fn is_window_in_hide_list(&mut self, objref: &Arc<Mutex<WindowInner>>) -> Option<usize> {
         let mut i = 0_usize;
         for item in self.hide_list.iter() {
             if let Some(item_ptr) = item.upgrade() {
@@ -178,7 +179,7 @@ impl<U: Pixel> WindowManager<U> {
     }
 
     /// delete a window and refresh its region
-    pub fn delete_window<P: Pixel>(&mut self, objref: &Arc<Mutex<WindowInner<P>>>) -> Result<(), &'static str> {
+    pub fn delete_window(&mut self, objref: &Arc<Mutex<WindowInner>>) -> Result<(), &'static str> {
         let (top_left, bottom_right) = {
             let inner = objref.lock();
             let top_left = inner.get_position();
@@ -192,9 +193,9 @@ impl<U: Pixel> WindowManager<U> {
                 bottom_right: bottom_right
             }
         );
-        let window_ref = Arc::into_raw(objref.clone()) as usize;
+
         if let Some(current_active) = self.active.upgrade() {
-            if Arc::into_raw(current_active.clone()) as usize == window_ref {
+            if Arc::ptr_eq(&current_active, objref) {
                 self.refresh_bottom_windows(area, false)?;
                 if let Some(window) = self.show_list.remove(0) {
                     self.active = window;
@@ -207,33 +208,15 @@ impl<U: Pixel> WindowManager<U> {
             }
         }
         
-        let mut i = 0;
-        for item in &self.show_list {
-            if let Some(item_ref) = item.upgrade() {
-                if Arc::into_raw(item_ref.clone()) as usize == window_ref {
-                    break;
-                } 
-            }
-            i += 1;
-        }
-        if i < self.show_list.len() {
-            self.show_list.remove(i);
+        if let Some(index) = self.is_window_in_show_list(objref) {
+            self.show_list.remove(index);
             self.refresh_windows(area, true)?;
             return Ok(())        
         }
 
-        i = 0;
-        for item in &self.hide_list {
-            if let Some(item_ref) = item.upgrade() {
-                if Arc::into_raw(item_ref.clone()) as usize == window_ref {
-                    break;
-                } 
-            }
-            i += 1;
-        }
-        if i < self.hide_list.len() {
-            self.hide_list.remove(i);
-            self.refresh_windows(area, true)?;
+        if let Some(index) = self.is_window_in_hide_list(objref) {
+            self.show_list.remove(index);
+            // self.refresh_windows(area, true)?;
             return Ok(())        
         }
         Err("cannot find this window")
@@ -467,7 +450,7 @@ impl<U: Pixel> WindowManager<U> {
                 coordinate, 
                 width as usize, 
                 height as usize, 
-                U::from(color)
+                color
             );
 
             for m in 0..width {
@@ -547,7 +530,7 @@ impl<U: Pixel> WindowManager<U> {
                 self.mouse.x - MOUSE_POINTER_HALF_SIZE as isize..self.mouse.x + MOUSE_POINTER_HALF_SIZE as isize + 1
             {
                 let coordinate = Coord::new(x, y);
-                self.top_fb.overwrite_pixel(coordinate, U::from(T));
+                self.top_fb.overwrite_pixel(coordinate, T);
             }
         }
         let update_coords = self.get_mouse_coords();
@@ -564,10 +547,7 @@ impl<U: Pixel> WindowManager<U> {
                 let pixel = MOUSE_BASIC
                             [(MOUSE_POINTER_HALF_SIZE as isize + x - new.x) as usize]
                             [(MOUSE_POINTER_HALF_SIZE as isize + y - new.y) as usize];
-                self.top_fb.overwrite_pixel(
-                        coordinate,
-                        U::from(pixel),
-                );
+                self.top_fb.overwrite_pixel(coordinate, pixel);
             }
         }
         let update_coords = self.get_mouse_coords();
@@ -609,7 +589,7 @@ impl<U: Pixel> WindowManager<U> {
     }
 
     /// Whether a window is active
-    pub fn is_active(&self, objref: &Arc<Mutex<WindowInner<U>>>) -> bool {
+    pub fn is_active(&self, objref: &Arc<Mutex<WindowInner>>) -> bool {
         if let Some(current_active) = self.active.upgrade() {
             if Arc::ptr_eq(&(current_active), objref) {
                 return true;
@@ -644,7 +624,7 @@ impl<U: Pixel> WindowManager<U> {
 /// Initialize the window manager. It returns (keyboard_producer, mouse_producer) for the I/O devices.
 pub fn init() -> Result<(Queue<Event>, Queue<Event>), &'static str> {
     font::init()?;
-    let final_framebuffer = frame_buffer::init()?;
+    let final_framebuffer: FrameBuffer<AlphaPixel> = frame_buffer::init()?;
     let (width, height) = final_framebuffer.get_size();
     let mut bg_framebuffer = FrameBuffer::new(width, height, None)?;
     let mut top_framebuffer = FrameBuffer::new(width, height, None)?;
@@ -659,10 +639,10 @@ pub fn init() -> Result<(Queue<Event>, Queue<Event>), &'static str> {
             )
         }
     }
-    top_framebuffer.fill_color(AlphaPixel::from(T)); 
+    top_framebuffer.fill_color(T); 
 
     // initialize static window manager
-    let window_manager: WindowManager<AlphaPixel> = WindowManager {
+    let window_manager = WindowManager {
         hide_list: VecDeque::new(),
         show_list: VecDeque::new(),
         active: Weak::new(),

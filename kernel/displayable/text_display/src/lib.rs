@@ -32,8 +32,8 @@ pub struct TextDisplay {
     cache: String,
 }
 
-impl<T: Pixel> Displayable<T> for TextDisplay {
-    fn display(
+impl Displayable for TextDisplay {
+    fn display<T: Pixel>(
         &mut self,
         coordinate: Coord,
         framebuffer: &mut FrameBuffer<T>,

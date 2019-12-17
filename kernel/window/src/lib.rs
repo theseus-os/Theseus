@@ -83,9 +83,9 @@ impl From<usize> for TopButton {
 }
 
 /// Abstraction of a window which owns a framebuffer and the window's handler. It provides title bar which helps user moving, close, maximize or minimize window
-pub struct Window<T: Pixel> {
+pub struct Window {
     /// this object contains states and methods required by the window manager
-    pub inner: Arc<Mutex<WindowInner<T>>>,
+    pub inner: Arc<Mutex<WindowInner>>,
     /// the width of border, init as WINDOW_BORDER. the border is still part of the window and remains flexibility for user to change border style or remove border. However, for most application a border is useful for user to identify the region.
     border_size: usize,
     /// the height of title bar in pixel, init as WINDOW_TITLE_BAR. it is render inside the window so user shouldn't use this area anymore
@@ -102,7 +102,7 @@ pub struct Window<T: Pixel> {
     last_is_active: bool,
 }
 
-impl<T: Pixel> Window<T> {
+impl Window {
     /// Creates a new Window at `coordinate` relative to the top-left of the screenand and adds it to the window manager `wm_mutex`.
     /// `(width, height)` is the size of the window and `background` is the background color of the window.
     pub fn new(
@@ -110,9 +110,9 @@ impl<T: Pixel> Window<T> {
         width: usize,
         height: usize,
         background: PixelColor,
-        wm_mutex: &Mutex<WindowManager<T>>
-    ) -> Result<Window<T>, &'static str> {
-        let framebuffer: FrameBuffer<T> = FrameBuffer::new(width, height, None)?;
+        wm_mutex: &Mutex<WindowManager>
+    ) -> Result<Window, &'static str> {
+        let framebuffer = FrameBuffer::new(width, height, None)?;
         let (width, height) = framebuffer.get_size();
         if width <= 2 * WINDOW_TITLE_BAR || height <= WINDOW_TITLE_BAR + WINDOW_BORDER {
             return Err("window too small to even draw border");
@@ -138,7 +138,7 @@ impl<T: Pixel> Window<T> {
 
         {
             let mut inner = window.inner.lock();
-            inner.framebuffer.fill_color(T::from(window.background));
+            inner.framebuffer.fill_color(window.background);
         }
 
         window.draw_border(true); // draw window with active border
@@ -162,22 +162,12 @@ impl<T: Pixel> Window<T> {
         Ok(window)
     }
 
-    /// Display a displayable in the window at `coordinate`.
-    pub fn display(&mut self, displayable: &mut dyn Displayable<T>, coordinate: Coord) -> Result<(), &'static str> {
-        let area = {
-            let mut window = self.inner.lock();
-            let area = displayable.display(
-                coordinate + self.inner_position(), 
-                &mut window.framebuffer
-            )?;
-            area
-        };
-
-        self.render(Some(area))
-    }
+    // /// Display a displayable in the window at `coordinate`.
+    // pub fn display(&mut self, displayable: &mut dyn Displayable, coordinate: Coord) -> Result<(), &'static str> {
+    // }
 
     /// Handles the event sent to the window by window manager
-    pub fn handle_event(&mut self, wm_mut: &Mutex<WindowManager<T>>) -> Result<(), &'static str> {
+    pub fn handle_event(&mut self, wm_mut: &Mutex<WindowManager>) -> Result<(), &'static str> {
         let mut call_later_do_refresh_floating_border = false;
         let mut call_later_do_move_active_window = false;
         let mut need_to_set_active = false;
@@ -414,7 +404,7 @@ impl<T: Pixel> Window<T> {
     }
 
     /// show three button with status. state = 0,1,2 for three different color
-    fn show_button(&self, button: TopButton, state: usize, inner: &mut WindowInner<T>) {
+    fn show_button(&self, button: TopButton, state: usize, inner: &mut WindowInner) {
         let y = self.title_size / 2;
         let x = WINDOW_BUTTON_BIAS_X
             + WINDOW_BUTTON_BETWEEN
@@ -427,12 +417,12 @@ impl<T: Pixel> Window<T> {
             &mut inner.framebuffer,
             Coord::new(x as isize, y as isize),
             WINDOW_BUTTON_SIZE,
-            T::from(BLACK).weight_mix(
-                T::from(match button {
+            Pixel::weight_mix(BLACK, 
+                match button {
                     TopButton::Close => WINDOW_BUTTON_COLOR_CLOSE,
                     TopButton::MinimizeMaximize => WINDOW_BUTTON_COLOR_MINIMIZE_MAMIMIZE,
                     TopButton::Hide => WINDOW_BUTTON_COLOR_HIDE,
-                }),
+                },
                 0.2f32 * (state as f32),
             ),
         );
@@ -476,7 +466,7 @@ impl<T: Pixel> Window<T> {
 }
 
 
-impl<T: Pixel> Drop for Window<T>{
+impl Drop for Window{
     fn drop(&mut self){
         match WINDOW_MANAGER
             .try()

@@ -61,7 +61,7 @@ pub enum ScrollError {
 ///     - Producer is the window manager. Window manager is responsible for enqueuing keyevents into the active application
 pub struct Terminal<T: Pixel> {
     /// The terminal's own window.
-    pub window: Window<T>,
+    pub window: Window,
     /// The terminal's scrollback buffer which stores a string to be displayed by the text display
     scrollback_buffer: String,
     /// Indicates whether the text display is displaying the last part of the scrollback buffer slice
@@ -397,6 +397,20 @@ impl<T: Pixel> Terminal<T> {
         Ok(())
     }
 
+    /// Display the text displayable in the window and render it to the screen
+    fn display_text() -> Result<(), &'static str>{
+        let area = {
+            let mut inner = self.window.inner.lock();
+            let area = self.text_display.display::<AlphaPixel>(
+                Coord::new(0, 0) + self.inner_position(), 
+                inner.buffer_mut()
+            )?;
+            area
+        };
+
+        self.window.render(Some(area))
+    }
+
     /// Updates the text display by taking a string index and displaying as much as it can going backwards from the passed string index (i.e. starts from the bottom of the display and goes up)
     fn update_display_backwards(&mut self, end_idx: usize) -> Result<(), &'static str> {
         let (start_idx, _cursor_pos) = self.calc_start_idx(end_idx);
@@ -417,7 +431,7 @@ impl<T: Pixel> Terminal<T> {
 /// Public methods of `Terminal`.
 impl<T: Pixel> Terminal<T> {
     /// Creates a new terminal and adds it to the window manager `wm_mutex`
-    pub fn new(wm_mutex: &Mutex<WindowManager<T>>) -> Result<Terminal<T>, &'static str> {
+    pub fn new(wm_mutex: &Mutex<WindowManager>) -> Result<Terminal<T>, &'static str> {
         let (window_width, window_height) = {
             let wm = wm_mutex.lock();
             wm.get_screen_size()
@@ -587,7 +601,7 @@ impl<T: Pixel> Terminal<T> {
     }
 
     /// Get a key event from the underlying window.
-    pub fn get_event(&mut self, wm: &Mutex<WindowManager<T>>) -> Option<Event> {
+    pub fn get_event(&mut self, wm: &Mutex<WindowManager>) -> Option<Event> {
         match self.window.handle_event(wm) {
             Err(_e) => {
                 return Some(Event::ExitEvent);
