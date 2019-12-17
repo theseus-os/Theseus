@@ -27,6 +27,7 @@ use alloc::string::{String, ToString};
 use alloc::vec::Vec;
 use cursor::*;
 use text_display::TextDisplay;
+use displayable::Displayable;
 use event_types::Event;
 use font::{CHARACTER_HEIGHT, CHARACTER_WIDTH};
 use frame_buffer::{FrameBuffer, Pixel, PixelColor};
@@ -59,7 +60,7 @@ pub enum ScrollError {
 /// 2) The input queue (in the window manager) that handles keypresses and resize events
 ///     - Consumer is the main terminal loop
 ///     - Producer is the window manager. Window manager is responsible for enqueuing keyevents into the active application
-pub struct Terminal<T: Pixel> {
+pub struct Terminal {
     /// The terminal's own window.
     pub window: Window,
     /// The terminal's scrollback buffer which stores a string to be displayed by the text display
@@ -75,7 +76,7 @@ pub struct Terminal<T: Pixel> {
 }
 
 /// Privite methods of `Terminal`.
-impl<T: Pixel> Terminal<T> {
+impl Terminal {
     /// Gets the width and height of the text displayable in number of characters.
     pub fn get_text_dimensions(&self) -> (usize, usize) {
         self.text_display.get_dimensions()
@@ -390,7 +391,7 @@ impl<T: Pixel> Terminal<T> {
         let result  = self.scrollback_buffer.get(start_idx..=end_idx); // =end_idx includes the end index in the slice
         if let Some(slice) = result {
             self.text_display.set_text(&slice);
-            self.window.display(&mut self.text_display, Coord::new(0, 0))?;
+            self.display_text()?;
         } else {
             return Err("could not get slice of scrollback buffer string");
         }
@@ -398,11 +399,11 @@ impl<T: Pixel> Terminal<T> {
     }
 
     /// Display the text displayable in the window and render it to the screen
-    fn display_text() -> Result<(), &'static str>{
+    fn display_text(&mut self) -> Result<(), &'static str>{
         let area = {
             let mut inner = self.window.inner.lock();
-            let area = self.text_display.display::<AlphaPixel>(
-                Coord::new(0, 0) + self.inner_position(), 
+            let area = self.text_display.display(
+                Coord::new(0, 0) + self.window.inner_position(), 
                 inner.buffer_mut()
             )?;
             area
@@ -420,7 +421,7 @@ impl<T: Pixel> Terminal<T> {
 
         if let Some(slice) = result {
             self.text_display.set_text(slice);
-            self.window.display(&mut self.text_display, Coord::new(0, 0))?;        
+            self.display_text()?;
         } else {
             return Err("could not get slice of scrollback buffer string");
         }
@@ -429,9 +430,9 @@ impl<T: Pixel> Terminal<T> {
 }
 
 /// Public methods of `Terminal`.
-impl<T: Pixel> Terminal<T> {
+impl Terminal {
     /// Creates a new terminal and adds it to the window manager `wm_mutex`
-    pub fn new(wm_mutex: &Mutex<WindowManager>) -> Result<Terminal<T>, &'static str> {
+    pub fn new(wm_mutex: &Mutex<WindowManager>) -> Result<Terminal, &'static str> {
         let (window_width, window_height) = {
             let wm = wm_mutex.lock();
             wm.get_screen_size()
@@ -456,7 +457,7 @@ impl<T: Pixel> Terminal<T> {
             text_display: text_display,
             cursor: Cursor::new(),
         };
-        terminal.window.display(&mut terminal.text_display, Coord::new(0, 0))?;
+        terminal.display_text()?;
 
         terminal.print_to_terminal(format!("Theseus Terminal Emulator\nPress Ctrl+C to quit a task\n"));
         Ok(terminal)

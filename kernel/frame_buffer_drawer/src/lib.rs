@@ -179,7 +179,7 @@ pub fn fill_rectangle<T: Pixel>(
 }
 
 /// Draw a circle in the framebuffer. `coordinate` is the position of the center of the circle relative to the top-left corner of the framebuffer and `r` is the radius
-pub fn draw_circle<T: Pixel>(framebuffer: &mut FrameBuffer<T>, center: Coord, r: usize, color: T) {
+pub fn draw_circle<T: Pixel>(framebuffer: &mut FrameBuffer<T>, center: Coord, r: usize, color: PixelColor) {
     let r2 = (r * r) as isize;
     for y in center.y - r as isize..center.y + r as isize {
         for x in center.x - r as isize..center.x + r as isize {
@@ -187,7 +187,7 @@ pub fn draw_circle<T: Pixel>(framebuffer: &mut FrameBuffer<T>, center: Coord, r:
             if framebuffer.contains(coordinate) {
                 let d = coordinate - center;
                 if d.x * d.x + d.y * d.y <= r2 {
-                    framebuffer.draw_pixel(coordinate, color);
+                    framebuffer.draw_pixel(coordinate, T::from(color));
                 }
             }
         }

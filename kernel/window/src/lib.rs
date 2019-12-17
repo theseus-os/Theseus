@@ -339,7 +339,7 @@ impl Window {
             Coord::new(0, self.title_size as isize),
             self.border_size,
             height - self.title_size,
-            T::from(border_color),
+            border_color,
         );
 
         frame_buffer_drawer::draw_rectangle(
@@ -347,7 +347,7 @@ impl Window {
             Coord::new(0, (height - self.border_size) as isize),
             width,
             self.border_size,
-            T::from(border_color),
+            border_color,
         );
         frame_buffer_drawer::draw_rectangle(
             &mut inner.framebuffer,
@@ -357,7 +357,7 @@ impl Window {
             ),
             self.border_size,
             height - self.title_size,
-            T::from(border_color),
+            border_color,
         );
 
         // then draw the title bar
@@ -368,8 +368,9 @@ impl Window {
                     Coord::new(0, i as isize),
                     width,
                     1,
-                    T::from(WINDOW_BORDER_COLOR_ACTIVE_BOTTOM).weight_mix(
-                        T::from(WINDOW_BORDER_COLOR_ACTIVE_TOP),
+                    frame_buffer::pixel::weight_mix(
+                        WINDOW_BORDER_COLOR_ACTIVE_BOTTOM,
+                        WINDOW_BORDER_COLOR_ACTIVE_TOP,
                         (i as f32) / (self.title_size as f32),
                     ),
                 ); 
@@ -380,7 +381,7 @@ impl Window {
                 Coord::new(0, 0),
                 width,
                 self.title_size,
-                T::from(border_color),
+                border_color,
             );
         }
 
@@ -393,10 +394,10 @@ impl Window {
                 if dx1 * dx1 + dy1 * dy1 > r2 {
                     // draw this to transparent
                     inner.framebuffer
-                        .overwrite_pixel(Coord::new(i as isize, j as isize), T::from(0xFFFFFFFF));
+                        .overwrite_pixel(Coord::new(i as isize, j as isize), 0xFFFFFFFF);
                     inner.framebuffer.overwrite_pixel(
                         Coord::new((width - i - 1) as isize, j as isize),
-                        T::from(0xFFFFFFFF),
+                        0xFFFFFFFF,
                     );
                 }
             }
@@ -417,7 +418,7 @@ impl Window {
             &mut inner.framebuffer,
             Coord::new(x as isize, y as isize),
             WINDOW_BUTTON_SIZE,
-            Pixel::weight_mix(BLACK, 
+            frame_buffer::pixel::weight_mix(BLACK, 
                 match button {
                     TopButton::Close => WINDOW_BUTTON_COLOR_CLOSE,
                     TopButton::MinimizeMaximize => WINDOW_BUTTON_COLOR_MINIMIZE_MAMIMIZE,

@@ -141,7 +141,7 @@ enum AppErr {
     SpawnErr(String)
 }
 
-struct Shell<T:Pixel> {
+struct Shell {
     /// Variable that stores the task id of any application manually spawned from the terminal
     jobs: BTreeMap<isize, Job>,
     /// Map task number to job number.
@@ -171,13 +171,13 @@ struct Shell<T:Pixel> {
     /// The terminal's current environment
     env: Arc<Mutex<Environment>>,
     /// the terminal that is bind with the shell instance
-    terminal: Arc<Mutex<Terminal<T>>>
+    terminal: Arc<Mutex<Terminal>>
 }
 
-impl<T: Pixel> Shell<T> {
+impl Shell {
     /// Create a new shell. It will prints to the given terminal.
     /// by the `app_io` crate.
-    fn new(terminal: Arc<Mutex<Terminal<T>>>) -> Result<Shell<T>, &'static str> {
+    fn new(terminal: Arc<Mutex<Terminal>>) -> Result<Shell, &'static str> {
         // Initialize a dfqueue for the terminal object to handle printing from applications.
         // Note that this is only to support legacy output. Newly developed applications should
         // turn to use `stdio` provided by the `stdio` crate together with the support of `app_io`.
@@ -1370,7 +1370,7 @@ impl<T: Pixel> Shell<T> {
 }
 
 /// Shell internal command related methods.
-impl<T: Pixel> Shell<T> {
+impl Shell {
     /// Check if the current command line is a shell internal command.
     fn is_internal_command(&self) -> bool {
         let mut iter = self.cmdline.split_whitespace();

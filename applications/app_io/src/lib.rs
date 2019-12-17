@@ -54,7 +54,7 @@ pub struct IoStreams {
     /// shell. Apps can take this reader to directly access keyboard events.
     key_event_reader: Arc<Mutex<Option<KeyEventQueueReader>>>,
     /// Points to the terminal.
-    terminal: Arc<Mutex<Terminal<AlphaPixel>>>
+    terminal: Arc<Mutex<Terminal>>
 }
 
 /// Applications set the flags in this structure to inform the parent shell to
@@ -135,7 +135,7 @@ mod shared_maps {
 
 lazy_static! {
     /// The default terminal.
-    static ref DEFAULT_TERMINAL: Option<Arc<Mutex<Terminal<AlphaPixel>>>> = {
+    static ref DEFAULT_TERMINAL: Option<Arc<Mutex<Terminal>>> = {
 
         match window_manager::WINDOW_MANAGER.try() {
             Some(wm) => {
@@ -157,7 +157,7 @@ lazy_static! {
 /// If the calling application has already been assigned a terminal to print, that assigned
 /// terminal is returned. Otherwise, the default terminal is assigned to the calling application
 /// and then returned.
-pub fn get_terminal_or_default() -> Result<Arc<Mutex<Terminal<AlphaPixel>>>, &'static str> {
+pub fn get_terminal_or_default() -> Result<Arc<Mutex<Terminal>>, &'static str> {
     
     let task_id = task::get_my_current_task_id()
                       .ok_or("Cannot get task ID for getting default terminal")?;
