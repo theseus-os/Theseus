@@ -175,7 +175,7 @@ struct Shell {
 }
 
 impl Shell {
-    /// Create a new shell. It will prints to the given terminal.
+    /// Create a new shell. Currently the shell will bind to the default terminal instance provided
     /// by the `app_io` crate.
     fn new() -> Result<Shell, &'static str> {
         // Initialize a dfqueue for the terminal object to handle printing from applications.
@@ -212,7 +212,7 @@ impl Shell {
             print_consumer,
             print_producer,
             env: Arc::new(Mutex::new(env)),
-            terminal: terminal,
+            terminal
         })
     }
 
@@ -1326,7 +1326,7 @@ impl Shell {
                     }
                     _ => { }
                 };
-            }                      
+            }          
             if need_refresh || need_refresh_on_task_event {
                 // update if there are outputs from applications
                 self.terminal.lock().refresh_display()?;
