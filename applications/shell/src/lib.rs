@@ -177,7 +177,7 @@ struct Shell {
 impl Shell {
     /// Create a new shell. It will prints to the given terminal.
     /// by the `app_io` crate.
-    fn new(terminal: Arc<Mutex<Terminal>>) -> Result<Shell, &'static str> {
+    fn new() -> Result<Shell, &'static str> {
         // Initialize a dfqueue for the terminal object to handle printing from applications.
         // Note that this is only to support legacy output. Newly developed applications should
         // turn to use `stdio` provided by the `stdio` crate together with the support of `app_io`.
@@ -196,7 +196,7 @@ impl Shell {
             working_dir: Arc::clone(root::get_root()), 
         };
 
-        // let terminal = app_io::get_terminal_or_default()?;
+        let terminal = app_io::get_terminal_or_default()?;
 
         Ok(Shell {
             jobs: BTreeMap::new(),
@@ -747,13 +747,14 @@ impl Shell {
                 for task_id in &task_ids {
                     let stdio_queue_for_stdin_and_stdout = Stdio::new();
                     let stdio_queue_for_stderr = Stdio::new();
-                    // let terminal = app_io::get_terminal_or_default()?;
+                    let terminal = app_io::get_terminal_or_default()?;
                     let streams = IoStreams::new(
                         previous_queue_reader,
                         stdio_queue_for_stdin_and_stdout.get_writer(),
                         stdio_queue_for_stderr.get_writer(),
                         self.key_event_consumer.clone(),
-                    )?;
+                        terminal
+                    );
                     app_io::insert_child_streams(*task_id, streams);
 
                     previous_queue_reader = stdio_queue_for_stdin_and_stdout.get_reader();
@@ -1281,8 +1282,7 @@ impl Shell {
     /// The print queue is handled first inside the loop iteration, which means that all print events in the print
     /// queue will always be printed to the text display before input events or any other managerial functions are handled. 
     /// This allows for clean appending to the scrollback buffer and prevents interleaving of text.
-    /// The application will gets inputs sent by the window manager `wm_mutex`.
-    fn start(mut self, wm_mutex: &Mutex<WindowManager>) -> Result<(), &'static str> {
+    fn start(mut self) -> Result<(), &'static str> {
         let mut need_refresh = false;
         let mut need_prompt = false;
         self.redisplay_prompt();
@@ -1308,7 +1308,7 @@ impl Shell {
 
             // Looks at the input queue from the window manager
             // Handles all the event items until the queue is empty
-            while let Some(ev) = self.terminal.lock().get_event(wm_mutex) {
+            while let Some(ev) = self.terminal.lock().get_event() {
                 match ev {
                     // Returns from the main loop.
                     Event::ExitEvent => {
@@ -1333,8 +1333,7 @@ impl Shell {
             }
 
             let is_active = {
-                let wm = wm_mutex.lock();
-                wm.is_active(&self.terminal.lock().window.inner)
+                window_manager::WINDOW_MANAGER.try().ok_or("The window manager is not initialized")?.lock().is_active(&self.terminal.lock().window.inner)
             };
             
             if is_active {
@@ -1495,8 +1494,6 @@ impl Shell {
 
 /// Start a new shell. Shell::start() is an infinite loop, so normally we do not return from this function.
 fn shell_loop(mut _dummy: ()) -> Result<(), &'static str> {
-    let wm = window_manager::WINDOW_MANAGER.try().ok_or("The window manager is not initialized")?;
-    let terminal = app_io::get_terminal_or_default()?;
-    Shell::new(terminal)?.start(wm)?;
+    Shell::new()?.start()?;
     Ok(())
 }

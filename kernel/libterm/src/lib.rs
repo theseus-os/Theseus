@@ -432,9 +432,10 @@ impl Terminal {
 /// Public methods of `Terminal`.
 impl Terminal {
     /// Creates a new terminal and adds it to the window manager `wm_mutex`
-    pub fn new(wm_mutex: &Mutex<WindowManager>) -> Result<Terminal, &'static str> {
+    pub fn new() -> Result<Terminal, &'static str> {
+        let wm_mut = window_manager::WINDOW_MANAGER.try().ok_or("The window manager is not initialized")?;
         let (window_width, window_height) = {
-            let wm = wm_mutex.lock();
+            let wm = wm_mut.lock();
             wm.get_screen_size()
         };
         const WINDOW_MARGIN: usize = 20;
@@ -443,7 +444,6 @@ impl Terminal {
             window_width - 2 * WINDOW_MARGIN, 
             window_height - 2 * WINDOW_MARGIN,
             0,
-            wm_mutex//&frame_buffer_rgb::new
         )?;
         
         let (width_inner, height_inner) = window.inner_size();
@@ -602,8 +602,8 @@ impl Terminal {
     }
 
     /// Get a key event from the underlying window.
-    pub fn get_event(&mut self, wm: &Mutex<WindowManager>) -> Option<Event> {
-        match self.window.handle_event(wm) {
+    pub fn get_event(&mut self) -> Option<Event> {
+        match self.window.handle_event() {
             Err(_e) => {
                 return Some(Event::ExitEvent);
             }

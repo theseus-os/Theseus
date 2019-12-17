@@ -42,19 +42,11 @@ pub fn main(_args: Vec<String>) -> isize {
     let height = _args[3].parse::<usize>().unwrap();
     debug!("parameters {:?}", (coordinate, width, height));
 
-    let wm = match window_manager::WINDOW_MANAGER.try() {
-        Some(wm) => wm,
-        None => {
-            debug!("The window manager is not initialized");
-            return -1;
-        }
-    };
     let mut window = match window::Window::new(
         coordinate,
         width,
         height,
         WINDOW_BACKGROUND,
-        wm
     ) {
         Ok(m) => m,
         Err(err) => {
@@ -64,7 +56,7 @@ pub fn main(_args: Vec<String>) -> isize {
     };
 
     loop {
-        if let Err(err) = window.handle_event(wm) {
+        if let Err(err) = window.handle_event() {
             debug!("{}", err); 
             return 0;
         }

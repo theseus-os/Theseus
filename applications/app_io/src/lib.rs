@@ -78,15 +78,15 @@ impl IoControlFlags {
 impl IoStreams {
     pub fn new(stdin: StdioReader, stdout: StdioWriter,
                stderr: StdioWriter,
-               key_event_reader: Arc<Mutex<Option<KeyEventQueueReader>>>) -> Result<IoStreams, &'static str> {
-        let terminal = get_terminal_or_default()?;
-        Ok(IoStreams {
+               key_event_reader: Arc<Mutex<Option<KeyEventQueueReader>>>,
+               terminal: Arc<Mutex<Terminal>>) -> IoStreams {
+        IoStreams {
             stdin,
             stdout,
             stderr,
             key_event_reader,
             terminal
-        })
+        }
     }
 }
 
@@ -136,18 +136,12 @@ mod shared_maps {
 lazy_static! {
     /// The default terminal.
     static ref DEFAULT_TERMINAL: Option<Arc<Mutex<Terminal>>> = {
-
-        match window_manager::WINDOW_MANAGER.try() {
-            Some(wm) => {
-                match Terminal::new(wm) {
-                    Ok(terminal) => Some(Arc::new(Mutex::new(terminal))),
-                    Err(err) => {
-                        debug!("Fail to create the default terminal: {}", err);
-                        None
-                    }
-                }
-            },
-            None => None
+        match Terminal::new() {
+            Ok(terminal) => Some(Arc::new(Mutex::new(terminal))),
+            Err(err) => {
+                debug!("Fail to create the default terminal: {}", err);
+                None
+            }
         }
     };
         

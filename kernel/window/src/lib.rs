@@ -103,14 +103,13 @@ pub struct Window {
 }
 
 impl Window {
-    /// Creates a new Window at `coordinate` relative to the top-left of the screenand and adds it to the window manager `wm_mutex`.
+    /// Creates a new Window at `coordinate` relative to the top-left of the screenand and adds it to the window manager.
     /// `(width, height)` is the size of the window and `background` is the background color of the window.
     pub fn new(
         coordinate: Coord,
         width: usize,
         height: usize,
         background: PixelColor,
-        wm_mutex: &Mutex<WindowManager>
     ) -> Result<Window, &'static str> {
         let framebuffer = FrameBuffer::new(width, height, None)?;
         let (width, height) = framebuffer.get_size();
@@ -155,7 +154,7 @@ impl Window {
             bottom_right: coordinate + (width as isize, height as isize)
         };
 
-        let mut wm = wm_mutex.lock();
+        let mut wm = window_manager::WINDOW_MANAGER.try().ok_or("The window manager is not initialized")?.lock();
         wm.set_active(&window.inner, false)?; // do not refresh now for
         wm.refresh_active_window(Some(area))?;
 
@@ -167,12 +166,14 @@ impl Window {
     // }
 
     /// Handles the event sent to the window by window manager
-    pub fn handle_event(&mut self, wm_mut: &Mutex<WindowManager>) -> Result<(), &'static str> {
+    pub fn handle_event(&mut self) -> Result<(), &'static str> {
         let mut call_later_do_refresh_floating_border = false;
         let mut call_later_do_move_active_window = false;
         let mut need_to_set_active = false;
         let mut need_refresh_three_button = false;
 
+        let wm_mut = window_manager::WINDOW_MANAGER.try().ok_or("The window manager is not initialized")?;
+        
         let is_active = {
             let wm = wm_mut.lock();
             wm.is_active(&self.inner)
