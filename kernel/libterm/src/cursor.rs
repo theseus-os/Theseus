@@ -99,7 +99,7 @@ impl Cursor {
                         + (0, 1),
                     CHARACTER_WIDTH,
                     CHARACTER_HEIGHT - 2,
-                    T::from(self.color),
+                    self.color,
                 );
             } else {
                 frame_buffer_printer::print_ascii_character(

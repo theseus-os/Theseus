@@ -27,9 +27,6 @@ path = "../../kernel/task"
 [dependencies.print]
 path = "../../kernel/print"
 
-[dependencies.frame_buffer]
-path = "../../kernel/frame_buffer"
-
 [dependencies.window_manager]
 path = "../../kernel/window_manager"
 

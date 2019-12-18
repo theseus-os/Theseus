@@ -13,7 +13,6 @@ extern crate spin;
 extern crate app_io;
 extern crate stdio;
 extern crate core_io;
-extern crate frame_buffer;
 #[macro_use] extern crate log;
 
 use keycodes_ascii::{Keycode, KeyAction};
@@ -23,7 +22,6 @@ use alloc::{
     string::{String, ToString},
     sync::Arc,
 };
-use frame_buffer::Pixel;
 use getopts::Options;
 use path::Path;
 use fs_node::FileOrDir;

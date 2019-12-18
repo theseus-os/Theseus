@@ -10,17 +10,14 @@ extern crate memory;
 extern crate multicore_bringup;
 extern crate owning_ref;
 extern crate shapes;
-extern crate spin;
 
 pub mod pixel;
 use alloc::boxed::Box;
-use spin::{Mutex, Once};
 use core::ops::DerefMut;
 
 use memory::{EntryFlags, FrameRange, MappedPages, PhysicalAddress, FRAME_ALLOCATOR};
 use owning_ref::BoxRefMut;
 use shapes::Coord;
-use core::marker::PhantomData;
 pub use pixel::*;
 
 // /// The final framebuffer instance. It contains the pages which are mapped to the physical framebuffer.

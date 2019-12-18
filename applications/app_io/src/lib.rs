@@ -25,7 +25,6 @@ extern crate libterm;
 extern crate scheduler;
 extern crate serial_port;
 extern crate core_io;
-extern crate frame_buffer;
 extern crate window_manager;
 
 use stdio::{StdioReader, StdioWriter, KeyEventReadGuard,
@@ -37,7 +36,6 @@ use alloc::sync::Arc;
 use alloc::string::String;
 use alloc::vec::Vec;
 use libterm::Terminal;
-use frame_buffer::pixel::AlphaPixel;
 
 /// Stores the stdio queues, key event queue and the pointer to the terminal
 /// for applications. This structure is provided for application's use and only

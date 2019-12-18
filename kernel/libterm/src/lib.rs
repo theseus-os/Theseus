@@ -21,7 +21,6 @@ extern crate window_manager;
 extern crate window;
 extern crate text_display;
 extern crate shapes;
-extern crate spin;
 
 use alloc::string::{String, ToString};
 use alloc::vec::Vec;
@@ -34,8 +33,6 @@ use frame_buffer::{FrameBuffer, Pixel, PixelColor};
 use shapes::{Coord, Rectangle};
 use tsc::{tsc_ticks, TscTicks};
 use window::Window;
-use window_manager::WindowManager;
-use spin::Mutex;
 
 pub mod cursor;
 
@@ -404,7 +401,7 @@ impl Terminal {
             let mut inner = self.window.inner.lock();
             let area = self.text_display.display(
                 Coord::new(0, 0) + self.window.inner_position(), 
-                inner.buffer_mut()
+                &mut inner.framebuffer
             )?;
             area
         };

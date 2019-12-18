@@ -17,7 +17,6 @@ extern crate event_types;
 extern crate spin;
 #[macro_use]
 extern crate log;
-extern crate displayable;
 extern crate font;
 extern crate frame_buffer;
 extern crate frame_buffer_drawer;
@@ -28,13 +27,12 @@ extern crate shapes;
 
 use alloc::sync::Arc;
 use mpmc::Queue;
-use displayable::Displayable;
 use event_types::{Event, MousePositionEvent};
-use frame_buffer::{FrameBuffer, Pixel, pixel::{BLACK, PixelColor}};
+use frame_buffer::{FrameBuffer, pixel::{BLACK, PixelColor}};
 use shapes::{Coord, Rectangle};
 use spin::Mutex;
 use window_inner::{WindowInner, WindowMovingStatus};
-use window_manager::{WINDOW_MANAGER, WindowManager};
+use window_manager::{WINDOW_MANAGER};
 
 // The title bar size, in number of pixels
 const WINDOW_TITLE_BAR: usize = 15;

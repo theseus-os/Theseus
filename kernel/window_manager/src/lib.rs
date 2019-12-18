@@ -36,7 +36,7 @@ use compositor::{Compositor, FrameBufferUpdates};
 
 use mpmc::Queue;
 use event_types::{Event, MousePositionEvent};
-use frame_buffer::{FrameBuffer, Pixel, AlphaPixel, PixelColor};
+use frame_buffer::{FrameBuffer, AlphaPixel, PixelColor};
 use shapes::{Coord, Rectangle};
 use frame_buffer_compositor::{FRAME_COMPOSITOR};
 ////

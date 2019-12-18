@@ -126,7 +126,7 @@ pub fn init(
     // initialize window manager.
     let (key_producer, mouse_producer) = window_manager::init()?;
 
-    // initialize the i/o subsystem, which will start window manager and the default terminal 
+    // initialize the input event manager, which will start the default terminal 
     input_event_manager::init()?;
 
     // initialize the rest of our drivers

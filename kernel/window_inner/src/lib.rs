@@ -81,11 +81,6 @@ impl WindowInner {
         self.coordinate = coordinate;
     }
 
-    /// Returns the mutable framebuffer of the window inner
-    pub fn buffer_mut(&mut self) -> &mut FrameBuffer<AlphaPixel> {
-        &mut self.framebuffer
-    }
-
     /// Returns the pixel at the coordinate
     pub fn get_pixel(&self, coordinate: Coord) -> Result<AlphaPixel, &'static str> {
         self.framebuffer.get_pixel(coordinate)

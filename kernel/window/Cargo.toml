@@ -21,9 +21,6 @@ path = "../shapes"
 [dependencies.frame_buffer_drawer]
 path = "../frame_buffer_drawer"
 
-[dependencies.displayable]
-path = "../displayable"
-
 [dependencies.window_inner]
 path = "../window_inner"
 

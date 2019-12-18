@@ -58,9 +58,6 @@ path = "../../kernel/libterm"
 [dependencies.scheduler]
 path = "../../kernel/scheduler"
 
-[dependencies.frame_buffer]
-path = "../../kernel/frame_buffer"
-
 [dependencies.stdio]
 path = "../../libs/stdio"
 

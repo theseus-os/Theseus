@@ -24,7 +24,6 @@ extern crate terminal_print;
 extern crate print;
 extern crate environment;
 extern crate libterm;
-extern crate frame_buffer;
 
 #[macro_use] extern crate alloc;
 #[macro_use] extern crate log;
@@ -49,8 +48,6 @@ use core_io::Write;
 use core::ops::Deref;
 use app_io::{IoStreams, IoControlFlags};
 use fs_node::FileOrDir;
-use frame_buffer::{Pixel};
-use window_manager::WindowManager;
 
 /// The status of a job.
 #[derive(PartialEq)]
