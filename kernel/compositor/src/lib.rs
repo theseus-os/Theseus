@@ -34,9 +34,9 @@ pub trait Compositor<T: Mixable> {
 
 
 /// The framebuffers to be composited together with the positions.
-pub struct FrameBufferUpdates<'a, T: Pixel> {
+pub struct FrameBufferUpdates<'a, P: Pixel> {
     /// The framebuffer to be composited.
-    pub framebuffer: &'a FrameBuffer<T>,
+    pub framebuffer: &'a FrameBuffer<P>,
     /// The coordinate of the framebuffer where it is rendered to the final framebuffer.
     pub coordinate: Coord,
 }
@@ -44,19 +44,19 @@ pub struct FrameBufferUpdates<'a, T: Pixel> {
 /// A `Mixable` is an item that can be mixed with the final framebuffer. A compositor can mix a list of shaped items with the final framebuffer rather than mix the whole framebuffer for better performance.
 pub trait Mixable {
     /// Mix the item in the `src_fb` framebuffer with the final framebuffer. `src_coord` is the position of the source framebuffer relative to the top-left of the final buffer.
-    fn mix_buffers<T: Pixel>(
+    fn mix_buffers<P: Pixel>(
         &self, 
-        src_fb: &FrameBuffer<T>, 
-        final_fb: &mut FrameBuffer<T>, 
+        src_fb: &FrameBuffer<P>, 
+        final_fb: &mut FrameBuffer<P>, 
         src_coord: Coord,        
     ) -> Result<(), &'static str>;
 }
 
 impl Mixable for Coord {
-    fn mix_buffers<T: Pixel>(
+    fn mix_buffers<P: Pixel>(
         &self, 
-        src_fb: &FrameBuffer<T>,
-        final_fb: &mut FrameBuffer<T>, 
+        src_fb: &FrameBuffer<P>,
+        final_fb: &mut FrameBuffer<P>, 
         src_coord: Coord,        
     ) -> Result<(), &'static str>{
         let relative_coord = self.clone() - src_coord;
@@ -69,10 +69,10 @@ impl Mixable for Coord {
 }
 
 impl Mixable for Rectangle {
-    fn mix_buffers<T: Pixel>(
+    fn mix_buffers<P: Pixel>(
         &self, 
-        src_fb: &FrameBuffer<T>, 
-        final_fb: &mut FrameBuffer<T>,
+        src_fb: &FrameBuffer<P>, 
+        final_fb: &mut FrameBuffer<P>,
         src_coord: Coord,
     ) -> Result<(), &'static str> {
         let (final_width, final_height) = final_fb.get_size();

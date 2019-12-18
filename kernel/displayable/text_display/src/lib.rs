@@ -33,10 +33,10 @@ pub struct TextDisplay {
 }
 
 impl Displayable for TextDisplay {
-    fn display<T: Pixel>(
+    fn display<P: Pixel>(
         &mut self,
         coordinate: Coord,
-        framebuffer: &mut FrameBuffer<T>,
+        framebuffer: &mut FrameBuffer<P>,
     ) -> Result<Rectangle, &'static str> {
         let (string, col, line) = if self.cache.len() > 0 && self.text.starts_with(self.cache.as_str()) {
             (

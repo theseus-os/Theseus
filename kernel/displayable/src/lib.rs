@@ -19,10 +19,10 @@ pub trait Displayable {
     /// * `framebuffer`: the framebuffer to display onto.
     ///
     /// Returns a rectangle that covers the updated area.
-    fn display<T: Pixel>(
+    fn display<P: Pixel>(
         &mut self,
         coordinate: Coord,
-        framebuffer: &mut FrameBuffer<T>,
+        framebuffer: &mut FrameBuffer<P>,
     ) -> Result<Rectangle, &'static str> ;
 
     /// Resizes the displayable area.

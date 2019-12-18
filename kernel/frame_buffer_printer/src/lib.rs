@@ -27,8 +27,8 @@ type ASCII = u8;
 /// * `font_color`: the color of the text.
 /// * `bg_color`: the background color of the text block.
 /// * `(column, line)`: the location of the text in the text block as symbols.
-pub fn print_string<T: Pixel>(
-    framebuffer: &mut FrameBuffer<T>,
+pub fn print_string<P: Pixel>(
+    framebuffer: &mut FrameBuffer<P>,
     coordinate: Coord,
     width: usize,
     height: usize,
@@ -127,8 +127,8 @@ pub fn print_string<T: Pixel>(
 /// * `bg_color`: the background color of the character.
 /// * `coordinate`: the left top coordinate of the text block relative to the origin(top-left point) of the frame buffer.
 /// * `(column, line)`: the location of the character in the text block as symbols.
-pub fn print_ascii_character<T: Pixel>(
-    framebuffer: &mut FrameBuffer<T>,
+pub fn print_ascii_character<P: Pixel>(
+    framebuffer: &mut FrameBuffer<P>,
     character: ASCII,
     font_color: PixelColor,
     bg_color: PixelColor,
@@ -154,7 +154,7 @@ pub fn print_ascii_character<T: Pixel>(
         if framebuffer.contains(coordinate) {
             let mask: u32 = fonts[character as usize][i][j];
             let color = font_color & mask | bg_color & (!mask);
-            framebuffer.draw_pixel(coordinate, T::from(color));
+            framebuffer.draw_pixel(coordinate, P::from(color));
         }
         j += 1;
         if j == CHARACTER_WIDTH || start.x + j as isize == buffer_width as isize {
@@ -168,8 +168,8 @@ pub fn print_ascii_character<T: Pixel>(
 }
 
 /// Fill a blank text area (left, top, right, bottom) with color. The tuple specifies the location of the area relative to the origin(top-left point) of the frame buffer.
-pub fn fill_blank<T: Pixel>(
-    framebuffer: &mut FrameBuffer<T>,
+pub fn fill_blank<P: Pixel>(
+    framebuffer: &mut FrameBuffer<P>,
     left: isize,
     top: isize,
     right: isize,
@@ -188,7 +188,7 @@ pub fn fill_blank<T: Pixel>(
         return
     }
 
-    let fill = vec![T::from(color); (right - left) as usize];
+    let fill = vec![P::from(color); (right - left) as usize];
     let mut coordinate = Coord::new(left, top);
     
     loop {

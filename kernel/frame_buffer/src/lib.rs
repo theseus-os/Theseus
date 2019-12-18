@@ -25,7 +25,7 @@ pub use pixel::*;
 
 /// Initialize the final frame buffer.
 /// The final framebuffer contains a block of memory which is mapped to the physical framebuffer frames.
-pub fn init<T: Pixel>() -> Result<FrameBuffer<T>, &'static str> {
+pub fn init<P: Pixel>() -> Result<FrameBuffer<P>, &'static str> {
     // get the graphic mode information
     let vesa_display_phys_start: PhysicalAddress;
     let buffer_width: usize;
@@ -48,13 +48,13 @@ pub fn init<T: Pixel>() -> Result<FrameBuffer<T>, &'static str> {
 
 /// The frame buffer structure. It is a buffer of pixels that an application can display in. `T` specifies the type of pixels in this framebuffer.
 #[derive(Hash)]
-pub struct FrameBuffer<T> {
+pub struct FrameBuffer<P> {
     width: usize,
     height: usize,
-    buffer: BoxRefMut<MappedPages, [T]>,
+    buffer: BoxRefMut<MappedPages, [P]>,
 } 
 
-impl<T: Pixel> FrameBuffer<T> {
+impl<P: Pixel> FrameBuffer<P> {
     /// Creates a new frame buffer with specified size.
     /// If the `physical_address` is specified, the new virtual frame buffer will be mapped to hardware's physical memory at that address.
     /// If the `physical_address` is none, the new function will allocate a block of physical memory at a random address and map the new frame buffer to that memory.
@@ -62,7 +62,7 @@ impl<T: Pixel> FrameBuffer<T> {
         width: usize,
         height: usize,
         physical_address: Option<PhysicalAddress>,
-    ) -> Result<FrameBuffer<T>, &'static str> {
+    ) -> Result<FrameBuffer<P>, &'static str> {
         // get a reference to the kernel's memory mapping information
         let kernel_mmi_ref =
             memory::get_kernel_mmi_ref().ok_or("KERNEL_MMI was not yet initialized!")?;
@@ -104,12 +104,12 @@ impl<T: Pixel> FrameBuffer<T> {
     }
 
     /// Returns a mutable reference to the mapped memory of the buffer.
-    pub fn buffer_mut(&mut self) -> &mut BoxRefMut<MappedPages, [T]> {
+    pub fn buffer_mut(&mut self) -> &mut BoxRefMut<MappedPages, [P]> {
         return &mut self.buffer;
     }
 
     /// Returns a referece to the mapped memory of the buffer
-    pub fn buffer(&self) -> &BoxRefMut<MappedPages, [T]> {
+    pub fn buffer(&self) -> &BoxRefMut<MappedPages, [P]> {
         return &self.buffer;
     }
 
@@ -119,14 +119,14 @@ impl<T: Pixel> FrameBuffer<T> {
     }
 
     /// Composites `src` to the buffer starting from `index`.
-    pub fn composite_buffer(&mut self, src: &[T], index: usize) {
+    pub fn composite_buffer(&mut self, src: &[P], index: usize) {
         let len = src.len();
         let dest_end = index + len;
-        T::composite_buffer(src, &mut self.buffer_mut()[index..dest_end]);
+        P::composite_buffer(src, &mut self.buffer_mut()[index..dest_end]);
     }
 
     /// Draw a pixel at the given coordinate. The pixel will mix with the original one at the coordinate.
-    pub fn draw_pixel(&mut self, coordinate: Coord, pixel: T) {
+    pub fn draw_pixel(&mut self, coordinate: Coord, pixel: P) {
         if let Some(index) = self.index(coordinate) {
             self.buffer[index] = pixel.mix(self.buffer[index]).into();
         }
@@ -134,11 +134,11 @@ impl<T: Pixel> FrameBuffer<T> {
 
     /// Overwites a pixel at the given coordinate.
     pub fn overwrite_pixel(&mut self, coordinate: Coord, color: PixelColor) {
-        self.draw_pixel(coordinate, T::from(color))
+        self.draw_pixel(coordinate, P::from(color))
     }
 
     /// Returns a pixel at coordinate.
-    pub fn get_pixel(&self, coordinate: Coord) -> Result<T, &'static str> {
+    pub fn get_pixel(&self, coordinate: Coord) -> Result<P, &'static str> {
         if let Some(index) = self.index(coordinate) {
             return Ok(self.buffer[index]);
         } else {
@@ -151,7 +151,7 @@ impl<T: Pixel> FrameBuffer<T> {
         for y in 0..self.height {
             for x in 0..self.width {
                 let coordinate = Coord::new(x as isize, y as isize);
-                self.draw_pixel(coordinate, T::from(color));
+                self.draw_pixel(coordinate, P::from(color));
             }
         }
     }
