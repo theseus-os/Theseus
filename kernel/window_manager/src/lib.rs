@@ -492,6 +492,7 @@ impl WindowManager {
                 }
             };
             self.refresh_bottom_windows(Some(Rectangle{top_left: old_top_left, bottom_right: old_bottom_right}), false)?;
+            self.refresh_floating_border(false, Coord::new(0, 0), Coord::new(0, 0))?;
             self.refresh_active_window(Some(Rectangle{top_left: new_top_left, bottom_right: new_bottom_right}))?;
             let update_coords = self.get_mouse_coords();
             self.refresh_top_pixels(update_coords.into_iter())?;
