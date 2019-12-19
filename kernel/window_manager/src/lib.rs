@@ -668,7 +668,7 @@ pub fn init() -> Result<(Queue<Event>, Queue<Event>), &'static str> {
         y: screen_height as isize / 2,
     }; 
     
-    //win.refresh_bottom_windows(None, false)?;
+    // win.refresh_bottom_windows(None, false)?;
 
     // keyinput queue initialization
     let key_consumer: Queue<Event> = Queue::with_capacity(100);

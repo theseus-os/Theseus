@@ -124,9 +124,14 @@ impl Pixel for AlphaPixel {
     }
 
     fn weight_mix(origin: Self, other: Self, mix: f32) -> Self {
-        if mix < 0f32 || mix > 1f32 {
-            return BLACK.into();
-        }
+        let mix = if mix < 0f32 {
+            0f32
+        } else if mix > 1f32 {
+            1f32
+        } else {
+            mix
+        };
+
         let new_channel =
             ((origin.alpha as f32) * mix + (other.alpha as f32) * (1f32 - mix)) as u32;
         let new_red =
@@ -138,21 +143,3 @@ impl Pixel for AlphaPixel {
         (new_channel <<24 | new_red << 16 | new_green << 8 | new_blue).into()
     }
 }
-
-// /// Mix two pixels linearly with weights, as `mix` for `origin` and (1-`mix`) for `other`. It returns black if mix is outside range of [0, 1].
-// pub fn weight_mix<U: Into<u32>>(origin: U, other: U, mix: f32) -> u32 {
-//     let origin: u32 = origin.into();
-//     let other: u32 = other.into();
-//     if mix < 0f32 || mix > 1f32 {
-//         return BLACK;
-//     }
-//     let new_channel =
-//         (((origin >> 24) as f32) * mix + ((other >> 24) as f32) * (1f32 - mix)) as u32;
-//     let new_red =
-//         ((((origin >> 16) as u8) as f32) * mix + (((other >> 16) as u8) as f32) * (1f32 - mix)) as u32;
-//     let new_green =
-//         ((((origin >> 8) as u8) as f32) * mix + (((other >> 8) as u8) as f32) * (1f32 - mix)) as u32;
-//     let new_blue =
-//         (((origin as u8) as f32) * mix + ((other as u8) as f32) * (1f32 - mix)) as u32;
-//     new_channel <<24 | new_red << 16 | new_green << 8 | new_blue
-// }

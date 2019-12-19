@@ -49,13 +49,20 @@ pub fn print_string<P: Pixel>(
 
     for byte in slice.bytes() {
         if byte == b'\n' {
+            let mut blank = Rectangle {
+                top_left: Coord::new(
+                    coordinate.x + (curr_column * CHARACTER_WIDTH) as isize,
+                    coordinate.y + (curr_line * CHARACTER_HEIGHT) as isize,
+                ),
+                bottom_right: Coord::new(
+                    coordinate.x + width as isize,
+                    coordinate.y + ((curr_line + 1) * CHARACTER_HEIGHT) as isize,
+                )
+            };
             // fill the remaining blank of current line and go to the next line
             fill_blank(
                 framebuffer,
-                coordinate.x + (curr_column * CHARACTER_WIDTH) as isize,
-                coordinate.y + (curr_line * CHARACTER_HEIGHT) as isize,
-                coordinate.x + width as isize,
-                coordinate.y + ((curr_line + 1) * CHARACTER_HEIGHT) as isize,
+                &mut blank,
                 bg_pixel,
             );
             curr_column = 0;
@@ -85,13 +92,20 @@ pub fn print_string<P: Pixel>(
         }
     }  
 
+    let mut blank = Rectangle {
+        top_left: Coord::new(
+            x + (curr_column * CHARACTER_WIDTH) as isize,
+            y + (curr_line * CHARACTER_HEIGHT) as isize,
+        ),
+        bottom_right: Coord::new(
+            x + width as isize,
+            y + ((curr_line + 1) * CHARACTER_HEIGHT) as isize,
+        )
+    };
     // fill the blank of the last line
     fill_blank(
         framebuffer,
-        x + (curr_column * CHARACTER_WIDTH) as isize,
-        y + (curr_line * CHARACTER_HEIGHT) as isize,
-        x + width as isize,
-        y + ((curr_line + 1) * CHARACTER_HEIGHT) as isize,
+        &mut blank,
         bg_pixel,
     );
 
@@ -106,12 +120,19 @@ pub fn print_string<P: Pixel>(
     };
 
     // fill the blank of the remaining part
+    blank = Rectangle {
+        top_left: Coord::new(
+            x,
+            y + ((curr_line + 1) * CHARACTER_HEIGHT) as isize,
+        ),
+        bottom_right: Coord::new(
+            x + width as isize,
+            y + height as isize,
+        )
+    };
     fill_blank(
         framebuffer,
-        x,
-        y + ((curr_line + 1) * CHARACTER_HEIGHT) as isize,
-        x + width as isize,
-        y + height as isize,
+        &mut blank,
         bg_pixel,
     );
 
@@ -175,29 +196,26 @@ pub fn print_ascii_character<P: Pixel>(
 /// Fill a blank text area (left, top, right, bottom) with color. The tuple specifies the location of the area relative to the origin(top-left point) of the frame buffer.
 pub fn fill_blank<P: Pixel>(
     framebuffer: &mut FrameBuffer<P>,
-    left: isize,
-    top: isize,
-    right: isize,
-    bottom: isize,
+    blank: &mut Rectangle,
     pixel: P,
 ) {
 
     let (width, height) = framebuffer.get_size();
     // fill the part within the frame buffer
-    let left = core::cmp::max(0, left);
-    let right = core::cmp::min(right, width as isize);
-    let top = core::cmp::max(0, top);
-    let bottom = core::cmp::min(bottom, height as isize);
+    blank.top_left.x = core::cmp::max(0, blank.top_left.x);
+    blank.top_left.y = core::cmp::max(0, blank.top_left.y);
+    blank.bottom_right.x = core::cmp::min(blank.bottom_right.x, width as isize);
+    blank.bottom_right.y = core::cmp::min(blank.bottom_right.y, height as isize);
 
-    if left >= right || top >= bottom {
+    if blank.top_left.x >= blank.bottom_right.x || 
+        blank.top_left.y >= blank.bottom_right.y {
         return
     }
 
-    let fill = vec![pixel; (right - left) as usize];
-    let mut coordinate = Coord::new(left, top);
-    
+    let fill = vec![pixel; (blank.bottom_right.x - blank.top_left.x) as usize];
+    let mut coordinate = blank.top_left;    
     loop {
-        if coordinate.y == bottom {
+        if coordinate.y == blank.bottom_right.y {
             return
         }
         if let Some(start) = framebuffer.index(coordinate) {
