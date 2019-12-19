@@ -33,6 +33,7 @@ use alloc::string::{String, ToString};
 use alloc::sync::{Arc, Weak};
 use alloc::vec::{Vec};
 use compositor::{Compositor, FrameBufferUpdates};
+use core::slice;
 
 use mpmc::Queue;
 use event_types::{Event, MousePositionEvent};
@@ -104,22 +105,28 @@ pub struct WindowManager {
 }
 
 impl WindowManager {
-    /// set one window as active, push last active (if exists) to top of show_list. if `refresh` is `true`, will then refresh the window's area
+    /// Sets one window as active, push last active (if exists) to top of show_list. if `refresh` is `true`, will then refresh the window's area.
+    /// Returns whether this window is the first active window in the manager.
     pub fn set_active(
         &mut self,
         objref: &Arc<Mutex<WindowInner>>,
         refresh: bool,
-    ) -> Result<(), &'static str> {
+    ) -> Result<bool, &'static str> {
         // if it is currently actived, just return
-        if let Some(current_active) = self.active.upgrade() {
-            if Arc::ptr_eq(&(current_active), objref) {
-                return Ok(()); // do nothing
-            } else {
-                // save this to show_list
-                self.show_list.push_front(self.active.clone());
-                self.active = Weak::new();
+        let first_active = match self.active.upgrade() {
+            Some(current_active) => {
+                if Arc::ptr_eq(&(current_active), objref) {
+                    return Ok((true)); // do nothing
+                } else {
+                    // save this to show_list
+                    self.show_list.push_front(self.active.clone());
+                    self.active = Weak::new();
+                }
+                false
             }
-        }
+            None => true,
+        };
+        
         match self.is_window_in_show_list(&objref) {
             // remove item in current list
             Some(i) => {
@@ -147,7 +154,7 @@ impl WindowManager {
         if refresh {
             self.refresh_bottom_windows(Some(area), true)?;
         }
-        Ok(())
+        Ok(first_active)
     }
 
     /// Return the index of a window if it is in the show list
@@ -179,9 +186,9 @@ impl WindowManager {
     }
 
     /// delete a window and refresh its region
-    pub fn delete_window(&mut self, objref: &Arc<Mutex<WindowInner>>) -> Result<(), &'static str> {
+    pub fn delete_window(&mut self, inner_ref: &Arc<Mutex<WindowInner>>) -> Result<(), &'static str> {
         let (top_left, bottom_right) = {
-            let inner = objref.lock();
+            let inner = inner_ref.lock();
             let top_left = inner.get_position();
             let (width, height) = inner.get_size();
             let bottom_right = top_left + (width as isize, height as isize);
@@ -195,7 +202,7 @@ impl WindowManager {
         );
 
         if let Some(current_active) = self.active.upgrade() {
-            if Arc::ptr_eq(&current_active, objref) {
+            if Arc::ptr_eq(&current_active, inner_ref) {
                 self.refresh_bottom_windows(area, false)?;
                 if let Some(window) = self.show_list.remove(0) {
                     self.active = window;
@@ -208,13 +215,13 @@ impl WindowManager {
             }
         }
         
-        if let Some(index) = self.is_window_in_show_list(objref) {
+        if let Some(index) = self.is_window_in_show_list(inner_ref) {
             self.show_list.remove(index);
             self.refresh_windows(area, true)?;
             return Ok(())        
         }
 
-        if let Some(index) = self.is_window_in_hide_list(objref) {
+        if let Some(index) = self.is_window_in_hide_list(inner_ref) {
             self.show_list.remove(index);
             // self.refresh_windows(area, true)?;
             return Ok(())        
@@ -627,19 +634,16 @@ pub fn init() -> Result<(Queue<Event>, Queue<Event>), &'static str> {
     font::init()?;
     let final_framebuffer: FrameBuffer<AlphaPixel> = frame_buffer::init()?;
     let (width, height) = final_framebuffer.get_size();
-    let mut bg_framebuffer = FrameBuffer::new(width, height, None)?;
+    let mut bottom_framebuffer = FrameBuffer::new(width, height, None)?;
     let mut top_framebuffer = FrameBuffer::new(width, height, None)?;
     
     // initialize the framebuffer
-    let (screen_width, screen_height) = bg_framebuffer.get_size();
-    for x in 0..screen_width{
-        for y in 0..screen_height {
-            bg_framebuffer.draw_pixel(
-                Coord::new(x as isize, y as isize),
-                AlphaPixel::from(background::BACKGROUND[y / 2][x / 2])
-            )
-        }
-    }
+    let (screen_width, screen_height) = bottom_framebuffer.get_size();
+    let bg_image: &[AlphaPixel] = unsafe {
+        slice::from_raw_parts((background::BACKGROUND.as_ptr()) as *const AlphaPixel, screen_width * screen_height)
+    };
+
+    bottom_framebuffer.buffer_mut().copy_from_slice(bg_image);
     top_framebuffer.fill_color(T); 
 
     // initialize static window manager
@@ -649,7 +653,7 @@ pub fn init() -> Result<(Queue<Event>, Queue<Event>), &'static str> {
         active: Weak::new(),
         mouse: Coord { x: 0, y: 0 },
         repositioned_border: None,
-        bottom_fb: bg_framebuffer,
+        bottom_fb: bottom_framebuffer,
         top_fb: top_framebuffer,
         final_fb: final_framebuffer,
     };
@@ -664,7 +668,7 @@ pub fn init() -> Result<(Queue<Event>, Queue<Event>), &'static str> {
         y: screen_height as isize / 2,
     }; 
     
-    win.refresh_bottom_windows(None, false)?;
+    //win.refresh_bottom_windows(None, false)?;
 
     // keyinput queue initialization
     let key_consumer: Queue<Event> = Queue::with_capacity(100);

@@ -122,7 +122,7 @@ impl<P: Pixel> FrameBuffer<P> {
     pub fn composite_buffer(&mut self, src: &[P], index: usize) {
         let len = src.len();
         let dest_end = index + len;
-        P::composite_buffer(src, &mut self.buffer_mut()[index..dest_end]);
+        Pixel::composite_buffer(src, &mut self.buffer_mut()[index..dest_end]);
     }
 
     /// Draw a pixel at the given coordinate. The pixel will mix with the original one at the coordinate.

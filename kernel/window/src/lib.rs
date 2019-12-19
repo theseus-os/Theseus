@@ -101,7 +101,7 @@ pub struct Window {
 }
 
 impl Window {
-    /// Creates a new Window at `coordinate` relative to the top-left of the screenand and adds it to the window manager.
+    /// Creates a new Window at `coordinate` relative to the top-left of the screen and adds it to the window manager.
     /// `(width, height)` is the size of the window and `background` is the background color of the window.
     pub fn new(
         coordinate: Coord,
@@ -153,9 +153,12 @@ impl Window {
         };
 
         let mut wm = window_manager::WINDOW_MANAGER.try().ok_or("The window manager is not initialized")?.lock();
-        wm.set_active(&window.inner, false)?; // do not refresh now for
-        wm.refresh_active_window(Some(area))?;
-
+        let first_active = wm.set_active(&window.inner, false)?; 
+        if first_active {
+            wm.refresh_bottom_windows(None, true)?;
+        } else {
+            wm.refresh_active_window(Some(area))?;
+        } 
         Ok(window)
     }
 
