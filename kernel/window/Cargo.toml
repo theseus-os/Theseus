@@ -33,9 +33,6 @@ path = "../frame_buffer"
 [dependencies.event_types]
 path = "../event_types"
 
-[dependencies.font]
-path = "../font"
-
 [dependencies.spawn]
 path = "../spawn"
 

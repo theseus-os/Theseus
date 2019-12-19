@@ -7,7 +7,7 @@
 //!
 //! First, it divides every incoming framebuffer into blocks. The height of every block is a constant 16 except for the last one. The width of a block is the same as the width of the framebuffer it belongs to. A block is a continuous array so that we can compute its hash to compare the content of two blocks.
 //!
-//! In the next step, the compositor chooses all the blocks overlap with the shape and checks if a block is already cached. If the answer is no, the compositor will refresh the intersection of the block with the updated shape.
+//! In the next step, the compositor chooses all the blocks that overlap the given shape of pixels to be displayed and checks if each block is already cached. If the answer is no, the compositor will refresh the intersection of the block with the updated shape.
 //!
 //! Once a block is refreshed, the compositor will remove all the existing caches overlap with it and cache the new one.
 

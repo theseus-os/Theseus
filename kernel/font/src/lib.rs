@@ -1,9 +1,6 @@
 #![no_std]
 extern crate spin;
 
-use core::ops::DerefMut;
-use spin::Mutex;
-
 /// The width of a character.
 pub const CHARACTER_WIDTH: usize = 9;
 /// The height of a character.
@@ -1038,26 +1035,26 @@ pub static FONT_BASIC: [[u8; CHARACTER_HEIGHT]; 256] = [
     ],
 ];
 
-/// The font mask array.
-/// FONT_PIXEL[ascii][y][x] = 0xFFFFFFFF/0x00000000 in which `ascii` is the ASCII code of a character, and (x, y) represents its coordinate.
-pub static FONT_PIXEL: Mutex<[[[u32; CHARACTER_WIDTH]; CHARACTER_HEIGHT]; 256]> =
-    Mutex::new([[[0; CHARACTER_WIDTH]; CHARACTER_HEIGHT]; 256]);
+// /// The font mask array.
+// /// FONT_PIXEL[ascii][y][x] = 0xFFFFFFFF/0x00000000 in which `ascii` is the ASCII code of a character, and (x, y) represents its coordinate.
+// pub static FONT_PIXEL: Mutex<[[[u32; CHARACTER_WIDTH]; CHARACTER_HEIGHT]; 256]> =
+//     Mutex::new([[[0; CHARACTER_WIDTH]; CHARACTER_HEIGHT]; 256]);
 
-/// Initializes the font bitmaps array.
-pub fn init() -> Result<(), &'static str> {
-    let mut fonts_locked = FONT_PIXEL.lock();
-    let fonts = fonts_locked.deref_mut();
+// /// Initializes the font bitmaps array.
+// pub fn init() -> Result<(), &'static str> {
+//     let mut fonts_locked = FONT_PIXEL.lock();
+//     let fonts = fonts_locked.deref_mut();
 
-    for index in 0..FONT_BASIC.len() {
-        for y in 0..CHARACTER_HEIGHT {
-            let char_font = FONT_BASIC[index][y] as u64;
-            for x in 0..CHARACTER_WIDTH {
-                if char_font & (0x80 >> x) != 0 {
-                    fonts[index][y][x + 1] = 0xFFFFFFFF;
-                }
-            }
-        }
-    }
+//     for index in 0..FONT_BASIC.len() {
+//         for y in 0..CHARACTER_HEIGHT {
+//             let char_font = FONT_BASIC[index][y] as u64;
+//             for x in 0..CHARACTER_WIDTH {
+//                 if char_font & (0x80 >> x) != 0 {
+//                     fonts[index][y][x + 1] = 0xFFFFFFFF;
+//                 }
+//             }
+//         }
+//     }
 
-    Ok(())
-}
+//     Ok(())
+// }

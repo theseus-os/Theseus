@@ -17,7 +17,6 @@ extern crate event_types;
 extern crate spin;
 #[macro_use]
 extern crate log;
-extern crate font;
 extern crate frame_buffer;
 extern crate frame_buffer_drawer;
 extern crate mouse;
@@ -135,7 +134,7 @@ impl Window {
 
         {
             let mut inner = window.inner.lock();
-            inner.framebuffer.fill_color(window.background);
+            inner.framebuffer.fill_color(window.background.into());
         }
 
         window.draw_border(true); // draw window with active border
@@ -341,7 +340,7 @@ impl Window {
             Coord::new(0, self.title_size as isize),
             self.border_size,
             height - self.title_size,
-            border_color,
+            border_color.into(),
         );
 
         frame_buffer_drawer::draw_rectangle(
@@ -349,7 +348,7 @@ impl Window {
             Coord::new(0, (height - self.border_size) as isize),
             width,
             self.border_size,
-            border_color,
+            border_color.into(),
         );
         frame_buffer_drawer::draw_rectangle(
             &mut inner.framebuffer,
@@ -359,7 +358,7 @@ impl Window {
             ),
             self.border_size,
             height - self.title_size,
-            border_color,
+            border_color.into(),
         );
 
         // then draw the title bar
@@ -370,11 +369,16 @@ impl Window {
                     Coord::new(0, i as isize),
                     width,
                     1,
-                    frame_buffer::pixel::weight_mix(
-                        WINDOW_BORDER_COLOR_ACTIVE_BOTTOM,
-                        WINDOW_BORDER_COLOR_ACTIVE_TOP,
-                        (i as f32) / (self.title_size as f32),
-                    ),
+                    frame_buffer::Pixel::weight_mix(
+                        WINDOW_BORDER_COLOR_ACTIVE_BOTTOM.into(),     WINDOW_BORDER_COLOR_ACTIVE_TOP.into(), 
+                        (i as f32) / (self.title_size as f32)
+                    )
+
+                    // frame_buffer::pixel::weight_mix(
+                    //     WINDOW_BORDER_COLOR_ACTIVE_BOTTOM,
+                    //     WINDOW_BORDER_COLOR_ACTIVE_TOP,
+                    //     (i as f32) / (self.title_size as f32),
+                    // ).into(),
                 ); 
             }
         } else {
@@ -383,7 +387,7 @@ impl Window {
                 Coord::new(0, 0),
                 width,
                 self.title_size,
-                border_color,
+                border_color.into(),
             );
         }
 
@@ -396,10 +400,10 @@ impl Window {
                 if dx1 * dx1 + dy1 * dy1 > r2 {
                     // draw this to transparent
                     inner.framebuffer
-                        .overwrite_pixel(Coord::new(i as isize, j as isize), 0xFFFFFFFF);
+                        .overwrite_pixel(Coord::new(i as isize, j as isize), 0xFFFFFFFF.into());
                     inner.framebuffer.overwrite_pixel(
                         Coord::new((width - i - 1) as isize, j as isize),
-                        0xFFFFFFFF,
+                        0xFFFFFFFF.into(),
                     );
                 }
             }
@@ -420,12 +424,13 @@ impl Window {
             &mut inner.framebuffer,
             Coord::new(x as isize, y as isize),
             WINDOW_BUTTON_SIZE,
-            frame_buffer::pixel::weight_mix(BLACK, 
+            frame_buffer::Pixel::weight_mix(
+                BLACK.into(), 
                 match button {
                     TopButton::Close => WINDOW_BUTTON_COLOR_CLOSE,
                     TopButton::MinimizeMaximize => WINDOW_BUTTON_COLOR_MINIMIZE_MAMIMIZE,
                     TopButton::Hide => WINDOW_BUTTON_COLOR_HIDE,
-                },
+                }.into(),
                 0.2f32 * (state as f32),
             ),
         );

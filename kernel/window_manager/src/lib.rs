@@ -440,11 +440,11 @@ impl WindowManager {
         Ok(())
     }
 
-    /// draw the floating border with color. Return pixels of the border.
+    /// draw the floating border with color. Return pixels coordinates of the border.
     /// `start` and `end` indicates the top-left and bottom-right corner of the border.
-    fn draw_floating_border(&mut self, top_left: Coord, bottom_right: Coord, color: u32) -> Vec<Coord> {
-        let mut pixels = Vec::new();
-
+    fn draw_floating_border<C: Into<AlphaPixel>>(&mut self, top_left: Coord, bottom_right: Coord, color: C) -> Vec<Coord> {
+        let mut coordinates = Vec::new();
+        let pixel = color.into();
         for i in 0..(WINDOW_BORDER_SIZE) as isize {
             let width = (bottom_right.x - top_left.x) - 2 * i;
             let height = (bottom_right.y - top_left.y) - 2 * i;
@@ -457,21 +457,21 @@ impl WindowManager {
                 coordinate, 
                 width as usize, 
                 height as usize, 
-                color
+                pixel
             );
 
             for m in 0..width {
-                pixels.push(coordinate + (m, 0));
-                pixels.push(coordinate + (m, height));
+                coordinates.push(coordinate + (m, 0));
+                coordinates.push(coordinate + (m, height));
             }            
             
             for m in 1..height - 1 {
-                pixels.push(coordinate + (0, m));
-                pixels.push(coordinate + (width, m));
+                coordinates.push(coordinate + (0, m));
+                coordinates.push(coordinate + (width, m));
             }            
         }
 
-        pixels
+        coordinates
     }
 
     /// take active window's base position and current mouse, move the window with delta
@@ -538,7 +538,7 @@ impl WindowManager {
                 self.mouse.x - MOUSE_POINTER_HALF_SIZE as isize..self.mouse.x + MOUSE_POINTER_HALF_SIZE as isize + 1
             {
                 let coordinate = Coord::new(x, y);
-                self.top_fb.overwrite_pixel(coordinate, T);
+                self.top_fb.overwrite_pixel(coordinate, T.into());
             }
         }
         let update_coords = self.get_mouse_coords();
@@ -554,7 +554,7 @@ impl WindowManager {
                 let coordinate = Coord::new(x, y);
                 let pixel = MOUSE_BASIC
                             [(MOUSE_POINTER_HALF_SIZE as isize + x - new.x) as usize]
-                            [(MOUSE_POINTER_HALF_SIZE as isize + y - new.y) as usize];
+                            [(MOUSE_POINTER_HALF_SIZE as isize + y - new.y) as usize].into();
                 self.top_fb.overwrite_pixel(coordinate, pixel);
             }
         }
@@ -631,7 +631,7 @@ impl WindowManager {
 
 /// Initialize the window manager. It returns (keyboard_producer, mouse_producer) for the I/O devices.
 pub fn init() -> Result<(Queue<Event>, Queue<Event>), &'static str> {
-    font::init()?;
+    // font::init()?;
     let final_framebuffer: FrameBuffer<AlphaPixel> = frame_buffer::init()?;
     let (width, height) = final_framebuffer.get_size();
     let mut bottom_framebuffer = FrameBuffer::new(width, height, None)?;
@@ -644,7 +644,7 @@ pub fn init() -> Result<(Queue<Event>, Queue<Event>), &'static str> {
     };
 
     bottom_framebuffer.buffer_mut().copy_from_slice(bg_image);
-    top_framebuffer.fill_color(T); 
+    top_framebuffer.fill_color(T.into()); 
 
     // initialize static window manager
     let window_manager = WindowManager {

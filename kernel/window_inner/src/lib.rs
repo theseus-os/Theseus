@@ -51,13 +51,7 @@ impl WindowInner {
 
     /// Clear the content of a window
     pub fn clear(&mut self) -> Result<(), &'static str> {
-        self.framebuffer.fill_color(WINDOW_DEFAULT_COLOR);
-        Ok(())
-    }
-
-    /// Draw the border of a window
-    pub fn draw_border(&self, _color: u32) -> Result<(), &'static str> {
-        // this window uses Window instead of border
+        self.framebuffer.fill_color(WINDOW_DEFAULT_COLOR.into());
         Ok(())
     }
 

@@ -99,14 +99,14 @@ impl Cursor {
                         + (0, 1),
                     CHARACTER_WIDTH,
                     CHARACTER_HEIGHT - 2,
-                    self.color,
+                    self.color.into(),
                 );
             } else {
                 frame_buffer_printer::print_ascii_character(
                     framebuffer,
                     self.underlying_char,
-                    FONT_COLOR,
-                    BACKGROUND_COLOR,
+                    FONT_COLOR.into(),
+                    BACKGROUND_COLOR.into(),
                     coordinate,
                     column,
                     line,
