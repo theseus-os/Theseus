@@ -13,7 +13,7 @@ extern crate shapes;
 use alloc::string::String;
 use displayable::{Displayable};
 use font::{CHARACTER_HEIGHT, CHARACTER_WIDTH};
-use frame_buffer::{Pixel, FrameBuffer};
+use frame_buffer::{Pixel, FrameBuffer, IntoPixel};
 use shapes::{Coord, Rectangle};
 
 
@@ -25,8 +25,8 @@ pub struct TextDisplay {
     next_col: usize,
     next_line: usize,
     text: String,
-    fg_color: u32,
-    bg_color: u32,
+    fg_color: IntoPixel,
+    bg_color: IntoPixel,
     /// The text cached since last display
     cache: String,
 }
@@ -88,8 +88,8 @@ impl TextDisplay {
     pub fn new(
         width: usize,
         height: usize,
-        fg_color: u32,
-        bg_color: u32,
+        fg_color: IntoPixel,
+        bg_color: IntoPixel,
     ) -> Result<TextDisplay, &'static str> {
         Ok(TextDisplay {
             width: width,
@@ -104,7 +104,7 @@ impl TextDisplay {
     }
 
     /// Gets the background color of the text area
-    pub fn get_bg_color(&self) -> u32 {
+    pub fn get_bg_color(&self) -> IntoPixel {
         self.bg_color
     }
     

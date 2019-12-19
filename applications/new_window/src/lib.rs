@@ -11,10 +11,11 @@ extern crate alloc;
 
 extern crate window;
 extern crate shapes;
+extern crate frame_buffer;
 
 use alloc::string::String;
 use alloc::vec::Vec;
-//use frame_buffer::Coord;
+use frame_buffer::IntoPixel;
 use shapes::Coord;
 
 const WINDOW_BACKGROUND: u32 = 0x40FFFFFF;
@@ -39,7 +40,7 @@ pub fn main(_args: Vec<String>) -> isize {
         coordinate,
         width,
         height,
-        WINDOW_BACKGROUND,
+        IntoPixel(WINDOW_BACKGROUND),
     ) {
         Ok(m) => m,
         Err(err) => {

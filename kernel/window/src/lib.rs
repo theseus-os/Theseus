@@ -27,7 +27,7 @@ extern crate shapes;
 use alloc::sync::Arc;
 use mpmc::Queue;
 use event_types::{Event, MousePositionEvent};
-use frame_buffer::{FrameBuffer, pixel::{BLACK}};
+use frame_buffer::{FrameBuffer, pixel::{BLACK}, IntoPixel};
 use shapes::{Coord, Rectangle};
 use spin::Mutex;
 use window_inner::{WindowInner, WindowMovingStatus};
@@ -88,7 +88,7 @@ pub struct Window {
     /// the height of title bar in pixel, init as WINDOW_TITLE_BAR. it is render inside the window so user shouldn't use this area anymore
     title_size: usize,
     /// the background of this window, init as WINDOW_BACKGROUND
-    background: u32,
+    background: IntoPixel,
     /// application could get events from this consumer
     pub consumer: Queue<Event>,
     /// event output used by window manager, private variable
@@ -106,7 +106,7 @@ impl Window {
         coordinate: Coord,
         width: usize,
         height: usize,
-        background: u32,
+        background: IntoPixel,
     ) -> Result<Window, &'static str> {
         let framebuffer = FrameBuffer::new(width, height, None)?;
         let (width, height) = framebuffer.get_size();
@@ -328,9 +328,9 @@ impl Window {
     fn draw_border(&mut self, active: bool) {
         let mut inner = self.inner.lock();
         // first draw left, bottom, right border
-        let mut border_color = WINDOW_BORDER_COLOR_INACTIVE;
+        let mut border_color = IntoPixel(WINDOW_BORDER_COLOR_INACTIVE);
         if active {
-            border_color = WINDOW_BORDER_COLOR_ACTIVE_BOTTOM;
+            border_color = IntoPixel(WINDOW_BORDER_COLOR_ACTIVE_BOTTOM);
         }
         let width = inner.width;
         let height = inner.height;
@@ -370,7 +370,7 @@ impl Window {
                     width,
                     1,
                     frame_buffer::Pixel::weight_mix(
-                        WINDOW_BORDER_COLOR_ACTIVE_BOTTOM.into(),     WINDOW_BORDER_COLOR_ACTIVE_TOP.into(), 
+                        IntoPixel(WINDOW_BORDER_COLOR_ACTIVE_BOTTOM).into(),     IntoPixel(WINDOW_BORDER_COLOR_ACTIVE_TOP).into(), 
                         (i as f32) / (self.title_size as f32)
                     )
 
@@ -393,6 +393,7 @@ impl Window {
 
         // draw radius finally
         let r2 = WINDOW_RADIUS * WINDOW_RADIUS;
+        let pixel = IntoPixel(0xFFFFFFFF).into();
         for i in 0..WINDOW_RADIUS {
             for j in 0..WINDOW_RADIUS {
                 let dx1 = WINDOW_RADIUS - i;
@@ -400,11 +401,9 @@ impl Window {
                 if dx1 * dx1 + dy1 * dy1 > r2 {
                     // draw this to transparent
                     inner.framebuffer
-                        .overwrite_pixel(Coord::new(i as isize, j as isize), 0xFFFFFFFF.into());
+                        .overwrite_pixel(Coord::new(i as isize, j as isize), pixel);
                     inner.framebuffer.overwrite_pixel(
-                        Coord::new((width - i - 1) as isize, j as isize),
-                        0xFFFFFFFF.into(),
-                    );
+                        Coord::new((width - i - 1) as isize, j as isize), pixel);
                 }
             }
         }
@@ -420,17 +419,18 @@ impl Window {
                     TopButton::MinimizeMaximize => 1,
                     TopButton::Hide => 2,
                 };
+        let pixel = match button {
+            TopButton::Close => WINDOW_BUTTON_COLOR_CLOSE,
+            TopButton::MinimizeMaximize => WINDOW_BUTTON_COLOR_MINIMIZE_MAMIMIZE,
+            TopButton::Hide => WINDOW_BUTTON_COLOR_HIDE,
+        };
         frame_buffer_drawer::draw_circle(
             &mut inner.framebuffer,
             Coord::new(x as isize, y as isize),
             WINDOW_BUTTON_SIZE,
             frame_buffer::Pixel::weight_mix(
-                BLACK.into(), 
-                match button {
-                    TopButton::Close => WINDOW_BUTTON_COLOR_CLOSE,
-                    TopButton::MinimizeMaximize => WINDOW_BUTTON_COLOR_MINIMIZE_MAMIMIZE,
-                    TopButton::Hide => WINDOW_BUTTON_COLOR_HIDE,
-                }.into(),
+                IntoPixel(BLACK).into(), 
+                IntoPixel(pixel).into(),
                 0.2f32 * (state as f32),
             ),
         );
