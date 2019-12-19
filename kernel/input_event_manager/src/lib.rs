@@ -8,9 +8,7 @@
 //! In the future, the input event manager will handle other forms of input to the OS
 
 #![no_std]
-extern crate spin;
 extern crate spawn;
-extern crate task;
 extern crate mod_mgmt;
 extern crate alloc;
 

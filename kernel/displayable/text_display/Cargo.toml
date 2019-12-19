@@ -20,9 +20,6 @@ path = "../../frame_buffer_printer"
 [dependencies.font]
 path = "../../font"
 
-[dependencies.frame_buffer_drawer]
-path = "../../frame_buffer_drawer"
-
 [dependencies.shapes]
 path = "../../shapes"
 

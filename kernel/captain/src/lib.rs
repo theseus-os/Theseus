@@ -40,8 +40,6 @@ extern crate acpi;
 extern crate device_manager;
 extern crate e1000;
 extern crate scheduler;
-extern crate frame_buffer;
-extern crate font;
 #[cfg(mirror_log_to_vga)] #[macro_use] extern crate print;
 extern crate input_event_manager;
 extern crate exceptions_full;

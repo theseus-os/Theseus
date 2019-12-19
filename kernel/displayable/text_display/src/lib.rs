@@ -7,7 +7,6 @@ extern crate alloc;
 extern crate displayable;
 extern crate font;
 extern crate frame_buffer;
-extern crate frame_buffer_drawer;
 extern crate frame_buffer_printer;
 extern crate shapes;
 

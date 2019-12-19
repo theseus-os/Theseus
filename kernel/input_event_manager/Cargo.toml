@@ -7,13 +7,9 @@ build = "../../build.rs"
 
 
 [dependencies]
-spin = "0.4.10"
 
 [dependencies.spawn]
 path = "../spawn"
-
-[dependencies.task]
-path = "../task"
 
 [dependencies.mod_mgmt]
 path  = "../mod_mgmt"

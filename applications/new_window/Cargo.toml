@@ -17,27 +17,8 @@ version = "0.3.7"
 [dependencies.shapes]
 path = "../../kernel/shapes"
 
-[dependencies.dfqueue]
-path = "../../libs/dfqueue"
-version = "0.1.0"
-
-[dependencies.spawn]
-path = "../../kernel/spawn"
-
-[dependencies.runqueue]
-path = "../../kernel/runqueue"
-
-[dependencies.window_manager]
-path = "../../kernel/window_manager"
-
 [dependencies.window]
 path = "../../kernel/window"
-
-[dependencies.scheduler]
-path = "../../kernel/scheduler"
-
-[dependencies.print]
-path = "../../kernel/print"
 
 [lib]
 crate-type = ["rlib"]

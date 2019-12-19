@@ -16,26 +16,6 @@ pub trait Pixel: From<u32> + Copy + Hash {
     
     /// mix with another pixel considering their extra channel.
     fn mix(self, other: Self) -> Self;
-
-    /// Gets the value of the red byte
-    fn get_red(&self) -> u8;
-
-    /// Gets the value of the green byte
-    fn get_green(&self) -> u8;
-
-    /// Gets the value of the blue byte
-    fn get_blue(&self) -> u8;
-
-    /// Gets the value of the extra channel
-    fn get_channel(&self) -> u8;
-
-    /// Turn the pixel to a u32 color
-    fn get_color(&self) -> u32 {
-        (self.get_channel() as u32) << 24 |
-        (self.get_red() as u32) << 16 |
-        (self.get_green() as u32) << 8 |
-        (self.get_blue() as u32)
-    }
 }
 
 #[repr(C, packed)]
@@ -95,23 +75,6 @@ impl Pixel for RGBPixel {
     fn mix(self, _other: Self) -> Self {
         self
     }
-
-    fn get_red(&self) -> u8 {
-        self.red
-    }
-
-    fn get_green(&self) -> u8 {
-        self.green
-    }
-
-    fn get_blue(&self) -> u8 {
-        self.blue
-    }
-
-    fn get_channel(&self) -> u8 {
-        self.channel
-    }
-
 }
 
 impl Pixel for AlphaPixel {   
@@ -140,22 +103,6 @@ impl Pixel for AlphaPixel {
             green: new_green,
             blue: new_blue
         }
-    }
-
-    fn get_red(&self) -> u8 {
-        self.red
-    }
-
-    fn get_green(&self) -> u8 {
-        self.green
-    }
-
-    fn get_blue(&self) -> u8 {
-        self.blue
-    }
-
-    fn get_channel(&self) -> u8 {
-        self.alpha
     }
 }
 

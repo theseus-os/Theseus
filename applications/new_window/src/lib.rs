@@ -4,20 +4,13 @@
 //!
 //! The new window has a half-transparent background. This simple application is to test `WindowManager` with multiple window overlapping each other,
 //! as well as test `Window` which provides easy-to-use interface for application to enable GUI.
-
 #![no_std]
 #[macro_use]
 extern crate log;
 extern crate alloc;
 
-extern crate dfqueue;
-extern crate runqueue;
-extern crate spawn;
-extern crate window_manager;
-extern crate print;
 extern crate window;
 extern crate shapes;
-extern crate scheduler;
 
 use alloc::string::String;
 use alloc::vec::Vec;
