@@ -116,7 +116,7 @@ impl WindowManager {
         let first_active = match self.active.upgrade() {
             Some(current_active) => {
                 if Arc::ptr_eq(&(current_active), objref) {
-                    return Ok((true)); // do nothing
+                    return Ok(true); // do nothing
                 } else {
                     // save this to show_list
                     self.show_list.push_front(self.active.clone());
