@@ -1,9 +1,7 @@
 use core::hash::Hash;
 
-/// A pixel is basically a u32 of 4 bytes.
-pub type PixelColor = u32;
 /// The size of a pixel.
-pub const PIXEL_SIZE: usize = core::mem::size_of::<PixelColor>();
+pub const PIXEL_SIZE: usize = core::mem::size_of::<u32>();
 
 
 /// predefined opaque black
@@ -12,7 +10,7 @@ pub const BLACK: u32 = 0;
 pub const WHITE: u32 = 0x00FFFFFF;
 
 /// A pixel provides methods to mix with others.
-pub trait Pixel: Sized + From<PixelColor> + Copy + Hash {
+pub trait Pixel: From<u32> + Copy + Hash {
     /// Composites the `src` pixel slice to the `dest` pixel slice.
     fn composite_buffer(src: &[Self], dest: &mut[Self]);
     
@@ -30,6 +28,14 @@ pub trait Pixel: Sized + From<PixelColor> + Copy + Hash {
 
     /// Gets the value of the extra channel
     fn get_channel(&self) -> u8;
+
+    /// Turn the pixel to a u32 color
+    fn get_color(&self) -> u32 {
+        (self.get_channel() as u32) << 24 |
+        (self.get_red() as u32) << 16 |
+        (self.get_green() as u32) << 8 |
+        (self.get_blue() as u32)
+    }
 }
 
 #[repr(C, packed)]
@@ -42,8 +48,8 @@ pub struct RGBPixel {
     pub channel: u8,
 }
 
-impl From<PixelColor> for RGBPixel {
-    fn from(color: PixelColor) -> Self {
+impl From<u32> for RGBPixel {
+    fn from(color: u32) -> Self {
         RGBPixel {
             channel: 0,
             red: (color >> 16) as u8,
@@ -63,8 +69,8 @@ pub struct AlphaPixel {
     pub alpha: u8
 }
 
-impl From<PixelColor> for AlphaPixel {
-    fn from(color: PixelColor) -> Self {
+impl From<u32> for AlphaPixel {
+    fn from(color: u32) -> Self {
         AlphaPixel {
             alpha: (color >> 24) as u8,
             red: (color >> 16) as u8,
@@ -154,7 +160,7 @@ impl Pixel for AlphaPixel {
 }
 
 /// Mix two pixels linearly with weights, as `mix` for `origin` and (1-`mix`) for `other`. It returns black if mix is outside range of [0, 1].
-pub fn weight_mix(origin: PixelColor, other: PixelColor, mix: f32) -> u32 {
+pub fn weight_mix(origin: u32, other: u32, mix: f32) -> u32 {
     if mix < 0f32 || mix > 1f32 {
         return BLACK;
     }

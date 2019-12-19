@@ -331,7 +331,7 @@ impl Shell {
         Ok(())
     }
 
-    /// Update the position of cursor. `offset_from_end` specifies the position relative to the end of the text in number of characterss.
+    /// Update the position of cursor. `offset_from_end` specifies the position relative to the end of the text in number of characters.
     fn update_cursor_pos(&mut self, offset_from_end: usize) -> Result<(), &'static str> {
         let mut terminal = self.terminal.lock();
         terminal.cursor.disable();

@@ -13,7 +13,7 @@ pub struct Cursor {
     /// The current blinking state show/hidden
     show: bool,
     /// The color of the cursor
-    color: PixelColor,
+    color: u32,
     /// The position of the cursor relative to the end of terminal text in number of characters.
     pub offset_from_end: usize,
     /// The underlying character at the position of the cursor.

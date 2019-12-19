@@ -12,13 +12,13 @@ extern crate shapes;
 use alloc::sync::Arc;
 use mpmc::Queue;
 use event_types::{Event};
-use frame_buffer::{FrameBuffer, AlphaPixel, PixelColor};
+use frame_buffer::{FrameBuffer, AlphaPixel};
 use shapes::Coord;
 use spin::{Mutex};
 
 
 /// The default color of a window;
-const WINDOW_DEFAULT_COLOR: PixelColor = 0x80FFFFFF;
+const WINDOW_DEFAULT_COLOR: u32 = 0x80FFFFFF;
 
 /// The status about whether a window is moving
 pub enum WindowMovingStatus {

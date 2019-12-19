@@ -36,7 +36,7 @@ use compositor::{Compositor, FrameBufferUpdates};
 
 use mpmc::Queue;
 use event_types::{Event, MousePositionEvent};
-use frame_buffer::{FrameBuffer, AlphaPixel, PixelColor};
+use frame_buffer::{FrameBuffer, AlphaPixel};
 use shapes::{Coord, Rectangle};
 use frame_buffer_compositor::{FRAME_COMPOSITOR};
 ////
@@ -53,13 +53,13 @@ pub static WINDOW_MANAGER: Once<Mutex<WindowManager>> = Once::new();
 // The half size of mouse in number of pixels, the actual size of pointer is 1+2*`MOUSE_POINTER_HALF_SIZE`
 const MOUSE_POINTER_HALF_SIZE: usize = 7;
 // Transparent pixel
-const T: PixelColor = 0xFF000000;
+const T: u32 = 0xFF000000;
 // Opaque white
-const O: PixelColor = 0x00FFFFFF;
+const O: u32 = 0x00FFFFFF;
 // Opaque blue
-const B: PixelColor = 0x00000FF;
+const B: u32 = 0x00000FF;
 // the mouse picture
-static MOUSE_BASIC: [[PixelColor; 2 * MOUSE_POINTER_HALF_SIZE + 1];
+static MOUSE_BASIC: [[u32; 2 * MOUSE_POINTER_HALF_SIZE + 1];
     2 * MOUSE_POINTER_HALF_SIZE + 1] = [
     [T, T, T, T, T, T, T, T, T, T, T, T, T, T, T],
     [T, T, T, T, T, T, T, T, T, T, T, T, T, T, T],
@@ -81,7 +81,7 @@ static MOUSE_BASIC: [[PixelColor; 2 * MOUSE_POINTER_HALF_SIZE + 1];
 // the border indicating new window position and size
 const WINDOW_BORDER_SIZE: usize = 3;
 // border's inner color
-const WINDOW_BORDER_COLOR_INNER: PixelColor = 0x00CA6F1E;
+const WINDOW_BORDER_COLOR_INNER: u32 = 0x00CA6F1E;
 
 /// Window manager structure which maintains a list of windows and a mouse.
 pub struct WindowManager {
@@ -435,7 +435,7 @@ impl WindowManager {
 
     /// draw the floating border with color. Return pixels of the border.
     /// `start` and `end` indicates the top-left and bottom-right corner of the border.
-    fn draw_floating_border(&mut self, top_left: Coord, bottom_right: Coord, color: PixelColor) -> Vec<Coord> {
+    fn draw_floating_border(&mut self, top_left: Coord, bottom_right: Coord, color: u32) -> Vec<Coord> {
         let mut pixels = Vec::new();
 
         for i in 0..(WINDOW_BORDER_SIZE) as isize {

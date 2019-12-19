@@ -29,7 +29,7 @@ use text_display::TextDisplay;
 use displayable::Displayable;
 use event_types::Event;
 use font::{CHARACTER_HEIGHT, CHARACTER_WIDTH};
-use frame_buffer::{FrameBuffer, Pixel, PixelColor};
+use frame_buffer::{FrameBuffer, Pixel};
 use shapes::{Coord, Rectangle};
 use tsc::{tsc_ticks, TscTicks};
 use window::Window;
@@ -485,7 +485,7 @@ impl Terminal {
     /// # Arguments
     ///
     /// * `c`: the new character to insert.
-    /// * `offset_from_end`: the position to insert the character. It represents the distance relative to the end of the whole output in the terminal in number of characterss.
+    /// * `offset_from_end`: the position to insert the character. It represents the distance relative to the end of the whole output in the terminal in number of characters.
     ///
     /// # Examples
     ///
@@ -505,7 +505,7 @@ impl Terminal {
     ///
     /// # Arguments
     ///
-    /// * `offset_from_end`: the position of the character to remove. It represents the distance relative to the end of the whole output in the terminal in number of characterss. `offset_from_end == 0` is *invalid* here.
+    /// * `offset_from_end`: the position of the character to remove. It represents the distance relative to the end of the whole output in the terminal in number of characters. `offset_from_end == 0` is *invalid* here.
     ///
     /// # Examples
     ///
@@ -652,14 +652,14 @@ impl Terminal {
         self.window.render(Some(update_area))
     }
 
-    /// Gets the position of the cursor relative to the end of text in number of characterss.
+    /// Gets the position of the cursor relative to the end of text in number of characters.
     pub fn get_cursor_offset_from_end(&self) -> usize {
         self.cursor.offset_from_end
     }
 
     /// Updates the position of a cursor.
     /// # Arguments
-    /// * `offset_from_end`: the position of the cursor relative to the end of text in number of characterss.
+    /// * `offset_from_end`: the position of the cursor relative to the end of text in number of characters.
     /// * `underlying_char`: the ASCII code of the underlying character when the cursor is unseen.
     pub fn update_cursor_pos(&mut self, offset_from_end: usize, underlying_char: u8) {
         self.cursor.offset_from_end = offset_from_end;

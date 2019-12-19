@@ -10,7 +10,7 @@ extern crate shapes;
 
 use alloc::vec;
 use font::{CHARACTER_HEIGHT, CHARACTER_WIDTH, FONT_PIXEL};
-use frame_buffer::{FrameBuffer, Pixel, PixelColor};
+use frame_buffer::{FrameBuffer, Pixel};
 use shapes::{Coord, Rectangle};
 
 
@@ -127,11 +127,11 @@ pub fn print_string<P: Pixel>(
 /// * `bg_color`: the background color of the character.
 /// * `coordinate`: the left top coordinate of the text block relative to the origin(top-left point) of the frame buffer.
 /// * `(column, line)`: the location of the character in the text block as symbols.
-pub fn print_ascii_character<P: Pixel>(
+pub fn print_ascii_character<P: Pixel, C: Into<P>>(
     framebuffer: &mut FrameBuffer<P>,
     character: ASCII,
-    font_color: PixelColor,
-    bg_color: PixelColor,
+    font_color: C,
+    bg_color: C,
     coordinate: Coord,
     column: usize,
     line: usize,
@@ -149,12 +149,14 @@ pub fn print_ascii_character<P: Pixel>(
     let off_set_y: usize = if start.y < 0 { -(start.y) as usize } else { 0 };    
     let mut j = off_set_x;
     let mut i = off_set_y;
+    let fcolor = font_color.into().get_color();
+    let bcolor = bg_color.into().get_color();
     loop {
         let coordinate = start + (j as isize, i as isize);
         if framebuffer.contains(coordinate) {
             let mask: u32 = fonts[character as usize][i][j];
-            let color = font_color & mask | bg_color & (!mask);
-            framebuffer.draw_pixel(coordinate, P::from(color));
+            let color = fcolor & mask | bcolor & (!mask);
+            framebuffer.draw_pixel(coordinate, color);
         }
         j += 1;
         if j == CHARACTER_WIDTH || start.x + j as isize == buffer_width as isize {
@@ -188,7 +190,7 @@ pub fn fill_blank<P: Pixel>(
         return
     }
 
-    let fill = vec![P::from(color); (right - left) as usize];
+    let fill = vec![color.into(); (right - left) as usize];
     let mut coordinate = Coord::new(left, top);
     
     loop {

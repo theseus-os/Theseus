@@ -28,7 +28,7 @@ extern crate shapes;
 use alloc::sync::Arc;
 use mpmc::Queue;
 use event_types::{Event, MousePositionEvent};
-use frame_buffer::{FrameBuffer, pixel::{BLACK, PixelColor}};
+use frame_buffer::{FrameBuffer, pixel::{BLACK}};
 use shapes::{Coord, Rectangle};
 use spin::Mutex;
 use window_inner::{WindowInner, WindowMovingStatus};
@@ -41,17 +41,17 @@ const WINDOW_BORDER: usize = 2;
 // border radius, in number of pixels
 const WINDOW_RADIUS: usize = 5;
 // border and title bar color when window is inactive
-const WINDOW_BORDER_COLOR_INACTIVE: PixelColor = 0x00333333;
+const WINDOW_BORDER_COLOR_INACTIVE: u32 = 0x00333333;
 // border and title bar color when window is active, the top part color
-const WINDOW_BORDER_COLOR_ACTIVE_TOP: PixelColor = 0x00BBBBBB;
+const WINDOW_BORDER_COLOR_ACTIVE_TOP: u32 = 0x00BBBBBB;
 // border and title bar color when window is active, the bottom part color
-const WINDOW_BORDER_COLOR_ACTIVE_BOTTOM: PixelColor = 0x00666666;
+const WINDOW_BORDER_COLOR_ACTIVE_BOTTOM: u32 = 0x00666666;
 // window button color: red
-const WINDOW_BUTTON_COLOR_CLOSE: PixelColor = 0x00E74C3C;
+const WINDOW_BUTTON_COLOR_CLOSE: u32 = 0x00E74C3C;
 // window button color: green
-const WINDOW_BUTTON_COLOR_MINIMIZE_MAMIMIZE: PixelColor = 0x00239B56;
+const WINDOW_BUTTON_COLOR_MINIMIZE_MAMIMIZE: u32 = 0x00239B56;
 // window button color: purple
-const WINDOW_BUTTON_COLOR_HIDE: PixelColor = 0x007D3C98;
+const WINDOW_BUTTON_COLOR_HIDE: u32 = 0x007D3C98;
 // window button margin from left, in number of pixels
 const WINDOW_BUTTON_BIAS_X: usize = 12;
 // the interval between buttons, in number of pixels
@@ -89,7 +89,7 @@ pub struct Window {
     /// the height of title bar in pixel, init as WINDOW_TITLE_BAR. it is render inside the window so user shouldn't use this area anymore
     title_size: usize,
     /// the background of this window, init as WINDOW_BACKGROUND
-    background: PixelColor,
+    background: u32,
     /// application could get events from this consumer
     pub consumer: Queue<Event>,
     /// event output used by window manager, private variable
@@ -107,7 +107,7 @@ impl Window {
         coordinate: Coord,
         width: usize,
         height: usize,
-        background: PixelColor,
+        background: u32,
     ) -> Result<Window, &'static str> {
         let framebuffer = FrameBuffer::new(width, height, None)?;
         let (width, height) = framebuffer.get_size();

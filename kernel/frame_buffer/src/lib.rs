@@ -126,15 +126,16 @@ impl<P: Pixel> FrameBuffer<P> {
     }
 
     /// Draw a pixel at the given coordinate. The pixel will mix with the original one at the coordinate.
-    pub fn draw_pixel(&mut self, coordinate: Coord, pixel: P) {
+    pub fn draw_pixel<C: Into<P>>(&mut self, coordinate: Coord, color: C) {
+        let pixel = color.into();
         if let Some(index) = self.index(coordinate) {
             self.buffer[index] = pixel.mix(self.buffer[index]).into();
         }
     }
 
     /// Overwites a pixel at the given coordinate.
-    pub fn overwrite_pixel(&mut self, coordinate: Coord, color: PixelColor) {
-        self.draw_pixel(coordinate, P::from(color))
+    pub fn overwrite_pixel<C: Into<P>>(&mut self, coordinate: Coord, color: C) {
+        self.draw_pixel(coordinate, color.into())
     }
 
     /// Returns a pixel at coordinate.
@@ -147,11 +148,12 @@ impl<P: Pixel> FrameBuffer<P> {
     }
 
     /// Fills the framebuffer with color.
-    pub fn fill_color(&mut self, color: PixelColor) {
+    pub fn fill_color<C: Into<P>>(&mut self, color: C) {
+        let color = color.into();
         for y in 0..self.height {
             for x in 0..self.width {
                 let coordinate = Coord::new(x as isize, y as isize);
-                self.draw_pixel(coordinate, P::from(color));
+                self.draw_pixel(coordinate, color);
             }
         }
     }
