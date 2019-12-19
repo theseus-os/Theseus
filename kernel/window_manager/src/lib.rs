@@ -109,13 +109,13 @@ impl WindowManager {
     /// Returns whether this window is the first active window in the manager.
     pub fn set_active(
         &mut self,
-        objref: &Arc<Mutex<WindowInner>>,
+        inner_ref: &Arc<Mutex<WindowInner>>,
         refresh: bool,
     ) -> Result<bool, &'static str> {
         // if it is currently actived, just return
         let first_active = match self.active.upgrade() {
             Some(current_active) => {
-                if Arc::ptr_eq(&(current_active), objref) {
+                if Arc::ptr_eq(&(current_active), inner_ref) {
                     return Ok(true); // do nothing
                 } else {
                     // save this to show_list
@@ -127,23 +127,23 @@ impl WindowManager {
             None => true,
         };
         
-        match self.is_window_in_show_list(&objref) {
+        match self.is_window_in_show_list(&inner_ref) {
             // remove item in current list
             Some(i) => {
                 self.show_list.remove(i);
             }
             None => {}
         }
-        match self.is_window_in_hide_list(&objref) {
+        match self.is_window_in_hide_list(&inner_ref) {
             // remove item in current list
             Some(i) => {
                 self.hide_list.remove(i);
             }
             None => {}
         }
-        self.active = Arc::downgrade(objref);
+        self.active = Arc::downgrade(inner_ref);
         let area = {
-            let window = objref.lock();
+            let window = inner_ref.lock();
             let top_left = window.get_position();
             let (width, height) = window.get_size();          
             Rectangle {
@@ -158,11 +158,11 @@ impl WindowManager {
     }
 
     /// Return the index of a window if it is in the show list
-    fn is_window_in_show_list(&mut self, objref: &Arc<Mutex<WindowInner>>) -> Option<usize> {
+    fn is_window_in_show_list(&mut self, inner_ref: &Arc<Mutex<WindowInner>>) -> Option<usize> {
         let mut i = 0_usize;
         for item in self.show_list.iter() {
             if let Some(item_ptr) = item.upgrade() {
-                if Arc::ptr_eq(&(item_ptr), objref) {
+                if Arc::ptr_eq(&(item_ptr), inner_ref) {
                     return Some(i);
                 }
             }
@@ -172,11 +172,11 @@ impl WindowManager {
     }
 
     /// Return the index of a window if it is in the hide list
-    fn is_window_in_hide_list(&mut self, objref: &Arc<Mutex<WindowInner>>) -> Option<usize> {
+    fn is_window_in_hide_list(&mut self, inner_ref: &Arc<Mutex<WindowInner>>) -> Option<usize> {
         let mut i = 0_usize;
         for item in self.hide_list.iter() {
             if let Some(item_ptr) = item.upgrade() {
-                if Arc::ptr_eq(&(item_ptr), objref) {
+                if Arc::ptr_eq(&(item_ptr), inner_ref) {
                     return Some(i);
                 }
             }
@@ -597,9 +597,9 @@ impl WindowManager {
     }
 
     /// Whether a window is active
-    pub fn is_active(&self, objref: &Arc<Mutex<WindowInner>>) -> bool {
+    pub fn is_active(&self, inner_ref: &Arc<Mutex<WindowInner>>) -> bool {
         if let Some(current_active) = self.active.upgrade() {
-            if Arc::ptr_eq(&(current_active), objref) {
+            if Arc::ptr_eq(&(current_active), inner_ref) {
                 return true;
             }
         }
