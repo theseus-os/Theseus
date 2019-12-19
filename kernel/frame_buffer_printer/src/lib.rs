@@ -24,8 +24,8 @@ type ASCII = u8;
 /// * `coordinate`: the left top coordinate of the text block relative to the origin(top-left point) of the frame buffer.
 /// * `(width, height)`: the size of the text block.
 /// * `slice`: the string to display.
-/// * `font_pixel`: the pixel color of font.
-/// * `bg_pixel`: the pixel color of background.
+/// * `font_pixel`: the pixel value of font.
+/// * `bg_pixel`: the pixel value of background.
 /// * `(column, line)`: the location of the text in the text block as symbols.
 pub fn print_string<P: Pixel>(
     framebuffer: &mut FrameBuffer<P>,
@@ -144,8 +144,8 @@ pub fn print_string<P: Pixel>(
 /// # Arguments
 /// * `framebuffer`: the framebuffer to display in.
 /// * `character`: the ASCII code of the character to display.
-/// * `font_pixel`: the pixel color of the character.
-/// * `bg_pixel`: the background pixel color of the character.
+/// * `font_pixel`: the pixel value of the character.
+/// * `bg_pixel`: the background pixel value of the character.
 /// * `coordinate`: the left top coordinate of the text block relative to the origin(top-left point) of the frame buffer.
 /// * `(column, line)`: the location of the character in the text block as symbols.
 pub fn print_ascii_character<P: Pixel>(

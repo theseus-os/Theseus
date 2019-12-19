@@ -442,9 +442,10 @@ impl WindowManager {
 
     /// draw the floating border with color. Return pixels coordinates of the border.
     /// `start` and `end` indicates the top-left and bottom-right corner of the border.
-    fn draw_floating_border<C: Into<AlphaPixel>>(&mut self, top_left: Coord, bottom_right: Coord, color: C) -> Vec<Coord> {
+    /// `pixel` is the pixel value of the floating border.
+    fn draw_floating_border(&mut self, top_left: Coord, bottom_right: Coord, pixel: IntoPixel) -> Vec<Coord> {
         let mut coordinates = Vec::new();
-        let pixel = color.into();
+        let pixel = pixel.into();
         for i in 0..(WINDOW_BORDER_SIZE) as isize {
             let width = (bottom_right.x - top_left.x) - 2 * i;
             let height = (bottom_right.y - top_left.y) - 2 * i;

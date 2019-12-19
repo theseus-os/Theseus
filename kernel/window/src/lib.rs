@@ -101,7 +101,7 @@ pub struct Window {
 
 impl Window {
     /// Creates a new Window at `coordinate` relative to the top-left of the screen and adds it to the window manager.
-    /// `(width, height)` is the size of the window and `background` is the background color of the window.
+    /// `(width, height)` is the size of the window and `background` is the background color of the window. Currently the window is based on alpha framebuffer, so the pixel value of the background has an alpha channel and RGB bytes.
     pub fn new(
         coordinate: Coord,
         width: usize,

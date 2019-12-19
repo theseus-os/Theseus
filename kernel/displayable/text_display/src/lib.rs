@@ -25,8 +25,8 @@ pub struct TextDisplay {
     next_col: usize,
     next_line: usize,
     text: String,
-    fg_color: IntoPixel,
-    bg_color: IntoPixel,
+    fg_pixel: IntoPixel,
+    bg_pixel: IntoPixel,
     /// The text cached since last display
     cache: String,
 }
@@ -53,8 +53,8 @@ impl Displayable for TextDisplay {
             self.width,
             self.height,
             string,
-            self.fg_color.into(),
-            self.bg_color.into(),
+            self.fg_pixel.into(),
+            self.bg_pixel.into(),
             col,
             line,
         );
@@ -84,12 +84,12 @@ impl TextDisplay {
     /// Creates a new text displayable.
     /// # Arguments
     /// * `(width, height)`: the size of the text area.
-    /// * `(fg_color, bg_color)`: the foreground and background color of the text area.
+    /// * `(fg_pixel, bg_pixel)`: the foreground and background color of the text area. The semantic of the color depends on the framebuffer the displayable will display in. For example, if the displayable displays in a alpha framebuffer, the value of the pixel represents an alpha channel and three RGB bytes.
     pub fn new(
         width: usize,
         height: usize,
-        fg_color: IntoPixel,
-        bg_color: IntoPixel,
+        fg_pixel: IntoPixel,
+        bg_pixel: IntoPixel,
     ) -> Result<TextDisplay, &'static str> {
         Ok(TextDisplay {
             width: width,
@@ -97,15 +97,15 @@ impl TextDisplay {
             next_col: 0,
             next_line: 0,
             text: String::new(),
-            fg_color: fg_color,
-            bg_color: bg_color,
+            fg_pixel: fg_pixel,
+            bg_pixel: bg_pixel,
             cache: String::new(),
         })
     }
 
     /// Gets the background color of the text area
-    pub fn get_bg_color(&self) -> IntoPixel {
-        self.bg_color
+    pub fn get_bg_pixel(&self) -> IntoPixel {
+        self.bg_pixel
     }
     
     /// Clear the cache of the text displayable.

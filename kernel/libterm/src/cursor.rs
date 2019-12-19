@@ -12,8 +12,8 @@ pub struct Cursor {
     time: TscTicks,
     /// The current blinking state show/hidden
     show: bool,
-    /// The color of the cursor
-    color: IntoPixel,
+    /// The pixel value of the cursor
+    pixel: IntoPixel,
     /// The position of the cursor relative to the end of terminal text in number of characters.
     pub offset_from_end: usize,
     /// The underlying character at the position of the cursor.
@@ -22,14 +22,14 @@ pub struct Cursor {
 }
 
 impl Cursor {
-    /// Creates a new cursor object which is initially enabled. The `blink_interval` is initialized as `DEFAULT_CURSOR_FREQ` however one can change this at any time. `time` is set to current time.
+    /// Creates a new cursor object which is initially enabled. The `blink_interval` is initialized as `DEFAULT_CURSOR_FREQ` however one can change this at any time. `time` is set to current time. `pixel` represents the pixel value of the cursor's pixels.
     pub fn new() -> Cursor {
         Cursor {
             enabled: true,
             freq: DEFAULT_CURSOR_FREQ,
             time: tsc_ticks(),
             show: true,
-            color: IntoPixel(FONT_COLOR),
+            pixel: IntoPixel(FONT_COLOR),
             offset_from_end: 0,
             underlying_char: 0,
         }
@@ -99,7 +99,7 @@ impl Cursor {
                         + (0, 1),
                     CHARACTER_WIDTH,
                     CHARACTER_HEIGHT - 2,
-                    self.color.into(),
+                    self.pixel.into(),
                 );
             } else {
                 frame_buffer_printer::print_ascii_character(
