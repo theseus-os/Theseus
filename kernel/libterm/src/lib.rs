@@ -29,7 +29,7 @@ use text_display::TextDisplay;
 use displayable::Displayable;
 use event_types::Event;
 use font::{CHARACTER_HEIGHT, CHARACTER_WIDTH};
-use frame_buffer::{FrameBuffer, Pixel, IntoPixel};
+use frame_buffer::{FrameBuffer, Pixel, AlphaColor};
 use shapes::{Coord, Rectangle};
 use tsc::{tsc_ticks, TscTicks};
 use window::Window;
@@ -440,11 +440,11 @@ impl Terminal {
             Coord::new(WINDOW_MARGIN as isize, WINDOW_MARGIN as isize), 
             window_width - 2 * WINDOW_MARGIN, 
             window_height - 2 * WINDOW_MARGIN,
-            IntoPixel(0x000000),
+            AlphaColor::from(0x000000),
         )?;
         
         let (width_inner, height_inner) = window.inner_size();
-        let text_display = TextDisplay::new(width_inner, height_inner, IntoPixel(FONT_COLOR), IntoPixel(BACKGROUND_COLOR))?;
+        let text_display = TextDisplay::new(width_inner, height_inner, AlphaColor::from(FONT_COLOR), AlphaColor::from(BACKGROUND_COLOR), 0)?;
 
         let mut terminal = Terminal {
             window: window,

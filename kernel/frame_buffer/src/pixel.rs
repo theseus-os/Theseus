@@ -11,10 +11,43 @@ pub const WHITE: u32 = 0x00FFFFFF;
 
 /// User uses this type to provide pixel value to the framebuffer.
 #[derive(Clone, Copy)]
-pub struct IntoPixel(pub u32);
+pub struct Color {
+    pub red: u8,
+    pub green: u8,
+    pub blue: u8,
+}
 
+impl From<u32> for Color {
+    fn from(color: u32) -> Color {
+        Color {
+            red: (color >> 16) as u8,
+            green: (color >> 8) as u8,
+            blue: color as u8,
+        }
+    }
+}
+
+/// User uses this type to provide pixel value to the framebuffer.
+#[derive(Clone, Copy)]
+pub struct AlphaColor {
+    /// 0 is non-transparent while 0xFF is totally transparent
+    transparency: u8,
+    color: Color
+}
+
+impl From<u32> for AlphaColor {
+    fn from(acolor: u32) -> AlphaColor {
+        AlphaColor {
+            transparency: (acolor >> 24) as u8,
+            color: acolor.into(),
+        }
+    }
+}
+
+/// 0 represents non-transparent and 0xFF represents totally transparent.
+pub type Transparency = u8;
 /// A pixel provides methods to mix with others.
-pub trait Pixel: From<IntoPixel> + Copy + Hash {
+pub trait Pixel: From<AlphaColor> + Copy + Hash {
     /// Composites the `src` pixel slice to the `dest` pixel slice.
     fn composite_buffer(src: &[Self], dest: &mut[Self]);
     
@@ -32,17 +65,16 @@ pub struct RGBPixel {
     pub blue: u8,
     pub green: u8,
     pub red: u8,
-    pub channel: u8,
+    pub _channel: u8,
 }
 
-impl From<IntoPixel> for RGBPixel {
-    fn from(into: IntoPixel) -> Self {
-        let pixel = into.0;
+impl From<Color> for RGBPixel {
+    fn from(color: Color) -> Self {
         RGBPixel {
-            channel: 0,
-            red: (pixel >> 16) as u8,
-            green: (pixel >> 8) as u8,
-            blue: pixel as u8
+            _channel: 0,
+            red: color.red,
+            green: color.green,
+            blue: color.blue
         }
     }
 }
@@ -57,14 +89,24 @@ pub struct AlphaPixel {
     pub alpha: u8
 }
 
-impl From<IntoPixel> for AlphaPixel {
-    fn from(into: IntoPixel) -> Self {
-        let pixel = into.0;
+impl From<AlphaColor> for AlphaPixel {
+    fn from(acolor: AlphaColor) -> Self {
         AlphaPixel {
-            alpha: (pixel >> 24) as u8,
-            red: (pixel >> 16) as u8,
-            green: (pixel >> 8) as u8,
-            blue: pixel as u8
+            alpha: acolor.transparency,
+            red: acolor.color.red,
+            green: acolor.color.green,
+            blue: acolor.color.blue
+        }
+    }
+}
+
+impl From<AlphaColor> for RGBPixel {
+    fn from(acolor: AlphaColor) -> Self {
+        RGBPixel {
+            _channel: 0,
+            red: acolor.color.red,
+            green: acolor.color.green,
+            blue: acolor.color.blue
         }
     }
 }
@@ -86,18 +128,27 @@ impl Pixel for RGBPixel {
     }
 
     fn weight_mix(origin: Self, other: Self, mix: f32) -> Self {
-        if mix < 0f32 || mix > 1f32 {
-            return IntoPixel(BLACK).into();
-        }
-        let new_channel =
-            ((origin.channel as f32) * mix + (other.channel as f32) * (1f32 - mix)) as u32;
+        let mix = if mix < 0f32 {
+            0f32
+        } else if mix > 1f32 {
+            1f32
+        } else {
+            mix
+        };
+
         let new_red =
-            ((origin.red as f32) * mix + (other.red as f32) * (1f32 - mix)) as u32;
+            ((origin.red as f32) * mix + (other.red as f32) * (1f32 - mix)) as u8;
         let new_green =
-            ((origin.green as f32) * mix + (other.green as f32) * (1f32 - mix)) as u32;
+            ((origin.green as f32) * mix + (other.green as f32) * (1f32 - mix)) as u8;
         let new_blue =
-            ((origin.blue as f32) * mix + (other.blue as f32) * (1f32 - mix)) as u32;
-        IntoPixel(new_channel <<24 | new_red << 16 | new_green << 8 | new_blue).into()
+            ((origin.blue as f32) * mix + (other.blue as f32) * (1f32 - mix)) as u8;
+        
+        RGBPixel{
+            _channel: 0,
+            red: new_red,
+            green: new_green,
+            blue: new_blue
+        }
     }
 }
 
@@ -139,13 +190,18 @@ impl Pixel for AlphaPixel {
         };
 
         let new_channel =
-            ((origin.alpha as f32) * mix + (other.alpha as f32) * (1f32 - mix)) as u32;
+            ((origin.alpha as f32) * mix + (other.alpha as f32) * (1f32 - mix)) as u8;
         let new_red =
-            ((origin.red as f32) * mix + (other.red as f32) * (1f32 - mix)) as u32;
+            ((origin.red as f32) * mix + (other.red as f32) * (1f32 - mix)) as u8;
         let new_green =
-            ((origin.green as f32) * mix + (other.green as f32) * (1f32 - mix)) as u32;
+            ((origin.green as f32) * mix + (other.green as f32) * (1f32 - mix)) as u8;
         let new_blue =
-            ((origin.blue as f32) * mix + (other.blue as f32) * (1f32 - mix)) as u32;
-        IntoPixel(new_channel <<24 | new_red << 16 | new_green << 8 | new_blue).into()
+            ((origin.blue as f32) * mix + (other.blue as f32) * (1f32 - mix)) as u8;
+        AlphaPixel {
+            alpha: new_channel,
+            red: new_red,
+            green: new_green,
+            blue: new_blue
+        }
     }
 }

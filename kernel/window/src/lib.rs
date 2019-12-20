@@ -27,7 +27,7 @@ extern crate shapes;
 use alloc::sync::Arc;
 use mpmc::Queue;
 use event_types::{Event, MousePositionEvent};
-use frame_buffer::{FrameBuffer, pixel::{BLACK}, IntoPixel};
+use frame_buffer::{FrameBuffer, pixel::{BLACK}, AlphaColor};
 use shapes::{Coord, Rectangle};
 use spin::Mutex;
 use window_inner::{WindowInner, WindowMovingStatus};
@@ -44,7 +44,7 @@ const WINDOW_BORDER_COLOR_INACTIVE: u32 = 0x00333333;
 // border and title bar color when window is active, the top part color
 const WINDOW_BORDER_COLOR_ACTIVE_TOP: u32 = 0x00BBBBBB;
 // border and title bar color when window is active, the bottom part color
-const WINDOW_BORDER_COLOR_ACTIVE_BOTTOM: u32 = 0x00666666;
+static WINDOW_BORDER_COLOR_ACTIVE_BOTTOM: u32 = 0x00666666;
 // window button color: red
 const WINDOW_BUTTON_COLOR_CLOSE: u32 = 0x00E74C3C;
 // window button color: green
@@ -88,7 +88,7 @@ pub struct Window {
     /// the height of title bar in pixel, init as WINDOW_TITLE_BAR. it is render inside the window so user shouldn't use this area anymore
     title_size: usize,
     /// the background of this window, init as WINDOW_BACKGROUND
-    background: IntoPixel,
+    background: AlphaColor,
     /// application could get events from this consumer
     pub consumer: Queue<Event>,
     /// event output used by window manager, private variable
@@ -106,7 +106,7 @@ impl Window {
         coordinate: Coord,
         width: usize,
         height: usize,
-        background: IntoPixel,
+        background: AlphaColor,
     ) -> Result<Window, &'static str> {
         let framebuffer = FrameBuffer::new(width, height, None)?;
         let (width, height) = framebuffer.get_size();
@@ -328,9 +328,9 @@ impl Window {
     fn draw_border(&mut self, active: bool) {
         let mut inner = self.inner.lock();
         // first draw left, bottom, right border
-        let mut border_color = IntoPixel(WINDOW_BORDER_COLOR_INACTIVE);
+        let mut border_color = AlphaColor::from(WINDOW_BORDER_COLOR_INACTIVE);
         if active {
-            border_color = IntoPixel(WINDOW_BORDER_COLOR_ACTIVE_BOTTOM);
+            border_color = AlphaColor::from(WINDOW_BORDER_COLOR_ACTIVE_BOTTOM);
         }
         let width = inner.width;
         let height = inner.height;
@@ -370,7 +370,7 @@ impl Window {
                     width,
                     1,
                     frame_buffer::Pixel::weight_mix(
-                        IntoPixel(WINDOW_BORDER_COLOR_ACTIVE_BOTTOM).into(),     IntoPixel(WINDOW_BORDER_COLOR_ACTIVE_TOP).into(), 
+                        AlphaColor::from(WINDOW_BORDER_COLOR_ACTIVE_BOTTOM).into(),     AlphaColor::from(WINDOW_BORDER_COLOR_ACTIVE_TOP).into(), 
                         (i as f32) / (self.title_size as f32)
                     )
 
@@ -393,7 +393,8 @@ impl Window {
 
         // draw radius finally
         let r2 = WINDOW_RADIUS * WINDOW_RADIUS;
-        let pixel = IntoPixel(0xFFFFFFFF).into();
+        let pixel = AlphaColor::from(0xFFFFFFFF).into();
+
         for i in 0..WINDOW_RADIUS {
             for j in 0..WINDOW_RADIUS {
                 let dx1 = WINDOW_RADIUS - i;
@@ -429,8 +430,8 @@ impl Window {
             Coord::new(x as isize, y as isize),
             WINDOW_BUTTON_SIZE,
             frame_buffer::Pixel::weight_mix(
-                IntoPixel(BLACK).into(), 
-                IntoPixel(pixel).into(),
+                AlphaColor::from(BLACK).into(), 
+                AlphaColor::from(pixel).into(),
                 0.2f32 * (state as f32),
             ),
         );

@@ -25,7 +25,7 @@ type ASCII = u8;
 /// * `(width, height)`: the size of the text block.
 /// * `slice`: the string to display.
 /// * `font_pixel`: the pixel value of font.
-/// * `bg_pixel`: the pixel value of background.
+/// * `bg_color`: the pixel value of background.
 /// * `(column, line)`: the location of the text in the text block as symbols.
 pub fn print_string<P: Pixel>(
     framebuffer: &mut FrameBuffer<P>,
@@ -34,7 +34,7 @@ pub fn print_string<P: Pixel>(
     height: usize,
     slice: &str,
     font_pixel: P,
-    bg_pixel: P,
+    bg_color: P,
     column: usize,
     line: usize,
 ) -> (usize, usize, Rectangle) {
@@ -63,7 +63,7 @@ pub fn print_string<P: Pixel>(
             fill_blank(
                 framebuffer,
                 &mut blank,
-                bg_pixel,
+                bg_color,
             );
             curr_column = 0;
             curr_line += 1;
@@ -76,7 +76,7 @@ pub fn print_string<P: Pixel>(
                 framebuffer,
                 byte,
                 font_pixel,
-                bg_pixel,
+                bg_color,
                 coordinate,
                 curr_column,
                 curr_line,
@@ -106,7 +106,7 @@ pub fn print_string<P: Pixel>(
     fill_blank(
         framebuffer,
         &mut blank,
-        bg_pixel,
+        bg_color,
     );
 
     let bottom_right = Coord::new(
@@ -133,7 +133,7 @@ pub fn print_string<P: Pixel>(
     fill_blank(
         framebuffer,
         &mut blank,
-        bg_pixel,
+        bg_color,
     );
 
     // return the position of next symbol and updated blocks.
@@ -145,14 +145,14 @@ pub fn print_string<P: Pixel>(
 /// * `framebuffer`: the framebuffer to display in.
 /// * `character`: the ASCII code of the character to display.
 /// * `font_pixel`: the pixel value of the character.
-/// * `bg_pixel`: the background pixel value of the character.
+/// * `bg_color`: the background pixel value of the character.
 /// * `coordinate`: the left top coordinate of the text block relative to the origin(top-left point) of the frame buffer.
 /// * `(column, line)`: the location of the character in the text block as symbols.
 pub fn print_ascii_character<P: Pixel>(
     framebuffer: &mut FrameBuffer<P>,
     character: ASCII,
     font_pixel: P,
-    bg_pixel: P,
+    bg_color: P,
     coordinate: Coord,
     column: usize,
     line: usize,
@@ -175,10 +175,10 @@ pub fn print_ascii_character<P: Pixel>(
                 if char_font & (0x80 >> (j - 1)) != 0 {
                     font_pixel
                 } else {
-                    bg_pixel
+                    bg_color
                 }
             } else {
-                bg_pixel // 1 pixel between two characters
+                bg_color // 1 pixel between two characters
             };
             framebuffer.draw_pixel(coordinate, pixel);
         }
