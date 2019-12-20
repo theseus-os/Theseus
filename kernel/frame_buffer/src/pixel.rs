@@ -4,9 +4,9 @@ use core::hash::Hash;
 pub const PIXEL_SIZE: usize = core::mem::size_of::<u32>();
 
 
-/// predefined opaque black
+/// predefined black
 pub const BLACK: u32 = 0;
-/// predefined opaque white
+/// predefined white
 pub const WHITE: u32 = 0x00FFFFFF;
 
 /// User uses this type to provide pixel value to the framebuffer.

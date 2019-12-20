@@ -139,8 +139,8 @@ impl Window {
         {
             let mut inner = window.inner.lock();
             let alpha_color = AlphaColor {
-                transparency: transparency,
-                color: background
+                transparency: window.transparency,
+                color: window.background
             };
             inner.framebuffer.fill_color(alpha_color.into());
         }
@@ -401,8 +401,11 @@ impl Window {
 
         // draw radius finally
         let r2 = WINDOW_RADIUS * WINDOW_RADIUS;
-        let pixel = AlphaColor::from(0xFFFFFFFF).into();
-
+        let color = Color::from(frame_buffer::WHITE);
+        let pixel = AlphaColor {
+            transparency: 0xFF,
+            color: color
+        }.into();
         for i in 0..WINDOW_RADIUS {
             for j in 0..WINDOW_RADIUS {
                 let dx1 = WINDOW_RADIUS - i;

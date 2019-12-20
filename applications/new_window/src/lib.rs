@@ -15,7 +15,7 @@ extern crate frame_buffer;
 
 use alloc::string::String;
 use alloc::vec::Vec;
-use frame_buffer::{AlphaColor, Color};
+use frame_buffer::{Color};
 use shapes::Coord;
 
 const WINDOW_BACKGROUND: u32 = 0xFFFFFF;
