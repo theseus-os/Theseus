@@ -12,13 +12,13 @@ extern crate shapes;
 use alloc::sync::Arc;
 use mpmc::Queue;
 use event_types::{Event};
-use frame_buffer::{FrameBuffer, AlphaPixel, Color, AlphaColor};
+use frame_buffer::{FrameBuffer, AlphaPixel, RGBAColor, rgba_color};
 use shapes::Coord;
 use spin::{Mutex};
 
 
 /// The default color of a window;
-const WINDOW_DEFAULT_COLOR: u32 = 0x80FFFFFF;
+const WINDOW_DEFAULT_COLOR: RGBAColor = rgba_color(0x80FFFFFF);
 
 /// The status about whether a window is moving
 pub enum WindowMovingStatus {
@@ -51,8 +51,7 @@ impl WindowInner {
 
     /// Clear the content of a window
     pub fn clear(&mut self) -> Result<(), &'static str> {
-        let acolor = AlphaColor{ transparency:0, color: Color::from(WINDOW_DEFAULT_COLOR) };
-        self.framebuffer.fill_color(acolor.into());
+        self.framebuffer.fill_color(WINDOW_DEFAULT_COLOR.into());
         Ok(())
     }
 

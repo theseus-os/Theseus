@@ -13,7 +13,7 @@ extern crate shapes;
 use alloc::string::String;
 use displayable::{Displayable};
 use font::{CHARACTER_HEIGHT, CHARACTER_WIDTH};
-use frame_buffer::{Pixel, FrameBuffer, Color, AlphaColor};
+use frame_buffer::{Pixel, FrameBuffer, RGBAColor};
 use shapes::{Coord, Rectangle};
 
 
@@ -25,9 +25,8 @@ pub struct TextDisplay {
     next_col: usize,
     next_line: usize,
     text: String,
-    fg_color: Color,
-    bg_color: Color,
-    transparency: u8,
+    fg_color: RGBAColor,
+    bg_color: RGBAColor,
     /// The text cached since last display
     cache: String,
 }
@@ -54,8 +53,8 @@ impl Displayable for TextDisplay {
             self.width,
             self.height,
             string,
-            AlphaColor{ transparency: self.transparency, color: self.fg_color }.into(),
-            AlphaColor{ transparency: self.transparency, color: self.bg_color }.into(),
+            self.fg_color.into(),
+            self.bg_color.into(),
             col,
             line,
         );
@@ -90,9 +89,8 @@ impl TextDisplay {
     pub fn new(
         width: usize,
         height: usize,
-        fg_color: Color,
-        bg_color: Color,
-        transparency: u8,
+        fg_color: RGBAColor,
+        bg_color: RGBAColor,
     ) -> Result<TextDisplay, &'static str> {
         Ok(TextDisplay {
             width: width,
@@ -102,13 +100,12 @@ impl TextDisplay {
             text: String::new(),
             fg_color: fg_color,
             bg_color: bg_color,
-            transparency: transparency,
             cache: String::new(),
         })
     }
 
     /// Gets the background color of the text area
-    pub fn get_bg_color(&self) -> Color {
+    pub fn get_bg_color(&self) -> RGBAColor {
         self.bg_color
     }
     

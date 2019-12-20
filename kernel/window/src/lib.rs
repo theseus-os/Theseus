@@ -27,7 +27,7 @@ extern crate shapes;
 use alloc::sync::Arc;
 use mpmc::Queue;
 use event_types::{Event, MousePositionEvent};
-use frame_buffer::{FrameBuffer, pixel::{BLACK}, AlphaColor, Color};
+use frame_buffer::{FrameBuffer, pixel::{BLACK}, RGBAColor, rgba_color};
 use shapes::{Coord, Rectangle};
 use spin::Mutex;
 use window_inner::{WindowInner, WindowMovingStatus};
@@ -40,17 +40,17 @@ const WINDOW_BORDER: usize = 2;
 // border radius, in number of pixels
 const WINDOW_RADIUS: usize = 5;
 // border and title bar color when window is inactive
-const WINDOW_BORDER_COLOR_INACTIVE: u32 = 0x00333333;
+const WINDOW_BORDER_COLOR_INACTIVE: RGBAColor = rgba_color(0x00333333);
 // border and title bar color when window is active, the top part color
-const WINDOW_BORDER_COLOR_ACTIVE_TOP: u32 = 0x00BBBBBB;
+const WINDOW_BORDER_COLOR_ACTIVE_TOP: RGBAColor = rgba_color(0x00BBBBBB);
 // border and title bar color when window is active, the bottom part color
-static WINDOW_BORDER_COLOR_ACTIVE_BOTTOM: u32 = 0x00666666;
+static WINDOW_BORDER_COLOR_ACTIVE_BOTTOM: RGBAColor = rgba_color(0x00666666);
 // window button color: red
-const WINDOW_BUTTON_COLOR_CLOSE: u32 = 0x00E74C3C;
+const WINDOW_BUTTON_COLOR_CLOSE: RGBAColor = rgba_color(0x00E74C3C);
 // window button color: green
-const WINDOW_BUTTON_COLOR_MINIMIZE_MAMIMIZE: u32 = 0x00239B56;
+const WINDOW_BUTTON_COLOR_MINIMIZE_MAMIMIZE: RGBAColor = rgba_color(0x00239B56);
 // window button color: purple
-const WINDOW_BUTTON_COLOR_HIDE: u32 = 0x007D3C98;
+const WINDOW_BUTTON_COLOR_HIDE: RGBAColor = rgba_color(0x007D3C98);
 // window button margin from left, in number of pixels
 const WINDOW_BUTTON_BIAS_X: usize = 12;
 // the interval between buttons, in number of pixels
@@ -88,9 +88,7 @@ pub struct Window {
     /// the height of title bar in pixel, init as WINDOW_TITLE_BAR. it is render inside the window so user shouldn't use this area anymore
     title_size: usize,
     /// the background of this window, init as WINDOW_BACKGROUND
-    background: Color,
-    /// the transparency of the window. 0 means it's non-tranparent.
-    transparency: u8,
+    background: RGBAColor,
     /// application could get events from this consumer
     pub consumer: Queue<Event>,
     /// event output used by window manager, private variable
@@ -108,8 +106,7 @@ impl Window {
         coordinate: Coord,
         width: usize,
         height: usize,
-        background: Color,
-        transparency: u8,
+        background: RGBAColor,
     ) -> Result<Window, &'static str> {
         let framebuffer = FrameBuffer::new(width, height, None)?;
         let (width, height) = framebuffer.get_size();
@@ -128,7 +125,6 @@ impl Window {
             border_size: WINDOW_BORDER,
             title_size: WINDOW_TITLE_BAR,
             background: background,
-            transparency: transparency,
             consumer: consumer,
             producer: producer,
             last_mouse_position_event: MousePositionEvent::default(),
@@ -138,11 +134,7 @@ impl Window {
 
         {
             let mut inner = window.inner.lock();
-            let alpha_color = AlphaColor {
-                transparency: window.transparency,
-                color: window.background
-            };
-            inner.framebuffer.fill_color(alpha_color.into());
+            inner.framebuffer.fill_color(window.background.into());
         }
 
         window.draw_border(true); // draw window with active border
@@ -336,9 +328,9 @@ impl Window {
     fn draw_border(&mut self, active: bool) {
         let mut inner = self.inner.lock();
         // first draw left, bottom, right border
-        let mut border_color = AlphaColor::from(WINDOW_BORDER_COLOR_INACTIVE);
+        let mut border_color = RGBAColor::from(WINDOW_BORDER_COLOR_INACTIVE);
         if active {
-            border_color = AlphaColor::from(WINDOW_BORDER_COLOR_ACTIVE_BOTTOM);
+            border_color = RGBAColor::from(WINDOW_BORDER_COLOR_ACTIVE_BOTTOM);
         }
         let width = inner.width;
         let height = inner.height;
@@ -378,7 +370,7 @@ impl Window {
                     width,
                     1,
                     frame_buffer::Pixel::weight_mix(
-                        AlphaColor::from(WINDOW_BORDER_COLOR_ACTIVE_BOTTOM).into(),     AlphaColor::from(WINDOW_BORDER_COLOR_ACTIVE_TOP).into(), 
+                        RGBAColor::from(WINDOW_BORDER_COLOR_ACTIVE_BOTTOM).into(),     RGBAColor::from(WINDOW_BORDER_COLOR_ACTIVE_TOP).into(), 
                         (i as f32) / (self.title_size as f32)
                     )
 
@@ -401,11 +393,9 @@ impl Window {
 
         // draw radius finally
         let r2 = WINDOW_RADIUS * WINDOW_RADIUS;
-        let color = Color::from(frame_buffer::WHITE);
-        let pixel = AlphaColor {
-            transparency: 0xFF,
-            color: color
-        }.into();
+        const TRANS: RGBAColor = rgba_color(0xFF000000);
+        let pixel = TRANS.into();
+  
         for i in 0..WINDOW_RADIUS {
             for j in 0..WINDOW_RADIUS {
                 let dx1 = WINDOW_RADIUS - i;
@@ -441,8 +431,8 @@ impl Window {
             Coord::new(x as isize, y as isize),
             WINDOW_BUTTON_SIZE,
             frame_buffer::Pixel::weight_mix(
-                AlphaColor::from(BLACK).into(), 
-                AlphaColor::from(pixel).into(),
+                BLACK.into(), 
+                pixel.into(),
                 0.2f32 * (state as f32),
             ),
         );

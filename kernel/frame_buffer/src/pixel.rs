@@ -5,49 +5,31 @@ pub const PIXEL_SIZE: usize = core::mem::size_of::<u32>();
 
 
 /// predefined black
-pub const BLACK: u32 = 0;
+pub const BLACK: RGBAColor = rgba_color(0);
 /// predefined white
-pub const WHITE: u32 = 0x00FFFFFF;
+pub const WHITE: RGBAColor = rgba_color(0x00FFFFFF);
 
-/// An RGB color structure. 
+/// This structure represents an RGBA color value. It can turn into an alpha pixel or a pixel for framebuffers that does not support the alpha channel.
 #[derive(Clone, Copy)]
-pub struct Color {
+pub struct RGBAColor {
+    /// 0 is opaque while 0xFF is transparent
+    pub alpha: u8,
     pub red: u8,
     pub green: u8,
-    pub blue: u8,
+    pub blue: u8
 }
 
-impl From<u32> for Color {
-    fn from(color: u32) -> Color {
-        Color {
-            red: (color >> 16) as u8,
-            green: (color >> 8) as u8,
-            blue: color as u8,
-        }
+pub const fn rgba_color(color: u32) -> RGBAColor {
+    RGBAColor {
+        alpha: (color >> 24) as u8,
+        red: (color >> 16) as u8,
+        green: (color >> 8) as u8,
+        blue: color as u8,
     }
 }
 
-/// This structure has a color and a transparency value. It can turn into an alpha pixel or a pixel for framebuffers that does not support the alpha channel.
-#[derive(Clone, Copy)]
-pub struct AlphaColor {
-    /// 0 is non-transparent while 0xFF is totally transparent
-    pub transparency: u8,
-    pub color: Color
-}
-
-impl From<u32> for AlphaColor {
-    fn from(acolor: u32) -> AlphaColor {
-        AlphaColor {
-            transparency: (acolor >> 24) as u8,
-            color: acolor.into(),
-        }
-    }
-}
-
-/// 0 represents non-transparent and 0xFF represents totally transparent.
-pub type Transparency = u8;
 /// A pixel provides methods to mix with others.
-pub trait Pixel: From<AlphaColor> + Copy + Hash {
+pub trait Pixel: From<RGBAColor> + Copy + Hash {
     /// Composites the `src` pixel slice to the `dest` pixel slice.
     fn composite_buffer(src: &[Self], dest: &mut[Self]);
     
@@ -68,20 +50,14 @@ pub struct RGBPixel {
     pub _channel: u8,
 }
 
-impl From<Color> for RGBPixel {
-    fn from(color: Color) -> Self {
+impl From<RGBAColor> for RGBPixel {
+    fn from(color: RGBAColor) -> Self {
         RGBPixel {
             _channel: 0,
             red: color.red,
             green: color.green,
             blue: color.blue
         }
-    }
-}
-
-impl From<AlphaColor> for RGBPixel {
-    fn from(acolor: AlphaColor) -> Self {
-        acolor.color.into()
     }
 }
 
@@ -95,13 +71,13 @@ pub struct AlphaPixel {
     pub alpha: u8
 }
 
-impl From<AlphaColor> for AlphaPixel {
-    fn from(acolor: AlphaColor) -> Self {
+impl From<RGBAColor> for AlphaPixel {
+    fn from(color: RGBAColor) -> Self {
         AlphaPixel {
-            alpha: acolor.transparency,
-            red: acolor.color.red,
-            green: acolor.color.green,
-            blue: acolor.color.blue
+            alpha: color.alpha,
+            red: color.red,
+            green: color.green,
+            blue: color.blue
         }
     }
 }

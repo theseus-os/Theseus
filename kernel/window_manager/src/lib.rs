@@ -37,7 +37,7 @@ use core::slice;
 
 use mpmc::Queue;
 use event_types::{Event, MousePositionEvent};
-use frame_buffer::{FrameBuffer, AlphaPixel, AlphaColor, Color};
+use frame_buffer::{FrameBuffer, AlphaPixel, RGBAColor, rgba_color};
 use shapes::{Coord, Rectangle};
 use frame_buffer_compositor::{FRAME_COMPOSITOR};
 ////
@@ -54,13 +54,13 @@ pub static WINDOW_MANAGER: Once<Mutex<WindowManager>> = Once::new();
 // The half size of mouse in number of pixels, the actual size of pointer is 1+2*`MOUSE_POINTER_HALF_SIZE`
 const MOUSE_POINTER_HALF_SIZE: usize = 7;
 // Transparent pixel
-const T: u32 = 0xFF000000;
+const T: RGBAColor = rgba_color(0xFF000000);
 // Opaque white
-const O: u32 = 0x00FFFFFF;
+const O: RGBAColor = rgba_color(0x00FFFFFF);
 // Opaque blue
-const B: u32 = 0x00000FF;
+const B: RGBAColor = rgba_color(0x00000FF);
 // the mouse picture
-static MOUSE_BASIC: [[u32; 2 * MOUSE_POINTER_HALF_SIZE + 1];
+static MOUSE_BASIC: [[RGBAColor; 2 * MOUSE_POINTER_HALF_SIZE + 1];
     2 * MOUSE_POINTER_HALF_SIZE + 1] = [
     [T, T, T, T, T, T, T, T, T, T, T, T, T, T, T],
     [T, T, T, T, T, T, T, T, T, T, T, T, T, T, T],
@@ -82,7 +82,7 @@ static MOUSE_BASIC: [[u32; 2 * MOUSE_POINTER_HALF_SIZE + 1];
 // the border indicating new window position and size
 const WINDOW_BORDER_SIZE: usize = 3;
 // border's inner color
-const WINDOW_BORDER_COLOR_INNER: u32 = 0x00CA6F1E;
+const WINDOW_BORDER_COLOR_INNER: RGBAColor = rgba_color(0x00CA6F1E);
 
 /// Window manager structure which maintains a list of windows and a mouse.
 pub struct WindowManager {
@@ -422,7 +422,7 @@ impl WindowManager {
         // first clear old border if exists
         match self.repositioned_border {
             Some(border) => {
-                let pixels = self.draw_floating_border(border.top_left, border.bottom_right, AlphaColor::from(T));
+                let pixels = self.draw_floating_border(border.top_left, border.bottom_right, RGBAColor::from(T));
                 self.refresh_bottom_windows_pixels(pixels.into_iter())?;
             },
             None =>{}
@@ -431,11 +431,7 @@ impl WindowManager {
         // then draw current border
         if show {
             self.repositioned_border = Some(Rectangle { top_left, bottom_right });
-            let acolor = AlphaColor{ 
-                transparency: 0, 
-                color: Color::from(WINDOW_BORDER_COLOR_INNER)
-            };
-            let pixels = self.draw_floating_border(top_left, bottom_right, acolor);
+            let pixels = self.draw_floating_border(top_left, bottom_right, WINDOW_BORDER_COLOR_INNER);
             self.refresh_top_pixels(pixels.into_iter())?;
         } else {
             self.repositioned_border = None;
@@ -543,7 +539,7 @@ impl WindowManager {
                 self.mouse.x - MOUSE_POINTER_HALF_SIZE as isize..self.mouse.x + MOUSE_POINTER_HALF_SIZE as isize + 1
             {
                 let coordinate = Coord::new(x, y);
-                self.top_fb.overwrite_pixel(coordinate, AlphaColor::from(T).into());
+                self.top_fb.overwrite_pixel(coordinate, RGBAColor::from(T).into());
             }
         }
         let update_coords = self.get_mouse_coords();
@@ -557,7 +553,7 @@ impl WindowManager {
                 new.x - MOUSE_POINTER_HALF_SIZE as isize..new.x + MOUSE_POINTER_HALF_SIZE as isize + 1
             {
                 let coordinate = Coord::new(x, y);
-                let pixel = AlphaColor::from(MOUSE_BASIC
+                let pixel = RGBAColor::from(MOUSE_BASIC
                             [(MOUSE_POINTER_HALF_SIZE as isize + x - new.x) as usize]
                             [(MOUSE_POINTER_HALF_SIZE as isize + y - new.y) as usize]).into();
                 self.top_fb.overwrite_pixel(coordinate, pixel);
@@ -621,7 +617,7 @@ impl WindowManager {
         let mut result = Vec::new();
         for i in 6..15 {
             for j in 6..15 {
-                if MOUSE_BASIC[i][j] != T {
+                if MOUSE_BASIC[i][j].alpha != 0xFF {
                     let coordinate = self.mouse - (7, 7) + (j as isize, i as isize);
                     if self.top_fb.contains(coordinate) {
                         result.push(coordinate)
@@ -649,7 +645,7 @@ pub fn init() -> Result<(Queue<Event>, Queue<Event>), &'static str> {
     };
 
     bottom_framebuffer.buffer_mut().copy_from_slice(bg_image);
-    top_framebuffer.fill_color(AlphaColor::from(T).into()); 
+    top_framebuffer.fill_color(RGBAColor::from(T).into()); 
 
     // initialize static window manager
     let window_manager = WindowManager {
