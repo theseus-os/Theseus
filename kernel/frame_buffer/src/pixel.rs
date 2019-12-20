@@ -9,7 +9,7 @@ pub const BLACK: u32 = 0;
 /// predefined white
 pub const WHITE: u32 = 0x00FFFFFF;
 
-/// User uses this type to provide pixel value to the framebuffer.
+/// An RGB color structure. 
 #[derive(Clone, Copy)]
 pub struct Color {
     pub red: u8,

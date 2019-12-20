@@ -37,7 +37,7 @@ use core::slice;
 
 use mpmc::Queue;
 use event_types::{Event, MousePositionEvent};
-use frame_buffer::{FrameBuffer, AlphaPixel, AlphaColor};
+use frame_buffer::{FrameBuffer, AlphaPixel, AlphaColor, Color};
 use shapes::{Coord, Rectangle};
 use frame_buffer_compositor::{FRAME_COMPOSITOR};
 ////
@@ -431,7 +431,11 @@ impl WindowManager {
         // then draw current border
         if show {
             self.repositioned_border = Some(Rectangle { top_left, bottom_right });
-            let pixels = self.draw_floating_border(top_left, bottom_right, AlphaColor::from(WINDOW_BORDER_COLOR_INNER));
+            let acolor = AlphaColor{ 
+                transparency: 0, 
+                color: Color::from(WINDOW_BORDER_COLOR_INNER)
+            };
+            let pixels = self.draw_floating_border(top_left, bottom_right, acolor);
             self.refresh_top_pixels(pixels.into_iter())?;
         } else {
             self.repositioned_border = None;

@@ -12,7 +12,7 @@ extern crate shapes;
 use alloc::sync::Arc;
 use mpmc::Queue;
 use event_types::{Event};
-use frame_buffer::{FrameBuffer, AlphaPixel, AlphaColor};
+use frame_buffer::{FrameBuffer, AlphaPixel, Color, AlphaColor};
 use shapes::Coord;
 use spin::{Mutex};
 
@@ -51,7 +51,8 @@ impl WindowInner {
 
     /// Clear the content of a window
     pub fn clear(&mut self) -> Result<(), &'static str> {
-        self.framebuffer.fill_color(AlphaColor::from(WINDOW_DEFAULT_COLOR).into());
+        let acolor = AlphaColor{ transparency:0, color: Color::from(WINDOW_DEFAULT_COLOR) };
+        self.framebuffer.fill_color(acolor.into());
         Ok(())
     }
 
