@@ -25,8 +25,8 @@ pub struct TextDisplay {
     next_col: usize,
     next_line: usize,
     text: String,
-    fg_color: AlphaColor,
-    bg_color: AlphaColor,
+    fg_color: Color,
+    bg_color: Color,
     transparency: u8,
     /// The text cached since last display
     cache: String,
@@ -54,8 +54,8 @@ impl Displayable for TextDisplay {
             self.width,
             self.height,
             string,
-            self.fg_color.into(),
-            self.bg_color.into(),
+            AlphaColor{ transparency: self.transparency, color: self.fg_color }.into(),
+            AlphaColor{ transparency: self.transparency, color: self.bg_color }.into(),
             col,
             line,
         );
@@ -86,11 +86,12 @@ impl TextDisplay {
     /// # Arguments
     /// * `(width, height)`: the size of the text area.
     /// * `(fg_color, bg_color)`: the foreground and background color of the text area. The semantic of the color depends on the framebuffer the displayable will display in. For example, if the displayable displays in a alpha framebuffer, the value of the pixel represents an alpha channel and three RGB bytes.
+    /// * `transparency`: the transparency of the text displayable. It would be invalid if the framebuffer the displayable in does not support alpha channel.
     pub fn new(
         width: usize,
         height: usize,
-        fg_color: AlphaColor,
-        bg_color: AlphaColor,
+        fg_color: Color,
+        bg_color: Color,
         transparency: u8,
     ) -> Result<TextDisplay, &'static str> {
         Ok(TextDisplay {
@@ -107,7 +108,7 @@ impl TextDisplay {
     }
 
     /// Gets the background color of the text area
-    pub fn get_bg_color(&self) -> AlphaColor {
+    pub fn get_bg_color(&self) -> Color {
         self.bg_color
     }
     

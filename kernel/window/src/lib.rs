@@ -27,7 +27,7 @@ extern crate shapes;
 use alloc::sync::Arc;
 use mpmc::Queue;
 use event_types::{Event, MousePositionEvent};
-use frame_buffer::{FrameBuffer, pixel::{BLACK}, AlphaColor};
+use frame_buffer::{FrameBuffer, pixel::{BLACK}, AlphaColor, Color};
 use shapes::{Coord, Rectangle};
 use spin::Mutex;
 use window_inner::{WindowInner, WindowMovingStatus};
@@ -88,7 +88,9 @@ pub struct Window {
     /// the height of title bar in pixel, init as WINDOW_TITLE_BAR. it is render inside the window so user shouldn't use this area anymore
     title_size: usize,
     /// the background of this window, init as WINDOW_BACKGROUND
-    background: AlphaColor,
+    background: Color,
+    /// the transparency of the window. 0 means it's non-tranparent.
+    transparency: u8,
     /// application could get events from this consumer
     pub consumer: Queue<Event>,
     /// event output used by window manager, private variable
@@ -106,7 +108,8 @@ impl Window {
         coordinate: Coord,
         width: usize,
         height: usize,
-        background: AlphaColor,
+        background: Color,
+        transparency: u8,
     ) -> Result<Window, &'static str> {
         let framebuffer = FrameBuffer::new(width, height, None)?;
         let (width, height) = framebuffer.get_size();
@@ -125,6 +128,7 @@ impl Window {
             border_size: WINDOW_BORDER,
             title_size: WINDOW_TITLE_BAR,
             background: background,
+            transparency: transparency,
             consumer: consumer,
             producer: producer,
             last_mouse_position_event: MousePositionEvent::default(),
@@ -134,7 +138,11 @@ impl Window {
 
         {
             let mut inner = window.inner.lock();
-            inner.framebuffer.fill_color(window.background.into());
+            let alpha_color = AlphaColor {
+                transparency: transparency,
+                color: background
+            };
+            inner.framebuffer.fill_color(alpha_color.into());
         }
 
         window.draw_border(true); // draw window with active border

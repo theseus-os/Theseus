@@ -12,8 +12,8 @@ pub struct Cursor {
     time: TscTicks,
     /// The current blinking state show/hidden
     show: bool,
-    /// The pixel value of the cursor
-    pixel: AlphaColor,
+    /// The color of the cursor
+    color: Color,
     /// The position of the cursor relative to the end of terminal text in number of characters.
     pub offset_from_end: usize,
     /// The underlying character at the position of the cursor.
@@ -29,7 +29,7 @@ impl Cursor {
             freq: DEFAULT_CURSOR_FREQ,
             time: tsc_ticks(),
             show: true,
-            pixel: AlphaColor::from(FONT_COLOR),
+            color: Color::from(FONT_COLOR),
             offset_from_end: 0,
             underlying_char: 0,
         }
@@ -99,14 +99,14 @@ impl Cursor {
                         + (0, 1),
                     CHARACTER_WIDTH,
                     CHARACTER_HEIGHT - 2,
-                    self.pixel.into(),
+                    AlphaColor{ transparency: 0, color: self.color }.into(),
                 );
             } else {
                 frame_buffer_printer::print_ascii_character(
                     framebuffer,
                     self.underlying_char,
-                    AlphaColor::from(FONT_COLOR).into(),
-                    AlphaColor::from(BACKGROUND_COLOR).into(),
+                    AlphaColor{ transparency: 0, color: Color::from(FONT_COLOR)}.into(),
+                    AlphaColor{ transparency: 0, color: Color::from(BACKGROUND_COLOR) }.into(),
                     coordinate,
                     column,
                     line,

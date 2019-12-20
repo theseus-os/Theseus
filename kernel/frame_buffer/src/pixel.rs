@@ -27,12 +27,12 @@ impl From<u32> for Color {
     }
 }
 
-/// User uses this type to provide pixel value to the framebuffer.
+/// This structure has a color and a transparency value. It can turn into an alpha pixel or a pixel for framebuffers that does not support the alpha channel.
 #[derive(Clone, Copy)]
 pub struct AlphaColor {
     /// 0 is non-transparent while 0xFF is totally transparent
-    transparency: u8,
-    color: Color
+    pub transparency: u8,
+    pub color: Color
 }
 
 impl From<u32> for AlphaColor {
@@ -79,6 +79,12 @@ impl From<Color> for RGBPixel {
     }
 }
 
+impl From<AlphaColor> for RGBPixel {
+    fn from(acolor: AlphaColor) -> Self {
+        acolor.color.into()
+    }
+}
+
 #[repr(C, packed)]
 #[derive(Hash, Debug, Clone, Copy)]
 /// An Alpha Pixel is a pixel with an alpha channel
@@ -93,17 +99,6 @@ impl From<AlphaColor> for AlphaPixel {
     fn from(acolor: AlphaColor) -> Self {
         AlphaPixel {
             alpha: acolor.transparency,
-            red: acolor.color.red,
-            green: acolor.color.green,
-            blue: acolor.color.blue
-        }
-    }
-}
-
-impl From<AlphaColor> for RGBPixel {
-    fn from(acolor: AlphaColor) -> Self {
-        RGBPixel {
-            _channel: 0,
             red: acolor.color.red,
             green: acolor.color.green,
             blue: acolor.color.blue

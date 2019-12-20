@@ -15,10 +15,11 @@ extern crate frame_buffer;
 
 use alloc::string::String;
 use alloc::vec::Vec;
-use frame_buffer::AlphaColor;
+use frame_buffer::{AlphaColor, Color};
 use shapes::Coord;
 
-const WINDOW_BACKGROUND: u32 = 0x40FFFFFF;
+const WINDOW_BACKGROUND: u32 = 0xFFFFFF;
+const WINDOW_TRANSPARENCY: u8 = 0x40;
 
 #[no_mangle]
 pub fn main(_args: Vec<String>) -> isize {
@@ -40,7 +41,8 @@ pub fn main(_args: Vec<String>) -> isize {
         coordinate,
         width,
         height,
-        AlphaColor::from(WINDOW_BACKGROUND),
+        Color::from(WINDOW_BACKGROUND),
+        WINDOW_TRANSPARENCY
     ) {
         Ok(m) => m,
         Err(err) => {
