@@ -13,7 +13,7 @@ pub struct Cursor {
     /// The current blinking state show/hidden
     show: bool,
     /// The color of the cursor
-    color: RGBAColor,
+    color: Color,
     /// The position of the cursor relative to the end of terminal text in number of characters.
     pub offset_from_end: usize,
     /// The underlying character at the position of the cursor.
@@ -80,7 +80,7 @@ impl Cursor {
     /// * `column`: the column of the cursor in the textarea.
     /// * `line`: the line of the cursor in the textarea.
     /// * `framebuffer`: the framebuffer to display the cursor in.
-    pub fn display<P: Pixel>(
+    pub fn display<P: Pixel + From<Color>>(
         &mut self,
         coordinate: Coord,
         column: usize,

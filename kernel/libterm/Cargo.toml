@@ -19,6 +19,9 @@ path = "../root"
 [dependencies.print]
 path = "../print"
 
+[dependencies.color]
+path = "../color"
+
 [dependencies.event_types]
 path = "../event_types"
 

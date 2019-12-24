@@ -26,6 +26,7 @@ extern crate scheduler;
 extern crate spawn;
 extern crate window_inner;
 extern crate shapes;
+extern crate color;
 
 mod background;
 use alloc::collections::VecDeque;
@@ -37,7 +38,8 @@ use core::slice;
 
 use mpmc::Queue;
 use event_types::{Event, MousePositionEvent};
-use frame_buffer::{FrameBuffer, AlphaPixel, RGBAColor, rgba_color};
+use frame_buffer::{FrameBuffer, AlphaPixel};
+use color::{Color, rgba_color};
 use shapes::{Coord, Rectangle};
 use frame_buffer_compositor::{FRAME_COMPOSITOR};
 ////
@@ -54,13 +56,13 @@ pub static WINDOW_MANAGER: Once<Mutex<WindowManager>> = Once::new();
 // The half size of mouse in number of pixels, the actual size of pointer is 1+2*`MOUSE_POINTER_HALF_SIZE`
 const MOUSE_POINTER_HALF_SIZE: usize = 7;
 // Transparent pixel
-const T: RGBAColor = rgba_color(0xFF000000);
+const T: Color = rgba_color(0xFF000000);
 // Opaque white
-const O: RGBAColor = rgba_color(0x00FFFFFF);
+const O: Color = rgba_color(0x00FFFFFF);
 // Opaque blue
-const B: RGBAColor = rgba_color(0x00000FF);
+const B: Color = rgba_color(0x00000FF);
 // the mouse picture
-static MOUSE_BASIC: [[RGBAColor; 2 * MOUSE_POINTER_HALF_SIZE + 1];
+static MOUSE_BASIC: [[Color; 2 * MOUSE_POINTER_HALF_SIZE + 1];
     2 * MOUSE_POINTER_HALF_SIZE + 1] = [
     [T, T, T, T, T, T, T, T, T, T, T, T, T, T, T],
     [T, T, T, T, T, T, T, T, T, T, T, T, T, T, T],
@@ -82,7 +84,7 @@ static MOUSE_BASIC: [[RGBAColor; 2 * MOUSE_POINTER_HALF_SIZE + 1];
 // the border indicating new window position and size
 const WINDOW_BORDER_SIZE: usize = 3;
 // border's inner color
-const WINDOW_BORDER_COLOR_INNER: RGBAColor = rgba_color(0x00CA6F1E);
+const WINDOW_BORDER_COLOR_INNER: Color = rgba_color(0x00CA6F1E);
 
 /// Window manager structure which maintains a list of windows and a mouse.
 pub struct WindowManager {
@@ -422,7 +424,7 @@ impl WindowManager {
         // first clear old border if exists
         match self.repositioned_border {
             Some(border) => {
-                let pixels = self.draw_floating_border(border.top_left, border.bottom_right, RGBAColor::from(T));
+                let pixels = self.draw_floating_border(border.top_left, border.bottom_right, Color::from(T));
                 self.refresh_bottom_windows_pixels(pixels.into_iter())?;
             },
             None =>{}
@@ -539,7 +541,7 @@ impl WindowManager {
                 self.mouse.x - MOUSE_POINTER_HALF_SIZE as isize..self.mouse.x + MOUSE_POINTER_HALF_SIZE as isize + 1
             {
                 let coordinate = Coord::new(x, y);
-                self.top_fb.overwrite_pixel(coordinate, RGBAColor::from(T).into());
+                self.top_fb.overwrite_pixel(coordinate, Color::from(T).into());
             }
         }
         let update_coords = self.get_mouse_coords();
@@ -553,7 +555,7 @@ impl WindowManager {
                 new.x - MOUSE_POINTER_HALF_SIZE as isize..new.x + MOUSE_POINTER_HALF_SIZE as isize + 1
             {
                 let coordinate = Coord::new(x, y);
-                let pixel = RGBAColor::from(MOUSE_BASIC
+                let pixel = Color::from(MOUSE_BASIC
                             [(MOUSE_POINTER_HALF_SIZE as isize + x - new.x) as usize]
                             [(MOUSE_POINTER_HALF_SIZE as isize + y - new.y) as usize]).into();
                 self.top_fb.overwrite_pixel(coordinate, pixel);
@@ -645,7 +647,7 @@ pub fn init() -> Result<(Queue<Event>, Queue<Event>), &'static str> {
     };
 
     bottom_framebuffer.buffer_mut().copy_from_slice(bg_image);
-    top_framebuffer.fill_color(RGBAColor::from(T).into()); 
+    top_framebuffer.fill_color(Color::from(T).into()); 
 
     // initialize static window manager
     let window_manager = WindowManager {

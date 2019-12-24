@@ -6,11 +6,13 @@
 
 extern crate frame_buffer;
 extern crate shapes;
+extern crate color;
 
 use core::iter::IntoIterator;
 
 use frame_buffer::{FrameBuffer, Pixel};
 use shapes::{Coord, Rectangle};
+use color::Color;
 
 /// The compositor trait.
 /// A compositor composites a list of buffers to a single buffer. It caches the information of incoming buffers for better performance.
@@ -24,7 +26,7 @@ pub trait Compositor<T: Mixable> {
     /// * `final_fb`: the final framebuffer that the compositor will composite the bufferlist with.
     /// * `updates`: a interator over the shaped to be updated. The compositor will update the shape in every framebuffer in order or the whole framebuffer if it is `None`.
     /// A compositor can cache the updated areas for better performance.
-    fn composite<'a, U: IntoIterator<Item = T> + Clone, P: 'a + Pixel>(
+    fn composite<'a, U: IntoIterator<Item = T> + Clone, P: 'a + Pixel + From<Color>>(
         &mut self,
         bufferlist: impl IntoIterator<Item = FrameBufferUpdates<'a, P>>,
         final_fb: &mut FrameBuffer<P>,
@@ -34,7 +36,7 @@ pub trait Compositor<T: Mixable> {
 
 
 /// The framebuffers to be composited together with the positions.
-pub struct FrameBufferUpdates<'a, P: Pixel> {
+pub struct FrameBufferUpdates<'a, P: Pixel + From<Color>> {
     /// The framebuffer to be composited.
     pub framebuffer: &'a FrameBuffer<P>,
     /// The coordinate of the framebuffer where it is rendered to the final framebuffer.
@@ -44,7 +46,7 @@ pub struct FrameBufferUpdates<'a, P: Pixel> {
 /// A `Mixable` is an item that can be mixed with the final framebuffer. A compositor can mix a list of shaped items with the final framebuffer rather than mix the whole framebuffer for better performance.
 pub trait Mixable {
     /// Mix the item in the `src_fb` framebuffer with the final framebuffer. `src_coord` is the position of the source framebuffer relative to the top-left of the final buffer.
-    fn mix_buffers<P: Pixel>(
+    fn mix_buffers<P: Pixel + From<Color>>(
         &self, 
         src_fb: &FrameBuffer<P>, 
         final_fb: &mut FrameBuffer<P>, 
@@ -53,7 +55,7 @@ pub trait Mixable {
 }
 
 impl Mixable for Coord {
-    fn mix_buffers<P: Pixel>(
+    fn mix_buffers<P: Pixel + From<Color>>(
         &self, 
         src_fb: &FrameBuffer<P>,
         final_fb: &mut FrameBuffer<P>, 
@@ -69,7 +71,7 @@ impl Mixable for Coord {
 }
 
 impl Mixable for Rectangle {
-    fn mix_buffers<P: Pixel>(
+    fn mix_buffers<P: Pixel + From<Color>>(
         &self, 
         src_fb: &FrameBuffer<P>, 
         final_fb: &mut FrameBuffer<P>,

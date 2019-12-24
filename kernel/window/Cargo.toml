@@ -18,6 +18,9 @@ path = "../../libs/mpmc"
 [dependencies.shapes]
 path = "../shapes"
 
+[dependencies.color]
+path = "../color"
+
 [dependencies.frame_buffer_drawer]
 path = "../frame_buffer_drawer"
 

@@ -3,33 +3,8 @@ use core::hash::Hash;
 /// The size of a pixel.
 pub const PIXEL_SIZE: usize = core::mem::size_of::<u32>();
 
-
-/// predefined black
-pub const BLACK: RGBAColor = rgba_color(0);
-/// predefined white
-pub const WHITE: RGBAColor = rgba_color(0x00FFFFFF);
-
-/// This structure represents an RGBA color value. It can turn into an alpha pixel or a pixel for framebuffers that does not support the alpha channel.
-#[derive(Clone, Copy)]
-pub struct RGBAColor {
-    /// 0 is opaque while 0xFF is transparent
-    pub alpha: u8,
-    pub red: u8,
-    pub green: u8,
-    pub blue: u8
-}
-
-pub const fn rgba_color(color: u32) -> RGBAColor {
-    RGBAColor {
-        alpha: (color >> 24) as u8,
-        red: (color >> 16) as u8,
-        green: (color >> 8) as u8,
-        blue: color as u8,
-    }
-}
-
 /// A pixel provides methods to mix with others.
-pub trait Pixel: From<RGBAColor> + Copy + Hash {
+pub trait Pixel: Copy + Hash {
     /// Composites the `src` pixel slice to the `dest` pixel slice.
     fn composite_buffer(src: &[Self], dest: &mut[Self]);
     
@@ -50,17 +25,6 @@ pub struct RGBPixel {
     pub _channel: u8,
 }
 
-impl From<RGBAColor> for RGBPixel {
-    fn from(color: RGBAColor) -> Self {
-        RGBPixel {
-            _channel: 0,
-            red: color.red,
-            green: color.green,
-            blue: color.blue
-        }
-    }
-}
-
 #[repr(C, packed)]
 #[derive(Hash, Debug, Clone, Copy)]
 /// An Alpha Pixel is a pixel with an alpha channel
@@ -69,17 +33,6 @@ pub struct AlphaPixel {
     pub green: u8,
     pub red: u8,
     pub alpha: u8
-}
-
-impl From<RGBAColor> for AlphaPixel {
-    fn from(color: RGBAColor) -> Self {
-        AlphaPixel {
-            alpha: color.alpha,
-            red: color.red,
-            green: color.green,
-            blue: color.blue
-        }
-    }
 }
 
 impl Pixel for RGBPixel {

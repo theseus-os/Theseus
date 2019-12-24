@@ -21,6 +21,7 @@ extern crate window_manager;
 extern crate window;
 extern crate text_display;
 extern crate shapes;
+extern crate color;
 
 use alloc::string::{String, ToString};
 use alloc::vec::Vec;
@@ -29,15 +30,16 @@ use text_display::TextDisplay;
 use displayable::Displayable;
 use event_types::Event;
 use font::{CHARACTER_HEIGHT, CHARACTER_WIDTH};
-use frame_buffer::{FrameBuffer, Pixel, RGBAColor, rgba_color};
+use frame_buffer::{FrameBuffer, Pixel};
+use color::{Color, rgba_color};
 use shapes::{Coord, Rectangle};
 use tsc::{tsc_ticks, TscTicks};
 use window::Window;
 
 pub mod cursor;
 
-pub const FONT_COLOR: RGBAColor = rgba_color(0x93ee90);
-pub const BACKGROUND_COLOR: RGBAColor = rgba_color(0x000000);
+pub const FONT_COLOR: Color = rgba_color(0x93ee90);
+pub const BACKGROUND_COLOR: Color = rgba_color(0x000000);
 const DEFAULT_CURSOR_FREQ: u64 = 400000000;
 
 /// Error type for tracking different scroll errors that a terminal
@@ -440,7 +442,7 @@ impl Terminal {
             Coord::new(WINDOW_MARGIN as isize, WINDOW_MARGIN as isize), 
             window_width - 2 * WINDOW_MARGIN, 
             window_height - 2 * WINDOW_MARGIN,
-            frame_buffer::BLACK,
+            color::BLACK,
         )?;
         
         let (width_inner, height_inner) = window.inner_size();

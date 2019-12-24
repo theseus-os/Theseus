@@ -9,11 +9,13 @@ extern crate font;
 extern crate frame_buffer;
 extern crate frame_buffer_printer;
 extern crate shapes;
+extern crate color;
 
 use alloc::string::String;
 use displayable::{Displayable};
 use font::{CHARACTER_HEIGHT, CHARACTER_WIDTH};
-use frame_buffer::{Pixel, FrameBuffer, RGBAColor};
+use frame_buffer::{Pixel, FrameBuffer};
+use color::Color;
 use shapes::{Coord, Rectangle};
 
 
@@ -25,14 +27,14 @@ pub struct TextDisplay {
     next_col: usize,
     next_line: usize,
     text: String,
-    fg_color: RGBAColor,
-    bg_color: RGBAColor,
+    fg_color: Color,
+    bg_color: Color,
     /// The text cached since last display
     cache: String,
 }
 
 impl Displayable for TextDisplay {
-    fn display<P: Pixel>(
+    fn display<P: Pixel + From<Color> + From<Color>>(
         &mut self,
         coordinate: Coord,
         framebuffer: &mut FrameBuffer<P>,
@@ -89,8 +91,8 @@ impl TextDisplay {
     pub fn new(
         width: usize,
         height: usize,
-        fg_color: RGBAColor,
-        bg_color: RGBAColor,
+        fg_color: Color,
+        bg_color: Color,
     ) -> Result<TextDisplay, &'static str> {
         Ok(TextDisplay {
             width: width,
@@ -105,7 +107,7 @@ impl TextDisplay {
     }
 
     /// Gets the background color of the text area
-    pub fn get_bg_color(&self) -> RGBAColor {
+    pub fn get_bg_color(&self) -> Color {
         self.bg_color
     }
     

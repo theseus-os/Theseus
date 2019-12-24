@@ -277,9 +277,18 @@ version = "0.1.9"
 source = "registry+https://github.com/rust-lang/crates.io-index"
 
 [[package]]
+name = "color"
+version = "0.1.0"
+dependencies = [
+ "frame_buffer 0.1.0",
+ "spin 0.4.10 (registry+https://github.com/rust-lang/crates.io-index)",
+]
+
+[[package]]
 name = "compositor"
 version = "0.1.0"
 dependencies = [
+ "color 0.1.0",
  "frame_buffer 0.1.0",
  "shapes 0.1.0",
 ]
@@ -435,6 +444,7 @@ dependencies = [
 name = "displayable"
 version = "0.1.0"
 dependencies = [
+ "color 0.1.0",
  "frame_buffer 0.1.0",
  "shapes 0.1.0",
  "spin 0.4.10 (registry+https://github.com/rust-lang/crates.io-index)",
@@ -585,6 +595,7 @@ dependencies = [
 name = "frame_buffer_compositor"
 version = "0.1.0"
 dependencies = [
+ "color 0.1.0",
  "compositor 0.1.0",
  "frame_buffer 0.1.0",
  "hashbrown 0.1.8 (registry+https://github.com/rust-lang/crates.io-index)",
@@ -597,6 +608,7 @@ dependencies = [
 name = "frame_buffer_drawer"
 version = "0.1.0"
 dependencies = [
+ "color 0.1.0",
  "frame_buffer 0.1.0",
  "shapes 0.1.0",
 ]
@@ -605,6 +617,7 @@ dependencies = [
 name = "frame_buffer_printer"
 version = "0.1.0"
 dependencies = [
+ "color 0.1.0",
  "font 0.1.0",
  "frame_buffer 0.1.0",
  "shapes 0.1.0",
@@ -913,6 +926,7 @@ dependencies = [
 name = "libterm"
 version = "0.1.0"
 dependencies = [
+ "color 0.1.0",
  "dfqueue 0.1.0",
  "displayable 0.1.0",
  "environment 0.1.0",
@@ -1216,6 +1230,7 @@ dependencies = [
 name = "new_window"
 version = "0.1.0"
 dependencies = [
+ "color 0.1.0",
  "frame_buffer 0.1.0",
  "log 0.3.9 (registry+https://github.com/rust-lang/crates.io-index)",
  "shapes 0.1.0",
@@ -2132,6 +2147,7 @@ dependencies = [
 name = "text_display"
 version = "0.1.0"
 dependencies = [
+ "color 0.1.0",
  "displayable 0.1.0",
  "font 0.1.0",
  "frame_buffer 0.1.0",
@@ -2288,6 +2304,7 @@ source = "registry+https://github.com/rust-lang/crates.io-index"
 name = "window"
 version = "0.1.0"
 dependencies = [
+ "color 0.1.0",
  "event_types 0.1.0",
  "frame_buffer 0.1.0",
  "frame_buffer_drawer 0.1.0",
@@ -2306,6 +2323,7 @@ dependencies = [
 name = "window_inner"
 version = "0.1.0"
 dependencies = [
+ "color 0.1.0",
  "event_types 0.1.0",
  "frame_buffer 0.1.0",
  "mpmc 0.1.6-pre",
@@ -2317,6 +2335,7 @@ dependencies = [
 name = "window_manager"
 version = "0.1.0"
 dependencies = [
+ "color 0.1.0",
  "compositor 0.1.0",
  "event_types 0.1.0",
  "font 0.1.0",

@@ -23,11 +23,13 @@ extern crate mouse;
 extern crate window_inner;
 extern crate window_manager;
 extern crate shapes;
+extern crate color;
 
 use alloc::sync::Arc;
 use mpmc::Queue;
 use event_types::{Event, MousePositionEvent};
-use frame_buffer::{FrameBuffer, pixel::{BLACK}, RGBAColor, rgba_color};
+use frame_buffer::{FrameBuffer};
+use color::{Color, BLACK, rgba_color};
 use shapes::{Coord, Rectangle};
 use spin::Mutex;
 use window_inner::{WindowInner, WindowMovingStatus};
@@ -40,17 +42,17 @@ const WINDOW_BORDER: usize = 2;
 // border radius, in number of pixels
 const WINDOW_RADIUS: usize = 5;
 // border and title bar color when window is inactive
-const WINDOW_BORDER_COLOR_INACTIVE: RGBAColor = rgba_color(0x00333333);
+const WINDOW_BORDER_COLOR_INACTIVE: Color = rgba_color(0x00333333);
 // border and title bar color when window is active, the top part color
-const WINDOW_BORDER_COLOR_ACTIVE_TOP: RGBAColor = rgba_color(0x00BBBBBB);
+const WINDOW_BORDER_COLOR_ACTIVE_TOP: Color = rgba_color(0x00BBBBBB);
 // border and title bar color when window is active, the bottom part color
-static WINDOW_BORDER_COLOR_ACTIVE_BOTTOM: RGBAColor = rgba_color(0x00666666);
+static WINDOW_BORDER_COLOR_ACTIVE_BOTTOM: Color = rgba_color(0x00666666);
 // window button color: red
-const WINDOW_BUTTON_COLOR_CLOSE: RGBAColor = rgba_color(0x00E74C3C);
+const WINDOW_BUTTON_COLOR_CLOSE: Color = rgba_color(0x00E74C3C);
 // window button color: green
-const WINDOW_BUTTON_COLOR_MINIMIZE_MAMIMIZE: RGBAColor = rgba_color(0x00239B56);
+const WINDOW_BUTTON_COLOR_MINIMIZE_MAMIMIZE: Color = rgba_color(0x00239B56);
 // window button color: purple
-const WINDOW_BUTTON_COLOR_HIDE: RGBAColor = rgba_color(0x007D3C98);
+const WINDOW_BUTTON_COLOR_HIDE: Color = rgba_color(0x007D3C98);
 // window button margin from left, in number of pixels
 const WINDOW_BUTTON_BIAS_X: usize = 12;
 // the interval between buttons, in number of pixels
@@ -88,7 +90,7 @@ pub struct Window {
     /// the height of title bar in pixel, init as WINDOW_TITLE_BAR. it is render inside the window so user shouldn't use this area anymore
     title_size: usize,
     /// the background of this window, init as WINDOW_BACKGROUND
-    background: RGBAColor,
+    background: Color,
     /// application could get events from this consumer
     pub consumer: Queue<Event>,
     /// event output used by window manager, private variable
@@ -106,7 +108,7 @@ impl Window {
         coordinate: Coord,
         width: usize,
         height: usize,
-        background: RGBAColor,
+        background: Color,
     ) -> Result<Window, &'static str> {
         let framebuffer = FrameBuffer::new(width, height, None)?;
         let (width, height) = framebuffer.get_size();
@@ -328,9 +330,9 @@ impl Window {
     fn draw_border(&mut self, active: bool) {
         let mut inner = self.inner.lock();
         // first draw left, bottom, right border
-        let mut border_color = RGBAColor::from(WINDOW_BORDER_COLOR_INACTIVE);
+        let mut border_color = Color::from(WINDOW_BORDER_COLOR_INACTIVE);
         if active {
-            border_color = RGBAColor::from(WINDOW_BORDER_COLOR_ACTIVE_BOTTOM);
+            border_color = Color::from(WINDOW_BORDER_COLOR_ACTIVE_BOTTOM);
         }
         let width = inner.width;
         let height = inner.height;
@@ -370,7 +372,7 @@ impl Window {
                     width,
                     1,
                     frame_buffer::Pixel::weight_mix(
-                        RGBAColor::from(WINDOW_BORDER_COLOR_ACTIVE_BOTTOM).into(),     RGBAColor::from(WINDOW_BORDER_COLOR_ACTIVE_TOP).into(), 
+                        Color::from(WINDOW_BORDER_COLOR_ACTIVE_BOTTOM).into(),     Color::from(WINDOW_BORDER_COLOR_ACTIVE_TOP).into(), 
                         (i as f32) / (self.title_size as f32)
                     )
 
@@ -393,7 +395,7 @@ impl Window {
 
         // draw radius finally
         let r2 = WINDOW_RADIUS * WINDOW_RADIUS;
-        const TRANS: RGBAColor = rgba_color(0xFF000000);
+        const TRANS: Color = rgba_color(0xFF000000);
         let pixel = TRANS.into();
   
         for i in 0..WINDOW_RADIUS {

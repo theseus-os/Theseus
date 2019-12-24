@@ -23,6 +23,9 @@ path = "../../kernel/frame_buffer"
 [dependencies.window]
 path = "../../kernel/window"
 
+[dependencies.color]
+path = "../../kernel/color"
+
 [lib]
 crate-type = ["rlib"]
 

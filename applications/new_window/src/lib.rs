@@ -8,6 +8,7 @@
 #[macro_use]
 extern crate log;
 extern crate alloc;
+extern crate color;
 
 extern crate window;
 extern crate shapes;
@@ -15,10 +16,10 @@ extern crate frame_buffer;
 
 use alloc::string::String;
 use alloc::vec::Vec;
-use frame_buffer::{RGBAColor};
 use shapes::Coord;
+use color::Color;
 
-const WINDOW_BACKGROUND: RGBAColor = frame_buffer::rgba_color(0x40FFFFFF);
+const WINDOW_BACKGROUND: Color = color::rgba_color(0x40FFFFFF);
 
 #[no_mangle]
 pub fn main(_args: Vec<String>) -> isize {

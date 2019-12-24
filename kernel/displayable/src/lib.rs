@@ -6,9 +6,11 @@
 
 extern crate frame_buffer;
 extern crate shapes;
+extern crate color;
 
 use frame_buffer::{FrameBuffer, Pixel};
 use shapes::{Coord, Rectangle};
+use color::Color;
 
 /// Trait for displayables. A displayable is an item which can display itself onto a framebuffer. 
 /// It is usually a composition of basic graphs and can display in a window as a component such as a text box, a button, etc.
@@ -19,7 +21,7 @@ pub trait Displayable {
     /// * `framebuffer`: the framebuffer to display onto.
     ///
     /// Returns a rectangle that covers the updated area.
-    fn display<P: Pixel>(
+    fn display<P: Pixel + From<Color>>(
         &mut self,
         coordinate: Coord,
         framebuffer: &mut FrameBuffer<P>,

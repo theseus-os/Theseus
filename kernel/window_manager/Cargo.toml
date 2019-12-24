@@ -29,6 +29,9 @@ path = "../shapes"
 [dependencies.frame_buffer]
 path = "../frame_buffer"
 
+[dependencies.color]
+path = "../color"
+
 [dependencies.event_types]
 path = "../event_types"
 

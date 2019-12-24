@@ -21,6 +21,7 @@ extern crate spin;
 extern crate lazy_static;
 extern crate hashbrown;
 extern crate shapes;
+extern crate color;
 
 use alloc::collections::BTreeMap;
 use alloc::vec::{Vec};
@@ -30,6 +31,7 @@ use compositor::{Compositor, FrameBufferUpdates, Mixable};
 use frame_buffer::{FrameBuffer, Pixel};
 use shapes::{Coord, Rectangle};
 use spin::Mutex;
+use color::Color;
 
 /// The height of a cache block. See the definition of `BlockCache`.
 pub const CACHE_BLOCK_HEIGHT:usize = 16;
@@ -85,7 +87,7 @@ pub struct FrameCompositor {
 
 impl FrameCompositor {
     /// Checks if a coordinate is in the cache list.
-    fn is_cached<P: Pixel>(&self, block: &[P], coordinate: &Coord) -> bool {
+    fn is_cached<P: Pixel + From<Color>>(&self, block: &[P], coordinate: &Coord) -> bool {
         match self.caches.get(coordinate) {
             Some(cache) => {
                 // The same hash means the array of two blocks are the same. Since all blocks are of the same height, two blocks of the same array must share the same width. Therefore, the coordinate and content_hash can identify a block.
@@ -104,7 +106,7 @@ impl FrameCompositor {
     /// * `coordinate`: the position of the source framebuffer relative to the final one.
     /// * `index`: the index of the block to be rendered. The framebuffer are divided into y-aligned blocks and index indicates the order of the block.
     /// * `area`: the rectangle to be updated.
-    fn check_cache_and_mix<P: Pixel>(
+    fn check_cache_and_mix<P: Pixel + From<Color>>(
         &mut self, 
         src_fb: &FrameBuffer<P>, 
         final_fb: &mut FrameBuffer<P>, 
@@ -178,7 +180,7 @@ impl FrameCompositor {
 }
 
 impl Compositor<Rectangle> for FrameCompositor {
-    fn composite<'a, U: IntoIterator<Item = Rectangle> + Clone, P: 'a + Pixel>(
+    fn composite<'a, U: IntoIterator<Item = Rectangle> + Clone, P: 'a + Pixel + From<Color>>(
         &mut self,
         bufferlist: impl IntoIterator<Item = FrameBufferUpdates<'a, P>>,
         final_fb: &mut FrameBuffer<P>,
@@ -218,7 +220,7 @@ impl Compositor<Rectangle> for FrameCompositor {
 }
 
 impl Compositor<Coord> for FrameCompositor {
-    fn composite<'a, U: IntoIterator<Item = Coord> + Clone, P: 'a + Pixel>(
+    fn composite<'a, U: IntoIterator<Item = Coord> + Clone, P: 'a + Pixel + From<Color>>(
         &mut self,
         bufferlist: impl IntoIterator<Item = FrameBufferUpdates<'a, P>>,
         final_fb: &mut FrameBuffer<P>,
@@ -244,7 +246,7 @@ impl Compositor<Coord> for FrameCompositor {
 /// * `framebuffer`: the framebuffer to composite.
 /// * `coordinate`: the coordinate of the framebuffer relative to the origin(top-left) of the screen.
 /// * `area`: the updated area relative to the origin(top-left) of the screen. The returned indexes represent the blocks overlap with this area.
-pub fn get_block_index_iter<P: Pixel>(
+pub fn get_block_index_iter<P: Pixel + From<Color>>(
     framebuffer: &FrameBuffer<P>, 
     coordinate: Coord, 
     abs_area: &Rectangle

@@ -7,11 +7,13 @@ extern crate alloc;
 extern crate font;
 extern crate frame_buffer;
 extern crate shapes;
+extern crate color;
 
 use alloc::vec;
 use font::{CHARACTER_HEIGHT, CHARACTER_WIDTH};
 use frame_buffer::{FrameBuffer, Pixel};
 use shapes::{Coord, Rectangle};
+use color::Color;
 
 
 type ASCII = u8;
@@ -27,7 +29,7 @@ type ASCII = u8;
 /// * `font_pixel`: the pixel value of font.
 /// * `bg_color`: the pixel value of background.
 /// * `(column, line)`: the location of the text in the text block as symbols.
-pub fn print_string<P: Pixel>(
+pub fn print_string<P: Pixel + From<Color>>(
     framebuffer: &mut FrameBuffer<P>,
     coordinate: Coord,
     width: usize,
@@ -148,7 +150,7 @@ pub fn print_string<P: Pixel>(
 /// * `bg_color`: the background pixel value of the character.
 /// * `coordinate`: the left top coordinate of the text block relative to the origin(top-left point) of the frame buffer.
 /// * `(column, line)`: the location of the character in the text block as symbols.
-pub fn print_ascii_character<P: Pixel>(
+pub fn print_ascii_character<P: Pixel + From<Color>>(
     framebuffer: &mut FrameBuffer<P>,
     character: ASCII,
     font_pixel: P,
@@ -194,7 +196,7 @@ pub fn print_ascii_character<P: Pixel>(
 }
 
 /// Fill a blank text area (left, top, right, bottom) with color. The tuple specifies the location of the area relative to the origin(top-left point) of the frame buffer.
-pub fn fill_blank<P: Pixel>(
+pub fn fill_blank<P: Pixel + From<Color>>(
     framebuffer: &mut FrameBuffer<P>,
     blank: &mut Rectangle,
     pixel: P,
