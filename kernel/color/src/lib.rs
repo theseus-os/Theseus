@@ -1,6 +1,4 @@
 #![no_std]
-#![feature(const_fn)]
-extern crate spin;
 extern crate frame_buffer;
 
 use frame_buffer::{RGBPixel, AlphaPixel};
@@ -8,7 +6,7 @@ use frame_buffer::{RGBPixel, AlphaPixel};
 /// This structure represents an RGBA color value. It can turn into an alpha pixel or a pixel for framebuffers that does not support the alpha channel.
 #[derive(Clone, Copy)]
 pub struct Color {
-    /// 0 is opaque while 0xFF is transparent
+    /// 0 is opaque and 0xFF is transparent
     alpha: u8,
     red: u8,
     green: u8,

@@ -31,7 +31,7 @@ use displayable::Displayable;
 use event_types::Event;
 use font::{CHARACTER_HEIGHT, CHARACTER_WIDTH};
 use frame_buffer::{FrameBuffer, Pixel};
-use color::{Color, new_color, ColorName};
+use color::{Color, ColorName};
 use shapes::{Coord, Rectangle};
 use tsc::{tsc_ticks, TscTicks};
 use window::Window;
