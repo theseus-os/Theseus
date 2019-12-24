@@ -607,7 +607,6 @@ dependencies = [
 name = "frame_buffer_drawer"
 version = "0.1.0"
 dependencies = [
- "color 0.1.0",
  "frame_buffer 0.1.0",
  "shapes 0.1.0",
 ]
@@ -616,7 +615,6 @@ dependencies = [
 name = "frame_buffer_printer"
 version = "0.1.0"
 dependencies = [
- "color 0.1.0",
  "font 0.1.0",
  "frame_buffer 0.1.0",
  "shapes 0.1.0",

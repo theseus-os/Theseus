@@ -11,8 +11,5 @@ path = "../frame_buffer"
 [dependencies.shapes]
 path = "../shapes"
 
-[dependencies.color]
-path = "../color"
-
 [lib]
 crate-type = ["rlib"]

@@ -36,7 +36,7 @@ pub trait Compositor<T: Mixable> {
 
 
 /// The framebuffers to be composited together with the positions.
-pub struct FrameBufferUpdates<'a, P: Pixel + From<Color>> {
+pub struct FrameBufferUpdates<'a, P: Pixel> {
     /// The framebuffer to be composited.
     pub framebuffer: &'a FrameBuffer<P>,
     /// The coordinate of the framebuffer where it is rendered to the final framebuffer.
@@ -46,7 +46,7 @@ pub struct FrameBufferUpdates<'a, P: Pixel + From<Color>> {
 /// A `Mixable` is an item that can be mixed with the final framebuffer. A compositor can mix a list of shaped items with the final framebuffer rather than mix the whole framebuffer for better performance.
 pub trait Mixable {
     /// Mix the item in the `src_fb` framebuffer with the final framebuffer. `src_coord` is the position of the source framebuffer relative to the top-left of the final buffer.
-    fn mix_buffers<P: Pixel + From<Color>>(
+    fn mix_buffers<P: Pixel>(
         &self, 
         src_fb: &FrameBuffer<P>, 
         final_fb: &mut FrameBuffer<P>, 
@@ -55,7 +55,7 @@ pub trait Mixable {
 }
 
 impl Mixable for Coord {
-    fn mix_buffers<P: Pixel + From<Color>>(
+    fn mix_buffers<P: Pixel>(
         &self, 
         src_fb: &FrameBuffer<P>,
         final_fb: &mut FrameBuffer<P>, 
@@ -71,7 +71,7 @@ impl Mixable for Coord {
 }
 
 impl Mixable for Rectangle {
-    fn mix_buffers<P: Pixel + From<Color>>(
+    fn mix_buffers<P: Pixel>(
         &self, 
         src_fb: &FrameBuffer<P>, 
         final_fb: &mut FrameBuffer<P>,

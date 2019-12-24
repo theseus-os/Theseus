@@ -34,7 +34,7 @@ pub struct TextDisplay {
 }
 
 impl Displayable for TextDisplay {
-    fn display<P: Pixel + From<Color> + From<Color>>(
+    fn display<P: Pixel + From<Color>>(
         &mut self,
         coordinate: Coord,
         framebuffer: &mut FrameBuffer<P>,
