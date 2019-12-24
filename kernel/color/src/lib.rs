@@ -1,4 +1,5 @@
 #![no_std]
+#![feature(const_fn)]
 extern crate spin;
 extern crate frame_buffer;
 
@@ -8,10 +9,10 @@ use frame_buffer::{RGBPixel, AlphaPixel};
 #[derive(Clone, Copy)]
 pub struct Color {
     /// 0 is opaque while 0xFF is transparent
-    pub alpha: u8,
-    pub red: u8,
-    pub green: u8,
-    pub blue: u8
+    alpha: u8,
+    red: u8,
+    green: u8,
+    blue: u8
 }
 
 impl Color {
@@ -26,23 +27,24 @@ impl Color {
     }
 }
 
+#[derive(Clone, Copy)]
 pub enum ColorName {
-    Black = 0x000000,
-    Blue = 0x0000FF,
-    Green = 0x00FF00,
-    Cyan = 0x00FFFF,
-    Red = 0xFF0000,
-    Magenta = 0xFF00FF,
-    Brown = 0xA52A2A,
-    LightGray = 0xD3D3D3,
-    DarkGray = 0xA9A9A9,
-    LightBlue = 0xADD8E6,
-    LightGreen = 0x90EE90,
-    LightCyan = 0xE0FFFF,
-    Pink = 0xFFC0CB,
-    Yellow = 0xFFFF00,
-    White = 0xFFFFFF,
-    Transparent = 0xFF000000,
+    Black,
+    Blue,
+    Green,
+    Cyan,
+    Red,
+    Magenta,
+    Brown,
+    LightGray,
+    DarkGray,
+    LightBlue,
+    LightGreen,
+    LightCyan,
+    Pink,
+    Yellow,
+    White,
+    Transparent,
 }
 
 pub const fn new_color(color: u32) -> Color {
@@ -56,7 +58,24 @@ pub const fn new_color(color: u32) -> Color {
 
 impl From<ColorName> for Color {
     fn from(name: ColorName) -> Color {
-        new_color(name as u32)
+        match name {
+            ColorName::Black => new_color(0x000000),
+            ColorName::Blue => new_color(0x0000FF),
+            ColorName::Green => new_color(0x00FF00),
+            ColorName::Cyan => new_color(0x00FFFF),
+            ColorName::Red => new_color(0xFF0000),
+            ColorName::Magenta => new_color(0xFF00FF),
+            ColorName::Brown => new_color(0xA52A2A),
+            ColorName::LightGray => new_color(0xD3D3D3),
+            ColorName::DarkGray => new_color(0xA9A9A9),
+            ColorName::LightBlue => new_color(0xADD8E6),
+            ColorName::LightGreen => new_color(0x90EE90),
+            ColorName::LightCyan => new_color(0xE0FFFF),
+            ColorName::Pink => new_color(0xFFC0CB),
+            ColorName::Yellow => new_color(0xFFFF00),
+            ColorName::White => new_color(0xFFFFFF),
+            ColorName::Transparent => new_color(0xFF000000),
+        }
     }
 }
 

@@ -56,13 +56,13 @@ pub static WINDOW_MANAGER: Once<Mutex<WindowManager>> = Once::new();
 // The half size of mouse in number of pixels, the actual size of pointer is 1+2*`MOUSE_POINTER_HALF_SIZE`
 const MOUSE_POINTER_HALF_SIZE: usize = 7;
 // Transparent pixel
-const T: Color = new_color(ColorName::Transparent as u32);
+const T: ColorName = ColorName::Transparent;
 // Opaque white
-const O: Color = new_color(ColorName::White as u32);
+const O: ColorName = ColorName::White;
 // Opaque blue
-const B: Color = new_color(ColorName::Blue as u32);
+const B: ColorName = ColorName::Blue;
 // the mouse picture
-static MOUSE_BASIC: [[Color; 2 * MOUSE_POINTER_HALF_SIZE + 1];
+static MOUSE_BASIC: [[ColorName; 2 * MOUSE_POINTER_HALF_SIZE + 1];
     2 * MOUSE_POINTER_HALF_SIZE + 1] = [
     [T, T, T, T, T, T, T, T, T, T, T, T, T, T, T],
     [T, T, T, T, T, T, T, T, T, T, T, T, T, T, T],
@@ -619,10 +619,13 @@ impl WindowManager {
         let mut result = Vec::new();
         for i in 6..15 {
             for j in 6..15 {
-                if MOUSE_BASIC[i][j].get_transparency() != 0xFF {
-                    let coordinate = self.mouse - (7, 7) + (j as isize, i as isize);
-                    if self.top_fb.contains(coordinate) {
-                        result.push(coordinate)
+                match MOUSE_BASIC[i][j].clone() {
+                    ColorName::Transparent => {/*ignore transparent pixels*/},
+                    _ => {
+                        let coordinate = self.mouse - (7, 7) + (j as isize, i as isize);
+                        if self.top_fb.contains(coordinate) {
+                            result.push(coordinate)
+                        }
                     }
                 }
             }
