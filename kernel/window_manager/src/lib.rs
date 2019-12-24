@@ -622,7 +622,7 @@ impl WindowManager {
                 match MOUSE_BASIC[i][j].clone() {
                     ColorName::Transparent => {/*ignore transparent pixels*/},
                     _ => {
-                        let coordinate = self.mouse - (7, 7) + (j as isize, i as isize);
+                        let coordinate = self.mouse - (MOUSE_POINTER_HALF_SIZE, MOUSE_POINTER_HALF_SIZE) + (j as isize, i as isize);
                         if self.top_fb.contains(coordinate) {
                             result.push(coordinate)
                         }
