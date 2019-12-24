@@ -18,11 +18,6 @@ impl Color {
     pub fn set_transparency(&mut self, trans: u8) {
         self.alpha = trans;
     }
-
-    /// Gets the tranparency value of the color. 0 means the color of opaque
-    pub fn get_transparency(&self) -> u8 {
-        self.alpha
-    }
 }
 
 #[derive(Clone, Copy)]
