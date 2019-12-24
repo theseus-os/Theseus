@@ -39,7 +39,7 @@ use core::slice;
 use mpmc::Queue;
 use event_types::{Event, MousePositionEvent};
 use frame_buffer::{FrameBuffer, AlphaPixel};
-use color::{Color, rgba_color};
+use color::{Color, new_color, ColorName};
 use shapes::{Coord, Rectangle};
 use frame_buffer_compositor::{FRAME_COMPOSITOR};
 ////
@@ -56,11 +56,11 @@ pub static WINDOW_MANAGER: Once<Mutex<WindowManager>> = Once::new();
 // The half size of mouse in number of pixels, the actual size of pointer is 1+2*`MOUSE_POINTER_HALF_SIZE`
 const MOUSE_POINTER_HALF_SIZE: usize = 7;
 // Transparent pixel
-const T: Color = rgba_color(0xFF000000);
+const T: Color = new_color(ColorName::Transparent as u32);
 // Opaque white
-const O: Color = rgba_color(0x00FFFFFF);
+const O: Color = new_color(ColorName::White as u32);
 // Opaque blue
-const B: Color = rgba_color(0x00000FF);
+const B: Color = new_color(ColorName::Blue as u32);
 // the mouse picture
 static MOUSE_BASIC: [[Color; 2 * MOUSE_POINTER_HALF_SIZE + 1];
     2 * MOUSE_POINTER_HALF_SIZE + 1] = [
@@ -84,7 +84,7 @@ static MOUSE_BASIC: [[Color; 2 * MOUSE_POINTER_HALF_SIZE + 1];
 // the border indicating new window position and size
 const WINDOW_BORDER_SIZE: usize = 3;
 // border's inner color
-const WINDOW_BORDER_COLOR_INNER: Color = rgba_color(0x00CA6F1E);
+const WINDOW_BORDER_COLOR_INNER: Color = new_color(0x00CA6F1E);
 
 /// Window manager structure which maintains a list of windows and a mouse.
 pub struct WindowManager {
@@ -619,7 +619,7 @@ impl WindowManager {
         let mut result = Vec::new();
         for i in 6..15 {
             for j in 6..15 {
-                if MOUSE_BASIC[i][j].alpha != 0xFF {
+                if MOUSE_BASIC[i][j].get_transparency() != 0xFF {
                     let coordinate = self.mouse - (7, 7) + (j as isize, i as isize);
                     if self.top_fb.contains(coordinate) {
                         result.push(coordinate)

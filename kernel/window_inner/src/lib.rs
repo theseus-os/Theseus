@@ -14,13 +14,13 @@ use alloc::sync::Arc;
 use mpmc::Queue;
 use event_types::{Event};
 use frame_buffer::{FrameBuffer, AlphaPixel};
-use color::{Color, rgba_color};
+use color::{Color, new_color};
 use shapes::Coord;
 use spin::{Mutex};
 
 
 /// The default color of a window;
-const WINDOW_DEFAULT_COLOR: Color = rgba_color(0x80FFFFFF);
+const WINDOW_DEFAULT_COLOR: Color = new_color(0x80FFFFFF);
 
 /// The status about whether a window is moving
 pub enum WindowMovingStatus {

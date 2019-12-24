@@ -29,7 +29,7 @@ use alloc::sync::Arc;
 use mpmc::Queue;
 use event_types::{Event, MousePositionEvent};
 use frame_buffer::{FrameBuffer};
-use color::{Color, BLACK, rgba_color};
+use color::{Color, ColorName, new_color};
 use shapes::{Coord, Rectangle};
 use spin::Mutex;
 use window_inner::{WindowInner, WindowMovingStatus};
@@ -42,17 +42,17 @@ const WINDOW_BORDER: usize = 2;
 // border radius, in number of pixels
 const WINDOW_RADIUS: usize = 5;
 // border and title bar color when window is inactive
-const WINDOW_BORDER_COLOR_INACTIVE: Color = rgba_color(0x00333333);
+const WINDOW_BORDER_COLOR_INACTIVE: Color = new_color(0x00333333);
 // border and title bar color when window is active, the top part color
-const WINDOW_BORDER_COLOR_ACTIVE_TOP: Color = rgba_color(0x00BBBBBB);
+const WINDOW_BORDER_COLOR_ACTIVE_TOP: Color = new_color(0x00BBBBBB);
 // border and title bar color when window is active, the bottom part color
-static WINDOW_BORDER_COLOR_ACTIVE_BOTTOM: Color = rgba_color(0x00666666);
+static WINDOW_BORDER_COLOR_ACTIVE_BOTTOM: Color = new_color(0x00666666);
 // window button color: red
-const WINDOW_BUTTON_COLOR_CLOSE: Color = rgba_color(0x00E74C3C);
+const WINDOW_BUTTON_COLOR_CLOSE: Color = new_color(0x00E74C3C);
 // window button color: green
-const WINDOW_BUTTON_COLOR_MINIMIZE_MAMIMIZE: Color = rgba_color(0x00239B56);
+const WINDOW_BUTTON_COLOR_MINIMIZE_MAMIMIZE: Color = new_color(0x00239B56);
 // window button color: purple
-const WINDOW_BUTTON_COLOR_HIDE: Color = rgba_color(0x007D3C98);
+const WINDOW_BUTTON_COLOR_HIDE: Color = new_color(0x007D3C98);
 // window button margin from left, in number of pixels
 const WINDOW_BUTTON_BIAS_X: usize = 12;
 // the interval between buttons, in number of pixels
@@ -395,8 +395,8 @@ impl Window {
 
         // draw radius finally
         let r2 = WINDOW_RADIUS * WINDOW_RADIUS;
-        const TRANS: Color = rgba_color(0xFF000000);
-        let pixel = TRANS.into();
+        let trans_color = Color::from(ColorName::Transparent);
+        let trans_pixel = trans_color.into();
   
         for i in 0..WINDOW_RADIUS {
             for j in 0..WINDOW_RADIUS {
@@ -405,9 +405,9 @@ impl Window {
                 if dx1 * dx1 + dy1 * dy1 > r2 {
                     // draw this to transparent
                     inner.framebuffer
-                        .overwrite_pixel(Coord::new(i as isize, j as isize), pixel);
+                        .overwrite_pixel(Coord::new(i as isize, j as isize), trans_pixel);
                     inner.framebuffer.overwrite_pixel(
-                        Coord::new((width - i - 1) as isize, j as isize), pixel);
+                        Coord::new((width - i - 1) as isize, j as isize), trans_pixel);
                 }
             }
         }
@@ -433,7 +433,7 @@ impl Window {
             Coord::new(x as isize, y as isize),
             WINDOW_BUTTON_SIZE,
             frame_buffer::Pixel::weight_mix(
-                BLACK.into(), 
+                Color::from(ColorName::Black).into(), 
                 pixel.into(),
                 0.2f32 * (state as f32),
             ),

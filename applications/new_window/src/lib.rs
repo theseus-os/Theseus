@@ -17,9 +17,7 @@ extern crate frame_buffer;
 use alloc::string::String;
 use alloc::vec::Vec;
 use shapes::Coord;
-use color::Color;
-
-const WINDOW_BACKGROUND: Color = color::rgba_color(0x40FFFFFF);
+use color::{Color, ColorName};
 
 #[no_mangle]
 pub fn main(_args: Vec<String>) -> isize {
@@ -37,11 +35,14 @@ pub fn main(_args: Vec<String>) -> isize {
     let height = _args[3].parse::<usize>().unwrap();
     debug!("parameters {:?}", (coordinate, width, height));
 
+    let mut bg_color = Color::from(ColorName::White);
+    bg_color.set_transparency(0x40);
+
     let mut window = match window::Window::new(
         coordinate,
         width,
         height,
-        WINDOW_BACKGROUND,
+        bg_color,
     ) {
         Ok(m) => m,
         Err(err) => {

@@ -29,7 +29,7 @@ impl Cursor {
             freq: DEFAULT_CURSOR_FREQ,
             time: tsc_ticks(),
             show: true,
-            color: FONT_COLOR,
+            color: Color::from(FONT_COLOR),
             offset_from_end: 0,
             underlying_char: 0,
         }
@@ -105,8 +105,8 @@ impl Cursor {
                 frame_buffer_printer::print_ascii_character(
                     framebuffer,
                     self.underlying_char,
-                    FONT_COLOR.into(),
-                    BACKGROUND_COLOR.into(),
+                    Color::from(FONT_COLOR).into(),
+                    Color::from(BACKGROUND_COLOR).into(),
                     coordinate,
                     column,
                     line,

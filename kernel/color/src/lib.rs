@@ -4,12 +4,6 @@ extern crate frame_buffer;
 
 use frame_buffer::{RGBPixel, AlphaPixel};
 
-
-/// predefined black
-pub const BLACK: Color = rgba_color(0);
-/// predefined white
-pub const WHITE: Color = rgba_color(0x00FFFFFF);
-
 /// This structure represents an RGBA color value. It can turn into an alpha pixel or a pixel for framebuffers that does not support the alpha channel.
 #[derive(Clone, Copy)]
 pub struct Color {
@@ -20,12 +14,49 @@ pub struct Color {
     pub blue: u8
 }
 
-pub const fn rgba_color(color: u32) -> Color {
+impl Color {
+    /// Sets the transparency value of the color. 0 means the color is opaque
+    pub fn set_transparency(&mut self, trans: u8) {
+        self.alpha = trans;
+    }
+
+    /// Gets the tranparency value of the color. 0 means the color of opaque
+    pub fn get_transparency(&self) -> u8 {
+        self.alpha
+    }
+}
+
+pub enum ColorName {
+    Black = 0x000000,
+    Blue = 0x0000FF,
+    Green = 0x00FF00,
+    Cyan = 0x00FFFF,
+    Red = 0xFF0000,
+    Magenta = 0xFF00FF,
+    Brown = 0xA52A2A,
+    LightGray = 0xD3D3D3,
+    DarkGray = 0xA9A9A9,
+    LightBlue = 0xADD8E6,
+    LightGreen = 0x90EE90,
+    LightCyan = 0xE0FFFF,
+    Pink = 0xFFC0CB,
+    Yellow = 0xFFFF00,
+    White = 0xFFFFFF,
+    Transparent = 0xFF000000,
+}
+
+pub const fn new_color(color: u32) -> Color {
     Color {
         alpha: (color >> 24) as u8,
         red: (color >> 16) as u8,
         green: (color >> 8) as u8,
         blue: color as u8,
+    }
+}
+
+impl From<ColorName> for Color {
+    fn from(name: ColorName) -> Color {
+        new_color(name as u32)
     }
 }
 
@@ -40,7 +71,6 @@ impl From<Color> for RGBPixel {
     }
 }
 
-
 impl From<Color> for AlphaPixel {
     fn from(color: Color) -> Self {
         AlphaPixel {
@@ -51,4 +81,3 @@ impl From<Color> for AlphaPixel {
         }
     }
 }
-
