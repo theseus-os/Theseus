@@ -31,15 +31,15 @@ use displayable::Displayable;
 use event_types::Event;
 use font::{CHARACTER_HEIGHT, CHARACTER_WIDTH};
 use frame_buffer::{FrameBuffer, Pixel};
-use color::{Color, ColorName};
+use color::{Color};
 use shapes::{Coord, Rectangle};
 use tsc::{tsc_ticks, TscTicks};
 use window::Window;
 
 pub mod cursor;
 
-pub const FONT_COLOR: ColorName = ColorName::LightGreen;
-pub const BACKGROUND_COLOR: ColorName = ColorName::Black;
+pub const FONT_COLOR: Color = color::LIGHTGREEN;
+pub const BACKGROUND_COLOR: Color = color::BLACK;
 const DEFAULT_CURSOR_FREQ: u64 = 400000000;
 
 /// Error type for tracking different scroll errors that a terminal
@@ -442,7 +442,7 @@ impl Terminal {
             Coord::new(WINDOW_MARGIN as isize, WINDOW_MARGIN as isize), 
             window_width - 2 * WINDOW_MARGIN, 
             window_height - 2 * WINDOW_MARGIN,
-            Color::from(ColorName::Black),
+            color::BLACK
         )?;
         
         let (width_inner, height_inner) = window.inner_size();

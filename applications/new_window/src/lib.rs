@@ -17,7 +17,6 @@ extern crate frame_buffer;
 use alloc::string::String;
 use alloc::vec::Vec;
 use shapes::Coord;
-use color::{Color, ColorName};
 
 #[no_mangle]
 pub fn main(_args: Vec<String>) -> isize {
@@ -35,7 +34,7 @@ pub fn main(_args: Vec<String>) -> isize {
     let height = _args[3].parse::<usize>().unwrap();
     debug!("parameters {:?}", (coordinate, width, height));
 
-    let mut bg_color = Color::from(ColorName::White);
+    let mut bg_color = color::WHITE;
     bg_color.set_transparency(0x40);
 
     let mut window = match window::Window::new(

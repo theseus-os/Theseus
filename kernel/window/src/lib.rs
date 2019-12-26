@@ -29,7 +29,7 @@ use alloc::sync::Arc;
 use mpmc::Queue;
 use event_types::{Event, MousePositionEvent};
 use frame_buffer::{FrameBuffer};
-use color::{Color, ColorName, new_color};
+use color::{Color, new_color};
 use shapes::{Coord, Rectangle};
 use spin::Mutex;
 use window_inner::{WindowInner, WindowMovingStatus};
@@ -395,8 +395,7 @@ impl Window {
 
         // draw radius finally
         let r2 = WINDOW_RADIUS * WINDOW_RADIUS;
-        let trans_color = Color::from(ColorName::Transparent);
-        let trans_pixel = trans_color.into();
+        let trans_pixel = color::TRANSPARENT.into();
   
         for i in 0..WINDOW_RADIUS {
             for j in 0..WINDOW_RADIUS {
@@ -433,7 +432,7 @@ impl Window {
             Coord::new(x as isize, y as isize),
             WINDOW_BUTTON_SIZE,
             frame_buffer::Pixel::weight_mix(
-                Color::from(ColorName::Black).into(), 
+                color::BLACK.into(), 
                 pixel.into(),
                 0.2f32 * (state as f32),
             ),

@@ -39,7 +39,7 @@ use core::slice;
 use mpmc::Queue;
 use event_types::{Event, MousePositionEvent};
 use frame_buffer::{FrameBuffer, AlphaPixel};
-use color::{Color, new_color, ColorName};
+use color::{Color, new_color};
 use shapes::{Coord, Rectangle};
 use frame_buffer_compositor::{FRAME_COMPOSITOR};
 ////
@@ -56,13 +56,13 @@ pub static WINDOW_MANAGER: Once<Mutex<WindowManager>> = Once::new();
 // The half size of mouse in number of pixels, the actual size of pointer is 1+2*`MOUSE_POINTER_HALF_SIZE`
 const MOUSE_POINTER_HALF_SIZE: usize = 7;
 // Transparent pixel
-const T: ColorName = ColorName::Transparent;
+const T: Color = color::TRANSPARENT;
 // Opaque white
-const O: ColorName = ColorName::White;
+const O: Color = color::WHITE;
 // Opaque blue
-const B: ColorName = ColorName::Blue;
+const B: Color = color::BLUE;
 // the mouse picture
-static MOUSE_BASIC: [[ColorName; 2 * MOUSE_POINTER_HALF_SIZE + 1];
+static MOUSE_BASIC: [[Color; 2 * MOUSE_POINTER_HALF_SIZE + 1];
     2 * MOUSE_POINTER_HALF_SIZE + 1] = [
     [T, T, T, T, T, T, T, T, T, T, T, T, T, T, T],
     [T, T, T, T, T, T, T, T, T, T, T, T, T, T, T],
@@ -424,7 +424,7 @@ impl WindowManager {
         // first clear old border if exists
         match self.repositioned_border {
             Some(border) => {
-                let pixels = self.draw_floating_border(border.top_left, border.bottom_right, Color::from(T));
+                let pixels = self.draw_floating_border(border.top_left, border.bottom_right, T);
                 self.refresh_bottom_windows_pixels(pixels.into_iter())?;
             },
             None =>{}
@@ -541,7 +541,7 @@ impl WindowManager {
                 self.mouse.x - MOUSE_POINTER_HALF_SIZE as isize..self.mouse.x + MOUSE_POINTER_HALF_SIZE as isize + 1
             {
                 let coordinate = Coord::new(x, y);
-                self.top_fb.overwrite_pixel(coordinate, Color::from(T).into());
+                self.top_fb.overwrite_pixel(coordinate, T.into());
             }
         }
         let update_coords = self.get_mouse_coords();
@@ -619,13 +619,10 @@ impl WindowManager {
         let mut result = Vec::new();
         for i in 6..15 {
             for j in 6..15 {
-                match MOUSE_BASIC[i][j].clone() {
-                    ColorName::Transparent => {/*ignore transparent pixels*/},
-                    _ => {
-                        let coordinate = self.mouse - (MOUSE_POINTER_HALF_SIZE as isize, MOUSE_POINTER_HALF_SIZE as isize) + (j as isize, i as isize);
-                        if self.top_fb.contains(coordinate) {
-                            result.push(coordinate)
-                        }
+                if MOUSE_BASIC[i][j] != T {
+                    let coordinate = self.mouse - (MOUSE_POINTER_HALF_SIZE as isize, MOUSE_POINTER_HALF_SIZE as isize) + (j as isize, i as isize);
+                    if self.top_fb.contains(coordinate) {
+                        result.push(coordinate)
                     }
                 }
             }
@@ -650,7 +647,7 @@ pub fn init() -> Result<(Queue<Event>, Queue<Event>), &'static str> {
     };
 
     bottom_framebuffer.buffer_mut().copy_from_slice(bg_image);
-    top_framebuffer.fill_color(Color::from(T).into()); 
+    top_framebuffer.fill_color(T.into()); 
 
     // initialize static window manager
     let window_manager = WindowManager {
