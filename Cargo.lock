@@ -1183,7 +1183,7 @@ dependencies = [
  "spin 0.4.10 (registry+https://github.com/rust-lang/crates.io-index)",
  "stable_deref_trait 1.1.1 (git+https://github.com/kevinaboos/stable_deref_trait.git?branch=spin)",
  "task 0.1.0",
- "wait_event 0.1.0",
+ "wait_queue 0.1.0",
 ]
 
 [[package]]
@@ -2153,7 +2153,7 @@ dependencies = [
 ]
 
 [[package]]
-name = "test_wait_event"
+name = "test_wait_queue"
 version = "0.1.0"
 dependencies = [
  "apic 0.1.0",
@@ -2163,7 +2163,7 @@ dependencies = [
  "spin 0.4.10 (registry+https://github.com/rust-lang/crates.io-index)",
  "task 0.1.0",
  "terminal_print 0.1.0",
- "wait_event 0.1.0",
+ "wait_condition 0.1.0",
 ]
 
 [[package]]
@@ -2323,7 +2323,15 @@ version = "0.2.5"
 source = "registry+https://github.com/rust-lang/crates.io-index"
 
 [[package]]
-name = "wait_event"
+name = "wait_condition"
+version = "0.1.0"
+dependencies = [
+ "task 0.1.0",
+ "wait_queue 0.1.0",
+]
+
+[[package]]
+name = "wait_queue"
 version = "0.1.0"
 dependencies = [
  "irq_safety 0.1.1 (git+https://github.com/kevinaboos/irq_safety)",

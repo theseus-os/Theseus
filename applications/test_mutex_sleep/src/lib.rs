@@ -8,7 +8,6 @@ extern crate scheduler;
 extern crate mutex_sleep;
 extern crate apic;
 
-// use core::sync::atomic::{Ordering, AtomicBool};
 use alloc::{
     vec::Vec,
     string::String,
@@ -77,7 +76,7 @@ fn mutex_sleep_task(lock: Arc<MutexSleep<usize>>) -> Result<(), &'static str> {
     warn!("ENTERED TASK {}", curr_task);
 
     for _i in 0..1000 {
-        scheduler::schedule();
+        scheduler::schedule(); // give other tasks a chance to acquire the lock
         warn!("{} trying to acquire lock...", curr_task);
         let mut locked = lock.lock()?;
         warn!("{} acquired lock!", curr_task);
@@ -134,15 +133,14 @@ fn lockstep_task((lock, remainder): (Arc<MutexSleep<usize>>, usize)) -> Result<(
     };
     warn!("ENTERED TASK {}", curr_task);
 
-    for _i in 0..100 {
+    for _i in 0..20 {
         loop { 
             warn!("{} top of loop, remainder {}", curr_task, remainder);
-            scheduler::schedule();
+            scheduler::schedule(); // give other tasks a chance to acquire the lock
             let mut locked = lock.lock()?;
             scheduler::schedule();
             if *locked % 3 == remainder {
                 warn!("Task {} Time to shine, value is {}!", curr_task, *locked);
-                scheduler::schedule();
                 *locked += 1;
                 break;
             } else {

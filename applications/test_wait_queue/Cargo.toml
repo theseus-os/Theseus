@@ -1,7 +1,7 @@
 [package]
-name = "test_wait_event"
+name = "test_wait_queue"
 version = "0.1.0"
-description = "Tests the wait event functionality of Theseus with multiple tasks"
+description = "Tests the wait queue functionality of Theseus with multiple tasks"
 authors = ["Kevin Boos <kevinaboos@gmail.com>"]
 build = "../../build.rs"
 
@@ -24,8 +24,8 @@ path = "../../kernel/scheduler"
 [dependencies.spawn]
 path = "../../kernel/spawn"
 
-[dependencies.wait_event]
-path = "../../kernel/wait_event"
+[dependencies.wait_condition]
+path = "../../kernel/wait_condition"
 
 [dependencies.terminal_print]
 path = "../terminal_print"

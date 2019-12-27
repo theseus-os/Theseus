@@ -4,7 +4,7 @@
 extern crate spin;
 extern crate owning_ref;
 extern crate stable_deref_trait;
-extern crate wait_event;
+extern crate wait_queue;
 extern crate task;
 
 use core::fmt;
@@ -12,7 +12,7 @@ use core::ops::{Deref, DerefMut};
 use spin::{Mutex, MutexGuard};
 use owning_ref::{OwningRef, OwningRefMut};
 use stable_deref_trait::StableDeref;
-use wait_event::WaitQueue;
+use wait_queue::WaitQueue;
 
 
 /// A mutual exclusion wrapper that puts a `Task` to sleep while waiting for the lock to become available. 
@@ -61,21 +61,19 @@ impl<T> MutexSleep<T> {
 impl<T: ?Sized> MutexSleep<T> {
 
     /// Blocks until the lock is acquired by putting this `Task` to sleep 
-    /// until the other `Task` that has the lock releases it. 
+    /// until another `Task` that has the lock releases it. 
     ///
-    /// The returned value may be dereferenced for data access;
-    /// the lock will be released when the guard falls out of scope and is dropped.
+    /// The returned guard may be dereferenced to access the protected data;
+    /// the lock will be released when the returned guard falls out of scope and is dropped.
     pub fn lock(&self) -> Result<MutexSleepGuard<T>, &'static str> {
-        loop {
-            if let Some(guard) = self.try_lock() {
-                return Ok(guard);
-            } else {
-                // add the current task to this lock's waitqueue
-                self.queue.wait().map_err(|_| "failed to add current task to waitqueue")?;
-                // Here, someone has woken us up, so we go back to the top of the loop 
-                // and try to obtain the lock again.
-            }
+        // Try to obtain the lock, which is fast in the uncontended case.
+        if let Some(guard) = self.try_lock() {
+            return Ok(guard);
         }
+        // If unavailable, wait until the lock can be obtained.
+        self.queue
+            .wait_until(&|| self.try_lock())
+            .map_err(|_| "failed to add current task to waitqueue")
     }
 
     /// Tries to lock the MutexSleep. If it is already locked, it will return None. Otherwise it returns
@@ -122,7 +120,6 @@ impl<'a, T: ?Sized> DerefMut for MutexSleepGuard<'a, T> {
 
 impl<'a, T: ?Sized> Drop for MutexSleepGuard<'a, T> {
     fn drop(&mut self) {
-        debug!(" -- dropping MutexSleepGuard in Task {:?}", task::get_my_current_task().unwrap());
         // Notify a task on the waitqueue that the lock is released,
         // which occurs automatically when the inner `guard` is dropped after this method executes.
         self.queue.notify_one();

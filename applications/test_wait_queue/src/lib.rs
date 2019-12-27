@@ -7,7 +7,7 @@ extern crate spin;
 extern crate task;
 extern crate spawn;
 extern crate scheduler;
-extern crate wait_event;
+extern crate wait_condition;
 extern crate apic;
 
 // use core::sync::atomic::{Ordering, AtomicBool};
@@ -18,7 +18,7 @@ use alloc::{
 };
 use spin::Mutex;
 use spawn::KernelTaskBuilder;
-use wait_event::{WaitCondition, WaitConditionFn};
+use wait_condition::{WaitCondition, WaitConditionFn};
 
 
 #[no_mangle]
@@ -48,6 +48,12 @@ fn rmain() -> Result<(), &'static str> {
         .pin_on_core(my_cpu)
         .spawn()?;
 
+    let t2 = KernelTaskBuilder::new(notify_task, (wc2, ready2))
+        .name(String::from("notify_task"))
+        .pin_on_core(my_cpu)
+        .block()
+        .spawn()?;
+        
     let t3 = KernelTaskBuilder::new(
         |tref| {
             warn!("DeezNutz:  testing spurious wakeup on task {:?}", tref);
@@ -59,14 +65,8 @@ fn rmain() -> Result<(), &'static str> {
         .pin_on_core(my_cpu)
         .block()
         .spawn()?;
-    
-    let t2 = KernelTaskBuilder::new(notify_task, (wc2, ready2))
-        .name(String::from("notify_task"))
-        .pin_on_core(my_cpu)
-        .block()
-        .spawn()?;
 
-    warn!("Finished spawning the 3 tasks");
+        warn!("Finished spawning the 3 tasks");
 
     // give the wait task (t1) a chance to run before the notify task
     for _ in 0..100 { scheduler::schedule(); }
@@ -99,7 +99,7 @@ fn notify_task<WF: WaitConditionFn>((wc, ready): (Arc<WaitCondition<WF>>, Arc<Mu
     warn!("  notify_task:  setting ready to true, calling notify_one()...");
     *ready.lock() = true;
     let cond_sat = wc.condition_satisfied().ok_or("condition wasn't properly satisfied")?;
-    // panic!("intentional panic in test_wait_event2");
+    // panic!("intentional panic in test_wait_queue2");
     let woken_up = cond_sat.notify_one();
     warn!("  notify_task:  notified a task? {}", woken_up);
     Ok(woken_up)
