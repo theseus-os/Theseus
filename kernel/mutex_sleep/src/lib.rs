@@ -1,3 +1,5 @@
+//! A mutex that puts tasks to sleep while they wait for the lock. 
+
 #![no_std]
 
 #[macro_use] extern crate log;
@@ -18,9 +20,8 @@ use wait_queue::WaitQueue;
 /// A mutual exclusion wrapper that puts a `Task` to sleep while waiting for the lock to become available. 
 /// 
 /// A sleeping `Task` has a "blocked" runstate, meaning that it will not be scheduled in. 
-/// Once the lock becomes available, any `Task`s that are sleeping while waiting for the lock
+/// Once the lock becomes available, `Task`s that are sleeping while waiting for the lock
 /// will be notified (woken up) so they can attempt to acquire the lock again.
-///
 pub struct MutexSleep<T: ?Sized> {
     queue: WaitQueue,
     lock: Mutex<T>,
@@ -41,9 +42,10 @@ unsafe impl<T: ?Sized + Send> Send for MutexSleep<T> {}
 
 impl<T> MutexSleep<T> {
     /// Creates a new lock wrapping the supplied data.
-    /// 
-    // /// May be used in a `const` context. 
-    // #[cfg(feature = "const_fn")]
+    ///
+    // NOTE: const fn is currently disabled because the inner WaitQueue
+    // is a VecDeque, which isn't statically initializable. 
+    // When we switch to a different type, we can offer this as a const fn again.
     // pub const fn new (data: T) -> MutexSleep<T> {
     pub fn new(data: T) -> MutexSleep<T> {
         MutexSleep {
@@ -66,18 +68,18 @@ impl<T: ?Sized> MutexSleep<T> {
     /// The returned guard may be dereferenced to access the protected data;
     /// the lock will be released when the returned guard falls out of scope and is dropped.
     pub fn lock(&self) -> Result<MutexSleepGuard<T>, &'static str> {
-        // Try to obtain the lock, which is fast in the uncontended case.
+        // Fast path: check for the uncontended case.
         if let Some(guard) = self.try_lock() {
             return Ok(guard);
         }
-        // If unavailable, wait until the lock can be obtained.
+        // Slow path if already locked elsewhere: wait until we obtain the lock.
         self.queue
             .wait_until(&|| self.try_lock())
             .map_err(|_| "failed to add current task to waitqueue")
     }
 
-    /// Tries to lock the MutexSleep. If it is already locked, it will return None. Otherwise it returns
-    /// a guard within Some.
+    /// Tries to lock the MutexSleep. If it is already locked, it will return `None`.
+    /// Otherwise it returns a guard within `Some`.
     pub fn try_lock(&self) -> Option<MutexSleepGuard<T>> {
         self.lock.try_lock().map(|spinlock_guard| {
             MutexSleepGuard {
@@ -107,7 +109,7 @@ impl<'a, T: ?Sized> Deref for MutexSleepGuard<'a, T> {
     type Target = T;
 
     fn deref<'b>(&'b self) -> &'b T { 
-        & *(self.guard) 
+        &*(self.guard) 
     }
 }
 
