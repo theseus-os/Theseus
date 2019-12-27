@@ -1,0 +1,36 @@
+[package]
+authors = ["Kevin Boos <kevinaboos@gmail.com>"]
+name = "mutex_sleep"
+description = "A Mutex abstraction that puts a Task to sleep while waiting for the lock"
+version = "0.1.0"
+build = "../../build.rs"
+
+[dependencies]
+spin = "0.4.10"
+
+[dependencies.log]
+default-features = false
+version = "0.3.7"
+
+
+[dependencies.stable_deref_trait]
+git = "https://github.com/kevinaboos/stable_deref_trait.git"
+branch = "spin"
+default-features = false
+features = [ "alloc", "spin" ]
+
+[dependencies.owning_ref]
+# version = "0.3.3"
+# path = "../../libs/owning-ref-rs"
+git = "https://github.com/kevinaboos/owning-ref-rs.git"
+
+
+[dependencies.wait_queue]
+path = "../wait_queue"
+
+[dependencies.task]
+path = "../task"
+
+
+[lib]
+crate-type = ["rlib"]
