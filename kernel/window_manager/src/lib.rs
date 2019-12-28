@@ -418,13 +418,12 @@ impl WindowManager {
     fn refresh_floating_border(
         &mut self,
         show: bool,
-        top_left: Coord,
-        bottom_right: Coord,
+        new_border: Rectangle,
     ) -> Result<(), &'static str> {
         // first clear old border if exists
         match self.repositioned_border {
             Some(border) => {
-                let pixels = self.draw_floating_border(border.top_left, border.bottom_right, T);
+                let pixels = self.draw_floating_border(&border, T);
                 self.refresh_bottom_windows_pixels(pixels.into_iter())?;
             },
             None =>{}
@@ -432,9 +431,9 @@ impl WindowManager {
 
         // then draw current border
         if show {
-            self.repositioned_border = Some(Rectangle { top_left, bottom_right });
-            let pixels = self.draw_floating_border(top_left, bottom_right, WINDOW_BORDER_COLOR_INNER);
+            let pixels = self.draw_floating_border(&new_border, WINDOW_BORDER_COLOR_INNER);
             self.refresh_top_pixels(pixels.into_iter())?;
+            self.repositioned_border = Some(new_border);
         } else {
             self.repositioned_border = None;
         }
@@ -442,16 +441,16 @@ impl WindowManager {
         Ok(())
     }
 
-    /// draw the floating border with color. Return pixels coordinates of the border.
-    /// `start` and `end` indicates the top-left and bottom-right corner of the border.
+    /// draw the floating border with `pixel`. Return the coordinates of updated pixels.
+    /// `border` indicates the position of the border as a rectangle.
     /// `pixel` is the pixel value of the floating border.
-    fn draw_floating_border<P: Into<AlphaPixel>>(&mut self, top_left: Coord, bottom_right: Coord, pixel: P) -> Vec<Coord> {
+    fn draw_floating_border<P: Into<AlphaPixel>>(&mut self, border: &Rectangle, pixel: P) -> Vec<Coord> {
         let mut coordinates = Vec::new();
         let pixel = pixel.into();
         for i in 0..(WINDOW_BORDER_SIZE) as isize {
-            let width = (bottom_right.x - top_left.x) - 2 * i;
-            let height = (bottom_right.y - top_left.y) - 2 * i;
-            let coordinate = top_left + (i as isize, i as isize);
+            let width = (border.bottom_right.x - border.top_left.x) - 2 * i;
+            let height = (border.bottom_right.y - border.top_left.y) - 2 * i;
+            let coordinate = border.top_left + (i as isize, i as isize);
             if width <= 0 || height <= 0 {
                 break;
             }
@@ -502,7 +501,11 @@ impl WindowManager {
                 }
             };
             self.refresh_bottom_windows(Some(Rectangle{top_left: old_top_left, bottom_right: old_bottom_right}), false)?;
-            self.refresh_floating_border(false, Coord::new(0, 0), Coord::new(0, 0))?;
+            let border = Rectangle { 
+                top_left: Coord::new(0, 0), 
+                bottom_right: Coord::new(0, 0) 
+            };
+            self.refresh_floating_border(false, border)?;
             self.refresh_active_window(Some(Rectangle{top_left: new_top_left, bottom_right: new_bottom_right}))?;
             let bounding_box = self.get_mouse_coords();
             self.refresh_top_pixels(bounding_box.into_iter())?;
@@ -591,9 +594,17 @@ impl WindowManager {
                     WindowMovingStatus::Stationary => (false, Coord::new(0, 0), Coord::new(0, 0)),
                 }
             };
-            self.refresh_floating_border(is_draw, border_start, border_end)?;
+            let border = Rectangle {
+                top_left: border_start,
+                bottom_right: border_end,
+            };
+            self.refresh_floating_border(is_draw, border)?;
         } else {
-            self.refresh_floating_border(false, Coord::new(0, 0), Coord::new(0, 0))?;
+            let border = Rectangle {
+                top_left: Coord::new(0, 0),
+                bottom_right: Coord::new(0, 0),
+            };
+            self.refresh_floating_border(false, border)?;
         }
 
         Ok(())
