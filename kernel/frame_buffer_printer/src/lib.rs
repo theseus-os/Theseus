@@ -170,15 +170,17 @@ pub fn print_ascii_character<P: Pixel>(
     loop {
         let coordinate = start + (j as isize, i as isize);
         if framebuffer.contains(coordinate) {
-            let pixel = if j > 0 {
+            let pixel = if j >= 1 {
+                // leave 1 pixel gap between two characters
+                let index = j - 1;
                 let char_font = font::FONT_BASIC[character as usize][i];
-                if char_font & (0x80 >> (j - 1)) != 0 {
+                if get_bit(char_font, index) != 0 {
                     fg_pixel
                 } else {
                     bg_pixel
                 }
             } else {
-                bg_pixel // 1 pixel between two characters
+                bg_pixel
             };
             framebuffer.draw_pixel(coordinate, pixel);
         }
@@ -224,3 +226,9 @@ pub fn fill_blank<P: Pixel>(
         coordinate.y += 1;
     }
 }
+
+/// Gets the i_th most significant bit of `char_font`. The returned value is `1` or `0`.
+fn get_bit(char_font: u8, i: usize) -> u8 {
+    char_font & (0x80 >> i)
+}
+
