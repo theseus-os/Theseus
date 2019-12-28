@@ -85,9 +85,8 @@ impl Displayable for TextDisplay {
 impl TextDisplay {
     /// Creates a new text displayable.
     /// # Arguments
-    /// * `(width, height)`: the size of the text area.
-    /// * `(fg_color, bg_color)`: the foreground and background color of the text area. The semantic of the color depends on the framebuffer the displayable will display in. For example, if the displayable displays in a alpha framebuffer, the value of the pixel represents an alpha channel and three RGB bytes.
-    /// * `transparency`: the transparency of the text displayable. It would be invalid if the framebuffer the displayable in does not support alpha channel.
+    /// * `width`, `height`: the dimensions of the text area, in number of characters.
+    /// * `fg_color`, `bg_color`: the colors used for the actual text and for the background behind the text, respectively.
     pub fn new(
         width: usize,
         height: usize,

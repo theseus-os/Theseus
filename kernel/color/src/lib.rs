@@ -25,7 +25,7 @@ impl Color {
         }
     }
 
-    /// Sets the transparency value of the color. 0 means the color is opaque
+    /// Sets the transparency value of the color. 0 means opaque and 0xFF is transparent.
     pub fn set_transparency(&mut self, trans: u8) {
         self.alpha = trans;
     }

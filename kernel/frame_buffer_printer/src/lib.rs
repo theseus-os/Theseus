@@ -22,7 +22,7 @@ type ASCII = u8;
 /// # Arguments
 /// * `framebuffer`: the framebuffer to display in.
 /// * `coordinate`: the left top coordinate of the text block relative to the origin(top-left point) of the frame buffer.
-/// * `(width, height)`: the size of the text block.
+/// * `width`, `height`: the size of the text block.
 /// * `slice`: the string to display.
 /// * `font_pixel`: the pixel value of font.
 /// * `bg_color`: the pixel value of background.
