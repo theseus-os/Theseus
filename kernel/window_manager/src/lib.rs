@@ -39,7 +39,7 @@ use core::slice;
 use mpmc::Queue;
 use event_types::{Event, MousePositionEvent};
 use frame_buffer::{FrameBuffer, AlphaPixel};
-use color::{Color, new_color};
+use color::{Color};
 use shapes::{Coord, Rectangle};
 use frame_buffer_compositor::{FRAME_COMPOSITOR};
 ////
@@ -84,7 +84,7 @@ static MOUSE_BASIC: [[Color; 2 * MOUSE_POINTER_HALF_SIZE + 1];
 // the border indicating new window position and size
 const WINDOW_BORDER_SIZE: usize = 3;
 // border's inner color
-const WINDOW_BORDER_COLOR_INNER: Color = new_color(0x00CA6F1E);
+const WINDOW_BORDER_COLOR_INNER: Color = Color::new(0x00CA6F1E);
 
 /// Window manager structure which maintains a list of windows and a mouse.
 pub struct WindowManager {

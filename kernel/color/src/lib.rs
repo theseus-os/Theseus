@@ -14,6 +14,17 @@ pub struct Color {
 }
 
 impl Color {
+
+    /// Creates a new `Color` structure from a 4 bytes ARGB representation.
+    pub const fn new(color: u32) -> Color {
+        Color {
+            alpha: (color >> 24) as u8,
+            red: (color >> 16) as u8,
+            green: (color >> 8) as u8,
+            blue: color as u8,
+        }
+    }
+
     /// Sets the transparency value of the color. 0 means the color is opaque
     pub fn set_transparency(&mut self, trans: u8) {
         self.alpha = trans;
@@ -32,31 +43,22 @@ impl PartialEq for Color {
 
 impl Eq for Color { }
 
-pub const fn new_color(color: u32) -> Color {
-    Color {
-        alpha: (color >> 24) as u8,
-        red: (color >> 16) as u8,
-        green: (color >> 8) as u8,
-        blue: color as u8,
-    }
-}
-
-pub const BLACK: Color = new_color(0x000000);
-pub const BLUE: Color = new_color(0x0000FF);
-pub const GREEN: Color = new_color(0x00FF00);
-pub const CYAN: Color = new_color(0x00FFFF);
-pub const RED: Color = new_color(0xFF0000);
-pub const MAGENTA: Color = new_color(0xFF00FF);
-pub const BROWN: Color = new_color(0xA52A2A);
-pub const LIGHTGRAY: Color = new_color(0xD3D3D3);
-pub const DARKGRAY: Color = new_color(0xA9A9A9);
-pub const LIGHTBLUE: Color = new_color(0xADD8E6);
-pub const LIGHTGREEN: Color = new_color(0x90EE90);
-pub const LIGHTCYAN: Color = new_color(0xE0FFFF);
-pub const PINK: Color = new_color(0xFFC0CB);
-pub const YELLOW: Color = new_color(0xFFFF00);
-pub const WHITE: Color = new_color(0xFFFFFF);
-pub const TRANSPARENT: Color = new_color(0xFF000000);
+pub const BLACK: Color = Color::new(0x000000);
+pub const BLUE: Color = Color::new(0x0000FF);
+pub const GREEN: Color = Color::new(0x00FF00);
+pub const CYAN: Color = Color::new(0x00FFFF);
+pub const RED: Color = Color::new(0xFF0000);
+pub const MAGENTA: Color = Color::new(0xFF00FF);
+pub const BROWN: Color = Color::new(0xA52A2A);
+pub const LIGHTGRAY: Color = Color::new(0xD3D3D3);
+pub const DARKGRAY: Color = Color::new(0xA9A9A9);
+pub const LIGHTBLUE: Color = Color::new(0xADD8E6);
+pub const LIGHTGREEN: Color = Color::new(0x90EE90);
+pub const LIGHTCYAN: Color = Color::new(0xE0FFFF);
+pub const PINK: Color = Color::new(0xFFC0CB);
+pub const YELLOW: Color = Color::new(0xFFFF00);
+pub const WHITE: Color = Color::new(0xFFFFFF);
+pub const TRANSPARENT: Color = Color::new(0xFF000000);
 
 impl From<Color> for RGBPixel {
     fn from(color: Color) -> Self {
