@@ -6,13 +6,11 @@
 
 extern crate frame_buffer;
 extern crate shapes;
-extern crate color;
 
 use core::iter::IntoIterator;
 
 use frame_buffer::{FrameBuffer, Pixel};
 use shapes::{Coord, Rectangle};
-use color::Color;
 
 /// The compositor trait.
 /// A compositor composites a list of buffers to a single buffer. It caches the information of incoming buffers for better performance.
@@ -26,7 +24,7 @@ pub trait Compositor<T: Mixable> {
     /// * `final_fb`: the final framebuffer that the compositor will composite the bufferlist with.
     /// * `bounding_boxes`: a interator over the bounding boxes to be updated. The compositor will update the parts of every framebuffer in the boxes or the whole framebuffer if the argument is `None`.
     /// A compositor can cache the updated parts for better performance.
-    fn composite<'a, U: IntoIterator<Item = T> + Clone, P: 'a + Pixel + From<Color>>(
+    fn composite<'a, U: IntoIterator<Item = T> + Clone, P: 'a + Pixel>(
         &mut self,
         bufferlist: impl IntoIterator<Item = FrameBufferUpdates<'a, P>>,
         final_fb: &mut FrameBuffer<P>,

@@ -34,11 +34,11 @@ pub struct TextDisplay {
 }
 
 impl Displayable for TextDisplay {
-    fn display<P: Pixel + From<Color>>(
+    fn display<P: Pixel> (
         &mut self,
         coordinate: Coord,
         framebuffer: &mut FrameBuffer<P>,
-    ) -> Result<Rectangle, &'static str> {
+    ) -> Result<Rectangle, &'static str> where Color: Into<P> {
         let (string, col, line) = if self.cache.len() > 0 && self.text.starts_with(self.cache.as_str()) {
             (
                 &self.text.as_str()[self.cache.len()..self.text.len()],
@@ -49,6 +49,7 @@ impl Displayable for TextDisplay {
             (self.text.as_str(), 0, 0)
         };
 
+        //let color = self.fg_color.clone() as Into<P>;
         let (next_col, next_line, mut bounding_box) = frame_buffer_printer::print_string(
             framebuffer,
             coordinate,

@@ -21,7 +21,6 @@ extern crate spin;
 extern crate lazy_static;
 extern crate hashbrown;
 extern crate shapes;
-extern crate color;
 
 use alloc::collections::BTreeMap;
 use alloc::vec::{Vec};
@@ -31,7 +30,6 @@ use compositor::{Compositor, FrameBufferUpdates, Mixable};
 use frame_buffer::{FrameBuffer, Pixel};
 use shapes::{Coord, Rectangle};
 use spin::Mutex;
-use color::Color;
 
 /// The height of a cache block. See the definition of `BlockCache`.
 pub const CACHE_BLOCK_HEIGHT:usize = 16;
@@ -180,7 +178,7 @@ impl FrameCompositor {
 }
 
 impl Compositor<Rectangle> for FrameCompositor {
-    fn composite<'a, U: IntoIterator<Item = Rectangle> + Clone, P: 'a + Pixel + From<Color>>(
+    fn composite<'a, U: IntoIterator<Item = Rectangle> + Clone, P: 'a + Pixel>(
         &mut self,
         bufferlist: impl IntoIterator<Item = FrameBufferUpdates<'a, P>>,
         final_fb: &mut FrameBuffer<P>,
@@ -220,7 +218,7 @@ impl Compositor<Rectangle> for FrameCompositor {
 }
 
 impl Compositor<Coord> for FrameCompositor {
-    fn composite<'a, U: IntoIterator<Item = Coord> + Clone, P: 'a + Pixel + From<Color>>(
+    fn composite<'a, U: IntoIterator<Item = Coord> + Clone, P: 'a + Pixel>(
         &mut self,
         bufferlist: impl IntoIterator<Item = FrameBufferUpdates<'a, P>>,
         final_fb: &mut FrameBuffer<P>,

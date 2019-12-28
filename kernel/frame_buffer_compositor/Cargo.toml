@@ -14,9 +14,6 @@ path = "../frame_buffer"
 [dependencies.shapes]
 path = "../shapes"
 
-[dependencies.color]
-path = "../color"
-
 [dependencies.compositor]
 path = "../compositor"
 

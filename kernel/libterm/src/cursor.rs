@@ -69,13 +69,13 @@ impl Cursor {
     /// * `framebuffer`: the framebuffer to display the cursor in.
     ///
     /// Returns a bounding box which wraps the cursor.
-    pub fn display<P: Pixel + From<Color>>(
+    pub fn display<P: Pixel>(
         &mut self,
         coordinate: Coord,
         column: usize,
         line: usize,
         framebuffer: &mut FrameBuffer<P>,
-    ) -> Result<Rectangle, &'static str> {
+    ) -> Result<Rectangle, &'static str> where Color: Into<P> {
         if self.blink() {
             if self.show() {
                 frame_buffer_drawer::fill_rectangle(

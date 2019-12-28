@@ -21,11 +21,11 @@ pub trait Displayable {
     /// * `framebuffer`: the framebuffer to display onto.
     ///
     /// Returns a rectangle that covers the updated part.
-    fn display<P: Pixel + From<Color>>(
+    fn display<P: Pixel>(
         &mut self,
         coordinate: Coord,
         framebuffer: &mut FrameBuffer<P>,
-    ) -> Result<Rectangle, &'static str> ;
+    ) -> Result<Rectangle, &'static str> where Color: Into<P>;
 
     /// Resizes the displayable area.
     fn resize(&mut self, width: usize, height: usize);
