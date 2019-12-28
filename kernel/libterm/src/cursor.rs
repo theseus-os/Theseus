@@ -22,19 +22,6 @@ pub struct Cursor {
 }
 
 impl Cursor {
-    /// Creates a new cursor object which is initially enabled. The `blink_interval` is initialized as `DEFAULT_CURSOR_FREQ` however one can change this at any time. `time` is set to current time. `pixel` represents the pixel value of the cursor's pixels.
-    pub fn new() -> Cursor {
-        Cursor {
-            enabled: true,
-            freq: DEFAULT_CURSOR_FREQ,
-            time: tsc_ticks(),
-            show: true,
-            color: Color::from(FONT_COLOR),
-            offset_from_end: 0,
-            underlying_char: 0,
-        }
-    }
-
     /// Reset the state of the cursor as unseen
     pub fn reset(&mut self) {
         self.show = true;
@@ -149,3 +136,18 @@ impl Cursor {
         self.underlying_char
     }
 }
+
+impl Default for Cursor  {
+    fn default() -> Self {
+        Cursor {
+            enabled: true,
+            freq: DEFAULT_CURSOR_FREQ,
+            time: tsc_ticks(),
+            show: true,
+            color: Color::from(FONT_COLOR),
+            offset_from_end: 0,
+            underlying_char: 0,
+        }
+    }
+}
+
