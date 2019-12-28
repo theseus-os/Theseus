@@ -38,7 +38,7 @@ use window::Window;
 
 pub mod cursor;
 
-pub const FONT_COLOR: Color = color::LIGHTGREEN;
+pub const FONT_COLOR: Color = color::LIGHT_GREEN;
 pub const BACKGROUND_COLOR: Color = color::BLACK;
 const DEFAULT_CURSOR_FREQ: u64 = 400000000;
 
