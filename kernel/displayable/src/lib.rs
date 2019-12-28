@@ -20,7 +20,7 @@ pub trait Displayable {
     /// * `coordinate`: the coordinate within the given `framebuffer` where this displayable should render itself. The `coordinate` is relative to the top-left point `(0, 0)` of the `framebuffer`.
     /// * `framebuffer`: the framebuffer to display onto.
     ///
-    /// Returns a rectangle that covers the updated area.
+    /// Returns a rectangle that covers the updated part.
     fn display<P: Pixel + From<Color>>(
         &mut self,
         coordinate: Coord,

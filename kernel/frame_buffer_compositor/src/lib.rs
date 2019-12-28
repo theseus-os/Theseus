@@ -98,7 +98,7 @@ impl FrameCompositor {
     }
 
     /// Checks if a block is already cached and update the new blocks.
-    /// This function will get the `index`_th block in the framebuffer and check if it is cached. If not, it will update the intersection of the block and the update are.
+    /// This function will get the `index`_th block in the framebuffer and check if it is cached. If not, it will update the intersection of the block and the bounding boxes.
     /// It then removes the cache overlaps with the block and caches the new one. 
     /// # Arguments
     /// * `src_fb`: the updated source framebuffer.

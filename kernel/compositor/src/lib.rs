@@ -25,7 +25,7 @@ pub trait Compositor<T: Mixable> {
     /// * `bufferlist`: an iterator over the buffers to be composited. Every item is a framebuffer and its position relative to the top-left of the screen. 
     /// * `final_fb`: the final framebuffer that the compositor will composite the bufferlist with.
     /// * `bounding_boxes`: a interator over the bounding boxes to be updated. The compositor will update the parts of every framebuffer in the boxes or the whole framebuffer if the argument is `None`.
-    /// A compositor can cache the updated areas for better performance.
+    /// A compositor can cache the updated parts for better performance.
     fn composite<'a, U: IntoIterator<Item = T> + Clone, P: 'a + Pixel + From<Color>>(
         &mut self,
         bufferlist: impl IntoIterator<Item = FrameBufferUpdates<'a, P>>,
@@ -80,7 +80,7 @@ impl Mixable for Rectangle {
         let (final_width, final_height) = final_fb.get_size();
         let (src_width, src_height) = src_fb.get_size();
  
-        // skip if the updated area is not in the final framebuffer
+        // skip if the updated part is not in the final framebuffer
         let final_start = Coord::new(
             core::cmp::max(0, self.top_left.x),
             core::cmp::max(0, self.top_left.y)
@@ -98,7 +98,7 @@ impl Mixable for Rectangle {
             return Ok(());
         }
                 
-        // skip if the updated area is not in the source framebuffer
+        // skip if the updated part is not in the source framebuffer
         let coordinate_start = final_start - src_coord;
         let coordinate_end = final_end - src_coord;
         if coordinate_end.x < 0

@@ -49,7 +49,7 @@ impl Displayable for TextDisplay {
             (self.text.as_str(), 0, 0)
         };
 
-        let (next_col, next_line, mut update_area) = frame_buffer_printer::print_string(
+        let (next_col, next_line, mut bounding_box) = frame_buffer_printer::print_string(
             framebuffer,
             coordinate,
             self.width,
@@ -62,14 +62,14 @@ impl Displayable for TextDisplay {
         );
 
         if next_line < self.next_line {
-            update_area.bottom_right.y = ((self.next_line + 1 ) * CHARACTER_HEIGHT) as isize
+            bounding_box.bottom_right.y = ((self.next_line + 1 ) * CHARACTER_HEIGHT) as isize
         }
 
         self.next_col = next_col;
         self.next_line = next_line;
         self.cache = self.text.clone();
 
-        return Ok(update_area + coordinate);
+        return Ok(bounding_box + coordinate);
     }
 
     fn resize(&mut self, width: usize, height: usize) {
