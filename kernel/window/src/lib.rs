@@ -3,7 +3,7 @@
 //! This library will create a window with default title bar and border. It handles the commonly used interactions like moving
 //! the window or close the window. Also, it is responsible to show title bar differently when window is active. 
 //!
-//! A window can render itself to the screen via a window manager. The window manager will compute the updated area and composites it with other existing windows according to their order.
+//! A window can render itself to the screen via a window manager. The window manager will compute the bounding box of the updated part and composites it with other existing windows according to their order.
 //!
 //! The library
 //! frees applications from handling the complicated interaction with window manager, however, advanced users could learn from
@@ -103,7 +103,8 @@ pub struct Window {
 
 impl Window {
     /// Creates a new Window at `coordinate` relative to the top-left of the screen and adds it to the window manager.
-    /// `width`, `height` represent the size of the window and `background` is the background color of the window. Currently the window is based on alpha framebuffer, so the pixel value of the background has an alpha channel and RGB bytes.
+    /// `width`, `height` represent the size of the window in number of pixels.
+    /// `background` is the background color of the window. Currently the window is based on alpha framebuffer, so the pixel value of the background has an alpha channel and RGB bytes.
     pub fn new(
         coordinate: Coord,
         width: usize,
@@ -307,8 +308,8 @@ impl Window {
         Ok(())
     }
 
-    /// Render a window to the screen. Should be invoked after updating.
-    pub fn render(&mut self, area: Option<Rectangle>) -> Result<(), &'static str> {
+    /// Render the part of the window in `bounding_box` to the screen. Refresh the whole window if `bounding_box` is `None`. The method should be invoked after updating.
+    pub fn render(&mut self, bounding_box: Option<Rectangle>) -> Result<(), &'static str> {
         let coordinate = {
             let window = self.inner.lock();
             window.get_position()
@@ -319,11 +320,11 @@ impl Window {
             .ok_or("The static window manager was not yet initialized")?
             .lock();
 
-        let absolute_area = match area {
-            Some(area) => Some(area + coordinate),
+        let absolute_box = match bounding_box {
+            Some(bounding_box) => Some(bounding_box + coordinate),
             None => None,
         };
-        wm.refresh_windows(absolute_area, true)
+        wm.refresh_windows(absolute_box, true)
     }
 
     /// Draw the border of this window, with argument of whether this window is active now

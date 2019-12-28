@@ -5,7 +5,7 @@
 //! A window manager owns a bottom framebuffer and a top framebuffer. The bottom is the background of the desktop and the top framebuffer contains a floating window border and a mouse arrow. 
 //! A window manager also contains a final framebuffer which is mapped to the screen. In refreshing an area, the manager will render all the framebuffers to the final one in order: bottom -> hide list -> showlist -> active -> top.
 //!
-//! The window manager provides methods to update a shaped rather than the whole screen for better performance. See crate `shape`.
+//! The window manager provides methods to update within some bounding boxes rather than the whole screen for better performance.
 
 #![no_std]
 
@@ -282,9 +282,9 @@ impl WindowManager {
         FRAME_COMPOSITOR.lock().composite(Some(top_buffer), &mut self.final_fb, pixels)
     }
 
-    /// Refresh `area` in every window. `area` is a rectangle relative to the top-left of the screen. Refresh the whole screen if area is None.
+    /// Refresh the part in `bounding_box` of every window. `bounding_box` is a rectangle relative to the top-left of the screen. Refresh the whole screen if the bounding box is None.
     /// Ignore the active window if `active` is false.
-    pub fn refresh_windows(&mut self, area: Option<Rectangle>, active: bool) -> Result<(), &'static str> {
+    pub fn refresh_windows(&mut self, bounding_box: Option<Rectangle>, active: bool) -> Result<(), &'static str> {
         // reference of windows
         let mut window_ref_list = Vec::new();
         for window in &self.hide_list {
@@ -313,46 +313,46 @@ impl WindowManager {
             }
         }).collect::<Vec<_>>();
         
-        FRAME_COMPOSITOR.lock().composite(bufferlist.into_iter(), &mut self.final_fb, area)
+        FRAME_COMPOSITOR.lock().composite(bufferlist.into_iter(), &mut self.final_fb, bounding_box)
     }
 
 
-    /// Refresh `area` in the active window. `area` is a rectangle relative to the top-left of the screen. Refresh the whole screen if area is None.
-    pub fn refresh_active_window(&mut self, area: Option<Rectangle>) -> Result<(), &'static str> {
+    /// Refresh the part in `bounding_box` of the active window. `bounding_box` is a rectangle relative to the top-left of the screen. Refresh the whole screen if the bounding box is None.
+    pub fn refresh_active_window(&mut self, bounding_box: Option<Rectangle>) -> Result<(), &'static str> {
         if let Some(window_ref) = self.active.upgrade() {
             let window = window_ref.lock();
             let buffer_update = FrameBufferUpdates {
                 framebuffer: &window.framebuffer,
                 coordinate: window.get_position(),
             };
-            FRAME_COMPOSITOR.lock().composite(Some(buffer_update), &mut self.final_fb, area)
+            FRAME_COMPOSITOR.lock().composite(Some(buffer_update), &mut self.final_fb, bounding_box)
         } else {
             Ok(())
         }
     }
 
-    /// Refresh `area` in the background and in every window. 
-    /// `area` is a rectangle relative to the top-left of the screen. Refresh the whole screen if area is None. 
+    /// Refresh the part in `bounding_box` of the background and every window. 
+    /// `bounding_box` is a rectangle relative to the top-left of the screen. Refresh the whole screen if area is None. 
     /// Ignore the active window if `active` is false.
-    pub fn refresh_bottom_windows(&mut self, area: Option<Rectangle>, active: bool) -> Result<(), &'static str> {
+    pub fn refresh_bottom_windows(&mut self, bounding_box: Option<Rectangle>, active: bool) -> Result<(), &'static str> {
         let bg_buffer = FrameBufferUpdates {
             framebuffer: &self.bottom_fb,
             coordinate: Coord::new(0, 0),
         }; 
 
-        FRAME_COMPOSITOR.lock().composite(Some(bg_buffer), &mut self.final_fb, area.into_iter())?;
-        self.refresh_windows(area, active)
+        FRAME_COMPOSITOR.lock().composite(Some(bg_buffer), &mut self.final_fb, bounding_box.into_iter())?;
+        self.refresh_windows(bounding_box, active)
     }
     
-    /// Refresh `area` in the top framebuffer of the window manager. It contains the mouse and moving floating window border.
-    /// `area` is a rectangle relative to the top-left of the screen. Update the whole screen if `area` is `None`.
-    pub fn refresh_top(&mut self, area: Option<Rectangle>) -> Result<(), &'static str> {
+    /// Refresh the part of the top framebuffer in `bounding_box`. The top framebuffer contains the mouse and moving floating window border.
+    /// `bounding_box` is a rectangle relative to the top-left of the screen. Update the whole screen if `bounding_box` is `None`.
+    pub fn refresh_top(&mut self, bounding_box: Option<Rectangle>) -> Result<(), &'static str> {
         let top_buffer = FrameBufferUpdates {
             framebuffer: &self.top_fb,
             coordinate: Coord::new(0, 0),
         }; 
 
-        FRAME_COMPOSITOR.lock().composite(Some(top_buffer), &mut self.final_fb, area)
+        FRAME_COMPOSITOR.lock().composite(Some(top_buffer), &mut self.final_fb, bounding_box)
     }
     
     /// pass keyboard event to currently active window
@@ -504,8 +504,8 @@ impl WindowManager {
             self.refresh_bottom_windows(Some(Rectangle{top_left: old_top_left, bottom_right: old_bottom_right}), false)?;
             self.refresh_floating_border(false, Coord::new(0, 0), Coord::new(0, 0))?;
             self.refresh_active_window(Some(Rectangle{top_left: new_top_left, bottom_right: new_bottom_right}))?;
-            let update_coords = self.get_mouse_coords();
-            self.refresh_top_pixels(update_coords.into_iter())?;
+            let bounding_box = self.get_mouse_coords();
+            self.refresh_top_pixels(bounding_box.into_iter())?;
         } else {
             return Err("cannot fid active window to move");
         }
@@ -544,8 +544,8 @@ impl WindowManager {
                 self.top_fb.overwrite_pixel(coordinate, T.into());
             }
         }
-        let update_coords = self.get_mouse_coords();
-        self.refresh_bottom_windows_pixels(update_coords.into_iter())?;
+        let bounding_box = self.get_mouse_coords();
+        self.refresh_bottom_windows_pixels(bounding_box.into_iter())?;
 
         // draw new mouse
         self.mouse = new;
@@ -561,8 +561,8 @@ impl WindowManager {
                 self.top_fb.overwrite_pixel(coordinate, pixel);
             }
         }
-        let update_coords = self.get_mouse_coords();
-        self.refresh_top_pixels(update_coords.into_iter())?;
+        let bounding_box = self.get_mouse_coords();
+        self.refresh_top_pixels(bounding_box.into_iter())?;
 
         Ok(())
     }

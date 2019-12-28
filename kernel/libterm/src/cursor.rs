@@ -80,6 +80,8 @@ impl Cursor {
     /// * `column`: the column of the cursor in the textarea.
     /// * `line`: the line of the cursor in the textarea.
     /// * `framebuffer`: the framebuffer to display the cursor in.
+    ///
+    /// Returns a bounding box which wraps the cursor.
     pub fn display<P: Pixel + From<Color>>(
         &mut self,
         coordinate: Coord,
@@ -119,12 +121,12 @@ impl Cursor {
                 (column * CHARACTER_WIDTH) as isize,
                 (line * CHARACTER_HEIGHT) as isize,
             );
-        let update_area = Rectangle {
+        let bounding_box = Rectangle {
             top_left: top_left,
             bottom_right: top_left + (CHARACTER_WIDTH as isize, CHARACTER_HEIGHT as isize),
         };
 
-        Ok(update_area)
+        Ok(bounding_box)
     }
 
     /// Sets the position of the cursor relative to the end of the command

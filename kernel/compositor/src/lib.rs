@@ -16,21 +16,21 @@ use color::Color;
 
 /// The compositor trait.
 /// A compositor composites a list of buffers to a single buffer. It caches the information of incoming buffers for better performance.
-/// The incoming list contains framebuffers and an iterator on shaped areas to update. The compositor will refresh the shape in every framebuffer.
-/// `T` specifies the type of a shape. It implements `Mixable` which can mix a shaped area in the source framebuffer to the final one.
+/// The incoming list contains framebuffers and an iterator on bounding boxes. The compositor will refresh the part of every framebuffer in the bounding boxes.
+/// `T` specifies the type of a bounding box. It implements `Mixable` which can mix the part of a framebuffer within the box to the final one.
 pub trait Compositor<T: Mixable> {
     /// Composites the buffers in the bufferlist.
     ///
     /// # Arguments
     /// * `bufferlist`: an iterator over the buffers to be composited. Every item is a framebuffer and its position relative to the top-left of the screen. 
     /// * `final_fb`: the final framebuffer that the compositor will composite the bufferlist with.
-    /// * `updates`: a interator over the shaped to be updated. The compositor will update the shape in every framebuffer in order or the whole framebuffer if it is `None`.
+    /// * `bounding_boxes`: a interator over the bounding boxes to be updated. The compositor will update the parts of every framebuffer in the boxes or the whole framebuffer if the argument is `None`.
     /// A compositor can cache the updated areas for better performance.
     fn composite<'a, U: IntoIterator<Item = T> + Clone, P: 'a + Pixel + From<Color>>(
         &mut self,
         bufferlist: impl IntoIterator<Item = FrameBufferUpdates<'a, P>>,
         final_fb: &mut FrameBuffer<P>,
-        updates: U
+        bounding_boxes: U
     ) -> Result<(), &'static str>;
 }
 
@@ -43,7 +43,7 @@ pub struct FrameBufferUpdates<'a, P: Pixel> {
     pub coordinate: Coord,
 }
 
-/// A `Mixable` is an item that can be mixed with the final framebuffer. A compositor can mix a list of shaped items with the final framebuffer rather than mix the whole framebuffer for better performance.
+/// A `Mixable` is an item that can be mixed with the final framebuffer. A compositor can mix the parts in some bounding boxes to the final framebuffer rather than mix the whole framebuffer for better performance.
 pub trait Mixable {
     /// Mix the item in the `src_fb` framebuffer with the final framebuffer. `src_coord` is the position of the source framebuffer relative to the top-left of the final buffer.
     fn mix_buffers<P: Pixel>(

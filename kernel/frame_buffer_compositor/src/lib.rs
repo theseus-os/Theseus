@@ -7,7 +7,7 @@
 //!
 //! First, it divides every incoming framebuffer into blocks. The height of every block is a constant 16 except for the last one. The width of a block is the same as the width of the framebuffer it belongs to. A block is a continuous array so that we can compute its hash to compare the content of two blocks.
 //!
-//! In the next step, the compositor chooses all the blocks that overlap the given shape of pixels to be displayed and checks if each block is already cached. If the answer is no, the compositor will refresh the intersection of the block with the updated shape.
+//! In the next step, the compositor chooses all the blocks that overlap the given bounding box and checks if each block is already cached. If the answer is no, the compositor will refresh the part of the block within the bounding box.
 //!
 //! Once a block is refreshed, the compositor will remove all the existing caches overlap with it and cache the new one.
 
@@ -105,14 +105,14 @@ impl FrameCompositor {
     /// * `final_fn`: the final framebuffer mapped to the screen.
     /// * `coordinate`: the position of the source framebuffer relative to the final one.
     /// * `index`: the index of the block to be rendered. The framebuffer are divided into y-aligned blocks and index indicates the order of the block.
-    /// * `area`: the rectangle to be updated.
+    /// * `bounding_box`: the bounding box of the part to update.
     fn check_cache_and_mix<P: Pixel>(
         &mut self, 
         src_fb: &FrameBuffer<P>, 
         final_fb: &mut FrameBuffer<P>, 
         coordinate: Coord, 
         index: usize, 
-        area: &Rectangle
+        bounding_box: &Rectangle
     ) -> Result<(), &'static str> {
         let (src_width, src_height) = src_fb.get_size();
         let src_buffer_len = src_width * src_height;
@@ -155,12 +155,12 @@ impl FrameCompositor {
 
         let update_rect = Rectangle {
             top_left: Coord::new(
-                area.top_left.x,
-                core::cmp::max((index * CACHE_BLOCK_HEIGHT) as isize + coordinate.y, area.top_left.y),
+                bounding_box.top_left.x,
+                core::cmp::max((index * CACHE_BLOCK_HEIGHT) as isize + coordinate.y, bounding_box.top_left.y),
             ),
             bottom_right: Coord::new(
-                area.bottom_right.x,
-                core::cmp::min(((index + 1) * CACHE_BLOCK_HEIGHT) as isize + coordinate.y, area.bottom_right.y)
+                bounding_box.bottom_right.x,
+                core::cmp::min(((index + 1) * CACHE_BLOCK_HEIGHT) as isize + coordinate.y, bounding_box.bottom_right.y)
             )
         };
 
@@ -184,19 +184,19 @@ impl Compositor<Rectangle> for FrameCompositor {
         &mut self,
         bufferlist: impl IntoIterator<Item = FrameBufferUpdates<'a, P>>,
         final_fb: &mut FrameBuffer<P>,
-        updates: U
+        bounding_boxes: U
     ) -> Result<(), &'static str> {
         //let mut final_fb = FINAL_FRAME_BUFFER.try().ok_or("FrameCompositor fails to get the final frame buffer")?.lock();
         //let final_fb = final_fb_locked.deref_mut();
-        let update_area = updates.into_iter().next();
+        let bounding_box = bounding_boxes.into_iter().next();
         for frame_buffer_updates in bufferlist.into_iter() {
             let src_fb = frame_buffer_updates.framebuffer;
             let coordinate = frame_buffer_updates.coordinate;
-            match &update_area {
-                Some(area) => {
-                    let blocks = get_block_index_iter(src_fb, coordinate, area);
+            match &bounding_box {
+                Some(rect) => {
+                    let blocks = get_block_index_iter(src_fb, coordinate, rect);
                     for block in blocks {
-                        self.check_cache_and_mix(src_fb, final_fb, coordinate, block, &area)?;
+                        self.check_cache_and_mix(src_fb, final_fb, coordinate, block, &rect)?;
                     } 
                 },
                 None => {
@@ -224,12 +224,12 @@ impl Compositor<Coord> for FrameCompositor {
         &mut self,
         bufferlist: impl IntoIterator<Item = FrameBufferUpdates<'a, P>>,
         final_fb: &mut FrameBuffer<P>,
-        updates: U
+        bounding_boxes: U
     ) -> Result<(), &'static str> {
         //let mut final_fb = FINAL_FRAME_BUFFER.try().ok_or("FrameCompositor fails to get the final frame buffer")?.lock();
 
         for frame_buffer_updates in bufferlist {
-            for pixel in updates.clone() {
+            for pixel in bounding_boxes.clone() {
                 pixel.mix_buffers(
                     frame_buffer_updates.framebuffer,
                     final_fb,
@@ -241,17 +241,17 @@ impl Compositor<Coord> for FrameCompositor {
     }
 }
 
-/// Gets a iterator over the block indexes to be updated in the framebuffer.
+/// Gets an iterator over the block indexes to update in the framebuffer.
 /// # Arguments
 /// * `framebuffer`: the framebuffer to composite.
 /// * `coordinate`: the coordinate of the framebuffer relative to the origin(top-left) of the screen.
-/// * `area`: the updated area relative to the origin(top-left) of the screen. The returned indexes represent the blocks overlap with this area.
+/// * `bounding_box`: the bounding box to update relative to the origin(top-left) of the screen. The returned indexes represent the blocks overlap with this area.
 pub fn get_block_index_iter<P: Pixel>(
     framebuffer: &FrameBuffer<P>, 
     coordinate: Coord, 
-    abs_area: &Rectangle
+    bounding_box: &Rectangle
 ) -> core::ops::Range<usize> {
-    let relative_area = *abs_area - coordinate;
+    let relative_area = *bounding_box - coordinate;
     let (width, height) = framebuffer.get_size();
 
     let start_x = core::cmp::max(relative_area.top_left.x, 0);

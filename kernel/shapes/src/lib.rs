@@ -1,4 +1,4 @@
-//! This crate defines the basic shapes used in the framebuffer compositor.
+//! This crate defines the basic shapes used for display.
 
 #![no_std]
 

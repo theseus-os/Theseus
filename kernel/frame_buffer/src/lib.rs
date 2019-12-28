@@ -175,8 +175,8 @@ impl<P: Pixel> FrameBuffer<P> {
     /// Checks if a framebuffer overlaps with an area.
     /// # Arguments
     /// * `coordinate`: the top-left corner of the area relative to the origin(top-left point) of the frame buffer.
-    /// * `width`: the width of the area.
-    /// * `height`: the height of the area.
+    /// * `width`: the width of the area in number of pixels.
+    /// * `height`: the height of the area in number of pixels.
     pub fn overlaps_with(&mut self, coordinate: Coord, width: usize, height: usize) -> bool {
         let (buffer_width, buffer_height) = self.get_size();
         coordinate.x < buffer_width as isize && coordinate.x + width as isize >= 0

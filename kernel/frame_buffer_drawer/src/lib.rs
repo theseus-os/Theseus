@@ -76,8 +76,8 @@ pub fn draw_line<P: Pixel>(
 /// # Arguments
 /// * `framebuffer`: the framebuffer to draw in.
 /// * `coordinate`: the left top coordinate of the rectangle relative to the origin(top-left point) of the framebuffer.
-/// * `width`: the width of the rectangle.
-/// * `height`: the height of the rectangle.
+/// * `width`: the width of the rectangle in number of pixels.
+/// * `height`: the height of the rectangle in number of pixels.
 /// * `color`: the color of the rectangle's border.
 pub fn draw_rectangle<P: Pixel>(
     framebuffer: &mut FrameBuffer<P>,
@@ -136,8 +136,8 @@ pub fn draw_rectangle<P: Pixel>(
 /// # Arguments
 /// * `framebuffer`: the framebuffer to draw in.
 /// * `coordinate`: the left top coordinate of the retangle relative to the origin(top-left point) of the frame buffer.
-/// * `width`: the width of the rectangle.
-/// * `height`: the height of the rectangle.
+/// * `width`: the width of the rectangle in number of pixels.
+/// * `height`: the height of the rectangle in number of pixels.
 /// * `pixel`: the pixel value of the rectangle.
 pub fn fill_rectangle<P: Pixel>(
     framebuffer: &mut FrameBuffer<P>,

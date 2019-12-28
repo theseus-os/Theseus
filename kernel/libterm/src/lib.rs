@@ -640,18 +640,18 @@ impl Terminal {
         let cursor_col = cursor_pos % col_num;
 
         // Get the container to display the cursor in
-        let update_area = {
+        let bounding_box = {
             let mut window = self.window.inner.lock();
-            let area = self.cursor.display(
+            let bounding_box = self.cursor.display(
                 coordinate,
                 cursor_col,
                 cursor_line,
                 &mut window.framebuffer,
             )?;
-            area
+            bounding_box
         };   
 
-        self.window.render(Some(update_area))
+        self.window.render(Some(bounding_box))
     }
 
     /// Gets the position of the cursor relative to the end of text in number of characters.
