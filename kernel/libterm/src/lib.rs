@@ -454,7 +454,7 @@ impl Terminal {
             scroll_start_idx: 0,
             is_scroll_end: true,
             text_display: text_display,
-            cursor: Cursor::new(),
+            cursor: Cursor::default(),
         };
         terminal.display_text()?;
 
