@@ -1,0 +1,25 @@
+[package]
+name = "test_rendezvous"
+version = "0.1.0"
+description = "Tests the synchronous rendezvous-based channel with multiple tasks"
+authors = ["Kevin Boos <kevinaboos@gmail.com>"]
+build = "../../build.rs"
+
+[dependencies.log]
+default-features = false
+version = "0.3.7"
+
+[dependencies.scheduler]
+path = "../../kernel/scheduler"
+
+[dependencies.task]
+path = "../../kernel/task"
+
+[dependencies.apic]
+path = "../../kernel/apic"
+
+[dependencies.spawn]
+path = "../../kernel/spawn"
+
+[dependencies.rendezvous]
+path = "../../kernel/rendezvous"

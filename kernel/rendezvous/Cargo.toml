@@ -1,0 +1,35 @@
+[package]
+authors = ["Kevin Boos <kevinaboos@gmail.com>"]
+name = "rendezvous"
+description = "Synchronous Inter-Task Communication using a rendezvous approach"
+version = "0.1.0"
+build = "../../build.rs"
+
+[dependencies]
+spin = "0.4.10"
+# x86_64 = { git = "https://github.com/kevinaboos/x86_64" }
+x86_64 = { path = "../../libs/x86_64" } # currently using our local copy, forked from Phil Opp's crate
+
+
+[dependencies.log]
+default-features = false
+version = "0.3.7"
+
+[dependencies.irq_safety]
+git = "https://github.com/kevinaboos/irq_safety"
+
+[dependencies.task]
+path = "../task"
+
+[dependencies.scheduler]
+path = "../scheduler"
+
+[dependencies.wait_queue]
+path = "../wait_queue"
+
+[dependencies.mutex_sleep]
+path = "../mutex_sleep"
+
+
+[lib]
+crate-type = ["rlib"]
