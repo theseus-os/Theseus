@@ -1,7 +1,7 @@
 #![no_std]
 extern crate frame_buffer;
 
-use frame_buffer::{RGBPixel, AlphaPixel};
+use frame_buffer::{RGBPixel, AlphaPixel, Pixel, IntoPixel};
 
 /// This structure represents an RGBA color value. It can turn into an alpha pixel or a pixel for framebuffers that does not support the alpha channel.
 #[derive(Clone, Copy)]
@@ -79,5 +79,13 @@ impl From<Color> for AlphaPixel {
             green: color.green,
             blue: color.blue
         }
+    }
+}
+
+impl<P> IntoPixel<P> for Color 
+    where P: Pixel,
+    Color: Into<P> {
+    fn into_pixel(self) -> P {
+        self.into()
     }
 }

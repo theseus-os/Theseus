@@ -15,6 +15,12 @@ pub trait Pixel: Copy + Hash {
     fn weight_mix(origin: Self, other: Self, mix: f32) -> Self;
 }
 
+/// Any structure who implements the trait can turn into a pixel
+pub trait IntoPixel<P> where P: Pixel {
+    /// Turn the object into a pixel
+    fn into_pixel(self) -> P;
+}
+
 #[repr(C, packed)]
 #[derive(Hash, Debug, Clone, Copy)]
 /// An RGB Pixel is a pixel with no extra channel.
