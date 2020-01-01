@@ -1,4 +1,4 @@
-//! Synchronous Inter-Task Communication (ITC) using a rendezvous approach.
+//! A rendezvous-based channel for synchronous Inter-Task Communication (ITC).
 //! 
 //! This crate offers a rendezvous channel, in which two tasks can exchange messages
 //! without an intermediary buffer. 
@@ -19,16 +19,41 @@ extern crate irq_safety;
 extern crate wait_queue;
 extern crate task;
 extern crate scheduler;
-// extern crate mutex_sleep;
+extern crate mutex_sleep;
 
 use core::fmt;
 use alloc::sync::Arc;
 use irq_safety::MutexIrqSafe;
-// use mutex_sleep::MutexSleep;
+use spin::Mutex;
 use wait_queue::WaitGuard;
 
+// struct InnerSlot<T>(MutexIrqSafe<ExchangeState<T>>);
 
-enum WaitEntry<T> {
+/// 
+struct ExchangeSlot<T> {
+    sender:   Option<Arc<MutexIrqSafe<ExchangeState<T>>>>,
+    receiver: Option<Arc<MutexIrqSafe<ExchangeState<T>>>>,
+}
+impl<T> ExchangeSlot<T> {
+    fn new() -> ExchangeSlot<T> {
+        let inner = Arc::new(MutexIrqSafe::new(ExchangeState::Init));
+        ExchangeSlot {
+            sender:   Some(inner.clone()),
+            receiver: Some(inner),
+        }
+    }
+
+    // fn take_sender_slot(&mut self) -> ExchangeSlotGuard<T> {
+    //     unimplemented!()
+    // }
+
+    // fn take_receiver_slot(&mut self) -> ExchangeSlotGuard<T> {
+    //     unimplemented!()
+    // }
+}
+
+
+enum ExchangeState<T> {
     /// Initial state: we're waiting for either a sender or a receiver.
     Init,
     /// A sender has arrived. 
@@ -46,14 +71,14 @@ enum WaitEntry<T> {
     /// and it is the receivers's responsibility to reset to the initial state.
     SenderFinishedFirst(T),
 }
-impl<T> fmt::Debug for WaitEntry<T> {
+impl<T> fmt::Debug for ExchangeState<T> {
     fn fmt(&self, f: &mut fmt::Formatter) -> fmt::Result {
-        write!(f, "WaitEntry::{}", match self {
-            WaitEntry::Init => "Init",
-            WaitEntry::WaitingForReceiver(..) => "WaitingForReceiver",
-            WaitEntry::WaitingForSender(..) => "WaitingForSender",
-            WaitEntry::ReceiverFinishedFirst => "ReceiverFinishedFirst",
-            WaitEntry::SenderFinishedFirst(..) => "SenderFinishedFirst",
+        write!(f, "ExchangeState::{}", match self {
+            ExchangeState::Init => "Init",
+            ExchangeState::WaitingForReceiver(..) => "WaitingForReceiver",
+            ExchangeState::WaitingForSender(..) => "WaitingForSender",
+            ExchangeState::ReceiverFinishedFirst => "ReceiverFinishedFirst",
+            ExchangeState::SenderFinishedFirst(..) => "SenderFinishedFirst",
         })
     }
 }
@@ -71,17 +96,56 @@ impl<T> fmt::Debug for WaitEntry<T> {
 
 pub fn new_channel<T: Send>() -> (Sender<T>, Receiver<T>) {
     let channel = Arc::new(Channel::<T> {
-        waiter: MutexIrqSafe::new(WaitEntry::Init),
+        slot: Mutex::new(ExchangeSlot::new()),
     });
     (Sender::new(channel.clone()), Receiver::new(channel))
 }
 
 
+
+// struct ExchangeSlotGuard<'m, T> {
+//     is_sender: bool,
+//     slot: Arc<MutexIrqSafe<ExchangeState<T>>>,
+//     inner_slot_ref: &'m Mutex<ExchangeSlot<T>>,
+// }
+// impl<'s, T> Drop for ExchangeSlotGuard<'s, T> {
+//     fn drop(&mut self) {
+//         let newly_available_slot = core::mem::replace(&mut self.slot, Arc::default());
+//         if is_sender {
+//             *self.inner_slot_ref.lock().sender = Some(newly_available_slot);
+//         } else {
+//             *self.inner_slot_ref.lock().receiver = Some(newly_available_slot);
+//         }
+//     }
+// }
+
+
+
 /// The inner channel for synchronous, rendezvous-based communication
 /// between `Sender`s and `Receiver`s.
 struct Channel<T: Send> {
-    waiter: MutexIrqSafe<WaitEntry<T>>,
+    /// In a zero-capacity synchronous channel, there is only a single slot,
+    /// but senders and receivers perform a blocking wait on it until the slot becomes available.
+    /// In contrast, a synchronous channel with a capacity of 1 would return a "channel full" error
+    /// if the slot was taken, instead of blocking. 
+    slot: Mutex<ExchangeSlot<T>>,
 }
+// impl<T: Send> Channel<T> {
+//     fn take_sender_slot(&mut self) -> ExchangeSlotGuard<T> {
+//         loop {
+//             if let Some(s) = self.channel.slot.lock().sender.take() {
+//                 return ExchangeSlotGuard {
+
+//                 };
+//             }
+//             scheduler::schedule();
+//         }
+//     }
+
+//     fn take_receiver_slot(&mut self) -> ExchangeSlotGuard<T> {
+//         unimplemented!()
+//     }
+// }
 
 
 pub struct Sender<T: Send> {
@@ -101,46 +165,55 @@ impl <T: Send> Sender<T> {
     pub fn send(&self, msg: T) -> Result<(), &'static str> {
         let curr_task = task::get_my_current_task().ok_or("couldn't get current task")?;
 
-        // TODO: block on obtaining a wait slot with a valid state: either Init or WaitingForSender
+        // obtain a sender-side exchange slot, blocking if necessary
+        let slot_ref = loop {
+            trace!("Sender is waiting for slot to become available...");
+            if let Some(s) = self.channel.slot.lock().sender.take() {
+                break s;
+            }
+            trace!("Sender slot was taken...");
+            scheduler::schedule();
+        };
 
-        // Here, either the sender (us) arrived first and needs to wait for a receiver,
+        // Here, either the sender (this task) arrived first and needs to wait for a receiver,
         // or a receiver has already arrived and is waiting for a sender. 
         {
-            let _held_interrupts = {
-                let mut wait_entry = self.channel.waiter.lock();
-                // Temporarily take ownership of the channel's waiting state so we can modify it;
-                // the match statement below will advance the waiting state to the proper next state.
-                let current_state = core::mem::replace(&mut *wait_entry, WaitEntry::Init);
-                match current_state {
-                    WaitEntry::Init => {
-                        // hold interrupts to avoid blocking & descheduling this task until we release the waiter lock.
-                        let held_interrupts = irq_safety::hold_interrupts();
-                        *wait_entry = WaitEntry::WaitingForReceiver(WaitGuard::new(curr_task.clone()), msg);
-                        held_interrupts
-                    }
-                    WaitEntry::WaitingForSender(receiver_to_nofity) => {
-                        *wait_entry = WaitEntry::SenderFinishedFirst(msg);
-                        drop(receiver_to_nofity); // notifies the receiver
-                        // the message has been sent successfully!
-                        return Ok(());
-                    }
-                    other => {
-                        error!("BUG: Sender (at beginning) in invalid state {:?}", other);
-                        *wait_entry = other;
-                        return Err("BUG: Sender (at beginning) in invalid state");
-                    }
+            let mut slot = slot_ref.lock();
+            // Temporarily take ownership of the channel's waiting state so we can modify it;
+            // the match statement below will advance the waiting state to the proper next state.
+            let current_state = core::mem::replace(&mut *slot, ExchangeState::Init);
+            match current_state {
+                ExchangeState::Init => {
+                    // Hold interrupts to avoid blocking & descheduling this task until we release the slot lock,
+                    // which is currently done automatically because the slot uses a MutexIrqSafe.
+                    *slot = ExchangeState::WaitingForReceiver(WaitGuard::new(curr_task.clone()), msg);
                 }
-                // here, the waiter lock is dropped
-            };
-            // here, interrupts are re-enabled and this task (the sender) will be descheduled
+                ExchangeState::WaitingForSender(receiver_to_nofity) => {
+                    *slot = ExchangeState::SenderFinishedFirst(msg);
+                    // The message has been sent successfully! Notify the receiver task.
+                    drop(receiver_to_nofity);
+                    // Note that here we do NOT return/restore the sender slot to the channel yet; 
+                    // that will be done once the receiver is also finished with the slot (in SenderFinishedFirst).
+                    return Ok(());
+                }
+                other => {
+                    error!("BUG: Sender (at beginning) in invalid state {:?}", other);
+                    *slot = other;
+                    // restore the sender slot
+                    self.channel.slot.lock().sender = Some(slot_ref.clone());
+                    return Err("BUG: Sender (at beginning) in invalid state");
+                }
+            }
+            // here, the waiter lock is dropped
         }
+        scheduler::schedule();
 
-        // Here, the sender (us) is waiting for a receiver
+        // Here, the sender (this task) is waiting for a receiver
         loop {
             {
-                let wait_entry = self.channel.waiter.lock();
-                match &*wait_entry {
-                    WaitEntry::WaitingForReceiver(blocked_sender, ..) => {
+                let slot = slot_ref.lock();
+                match &*slot {
+                    ExchangeState::WaitingForReceiver(blocked_sender, ..) => {
                         warn!("spurious wakeup while sender is waiting for receiver... re-blocking task.");
                         if blocked_sender.task() != curr_task {
                             return Err("BUG: CURR TASK WAS DIFFERENT THAN BLOCKED SENDER");
@@ -154,23 +227,30 @@ impl <T: Send> Sender<T> {
         }
 
         // Here, we are at the rendezvous point
-        let mut wait_entry = self.channel.waiter.lock();
-        // Temporarily take ownership of the channel's waiting state so we can modify it;
-        // the match statement below will advance the waiting state to the proper next state.
-        let current_state = core::mem::replace(&mut *wait_entry, WaitEntry::Init);
-        match current_state {
-            WaitEntry::ReceiverFinishedFirst => {
-                *wait_entry = WaitEntry::Init; // start over: ready to transfer another message.
-                Ok(())
+        let retval = {
+            let mut slot = slot_ref.lock();
+            // Temporarily take ownership of the channel's waiting state so we can modify it;
+            // the match statement below will advance the waiting state to the proper next state.
+            let current_state = core::mem::replace(&mut *slot, ExchangeState::Init);
+            match current_state {
+                ExchangeState::ReceiverFinishedFirst => {
+                    *slot = ExchangeState::Init; // ready to transfer another message.
+                    // restore the receiver slot now that the receiver is finished.
+                    self.channel.slot.lock().receiver = Some(slot_ref.clone());
+                    Ok(())
+                }
+                other => {
+                    error!("BUG: Sender (while waiting) in invalid state {:?}", other);
+                    *slot = other;
+                    Err("BUG: Sender (while waiting) in invalid state")
+                }
             }
-            other => {
-                error!("BUG: Sender (while waiting) in invalid state {:?}", other);
-                *wait_entry = other;
-                Err("BUG: Sender (while waiting) in invalid state")
-            }
-        }
-
-
+        };
+        
+        // restore the sender slot now that we're completely done with it
+        trace!("sender done, restoring slot");
+        self.channel.slot.lock().sender = Some(slot_ref.clone());
+        retval
         
         /*
         loop {
@@ -223,44 +303,55 @@ impl <T: Send> Receiver<T> {
     pub fn receive(&self) -> Result<T, &'static str> {
         let curr_task = task::get_my_current_task().ok_or("couldn't get current task")?;
         
-        // TODO: block on obtaining a wait slot with a valid state: either Init or WaitingForSender
+        // obtain a receiver-side exchange slot, blocking if necessary
+        let slot_ref = loop {
+            trace!("Receiver is waiting for slot to become available...");
+            if let Some(r) = self.channel.slot.lock().receiver.take() {
+                break r;
+            }
+            trace!("Receiver slot was taken...");
+            scheduler::schedule();
+        };
 
-        // Here, either the receiver (us) arrived first and needs to wait for a sender,
+        // Here, either the receiver (this task) arrived first and needs to wait for a sender,
         // or a sender has already arrived and is waiting for a receiver. 
         {
-            let _held_interrupts = {
-                let mut wait_entry = self.channel.waiter.lock();
-                // Temporarily take ownership of the channel's waiting state so we can modify it;
-                // the match statement below will advance the waiting state to the proper next state.
-                let current_state = core::mem::replace(&mut *wait_entry, WaitEntry::Init);
-                match current_state {
-                    WaitEntry::Init => {
-                        // hold interrupts to avoid blocking & descheduling this task until we release the waiter lock.
-                        let held_interrupts = irq_safety::hold_interrupts();
-                        *wait_entry = WaitEntry::WaitingForSender(WaitGuard::new(curr_task.clone()));
-                        held_interrupts
-                    }
-                    WaitEntry::WaitingForReceiver(sender_to_notify, msg) => {
-                        *wait_entry = WaitEntry::ReceiverFinishedFirst;
-                        drop(sender_to_notify); // notifies the sender
-                        return Ok(msg);
-                    }
-                    _x => {
-                        error!("BUG: Receiver (at beginning) in invalid state {:?}", _x);
-                        return Err("BUG: Receiver (at beginning) in invalid state");
-                    }
+            let mut slot = slot_ref.lock();
+            // Temporarily take ownership of the channel's waiting state so we can modify it;
+            // the match statement below will advance the waiting state to the proper next state.
+            let current_state = core::mem::replace(&mut *slot, ExchangeState::Init);
+            match current_state {
+                ExchangeState::Init => {
+                    // Hold interrupts to avoid blocking & descheduling this task until we release the slot lock,
+                    // which is currently done automatically because the slot uses a MutexIrqSafe.
+                    *slot = ExchangeState::WaitingForSender(WaitGuard::new(curr_task.clone()));
                 }
-                // here, the waiter lock is dropped
-            };
-            // here, interrupts are re-enabled and this task (the sender) will be descheduled
+                ExchangeState::WaitingForReceiver(sender_to_notify, msg) => {
+                    *slot = ExchangeState::ReceiverFinishedFirst;
+                    // The message has been received successfully! Notify the sender task.
+                    drop(sender_to_notify);
+                    // Note that here we do NOT return/restore the sender slot to the channel yet; 
+                    // that will be done once the sender is also finished with the slot (in ReceiverFinishedFirst).
+                    return Ok(msg);
+                }
+                other => {
+                    error!("BUG: Receiver (at beginning) in invalid state {:?}", other);
+                    *slot = other;
+                    // restore the receiver slot
+                    self.channel.slot.lock().receiver = Some(slot_ref.clone());
+                    return Err("BUG: Receiver (at beginning) in invalid state");
+                }
+            }
+            // here, the waiter lock is dropped
         }
+        scheduler::schedule();
 
-        // Here, the receiver (us) is waiting for a sender
+        // Here, the receiver (this task) is waiting for a sender
         loop {
             {
-                let wait_entry = self.channel.waiter.lock();
-                match &*wait_entry {
-                    WaitEntry::WaitingForSender(blocked_receiver) => {
+                let slot = slot_ref.lock();
+                match &*slot {
+                    ExchangeState::WaitingForSender(blocked_receiver) => {
                         warn!("spurious wakeup while receiver is WaitingForSender... re-blocking task.");
                         if blocked_receiver.task() != curr_task {
                             return Err("BUG: CURR TASK WAS DIFFERENT THAN BLOCKED RECEIVER");
@@ -275,21 +366,30 @@ impl <T: Send> Receiver<T> {
 
 
         // Here, we are at the rendezvous point
-        let mut wait_entry = self.channel.waiter.lock();
-        // Temporarily take ownership of the channel's waiting state so we can modify it;
-        // the match statement below will advance the waiting state to the proper next state.
-        let current_state = core::mem::replace(&mut *wait_entry, WaitEntry::Init);
-        match current_state {
-            WaitEntry::SenderFinishedFirst(msg) => {
-                *wait_entry = WaitEntry::Init;
-                Ok(msg)
+        let retval = {
+            let mut slot = slot_ref.lock();
+            // Temporarily take ownership of the channel's waiting state so we can modify it;
+            // the match statement below will advance the waiting state to the proper next state.
+            let current_state = core::mem::replace(&mut *slot, ExchangeState::Init);
+            match current_state {
+                ExchangeState::SenderFinishedFirst(msg) => {
+                    *slot = ExchangeState::Init; // ready to transfer another message.
+                    // restore the sender slot now that the sender is finished.
+                    self.channel.slot.lock().sender = Some(slot_ref.clone());
+                    Ok(msg)
+                }
+                other => {
+                    error!("BUG: Receiver (at end) in invalid state {:?}", other);
+                    *slot = other;
+                    Err("BUG: Receiver (at end) in invalid state")
+                }
             }
-            other => {
-                error!("BUG: Receiver (at end) in invalid state {:?}", other);
-                *wait_entry = other;
-                Err("BUG: Receiver (at end) in invalid state")
-            }
-        }
+        };
+
+        // restore the receiver slot now that we're completely done with it
+        trace!("receiver done, restoring slot");
+        self.channel.slot.lock().receiver = Some(slot_ref.clone());
+        retval
     }
 
     /// Tries to receive a message, only succeeding if a sender is ready and waiting. 

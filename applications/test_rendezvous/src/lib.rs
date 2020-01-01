@@ -57,7 +57,7 @@ fn test_oneshot() -> Result<(), &'static str> {
         Ok(())
     }, ())
         .name(String::from("sender_task"))
-        .pin_on_core(my_cpu)
+        // .pin_on_core(my_cpu)
         .block()
         .spawn()?;
 
@@ -68,7 +68,7 @@ fn test_oneshot() -> Result<(), &'static str> {
         Ok(())
     }, ())
         .name(String::from("receiver_task"))
-        .pin_on_core(my_cpu)
+        // .pin_on_core(my_cpu)
         .block()
         .spawn()?;
 
@@ -101,7 +101,7 @@ fn test_multiple(iterations: usize) -> Result<(), &'static str> {
         Ok(())
     }, ())
         .name(String::from("sender_task"))
-        .pin_on_core(my_cpu)
+        // .pin_on_core(my_cpu)
         .block()
         .spawn()?;
 
@@ -114,7 +114,7 @@ fn test_multiple(iterations: usize) -> Result<(), &'static str> {
         Ok(())
     }, ())
         .name(String::from("receiver_task"))
-        .pin_on_core(my_cpu)
+        // .pin_on_core(my_cpu)
         .block()
         .spawn()?;
 
