@@ -28,7 +28,7 @@ extern crate color;
 use alloc::sync::Arc;
 use mpmc::Queue;
 use event_types::{Event, MousePositionEvent};
-use frame_buffer::{FrameBuffer};
+use frame_buffer::{FrameBuffer, IntoPixel};
 use color::{Color};
 use shapes::{Coord, Rectangle};
 use spin::Mutex;
@@ -137,7 +137,7 @@ impl Window {
 
         {
             let mut inner = window.inner.lock();
-            inner.framebuffer.fill_color(window.background.into());
+            inner.framebuffer.fill_color(window.background.into_pixel());
         }
 
         window.draw_border(true); // draw window with active border
@@ -331,10 +331,11 @@ impl Window {
     fn draw_border(&mut self, active: bool) {
         let mut inner = self.inner.lock();
         // first draw left, bottom, right border
-        let mut border_color = Color::from(WINDOW_BORDER_COLOR_INACTIVE);
-        if active {
-            border_color = Color::from(WINDOW_BORDER_COLOR_ACTIVE_BOTTOM);
-        }
+        let border_color = if active {
+            WINDOW_BORDER_COLOR_ACTIVE_BOTTOM
+        } else {
+            WINDOW_BORDER_COLOR_INACTIVE
+        };
         let width = inner.width;
         let height = inner.height;
 
@@ -343,7 +344,7 @@ impl Window {
             Coord::new(0, self.title_size as isize),
             self.border_size,
             height - self.title_size,
-            border_color.into(),
+            border_color.into_pixel(),
         );
 
         frame_buffer_drawer::draw_rectangle(
@@ -351,7 +352,7 @@ impl Window {
             Coord::new(0, (height - self.border_size) as isize),
             width,
             self.border_size,
-            border_color.into(),
+            border_color.into_pixel(),
         );
         frame_buffer_drawer::draw_rectangle(
             &mut inner.framebuffer,
@@ -361,7 +362,7 @@ impl Window {
             ),
             self.border_size,
             height - self.title_size,
-            border_color.into(),
+            border_color.into_pixel(),
         );
 
         // then draw the title bar
@@ -373,7 +374,8 @@ impl Window {
                     width,
                     1,
                     frame_buffer::Pixel::weight_mix(
-                        Color::from(WINDOW_BORDER_COLOR_ACTIVE_BOTTOM).into(),     Color::from(WINDOW_BORDER_COLOR_ACTIVE_TOP).into(), 
+                        WINDOW_BORDER_COLOR_ACTIVE_BOTTOM.into_pixel(),
+                        WINDOW_BORDER_COLOR_ACTIVE_TOP.into_pixel(),
                         (i as f32) / (self.title_size as f32)
                     )
 
@@ -390,13 +392,13 @@ impl Window {
                 Coord::new(0, 0),
                 width,
                 self.title_size,
-                border_color.into(),
+                border_color.into_pixel(),
             );
         }
 
         // draw radius finally
         let r2 = WINDOW_RADIUS * WINDOW_RADIUS;
-        let trans_pixel = color::TRANSPARENT.into();
+        let trans_pixel = color::TRANSPARENT.into_pixel();
   
         for i in 0..WINDOW_RADIUS {
             for j in 0..WINDOW_RADIUS {
@@ -423,7 +425,7 @@ impl Window {
                     TopButton::MinimizeMaximize => 1,
                     TopButton::Hide => 2,
                 };
-        let pixel = match button {
+        let color = match button {
             TopButton::Close => WINDOW_BUTTON_COLOR_CLOSE,
             TopButton::MinimizeMaximize => WINDOW_BUTTON_COLOR_MINIMIZE_MAMIMIZE,
             TopButton::Hide => WINDOW_BUTTON_COLOR_HIDE,
@@ -433,8 +435,8 @@ impl Window {
             Coord::new(x as isize, y as isize),
             WINDOW_BUTTON_SIZE,
             frame_buffer::Pixel::weight_mix(
-                color::BLACK.into(), 
-                pixel.into(),
+                color::BLACK.into_pixel(), 
+                color.into_pixel(),
                 0.2f32 * (state as f32),
             ),
         );

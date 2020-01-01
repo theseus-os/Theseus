@@ -30,7 +30,7 @@ use text_display::TextDisplay;
 use displayable::Displayable;
 use event_types::Event;
 use font::{CHARACTER_HEIGHT, CHARACTER_WIDTH};
-use frame_buffer::{FrameBuffer, Pixel};
+use frame_buffer::{FrameBuffer, Pixel, IntoPixel};
 use color::{Color};
 use shapes::{Coord, Rectangle};
 use tsc::{tsc_ticks, TscTicks};
@@ -446,7 +446,7 @@ impl Terminal {
         )?;
         
         let (width_inner, height_inner) = window.inner_size();
-        let text_display = TextDisplay::new(width_inner, height_inner, FONT_COLOR.into(), BACKGROUND_COLOR.into())?;
+        let text_display = TextDisplay::new(width_inner, height_inner, FONT_COLOR, BACKGROUND_COLOR)?;
 
         let mut terminal = Terminal {
             window: window,

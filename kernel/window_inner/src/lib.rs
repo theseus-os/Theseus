@@ -13,7 +13,7 @@ extern crate color;
 use alloc::sync::Arc;
 use mpmc::Queue;
 use event_types::{Event};
-use frame_buffer::{FrameBuffer, AlphaPixel};
+use frame_buffer::{FrameBuffer, AlphaPixel, IntoPixel};
 use color::{Color};
 use shapes::Coord;
 use spin::{Mutex};
@@ -53,7 +53,7 @@ impl WindowInner {
 
     /// Clear the content of a window
     pub fn clear(&mut self) -> Result<(), &'static str> {
-        self.framebuffer.fill_color(WINDOW_DEFAULT_COLOR.into());
+        self.framebuffer.fill_color(WINDOW_DEFAULT_COLOR.into_pixel());
         Ok(())
     }
 

@@ -75,7 +75,7 @@ impl Cursor {
         column: usize,
         line: usize,
         framebuffer: &mut FrameBuffer<P>,
-    ) -> Result<Rectangle, &'static str> where Color: Into<P> {
+    ) -> Result<Rectangle, &'static str> {
         if self.blink() {
             if self.show() {
                 frame_buffer_drawer::fill_rectangle(
@@ -88,14 +88,14 @@ impl Cursor {
                         + (0, 1),
                     CHARACTER_WIDTH,
                     CHARACTER_HEIGHT - 2,
-                    self.color.into(),
+                    self.color.into_pixel(),
                 );
             } else {
                 frame_buffer_printer::print_ascii_character(
                     framebuffer,
                     self.underlying_char,
-                    Color::from(FONT_COLOR).into(),
-                    Color::from(BACKGROUND_COLOR).into(),
+                    FONT_COLOR.into_pixel(),
+                    BACKGROUND_COLOR.into_pixel(),
                     coordinate,
                     column,
                     line,
@@ -144,7 +144,7 @@ impl Default for Cursor  {
             freq: DEFAULT_CURSOR_FREQ,
             time: tsc_ticks(),
             show: true,
-            color: Color::from(FONT_COLOR),
+            color: FONT_COLOR,
             offset_from_end: 0,
             underlying_char: 0,
         }

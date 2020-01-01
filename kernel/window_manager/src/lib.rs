@@ -38,7 +38,7 @@ use core::slice;
 
 use mpmc::Queue;
 use event_types::{Event, MousePositionEvent};
-use frame_buffer::{FrameBuffer, AlphaPixel};
+use frame_buffer::{FrameBuffer, AlphaPixel, IntoPixel};
 use color::{Color};
 use shapes::{Coord, Rectangle};
 use frame_buffer_compositor::{FRAME_COMPOSITOR};
@@ -444,9 +444,9 @@ impl WindowManager {
     /// draw the floating border with `pixel`. Return the coordinates of updated pixels.
     /// `border` indicates the position of the border as a rectangle.
     /// `pixel` is the pixel value of the floating border.
-    fn draw_floating_border<P: Into<AlphaPixel>>(&mut self, border: &Rectangle, pixel: P) -> Vec<Coord> {
+    fn draw_floating_border(&mut self, border: &Rectangle, color: Color) -> Vec<Coord> {
         let mut coordinates = Vec::new();
-        let pixel = pixel.into();
+        let pixel = color.into_pixel();
         for i in 0..(WINDOW_BORDER_SIZE) as isize {
             let width = (border.bottom_right.x - border.top_left.x) - 2 * i;
             let height = (border.bottom_right.y - border.top_left.y) - 2 * i;
@@ -544,7 +544,7 @@ impl WindowManager {
                 self.mouse.x - MOUSE_POINTER_HALF_SIZE as isize..self.mouse.x + MOUSE_POINTER_HALF_SIZE as isize + 1
             {
                 let coordinate = Coord::new(x, y);
-                self.top_fb.overwrite_pixel(coordinate, color::TRANSPARENT.into());
+                self.top_fb.overwrite_pixel(coordinate, color::TRANSPARENT.into_pixel());
             }
         }
         let bounding_box = self.get_mouse_coords();
@@ -558,9 +558,9 @@ impl WindowManager {
                 new.x - MOUSE_POINTER_HALF_SIZE as isize..new.x + MOUSE_POINTER_HALF_SIZE as isize + 1
             {
                 let coordinate = Coord::new(x, y);
-                let pixel = Color::from(MOUSE_BASIC
+                let pixel = MOUSE_BASIC
                             [(MOUSE_POINTER_HALF_SIZE as isize + x - new.x) as usize]
-                            [(MOUSE_POINTER_HALF_SIZE as isize + y - new.y) as usize]).into();
+                            [(MOUSE_POINTER_HALF_SIZE as isize + y - new.y) as usize].into_pixel();
                 self.top_fb.overwrite_pixel(coordinate, pixel);
             }
         }
@@ -658,7 +658,7 @@ pub fn init() -> Result<(Queue<Event>, Queue<Event>), &'static str> {
     };
 
     bottom_framebuffer.buffer_mut().copy_from_slice(bg_image);
-    top_framebuffer.fill_color(color::TRANSPARENT.into()); 
+    top_framebuffer.fill_color(color::TRANSPARENT.into_pixel()); 
 
     // initialize static window manager
     let window_manager = WindowManager {
