@@ -60,9 +60,32 @@ pub const YELLOW: Color = Color::new(0xFFFF00);
 pub const WHITE: Color = Color::new(0xFFFFFF);
 pub const TRANSPARENT: Color = Color::new(0xFF000000);
 
+impl From<Color> for RGBPixel {
+    fn from(color: Color) -> Self {
+        RGBPixel {
+            _channel: color.alpha,
+            red: color.red,
+            green: color.green,
+            blue: color.blue
+        }
+    }
+}
+
+impl From<Color> for AlphaPixel {
+    fn from(color: Color) -> Self {
+        AlphaPixel {
+            alpha: color.alpha,
+            red: color.red,
+            green: color.green,
+            blue: color.blue
+        }
+    }
+}
+
 impl<P> IntoPixel<P> for Color 
-    where P: Pixel {
+    where P: Pixel,
+    Color: Into<P> {
     fn into_pixel(self) -> P {
-        P::new_from_crgb(self.alpha, self.red, self.green, self.blue)
+        self.into()
     }
 }

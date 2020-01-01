@@ -5,10 +5,6 @@ pub const PIXEL_SIZE: usize = core::mem::size_of::<u32>();
 
 /// A pixel provides methods to mix with others.
 pub trait Pixel: Copy + Hash {
-    /// Creates from RGB color and an extra channel. 
-    /// We'll have other construction function in the future.
-    fn new_from_crgb(channel: u8, red: u8, green: u8, blue: u8) -> Self;
-
     /// Composites the `src` pixel slice to the `dest` pixel slice.
     fn composite_buffer(src: &[Self], dest: &mut[Self]);
     
@@ -46,15 +42,6 @@ pub struct AlphaPixel {
 }
 
 impl Pixel for RGBPixel {
-    fn new_from_crgb(channel: u8, red: u8, green: u8, blue: u8) -> Self {
-        RGBPixel {
-            _channel: channel,
-            red: red,
-            green: green,
-            blue: blue
-        }
-    }
-
     #[inline]
     fn composite_buffer(src: &[Self], dest: &mut[Self]) {
         dest.copy_from_slice(src)
@@ -91,15 +78,6 @@ impl Pixel for RGBPixel {
 }
 
 impl Pixel for AlphaPixel {   
-    fn new_from_crgb(channel: u8, red: u8, green: u8, blue: u8) -> Self {
-        AlphaPixel {
-            alpha: channel,
-            red: red,
-            green: green,
-            blue: blue
-        }
-    }
-
     fn composite_buffer(src: &[Self], dest: &mut[Self]) {
         for i in 0..src.len() {
             dest[i] = AlphaPixel::from(src[i]).mix(AlphaPixel::from(dest[i])).into();

@@ -25,7 +25,7 @@ pub trait Displayable {
         &mut self,
         coordinate: Coord,
         framebuffer: &mut FrameBuffer<P>,
-    ) -> Result<Rectangle, &'static str>;
+    ) -> Result<Rectangle, &'static str> where Color: Into<P>;
 
     /// Resizes the displayable area.
     fn resize(&mut self, width: usize, height: usize);

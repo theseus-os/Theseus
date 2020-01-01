@@ -75,7 +75,7 @@ impl Cursor {
         column: usize,
         line: usize,
         framebuffer: &mut FrameBuffer<P>,
-    ) -> Result<Rectangle, &'static str> {
+    ) -> Result<Rectangle, &'static str> where Color: Into<P> {
         if self.blink() {
             if self.show() {
                 frame_buffer_drawer::fill_rectangle(
