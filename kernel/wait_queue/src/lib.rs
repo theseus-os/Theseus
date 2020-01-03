@@ -12,6 +12,39 @@ use irq_safety::MutexIrqSafe;
 use task::TaskRef;
 
 
+/// An object that holds a blocked `Task` 
+/// that will be automatically unblocked upon drop.  
+pub struct WaitGuard {
+    task: TaskRef,
+}
+impl WaitGuard {
+    /// Blocks the given `Task` and returns a new `WaitGuard` object
+    /// that will automatically unblock that Task when it is dropped. 
+    pub fn new(task: TaskRef) -> WaitGuard {
+        task.block();
+        WaitGuard {
+            task: task,
+        }
+    }
+
+    /// Blocks the task guarded by this waitguard,
+    /// which is useful to re-block a task after it spuriously woke up. 
+    pub fn block_again(&self) {
+        self.task.block();
+    }
+
+    /// Returns a reference to the `Task` being blocked in this `WaitGuard`.
+    pub fn task(&self) -> &TaskRef {
+        &self.task
+    }
+}
+impl Drop for WaitGuard {
+    fn drop(&mut self) {
+        self.task.unblock();
+    }
+}
+
+
 /// Errors that may occur while waiting on a waitqueue/condition/event.
 #[derive(Debug)]
 pub enum WaitError {
@@ -61,7 +94,7 @@ impl WaitQueue {
     /// 
     /// This function blocks until the `Task` is woken up through the notify mechanism.
     pub fn wait(&self) -> Result<(), WaitError> {
-        self.wait_until(&|| Some(()))
+        self.wait_until(&|/* _ */| Some(()))
     }
 
     /// Similar to [`wait`](#method.wait), but this function blocks until the given
@@ -71,7 +104,10 @@ impl WaitQueue {
     /// which avoids the problem of a waiting task missing a "notify" from another task
     /// due to interleaving of instructions that may occur if the `condition` is checked 
     /// when the wait queue lock is not held. 
-    pub fn wait_until<R>(&self, condition: &dyn Fn() -> Option<R>) -> Result<R, WaitError> {
+    /// 
+    // /// The `condition` closure is invoked with one argument, an immutable reference to the waitqueue, 
+    // /// to allow the closure to examine the condition of the waitqueue if necessary. 
+    pub fn wait_until<R>(&self, condition: &dyn Fn(/* &VecDeque<TaskRef> */) -> Option<R>) -> Result<R, WaitError> {
         let curr_task = task::get_my_current_task().ok_or(WaitError::NoCurrentTask)?;
 
         // Do the following atomically:
@@ -82,7 +118,7 @@ impl WaitQueue {
         loop {
             {
                 let mut wq_locked = self.0.lock();
-                if let Some(ret) = condition() {
+                if let Some(ret) = condition(/* &wq_locked */) {
                     return Ok(ret);
                 }
                 // This is only necessary because we're using a non-Set waitqueue collection that allows duplicates
