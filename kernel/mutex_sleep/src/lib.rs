@@ -2,7 +2,6 @@
 
 #![no_std]
 
-#[macro_use] extern crate log;
 extern crate spin;
 extern crate owning_ref;
 extern crate stable_deref_trait;
