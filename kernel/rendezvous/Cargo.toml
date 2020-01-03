@@ -27,9 +27,6 @@ path = "../scheduler"
 [dependencies.wait_queue]
 path = "../wait_queue"
 
-[dependencies.mutex_sleep]
-path = "../mutex_sleep"
-
 
 [lib]
 crate-type = ["rlib"]
