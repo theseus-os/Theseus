@@ -1,47 +1,6 @@
+//! A simple representation of the standard RGB color model.
 #![no_std]
-extern crate frame_buffer;
 
-use frame_buffer::{RGBPixel, AlphaPixel, Pixel, IntoPixel};
-
-/// This structure represents an RGBA color value. It can turn into an alpha pixel or a pixel for framebuffers that does not support the alpha channel.
-#[derive(Clone, Copy)]
-pub struct Color {
-    /// 0 is opaque and 0xFF is transparent
-    alpha: u8,
-    red: u8,
-    green: u8,
-    blue: u8
-}
-
-impl Color {
-
-    /// Creates a new `Color` structure from a 4 bytes ARGB representation.
-    pub const fn new(color: u32) -> Color {
-        Color {
-            alpha: (color >> 24) as u8,
-            red: (color >> 16) as u8,
-            green: (color >> 8) as u8,
-            blue: color as u8,
-        }
-    }
-
-    /// Sets the transparency value of the color. 0 means opaque and 0xFF is transparent.
-    pub fn set_transparency(&mut self, trans: u8) {
-        self.alpha = trans;
-    }
-}
-
-
-impl PartialEq for Color {
-    fn eq(&self, other: &Color) -> bool {
-        self.alpha == other.alpha &&
-            self.red == other.red &&
-            self.green == other.green &&
-            self.blue == other.blue
-    }
-}
-
-impl Eq for Color { }
 
 pub const BLACK: Color = Color::new(0x000000);
 pub const BLUE: Color = Color::new(0x0000FF);
@@ -60,32 +19,67 @@ pub const YELLOW: Color = Color::new(0xFFFF00);
 pub const WHITE: Color = Color::new(0xFFFFFF);
 pub const TRANSPARENT: Color = Color::new(0xFF000000);
 
-impl From<Color> for RGBPixel {
-    fn from(color: Color) -> Self {
-        RGBPixel {
-            _channel: color.alpha,
-            red: color.red,
-            green: color.green,
-            blue: color.blue
+
+/// This structure represents a color value in the standard RGB color model,
+/// comprised of red, blue, green, and transparency components.
+#[derive(Clone, Copy)]
+pub struct Color {
+    /// 0 is opaque and 0xFF is transparent
+    alpha: u8,
+    red: u8,
+    green: u8,
+    blue: u8
+}
+
+impl Color {
+    /// Creates a new `Color` structure from a 4 bytes ARGB representation.
+    pub const fn new(color: u32) -> Color {
+        Color {
+            alpha: (color >> 24) as u8,
+            red: (color >> 16) as u8,
+            green: (color >> 8) as u8,
+            blue: color as u8,
         }
+    }
+
+    /// Sets the transparency of the color, in which `0` is opaque and `0xFF` is transparent.
+    #[inline(always)]
+    pub fn set_transparency(&mut self, alpha: u8) {
+        self.alpha = alpha;
+    }
+
+    /// Returns the transparency component of this `Color` as a `u8` value.
+    #[inline(always)]
+    pub fn transparency(&self) -> u8 {
+        self.alpha
+    }
+
+    /// Returns the red component of this `Color` as a `u8` value.
+    #[inline(always)]
+    pub fn red(&self) -> u8 {
+        self.red
+    }
+
+    /// Returns the blue component of this `Color` as a `u8` value.
+    #[inline(always)]
+    pub fn blue(&self) -> u8 {
+        self.blue
+    }
+
+    /// Returns the green component of this `Color` as a `u8` value.
+    #[inline(always)]
+    pub fn green(&self) -> u8 {
+        self.green
     }
 }
 
-impl From<Color> for AlphaPixel {
-    fn from(color: Color) -> Self {
-        AlphaPixel {
-            alpha: color.alpha,
-            red: color.red,
-            green: color.green,
-            blue: color.blue
-        }
+impl PartialEq for Color {
+    fn eq(&self, other: &Color) -> bool {
+        self.alpha == other.alpha &&
+            self.red == other.red &&
+            self.green == other.green &&
+            self.blue == other.blue
     }
 }
 
-impl<P> IntoPixel<P> for Color 
-    where P: Pixel,
-    Color: Into<P> {
-    fn into_pixel(self) -> P {
-        self.into()
-    }
-}
+impl Eq for Color { }

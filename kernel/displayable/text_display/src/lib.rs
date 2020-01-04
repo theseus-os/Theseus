@@ -14,7 +14,7 @@ extern crate color;
 use alloc::string::String;
 use displayable::{Displayable};
 use font::{CHARACTER_HEIGHT, CHARACTER_WIDTH};
-use frame_buffer::{Pixel, FrameBuffer, IntoPixel};
+use frame_buffer::{Pixel, FrameBuffer};
 use color::Color;
 use shapes::{Coord, Rectangle};
 
@@ -23,22 +23,23 @@ use shapes::{Coord, Rectangle};
 pub struct TextDisplay {
     width: usize,
     height: usize,
-    /// The position of the next symbol. It is updated after display and will be useful for optimization.
+    /// The position where the next character will be displayed. 
+    /// This is updated after each `display()` invocation, and is useful for optimization.
     next_col: usize,
     next_line: usize,
     text: String,
     fg_color: Color,
     bg_color: Color,
-    /// The text cached since last display
+    /// The cache of the text that was last displayed.
     cache: String,
 }
 
 impl Displayable for TextDisplay {
-    fn display<P: Pixel> (
+    fn display<P: Pixel+ From<Color>> (
         &mut self,
         coordinate: Coord,
         framebuffer: &mut FrameBuffer<P>,
-    ) -> Result<Rectangle, &'static str> where Color: Into<P> {
+    ) -> Result<Rectangle, &'static str> {
         let (string, col, line) = if self.cache.len() > 0 && self.text.starts_with(self.cache.as_str()) {
             (
                 &self.text.as_str()[self.cache.len()..self.text.len()],
@@ -49,15 +50,14 @@ impl Displayable for TextDisplay {
             (self.text.as_str(), 0, 0)
         };
 
-        //let color = self.fg_color.clone() as Into<P>;
         let (next_col, next_line, mut bounding_box) = frame_buffer_printer::print_string(
             framebuffer,
             coordinate,
             self.width,
             self.height,
             string,
-            self.fg_color.into_pixel(),
-            self.bg_color.into_pixel(),
+            self.fg_color.into(),
+            self.bg_color.into(),
             col,
             line,
         );
@@ -87,7 +87,7 @@ impl TextDisplay {
     /// Creates a new text displayable.
     /// # Arguments
     /// * `width`, `height`: the dimensions of the text area, in number of characters.
-    /// * `fg_color`, `bg_color`: the colors used for the actual text and for the background behind the text, respectively.
+    /// * `fg_color`, `bg_color`: the color of the text and the background behind the text, respectively.
     pub fn new(
         width: usize,
         height: usize,

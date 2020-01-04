@@ -1,5 +1,5 @@
 //! This crate contains functions to print strings in a framebuffer.
-//! The coordinate in these functions is relative to the origin(top-left point) of the frame buffer.
+//! The coordinate in these functions is relative to the origin(top-left point) of the framebuffer.
 
 #![no_std]
 
@@ -21,7 +21,7 @@ type ASCII = u8;
 /// A block item (index, width) represents the index of line number and the width of charaters in this line as pixels. It can be viewed as a framebuffer block which is described in the `frame_buffer_compositor` crate.
 /// # Arguments
 /// * `framebuffer`: the framebuffer to display in.
-/// * `coordinate`: the left top coordinate of the text block relative to the origin(top-left point) of the frame buffer.
+/// * `coordinate`: the left top coordinate of the text block relative to the origin(top-left point) of the framebuffer.
 /// * `width`, `height`: the size of the text block in number of pixels.
 /// * `slice`: the string to display.
 /// * `fg_pixel`: the value of pixels in the foreground.
@@ -146,7 +146,7 @@ pub fn print_string<P: Pixel>(
 /// * `character`: the ASCII code of the character to display.
 /// * `fg_pixel`: the value of every pixel in the character.
 /// * `bg_color`: the value of every pixel in the background.
-/// * `coordinate`: the left top coordinate of the text block relative to the origin(top-left point) of the frame buffer.
+/// * `coordinate`: the left top coordinate of the text block relative to the origin(top-left point) of the framebuffer.
 /// * `column`, `line`: the location of the character in the text block as symbols.
 pub fn print_ascii_character<P: Pixel>(
     framebuffer: &mut FrameBuffer<P>,
@@ -161,7 +161,7 @@ pub fn print_ascii_character<P: Pixel>(
     if !framebuffer.overlaps_with(start, CHARACTER_WIDTH, CHARACTER_HEIGHT) {
         return
     }
-    // print from the offset within the frame buffer
+    // print from the offset within the framebuffer
     let (buffer_width, buffer_height) = framebuffer.get_size();
     let off_set_x: usize = if start.x < 0 { -(start.x) as usize } else { 0 };
     let off_set_y: usize = if start.y < 0 { -(start.y) as usize } else { 0 };    
@@ -195,7 +195,7 @@ pub fn print_ascii_character<P: Pixel>(
     }
 }
 
-/// Fill a blank text area (left, top, right, bottom) with color. The tuple specifies the location of the area relative to the origin(top-left point) of the frame buffer.
+/// Fill a blank text area (left, top, right, bottom) with color. The tuple specifies the location of the area relative to the origin(top-left point) of the framebuffer.
 pub fn fill_blank<P: Pixel>(
     framebuffer: &mut FrameBuffer<P>,
     blank: &mut Rectangle,
@@ -203,7 +203,7 @@ pub fn fill_blank<P: Pixel>(
 ) {
 
     let (width, height) = framebuffer.get_size();
-    // fill the part within the frame buffer
+    // fill the part within the framebuffer
     blank.top_left.x = core::cmp::max(0, blank.top_left.x);
     blank.top_left.y = core::cmp::max(0, blank.top_left.y);
     blank.bottom_right.x = core::cmp::min(blank.bottom_right.x, width as isize);
@@ -220,7 +220,7 @@ pub fn fill_blank<P: Pixel>(
         if coordinate.y == blank.bottom_right.y {
             return
         }
-        if let Some(start) = framebuffer.index(coordinate) {
+        if let Some(start) = framebuffer.index_of(coordinate) {
             framebuffer.composite_buffer(&fill, start);
         }
         coordinate.y += 1;

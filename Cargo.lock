@@ -279,9 +279,6 @@ source = "registry+https://github.com/rust-lang/crates.io-index"
 [[package]]
 name = "color"
 version = "0.1.0"
-dependencies = [
- "frame_buffer 0.1.0",
-]
 
 [[package]]
 name = "compositor"
@@ -583,6 +580,7 @@ dependencies = [
 name = "frame_buffer"
 version = "0.1.0"
 dependencies = [
+ "color 0.1.0",
  "memory 0.1.0",
  "multicore_bringup 0.1.0",
  "owning_ref 0.4.0 (git+https://github.com/kevinaboos/owning-ref-rs)",

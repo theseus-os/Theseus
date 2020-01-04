@@ -12,20 +12,21 @@ use frame_buffer::{FrameBuffer, Pixel};
 use shapes::{Coord, Rectangle};
 use color::Color;
 
-/// Trait for displayables. A displayable is an item which can display itself onto a framebuffer. 
-/// It is usually a composition of basic graphs and can display in a window as a component such as a text box, a button, etc.
+/// The `Displayable` trait is an abstraction for any object that can display itself onto a framebuffer. 
+/// Examples include a text box, button, window border, etc.
 pub trait Displayable {
     /// Displays in a framebuffer.
     /// # Arguments
-    /// * `coordinate`: the coordinate within the given `framebuffer` where this displayable should render itself. The `coordinate` is relative to the top-left point `(0, 0)` of the `framebuffer`.
+    /// * `coordinate`: the coordinate within the given `framebuffer` where this displayable should render itself.
+    ///    The `coordinate` is relative to the top-left point of the `framebuffer`.
     /// * `framebuffer`: the framebuffer to display onto.
     ///
-    /// Returns a rectangle that covers the updated part.
-    fn display<P: Pixel>(
+    /// Returns a rectangle that represents the region of the framebuffer that was updated.
+    fn display<P: Pixel + From<Color>>(
         &mut self,
         coordinate: Coord,
         framebuffer: &mut FrameBuffer<P>,
-    ) -> Result<Rectangle, &'static str> where Color: Into<P>;
+    ) -> Result<Rectangle, &'static str>;
 
     /// Resizes the displayable area.
     fn resize(&mut self, width: usize, height: usize);

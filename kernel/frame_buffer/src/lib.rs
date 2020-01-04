@@ -1,7 +1,7 @@
 //! This crate defines a `FrameBuffer` structure.
 //! The structure contains a buffer of pixels. A compositor can composite a list of framebuffers to a final one. 
 //!
-//! `pixel.rs` defines two type of pixels which implement the `Pixel` trait. The lower three bytes represent the color of a pixel and the 4th byte is an extra channel. `RGBPixel` is a normal pixel without channel and `AlphaPixel` has an alpha channel. The pixels to be mixed together should be of the same type in case the semantic of their channels are different.
+//! `pixel.rs` defines two type of pixels which implement the `Pixel` trait. The lower three bytes represent the color of a pixel and the 4th byte is an extra channel. `RGBPixel` is a normal pixel without channel and `AlphaPixel` has an alpha channel. The pixels to be blended together should be of the same type in case the semantic of their channels are different.
 
 #![no_std]
 
@@ -10,6 +10,7 @@ extern crate memory;
 extern crate multicore_bringup;
 extern crate owning_ref;
 extern crate shapes;
+extern crate color;
 
 pub mod pixel;
 use alloc::boxed::Box;
@@ -20,10 +21,7 @@ use owning_ref::BoxRefMut;
 use shapes::Coord;
 pub use pixel::*;
 
-// /// The final framebuffer instance. It contains the pages which are mapped to the physical framebuffer.
-// pub static FINAL_FRAME_BUFFER: Once<Mutex<FrameBuffer<AlphaPixel>>> = Once::new();
-
-/// Initialize the final frame buffer.
+/// Initialize the final framebuffer.
 /// The final framebuffer contains a block of memory which is mapped to the physical framebuffer frames.
 pub fn init<P: Pixel>() -> Result<FrameBuffer<P>, &'static str> {
     // get the graphic mode information
@@ -46,29 +44,31 @@ pub fn init<P: Pixel>() -> Result<FrameBuffer<P>, &'static str> {
     Ok(framebuffer)
 }
 
-/// The frame buffer structure. It is a buffer of pixels that an application can display in. `T` specifies the type of pixels in this framebuffer.
+/// A framebuffer is effectively a rectangular region of pixels
+/// that can be displayed  buffer of pixels that is represented 
+/// as a rectangle, with a width and height.
 #[derive(Hash)]
-pub struct FrameBuffer<P> {
+pub struct FrameBuffer<P: Pixel> {
     width: usize,
     height: usize,
     buffer: BoxRefMut<MappedPages, [P]>,
 } 
 
 impl<P: Pixel> FrameBuffer<P> {
-    /// Creates a new frame buffer with specified size.
-    /// If the `physical_address` is specified, the new virtual frame buffer will be mapped to hardware's physical memory at that address.
-    /// If the `physical_address` is none, the new function will allocate a block of physical memory at a random address and map the new frame buffer to that memory.
+    /// Creates a new framebuffer with rectangular dimensions of `width * height`, 
+    /// specified in number of pixels.
+    /// If the `physical_address` is provided, the returned framebuffer will be "real",
+    /// i.e., mapped to the physical memory at that address, which is typically a hardware graphics device's memory.
+    /// If the `physical_address` is `None`, the returned framebuffer is a "virtual" one 
+    /// that renders to a randomly-allocated chunk of memory.
     pub fn new(
         width: usize,
         height: usize,
         physical_address: Option<PhysicalAddress>,
     ) -> Result<FrameBuffer<P>, &'static str> {
         // get a reference to the kernel's memory mapping information
-        let kernel_mmi_ref =
-            memory::get_kernel_mmi_ref().ok_or("KERNEL_MMI was not yet initialized!")?;
-        let allocator = FRAME_ALLOCATOR
-            .try()
-            .ok_or("Couldn't get Frame Allocator")?;
+        let kernel_mmi_ref = memory::get_kernel_mmi_ref().ok_or("KERNEL_MMI was not yet initialized!")?;
+        let allocator = FRAME_ALLOCATOR.try().ok_or("Couldn't get Frame Allocator")?;
 
         let vesa_display_flags: EntryFlags =
             EntryFlags::PRESENT | EntryFlags::WRITABLE | EntryFlags::GLOBAL | EntryFlags::NO_CACHE;
@@ -92,7 +92,7 @@ impl<P: Pixel> FrameBuffer<P> {
             )?
         };
 
-        // create a refence to transmute the mapped frame buffer pages as a slice
+        // create a refence to transmute the mapped framebuffer pages as a slice
         let buffer = BoxRefMut::new(Box::new(mapped_frame_buffer))
             .try_map_mut(|mp| mp.as_slice_mut(0, width * height))?;
 
@@ -105,15 +105,15 @@ impl<P: Pixel> FrameBuffer<P> {
 
     /// Returns a mutable reference to the mapped memory of the buffer.
     pub fn buffer_mut(&mut self) -> &mut BoxRefMut<MappedPages, [P]> {
-        return &mut self.buffer;
+        &mut self.buffer
     }
 
-    /// Returns a referece to the mapped memory of the buffer
+    /// Returns a reference to the mapped memory of the buffer
     pub fn buffer(&self) -> &BoxRefMut<MappedPages, [P]> {
-        return &self.buffer;
+        &self.buffer
     }
 
-    /// Returns (width, height) of the framebuffer
+    /// Returns the `(width, height)` of this framebuffer.
     pub fn get_size(&self) -> (usize, usize) {
         (self.width, self.height)
     }
@@ -125,25 +125,24 @@ impl<P: Pixel> FrameBuffer<P> {
         Pixel::composite_buffer(src, &mut self.buffer_mut()[index..dest_end]);
     }
 
-    /// Draw a pixel at the given coordinate. The pixel will mix with the original one at the coordinate.
+    /// Draw a pixel at the given 1coordinate1. 
+    /// The `pixel` will be blended with the existing pixel value
+    /// at that `coordinate` in this framebuffer.
     pub fn draw_pixel(&mut self, coordinate: Coord, pixel: P) {
-        if let Some(index) = self.index(coordinate) {
-            self.buffer[index] = pixel.mix(self.buffer[index]).into();
+        if let Some(index) = self.index_of(coordinate) {
+            self.buffer[index] = pixel.blend(self.buffer[index]).into();
         }
     }
 
-    /// Overwites a pixel at the given coordinate.
+    /// Overwites a pixel at the given coordinate in this framebuffer
+    /// instead of blending it like [`draw_pixel`](#method.draw_pixel).
     pub fn overwrite_pixel(&mut self, coordinate: Coord, pixel: P) {
         self.draw_pixel(coordinate, pixel)
     }
 
-    /// Returns a pixel at coordinate.
-    pub fn get_pixel(&self, coordinate: Coord) -> Result<P, &'static str> {
-        if let Some(index) = self.index(coordinate) {
-            return Ok(self.buffer[index]);
-        } else {
-            return Err("No pixel");
-        }
+    /// Returns the pixel value at the given `coordinate` in this framebuffer.
+    pub fn get_pixel(&self, coordinate: Coord) -> Option<P> {
+        self.index_of(coordinate).map(|i| self.buffer[i])
     }
 
     /// Fills the framebuffer with color.
@@ -156,31 +155,35 @@ impl<P: Pixel> FrameBuffer<P> {
         }
     }
 
-    /// Returns the index of the coordinate in the buffer
-    pub fn index(&self, coordinate: Coord) -> Option<usize> {
+    /// Returns the index of the given `coordinate` in this framebuffer,
+    /// if this framebuffer [`contains`](#method.contains) the `coordinate` within its bounds.
+    pub fn index_of(&self, coordinate: Coord) -> Option<usize> {
         if self.contains(coordinate) {
-            return Some(coordinate.y as usize * self.width + coordinate.x as usize);
+            Some((self.width * coordinate.y as usize) + coordinate.x as usize)
         } else {
-            return None;
+            None
         }
     }
 
-    /// Checks if a coordinate is within the framebuffer.
+    /// Checks if the given `coordinate` is within the framebuffer's bounds.
+    /// The `coordinate` is relative to the origin coordinate of `(0, 0)` being the top-left point of the framebuffer.
     pub fn contains(&self, coordinate: Coord) -> bool {
-        let (width, height) = self.get_size();
-        coordinate.x >= 0 && coordinate.x < width as isize
-            && coordinate.y >= 0 && coordinate.y < height as isize
+        coordinate.x >= 0
+            && coordinate.x < (self.width as isize)
+            && coordinate.y >= 0
+            && coordinate.y < (self.height as isize)
     }
 
     /// Checks if a framebuffer overlaps with an area.
     /// # Arguments
-    /// * `coordinate`: the top-left corner of the area relative to the origin(top-left point) of the frame buffer.
+    /// * `coordinate`: the top-left corner of the area relative to the origin(top-left point) of the framebuffer.
     /// * `width`: the width of the area in number of pixels.
     /// * `height`: the height of the area in number of pixels.
     pub fn overlaps_with(&mut self, coordinate: Coord, width: usize, height: usize) -> bool {
-        let (buffer_width, buffer_height) = self.get_size();
-        coordinate.x < buffer_width as isize && coordinate.x + width as isize >= 0
-            && coordinate.y < buffer_height as isize && coordinate.y + height as isize >= 0
+        coordinate.x < self.width as isize
+            && coordinate.x + width as isize >= 0
+            && coordinate.y < self.height as isize
+            && coordinate.y + height as isize >= 0
     }
 
 }

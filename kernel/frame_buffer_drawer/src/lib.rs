@@ -1,6 +1,6 @@
 //! This crate contains a series of basic draw functions to draw onto a framebuffer.
 //! Displayables invoke these basic functions to display themselves onto a framebuffer.
-//! The coordinate in these interfaces is relative to the origin(top-left point) of the frame buffer.
+//! The coordinate in these interfaces is relative to the origin(top-left point) of the framebuffer.
 
 #![no_std]
 
@@ -13,8 +13,8 @@ use shapes::Coord;
 /// Draws a line in a framebuffer. The part exceeding the boundary of the framebuffer will be ignored.
 /// # Arguments
 /// * `framebuffer`: the framebuffer to draw in.
-/// * `start`: the start coordinate of the line relative to the origin(top-left point) of the frame buffer.
-/// * `end`: the end coordinate of the line relative to the origin(top-left point) of the frame buffer.
+/// * `start`: the start coordinate of the line relative to the origin(top-left point) of the framebuffer.
+/// * `end`: the end coordinate of the line relative to the origin(top-left point) of the framebuffer.
 /// * `color`: the color of the line.
 pub fn draw_line<P: Pixel>(
     framebuffer: &mut FrameBuffer<P>,
@@ -88,12 +88,12 @@ pub fn draw_rectangle<P: Pixel>(
 ) {
     let (buffer_width, buffer_height) = framebuffer.get_size();
 
-    // return if the rectangle is not within the frame buffer
+    // return if the rectangle is not within the framebuffer
     if !framebuffer.overlaps_with(coordinate, width, height){
         return
     }
 
-    // draw the part within the frame buffer
+    // draw the part within the framebuffer
     let start_x = core::cmp::max(coordinate.x, 0);
     let start_y = core::cmp::max(coordinate.y, 0);
     let end_x = core::cmp::min(coordinate.x + width as isize, buffer_width as isize);
@@ -135,7 +135,7 @@ pub fn draw_rectangle<P: Pixel>(
 /// The part exceeding the boundary of the framebuffer will be ignored.
 /// # Arguments
 /// * `framebuffer`: the framebuffer to draw in.
-/// * `coordinate`: the left top coordinate of the retangle relative to the origin(top-left point) of the frame buffer.
+/// * `coordinate`: the left top coordinate of the retangle relative to the origin(top-left point) of the framebuffer.
 /// * `width`: the width of the rectangle in number of pixels.
 /// * `height`: the height of the rectangle in number of pixels.
 /// * `pixel`: the pixel value of the rectangle.
@@ -147,12 +147,12 @@ pub fn fill_rectangle<P: Pixel>(
     pixel: P,
 ) {
     let (buffer_width, buffer_height) = framebuffer.get_size();
-    // return if the rectangle is not within the frame buffer
+    // return if the rectangle is not within the framebuffer
     if !framebuffer.overlaps_with(coordinate, width, height){
         return
     }
 
-    // draw the part within the frame buffer
+    // draw the part within the framebuffer
     let start_x = core::cmp::max(coordinate.x, 0);
     let start_y = core::cmp::max(coordinate.y, 0);
     let end_x = core::cmp::min(coordinate.x + width as isize, buffer_width as isize);

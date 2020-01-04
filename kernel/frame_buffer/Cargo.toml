@@ -17,5 +17,8 @@ path = "../multicore_bringup"
 [dependencies.shapes]
 path = "../shapes"
 
+[dependencies.color]
+path = "../color"
+
 [lib]
 crate-type = ["rlib"]

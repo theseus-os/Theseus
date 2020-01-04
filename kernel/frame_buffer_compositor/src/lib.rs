@@ -1,6 +1,6 @@
 //! This crate defines a framebuffer compositor.
-//! A framebuffer compositor composites a sequence of framebuffers and display them in the final framebuffer.
-//! The coordinate of a frame buffer represents its origin (top-left point).
+//! A framebuffer compositor composites a list of framebuffers into a single destination framebuffer.
+//! The coordinate of a framebuffer represents its origin (top-left point).
 //!
 //! # Cache
 //! The compositor caches framebuffer blocks for better performance. 
@@ -26,7 +26,7 @@ use alloc::collections::BTreeMap;
 use alloc::vec::{Vec};
 use core::hash::{Hash, Hasher, BuildHasher};
 use hashbrown::hash_map::{DefaultHashBuilder};
-use compositor::{Compositor, FrameBufferUpdates, Mixable};
+use compositor::{Compositor, FrameBufferUpdates, BlendableRegion};
 use frame_buffer::{FrameBuffer, Pixel};
 use shapes::{Coord, Rectangle};
 use spin::Mutex;
@@ -35,7 +35,7 @@ use spin::Mutex;
 pub const CACHE_BLOCK_HEIGHT:usize = 16;
 
 lazy_static! {
-    /// The instance of the frame buffer compositor.
+    /// The instance of the framebuffer compositor.
     pub static ref FRAME_COMPOSITOR: Mutex<FrameCompositor> = Mutex::new(
         FrameCompositor{
             caches: BTreeMap::new()
@@ -45,9 +45,9 @@ lazy_static! {
 
 /// Metadata that describes the cached block.
 pub struct BlockCache {
-    /// The coordinate of the block where it is rendered to the final framebuffer.
+    /// The coordinate of the block where it is rendered to the destination framebuffer.
     coordinate: Coord,
-    /// The hash of the content in the frame buffer.
+    /// The hash of the content in the framebuffer.
     content_hash: u64,
     /// The width of the block
     width: usize,
@@ -100,14 +100,15 @@ impl FrameCompositor {
     /// It then removes the cache overlaps with the block and caches the new one. 
     /// # Arguments
     /// * `src_fb`: the updated source framebuffer.
-    /// * `final_fn`: the final framebuffer mapped to the screen.
-    /// * `coordinate`: the position of the source framebuffer relative to the final one.
-    /// * `index`: the index of the block to be rendered. The framebuffer are divided into y-aligned blocks and index indicates the order of the block.
-    /// * `bounding_box`: the bounding box of the part to update.
-    fn check_cache_and_mix<P: Pixel>(
+    /// * `dest_fn`: the destination framebuffer.
+    /// * `coordinate`: the position of the source framebuffer relative to the destination framebuffer.
+    /// * `index`: the index of the block to be rendered. 
+    ///    The framebuffer are divided into y-aligned blocks and index indicates the order of the block.
+    /// * `bounding_box`: the bounding box specifying the region to update.
+    fn check_cache_and_blend<P: Pixel>(
         &mut self, 
         src_fb: &FrameBuffer<P>, 
-        final_fb: &mut FrameBuffer<P>, 
+        dest_fb: &mut FrameBuffer<P>, 
         coordinate: Coord, 
         index: usize, 
         bounding_box: &Rectangle
@@ -162,10 +163,10 @@ impl FrameCompositor {
             )
         };
 
-        // render to the final framebuffer
-        update_rect.mix_buffers(
+        // render to the destination framebuffer
+        update_rect.blend_buffers(
             src_fb,
-            final_fb,
+            dest_fb,
             coordinate,
         )?;
 
@@ -180,21 +181,19 @@ impl FrameCompositor {
 impl Compositor<Rectangle> for FrameCompositor {
     fn composite<'a, U: IntoIterator<Item = Rectangle> + Clone, P: 'a + Pixel>(
         &mut self,
-        bufferlist: impl IntoIterator<Item = FrameBufferUpdates<'a, P>>,
-        final_fb: &mut FrameBuffer<P>,
+        src_fbs: impl IntoIterator<Item = FrameBufferUpdates<'a, P>>,
+        dest_fb: &mut FrameBuffer<P>,
         bounding_boxes: U
     ) -> Result<(), &'static str> {
-        //let mut final_fb = FINAL_FRAME_BUFFER.try().ok_or("FrameCompositor fails to get the final frame buffer")?.lock();
-        //let final_fb = final_fb_locked.deref_mut();
         let bounding_box = bounding_boxes.into_iter().next();
-        for frame_buffer_updates in bufferlist.into_iter() {
+        for frame_buffer_updates in src_fbs.into_iter() {
             let src_fb = frame_buffer_updates.framebuffer;
             let coordinate = frame_buffer_updates.coordinate;
             match &bounding_box {
                 Some(rect) => {
                     let blocks = get_block_index_iter(src_fb, coordinate, rect);
                     for block in blocks {
-                        self.check_cache_and_mix(src_fb, final_fb, coordinate, block, &rect)?;
+                        self.check_cache_and_blend(src_fb, dest_fb, coordinate, block, &rect)?;
                     } 
                 },
                 None => {
@@ -206,7 +205,7 @@ impl Compositor<Rectangle> for FrameCompositor {
                         bottom_right: coordinate + (src_width as isize, src_height as isize)
                     };
                     for i in 0.. block_number {
-                        self.check_cache_and_mix(src_fb, final_fb, coordinate, i, &area)?;
+                        self.check_cache_and_blend(src_fb, dest_fb, coordinate, i, &area)?;
                     }
                 } 
             };
@@ -220,17 +219,15 @@ impl Compositor<Rectangle> for FrameCompositor {
 impl Compositor<Coord> for FrameCompositor {
     fn composite<'a, U: IntoIterator<Item = Coord> + Clone, P: 'a + Pixel>(
         &mut self,
-        bufferlist: impl IntoIterator<Item = FrameBufferUpdates<'a, P>>,
-        final_fb: &mut FrameBuffer<P>,
+        src_fbs: impl IntoIterator<Item = FrameBufferUpdates<'a, P>>,
+        dest_fb: &mut FrameBuffer<P>,
         bounding_boxes: U
     ) -> Result<(), &'static str> {
-        //let mut final_fb = FINAL_FRAME_BUFFER.try().ok_or("FrameCompositor fails to get the final frame buffer")?.lock();
-
-        for frame_buffer_updates in bufferlist {
+        for frame_buffer_updates in src_fbs {
             for pixel in bounding_boxes.clone() {
-                pixel.mix_buffers(
+                pixel.blend_buffers(
                     frame_buffer_updates.framebuffer,
-                    final_fb,
+                    dest_fb,
                     frame_buffer_updates.coordinate,
                 )?;
             }

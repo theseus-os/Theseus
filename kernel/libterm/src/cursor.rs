@@ -88,14 +88,14 @@ impl Cursor {
                         + (0, 1),
                     CHARACTER_WIDTH,
                     CHARACTER_HEIGHT - 2,
-                    self.color.into_pixel(),
+                    self.color.into(),
                 );
             } else {
                 frame_buffer_printer::print_ascii_character(
                     framebuffer,
                     self.underlying_char,
-                    FONT_COLOR.into_pixel(),
-                    BACKGROUND_COLOR.into_pixel(),
+                    FONT_COLOR.into(),
+                    BACKGROUND_COLOR.into(),
                     coordinate,
                     column,
                     line,

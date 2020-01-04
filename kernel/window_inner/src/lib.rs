@@ -13,7 +13,7 @@ extern crate color;
 use alloc::sync::Arc;
 use mpmc::Queue;
 use event_types::{Event};
-use frame_buffer::{FrameBuffer, AlphaPixel, IntoPixel};
+use frame_buffer::{FrameBuffer, AlphaPixel};
 use color::{Color};
 use shapes::Coord;
 use spin::{Mutex};
@@ -43,7 +43,7 @@ pub struct WindowInner {
     pub consumer: Queue<Event>, // event input
     /// event producer that could be used to send events to the `Window` object.
     pub producer: Queue<Event>, // event output used by window manager
-    /// frame buffer of this window
+    /// framebuffer of this window
     pub framebuffer: FrameBuffer<AlphaPixel>,
     /// Whether a window is moving and the position before a window starts to move.
     pub moving: WindowMovingStatus,
@@ -53,7 +53,7 @@ impl WindowInner {
 
     /// Clear the content of a window
     pub fn clear(&mut self) -> Result<(), &'static str> {
-        self.framebuffer.fill_color(WINDOW_DEFAULT_COLOR.into_pixel());
+        self.framebuffer.fill_color(WINDOW_DEFAULT_COLOR.into());
         Ok(())
     }
 
@@ -78,7 +78,7 @@ impl WindowInner {
     }
 
     /// Returns the pixel at the coordinate
-    pub fn get_pixel(&self, coordinate: Coord) -> Result<AlphaPixel, &'static str> {
+    pub fn get_pixel(&self, coordinate: Coord) -> Option<AlphaPixel> {
         self.framebuffer.get_pixel(coordinate)
     }
 }
