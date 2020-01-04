@@ -1,8 +1,5 @@
 use core::hash::Hash;
 
-/// The size of a pixel.
-pub const PIXEL_SIZE: usize = core::mem::size_of::<u32>();
-
 /// A pixel provides methods to mix with others.
 pub trait Pixel: Copy + Hash {
     /// Composites the `src` pixel slice to the `dest` pixel slice.

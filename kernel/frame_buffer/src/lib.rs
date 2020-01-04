@@ -73,7 +73,7 @@ impl<P: Pixel> FrameBuffer<P> {
         let vesa_display_flags: EntryFlags =
             EntryFlags::PRESENT | EntryFlags::WRITABLE | EntryFlags::GLOBAL | EntryFlags::NO_CACHE;
 
-        let size = width * height * PIXEL_SIZE;
+        let size = width * height * core::mem::size_of::<P>();
         let pages = memory::allocate_pages_by_bytes(size).ok_or("could not allocate pages")?;
 
         let mapped_frame_buffer = if let Some(address) = physical_address {
