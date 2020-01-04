@@ -19,12 +19,9 @@ pub trait Compositor<R: BlendableRegion> {
     /// Composites the framebuffers in the list of source framebuffers `src_fbs` into the destination framebuffer `dest_fb`.
     ///
     /// # Arguments
-    /// * `src_fbs`: an iterator over the source framebuffers to be composited and (@yuwenqiu?) where in the `dest_fb` they should be composited. 
+    /// * `src_fbs`: an iterator over the source framebuffers to be composited and where in the `dest_fb` they should be composited. 
     /// * `dest_fb`: the destination framebuffer that will contain the result of the composited source framebuffers.
-    /// * `bounding_boxes`: an iterator over bounding boxes that specify which regions of the source framebuffers (@yuwenqiu?) should to be composited. 
-    ///    The compositor will update the parts of every framebuffer in the boxes or the whole framebuffer if the argument is `None`.
-    ///     (@yuwenqiu:  how do the bounding boxes work? There is no information about that. Is there one per source fb, or a single list for the whole dest_fb?)
-    ///
+    /// * `bounding_boxes`: an iterator over bounding boxes that specify which regions of the final framebuffer should be updated. For every framebuffer, the compositor will composite its corresponding regions into the boxes of the final framebuffer. It will update the whole final framebuffer if this argument is `None`.
     fn composite<'a, U: IntoIterator<Item = R> + Clone, P: 'a + Pixel>(
         &mut self,
         src_fbs: impl IntoIterator<Item = FrameBufferUpdates<'a, P>>,
@@ -39,7 +36,7 @@ pub struct FrameBufferUpdates<'a, P: Pixel> {
     /// The framebuffer to be composited.
     pub framebuffer: &'a FrameBuffer<P>,
     /// The coordinate where the source `framebuffer` should be composited into the destination framebuffer,
-    /// which is relative to the top-left point of the destination framebuffer. (@yuwenqiu?) 
+    /// which is relative to the top-left point of the destination framebuffer. 
     pub coordinate: Coord,
 }
 
@@ -52,7 +49,6 @@ pub struct FrameBufferUpdates<'a, P: Pixel> {
 pub trait BlendableRegion {
     /// Blends the pixels in the source framebuffer `src_fb` into the pixels in the destination framebuffer `dest_fb`.
     /// The `dest_coord` is the coordinate relative to the top-left of the destination buffer.
-    /// (@yuwenqiu: when looking at a BlendableRegion, does `self` refer to the region in the dest fb or in a src fb?)
     fn blend_buffers<P: Pixel>(
         &self, 
         src_fb: &FrameBuffer<P>, 
@@ -71,8 +67,8 @@ impl BlendableRegion for Coord {
         let relative_coord = self.clone() - dest_coord;
         // (@yuwenqiu: bounds checking is being done THREE times here: in "contains", in "get_pixel", and in "draw_pixel".
         //             no wonder things are so slow!)
-        if src_fb.contains(relative_coord) {
-            let pixel = src_fb.get_pixel(relative_coord).ok_or("coordinate out of bounds")?;
+        // (@kevin: I kept the later two. `get_pixel` is for src framebuffer and `draw_pixel` is for dest framebuffer.)
+        if let Some(pixel) = src_fb.get_pixel(relative_coord) {
             dest_fb.draw_pixel(self.clone(), pixel);
         }
         Ok(())
