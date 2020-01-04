@@ -65,9 +65,6 @@ impl BlendableRegion for Coord {
         dest_coord: Coord,        
     ) -> Result<(), &'static str>{
         let relative_coord = self.clone() - dest_coord;
-        // (@yuwenqiu: bounds checking is being done THREE times here: in "contains", in "get_pixel", and in "draw_pixel".
-        //             no wonder things are so slow!)
-        // (@kevin: I kept the later two. `get_pixel` is for src framebuffer and `draw_pixel` is for dest framebuffer.)
         if let Some(pixel) = src_fb.get_pixel(relative_coord) {
             dest_fb.draw_pixel(self.clone(), pixel);
         }
