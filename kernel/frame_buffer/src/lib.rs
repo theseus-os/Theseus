@@ -1,7 +1,5 @@
-//! This crate defines a `FrameBuffer` structure.
-//! The structure contains a buffer of pixels. A compositor can composite a list of framebuffers to a final one. 
-//!
-//! `pixel.rs` defines two type of pixels which implement the `Pixel` trait. The lower three bytes represent the color of a pixel and the 4th byte is an extra channel. `RGBPixel` is a normal pixel without channel and `AlphaPixel` has an alpha channel. The pixels to be blended together should be of the same type in case the semantic of their channels are different.
+//! This crate defines a `FrameBuffer` structure, which is effectively a region of memory
+//! that is interpreted as a 2-D array of pixels.
 
 #![no_std]
 
@@ -21,8 +19,10 @@ use owning_ref::BoxRefMut;
 use shapes::Coord;
 pub use pixel::*;
 
-/// Initialize the final framebuffer.
-/// The final framebuffer contains a block of memory which is mapped to the physical framebuffer frames.
+/// Initializes the final framebuffer based on VESA graphics mode information obtained during boot.
+/// 
+/// The final framebuffer represents the actual pixel content displayed on screen 
+/// because its memory is directly mapped to the VESA display device's underlying physical memory.
 pub fn init<P: Pixel>() -> Result<FrameBuffer<P>, &'static str> {
     // get the graphic mode information
     let vesa_display_phys_start: PhysicalAddress;
@@ -44,9 +44,8 @@ pub fn init<P: Pixel>() -> Result<FrameBuffer<P>, &'static str> {
     Ok(framebuffer)
 }
 
-/// A framebuffer is effectively a rectangular region of pixels
-/// that can be displayed  buffer of pixels that is represented 
-/// as a rectangle, with a width and height.
+/// A framebuffer is a region of memory interpreted as a 2-D array of pixels.
+/// The memory buffer is a rectangular region with a width and height.
 #[derive(Hash)]
 pub struct FrameBuffer<P: Pixel> {
     width: usize,
@@ -57,7 +56,7 @@ pub struct FrameBuffer<P: Pixel> {
 impl<P: Pixel> FrameBuffer<P> {
     /// Creates a new framebuffer with rectangular dimensions of `width * height`, 
     /// specified in number of pixels.
-    /// If the `physical_address` is provided, the returned framebuffer will be "real",
+    /// If the `physical_address` is provided, the returned framebuffer will be **final**,
     /// i.e., mapped to the physical memory at that address, which is typically a hardware graphics device's memory.
     /// If the `physical_address` is `None`, the returned framebuffer is a "virtual" one 
     /// that renders to a randomly-allocated chunk of memory.

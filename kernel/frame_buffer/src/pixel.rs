@@ -1,3 +1,5 @@
+//! Defines the `Pixel` trait as well as basic pixel formats, like RBG/RBGA. 
+
 use core::hash::Hash;
 use color::Color;
 

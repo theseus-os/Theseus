@@ -2,7 +2,7 @@
 name = "frame_buffer_compositor"
 version = "0.1.0"
 authors = ["Wenqiu Yu <yuwenqiuj@gmail.com>"]
-description = "the framebuffer compositor composites a list of framebuffers to a final framebuffer"
+description = "the framebuffer compositor composites multiple source framebuffers into one destination framebuffer"
 build = "../../build.rs"
 
 [dependencies]

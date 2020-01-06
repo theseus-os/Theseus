@@ -19,9 +19,11 @@ pub trait Compositor<R: BlendableRegion> {
     /// Composites the framebuffers in the list of source framebuffers `src_fbs` into the destination framebuffer `dest_fb`.
     ///
     /// # Arguments
-    /// * `src_fbs`: an iterator over the source framebuffers to be composited and where in the `dest_fb` they should be composited. 
-    /// * `dest_fb`: the destination framebuffer that will contain the result of the composited source framebuffers.
-    /// * `bounding_boxes`: an iterator over bounding boxes that specify which regions of the final framebuffer should be updated. For every framebuffer, the compositor will composite its corresponding regions into the boxes of the final framebuffer. It will update the whole final framebuffer if this argument is `None`.
+    /// * `src_fbs`: an iterator over the source framebuffers to be composited, along with where in the `dest_fb` they should be composited. 
+    /// * `dest_fb`: the destination framebuffer that will hold the composited source framebuffers.
+    /// * `bounding_boxes`: an iterator over bounding boxes that specify which regions of the destination framebuffer should be updated. 
+    ///    For every source framebuffer, the compositor will composite its corresponding regions into the boxes of the destination framebuffer. 
+    ///    It will update the whole destination framebuffer if this argument is `None`.
     fn composite<'a, U: IntoIterator<Item = R> + Clone, P: 'a + Pixel>(
         &mut self,
         src_fbs: impl IntoIterator<Item = FrameBufferUpdates<'a, P>>,
@@ -40,15 +42,19 @@ pub struct FrameBufferUpdates<'a, P: Pixel> {
     pub coordinate: Coord,
 }
 
-/// A `BlendableRegion` is an abstract region (i.e., shape, bounding box) 
-/// that can optimize the blending of one framebuffer's pixels into another framebuffer's pixels,
-/// according to the nature of each region (e.g., a single point, a rectangle, etc).
-/// This allows a compositor to blend the pixel contents in only a subset of bounding boxes and 
-/// composite them to a destination framebuffer rather than doing so for the whole framebuffer,
-/// which vastly improves performance.
+/// A `BlendableRegion` is an abstract region (i.e., a bounding box) 
+/// that can optimize the compositing (blending) of one framebuffer into another framebuffer
+/// according to the specifics of the region's shape. 
+/// For example, a single 2-D point (`Coord`) offers no real room for optimization 
+/// because only one pixel will be composited,
+/// but a rectangle **does** allow for optimization, as a large chunk of pixels can be composited all at once.
+/// 
+/// In addition, a `BlendableRegion` makes it easier for a compositor to only blend pixels in a subset of a given source framebuffer
+/// rather than forcing it to composite the whole framebuffer, which vastly improves performance.
 pub trait BlendableRegion {
     /// Blends the pixels in the source framebuffer `src_fb` into the pixels in the destination framebuffer `dest_fb`.
-    /// The `dest_coord` is the coordinate relative to the top-left of the destination buffer.
+    /// The `dest_coord` is the coordinate in the destination buffer (relative to its top-left corner)
+    /// where the `src_fb` will be composited into (starting at the `src_fb`'s top-left corner).
     fn blend_buffers<P: Pixel>(
         &self, 
         src_fb: &FrameBuffer<P>, 
