@@ -1,4 +1,4 @@
-//! This application is an example of how to write applications in Theseus.
+//! This application is an example of how to start event based sampling using the PMU
 
 #![no_std]
 
@@ -10,72 +10,30 @@ extern crate spawn;
 
 use alloc::vec::Vec;
 use alloc::string::String;
-use getopts::Options;
 
-
-pub fn main(args: Vec<String>) -> isize {
-    let mut opts = Options::new();
-    opts.optflag("h", "help", "print this help menu");
-
-    let matches = match opts.parse(&args) {
-        Ok(m) => m,
-        Err(_f) => {
-            println!("{}", _f);
-            print_usage(opts);
-            return -1; 
-        }
-    };
-    /*
-    let _my_thread = spawn::KernelTaskBuilder::new( 
-        |_: Option<u8>| {
-            pmu_x86::init();
-            let sampler = pmu_x86::start_samples(pmu_x86::EventType::UnhaltedReferenceCycles, 0xFFFFF, None, 500);
-            if let Ok(my_sampler) = sampler {
-                /*
-                debug!("Sampling running ok.");
-                let mut counter = 0;
-                while counter < 5000 {
-                    counter += 1;
-                } 
-                
-                if let Ok(mut samples) = pmu_x86::retrieve_samples() {
-                    debug!("The results from retrieve_samples was okay");
-                    pmu_x86::print_samples(&mut samples);
-                } else {
-                    debug!("Something went wrong!");
-                }
-                */
-            } else {
-                println!("Sample didn't begin");
-            }
-        }, 
-        None)
-        .name(String::from("pmu_test"))
-        .pin_on_core(0)
-        .spawn()?;
-    */
-    pmu_x86::init();
-    let _sampler = pmu_x86::start_samples(pmu_x86::EventType::UnhaltedReferenceCycles, 0xFFFFF, None, 10);
-    /*
-    pmu_x86::init();
-    let sampler = pmu_x86::start_samples(pmu_x86::EventType::UnhaltedReferenceCycles, 0xFFFFF, None, 10);
-    */
-    if matches.opt_present("h") {
-        print_usage(opts);
-        return 0;
+pub fn main(_args: Vec<String>) -> isize {
+    if let Err(e) = pmu_x86::init() {
+        println!("Could not initialize PMU: {:?}", e);
+        return -1;
     }
 
-    println!("This is an example application.\nArguments: {:?}", args);
+    // run the pmu stat on this core
+    /*let pmu = pmu_x86::stat::PerformanceCounters::new();
+    match pmu {
+        Ok(mut x) => {
+            match x.end(){
+                Ok(results) => println!("{:?}", results),
+                Err(x) => println!("Results could not be retrieved for PMU stat: {:?}", x)
+            }
+        },
+        Err(x) => println!("Could not create counters for PMU stat: {:?}", x)
+    } */
+    
+    // run event based sampling on this core
+    if let Err(e) = pmu_x86::start_samples(pmu_x86::EventType::UnhaltedReferenceCycles, 0xF_FFFF, None, 10) {
+        println!("Could not start PMU sampling: {:?}", e);
+        return -1;
+    }
 
     0
 }
-
-
-
-fn print_usage(opts: Options) {
-    println!("{}", opts.usage(USAGE));
-}
-
-
-const USAGE: &'static str = "Usage: example [ARGS]
-An example application that just echoes its arguments.";

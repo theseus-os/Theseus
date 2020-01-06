@@ -188,7 +188,7 @@ const IA32_APIC_BASE_MSR_IS_BSP: u64 = 1 << 8; // 0x100
 const APIC_SW_ENABLE: u32 = 1 << 8;
 const APIC_TIMER_PERIODIC:  u32 = 0x2_0000;
 const APIC_DISABLE: u32 = 0x1_0000;
-const APIC_NMI: u32 = 4 << 8;
+pub const APIC_NMI: u32 = 4 << 8;
 
 
 
