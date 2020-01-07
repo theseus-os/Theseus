@@ -156,7 +156,7 @@ impl FrameCompositor {
 
             self.caches.insert(coordinate_start, new_cache);
 
-        } 
+        }
         
         let update_box = bounding_box.intersect_block(index, coordinate, CACHE_BLOCK_HEIGHT);
 
@@ -197,11 +197,19 @@ impl Compositor for FrameCompositor {
             }
         } else {
             for frame_buffer_updates in src_fbs.into_iter() {
+                let mut updated_blocks = Vec::new();
                 for rect in bounding_boxes.clone() {
                     let src_fb = frame_buffer_updates.framebuffer;
                     let coordinate = frame_buffer_updates.coordinate;
                     let blocks = rect.get_block_index_iter(src_fb, coordinate, CACHE_BLOCK_HEIGHT);
                     for block in blocks {
+                        /// The same block is cached only once
+                        let check_cached = if updated_blocks.contains(&block) {
+                            false
+                        } else {
+                            updated_blocks.push(block);
+                            true
+                        };
                         self.check_cache_and_blend(src_fb, dest_fb, coordinate, block, &rect.clone(), check_cache)?;
                     } 
                 }
