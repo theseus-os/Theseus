@@ -267,7 +267,7 @@ impl WindowManager {
         }).collect::<Vec<_>>();
         
         let buffer_iter = Some(bottom_fb).into_iter().chain(window_bufferlist.into_iter());
-        FRAME_COMPOSITOR.lock().composite(buffer_iter, &mut self.final_fb, pixels)?;
+        FRAME_COMPOSITOR.lock().composite(buffer_iter, &mut self.final_fb, pixels, false)?;
         
         Ok(())
     }
@@ -279,7 +279,7 @@ impl WindowManager {
             coordinate: Coord::new(0, 0),
         }; 
 
-        FRAME_COMPOSITOR.lock().composite(Some(top_buffer), &mut self.final_fb, pixels)
+        FRAME_COMPOSITOR.lock().composite(Some(top_buffer), &mut self.final_fb, pixels, false)
     }
 
     /// Refresh the part in `bounding_box` of every window. `bounding_box` is a rectangle relative to the top-left of the screen. Refresh the whole screen if the bounding box is None.
@@ -313,7 +313,7 @@ impl WindowManager {
             }
         }).collect::<Vec<_>>();
 
-        FRAME_COMPOSITOR.lock().composite(bufferlist.into_iter(), &mut self.final_fb, bounding_box)
+        FRAME_COMPOSITOR.lock().composite(bufferlist.into_iter(), &mut self.final_fb, bounding_box, true)
     }
 
 
@@ -325,7 +325,7 @@ impl WindowManager {
                 framebuffer: &window.framebuffer,
                 coordinate: window.get_position(),
             };
-            FRAME_COMPOSITOR.lock().composite(Some(buffer_update), &mut self.final_fb, bounding_box)
+            FRAME_COMPOSITOR.lock().composite(Some(buffer_update), &mut self.final_fb, bounding_box, true)
         } else {
             Ok(())
         }
@@ -340,7 +340,7 @@ impl WindowManager {
             coordinate: Coord::new(0, 0),
         }; 
 
-        FRAME_COMPOSITOR.lock().composite(Some(bg_buffer), &mut self.final_fb, bounding_box.into_iter())?;
+        FRAME_COMPOSITOR.lock().composite(Some(bg_buffer), &mut self.final_fb, bounding_box.into_iter(), true)?;
         self.refresh_windows(bounding_box, active)
     }
     
@@ -352,7 +352,7 @@ impl WindowManager {
             coordinate: Coord::new(0, 0),
         }; 
 
-        FRAME_COMPOSITOR.lock().composite(Some(top_buffer), &mut self.final_fb, bounding_box)
+        FRAME_COMPOSITOR.lock().composite(Some(top_buffer), &mut self.final_fb, bounding_box, true)
     }
     
     /// pass keyboard event to currently active window

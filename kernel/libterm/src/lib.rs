@@ -440,8 +440,8 @@ impl Terminal {
         const WINDOW_MARGIN: usize = 20;
         let window = window::Window::new(
             Coord::new(WINDOW_MARGIN as isize, WINDOW_MARGIN as isize), 
-            window_width - 2 * WINDOW_MARGIN, 
-            window_height - 2 * WINDOW_MARGIN,
+            window_width, 
+            window_height,
             color::BLACK
         )?;
         

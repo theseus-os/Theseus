@@ -22,6 +22,7 @@ pub trait Compositor {
     /// * `src_fbs`: an iterator over the source framebuffers to be composited, along with where in the `dest_fb` they should be composited. 
     /// * `dest_fb`: the destination framebuffer that will hold the composited source framebuffers.
     /// * `bounding_boxes`: an iterator over bounding boxes that specify which regions of the destination framebuffer should be updated. 
+    /// * `cache_check`: whether to check cache before updating. For tiny updates like a pixel, we'd better update directly for better performance.
     ///    For every source framebuffer, the compositor will composite its corresponding regions into the boxes of the destination framebuffer. 
     ///    It will update the whole destination framebuffer if this argument is `None`.
     fn composite<'a, B: BlendableRegion + Clone, P: 'a + Pixel>(
@@ -29,6 +30,7 @@ pub trait Compositor {
         src_fbs: impl IntoIterator<Item = FrameBufferUpdates<'a, P>>,
         dest_fb: &mut FrameBuffer<P>,
         bounding_boxes: impl IntoIterator<Item = B> + Clone,
+        cache_check: bool,
     ) -> Result<(), &'static str>;
 }
 
