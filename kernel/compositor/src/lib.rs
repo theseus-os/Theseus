@@ -52,6 +52,13 @@ pub struct FrameBufferUpdates<'a, P: Pixel> {
 /// In addition, a `BlendableRegion` makes it easier for a compositor to only blend pixels in a subset of a given source framebuffer
 /// rather than forcing it to composite the whole framebuffer, which vastly improves performance.
 pub trait BlendableRegion {
+    fn get_block_index_iter<P: Pixel>(    
+        &self,
+        framebuffer: &FrameBuffer<P>, 
+        coordinate: Coord, 
+        block_height: usize,
+    ) -> core::ops::Range<usize>;
+
     /// Blends the pixels in the source framebuffer `src_fb` into the pixels in the destination framebuffer `dest_fb`.
     /// The `dest_coord` is the coordinate in the destination buffer (relative to its top-left corner)
     /// where the `src_fb` will be composited into (starting at the `src_fb`'s top-left corner).
@@ -64,6 +71,22 @@ pub trait BlendableRegion {
 }
 
 impl BlendableRegion for Coord {
+    fn get_block_index_iter<P: Pixel>(    
+        &self,
+        framebuffer: &FrameBuffer<P>, 
+        coordinate: Coord,
+        block_height: usize,
+    ) -> core::ops::Range<usize> {
+        let relative_coord = *self - coordinate;
+        let (_, height) = framebuffer.get_size();
+        if relative_coord.y >= 0 && relative_coord.y < height as isize {
+            let index = relative_coord.y as usize / block_height;
+            return index..index + 1;
+        } else {
+            return 0..0;
+        }
+    }
+
     fn blend_buffers<P: Pixel>(
         &self, 
         src_fb: &FrameBuffer<P>,
@@ -79,6 +102,32 @@ impl BlendableRegion for Coord {
 }
 
 impl BlendableRegion for Rectangle {
+    fn get_block_index_iter<P: Pixel>(    
+        &self,
+        framebuffer: &FrameBuffer<P>, 
+        coordinate: Coord, 
+        block_height: usize,
+    ) -> core::ops::Range<usize> {
+        let relative_area = *self - coordinate;
+        let (width, height) = framebuffer.get_size();
+
+        let start_x = core::cmp::max(relative_area.top_left.x, 0);
+        let end_x = core::cmp::min(relative_area.bottom_right.x, width as isize);
+        if start_x >= end_x {
+            return 0..0;
+        }
+        
+        let start_y = core::cmp::max(relative_area.top_left.y, 0);
+        let end_y = core::cmp::min(relative_area.bottom_right.y, height as isize);
+        if start_y >= end_y {
+            return 0..0;
+        }
+        let start_index = start_y as usize / block_height;
+        let end_index = end_y as usize / block_height + 1;
+        
+        return start_index..end_index
+    }
+
     fn blend_buffers<P: Pixel>(
         &self, 
         src_fb: &FrameBuffer<P>, 

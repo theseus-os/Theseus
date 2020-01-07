@@ -191,7 +191,7 @@ impl Compositor<Rectangle> for FrameCompositor {
             let coordinate = frame_buffer_updates.coordinate;
             match &bounding_box {
                 Some(rect) => {
-                    let blocks = get_block_index_iter(src_fb, coordinate, rect);
+                    let blocks = rect.get_block_index_iter(src_fb, coordinate, CACHE_BLOCK_HEIGHT);
                     for block in blocks {
                         self.check_cache_and_blend(src_fb, dest_fb, coordinate, block, &rect)?;
                     } 
@@ -236,35 +236,35 @@ impl Compositor<Coord> for FrameCompositor {
     }
 }
 
-/// Gets an iterator over the block indexes to update in the framebuffer.
-/// # Arguments
-/// * `framebuffer`: the framebuffer to composite.
-/// * `coordinate`: the coordinate of the framebuffer relative to the origin(top-left) of the screen.
-/// * `bounding_box`: the bounding box to update relative to the origin(top-left) of the screen. The returned indexes represent the blocks overlap with this area.
-pub fn get_block_index_iter<P: Pixel>(
-    framebuffer: &FrameBuffer<P>, 
-    coordinate: Coord, 
-    bounding_box: &Rectangle
-) -> core::ops::Range<usize> {
-    let relative_area = *bounding_box - coordinate;
-    let (width, height) = framebuffer.get_size();
+// /// Gets an iterator over the block indexes to update in the framebuffer.
+// /// # Arguments
+// /// * `framebuffer`: the framebuffer to composite.
+// /// * `coordinate`: the coordinate of the framebuffer relative to the origin(top-left) of the screen.
+// /// * `bounding_box`: the bounding box to update relative to the origin(top-left) of the screen. The returned indexes represent the blocks overlap with this area.
+// pub fn get_block_index_iter<P: Pixel>(
+//     framebuffer: &FrameBuffer<P>, 
+//     coordinate: Coord, 
+//     bounding_box: &Rectangle
+// ) -> core::ops::Range<usize> {
+//     let relative_area = *bounding_box - coordinate;
+//     let (width, height) = framebuffer.get_size();
 
-    let start_x = core::cmp::max(relative_area.top_left.x, 0);
-    let end_x = core::cmp::min(relative_area.bottom_right.x, width as isize);
-    if start_x >= end_x {
-        return 0..0;
-    }
+//     let start_x = core::cmp::max(relative_area.top_left.x, 0);
+//     let end_x = core::cmp::min(relative_area.bottom_right.x, width as isize);
+//     if start_x >= end_x {
+//         return 0..0;
+//     }
     
-    let start_y = core::cmp::max(relative_area.top_left.y, 0);
-    let end_y = core::cmp::min(relative_area.bottom_right.y, height as isize);
-    if start_y >= end_y {
-        return 0..0;
-    }
-    let start_index = start_y as usize / CACHE_BLOCK_HEIGHT;
-    let end_index = end_y as usize / CACHE_BLOCK_HEIGHT + 1;
+//     let start_y = core::cmp::max(relative_area.top_left.y, 0);
+//     let end_y = core::cmp::min(relative_area.bottom_right.y, height as isize);
+//     if start_y >= end_y {
+//         return 0..0;
+//     }
+//     let start_index = start_y as usize / CACHE_BLOCK_HEIGHT;
+//     let end_index = end_y as usize / CACHE_BLOCK_HEIGHT + 1;
     
-    return start_index..end_index
-}
+//     return start_index..end_index
+// }
 
 /// Gets the hash of a cache block
 fn hash<T: Hash>(block: T) -> u64 {
