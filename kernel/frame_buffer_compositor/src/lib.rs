@@ -95,7 +95,6 @@ impl FrameCompositor {
         }
     }
 
-    /// Checks if a block is already cached and update the new blocks.
     /// This function will get the `index`_th block in the framebuffer and check if it is cached. If not, it will update the intersection of the block and the bounding boxes.
     /// It then removes the cache overlaps with the block and caches the new one. 
     /// # Arguments
@@ -105,65 +104,68 @@ impl FrameCompositor {
     /// * `index`: the index of the block to be rendered. 
     ///    The framebuffer are divided into y-aligned blocks and index indicates the order of the block.
     /// * `bounding_box`: the bounding box specifying the region to update.
+    /// * `check_cache`: if this argument is true, checks whether a block is already cached and update the new blocks.
     fn check_cache_and_blend<P: Pixel, B: BlendableRegion>(
         &mut self, 
         src_fb: &FrameBuffer<P>, 
         dest_fb: &mut FrameBuffer<P>, 
         coordinate: Coord, 
         index: usize, 
-        bounding_box: &B
+        bounding_box: &B,
+        check_cache: bool,
     ) -> Result<(), &'static str> {
-        let (src_width, src_height) = src_fb.get_size();
-        let src_buffer_len = src_width * src_height;
-        let block_pixels = CACHE_BLOCK_HEIGHT * src_width;
+        if check_cache {
+            let (src_width, src_height) = src_fb.get_size();
+            let src_buffer_len = src_width * src_height;
+            let block_pixels = CACHE_BLOCK_HEIGHT * src_width;
 
-        // The start pixel of the block
-        let start_index = block_pixels * index;
-        let coordinate_start = coordinate + (0, (CACHE_BLOCK_HEIGHT * index) as isize);
+            // The start pixel of the block
+            let start_index = block_pixels * index;
+            let coordinate_start = coordinate + (0, (CACHE_BLOCK_HEIGHT * index) as isize);
 
-        // The end pixel of the block
-        let end_index = start_index + block_pixels;
-        
-        let block_content = &src_fb.buffer()[start_index..core::cmp::min(end_index, src_buffer_len)];
-        
-        // Skip if a block is already cached
-        if self.is_cached(&block_content, &coordinate_start) {
-            return Ok(());
-        }
+            // The end pixel of the block
+            let end_index = start_index + block_pixels;
+            
+            let block_content = &src_fb.buffer()[start_index..core::cmp::min(end_index, src_buffer_len)];
+            
+            // Skip if a block is already cached
+            if self.is_cached(&block_content, &coordinate_start) {
+                return Ok(());
+            }
 
-        // find overlapped caches
-        // extend the width of the updated part to the right side of the cached block content
-        // remove caches of the same location
-        let new_cache = BlockCache {
-            content_hash: hash(block_content),
-            coordinate: coordinate_start,
-            width: src_width,
-        };
-        let keys: Vec<_> = self.caches.keys().cloned().collect();
-        for key in keys {
-            if let Some(cache) = self.caches.get_mut(&key) {
-                if cache.overlaps_with(&new_cache) {
-                    if cache.coordinate == new_cache.coordinate  && cache.width == new_cache.width {
-                        self.caches.remove(&key);
-                    } else {
-                        cache.content_hash = 0;
-                    }
-                }
+            // find overlapped caches
+            // extend the width of the updated part to the right side of the cached block content
+            // remove caches of the same location
+            let new_cache = BlockCache {
+                content_hash: hash(block_content),
+                coordinate: coordinate_start,
+                width: src_width,
             };
-        }
+            let keys: Vec<_> = self.caches.keys().cloned().collect();
+            for key in keys {
+                if let Some(cache) = self.caches.get_mut(&key) {
+                    if cache.overlaps_with(&new_cache) {
+                        if cache.coordinate == new_cache.coordinate  && cache.width == new_cache.width {
+                            self.caches.remove(&key);
+                        } else {
+                            cache.content_hash = 0;
+                        }
+                    }
+                };
+            }
 
+            self.caches.insert(coordinate_start, new_cache);
+
+        } 
+        
         let update_box = bounding_box.intersect_block(index, coordinate, CACHE_BLOCK_HEIGHT);
 
-        // render to the destination framebuffer
         update_box.blend_buffers(
             src_fb,
             dest_fb,
             coordinate,
         )?;
-
-        // insert the new cache
-        self.caches.insert(coordinate_start, new_cache);
-
+        
         Ok(())
     }
 
@@ -189,7 +191,7 @@ impl Compositor<Rectangle> for FrameCompositor {
                     bottom_right: coordinate + (src_width as isize, src_height as isize)
                 };
                 for i in 0.. block_number {
-                    self.check_cache_and_blend(src_fb, dest_fb, coordinate, i, &area)?;
+                    self.check_cache_and_blend(src_fb, dest_fb, coordinate, i, &area, true)?;
                 }
             }
         } else {
@@ -199,7 +201,7 @@ impl Compositor<Rectangle> for FrameCompositor {
                     let coordinate = frame_buffer_updates.coordinate;
                     let blocks = rect.get_block_index_iter(src_fb, coordinate, CACHE_BLOCK_HEIGHT);
                     for block in blocks {
-                        self.check_cache_and_blend(src_fb, dest_fb, coordinate, block, &rect.clone())?;
+                        self.check_cache_and_blend(src_fb, dest_fb, coordinate, block, &rect.clone(), true)?;
                     } 
                 }
             }
@@ -216,15 +218,40 @@ impl Compositor<Coord> for FrameCompositor {
         dest_fb: &mut FrameBuffer<P>,
         bounding_boxes: U
     ) -> Result<(), &'static str> {
-        for frame_buffer_updates in src_fbs {
-            for pixel in bounding_boxes.clone() {
-                pixel.blend_buffers(
-                    frame_buffer_updates.framebuffer,
-                    dest_fb,
-                    frame_buffer_updates.coordinate,
-                )?;
+        let mut box_iter = bounding_boxes.clone().into_iter();
+        if box_iter.next().is_none() {
+            for frame_buffer_updates in src_fbs.into_iter() {
+                let src_fb = frame_buffer_updates.framebuffer;
+                let coordinate = frame_buffer_updates.coordinate;
+                // Update the whole screen if the caller does not specify the blocks
+                let (src_width, src_height) = frame_buffer_updates.framebuffer.get_size();
+                let block_number = (src_height - 1) / CACHE_BLOCK_HEIGHT + 1;
+                let area = Rectangle {
+                    top_left: coordinate,
+                    bottom_right: coordinate + (src_width as isize, src_height as isize)
+                };
+                for i in 0.. block_number {
+                    self.check_cache_and_blend(src_fb, dest_fb, coordinate, i, &area, true)?;
+                }
+            }
+        } else {
+            for frame_buffer_updates in src_fbs.into_iter() {
+                for pixel in bounding_boxes.clone() {
+                    let src_fb = frame_buffer_updates.framebuffer;
+                    let coordinate = frame_buffer_updates.coordinate;
+                    let blocks = pixel.get_block_index_iter(src_fb, coordinate, CACHE_BLOCK_HEIGHT);
+                    for block in blocks {
+                        // pixel.blend_buffers(
+                        //     frame_buffer_updates.framebuffer,
+                        //     dest_fb,
+                        //     frame_buffer_updates.coordinate,
+                        // )?;
+                        self.check_cache_and_blend(src_fb, dest_fb, coordinate, block, &pixel.clone(), false)?;
+                    } 
+                }
             }
         }
+
         Ok(())
     }
 }
