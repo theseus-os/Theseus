@@ -105,13 +105,13 @@ impl FrameCompositor {
     /// * `index`: the index of the block to be rendered. 
     ///    The framebuffer are divided into y-aligned blocks and index indicates the order of the block.
     /// * `bounding_box`: the bounding box specifying the region to update.
-    fn check_cache_and_blend<P: Pixel>(
+    fn check_cache_and_blend<P: Pixel, B: BlendableRegion>(
         &mut self, 
         src_fb: &FrameBuffer<P>, 
         dest_fb: &mut FrameBuffer<P>, 
         coordinate: Coord, 
         index: usize, 
-        bounding_box: &Rectangle
+        bounding_box: &B
     ) -> Result<(), &'static str> {
         let (src_width, src_height) = src_fb.get_size();
         let src_buffer_len = src_width * src_height;
@@ -152,19 +152,10 @@ impl FrameCompositor {
             };
         }
 
-        let update_rect = Rectangle {
-            top_left: Coord::new(
-                bounding_box.top_left.x,
-                core::cmp::max((index * CACHE_BLOCK_HEIGHT) as isize + coordinate.y, bounding_box.top_left.y),
-            ),
-            bottom_right: Coord::new(
-                bounding_box.bottom_right.x,
-                core::cmp::min(((index + 1) * CACHE_BLOCK_HEIGHT) as isize + coordinate.y, bounding_box.bottom_right.y)
-            )
-        };
+        let update_box = bounding_box.intersect_block(index, coordinate, CACHE_BLOCK_HEIGHT);
 
         // render to the destination framebuffer
-        update_rect.blend_buffers(
+        update_box.blend_buffers(
             src_fb,
             dest_fb,
             coordinate,
@@ -193,7 +184,7 @@ impl Compositor<Rectangle> for FrameCompositor {
                 Some(rect) => {
                     let blocks = rect.get_block_index_iter(src_fb, coordinate, CACHE_BLOCK_HEIGHT);
                     for block in blocks {
-                        self.check_cache_and_blend(src_fb, dest_fb, coordinate, block, &rect)?;
+                        self.check_cache_and_blend(src_fb, dest_fb, coordinate, block, &rect.clone())?;
                     } 
                 },
                 None => {
@@ -223,17 +214,35 @@ impl Compositor<Coord> for FrameCompositor {
         dest_fb: &mut FrameBuffer<P>,
         bounding_boxes: U
     ) -> Result<(), &'static str> {
-        for frame_buffer_updates in src_fbs {
-            for pixel in bounding_boxes.clone() {
-                pixel.blend_buffers(
-                    frame_buffer_updates.framebuffer,
-                    dest_fb,
-                    frame_buffer_updates.coordinate,
-                )?;
-            }
+       let bounding_box = bounding_boxes.into_iter().next();
+        for frame_buffer_updates in src_fbs.into_iter() {
+            let src_fb = frame_buffer_updates.framebuffer;
+            let coordinate = frame_buffer_updates.coordinate;
+            match &bounding_box {
+                Some(rect) => {
+                    let blocks = rect.get_block_index_iter(src_fb, coordinate, CACHE_BLOCK_HEIGHT);
+                    for block in blocks {
+                        self.check_cache_and_blend(src_fb, dest_fb, coordinate, block, &rect.clone())?;
+                    } 
+                },
+                None => {
+                    // Update the whole screen if the caller does not specify the blocks
+                    let (src_width, src_height) = frame_buffer_updates.framebuffer.get_size();
+                    let block_number = (src_height - 1) / CACHE_BLOCK_HEIGHT + 1;
+                    let area = Rectangle {
+                        top_left: coordinate,
+                        bottom_right: coordinate + (src_width as isize, src_height as isize)
+                    };
+                    for i in 0.. block_number {
+                        self.check_cache_and_blend(src_fb, dest_fb, coordinate, i, &area)?;
+                    }
+                } 
+            };
+      
         }
+
         Ok(())
-    }
+        }
 }
 
 // /// Gets an iterator over the block indexes to update in the framebuffer.

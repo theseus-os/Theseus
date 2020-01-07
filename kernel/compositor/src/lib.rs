@@ -59,6 +59,7 @@ pub trait BlendableRegion {
         block_height: usize,
     ) -> core::ops::Range<usize>;
 
+    fn intersect_block(&self, block_index: usize, coordinate: Coord, block_height: usize) -> Self;
     /// Blends the pixels in the source framebuffer `src_fb` into the pixels in the destination framebuffer `dest_fb`.
     /// The `dest_coord` is the coordinate in the destination buffer (relative to its top-left corner)
     /// where the `src_fb` will be composited into (starting at the `src_fb`'s top-left corner).
@@ -85,6 +86,10 @@ impl BlendableRegion for Coord {
         } else {
             return 0..0;
         }
+    }
+ 
+    fn intersect_block(&self, block_index: usize, coordinate: Coord, block_height: usize) -> Coord {
+        return self.clone()
     }
 
     fn blend_buffers<P: Pixel>(
@@ -126,6 +131,19 @@ impl BlendableRegion for Rectangle {
         let end_index = end_y as usize / block_height + 1;
         
         return start_index..end_index
+    }
+
+    fn intersect_block(&self, block_index: usize, coordinate: Coord, block_height: usize) -> Rectangle {
+        return Rectangle {
+            top_left: Coord::new(
+                self.top_left.x,
+                core::cmp::max((block_index * block_height) as isize + coordinate.y, self.top_left.y),
+            ),
+            bottom_right: Coord::new(
+                self.bottom_right.x,
+                core::cmp::min(((block_index + 1) * block_height) as isize + coordinate.y, self.bottom_right.y)
+            )
+        };
     }
 
     fn blend_buffers<P: Pixel>(
