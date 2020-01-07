@@ -97,8 +97,8 @@ impl FrameCompositor {
         }
     }
 
-    /// This function will get the `index`_th block in the framebuffer and check if it is cached. If not, it will update the intersection of the block and the bounding boxes.
-    /// It then removes the cache overlaps with the block and caches the new one. 
+    /// This function will get the `index`_th block in the framebuffer and check if it is cached.
+    /// If the answer is not, it will remove the cache overlaps with the block and caches the new one. 
     /// # Arguments
     /// * `src_fb`: the updated source framebuffer.
     /// * `dest_fn`: the destination framebuffer.
@@ -106,17 +106,14 @@ impl FrameCompositor {
     /// * `index`: the index of the block to be rendered. 
     ///    The framebuffer are divided into y-aligned blocks and index indicates the order of the block.
     /// * `bounding_box`: the bounding box specifying the region to update.
-    /// * `check_cache`: if this argument is true, checks whether a block is already cached and update the new blocks.
-    fn check_cache_and_blend<P: Pixel, B: BlendableRegion>(
+    fn check_and_cache<P: Pixel, B: BlendableRegion>(
         &mut self, 
         src_fb: &FrameBuffer<P>, 
         dest_fb: &mut FrameBuffer<P>, 
         coordinate: Coord, 
         index: usize, 
         bounding_box: &B,
-        check_cache: bool,
     ) -> Result<(), &'static str> {
-        if check_cache {
             let (src_width, src_height) = src_fb.get_size();
             let src_buffer_len = src_width * src_height;
             let block_pixels = CACHE_BLOCK_HEIGHT * src_width;
@@ -156,19 +153,26 @@ impl FrameCompositor {
                 };
             }
 
-            self.caches.insert(coordinate_start, new_cache);
+            self.caches.insert(coordinate_start, new_cache);        
+        Ok(())
+    }
 
-        }
-        
+    /// This function will blend the intersection of the bounding_box with the `index_th` block in the source framebuffer to the destination. `coordinate` is the top-left point of the source framebuffer relative to top-left of the distination one. About `block` see the definition of this `frame_buffer_compositor` crate.
+    fn blend<B: BlendableRegion, P: Pixel>(
+        &self,
+        src_fb: &FrameBuffer<P>,
+        dest_fb: &mut FrameBuffer<P>,
+        bounding_box: &B, 
+        index: usize, 
+        coordinate: Coord
+    ) -> Result<(), &'static str> {
         let update_box = bounding_box.intersect_block(index, coordinate, CACHE_BLOCK_HEIGHT);
 
         update_box.blend_buffers(
             src_fb,
             dest_fb,
             coordinate,
-        )?;
-        
-        Ok(())
+        )
     }
 
 }
@@ -179,7 +183,6 @@ impl Compositor for FrameCompositor {
         src_fbs: impl IntoIterator<Item = FrameBufferUpdates<'a, P>>,
         dest_fb: &mut FrameBuffer<P>,
         bounding_boxes: impl IntoIterator<Item = B> + Clone,
-        check_cache: bool,
     ) -> Result<(), &'static str> {
         let mut box_iter = bounding_boxes.clone().into_iter();
         if box_iter.next().is_none() {
@@ -194,29 +197,26 @@ impl Compositor for FrameCompositor {
                     bottom_right: coordinate + (src_width as isize, src_height as isize)
                 };
                 for i in 0.. block_number {
-                    self.check_cache_and_blend(src_fb, dest_fb, coordinate, i, &area, check_cache)?;
+                    self.check_and_cache(src_fb, dest_fb, coordinate, i, &area)?;
+                    self.blend(src_fb, dest_fb, &area, i, coordinate)?;
                 }
             }
         } else {
-            let mut wenqiu = 0;
             for frame_buffer_updates in src_fbs.into_iter() {
                 let mut updated_blocks = Vec::new();
-                for rect in bounding_boxes.clone() {
+                for bounding_box in bounding_boxes.clone() {
                     let src_fb = frame_buffer_updates.framebuffer;
                     let coordinate = frame_buffer_updates.coordinate;
-                    let blocks = rect.get_block_index_iter(src_fb, coordinate, CACHE_BLOCK_HEIGHT);
+                    let blocks = bounding_box.get_block_index_iter(src_fb, coordinate, CACHE_BLOCK_HEIGHT);
                     for block in blocks {
-                        /// The same block is cached only once
-                        let mut check_cached = if updated_blocks.contains(&block) {
-                            false
-                        } else {
+                        // The same block is cached only once
+                        if !updated_blocks.contains(&block) {
                             updated_blocks.push(block);
-                            true
+                            self.check_and_cache(src_fb, dest_fb, coordinate, block, &bounding_box.clone())?;
                         };
-                        self.check_cache_and_blend(src_fb, dest_fb, coordinate, block, &rect.clone(), check_cached)?;
+                        self.blend(src_fb, dest_fb, &bounding_box.clone(), block, coordinate)?;                        
                     } 
                 }
-                wenqiu += 1;
             }
         }
 

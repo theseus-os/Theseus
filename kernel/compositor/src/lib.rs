@@ -29,7 +29,6 @@ pub trait Compositor {
         src_fbs: impl IntoIterator<Item = FrameBufferUpdates<'a, P>>,
         dest_fb: &mut FrameBuffer<P>,
         bounding_boxes: impl IntoIterator<Item = B> + Clone,
-        check_cache: bool,
     ) -> Result<(), &'static str>;
 }
 
