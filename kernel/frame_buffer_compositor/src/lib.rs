@@ -171,12 +171,13 @@ impl FrameCompositor {
 
 }
 
-impl Compositor<Rectangle> for FrameCompositor {
-    fn composite<'a, U: IntoIterator<Item = Rectangle> + Clone, P: 'a + Pixel>(
+impl Compositor for FrameCompositor {
+    fn composite<'a, B: BlendableRegion + Clone, P: 'a + Pixel>(
         &mut self,
         src_fbs: impl IntoIterator<Item = FrameBufferUpdates<'a, P>>,
         dest_fb: &mut FrameBuffer<P>,
-        bounding_boxes: U
+        bounding_boxes: impl IntoIterator<Item = B> + Clone,
+        check_cache: bool,
     ) -> Result<(), &'static str> {
         let mut box_iter = bounding_boxes.clone().into_iter();
         if box_iter.next().is_none() {
@@ -191,7 +192,7 @@ impl Compositor<Rectangle> for FrameCompositor {
                     bottom_right: coordinate + (src_width as isize, src_height as isize)
                 };
                 for i in 0.. block_number {
-                    self.check_cache_and_blend(src_fb, dest_fb, coordinate, i, &area, true)?;
+                    self.check_cache_and_blend(src_fb, dest_fb, coordinate, i, &area, check_cache)?;
                 }
             }
         } else {
@@ -201,7 +202,7 @@ impl Compositor<Rectangle> for FrameCompositor {
                     let coordinate = frame_buffer_updates.coordinate;
                     let blocks = rect.get_block_index_iter(src_fb, coordinate, CACHE_BLOCK_HEIGHT);
                     for block in blocks {
-                        self.check_cache_and_blend(src_fb, dest_fb, coordinate, block, &rect.clone(), true)?;
+                        self.check_cache_and_blend(src_fb, dest_fb, coordinate, block, &rect.clone(), check_cache)?;
                     } 
                 }
             }
@@ -211,50 +212,45 @@ impl Compositor<Rectangle> for FrameCompositor {
     }
 }
 
-impl Compositor<Coord> for FrameCompositor {
-    fn composite<'a, U: IntoIterator<Item = Coord> + Clone, P: 'a + Pixel>(
-        &mut self,
-        src_fbs: impl IntoIterator<Item = FrameBufferUpdates<'a, P>>,
-        dest_fb: &mut FrameBuffer<P>,
-        bounding_boxes: U
-    ) -> Result<(), &'static str> {
-        let mut box_iter = bounding_boxes.clone().into_iter();
-        if box_iter.next().is_none() {
-            for frame_buffer_updates in src_fbs.into_iter() {
-                let src_fb = frame_buffer_updates.framebuffer;
-                let coordinate = frame_buffer_updates.coordinate;
-                // Update the whole screen if the caller does not specify the blocks
-                let (src_width, src_height) = frame_buffer_updates.framebuffer.get_size();
-                let block_number = (src_height - 1) / CACHE_BLOCK_HEIGHT + 1;
-                let area = Rectangle {
-                    top_left: coordinate,
-                    bottom_right: coordinate + (src_width as isize, src_height as isize)
-                };
-                for i in 0.. block_number {
-                    self.check_cache_and_blend(src_fb, dest_fb, coordinate, i, &area, true)?;
-                }
-            }
-        } else {
-            for frame_buffer_updates in src_fbs.into_iter() {
-                for pixel in bounding_boxes.clone() {
-                    let src_fb = frame_buffer_updates.framebuffer;
-                    let coordinate = frame_buffer_updates.coordinate;
-                    let blocks = pixel.get_block_index_iter(src_fb, coordinate, CACHE_BLOCK_HEIGHT);
-                    for block in blocks {
-                        // pixel.blend_buffers(
-                        //     frame_buffer_updates.framebuffer,
-                        //     dest_fb,
-                        //     frame_buffer_updates.coordinate,
-                        // )?;
-                        self.check_cache_and_blend(src_fb, dest_fb, coordinate, block, &pixel.clone(), false)?;
-                    } 
-                }
-            }
-        }
+// impl Compositor<Coord> for FrameCompositor {
+//     fn composite<'a, U: IntoIterator<Item = Coord> + Clone, P: 'a + Pixel>(
+//         &mut self,
+//         src_fbs: impl IntoIterator<Item = FrameBufferUpdates<'a, P>>,
+//         dest_fb: &mut FrameBuffer<P>,
+//         bounding_boxes: U
+//     ) -> Result<(), &'static str> {
+//         let mut box_iter = bounding_boxes.clone().into_iter();
+//         if box_iter.next().is_none() {
+//             for frame_buffer_updates in src_fbs.into_iter() {
+//                 let src_fb = frame_buffer_updates.framebuffer;
+//                 let coordinate = frame_buffer_updates.coordinate;
+//                 // Update the whole screen if the caller does not specify the blocks
+//                 let (src_width, src_height) = frame_buffer_updates.framebuffer.get_size();
+//                 let block_number = (src_height - 1) / CACHE_BLOCK_HEIGHT + 1;
+//                 let area = Rectangle {
+//                     top_left: coordinate,
+//                     bottom_right: coordinate + (src_width as isize, src_height as isize)
+//                 };
+//                 for i in 0.. block_number {
+//                     self.check_cache_and_blend(src_fb, dest_fb, coordinate, i, &area, true)?;
+//                 }
+//             }
+//         } else {
+//             for frame_buffer_updates in src_fbs.into_iter() {
+//                 for rect in bounding_boxes.clone() {
+//                     let src_fb = frame_buffer_updates.framebuffer;
+//                     let coordinate = frame_buffer_updates.coordinate;
+//                     let blocks = rect.get_block_index_iter(src_fb, coordinate, CACHE_BLOCK_HEIGHT);
+//                     for block in blocks {
+//                         self.check_cache_and_blend(src_fb, dest_fb, coordinate, block, &rect.clone(), true)?;
+//                     } 
+//                 }
+//             }
+//         }
 
-        Ok(())
-    }
-}
+//         Ok(())
+//     }
+// }
 
 // /// Gets an iterator over the block indexes to update in the framebuffer.
 // /// # Arguments

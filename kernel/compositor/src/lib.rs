@@ -15,7 +15,7 @@ use shapes::{Coord, Rectangle};
 /// A compositor composites (combines or blends) a series of "source" framebuffers onto a single "destination" framebuffer. 
 /// The type parameter `R` allows a compositor to support multiple types of regions or "bounding boxes", 
 /// given by the trait bound `BlendableRegion`.
-pub trait Compositor<R: BlendableRegion> {
+pub trait Compositor {
     /// Composites the framebuffers in the list of source framebuffers `src_fbs` into the destination framebuffer `dest_fb`.
     ///
     /// # Arguments
@@ -24,11 +24,12 @@ pub trait Compositor<R: BlendableRegion> {
     /// * `bounding_boxes`: an iterator over bounding boxes that specify which regions of the destination framebuffer should be updated. 
     ///    For every source framebuffer, the compositor will composite its corresponding regions into the boxes of the destination framebuffer. 
     ///    It will update the whole destination framebuffer if this argument is `None`.
-    fn composite<'a, U: IntoIterator<Item = R> + Clone, P: 'a + Pixel>(
+    fn composite<'a, B: BlendableRegion + Clone, P: 'a + Pixel>(
         &mut self,
         src_fbs: impl IntoIterator<Item = FrameBufferUpdates<'a, P>>,
         dest_fb: &mut FrameBuffer<P>,
-        bounding_boxes: U
+        bounding_boxes: impl IntoIterator<Item = B> + Clone,
+        check_cache: bool,
     ) -> Result<(), &'static str>;
 }
 
