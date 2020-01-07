@@ -137,6 +137,38 @@ impl WaitQueue {
         }
     }
 
+    /// Similar to [`wait_until`](#method.wait_until), but this function accepts a `condition` closure
+    /// that can mutate its environment (a `FnMut`).
+    pub fn wait_until_mut<R>(&self, condition: &mut dyn FnMut(/* &VecDeque<TaskRef> */) -> Option<R>) -> Result<R, WaitError> {
+        let curr_task = task::get_my_current_task().ok_or(WaitError::NoCurrentTask)?;
+
+        // Do the following atomically:
+        // (1) Obtain the waitqueue lock
+        // (2) Add the current task to the waitqueue
+        // (3) Set the current task's runstate to `Blocked`
+        // (4) Release the lock on the waitqueue.
+        loop {
+            {
+                let mut wq_locked = self.0.lock();
+                if let Some(ret) = condition(/* &wq_locked */) {
+                    return Ok(ret);
+                }
+                // This is only necessary because we're using a non-Set waitqueue collection that allows duplicates
+                if !wq_locked.contains(curr_task) {
+                    wq_locked.push_back(curr_task.clone());
+                } else {
+                    warn!("WaitQueue::wait_until():  task was already on waitqueue (potential spurious wakeup?). {:?}", curr_task);
+                }
+                // trace!("WaitQueue::wait_until():  putting task to sleep: {:?}\n    --> WQ: {:?}", curr_task, &*wq_locked);
+                curr_task.block();
+            }
+            scheduler::schedule();
+
+            // Here, we have been woken up, so loop back around and check the condition again
+            // trace!("WaitQueue::wait_until():  woke up!");
+        }
+    }
+
     /// Wake up one random `Task` that is waiting on this queue.
     /// # Return
     /// * returns `Ok(true)` if a `Task` was successfully woken up,

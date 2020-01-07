@@ -9,6 +9,11 @@
 //! 
 //! This is not a zero-copy channel; 
 //! To avoid copying large messages, use a reference (layer of indirection) like `Box`.
+//! 
+//! TODO: add support for a queue of pending senders and receivers 
+//!       so that we can enable MPMC (multi-producer multi-consumer) behavior
+//!       that allows senders and receivers to be cloned. 
+//!       Note that currently only a single receiver and single sender is supported.
 
 #![no_std]
 

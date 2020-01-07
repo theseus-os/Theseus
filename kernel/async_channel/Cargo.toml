@@ -1,7 +1,7 @@
 [package]
 authors = ["Kevin Boos <kevinaboos@gmail.com>"]
-name = "rendezvous"
-description = "Synchronous Inter-Task Communication using a rendezvous approach"
+name = "async_channel"
+description = "Channel for asynchronous Inter-Task Communication via a bounded buffer"
 version = "0.1.0"
 build = "../../build.rs"
 
@@ -12,14 +12,8 @@ spin = "0.4.10"
 default-features = false
 version = "0.3.7"
 
-[dependencies.irq_safety]
-git = "https://github.com/kevinaboos/irq_safety"
-
-[dependencies.task]
-path = "../task"
-
-[dependencies.scheduler]
-path = "../scheduler"
+[dependencies.mpmc]
+path = "../../libs/mpmc"
 
 [dependencies.wait_queue]
 path = "../wait_queue"
