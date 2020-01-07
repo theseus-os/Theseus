@@ -47,7 +47,7 @@ pub fn print_string<P: Pixel>(
 
     let top_left = Coord::new(0, (curr_line * CHARACTER_HEIGHT) as isize);
 
-    let mut line_feed = true;
+    let mut line_feed = false;
     for byte in slice.bytes() {
         if byte == b'\n' {
             if !line_feed {

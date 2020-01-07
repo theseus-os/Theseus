@@ -437,9 +437,9 @@ impl Terminal {
             let wm = wm_mut.lock();
             wm.get_screen_size()
         };
-        const WINDOW_MARGIN: usize = 20;
+        // const WINDOW_MARGIN: usize = 20;
         let window = window::Window::new(
-            Coord::new(WINDOW_MARGIN as isize, WINDOW_MARGIN as isize), 
+            Coord::new(0, 0), 
             window_width, 
             window_height,
             color::BLACK
