@@ -23,6 +23,10 @@ path = "../compositor"
 [dependencies.frame_buffer_compositor]
 path = "../frame_buffer_compositor"
 
+[dependencies.log]
+default-features = false
+version = "0.3.7"
+
 [dependencies.shapes]
 path = "../shapes"
 

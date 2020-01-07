@@ -21,6 +21,8 @@ extern crate spin;
 extern crate lazy_static;
 extern crate hashbrown;
 extern crate shapes;
+#[macro_use]
+extern crate log;
 
 use alloc::collections::BTreeMap;
 use alloc::vec::{Vec};
@@ -196,6 +198,7 @@ impl Compositor for FrameCompositor {
                 }
             }
         } else {
+            let mut wenqiu = 0;
             for frame_buffer_updates in src_fbs.into_iter() {
                 let mut updated_blocks = Vec::new();
                 for rect in bounding_boxes.clone() {
@@ -204,15 +207,16 @@ impl Compositor for FrameCompositor {
                     let blocks = rect.get_block_index_iter(src_fb, coordinate, CACHE_BLOCK_HEIGHT);
                     for block in blocks {
                         /// The same block is cached only once
-                        let check_cached = if updated_blocks.contains(&block) {
+                        let mut check_cached = if updated_blocks.contains(&block) {
                             false
                         } else {
                             updated_blocks.push(block);
                             true
                         };
-                        self.check_cache_and_blend(src_fb, dest_fb, coordinate, block, &rect.clone(), check_cache)?;
+                        self.check_cache_and_blend(src_fb, dest_fb, coordinate, block, &rect.clone(), check_cached)?;
                     } 
                 }
+                wenqiu += 1;
             }
         }
 

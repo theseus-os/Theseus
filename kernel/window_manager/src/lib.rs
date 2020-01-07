@@ -13,6 +13,8 @@ extern crate spin;
 #[macro_use]
 extern crate alloc;
 extern crate mpmc;
+#[macro_use]
+extern crate log;
 extern crate event_types;
 extern crate compositor;
 extern crate frame_buffer;
@@ -267,7 +269,7 @@ impl WindowManager {
         }).collect::<Vec<_>>();
         
         let buffer_iter = Some(bottom_fb).into_iter().chain(window_bufferlist.into_iter());
-        FRAME_COMPOSITOR.lock().composite(buffer_iter, &mut self.final_fb, pixels, false)?;
+        FRAME_COMPOSITOR.lock().composite(buffer_iter, &mut self.final_fb, pixels, true)?;
         
         Ok(())
     }
@@ -312,7 +314,7 @@ impl WindowManager {
                 coordinate: window.get_position(),
             }
         }).collect::<Vec<_>>();
-        
+
         FRAME_COMPOSITOR.lock().composite(bufferlist.into_iter(), &mut self.final_fb, bounding_box, true)
     }
 
@@ -479,6 +481,12 @@ impl WindowManager {
     /// take active window's base position and current mouse, move the window with delta
     pub fn move_active_window(&mut self) -> Result<(), &'static str> {
         if let Some(current_active) = self.active.upgrade() {
+            let border = Rectangle { 
+                top_left: Coord::new(0, 0), 
+                bottom_right: Coord::new(0, 0) 
+            };
+            self.refresh_floating_border(false, border)?;
+
             let (old_top_left, old_bottom_right, new_top_left, new_bottom_right) = {
                 let mut current_active_win = current_active.lock();
                 let (current_x, current_y) = {
@@ -501,11 +509,7 @@ impl WindowManager {
                 }
             };
             self.refresh_bottom_windows(Some(Rectangle{top_left: old_top_left, bottom_right: old_bottom_right}), false)?;
-            let border = Rectangle { 
-                top_left: Coord::new(0, 0), 
-                bottom_right: Coord::new(0, 0) 
-            };
-            self.refresh_floating_border(false, border)?;
+
             self.refresh_active_window(Some(Rectangle{top_left: new_top_left, bottom_right: new_bottom_right}))?;
             let bounding_box = self.get_mouse_coords();
             self.refresh_top_pixels(bounding_box.into_iter())?;

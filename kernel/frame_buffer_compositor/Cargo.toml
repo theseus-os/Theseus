@@ -11,6 +11,11 @@ spin = "0.4.10"
 [dependencies.frame_buffer]
 path = "../frame_buffer"
 
+
+[dependencies.log]
+default-features = false
+version = "0.3.7"
+
 [dependencies.shapes]
 path = "../shapes"
 
