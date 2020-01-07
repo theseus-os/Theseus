@@ -47,30 +47,35 @@ pub fn print_string<P: Pixel>(
 
     let top_left = Coord::new(0, (curr_line * CHARACTER_HEIGHT) as isize);
 
+    let mut line_feed = true;
     for byte in slice.bytes() {
         if byte == b'\n' {
-            let mut blank = Rectangle {
-                top_left: Coord::new(
-                    coordinate.x + (curr_column * CHARACTER_WIDTH) as isize,
-                    coordinate.y + (curr_line * CHARACTER_HEIGHT) as isize,
-                ),
-                bottom_right: Coord::new(
-                    coordinate.x + width as isize,
-                    coordinate.y + ((curr_line + 1) * CHARACTER_HEIGHT) as isize,
-                )
-            };
-            // fill the remaining blank of current line and go to the next line
-            fill_blank(
-                framebuffer,
-                &mut blank,
-                bg_pixel,
-            );
-            curr_column = 0;
-            curr_line += 1;
-            if curr_line == buffer_height {
-                break;
+            if !line_feed {
+                let mut blank = Rectangle {
+                    top_left: Coord::new(
+                        coordinate.x + (curr_column * CHARACTER_WIDTH) as isize,
+                        coordinate.y + (curr_line * CHARACTER_HEIGHT) as isize,
+                    ),
+                    bottom_right: Coord::new(
+                        coordinate.x + width as isize,
+                        coordinate.y + ((curr_line + 1) * CHARACTER_HEIGHT) as isize,
+                    )
+                };
+                // fill the remaining blank of current line and go to the next line
+                fill_blank(
+                    framebuffer,
+                    &mut blank,
+                    bg_pixel,
+                );
+                curr_column = 0;
+                curr_line += 1;
+                if curr_line == buffer_height {
+                    break;
+                }
             }
+            line_feed = false;
         } else {
+            line_feed = false;
             // print the next character
             print_ascii_character(
                 framebuffer,
@@ -85,6 +90,7 @@ pub fn print_string<P: Pixel>(
             if curr_column == buffer_width {
                 curr_column = 0;
                 curr_line += 1;
+                line_feed = true;
                 if curr_line == buffer_height {
                     break;
                 }

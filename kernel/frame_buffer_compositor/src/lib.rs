@@ -21,8 +21,6 @@ extern crate spin;
 extern crate lazy_static;
 extern crate hashbrown;
 extern crate shapes;
-#[macro_use]
-extern crate log;
 
 use alloc::collections::BTreeMap;
 use alloc::vec::{Vec};
@@ -106,54 +104,52 @@ impl FrameCompositor {
     /// * `index`: the index of the block to be rendered. 
     ///    The framebuffer are divided into y-aligned blocks and index indicates the order of the block.
     /// * `bounding_box`: the bounding box specifying the region to update.
-    fn check_and_cache<P: Pixel, B: BlendableRegion>(
+    fn check_and_cache<P: Pixel>(
         &mut self, 
         src_fb: &FrameBuffer<P>, 
-        dest_fb: &mut FrameBuffer<P>, 
         coordinate: Coord, 
         index: usize, 
-        bounding_box: &B,
     ) -> Result<(), &'static str> {
-            let (src_width, src_height) = src_fb.get_size();
-            let src_buffer_len = src_width * src_height;
-            let block_pixels = CACHE_BLOCK_HEIGHT * src_width;
+        let (src_width, src_height) = src_fb.get_size();
+        let src_buffer_len = src_width * src_height;
+        let block_pixels = CACHE_BLOCK_HEIGHT * src_width;
 
-            // The start pixel of the block
-            let start_index = block_pixels * index;
-            let coordinate_start = coordinate + (0, (CACHE_BLOCK_HEIGHT * index) as isize);
+        // The start pixel of the block
+        let start_index = block_pixels * index;
+        let coordinate_start = coordinate + (0, (CACHE_BLOCK_HEIGHT * index) as isize);
 
-            // The end pixel of the block
-            let end_index = start_index + block_pixels;
-            
-            let block_content = &src_fb.buffer()[start_index..core::cmp::min(end_index, src_buffer_len)];
-            
-            // Skip if a block is already cached
-            if self.is_cached(&block_content, &coordinate_start) {
-                return Ok(());
-            }
+        // The end pixel of the block
+        let end_index = start_index + block_pixels;
+        
+        let block_content = &src_fb.buffer()[start_index..core::cmp::min(end_index, src_buffer_len)];
+        
+        // Skip if a block is already cached
+        if self.is_cached(&block_content, &coordinate_start) {
+            return Ok(());
+        }
 
-            // find overlapped caches
-            // extend the width of the updated part to the right side of the cached block content
-            // remove caches of the same location
-            let new_cache = BlockCache {
-                content_hash: hash(block_content),
-                coordinate: coordinate_start,
-                width: src_width,
-            };
-            let keys: Vec<_> = self.caches.keys().cloned().collect();
-            for key in keys {
-                if let Some(cache) = self.caches.get_mut(&key) {
-                    if cache.overlaps_with(&new_cache) {
-                        if cache.coordinate == new_cache.coordinate  && cache.width == new_cache.width {
-                            self.caches.remove(&key);
-                        } else {
-                            cache.content_hash = 0;
-                        }
+        // find overlapped caches
+        // extend the width of the updated part to the right side of the cached block content
+        // remove caches of the same location
+        let new_cache = BlockCache {
+            content_hash: hash(block_content),
+            coordinate: coordinate_start,
+            width: src_width,
+        };
+        let keys: Vec<_> = self.caches.keys().cloned().collect();
+        for key in keys {
+            if let Some(cache) = self.caches.get_mut(&key) {
+                if cache.overlaps_with(&new_cache) {
+                    if cache.coordinate == new_cache.coordinate  && cache.width == new_cache.width {
+                        self.caches.remove(&key);
+                    } else {
+                        cache.content_hash = 0;
                     }
-                };
-            }
+                }
+            };
+        }
 
-            self.caches.insert(coordinate_start, new_cache);        
+        self.caches.insert(coordinate_start, new_cache);        
         Ok(())
     }
 
@@ -197,7 +193,7 @@ impl Compositor for FrameCompositor {
                     bottom_right: coordinate + (src_width as isize, src_height as isize)
                 };
                 for i in 0.. block_number {
-                    self.check_and_cache(src_fb, dest_fb, coordinate, i, &area)?;
+                    self.check_and_cache(src_fb, coordinate, i)?;
                     self.blend(src_fb, dest_fb, &area, i, coordinate)?;
                 }
             }
@@ -212,7 +208,7 @@ impl Compositor for FrameCompositor {
                         // The same block is cached only once
                         if !updated_blocks.contains(&block) {
                             updated_blocks.push(block);
-                            self.check_and_cache(src_fb, dest_fb, coordinate, block, &bounding_box.clone())?;
+                            self.check_and_cache(src_fb, coordinate, block)?;
                         };
                         self.blend(src_fb, dest_fb, &bounding_box.clone(), block, coordinate)?;                        
                     } 
@@ -223,76 +219,6 @@ impl Compositor for FrameCompositor {
         Ok(())
     }
 }
-
-// impl Compositor<Coord> for FrameCompositor {
-//     fn composite<'a, U: IntoIterator<Item = Coord> + Clone, P: 'a + Pixel>(
-//         &mut self,
-//         src_fbs: impl IntoIterator<Item = FrameBufferUpdates<'a, P>>,
-//         dest_fb: &mut FrameBuffer<P>,
-//         bounding_boxes: U
-//     ) -> Result<(), &'static str> {
-//         let mut box_iter = bounding_boxes.clone().into_iter();
-//         if box_iter.next().is_none() {
-//             for frame_buffer_updates in src_fbs.into_iter() {
-//                 let src_fb = frame_buffer_updates.framebuffer;
-//                 let coordinate = frame_buffer_updates.coordinate;
-//                 // Update the whole screen if the caller does not specify the blocks
-//                 let (src_width, src_height) = frame_buffer_updates.framebuffer.get_size();
-//                 let block_number = (src_height - 1) / CACHE_BLOCK_HEIGHT + 1;
-//                 let area = Rectangle {
-//                     top_left: coordinate,
-//                     bottom_right: coordinate + (src_width as isize, src_height as isize)
-//                 };
-//                 for i in 0.. block_number {
-//                     self.check_cache_and_blend(src_fb, dest_fb, coordinate, i, &area, true)?;
-//                 }
-//             }
-//         } else {
-//             for frame_buffer_updates in src_fbs.into_iter() {
-//                 for rect in bounding_boxes.clone() {
-//                     let src_fb = frame_buffer_updates.framebuffer;
-//                     let coordinate = frame_buffer_updates.coordinate;
-//                     let blocks = rect.get_block_index_iter(src_fb, coordinate, CACHE_BLOCK_HEIGHT);
-//                     for block in blocks {
-//                         self.check_cache_and_blend(src_fb, dest_fb, coordinate, block, &rect.clone(), true)?;
-//                     } 
-//                 }
-//             }
-//         }
-
-//         Ok(())
-//     }
-// }
-
-// /// Gets an iterator over the block indexes to update in the framebuffer.
-// /// # Arguments
-// /// * `framebuffer`: the framebuffer to composite.
-// /// * `coordinate`: the coordinate of the framebuffer relative to the origin(top-left) of the screen.
-// /// * `bounding_box`: the bounding box to update relative to the origin(top-left) of the screen. The returned indexes represent the blocks overlap with this area.
-// pub fn get_block_index_iter<P: Pixel>(
-//     framebuffer: &FrameBuffer<P>, 
-//     coordinate: Coord, 
-//     bounding_box: &Rectangle
-// ) -> core::ops::Range<usize> {
-//     let relative_area = *bounding_box - coordinate;
-//     let (width, height) = framebuffer.get_size();
-
-//     let start_x = core::cmp::max(relative_area.top_left.x, 0);
-//     let end_x = core::cmp::min(relative_area.bottom_right.x, width as isize);
-//     if start_x >= end_x {
-//         return 0..0;
-//     }
-    
-//     let start_y = core::cmp::max(relative_area.top_left.y, 0);
-//     let end_y = core::cmp::min(relative_area.bottom_right.y, height as isize);
-//     if start_y >= end_y {
-//         return 0..0;
-//     }
-//     let start_index = start_y as usize / CACHE_BLOCK_HEIGHT;
-//     let end_index = end_y as usize / CACHE_BLOCK_HEIGHT + 1;
-    
-//     return start_index..end_index
-// }
 
 /// Gets the hash of a cache block
 fn hash<T: Hash>(block: T) -> u64 {

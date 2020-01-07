@@ -52,6 +52,11 @@ pub struct FrameBufferUpdates<'a, P: Pixel> {
 /// In addition, a `BlendableRegion` makes it easier for a compositor to only blend pixels in a subset of a given source framebuffer
 /// rather than forcing it to composite the whole framebuffer, which vastly improves performance.
 pub trait BlendableRegion {
+    /// Gets the index of blocks overlapping with the region in the source framebuffer. A block is a rectangle area in the framebuffer. The framebuffer will be divided into several blocks of `block_height` along y-axis.
+    /// # Arguments
+    /// * `framebuffer`: the source framebuffer that the blendable region is in.
+    /// * `coordinate`: the position relative to the top-left of the destination framebuffer where the source framebuffer will be composited to.
+    /// * `block_height`: the height of every block in the framebuffer. This method will calculate the block indexes according to this parameter. 
     fn get_block_index_iter<P: Pixel>(    
         &self,
         framebuffer: &FrameBuffer<P>, 
@@ -59,7 +64,14 @@ pub trait BlendableRegion {
         block_height: usize,
     ) -> core::ops::Range<usize>;
 
+    /// Returns the intersection of the blendable region and the block specified by `block_index`.
+    /// # Arguments
+    /// * `block_index`: the index of the block
+    /// * `framebuffer`: the source framebuffer that the blendable region is in.
+    /// * `coordinate`: the position relative to the top-left of the destination framebuffer where the source framebuffer will be composited to.
+    /// * `block_height`: the height of every block in the framebuffer. A framebuffer will be divided into several blocks of `block_height` along y-axis.
     fn intersect_block(&self, block_index: usize, coordinate: Coord, block_height: usize) -> Self;
+
     /// Blends the pixels in the source framebuffer `src_fb` into the pixels in the destination framebuffer `dest_fb`.
     /// The `dest_coord` is the coordinate in the destination buffer (relative to its top-left corner)
     /// where the `src_fb` will be composited into (starting at the `src_fb`'s top-left corner).
@@ -88,7 +100,7 @@ impl BlendableRegion for Coord {
         }
     }
  
-    fn intersect_block(&self, block_index: usize, coordinate: Coord, block_height: usize) -> Coord {
+    fn intersect_block(&self, _block_index: usize, _coordinate: Coord, _block_height: usize) -> Coord {
         return self.clone()
     }
 

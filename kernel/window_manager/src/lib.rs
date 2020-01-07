@@ -13,8 +13,6 @@ extern crate spin;
 #[macro_use]
 extern crate alloc;
 extern crate mpmc;
-#[macro_use]
-extern crate log;
 extern crate event_types;
 extern crate compositor;
 extern crate frame_buffer;
