@@ -1,9 +1,16 @@
 [package]
-name = "test_rendezvous"
+name = "test_channel"
 version = "0.1.0"
-description = "Tests the synchronous rendezvous-based channel with multiple tasks"
+description = "Tests Theseus's channel implementations with multiple tasks"
 authors = ["Kevin Boos <kevinaboos@gmail.com>"]
 build = "../../build.rs"
+
+[dependencies]
+getopts = "0.2.21"
+spin = "0.4.10"
+
+[dependencies.terminal_print]
+path = "../terminal_print"
 
 [dependencies.log]
 default-features = false
@@ -23,3 +30,6 @@ path = "../../kernel/spawn"
 
 [dependencies.rendezvous]
 path = "../../kernel/rendezvous"
+
+[dependencies.async_channel]
+path = "../../kernel/async_channel"
