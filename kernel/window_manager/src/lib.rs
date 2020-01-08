@@ -509,8 +509,7 @@ impl WindowManager {
             self.refresh_bottom_windows(Some(Rectangle{top_left: old_top_left, bottom_right: old_bottom_right}), false)?;
 
             self.refresh_active_window(Some(Rectangle{top_left: new_top_left, bottom_right: new_bottom_right}))?;
-            let bounding_box = self.get_mouse_coords();
-            self.refresh_top_pixels(bounding_box.into_iter())?;
+            self.refresh_mouse()?;
         } else {
             return Err("cannot fid active window to move");
         }
@@ -572,8 +571,7 @@ impl WindowManager {
                 self.top_fb.overwrite_pixel(coordinate, pixel);
             }
         }
-        let bounding_box = self.get_mouse_coords();
-        self.refresh_top_pixels(bounding_box.into_iter())?;
+        self.refresh_mouse()?;
 
         Ok(())
     }
