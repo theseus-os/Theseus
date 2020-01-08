@@ -294,6 +294,7 @@ impl Window {
         if need_refresh_three_button {
             let area = self.get_button_area();
             wm.refresh_active_window(Some(area))?;
+            wm.refresh_mouse()?;
         }
 
         if call_later_do_refresh_floating_border {

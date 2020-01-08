@@ -517,6 +517,12 @@ impl WindowManager {
         Ok(())
     }
 
+    /// Refresh the mouse display
+    pub fn refresh_mouse(&mut self) -> Result<(), &'static str> {
+        let bounding_box = self.get_mouse_coords();
+        self.refresh_top_pixels(bounding_box.into_iter())
+    }
+
     /// Move mouse. `relative` indicates the new position relative to current position.
     fn move_mouse(&mut self, relative: Coord) -> Result<(), &'static str> {
         let old = self.mouse;
