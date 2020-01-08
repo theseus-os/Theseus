@@ -115,6 +115,7 @@ dependencies = [
 name = "async_channel"
 version = "0.1.0"
 dependencies = [
+ "debugit 0.1.0",
  "log 0.3.9 (registry+https://github.com/rust-lang/crates.io-index)",
  "mpmc 0.1.6-pre",
  "spin 0.4.10 (registry+https://github.com/rust-lang/crates.io-index)",

@@ -12,6 +12,9 @@ spin = "0.4.10"
 default-features = false
 version = "0.3.7"
 
+[dependencies.debugit]
+path = "../../libs/debugit"
+
 [dependencies.mpmc]
 path = "../../libs/mpmc"
 

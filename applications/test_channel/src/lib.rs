@@ -50,7 +50,7 @@ pub fn main(args: Vec<String>) -> isize {
     let mut opts = Options::new();
     opts.optflag("h", "help", "print this help menu");
     opts.optflag("v", "verbose", "enable verbose output");
-    opts.optflag("p", "pinned", "force all test tasks to be spawned on and pinned to a single CPU. Otherwise, default behavior is spawning tasks across multiple CPUs.)");
+    opts.optflag("p", "pinned", "force all test tasks to be spawned on and pinned to a single CPU. Otherwise, default behavior is spawning tasks across multiple CPUs.");
     opts.optopt("n", "iterations", "number of test iterations (default 100)", "ITER");
 
     opts.optflag("r", "rendezvous", "run the test on the rendezvous-based synchronous channel");
@@ -81,7 +81,7 @@ pub fn main(args: Vec<String>) -> isize {
     match rmain(matches) {
         Ok(_) => 0,
         Err(e) => {
-            println!("Error:\n{}", e);
+            println!("Error: {}", e);
             -1
         }    
     }    
@@ -120,6 +120,7 @@ fn rmain(matches: Matches) -> Result<(), &'static str> {
     }
 
     if did_something {
+        println!("Test complete.");
         Ok(())
     } else {
         Err("no action performed, please select a test")

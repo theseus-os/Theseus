@@ -13,6 +13,7 @@
 
 extern crate alloc;
 // #[macro_use] extern crate log;
+// #[macro_use] extern crate debugit;
 extern crate wait_queue;
 extern crate mpmc;
 
@@ -48,7 +49,6 @@ pub fn new_channel<T: Send>(minimum_capacity: usize) -> (Sender<T>, Receiver<T>)
 }
 
 
-
 /// The inner channel for asynchronous communication between `Sender`s and `Receiver`s.
 ///
 /// This struct is effectively a wrapper around a MPMC queue 
@@ -79,26 +79,42 @@ impl <T: Send> Sender<T> {
             Err(returned_msg) => returned_msg,
         };
 
-        // Slow path: the buffer was full, so now we need to block until space becomes available
-        let mut msg = Some(msg);
+        // Slow path: the buffer was full, so now we need to block until space becomes available.
+        // trace!("waiting for space to send...");
+
         // Here we use an option to store the un-sent message outside of the `closure`
         // so that we can repeatedly try to re-send it upon the next invocation of the `closure`
         // (which happens when this sender task is notified in the future).
+        let mut msg = Some(msg);
+
+        // This closure is invoked from within a locked context, so we cannot just call `try_send()` here
+        // because it will notify the receivers which can cause deadlock.
+        // Therefore, we need to perform the nofity action outside of this closure after it returns.
         let mut closure = || {
             let owned_msg = msg.take();
-            owned_msg.and_then(|m| match self.try_send(m) {
+            owned_msg.and_then(|m| match self.channel.queue.push(m) {
                 Ok(()) => Some(()),
                 Err(returned_msg) => {
                     // Here: we (the sender) woke up and failed to send, 
                     // so we save the returned message outside of the closure to retry later. 
+                    // trace!("try_send() failed, saving message {:?} for next retry.", debugit!(returned_msg));
                     msg = Some(returned_msg);
                     None
                 }
             })
         };
-        self.channel.waiting_senders
+        let res = self.channel.waiting_senders
             .wait_until_mut(&mut closure)
-            .map_err(|_| "failed to add current task to senders waitqueue")
+            .map_err(|_| "failed to add current task to queue of waiting senders waitqueue");
+        // trace!("... sending space became available.");
+
+        // If we successfully sent a message, we need to notify any waiting receivers.
+        // As stated above, to avoid deadlock, this must be done here rather than in the above closure.
+        if res.is_ok() {
+            // trace!("successful send() is notifying receivers.");
+            self.channel.waiting_receivers.notify_one();
+        }
+        res
     }
 
     /// Tries to send the message, only succeeding if buffer space is available.
@@ -108,6 +124,7 @@ impl <T: Send> Sender<T> {
         match self.channel.queue.push(msg) {
             // successfully sent
             Ok(()) => {
+                // trace!("successful try_send() is notifying receivers.");
                 self.channel.waiting_receivers.notify_one();
                 Ok(())
             }
@@ -131,10 +148,24 @@ impl <T: Send> Receiver<T> {
             return Ok(msg);
         }
 
-        // Slow path: the buffer was empty, so we need to block until a message is sent
-        self.channel.waiting_receivers
+        // Slow path: the buffer was empty, so we need to block until a message is sent.
+        // trace!("waiting to receive a message...");
+        
+        // This closure is invoked from within a locked context, so we cannot just call `try_receive()` here
+        // because it will notify the receivers which can cause deadlock.
+        // Therefore, we need to perform the nofity action outside of this closure after it returns.
+        let res = self.channel.waiting_receivers
             .wait_until(&|| self.try_receive())
-            .map_err(|_| "failed to add current task to receivers waitqueue")
+            .map_err(|_| "failed to add current task to queue of waiting receivers");
+        // trace!("... received msg.");
+
+        // If we successfully received a message, we need to notify any waiting senders.
+        // As stated above, to avoid deadlock, this must be done here rather than in the above closure.
+        if res.is_ok() {
+            // trace!("successful receive() is notifying senders.");
+            self.channel.waiting_senders.notify_one();
+        }
+        res
     }
 
     /// Tries to receive a message, only succeeding if a message is already available in the buffer.
@@ -143,6 +174,7 @@ impl <T: Send> Receiver<T> {
     pub fn try_receive(&self) -> Option<T> {
         let msg = self.channel.queue.pop();
         if msg.is_some() {
+            // trace!("successful try_receive() is notifying senders.");
             self.channel.waiting_senders.notify_one();
             msg
         } else {
