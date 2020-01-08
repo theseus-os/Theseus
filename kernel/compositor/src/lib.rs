@@ -14,7 +14,7 @@ use shapes::{Coord, Rectangle};
 
 /// A compositor composites (combines or blends) a series of "source" framebuffers onto a single "destination" framebuffer. 
 /// The type parameter `R` allows a compositor to support multiple types of regions or "bounding boxes", 
-/// given by the trait bound `BlendableRegion`.
+/// given by the trait bound `CompositableRegion`.
 pub trait Compositor {
     /// Composites the framebuffers in the list of source framebuffers `src_fbs` into the destination framebuffer `dest_fb`.
     ///
@@ -25,7 +25,7 @@ pub trait Compositor {
     /// * `cache_check`: whether to check cache before updating. For tiny updates like a pixel, we'd better update directly for better performance.
     ///    For every source framebuffer, the compositor will composite its corresponding regions into the boxes of the destination framebuffer. 
     ///    It will update the whole destination framebuffer if this argument is `None`.
-    fn composite<'a, B: BlendableRegion + Clone, P: 'a + Pixel>(
+    fn composite<'a, B: CompositableRegion + Clone, P: 'a + Pixel>(
         &mut self,
         src_fbs: impl IntoIterator<Item = FrameBufferUpdates<'a, P>>,
         dest_fb: &mut FrameBuffer<P>,
@@ -43,19 +43,19 @@ pub struct FrameBufferUpdates<'a, P: Pixel> {
     pub coordinate: Coord,
 }
 
-/// A `BlendableRegion` is an abstract region (i.e., a bounding box) 
+/// A `CompositableRegion` is an abstract region (i.e., a bounding box) 
 /// that can optimize the compositing (blending) of one framebuffer into another framebuffer
 /// according to the specifics of the region's shape. 
 /// For example, a single 2-D point (`Coord`) offers no real room for optimization 
 /// because only one pixel will be composited,
 /// but a rectangle **does** allow for optimization, as a large chunk of pixels can be composited all at once.
 /// 
-/// In addition, a `BlendableRegion` makes it easier for a compositor to only blend pixels in a subset of a given source framebuffer
+/// In addition, a `CompositableRegion` makes it easier for a compositor to only composite pixels in a subset of a given source framebuffer
 /// rather than forcing it to composite the whole framebuffer, which vastly improves performance.
-pub trait BlendableRegion {
+pub trait CompositableRegion {
     /// Gets the index of blocks overlapping with the region in the source framebuffer. A block is a rectangle area in the framebuffer. The framebuffer will be divided into several blocks of `block_height` along y-axis.
     /// # Arguments
-    /// * `framebuffer`: the source framebuffer that the blendable region is in.
+    /// * `framebuffer`: the source framebuffer that the compositable region is in.
     /// * `coordinate`: the position relative to the top-left of the destination framebuffer where the source framebuffer will be composited to.
     /// * `block_height`: the height of every block in the framebuffer. This method will calculate the block indexes according to this parameter. 
     fn get_block_index_iter<P: Pixel>(    
@@ -65,10 +65,10 @@ pub trait BlendableRegion {
         block_height: usize,
     ) -> core::ops::Range<usize>;
 
-    /// Returns the intersection of the blendable region and the block specified by `block_index`.
+    /// Returns the intersection of the compositable region and the block specified by `block_index`.
     /// # Arguments
     /// * `block_index`: the index of the block
-    /// * `framebuffer`: the source framebuffer that the blendable region is in.
+    /// * `framebuffer`: the source framebuffer that the compositable region is in.
     /// * `coordinate`: the position relative to the top-left of the destination framebuffer where the source framebuffer will be composited to.
     /// * `block_height`: the height of every block in the framebuffer. A framebuffer will be divided into several blocks of `block_height` along y-axis.
     fn intersect_block(&self, block_index: usize, coordinate: Coord, block_height: usize) -> Self;
@@ -87,7 +87,7 @@ pub trait BlendableRegion {
     ) -> Result<(), &'static str>;
 }
 
-impl BlendableRegion for Coord {
+impl CompositableRegion for Coord {
     fn get_block_index_iter<P: Pixel>(    
         &self,
         framebuffer: &FrameBuffer<P>, 
@@ -127,7 +127,7 @@ impl BlendableRegion for Coord {
     }
 }
 
-impl BlendableRegion for Rectangle {
+impl CompositableRegion for Rectangle {
     fn get_block_index_iter<P: Pixel>(    
         &self,
         framebuffer: &FrameBuffer<P>, 

@@ -26,7 +26,7 @@ use alloc::collections::BTreeMap;
 use alloc::vec::{Vec};
 use core::hash::{Hash, Hasher, BuildHasher};
 use hashbrown::hash_map::{DefaultHashBuilder};
-use compositor::{Compositor, FrameBufferUpdates, BlendableRegion};
+use compositor::{Compositor, FrameBufferUpdates, CompositableRegion};
 use frame_buffer::{FrameBuffer, Pixel};
 use shapes::{Coord, Rectangle};
 use spin::Mutex;
@@ -154,7 +154,7 @@ impl FrameCompositor {
     }
 
     /// This function will blend the intersection of the bounding_box with the `index_th` block in the source framebuffer to the destination. `coordinate` is the top-left point of the source framebuffer relative to top-left of the distination one. About `block` see the definition of this `frame_buffer_compositor` crate.
-    fn blend<B: BlendableRegion, P: Pixel>(
+    fn blend<B: CompositableRegion, P: Pixel>(
         &self,
         src_fb: &FrameBuffer<P>,
         dest_fb: &mut FrameBuffer<P>,
@@ -174,7 +174,7 @@ impl FrameCompositor {
 }
 
 impl Compositor for FrameCompositor {
-    fn composite<'a, B: BlendableRegion + Clone, P: 'a + Pixel>(
+    fn composite<'a, B: CompositableRegion + Clone, P: 'a + Pixel>(
         &mut self,
         src_fbs: impl IntoIterator<Item = FrameBufferUpdates<'a, P>>,
         dest_fb: &mut FrameBuffer<P>,
