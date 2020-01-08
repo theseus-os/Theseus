@@ -30,7 +30,6 @@ pub trait Compositor {
         src_fbs: impl IntoIterator<Item = FrameBufferUpdates<'a, P>>,
         dest_fb: &mut FrameBuffer<P>,
         bounding_boxes: impl IntoIterator<Item = B> + Clone,
-        cache_check: bool,
     ) -> Result<(), &'static str>;
 }
 
@@ -74,6 +73,9 @@ pub trait BlendableRegion {
     /// * `block_height`: the height of every block in the framebuffer. A framebuffer will be divided into several blocks of `block_height` along y-axis.
     fn intersect_block(&self, block_index: usize, coordinate: Coord, block_height: usize) -> Self;
 
+    /// Returns the size of the region.
+    fn size(&self) -> usize;
+
     /// Blends the pixels in the source framebuffer `src_fb` into the pixels in the destination framebuffer `dest_fb`.
     /// The `dest_coord` is the coordinate in the destination buffer (relative to its top-left corner)
     /// where the `src_fb` will be composited into (starting at the `src_fb`'s top-left corner).
@@ -104,6 +106,11 @@ impl BlendableRegion for Coord {
  
     fn intersect_block(&self, _block_index: usize, _coordinate: Coord, _block_height: usize) -> Coord {
         return self.clone()
+    }
+
+    #[inline]
+    fn size(&self) -> usize {
+        1
     }
 
     fn blend_buffers<P: Pixel>(
@@ -158,6 +165,11 @@ impl BlendableRegion for Rectangle {
                 core::cmp::min(((block_index + 1) * block_height) as isize + coordinate.y, self.bottom_right.y)
             )
         };
+    }
+
+    #[inline]
+    fn size(&self) -> usize {
+        (self.bottom_right.x - self.top_left.x) as usize * (self.bottom_right.y - self.top_left.y) as usize
     }
 
     fn blend_buffers<P: Pixel>(

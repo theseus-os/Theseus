@@ -179,7 +179,6 @@ impl Compositor for FrameCompositor {
         src_fbs: impl IntoIterator<Item = FrameBufferUpdates<'a, P>>,
         dest_fb: &mut FrameBuffer<P>,
         bounding_boxes: impl IntoIterator<Item = B> + Clone,
-        cache_check: bool,
     ) -> Result<(), &'static str> {
         let mut box_iter = bounding_boxes.clone().into_iter();
         if box_iter.next().is_none() {
@@ -194,9 +193,7 @@ impl Compositor for FrameCompositor {
                     bottom_right: coordinate + (src_width as isize, src_height as isize)
                 };
                 for i in 0.. block_number {
-                    if cache_check {
-                        self.check_and_cache(src_fb, coordinate, i)?;
-                    }
+                    self.check_and_cache(src_fb, coordinate, i)?;
                     self.blend(src_fb, dest_fb, &area, i, coordinate)?;
                 }
             }
@@ -205,12 +202,13 @@ impl Compositor for FrameCompositor {
                 //let mut updated_blocks = Vec::new();
                 for bounding_box in bounding_boxes.clone() {
                     let src_fb = frame_buffer_updates.framebuffer;
+                    let (width, _) = src_fb.get_size();
                     let coordinate = frame_buffer_updates.coordinate;
                     let blocks = bounding_box.get_block_index_iter(src_fb, coordinate, CACHE_BLOCK_HEIGHT);
+                    let block_size = CACHE_BLOCK_HEIGHT * width;
+                    let check_cache = bounding_box.size() > block_size;
                     for block in blocks {
-                        // The same block is cached only once
-                        if cache_check {
-                            //updated_blocks.push(block);
+                        if check_cache {
                             self.check_and_cache(src_fb, coordinate, block)?;
                         };
                         self.blend(src_fb, dest_fb, &bounding_box.clone(), block, coordinate)?;                        
