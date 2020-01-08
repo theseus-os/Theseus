@@ -2610,13 +2610,28 @@ fn allocate_section_pages(elf_file: &ElfFile, kernel_mmi_ref: &MmiRef) -> Result
         let mut text_max_offset = 0;
         let mut ro_bytes = 0;
         let mut rw_bytes = 0;
-        for sec in elf_file.section_iter() {
-            let size = sec.size() as usize;
-            // skip zero-sized sections and non-allocated sections (they're useless)
-            if (size == 0) || (sec.flags() & SHF_ALLOC == 0) {
+        for (shndx, sec) in elf_file.section_iter().enumerate() {
+            // Skip non-allocated sections; they don't need to be loaded into memory
+            if sec.flags() & SHF_ALLOC == 0 {
                 continue;
             }
 
+            // Zero-sized sections may be aliased references to the next section in the ELF file,
+            // but only if they have the same offset.
+            // The empty .text section at the start of each object file should be ignored. 
+            let sec = if (sec.size() == 0) && (sec.get_name(elf_file) != Ok(".text")) {
+                let next_sec = elf_file.section_header((shndx + 1) as u16)
+                    .map_err(|_| "couldn't get next section for a zero-sized section")?;
+                if next_sec.offset() == sec.offset() {
+                    next_sec
+                } else {
+                    sec
+                }
+            } else {
+                sec
+            };
+
+            let size = sec.size() as usize;
             let align = sec.align() as usize;
             let addend = round_up_power_of_two(size, align);
 
