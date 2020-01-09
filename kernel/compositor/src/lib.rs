@@ -57,7 +57,7 @@ pub trait CompositableRegion {
     /// * `framebuffer`: the source framebuffer that the compositable region is in.
     /// * `coordinate`: the position relative to the top-left of the destination framebuffer where the source framebuffer will be composited to.
     /// * `block_height`: the height of every block in the framebuffer. This method will calculate the block indexes according to this parameter. 
-    fn get_block_index_iter<P: Pixel>(    
+    fn get_cache_row_range<P: Pixel>(    
         &self,
         framebuffer: &FrameBuffer<P>, 
         coordinate: Coord, 
@@ -87,7 +87,7 @@ pub trait CompositableRegion {
 }
 
 impl CompositableRegion for Coord {
-    fn get_block_index_iter<P: Pixel>(    
+    fn get_cache_row_range<P: Pixel>(    
         &self,
         framebuffer: &FrameBuffer<P>, 
         coordinate: Coord,
@@ -127,7 +127,7 @@ impl CompositableRegion for Coord {
 }
 
 impl CompositableRegion for Rectangle {
-    fn get_block_index_iter<P: Pixel>(    
+    fn get_cache_row_range<P: Pixel>(    
         &self,
         framebuffer: &FrameBuffer<P>, 
         coordinate: Coord, 

@@ -84,12 +84,12 @@ pub struct FrameCompositor {
 }
 
 impl FrameCompositor {
-    /// Checks if a coordinate is in the cache list.
-    fn is_cached<P: Pixel>(&self, block: &[P], coordinate: &Coord) -> bool {
+    /// Checks if some rows of a framebuffer is cached.
+    fn is_cached<P: Pixel>(&self, pixel_rows: &[P], coordinate: &Coord, width: usize) -> bool {
         match self.caches.get(coordinate) {
             Some(cache) => {
                 // The same hash means the array of two blocks are the same. Since all blocks are of the same height, two blocks of the same array must share the same width. Therefore, the coordinate and content_hash can identify a block.
-                return cache.content_hash == hash(block)
+                return cache.content_hash == hash(pixel_rows) && cache.width == width
             }
             None => return false,
         }
@@ -103,12 +103,12 @@ impl FrameCompositor {
     /// * `coordinate`: the position of the source framebuffer relative to the destination framebuffer.
     /// * `index`: the index of the block to be rendered. 
     ///    The framebuffer are divided into y-aligned blocks and index indicates the order of the block.
-    /// * `bounding_box`: the bounding box specifying the region to update.
     fn check_and_cache<P: Pixel>(
         &mut self, 
         src_fb: &FrameBuffer<P>, 
         coordinate: Coord, 
-        row_start: usize, 
+        row_start: usize,
+        row_num: usize,
     ) -> Result<(), &'static str> {
         let (src_width, src_height) = src_fb.get_size();
         let src_buffer_len = src_width * src_height;
@@ -118,12 +118,12 @@ impl FrameCompositor {
         let coordinate_start = coordinate + (0, row_start as isize);
 
         // The end pixel of the block
-        let end_index = start_index + CACHE_BLOCK_HEIGHT * src_width;
+        let end_index = start_index + row_num * src_width;
         
         let block_content = &src_fb.buffer()[start_index..core::cmp::min(end_index, src_buffer_len)];
         
         // Skip if a block is already cached
-        if self.is_cached(&block_content, &coordinate_start) {
+        if self.is_cached(&block_content, &coordinate_start, src_width) {
             return Ok(());
         }
 
@@ -159,10 +159,10 @@ impl FrameCompositor {
         dest_fb: &mut FrameBuffer<P>,
         bounding_box: &B, 
         row_start: usize, 
+        row_num: usize,
         coordinate: Coord
     ) -> Result<(), &'static str> {
-        let update_box = bounding_box.intersect_block(row_start, coordinate, CACHE_BLOCK_HEIGHT);
-
+        let update_box = bounding_box.intersect_block(row_start, coordinate, row_num);
         update_box.blend_buffers(
             src_fb,
             dest_fb,
@@ -191,14 +191,14 @@ impl Compositor for FrameCompositor {
                     top_left: coordinate,
                     bottom_right: coordinate + (src_width as isize, src_height as isize)
                 };
-                let mut cache_row_start = 0;
+                let mut row_start = 0;
                 loop {
-                    if cache_row_start >= src_height {
+                    if row_start >= src_height {
                         break;
                     }
-                    self.check_and_cache(src_fb, coordinate, cache_row_start)?;
-                    self.blend(src_fb, dest_fb, &area, cache_row_start, coordinate)?;
-                    cache_row_start += CACHE_BLOCK_HEIGHT;
+                    self.check_and_cache(src_fb, coordinate, row_start, CACHE_BLOCK_HEIGHT)?;
+                    self.blend(src_fb, dest_fb, &area, row_start, CACHE_BLOCK_HEIGHT, coordinate)?;
+                    row_start += CACHE_BLOCK_HEIGHT;
                 }
             }
         } else {
@@ -208,19 +208,19 @@ impl Compositor for FrameCompositor {
                     let src_fb = frame_buffer_updates.framebuffer;
                     let (width, _) = src_fb.get_size();
                     let coordinate = frame_buffer_updates.coordinate;
-                    let (mut cache_row_start, cache_row_end) = bounding_box.get_block_index_iter(src_fb, coordinate, CACHE_BLOCK_HEIGHT);
-                    let block_size = CACHE_BLOCK_HEIGHT * width;
-                    let check_cache = bounding_box.size() > block_size;
+                    let (mut row_start, row_end) = bounding_box.get_cache_row_range(src_fb, coordinate, CACHE_BLOCK_HEIGHT);
+                    let cache_block_size = CACHE_BLOCK_HEIGHT * width;
+                    let check_cache = bounding_box.size() > cache_block_size;
 
                     loop {
-                        if cache_row_start >= cache_row_end {
+                        if row_start >= row_end {
                             break;
                         }                     
                         if check_cache {
-                            self.check_and_cache(src_fb, coordinate, cache_row_start)?;
+                            self.check_and_cache(src_fb, coordinate, row_start, CACHE_BLOCK_HEIGHT)?;
                         };
-                        self.blend(src_fb, dest_fb, &bounding_box.clone(), cache_row_start, coordinate)?;
-                        cache_row_start += CACHE_BLOCK_HEIGHT;
+                        self.blend(src_fb, dest_fb, &bounding_box.clone(), row_start, CACHE_BLOCK_HEIGHT, coordinate)?;
+                        row_start += CACHE_BLOCK_HEIGHT;
                     } 
                 }
             }
