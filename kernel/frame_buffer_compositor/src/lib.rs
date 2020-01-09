@@ -9,7 +9,7 @@
 //!
 //! In the next step, the compositor checks if the contents of a framebuffer within every row range is already cached. It ignores those do not overlap the bounding box to be updated. For rows in a range that have not been cached, the compositor will refresh the part of these rows within the bounding box.
 //!
-//! Once a row range is updated, the compositor will remove all the existing caches overlap with it and cache the new one. It computes the hash of the pixels in the row range and wrap it with the width of the framebuffer and the coordinate of the start pixel as a cache block.
+//! Once a row range is updated, the compositor will remove all the existing caches overlap with it and cache the new one. It computes the hash of the pixels in the row range and wrap it with the size and location of the pixels as a cache block.
 
 #![no_std]
 
@@ -87,56 +87,61 @@ pub struct FrameCompositor {
 
 impl FrameCompositor {
     /// Checks if some rows of a framebuffer is cached.
+    /// # Arguments
+    /// * `pixel_rows`: the continuous pixels in the rows.
+    /// * `coordinate`: the location of the first pixel.
+    /// * `width`: the width of the rows
+    ///
     fn is_cached<P: Pixel>(&self, pixel_rows: &[P], coordinate: &Coord, width: usize) -> bool {
         match self.caches.get(coordinate) {
             Some(cache) => {
-                // The same hash and width means the array of two blocks are the same.
+                // The same hash and width means the array of two blocks are the same. We do not need the height because if the hashes are the same, the number of pixels, namely `width * height` must be the same.
                 return cache.content_hash == hash(pixel_rows) && cache.width == width
             }
             None => return false,
         }
     }
 
-    /// This function will get the `index`_th block in the framebuffer and check if it is cached.
-    /// If the answer is not, it will remove the cache overlaps with the block and caches the new one. 
+    /// This function will check several continuous rows in the framebuffer is cached.
+    /// If the answer is not, it will remove the cache overlaps with the rows and cache the rows
     /// # Arguments
     /// * `src_fb`: the updated source framebuffer.
     /// * `dest_fn`: the destination framebuffer.
     /// * `coordinate`: the position of the source framebuffer relative to the destination framebuffer.
-    /// * `index`: the index of the block to be rendered. 
-    ///    The framebuffer are divided into y-aligned blocks and index indicates the order of the block.
+    /// * `row_start`: start row index to be checked.
+    /// * `row_num`: the number of rows to be checked
     fn check_and_cache<P: Pixel>(
         &mut self, 
         src_fb: &FrameBuffer<P>, 
         coordinate: Coord, 
         row_start: usize,
         row_num: usize,
-    ) -> Result<(), &'static str> {
+    ) -> Result<bool, &'static str> {
         let (src_width, src_height) = src_fb.get_size();
         let src_buffer_len = src_width * src_height;
 
-        // The start pixel of the block
+        // The start pixel of the rows
         let start_index = src_width * row_start;
         let coordinate_start = coordinate + (0, row_start as isize);
 
-        // The end pixel of the block
+        // The end pixel of the rows
         let end_index = start_index + row_num * src_width;
         
-        let block_content = &src_fb.buffer()[start_index..core::cmp::min(end_index, src_buffer_len)];
+        let pixel_slice = &src_fb.buffer()[start_index..core::cmp::min(end_index, src_buffer_len)];
         
-        // Skip if a block is already cached
-        if self.is_cached(&block_content, &coordinate_start, src_width) {
-            return Ok(());
+        // Skip if the rows are already cached
+        if self.is_cached(&pixel_slice, &coordinate_start, src_width) {
+            return Ok(true);
         }
 
         // find overlapped caches
         // extend the width of the updated part to the right side of the cached block content
         // remove caches of the same location
         let new_cache = CacheBlock {
-            content_hash: hash(block_content),
+            content_hash: hash(pixel_slice),
             coordinate: coordinate_start,
             width: src_width,
-            height: block_content.len() / src_width
+            height: pixel_slice.len() / src_width
         };
         let keys: Vec<_> = self.caches.keys().cloned().collect();
         for key in keys {
@@ -152,7 +157,7 @@ impl FrameCompositor {
         }
 
         self.caches.insert(coordinate_start, new_cache);        
-        Ok(())
+        Ok(false)
     }
 
     /// This function will blend the intersection of the bounding_box with the `index_th` block in the source framebuffer to the destination. `coordinate` is the top-left point of the source framebuffer relative to top-left of the distination one. About `block` see the definition of this `frame_buffer_compositor` crate.
@@ -199,8 +204,9 @@ impl Compositor for FrameCompositor {
                     if row_start >= src_height {
                         break;
                     }
-                    self.check_and_cache(src_fb, coordinate, row_start, CACHE_BLOCK_HEIGHT)?;
-                    self.blend(src_fb, dest_fb, &area, row_start, CACHE_BLOCK_HEIGHT, coordinate)?;
+                    if !self.check_and_cache(src_fb, coordinate, row_start, CACHE_BLOCK_HEIGHT)? {
+                        self.blend(src_fb, dest_fb, &area, row_start, CACHE_BLOCK_HEIGHT, coordinate)?;
+                    }
                     row_start += CACHE_BLOCK_HEIGHT;
                 }
             }
@@ -220,7 +226,10 @@ impl Compositor for FrameCompositor {
                             break;
                         }                     
                         if check_cache {
-                            self.check_and_cache(src_fb, coordinate, row_start, CACHE_BLOCK_HEIGHT)?;
+                            if self.check_and_cache(src_fb, coordinate, row_start, CACHE_BLOCK_HEIGHT)? {
+                                 row_start += CACHE_BLOCK_HEIGHT;
+                                 continue;
+                            }
                         };
                         self.blend(src_fb, dest_fb, &bounding_box.clone(), row_start, CACHE_BLOCK_HEIGHT, coordinate)?;
                         row_start += CACHE_BLOCK_HEIGHT;
