@@ -3,13 +3,13 @@
 //! The coordinate of a framebuffer represents its origin (top-left point).
 //!
 //! # Cache
-//! The compositor caches framebuffer blocks for better performance. 
+//! The compositor caches framebuffer rows for better performance. 
 //!
-//! First, it divides every incoming framebuffer into blocks. The height of every block is a constant 16 except for the last one. The width of a block is the same as the width of the framebuffer it belongs to. A block is a continuous array so that we can compute its hash to compare the content of two blocks.
+//! First, it divides every incoming framebuffer into several row ranges. Every row range has 16 rows except for the last one. The pixels in a row range is a continuous array so that we can compute its hash to compare the content of two row ranges.
 //!
-//! In the next step, the compositor chooses all the blocks that overlap the given bounding box and checks if each block is already cached. If the answer is no, the compositor will refresh the part of the block within the bounding box.
+//! In the next step, the compositor checks if the contents of a framebuffer within every row range is already cached. It ignores those do not overlap the bounding box to be updated. For rows in a range that have not been cached, the compositor will refresh the part of these rows within the bounding box.
 //!
-//! Once a block is refreshed, the compositor will remove all the existing caches overlap with it and cache the new one.
+//! Once a row range is updated, the compositor will remove all the existing caches overlap with it and cache the new one. It computes the hash of the pixels in the row range and wrap it with the width of the framebuffer and the coordinate of the start pixel as a cache block.
 
 #![no_std]
 
@@ -31,7 +31,7 @@ use frame_buffer::{FrameBuffer, Pixel};
 use shapes::{Coord, Rectangle};
 use spin::Mutex;
 
-/// The height of a cache block. See the definition of `CacheBlock`.
+/// The height of a cache block. In every iteration the compositor will deal of 16 rows and cache it.
 pub const CACHE_BLOCK_HEIGHT:usize = 16;
 
 lazy_static! {
@@ -43,14 +43,16 @@ lazy_static! {
     );
 }
 
-/// Metadata that describes the cached block.
+/// Metadata that describes the cached block. 
 pub struct CacheBlock {
     /// The coordinate of the block where it is rendered to the destination framebuffer.
     coordinate: Coord,
-    /// The hash of the content in the framebuffer.
+    /// The hash of the content in the block. It is the hash of continuous pixels.
     content_hash: u64,
     /// The width of the block
     width: usize,
+    /// The height of the block
+    height: usize,
 }
 
 impl CacheBlock {
@@ -64,15 +66,15 @@ impl CacheBlock {
         return coordinate.x >= self.coordinate.x
             && coordinate.x < self.coordinate.x + self.width as isize
             && coordinate.y >= self.coordinate.y
-            && coordinate.y < self.coordinate.y + CACHE_BLOCK_HEIGHT as isize;
+            && coordinate.y < self.coordinate.y + self.height as isize;
     }
 
     /// checks if this block contains any of the four corners of another `cache`.
     fn contains_corner(&self, cache: &CacheBlock) -> bool {
         self.contains(cache.coordinate)
             || self.contains(cache.coordinate + (cache.width as isize - 1, 0))
-            || self.contains(cache.coordinate + (0, CACHE_BLOCK_HEIGHT as isize - 1))
-            || self.contains(cache.coordinate + (cache.width as isize - 1, CACHE_BLOCK_HEIGHT as isize - 1))
+            || self.contains(cache.coordinate + (0, cache.height as isize - 1))
+            || self.contains(cache.coordinate + (cache.width as isize - 1, cache.height as isize - 1))
     }
 }
 
@@ -88,7 +90,7 @@ impl FrameCompositor {
     fn is_cached<P: Pixel>(&self, pixel_rows: &[P], coordinate: &Coord, width: usize) -> bool {
         match self.caches.get(coordinate) {
             Some(cache) => {
-                // The same hash means the array of two blocks are the same. Since all blocks are of the same height, two blocks of the same array must share the same width. Therefore, the coordinate and content_hash can identify a block.
+                // The same hash and width means the array of two blocks are the same.
                 return cache.content_hash == hash(pixel_rows) && cache.width == width
             }
             None => return false,
@@ -134,6 +136,7 @@ impl FrameCompositor {
             content_hash: hash(block_content),
             coordinate: coordinate_start,
             width: src_width,
+            height: block_content.len() / src_width
         };
         let keys: Vec<_> = self.caches.keys().cloned().collect();
         for key in keys {
