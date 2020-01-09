@@ -62,7 +62,7 @@ pub trait CompositableRegion {
         framebuffer: &FrameBuffer<P>, 
         coordinate: Coord, 
         block_height: usize,
-    ) -> core::ops::Range<usize>;
+    ) -> (usize, usize);
 
     /// Returns the intersection of the compositable region and the block specified by `block_index`.
     /// # Arguments
@@ -92,14 +92,14 @@ impl CompositableRegion for Coord {
         framebuffer: &FrameBuffer<P>, 
         coordinate: Coord,
         block_height: usize,
-    ) -> core::ops::Range<usize> {
+    ) -> (usize, usize) {
         let relative_coord = *self - coordinate;
         let (_, height) = framebuffer.get_size();
         if relative_coord.y >= 0 && relative_coord.y < height as isize {
-            let index = relative_coord.y as usize / block_height;
-            return index..index + 1;
+            let row_start = relative_coord.y as usize / block_height * block_height;
+            return (row_start, row_start + block_height);
         } else {
-            return 0..0;
+            return (0, 0);
         }
     }
  
@@ -132,36 +132,36 @@ impl CompositableRegion for Rectangle {
         framebuffer: &FrameBuffer<P>, 
         coordinate: Coord, 
         block_height: usize,
-    ) -> core::ops::Range<usize> {
+    ) -> (usize, usize) {
         let relative_area = *self - coordinate;
         let (width, height) = framebuffer.get_size();
 
         let start_x = core::cmp::max(relative_area.top_left.x, 0);
         let end_x = core::cmp::min(relative_area.bottom_right.x, width as isize);
         if start_x >= end_x {
-            return 0..0;
+            return (0, 0);
         }
         
         let start_y = core::cmp::max(relative_area.top_left.y, 0);
         let end_y = core::cmp::min(relative_area.bottom_right.y, height as isize);
         if start_y >= end_y {
-            return 0..0;
+            return (0, 0);
         }
         let start_index = start_y as usize / block_height;
         let end_index = end_y as usize / block_height + 1;
         
-        return start_index..end_index
+        return (start_index * block_height, end_index * block_height)
     }
 
-    fn intersect_block(&self, block_index: usize, coordinate: Coord, block_height: usize) -> Rectangle {
+    fn intersect_block(&self, row_start: usize, coordinate: Coord, block_height: usize) -> Rectangle {
         return Rectangle {
             top_left: Coord::new(
                 self.top_left.x,
-                core::cmp::max((block_index * block_height) as isize + coordinate.y, self.top_left.y),
+                core::cmp::max((row_start) as isize + coordinate.y, self.top_left.y),
             ),
             bottom_right: Coord::new(
                 self.bottom_right.x,
-                core::cmp::min(((block_index + 1) * block_height) as isize + coordinate.y, self.bottom_right.y)
+                core::cmp::min((row_start + block_height) as isize + coordinate.y, self.bottom_right.y)
             )
         };
     }

@@ -31,7 +31,7 @@ use frame_buffer::{FrameBuffer, Pixel};
 use shapes::{Coord, Rectangle};
 use spin::Mutex;
 
-/// The height of a cache block. See the definition of `BlockCache`.
+/// The height of a cache block. See the definition of `CacheBlock`.
 pub const CACHE_BLOCK_HEIGHT:usize = 16;
 
 lazy_static! {
@@ -44,7 +44,7 @@ lazy_static! {
 }
 
 /// Metadata that describes the cached block.
-pub struct BlockCache {
+pub struct CacheBlock {
     /// The coordinate of the block where it is rendered to the destination framebuffer.
     coordinate: Coord,
     /// The hash of the content in the framebuffer.
@@ -53,9 +53,9 @@ pub struct BlockCache {
     width: usize,
 }
 
-impl BlockCache {
+impl CacheBlock {
     /// Checks if a block cache overlaps with another one
-    pub fn overlaps_with(&self, cache: &BlockCache) -> bool {
+    pub fn overlaps_with(&self, cache: &CacheBlock) -> bool {
         self.contains_corner(cache) || cache.contains_corner(self)
     }
 
@@ -68,7 +68,7 @@ impl BlockCache {
     }
 
     /// checks if this block contains any of the four corners of another `cache`.
-    fn contains_corner(&self, cache: &BlockCache) -> bool {
+    fn contains_corner(&self, cache: &CacheBlock) -> bool {
         self.contains(cache.coordinate)
             || self.contains(cache.coordinate + (cache.width as isize - 1, 0))
             || self.contains(cache.coordinate + (0, CACHE_BLOCK_HEIGHT as isize - 1))
@@ -80,7 +80,7 @@ impl BlockCache {
 /// It caches framebuffer blocks since last update as soft states for better performance.
 pub struct FrameCompositor {
     // Cache of updated framebuffers
-    caches: BTreeMap<Coord, BlockCache>,
+    caches: BTreeMap<Coord, CacheBlock>,
 }
 
 impl FrameCompositor {
@@ -108,18 +108,17 @@ impl FrameCompositor {
         &mut self, 
         src_fb: &FrameBuffer<P>, 
         coordinate: Coord, 
-        index: usize, 
+        row_start: usize, 
     ) -> Result<(), &'static str> {
         let (src_width, src_height) = src_fb.get_size();
         let src_buffer_len = src_width * src_height;
-        let block_pixels = CACHE_BLOCK_HEIGHT * src_width;
 
         // The start pixel of the block
-        let start_index = block_pixels * index;
-        let coordinate_start = coordinate + (0, (CACHE_BLOCK_HEIGHT * index) as isize);
+        let start_index = src_width * row_start;
+        let coordinate_start = coordinate + (0, row_start as isize);
 
         // The end pixel of the block
-        let end_index = start_index + block_pixels;
+        let end_index = start_index + CACHE_BLOCK_HEIGHT * src_width;
         
         let block_content = &src_fb.buffer()[start_index..core::cmp::min(end_index, src_buffer_len)];
         
@@ -131,7 +130,7 @@ impl FrameCompositor {
         // find overlapped caches
         // extend the width of the updated part to the right side of the cached block content
         // remove caches of the same location
-        let new_cache = BlockCache {
+        let new_cache = CacheBlock {
             content_hash: hash(block_content),
             coordinate: coordinate_start,
             width: src_width,
@@ -159,10 +158,10 @@ impl FrameCompositor {
         src_fb: &FrameBuffer<P>,
         dest_fb: &mut FrameBuffer<P>,
         bounding_box: &B, 
-        index: usize, 
+        row_start: usize, 
         coordinate: Coord
     ) -> Result<(), &'static str> {
-        let update_box = bounding_box.intersect_block(index, coordinate, CACHE_BLOCK_HEIGHT);
+        let update_box = bounding_box.intersect_block(row_start, coordinate, CACHE_BLOCK_HEIGHT);
 
         update_box.blend_buffers(
             src_fb,
@@ -187,14 +186,19 @@ impl Compositor for FrameCompositor {
                 let coordinate = frame_buffer_updates.coordinate;
                 // Update the whole screen if the caller does not specify the blocks
                 let (src_width, src_height) = frame_buffer_updates.framebuffer.get_size();
-                let block_number = (src_height - 1) / CACHE_BLOCK_HEIGHT + 1;
+                // let block_number = (src_height - 1) / CACHE_BLOCK_HEIGHT + 1;
                 let area = Rectangle {
                     top_left: coordinate,
                     bottom_right: coordinate + (src_width as isize, src_height as isize)
                 };
-                for i in 0.. block_number {
-                    self.check_and_cache(src_fb, coordinate, i)?;
-                    self.blend(src_fb, dest_fb, &area, i, coordinate)?;
+                let mut cache_row_start = 0;
+                loop {
+                    if cache_row_start >= src_height {
+                        break;
+                    }
+                    self.check_and_cache(src_fb, coordinate, cache_row_start)?;
+                    self.blend(src_fb, dest_fb, &area, cache_row_start, coordinate)?;
+                    cache_row_start += CACHE_BLOCK_HEIGHT;
                 }
             }
         } else {
@@ -204,14 +208,19 @@ impl Compositor for FrameCompositor {
                     let src_fb = frame_buffer_updates.framebuffer;
                     let (width, _) = src_fb.get_size();
                     let coordinate = frame_buffer_updates.coordinate;
-                    let blocks = bounding_box.get_block_index_iter(src_fb, coordinate, CACHE_BLOCK_HEIGHT);
+                    let (mut cache_row_start, cache_row_end) = bounding_box.get_block_index_iter(src_fb, coordinate, CACHE_BLOCK_HEIGHT);
                     let block_size = CACHE_BLOCK_HEIGHT * width;
                     let check_cache = bounding_box.size() > block_size;
-                    for block in blocks {
+
+                    loop {
+                        if cache_row_start >= cache_row_end {
+                            break;
+                        }                     
                         if check_cache {
-                            self.check_and_cache(src_fb, coordinate, block)?;
+                            self.check_and_cache(src_fb, coordinate, cache_row_start)?;
                         };
-                        self.blend(src_fb, dest_fb, &bounding_box.clone(), block, coordinate)?;                        
+                        self.blend(src_fb, dest_fb, &bounding_box.clone(), cache_row_start, coordinate)?;
+                        cache_row_start += CACHE_BLOCK_HEIGHT;
                     } 
                 }
             }
