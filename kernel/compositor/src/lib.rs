@@ -22,7 +22,6 @@ pub trait Compositor {
     /// * `src_fbs`: an iterator over the source framebuffers to be composited, along with where in the `dest_fb` they should be composited. 
     /// * `dest_fb`: the destination framebuffer that will hold the composited source framebuffers.
     /// * `bounding_boxes`: an iterator over bounding boxes that specify which regions of the destination framebuffer should be updated. 
-    /// * `cache_check`: whether to check cache before updating. For tiny updates like a pixel, we'd better update directly for better performance.
     ///    For every source framebuffer, the compositor will composite its corresponding regions into the boxes of the destination framebuffer. 
     ///    It will update the whole destination framebuffer if this argument is `None`.
     fn composite<'a, B: CompositableRegion + Clone, P: 'a + Pixel>(
@@ -73,7 +72,7 @@ pub trait CompositableRegion {
     /// * `block_height`: the height of every block in the framebuffer. A framebuffer will be divided into several blocks of `block_height` along y-axis.
     fn intersect_block(&self, block_index: usize, coordinate: Coord, block_height: usize) -> Self;
 
-    /// Returns the size of the region.
+    /// Returns the number of pixels in the region.
     fn size(&self) -> usize;
 
     /// Blends the pixels in the source framebuffer `src_fb` into the pixels in the destination framebuffer `dest_fb`.
