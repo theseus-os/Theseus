@@ -219,7 +219,7 @@ impl Compositor for FrameCompositor {
                     let coordinate = frame_buffer_updates.coordinate;
                     let (mut row_start, row_end) = bounding_box.get_cache_row_range(src_fb, coordinate, CACHE_BLOCK_HEIGHT);
                     let cache_block_size = CACHE_BLOCK_HEIGHT * width;
-                    let check_cache = bounding_box.size() > cache_block_size;
+                    let check_cache = bounding_box.size() > 1;
 
                     loop {
                         if row_start >= row_end {
