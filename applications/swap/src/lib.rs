@@ -1,5 +1,5 @@
 
-//! This application is for performing module management, such as swapping.
+//! This application is for performing crate management, such as swapping.
 
 
 #![no_std]
@@ -31,6 +31,10 @@ use fs_node::{FileOrDir, FsNode, DirRef};
 
 #[no_mangle]
 pub fn main(args: Vec<String>) -> isize {
+    #[cfg(not(loadable))] {
+        println!("WARNING: Theseus was not built in 'loadable' mode, so crate swapping may not work.");
+    }
+
     let mut opts = Options::new();
     opts.optflag("h", "help", "print this help menu");
     opts.optflag("v", "verbose", "enable verbose logging of crate swapping actions");
@@ -93,7 +97,7 @@ fn rmain(matches: Matches) -> Result<(), String> {
     println!("tuples: {:?}", tuples);
         
 
-    swap_modules(
+    do_swap(
         tuples, 
         &curr_dir, 
         override_namespace_crate_dir,
@@ -134,12 +138,12 @@ fn parse_input_tuples<'a>(args: &'a str) -> Result<Vec<(&'a str, &'a str, bool)>
                 };
                 v.push((o, n, reexport_bool));
             }
-            _ => return Err("list of module pairs is formatted incorrectly.".to_string()),
+            _ => return Err("list of crate pairs is formatted incorrectly.".to_string()),
         }
     }
 
     if v.is_empty() {
-        Err("no module pairs specified.".to_string())
+        Err("no crate pairs specified.".to_string())
     }
     else {
         Ok(v)
@@ -148,14 +152,14 @@ fn parse_input_tuples<'a>(args: &'a str) -> Result<Vec<(&'a str, &'a str, bool)>
 
 
 /// Performs the actual swapping of crates.
-fn swap_modules(
+fn do_swap(
     tuples: Vec<(&str, &str, bool)>, 
     curr_dir: &DirRef, 
     override_namespace_crate_dir: Option<NamespaceDir>, 
     state_transfer_functions: Vec<String>,
     verbose_log: bool
 ) -> Result<(), String> {
-    let namespace = mod_mgmt::get_default_namespace().ok_or("Couldn't get default crate namespace")?;
+    let namespace = task::get_my_current_task().ok_or("Couldn't get current task")?.get_namespace();
 
     let swap_requests = {
         let mut mods: Vec<SwapRequest> = Vec::with_capacity(tuples.len());
@@ -211,9 +215,9 @@ fn print_usage(opts: Options) {
 
 
 const USAGE: &'static str = "Usage: swap (OLD1, NEW1 [, true | false]) [(OLD2, NEW2 [, true | false])]...
-Swaps the given list of crate-module tuples, with NEW# replacing OLD# in each tuple.
-The OLD value is a crate name (\"my_crate-<hash>\"), whereas the NEW value is a module file name (\"k#my_crate-<hash>\").
-Both the old crate name and the new module name can be autocompleted, e.g., \"my_cra\" will find \"my_crate-<hash>\" 
-if there is only ONE crate or module file that matched \"my_cra\".
+Swaps the given list of crate tuples, with NEW# replacing OLD# in each tuple.
+The OLD and NEW values are crate names, such as \"my_crate-<hash>\".
+Both the old crate name and the new crate name can be autocompleted, e.g., \"my_cra\" will find \"my_crate-<hash>\", 
+but *only* if there is a single matching crate or object file.
 A third element of each tuple is the optional 'reexport_new_symbols_as_old' boolean, which if true, 
 will reexport new symbols under their old names, if those symbols match (excluding hashes).";

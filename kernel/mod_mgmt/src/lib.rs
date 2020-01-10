@@ -176,7 +176,7 @@ pub type SwapRequestList = Vec<SwapRequest>;
 /// # Important Note
 /// When swapping out an old crate, the new crate must satisfy all of the dependencies
 /// that other crates had on that old crate. 
-/// However, this function will completely remove the old crate and its symbols from that `CrateNamespace`,
+/// However, the swapping procedure will completely remove the old crate and its symbols from that `CrateNamespace`,
 /// so it may be useful to re-expose or "mirror" the new crate's sections as symbols with names 
 /// that match the relevant sections from the old crate.
 /// This satisfies other crates' dependenices on the old crate while allowing the new crate to exist normally,
@@ -624,7 +624,7 @@ impl CrateNamespace {
     /// and only after *all* crates are loaded does it move on to linking/relocation calculations. 
     /// 
     /// This allows multiple object files with circular dependencies on one another
-    /// to be loaded "atomically", i.e., as a single unit. 
+    /// to be loaded all at once, as if they were a single entity.
     /// 
     /// # Example
     /// If crate `A` depends on crate `B`, and crate `B` depends on crate `A`,
@@ -651,7 +651,7 @@ impl CrateNamespace {
             crate_files.push(crate_file_ref);
         }
 
-        // second, lock all of the crates
+        // second, lock all of the crate object files
         let mut locked_crate_files = Vec::with_capacity(crate_files.len());
         for crate_file_ref in &crate_files {
             locked_crate_files.push(crate_file_ref.lock());
@@ -710,20 +710,23 @@ impl CrateNamespace {
     }
 
 
-    /// Swaps in new modules to replace existing crates this in `CrateNamespace`.
+    /// Swaps in new crates that can optionally replace existing crates in this `CrateNamespace`.
     /// 
     /// See the documentation of the [`SwapRequest`](#struct.SwapRequest.html) struct for more details.
     /// 
-    /// In general, the strategy for replacing an old module `C` with a new module `C2` consists of three simple steps:
-    /// 1) Load the new replacement module `C2`.
-    /// 2) Set up new relocation entries that redirect all module's dependencies on the old module `C` to the new module `C2`.
-    /// 3) Remove module `C` and clean it up, e.g., removing its entries from the symbol map.
+    /// In general, the strategy for replacing an old crate `C` with a new crate `C2` consists of three steps:
+    /// 1) Load the new replacement crate `C2` from its object file.
+    /// 2) Set up new relocation entries that redirect all dependencies on the old crate `C` to the new crate `C2`.
+    /// 3) Remove crate `C` and clean it up, e.g., removing its entries from the symbol map.
     ///    Save the removed crate (and its symbol subtrie) in a cache for later use to expedite future swapping operations.
     /// 
-    /// This `CrateNamespace` (self) is used as the backup namespace for resolving unknown symbols.
+    /// This `CrateNamespace` (self) is used as the backup namespace for resolving unknown symbols,
+    /// in adddition to any recursive namespaces on which this namespace depends.
     /// 
     /// Upon a successful return, this namespace (self) will have the new crates in place of the old ones,
     /// and the old crates will be completely removed from this namespace. 
+    /// In this namespace there will be no remaining dependencies on the old crates, 
+    /// although crates in other namespaces may still include and depend upon those old crates.
     /// 
     /// # Arguments
     /// * `swap_requests`: a list of several `SwapRequest`s, in order to allow swapping multiple crates all at once 
@@ -743,7 +746,7 @@ impl CrateNamespace {
     ///   in which the `current_namespace` is the one currently running that contains the old crates,
     ///   and the `new_namespace` contains only newly-loaded crates that are not yet being used.
     ///   Both namespaces may (and likely will) contain more crates than just the old and new crates specified in the swap request list.
-    /// * `kernel_mmi_ref`: a mutable reference to the kernel's `MemoryManagementInfo`.
+    /// * `kernel_mmi_ref`: a reference to the kernel's `MemoryManagementInfo`.
     /// * `verbose_log`: enable verbose logging.
     /// 
     /// # Warning: Correctness not guaranteed
@@ -876,6 +879,7 @@ impl CrateNamespace {
             // scope the lock for `self.symbol_map` and `new_crate_ref`
             {
                 let mut this_symbol_map = self.symbol_map.lock();
+                debug!("\nDUMPING SYMBOL MAP:\n{:?}", this_symbol_map);
                 let mut new_crate = new_crate_ref.lock_as_mut()
                     .ok_or_else(|| "BUG: swap_crates(): new_crate was unexpectedly shared in another namespace (couldn't get as exclusively mutable)...?")?;
                 
@@ -894,9 +898,13 @@ impl CrateNamespace {
                 // i.e., those that were previously added to this namespace's symbol map,
                 // because other crates could not possibly depend on non-public sections in the old crate.
                 for old_sec_name in &old_crate.global_symbols {
+                    debug!("swap_crates(): looking for old_sec_name: {:?}", old_sec_name);
                     let old_sec_ref = this_symbol_map.get(old_sec_name)
                         .and_then(|weak_sec_ref| weak_sec_ref.upgrade())
-                        .ok_or("BUG: swap_crates(): couldn't get/upgrade old crate's section")?;
+                        .ok_or_else(|| {
+                            error!("BUG: swap_crates(): couldn't get/upgrade old crate's section: {:?}", old_sec_name);
+                            "BUG: swap_crates(): couldn't get/upgrade old crate's section"
+                        })?;
 
                     #[cfg(not(loscd_eval))]
                     debug!("swap_crates(): old_sec_name: {:?}, old_sec: {:?}", old_sec_name, old_sec_ref);
@@ -1938,10 +1946,8 @@ impl CrateNamespace {
                             if let Ok(source_sec_name) = source_sec_entry.get_name(&elf_file) {
                                 const DATARELRO: &'static str = ".data.rel.ro.";
                                 let source_sec_name = if source_sec_name.starts_with(DATARELRO) {
-                                    source_sec_name.get(DATARELRO.len() ..)
-                                        .ok_or("Couldn't get name of .data.rel.ro. section")?
-                                }
-                                else {
+                                    source_sec_name.get(DATARELRO.len() ..).ok_or("Couldn't get name of .data.rel.ro. section")?
+                                } else {
                                     source_sec_name
                                 };
                                 let demangled = demangle(source_sec_name).to_string();
@@ -2264,9 +2270,16 @@ impl CrateNamespace {
     /// if it exists in this namespace's or its recursive namespace's symbol map.
     /// Otherwise, it returns None if the symbol does not exist.
     fn get_symbol_internal(&self, demangled_full_symbol: &str) -> Option<WeakSectionRef> {
-        self.symbol_map.lock().get_str(demangled_full_symbol).cloned()
+        self.get_symbol_and_namespace_internal(demangled_full_symbol).map(|(sym, _ns)| sym)
+    }
+
+
+    /// Like `get_symbol_internal()`, but also returns the exact `CrateNamespace` where the symbol was found.
+    fn get_symbol_and_namespace_internal(&self, demangled_full_symbol: &str) -> Option<(WeakSectionRef, &CrateNamespace)> {
+        let symbol = self.symbol_map.lock().get_str(demangled_full_symbol).cloned();
+        symbol.map(|sym| (sym, self))
             // search the recursive namespace if the symbol cannot be found in this namespace
-            .or_else(|| self.recursive_namespace.as_ref().and_then(|rns| rns.get_symbol_internal(demangled_full_symbol)))
+            .or_else(|| self.recursive_namespace.as_ref().and_then(|rns| rns.get_symbol_and_namespace_internal(demangled_full_symbol)))
     }
 
 
@@ -2323,7 +2336,7 @@ impl CrateNamespace {
         if let Some(backup) = temp_backup_namespace {
             // info!("Symbol \"{}\" not initially found, attempting to load it from backup namespace {:?}", 
             //     demangled_full_symbol, backup.name);
-            if let Some(weak_sec) = backup.get_symbol_internal(demangled_full_symbol) {
+            if let Some((weak_sec, _found_in_ns)) = backup.get_symbol_and_namespace_internal(demangled_full_symbol) {
                 if let Some(sec) = weak_sec.upgrade() {
                     // If we found it in the temp_backup_namespace, then that saves us the effort of having to load the crate again.
                     // We need to add a shared reference to that section's parent crate to this namespace as well, 
@@ -2342,7 +2355,7 @@ impl CrateNamespace {
                         };
                         #[cfg(not(loscd_eval))]
                         info!("Symbol {:?} not initially found, using symbol from (crate {:?}) in backup namespace {:?} in new namespace {:?}",
-                            demangled_full_symbol, parent_crate_name, backup.name, self.name);
+                            demangled_full_symbol, parent_crate_name, _found_in_ns.name, self.name);
                         self.crate_tree.lock().insert(parent_crate_name.into(), parent_crate_ref);
                         return weak_sec;
                     }
@@ -2359,10 +2372,10 @@ impl CrateNamespace {
         // This is basically the same code as the above temp_backup_namespace conditional, but checks to ensure there aren't multiple fuzzy matches.
         if self.fuzzy_symbol_matching {
             if let Some(backup) = temp_backup_namespace {
-                let fuzzy_matches = backup.find_symbols_starting_with(LoadedSection::section_name_without_hash(demangled_full_symbol));
+                let fuzzy_matches = backup.find_symbols_starting_with_and_namespace(LoadedSection::section_name_without_hash(demangled_full_symbol));
                 
                 if fuzzy_matches.len() == 1 {
-                    let (_sec_name, weak_sec) = &fuzzy_matches[0];
+                    let (_sec_name, weak_sec, _found_in_ns) = &fuzzy_matches[0];
                     if let Some(sec) = weak_sec.upgrade() {
                         // If we found it in the temp_backup_namespace, we need to add a shared reference to that section's parent crate
                         // to this namespace so it can't be dropped while this namespace is still relying on it.  
@@ -2374,7 +2387,7 @@ impl CrateNamespace {
                                 parent_crate.crate_name.clone()
                             };
                             warn!("Symbol {:?} not initially found, using fuzzy match symbol {:?} from (crate {:?}) in backup namespace {:?} in new namespace {:?}",
-                                demangled_full_symbol, _sec_name, parent_crate_name, backup.name, self.name);
+                                demangled_full_symbol, _sec_name, parent_crate_name, _found_in_ns.name, self.name);
                             self.crate_tree.lock().insert(parent_crate_name.into(), parent_crate_ref);
                             return weak_sec.clone();
                         }
@@ -2392,7 +2405,7 @@ impl CrateNamespace {
             }
         }
 
-        // As a final attempt, we try to load the crate(s) containing the missing symbol.
+        // Next, try to load the crate(s) containing the missing symbol.
         // We are only able to do this for mangled symbols that contain a crate name, such as "my_crate::foo". 
         // If "foo()" was marked no_mangle, then we don't know which crate to load because there is no "my_crate::" before it.
         // There are multiple potential containing crates, so we try to load each one to find the missing symbol.
@@ -2404,8 +2417,8 @@ impl CrateNamespace {
             if let Some(dependency_crate_file_path) = self.get_crate_file_starting_with(&crate_dependency_name)
                 .or_else(|| temp_backup_namespace.and_then(|backup| backup.get_crate_file_starting_with(&crate_dependency_name)))
             {   
-                // Check to make sure this crate is not already loaded into this namespace.
-                if self.crate_tree.lock().contains_key_str(dependency_crate_file_path.file_stem()) {
+                // Check to make sure this crate is not already loaded into this namespace (or its recursive namespace).
+                if self.get_crate(dependency_crate_file_path.file_stem()).is_some() {
                     trace!("  (skipping already-loaded crate {:?})", dependency_crate_file_path);
                     continue;
                 }
@@ -2468,6 +2481,22 @@ impl CrateNamespace {
             .collect();
 
         if let Some(mut syms_recursive) = self.recursive_namespace().as_ref().map(|r_ns| r_ns.find_symbols_starting_with(symbol_prefix)) {
+            syms.append(&mut syms_recursive);
+        }
+
+        syms
+    }
+
+
+    /// Similar to `find_symbols_starting_with`, but also includes a reference to the exact `CrateNamespace`
+    /// where the matching symbol was found.
+    pub fn find_symbols_starting_with_and_namespace(&self, symbol_prefix: &str) -> Vec<(String, WeakSectionRef, &CrateNamespace)> { 
+        let mut syms: Vec<(String, WeakSectionRef, &CrateNamespace)> = self.symbol_map.lock()
+            .iter_prefix_str(symbol_prefix)
+            .map(|(k, v)| (String::from(k.as_str()), v.clone(), self))
+            .collect();
+
+        if let Some(mut syms_recursive) = self.recursive_namespace().as_ref().map(|r_ns| r_ns.find_symbols_starting_with_and_namespace(symbol_prefix)) {
             syms.append(&mut syms_recursive);
         }
 
