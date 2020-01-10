@@ -1,6 +1,5 @@
 //! This crate defines a trait of `Compositor`  .
 //! A compositor composites a list of buffers to a single buffer.
-//! The coordinate of a framebuffer represents the location of its origin (top-left point).
 
 #![no_std]
 
@@ -13,7 +12,7 @@ use frame_buffer::{FrameBuffer, Pixel};
 use shapes::{Coord, Rectangle};
 
 /// A compositor composites (combines or blends) a series of "source" framebuffers onto a single "destination" framebuffer. 
-/// The type parameter `R` allows a compositor to support multiple types of regions or "bounding boxes", 
+/// The type parameter `B` allows a compositor to support multiple types of regions or "bounding boxes", 
 /// given by the trait bound `CompositableRegion`.
 pub trait Compositor {
     /// Composites the framebuffers in the list of source framebuffers `src_fbs` into the destination framebuffer `dest_fb`.
@@ -22,8 +21,8 @@ pub trait Compositor {
     /// * `src_fbs`: an iterator over the source framebuffers to be composited, along with where in the `dest_fb` they should be composited. 
     /// * `dest_fb`: the destination framebuffer that will hold the composited source framebuffers.
     /// * `bounding_boxes`: an iterator over bounding boxes that specify which regions of the destination framebuffer should be updated. 
-    ///    For every source framebuffer, the compositor will composite its corresponding regions into the boxes of the destination framebuffer. 
-    ///    It will update the whole destination framebuffer if this argument is `None`.
+    ///    In the iteration of every source framebuffer, the compositor will traverse all the bounding boxes relative to the destination framebuffer, get the part of the source framebuffer in every bounding box when the source is composited to the destination one, and blend the part with the bounded region in the destination.
+    /// For example, if the window manager wants to draw a line in the top window, `src_fbs` would be the framebuffers of all the windows and their location in a bottom-top order, and the `bounding_boxes` is an iterator over the pixels of the line relative to the top-left corner of the screen. For every window, the compositor will update the pixels at the location of line in the screen from the bottom window to the top one.
     fn composite<'a, B: CompositableRegion + Clone, P: 'a + Pixel>(
         &mut self,
         src_fbs: impl IntoIterator<Item = FrameBufferUpdates<'a, P>>,
@@ -52,25 +51,24 @@ pub struct FrameBufferUpdates<'a, P: Pixel> {
 /// In addition, a `CompositableRegion` makes it easier for a compositor to only composite pixels in a subset of a given source framebuffer
 /// rather than forcing it to composite the whole framebuffer, which vastly improves performance.
 pub trait CompositableRegion {
-    /// Gets the index of blocks overlapping with the region in the source framebuffer. A block is a rectangle area in the framebuffer. The framebuffer will be divided into several blocks of `block_height` along y-axis.
+    /// Returns the start and end rows in the framebuffer that may be cached and overlap with the region. The row range is usually equal to or larger than the region because the framebuffers are cached as every `cache_block_height` rows.
     /// # Arguments
     /// * `framebuffer`: the source framebuffer that the compositable region is in.
     /// * `coordinate`: the position relative to the top-left of the destination framebuffer where the source framebuffer will be composited to.
-    /// * `block_height`: the height of every block in the framebuffer. This method will calculate the block indexes according to this parameter. 
+    /// * `cache_block_height`: the height of every cache block of the framebuffer.
     fn get_cache_row_range<P: Pixel>(    
         &self,
         framebuffer: &FrameBuffer<P>, 
         coordinate: Coord, 
-        block_height: usize,
+        cache_block_height: usize,
     ) -> (usize, usize);
 
-    /// Returns the intersection of the compositable region and the block specified by `block_index`.
+    /// Returns the intersection of the compositable region and the continuous rows
     /// # Arguments
-    /// * `block_index`: the index of the block
-    /// * `framebuffer`: the source framebuffer that the compositable region is in.
+    /// * `row_start`: the index of the start row
     /// * `coordinate`: the position relative to the top-left of the destination framebuffer where the source framebuffer will be composited to.
-    /// * `block_height`: the height of every block in the framebuffer. A framebuffer will be divided into several blocks of `block_height` along y-axis.
-    fn intersect_block(&self, block_index: usize, coordinate: Coord, block_height: usize) -> Self;
+    /// * `row_num`: the number of rows
+    fn intersect_rows(&self, row_start: usize, coordinate: Coord, row_num: usize) -> Self;
 
     /// Returns the number of pixels in the region.
     fn size(&self) -> usize;
@@ -91,19 +89,19 @@ impl CompositableRegion for Coord {
         &self,
         framebuffer: &FrameBuffer<P>, 
         coordinate: Coord,
-        block_height: usize,
+        cache_block_height: usize,
     ) -> (usize, usize) {
         let relative_coord = *self - coordinate;
         let (_, height) = framebuffer.get_size();
         if relative_coord.y >= 0 && relative_coord.y < height as isize {
-            let row_start = relative_coord.y as usize / block_height * block_height;
-            return (row_start, row_start + block_height);
+            let row_start = relative_coord.y as usize / cache_block_height * cache_block_height;
+            return (row_start, row_start + cache_block_height);
         } else {
             return (0, 0);
         }
     }
  
-    fn intersect_block(&self, _block_index: usize, _coordinate: Coord, _block_height: usize) -> Coord {
+    fn intersect_rows(&self, _row_start: usize, _coordinate: Coord, _row_num: usize) -> Coord {
         return self.clone()
     }
 
@@ -131,7 +129,7 @@ impl CompositableRegion for Rectangle {
         &self,
         framebuffer: &FrameBuffer<P>, 
         coordinate: Coord, 
-        block_height: usize,
+        cache_block_height: usize,
     ) -> (usize, usize) {
         let relative_area = *self - coordinate;
         let (width, height) = framebuffer.get_size();
@@ -147,13 +145,13 @@ impl CompositableRegion for Rectangle {
         if start_y >= end_y {
             return (0, 0);
         }
-        let start_index = start_y as usize / block_height;
-        let end_index = end_y as usize / block_height + 1;
+        let start_index = start_y as usize / cache_block_height;
+        let end_index = end_y as usize / cache_block_height + 1;
         
-        return (start_index * block_height, end_index * block_height)
+        return (start_index * cache_block_height, end_index * cache_block_height)
     }
 
-    fn intersect_block(&self, row_start: usize, coordinate: Coord, block_height: usize) -> Rectangle {
+    fn intersect_rows(&self, row_start: usize, coordinate: Coord, row_num: usize) -> Rectangle {
         return Rectangle {
             top_left: Coord::new(
                 self.top_left.x,
@@ -161,7 +159,7 @@ impl CompositableRegion for Rectangle {
             ),
             bottom_right: Coord::new(
                 self.bottom_right.x,
-                core::cmp::min((row_start + block_height) as isize + coordinate.y, self.bottom_right.y)
+                core::cmp::min((row_start + cache_block_height) as isize + coordinate.y, self.bottom_right.y)
             )
         };
     }
