@@ -51,18 +51,6 @@ pub struct FrameBufferUpdates<'a, P: Pixel> {
 /// In addition, a `CompositableRegion` makes it easier for a compositor to only composite pixels in a subset of a given source framebuffer
 /// rather than forcing it to composite the whole framebuffer, which vastly improves performance.
 pub trait CompositableRegion {
-    /// Returns the start and end rows in the framebuffer that may be cached and overlap with the region. The row range is usually equal to or larger than the region because the framebuffers are cached as every `cache_block_height` rows.
-    /// # Arguments
-    /// * `framebuffer`: the source framebuffer that the compositable region is in.
-    /// * `coordinate`: the position relative to the top-left of the destination framebuffer where the source framebuffer will be composited to.
-    /// * `cache_block_height`: the height of every cache block of the framebuffer.
-    fn get_cache_row_range<P: Pixel>(    
-        &self,
-        framebuffer: &FrameBuffer<P>, 
-        coordinate: Coord, 
-        cache_block_height: usize,
-    ) -> (usize, usize);
-
     /// Returns the intersection of the compositable region and the continuous rows
     /// # Arguments
     /// * `row_start`: the index of the start row
@@ -72,6 +60,9 @@ pub trait CompositableRegion {
 
     /// Returns the number of pixels in the region.
     fn size(&self) -> usize;
+
+    /// Returns the start row index and the number of rows occupied by this region.
+    fn row_range(&self) -> (isize, isize);
 
     /// Blends the pixels in the source framebuffer `src_fb` into the pixels in the destination framebuffer `dest_fb`.
     /// The `dest_coord` is the coordinate in the destination buffer (relative to its top-left corner)
@@ -85,20 +76,8 @@ pub trait CompositableRegion {
 }
 
 impl CompositableRegion for Coord {
-    fn get_cache_row_range<P: Pixel>(    
-        &self,
-        framebuffer: &FrameBuffer<P>, 
-        coordinate: Coord,
-        cache_block_height: usize,
-    ) -> (usize, usize) {
-        let relative_coord = *self - coordinate;
-        let (_, height) = framebuffer.get_size();
-        if relative_coord.y >= 0 && relative_coord.y < height as isize {
-            let row_start = relative_coord.y as usize / cache_block_height * cache_block_height;
-            return (row_start, row_start + cache_block_height);
-        } else {
-            return (0, 0);
-        }
+    fn row_range(&self) -> (isize, isize) {
+        (self.y, self.y + 1)
     }
  
     fn intersect_rows(&self, _row_start: usize, _coordinate: Coord, _row_num: usize) -> Coord {
@@ -125,30 +104,8 @@ impl CompositableRegion for Coord {
 }
 
 impl CompositableRegion for Rectangle {
-    fn get_cache_row_range<P: Pixel>(    
-        &self,
-        framebuffer: &FrameBuffer<P>, 
-        coordinate: Coord, 
-        cache_block_height: usize,
-    ) -> (usize, usize) {
-        let relative_area = *self - coordinate;
-        let (width, height) = framebuffer.get_size();
-
-        let start_x = core::cmp::max(relative_area.top_left.x, 0);
-        let end_x = core::cmp::min(relative_area.bottom_right.x, width as isize);
-        if start_x >= end_x {
-            return (0, 0);
-        }
-        
-        let start_y = core::cmp::max(relative_area.top_left.y, 0);
-        let end_y = core::cmp::min(relative_area.bottom_right.y, height as isize);
-        if start_y >= end_y {
-            return (0, 0);
-        }
-        let start_index = start_y as usize / cache_block_height;
-        let end_index = end_y as usize / cache_block_height + 1;
-        
-        return (start_index * cache_block_height, end_index * cache_block_height)
+    fn row_range(&self) -> (isize, isize) {
+        (self.top_left.y, self.bottom_right.y)
     }
 
     fn intersect_rows(&self, row_start: usize, coordinate: Coord, row_num: usize) -> Rectangle {
@@ -159,7 +116,7 @@ impl CompositableRegion for Rectangle {
             ),
             bottom_right: Coord::new(
                 self.bottom_right.x,
-                core::cmp::min((row_start + cache_block_height) as isize + coordinate.y, self.bottom_right.y)
+                core::cmp::min((row_start + row_num) as isize + coordinate.y, self.bottom_right.y)
             )
         };
     }

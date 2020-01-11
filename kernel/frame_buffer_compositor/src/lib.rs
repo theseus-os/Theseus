@@ -18,6 +18,8 @@ extern crate compositor;
 extern crate frame_buffer;
 extern crate spin;
 #[macro_use]
+extern crate log;
+#[macro_use]
 extern crate lazy_static;
 extern crate hashbrown;
 extern crate shapes;
@@ -177,6 +179,39 @@ impl FrameCompositor {
         )
     }
 
+    /// Returns the start and end rows in the framebuffer that may be cached and overlap with the region. The row range is usually equal to or larger than the region because the framebuffers are cached as cache blocks and every cache block has a fixed `CACHE_BLOCK_HEIGHT` rows.
+    /// # Arguments
+    /// * `coordinate`: the position of the framebuffer relative to the top-left of the destination framebuffer where the source framebuffer will be composited to.
+    /// * `bounding_box`: the compositable region to be composited
+    /// * `fb_height`: the height of the framebuffer.
+    fn get_cache_row_range<B: CompositableRegion>(
+        &self,
+        coordinate: Coord,
+        bounding_box: &B,
+        fb_height: usize,
+    ) -> (usize, usize) {
+        let (abs_row_start, abs_row_end) = bounding_box.row_range();
+        let mut relative_row_start = abs_row_start - coordinate.y;
+        let mut relative_row_end = abs_row_end - coordinate.y;
+
+        relative_row_start = core::cmp::max(relative_row_start, 0);
+        relative_row_end = core::cmp::min(relative_row_end, fb_height as isize);
+
+        if relative_row_start >= relative_row_end {
+            return (0, 0);
+        }
+        
+        let cache_row_start = relative_row_start as usize / CACHE_BLOCK_HEIGHT * CACHE_BLOCK_HEIGHT;
+        let mut cache_row_end = (relative_row_end as usize / CACHE_BLOCK_HEIGHT + 1) * CACHE_BLOCK_HEIGHT;
+
+        cache_row_end = core::cmp::min(cache_row_end, fb_height);
+
+        // if row_num == 1 {
+        //     trace!("Wenqiu:{} {}", cache_row_start, cache_row_end);
+        // }        
+        return (cache_row_start, cache_row_end)
+    }
+
 }
 
 impl Compositor for FrameCompositor {
@@ -215,7 +250,8 @@ impl Compositor for FrameCompositor {
                 for bounding_box in bounding_boxes.clone() {
                     let src_fb = frame_buffer_updates.framebuffer;
                     let coordinate = frame_buffer_updates.coordinate;
-                    let (mut row_start, row_end) = bounding_box.get_cache_row_range(src_fb, coordinate, CACHE_BLOCK_HEIGHT);
+                    let (_, height) = src_fb.get_size();
+                    let (mut row_start, row_end) = self.get_cache_row_range(coordinate, &bounding_box, height);
                     // let cache_block_size = CACHE_BLOCK_HEIGHT * width;
 
                     loop {
