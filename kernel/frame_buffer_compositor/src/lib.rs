@@ -155,32 +155,6 @@ impl FrameCompositor {
         Ok(false)
     }
 
-    /// This function will blend the rows in the source framebuffer to the destination.
-    /// # Arguments
-    /// * `src_fb`: the updated source framebuffer.
-    /// * `dest_fb`: the destination framebuffer to be composited to.
-    /// * `bounding_box`: when the compositor blend the rows, it only deals with the part wrapped by the bounding box.
-    /// * `row_start`: start row index to be blent.
-    /// * `row_num`: the number of rows to be blent.
-    fn blend<B: CompositableRegion, P: Pixel>(
-        &self,
-        src_fb: &FrameBuffer<P>,
-        dest_fb: &mut FrameBuffer<P>,
-        bounding_box: &B, 
-        row_start: usize, 
-        row_num: usize,
-        coordinate: Coord
-    ) -> Result<(), &'static str> {
-        // let update_box = bounding_box.intersect_rows(row_start, coordinate, row_num);
-        bounding_box.blend_buffers(
-            src_fb,
-            dest_fb,
-            coordinate,
-            row_start,
-            row_num,
-        )
-    }
-
     /// Returns the start and end rows in the framebuffer that may be cached and overlap with the region. The row range is usually equal to or larger than the region because the framebuffers are cached as cache blocks and every cache block has a fixed `CACHE_BLOCK_HEIGHT` rows.
     /// # Arguments
     /// * `coordinate`: the position of the framebuffer relative to the top-left of the destination framebuffer where the source framebuffer will be composited to.
@@ -208,9 +182,6 @@ impl FrameCompositor {
 
         cache_row_end = core::cmp::min(cache_row_end, fb_height);
 
-        // if row_num == 1 {
-        //     trace!("Wenqiu:{} {}", cache_row_start, cache_row_end);
-        // }        
         return (cache_row_start, cache_row_end)
     }
 
@@ -241,7 +212,13 @@ impl Compositor for FrameCompositor {
                         break;
                     }
                     if !self.check_and_cache(src_fb, coordinate, row_start, CACHE_BLOCK_HEIGHT)? {
-                        self.blend(src_fb, dest_fb, &area, row_start, CACHE_BLOCK_HEIGHT, coordinate)?;
+                        area.blend_buffers(
+                            src_fb,
+                            dest_fb,
+                            coordinate,
+                            row_start,
+                            CACHE_BLOCK_HEIGHT,
+                        )?;
                     }
                     row_start += CACHE_BLOCK_HEIGHT;
                 }
@@ -267,7 +244,13 @@ impl Compositor for FrameCompositor {
                                  continue;
                             }
                         };
-                        self.blend(src_fb, dest_fb, &bounding_box.clone(), row_start, CACHE_BLOCK_HEIGHT, coordinate)?;
+                        bounding_box.blend_buffers(
+                            src_fb,
+                            dest_fb,
+                            coordinate,
+                            row_start,
+                            CACHE_BLOCK_HEIGHT,
+                        )?;
                         row_start += CACHE_BLOCK_HEIGHT;
                     } 
                 }

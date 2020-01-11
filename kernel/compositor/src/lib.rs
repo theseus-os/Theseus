@@ -51,22 +51,16 @@ pub struct FrameBufferUpdates<'a, P: Pixel> {
 /// In addition, a `CompositableRegion` makes it easier for a compositor to only composite pixels in a subset of a given source framebuffer
 /// rather than forcing it to composite the whole framebuffer, which vastly improves performance.
 pub trait CompositableRegion {
-    // /// Returns the intersection of the compositable region and the continuous rows
-    // /// # Arguments
-    // /// * `row_start`: the index of the start row
-    // /// * `coordinate`: the position relative to the top-left of the destination framebuffer where the source framebuffer will be composited to.
-    // /// * `row_num`: the number of rows
-    // fn sub_region(&self, row_start: usize, coordinate: Coord, row_num: usize) -> Self;
-
     /// Returns the number of pixels in the region.
     fn size(&self) -> usize;
 
     /// Returns the start row index and the number of rows occupied by this region.
     fn row_range(&self) -> (isize, isize);
 
-    /// Blends the pixels in the source framebuffer `src_fb` into the pixels in the destination framebuffer `dest_fb`.
+    /// Blends the pixels in the source framebuffer `src_fb` into the pixels in the destination framebuffer `dest_fb` in a row range.
     /// The `dest_coord` is the coordinate in the destination buffer (relative to its top-left corner)
     /// where the `src_fb` will be composited into (starting at the `src_fb`'s top-left corner).
+    /// `row_start` and `row_num` specify the row range to blend. This method starts from the `row_start`_th row of the source framebuffer and blends `row_num` rows.
     fn blend_buffers<P: Pixel>(
         &self, 
         src_fb: &FrameBuffer<P>, 
@@ -78,13 +72,10 @@ pub trait CompositableRegion {
 }
 
 impl CompositableRegion for Coord {
+    #[inline]
     fn row_range(&self) -> (isize, isize) {
         (self.y, self.y + 1)
     }
- 
-    // fn intersect_rows(&self, _row_start: usize, _coordinate: Coord, _row_num: usize) -> Coord {
-    //     return self.clone()
-    // }
 
     #[inline]
     fn size(&self) -> usize {
@@ -108,6 +99,7 @@ impl CompositableRegion for Coord {
 }
 
 impl CompositableRegion for Rectangle {
+    #[inline]
     fn row_range(&self) -> (isize, isize) {
         (self.top_left.y, self.bottom_right.y)
     }
@@ -125,18 +117,6 @@ impl CompositableRegion for Rectangle {
         row_start: usize,
         row_num: usize,
     ) -> Result<(), &'static str> {
-
-        // return Rectangle {
-        //     top_left: Coord::new(
-        //         self.top_left.x,
-        //         ,
-        //     ),
-        //     bottom_right: Coord::new(
-        //         self.bottom_right.x,
-        //     )
-        // };
-
-
         let (dest_width, dest_height) = dest_fb.get_size();
         let (src_width, src_height) = src_fb.get_size();
 
