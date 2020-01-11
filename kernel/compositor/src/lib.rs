@@ -32,12 +32,13 @@ pub trait Compositor {
 }
 
 
-/// The framebuffers to be composited together with their target positions.
+/// A source framebuffer to be composited, along with its target position.
 pub struct FrameBufferUpdates<'a, P: Pixel> {
-    /// The framebuffer to be composited.
+    /// The source framebuffer to be composited.
     pub framebuffer: &'a FrameBuffer<P>,
-    /// The coordinate where the source `framebuffer` should be composited into the destination framebuffer,
-    /// which is relative to the top-left point of the destination framebuffer. 
+    /// The coordinate in the destination framebuffer where the source `framebuffer` 
+    /// should be composited. 
+    /// This coordinate is expressed relative to the top-left corner of the destination framebuffer. 
     pub coordinate: Coord,
 }
 
