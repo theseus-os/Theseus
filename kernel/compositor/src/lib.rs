@@ -51,12 +51,12 @@ pub struct FrameBufferUpdates<'a, P: Pixel> {
 /// In addition, a `CompositableRegion` makes it easier for a compositor to only composite pixels in a subset of a given source framebuffer
 /// rather than forcing it to composite the whole framebuffer, which vastly improves performance.
 pub trait CompositableRegion {
-    /// Returns the intersection of the compositable region and the continuous rows
-    /// # Arguments
-    /// * `row_start`: the index of the start row
-    /// * `coordinate`: the position relative to the top-left of the destination framebuffer where the source framebuffer will be composited to.
-    /// * `row_num`: the number of rows
-    fn intersect_rows(&self, row_start: usize, coordinate: Coord, row_num: usize) -> Self;
+    // /// Returns the intersection of the compositable region and the continuous rows
+    // /// # Arguments
+    // /// * `row_start`: the index of the start row
+    // /// * `coordinate`: the position relative to the top-left of the destination framebuffer where the source framebuffer will be composited to.
+    // /// * `row_num`: the number of rows
+    // fn sub_region(&self, row_start: usize, coordinate: Coord, row_num: usize) -> Self;
 
     /// Returns the number of pixels in the region.
     fn size(&self) -> usize;
@@ -71,7 +71,9 @@ pub trait CompositableRegion {
         &self, 
         src_fb: &FrameBuffer<P>, 
         dest_fb: &mut FrameBuffer<P>, 
-        dest_coord: Coord,        
+        dest_coord: Coord,
+        row_start: usize,
+        row_num: usize,       
     ) -> Result<(), &'static str>;
 }
 
@@ -80,9 +82,9 @@ impl CompositableRegion for Coord {
         (self.y, self.y + 1)
     }
  
-    fn intersect_rows(&self, _row_start: usize, _coordinate: Coord, _row_num: usize) -> Coord {
-        return self.clone()
-    }
+    // fn intersect_rows(&self, _row_start: usize, _coordinate: Coord, _row_num: usize) -> Coord {
+    //     return self.clone()
+    // }
 
     #[inline]
     fn size(&self) -> usize {
@@ -94,6 +96,8 @@ impl CompositableRegion for Coord {
         src_fb: &FrameBuffer<P>,
         dest_fb: &mut FrameBuffer<P>, 
         dest_coord: Coord,        
+        row_start: usize,
+        row_num: usize,       
     ) -> Result<(), &'static str>{
         let relative_coord = self.clone() - dest_coord;
         if let Some(pixel) = src_fb.get_pixel(relative_coord) {
@@ -108,19 +112,6 @@ impl CompositableRegion for Rectangle {
         (self.top_left.y, self.bottom_right.y)
     }
 
-    fn intersect_rows(&self, row_start: usize, coordinate: Coord, row_num: usize) -> Rectangle {
-        return Rectangle {
-            top_left: Coord::new(
-                self.top_left.x,
-                core::cmp::max((row_start) as isize + coordinate.y, self.top_left.y),
-            ),
-            bottom_right: Coord::new(
-                self.bottom_right.x,
-                core::cmp::min((row_start + row_num) as isize + coordinate.y, self.bottom_right.y)
-            )
-        };
-    }
-
     #[inline]
     fn size(&self) -> usize {
         (self.bottom_right.x - self.top_left.x) as usize * (self.bottom_right.y - self.top_left.y) as usize
@@ -131,19 +122,36 @@ impl CompositableRegion for Rectangle {
         src_fb: &FrameBuffer<P>, 
         dest_fb: &mut FrameBuffer<P>,
         dest_coord: Coord,
+        row_start: usize,
+        row_num: usize,
     ) -> Result<(), &'static str> {
+
+        // return Rectangle {
+        //     top_left: Coord::new(
+        //         self.top_left.x,
+        //         ,
+        //     ),
+        //     bottom_right: Coord::new(
+        //         self.bottom_right.x,
+        //     )
+        // };
+
+
         let (dest_width, dest_height) = dest_fb.get_size();
         let (src_width, src_height) = src_fb.get_size();
- 
+
+        let start_y = core::cmp::max(row_start as isize + dest_coord.y, self.top_left.y);
+        let end_y = core::cmp::min((row_start + row_num) as isize + dest_coord.y, self.bottom_right.y);
+
         // skip if the updated part is not in the dest framebuffer
         let dest_start = Coord::new(
             core::cmp::max(0, self.top_left.x),
-            core::cmp::max(0, self.top_left.y)
+            core::cmp::max(0, start_y)
         );
 
         let dest_end = Coord::new(
             core::cmp::min(dest_width as isize, self.bottom_right.x),
-            core::cmp::min(dest_height as isize, self.bottom_right.y)
+            core::cmp::min(dest_height as isize, end_y)
         );
         if dest_end.x < 0
             || dest_start.x > dest_width as isize

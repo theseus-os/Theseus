@@ -171,11 +171,13 @@ impl FrameCompositor {
         row_num: usize,
         coordinate: Coord
     ) -> Result<(), &'static str> {
-        let update_box = bounding_box.intersect_rows(row_start, coordinate, row_num);
-        update_box.blend_buffers(
+        // let update_box = bounding_box.intersect_rows(row_start, coordinate, row_num);
+        bounding_box.blend_buffers(
             src_fb,
             dest_fb,
             coordinate,
+            row_start,
+            row_num,
         )
     }
 
