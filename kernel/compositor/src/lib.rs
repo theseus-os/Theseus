@@ -21,8 +21,8 @@ pub trait Compositor {
     /// * `src_fbs`: an iterator over the source framebuffers to be composited, along with where in the `dest_fb` they should be composited. 
     /// * `dest_fb`: the destination framebuffer that will hold the composited source framebuffers.
     /// * `bounding_boxes`: an iterator over bounding boxes that specify which regions of the destination framebuffer should be updated. 
-    ///    In the iteration of every source framebuffer, the compositor will traverse all the bounding boxes relative to the destination framebuffer, get the part of the source framebuffer in every bounding box when the source is composited to the destination one, and blend the part with the bounded region in the destination.
-    /// For example, if the window manager wants to draw a line in the top window, `src_fbs` would be the framebuffers of all the windows and their location in a bottom-top order, and the `bounding_boxes` is an iterator over the pixels of the line relative to the top-left corner of the screen. For every window, the compositor will update the pixels at the location of line in the screen from the bottom window to the top one.
+    ///    In the iteration of every source framebuffer, the compositor will traverse every bounding box relative to the destination framebuffer, get the region of the source framebuffer matching every bounding box when the source is composited to the destination, and blend the regions onto the bounded regions in the destination.
+    /// For example, if the window manager wants to draw a line in the top window, `src_fbs` would be the framebuffers of all the windows and their location in a bottom-top order, and the `bounding_boxes` is an iterator over the pixels of the line relative to the top-left corner of the screen. For every window, the compositor will update the pixels of the line in the screen.
     fn composite<'a, B: CompositableRegion + Clone, P: 'a + Pixel>(
         &mut self,
         src_fbs: impl IntoIterator<Item = FrameBufferUpdates<'a, P>>,
@@ -87,8 +87,8 @@ impl CompositableRegion for Coord {
         src_fb: &FrameBuffer<P>,
         dest_fb: &mut FrameBuffer<P>, 
         dest_coord: Coord,        
-        row_start: usize,
-        row_num: usize,       
+        _row_start: usize,
+        _row_num: usize,       
     ) -> Result<(), &'static str>{
         let relative_coord = self.clone() - dest_coord;
         if let Some(pixel) = src_fb.get_pixel(relative_coord) {

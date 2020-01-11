@@ -5,11 +5,12 @@
 //! # Cache
 //! The compositor caches framebuffer rows for better performance. 
 //!
-//! First, it divides every incoming framebuffer into several row ranges. Every row range has 16 rows except for the last one. The pixels in a row range is a continuous array so that we can compute its hash to compare the content of two row ranges.
+//! First, it divides an incoming framebuffer into every 16(CACHE_BLOCK_HEIGHT) rows and deals with these row-range one by one. The pixels in a row-range is a continuous array of length `16 * frame_buffer_width` so that we can compute its hash to cache the content. 
 //!
-//! In the next step, the compositor checks if the contents of a framebuffer within every row range is already cached. It ignores those do not overlap the bounding box to be updated. For rows in a range that have not been cached, the compositor will refresh the part of these rows within the bounding box.
+//! In the next step, for every 16 rows, the compositor checks if the pixel array of the 16 rows are already cached. It ignores row-ranges that do not overlap with the bounding box to be updated. If a pixel array is not cached, the compositor will refresh the pixels within the bounding box and cache the 16 rows.
 //!
-//! Once a row range is updated, the compositor will remove all the existing caches overlap with it and cache the new one. It computes the hash of the pixels in the row range and wrap it with the size and location of the pixels as a cache block.
+//! In order to cache some rows of the source framebuffer, the compositor needs to cache its contents, its location in the final framebuffer and its width and height. It's basically a rectangle region in the final framebuffer and We define a structure `CacheBlock` to represent it.
+
 
 #![no_std]
 
@@ -17,8 +18,6 @@ extern crate alloc;
 extern crate compositor;
 extern crate frame_buffer;
 extern crate spin;
-#[macro_use]
-extern crate log;
 #[macro_use]
 extern crate lazy_static;
 extern crate hashbrown;
@@ -45,11 +44,13 @@ lazy_static! {
     );
 }
 
-/// Metadata that describes the cached block. 
+/// Metadata that describes a cached block. It represents the cache of some rows in the source framebuffer updated before. It's basically a rectangle region and its contents in the final framebuffer and is independent from the source framebuffer after cached.
+/// `coordinate`, `width` and `height` specifies a rectangle region in the final framebuffer occupied by the updated rows in the source framebuffer. We need to cache these information because if an old cache block overlap with some new framebuffer rows to be updated, the compositor should remove the old one since part of the region will change.
+/// `content_hash` is the hash of pixels in the source framebuffer rows to be cached. A cache block is identical to some new framebuffer rows to be updated if they share the same `content_hash` and `width`.
 pub struct CacheBlock {
-    /// The coordinate of the block where it is rendered to the destination framebuffer.
+    /// The coordinate of the block in the final framebuffer(relative to the top-left corner of the framebuffer.)
     coordinate: Coord,
-    /// The hash of the content in the block. It is the hash of continuous pixels.
+    /// The hash of the pixel array in the block.
     content_hash: u64,
     /// The width of the block
     width: usize,
@@ -58,7 +59,7 @@ pub struct CacheBlock {
 }
 
 impl CacheBlock {
-    /// Checks if a block cache overlaps with another one
+    /// Checks if a cache block overlaps with another one
     pub fn overlaps_with(&self, cache: &CacheBlock) -> bool {
         self.contains_corner(cache) || cache.contains_corner(self)
     }
@@ -71,7 +72,7 @@ impl CacheBlock {
             && coordinate.y < self.coordinate.y + self.height as isize;
     }
 
-    /// checks if this block contains any of the four corners of another `cache`.
+    /// checks if this block contains any of the four corners of another cache block.
     fn contains_corner(&self, cache: &CacheBlock) -> bool {
         self.contains(cache.coordinate)
             || self.contains(cache.coordinate + (cache.width as isize - 1, 0))
@@ -97,7 +98,7 @@ impl FrameCompositor {
     fn is_cached<P: Pixel>(&self, row_pixels: &[P], coordinate: &Coord, width: usize) -> bool {
         match self.caches.get(coordinate) {
             Some(cache) => {
-                // The same hash and width means the two cache blocks are the same. We do not check the height because if the hashes are the same, the number of pixels, namely `width * height` must be the same.
+                // The same hash and width means the cache block is identical to the row pixels. We do not check the height because if the hashes are the same, the number of pixels, namely `width * height` must be the same.
                 return cache.content_hash == hash(row_pixels) && cache.width == width
             }
             None => return false,
@@ -105,12 +106,12 @@ impl FrameCompositor {
     }
 
     /// This function will return if several continuous rows in the framebuffer is cached.
-    /// If the answer is no, it will remove the cache overlaps with the rows and cache the rows
+    /// If the answer is no, it will remove the old cache blocks overlaps with the rows and cache the rows as a new cache block.
     /// # Arguments
     /// * `src_fb`: the updated source framebuffer.
-    /// * `coordinate`: the position of the source framebuffer relative to the destination framebuffer.
-    /// * `row_start`: start row index to be checked.
-    /// * `row_num`: the number of rows to be checked
+    /// * `coordinate`: the position of the source framebuffer(top-left corner) relative to the destination framebuffer(top-left corner).
+    /// * `row_start`: start row index to be checked and cached.
+    /// * `row_num`: the number of rows to be checked and cached.
     fn check_and_cache<P: Pixel>(
         &mut self, 
         src_fb: &FrameBuffer<P>, 
@@ -155,10 +156,10 @@ impl FrameCompositor {
         Ok(false)
     }
 
-    /// Returns the start and end rows in the framebuffer that may be cached and overlap with the region. The row range is usually equal to or larger than the region because the framebuffers are cached as cache blocks and every cache block has a fixed `CACHE_BLOCK_HEIGHT` rows.
+    /// Returns the start and end rows in the framebuffer that may be cached before as cache blocks and overlap with the bounding box. This methods extends the row range of the bounding box because the compositor should deal with every `CACHE_BLOCK_HEIGHT` rows.
     /// # Arguments
     /// * `coordinate`: the position of the framebuffer relative to the top-left of the destination framebuffer where the source framebuffer will be composited to.
-    /// * `bounding_box`: the compositable region to be composited
+    /// * `bounding_box`: the compositable region to be composited.
     /// * `fb_height`: the height of the framebuffer.
     fn get_cache_row_range<B: CompositableRegion>(
         &self,
@@ -261,10 +262,10 @@ impl Compositor for FrameCompositor {
     }
 }
 
-/// Gets the hash of a cache block
-fn hash<T: Hash>(block: T) -> u64 {
+/// Gets the hash of an item
+fn hash<T: Hash>(item: T) -> u64 {
     let builder = DefaultHashBuilder::default();
     let mut hasher = builder.build_hasher();
-    block.hash(&mut hasher);
+    item.hash(&mut hasher);
     hasher.finish()
 }
