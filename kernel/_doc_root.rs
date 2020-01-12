@@ -33,9 +33,9 @@
 //! * `exceptions_early`: Early exception handlers that do nothing but print an error and hang.
 //! * `exceptions_full`: Exception handlers that are more fully-featured, i.e., kills tasks on an exception.
 //! * `font`: Defines font for an array of ASCII code.
-//! * `framebuffer_compositor`: Composites a list of framebuffers to a final framebuffer which is mapped to the physical framebuffer.
-//! * `frame_drawer`: Basic draw functions.
-//! * `frame_printer`: Prints a string in a framebuffer.
+//! * `framebuffer_compositor`: Composites a list of framebuffers to a final framebuffer which is mapped to the screen.
+//! * `framebuffer_drawer`: Basic draw functions.
+//! * `framebuffer_printer`: Prints a string in a framebuffer.
 //! * `framebuffer`: Defines a Framebuffer structure. It is a buffer of pixels in which an application can display.
 //! * `fs_node`: defines the traits for File and Directory. These files and directories mimic that of a standard unix virtual filesystem
 //! * `gdt`: GDT (Global Descriptor Table) support (x86 only) for Theseus.

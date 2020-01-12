@@ -443,7 +443,7 @@ impl WindowManager {
 
     /// draw the floating border with `pixel`. Return the coordinates of updated pixels.
     /// `border` indicates the position of the border as a rectangle.
-    /// `pixel` is the pixel value of the floating border.
+    /// `pixel` is the value of pixels in the floating border.
     fn draw_floating_border(&mut self, border: &Rectangle, color: Color) -> Vec<Coord> {
         let mut coordinates = Vec::new();
         let pixel = color.into();

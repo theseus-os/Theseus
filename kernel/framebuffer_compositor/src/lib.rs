@@ -1,16 +1,22 @@
 //! This crate defines a framebuffer compositor.
+//!
 //! A framebuffer compositor composites a list of framebuffers into a single destination framebuffer.
-//! The coordinate of a framebuffer represents its origin (top-left point).
+//! The coordinate system within a framebuffer is expressed relative to its origin, i.e., the top-left point.
 //!
 //! # Cache
-//! The compositor caches framebuffer rows for better performance. 
+//! The compositor caches groups of framebuffer rows for better performance. 
 //!
-//! First, it divides an incoming framebuffer into every 16(CACHE_BLOCK_HEIGHT) rows and deals with these row ranges one by one. The pixels in a 16 row range is a continuous array of length `16 * framebuffer_width` so that we can cache its hash value.
+//! First, it divides each framebuffer into ranges of rows called "blocks" which are `CACHE_BLOCK_HEIGHT` rows in height,
+//! and deals with these row ranges one by one. 
+//! The pixels in each block's row range are a contiguous array of length `CACHE_BLOCK_HEIGHT * framebuffer_width`,
+//! and the cache key is the hash value of that pixel array.
 //!
-//! In the next step, for every 16 rows, the compositor checks if the pixel array of the 16 rows are already cached. It ignores row ranges that do not overlap with the given bounding box to be updated. If a pixel array is not cached, the compositor will refresh the pixels within the bounding box and cache the 16 rows.
+//! In the next step, for every `CACHE_BLOCK_HEIGHT` rows, the compositor checks if the pixel array is are already cached.
+//! It ignores row ranges that do not overlap with the given bounding box to be updated.
+//! If a pixel array is not cached, the compositor will refresh the pixels within the bounding box and cache those `CACHE_BLOCK_HEIGHT` rows.
 //!
-//! In order to cache a range of rows in the source framebuffer, the compositor needs to cache its contents, its location in the destination framebuffer and its size. The cache is basically a rectangle region in the destination framebuffer, and we define a structure `CacheBlock` to represent it.
-
+//! In order to cache a range of rows from the source framebuffer, the compositor needs to cache its contents, its location in the destination framebuffer, and its size.
+//! The cache is basically a rectangular region in the destination framebuffer, and we define the structure `CacheBlock` to represent that cached region.
 
 #![no_std]
 
@@ -33,8 +39,8 @@ use shapes::{Coord, Rectangle};
 use spin::Mutex;
 use core::ops::Range;
 
-/// The height of a cache block. In every iteration the compositor will deal of 16 rows and cache them.
-pub const CACHE_BLOCK_HEIGHT:usize = 16;
+/// The height of a cache block. In every iteration the compositor will deal with groups of 16 rows and cache them.
+pub const CACHE_BLOCK_HEIGHT: usize = 16;
 
 lazy_static! {
     /// The instance of the framebuffer compositor.
@@ -45,11 +51,14 @@ lazy_static! {
     );
 }
 
-/// Metadata that describes a cached block. It represents the cache of some rows in the source framebuffer updated before. It's basically a rectangle region in the destination framebuffer. A cache block is independent of the source framebuffer after cached.
-/// `block` is the rectangle region in the destination framebuffer occupied by the updated rows in the source framebuffer. We need to cache this information because if an old cache block overlaps with some new framebuffer rows to be updated, the compositor should remove the old one since part of the region will change.
+/// A `CacheBlock` represents the cached (previously-composited) content of a range of rows in the source framebuffer. 
+/// It specifies the rectangular region in the destination framebuffer and the hash.
+/// Once cached, a `CacheBlock` block is independent of the source framebuffer it came from.
 /// `content_hash` is the hash value of the actual pixel contents in the cached block. A cache block is identical to some new framebuffer rows to be updated if they share the same `content_hash`, location and width.
 pub struct CacheBlock {
-    /// the rectangle region of this cache block. It specifies the size and location of the block
+    /// The rectanglular region in the destination framebuffer occupied by the cached rows in the source framebuffer. 
+    /// We need this information because if an old cache block overlaps with some new framebuffer rows to be updated, 
+    /// the compositor should remove the old one since part of that region will change.
     block: Rectangle,
     /// The hash value of the actual pixel contents in the cached block.
     content_hash: u64,
@@ -86,7 +95,7 @@ pub struct FrameCompositor {
 }
 
 impl FrameCompositor {
-    /// Checks if some rows of a framebuffer is cached.
+    /// Checks if some rows of a framebuffer are cached.
     /// # Arguments
     /// * `row_pixels`: the continuous pixels in the rows.
     /// * `dest_coord`: the location of the first pixel in the destination framebuffer.
@@ -95,7 +104,8 @@ impl FrameCompositor {
     fn is_cached<P: Pixel>(&self, row_pixels: &[P], dest_coord: &Coord, width: usize) -> bool {
         match self.caches.get(dest_coord) {
             Some(cache) => {
-                // The same hash and width means the cache block is identical to the row pixels. We do not check the height because if the hashes are the same, the number of pixels, namely `width * height` must be the same.
+                // The same hash and width means the cache block is identical to the row pixels.
+                // We do not check the height because if the hashes are the same, the number of pixels, namely `width * height` must be the same.
                 return cache.content_hash == hash(row_pixels) && (cache.block.bottom_right.x - cache.block.top_left.x) as usize == width
             }
             None => return false,
@@ -103,11 +113,12 @@ impl FrameCompositor {
     }
 
     /// This function will return true if several continuous rows in the framebuffer are cached.
-    /// If false, i.e. the given `row_range` is not in the cache, then the function will remove the old cached blocks that overlap with the rows in that `row_range` and cache those rows as a new cache block.
+    /// If false, i.e. the given `row_range` is not in the cache, this function will remove 
+    /// the old cached blocks that overlap with the rows in the given `src_fb_row_range` and cache those rows as a new cache block.
     /// # Arguments
     /// * `src_fb`: the updated source framebuffer.
-    /// * `dest_coord`: the position of the source framebuffer(top-left corner) relative to the destination framebuffer(top-left corner).
-    /// * `src_fb_row_range`: the index range of rows in the source framebuffer to check and cache.
+    /// * `dest_coord`: the position of the source framebuffer (its top-left corner) relative to the destination framebuffer's top-left corner.
+    /// * `src_fb_row_range`: the range of rows in the source framebuffer to check and cache.
     fn check_and_cache<P: Pixel>(
         &mut self, 
         src_fb: &Framebuffer<P>, 
@@ -152,10 +163,13 @@ impl FrameCompositor {
         Ok(false)
     }
 
-    /// Returns the row index range in the source framebuffer that may be cached before as cache blocks and overlap with the bounding box. This methods extends the row range of the given bounding box because the compositor should deal with every `CACHE_BLOCK_HEIGHT` rows.
+    /// Returns the range of rows in the source framebuffer that were (1) previously cached as cache blocks
+    /// and (2) overlap with the given `dest_bounding_box`. 
+    /// This methods extends the row range of the given bounding box because the compositor deals with chunks of `CACHE_BLOCK_HEIGHT` rows.
     /// # Arguments
-    /// * `dest_coord`: the position of the framebuffer relative to the top-left of the destination framebuffer where the source framebuffer will be composited to.
-    /// * `dest_bounding_box`: the compositable region to be composited in the destination.
+    /// * `dest_coord`: the position in the destination framebuffer (relative to its top-left corner)
+    ///    to where the source framebuffer will be composited.
+    /// * `dest_bounding_box`: the region of the destination framebuffer that should be composited.
     /// * `src_fb_height`: the height of the source framebuffer.
     fn get_cache_row_range<B: CompositableRegion>(
         &self,

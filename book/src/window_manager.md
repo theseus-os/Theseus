@@ -12,7 +12,7 @@ To solve this problem, we define two objects `Window` and `WindowInner`. `Window
 
 The `window_inner` crate defines a `WindowInner` structure. It has states and methods of displaying the window on the screen. 
 
-A `WindowInner` has a framebuffer in which it can display the content of the window. The framebuffer takes a type parameter of pixels it consists of. When the window is rendered to the screen, a compositor may composite every pixel with different principles according to the type. Currently, we have implemented a normal RGB pixel and a pixel of an alpha channel.
+A `WindowInner` has a framebuffer to which it can display the content of the window. The framebuffer takes a type parameter of pixels it consists of. When the window is rendered to the screen, a compositor may composite every pixel with different principles according to the type. Currently, we have implemented a normal RGB pixel and a pixel of an alpha channel.
 
 Both an application's window and the window manager has a reference to the same `WindowInner` object. The application can configure and draw in the framebuffer and the manager can display and composite the window with others.
 

@@ -5,8 +5,7 @@
 use core::ops::{Add, Sub};
 use core::cmp::{Ord, Ordering};
 
-/// The coordinate of a pixel.
-/// In the display subsystem, the origin of an area is its top-left point.
+/// A 2-D integer coordinate.
 #[derive(Clone, Copy, PartialEq, Debug, Hash)]
 pub struct Coord {
     /// The x coordinate
@@ -82,7 +81,7 @@ impl PartialOrd for Coord {
 impl Eq for Coord { }
 
 
-/// a rectangle region
+/// A rectangle given by its top-left coordinate and bottom-right coordinate.
 #[derive(Clone, Copy, PartialEq, Debug, Hash)]
 pub struct Rectangle {
     /// The top-left point

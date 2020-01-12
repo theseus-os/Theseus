@@ -138,7 +138,7 @@ pub fn draw_rectangle<P: Pixel>(
 /// * `coordinate`: the left top coordinate of the retangle relative to the origin(top-left point) of the framebuffer.
 /// * `width`: the width of the rectangle in number of pixels.
 /// * `height`: the height of the rectangle in number of pixels.
-/// * `pixel`: the pixel value of the rectangle.
+/// * `pixel`: the value of pixels in the rectangle.
 pub fn fill_rectangle<P: Pixel>(
     framebuffer: &mut Framebuffer<P>,
     coordinate: Coord,
