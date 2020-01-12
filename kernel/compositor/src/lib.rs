@@ -10,6 +10,7 @@ use core::iter::IntoIterator;
 
 use frame_buffer::{FrameBuffer, Pixel};
 use shapes::{Coord, Rectangle};
+use core::ops::Range;
 
 /// A compositor composites (combines or blends) a series of "source" framebuffers onto a single "destination" framebuffer. 
 /// The type parameter `B` allows a compositor to support multiple types of regions or "bounding boxes", 
@@ -57,27 +58,26 @@ pub trait CompositableRegion {
     /// Returns the number of pixels in the region.
     fn size(&self) -> usize;
 
-    /// Returns the start row index and the number of rows occupied by this region.
-    fn row_range(&self) -> (isize, isize);
+    /// Returns the range of row index occupied by this region.
+    fn row_range(&self) -> Range<isize>;
 
     /// Blends the pixels in the source framebuffer `src_fb` into the pixels in the destination framebuffer `dest_fb` in a row range.
     /// The `dest_coord` is the coordinate in the destination buffer (relative to its top-left corner)
     /// where the `src_fb` will be composited into (starting at the `src_fb`'s top-left corner).
-    /// `row_start` and `row_num` specify the row range to blend. This method starts from the `row_start`_th row of the source framebuffer and blends `row_num` rows.
+    /// `row_range` is the index range of rows in the source framebuffer to blend.
     fn blend_buffers<P: Pixel>(
         &self, 
         src_fb: &FrameBuffer<P>, 
         dest_fb: &mut FrameBuffer<P>, 
         dest_coord: Coord,
-        row_start: usize,
-        row_num: usize,       
+        row_range: Range<usize>       
     ) -> Result<(), &'static str>;
 }
 
 impl CompositableRegion for Coord {
     #[inline]
-    fn row_range(&self) -> (isize, isize) {
-        (self.y, self.y + 1)
+    fn row_range(&self) -> Range<isize> {
+        self.y..self.y + 1
     }
 
     #[inline]
@@ -90,8 +90,7 @@ impl CompositableRegion for Coord {
         src_fb: &FrameBuffer<P>,
         dest_fb: &mut FrameBuffer<P>, 
         dest_coord: Coord,        
-        _row_start: usize,
-        _row_num: usize,       
+        _row_range: Range<usize>,
     ) -> Result<(), &'static str>{
         let relative_coord = self.clone() - dest_coord;
         if let Some(pixel) = src_fb.get_pixel(relative_coord) {
@@ -103,8 +102,8 @@ impl CompositableRegion for Coord {
 
 impl CompositableRegion for Rectangle {
     #[inline]
-    fn row_range(&self) -> (isize, isize) {
-        (self.top_left.y, self.bottom_right.y)
+    fn row_range(&self) -> Range<isize> {
+        self.top_left.y..self.bottom_right.y
     }
 
     #[inline]
@@ -117,14 +116,13 @@ impl CompositableRegion for Rectangle {
         src_fb: &FrameBuffer<P>, 
         dest_fb: &mut FrameBuffer<P>,
         dest_coord: Coord,
-        row_start: usize,
-        row_num: usize,
+        row_range: Range<usize>,
     ) -> Result<(), &'static str> {
         let (dest_width, dest_height) = dest_fb.get_size();
         let (src_width, src_height) = src_fb.get_size();
 
-        let start_y = core::cmp::max(row_start as isize + dest_coord.y, self.top_left.y);
-        let end_y = core::cmp::min((row_start + row_num) as isize + dest_coord.y, self.bottom_right.y);
+        let start_y = core::cmp::max(row_range.start as isize + dest_coord.y, self.top_left.y);
+        let end_y = core::cmp::min(row_range.end as isize + dest_coord.y, self.bottom_right.y);
 
         // skip if the updated part is not in the dest framebuffer
         let dest_start = Coord::new(

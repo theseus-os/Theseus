@@ -31,6 +31,7 @@ use compositor::{Compositor, FrameBufferUpdates, CompositableRegion};
 use frame_buffer::{FrameBuffer, Pixel};
 use shapes::{Coord, Rectangle};
 use spin::Mutex;
+use core::ops::Range;
 
 /// The height of a cache block. In every iteration the compositor will deal of 16 rows and cache them.
 pub const CACHE_BLOCK_HEIGHT:usize = 16;
@@ -110,24 +111,22 @@ impl FrameCompositor {
     /// # Arguments
     /// * `src_fb`: the updated source framebuffer.
     /// * `coordinate`: the position of the source framebuffer(top-left corner) relative to the destination framebuffer(top-left corner).
-    /// * `row_start`: start row index to be checked and cached.
-    /// * `row_num`: the number of rows to be checked and cached.
+    /// * `row_range`: the index range of rows in the source framebuffer to check and cache.
     fn check_and_cache<P: Pixel>(
         &mut self, 
         src_fb: &FrameBuffer<P>, 
         coordinate: Coord, 
-        row_start: usize,
-        row_num: usize,
+        row_range: &Range<usize>,
     ) -> Result<bool, &'static str> {
         let (src_width, src_height) = src_fb.get_size();
         let src_buffer_len = src_width * src_height;
 
         // The start pixel of the rows
-        let start_index = src_width * row_start;
-        let coordinate_start = coordinate + (0, row_start as isize);
+        let start_index = src_width * row_range.start;
+        let coordinate_start = coordinate + (0, row_range.start as isize);
 
         // The end pixel of the rows
-        let end_index = start_index + row_num * src_width;
+        let end_index = src_width * row_range.end;
         
         let pixel_slice = &src_fb.buffer()[start_index..core::cmp::min(end_index, src_buffer_len)];
         
@@ -156,7 +155,7 @@ impl FrameCompositor {
         Ok(false)
     }
 
-    /// Returns the start and end rows in the framebuffer that may be cached before as cache blocks and overlap with the bounding box. This methods extends the row range of the bounding box because the compositor should deal with every `CACHE_BLOCK_HEIGHT` rows.
+    /// Returns the row index range in the framebuffer that may be cached before as cache blocks and overlap with the bounding box. This methods extends the row range of the bounding box because the compositor should deal with every `CACHE_BLOCK_HEIGHT` rows.
     /// # Arguments
     /// * `coordinate`: the position of the framebuffer relative to the top-left of the destination framebuffer where the source framebuffer will be composited to.
     /// * `bounding_box`: the compositable region to be composited.
@@ -166,16 +165,16 @@ impl FrameCompositor {
         coordinate: Coord,
         bounding_box: &B,
         fb_height: usize,
-    ) -> (usize, usize) {
-        let (abs_row_start, abs_row_end) = bounding_box.row_range();
-        let mut relative_row_start = abs_row_start - coordinate.y;
-        let mut relative_row_end = abs_row_end - coordinate.y;
+    ) -> Range<usize> {
+        let abs_row_range = bounding_box.row_range();
+        let mut relative_row_start = abs_row_range.start - coordinate.y;
+        let mut relative_row_end = abs_row_range.end - coordinate.y;
 
         relative_row_start = core::cmp::max(relative_row_start, 0);
         relative_row_end = core::cmp::min(relative_row_end, fb_height as isize);
 
         if relative_row_start >= relative_row_end {
-            return (0, 0);
+            return 0..0;
         }
         
         let cache_row_start = relative_row_start as usize / CACHE_BLOCK_HEIGHT * CACHE_BLOCK_HEIGHT;
@@ -183,7 +182,7 @@ impl FrameCompositor {
 
         cache_row_end = core::cmp::min(cache_row_end, fb_height);
 
-        return (cache_row_start, cache_row_end)
+        return cache_row_start..cache_row_end
     }
 
 }
@@ -212,13 +211,13 @@ impl Compositor for FrameCompositor {
                     if row_start >= src_height {
                         break;
                     }
-                    if !self.check_and_cache(src_fb, coordinate, row_start, CACHE_BLOCK_HEIGHT)? {
+                    let cache_range = row_start..(row_start + CACHE_BLOCK_HEIGHT);
+                    if !self.check_and_cache(src_fb, coordinate, &cache_range)? {
                         area.blend_buffers(
                             src_fb,
                             dest_fb,
                             coordinate,
-                            row_start,
-                            CACHE_BLOCK_HEIGHT,
+                            cache_range,
                         )?;
                     }
                     row_start += CACHE_BLOCK_HEIGHT;
@@ -231,17 +230,18 @@ impl Compositor for FrameCompositor {
                     let src_fb = frame_buffer_updates.framebuffer;
                     let coordinate = frame_buffer_updates.coordinate;
                     let (_, height) = src_fb.get_size();
-                    let (mut row_start, row_end) = self.get_cache_row_range(coordinate, &bounding_box, height);
+                    let mut row_range = self.get_cache_row_range(coordinate, &bounding_box, height);
                     // let cache_block_size = CACHE_BLOCK_HEIGHT * width;
 
                     loop {
-                        if row_start >= row_end {
+                        if row_range.start >= row_range.end {
                             break;
-                        }  
+                        }
+                        let cache_range = row_range.start..(row_range.start + CACHE_BLOCK_HEIGHT);
                         // check cache if the bounding box is not a single pixel
                         if bounding_box.size() > 1 {
-                            if self.check_and_cache(src_fb, coordinate, row_start, CACHE_BLOCK_HEIGHT)? {
-                                 row_start += CACHE_BLOCK_HEIGHT;
+                            if self.check_and_cache(src_fb, coordinate, &cache_range)? {
+                                 row_range.start += CACHE_BLOCK_HEIGHT;
                                  continue;
                             }
                         };
@@ -249,10 +249,9 @@ impl Compositor for FrameCompositor {
                             src_fb,
                             dest_fb,
                             coordinate,
-                            row_start,
-                            CACHE_BLOCK_HEIGHT,
+                            cache_range,
                         )?;
-                        row_start += CACHE_BLOCK_HEIGHT;
+                        row_range.start += CACHE_BLOCK_HEIGHT;
                     } 
                 }
             }
