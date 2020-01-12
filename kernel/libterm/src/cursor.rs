@@ -74,7 +74,7 @@ impl Cursor {
         coordinate: Coord,
         column: usize,
         line: usize,
-        framebuffer: &mut FrameBuffer<P>,
+        framebuffer: &mut Framebuffer<P>,
     ) -> Result<Rectangle, &'static str> where Color: Into<P> {
         if self.blink() {
             if self.show() {

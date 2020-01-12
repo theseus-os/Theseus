@@ -7,7 +7,7 @@
 extern crate frame_buffer;
 extern crate shapes;
 
-use frame_buffer::{FrameBuffer, Pixel};
+use frame_buffer::{Framebuffer, Pixel};
 use shapes::Coord;
 
 /// Draws a line in a framebuffer. The part exceeding the boundary of the framebuffer will be ignored.
@@ -17,7 +17,7 @@ use shapes::Coord;
 /// * `end`: the end coordinate of the line relative to the origin(top-left point) of the framebuffer.
 /// * `color`: the color of the line.
 pub fn draw_line<P: Pixel>(
-    framebuffer: &mut FrameBuffer<P>,
+    framebuffer: &mut Framebuffer<P>,
     start: Coord,
     end: Coord,
     pixel: P,
@@ -80,7 +80,7 @@ pub fn draw_line<P: Pixel>(
 /// * `height`: the height of the rectangle in number of pixels.
 /// * `color`: the color of the rectangle's border.
 pub fn draw_rectangle<P: Pixel>(
-    framebuffer: &mut FrameBuffer<P>,
+    framebuffer: &mut Framebuffer<P>,
     coordinate: Coord,
     width: usize,
     height: usize,
@@ -140,7 +140,7 @@ pub fn draw_rectangle<P: Pixel>(
 /// * `height`: the height of the rectangle in number of pixels.
 /// * `pixel`: the pixel value of the rectangle.
 pub fn fill_rectangle<P: Pixel>(
-    framebuffer: &mut FrameBuffer<P>,
+    framebuffer: &mut Framebuffer<P>,
     coordinate: Coord,
     width: usize,
     height: usize,
@@ -177,7 +177,7 @@ pub fn fill_rectangle<P: Pixel>(
 }
 
 /// Draw a circle in the framebuffer. `coordinate` is the position of the center of the circle relative to the top-left corner of the framebuffer and `r` is the radius
-pub fn draw_circle<P: Pixel>(framebuffer: &mut FrameBuffer<P>, center: Coord, r: usize, pixel: P) {
+pub fn draw_circle<P: Pixel>(framebuffer: &mut Framebuffer<P>, center: Coord, r: usize, pixel: P) {
     let r2 = (r * r) as isize;
     for y in center.y - r as isize..center.y + r as isize {
         for x in center.x - r as isize..center.x + r as isize {

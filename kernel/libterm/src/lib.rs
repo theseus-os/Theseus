@@ -30,7 +30,7 @@ use text_display::TextDisplay;
 use displayable::Displayable;
 use event_types::Event;
 use font::{CHARACTER_HEIGHT, CHARACTER_WIDTH};
-use frame_buffer::{FrameBuffer, Pixel};
+use frame_buffer::{Framebuffer, Pixel};
 use color::{Color};
 use shapes::{Coord, Rectangle};
 use tsc::{tsc_ticks, TscTicks};

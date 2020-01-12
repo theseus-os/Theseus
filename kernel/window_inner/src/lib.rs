@@ -13,7 +13,7 @@ extern crate color;
 use alloc::sync::Arc;
 use mpmc::Queue;
 use event_types::{Event};
-use frame_buffer::{FrameBuffer, AlphaPixel};
+use frame_buffer::{Framebuffer, AlphaPixel};
 use color::{Color};
 use shapes::Coord;
 use spin::{Mutex};
@@ -44,7 +44,7 @@ pub struct WindowInner {
     /// event producer that could be used to send events to the `Window` object.
     pub producer: Queue<Event>, // event output used by window manager
     /// framebuffer of this window
-    pub framebuffer: FrameBuffer<AlphaPixel>,
+    pub framebuffer: Framebuffer<AlphaPixel>,
     /// Whether a window is moving and the position before a window starts to move.
     pub moving: WindowMovingStatus,
 }
@@ -86,7 +86,7 @@ impl WindowInner {
 /// Creates a new window object with given position and size
 pub fn new_window<'a>(
     coordinate: Coord,
-    framebuffer: FrameBuffer<AlphaPixel>,
+    framebuffer: Framebuffer<AlphaPixel>,
 ) -> Result<Arc<Mutex<WindowInner>>, &'static str> {
     // Init the key input producer and consumer
     let consumer = Queue::with_capacity(100);

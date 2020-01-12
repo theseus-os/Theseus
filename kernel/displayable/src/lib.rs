@@ -8,7 +8,7 @@ extern crate frame_buffer;
 extern crate shapes;
 extern crate color;
 
-use frame_buffer::{FrameBuffer, Pixel};
+use frame_buffer::{Framebuffer, Pixel};
 use shapes::{Coord, Rectangle};
 use color::Color;
 
@@ -25,7 +25,7 @@ pub trait Displayable {
     fn display<P: Pixel + From<Color>>(
         &mut self,
         coordinate: Coord,
-        framebuffer: &mut FrameBuffer<P>,
+        framebuffer: &mut Framebuffer<P>,
     ) -> Result<Rectangle, &'static str>;
 
     /// Resizes the displayable area.

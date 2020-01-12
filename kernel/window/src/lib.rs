@@ -28,7 +28,7 @@ extern crate color;
 use alloc::sync::Arc;
 use mpmc::Queue;
 use event_types::{Event, MousePositionEvent};
-use frame_buffer::FrameBuffer;
+use frame_buffer::Framebuffer;
 use color::{Color};
 use shapes::{Coord, Rectangle};
 use spin::Mutex;
@@ -111,7 +111,7 @@ impl Window {
         height: usize,
         background: Color,
     ) -> Result<Window, &'static str> {
-        let framebuffer = FrameBuffer::new(width, height, None)?;
+        let framebuffer = Framebuffer::new(width, height, None)?;
         let (width, height) = framebuffer.get_size();
         if width <= 2 * WINDOW_TITLE_BAR || height <= WINDOW_TITLE_BAR + WINDOW_BORDER {
             return Err("window too small to even draw border");

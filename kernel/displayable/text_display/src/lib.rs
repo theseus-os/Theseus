@@ -14,7 +14,7 @@ extern crate color;
 use alloc::string::String;
 use displayable::{Displayable};
 use font::{CHARACTER_HEIGHT, CHARACTER_WIDTH};
-use frame_buffer::{Pixel, FrameBuffer};
+use frame_buffer::{Pixel, Framebuffer};
 use color::Color;
 use shapes::{Coord, Rectangle};
 
@@ -38,7 +38,7 @@ impl Displayable for TextDisplay {
     fn display<P: Pixel+ From<Color>> (
         &mut self,
         coordinate: Coord,
-        framebuffer: &mut FrameBuffer<P>,
+        framebuffer: &mut Framebuffer<P>,
     ) -> Result<Rectangle, &'static str> {
         let (string, col, line) = if self.cache.len() > 0 && self.text.starts_with(self.cache.as_str()) {
             (

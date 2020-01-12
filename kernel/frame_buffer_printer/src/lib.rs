@@ -10,7 +10,7 @@ extern crate shapes;
 
 use alloc::vec;
 use font::{CHARACTER_HEIGHT, CHARACTER_WIDTH};
-use frame_buffer::{FrameBuffer, Pixel};
+use frame_buffer::{Framebuffer, Pixel};
 use shapes::{Coord, Rectangle};
 
 
@@ -28,7 +28,7 @@ type ASCII = u8;
 /// * `bg_pixel` the value of pixels in the background.
 /// * `column`, `line`: the location of the text in the text block in number of characters.
 pub fn print_string<P: Pixel>(
-    framebuffer: &mut FrameBuffer<P>,
+    framebuffer: &mut Framebuffer<P>,
     coordinate: Coord,
     width: usize,
     height: usize,
@@ -149,7 +149,7 @@ pub fn print_string<P: Pixel>(
 /// * `coordinate`: the left top coordinate of the text block relative to the origin(top-left point) of the framebuffer.
 /// * `column`, `line`: the location of the character in the text block as symbols.
 pub fn print_ascii_character<P: Pixel>(
-    framebuffer: &mut FrameBuffer<P>,
+    framebuffer: &mut Framebuffer<P>,
     character: ASCII,
     fg_pixel: P,
     bg_pixel: P,
@@ -197,7 +197,7 @@ pub fn print_ascii_character<P: Pixel>(
 
 /// Fill a blank text area (left, top, right, bottom) with color. The tuple specifies the location of the area relative to the origin(top-left point) of the framebuffer.
 pub fn fill_blank<P: Pixel>(
-    framebuffer: &mut FrameBuffer<P>,
+    framebuffer: &mut Framebuffer<P>,
     blank: &mut Rectangle,
     pixel: P,
 ) {

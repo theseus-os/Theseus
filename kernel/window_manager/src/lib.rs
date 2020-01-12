@@ -33,12 +33,12 @@ use alloc::collections::VecDeque;
 use alloc::string::{String, ToString};
 use alloc::sync::{Arc, Weak};
 use alloc::vec::{Vec};
-use compositor::{Compositor, FrameBufferUpdates};
+use compositor::{Compositor, FramebufferUpdates};
 use core::slice;
 
 use mpmc::Queue;
 use event_types::{Event, MousePositionEvent};
-use frame_buffer::{FrameBuffer, AlphaPixel};
+use frame_buffer::{Framebuffer, AlphaPixel};
 use color::{Color};
 use shapes::{Coord, Rectangle};
 use frame_buffer_compositor::{FRAME_COMPOSITOR};
@@ -99,11 +99,11 @@ pub struct WindowManager {
     /// If a window is being repositioned (e.g., by dragging it), this is the position of that window's border
     repositioned_border: Option<Rectangle>,
     /// the framebuffer that it should print on
-    bottom_fb: FrameBuffer<AlphaPixel>,
+    bottom_fb: Framebuffer<AlphaPixel>,
     /// the framebuffer that it should print on
-    top_fb: FrameBuffer<AlphaPixel>,
+    top_fb: Framebuffer<AlphaPixel>,
     /// The final framebuffer which is mapped to the screen;
-    pub final_fb: FrameBuffer<AlphaPixel>,
+    pub final_fb: Framebuffer<AlphaPixel>,
 }
 
 impl WindowManager {
@@ -234,9 +234,9 @@ impl WindowManager {
     /// Refresh the pixels in `update_coords`. Only render the bottom final framebuffer and windows. Ignore the top buffer.
     pub fn refresh_bottom_windows_pixels(&mut self, pixels: impl IntoIterator<Item = Coord> + Clone) -> Result<(), &'static str> {
         // bottom framebuffer
-        let bottom_fb = FrameBufferUpdates {
-            framebuffer: &self.bottom_fb,
-            coordinate: Coord::new(0, 0),
+        let bottom_fb = FramebufferUpdates {
+            src_framebuffer: &self.bottom_fb,
+            coordinate_in_dest_framebuffer: Coord::new(0, 0),
         };
 
         // list of windows to be updated
@@ -260,9 +260,9 @@ impl WindowManager {
 
         // create updated framebuffer info objects
         let window_bufferlist = locked_window_list.iter().map(|window| {
-            FrameBufferUpdates {
-                framebuffer: &window.framebuffer,
-                coordinate: window.get_position(),
+            FramebufferUpdates {
+                src_framebuffer: &window.framebuffer,
+                coordinate_in_dest_framebuffer: window.get_position(),
             }
         }).collect::<Vec<_>>();
         
@@ -274,9 +274,9 @@ impl WindowManager {
 
     /// Refresh the pixels in the top framebuffer
     pub fn refresh_top_pixels(&mut self, pixels: impl IntoIterator<Item = Coord> + Clone) -> Result<(), &'static str> {
-        let top_buffer = FrameBufferUpdates {
-            framebuffer: &self.top_fb,
-            coordinate: Coord::new(0, 0),
+        let top_buffer = FramebufferUpdates {
+            src_framebuffer: &self.top_fb,
+            coordinate_in_dest_framebuffer: Coord::new(0, 0),
         }; 
 
         FRAME_COMPOSITOR.lock().composite(Some(top_buffer), &mut self.final_fb, pixels)
@@ -307,9 +307,9 @@ impl WindowManager {
         let locked_window_list = &window_ref_list.iter().map(|x| x.lock()).collect::<Vec<_>>();
         // create updated framebuffer info objects
         let bufferlist = locked_window_list.iter().map(|window| {
-            FrameBufferUpdates {
-                framebuffer: &window.framebuffer,
-                coordinate: window.get_position(),
+            FramebufferUpdates {
+                src_framebuffer: &window.framebuffer,
+                coordinate_in_dest_framebuffer: window.get_position(),
             }
         }).collect::<Vec<_>>();
 
@@ -321,9 +321,9 @@ impl WindowManager {
     pub fn refresh_active_window(&mut self, bounding_box: Option<Rectangle>) -> Result<(), &'static str> {
         if let Some(window_ref) = self.active.upgrade() {
             let window = window_ref.lock();
-            let buffer_update = FrameBufferUpdates {
-                framebuffer: &window.framebuffer,
-                coordinate: window.get_position(),
+            let buffer_update = FramebufferUpdates {
+                src_framebuffer: &window.framebuffer,
+                coordinate_in_dest_framebuffer: window.get_position(),
             };
             FRAME_COMPOSITOR.lock().composite(Some(buffer_update), &mut self.final_fb, bounding_box)
         } else {
@@ -335,9 +335,9 @@ impl WindowManager {
     /// `bounding_box` is a rectangle relative to the top-left of the screen. Refresh the whole screen if area is None. 
     /// Ignore the active window if `active` is false.
     pub fn refresh_bottom_windows(&mut self, bounding_box: Option<Rectangle>, active: bool) -> Result<(), &'static str> {
-        let bg_buffer = FrameBufferUpdates {
-            framebuffer: &self.bottom_fb,
-            coordinate: Coord::new(0, 0),
+        let bg_buffer = FramebufferUpdates {
+            src_framebuffer: &self.bottom_fb,
+            coordinate_in_dest_framebuffer: Coord::new(0, 0),
         }; 
 
         FRAME_COMPOSITOR.lock().composite(Some(bg_buffer), &mut self.final_fb, bounding_box.into_iter())?;
@@ -347,9 +347,9 @@ impl WindowManager {
     /// Refresh the part of the top framebuffer in `bounding_box`. The top framebuffer contains the mouse and moving floating window border.
     /// `bounding_box` is a rectangle relative to the top-left of the screen. Update the whole screen if `bounding_box` is `None`.
     pub fn refresh_top(&mut self, bounding_box: Option<Rectangle>) -> Result<(), &'static str> {
-        let top_buffer = FrameBufferUpdates {
-            framebuffer: &self.top_fb,
-            coordinate: Coord::new(0, 0),
+        let top_buffer = FramebufferUpdates {
+            src_framebuffer: &self.top_fb,
+            coordinate_in_dest_framebuffer: Coord::new(0, 0),
         }; 
 
         FRAME_COMPOSITOR.lock().composite(Some(top_buffer), &mut self.final_fb, bounding_box)
@@ -652,10 +652,10 @@ impl WindowManager {
 /// Initialize the window manager. It returns (keyboard_producer, mouse_producer) for the I/O devices.
 pub fn init() -> Result<(Queue<Event>, Queue<Event>), &'static str> {
     // font::init()?;
-    let final_framebuffer: FrameBuffer<AlphaPixel> = frame_buffer::init()?;
+    let final_framebuffer: Framebuffer<AlphaPixel> = frame_buffer::init()?;
     let (width, height) = final_framebuffer.get_size();
-    let mut bottom_framebuffer = FrameBuffer::new(width, height, None)?;
-    let mut top_framebuffer = FrameBuffer::new(width, height, None)?;
+    let mut bottom_framebuffer = Framebuffer::new(width, height, None)?;
+    let mut top_framebuffer = Framebuffer::new(width, height, None)?;
     
     // initialize the framebuffer
     let (screen_width, screen_height) = bottom_framebuffer.get_size();

@@ -36,7 +36,7 @@
 //! * `frame_buffer_compositor`: Composites a list of framebuffers to a final framebuffer which is mapped to the physical framebuffer.
 //! * `frame_drawer`: Basic draw functions.
 //! * `frame_printer`: Prints a string in a framebuffer.
-//! * `frame_buffer`: Defines a FrameBuffer structure. It is a buffer of pixels in which an application can display.
+//! * `frame_buffer`: Defines a Framebuffer structure. It is a buffer of pixels in which an application can display.
 //! * `fs_node`: defines the traits for File and Directory. These files and directories mimic that of a standard unix virtual filesystem
 //! * `gdt`: GDT (Global Descriptor Table) support (x86 only) for Theseus.
 //! * `interrupts`: Interrupt configuration and handlers for Theseus. 

@@ -27,8 +27,8 @@ use alloc::collections::BTreeMap;
 use alloc::vec::{Vec};
 use core::hash::{Hash, Hasher, BuildHasher};
 use hashbrown::hash_map::{DefaultHashBuilder};
-use compositor::{Compositor, FrameBufferUpdates, CompositableRegion};
-use frame_buffer::{FrameBuffer, Pixel};
+use compositor::{Compositor, FramebufferUpdates, CompositableRegion};
+use frame_buffer::{Framebuffer, Pixel};
 use shapes::{Coord, Rectangle};
 use spin::Mutex;
 use core::ops::Range;
@@ -47,11 +47,11 @@ lazy_static! {
 
 /// Metadata that describes a cached block. It represents the cache of some rows in the source framebuffer updated before. It's basically a rectangle region and its contents in the destination framebuffer and is independent from the source framebuffer after cached.
 /// `block` is a rectangle region in the destination framebuffer occupied by the updated rows in the source framebuffer. We need to cache these information because if an old cache block overlap with some new framebuffer rows to be updated, the compositor should remove the old one since part of the region will change.
-/// `content_hash` is the hash of pixels in the source framebuffer rows to be cached. A cache block is identical to some new framebuffer rows to be updated if they share the same `content_hash` and `width`.
+/// `content_hash` is the hash value of the actual pixel contents in the cached block. A cache block is identical to some new framebuffer rows to be updated if they share the same `content_hash`, location and size.
 pub struct CacheBlock {
     /// the rectangle region of this cache block. It specifies the size and location of the block
     block: Rectangle,
-    /// The hash of the pixel array in the block.
+    /// The hash value of the actual pixel contents in the cached block.
     content_hash: u64,
 }
 
@@ -102,15 +102,15 @@ impl FrameCompositor {
         }
     }
 
-    /// This function will return if several continuous rows in the framebuffer is cached.
-    /// If the answer is no, it will remove the old cache blocks overlaps with the rows and cache the rows as a new cache block.
+    /// This function will return true if several continuous rows in the framebuffer is cached.
+    /// If false, i.e. the given `row_range` is not in the cache, then it will remove the old cached blocks that overlap with the rows in that `row_range` and cache those rows as a new cache block.
     /// # Arguments
     /// * `src_fb`: the updated source framebuffer.
     /// * `dest_coord`: the position of the source framebuffer(top-left corner) relative to the destination framebuffer(top-left corner).
     /// * `src_fb_row_range`: the index range of rows in the source framebuffer to check and cache.
     fn check_and_cache<P: Pixel>(
         &mut self, 
-        src_fb: &FrameBuffer<P>, 
+        src_fb: &Framebuffer<P>, 
         dest_coord: Coord, 
         src_fb_row_range: &Range<usize>,
     ) -> Result<bool, &'static str> {
@@ -187,17 +187,17 @@ impl FrameCompositor {
 impl Compositor for FrameCompositor {
     fn composite<'a, B: CompositableRegion + Clone, P: 'a + Pixel>(
         &mut self,
-        src_fbs: impl IntoIterator<Item = FrameBufferUpdates<'a, P>>,
-        dest_fb: &mut FrameBuffer<P>,
+        src_fbs: impl IntoIterator<Item = FramebufferUpdates<'a, P>>,
+        dest_fb: &mut Framebuffer<P>,
         dest_bounding_boxes: impl IntoIterator<Item = B> + Clone,
     ) -> Result<(), &'static str> {
         let mut box_iter = dest_bounding_boxes.clone().into_iter();
         if box_iter.next().is_none() {
             for frame_buffer_updates in src_fbs.into_iter() {
-                let src_fb = frame_buffer_updates.framebuffer;
-                let coordinate = frame_buffer_updates.coordinate;
+                let src_fb = frame_buffer_updates.src_framebuffer;
+                let coordinate = frame_buffer_updates.coordinate_in_dest_framebuffer;
                 // Update the whole screen if the caller does not specify the blocks
-                let (src_width, src_height) = frame_buffer_updates.framebuffer.get_size();
+                let (src_width, src_height) = frame_buffer_updates.src_framebuffer.get_size();
                 // let block_number = (src_height - 1) / CACHE_BLOCK_HEIGHT + 1;
                 let area = Rectangle {
                     top_left: coordinate,
@@ -224,8 +224,8 @@ impl Compositor for FrameCompositor {
             for frame_buffer_updates in src_fbs.into_iter() {
                 //let mut updated_blocks = Vec::new();
                 for bounding_box in dest_bounding_boxes.clone() {
-                    let src_fb = frame_buffer_updates.framebuffer;
-                    let coordinate = frame_buffer_updates.coordinate;
+                    let src_fb = frame_buffer_updates.src_framebuffer;
+                    let coordinate = frame_buffer_updates.coordinate_in_dest_framebuffer;
                     let (_, height) = src_fb.get_size();
                     let mut row_range = self.get_cache_row_range(coordinate, &bounding_box, height);
                     // let cache_block_size = CACHE_BLOCK_HEIGHT * width;

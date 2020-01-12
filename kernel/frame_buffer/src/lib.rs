@@ -1,4 +1,4 @@
-//! This crate defines a `FrameBuffer` structure, which is effectively a region of memory
+//! This crate defines a `Framebuffer` structure, which is effectively a region of memory
 //! that is interpreted as a 2-D array of pixels.
 
 #![no_std]
@@ -23,7 +23,7 @@ pub use pixel::*;
 /// 
 /// The final framebuffer represents the actual pixel content displayed on screen 
 /// because its memory is directly mapped to the VESA display device's underlying physical memory.
-pub fn init<P: Pixel>() -> Result<FrameBuffer<P>, &'static str> {
+pub fn init<P: Pixel>() -> Result<Framebuffer<P>, &'static str> {
     // get the graphic mode information
     let vesa_display_phys_start: PhysicalAddress;
     let buffer_width: usize;
@@ -39,7 +39,7 @@ pub fn init<P: Pixel>() -> Result<FrameBuffer<P>, &'static str> {
     };
 
     // init the final framebuffer
-    let framebuffer = FrameBuffer::new(buffer_width, buffer_height, Some(vesa_display_phys_start))?;
+    let framebuffer = Framebuffer::new(buffer_width, buffer_height, Some(vesa_display_phys_start))?;
 
     Ok(framebuffer)
 }
@@ -47,13 +47,13 @@ pub fn init<P: Pixel>() -> Result<FrameBuffer<P>, &'static str> {
 /// A framebuffer is a region of memory interpreted as a 2-D array of pixels.
 /// The memory buffer is a rectangular region with a width and height.
 #[derive(Hash)]
-pub struct FrameBuffer<P: Pixel> {
+pub struct Framebuffer<P: Pixel> {
     width: usize,
     height: usize,
     buffer: BoxRefMut<MappedPages, [P]>,
 } 
 
-impl<P: Pixel> FrameBuffer<P> {
+impl<P: Pixel> Framebuffer<P> {
     /// Creates a new framebuffer with rectangular dimensions of `width * height`, 
     /// specified in number of pixels.
     /// If the `physical_address` is provided, the returned framebuffer will be **final**,
@@ -64,7 +64,7 @@ impl<P: Pixel> FrameBuffer<P> {
         width: usize,
         height: usize,
         physical_address: Option<PhysicalAddress>,
-    ) -> Result<FrameBuffer<P>, &'static str> {
+    ) -> Result<Framebuffer<P>, &'static str> {
         // get a reference to the kernel's memory mapping information
         let kernel_mmi_ref = memory::get_kernel_mmi_ref().ok_or("KERNEL_MMI was not yet initialized!")?;
         let allocator = FRAME_ALLOCATOR.try().ok_or("Couldn't get Frame Allocator")?;
@@ -95,7 +95,7 @@ impl<P: Pixel> FrameBuffer<P> {
         let buffer = BoxRefMut::new(Box::new(mapped_frame_buffer))
             .try_map_mut(|mp| mp.as_slice_mut(0, width * height))?;
 
-        Ok(FrameBuffer {
+        Ok(Framebuffer {
             width: width,
             height: height,
             buffer: buffer,

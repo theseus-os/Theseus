@@ -8,7 +8,7 @@ extern crate shapes;
 
 use core::iter::IntoIterator;
 
-use frame_buffer::{FrameBuffer, Pixel};
+use frame_buffer::{Framebuffer, Pixel};
 use shapes::{Coord, Rectangle};
 use core::ops::Range;
 
@@ -29,21 +29,21 @@ pub trait Compositor {
     /// In another example, suppose the window manager wants to draw a half-transparent mouse arrow on top of all windows. It will pass the framebuffers of existing windows together with a top framebuffer which covers the screen and contains the arrow. In this case, the `bounding_boxes` are the coordinates of all the pixels in this arrow relative to the final framebuffer. For framebuffers from the bottom one to the top one, the compositor will redraw their pixels at these coordinates relative to the screen(final framebuffer) so that the arrow is displayed on top as half-transparent. 
     fn composite<'a, B: CompositableRegion + Clone, P: 'a + Pixel>(
         &mut self,
-        src_fbs: impl IntoIterator<Item = FrameBufferUpdates<'a, P>>,
-        dest_fb: &mut FrameBuffer<P>,
+        src_fbs: impl IntoIterator<Item = FramebufferUpdates<'a, P>>,
+        dest_fb: &mut Framebuffer<P>,
         dest_bounding_boxes: impl IntoIterator<Item = B> + Clone,
     ) -> Result<(), &'static str>;
 }
 
 
 /// A source framebuffer to be composited, along with its target position.
-pub struct FrameBufferUpdates<'a, P: Pixel> {
+pub struct FramebufferUpdates<'a, P: Pixel> {
     /// The source framebuffer to be composited.
-    pub framebuffer: &'a FrameBuffer<P>,
+    pub src_framebuffer: &'a Framebuffer<P>,
     /// The coordinate in the destination framebuffer where the source `framebuffer` 
     /// should be composited. 
     /// This coordinate is expressed relative to the top-left corner of the destination framebuffer. 
-    pub coordinate: Coord,
+    pub coordinate_in_dest_framebuffer: Coord,
 }
 
 /// A `CompositableRegion` is an abstract region (i.e., a bounding box) 
@@ -68,8 +68,8 @@ pub trait CompositableRegion {
     /// `src_fb_row_range` is the index range of rows in the source framebuffer to blend.
     fn blend_buffers<P: Pixel>(
         &self, 
-        src_fb: &FrameBuffer<P>, 
-        dest_fb: &mut FrameBuffer<P>, 
+        src_fb: &Framebuffer<P>, 
+        dest_fb: &mut Framebuffer<P>, 
         dest_coord: Coord,
         src_fb_row_range: Range<usize>       
     ) -> Result<(), &'static str>;
@@ -88,8 +88,8 @@ impl CompositableRegion for Coord {
 
     fn blend_buffers<P: Pixel>(
         &self, 
-        src_fb: &FrameBuffer<P>,
-        dest_fb: &mut FrameBuffer<P>, 
+        src_fb: &Framebuffer<P>,
+        dest_fb: &mut Framebuffer<P>, 
         dest_coord: Coord,        
         _src_fb_row_range: Range<usize>,
     ) -> Result<(), &'static str>{
@@ -114,8 +114,8 @@ impl CompositableRegion for Rectangle {
 
     fn blend_buffers<P: Pixel>(
         &self, 
-        src_fb: &FrameBuffer<P>, 
-        dest_fb: &mut FrameBuffer<P>,
+        src_fb: &Framebuffer<P>, 
+        dest_fb: &mut Framebuffer<P>,
         dest_coord: Coord,
         src_fb_row_range: Range<usize>,
     ) -> Result<(), &'static str> {
