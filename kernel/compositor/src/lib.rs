@@ -21,7 +21,7 @@ pub trait Compositor {
     /// # Arguments
     /// * `src_fbs`: an iterator over the source framebuffers to be composited, along with where in the `dest_fb` they should be composited. 
     /// * `dest_fb`: the destination framebuffer that will hold the composited source framebuffers.
-    /// * `bounding_boxes`: an iterator over bounding boxes that specify which regions of the destination framebuffer should be updated. 
+    /// * `dest_bounding_boxes`: an iterator over bounding boxes that specify which regions of the destination framebuffer should be updated. 
     ///    In the iteration of every source framebuffer, the compositor will traverse every bounding box relative to the destination framebuffer, get the region of the source framebuffer matching every bounding box when the source is composited to the destination, and blend the regions onto the bounded regions in the destination.
     /// For example, if the window manager wants to draw a new half-transparent window, it will pass the framebuffers of all the existing windows and the new window in a bottom-top order as `src_fbs`. The `dest_fb` is the final framebuffer mapped to the screen, and the `bounding_boxes` is `Some(area)` in which area is the region in the final framebuffer where the new window will be located. The compositor will update the overlapped area of every framebuffer and the bounding_boxes from bottom to top.
     ///
@@ -30,7 +30,7 @@ pub trait Compositor {
         &mut self,
         src_fbs: impl IntoIterator<Item = FrameBufferUpdates<'a, P>>,
         dest_fb: &mut FrameBuffer<P>,
-        bounding_boxes: impl IntoIterator<Item = B> + Clone,
+        dest_bounding_boxes: impl IntoIterator<Item = B> + Clone,
     ) -> Result<(), &'static str>;
 }
 
@@ -64,13 +64,13 @@ pub trait CompositableRegion {
     /// Blends the pixels in the source framebuffer `src_fb` into the pixels in the destination framebuffer `dest_fb` in a row range.
     /// The `dest_coord` is the coordinate in the destination buffer (relative to its top-left corner)
     /// where the `src_fb` will be composited into (starting at the `src_fb`'s top-left corner).
-    /// `row_range` is the index range of rows in the source framebuffer to blend.
+    /// `src_fb_row_range` is the index range of rows in the source framebuffer to blend.
     fn blend_buffers<P: Pixel>(
         &self, 
         src_fb: &FrameBuffer<P>, 
         dest_fb: &mut FrameBuffer<P>, 
         dest_coord: Coord,
-        row_range: Range<usize>       
+        src_fb_row_range: Range<usize>       
     ) -> Result<(), &'static str>;
 }
 
@@ -90,7 +90,7 @@ impl CompositableRegion for Coord {
         src_fb: &FrameBuffer<P>,
         dest_fb: &mut FrameBuffer<P>, 
         dest_coord: Coord,        
-        _row_range: Range<usize>,
+        _src_fb_row_range: Range<usize>,
     ) -> Result<(), &'static str>{
         let relative_coord = self.clone() - dest_coord;
         if let Some(pixel) = src_fb.get_pixel(relative_coord) {
@@ -116,13 +116,13 @@ impl CompositableRegion for Rectangle {
         src_fb: &FrameBuffer<P>, 
         dest_fb: &mut FrameBuffer<P>,
         dest_coord: Coord,
-        row_range: Range<usize>,
+        src_fb_row_range: Range<usize>,
     ) -> Result<(), &'static str> {
         let (dest_width, dest_height) = dest_fb.get_size();
         let (src_width, src_height) = src_fb.get_size();
 
-        let start_y = core::cmp::max(row_range.start as isize + dest_coord.y, self.top_left.y);
-        let end_y = core::cmp::min(row_range.end as isize + dest_coord.y, self.bottom_right.y);
+        let start_y = core::cmp::max(src_fb_row_range.start as isize + dest_coord.y, self.top_left.y);
+        let end_y = core::cmp::min(src_fb_row_range.end as isize + dest_coord.y, self.bottom_right.y);
 
         // skip if the updated part is not in the dest framebuffer
         let dest_start = Coord::new(
