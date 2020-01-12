@@ -39,7 +39,7 @@ use storage_device::{StorageDevice, StorageDeviceRef, BlockBounds};
 pub struct BlockIo {
     /// The cache of blocks (sectors) read from the storage device,
     /// a map from sector number to data byte array.
-    cache: CacheBlock, 
+    cache: BlockCache, 
     /// The underlying storage device from where the blocks are read/written.
     device: StorageDeviceRef,
 }
@@ -162,7 +162,7 @@ impl BlockIo {
     /// in order to avoid reading from the storage device.
     /// If that block exists in the cache, it is copied into the buffer. 
     /// If not, it is read from the storage device into the cache, and then copied into the buffer.
-    fn read_block<'c>(cache: &'c mut CacheBlock, locked_device: &mut dyn StorageDevice, block: usize) -> Result<&'c [u8], &'static str> {
+    fn read_block<'c>(cache: &'c mut BlockCache, locked_device: &mut dyn StorageDevice, block: usize) -> Result<&'c [u8], &'static str> {
         match cache.entry(block) {
             Entry::Occupied(occ) => {
                 // An existing entry in the cache can be used directly (without going to the backing store)
@@ -221,7 +221,7 @@ struct CachedBlock {
     state: CacheState,
 }
 
-type CacheBlock = HashMap<usize, CachedBlock>;
+type BlockCache = HashMap<usize, CachedBlock>;
 
 
 /// The states of an item in the cache, following the MSI cache coherence protocol.
