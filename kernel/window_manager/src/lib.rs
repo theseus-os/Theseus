@@ -42,7 +42,6 @@ use framebuffer::{Framebuffer, AlphaPixel};
 use color::{Color};
 use shapes::{Coord, Rectangle};
 use framebuffer_compositor::{FRAME_COMPOSITOR};
-////
 use keycodes_ascii::{KeyAction, KeyEvent, Keycode};
 use mouse_data::MouseEvent;
 use path::Path;
@@ -55,31 +54,29 @@ pub static WINDOW_MANAGER: Once<Mutex<WindowManager>> = Once::new();
 
 // The half size of mouse in number of pixels, the actual size of pointer is 1+2*`MOUSE_POINTER_HALF_SIZE`
 const MOUSE_POINTER_HALF_SIZE: usize = 7;
-// Transparent pixel
-const TR: Color = color::TRANSPARENT;
-// Opaque white
-const WT: Color = color::WHITE;
-// Opaque blue
-const BL: Color = color::BLUE;
-// the mouse picture
-static MOUSE_BASIC: [[Color; 2 * MOUSE_POINTER_HALF_SIZE + 1];
-    2 * MOUSE_POINTER_HALF_SIZE + 1] = [
-    [TR, TR, TR, TR, TR, TR, TR, TR, TR, TR, TR, TR, TR, TR, TR],
-    [TR, TR, TR, TR, TR, TR, TR, TR, TR, TR, TR, TR, TR, TR, TR],
-    [TR, TR, TR, TR, TR, TR, TR, TR, TR, TR, TR, TR, TR, TR, TR],
-    [TR, TR, TR, TR, TR, TR, TR, TR, TR, TR, TR, TR, TR, TR, TR],
-    [TR, TR, TR, TR, TR, TR, TR, TR, TR, TR, TR, TR, TR, TR, TR],
-    [TR, TR, TR, TR, TR, TR, TR, TR, TR, TR, TR, TR, TR, TR, TR],
-    [TR, TR, TR, TR, TR, TR, BL, BL, BL, BL, BL, BL, BL, BL, BL],
-    [TR, TR, TR, TR, TR, TR, BL, WT, WT, WT, WT, WT, WT, BL, TR],
-    [TR, TR, TR, TR, TR, TR, BL, WT, WT, WT, WT, WT, BL, TR, TR],
-    [TR, TR, TR, TR, TR, TR, BL, WT, WT, WT, WT, BL, TR, TR, TR],
-    [TR, TR, TR, TR, TR, TR, BL, WT, WT, WT, WT, BL, TR, TR, TR],
-    [TR, TR, TR, TR, TR, TR, BL, WT, WT, BL, BL, WT, BL, TR, TR],
-    [TR, TR, TR, TR, TR, TR, BL, WT, BL, TR, TR, BL, WT, BL, TR],
-    [TR, TR, TR, TR, TR, TR, BL, BL, TR, TR, TR, TR, BL, WT, BL],
-    [TR, TR, TR, TR, TR, TR, BL, TR, TR, TR, TR, TR, TR, BL, BL],
-];
+/// The mouse pointer image defined as a 2-D pixel array.
+static MOUSE_BASIC: [[Color; 2 * MOUSE_POINTER_HALF_SIZE + 1]; 2 * MOUSE_POINTER_HALF_SIZE + 1] = {
+    const T: Color = color::TRANSPARENT;
+    const W: Color = color::WHITE;
+    const B: Color = color::BLUE;
+    [
+        [T, T, T, T, T, T, T, T, T, T, T, T, T, T, T],
+        [T, T, T, T, T, T, T, T, T, T, T, T, T, T, T],
+        [T, T, T, T, T, T, T, T, T, T, T, T, T, T, T],
+        [T, T, T, T, T, T, T, T, T, T, T, T, T, T, T],
+        [T, T, T, T, T, T, T, T, T, T, T, T, T, T, T],
+        [T, T, T, T, T, T, T, T, T, T, T, T, T, T, T],
+        [T, T, T, T, T, T, B, B, B, B, B, B, B, B, B],
+        [T, T, T, T, T, T, B, W, W, W, W, W, W, B, T],
+        [T, T, T, T, T, T, B, W, W, W, W, W, B, T, T],
+        [T, T, T, T, T, T, B, W, W, W, W, B, T, T, T],
+        [T, T, T, T, T, T, B, W, W, W, W, B, T, T, T],
+        [T, T, T, T, T, T, B, W, W, B, B, W, B, T, T],
+        [T, T, T, T, T, T, B, W, B, T, T, B, W, B, T],
+        [T, T, T, T, T, T, B, B, T, T, T, T, B, W, B],
+        [T, T, T, T, T, T, B, T, T, T, T, T, T, B, B],
+    ]
+};
 
 // the border indicating new window position and size
 const WINDOW_BORDER_SIZE: usize = 3;
@@ -413,8 +410,9 @@ impl WindowManager {
         Err("cannot find window to pass")
     }
 
-    /// refresh the floating border indicating user of new window position and size. `show` indicates whether to show the border or not.
-    /// `start` and `end` indicates the top-left and bottom-right corner of the border.
+    /// Refresh the floating border, which is used to show the outline of a window while it is being moved. 
+    /// `show` indicates whether to show the border or not.
+    /// `new_border` defines the rectangular outline of the border.
     fn refresh_floating_border(
         &mut self,
         show: bool,
@@ -441,9 +439,9 @@ impl WindowManager {
         Ok(())
     }
 
-    /// draw the floating border with `pixel`. Return the coordinates of updated pixels.
+    /// draw the floating border with `pixel`. Return the list of coordinates of pixels that were updated.
     /// `border` indicates the position of the border as a rectangle.
-    /// `pixel` is the value of pixels in the floating border.
+    /// `color` is the color of the floating border.
     fn draw_floating_border(&mut self, border: &Rectangle, color: Color) -> Vec<Coord> {
         let mut coordinates = Vec::new();
         let pixel = color.into();
