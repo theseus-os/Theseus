@@ -17,8 +17,8 @@ version = "0.3.7"
 [dependencies.shapes]
 path = "../../kernel/shapes"
 
-[dependencies.frame_buffer]
-path = "../../kernel/frame_buffer"
+[dependencies.framebuffer]
+path = "../../kernel/framebuffer"
 
 [dependencies.window]
 path = "../../kernel/window"

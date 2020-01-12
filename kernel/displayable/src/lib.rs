@@ -4,11 +4,11 @@
 
 #![no_std]
 
-extern crate frame_buffer;
+extern crate framebuffer;
 extern crate shapes;
 extern crate color;
 
-use frame_buffer::{Framebuffer, Pixel};
+use framebuffer::{Framebuffer, Pixel};
 use shapes::{Coord, Rectangle};
 use color::Color;
 

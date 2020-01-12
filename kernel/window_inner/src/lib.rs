@@ -5,7 +5,7 @@
 extern crate alloc;
 extern crate mpmc;
 extern crate event_types;
-extern crate frame_buffer;
+extern crate framebuffer;
 extern crate spin;
 extern crate shapes;
 extern crate color;
@@ -13,7 +13,7 @@ extern crate color;
 use alloc::sync::Arc;
 use mpmc::Queue;
 use event_types::{Event};
-use frame_buffer::{Framebuffer, AlphaPixel};
+use framebuffer::{Framebuffer, AlphaPixel};
 use color::{Color};
 use shapes::Coord;
 use spin::{Mutex};

@@ -15,9 +15,9 @@ extern crate alloc;
 extern crate mpmc;
 extern crate event_types;
 extern crate compositor;
-extern crate frame_buffer;
-extern crate frame_buffer_compositor;
-extern crate frame_buffer_drawer;
+extern crate framebuffer;
+extern crate framebuffer_compositor;
+extern crate framebuffer_drawer;
 extern crate keycodes_ascii;
 extern crate mod_mgmt;
 extern crate mouse_data;
@@ -38,10 +38,10 @@ use core::slice;
 
 use mpmc::Queue;
 use event_types::{Event, MousePositionEvent};
-use frame_buffer::{Framebuffer, AlphaPixel};
+use framebuffer::{Framebuffer, AlphaPixel};
 use color::{Color};
 use shapes::{Coord, Rectangle};
-use frame_buffer_compositor::{FRAME_COMPOSITOR};
+use framebuffer_compositor::{FRAME_COMPOSITOR};
 ////
 use keycodes_ascii::{KeyAction, KeyEvent, Keycode};
 use mouse_data::MouseEvent;
@@ -454,7 +454,7 @@ impl WindowManager {
             if width <= 0 || height <= 0 {
                 break;
             }
-            frame_buffer_drawer::draw_rectangle(
+            framebuffer_drawer::draw_rectangle(
                 &mut self.top_fb, 
                 coordinate, 
                 width as usize, 
@@ -652,7 +652,7 @@ impl WindowManager {
 /// Initialize the window manager. It returns (keyboard_producer, mouse_producer) for the I/O devices.
 pub fn init() -> Result<(Queue<Event>, Queue<Event>), &'static str> {
     // font::init()?;
-    let final_framebuffer: Framebuffer<AlphaPixel> = frame_buffer::init()?;
+    let final_framebuffer: Framebuffer<AlphaPixel> = framebuffer::init()?;
     let (width, height) = final_framebuffer.get_size();
     let mut bottom_framebuffer = Framebuffer::new(width, height, None)?;
     let mut top_framebuffer = Framebuffer::new(width, height, None)?;

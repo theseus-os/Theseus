@@ -8,8 +8,8 @@ build = "../../build.rs"
 [dependencies]
 spin = "0.4.10"
 
-[dependencies.frame_buffer]
-path = "../frame_buffer"
+[dependencies.framebuffer]
+path = "../framebuffer"
 
 [dependencies.color]
 path = "../color"

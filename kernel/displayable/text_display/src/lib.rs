@@ -6,15 +6,15 @@
 extern crate alloc;
 extern crate displayable;
 extern crate font;
-extern crate frame_buffer;
-extern crate frame_buffer_printer;
+extern crate framebuffer;
+extern crate framebuffer_printer;
 extern crate shapes;
 extern crate color;
 
 use alloc::string::String;
 use displayable::{Displayable};
 use font::{CHARACTER_HEIGHT, CHARACTER_WIDTH};
-use frame_buffer::{Pixel, Framebuffer};
+use framebuffer::{Pixel, Framebuffer};
 use color::Color;
 use shapes::{Coord, Rectangle};
 
@@ -50,7 +50,7 @@ impl Displayable for TextDisplay {
             (self.text.as_str(), 0, 0)
         };
 
-        let (next_col, next_line, mut bounding_box) = frame_buffer_printer::print_string(
+        let (next_col, next_line, mut bounding_box) = framebuffer_printer::print_string(
             framebuffer,
             coordinate,
             self.width,

@@ -78,7 +78,7 @@ impl Cursor {
     ) -> Result<Rectangle, &'static str> where Color: Into<P> {
         if self.blink() {
             if self.show() {
-                frame_buffer_drawer::fill_rectangle(
+                framebuffer_drawer::fill_rectangle(
                     framebuffer,
                     coordinate
                         + (
@@ -91,7 +91,7 @@ impl Cursor {
                     self.color.into(),
                 );
             } else {
-                frame_buffer_printer::print_ascii_character(
+                framebuffer_printer::print_ascii_character(
                     framebuffer,
                     self.underlying_char,
                     FONT_COLOR.into(),

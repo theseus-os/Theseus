@@ -31,17 +31,17 @@ path = "../displayable/text_display"
 [dependencies.displayable]
 path = "../displayable"
 
-[dependencies.frame_buffer]
-path = "../frame_buffer"
+[dependencies.framebuffer]
+path = "../framebuffer"
 
 [dependencies.shapes]
 path = "../shapes"
 
-[dependencies.frame_buffer_drawer]
-path = "../frame_buffer_drawer"
+[dependencies.framebuffer_drawer]
+path = "../framebuffer_drawer"
 
-[dependencies.frame_buffer_printer]
-path = "../frame_buffer_printer"
+[dependencies.framebuffer_printer]
+path = "../framebuffer_printer"
 
 [dependencies.window_manager]
 path = "../window_manager"

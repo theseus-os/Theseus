@@ -12,7 +12,7 @@ extern crate color;
 
 extern crate window;
 extern crate shapes;
-extern crate frame_buffer;
+extern crate framebuffer;
 
 use alloc::string::String;
 use alloc::vec::Vec;

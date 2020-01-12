@@ -17,8 +17,8 @@ extern crate event_types;
 extern crate spin;
 #[macro_use]
 extern crate log;
-extern crate frame_buffer;
-extern crate frame_buffer_drawer;
+extern crate framebuffer;
+extern crate framebuffer_drawer;
 extern crate mouse;
 extern crate window_inner;
 extern crate window_manager;
@@ -28,7 +28,7 @@ extern crate color;
 use alloc::sync::Arc;
 use mpmc::Queue;
 use event_types::{Event, MousePositionEvent};
-use frame_buffer::Framebuffer;
+use framebuffer::Framebuffer;
 use color::{Color};
 use shapes::{Coord, Rectangle};
 use spin::Mutex;
@@ -340,7 +340,7 @@ impl Window {
         let width = inner.width;
         let height = inner.height;
 
-        frame_buffer_drawer::draw_rectangle(
+        framebuffer_drawer::draw_rectangle(
             &mut inner.framebuffer,
             Coord::new(0, self.title_size as isize),
             self.border_size,
@@ -348,14 +348,14 @@ impl Window {
             border_color.into(),
         );
 
-        frame_buffer_drawer::draw_rectangle(
+        framebuffer_drawer::draw_rectangle(
             &mut inner.framebuffer,
             Coord::new(0, (height - self.border_size) as isize),
             width,
             self.border_size,
             border_color.into(),
         );
-        frame_buffer_drawer::draw_rectangle(
+        framebuffer_drawer::draw_rectangle(
             &mut inner.framebuffer,
             Coord::new(
                 (width - self.border_size) as isize,
@@ -369,18 +369,18 @@ impl Window {
         // then draw the title bar
         if active {
             for i in 0..self.title_size {
-                frame_buffer_drawer::draw_rectangle(
+                framebuffer_drawer::draw_rectangle(
                     &mut inner.framebuffer,
                     Coord::new(0, i as isize),
                     width,
                     1,
-                    frame_buffer::Pixel::weight_blend(
+                    framebuffer::Pixel::weight_blend(
                         WINDOW_BORDER_COLOR_ACTIVE_BOTTOM.into(),
                         WINDOW_BORDER_COLOR_ACTIVE_TOP.into(),
                         (i as f32) / (self.title_size as f32)
                     )
 
-                    // frame_buffer::pixel::weight_blend(
+                    // framebuffer::pixel::weight_blend(
                     //     WINDOW_BORDER_COLOR_ACTIVE_BOTTOM,
                     //     WINDOW_BORDER_COLOR_ACTIVE_TOP,
                     //     (i as f32) / (self.title_size as f32),
@@ -388,7 +388,7 @@ impl Window {
                 ); 
             }
         } else {
-            frame_buffer_drawer::draw_rectangle(
+            framebuffer_drawer::draw_rectangle(
                 &mut inner.framebuffer,
                 Coord::new(0, 0),
                 width,
@@ -431,11 +431,11 @@ impl Window {
             TopButton::MinimizeMaximize => WINDOW_BUTTON_COLOR_MINIMIZE_MAMIMIZE,
             TopButton::Hide => WINDOW_BUTTON_COLOR_HIDE,
         };
-        frame_buffer_drawer::draw_circle(
+        framebuffer_drawer::draw_circle(
             &mut inner.framebuffer,
             Coord::new(x as isize, y as isize),
             WINDOW_BUTTON_SIZE,
-            frame_buffer::Pixel::weight_blend(
+            framebuffer::Pixel::weight_blend(
                 color::BLACK.into(), 
                 color.into(),
                 0.2f32 * (state as f32),

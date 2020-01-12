@@ -32,7 +32,7 @@ pub fn is_valid_crate_name_char(c: char) -> bool {
 /// # Examples
 /// * `<*const T as core::fmt::Debug>::fmt` -> `["core"]`
 /// * `<alloc::boxed::Box<T>>::into_unique` -> `["alloc"]`
-/// * `<frame_buffer::VirtualFramebuffer as display::Display>::fill_rectangle` -> `["frame_buffer", "display"]`
+/// * `<framebuffer::VirtualFramebuffer as display::Display>::fill_rectangle` -> `["framebuffer", "display"]`
 /// * `keyboard::init` -> `["keyboard"]`
 pub fn get_containing_crate_name<'a>(demangled_full_symbol: &'a str) -> Vec<&'a str> {
     get_containing_crate_name_ranges(demangled_full_symbol)
@@ -50,7 +50,7 @@ pub fn get_containing_crate_name<'a>(demangled_full_symbol: &'a str) -> Vec<&'a 
 /// # Examples
 /// * `<*const T as core::fmt::Debug>::fmt` -> `[12..16]`
 /// * `<alloc::boxed::Box<T>>::into_unique` -> `[1..6]`
-/// * `<frame_buffer::VirtualFramebuffer as display::Display>::fill_rectangle` -> `[1..13, 37..44]`
+/// * `<framebuffer::VirtualFramebuffer as display::Display>::fill_rectangle` -> `[1..13, 37..44]`
 /// * `keyboard::init` -> `[0..8]`
 pub fn get_containing_crate_name_ranges(demangled_full_symbol: &str) -> Vec<Range<usize>> {
     let mut ranges: Vec<Range<usize>> = Vec::new();
@@ -102,8 +102,8 @@ pub fn get_containing_crate_name_ranges(demangled_full_symbol: &str) -> Vec<Rang
 /// 
 /// # Examples
 /// * `replace_containing_crate_name("keyboard::init", "keyboard", "keyboard_new")  ->  Some("keyboard_new::init")`
-/// * `replace_containing_crate_name("<frame_buffer::VirtualFramebuffer as display::Display>::fill_rectangle", "display", "display3")
-///    ->  Some("<frame_buffer::VirtualFramebuffer as display3::Display>::fill_rectangle")`
+/// * `replace_containing_crate_name("<framebuffer::VirtualFramebuffer as display::Display>::fill_rectangle", "display", "display3")
+///    ->  Some("<framebuffer::VirtualFramebuffer as display3::Display>::fill_rectangle")`
 pub fn replace_containing_crate_name(demangled_full_symbol: &str, old_crate_name: &str, new_crate_name: &str) -> Option<String> {
     let mut new_symbol = String::from(demangled_full_symbol);
     let mut addend: isize = 0; // index compensation for the difference in old vs. new crate name length

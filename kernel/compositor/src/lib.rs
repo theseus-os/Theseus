@@ -3,12 +3,12 @@
 
 #![no_std]
 
-extern crate frame_buffer;
+extern crate framebuffer;
 extern crate shapes;
 
 use core::iter::IntoIterator;
 
-use frame_buffer::{Framebuffer, Pixel};
+use framebuffer::{Framebuffer, Pixel};
 use shapes::{Coord, Rectangle};
 use core::ops::Range;
 

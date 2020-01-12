@@ -11,8 +11,8 @@ spin = "0.4.10"
 [dependencies.mpmc]
 path = "../../libs/mpmc"
 
-[dependencies.frame_buffer_drawer]
-path = "../frame_buffer_drawer"
+[dependencies.framebuffer_drawer]
+path = "../framebuffer_drawer"
 
 [dependencies.window_inner]
 path = "../window_inner"
@@ -20,14 +20,14 @@ path = "../window_inner"
 [dependencies.compositor]
 path = "../compositor"
 
-[dependencies.frame_buffer_compositor]
-path = "../frame_buffer_compositor"
+[dependencies.framebuffer_compositor]
+path = "../framebuffer_compositor"
 
 [dependencies.shapes]
 path = "../shapes"
 
-[dependencies.frame_buffer]
-path = "../frame_buffer"
+[dependencies.framebuffer]
+path = "../framebuffer"
 
 [dependencies.color]
 path = "../color"
