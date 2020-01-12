@@ -9,7 +9,7 @@
 //!
 //! In the next step, for every 16 rows, the compositor checks if the pixel array of the 16 rows are already cached. It ignores row-ranges that do not overlap with the bounding box to be updated. If a pixel array is not cached, the compositor will refresh the pixels within the bounding box and cache the 16 rows.
 //!
-//! In order to cache some rows of the source framebuffer, the compositor needs to cache its contents, its location in the final framebuffer and its width and height. It's basically a rectangle region in the final framebuffer and We define a structure `CacheBlock` to represent it.
+//! In order to cache some rows of the source framebuffer, the compositor needs to cache its contents, its location in the destination framebuffer and its width and height. It's basically a rectangle region in the destination framebuffer and we define a structure `CacheBlock` to represent it.
 
 
 #![no_std]
@@ -45,18 +45,14 @@ lazy_static! {
     );
 }
 
-/// Metadata that describes a cached block. It represents the cache of some rows in the source framebuffer updated before. It's basically a rectangle region and its contents in the final framebuffer and is independent from the source framebuffer after cached.
-/// `coordinate`, `width` and `height` specifies a rectangle region in the final framebuffer occupied by the updated rows in the source framebuffer. We need to cache these information because if an old cache block overlap with some new framebuffer rows to be updated, the compositor should remove the old one since part of the region will change.
+/// Metadata that describes a cached block. It represents the cache of some rows in the source framebuffer updated before. It's basically a rectangle region and its contents in the destination framebuffer and is independent from the source framebuffer after cached.
+/// `block` is a rectangle region in the destination framebuffer occupied by the updated rows in the source framebuffer. We need to cache these information because if an old cache block overlap with some new framebuffer rows to be updated, the compositor should remove the old one since part of the region will change.
 /// `content_hash` is the hash of pixels in the source framebuffer rows to be cached. A cache block is identical to some new framebuffer rows to be updated if they share the same `content_hash` and `width`.
 pub struct CacheBlock {
-    /// The coordinate of the block in the final framebuffer(relative to the top-left corner of the framebuffer.)
-    coordinate: Coord,
+    /// the rectangle region of this cache block. It specifies the size and location of the block
+    block: Rectangle,
     /// The hash of the pixel array in the block.
     content_hash: u64,
-    /// The width of the block
-    width: usize,
-    /// The height of the block
-    height: usize,
 }
 
 impl CacheBlock {
@@ -67,18 +63,18 @@ impl CacheBlock {
 
     /// checks if the coordinate is within the block
     fn contains(&self, coordinate: Coord) -> bool {
-        return coordinate.x >= self.coordinate.x
-            && coordinate.x < self.coordinate.x + self.width as isize
-            && coordinate.y >= self.coordinate.y
-            && coordinate.y < self.coordinate.y + self.height as isize;
+        return coordinate.x >= self.block.top_left.x
+            && coordinate.x < self.block.bottom_right.x
+            && coordinate.y >= self.block.top_left.y
+            && coordinate.y < self.block.bottom_right.y
     }
 
     /// checks if this block contains any of the four corners of another cache block.
     fn contains_corner(&self, cache: &CacheBlock) -> bool {
-        self.contains(cache.coordinate)
-            || self.contains(cache.coordinate + (cache.width as isize - 1, 0))
-            || self.contains(cache.coordinate + (0, cache.height as isize - 1))
-            || self.contains(cache.coordinate + (cache.width as isize - 1, cache.height as isize - 1))
+        self.contains(cache.block.top_left)
+            || self.contains(cache.block.top_left + (cache.block.bottom_right.x - cache.block.top_left.x - 1, 0))
+            || self.contains(cache.block.top_left + (0, cache.block.bottom_right.y - cache.block.top_left.y - 1))
+            || self.contains(cache.block.bottom_right - (1, 1))
     }
 }
 
@@ -100,7 +96,7 @@ impl FrameCompositor {
         match self.caches.get(dest_coord) {
             Some(cache) => {
                 // The same hash and width means the cache block is identical to the row pixels. We do not check the height because if the hashes are the same, the number of pixels, namely `width * height` must be the same.
-                return cache.content_hash == hash(row_pixels) && cache.width == width
+                return cache.content_hash == hash(row_pixels) && (cache.block.bottom_right.x - cache.block.top_left.x) as usize == width
             }
             None => return false,
         }
@@ -137,10 +133,11 @@ impl FrameCompositor {
 
         // remove overlapped caches
         let new_cache = CacheBlock {
+            block: Rectangle {
+                top_left: coordinate_start,
+                bottom_right: coordinate_start + (src_width as isize, (pixel_slice.len() / src_width) as isize)
+            },
             content_hash: hash(pixel_slice),
-            coordinate: coordinate_start,
-            width: src_width,
-            height: pixel_slice.len() / src_width
         };
         let keys: Vec<_> = self.caches.keys().cloned().collect();
         for key in keys {
