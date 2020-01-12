@@ -12,7 +12,7 @@ To solve this problem, we define two objects `Window` and `WindowInner`. `Window
 
 The `window_inner` crate defines a `WindowInner` trait. It has states and methods of displaying the window on the screen. 
 
-A `WindowInner` has a framebuffer in which it can display the content of the window. The framebuffer is an object which implements the `Framebuffer` trait. When the window is rendered to the screen, a compositor may render it with different principles according to the type of its framebuffer. Currently, we have implemented a normal framebuffer and one with the alpha channel.
+A `WindowInner` has a framebuffer to which it can display the content of the window. The framebuffer is an object which implements the `Framebuffer` trait. When the window is rendered to the screen, a compositor may render it with different principles according to the type of its framebuffer. Currently, we have implemented a normal framebuffer and one with the alpha channel.
 
 Both an application's window and the window manager has a reference to the same `WindowInner` object. The application can configure and draw in the framebuffer and the manager can display and composite the window with others.
 
