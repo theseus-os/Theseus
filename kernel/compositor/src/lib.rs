@@ -1,5 +1,5 @@
 //! This crate defines a trait of `Compositor`  .
-//! A compositor composites a list of buffers to a single buffer.
+//! A compositor composites a list of sources buffers to a single destination buffer.
 
 #![no_std]
 
@@ -16,15 +16,15 @@ use core::ops::Range;
 /// The type parameter `B` allows a compositor to support multiple types of regions or "bounding boxes", 
 /// given by the trait bound `CompositableRegion`.
 pub trait Compositor {
-    /// Composites the framebuffers in the list of source framebuffers `src_fbs` into the destination framebuffer `dest_fb`.
+    /// Composites the framebuffers in the list of source framebuffers `src_fbs` onto the destination framebuffer `dest_fb`.
     ///
     /// # Arguments
     /// * `src_fbs`: an iterator over the source framebuffers to be composited, along with where in the `dest_fb` they should be composited. 
-    /// * `dest_fb`: the destination framebuffer that will hold the composited source framebuffers.
-    /// * `dest_bounding_boxes`: an iterator over bounding boxes that specify which regions of the destination framebuffer should be updated. 
-    ///    For each source framebuffer in `src_fbs`, the compositor will iterate over every bounding box relative to the destination framebuffer. It then finds the corresponding region in the source framebuffer when the source is composited to the destination, and blends the region onto the the destination.
+    /// * `dest_fb`: the destination framebuffer that will hold the source framebuffers to be composited.
+    /// * `dest_bounding_boxes`: an iterator over bounding boxes that specify which regions in the destination framebuffer should update. 
+    ///    For each source framebuffer in `src_fbs`, the compositor will iterate over every bounding box relative to the destination framebuffer. It will find the corresponding region in the source framebuffer when the source is composited to the destination, and then blend the region onto the the destination.
     /// 
-    /// For example, if the window manager wants to draw a half-transparent window, it will pass the framebuffers of all the existing windows and the new window in a bottom-top order to the compositor as `src_fbs`. The `dest_fb` is the final framebuffer which is mapped to the screen, and the `bounding_boxes` is `Some(area)` in which area is the region in the final framebuffer where the new window will be located. When are source framebuffers are composited from bottom to top, the compositor will redraw the part every source framebuffer in the bounding box.
+    /// For example, if the window manager wants to draw a half-transparent window, it will pass the framebuffers of all the existing windows and the new window in a bottom-top order to the compositor as `src_fbs`. The `dest_fb` is the final framebuffer which is mapped to the screen, and the `bounding_boxes` is `Some(area)` in which area is the region in the final framebuffer where the new window will be located. When the source framebuffers are composited from bottom to top, the compositor will redraw the part of every source framebuffer in the bounding box.
     ///
     /// In another example, suppose the window manager wants to draw a half-transparent mouse arrow on top of all windows. It will pass the framebuffers of existing windows together with a top framebuffer which covers the screen and contains the arrow. In this case, the `bounding_boxes` are the coordinates of all the pixels in this arrow relative to the final framebuffer. For framebuffers from the bottom one to the top one, the compositor will redraw their pixels at these coordinates relative to the screen(final framebuffer) so that the arrow is displayed on top as half-transparent. 
     fn composite<'a, B: CompositableRegion + Clone, P: 'a + Pixel>(
@@ -59,7 +59,7 @@ pub trait CompositableRegion {
     /// Returns the number of pixels in the region.
     fn size(&self) -> usize;
 
-    /// Returns the range of row index occupied by this region.
+    /// Returns the range of row indexes occupied by this region.
     fn row_range(&self) -> Range<isize>;
 
     /// Blends the pixels in the source framebuffer `src_fb` into the pixels in the destination framebuffer `dest_fb` in the given row range.
