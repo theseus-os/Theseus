@@ -72,7 +72,8 @@ pub trait CompositableRegion {
     /// Returns the number of pixels in the region.
     fn size(&self) -> usize;
 
-    /// Returns the range of row indexes occupied by this region.
+    /// Returns the range of rows covered by this region, 
+    /// given as row indices where row `0` is the top row in the region.
     fn row_range(&self) -> Range<isize>;
 
     /// Blends the pixels in the source framebuffer `src_fb` within the range of rows (`src_fb_row_range`) 
