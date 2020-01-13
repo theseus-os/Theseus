@@ -52,29 +52,23 @@ use window_inner::{WindowInner, WindowMovingStatus};
 /// The instance of the default window manager
 pub static WINDOW_MANAGER: Once<Mutex<WindowManager>> = Once::new();
 
-// The half size of mouse in number of pixels, the actual size of pointer is 1+2*`MOUSE_POINTER_HALF_SIZE`
-const MOUSE_POINTER_HALF_SIZE: usize = 7;
+/// The width and height size of mouse in number of pixels.
+const MOUSE_POINTER_SIZE: usize = 9;
 /// The mouse pointer image defined as a 2-D pixel array.
-static MOUSE_BASIC: [[Color; 2 * MOUSE_POINTER_HALF_SIZE + 1]; 2 * MOUSE_POINTER_HALF_SIZE + 1] = {
+static MOUSE_POINTER_IMAGE: [[Color; MOUSE_POINTER_SIZE]; MOUSE_POINTER_SIZE] = {
     const T: Color = color::TRANSPARENT;
     const W: Color = color::WHITE;
     const B: Color = color::BLUE;
     [
-        [T, T, T, T, T, T, T, T, T, T, T, T, T, T, T],
-        [T, T, T, T, T, T, T, T, T, T, T, T, T, T, T],
-        [T, T, T, T, T, T, T, T, T, T, T, T, T, T, T],
-        [T, T, T, T, T, T, T, T, T, T, T, T, T, T, T],
-        [T, T, T, T, T, T, T, T, T, T, T, T, T, T, T],
-        [T, T, T, T, T, T, T, T, T, T, T, T, T, T, T],
-        [T, T, T, T, T, T, B, B, B, B, B, B, B, B, B],
-        [T, T, T, T, T, T, B, W, W, W, W, W, W, B, T],
-        [T, T, T, T, T, T, B, W, W, W, W, W, B, T, T],
-        [T, T, T, T, T, T, B, W, W, W, W, B, T, T, T],
-        [T, T, T, T, T, T, B, W, W, W, W, B, T, T, T],
-        [T, T, T, T, T, T, B, W, W, B, B, W, B, T, T],
-        [T, T, T, T, T, T, B, W, B, T, T, B, W, B, T],
-        [T, T, T, T, T, T, B, B, T, T, T, T, B, W, B],
-        [T, T, T, T, T, T, B, T, T, T, T, T, T, B, B],
+        [B, B, B, B, B, B, B, B, B],
+        [B, W, W, W, W, W, W, B, T],
+        [B, W, W, W, W, W, B, T, T],
+        [B, W, W, W, W, B, T, T, T],
+        [B, W, W, W, W, B, T, T, T],
+        [B, W, W, B, B, W, B, T, T],
+        [B, W, B, T, T, B, W, B, T],
+        [B, B, T, T, T, T, B, W, B],
+        [B, T, T, T, T, T, T, B, B],
     ]
 };
 
@@ -532,22 +526,21 @@ impl WindowManager {
         if new.y < 0 {
             new.y = 0;
         }
-        if new.x >= (screen_width as isize) {
-            new.x = (screen_width as isize) - 1;
-        }
-        if new.y >= (screen_height as isize) {
-            new.y = (screen_height as isize) - 1;
-        }
+
+        // keep mouse pointer border in the screen when it is at the right or bottom side.
+        const MOUSE_POINTER_BORDER: isize = 3;
+        new.x = core::cmp::min(new.x, screen_width as isize - MOUSE_POINTER_BORDER);
+        new.y = core::cmp::min(new.y, screen_height as isize - MOUSE_POINTER_BORDER);
+            
         self.move_mouse_to(new)
     }
     
     // Move mouse to absolute position `new`
     fn move_mouse_to(&mut self, new: Coord) -> Result<(), &'static str> {
         // clear old mouse
-        for y in self.mouse.y - MOUSE_POINTER_HALF_SIZE as isize..self.mouse.y + MOUSE_POINTER_HALF_SIZE as isize + 1 {
+        for y in self.mouse.y..self.mouse.y + MOUSE_POINTER_SIZE as isize {
             for x in
-                self.mouse.x - MOUSE_POINTER_HALF_SIZE as isize..self.mouse.x + MOUSE_POINTER_HALF_SIZE as isize + 1
-            {
+                self.mouse.x..self.mouse.x + MOUSE_POINTER_SIZE as isize {
                 let coordinate = Coord::new(x, y);
                 self.top_fb.overwrite_pixel(coordinate, color::TRANSPARENT.into());
             }
@@ -557,15 +550,10 @@ impl WindowManager {
 
         // draw new mouse
         self.mouse = new;
-        for y in new.y - MOUSE_POINTER_HALF_SIZE as isize..new.y + MOUSE_POINTER_HALF_SIZE as isize + 1
-        {
-            for x in
-                new.x - MOUSE_POINTER_HALF_SIZE as isize..new.x + MOUSE_POINTER_HALF_SIZE as isize + 1
-            {
+        for y in new.y..new.y + MOUSE_POINTER_SIZE as isize {
+            for x in new.x..new.x + MOUSE_POINTER_SIZE as isize {
                 let coordinate = Coord::new(x, y);
-                let pixel = MOUSE_BASIC
-                            [(MOUSE_POINTER_HALF_SIZE as isize + x - new.x) as usize]
-                            [(MOUSE_POINTER_HALF_SIZE as isize + y - new.y) as usize].into();
+                let pixel = MOUSE_POINTER_IMAGE[(x - new.x) as usize][(y - new.y) as usize].into();
                 self.top_fb.overwrite_pixel(coordinate, pixel);
             }
         }
@@ -632,10 +620,10 @@ impl WindowManager {
     /// Get the pixels occupied by current mouse.
     fn get_mouse_coords(&self) -> Vec<Coord> {
         let mut result = Vec::new();
-        for i in 6..15 {
-            for j in 6..15 {
-                if MOUSE_BASIC[i][j] != color::TRANSPARENT {
-                    let coordinate = self.mouse - (MOUSE_POINTER_HALF_SIZE as isize, MOUSE_POINTER_HALF_SIZE as isize) + (j as isize, i as isize);
+        for i in 0..MOUSE_POINTER_SIZE{
+            for j in 0..MOUSE_POINTER_SIZE {
+                if MOUSE_POINTER_IMAGE[i][j] != color::TRANSPARENT {
+                    let coordinate = self.mouse + (j as isize, i as isize);
                     if self.top_fb.contains(coordinate) {
                         result.push(coordinate)
                     }
