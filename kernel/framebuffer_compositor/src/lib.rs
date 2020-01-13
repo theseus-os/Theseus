@@ -189,7 +189,7 @@ impl FrameCompositor {
         }
         
         let cache_row_start = relative_row_start as usize / CACHE_BLOCK_HEIGHT * CACHE_BLOCK_HEIGHT;
-        let mut cache_row_end = (relative_row_end as usize / CACHE_BLOCK_HEIGHT + 1) * CACHE_BLOCK_HEIGHT;
+        let mut cache_row_end = ((relative_row_end - 1) as usize / CACHE_BLOCK_HEIGHT + 1) * CACHE_BLOCK_HEIGHT;
 
         cache_row_end = core::cmp::min(cache_row_end, src_fb_height);
 
