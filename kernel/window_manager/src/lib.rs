@@ -33,7 +33,7 @@ use alloc::collections::VecDeque;
 use alloc::string::{String, ToString};
 use alloc::sync::{Arc, Weak};
 use alloc::vec::{Vec};
-use compositor::{Compositor, FramebufferUpdates};
+use compositor::{Compositor, FramebufferUpdates, CompositableRegion};
 use core::slice;
 
 use mpmc::Queue;
@@ -223,7 +223,7 @@ impl WindowManager {
     }
 
     /// Refresh the pixels in `update_coords`. Only render the bottom final framebuffer and windows. Ignore the top buffer.
-    pub fn refresh_bottom_windows_pixels(&mut self, pixels: impl IntoIterator<Item = Coord> + Clone) -> Result<(), &'static str> {
+    pub fn refresh_bottom_windows_pixels<B: CompositableRegion + Clone>(&mut self, pixels: impl IntoIterator<Item = B> + Clone) -> Result<(), &'static str> {
         // bottom framebuffer
         let bottom_fb = FramebufferUpdates {
             src_framebuffer: &self.bottom_fb,
@@ -264,13 +264,16 @@ impl WindowManager {
     }
 
     /// Refresh the pixels in the top framebuffer
-    pub fn refresh_top_pixels(&mut self, pixels: impl IntoIterator<Item = Coord> + Clone) -> Result<(), &'static str> {
+    pub fn refresh_top<B: CompositableRegion + Clone>(
+        &mut self, 
+        bounding_box: impl IntoIterator<Item = B> + Clone
+    ) -> Result<(), &'static str> {
         let top_buffer = FramebufferUpdates {
             src_framebuffer: &self.top_fb,
             coordinate_in_dest_framebuffer: Coord::new(0, 0),
         }; 
 
-        FRAME_COMPOSITOR.lock().composite(Some(top_buffer), &mut self.final_fb, pixels)
+        FRAME_COMPOSITOR.lock().composite(Some(top_buffer), &mut self.final_fb, bounding_box)
     }
 
     /// Refresh the part in `bounding_box` of every window. `bounding_box` is a rectangle relative to the top-left of the screen. Refresh the whole screen if the bounding box is None.
@@ -319,7 +322,7 @@ impl WindowManager {
             FRAME_COMPOSITOR.lock().composite(Some(buffer_update), &mut self.final_fb, bounding_box)
         } else {
             Ok(())
-        }
+        } 
     }
 
     /// Refresh the part in `bounding_box` of the background and every window. 
@@ -335,16 +338,16 @@ impl WindowManager {
         self.refresh_windows(bounding_box, active)
     }
     
-    /// Refresh the part of the top framebuffer in `bounding_box`. The top framebuffer contains the mouse and moving floating window border.
-    /// `bounding_box` is a rectangle relative to the top-left of the screen. Update the whole screen if `bounding_box` is `None`.
-    pub fn refresh_top(&mut self, bounding_box: Option<Rectangle>) -> Result<(), &'static str> {
-        let top_buffer = FramebufferUpdates {
-            src_framebuffer: &self.top_fb,
-            coordinate_in_dest_framebuffer: Coord::new(0, 0),
-        }; 
+    // /// Refresh the part of the top framebuffer in `bounding_box`. The top framebuffer contains the mouse and moving floating window border.
+    // /// `bounding_box` is a rectangle relative to the top-left of the screen. Update the whole screen if `bounding_box` is `None`.
+    // pub fn refresh_top(&mut self, bounding_box: Option<Rectangle>) -> Result<(), &'static str> {
+    //     let top_buffer = FramebufferUpdates {
+    //         src_framebuffer: &self.top_fb,
+    //         coordinate_in_dest_framebuffer: Coord::new(0, 0),
+    //     }; 
 
-        FRAME_COMPOSITOR.lock().composite(Some(top_buffer), &mut self.final_fb, bounding_box)
-    }
+    //     FRAME_COMPOSITOR.lock().composite(Some(top_buffer), &mut self.final_fb, bounding_box)
+    // }
     
     /// pass keyboard event to currently active window
     fn pass_keyboard_event_to_window(&self, key_event: KeyEvent) -> Result<(), &'static str> {
@@ -424,7 +427,7 @@ impl WindowManager {
         // then draw current border
         if show {
             let pixels = self.draw_floating_border(&new_border, WINDOW_BORDER_COLOR_INNER);
-            self.refresh_top_pixels(pixels.into_iter())?;
+            self.refresh_top(pixels.into_iter())?;
             self.repositioned_border = Some(new_border);
         } else {
             self.repositioned_border = None;
@@ -510,8 +513,13 @@ impl WindowManager {
 
     /// Refresh the mouse display
     pub fn refresh_mouse(&mut self) -> Result<(), &'static str> {
-        let bounding_box = self.get_mouse_coords();
-        self.refresh_top_pixels(bounding_box.into_iter())
+        let bounding_box = Some(Rectangle {
+            top_left: self.mouse,
+            bottom_right: self.mouse + (MOUSE_POINTER_SIZE as isize, MOUSE_POINTER_SIZE as isize)
+        });
+        
+        // self.get_mouse_coords();
+        self.refresh_top(bounding_box.into_iter())
     }
 
     /// Move mouse. `relative` indicates the new position relative to current position.
@@ -545,7 +553,10 @@ impl WindowManager {
                 self.top_fb.overwrite_pixel(coordinate, color::TRANSPARENT.into());
             }
         }
-        let bounding_box = self.get_mouse_coords();
+        let bounding_box = Some(Rectangle {
+            top_left: self.mouse,
+            bottom_right: self.mouse + (MOUSE_POINTER_SIZE as isize, MOUSE_POINTER_SIZE as isize)
+        });
         self.refresh_bottom_windows_pixels(bounding_box.into_iter())?;
 
         // draw new mouse
@@ -617,22 +628,22 @@ impl WindowManager {
         self.bottom_fb.get_size()
     }
 
-    /// Get the pixels occupied by current mouse.
-    fn get_mouse_coords(&self) -> Vec<Coord> {
-        let mut result = Vec::new();
-        for i in 0..MOUSE_POINTER_SIZE{
-            for j in 0..MOUSE_POINTER_SIZE {
-                if MOUSE_POINTER_IMAGE[i][j] != color::TRANSPARENT {
-                    let coordinate = self.mouse + (j as isize, i as isize);
-                    if self.top_fb.contains(coordinate) {
-                        result.push(coordinate)
-                    }
-                }
-            }
-        }
+    // /// Get the pixels occupied by current mouse.
+    // fn get_mouse_coords(&self) -> Vec<Coord> {
+    //     let mut result = Vec::new();
+    //     for i in 0..MOUSE_POINTER_SIZE{
+    //         for j in 0..MOUSE_POINTER_SIZE {
+    //             if MOUSE_POINTER_IMAGE[i][j] != color::TRANSPARENT {
+    //                 let coordinate = self.mouse + (j as isize, i as isize);
+    //                 if self.top_fb.contains(coordinate) {
+    //                     result.push(coordinate)
+    //                 }
+    //             }
+    //         }
+    //     }
 
-        result
-    }
+    //     result
+    // }
 }
 
 /// Initialize the window manager. It returns (keyboard_producer, mouse_producer) for the I/O devices.
