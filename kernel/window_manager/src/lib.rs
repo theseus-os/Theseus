@@ -501,7 +501,6 @@ impl WindowManager {
             bottom_right: self.mouse + (MOUSE_POINTER_SIZE as isize, MOUSE_POINTER_SIZE as isize)
         });
         
-        // self.get_mouse_coords();
         self.refresh_top(bounding_box.into_iter())
     }
 
@@ -610,23 +609,6 @@ impl WindowManager {
     pub fn get_screen_size(&self) -> (usize, usize) {
         self.bottom_fb.get_size()
     }
-
-    // /// Get the pixels occupied by current mouse.
-    // fn get_mouse_coords(&self) -> Vec<Coord> {
-    //     let mut result = Vec::new();
-    //     for i in 0..MOUSE_POINTER_SIZE{
-    //         for j in 0..MOUSE_POINTER_SIZE {
-    //             if MOUSE_POINTER_IMAGE[i][j] != color::TRANSPARENT {
-    //                 let coordinate = self.mouse + (j as isize, i as isize);
-    //                 if self.top_fb.contains(coordinate) {
-    //                     result.push(coordinate)
-    //                 }
-    //             }
-    //         }
-    //     }
-
-    //     result
-    // }
 }
 
 /// Initialize the window manager. It returns (keyboard_producer, mouse_producer) for the I/O devices.
