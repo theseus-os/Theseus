@@ -156,11 +156,12 @@ impl Window {
 
         let mut wm = window_manager::WINDOW_MANAGER.try().ok_or("The window manager is not initialized")?.lock();
         let first_active = wm.set_active(&window.inner, false)?; 
-        if first_active {
-            wm.refresh_bottom_windows(None, true)?;
+        let bounding_box = if first_active {
+            None
         } else {
-            wm.refresh_active_window(Some(area))?;
-        } 
+            Some(area)
+        };
+        wm.refresh_bottom_windows(bounding_box, true)?;
         Ok(window)
     }
 
@@ -325,7 +326,7 @@ impl Window {
             Some(bounding_box) => Some(bounding_box + coordinate),
             None => None,
         };
-        wm.refresh_windows(absolute_box, true)
+        wm.refresh_windows(absolute_box)
     }
 
     /// Draw the border of this window, with argument of whether this window is active now

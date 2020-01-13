@@ -210,7 +210,7 @@ impl WindowManager {
         
         if let Some(index) = self.is_window_in_show_list(inner_ref) {
             self.show_list.remove(index);
-            self.refresh_windows(area, true)?;
+            self.refresh_windows(area)?;
             return Ok(())        
         }
 
@@ -222,8 +222,12 @@ impl WindowManager {
         Err("cannot find this window")
     }
 
-    /// Refresh the pixels in `update_coords`. Only render the bottom final framebuffer and windows. Ignore the top buffer.
-    pub fn refresh_bottom_windows_pixels<B: CompositableRegion + Clone>(&mut self, pixels: impl IntoIterator<Item = B> + Clone) -> Result<(), &'static str> {
+    /// Refresh the region in `bounding_box`. Only render the bottom final framebuffer and windows. Ignore the active window if `active` is false.
+    pub fn refresh_bottom_windows<B: CompositableRegion + Clone>(
+        &mut self, 
+        bounding_box: impl IntoIterator<Item = B> + Clone,
+        active: bool,
+    ) -> Result<(), &'static str> {
         // bottom framebuffer
         let bottom_fb = FramebufferUpdates {
             src_framebuffer: &self.bottom_fb,
@@ -231,55 +235,6 @@ impl WindowManager {
         };
 
         // list of windows to be updated
-        let mut window_ref_list = Vec::new();
-        for window in &self.hide_list {
-            if let Some(window_ref) = window.upgrade() {
-                window_ref_list.push(window_ref);
-            }
-        }
-        for window in &self.show_list {
-            if let Some(window_ref) = window.upgrade() {
-                window_ref_list.push(window_ref);
-            }
-        }
-        if let Some(window_ref) = self.active.upgrade() {
-            window_ref_list.push(window_ref)
-        }
-
-        // lock windows
-        let locked_window_list = &window_ref_list.iter().map(|x| x.lock()).collect::<Vec<_>>();
-
-        // create updated framebuffer info objects
-        let window_bufferlist = locked_window_list.iter().map(|window| {
-            FramebufferUpdates {
-                src_framebuffer: &window.framebuffer,
-                coordinate_in_dest_framebuffer: window.get_position(),
-            }
-        }).collect::<Vec<_>>();
-        
-        let buffer_iter = Some(bottom_fb).into_iter().chain(window_bufferlist.into_iter());
-        FRAME_COMPOSITOR.lock().composite(buffer_iter, &mut self.final_fb, pixels)?;
-        
-        Ok(())
-    }
-
-    /// Refresh the pixels in the top framebuffer
-    pub fn refresh_top<B: CompositableRegion + Clone>(
-        &mut self, 
-        bounding_box: impl IntoIterator<Item = B> + Clone
-    ) -> Result<(), &'static str> {
-        let top_buffer = FramebufferUpdates {
-            src_framebuffer: &self.top_fb,
-            coordinate_in_dest_framebuffer: Coord::new(0, 0),
-        }; 
-
-        FRAME_COMPOSITOR.lock().composite(Some(top_buffer), &mut self.final_fb, bounding_box)
-    }
-
-    /// Refresh the part in `bounding_box` of every window. `bounding_box` is a rectangle relative to the top-left of the screen. Refresh the whole screen if the bounding box is None.
-    /// Ignore the active window if `active` is false.
-    pub fn refresh_windows(&mut self, bounding_box: Option<Rectangle>, active: bool) -> Result<(), &'static str> {
-        // reference of windows
         let mut window_ref_list = Vec::new();
         for window in &self.hide_list {
             if let Some(window_ref) = window.upgrade() {
@@ -299,6 +254,58 @@ impl WindowManager {
 
         // lock windows
         let locked_window_list = &window_ref_list.iter().map(|x| x.lock()).collect::<Vec<_>>();
+
+        // create updated framebuffer info objects
+        let window_bufferlist = locked_window_list.iter().map(|window| {
+            FramebufferUpdates {
+                src_framebuffer: &window.framebuffer,
+                coordinate_in_dest_framebuffer: window.get_position(),
+            }
+        }).collect::<Vec<_>>();
+        
+        let buffer_iter = Some(bottom_fb).into_iter().chain(window_bufferlist.into_iter());
+        FRAME_COMPOSITOR.lock().composite(buffer_iter, &mut self.final_fb, bounding_box)?;
+        
+        Ok(())
+    }
+
+    /// Refresh the region of `bounding_box` in the top framebuffer
+    pub fn refresh_top<B: CompositableRegion + Clone>(
+        &mut self, 
+        bounding_box: impl IntoIterator<Item = B> + Clone
+    ) -> Result<(), &'static str> {
+        let top_buffer = FramebufferUpdates {
+            src_framebuffer: &self.top_fb,
+            coordinate_in_dest_framebuffer: Coord::new(0, 0),
+        }; 
+
+        FRAME_COMPOSITOR.lock().composite(Some(top_buffer), &mut self.final_fb, bounding_box)
+    }
+
+    /// Refresh the part in `bounding_box` of every window. `bounding_box` is a region relative to the top-left of the screen. Refresh the whole screen if the bounding box is None.
+    pub fn refresh_windows<B: CompositableRegion + Clone>(
+        &mut self, 
+        bounding_box: impl IntoIterator<Item = B> + Clone,
+    ) -> Result<(), &'static str> {
+        // reference of windows
+        let mut window_ref_list = Vec::new();
+        for window in &self.hide_list {
+            if let Some(window_ref) = window.upgrade() {
+                window_ref_list.push(window_ref);
+            }
+        }
+        for window in &self.show_list {
+            if let Some(window_ref) = window.upgrade() {
+                window_ref_list.push(window_ref);
+            }
+        }
+
+        if let Some(window_ref) = self.active.upgrade() {
+            window_ref_list.push(window_ref)
+        }
+
+        // lock windows
+        let locked_window_list = &window_ref_list.iter().map(|x| x.lock()).collect::<Vec<_>>();
         // create updated framebuffer info objects
         let bufferlist = locked_window_list.iter().map(|window| {
             FramebufferUpdates {
@@ -311,7 +318,7 @@ impl WindowManager {
     }
 
 
-    /// Refresh the part in `bounding_box` of the active window. `bounding_box` is a rectangle relative to the top-left of the screen. Refresh the whole screen if the bounding box is None.
+    /// Refresh the part in `bounding_box` of the active window. `bounding_box` is a region relative to the top-left of the screen. Refresh the whole screen if the bounding box is None.
     pub fn refresh_active_window(&mut self, bounding_box: Option<Rectangle>) -> Result<(), &'static str> {
         if let Some(window_ref) = self.active.upgrade() {
             let window = window_ref.lock();
@@ -324,30 +331,6 @@ impl WindowManager {
             Ok(())
         } 
     }
-
-    /// Refresh the part in `bounding_box` of the background and every window. 
-    /// `bounding_box` is a rectangle relative to the top-left of the screen. Refresh the whole screen if area is None. 
-    /// Ignore the active window if `active` is false.
-    pub fn refresh_bottom_windows(&mut self, bounding_box: Option<Rectangle>, active: bool) -> Result<(), &'static str> {
-        let bg_buffer = FramebufferUpdates {
-            src_framebuffer: &self.bottom_fb,
-            coordinate_in_dest_framebuffer: Coord::new(0, 0),
-        }; 
-
-        FRAME_COMPOSITOR.lock().composite(Some(bg_buffer), &mut self.final_fb, bounding_box.into_iter())?;
-        self.refresh_windows(bounding_box, active)
-    }
-    
-    // /// Refresh the part of the top framebuffer in `bounding_box`. The top framebuffer contains the mouse and moving floating window border.
-    // /// `bounding_box` is a rectangle relative to the top-left of the screen. Update the whole screen if `bounding_box` is `None`.
-    // pub fn refresh_top(&mut self, bounding_box: Option<Rectangle>) -> Result<(), &'static str> {
-    //     let top_buffer = FramebufferUpdates {
-    //         src_framebuffer: &self.top_fb,
-    //         coordinate_in_dest_framebuffer: Coord::new(0, 0),
-    //     }; 
-
-    //     FRAME_COMPOSITOR.lock().composite(Some(top_buffer), &mut self.final_fb, bounding_box)
-    // }
     
     /// pass keyboard event to currently active window
     fn pass_keyboard_event_to_window(&self, key_event: KeyEvent) -> Result<(), &'static str> {
@@ -419,7 +402,7 @@ impl WindowManager {
         match self.repositioned_border {
             Some(border) => {
                 let pixels = self.draw_floating_border(&border, color::TRANSPARENT);
-                self.refresh_bottom_windows_pixels(pixels.into_iter())?;
+                self.refresh_bottom_windows(pixels.into_iter(), true)?;
             },
             None =>{}
         }
@@ -557,7 +540,7 @@ impl WindowManager {
             top_left: self.mouse,
             bottom_right: self.mouse + (MOUSE_POINTER_SIZE as isize, MOUSE_POINTER_SIZE as isize)
         });
-        self.refresh_bottom_windows_pixels(bounding_box.into_iter())?;
+        self.refresh_bottom_windows(bounding_box.into_iter(), true)?;
 
         // draw new mouse
         self.mouse = new;
