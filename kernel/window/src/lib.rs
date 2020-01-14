@@ -242,12 +242,15 @@ impl Window {
                                             self.show_button(TopButton::from(i), 0, &mut inner);
                                             need_refresh_three_button = true;
                                             if self.last_mouse_position_event.left_button_hold {
+                                                // Kevin: disabling the close button until it actually works
+                                                /*
                                                 // click event
                                                 if i == 0 {
                                                     debug!("close window");
                                                     return Err("user close window");
                                                     // window will not close until app drop self
                                                 }
+                                                */
                                             }
                                         }
                                     } else {
