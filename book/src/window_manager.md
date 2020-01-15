@@ -1,39 +1,43 @@
 # How the window manager works
 
-## The Window Trait
+## Design
 
-The `window` crate defines a `Window` trait. It has basic methods of operations on a window such as setting its states or clear its contents. Any structure that implements the trait can act as a window. A window object is usually owned by an application or the window manager.
+In most of the cases, both an application and the window manager want to get access to the same window. The application needs to display in the window, and the window manager requires the information and order of windows to render them to the screen. In order to share a window between an application and the window manager, we wrap a window object with `Mutex`. The application owns a strong reference to the window, while the window manager holds a weak reference since its lifetime is longer than the window.
 
-## The WindowList structure
+However, `Mutex` introduces a danger of deadlocks. When an application wants to get access to its window, it must lock it first, operate on it and then release it. If an application does not release the locked window, the window manager will be blocked in most of the operations such as switching or deleting since it needs to traverse all the windows including the locked one. 
 
-The `window_list` crate defines a `WindowList` structure. This structure consists of an active window and a list of background windows. It takes a type parameter to specify the concrete type of these `Window` objects. The structure implements basic methods to manipulate the list such as adding or deleting a window. 
+To solve this problem, we define two objects `Window` and `WindowInner`. `WindowInner` only contains the information required by the window manager. A window manager holds a list of reference to `WindowInner`s. An application owns a `Window` object which wraps a reference to its `WindowInner` object together with other states required by the application. 
 
-The structure also implements two functions `switch_to` and `switch_to_next` to switch to a specified window or to the next one. The order of windows depends on the last time they become active. The one which was active most recently is at the top of the background list. The active window would show on top of all windows and get all the events passed to the window manager. Once an active window is deleted, the next window in the background list will become active.
+## The WindowInner structure
 
-The `WindowList` structure has a method `send_event_to_active` to send an event to the active window. The `event_type` crate defines various event types as enums. For example, `InputEvent` represents the key inputs received by the `input_event_manager`, and a window manager can invoke `send_event_to_active` to send the key inputs to the active window.
+The `window_inner` crate defines a `WindowInner` structure. It has states and methods of displaying the window on the screen. 
 
-A window manager holds an instance of the `WindowList` structure. In the future, we will define the `WindowList` as a generic trait and implement various kinds of window managers.
+A `WindowInner` has a framebuffer to which it can display the content of the window. The framebuffer takes a type parameter of pixels it consists of. When the window is rendered to the screen, a compositor may composite every pixel with different principles according to the type. Currently, we have implemented a normal RGB pixel and a pixel of an alpha channel.
 
-## The Window Manager
+Both an application's window and the window manager has a reference to the same `WindowInner` object. The application can configure and draw in the framebuffer and the manager can display and composite the window with others.
 
-The `window_manager` owns a `WINDOWLIST` instance which contains all the existing windows. It invokes the methods of `WindowList` to manage these windows.
+This structure also has an event producer. The window manager gets events from I/O devices such as keyboards and push them to the corresponding producer.
 
-In most of the cases, both an application and the window manager want to get access to the same window. The application needs to display in the window, and the window manager requires the information and order of windows to render them to the screen. In order to share a window between an application and the window manager, we wrap a `Window` object with `Mutex`. The application owns a strong reference to the window, while the window manager holds a weak reference since its lifetime is longer than the window.
 
-However, `Mutex` introduces a danger of deadlocks. When an application wants to get access to its window, it must lock it first, operates on it and then release it. If an application does not release the locked window, the window manager will be blocked in most of the operations such as switching or deleting since it needs to traverse all the windows including the locked one. 
+## Window
 
-To solve this problem, we define two objects `WindowProfile` and `WindowGeneric`. `WindowProfile` only contains the information required by the window manager and implements the `Window` trait. `WINDOWLIST` in the window manager holds a list of reference to `WindowProfile`s. An application owns a `WindowGeneric` object which wraps a reference to its `WindowProfile` structure together with other states required by the application. 
+A `Window` object represents a window and is owned by an application. It contains its profile, a title, a consumer and a list of displayables. The consumer can get events pushed to the producer in its profile by the manager.
 
-## WindowProfile
-
-The `WindowProfile` structure contains the location, the size, the padding, the active state of a window and an event producer. Window manager uses the profile information to render all the windows to the screen. Once an event arrives, the window manager will push it into the producer of the active window so that the owner of the corresponding `WindowGeneric` object can handle it.
-
-## WindowGeneric
-
-The `WindowGeneric` object represents the whole window and is owned by an application. Except for the profile, it also contains a framebuffer onto which the window can display its content(displayables), a consumer which deals with the events the window receives and a list of displayables that can display themselves onto the framebuffer.
+A `Window` provides methods to display the displayables in it and render itself to the screen. The window manager is responsible for compositing it with other windows through a framebuffer compositor.
 
 ## Displayables
 
-The `displayable` crate defines a `Displayable` trait. A `Displayable` is an item which can display itself onto a framebuffer. It usually consists of basic graphs and acts as a component of a window such as a button or a text box. Currently, we have implemented a `TextDisplay` which is a block of text. In the future we will implement other kinds of displayables.
+The `displayable` crate defines a `Displayable` trait. A `Displayable` is an item which can display itself onto a framebuffer. It usually consists of basic graphs and acts as a component of a window such as a button or a text box. Currently, we have implemented a `TextDisplay` which is a block of text. In the future, we will implement other kinds of displayables.
 
-An application can add any `Displayable` object to a window and display it. The `WindowGeneric` structure identifies `Displayables` by their name. It implements generic methods to get access to different kinds of displayables or display them by their names.
+An application can own multiple displayables and display any type of `Displayable` in its window.
+
+## The WindowManager
+
+The `window_manager` crate defines a `WindowManager` structure. This structure consists of the profiles of an active window, a list of shown windows and a list of hidden windows. The hidden ones are totally overlapped by others. The structure implements basic methods to manipulate the list such as adding or deleting a window. 
+
+The `WindowManager` structure contains a bottom framebuffer which represents the background image and a final framebuffer of a floating window border and a mouse arrow. In refreshing an area, it renders the framebuffers in order background -> hidden list -> shown list -> active -> top. It provides several methods to update a rectangle area or several pixels for better performance.
+
+The structure defines a loop for generic events, a loop for keyboard events and a loop for mouse events. Theseus will initialize them as tasks to handle inputs. The window manager structure provides methods to operate on the window list as reactions to these inputs. It can move a window when we drag it with mouse or pass other events to the active window. The owner application of the active window can handle these events.
+
+The `window_manager` crate owns a `WINDOW_MANAGER` instance which contains all the existing windows. It invokes the methods of `WindowManager` to manage these windows.
+

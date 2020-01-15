@@ -194,7 +194,6 @@ impl Shell {
         };
 
         let terminal = app_io::get_terminal_or_default()?;
-        terminal.lock().initialize_screen()?;
 
         Ok(Shell {
             jobs: BTreeMap::new(),
@@ -327,10 +326,12 @@ impl Shell {
         if offset_from_end > 0 {
             self.update_cursor_pos(offset_from_end - 1)?;
         }
+        self.terminal.lock().cursor.enable();
+        
         Ok(())
     }
 
-    /// Update the position of cursor. `offset_from_end` specifies the position relative to the end of the text in units of characters.
+    /// Update the position of cursor. `offset_from_end` specifies the position relative to the end of the text in number of characters.
     fn update_cursor_pos(&mut self, offset_from_end: usize) -> Result<(), &'static str> {
         let mut terminal = self.terminal.lock();
         terminal.cursor.disable();
@@ -939,7 +940,7 @@ impl Shell {
         if possible_names.is_empty() { return Ok(()); }
 
         // Get terminal screen width.
-        let (width, _) = self.terminal.lock().get_width_height();
+        let (width, _) = self.terminal.lock().get_text_dimensions();
 
         // Find the length of the longest string.
         let longest_len = match possible_names.iter().map(|name| name.len()).max() {
@@ -1282,7 +1283,7 @@ impl Shell {
         let mut need_refresh = false;
         let mut need_prompt = false;
         self.redisplay_prompt();
-        self.terminal.lock().refresh_display();
+        self.terminal.lock().refresh_display()?;
         loop {
             // If there is anything from running applications to be printed, it printed on the screen and then
             // return true, so that the loop continues, otherwise nothing happens and we keep on going with the
@@ -1312,12 +1313,12 @@ impl Shell {
                         return Ok(());
                     }
 
-                    Event::ResizeEvent(ref _rev) => {
+                    Event::WindowResizeEvent(ref _rev) => {
                         need_refresh = true; // application refreshes display after resize event is received
                     }
 
                     // Handles ordinary keypresses
-                    Event::InputEvent(ref input_event) => {
+                    Event::KeyboardEvent(ref input_event) => {
                         self.key_event_producer.write_one(input_event.key_event);
                     }
                     _ => { }
@@ -1325,9 +1326,16 @@ impl Shell {
             }          
             if need_refresh || need_refresh_on_task_event {
                 // update if there are outputs from applications
-                self.terminal.lock().refresh_display();
+                self.terminal.lock().refresh_display()?;
             }
-            self.terminal.lock().display_cursor()?;
+
+            let is_active = {
+                window_manager::WINDOW_MANAGER.try().ok_or("The window manager is not initialized")?.lock().is_active(&self.terminal.lock().window.inner)
+            };
+            
+            if is_active {
+                self.terminal.lock().display_cursor()?;
+            }
 
             // handle inputs
             need_refresh = false;
@@ -1349,7 +1357,7 @@ impl Shell {
             }
             if need_refresh {
                 // update if there are inputs
-                self.terminal.lock().refresh_display();
+                self.terminal.lock().refresh_display()?;
             } else {
                 scheduler::schedule(); // yield the CPU if nothing to do
             }

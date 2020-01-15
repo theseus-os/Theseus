@@ -8,42 +8,16 @@
 //! In the future, the input event manager will handle other forms of input to the OS
 
 #![no_std]
-extern crate keycodes_ascii;
-extern crate spin;
-extern crate mpmc;
 extern crate spawn;
-extern crate task;
 extern crate mod_mgmt;
-extern crate event_types; 
-extern crate window_manager;
-extern crate path;
+extern crate alloc;
 
-#[macro_use] extern crate alloc;
-#[macro_use] extern crate log;
+use alloc::{string::ToString, sync::Arc};
+use mod_mgmt::{metadata::CrateType, CrateNamespace, NamespaceDir};
+use spawn::{ApplicationTaskBuilder};
 
-use alloc::{
-    string::{String, ToString},
-    vec::Vec,
-    sync::Arc,
-};
-use event_types::{Event};
-use keycodes_ascii::{Keycode, KeyAction};
-use mpmc::Queue;
-use mod_mgmt::{
-    CrateNamespace,
-    NamespaceDir,
-    metadata::CrateType,
-};
-use spawn::{KernelTaskBuilder, ApplicationTaskBuilder};
-use path::Path;
-
-/// Initializes the keyinput queue and the default display
-pub fn init() -> Result<Queue<Event>, &'static str> {
-    // keyinput queue initialization
-    let keyboard_event_handling_queue: Queue<Event> = Queue::with_capacity(100);
-    let keyboard_event_handling_consumer = keyboard_event_handling_queue.clone();
-    let returned_keyboard_producer = keyboard_event_handling_queue.clone();
-
+/// Initializes the i/o related tasks.
+pub fn init() -> Result<(), &'static str> {
     // Create the first application CrateNamespace via the following steps:
     // (1) get the default kernel CrateNamespace, which will serve as the new app namespace's recursive namespace,
     // (2) get the directory where the default app namespace should have been populated when mod_mgmt was init'd,
@@ -85,69 +59,5 @@ pub fn init() -> Result<Queue<Event>, &'static str> {
         .namespace(default_app_namespace)
         .spawn()?;
 
-    // start the input event loop thread
-    KernelTaskBuilder::new(input_event_loop, keyboard_event_handling_consumer)
-        .name("input_event_loop".to_string())
-        .spawn()?;
-
-    Ok(returned_keyboard_producer)
-}
-
-/// Handles all key inputs to the system
-fn input_event_loop(consumer:Queue<Event>) -> Result<(), &'static str> {
-    let mut terminal_id_counter: usize = 1; 
-    loop {
-        let mut meta_keypress = false; // bool prevents keypresses to control the terminals themselves from getting logged to the active terminal 
-
-        // Pops events off the keyboard queue and redirects to the appropriate terminal input queue producer
-        let event = match consumer.pop() {
-            Some(ev) => ev,
-            _ => { continue; }
-        };
-        match event {
-            Event::ExitEvent => {
-                trace!("exiting the main loop of the input event manager");
-                return Ok(()); 
-            }
-
-            Event::InputEvent(ref input_event) => {
-                let key_input = input_event.key_event;
-                // The following are keypresses for control over the windowing system
-                // Creates new terminal window
-                if key_input.modifiers.control && key_input.keycode == Keycode::T && key_input.action == KeyAction::Pressed {
-                    let task_name: String = format!("terminal {}", terminal_id_counter);
-                    let args: Vec<String> = vec![]; // terminal::main() does not accept any arguments
-                    ApplicationTaskBuilder::new(Path::new(String::from("shell")))
-                        .argument(args)
-                        .name(task_name)
-                        .spawn()?;
-                    terminal_id_counter += 1;
-                    meta_keypress = true;
-                    //event.mark_completed();
-                  
-                }
-
-                // Switches between terminal windows
-                if key_input.modifiers.alt && key_input.keycode == Keycode::Tab && key_input.action == KeyAction::Pressed {
-                    window_manager::WINDOWLIST.lock().switch_to_next()?;
-                    meta_keypress = true;
-                   // event.mark_completed();
-
-                }
-
-                // Deletes the active window (whichever window Ctrl + W is logged in)
-                if key_input.modifiers.control && key_input.keycode == Keycode::W && key_input.action == KeyAction::Pressed {
-                    window_manager::WINDOWLIST.lock().send_event_to_active(Event::ExitEvent)?; // tells application to exit
-                }
-            }
-            _ => { }
-        }
-
-        // If the keyevent was not for control of the terminal windows, enqueues keycode into active window
-        if !meta_keypress {
-            window_manager::WINDOWLIST.lock().send_event_to_active(event.clone())?;
-            //event.mark_completed();
-
-        }
-    }    
+    Ok(())
 }
