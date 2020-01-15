@@ -24,7 +24,11 @@ path = "../../libs/mouse_data"
 [dependencies.ps2]
 path = "../ps2"
 
+[dependencies.event_types]
+path = "../event_types"
 
+[dependencies.mpmc]
+path = "../../libs/mpmc"
 
 [lib]
 crate-type = ["rlib"]

@@ -8,20 +8,23 @@ build = "../../../build.rs"
 [dependencies]
 spin = "0.4.10"
 
-[dependencies.frame_buffer]
-path = "../../frame_buffer"
+[dependencies.framebuffer]
+path = "../../framebuffer"
 
 [dependencies.displayable]
 path = "../"
 
-[dependencies.frame_buffer_printer]
-path = "../../frame_buffer_printer"
+[dependencies.framebuffer_printer]
+path = "../../framebuffer_printer"
 
 [dependencies.font]
 path = "../../font"
 
-[dependencies.frame_buffer_drawer]
-path = "../../frame_buffer_drawer"
+[dependencies.shapes]
+path = "../../shapes"
+
+[dependencies.color]
+path = "../../color"
 
 [lib]
 crate-type = ["rlib"]

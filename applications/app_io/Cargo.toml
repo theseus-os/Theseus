@@ -27,6 +27,9 @@ path = "../../kernel/task"
 [dependencies.print]
 path = "../../kernel/print"
 
+[dependencies.window_manager]
+path = "../../kernel/window_manager"
+
 [dependencies.libterm]
 path = "../../kernel/libterm"
 

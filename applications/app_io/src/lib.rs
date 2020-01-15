@@ -25,12 +25,13 @@ extern crate libterm;
 extern crate scheduler;
 extern crate serial_port;
 extern crate core_io;
+extern crate window_manager;
 
 use stdio::{StdioReader, StdioWriter, KeyEventReadGuard,
             KeyEventQueueReader};
 use spin::{Mutex, MutexGuard};
-use alloc::collections::BTreeMap;
 use alloc::boxed::Box;
+use alloc::collections::BTreeMap;
 use alloc::sync::Arc;
 use alloc::string::String;
 use alloc::vec::Vec;
@@ -132,11 +133,16 @@ mod shared_maps {
 
 lazy_static! {
     /// The default terminal.
-    static ref DEFAULT_TERMINAL: Option<Arc<Mutex<Terminal>>> =
+    static ref DEFAULT_TERMINAL: Option<Arc<Mutex<Terminal>>> = {
         match Terminal::new() {
             Ok(terminal) => Some(Arc::new(Mutex::new(terminal))),
-            Err(_) => None
-        };
+            Err(err) => {
+                debug!("Fail to create the default terminal: {}", err);
+                None
+            }
+        }
+    };
+        
 }
 
 /// Applications call this function to get the terminal to which it should print.

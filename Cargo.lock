@@ -100,6 +100,7 @@ dependencies = [
  "spin 0.4.10 (registry+https://github.com/rust-lang/crates.io-index)",
  "stdio 0.1.0",
  "task 0.1.0",
+ "window_manager 0.1.0",
  "x86_64 0.1.2",
 ]
 
@@ -218,9 +219,6 @@ dependencies = [
  "dfqueue 0.1.0",
  "e1000 0.1.0",
  "exceptions_full 0.1.0",
- "font 0.1.0",
- "frame_buffer 0.1.0",
- "frame_buffer_rgb 0.1.0",
  "input_event_manager 0.1.0",
  "interrupts 0.1.0",
  "irq_safety 0.1.1 (git+https://github.com/kevinaboos/irq_safety)",
@@ -290,10 +288,15 @@ version = "0.1.9"
 source = "registry+https://github.com/rust-lang/crates.io-index"
 
 [[package]]
+name = "color"
+version = "0.1.0"
+
+[[package]]
 name = "compositor"
 version = "0.1.0"
 dependencies = [
- "frame_buffer 0.1.0",
+ "framebuffer 0.1.0",
+ "shapes 0.1.0",
 ]
 
 [[package]]
@@ -447,8 +450,9 @@ dependencies = [
 name = "displayable"
 version = "0.1.0"
 dependencies = [
- "downcast-rs 1.0.4 (git+https://github.com/theseus-os/downcast-rs)",
- "frame_buffer 0.1.0",
+ "color 0.1.0",
+ "framebuffer 0.1.0",
+ "shapes 0.1.0",
  "spin 0.4.10 (registry+https://github.com/rust-lang/crates.io-index)",
 ]
 
@@ -523,8 +527,9 @@ dependencies = [
 name = "event_types"
 version = "0.1.0"
 dependencies = [
- "frame_buffer 0.1.0",
  "keycodes_ascii 0.1.0",
+ "mouse_data 0.1.0",
+ "shapes 0.1.0",
 ]
 
 [[package]]
@@ -583,50 +588,43 @@ dependencies = [
 ]
 
 [[package]]
-name = "frame_buffer"
+name = "framebuffer"
 version = "0.1.0"
 dependencies = [
- "memory 0.1.0",
- "owning_ref 0.4.0 (git+https://github.com/kevinaboos/owning-ref-rs)",
- "spin 0.4.10 (registry+https://github.com/rust-lang/crates.io-index)",
-]
-
-[[package]]
-name = "frame_buffer_compositor"
-version = "0.1.0"
-dependencies = [
- "compositor 0.1.0",
- "frame_buffer 0.1.0",
- "hashbrown 0.1.8 (registry+https://github.com/rust-lang/crates.io-index)",
- "lazy_static 1.2.0 (registry+https://github.com/rust-lang/crates.io-index)",
- "spin 0.4.10 (registry+https://github.com/rust-lang/crates.io-index)",
-]
-
-[[package]]
-name = "frame_buffer_drawer"
-version = "0.1.0"
-dependencies = [
- "frame_buffer 0.1.0",
-]
-
-[[package]]
-name = "frame_buffer_printer"
-version = "0.1.0"
-dependencies = [
- "font 0.1.0",
- "frame_buffer 0.1.0",
- "frame_buffer_rgb 0.1.0",
-]
-
-[[package]]
-name = "frame_buffer_rgb"
-version = "0.1.0"
-dependencies = [
- "frame_buffer 0.1.0",
+ "color 0.1.0",
  "memory 0.1.0",
  "multicore_bringup 0.1.0",
  "owning_ref 0.4.0 (git+https://github.com/kevinaboos/owning-ref-rs)",
+ "shapes 0.1.0",
+]
+
+[[package]]
+name = "framebuffer_compositor"
+version = "0.1.0"
+dependencies = [
+ "compositor 0.1.0",
+ "framebuffer 0.1.0",
+ "hashbrown 0.1.8 (registry+https://github.com/rust-lang/crates.io-index)",
+ "lazy_static 1.2.0 (registry+https://github.com/rust-lang/crates.io-index)",
+ "shapes 0.1.0",
  "spin 0.4.10 (registry+https://github.com/rust-lang/crates.io-index)",
+]
+
+[[package]]
+name = "framebuffer_drawer"
+version = "0.1.0"
+dependencies = [
+ "framebuffer 0.1.0",
+ "shapes 0.1.0",
+]
+
+[[package]]
+name = "framebuffer_printer"
+version = "0.1.0"
+dependencies = [
+ "font 0.1.0",
+ "framebuffer 0.1.0",
+ "shapes 0.1.0",
 ]
 
 [[package]]
@@ -784,17 +782,8 @@ dependencies = [
 name = "input_event_manager"
 version = "0.1.0"
 dependencies = [
- "event_types 0.1.0",
- "keycodes_ascii 0.1.0",
- "log 0.3.9 (registry+https://github.com/rust-lang/crates.io-index)",
  "mod_mgmt 0.1.0",
- "mpmc 0.1.6-pre",
- "path 0.1.0",
  "spawn 0.1.0",
- "spin 0.4.10 (registry+https://github.com/rust-lang/crates.io-index)",
- "task 0.1.0",
- "window_manager 0.1.0",
- "x86_64 0.1.2",
 ]
 
 [[package]]
@@ -941,21 +930,21 @@ dependencies = [
 name = "libterm"
 version = "0.1.0"
 dependencies = [
+ "color 0.1.0",
  "dfqueue 0.1.0",
  "displayable 0.1.0",
  "environment 0.1.0",
  "event_types 0.1.0",
  "font 0.1.0",
- "frame_buffer 0.1.0",
- "frame_buffer_drawer 0.1.0",
- "frame_buffer_printer 0.1.0",
- "frame_buffer_rgb 0.1.0",
- "log 0.3.9 (registry+https://github.com/rust-lang/crates.io-index)",
+ "framebuffer 0.1.0",
+ "framebuffer_drawer 0.1.0",
+ "framebuffer_printer 0.1.0",
  "print 0.1.0",
  "root 0.1.0",
- "spin 0.4.10 (registry+https://github.com/rust-lang/crates.io-index)",
+ "shapes 0.1.0",
  "text_display 0.1.0",
  "tsc 0.1.0",
+ "window 0.1.0",
  "window_manager 0.1.0",
 ]
 
@@ -1144,8 +1133,10 @@ dependencies = [
 name = "mouse"
 version = "0.1.0"
 dependencies = [
+ "event_types 0.1.0",
  "log 0.3.9 (registry+https://github.com/rust-lang/crates.io-index)",
  "mouse_data 0.1.0",
+ "mpmc 0.1.6-pre",
  "ps2 0.1.0",
  "spin 0.4.10 (registry+https://github.com/rust-lang/crates.io-index)",
 ]
@@ -1249,6 +1240,19 @@ version = "1.0.1"
 source = "registry+https://github.com/rust-lang/crates.io-index"
 dependencies = [
  "unreachable 1.0.0 (registry+https://github.com/rust-lang/crates.io-index)",
+]
+
+[[package]]
+name = "new_window"
+version = "0.1.0"
+dependencies = [
+ "color 0.1.0",
+ "framebuffer 0.1.0",
+ "log 0.3.9 (registry+https://github.com/rust-lang/crates.io-index)",
+ "shapes 0.1.0",
+ "spin 0.4.10 (registry+https://github.com/rust-lang/crates.io-index)",
+ "window 0.1.0",
+ "x86_64 0.1.2",
 ]
 
 [[package]]
@@ -1868,6 +1872,10 @@ dependencies = [
 ]
 
 [[package]]
+name = "shapes"
+version = "0.1.0"
+
+[[package]]
 name = "shell"
 version = "0.1.0"
 dependencies = [
@@ -2209,11 +2217,12 @@ dependencies = [
 name = "text_display"
 version = "0.1.0"
 dependencies = [
+ "color 0.1.0",
  "displayable 0.1.0",
  "font 0.1.0",
- "frame_buffer 0.1.0",
- "frame_buffer_drawer 0.1.0",
- "frame_buffer_printer 0.1.0",
+ "framebuffer 0.1.0",
+ "framebuffer_printer 0.1.0",
+ "shapes 0.1.0",
  "spin 0.4.10 (registry+https://github.com/rust-lang/crates.io-index)",
 ]
 
@@ -2383,39 +2392,55 @@ dependencies = [
 name = "window"
 version = "0.1.0"
 dependencies = [
- "dfqueue 0.1.0",
+ "color 0.1.0",
  "event_types 0.1.0",
- "frame_buffer 0.1.0",
+ "framebuffer 0.1.0",
+ "framebuffer_drawer 0.1.0",
+ "log 0.3.9 (registry+https://github.com/rust-lang/crates.io-index)",
+ "mouse 0.1.0",
+ "mpmc 0.1.6-pre",
+ "path 0.1.0",
+ "shapes 0.1.0",
+ "spawn 0.1.0",
+ "spin 0.4.10 (registry+https://github.com/rust-lang/crates.io-index)",
+ "window_inner 0.1.0",
+ "window_manager 0.1.0",
 ]
 
 [[package]]
-name = "window_list"
+name = "window_inner"
 version = "0.1.0"
 dependencies = [
+ "color 0.1.0",
  "event_types 0.1.0",
- "frame_buffer 0.1.0",
- "frame_buffer_printer 0.1.0",
+ "framebuffer 0.1.0",
+ "mpmc 0.1.6-pre",
+ "shapes 0.1.0",
  "spin 0.4.10 (registry+https://github.com/rust-lang/crates.io-index)",
- "window 0.1.0",
 ]
 
 [[package]]
 name = "window_manager"
 version = "0.1.0"
 dependencies = [
+ "color 0.1.0",
  "compositor 0.1.0",
- "dfqueue 0.1.0",
- "displayable 0.1.0",
  "event_types 0.1.0",
- "frame_buffer 0.1.0",
- "frame_buffer_compositor 0.1.0",
- "frame_buffer_drawer 0.1.0",
- "frame_buffer_printer 0.1.0",
- "frame_buffer_rgb 0.1.0",
+ "font 0.1.0",
+ "framebuffer 0.1.0",
+ "framebuffer_compositor 0.1.0",
+ "framebuffer_drawer 0.1.0",
+ "keycodes_ascii 0.1.0",
  "lazy_static 1.2.0 (registry+https://github.com/rust-lang/crates.io-index)",
+ "mod_mgmt 0.1.0",
+ "mouse_data 0.1.0",
+ "mpmc 0.1.6-pre",
+ "path 0.1.0",
+ "scheduler 0.1.0",
+ "shapes 0.1.0",
+ "spawn 0.1.0",
  "spin 0.4.10 (registry+https://github.com/rust-lang/crates.io-index)",
- "window 0.1.0",
- "window_list 0.1.0",
+ "window_inner 0.1.0",
 ]
 
 [[package]]
