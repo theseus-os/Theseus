@@ -32,7 +32,7 @@ use fs_node::{FileOrDir, FsNode, DirRef};
 #[no_mangle]
 pub fn main(args: Vec<String>) -> isize {
     #[cfg(not(loadable))] {
-        println!("WARNING: Theseus was not built in 'loadable' mode, so crate swapping may not work.");
+        println!("****************\nWARNING: Theseus was not built in 'loadable' mode, so crate swapping may not work.\n****************");
     }
 
     let mut opts = Options::new();
@@ -138,12 +138,12 @@ fn parse_input_tuples<'a>(args: &'a str) -> Result<Vec<(&'a str, &'a str, bool)>
                 };
                 v.push((o, n, reexport_bool));
             }
-            _ => return Err("list of crate pairs is formatted incorrectly.".to_string()),
+            _ => return Err("list of crate tuples is formatted incorrectly.".to_string()),
         }
     }
 
     if v.is_empty() {
-        Err("no crate pairs specified.".to_string())
+        Err("no crate tuples specified.".to_string())
     }
     else {
         Ok(v)
@@ -165,17 +165,32 @@ fn do_swap(
         let mut mods: Vec<SwapRequest> = Vec::with_capacity(tuples.len());
         for (o, n, r) in tuples {
             // 1) check that the old crate exists and is loaded into the namespace
-            let old_crate = namespace.get_crate_starting_with(o)
-                .map(|(_name, crate_ref)| crate_ref)
-                .ok_or_else(|| format!("Couldn't find old crate loaded into namespace that matched {:?}", o))?;
+            let old_crate = match namespace.get_crates_starting_with(o).as_slice() {
+                [single_match] => single_match.1.clone_shallow(),
+                multiple_matches => {
+                    let mut err_str = format!("Couldn't find single match for an old crate named {:?}. Matching crates:", o);
+                    for (crate_name, _crate_ref, ns) in multiple_matches {
+                        err_str = format!("{}\n\t{} \t in namespace: {:?}", err_str, crate_name, ns.name);
+                    }
+                    return Err(err_str);
+                }
+            };
 
             // 2) check that the new crate file exists. It could be a regular path, or a prefix for a file in the namespace's kernel dir
             let new_crate_abs_path = match Path::new(String::from(n)).get(curr_dir) {
-                Some(FileOrDir::File(f)) => Ok(Path::new(f.lock().get_absolute_path())),
-                _ => namespace.get_crate_file_starting_with(n)
-                        .and_then(|p| p.get(namespace.dir()).map(|f_or_d| Path::new(f_or_d.get_absolute_path())))
-                        .ok_or_else(|| format!("Couldn't find new kernel crate file {:?}.", n))
-            }?;
+                Some(FileOrDir::File(f)) => Path::new(f.lock().get_absolute_path()),
+                _ => match namespace.get_crate_files_starting_with(n).as_slice() {
+                    [single_file] => single_file.clone(),
+                    multiple_files => {
+                        let mut err_str = format!("Couldn't find single match for the new kernel crate file {:?}. Matching files:", n);
+                        for path in multiple_files {
+                            err_str = format!("{}\n\t{}", err_str, path);
+                        }
+                        return Err(err_str);
+                    }
+                }
+            };
+
             mods.push(
                 SwapRequest::new(old_crate.lock_as_ref().crate_name.clone(), new_crate_abs_path, r)
                     .map_err(|_e| format!("BUG: the path of the new crate (passed in as {:?}) was not an absolute Path.", n))?

@@ -48,7 +48,7 @@ pub fn prio_sched(old_namespace: &CrateNamespace, new_namespace: &CrateNamespace
 
     // Extract the taskrefs from the round robin Runqueue, 
     // then convert them into priority taskrefs and place them on the priority Runqueue.
-    let rq_rr_crate = old_namespace.get_crate_starting_with("runqueue_round_robin").map(|(_crate_name, crate_ref)| crate_ref)
+    let rq_rr_crate = old_namespace.get_crate_starting_with("runqueue_round_robin").map(|(_crate_name, crate_ref, _ns)| crate_ref)
         .ok_or("Couldn't get runqueue_round_robin crate from old namespace")?;
     
     let krate = rq_rr_crate.lock_as_ref();
