@@ -943,7 +943,7 @@ impl CrateNamespace {
 
                     #[cfg(not(loscd_eval))]
                     debug!("swap_crates(): old_sec_name: {:?}, old_sec: {:?}", old_sec_name, old_sec_ref);
-                    let old_sec = old_sec_ref.lock();
+                    let mut old_sec = old_sec_ref.lock();
                     let old_sec_name_without_hash = old_sec.name_without_hash();
 
 
@@ -994,12 +994,14 @@ impl CrateNamespace {
                     // the section from the `new_crate` that corresponds to the `old_sec_ref` from the `old_crate`
                     let mut new_sec_ref: Option<StrongSectionRef> = None;
 
-                    for weak_dep in &old_sec.sections_dependent_on_me {
+                    // Iterate over all sections that depend on the old_sec. 
+                    let mut dead_weak_deps_to_remove: Vec<usize> = Vec::new();
+                    for (i, weak_dep) in old_sec.sections_dependent_on_me.iter().enumerate() {
                         let target_sec_ref = if let Some(sr) = weak_dep.section.upgrade() {
                             sr
                         } else {
-                            // TODO remove this `weak_dep` from `old_sec.sections_dependent_on_me`
-                            trace!("REMINDER to implement the removal of dead weak dependencies from old_sec: {}", old_sec.name);
+                            trace!("Removing dead weak dependency from old_sec: {}", old_sec.name);
+                            dead_weak_deps_to_remove.push(i);
                             continue;
                         };
                         let mut target_sec = target_sec_ref.lock();
@@ -1095,7 +1097,12 @@ impl CrateNamespace {
                             let end_fixing_dependencies = hpet.get_counter();
                             hpet_total_fixing_dependencies += (end_fixing_dependencies - start_fixing_dependencies);
                         }
+                    } // end of loop that iterates over all weak deps in the old_sec
+
+                    for index in dead_weak_deps_to_remove {
+                        old_sec.sections_dependent_on_me.remove(index);
                     }
+                    
                 } // end of loop that rewrites dependencies for sections that depend on the old_crate
 
                 #[cfg(loscd_eval)]

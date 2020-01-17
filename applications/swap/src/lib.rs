@@ -26,7 +26,7 @@ use getopts::{Options, Matches};
 use mod_mgmt::{NamespaceDir, SwapRequest};
 use hpet::get_hpet;
 use path::Path;
-use fs_node::{FileOrDir, FsNode, DirRef};
+use fs_node::{FileOrDir, DirRef};
 
 
 #[no_mangle]
@@ -170,7 +170,7 @@ fn do_swap(
                 multiple_matches => {
                     let mut err_str = format!("Couldn't find single match for an old crate named {:?}. Matching crates:", o);
                     for (crate_name, _crate_ref, ns) in multiple_matches {
-                        err_str = format!("{}\n\t{} \t in namespace: {:?}", err_str, crate_name, ns.name);
+                        err_str = format!("{}\n    {}  in namespace: {:?}", err_str, crate_name, ns.name);
                     }
                     return Err(err_str);
                 }
@@ -184,7 +184,7 @@ fn do_swap(
                     multiple_files => {
                         let mut err_str = format!("Couldn't find single match for the new kernel crate file {:?}. Matching files:", n);
                         for path in multiple_files {
-                            err_str = format!("{}\n\t{}", err_str, path);
+                            err_str = format!("{}\n    {}", err_str, path);
                         }
                         return Err(err_str);
                     }
