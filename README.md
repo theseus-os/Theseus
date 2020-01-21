@@ -13,7 +13,7 @@ More details are provided in Theseus's [documentation](#Documentation), especial
 Currently, we support building and running Theseus on the following host OSes:
  * Linux, 64-bit Debian-based distributions like Ubuntu, tested on Ubuntu 16.04 and 18.04.
  * Windows, using the Windows Subsystem for Linux (WSL), tested on the Ubuntu version.
- * MacOS, tested on version High Sierra (10.13), but likely works on others. 
+ * MacOS, tested on version Catalina (10.15.2), but likely works on others. 
 
 
 ### Setting up the build environment
@@ -29,8 +29,11 @@ Additionally, If you're on WSL, you'll need to do the following:
   * Install a C compiler and linker toolchain, such as `gcc`.
 
 If you're on Mac OS, do the following:
-  * Install [MacPorts](https://www.macports.org/install.php) and [HomeBrew](https://brew.sh/).
+  * Install [MacPorts](https://www.macports.org/install.php) and [HomeBrew](https://brew.sh/). 
+    * Make sure that `port -v` and `brew --version` works from your terminal. Otherwise, try exporting the PATH variable (or by directly adding `/opt/local/bin` to `/etc/paths` file, through `sudo nano /etc/paths`.) 
+  * If you've got your QEMU installed through MacPort, run `sudo port uninstall qemu`. Then install QEMU through Homebrew by running `brew install qemu`. 
   * run the MacOS build setup script: `./scripts/mac_os_build_setup.sh`
+    * If things later go wrong, to undo this step, run `rm -rf $HOME/theseus_tools_src $HOME/theseus_tools_opt`. Then retry by running the script. 
 
 
 
@@ -39,7 +42,7 @@ Install the current Rust compiler and toolchain by following the [setup instruct
 `curl https://sh.rustup.rs -sSf | sh`
 
 We also need to install Xargo, a drop-in replacement wrapper for Cargo that makes cross-compiling easier:    
-`cargo install --vers 0.3.13 xargo`
+`cargo install --vers 0.3.17 xargo`
 
 
 
