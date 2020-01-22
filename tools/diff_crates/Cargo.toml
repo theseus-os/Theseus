@@ -4,6 +4,12 @@ version = "0.1.0"
 description = "A tool for differencing crates' object files across builds of Theseus to see what has changed"
 authors = ["Kevin Boos <kevinaboos@gmail.com>"]
 
+
+[patch.crates-io]
+### use our own no_std-compatible qp trie
+qp-trie = { git = "https://github.com/messense/qp-trie-rs", branch = "fix-compilation" }
+
+
 [dependencies]
 getopts = "0.2"
 walkdir = "2.2.7"
