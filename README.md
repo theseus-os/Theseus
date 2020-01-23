@@ -30,10 +30,8 @@ Additionally, If you're on WSL, you'll need to do the following:
 
 If you're on Mac OS, do the following:
   * Install [MacPorts](https://www.macports.org/install.php) and [HomeBrew](https://brew.sh/). 
-    * Make sure that `port -v` and `brew --version` works from your terminal. Otherwise, try exporting the PATH variable (or by directly adding `/opt/local/bin` to `/etc/paths` file, through `sudo nano /etc/paths`.) 
-  * If you've got your QEMU installed through MacPort, run `sudo port uninstall qemu`. Then install QEMU through Homebrew by running `brew install qemu`. 
   * run the MacOS build setup script: `./scripts/mac_os_build_setup.sh`
-    * If things later go wrong, to undo this step, run `rm -rf $HOME/theseus_tools_src $HOME/theseus_tools_opt`. Then retry by running the script. 
+    * If things later go wrong, run `rm -rf $HOME/theseus_tools_src $HOME/theseus_tools_opt /opt/local/bin/make` and then start over. 
 
 
 
@@ -66,8 +64,9 @@ So, if you see a build error about the improper version of `rustc`, follow the i
 QEMU allows us to run Theseus quickly and easily in its own virtual machine, completely segregated from the host machine and OS. 
 To exit Theseus in QEMU, press `Ctrl+Alt`, which releases your keyboard focus from the QEMU window. Then press `Ctrl+C` in the terminal window that you ran `make run` from originally to kill QEMU. 
 
-To investigate the state of the running QEMU entity, you can switch to the QEMU console by pressing `Ctrl+Alt+2`. Switch back to the main window with `Ctrl+Alt+1`.    
+To investigate the state of the running QEMU entity, you can switch to the QEMU console by pressing `Ctrl+Alt+2`. Switch back to the main window with `Ctrl+Alt+1`. 
 
+On Mac, enter `Ctrl+Alt+G` to release mouse. To switch between console view and vga mode view, first release mouse and then manually select `VGA` or `compact_monitor0` under `View` from the top menu bar. Use `Ctrl+C` to kill QEMU. 
 
 ### KVM Support
 While not strictly required, KVM will speed up the execution of QEMU.
