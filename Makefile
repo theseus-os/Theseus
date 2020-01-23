@@ -55,7 +55,7 @@ endif
 ###################################################################################################
 
 XARGO_CURRENT_SUPPORTED_VERSION := 0.3.17
-XARGO_OUTPUT=$(shell xargo --version 2>&1 | head -n 1)
+XARGO_OUTPUT=$(shell xargo --version 2>&1 | head -n 1 | grep -o 'xargo [0-9]*\.[0-9]*\.[0-9]*')
 
 check_xargo: 	
 ifneq (${BYPASS_XARGO_CHECK}, yes)
