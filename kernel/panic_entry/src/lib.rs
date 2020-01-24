@@ -46,7 +46,7 @@ fn panic_entry_point(info: &PanicInfo) -> ! {
                 const PANIC_WRAPPER_SYMBOL: &'static str = "panic_wrapper::panic_wrapper::";
                 let section_ref = {
                     task::get_my_current_task().map(|t| t.get_namespace()).as_ref()
-                        .or_else(|| mod_mgmt::get_default_namespace())
+                        .or_else(|| mod_mgmt::get_initial_kernel_namespace())
                         .and_then(|namespace| namespace.get_symbol_starting_with(PANIC_WRAPPER_SYMBOL).upgrade())
                         .ok_or("Couldn't get single symbol matching \"panic_wrapper::panic_wrapper::\"")?
                 };
@@ -118,7 +118,7 @@ extern "C" fn _Unwind_Resume(arg: usize) -> ! {
             const UNWIND_RESUME_SYMBOL: &'static str = "unwind::unwind_resume::";
             let section_ref = {
                 task::get_my_current_task().map(|t| t.get_namespace()).as_ref()
-                    .or_else(|| mod_mgmt::get_default_namespace())
+                    .or_else(|| mod_mgmt::get_initial_kernel_namespace())
                     .and_then(|namespace| namespace.get_symbol_starting_with(UNWIND_RESUME_SYMBOL).upgrade())
                     .ok_or("Couldn't get single symbol matching \"unwind::unwind_resume::\"")?
             };

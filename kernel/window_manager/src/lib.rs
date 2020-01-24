@@ -10,8 +10,8 @@
 #![no_std]
 
 extern crate spin;
-#[macro_use]
-extern crate alloc;
+#[macro_use] extern crate log;
+#[macro_use] extern crate alloc;
 extern crate mpmc;
 extern crate event_types;
 extern crate compositor;
@@ -30,7 +30,7 @@ extern crate color;
 
 mod background;
 use alloc::collections::VecDeque;
-use alloc::string::{String, ToString};
+use alloc::string::ToString;
 use alloc::sync::{Arc, Weak};
 use alloc::vec::{Vec};
 use compositor::{Compositor, FramebufferUpdates, CompositableRegion};
@@ -113,6 +113,7 @@ impl WindowManager {
                 } else {
                     // save this to show_list
                     self.show_list.push_front(self.active.clone());
+                    warn!("SET ACTIVE TO NONE");
                     self.active = Weak::new();
                 }
                 false
@@ -332,15 +333,12 @@ impl WindowManager {
         } 
     }
     
-    /// pass keyboard event to currently active window
+    /// Passes the given keyboard event to the currently active window
     fn pass_keyboard_event_to_window(&self, key_event: KeyEvent) -> Result<(), &'static str> {
-        if let Some(current_active) = self.active.upgrade() {
-            let current_active_win = current_active.lock();
-            current_active_win
-                .producer
-                .push(Event::new_keyboard_event(key_event)).map_err(|_e| "Fail to enqueue the mouse position event")?;
-        }
-        Err("cannot find window to pass key event")
+        let active_window_ref = self.active.upgrade().ok_or("no window was set as active to receive a keyboard event")?;
+        let active_window = active_window_ref.lock();
+        active_window.producer.push(Event::new_keyboard_event(key_event)).map_err(|_e| "Failed to enqueue the keyboard event")?;
+        Ok(())
     }
 
     /// pass mouse event to the top window that mouse on, may also transfer to those want all events
@@ -749,55 +747,38 @@ fn window_manager_loop(
 fn keyboard_handle_application(key_input: KeyEvent) -> Result<(), &'static str> {
     // Check for WM-level actions here, e.g., spawning a new terminal via Ctrl+Alt+T
     if key_input.modifiers.control
+        && key_input.modifiers.alt
         && key_input.keycode == Keycode::T
         && key_input.action == KeyAction::Pressed
     {
-        // Since the WM currently runs in the kernel, we need to create a new application namespace for the terminal
-        use mod_mgmt::{metadata::CrateType, CrateNamespace, NamespaceDir};
-        let default_kernel_namespace = mod_mgmt::get_default_namespace()
-            .ok_or("default CrateNamespace not yet initialized")?;
-        let new_app_namespace_name = CrateType::Application.namespace_name().to_string();
-        let new_app_namespace_dir = mod_mgmt::get_namespaces_directory()
-            .and_then(|ns_dir| ns_dir.lock().get_dir(&new_app_namespace_name))
-            .ok_or("Couldn't find the directory to create a new application CrateNamespace")?;
-        let new_app_namespace = Arc::new(CrateNamespace::new(
-            new_app_namespace_name,
-            NamespaceDir::new(new_app_namespace_dir),
-            Some(default_kernel_namespace.clone()),
-        ));
+        // Because this task (the window manager loop) runs in a kernel-only namespace,
+        // we have to create a new application namespace in order to be able to actually spawn a shell.
 
-        let task_name: String = format!("shell");
-        let args: Vec<String> = vec![]; // shell::main() does not accept any arguments
-        let terminal_obj_file = new_app_namespace
-            .dir()
-            .get_file_starting_with("shell-")
+        let new_app_namespace = mod_mgmt::create_application_namespace(None)?;
+        let shell_objfile = new_app_namespace.dir().get_file_starting_with("shell-")
             .ok_or("Couldn't find shell application file to run upon Ctrl+Alt+T")?;
-        let path = Path::new(terminal_obj_file.lock().get_absolute_path());
+        let path = Path::new(shell_objfile.lock().get_absolute_path());
         ApplicationTaskBuilder::new(path)
-            .argument(args)
-            .name(task_name)
+            .name(format!("shell"))
             .namespace(new_app_namespace)
             .spawn()?;
+
+        debug!("window_manager: spawned new shell app in new app namespace.");
+        return Ok(());
     }
+
     // then pass them to window
-    let win = WINDOW_MANAGER
-        .try()
-        .ok_or("The static window manager was not yet initialized")?
-        .lock();
-    if let Err(_) = win.pass_keyboard_event_to_window(key_input) {
-        // note that keyboard event should be passed to currently active window
-        // if no window is active now, this function will return Err, but that's OK for now.
-        // This part could be used to add logic when no active window is present, how to handle keyboards, but just leave blank now
+    let win = WINDOW_MANAGER.try().ok_or("The static window manager was not yet initialized")?.lock();
+    if let Err(_e) = win.pass_keyboard_event_to_window(key_input) {
+        error!("window_manager: failed to pass keyboard event to active window. Error: {:?}", _e);
+        // If no window is currently active, 
     }
     Ok(())
 }
 
 /// handle mouse event, push it to related window or anyone asked for it
 fn cursor_handle_application(mouse_event: MouseEvent) -> Result<(), &'static str> {
-    let wm = WINDOW_MANAGER
-        .try()
-        .ok_or("The static window manager was not yet initialized")?
-        .lock();
+    let wm = WINDOW_MANAGER.try().ok_or("The static window manager was not yet initialized")?.lock();
     if let Err(_) = wm.pass_mouse_event_to_window(mouse_event) {
         // the mouse event should be passed to the window that satisfies:
         // 1. the mouse position is currently in the window area

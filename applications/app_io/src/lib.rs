@@ -22,7 +22,6 @@ extern crate spin;
 #[macro_use] extern crate alloc;
 extern crate keycodes_ascii;
 extern crate libterm;
-extern crate scheduler;
 extern crate serial_port;
 extern crate core_io;
 extern crate window_manager;
@@ -95,18 +94,17 @@ mod shared_maps {
     use IoStreams;
 
     lazy_static! {
-        /// Map applications to their IoControlFlags structure. Here the key is the task_id
-        /// of each task. When shells call `insert_child_streams`, the default value is
-        /// automatically inserted for that task. When shells call `remove_child_streams`,
-        /// the corresponding structure is removed from this map.
+        /// Map a task to its IoControlFlags structure.
+        /// When shells call `insert_child_streams`, the default value is automatically inserted for that task.
+        /// When shells call `remove_child_streams`, the corresponding structure is removed from this map.
         static ref APP_IO_CTRL_FLAGS: Mutex<BTreeMap<usize, IoControlFlags>> = Mutex::new(BTreeMap::new());
     }
 
     lazy_static! {
-        /// Map applications to their IoStreams structure. Here the key is the task_id of
-        /// each task. Shells should call `insert_child_streams` when spawning a new app,
-        /// which effectively stores a new key value pair to this map. After applications
-        /// exit, shells should call `remove_child_streams` to clean up.
+        /// Map a task id to its IoStreams structure.
+        /// Shells should call `insert_child_streams` when spawning a new app,
+        /// which effectively stores a new key value pair to this map. 
+        /// After a shell's child app exits, the shell should call `remove_child_streams` to clean it up.
         static ref APP_IO_STREAMS: Mutex<BTreeMap<usize, IoStreams>> = Mutex::new(BTreeMap::new());
     }
 
@@ -131,40 +129,14 @@ mod shared_maps {
     }
 }
 
-lazy_static! {
-    /// The default terminal.
-    static ref DEFAULT_TERMINAL: Option<Arc<Mutex<Terminal>>> = {
-        match Terminal::new() {
-            Ok(terminal) => Some(Arc::new(Mutex::new(terminal))),
-            Err(err) => {
-                debug!("Fail to create the default terminal: {}", err);
-                None
-            }
-        }
-    };
-        
-}
 
-/// Applications call this function to get the terminal to which it should print.
-/// If the calling application has already been assigned a terminal to print, that assigned
-/// terminal is returned. Otherwise, the default terminal is assigned to the calling application
-/// and then returned.
-pub fn get_terminal_or_default() -> Result<Arc<Mutex<Terminal>>, &'static str> {
-    
-    let task_id = task::get_my_current_task_id()
-                      .ok_or("Cannot get task ID for getting default terminal")?;
-
-    if let Some(property) = shared_maps::lock_stream_map().get(&task_id) {
-        return Ok(Arc::clone(&property.terminal));
-    }
-
-    loop {
-        match *DEFAULT_TERMINAL {
-            Some(ref terminal) => return Ok(Arc::clone(&terminal)),
-            _ => { error!("Failed to get default terminal, retrying..."); }
-        }
-        scheduler::schedule(); // yield the CPU and try again later
-    }
+/// An application can call this function to get the terminal to which it should print.
+pub fn get_my_terminal() -> Option<Arc<Mutex<Terminal>>> {
+    task::get_my_current_task_id()
+        .and_then(|id| shared_maps::lock_stream_map()
+            .get(&id)
+            .map(|property| property.terminal.clone())
+        )
 }
 
 /// Lock all shared states (i.e. those defined in `lazy_static!`) and execute the closure.
@@ -339,8 +311,7 @@ macro_rules! println {
 
 }
 
-/// The main printing macro, which simply pushes an output event to the input_event_manager's event queue. 
-/// This ensures that only one thread (the input_event_manager acting as a consumer) ever accesses the GUI.
+/// The main printing macro, which simply writes to the current task's stdout stream.
 #[macro_export]
 macro_rules! print {
     ($($arg:tt)*) => ({

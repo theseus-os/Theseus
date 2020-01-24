@@ -52,6 +52,7 @@ pub enum ScrollError {
 
 /// Terminal Structure that allows multiple terminals to be individually run.
 /// There are now two queues that constitute the event-driven terminal architecture
+/// 
 /// 1) The terminal print queue that handles printing from external applications
 ///     - Consumer is the main terminal loop
 ///     - Producers are any external application trying to print to the terminal's stdout
@@ -437,7 +438,6 @@ impl Terminal {
             let wm = wm_mut.lock();
             wm.get_screen_size()
         };
-        // const WINDOW_MARGIN: usize = 20;
         let window = window::Window::new(
             Coord::new(0, 0), 
             window_width, 

@@ -26,4 +26,4 @@ path = "../../kernel/kernel_config"
 path = "../../kernel/memory"
 
 [dependencies.terminal_print]
-path = "../terminal_print"
+path = "../../kernel/terminal_print"

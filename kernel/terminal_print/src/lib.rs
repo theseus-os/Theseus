@@ -5,10 +5,14 @@
 //! For example, when a terminal runs a command, it will map that child command's task ID to that terminal's print producer
 //! so that any output from the child command is identified and outputted to the parent terminal
 //! 
-//! *Note: this printing crate only supports single-task child applications
+//! # Deprecated
+//! This crate is deprecated in favor of using proper stdio streams. 
+//! 
+//! # Note
+//! This printing crate only supports single-task applications. 
+//! If an application itself spawns child tasks, those will not be able to properly print through these interfaces.
 
 #![no_std]
-#![feature(asm)]
 
 #[macro_use] extern crate alloc;
 #[macro_use] extern crate lazy_static;
@@ -33,8 +37,8 @@ macro_rules! println {
 
 }
 
-/// The main printing macro, which simply pushes an output event to the input_event_manager's event queue. 
-/// This ensures that only one thread (the input_event_manager acting as a consumer) ever accesses the GUI.
+/// The main printing macro, which simply pushes an output event to the current task's terminal event queue. 
+/// This ensures that only one thread (the terminal acting as a consumer) ever accesses the GUI.
 #[macro_export]
 macro_rules! print {
     ($($arg:tt)*) => ({
@@ -77,21 +81,11 @@ pub fn print_to_stdout_args(fmt_args: fmt::Arguments) {
         }
     };
     
-    // Obtains the correct temrinal print producer and enqueues the print event, which will later be popped off
+    // Obtains the correct terminal print producer and enqueues the print event, which will later be popped off
     // and handled by the infinite terminal instance loop 
     let print_map = TERMINAL_PRINT_PRODUCERS.lock();
     let result = print_map.get(&task_id);
     if let Some(selected_term_producer) = result {
         selected_term_producer.enqueue(Event::new_output_event(format!("{}", fmt_args)));
-    }
-}
-
-#[no_mangle]
-pub fn main(_args: Vec<String>) -> isize {
-    loop {
-        // block this task, because it never needs to actually run again
-        if let Some(my_task) = task::get_my_current_task() {
-            my_task.block();
-        }
     }
 }

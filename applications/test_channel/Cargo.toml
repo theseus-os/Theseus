@@ -10,7 +10,7 @@ getopts = "0.2.21"
 spin = "0.4.10"
 
 [dependencies.terminal_print]
-path = "../terminal_print"
+path = "../../kernel/terminal_print"
 
 [dependencies.log]
 default-features = false

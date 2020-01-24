@@ -186,14 +186,16 @@ impl Shell {
         let key_event_producer = key_event_queue.get_writer();
         let key_event_consumer = key_event_queue.get_reader();
 
-        // Sets up the kernel to print to this terminal instance
+        // Sets up the kernel to print to this terminal instance.
+        // Note that if this has already been previously set by an existing shell,
+        // this function call will do nothing. 
         print::set_default_print_output(print_producer.obtain_producer());
 
         let env = Environment {
             working_dir: Arc::clone(root::get_root()), 
         };
 
-        let terminal = app_io::get_terminal_or_default()?;
+        let terminal = Arc::new(Mutex::new(Terminal::new()?));
 
         Ok(Shell {
             jobs: BTreeMap::new(),
@@ -575,7 +577,7 @@ impl Shell {
             return Ok(());
         }
 
-        // home, end, page up, page down, up arrow, down arrow for the input_event_manager
+        // handle navigation keys: home, end, page up, page down, up arrow, down arrow 
         if keyevent.keycode == Keycode::Home && keyevent.modifiers.control {
             return self.terminal.lock().move_screen_to_begin();
         }
@@ -744,13 +746,12 @@ impl Shell {
                 for task_id in &task_ids {
                     let stdio_queue_for_stdin_and_stdout = Stdio::new();
                     let stdio_queue_for_stderr = Stdio::new();
-                    let terminal = app_io::get_terminal_or_default()?;
                     let streams = IoStreams::new(
                         previous_queue_reader,
                         stdio_queue_for_stdin_and_stdout.get_writer(),
                         stdio_queue_for_stderr.get_writer(),
                         self.key_event_consumer.clone(),
-                        terminal
+                        self.terminal.clone(),
                     );
                     app_io::insert_child_streams(*task_id, streams);
 

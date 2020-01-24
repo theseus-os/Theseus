@@ -80,7 +80,7 @@ impl Event {
     }
 }
 
-/// use this to deliver input events (such as keyboard input) to the input_event_manager.
+/// A keyboard event, indicating that one or more keys were pressed or released.
 #[derive(Debug, Clone)]
 pub struct KeyboardInputEvent {
     /// The key input event from i/o device
@@ -96,7 +96,7 @@ impl KeyboardInputEvent {
     }
 }
 
-/// use this to queue up a formatted string that should be printed to the input_event_manager. 
+/// An output event that will enqueue a formatted string to be printed in a terminal or log.
 #[derive(Debug, Clone)]
 pub struct PrintOutputEvent {
     /// The text to print

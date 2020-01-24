@@ -46,7 +46,7 @@ const WINDOW_BORDER_COLOR_INACTIVE: Color = Color::new(0x00333333);
 // border and title bar color when window is active, the top part color
 const WINDOW_BORDER_COLOR_ACTIVE_TOP: Color = Color::new(0x00BBBBBB);
 // border and title bar color when window is active, the bottom part color
-static WINDOW_BORDER_COLOR_ACTIVE_BOTTOM: Color = Color::new(0x00666666);
+const WINDOW_BORDER_COLOR_ACTIVE_BOTTOM: Color = Color::new(0x00666666);
 // window button color: red
 const WINDOW_BUTTON_COLOR_CLOSE: Color = Color::new(0x00E74C3C);
 // window button color: green
@@ -140,8 +140,9 @@ impl Window {
             inner.framebuffer.fill_color(window.background.into());
         }
 
-        window.draw_border(true); // draw window with active border
-                                    // draw three buttons
+        // draw window with active border
+        window.draw_border(true);
+        // draw three buttons
         {
             let mut inner = window.inner.lock();
             window.show_button(TopButton::Close, 1, &mut inner);
@@ -269,8 +270,7 @@ impl Window {
                             } else {
                                 // the region of components
                                 // TODO: if any components want this event? ask them!
-                                self.producer
-                                    .push(Event::MousePositionEvent(mouse_event.clone())).map_err(|_e| "Fail to push the keyboard event")?;
+                                self.producer.push(Event::MousePositionEvent(mouse_event.clone())).map_err(|_e| "Fail to push the keyboard event")?;
                             }
                             if (mouse_event.coordinate.y as usize) < inner.height
                                 && (mouse_event.coordinate.x as usize) < inner.width
