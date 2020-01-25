@@ -15,6 +15,12 @@ use color::{Color};
 use shapes::{Coord, Rectangle};
 
 
+// The title bar height, in number of pixels
+pub const DEFAULT_TITLE_BAR_HEIGHT: usize = 16;
+// left, right, bottom border size, in number of pixels
+pub const DEFAULT_BORDER_SIZE: usize = 2;
+
+
 /// Whether a window is moving (being dragged by the mouse).
 pub enum WindowMovingStatus {
     /// The window is not in motion.
@@ -32,6 +38,12 @@ pub struct WindowInner {
     /// The position of the top-left corner of the window,
     /// expressed relative to the top-left corner of the screen.
     pub coordinate: Coord,
+    /// The width of the border in pixels.
+    /// By default, there is a border on the left, right, and bottom edges of the window.
+    pub border_size: usize,
+    /// The height of title bar in pixels.
+    /// By default, there is one title bar at the top edge of the window.
+    pub title_bar_height: usize,
     /// event consumer that could be used to get event input given to this window
     pub consumer: Queue<Event>, // event input
     /// event producer that could be used to send events to the `Window` object.
@@ -60,6 +72,8 @@ impl WindowInner {
     
         let mut wi = WindowInner {
             coordinate,
+            border_size: DEFAULT_BORDER_SIZE,
+            title_bar_height: DEFAULT_TITLE_BAR_HEIGHT,
             consumer,
             producer,
             background,
@@ -96,9 +110,34 @@ impl WindowInner {
         self.coordinate = coordinate;
     }
 
-    /// Returns the pixel at the coordinate
+    /// Returns the pixel value at the given `coordinate`,
+    /// if the `coordinate` is within the window's bounds.
     pub fn get_pixel(&self, coordinate: Coord) -> Option<AlphaPixel> {
         self.framebuffer.get_pixel(coordinate)
+    }
+
+    /// Returns the size of the Window border in pixels. 
+    /// There is a border drawn on the left, right, and bottom edges.
+    pub fn get_border_size(&self) -> usize {
+        self.border_size
+    }
+
+    /// Returns the size of the Window title bar in pixels. 
+    /// There is a title bar drawn on the top edge of the Window.
+    pub fn get_title_bar_height(&self) -> usize {
+        self.title_bar_height
+    }
+
+    /// Returns the position and dimensions of the Window's content region,
+    /// i.e., the area within the window excluding the title bar and border.
+    /// 
+    /// The returned `Rectangle` is expressed relative to this Window's position.
+    pub fn content_area(&self) -> Rectangle {
+        let (window_width, window_height) = self.get_size();
+        // There is one title bar on top, and a border on the left, right, and bottom
+        let top_left = Coord::new(self.border_size as isize, self.title_bar_height as isize);
+        let bottom_right = Coord::new((window_width - self.border_size) as isize, (window_height - self.border_size) as isize);
+        Rectangle { top_left, bottom_right }
     }
 
     /// Resizes and moves this window to fit the given `Rectangle` that describes its new position. 
@@ -106,10 +145,12 @@ impl WindowInner {
         // First, perform the actual resize of the inner window
         self.coordinate = new_position.top_left;
         self.framebuffer = Framebuffer::new(new_position.width(), new_position.height(), None)?;
-        self.clear()?;
 
-        // Second, send a resize event to that window so it knows to refresh its display
-        self.producer.push(Event::new_window_resize_event(new_position))
+        // Second, send a resize event to that application window so it knows to refresh its display.
+        // Instead of sending the total size of the whole window, 
+        // we instead send the size and position of the inner content area of the window. 
+        // This prevents the application from thinking it can render over the window's title bar or border.
+        self.producer.push(Event::new_window_resize_event(self.content_area()))
             .map_err(|_e| "Failed to enqueue the new resize event")?;
 
         Ok(())

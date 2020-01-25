@@ -32,13 +32,10 @@ use framebuffer::Framebuffer;
 use color::{Color};
 use shapes::{Coord, Rectangle};
 use spin::Mutex;
-use window_inner::{WindowInner, WindowMovingStatus};
+use window_inner::{WindowInner, WindowMovingStatus, DEFAULT_BORDER_SIZE, DEFAULT_TITLE_BAR_HEIGHT};
 use window_manager::{WINDOW_MANAGER};
 
-// The title bar height, in number of pixels
-const DEFAULT_TITLE_BAR_HEIGHT: usize = 16;
-// left, right, bottom border size, in number of pixels
-const WINDOW_BORDER: usize = 2;
+
 // border radius, in number of pixels
 const WINDOW_RADIUS: usize = 5;
 // border and title bar color when window is inactive
@@ -85,10 +82,6 @@ impl From<usize> for TopButton {
 pub struct Window {
     /// this object contains states and methods required by the window manager
     pub inner: Arc<Mutex<WindowInner>>,
-    /// the width of border, init as WINDOW_BORDER. the border is still part of the window and remains flexibility for user to change border style or remove border. However, for most application a border is useful for user to identify the region.
-    border_size: usize,
-    /// The height of title bar in pixels, init as DEFAULT_TITLE_BAR_HEIGHT. it is render inside the window so user shouldn't use this area anymore
-    title_bar_height: usize,
     /// application could get events from this consumer
     pub consumer: Queue<Event>,
     /// event output used by window manager, private variable
@@ -111,7 +104,7 @@ impl Window {
     ) -> Result<Window, &'static str> {
         let framebuffer = Framebuffer::new(width, height, None)?;
         let (width, height) = framebuffer.get_size();
-        if width <= 2 * DEFAULT_TITLE_BAR_HEIGHT || height <= DEFAULT_TITLE_BAR_HEIGHT + WINDOW_BORDER {
+        if width <= 2 * DEFAULT_TITLE_BAR_HEIGHT || height <= DEFAULT_TITLE_BAR_HEIGHT + DEFAULT_BORDER_SIZE {
             return Err("window dimensions must be large enough for the title bar and borders to be drawn");
         }
 
@@ -121,8 +114,6 @@ impl Window {
 
         let mut window = Window {
             inner: Arc::new(Mutex::new(WindowInner::new(coordinate, framebuffer, background)?)),
-            border_size: WINDOW_BORDER,
-            title_bar_height: DEFAULT_TITLE_BAR_HEIGHT,
             consumer: consumer,
             producer: producer,
             last_mouse_position_event: MousePositionEvent::default(),
@@ -200,7 +191,7 @@ impl Window {
                             call_later_do_refresh_floating_border = true;
                         },
                         WindowMovingStatus::Stationary => {
-                            if (mouse_event.coordinate.y as usize) < self.title_bar_height
+                            if (mouse_event.coordinate.y as usize) < inner.title_bar_height
                                 && (mouse_event.coordinate.x as usize) < width
                             {
                                 // the region of title bar
@@ -211,7 +202,7 @@ impl Window {
                                         mouse_event.coordinate.x
                                             - WINDOW_BUTTON_BIAS_X as isize
                                             - (i as isize) * WINDOW_BUTTON_BETWEEN as isize,
-                                        mouse_event.coordinate.y - self.title_bar_height as isize / 2,
+                                        mouse_event.coordinate.y - inner.title_bar_height as isize / 2,
                                     );
                                     if dcoordinate.x * dcoordinate.x + dcoordinate.y * dcoordinate.y
                                         <= r2 as isize
@@ -319,6 +310,9 @@ impl Window {
     /// Draw the border of this window, with argument of whether this window is active now
     fn draw_border(&mut self, active: bool) {
         let mut inner = self.inner.lock();
+        let border_size = inner.border_size;
+        let title_bar_height = inner.title_bar_height;
+
         // first draw left, bottom, right border
         let border_color = if active {
             WINDOW_BORDER_COLOR_ACTIVE_BOTTOM
@@ -329,33 +323,33 @@ impl Window {
 
         framebuffer_drawer::draw_rectangle(
             &mut inner.framebuffer,
-            Coord::new(0, self.title_bar_height as isize),
-            self.border_size,
-            height - self.title_bar_height,
+            Coord::new(0, title_bar_height as isize),
+            border_size,
+            height - title_bar_height,
             border_color.into(),
         );
 
         framebuffer_drawer::draw_rectangle(
             &mut inner.framebuffer,
-            Coord::new(0, (height - self.border_size) as isize),
+            Coord::new(0, (height - border_size) as isize),
             width,
-            self.border_size,
+            border_size,
             border_color.into(),
         );
         framebuffer_drawer::draw_rectangle(
             &mut inner.framebuffer,
             Coord::new(
-                (width - self.border_size) as isize,
-                self.title_bar_height as isize,
+                (width - border_size) as isize,
+                title_bar_height as isize,
             ),
-            self.border_size,
-            height - self.title_bar_height,
+            border_size,
+            height - title_bar_height,
             border_color.into(),
         );
 
         // then draw the title bar
         if active {
-            for i in 0..self.title_bar_height {
+            for i in 0..title_bar_height {
                 framebuffer_drawer::draw_rectangle(
                     &mut inner.framebuffer,
                     Coord::new(0, i as isize),
@@ -364,14 +358,8 @@ impl Window {
                     framebuffer::Pixel::weight_blend(
                         WINDOW_BORDER_COLOR_ACTIVE_BOTTOM.into(),
                         WINDOW_BORDER_COLOR_ACTIVE_TOP.into(),
-                        (i as f32) / (self.title_bar_height as f32)
+                        (i as f32) / (title_bar_height as f32)
                     )
-
-                    // framebuffer::pixel::weight_blend(
-                    //     WINDOW_BORDER_COLOR_ACTIVE_BOTTOM,
-                    //     WINDOW_BORDER_COLOR_ACTIVE_TOP,
-                    //     (i as f32) / (self.title_bar_height as f32),
-                    // ).into(),
                 ); 
             }
         } else {
@@ -379,7 +367,7 @@ impl Window {
                 &mut inner.framebuffer,
                 Coord::new(0, 0),
                 width,
-                self.title_bar_height,
+                title_bar_height,
                 border_color.into(),
             );
         }
@@ -405,7 +393,7 @@ impl Window {
 
     /// show three button with status. state = 0,1,2 for three different color
     fn show_button(&self, button: TopButton, state: usize, inner: &mut WindowInner) {
-        let y = self.title_bar_height / 2;
+        let y = inner.title_bar_height / 2;
         let x = WINDOW_BUTTON_BIAS_X
             + WINDOW_BUTTON_BETWEEN
                 * match button {
@@ -436,52 +424,20 @@ impl Window {
         let width = inner.get_size().0;
         Rectangle {
             top_left: Coord::new(0, 0),
-            bottom_right: Coord::new(width as isize, self.title_bar_height as isize)
+            bottom_right: Coord::new(width as isize, inner.title_bar_height as isize)
         }
-    }
-
-    /// Returns the position and dimensions of the Window's content region,
-    /// i.e., the area within the window excluding the title bar and border.
-    /// 
-    /// Obtains the lock on the inner `WindowInner` object.
-    /// 
-    /// The returned `Rectangle` is expressed relative to this Window's position.
-    pub fn content_area(&self) -> Rectangle {
-        let (window_width, window_height) = self.inner.lock().get_size();
-        // There is one title bar on top, and a border on the left, right, and bottom
-        let top_left = Coord::new(self.border_size as isize, self.title_bar_height as isize);
-        let bottom_right = Coord::new((window_width - self.border_size) as isize, (window_height - self.border_size) as isize);
-        Rectangle { top_left, bottom_right }
-    }
-
-    /// get space remained for border, in number of pixel. There is border on the left, right and bottom.
-    /// When user add their components, should margin its area to avoid overlapping these borders.
-    pub fn get_border_size(&self) -> usize {
-        self.border_size
-    }
-
-    /// get space remained for title bar, in number of pixel. The title bar is on the top of the window, so when user
-    /// add their components, should margin its area to avoid overlapping the title bar.
-    pub fn get_title_bar_height(&self) -> usize {
-        self.title_bar_height
     }
 }
 
 
 impl Drop for Window{
     fn drop(&mut self){
-        match WINDOW_MANAGER
-            .try()
-            .ok_or("The static window manager was not yet initialized")
-        {
-            Ok(wm) => {
-                if let Err(err) = wm.lock().delete_window(&self.inner){
-                    error!("delete_window failed {}", err);
-                }
+        if let Some(wm) = WINDOW_MANAGER.try() {
+            if let Err(err) = wm.lock().delete_window(&self.inner) {
+                error!("Failed to delete_window upon drop: {:?}", err);
             }
-            Err(err) => {
-                error!("delete_window failed {}", err);
-            }
+        } else {
+            error!("BUG: Could not delete_window upon drop because the window manager was not initialized");
         }
     }
 }

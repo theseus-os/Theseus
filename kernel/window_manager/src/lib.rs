@@ -766,7 +766,13 @@ fn keyboard_handle_application(key_input: KeyEvent) -> Result<(), &'static str> 
                 active_window.lock().resize(position)?;
             }
         }
-        
+
+        // force refresh the entire screen for now
+        // let bb = Rectangle { top_left: Coord::new(0, 0), bottom_right: Coord::new(width, height) };
+        // win_mgr.lock().refresh_bottom_windows(Some(bb).into_iter(), true)?;
+
+        // TODO: perform a proper screen refresh here!
+
         return Ok(());
     }
 

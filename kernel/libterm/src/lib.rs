@@ -396,8 +396,9 @@ impl Terminal {
     /// Display the text displayable in the window and render it to the screen
     fn display_text(&mut self) -> Result<(), &'static str>{
         let area_to_render = {
-            let coord = self.window.content_area().top_left;
-            let area = self.text_display.display(coord, &mut self.window.inner.lock().framebuffer)?;
+            let mut inner = self.window.inner.lock();
+            let coord = inner.content_area().top_left;
+            let area = self.text_display.display(coord, &mut inner.framebuffer)?;
             area
         };
 
@@ -437,7 +438,7 @@ impl Terminal {
             FONT_BACKGROUND_COLOR,
         )?;
         
-        let content_area = window.content_area();
+        let content_area = window.inner.lock().content_area();
         let text_display = TextDisplay::new(content_area.width(), content_area.height(), FONT_FOREGROUND_COLOR, FONT_BACKGROUND_COLOR)?;
 
         let mut terminal = Terminal {
@@ -498,11 +499,9 @@ impl Terminal {
     /// Remove a character from the terminal.
     ///
     /// # Arguments
-    ///
     /// * `offset_from_end`: the position of the character to remove. It represents the distance relative to the end of the whole output in the terminal in number of characters. `offset_from_end == 0` is *invalid* here.
     ///
     /// # Examples
-    ///
     /// * `terminal.remove_char(1)` will remove the last character in the screen.
     ///
     /// After invoke this function, one must call `refresh_display` to get the updates actually showed on the screen.
@@ -603,7 +602,6 @@ impl Terminal {
 
     /// Display the cursor of the terminal.
     pub fn display_cursor(&mut self) -> Result<(), &'static str> {
-        let coordinate = self.window.content_area().top_left;
         // get info about the text displayable
         let (col_num, line_num, text_next_pos) = {
             let text_next_pos = self.text_display.get_next_index();
@@ -621,14 +619,14 @@ impl Terminal {
         let cursor_line = cursor_pos / col_num;
         let cursor_col = cursor_pos % col_num;
 
-        // Get the container to display the cursor in
+        // Get the bounding box that contains the displayed cursor.
         let bounding_box = {
-            let mut window = self.window.inner.lock();
+            let mut inner = self.window.inner.lock();
             let bounding_box = self.cursor.display(
-                coordinate,
+                inner.content_area().top_left,
                 cursor_col,
                 cursor_line,
-                &mut window.framebuffer,
+                &mut inner.framebuffer,
             )?;
             bounding_box
         };   
@@ -650,12 +648,10 @@ impl Terminal {
         self.cursor.underlying_char = underlying_char;
     }
 
-    /// Resizes this terminal and its underlying text display
-    /// and then refreshes its display.
+    /// Resizes this terminal and its underlying text display and then refreshes the window.
     /// This does not automatically redisplay the terminal cursor.
     pub fn resize(&mut self, new_position: Rectangle) -> Result<(), &'static str> {
         self.text_display.set_size(new_position.width(), new_position.height());
-        warn!("TERMINAL::RESIZE(): Set text_display to new size: {:?}", self.text_display.get_size());
         self.text_display.reset_cache();
         self.refresh_display()?;
         Ok(())
