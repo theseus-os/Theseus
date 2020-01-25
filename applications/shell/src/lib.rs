@@ -399,7 +399,7 @@ impl Shell {
         }
 
         // Ctrl+C signals the shell to exit the job
-        if keyevent.modifiers.control && keyevent.keycode == Keycode::C {
+        if keyevent.modifiers.is_control() && keyevent.keycode == Keycode::C {
             if let Some(ref fg_job_num) = self.fg_job_num {
                 let task_refs = match self.jobs.get(fg_job_num) {
                     Some(job) => job.tasks.clone(), 
@@ -453,7 +453,7 @@ impl Shell {
         }
 
         // Ctrl+Z signals the shell to stop the job
-        if keyevent.modifiers.control && keyevent.keycode == Keycode::Z {
+        if keyevent.modifiers.is_control() && keyevent.keycode == Keycode::Z {
             // Do nothing if we have no running foreground job.
 
             if let Some(ref fg_job_num) = self.fg_job_num {
@@ -492,7 +492,7 @@ impl Shell {
         }
 
         // Set EOF to the stdin of the foreground job.
-        if keyevent.modifiers.control && keyevent.keycode == Keycode::D {
+        if keyevent.modifiers.is_control() && keyevent.keycode == Keycode::D {
             if let Some(ref fg_job_num) = self.fg_job_num {
                 if let Some(job) = self.jobs.get(fg_job_num) {
                     job.stdin_writer.lock().set_eof();
@@ -578,24 +578,24 @@ impl Shell {
         }
 
         // handle navigation keys: home, end, page up, page down, up arrow, down arrow 
-        if keyevent.keycode == Keycode::Home && keyevent.modifiers.control {
+        if keyevent.keycode == Keycode::Home && keyevent.modifiers.is_control() {
             return self.terminal.lock().move_screen_to_begin();
         }
-        if keyevent.keycode == Keycode::End && keyevent.modifiers.control{
+        if keyevent.keycode == Keycode::End && keyevent.modifiers.is_control(){
             return self.terminal.lock().move_screen_to_end();
         }
-        if keyevent.modifiers.control && keyevent.modifiers.shift && keyevent.keycode == Keycode::Up  {
+        if keyevent.modifiers.is_control() && keyevent.modifiers.is_shift() && keyevent.keycode == Keycode::Up  {
             return self.terminal.lock().move_screen_line_up();
         }
-        if keyevent.modifiers.control && keyevent.modifiers.shift && keyevent.keycode == Keycode::Down  {
+        if keyevent.modifiers.is_control() && keyevent.modifiers.is_shift() && keyevent.keycode == Keycode::Down  {
             return self.terminal.lock().move_screen_line_down();
         }
 
-        if keyevent.keycode == Keycode::PageUp && keyevent.modifiers.shift {
+        if keyevent.keycode == Keycode::PageUp && keyevent.modifiers.is_shift() {
             return self.terminal.lock().move_screen_page_up();
         }
 
-        if keyevent.keycode == Keycode::PageDown && keyevent.modifiers.shift {
+        if keyevent.keycode == Keycode::PageDown && keyevent.modifiers.is_shift() {
             return self.terminal.lock().move_screen_page_down();
         }
 
@@ -1215,7 +1215,7 @@ impl Shell {
         if let Some(print_event) = self.print_consumer.peek() {
             match print_event.deref() {
                 &Event::OutputEvent(ref s) => {
-                    self.terminal.lock().print_to_terminal(s.text.clone());
+                    self.terminal.lock().print_to_terminal(s.clone());
                 },
                 _ => { },
             }
@@ -1285,6 +1285,7 @@ impl Shell {
         let mut need_prompt = false;
         self.redisplay_prompt();
         self.terminal.lock().refresh_display()?;
+
         loop {
             // If there is anything from running applications to be printed, it printed on the screen and then
             // return true, so that the loop continues, otherwise nothing happens and we keep on going with the
@@ -1304,9 +1305,12 @@ impl Shell {
                 need_prompt = false;
             }
 
-            // Looks at the input queue from the window manager
-            // Handles all the event items until the queue is empty
-            while let Some(ev) = self.terminal.lock().get_event() {
+            // Handle all available events from the terminal's (its window's) event queue.
+            while let Some(ev) = {
+                // this weird syntax ensures the terminal lock is dropped before entering the loop body
+                let mut locked_terminal = self.terminal.lock();
+                locked_terminal.get_event()
+            } {
                 match ev {
                     // Returns from the main loop.
                     Event::ExitEvent => {
@@ -1314,15 +1318,19 @@ impl Shell {
                         return Ok(());
                     }
 
-                    Event::WindowResizeEvent(ref _rev) => {
-                        need_refresh = true; // application refreshes display after resize event is received
+                    Event::WindowResizeEvent(new_position) => {
+                        self.terminal.lock().resize(new_position)?;
+                        // the above function also refreshes the terminal display
                     }
 
                     // Handles ordinary keypresses
                     Event::KeyboardEvent(ref input_event) => {
                         self.key_event_producer.write_one(input_event.key_event);
                     }
-                    _ => { }
+
+                    _unhandled => { 
+                        // trace!("Shell is ignoring unhandled event: {:?}", _unhandled);
+                    }
                 };
             }          
             if need_refresh || need_refresh_on_task_event {
@@ -1331,7 +1339,10 @@ impl Shell {
             }
 
             let is_active = {
-                window_manager::WINDOW_MANAGER.try().ok_or("The window manager is not initialized")?.lock().is_active(&self.terminal.lock().window.inner)
+                window_manager::WINDOW_MANAGER.try()
+                    .ok_or("The window manager is not initialized")?
+                    .lock()
+                    .is_active(&self.terminal.lock().window.inner)
             };
             
             if is_active {

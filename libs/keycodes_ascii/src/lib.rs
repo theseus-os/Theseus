@@ -3,6 +3,7 @@
 
 #![feature(const_fn)]
 
+#[macro_use] extern crate bitflags;
 
 // use core::cell::RefCell;
 
@@ -24,38 +25,98 @@ static MYMAP: phf::Map<u8, &'static Keycode> = phf_map! {
 // which is to use complicated data structures to permit simpler logic. 
 
 
-#[derive(Debug, Copy, Clone)]
-pub struct KeyboardModifiers {
-    pub control: bool,
-    pub alt: bool, 
-    pub shift: bool,
-    pub caps_lock: bool,
-    pub num_lock: bool,
-    pub scroll_lock: bool,
-}
-
-impl KeyboardModifiers {
-    /// Returns a new `KeyboardModifiers` struct with no keys pressed (all false).
-    pub const fn default() -> KeyboardModifiers {
-        KeyboardModifiers {
-            control: false,
-            alt: false,
-            shift: false,
-            caps_lock: false,
-            num_lock: false,
-            scroll_lock: false,
-        }
+bitflags! {
+    /// The set of modifier keys that can be held down while other keys are pressed.
+    /// 
+    /// To save space, this is expressed using bitflags 
+    /// rather than a series of individual booleans, 
+    /// because Rust's `bool` type is a whole byte.
+    pub struct KeyboardModifiers: u16 {
+        const CONTROL_LEFT    = 1 <<  0;
+        const CONTROL_RIGHT   = 1 <<  1;
+        const SHIFT_LEFT      = 1 <<  2;
+        const SHIFT_RIGHT     = 1 <<  3;
+        const ALT             = 1 <<  4;
+        const ALT_GR          = 1 <<  5;
+        const SUPER_KEY_LEFT  = 1 <<  6;
+        const SUPER_KEY_RIGHT = 1 <<  7;
+        const CAPS_LOCK       = 1 <<  8;
+        const NUM_LOCK        = 1 <<  9;
+        const SCROLL_LOCK     = 1 << 10;
     }
 }
 
+impl Default for KeyboardModifiers {
+    fn default() -> Self {
+        Self::new()
+    }
+}
 
+impl KeyboardModifiers {
+    /// Returns a new `KeyboardModifiers` struct with no keys pressed.
+    pub const fn new() -> KeyboardModifiers {
+        Self::empty()
+    }
+
+    /// Returns `true` if a `Shift` key is held down (either left or right).
+    #[inline(always)]
+    pub fn is_shift(&self) -> bool {
+        self.intersects(Self::SHIFT_LEFT | Self::SHIFT_RIGHT)
+    }
+
+    /// Returns `true` if a `Control` key is held down (either left or right).
+    #[inline(always)]
+    pub fn is_control(&self) -> bool {
+        self.intersects(Self::CONTROL_LEFT | Self::CONTROL_RIGHT)
+    }
+
+    /// Returns `true` if the `Alt` key is held down.
+    #[inline(always)]
+    pub fn is_alt(&self) -> bool {
+        self.intersects(Self::ALT)
+    }
+
+    /// Returns `true` if the `AltGr` key is held down.
+    #[inline(always)]
+    pub fn is_alt_gr(&self) -> bool {
+        self.intersects(Self::ALT_GR)
+    }
+
+    /// Returns `true` if a Super key is held down (either left or right).
+    /// 
+    /// Examples include the Windows key, the Meta key, the command key, etc.
+    #[inline(always)]
+    pub fn is_super_key(&self) -> bool {
+        self.intersects(Self::SUPER_KEY_LEFT | Self::SUPER_KEY_RIGHT)
+    }
+
+    /// Returns `true` if the `Caps Lock` key is held down.
+    #[inline(always)]
+    pub fn is_caps_lock(&self) -> bool {
+        self.intersects(Self::CAPS_LOCK)
+    }
+
+    /// Returns `true` if the `Num Lock` key is held down.
+    #[inline(always)]
+    pub fn is_num_lock(&self) -> bool {
+        self.intersects(Self::NUM_LOCK)
+    }
+
+    /// Returns `true` if the `Scroll Lock` key is held down.
+    #[inline(always)]
+    pub fn is_scroll_lock(&self) -> bool {
+        self.intersects(Self::SCROLL_LOCK)
+    }
+}
+
+/// Whether a keyboard event was a key press or a key released.
 #[derive(Debug, Copy, Clone, PartialEq)]
 pub enum KeyAction {
     Pressed,
     Released,
 }
 
-/// the KeyEvent that should be delivered to applications upon a keyboard action
+/// The KeyEvent that should be delivered to applications upon a keyboard action.
 #[derive(Debug, Copy, Clone)]
 pub struct KeyEvent {
     pub keycode: Keycode,
@@ -73,25 +134,16 @@ impl KeyEvent {
     }
 }
 
-
-
+/// The offset that a keyboard adds to the scancode
+/// to indicate that the key was released rather than pressed. 
+/// So if a scancode of `1` means a key `foo` was pressed,
+/// a scancode of `129` (1 + 128) means that key `foo` was released. 
 pub const KEY_RELEASED_OFFSET: u8 = 128;
-
-
-
 
 /// convenience function for obtaining the ascii value for a raw scancode under the given modifiers
 pub fn scancode_to_ascii(modifiers: KeyboardModifiers, scan_code: u8) -> Option<char> {
-	// FIXME: this whole let if stmt can likely be replaced by an "and_then" flow
-    if let Some(keycode) = Keycode::from_scancode(scan_code) {
-        keycode.to_ascii(modifiers)
-    }
-    else {
-        None
-    }
+	Keycode::from_scancode(scan_code).and_then(|k| k.to_ascii(modifiers))
 }
-
-
 
 
 #[derive(Debug, PartialEq, Clone, Copy)]
@@ -187,8 +239,8 @@ pub enum Keycode {
     F12,
     Pause,
     Unknown3,
-    LeftGui,
-    RightGui,
+    SuperKeyLeft,
+    SuperKeyRight,
     Menu,
 } 
 
@@ -290,8 +342,8 @@ impl Keycode {
             88 => Some(Keycode::F12),
             89 => Some(Keycode::Pause),
             90 => Some(Keycode::Unknown3),
-            91 => Some(Keycode::LeftGui),
-            92 => Some(Keycode::RightGui),
+            91 => Some(Keycode::SuperKeyLeft),
+            92 => Some(Keycode::SuperKeyRight),
             93 => Some(Keycode::Menu),
 
             _ => None,
@@ -300,12 +352,12 @@ impl Keycode {
 
 
 
-    // obtains the ascii value for a keycode under the given modifiers
+    /// Obtains the ascii value for a keycode under the given modifiers
     pub fn to_ascii(&self, modifiers: KeyboardModifiers) -> Option<char> {
         // handle shift key being pressed
-        if modifiers.shift {
+        if modifiers.is_shift() {
             // if shift is pressed and caps lock is on, give a regular lowercase letter
-            if modifiers.caps_lock && self.is_letter() {
+            if modifiers.is_caps_lock() && self.is_letter() {
                 return self.as_ascii();
             }
             // if shift is pressed and caps lock is not, give a regular shifted key
@@ -316,7 +368,7 @@ impl Keycode {
         
         // just a regular caps_lock, no shift pressed 
         // (we already covered the shift && caps_lock scenario above)
-        if modifiers.caps_lock {
+        if modifiers.is_caps_lock() {
             if self.is_letter() {
                 return self.as_ascii_shifted()
             }

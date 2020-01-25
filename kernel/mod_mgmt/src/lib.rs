@@ -96,12 +96,12 @@ pub fn create_application_namespace(recursive_namespace: Option<Arc<CrateNamespa
     let recursive_namespace = recursive_namespace
         .or_else(|| get_initial_kernel_namespace().cloned())
         .ok_or("initial kernel CrateNamespace not yet initialized")?;
-    // (2) get the directory where the default app namespace should have been populated when mod_mgmt was init'd,
+    // (2) get the directory where the default app namespace should have been populated when mod_mgmt was inited.
     let default_app_namespace_name = CrateType::Application.namespace_name().to_string(); // this will be "_applications"
     let default_app_namespace_dir = get_namespaces_directory()
         .and_then(|ns_dir| ns_dir.lock().get_dir(&default_app_namespace_name))
         .ok_or("Couldn't find the directory for the default application CrateNamespace")?;
-    // (3) create the actual new application CrateNamespace
+    // (3) create the actual new application CrateNamespace.
     let new_app_namespace = Arc::new(CrateNamespace::new(
         default_app_namespace_name,
         NamespaceDir::new(default_app_namespace_dir),

@@ -28,13 +28,11 @@ extern crate window_inner;
 extern crate shapes;
 extern crate color;
 
-mod background;
 use alloc::collections::VecDeque;
 use alloc::string::ToString;
 use alloc::sync::{Arc, Weak};
 use alloc::vec::{Vec};
 use compositor::{Compositor, FramebufferUpdates, CompositableRegion};
-use core::slice;
 
 use mpmc::Queue;
 use event_types::{Event, MousePositionEvent};
@@ -89,7 +87,8 @@ pub struct WindowManager {
     mouse: Coord,
     /// If a window is being repositioned (e.g., by dragging it), this is the position of that window's border
     repositioned_border: Option<Rectangle>,
-    /// the framebuffer that it should print on
+    /// The bottom framebuffer typically contains the background/wallpaper image, 
+    /// which is displayed by default when no other windows exist on top of it.
     bottom_fb: Framebuffer<AlphaPixel>,
     /// the framebuffer that it should print on
     top_fb: Framebuffer<AlphaPixel>,
@@ -230,7 +229,7 @@ impl WindowManager {
         active: bool,
     ) -> Result<(), &'static str> {
         // bottom framebuffer
-        let bottom_fb = FramebufferUpdates {
+        let bottom_fb_area = FramebufferUpdates {
             src_framebuffer: &self.bottom_fb,
             coordinate_in_dest_framebuffer: Coord::new(0, 0),
         };
@@ -264,7 +263,7 @@ impl WindowManager {
             }
         }).collect::<Vec<_>>();
         
-        let buffer_iter = Some(bottom_fb).into_iter().chain(window_bufferlist.into_iter());
+        let buffer_iter = Some(bottom_fb_area).into_iter().chain(window_bufferlist.into_iter());
         FRAME_COMPOSITOR.lock().composite(buffer_iter, &mut self.final_fb, bounding_box)?;
         
         Ok(())
@@ -594,61 +593,49 @@ impl WindowManager {
     }
 
     /// Whether a window is active
-    pub fn is_active(&self, inner_ref: &Arc<Mutex<WindowInner>>) -> bool {
-        if let Some(current_active) = self.active.upgrade() {
-            if Arc::ptr_eq(&(current_active), inner_ref) {
-                return true;
-            }
-        }
-        false
+    pub fn is_active(&self, window_inner: &Arc<Mutex<WindowInner>>) -> bool {
+        self.active.upgrade()
+            .map(|active| Arc::ptr_eq(&active, window_inner))
+            .unwrap_or(false)
     }
 
     /// Get the screen size of the desktop
     pub fn get_screen_size(&self) -> (usize, usize) {
-        self.bottom_fb.get_size()
+        self.final_fb.get_size()
     }
 }
 
 /// Initialize the window manager. It returns (keyboard_producer, mouse_producer) for the I/O devices.
 pub fn init() -> Result<(Queue<Event>, Queue<Event>), &'static str> {
-    // font::init()?;
     let final_framebuffer: Framebuffer<AlphaPixel> = framebuffer::init()?;
     let (width, height) = final_framebuffer.get_size();
     let mut bottom_framebuffer = Framebuffer::new(width, height, None)?;
     let mut top_framebuffer = Framebuffer::new(width, height, None)?;
     
-    // initialize the framebuffer
     let (screen_width, screen_height) = bottom_framebuffer.get_size();
-    let bg_image: &[AlphaPixel] = unsafe {
-        slice::from_raw_parts((background::BACKGROUND.as_ptr()) as *const AlphaPixel, screen_width * screen_height)
-    };
+    bottom_framebuffer.fill(color::LIGHT_GRAY.into());
+    top_framebuffer.fill(color::TRANSPARENT.into()); 
 
-    bottom_framebuffer.buffer_mut().copy_from_slice(bg_image);
-    top_framebuffer.fill_color(color::TRANSPARENT.into()); 
+    // the mouse starts in the center of the screen.
+    let center = Coord {
+        x: screen_width as isize / 2,
+        y: screen_height as isize / 2,
+    }; 
 
     // initialize static window manager
     let window_manager = WindowManager {
         hide_list: VecDeque::new(),
         show_list: VecDeque::new(),
         active: Weak::new(),
-        mouse: Coord { x: 0, y: 0 },
+        mouse: center,
         repositioned_border: None,
         bottom_fb: bottom_framebuffer,
         top_fb: top_framebuffer,
         final_fb: final_framebuffer,
     };
-    WINDOW_MANAGER.call_once(|| Mutex::new(window_manager));
+    let _wm = WINDOW_MANAGER.call_once(|| Mutex::new(window_manager));
 
-    let mut win = WINDOW_MANAGER
-        .try()
-        .ok_or("The static window manager was not yet initialized")?
-        .lock();
-    win.mouse = Coord {
-        x: screen_width as isize / 2,
-        y: screen_height as isize / 2,
-    }; 
-    
-    // win.refresh_bottom_windows(None, false)?;
+    // wm.refresh_bottom_windows(None, false)?;
 
     // keyinput queue initialization
     let key_consumer: Queue<Event> = Queue::with_capacity(100);
@@ -661,6 +648,7 @@ pub fn init() -> Result<(Queue<Event>, Queue<Event>), &'static str> {
     KernelTaskBuilder::new(window_manager_loop, (key_consumer, mouse_consumer))
         .name("window_manager_loop".to_string())
         .spawn()?;
+
     Ok((key_producer, mouse_producer))
 }
 
@@ -743,11 +731,48 @@ fn window_manager_loop(
     }
 }
 
-/// handle keyboard event, push it to the active window if exists
+/// handle keyboard event, push it to the active window if one exists
 fn keyboard_handle_application(key_input: KeyEvent) -> Result<(), &'static str> {
-    // Check for WM-level actions here, e.g., spawning a new terminal via Ctrl+Alt+T
-    if key_input.modifiers.control
-        && key_input.modifiers.alt
+    let win_mgr = WINDOW_MANAGER.try().ok_or("The window manager was not yet initialized")?;
+    // First, handle keyboard shortcuts understood by the window manager
+    
+    // Resize and move windows to the specified half of the screen (left, right, top, or bottom)
+    if key_input.modifiers.is_super_key() && key_input.action == KeyAction::Pressed {
+        let screen_dimensions = win_mgr.lock().get_screen_size();
+        let (width, height) = (screen_dimensions.0 as isize, screen_dimensions.1 as isize);
+        let new_position: Option<Rectangle> = match key_input.keycode {
+            Keycode::Left => Some(Rectangle {
+                top_left:     Coord { x: 0, y: 0 },
+                bottom_right: Coord { x: width / 2, y: height },
+            }),
+            Keycode::Right => Some(Rectangle {
+                top_left:     Coord { x: width / 2, y: 0 },
+                bottom_right: Coord { x: width, y: height },
+            }),
+            Keycode::Up => Some(Rectangle {
+                top_left:     Coord { x: 0, y: 0 },
+                bottom_right: Coord { x: width, y: height / 2 },
+            }),
+            Keycode::Down => Some(Rectangle {
+                top_left:     Coord { x: 0, y: height / 2 },
+                bottom_right: Coord { x: width, y: height },
+            }),
+            _ => None,
+        };
+        
+        if let Some(position) = new_position {
+            if let Some(active_window) = win_mgr.lock().active.upgrade() {
+                debug!("window_manager: resizing active window to {:?}", new_position);
+                active_window.lock().resize(position)?;
+            }
+        }
+        
+        return Ok(());
+    }
+
+    // Spawn a new terminal via Ctrl+Alt+T
+    if key_input.modifiers.is_control()
+        && key_input.modifiers.is_alt()
         && key_input.keycode == Keycode::T
         && key_input.action == KeyAction::Pressed
     {
@@ -767,11 +792,12 @@ fn keyboard_handle_application(key_input: KeyEvent) -> Result<(), &'static str> 
         return Ok(());
     }
 
-    // then pass them to window
-    let win = WINDOW_MANAGER.try().ok_or("The static window manager was not yet initialized")?.lock();
-    if let Err(_e) = win.pass_keyboard_event_to_window(key_input) {
-        error!("window_manager: failed to pass keyboard event to active window. Error: {:?}", _e);
-        // If no window is currently active, 
+    // Any keyboard event unhandled above should be passed to the active window.
+    if let Err(_e) = win_mgr.lock().pass_keyboard_event_to_window(key_input) {
+        warn!("window_manager: failed to pass keyboard event to active window. Error: {:?}", _e);
+        // If no window is currently active, then something might be potentially wrong, 
+        // but we can likely recover in the future when another window becomes active.
+        // Thus, we don't need to return a hard error here. 
     }
     Ok(())
 }

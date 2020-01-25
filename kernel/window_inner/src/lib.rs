@@ -2,58 +2,77 @@
 
 #![no_std]
 
-extern crate alloc;
 extern crate mpmc;
 extern crate event_types;
 extern crate framebuffer;
-extern crate spin;
 extern crate shapes;
 extern crate color;
 
-use alloc::sync::Arc;
 use mpmc::Queue;
 use event_types::{Event};
 use framebuffer::{Framebuffer, AlphaPixel};
 use color::{Color};
-use shapes::Coord;
-use spin::{Mutex};
+use shapes::{Coord, Rectangle};
 
 
-/// The default color of a window;
-const WINDOW_DEFAULT_COLOR: Color = Color::new(0x80FFFFFF);
-
-/// The status about whether a window is moving
+/// Whether a window is moving (being dragged by the mouse).
 pub enum WindowMovingStatus {
-    /// marks a non-moving window.
+    /// The window is not in motion.
     Stationary,
-    /// marks a moving window. The inner coordinate is the position before the window starts to move.
+    /// The window is currently in motion. 
+    /// The enclosed `Coord` represents the initial position of the window before it started moving.
     Moving(Coord),
 }
 
-/// WindowInner object that should be owned by the manager. It is usually owned by both an application's window and the manager so that the application can modify it and the manager can re-display it when necessary.
+/// WindowInner object that should be owned by the manager.
+/// It is usually owned by both an application's window and the manager so that the application can modify it and the manager can re-display it when necessary.
+/// 
+/// TODO: fix this dumb structure of too many queues. Currently the `consumer` and `producer` point to the same `Queue`...
 pub struct WindowInner {
-    /// The position of the top-left corner of the window.
-    /// It is relative to the top-left corner of the screen.
+    /// The position of the top-left corner of the window,
+    /// expressed relative to the top-left corner of the screen.
     pub coordinate: Coord,
-    /// The width of the window.
-    pub width: usize,
-    /// The height of the window.
-    pub height: usize,
     /// event consumer that could be used to get event input given to this window
     pub consumer: Queue<Event>, // event input
     /// event producer that could be used to send events to the `Window` object.
     pub producer: Queue<Event>, // event output used by window manager
-    /// framebuffer of this window
+    /// The background color of this window, used when initializing or clearing the window's content.
+    pub background: Color,
+    /// The virtual framebuffer that is used exclusively for rendering only this window.
     pub framebuffer: Framebuffer<AlphaPixel>,
-    /// Whether a window is moving and the position before a window starts to move.
+    /// Whether a window is moving or stationary.
     pub moving: WindowMovingStatus,
 }
 
 impl WindowInner {
+    /// Creates a new `WindowInner` object backed by the given `framebuffer`
+    /// and that will be rendered at the given `coordinate` relative to the screen.
+    /// 
+    /// The given `framebuffer` will be filled with the `background` color.
+    pub fn new(
+        coordinate: Coord,
+        framebuffer: Framebuffer<AlphaPixel>,
+        background: Color,
+    ) -> Result<WindowInner, &'static str> {
+        // Init the key input producer and consumer
+        let consumer = Queue::with_capacity(100);
+        let producer = consumer.clone();
+    
+        let mut wi = WindowInner {
+            coordinate,
+            consumer,
+            producer,
+            background,
+            framebuffer,
+            moving: WindowMovingStatus::Stationary,
+        };
+        wi.clear()?;
+        Ok(wi)
+    }
 
-    /// Clear the content of a window
+    /// Clear the content of a window by filling it with the `background` color. 
     pub fn clear(&mut self) -> Result<(), &'static str> {
-        self.framebuffer.fill_color(WINDOW_DEFAULT_COLOR.into());
+        self.framebuffer.fill(self.background.into());
         Ok(())
     }
 
@@ -64,7 +83,7 @@ impl WindowInner {
 
     /// Gets the size of a window in pixels
     pub fn get_size(&self) -> (usize, usize) {
-        (self.width, self.height)
+        self.framebuffer.get_size()
     }
 
     /// Gets the top-left position of the window relative to the top-left of the screen
@@ -81,30 +100,18 @@ impl WindowInner {
     pub fn get_pixel(&self, coordinate: Coord) -> Option<AlphaPixel> {
         self.framebuffer.get_pixel(coordinate)
     }
-}
 
-/// Creates a new window object with given position and size
-pub fn new_window<'a>(
-    coordinate: Coord,
-    framebuffer: Framebuffer<AlphaPixel>,
-) -> Result<Arc<Mutex<WindowInner>>, &'static str> {
-    // Init the key input producer and consumer
-    let consumer = Queue::with_capacity(100);
-    let producer = consumer.clone();
+    /// Resizes and moves this window to fit the given `Rectangle` that describes its new position. 
+    pub fn resize(&mut self, new_position: Rectangle) -> Result<(), &'static str> {
+        // First, perform the actual resize of the inner window
+        self.coordinate = new_position.top_left;
+        self.framebuffer = Framebuffer::new(new_position.width(), new_position.height(), None)?;
+        self.clear()?;
 
-    let (width, height) = framebuffer.get_size();
+        // Second, send a resize event to that window so it knows to refresh its display
+        self.producer.push(Event::new_window_resize_event(new_position))
+            .map_err(|_e| "Failed to enqueue the new resize event")?;
 
-    // new window object
-    let window: WindowInner = WindowInner {
-        coordinate: coordinate,
-        width: width,
-        height: height,
-        consumer: consumer,
-        producer: producer,
-        framebuffer: framebuffer,
-        moving: WindowMovingStatus::Stationary,
-    };
-
-    let window_ref = Arc::new(Mutex::new(window));
-    Ok(window_ref)
+        Ok(())
+    }
 }

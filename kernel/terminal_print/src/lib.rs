@@ -25,8 +25,6 @@ extern crate spin;
 use event_types::Event;
 use dfqueue::DFQueueProducer;
 use alloc::collections::BTreeMap;
-use alloc::vec::Vec;
-use alloc::string::String;
 use spin::Mutex;
 
 /// Calls `print!()` with an extra newline ('\n') appended to the end. 

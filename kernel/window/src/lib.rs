@@ -35,8 +35,8 @@ use spin::Mutex;
 use window_inner::{WindowInner, WindowMovingStatus};
 use window_manager::{WINDOW_MANAGER};
 
-// The title bar size, in number of pixels
-const WINDOW_TITLE_BAR: usize = 15;
+// The title bar height, in number of pixels
+const DEFAULT_TITLE_BAR_HEIGHT: usize = 16;
 // left, right, bottom border size, in number of pixels
 const WINDOW_BORDER: usize = 2;
 // border radius, in number of pixels
@@ -87,10 +87,8 @@ pub struct Window {
     pub inner: Arc<Mutex<WindowInner>>,
     /// the width of border, init as WINDOW_BORDER. the border is still part of the window and remains flexibility for user to change border style or remove border. However, for most application a border is useful for user to identify the region.
     border_size: usize,
-    /// the height of title bar in pixel, init as WINDOW_TITLE_BAR. it is render inside the window so user shouldn't use this area anymore
-    title_size: usize,
-    /// the background of this window, init as WINDOW_BACKGROUND
-    background: Color,
+    /// The height of title bar in pixels, init as DEFAULT_TITLE_BAR_HEIGHT. it is render inside the window so user shouldn't use this area anymore
+    title_bar_height: usize,
     /// application could get events from this consumer
     pub consumer: Queue<Event>,
     /// event output used by window manager, private variable
@@ -113,32 +111,23 @@ impl Window {
     ) -> Result<Window, &'static str> {
         let framebuffer = Framebuffer::new(width, height, None)?;
         let (width, height) = framebuffer.get_size();
-        if width <= 2 * WINDOW_TITLE_BAR || height <= WINDOW_TITLE_BAR + WINDOW_BORDER {
-            return Err("window too small to even draw border");
+        if width <= 2 * DEFAULT_TITLE_BAR_HEIGHT || height <= DEFAULT_TITLE_BAR_HEIGHT + WINDOW_BORDER {
+            return Err("window dimensions must be large enough for the title bar and borders to be drawn");
         }
-
-        let inner_mutex = window_inner::new_window(coordinate, framebuffer)?;
 
         // create event queue for components
         let consumer = Queue::with_capacity(100);
         let producer = consumer.clone();
 
         let mut window = Window {
-            inner: inner_mutex,
+            inner: Arc::new(Mutex::new(WindowInner::new(coordinate, framebuffer, background)?)),
             border_size: WINDOW_BORDER,
-            title_size: WINDOW_TITLE_BAR,
-            background: background,
+            title_bar_height: DEFAULT_TITLE_BAR_HEIGHT,
             consumer: consumer,
             producer: producer,
             last_mouse_position_event: MousePositionEvent::default(),
-            last_is_active: true, // new window is by default active
-            //components: BTreeMap::new(),
+            last_is_active: true, // new window is now set as the active window by default 
         };
-
-        {
-            let mut inner = window.inner.lock();
-            inner.framebuffer.fill_color(window.background.into());
-        }
 
         // draw window with active border
         window.draw_border(true);
@@ -166,11 +155,10 @@ impl Window {
         Ok(window)
     }
 
-    // /// Display a displayable in the window at `coordinate`.
-    // pub fn display(&mut self, displayable: &mut dyn Displayable, coordinate: Coord) -> Result<(), &'static str> {
-    // }
 
-    /// Handles the event sent to the window by window manager
+    /// Handles the event sent to the window's inner event queue by window manager.
+    /// 
+    /// Currently, if an event is not handled here, it is pushed 
     pub fn handle_event(&mut self) -> Result<(), &'static str> {
         let mut call_later_do_refresh_floating_border = false;
         let mut call_later_do_move_active_window = false;
@@ -194,20 +182,13 @@ impl Window {
 
         loop {
             let mut inner = self.inner.lock();
-            let consumer = &inner.consumer;
-            let event = match consumer.pop() {
+            let (width, height) = inner.get_size();
+            let event = match inner.consumer.pop() {
                 Some(ev) => ev,
-                _ => {
-                    break;
-                    //return Ok(());
-                }
+                None => break,
             };
 
             match event {
-                Event::KeyboardEvent(ref input_event) => {
-                    let key_input = input_event.key_event;
-                    self.producer.push(Event::new_keyboard_event(key_input)).map_err(|_e| "Fail to push the keyboard event")?;
-                }
                 Event::MousePositionEvent(ref mouse_event) => {
                     match inner.moving {
                         WindowMovingStatus::Moving(_) => {
@@ -219,8 +200,8 @@ impl Window {
                             call_later_do_refresh_floating_border = true;
                         },
                         WindowMovingStatus::Stationary => {
-                            if (mouse_event.coordinate.y as usize) < self.title_size
-                                && (mouse_event.coordinate.x as usize) < inner.width
+                            if (mouse_event.coordinate.y as usize) < self.title_bar_height
+                                && (mouse_event.coordinate.x as usize) < width
                             {
                                 // the region of title bar
                                 let r2 = WINDOW_RADIUS * WINDOW_RADIUS;
@@ -230,7 +211,7 @@ impl Window {
                                         mouse_event.coordinate.x
                                             - WINDOW_BUTTON_BIAS_X as isize
                                             - (i as isize) * WINDOW_BUTTON_BETWEEN as isize,
-                                        mouse_event.coordinate.y - self.title_size as isize / 2,
+                                        mouse_event.coordinate.y - self.title_bar_height as isize / 2,
                                     );
                                     if dcoordinate.x * dcoordinate.x + dcoordinate.y * dcoordinate.y
                                         <= r2 as isize
@@ -259,7 +240,7 @@ impl Window {
                                         need_refresh_three_button = true;
                                     }
                                 }
-                                // check if user push the title bar, which means user willing to move the window
+                                // check if user clicked and held the title bar, which means user wanted to move the window
                                 if !is_three_button
                                     && !self.last_mouse_position_event.left_button_hold
                                     && mouse_event.left_button_hold
@@ -268,12 +249,13 @@ impl Window {
                                     call_later_do_refresh_floating_border = true;
                                 }
                             } else {
-                                // the region of components
-                                // TODO: if any components want this event? ask them!
-                                self.producer.push(Event::MousePositionEvent(mouse_event.clone())).map_err(|_e| "Fail to push the keyboard event")?;
+                                // The mouse event occurred within the actual window content, not in the title bar.
+                                // Thus, we push it into the "outer" window queue so applications can handle it.
+                                self.producer.push(Event::MousePositionEvent(mouse_event.clone()))
+                                    .map_err(|_e| "Failed to push the mouse event from inner to outer queue")?;
                             }
-                            if (mouse_event.coordinate.y as usize) < inner.height
-                                && (mouse_event.coordinate.x as usize) < inner.width
+                            if (mouse_event.coordinate.y as usize) < height
+                                && (mouse_event.coordinate.x as usize) < width
                                 && !self.last_mouse_position_event.left_button_hold
                                 && mouse_event.left_button_hold
                             {
@@ -283,10 +265,12 @@ impl Window {
                         }
                     }
                 }
-                _ => {
-                    return Ok(());
+                unhandled => {
+                    // push unhandled events from the window's inner queue onto the window's "outer" queue
+                    self.producer.push(unhandled)
+                        .map_err(|_e| "Failed to push unhandled event from inner to outer queue")?;
                 }
-            };
+            }
             // event.mark_completed();
         }
 
@@ -341,14 +325,13 @@ impl Window {
         } else {
             WINDOW_BORDER_COLOR_INACTIVE
         };
-        let width = inner.width;
-        let height = inner.height;
+        let (width, height) = inner.get_size();
 
         framebuffer_drawer::draw_rectangle(
             &mut inner.framebuffer,
-            Coord::new(0, self.title_size as isize),
+            Coord::new(0, self.title_bar_height as isize),
             self.border_size,
-            height - self.title_size,
+            height - self.title_bar_height,
             border_color.into(),
         );
 
@@ -363,16 +346,16 @@ impl Window {
             &mut inner.framebuffer,
             Coord::new(
                 (width - self.border_size) as isize,
-                self.title_size as isize,
+                self.title_bar_height as isize,
             ),
             self.border_size,
-            height - self.title_size,
+            height - self.title_bar_height,
             border_color.into(),
         );
 
         // then draw the title bar
         if active {
-            for i in 0..self.title_size {
+            for i in 0..self.title_bar_height {
                 framebuffer_drawer::draw_rectangle(
                     &mut inner.framebuffer,
                     Coord::new(0, i as isize),
@@ -381,13 +364,13 @@ impl Window {
                     framebuffer::Pixel::weight_blend(
                         WINDOW_BORDER_COLOR_ACTIVE_BOTTOM.into(),
                         WINDOW_BORDER_COLOR_ACTIVE_TOP.into(),
-                        (i as f32) / (self.title_size as f32)
+                        (i as f32) / (self.title_bar_height as f32)
                     )
 
                     // framebuffer::pixel::weight_blend(
                     //     WINDOW_BORDER_COLOR_ACTIVE_BOTTOM,
                     //     WINDOW_BORDER_COLOR_ACTIVE_TOP,
-                    //     (i as f32) / (self.title_size as f32),
+                    //     (i as f32) / (self.title_bar_height as f32),
                     // ).into(),
                 ); 
             }
@@ -396,7 +379,7 @@ impl Window {
                 &mut inner.framebuffer,
                 Coord::new(0, 0),
                 width,
-                self.title_size,
+                self.title_bar_height,
                 border_color.into(),
             );
         }
@@ -422,7 +405,7 @@ impl Window {
 
     /// show three button with status. state = 0,1,2 for three different color
     fn show_button(&self, button: TopButton, state: usize, inner: &mut WindowInner) {
-        let y = self.title_size / 2;
+        let y = self.title_bar_height / 2;
         let x = WINDOW_BUTTON_BIAS_X
             + WINDOW_BUTTON_BETWEEN
                 * match button {
@@ -453,22 +436,22 @@ impl Window {
         let width = inner.get_size().0;
         Rectangle {
             top_left: Coord::new(0, 0),
-            bottom_right: Coord::new(width as isize, self.title_size as isize)
+            bottom_right: Coord::new(width as isize, self.title_bar_height as isize)
         }
     }
 
-    /// return the available inner size, excluding title bar and border
-    pub fn inner_size(&self) -> (usize, usize) {
-        let inner = self.inner.lock();
-        (
-            inner.width - 2 * self.border_size,
-            inner.height - self.border_size - self.title_size,
-        )
-    }
-
-    /// return the top-left coordinate of the available inner position, excluding title bar and border
-    pub fn inner_position(&self) -> Coord {
-        Coord::new(self.border_size as isize, self.title_size as isize)
+    /// Returns the position and dimensions of the Window's content region,
+    /// i.e., the area within the window excluding the title bar and border.
+    /// 
+    /// Obtains the lock on the inner `WindowInner` object.
+    /// 
+    /// The returned `Rectangle` is expressed relative to this Window's position.
+    pub fn content_area(&self) -> Rectangle {
+        let (window_width, window_height) = self.inner.lock().get_size();
+        // There is one title bar on top, and a border on the left, right, and bottom
+        let top_left = Coord::new(self.border_size as isize, self.title_bar_height as isize);
+        let bottom_right = Coord::new((window_width - self.border_size) as isize, (window_height - self.border_size) as isize);
+        Rectangle { top_left, bottom_right }
     }
 
     /// get space remained for border, in number of pixel. There is border on the left, right and bottom.
@@ -479,8 +462,8 @@ impl Window {
 
     /// get space remained for title bar, in number of pixel. The title bar is on the top of the window, so when user
     /// add their components, should margin its area to avoid overlapping the title bar.
-    pub fn get_title_size(&self) -> usize {
-        self.title_size
+    pub fn get_title_bar_height(&self) -> usize {
+        self.title_bar_height
     }
 }
 
