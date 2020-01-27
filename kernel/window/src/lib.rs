@@ -17,6 +17,7 @@ extern crate event_types;
 extern crate spin;
 #[macro_use]
 extern crate log;
+extern crate owning_ref;
 extern crate framebuffer;
 extern crate framebuffer_drawer;
 extern crate mouse;
@@ -28,7 +29,8 @@ extern crate color;
 use alloc::sync::Arc;
 use mpmc::Queue;
 use event_types::{Event, MousePositionEvent};
-use framebuffer::Framebuffer;
+use owning_ref::{MutexGuardRef, MutexGuardRefMut};
+use framebuffer::{Framebuffer, AlphaPixel};
 use color::{Color};
 use shapes::{Coord, Rectangle};
 use spin::Mutex;
@@ -78,51 +80,70 @@ impl From<usize> for TopButton {
     }
 }
 
-/// Abstraction of a window which owns a framebuffer and the window's handler. It provides title bar which helps user moving, close, maximize or minimize window
+
+/// This struct is the application-facing representation of a window.
+/// 
 pub struct Window {
-    /// this object contains states and methods required by the window manager
-    pub inner: Arc<Mutex<WindowInner>>,
-    /// application could get events from this consumer
-    pub consumer: Queue<Event>,
-    /// event output used by window manager, private variable
-    producer: Queue<Event>,
+    /// The system-facing inner representation of this window.
+    /// The window manager interacts with this object directly;
+    /// thus, applications should not be able to access this directly. 
+    /// 
+    /// This is wrapped in an `Arc` such that the window manager can hold `Weak` references to it.
+    inner: Arc<Mutex<WindowInner>>,
+    /// The event queue
+    event_consumer: Queue<Event>,
     /// last mouse position event, used to judge click and press-moving event
+    /// TODO FIXME (kevinaboos): why is mouse-specific stuff here? 
     last_mouse_position_event: MousePositionEvent,
     /// record last result of whether this window is active, to reduce redraw overhead
     last_is_active: bool,
 }
 
 impl Window {
-    /// Creates a new Window at `coordinate` relative to the top-left of the screen and adds it to the window manager.
-    /// `width`, `height` represent the size of the window in number of pixels.
-    /// `background` is the background color of the window. Currently the window is based on alpha framebuffer, so the pixel value of the background has an alpha channel and RGB bytes.
+    /// Creates a new window to be displayed on screen. 
+    /// 
+    /// The given `framebuffer` will be filled with the `initial_background` color.
+    /// 
+    /// The newly-created `Window` will be set as the "active" window that has current focus. 
+    /// 
+    /// # Arguments: 
+    /// * `coordinate`: the position of the window relative to the top-left corner of the screen.
+    /// * `width`, `height`: the dimensions of the window in pixels.
+    /// * `initial_background`: the default color of the window.
     pub fn new(
         coordinate: Coord,
         width: usize,
         height: usize,
-        background: Color,
+        initial_background: Color,
     ) -> Result<Window, &'static str> {
-        let framebuffer = Framebuffer::new(width, height, None)?;
+        let wm_ref = window_manager::WINDOW_MANAGER.try().ok_or("The window manager is not initialized")?;
+
+        // Create a new virtual framebuffer to hold this window's contents only,
+        // and fill it with the initial background color.
+        let mut framebuffer = Framebuffer::new(width, height, None)?;
+        framebuffer.fill(initial_background.into());
         let (width, height) = framebuffer.get_size();
+
+        // TODO: FIXME: (kevinaboos) this condition seems wrong... at least the first conditional does.
         if width <= 2 * DEFAULT_TITLE_BAR_HEIGHT || height <= DEFAULT_TITLE_BAR_HEIGHT + DEFAULT_BORDER_SIZE {
             return Err("window dimensions must be large enough for the title bar and borders to be drawn");
         }
 
-        // create event queue for components
-        let consumer = Queue::with_capacity(100);
-        let producer = consumer.clone();
+        // Create an event queue to allow the window manager to pass events to this `Window` via its `WindowInner` instance,
+        // and to allow applications to receive events from this `Window` object itself.
+        let event_consumer = Queue::with_capacity(100);
+        let event_producer = event_consumer.clone();
 
+        let window_inner = WindowInner::new(coordinate, framebuffer, event_producer);
         let mut window = Window {
-            inner: Arc::new(Mutex::new(WindowInner::new(coordinate, framebuffer, background)?)),
-            consumer: consumer,
-            producer: producer,
+            inner: Arc::new(Mutex::new(window_inner)),
+            event_consumer,
             last_mouse_position_event: MousePositionEvent::default(),
             last_is_active: true, // new window is now set as the active window by default 
         };
 
-        // draw window with active border
+        // Draw the actual window frame, the title bar and borders.
         window.draw_border(true);
-        // draw three buttons
         {
             let mut inner = window.inner.lock();
             window.show_button(TopButton::Close, 1, &mut inner);
@@ -130,36 +151,39 @@ impl Window {
             window.show_button(TopButton::Hide, 1, &mut inner);
         }
 
-        let area = Rectangle {
+        let _window_bounding_box = Rectangle {
             top_left: coordinate,
             bottom_right: coordinate + (width as isize, height as isize)
         };
 
-        let mut wm = window_manager::WINDOW_MANAGER.try().ok_or("The window manager is not initialized")?.lock();
-        let first_active = wm.set_active(&window.inner, false)?; 
-        let bounding_box = if first_active {
-            None
-        } else {
-            Some(area)
-        };
-        wm.refresh_bottom_windows(bounding_box, true)?;
+        let mut wm = wm_ref.lock();
+        wm.set_active(&window.inner, false)?; 
+
+        // Currently, refresh the whole screen instead of just the new window's bounds
+        // wm.refresh_bottom_windows(Some(window_bounding_box), true)?;
+        wm.refresh_bottom_windows(Option::<Rectangle>::None, true)?;
+        
         Ok(window)
     }
 
 
-    /// Handles the event sent to the window's inner event queue by window manager.
+    /// Tries to receive an `Event` that has been sent to this `Window`.
+    /// If no events exist on the queue, it returns `Ok(None)`. 
     /// 
-    /// Currently, if an event is not handled here, it is pushed 
-    pub fn handle_event(&mut self) -> Result<(), &'static str> {
+    /// "Internal" events will be automatically handled rather than returned. 
+    /// If an error occurs while obtaining the event (or when handling internal events),
+    ///
+    /// Otherwise, the event at the front of this window's event queue will be popped off and returned. 
+    pub fn handle_event(&mut self) -> Result<Option<Event>, &'static str> {
         let mut call_later_do_refresh_floating_border = false;
         let mut call_later_do_move_active_window = false;
         let mut need_to_set_active = false;
         let mut need_refresh_three_button = false;
 
-        let wm_mut = window_manager::WINDOW_MANAGER.try().ok_or("The window manager is not initialized")?;
+        let wm_ref = window_manager::WINDOW_MANAGER.try().ok_or("The window manager is not initialized")?;
         
         let is_active = {
-            let wm = wm_mut.lock();
+            let wm = wm_ref.lock();
             wm.is_active(&self.inner)
         };
         if is_active != self.last_is_active {
@@ -171,13 +195,20 @@ impl Window {
             self.show_button(TopButton::Hide, 1, &mut inner);
         }
 
+        // If we cannot handle this event as an "internal" event (e.g., clicking on the window title bar or border),
+        // we simply return that event from this function such that the application can handle it. 
+        let mut unhandled_event: Option<Event> = None;
+
         loop {
-            let mut inner = self.inner.lock();
-            let (width, height) = inner.get_size();
-            let event = match inner.consumer.pop() {
+            let event = match self.event_consumer.pop() {
                 Some(ev) => ev,
                 None => break,
             };
+            
+            // TODO FIXME: for a performant design, the goal is to AVOID holding the lock on `inner` as much as possible. 
+            //             That means that most of the drawing logic should be moved into the `window_inner` crate itself.
+            let mut inner = self.inner.lock();
+            let (width, height) = inner.get_size();
 
             match event {
                 Event::MousePositionEvent(ref mouse_event) => {
@@ -241,9 +272,8 @@ impl Window {
                                 }
                             } else {
                                 // The mouse event occurred within the actual window content, not in the title bar.
-                                // Thus, we push it into the "outer" window queue so applications can handle it.
-                                self.producer.push(Event::MousePositionEvent(mouse_event.clone()))
-                                    .map_err(|_e| "Failed to push the mouse event from inner to outer queue")?;
+                                // Thus, we let the caller handle it.
+                                unhandled_event = Some(Event::MousePositionEvent(mouse_event.clone()));
                             }
                             if (mouse_event.coordinate.y as usize) < height
                                 && (mouse_event.coordinate.x as usize) < width
@@ -257,15 +287,18 @@ impl Window {
                     }
                 }
                 unhandled => {
-                    // push unhandled events from the window's inner queue onto the window's "outer" queue
-                    self.producer.push(unhandled)
-                        .map_err(|_e| "Failed to push unhandled event from inner to outer queue")?;
+                    unhandled_event = Some(unhandled);
                 }
             }
-            // event.mark_completed();
+
+            // Immediately return any unhandled events to the caller
+            // before we loop back to handle additional events.
+            if unhandled_event.is_some() {
+                break;
+            }
         }
 
-        let mut wm = wm_mut.lock();
+        let mut wm = wm_ref.lock();
         if need_to_set_active {
             wm.set_active(&self.inner, true)?;
         }
@@ -285,26 +318,54 @@ impl Window {
             self.inner.lock().moving = WindowMovingStatus::Stationary;
         }
 
-        Ok(())
+        Ok(unhandled_event)
     }
 
-    /// Render the part of the window in `bounding_box` to the screen. Refresh the whole window if `bounding_box` is `None`. The method should be invoked after updating.
+    /// Renders the area of this `Window` specified by the given `bounding_box`,
+    /// which is relative to the top-left coordinate of this `Window`.
+    /// 
+    /// Refreshes the whole window if `bounding_box` is `None`.
+    /// 
+    /// This method should be invoked after updating the window's contents in order to see its new content.
     pub fn render(&mut self, bounding_box: Option<Rectangle>) -> Result<(), &'static str> {
+        let wm_ref = WINDOW_MANAGER.try().ok_or("The static window manager was not yet initialized")?;
+
+        // Convert the given relative `bounding_box` to an absolute one (relative to the screen, not the window).
         let coordinate = {
             let window = self.inner.lock();
             window.get_position()
         };
+        let absolute_bounding_box = bounding_box.map(|bb| bb + coordinate);
 
-        let mut wm = WINDOW_MANAGER
-            .try()
-            .ok_or("The static window manager was not yet initialized")?
-            .lock();
+        wm_ref.lock().refresh_windows(absolute_bounding_box)
+    }
 
-        let absolute_box = match bounding_box {
-            Some(bounding_box) => Some(bounding_box + coordinate),
-            None => None,
-        };
-        wm.refresh_windows(absolute_box)
+    /// Returns a `Rectangle` describing the position and dimensions of this Window's content region,
+    /// i.e., the area within the window excluding the title bar and border
+    /// that is available for rendering application content. 
+    /// 
+    /// The returned `Rectangle` is expressed relative to this Window's position.
+    pub fn area(&self) -> Rectangle {
+        self.inner.lock().content_area()
+    }
+
+    /// Returns an immutable reference to this window's virtual `Framebuffer`. 
+    pub fn framebuffer(&self) -> MutexGuardRef<WindowInner, Framebuffer<AlphaPixel>> {
+        MutexGuardRef::new(self.inner.lock()).map(|inner| &inner.framebuffer)
+    }
+
+    /// Returns a mutable reference to this window's virtual `Framebuffer`. 
+    pub fn framebuffer_mut(&mut self) -> MutexGuardRefMut<WindowInner, Framebuffer<AlphaPixel>> {
+        MutexGuardRefMut::new(self.inner.lock()).map_mut(|inner| &mut inner.framebuffer)
+    }
+
+    /// Returns `true` if this window is the currently active window. 
+    /// 
+    /// Obtains the lock on the window manager instance. 
+    pub fn is_active(&self) -> bool {
+        WINDOW_MANAGER.try()
+            .map(|wm| wm.lock().is_active(&self.inner))
+            .unwrap_or(false)
     }
 
     /// Draw the border of this window, with argument of whether this window is active now

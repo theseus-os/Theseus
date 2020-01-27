@@ -12,8 +12,3 @@ After display a displayable in its framebuffer, the window would invoke its `ren
 
 ## Handle Key Inputs
 An application invokes `Window.handle_event()` to handle the events sent to it. For example, an active window will receive all the key input events. An application can invoke `Window.handle_event()` in a loop to handle these inputs from the keyboard.
-
-## Example
-The application `new_window` is an example of how to create a new half-transparent window and handle the event to close the window.
-
-To test the application, run `new_ window x y width height` in the terminal in which (x, y) is the top-left point of the window relative to the top-left of the screen and (width, height) is the size of the new window.

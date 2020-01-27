@@ -1246,19 +1246,6 @@ dependencies = [
 ]
 
 [[package]]
-name = "new_window"
-version = "0.1.0"
-dependencies = [
- "color 0.1.0",
- "framebuffer 0.1.0",
- "log 0.3.9 (registry+https://github.com/rust-lang/crates.io-index)",
- "shapes 0.1.0",
- "spin 0.4.10 (registry+https://github.com/rust-lang/crates.io-index)",
- "window 0.1.0",
- "x86_64 0.1.2",
-]
-
-[[package]]
 name = "nic_buffers"
 version = "0.1.0"
 dependencies = [
@@ -2401,6 +2388,7 @@ dependencies = [
  "log 0.3.9 (registry+https://github.com/rust-lang/crates.io-index)",
  "mouse 0.1.0",
  "mpmc 0.1.6-pre",
+ "owning_ref 0.4.0 (git+https://github.com/kevinaboos/owning-ref-rs)",
  "path 0.1.0",
  "shapes 0.1.0",
  "spawn 0.1.0",
@@ -2413,7 +2401,6 @@ dependencies = [
 name = "window_inner"
 version = "0.1.0"
 dependencies = [
- "color 0.1.0",
  "event_types 0.1.0",
  "framebuffer 0.1.0",
  "mpmc 0.1.6-pre",

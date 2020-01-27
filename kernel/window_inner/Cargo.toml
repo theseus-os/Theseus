@@ -15,9 +15,6 @@ path = "../framebuffer"
 [dependencies.shapes]
 path = "../shapes"
 
-[dependencies.color]
-path = "../color"
-
 [dependencies.event_types]
 path = "../event_types"
 

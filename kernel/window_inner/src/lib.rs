@@ -1,4 +1,17 @@
-//! This crate defines a `WindowInner` struct. It profiles the basic information of a window such as its size, position and other states. It owns a framebuffer which it can display in and render to the final framebuffer via a compositor.
+//! The `WindowInner` struct is the internal representation of a `Window` used by the window manager. 
+//! 
+//! In comparison, the `Window` struct is application-facing, meaning it is used by (owned by)
+//! and exposed directly to applications or tasks that wish to display content. 
+//! 
+//! The `WindowInner` in the window_manager-facing version of the `Window`, 
+//! and each `Window` contains a reference to its `WindowInner`. 
+//! 
+//! The window manager typically holds `Weak` references to a `WindowInner` struct,
+//! which allows it to control the window itself and handle non-application-related components of the window,
+//! such as the title bar, border, etc. 
+//! 
+//! It also allows the window manager to control the window, e.g., move, hide, show, or resize it
+//! in a way that applications may not be able to do.
 
 #![no_std]
 
@@ -6,12 +19,10 @@ extern crate mpmc;
 extern crate event_types;
 extern crate framebuffer;
 extern crate shapes;
-extern crate color;
 
 use mpmc::Queue;
 use event_types::{Event};
 use framebuffer::{Framebuffer, AlphaPixel};
-use color::{Color};
 use shapes::{Coord, Rectangle};
 
 
@@ -30,67 +41,63 @@ pub enum WindowMovingStatus {
     Moving(Coord),
 }
 
-/// WindowInner object that should be owned by the manager.
-/// It is usually owned by both an application's window and the manager so that the application can modify it and the manager can re-display it when necessary.
+/// The `WindowInner` struct is the internal system-facing representation of a window. 
+/// Its members and functions describe the size, state, and events related to window handling,
+/// including elements like:
+/// * The underlying virtual framebuffer to which the window is rendered,
+/// * THe location and dimensions of the window in the final screen, 
+/// * The window's title bar, buttons, and borders, 
+/// * Queues for events that have been received by this window, and more. 
 /// 
-/// TODO: fix this dumb structure of too many queues. Currently the `consumer` and `producer` point to the same `Queue`...
+/// The window manager directly interacts with instances of `WindowInner` rather than `Window`,
+/// and the application tasks should not have direct access to this struct for correctness reasons.
+/// See the crate-level documentation for more details about how to use this
+/// and how it differs from `Window`.
 pub struct WindowInner {
     /// The position of the top-left corner of the window,
     /// expressed relative to the top-left corner of the screen.
-    pub coordinate: Coord,
+    coordinate: Coord,
     /// The width of the border in pixels.
     /// By default, there is a border on the left, right, and bottom edges of the window.
     pub border_size: usize,
     /// The height of title bar in pixels.
     /// By default, there is one title bar at the top edge of the window.
     pub title_bar_height: usize,
-    /// event consumer that could be used to get event input given to this window
-    pub consumer: Queue<Event>, // event input
-    /// event producer that could be used to send events to the `Window` object.
-    pub producer: Queue<Event>, // event output used by window manager
-    /// The background color of this window, used when initializing or clearing the window's content.
-    pub background: Color,
+    /// The producer side of this window's event queue. 
+    /// Entities that want to send events to this window (or the application that owns this window) 
+    /// should push events onto this queue.
+    /// 
+    /// The corresponding consumer for this event queue is found in the `Window` struct
+    /// that created and owns this `WindowInner` instance.
+    event_producer: Queue<Event>, // event output used by window manager
     /// The virtual framebuffer that is used exclusively for rendering only this window.
     pub framebuffer: Framebuffer<AlphaPixel>,
     /// Whether a window is moving or stationary.
+    /// 
+    /// TODO: FIXME (kevinaboos): this should be private, and window moving logic should be moved into this crate.
     pub moving: WindowMovingStatus,
 }
 
 impl WindowInner {
     /// Creates a new `WindowInner` object backed by the given `framebuffer`
     /// and that will be rendered at the given `coordinate` relative to the screen.
-    /// 
-    /// The given `framebuffer` will be filled with the `background` color.
     pub fn new(
         coordinate: Coord,
         framebuffer: Framebuffer<AlphaPixel>,
-        background: Color,
-    ) -> Result<WindowInner, &'static str> {
-        // Init the key input producer and consumer
-        let consumer = Queue::with_capacity(100);
-        let producer = consumer.clone();
-    
-        let mut wi = WindowInner {
+        event_producer: Queue<Event>,
+    ) -> WindowInner {
+        WindowInner {
             coordinate,
             border_size: DEFAULT_BORDER_SIZE,
             title_bar_height: DEFAULT_TITLE_BAR_HEIGHT,
-            consumer,
-            producer,
-            background,
+            event_producer,
             framebuffer,
             moving: WindowMovingStatus::Stationary,
-        };
-        wi.clear()?;
-        Ok(wi)
+        }
     }
 
-    /// Clear the content of a window by filling it with the `background` color. 
-    pub fn clear(&mut self) -> Result<(), &'static str> {
-        self.framebuffer.fill(self.background.into());
-        Ok(())
-    }
-
-    /// Checks if a coordinate relative to the top-left corner of a window is in the window
+    /// Returns `true` if the given `coordinate` (relative to the top-left corner of this window)
+    /// is within the bounds of this window.
     pub fn contains(&self, coordinate: Coord) -> bool {
         self.framebuffer.contains(coordinate)
     }
@@ -108,6 +115,16 @@ impl WindowInner {
     /// Sets the top-left position of the window relative to the top-left of the screen
     pub fn set_position(&mut self, coordinate: Coord) {
         self.coordinate = coordinate;
+    }
+
+    /// Returns an immutable reference to this window's virtual Framebuffer. 
+    pub fn framebuffer(&self) -> &Framebuffer<AlphaPixel> {
+        &self.framebuffer
+    }
+
+    /// Returns a mutable reference to this window's virtual Framebuffer. 
+    pub fn framebuffer_mut(&mut self) -> &mut Framebuffer<AlphaPixel> {
+        &mut self.framebuffer
     }
 
     /// Returns the pixel value at the given `coordinate`,
@@ -146,13 +163,22 @@ impl WindowInner {
         self.coordinate = new_position.top_left;
         self.framebuffer = Framebuffer::new(new_position.width(), new_position.height(), None)?;
 
-        // Second, send a resize event to that application window so it knows to refresh its display.
-        // Instead of sending the total size of the whole window, 
+        // Second, send a resize event to that application window (the `Window` object) 
+        // so it knows to refresh its display.
+        // Rather than send the total size of the whole window, 
         // we instead send the size and position of the inner content area of the window. 
-        // This prevents the application from thinking it can render over the window's title bar or border.
-        self.producer.push(Event::new_window_resize_event(self.content_area()))
-            .map_err(|_e| "Failed to enqueue the new resize event")?;
+        // This prevents the application from thinking it can render over the area
+        // that contains this window's title bar or border.
+        self.send_event(Event::new_window_resize_event(self.content_area()))
+            .map_err(|_e| "Failed to enqueue the resize event; window event queue was full.")?;
 
         Ok(())
+    }
+
+    /// Sends the given `event` to this window.
+    /// 
+    /// If the event queue was full, `Err(event)` is returned.
+    pub fn send_event(&self, event: Event) -> Result<(), Event> {
+        self.event_producer.push(event)
     }
 }

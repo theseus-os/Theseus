@@ -99,6 +99,8 @@ pub struct WindowManager {
 impl WindowManager {
     /// Sets one window as active, push last active (if exists) to top of show_list. if `refresh` is `true`, will then refresh the window's area.
     /// Returns whether this window is the first active window in the manager.
+    /// 
+    /// TODO FIXME: (kevinaboos) remove this dumb notion of "first active". This is a bad hack. 
     pub fn set_active(
         &mut self,
         inner_ref: &Arc<Mutex<WindowInner>>,
@@ -112,8 +114,6 @@ impl WindowManager {
                 } else {
                     // save this to show_list
                     self.show_list.push_front(self.active.clone());
-                    warn!("SET ACTIVE TO NONE");
-                    self.active = Weak::new();
                 }
                 false
             }
@@ -150,12 +150,12 @@ impl WindowManager {
         Ok(first_active)
     }
 
-    /// Return the index of a window if it is in the show list
-    fn is_window_in_show_list(&mut self, inner_ref: &Arc<Mutex<WindowInner>>) -> Option<usize> {
+    /// Returns the index of a window if it is in the show list
+    fn is_window_in_show_list(&mut self, window: &Arc<Mutex<WindowInner>>) -> Option<usize> {
         let mut i = 0_usize;
         for item in self.show_list.iter() {
             if let Some(item_ptr) = item.upgrade() {
-                if Arc::ptr_eq(&(item_ptr), inner_ref) {
+                if Arc::ptr_eq(&(item_ptr), window) {
                     return Some(i);
                 }
             }
@@ -164,12 +164,12 @@ impl WindowManager {
         None
     }
 
-    /// Return the index of a window if it is in the hide list
-    fn is_window_in_hide_list(&mut self, inner_ref: &Arc<Mutex<WindowInner>>) -> Option<usize> {
+    /// Returns the index of a window if it is in the hide list
+    fn is_window_in_hide_list(&mut self, window: &Arc<Mutex<WindowInner>>) -> Option<usize> {
         let mut i = 0_usize;
         for item in self.hide_list.iter() {
             if let Some(item_ptr) = item.upgrade() {
-                if Arc::ptr_eq(&(item_ptr), inner_ref) {
+                if Arc::ptr_eq(&(item_ptr), window) {
                     return Some(i);
                 }
             }
@@ -215,8 +215,7 @@ impl WindowManager {
         }
 
         if let Some(index) = self.is_window_in_hide_list(inner_ref) {
-            self.show_list.remove(index);
-            // self.refresh_windows(area, true)?;
+            self.hide_list.remove(index);
             return Ok(())        
         }
         Err("cannot find this window")
@@ -332,15 +331,19 @@ impl WindowManager {
         } 
     }
     
-    /// Passes the given keyboard event to the currently active window
+    /// Passes the given keyboard event to the currently active window.
     fn pass_keyboard_event_to_window(&self, key_event: KeyEvent) -> Result<(), &'static str> {
-        let active_window_ref = self.active.upgrade().ok_or("no window was set as active to receive a keyboard event")?;
-        let active_window = active_window_ref.lock();
-        active_window.producer.push(Event::new_keyboard_event(key_event)).map_err(|_e| "Failed to enqueue the keyboard event")?;
+        let active_window = self.active.upgrade().ok_or("no window was set as active to receive a keyboard event")?;
+        active_window.lock().send_event(Event::new_keyboard_event(key_event))
+            .map_err(|_e| "Failed to enqueue the keyboard event; window event queue was full.")?;
         Ok(())
     }
 
-    /// pass mouse event to the top window that mouse on, may also transfer to those want all events
+    /// Passes the given mouse event to the window that the mouse is currently over. 
+    /// 
+    /// If the mouse is not over any window, an error is returned; 
+    /// however, this error is quite common and expected when the mouse is not positioned within a window,
+    /// and is not a true failure. 
     fn pass_mouse_event_to_window(&self, mouse_event: MouseEvent) -> Result<(), &'static str> {
         let coordinate = { &self.mouse };
         let mut event: MousePositionEvent = MousePositionEvent {
@@ -354,6 +357,10 @@ impl WindowManager {
             fifth_button_hold: mouse_event.buttonact.fifth_button_hold,
         };
 
+        // TODO: FIXME:  improve this logic to just send the mouse event to the top-most window in the entire WM list,
+        //               not just necessarily the active one. (For example, scroll wheel events can be sent to non-active windows).
+
+
         // first check the active one
         if let Some(current_active) = self.active.upgrade() {
             let current_active_win = current_active.lock();
@@ -364,12 +371,14 @@ impl WindowManager {
             }{
                 event.coordinate = *coordinate - current_coordinate;
                 // debug!("pass to active: {}, {}", event.x, event.y);
-                current_active_win
-                    .producer
-                    .push(Event::MousePositionEvent(event)).map_err(|_e| "Fail to enqueue the mouse position event")?;
+                current_active_win.send_event(Event::MousePositionEvent(event))
+                    .map_err(|_e| "Failed to enqueue the mouse event; window event queue was full.")?;
                 return Ok(());
             }
         }
+
+        // TODO FIXME: (kevinaboos): the logic below here is actually incorrect -- it could send mouse events to an invisible window below others.
+
         // then check show_list
         for i in 0..self.show_list.len() {
             if let Some(now_inner_mutex) = self.show_list[i].upgrade() {
@@ -377,14 +386,14 @@ impl WindowManager {
                 let current_coordinate = now_inner.get_position();
                 if now_inner.contains(*coordinate - current_coordinate) {
                     event.coordinate = *coordinate - current_coordinate;
-                    now_inner
-                        .producer
-                        .push(Event::MousePositionEvent(event)).map_err(|_e| "Fail to enqueue the mouse position event")?;
+                    now_inner.send_event(Event::MousePositionEvent(event))
+                        .map_err(|_e| "Failed to enqueue the mouse event; window event queue was full.")?;
                     return Ok(());
                 }
             }
         }
-        Err("cannot find window to pass")
+
+        Err("the mouse position does not fall within the bounds of any window")
     }
 
     /// Refresh the floating border, which is used to show the outline of a window while it is being moved. 
@@ -592,14 +601,14 @@ impl WindowManager {
         Ok(())
     }
 
-    /// Whether a window is active
-    pub fn is_active(&self, window_inner: &Arc<Mutex<WindowInner>>) -> bool {
+    /// Returns true if the given `window` is the currently active window.
+    pub fn is_active(&self, window: &Arc<Mutex<WindowInner>>) -> bool {
         self.active.upgrade()
-            .map(|active| Arc::ptr_eq(&active, window_inner))
+            .map(|active| Arc::ptr_eq(&active, window))
             .unwrap_or(false)
     }
 
-    /// Get the screen size of the desktop
+    /// Returns the `(width, height)` in pixels of the screen itself (the final framebuffer).
     pub fn get_screen_size(&self) -> (usize, usize) {
         self.final_fb.get_size()
     }
@@ -610,6 +619,7 @@ pub fn init() -> Result<(Queue<Event>, Queue<Event>), &'static str> {
     let final_framebuffer: Framebuffer<AlphaPixel> = framebuffer::init()?;
     let (width, height) = final_framebuffer.get_size();
     let mut bottom_framebuffer = Framebuffer::new(width, height, None)?;
+    // TODO: FIXME: the top framebuffer holds the mouse, so it only needs to be as large as the mouse pointer image
     let mut top_framebuffer = Framebuffer::new(width, height, None)?;
     
     let (screen_width, screen_height) = bottom_framebuffer.get_size();
@@ -654,10 +664,8 @@ pub fn init() -> Result<(Queue<Event>, Queue<Event>), &'static str> {
 
 /// handles all keyboard and mouse movement in this window manager
 fn window_manager_loop(
-    consumer: (Queue<Event>, Queue<Event>),
+    (key_consumer, mouse_consumer): (Queue<Event>, Queue<Event>),
 ) -> Result<(), &'static str> {
-    let (key_consumer, mouse_consumer) = consumer;
-
     loop {
         let event_opt = key_consumer.pop()
             .or_else(||mouse_consumer.pop())
@@ -667,11 +675,8 @@ fn window_manager_loop(
             });
 
         if let Some(event) = event_opt {
-            // event could be either key input or mouse input
+            // Currently, the window manager only cares about keyboard or mouse events
             match event {
-                Event::ExitEvent => {
-                    return Ok(());
-                }
                 Event::KeyboardEvent(ref input_event) => {
                     let key_input = input_event.key_event;
                     keyboard_handle_application(key_input)?;
@@ -725,7 +730,9 @@ fn window_manager_loop(
                     }
                     cursor_handle_application(*mouse_event)?; // tell the event to application, or moving window
                 }
-                _ => {}
+                _other => {
+                    trace!("WINDOW_MANAGER: ignoring unexpected event: {:?}", _other);
+                }
             }
         }
     }
@@ -734,9 +741,10 @@ fn window_manager_loop(
 /// handle keyboard event, push it to the active window if one exists
 fn keyboard_handle_application(key_input: KeyEvent) -> Result<(), &'static str> {
     let win_mgr = WINDOW_MANAGER.try().ok_or("The window manager was not yet initialized")?;
-    // First, handle keyboard shortcuts understood by the window manager
     
-    // Resize and move windows to the specified half of the screen (left, right, top, or bottom)
+    // First, we handle keyboard shortcuts understood by the window manager.
+    
+    // "Super + Arrow" will resize and move windows to the specified half of the screen (left, right, top, or bottom)
     if key_input.modifiers.is_super_key() && key_input.action == KeyAction::Pressed {
         let screen_dimensions = win_mgr.lock().get_screen_size();
         let (width, height) = (screen_dimensions.0 as isize, screen_dimensions.1 as isize);

@@ -1339,10 +1339,8 @@ impl Shell {
             }
 
             let is_active = {
-                window_manager::WINDOW_MANAGER.try()
-                    .ok_or("The window manager is not initialized")?
-                    .lock()
-                    .is_active(&self.terminal.lock().window.inner)
+                let term = self.terminal.lock();
+                term.window.is_active()
             };
             
             if is_active {

@@ -27,6 +27,7 @@ extern crate text_display;
 extern crate shapes;
 extern crate color;
 
+use core::ops::DerefMut;
 use alloc::string::{String, ToString};
 use alloc::vec::Vec;
 use cursor::*;
@@ -395,13 +396,8 @@ impl Terminal {
 
     /// Display the text displayable in the window and render it to the screen
     fn display_text(&mut self) -> Result<(), &'static str>{
-        let area_to_render = {
-            let mut inner = self.window.inner.lock();
-            let coord = inner.content_area().top_left;
-            let area = self.text_display.display(coord, &mut inner.framebuffer)?;
-            area
-        };
-
+        let coord = self.window.area().top_left;
+        let area_to_render = self.text_display.display(coord, self.window.framebuffer_mut().deref_mut())?;
         self.window.render(Some(area_to_render))
     }
 
@@ -426,9 +422,9 @@ impl Terminal {
 impl Terminal {
     /// Creates a new terminal and adds it to the window manager `wm_mutex`
     pub fn new() -> Result<Terminal, &'static str> {
-        let wm_mut = window_manager::WINDOW_MANAGER.try().ok_or("The window manager is not initialized")?;
+        let wm_ref = window_manager::WINDOW_MANAGER.try().ok_or("The window manager is not initialized")?;
         let (window_width, window_height) = {
-            let wm = wm_mut.lock();
+            let wm = wm_ref.lock();
             wm.get_screen_size()
         };
         let window = window::Window::new(
@@ -438,8 +434,8 @@ impl Terminal {
             FONT_BACKGROUND_COLOR,
         )?;
         
-        let content_area = window.inner.lock().content_area();
-        let text_display = TextDisplay::new(content_area.width(), content_area.height(), FONT_FOREGROUND_COLOR, FONT_BACKGROUND_COLOR)?;
+        let area = window.area();
+        let text_display = TextDisplay::new(area.width(), area.height(), FONT_FOREGROUND_COLOR, FONT_BACKGROUND_COLOR)?;
 
         let mut terminal = Terminal {
             window: window,
@@ -584,20 +580,24 @@ impl Terminal {
         Ok(())
     }
 
-    /// Clear all.
+    /// Clear the scrollback buffer and reset the scroll positions.
     pub fn clear(&mut self) {
         self.scrollback_buffer.clear();
         self.scroll_start_idx = 0;
         self.is_scroll_end = true;
     }
 
-    /// Get a key event from the underlying window.
+    /// Gets an event from the window's event queue.
+    /// 
+    /// Returns `None` if no events have been sent to this window.
     pub fn get_event(&mut self) -> Option<Event> {
-        if let Err(_e) = self.window.handle_event() {
-            error!("Terminal::get_event() error: {:?}.", _e);
-            return Some(Event::ExitEvent);
+        match self.window.handle_event() {
+            Ok(event) => event,
+            Err(_e) => {
+                error!("Terminal::get_event(): error in the window's event handler: {:?}.", _e);
+                Some(Event::ExitEvent)
+            }
         }
-        self.window.consumer.pop()
     }
 
     /// Display the cursor of the terminal.
@@ -621,12 +621,12 @@ impl Terminal {
 
         // Get the bounding box that contains the displayed cursor.
         let bounding_box = {
-            let mut inner = self.window.inner.lock();
+            let coord = self.window.area().top_left;
             let bounding_box = self.cursor.display(
-                inner.content_area().top_left,
+                coord,
                 cursor_col,
                 cursor_line,
-                &mut inner.framebuffer,
+                self.window.framebuffer_mut().deref_mut(),
             )?;
             bounding_box
         };   
