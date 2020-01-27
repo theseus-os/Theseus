@@ -1,21 +1,49 @@
 [package]
 name = "window"
 version = "0.1.0"
-authors = ["Wenqiu Yu <yuwenqiuj@gmail.com>"]
-description = "define a Window trait"
+authors = ["Yue Wu <wuyue16@pku.edu.cn>", "Wenqiu Yu <yuwenqiuj@gmail.com>"]
+description = "an easy-to-use window object owned by application"
 build = "../../build.rs"
 
 [dependencies]
+spin = "0.4.10"
 
-[dependencies.dfqueue]
-path = "../../libs/dfqueue"
-version = "0.1.0"
+[dependencies.log]
+default-features = false
+version = "0.3.7"
+
+[dependencies.mpmc]
+path = "../../libs/mpmc"
+
+[dependencies.shapes]
+path = "../shapes"
+
+[dependencies.color]
+path = "../color"
+
+[dependencies.framebuffer_drawer]
+path = "../framebuffer_drawer"
+
+[dependencies.window_inner]
+path = "../window_inner"
+
+[dependencies.window_manager]
+path = "../window_manager"
+
+[dependencies.framebuffer]
+path = "../framebuffer"
 
 [dependencies.event_types]
 path = "../event_types"
 
-[dependencies.frame_buffer]
-path = "../frame_buffer"
+[dependencies.spawn]
+path = "../spawn"
+
+[dependencies.mouse]
+path = "../mouse"
+
+[dependencies.path]
+path = "../../kernel/path"
 
 [lib]
 crate-type = ["rlib"]

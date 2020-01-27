@@ -39,16 +39,13 @@ extern crate interrupts;
 extern crate acpi;
 extern crate device_manager;
 extern crate e1000;
-extern crate window_manager;
 extern crate scheduler;
-extern crate frame_buffer;
-extern crate frame_buffer_rgb;
-extern crate font;
 #[cfg(mirror_log_to_vga)] #[macro_use] extern crate print;
 extern crate input_event_manager;
 extern crate exceptions_full;
 extern crate network_manager;
 extern crate pause;
+extern crate window_manager;
 
 #[cfg(simd_personality)] extern crate simd_personality;
 
@@ -124,19 +121,14 @@ pub fn init(
     let ap_count = multicore_bringup::handle_ap_cores(kernel_mmi_ref.clone(), ap_start_realmode_begin, ap_start_realmode_end)?;
     info!("Finished handling and booting up all {} AP cores.", ap_count);
 
-    // init the display subsystem
-    // Currently we use a FrameBufferRGB as the final frame buffer, but other types of FrameBuffers could be used instead.
-    frame_buffer_rgb::init()?;
-    font::init()?;
-    window_manager::init()?;
-    info!("Display subsystem initialized successfully.");
+    // initialize window manager.
+    let (key_producer, mouse_producer) = window_manager::init()?;
 
     // initialize the input event manager, which will start the default terminal 
-    let input_event_queue_producer = input_event_manager::init()?;
+    input_event_manager::init()?;
 
     // initialize the rest of our drivers
-    device_manager::init(input_event_queue_producer)?;
-
+    device_manager::init(key_producer, mouse_producer)?;
     task_fs::init()?;
 
 

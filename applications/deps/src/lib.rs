@@ -176,7 +176,7 @@ fn find_section(section_name: &str) -> Result<StrongSectionRef, String> {
         .or_else(|| get_containing_crate_name(section_name).get(1)
             .and_then(|cname| namespace.get_crate_starting_with(&format!("{}-", cname)))
         )
-        .map(|(_cname, crate_ref)| crate_ref)
+        .map(|(_cname, crate_ref, _ns)| crate_ref)
         .ok_or_else(|| format!("Couldn't find section {} in symbol map, and couldn't get its containing crate", section_name))?;
 
     let mut matching_sections: Vec<(String, StrongSectionRef)> = containing_crate_ref.lock_as_ref().sections.values()

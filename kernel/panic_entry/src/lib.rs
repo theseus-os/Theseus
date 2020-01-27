@@ -136,7 +136,7 @@ extern "C" fn _Unwind_Resume(arg: usize) -> ! {
 
         match invoke_unwind_resume(arg) {
             Ok(()) => error!("BUG: _Unwind_Resume: unexpectedly returned Ok(()) from unwind::unwind_resume()"),
-            Err(e) => error!("_Unwind_Resume: failed to dynamically invoke unwind::unwind_resume!"),
+            Err(e) => error!("_Unwind_Resume: failed to dynamically invoke unwind::unwind_resume! Error: {}", e),
         }
         loop { }
     }

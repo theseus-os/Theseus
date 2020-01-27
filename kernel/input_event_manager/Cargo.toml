@@ -7,38 +7,12 @@ build = "../../build.rs"
 
 
 [dependencies]
-spin = "0.4.10"
-# x86_64 = { git = "https://github.com/kevinaboos/x86_64" }
-x86_64 = { path = "../../libs/x86_64" }
-
-[dependencies.log]
-default-features = false
-version = "0.3.7"
-
-[dependencies.keycodes_ascii]
-path = "../../libs/keycodes_ascii"
-
-[dependencies.window_manager]
-path = "../window_manager"
-
-[dependencies.mpmc]
-path = "../../libs/mpmc"
-
-[dependencies.event_types]
-path = "../event_types"
 
 [dependencies.spawn]
 path = "../spawn"
 
-[dependencies.task]
-path = "../task"
-
 [dependencies.mod_mgmt]
 path  = "../mod_mgmt"
-
-[dependencies.path]
-path = "../path"
-
 
 [lib]
 crate-type = ["rlib"]

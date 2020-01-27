@@ -47,9 +47,9 @@ pub fn early_init(kernel_mmi: &mut MemoryManagementInfo) -> Result<(), &'static 
 
 /// Initializes all other devices, such as the keyboard and mouse
 /// as well as all devices discovered on the PCI bus.
-pub fn init(keyboard_producer: Queue<Event>) -> Result<(), &'static str>  {
-    keyboard::init(keyboard_producer);
-    mouse::init();
+pub fn init(key_producer: Queue<Event>, mouse_producer: Queue<Event>) -> Result<(), &'static str>  {
+    keyboard::init(key_producer);
+    mouse::init(mouse_producer);
 
     // Initialize/scan the PCI bus to discover PCI devices
     for dev in pci::pci_device_iter() {

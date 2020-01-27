@@ -1,0 +1,29 @@
+[package]
+name = "framebuffer_compositor"
+version = "0.1.0"
+authors = ["Wenqiu Yu <yuwenqiuj@gmail.com>"]
+description = "the framebuffer compositor composites multiple source framebuffers into one destination framebuffer"
+build = "../../build.rs"
+
+[dependencies]
+spin = "0.4.10"
+
+[dependencies.framebuffer]
+path = "../framebuffer"
+
+[dependencies.shapes]
+path = "../shapes"
+
+[dependencies.compositor]
+path = "../compositor"
+
+[dependencies.lazy_static]
+features = ["spin_no_std", "nightly"]
+version = "1.2.0"
+
+[dependencies.hashbrown]
+version = "0.1.8"
+features = ["nightly"]
+
+[lib]
+crate-type = ["rlib"]
