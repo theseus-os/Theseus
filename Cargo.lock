@@ -287,6 +287,19 @@ version = "0.1.9"
 source = "registry+https://github.com/rust-lang/crates.io-index"
 
 [[package]]
+name = "channel_app"
+version = "0.1.0"
+dependencies = [
+ "apic 0.1.0",
+ "getopts 0.2.21 (git+https://github.com/kevinaboos/getopts)",
+ "log 0.3.9 (registry+https://github.com/rust-lang/crates.io-index)",
+ "spawn 0.1.0",
+ "task 0.1.0",
+ "terminal_print 0.1.0",
+ "unified_channel 0.1.0",
+]
+
+[[package]]
 name = "color"
 version = "0.1.0"
 
@@ -2269,6 +2282,15 @@ source = "registry+https://github.com/rust-lang/crates.io-index"
 name = "unicode-xid"
 version = "0.1.0"
 source = "registry+https://github.com/rust-lang/crates.io-index"
+
+[[package]]
+name = "unified_channel"
+version = "0.1.0"
+dependencies = [
+ "async_channel 0.1.0",
+ "cfg-if 0.1.9 (registry+https://github.com/rust-lang/crates.io-index)",
+ "rendezvous 0.1.0",
+]
 
 [[package]]
 name = "unreachable"
