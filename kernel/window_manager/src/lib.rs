@@ -769,15 +769,17 @@ fn keyboard_handle_application(key_input: KeyEvent) -> Result<(), &'static str> 
         };
         
         if let Some(position) = new_position {
-            if let Some(active_window) = win_mgr.lock().active.upgrade() {
+            let mut wm = win_mgr.lock();
+            if let Some(active_window) = wm.active.upgrade() {
                 debug!("window_manager: resizing active window to {:?}", new_position);
                 active_window.lock().resize(position)?;
+
+                // force refresh the entire screen for now
+                // TODO: perform a proper screen refresh here: only refresh the area that contained the active_window's old bounds.
+                wm.refresh_bottom_windows(Option::<Rectangle>::None, true)?;
             }
         }
 
-        // force refresh the entire screen for now
-        // TODO: perform a proper screen refresh here: only refresh the area that contained the active_window's old bounds.
-        win_mgr.lock().refresh_bottom_windows(Option::<Rectangle>::None, false)?;
         return Ok(());
     }
 
