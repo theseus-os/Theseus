@@ -28,4 +28,4 @@ path = "../../kernel/spawn"
 path = "../../kernel/wait_condition"
 
 [dependencies.terminal_print]
-path = "../terminal_print"
+path = "../../kernel/terminal_print"

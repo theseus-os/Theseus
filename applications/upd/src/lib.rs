@@ -29,6 +29,7 @@ use alloc::{
     string::{String, ToString},
     vec::Vec,
     collections::BTreeSet,
+    sync::Arc,
 };
 use spin::Once;
 use getopts::{Matches, Options};
@@ -278,9 +279,10 @@ fn apply(base_dir_path: &Path) -> Result<(), String> {
 }
 
 
-// TODO: fix this later once each task's environment contains a current namespace
-fn get_my_current_namespace() -> &'static CrateNamespace {
-    mod_mgmt::get_default_namespace().unwrap()
+fn get_my_current_namespace() -> Arc<CrateNamespace> {
+    task::get_my_current_task().map(|t| t.get_namespace()).unwrap_or_else(|| 
+        mod_mgmt::get_initial_kernel_namespace().expect("BUG: initial kernel namespace wasn't initialized").clone()
+    )
 }
 
 

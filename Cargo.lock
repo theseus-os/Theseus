@@ -95,7 +95,6 @@ dependencies = [
  "libterm 0.1.0",
  "log 0.3.9 (registry+https://github.com/rust-lang/crates.io-index)",
  "print 0.1.0",
- "scheduler 0.1.0",
  "serial_port 0.1.0",
  "spin 0.4.10 (registry+https://github.com/rust-lang/crates.io-index)",
  "stdio 0.1.0",
@@ -889,6 +888,9 @@ dependencies = [
 [[package]]
 name = "keycodes_ascii"
 version = "0.1.0"
+dependencies = [
+ "bitflags 1.1.0 (registry+https://github.com/rust-lang/crates.io-index)",
+]
 
 [[package]]
 name = "kill"
@@ -939,6 +941,7 @@ dependencies = [
  "framebuffer 0.1.0",
  "framebuffer_drawer 0.1.0",
  "framebuffer_printer 0.1.0",
+ "log 0.3.9 (registry+https://github.com/rust-lang/crates.io-index)",
  "print 0.1.0",
  "root 0.1.0",
  "shapes 0.1.0",
@@ -1243,19 +1246,6 @@ dependencies = [
 ]
 
 [[package]]
-name = "new_window"
-version = "0.1.0"
-dependencies = [
- "color 0.1.0",
- "framebuffer 0.1.0",
- "log 0.3.9 (registry+https://github.com/rust-lang/crates.io-index)",
- "shapes 0.1.0",
- "spin 0.4.10 (registry+https://github.com/rust-lang/crates.io-index)",
- "window 0.1.0",
- "x86_64 0.1.2",
-]
-
-[[package]]
 name = "nic_buffers"
 version = "0.1.0"
 dependencies = [
@@ -1496,7 +1486,6 @@ version = "0.1.0"
 dependencies = [
  "dfqueue 0.1.0",
  "event_types 0.1.0",
- "input_event_manager 0.1.0",
  "log 0.3.9 (registry+https://github.com/rust-lang/crates.io-index)",
  "spin 0.4.10 (registry+https://github.com/rust-lang/crates.io-index)",
 ]
@@ -2399,6 +2388,7 @@ dependencies = [
  "log 0.3.9 (registry+https://github.com/rust-lang/crates.io-index)",
  "mouse 0.1.0",
  "mpmc 0.1.6-pre",
+ "owning_ref 0.4.0 (git+https://github.com/kevinaboos/owning-ref-rs)",
  "path 0.1.0",
  "shapes 0.1.0",
  "spawn 0.1.0",
@@ -2411,12 +2401,10 @@ dependencies = [
 name = "window_inner"
 version = "0.1.0"
 dependencies = [
- "color 0.1.0",
  "event_types 0.1.0",
  "framebuffer 0.1.0",
  "mpmc 0.1.6-pre",
  "shapes 0.1.0",
- "spin 0.4.10 (registry+https://github.com/rust-lang/crates.io-index)",
 ]
 
 [[package]]
@@ -2432,6 +2420,7 @@ dependencies = [
  "framebuffer_drawer 0.1.0",
  "keycodes_ascii 0.1.0",
  "lazy_static 1.2.0 (registry+https://github.com/rust-lang/crates.io-index)",
+ "log 0.3.9 (registry+https://github.com/rust-lang/crates.io-index)",
  "mod_mgmt 0.1.0",
  "mouse_data 0.1.0",
  "mpmc 0.1.6-pre",

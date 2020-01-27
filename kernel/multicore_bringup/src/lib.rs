@@ -121,8 +121,8 @@ pub fn handle_ap_cores(
     // Copy the AP startup code (from the kernel's text section pages) into the AP_STARTUP physical address entry point.
     {
         // First, get the kernel's text pages, which is the MappedPages object that contains the vaddr `ap_start_realmode_begin`.
-        let kernel_text_pages_ref = mod_mgmt::get_default_namespace()
-            .ok_or("BUG: couldn't get the default CrateNamespace")
+        let kernel_text_pages_ref = mod_mgmt::get_initial_kernel_namespace()
+            .ok_or("BUG: couldn't get the initial kernel CrateNamespace")
             .and_then(|namespace| namespace.get_crate("nano_core").ok_or("BUG: couldn't get the 'nano_core' crate"))
             .and_then(|nano_core_crate| nano_core_crate.lock_as_ref().text_pages.clone().ok_or("BUG: nano_core crate had no text pages"))?;
         let kernel_text_pages = kernel_text_pages_ref.0.lock();

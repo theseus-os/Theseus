@@ -9,4 +9,4 @@ build = "../../build.rs"
 getopts = "0.2.21"
 
 [dependencies.terminal_print]
-path = "../terminal_print"
+path = "../../kernel/terminal_print"

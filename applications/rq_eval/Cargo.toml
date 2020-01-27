@@ -26,4 +26,4 @@ path = "../../kernel/task"
 path = "../../kernel/runqueue"
 
 [dependencies.terminal_print]
-path = "../terminal_print"
+path = "../../kernel/terminal_print"

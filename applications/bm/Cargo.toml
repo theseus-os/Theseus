@@ -16,7 +16,7 @@ bm_in_us = []
 
 
 [dependencies.terminal_print]
-path = "../terminal_print"
+path = "../../kernel/terminal_print"
 
 [dependencies.task]
 path = "../../kernel/task"

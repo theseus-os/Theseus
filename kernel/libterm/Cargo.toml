@@ -6,6 +6,10 @@ build = "../../build.rs"
 
 [dependencies]
 
+[dependencies.log]
+default-features = false
+version = "0.3.7"
+
 [dependencies.dfqueue]
 path = "../../libs/dfqueue"
 version = "0.1.0"

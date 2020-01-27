@@ -20,6 +20,7 @@ extern crate spin;
 use alloc::{
     string::{String},
     vec::Vec,
+    sync::Arc,
 };
 use spin::Once;
 use getopts::{Matches, Options};
@@ -218,9 +219,10 @@ fn _find_crate(crate_name: &str) -> Result<StrongCrateRef, String> {
 }
 
 
-// TODO: fix this later once each task's environment contains a current namespace
-fn get_my_current_namespace() -> &'static CrateNamespace {
-    mod_mgmt::get_default_namespace().unwrap()
+fn get_my_current_namespace() -> Arc<CrateNamespace> {
+    task::get_my_current_task().map(|t| t.get_namespace()).unwrap_or_else(|| 
+        mod_mgmt::get_initial_kernel_namespace().expect("BUG: initial kernel namespace wasn't initialized").clone()
+    )
 }
 
 

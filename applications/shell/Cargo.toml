@@ -38,7 +38,7 @@ path = "../../kernel/runqueue"
 path = "../../kernel/window_manager"
 
 [dependencies.terminal_print]
-path = "../terminal_print"
+path = "../../kernel/terminal_print"
 
 [dependencies.print]
 path = "../../kernel/print"

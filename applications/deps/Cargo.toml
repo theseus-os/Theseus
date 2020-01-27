@@ -14,7 +14,7 @@ version = "0.7.9"
 default-features = false
 
 [dependencies.terminal_print]
-path = "../terminal_print"
+path = "../../kernel/terminal_print"
 
 [dependencies.crate_name_utils]
 path = "../../kernel/crate_name_utils"

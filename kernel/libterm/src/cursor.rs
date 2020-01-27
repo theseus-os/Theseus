@@ -94,8 +94,8 @@ impl Cursor {
                 framebuffer_printer::print_ascii_character(
                     framebuffer,
                     self.underlying_char,
-                    FONT_COLOR.into(),
-                    BACKGROUND_COLOR.into(),
+                    FONT_FOREGROUND_COLOR.into(),
+                    FONT_BACKGROUND_COLOR.into(),
                     coordinate,
                     column,
                     line,
@@ -144,7 +144,7 @@ impl Default for Cursor  {
             freq: DEFAULT_CURSOR_FREQ,
             time: tsc_ticks(),
             show: true,
-            color: FONT_COLOR,
+            color: FONT_FOREGROUND_COLOR,
             offset_from_end: 0,
             underlying_char: 0,
         }

@@ -8,7 +8,7 @@ extern crate shapes;
 use keycodes_ascii::KeyEvent;
 use mouse_data::MouseEvent;
 use alloc::string::String;
-use shapes::Coord;
+use shapes::{Coord, Rectangle};
 
 /// An event describing mouse position rather than movement differential from last event.
 /// It contains two position, `coodinate` for the relative position in each window, and `gcoordinate` for global absolute position of the screen.
@@ -53,11 +53,15 @@ pub enum Event {
     KeyboardEvent(KeyboardInputEvent),
     /// An input event from a mouse
     MouseMovementEvent(MouseEvent),
-    /// An event from another entity that wishes to print a message
-    OutputEvent(PrintOutputEvent),
-    /// Tells an application that the window manager has resized that application's window
-    /// so that it knows to perform any necessary tasks related to window size, such as text reflow.
-    WindowResizeEvent(WindowResizeEvent),
+    /// An event indicating that another entity wants to print the given `String`.
+    OutputEvent(String),
+    /// Tells an application that the window manager has resized or moved its window
+    /// so that it knows to refresh its display and perform any necessary tasks, such as text reflow.
+    /// 
+    /// The new position and size of the window is given by the `Rectangle` within,
+    /// and represents the content area within the window that is accessible to the application,
+    /// which excludes the window title bar, borders, etc. 
+    WindowResizeEvent(Rectangle),
     /// The event tells application about mouse's position currently (including relative to a window and relative to a screen)
     MousePositionEvent(MousePositionEvent),
     ExitEvent,
@@ -71,16 +75,16 @@ impl Event {
 
     /// Create a new output event
     pub fn new_output_event<S>(s: S) -> Event where S: Into<String> {
-        Event::OutputEvent(PrintOutputEvent::new(s.into()))
+        Event::OutputEvent(s.into())
     }
 
     /// Create a new window resize event
-    pub fn new_resize_event(coordinate: Coord, width: usize, height: usize) -> Event {
-        Event::WindowResizeEvent(WindowResizeEvent::new(coordinate, width, height))
+    pub fn new_window_resize_event(new_position: Rectangle) -> Event {
+        Event::WindowResizeEvent(new_position)
     }
 }
 
-/// use this to deliver input events (such as keyboard input) to the input_event_manager.
+/// A keyboard event, indicating that one or more keys were pressed or released.
 #[derive(Debug, Clone)]
 pub struct KeyboardInputEvent {
     /// The key input event from i/o device
@@ -92,44 +96,6 @@ impl KeyboardInputEvent {
     pub fn new(key: KeyEvent) -> KeyboardInputEvent {
         KeyboardInputEvent { 
             key_event: key 
-        }
-    }
-}
-
-/// use this to queue up a formatted string that should be printed to the input_event_manager. 
-#[derive(Debug, Clone)]
-pub struct PrintOutputEvent {
-    /// The text to print
-    pub text: String,
-}
-
-impl PrintOutputEvent {
-    /// Create a new print output event. `s` is the string to print
-    pub fn new(s: String) -> PrintOutputEvent {
-        PrintOutputEvent {
-            text: s,
-        }
-    }
-}
-
-/// Use this to inform the window manager to adjust the sizes of existing windows
-#[derive(Debug, Clone)]
-pub struct WindowResizeEvent {
-    /// the new position of the window
-    pub coordinate: Coord,
-    /// the new width of the window
-    pub width: usize, 
-    /// the new height of the window
-    pub height: usize, 
-}
-
-impl WindowResizeEvent {
-    /// Create a new window resize event. `coordinate` is the new position and `(width, height)` is the new size of the window.
-    pub fn new(coordinate: Coord, width: usize, height: usize) -> WindowResizeEvent {
-        WindowResizeEvent {
-            coordinate: coordinate,
-            width: width, 
-            height: height,
         }
     }
 }
