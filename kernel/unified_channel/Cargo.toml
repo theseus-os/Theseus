@@ -1,0 +1,15 @@
+[package]
+name = "unified_channel"
+version = "0.1.0"
+description = "A cfg-based wrapper that unifies rendezvous channels and async channels, for evaluation purposes"
+authors = ["Kevin Boos <kevinaboos@gmail.com>"]
+build = "../../build.rs"
+
+[dependencies]
+cfg-if = "0.1.6"
+
+[dependencies.async_channel]
+path = "../async_channel"
+
+[dependencies.rendezvous]
+path = "../rendezvous"
