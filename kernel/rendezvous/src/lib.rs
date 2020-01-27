@@ -211,6 +211,7 @@ impl <T: Send> Sender<T> {
     /// Returns `Ok(())` if the message was sent and received successfully,
     /// otherwise returns an error. 
     pub fn send(&self, msg: T) -> Result<(), &'static str> {
+        // trace!("rendezvous: send() entry");
         let curr_task = task::get_my_current_task().ok_or("couldn't get current task")?;
 
         // obtain a sender-side exchange slot, blocking if necessary
@@ -357,6 +358,7 @@ impl <T: Send> Receiver<T> {
     /// Returns the message if it was received properly,
     /// otherwise returns an error.
     pub fn receive(&self) -> Result<T, &'static str> {
+        // trace!("rendezvous: receive() entry");
         let curr_task = task::get_my_current_task().ok_or("couldn't get current task")?;
         
         // obtain a receiver-side exchange slot, blocking if necessary
@@ -458,7 +460,7 @@ impl <T: Send> Receiver<T> {
         // trace!("receiver done, restoring slot");
         self.channel.slot.replace_receiver_slot(receiver_slot);
         self.channel.waiting_receivers.notify_one();
-        // trace!("receiver done, returning from receive().");
+        // trace!("rendezvous: receiver done, returning from receive().");
         retval
     }
 
