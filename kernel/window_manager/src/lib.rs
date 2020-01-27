@@ -90,9 +90,10 @@ pub struct WindowManager {
     /// The bottom framebuffer typically contains the background/wallpaper image, 
     /// which is displayed by default when no other windows exist on top of it.
     bottom_fb: Framebuffer<AlphaPixel>,
-    /// the framebuffer that it should print on
+    /// The top framebuffer is used for overlaying visual elements atop the rest of the windows, 
+    /// e.g., the mouse pointer, the border of a window being dragged/moved, etc. 
     top_fb: Framebuffer<AlphaPixel>,
-    /// The final framebuffer which is mapped to the screen;
+    /// The final framebuffer which is mapped to the screen (the actual display device).
     pub final_fb: Framebuffer<AlphaPixel>,
 }
 
@@ -257,7 +258,7 @@ impl WindowManager {
         // create updated framebuffer info objects
         let window_bufferlist = locked_window_list.iter().map(|window| {
             FramebufferUpdates {
-                src_framebuffer: &window.framebuffer,
+                src_framebuffer: window.framebuffer(),
                 coordinate_in_dest_framebuffer: window.get_position(),
             }
         }).collect::<Vec<_>>();
@@ -308,7 +309,7 @@ impl WindowManager {
         // create updated framebuffer info objects
         let bufferlist = locked_window_list.iter().map(|window| {
             FramebufferUpdates {
-                src_framebuffer: &window.framebuffer,
+                src_framebuffer: window.framebuffer(),
                 coordinate_in_dest_framebuffer: window.get_position(),
             }
         }).collect::<Vec<_>>();
@@ -322,7 +323,7 @@ impl WindowManager {
         if let Some(window_ref) = self.active.upgrade() {
             let window = window_ref.lock();
             let buffer_update = FramebufferUpdates {
-                src_framebuffer: &window.framebuffer,
+                src_framebuffer: window.framebuffer(),
                 coordinate_in_dest_framebuffer: window.get_position(),
             };
             FRAME_COMPOSITOR.lock().composite(Some(buffer_update), &mut self.final_fb, bounding_box)
@@ -495,7 +496,7 @@ impl WindowManager {
             self.refresh_active_window(Some(Rectangle{top_left: new_top_left, bottom_right: new_bottom_right}))?;
             self.refresh_mouse()?;
         } else {
-            return Err("cannot fid active window to move");
+            return Err("cannot find active window to move");
         }
         Ok(())
     }
@@ -618,10 +619,9 @@ impl WindowManager {
 pub fn init() -> Result<(Queue<Event>, Queue<Event>), &'static str> {
     let final_framebuffer: Framebuffer<AlphaPixel> = framebuffer::init()?;
     let (width, height) = final_framebuffer.get_size();
+
     let mut bottom_framebuffer = Framebuffer::new(width, height, None)?;
-    // TODO: FIXME: the top framebuffer holds the mouse, so it only needs to be as large as the mouse pointer image
     let mut top_framebuffer = Framebuffer::new(width, height, None)?;
-    
     let (screen_width, screen_height) = bottom_framebuffer.get_size();
     bottom_framebuffer.fill(color::LIGHT_GRAY.into());
     top_framebuffer.fill(color::TRANSPARENT.into()); 
@@ -776,11 +776,8 @@ fn keyboard_handle_application(key_input: KeyEvent) -> Result<(), &'static str> 
         }
 
         // force refresh the entire screen for now
-        // let bb = Rectangle { top_left: Coord::new(0, 0), bottom_right: Coord::new(width, height) };
-        // win_mgr.lock().refresh_bottom_windows(Some(bb).into_iter(), true)?;
-
-        // TODO: perform a proper screen refresh here!
-
+        // TODO: perform a proper screen refresh here: only refresh the area that contained the active_window's old bounds.
+        win_mgr.lock().refresh_bottom_windows(Option::<Rectangle>::None, false)?;
         return Ok(());
     }
 

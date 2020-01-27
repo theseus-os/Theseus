@@ -351,12 +351,12 @@ impl Window {
 
     /// Returns an immutable reference to this window's virtual `Framebuffer`. 
     pub fn framebuffer(&self) -> MutexGuardRef<WindowInner, Framebuffer<AlphaPixel>> {
-        MutexGuardRef::new(self.inner.lock()).map(|inner| &inner.framebuffer)
+        MutexGuardRef::new(self.inner.lock()).map(|inner| inner.framebuffer())
     }
 
     /// Returns a mutable reference to this window's virtual `Framebuffer`. 
     pub fn framebuffer_mut(&mut self) -> MutexGuardRefMut<WindowInner, Framebuffer<AlphaPixel>> {
-        MutexGuardRefMut::new(self.inner.lock()).map_mut(|inner| &mut inner.framebuffer)
+        MutexGuardRefMut::new(self.inner.lock()).map_mut(|inner| inner.framebuffer_mut())
     }
 
     /// Returns `true` if this window is the currently active window. 
@@ -383,7 +383,7 @@ impl Window {
         let (width, height) = inner.get_size();
 
         framebuffer_drawer::draw_rectangle(
-            &mut inner.framebuffer,
+            inner.framebuffer_mut(),
             Coord::new(0, title_bar_height as isize),
             border_size,
             height - title_bar_height,
@@ -391,14 +391,14 @@ impl Window {
         );
 
         framebuffer_drawer::draw_rectangle(
-            &mut inner.framebuffer,
+            inner.framebuffer_mut(),
             Coord::new(0, (height - border_size) as isize),
             width,
             border_size,
             border_color.into(),
         );
         framebuffer_drawer::draw_rectangle(
-            &mut inner.framebuffer,
+            inner.framebuffer_mut(),
             Coord::new(
                 (width - border_size) as isize,
                 title_bar_height as isize,
@@ -412,7 +412,7 @@ impl Window {
         if active {
             for i in 0..title_bar_height {
                 framebuffer_drawer::draw_rectangle(
-                    &mut inner.framebuffer,
+                    inner.framebuffer_mut(),
                     Coord::new(0, i as isize),
                     width,
                     1,
@@ -425,7 +425,7 @@ impl Window {
             }
         } else {
             framebuffer_drawer::draw_rectangle(
-                &mut inner.framebuffer,
+                inner.framebuffer_mut(),
                 Coord::new(0, 0),
                 width,
                 title_bar_height,
@@ -443,10 +443,8 @@ impl Window {
                 let dy1 = WINDOW_RADIUS - j;
                 if dx1 * dx1 + dy1 * dy1 > r2 {
                     // draw this to transparent
-                    inner.framebuffer
-                        .overwrite_pixel(Coord::new(i as isize, j as isize), trans_pixel);
-                    inner.framebuffer.overwrite_pixel(
-                        Coord::new((width - i - 1) as isize, j as isize), trans_pixel);
+                    inner.framebuffer_mut().overwrite_pixel(Coord::new(i as isize, j as isize), trans_pixel);
+                    inner.framebuffer_mut().overwrite_pixel(Coord::new((width - i - 1) as isize, j as isize), trans_pixel);
                 }
             }
         }
@@ -468,7 +466,7 @@ impl Window {
             TopButton::Hide => WINDOW_BUTTON_COLOR_HIDE,
         };
         framebuffer_drawer::draw_circle(
-            &mut inner.framebuffer,
+            inner.framebuffer_mut(),
             Coord::new(x as isize, y as isize),
             WINDOW_BUTTON_SIZE,
             framebuffer::Pixel::weight_blend(

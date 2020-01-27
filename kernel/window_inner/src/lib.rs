@@ -71,7 +71,7 @@ pub struct WindowInner {
     /// that created and owns this `WindowInner` instance.
     event_producer: Queue<Event>, // event output used by window manager
     /// The virtual framebuffer that is used exclusively for rendering only this window.
-    pub framebuffer: Framebuffer<AlphaPixel>,
+    framebuffer: Framebuffer<AlphaPixel>,
     /// Whether a window is moving or stationary.
     /// 
     /// TODO: FIXME (kevinaboos): this should be private, and window moving logic should be moved into this crate.
