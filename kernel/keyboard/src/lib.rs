@@ -16,7 +16,7 @@ use ps2::{init_ps2_port1,test_ps2_port1,keyboard_led,keyboard_detect,KeyboardTyp
 
 
 // TODO: avoid unsafe static mut using the following: https://www.reddit.com/r/rust/comments/1wvxcn/lazily_initialized_statics/cf61im5/
-static mut KBD_MODIFIERS: KeyboardModifiers = KeyboardModifiers::default();
+static mut KBD_MODIFIERS: KeyboardModifiers = KeyboardModifiers::new();
 
 
 static KEYBOARD_PRODUCER: Once<Queue<Event>> = Once::new();
@@ -58,39 +58,44 @@ pub fn init(keyboard_queue_producer: Queue<Event>) {
 
 /// returns Ok(()) if everything was handled properly.
 /// Otherwise, returns an error string.
-pub fn handle_keyboard_input(scan_code: u8, _extended: bool) -> Result<(), &'static str> {
+pub fn handle_keyboard_input(scan_code: u8, extended: bool) -> Result<(), &'static str> {
     // SAFE: no real race conditions with keyboard presses
     let modifiers = unsafe { &mut KBD_MODIFIERS };
     // debug!("KBD_MODIFIERS before {}: {:?}", scan_code, modifiers);
 
     // first, update the modifier keys
     match scan_code {
-        x if x == Keycode::Control as u8 => { modifiers.control = true }
-        x if x == Keycode::Alt     as u8 => { modifiers.alt = true }
-
-        x if x == (Keycode::LeftShift as u8) || x == (Keycode::RightShift as u8) => { 
-            modifiers.shift = true 
+        x if x == Keycode::Control        as u8                       => { 
+            modifiers.insert(if extended { KeyboardModifiers::CONTROL_RIGHT } else { KeyboardModifiers::CONTROL_LEFT});
         }
+        x if x == Keycode::Alt            as u8                       => { modifiers.insert(KeyboardModifiers::ALT);              }
+        x if x == Keycode::LeftShift      as u8                       => { modifiers.insert(KeyboardModifiers::SHIFT_LEFT);       }
+        x if x == Keycode::RightShift     as u8                       => { modifiers.insert(KeyboardModifiers::SHIFT_RIGHT);      }
+        x if x == Keycode::SuperKeyLeft   as u8                       => { modifiers.insert(KeyboardModifiers::SUPER_KEY_LEFT);   }
+        x if x == Keycode::SuperKeyRight  as u8                       => { modifiers.insert(KeyboardModifiers::SUPER_KEY_RIGHT);  }
 
-        // toggle caps lock on press only
+        x if x == Keycode::Control        as u8 + KEY_RELEASED_OFFSET => {
+            modifiers.remove(if extended { KeyboardModifiers::CONTROL_RIGHT } else { KeyboardModifiers::CONTROL_LEFT});
+        }
+        x if x == Keycode::Alt            as u8 + KEY_RELEASED_OFFSET => { modifiers.remove(KeyboardModifiers::ALT);              }
+        x if x == Keycode::LeftShift      as u8 + KEY_RELEASED_OFFSET => { modifiers.remove(KeyboardModifiers::SHIFT_LEFT);       }
+        x if x == Keycode::RightShift     as u8 + KEY_RELEASED_OFFSET => { modifiers.remove(KeyboardModifiers::SHIFT_RIGHT);      }
+        x if x == Keycode::SuperKeyLeft   as u8 + KEY_RELEASED_OFFSET => { modifiers.remove(KeyboardModifiers::SUPER_KEY_LEFT);   }
+        x if x == Keycode::SuperKeyRight  as u8 + KEY_RELEASED_OFFSET => { modifiers.remove(KeyboardModifiers::SUPER_KEY_RIGHT);  }
+
+        // The "*Lock" keys are toggled only upon being pressed, not when released.
         x if x == Keycode::CapsLock as u8 => {
-            modifiers.caps_lock ^= true;
+            modifiers.toggle(KeyboardModifiers::CAPS_LOCK);
             set_keyboard_led(&modifiers);
         }
-
         x if x == Keycode::ScrollLock as u8 => {
-            modifiers.scroll_lock ^= true;
+            modifiers.toggle(KeyboardModifiers::SCROLL_LOCK);
             set_keyboard_led(&modifiers);
         }
-
-        x if x == Keycode::NumLock    as u8 => {
-            modifiers.num_lock ^= true;
+        x if x == Keycode::NumLock as u8 => {
+            modifiers.toggle(KeyboardModifiers::NUM_LOCK);
             set_keyboard_led(&modifiers);
         }
-
-        x if x == Keycode::Control as u8 + KEY_RELEASED_OFFSET => { modifiers.control = false }
-        x if x == Keycode::Alt     as u8 + KEY_RELEASED_OFFSET => { modifiers.alt = false }
-        x if x == ((Keycode::LeftShift as u8) + KEY_RELEASED_OFFSET) || x == ((Keycode::RightShift as u8) + KEY_RELEASED_OFFSET) => { modifiers.shift = false }
 
         _ => { } // do nothing
     }
@@ -108,7 +113,7 @@ pub fn handle_keyboard_input(scan_code: u8, _extended: bool) -> Result<(), &'sta
 
             let keycode = Keycode::from_scancode(adjusted_scan_code); 
             match keycode {
-                Some(keycode) => { // this re-scopes (shadows) keycode
+                Some(keycode) => {
                     let event = Event::new_keyboard_event(KeyEvent::new(keycode, action, modifiers.clone()));
                     if let Some(producer) = KEYBOARD_PRODUCER.try() {
                         producer.push(event).map_err(|_e| "keyboard input queue is full")
@@ -136,13 +141,13 @@ pub fn handle_keyboard_input(scan_code: u8, _extended: bool) -> Result<(), &'sta
 
 fn set_keyboard_led(modifiers: &KeyboardModifiers) {
     let mut led_bitmask: u8 = 0; 
-    if modifiers.caps_lock {
+    if modifiers.is_caps_lock() {
         led_bitmask |= CAPS_LED;
     }
-    if modifiers.num_lock {
+    if modifiers.is_num_lock() {
         led_bitmask |= NUM_LED;
     }
-    if modifiers.scroll_lock {
+    if modifiers.is_scroll_lock() {
         led_bitmask |= SCROLL_LED;
     }
 

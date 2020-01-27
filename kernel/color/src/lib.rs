@@ -10,6 +10,7 @@ pub const RED: Color = Color::new(0xFF0000);
 pub const MAGENTA: Color = Color::new(0xFF00FF);
 pub const BROWN: Color = Color::new(0xA52A2A);
 pub const LIGHT_GRAY: Color = Color::new(0xD3D3D3);
+pub const GRAY: Color = Color::new(0x808080);
 pub const DARK_GRAY: Color = Color::new(0xA9A9A9);
 pub const LIGHT_BLUE: Color = Color::new(0xADD8E6);
 pub const LIGHT_GREEN: Color = Color::new(0x90EE90);
@@ -22,7 +23,7 @@ pub const TRANSPARENT: Color = Color::new(0xFF000000);
 
 /// This structure represents a color value in the standard RGB color model,
 /// comprised of red, blue, green, and transparency components.
-#[derive(Clone, Copy)]
+#[derive(Debug, Clone, Copy)]
 pub struct Color {
     /// 0 is opaque and 0xFF is transparent
     alpha: u8,

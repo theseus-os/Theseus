@@ -69,18 +69,46 @@ use self::dependency::*;
 pub const NAMESPACES_DIRECTORY_NAME: &'static str = "namespaces";
 
 /// The initial `CrateNamespace` that all kernel crates are added to by default.
-static DEFAULT_CRATE_NAMESPACE: Once<Arc<CrateNamespace>> = Once::new();
+static INITIAL_KERNEL_NAMESPACE: Once<Arc<CrateNamespace>> = Once::new();
 
-/// Returns a reference to the default namespace, which must exist 
-/// because it contains the initially-loaded kernel crates. 
+/// Returns a reference to the default kernel namespace, 
+/// which must exist because it contains the initially-loaded kernel crates. 
 /// Returns None if the default namespace hasn't yet been initialized.
-pub fn get_default_namespace() -> Option<&'static Arc<CrateNamespace>> {
-    DEFAULT_CRATE_NAMESPACE.try()
+pub fn get_initial_kernel_namespace() -> Option<&'static Arc<CrateNamespace>> {
+    INITIAL_KERNEL_NAMESPACE.try()
 }
 
 /// Returns the top-level directory that contains all of the namespaces. 
 pub fn get_namespaces_directory() -> Option<DirRef> {
     root::get_root().lock().get_dir(NAMESPACES_DIRECTORY_NAME)
+}
+
+
+/// Create a new application `CrateNamespace` that uses the default application directory 
+/// and is structured atop the given `recursive_namespace`. 
+/// If no `recursive_namespace` is provided, the default initial kernel namespace will be used. 
+/// 
+/// # Return
+/// The returned `CrateNamespace` will itself be empty, having no crates and no symbols in its map.
+/// 
+pub fn create_application_namespace(recursive_namespace: Option<Arc<CrateNamespace>>) -> Result<Arc<CrateNamespace>, &'static str> {
+    // (1) use the initial kernel CrateNamespace as the new app namespace's recursive namespace if none was provided.
+    let recursive_namespace = recursive_namespace
+        .or_else(|| get_initial_kernel_namespace().cloned())
+        .ok_or("initial kernel CrateNamespace not yet initialized")?;
+    // (2) get the directory where the default app namespace should have been populated when mod_mgmt was inited.
+    let default_app_namespace_name = CrateType::Application.namespace_name().to_string(); // this will be "_applications"
+    let default_app_namespace_dir = get_namespaces_directory()
+        .and_then(|ns_dir| ns_dir.lock().get_dir(&default_app_namespace_name))
+        .ok_or("Couldn't find the directory for the default application CrateNamespace")?;
+    // (3) create the actual new application CrateNamespace.
+    let new_app_namespace = Arc::new(CrateNamespace::new(
+        default_app_namespace_name,
+        NamespaceDir::new(default_app_namespace_dir),
+        Some(recursive_namespace),
+    ));
+
+    Ok(new_app_namespace)
 }
 
 
@@ -99,7 +127,7 @@ pub fn init(boot_info: &BootInformation, kernel_mmi: &mut MemoryManagementInfo) 
     // Create the default CrateNamespace for kernel crates.
     let name = default_kernel_namespace_dir.lock().get_name();
     let default_namespace = CrateNamespace::new(name, default_kernel_namespace_dir, None);
-    Ok(DEFAULT_CRATE_NAMESPACE.call_once(|| Arc::new(default_namespace)))
+    Ok(INITIAL_KERNEL_NAMESPACE.call_once(|| Arc::new(default_namespace)))
 }
 
 
@@ -599,7 +627,6 @@ impl CrateNamespace {
     /// * `crate_file_path`: the path to the crate object file that will be loaded into this `CrateNamespace`.
     /// * `temp_backup_namespace`: the `CrateNamespace` that should be searched for missing symbols 
     ///   (for relocations) if a symbol cannot be found in this `CrateNamespace`. 
-    ///   For example, the default namespace could be used by passing in `Some(get_default_namespace())`.
     ///   If `temp_backup_namespace` is `None`, then no other namespace will be searched, 
     ///   and any missing symbols will return an `Err`. 
     /// * `kernel_mmi_ref`: a mutable reference to the kernel's `MemoryManagementInfo`.

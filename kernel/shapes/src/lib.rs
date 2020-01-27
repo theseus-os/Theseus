@@ -90,6 +90,18 @@ pub struct Rectangle {
     pub bottom_right: Coord,
 }
 
+impl Rectangle {
+    /// Returns the width of this Rectangle.
+    pub fn width(&self) -> usize {
+        (self.bottom_right.x - self.top_left.x) as usize
+    }
+
+    /// Returns the height of this Rectangle.
+    pub fn height(&self) -> usize {
+        (self.bottom_right.y - self.top_left.y) as usize
+    }
+}
+
 impl Add<Coord> for Rectangle {
     type Output = Rectangle;
 

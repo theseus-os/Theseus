@@ -15,8 +15,7 @@ One-line summaries of what each crate includes (may be incomplete):
 * `ap_start`: High-level initialization code that runs on each AP (core) after it has booted up
 * `ata_pio`: Support for ATA hard disks (IDE/PATA) using PIO (not DMA), and not SATA.
 * `captain`: The main driver of Theseus. Controls the loading and initialization of all subsystems and other crates.
-* `input_event_manager`: Handles input events from the keyboard and routes them to the correct application. ** Being phased out by window manager
-* `event_types`: A temporary way to move the input_event_manager typedefs out of the input_event_manager crate.
+* `event_types`: The types used for passing input and output events across the system.
 * `device_manager`: Code for handling the sequence required to initialize each driver.
 * `e1000`: Support for the e1000 NIC and driver.
 * `exceptions_early`: Early exception handlers that do nothing but print an error and hang.

@@ -930,8 +930,8 @@ pub fn create_idle_task(
             EntryFlags::WRITABLE | EntryFlags::PRESENT
         ),
     );
-    let default_namespace = mod_mgmt::get_default_namespace()
-        .ok_or("The default CrateNamespace must be initialized before the tasking subsystem.")?
+    let default_namespace = mod_mgmt::get_initial_kernel_namespace()
+        .ok_or("The initial kernel CrateNamespace must be initialized before the tasking subsystem.")?
         .clone();
     let default_env = Arc::new(Mutex::new(Environment::default()));
     let mut idle_task = Task::new_internal(kstack, kernel_mmi_ref, default_namespace, default_env, None);

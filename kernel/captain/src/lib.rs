@@ -62,7 +62,7 @@ use pause::spin_loop_hint;
 
 
 #[cfg(mirror_log_to_vga)]
-/// the callback use in the logger crate for mirroring log functions to the input_event_manager
+/// the callback use in the logger crate for mirroring log functions to the terminal
 pub fn mirror_to_vga_cb(_color: &logger::LogColor, prefix: &'static str, args: core::fmt::Arguments) {
     println!("{}{}", prefix, args);
 }
@@ -132,9 +132,10 @@ pub fn init(
     task_fs::init()?;
 
 
-    // before we jump to userspace, we need to unmap the identity-mapped section of the kernel's page tables, at PML4[0]
-    // unmap the kernel's original identity mapping (including multiboot2 boot_info) to clear the way for userspace mappings
-    // we cannot do this until we have booted up all the APs
+    // Before we start running applications, we need to unmap the identity-mapped section of the kernel's page tables, at PML4[0].
+    // Unmap the kernel's original identity mapping (including multiboot2 boot_info) to clear the way for userspace mappings, 
+    // which although we currently don't use since we don't have a userspace, but it is still a good idea. 
+    // Note that we cannot do this until we have booted up all the APs.
     drop(identity_mapped_pages);
     {
         // for i in 0 .. 512 { 

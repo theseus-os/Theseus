@@ -7,5 +7,5 @@ categories = ["no-std", "hardware-support"]
 license = "MIT"
 
 [dependencies]
-
+bitflags = "1.1.0"
 

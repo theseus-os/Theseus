@@ -20,6 +20,7 @@ use shapes::{Coord, Rectangle};
 
 
 /// A text displayable profiles the size and color of a block of text. It can display in a framebuffer.
+#[derive(Debug)]
 pub struct TextDisplay {
     width: usize,
     height: usize,
@@ -73,7 +74,7 @@ impl Displayable for TextDisplay {
         return Ok(bounding_box + coordinate);
     }
 
-    fn resize(&mut self, width: usize, height: usize) {
+    fn set_size(&mut self, width: usize, height: usize) {
         self.width = width;
         self.height = height;
     }
@@ -143,5 +144,4 @@ impl TextDisplay {
     pub fn set_text(&mut self, text: &str) {
         self.text = String::from(text);
     }
-
 }
