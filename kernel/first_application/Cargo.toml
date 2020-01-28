@@ -1,12 +1,10 @@
 [package]
 authors = ["Kevin Boos <kevinaboos@gmail.com>"]
-name = "input_event_manager"
-description = "Handles keyboard input and redirects to the appropriate terminal"
+name = "first_application"
+description = "Starts the first application in Theseus after kernel initialization is complete"
 version = "0.1.0"
 build = "../../build.rs"
 
-
-[dependencies]
 
 [dependencies.spawn]
 path = "../spawn"
