@@ -179,7 +179,7 @@ fn do_swap(
             // 2) check that the new crate file exists. It could be a regular path, or a prefix for a file in the namespace's kernel dir
             let new_crate_abs_path = match Path::new(String::from(n)).get(curr_dir) {
                 Some(FileOrDir::File(f)) => Path::new(f.lock().get_absolute_path()),
-                _ => match namespace.get_crate_files_starting_with(n).as_slice() {
+                _ => match namespace.get_crate_files_starting_with(n, true).as_slice() {
                     [single_file] => single_file.clone(),
                     multiple_files => {
                         let mut err_str = format!("Couldn't find single match for the new kernel crate file {:?}. Matching files:", n);

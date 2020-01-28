@@ -2487,8 +2487,11 @@ impl CrateNamespace {
  
             // Try to find and load the missing crate object file from this namespace's directory set,
             // (or from the backup namespace's directory set).
-            if let Some(dependency_crate_file_path) = self.get_crate_file_starting_with(&crate_dependency_name)
-                .or_else(|| temp_backup_namespace.and_then(|backup| backup.get_crate_file_starting_with(&crate_dependency_name)))
+            // We *do not* search recursively here since we want the new crate to be loaded into the namespace 
+            // that contains its crate object file, not a higher-level namespace. 
+            // Checking recursive namespaces will occur at the end of this function during the recursive call to this same function.
+            if let Some(dependency_crate_file_path) = self.get_crate_file_starting_with(&crate_dependency_name, false)
+                .or_else(|| temp_backup_namespace.and_then(|backup| backup.get_crate_file_starting_with(&crate_dependency_name, true)))
             {   
                 // Check to make sure this crate is not already loaded into this namespace (or its recursive namespace).
                 if self.get_crate(dependency_crate_file_path.file_stem()).is_some() {
@@ -2496,8 +2499,8 @@ impl CrateNamespace {
                     continue;
                 }
                 #[cfg(not(loscd_eval))]
-                info!("Symbol \"{}\" not initially found, attempting to load crate {:?} that may contain it.", 
-                    demangled_full_symbol, crate_dependency_name);
+                info!("Symbol \"{}\" not initially found in namespace {:?}, attempting to load crate {:?} that may contain it.", 
+                    demangled_full_symbol, self.name, crate_dependency_name);
 
                 match self.load_crate(&dependency_crate_file_path, temp_backup_namespace, kernel_mmi_ref, verbose_log) {
                     Ok(_num_new_syms) => {
@@ -2516,8 +2519,10 @@ impl CrateNamespace {
                 }
             }
             else {
-                warn!("Couldn't find a single containing crate for symbol \"{}\" (tried looking up crate {:?}).", 
-                    demangled_full_symbol, crate_dependency_name);
+                if self.recursive_namespace.is_none() {
+                    warn!("Couldn't find a single containing crate for symbol \"{}\" in namespace {:?} (tried looking up crate {:?}).", 
+                        demangled_full_symbol, self.name, crate_dependency_name);
+                }
             }
         }
 
@@ -2655,26 +2660,35 @@ impl CrateNamespace {
     /// but returns `Some(Path)` only if there is a single match.
     /// If there are multiple matches, `None` is returned.
     /// 
+    /// If `recursive` is `true`, recursive namespaces are searched as well.
+    /// In that case, this function will return `Some` only if there is a single matching crate file
+    /// across this namespace and all of its recursive namespaces.
+    /// 
     /// Returns the absolute `Path` of the matching crate file.
-    pub fn get_crate_file_starting_with(&self, prefix: &str) -> Option<Path> {
-        let mut files_iter = self.get_crate_files_starting_with(prefix).into_iter();    
+    pub fn get_crate_file_starting_with(&self, prefix: &str, recursive: bool) -> Option<Path> {
+        let mut files_iter = self.get_crate_files_starting_with(prefix, recursive).into_iter();    
         files_iter.next().filter(|_| files_iter.next().is_none()) // ensure single element
     }
-
 
     /// Finds the crate object files in this `CrateNamespace`'s directory 
     /// that start with the given `prefix`.
     /// 
+    /// If `recursive` is `true`, recursive namespaces are searched as well. 
+    /// 
     /// Returns a list of the absolute `Path`s of matching kernel files.
-    pub fn get_crate_files_starting_with(&self, prefix: &str) -> Vec<Path> {
+    pub fn get_crate_files_starting_with(&self, prefix: &str, recursive: bool) -> Vec<Path> {
         let mut cfiles: Vec<Path> = self.dir
             .get_files_starting_with(prefix)
             .into_iter()
             .map(|f| Path::new(f.lock().get_absolute_path()))
             .collect();
 
-        if let Some(mut cfiles_recursive) = self.recursive_namespace().as_ref().map(|r_ns| r_ns.get_crate_files_starting_with(prefix)) {
-            cfiles.append(&mut cfiles_recursive);
+        if recursive {
+            if let Some(mut cfiles_recursive) = self.recursive_namespace().as_ref()
+                .map(|r_ns| r_ns.get_crate_files_starting_with(prefix, recursive))
+            {
+                cfiles.append(&mut cfiles_recursive);
+            }
         }
 
         cfiles

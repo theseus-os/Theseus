@@ -180,10 +180,10 @@ pub extern "C" fn nano_core_start(multiboot_information_virtual_address: usize) 
     #[cfg(loadable)] 
     {
         println_raw!("nano_core_start(): loading the \"captain\" crate...");     
-        let captain_path = try_exit!(default_namespace.get_crate_file_starting_with("captain-").ok_or("couldn't find the singular \"captain\" crate object file"));
+        let captain_path = try_exit!(default_namespace.get_crate_file_starting_with("captain-", false).ok_or("couldn't find the singular \"captain\" crate object file"));
         let _num_captain_syms = try_exit!(default_namespace.load_crate(&captain_path, None, &kernel_mmi_ref, false));
         
-        let panic_wrapper_path = try_exit!(default_namespace.get_crate_file_starting_with("panic_wrapper-").ok_or("couldn't find the singular \"panic_wrapper\" crate object file"));
+        let panic_wrapper_path = try_exit!(default_namespace.get_crate_file_starting_with("panic_wrapper-", false).ok_or("couldn't find the singular \"panic_wrapper\" crate object file"));
         let _num_libcore_syms = try_exit!(default_namespace.load_crate(&panic_wrapper_path, None, &kernel_mmi_ref, false));
     }
 
