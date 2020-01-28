@@ -76,7 +76,7 @@ pub fn parse_nano_core(
     let data_pages   = Arc::new(Mutex::new(data_pages));
 
     let nano_core_file_path = try_mp!(
-        namespace.get_crate_file_starting_with(NANO_CORE_FILENAME_PREFIX).ok_or("couldn't find the expected \"nano_core\" kernel file"),
+        namespace.get_crate_file_starting_with(NANO_CORE_FILENAME_PREFIX, false).ok_or("couldn't find the expected \"nano_core\" kernel file"),
         text_pages, rodata_pages, data_pages
     );
 

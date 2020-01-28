@@ -21,16 +21,8 @@ use spawn::ApplicationTaskBuilder;
 /// Kernel initialization routines should be complete before invoking this. 
 pub fn start() -> Result<(), &'static str> {
     let new_app_ns = mod_mgmt::create_application_namespace(None)?;
-    let app_io_path = new_app_ns.get_crate_file_starting_with("app_io-")
-        .ok_or("Couldn't find app_io application in default app namespace")?;
-    let shell_path = new_app_ns.get_crate_file_starting_with("shell-")
+    let shell_path = new_app_ns.get_crate_file_starting_with("shell-", false)
         .ok_or("Couldn't find shell application in default app namespace")?;
-
-    ApplicationTaskBuilder::new(app_io_path)
-        .name("application_io_manager".to_string())
-        // .namespace(new_app_ns)
-        .singleton()
-        .spawn()?;
 
     // Spawn the default shell
     ApplicationTaskBuilder::new(shell_path)
