@@ -41,7 +41,7 @@ extern crate device_manager;
 extern crate e1000;
 extern crate scheduler;
 #[cfg(mirror_log_to_vga)] #[macro_use] extern crate print;
-extern crate input_event_manager;
+extern crate first_application;
 extern crate exceptions_full;
 extern crate network_manager;
 extern crate pause;
@@ -124,9 +124,6 @@ pub fn init(
     // initialize window manager.
     let (key_producer, mouse_producer) = window_manager::init()?;
 
-    // initialize the input event manager, which will start the default terminal 
-    input_event_manager::init()?;
-
     // initialize the rest of our drivers
     device_manager::init(key_producer, mouse_producer)?;
     task_fs::init()?;
@@ -155,6 +152,9 @@ pub fn init(
             .spawn()?;
     }
 
+
+    // Now that initialization is complete, we can spawn the first application(s)
+    first_application::start()?;
 
     info!("captain::init(): initialization done! Enabling interrupts and entering Task 0's idle loop...");
     enable_interrupts();
