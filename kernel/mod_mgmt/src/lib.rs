@@ -2283,7 +2283,6 @@ impl CrateNamespace {
     }
 
 
-
     /// Finds the section that contains the given `VirtualAddress` in its loaded code,
     /// also searching any recursive namespaces as well.
     /// 
@@ -2337,9 +2336,7 @@ impl CrateNamespace {
             }
         }
         None
-        
     }
-
 
     /// Like [`get_symbol()`](#method.get_symbol), but also returns the exact `CrateNamespace` where the symbol was found.
     pub fn get_symbol_and_namespace(&self, demangled_full_symbol: &str) -> Option<(WeakSectionRef, &CrateNamespace)> {
@@ -2390,7 +2387,7 @@ impl CrateNamespace {
     /// * `temp_backup_namespace`: the `CrateNamespace` that should be temporarily searched (just during this call)
     ///   for the missing symbol.
     ///   If `temp_backup_namespace` is `None`, then only this namespace (and its recursive namespaces) will be searched.
-    /// * `kernel_mmi_ref`: a mutable reference to the kernel's `MemoryManagementInfo`.
+    /// * `kernel_mmi_ref`: a reference to the kernel's `MemoryManagementInfo`, which must not be locked.
     pub fn get_symbol_or_load(
         &self, 
         demangled_full_symbol: &str, 
@@ -2399,45 +2396,18 @@ impl CrateNamespace {
         verbose_log: bool
     ) -> WeakSectionRef {
         // First, see if the section for the given symbol is already available and loaded
-        // in either this namespace or the recursive namespace
-        if let Some(sec) = self.get_symbol_internal(demangled_full_symbol) {
-            return sec;
+        // in either this namespace or its recursive namespace
+        if let Some(weak_sec) = self.get_symbol_internal(demangled_full_symbol) {
+            return weak_sec;
         }
 
-        // If not, our second option is to check the temp_backup_namespace
-        // to see if that namespace already has the section we want
+        // If not, our second option is to check the temp_backup_namespace to see if that namespace already has the section we want.
+        // If we can find it there, that saves us the effort of having to load the crate again from scratch.
         if let Some(backup) = temp_backup_namespace {
             // info!("Symbol \"{}\" not initially found, attempting to load it from backup namespace {:?}", 
             //     demangled_full_symbol, backup.name);
-            if let Some((weak_sec, _found_in_ns)) = backup.get_symbol_and_namespace(demangled_full_symbol) {
-                if let Some(sec) = weak_sec.upgrade() {
-                    // If we found it in the temp_backup_namespace, then that saves us the effort of having to load the crate again.
-                    // We need to add a shared reference to that section's parent crate to this namespace as well, 
-                    // so it can't be dropped while this namespace is still relying on it.  
-                    let pcref_opt = { sec.lock().parent_crate.upgrade() };
-                    if let Some(parent_crate_ref) = pcref_opt {
-                        let parent_crate_name = {
-                            let parent_crate = parent_crate_ref.lock_as_ref();
-                            // Here, there is a misguided potential for optimization: add all symbols from the parent_crate into the current namespace.
-                            // While this would save lookup/loading time if future symbols were needed from this crate,
-                            // we *cannot* do this because it violates the expectations of certain namespaces. 
-                            // For example, some namespaces may want to use just *one* symbol from another namespace's crate, not all of them. 
-                            // Thus, we just add the one symbol for `sec` to this namespace.
-                            self.add_symbols(Some(sec.clone()).iter(), verbose_log);
-                            parent_crate.crate_name.clone()
-                        };
-                        #[cfg(not(loscd_eval))]
-                        info!("Symbol {:?} not initially found, using symbol from (crate {:?}) in backup namespace {:?} in new namespace {:?}",
-                            demangled_full_symbol, parent_crate_name, _found_in_ns.name, self.name);
-                        self.crate_tree.lock().insert(parent_crate_name.into(), parent_crate_ref);
-                        return weak_sec;
-                    }
-                    else {
-                        error!("get_symbol_or_load(): found symbol \"{}\" in backup namespace, but unexpectedly couldn't get its section's parent crate!",
-                            demangled_full_symbol);
-                        return Weak::default();
-                    }
-                }
+            if let Some(sec) = self.get_symbol_from_backup_namespace(demangled_full_symbol, backup, false, verbose_log) {
+                return Arc::downgrade(&sec);
             }
         }
 
@@ -2445,43 +2415,116 @@ impl CrateNamespace {
         // This is basically the same code as the above temp_backup_namespace conditional, but checks to ensure there aren't multiple fuzzy matches.
         if self.fuzzy_symbol_matching {
             if let Some(backup) = temp_backup_namespace {
-                let fuzzy_matches = backup.find_symbols_starting_with_and_namespace(LoadedSection::section_name_without_hash(demangled_full_symbol));
-                
-                if fuzzy_matches.len() == 1 {
-                    let (_sec_name, weak_sec, _found_in_ns) = &fuzzy_matches[0];
-                    if let Some(sec) = weak_sec.upgrade() {
-                        // If we found it in the temp_backup_namespace, we need to add a shared reference to that section's parent crate
-                        // to this namespace so it can't be dropped while this namespace is still relying on it.  
-                        let pcref_opt = { sec.lock().parent_crate.upgrade() };
-                        if let Some(parent_crate_ref) = pcref_opt {
-                            let parent_crate_name = {
-                                let parent_crate = parent_crate_ref.lock_as_ref();
-                                self.add_symbols(Some(sec.clone()).iter(), verbose_log);
-                                parent_crate.crate_name.clone()
-                            };
-                            warn!("Symbol {:?} not initially found, using fuzzy match symbol {:?} from (crate {:?}) in backup namespace {:?} in new namespace {:?}",
-                                demangled_full_symbol, _sec_name, parent_crate_name, _found_in_ns.name, self.name);
-                            self.crate_tree.lock().insert(parent_crate_name.into(), parent_crate_ref);
-                            return weak_sec.clone();
-                        }
-                        else {
-                            error!("BUG: get_symbol_or_load(): found fuzzy-matched symbol \"{}\" in backup namespace, but unexpectedly couldn't get its section's parent crate!",
-                                demangled_full_symbol);
-                            return Weak::default();
-                        }
-                    }
-                }
-                else {
-                    warn!("Cannot resolve dependency because there are {} fuzzy matches for symbol {:?} in backup namespace {:?}\n\t{:?}",
-                        fuzzy_matches.len(), demangled_full_symbol, backup.name, fuzzy_matches.into_iter().map(|tup| tup.0).collect::<String>());
+                // info!("Symbol \"{}\" not initially found, attempting to load it from backup namespace {:?}", 
+                //     demangled_full_symbol, backup.name);
+                if let Some(sec) = self.get_symbol_from_backup_namespace(demangled_full_symbol, backup, true, verbose_log) {
+                    return Arc::downgrade(&sec);
                 }
             }
         }
 
-        // Next, try to load the crate(s) containing the missing symbol.
-        // We are only able to do this for mangled symbols that contain a crate name, such as "my_crate::foo". 
-        // If "foo()" was marked no_mangle, then we don't know which crate to load because there is no "my_crate::" before it.
-        // There are multiple potential containing crates, so we try to load each one to find the missing symbol.
+        // Finally, try to load the crate containing the missing symbol.
+        if let Some(weak_sec) = self.load_crate_for_missing_symbol(demangled_full_symbol, temp_backup_namespace, kernel_mmi_ref, verbose_log) {
+            weak_sec
+        } else {
+            error!("Symbol \"{}\" not found. Try loading the specific crate manually first.", demangled_full_symbol);
+            Weak::default() // same as returning None, since it must be upgraded to an Arc before being used
+        }
+    }
+
+
+    /// Looks for the given `demangled_full_symbol` in the `temp_backup_namespace` and returns a reference to the matching section. 
+    /// 
+    /// This is the second and third attempts to find a symbol within [`get_symbol_or_load()`](#method.get_symbol_or_load).
+    fn get_symbol_from_backup_namespace(
+        &self,
+        demangled_full_symbol: &str,
+        temp_backup_namespace: &CrateNamespace,
+        fuzzy_matching: bool,
+        verbose_log: bool,
+    ) -> Option<StrongSectionRef> {
+        let mut fuzzy_matched_symbol_name: Option<String> = None;
+
+        let (weak_sec, _found_in_ns) = if !fuzzy_matching {
+            // use exact (non-fuzzy) matching
+            temp_backup_namespace.get_symbol_and_namespace(demangled_full_symbol)?
+        } else {
+            // use fuzzy matching (ignoring the symbol hash suffix)
+            let fuzzy_matches = temp_backup_namespace.find_symbols_starting_with_and_namespace(LoadedSection::section_name_without_hash(demangled_full_symbol));
+            match fuzzy_matches.as_slice() {
+                [(sec_name, weak_sec, _found_in_ns)] => {
+                    fuzzy_matched_symbol_name = Some(sec_name.clone());
+                    (weak_sec.clone(), *_found_in_ns)
+                }
+                fuzzy_matches => {
+                    warn!("Cannot resolve dependency because there are {} fuzzy matches for symbol {:?} in backup namespace {:?}\n\t{:?}",
+                        fuzzy_matches.len(), 
+                        demangled_full_symbol, 
+                        temp_backup_namespace.name, 
+                        fuzzy_matches.into_iter().map(|tup| &tup.0).collect::<Vec<_>>()
+                    );
+                    return None;
+                }
+            }
+        };
+        let sec = weak_sec.upgrade().or_else(|| {
+            error!("Found matching symbol \"{}\" in backup namespace, but unexpectedly couldn't upgrade it to a strong section reference!", demangled_full_symbol);
+            None
+        })?;
+
+        // Here, we found the matching section in the temp_backup_namespace.
+        let parent_crate_ref = { 
+            sec.lock().parent_crate.upgrade().or_else(|| {
+                error!("BUG: Found symbol \"{}\" in backup namespace, but unexpectedly couldn't get its parent crate!", demangled_full_symbol);
+                None
+            })?
+        };
+        let parent_crate_name = {
+            let parent_crate = parent_crate_ref.lock_as_ref();
+            // Here, there is a misguided potential for optimization: add all symbols from the parent_crate into the current namespace.
+            // While this would save lookup/loading time if future symbols were needed from this crate,
+            // we *cannot* do this because it violates the expectations of certain namespaces. 
+            // For example, some namespaces may want to use just *one* symbol from another namespace's crate, not all of them. 
+            // Thus, we just add the one symbol for `sec` to this namespace.
+            self.add_symbols(Some(sec.clone()).iter(), verbose_log);
+            parent_crate.crate_name.clone()
+        };
+        
+        #[cfg(not(loscd_eval))]
+        info!("Symbol {:?} not initially found, using {} symbol {} from crate {:?} in backup namespace {:?} in new namespace {:?}",
+            demangled_full_symbol, 
+            if fuzzy_matching { "fuzzy-matched" } else { "" },
+            fuzzy_matched_symbol_name.unwrap_or_default(),
+            parent_crate_name,
+            _found_in_ns.name,
+            self.name
+        );
+
+        // We add a shared reference to that section's parent crate to this namespace as well, 
+        // to prevent that crate from being dropped while this namespace still relies on it.
+        self.crate_tree.lock().insert(parent_crate_name.into(), parent_crate_ref);
+        return Some(sec);
+    }
+
+
+    /// Attempts to find and load the crate containing the given `demangled_full_symbol`. 
+    /// If successful, the new crate is loaded into this `CrateNamespace` and the symbol's section is returned.
+    /// 
+    /// If this namespace does not contain any matching crates, its recursive namespaces are searched as well.
+    /// 
+    /// This approach only works for mangled symbols that contain a crate name, such as "my_crate::foo". 
+    /// If "foo()" was marked no_mangle, then we don't know which crate to load because there is no "my_crate::" prefix before it.
+    /// 
+    /// This is the final attempt to find a symbol within [`get_symbol_or_load()`](#method.get_symbol_or_load).
+    fn load_crate_for_missing_symbol(
+        &self,
+        demangled_full_symbol: &str,
+        temp_backup_namespace: Option<&CrateNamespace>,
+        kernel_mmi_ref: &MmiRef,
+        verbose_log: bool,
+    ) -> Option<WeakSectionRef> {
+
+        // Some symbols may have multiple potential containing crates, so we try to load each one to find the missing symbol.
         for crate_dependency_name in get_containing_crate_name(demangled_full_symbol) {
             let crate_dependency_name = format!("{}-", crate_dependency_name);
  
@@ -2491,52 +2534,47 @@ impl CrateNamespace {
             // that contains its crate object file, not a higher-level namespace. 
             // Checking recursive namespaces will occur at the end of this function during the recursive call to this same function.
             if let Some(dependency_crate_file_path) = self.get_crate_file_starting_with(&crate_dependency_name, false)
-                .or_else(|| temp_backup_namespace.and_then(|backup| backup.get_crate_file_starting_with(&crate_dependency_name, true)))
-            {   
+                .or_else(|| temp_backup_namespace.and_then(|backup| backup.get_crate_file_starting_with(&crate_dependency_name, true)))  // TODO: should we be blindly recursively searching the backup namespace's files?
+            {
                 // Check to make sure this crate is not already loaded into this namespace (or its recursive namespace).
                 if self.get_crate(dependency_crate_file_path.file_stem()).is_some() {
                     trace!("  (skipping already-loaded crate {:?})", dependency_crate_file_path);
                     continue;
                 }
                 #[cfg(not(loscd_eval))]
-                info!("Symbol \"{}\" not initially found in namespace {:?}, attempting to load crate {:?} that may contain it.", 
+                info!("Symbol {:?} not initially found in namespace {:?}, attempting to load crate {:?} that may contain it.", 
                     demangled_full_symbol, self.name, crate_dependency_name);
 
                 match self.load_crate(&dependency_crate_file_path, temp_backup_namespace, kernel_mmi_ref, verbose_log) {
                     Ok(_num_new_syms) => {
                         // try again to find the missing symbol, now that we've loaded the missing crate
                         if let Some(sec) = self.get_symbol_internal(demangled_full_symbol) {
-                            return sec;
+                            return Some(sec);
                         } else {
-                            trace!("Loaded symbol's (\"{}\") containing crate {:?}, but still couldn't find the symbol.", 
-                                demangled_full_symbol, dependency_crate_file_path);
+                            // the missing symbol wasn't in this crate, continue to load the other potential containing crates.
+                            trace!("Loaded symbol's containing crate {:?}, but still couldn't find the symbol {:?}.", 
+                                dependency_crate_file_path, demangled_full_symbol);
                         }
                     }
                     Err(_e) => {
                         error!("Found symbol's (\"{}\") containing crate, but couldn't load the crate file {:?}. Error: {:?}",
                             demangled_full_symbol, dependency_crate_file_path, _e);
+                        // We *could* return an error here, but we might as well continue on to trying to load other crates.
                     }
                 }
             }
             else {
                 if self.recursive_namespace.is_none() {
-                    warn!("Couldn't find a single containing crate for symbol \"{}\" in namespace {:?} (tried looking up crate {:?}).", 
-                        demangled_full_symbol, self.name, crate_dependency_name);
+                    warn!("Couldn't find a single crate object file with prefix {:?} that may contain symbol {:?} in namespace {:?}.", 
+                        crate_dependency_name, demangled_full_symbol, self.name);
                 }
             }
         }
 
-
-        // Finally, try getting/loading the symbol from the recursive namespace instead
-        if let Some(sec) = self.recursive_namespace().as_ref().map(|r_ns|
-            r_ns.get_symbol_or_load(demangled_full_symbol, temp_backup_namespace, kernel_mmi_ref, verbose_log)
-        ) {
-            sec
-        }
-        else {
-            error!("Symbol \"{}\" not found. Try loading the specific crate manually first.", demangled_full_symbol);
-            Weak::default() // same as returning None, since it must be upgraded to an Arc before being used
-        }
+        // If we couldn't find any non-loaded crates that contain the symbol in this namespace, check its recursive namespace.
+        self.recursive_namespace().as_ref()
+            .map(|r_ns| r_ns.load_crate_for_missing_symbol(demangled_full_symbol, temp_backup_namespace, kernel_mmi_ref, verbose_log))
+            .unwrap_or_default()
     }
 
 
