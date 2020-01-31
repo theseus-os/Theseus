@@ -241,28 +241,38 @@ fn apply(base_dir_path: &Path) -> Result<(), String> {
     // it is safe to actually replace the old crate object files with the new ones. 
     
     let curr_namespace = get_my_current_namespace();
-    // create swap requests to replace the currently loaded old crates with the new crates 
+    // Now we create swap requests based on the contents of the diff file
     let mut swap_requests = SwapRequestList::new();
+
     for (old_crate_file_name, new_crate_file_name) in &diffs.pairs {
         println!("Looking at diff {} -> {}", old_crate_file_name, new_crate_file_name);
-        let old_crate_name = if old_crate_file_name == "" {
-            String::new() // skip checks for empty old crates (just the new crate will be loaded w/o replacing anything)
+        let (old_crate_name, old_namespace) = if old_crate_file_name == "" {
+            // An empty old_crate_name indicates that there is no old crate or object file to remove, we are just loading a new crate (or inserting its object file)
+            (String::new(), curr_namespace) 
         } else {
-            // check to make sure the old crate actually exists
-            let old_crate_file = curr_namespace.dir().get_crate_object_file(old_crate_file_name)
-                .ok_or_else(|| format!("cannot find old crate file {:?} in namespace {:?}", old_crate_file_name, curr_namespace.name))?;
-            // the old needs to be swapped if it's currently loaded
-            let old_crate_file_name = Path::new(old_crate_file.lock().get_name());
-            let old_crate_name = old_crate_file_name.file_stem().to_string();
+            let (_crate_type, _prefix, objfilename) = CrateType::from_module_name(old_crate_file_name).map_err(|e| 
+                format!("Invalid old crate file name {:?} in {}/{}. Expected a module name like \"k#my_crate-<hash>.o\". Error: {:?}", 
+                    old_crate_file_name, base_dir_path, DIFF_FILE_NAME, e
+                )
+            )?;
+            // Find which namespace the old crate is in (it can only be in the current namespace or its recursive children).
+            // The old crate object file must be in the namespace's directory, but it may not necessarily be currently loaded. 
+            let (_old_crate_file, old_namespace) = CrateNamespace::get_crate_object_file_starting_with(&curr_namespace, old_crate_file_name)
+                .ok_or_else(|| format!("cannot find old crate file {:?} in namespace {:?} (recursively searched)", old_crate_file_name, curr_namespace.name))?;
             if curr_namespace.get_crate(&old_crate_name).is_none() {
-                println!("   not swapping non-loaded old crate: {}", old_crate_name);
-                continue;
+                println!("\t Note: old crate {:?} was not currently loaded into namespace {:?}.", old_crate_name, curr_namespace.name);
+                warn!("Note: old crate {:?} was not currently loaded into namespace {:?}.", old_crate_name, curr_namespace.name);
             }
-            old_crate_name
+            (old_crate_name, old_namespace)
         };
         let new_crate_file = new_namespace_dir.get_crate_object_file(new_crate_file_name)
             .ok_or_else(|| format!("cannot find new crate file {:?} in new namespace dir {}", new_crate_file_name, base_dir_path))?;
-        let swap_req = SwapRequest::new(old_crate_name, Path::new(new_crate_file.lock().get_absolute_path()), false)?;
+        let swap_req = SwapRequest::new(
+            old_crate_name,
+            old_namespace,
+            Path::new(new_crate_file.lock().get_absolute_path()),
+            None, // all diff-based swaps occur within the same namespace
+            false)?;
         swap_requests.push(swap_req);
     }
 

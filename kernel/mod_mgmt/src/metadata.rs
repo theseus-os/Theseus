@@ -627,7 +627,7 @@ impl LoadedSection {
     pub fn section_name_without_hash(sec_name: &str) -> &str {
         // the hash identifier (delimiter) is "::h"
         const HASH_DELIMITER: &'static str = "::h";
-        sec_name.rfind("::h")
+        sec_name.rfind(HASH_DELIMITER)
             .and_then(|end| sec_name.get(0 .. (end + HASH_DELIMITER.len())))
             .unwrap_or_else(|| &sec_name)
     }
