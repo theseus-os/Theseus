@@ -69,7 +69,7 @@ fn rmain(_matches: Matches) -> Result<(), &'static str> {
 fn test_multiple(iterations: usize) -> Result<(), &'static str> {
     let my_cpu = apic::get_my_apic_id().ok_or("couldn't get my APIC ID")?;
 
-    let (sender, receiver) = unified_channel::new_channel(2);
+    let (sender, receiver) = unified_channel::new_string_channel(2);
 
     let t1 = KernelTaskBuilder::new(|_: ()| -> Result<(), &'static str> {
         warn!("test_multiple(): Entered sender task!");
@@ -103,6 +103,8 @@ fn test_multiple(iterations: usize) -> Result<(), &'static str> {
     t1.join()?;
     t2.join()?;
     warn!("test_multiple(): Joined the sender and receiver tasks.");
+    let _t1_exit = t1.take_exit_value();
+    let _t2_exit = t2.take_exit_value();
     
     Ok(())
 }

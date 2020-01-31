@@ -3,37 +3,46 @@
 //! The cfg option is `use_async_channel`, the default is to use the rendezvous channel.
 
 #![no_std]
-#[macro_use] extern crate cfg_if;
+extern crate alloc;
+extern crate async_channel;
+extern crate rendezvous;
 
-cfg_if! {
-    
-// use async
-if #[cfg(use_async_channel)] {
-    extern crate async_channel;
-    pub use async_channel::{Sender, Receiver};
+use alloc::string::String;
 
-    /// Creates a new channel based on the chosen `cfg(use_async_channel)`.
-    /// If that config is given, an async channel will be created with the given `minimum_capacity`
-    /// otherwise a zero-capacity rendezvous channel will be created (ignoring the given `minimum_capacity`). 
-    /// 
-    /// This is a convenience function that unifies the two channel types, for evaluation purposes.
-    pub fn new_channel<T: Send>(minimum_capacity: usize) -> (Sender<T>, Receiver<T>) {
-        async_channel::new_channel(minimum_capacity)
+
+pub fn new_string_channel(_minimum_capacity: usize) -> (StringSender, StringReceiver) {
+    #[cfg(use_async_channel)] {
+        let (sender, receiver) = async_channel::new_channel::<String>(_minimum_capacity);
+        return (StringSender { sender }, StringReceiver { receiver });
     }
-} 
 
-// use rendezvous
-else {
-    extern crate rendezvous;
-    pub use rendezvous::{Sender, Receiver};
-
-    /// Creates a new channel based on the chosen `cfg(use_async_channel)`.
-    /// If that config is given, an async channel will be created with the given `minimum_capacity`
-    /// otherwise a zero-capacity rendezvous channel will be created (ignoring the given `minimum_capacity`). 
-    /// 
-    /// This is a convenience function that unifies the two channel types, for evaluation purposes.
-    pub fn new_channel<T: Send>(_minimum_capacity: usize) -> (Sender<T>, Receiver<T>) {
-        rendezvous::new_channel()
+    #[cfg(not(use_async_channel))] {
+        let (sender, receiver) = rendezvous::new_channel::<String>();
+        return (StringSender { sender }, StringReceiver { receiver });
     }
 }
+
+pub struct StringSender {
+    #[cfg(use_async_channel)]
+    sender: async_channel::Sender<String>,
+    #[cfg(not(use_async_channel))]
+    sender: rendezvous::Sender<String>, 
+}
+impl StringSender {
+    pub fn send(&self, msg: String) -> Result<(), &'static str> {
+        self.sender.send(msg)
+    }
+}
+
+
+pub struct StringReceiver {
+    #[cfg(use_async_channel)]
+    receiver: async_channel::Receiver<String>,
+    #[cfg(not(use_async_channel))]
+    receiver: rendezvous::Receiver<String>, 
+}
+impl StringReceiver {
+    pub fn receive(&self) -> Result<String, &'static str> {
+        self.receiver.receive()
+    }
 }
