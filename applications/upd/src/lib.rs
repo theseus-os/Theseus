@@ -223,7 +223,7 @@ fn apply(base_dir_path: &Path) -> Result<(), String> {
     };
     let diff_file = match new_namespace_dir.lock().get(DIFF_FILE_NAME) { 
         Some(FileOrDir::File(f)) => f,
-        _ => return Err(format!("cannot find diff file at {}/{}", base_dir_path, DIFF_FILE_NAME)),
+        _ => return Err(format!("cannot find diff file expected at {}/{}", base_dir_path, DIFF_FILE_NAME)),
     };
     let mut diff_content: Vec<u8> = alloc::vec::from_elem(0, diff_file.lock().size()); 
     let _bytes_read = diff_file.lock().read(&mut diff_content, 0)?;
@@ -247,33 +247,32 @@ fn apply(base_dir_path: &Path) -> Result<(), String> {
 
     for (old_crate_module_file_name, new_crate_module_file_name) in &diffs.pairs {
         println!("Looking at diff {} -> {}", old_crate_module_file_name, new_crate_module_file_name);
-        let (old_crate_name, old_namespace) = if old_crate_module_file_name == "" {
+        let old_crate_name = if old_crate_module_file_name == "" {
             // An empty old_crate_name indicates that there is no old crate or object file to remove, we are just loading a new crate (or inserting its object file)
-            (String::new(), Arc::clone(&curr_namespace))
+            String::new()
         } else {
             let (_crate_type, _prefix, old_crate_file_name) = CrateType::from_module_name(old_crate_module_file_name).map_err(|e| 
                 format!("Invalid old crate file name {:?} in {}/{}. Expected a module name like \"k#my_crate-<hash>.o\". Error: {:?}", 
                     old_crate_module_file_name, base_dir_path, DIFF_FILE_NAME, e
                 )
             )?;
-            // Find which namespace the old crate is in (it can only be in the current namespace or its recursive children).
-            // The old crate object file must be in the namespace's directory, but it may not necessarily be currently loaded. 
-            let (_old_crate_file, old_namespace) = CrateNamespace::get_crate_object_file_starting_with(&curr_namespace, old_crate_file_name)
-                .ok_or_else(|| format!("cannot find old crate file {:?} in namespace {:?} (recursively searched)", old_crate_file_name, curr_namespace.name))?;
-            if curr_namespace.get_crate(&old_crate_file_name).is_none() {
+            let old_crate_name = Path::new(old_crate_file_name.to_string()).file_stem().to_string();
+            if curr_namespace.get_crate(&old_crate_name).is_none() {
                 println!("\t Note: old crate {:?} was not currently loaded into namespace {:?}.", old_crate_file_name, curr_namespace.name);
             }
-            let old_crate_name = Path::new(old_crate_file_name.to_string()).file_stem().to_string();
-            (old_crate_name, Arc::clone(old_namespace))
+            old_crate_name
         };
+        
         let new_crate_file = new_namespace_dir.get_crate_object_file(new_crate_module_file_name)
             .ok_or_else(|| format!("cannot find new crate file {:?} in new namespace dir {}", new_crate_module_file_name, base_dir_path))?;
+
         let swap_req = SwapRequest::new(
             old_crate_name,
-            old_namespace,
+            Arc::clone(&curr_namespace),
             Path::new(new_crate_file.lock().get_absolute_path()),
             None, // all diff-based swaps occur within the same namespace
-            false)?;
+            false
+        )?;
         swap_requests.push(swap_req);
     }
 

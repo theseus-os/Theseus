@@ -267,8 +267,22 @@ impl SwapRequest {
     /// will swap out the given old crate and replace it with the given new crate,
     /// and optionally re-export the new crate's symbols.
     /// 
-    /// If the given `new_namespace` is `None`, then the `new_crate` will be loaded into the `old_namespace`,
-    /// i.e., the same namespace from which the `old_crate` was removed; this is the typical choice when swapping.
+    /// # Arguments
+    /// * `old_crate_name`: the name of the old crate that should be unloaded and removed from the `old_namespace`. 
+    ///    If `old_crate_name` is the empty string (`""`), that signifies there is no old crate to be removed
+    ///    and that only a new crate will be added.
+    ///    Note that `old_crate_name` can be any string prefix, so long as it can uniquely identify a crate object file
+    ///    in the given `old_namespace` or any of its recursive namespaces. 
+    ///    Thus, to be more accurate, it is wise to specify a full crate name with hash, e.g., "my_crate-<hash>".
+    /// * `old_namespace`: the `CrateNamespace` that contains the old crate;
+    ///    that old crate and its symbols will be removed from this namespace. 
+    /// * `new_crate_object_file_abs_path`: the absolute path of the new crate's object file. 
+    /// * `new_namespace`: the `CrateNamespace` to which the new crate will be loaded and its symbols added.
+    ///    If `None`, then the new crate will be loaded into the `old_namespace`, which is a common case for swapping. 
+    /// * `reexport_new_symbols_as_old`: if `true`, all public symbols the new crate will be reexported
+    ///    in the `new_namespace` with the same full name those symbols had from the old crate in the `old_namespace`. 
+    ///    See the "Important Note" in the struct-level documentation for more details.
+    /// 
     pub fn new(
         old_crate_name: String, 
         old_namespace: Arc<CrateNamespace>,
@@ -276,26 +290,42 @@ impl SwapRequest {
         new_namespace: Option<Arc<CrateNamespace>>,
         reexport_new_symbols_as_old: bool,
     ) -> Result<SwapRequest, &'static str> {
+        let mut old_namespace = old_namespace;
 
-        if new_crate_object_file_abs_path.is_absolute() {
-            let old_namespace = ByAddress(old_namespace);
-            let new_namespace = new_namespace.map_or_else(|| old_namespace.clone(), |nn| ByAddress(nn));
+        // Check that the old crate object file is actually in the old namespace; 
+        // it may not necessarily be loaded into the old_namespace, but that's okay.
+        // If the old crate name is empty, that means there is no old crate to replace. 
+        if old_crate_name != "" {
+            // Find the exact namespace that contains the old crate object file (it can only be in the given old_namespace or its recursive children).
+            let (_old_crate_file, real_old_namespace) = CrateNamespace::get_crate_object_file_starting_with(&old_namespace, &old_crate_name)
+                // .ok_or(OldCrateNotFound(old_crate_name, old_namespace))?;
+                .ok_or_else(|| "cannot find old_crate_file in old_namespace (recursively searched)")?;
+            old_namespace = Arc::clone(real_old_namespace);
+        }
 
-            // TODO: FIXME: verify swap requests in more depth:
-            //              -- check that the old_crate exists in the old_namespace
-            //              -- anything else?
-            Ok(SwapRequest {
-                old_crate_name,
-                old_namespace,
-                new_crate_object_file_abs_path,
-                new_namespace,
-                reexport_new_symbols_as_old,
-            })
+        if !new_crate_object_file_abs_path.is_absolute() {
+            // return Err(NewCratePathNotAbsolute(new_crate_object_file_abs_path));
+            return Err("new_crate_object_file_abs_path was not an absolute path");
         }
-        else {
-            Err("new_crate_object_file_abs_path was not an absolute Path")
-        }
+
+        let old_namespace = ByAddress(old_namespace);
+        let new_namespace = new_namespace.map_or_else(|| old_namespace.clone(), |nn| ByAddress(nn));
+
+        Ok(SwapRequest {
+            old_crate_name,
+            old_namespace,
+            new_crate_object_file_abs_path,
+            new_namespace,
+            reexport_new_symbols_as_old,
+        })
     }
+}
+
+/// The possible errors that can occur when trying to create a valid `SwapRequest`. 
+pub enum InvalidSwapRequest {
+    OldCrateNotFound(String, Arc<CrateNamespace>),
+    NewCrateNotFound(Path, Arc<CrateNamespace>),
+    NewCratePathNotAbsolute(Path),
 }
 
 
@@ -1150,7 +1180,7 @@ impl CrateNamespace {
                             "couldn't find section in the new crate that corresponds to a match of the old section"
                         })?;
                         #[cfg(not(loscd_eval))]
-                        debug!("swap_crates(): found match for old source_sec {:?}, new source_sec: {:?}", old_sec, new_crate_source_sec);
+                        debug!("swap_crates(): found match for old source_sec {:?}, new source_sec: {:?}", &*old_sec, &*new_crate_source_sec);
 
                         if reexport_new_symbols_as_old && old_sec.global {
                             // reexport the new source section under the old sec's name, i.e., redirect the old mapping to the new source sec
@@ -1202,7 +1232,7 @@ impl CrateNamespace {
 
                         let mut new_source_sec = new_source_sec_ref.lock();
                         #[cfg(not(loscd_eval))]
-                        debug!("    swap_crates(): target_sec: {:?}, old source sec: {:?}, new source sec: {:?}", target_sec, old_sec, new_source_sec);
+                        debug!("    swap_crates(): target_sec: {:?}, old source sec: {:?}, new source sec: {:?}", &*target_sec, &*old_sec, &*new_source_sec);
 
                         // If the target_sec's mapped pages aren't writable (which is common in the case of swapping),
                         // then we need to temporarily remap them as writable here so we can fix up the target_sec's new relocation entry.
