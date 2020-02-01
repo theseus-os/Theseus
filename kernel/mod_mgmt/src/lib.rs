@@ -1062,7 +1062,7 @@ impl CrateNamespace {
             let new_crate_name = new_crate_object_file_abs_path.file_stem();
             
             let (old_crate_ref, old_crate_ns) = CrateNamespace::get_crate_and_namespace(this_namespace, &*old_crate_name).ok_or_else(|| {
-                error!("swap_crates(): couldn't find requested old_crate {:?} in namespace", old_crate_name);
+                error!("swap_crates(): couldn't find requested old_crate {:?} in namespace {:?}", old_crate_name, this_namespace.name);
                 "swap_crates(): couldn't find requested old crate in namespace"
             })?;
             // TODO: once we preverify SwapRequests when creating them, we can skip this sanity check.

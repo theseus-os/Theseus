@@ -253,7 +253,7 @@ fn apply(base_dir_path: &Path) -> Result<(), String> {
         } else {
             let (_crate_type, _prefix, old_crate_file_name) = CrateType::from_module_name(old_crate_module_file_name).map_err(|e| 
                 format!("Invalid old crate file name {:?} in {}/{}. Expected a module name like \"k#my_crate-<hash>.o\". Error: {:?}", 
-                old_crate_module_file_name, base_dir_path, DIFF_FILE_NAME, e
+                    old_crate_module_file_name, base_dir_path, DIFF_FILE_NAME, e
                 )
             )?;
             // Find which namespace the old crate is in (it can only be in the current namespace or its recursive children).
@@ -263,7 +263,8 @@ fn apply(base_dir_path: &Path) -> Result<(), String> {
             if curr_namespace.get_crate(&old_crate_file_name).is_none() {
                 println!("\t Note: old crate {:?} was not currently loaded into namespace {:?}.", old_crate_file_name, curr_namespace.name);
             }
-            (String::from(old_crate_file_name), Arc::clone(old_namespace))
+            let old_crate_name = Path::new(old_crate_file_name.to_string()).file_stem().to_string();
+            (old_crate_name, Arc::clone(old_namespace))
         };
         let new_crate_file = new_namespace_dir.get_crate_object_file(new_crate_module_file_name)
             .ok_or_else(|| format!("cannot find new crate file {:?} in new namespace dir {}", new_crate_module_file_name, base_dir_path))?;
