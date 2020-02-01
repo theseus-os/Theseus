@@ -23,7 +23,7 @@ use alloc::{
     sync::Arc,
 };
 use getopts::{Options, Matches};
-use mod_mgmt::{NamespaceDir, SwapRequest};
+use mod_mgmt::{CrateNamespace, NamespaceDir, SwapRequest};
 use hpet::get_hpet;
 use path::Path;
 use fs_node::{FileOrDir, DirRef};
@@ -159,14 +159,15 @@ fn do_swap(
     state_transfer_functions: Vec<String>,
     verbose_log: bool
 ) -> Result<(), String> {
+    let kernel_mmi_ref = memory::get_kernel_mmi_ref().ok_or_else(|| "couldn't get kernel_mmi_ref".to_string())?;
     let namespace = task::get_my_current_task().ok_or("Couldn't get current task")?.get_namespace();
 
     let swap_requests = {
-        let mut mods: Vec<SwapRequest> = Vec::with_capacity(tuples.len());
-        for (o, n, r) in tuples {
-            // 1) check that the old crate exists and is loaded into the namespace
-            let old_crate = match namespace.get_crates_starting_with(o).as_slice() {
-                [single_match] => single_match.1.clone_shallow(),
+        let mut requests: Vec<SwapRequest> = Vec::with_capacity(tuples.len());
+        for (o, n, reexport) in tuples {
+            // 1) Check that the old crate exists and is loaded into the namespace.
+            let (old_crate, old_crate_ns) = match CrateNamespace::get_crates_starting_with(&namespace, o).as_slice() {
+                [(_crate_name, crate_ref, ns)] => (crate_ref.clone_shallow(), Arc::clone(ns)),
                 multiple_matches => {
                     let mut err_str = format!("Couldn't find single match for an old crate named {:?}. Matching crates:", o);
                     for (crate_name, _crate_ref, ns) in multiple_matches {
@@ -176,34 +177,42 @@ fn do_swap(
                 }
             };
 
-            // 2) check that the new crate file exists. It could be a regular path, or a prefix for a file in the namespace's kernel dir
-            let new_crate_abs_path = match Path::new(String::from(n)).get(curr_dir) {
-                Some(FileOrDir::File(f)) => Path::new(f.lock().get_absolute_path()),
-                _ => match namespace.get_crate_files_starting_with(n, true).as_slice() {
-                    [single_file] => single_file.clone(),
+            // 2) Check that the new crate file exists. It could be a regular path, or a prefix for a file in the namespace's dir.
+            //    If it's a full path, then we just check that the path points to a valid crate object file. 
+            //    But if it's the common case of a prefix for a crate object file name, then we search recursively in the current namespace.
+            let (new_crate_file, new_namespace) = match Path::new(String::from(n)).get(curr_dir) {
+                Some(FileOrDir::File(f)) => (f, None),
+                _ => match CrateNamespace::get_crate_object_files_starting_with(&namespace, n).as_slice() {
+                    [(file, ns)] => (file.clone(), Some(Arc::clone(ns))),
                     multiple_files => {
-                        let mut err_str = format!("Couldn't find single match for the new kernel crate file {:?}. Matching files:", n);
-                        for path in multiple_files {
-                            err_str = format!("{}\n    {}", err_str, path);
+                        let mut err_str = format!("Couldn't find single match for the new crate file {:?}. Matching files:", n);
+                        for (f, ns) in multiple_files {
+                            err_str = format!("{}\n    {} in namespace {}", err_str, f.lock().get_absolute_path(), ns.name);
                         }
                         return Err(err_str);
                     }
                 }
             };
 
-            mods.push(
-                SwapRequest::new(old_crate.lock_as_ref().crate_name.clone(), new_crate_abs_path, r)
-                    .map_err(|_e| format!("BUG: the path of the new crate (passed in as {:?}) was not an absolute Path.", n))?
+            requests.push(
+                SwapRequest::new(
+                    old_crate.lock_as_ref().crate_name.clone(),
+                    old_crate_ns,
+                    Path::new(new_crate_file.lock().get_absolute_path()),
+                    new_namespace,
+                    reexport
+                ).map_err(|_e| 
+                    format!("BUG: the path of the new crate (passed in as {:?}) was not an absolute Path.", n)
+                )?
             );
         }
-        mods
+        requests
     };
-
-    let kernel_mmi_ref = memory::get_kernel_mmi_ref().ok_or_else(|| "couldn't get kernel_mmi_ref".to_string())?;
     
     let start = get_hpet().as_ref().ok_or("couldn't get HPET timer")?.get_counter();
 
-    let swap_result = namespace.swap_crates(
+    let swap_result = CrateNamespace::swap_crates(
+        &namespace,
         swap_requests, 
         override_namespace_crate_dir,
         state_transfer_functions,
@@ -215,11 +224,16 @@ fn do_swap(
     let hpet_period = get_hpet().as_ref().ok_or("couldn't get HPET timer")?.counter_period_femtoseconds();
 
     let elapsed_ticks = end - start;
-    println!("Swap operation complete. Elapsed HPET ticks: {}, (HPET Period: {} femtoseconds)", 
-        elapsed_ticks, hpet_period);
-
-
-    swap_result.map_err(|e| e.to_string())
+    
+    
+    match swap_result {
+        Ok(()) => {
+            println!("Swap operation complete. Elapsed HPET ticks: {}, (HPET Period: {} femtoseconds)", 
+                elapsed_ticks, hpet_period);
+            Ok(())
+        }
+        Err(e) => Err(e.to_string())
+    }
 }
 
 

@@ -173,9 +173,9 @@ fn find_section(section_name: &str) -> Result<StrongSectionRef, String> {
     // If it wasn't a global section in the symbol map, then we need to find its containing crate
     // and search that crate's symbols manually.
     let containing_crate_ref = get_containing_crate_name(section_name).get(0)
-        .and_then(|cname| namespace.get_crate_starting_with(&format!("{}-", cname)))
+        .and_then(|cname| CrateNamespace::get_crate_starting_with(&namespace, &format!("{}-", cname)))
         .or_else(|| get_containing_crate_name(section_name).get(1)
-            .and_then(|cname| namespace.get_crate_starting_with(&format!("{}-", cname)))
+            .and_then(|cname| CrateNamespace::get_crate_starting_with(&namespace, &format!("{}-", cname)))
         )
         .map(|(_cname, crate_ref, _ns)| crate_ref)
         .ok_or_else(|| format!("Couldn't find section {} in symbol map, and couldn't get its containing crate", section_name))?;

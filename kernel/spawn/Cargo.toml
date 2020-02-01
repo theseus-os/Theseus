@@ -64,5 +64,8 @@ path = "../context_switch"
 [dependencies.path]
 path = "../path"
 
+[dependencies.fs_node]
+path = "../fs_node"
+
 [lib]
 crate-type = ["rlib"]

@@ -20,7 +20,7 @@ use cstr_core::CStr;
 use memory::{VirtualAddress, MappedPages};
 use metadata::{LoadedCrate, StrongCrateRef, LoadedSection, StrongSectionRef, SectionType};
 use qp_trie::Trie;
-use fs_node::{File, FileOrDir};
+use fs_node::{File};
 use path::Path;
 use super::CrateNamespace;
 
@@ -64,7 +64,7 @@ macro_rules! try_break {
 /// If an error occurs, the returned `Result::Err` contains the passed-in `text_pages`, `rodata_pages`, and `data_pages`
 /// because those cannot be dropped, as they hold the currently-running code, and dropping them would cause endless exceptions.
 pub fn parse_nano_core(
-    namespace:    &CrateNamespace,
+    namespace:    &Arc<CrateNamespace>,
     text_pages:   MappedPages, 
     rodata_pages: MappedPages, 
     data_pages:   MappedPages, 
@@ -75,16 +75,12 @@ pub fn parse_nano_core(
     let rodata_pages = Arc::new(Mutex::new(rodata_pages));
     let data_pages   = Arc::new(Mutex::new(data_pages));
 
-    let nano_core_file_path = try_mp!(
-        namespace.get_crate_file_starting_with(NANO_CORE_FILENAME_PREFIX, false).ok_or("couldn't find the expected \"nano_core\" kernel file"),
+    let (nano_core_file_ref, _ns) = try_mp!(
+        CrateNamespace::get_crate_object_file_starting_with(namespace, NANO_CORE_FILENAME_PREFIX).ok_or("couldn't find the expected \"nano_core\" kernel file"),
         text_pages, rodata_pages, data_pages
     );
-
-    let nano_core_file_ref = match nano_core_file_path.get(namespace.dir()) {
-        Some(FileOrDir::File(f)) => f,
-        _ => return Err(("BUG: no nano_core file at expected path", [text_pages, rodata_pages, data_pages])),
-    };
     let nano_core_file = &*nano_core_file_ref.lock();
+    let nano_core_file_path = Path::new(nano_core_file.get_absolute_path());
 
     debug!("parse_nano_core: trying to load and parse the nano_core file: {:?}", nano_core_file_path);
     // We don't need to actually load the nano_core as a new crate, since we're already running it.

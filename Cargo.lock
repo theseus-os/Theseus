@@ -601,7 +601,9 @@ source = "registry+https://github.com/rust-lang/crates.io-index"
 name = "first_application"
 version = "0.1.0"
 dependencies = [
+ "log 0.3.9 (registry+https://github.com/rust-lang/crates.io-index)",
  "mod_mgmt 0.1.0",
+ "path 0.1.0",
  "spawn 0.1.0",
 ]
 
@@ -1976,6 +1978,7 @@ dependencies = [
  "catch_unwind 0.1.0",
  "context_switch 0.1.0",
  "debugit 0.1.0",
+ "fs_node 0.1.0",
  "gdt 0.1.0",
  "irq_safety 0.1.1 (git+https://github.com/kevinaboos/irq_safety)",
  "kernel_config 0.1.0",
