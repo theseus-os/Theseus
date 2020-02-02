@@ -20,7 +20,7 @@ use cstr_core::CStr;
 use memory::{VirtualAddress, MappedPages};
 use metadata::{LoadedCrate, StrongCrateRef, LoadedSection, StrongSectionRef, SectionType};
 use qp_trie::Trie;
-use fs_node::{File};
+use fs_node::FileRef;
 use path::Path;
 use super::CrateNamespace;
 
@@ -75,12 +75,11 @@ pub fn parse_nano_core(
     let rodata_pages = Arc::new(Mutex::new(rodata_pages));
     let data_pages   = Arc::new(Mutex::new(data_pages));
 
-    let (nano_core_file_ref, _ns) = try_mp!(
+    let (nano_core_file, real_namespace) = try_mp!(
         CrateNamespace::get_crate_object_file_starting_with(namespace, NANO_CORE_FILENAME_PREFIX).ok_or("couldn't find the expected \"nano_core\" kernel file"),
         text_pages, rodata_pages, data_pages
     );
-    let nano_core_file = &*nano_core_file_ref.lock();
-    let nano_core_file_path = Path::new(nano_core_file.get_absolute_path());
+    let nano_core_file_path = Path::new(nano_core_file.lock().get_absolute_path());
 
     debug!("parse_nano_core: trying to load and parse the nano_core file: {:?}", nano_core_file_path);
     // We don't need to actually load the nano_core as a new crate, since we're already running it.
@@ -96,10 +95,10 @@ pub fn parse_nano_core(
 
     let crate_name = String::from(NANO_CORE_CRATE_NAME);
 
-    trace!("parse_nano_core(): adding symbols to namespace...");
-    let new_syms = namespace.add_symbols(new_crate_ref.lock_as_ref().sections.values(), verbose_log);
+    trace!("parse_nano_core(): adding symbols to namespace {:?}...", real_namespace.name);
+    let new_syms = real_namespace.add_symbols(new_crate_ref.lock_as_ref().sections.values(), verbose_log);
     trace!("parse_nano_core(): finished adding symbols.");
-    namespace.crate_tree.lock().insert(crate_name.into(), new_crate_ref);
+    real_namespace.crate_tree.lock().insert(crate_name.into(), new_crate_ref);
     info!("parsed nano_core crate, {} new symbols.", new_syms);
     Ok((init_symbols, new_syms))
 }
@@ -109,17 +108,16 @@ pub fn parse_nano_core(
 /// Parses the nano_core symbol file that represents the already loaded (and currently running) nano_core code.
 /// Basically, just searches the section list for offsets, size, and flag data,
 /// and parses the symbol table to populate the list of sections.
-fn parse_nano_core_symbol_file<F: File + ?Sized>(
-    nano_core_object_file: &F,
+fn parse_nano_core_symbol_file(
+    nano_core_object_file_ref: FileRef,
     text_pages:   Arc<Mutex<MappedPages>>,
     rodata_pages: Arc<Mutex<MappedPages>>,
     data_pages:   Arc<Mutex<MappedPages>>,
 ) -> Result<(StrongCrateRef, BTreeMap<String, usize>), (&'static str, [Arc<Mutex<MappedPages>>; 3])> {
-    
+    let nano_core_object_file = nano_core_object_file_ref.lock();
     let crate_name = String::from(NANO_CORE_CRATE_NAME);
     let size = nano_core_object_file.size();
     let mapped_pages = try_mp!(nano_core_object_file.as_mapping(), text_pages, rodata_pages, data_pages);
-    let abs_path = Path::new(nano_core_object_file.get_absolute_path());
 
     debug!("Parsing nano_core symbols: size {:#x}({}), mapped_pages: {:?}, text_pages: {:?}, rodata_pages: {:?}, data_pages: {:?}", 
         size, size, mapped_pages, text_pages, rodata_pages, data_pages);
@@ -138,7 +136,7 @@ fn parse_nano_core_symbol_file<F: File + ?Sized>(
 
     let new_crate = CowArc::new(LoadedCrate {
         crate_name:              crate_name,
-        object_file_abs_path:    abs_path,
+        object_file:             nano_core_object_file_ref.clone(),
         sections:                BTreeMap::new(),
         text_pages:              Some((text_pages.clone(),   mp_range(&text_pages))),
         rodata_pages:            Some((rodata_pages.clone(), mp_range(&rodata_pages))),
@@ -477,17 +475,16 @@ fn parse_nano_core_symbol_file<F: File + ?Sized>(
 /// Thus, we simply search for its global symbols, and add them to the system map and the crate metadata.
 /// 
 /// Drops the given `mapped_pages` that hold the nano_core binary file itself.
-fn parse_nano_core_binary<F: File + ?Sized>(
-    nano_core_object_file: &F,
+fn parse_nano_core_binary(
+    nano_core_object_file_ref: FileRef,
     text_pages:   Arc<Mutex<MappedPages>>, 
     rodata_pages: Arc<Mutex<MappedPages>>, 
     data_pages:   Arc<Mutex<MappedPages>>, 
 ) -> Result<(StrongCrateRef, BTreeMap<String, usize>), (&'static str, [Arc<Mutex<MappedPages>>; 3])> {
-
+    let nano_core_object_file = nano_core_object_file_ref.lock();
     let crate_name = String::from(NANO_CORE_CRATE_NAME);
     let size_in_bytes = nano_core_object_file.size();
     let mapped_pages = try_mp!(nano_core_object_file.as_mapping(), text_pages, rodata_pages, data_pages);
-    let abs_path = Path::new(nano_core_object_file.get_absolute_path());
 
     debug!("Parsing {} binary: size {:#x}({}), MappedPages: {:?}, text_pages: {:?}, rodata_pages: {:?}, data_pages: {:?}", 
             crate_name, size_in_bytes, size_in_bytes, mapped_pages, text_pages, rodata_pages, data_pages);
@@ -587,7 +584,7 @@ fn parse_nano_core_binary<F: File + ?Sized>(
 
     let new_crate = CowArc::new(LoadedCrate {
         crate_name:              crate_name, 
-        object_file_abs_path:    abs_path,
+        object_file:             nano_core_object_file_ref.clone(),
         sections:                BTreeMap::new(),
         text_pages:              Some((text_pages.clone(),   mp_range(&text_pages))),
         rodata_pages:            Some((rodata_pages.clone(), mp_range(&rodata_pages))),

@@ -13,7 +13,7 @@ use memory::{MappedPages, VirtualAddress, PageTable, EntryFlags, FrameAllocator}
 use dependency::*;
 use super::{TEXT_SECTION_FLAGS, RODATA_SECTION_FLAGS, DATA_BSS_SECTION_FLAGS};
 use cow_arc::{CowArc, CowWeak};
-use path::Path;
+use fs_node::FileRef;
 
 use qp_trie::{Trie, wrapper::BString};
 
@@ -113,8 +113,8 @@ impl CrateType {
 pub struct LoadedCrate {
     /// The name of this crate.
     pub crate_name: String,
-    /// The absolute path of the object file that this crate was loaded from.
-    pub object_file_abs_path: Path,
+    /// The the object file that this crate was loaded from.
+    pub object_file: FileRef,
     /// A map containing all the sections in this crate.
     /// In general we're only interested the values (the `LoadedSection`s themselves),
     /// but we keep each section's shndx (section header index from its crate's ELF file)
@@ -166,10 +166,13 @@ pub struct LoadedCrate {
 use core::fmt;
 impl fmt::Debug for LoadedCrate {
     fn fmt(&self, f: &mut fmt::Formatter) -> fmt::Result {
-        write!(f, "LoadedCrate(name: {:?}, objfile: {:?})", 
-            self.crate_name, 
-            self.object_file_abs_path,
-        )
+        f.debug_struct("LoadedCrate")
+            .field("name", &self.crate_name)
+            .field("object_file", &self.object_file.try_lock()
+                .map(|f| f.get_absolute_path())
+                .unwrap_or_else(|| format!("<Locked>"))
+            )
+            .finish()
     }
 }
 
@@ -312,7 +315,7 @@ impl LoadedCrate {
 
         let new_crate = CowArc::new(LoadedCrate {
             crate_name:              self.crate_name.clone(),
-            object_file_abs_path:    self.object_file_abs_path.clone(),
+            object_file:             self.object_file.clone(),
             sections:                BTreeMap::new(),
             text_pages:              new_text_pages_range,
             rodata_pages:            new_rodata_pages_range,

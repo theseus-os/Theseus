@@ -40,6 +40,7 @@ use mod_mgmt::{
     NamespaceDir,
     SwapRequest,
     SwapRequestList,
+    IntoCrateObjectFile,
     metadata::CrateType
 };
 use memfs::MemFile;
@@ -269,7 +270,7 @@ fn apply(base_dir_path: &Path) -> Result<(), String> {
         let swap_req = SwapRequest::new(
             old_crate_name,
             Arc::clone(&curr_namespace),
-            Path::new(new_crate_file.lock().get_absolute_path()),
+            IntoCrateObjectFile::File(new_crate_file),
             None, // all diff-based swaps occur within the same namespace
             false
         )?;

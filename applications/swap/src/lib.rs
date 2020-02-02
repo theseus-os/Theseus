@@ -23,7 +23,7 @@ use alloc::{
     sync::Arc,
 };
 use getopts::{Options, Matches};
-use mod_mgmt::{CrateNamespace, NamespaceDir, SwapRequest};
+use mod_mgmt::{CrateNamespace, NamespaceDir, SwapRequest, IntoCrateObjectFile};
 use hpet::get_hpet;
 use path::Path;
 use fs_node::{FileOrDir, DirRef};
@@ -164,47 +164,42 @@ fn do_swap(
 
     let swap_requests = {
         let mut requests: Vec<SwapRequest> = Vec::with_capacity(tuples.len());
-        for (o, n, reexport) in tuples {
-            // 1) Check that the old crate exists and is loaded into the namespace.
-            let (old_crate, old_crate_ns) = match CrateNamespace::get_crates_starting_with(&namespace, o).as_slice() {
-                [(_crate_name, crate_ref, ns)] => (crate_ref.clone_shallow(), Arc::clone(ns)),
-                multiple_matches => {
-                    let mut err_str = format!("Couldn't find single match for an old crate named {:?}. Matching crates:", o);
-                    for (crate_name, _crate_ref, ns) in multiple_matches {
-                        err_str = format!("{}\n    {}  in namespace: {:?}", err_str, crate_name, ns.name);
-                    }
-                    return Err(err_str);
+        for (old_crate_name, new_crate_str, reexport) in tuples {
+
+            // Check that the new crate file exists. It could be a regular path, or a prefix for a file in the namespace's dir.
+            // If it's a full path, then we just check that the path points to a valid crate object file. 
+            // Otherwise, we treat it as a prefix for a crate object file name that may be found 
+            let (into_new_crate_file, new_namespace) = {
+                if let Some(f) = override_namespace_crate_dir.as_ref().and_then(|ns_dir| ns_dir.get_file_starting_with(new_crate_str)) {
+                    (IntoCrateObjectFile::File(f), None)
+                } else if let Some(FileOrDir::File(f)) = Path::new(String::from(new_crate_str)).get(curr_dir) {
+                    (IntoCrateObjectFile::File(f), None)
+                } else {
+                    (IntoCrateObjectFile::Prefix(String::from(new_crate_str)), None)
                 }
             };
-
-            // 2) Check that the new crate file exists. It could be a regular path, or a prefix for a file in the namespace's dir.
-            //    If it's a full path, then we just check that the path points to a valid crate object file. 
-            //    But if it's the common case of a prefix for a crate object file name, then we search recursively in the current namespace.
-            let (new_crate_file, new_namespace) = match Path::new(String::from(n)).get(curr_dir) {
-                Some(FileOrDir::File(f)) => (f, None),
-                _ => match CrateNamespace::get_crate_object_files_starting_with(&namespace, n).as_slice() {
-                    [(file, ns)] => (file.clone(), Some(Arc::clone(ns))),
-                    multiple_files => {
-                        let mut err_str = format!("Couldn't find single match for the new crate file {:?}. Matching files:", n);
-                        for (f, ns) in multiple_files {
-                            err_str = format!("{}\n    {} in namespace {}", err_str, f.lock().get_absolute_path(), ns.name);
-                        }
-                        return Err(err_str);
-                    }
-                }
-            };
-
-            requests.push(
-                SwapRequest::new(
-                    old_crate.lock_as_ref().crate_name.clone(),
-                    old_crate_ns,
-                    Path::new(new_crate_file.lock().get_absolute_path()),
-                    new_namespace,
-                    reexport
-                ).map_err(|_e| 
-                    format!("BUG: the path of the new crate (passed in as {:?}) was not an absolute Path.", n)
-                )?
-            );
+            
+            let swap_req = SwapRequest::new(
+                String::from(old_crate_name),
+                Arc::clone(&namespace),
+                into_new_crate_file,
+                new_namespace,
+                reexport
+            ).map_err(|_e| 
+                format!("Failed to create SwapRequest: {:?}", _e)
+                // use the below code to print out multiple matches
+                // match CrateNamespace::get_crate_object_files_starting_with(&namespace, n).as_slice() {
+                //     [(file, ns)] => (file.clone(), Some(Arc::clone(ns))),
+                //     multiple_files => {
+                //         let mut err_str = format!("Couldn't find single match for the new crate file {:?}. Matching files:", n);
+                //         for (f, ns) in multiple_files {
+                //             err_str = format!("{}\n    {} in namespace {}", err_str, f.lock().get_absolute_path(), ns.name);
+                //         }
+                //         return Err(err_str);
+                //     }
+                // }
+            )?;
+            requests.push(swap_req);
         }
         requests
     };
@@ -246,7 +241,7 @@ fn print_usage(opts: Options) {
 const USAGE: &'static str = "Usage: swap (OLD1, NEW1 [, true | false]) [(OLD2, NEW2 [, true | false])]...
 Swaps the given list of crate tuples, with NEW# replacing OLD# in each tuple.
 The OLD and NEW values are crate names, such as \"my_crate-<hash>\".
-Both the old crate name and the new crate name can be autocompleted, e.g., \"my_cra\" will find \"my_crate-<hash>\", 
+Both the old crate name and the new crate name can be prefixes, e.g., \"my_cra\" will find \"my_crate-<hash>\", 
 but *only* if there is a single matching crate or object file.
 A third element of each tuple is the optional 'reexport_new_symbols_as_old' boolean, which if true, 
 will reexport new symbols under their old names, if those symbols match (excluding hashes).";
