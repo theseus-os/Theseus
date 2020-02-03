@@ -41,7 +41,6 @@ use mod_mgmt::{
     SwapRequest,
     SwapRequestList,
     IntoCrateObjectFile,
-    metadata::CrateType
 };
 use memfs::MemFile;
 use path::Path;
@@ -246,26 +245,22 @@ fn apply(base_dir_path: &Path) -> Result<(), String> {
     // Now we create swap requests based on the contents of the diff file
     let mut swap_requests = SwapRequestList::new();
 
-    for (old_crate_module_file_name, new_crate_module_file_name) in &diffs.pairs {
+    for (old_crate_module_file_name, new_crate_module_file_name) in diffs.pairs.into_iter() {
         println!("Looking at diff {} -> {}", old_crate_module_file_name, new_crate_module_file_name);
         let old_crate_name = if old_crate_module_file_name == "" {
             // An empty old_crate_name indicates that there is no old crate or object file to remove, we are just loading a new crate (or inserting its object file)
             String::new()
         } else {
-            let (_crate_type, _prefix, old_crate_file_name) = CrateType::from_module_name(old_crate_module_file_name).map_err(|e| 
-                format!("Invalid old crate file name {:?} in {}/{}. Expected a module name like \"k#my_crate-<hash>.o\". Error: {:?}", 
-                    old_crate_module_file_name, base_dir_path, DIFF_FILE_NAME, e
-                )
-            )?;
-            let old_crate_name = Path::new(old_crate_file_name.to_string()).file_stem().to_string();
+            let old_crate_name = mod_mgmt::crate_name_from_path(&Path::new(old_crate_module_file_name)).to_string();
             if curr_namespace.get_crate(&old_crate_name).is_none() {
-                println!("\t Note: old crate {:?} was not currently loaded into namespace {:?}.", old_crate_file_name, curr_namespace.name);
+                println!("\t Note: old crate {:?} was not currently loaded into namespace {:?}.", old_crate_name, curr_namespace.name);
             }
             old_crate_name
         };
         
-        let new_crate_file = new_namespace_dir.get_crate_object_file(new_crate_module_file_name)
-            .ok_or_else(|| format!("cannot find new crate file {:?} in new namespace dir {}", new_crate_module_file_name, base_dir_path))?;
+        let new_crate_file = new_namespace_dir.get_crate_object_file(&new_crate_module_file_name).ok_or_else(|| 
+            format!("cannot find new crate file {:?} in new namespace dir {}", new_crate_module_file_name, base_dir_path)
+        )?;
 
         let swap_req = SwapRequest::new(
             old_crate_name,

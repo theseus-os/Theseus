@@ -115,6 +115,23 @@ pub fn create_application_namespace(recursive_namespace: Option<Arc<CrateNamespa
 }
 
 
+/// Returns the crate name that is derived from a crate object file path.
+/// 
+/// # Examples of acceptable paths
+/// Legal paths can:
+/// * be absolute or relative,
+/// * optionally end with an extension, e.g., `".o"`,   optionally start 
+/// * optionally start with a module file prefix, e.g., `"k#my_crate-<hash>.o"`.
+pub fn crate_name_from_path<'p>(object_file_path: &'p Path) -> &'p str {
+    let stem = object_file_path.file_stem();
+    if let Ok((_crate_type, _prefix, name)) = CrateType::from_module_name(stem) {
+        name
+    } else {
+        stem
+    }
+}
+
+
 /// `.text` sections are read-only and executable.
 const TEXT_SECTION_FLAGS:     EntryFlags = EntryFlags::PRESENT;
 /// `.rodata` sections are read-only and non-executable.
@@ -327,30 +344,34 @@ impl SwapRequest {
         new_namespace: Option<Arc<CrateNamespace>>,
         reexport_new_symbols_as_old: bool,
     ) -> Result<SwapRequest, &'static str> {
-        let mut old_namespace = old_namespace;
-        
         // Check that the old crate is actually in the old namespace; 
         // it may be currently loaded into the old namespace, 
         // but if not, we look to see if its crate object file is there.
-        // If the old crate name is empty, that means there is no old crate to replace. 
-        if old_crate_name != "" {
+        let (old_crate_full_name, real_old_namespace) = if old_crate_name == "" {
+            // If the old crate name is empty, that means there is no old crate to replace. 
+            (String::new(), &old_namespace)
+        } else {
             // Find the exact namespace that contains the old crate or its object file (it can only be in the given old_namespace or its recursive children).
-            let real_old_namespace = if let Some((_ocn, _ocr, real_old_namespace)) = CrateNamespace::get_crate_starting_with(&old_namespace, &old_crate_name) {
-                Arc::clone(real_old_namespace)
-            } else if let Some((_ocf, real_old_namespace)) = CrateNamespace::get_crate_object_file_starting_with(&old_namespace, &old_crate_name) {
-                Arc::clone(real_old_namespace)
+            if let Some((old_crate_full_name, _ocr, real_old_namespace)) = CrateNamespace::get_crate_starting_with(&old_namespace, &old_crate_name) {
+                (old_crate_full_name, real_old_namespace)
+            } else if let Some((old_crate_file, real_old_namespace)) = CrateNamespace::get_crate_object_file_starting_with(&old_namespace, &old_crate_name) {
+                let old_crate_file_path = Path::new(old_crate_file.lock().get_name());
+                let old_crate_full_name = crate_name_from_path(&old_crate_file_path).to_string();
+                (old_crate_full_name, real_old_namespace)
             } else {
                 //  return OldCrateNotFound(old_crate_name, old_namespace)?;
                 return Err("cannot find old_crate_file in old_namespace (recursively searched)");
-            };
+            }
+        };
+
+        if !Arc::ptr_eq(&old_namespace, real_old_namespace) {
             trace!("SwapRequest::new(): changing old namespace from {:?} to {:?}", old_namespace.name, real_old_namespace.name);
-            old_namespace = real_old_namespace;
         }
         
         // If no new namespace was given, use the same namespace that the old crate was found in.
         let mut new_namespace = new_namespace.unwrap_or_else(|| {
-            trace!("SwapRequest::new(): new namespace was None, using old namespace {:?}", old_namespace.name);
-            Arc::clone(&old_namespace)
+            trace!("SwapRequest::new(): new namespace was None, using old namespace {:?}", real_old_namespace.name);
+            Arc::clone(real_old_namespace)
         });
 
         // Try to resolve the new crate argument into an actual file.
@@ -371,8 +392,8 @@ impl SwapRequest {
         };
 
         Ok(SwapRequest {
-            old_crate_name,
-            old_namespace: ByAddress(old_namespace),
+            old_crate_name: old_crate_full_name,
+            old_namespace: ByAddress(Arc::clone(real_old_namespace)),
             new_crate_object_file: ByAddress(verified_new_crate_file),
             new_namespace: ByAddress(new_namespace),
             reexport_new_symbols_as_old,
@@ -1145,7 +1166,7 @@ impl CrateNamespace {
                 "Unimplemented: swap_crates() doesn't yet support deep copying shared crates to get a new exclusive mutable instance"
             })?;
             
-            let new_crate_name = Path::new(new_crate_object_file.lock().get_name()).file_stem().to_string();
+            let new_crate_name = crate_name_from_path(&Path::new(new_crate_object_file.lock().get_name())).to_string();
             let new_crate_ref = if is_optimized {
                 debug!("swap_crates(): OPTIMIZED: looking for new crate {:?} in cache", new_crate_name);
                 namespace_of_new_crates.get_crate(&new_crate_name)
@@ -1698,7 +1719,7 @@ impl CrateNamespace {
         let mapped_pages  = crate_file.as_mapping()?;
         let size_in_bytes = crate_file.size();
         let abs_path      = Path::new(crate_file.get_absolute_path());
-        let crate_name    = abs_path.file_stem().to_string();
+        let crate_name    = crate_name_from_path(&abs_path).to_string();
 
         // First, check to make sure this crate hasn't already been loaded. 
         // Regular, non-singleton application crates aren't added to the CrateNamespace, so they can be multiply loaded.
@@ -2801,7 +2822,7 @@ impl CrateNamespace {
                           
             let potential_crate_file_path = Path::new(potential_crate_file.lock().get_absolute_path());
             // Check to make sure this crate is not already loaded into this namespace (or its recursive namespace).
-            if self.get_crate(potential_crate_file_path.file_stem()).is_some() {
+            if self.get_crate(crate_name_from_path(&potential_crate_file_path)).is_some() {
                 trace!("  (skipping already-loaded crate {:?})", potential_crate_file_path);
                 continue;
             }
