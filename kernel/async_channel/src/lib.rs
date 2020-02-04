@@ -12,7 +12,7 @@
 #![no_std]
 
 extern crate alloc;
-#[macro_use] extern crate log;
+// #[macro_use] extern crate log;
 // #[macro_use] extern crate debugit;
 extern crate wait_queue;
 extern crate mpmc;
@@ -73,7 +73,7 @@ impl <T: Send> Sender<T> {
     /// Returns `Ok(())` if the message was sent and received successfully,
     /// otherwise returns an error. 
     pub fn send(&self, msg: T) -> Result<(), &'static str> {
-        trace!("async_channel: send() entry");
+        // trace!("async_channel: send() entry");
         // Fast path: attempt to send the message, assuming the buffer isn't full
         let msg = match self.try_send(msg) {
             Ok(()) => return Ok(()),
@@ -144,7 +144,7 @@ impl <T: Send> Receiver<T> {
     /// 
     /// Returns the message if it was received properly, otherwise returns an error.
     pub fn receive(&self) -> Result<T, &'static str> {
-        trace!("async_channel: receive() entry");
+        // trace!("async_channel: receive() entry");
         // Fast path: attempt to receive a message, assuming the buffer isn't empty
         if let Some(msg) = self.try_receive() {
             return Ok(msg);

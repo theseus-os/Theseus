@@ -177,7 +177,7 @@ pub extern "C" fn nano_core_start(multiboot_information_virtual_address: usize) 
 
     
     // if in loadable mode, parse the crates we always need: the core library (Rust no_std lib), the panic handlers, and the captain
-    // #[cfg(loadable)] 
+    #[cfg(loadable)] 
     {
         use mod_mgmt::CrateNamespace;
         println_raw!("nano_core_start(): loading the \"captain\" crate...");     

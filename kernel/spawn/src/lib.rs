@@ -236,7 +236,7 @@ impl ApplicationTaskBuilder {
     /// Creates a new application `Task` from the given `path`, which points to 
     /// an application crate object file that must have an entry point called `main`.
     /// 
-    /// TODO FIXME: change this to accept a `FileRef` instead of a `Path`
+    /// TODO: change this to accept a `FileRef` instead of a `Path`
     pub fn new(path: Path) -> ApplicationTaskBuilder {
         ApplicationTaskBuilder {
             path: path,
