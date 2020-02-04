@@ -249,13 +249,13 @@ fn apply(base_dir_path: &Path) -> Result<(), String> {
         println!("Looking at diff {} -> {}", old_crate_module_file_name, new_crate_module_file_name);
         let old_crate_name = if old_crate_module_file_name == "" {
             // An empty old_crate_name indicates that there is no old crate or object file to remove, we are just loading a new crate (or inserting its object file)
-            String::new()
+            None
         } else {
             let old_crate_name = mod_mgmt::crate_name_from_path(&Path::new(old_crate_module_file_name)).to_string();
             if curr_namespace.get_crate(&old_crate_name).is_none() {
                 println!("\t Note: old crate {:?} was not currently loaded into namespace {:?}.", old_crate_name, curr_namespace.name);
             }
-            old_crate_name
+            Some(old_crate_name)
         };
         
         let new_crate_file = new_namespace_dir.get_crate_object_file(&new_crate_module_file_name).ok_or_else(|| 
@@ -263,7 +263,7 @@ fn apply(base_dir_path: &Path) -> Result<(), String> {
         )?;
 
         let swap_req = SwapRequest::new(
-            old_crate_name,
+            old_crate_name.as_deref(),
             Arc::clone(&curr_namespace),
             IntoCrateObjectFile::File(new_crate_file),
             None, // all diff-based swaps occur within the same namespace

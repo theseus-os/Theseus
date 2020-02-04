@@ -213,7 +213,7 @@ fn parse_bootloader_modules_into_files(
 }
 
 
-/// An object that can be converted into a crate object file.
+/// A type that can be converted into a crate object file.
 /// We use an enum rather than implement `TryInto` because we need additional information
 /// to resolve a prefix path.
 pub enum IntoCrateObjectFile {
@@ -225,6 +225,7 @@ pub enum IntoCrateObjectFile {
     /// This must be able to uniquely identify a single crate object file in the namespace directory (recursively searched). 
     Prefix(String),
 }
+
 
 /// A list of one or more `SwapRequest`s that is used by the `swap_crates` function.
 pub type SwapRequestList = Vec<SwapRequest>;
@@ -279,7 +280,7 @@ pub struct SwapRequest {
     /// This will be used to search the `CrateNamespace` to find an existing `LoadedCrate`.
     /// The `SwapRequest` constructor ensures this is fully-qualified (includes a hash value)
     /// and is unique within the `old_namespace`.
-    old_crate_name: String,
+    old_crate_name: Option<String>,
     /// The `CrateNamespace` that contains the given old crate, 
     /// from which that old crate and its symbols should be removed. 
     old_namespace: ByAddress<Arc<CrateNamespace>>,
@@ -313,7 +314,7 @@ impl SwapRequest {
     /// 
     /// # Arguments
     /// * `old_crate_name`: the name of the old crate that should be unloaded and removed from the `old_namespace`. 
-    ///    An `old_crate_name` of `None` signifies there is no old crate to be removed,
+    ///    An `old_crate_name` of `None` (or an empty string) signifies there is no old crate to be removed,
     ///    and that only a new crate will be added.
     /// 
     ///    Note that `old_crate_name` can be any string prefix, so long as it can uniquely identify a crate object file
@@ -337,8 +338,8 @@ impl SwapRequest {
     ///    See the "Important Note" in the struct-level documentation for more details.
     /// 
     pub fn new(
-        // TODO FIXME: change to `Option<&str>`
-        old_crate_name: String,
+        // We could change this to `Option<&str>`
+        old_crate_name: Option<&str>,
         old_namespace: Arc<CrateNamespace>,
         new_crate_object_file: IntoCrateObjectFile,
         new_namespace: Option<Arc<CrateNamespace>>,
@@ -347,20 +348,23 @@ impl SwapRequest {
         // Check that the old crate is actually in the old namespace; 
         // it may be currently loaded into the old namespace, 
         // but if not, we look to see if its crate object file is there.
-        let (old_crate_full_name, real_old_namespace) = if old_crate_name == "" {
-            // If the old crate name is empty, that means there is no old crate to replace. 
-            (String::new(), &old_namespace)
-        } else {
-            // Find the exact namespace that contains the old crate or its object file (it can only be in the given old_namespace or its recursive children).
-            if let Some((old_crate_full_name, _ocr, real_old_namespace)) = CrateNamespace::get_crate_starting_with(&old_namespace, &old_crate_name) {
-                (old_crate_full_name, real_old_namespace)
-            } else if let Some((old_crate_file, real_old_namespace)) = CrateNamespace::get_crate_object_file_starting_with(&old_namespace, &old_crate_name) {
-                let old_crate_file_path = Path::new(old_crate_file.lock().get_name());
-                let old_crate_full_name = crate_name_from_path(&old_crate_file_path).to_string();
-                (old_crate_full_name, real_old_namespace)
-            } else {
-                //  return OldCrateNotFound(old_crate_name, old_namespace)?;
-                return Err("cannot find old_crate_file in old_namespace (recursively searched)");
+        let (old_crate_full_name, real_old_namespace) = match old_crate_name {
+            None | Some("") => {
+                // If the old crate name is empty, that means there is no old crate to replace. 
+                (None, &old_namespace)
+            }    
+            Some(ocn) => {
+                // Find the exact namespace that contains the old crate or its object file (it can only be in the given old_namespace or its recursive children).
+                if let Some((old_crate_full_name, _ocr, real_old_namespace)) = CrateNamespace::get_crate_starting_with(&old_namespace, ocn) {
+                    (Some(old_crate_full_name), real_old_namespace)
+                } else if let Some((old_crate_file, real_old_namespace)) = CrateNamespace::get_crate_object_file_starting_with(&old_namespace, ocn) {
+                    let old_crate_file_path = Path::new(old_crate_file.lock().get_name());
+                    let old_crate_full_name = crate_name_from_path(&old_crate_file_path).to_string();
+                    (Some(old_crate_full_name), real_old_namespace)
+                } else {
+                    //  return OldCrateNotFound(old_crate_name, old_namespace)?;
+                    return Err("cannot find old_crate_file in old_namespace (recursively searched)");
+                }
             }
         };
 
@@ -1150,11 +1154,14 @@ impl CrateNamespace {
         // such that they refer to the new_module instead of the old_crate.
         for req in &swap_requests {
             let SwapRequest { old_crate_name, old_namespace, new_crate_object_file, new_namespace: _new_ns, reexport_new_symbols_as_old } = req;
-            if old_crate_name == "" {
-                // just adding a new crate, no replacement needed
-                new_crate_names.push(String::new());
-                continue; 
-            }
+            let old_crate_name = match old_crate_name {
+                Some(ocn) => ocn,
+                _ => {
+                    // just adding a new crate, no replacement needed
+                    new_crate_names.push(String::new());
+                    continue;
+                }
+            };
             let reexport_new_symbols_as_old = *reexport_new_symbols_as_old;
             
             let (old_crate_ref, _) = CrateNamespace::get_crate_and_namespace(old_namespace, &*old_crate_name).ok_or_else(|| {
@@ -1431,7 +1438,10 @@ impl CrateNamespace {
         // This doesn't mean each crate will be immediately dropped -- they still might be in use by other crates or tasks.
         for (req, new_crate_name) in swap_requests.iter().zip(new_crate_names.iter()) {
             let SwapRequest { old_crate_name, old_namespace, new_crate_object_file: _, new_namespace, reexport_new_symbols_as_old } = req;
-            if old_crate_name == "" { continue; }
+            let old_crate_name = match old_crate_name {
+                Some(ocn) => ocn,
+                _ => continue,
+            };
             // Remove the old crate from the namespace that it was previously in, and remove its sections' symbols too.
             if let Some(old_crate_ref) = old_namespace.crate_tree.lock().remove_str(old_crate_name) {
                 {
@@ -1448,7 +1458,7 @@ impl CrateNamespace {
                         // (3) the future `reexport_new_symbols_as_old`  ==  true if the old crate had any reexported symbols
                         //     -- to understand this, see the docs for `LoadedCrate.reexported_prefix`
                         let future_swap_req = SwapRequest {
-                            old_crate_name: new_crate_name.clone(),
+                            old_crate_name: Some(new_crate_name.clone()),
                             old_namespace: ByAddress(Arc::clone(new_namespace)),
                             new_crate_object_file: ByAddress(old_crate.object_file.clone()),
                             new_namespace: ByAddress(Arc::clone(old_namespace)),

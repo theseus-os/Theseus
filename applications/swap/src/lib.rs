@@ -180,7 +180,7 @@ fn do_swap(
             };
             
             let swap_req = SwapRequest::new(
-                String::from(old_crate_name),
+                Some(old_crate_name),
                 Arc::clone(&namespace),
                 into_new_crate_file,
                 new_namespace,
