@@ -268,7 +268,7 @@ fn apply(base_dir_path: &Path) -> Result<(), String> {
             IntoCrateObjectFile::File(new_crate_file),
             None, // all diff-based swaps occur within the same namespace
             false
-        )?;
+        ).map_err(|invalid_req| format!("{:?}", invalid_req))?;
         swap_requests.push(swap_req);
     }
 

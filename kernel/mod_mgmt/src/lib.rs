@@ -225,6 +225,21 @@ pub enum IntoCrateObjectFile {
     /// This must be able to uniquely identify a single crate object file in the namespace directory (recursively searched). 
     Prefix(String),
 }
+impl fmt::Debug for IntoCrateObjectFile {
+    fn fmt(&self, f: &mut fmt::Formatter) -> fmt::Result {
+        let mut dbg = f.debug_struct("IntoCrateObjectFile");
+        match self {
+            Self::File(object_file) => dbg.field("File", &object_file.try_lock()
+                .map(|f| f.get_absolute_path())
+                .unwrap_or_else(|| format!("<Locked>"))
+            ),
+            Self::AbsolutePath(p) => dbg.field("AbsolutePath", p),
+            Self::Prefix(prefix) => dbg.field("Prefix", prefix),
+        };
+        dbg.finish()
+    }
+}
+
 
 
 /// A list of one or more `SwapRequest`s that is used by the `swap_crates` function.
@@ -344,7 +359,7 @@ impl SwapRequest {
         new_crate_object_file: IntoCrateObjectFile,
         new_namespace: Option<Arc<CrateNamespace>>,
         reexport_new_symbols_as_old: bool,
-    ) -> Result<SwapRequest, &'static str> {
+    ) -> Result<SwapRequest, InvalidSwapRequest> {
         // Check that the old crate is actually in the old namespace; 
         // it may be currently loaded into the old namespace, 
         // but if not, we look to see if its crate object file is there.
@@ -362,8 +377,8 @@ impl SwapRequest {
                     let old_crate_full_name = crate_name_from_path(&old_crate_file_path).to_string();
                     (Some(old_crate_full_name), real_old_namespace)
                 } else {
-                    //  return OldCrateNotFound(old_crate_name, old_namespace)?;
-                    return Err("cannot find old_crate_file in old_namespace (recursively searched)");
+                    return Err(InvalidSwapRequest::OldCrateNotFound(old_crate_name.map(ToString::to_string), old_namespace));
+                    // return Err("cannot find old_crate_file in old_namespace (recursively searched)");
                 }
             }
         };
@@ -381,14 +396,15 @@ impl SwapRequest {
         // Try to resolve the new crate argument into an actual file.
         let verified_new_crate_file = match new_crate_object_file {
             IntoCrateObjectFile::File(f) => f,
-            IntoCrateObjectFile::AbsolutePath(path) => match Path::get_absolute(&path) {
+            IntoCrateObjectFile::AbsolutePath(ref path) => match Path::get_absolute(path) {
                 Some(FileOrDir::File(f)) => f,
-                _ => return Err("Couldn't find new crate object file file at absolute path"),
+                _ => return Err(InvalidSwapRequest::NewCrateNotFound(new_crate_object_file, new_namespace)),
             }
-            IntoCrateObjectFile::Prefix(prefix) => {
-                let (new_crate_file, real_new_namespace) = CrateNamespace::get_crate_object_file_starting_with(&new_namespace, &prefix)
-                    // .ok_or_else(|| NewCrateNotFound(...))?
-                    .ok_or("cannot find new crate object file from prefix in new namespace (recursively searched)")?;
+            IntoCrateObjectFile::Prefix(ref prefix) => {
+                let (new_crate_file, real_new_namespace) = match CrateNamespace::get_crate_object_file_starting_with(&new_namespace, prefix) {
+                    Some(found) => found,
+                    _ => return Err(InvalidSwapRequest::NewCrateNotFound(new_crate_object_file, new_namespace)),
+                };
                 trace!("SwapRequest::new(): changing new namespace from {:?} to {:?}", new_namespace.name, real_new_namespace.name);
                 new_namespace = Arc::clone(real_new_namespace);
                 new_crate_file
@@ -407,9 +423,27 @@ impl SwapRequest {
 
 /// The possible errors that can occur when trying to create a valid `SwapRequest`. 
 pub enum InvalidSwapRequest {
-    OldCrateNotFound(String, Arc<CrateNamespace>),
+    /// The old crate was not found in the old `CrateNamespace`.
+    /// The enclosed `String` is the `old_crate_name` passed into `SwapRequest::new()`.
+    OldCrateNotFound(Option<String>, Arc<CrateNamespace>),
+    /// The new crate object file could not be resolved or found within the new `CrateNamespace`.
     NewCrateNotFound(IntoCrateObjectFile, Arc<CrateNamespace>),
-    NewCratePathNotAbsolute(Path),
+}
+impl fmt::Debug for InvalidSwapRequest {
+    fn fmt(&self, f: &mut fmt::Formatter) -> fmt::Result {
+        let mut dbg = f.debug_struct("InvalidSwapRequest");
+        match self {
+            Self::OldCrateNotFound(old_crate_name, old_namespace) => {
+                dbg.field("old_crate_name", old_crate_name)
+                    .field("old_namespace", &old_namespace.name);
+            }
+            Self::NewCrateNotFound(new_crate_object_file, new_namespace) => {
+                dbg.field("new_crate_object_file", new_crate_object_file)
+                    .field("new_namespace", &new_namespace.name);
+            }
+        };
+        dbg.finish()
+    }
 }
 
 

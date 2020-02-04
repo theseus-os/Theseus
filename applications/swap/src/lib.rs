@@ -185,9 +185,9 @@ fn do_swap(
                 into_new_crate_file,
                 new_namespace,
                 reexport
-            ).map_err(|_e| 
-                format!("Failed to create SwapRequest: {:?}", _e)
-                // use the below code to print out multiple matches
+            ).map_err(|invalid_req| 
+                format!("Failed to create SwapRequest: {:?}", invalid_req)
+                // TODO: use the below code to print out multiple matches
                 // match CrateNamespace::get_crate_object_files_starting_with(&namespace, n).as_slice() {
                 //     [(file, ns)] => (file.clone(), Some(Arc::clone(ns))),
                 //     multiple_files => {
