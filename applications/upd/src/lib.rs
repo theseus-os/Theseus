@@ -253,7 +253,7 @@ fn apply(base_dir_path: &Path) -> Result<(), String> {
         } else {
             let old_crate_name = mod_mgmt::crate_name_from_path(&Path::new(old_crate_module_file_name)).to_string();
             if curr_namespace.get_crate(&old_crate_name).is_none() {
-                println!("\t Note: old crate {:?} was not currently loaded into namespace {:?}.", old_crate_name, curr_namespace.name);
+                println!("\t Note: old crate {:?} was not currently loaded into namespace {:?}.", old_crate_name, curr_namespace.name());
             }
             Some(old_crate_name)
         };
