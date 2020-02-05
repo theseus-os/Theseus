@@ -212,7 +212,7 @@ fn _find_crate(crate_name: &str) -> Result<StrongCrateRef, String> {
     
     if matching_crate_names.len() == 1 {
         namespace.get_crate(&matching_crate_names[0])
-            .ok_or_else(|| format!("Couldn't get crate {} from namespace {}", matching_crate_names[0], namespace.name))
+            .ok_or_else(|| format!("Couldn't get crate {} from namespace {}", matching_crate_names[0], namespace.name()))
     } else {
         Err(matching_crate_names.join("\n"))
     }
