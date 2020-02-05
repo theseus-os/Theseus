@@ -10,9 +10,9 @@ extern crate xmas_elf;
 extern crate memory;
 extern crate multiboot2;
 extern crate kernel_config;
-extern crate goblin;
 extern crate util;
 extern crate crate_name_utils;
+extern crate crate_metadata;
 extern crate rustc_demangle;
 extern crate owning_ref;
 extern crate cow_arc;
@@ -27,8 +27,10 @@ extern crate hpet;
 extern crate cstr_core;
 extern crate by_address;
 
-use core::ops::{DerefMut, Deref, Range};
-use core::fmt;
+use core::{
+    fmt,
+    ops::{DerefMut, Deref, Range},
+};
 use alloc::{
     vec::Vec,
     collections::{BTreeMap, btree_map, BTreeSet},
@@ -37,17 +39,13 @@ use alloc::{
 };
 use spin::{Mutex, Once};
 use by_address::ByAddress;
-
 use xmas_elf::{
     ElfFile,
     sections::{SectionData, ShType, SHF_WRITE, SHF_ALLOC, SHF_EXECINSTR},
 };
-use goblin::elf::reloc::*;
-
 use util::round_up_power_of_two;
 use memory::{MmiRef, FRAME_ALLOCATOR, MemoryManagementInfo, FrameRange, VirtualAddress, PhysicalAddress, MappedPages, EntryFlags, allocate_pages_by_bytes};
 use multiboot2::BootInformation;
-use metadata::{StrongCrateRef, WeakSectionRef};
 use cow_arc::CowArc;
 use hashbrown::HashMap;
 use rustc_demangle::demangle;
@@ -57,15 +55,11 @@ use vfs_node::VFSDirectory;
 use path::Path;
 use memfs::MemFile;
 use crate_name_utils::{get_containing_crate_name, replace_containing_crate_name};
+pub use crate_metadata::*;
 
 
 pub mod elf_executable;
 pub mod parse_nano_core;
-pub mod metadata;
-pub mod dependency;
-
-use self::metadata::*;
-use self::dependency::*;
 
 
 /// The name of the directory that contains all of the CrateNamespace files.
@@ -100,7 +94,7 @@ pub fn create_application_namespace(recursive_namespace: Option<Arc<CrateNamespa
         .or_else(|| get_initial_kernel_namespace().cloned())
         .ok_or("initial kernel CrateNamespace not yet initialized")?;
     // (2) get the directory where the default app namespace should have been populated when mod_mgmt was inited.
-    let default_app_namespace_name = CrateType::Application.namespace_name().to_string(); // this will be "_applications"
+    let default_app_namespace_name = CrateType::Application.default_namespace_name().to_string(); // this will be "_applications"
     let default_app_namespace_dir = get_namespaces_directory()
         .and_then(|ns_dir| ns_dir.lock().get_dir(&default_app_namespace_name))
         .ok_or("Couldn't find the directory for the default application CrateNamespace")?;
@@ -130,14 +124,6 @@ pub fn crate_name_from_path<'p>(object_file_path: &'p Path) -> &'p str {
         stem
     }
 }
-
-
-/// `.text` sections are read-only and executable.
-const TEXT_SECTION_FLAGS:     EntryFlags = EntryFlags::PRESENT;
-/// `.rodata` sections are read-only and non-executable.
-const RODATA_SECTION_FLAGS:   EntryFlags = EntryFlags::from_bits_truncate(EntryFlags::PRESENT.bits() | EntryFlags::NO_EXECUTE.bits());
-/// `.data` and `.bss` sections are read-write and non-executable.
-const DATA_BSS_SECTION_FLAGS: EntryFlags = EntryFlags::from_bits_truncate(EntryFlags::PRESENT.bits() | EntryFlags::NO_EXECUTE.bits() | EntryFlags::WRITABLE.bits());
 
 
 /// Initializes the module management system based on the bootloader-provided modules, 
@@ -181,7 +167,7 @@ fn parse_bootloader_modules_into_files(
         let size_in_bytes = (m.end_address() - m.start_address()) as usize;
         let frames = FrameRange::from_phys_addr(PhysicalAddress::new(m.start_address() as usize)?, size_in_bytes);
         let (crate_type, prefix, file_name) = CrateType::from_module_name(m.name())?;
-        let dir_name = format!("{}{}", prefix, crate_type.namespace_name());
+        let dir_name = format!("{}{}", prefix, crate_type.default_namespace_name());
         let name = String::from(file_name);
 
         let pages = allocate_pages_by_bytes(size_in_bytes).ok_or("Couldn't allocate virtual pages for bootloader module area")?;
@@ -208,7 +194,7 @@ fn parse_bootloader_modules_into_files(
     debug!("Created namespace directories: {:?}", prefix_map.keys().map(|s| &**s).collect::<Vec<&str>>().join(", "));
     Ok((
         namespaces_dir,
-        prefix_map.remove(CrateType::Kernel.namespace_name()).ok_or("BUG: no default namespace found")?,
+        prefix_map.remove(CrateType::Kernel.default_namespace_name()).ok_or("BUG: no default namespace found")?,
     ))
 }
 
@@ -724,7 +710,7 @@ impl CrateNamespace {
     pub fn name(&self) -> &str {
         &self.name
     }
-    
+
     /// Returns the directory that this `CrateNamespace` is based on.
     pub fn dir(&self) -> &NamespaceDir {
         &self.dir
@@ -3224,66 +3210,6 @@ fn allocate_and_map_as_writable(size_in_bytes: usize, flags: EntryFlags, kernel_
     let mut frame_allocator = FRAME_ALLOCATOR.try().ok_or("couldn't get FRAME_ALLOCATOR")?.lock();
     let allocated_pages = allocate_pages_by_bytes(size_in_bytes).ok_or("Couldn't allocate_pages_by_bytes, out of virtual address space")?;
     kernel_mmi_ref.lock().page_table.map_allocated_pages(allocated_pages, flags | EntryFlags::PRESENT | EntryFlags::WRITABLE, frame_allocator.deref_mut())
-}
-
-
-/// Write the actual relocation entry.
-/// # Arguments
-/// * `rela_entry`: the relocation entry from the ELF file that specifies which relocation action to perform.
-/// * `target_sec_mapped_pages`: the `MappedPages` that covers the target section, i.e., the section where the relocation data will be written to.
-/// * `target_sec_mapped_pages_offset`: the offset into `target_sec_mapped_pages` where the target section is located.
-/// * `source_sec`: the source section of the relocation, i.e., the section that the `target_sec` depends on and "points" to.
-/// * `verbose_log`: whether to output verbose logging information about this relocation action.
-fn write_relocation(
-    relocation_entry: RelocationEntry,
-    target_sec_mapped_pages: &mut MappedPages,
-    target_sec_mapped_pages_offset: usize,
-    source_sec_vaddr: VirtualAddress,
-    verbose_log: bool
-) -> Result<(), &'static str>
-{
-    // Calculate exactly where we should write the relocation data to.
-    let target_offset = target_sec_mapped_pages_offset + relocation_entry.offset;
-
-    // Perform the actual relocation data writing here.
-    // There is a great, succint table of relocation types here
-    // https://docs.rs/goblin/0.0.24/goblin/elf/reloc/index.html
-    match relocation_entry.typ {
-        R_X86_64_32 => {
-            let target_ref: &mut u32 = target_sec_mapped_pages.as_type_mut(target_offset)?;
-            let source_val = source_sec_vaddr.value().wrapping_add(relocation_entry.addend);
-            if verbose_log { trace!("                    target_ptr: {:#X}, source_val: {:#X} (from sec_vaddr {:#X})", target_ref as *mut _ as usize, source_val, source_sec_vaddr); }
-            *target_ref = source_val as u32;
-        }
-        R_X86_64_64 => {
-            let target_ref: &mut u64 = target_sec_mapped_pages.as_type_mut(target_offset)?;
-            let source_val = source_sec_vaddr.value().wrapping_add(relocation_entry.addend);
-            if verbose_log { trace!("                    target_ptr: {:#X}, source_val: {:#X} (from sec_vaddr {:#X})", target_ref as *mut _ as usize, source_val, source_sec_vaddr); }
-            *target_ref = source_val as u64;
-        }
-        R_X86_64_PC32 |
-        R_X86_64_PLT32 => {
-            let target_ref: &mut u32 = target_sec_mapped_pages.as_type_mut(target_offset)?;
-            let source_val = source_sec_vaddr.value().wrapping_add(relocation_entry.addend).wrapping_sub(target_ref as *mut _ as usize);
-            if verbose_log { trace!("                    target_ptr: {:#X}, source_val: {:#X} (from sec_vaddr {:#X})", target_ref as *mut _ as usize, source_val, source_sec_vaddr); }
-            *target_ref = source_val as u32;
-        }
-        R_X86_64_PC64 => {
-            let target_ref: &mut u64 = target_sec_mapped_pages.as_type_mut(target_offset)?;
-            let source_val = source_sec_vaddr.value().wrapping_add(relocation_entry.addend).wrapping_sub(target_ref as *mut _ as usize);
-            if verbose_log { trace!("                    target_ptr: {:#X}, source_val: {:#X} (from sec_vaddr {:#X})", target_ref as *mut _ as usize, source_val, source_sec_vaddr); }
-            *target_ref = source_val as u64;
-        }
-        // R_X86_64_GOTPCREL => { 
-        //     unimplemented!(); // if we stop using the large code model, we need to create a Global Offset Table
-        // }
-        _ => {
-            error!("found unsupported relocation type {}\n  --> Are you compiling crates with 'code-model=large'?", relocation_entry.typ);
-            return Err("found unsupported relocation type. Are you compiling crates with 'code-model=large'?");
-        }
-    }
-
-    Ok(())
 }
 
 

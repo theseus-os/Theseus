@@ -25,7 +25,8 @@ use alloc::{
 use spin::Once;
 use getopts::{Matches, Options};
 use mod_mgmt::{
-    metadata::{StrongCrateRef, StrongSectionRef},
+    StrongCrateRef,
+    StrongSectionRef,
     CrateNamespace,
 };
 use crate_name_utils::get_containing_crate_name;
