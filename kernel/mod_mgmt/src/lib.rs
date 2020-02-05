@@ -25,8 +25,10 @@ extern crate path;
 extern crate memfs;
 extern crate hpet;
 extern crate cstr_core;
+extern crate by_address;
 
 use core::ops::{DerefMut, Deref, Range};
+use core::fmt;
 use alloc::{
     vec::Vec,
     collections::{BTreeMap, btree_map, BTreeSet},
@@ -34,6 +36,7 @@ use alloc::{
     sync::{Arc, Weak},
 };
 use spin::{Mutex, Once};
+use by_address::ByAddress;
 
 use xmas_elf::{
     ElfFile,
@@ -109,6 +112,23 @@ pub fn create_application_namespace(recursive_namespace: Option<Arc<CrateNamespa
     ));
 
     Ok(new_app_namespace)
+}
+
+
+/// Returns the crate name that is derived from a crate object file path.
+/// 
+/// # Examples of acceptable paths
+/// Legal paths can:
+/// * be absolute or relative,
+/// * optionally end with an extension, e.g., `".o"`,   optionally start 
+/// * optionally start with a module file prefix, e.g., `"k#my_crate-<hash>.o"`.
+pub fn crate_name_from_path<'p>(object_file_path: &'p Path) -> &'p str {
+    let stem = object_file_path.file_stem();
+    if let Ok((_crate_type, _prefix, name)) = CrateType::from_module_name(stem) {
+        name
+    } else {
+        stem
+    }
 }
 
 
@@ -193,18 +213,48 @@ fn parse_bootloader_modules_into_files(
 }
 
 
+/// A type that can be converted into a crate object file.
+/// We use an enum rather than implement `TryInto` because we need additional information
+/// to resolve a prefix path.
+pub enum IntoCrateObjectFile {
+    /// A direct reference to the crate object file. This will be used as-is. 
+    File(FileRef),
+    /// An absolute path that points to the crate object file. 
+    AbsolutePath(Path),
+    /// A string prefix that will be used to search for the crate object file in the namespace.
+    /// This must be able to uniquely identify a single crate object file in the namespace directory (recursively searched). 
+    Prefix(String),
+}
+impl fmt::Debug for IntoCrateObjectFile {
+    fn fmt(&self, f: &mut fmt::Formatter) -> fmt::Result {
+        let mut dbg = f.debug_struct("IntoCrateObjectFile");
+        match self {
+            Self::File(object_file) => dbg.field("File", &object_file.try_lock()
+                .map(|f| f.get_absolute_path())
+                .unwrap_or_else(|| format!("<Locked>"))
+            ),
+            Self::AbsolutePath(p) => dbg.field("AbsolutePath", p),
+            Self::Prefix(prefix) => dbg.field("Prefix", prefix),
+        };
+        dbg.finish()
+    }
+}
+
+
+
 /// A list of one or more `SwapRequest`s that is used by the `swap_crates` function.
 pub type SwapRequestList = Vec<SwapRequest>;
   
 
 /// This struct is used to specify the details of a crate-swapping operation,
-/// in which an "old" crate is removed and replaced with a "new" crate
-/// that is then used in place of that old crate. 
+/// in which an "old" crate is replaced with a "new" crate that is then used in place of that old crate. 
+/// The old crate is removed from its old `CrateNamespace` while the new crate 
+/// is added to the new `CrateNamespace`; typically the old and new namespaces are the same. 
 /// 
-/// # Important Note
+/// # Important Note: Reexporting Symbols
 /// When swapping out an old crate, the new crate must satisfy all of the dependencies
 /// that other crates had on that old crate. 
-/// However, the swapping procedure will completely remove the old crate and its symbols from that `CrateNamespace`,
+/// However, the swapping procedure will completely remove the old crate and its symbols from its containing `CrateNamespace`,
 /// so it may be useful to re-expose or "mirror" the new crate's sections as symbols with names 
 /// that match the relevant sections from the old crate.
 /// This satisfies other crates' dependenices on the old crate while allowing the new crate to exist normally,
@@ -221,42 +271,255 @@ pub type SwapRequestList = Vec<SwapRequest>;
 /// because you will likely need to swap far fewer crates at once, 
 /// and as a convenience bonus, you don't have to specify the exact versions (hashes) of each crate.
 /// 
-/// Example: the function `drivers::init::h...` in the `drivers` crate depends 
-/// on the function `keyboard::init::hABC` in the `keyboard` crate.
+/// ## Example of Reexporting Symbols
+/// There exists a function `drivers::init::h...` in the `drivers` crate 
+/// that depends on the function `keyboard::init::hABC` in the `keyboard` crate.
 /// We call `swap_crates()` to replace the `keyboard` crate with a new crate called `keyboard_new`.
-/// The new `keyboard_new` crate has a function called `keyboard_new::init::hDEF`, 
-/// which now appears in the symbols map twice: 
-/// * one symbol `keyboard_new::init::hDEF`, which is the normal behavior when loading a crate, and
-/// * one symbol `keyboard::init::hABC`, which exactly matches the function from the old `keyboard` crate.
+/// 
+/// If `reexport_new_symbols_as_old` is `true`, the new `keyboard_new` crate's function called `keyboard_new::init::hDEF`
+/// will now appear in the namespace's symbol map twice: 
+/// 1. in its normal form `keyboard_new::init::hDEF`, which is the normal behavior when loading a crate, and
+/// 2. in its reexported form `keyboard::init::hABC`, which exactly matches the function from the old `keyboard` crate.
+/// 
 /// In this way, the single function in the new crate `keyboard_new` appears twice in the symbol map
 /// under different names, allowing it to fulfill dependencies on both the old crate and the new crate.
+/// In general, this option is not needed. 
 /// 
-#[derive(Debug, Eq, PartialEq, Hash)]
+#[derive(Eq, PartialEq, Hash)]
 pub struct SwapRequest {
-    /// The name of the old crate that will be replaced by the new crate.
+    // Note: the usage of `ByAddress` is to allow us to hash and compare reference types like Arc
+    //       to make sure that they point to the same file rather than having the same actual contents.
+    //       It makes hashing extremely cheap and fast!
+
+    /// The full name of the old crate that will be replaced by the new crate.
     /// This will be used to search the `CrateNamespace` to find an existing `LoadedCrate`.
-    old_crate_name: String,
-    /// The absolute path to the object file for the new crate that will replace the old crate. 
-    new_crate_object_file_abs_path: Path,
+    /// The `SwapRequest` constructor ensures this is fully-qualified (includes a hash value)
+    /// and is unique within the `old_namespace`.
+    old_crate_name: Option<String>,
+    /// The `CrateNamespace` that contains the given old crate, 
+    /// from which that old crate and its symbols should be removed. 
+    old_namespace: ByAddress<Arc<CrateNamespace>>,
+    /// The object file for the new crate that will replace the old crate. 
+    new_crate_object_file: ByAddress<FileRef>,
+    /// The `CrateNamespace` into which the replacement new crate and its symbols should be loaded.
+    /// Typically, this is the same namespace as the `old_namespace`.
+    new_namespace: ByAddress<Arc<CrateNamespace>>,
     /// Whether to expose the new crate's sections with symbol names that match those from the old crate.
     /// For more details, see the above docs for this struct.
     reexport_new_symbols_as_old: bool,
 }
+impl fmt::Debug for SwapRequest {
+    fn fmt(&self, f: &mut fmt::Formatter) -> fmt::Result {
+        f.debug_struct("SwapRequest")
+            .field("old_crate", &self.old_crate_name)
+            .field("old_namespace", &self.old_namespace.name)
+            .field("new_crate", &self.new_crate_object_file.try_lock()
+                .map(|f| f.get_absolute_path())
+                .unwrap_or_else(|| format!("<Locked>"))
+            )
+            .field("new_namespace", &self.new_namespace.name)
+            .field("reexport_symbols", &self.reexport_new_symbols_as_old)
+            .finish()
+    }
+}
 impl SwapRequest {
     /// Create a new `SwapRequest` that, when given to `swap_crates()`, 
     /// will swap out the given old crate and replace it with the given new crate,
-    /// and optionally re-export the new crate's symbols 
+    /// and optionally re-export the new crate's symbols.
+    /// 
+    /// # Arguments
+    /// * `old_crate_name`: the name of the old crate that should be unloaded and removed from the `old_namespace`. 
+    ///    An `old_crate_name` of `None` (or an empty string) signifies there is no old crate to be removed,
+    ///    and that only a new crate will be added.
+    /// 
+    ///    Note that `old_crate_name` can be any string prefix, so long as it can uniquely identify a crate object file
+    ///    in the given `old_namespace` or any of its recursive namespaces. 
+    ///    Thus, to be more accurate, it is wise to specify a full crate name with hash, e.g., "my_crate-<hash>".
+    /// 
+    /// * `old_namespace`: the `CrateNamespace` that contains the old crate;
+    ///    that old crate and its symbols will be removed from this namespace. 
+    /// 
+    ///    If `old_crate_name` is `None`, then `old_namespace` should be the same namespace 
+    ///    as the `this_namespace` argument that `swap_crates()` is invoked with. 
+    /// 
+    /// * `new_crate_object_file`: a type that can be converted into a crate object file.
+    ///    This can either be a direct reference to the file, an absolute `Path` that points to the file,
+    ///    or a prefix string used to find the file in the new namespace's directory of crate object files. 
+    /// 
+    /// * `new_namespace`: the `CrateNamespace` to which the new crate will be loaded and its symbols added.
+    ///    If `None`, then the new crate will be loaded into the `old_namespace`, which is a common case for swapping. 
+    /// * `reexport_new_symbols_as_old`: if `true`, all public symbols the new crate will be reexported
+    ///    in the `new_namespace` with the same full name those symbols had from the old crate in the `old_namespace`. 
+    ///    See the "Important Note" in the struct-level documentation for more details.
+    /// 
     pub fn new(
-        old_crate_name: String, 
-        new_crate_object_file_abs_path: Path, 
+        // We could change this to `Option<&str>`
+        old_crate_name: Option<&str>,
+        old_namespace: Arc<CrateNamespace>,
+        new_crate_object_file: IntoCrateObjectFile,
+        new_namespace: Option<Arc<CrateNamespace>>,
         reexport_new_symbols_as_old: bool,
-    ) -> Result<SwapRequest, &'static str> {
-        if new_crate_object_file_abs_path.is_absolute() {
-            Ok( SwapRequest { old_crate_name, new_crate_object_file_abs_path, reexport_new_symbols_as_old } )
+    ) -> Result<SwapRequest, InvalidSwapRequest> {
+        // Check that the old crate is actually in the old namespace; 
+        // it may be currently loaded into the old namespace, 
+        // but if not, we look to see if its crate object file is there.
+        let (old_crate_full_name, real_old_namespace) = match old_crate_name {
+            None | Some("") => {
+                // If the old crate name is empty, that means there is no old crate to replace. 
+                (None, &old_namespace)
+            }    
+            Some(ocn) => {
+                // Look for a single loaded crate that matches the `old_crate_name` prefix.
+                let mut matching_crates = CrateNamespace::get_crates_starting_with(&old_namespace, ocn);
+                if matching_crates.len() == 1 {
+                    let (old_crate_full_name, _ocr, real_old_namespace) = matching_crates.remove(0);
+                    (Some(old_crate_full_name), real_old_namespace)
+                } else {
+                    // If we couldn't find a single loaded crate, then the old crate may not be loaded yet. 
+                    // Thus, we should instead look for a single crate **object file** that matches the `old_crate_name` prefix.
+                    let mut matching_files = CrateNamespace::get_crate_object_files_starting_with(&old_namespace, ocn);
+                    if matching_files.len() == 1 {
+                        let (old_crate_file, real_old_namespace) = matching_files.remove(0);
+                        let old_crate_file_path = Path::new(old_crate_file.lock().get_name());
+                        let old_crate_full_name = crate_name_from_path(&old_crate_file_path).to_string();
+                        (Some(old_crate_full_name), real_old_namespace)
+                    } else {
+                        // Here, we couldn't find a single matching loaded crate or crate object file, so we return an error. 
+                        let matches_vec = if !matching_crates.is_empty() {
+                            matching_crates.into_iter().map(|(c_name, _c_ref, ns)| (c_name, Arc::clone(ns))).collect::<Vec<_>>()
+                        } else if !matching_files.is_empty() {
+                            matching_files.into_iter()
+                                .map(|(file, ns)| (
+                                    file.try_lock().map(|f| f.get_absolute_path()).unwrap_or_else(|| format!("<Locked>")),
+                                    Arc::clone(ns)
+                                ))
+                                .collect::<Vec<_>>()
+                        } else {
+                            Vec::new()
+                        };
+                        return Err(InvalidSwapRequest::OldCrateNotFound(
+                            old_crate_name.map(ToString::to_string),
+                            old_namespace,
+                            matches_vec,
+                        ));
+                    }
+
+                }
+
+            }
+        };
+
+        if !Arc::ptr_eq(&old_namespace, real_old_namespace) {
+            trace!("SwapRequest::new(): changing old namespace from {:?} to {:?}", old_namespace.name, real_old_namespace.name);
         }
-        else {
-            Err("new_crate_object_file_abs_path was not an absolute Path")
-        }
+        
+        // If no new namespace was given, use the same namespace that the old crate was found in.
+        let mut new_namespace = new_namespace.unwrap_or_else(|| {
+            trace!("SwapRequest::new(): new namespace was None, using old namespace {:?}", real_old_namespace.name);
+            Arc::clone(real_old_namespace)
+        });
+
+        // Try to resolve the new crate argument into an actual file.
+        let verified_new_crate_file = match new_crate_object_file {
+            IntoCrateObjectFile::File(f) => f,
+            IntoCrateObjectFile::AbsolutePath(path) => match Path::get_absolute(&path) {
+                Some(FileOrDir::File(f)) => f,
+                _ => if path.is_absolute() {
+                    return Err(InvalidSwapRequest::NewCrateAbsolutePathNotFound(path));
+                } else {
+                    return Err(InvalidSwapRequest::NewCratePathNotAbsolute(path));
+                },
+            }
+            IntoCrateObjectFile::Prefix(prefix) => {
+                let (new_crate_file, real_new_namespace) = {
+                    let mut matching_files = CrateNamespace::get_crate_object_files_starting_with(&new_namespace, &prefix);
+                    if matching_files.len() == 1 {
+                        matching_files.remove(0)
+                    } else {
+                        return Err(InvalidSwapRequest::NewCratePrefixNotFound(
+                            prefix, 
+                            Arc::clone(&new_namespace),
+                            matching_files.into_iter().map(|(f, ns_ref)| (f, Arc::clone(ns_ref))).collect::<Vec<_>>()
+                        ));
+                    }
+                };
+                if !Arc::ptr_eq(&new_namespace, real_new_namespace) {
+                    trace!("SwapRequest::new(): changing new namespace from {:?} to {:?}", new_namespace.name, real_new_namespace.name);
+                    new_namespace = Arc::clone(real_new_namespace);
+                }
+                new_crate_file
+            }
+        };
+
+        Ok(SwapRequest {
+            old_crate_name: old_crate_full_name,
+            old_namespace: ByAddress(Arc::clone(real_old_namespace)),
+            new_crate_object_file: ByAddress(verified_new_crate_file),
+            new_namespace: ByAddress(new_namespace),
+            reexport_new_symbols_as_old,
+        })
+    }
+}
+
+/// The possible errors that can occur when trying to create a valid `SwapRequest`. 
+pub enum InvalidSwapRequest {
+    /// The old crate was not found in the old `CrateNamespace`.
+    /// The enclosed `String` is the `old_crate_name` passed into `SwapRequest::new()`.
+    /// The enclosed vector is the list of matching crate names or crate object file names 
+    /// along with the `CrateNamespace` in which they were found. 
+    OldCrateNotFound(Option<String>, Arc<CrateNamespace>, Vec<(String, Arc<CrateNamespace>)>),
+    /// The given absolute `Path` for the new crate object file could not be resolved.
+    NewCrateAbsolutePathNotFound(Path),
+    /// The given `Path` for the new crate object file was not an absolute path, as expected.
+    NewCratePathNotAbsolute(Path),
+    /// A single crate object file could not be found by matching the given prefix `String`
+    /// within the given new `CrateNamespace` (which was searched recursively).
+    /// Either zero or multiple crate object files matched the prefix,
+    /// the results of the match are given by the enclosed vector. 
+    NewCratePrefixNotFound(String, Arc<CrateNamespace>, Vec<(FileRef, Arc<CrateNamespace>)>),
+}
+impl fmt::Debug for InvalidSwapRequest {
+    fn fmt(&self, f: &mut fmt::Formatter) -> fmt::Result {
+        let mut dbg = f.debug_struct("InvalidSwapRequest");
+        match self {
+            Self::OldCrateNotFound(old_crate_name, old_namespace, matches) => {
+                if matches.is_empty() {
+                    dbg.field("reason", &"No Matches for Old Crate Name");
+                } else {
+                    dbg.field("reason", &"Multiple Matches for Old Crate Name");
+                }
+                dbg.field("old_crate_name", old_crate_name)
+                    .field("old_namespace", &old_namespace.name);
+                for (f, ns) in matches {
+                    dbg.field("match", &format!("{:?} in namespace {:?}", f, ns.name));
+                }
+            }
+            Self::NewCrateAbsolutePathNotFound(path) => {
+                dbg.field("reason", &"New Crate Absolute Path Not Found")
+                    .field("path", &path);
+            }
+            Self::NewCratePathNotAbsolute(path) => {
+                dbg.field("reason", &"New Crate Path Not Absolute")
+                    .field("path", &path);
+            }
+            Self::NewCratePrefixNotFound(prefix, new_namespace, matches) => {
+                if matches.is_empty() {
+                    dbg.field("reason", &"No Matches for New Crate File Prefix");
+                } else {
+                    dbg.field("reason", &"Multiple Matches for New Crate File Prefix");
+                }
+                dbg.field("prefix", &prefix)
+                    .field("searched in new_namespace", &new_namespace.name);
+                for (file, ns) in matches {
+                    let s = format!("{:?} in namespace {:?}",
+                        file.try_lock().map(|f| f.get_absolute_path()).unwrap_or_else(|| format!("<Locked>")),
+                        ns.name,
+                    );
+                    dbg.field("matching file", &s);
+                }
+            }
+        };
+        dbg.finish()
     }
 }
 
@@ -279,12 +542,24 @@ pub type StateTransferFunction = fn(&CrateNamespace, &CrateNamespace) -> Result<
 /// Auto-derefs into a `DirRef`.
 #[derive(Clone)] 
 pub struct NamespaceDir(DirRef);
+
 impl Deref for NamespaceDir {
     type Target = DirRef;
     fn deref(&self) -> &DirRef {
         &self.0
     }
 }
+
+impl fmt::Debug for NamespaceDir {
+    fn fmt(&self, f: &mut fmt::Formatter) -> fmt::Result {
+        if let Some(locked_dir) = self.0.try_lock() {
+            write!(f, "{:?}", locked_dir.get_absolute_path())
+        } else {
+            write!(f, "<Locked>")
+        }
+    }
+}
+
 impl NamespaceDir {
     /// Creates a new `NamespaceDir` that wraps the given `DirRef`.
     pub fn new(dir: DirRef) -> NamespaceDir {
@@ -304,10 +579,11 @@ impl NamespaceDir {
 
     /// Returns the list of files in this Directory whose name starts with the given `prefix`.
     pub fn get_files_starting_with(&self, prefix: &str) -> Vec<FileRef> {
-        let children = { self.0.lock().list() };
+        let dir_locked = self.0.lock();
+        let children = dir_locked.list();
         children.into_iter().filter_map(|name| {
             if name.starts_with(prefix) {
-                self.0.lock().get_file(&name)
+                dir_locked.get_file(&name)
             } else {
                 None
             }
@@ -332,8 +608,8 @@ impl NamespaceDir {
     /// * The name "k#keyboard-36be916209949cef.o" will look for and return the file "keyboard-36be916209949cef.o".
     /// * The name "keyboard-36be916209949cef.o" will look for and return the file "keyboard-36be916209949cef.o".
     /// * The name "a#ps.o" will look for and return the file "ps.o".
-    pub fn get_crate_object_file(&self, crate_object_file_name: &str) -> Option<FileRef> {
-        let (_crate_type, _prefix, objfilename) = CrateType::from_module_name(crate_object_file_name).ok()?;
+    pub fn get_crate_object_file(&self, crate_module_file_name: &str) -> Option<FileRef> {
+        let (_crate_type, _prefix, objfilename) = CrateType::from_module_name(crate_module_file_name).ok()?;
         self.0.lock().get_file(objfilename)
     }
 
@@ -506,19 +782,37 @@ impl CrateNamespace {
     /// that matches the given `crate_name`, if it exists in this namespace.
     /// If it does not exist in this namespace, then the recursive namespace is searched as well.
     /// 
+    /// # Important note about Return value
     /// Returns a `StrongCrateReference` that **has not** been marked as a shared crate reference,
     /// so if the caller wants to keep the returned `StrongCrateRef` as a shared crate 
     /// that jointly exists in another namespace, they should invoke the 
     /// [`CowArc::share()`](cow_arc/CowArc.share.html) function on the returned value.
     pub fn get_crate(&self, crate_name: &str) -> Option<StrongCrateRef> {
-        self.get_crate_and_namespace(crate_name).map(|(c, _ns)| c)
+        self.crate_tree.lock().get_str(crate_name)
+            .map(|c| CowArc::clone_shallow(c))
+            .or_else(|| self.recursive_namespace.as_ref().and_then(|r_ns| r_ns.get_crate(crate_name)))
     }
 
-    /// Similar to `get_crate`, but also returns the `CrateNamespace` in which the crate was found.
-    pub fn get_crate_and_namespace(&self, crate_name: &str) -> Option<(StrongCrateRef, &CrateNamespace)> {
-        self.crate_tree.lock().get_str(crate_name)
-            .map(|c| (CowArc::clone_shallow(c), self))
-            .or_else(|| self.recursive_namespace.as_ref().and_then(|r_ns| r_ns.get_crate_and_namespace(crate_name)))
+    /// Acquires the lock on this `CrateNamespace`'s crate list and returns the crate 
+    /// that matches the given `crate_name`, if it exists in this namespace.
+    /// If it does not exist in this namespace, then the recursive namespace is searched as well.
+    ///
+    /// This function is similar to the [`get_crate`](#method.get_crate) method,
+    /// but it also returns the `CrateNamespace` in which the crate was found.
+    /// It is an associated function rather than a method so it can operate on `Arc<CrateNamespace>`s.
+    /// 
+    /// # Important note about Return value
+    /// Returns a `StrongCrateReference` that **has not** been marked as a shared crate reference,
+    /// so if the caller wants to keep the returned `StrongCrateRef` as a shared crate 
+    /// that jointly exists in another namespace, they should invoke the 
+    /// [`CowArc::share()`](cow_arc/CowArc.share.html) function on the returned value.
+    pub fn get_crate_and_namespace<'n>(
+        namespace: &'n Arc<CrateNamespace>,
+        crate_name: &str
+    ) -> Option<(StrongCrateRef, &'n Arc<CrateNamespace>)> {
+        namespace.crate_tree.lock().get_str(crate_name)
+            .map(|c| (CowArc::clone_shallow(c), namespace))
+            .or_else(|| namespace.recursive_namespace.as_ref().and_then(|r_ns| Self::get_crate_and_namespace(r_ns, crate_name)))
     }
 
     /// Finds the `LoadedCrate`s whose names start with the given `crate_name_prefix`.
@@ -538,16 +832,19 @@ impl CrateNamespace {
     /// * This `CrateNamespace` contains the crates `my_crate-843a613894da0c24` and 
     ///   `my_crate_new-933a635894ce0f12`. 
     ///   Calling `get_crates_starting_with("my_crate")` will return both crates,
-    pub fn get_crates_starting_with(&self, crate_name_prefix: &str) -> Vec<(String, StrongCrateRef, &CrateNamespace)> { 
+    pub fn get_crates_starting_with<'n>(
+        namespace: &'n Arc<CrateNamespace>,
+        crate_name_prefix: &str
+    ) -> Vec<(String, StrongCrateRef, &'n Arc<CrateNamespace>)> { 
         // First, we make a list of matching crates in this namespace. 
-        let crates = self.crate_tree.lock();
-        let mut crates_in_this_namespace: Vec<(String, StrongCrateRef, &CrateNamespace)> = crates.iter_prefix_str(crate_name_prefix)
-            .map(|(key, val)| (key.clone().into(), val.clone_shallow(), self))
-            .collect();
+        let crates = namespace.crate_tree.lock();
+        let mut crates_in_this_namespace = crates.iter_prefix_str(crate_name_prefix)
+            .map(|(key, val)| (key.clone().into(), val.clone_shallow(), namespace))
+            .collect::<Vec<_>>();
 
         // Second, we make a similar list for the recursive namespace.
-        let mut crates_in_recursive_namespace = self.recursive_namespace().as_ref()
-            .map(|r_ns| r_ns.get_crates_starting_with(crate_name_prefix))
+        let mut crates_in_recursive_namespace = namespace.recursive_namespace.as_ref()
+            .map(|r_ns| Self::get_crates_starting_with(r_ns, crate_name_prefix))
             .unwrap_or_default();
 
         // Third, we combine the lists into one list that spans all namespaces.
@@ -576,9 +873,93 @@ impl CrateNamespace {
     ///   Calling `get_crate_starting_with("my_crate")` will return None,
     ///   because it will match both `my_crate` and `my_crate_new`. 
     ///   To match only `my_crate`, call this function as `get_crate_starting_with("my_crate-")`.
-    pub fn get_crate_starting_with(&self, crate_name_prefix: &str) -> Option<(String, StrongCrateRef, &CrateNamespace)> { 
-        let mut crates_iter = self.get_crates_starting_with(crate_name_prefix).into_iter();    
+    pub fn get_crate_starting_with<'n>(
+        namespace: &'n Arc<CrateNamespace>,
+        crate_name_prefix: &str
+    ) -> Option<(String, StrongCrateRef, &'n Arc<CrateNamespace>)> { 
+        let mut crates_iter = Self::get_crates_starting_with(namespace, crate_name_prefix).into_iter();
         crates_iter.next().filter(|_| crates_iter.next().is_none()) // ensure single element
+    }
+
+    /// Like [`get_crates_starting_with()`](#method.get_crates_starting_with),
+    /// but for crate *object file*s instead of loaded crates. 
+    /// 
+    /// Returns a list of matching object files and the namespace in which they were found,
+    /// inclusive of recursive namespaces.
+    pub fn get_crate_object_files_starting_with<'n>(
+        namespace: &'n Arc<CrateNamespace>,
+        file_name_prefix: &str
+    ) -> Vec<(FileRef, &'n Arc<CrateNamespace>)> { 
+        // First, we make a list of matching files in this namespace. 
+        let mut files = namespace.dir
+            .get_files_starting_with(file_name_prefix)
+            .into_iter()
+            .map(|f| (f, namespace))
+            .collect::<Vec<_>>();
+
+        // Second, we make a similar list for the recursive namespace.
+        let mut files_in_recursive_namespace = namespace.recursive_namespace.as_ref()
+            .map(|r_ns| Self::get_crate_object_files_starting_with(r_ns, file_name_prefix))
+            .unwrap_or_default();
+
+        // Third, we combine the lists into one list that spans all namespaces.
+        files.append(&mut files_in_recursive_namespace);
+        files        
+    }
+
+    /// Like [`get_crate_starting_with()`](#method.get_crate_starting_with),
+    /// but for crate *object file*s instead of loaded crates. 
+    /// 
+    /// Returns the matching object file and the namespace in which it was found,
+    /// if and only if there was a single match (inclusive of recursive namespaces).
+    pub fn get_crate_object_file_starting_with<'n>(
+        namespace: &'n Arc<CrateNamespace>,
+        file_name_prefix: &str
+    ) -> Option<(FileRef, &'n Arc<CrateNamespace>)> { 
+        let mut files_iter = Self::get_crate_object_files_starting_with(namespace, file_name_prefix).into_iter();
+        files_iter.next().filter(|_| files_iter.next().is_none()) // ensure single element
+    }
+
+
+    /// Same as `get_crate_object_files_starting_with()`,
+    /// but is a method instead of an associated function,
+    /// and also returns `&CrateNamespace` instead of `&Arc<CrateNamespace>`.
+    /// 
+    /// This is only necessary because I can't figure out how to make a generic function
+    /// that accepts and returns either `&CrateNamespace` or `&Arc<CrateNamespace>`.
+    fn method_get_crate_object_files_starting_with(
+        &self,
+        file_name_prefix: &str
+    ) -> Vec<(FileRef, &CrateNamespace)> { 
+        // First, we make a list of matching files in this namespace. 
+        let mut files = self.dir
+            .get_files_starting_with(file_name_prefix)
+            .into_iter()
+            .map(|f| (f, self))
+            .collect::<Vec<_>>();
+
+        // Second, we make a similar list for the recursive namespace.
+        let mut files_in_recursive_namespace = self.recursive_namespace.as_ref()
+            .map(|r_ns| r_ns.method_get_crate_object_files_starting_with(file_name_prefix))
+            .unwrap_or_default();
+
+        // Third, we combine the lists into one list that spans all namespaces.
+        files.append(&mut files_in_recursive_namespace);
+        files        
+    }
+
+    /// Same as `get_crate_object_file_starting_with()`,
+    /// but is a method instead of an associated function,
+    /// and also returns `&CrateNamespace` instead of `&Arc<CrateNamespace>`.
+    /// 
+    /// This is only necessary because I can't figure out how to make a generic function
+    /// that accepts and returns either `&CrateNamespace` or `&Arc<CrateNamespace>`.
+    fn method_get_crate_object_file_starting_with(
+        &self,
+        file_name_prefix: &str
+    ) -> Option<(FileRef, &CrateNamespace)> { 
+        let mut files_iter = self.method_get_crate_object_files_starting_with(file_name_prefix).into_iter();
+        files_iter.next().filter(|_| files_iter.next().is_none()) // ensure single element
     }
 
     /// Loads the specified application crate into memory, allowing it to be invoked.
@@ -592,16 +973,16 @@ impl CrateNamespace {
     /// Returns a Result containing the new crate itself.
     pub fn load_crate_as_application(
         &self, 
-        crate_file_path: &Path, 
+        crate_object_file: &FileRef, 
         kernel_mmi_ref: &MmiRef, 
         load_symbols_as_singleton: bool,
         verbose_log: bool
     ) -> Result<StrongCrateRef, &'static str> {
         
-        debug!("load_crate_as_application: trying to load application crate {:?}", crate_file_path);
+        debug!("load_crate_as_application(): trying to load application crate at {:?}", crate_object_file.lock().get_absolute_path());
         // Don't use a backup namespace when loading applications, 
         // it must be able to find all symbols in only this namespace (&self) and its backing namespaces.
-        let new_crate_ref = self.load_crate_internal(crate_file_path, None, kernel_mmi_ref, verbose_log)?;
+        let new_crate_ref = self.load_crate_internal(crate_object_file, None, kernel_mmi_ref, verbose_log)?;
 
         if load_symbols_as_singleton {
             // if this is a singleton application, we add its public symbols (except "main")
@@ -613,7 +994,7 @@ impl CrateNamespace {
             self.crate_tree.lock().insert_str(&new_crate.crate_name, CowArc::clone_shallow(&new_crate_ref));
         } else {
             let new_crate = new_crate_ref.lock_as_ref();
-            info!("loaded new application crate module: {}, num sections: {}", new_crate.crate_name, new_crate.sections.len());
+            info!("loaded new application crate: {}, num sections: {}", new_crate.crate_name, new_crate.sections.len());
         }
         Ok(new_crate_ref)
     }
@@ -624,7 +1005,7 @@ impl CrateNamespace {
     /// as a result of loading this crate.
     /// 
     /// # Arguments
-    /// * `crate_file_path`: the path to the crate object file that will be loaded into this `CrateNamespace`.
+    /// * `crate_object_file`: the crate object file that will be loaded into this `CrateNamespace`.
     /// * `temp_backup_namespace`: the `CrateNamespace` that should be searched for missing symbols 
     ///   (for relocations) if a symbol cannot be found in this `CrateNamespace`. 
     ///   If `temp_backup_namespace` is `None`, then no other namespace will be searched, 
@@ -633,15 +1014,15 @@ impl CrateNamespace {
     /// * `verbose_log`: a boolean value whether to enable verbose_log logging of crate loading actions.
     pub fn load_crate(
         &self,
-        crate_file_path: &Path,
+        crate_object_file: &FileRef,
         temp_backup_namespace: Option<&CrateNamespace>, 
         kernel_mmi_ref: &MmiRef, 
         verbose_log: bool
     ) -> Result<usize, &'static str> {
 
         #[cfg(not(loscd_eval))]
-        debug!("load_crate: trying to load crate {}", crate_file_path);
-        let new_crate_ref = self.load_crate_internal(crate_file_path, temp_backup_namespace, kernel_mmi_ref, verbose_log)?;
+        debug!("load_crate: trying to load crate at {:?}", crate_object_file.lock().get_absolute_path());
+        let new_crate_ref = self.load_crate_internal(crate_object_file, temp_backup_namespace, kernel_mmi_ref, verbose_log)?;
         
         let (new_crate_name, new_syms) = {
             let new_crate = new_crate_ref.lock_as_ref();
@@ -660,20 +1041,13 @@ impl CrateNamespace {
     /// but does not add the crate nor its symbols to this namespace. 
     /// See [`load_crate`](#method.load_crate) and [`load_crate_as_application`](#method.load_crate_as_application).
     fn load_crate_internal(&self,
-        crate_file_path: &Path,
+        crate_object_file: &FileRef,
         temp_backup_namespace: Option<&CrateNamespace>, 
         kernel_mmi_ref: &MmiRef, 
         verbose_log: bool
     ) -> Result<StrongCrateRef, &'static str> {
-
-        let crate_file_ref = match crate_file_path.get(&self.dir)
-            .or_else(|| Path::new(format!("{}.o", crate_file_path)).get(&self.dir)) // retry with the ".o" extension
-        {
-            Some(FileOrDir::File(f)) => f,
-            _ => return Err("couldn't find specified crate file path"),
-        };
-        let crate_file = crate_file_ref.lock();
-        let (new_crate_ref, elf_file) = self.load_crate_sections(crate_file.deref(), kernel_mmi_ref, verbose_log)?;
+        let cf = crate_object_file.lock();
+        let (new_crate_ref, elf_file) = self.load_crate_sections(cf.deref(), kernel_mmi_ref, verbose_log)?;
         self.perform_relocations(&elf_file, &new_crate_ref, temp_backup_namespace, kernel_mmi_ref, verbose_log)?;
         Ok(new_crate_ref)
     }
@@ -688,43 +1062,30 @@ impl CrateNamespace {
     /// # Example
     /// If crate `A` depends on crate `B`, and crate `B` depends on crate `A`,
     /// this function will load both crate `A` and `B` before trying to resolve their dependencies individually. 
-    pub fn load_crates<'p, I>(
+    pub fn load_crates<'f, I>(
         &self,
-        crate_file_paths: I,
+        crate_files: I,
         temp_backup_namespace: Option<&CrateNamespace>,
         kernel_mmi_ref: &MmiRef,
         verbose_log: bool,
     ) -> Result<(), &'static str> 
-        where I: Iterator<Item = &'p Path>
+        where I: Iterator<Item = &'f FileRef>
     {
-        // first, validate all of the crate paths by turning them into direct file references
-        let mut crate_files: Vec<FileRef> = Vec::new();
-        for crate_file_path in crate_file_paths {
-            let crate_file_ref: FileRef = match crate_file_path.get(&self.dir) {
-                Some(FileOrDir::File(f)) => f,
-                _ => {
-                    error!("Couldn't find specified crate file path: {:?}", crate_file_path);
-                    return Err("couldn't find specified crate file path");
-                }
-            };
-            crate_files.push(crate_file_ref);
-        }
-
-        // second, lock all of the crate object files
-        let mut locked_crate_files = Vec::with_capacity(crate_files.len());
-        for crate_file_ref in &crate_files {
+        // First, lock all of the crate object files.
+        let mut locked_crate_files = Vec::new();
+        for crate_file_ref in crate_files {
             locked_crate_files.push(crate_file_ref.lock());
         }
 
-        // third, do all of the section parsing and loading
-        let mut partially_loaded_crates: Vec<(StrongCrateRef, ElfFile)> = Vec::with_capacity(crate_files.len()); 
+        // Second, do all of the section parsing and loading.
+        let mut partially_loaded_crates: Vec<(StrongCrateRef, ElfFile)> = Vec::with_capacity(locked_crate_files.len()); 
         for locked_crate_file in &locked_crate_files {            
             let (new_crate_ref, elf_file) = self.load_crate_sections(locked_crate_file.deref(), kernel_mmi_ref, verbose_log)?;
             let _new_syms = self.add_symbols(new_crate_ref.lock_as_ref().sections.values(), verbose_log);
             partially_loaded_crates.push((new_crate_ref, elf_file));
         }
         
-        // finally, we do all of the relocations 
+        // Finally, we do all of the relocations.
         for (new_crate_ref, elf_file) in partially_loaded_crates {
             self.perform_relocations(&elf_file, &new_crate_ref, temp_backup_namespace, kernel_mmi_ref, verbose_log)?;
             let name = new_crate_ref.lock_as_ref().crate_name.clone();
@@ -779,10 +1140,10 @@ impl CrateNamespace {
     /// 3) Remove crate `C` and clean it up, e.g., removing its entries from the symbol map.
     ///    Save the removed crate (and its symbol subtrie) in a cache for later use to expedite future swapping operations.
     /// 
-    /// This `CrateNamespace` (self) is used as the backup namespace for resolving unknown symbols,
+    /// The given `CrateNamespace` is used as the backup namespace for resolving unknown symbols,
     /// in adddition to any recursive namespaces on which this namespace depends.
     /// 
-    /// Upon a successful return, this namespace (self) will have the new crates in place of the old ones,
+    /// Upon a successful return, this namespacewill have the new crates in place of the old ones,
     /// and the old crates will be completely removed from this namespace. 
     /// In this namespace there will be no remaining dependencies on the old crates, 
     /// although crates in other namespaces may still include and depend upon those old crates.
@@ -793,8 +1154,7 @@ impl CrateNamespace {
     ///   such as a new crate linking against an old crate that already exists in this namespace
     ///   instead of linking against the new one that we want to replace that old crate with. 
     /// * `override_namespace_dir`: the directories of object files from which missing crates should be loaded.
-    ///   If a crate cannot be found in this directory set, the current namespace's (self's) directory set 
-    ///   will be searched for the crate. 
+    ///   If a crate cannot be found in this directory set, this namespace's directory set will be searched for the crate. 
     ///   If `None`, only this `CrateNamespace`'s directory set will be used to find missing crates to be loaded.
     /// * `state_transfer_functions`: the fully-qualified symbol names of the state transfer functions, 
     ///   arbitrary functions that are invoked after all of the new crates are loaded but before the old crates are unloaded, 
@@ -814,16 +1174,12 @@ impl CrateNamespace {
     /// other crates will be swapped alongside that one. 
     /// It will most likely error out, but this responsibility is currently left to the caller.
     /// 
-    /// # Enabling swapping optimizations
+    /// # Crate swapping optimizations
     /// When one or more crates is swapped out, they are not fully unloaded, but rather saved in a cache
     /// in order to accelerate future swapping commands. 
-    /// You must use full absolute `Path`s in the given list of `swap_requests` to ensure that the 
-    /// optimizer can find the correct previously-swapped out crate cache.
-    /// This is because in order for the cached crates to be found, 
-    /// the swap request list must be the exact inverse of a prior swap request list. 
     /// 
     pub fn swap_crates(
-        &self,
+        this_namespace: &Arc<CrateNamespace>,
         swap_requests: SwapRequestList,
         override_namespace_dir: Option<NamespaceDir>,
         state_transfer_functions: Vec<String>,
@@ -848,7 +1204,7 @@ impl CrateNamespace {
             #[cfg(not(loscd_eval))] {
                 // First, before we perform any expensive crate loading, let's try an optimization
                 // based on cached crates that were unloaded during a previous swap operation. 
-                if let Some(cached_crates) = self.unloaded_crate_cache.lock().remove(&swap_requests) {
+                if let Some(cached_crates) = this_namespace.unloaded_crate_cache.lock().remove(&swap_requests) {
                     warn!("Using optimized swap routine to swap in cached crates: {:?}", cached_crates.crate_names(true));
                     (cached_crates, true)
                 } else {
@@ -857,11 +1213,11 @@ impl CrateNamespace {
                     let nn = CrateNamespace::new(
                         String::from("temp_swap"), // format!("temp_swap--{:?}", swap_requests), 
                         // use the optionally-provided directory of crates instead of the current namespace's directories.
-                        override_namespace_dir.unwrap_or_else(|| self.dir.clone()),
+                        override_namespace_dir.unwrap_or_else(|| this_namespace.dir.clone()),
                         None,
                     );
-                    let crate_file_iter = swap_requests.iter().map(|swap_req| &swap_req.new_crate_object_file_abs_path);
-                    nn.load_crates(crate_file_iter, Some(self), kernel_mmi_ref, verbose_log)?;
+                    let crate_file_iter = swap_requests.iter().map(|swap_req| swap_req.new_crate_object_file.deref());
+                    nn.load_crates(crate_file_iter, Some(this_namespace), kernel_mmi_ref, verbose_log)?;
                     (nn, false)
                 }
             }
@@ -869,11 +1225,11 @@ impl CrateNamespace {
                 let nn = CrateNamespace::new(
                     String::from("temp_swap"), // format!("temp_swap--{:?}", swap_requests), 
                     // use the optionally-provided directory of crates instead of the current namespace's directories.
-                    override_namespace_dirs.unwrap_or_else(|| self.dir.clone()),
+                    override_namespace_dirs.unwrap_or_else(|| this_namespace.dir.clone()),
                     None,
                 );
-                let crate_file_iter = swap_requests.iter().map(|swap_req| &swap_req.new_crate_object_file_abs_path);
-                nn.load_crates(crate_file_iter, Some(self), kernel_mmi_ref, verbose_log)?;
+                let crate_file_iter = swap_requests.iter().map(|swap_req| swap_req.new_crate_object_file.deref());
+                nn.load_crates(crate_file_iter, Some(this_namespace), kernel_mmi_ref, verbose_log)?;
                 (nn, false)
             }
         };
@@ -886,7 +1242,7 @@ impl CrateNamespace {
         #[cfg(not(loscd_eval))]
         let cached_crates: CrateNamespace = CrateNamespace::new(
             format!("cached_crates--{:?}", swap_requests), 
-            self.dir.clone(),
+            this_namespace.dir.clone(),
             None
         );
 
@@ -900,51 +1256,52 @@ impl CrateNamespace {
         #[cfg(loscd_eval)]
         let mut hpet_total_bss_transfer = 0;
 
-        // The namespace that each old_crate was found in, one per swap request. 
-        // This is useful because we need to know which namespace to insert the new replacement crate into.
-        let mut namespaces_containing_old_crates: Vec<&CrateNamespace> = Vec::with_capacity(swap_requests.len());
+        // The name of the new crate in each swap request. There is one entry per swap request.
+        let mut new_crate_names: Vec<String> = Vec::with_capacity(swap_requests.len());
 
         // Now that we have loaded all of the new modules into the new namepsace in isolation,
         // we simply need to fix up all of the relocations `WeakDependents` for each of the existing sections
         // that depend on the old crate that we're replacing here,
         // such that they refer to the new_module instead of the old_crate.
         for req in &swap_requests {
-            let SwapRequest { old_crate_name, new_crate_object_file_abs_path, reexport_new_symbols_as_old } = req;
-            if old_crate_name == "" {
-                // just adding a new crate, no replacements needed
-                namespaces_containing_old_crates.push(self);
-                continue; 
-            }
+            let SwapRequest { old_crate_name, old_namespace, new_crate_object_file, new_namespace: _new_ns, reexport_new_symbols_as_old } = req;
+            let old_crate_name = match old_crate_name {
+                Some(ocn) => ocn,
+                _ => {
+                    // just adding a new crate, no replacement needed
+                    new_crate_names.push(String::new());
+                    continue;
+                }
+            };
             let reexport_new_symbols_as_old = *reexport_new_symbols_as_old;
-            let new_crate_name = new_crate_object_file_abs_path.file_stem();
             
-            let (old_crate_ref, old_crate_ns) = self.get_crate_and_namespace(&*old_crate_name).ok_or_else(|| {
-                error!("swap_crates(): couldn't find requested old_crate {:?} in namespace", old_crate_name);
-                "swap_crates(): couldn't find requested old crate in namespace"
+            let (old_crate_ref, _) = CrateNamespace::get_crate_and_namespace(old_namespace, &*old_crate_name).ok_or_else(|| {
+                error!("BUG: swap_crates(): couldn't find old_crate {:?} in namespace {:?}. This should be guaranteed in SwapRequest::new()!", old_crate_name, old_namespace.name);
+                "BUG: swap_crates(): couldn't find old crate in old namespace. This should be guaranteed in SwapRequest::new()!"
             })?;
             let old_crate = old_crate_ref.lock_as_mut().ok_or_else(|| {
-                error!("TODO: swap_crates(), old_crate: {:?}, doesn't yet support deep copying shared crates to get a new exclusive mutable instance", old_crate_ref);
-                "TODO: swap_crates() doesn't yet support deep copying shared crates to get a new exclusive mutable instance"
+                error!("Unimplemented: swap_crates(), old_crate: {:?}, doesn't yet support deep copying shared crates to get a new exclusive mutable instance", old_crate_ref);
+                "Unimplemented: swap_crates() doesn't yet support deep copying shared crates to get a new exclusive mutable instance"
             })?;
-            namespaces_containing_old_crates.push(old_crate_ns);
-
+            
+            let new_crate_name = crate_name_from_path(&Path::new(new_crate_object_file.lock().get_name())).to_string();
             let new_crate_ref = if is_optimized {
                 debug!("swap_crates(): OPTIMIZED: looking for new crate {:?} in cache", new_crate_name);
-                namespace_of_new_crates.get_crate(new_crate_name)
+                namespace_of_new_crates.get_crate(&new_crate_name)
                     .ok_or_else(|| "BUG: swap_crates(): Couldn't get new crate from optimized cache")?
             } else {
                 #[cfg(not(loscd_eval))]
                 debug!("looking for newly-loaded crate {:?} in temp namespace", new_crate_name);
-                
-                namespace_of_new_crates.get_crate(new_crate_name)
+                namespace_of_new_crates.get_crate(&new_crate_name)
                     .ok_or_else(|| "BUG: Couldn't get new crate that should've just been loaded into a new temporary namespace")?
             };
+            new_crate_names.push(new_crate_name);
 
-
-            // scope the lock for `new_crate_ref`
+            // scope the lock on the `new_crate_ref`
             {
-                let mut new_crate = new_crate_ref.lock_as_mut()
-                    .ok_or_else(|| "BUG: swap_crates(): new_crate was unexpectedly shared in another namespace (couldn't get as exclusively mutable)...?")?;
+                let mut new_crate = new_crate_ref.lock_as_mut().ok_or_else(|| 
+                    "BUG: swap_crates(): new_crate was unexpectedly shared in another namespace (couldn't get as exclusively mutable)...?"
+                )?;
                 
                 // currently we're always clearing out the new crate's reexports because we recalculate them every time
                 new_crate.reexported_symbols.clear();
@@ -961,7 +1318,7 @@ impl CrateNamespace {
                 // because other crates could not possibly depend on non-public sections in the old crate.
                 for old_sec_name in &old_crate.global_symbols {
                     debug!("swap_crates(): looking for old_sec_name: {:?}", old_sec_name);
-                    let (old_sec_ref, old_sec_ns) = self.get_symbol_and_namespace(old_sec_name.as_str())
+                    let (old_sec_ref, old_sec_ns) = this_namespace.get_symbol_and_namespace(old_sec_name.as_str())
                         .and_then(|(weak_sec_ref, ns)| weak_sec_ref.upgrade().map(|sec| (sec, ns)))
                         .ok_or_else(|| {
                             error!("BUG: swap_crates(): couldn't get/upgrade old crate's section: {:?}", old_sec_name);
@@ -1003,7 +1360,7 @@ impl CrateNamespace {
                             "couldn't find section in the new crate that corresponds to a match of the old section"
                         })?;
                         #[cfg(not(loscd_eval))]
-                        debug!("swap_crates(): found match for old source_sec {:?}, new source_sec: {:?}", old_sec, new_crate_source_sec);
+                        debug!("swap_crates(): found match for old source_sec {:?}, new source_sec: {:?}", &*old_sec, &*new_crate_source_sec);
 
                         if reexport_new_symbols_as_old && old_sec.global {
                             // reexport the new source section under the old sec's name, i.e., redirect the old mapping to the new source sec
@@ -1055,7 +1412,7 @@ impl CrateNamespace {
 
                         let mut new_source_sec = new_source_sec_ref.lock();
                         #[cfg(not(loscd_eval))]
-                        debug!("    swap_crates(): target_sec: {:?}, old source sec: {:?}, new source sec: {:?}", target_sec, old_sec, new_source_sec);
+                        debug!("    swap_crates(): target_sec: {:?}, old source sec: {:?}, new source sec: {:?}", &*target_sec, &*old_sec, &*new_source_sec);
 
                         // If the target_sec's mapped pages aren't writable (which is common in the case of swapping),
                         // then we need to temporarily remap them as writable here so we can fix up the target_sec's new relocation entry.
@@ -1167,13 +1524,13 @@ impl CrateNamespace {
                     let hpet_end_bss_transfer = hpet.get_counter();
                     hpet_total_bss_transfer += (hpet_end_bss_transfer - hpet_start_bss_transfer);
                 }
-            } // end of scope, drops lock for `new_crate_ref`
-        } // end of iteration over all swap requests
+            } // end of scope, drops lock on `new_crate_ref`
+        } // end of iterating over all swap requests to fix up old crate dependents
 
 
         // apply the state transfer function, if provided
         for symbol in state_transfer_functions {
-            let state_transfer_fn_sec_ref = namespace_of_new_crates.get_symbol_or_load(&symbol, Some(self), kernel_mmi_ref, verbose_log).upgrade()
+            let state_transfer_fn_sec_ref = namespace_of_new_crates.get_symbol_or_load(&symbol, Some(this_namespace), kernel_mmi_ref, verbose_log).upgrade()
                 // as a backup, search fuzzily to accommodate state transfer function symbol names without full hashes
                 .or_else(|| namespace_of_new_crates.get_symbol_starting_with(&symbol).upgrade())
                 .ok_or("couldn't find specified state transfer function in the new CrateNamespace")?;
@@ -1185,105 +1542,134 @@ impl CrateNamespace {
                 mapped_pages.as_func::<StateTransferFunction>(state_transfer_fn_sec.mapped_pages_offset, &mut space)?
             };
             info!("swap_crates(): invoking the state transfer function {:?}", symbol);
-            st_fn(self, &namespace_of_new_crates)?;
+            st_fn(this_namespace, &namespace_of_new_crates)?;
         }
-
-        warn!("NAMESPACES_CONTAINING_OLD_CRATES: {:?}", namespaces_containing_old_crates.iter().map(|ns| &ns.name).collect::<Vec<&String>>());
 
         // Remove all of the old crates now that we're fully done using them.
         // This doesn't mean each crate will be immediately dropped -- they still might be in use by other crates or tasks.
-        {
-            for (req, old_crate_ns) in swap_requests.into_iter().zip(namespaces_containing_old_crates.into_iter()) {
-                let SwapRequest { old_crate_name, new_crate_object_file_abs_path, reexport_new_symbols_as_old } = req;
-                if old_crate_name == "" { continue; }
-                let new_crate_name = new_crate_object_file_abs_path.file_stem();
-                // Remove the old crate from the namespace that it was previously in, and remove its sections' symbols too.
-                if let Some(old_crate_ref) = old_crate_ns.crate_tree.lock().remove_str(&old_crate_name) {
-                    {
-                        let old_crate = old_crate_ref.lock_as_ref();
-                        
-                        #[cfg(not(loscd_eval))]
-                        {
-                            info!("  Removed old crate {}({}) (path {}) from namespace {}", old_crate_name, old_crate.crate_name, old_crate.object_file_abs_path, old_crate_ns.name);
-
-                            // Here, we setup the crate cache to enable the removed old crate to be quickly swapped back in in the future.
-                            // This removed old crate will be useful when a future swap request includes the following:
-                            // (1) the future `new_crate_object_file`        ==  the current `old_crate.object_file`
-                            // (2) the future `old_crate_name`               ==  the current `new_crate_name`
-                            // (3) the future `reexport_new_symbols_as_old`  ==  true if the old crate had any reexported symbols
-                            //     -- to understand this, see the docs for `LoadedCrate.reexported_prefix`
-                            let future_swap_req = SwapRequest::new(
-                                String::from(new_crate_name), 
-                                old_crate.object_file_abs_path.clone(), 
-                                !old_crate.reexported_symbols.is_empty()
-                            )?;
-                            future_swap_requests.push(future_swap_req);
-                        }
-                        
-                        // Remove all of the symbols belonging to the old crate from the namespace it was in.
-                        // If reexport_new_symbols_as_old is true, we MUST NOT remove the old_crate's symbols from this symbol map,
-                        // because we already replaced them above with mappings that redirect to the corresponding new crate sections.
-                        if !reexport_new_symbols_as_old {
-                            for symbol in &old_crate.global_symbols {
-                                if old_crate_ns.symbol_map.lock().remove(symbol).is_none() {
-                                    error!("swap_crates(): couldn't find old symbol {:?} in the old crate's namespace: {}.", symbol, old_crate_ns.name);
-                                    return Err("couldn't find old symbol {:?} in the old crate's namespace");
-                                }
-                            }
-                        }
-
-                        // If the old crate had reexported its symbols, we should remove those reexports here,
-                        // because they're no longer active since the old crate is being removed. 
-                        for sym in &old_crate.reexported_symbols {
-                            let _old_reexported_symbol = old_crate_ns.symbol_map.lock().remove(sym);
-                            if _old_reexported_symbol.is_none() {
-                                warn!("swap_crates(): the old_crate {:?}'s reexported symbol was not in its old namespace, couldn't be removed.", sym);
-                            }
-                        }
-
-                        // TODO: could maybe optimize transfer of old symbols from this namespace to cached_crates namespace 
-                        //       by saving the removed symbols above and directly adding them to the cached_crates.symbol_map instead of iterating over all old_crate.sections.
-                        //       This wil only really be faster once qp_trie supports a non-iterator-based (non-extend) Trie merging function.
-                        #[cfg(not(loscd_eval))]
-                        cached_crates.add_symbols(old_crate.sections.values(), verbose_log); 
-                    } // drops lock for `old_crate_ref`
+        for (req, new_crate_name) in swap_requests.iter().zip(new_crate_names.iter()) {
+            let SwapRequest { old_crate_name, old_namespace, new_crate_object_file: _, new_namespace, reexport_new_symbols_as_old } = req;
+            let old_crate_name = match old_crate_name {
+                Some(ocn) => ocn,
+                _ => continue,
+            };
+            // Remove the old crate from the namespace that it was previously in, and remove its sections' symbols too.
+            if let Some(old_crate_ref) = old_namespace.crate_tree.lock().remove_str(old_crate_name) {
+                {
+                    let old_crate = old_crate_ref.lock_as_ref();
                     
                     #[cfg(not(loscd_eval))]
-                    cached_crates.crate_tree.lock().insert_str(&old_crate_name, old_crate_ref);
-                    #[cfg(loscd_eval)]
-                    core::mem::forget(old_crate_ref);
-                }
-                else {
-                    error!("BUG: swap_crates(): failed to remove old crate {} from namespace {}", old_crate_name, old_crate_ns.name);
-                }
+                    {
+                        info!("  Removed old crate {:?} ({:?}) from namespace {}", old_crate_name, &*old_crate, old_namespace.name);
+
+                        // Here, we setup the crate cache to enable the removed old crate to be quickly swapped back in in the future.
+                        // This removed old crate will be useful when a future swap request includes the following:
+                        // (1) the future `new_crate_object_file`        ==  the current `old_crate.object_file`
+                        // (2) the future `old_crate_name`               ==  the current `new_crate_name`
+                        // (3) the future `reexport_new_symbols_as_old`  ==  true if the old crate had any reexported symbols
+                        //     -- to understand this, see the docs for `LoadedCrate.reexported_prefix`
+                        let future_swap_req = SwapRequest {
+                            old_crate_name: Some(new_crate_name.clone()),
+                            old_namespace: ByAddress(Arc::clone(new_namespace)),
+                            new_crate_object_file: ByAddress(old_crate.object_file.clone()),
+                            new_namespace: ByAddress(Arc::clone(old_namespace)),
+                            reexport_new_symbols_as_old: !old_crate.reexported_symbols.is_empty(),
+                        };
+                        future_swap_requests.push(future_swap_req);
+                    }
+                    
+                    // Remove all of the symbols belonging to the old crate from the namespace it was in.
+                    // If reexport_new_symbols_as_old is true, we MUST NOT remove the old_crate's symbols from this symbol map,
+                    // because we already replaced them above with mappings that redirect to the corresponding new crate sections.
+                    if !reexport_new_symbols_as_old {
+                        for symbol in &old_crate.global_symbols {
+                            if old_namespace.symbol_map.lock().remove(symbol).is_none() {
+                                error!("swap_crates(): couldn't find old symbol {:?} in the old crate's namespace: {}.", symbol, old_namespace.name);
+                                return Err("couldn't find old symbol {:?} in the old crate's namespace");
+                            }
+                        }
+                    }
+
+                    // If the old crate had reexported its symbols, we should remove those reexports here,
+                    // because they're no longer active since the old crate is being removed. 
+                    for sym in &old_crate.reexported_symbols {
+                        let _old_reexported_symbol = old_namespace.symbol_map.lock().remove(sym);
+                        if _old_reexported_symbol.is_none() {
+                            warn!("swap_crates(): the old_crate {:?}'s reexported symbol was not in its old namespace, couldn't be removed.", sym);
+                        }
+                    }
+
+                    // TODO: could maybe optimize transfer of old symbols from this namespace to cached_crates namespace 
+                    //       by saving the removed symbols above and directly adding them to the cached_crates.symbol_map instead of iterating over all old_crate.sections.
+                    //       This wil only really be faster once qp_trie supports a non-iterator-based (non-extend) Trie merging function.
+                    #[cfg(not(loscd_eval))]
+                    cached_crates.add_symbols(old_crate.sections.values(), verbose_log); 
+                } // drops lock for `old_crate_ref`
+                
+                #[cfg(not(loscd_eval))]
+                cached_crates.crate_tree.lock().insert_str(old_crate_name, old_crate_ref);
+                #[cfg(loscd_eval)]
+                core::mem::forget(old_crate_ref);
+            }
+            else {
+                error!("BUG: swap_crates(): failed to remove old crate {} from namespace {}", old_crate_name, old_namespace.name);
             }
         }
 
         #[cfg(loscd_eval)]
         let start_symbol_cleanup = hpet.get_counter();
 
-        // Here, we move new crates from the temp namespace into the current namespace (self). 
-        // We can't simply move only the crates in the swap request list, because we may have loaded other crates from object files (for the first time).
-        // Instead, we need to move all **newly-loaded** crates from the temp namespace into this namespace;
+        // Here, we move all of the new crates into the actual new namespace where they belong. 
+        for (req, new_crate_name) in swap_requests.iter().zip(new_crate_names.iter()) {
+            let new_crate_ref = namespace_of_new_crates.crate_tree.lock().remove_str(new_crate_name)
+                .ok_or("BUG: swap_crates(): new crate specified by swap request was not found in the new namespace")?;
+            
+            #[cfg(not(loscd_eval))]
+            debug!("swap_crates(): adding new crate {:?} to namespace {}", new_crate_ref, req.new_namespace.name);
+            req.new_namespace.add_symbols(new_crate_ref.lock_as_ref().sections.values(), verbose_log);
+            req.new_namespace.crate_tree.lock().insert_str(new_crate_name, new_crate_ref.clone());
+        }
+        
+        // Other crates may have been loaded from their object files into the `namespace_of_new_crates` as dependendencies (required by the new crates specified by swap requests).
+        // Thus, we need to move all **newly-loaded** crates from the `namespace_of_new_crates` into the proper new namespace;
         // for this, we add only the non-shared (exclusive) crates, because shared crates are those that were previously loaded (and came from the backup namespace).
         namespace_of_new_crates.for_each_crate(true, |new_crate_name, new_crate_ref| {
-            if new_crate_ref.is_shared() {
-                if self.get_crate(new_crate_name).is_none() { 
-                    error!("BUG: shared crate {} was not already in the current (backup) namespace", new_crate_name);
-                }
-                else {
-                    #[cfg(not(loscd_eval))]
-                    debug!("shared crate {} was in the current namespace like we expected.", new_crate_name);
-                }
-            }
-            else {
+            if !new_crate_ref.is_shared() {
                 // TODO FIXME: we may not want to add the new crate to this namespace, we might want to add it to one of its recursive namespaces
-                //             (e.g., `self` could be an application ns, but the new_crate could be a kernel crate that belongs in the app ns's recursive kernel ns).
-                let target_ns = self;
+                //             (e.g., `this_namespace` could be an application ns, but the new_crate could be a kernel crate that belongs in `this_namespaces`'s recursive kernel namespace).
+                //
+                // To infer which actual namespace this newly-loaded crate should be added to (we don't want to add kernel crates to an application namespace),
+                // we could iterate over all of the new crates in the swap requests that transitively depend on this new_crate,
+                // and then look at which `new_namespace` those new crates in the swap requests were destined for.
+                // Then, we use the highest-level namespace that we can, but it cannot be higher than any one `new_namespace'.
+                // 
+                // As an example, suppose there are 3 new crates from the swap request list that depend on this new_crate_ref here. 
+                // If two of those were application crates that belong to a higher-level "applications" namespace (their `new_namespace`), 
+                // but one of them was a kernel crate that belonged to a lower "kernel" namespace that was found in that "applications" namespace recursive children, 
+                // the highest-level namespace we could add this `new_crate_ref` to would be that "kernel" namespace,
+                // meaning that we had inferred that this `new_crate_ref` was also a kernel crate that belonged in the "kernel" namespace.
+                //
+                // This follows the rule that crates in a lower-level namespace cannot depend on those in a higher-level namespace. 
+                //
+                // Note that we don't just want to put the crate in the lowest namespace we can, 
+                // because that could result in putting an application crate in a kernel namespace. 
+                // 
+                let target_ns = this_namespace;
+
                 #[cfg(not(loscd_eval))]
-                debug!("swap_crates(): adding new crate itself {:?} to namespace {}", new_crate_ref, target_ns.name);
+                warn!("swap_crates(): untested scenario of adding new non-requested (depedency) crate {:?} to namespace {}", new_crate_ref, target_ns.name);
                 target_ns.add_symbols(new_crate_ref.lock_as_ref().sections.values(), verbose_log);
                 target_ns.crate_tree.lock().insert_str(new_crate_name, new_crate_ref.clone());
+            }
+            else {
+                #[cfg(not(loscd_eval))] {
+                    if this_namespace.get_crate(new_crate_name).is_some() { 
+                        debug!("shared crate {} was in the current namespace like we expected.", new_crate_name);
+                    }
+                    else {
+                        error!("BUG: shared crate {} was not already in the current (backup) namespace", new_crate_name);
+                    }
+                }
             }
             true
         });
@@ -1292,8 +1678,10 @@ impl CrateNamespace {
         let end_symbol_cleanup = hpet.get_counter();
 
 
+        // TODO: rewrite this closure to put the new crate object files into the proper namespace folder (not just all files in the override).
+        //
         // Now that we've fixed up the already-loaded (running) crates, 
-        // we need to move the new crate object files from new namespace directory set to the old (self),
+        // we need to move the new crate object files from new namespace directory set to the old (this_namespace),
         // such that future usage of those crates will load the appropriate new crate object files. 
         let copy_directory_contents = |source_dir_ref: &DirRef, dest_dir_ref: &DirRef| -> Result<(), &'static str> {
             if Arc::ptr_eq(source_dir_ref, dest_dir_ref) { 
@@ -1318,13 +1706,13 @@ impl CrateNamespace {
             }
             Ok(())
         };
-        copy_directory_contents(&namespace_of_new_crates.dir, &self.dir)?;
+        copy_directory_contents(&namespace_of_new_crates.dir, &this_namespace.dir)?; // TODO: FIXME: see above TODO, this is wrong
 
         #[cfg(not(loscd_eval))]
         {
             debug!("swap_crates() [end]: adding old_crates to cache. \n   future_swap_requests: {:?}, \n   old_crates: {:?}", 
                 future_swap_requests, cached_crates.crate_names(true));
-            self.unloaded_crate_cache.lock().insert(future_swap_requests, cached_crates);
+            this_namespace.unloaded_crate_cache.lock().insert(future_swap_requests, cached_crates);
         }
 
 
@@ -1452,13 +1840,20 @@ impl CrateNamespace {
         let mapped_pages  = crate_file.as_mapping()?;
         let size_in_bytes = crate_file.size();
         let abs_path      = Path::new(crate_file.get_absolute_path());
-        let crate_name    = abs_path.file_stem().to_string();
+        let crate_name    = crate_name_from_path(&abs_path).to_string();
 
         // First, check to make sure this crate hasn't already been loaded. 
         // Regular, non-singleton application crates aren't added to the CrateNamespace, so they can be multiply loaded.
-        if self.crate_tree.lock().contains_key_str(&crate_name) {
+        if self.get_crate(&crate_name).is_some() {
             return Err("the crate has already been loaded, cannot load it again in the same namespace");
         }
+
+        // It's probably better to pass in the actual crate file reference so we can use it here,
+        // but since we don't currently do that, we just get another reference to the crate object file via its Path.
+        let crate_object_file = match Path::get_absolute(&abs_path) {
+            Some(FileOrDir::File(f)) => f, 
+            _ => return Err("BUG: load_crate_sections(): couldn't get crate object file path"),
+        };
 
         // Parse the crate file as an ELF file
         let byte_slice: &[u8] = mapped_pages.as_slice(0, size_in_bytes)?;
@@ -1536,7 +1931,7 @@ impl CrateNamespace {
 
         let new_crate = CowArc::new(LoadedCrate {
             crate_name:              crate_name.clone(),
-            object_file_abs_path:    abs_path,
+            object_file:             crate_object_file, 
             sections:                BTreeMap::new(),
             text_pages:              text_pages.clone(),
             rodata_pages:            rodata_pages.clone(),
@@ -2523,58 +2918,59 @@ impl CrateNamespace {
         kernel_mmi_ref: &MmiRef,
         verbose_log: bool,
     ) -> Option<WeakSectionRef> {
-
         // Some symbols may have multiple potential containing crates, so we try to load each one to find the missing symbol.
-        for crate_dependency_name in get_containing_crate_name(demangled_full_symbol) {
-            let crate_dependency_name = format!("{}-", crate_dependency_name);
+        for potential_crate_name in get_containing_crate_name(demangled_full_symbol) {
+            let potential_crate_name = format!("{}-", potential_crate_name);
  
-            // Try to find and load the missing crate object file from this namespace's directory set,
+            // Try to find and load the missing crate object file from this namespace's directory or its recursive namespace's directory,
             // (or from the backup namespace's directory set).
             // We *do not* search recursively here since we want the new crate to be loaded into the namespace 
             // that contains its crate object file, not a higher-level namespace. 
             // Checking recursive namespaces will occur at the end of this function during the recursive call to this same function.
-            if let Some(dependency_crate_file_path) = self.get_crate_file_starting_with(&crate_dependency_name, false)
-                .or_else(|| temp_backup_namespace.and_then(|backup| backup.get_crate_file_starting_with(&crate_dependency_name, true)))  // TODO: should we be blindly recursively searching the backup namespace's files?
-            {
-                // Check to make sure this crate is not already loaded into this namespace (or its recursive namespace).
-                if self.get_crate(dependency_crate_file_path.file_stem()).is_some() {
-                    trace!("  (skipping already-loaded crate {:?})", dependency_crate_file_path);
-                    continue;
-                }
-                #[cfg(not(loscd_eval))]
-                info!("Symbol {:?} not initially found in namespace {:?}, attempting to load crate {:?} that may contain it.", 
-                    demangled_full_symbol, self.name, crate_dependency_name);
-
-                match self.load_crate(&dependency_crate_file_path, temp_backup_namespace, kernel_mmi_ref, verbose_log) {
-                    Ok(_num_new_syms) => {
-                        // try again to find the missing symbol, now that we've loaded the missing crate
-                        if let Some(sec) = self.get_symbol_internal(demangled_full_symbol) {
-                            return Some(sec);
-                        } else {
-                            // the missing symbol wasn't in this crate, continue to load the other potential containing crates.
-                            trace!("Loaded symbol's containing crate {:?}, but still couldn't find the symbol {:?}.", 
-                                dependency_crate_file_path, demangled_full_symbol);
-                        }
-                    }
-                    Err(_e) => {
-                        error!("Found symbol's (\"{}\") containing crate, but couldn't load the crate file {:?}. Error: {:?}",
-                            demangled_full_symbol, dependency_crate_file_path, _e);
-                        // We *could* return an error here, but we might as well continue on to trying to load other crates.
+            let (potential_crate_file, ns_of_crate_file) = match self.method_get_crate_object_file_starting_with(&potential_crate_name) {
+                Some(found) => found,
+                // TODO: should we be blindly recursively searching the backup namespace's files?
+                None => match temp_backup_namespace.and_then(|backup| backup.method_get_crate_object_file_starting_with(&potential_crate_name)) {
+                    // do not modify the backup namespace, instead load its crate into this namespace
+                    Some((crate_file_in_backup_ns, _backup_ns)) => (crate_file_in_backup_ns, self),
+                    None => {
+                        warn!("Couldn't find a single crate object file with prefix {:?} that may contain symbol {:?} in namespace {:?}.", 
+                            potential_crate_name, demangled_full_symbol, self.name);
+                        continue;
                     }
                 }
+            };
+                          
+            let potential_crate_file_path = Path::new(potential_crate_file.lock().get_absolute_path());
+            // Check to make sure this crate is not already loaded into this namespace (or its recursive namespace).
+            if self.get_crate(crate_name_from_path(&potential_crate_file_path)).is_some() {
+                trace!("  (skipping already-loaded crate {:?})", potential_crate_file_path);
+                continue;
             }
-            else {
-                if self.recursive_namespace.is_none() {
-                    warn!("Couldn't find a single crate object file with prefix {:?} that may contain symbol {:?} in namespace {:?}.", 
-                        crate_dependency_name, demangled_full_symbol, self.name);
+            #[cfg(not(loscd_eval))]
+            info!("Symbol {:?} not initially found in namespace {:?}, attempting to load crate {:?} into namespace {:?} that may contain it.", 
+                demangled_full_symbol, self.name, potential_crate_name, ns_of_crate_file.name);
+
+            match ns_of_crate_file.load_crate(&potential_crate_file, temp_backup_namespace, kernel_mmi_ref, verbose_log) {
+                Ok(_num_new_syms) => {
+                    // try again to find the missing symbol, now that we've loaded the missing crate
+                    if let Some(sec) = ns_of_crate_file.get_symbol_internal(demangled_full_symbol) {
+                        return Some(sec);
+                    } else {
+                        // the missing symbol wasn't in this crate, continue to load the other potential containing crates.
+                        trace!("Loaded symbol's containing crate {:?}, but still couldn't find the symbol {:?}.", 
+                            potential_crate_file_path, demangled_full_symbol);
+                    }
+                }
+                Err(_e) => {
+                    error!("Found symbol's (\"{}\") containing crate, but couldn't load the crate file {:?}. Error: {:?}",
+                        demangled_full_symbol, potential_crate_file_path, _e);
+                    // We *could* return an error here, but we might as well continue on to trying to load other crates.
                 }
             }
         }
 
-        // If we couldn't find any non-loaded crates that contain the symbol in this namespace, check its recursive namespace.
-        self.recursive_namespace().as_ref()
-            .map(|r_ns| r_ns.load_crate_for_missing_symbol(demangled_full_symbol, temp_backup_namespace, kernel_mmi_ref, verbose_log))
-            .unwrap_or_default()
+        None
     }
 
 
@@ -2596,7 +2992,7 @@ impl CrateNamespace {
             .map(|(k, v)| (String::from(k.as_str()), v.clone()))
             .collect();
 
-        if let Some(mut syms_recursive) = self.recursive_namespace().as_ref().map(|r_ns| r_ns.find_symbols_starting_with(symbol_prefix)) {
+        if let Some(mut syms_recursive) = self.recursive_namespace.as_ref().map(|r_ns| r_ns.find_symbols_starting_with(symbol_prefix)) {
             syms.append(&mut syms_recursive);
         }
 
@@ -2612,7 +3008,7 @@ impl CrateNamespace {
             .map(|(k, v)| (String::from(k.as_str()), v.clone(), self))
             .collect();
 
-        if let Some(mut syms_recursive) = self.recursive_namespace().as_ref().map(|r_ns| r_ns.find_symbols_starting_with_and_namespace(symbol_prefix)) {
+        if let Some(mut syms_recursive) = self.recursive_namespace.as_ref().map(|r_ns| r_ns.find_symbols_starting_with_and_namespace(symbol_prefix)) {
             syms.append(&mut syms_recursive);
         }
 
@@ -2661,7 +3057,7 @@ impl CrateNamespace {
             .cloned();
         
         // Second, we see if there's a single matching symbol in the recursive namespace.
-        let symbol_in_recursive_namespace = self.recursive_namespace().as_ref().and_then(|r_ns| r_ns.get_symbol_starting_with_internal(symbol_prefix));
+        let symbol_in_recursive_namespace = self.recursive_namespace.as_ref().and_then(|r_ns| r_ns.get_symbol_starting_with_internal(symbol_prefix));
 
         // There can only be one matching crate across all recursive namespaces.
         symbol_in_this_namespace.xor(symbol_in_recursive_namespace)
@@ -2692,46 +3088,6 @@ impl CrateNamespace {
 
         syms
     }
-
-
-    /// Same as `get_crate_files_starting_with()`, 
-    /// but returns `Some(Path)` only if there is a single match.
-    /// If there are multiple matches, `None` is returned.
-    /// 
-    /// If `recursive` is `true`, recursive namespaces are searched as well.
-    /// In that case, this function will return `Some` only if there is a single matching crate file
-    /// across this namespace and all of its recursive namespaces.
-    /// 
-    /// Returns the absolute `Path` of the matching crate file.
-    pub fn get_crate_file_starting_with(&self, prefix: &str, recursive: bool) -> Option<Path> {
-        let mut files_iter = self.get_crate_files_starting_with(prefix, recursive).into_iter();    
-        files_iter.next().filter(|_| files_iter.next().is_none()) // ensure single element
-    }
-
-    /// Finds the crate object files in this `CrateNamespace`'s directory 
-    /// that start with the given `prefix`.
-    /// 
-    /// If `recursive` is `true`, recursive namespaces are searched as well. 
-    /// 
-    /// Returns a list of the absolute `Path`s of matching kernel files.
-    pub fn get_crate_files_starting_with(&self, prefix: &str, recursive: bool) -> Vec<Path> {
-        let mut cfiles: Vec<Path> = self.dir
-            .get_files_starting_with(prefix)
-            .into_iter()
-            .map(|f| Path::new(f.lock().get_absolute_path()))
-            .collect();
-
-        if recursive {
-            if let Some(mut cfiles_recursive) = self.recursive_namespace().as_ref()
-                .map(|r_ns| r_ns.get_crate_files_starting_with(prefix, recursive))
-            {
-                cfiles.append(&mut cfiles_recursive);
-            }
-        }
-
-        cfiles
-    }
-
 }
 
 

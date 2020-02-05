@@ -40,6 +40,7 @@ use mod_mgmt::{
     NamespaceDir,
     SwapRequest,
     SwapRequestList,
+    IntoCrateObjectFile,
 };
 use memfs::MemFile;
 use path::Path;
@@ -222,7 +223,7 @@ fn apply(base_dir_path: &Path) -> Result<(), String> {
     };
     let diff_file = match new_namespace_dir.lock().get(DIFF_FILE_NAME) { 
         Some(FileOrDir::File(f)) => f,
-        _ => return Err(format!("cannot find diff file at {}/{}", base_dir_path, DIFF_FILE_NAME)),
+        _ => return Err(format!("cannot find diff file expected at {}/{}", base_dir_path, DIFF_FILE_NAME)),
     };
     let mut diff_content: Vec<u8> = alloc::vec::from_elem(0, diff_file.lock().size()); 
     let _bytes_read = diff_file.lock().read(&mut diff_content, 0)?;
@@ -241,33 +242,39 @@ fn apply(base_dir_path: &Path) -> Result<(), String> {
     // it is safe to actually replace the old crate object files with the new ones. 
     
     let curr_namespace = get_my_current_namespace();
-    // create swap requests to replace the currently loaded old crates with the new crates 
+    // Now we create swap requests based on the contents of the diff file
     let mut swap_requests = SwapRequestList::new();
-    for (old_crate_file_name, new_crate_file_name) in &diffs.pairs {
-        println!("Looking at diff {} -> {}", old_crate_file_name, new_crate_file_name);
-        let old_crate_name = if old_crate_file_name == "" {
-            String::new() // skip checks for empty old crates (just the new crate will be loaded w/o replacing anything)
+
+    for (old_crate_module_file_name, new_crate_module_file_name) in diffs.pairs.into_iter() {
+        println!("Looking at diff {} -> {}", old_crate_module_file_name, new_crate_module_file_name);
+        let old_crate_name = if old_crate_module_file_name == "" {
+            // An empty old_crate_name indicates that there is no old crate or object file to remove, we are just loading a new crate (or inserting its object file)
+            None
         } else {
-            // check to make sure the old crate actually exists
-            let old_crate_file = curr_namespace.dir().get_crate_object_file(old_crate_file_name)
-                .ok_or_else(|| format!("cannot find old crate file {:?} in namespace {:?}", old_crate_file_name, curr_namespace.name))?;
-            // the old needs to be swapped if it's currently loaded
-            let old_crate_file_name = Path::new(old_crate_file.lock().get_name());
-            let old_crate_name = old_crate_file_name.file_stem().to_string();
+            let old_crate_name = mod_mgmt::crate_name_from_path(&Path::new(old_crate_module_file_name)).to_string();
             if curr_namespace.get_crate(&old_crate_name).is_none() {
-                println!("   not swapping non-loaded old crate: {}", old_crate_name);
-                continue;
+                println!("\t Note: old crate {:?} was not currently loaded into namespace {:?}.", old_crate_name, curr_namespace.name);
             }
-            old_crate_name
+            Some(old_crate_name)
         };
-        let new_crate_file = new_namespace_dir.get_crate_object_file(new_crate_file_name)
-            .ok_or_else(|| format!("cannot find new crate file {:?} in new namespace dir {}", new_crate_file_name, base_dir_path))?;
-        let swap_req = SwapRequest::new(old_crate_name, Path::new(new_crate_file.lock().get_absolute_path()), false)?;
+        
+        let new_crate_file = new_namespace_dir.get_crate_object_file(&new_crate_module_file_name).ok_or_else(|| 
+            format!("cannot find new crate file {:?} in new namespace dir {}", new_crate_module_file_name, base_dir_path)
+        )?;
+
+        let swap_req = SwapRequest::new(
+            old_crate_name.as_deref(),
+            Arc::clone(&curr_namespace),
+            IntoCrateObjectFile::File(new_crate_file),
+            None, // all diff-based swaps occur within the same namespace
+            false
+        ).map_err(|invalid_req| format!("{:#?}", invalid_req))?;
         swap_requests.push(swap_req);
     }
 
     // now do the actual live crate swap at runtime
-    curr_namespace.swap_crates(
+    CrateNamespace::swap_crates(
+        &curr_namespace,
         swap_requests, 
         Some(new_namespace_dir), 
         diffs.state_transfer_functions, 
