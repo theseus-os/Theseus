@@ -179,12 +179,13 @@ pub extern "C" fn nano_core_start(multiboot_information_virtual_address: usize) 
     // if in loadable mode, parse the crates we always need: the core library (Rust no_std lib), the panic handlers, and the captain
     #[cfg(loadable)] 
     {
+        use mod_mgmt::CrateNamespace;
         println_raw!("nano_core_start(): loading the \"captain\" crate...");     
-        let captain_path = try_exit!(default_namespace.get_crate_file_starting_with("captain-", false).ok_or("couldn't find the singular \"captain\" crate object file"));
-        let _num_captain_syms = try_exit!(default_namespace.load_crate(&captain_path, None, &kernel_mmi_ref, false));
-        
-        let panic_wrapper_path = try_exit!(default_namespace.get_crate_file_starting_with("panic_wrapper-", false).ok_or("couldn't find the singular \"panic_wrapper\" crate object file"));
-        let _num_libcore_syms = try_exit!(default_namespace.load_crate(&panic_wrapper_path, None, &kernel_mmi_ref, false));
+        let (captain_file, _ns) = try_exit!(CrateNamespace::get_crate_object_file_starting_with(default_namespace, "captain-").ok_or("couldn't find the singular \"captain\" crate object file"));
+        let _num_captain_syms = try_exit!(default_namespace.load_crate(&captain_file, None, &kernel_mmi_ref, false));
+        println_raw!("nano_core_start(): loading the panic handling crate(s)...");     
+        let (panic_wrapper_file, _ns) = try_exit!(CrateNamespace::get_crate_object_file_starting_with(default_namespace, "panic_wrapper-").ok_or("couldn't find the singular \"panic_wrapper\" crate object file"));
+        let _num_libcore_syms = try_exit!(default_namespace.load_crate(&panic_wrapper_file, None, &kernel_mmi_ref, false));
     }
 
 

@@ -14,6 +14,7 @@ extern crate runqueue_round_robin;
 extern crate runqueue_priority;
 
 use core::ops::Deref;
+use alloc::sync::Arc;
 use mod_mgmt::CrateNamespace;
 // use lazy_static::lazy::Lazy;
 use irq_safety::RwLockIrqSafe;
@@ -22,7 +23,7 @@ use task::TaskRef;
 
 
 /// Used for the evolution from a round robin scheduler to a priority scheduler
-pub fn prio_sched(old_namespace: &CrateNamespace, new_namespace: &CrateNamespace) -> Result<(), &'static str> {
+pub fn prio_sched(old_namespace: &Arc<CrateNamespace>, new_namespace: &CrateNamespace) -> Result<(), &'static str> {
 
     warn!("prio_sched(): at the top.");
     // Since we don't currently support updating a running application's code with the new object code, 
@@ -48,7 +49,8 @@ pub fn prio_sched(old_namespace: &CrateNamespace, new_namespace: &CrateNamespace
 
     // Extract the taskrefs from the round robin Runqueue, 
     // then convert them into priority taskrefs and place them on the priority Runqueue.
-    let rq_rr_crate = old_namespace.get_crate_starting_with("runqueue_round_robin").map(|(_crate_name, crate_ref, _ns)| crate_ref)
+    let rq_rr_crate = CrateNamespace::get_crate_starting_with(old_namespace, "runqueue_round_robin")
+        .map(|(_crate_name, crate_ref, _ns)| crate_ref)
         .ok_or("Couldn't get runqueue_round_robin crate from old namespace")?;
     
     let krate = rq_rr_crate.lock_as_ref();

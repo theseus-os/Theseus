@@ -2,7 +2,7 @@
 #![feature(asm)]
 #![feature(stmt_expr_attributes)]
 
-extern crate alloc;
+#[macro_use] extern crate alloc;
 #[macro_use] extern crate log;
 #[macro_use] extern crate debugit;
 extern crate irq_safety;
@@ -18,6 +18,7 @@ extern crate owning_ref;
 extern crate apic;
 extern crate context_switch;
 extern crate path;
+extern crate fs_node;
 extern crate type_name;
 extern crate catch_unwind;
 
@@ -38,6 +39,7 @@ use memory::{get_kernel_mmi_ref, MemoryManagementInfo, VirtualAddress};
 use task::{Task, TaskRef, get_my_current_task, RunState, TASKLIST, TASK_SWITCH_LOCKS};
 use mod_mgmt::CrateNamespace;
 use path::Path;
+use fs_node::FileOrDir;
 
 #[cfg(spawn_userspace)]
 use core::ops::DerefMut;
@@ -233,6 +235,8 @@ pub struct ApplicationTaskBuilder {
 impl ApplicationTaskBuilder {
     /// Creates a new application `Task` from the given `path`, which points to 
     /// an application crate object file that must have an entry point called `main`.
+    /// 
+    /// TODO: change this to accept a `FileRef` instead of a `Path`
     pub fn new(path: Path) -> ApplicationTaskBuilder {
         ApplicationTaskBuilder {
             path: path,
@@ -308,13 +312,20 @@ impl ApplicationTaskBuilder {
     /// 
     /// This is similar (but not identical) to the `exec()` system call in POSIX environments. 
     pub fn spawn(self) -> Result<TaskRef, &'static str> {
-        let namespace = self.namespace
+        let namespace = self.namespace.clone()
             .or_else(|| task::get_my_current_task().map(|taskref| taskref.get_namespace()))
             .ok_or("ApplicationTaskBuilder::spawn(): couldn't get current task to use its CrateNamespace")?;
-
+        
+        let crate_object_file = match (&self.path).get(namespace.dir())
+            .or_else(|| Path::new(format!("{}.o", &self.path)).get(namespace.dir())) // retry with ".o" extension
+        {
+            Some(FileOrDir::File(f)) => f,
+            _ => return Err("Couldn't find specified file path for new application crate"),
+        };
         let app_crate_ref = {
             let kernel_mmi_ref = get_kernel_mmi_ref().ok_or("couldn't get_kernel_mmi_ref")?;
-            namespace.load_crate_as_application(&self.path, &kernel_mmi_ref, self.singleton, false)?
+            debug!("ApplicationTaskBuilder::spawn(): loading crate_object_file is_locked? {}", crate_object_file.try_lock().is_none());
+            namespace.load_crate_as_application(&crate_object_file, &kernel_mmi_ref, self.singleton, false)?
         };
 
         // get the LoadedSection for the "main" function in the app_crate
