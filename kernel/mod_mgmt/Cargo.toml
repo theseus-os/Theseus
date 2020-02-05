@@ -13,6 +13,7 @@ rustc-demangle = "0.1.14"
 qp-trie = "0.7.3"
 owning_ref = { git = "https://github.com/kevinaboos/owning-ref-rs" }
 cstr_core = "0.1.2"
+by_address = "1.0.4"
 
 
 [dependencies.hashbrown]

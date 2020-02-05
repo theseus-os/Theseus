@@ -96,7 +96,7 @@ fn print_crates(output: &mut String, indent: usize, namespace: &CrateNamespace, 
     let mut crates: Vec<String> = Vec::new();
     // We do recursion manually here so we can separately print each recursive namespace.
     namespace.for_each_crate(false, |crate_name, crate_ref| {
-        crates.push(format!("{:indent$}{}    {}", "", crate_name, crate_ref.lock_as_ref().object_file_abs_path, indent = (indent + 4)));
+        crates.push(format!("{:indent$}{}     {:?}", "", crate_name, crate_ref.lock_as_ref().object_file.lock().get_absolute_path(), indent = (indent + 4)));
         true
     });
     crates.sort();

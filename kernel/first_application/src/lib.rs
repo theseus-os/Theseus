@@ -5,11 +5,15 @@
 #![no_std]
 
 extern crate alloc;
+#[macro_use] extern crate log;
 extern crate spawn;
 extern crate mod_mgmt;
+extern crate path;
 
 use alloc::string::ToString;
 use spawn::ApplicationTaskBuilder;
+use mod_mgmt::CrateNamespace;
+use path::Path;
 
 /// Starts the first applications that run in Theseus 
 /// by creating a new "default" application namespace
@@ -21,11 +25,13 @@ use spawn::ApplicationTaskBuilder;
 /// Kernel initialization routines should be complete before invoking this. 
 pub fn start() -> Result<(), &'static str> {
     let new_app_ns = mod_mgmt::create_application_namespace(None)?;
-    let shell_path = new_app_ns.get_crate_file_starting_with("shell-", false)
+    let (shell_file, _ns) = CrateNamespace::get_crate_object_file_starting_with(&new_app_ns, "shell-")
         .ok_or("Couldn't find shell application in default app namespace")?;
 
+    let path = Path::new(shell_file.lock().get_absolute_path());
+    info!("Starting first application: crate at {:?}", path);
     // Spawn the default shell
-    ApplicationTaskBuilder::new(shell_path)
+    ApplicationTaskBuilder::new(path)
         .name("default_shell".to_string())
         .namespace(new_app_ns)
         .spawn()?;
