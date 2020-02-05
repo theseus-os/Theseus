@@ -18,7 +18,7 @@ use rustc_demangle::demangle;
 use cstr_core::CStr;
 
 use memory::{VirtualAddress, MappedPages};
-use metadata::{LoadedCrate, StrongCrateRef, LoadedSection, StrongSectionRef, SectionType};
+use crate_metadata::{LoadedCrate, StrongCrateRef, LoadedSection, StrongSectionRef, SectionType};
 use qp_trie::Trie;
 use fs_node::FileRef;
 use path::Path;
