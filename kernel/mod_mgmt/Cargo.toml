@@ -23,12 +23,6 @@ features = ["nightly"]
 [dependencies.irq_safety]
 git = "https://github.com/kevinaboos/irq_safety"
 
-### used for linker relocation typedefs
-[dependencies.goblin]
-version = "0.0.19"
-default-features = false
-features = ["elf64"]
-
 [dependencies.util]
 path = "../../libs/util"
 
@@ -44,6 +38,9 @@ version = "0.3.7"
 
 [dependencies.crate_name_utils]
 path = "../crate_name_utils"
+
+[dependencies.crate_metadata]
+path = "../crate_metadata"
 
 [dependencies.memory]
 path = "../memory"

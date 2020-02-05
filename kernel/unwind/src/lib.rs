@@ -77,7 +77,9 @@ use registers::{Registers, LandingRegisters, SavedRegs};
 use fallible_iterator::FallibleIterator;
 use mod_mgmt::{
     CrateNamespace,
-    metadata::{SectionType, StrongCrateRef, StrongSectionRef},
+    SectionType,
+    StrongCrateRef,
+    StrongSectionRef,
 };
 use memory::VirtualAddress;
 use task::{TaskRef, KillReason};

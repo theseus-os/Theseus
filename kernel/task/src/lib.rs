@@ -67,7 +67,7 @@ use atomic_linked_list::atomic_map::AtomicMap;
 use tss::tss_set_rsp0;
 use mod_mgmt::{
     CrateNamespace,
-    metadata::StrongCrateRef,
+    StrongCrateRef,
 };
 use environment::Environment;
 use spin::Mutex;
