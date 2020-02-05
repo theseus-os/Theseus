@@ -648,7 +648,7 @@ impl NamespaceDir {
 /// that contains kernel crates and symbols. 
 pub struct CrateNamespace {
     /// An identifier for this namespace, just for convenience.
-    pub name: String,
+    name: String,
 
     /// The directory containing all crate object files owned by this namespace. 
     /// When this namespace is looking for a missing symbol or crate,
@@ -663,7 +663,7 @@ pub struct CrateNamespace {
     /// and a single crate can be part of multiple namespaces at once.
     /// For example, the "core" (Rust core library) crate is essentially
     /// part of every single namespace, simply because most other crates rely upon it. 
-    pub crate_tree: Mutex<Trie<BString, StrongCrateRef>>,
+    crate_tree: Mutex<Trie<BString, StrongCrateRef>>,
 
     /// The "system map" of all symbols that are present in all of the crates in this `CrateNamespace`.
     /// Maps a fully-qualified symbol name string to a corresponding `LoadedSection`,
@@ -720,6 +720,11 @@ impl CrateNamespace {
         }
     } 
 
+    /// Returns the name of this `CrateNamespace`, which is just used for debugging purposes. 
+    pub fn name(&self) -> &str {
+        &self.name
+    }
+    
     /// Returns the directory that this `CrateNamespace` is based on.
     pub fn dir(&self) -> &NamespaceDir {
         &self.dir
@@ -731,10 +736,12 @@ impl CrateNamespace {
         self.recursive_namespace.as_ref()
     }
 
+    #[doc(hidden)]
     pub fn enable_fuzzy_symbol_matching(&mut self) {
         self.fuzzy_symbol_matching = true;
     }
 
+    #[doc(hidden)]
     pub fn disable_fuzzy_symbol_matching(&mut self) {
         self.fuzzy_symbol_matching = false;
     }
@@ -1143,7 +1150,7 @@ impl CrateNamespace {
     /// The given `CrateNamespace` is used as the backup namespace for resolving unknown symbols,
     /// in adddition to any recursive namespaces on which this namespace depends.
     /// 
-    /// Upon a successful return, this namespacewill have the new crates in place of the old ones,
+    /// Upon a successful return, this namespace (and/or its recursive namespace) will have the new crates in place of the old ones,
     /// and the old crates will be completely removed from this namespace. 
     /// In this namespace there will be no remaining dependencies on the old crates, 
     /// although crates in other namespaces may still include and depend upon those old crates.
