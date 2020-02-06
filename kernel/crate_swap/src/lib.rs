@@ -33,6 +33,7 @@ use qp_trie::wrapper::BString;
 use mod_mgmt::{
     CrateNamespace,
     NamespaceDir,
+    IntoCrateObjectFile,
     write_relocation,
     crate_name_from_path,
     replace_containing_crate_name,
@@ -337,7 +338,7 @@ pub fn swap_crates(
                     let target_sec_ref = if let Some(sr) = weak_dep.section.upgrade() {
                         sr
                     } else {
-                        trace!("Removing dead weak dependency from old_sec: {}", old_sec.name);
+                        trace!("Removing dead weak dependency on old_sec: {}", old_sec.name);
                         dead_weak_deps_to_remove.push(i);
                         continue;
                     };
@@ -625,12 +626,12 @@ pub fn swap_crates(
         }
         else {
             #[cfg(not(loscd_eval))] {
-                if this_namespace.get_crate(new_crate_name).is_some() { 
-                    debug!("shared crate {} was in the current namespace like we expected.", new_crate_name);
-                }
-                else {
+                if this_namespace.get_crate(new_crate_name).is_none() { 
                     error!("BUG: shared crate {} was not already in the current (backup) namespace", new_crate_name);
                 }
+                // else {
+                //     debug!("shared crate {} was in the current namespace like we expected.", new_crate_name);
+                // }
             }
         }
         true
@@ -809,6 +810,7 @@ impl SwapRequest {
     /// 
     /// * `new_namespace`: the `CrateNamespace` to which the new crate will be loaded and its symbols added.
     ///    If `None`, then the new crate will be loaded into the `old_namespace`, which is a common case for swapping. 
+    /// 
     /// * `reexport_new_symbols_as_old`: if `true`, all public symbols the new crate will be reexported
     ///    in the `new_namespace` with the same full name those symbols had from the old crate in the `old_namespace`. 
     ///    See the "Important Note" in the struct-level documentation for more details.
@@ -979,34 +981,6 @@ impl fmt::Debug for InvalidSwapRequest {
                     dbg.field("matching file", &s);
                 }
             }
-        };
-        dbg.finish()
-    }
-}
-
-
-/// A type that can be converted into a crate object file.
-/// We use an enum rather than implement `TryInto` because we need additional information
-/// to resolve a prefix path.
-pub enum IntoCrateObjectFile {
-    /// A direct reference to the crate object file. This will be used as-is. 
-    File(FileRef),
-    /// An absolute path that points to the crate object file. 
-    AbsolutePath(Path),
-    /// A string prefix that will be used to search for the crate object file in the namespace.
-    /// This must be able to uniquely identify a single crate object file in the namespace directory (recursively searched). 
-    Prefix(String),
-}
-impl fmt::Debug for IntoCrateObjectFile {
-    fn fmt(&self, f: &mut fmt::Formatter) -> fmt::Result {
-        let mut dbg = f.debug_struct("IntoCrateObjectFile");
-        match self {
-            Self::File(object_file) => dbg.field("File", &object_file.try_lock()
-                .map(|f| f.get_absolute_path())
-                .unwrap_or_else(|| format!("<Locked>"))
-            ),
-            Self::AbsolutePath(p) => dbg.field("AbsolutePath", p),
-            Self::Prefix(prefix) => dbg.field("Prefix", prefix),
         };
         dbg.finish()
     }
