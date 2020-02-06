@@ -11,7 +11,6 @@ use alloc::vec::Vec;
 use alloc::string::String;
 
 
-#[no_mangle]
 pub fn main(_args: Vec<String>) -> isize {
     // info!("Hello, world! (from hello application)");
     println!("Hello, world! Args: {:?}", _args);

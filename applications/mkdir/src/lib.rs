@@ -14,7 +14,6 @@ use alloc::string::ToString;
 // use fs_node::FileOrDir;
 use vfs_node::VFSDirectory;
 
-#[no_mangle]
 pub fn main(args: Vec<String>) -> isize {
     if !(args.is_empty()) {
         for dir_name in args.iter() {

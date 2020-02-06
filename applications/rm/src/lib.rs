@@ -18,7 +18,6 @@ use path::Path;
 use fs_node::{FsNode, FileOrDir};
 
 
-#[no_mangle]
 pub fn main(args: Vec<String>) -> isize {
     match remove_node(args) {
         Ok(_) => 0,

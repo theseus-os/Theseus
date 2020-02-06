@@ -85,6 +85,17 @@ pub const RODATA_SECTION_FLAGS:   EntryFlags = EntryFlags::from_bits_truncate(En
 pub const DATA_BSS_SECTION_FLAGS: EntryFlags = EntryFlags::from_bits_truncate(EntryFlags::PRESENT.bits() | EntryFlags::NO_EXECUTE.bits() | EntryFlags::WRITABLE.bits());
 
 
+/// The Theseus Makefile appends prefixes onto bootloader module names,
+/// which are separated by the "#" character. 
+/// For example, "k#my_crate-hash.o".
+pub const MODULE_PREFIX_DELIMITER: &'static str = "#";
+/// A crate's name and its hash are separated by "-", i.e., "my_crate-hash".
+pub const CRATE_HASH_DELIMITER: &'static str = "-";
+/// A section's demangled name and its hash are separated by "::h", 
+/// e.g., "my_crate::section_name::h<hash>".
+pub const SECTION_HASH_DELIMITER: &'static str = "::h";
+
+
 /// The type of a crate, based on its object file naming convention.
 /// This naming convention is only used for crate object files
 /// that come from **bootloader-provided modules**,
@@ -130,9 +141,7 @@ impl CrateType {
     /// assert_eq!(result, (CrateType::Kernel, "sse", "my_crate.o") );
     /// ```
     pub fn from_module_name<'a>(module_name: &'a str) -> Result<(CrateType, &'a str, &'a str), &'static str> {
-        const CRATE_PREFIX_DELIMITER: &'static str = "#";
-
-        let mut iter = module_name.split(CRATE_PREFIX_DELIMITER);
+        let mut iter = module_name.split(MODULE_PREFIX_DELIMITER);
         let prefix = iter.next().ok_or("couldn't parse crate type prefix before delimiter")?;
         let crate_name = iter.next().ok_or("couldn't parse crate name after prefix delimiter")?;
         if iter.next().is_some() {
@@ -254,8 +263,11 @@ impl LoadedCrate {
         )
     }
 
-    /// Returns the first `LoadedSection` that matches the given predicate,
+    /// Returns the **first** `LoadedSection` that matches the given predicate,
     /// i.e., for which the `predicate` closure returns `true`.
+    /// 
+    /// If you need to check for multiple matches, then it's best to iterate
+    /// over the sections in this crate yourself. 
     pub fn find_section<F>(&self, predicate: F) -> Option<&StrongSectionRef> 
         where F: Fn(&LoadedSection) -> bool
     {
@@ -267,8 +279,7 @@ impl LoadedCrate {
     /// Returns the substring of this crate's name that excludes the trailing hash. 
     /// If there is no hash, then it returns the entire name. 
     pub fn crate_name_without_hash(&self) -> &str {
-        // the hash identifier (delimiter) is "-"
-        self.crate_name.split("-")
+        self.crate_name.split(CRATE_HASH_DELIMITER)
             .next()
             .unwrap_or_else(|| &self.crate_name)
     }
@@ -677,7 +688,7 @@ impl LoadedSection {
 
     /// Returns the substring of this section's name that excludes the trailing hash. 
     /// 
-    /// See the identical associated function [`section_name_without_hash()`](#method.section_name_without_hash) for more. 
+    /// See the identical associated function [`section_name_without_hash()`](#fn.section_name_without_hash.html) for more. 
     pub fn name_without_hash(&self) -> &str {
         Self::section_name_without_hash(&self.name)
     }
@@ -691,10 +702,8 @@ impl LoadedSection {
     /// name: "`keyboard_new::init::h832430094f98e56b`", return value: "`keyboard_new::init::h`"
     /// name: "`start_me`", return value: "`start_me`"
     pub fn section_name_without_hash(sec_name: &str) -> &str {
-        // the hash identifier (delimiter) is "::h"
-        const HASH_DELIMITER: &'static str = "::h";
-        sec_name.rfind(HASH_DELIMITER)
-            .and_then(|end| sec_name.get(0 .. (end + HASH_DELIMITER.len())))
+        sec_name.rfind(SECTION_HASH_DELIMITER)
+            .and_then(|end| sec_name.get(0 .. (end + SECTION_HASH_DELIMITER.len())))
             .unwrap_or_else(|| &sec_name)
     }
 

@@ -36,7 +36,6 @@ fn foo(cause_page_fault: bool) {
 }
 
 
-#[no_mangle]
 pub fn main(_args: Vec<String>) -> isize {
 
     // // dump some info about the this loaded app crate

@@ -1,4 +1,4 @@
-//! This crate stores the IO queues and pointers to terminals for running applications.
+//! This crate is an application-level library that stores the IO queues and pointers to terminal instances for running applications.
 //! It provides some APIs similar to std::io for applications to access those queues.
 //! 
 //! Usage example:
@@ -32,8 +32,6 @@ use spin::{Mutex, MutexGuard};
 use alloc::boxed::Box;
 use alloc::collections::BTreeMap;
 use alloc::sync::Arc;
-use alloc::string::String;
-use alloc::vec::Vec;
 use libterm::Terminal;
 
 /// Stores the stdio queues, key event queue and the pointer to the terminal
@@ -356,14 +354,4 @@ pub fn print_to_stdout_args(fmt_args: fmt::Arguments) {
             return;
         }
     };
-}
-
-#[no_mangle]
-pub fn main(_args: Vec<String>) -> isize {
-    loop {
-        // block this task, because it never needs to actually run again
-        if let Some(my_task) = task::get_my_current_task() {
-            my_task.block();
-        }
-    }
 }
