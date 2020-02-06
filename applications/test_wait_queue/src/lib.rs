@@ -21,7 +21,6 @@ use spawn::KernelTaskBuilder;
 use wait_condition::{WaitCondition, WaitConditionFn};
 
 
-#[no_mangle]
 pub fn main(_args: Vec<String>) -> isize {    
     match rmain() {
         Ok(_) => 0,

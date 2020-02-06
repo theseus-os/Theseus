@@ -21,7 +21,6 @@ use fs_node::FileOrDir;
 use core_io::{Read, Write};
 
 
-#[no_mangle]
 pub fn main(args: Vec<String>) -> isize {
     let mut opts = Options::new();
     opts.optflag("h", "help", "print this help menu");

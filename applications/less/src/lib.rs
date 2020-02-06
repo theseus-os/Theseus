@@ -211,7 +211,6 @@ fn event_handler_loop(content: &String, map: &BTreeMap<usize, LineSlice>,
 }
 
 
-#[no_mangle]
 pub fn main(args: Vec<String>) -> isize {
 
     // Get stdout.

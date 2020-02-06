@@ -101,7 +101,6 @@ fn test_filerw() -> Result<(), &'static str> {
     Ok(())
 }
 
-#[no_mangle]
 pub fn main(_args: Vec<String>) -> isize {
 
     match test_filerw() {

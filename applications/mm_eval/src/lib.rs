@@ -251,7 +251,6 @@ fn unmap_spillful(
 }
 
 
-#[no_mangle]
 pub fn main(args: Vec<String>) -> isize {
 
     let mut opts = Options::new();
@@ -354,7 +353,6 @@ The normal spill-free MappedPages approach is evaluated by default.";
 } // end of cfg_if
 else {
     
-#[no_mangle]
 pub fn main(_args: Vec<String>) -> isize {
     println!("Error: Theseus was not compiled with the 'mapper_spillful' config enabled, \
               which is required to run this benchmark application.");

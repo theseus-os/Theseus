@@ -93,7 +93,6 @@ struct Job {
 }
 
 /// A main function that spawns a new shell and waits for the shell loop to exit before returning an exit value
-#[no_mangle]
 pub fn main(_args: Vec<String>) -> isize {
     {
         let _task_ref = match KernelTaskBuilder::new(shell_loop, ())
