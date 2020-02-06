@@ -4,6 +4,8 @@
 
 #[macro_use] extern crate alloc;
 extern crate itertools;
+extern crate path;
+extern crate crate_metadata;
 
 use core::ops::Range;
 use alloc::{
@@ -11,9 +13,29 @@ use alloc::{
     vec::Vec,
 };
 use itertools::Itertools;
+use path::Path;
+use crate_metadata::CrateType;
 
 
-/// Crate names must be only alphanumeric characters, an underscore, or a dash. 
+
+/// Returns the crate name that is derived from a crate object file path.
+/// 
+/// # Examples of acceptable paths
+/// Legal paths can:
+/// * be absolute or relative,
+/// * optionally end with an extension, e.g., `".o"`,   optionally start 
+/// * optionally start with a module file prefix, e.g., `"k#my_crate-<hash>.o"`.
+pub fn crate_name_from_path<'p>(object_file_path: &'p Path) -> &'p str {
+    let stem = object_file_path.file_stem();
+    if let Ok((_crate_type, _prefix, name)) = CrateType::from_module_name(stem) {
+        name
+    } else {
+        stem
+    }
+}
+
+/// Crate names must be only alphanumeric characters, an underscore, or a dash.
+///  
 /// See: <https://www.reddit.com/r/rust/comments/4rlom7/what_characters_are_allowed_in_a_crate_name/>
 pub fn is_valid_crate_name_char(c: char) -> bool {
     char::is_alphanumeric(c) || 
