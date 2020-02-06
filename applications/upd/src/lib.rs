@@ -16,6 +16,7 @@ extern crate ota_update_client;
 extern crate network_manager;
 extern crate memory;
 extern crate mod_mgmt;
+extern crate crate_swap;
 extern crate smoltcp;
 extern crate path;
 extern crate memfs;
@@ -38,6 +39,8 @@ use smoltcp::wire::IpEndpoint;
 use mod_mgmt::{
     CrateNamespace,
     NamespaceDir,
+};
+use crate_swap::{
     SwapRequest,
     SwapRequestList,
     IntoCrateObjectFile,
@@ -273,7 +276,7 @@ fn apply(base_dir_path: &Path) -> Result<(), String> {
     }
 
     // now do the actual live crate swap at runtime
-    CrateNamespace::swap_crates(
+    crate_swap::swap_crates(
         &curr_namespace,
         swap_requests, 
         Some(new_namespace_dir), 

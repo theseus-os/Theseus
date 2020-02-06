@@ -11,17 +11,8 @@ multiboot2 = "0.7.1"
 xmas-elf = { version = "0.6.2", git = "https://github.com/kevinaboos/xmas-elf.git" }
 rustc-demangle = "0.1.14"
 qp-trie = "0.7.3"
-owning_ref = { git = "https://github.com/kevinaboos/owning-ref-rs" }
 cstr_core = "0.1.2"
-by_address = "1.0.4"
 
-
-[dependencies.hashbrown]
-version = "0.1.8"
-features = ["nightly"]
-
-[dependencies.irq_safety]
-git = "https://github.com/kevinaboos/irq_safety"
 
 [dependencies.util]
 path = "../../libs/util"

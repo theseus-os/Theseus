@@ -389,7 +389,25 @@ dependencies = [
 name = "crate_name_utils"
 version = "0.1.0"
 dependencies = [
+ "crate_metadata 0.1.0",
  "itertools 0.7.11 (registry+https://github.com/rust-lang/crates.io-index)",
+ "path 0.1.0",
+]
+
+[[package]]
+name = "crate_swap"
+version = "0.1.0"
+dependencies = [
+ "by_address 1.0.4 (registry+https://github.com/rust-lang/crates.io-index)",
+ "fs_node 0.1.0",
+ "hashbrown 0.1.8 (registry+https://github.com/rust-lang/crates.io-index)",
+ "lazy_static 1.2.0 (registry+https://github.com/rust-lang/crates.io-index)",
+ "log 0.3.9 (registry+https://github.com/rust-lang/crates.io-index)",
+ "memory 0.1.0",
+ "mod_mgmt 0.1.0",
+ "path 0.1.0",
+ "qp-trie 0.7.3 (git+https://github.com/theseus-os/qp-trie-rs)",
+ "spin 0.4.10 (registry+https://github.com/rust-lang/crates.io-index)",
 ]
 
 [[package]]
@@ -1142,21 +1160,17 @@ dependencies = [
 name = "mod_mgmt"
 version = "0.1.0"
 dependencies = [
- "by_address 1.0.4 (registry+https://github.com/rust-lang/crates.io-index)",
  "cow_arc 0.1.0",
  "crate_metadata 0.1.0",
  "crate_name_utils 0.1.0",
  "cstr_core 0.1.2 (registry+https://github.com/rust-lang/crates.io-index)",
  "fs_node 0.1.0",
- "hashbrown 0.1.8 (registry+https://github.com/rust-lang/crates.io-index)",
  "hpet 0.1.0",
- "irq_safety 0.1.1 (git+https://github.com/kevinaboos/irq_safety)",
  "kernel_config 0.1.0",
  "log 0.3.9 (registry+https://github.com/rust-lang/crates.io-index)",
  "memfs 0.1.0",
  "memory 0.1.0",
  "multiboot2 0.7.1 (registry+https://github.com/rust-lang/crates.io-index)",
- "owning_ref 0.4.0 (git+https://github.com/kevinaboos/owning-ref-rs)",
  "path 0.1.0",
  "qp-trie 0.7.3 (git+https://github.com/theseus-os/qp-trie-rs)",
  "root 0.1.0",
@@ -2108,6 +2122,7 @@ dependencies = [
 name = "swap"
 version = "0.1.0"
 dependencies = [
+ "crate_swap 0.1.0",
  "fs_node 0.1.0",
  "getopts 0.2.21 (git+https://github.com/kevinaboos/getopts)",
  "hpet 0.1.0",
@@ -2353,6 +2368,7 @@ dependencies = [
 name = "upd"
 version = "0.1.0"
 dependencies = [
+ "crate_swap 0.1.0",
  "fs_node 0.1.0",
  "getopts 0.2.21 (git+https://github.com/kevinaboos/getopts)",
  "itertools 0.7.11 (registry+https://github.com/rust-lang/crates.io-index)",
