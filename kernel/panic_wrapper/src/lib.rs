@@ -61,10 +61,11 @@ pub fn panic_wrapper(panic_info: &PanicInfo) -> Result<(), &'static str> {
             };
             let mmi = mmi_ref.lock();
 
+            use core::ops::Deref;
             stack_trace_frame_pointers::stack_trace_using_frame_pointers(
                 &mmi.page_table,
                 &mut |_frame_pointer, instruction_pointer: VirtualAddress| {
-                    let symbol_offset = namespace.get_section_containing_address(instruction_pointer, app_crate_ref.as_ref(), false)
+                    let symbol_offset = namespace.get_section_containing_address(instruction_pointer, app_crate_ref.as_deref().map(|acr| acr.deref()), false)
                         .map(|(sec_ref, offset)| (sec_ref.lock().name.clone(), offset));
                     if let Some((symbol_name, offset)) = symbol_offset {
                         error!("  {:>#018X} in {} + {:#X}", instruction_pointer, symbol_name, offset);

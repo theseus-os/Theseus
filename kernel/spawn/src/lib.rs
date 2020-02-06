@@ -224,7 +224,6 @@ pub struct ApplicationTaskBuilder {
     argument: MainFuncArg,
     name: Option<String>,
     pin_on_core: Option<u8>,
-    singleton: bool,
     namespace: Option<Arc<CrateNamespace>>,
     blocked: bool,
 
@@ -236,14 +235,13 @@ impl ApplicationTaskBuilder {
     /// Creates a new application `Task` from the given `path`, which points to 
     /// an application crate object file that must have an entry point called `main`.
     /// 
-    /// TODO: change this to accept a `FileRef` instead of a `Path`
+    /// TODO: change the `Path` argument to the more flexible type `IntoCrateObjectFile`.
     pub fn new(path: Path) -> ApplicationTaskBuilder {
         ApplicationTaskBuilder {
             path: path,
             argument: Vec::new(), // doesn't allocate yet
             name: None,
             pin_on_core: None,
-            singleton: false,
             namespace: None,
             blocked: false,
 
@@ -275,17 +273,6 @@ impl ApplicationTaskBuilder {
     /// Set the argument strings for this Task.
     pub fn argument(mut self, argument: MainFuncArg) -> ApplicationTaskBuilder {
         self.argument = argument;
-        self
-    }
-
-    /// Sets this application Task to be a **singleton** application.
-    /// A singleton application is a special application whose public symbols are added
-    /// to the default namespace's symbol map, which allows other applications to depend upon it. 
-    /// This also prevents this application from being re-loaded again, making it a system-wide singleton that cannot be duplicated.
-    /// 
-    /// In general, for regular applications, you likely should *not* use this. 
-    pub fn singleton(mut self) -> ApplicationTaskBuilder {
-        self.singleton = true;
         self
     }
 
@@ -324,13 +311,13 @@ impl ApplicationTaskBuilder {
         };
         let app_crate_ref = {
             let kernel_mmi_ref = get_kernel_mmi_ref().ok_or("couldn't get_kernel_mmi_ref")?;
-            debug!("ApplicationTaskBuilder::spawn(): loading crate_object_file is_locked? {}", crate_object_file.try_lock().is_none());
-            namespace.load_crate_as_application(&crate_object_file, &kernel_mmi_ref, self.singleton, false)?
+            CrateNamespace::load_crate_as_application(&namespace, &crate_object_file, &kernel_mmi_ref, false)?
         };
 
         // get the LoadedSection for the "main" function in the app_crate
+        // TODO: FIXME: remove the requirement for the "main" function to be `no_mangle` so we can add all symbols here. 
         let main_func_sec_ref = app_crate_ref.lock_as_ref().get_function_section("main")
-            .ok_or("ApplicationTaskBuilder::spawn(): couldn't find \"main\" function, is this an app library? (you cannot spawn a library)")?.clone();
+            .ok_or("ApplicationTaskBuilder::spawn(): couldn't find \"main\" function, is this an app-level library or kernel crate? (you cannot spawn a library)")?.clone();
 
         let mut space: usize = 0; // must live as long as main_func, see MappedPages::as_func()
         let main_func = {
@@ -352,7 +339,7 @@ impl ApplicationTaskBuilder {
 
         // set up app-specific task states right before the task creation is completed
         let post_build_func = |new_task: &mut Task| -> Result<(), &'static str> {
-            new_task.app_crate = Some(app_crate_ref);
+            new_task.app_crate = Some(Arc::new(app_crate_ref));
             new_task.namespace = namespace;
             Ok(())
         };
