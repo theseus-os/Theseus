@@ -1,0 +1,33 @@
+[package]
+name = "new_window"
+version = "0.1.0"
+description = "Try New Window"
+authors = ["Yue Wu <wuyue16@pku.edu.cn>"]
+build = "../../build.rs"
+
+[dependencies]
+spin = "0.4.10"
+# x86_64 = { git = "https://github.com/kevinaboos/x86_64" }
+x86_64 = { path = "../../libs/x86_64" }
+
+[dependencies.log]
+default-features = false
+version = "0.3.7"
+
+[dependencies.shapes]
+path = "../../kernel/shapes"
+
+[dependencies.framebuffer]
+path = "../../kernel/framebuffer"
+
+[dependencies.window]
+path = "../../kernel/window"
+
+[dependencies.color]
+path = "../../kernel/color"
+
+[lib]
+crate-type = ["rlib"]
+
+
+

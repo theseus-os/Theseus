@@ -63,3 +63,5 @@ if [ ! -d "grub" ]; then
   make install
 fi
 
+### install qemu using Homebrew 
+brew install qemu 

@@ -7,36 +7,39 @@
 #![no_std]
 
 #[macro_use] extern crate alloc;
-#[macro_use] extern crate log;
 extern crate dfqueue;
-extern crate window_manager;
 extern crate environment;
 extern crate print;
 extern crate event_types;
-extern crate spin;
-extern crate text_display;
 extern crate displayable;
-extern crate frame_buffer_rgb;
-extern crate frame_buffer;
 extern crate font;
+extern crate framebuffer;
+extern crate framebuffer_drawer;
+extern crate framebuffer_printer;
 extern crate tsc;
-extern crate frame_buffer_drawer;
-extern crate frame_buffer_printer;
+extern crate window_manager;
+extern crate window;
+extern crate text_display;
+extern crate shapes;
+extern crate color;
 
 use alloc::string::{String, ToString};
 use alloc::vec::Vec;
-use alloc::boxed::Box;
-use event_types::Event;
-use text_display::{TextDisplay};
+use cursor::*;
+use text_display::TextDisplay;
 use displayable::Displayable;
-use frame_buffer_rgb::FrameBufferRGB;
-use frame_buffer::{Coord, FrameBuffer};
-use window_manager::WindowGeneric;
+use event_types::Event;
 use font::{CHARACTER_HEIGHT, CHARACTER_WIDTH};
+use framebuffer::{Framebuffer, Pixel};
+use color::{Color};
+use shapes::{Coord, Rectangle};
 use tsc::{tsc_ticks, TscTicks};
+use window::Window;
 
-pub const FONT_COLOR: u32 = 0x93ee90;
-pub const BACKGROUND_COLOR: u32 = 0x000000;
+pub mod cursor;
+
+pub const FONT_COLOR: Color = color::LIGHT_GREEN;
+pub const BACKGROUND_COLOR: Color = color::BLACK;
 const DEFAULT_CURSOR_FREQ: u64 = 400000000;
 
 /// Error type for tracking different scroll errors that a terminal
@@ -57,33 +60,25 @@ pub enum ScrollError {
 ///     - Consumer is the main terminal loop
 ///     - Producer is the window manager. Window manager is responsible for enqueuing keyevents into the active application
 pub struct Terminal {
-    /// The terminal's own window
-    window: WindowGeneric<FrameBufferRGB>,
-    // Name of the displayable object of the terminal
-    display_name: String,
+    /// The terminal's own window.
+    pub window: Window,
     /// The terminal's scrollback buffer which stores a string to be displayed by the text display
     scrollback_buffer: String,
     /// Indicates whether the text display is displaying the last part of the scrollback buffer slice
     is_scroll_end: bool,
     /// The starting index of the scrollback buffer string slice that is currently being displayed on the text display
     scroll_start_idx: usize,
+    /// The text displayable which the terminal prints to.
+    text_display: TextDisplay,
     /// The cursor of the terminal.
     pub cursor: Cursor
 }
 
 /// Privite methods of `Terminal`.
 impl Terminal {
-    /// Get the width and height of the text display.
-    fn get_displayable_dimensions(&self, name:&str) -> (usize, usize){        
-        match self.window.get_concrete_display::<TextDisplay>(&name) {
-            Ok(text_display) => {
-                return text_display.get_dimensions();
-            },
-            Err(err) => {
-                debug!("get_displayable_dimensions: {}", err);
-                return (0, 0);
-            }
-        }
+    /// Gets the width and height of the text displayable in number of characters.
+    pub fn get_text_dimensions(&self) -> (usize, usize) {
+        self.text_display.get_dimensions()
     }
 
     /// This function takes in the end index of some index in the scrollback buffer and calculates the starting index of the
@@ -94,13 +89,13 @@ impl Terminal {
     /// as if the whole physical line is displayed on the buffer
     /// 
     /// Return: starting index of the string and the cursor position(with respect to position on the screen, not in the scrollback buffer) in that order
-    fn calc_start_idx(&self, end_idx: usize, display_name:&str) -> (usize, usize) {
-        let (buffer_width, buffer_height) = self.get_displayable_dimensions(display_name);
+    fn calc_start_idx(&self, end_idx: usize) -> (usize, usize) {
+        let (buffer_width, buffer_height) = self.get_text_dimensions();
         let mut start_idx = end_idx;
         let result;
         // Grabs a max-size slice of the scrollback buffer (usually does not totally fit because of newlines)
         if end_idx > buffer_width * buffer_height {
-            result = self.scrollback_buffer.get(end_idx - buffer_width*buffer_height..end_idx);
+            result = self.scrollback_buffer.get(end_idx - buffer_width * buffer_height..end_idx);
         } else {
             result = self.scrollback_buffer.get(0..end_idx);
         }
@@ -181,8 +176,8 @@ impl Terminal {
     /// This function takes in the start index of some index in the scrollback buffer and calculates the end index of the
     /// scrollback buffer so that a slice containing the starting and ending index would perfectly fit inside the dimensions of 
     /// text display. 
-    fn calc_end_idx(&self, start_idx: usize, display_name:&str) -> Result<usize, ScrollError> {
-        let (buffer_width,buffer_height) = self.get_displayable_dimensions(display_name);
+    fn calc_end_idx(&self, start_idx: usize) -> Result<usize, ScrollError> {
+        let (buffer_width, buffer_height) = self.get_text_dimensions();
         let scrollback_buffer_len = self.scrollback_buffer.len();
         let mut end_idx = start_idx;
         let result;
@@ -255,7 +250,7 @@ impl Terminal {
 
     /// Scrolls the text display up one line
     fn scroll_up_one_line(&mut self) {
-        let buffer_width = self.get_displayable_dimensions(&self.display_name).0;
+        let buffer_width = self.get_text_dimensions().0;
         let mut start_idx = self.scroll_start_idx;
         //indicates that the user has scrolled to the top of the page
         if start_idx < 1 {
@@ -291,13 +286,13 @@ impl Terminal {
 
     /// Scrolls the text display down one line
     fn scroll_down_one_line(&mut self) {
-        let buffer_width = self.get_displayable_dimensions(&self.display_name).0;
+        let buffer_width = self.get_text_dimensions().0;
         let prev_start_idx;
         // Prevents the user from scrolling down if already at the bottom of the page
         if self.is_scroll_end == true {
             return;} 
         prev_start_idx = self.scroll_start_idx;
-        let result = self.calc_end_idx(prev_start_idx, &self.display_name);
+        let result = self.calc_end_idx(prev_start_idx);
         let mut end_idx = match result {
             Ok(end_idx) => end_idx,
             Err(ScrollError::OffEndBound) => self.scrollback_buffer.len() -1,
@@ -306,7 +301,7 @@ impl Terminal {
         // If the newly calculated end index is the bottom of the scrollback buffer, recalculates the start index and returns
         if end_idx == self.scrollback_buffer.len() -1 {
             self.is_scroll_end = true;
-            let new_start = self.calc_start_idx(end_idx, &self.display_name).0;
+            let new_start = self.calc_start_idx(end_idx).0;
             self.scroll_start_idx = new_start;
             return;
         }
@@ -335,37 +330,37 @@ impl Terminal {
             }
         }
         // Recalculates new starting index
-        let start_idx = self.calc_start_idx(new_end_idx, &self.display_name).0;
+        let start_idx = self.calc_start_idx(new_end_idx).0;
         self.scroll_start_idx = start_idx;
     }
 
     /// Shifts the text display up by making the previous first line the last line displayed on the text display
     fn page_up(&mut self) {
         let new_end_idx = self.scroll_start_idx;
-        let new_start_idx = self.calc_start_idx(new_end_idx, &self.display_name);
+        let new_start_idx = self.calc_start_idx(new_end_idx);
         self.scroll_start_idx = new_start_idx.0;
     }
 
     /// Shifts the text display down by making the previous last line the first line displayed on the text display
     fn page_down(&mut self) {
         let start_idx = self.scroll_start_idx;
-        let result = self.calc_end_idx(start_idx, &self.display_name);
+        let result = self.calc_end_idx(start_idx);
         let new_start_idx = match result {
             Ok(idx) => idx+ 1, 
             Err(ScrollError::OffEndBound) => {
                 let scrollback_buffer_len = self.scrollback_buffer.len();
-                let new_start_idx = self.calc_start_idx(scrollback_buffer_len, &self.display_name).0;
+                let new_start_idx = self.calc_start_idx(scrollback_buffer_len).0;
                 self.scroll_start_idx = new_start_idx;
                 self.is_scroll_end = true;
                 return;
             },
         };
-        let result = self.calc_end_idx(new_start_idx, &self.display_name);
+        let result = self.calc_end_idx(new_start_idx);
         let new_end_idx = match result {
             Ok(end_idx) => end_idx,
             Err(ScrollError::OffEndBound) => {
                 let scrollback_buffer_len = self.scrollback_buffer.len();
-                let new_start_idx = self.calc_start_idx(scrollback_buffer_len, &self.display_name).0;
+                let new_start_idx = self.calc_start_idx(scrollback_buffer_len).0;
                 self.scroll_start_idx = new_start_idx;
                 self.is_scroll_end = true;
                 return;
@@ -382,42 +377,50 @@ impl Terminal {
     /// Updates the text display by taking a string index and displaying as much as it starting from the passed string index (i.e. starts from the top of the display and goes down)
     fn update_display_forwards(&mut self, start_idx: usize) -> Result<(), &'static str> {
         self.scroll_start_idx = start_idx;
-        let result= self.calc_end_idx(start_idx, &self.display_name); 
+        let result = self.calc_end_idx(start_idx);
         let end_idx = match result {
             Ok(end_idx) => end_idx,
             Err(ScrollError::OffEndBound) => {
                 let new_end_idx = self.scrollback_buffer.len() -1;
-                let new_start_idx = self.calc_start_idx(new_end_idx, &self.display_name).0;
+                let new_start_idx = self.calc_start_idx(new_end_idx).0;
                 self.scroll_start_idx = new_start_idx;
                 new_end_idx
             },
         };
         let result  = self.scrollback_buffer.get(start_idx..=end_idx); // =end_idx includes the end index in the slice
         if let Some(slice) = result {
-            {
-                let text_display = self.window.get_concrete_display_mut::<TextDisplay>(&self.display_name)?;
-                text_display.set_text(slice);
-            }
-            self.window.display(&self.display_name)?;
+            self.text_display.set_text(&slice);
+            self.display_text()?;
         } else {
             return Err("could not get slice of scrollback buffer string");
         }
         Ok(())
     }
 
+    /// Display the text displayable in the window and render it to the screen
+    fn display_text(&mut self) -> Result<(), &'static str>{
+        let area = {
+            let mut inner = self.window.inner.lock();
+            let area = self.text_display.display(
+                Coord::new(0, 0) + self.window.inner_position(), 
+                &mut inner.framebuffer
+            )?;
+            area
+        };
+
+        self.window.render(Some(area))
+    }
+
     /// Updates the text display by taking a string index and displaying as much as it can going backwards from the passed string index (i.e. starts from the bottom of the display and goes up)
     fn update_display_backwards(&mut self, end_idx: usize) -> Result<(), &'static str> {
-        let (start_idx, _cursor_pos) = self.calc_start_idx(end_idx, &self.display_name);
+        let (start_idx, _cursor_pos) = self.calc_start_idx(end_idx);
         self.scroll_start_idx = start_idx;
 
         let result = self.scrollback_buffer.get(start_idx..end_idx);
 
         if let Some(slice) = result {
-            {
-                let text_display = self.window.get_concrete_display_mut::<TextDisplay>(&self.display_name)?;
-                text_display.set_text(slice);
-            }
-            self.window.display(&self.display_name)?;        
+            self.text_display.set_text(slice);
+            self.display_text()?;
         } else {
             return Err("could not get slice of scrollback buffer string");
         }
@@ -427,24 +430,34 @@ impl Terminal {
 
 /// Public methods of `Terminal`.
 impl Terminal {
+    /// Creates a new terminal and adds it to the window manager `wm_mutex`
     pub fn new() -> Result<Terminal, &'static str> {
-        // Requests a new window object from the window manager
-        let window_object = match window_manager::new_default_window() {
-            Ok(window_object) => window_object,
-            Err(err) => {debug!("new window returned err"); return Err(err)}
+        let wm_mut = window_manager::WINDOW_MANAGER.try().ok_or("The window manager is not initialized")?;
+        let (window_width, window_height) = {
+            let wm = wm_mut.lock();
+            wm.get_screen_size()
         };
+        // const WINDOW_MARGIN: usize = 20;
+        let window = window::Window::new(
+            Coord::new(0, 0), 
+            window_width, 
+            window_height,
+            color::BLACK
+        )?;
+        
+        let (width_inner, height_inner) = window.inner_size();
+        let text_display = TextDisplay::new(width_inner, height_inner, FONT_COLOR, BACKGROUND_COLOR)?;
 
-        // let mut prompt_string = root.lock().get_absolute_path(); // ref numbers are 0-indexed
         let mut terminal = Terminal {
-            window: window_object,
-            display_name: String::from("content"),
+            window: window,
             scrollback_buffer: String::new(),
             scroll_start_idx: 0,
             is_scroll_end: true,
-            cursor: Cursor::new(FONT_COLOR),
+            text_display: text_display,
+            cursor: Cursor::default(),
         };
+        terminal.display_text()?;
 
-        // Inserts a producer for the print queue into global list of terminal print producers
         terminal.print_to_terminal(format!("Theseus Terminal Emulator\nPress Ctrl+C to quit a task\n"));
         Ok(terminal)
     }
@@ -456,21 +469,17 @@ impl Terminal {
     }
 
     /// Actually refresh the screen. Currently it's expensive.
-    pub fn refresh_display(&mut self) {
+    pub fn refresh_display(&mut self) -> Result<(), &'static str> {
         let start_idx = self.scroll_start_idx;
         // handling display refreshing errors here so that we don't clog the main loop of the terminal
         if self.is_scroll_end {
             let buffer_len = self.scrollback_buffer.len();
-            match self.update_display_backwards(buffer_len) {
-                Ok(_) => { }
-                Err(err) => {error!("could not update display backwards: {}", err); return}
-            }
+            self.update_display_backwards(buffer_len)?;
         } else {
-            match self.update_display_forwards(start_idx) {
-                Ok(_) => { }
-                Err(err) => {error!("could not update display forwards: {}", err); return}
-            }
+            self.update_display_forwards(start_idx)?;
         }
+
+        Ok(())
     }
 
     /// Insert a character to the terminal.
@@ -478,8 +487,8 @@ impl Terminal {
     /// # Arguments
     ///
     /// * `c`: the new character to insert.
-    /// * `offset_from_end`: the position to insert the character. It represents the distance relative to the end of the whole output in the terminal in units of characters.
-    /// 
+    /// * `offset_from_end`: the position to insert the character. It represents the distance relative to the end of the whole output in the terminal in number of characters.
+    ///
     /// # Examples
     ///
     /// * `terminal.insert_char(char, 0)` will append `char` to the end of existing text.
@@ -498,8 +507,8 @@ impl Terminal {
     ///
     /// # Arguments
     ///
-    /// * `offset_from_end`: the position of the character to remove. It represents the distance relative to the end of the whole output in the terminal in units of characters. `offset_from_end == 0` is *invalid* here.
-    /// 
+    /// * `offset_from_end`: the position of the character to remove. It represents the distance relative to the end of the whole output in the terminal in number of characters. `offset_from_end == 0` is *invalid* here.
+    ///
     /// # Examples
     ///
     /// * `terminal.remove_char(1)` will remove the last character in the screen.
@@ -520,6 +529,7 @@ impl Terminal {
         if self.scroll_start_idx != 0 {
             self.is_scroll_end = false;
             self.scroll_start_idx = 0; // takes us up to the start of the page
+            self.cursor.disable();
             self.display_cursor()?;
         }
         
@@ -533,7 +543,7 @@ impl Terminal {
             self.display_cursor()?;
             self.is_scroll_end = true;
             let buffer_len = self.scrollback_buffer.len();
-            self.scroll_start_idx = self.calc_start_idx(buffer_len, &self.display_name).0;
+            self.scroll_start_idx = self.calc_start_idx(buffer_len).0;
             self.cursor.enable();
         }
         Ok(())
@@ -543,6 +553,7 @@ impl Terminal {
     pub fn move_screen_line_up(&mut self) -> Result<(), &'static str> {
         if self.scroll_start_idx != 0 {
             self.scroll_up_one_line();
+            self.cursor.disable();
             self.display_cursor()?;
         }
         Ok(())
@@ -566,6 +577,7 @@ impl Terminal {
         }
         self.page_up();
         self.is_scroll_end = false;
+        self.cursor.disable();
         self.display_cursor()
     }
 
@@ -588,42 +600,35 @@ impl Terminal {
         self.is_scroll_end = true;
     }
 
-    pub fn initialize_screen(&mut self) -> Result<(), &'static str> {
-        let display_name = self.display_name.clone();
-        { 
-            let (width, height) = self.window.dimensions();
-            let width  = width  - 2*window_manager::WINDOW_MARGIN;
-            let height = height - 2*window_manager::WINDOW_MARGIN;
-            let text_display = TextDisplay::new(width, height, FONT_COLOR, BACKGROUND_COLOR)?;
-            let displayable: Box<dyn Displayable> = Box::new(text_display);
-            self.window.add_displayable(&display_name, Coord::new(0, 0),displayable)?;
-        }
-        Ok(())
-    }
-
     /// Get a key event from the underlying window.
-    pub fn get_event(&self) -> Option<Event> {
-        self.window.get_event()
-    }
-
-    pub fn get_width_height(&self) -> (usize, usize) {
-        self.get_displayable_dimensions(&self.display_name)
+    pub fn get_event(&mut self) -> Option<Event> {
+        match self.window.handle_event() {
+            Err(_e) => {
+                return Some(Event::ExitEvent);
+            }
+            _ => {}
+        };
+        let event = match self.window.consumer.pop() {
+            Some(ev) => ev,
+            None => {
+                return None;
+            }
+        };
+        Some(event)
     }
 
     /// Display the cursor of the terminal.
     pub fn display_cursor(
         &mut self
     ) -> Result<(), &'static str> {
-        let coordinate = self.window.get_displayable_position(&self.display_name)?;
-        
+        let coordinate = self.window.inner_position();
         // get info about the text displayable
         let (col_num, line_num, text_next_pos) = {
-            let text_display = self.window.get_concrete_display::<TextDisplay>(&self.display_name)?;
-            let text_next_pos = text_display.get_next_pos();
-            let (col_num, line_num) = text_display.get_dimensions();
+            let text_next_pos = self.text_display.get_next_index();
+            let (col_num, line_num) = self.get_text_dimensions();
             (col_num, line_num, text_next_pos)
         };
-        
+
         // return if the cursor is not in the screen
         if text_next_pos >= col_num * line_num {
             return Ok(())
@@ -633,142 +638,34 @@ impl Terminal {
         let cursor_pos = text_next_pos - self.cursor.offset_from_end;
         let cursor_line = cursor_pos / col_num;
         let cursor_col = cursor_pos % col_num;
-                
-        self.cursor.display(
-            coordinate,
-            cursor_col,
-            cursor_line,
-            &mut self.window.framebuffer,
-        );
 
-        // update to the end of the text if the cursor is at the last line
-        let text_width = if text_next_pos / col_num == cursor_line {
-            text_next_pos % col_num
-        } else {
-            col_num * CHARACTER_WIDTH
-        };
+        // Get the container to display the cursor in
+        let bounding_box = {
+            let mut window = self.window.inner.lock();
+            let bounding_box = self.cursor.display(
+                coordinate,
+                cursor_col,
+                cursor_line,
+                &mut window.framebuffer,
+            )?;
+            bounding_box
+        };   
 
-        let block = vec![(cursor_line, text_width)];
-        self.window.render(Some(block.into_iter()))
+        self.window.render(Some(bounding_box))
     }
 
-    /// Gets the position of the cursor relative to the end of text in units of characters.
+    /// Gets the position of the cursor relative to the end of text in number of characters.
     pub fn get_cursor_offset_from_end(&self) -> usize {
         self.cursor.offset_from_end
     }
 
     /// Updates the position of a cursor.
     /// # Arguments
-    /// * `offset_from_end`: the position of the cursor relative to the end of text in units of characters.
+    /// * `offset_from_end`: the position of the cursor relative to the end of text in number of characters.
     /// * `underlying_char`: the ASCII code of the underlying character when the cursor is unseen.
     pub fn update_cursor_pos(&mut self, offset_from_end: usize, underlying_char: u8) {
         self.cursor.offset_from_end = offset_from_end;
         self.cursor.underlying_char = underlying_char;
     }
 
-}
-
-/// The cursor structure.
-/// A cursor is a special symbol shown in the text box of a terminal. It indicates the position of character where the next input would be put or the delete operation works on.
-/// Terminal invokes its `display` method in a loop to let a cursor blink.
-pub struct Cursor {
-    /// Whether the cursor is enabled in the terminal.
-    enabled: bool,
-    /// The blinking frequency.
-    freq: u64,
-    /// The last time it blinks.
-    time: TscTicks,
-    /// The current blinking state show/hidden
-    show: bool,
-    /// The color of the cursor
-    color: u32,
-    /// The position of the cursor relative to the end of terminal text in units of number of characters.
-    offset_from_end: usize,
-    /// The underlying character at the position of the cursor.
-    /// It is shown when the cursor is unseen.
-    underlying_char: u8,
-}
-
-impl Cursor {
-    /// Creates a new cursor structure with a default offset to the end of the text as 0 and the underlying character as `\0`. The initial `show` state is  `true` and the blinking frequency is defined as `libterm::DEFAULT_CURSOR_FREQ`. The parameter `color` specifies the color of the cursor.
-    pub fn new(color: u32) -> Cursor {
-        Cursor {
-            enabled: true,
-            freq: DEFAULT_CURSOR_FREQ,
-            time: tsc_ticks(),
-            show: true,
-            color: color,
-            offset_from_end: 0,
-            underlying_char: 0,
-        }
-    }
-
-    /// Resets the blink state of the cursor.
-    pub fn reset(&mut self) {
-        self.show = true;
-        self.time = tsc_ticks();
-    }
-
-    /// Enables a cursor.
-    pub fn enable(&mut self) {
-        self.enabled = true;
-        self.reset();
-    }
-
-    /// Disables a cursor.
-    pub fn disable(&mut self) {
-        self.enabled = false;
-    }
-
-    /// Changes the blink state show/hidden of a cursor based on its frequency.
-    /// It returns whether the cursor should be re-display. If the cursor is enabled, it returns whether the show/hidden state has been changed. Otherwise it returns true because the cursor is disabled and should refresh.
-    pub fn blink(&mut self) -> bool {
-        if self.enabled {
-            let time = tsc_ticks();
-            if let Some(duration) = time.sub(&(self.time)) {
-                if let Some(ns) = duration.to_ns() {
-                    if ns >= self.freq {
-                        self.time = time;
-                        self.show = !self.show;
-                        return true;
-                    }
-                }
-            }
-        }
-        true
-    }
-
-    /// Checks if the cursor should be shown.
-    pub fn show(&self) -> bool {
-        self.enabled && self.show
-    }
-
-    /// Displays a cursor in a text block onto a frame buffer. An application calls this function in a loop to make it blinking.
-    /// # Arguments
-    /// * `coordinate`: the left top coordinate of the text block relative to the origin(top-left point) of the frame buffer.
-    /// * `(column, line)`: the location of the cursor in the text block in units of characters.
-    /// * `framebuffer`: the framebuffer to display onto.
-    pub fn display(&mut self, coordinate: Coord, column: usize, line: usize, framebuffer: &mut dyn FrameBuffer) {
-        if self.blink() {
-            if self.show() {
-                frame_buffer_drawer::fill_rectangle(
-                    framebuffer,
-                    coordinate + ((column * CHARACTER_WIDTH) as isize, (line * CHARACTER_HEIGHT) as isize) + (0, 1),
-                    CHARACTER_WIDTH,
-                    CHARACTER_HEIGHT - 2,
-                    self.color,
-                );
-            } else {
-                frame_buffer_printer::print_ascii_character(
-                    framebuffer,
-                    self.underlying_char,
-                    FONT_COLOR,
-                    BACKGROUND_COLOR,
-                    coordinate,
-                    column,
-                    line,
-                )
-            }
-        }
-    }
 }

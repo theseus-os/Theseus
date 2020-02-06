@@ -24,12 +24,6 @@ path = "../kernel_config"
 [dependencies.logger]
 path = "../logger"
 
-[dependencies.frame_buffer]
-path = "../frame_buffer"
-
-[dependencies.frame_buffer_rgb]
-path = "../frame_buffer_rgb"
-
 [dependencies.window_manager]
 path = "../window_manager"
 
@@ -86,9 +80,6 @@ path = "../network_manager"
 
 [dependencies.ota_update_client]
 path = "../ota_update_client"
-
-[dependencies.font]
-path = "../font"
 
 ## This should be dependent upon 'cfg(simd_personality)',
 ## but it cannot be because of https://github.com/rust-lang/cargo/issues/5499.
