@@ -12,6 +12,7 @@ extern crate itertools;
 extern crate getopts;
 extern crate memory;
 extern crate mod_mgmt;
+extern crate crate_swap;
 extern crate hpet;
 extern crate task;
 extern crate path;
@@ -23,7 +24,8 @@ use alloc::{
     sync::Arc,
 };
 use getopts::{Options, Matches};
-use mod_mgmt::{CrateNamespace, NamespaceDir, SwapRequest, IntoCrateObjectFile};
+use mod_mgmt::NamespaceDir;
+use crate_swap::{SwapRequest, IntoCrateObjectFile};
 use hpet::get_hpet;
 use path::Path;
 use fs_node::{FileOrDir, DirRef};
@@ -193,7 +195,7 @@ fn do_swap(
     
     let start = get_hpet().as_ref().ok_or("couldn't get HPET timer")?.get_counter();
 
-    let swap_result = CrateNamespace::swap_crates(
+    let swap_result = crate_swap::swap_crates(
         &namespace,
         swap_requests, 
         override_namespace_crate_dir,
