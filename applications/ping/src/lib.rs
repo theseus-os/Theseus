@@ -45,8 +45,7 @@ macro_rules! hpet_ticks {
 }
 
 
-#[no_mangle]
-fn main(args: Vec<String>) -> isize {
+pub fn main(args: Vec<String>) -> isize {
 
     let mut opts = Options::new();
     opts.optflag("h", "help", "print this help menu");

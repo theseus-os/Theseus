@@ -12,7 +12,6 @@ use alloc::vec::Vec;
 use alloc::string::String;
 use apic::get_lapics;
 
-#[no_mangle]
 pub fn main(args: Vec<String>) -> isize {
     let mut opts = Options::new();
     opts.optflag("h", "help", "print this help menu");

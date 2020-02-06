@@ -28,7 +28,6 @@ const CONFIG: &'static str = "WITHOUT state spill";
 const _FEMTOSECONDS_PER_SECOND: u64 = 1000*1000*1000*1000*1000; // 10^15
 
 
-#[no_mangle]
 pub fn main(args: Vec<String>) -> isize {
     let mut opts = Options::new();
     opts.optflag("h", "help", "print this help menu");

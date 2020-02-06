@@ -31,7 +31,6 @@ use path::Path;
 use fs_node::{FileOrDir, DirRef};
 
 
-#[no_mangle]
 pub fn main(args: Vec<String>) -> isize {
     #[cfg(not(loadable))] {
         println!("****************\nWARNING: Theseus was not built in 'loadable' mode, so crate swapping may not work.\n****************");

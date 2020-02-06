@@ -69,7 +69,6 @@ macro_rules! CPU_ID {
 	() => (apic::get_my_apic_id().unwrap())
 }
 
-#[no_mangle]
 pub fn main(args: Vec<String>) -> isize {
 	let prog = get_prog_name();
 

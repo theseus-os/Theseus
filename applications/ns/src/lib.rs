@@ -22,7 +22,6 @@ use getopts::{Options, Matches};
 use mod_mgmt::CrateNamespace;
 
 
-#[no_mangle]
 pub fn main(args: Vec<String>) -> isize {
     let mut opts = Options::new();
     opts.optflag("h", "help", "print this help menu");

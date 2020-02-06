@@ -37,7 +37,7 @@ use alloc::{
 use irq_safety::{MutexIrqSafe, hold_interrupts, enable_interrupts};
 use memory::{get_kernel_mmi_ref, MemoryManagementInfo, VirtualAddress};
 use task::{Task, TaskRef, get_my_current_task, RunState, TASKLIST, TASK_SWITCH_LOCKS};
-use mod_mgmt::CrateNamespace;
+use mod_mgmt::{CrateNamespace, SectionType, SECTION_HASH_DELIMITER};
 use path::Path;
 use fs_node::FileOrDir;
 
@@ -217,6 +217,9 @@ impl<F, A, R> KernelTaskBuilder<F, A, R>
 
 }
 
+/// Every executable application must have an entry point function named "main".
+const ENTRY_POINT_SECTION_NAME: &'static str = "main";
+
 /// A struct that uses the Builder pattern to create and customize new application `Task`s.
 /// Note that the new `Task` will not actually be created until the [`spawn`](#method.spawn) method is invoked.
 pub struct ApplicationTaskBuilder {
@@ -314,10 +317,21 @@ impl ApplicationTaskBuilder {
             CrateNamespace::load_crate_as_application(&namespace, &crate_object_file, &kernel_mmi_ref, false)?
         };
 
-        // get the LoadedSection for the "main" function in the app_crate
-        // TODO: FIXME: remove the requirement for the "main" function to be `no_mangle` so we can add all symbols here. 
-        let main_func_sec_ref = app_crate_ref.lock_as_ref().get_function_section("main")
-            .ok_or("ApplicationTaskBuilder::spawn(): couldn't find \"main\" function, is this an app-level library or kernel crate? (you cannot spawn a library)")?.clone();
+        // Find the "main" entry point function in the new app crate
+        let main_func_sec_ref = { 
+            let app_crate = app_crate_ref.lock_as_ref();
+            let expected_main_section_name = format!("{}{}{}", app_crate.crate_name_as_prefix(), ENTRY_POINT_SECTION_NAME, SECTION_HASH_DELIMITER);
+            let main_func_sec = app_crate.find_section(|sec| {
+                if sec.get_type() != SectionType::Text {
+                    return false;
+                }
+                sec.name_without_hash() == &expected_main_section_name
+            });
+            main_func_sec.cloned()
+        }.ok_or("ApplicationTaskBuilder::spawn(): couldn't find \"main\" function, expected function name like \"<crate_name>::main::<hash>\"\
+                    --> Is this an app-level library or kernel crate? (Note: you cannot spawn a library crate with no main function)"
+        )?
+        .clone();
 
         let mut space: usize = 0; // must live as long as main_func, see MappedPages::as_func()
         let main_func = {

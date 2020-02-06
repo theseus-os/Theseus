@@ -17,7 +17,6 @@ use spawn::KernelTaskBuilder;
 use mutex_sleep::MutexSleep;
 
 
-#[no_mangle]
 pub fn main(_args: Vec<String>) -> isize {    
     let res = match _args.get(0).map(|s| &**s) {
         Some("-c") => test_contention(),
