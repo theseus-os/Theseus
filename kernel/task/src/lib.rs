@@ -67,7 +67,7 @@ use atomic_linked_list::atomic_map::AtomicMap;
 use tss::tss_set_rsp0;
 use mod_mgmt::{
     CrateNamespace,
-    StrongCrateRef,
+    AppCrateRef,
 };
 use environment::Environment;
 use spin::Mutex;
@@ -238,10 +238,9 @@ pub struct Task {
     /// Whether this Task is an idle task, the task that runs by default when no other task is running.
     /// There exists one idle task per core, so this is `false` for most tasks.
     pub is_an_idle_task: bool,
-    /// For application `Task`s, the [`LoadedCrate`](../mod_mgmt/metadata/struct.LoadedCrate.html)
-    /// that contains the backing memory regions and sections for running this `Task`'s object file.
-    /// The `app_crate` will contain the main function (entry point) for this `Task`, among other things.
-    pub app_crate: Option<StrongCrateRef>,
+    /// For application `Task`s, this is a reference to the [`LoadedCrate`](../mod_mgmt/metadata/struct.LoadedCrate.html)
+    /// that contains the entry function for this `Task`.
+    pub app_crate: Option<Arc<AppCrateRef>>,
     /// This `Task` is linked into and runs within the context of 
     /// this [`CrateNamespace`](../mod_mgmt/struct.CrateNamespace.html).
     pub namespace: Arc<CrateNamespace>,
@@ -266,7 +265,7 @@ impl fmt::Debug for Task {
 impl Task {
     /// Creates a new Task structure and initializes it to be non-Runnable.
     /// By default, the new `Task` will inherit some of the same states from the currently-running `Task`:
-    /// its `Environment`, `MemoryManagementInfo`, `CrateNamespace`, and `app_crate` reference (`StrongCrateRef`).
+    /// its `Environment`, `MemoryManagementInfo`, `CrateNamespace`, and `app_crate` reference.
     /// If needed, those states can be changed by setting them for the returned `Task`.
     /// 
     /// # Arguments
@@ -296,7 +295,7 @@ impl Task {
         kstack: Stack, 
         mmi: MmiRef, namespace: Arc<CrateNamespace>,
         env: Arc<Mutex<Environment>>,
-        app_crate: Option<StrongCrateRef>
+        app_crate: Option<Arc<AppCrateRef>>
     ) -> Self {
          /// The counter of task IDs
         static TASKID_COUNTER: AtomicUsize = AtomicUsize::new(0);

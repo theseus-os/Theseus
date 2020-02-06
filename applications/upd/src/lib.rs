@@ -39,11 +39,11 @@ use smoltcp::wire::IpEndpoint;
 use mod_mgmt::{
     CrateNamespace,
     NamespaceDir,
+    IntoCrateObjectFile,
 };
 use crate_swap::{
     SwapRequest,
     SwapRequestList,
-    IntoCrateObjectFile,
 };
 use memfs::MemFile;
 use path::Path;

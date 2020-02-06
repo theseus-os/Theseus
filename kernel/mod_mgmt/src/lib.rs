@@ -280,6 +280,71 @@ impl NamespaceDir {
 }
 
 
+/// A type that can be converted into a crate object file.
+/// 
+/// We use an enum rather than implement `TryInto` because we need additional information
+/// to resolve a `Prefix`, namely the `CrateNamespace` in which to search for the prefix.
+pub enum IntoCrateObjectFile {
+    /// A direct reference to the crate object file. This will be used as-is. 
+    File(FileRef),
+    /// An absolute path that points to the crate object file. 
+    AbsolutePath(Path),
+    /// A string prefix that will be used to search for the crate object file in the namespace.
+    /// This must be able to uniquely identify a single crate object file in the namespace directory (recursively searched). 
+    Prefix(String),
+}
+impl fmt::Debug for IntoCrateObjectFile {
+    fn fmt(&self, f: &mut fmt::Formatter) -> fmt::Result {
+        let mut dbg = f.debug_struct("IntoCrateObjectFile");
+        match self {
+            Self::File(object_file) => dbg.field("File", &object_file.try_lock()
+                .map(|f| f.get_absolute_path())
+                .unwrap_or_else(|| format!("<Locked>"))
+            ),
+            Self::AbsolutePath(p) => dbg.field("AbsolutePath", p),
+            Self::Prefix(prefix) => dbg.field("Prefix", prefix),
+        };
+        dbg.finish()
+    }
+}
+
+
+/// An application crate that has been loaded into a `CrateNamespace`.
+/// 
+/// This type auto-derefs into the application's `StrongCrateRef`.
+/// 
+/// When dropped, the application crate will be removed 
+/// from the `CrateNamespace` into which it was originally loaded.
+pub struct AppCrateRef {
+    crate_ref: StrongCrateRef,
+    namespace: Arc<CrateNamespace>,
+}
+impl Deref for AppCrateRef {
+    type Target = StrongCrateRef;
+    fn deref(&self) -> &StrongCrateRef {
+        &self.crate_ref
+    }
+}
+impl Drop for AppCrateRef {
+    fn drop(&mut self) {
+        // trace!("### Dropping AppCrateRef {:?} from namespace {:?}", self.crate_ref, self.namespace.name());
+        let crate_locked = self.crate_ref.lock_as_ref();
+        // First, remove the actual crate from the namespace.
+        if let Some(_removed_app_crate) = self.namespace.crate_tree().lock().remove_str(&crate_locked.crate_name) {
+            // Second, remove all of the crate's global symbols from the namespace's symbol map.
+            let mut symbol_map = self.namespace.symbol_map().lock();
+            for symbol in &crate_locked.global_symbols {
+                if symbol_map.remove(symbol).is_none() {
+                    error!("NOTE: couldn't find old symbol {:?} in the old crate {:?} to remove from namespace {:?}.", symbol, crate_locked.crate_name, self.namespace.name());
+                }
+            }
+        } else {
+            error!("BUG: the dropped AppCrateRef {:?} could not be removed from namespace {:?}", self.crate_ref, self.namespace.name());
+        }
+    }
+}
+
+
 /// This struct represents a namespace of crates and their "global" (publicly-visible) symbols.
 /// A crate namespace struct is basically a container around many crates 
 /// that have all been loaded and linked against each other, 
@@ -615,41 +680,36 @@ impl CrateNamespace {
         files_iter.next().filter(|_| files_iter.next().is_none()) // ensure single element
     }
 
-    /// Loads the specified application crate into memory, allowing it to be invoked.
+    /// Loads the specified application crate into this `CrateNamespace`, allowing it to be run.
     /// 
-    /// The argument `load_symbols_as_singleton` determines what is done with the newly-loaded crate:      
-    /// * If true, this application is loaded as a system-wide singleton crate and added to this namespace, 
-    ///   and its public symbols are added to this namespace's symbol map, allowing other applications to depend upon it.
-    /// * If false, this application is loaded normally and not added to this namespace in any way,
-    ///   allowing it to be loaded again in the future as a totally separate instance.
+    /// The new application crate's public symbols are added to this `CrateNamespace`'s symbol map,
+    /// allowing other crates in this namespace to depend upon it.
     /// 
-    /// Returns a Result containing the new crate itself.
+    /// Application crates are added to the CrateNamespace just like kernel crates,
+    /// so to load an application crate multiple times to spawn multiple instances of it,
+    /// you can create a new top-level namespace to hold that application crate.
+    /// 
+    /// Returns a Result containing the newly-loaded application crate itself.
     pub fn load_crate_as_application(
-        &self, 
+        namespace: &Arc<CrateNamespace>,
         crate_object_file: &FileRef, 
         kernel_mmi_ref: &MmiRef, 
-        load_symbols_as_singleton: bool,
         verbose_log: bool
-    ) -> Result<StrongCrateRef, &'static str> {
-        
+    ) -> Result<AppCrateRef, &'static str> {
         debug!("load_crate_as_application(): trying to load application crate at {:?}", crate_object_file.lock().get_absolute_path());
-        // Don't use a backup namespace when loading applications, 
-        // it must be able to find all symbols in only this namespace (&self) and its backing namespaces.
-        let new_crate_ref = self.load_crate_internal(crate_object_file, None, kernel_mmi_ref, verbose_log)?;
-
-        if load_symbols_as_singleton {
-            // if this is a singleton application, we add its public symbols (except "main")
+        // Don't use a backup namespace when loading applications;
+        // we must be able to find all symbols in only this namespace and its backing recursive namespaces.
+        let new_crate_ref = namespace.load_crate_internal(crate_object_file, None, kernel_mmi_ref, verbose_log)?;
+        {
             let new_crate = new_crate_ref.lock_as_ref();
-            self.add_symbols_filtered(new_crate.sections.values(), 
-                |sec| sec.name != "main", 
-                verbose_log
-            );
-            self.crate_tree.lock().insert_str(&new_crate.crate_name, CowArc::clone_shallow(&new_crate_ref));
-        } else {
-            let new_crate = new_crate_ref.lock_as_ref();
-            info!("loaded new application crate: {}, num sections: {}", new_crate.crate_name, new_crate.sections.len());
+            let _new_syms = namespace.add_symbols(new_crate.sections.values(), verbose_log);
+            namespace.crate_tree.lock().insert_str(&new_crate.crate_name, CowArc::clone_shallow(&new_crate_ref));
+            info!("loaded new application crate: {:?}, num sections: {}, added {} new symbols", new_crate.crate_name, new_crate.sections.len(), _new_syms);
         }
-        Ok(new_crate_ref)
+        Ok(AppCrateRef {
+            crate_ref: new_crate_ref,
+            namespace: Arc::clone(namespace),
+        })
     }
 
 
@@ -677,14 +737,14 @@ impl CrateNamespace {
         debug!("load_crate: trying to load crate at {:?}", crate_object_file.lock().get_absolute_path());
         let new_crate_ref = self.load_crate_internal(crate_object_file, temp_backup_namespace, kernel_mmi_ref, verbose_log)?;
         
-        let (new_crate_name, new_syms) = {
+        let (new_crate_name, num_sections, new_syms) = {
             let new_crate = new_crate_ref.lock_as_ref();
             let new_syms = self.add_symbols(new_crate.sections.values(), verbose_log);
-            (new_crate.crate_name.clone(), new_syms)
+            (new_crate.crate_name.clone(), new_crate.sections.len(), new_syms)
         };
             
         #[cfg(not(loscd_eval))]
-        info!("loaded new crate {:?}, {} new symbols.", new_crate_name, new_syms);
+        info!("loaded new crate {:?}, num sections: {}, added {} new symbols.", new_crate_name, num_sections, new_syms);
         self.crate_tree.lock().insert(new_crate_name.into(), new_crate_ref);
         Ok(new_syms)
     }
@@ -692,7 +752,7 @@ impl CrateNamespace {
 
     /// The internal function that does the work for loading crates,
     /// but does not add the crate nor its symbols to this namespace. 
-    /// See [`load_crate`](#method.load_crate) and [`load_crate_as_application`](#method.load_crate_as_application).
+    /// See [`load_crate`](#method.load_crate) and [`load_crate_as_application`](#fn.load_crate_as_application).
     fn load_crate_internal(&self,
         crate_object_file: &FileRef,
         temp_backup_namespace: Option<&CrateNamespace>, 
@@ -730,7 +790,7 @@ impl CrateNamespace {
             locked_crate_files.push(crate_file_ref.lock());
         }
 
-        // Second, do all of the section parsing and loading.
+        // Second, do all of the section parsing and loading, and add all public symbols to the symbol map.
         let mut partially_loaded_crates: Vec<(StrongCrateRef, ElfFile)> = Vec::with_capacity(locked_crate_files.len()); 
         for locked_crate_file in &locked_crate_files {            
             let (new_crate_ref, elf_file) = self.load_crate_sections(locked_crate_file.deref(), kernel_mmi_ref, verbose_log)?;
@@ -856,7 +916,7 @@ impl CrateNamespace {
     }
 
 
-    /// The primary internal routine for parsing and loading all of the sections.
+    /// The primary internal routine for parsing and loading all sections in a crate object file.
     /// This does not perform any relocations or linking, so the crate **is not yet ready to use after this function**,
     /// since its sections are totally incomplete and non-executable.
     /// 
@@ -883,7 +943,9 @@ impl CrateNamespace {
         let crate_name    = crate_name_from_path(&abs_path).to_string();
 
         // First, check to make sure this crate hasn't already been loaded. 
-        // Regular, non-singleton application crates aren't added to the CrateNamespace, so they can be multiply loaded.
+        // Application crates are now added to the CrateNamespace just like kernel crates,
+        // so to load an application crate multiple times and run multiple instances of it,
+        // you can create a top-level new namespace to hold that application crate.
         if self.get_crate(&crate_name).is_some() {
             return Err("the crate has already been loaded, cannot load it again in the same namespace");
         }

@@ -24,8 +24,8 @@ use alloc::{
     sync::Arc,
 };
 use getopts::{Options, Matches};
-use mod_mgmt::NamespaceDir;
-use crate_swap::{SwapRequest, IntoCrateObjectFile};
+use mod_mgmt::{NamespaceDir, IntoCrateObjectFile};
+use crate_swap::SwapRequest;
 use hpet::get_hpet;
 use path::Path;
 use fs_node::{FileOrDir, DirRef};
