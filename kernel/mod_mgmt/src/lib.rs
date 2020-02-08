@@ -271,7 +271,7 @@ impl NamespaceDir {
     /// # Examples 
     /// * The file "k#keyboard-36be916209949cef.o" will be written to "./keyboard-36be916209949cef.o". 
     /// * The file "a#ps.o" will be placed into "./ps.o". 
-    pub fn insert_crate_object_file(&self, crate_object_file_name: &str, content: &[u8]) -> Result<FileRef, &'static str> {
+    pub fn write_crate_object_file(&self, crate_object_file_name: &str, content: &[u8]) -> Result<FileRef, &'static str> {
         let (_crate_type, _prefix, objfilename) = CrateType::from_module_name(crate_object_file_name)?;
         let cfile = MemFile::new(String::from(objfilename), &self.0)?;
         cfile.lock().write(content, 0)?;
