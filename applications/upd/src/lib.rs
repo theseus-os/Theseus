@@ -196,7 +196,7 @@ fn download(remote_endpoint: IpEndpoint, update_build: &str, crate_list: Option<
         // The name of the crate file that we downloaded is something like: "/keyboard_log/k#keyboard-36be916209949cef.o".
         // We need to get just the basename of the file, then remove the crate type prefix ("k#").
         let df_path = Path::new(df.name);
-        let cfile = new_namespace_dir.insert_crate_object_file(df_path.basename(), content)?;
+        let cfile = new_namespace_dir.write_crate_object_file(df_path.basename(), content)?;
         println!("Downloaded crate: {:?}, size {}", cfile.lock().get_absolute_path(), size);
     }
 
@@ -238,8 +238,8 @@ fn apply(base_dir_path: &Path) -> Result<(), String> {
     // before the currently-loaded ones were replaced. 
     // Instead, we need to just keep the new files in a new folder for now (which they already are),
     // and tell the crate swapping routine to use them. 
-    // But first, we must check to make sure that the current namespace actually has all of the old crates
-    // that are expected/listed in the diff file.
+    // But first, we must create SwapRequests, which validates that the current namespace 
+    // actually has all of the old crates that are expected/listed in the diff file.
     // After the live swap of all loaded crates in the namespace has completed,
     // it is safe to actually replace the old crate object files with the new ones. 
     
