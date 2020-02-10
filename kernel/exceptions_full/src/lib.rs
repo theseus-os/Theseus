@@ -103,7 +103,6 @@ fn kill_and_halt(exception_number: u8) {
         &|stack_frame, stack_frame_iter| {
             let symbol_offset = stack_frame_iter.namespace().get_section_containing_address(
                 memory::VirtualAddress::new_canonical(stack_frame.call_site_address() as usize),
-                stack_frame_iter.starting_crate(),
                 false
             ).map(|(sec_ref, offset)| (sec_ref.lock().name.clone(), offset));
             if let Some((symbol_name, offset)) = symbol_offset {
