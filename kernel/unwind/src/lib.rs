@@ -152,16 +152,6 @@ impl StackFrame {
 }
 
 
-/// Essentially a set of crates, useful for symbol resolution.
-struct NamespaceContext {
-    /// The underlying namespace used to resolve symbols and find sections from addresses.
-    namespace: Arc<CrateNamespace>, 
-    /// The additional crate (usually an application crate) that is not
-    /// a member of the `namespace` but should be used for additional symbol resolution.
-    starting_crate: Option<StrongCrateRef>,
-}
-
-
 /// An iterator over the stack frames on the current task's call stack,
 /// which works in reverse calling order from the current function
 /// up the call stack to the very first function on the stack,
@@ -172,10 +162,9 @@ struct NamespaceContext {
 /// 
 /// This can be used with the `FallibleIterator` trait.
 pub struct StackFrameIter {
-    /// A reference to the underlying namespace crates 
-    /// that are used to resolve symbols and section addresses 
-    /// when iterating over stack frames. 
-    namespace_context: NamespaceContext,
+    /// The namespace (set of crates/sections) that is used to resolve symbols
+    /// and section addresses when iterating over stack frames. 
+    namespace: Arc<CrateNamespace>,
     /// The register values that 
     /// These register values will change on each invocation of `next()`
     /// as different stack frames are successively iterated over.
@@ -206,13 +195,12 @@ impl fmt::Debug for StackFrameIter {
 impl StackFrameIter {
     /// Create a new iterator over stack frames that starts from the current frame
     /// and uses the given `Registers` values as a starting point. 
-    /// The given `namespace` and `starting_crate` are used for resolving symbol addresses into sections.
     /// 
     /// Note: ideally, this shouldn't be public since it needs to be invoked with the correct initial register values.
     #[doc(hidden)]
-    pub fn new(namespace: Arc<CrateNamespace>, app_crate: Option<StrongCrateRef>, registers: Registers) -> Self {
+    pub fn new(namespace: Arc<CrateNamespace>, registers: Registers) -> Self {
         StackFrameIter {
-            namespace_context: NamespaceContext { namespace, starting_crate: app_crate },
+            namespace,
             registers,
             state: None,
             cfa_adjustment: None,
@@ -232,13 +220,7 @@ impl StackFrameIter {
     /// Returns a reference to the underlying `CrateNamespace`
     /// that is used for symbol resolution while iterating over these stack frames.
     pub fn namespace(&self) -> &Arc<CrateNamespace> {
-        &self.namespace_context.namespace
-    }
-
-    /// Returns a reference to the additional crate (usually an application crate) that is not
-    /// a member of the underlying `namespace`, but should also be used for symbol resolution.
-    pub fn starting_crate(&self) -> Option<&StrongCrateRef> {
-        self.namespace_context.starting_crate.as_ref()
+        &self.namespace
     }
 }
 
@@ -340,11 +322,7 @@ impl FallibleIterator for StackFrameIter {
         // trace!("call_site_address: {:#X}", caller);
 
         // Get unwind info for the call site address
-        let crate_ref = self.namespace_context.namespace.get_crate_containing_address(
-            VirtualAddress::new_canonical(caller as usize), 
-            self.namespace_context.starting_crate.as_ref(),
-            false,
-        ).ok_or_else(|| {
+        let crate_ref = self.namespace.get_crate_containing_address(VirtualAddress::new_canonical(caller as usize), false).ok_or_else(|| {
             error!("StackTraceIter::next(): couldn't get crate containing call site address: {:#X}", caller);
             "couldn't get crate containing call site address"
         })?;
@@ -683,16 +661,11 @@ pub fn start_unwinding(reason: KillReason, stack_frames_to_skip: usize) -> Resul
     let unwinding_context_ptr = {
         let curr_task = task::get_my_current_task().ok_or("get_my_current_task() failed")?;
         let namespace = curr_task.get_namespace();
-        let app_crate_ref = { 
-            let t = curr_task.lock();
-            t.app_crate.as_ref().map(|a| a.clone_shallow())
-        };
 
         Box::into_raw(Box::new(
             UnwindingContext {
                 stack_frame_iter: StackFrameIter::new(
                     namespace,
-                    app_crate_ref,
                     // we will set the real register values later, in the `invoke_with_current_registers()` closure.
                     Registers::default()
                 ), 
@@ -759,12 +732,12 @@ fn continue_unwinding(unwinding_context_ptr: *mut UnwindingContext) -> Result<()
         "continue_unwinding: error getting next stack frame in the call stack"
     })? {
         info!("Unwinding StackFrame: {:#X?}", frame);
-        info!("  In func: {:?}", stack_frame_iter.namespace().get_section_containing_address(VirtualAddress::new_canonical(frame.initial_address() as usize), stack_frame_iter.starting_crate(), false));
+        info!("  In func: {:?}", stack_frame_iter.namespace().get_section_containing_address(VirtualAddress::new_canonical(frame.initial_address() as usize), false));
         info!("  Regs: {:?}", stack_frame_iter.registers());
 
         if let Some(lsda) = frame.lsda() {
             let lsda = VirtualAddress::new_canonical(lsda as usize);
-            if let Some((lsda_sec_ref, _)) = stack_frame_iter.namespace().get_section_containing_address(lsda, stack_frame_iter.starting_crate(), true) {
+            if let Some((lsda_sec_ref, _)) = stack_frame_iter.namespace().get_section_containing_address(lsda, true) {
                 info!("  parsing LSDA section: {:?}", lsda_sec_ref);
                 let sec = lsda_sec_ref.lock();
                 let starting_offset = sec.mapped_pages_offset + (lsda.value() - sec.address_range.start.value());

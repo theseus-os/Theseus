@@ -1698,19 +1698,12 @@ impl CrateNamespace {
     }
 
     
-    /// Finds the crate that contains the given `VirtualAddress` in its loaded code,
-    /// also searching any recursive namespaces as well.
+    /// Finds the crate that contains the given `VirtualAddress` in its loaded code.
     /// 
     /// By default, only executable sections (`.text`) are searched, since typically the only use case 
     /// for this function is to search for an instruction pointer (program counter) address.
     /// However, if `search_all_section_types` is `true`, both the read-only and read-write sections
     /// will be included in the search, e.g., `.rodata`, `.data`, `.bss`. 
-    /// 
-    /// If a `starting_crate` is provided, the search will begin from that crate
-    /// and include all of its dependencies recursively. 
-    /// If no `starting_crate` is provided, all crates in this namespace will be searched, in no particular order.
-    /// 
-    /// TODO FIXME: currently starting_crate is searched non-recursively, meaning that its dependencies are excluded.
     /// 
     /// # Usage
     /// This is mostly useful for printing symbol names for a stack trace (backtrace).
@@ -1724,11 +1717,10 @@ impl CrateNamespace {
     /// 
     /// # Note
     /// This is a slow procedure because, in the worst case,
-    /// it will iterate through **every** loaded crate.
+    /// it will iterate through **every** loaded crate in this namespace (and its recursive namespace).
     pub fn get_crate_containing_address(
         &self, 
         virt_addr: VirtualAddress, 
-        starting_crate: Option<&StrongCrateRef>,
         search_all_section_types: bool,
     ) -> Option<StrongCrateRef> {
 
@@ -1755,13 +1747,6 @@ impl CrateNamespace {
             false
         };
         
-        // If a starting crate was given, search that first. 
-        if let Some(crate_ref) = starting_crate {
-            if crate_contains_vaddr(crate_ref) {
-                return Some(crate_ref.clone());
-            }
-        }
-
         let mut found_crate = None;
 
         // Here, we didn't find the symbol when searching from the starting crate, 
@@ -1780,19 +1765,12 @@ impl CrateNamespace {
     }
 
 
-    /// Finds the section that contains the given `VirtualAddress` in its loaded code,
-    /// also searching any recursive namespaces as well.
+    /// Finds the section that contains the given `VirtualAddress` in its loaded code.
     /// 
     /// By default, only executable sections (`.text`) are searched, since typically the only use case 
     /// for this function is to search for an instruction pointer (program counter) address.
     /// However, if `search_all_section_types` is `true`, both the read-only and read-write sections
     /// will be included in the search, e.g., `.rodata`, `.data`, `.bss`. 
-    /// 
-    /// If a `starting_crate` is provided, the search will begin from that crate
-    /// and include all of its dependencies recursively. 
-    /// If no `starting_crate` is provided, all crates in this namespace will be searched, in no particular order.
-    /// 
-    /// TODO FIXME: currently starting_crate is searched non-recursively, meaning that its dependencies are excluded.
     /// 
     /// # Usage
     /// This is mostly useful for printing symbol names for a stack trace (backtrace).
@@ -1805,17 +1783,17 @@ impl CrateNamespace {
     /// 
     /// # Note
     /// This is a slow procedure because, in the worst case,
-    /// it will iterate through **every** section in **every** loaded crate,
-    /// not just the publicly-visible (global) ones. 
+    /// it will iterate through **every** section in **every** loaded crate 
+    /// in this namespace (and its recursive namespace),
+    /// not just the publicly-visible (global) sections. 
     pub fn get_section_containing_address(
         &self, 
         virt_addr: VirtualAddress, 
-        starting_crate: Option<&StrongCrateRef>,
         search_all_section_types: bool,
     ) -> Option<(StrongSectionRef, usize)> {
 
         // First, we find the crate that contains the address, then later we narrow it down.
-        let containing_crate = self.get_crate_containing_address(virt_addr, starting_crate, search_all_section_types)?;
+        let containing_crate = self.get_crate_containing_address(virt_addr, search_all_section_types)?;
         let crate_locked = containing_crate.lock_as_ref();
 
         // Second, we find the section in that crate that contains the address.
