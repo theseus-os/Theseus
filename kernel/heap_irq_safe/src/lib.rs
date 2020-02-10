@@ -18,13 +18,14 @@ extern crate alloc;
 extern crate linked_list_allocator;
 extern crate irq_safety; 
 extern crate spin;
+extern crate block_allocator;
 
 use core::ops::Deref;
 use core::ptr::NonNull;
 use alloc::alloc::{GlobalAlloc, Layout};
 use linked_list_allocator::Heap;
 use irq_safety::MutexIrqSafe; 
-
+use block_allocator::FixedSizeBlockAllocator;
 
 #[global_allocator]
 static ALLOCATOR: IrqSafeHeap = IrqSafeHeap::empty();
@@ -38,19 +39,19 @@ pub fn init(start_virt_addr: usize, size_in_bytes: usize) {
 
 
 /// This is mostly copied from LockedHeap, just to use IrqSafe versions instead of spin::Mutex.
-pub struct IrqSafeHeap(MutexIrqSafe<Heap>);
+pub struct IrqSafeHeap(MutexIrqSafe<FixedSizeBlockAllocator>);
 
 impl IrqSafeHeap {
     /// Creates an empty heap. All allocate calls will return `None`.
     pub const fn empty() -> IrqSafeHeap {
-        IrqSafeHeap(MutexIrqSafe::new(Heap::empty()))
+        IrqSafeHeap(MutexIrqSafe::new(FixedSizeBlockAllocator::new()))
     }
 }
 
 impl Deref for IrqSafeHeap {
-    type Target = MutexIrqSafe<Heap>;
+    type Target = MutexIrqSafe<FixedSizeBlockAllocator>;
 
-    fn deref(&self) -> &MutexIrqSafe<Heap> {
+    fn deref(&self) -> &MutexIrqSafe<FixedSizeBlockAllocator> {
         &self.0
     }
 }
@@ -58,13 +59,11 @@ impl Deref for IrqSafeHeap {
 unsafe impl GlobalAlloc for IrqSafeHeap {
     unsafe fn alloc(&self, layout: Layout) -> *mut u8 {
         self.0.lock()
-            .allocate_first_fit(layout)
-            .ok()
-            .map_or(0 as *mut u8, |allocation| allocation.as_ptr())
+            .allocate(layout)
     }
 
     unsafe fn dealloc(&self, ptr: *mut u8, layout: Layout) {
         self.0.lock()
-            .deallocate(NonNull::new_unchecked(ptr), layout)
+            .deallocate(ptr, layout)
     }
 }
