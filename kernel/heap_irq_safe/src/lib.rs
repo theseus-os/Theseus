@@ -21,9 +21,7 @@ extern crate spin;
 extern crate block_allocator;
 
 use core::ops::Deref;
-use core::ptr::NonNull;
 use alloc::alloc::{GlobalAlloc, Layout};
-use linked_list_allocator::Heap;
 use irq_safety::MutexIrqSafe; 
 use block_allocator::FixedSizeBlockAllocator;
 

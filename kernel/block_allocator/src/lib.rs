@@ -17,7 +17,7 @@
 extern crate alloc;
 extern crate linked_list_allocator;
 
-use alloc::alloc::{GlobalAlloc, Layout};
+use alloc::alloc::Layout;
 use core::{
     mem,
     ptr::{self, NonNull},
