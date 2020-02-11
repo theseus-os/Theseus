@@ -12,3 +12,6 @@ default-features = false
 
 [dependencies.irq_safety]
 git = "https://github.com/kevinaboos/irq_safety"
+
+[dependencies.block_allocator]
+path = "../block_allocator"

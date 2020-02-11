@@ -173,6 +173,13 @@ dependencies = [
 ]
 
 [[package]]
+name = "block_allocator"
+version = "0.1.0"
+dependencies = [
+ "linked_list_allocator 0.6.3 (registry+https://github.com/rust-lang/crates.io-index)",
+]
+
+[[package]]
 name = "block_io"
 version = "0.1.0"
 dependencies = [
@@ -761,6 +768,7 @@ dependencies = [
 name = "heap_irq_safe"
 version = "0.1.0"
 dependencies = [
+ "block_allocator 0.1.0",
  "irq_safety 0.1.1 (git+https://github.com/kevinaboos/irq_safety)",
  "linked_list_allocator 0.6.3 (registry+https://github.com/rust-lang/crates.io-index)",
  "spin 0.4.10 (registry+https://github.com/rust-lang/crates.io-index)",
@@ -2216,6 +2224,19 @@ dependencies = [
  "memfs 0.1.0",
  "memory 0.1.0",
  "root 0.1.0",
+ "terminal_print 0.1.0",
+]
+
+[[package]]
+name = "test_heap"
+version = "0.1.0"
+dependencies = [
+ "apic 0.1.0",
+ "hashbrown 0.1.8 (registry+https://github.com/rust-lang/crates.io-index)",
+ "hpet 0.1.0",
+ "log 0.3.9 (registry+https://github.com/rust-lang/crates.io-index)",
+ "qp-trie 0.7.3 (git+https://github.com/theseus-os/qp-trie-rs)",
+ "runqueue 0.1.0",
  "terminal_print 0.1.0",
 ]
 
