@@ -123,6 +123,7 @@ fn do_vec() {
     }
 }
 
+#[allow(dead_code)]
 fn create_vec_with_capacity(cap: usize) -> u64 {
     let iterations = ITERATIONS;
 
@@ -193,12 +194,13 @@ fn do_hashmap() {
 
 }
 
+#[allow(dead_code)]
 fn create_hashmap_with_capacity(cap: usize) -> u64 {
     let iterations = ITERATIONS;
 
     let start_hpet = get_hpet().as_ref().unwrap().get_counter();
     for _ in 0..iterations {
-        let vec: HashMap<usize, String> = HashMap::with_capacity(cap);
+        let _vec: HashMap<usize, String> = HashMap::with_capacity(cap);
     }
     let end_hpet = get_hpet().as_ref().unwrap().get_counter();
     let time = hpet_2_ns(end_hpet - start_hpet) / iterations;
