@@ -440,6 +440,14 @@ fn task_wrapper<F, A, R>() -> !
         let curr_task_ref = get_my_current_task().expect("BUG: task_wrapper: couldn't get current task (before task func).");
         let curr_task_name = curr_task_ref.lock().name.clone();
 
+        // Set the pointer to the type-specific `task_cleanup_failure` function, for use upon unwinding failure.
+        // TODO: FIXME: we should probably set this elsewhere, e.g., in the `KernelTaskBuilder::spawn()` function. 
+        {
+            let cleanup_func_ptr = &(task_cleanup_failure::<F, A, R> as fn(TaskRef, task::KillReason) -> !) as *const _ as usize;
+            curr_task_ref.lock_mut().cleanup_func = cleanup_func_ptr;
+            debug!("TASK_WRAPPER: setting task_cleanup_failure function to {:#X}", cleanup_func_ptr);
+        }
+
         // The pointer to the kthread_call struct (func and arg) was placed at the bottom of the stack when this task was spawned.
         let kthread_call_ptr: *mut KthreadCall<F, A, R> = {
             let t = curr_task_ref.lock();
@@ -470,62 +478,96 @@ fn task_wrapper<F, A, R>() -> !
 
     // Now we actually invoke the entry point function that this Task was spawned for, catching a panic if one occurs.
     let result = catch_unwind::catch_unwind_with_arg(func, arg);
-    
 
     // Here: now that the task is finished running, we must clean in up by doing three things:
-    // 1. Put the task into a non-runnable mode (exited or killed), and set its exit value
+    // 1. Put the task into a non-runnable mode (exited or killed) and set its exit value or killed reason
     // 2. Remove it from its runqueue
     // 3. Yield the CPU
+    //
     // The first two need to be done "atomically" (without interruption), so we must disable preemption before step 1.
     // Otherwise, this task could be marked as `Exited`, and then a context switch could occur to another task,
     // which would prevent this task from ever running again, so it would never get to remove itself from the runqueue.
-    {
-        // (0) disable preemption (currently just disabling interrupts altogether)
-        let _held_interrupts = hold_interrupts();
-    
-        { 
-            let curr_task_ref = get_my_current_task().expect("BUG: task_wrapper: couldn't get current task (after task func).");
-            let curr_task_name = curr_task_ref.lock().name.clone();
-            
-            // (1) Put the task into a non-runnable mode (exited or killed), and set its exit value accordingly
-            match result {
-                // task exited properly
-                Ok(exit_value) => {
-                    debug!("task_wrapper [2]: \"{}\" exited with return value {:?}", curr_task_name, debugit!(exit_value));
-                    if curr_task_ref.mark_as_exited(Box::new(exit_value)).is_err() {
-                        error!("task_wrapper: \"{}\" task could not set exit value, because task had already exited. Is this correct?", curr_task_name);
-                    }
-                }
-                // task panicked, and we caught it above
-                Err(cause) => {
-                    debug!("task_wrapper [2]: \"{}\" panicked with {:?}", curr_task_name, cause);
-                    if curr_task_ref.mark_as_killed(cause).is_err() {
-                        error!("task_wrapper: \"{}\" task could not set kill reason, because task had already exited. Is this correct?", curr_task_name);
-                    }
-                }
-            }            
+    //
+    // Operations 1 happen in `task_cleanup_success` or `task_cleanup_failure`, 
+    // while operations 2 and 3 then happen in `task_cleanup_final`.
+    let curr_task = get_my_current_task().expect("BUG: task_wrapper: couldn't get current task (after task func).").clone();
+    match result {
+        Ok(exit_value)   => task_cleanup_success::<F, A, R>(curr_task, exit_value),
+        Err(kill_reason) => task_cleanup_failure::<F, A, R>(curr_task, kill_reason),
+    }
+}
 
-            // (2) Remove it from its runqueue
-            #[cfg(not(runqueue_state_spill_evaluation))]  // the normal case
-            {
-                if let Err(e) = apic::get_my_apic_id()
-                    .and_then(|id| runqueue::get_runqueue(id))
-                    .ok_or("couldn't get this core's ID or runqueue to remove exited task from it")
-                    .and_then(|rq| rq.write().remove_task(&curr_task_ref)) 
-                {
-                    error!("BUG: task_wrapper(): couldn't remove exited task from runqueue: {}", e);
-                }
-            }
-        }
-        
-        // re-enabled preemption/interrupts here (happens automatically when _held_interrupts is dropped)
+
+/// This function cleans up a task that exited properly.
+fn task_cleanup_success<F, A, R>(current_task: TaskRef, exit_value: R) -> !
+    where A: Send + 'static, 
+          R: Send + 'static,
+          F: FnOnce(A) -> R, 
+{
+    // Disable preemption (currently just disabling interrupts altogether)
+    let held_interrupts = hold_interrupts();
+
+    debug!("task_cleanup_success: {:?} successfully exited with return value {:?}", current_task.lock().name, debugit!(exit_value));
+    if current_task.mark_as_exited(Box::new(exit_value)).is_err() {
+        error!("task_cleanup_success: {:?} task could not set exit value, because task had already exited. Is this correct?", current_task.lock().name);
     }
 
-    // (3) Yield the CPU
+    task_cleanup_final::<F, A, R>(held_interrupts, current_task)
+}
+            
+
+/// This function cleans up a task that did not exit properly,
+/// e.g., it panicked, hit an exception, etc. 
+/// 
+/// A failure that occurs while unwinding a task will also jump here.
+/// 
+/// The generic type parameters are derived from the original `task_wrapper` invocation,
+/// and are here to provide type information needed when cleaning up a failed task.
+fn task_cleanup_failure<F, A, R>(current_task: TaskRef, kill_reason: task::KillReason) -> !
+    where A: Send + 'static, 
+          R: Send + 'static,
+          F: FnOnce(A) -> R, 
+{
+    // Disable preemption (currently just disabling interrupts altogether)
+    let held_interrupts = hold_interrupts();
+
+    debug!("task_cleanup_failure: {:?} panicked with {:?}", current_task.lock().name, kill_reason);
+    if current_task.mark_as_killed(kill_reason).is_err() {
+        error!("task_cleanup_failure: {:?} task could not set kill reason, because task had already exited. Is this correct?", current_task.lock().name);
+    }
+
+    task_cleanup_final::<F, A, R>(held_interrupts, current_task)
+}
+
+
+/// The final piece of the task cleanup logic,
+/// which removes the task from its runqueue and permanently deschedules it. 
+fn task_cleanup_final<F, A, R>(_held_interrupts: irq_safety::HeldInterrupts, current_task: TaskRef) -> ! 
+    where A: Send + 'static, 
+          R: Send + 'static,
+          F: FnOnce(A) -> R, 
+{
+    // Remove the task from its runqueue
+    #[cfg(not(runqueue_state_spill_evaluation))]  // the normal case
+    {
+        if let Err(e) = apic::get_my_apic_id()
+            .and_then(|id| runqueue::get_runqueue(id))
+            .ok_or("couldn't get this core's ID or runqueue to remove exited task from it")
+            .and_then(|rq| rq.write().remove_task(&current_task)) 
+        {
+            error!("BUG: task_wrapper(): couldn't remove exited task from runqueue: {}", e);
+        }
+    }
+
+    // We must drop any local stack variables here since this function will not return
+    drop(current_task);
+    drop(_held_interrupts); // reenables preemption (interrupts)
+
+    // Yield the CPU
     scheduler::schedule();
-
+    
     // nothing below here should ever run again, we should never ever reach this point
-
-    error!("BUG: task_wrapper WAS RESCHEDULED AFTER BEING DEAD!");
+    
+    error!("BUG: task was rescheduled after being dead!");
     loop { }
 }

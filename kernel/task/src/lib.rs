@@ -238,6 +238,8 @@ pub struct Task {
     #[cfg(simd_personality)]
     /// Whether this Task is SIMD enabled and what level of SIMD extensions it uses.
     pub simd: SimdExt,
+
+    pub cleanup_func: usize,
 }
 
 impl fmt::Debug for Task {
@@ -312,6 +314,8 @@ impl Task {
 
             #[cfg(simd_personality)]
             simd: SimdExt::None,
+
+            cleanup_func: 0,
         }
     }
 
