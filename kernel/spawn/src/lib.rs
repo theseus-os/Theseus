@@ -26,7 +26,6 @@ extern crate catch_unwind;
 use core::{
     mem,
     marker::PhantomData,
-    sync::atomic::{Ordering, AtomicBool, compiler_fence},
 };
 use alloc::{
     vec::Vec,
@@ -36,7 +35,7 @@ use alloc::{
 };
 use irq_safety::{MutexIrqSafe, hold_interrupts, enable_interrupts};
 use memory::{get_kernel_mmi_ref, MemoryManagementInfo, VirtualAddress};
-use task::{Task, TaskRef, get_my_current_task, RunState, TASKLIST, TASK_SWITCH_LOCKS};
+use task::{Task, TaskRef, get_my_current_task, RunState, TASKLIST};
 use mod_mgmt::{CrateNamespace, SectionType, SECTION_HASH_DELIMITER};
 use path::Path;
 use fs_node::FileOrDir;
@@ -51,8 +50,6 @@ pub fn init(kernel_mmi_ref: Arc<MutexIrqSafe<MemoryManagementInfo>>, apic_id: u8
             stack_bottom: VirtualAddress, stack_top: VirtualAddress) 
             -> Result<TaskRef, &'static str> 
 {
-    TASK_SWITCH_LOCKS.insert(apic_id, AtomicBool::new(false));    
-
     runqueue::init(apic_id)?;
     
     let task_ref = task::create_idle_task(apic_id, stack_bottom, stack_top, kernel_mmi_ref)?;
@@ -469,10 +466,7 @@ fn task_wrapper<F, A, R>() -> !
         (func, arg)
     };
 
-    
     enable_interrupts(); // we must enable interrupts for the new task, otherwise we won't be able to preempt it.
-    compiler_fence(Ordering::SeqCst); // I don't think this is necessary...    
-
 
     // Now we actually invoke the entry point function that this Task was spawned for, catching a panic if one occurs.
     let result = catch_unwind::catch_unwind_with_arg(func, arg);
