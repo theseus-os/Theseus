@@ -228,10 +228,6 @@ pub struct Task {
     pub mmi: MmiRef, 
     /// The kernel stack, which all `Task`s must have in order to execute.
     pub kstack: Stack,
-    /// The userspace stack, which is `None` for tasks that do not run in userspace.
-    pub ustack: Option<Stack>,
-    /// for special behavior of new userspace task
-    pub new_userspace_entry_addr: Option<VirtualAddress>, 
     /// Whether or not this task is pinned to a certain core
     /// The idle tasks (like idle_task) are always pinned to their respective cores
     pub pinned_core: Option<u8>,
@@ -317,9 +313,7 @@ impl Task {
             drop_after_task_switch: None,
             name: format!("task_{}", task_id),
             kstack: kstack,
-            ustack: None,
             mmi: mmi,
-            new_userspace_entry_addr: None,
             pinned_core: None,
             is_an_idle_task: false,
             app_crate: app_crate,
@@ -368,8 +362,10 @@ impl Task {
     }
 
     /// Returns true if this is a userspace`Task`.
+    /// Currently userspace support is disabled, so this always returns `false`.
     pub fn is_userspace(&self) -> bool {
-        self.ustack.is_some()
+        // self.ustack.is_some()
+        false
     }
 
     /// Registers a function or closure that will be called if this `Task` panics,
@@ -501,9 +497,10 @@ impl Task {
         self.running_on_cpu = None; // no longer running
         next.running_on_cpu = Some(apic_id); // now running on this core
 
-
-        // We now do the page table switching here, so we can use our higher-level PageTable abstractions
-        {
+        // Switch page tables. 
+        // Since there is only a single address space (as userspace support is currently disabled),
+        // we do not need to do this at all.
+        if false {
             let prev_mmi = &self.mmi;
             let next_mmi = &next.mmi;
             
