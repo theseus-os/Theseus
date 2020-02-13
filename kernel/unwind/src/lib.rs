@@ -838,15 +838,19 @@ fn cleanup_unwinding_context(unwinding_context_ptr: *mut UnwindingContext) -> ! 
     let UnwindingContext { current_task, cause, stack_frame_iter } = unwinding_context;
     drop(stack_frame_iter);
 
-    let cleanup_func_ptr = {
-        let t = current_task.lock();
-        t.cleanup_func
+    let cleanup_func_opt = {
+        let mut t = current_task.lock_mut();
+        t.failure_cleanup_function.take()
     };
-    warn!("cleanup_unwinding_context(): invoking the task_cleanup_failure function at {:#X}", cleanup_func_ptr);
-    // NOTE: the below pointer cast MUST MATCH the function signature of `spawn::task_cleanup_failure`.
-    let cleanup_func = cleanup_func_ptr as *const fn(TaskRef, task::KillReason) -> !;
-    let func = unsafe { &* cleanup_func };
-    func(current_task, cause)
+    if let Some(cleanup_func) = cleanup_func_opt {
+        warn!("cleanup_unwinding_context(): invoking the task_cleanup_failure function for task {:?}", current_task);
+        cleanup_func(current_task, cause)
+    } else {
+        error!("BUG: cleanup_unwinding_context(): task {:?} did not have a failure cleanup function set! Looping indefinitely.", current_task);
+        drop(current_task);
+        drop(cause);
+        loop { }
+    }
 }
 
 

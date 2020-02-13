@@ -239,7 +239,10 @@ pub struct Task {
     /// Whether this Task is SIMD enabled and what level of SIMD extensions it uses.
     pub simd: SimdExt,
 
-    pub cleanup_func: usize,
+    /// The function that should be run as a last-ditch attempt to recover from this task's failure,
+    /// e.g., this can be called when unwinding itself fails. 
+    /// Typically, it will point to this Task's specific instance of `spawn::task_cleanup_failure()`.
+    pub failure_cleanup_function: Option<fn(TaskRef, KillReason) -> !>,
 }
 
 impl fmt::Debug for Task {
@@ -315,7 +318,7 @@ impl Task {
             #[cfg(simd_personality)]
             simd: SimdExt::None,
 
-            cleanup_func: 0,
+            failure_cleanup_function: None,
         }
     }
 

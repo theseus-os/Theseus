@@ -443,8 +443,9 @@ fn task_wrapper<F, A, R>() -> !
         // Set the pointer to the type-specific `task_cleanup_failure` function, for use upon unwinding failure.
         // TODO: FIXME: we should probably set this elsewhere, e.g., in the `KernelTaskBuilder::spawn()` function. 
         {
+            curr_task_ref.lock_mut().failure_cleanup_function = Some(task_cleanup_failure::<F, A, R> as fn(TaskRef, task::KillReason) -> !);
+
             let cleanup_func_ptr = &(task_cleanup_failure::<F, A, R> as fn(TaskRef, task::KillReason) -> !) as *const _ as usize;
-            curr_task_ref.lock_mut().cleanup_func = cleanup_func_ptr;
             debug!("TASK_WRAPPER: setting task_cleanup_failure function to {:#X}", cleanup_func_ptr);
         }
 
@@ -555,7 +556,7 @@ fn task_cleanup_final<F, A, R>(_held_interrupts: irq_safety::HeldInterrupts, cur
             .ok_or("couldn't get this core's ID or runqueue to remove exited task from it")
             .and_then(|rq| rq.write().remove_task(&current_task)) 
         {
-            error!("BUG: task_wrapper(): couldn't remove exited task from runqueue: {}", e);
+            error!("BUG: task_cleanup_final(): couldn't remove exited task from runqueue: {}", e);
         }
     }
 
@@ -565,9 +566,8 @@ fn task_cleanup_final<F, A, R>(_held_interrupts: irq_safety::HeldInterrupts, cur
 
     // Yield the CPU
     scheduler::schedule();
-    
+
     // nothing below here should ever run again, we should never ever reach this point
-    
-    error!("BUG: task was rescheduled after being dead!");
+    error!("BUG: task_cleanup_final(): task was rescheduled after being dead!");
     loop { }
 }
