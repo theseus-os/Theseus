@@ -327,10 +327,7 @@ pub fn print_to_stdout_args(fmt_args: fmt::Arguments) {
         None => {
             // We cannot use log macros here, because when they're mirrored to the vga, they will cause
             // infinite loops on an error. Instead, we write directly to the serial port. 
-            let _ = serial_port::write_fmt_log(
-                "\x1b[31m", "[E] ",
-                format_args!("error in print!/println! macro: failed to get current task id"), "\x1b[0m\n"
-            );
+            let _ = serial_port::write_str("\x1b[31m [E] error in print!/println! macro: failed to get current task id \x1b[0m\n");
             return;
         }
     };
@@ -340,17 +337,11 @@ pub fn print_to_stdout_args(fmt_args: fmt::Arguments) {
     match locked_streams.get(&task_id) {
         Some(queues) => {
             if let Err(_) = queues.stdout.lock().write_all(format!("{}", fmt_args).as_bytes()) {
-                let _ = serial_port::write_fmt_log(
-                    "\x1b[31m", "[E] ",
-                    format_args!("failed to write to stdout"), "\x1b[0m\n"
-                );
+                let _ = serial_port::write_str("\x1b[31m [E] failed to write to stdout \x1b[0m\n");
             }
         },
         None => {
-            let _ = serial_port::write_fmt_log(
-                "\x1b[31m", "[E] ",
-                format_args!("error in print!/println! macro: no stdout queue for current task"), "\x1b[0m\n"
-            );
+            let _ = serial_port::write_str("\x1b[31m [E] error in print!/println! macro: no stdout queue for current task \x1b[0m\n");
             return;
         }
     };
