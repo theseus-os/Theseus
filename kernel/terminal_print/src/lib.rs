@@ -74,7 +74,7 @@ pub fn print_to_stdout_args(fmt_args: fmt::Arguments) {
         None => {
             // We cannot use log macros here, because when they're mirrored to the vga, they will cause infinite loops on an error.
             // Instead, we write direclty to the serial port. 
-            let _ = serial_port::write_fmt_log("\x1b[31m", "[E] ", format_args!("error in print!/println! macro: failed to get current task id"), "\x1b[0m\n");
+            let _ = serial_port::write_str("\x1b[31m [E] error in print!/println! macro: failed to get current task id \x1b[0m\n");
             return;
         }
     };

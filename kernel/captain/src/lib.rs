@@ -63,8 +63,8 @@ use pause::spin_loop_hint;
 
 #[cfg(mirror_log_to_vga)]
 /// the callback use in the logger crate for mirroring log functions to the terminal
-pub fn mirror_to_vga_cb(_color: &logger::LogColor, prefix: &'static str, args: core::fmt::Arguments) {
-    println!("{}{}", prefix, args);
+pub fn mirror_to_vga_cb(args: core::fmt::Arguments) {
+    println!("{}", args);
 }
 
 
