@@ -9,6 +9,10 @@ include cfg/Config.mk
 
 all: iso
 
+## Default values for various configuration options.
+debug ?= none
+net ?= none
+
 ## test for Windows Subsystem for Linux (Linux on Windows)
 IS_WSL = $(shell grep -s 'Microsoft' /proc/version)
 
@@ -84,6 +88,7 @@ NANO_CORE_BUILD_DIR := $(BUILD_DIR)/nano_core
 iso := $(BUILD_DIR)/theseus-$(ARCH).iso
 GRUB_ISOFILES := $(BUILD_DIR)/grub-isofiles
 OBJECT_FILES_BUILD_DIR := $(GRUB_ISOFILES)/modules
+DEBUG_SYMBOLS_DIR := $(BUILD_DIR)/debug_symbols
 
 
 ## This is the output path of the xargo command, defined by cargo (not our choice).
@@ -132,7 +137,7 @@ APP_CRATE_NAMES += getopts unicode_width
 ### Most targets are PHONY because cargo itself handles whether or not to rebuild the Rust code base.
 .PHONY: all \
 		check_rustc check_xargo check_captain \
-		clean run debug iso build userspace cargo \
+		clean run run_wait iso build userspace cargo \
 		simd_personality_sse build_sse simd_personality_avx build_avx \
 		$(assembly_source_files) \
 		gdb doc docs view-doc view-docs
@@ -189,11 +194,30 @@ build: $(nano_core_binary)
 		NEW_FILE_PATH=$(OBJECT_FILES_BUILD_DIR)/`basename $${OLD_FILE_PATH} | sed -n -e 's/$(KERNEL_PREFIX)\(.*\)/$(APP_PREFIX)\1/p'` ; \
 		mv  $${OLD_FILE_PATH}  $${NEW_FILE_PATH} ; \
 	done
-## Strip debug information (optional, just improves QEMU load times and reduces mem usage)
-	@for f in $(OBJECT_FILES_BUILD_DIR)/*.o ; do \
-		$(CROSS)strip  --strip-debug  $${f} ; \
-	done
 
+## Strip debug information if requested. This reduces object file size, improving load times and reducing memory usage.
+	@mkdir -p $(DEBUG_SYMBOLS_DIR)
+ifeq ($(debug),full)
+# don't strip any files
+else ifeq ($(debug),none)
+# strip all files
+	@for f in $(OBJECT_FILES_BUILD_DIR)/*.o $(nano_core_binary); do \
+		dbg_file=$(DEBUG_SYMBOLS_DIR)/`basename $${f}`.dbg ; \
+		cp $${f} $${dbg_file} ; \
+		$(CROSS)strip  --only-keep-debug  $${dbg_file} ; \
+		$(CROSS)strip  --strip-debug      $${f} ; \
+	done
+else ifeq ($(debug),base)
+# strip all object files but the base kernel
+	@for f in $(OBJECT_FILES_BUILD_DIR)/*.o ; do \
+		dbg_file=$(DEBUG_SYMBOLS_DIR)/`basename $${f}`.dbg ; \
+		cp $${f} $${dbg_file} ; \
+		$(CROSS)strip  --only-keep-debug  $${dbg_file} ; \
+		$(CROSS)strip  --strip-debug      $${f} ; \
+	done
+else
+$(error Error: unsupported option "debug=$(debug)")
+endif
 
 
 ## This target invokes the actual Rust build process
@@ -427,13 +451,13 @@ help:
 	@echo -e "   loadable:"
 	@echo -e "\t Same as 'run', but enables the 'loadable' configuration so that all crates are dynamically loaded."
 
-	@echo -e "   debug:"
+	@echo -e "   run_pause:"
 	@echo -e "\t Same as 'run', but pauses QEMU at its GDB stub entry point,"
 	@echo -e "\t which waits for you to connect a GDB debugger using 'make gdb'."
 
 	@echo -e "   gdb:"
 	@echo -e "\t Runs a new instance of GDB that connects to an already-running QEMU instance."
-	@echo -e "\t You must run 'make debug' beforehand in a separate terminal."
+	@echo -e "\t You must run an instance of Theseus in QEMU beforehand in a separate terminal."
 
 	@echo -e "   bochs:"
 	@echo -e "\t Same as 'make run', but runs Theseus in the Bochs emulator instead of QEMU."
@@ -461,11 +485,22 @@ help:
 	@echo -e "\t then checkout version 2 (or otherwise make some changes) and run 'make build_server'."
 	@echo -e "\t Then, a running instance of Theseus version 1 can contact this machine's build_server to update itself to version 2."
 	
-	@echo -e "\nThe following key-value options are available for QEMU targets, like 'run' and 'debug':"
-	@echo -e "   net=user:"
-	@echo -e "\t Enable networking with an e1000 NIC in the guest and a userspace SLIRP-based interface in the host (QEMU default)."
-	@echo -e "   net=tap:"
-	@echo -e "\t Enable networking with an e1000 NIC in the guest and a TAP interface in the host."
+	@echo -e "\nThe following key-value options are available to customize the build process:"
+	@echo -e "   debug=full|base|none"
+	@echo -e "\t Configure which debug symbols are stripped from the build artifacts."
+	@echo -e "\t Stripped symbols are placed into files ending with \".dbg\" in \"$(DEBUG_SYMBOLS_DIR)\"."
+	@echo -e "\t This is strictly a post-compilation action, it doesn't affect how code is compiled."
+	@echo -e "\t    'full':   Keep debug symbols in all files, including the base kernel image and all crate object files."
+	@echo -e "\t    'base':   Keep debug symbols in only the base kernel image; strip debug symbols from crate object files."
+	@echo -e "\t    'none':   Strip debug symbols from both the base kernel image and all crate object files."
+	@echo -e "\t              This is the default option, because it is the fastest to boot."
+
+	@echo -e "\nThe following key-value options are available for QEMU targets, like 'run':"
+	@echo -e "   net=user|tap|none"
+	@echo -e "\t Configure networking in the QEMU guest:"
+	@echo -e "\t    'user':  Enable networking with an e1000 NIC in the guest and a userspace SLIRP-based interface in the host (QEMU default)."
+	@echo -e "\t    'tap' :  Enable networking with an e1000 NIC in the guest and a TAP interface in the host."
+	@echo -e "\t    'none':  Disable all networking in the QEMU guest. This is the default behavior if no other 'net' option is provided."
 # @echo -e "   kvm=yes:"
 # @echo -e "\t Enable KVM acceleration (the host computer must support it)."
 	@echo -e "   host=yes:"
@@ -522,8 +557,6 @@ else ifeq ($(net),none)
 	QEMU_FLAGS += -net none
 else ifneq (,$(net)) 
 $(error Error: unsupported option "net=$(net)")
-else
-	QEMU_FLAGS += -net none
 endif
 
 ## Dump interrupts to the serial port log
@@ -555,8 +588,8 @@ orun:
 	@qemu-system-x86_64 $(QEMU_FLAGS)
 
 
-### Old Debug: runs the most recent build with debugging without rebuilding
-odebug:
+### Old Run Wait: runs the most recent build without rebuilding but waits for a GDB connection.
+orun_pause:
 	@qemu-system-x86_64 $(QEMU_FLAGS) -S
 
 
@@ -573,15 +606,16 @@ run: $(iso)
 
 
 ### builds and runs Theseus in QEMU, but pauses execution until a GDB instance is connected.
-debug: $(iso)
+run_pause: $(iso)
 	@qemu-system-x86_64 $(QEMU_FLAGS) -S
-#-monitor stdio
 
 
 ### Runs a gdb instance on the host machine. 
-### Run this after invoking "make debug" in a different terminal.
+### Run this after invoking another QEMU target in a different terminal.
 gdb:
-	@rust-os-gdb/bin/rust-gdb "$(nano_core_binary)" -ex "target remote :1234"
+	@rust-os-gdb/bin/rust-gdb "$(nano_core_binary)" \
+		-ex "symbol-file $(DEBUG_SYMBOLS_DIR)/`basename $(nano_core_binary)`.dbg" \
+		-ex "target remote :1234"
 
 
 
