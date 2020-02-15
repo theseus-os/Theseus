@@ -7,7 +7,7 @@ use alloc::{
     collections::{BTreeMap, BTreeSet},
     sync::Arc,
 };
-use spin::Mutex;
+use spin::{Mutex, RwLock};
 use cow_arc::CowArc;
 
 use xmas_elf;
@@ -231,7 +231,7 @@ fn parse_nano_core_symbol_file(
                 );
                 sections.insert(
                     section_counter,
-                    Arc::new(Mutex::new(LoadedSection::new(
+                    Arc::new(RwLock::new(LoadedSection::new(
                         SectionType::EhFrame,
                         String::from(".eh_frame"),
                         Arc::clone(&rodata_pages),
@@ -256,7 +256,7 @@ fn parse_nano_core_symbol_file(
                 );
                 sections.insert(
                     section_counter,
-                    Arc::new(Mutex::new(LoadedSection::new(
+                    Arc::new(RwLock::new(LoadedSection::new(
                         SectionType::GccExceptTable,
                         String::from(".gcc_except_table"),
                         Arc::clone(&rodata_pages),
@@ -379,7 +379,7 @@ fn parse_nano_core_symbol_file(
                     let sec_vaddr = try_break!(VirtualAddress::new(sec_vaddr), loop_result);
                     sections.insert(
                         section_counter,
-                        Arc::new(Mutex::new(LoadedSection::new(
+                        Arc::new(RwLock::new(LoadedSection::new(
                             SectionType::Text,
                             name.to_string(),
                             Arc::clone(&text_pages),
@@ -395,7 +395,7 @@ fn parse_nano_core_symbol_file(
                     let sec_vaddr = try_break!(VirtualAddress::new(sec_vaddr), loop_result);
                     sections.insert(
                         section_counter,
-                        Arc::new(Mutex::new(LoadedSection::new(
+                        Arc::new(RwLock::new(LoadedSection::new(
                             SectionType::Rodata,
                             name.to_string(),
                             Arc::clone(&rodata_pages),
@@ -411,7 +411,7 @@ fn parse_nano_core_symbol_file(
                     let sec_vaddr = try_break!(VirtualAddress::new(sec_vaddr), loop_result);
                     sections.insert(
                         section_counter,
-                        Arc::new(Mutex::new(LoadedSection::new(
+                        Arc::new(RwLock::new(LoadedSection::new(
                             SectionType::Data,
                             name.to_string(),
                             Arc::clone(&data_pages),
@@ -427,7 +427,7 @@ fn parse_nano_core_symbol_file(
                     let sec_vaddr = try_break!(VirtualAddress::new(sec_vaddr), loop_result);
                     sections.insert(
                         section_counter,
-                        Arc::new(Mutex::new(LoadedSection::new(
+                        Arc::new(RwLock::new(LoadedSection::new(
                             SectionType::Bss,
                             name.to_string(),
                             Arc::clone(&data_pages),
@@ -686,7 +686,7 @@ fn parse_nano_core_binary(
 
                         if let Some(sec) = new_section {
                             // debug!("parse_nano_core: new section: {:?}", sec);
-                            sections.insert(section_counter, Arc::new(Mutex::new(sec)));
+                            sections.insert(section_counter, Arc::new(RwLock::new(sec)));
                             section_counter += 1;
                         }
                     }

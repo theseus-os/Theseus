@@ -285,7 +285,7 @@ pub fn swap_crates(
 
                 #[cfg(not(loscd_eval))]
                 debug!("swap_crates(): old_sec_name: {:?}, old_sec: {:?}", old_sec_name, old_sec_ref);
-                let mut old_sec = old_sec_ref.lock();
+                let mut old_sec = old_sec_ref.write();
                 let old_sec_name_without_hash = old_sec.name_without_hash();
 
 
@@ -346,7 +346,7 @@ pub fn swap_crates(
                         dead_weak_deps_to_remove.push(i);
                         continue;
                     };
-                    let mut target_sec = target_sec_ref.lock();
+                    let mut target_sec = target_sec_ref.write();
                     let relocation_entry = weak_dep.relocation;
 
                     #[cfg(loscd_eval)]
@@ -368,7 +368,7 @@ pub fn swap_crates(
                         hpet_total_symbol_finding += (end_symbol_finding - start_symbol_finding);
                     }
 
-                    let mut new_source_sec = new_source_sec_ref.lock();
+                    let mut new_source_sec = new_source_sec_ref.write();
                     #[cfg(not(loscd_eval))]
                     debug!("    swap_crates(): target_sec: {:?}, old source sec: {:?}, new source sec: {:?}", &*target_sec, &*old_sec, &*new_source_sec);
 
@@ -454,7 +454,7 @@ pub fn swap_crates(
             // as they represent a static variable that would otherwise result in a loss of data.
             // Currently, AFAIK, static variables only exist in the form of .bss sections.
             for old_sec_ref in old_crate.bss_sections.values() {
-                let old_sec = old_sec_ref.lock();
+                let old_sec = old_sec_ref.read();
                 let old_sec_name_without_hash = old_sec.name_without_hash();
                 // get the section from the new crate that corresponds to the `old_sec`
                 let new_dest_sec_ref = {
@@ -475,7 +475,7 @@ pub fn swap_crates(
                 )?;
 
                 // warn!("swap_crates(): copying BSS section from old {:?} to new {:?}", &*old_sec, new_dest_sec_ref);
-                old_sec.copy_section_data_to(&mut new_dest_sec_ref.lock())?;
+                old_sec.copy_section_data_to(&mut new_dest_sec_ref.write())?;
             }
 
             #[cfg(loscd_eval)] {
@@ -495,7 +495,7 @@ pub fn swap_crates(
         
         let mut space: usize = 0;
         let st_fn = {
-            let state_transfer_fn_sec = state_transfer_fn_sec_ref.lock();
+            let state_transfer_fn_sec = state_transfer_fn_sec_ref.read();
             let mapped_pages = state_transfer_fn_sec.mapped_pages.lock();
             mapped_pages.as_func::<StateTransferFunction>(state_transfer_fn_sec.mapped_pages_offset, &mut space)?
         };

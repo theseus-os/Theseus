@@ -323,7 +323,7 @@ impl ApplicationTaskBuilder {
 
         let mut space: usize = 0; // must live as long as main_func, see MappedPages::as_func()
         let main_func = {
-            let main_func_sec = main_func_sec_ref.lock();
+            let main_func_sec = main_func_sec_ref.read();
             let mapped_pages = main_func_sec.mapped_pages.lock();
             mapped_pages.as_func::<MainFunc>(main_func_sec.mapped_pages_offset, &mut space)?
         };

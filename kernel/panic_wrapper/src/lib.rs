@@ -39,7 +39,7 @@ pub fn panic_wrapper(panic_info: &PanicInfo) -> Result<(), &'static str> {
                     let symbol_offset = stack_frame_iter.namespace().get_section_containing_address(
                         VirtualAddress::new_canonical(stack_frame.call_site_address() as usize),
                         false
-                    ).map(|(sec_ref, offset)| (sec_ref.lock().name.clone(), offset));
+                    ).map(|(sec_ref, offset)| (sec_ref.read().name.clone(), offset));
                     if let Some((symbol_name, offset)) = symbol_offset {
                         error!("  {:>#018X} in {} + {:#X}", stack_frame.call_site_address(), symbol_name, offset);
                     } else {
@@ -65,7 +65,7 @@ pub fn panic_wrapper(panic_info: &PanicInfo) -> Result<(), &'static str> {
                 &mmi.page_table,
                 &mut |_frame_pointer, instruction_pointer: VirtualAddress| {
                     let symbol_offset = namespace.get_section_containing_address(instruction_pointer, app_crate_ref.as_deref().map(|acr| acr.deref()), false)
-                        .map(|(sec_ref, offset)| (sec_ref.lock().name.clone(), offset));
+                        .map(|(sec_ref, offset)| (sec_ref.read().name.clone(), offset));
                     if let Some((symbol_name, offset)) = symbol_offset {
                         error!("  {:>#018X} in {} + {:#X}", instruction_pointer, symbol_name, offset);
                     } else {
