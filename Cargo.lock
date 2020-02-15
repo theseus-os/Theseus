@@ -440,6 +440,17 @@ dependencies = [
 ]
 
 [[package]]
+name = "debug_info"
+version = "0.1.0"
+dependencies = [
+ "fs_node 0.1.0",
+ "gimli 0.19.0 (registry+https://github.com/rust-lang/crates.io-index)",
+ "log 0.3.9 (registry+https://github.com/rust-lang/crates.io-index)",
+ "memory 0.1.0",
+ "owning_ref 0.4.0 (git+https://github.com/kevinaboos/owning-ref-rs)",
+]
+
+[[package]]
 name = "debugit"
 version = "0.1.0"
 
@@ -2210,6 +2221,16 @@ dependencies = [
  "scheduler 0.1.0",
  "spawn 0.1.0",
  "spin 0.4.10 (registry+https://github.com/rust-lang/crates.io-index)",
+ "task 0.1.0",
+ "terminal_print 0.1.0",
+]
+
+[[package]]
+name = "test_exception"
+version = "0.1.0"
+dependencies = [
+ "log 0.3.9 (registry+https://github.com/rust-lang/crates.io-index)",
+ "serial_port 0.1.0",
  "task 0.1.0",
  "terminal_print 0.1.0",
 ]

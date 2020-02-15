@@ -1033,6 +1033,7 @@ impl CrateNamespace {
 
         let new_crate = CowArc::new(LoadedCrate {
             crate_name:              crate_name.clone(),
+            debug_symbols:           DebugSymbols::Unloaded(Arc::downgrade(&crate_object_file)),
             object_file:             crate_object_file, 
             sections:                BTreeMap::new(),
             text_pages:              text_pages.clone(),
