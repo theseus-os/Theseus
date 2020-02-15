@@ -51,7 +51,7 @@ fn panic_entry_point(info: &PanicInfo) -> ! {
                         .ok_or("Couldn't get single symbol matching \"panic_wrapper::panic_wrapper::\"")?
                 };
                 let (mapped_pages, mapped_pages_offset) = { 
-                    let section = section_ref.lock();
+                    let section = section_ref.read();
                     (section.mapped_pages.clone(), section.mapped_pages_offset)
                 };
                 let mut space = 0;
@@ -123,7 +123,7 @@ extern "C" fn _Unwind_Resume(arg: usize) -> ! {
                     .ok_or("Couldn't get single symbol matching \"unwind::unwind_resume::\"")?
             };
             let (mapped_pages, mapped_pages_offset) = { 
-                let section = section_ref.lock();
+                let section = section_ref.read();
                 (section.mapped_pages.clone(), section.mapped_pages_offset)
             };
             let mut space = 0;

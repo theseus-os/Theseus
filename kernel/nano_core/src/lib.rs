@@ -160,8 +160,8 @@ pub extern "C" fn nano_core_start(multiboot_information_virtual_address: usize) 
         Ok((init_symbols, _num_new_syms)) => {
             // Get symbols from the boot assembly code that defines where the BSP stack and the ap_start code are.
             // The symbols in the ".init" section will be in init_symbols, all others will be in the regular namespace symbol tree.
-            bsp_stack_top     = try_exit!(default_namespace.get_symbol("initial_bsp_stack_top").upgrade().ok_or("Missing expected symbol from assembly code \"initial_bsp_stack_top\"")).lock().start_address();
-            bsp_stack_bottom  = try_exit!(default_namespace.get_symbol("initial_bsp_stack_bottom").upgrade().ok_or("Missing expected symbol from assembly code \"initial_bsp_stack_bottom\"")).lock().start_address();
+            bsp_stack_top     = try_exit!(default_namespace.get_symbol("initial_bsp_stack_top").upgrade().ok_or("Missing expected symbol from assembly code \"initial_bsp_stack_top\"")).read().start_address();
+            bsp_stack_bottom  = try_exit!(default_namespace.get_symbol("initial_bsp_stack_bottom").upgrade().ok_or("Missing expected symbol from assembly code \"initial_bsp_stack_bottom\"")).read().start_address();
             ap_realmode_begin = try_exit!(init_symbols.get("ap_start_realmode").ok_or("Missing expected symbol from assembly code \"ap_start_realmode\"").and_then(|v| VirtualAddress::new(*v + KERNEL_OFFSET)));
             ap_realmode_end   = try_exit!(init_symbols.get("ap_start_realmode_end").ok_or("Missing expected symbol from assembly code \"ap_start_realmode_end\"").and_then(|v| VirtualAddress::new(*v + KERNEL_OFFSET)));
             // debug!("bsp_stack_top: {:#X}, bsp_stack_bottom: {:#X}, ap_realmode_begin: {:#X}, ap_realmode_end: {:#X}", bsp_stack_top, bsp_stack_bottom, ap_realmode_begin, ap_realmode_end);
@@ -213,12 +213,12 @@ pub extern "C" fn nano_core_start(multiboot_information_virtual_address: usize) 
             .upgrade()
             .ok_or("no single symbol matching \"captain::init\"")
         );
-        info!("The nano_core (in loadable mode) is invoking the captain init function: {:?}", section_ref.lock().name);
+        info!("The nano_core (in loadable mode) is invoking the captain init function: {:?}", section_ref.read().name);
 
         type CaptainInitFunc = fn(Arc<MutexIrqSafe<MemoryManagementInfo>>, Vec<MappedPages>, VirtualAddress, VirtualAddress, VirtualAddress, VirtualAddress) -> Result<(), &'static str>;
         let mut space = 0;
         let (mapped_pages, mapped_pages_offset) = { 
-            let section = section_ref.lock();
+            let section = section_ref.read();
             (section.mapped_pages.clone(), section.mapped_pages_offset)
         };
         let func: &CaptainInitFunc = {

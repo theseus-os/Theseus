@@ -101,9 +101,9 @@ fn rmain(matches: Matches) -> Result<(), String> {
 /// all of the matching section names separated by the newline character `'\n'`.
 fn sections_dependent_on_me(section_name: &str) -> Result<(), String> {
     let sec_ref = find_section(section_name)?;
-    println!("Sections that depend on {}  (weak dependents):", sec_ref.lock().name);
-    for dependent_sec_ref in sec_ref.lock().sections_dependent_on_me.iter().filter_map(|weak_dep| weak_dep.section.upgrade()) {
-        let dependent_sec = dependent_sec_ref.lock();
+    println!("Sections that depend on {}  (weak dependents):", sec_ref.read().name);
+    for dependent_sec_ref in sec_ref.read().sections_dependent_on_me.iter().filter_map(|weak_dep| weak_dep.section.upgrade()) {
+        let dependent_sec = dependent_sec_ref.read();
         if verbose!() { 
             println!("    {}  in {:?}", dependent_sec.name, dependent_sec.parent_crate.upgrade());
         } else {
@@ -121,9 +121,9 @@ fn sections_dependent_on_me(section_name: &str) -> Result<(), String> {
 /// all of the matching section names separated by the newline character `'\n'`.
 fn sections_i_depend_on(section_name: &str) -> Result<(), String> {
     let sec_ref = find_section(section_name)?;
-    println!("Sections that {} depends on  (strong dependencies):", sec_ref.lock().name);
-    for dependency_sec_ref in sec_ref.lock().sections_i_depend_on.iter().map(|dep| &dep.section) {
-        let dependency_sec = dependency_sec_ref.lock();
+    println!("Sections that {} depends on  (strong dependencies):", sec_ref.read().name);
+    for dependency_sec_ref in sec_ref.read().sections_i_depend_on.iter().map(|dep| &dep.section) {
+        let dependency_sec = dependency_sec_ref.read();
         if verbose!() { 
             println!("    {}  in {:?}", dependency_sec.name, dependency_sec.parent_crate.upgrade());
         } else {
@@ -182,7 +182,7 @@ fn find_section(section_name: &str) -> Result<StrongSectionRef, String> {
 
     let mut matching_sections: Vec<(String, StrongSectionRef)> = containing_crate_ref.lock_as_ref().sections.values()
         .filter_map(|sec_ref| {
-            let sec_name = sec_ref.lock().name.clone();
+            let sec_name = sec_ref.read().name.clone();
             if sec_name.starts_with(section_name) {
                 Some((sec_name, sec_ref.clone()))
             } else {
