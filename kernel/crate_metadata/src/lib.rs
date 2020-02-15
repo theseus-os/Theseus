@@ -53,7 +53,7 @@ extern crate goblin;
 
 use core::fmt;
 use core::ops::Range;
-use spin::Mutex;
+use spin::{Mutex, RwLock};
 use alloc::{
     collections::{BTreeMap, BTreeSet},
     string::String,
@@ -72,9 +72,9 @@ pub type StrongCrateRef  = CowArc<LoadedCrate>;
 /// A Weak reference to a `LoadedCrate`.
 pub type WeakCrateRef = CowWeak<LoadedCrate>;
 /// A Strong reference (`Arc`) to a `LoadedSection`.
-pub type StrongSectionRef  = Arc<Mutex<LoadedSection>>;
+pub type StrongSectionRef  = Arc<RwLock<LoadedSection>>;
 /// A Weak reference (`Weak`) to a `LoadedSection`.
-pub type WeakSectionRef = Weak<Mutex<LoadedSection>>;
+pub type WeakSectionRef = Weak<RwLock<LoadedSection>>;
 
 
 /// `.text` sections are read-only and executable.
@@ -272,7 +272,7 @@ impl LoadedCrate {
         where F: Fn(&LoadedSection) -> bool
     {
         self.sections.values()
-            .filter(|sec_ref| predicate(&sec_ref.lock()))
+            .filter(|sec_ref| predicate(&sec_ref.read()))
             .next()
     }
 
@@ -297,10 +297,10 @@ impl LoadedCrate {
     pub fn crates_dependent_on_me(&self) -> Vec<WeakCrateRef> {
         let mut results: Vec<WeakCrateRef> = Vec::new();
         for sec in self.sections.values() {
-            let sec_locked = sec.lock();
+            let sec_locked = sec.read();
             for weak_dep in &sec_locked.sections_dependent_on_me {
                 if let Some(dep_sec) = weak_dep.section.upgrade() {
-                    let dep_sec_locked = dep_sec.lock();
+                    let dep_sec_locked = dep_sec.read();
                     let parent_crate = dep_sec_locked.parent_crate.clone();
                     results.push(parent_crate);
                 }
@@ -319,9 +319,9 @@ impl LoadedCrate {
     pub fn crates_i_depend_on(&self) -> Vec<WeakCrateRef> {
         let mut results: Vec<WeakCrateRef> = Vec::new();
         for sec in self.sections.values() {
-            let sec_locked = sec.lock();
+            let sec_locked = sec.read();
             for strong_dep in &sec_locked.sections_i_depend_on {
-                let dep_sec_locked = strong_dep.section.lock();
+                let dep_sec_locked = strong_dep.section.read();
                 let parent_crate = dep_sec_locked.parent_crate.clone();
                 results.push(parent_crate);
             }
@@ -411,7 +411,7 @@ impl LoadedCrate {
         let mut new_sections: BTreeMap<usize, StrongSectionRef> = BTreeMap::new();
         let mut new_bss_sections: Trie<BString, StrongSectionRef> = Trie::new();
         for (shndx, old_sec_ref) in self.sections.iter() {
-            let old_sec = old_sec_ref.lock();
+            let old_sec = old_sec_ref.read();
             let new_sec_mapped_pages_offset = old_sec.mapped_pages_offset;
             let (new_sec_mapped_pages_ref, new_sec_virt_addr) = match old_sec.typ {
                 SectionType::Text => (
@@ -432,7 +432,7 @@ impl LoadedCrate {
             };
             let new_sec_virt_addr = new_sec_virt_addr.ok_or_else(|| "BUG: couldn't get virt_addr for new section")?;
 
-            let new_sec_ref = Arc::new(Mutex::new(LoadedSection::with_dependencies(
+            let new_sec_ref = Arc::new(RwLock::new(LoadedSection::with_dependencies(
                 old_sec.typ,                            // section type is the same
                 old_sec.name.clone(),                   // name is the same
                 new_sec_mapped_pages_ref,               // mapped_pages is different, points to the new duplicated one
@@ -457,7 +457,7 @@ impl LoadedCrate {
         // The foreign sections dependencies (sections_i_depend_on) are the same, 
         // but all relocation entries must be rewritten because the sections' virtual addresses have changed.
         for new_sec_ref in new_sections.values() {
-            let mut new_sec = new_sec_ref.lock();
+            let mut new_sec = new_sec_ref.write();
             let new_sec_mapped_pages = match new_sec.typ {
                 SectionType::Text    => new_text_pages_locked.as_mut().ok_or_else(|| "BUG: missing text pages in newly-copied crate")?,
                 SectionType::Rodata |
@@ -474,7 +474,7 @@ impl LoadedCrate {
                 // we can skip modifying "absolute" relocations, since those only depend on the source section,
                 // which we haven't actually changed (we've duplicated the target section here, not the source)
                 if !strong_dep.relocation.is_absolute() {
-                    let mut source_sec = strong_dep.section.lock();
+                    let mut source_sec = strong_dep.section.write();
                     // perform the actual fix by writing the relocation
                     write_relocation(
                         strong_dep.relocation, 
@@ -509,7 +509,7 @@ impl LoadedCrate {
                     new_sec.start_address()
                 } else {
                     // here: the source_sec and new_sec are different, so we can go ahead and safely lock the source_sec
-                    source_sec_ref.lock().start_address()
+                    source_sec_ref.read().start_address()
                 };
                 write_relocation(
                     internal_dep.relocation, 

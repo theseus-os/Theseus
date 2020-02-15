@@ -592,7 +592,7 @@ impl UnwindRowReference {
     fn with_unwind_info<O, F>(&self, mut f: F) -> Result<O, &'static str>
         where F: FnMut(&FrameDescriptionEntry<NativeEndianSliceReader, usize>, &UnwindTableRow<NativeEndianSliceReader>) -> Result<O, &'static str>
     {
-        let sec = self.eh_frame_sec_ref.lock();
+        let sec = self.eh_frame_sec_ref.read();
         let size_in_bytes = sec.size();
         let sec_pages = sec.mapped_pages.lock();
         let eh_frame_slice: &[u8] = sec_pages.as_slice(sec.mapped_pages_offset, size_in_bytes)?;
@@ -634,10 +634,10 @@ fn get_eh_frame_info(crate_ref: &StrongCrateRef) -> Option<(StrongSectionRef, Ba
     let parent_crate = crate_ref.lock_as_ref();
 
     let eh_frame_sec_ref = parent_crate.sections.values()
-        .filter(|s| s.lock().typ == SectionType::EhFrame)
+        .filter(|s| s.read().typ == SectionType::EhFrame)
         .next()?;
     
-    let eh_frame_vaddr = eh_frame_sec_ref.lock().start_address().value();
+    let eh_frame_vaddr = eh_frame_sec_ref.read().start_address().value();
     let text_pages_vaddr = parent_crate.text_pages.as_ref()?.1.start.value();
     let base_addrs = BaseAddresses::default()
         .set_eh_frame(eh_frame_vaddr as u64)
@@ -739,7 +739,7 @@ fn continue_unwinding(unwinding_context_ptr: *mut UnwindingContext) -> Result<()
             let lsda = VirtualAddress::new_canonical(lsda as usize);
             if let Some((lsda_sec_ref, _)) = stack_frame_iter.namespace().get_section_containing_address(lsda, true) {
                 info!("  parsing LSDA section: {:?}", lsda_sec_ref);
-                let sec = lsda_sec_ref.lock();
+                let sec = lsda_sec_ref.read();
                 let starting_offset = sec.mapped_pages_offset + (lsda.value() - sec.address_range.start.value());
                 let length_til_end_of_mp = sec.address_range.end.value() - lsda.value();
                 let sec_mp = sec.mapped_pages.lock();
