@@ -44,19 +44,15 @@ fn panic_entry_point(info: &PanicInfo) -> ! {
             fn invoke_panic_wrapper(info: &PanicInfo) -> Result<(), &'static str> {
                 type PanicWrapperFunc = fn(&PanicInfo) -> Result<(), &'static str>;
                 const PANIC_WRAPPER_SYMBOL: &'static str = "panic_wrapper::panic_wrapper::";
-                let section_ref = {
+                let section = {
                     task::get_my_current_task().map(|t| t.get_namespace()).as_ref()
                         .or_else(|| mod_mgmt::get_initial_kernel_namespace())
                         .and_then(|namespace| namespace.get_symbol_starting_with(PANIC_WRAPPER_SYMBOL).upgrade())
                         .ok_or("Couldn't get single symbol matching \"panic_wrapper::panic_wrapper::\"")?
                 };
-                let (mapped_pages, mapped_pages_offset) = { 
-                    let section = section_ref.read();
-                    (section.mapped_pages.clone(), section.mapped_pages_offset)
-                };
                 let mut space = 0;
                 let func: &PanicWrapperFunc = {
-                    mapped_pages.lock().as_func(mapped_pages_offset, &mut space)?
+                    section.mapped_pages.lock().as_func(section.mapped_pages_offset, &mut space)?
                 };
                 func(info)
             }
@@ -116,19 +112,15 @@ extern "C" fn _Unwind_Resume(arg: usize) -> ! {
         fn invoke_unwind_resume(arg: usize) -> Result<(), &'static str> {
             type UnwindResumeFunc = fn(usize) -> !;
             const UNWIND_RESUME_SYMBOL: &'static str = "unwind::unwind_resume::";
-            let section_ref = {
+            let section = {
                 task::get_my_current_task().map(|t| t.get_namespace()).as_ref()
                     .or_else(|| mod_mgmt::get_initial_kernel_namespace())
                     .and_then(|namespace| namespace.get_symbol_starting_with(UNWIND_RESUME_SYMBOL).upgrade())
                     .ok_or("Couldn't get single symbol matching \"unwind::unwind_resume::\"")?
             };
-            let (mapped_pages, mapped_pages_offset) = { 
-                let section = section_ref.read();
-                (section.mapped_pages.clone(), section.mapped_pages_offset)
-            };
             let mut space = 0;
             let func: &UnwindResumeFunc = {
-                mapped_pages.lock().as_func(mapped_pages_offset, &mut space)?
+                section.mapped_pages.lock().as_func(section.mapped_pages_offset, &mut space)?
             };
             trace!("[LOADABLE MODE]: invoking unwind::unwind_resume()...");
             func(arg)

@@ -7,7 +7,7 @@ use alloc::{
     collections::{BTreeMap, BTreeSet},
     sync::Arc,
 };
-use spin::{Mutex, RwLock};
+use spin::Mutex;
 use cow_arc::CowArc;
 
 use xmas_elf;
@@ -231,7 +231,7 @@ fn parse_nano_core_symbol_file(
                 );
                 sections.insert(
                     section_counter,
-                    Arc::new(RwLock::new(LoadedSection::new(
+                    Arc::new(LoadedSection::new(
                         SectionType::EhFrame,
                         String::from(".eh_frame"),
                         Arc::clone(&rodata_pages),
@@ -240,7 +240,7 @@ fn parse_nano_core_symbol_file(
                         sec_size,
                         false, // .eh_frame is not global
                         new_crate_weak_ref.clone(), 
-                    )))
+                    ))
                 );
                 section_counter += 1;
             }
@@ -256,7 +256,7 @@ fn parse_nano_core_symbol_file(
                 );
                 sections.insert(
                     section_counter,
-                    Arc::new(RwLock::new(LoadedSection::new(
+                    Arc::new(LoadedSection::new(
                         SectionType::GccExceptTable,
                         String::from(".gcc_except_table"),
                         Arc::clone(&rodata_pages),
@@ -265,7 +265,7 @@ fn parse_nano_core_symbol_file(
                         sec_size,
                         false, // .gcc_except_table is not global
                         new_crate_weak_ref.clone(), 
-                    )))
+                    ))
                 );
                 section_counter += 1;
             }
@@ -379,7 +379,7 @@ fn parse_nano_core_symbol_file(
                     let sec_vaddr = try_break!(VirtualAddress::new(sec_vaddr), loop_result);
                     sections.insert(
                         section_counter,
-                        Arc::new(RwLock::new(LoadedSection::new(
+                        Arc::new(LoadedSection::new(
                             SectionType::Text,
                             name.to_string(),
                             Arc::clone(&text_pages),
@@ -388,14 +388,14 @@ fn parse_nano_core_symbol_file(
                             sec_size,
                             global,
                             new_crate_weak_ref.clone(), 
-                        )))
+                        ))
                     );
                 }
                 else if sec_ndx == rodata_shndx {
                     let sec_vaddr = try_break!(VirtualAddress::new(sec_vaddr), loop_result);
                     sections.insert(
                         section_counter,
-                        Arc::new(RwLock::new(LoadedSection::new(
+                        Arc::new(LoadedSection::new(
                             SectionType::Rodata,
                             name.to_string(),
                             Arc::clone(&rodata_pages),
@@ -404,14 +404,14 @@ fn parse_nano_core_symbol_file(
                             sec_size,
                             global,
                             new_crate_weak_ref.clone(),
-                        )))
+                        ))
                     );
                 }
                 else if sec_ndx == data_shndx {
                     let sec_vaddr = try_break!(VirtualAddress::new(sec_vaddr), loop_result);
                     sections.insert(
                         section_counter,
-                        Arc::new(RwLock::new(LoadedSection::new(
+                        Arc::new(LoadedSection::new(
                             SectionType::Data,
                             name.to_string(),
                             Arc::clone(&data_pages),
@@ -420,14 +420,14 @@ fn parse_nano_core_symbol_file(
                             sec_size,
                             global,
                             new_crate_weak_ref.clone(),
-                        )))
+                        ))
                     );
                 }
                 else if sec_ndx == bss_shndx {
                     let sec_vaddr = try_break!(VirtualAddress::new(sec_vaddr), loop_result);
                     sections.insert(
                         section_counter,
-                        Arc::new(RwLock::new(LoadedSection::new(
+                        Arc::new(LoadedSection::new(
                             SectionType::Bss,
                             name.to_string(),
                             Arc::clone(&data_pages),
@@ -436,7 +436,7 @@ fn parse_nano_core_symbol_file(
                             sec_size,
                             global,
                             new_crate_weak_ref.clone(),
-                        )))
+                        ))
                     );
                 }
                 else {
@@ -686,7 +686,7 @@ fn parse_nano_core_binary(
 
                         if let Some(sec) = new_section {
                             // debug!("parse_nano_core: new section: {:?}", sec);
-                            sections.insert(section_counter, Arc::new(RwLock::new(sec)));
+                            sections.insert(section_counter, Arc::new(sec));
                             section_counter += 1;
                         }
                     }

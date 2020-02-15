@@ -54,8 +54,7 @@ pub fn prio_sched(old_namespace: &Arc<CrateNamespace>, new_namespace: &CrateName
         .ok_or("Couldn't get runqueue_round_robin crate from old namespace")?;
     
     let krate = rq_rr_crate.lock_as_ref();
-    for sec_ref in krate.sections.values() {
-        let sec = sec_ref.read();
+    for sec in krate.sections.values() {
         if sec.name.contains("RUNQUEUES") {
             warn!("Section {}\n\ttype: {:?}\n\tvaddr: {:#X}\n\tsize: {}\n", sec.name, sec.typ, sec.start_address(), sec.size());
         }

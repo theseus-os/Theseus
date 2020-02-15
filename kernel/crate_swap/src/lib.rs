@@ -276,16 +276,15 @@ pub fn swap_crates(
             // because other crates could not possibly depend on non-public sections in the old crate.
             for old_sec_name in &old_crate.global_symbols {
                 debug!("swap_crates(): looking for old_sec_name: {:?}", old_sec_name);
-                let (old_sec_ref, old_sec_ns) = this_namespace.get_symbol_and_namespace(old_sec_name.as_str())
-                    .and_then(|(weak_sec_ref, ns)| weak_sec_ref.upgrade().map(|sec| (sec, ns)))
+                let (old_sec, old_sec_ns) = this_namespace.get_symbol_and_namespace(old_sec_name.as_str())
+                    .and_then(|(weak_old_sec, ns)| weak_old_sec.upgrade().map(|sec| (sec, ns)))
                     .ok_or_else(|| {
                         error!("BUG: swap_crates(): couldn't get/upgrade old crate's section: {:?}", old_sec_name);
                         "BUG: swap_crates(): couldn't get/upgrade old crate's section"
                     })?;
 
                 #[cfg(not(loscd_eval))]
-                debug!("swap_crates(): old_sec_name: {:?}, old_sec: {:?}", old_sec_name, old_sec_ref);
-                let mut old_sec = old_sec_ref.write();
+                debug!("swap_crates(): old_sec_name: {:?}, old_sec: {:?}", old_sec_name, old_sec);
                 let old_sec_name_without_hash = old_sec.name_without_hash();
 
 
@@ -333,20 +332,19 @@ pub fn swap_crates(
                 };
 
 
-                // the section from the `new_crate` that corresponds to the `old_sec_ref` from the `old_crate`
-                let mut new_sec_ref: Option<StrongSectionRef> = None;
+                // the section from the `new_crate` that corresponds to the `old_sec` from the `old_crate`
+                let mut new_sec: Option<StrongSectionRef> = None;
 
                 // Iterate over all sections that depend on the old_sec. 
                 let mut dead_weak_deps_to_remove: Vec<usize> = Vec::new();
-                for (i, weak_dep) in old_sec.sections_dependent_on_me.iter().enumerate() {
-                    let target_sec_ref = if let Some(sr) = weak_dep.section.upgrade() {
+                for (i, weak_dep) in old_sec.inner.read().sections_dependent_on_me.iter().enumerate() {
+                    let target_sec = if let Some(sr) = weak_dep.section.upgrade() {
                         sr
                     } else {
                         trace!("Removing dead weak dependency on old_sec: {}", old_sec.name);
                         dead_weak_deps_to_remove.push(i);
                         continue;
                     };
-                    let mut target_sec = target_sec_ref.write();
                     let relocation_entry = weak_dep.relocation;
 
                     #[cfg(loscd_eval)]
@@ -354,13 +352,13 @@ pub fn swap_crates(
                     
 
                     // get the section from the new crate that corresponds to the `old_sec`
-                    let new_source_sec_ref = if let Some(ref nsr) = new_sec_ref {
+                    let new_source_sec = if let Some(ref nsr) = new_sec {
                         trace!("using cached version of new source section");
                         nsr
                     } else {
                         trace!("Finding new source section from scratch");
                         let nsr = find_corresponding_new_section(&mut new_crate.reexported_symbols)?;
-                        new_sec_ref.get_or_insert(nsr)
+                        new_sec.get_or_insert(nsr)
                     };
 
                     #[cfg(loscd_eval)] {
@@ -368,7 +366,6 @@ pub fn swap_crates(
                         hpet_total_symbol_finding += (end_symbol_finding - start_symbol_finding);
                     }
 
-                    let mut new_source_sec = new_source_sec_ref.write();
                     #[cfg(not(loscd_eval))]
                     debug!("    swap_crates(): target_sec: {:?}, old source sec: {:?}, new source sec: {:?}", &*target_sec, &*old_sec, &*new_source_sec);
 
@@ -413,18 +410,18 @@ pub fn swap_crates(
                     // Note that we don't need to do this if we're re-swapping in a cached crate,
                     // because that crate's sections' dependents are already properly set up from when it was first swapped in.
                     if !is_optimized {
-                        new_source_sec.sections_dependent_on_me.push(WeakDependent {
-                            section: Arc::downgrade(&target_sec_ref),
+                        new_source_sec.inner.write().sections_dependent_on_me.push(WeakDependent {
+                            section: Arc::downgrade(&target_sec),
                             relocation: relocation_entry,
                         });
                     }
 
-                    // Tell the existing target_sec that it no longer depends on the old source section (old_sec_ref),
+                    // Tell the existing target_sec that it no longer depends on the old source section (old_sec),
                     // and that it now depends on the new source_sec.
                     let mut found_strong_dependency = false;
-                    for mut strong_dep in target_sec.sections_i_depend_on.iter_mut() {
-                        if Arc::ptr_eq(&strong_dep.section, &old_sec_ref) && strong_dep.relocation == relocation_entry {
-                            strong_dep.section = Arc::clone(&new_source_sec_ref);
+                    for mut strong_dep in target_sec.inner.write().sections_i_depend_on.iter_mut() {
+                        if Arc::ptr_eq(&strong_dep.section, &old_sec) && strong_dep.relocation == relocation_entry {
+                            strong_dep.section = Arc::clone(&new_source_sec);
                             found_strong_dependency = true;
                             break;
                         }
@@ -441,8 +438,11 @@ pub fn swap_crates(
                     }
                 } // end of loop that iterates over all weak deps in the old_sec
 
-                for index in dead_weak_deps_to_remove {
-                    old_sec.sections_dependent_on_me.remove(index);
+                {
+                    let mut old_sec_inner = old_sec.inner.write();
+                    for index in dead_weak_deps_to_remove {
+                        old_sec_inner.sections_dependent_on_me.remove(index);
+                    }
                 }
                 
             } // end of loop that rewrites dependencies for sections that depend on the old_crate
@@ -453,11 +453,10 @@ pub fn swap_crates(
             // Go through all the BSS sections and copy over the old_sec into the new source_sec,
             // as they represent a static variable that would otherwise result in a loss of data.
             // Currently, AFAIK, static variables only exist in the form of .bss sections.
-            for old_sec_ref in old_crate.bss_sections.values() {
-                let old_sec = old_sec_ref.read();
+            for old_sec in old_crate.bss_sections.values() {
                 let old_sec_name_without_hash = old_sec.name_without_hash();
                 // get the section from the new crate that corresponds to the `old_sec`
-                let new_dest_sec_ref = {
+                let new_dest_sec = {
                     let mut iter = if crates_have_same_name {
                         new_crate.bss_sections.iter_prefix_str(old_sec_name_without_hash)
                     } else {
@@ -474,8 +473,8 @@ pub fn swap_crates(
                     "couldn't find destination section in new crate for copying old_sec's data into (BSS state transfer)"
                 )?;
 
-                // warn!("swap_crates(): copying BSS section from old {:?} to new {:?}", &*old_sec, new_dest_sec_ref);
-                old_sec.copy_section_data_to(&mut new_dest_sec_ref.write())?;
+                // warn!("swap_crates(): copying BSS section from old {:?} to new {:?}", &*old_sec, new_dest_sec);
+                old_sec.copy_section_data_to(&new_dest_sec)?;
             }
 
             #[cfg(loscd_eval)] {
@@ -488,14 +487,13 @@ pub fn swap_crates(
 
     // Execute the provided state transfer functions
     for symbol in state_transfer_functions {
-        let state_transfer_fn_sec_ref = namespace_of_new_crates.get_symbol_or_load(&symbol, Some(this_namespace), kernel_mmi_ref, verbose_log).upgrade()
+        let state_transfer_fn_sec = namespace_of_new_crates.get_symbol_or_load(&symbol, Some(this_namespace), kernel_mmi_ref, verbose_log).upgrade()
             // as a backup, search fuzzily to accommodate state transfer function symbol names without full hashes
             .or_else(|| namespace_of_new_crates.get_symbol_starting_with(&symbol).upgrade())
             .ok_or("couldn't find specified state transfer function in the new CrateNamespace")?;
         
         let mut space: usize = 0;
         let st_fn = {
-            let state_transfer_fn_sec = state_transfer_fn_sec_ref.read();
             let mapped_pages = state_transfer_fn_sec.mapped_pages.lock();
             mapped_pages.as_func::<StateTransferFunction>(state_transfer_fn_sec.mapped_pages_offset, &mut space)?
         };
