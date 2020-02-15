@@ -33,7 +33,7 @@ use alloc::{
     string::{String, ToString},
     sync::{Arc, Weak},
 };
-use spin::{Mutex, RwLock, Once};
+use spin::{Mutex, Once};
 use xmas_elf::{
     ElfFile,
     sections::{SectionData, ShType, SHF_WRITE, SHF_ALLOC, SHF_EXECINSTR},
@@ -852,15 +852,11 @@ impl CrateNamespace {
         kernel_mmi_ref: &MmiRef
     ) -> Result<(), &'static str> {
 
-        let old_sec = old_section.read();
-
-        for weak_dep in &old_sec.sections_dependent_on_me {
-            let target_sec_ref = weak_dep.section.upgrade().ok_or_else(|| "couldn't upgrade WeakDependent.section")?;
-            let mut target_sec = target_sec_ref.write();
+        for weak_dep in &old_section.inner.read().sections_dependent_on_me {
+            let target_sec = weak_dep.section.upgrade().ok_or_else(|| "couldn't upgrade WeakDependent.section")?;
             let relocation_entry = weak_dep.relocation;
 
-            let mut new_source_sec = new_section.write();
-            debug!("rewrite_section_dependents(): target_sec: {:?}, old source sec: {:?}, new source sec: {:?}", target_sec, old_sec, new_source_sec);
+            debug!("rewrite_section_dependents(): target_sec: {:?}, old_sec: {:?}, new_sec: {:?}", target_sec, old_section, new_section);
 
             // If the target_sec's mapped pages aren't writable (which is common in the case of swapping),
             // then we need to temporarily remap them as writable here so we can fix up the target_sec's new relocation entry.
@@ -875,7 +871,7 @@ impl CrateNamespace {
                     relocation_entry, 
                     &mut target_sec_mapped_pages, 
                     target_sec.mapped_pages_offset, 
-                    new_source_sec.start_address(), 
+                    new_section.start_address(), 
                     false
                 )?;
 
@@ -889,16 +885,16 @@ impl CrateNamespace {
             // Note that we don't need to do this if we're re-swapping in a cached crate,
             // because that crate's sections' dependents are already properly set up from when it was first swapped in.
             // if !is_optimized {
-                new_source_sec.sections_dependent_on_me.push(WeakDependent {
-                    section: Arc::downgrade(&target_sec_ref),
+                new_section.inner.write().sections_dependent_on_me.push(WeakDependent {
+                    section: Arc::downgrade(&target_sec),
                     relocation: relocation_entry,
                 });
             // }
 
-            // Tell the existing target_sec that it no longer depends on the old source section (old_sec_ref),
+            // Tell the existing target_sec that it no longer depends on the old source section (old_sec),
             // and that it now depends on the new source_sec.
             let mut found_strong_dependency = false;
-            for mut strong_dep in target_sec.sections_i_depend_on.iter_mut() {
+            for mut strong_dep in target_sec.inner.write().sections_i_depend_on.iter_mut() {
                 if Arc::ptr_eq(&strong_dep.section, old_section) && strong_dep.relocation == relocation_entry {
                     strong_dep.section = Arc::clone(new_section);
                     found_strong_dependency = true;
@@ -907,7 +903,7 @@ impl CrateNamespace {
             }
             if !found_strong_dependency {
                 error!("Couldn't find/remove the existing StrongDependency from target_sec {:?} to old_sec {:?}",
-                    target_sec.name, old_sec.name);
+                    target_sec.name, old_section.name);
                 return Err("Couldn't find/remove the target_sec's StrongDependency on the old crate section");
             }
         }
@@ -1132,7 +1128,7 @@ impl CrateNamespace {
                         let dest_vaddr = tp_range.start + text_offset;
 
                         loaded_sections.insert(shndx, 
-                            Arc::new(RwLock::new(LoadedSection::new(
+                            Arc::new(LoadedSection::new(
                                 SectionType::Text,
                                 demangled,
                                 Arc::clone(tp_ref),
@@ -1141,7 +1137,7 @@ impl CrateNamespace {
                                 sec_size,
                                 is_global,
                                 new_crate_weak_ref.clone(),
-                            )))
+                            ))
                         );
                     }
                     else {
@@ -1190,7 +1186,7 @@ impl CrateNamespace {
                         }
                         
                         loaded_sections.insert(shndx, 
-                            Arc::new(RwLock::new(LoadedSection::new(
+                            Arc::new(LoadedSection::new(
                                 SectionType::Data,
                                 demangled,
                                 Arc::clone(dp_ref),
@@ -1199,7 +1195,7 @@ impl CrateNamespace {
                                 sec_size,
                                 is_global,
                                 new_crate_weak_ref.clone(),
-                            )))
+                            ))
                         );
 
                         data_offset += round_up_power_of_two(sec_size, sec_align);
@@ -1234,7 +1230,7 @@ impl CrateNamespace {
                             global_symbols.insert(demangled.clone().into());
                         }
                         
-                        let sec_ref = Arc::new(RwLock::new(LoadedSection::new(
+                        let sec = Arc::new(LoadedSection::new(
                             SectionType::Bss,
                             demangled.clone(),
                             Arc::clone(dp_ref),
@@ -1243,9 +1239,9 @@ impl CrateNamespace {
                             sec_size,
                             is_global,
                             new_crate_weak_ref.clone(),
-                        )));
-                        loaded_sections.insert(shndx, sec_ref.clone());
-                        bss_sections.insert(demangled.into(), sec_ref);
+                        ));
+                        loaded_sections.insert(shndx, Arc::clone(&sec));
+                        bss_sections.insert(demangled.into(), sec);
 
                         data_offset += round_up_power_of_two(sec_size, sec_align);
                     }
@@ -1288,7 +1284,7 @@ impl CrateNamespace {
                         }
                         
                         loaded_sections.insert(shndx, 
-                            Arc::new(RwLock::new(LoadedSection::new(
+                            Arc::new(LoadedSection::new(
                                 SectionType::Rodata,
                                 demangled,
                                 Arc::clone(rp_ref),
@@ -1297,7 +1293,7 @@ impl CrateNamespace {
                                 sec_size,
                                 is_global,
                                 new_crate_weak_ref.clone(),
-                            )))
+                            ))
                         );
 
                         rodata_offset += round_up_power_of_two(sec_size, sec_align);
@@ -1337,7 +1333,7 @@ impl CrateNamespace {
                     let is_global = false;
                     
                     loaded_sections.insert(shndx, 
-                        Arc::new(RwLock::new(LoadedSection::new(
+                        Arc::new(LoadedSection::new(
                             SectionType::GccExceptTable,
                             sec_name.to_string(),
                             Arc::clone(rp_ref),
@@ -1346,7 +1342,7 @@ impl CrateNamespace {
                             sec_size,
                             is_global,
                             new_crate_weak_ref.clone(),
-                        )))
+                        ))
                     );
 
                     rodata_offset += round_up_power_of_two(sec_size, sec_align);
@@ -1381,7 +1377,7 @@ impl CrateNamespace {
                     let is_global = false;
                     
                     loaded_sections.insert(shndx, 
-                        Arc::new(RwLock::new(LoadedSection::new(
+                        Arc::new(LoadedSection::new(
                             SectionType::EhFrame,
                             sec_name.to_string(),
                             Arc::clone(rp_ref),
@@ -1390,7 +1386,7 @@ impl CrateNamespace {
                             sec_size,
                             is_global,
                             new_crate_weak_ref.clone(),
-                        )))
+                        ))
                     );
 
                     rodata_offset += round_up_power_of_two(sec_size, sec_align);
@@ -1471,15 +1467,13 @@ impl CrateNamespace {
                 
             // Get the target section (that we already loaded) for this rela_array Rela section.
             let target_sec_shndx = sec.info() as usize;
-            let target_sec_ref = new_crate.sections.get(&target_sec_shndx).ok_or_else(|| {
+            let target_sec = new_crate.sections.get(&target_sec_shndx).ok_or_else(|| {
                 error!("ELF file error: target section was not loaded for Rela section {:?}!", sec.get_name(&elf_file));
                 "target section was not loaded for Rela section"
             })?; 
             
             let mut target_sec_dependencies: Vec<StrongDependency> = Vec::new();
             let mut target_sec_internal_dependencies: Vec<InternalDependency> = Vec::new();
-
-            let mut target_sec = target_sec_ref.write();
             {
                 let mut target_sec_mapped_pages = target_sec.mapped_pages.lock();
 
@@ -1506,7 +1500,7 @@ impl CrateNamespace {
                     let mut source_and_target_in_same_crate = false;
 
                     // We first try to get the source section from loaded_sections, which works if the section is in the crate currently being loaded.
-                    let source_sec_ref = match new_crate.sections.get(&source_sec_shndx) {
+                    let source_sec = match new_crate.sections.get(&source_sec_shndx) {
                         Some(ss) => {
                             source_and_target_in_same_crate = true;
                             Ok(ss.clone())
@@ -1540,14 +1534,12 @@ impl CrateNamespace {
                         }
                     }?;
 
-                    let source_and_target_are_same_section = Arc::ptr_eq(&source_sec_ref, &target_sec_ref);
                     let relocation_entry = RelocationEntry::from_elf_relocation(rela_entry);
-
                     write_relocation(
                         relocation_entry,
                         &mut target_sec_mapped_pages,
                         target_sec.mapped_pages_offset,
-                        if source_and_target_are_same_section { target_sec.start_address() } else { source_sec_ref.read().start_address() },
+                        source_sec.start_address(),
                         verbose_log
                     )?;
 
@@ -1561,14 +1553,14 @@ impl CrateNamespace {
                     else {
                         // tell the source_sec that the target_sec is dependent upon it
                         let weak_dep = WeakDependent {
-                            section: Arc::downgrade(&target_sec_ref),
+                            section: Arc::downgrade(&target_sec),
                             relocation: relocation_entry,
                         };
-                        source_sec_ref.write().sections_dependent_on_me.push(weak_dep);
+                        source_sec.inner.write().sections_dependent_on_me.push(weak_dep);
                         
                         // tell the target_sec that it has a strong dependency on the source_sec
                         let strong_dep = StrongDependency {
-                            section: Arc::clone(&source_sec_ref),
+                            section: Arc::clone(&source_sec),
                             relocation: relocation_entry,
                         };
                         target_sec_dependencies.push(strong_dep);          
@@ -1577,8 +1569,11 @@ impl CrateNamespace {
             }
 
             // add the target section's dependencies and relocation details all at once
-            target_sec.sections_i_depend_on.append(&mut target_sec_dependencies);
-            target_sec.internal_dependencies.append(&mut target_sec_internal_dependencies);
+            {
+                let mut target_sec_inner = target_sec.inner.write();
+                target_sec_inner.sections_i_depend_on.append(&mut target_sec_dependencies);
+                target_sec_inner.internal_dependencies.append(&mut target_sec_internal_dependencies);
+            }
         }
         // here, we're done with handling all the relocations in this entire crate
 
@@ -1603,34 +1598,30 @@ impl CrateNamespace {
     fn add_symbol(
         existing_symbol_map: &mut SymbolMap,
         new_section_key: String,
-        new_section_ref: &StrongSectionRef,
+        new_section: &StrongSectionRef,
         log_replacements: bool,
     ) -> bool {
         match existing_symbol_map.entry(new_section_key.into()) {
             qp_trie::Entry::Occupied(mut old_val) => {
                 if log_replacements {
-                    if let Some(old_sec_ref) = old_val.get().upgrade() {
-                        if !Arc::ptr_eq(&old_sec_ref, new_section_ref) {
-                            // debug!("       add_symbol(): replacing section: old: {:?}, new: {:?}", old_sec_ref, new_section_ref);
-                            let old_sec = old_sec_ref.read();
-                            let new_sec = new_section_ref.read();
-                            if new_sec.size() != old_sec.size() {
-                                warn!("         add_symbol(): Unexpectedly replacing differently-sized section: old: ({}B) {:?}, new: ({}B) {:?}", old_sec.size(), old_sec.name, new_sec.size(), new_sec.name);
-                            } 
-                            else {
-                                warn!("         add_symbol(): Replacing new symbol already present: old {:?}, new: {:?}", old_sec.name, new_sec.name);
-                            }
+                    if let Some(old_sec) = old_val.get().upgrade() {
+                        // debug!("       add_symbol(): replacing section: old: {:?}, new: {:?}", old_sec, new_section);
+                        if new_section.size() != old_sec.size() {
+                            warn!("         add_symbol(): Unexpectedly replacing differently-sized section: old: ({}B) {:?}, new: ({}B) {:?}", old_sec.size(), old_sec.name, new_section.size(), new_section.name);
+                        } 
+                        else {
+                            warn!("         add_symbol(): Replacing new symbol already present: old {:?}, new: {:?}", old_sec.name, new_section.name);
                         }
                     }
                 }
-                old_val.insert(Arc::downgrade(new_section_ref));
+                old_val.insert(Arc::downgrade(new_section));
                 false
             }
             qp_trie::Entry::Vacant(new_entry) => {
                 if log_replacements { 
-                    debug!("         add_symbol(): Adding brand new symbol: new: {:?}", new_section_ref);
+                    debug!("         add_symbol(): Adding brand new symbol: new: {:?}", new_section);
                 }
-                new_entry.insert(Arc::downgrade(new_section_ref));
+                new_entry.insert(Arc::downgrade(new_section));
                 true
             }
         }
@@ -1673,24 +1664,17 @@ impl CrateNamespace {
 
         // add all the global symbols to the symbol map, in a way that lets us inspect/log each one
         let mut count = 0;
-        for sec_ref in sections.into_iter() {
-            let (sec_name, condition) = {
-                let sec = sec_ref.read();
-                (
-                    sec.name.clone(),
-                    filter_func(&sec) && sec.global
-                )
-            };
-            
+        for sec in sections.into_iter() {
+            let condition = filter_func(&sec) && sec.global;
             if condition {
-                // trace!("add_symbols_filtered(): adding symbol {:?}", sec_ref);
-                let added = CrateNamespace::add_symbol(&mut existing_map, sec_name, sec_ref, log_replacements);
+                // trace!("add_symbols_filtered(): adding symbol {:?}", sec);
+                let added = CrateNamespace::add_symbol(&mut existing_map, sec.name.clone(), sec, log_replacements);
                 if added {
                     count += 1;
                 }
             }
             // else {
-            //     trace!("add_symbols_filtered(): skipping symbol {:?}", sec_ref);
+            //     trace!("add_symbols_filtered(): skipping symbol {:?}", sec);
             // }
         }
         
@@ -1797,9 +1781,7 @@ impl CrateNamespace {
         let crate_locked = containing_crate.lock_as_ref();
 
         // Second, we find the section in that crate that contains the address.
-        for sec_ref in crate_locked.sections.values() {
-            // trace!("get_section_containing_address: locking sec_ref: {:?}", sec_ref);
-            let sec = sec_ref.read();
+        for sec in crate_locked.sections.values() {
             // .text sections are always included, other sections are included if requested.
             let eligible_section = sec.typ == SectionType::Text || search_all_section_types;
             
@@ -1807,7 +1789,7 @@ impl CrateNamespace {
             // Only a single section can contain the address, so it's safe to stop once we've found a match.
             if eligible_section && sec.address_range.contains(&virt_addr) {
                 let offset = virt_addr.value() - sec.start_address().value();
-                return Some((sec_ref.clone(), offset));
+                return Some((sec.clone(), offset));
             }
         }
         None
@@ -1949,7 +1931,7 @@ impl CrateNamespace {
 
         // Here, we found the matching section in the temp_backup_namespace.
         let parent_crate_ref = { 
-            sec.read().parent_crate.upgrade().or_else(|| {
+            sec.parent_crate.upgrade().or_else(|| {
                 error!("BUG: Found symbol \"{}\" in backup namespace, but unexpectedly couldn't get its parent crate!", demangled_full_symbol);
                 None
             })?
@@ -2285,12 +2267,13 @@ fn dump_dependent_crates(krate: &LoadedCrate, prefix: String) {
 
 #[allow(dead_code)]
 fn dump_weak_dependents(sec: &LoadedSection, prefix: String) {
-	if !sec.sections_dependent_on_me.is_empty() {
+    let sec_inner = sec.inner.read();
+	if !sec_inner.sections_dependent_on_me.is_empty() {
 		debug!("{}Section \"{}\": sections dependent on me (weak dependents):", prefix, sec.name);
-		for weak_dep in &sec.sections_dependent_on_me {
+		for weak_dep in &sec_inner.sections_dependent_on_me {
 			if let Some(wds) = weak_dep.section.upgrade() {
 				let prefix = format!("{}  ", prefix); // add two spaces of indentation to the prefix
-				dump_weak_dependents(&*wds.read(), prefix);
+				dump_weak_dependents(&*wds, prefix);
 			}
 			else {
 				debug!("{}ERROR: weak dependent failed to upgrade()", prefix);
