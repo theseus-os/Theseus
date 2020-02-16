@@ -77,7 +77,9 @@ use registers::{Registers, LandingRegisters, SavedRegs};
 use fallible_iterator::FallibleIterator;
 use mod_mgmt::{
     CrateNamespace,
-    metadata::{SectionType, StrongCrateRef, StrongSectionRef},
+    SectionType,
+    StrongCrateRef,
+    StrongSectionRef,
 };
 use memory::VirtualAddress;
 use task::{TaskRef, KillReason};
@@ -150,16 +152,6 @@ impl StackFrame {
 }
 
 
-/// Essentially a set of crates, useful for symbol resolution.
-struct NamespaceContext {
-    /// The underlying namespace used to resolve symbols and find sections from addresses.
-    namespace: Arc<CrateNamespace>, 
-    /// The additional crate (usually an application crate) that is not
-    /// a member of the `namespace` but should be used for additional symbol resolution.
-    starting_crate: Option<StrongCrateRef>,
-}
-
-
 /// An iterator over the stack frames on the current task's call stack,
 /// which works in reverse calling order from the current function
 /// up the call stack to the very first function on the stack,
@@ -170,10 +162,9 @@ struct NamespaceContext {
 /// 
 /// This can be used with the `FallibleIterator` trait.
 pub struct StackFrameIter {
-    /// A reference to the underlying namespace crates 
-    /// that are used to resolve symbols and section addresses 
-    /// when iterating over stack frames. 
-    namespace_context: NamespaceContext,
+    /// The namespace (set of crates/sections) that is used to resolve symbols
+    /// and section addresses when iterating over stack frames. 
+    namespace: Arc<CrateNamespace>,
     /// The register values that 
     /// These register values will change on each invocation of `next()`
     /// as different stack frames are successively iterated over.
@@ -204,13 +195,12 @@ impl fmt::Debug for StackFrameIter {
 impl StackFrameIter {
     /// Create a new iterator over stack frames that starts from the current frame
     /// and uses the given `Registers` values as a starting point. 
-    /// The given `namespace` and `starting_crate` are used for resolving symbol addresses into sections.
     /// 
     /// Note: ideally, this shouldn't be public since it needs to be invoked with the correct initial register values.
     #[doc(hidden)]
-    pub fn new(namespace: Arc<CrateNamespace>, app_crate: Option<StrongCrateRef>, registers: Registers) -> Self {
+    pub fn new(namespace: Arc<CrateNamespace>, registers: Registers) -> Self {
         StackFrameIter {
-            namespace_context: NamespaceContext { namespace, starting_crate: app_crate },
+            namespace,
             registers,
             state: None,
             cfa_adjustment: None,
@@ -230,13 +220,7 @@ impl StackFrameIter {
     /// Returns a reference to the underlying `CrateNamespace`
     /// that is used for symbol resolution while iterating over these stack frames.
     pub fn namespace(&self) -> &Arc<CrateNamespace> {
-        &self.namespace_context.namespace
-    }
-
-    /// Returns a reference to the additional crate (usually an application crate) that is not
-    /// a member of the underlying `namespace`, but should also be used for symbol resolution.
-    pub fn starting_crate(&self) -> Option<&StrongCrateRef> {
-        self.namespace_context.starting_crate.as_ref()
+        &self.namespace
     }
 }
 
@@ -338,21 +322,17 @@ impl FallibleIterator for StackFrameIter {
         // trace!("call_site_address: {:#X}", caller);
 
         // Get unwind info for the call site address
-        let crate_ref = self.namespace_context.namespace.get_crate_containing_address(
-            VirtualAddress::new_canonical(caller as usize), 
-            self.namespace_context.starting_crate.as_ref(),
-            false,
-        ).ok_or_else(|| {
+        let crate_ref = self.namespace.get_crate_containing_address(VirtualAddress::new_canonical(caller as usize), false).ok_or_else(|| {
             error!("StackTraceIter::next(): couldn't get crate containing call site address: {:#X}", caller);
             "couldn't get crate containing call site address"
         })?;
-        let (eh_frame_sec_ref, base_addrs) = get_eh_frame_info(&crate_ref)
+        let (eh_frame_sec, base_addrs) = get_eh_frame_info(&crate_ref)
             .ok_or("couldn't get eh_frame section in caller's containing crate")?;
 
         let mut cfa_adjustment: Option<i64> = None;
         let mut this_frame_is_exception_handler = false;
 
-        let row_ref = UnwindRowReference { caller, eh_frame_sec_ref, base_addrs };
+        let row_ref = UnwindRowReference { caller, eh_frame_sec, base_addrs };
         let (cfa, frame) = row_ref.with_unwind_info(|fde, row| {
             // trace!("ok: {:?} (0x{:x} - 0x{:x})", row.cfa(), row.start_address(), row.end_address());
             let mut cfa = match *row.cfa() {
@@ -603,7 +583,7 @@ type NativeEndianSliceReader<'i> = EndianSlice<'i, NativeEndian>;
 #[derive(Debug)]
 struct UnwindRowReference {
     caller: u64,
-    eh_frame_sec_ref: StrongSectionRef,
+    eh_frame_sec: StrongSectionRef,
     base_addrs: BaseAddresses,
 }
 impl UnwindRowReference {
@@ -612,7 +592,7 @@ impl UnwindRowReference {
     fn with_unwind_info<O, F>(&self, mut f: F) -> Result<O, &'static str>
         where F: FnMut(&FrameDescriptionEntry<NativeEndianSliceReader, usize>, &UnwindTableRow<NativeEndianSliceReader>) -> Result<O, &'static str>
     {
-        let sec = self.eh_frame_sec_ref.lock();
+        let sec = &self.eh_frame_sec;
         let size_in_bytes = sec.size();
         let sec_pages = sec.mapped_pages.lock();
         let eh_frame_slice: &[u8] = sec_pages.as_slice(sec.mapped_pages_offset, size_in_bytes)?;
@@ -653,17 +633,17 @@ impl UnwindRowReference {
 fn get_eh_frame_info(crate_ref: &StrongCrateRef) -> Option<(StrongSectionRef, BaseAddresses)> {
     let parent_crate = crate_ref.lock_as_ref();
 
-    let eh_frame_sec_ref = parent_crate.sections.values()
-        .filter(|s| s.lock().typ == SectionType::EhFrame)
+    let eh_frame_sec = parent_crate.sections.values()
+        .filter(|s| s.typ == SectionType::EhFrame)
         .next()?;
     
-    let eh_frame_vaddr = eh_frame_sec_ref.lock().start_address().value();
+    let eh_frame_vaddr = eh_frame_sec.start_address().value();
     let text_pages_vaddr = parent_crate.text_pages.as_ref()?.1.start.value();
     let base_addrs = BaseAddresses::default()
         .set_eh_frame(eh_frame_vaddr as u64)
         .set_text(text_pages_vaddr as u64);
 
-    Some((eh_frame_sec_ref.clone(), base_addrs))
+    Some((eh_frame_sec.clone(), base_addrs))
 }
 
 
@@ -681,16 +661,11 @@ pub fn start_unwinding(reason: KillReason, stack_frames_to_skip: usize) -> Resul
     let unwinding_context_ptr = {
         let curr_task = task::get_my_current_task().ok_or("get_my_current_task() failed")?;
         let namespace = curr_task.get_namespace();
-        let app_crate_ref = { 
-            let t = curr_task.lock();
-            t.app_crate.as_ref().map(|a| a.clone_shallow())
-        };
 
         Box::into_raw(Box::new(
             UnwindingContext {
                 stack_frame_iter: StackFrameIter::new(
                     namespace,
-                    app_crate_ref,
                     // we will set the real register values later, in the `invoke_with_current_registers()` closure.
                     Registers::default()
                 ), 
@@ -757,14 +732,13 @@ fn continue_unwinding(unwinding_context_ptr: *mut UnwindingContext) -> Result<()
         "continue_unwinding: error getting next stack frame in the call stack"
     })? {
         info!("Unwinding StackFrame: {:#X?}", frame);
-        info!("  In func: {:?}", stack_frame_iter.namespace().get_section_containing_address(VirtualAddress::new_canonical(frame.initial_address() as usize), stack_frame_iter.starting_crate(), false));
+        info!("  In func: {:?}", stack_frame_iter.namespace().get_section_containing_address(VirtualAddress::new_canonical(frame.initial_address() as usize), false));
         info!("  Regs: {:?}", stack_frame_iter.registers());
 
         if let Some(lsda) = frame.lsda() {
             let lsda = VirtualAddress::new_canonical(lsda as usize);
-            if let Some((lsda_sec_ref, _)) = stack_frame_iter.namespace().get_section_containing_address(lsda, stack_frame_iter.starting_crate(), true) {
-                info!("  parsing LSDA section: {:?}", lsda_sec_ref);
-                let sec = lsda_sec_ref.lock();
+            if let Some((sec, _)) = stack_frame_iter.namespace().get_section_containing_address(lsda, true) {
+                info!("  parsing LSDA section: {:?}", sec);
                 let starting_offset = sec.mapped_pages_offset + (lsda.value() - sec.address_range.start.value());
                 let length_til_end_of_mp = sec.address_range.end.value() - lsda.value();
                 let sec_mp = sec.mapped_pages.lock();

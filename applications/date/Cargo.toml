@@ -8,7 +8,7 @@ build = "../../build.rs"
 
 
 [dependencies.terminal_print]
-path = "../terminal_print"
+path = "../../kernel/terminal_print"
 
 [dependencies.rtc]
 path = "../../kernel/rtc"

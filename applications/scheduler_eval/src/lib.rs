@@ -11,7 +11,6 @@ use alloc::string::String;
 use alloc::vec::Vec;
 
 
-#[no_mangle]
 pub fn main(_args: Vec<String>) -> (){
     let taskref1 = KernelTaskBuilder::new(test1 ,1)
         .name(String::from("test1"))

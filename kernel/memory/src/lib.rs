@@ -115,7 +115,7 @@ pub struct MemoryManagementInfo {
     pub extra_mapped_pages: Vec<MappedPages>,
 
     /// the task's stack allocator, which is initialized with a range of Pages from which to allocate.
-    pub stack_allocator: stack_allocator::StackAllocator,  // TODO: this shouldn't be public, once we move spawn_userspace code into this module
+    stack_allocator: stack_allocator::StackAllocator,
 }
 
 impl MemoryManagementInfo {

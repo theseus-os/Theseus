@@ -22,7 +22,6 @@ use getopts::{Options, Matches};
 use mod_mgmt::CrateNamespace;
 
 
-#[no_mangle]
 pub fn main(args: Vec<String>) -> isize {
     let mut opts = Options::new();
     opts.optflag("h", "help", "print this help menu");
@@ -74,8 +73,10 @@ fn rmain(matches: Matches) -> Result<(), String> {
 
 
 fn print_files(output: &mut String, indent: usize, namespace: &CrateNamespace, recursive: bool) -> core::fmt::Result {
-    writeln!(output, "\n{:indent$}{} CrateNamespace has crate object files:", "", namespace.name, indent = indent)?;
-    for f in namespace.dir().lock().list() {
+    writeln!(output, "\n{:indent$}{} CrateNamespace has crate object files:", "", namespace.name(), indent = indent)?;
+    let mut files = namespace.dir().lock().list();
+    files.sort();
+    for f in files {
         writeln!(output, "{:indent$}{}", "", f, indent = (indent + 4))?;
     }
 
@@ -90,12 +91,17 @@ fn print_files(output: &mut String, indent: usize, namespace: &CrateNamespace, r
 
 
 fn print_crates(output: &mut String, indent: usize, namespace: &CrateNamespace, recursive: bool) -> core::fmt::Result {
-    writeln!(output, "\n{:indent$}{} CrateNamespace has loaded crates:", "", namespace.name, indent = indent)?;
+    writeln!(output, "\n{:indent$}{} CrateNamespace has loaded crates:", "", namespace.name(), indent = indent)?;
+    let mut crates: Vec<String> = Vec::new();
     // We do recursion manually here so we can separately print each recursive namespace.
     namespace.for_each_crate(false, |crate_name, crate_ref| {
-        let _ = writeln!(output, "{:indent$}{}    {}", "", crate_name, crate_ref.lock_as_ref().object_file_abs_path, indent = (indent + 4));
+        crates.push(format!("{:indent$}{}     {:?}", "", crate_name, crate_ref.lock_as_ref().object_file.lock().get_absolute_path(), indent = (indent + 4)));
         true
     });
+    crates.sort();
+    for c in crates {
+        writeln!(output, "{}", c)?;
+    }
 
     if recursive {
         if let Some(r_ns) = namespace.recursive_namespace() {

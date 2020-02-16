@@ -12,10 +12,13 @@ version = "0.7.9"
 default-features = false
 
 [dependencies.terminal_print]
-path = "../terminal_print"
+path = "../../kernel/terminal_print"
 
 [dependencies.mod_mgmt]
 path = "../../kernel/mod_mgmt"
+
+[dependencies.crate_swap]
+path = "../../kernel/crate_swap"
 
 [dependencies.memory]
 path = "../../kernel/memory"

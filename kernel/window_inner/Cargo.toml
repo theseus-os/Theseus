@@ -5,8 +5,6 @@ authors = ["Yue Wu <wuyue16@pku.edu.cn>", "Wenqiu Yu <yuwenqiuj@gmail.com>"]
 description = "allocate new windows and manage a list of existing windows"
 build = "../../build.rs"
 
-[dependencies]
-spin = "0.4.10"
 
 [dependencies.mpmc]
 path = "../../libs/mpmc"
@@ -16,9 +14,6 @@ path = "../framebuffer"
 
 [dependencies.shapes]
 path = "../shapes"
-
-[dependencies.color]
-path = "../color"
 
 [dependencies.event_types]
 path = "../event_types"

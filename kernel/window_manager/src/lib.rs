@@ -10,8 +10,8 @@
 #![no_std]
 
 extern crate spin;
-#[macro_use]
-extern crate alloc;
+#[macro_use] extern crate log;
+#[macro_use] extern crate alloc;
 extern crate mpmc;
 extern crate event_types;
 extern crate compositor;
@@ -28,13 +28,11 @@ extern crate window_inner;
 extern crate shapes;
 extern crate color;
 
-mod background;
 use alloc::collections::VecDeque;
-use alloc::string::{String, ToString};
+use alloc::string::ToString;
 use alloc::sync::{Arc, Weak};
 use alloc::vec::{Vec};
 use compositor::{Compositor, FramebufferUpdates, CompositableRegion};
-use core::slice;
 
 use mpmc::Queue;
 use event_types::{Event, MousePositionEvent};
@@ -89,17 +87,21 @@ pub struct WindowManager {
     mouse: Coord,
     /// If a window is being repositioned (e.g., by dragging it), this is the position of that window's border
     repositioned_border: Option<Rectangle>,
-    /// the framebuffer that it should print on
+    /// The bottom framebuffer typically contains the background/wallpaper image, 
+    /// which is displayed by default when no other windows exist on top of it.
     bottom_fb: Framebuffer<AlphaPixel>,
-    /// the framebuffer that it should print on
+    /// The top framebuffer is used for overlaying visual elements atop the rest of the windows, 
+    /// e.g., the mouse pointer, the border of a window being dragged/moved, etc. 
     top_fb: Framebuffer<AlphaPixel>,
-    /// The final framebuffer which is mapped to the screen;
+    /// The final framebuffer which is mapped to the screen (the actual display device).
     pub final_fb: Framebuffer<AlphaPixel>,
 }
 
 impl WindowManager {
     /// Sets one window as active, push last active (if exists) to top of show_list. if `refresh` is `true`, will then refresh the window's area.
     /// Returns whether this window is the first active window in the manager.
+    /// 
+    /// TODO FIXME: (kevinaboos) remove this dumb notion of "first active". This is a bad hack. 
     pub fn set_active(
         &mut self,
         inner_ref: &Arc<Mutex<WindowInner>>,
@@ -113,7 +115,6 @@ impl WindowManager {
                 } else {
                     // save this to show_list
                     self.show_list.push_front(self.active.clone());
-                    self.active = Weak::new();
                 }
                 false
             }
@@ -150,12 +151,12 @@ impl WindowManager {
         Ok(first_active)
     }
 
-    /// Return the index of a window if it is in the show list
-    fn is_window_in_show_list(&mut self, inner_ref: &Arc<Mutex<WindowInner>>) -> Option<usize> {
+    /// Returns the index of a window if it is in the show list
+    fn is_window_in_show_list(&mut self, window: &Arc<Mutex<WindowInner>>) -> Option<usize> {
         let mut i = 0_usize;
         for item in self.show_list.iter() {
             if let Some(item_ptr) = item.upgrade() {
-                if Arc::ptr_eq(&(item_ptr), inner_ref) {
+                if Arc::ptr_eq(&(item_ptr), window) {
                     return Some(i);
                 }
             }
@@ -164,12 +165,12 @@ impl WindowManager {
         None
     }
 
-    /// Return the index of a window if it is in the hide list
-    fn is_window_in_hide_list(&mut self, inner_ref: &Arc<Mutex<WindowInner>>) -> Option<usize> {
+    /// Returns the index of a window if it is in the hide list
+    fn is_window_in_hide_list(&mut self, window: &Arc<Mutex<WindowInner>>) -> Option<usize> {
         let mut i = 0_usize;
         for item in self.hide_list.iter() {
             if let Some(item_ptr) = item.upgrade() {
-                if Arc::ptr_eq(&(item_ptr), inner_ref) {
+                if Arc::ptr_eq(&(item_ptr), window) {
                     return Some(i);
                 }
             }
@@ -215,8 +216,7 @@ impl WindowManager {
         }
 
         if let Some(index) = self.is_window_in_hide_list(inner_ref) {
-            self.show_list.remove(index);
-            // self.refresh_windows(area, true)?;
+            self.hide_list.remove(index);
             return Ok(())        
         }
         Err("cannot find this window")
@@ -229,7 +229,7 @@ impl WindowManager {
         active: bool,
     ) -> Result<(), &'static str> {
         // bottom framebuffer
-        let bottom_fb = FramebufferUpdates {
+        let bottom_fb_area = FramebufferUpdates {
             src_framebuffer: &self.bottom_fb,
             coordinate_in_dest_framebuffer: Coord::new(0, 0),
         };
@@ -258,12 +258,12 @@ impl WindowManager {
         // create updated framebuffer info objects
         let window_bufferlist = locked_window_list.iter().map(|window| {
             FramebufferUpdates {
-                src_framebuffer: &window.framebuffer,
+                src_framebuffer: window.framebuffer(),
                 coordinate_in_dest_framebuffer: window.get_position(),
             }
         }).collect::<Vec<_>>();
         
-        let buffer_iter = Some(bottom_fb).into_iter().chain(window_bufferlist.into_iter());
+        let buffer_iter = Some(bottom_fb_area).into_iter().chain(window_bufferlist.into_iter());
         FRAME_COMPOSITOR.lock().composite(buffer_iter, &mut self.final_fb, bounding_box)?;
         
         Ok(())
@@ -309,7 +309,7 @@ impl WindowManager {
         // create updated framebuffer info objects
         let bufferlist = locked_window_list.iter().map(|window| {
             FramebufferUpdates {
-                src_framebuffer: &window.framebuffer,
+                src_framebuffer: window.framebuffer(),
                 coordinate_in_dest_framebuffer: window.get_position(),
             }
         }).collect::<Vec<_>>();
@@ -323,7 +323,7 @@ impl WindowManager {
         if let Some(window_ref) = self.active.upgrade() {
             let window = window_ref.lock();
             let buffer_update = FramebufferUpdates {
-                src_framebuffer: &window.framebuffer,
+                src_framebuffer: window.framebuffer(),
                 coordinate_in_dest_framebuffer: window.get_position(),
             };
             FRAME_COMPOSITOR.lock().composite(Some(buffer_update), &mut self.final_fb, bounding_box)
@@ -332,18 +332,19 @@ impl WindowManager {
         } 
     }
     
-    /// pass keyboard event to currently active window
+    /// Passes the given keyboard event to the currently active window.
     fn pass_keyboard_event_to_window(&self, key_event: KeyEvent) -> Result<(), &'static str> {
-        if let Some(current_active) = self.active.upgrade() {
-            let current_active_win = current_active.lock();
-            current_active_win
-                .producer
-                .push(Event::new_keyboard_event(key_event)).map_err(|_e| "Fail to enqueue the mouse position event")?;
-        }
-        Err("cannot find window to pass key event")
+        let active_window = self.active.upgrade().ok_or("no window was set as active to receive a keyboard event")?;
+        active_window.lock().send_event(Event::new_keyboard_event(key_event))
+            .map_err(|_e| "Failed to enqueue the keyboard event; window event queue was full.")?;
+        Ok(())
     }
 
-    /// pass mouse event to the top window that mouse on, may also transfer to those want all events
+    /// Passes the given mouse event to the window that the mouse is currently over. 
+    /// 
+    /// If the mouse is not over any window, an error is returned; 
+    /// however, this error is quite common and expected when the mouse is not positioned within a window,
+    /// and is not a true failure. 
     fn pass_mouse_event_to_window(&self, mouse_event: MouseEvent) -> Result<(), &'static str> {
         let coordinate = { &self.mouse };
         let mut event: MousePositionEvent = MousePositionEvent {
@@ -357,6 +358,10 @@ impl WindowManager {
             fifth_button_hold: mouse_event.buttonact.fifth_button_hold,
         };
 
+        // TODO: FIXME:  improve this logic to just send the mouse event to the top-most window in the entire WM list,
+        //               not just necessarily the active one. (For example, scroll wheel events can be sent to non-active windows).
+
+
         // first check the active one
         if let Some(current_active) = self.active.upgrade() {
             let current_active_win = current_active.lock();
@@ -367,12 +372,14 @@ impl WindowManager {
             }{
                 event.coordinate = *coordinate - current_coordinate;
                 // debug!("pass to active: {}, {}", event.x, event.y);
-                current_active_win
-                    .producer
-                    .push(Event::MousePositionEvent(event)).map_err(|_e| "Fail to enqueue the mouse position event")?;
+                current_active_win.send_event(Event::MousePositionEvent(event))
+                    .map_err(|_e| "Failed to enqueue the mouse event; window event queue was full.")?;
                 return Ok(());
             }
         }
+
+        // TODO FIXME: (kevinaboos): the logic below here is actually incorrect -- it could send mouse events to an invisible window below others.
+
         // then check show_list
         for i in 0..self.show_list.len() {
             if let Some(now_inner_mutex) = self.show_list[i].upgrade() {
@@ -380,14 +387,14 @@ impl WindowManager {
                 let current_coordinate = now_inner.get_position();
                 if now_inner.contains(*coordinate - current_coordinate) {
                     event.coordinate = *coordinate - current_coordinate;
-                    now_inner
-                        .producer
-                        .push(Event::MousePositionEvent(event)).map_err(|_e| "Fail to enqueue the mouse position event")?;
+                    now_inner.send_event(Event::MousePositionEvent(event))
+                        .map_err(|_e| "Failed to enqueue the mouse event; window event queue was full.")?;
                     return Ok(());
                 }
             }
         }
-        Err("cannot find window to pass")
+
+        Err("the mouse position does not fall within the bounds of any window")
     }
 
     /// Refresh the floating border, which is used to show the outline of a window while it is being moved. 
@@ -489,7 +496,7 @@ impl WindowManager {
             self.refresh_active_window(Some(Rectangle{top_left: new_top_left, bottom_right: new_bottom_right}))?;
             self.refresh_mouse()?;
         } else {
-            return Err("cannot fid active window to move");
+            return Err("cannot find active window to move");
         }
         Ok(())
     }
@@ -595,62 +602,50 @@ impl WindowManager {
         Ok(())
     }
 
-    /// Whether a window is active
-    pub fn is_active(&self, inner_ref: &Arc<Mutex<WindowInner>>) -> bool {
-        if let Some(current_active) = self.active.upgrade() {
-            if Arc::ptr_eq(&(current_active), inner_ref) {
-                return true;
-            }
-        }
-        false
+    /// Returns true if the given `window` is the currently active window.
+    pub fn is_active(&self, window: &Arc<Mutex<WindowInner>>) -> bool {
+        self.active.upgrade()
+            .map(|active| Arc::ptr_eq(&active, window))
+            .unwrap_or(false)
     }
 
-    /// Get the screen size of the desktop
+    /// Returns the `(width, height)` in pixels of the screen itself (the final framebuffer).
     pub fn get_screen_size(&self) -> (usize, usize) {
-        self.bottom_fb.get_size()
+        self.final_fb.get_size()
     }
 }
 
 /// Initialize the window manager. It returns (keyboard_producer, mouse_producer) for the I/O devices.
 pub fn init() -> Result<(Queue<Event>, Queue<Event>), &'static str> {
-    // font::init()?;
     let final_framebuffer: Framebuffer<AlphaPixel> = framebuffer::init()?;
     let (width, height) = final_framebuffer.get_size();
+
     let mut bottom_framebuffer = Framebuffer::new(width, height, None)?;
     let mut top_framebuffer = Framebuffer::new(width, height, None)?;
-    
-    // initialize the framebuffer
     let (screen_width, screen_height) = bottom_framebuffer.get_size();
-    let bg_image: &[AlphaPixel] = unsafe {
-        slice::from_raw_parts((background::BACKGROUND.as_ptr()) as *const AlphaPixel, screen_width * screen_height)
-    };
+    bottom_framebuffer.fill(color::LIGHT_GRAY.into());
+    top_framebuffer.fill(color::TRANSPARENT.into()); 
 
-    bottom_framebuffer.buffer_mut().copy_from_slice(bg_image);
-    top_framebuffer.fill_color(color::TRANSPARENT.into()); 
+    // the mouse starts in the center of the screen.
+    let center = Coord {
+        x: screen_width as isize / 2,
+        y: screen_height as isize / 2,
+    }; 
 
     // initialize static window manager
     let window_manager = WindowManager {
         hide_list: VecDeque::new(),
         show_list: VecDeque::new(),
         active: Weak::new(),
-        mouse: Coord { x: 0, y: 0 },
+        mouse: center,
         repositioned_border: None,
         bottom_fb: bottom_framebuffer,
         top_fb: top_framebuffer,
         final_fb: final_framebuffer,
     };
-    WINDOW_MANAGER.call_once(|| Mutex::new(window_manager));
+    let _wm = WINDOW_MANAGER.call_once(|| Mutex::new(window_manager));
 
-    let mut win = WINDOW_MANAGER
-        .try()
-        .ok_or("The static window manager was not yet initialized")?
-        .lock();
-    win.mouse = Coord {
-        x: screen_width as isize / 2,
-        y: screen_height as isize / 2,
-    }; 
-    
-    // win.refresh_bottom_windows(None, false)?;
+    // wm.refresh_bottom_windows(None, false)?;
 
     // keyinput queue initialization
     let key_consumer: Queue<Event> = Queue::with_capacity(100);
@@ -663,15 +658,14 @@ pub fn init() -> Result<(Queue<Event>, Queue<Event>), &'static str> {
     KernelTaskBuilder::new(window_manager_loop, (key_consumer, mouse_consumer))
         .name("window_manager_loop".to_string())
         .spawn()?;
+
     Ok((key_producer, mouse_producer))
 }
 
 /// handles all keyboard and mouse movement in this window manager
 fn window_manager_loop(
-    consumer: (Queue<Event>, Queue<Event>),
+    (key_consumer, mouse_consumer): (Queue<Event>, Queue<Event>),
 ) -> Result<(), &'static str> {
-    let (key_consumer, mouse_consumer) = consumer;
-
     loop {
         let event_opt = key_consumer.pop()
             .or_else(||mouse_consumer.pop())
@@ -681,11 +675,8 @@ fn window_manager_loop(
             });
 
         if let Some(event) = event_opt {
-            // event could be either key input or mouse input
+            // Currently, the window manager only cares about keyboard or mouse events
             match event {
-                Event::ExitEvent => {
-                    return Ok(());
-                }
                 Event::KeyboardEvent(ref input_event) => {
                     let key_input = input_event.key_event;
                     keyboard_handle_application(key_input)?;
@@ -739,65 +730,94 @@ fn window_manager_loop(
                     }
                     cursor_handle_application(*mouse_event)?; // tell the event to application, or moving window
                 }
-                _ => {}
+                _other => {
+                    trace!("WINDOW_MANAGER: ignoring unexpected event: {:?}", _other);
+                }
             }
         }
     }
 }
 
-/// handle keyboard event, push it to the active window if exists
+/// handle keyboard event, push it to the active window if one exists
 fn keyboard_handle_application(key_input: KeyEvent) -> Result<(), &'static str> {
-    // Check for WM-level actions here, e.g., spawning a new terminal via Ctrl+Alt+T
-    if key_input.modifiers.control
+    let win_mgr = WINDOW_MANAGER.try().ok_or("The window manager was not yet initialized")?;
+    
+    // First, we handle keyboard shortcuts understood by the window manager.
+    
+    // "Super + Arrow" will resize and move windows to the specified half of the screen (left, right, top, or bottom)
+    if key_input.modifiers.is_super_key() && key_input.action == KeyAction::Pressed {
+        let screen_dimensions = win_mgr.lock().get_screen_size();
+        let (width, height) = (screen_dimensions.0 as isize, screen_dimensions.1 as isize);
+        let new_position: Option<Rectangle> = match key_input.keycode {
+            Keycode::Left => Some(Rectangle {
+                top_left:     Coord { x: 0, y: 0 },
+                bottom_right: Coord { x: width / 2, y: height },
+            }),
+            Keycode::Right => Some(Rectangle {
+                top_left:     Coord { x: width / 2, y: 0 },
+                bottom_right: Coord { x: width, y: height },
+            }),
+            Keycode::Up => Some(Rectangle {
+                top_left:     Coord { x: 0, y: 0 },
+                bottom_right: Coord { x: width, y: height / 2 },
+            }),
+            Keycode::Down => Some(Rectangle {
+                top_left:     Coord { x: 0, y: height / 2 },
+                bottom_right: Coord { x: width, y: height },
+            }),
+            _ => None,
+        };
+        
+        if let Some(position) = new_position {
+            let mut wm = win_mgr.lock();
+            if let Some(active_window) = wm.active.upgrade() {
+                debug!("window_manager: resizing active window to {:?}", new_position);
+                active_window.lock().resize(position)?;
+
+                // force refresh the entire screen for now
+                // TODO: perform a proper screen refresh here: only refresh the area that contained the active_window's old bounds.
+                wm.refresh_bottom_windows(Option::<Rectangle>::None, true)?;
+            }
+        }
+
+        return Ok(());
+    }
+
+    // Spawn a new terminal via Ctrl+Alt+T
+    if key_input.modifiers.is_control()
+        && key_input.modifiers.is_alt()
         && key_input.keycode == Keycode::T
         && key_input.action == KeyAction::Pressed
     {
-        // Since the WM currently runs in the kernel, we need to create a new application namespace for the terminal
-        use mod_mgmt::{metadata::CrateType, CrateNamespace, NamespaceDir};
-        let default_kernel_namespace = mod_mgmt::get_default_namespace()
-            .ok_or("default CrateNamespace not yet initialized")?;
-        let new_app_namespace_name = CrateType::Application.namespace_name().to_string();
-        let new_app_namespace_dir = mod_mgmt::get_namespaces_directory()
-            .and_then(|ns_dir| ns_dir.lock().get_dir(&new_app_namespace_name))
-            .ok_or("Couldn't find the directory to create a new application CrateNamespace")?;
-        let new_app_namespace = Arc::new(CrateNamespace::new(
-            new_app_namespace_name,
-            NamespaceDir::new(new_app_namespace_dir),
-            Some(default_kernel_namespace.clone()),
-        ));
+        // Because this task (the window manager loop) runs in a kernel-only namespace,
+        // we have to create a new application namespace in order to be able to actually spawn a shell.
 
-        let task_name: String = format!("shell");
-        let args: Vec<String> = vec![]; // shell::main() does not accept any arguments
-        let terminal_obj_file = new_app_namespace
-            .dir()
-            .get_file_starting_with("shell-")
+        let new_app_namespace = mod_mgmt::create_application_namespace(None)?;
+        let shell_objfile = new_app_namespace.dir().get_file_starting_with("shell-")
             .ok_or("Couldn't find shell application file to run upon Ctrl+Alt+T")?;
-        let path = Path::new(terminal_obj_file.lock().get_absolute_path());
+        let path = Path::new(shell_objfile.lock().get_absolute_path());
         ApplicationTaskBuilder::new(path)
-            .argument(args)
-            .name(task_name)
+            .name(format!("shell"))
             .namespace(new_app_namespace)
             .spawn()?;
+
+        debug!("window_manager: spawned new shell app in new app namespace.");
+        return Ok(());
     }
-    // then pass them to window
-    let win = WINDOW_MANAGER
-        .try()
-        .ok_or("The static window manager was not yet initialized")?
-        .lock();
-    if let Err(_) = win.pass_keyboard_event_to_window(key_input) {
-        // note that keyboard event should be passed to currently active window
-        // if no window is active now, this function will return Err, but that's OK for now.
-        // This part could be used to add logic when no active window is present, how to handle keyboards, but just leave blank now
+
+    // Any keyboard event unhandled above should be passed to the active window.
+    if let Err(_e) = win_mgr.lock().pass_keyboard_event_to_window(key_input) {
+        warn!("window_manager: failed to pass keyboard event to active window. Error: {:?}", _e);
+        // If no window is currently active, then something might be potentially wrong, 
+        // but we can likely recover in the future when another window becomes active.
+        // Thus, we don't need to return a hard error here. 
     }
     Ok(())
 }
 
 /// handle mouse event, push it to related window or anyone asked for it
 fn cursor_handle_application(mouse_event: MouseEvent) -> Result<(), &'static str> {
-    let wm = WINDOW_MANAGER
-        .try()
-        .ok_or("The static window manager was not yet initialized")?
-        .lock();
+    let wm = WINDOW_MANAGER.try().ok_or("The static window manager was not yet initialized")?.lock();
     if let Err(_) = wm.pass_mouse_event_to_window(mouse_event) {
         // the mouse event should be passed to the window that satisfies:
         // 1. the mouse position is currently in the window area

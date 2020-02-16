@@ -20,11 +20,13 @@ extern crate spin;
 use alloc::{
     string::{String},
     vec::Vec,
+    sync::Arc,
 };
 use spin::Once;
 use getopts::{Matches, Options};
 use mod_mgmt::{
-    metadata::{StrongCrateRef, StrongSectionRef},
+    StrongCrateRef,
+    StrongSectionRef,
     CrateNamespace,
 };
 use crate_name_utils::get_containing_crate_name;
@@ -36,7 +38,6 @@ macro_rules! verbose {
 }
 
 
-#[no_mangle]
 pub fn main(args: Vec<String>) -> isize {
     let mut opts = Options::new();
     opts.optflag("h", "help", "print this help menu");
@@ -99,10 +100,9 @@ fn rmain(matches: Matches) -> Result<(), String> {
 /// If there are multiple matches, this returns an Error containing 
 /// all of the matching section names separated by the newline character `'\n'`.
 fn sections_dependent_on_me(section_name: &str) -> Result<(), String> {
-    let sec_ref = find_section(section_name)?;
-    println!("Sections that depend on {}  (weak dependents):", sec_ref.lock().name);
-    for dependent_sec_ref in sec_ref.lock().sections_dependent_on_me.iter().filter_map(|weak_dep| weak_dep.section.upgrade()) {
-        let dependent_sec = dependent_sec_ref.lock();
+    let sec = find_section(section_name)?;
+    println!("Sections that depend on {}  (weak dependents):", sec.name);
+    for dependent_sec in sec.inner.read().sections_dependent_on_me.iter().filter_map(|weak_dep| weak_dep.section.upgrade()) {
         if verbose!() { 
             println!("    {}  in {:?}", dependent_sec.name, dependent_sec.parent_crate.upgrade());
         } else {
@@ -119,10 +119,9 @@ fn sections_dependent_on_me(section_name: &str) -> Result<(), String> {
 /// If there are multiple matches, this returns an Error containing 
 /// all of the matching section names separated by the newline character `'\n'`.
 fn sections_i_depend_on(section_name: &str) -> Result<(), String> {
-    let sec_ref = find_section(section_name)?;
-    println!("Sections that {} depends on  (strong dependencies):", sec_ref.lock().name);
-    for dependency_sec_ref in sec_ref.lock().sections_i_depend_on.iter().map(|dep| &dep.section) {
-        let dependency_sec = dependency_sec_ref.lock();
+    let sec = find_section(section_name)?;
+    println!("Sections that {} depends on  (strong dependencies):", sec.name);
+    for dependency_sec in sec.inner.read().sections_i_depend_on.iter().map(|dep| &dep.section) {
         if verbose!() { 
             println!("    {}  in {:?}", dependency_sec.name, dependency_sec.parent_crate.upgrade());
         } else {
@@ -172,18 +171,17 @@ fn find_section(section_name: &str) -> Result<StrongSectionRef, String> {
     // If it wasn't a global section in the symbol map, then we need to find its containing crate
     // and search that crate's symbols manually.
     let containing_crate_ref = get_containing_crate_name(section_name).get(0)
-        .and_then(|cname| namespace.get_crate_starting_with(&format!("{}-", cname)))
+        .and_then(|cname| CrateNamespace::get_crate_starting_with(&namespace, &format!("{}-", cname)))
         .or_else(|| get_containing_crate_name(section_name).get(1)
-            .and_then(|cname| namespace.get_crate_starting_with(&format!("{}-", cname)))
+            .and_then(|cname| CrateNamespace::get_crate_starting_with(&namespace, &format!("{}-", cname)))
         )
         .map(|(_cname, crate_ref, _ns)| crate_ref)
         .ok_or_else(|| format!("Couldn't find section {} in symbol map, and couldn't get its containing crate", section_name))?;
 
-    let mut matching_sections: Vec<(String, StrongSectionRef)> = containing_crate_ref.lock_as_ref().sections.values()
-        .filter_map(|sec_ref| {
-            let sec_name = sec_ref.lock().name.clone();
-            if sec_name.starts_with(section_name) {
-                Some((sec_name, sec_ref.clone()))
+    let mut matching_sections: Vec<StrongSectionRef> = containing_crate_ref.lock_as_ref().sections.values()
+        .filter_map(|sec| {
+            if sec.name.starts_with(section_name) {
+                Some(sec.clone())
             } else {
                 None 
             }
@@ -191,9 +189,9 @@ fn find_section(section_name: &str) -> Result<StrongSectionRef, String> {
         .collect();
 
     if matching_sections.len() == 1 { 
-        Ok(matching_sections.remove(0).1)
+        Ok(matching_sections.remove(0))
     } else {
-        Err(matching_sections.into_iter().map(|(name, _)| name).collect::<Vec<String>>().join("\n"))
+        Err(matching_sections.into_iter().map(|sec| sec.name.clone()).collect::<Vec<String>>().join("\n"))
     }
 }
 
@@ -211,16 +209,17 @@ fn _find_crate(crate_name: &str) -> Result<StrongCrateRef, String> {
     
     if matching_crate_names.len() == 1 {
         namespace.get_crate(&matching_crate_names[0])
-            .ok_or_else(|| format!("Couldn't get crate {} from namespace {}", matching_crate_names[0], namespace.name))
+            .ok_or_else(|| format!("Couldn't get crate {} from namespace {}", matching_crate_names[0], namespace.name()))
     } else {
         Err(matching_crate_names.join("\n"))
     }
 }
 
 
-// TODO: fix this later once each task's environment contains a current namespace
-fn get_my_current_namespace() -> &'static CrateNamespace {
-    mod_mgmt::get_default_namespace().unwrap()
+fn get_my_current_namespace() -> Arc<CrateNamespace> {
+    task::get_my_current_task().map(|t| t.get_namespace()).unwrap_or_else(|| 
+        mod_mgmt::get_initial_kernel_namespace().expect("BUG: initial kernel namespace wasn't initialized").clone()
+    )
 }
 
 

@@ -14,7 +14,6 @@ use alloc::vec::Vec;
 use alloc::string::String;
 use keycodes_ascii::Keycode;
 
-#[no_mangle]
 pub fn main(_args: Vec<String>) -> isize {
     if let Err(e) = run() {
         error!("{}", e);
