@@ -53,7 +53,7 @@ extern crate goblin;
 
 use core::fmt;
 use core::ops::Range;
-use spin::Mutex;
+use spin::{Mutex, RwLock};
 use alloc::{
     collections::{BTreeMap, BTreeSet},
     string::String,
@@ -72,9 +72,9 @@ pub type StrongCrateRef  = CowArc<LoadedCrate>;
 /// A Weak reference to a `LoadedCrate`.
 pub type WeakCrateRef = CowWeak<LoadedCrate>;
 /// A Strong reference (`Arc`) to a `LoadedSection`.
-pub type StrongSectionRef  = Arc<Mutex<LoadedSection>>;
+pub type StrongSectionRef  = Arc<LoadedSection>;
 /// A Weak reference (`Weak`) to a `LoadedSection`.
-pub type WeakSectionRef = Weak<Mutex<LoadedSection>>;
+pub type WeakSectionRef = Weak<LoadedSection>;
 
 
 /// `.text` sections are read-only and executable.
@@ -282,7 +282,7 @@ impl LoadedCrate {
         where F: Fn(&LoadedSection) -> bool
     {
         self.sections.values()
-            .filter(|sec_ref| predicate(&sec_ref.lock()))
+            .filter(|&sec| predicate(sec))
             .next()
     }
 
@@ -307,12 +307,9 @@ impl LoadedCrate {
     pub fn crates_dependent_on_me(&self) -> Vec<WeakCrateRef> {
         let mut results: Vec<WeakCrateRef> = Vec::new();
         for sec in self.sections.values() {
-            let sec_locked = sec.lock();
-            for weak_dep in &sec_locked.sections_dependent_on_me {
+            for weak_dep in &sec.inner.read().sections_dependent_on_me {
                 if let Some(dep_sec) = weak_dep.section.upgrade() {
-                    let dep_sec_locked = dep_sec.lock();
-                    let parent_crate = dep_sec_locked.parent_crate.clone();
-                    results.push(parent_crate);
+                    results.push(dep_sec.parent_crate.clone());
                 }
             }
         }
@@ -329,11 +326,8 @@ impl LoadedCrate {
     pub fn crates_i_depend_on(&self) -> Vec<WeakCrateRef> {
         let mut results: Vec<WeakCrateRef> = Vec::new();
         for sec in self.sections.values() {
-            let sec_locked = sec.lock();
-            for strong_dep in &sec_locked.sections_i_depend_on {
-                let dep_sec_locked = strong_dep.section.lock();
-                let parent_crate = dep_sec_locked.parent_crate.clone();
-                results.push(parent_crate);
+            for strong_dep in &sec.inner.read().sections_i_depend_on {
+                results.push(strong_dep.section.parent_crate.clone());
             }
         }
         results
@@ -421,8 +415,8 @@ impl LoadedCrate {
         // 3) The section's virt_addr, which is based on its new mapped_pages
         let mut new_sections: BTreeMap<usize, StrongSectionRef> = BTreeMap::new();
         let mut new_bss_sections: Trie<BString, StrongSectionRef> = Trie::new();
-        for (shndx, old_sec_ref) in self.sections.iter() {
-            let old_sec = old_sec_ref.lock();
+        for (shndx, old_sec) in self.sections.iter() {
+            let old_sec_inner = old_sec.inner.read();
             let new_sec_mapped_pages_offset = old_sec.mapped_pages_offset;
             let (new_sec_mapped_pages_ref, new_sec_virt_addr) = match old_sec.typ {
                 SectionType::Text => (
@@ -443,32 +437,32 @@ impl LoadedCrate {
             };
             let new_sec_virt_addr = new_sec_virt_addr.ok_or_else(|| "BUG: couldn't get virt_addr for new section")?;
 
-            let new_sec_ref = Arc::new(Mutex::new(LoadedSection::with_dependencies(
+            let new_sec = Arc::new(LoadedSection::with_dependencies(
                 old_sec.typ,                            // section type is the same
                 old_sec.name.clone(),                   // name is the same
                 new_sec_mapped_pages_ref,               // mapped_pages is different, points to the new duplicated one
                 new_sec_mapped_pages_offset,            // mapped_pages_offset is the same
                 new_sec_virt_addr,                      // virt_addr is different, based on the new mapped_pages
-                old_sec.size(),                           // size is the same
+                old_sec.size(),                         // size is the same
                 old_sec.global,                         // globalness is the same
                 new_crate_weak_ref.clone(),             // parent_crate is different, points to the newly-copied crate
-                old_sec.sections_i_depend_on.clone(),   // dependencies are the same, but relocations need to be re-written
+                old_sec_inner.sections_i_depend_on.clone(),   // dependencies are the same, but relocations need to be re-written
                 Vec::new(),                             // no sections can possibly depend on this one, since we just created it
-                old_sec.internal_dependencies.clone()   // internal dependencies are the same, but relocations need to be re-written
-            )));
+                old_sec_inner.internal_dependencies.clone()   // internal dependencies are the same, but relocations need to be re-written
+            ));
 
             if old_sec.typ == SectionType::Bss {
-                new_bss_sections.insert_str(&old_sec.name, new_sec_ref.clone());
+                new_bss_sections.insert_str(&old_sec.name, new_sec.clone());
             }
-            new_sections.insert(*shndx, new_sec_ref);
+            new_sections.insert(*shndx, new_sec);
         }
 
 
         // Now we can go through the list again and fix up the rest of the elements in each section.
         // The foreign sections dependencies (sections_i_depend_on) are the same, 
         // but all relocation entries must be rewritten because the sections' virtual addresses have changed.
-        for new_sec_ref in new_sections.values() {
-            let mut new_sec = new_sec_ref.lock();
+        for new_sec in new_sections.values() {
+            let mut new_sec_inner = new_sec.inner.write();
             let new_sec_mapped_pages = match new_sec.typ {
                 SectionType::Text    => new_text_pages_locked.as_mut().ok_or_else(|| "BUG: missing text pages in newly-copied crate")?,
                 SectionType::Rodata |
@@ -481,11 +475,11 @@ impl LoadedCrate {
 
             // The newly-duplicated crate still depends on the same sections, so we keep those as is, 
             // but we do need to recalculate those relocations.
-            for strong_dep in new_sec.sections_i_depend_on.iter_mut() {
+            for strong_dep in new_sec_inner.sections_i_depend_on.iter_mut() {
                 // we can skip modifying "absolute" relocations, since those only depend on the source section,
                 // which we haven't actually changed (we've duplicated the target section here, not the source)
                 if !strong_dep.relocation.is_absolute() {
-                    let mut source_sec = strong_dep.section.lock();
+                    let source_sec = &strong_dep.section;
                     // perform the actual fix by writing the relocation
                     write_relocation(
                         strong_dep.relocation, 
@@ -496,9 +490,9 @@ impl LoadedCrate {
                     )?;
 
                     // add this new_sec as one of the source sec's weak dependents
-                    source_sec.sections_dependent_on_me.push(
+                    source_sec.inner.write().sections_dependent_on_me.push(
                         WeakDependent {
-                            section: Arc::downgrade(new_sec_ref),
+                            section: Arc::downgrade(new_sec),
                             relocation: strong_dep.relocation,
                         }
                     );
@@ -509,18 +503,18 @@ impl LoadedCrate {
             // We shouldn't need to actually change the InternalDependency instances themselves 
             // because they are based on crate-specific section shndx values, 
             // which are completely safe to clone without needing any fix ups. 
-            for internal_dep in &new_sec.internal_dependencies {
-                let source_sec_ref = new_sections.get(&internal_dep.source_sec_shndx)
+            for internal_dep in &new_sec.inner.read().internal_dependencies {
+                let source_sec = new_sections.get(&internal_dep.source_sec_shndx)
                     .ok_or_else(|| "Couldn't get new section specified by an internal dependency's source_sec_shndx")?;
 
                 // The source and target (new_sec) sections might be the same, so we need to check first
                 // to ensure that we don't cause deadlock by trying to lock the same section twice.
-                let source_sec_vaddr = if Arc::ptr_eq(source_sec_ref, new_sec_ref) {
+                let source_sec_vaddr = if Arc::ptr_eq(source_sec, new_sec) {
                     // here: the source_sec and new_sec are the same, so just use the already-locked new_sec
                     new_sec.start_address()
                 } else {
                     // here: the source_sec and new_sec are different, so we can go ahead and safely lock the source_sec
-                    source_sec_ref.lock().start_address()
+                    source_sec.start_address()
                 };
                 write_relocation(
                     internal_dep.relocation, 
@@ -582,6 +576,27 @@ pub enum SectionType {
     EhFrame,
 }
 
+/// The parts of a `LoadedSection` that may be mutable, i.e., 
+/// only the parts that could change after a section is initially loaded and linked.
+#[derive(Default)]
+pub struct LoadedSectionInner {
+    /// The list of sections in foreign crates that this section depends on, i.e., "my required dependencies".
+    /// This is kept as a list of strong references because these sections must outlast this section,
+    /// i.e., those sections cannot be removed/deleted until this one is deleted.
+    pub sections_i_depend_on: Vec<StrongDependency>,
+    /// The list of sections in foreign crates that depend on this section, i.e., "my dependents".
+    /// This is kept as a list of Weak references because we must be able to remove other sections
+    /// that are dependent upon this one before we remove this one.
+    /// If we kept strong references to the sections dependent on this one, 
+    /// then we wouldn't be able to remove/delete those sections before deleting this one.
+    pub sections_dependent_on_me: Vec<WeakDependent>,
+    /// We keep track of inter-section dependencies within the same crate
+    /// so that we can faithfully reconstruct the crate section's relocation information.
+    /// This is necessary for doing a deep copy of the crate in memory, 
+    /// without having to re-parse that crate's ELF file (and requiring the ELF file to still exist).
+    pub internal_dependencies: Vec<InternalDependency>,
+}
+
 /// Represents a section that has been loaded and is part of a `LoadedCrate`.
 /// The containing `SectionType` enum determines which type of section it is.
 pub struct LoadedSection {
@@ -611,21 +626,9 @@ pub struct LoadedSection {
     pub global: bool,
     /// The `LoadedCrate` object that contains/owns this section
     pub parent_crate: WeakCrateRef,
-    /// The list of sections in foreign crates that this section depends on, i.e., "my required dependencies".
-    /// This is kept as a list of strong references because these sections must outlast this section,
-    /// i.e., those sections cannot be removed/deleted until this one is deleted.
-    pub sections_i_depend_on: Vec<StrongDependency>,
-    /// The list of sections in foreign crates that depend on this section, i.e., "my dependents".
-    /// This is kept as a list of Weak references because we must be able to remove other sections
-    /// that are dependent upon this one before we remove this one.
-    /// If we kept strong references to the sections dependent on this one, 
-    /// then we wouldn't be able to remove/delete those sections before deleting this one.
-    pub sections_dependent_on_me: Vec<WeakDependent>,
-    /// We keep track of inter-section dependencies within the same crate
-    /// so that we can faithfully reconstruct the crate section's relocation information.
-    /// This is necessary for doing a deep copy of the crate in memory, 
-    /// without having to re-parse that crate's ELF file (and requiring the ELF file to still exist).
-    pub internal_dependencies: Vec<InternalDependency>,
+    /// The inner contents of a section that could possibly change
+    /// after the section was initially loaded and linked. 
+    pub inner: RwLock<LoadedSectionInner>,
 }
 impl LoadedSection {
     /// Create a new `LoadedSection`, with an empty `dependencies` list.
@@ -648,9 +651,9 @@ impl LoadedSection {
             size,
             global,
             parent_crate,
-            Vec::new(),
-            Vec::new(),
-            Vec::new()
+            Default::default(),
+            Default::default(),
+            Default::default(),
         )
     }
 
@@ -676,9 +679,11 @@ impl LoadedSection {
             address_range: virt_addr .. (virt_addr + size),
             global,
             parent_crate,
-            sections_i_depend_on,
-            sections_dependent_on_me,
-            internal_dependencies
+            inner: RwLock::new(LoadedSectionInner {
+                sections_i_depend_on,
+                sections_dependent_on_me,
+                internal_dependencies,
+            }),
         }
     }
 
@@ -722,9 +727,9 @@ impl LoadedSection {
     /// Returns the index of the first `WeakDependent` object with a section
     /// that matches the given `matching_section` in this `LoadedSection`'s `sections_dependent_on_me` list.
     pub fn find_weak_dependent(&self, matching_section: &StrongSectionRef) -> Option<usize> {
-        for (index, weak_dep) in self.sections_dependent_on_me.iter().enumerate() {
-            if let Some(sec_ref) = weak_dep.section.upgrade() {
-                if Arc::ptr_eq(matching_section, &sec_ref) {
+        for (index, weak_dep) in self.inner.read().sections_dependent_on_me.iter().enumerate() {
+            if let Some(sec) = weak_dep.section.upgrade() {
+                if Arc::ptr_eq(matching_section, &sec) {
                     return Some(index);
                 }
             }
@@ -738,7 +743,7 @@ impl LoadedSection {
     /// * The two sections must have the same size,
     /// * The given `destination_section` must be mapped as writable,
     ///   basically, it must be a .data or .bss section.
-    pub fn copy_section_data_to(&self, destination_section: &mut LoadedSection) -> Result<(), &'static str> {
+    pub fn copy_section_data_to(&self, destination_section: &LoadedSection) -> Result<(), &'static str> {
 
         let mut dest_sec_mapped_pages = destination_section.mapped_pages.lock();
         let dest_sec_data: &mut [u8] = dest_sec_mapped_pages.as_slice_mut(destination_section.mapped_pages_offset, destination_section.size())?;

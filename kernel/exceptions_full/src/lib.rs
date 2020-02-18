@@ -104,7 +104,7 @@ fn kill_and_halt(exception_number: u8) {
             let symbol_offset = stack_frame_iter.namespace().get_section_containing_address(
                 memory::VirtualAddress::new_canonical(stack_frame.call_site_address() as usize),
                 false
-            ).map(|(sec_ref, offset)| (sec_ref.lock().name.clone(), offset));
+            ).map(|(sec, offset)| (sec.name.clone(), offset));
             if let Some((symbol_name, offset)) = symbol_offset {
                 println_both!("  {:>#018X} in {} + {:#X}", stack_frame.call_site_address(), symbol_name, offset);
             } else {

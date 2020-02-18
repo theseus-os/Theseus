@@ -306,7 +306,7 @@ impl ApplicationTaskBuilder {
         };
 
         // Find the "main" entry point function in the new app crate
-        let main_func_sec_ref = { 
+        let main_func_sec = { 
             let app_crate = app_crate_ref.lock_as_ref();
             let expected_main_section_name = format!("{}{}{}", app_crate.crate_name_as_prefix(), ENTRY_POINT_SECTION_NAME, SECTION_HASH_DELIMITER);
             let main_func_sec = app_crate.find_section(|sec| {
@@ -323,7 +323,6 @@ impl ApplicationTaskBuilder {
 
         let mut space: usize = 0; // must live as long as main_func, see MappedPages::as_func()
         let main_func = {
-            let main_func_sec = main_func_sec_ref.lock();
             let mapped_pages = main_func_sec.mapped_pages.lock();
             mapped_pages.as_func::<MainFunc>(main_func_sec.mapped_pages_offset, &mut space)?
         };

@@ -326,13 +326,13 @@ impl FallibleIterator for StackFrameIter {
             error!("StackTraceIter::next(): couldn't get crate containing call site address: {:#X}", caller);
             "couldn't get crate containing call site address"
         })?;
-        let (eh_frame_sec_ref, base_addrs) = get_eh_frame_info(&crate_ref)
+        let (eh_frame_sec, base_addrs) = get_eh_frame_info(&crate_ref)
             .ok_or("couldn't get eh_frame section in caller's containing crate")?;
 
         let mut cfa_adjustment: Option<i64> = None;
         let mut this_frame_is_exception_handler = false;
 
-        let row_ref = UnwindRowReference { caller, eh_frame_sec_ref, base_addrs };
+        let row_ref = UnwindRowReference { caller, eh_frame_sec, base_addrs };
         let (cfa, frame) = row_ref.with_unwind_info(|fde, row| {
             // trace!("ok: {:?} (0x{:x} - 0x{:x})", row.cfa(), row.start_address(), row.end_address());
             let mut cfa = match *row.cfa() {
@@ -583,7 +583,7 @@ type NativeEndianSliceReader<'i> = EndianSlice<'i, NativeEndian>;
 #[derive(Debug)]
 struct UnwindRowReference {
     caller: u64,
-    eh_frame_sec_ref: StrongSectionRef,
+    eh_frame_sec: StrongSectionRef,
     base_addrs: BaseAddresses,
 }
 impl UnwindRowReference {
@@ -592,7 +592,7 @@ impl UnwindRowReference {
     fn with_unwind_info<O, F>(&self, mut f: F) -> Result<O, &'static str>
         where F: FnMut(&FrameDescriptionEntry<NativeEndianSliceReader, usize>, &UnwindTableRow<NativeEndianSliceReader>) -> Result<O, &'static str>
     {
-        let sec = self.eh_frame_sec_ref.lock();
+        let sec = &self.eh_frame_sec;
         let size_in_bytes = sec.size();
         let sec_pages = sec.mapped_pages.lock();
         let eh_frame_slice: &[u8] = sec_pages.as_slice(sec.mapped_pages_offset, size_in_bytes)?;
@@ -633,17 +633,17 @@ impl UnwindRowReference {
 fn get_eh_frame_info(crate_ref: &StrongCrateRef) -> Option<(StrongSectionRef, BaseAddresses)> {
     let parent_crate = crate_ref.lock_as_ref();
 
-    let eh_frame_sec_ref = parent_crate.sections.values()
-        .filter(|s| s.lock().typ == SectionType::EhFrame)
+    let eh_frame_sec = parent_crate.sections.values()
+        .filter(|s| s.typ == SectionType::EhFrame)
         .next()?;
     
-    let eh_frame_vaddr = eh_frame_sec_ref.lock().start_address().value();
+    let eh_frame_vaddr = eh_frame_sec.start_address().value();
     let text_pages_vaddr = parent_crate.text_pages.as_ref()?.1.start.value();
     let base_addrs = BaseAddresses::default()
         .set_eh_frame(eh_frame_vaddr as u64)
         .set_text(text_pages_vaddr as u64);
 
-    Some((eh_frame_sec_ref.clone(), base_addrs))
+    Some((eh_frame_sec.clone(), base_addrs))
 }
 
 
@@ -737,9 +737,8 @@ fn continue_unwinding(unwinding_context_ptr: *mut UnwindingContext) -> Result<()
 
         if let Some(lsda) = frame.lsda() {
             let lsda = VirtualAddress::new_canonical(lsda as usize);
-            if let Some((lsda_sec_ref, _)) = stack_frame_iter.namespace().get_section_containing_address(lsda, true) {
-                info!("  parsing LSDA section: {:?}", lsda_sec_ref);
-                let sec = lsda_sec_ref.lock();
+            if let Some((sec, _)) = stack_frame_iter.namespace().get_section_containing_address(lsda, true) {
+                info!("  parsing LSDA section: {:?}", sec);
                 let starting_offset = sec.mapped_pages_offset + (lsda.value() - sec.address_range.start.value());
                 let length_til_end_of_mp = sec.address_range.end.value() - lsda.value();
                 let sec_mp = sec.mapped_pages.lock();
