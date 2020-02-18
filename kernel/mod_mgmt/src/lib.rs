@@ -1449,7 +1449,7 @@ impl CrateNamespace {
                 sec.get_name(&elf_file), sec.get_type(), sec.info()); 
             }
 
-            // currently not using debug sections
+            // Debug sections are handled separately
             if let Ok(name) = sec.get_name(&elf_file) {
                 if name.starts_with(".rela.debug")         // ignore debug special sections for now
                 {
