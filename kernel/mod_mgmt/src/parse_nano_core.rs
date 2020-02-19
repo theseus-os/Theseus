@@ -18,7 +18,7 @@ use rustc_demangle::demangle;
 use cstr_core::CStr;
 
 use memory::{VirtualAddress, MappedPages};
-use crate_metadata::{LoadedCrate, StrongCrateRef, LoadedSection, StrongSectionRef, SectionType, DebugSymbols};
+use crate_metadata::{LoadedCrate, StrongCrateRef, LoadedSection, StrongSectionRef, SectionType};
 use qp_trie::Trie;
 use fs_node::FileRef;
 use path::Path;
@@ -137,7 +137,7 @@ fn parse_nano_core_symbol_file(
     let new_crate = CowArc::new(LoadedCrate {
         crate_name:              crate_name,
         object_file:             nano_core_object_file_ref.clone(),
-        debug_symbols:           DebugSymbols::Unloaded(Arc::downgrade(&nano_core_object_file_ref)),
+        debug_symbols_file:      Arc::downgrade(&nano_core_object_file_ref),
         sections:                BTreeMap::new(),
         text_pages:              Some((text_pages.clone(),   mp_range(&text_pages))),
         rodata_pages:            Some((rodata_pages.clone(), mp_range(&rodata_pages))),
@@ -586,7 +586,7 @@ fn parse_nano_core_binary(
     let new_crate = CowArc::new(LoadedCrate {
         crate_name:              crate_name, 
         object_file:             nano_core_object_file_ref.clone(),
-        debug_symbols:           DebugSymbols::Unloaded(Arc::downgrade(&nano_core_object_file_ref)),
+        debug_symbols_file:      Arc::downgrade(&nano_core_object_file_ref),
         sections:                BTreeMap::new(),
         text_pages:              Some((text_pages.clone(),   mp_range(&text_pages))),
         rodata_pages:            Some((rodata_pages.clone(), mp_range(&rodata_pages))),

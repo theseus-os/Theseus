@@ -187,16 +187,17 @@ pub struct LoadedCrate {
     pub crate_name: String,
     /// The object file that this crate was loaded from.
     pub object_file: FileRef,
-    /// The debug symbols for this crate, which may exist in several forms:
-    /// * In the same file as the `object_file` above, i.e., not stripped.
+    /// The file that contains debug symbols for this crate. 
+    /// Debug symbols may exist in several forms:
+    /// * In the same file as the `object_file` above, i.e., not stripped,
     /// * As a separate file that was stripped off from the original object file,
-    /// * Already parsed into the actual DWARF debug information, and able to be used.
+    /// * Not at all (no debug symbols available for this crate).
     /// 
-    /// By default, the constructor for `LoadedCrate` assumes the first option,
+    /// By default, the constructor for `LoadedCrate` assumes the first form,
     /// so it will initialize this to a weak reference to the `LoadedCrate`'s `object_file` field.
     /// If that is not the case, then this field should be set differently once the crate is initialized
     /// or once a debug symbol file becomes available or requested.
-    pub debug_symbols: DebugSymbols,
+    pub debug_symbols_file: WeakFileRef,
     /// A map containing all the sections in this crate.
     /// In general we're only interested the values (the `LoadedSection`s themselves),
     /// but we keep each section's shndx (section header index from its crate's ELF file)
@@ -394,7 +395,7 @@ impl LoadedCrate {
         let new_crate = CowArc::new(LoadedCrate {
             crate_name:              self.crate_name.clone(),
             object_file:             self.object_file.clone(),
-            debug_symbols:           self.debug_symbols.clone(),
+            debug_symbols_file:      self.debug_symbols_file.clone(),
             sections:                BTreeMap::new(),
             text_pages:              new_text_pages_range,
             rodata_pages:            new_rodata_pages_range,

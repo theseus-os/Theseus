@@ -9,6 +9,7 @@ build = "../../build.rs"
 xmas-elf = { version = "0.6.2", git = "https://github.com/kevinaboos/xmas-elf.git" }
 owning_ref = { git = "https://github.com/kevinaboos/owning-ref-rs" }
 by_address = "1.0.4"
+rustc-demangle = "0.1.14"
 
 [dependencies.log]
 default-features = false
@@ -31,6 +32,9 @@ path = "../memory"
 
 [dependencies.fs_node]
 path = "../fs_node"
+
+[dependencies.mod_mgmt]
+path = "../mod_mgmt"
 
 [dependencies.crate_metadata]
 path = "../crate_metadata"

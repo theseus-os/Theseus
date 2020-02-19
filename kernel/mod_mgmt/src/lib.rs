@@ -1029,7 +1029,7 @@ impl CrateNamespace {
 
         let new_crate = CowArc::new(LoadedCrate {
             crate_name:              crate_name.clone(),
-            debug_symbols:           DebugSymbols::Unloaded(Arc::downgrade(&crate_object_file)),
+            debug_symbols_file:      Arc::downgrade(&crate_object_file),
             object_file:             crate_object_file, 
             sections:                BTreeMap::new(),
             text_pages:              text_pages.clone(),
@@ -2290,7 +2290,7 @@ fn dump_weak_dependents(sec: &LoadedSection, prefix: String) {
 
 
 /// Returns a reference to the symbol table in the given `ElfFile`.
-fn find_symbol_table<'e>(elf_file: &'e ElfFile) 
+pub fn find_symbol_table<'e>(elf_file: &'e ElfFile) 
     -> Result<&'e [xmas_elf::symbol_table::Entry64], &'static str>
     {
     use xmas_elf::sections::SectionData::SymbolTable64;

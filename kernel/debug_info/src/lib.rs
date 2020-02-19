@@ -12,20 +12,25 @@ extern crate memory;
 extern crate fs_node;
 extern crate owning_ref;
 extern crate crate_metadata;
+extern crate mod_mgmt;
 extern crate hashbrown;
 extern crate by_address;
+extern crate rustc_demangle;
 
 use core::ops::{
     DerefMut,
     Range,
 };
-use alloc::sync::Arc;
+use alloc::{
+    string::ToString,
+    sync::Arc,
+};
 use fs_node::WeakFileRef;
 use owning_ref::ArcRef;
 use memory::{MappedPages, VirtualAddress, MmiRef, FRAME_ALLOCATOR, allocate_pages_by_bytes, EntryFlags};
 use xmas_elf::{
     ElfFile,
-    sections::SectionData,
+    sections::{SectionData, SectionData::Rela64, ShType},
 };
 use gimli::{
     NativeEndian,
@@ -42,9 +47,11 @@ use gimli::{
         DebugStr,
     },
 };
+use rustc_demangle::demangle;
 use hashbrown::HashSet;
 use by_address::ByAddress;
-use crate_metadata::StrongSectionRef;
+use crate_metadata::{StrongCrateRef, StrongSectionRef, RelocationEntry, write_relocation};
+use mod_mgmt::{CrateNamespace, find_symbol_table};
 
 
 /// The set of debug sections that we need to use from a crate object file.
@@ -59,6 +66,8 @@ pub struct DebugSections {
     debug_pubnames:  DebugSectionSlice,
     debug_pubtypes:  DebugSectionSlice,
     debug_line:      DebugSectionSlice,
+    /// The crate that these debug sections correspond to, which must already be loaded.
+    loaded_crate: StrongCrateRef,
     /// The list of sections in foreign crates that these debug sections depend on.
     /// 
     /// Unlike the dependencies list maintained in `LoadedSection`'s `sections_i_depend_on`,
@@ -74,26 +83,45 @@ pub struct DebugSections {
     original_file: WeakFileRef,
 }
 impl DebugSections {
-    /// The `".debug_str"` section.
+    /// Returns the `".debug_str"` section.
     pub fn debug_str(&self) -> DebugStr<EndianSlice<NativeEndian>> {
         DebugStr::new(&self.debug_str.0, NativeEndian)
     }
 
-    // /// The `".debug_loc"` section.
-    // pub debug_loc:       DebugLoc<      EndianSlice<'i, NativeEndian>>,     
-    // /// The `".debug_abbrev"` section.
-    // pub debug_abbrev:    DebugAbbrev<   EndianSlice<'i, NativeEndian>>,
-    // /// The `".debug_info"` section.
-    // pub debug_info:      DebugInfo<     EndianSlice<'i, NativeEndian>>,
-    // /// The `".debug_ranges"` section.
-    // pub debug_ranges:    DebugRanges<   EndianSlice<'i, NativeEndian>>,
-    // /// The `".debug_pubnames"` section.
-    // pub debug_pubnames:  DebugPubNames< EndianSlice<'i, NativeEndian>>,
-    // /// The `".debug_pubtypes"` section.
-    // pub debug_pubtypes:  DebugPubTypes< EndianSlice<'i, NativeEndian>>,
-    // /// The `".debug_line"` section.
-    // pub debug_line:      DebugLine<     EndianSlice<'i, NativeEndian>>,
+    /// Returns the `".debug_loc"` section.
+    pub fn debug_loc(&self) -> DebugLoc<EndianSlice<NativeEndian>> {
+        DebugLoc::new(&self.debug_loc.0, NativeEndian)
+    }
 
+    /// Returns the `".debug_abbrev"` section.
+    pub fn debug_abbrev(&self) -> DebugAbbrev<EndianSlice<NativeEndian>> {
+        DebugAbbrev::new(&self.debug_abbrev.0, NativeEndian)
+    }
+
+    /// Returns the `".debug_info"` section.
+    pub fn debug_info(&self) -> DebugInfo<EndianSlice<NativeEndian>> {
+        DebugInfo::new(&self.debug_info.0, NativeEndian)
+    }
+
+    /// Returns the `".debug_ranges"` section.
+    pub fn debug_ranges(&self) -> DebugRanges<EndianSlice<NativeEndian>> {
+        DebugRanges::new(&self.debug_ranges.0, NativeEndian)
+    }
+
+    /// Returns the `".debug_pubnames"` section.
+    pub fn debug_pubnames(&self) -> DebugPubNames<EndianSlice<NativeEndian>> {
+        DebugPubNames::new(&self.debug_pubnames.0, NativeEndian)
+    }
+
+    /// Returns the `".debug_pubtypes"` section.
+    pub fn debug_pubtypes(&self) -> DebugPubTypes<EndianSlice<NativeEndian>> {
+        DebugPubTypes::new(&self.debug_pubtypes.0, NativeEndian)
+    }
+
+    /// Returns the `".debug_line"` section.
+    pub fn debug_line(&self) -> DebugLine<EndianSlice<NativeEndian>> {
+        DebugLine::new(&self.debug_line.0, NativeEndian)
+    }
 }
 
 /// An enum describing the possible forms of debug information for a crate. 
@@ -105,7 +133,7 @@ pub enum DebugSymbols {
     Loaded(DebugSections),
 }
 impl DebugSymbols {
-    pub fn load(&mut self) -> Result<&DebugSections, &'static str> {
+    pub fn load(&mut self, loaded_crate: &StrongCrateRef, namespace: &CrateNamespace) -> Result<&DebugSections, &'static str> {
         let weak_file = match self {
             Self::Loaded(ds) => return Ok(ds),
             Self::Unloaded(wf) => wf,
@@ -115,19 +143,25 @@ impl DebugSymbols {
         let file = file_ref.lock();
         let file_bytes: &[u8] = file.as_mapping()?.as_slice(0, file.size())?;
         let elf_file = ElfFile::new(file_bytes)?;
+        let symtab = find_symbol_table(&elf_file)?;
 
         // Allocate a memory region large enough to hold all debug sections.
-        let (mut debug_sections_mp, debug_sections_vaddr_range) = allocate_debug_section_pages(&elf_file, &kernel_mmi_ref)?;
+        let (mut debug_sections_mp, _debug_sections_vaddr_range) = allocate_debug_section_pages(&elf_file, &kernel_mmi_ref)?;
+        debug!("debug sections spans {:#X} to {:#X}  (size: {:#X} bytes)",
+            _debug_sections_vaddr_range.start, 
+            _debug_sections_vaddr_range.end,
+            _debug_sections_vaddr_range.end.value() - _debug_sections_vaddr_range.start.value(),
+        );
         let mut mp_offset = 0;
 
-        let mut debug_str_bounds:       Option<DebugSection> = None;
-        let mut debug_loc_bounds:       Option<DebugSection> = None;
-        let mut debug_abbrev_bounds:    Option<DebugSection> = None;
-        let mut debug_info_bounds:      Option<DebugSection> = None;
-        let mut debug_ranges_bounds:    Option<DebugSection> = None;
-        let mut debug_pubnames_bounds:  Option<DebugSection> = None;
-        let mut debug_pubtypes_bounds:  Option<DebugSection> = None;
-        let mut debug_line_bounds:      Option<DebugSection> = None;
+        let mut debug_str:       Option<DebugSection> = None;
+        let mut debug_loc:       Option<DebugSection> = None;
+        let mut debug_abbrev:    Option<DebugSection> = None;
+        let mut debug_info:      Option<DebugSection> = None;
+        let mut debug_ranges:    Option<DebugSection> = None;
+        let mut debug_pubnames:  Option<DebugSection> = None;
+        let mut debug_pubtypes:  Option<DebugSection> = None;
+        let mut debug_line:      Option<DebugSection> = None;
         let mut dependencies: HashSet<ByAddress<StrongSectionRef>> = HashSet::new();
         
         for (shndx, sec) in elf_file.section_iter().enumerate() {
@@ -137,28 +171,28 @@ impl DebugSymbols {
             let sec_name = sec.get_name(&elf_file);
             
             if Ok(SectionId::DebugStr.name()) == sec_name {
-                debug_str_bounds = Some(DebugSection { shndx, virt_addr, mp_offset, size, });
+                debug_str = Some(DebugSection { shndx, virt_addr, mp_offset, size, });
             }
             else if Ok(SectionId::DebugLoc.name()) == sec_name {
-                debug_loc_bounds = Some(DebugSection { shndx, virt_addr, mp_offset, size, });
+                debug_loc = Some(DebugSection { shndx, virt_addr, mp_offset, size, });
             }
             else if Ok(SectionId::DebugAbbrev.name()) == sec_name {
-                debug_abbrev_bounds = Some(DebugSection { shndx, virt_addr, mp_offset, size, });
+                debug_abbrev = Some(DebugSection { shndx, virt_addr, mp_offset, size, });
             }
             else if Ok(SectionId::DebugInfo.name()) == sec_name {
-                debug_info_bounds = Some(DebugSection { shndx, virt_addr, mp_offset, size, });
+                debug_info = Some(DebugSection { shndx, virt_addr, mp_offset, size, });
             }
             else if Ok(SectionId::DebugRanges.name()) == sec_name {
-                debug_ranges_bounds = Some(DebugSection { shndx, virt_addr, mp_offset, size, });
+                debug_ranges = Some(DebugSection { shndx, virt_addr, mp_offset, size, });
             }
             else if Ok(SectionId::DebugPubNames.name()) == sec_name {
-                debug_pubnames_bounds = Some(DebugSection { shndx, virt_addr, mp_offset, size, });
+                debug_pubnames = Some(DebugSection { shndx, virt_addr, mp_offset, size, });
             }
             else if Ok(SectionId::DebugPubTypes.name()) == sec_name {
-                debug_pubtypes_bounds = Some(DebugSection { shndx, virt_addr, mp_offset, size, });
+                debug_pubtypes = Some(DebugSection { shndx, virt_addr, mp_offset, size, });
             }
             else if Ok(SectionId::DebugLine.name()) == sec_name {
-                debug_line_bounds = Some(DebugSection { shndx, virt_addr, mp_offset, size, });
+                debug_line = Some(DebugSection { shndx, virt_addr, mp_offset, size, });
             }
             else {
                 continue;
@@ -176,11 +210,135 @@ impl DebugSymbols {
             mp_offset += size;
         }
 
+        // Ensure we found all of the expected debug sections.
+        let debug_str      = debug_str.ok_or("couldn't find .debug_str section")?;
+        let debug_loc      = debug_loc.ok_or("couldn't find .debug_loc section")?;
+        let debug_abbrev   = debug_abbrev.ok_or("couldn't find .debug_abbrev section")?;
+        let debug_info     = debug_info.ok_or("couldn't find .debug_info section")?;
+        let debug_ranges   = debug_ranges.ok_or("couldn't find .debug_ranges section")?;
+        let debug_pubnames = debug_pubnames.ok_or("couldn't find .debug_pubnames section")?;
+        let debug_pubtypes = debug_pubtypes.ok_or("couldn't find .debug_pubtypes section")?;
+        let debug_line     = debug_line.ok_or("couldn't find .debug_line section")?;
 
-        // TODO: we need to perform relocations here
+        let shndx_map = [
+            (debug_str.shndx, &debug_str),
+            (debug_loc.shndx, &debug_loc),
+            (debug_abbrev.shndx, &debug_abbrev),
+            (debug_info.shndx, &debug_info),
+            (debug_ranges.shndx, &debug_ranges),
+            (debug_pubnames.shndx, &debug_pubnames),
+            (debug_pubtypes.shndx, &debug_pubtypes),
+            (debug_line.shndx, &debug_line),
+        ];
 
-        
+        // A convenience function that searches for the local debug section with the given `shndx`
+        let find_debug_section_by_shndx = |shndx: &usize| -> Option<&DebugSection> {
+            shndx_map.iter()
+                .find(|(ndx, _)| shndx == ndx)
+                .map(|&(_, sec)| sec)
+        };
 
+        // Now that we've loaded the debug sections into memory, we can perform the relocations for those sections. 
+        for sec in elf_file.section_iter().filter(|sec| sec.get_type() == Ok(ShType::Rela)) {
+            // The target section is where we write the relocation data to.
+            // The source section is where we get the data from (typically just its virtual address). 
+
+            // The "info" field in this `sec` specifies the shndx of the target section.
+            let target_sec_shndx = sec.info() as usize;
+            let target_sec = match find_debug_section_by_shndx(&target_sec_shndx) {
+                Some(sec) => sec,
+                _ => continue,
+            };
+            
+            // There is one target section per rela section (`rela_array`), and one source section per rela_entry in this rela section.
+            let rela_array = match sec.get_data(&elf_file) {
+                Ok(Rela64(rela_arr)) => rela_arr,
+                _ => {
+                    error!("Found Rela section that wasn't able to be parsed as Rela64: {:?}", sec);
+                    return Err("Found Rela section that wasn't able to be parsed as Rela64");
+                } 
+            };
+            
+            // iterate through each relocation entry in the relocation array for the target_sec
+            for rela_entry in rela_array {
+                if false { 
+                    trace!("      Rela64 offset: {:#X}, addend: {:#X}, symtab_index: {}, type: {:#X}", 
+                        rela_entry.get_offset(), rela_entry.get_addend(), rela_entry.get_symbol_table_index(), rela_entry.get_type());
+                }
+
+                use xmas_elf::symbol_table::Entry;
+                let source_sec_entry = &symtab[rela_entry.get_symbol_table_index() as usize];
+                let source_sec_shndx = source_sec_entry.shndx() as usize; 
+                if false { 
+                    let source_sec_header_name = source_sec_entry.get_section_header(&elf_file, rela_entry.get_symbol_table_index() as usize)
+                        .and_then(|s| s.get_name(&elf_file));
+                    trace!("             relevant section [{}]: {:?}", source_sec_shndx, source_sec_header_name);
+                    // trace!("             Entry name {} {:?} vis {:?} bind {:?} type {:?} shndx {} value {} size {}", 
+                    //     source_sec_entry.name(), source_sec_entry.get_name(&elf_file), 
+                    //     source_sec_entry.get_other(), source_sec_entry.get_binding(), source_sec_entry.get_type(), 
+                    //     source_sec_entry.shndx(), source_sec_entry.value(), source_sec_entry.size());
+                }
+                
+                let mut source_and_target_in_same_crate = false;
+
+                // We first check if the source section is another debug section, then check if its a local section from the given `loaded_crate`.
+                let (source_sec_vaddr, source_sec_dep) = match find_debug_section_by_shndx(&source_sec_shndx).map(|s| (s.virt_addr, None))
+                    .or_else(|| loaded_crate.lock_as_ref().sections.get(&source_sec_shndx).map(|sec| (sec.address_range.start, Some(sec.clone()))))
+                {
+                    // We found the source section in the local debug sections or the given loaded crate. 
+                    Some(found) => {
+                        source_and_target_in_same_crate = true;
+                        Ok(found)
+                    }
+
+                    // If we couldn't get the source section based on its shndx, it means that the source section was in a foreign crate.
+                    // Thus, we must get the source section's name and check our list of foreign crates to see if it's there.
+                    // At this point, there's no other way to search for the source section besides its name.
+                    None => {
+                        if let Ok(source_sec_name) = source_sec_entry.get_name(&elf_file) {
+                            const DATARELRO: &'static str = ".data.rel.ro.";
+                            let source_sec_name = if source_sec_name.starts_with(DATARELRO) {
+                                source_sec_name.get(DATARELRO.len() ..).ok_or("Couldn't get name of .data.rel.ro. section")?
+                            } else {
+                                source_sec_name
+                            };
+                            let demangled = demangle(source_sec_name).to_string();
+
+                            // search for the symbol's demangled name in the kernel's symbol map
+                            namespace.get_symbol_or_load(&demangled, None, &kernel_mmi_ref, false)
+                                .upgrade()
+                                .ok_or("Couldn't get symbol for .debug section's foreign relocation entry, nor load its containing crate")
+                                .map(|sec| (sec.address_range.start, Some(sec)))
+                        }
+                        else {
+                            let _source_sec_header = source_sec_entry
+                                .get_section_header(&elf_file, rela_entry.get_symbol_table_index() as usize)
+                                .and_then(|s| s.get_name(&elf_file));
+                            error!("Couldn't get name of source section [{}] {:?}, needed for non-local relocation entry", source_sec_shndx, _source_sec_header);
+                            Err("Couldn't get source section's name, needed for non-local relocation entry")
+                        }
+                    }
+                }?;
+
+                let relocation_entry = RelocationEntry::from_elf_relocation(rela_entry);
+                write_relocation(
+                    relocation_entry,
+                    &mut debug_sections_mp,
+                    target_sec.mp_offset,
+                    source_sec_vaddr,
+                    false
+                )?;
+
+                // If these debug sections have a dependency on a section in a foreign crate, 
+                // add that dependency here to prevent that foreign crate's section from being dropped while we still depend on it.
+                if !source_and_target_in_same_crate {
+                    warn!("Found foreign dependency on source section {:?}", source_sec_dep);
+                    if let Some(ss) = source_sec_dep {
+                        dependencies.insert(ByAddress(Arc::clone(&ss)));
+                    }
+                }
+            } // end of relocations for a given target section
+        } // end of all relocations
 
 
         // The .debug sections were initially mapped as writable so we could modify them,
@@ -188,21 +346,22 @@ impl DebugSymbols {
         debug_sections_mp.remap(&mut kernel_mmi_ref.lock().page_table, EntryFlags::PRESENT)?; 
         let debug_sections_mp = Arc::new(debug_sections_mp);
 
-        let create_debug_section_slice = |bounds: Option<DebugSection>, err_msg: &'static str| -> Result<DebugSectionSlice, &'static str> {
-            bounds.ok_or(err_msg)
-                .and_then(|b| ArcRef::new(Arc::clone(&debug_sections_mp)).try_map(|mp| mp.as_slice::<u8>(b.mp_offset, b.size)))
+        let create_debug_section_slice = |debug_sec: DebugSection| -> Result<DebugSectionSlice, &'static str> {
+            ArcRef::new(Arc::clone(&debug_sections_mp))
+                .try_map(|mp| mp.as_slice::<u8>(debug_sec.mp_offset, debug_sec.size))
                 .map(|arcref| DebugSectionSlice(arcref))
         };
 
         let loaded = DebugSections {
-            debug_str:       create_debug_section_slice(debug_str_bounds,      "couldn't find .debug_str section")?,
-            debug_loc:       create_debug_section_slice(debug_loc_bounds,      "couldn't find .debug_loc section")?,
-            debug_abbrev:    create_debug_section_slice(debug_abbrev_bounds,   "couldn't find .debug_abbrev section")?,
-            debug_info:      create_debug_section_slice(debug_info_bounds,     "couldn't find .debug_info section")?,
-            debug_ranges:    create_debug_section_slice(debug_ranges_bounds,   "couldn't find .debug_ranges section")?,
-            debug_pubnames:  create_debug_section_slice(debug_pubnames_bounds, "couldn't find .debug_pubnames section")?,
-            debug_pubtypes:  create_debug_section_slice(debug_pubtypes_bounds, "couldn't find .debug_pubtypes section")?,
-            debug_line:      create_debug_section_slice(debug_line_bounds,     "couldn't find .debug_line section")?,
+            debug_str:       create_debug_section_slice(debug_str)?,
+            debug_loc:       create_debug_section_slice(debug_loc)?,
+            debug_abbrev:    create_debug_section_slice(debug_abbrev)?,
+            debug_info:      create_debug_section_slice(debug_info)?,
+            debug_ranges:    create_debug_section_slice(debug_ranges)?,
+            debug_pubnames:  create_debug_section_slice(debug_pubnames)?,
+            debug_pubtypes:  create_debug_section_slice(debug_pubtypes)?,
+            debug_line:      create_debug_section_slice(debug_line)?,
+            loaded_crate:    loaded_crate.clone_shallow(),
             dependencies:    dependencies,
             original_file:   weak_file.clone(),
         };
