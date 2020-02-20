@@ -1,5 +1,7 @@
 //! Support for DWARF debug information from ELF files.
 //! 
+//! This is a good intro to the DWARF format:
+//! <http://www.dwarfstd.org/doc/Debugging%20using%20DWARF.pdf>
 
 #![no_std]
 
@@ -33,6 +35,7 @@ use xmas_elf::{
     sections::{SectionData, SectionData::Rela64, ShType},
 };
 use gimli::{
+    DebugAbbrevOffset,
     NativeEndian,
     EndianSlice,
     SectionId,
@@ -45,6 +48,8 @@ use gimli::{
         DebugPubNames,
         DebugPubTypes,
         DebugStr,
+        Reader,
+        Section,
     },
 };
 use rustc_demangle::demangle;
@@ -76,7 +81,7 @@ pub struct DebugSections {
     /// since this only serves to ensure that these sections are not dropped 
     /// while this debug section exists (thus preserving memory safety),
     /// and not for swapping purposes. 
-    dependencies: HashSet<ByAddress<StrongSectionRef>>,
+    _dependencies: HashSet<ByAddress<StrongSectionRef>>,
     /// The file that this debug information was processed from. 
     /// This is useful for reclaiming this debug info's underlying memory
     /// and returning it back into an `Unloaded` state.
@@ -122,6 +127,48 @@ impl DebugSections {
     pub fn debug_line(&self) -> DebugLine<EndianSlice<NativeEndian>> {
         DebugLine::new(&self.debug_line.0, NativeEndian)
     }
+
+    
+    pub fn find_subprogram_containing(&self, vaddr: VirtualAddress) -> gimli::Result<()> {
+        let debug_info_sec = self.debug_info();
+        let debug_abbrev_sec = self.debug_abbrev();
+        let debug_str_sec = self.debug_str();
+
+        // internal function for recursively traversing a tree
+        fn process_tree<R: Reader>(depth: usize, node: gimli::EntriesTreeNode<R>) -> gimli::Result<()> {
+            {
+                // Examine the entry attributes.
+                let entry = node.entry();
+                debug!("{:indent$}DIE code: {:?}, tag: {:?}", "", entry.code(), entry.tag().static_string(), indent = ((depth) * 2));
+                let mut attribute_iter = node.entry().attrs();
+                while let Some(attr) = attribute_iter.next()? {
+                    debug!("{:indent$}Attribute: name: {:?}, value: {:?}", "", attr.name().static_string(), attr.value(), indent = ((depth + 1) * 2));
+                }
+            }
+            let mut children = node.children();
+            while let Some(child) = children.next()? {
+                // Recursively process a child.
+                process_tree(depth + 1, child)?;
+            }
+            Ok(())
+        }
+
+        let mut units = debug_info_sec.units();
+        debug!("------------ Debug Info -------------");
+        while let Some(u) = units.next()? {
+            debug!("{:?}", u);
+            // For some reason, the abbreviations offset in the unit header is incorrect. It should be 0 instead. 
+            let abbreviations = debug_abbrev_sec.abbreviations(DebugAbbrevOffset(0));
+            debug!("Abbreviations: {:?}", abbreviations);
+            let abbreviations = abbreviations?;
+            debug!("Entries:");
+            let mut entries_tree = u.entries_tree(&abbreviations, None)?;
+            let node = entries_tree.root()?;
+            process_tree(0, node)?;
+        }
+
+        Ok(())
+    }
 }
 
 /// An enum describing the possible forms of debug information for a crate. 
@@ -133,6 +180,10 @@ pub enum DebugSymbols {
     Loaded(DebugSections),
 }
 impl DebugSymbols {
+    /// Loads the debug symbols from the enclosed weak file reference
+    /// that correspond to the given `LoadedCrate` and using symbols from the given `CrateNamespace`. 
+    /// 
+    /// If these `DebugSymbols` are already loaded, this is a no-op and simply returns those loaded `DebugSections`.
     pub fn load(&mut self, loaded_crate: &StrongCrateRef, namespace: &CrateNamespace) -> Result<&DebugSections, &'static str> {
         let weak_file = match self {
             Self::Loaded(ds) => return Ok(ds),
@@ -220,6 +271,17 @@ impl DebugSymbols {
         let debug_pubtypes = debug_pubtypes.ok_or("couldn't find .debug_pubtypes section")?;
         let debug_line     = debug_line.ok_or("couldn't find .debug_line section")?;
 
+        if true {
+            debug!("Section .debug_str loaded from {:#X} to {:#X} (size {:#X} bytes)", debug_str.virt_addr, debug_str.virt_addr + debug_str.size, debug_str.size);
+            debug!("Section .debug_loc loaded from {:#X} to {:#X} (size {:#X} bytes)", debug_loc.virt_addr, debug_loc.virt_addr + debug_loc.size, debug_loc.size);
+            debug!("Section .debug_abbrev loaded from {:#X} to {:#X} (size {:#X} bytes)", debug_abbrev.virt_addr, debug_abbrev.virt_addr + debug_abbrev.size, debug_abbrev.size);
+            debug!("Section .debug_info loaded from {:#X} to {:#X} (size {:#X} bytes)", debug_info.virt_addr, debug_info.virt_addr + debug_info.size, debug_info.size);
+            debug!("Section .debug_ranges loaded from {:#X} to {:#X} (size {:#X} bytes)", debug_ranges.virt_addr, debug_ranges.virt_addr + debug_ranges.size, debug_ranges.size);
+            debug!("Section .debug_pubnames loaded from {:#X} to {:#X} (size {:#X} bytes)", debug_pubnames.virt_addr, debug_pubnames.virt_addr + debug_pubnames.size, debug_pubnames.size);
+            debug!("Section .debug_pubtypes loaded from {:#X} to {:#X} (size {:#X} bytes)", debug_pubtypes.virt_addr, debug_pubtypes.virt_addr + debug_pubtypes.size, debug_pubtypes.size);
+            debug!("Section .debug_line loaded from {:#X} to {:#X} (size {:#X} bytes)", debug_line.virt_addr, debug_line.virt_addr + debug_line.size, debug_line.size);
+        }
+
         let shndx_map = [
             (debug_str.shndx, &debug_str),
             (debug_loc.shndx, &debug_loc),
@@ -303,6 +365,7 @@ impl DebugSymbols {
                                 source_sec_name
                             };
                             let demangled = demangle(source_sec_name).to_string();
+                            warn!("Looking for foreign relocation source section {:?}", demangled);
 
                             // search for the symbol's demangled name in the kernel's symbol map
                             namespace.get_symbol_or_load(&demangled, None, &kernel_mmi_ref, false)
@@ -326,7 +389,7 @@ impl DebugSymbols {
                     &mut debug_sections_mp,
                     target_sec.mp_offset,
                     source_sec_vaddr,
-                    false
+                    true
                 )?;
 
                 // If these debug sections have a dependency on a section in a foreign crate, 
@@ -362,27 +425,40 @@ impl DebugSymbols {
             debug_pubtypes:  create_debug_section_slice(debug_pubtypes)?,
             debug_line:      create_debug_section_slice(debug_line)?,
             loaded_crate:    loaded_crate.clone_shallow(),
-            dependencies:    dependencies,
+            _dependencies:   dependencies,
             original_file:   weak_file.clone(),
         };
         *self = Self::Loaded(loaded);
         match self {
             Self::Loaded(d) => Ok(d), 
-            Self::Unloaded(_) => unreachable!(),
+            Self::Unloaded(_) => Err("BUG: unreachable: debug sections were loaded but DebugSymbols enum was wrong type"),
         }
     }
 
-    pub fn unload(&mut self) {
-        let weak_file = match self {
-            Self::Unloaded(_) => return,
-            Self::Loaded(ds) => ds.original_file.clone(),
-        };
-        *self = Self::Unloaded(weak_file);
-        // upon return, the loaded `DebugSections` struct will be dropped
+    /// A convenience method for accessing the already-loaded `DebugSections` within.
+    /// Returns `None` if the symbols are not currently loaded.
+    pub fn get_loaded(&self) -> Option<&DebugSections> {
+        match self {
+            Self::Loaded(d) => Some(d), 
+            Self::Unloaded(_) => None,
+        }
     }
 
-    pub fn dump_structs(&mut self, /*_krate: &LoadedCrate*/) -> Result<(), &'static str> {
-        Err("Unfinished")
+    /// Unloads these `DebugSymbols`, returning the enclosed `DebugSections` if they were already loaded.
+    /// If not, this is a no-op and returns `None`.
+    /// 
+    /// This is useful to free the large memory regions needed for debug information,
+    /// and also to release dependencies on other crates' sections.  
+    pub fn unload(&mut self) -> Option<DebugSections>{
+        let weak_file = match self {
+            Self::Unloaded(_) => return None,
+            Self::Loaded(ds) => ds.original_file.clone(),
+        };
+        let old = core::mem::replace(self, Self::Unloaded(weak_file));
+        match old {
+            Self::Loaded(d) => Some(d), 
+            Self::Unloaded(_) => None, // unreachable
+        }
     }
 }
 
@@ -402,7 +478,7 @@ fn allocate_debug_section_pages(elf_file: &ElfFile, kernel_mmi_ref: &MmiRef) -> 
         let align = sec.align() as usize;
         let addend = util::round_up_power_of_two(size, align);
 
-        trace!("  Looking at debug sec {:?}, size {:#X}, align {:#X} --> addend {:#X}", sec.get_name(elf_file), size, align, addend);
+        // trace!("  Looking at debug sec {:?}, size {:#X}, align {:#X} --> addend {:#X}", sec.get_name(elf_file), size, align, addend);
         ro_bytes += addend;
     }
 
@@ -418,7 +494,11 @@ fn allocate_debug_section_pages(elf_file: &ElfFile, kernel_mmi_ref: &MmiRef) -> 
     Ok((mp, range))
 }
 
-
+/// An internal struct used to store metadata about a debug section
+/// while it is still being linked. 
+/// 
+/// This is used to perform relocations on debug sections before they can be used.
+/// The final form of a ready-to-use debug section should be a `DebugSectionSlice`, not this type. 
 struct DebugSection {
     // /// The type of this debug section.
     // id: SectionId,
@@ -434,4 +514,5 @@ struct DebugSection {
     size: usize,
 }
 
+/// A slice that contains the exact byte range of fully-linked debug section.
 struct DebugSectionSlice(ArcRef<MappedPages, [u8]>);

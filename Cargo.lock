@@ -627,6 +627,8 @@ name = "exceptions_full"
 version = "0.1.0"
 dependencies = [
  "apic 0.1.0",
+ "debug_info 0.1.0",
+ "gimli 0.19.0 (registry+https://github.com/rust-lang/crates.io-index)",
  "log 0.3.9 (registry+https://github.com/rust-lang/crates.io-index)",
  "memory 0.1.0",
  "pmu_x86 0.1.0",
@@ -2234,6 +2236,16 @@ dependencies = [
 
 [[package]]
 name = "test_exception"
+version = "0.1.0"
+dependencies = [
+ "log 0.3.9 (registry+https://github.com/rust-lang/crates.io-index)",
+ "serial_port 0.1.0",
+ "task 0.1.0",
+ "terminal_print 0.1.0",
+]
+
+[[package]]
+name = "test_exception2"
 version = "0.1.0"
 dependencies = [
  "log 0.3.9 (registry+https://github.com/rust-lang/crates.io-index)",
