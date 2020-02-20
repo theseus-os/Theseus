@@ -20,6 +20,12 @@ version = "0.19.0"
 default-features = false
 features = [ "read", "alloc" ]
 
+### used for linker relocation typedefs
+[dependencies.goblin]
+version = "0.0.19"
+default-features = false
+features = ["elf64"]
+
 [dependencies.hashbrown]
 version = "0.1.8"
 features = ["nightly"]

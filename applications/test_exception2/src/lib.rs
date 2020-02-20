@@ -15,8 +15,8 @@ extern crate serial_port;
 struct MyStruct2(pub usize);
 impl MyStruct2 {
     #[inline(never)]
-    pub fn new(val: usize) -> MyStruct {
-        MyStruct(val)
+    pub fn new(val: usize) -> MyStruct2 {
+        MyStruct2(val)
     }
 }
 impl Drop for MyStruct2 {

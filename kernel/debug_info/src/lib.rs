@@ -9,6 +9,7 @@ extern crate alloc;
 #[macro_use] extern crate log;
 extern crate gimli;
 extern crate xmas_elf;
+extern crate goblin;
 extern crate util;
 extern crate memory;
 extern crate fs_node;
@@ -34,6 +35,7 @@ use xmas_elf::{
     ElfFile,
     sections::{SectionData, SectionData::Rela64, ShType},
 };
+use goblin::elf::reloc::*;
 use gimli::{
     DebugAbbrevOffset,
     NativeEndian,
@@ -135,7 +137,7 @@ impl DebugSections {
         let debug_str_sec = self.debug_str();
 
         // internal function for recursively traversing a tree
-        fn process_tree<R: Reader>(depth: usize, node: gimli::EntriesTreeNode<R>) -> gimli::Result<()> {
+        fn process_tree<R: Reader>(depth: usize, node: gimli::EntriesTreeNode<R>, debug_str_sec: &DebugStr<R>) -> gimli::Result<()> {
             {
                 // Examine the entry attributes.
                 let entry = node.entry();
@@ -143,12 +145,17 @@ impl DebugSections {
                 let mut attribute_iter = node.entry().attrs();
                 while let Some(attr) = attribute_iter.next()? {
                     debug!("{:indent$}Attribute: name: {:?}, value: {:?}", "", attr.name().static_string(), attr.value(), indent = ((depth + 1) * 2));
+                    if let Some(s) = attr.string_value(debug_str_sec) {
+                        trace!("{:indent$}--> Value: {:?}", "", s.to_string(), indent = ((depth + 2) * 2));
+                    } else {
+                        trace!("{:indent$}--> Value: None", "", indent = ((depth + 2) * 2));
+                    }
                 }
             }
             let mut children = node.children();
             while let Some(child) = children.next()? {
                 // Recursively process a child.
-                process_tree(depth + 1, child)?;
+                process_tree(depth + 1, child, debug_str_sec)?;
             }
             Ok(())
         }
@@ -157,14 +164,13 @@ impl DebugSections {
         debug!("------------ Debug Info -------------");
         while let Some(u) = units.next()? {
             debug!("{:?}", u);
-            // For some reason, the abbreviations offset in the unit header is incorrect. It should be 0 instead. 
-            let abbreviations = debug_abbrev_sec.abbreviations(DebugAbbrevOffset(0));
+            let abbreviations = u.abbreviations(&debug_abbrev_sec);
             debug!("Abbreviations: {:?}", abbreviations);
             let abbreviations = abbreviations?;
             debug!("Entries:");
             let mut entries_tree = u.entries_tree(&abbreviations, None)?;
             let node = entries_tree.root()?;
-            process_tree(0, node)?;
+            process_tree(0, node, &debug_str_sec)?;
         }
 
         Ok(())
@@ -382,9 +388,9 @@ impl DebugSymbols {
                         }
                     }
                 }?;
-
+                
                 let relocation_entry = RelocationEntry::from_elf_relocation(rela_entry);
-                write_relocation(
+                write_relocation_debug(
                     relocation_entry,
                     &mut debug_sections_mp,
                     target_sec.mp_offset,
@@ -516,3 +522,49 @@ struct DebugSection {
 
 /// A slice that contains the exact byte range of fully-linked debug section.
 struct DebugSectionSlice(ArcRef<MappedPages, [u8]>);
+
+
+
+
+/// Write a relocation entry for a `.debug_*` section. 
+/// 
+/// # Implementation and Usage Note
+/// I'm not entirely sure if this is implemented correctly, since it differs from the regular relocation formulas. 
+/// However, it seems to work with Gimli. 
+/// It may be that Gimli itself is broken in the way that it uses offsets:
+/// gimli seems to expect just an offset value to be written at the relocation target address, 
+/// rather than a direct (full, non-offset) value.
+/// 
+/// # Arguments
+/// * `relocation_entry`: the relocation entry from the ELF file that specifies the details of the relocation action to perform.
+/// * `target_sec_mapped_pages`: the `MappedPages` that covers the target section, i.e., the section where the relocation data will be written to.
+/// * `target_sec_mapped_pages_offset`: the offset into `target_sec_mapped_pages` where the target section is located.
+/// * `source_sec_vaddr`: the `VirtualAddress` of the source section of the relocation, i.e., the section that the `target_sec` depends on and "points" to.
+/// * `verbose_log`: whether to output verbose logging information about this relocation action.
+fn write_relocation_debug(
+    relocation_entry: RelocationEntry,
+    target_sec_mapped_pages: &mut MappedPages,
+    target_sec_mapped_pages_offset: usize,
+    source_sec_vaddr: VirtualAddress,
+    verbose_log: bool
+) -> Result<(), &'static str>
+{
+    // Calculate exactly where we should write the relocation data to.
+    let target_offset = target_sec_mapped_pages_offset + relocation_entry.offset;
+
+    match relocation_entry.typ {
+        R_X86_64_32 => {
+            // For this relocation entry type, typically we would say "target = source + addend".
+            // But for debug sections, apparently we just want to say "target = addend"...
+            let target_ref: &mut u32 = target_sec_mapped_pages.as_type_mut(target_offset)?;
+            let source_val = relocation_entry.addend;
+            if verbose_log { trace!("                    target_ptr: {:#X}, source_val: {:#X} (ignoring source_sec_vaddr {:#X})", target_ref as *mut _ as usize, source_val, source_sec_vaddr); }
+            *target_ref = source_val as u32;
+            Ok(())
+        }
+        _ => {
+            // Otherwise, we use the standard relocation formulas.
+            write_relocation(relocation_entry, target_sec_mapped_pages, target_sec_mapped_pages_offset, source_sec_vaddr, verbose_log)
+        }
+    }
+}

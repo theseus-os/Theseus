@@ -900,26 +900,26 @@ pub fn write_relocation(
         R_X86_64_32 => {
             let target_ref: &mut u32 = target_sec_mapped_pages.as_type_mut(target_offset)?;
             let source_val = source_sec_vaddr.value().wrapping_add(relocation_entry.addend);
-            if verbose_log { trace!("                    target_ptr: {:#X}, source_val: {:#X} (from sec_vaddr {:#X})", target_ref as *mut _ as usize, source_val, source_sec_vaddr); }
+            if verbose_log { trace!("                    target_ptr: {:#X}, source_val: {:#X} (from source_sec_vaddr {:#X})", target_ref as *mut _ as usize, source_val, source_sec_vaddr); }
             *target_ref = source_val as u32;
         }
         R_X86_64_64 => {
             let target_ref: &mut u64 = target_sec_mapped_pages.as_type_mut(target_offset)?;
             let source_val = source_sec_vaddr.value().wrapping_add(relocation_entry.addend);
-            if verbose_log { trace!("                    target_ptr: {:#X}, source_val: {:#X} (from sec_vaddr {:#X})", target_ref as *mut _ as usize, source_val, source_sec_vaddr); }
+            if verbose_log { trace!("                    target_ptr: {:#X}, source_val: {:#X} (from source_sec_vaddr {:#X})", target_ref as *mut _ as usize, source_val, source_sec_vaddr); }
             *target_ref = source_val as u64;
         }
         R_X86_64_PC32 |
         R_X86_64_PLT32 => {
             let target_ref: &mut u32 = target_sec_mapped_pages.as_type_mut(target_offset)?;
             let source_val = source_sec_vaddr.value().wrapping_add(relocation_entry.addend).wrapping_sub(target_ref as *mut _ as usize);
-            if verbose_log { trace!("                    target_ptr: {:#X}, source_val: {:#X} (from sec_vaddr {:#X})", target_ref as *mut _ as usize, source_val, source_sec_vaddr); }
+            if verbose_log { trace!("                    target_ptr: {:#X}, source_val: {:#X} (from source_sec_vaddr {:#X})", target_ref as *mut _ as usize, source_val, source_sec_vaddr); }
             *target_ref = source_val as u32;
         }
         R_X86_64_PC64 => {
             let target_ref: &mut u64 = target_sec_mapped_pages.as_type_mut(target_offset)?;
             let source_val = source_sec_vaddr.value().wrapping_add(relocation_entry.addend).wrapping_sub(target_ref as *mut _ as usize);
-            if verbose_log { trace!("                    target_ptr: {:#X}, source_val: {:#X} (from sec_vaddr {:#X})", target_ref as *mut _ as usize, source_val, source_sec_vaddr); }
+            if verbose_log { trace!("                    target_ptr: {:#X}, source_val: {:#X} (from source_sec_vaddr {:#X})", target_ref as *mut _ as usize, source_val, source_sec_vaddr); }
             *target_ref = source_val as u64;
         }
         // R_X86_64_GOTPCREL => { 
