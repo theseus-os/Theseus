@@ -137,16 +137,13 @@ impl DebugSections {
     /// which has a bounded range of program counters / instruction pointers that can be searched. 
     /// 
     /// # Return
-    /// Returns the offset of the Debugging Information Entry (DIE) that describes the subprogram
+    /// Returns the offset into the `DebugInfo` of the Debugging Information Entry (DIE) that describes the subprogram
     /// that covers (includes) the virtual address of the given `instruction_pointer`.
     /// 
     /// If a matching subprogram DIE is not found, `Ok(None)` is returned.
     /// 
     /// Otherwise, an error is returned upon failure, e.g., a problem parsing the debug sections.
     pub fn find_subprogram_containing(&self, instruction_pointer: VirtualAddress) -> gimli::Result<Option<gimli::DebugInfoOffset>> {
-        let debug_info_sec = self.debug_info();
-        let debug_abbrev_sec = self.debug_abbrev();
-        let debug_str_sec = self.debug_str();
 
         // internal function for recursively traversing a tree
         fn process_tree<R: Reader>(
@@ -154,7 +151,7 @@ impl DebugSections {
             depth: usize,
             node: gimli::EntriesTreeNode<R>,
             debug_str_sec: &DebugStr<R>
-        ) -> gimli::Result<()> {
+        ) -> gimli::Result<Option<gimli::UnitOffset<R::Offset>>> {
             // Examine the entry.
             let entry = node.entry();
             debug!("{:indent$}DIE code: {:?}, tag: {:?}", "", entry.code(), entry.tag().static_string(), indent = ((depth) * 2));
@@ -183,7 +180,8 @@ impl DebugSections {
                 );
 
                 if instruction_pointer >= starting_vaddr && instruction_pointer < ending_vaddr {
-                    warn!("{:indent$}--Found matching subprogram!", "", indent = ((depth) * 2));
+                    warn!("{:indent$}--Found matching subprogram at {:?}", "", entry.offset(), indent = ((depth) * 2));
+                    return Ok(Some(entry.offset()));
                 }                
             }
 
@@ -202,22 +200,35 @@ impl DebugSections {
             // Recurse into the entry node's children nodes.
             let mut children = node.children();
             while let Some(child) = children.next()? {
-                process_tree(instruction_pointer, depth + 1, child, debug_str_sec)?;
+                if let Some(offset) = process_tree(instruction_pointer, depth + 1, child, debug_str_sec)? {
+                    return Ok(Some(offset));
+                }
             }
-            Ok(())
+            
+            // Didn't find any matching subprogram DIE
+            Ok(None)
         }
 
+
+        // actual code starts here
+        let debug_info_sec = self.debug_info();
+        let debug_abbrev_sec = self.debug_abbrev();
+        let debug_str_sec = self.debug_str();
+
         let mut units = debug_info_sec.units();
-        // In almost every case, there is just one unit. But we go through all of them just in case. 
+        // In most cases, there is just one unit. But we go through all of them just in case. 
         while let Some(u) = units.next()? {
             let abbreviations = u.abbreviations(&debug_abbrev_sec)?;
             let mut entries_tree = u.entries_tree(&abbreviations, None)?;
             let node = entries_tree.root()?;
-            process_tree(instruction_pointer, 0, node, &debug_str_sec)?;
+            if let Some(offset) = process_tree(instruction_pointer, 0, node, &debug_str_sec)? {
+                return Ok(Some(offset.to_debug_info_offset(&u)));
+            }
         }
 
         Ok(None)
     }
+
 }
 
 /// An enum describing the possible forms of debug information for a crate. 

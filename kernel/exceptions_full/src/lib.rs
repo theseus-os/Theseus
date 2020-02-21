@@ -112,6 +112,9 @@ fn kill_and_halt(exception_number: u8, stack_frame: &ExceptionStackFrame) {
 
         let res = debug_sections.find_subprogram_containing(memory::VirtualAddress::new_canonical(instr_ptr));
         debug!("Result of find_subprogram_containing: {:?}", res);
+
+        // now find the lexical block of interest
+        // now look at any variables in that lexical block, specifically only those that have a real location. 
     }
 
     // print a stack trace
