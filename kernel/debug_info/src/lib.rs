@@ -25,7 +25,7 @@ use core::ops::{
     Range,
 };
 use alloc::{
-    string::ToString,
+    string::{String},
     sync::Arc,
 };
 use fs_node::WeakFileRef;
@@ -130,50 +130,93 @@ impl DebugSections {
         DebugLine::new(&self.debug_line.0, NativeEndian)
     }
 
-    
-    pub fn find_subprogram_containing(&self, vaddr: VirtualAddress) -> gimli::Result<()> {
+
+    /// Finds the subprogram that contains the given instruction pointer. 
+    /// 
+    /// A *subprogram* is DWARF's term for an executable function/method/closure/subroutine,
+    /// which has a bounded range of program counters / instruction pointers that can be searched. 
+    /// 
+    /// # Return
+    /// Returns the offset of the Debugging Information Entry (DIE) that describes the subprogram
+    /// that covers (includes) the virtual address of the given `instruction_pointer`.
+    /// 
+    /// If a matching subprogram DIE is not found, `Ok(None)` is returned.
+    /// 
+    /// Otherwise, an error is returned upon failure, e.g., a problem parsing the debug sections.
+    pub fn find_subprogram_containing(&self, instruction_pointer: VirtualAddress) -> gimli::Result<Option<gimli::DebugInfoOffset>> {
         let debug_info_sec = self.debug_info();
         let debug_abbrev_sec = self.debug_abbrev();
         let debug_str_sec = self.debug_str();
 
         // internal function for recursively traversing a tree
-        fn process_tree<R: Reader>(depth: usize, node: gimli::EntriesTreeNode<R>, debug_str_sec: &DebugStr<R>) -> gimli::Result<()> {
-            {
-                // Examine the entry attributes.
-                let entry = node.entry();
-                debug!("{:indent$}DIE code: {:?}, tag: {:?}", "", entry.code(), entry.tag().static_string(), indent = ((depth) * 2));
-                let mut attribute_iter = node.entry().attrs();
-                while let Some(attr) = attribute_iter.next()? {
-                    debug!("{:indent$}Attribute: name: {:?}, value: {:?}", "", attr.name().static_string(), attr.value(), indent = ((depth + 1) * 2));
-                    if let Some(s) = attr.string_value(debug_str_sec) {
-                        trace!("{:indent$}--> Value: {:?}", "", s.to_string(), indent = ((depth + 2) * 2));
-                    } else {
-                        trace!("{:indent$}--> Value: None", "", indent = ((depth + 2) * 2));
-                    }
+        fn process_tree<R: Reader>(
+            instruction_pointer: VirtualAddress,
+            depth: usize,
+            node: gimli::EntriesTreeNode<R>,
+            debug_str_sec: &DebugStr<R>
+        ) -> gimli::Result<()> {
+            // Examine the entry.
+            let entry = node.entry();
+            debug!("{:indent$}DIE code: {:?}, tag: {:?}", "", entry.code(), entry.tag().static_string(), indent = ((depth) * 2));
+            if entry.tag() == gimli::constants::DW_TAG_subprogram {
+                let low_pc  = entry.attr_value(gimli::DW_AT_low_pc)? .expect("Subprogram DIE didn't have a DW_AT_low_pc attribute");
+                let starting_vaddr = match low_pc {
+                    gimli::AttributeValue::Addr(a) => VirtualAddress::new_canonical(a as usize),
+                    unsupported => panic!("unsupported AttributeValue type for low_pc: {:?}", unsupported),
+                };
+                let high_pc = entry.attr_value(gimli::DW_AT_high_pc)?.expect("Subprogram DIE didn't have a DW_AT_high_pc attribute");
+                let size_of_subprogram = match high_pc {
+                    gimli::AttributeValue::Udata(d) => d as usize,
+                    unsupported => panic!("unsupported AttributeValue type for high_pc: {:?}", unsupported),
+                };
+                let ending_vaddr = starting_vaddr + size_of_subprogram;
+
+                let _subprogram_name = entry.attr(gimli::DW_AT_name)?.expect("Subprogram DIE didn't have a DW_AT_name attribute")
+                    .string_value(debug_str_sec).expect("Couldn't convert subprogram name attribute value to string")
+                    .to_string().map(|s| String::from(s))?;
+                let _subprogram_linkage_name = entry.attr(gimli::DW_AT_linkage_name)?.expect("Subprogram DIE didn't have a DW_AT_linkage_name attribute")
+                    .string_value(debug_str_sec).expect("Couldn't convert subprogram linkage_name attribute value to string")
+                    .to_string().map(|s| String::from(s))?;
+                debug!("{:indent$}--Subprogram {:?}({:?}) ranges from {:#X} to {:#X} (size {:#X} bytes)", "",
+                    _subprogram_name, _subprogram_linkage_name, starting_vaddr, ending_vaddr, size_of_subprogram,
+                    indent = ((depth) * 2)
+                );
+
+                if instruction_pointer >= starting_vaddr && instruction_pointer < ending_vaddr {
+                    warn!("{:indent$}--Found matching subprogram!", "", indent = ((depth) * 2));
+                }                
+            }
+
+            // Examine the entry's attributes.
+            let mut attribute_iter = node.entry().attrs();
+            while let Some(attr) = attribute_iter.next()? {
+                debug!("{:indent$}Attribute: {:?}, value: {:?}", "", attr.name().static_string(), attr.value(), indent = ((depth + 1) * 2));
+                if let Some(s) = attr.string_value(debug_str_sec) {
+                    trace!("{:indent$}--> Value: {:?}", "", s.to_string(), indent = ((depth + 2) * 2));
+                } else {
+                    trace!("{:indent$}--> Value: None", "", indent = ((depth + 2) * 2));
                 }
             }
+
+
+            // Recurse into the entry node's children nodes.
             let mut children = node.children();
             while let Some(child) = children.next()? {
-                // Recursively process a child.
-                process_tree(depth + 1, child, debug_str_sec)?;
+                process_tree(instruction_pointer, depth + 1, child, debug_str_sec)?;
             }
             Ok(())
         }
 
         let mut units = debug_info_sec.units();
-        debug!("------------ Debug Info -------------");
+        // In almost every case, there is just one unit. But we go through all of them just in case. 
         while let Some(u) = units.next()? {
-            debug!("{:?}", u);
-            let abbreviations = u.abbreviations(&debug_abbrev_sec);
-            debug!("Abbreviations: {:?}", abbreviations);
-            let abbreviations = abbreviations?;
-            debug!("Entries:");
+            let abbreviations = u.abbreviations(&debug_abbrev_sec)?;
             let mut entries_tree = u.entries_tree(&abbreviations, None)?;
             let node = entries_tree.root()?;
-            process_tree(0, node, &debug_str_sec)?;
+            process_tree(instruction_pointer, 0, node, &debug_str_sec)?;
         }
 
-        Ok(())
+        Ok(None)
     }
 }
 
@@ -370,6 +413,7 @@ impl DebugSymbols {
                             } else {
                                 source_sec_name
                             };
+                            use alloc::string::ToString;
                             let demangled = demangle(source_sec_name).to_string();
                             warn!("Looking for foreign relocation source section {:?}", demangled);
 
@@ -395,7 +439,7 @@ impl DebugSymbols {
                     &mut debug_sections_mp,
                     target_sec.mp_offset,
                     source_sec_vaddr,
-                    true
+                    false
                 )?;
 
                 // If these debug sections have a dependency on a section in a foreign crate, 
@@ -547,16 +591,14 @@ fn write_relocation_debug(
     target_sec_mapped_pages_offset: usize,
     source_sec_vaddr: VirtualAddress,
     verbose_log: bool
-) -> Result<(), &'static str>
-{
-    // Calculate exactly where we should write the relocation data to.
-    let target_offset = target_sec_mapped_pages_offset + relocation_entry.offset;
-
+) -> Result<(), &'static str> {
     match relocation_entry.typ {
         R_X86_64_32 => {
+            // Calculate exactly where we should write the relocation data to.
+            let target_offset = target_sec_mapped_pages_offset + relocation_entry.offset;
+            let target_ref: &mut u32 = target_sec_mapped_pages.as_type_mut(target_offset)?;
             // For this relocation entry type, typically we would say "target = source + addend".
             // But for debug sections, apparently we just want to say "target = addend"...
-            let target_ref: &mut u32 = target_sec_mapped_pages.as_type_mut(target_offset)?;
             let source_val = relocation_entry.addend;
             if verbose_log { trace!("                    target_ptr: {:#X}, source_val: {:#X} (ignoring source_sec_vaddr {:#X})", target_ref as *mut _ as usize, source_val, source_sec_vaddr); }
             *target_ref = source_val as u32;

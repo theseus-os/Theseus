@@ -888,8 +888,7 @@ pub fn write_relocation(
     target_sec_mapped_pages_offset: usize,
     source_sec_vaddr: VirtualAddress,
     verbose_log: bool
-) -> Result<(), &'static str>
-{
+) -> Result<(), &'static str> {
     // Calculate exactly where we should write the relocation data to.
     let target_offset = target_sec_mapped_pages_offset + relocation_entry.offset;
 
