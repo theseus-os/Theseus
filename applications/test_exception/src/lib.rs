@@ -21,7 +21,7 @@ impl Drop for MyStruct {
 }
 
 // pub fn main(_args: Vec<String>) -> isize {
-pub fn main() {
+pub unsafe fn main() {
 
     // // dump some info about the this loaded app crate
     // {
@@ -35,10 +35,12 @@ pub fn main() {
     //     }
     // }
 
-    let _my_struct = MyStruct(5);
-    
-    // cause page fault exception by dereferencing random memory value
-    unsafe { *(0x5050DEADBEEF as *mut usize) = 0x5555_5555_5555; }
+    {
+        let _my_struct = MyStruct(5);
+        
+        // cause page fault exception by dereferencing random memory value
+        *(0x5050DEADBEEF as *mut usize) = 0x5555_5555_5555;
+    }
 
     loop { }
     // 0

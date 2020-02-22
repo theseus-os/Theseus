@@ -137,7 +137,7 @@ APP_CRATE_NAMES += getopts unicode_width
 ### Most targets are PHONY because cargo itself handles whether or not to rebuild the Rust code base.
 .PHONY: all \
 		check_rustc check_xargo check_captain \
-		clean run run_wait iso build userspace cargo \
+		clean run run_pause iso build userspace cargo \
 		simd_personality_sse build_sse simd_personality_avx build_avx \
 		$(assembly_source_files) \
 		gdb doc docs view-doc view-docs

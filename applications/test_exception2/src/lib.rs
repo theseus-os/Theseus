@@ -40,13 +40,15 @@ pub fn main(val: usize) {
     //         trace!("   {:?}", &*s.lock());
     //     }
     // }
-
-    let _my_struct = MyStruct2::new(val);
     
-    // cause page fault exception by dereferencing random memory value
-    unsafe { *(0x5050DEADBEEF as *mut usize) = 0x5555_5555_5555; }
+    {
+        let _my_struct2 = MyStruct2::new(val);
+        
+        // cause page fault exception by dereferencing random memory value
+        unsafe { *(0x5050DEADBEEF as *mut usize) = 0x5555_5555_5555; }
+        let _res = serial_port::write_fmt(format_args!("{:?}", _my_struct2));
+    }
 
-    serial_port::write_fmt(format_args!("{:?}", _my_struct)).unwrap();
     loop { }
     // 0
 }
