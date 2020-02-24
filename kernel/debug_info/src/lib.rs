@@ -130,8 +130,10 @@ impl DebugSections {
         DebugLine::new(&self.debug_line.0, NativeEndian)
     }
 
-    
-    /// internal function for recursively traversing a tree of DIE nodes
+
+    /// Handle a node (one that's within a matching subprogram).
+    /// This can be either a variable node itself or anything that may contain a variable node, e.g., lexical blocks.
+    /// 
     /// 
     /// A *lexical block* is DWARF's term for a lexical scope block, e.g., curly braces like so:
     /// ```rust,no_run
@@ -148,7 +150,7 @@ impl DebugSections {
     ///     } // end
     /// } //end
     /// ```
-    ///
+    /// 
     /// Otherwise, an error is returned upon failure, e.g., a problem parsing the debug sections.
     fn handle_node<R: Reader>(
         &self,
@@ -161,51 +163,9 @@ impl DebugSections {
         let tag = entry.tag();
         debug!("{:indent$}DIE code: {:?}, tag: {:?}", "", entry.code(), tag.static_string(), indent = ((depth) * 2));
 
-        // We found a subprogram node.
-        // We only care about subprogram nodes that contain the given instruction pointer.
-        if tag == gimli::constants::DW_TAG_subprogram {
-            let _subprogram_name = entry.attr(gimli::DW_AT_name)?.expect("Subprogram DIE didn't have a DW_AT_name attribute")
-                .string_value(debug_str_sec).expect("Couldn't convert subprogram name attribute value to string")
-                .to_string().map(|s| String::from(s))?;
-            let _subprogram_linkage_name = entry.attr(gimli::DW_AT_linkage_name)?.expect("Subprogram DIE didn't have a DW_AT_linkage_name attribute")
-                .string_value(debug_str_sec).expect("Couldn't convert subprogram linkage_name attribute value to string")
-                .to_string().map(|s| String::from(s))?;
-
-            let starting_vaddr = match entry.attr_value(gimli::DW_AT_low_pc)? {
-                Some(gimli::AttributeValue::Addr(a)) => VirtualAddress::new_canonical(a as usize),
-                Some(unsupported) => panic!("unsupported AttributeValue type for low_pc: {:?}", unsupported),
-                _ => {
-                    debug!("{:indent$}--Subprogram {:?}({:?}) did not have attribute DW_AT_low_pc", "", _subprogram_name, _subprogram_linkage_name, indent = (depth * 2));
-                    return Ok(None);
-                }
-            };
-            let size_of_subprogram = match entry.attr_value(gimli::DW_AT_high_pc)? {
-                Some(gimli::AttributeValue::Udata(d)) => d as usize,
-                Some(unsupported) => panic!("unsupported AttributeValue type for high_pc: {:?}", unsupported),
-                _ => {
-                    debug!("{:indent$}--Subprogram {:?}({:?}) did not have attribute DW_AT_high_pc", "", _subprogram_name, _subprogram_linkage_name, indent = (depth * 2));
-                    return Ok(None);
-                }
-            };
-            let ending_vaddr = starting_vaddr + size_of_subprogram;
-
-            debug!("{:indent$}--Subprogram {:?}({:?}) ranges from {:#X} to {:#X} (size {:#X} bytes)", "",
-                _subprogram_name, _subprogram_linkage_name, starting_vaddr, ending_vaddr, size_of_subprogram,
-                indent = (depth * 2)
-            );
-
-            if instruction_pointer >= starting_vaddr && instruction_pointer < ending_vaddr {
-                warn!("{:indent$}--Found matching subprogram at {:?}", "", entry.offset(), indent = ((depth) * 2));
-                // Here we found a subprogram that contains the given instruction pointer. 
-                // We use a return statement here because once we've found a matching subprogram,
-                // we can stop looking at other subprograms because only one subprogram can possibly contain a given instruction pointer.
-                return self.handle_node(instruction_pointer, depth + 1, node, debug_str_sec);
-            } 
-        } 
-
         // We found a lexical block node. 
         // We only care about lexical block nodes because they may contain variable nodes.
-        else if tag == gimli::DW_TAG_lexical_block {
+        if tag == gimli::DW_TAG_lexical_block {
             let low_pc  = entry.attr_value(gimli::DW_AT_low_pc)? .expect("Lexical Block DIE didn't have a DW_AT_low_pc attribute");
             let starting_vaddr = match low_pc {
                 gimli::AttributeValue::Addr(a) => VirtualAddress::new_canonical(a as usize),
@@ -253,12 +213,19 @@ impl DebugSections {
                 .string_value(debug_str_sec).expect("Couldn't convert variable name attribute value to string")
                 .to_string().map(|s| String::from(s))?;
             let type_signature = match entry.attr_value(gimli::DW_AT_type)? {
-                Some(gimli::AttributeValue::DebugTypesRef(type_ref)) => type_ref,
-                unexpected => panic!("unexpected DW_AT_type attribute value: {:?}", unexpected),
+                Some(gimli::AttributeValue::DebugTypesRef(type_ref)) => Some(type_ref),
+                Some(gimli::AttributeValue::UnitRef(unit_offset)) => {
+                    warn!("TODO FIXME: do something with a UnitRef/UnitOffset type signature value! {:?}", unit_offset); 
+                    None
+                }
+                unexpected => {
+                    warn!("unexpected DW_AT_type attribute value: {:?}", unexpected);
+                    None
+                }
             };
             debug!("{:indent$}Variable {:?}, type: {:?}", "", variable_name, type_signature, indent = ((depth) * 2));
             if let Some(loc) = entry.attr(gimli::DW_AT_location)? {
-                warn!("{:indent$}Variable {:?}, type: {:?} NMAY NEED HANDLING FOR LOCATION {:?}", "", variable_name, type_signature, loc, indent = ((depth+1) * 2));
+                warn!("{:indent$}Variable {:?}, type: {:?} MAY NEED HANDLING FOR LOCATION {:?}", "", variable_name, type_signature, loc, indent = ((depth+1) * 2));
             } else {
                 // If a variable doesn't have a location, that means it was optimized out and doesn't actually exist in the object code. 
                 // So, do nothing here.
@@ -276,9 +243,9 @@ impl DebugSections {
             // };
         }
 
+        // In all other cases, we simply recurse through the child nodes.
         else { }
 
-        // In all other cases, we simply recurse through the child nodes.
 
         // Dump the entry's attributes.
         let mut attribute_iter = node.entry().attrs();
@@ -298,7 +265,112 @@ impl DebugSections {
                 return Ok(Some(offset));
             }
         }
+        
+        // Didn't find any matching subprogram DIE
+        Ok(None)
 
+    }
+
+    
+    /// The internal function for recursively traversing a tree of DIE nodes,
+    /// while looking for a subprogram node that contains the given instruction pointer.
+    /// 
+    /// A *lexical block* is DWARF's term for a lexical scope block, e.g., curly braces like so:
+    /// ```rust,no_run
+    /// fn main() { // start
+    ///     let a = 5;
+    ///     { // start
+    ///         let b = 6
+    ///         { // start
+    ///             let c = 10;
+    ///         } // end
+    ///     } // end
+    ///     { // start
+    ///         let d = 8;
+    ///     } // end
+    /// } //end
+    /// ```
+    ///
+    /// Otherwise, an error is returned upon failure, e.g., a problem parsing the debug sections.
+    fn handle_subprogram_node<R: Reader>(
+        &self,
+        instruction_pointer: VirtualAddress,
+        depth: usize,
+        node: gimli::EntriesTreeNode<R>,
+        debug_str_sec: &DebugStr<R>
+    ) -> gimli::Result<Option<gimli::UnitOffset<R::Offset>>> {
+        let entry = node.entry();
+        let tag = entry.tag();
+        debug!("{:indent$}DIE code: {:?}, tag: {:?}", "", entry.code(), tag.static_string(), indent = ((depth) * 2));
+
+        // We found a subprogram node.
+        // We only care about subprogram nodes that contain the given instruction pointer.
+        if tag == gimli::constants::DW_TAG_subprogram {
+            let _subprogram_name = entry.attr(gimli::DW_AT_name)?.and_then(|attr| 
+                attr.string_value(debug_str_sec).and_then(|s| 
+                    s.to_string().ok().map(|s| String::from(s))
+                )
+            );
+            let _subprogram_linkage_name = entry.attr(gimli::DW_AT_linkage_name)?.and_then(|attr| 
+                attr.string_value(debug_str_sec).and_then(|s| 
+                    s.to_string().ok().map(|s| String::from(s))
+                )
+            );
+
+            let starting_vaddr = match entry.attr_value(gimli::DW_AT_low_pc)? {
+                Some(gimli::AttributeValue::Addr(a)) => VirtualAddress::new_canonical(a as usize),
+                Some(unsupported) => panic!("unsupported AttributeValue type for low_pc: {:?}", unsupported),
+                _ => {
+                    debug!("{:indent$}--Subprogram {:?}({:?}) did not have attribute DW_AT_low_pc", "", _subprogram_name, _subprogram_linkage_name, indent = (depth * 2));
+                    return Ok(None);
+                }
+            };
+            let size_of_subprogram = match entry.attr_value(gimli::DW_AT_high_pc)? {
+                Some(gimli::AttributeValue::Udata(d)) => d as usize,
+                Some(unsupported) => panic!("unsupported AttributeValue type for high_pc: {:?}", unsupported),
+                _ => {
+                    debug!("{:indent$}--Subprogram {:?}({:?}) did not have attribute DW_AT_high_pc", "", _subprogram_name, _subprogram_linkage_name, indent = (depth * 2));
+                    return Ok(None);
+                }
+            };
+            let ending_vaddr = starting_vaddr + size_of_subprogram;
+
+            debug!("{:indent$}--Subprogram {:?}({:?}) ranges from {:#X} to {:#X} (size {:#X} bytes)", "",
+                _subprogram_name, _subprogram_linkage_name, starting_vaddr, ending_vaddr, size_of_subprogram,
+                indent = (depth * 2)
+            );
+
+            if instruction_pointer >= starting_vaddr && instruction_pointer < ending_vaddr {
+                warn!("{:indent$}--Found matching subprogram at {:?}", "", entry.offset(), indent = ((depth) * 2));
+                // Here we found a subprogram that contains the given instruction pointer. 
+                // We use a return statement here because once we've found a matching subprogram,
+                // we can stop looking at other subprograms because only one subprogram can possibly contain a given instruction pointer.
+                return self.handle_node(instruction_pointer, depth + 1, node, debug_str_sec);
+            } 
+        } 
+
+        // In all other cases, we simply recurse through the child nodes.
+        else { }
+
+
+        // Dump the entry's attributes.
+        let mut attribute_iter = node.entry().attrs();
+        while let Some(attr) = attribute_iter.next()? {
+            debug!("{:indent$}Attribute: {:?}, value: {:?}", "", attr.name().static_string(), attr.value(), indent = ((depth + 1) * 2));
+            if let Some(s) = attr.string_value(debug_str_sec) {
+                trace!("{:indent$}--> Value: {:?}", "", s.to_string(), indent = ((depth + 2) * 2));
+            } else {
+                trace!("{:indent$}--> Value: None", "", indent = ((depth + 2) * 2));
+            }
+        }
+
+        // Recurse into the entry node's children nodes.
+        let mut children = node.children();
+        while let Some(child_subtree) = children.next()? {
+            if let Some(offset) = self.handle_subprogram_node(instruction_pointer, depth + 1, child_subtree, debug_str_sec)? {
+                return Ok(Some(offset));
+            }
+        }
         
         // Didn't find any matching subprogram DIE
         Ok(None)
@@ -338,7 +410,7 @@ impl DebugSections {
             let abbreviations = u.abbreviations(&debug_abbrev_sec)?;
             let mut entries_tree = u.entries_tree(&abbreviations, None)?;
             let node = entries_tree.root()?;
-            if let Some(offset) = self.handle_node(instruction_pointer, 0, node, &debug_str_sec)? {
+            if let Some(offset) = self.handle_subprogram_node(instruction_pointer, 0, node, &debug_str_sec)? {
                 return Ok(Some(offset.to_debug_info_offset(&u)));
             }
         }
@@ -394,7 +466,6 @@ impl DebugSymbols {
         for (shndx, sec) in elf_file.section_iter().enumerate() {
             let size = sec.size() as usize;
             let virt_addr = debug_sections_mp.start_address() + mp_offset;
-            let dest_slice: &mut [u8] = debug_sections_mp.as_slice_mut(mp_offset, size)?;
             let sec_name = sec.get_name(&elf_file);
             
             if Ok(SectionId::DebugStr.name()) == sec_name {
@@ -427,7 +498,10 @@ impl DebugSymbols {
             
             // Copy this debug section's content from the ELF file into the previously-allocated memory region.
             match sec.get_data(&elf_file) {
-                Ok(SectionData::Undefined(sec_data)) => dest_slice.copy_from_slice(sec_data),
+                Ok(SectionData::Undefined(sec_data)) => {
+                    let dest_slice: &mut [u8] = debug_sections_mp.as_slice_mut(mp_offset, size)?;
+                    dest_slice.copy_from_slice(sec_data);
+                }
                 _ => {
                     error!("couldn't get section data for {:?}: {:?}", sec_name, sec.get_data(&elf_file));
                     return Err("couldn't get section data for .debug_* section section");
