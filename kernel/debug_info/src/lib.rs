@@ -157,7 +157,7 @@ impl DebugSections {
         instruction_pointer: VirtualAddress,
         depth: usize,
         node: gimli::EntriesTreeNode<R>,
-        debug_str_sec: &DebugStr<R>
+        context: &DwarfContext<R>,
     ) -> gimli::Result<Option<gimli::UnitOffset<R::Offset>>> {
         let entry = node.entry();
         let tag = entry.tag();
@@ -210,16 +210,39 @@ impl DebugSections {
         // Those are the variables that we want to drop. 
         else if tag == gimli::DW_TAG_variable {
             let variable_name = entry.attr(gimli::DW_AT_name)?.expect("Variable DIE didn't have a DW_AT_name attribute")
-                .string_value(debug_str_sec).expect("Couldn't convert variable name attribute value to string")
+                .string_value(context.debug_str_sec).expect("Couldn't convert variable name attribute value to string")
                 .to_string().map(|s| String::from(s))?;
             let type_signature = match entry.attr_value(gimli::DW_AT_type)? {
-                Some(gimli::AttributeValue::DebugTypesRef(type_ref)) => Some(type_ref),
+                Some(gimli::AttributeValue::DebugTypesRef(type_ref)) => {
+                    let _debug_pubtypes_sec = self.debug_pubtypes();
+                    // let type_ref = {
+                    //     let mut types_iter = debug_pubtypes_sec.items(); 
+                    //     while let Some(item) = types_iter.next()? {
+                    //         item
+                    //     }
+                    //     panic!("")
+                    // };
+                    Some(type_ref)
+                }
                 Some(gimli::AttributeValue::UnitRef(unit_offset)) => {
-                    warn!("TODO FIXME: do something with a UnitRef/UnitOffset type signature value! {:?}", unit_offset); 
+                    let mut entries = context.unit.entries_tree(context.abbreviations, Some(unit_offset))?;
+                    let type_node = entries.root()?;
+                    let type_entry = type_node.entry();
+                    match type_entry.tag() {
+                        gimli::DW_TAG_structure_type => {
+                            // TODO FIXME: check if this type has a Drop implementation
+
+                        }
+                        other_type => {
+                            // Note: other types probably don't have drop implementations
+                            warn!("Note: skipping search for drop implementation for variable {:?} of non-struct type {:X?}", variable_name, other_type);
+                        }
+                    }
+
                     None
                 }
                 unexpected => {
-                    warn!("unexpected DW_AT_type attribute value: {:?}", unexpected);
+                    warn!("{:indent$}unexpected DW_AT_type attribute value: {:X?}", "", unexpected, indent = ((depth) * 2));
                     None
                 }
             };
@@ -233,14 +256,7 @@ impl DebugSections {
             
             // TODO FIXME: check if one of the variable's location ranges contains the instruction pointer
             
-            let _debug_pubtypes_sec = self.debug_pubtypes();
-            // let type_ref = {
-            //     let mut types_iter = debug_pubtypes_sec.items(); 
-            //     while let Some(item) = types_iter.next()? {
-            //         item
-            //     }
-            //     panic!("")
-            // };
+            
         }
 
         // In all other cases, we simply recurse through the child nodes.
@@ -250,9 +266,9 @@ impl DebugSections {
         // Dump the entry's attributes.
         let mut attribute_iter = node.entry().attrs();
         while let Some(attr) = attribute_iter.next()? {
-            debug!("{:indent$}Attribute: {:?}, value: {:?}", "", attr.name().static_string(), attr.value(), indent = ((depth + 1) * 2));
-            if let Some(s) = attr.string_value(debug_str_sec) {
-                trace!("{:indent$}--> Value: {:?}", "", s.to_string(), indent = ((depth + 2) * 2));
+            debug!("{:indent$}Attribute: {:?}, value: {:X?}", "", attr.name().static_string(), attr.value(), indent = ((depth + 1) * 2));
+            if let Some(s) = attr.string_value(context.debug_str_sec) {
+                trace!("{:indent$}--> value: {:X?}", "", s.to_string(), indent = ((depth + 2) * 2));
             } else {
                 trace!("{:indent$}--> Value: None", "", indent = ((depth + 2) * 2));
             }
@@ -261,7 +277,7 @@ impl DebugSections {
         // Recurse into the entry node's children nodes.
         let mut children = node.children();
         while let Some(child_subtree) = children.next()? {
-            if let Some(offset) = self.handle_node(instruction_pointer, depth + 1, child_subtree, debug_str_sec)? {
+            if let Some(offset) = self.handle_node(instruction_pointer, depth + 1, child_subtree, context)? {
                 return Ok(Some(offset));
             }
         }
@@ -297,7 +313,7 @@ impl DebugSections {
         instruction_pointer: VirtualAddress,
         depth: usize,
         node: gimli::EntriesTreeNode<R>,
-        debug_str_sec: &DebugStr<R>
+        context: &DwarfContext<R>,
     ) -> gimli::Result<Option<gimli::UnitOffset<R::Offset>>> {
         let entry = node.entry();
         let tag = entry.tag();
@@ -307,12 +323,12 @@ impl DebugSections {
         // We only care about subprogram nodes that contain the given instruction pointer.
         if tag == gimli::constants::DW_TAG_subprogram {
             let _subprogram_name = entry.attr(gimli::DW_AT_name)?.and_then(|attr| 
-                attr.string_value(debug_str_sec).and_then(|s| 
+                attr.string_value(context.debug_str_sec).and_then(|s| 
                     s.to_string().ok().map(|s| String::from(s))
                 )
             );
             let _subprogram_linkage_name = entry.attr(gimli::DW_AT_linkage_name)?.and_then(|attr| 
-                attr.string_value(debug_str_sec).and_then(|s| 
+                attr.string_value(context.debug_str_sec).and_then(|s| 
                     s.to_string().ok().map(|s| String::from(s))
                 )
             );
@@ -345,7 +361,7 @@ impl DebugSections {
                 // Here we found a subprogram that contains the given instruction pointer. 
                 // We use a return statement here because once we've found a matching subprogram,
                 // we can stop looking at other subprograms because only one subprogram can possibly contain a given instruction pointer.
-                return self.handle_node(instruction_pointer, depth + 1, node, debug_str_sec);
+                return self.handle_node(instruction_pointer, depth + 1, node, context);
             } 
         } 
 
@@ -356,9 +372,9 @@ impl DebugSections {
         // Dump the entry's attributes.
         let mut attribute_iter = node.entry().attrs();
         while let Some(attr) = attribute_iter.next()? {
-            debug!("{:indent$}Attribute: {:?}, value: {:?}", "", attr.name().static_string(), attr.value(), indent = ((depth + 1) * 2));
-            if let Some(s) = attr.string_value(debug_str_sec) {
-                trace!("{:indent$}--> Value: {:?}", "", s.to_string(), indent = ((depth + 2) * 2));
+            debug!("{:indent$}Attribute: {:?}, value: {:X?}", "", attr.name().static_string(), attr.value(), indent = ((depth + 1) * 2));
+            if let Some(s) = attr.string_value(context.debug_str_sec) {
+                trace!("{:indent$}--> value: {:X?}", "", s.to_string(), indent = ((depth + 2) * 2));
             } else {
                 trace!("{:indent$}--> Value: None", "", indent = ((depth + 2) * 2));
             }
@@ -367,7 +383,7 @@ impl DebugSections {
         // Recurse into the entry node's children nodes.
         let mut children = node.children();
         while let Some(child_subtree) = children.next()? {
-            if let Some(offset) = self.handle_subprogram_node(instruction_pointer, depth + 1, child_subtree, debug_str_sec)? {
+            if let Some(offset) = self.handle_subprogram_node(instruction_pointer, depth + 1, child_subtree, context)? {
                 return Ok(Some(offset));
             }
         }
@@ -410,7 +426,12 @@ impl DebugSections {
             let abbreviations = u.abbreviations(&debug_abbrev_sec)?;
             let mut entries_tree = u.entries_tree(&abbreviations, None)?;
             let node = entries_tree.root()?;
-            if let Some(offset) = self.handle_subprogram_node(instruction_pointer, 0, node, &debug_str_sec)? {
+            let context = DwarfContext {
+                unit: &u,
+                abbreviations: &abbreviations,
+                debug_str_sec: &debug_str_sec,
+            };
+            if let Some(offset) = self.handle_subprogram_node(instruction_pointer, 0, node, &context)? {
                 return Ok(Some(offset.to_debug_info_offset(&u)));
             }
         }
@@ -418,6 +439,21 @@ impl DebugSections {
         Ok(None)
     }
 }
+
+
+/// The contextual info needed when traversing the tree of DWARF debugging information,
+/// which is passed around between all of the recursive functions that handle/visit each DWARF node type
+/// for convenience purposes and to avoid duplicate work in parsing the tree.
+struct DwarfContext<'a, R: Reader> {
+    /// The compilation unit currently being traversed.
+    unit: &'a gimli::CompilationUnitHeader<R>,
+    /// The abbreviations for the above compilation unit.
+    abbreviations: &'a gimli::Abbreviations,
+    /// The `.debug_str` section for the DWARF file containing this unit.
+    debug_str_sec: &'a DebugStr<R>,
+}
+
+
 
 /// An enum describing the possible forms of debug information for a crate. 
 pub enum DebugSymbols {
