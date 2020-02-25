@@ -55,7 +55,7 @@ use gimli::{
     },
 };
 use rustc_demangle::demangle;
-use hashbrown::HashSet;
+use hashbrown::{HashMap, HashSet};
 use by_address::ByAddress;
 use crate_metadata::{StrongCrateRef, StrongSectionRef, RelocationEntry, write_relocation};
 use mod_mgmt::{CrateNamespace, find_symbol_table};
@@ -249,6 +249,13 @@ impl DebugSections {
             debug!("{:indent$}Variable {:?}, type: {:?}", "", variable_name, type_signature, indent = ((depth) * 2));
             if let Some(loc) = entry.attr(gimli::DW_AT_location)? {
                 warn!("{:indent$}Variable {:?}, type: {:?} MAY NEED HANDLING FOR LOCATION {:?}", "", variable_name, type_signature, loc, indent = ((depth+1) * 2));
+                match loc.value() {
+                    gimli::AttributeValue::LocationListsRef(loc_lists_offset) => {
+                        if let Some(debug_loc_sec) = context.debug_loc_sec {
+                            let l = debug_loc_sec.lookup_offset_id(loc_lists_offset)?;
+                        }
+                    }
+                }
             } else {
                 // If a variable doesn't have a location, that means it was optimized out and doesn't actually exist in the object code. 
                 // So, do nothing here.
@@ -409,7 +416,16 @@ impl DebugSections {
 
         warn!("TARGET INSTRUCTION POINTER: {:#X}", instruction_pointer);
 
-        // actual code starts here
+        let load_section = |section_id| {
+            match section_id {
+                gimli::SectionId::DebugAbbrev => self.debug_abbrev(),
+                gimli::SectionId::DebugAddr => Err("no .debug_addr section"),
+                gimli::SectionId::DebugAranges => Err("no .debug_aranges section"),
+                
+            }
+        };
+        let dwarf = gimli::Dwarf::load(load_section,
+
         let debug_info_sec = self.debug_info();
         let debug_abbrev_sec = self.debug_abbrev();
         let debug_str_sec = self.debug_str();
@@ -451,6 +467,9 @@ struct DwarfContext<'a, R: Reader> {
     abbreviations: &'a gimli::Abbreviations,
     /// The `.debug_str` section for the DWARF file containing this unit.
     debug_str_sec: &'a DebugStr<R>,
+    /// The `.debug_loc` section for the DWARF file containing this unit,
+    /// if one exists. This section is not guaranteed/required to exist.
+    debug_loc_sec: Option<&'a DebugLoc<R>>,
 }
 
 
@@ -549,7 +568,7 @@ impl DebugSymbols {
 
         // Ensure we found all of the expected debug sections.
         let debug_str      = debug_str.ok_or("couldn't find .debug_str section")?;
-        let debug_loc      = debug_loc.ok_or("couldn't find .debug_loc section")?;
+        // debug_loc is optional
         let debug_abbrev   = debug_abbrev.ok_or("couldn't find .debug_abbrev section")?;
         let debug_info     = debug_info.ok_or("couldn't find .debug_info section")?;
         let debug_ranges   = debug_ranges.ok_or("couldn't find .debug_ranges section")?;
@@ -559,7 +578,11 @@ impl DebugSymbols {
 
         if true {
             debug!("Section .debug_str loaded from {:#X} to {:#X} (size {:#X} bytes)", debug_str.virt_addr, debug_str.virt_addr + debug_str.size, debug_str.size);
-            debug!("Section .debug_loc loaded from {:#X} to {:#X} (size {:#X} bytes)", debug_loc.virt_addr, debug_loc.virt_addr + debug_loc.size, debug_loc.size);
+            if let Some(ref loc) = debug_loc {
+                debug!("Section .debug_loc loaded from {:#X} to {:#X} (size {:#X} bytes)", loc.virt_addr, loc.virt_addr + loc.size, loc.size);
+            } else {
+                debug!("Section .debug_loc did not exist.");
+            }
             debug!("Section .debug_abbrev loaded from {:#X} to {:#X} (size {:#X} bytes)", debug_abbrev.virt_addr, debug_abbrev.virt_addr + debug_abbrev.size, debug_abbrev.size);
             debug!("Section .debug_info loaded from {:#X} to {:#X} (size {:#X} bytes)", debug_info.virt_addr, debug_info.virt_addr + debug_info.size, debug_info.size);
             debug!("Section .debug_ranges loaded from {:#X} to {:#X} (size {:#X} bytes)", debug_ranges.virt_addr, debug_ranges.virt_addr + debug_ranges.size, debug_ranges.size);
@@ -568,22 +591,19 @@ impl DebugSymbols {
             debug!("Section .debug_line loaded from {:#X} to {:#X} (size {:#X} bytes)", debug_line.virt_addr, debug_line.virt_addr + debug_line.size, debug_line.size);
         }
 
-        let shndx_map = [
-            (debug_str.shndx, &debug_str),
-            (debug_loc.shndx, &debug_loc),
-            (debug_abbrev.shndx, &debug_abbrev),
-            (debug_info.shndx, &debug_info),
-            (debug_ranges.shndx, &debug_ranges),
-            (debug_pubnames.shndx, &debug_pubnames),
-            (debug_pubtypes.shndx, &debug_pubtypes),
-            (debug_line.shndx, &debug_line),
-        ];
-
-        // A convenience function that searches for the local debug section with the given `shndx`
-        let find_debug_section_by_shndx = |shndx: &usize| -> Option<&DebugSection> {
-            shndx_map.iter()
-                .find(|(ndx, _)| shndx == ndx)
-                .map(|&(_, sec)| sec)
+        let shndx_map = {
+            let mut sections: HashMap<usize, &DebugSection> = HashMap::new();
+            sections.insert(debug_str.shndx, &debug_str);
+            if let Some(ref debug_loc) = debug_loc {
+                sections.insert(debug_loc.shndx, &debug_loc);
+            }
+            sections.insert(debug_abbrev.shndx, &debug_abbrev);
+            sections.insert(debug_info.shndx, &debug_info);
+            sections.insert(debug_ranges.shndx, &debug_ranges);
+            sections.insert(debug_pubnames.shndx, &debug_pubnames);
+            sections.insert(debug_pubtypes.shndx, &debug_pubtypes);
+            sections.insert(debug_line.shndx, &debug_line);
+            sections
         };
 
         // Now that we've loaded the debug sections into memory, we can perform the relocations for those sections. 
@@ -593,7 +613,7 @@ impl DebugSymbols {
 
             // The "info" field in this `sec` specifies the shndx of the target section.
             let target_sec_shndx = sec.info() as usize;
-            let target_sec = match find_debug_section_by_shndx(&target_sec_shndx) {
+            let target_sec = match shndx_map.get(&target_sec_shndx) {
                 Some(sec) => sec,
                 _ => continue,
             };
@@ -630,7 +650,7 @@ impl DebugSymbols {
                 let mut source_and_target_in_same_crate = false;
 
                 // We first check if the source section is another debug section, then check if its a local section from the given `loaded_crate`.
-                let (source_sec_vaddr, source_sec_dep) = match find_debug_section_by_shndx(&source_sec_shndx).map(|s| (s.virt_addr, None))
+                let (source_sec_vaddr, source_sec_dep) = match shndx_map.get(&source_sec_shndx).map(|s| (s.virt_addr, None))
                     .or_else(|| loaded_crate.lock_as_ref().sections.get(&source_sec_shndx).map(|sec| (sec.address_range.start, Some(sec.clone()))))
                 {
                     // We found the source section in the local debug sections or the given loaded crate. 
