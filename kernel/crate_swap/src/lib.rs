@@ -450,20 +450,19 @@ pub fn swap_crates(
             #[cfg(loscd_eval)]
             let hpet_start_bss_transfer = hpet.get_counter();
 
-            // Go through all the BSS sections and copy over the old_sec into the new source_sec,
-            // as they represent a static variable that would otherwise result in a loss of data.
-            // Currently, AFAIK, static variables only exist in the form of .bss sections.
-            for old_sec in old_crate.bss_sections.values() {
+            // Go through all the `.data` and `.bss` sections and copy over the old_sec into the new source_sec,
+            // as they represent static variables that would otherwise result in a loss of data.
+            for old_sec in old_crate.data_sections.values() {
                 let old_sec_name_without_hash = old_sec.name_without_hash();
                 // get the section from the new crate that corresponds to the `old_sec`
                 let new_dest_sec = {
                     let mut iter = if crates_have_same_name {
-                        new_crate.bss_sections.iter_prefix_str(old_sec_name_without_hash)
+                        new_crate.data_sections.iter_prefix_str(old_sec_name_without_hash)
                     } else {
                         if let Some(s) = replace_containing_crate_name(old_sec_name_without_hash, &old_crate_name_without_hash, &new_crate_name_without_hash) {
-                            new_crate.bss_sections.iter_prefix_str(&s)
+                            new_crate.data_sections.iter_prefix_str(&s)
                         } else {
-                            new_crate.bss_sections.iter_prefix_str(old_sec_name_without_hash)
+                            new_crate.data_sections.iter_prefix_str(old_sec_name_without_hash)
                         }
                     };
                     iter.next()
@@ -473,7 +472,7 @@ pub fn swap_crates(
                     "couldn't find destination section in new crate for copying old_sec's data into (BSS state transfer)"
                 )?;
 
-                // warn!("swap_crates(): copying BSS section from old {:?} to new {:?}", &*old_sec, new_dest_sec);
+                debug!("swap_crates(): copying .data or .bss section from old {:?} to new {:?}", &*old_sec, new_dest_sec);
                 old_sec.copy_section_data_to(&new_dest_sec)?;
             }
 

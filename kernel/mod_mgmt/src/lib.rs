@@ -1035,7 +1035,7 @@ impl CrateNamespace {
             rodata_pages:            rodata_pages.clone(),
             data_pages:              data_pages.clone(),
             global_symbols:          BTreeSet::new(),
-            bss_sections:            Trie::new(),
+            data_sections:           Trie::new(),
             reexported_symbols:      BTreeSet::new(),
         });
         let new_crate_weak_ref = CowArc::downgrade(&new_crate);
@@ -1044,8 +1044,8 @@ impl CrateNamespace {
         let mut loaded_sections: BTreeMap<usize, StrongSectionRef> = BTreeMap::new(); 
         // the list of all symbols in this crate that are public (global) 
         let mut global_symbols: BTreeSet<BString> = BTreeSet::new();
-        // the map of BSS section names to the actual BSS section
-        let mut bss_sections: Trie<BString, StrongSectionRef> = Trie::new();
+        // the map of .data and .bss section names to the actual section
+        let mut data_sections: Trie<BString, StrongSectionRef> = Trie::new();
 
         let mut read_only_pages_locked  = rodata_pages.as_ref().map(|(rp, _)| (rp.clone(), rp.lock()));
         let mut read_write_pages_locked = data_pages  .as_ref().map(|(dp, _)| (dp.clone(), dp.lock()));
@@ -1150,112 +1150,83 @@ impl CrateNamespace {
                 }
             }
 
-            // Second, if not executable, handle writable .data sections
-            else if write && sec_name.starts_with(DATA_PREFIX) {
-                if let Some(name) = sec_name.get(DATA_PREFIX.len() ..) {
-                    let name = if name.starts_with(RELRO_PREFIX) {
-                        let relro_name = name.get(RELRO_PREFIX.len() ..).ok_or("Couldn't get name of .data.rel.ro. section")?;
-                        relro_name
+            // Second, if not executable, handle writable .data/.bss sections
+            else if write {
+                // check if this section is .bss or .data
+                let (name, is_bss) = if sec_name.starts_with(BSS_PREFIX) {
+                    if let Some(name) = sec_name.get(BSS_PREFIX.len() ..) {
+                        (name, true) // true means it is .bss
+                    } else {
+                        error!("Failed to get the .bss section's name after \".bss.\": {:?}", sec_name);
+                        return Err("Failed to get the .bss section's name after \".bss.\"!");
                     }
-                    else {
-                        name
-                    };
-                    let demangled = demangle(name).to_string();
-                    
-                    if let Some((ref dp_ref, ref mut dp)) = read_write_pages_locked {
-                        // here: we're ready to copy the data/bss section to the proper address
-                        let dest_vaddr = dp.address_at_offset(data_offset)
-                            .ok_or_else(|| "BUG: data_offset wasn't within data_pages")?;
-                        let dest_slice: &mut [u8]  = dp.as_slice_mut(data_offset, sec_size)?;
-                        match sec.get_data(&elf_file) {
-                            Ok(SectionData::Undefined(sec_data)) => dest_slice.copy_from_slice(sec_data),
-                            Ok(SectionData::Empty) => {
-                                for b in dest_slice {
-                                    *b = 0;
-                                }
-                            },
-                            _ => {
-                                error!("load_crate_sections(): Couldn't get section data for .data section [{}] {}: {:?}", shndx, sec_name, sec.get_data(&elf_file));
-                                return Err("couldn't get section data in .data section");
-                            }
-                        }
-
-                        let is_global = global_sections.contains(&shndx);
-                        if is_global {
-                            global_symbols.insert(demangled.clone().into());
-                        }
-                        
-                        loaded_sections.insert(shndx, 
-                            Arc::new(LoadedSection::new(
-                                SectionType::Data,
-                                demangled,
-                                Arc::clone(dp_ref),
-                                data_offset,
-                                dest_vaddr,
-                                sec_size,
-                                is_global,
-                                new_crate_weak_ref.clone(),
-                            ))
-                        );
-
-                        data_offset += round_up_power_of_two(sec_size, sec_align);
-                    }
-                    else {
-                        return Err("no data_pages were allocated for .data section");
-                    }
-                }
-                else {
-                    error!("Failed to get the .data section's name after \".data.\": {:?}", sec_name);
-                    return Err("Failed to get the .data section's name after \".data.\"!");
-                }
-            }
-
-            // Third, if not executable and not a writable .data section, handle writable .bss sections
-            else if write && sec_name.starts_with(BSS_PREFIX) {
-                if let Some(name) = sec_name.get(BSS_PREFIX.len() ..) {
-                    let demangled = demangle(name).to_string();
-                    
-                    // we still use DataSection to represent the .bss sections, since they have the same flags
-                    if let Some((ref dp_ref, ref mut dp)) = read_write_pages_locked {
-                        // here: we're ready to fill the bss section with zeroes at the proper address
-                        let dest_vaddr = dp.address_at_offset(data_offset)
-                            .ok_or_else(|| "BUG: data_offset wasn't within data_pages")?;
-                        let dest_slice: &mut [u8]  = dp.as_slice_mut(data_offset, sec_size)?;
-                        for b in dest_slice {
-                            *b = 0;
+                } else if sec_name.starts_with(DATA_PREFIX) {
+                    if let Some(name) = sec_name.get(DATA_PREFIX.len() ..) {
+                        let name = if name.starts_with(RELRO_PREFIX) {
+                            let relro_name = name.get(RELRO_PREFIX.len() ..).ok_or("Couldn't get name of .data.rel.ro. section")?;
+                            relro_name
+                        } else {
+                            name
                         };
-
-                        let is_global = global_sections.contains(&shndx);
-                        if is_global {
-                            global_symbols.insert(demangled.clone().into());
-                        }
-                        
-                        let sec = Arc::new(LoadedSection::new(
-                            SectionType::Bss,
-                            demangled.clone(),
-                            Arc::clone(dp_ref),
-                            data_offset,
-                            dest_vaddr,
-                            sec_size,
-                            is_global,
-                            new_crate_weak_ref.clone(),
-                        ));
-                        loaded_sections.insert(shndx, Arc::clone(&sec));
-                        bss_sections.insert(demangled.into(), sec);
-
-                        data_offset += round_up_power_of_two(sec_size, sec_align);
+                        (name, false) // false means it's not .bss
                     }
                     else {
-                        return Err("no data_pages were allocated for .bss section");
+                        error!("Failed to get the .data section's name after \".data.\": {:?}", sec_name);
+                        return Err("Failed to get the .data section's name after \".data.\"!");
                     }
+                } else {
+                    error!("Unsupported: found writable section that wasn't .data or .bss: {:?}", sec_name);
+                    return Err("Unsupported: found writable section that wasn't .data or .bss");
+                };
+                let demangled = demangle(name).to_string();
+                
+                if let Some((ref dp_ref, ref mut dp)) = read_write_pages_locked {
+                    // here: we're ready to copy the data/bss section to the proper address
+                    let dest_vaddr = dp.address_at_offset(data_offset)
+                        .ok_or_else(|| "BUG: data_offset wasn't within data_pages")?;
+                    let dest_slice: &mut [u8] = dp.as_slice_mut(data_offset, sec_size)?;
+                    if is_bss {
+                        warn!(".bss section had data: {:?}", sec.get_data(&elf_file));
+                    }
+                    match sec.get_data(&elf_file) {
+                        Ok(SectionData::Undefined(sec_data)) => dest_slice.copy_from_slice(sec_data),
+                        Ok(SectionData::Empty) => {
+                            for b in dest_slice {
+                                *b = 0;
+                            }
+                        },
+                        _ => {
+                            error!("load_crate_sections(): Couldn't get section data for .data section [{}] {}: {:?}", shndx, sec_name, sec.get_data(&elf_file));
+                            return Err("couldn't get section data in .data section");
+                        }
+                    }
+
+                    let is_global = global_sections.contains(&shndx);
+                    if is_global {
+                        global_symbols.insert(demangled.clone().into());
+                    }
+                    
+                    let sec = Arc::new(LoadedSection::new(
+                        if is_bss { SectionType::Bss } else { SectionType::Data },
+                        demangled.clone(),
+                        Arc::clone(dp_ref),
+                        data_offset,
+                        dest_vaddr,
+                        sec_size,
+                        is_global,
+                        new_crate_weak_ref.clone(),
+                    ));
+                    loaded_sections.insert(shndx, Arc::clone(&sec));
+                    data_sections.insert(demangled.into(), sec);
+
+                    data_offset += round_up_power_of_two(sec_size, sec_align);
                 }
                 else {
-                    error!("Failed to get the .bss section's name after \".bss.\": {:?}", sec_name);
-                    return Err("Failed to get the .bss section's name after \".bss.\"!");
+                    return Err("no data_pages were allocated for .data/.bss section");
                 }
             }
 
-            // Fourth, if neither executable nor writable, handle .rodata sections
+            // Third, if neither executable nor writable, handle .rodata sections
             else if sec_name.starts_with(RODATA_PREFIX) {
                 if let Some(name) = sec_name.get(RODATA_PREFIX.len() ..) {
                     let demangled = demangle(name).to_string();
@@ -1308,7 +1279,7 @@ impl CrateNamespace {
                 }
             }
 
-            // Fifth, if neither executable nor writable nor .rodata, handle the `.gcc_except_table` section
+            // Fourth, if neither executable nor writable nor .rodata, handle the `.gcc_except_table` section
             else if sec_name == GCC_EXCEPT_TABLE_NAME {
                 // The gcc_except_table section is read-only, so we put it in the .rodata pages
                 if let Some((ref rp_ref, ref mut rp)) = read_only_pages_locked {
@@ -1352,7 +1323,7 @@ impl CrateNamespace {
                 }
             }
 
-            // Sixth, if neither executable nor writable nor .rodata nor .gcc_except_table, handle the `.eh_frame` section
+            // Fifth, if neither executable nor writable nor .rodata nor .gcc_except_table, handle the `.eh_frame` section
             else if sec_name == EH_FRAME_NAME {
                 // The eh_frame section is read-only, so we put it in the .rodata pages
                 if let Some((ref rp_ref, ref mut rp)) = read_only_pages_locked {
@@ -1398,7 +1369,7 @@ impl CrateNamespace {
 
             // Finally, any other section type is considered unhandled, so return an error!
             else {
-                // currently not using sections like ".debug_gdb_scripts"
+                // .debug_* sections are handled separately, and are loaded on demand.
                 if sec_name.starts_with(".debug") {
                     continue;
                 }
@@ -1413,7 +1384,7 @@ impl CrateNamespace {
                 .ok_or_else(|| "BUG: load_crate_sections(): couldn't get exclusive mutable access to new_crate")?;
             new_crate_mut.sections = loaded_sections;
             new_crate_mut.global_symbols = global_symbols;
-            new_crate_mut.bss_sections = bss_sections;
+            new_crate_mut.data_sections = data_sections;
         }
 
         Ok((new_crate, elf_file))
