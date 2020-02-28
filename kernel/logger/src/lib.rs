@@ -10,14 +10,12 @@ use spin::Once;
 
 static LOG_LEVEL: LogLevel = LogLevel::Trace;
 
-pub type LogOutputFunc = fn(&LogColor, &'static str, fmt::Arguments);
-static MIRROR_VGA_FUNC:     Once<LogOutputFunc> = Once::new();
-// static MIRROR_NETWORK_FUNC: Once<LogOutputFunc> = Once::new();
+pub type LogOutputFunc = fn(fmt::Arguments);
+static MIRROR_VGA_FUNC: Once<LogOutputFunc> = Once::new();
 
 /// See ANSI terminal formatting schemes
 #[allow(dead_code)]
 pub enum LogColor {
-    Reset,
     Black,
     Red,
     Green,
@@ -26,6 +24,7 @@ pub enum LogColor {
     Purple,
     Cyan,
     White,
+    Reset,
 }
 
 impl LogColor {
@@ -50,11 +49,6 @@ pub fn mirror_to_vga(func: LogOutputFunc) {
     MIRROR_VGA_FUNC.call_once(|| func);
 }
 
-// /// Call this to enable mirroring logging macros to the network
-// pub fn mirror_to_network(func: LogOutputFunc) {
-//     MIRROR_VGA_FUNC.call_once(|| func);
-// }
-
 /// A dummy struct that exists so we can implement the Log trait's methods.
 struct Logger { }
 
@@ -68,24 +62,35 @@ impl Log for Logger {
             return;
         }
 
-        let (prefix, color) = match record.level() {
+        let (level_str, color) = match record.level() {
             LogLevel::Error => ("[E] ", LogColor::Red),
             LogLevel::Warn =>  ("[W] ", LogColor::Yellow),
             LogLevel::Info =>  ("[I] ", LogColor::Cyan),
             LogLevel::Debug => ("[D] ", LogColor::Green),
             LogLevel::Trace => ("[T] ", LogColor::Purple),
         };
-
-        let _ = serial_port::write_fmt_log(color.as_terminal_string(), prefix, record.args().clone(), LogColor::Reset.as_terminal_string());
-
+        let location = record.location();
+        let _result = serial_port::write_fmt(format_args!("{}{}{}:{}: {}{}",
+            color.as_terminal_string(),
+            level_str,
+            location.file(),
+            location.line(),
+            record.args(),
+            LogColor::Reset.as_terminal_string(),
+        ));
+        // If there was an error above, there's literally nothing we can do but ignore it,
+        // because there is no other lower-level way to log errors than the serial port.
         
         if let Some(func) = MIRROR_VGA_FUNC.try() {
-            func(&color, prefix, record.args().clone());
+            // Currently printing to the VGA terminal doesn't support ANSI color escape sequences,
+            // so we exclude the first and the last elements that set those colors.
+            func(format_args!("{}{}:{}: {}",
+                level_str,
+                location.file(),
+                location.line(),
+                record.args(),
+            ));
         }
-
-        // if let Some(func) = MIRROR_NETWORK_FUNC.try() {
-        //     func(&color, prefix, record.args().clone());
-        // }
     }
 }
 

@@ -77,7 +77,7 @@ extern crate fs_node;
 
 
 use alloc::string::String;
-use mod_mgmt::{CrateNamespace, get_default_namespace, get_namespaces_directory, NamespaceDirectorySet};
+use mod_mgmt::{CrateNamespace, get_initial_kernel_namespace, get_namespaces_directory, NamespaceDirectorySet};
 use spawn::KernelTaskBuilder;
 use fs_node::FileOrDir; 
 use task::SimdExt;
@@ -106,7 +106,7 @@ fn internal_setup_simd_personality(simd_ext: SimdExt) -> Result<(), &'static str
 	};
 
 	let kernel_mmi_ref = memory::get_kernel_mmi_ref().ok_or_else(|| "couldn't get kernel mmi")?;
-	let backup_namespace = get_default_namespace().ok_or("default crate namespace wasn't yet initialized")?;
+	let backup_namespace = get_initial_kernel_namespace().ok_or("initial kernel crate namespace wasn't yet initialized")?;
 
 	// The `mod_mgmt::init()` function should have initialized the following directories, 
 	// for example, if 'sse' was the prefix used to build the SSE versions of each crate:

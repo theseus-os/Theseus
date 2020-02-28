@@ -1,0 +1,18 @@
+[package]
+name = "framebuffer_printer"
+version = "0.1.0"
+authors = ["Wenqiu Yu <yuwenqiuj@gmail.com>"]
+description = "print a string in a framebuffer"
+build = "../../build.rs"
+
+[dependencies.framebuffer]
+path = "../framebuffer"
+
+[dependencies.font]
+path = "../font"
+
+[dependencies.shapes]
+path = "../shapes"
+
+[lib]
+crate-type = ["rlib"]

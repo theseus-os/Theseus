@@ -12,7 +12,6 @@ use alloc::string::String;
 use alloc::boxed::Box;
 
 
-#[no_mangle]
 pub fn main(_args: Vec<String>) -> isize {
     info!("test_panic::main(): at top");
 

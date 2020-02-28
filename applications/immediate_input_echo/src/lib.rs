@@ -11,7 +11,6 @@ use alloc::vec::Vec;
 use alloc::string::String;
 use core_io::{Read, Write};
 
-#[no_mangle]
 pub fn main(_args: Vec<String>) -> isize {
     if let Err(e) = run() {
         error!("{}", e);

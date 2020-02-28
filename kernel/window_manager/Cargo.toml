@@ -1,50 +1,68 @@
 [package]
 name = "window_manager"
 version = "0.1.0"
-authors = ["Wenqiu Yu <yuwenqiuj@gmail.com>"]
-description = "define a generic window structure and maintain a window manager of this kind of windows"
+authors = ["Yue Wu <wuyue16@pku.edu.cn>", "Wenqiu Yu <yuwenqiuj@gmail.com>"]
+description = "allocate new windows and manage a list of existing windows"
 build = "../../build.rs"
 
 [dependencies]
 spin = "0.4.10"
 
-[dependencies.dfqueue]
-path = "../../libs/dfqueue"
-version = "0.1.0"
+[dependencies.log]
+default-features = false
+version = "0.3.7"
 
-[dependencies.frame_buffer]
-path = "../frame_buffer"
+[dependencies.mpmc]
+path = "../../libs/mpmc"
 
-[dependencies.frame_buffer_rgb]
-path = "../frame_buffer_rgb"
+[dependencies.framebuffer_drawer]
+path = "../framebuffer_drawer"
 
-[dependencies.frame_buffer_compositor]
-path = "../frame_buffer_compositor"
+[dependencies.window_inner]
+path = "../window_inner"
 
 [dependencies.compositor]
 path = "../compositor"
 
-[dependencies.frame_buffer_drawer]
-path = "../frame_buffer_drawer"
+[dependencies.framebuffer_compositor]
+path = "../framebuffer_compositor"
 
-[dependencies.frame_buffer_printer]
-path = "../frame_buffer_printer"
+[dependencies.shapes]
+path = "../shapes"
+
+[dependencies.framebuffer]
+path = "../framebuffer"
+
+[dependencies.color]
+path = "../color"
 
 [dependencies.event_types]
 path = "../event_types"
 
-[dependencies.displayable]
-path = "../displayable"
-
-[dependencies.window]
-path = "../window"
-
-[dependencies.window_list]
-path = "../window_list"
+[dependencies.font]
+path = "../font"
 
 [dependencies.lazy_static]
 features = ["spin_no_std", "nightly"]
 version = "1.2.0"
 
+[dependencies.mod_mgmt]
+path = "../mod_mgmt"
+
+[dependencies.spawn]
+path = "../spawn"
+
+[dependencies.mouse_data]
+path = "../../libs/mouse_data"
+
+[dependencies.path]
+path = "../../kernel/path"
+
 [lib]
 crate-type = ["rlib"]
+
+[dependencies.keycodes_ascii]
+path = "../../libs/keycodes_ascii"
+
+[dependencies.scheduler]
+path = "../../kernel/scheduler"

@@ -7,10 +7,15 @@ build = "../../build.rs"
 
 [dependencies]
 spin = "0.4.10"
-downcast-rs = "1.0.4"
 
-[dependencies.frame_buffer]
-path = "../frame_buffer"
+[dependencies.framebuffer]
+path = "../framebuffer"
+
+[dependencies.color]
+path = "../color"
+
+[dependencies.shapes]
+path = "../shapes"
 
 [lib]
 crate-type = ["rlib"]

@@ -16,7 +16,6 @@ use getopts::Options;
 use path::Path;
 use alloc::sync::Arc;
 
-#[no_mangle]
 pub fn main(args: Vec<String>) -> isize {
     let mut opts = Options::new();
     opts.optflag("h", "help", "print this help menu");
@@ -29,6 +28,11 @@ pub fn main(args: Vec<String>) -> isize {
             return -1; 
         }
     };
+
+    if matches.opt_present("h") {
+        print_usage(opts);
+        return 0;
+    }
 
     let taskref = match task::get_my_current_task() {
         Some(t) => t,
@@ -53,20 +57,16 @@ pub fn main(args: Vec<String>) -> isize {
 
     let path = Path::new(matches.free[0].to_string());
 
-    // navigate to the filepath specified by first argument
+    // navigate to the path specified by first argument
     match path.get(&curr_wd) {
-        Some(file_dir_enum) => {
-            match file_dir_enum {
-                FileOrDir::Dir(dir) => {
-                    print_children(&dir);
-                    return 0;
-                },
-                FileOrDir::File(file) => {
-                    println!("'{}' is not a directory.", file.lock().get_name());
-                    return -1;
-                }
-            }
-        },
+        Some(FileOrDir::Dir(dir)) => {
+            print_children(&dir);
+            return 0;
+        }
+        Some(FileOrDir::File(file)) => {
+            println!("'{}' is not a directory; `ls` currently only supports listing directory contents.", file.lock().get_name());
+            return -1;
+        }
         _ => {
             println!("Couldn't find path: {}", path); 
             return -1;
@@ -89,5 +89,6 @@ fn print_usage(opts: Options) {
 }
 
 
-const USAGE: &'static str = "Usage: cd [ARGS]
-Change directory";
+const USAGE: &'static str = "Usage: ls [DIR | FILE]
+List the contents of the given directory or info about the given file.
+If no arguments are provided, it lists the contents of the current directory.";

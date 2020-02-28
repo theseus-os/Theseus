@@ -7,3 +7,9 @@ version = "0.1.0"
 [dependencies.itertools]
 version = "0.7.9"
 default-features = false
+
+[dependencies.path]
+path = "../path"
+
+[dependencies.crate_metadata]
+path = "../crate_metadata"

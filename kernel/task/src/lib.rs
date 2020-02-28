@@ -33,7 +33,6 @@
 #[macro_use] extern crate lazy_static;
 #[macro_use] extern crate log;
 extern crate irq_safety;
-extern crate atomic_linked_list;
 extern crate memory;
 extern crate tss;
 extern crate mod_mgmt;
@@ -42,9 +41,7 @@ extern crate environment;
 extern crate root;
 extern crate x86_64;
 extern crate spin;
-extern crate pause;
 extern crate kernel_config;
-
 
 
 use core::fmt;
@@ -58,16 +55,13 @@ use alloc::{
     string::String,
     sync::Arc,
 };
-use pause::spin_loop_hint;
-
 use irq_safety::{MutexIrqSafe, MutexIrqSafeGuardRef, MutexIrqSafeGuardRefMut, interrupts_enabled};
 use memory::{Stack, MappedPages, PageRange, EntryFlags, MmiRef, VirtualAddress};
 use kernel_config::memory::KERNEL_STACK_SIZE_IN_PAGES;
-use atomic_linked_list::atomic_map::AtomicMap;
 use tss::tss_set_rsp0;
 use mod_mgmt::{
     CrateNamespace,
-    metadata::StrongCrateRef,
+    AppCrateRef,
 };
 use environment::Environment;
 use spin::Mutex;
@@ -105,11 +99,6 @@ impl PanicInfoOwned {
     }
 }
 
-
-lazy_static! {
-    /// Used to ensure that task switches are done atomically on each core
-    pub static ref TASK_SWITCH_LOCKS: AtomicMap<u8, AtomicBool> = AtomicMap::new();
-}
 
 lazy_static! {
     /// The list of all Tasks in the system.
@@ -161,6 +150,8 @@ pub enum ExitValue {
 }
 
 
+/// The set of possible runstates that a task can be in, e.g.,
+/// runnable, blocked, exited, etc. 
 #[derive(Debug)]
 pub enum RunState {
     /// in the midst of setting up the task
@@ -226,20 +217,15 @@ pub struct Task {
     pub mmi: MmiRef, 
     /// The kernel stack, which all `Task`s must have in order to execute.
     pub kstack: Stack,
-    /// The userspace stack, which is `None` for tasks that do not run in userspace.
-    pub ustack: Option<Stack>,
-    /// for special behavior of new userspace task
-    pub new_userspace_entry_addr: Option<VirtualAddress>, 
     /// Whether or not this task is pinned to a certain core
     /// The idle tasks (like idle_task) are always pinned to their respective cores
     pub pinned_core: Option<u8>,
     /// Whether this Task is an idle task, the task that runs by default when no other task is running.
     /// There exists one idle task per core, so this is `false` for most tasks.
     pub is_an_idle_task: bool,
-    /// For application `Task`s, the [`LoadedCrate`](../mod_mgmt/metadata/struct.LoadedCrate.html)
-    /// that contains the backing memory regions and sections for running this `Task`'s object file.
-    /// The `app_crate` will contain the main function (entry point) for this `Task`, among other things.
-    pub app_crate: Option<StrongCrateRef>,
+    /// For application `Task`s, this is a reference to the [`LoadedCrate`](../mod_mgmt/metadata/struct.LoadedCrate.html)
+    /// that contains the entry function for this `Task`.
+    pub app_crate: Option<Arc<AppCrateRef>>,
     /// This `Task` is linked into and runs within the context of 
     /// this [`CrateNamespace`](../mod_mgmt/struct.CrateNamespace.html).
     pub namespace: Arc<CrateNamespace>,
@@ -264,7 +250,7 @@ impl fmt::Debug for Task {
 impl Task {
     /// Creates a new Task structure and initializes it to be non-Runnable.
     /// By default, the new `Task` will inherit some of the same states from the currently-running `Task`:
-    /// its `Environment`, `MemoryManagementInfo`, and `CrateNamespace`.
+    /// its `Environment`, `MemoryManagementInfo`, `CrateNamespace`, and `app_crate` reference.
     /// If needed, those states can be changed by setting them for the returned `Task`.
     /// 
     /// # Arguments
@@ -275,22 +261,27 @@ impl Task {
     /// This does not run the task, schedule it in, or switch to it.
     pub fn new(kstack: Option<Stack>) -> Result<Task, &'static str> {
         let curr_task = get_my_current_task().ok_or("Task::new(): couldn't get current task (not yet initialized)")?;
-        let (mmi, namespace, env) = {
+        let (mmi, namespace, env, app_crate) = {
             let t = curr_task.lock();
-            (Arc::clone(&t.mmi), Arc::clone(&t.namespace), Arc::clone(&t.env))
+            (Arc::clone(&t.mmi), Arc::clone(&t.namespace), Arc::clone(&t.env), t.app_crate.clone())
         };
 
         let kstack = kstack
             .or_else(|| mmi.lock().alloc_stack(KERNEL_STACK_SIZE_IN_PAGES))
             .ok_or("couldn't allocate kernel stack!")?;
 
-        Ok(Task::new_internal(kstack, mmi, namespace, env))
+        Ok(Task::new_internal(kstack, mmi, namespace, env, app_crate))
     }
     
     /// The internal routine for creating a `Task`, which does not make assumptions 
     /// about whether a currently-running `Task` exists or whether the new `Task`
     /// should inherit any states from it.
-    fn new_internal(kstack: Stack, mmi: MmiRef, namespace: Arc<CrateNamespace>, env: Arc<Mutex<Environment>>) -> Self {
+    fn new_internal(
+        kstack: Stack, 
+        mmi: MmiRef, namespace: Arc<CrateNamespace>,
+        env: Arc<Mutex<Environment>>,
+        app_crate: Option<Arc<AppCrateRef>>
+    ) -> Self {
          /// The counter of task IDs
         static TASKID_COUNTER: AtomicUsize = AtomicUsize::new(0);
 
@@ -311,12 +302,10 @@ impl Task {
             drop_after_task_switch: None,
             name: format!("task_{}", task_id),
             kstack: kstack,
-            ustack: None,
             mmi: mmi,
-            new_userspace_entry_addr: None,
             pinned_core: None,
             is_an_idle_task: false,
-            app_crate: None,
+            app_crate: app_crate,
             namespace: namespace,
             panic_handler: None,
             env: env,
@@ -354,14 +343,18 @@ impl Task {
         }
     }
 
-    /// Returns true if this is an application `Task`.
+    /// Returns `true` if this is an application `Task`. 
+    /// This will also return `true` if this task was spawned by an application task,
+    /// since a task inherits the "application crate" field from its "parent" who spawned it.
     pub fn is_application(&self) -> bool {
         self.app_crate.is_some()
     }
 
     /// Returns true if this is a userspace`Task`.
+    /// Currently userspace support is disabled, so this always returns `false`.
     pub fn is_userspace(&self) -> bool {
-        self.ustack.is_some()
+        // self.ustack.is_some()
+        false
     }
 
     /// Registers a function or closure that will be called if this `Task` panics,
@@ -439,36 +432,17 @@ impl Task {
     /// no locks need to be held to call this, but interrupts (later, preemption) should be disabled
     pub fn task_switch(&mut self, next: &mut Task, apic_id: u8) {
         // debug!("task_switch [0]: (AP {}) prev {:?}, next {:?}", apic_id, self, next);
-        
-        let my_task_switch_lock: &AtomicBool = match TASK_SWITCH_LOCKS.get(&apic_id) {
-            Some(csl) => csl,
-            _ => {
-                error!("BUG: task_switch(): no task switch lock present for AP {}, skipping task switch!", apic_id);
-                return;
-            } 
-        };
-        
-        // acquire this core's task switch lock
-        // TODO: add timeout
-        while my_task_switch_lock.compare_and_swap(false, true, Ordering::SeqCst) {
-            spin_loop_hint();
-        }
-
-        // debug!("task_switch [1], testing runstates.");
         if !next.is_runnable() {
             error!("BUG: Skipping task_switch due to scheduler bug: chosen 'next' Task was not Runnable! Current: {:?}, Next: {:?}", self, next);
-            my_task_switch_lock.store(false, Ordering::SeqCst);
             return;
         }
         if next.is_running() {
             error!("BUG: Skipping task_switch due to scheduler bug: chosen 'next' Task was already running on AP {}!\nCurrent: {:?} Next: {:?}", apic_id, self, next);
-            my_task_switch_lock.store(false, Ordering::SeqCst);
             return;
         }
         if let Some(pc) = next.pinned_core {
             if pc != apic_id {
                 error!("BUG: Skipping task_switch due to scheduler bug: chosen 'next' Task was pinned to AP {:?} but scheduled on AP {}!\nCurrent: {:?}, Next: {:?}", next.pinned_core, apic_id, self, next);
-                my_task_switch_lock.store(false, Ordering::SeqCst);
                 return;
             }
         }
@@ -476,7 +450,9 @@ impl Task {
 
         // Change the privilege stack (RSP0) in the TSS.
         // We can safely skip setting the TSS RSP0 when switching to a kernel task, 
-        // i.e., when `next` is not a userspace task
+        // i.e., when `next` is not a userspace task.
+        //
+        // Note that because userspace support is currently disabled, this will always be `false`.
         if next.is_userspace() {
             let new_tss_rsp0 = next.kstack.bottom() + (next.kstack.size() / 2); // the middle half of the stack
             if tss_set_rsp0(new_tss_rsp0).is_ok() { 
@@ -484,7 +460,6 @@ impl Task {
             }
             else {
                 error!("task_switch(): failed to set AP {} TSS RSP0, aborting task switch!", apic_id);
-                my_task_switch_lock.store(false, Ordering::SeqCst);
                 return;
             }
         }
@@ -493,9 +468,10 @@ impl Task {
         self.running_on_cpu = None; // no longer running
         next.running_on_cpu = Some(apic_id); // now running on this core
 
-
-        // We now do the page table switching here, so we can use our higher-level PageTable abstractions
-        {
+        // Switch page tables. 
+        // Since there is only a single address space (as userspace support is currently disabled),
+        // we do not need to do this at all.
+        if false {
             let prev_mmi = &self.mmi;
             let next_mmi = &next.mmi;
             
@@ -525,10 +501,7 @@ impl Task {
             next.drop_after_task_switch = self.take_task_local_data().map(|tld_box| tld_box as Box<dyn Any + Send>);
         }
 
-        // release this core's task switch lock
-        my_task_switch_lock.store(false, Ordering::SeqCst);
         // debug!("task_switch [4]: prev sp: {:#X}, next sp: {:#X}", self.saved_sp, next.saved_sp);
-        
 
         /// A private macro that actually calls the given context switch routine
         /// by putting the arguments into the proper registers, `rdi` and `rsi`.
@@ -921,11 +894,11 @@ pub fn create_idle_task(
             EntryFlags::WRITABLE | EntryFlags::PRESENT
         ),
     );
-    let default_namespace = mod_mgmt::get_default_namespace()
-        .ok_or("The default CrateNamespace must be initialized before the tasking subsystem.")?
+    let default_namespace = mod_mgmt::get_initial_kernel_namespace()
+        .ok_or("The initial kernel CrateNamespace must be initialized before the tasking subsystem.")?
         .clone();
     let default_env = Arc::new(Mutex::new(Environment::default()));
-    let mut idle_task = Task::new_internal(kstack, kernel_mmi_ref, default_namespace, default_env);
+    let mut idle_task = Task::new_internal(kstack, kernel_mmi_ref, default_namespace, default_env, None);
     idle_task.name = format!("idle_task_ap{}", apic_id);
     idle_task.is_an_idle_task = true;
     idle_task.runstate = RunState::Runnable;

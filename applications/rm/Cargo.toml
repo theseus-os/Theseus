@@ -9,7 +9,7 @@ description = "removes the directory from the virtual filesystem"
 getopts = "0.2.21"
 
 [dependencies.terminal_print]
-path = "../terminal_print"
+path = "../../kernel/terminal_print"
 
 [dependencies.task]
 path = "../../kernel/task"

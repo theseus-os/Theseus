@@ -13,7 +13,7 @@ version = "0.3.7"
 
 
 [dependencies.terminal_print]
-path = "../terminal_print"
+path = "../../kernel/terminal_print"
 
 [dependencies.task]
 path = "../../kernel/task"

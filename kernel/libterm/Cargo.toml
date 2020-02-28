@@ -5,22 +5,14 @@ authors = ["Andrew Pham <apham727@gmail.com>", "Zhiyao Ma <zm16@pku.edu.cn>"]
 build = "../../build.rs"
 
 [dependencies]
-spin = "0.4.10"
 
 [dependencies.log]
 default-features = false
 version = "0.3.7"
 
-
 [dependencies.dfqueue]
 path = "../../libs/dfqueue"
 version = "0.1.0"
-
-[dependencies.window_manager]
-path = "../window_manager"
-
-[dependencies.frame_buffer_rgb]
-path = "../frame_buffer_rgb"
 
 [dependencies.environment]
 path = "../environment"
@@ -31,6 +23,9 @@ path = "../root"
 [dependencies.print]
 path = "../print"
 
+[dependencies.color]
+path = "../color"
+
 [dependencies.event_types]
 path = "../event_types"
 
@@ -40,8 +35,26 @@ path = "../displayable/text_display"
 [dependencies.displayable]
 path = "../displayable"
 
-[dependencies.frame_buffer]
-path = "../frame_buffer"
+[dependencies.framebuffer]
+path = "../framebuffer"
+
+[dependencies.shapes]
+path = "../shapes"
+
+[dependencies.framebuffer_drawer]
+path = "../framebuffer_drawer"
+
+[dependencies.framebuffer_printer]
+path = "../framebuffer_printer"
+
+[dependencies.window_manager]
+path = "../window_manager"
+
+[dependencies.window]
+path = "../window"
+
+[dependencies.tsc]
+path = "../tsc"
 
 [dependencies.font]
 path = "../font"

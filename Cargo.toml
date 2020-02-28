@@ -16,6 +16,7 @@ exclude = [
 	"cfg",
 	"compiler_plugins",
 	"libs",
+	"old_crates",
 	"scripts",
 	"target",
 	"tools",

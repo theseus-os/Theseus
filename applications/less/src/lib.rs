@@ -98,7 +98,9 @@ fn get_content_string(file_path: String) -> Result<String, String> {
 /// not to cause panic.
 fn parse_content(content: &String) -> Result<BTreeMap<usize, LineSlice>, &'static str> {
     // Get the width and height of the terminal screen.
-    let (width, _height) = app_io::get_terminal_or_default()?.lock().get_width_height();
+    let (width, _height) = app_io::get_my_terminal().ok_or("couldn't get terminal for `less` app")?
+        .lock()
+        .get_text_dimensions();
 
     // Record the slice index of each line.
     let mut map: BTreeMap<usize, LineSlice> = BTreeMap::new();
@@ -140,7 +142,7 @@ fn display_content(content: &String, map: &BTreeMap<usize, LineSlice>,
     let mut locked_terminal = terminal.lock();
 
     // Calculate the last line to display. Make sure we don't extend over the end of the file.
-    let (_width, height) = locked_terminal.get_width_height();
+    let (_width, height) = locked_terminal.get_text_dimensions();
     let mut line_end: usize = line_start + height;
     if line_end > map.len() {
         line_end = map.len();
@@ -159,8 +161,7 @@ fn display_content(content: &String, map: &BTreeMap<usize, LineSlice>,
     locked_terminal.print_to_terminal(
         content[start_indices.start..end_indices.end].to_string()
     );
-    locked_terminal.refresh_display();
-    Ok(())
+    locked_terminal.refresh_display()
 }
 
 /// Handle user keyboard strikes and perform corresponding operations.
@@ -168,8 +169,8 @@ fn event_handler_loop(content: &String, map: &BTreeMap<usize, LineSlice>,
                       key_event_queue: &KeyEventQueueReader)
                       -> Result<(), &'static str> {
 
-    // Get a copy of the terminal pointer. The terminal is *not* locked here.
-    let terminal = app_io::get_terminal_or_default()?;
+    // Get a reference to this task's terminal. The terminal is *not* locked here.
+    let terminal = app_io::get_my_terminal().ok_or("couldn't get terminal for `less` app")?;
 
     // Display the beginning of the file.
     let mut line_start: usize = 0;
@@ -185,8 +186,7 @@ fn event_handler_loop(content: &String, map: &BTreeMap<usize, LineSlice>,
                     Keycode::Q => {
                         let mut locked_terminal = terminal.lock();
                         locked_terminal.clear();
-                        locked_terminal.refresh_display();
-                        return Ok(());
+                        return locked_terminal.refresh_display()
                     },
                     // Scroll down a line on "Down".
                     Keycode::Down => {
@@ -211,7 +211,6 @@ fn event_handler_loop(content: &String, map: &BTreeMap<usize, LineSlice>,
 }
 
 
-#[no_mangle]
 pub fn main(args: Vec<String>) -> isize {
 
     // Get stdout.

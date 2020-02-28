@@ -4,35 +4,33 @@
 
 #![no_std]
 
-extern crate alloc;
-extern crate frame_buffer;
-#[macro_use]
-extern crate downcast_rs;
+extern crate framebuffer;
+extern crate shapes;
+extern crate color;
 
-use alloc::boxed::Box;
-use alloc::vec::Vec;
-use downcast_rs::Downcast;
-use frame_buffer::{FrameBuffer, Coord};
+use framebuffer::{Framebuffer, Pixel};
+use shapes::{Coord, Rectangle};
+use color::Color;
 
-/// Trait for displayables. A displayable is an item which can display itself onto a framebuffer. 
-/// It is usually a composition of basic graphs and can act as a component such as a text box, a button belonging to a window, etc. 
-pub trait Displayable: Downcast + Send {
-    /// Displays in a framebuffer.
+/// The `Displayable` trait is an abstraction for any object that can display itself onto a framebuffer. 
+/// Examples include a text box, button, window border, etc.
+pub trait Displayable {
+    /// Displays this `Displayable`'s content in the given framebuffer.
     /// # Arguments
-    /// * `coordinate`: the coordinate within the given `framebuffer` where this displayable should render itself. The `coordinate` is relative to the top-left point `(0, 0)` of the `framebuffer`.
+    /// * `coordinate`: the coordinate within the given `framebuffer` where this displayable should render itself.
+    ///    The `coordinate` is relative to the top-left point of the `framebuffer`.
     /// * `framebuffer`: the framebuffer to display onto.
     ///
-    /// Returns a list of updated blocks. The tuple (index, width) represents the index of the block in the framebuffer and its width. The use of `block` is described in the `frame_buffer_compositor` crate.
-    fn display(
+    /// Returns a rectangle that represents the region of the framebuffer that was updated.
+    fn display<P: Pixel + From<Color>>(
         &mut self,
         coordinate: Coord,
-        framebuffer: &mut dyn FrameBuffer,
-    ) -> Vec<(usize, usize)> ;
+        framebuffer: &mut Framebuffer<P>,
+    ) -> Result<Rectangle, &'static str>;
 
-    /// Resizes the displayable area.
-    fn resize(&mut self, width: usize, height: usize);
+    /// Resizes the displayable area, but does not automatically refresh its display.
+    fn set_size(&mut self, width: usize, height: usize);
 
     /// Gets the size of the area occupied by the displayable.
     fn get_size(&self) -> (usize, usize);
 }
-impl_downcast!(Displayable);

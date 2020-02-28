@@ -23,9 +23,8 @@
 //! * `ap_start`: High-level initialization code that runs on each AP (core) after it has booted up
 //! * `ata_pio`: Support for ATA hard disks (IDE/PATA) using PIO (not DMA), and not SATA.
 //! * `captain`: The main driver of Theseus. Controls the loading and initialization of all subsystems and other crates.
-//! * `input_event_manager`: Handles input events from the keyboard and routes them to the correct application. ** Being phased out by window manager.
 //! * `compositor`: The trait of a compositor. It composites a list of buffers to a final buffer.
-//! * `event_types`: A temporary way to move the input_event_manager typedefs out of the input_event_manager crate.
+//! * `event_types`: The types used for passing input and output events across the system.
 //! * `device_manager`: Code for handling the sequence required to initialize each driver.
 //! * `displayable`: Defines a displayable trait. A displayable can display itself in a framebuffer.
 //! * `text_display`: A text display is a displayable. It contains a block of text and can display in a framebuffer.
@@ -33,11 +32,10 @@
 //! * `exceptions_early`: Early exception handlers that do nothing but print an error and hang.
 //! * `exceptions_full`: Exception handlers that are more fully-featured, i.e., kills tasks on an exception.
 //! * `font`: Defines font for an array of ASCII code.
-//! * `frame_buffer`: Defines a framebuffer trait.
-//! * `frame_buffer_compositor`: Composites a list of framebuffers to a final framebuffer which is mapped to the physical framebuffer.
-//! * `frame_drawer`: Basic draw functions.
-//! * `frame_printer`: Prints a string in a frame buffer.
-//! * `frame_buffer_rgb`: The RGB FrameBuffer. It contains pixels without the alpha channel.
+//! * `framebuffer_compositor`: Composites a list of framebuffers to a final framebuffer which is mapped to the screen.
+//! * `framebuffer_drawer`: Basic draw functions.
+//! * `framebuffer_printer`: Prints a string in a framebuffer.
+//! * `framebuffer`: Defines a Framebuffer structure. It is a buffer of pixels in which an application can display.
 //! * `fs_node`: defines the traits for File and Directory. These files and directories mimic that of a standard unix virtual filesystem
 //! * `gdt`: GDT (Global Descriptor Table) support (x86 only) for Theseus.
 //! * `interrupts`: Interrupt configuration and handlers for Theseus. 
@@ -64,6 +62,6 @@
 //! * `tss`: TSS (Task State Segment support (x86 only) for Theseus.
 //! * `vfs_node`: contains the structs VFSDirectory and VFSFile, which are the most basic, generic implementers of the traits Directory and File
 //! * `vga_buffer`: Simple routines for printing to the screen using the x86 VGA buffer text mode.
-//! * `window`: Defines a trait for window.
-//! * `window_manager`: Provides a structure of window manager.
-//! * `window_manager`: Defines a generic window structure which implements the Window trait. Maintains a window manager which contains a list of generic window. 
+//! * `window`: Defines window structure which wraps a window inner object.
+//! * `window_inner`: Defines a `WindowInner` structure which contains the information required by the window manager.
+//! * `window_manager`: A window manager maintains a list of existing windows.

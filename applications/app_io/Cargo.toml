@@ -27,6 +27,9 @@ path = "../../kernel/task"
 [dependencies.print]
 path = "../../kernel/print"
 
+[dependencies.window_manager]
+path = "../../kernel/window_manager"
+
 [dependencies.libterm]
 path = "../../kernel/libterm"
 
@@ -36,9 +39,6 @@ version = "1.2.0"
 
 [dependencies.stdio]
 path = "../../libs/stdio"
-
-[dependencies.scheduler]
-path = "../../kernel/scheduler"
 
 [dependencies.serial_port]
 path = "../../kernel/serial_port"

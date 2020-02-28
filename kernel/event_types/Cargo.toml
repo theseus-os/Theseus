@@ -1,15 +1,18 @@
 [package]
 authors = ["Kevin Boos <kevinaboos@gmail.com>"]
 name = "event_types"
-description = "A temporary way to move the input_event_manager typedefs out of the input_event_manager crate"
+description = "Types of input and output events that flow throughout the system"
 version = "0.1.0"
 build = "../../build.rs"
 
 [dependencies.keycodes_ascii]
 path = "../../libs/keycodes_ascii"
 
-[dependencies.frame_buffer]
-path = "../frame_buffer"
+[dependencies.shapes]
+path = "../shapes"
+
+[dependencies.mouse_data]
+path = "../../libs/mouse_data"
 
 [lib]
 crate-type = ["rlib"]
