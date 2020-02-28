@@ -1082,11 +1082,11 @@ impl CrateNamespace {
             // i.e., its  size, alignment, and actual data.
             let sec = if sec.size() == 0 {
                 match elf_file.section_header((shndx + 1) as u16) { // get the next section
-                    Ok(sec_hdr) => {
+                    Ok(next_sec) => {
                         // The next section must have the same offset as the current zero-sized one
-                        if sec_hdr.offset() == sec.offset() {
+                        if next_sec.offset() == sec.offset() {
                             // if it does, we can use it in place of the current section
-                            sec_hdr
+                            next_sec
                         }
                         else {
                             // if it does not, we should NOT use it in place of the current section
@@ -1108,8 +1108,8 @@ impl CrateNamespace {
             let sec_size  = sec.size()  as usize;
             let sec_align = sec.align() as usize;
 
-            let write: bool = sec.flags() & SHF_WRITE     == SHF_WRITE;
-            let exec:  bool = sec.flags() & SHF_EXECINSTR == SHF_EXECINSTR;
+            let write: bool = sec_flags & SHF_WRITE     == SHF_WRITE;
+            let exec:  bool = sec_flags & SHF_EXECINSTR == SHF_EXECINSTR;
 
             // First, check for executable sections, which can only be .text sections.
             if exec && !write {
@@ -1175,7 +1175,7 @@ impl CrateNamespace {
                         return Err("Failed to get the .data section's name after \".data.\"!");
                     }
                 } else {
-                    error!("Unsupported: found writable section that wasn't .data or .bss: {:?}", sec_name);
+                    error!("Unsupported: found writable section that wasn't .data or .bss: [{}] {:?}", shndx, sec_name);
                     return Err("Unsupported: found writable section that wasn't .data or .bss");
                 };
                 let demangled = demangle(name).to_string();
@@ -1185,9 +1185,6 @@ impl CrateNamespace {
                     let dest_vaddr = dp.address_at_offset(data_offset)
                         .ok_or_else(|| "BUG: data_offset wasn't within data_pages")?;
                     let dest_slice: &mut [u8] = dp.as_slice_mut(data_offset, sec_size)?;
-                    if is_bss {
-                        warn!(".bss section had data: {:?}", sec.get_data(&elf_file));
-                    }
                     match sec.get_data(&elf_file) {
                         Ok(SectionData::Undefined(sec_data)) => dest_slice.copy_from_slice(sec_data),
                         Ok(SectionData::Empty) => {
@@ -2151,8 +2148,9 @@ fn allocate_section_pages(elf_file: &ElfFile, kernel_mmi_ref: &MmiRef) -> Result
         let mut ro_bytes = 0;
         let mut rw_bytes = 0;
         for (shndx, sec) in elf_file.section_iter().enumerate() {
+            let sec_flags = sec.flags();
             // Skip non-allocated sections; they don't need to be loaded into memory
-            if sec.flags() & SHF_ALLOC == 0 {
+            if sec_flags & SHF_ALLOC == 0 {
                 continue;
             }
 
@@ -2176,8 +2174,8 @@ fn allocate_section_pages(elf_file: &ElfFile, kernel_mmi_ref: &MmiRef) -> Result
             let addend = round_up_power_of_two(size, align);
 
             // filter flags for ones we care about (we already checked that it's loaded (SHF_ALLOC))
-            let write: bool = sec.flags() & SHF_WRITE     == SHF_WRITE;
-            let exec:  bool = sec.flags() & SHF_EXECINSTR == SHF_EXECINSTR;
+            let write: bool = sec_flags & SHF_WRITE     == SHF_WRITE;
+            let exec:  bool = sec_flags & SHF_EXECINSTR == SHF_EXECINSTR;
             // trace!("  Looking at sec {:?}, size {:#X}, align {:#X} --> addend {:#X}", sec.get_name(elf_file), size, align, addend);
             if exec {
                 // this includes only .text sections
