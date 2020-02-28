@@ -214,10 +214,10 @@ pub struct LoadedCrate {
     /// The set of global symbols in this crate, including regular ones 
     /// that are prefixed with the `crate_name` and `no_mangle` symbols that are not.
     pub global_symbols: BTreeSet<BString>,
-    /// The set of BSS sections in this crate.
+    /// The set of `.data` and `.bss` sections in this crate.
     /// The key is the section name and the value is a reference to the section;
     /// these sections are also in the `sections` member above.
-    pub bss_sections: Trie<BString, StrongSectionRef>,
+    pub data_sections: Trie<BString, StrongSectionRef>,
     /// The set of symbols that this crate's global symbols are reexported under,
     /// i.e., they have been added to the enclosing `CrateNamespace`'s symbol map under these names.
     /// 
@@ -389,7 +389,7 @@ impl LoadedCrate {
             rodata_pages:            new_rodata_pages_range,
             data_pages:              new_data_pages_range,
             global_symbols:          self.global_symbols.clone(),
-            bss_sections:            Trie::new(),
+            data_sections:            Trie::new(),
             reexported_symbols:      self.reexported_symbols.clone(),
         });
         let new_crate_weak_ref = CowArc::downgrade(&new_crate);
@@ -403,7 +403,7 @@ impl LoadedCrate {
         // 2) The section's mapped_pages, which will point to a new `MappedPages` object for the newly-copied crate,
         // 3) The section's virt_addr, which is based on its new mapped_pages
         let mut new_sections: BTreeMap<usize, StrongSectionRef> = BTreeMap::new();
-        let mut new_bss_sections: Trie<BString, StrongSectionRef> = Trie::new();
+        let mut new_data_sections: Trie<BString, StrongSectionRef> = Trie::new();
         for (shndx, old_sec) in self.sections.iter() {
             let old_sec_inner = old_sec.inner.read();
             let new_sec_mapped_pages_offset = old_sec.mapped_pages_offset;
@@ -440,8 +440,8 @@ impl LoadedCrate {
                 old_sec_inner.internal_dependencies.clone()   // internal dependencies are the same, but relocations need to be re-written
             ));
 
-            if old_sec.typ == SectionType::Bss {
-                new_bss_sections.insert_str(&old_sec.name, new_sec.clone());
+            if old_sec.typ == SectionType::Data || old_sec.typ == SectionType::Bss {
+                new_data_sections.insert_str(&old_sec.name, new_sec.clone());
             }
             new_sections.insert(*shndx, new_sec);
         }
@@ -529,7 +529,7 @@ impl LoadedCrate {
             let mut new_crate_mut = new_crate.lock_as_mut()
                 .ok_or_else(|| "BUG: LoadedCrate::deep_copy(): couldn't get exclusive mutable access to newly-copied crate")?;
             new_crate_mut.sections = new_sections;
-            new_crate_mut.bss_sections = new_bss_sections;
+            new_crate_mut.data_sections = new_data_sections;
         }
 
         Ok(new_crate)

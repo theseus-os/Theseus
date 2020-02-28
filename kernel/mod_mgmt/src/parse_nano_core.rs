@@ -142,7 +142,7 @@ fn parse_nano_core_symbol_file(
         rodata_pages:            Some((rodata_pages.clone(), mp_range(&rodata_pages))),
         data_pages:              Some((data_pages.clone(),   mp_range(&data_pages))),
         global_symbols:          BTreeSet::new(),
-        bss_sections:            Trie::new(),
+        data_sections:           Trie::new(),
         reexported_symbols:      BTreeSet::new(),
     });
     let new_crate_weak_ref = CowArc::downgrade(&new_crate);
@@ -590,7 +590,7 @@ fn parse_nano_core_binary(
         rodata_pages:            Some((rodata_pages.clone(), mp_range(&rodata_pages))),
         data_pages:              Some((data_pages.clone(),   mp_range(&data_pages))),
         global_symbols:          BTreeSet::new(),
-        bss_sections:            Trie::new(),
+        data_sections:           Trie::new(),
         reexported_symbols:      BTreeSet::new(),
     });
     let new_crate_weak_ref = CowArc::downgrade(&new_crate);
