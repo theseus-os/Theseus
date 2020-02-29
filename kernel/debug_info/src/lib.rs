@@ -21,6 +21,7 @@ extern crate by_address;
 extern crate rustc_demangle;
 
 use core::ops::{
+    Deref,
     DerefMut,
     Range,
 };
@@ -66,7 +67,7 @@ use mod_mgmt::{CrateNamespace, find_symbol_table};
 /// All debug sections herein are contained within a single `MappedPages` memory region.
 pub struct DebugSections {
     debug_str:       DebugSectionSlice,
-    debug_loc:       DebugSectionSlice,
+    debug_loc:       Option<DebugSectionSlice>,
     debug_abbrev:    DebugSectionSlice,
     debug_info:      DebugSectionSlice,
     debug_ranges:    DebugSectionSlice,
@@ -96,8 +97,8 @@ impl DebugSections {
     }
 
     /// Returns the `".debug_loc"` section.
-    pub fn debug_loc(&self) -> DebugLoc<EndianSlice<NativeEndian>> {
-        DebugLoc::new(&self.debug_loc.0, NativeEndian)
+    pub fn debug_loc(&self) -> Option<DebugLoc<EndianSlice<NativeEndian>>> {
+        self.debug_loc.as_ref().map(|loc| DebugLoc::new(&loc.0, NativeEndian))
     }
 
     /// Returns the `".debug_abbrev"` section.
@@ -225,7 +226,7 @@ impl DebugSections {
                     Some(type_ref)
                 }
                 Some(gimli::AttributeValue::UnitRef(unit_offset)) => {
-                    let mut entries = context.unit.entries_tree(context.abbreviations, Some(unit_offset))?;
+                    let mut entries = context.unit.entries_tree(Some(unit_offset))?;
                     let type_node = entries.root()?;
                     let type_entry = type_node.entry();
                     match type_entry.tag() {
@@ -251,10 +252,12 @@ impl DebugSections {
                 warn!("{:indent$}Variable {:?}, type: {:?} MAY NEED HANDLING FOR LOCATION {:?}", "", variable_name, type_signature, loc, indent = ((depth+1) * 2));
                 match loc.value() {
                     gimli::AttributeValue::LocationListsRef(loc_lists_offset) => {
-                        if let Some(debug_loc_sec) = context.debug_loc_sec {
-                            let l = debug_loc_sec.lookup_offset_id(loc_lists_offset)?;
+                        let mut locations = context.dwarf.locations(&context.unit, loc_lists_offset)?;
+                        while let Some(location) = locations.next()? {
+                            warn!("{:indent$}Location {:?}", "", location, indent = ((depth+2) * 2));
                         }
                     }
+                    unsupported => panic!("Unsupported DW_AT_location attr value: {:?}", unsupported),
                 }
             } else {
                 // If a variable doesn't have a location, that means it was optimized out and doesn't actually exist in the object code. 
@@ -417,38 +420,50 @@ impl DebugSections {
         warn!("TARGET INSTRUCTION POINTER: {:#X}", instruction_pointer);
 
         let load_section = |section_id| {
-            match section_id {
-                gimli::SectionId::DebugAbbrev => self.debug_abbrev(),
-                gimli::SectionId::DebugAddr => Err("no .debug_addr section"),
-                gimli::SectionId::DebugAranges => Err("no .debug_aranges section"),
-                
-            }
+            let slice_opt = match section_id {
+                gimli::SectionId::DebugInfo =>     Some(self.debug_info.0.deref()),
+                gimli::SectionId::DebugLine =>     Some(self.debug_line.0.deref()),
+                gimli::SectionId::DebugLoc =>      self.debug_loc.as_ref().map(|loc| loc.0.deref()),
+                gimli::SectionId::DebugPubNames => Some(self.debug_pubnames.0.deref()),
+                gimli::SectionId::DebugPubTypes => Some(self.debug_pubtypes.0.deref()),
+                gimli::SectionId::DebugAbbrev =>   Some(self.debug_abbrev.0.deref()),
+                gimli::SectionId::DebugRanges =>   Some(self.debug_ranges.0.deref()),
+                gimli::SectionId::DebugStr =>      Some(self.debug_str.0.deref()),
+                _ => {
+                    error!("Unsupported debug section: {:?}", section_id.name());
+                    None
+                }
+            };
+            Ok(gimli::EndianSlice::new(slice_opt.unwrap_or_default(), NativeEndian))
         };
-        let dwarf = gimli::Dwarf::load(load_section,
-
+        let load_supplementary = |_section_id| {
+            Ok(gimli::EndianSlice::new(&[][..], NativeEndian))
+        };
+        let dwarf = gimli::Dwarf::load(load_section, load_supplementary)?;
+        
         let debug_info_sec = self.debug_info();
         let debug_abbrev_sec = self.debug_abbrev();
         let debug_str_sec = self.debug_str();
 
         let mut units = debug_info_sec.units();
         // just dump all units 
-        while let Some(u) = units.next()? {
-            debug!("Unit: {:?}", u);
+        while let Some(uh) = units.next()? {
+            debug!("Unit Headers: {:?}", uh);
         }
 
         // In most cases, there is just one unit. But we go through all of them just in case. 
         let mut units = debug_info_sec.units();
-        while let Some(u) = units.next()? {
-            let abbreviations = u.abbreviations(&debug_abbrev_sec)?;
-            let mut entries_tree = u.entries_tree(&abbreviations, None)?;
+        while let Some(uh) = units.next()? {
+            let abbreviations = uh.abbreviations(&debug_abbrev_sec)?;
+            let mut entries_tree = uh.entries_tree(&abbreviations, None)?;
             let node = entries_tree.root()?;
             let context = DwarfContext {
-                unit: &u,
-                abbreviations: &abbreviations,
+                unit: dwarf.unit(uh)?,
+                dwarf: &dwarf,
                 debug_str_sec: &debug_str_sec,
             };
-            if let Some(offset) = self.handle_subprogram_node(instruction_pointer, 0, node, &context)? {
-                return Ok(Some(offset.to_debug_info_offset(&u)));
+            if let Some(_offset) = self.handle_subprogram_node(instruction_pointer, 0, node, &context)? {
+                return Ok(Some(gimli::DebugInfoOffset(42))); // TODO FIXME change return value to something meaningful
             }
         }
 
@@ -461,15 +476,16 @@ impl DebugSections {
 /// which is passed around between all of the recursive functions that handle/visit each DWARF node type
 /// for convenience purposes and to avoid duplicate work in parsing the tree.
 struct DwarfContext<'a, R: Reader> {
-    /// The compilation unit currently being traversed.
-    unit: &'a gimli::CompilationUnitHeader<R>,
-    /// The abbreviations for the above compilation unit.
-    abbreviations: &'a gimli::Abbreviations,
+    /// The collection of Dwarf debugging sections.
+    dwarf: &'a gimli::Dwarf<R>,
+    /// The unit currently being traversed. 
+    /// This is obtained by parsing a unit header, e.g., a compilation unit header.
+    unit: gimli::Unit<R>,
     /// The `.debug_str` section for the DWARF file containing this unit.
     debug_str_sec: &'a DebugStr<R>,
-    /// The `.debug_loc` section for the DWARF file containing this unit,
-    /// if one exists. This section is not guaranteed/required to exist.
-    debug_loc_sec: Option<&'a DebugLoc<R>>,
+    // /// The `.debug_loc` section for the DWARF file containing this unit,
+    // /// if one exists. This section is not guaranteed/required to exist.
+    // debug_loc_sec: Option<&'a DebugLoc<R>>,
 }
 
 
@@ -724,7 +740,7 @@ impl DebugSymbols {
 
         let loaded = DebugSections {
             debug_str:       create_debug_section_slice(debug_str)?,
-            debug_loc:       create_debug_section_slice(debug_loc)?,
+            debug_loc:       if let Some(loc) = debug_loc { Some(create_debug_section_slice(loc)?) } else { None },
             debug_abbrev:    create_debug_section_slice(debug_abbrev)?,
             debug_info:      create_debug_section_slice(debug_info)?,
             debug_ranges:    create_debug_section_slice(debug_ranges)?,
