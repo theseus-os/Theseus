@@ -75,8 +75,9 @@ pub type StateTransferFunction = fn(&CrateNamespace, &CrateNamespace) -> Result<
 /// 
 /// In general, the strategy for replacing an old crate `C` with a new crate `C2` consists of three steps:
 /// 1) Load the new replacement crate `C2` from its object file.
-/// 2) Set up new relocation entries that redirect all dependencies on the old crate `C` to the new crate `C2`.
-/// 3) Remove crate `C` and clean it up, e.g., removing its entries from the symbol map.
+/// 2) Copy the data and .bss sections from old crate `C` to the new crate `C2`
+/// 3) Set up new relocation entries that redirect all dependencies on the old crate `C` to the new crate `C2`.
+/// 4) Remove crate `C` and clean it up, e.g., removing its entries from the symbol map.
 ///    Save the removed crate (and its symbol subtrie) in a cache for later use to expedite future swapping operations.
 /// 
 /// The given `CrateNamespace` is used as the backup namespace for resolving unknown symbols,
@@ -268,6 +269,40 @@ pub fn swap_crates(
             let new_crate_name_without_hash = String::from(new_crate.crate_name_without_hash());
             let crates_have_same_name = old_crate_name_without_hash == new_crate_name_without_hash;
 
+            #[cfg(loscd_eval)]
+            let hpet_start_bss_transfer = hpet.get_counter();
+
+            // Go through all the `.data` and `.bss` sections and copy over the old_sec into the new source_sec,
+            // as they represent static variables that would otherwise result in a loss of data.
+            for old_sec in old_crate.data_sections.values() {
+                let old_sec_name_without_hash = old_sec.name_without_hash();
+                // get the section from the new crate that corresponds to the `old_sec`
+                let new_dest_sec = {
+                    let mut iter = if crates_have_same_name {
+                        new_crate.data_sections.iter_prefix_str(old_sec_name_without_hash)
+                    } else {
+                        if let Some(s) = replace_containing_crate_name(old_sec_name_without_hash, &old_crate_name_without_hash, &new_crate_name_without_hash) {
+                            new_crate.data_sections.iter_prefix_str(&s)
+                        } else {
+                            new_crate.data_sections.iter_prefix_str(old_sec_name_without_hash)
+                        }
+                    };
+                    iter.next()
+                        .filter(|_| iter.next().is_none()) // ensure single element
+                        .map(|(_key, val)| val)
+                }.ok_or_else(|| 
+                    "couldn't find destination section in new crate for copying old_sec's data into (BSS state transfer)"
+                )?;
+
+                debug!("swap_crates(): copying .data or .bss section from old {:?} to new {:?}", &*old_sec, new_dest_sec);
+                old_sec.copy_section_data_to(&new_dest_sec)?;
+            }
+
+            #[cfg(loscd_eval)] {
+                let hpet_end_bss_transfer = hpet.get_counter();
+                hpet_total_bss_transfer += (hpet_end_bss_transfer - hpet_start_bss_transfer);
+            }
+
             // We need to find all of the "weak dependents" (sections that depend on the sections in the old crate)
             // and replace them by rewriting their relocation entries to point to the corresponding new section in the new_crate.
             //
@@ -447,39 +482,7 @@ pub fn swap_crates(
                 
             } // end of loop that rewrites dependencies for sections that depend on the old_crate
 
-            #[cfg(loscd_eval)]
-            let hpet_start_bss_transfer = hpet.get_counter();
-
-            // Go through all the `.data` and `.bss` sections and copy over the old_sec into the new source_sec,
-            // as they represent static variables that would otherwise result in a loss of data.
-            for old_sec in old_crate.data_sections.values() {
-                let old_sec_name_without_hash = old_sec.name_without_hash();
-                // get the section from the new crate that corresponds to the `old_sec`
-                let new_dest_sec = {
-                    let mut iter = if crates_have_same_name {
-                        new_crate.data_sections.iter_prefix_str(old_sec_name_without_hash)
-                    } else {
-                        if let Some(s) = replace_containing_crate_name(old_sec_name_without_hash, &old_crate_name_without_hash, &new_crate_name_without_hash) {
-                            new_crate.data_sections.iter_prefix_str(&s)
-                        } else {
-                            new_crate.data_sections.iter_prefix_str(old_sec_name_without_hash)
-                        }
-                    };
-                    iter.next()
-                        .filter(|_| iter.next().is_none()) // ensure single element
-                        .map(|(_key, val)| val)
-                }.ok_or_else(|| 
-                    "couldn't find destination section in new crate for copying old_sec's data into (BSS state transfer)"
-                )?;
-
-                debug!("swap_crates(): copying .data or .bss section from old {:?} to new {:?}", &*old_sec, new_dest_sec);
-                old_sec.copy_section_data_to(&new_dest_sec)?;
-            }
-
-            #[cfg(loscd_eval)] {
-                let hpet_end_bss_transfer = hpet.get_counter();
-                hpet_total_bss_transfer += (hpet_end_bss_transfer - hpet_start_bss_transfer);
-            }
+            
         } // end of scope, drops lock on `new_crate_ref`
     } // end of iterating over all swap requests to fix up old crate dependents
 
