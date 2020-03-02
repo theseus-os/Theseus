@@ -1,0 +1,31 @@
+[package]
+name = "test_wait_queue"
+version = "0.1.0"
+description = "Tests the wait queue functionality of Theseus with multiple tasks"
+authors = ["Kevin Boos <kevinaboos@gmail.com>"]
+build = "../../build.rs"
+
+[dependencies]
+spin = "0.4.10"
+
+[dependencies.log]
+default-features = false
+version = "0.3.7"
+
+[dependencies.task]
+path = "../../kernel/task"
+
+[dependencies.apic]
+path = "../../kernel/apic"
+
+[dependencies.scheduler]
+path = "../../kernel/scheduler"
+
+[dependencies.spawn]
+path = "../../kernel/spawn"
+
+[dependencies.wait_condition]
+path = "../../kernel/wait_condition"
+
+[dependencies.terminal_print]
+path = "../../kernel/terminal_print"

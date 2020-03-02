@@ -4,8 +4,6 @@ use super::super::{Page, BROADCAST_TLB_SHOOTDOWN_FUNC, VirtualMemoryArea, FrameA
 use super::table::{self, Table, Level4};
 use irq_safety::MutexIrqSafe;
 use alloc::vec::Vec;
-use x86_64;
-
 
 
 lazy_static! {
@@ -22,8 +20,8 @@ pub struct MapperSpillful {
 }
 
 impl MapperSpillful {
-    pub unsafe fn new() -> MapperSpillful {
-        MapperSpillful { p4: Unique::new_unchecked(table::P4) }
+    pub fn new() -> MapperSpillful {
+        MapperSpillful { p4: Unique::new(table::P4).unwrap() } // cannot panic, we know P4 is valid.
     }
 
     pub fn p4(&self) -> &Table<Level4> {
@@ -52,7 +50,7 @@ impl MapperSpillful {
                 let p3_entry = &p3[page.p3_index()];
                 // 1GiB page?
                 if let Some(start_frame) = p3_entry.pointed_frame() {
-                    if p3_entry.flags().contains(EntryFlags::HUGE_PAGE) {
+                    if p3_entry.flags().is_huge() {
                         // address must be 1GiB aligned
                         assert!(start_frame.number % (ENTRIES_PER_PAGE_TABLE * ENTRIES_PER_PAGE_TABLE) == 0);
                         return Some(Frame {
@@ -64,7 +62,7 @@ impl MapperSpillful {
                     let p2_entry = &p2[page.p2_index()];
                     // 2MiB page?
                     if let Some(start_frame) = p2_entry.pointed_frame() {
-                        if p2_entry.flags().contains(EntryFlags::HUGE_PAGE) {
+                        if p2_entry.flags().is_huge() {
                             // address must be 2MiB aligned
                             assert!(start_frame.number % ENTRIES_PER_PAGE_TABLE == 0);
                             return Some(Frame { number: start_frame.number + page.p1_index() });
@@ -90,7 +88,7 @@ impl MapperSpillful {
         top_level_flags.set(EntryFlags::NO_EXECUTE, false);
         // top_level_flags.set(EntryFlags::WRITABLE, true); // is the same true for the WRITABLE bit?
 
-        for page in Page::range_inclusive_addr(vaddr, size).clone() {
+        for page in PageRange::from_virt_addr(vaddr, size).clone() {
             let frame = allocator.allocate_frame().ok_or("MapperSpillful::map() -- out of memory trying to alloc frame")?;
             let mut p3 = self.p4_mut().next_table_create(page.p4_index(), top_level_flags, allocator);
             let mut p2 = p3.next_table_create(page.p3_index(), top_level_flags, allocator);
@@ -127,7 +125,7 @@ impl MapperSpillful {
             return Ok(());
         }
 
-        let pages = Page::range_inclusive_addr(vma.start_address(), vma.size());
+        let pages = PageRange::from_virt_addr(vma.start_address(), vma.size());
 
         let broadcast_tlb_shootdown = BROADCAST_TLB_SHOOTDOWN_FUNC.try();
         let mut vaddrs: Vec<VirtualAddress> = if broadcast_tlb_shootdown.is_some() {
@@ -143,11 +141,11 @@ impl MapperSpillful {
                 .and_then(|p2| p2.next_table_mut(page.p2_index()))
                 .ok_or("mapping code does not support huge pages")?;
             
-            let frame = try!(p1[page.p1_index()].pointed_frame().ok_or("remap(): page not mapped"));
+            let frame = p1[page.p1_index()].pointed_frame().ok_or("remap(): page not mapped")?;
             p1[page.p1_index()].set(frame, new_flags | EntryFlags::PRESENT);
 
             let vaddr = page.start_address();
-            x86_64::instructions::tlb::flush(x86_64::VirtualAddress(vaddr));
+            tlb_flush_virt_addr(vaddr);
             if broadcast_tlb_shootdown.is_some() && vaddr != TEMPORARY_PAGE_FRAME {
                 vaddrs.push(vaddr);
             }
@@ -183,7 +181,7 @@ impl MapperSpillful {
             let vma = vma.ok_or("couldn't find corresponding VMA")?;
             
             (
-                Page::range_inclusive_addr(vma.start_address(), vma.size()),
+                PageRange::from_virt_addr(vma.start_address(), vma.size()),
                 vma_index.ok_or("couldn't find corresponding VMA")?
             )
         };
@@ -207,7 +205,7 @@ impl MapperSpillful {
             p1[page.p1_index()].set_unused();
 
             let vaddr = page.start_address();
-            x86_64::instructions::tlb::flush(x86_64::VirtualAddress(vaddr));
+            tlb_flush_virt_addr(vaddr);
             if broadcast_tlb_shootdown.is_some() && vaddr != TEMPORARY_PAGE_FRAME {
                 vaddrs.push(vaddr);
             }

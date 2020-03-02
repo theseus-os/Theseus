@@ -1,0 +1,23 @@
+[package]
+authors = ["Kevin Boos <kevinaboos@gmail.com>"]
+name = "stack_trace"
+description = "The default stack trace (backtrace) functionality, which uses DWARF debugging info"
+version = "0.1.0"
+build = "../../build.rs"
+
+[dependencies]
+fallible-iterator = { version = "0.2.0", default-features = false }
+
+[dependencies.log]
+default-features = false
+version = "0.3.7"
+
+[dependencies.task]
+path = "../task"
+
+[dependencies.unwind]
+path = "../unwind"
+
+
+[lib]
+crate-type = ["rlib"]

@@ -20,8 +20,8 @@ pub struct ElfProgramSegment {
 pub fn parse_elf_executable(mapped_pages: MappedPages, size_in_bytes: usize) -> Result<(Vec<ElfProgramSegment>, VirtualAddress), &'static str> {
     debug!("Parsing Elf executable: mapped_pages {:?}, size_in_bytes {:#x}({})", mapped_pages, size_in_bytes, size_in_bytes);
 
-    let byte_slice: &[u8] = try!(mapped_pages.as_slice(0, size_in_bytes));
-    let elf_file = try!(ElfFile::new(byte_slice));
+    let byte_slice: &[u8] = mapped_pages.as_slice(0, size_in_bytes)?;
+    let elf_file = ElfFile::new(byte_slice)?;
     // debug!("Elf File: {:?}", elf_file);
 
     // check that elf_file is an executable type 
@@ -52,12 +52,12 @@ pub fn parse_elf_executable(mapped_pages: MappedPages, size_in_bytes: usize) -> 
         // TODO: how to get name of program section?
         // could infer it based on perms, like .text or .data
         prog_sects.push(ElfProgramSegment {
-            vma: VirtualMemoryArea::new(prog.virtual_addr() as VirtualAddress, prog.mem_size() as usize, flags, "test_name"),
+            vma: VirtualMemoryArea::new(VirtualAddress::new(prog.virtual_addr() as usize)?, prog.mem_size() as usize, flags, "test_name"),
             offset: prog.offset() as usize,
         });
     }
 
-    let entry_point = elf_file.header.pt2.entry_point() as VirtualAddress;
+    let entry_point = VirtualAddress::new(elf_file.header.pt2.entry_point() as usize)?;
 
     Ok((prog_sects, entry_point))
 }

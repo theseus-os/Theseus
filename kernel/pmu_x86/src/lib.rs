@@ -25,7 +25,6 @@
 
 #![no_std]
 #![feature(asm)]
-#![feature(alloc)]
 
 extern crate spin;
 #[macro_use] extern crate lazy_static;
@@ -380,6 +379,9 @@ pub fn print_samples(sample_results: &mut SampleResults) {
 }
 
 pub fn handle_sample(stack_frame: &mut ExceptionStackFrame) {
+    // println_both!("what value is in the status register {:x}", rdmsr(IA32_PERF_GLOBAL_STAUS));
+    unsafe { wrmsr(IA32_PERF_GLOBAL_OVF_CTRL, 0); }
+    // println_both!("what value is in the status register after clear: {:x}", rdmsr(IA32_PERF_GLOBAL_STAUS));
     
     debug!("handle_sample(): [0] on core {:?}!", apic::get_my_apic_id());
 

@@ -9,9 +9,6 @@ build = "../../build.rs"
 spin = "0.4.10"
 
 
-[dependencies.input_event_manager]
-path = "../input_event_manager"
-
 [dependencies.dfqueue]
 path = "../../libs/dfqueue"
 

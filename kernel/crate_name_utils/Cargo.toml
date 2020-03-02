@@ -1,0 +1,15 @@
+[package]
+authors = ["Kevin Boos <kevinaboos@gmail.com>"]
+name = "crate_name_utils"
+description = "Utility functions for processing, parsing, and working with crate names/symbol strings"
+version = "0.1.0"
+
+[dependencies.itertools]
+version = "0.7.9"
+default-features = false
+
+[dependencies.path]
+path = "../path"
+
+[dependencies.crate_metadata]
+path = "../crate_metadata"

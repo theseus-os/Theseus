@@ -44,7 +44,7 @@ default-features = false
 version = "0.5.0"
 default-features = false
 features = [
-    "alloc", 
+    "alloc", "ethernet",
     # "log", "verbose", 
     "proto-ipv4", "proto-igmp", "proto-ipv6", "proto-dhcpv4",
     "socket-raw", "socket-udp", "socket-tcp", "socket-icmp", 
@@ -54,3 +54,6 @@ features = [
 version = "0.6"
 default-features = false 
 features = [ "alloc" ]
+
+[dependencies.smoltcp_helper]
+path = "../smoltcp_helper"

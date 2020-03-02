@@ -26,7 +26,6 @@
 //! 
 
 #![no_std]
-#![feature(alloc)]
 #![feature(asm, naked_functions)]
 #![feature(panic_info_message)]
 
@@ -34,7 +33,6 @@
 #[macro_use] extern crate lazy_static;
 #[macro_use] extern crate log;
 extern crate irq_safety;
-extern crate atomic_linked_list;
 extern crate memory;
 extern crate tss;
 extern crate mod_mgmt;
@@ -43,12 +41,11 @@ extern crate environment;
 extern crate root;
 extern crate x86_64;
 extern crate spin;
-extern crate fs_node; 
-
+extern crate kernel_config;
 
 
 use core::fmt;
-use core::sync::atomic::{Ordering, AtomicUsize, AtomicBool, spin_loop_hint};
+use core::sync::atomic::{Ordering, AtomicUsize, AtomicBool};
 use core::any::Any;
 use core::panic::PanicInfo;
 use core::ops::Deref;
@@ -58,20 +55,21 @@ use alloc::{
     string::String,
     sync::Arc,
 };
-
 use irq_safety::{MutexIrqSafe, MutexIrqSafeGuardRef, MutexIrqSafeGuardRefMut, interrupts_enabled};
-use memory::{PageTable, Stack, MappedPages, Page, EntryFlags, MemoryManagementInfo, VirtualAddress};
-use atomic_linked_list::atomic_map::AtomicMap;
+use memory::{Stack, MappedPages, PageRange, EntryFlags, MmiRef, VirtualAddress};
+use kernel_config::memory::KERNEL_STACK_SIZE_IN_PAGES;
 use tss::tss_set_rsp0;
-use mod_mgmt::metadata::StrongCrateRef;
+use mod_mgmt::{
+    CrateNamespace,
+    AppCrateRef,
+};
 use environment::Environment;
 use spin::Mutex;
 use x86_64::registers::msr::{rdmsr, wrmsr, IA32_FS_BASE};
-use fs_node::DirRef;
 
 
 /// The signature of the callback function that can hook into receiving a panic. 
-pub type PanicHandler = Box<Fn(&PanicInfoOwned) + Send>;
+pub type PanicHandler = Box<dyn Fn(&PanicInfo) + Send>;
 
 /// Just like `core::panic::PanicInfo`, but with owned String types instead of &str references.
 #[derive(Debug, Clone)]
@@ -101,11 +99,6 @@ impl PanicInfoOwned {
     }
 }
 
-
-lazy_static! {
-    /// Used to ensure that task switches are done atomically on each core
-    pub static ref TASK_SWITCH_LOCKS: AtomicMap<u8, AtomicBool> = AtomicMap::new();
-}
 
 lazy_static! {
     /// The list of all Tasks in the system.
@@ -150,13 +143,15 @@ pub enum ExitValue {
     /// The Task ran to completion and returned the enclosed `Any` value.
     /// The caller of this type should know what type this Task returned,
     /// and should therefore be able to downcast it appropriately.
-    Completed(Box<Any + Send>),
+    Completed(Box<dyn Any + Send>),
     /// The Task did NOT run to completion, and was instead killed.
     /// The reason for it being killed is enclosed. 
     Killed(KillReason),
 }
 
 
+/// The set of possible runstates that a task can be in, e.g.,
+/// runnable, blocked, exited, etc. 
 #[derive(Debug)]
 pub enum RunState {
     /// in the midst of setting up the task
@@ -182,6 +177,7 @@ pub enum RunState {
 pub static RUNQUEUE_REMOVAL_FUNCTION: Once<fn(&TaskRef, u8) -> Result<(), &'static str>> = Once::new();
 
 
+#[cfg(simd_personality)]
 /// The supported levels of SIMD extensions that a `Task` can use.
 #[derive(Debug, Copy, Clone, PartialEq)]
 pub enum SimdExt {
@@ -215,26 +211,26 @@ pub struct Task {
     /// the virtual address of (a pointer to) the `TaskLocalData` struct, which refers back to this `Task` struct.
     task_local_data_ptr: VirtualAddress,
     /// Data that should be dropped after a task switch; for example, the previous Task's TaskLocalData.
-    drop_after_task_switch: Option<Box<Any + Send>>,
-    /// memory management details: page tables, mappings, allocators, etc.
-    /// Wrapped in an Arc & Mutex because it's shared between all other tasks in the same address space
-    pub mmi: Option<Arc<MutexIrqSafe<MemoryManagementInfo>>>, 
-    /// the kernelspace stack.  Wrapped in Option<> so we can initialize it to None.
-    pub kstack: Option<Stack>,
-    /// the userspace stack.  Wrapped in Option<> so we can initialize it to None.
-    pub ustack: Option<Stack>,
-    /// for special behavior of new userspace task
-    pub new_userspace_entry_addr: Option<VirtualAddress>, 
+    drop_after_task_switch: Option<Box<dyn Any + Send>>,
+    /// Memory management details: page tables, mappings, allocators, etc.
+    /// This is shared among all other tasks in the same address space.
+    pub mmi: MmiRef, 
+    /// The kernel stack, which all `Task`s must have in order to execute.
+    pub kstack: Stack,
     /// Whether or not this task is pinned to a certain core
     /// The idle tasks (like idle_task) are always pinned to their respective cores
     pub pinned_core: Option<u8>,
     /// Whether this Task is an idle task, the task that runs by default when no other task is running.
-    /// There exists one idle task per core.
+    /// There exists one idle task per core, so this is `false` for most tasks.
     pub is_an_idle_task: bool,
-    /// For application `Task`s, the [`LoadedCrate`](../mod_mgmt/metadata/struct.LoadedCrate.html)
-    /// that contains the backing memory regions and sections for running this `Task`'s object file 
-    pub app_crate: Option<StrongCrateRef>,
-    /// The function that will be called when this `Task` panics
+    /// For application `Task`s, this is a reference to the [`LoadedCrate`](../mod_mgmt/metadata/struct.LoadedCrate.html)
+    /// that contains the entry function for this `Task`.
+    pub app_crate: Option<Arc<AppCrateRef>>,
+    /// This `Task` is linked into and runs within the context of 
+    /// this [`CrateNamespace`](../mod_mgmt/struct.CrateNamespace.html).
+    pub namespace: Arc<CrateNamespace>,
+    /// The function that will be called when this `Task` panics;
+    /// it is invoked before the task is cleaned up via stack unwinding.
     pub panic_handler: Option<PanicHandler>,
     /// The environment of the task, Wrapped in an Arc & Mutex because it is shared among child and parent tasks
     pub env: Arc<Mutex<Environment>>,
@@ -253,20 +249,45 @@ impl fmt::Debug for Task {
 
 impl Task {
     /// Creates a new Task structure and initializes it to be non-Runnable.
+    /// By default, the new `Task` will inherit some of the same states from the currently-running `Task`:
+    /// its `Environment`, `MemoryManagementInfo`, `CrateNamespace`, and `app_crate` reference.
+    /// If needed, those states can be changed by setting them for the returned `Task`.
+    /// 
+    /// # Arguments
+    /// * `kstack`: the optional kernel `Stack` for this `Task` to use.
+    ///    If not provided, a kernel stack of the default size will be allocated and used.
+    /// 
     /// # Note
     /// This does not run the task, schedule it in, or switch to it.
-    pub fn new() -> Task {
-        /// The counter of task IDs
+    pub fn new(kstack: Option<Stack>) -> Result<Task, &'static str> {
+        let curr_task = get_my_current_task().ok_or("Task::new(): couldn't get current task (not yet initialized)")?;
+        let (mmi, namespace, env, app_crate) = {
+            let t = curr_task.lock();
+            (Arc::clone(&t.mmi), Arc::clone(&t.namespace), Arc::clone(&t.env), t.app_crate.clone())
+        };
+
+        let kstack = kstack
+            .or_else(|| mmi.lock().alloc_stack(KERNEL_STACK_SIZE_IN_PAGES))
+            .ok_or("couldn't allocate kernel stack!")?;
+
+        Ok(Task::new_internal(kstack, mmi, namespace, env, app_crate))
+    }
+    
+    /// The internal routine for creating a `Task`, which does not make assumptions 
+    /// about whether a currently-running `Task` exists or whether the new `Task`
+    /// should inherit any states from it.
+    fn new_internal(
+        kstack: Stack, 
+        mmi: MmiRef, namespace: Arc<CrateNamespace>,
+        env: Arc<Mutex<Environment>>,
+        app_crate: Option<Arc<AppCrateRef>>
+    ) -> Self {
+         /// The counter of task IDs
         static TASKID_COUNTER: AtomicUsize = AtomicUsize::new(0);
 
         // we should re-use old task IDs again, instead of simply blindly counting up
         // TODO FIXME: or use random values to avoid state spill
         let task_id = TASKID_COUNTER.fetch_add(1, Ordering::Acquire);
-
-        // TODO - change to option and initialize environment to none
-        let env = Environment {
-            working_dir: Arc::clone(root::get_root()), 
-        };
 
         Task {
             id: task_id,
@@ -277,18 +298,17 @@ impl Task {
             on_runqueue: None,
             
             saved_sp: 0,
-            task_local_data_ptr: 0,
+            task_local_data_ptr: VirtualAddress::zero(),
             drop_after_task_switch: None,
-            name: format!("task{}", task_id),
-            kstack: None,
-            ustack: None,
-            mmi: None,
-            new_userspace_entry_addr: None,
+            name: format!("task_{}", task_id),
+            kstack: kstack,
+            mmi: mmi,
             pinned_core: None,
             is_an_idle_task: false,
-            app_crate: None,
+            app_crate: app_crate,
+            namespace: namespace,
             panic_handler: None,
-            env: Arc::new(Mutex::new(env)),
+            env: env,
 
             #[cfg(simd_personality)]
             simd: SimdExt::None,
@@ -323,17 +343,22 @@ impl Task {
         }
     }
 
-    /// Returns true if this is an application `Task`.
+    /// Returns `true` if this is an application `Task`. 
+    /// This will also return `true` if this task was spawned by an application task,
+    /// since a task inherits the "application crate" field from its "parent" who spawned it.
     pub fn is_application(&self) -> bool {
         self.app_crate.is_some()
     }
 
     /// Returns true if this is a userspace`Task`.
+    /// Currently userspace support is disabled, so this always returns `false`.
     pub fn is_userspace(&self) -> bool {
-        self.ustack.is_some()
+        // self.ustack.is_some()
+        false
     }
 
-    /// Registers a function or closure that will be called if this `Task` panics.
+    /// Registers a function or closure that will be called if this `Task` panics,
+    /// invoked before the task is cleaned up via stack unwinding.
     pub fn set_panic_handler(&mut self, callback: PanicHandler) {
         self.panic_handler = Some(callback);
     }
@@ -385,7 +410,7 @@ impl Task {
     /// into the FS segment register base MSR.
     fn set_as_current_task(&self) {
         unsafe {
-            wrmsr(IA32_FS_BASE, self.task_local_data_ptr as u64);
+            wrmsr(IA32_FS_BASE, self.task_local_data_ptr.value() as u64);
         }
     }
 
@@ -393,9 +418,9 @@ impl Task {
     /// This should only be called once, after the Task will never ever be used again. 
     fn take_task_local_data(&mut self) -> Option<Box<TaskLocalData>> {
         // sanity check to ensure we haven't dropped this Task's TaskLocalData twice.
-        if self.task_local_data_ptr != 0 {
-            let tld = unsafe { Box::from_raw(self.task_local_data_ptr as *mut TaskLocalData) };
-            self.task_local_data_ptr = 0;
+        if self.task_local_data_ptr.value() != 0 {
+            let tld = unsafe { Box::from_raw(self.task_local_data_ptr.value() as *mut TaskLocalData) };
+            self.task_local_data_ptr = VirtualAddress::zero();
             Some(tld)
         }
         else {
@@ -407,36 +432,17 @@ impl Task {
     /// no locks need to be held to call this, but interrupts (later, preemption) should be disabled
     pub fn task_switch(&mut self, next: &mut Task, apic_id: u8) {
         // debug!("task_switch [0]: (AP {}) prev {:?}, next {:?}", apic_id, self, next);
-        
-        let my_task_switch_lock: &AtomicBool = match TASK_SWITCH_LOCKS.get(&apic_id) {
-            Some(csl) => csl,
-            _ => {
-                error!("BUG: task_switch(): no task switch lock present for AP {}, skipping task switch!", apic_id);
-                return;
-            } 
-        };
-        
-        // acquire this core's task switch lock
-        // TODO: add timeout
-        while my_task_switch_lock.compare_and_swap(false, true, Ordering::SeqCst) {
-            spin_loop_hint();
-        }
-
-        // debug!("task_switch [1], testing runstates.");
         if !next.is_runnable() {
             error!("BUG: Skipping task_switch due to scheduler bug: chosen 'next' Task was not Runnable! Current: {:?}, Next: {:?}", self, next);
-            my_task_switch_lock.store(false, Ordering::SeqCst);
             return;
         }
         if next.is_running() {
             error!("BUG: Skipping task_switch due to scheduler bug: chosen 'next' Task was already running on AP {}!\nCurrent: {:?} Next: {:?}", apic_id, self, next);
-            my_task_switch_lock.store(false, Ordering::SeqCst);
             return;
         }
         if let Some(pc) = next.pinned_core {
             if pc != apic_id {
                 error!("BUG: Skipping task_switch due to scheduler bug: chosen 'next' Task was pinned to AP {:?} but scheduled on AP {}!\nCurrent: {:?}, Next: {:?}", next.pinned_core, apic_id, self, next);
-                my_task_switch_lock.store(false, Ordering::SeqCst);
                 return;
             }
         }
@@ -444,16 +450,16 @@ impl Task {
 
         // Change the privilege stack (RSP0) in the TSS.
         // We can safely skip setting the TSS RSP0 when switching to a kernel task, 
-        // i.e., when `next` is not a userspace task
+        // i.e., when `next` is not a userspace task.
+        //
+        // Note that because userspace support is currently disabled, this will always be `false`.
         if next.is_userspace() {
-            let next_kstack = next.kstack.as_ref().expect("BUG: task_switch(): error: next task's kstack was None!");
-            let new_tss_rsp0 = next_kstack.bottom() + (next_kstack.size() / 2); // the middle half of the stack
+            let new_tss_rsp0 = next.kstack.bottom() + (next.kstack.size() / 2); // the middle half of the stack
             if tss_set_rsp0(new_tss_rsp0).is_ok() { 
                 // debug!("task_switch [2]: new_tss_rsp = {:#X}", new_tss_rsp0);
             }
             else {
                 error!("task_switch(): failed to set AP {} TSS RSP0, aborting task switch!", apic_id);
-                my_task_switch_lock.store(false, Ordering::SeqCst);
                 return;
             }
         }
@@ -462,11 +468,12 @@ impl Task {
         self.running_on_cpu = None; // no longer running
         next.running_on_cpu = Some(apic_id); // now running on this core
 
-
-        // We now do the page table switching here, so we can use our higher-level PageTable abstractions
-        {
-            let prev_mmi = self.mmi.as_ref().expect("task_switch: couldn't get prev task's MMI!");
-            let next_mmi = next.mmi.as_ref().expect("task_switch: couldn't get next task's MMI!");
+        // Switch page tables. 
+        // Since there is only a single address space (as userspace support is currently disabled),
+        // we do not need to do this at all.
+        if false {
+            let prev_mmi = &self.mmi;
+            let next_mmi = &next.mmi;
             
 
             if Arc::ptr_eq(prev_mmi, next_mmi) {
@@ -475,30 +482,12 @@ impl Task {
             }
             else {
                 // time to change to a different address space and switch the page tables!
-
                 let mut prev_mmi_locked = prev_mmi.lock();
-                let mut next_mmi_locked = next_mmi.lock();
+                let next_mmi_locked = next_mmi.lock();
                 // debug!("task_switch [3]: switching tables! From {} {:?} to {} {:?}", 
                 //         self.name, prev_mmi_locked.page_table, next.name, next_mmi_locked.page_table);
-                
 
-                let new_active_table = {
-                    // prev_table must be an ActivePageTable, and next_table must be an InactivePageTable
-                    match &mut prev_mmi_locked.page_table {
-                        &mut PageTable::Active(ref mut active_table) => {
-                            active_table.switch(&next_mmi_locked.page_table)
-                        }
-                        _ => {
-                            panic!("BUG: task_switch(): prev_table must be an ActivePageTable!");
-                        }
-                    }
-                };
-                
-                // since we're no longer changing the prev page table to be inactive, just leave it be,
-                // and only change the next task's page table to active 
-                // (it was either active already, or it was previously inactive (and now active) if it was the first time it had been run)
-                next_mmi_locked.set_page_table(PageTable::Active(new_active_table)); 
-
+                let _new_active_table = prev_mmi_locked.page_table.switch(&next_mmi_locked.page_table);
             }
         }
        
@@ -509,18 +498,15 @@ impl Task {
         // We store the removed TaskLocalData in the next Task struct so that we can access it after the context switch.
         if self.has_exited() {
             // trace!("task_switch(): preparing to drop TaskLocalData for running task {}", self);
-            next.drop_after_task_switch = self.take_task_local_data().map(|tld_box| tld_box as Box<Any + Send>);
+            next.drop_after_task_switch = self.take_task_local_data().map(|tld_box| tld_box as Box<dyn Any + Send>);
         }
 
-        // release this core's task switch lock
-        my_task_switch_lock.store(false, Ordering::SeqCst);
         // debug!("task_switch [4]: prev sp: {:#X}, next sp: {:#X}", self.saved_sp, next.saved_sp);
-        
 
         /// A private macro that actually calls the given context switch routine
         /// by putting the arguments into the proper registers, `rdi` and `rsi`.
         macro_rules! call_context_switch {
-            ($func:expr) => (
+            ($func:expr) => ( unsafe {
                 asm!("
                     mov rdi, $0; \
                     mov rsi, $1;" 
@@ -528,7 +514,7 @@ impl Task {
                     : "memory" : "intel", "volatile"
                 );
                 $func();
-            );
+            });
         }
 
         // Now it's time to perform the actual context switch.
@@ -536,9 +522,7 @@ impl Task {
         // using the singular context_switch routine that matches the actual build target. 
         #[cfg(not(simd_personality))]
         {
-            unsafe {
-                call_context_switch!(context_switch::context_switch);
-            }
+            call_context_switch!(context_switch::context_switch);
         }
         // If `simd_personality` is enabled, all `context_switch*` routines are available,
         // which allows us to choose one based on whether the prev/next Tasks are SIMD-enabled.
@@ -547,65 +531,47 @@ impl Task {
             match (&self.simd, &next.simd) {
                 (SimdExt::None, SimdExt::None) => {
                     // warn!("SWITCHING from REGULAR to REGULAR task {:?} -> {:?}", self, next);
-                    unsafe {
-                        call_context_switch!(context_switch::context_switch_regular);
-                    }
+                    call_context_switch!(context_switch::context_switch_regular);
                 }
 
                 (SimdExt::None, SimdExt::SSE)  => {
                     // warn!("SWITCHING from REGULAR to SSE task {:?} -> {:?}", self, next);
-                    unsafe {
-                        call_context_switch!(context_switch::context_switch_regular_to_sse);
-                    }
+                    call_context_switch!(context_switch::context_switch_regular_to_sse);
                 }
                 
                 (SimdExt::None, SimdExt::AVX)  => {
                     // warn!("SWITCHING from REGULAR to AVX task {:?} -> {:?}", self, next);
-                    unsafe {
-                        call_context_switch!(context_switch::context_switch_regular_to_avx);
-                    }
+                    call_context_switch!(context_switch::context_switch_regular_to_avx);
                 }
 
                 (SimdExt::SSE, SimdExt::None)  => {
                     // warn!("SWITCHING from SSE to REGULAR task {:?} -> {:?}", self, next);
-                    unsafe {
-                        call_context_switch!(context_switch::context_switch_sse_to_regular);
-                    }
+                    call_context_switch!(context_switch::context_switch_sse_to_regular);
                 }
 
                 (SimdExt::SSE, SimdExt::SSE)   => {
                     // warn!("SWITCHING from SSE to SSE task {:?} -> {:?}", self, next);
-                    unsafe {
-                        call_context_switch!(context_switch::context_switch_sse);
-                    }
+                    call_context_switch!(context_switch::context_switch_sse);
                 }
 
                 (SimdExt::SSE, SimdExt::AVX) => {
                     warn!("SWITCHING from SSE to AVX task {:?} -> {:?}", self, next);
-                    unsafe {
-                        call_context_switch!(context_switch::context_switch_sse_to_avx);
-                    }
+                    call_context_switch!(context_switch::context_switch_sse_to_avx);
                 }
 
                 (SimdExt::AVX, SimdExt::None) => {
                     // warn!("SWITCHING from AVX to REGULAR task {:?} -> {:?}", self, next);
-                    unsafe {
-                        call_context_switch!(context_switch::context_switch_avx_to_regular);
-                    }
+                    call_context_switch!(context_switch::context_switch_avx_to_regular);
                 }
 
                 (SimdExt::AVX, SimdExt::SSE) => {
                     warn!("SWITCHING from AVX to SSE task {:?} -> {:?}", self, next);
-                    unsafe {
-                        call_context_switch!(context_switch::context_switch_avx_to_sse);
-                    }
+                    call_context_switch!(context_switch::context_switch_avx_to_sse);
                 }
 
                 (SimdExt::AVX, SimdExt::AVX) => {
                     // warn!("SWITCHING from AVX to AVX task {:?} -> {:?}", self, next);
-                    unsafe {
-                        call_context_switch!(context_switch::context_switch_avx);
-                    }
+                    call_context_switch!(context_switch::context_switch_avx);
                 }
             }
         }
@@ -675,7 +641,7 @@ impl TaskRef {
             current_task_id: task_id,
         };
         let tld_ptr = Box::into_raw(Box::new(tld));
-        taskref.0.deref().0.lock().task_local_data_ptr = tld_ptr as VirtualAddress;
+        taskref.0.deref().0.lock().task_local_data_ptr = VirtualAddress::new_canonical(tld_ptr as usize);
         taskref
     }
 
@@ -750,9 +716,13 @@ impl TaskRef {
 
     /// Call this function to indicate that this task has successfully ran to completion,
     /// and that it has returned the given `exit_value`.
+    /// This task must be the currently executing task, 
+    /// you cannot invoke `mark_as_exited()` on a different task.
+    /// 
+    /// This should only be used at the end of the `task_wrapper` function once it has cleanly exited.
     /// 
     /// # Locking / Deadlock
-    /// This method obtains a writeable lock on the underlying Task in order to mutate its state.
+    /// This method obtains a writable lock on the underlying Task in order to mutate its state.
     /// 
     /// # Return
     /// * Returns `Ok` if the exit status was successfully set.     
@@ -761,16 +731,56 @@ impl TaskRef {
     /// # Note 
     /// The `Task` will not be halted immediately -- 
     /// it will finish running its current timeslice, and then never be run again.
-    pub fn exit(&self, exit_value: Box<Any + Send>) -> Result<(), &'static str> {
-        self.internal_exit(ExitValue::Completed(exit_value))
+    #[doc(hidden)]
+    pub fn mark_as_exited(&self, exit_value: Box<dyn Any + Send>) -> Result<(), &'static str> {
+        let curr_task = get_my_current_task().ok_or("mark_as_exited(): failed to check what the current task is")?;
+        if curr_task == self {
+            self.internal_exit(ExitValue::Completed(exit_value))
+        } else {
+            Err("`mark_as_exited()` can only be invoked on the current task, not on another task.")
+        }
     }
 
-
-    /// Kills this `Task` (not a clean exit) without allowing it to run to completion.
-    /// The given `KillReason` indicates why it was killed.
+    /// Call this function to indicate that this task has been cleaned up (e.g., by unwinding)
+    /// and it is ready to be marked as killed, i.e., it will never run again.
+    /// This task must be the currently executing task, 
+    /// you cannot invoke `mark_as_killed()` on a different task.
+    /// 
+    /// If you want to kill another task, use the [`kill()`](method.kill) method instead.
+    /// 
+    /// This should only be used by the unwinding routines once they have finished.
     /// 
     /// # Locking / Deadlock
-    /// This method obtains a writeable lock on the underlying Task in order to mutate its state.
+    /// This method obtains a writable lock on the underlying Task in order to mutate its state.
+    /// 
+    /// # Return
+    /// * Returns `Ok` if the exit status was successfully set.     
+    /// * Returns `Err` if this `Task` was already exited, and does not overwrite the existing exit status. 
+    ///  
+    /// # Note 
+    /// The `Task` will not be halted immediately -- 
+    /// it will finish running its current timeslice, and then never be run again.
+    #[doc(hidden)]
+    pub fn mark_as_killed(&self, reason: KillReason) -> Result<(), &'static str> {
+        let curr_task = get_my_current_task().ok_or("mark_as_exited(): failed to check what the current task is")?;
+        if curr_task == self {
+            self.internal_exit(ExitValue::Killed(reason))
+        } else {
+            Err("`mark_as_exited()` can only be invoked on the current task, not on another task.")
+        }
+    }
+
+    /// Kills this `Task` (not a clean exit) without allowing it to run to completion.
+    /// The provided `KillReason` indicates why it was killed.
+    /// 
+    /// **
+    /// Currently this immediately kills the task without performing any unwinding cleanup.
+    /// In the near future, the task will be unwound such that its resources are freed/dropped
+    /// to ensure proper cleanup before the task is actually fully killed.
+    /// **
+    /// 
+    /// # Locking / Deadlock
+    /// This method obtains a writable lock on the underlying Task in order to mutate its state.
     /// 
     /// # Return
     /// * Returns `Ok` if the exit status was successfully set to the given `KillReason`.     
@@ -780,6 +790,8 @@ impl TaskRef {
     /// The `Task` will not be halted immediately -- 
     /// it will finish running its current timeslice, and then never be run again.
     pub fn kill(&self, reason: KillReason) -> Result<(), &'static str> {
+        // TODO FIXME: cause a panic in this Task such that it will start the unwinding process
+        // instead of immediately causing it to exit
         self.internal_exit(ExitValue::Killed(reason))
     }
 
@@ -791,7 +803,18 @@ impl TaskRef {
         MutexIrqSafeGuardRef::new(self.0.deref().0.lock())
     }
 
-    /// Registers a function or closure that will be called if this `Task` panics.
+    /// Blocks this `Task` by setting its `RunState` to blocked.
+    pub fn block(&self) {
+        self.0.deref().0.lock().runstate = RunState::Blocked;
+    }
+
+    /// Unblocks this `Task` by setting its `RunState` to runnable.
+    pub fn unblock(&self) {
+        self.0.deref().0.lock().runstate = RunState::Runnable;
+    }
+
+    /// Registers a function or closure that will be called if this `Task` panics,
+    /// invoked before the task is cleaned up via stack unwinding.
     /// # Locking / Deadlock
     /// Obtains a write lock on the enclosed `Task` in order to mutate its state.
     pub fn set_panic_handler(&self, callback: PanicHandler) {
@@ -825,9 +848,14 @@ impl TaskRef {
     pub fn get_env(&self) -> Arc<Mutex<Environment>> {
         Arc::clone(&self.0.deref().0.lock().env)
     }
+
+    /// Gets a reference to this task's `CrateNamespace`.
+    pub fn get_namespace(&self) -> Arc<CrateNamespace> {
+        Arc::clone(&self.0.deref().0.lock().namespace)
+    }
     
-    /// Obtains the lock on the underlying `Task` in a writeable, blocking fashion.
-    #[deprecated] // TODO FIXME since 2018-09-06
+    /// Obtains the lock on the underlying `Task` in a writable, blocking fashion.
+    #[deprecated(note = "This method exposes inner Task details for debugging purposes. Do not use it.")]
     pub fn lock_mut(&self) -> MutexIrqSafeGuardRefMut<Task> {
         MutexIrqSafeGuardRefMut::new(self.0.deref().0.lock())
     }
@@ -841,59 +869,42 @@ impl PartialEq for TaskRef {
 
 impl Eq for TaskRef { }
 
-// impl Hash for TaskRef {
-//     fn hash<H: Hasher>(&self, state: &mut H) {
-//         (self.0.as_ref() as *const _ as usize).hash(state);
-//     }
-// }
-
-// use core::cmp::Ord;
-// impl Ord for TaskRef {
-//     fn cmp(&self, other: &TaskRef) -> core::cmp::Ordering {
-//         (self.0.as_ref() as *const _ as usize).cmp(&(other.0.as_ref() as *const _ as usize))
-//     }
-// }
-
-// impl PartialOrd for TaskRef {
-//     fn partial_cmp(&self, other: &TaskRef) -> Option<core::cmp::Ordering> {
-//         Some(self.cmp(other))
-//     }
-// }
 
 
 /// Create and initialize an idle task, of which there is one per processor core/LocalApic.
 /// The idle task is a task that runs by default (one per core) when no other task is running.
 /// 
-/// Returns a reference to the `Task`, protected by a `RwLockIrqSafe`
+/// Returns a reference to the newly-created idle `Task`.
 /// 
 /// # Note
-/// This function does not make the new idle task runnable, nor add it to any runqueue.
+/// This function does not add the new idle task to any runqueue.
 pub fn create_idle_task(
     apic_id: u8, 
     stack_bottom: VirtualAddress, 
     stack_top: VirtualAddress,
-    kernel_mmi_ref: Arc<MutexIrqSafe<MemoryManagementInfo>>
+    kernel_mmi_ref: MmiRef,
 ) -> Result<TaskRef, &'static str> {
-
-    let mut idle_task = Task::new();
+    // Here, we cannot call `Task::new()` because tasking hasn't yet been set up for this core.
+    // Instead, we generate all of the `Task` states manually, and create an initial idle task directly.
+    let kstack = Stack::new( 
+        stack_top, 
+        stack_bottom, 
+        MappedPages::from_existing(
+            PageRange::from_virt_addr(stack_bottom, stack_top.value() - stack_bottom.value()),
+            EntryFlags::WRITABLE | EntryFlags::PRESENT
+        ),
+    );
+    let default_namespace = mod_mgmt::get_initial_kernel_namespace()
+        .ok_or("The initial kernel CrateNamespace must be initialized before the tasking subsystem.")?
+        .clone();
+    let default_env = Arc::new(Mutex::new(Environment::default()));
+    let mut idle_task = Task::new_internal(kstack, kernel_mmi_ref, default_namespace, default_env, None);
     idle_task.name = format!("idle_task_ap{}", apic_id);
     idle_task.is_an_idle_task = true;
     idle_task.runstate = RunState::Runnable;
     idle_task.running_on_cpu = Some(apic_id); 
     idle_task.pinned_core = Some(apic_id); // can only run on this CPU core
-    idle_task.mmi = Some(kernel_mmi_ref);
     // debug!("IDLE TASK STACK (apic {}) at bottom={:#x} - top={:#x} ", apic_id, stack_bottom, stack_top);
-    idle_task.kstack = Some( 
-        Stack::new( 
-            stack_top, 
-            stack_bottom, 
-            MappedPages::from_existing(
-                Page::range_inclusive_addr(stack_bottom, stack_top - stack_bottom),
-                EntryFlags::WRITABLE | EntryFlags::PRESENT
-            ),
-        )
-    );
-
     let idle_task_id = idle_task.id;
     let task_ref = TaskRef::new(idle_task);
 
@@ -932,45 +943,26 @@ struct TaskLocalData {
 /// Returns a reference to the current task's `TaskLocalData` 
 /// by using the `TaskLocalData` pointer stored in the FS base MSR register.
 fn get_task_local_data() -> Option<&'static TaskLocalData> {
-    // SAFE: it's safe to cast this as a static reference
-    // because it will always be valid for the life of a given Task's execution.
-    let tld: &'static TaskLocalData = unsafe {
+    let tld: &'static TaskLocalData = {
         let tld_ptr = rdmsr(IA32_FS_BASE) as *const TaskLocalData;
         if tld_ptr.is_null() {
             return None;
         }
-        &*tld_ptr
+        // SAFE: it's safe to cast this as a static reference
+        // because it will always be valid for the life of a given Task's execution.
+        unsafe { &*tld_ptr }
     };
-    Some(&tld)
-
-    // let tld2: &TaskLocalData = unsafe {
-    //     let tld_ptr: u64;
-    //     asm!("mov $0, fs:[0x8]" : "=r"(tld_ptr) : : "memory" : "intel", "volatile");
-    //     let fs_base: u64;
-    //     asm!("mov $0, fs:[0x0]" : "=r"(fs_base) : : "memory" : "intel", "volatile");
-    //     warn!("current_task_id(): fs_base: {:#X}", fs_base);
-    //     &*(tld_ptr as *const TaskLocalData)
-    // };
+    Some(tld)
 }
 
-/// Returns a cloned reference to the current task id by using the `TaskLocalData` pointer
-/// stored in the FS base MSR register.
+/// Returns a reference to the current task by using the `TaskLocalData` pointer
+/// stored in the thread-local storage (FS base model-specific register).
 pub fn get_my_current_task() -> Option<&'static TaskRef> {
     get_task_local_data().map(|tld| &tld.current_taskref)
 }
 
 /// Returns the current Task's id by using the `TaskLocalData` pointer
-/// stored in the FS base MSR register.
+/// stored in the thread-local storage (FS base model-specific register).
 pub fn get_my_current_task_id() -> Option<usize> {
     get_task_local_data().map(|tld| tld.current_task_id)
-}
-
-/// Returns the current Task's working Directory
-/// from its `Environment` object.
-pub fn get_my_working_dir() -> Option<DirRef> {
-    get_my_current_task().map(|taskref| {
-        let env = taskref.get_env();
-        let env_locked = env.lock();
-        Arc::clone(&env_locked.working_dir)
-    })
 }

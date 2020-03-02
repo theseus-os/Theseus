@@ -2,7 +2,6 @@
 //! which is used to compare a standard runqueue with a state spill-free runqueue.
 
 #![no_std]
-#![feature(alloc)]
 
 #[macro_use] extern crate alloc;
 #[macro_use] extern crate terminal_print;
@@ -29,7 +28,6 @@ const CONFIG: &'static str = "WITHOUT state spill";
 const _FEMTOSECONDS_PER_SECOND: u64 = 1000*1000*1000*1000*1000; // 10^15
 
 
-#[no_mangle]
 pub fn main(args: Vec<String>) -> isize {
     let mut opts = Options::new();
     opts.optflag("h", "help", "print this help menu");
@@ -114,7 +112,7 @@ fn run_whole(num_tasks: usize) -> Result<(), &'static str> {
 
 fn run_single(iterations: usize) -> Result<(), &'static str> {
     println!("Evaluating runqueue {} with SINGLE tasks, {} iterations...", CONFIG, iterations);
-    let mut task = Task::new();
+    let mut task = Task::new(None)?;
     task.name = String::from("rq_eval_single_task_unrunnable");
     let taskref = TaskRef::new(task);
 

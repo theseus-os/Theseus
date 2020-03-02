@@ -1,0 +1,30 @@
+[package]
+name = "text_display"
+version = "0.1.0"
+authors = ["Wenqiu Yu <yuwenqiuj@gmail.com>"]
+description = "a text display is a block of text which can display onto a framebuffer"
+build = "../../../build.rs"
+
+[dependencies]
+spin = "0.4.10"
+
+[dependencies.framebuffer]
+path = "../../framebuffer"
+
+[dependencies.displayable]
+path = "../"
+
+[dependencies.framebuffer_printer]
+path = "../../framebuffer_printer"
+
+[dependencies.font]
+path = "../../font"
+
+[dependencies.shapes]
+path = "../../shapes"
+
+[dependencies.color]
+path = "../../color"
+
+[lib]
+crate-type = ["rlib"]

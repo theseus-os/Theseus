@@ -7,7 +7,7 @@
 // option. This file may not be copied, modified, or distributed
 // except according to those terms.
 
-use super::{Frame, FrameAllocator, FrameIter, PhysicalMemoryArea};
+use super::{Frame, FrameAllocator, FrameRange, PhysicalAddress, PhysicalMemoryArea};
 use alloc::vec::Vec;
 use kernel_config::memory::PAGE_SIZE;
 
@@ -66,7 +66,7 @@ impl AreaFrameAllocator {
         occ_len: usize
     ) -> Result<AreaFrameAllocator, &'static str> {
         let mut allocator = AreaFrameAllocator {
-            next_free_frame: Frame::containing_address(0),
+            next_free_frame: Frame::containing_address(PhysicalAddress::zero()),
             current_area: None,
             available: VectorArray::Array((avail_len, available)),
             occupied: VectorArray::Array((occ_len, occupied)),
@@ -115,7 +115,7 @@ impl AreaFrameAllocator {
                 arr.iter().take(len)
                     .filter(|area| {
                         let address = area.base_addr + area.size_in_bytes - 1;
-                        area.typ == 1 && Frame::containing_address(address as usize) >= self.next_free_frame
+                        area.typ == 1 && Frame::containing_address(address) >= self.next_free_frame
                     })
                     .min_by_key(|area| area.base_addr).cloned()
             }
@@ -123,7 +123,7 @@ impl AreaFrameAllocator {
                 v.iter()
                     .filter(|area| {
                         let address = area.base_addr + area.size_in_bytes - 1;
-                        area.typ == 1 && Frame::containing_address(address as usize) >= self.next_free_frame
+                        area.typ == 1 && Frame::containing_address(address) >= self.next_free_frame
                     })
                     .min_by_key(|area| area.base_addr).cloned()
             }
@@ -133,7 +133,7 @@ impl AreaFrameAllocator {
         trace!("AreaFrameAllocator: selected next area {:?}", self.current_area);
 
         if let Some(area) = self.current_area {
-            let start_frame = Frame::containing_address(area.base_addr as usize);
+            let start_frame = Frame::containing_address(area.base_addr);
             if self.next_free_frame < start_frame {
                 self.next_free_frame = start_frame;
             }
@@ -181,7 +181,7 @@ impl AreaFrameAllocator {
 
 impl FrameAllocator for AreaFrameAllocator {
 
-    fn allocate_frames(&mut self, num_frames: usize) -> Option<FrameIter> {
+    fn allocate_frames(&mut self, num_frames: usize) -> Option<FrameRange> {
         // this is just a shitty way to get contiguous frames, since right now it's really easy to get them
         // it wastes the frames that are allocated 
 
@@ -208,8 +208,8 @@ impl FrameAllocator for AreaFrameAllocator {
             }
 
             // here, we have allocated enough frames, and checked that they're all contiguous
-            let last_frame = first_frame.clone() + num_frames - 1; // -1 because FrameIter is inclusive
-            return Some(Frame::range_inclusive(first_frame, last_frame));
+            let last_frame = first_frame.clone() + num_frames - 1; // -1 because FrameRange is inclusive
+            return Some(FrameRange::new(first_frame, last_frame));
         }
 
         error!("Error: AreaFrameAllocator::allocate_frames(): couldn't allocate {} contiguous frames, out of memory!", num_frames);
@@ -229,7 +229,7 @@ impl FrameAllocator for AreaFrameAllocator {
             // the last frame of the current area
             let last_frame_in_current_area = {
                 let address = area.base_addr + area.size_in_bytes - 1;
-                Frame::containing_address(address as usize)
+                Frame::containing_address(address)
             };
 
             if frame > last_frame_in_current_area {

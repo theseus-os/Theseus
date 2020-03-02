@@ -1,656 +1,828 @@
-//! Window manager that simulates a desktop environment. 
-//! *note: since window overlap is not yet supported, any application that asks for a window that would overlap
-//! with an existing window will be returned an error
-//! 
-//! Applications request window objects from the window manager through either of two functions:
-//! - default_new_window() will provide a window of default size (centered, fills majority of screen)
-//! - new_window() provides a new window whose dimensions the caller must specify
-//! 
-//! Windows can be resized by calling resize()
-//! Window can be by passing the window object to delete() or directly through WindowObj.delete(), though the 2nd option requires updating the active pointer manually
-//! 
-//! The window object is designed as follows:
-//! The application's window provides a screen area for the application to display its content into. The application can select
-//! from various Displayables such as TextDisplay (multiple of which can be displayed into the application's window at a time)
-//! 
-//! The WINDOW_ALLOCATOR is used by the WindowManager itself to track and modify the existing windows
+//! This crate acts as a manager of a list of windows. It defines a `WindowManager` structure and an instance of it. 
+//!
+//! A window manager holds a set of `WindowInner` objects, including an active window, a list of shown windows and a list of hidden windows. The hidden windows are totally overlapped by others.
+//!
+//! A window manager owns a bottom framebuffer and a top framebuffer. The bottom is the background of the desktop and the top framebuffer contains a floating window border and a mouse arrow. 
+//! A window manager also contains a final framebuffer which is mapped to the screen. In refreshing an area, the manager will render all the framebuffers to the final one in order: bottom -> hide list -> showlist -> active -> top.
+//!
+//! The window manager provides methods to update within some bounding boxes rather than the whole screen for better performance.
 
 #![no_std]
-#![feature(alloc)]
-#![feature(const_fn)]
-#![feature(asm)]
 
 extern crate spin;
-extern crate irq_safety;
-extern crate alloc;
-extern crate dfqueue;
-extern crate keycodes_ascii;
-extern crate frame_buffer;
-extern crate event_types;
-extern crate spawn;
-extern crate pit_clock;
-
 #[macro_use] extern crate log;
-//#[macro_use] extern crate util;
+#[macro_use] extern crate alloc;
+extern crate mpmc;
+extern crate event_types;
+extern crate compositor;
+extern crate framebuffer;
+extern crate framebuffer_compositor;
+extern crate framebuffer_drawer;
+extern crate keycodes_ascii;
+extern crate mod_mgmt;
+extern crate mouse_data;
+extern crate path;
+extern crate scheduler; 
+extern crate spawn;
+extern crate window_inner;
+extern crate shapes;
+extern crate color;
 
-extern crate acpi;
-
-
-use spin::{Once, Mutex};
-use alloc::collections::{VecDeque, BTreeMap};
-use core::ops::Deref;
-use dfqueue::{DFQueue,DFQueueConsumer,DFQueueProducer};
+use alloc::collections::VecDeque;
+use alloc::string::ToString;
 use alloc::sync::{Arc, Weak};
-use frame_buffer::text_buffer::{FrameTextBuffer};
-use event_types::Event;
-use alloc::string::{String, ToString};
+use alloc::vec::{Vec};
+use compositor::{Compositor, FramebufferUpdates, CompositableRegion};
 
-pub mod displayable;
+use mpmc::Queue;
+use event_types::{Event, MousePositionEvent};
+use framebuffer::{Framebuffer, AlphaPixel};
+use color::{Color};
+use shapes::{Coord, Rectangle};
+use framebuffer_compositor::{FRAME_COMPOSITOR};
+use keycodes_ascii::{KeyAction, KeyEvent, Keycode};
+use mouse_data::MouseEvent;
+use path::Path;
+use spawn::{ApplicationTaskBuilder, KernelTaskBuilder};
+use spin::{Mutex, Once};
+use window_inner::{WindowInner, WindowMovingStatus};
 
-use displayable::text_display::TextDisplay;
+/// The instance of the default window manager
+pub static WINDOW_MANAGER: Once<Mutex<WindowManager>> = Once::new();
 
+/// The width and height size of mouse in number of pixels.
+const MOUSE_POINTER_SIZE: usize = 9;
+/// The mouse pointer image defined as a 2-D pixel array.
+static MOUSE_POINTER_IMAGE: [[Color; MOUSE_POINTER_SIZE]; MOUSE_POINTER_SIZE] = {
+    const T: Color = color::TRANSPARENT;
+    const W: Color = color::WHITE;
+    const B: Color = color::BLUE;
+    [
+        [B, B, B, B, B, B, B, B, B],
+        [B, W, W, W, W, W, W, B, T],
+        [B, W, W, W, W, W, B, T, T],
+        [B, W, W, W, W, B, T, T, T],
+        [B, W, W, W, W, B, T, T, T],
+        [B, W, W, B, B, W, B, T, T],
+        [B, W, B, T, T, B, W, B, T],
+        [B, B, T, T, T, T, B, W, B],
+        [B, T, T, T, T, T, T, B, B],
+    ]
+};
 
-static WINDOW_ALLOCATOR: Once<Mutex<WindowAllocator>> = Once::new();
-const WINDOW_ACTIVE_COLOR:u32 = 0xFFFFFF;
-const WINDOW_INACTIVE_COLOR:u32 = 0x343C37;
-const SCREEN_BACKGROUND_COLOR:u32 = 0x000000;
+// the border indicating new window position and size
+const WINDOW_BORDER_SIZE: usize = 3;
+// border's inner color
+const WINDOW_BORDER_COLOR_INNER: Color = Color::new(0x00CA6F1E);
 
-/// 10 pixel gap between windows 
-pub const GAP_SIZE: usize = 10;
-pub const WINDOW_MARGIN: usize = 2;
-
-struct WindowAllocator {
-    allocated: VecDeque<Weak<Mutex<WindowInner>>>, 
-    // a weak pointer directly to the active WindowInner so we don't have to search for the active window when we need it quickly
-    // this weak pointer is set in the WindowAllocator's switch(), delete(), and allocate() functions
-    active: Weak<Mutex<WindowInner>>, 
+/// Window manager structure which maintains a list of windows and a mouse.
+pub struct WindowManager {
+    /// those window currently not shown on screen
+    hide_list: VecDeque<Weak<Mutex<WindowInner>>>,
+    /// those window shown on screen that may overlapping each other
+    show_list: VecDeque<Weak<Mutex<WindowInner>>>,
+    /// the only active window, receiving all keyboard events (except for those remained for WM)
+    active: Weak<Mutex<WindowInner>>, // this one is not in show_list
+    /// current mouse position
+    mouse: Coord,
+    /// If a window is being repositioned (e.g., by dragging it), this is the position of that window's border
+    repositioned_border: Option<Rectangle>,
+    /// The bottom framebuffer typically contains the background/wallpaper image, 
+    /// which is displayed by default when no other windows exist on top of it.
+    bottom_fb: Framebuffer<AlphaPixel>,
+    /// The top framebuffer is used for overlaying visual elements atop the rest of the windows, 
+    /// e.g., the mouse pointer, the border of a window being dragged/moved, etc. 
+    top_fb: Framebuffer<AlphaPixel>,
+    /// The final framebuffer which is mapped to the screen (the actual display device).
+    pub final_fb: Framebuffer<AlphaPixel>,
 }
 
-/// Applications call this function to request a new window object with a default size (mostly fills screen with GAP_SIZE around all borders)
-/// If the caller a specific window size, it should call new_window()
-pub fn new_default_window() -> Result<WindowObj, &'static str> {
-    let (window_width, window_height) = get_screen_size();
-    match new_window(GAP_SIZE, GAP_SIZE, window_width - 2* GAP_SIZE, window_height - 2* GAP_SIZE) {
-        Ok(new_window) => {return Ok(new_window)}
-        Err(err) => {return Err(err)}
-    }
-}
-
-/// Lets the caller specify the dimensions of the new window and returns a new window
-/// Params x,y specify the (x,y) coordinates of the top left corner of the window
-/// Params width and height specify dimenions of new window in pixels
-pub fn new_window<'a>(x:usize, y:usize, width:usize, height:usize) -> Result<WindowObj, &'static str>{
-
-    let allocator: &Mutex<WindowAllocator> = WINDOW_ALLOCATOR.call_once(|| {
-        Mutex::new(WindowAllocator{
-            allocated:VecDeque::new(),
-            active:Weak::new(),
-        })
-    });
-
-    allocator.lock().allocate(x,y,width,height)
-}
-
-/// Puts an input event into the active window (i.e. a keypress event, resize event, etc.)
-/// If the caller wants to put an event into a specific window, use put_event_into_app()
-pub fn send_event_to_active(event: Event) -> Result<(), &'static str>{    
-    let mut allocator = try!(WINDOW_ALLOCATOR.try().ok_or("The window allocator is not initialized")).lock();
-    allocator.send_event(event)
-}
-
-
-// Gets the border color specified by the window manager
-fn get_border_color(active:bool) -> u32 {
-    if active {
-        WINDOW_ACTIVE_COLOR
-    } else {
-        WINDOW_INACTIVE_COLOR
-    }
-}
-
-
-/// switch the active window. Active the next window in the list based on the order they are created
-pub fn switch() -> Result<(), &'static str> {
-    let mut allocator = try!(WINDOW_ALLOCATOR.try().ok_or("The window allocator is not initialized")).lock();
-    allocator.switch();
-    Ok(())
-}
-
-/// delete a window object
-pub fn delete(window:WindowObj) -> Result<(), &'static str> {
-    let mut allocator = try!(WINDOW_ALLOCATOR.try().ok_or("The window allocator is not initialized")).lock();
-    // Switches to a new active window and sets 
-    // the active pointer field of the window allocator to the new active window
-    allocator.switch(); 
-    allocator.delete(&(window.inner));
-    Ok(())
-}
-
-/// Returns the width and height (in pixels) of the screen 
-pub fn get_screen_size() -> (usize, usize) {
-    frame_buffer::get_resolution()
-}
-
-impl WindowAllocator{
-    
-    // Allocate a new window and return it
-    fn allocate(&mut self, x:usize, y:usize, width:usize, height:usize) -> Result<WindowObj, &'static str>{
-        /*{
-            let mut drawer = frame_buffer::FRAME_DRAWER.lock();
-                let index = frame_buffer::get_index_fn(drawer.width);
-
-                let buffer;
-                match drawer.buffer() {
-                    Ok(rs) => {buffer = rs;},
-                    Err(err) => {return Err(err);},
+impl WindowManager {
+    /// Sets one window as active, push last active (if exists) to top of show_list. if `refresh` is `true`, will then refresh the window's area.
+    /// Returns whether this window is the first active window in the manager.
+    /// 
+    /// TODO FIXME: (kevinaboos) remove this dumb notion of "first active". This is a bad hack. 
+    pub fn set_active(
+        &mut self,
+        inner_ref: &Arc<Mutex<WindowInner>>,
+        refresh: bool,
+    ) -> Result<bool, &'static str> {
+        // if it is currently actived, just return
+        let first_active = match self.active.upgrade() {
+            Some(current_active) => {
+                if Arc::ptr_eq(&(current_active), inner_ref) {
+                    return Ok(true); // do nothing
+                } else {
+                    // save this to show_list
+                    self.show_list.push_front(self.active.clone());
                 }
-                buffer[index(0,0)] = 0x777777;
-        }*/
-
-        let (buffer_width, buffer_height) = frame_buffer::get_resolution();
-        if width < 2 * WINDOW_MARGIN || height < 2 * WINDOW_MARGIN {
-            return Err("Window size must be greater than the margin");
-        }
-
-        if x + width >= buffer_width
-       || y + height >= buffer_height {
-            return Err("Requested area extends the screen size");
-        }
-
-        let consumer = DFQueue::new().into_consumer();
-        let producer = consumer.obtain_producer();
-
-        //new_window = ||{WindowObj{x:x,y:y,width:width,height:height,active:true}};
-
-        let inner = WindowInner{
-            x:x,
-            y:y,
-            width:width,
-            height:height,
-            active:true,
-            margin:WINDOW_MARGIN,
-            key_producer:producer,
+                false
+            }
+            None => true,
         };
-
-        let inner_ref = Arc::new(Mutex::new(inner));
-
-        let overlapped = self.check_overlap(&inner_ref, x, y, width, height);       
-        if overlapped  {
-            return Err("Request area is already allocated");
-        }
-
-        // draw the window
-        {
-            let inner_lock = inner_ref.lock();
-            inner_lock.clean();
-            inner_lock.draw_border(get_border_color(true));
-        }
         
-        // inactive all other windows and active the new one
-        for item in self.allocated.iter_mut(){
-            let ref_opt = item.upgrade();
-            if let Some(reference) = ref_opt {
-                reference.lock().active(false);
+        match self.is_window_in_show_list(&inner_ref) {
+            // remove item in current list
+            Some(i) => {
+                self.show_list.remove(i);
             }
+            None => {}
         }
-        let weak_ref = Arc::downgrade(&inner_ref);
-        self.active = weak_ref.clone();
-        self.allocated.push_back(weak_ref);
-
-        // new the window
-        let window: WindowObj = WindowObj{
-            inner:inner_ref,
-            //text_buffer:FrameTextBuffer::new(),
-            consumer:consumer,
-            components:BTreeMap::new(),
-        }; 
-
-        Ok(window)    
+        match self.is_window_in_hide_list(&inner_ref) {
+            // remove item in current list
+            Some(i) => {
+                self.hide_list.remove(i);
+            }
+            None => {}
+        }
+        self.active = Arc::downgrade(inner_ref);
+        let area = {
+            let window = inner_ref.lock();
+            let top_left = window.get_position();
+            let (width, height) = window.get_size();          
+            Rectangle {
+                top_left: top_left,
+                bottom_right: top_left + (width as isize, height as isize)
+            }
+        };
+        if refresh {
+            self.refresh_bottom_windows(Some(area), true)?;
+        }
+        Ok(first_active)
     }
 
-    /// Switches to the next active window in the window allocator list
-    /// This function returns the index of the previously active window in the window_allocator.allocated vector
-    fn switch(&mut self) -> usize {
-        let mut flag = false;
-        let mut i = 0;
-        let mut prev_active = 0;
-        for item in self.allocated.iter_mut(){
-            let reference = item.upgrade();
-            if let Some(window) = reference {
-                let mut window = window.lock();
-                if flag {
-                    (*window).active(true);
-                    self.active = item.clone(); // clones the weak pointer to put in the active field
-                    flag = false;
-                    self.active = item.clone();
-                } else if window.active {
-                    (*window).active(false);
-                    prev_active = i;
-                    flag = true;
-                }
-                i += 1;
-            }
-        }
-        if flag {
-            for item in self.allocated.iter_mut(){
-                let reference = item.upgrade();
-                if let Some(window) = reference {
-                    let mut window = window.lock();
-                    (*window).active(true);
-                    self.active = item.clone(); // clones the weak pointer to put into the active field
-                    break;
-                }
-            }
-        }
-
-        return prev_active;
-    }
-
-    fn delete(&mut self, inner:&Arc<Mutex<WindowInner>>){
-        let mut i = 0;
-        let len = self.allocated.len();
-        for item in self.allocated.iter(){
-            let reference = item.upgrade();
-            if let Some(inner_ptr) = reference {
-                if Arc::ptr_eq(&(inner_ptr), inner) {
-                    break;
+    /// Returns the index of a window if it is in the show list
+    fn is_window_in_show_list(&mut self, window: &Arc<Mutex<WindowInner>>) -> Option<usize> {
+        let mut i = 0_usize;
+        for item in self.show_list.iter() {
+            if let Some(item_ptr) = item.upgrade() {
+                if Arc::ptr_eq(&(item_ptr), window) {
+                    return Some(i);
                 }
             }
             i += 1;
         }
-        if i < len {
-            {
-                let window_ref = &self.allocated[i];
-                let window = window_ref.upgrade();
-                if let Some(window) = window {
-                    window.lock().key_producer.enqueue(Event::ExitEvent);
-                }
-            }
-            self.allocated.remove(i);
-        }
-
-        let inner_lock = inner.lock();
-        inner_lock.clean();
-        inner_lock.draw_border(SCREEN_BACKGROUND_COLOR);
+        None
     }
 
-    fn check_overlap(&mut self, inner:&Arc<Mutex<WindowInner>>, x:usize, y:usize, width:usize, height:usize) -> bool {
-        let mut len = self.allocated.len();
-        let mut i = 0;
-        while i < len {
-            {   
-                let mut void = false;
-                if let Some(reference) = self.allocated.get(i) {
-                    if let Some(allocated_ref) = reference.upgrade() {
-                        if !Arc::ptr_eq(&allocated_ref, inner) {
-                            if allocated_ref.lock().is_overlapped(x, y, width, height) {
-                                return true;
-                            }
-                        }
-                        i += 1;
-                    } else {
-                        void = true;
+    /// Returns the index of a window if it is in the hide list
+    fn is_window_in_hide_list(&mut self, window: &Arc<Mutex<WindowInner>>) -> Option<usize> {
+        let mut i = 0_usize;
+        for item in self.hide_list.iter() {
+            if let Some(item_ptr) = item.upgrade() {
+                if Arc::ptr_eq(&(item_ptr), window) {
+                    return Some(i);
+                }
+            }
+            i += 1;
+        }
+        None
+    }
+
+    /// delete a window and refresh its region
+    pub fn delete_window(&mut self, inner_ref: &Arc<Mutex<WindowInner>>) -> Result<(), &'static str> {
+        let (top_left, bottom_right) = {
+            let inner = inner_ref.lock();
+            let top_left = inner.get_position();
+            let (width, height) = inner.get_size();
+            let bottom_right = top_left + (width as isize, height as isize);
+            (top_left, bottom_right)
+        };
+        let area = Some(
+            Rectangle {
+                top_left: top_left,
+                bottom_right: bottom_right
+            }
+        );
+
+        if let Some(current_active) = self.active.upgrade() {
+            if Arc::ptr_eq(&current_active, inner_ref) {
+                self.refresh_bottom_windows(area, false)?;
+                if let Some(window) = self.show_list.remove(0) {
+                    self.active = window;
+                } else if let Some(window) = self.hide_list.remove(0) {
+                    self.active = window;
+                } else {
+                    self.active = Weak::new(); // delete reference
+                }
+                return Ok(());
+            }
+        }
+        
+        if let Some(index) = self.is_window_in_show_list(inner_ref) {
+            self.show_list.remove(index);
+            self.refresh_windows(area)?;
+            return Ok(())        
+        }
+
+        if let Some(index) = self.is_window_in_hide_list(inner_ref) {
+            self.hide_list.remove(index);
+            return Ok(())        
+        }
+        Err("cannot find this window")
+    }
+
+    /// Refresh the region in `bounding_box`. Only render the bottom final framebuffer and windows. Ignore the active window if `active` is false.
+    pub fn refresh_bottom_windows<B: CompositableRegion + Clone>(
+        &mut self, 
+        bounding_box: impl IntoIterator<Item = B> + Clone,
+        active: bool,
+    ) -> Result<(), &'static str> {
+        // bottom framebuffer
+        let bottom_fb_area = FramebufferUpdates {
+            src_framebuffer: &self.bottom_fb,
+            coordinate_in_dest_framebuffer: Coord::new(0, 0),
+        };
+
+        // list of windows to be updated
+        let mut window_ref_list = Vec::new();
+        for window in &self.hide_list {
+            if let Some(window_ref) = window.upgrade() {
+                window_ref_list.push(window_ref);
+            }
+        }
+        for window in &self.show_list {
+            if let Some(window_ref) = window.upgrade() {
+                window_ref_list.push(window_ref);
+            }
+        }
+        if active {
+            if let Some(window_ref) = self.active.upgrade() {
+                window_ref_list.push(window_ref)
+            }
+        }
+
+        // lock windows
+        let locked_window_list = &window_ref_list.iter().map(|x| x.lock()).collect::<Vec<_>>();
+
+        // create updated framebuffer info objects
+        let window_bufferlist = locked_window_list.iter().map(|window| {
+            FramebufferUpdates {
+                src_framebuffer: window.framebuffer(),
+                coordinate_in_dest_framebuffer: window.get_position(),
+            }
+        }).collect::<Vec<_>>();
+        
+        let buffer_iter = Some(bottom_fb_area).into_iter().chain(window_bufferlist.into_iter());
+        FRAME_COMPOSITOR.lock().composite(buffer_iter, &mut self.final_fb, bounding_box)?;
+        
+        Ok(())
+    }
+
+    /// Refresh the region of `bounding_box` in the top framebuffer
+    pub fn refresh_top<B: CompositableRegion + Clone>(
+        &mut self, 
+        bounding_box: impl IntoIterator<Item = B> + Clone
+    ) -> Result<(), &'static str> {
+        let top_buffer = FramebufferUpdates {
+            src_framebuffer: &self.top_fb,
+            coordinate_in_dest_framebuffer: Coord::new(0, 0),
+        }; 
+
+        FRAME_COMPOSITOR.lock().composite(Some(top_buffer), &mut self.final_fb, bounding_box)
+    }
+
+    /// Refresh the part in `bounding_box` of every window. `bounding_box` is a region relative to the top-left of the screen. Refresh the whole screen if the bounding box is None.
+    pub fn refresh_windows<B: CompositableRegion + Clone>(
+        &mut self, 
+        bounding_box: impl IntoIterator<Item = B> + Clone,
+    ) -> Result<(), &'static str> {
+        // reference of windows
+        let mut window_ref_list = Vec::new();
+        for window in &self.hide_list {
+            if let Some(window_ref) = window.upgrade() {
+                window_ref_list.push(window_ref);
+            }
+        }
+        for window in &self.show_list {
+            if let Some(window_ref) = window.upgrade() {
+                window_ref_list.push(window_ref);
+            }
+        }
+
+        if let Some(window_ref) = self.active.upgrade() {
+            window_ref_list.push(window_ref)
+        }
+
+        // lock windows
+        let locked_window_list = &window_ref_list.iter().map(|x| x.lock()).collect::<Vec<_>>();
+        // create updated framebuffer info objects
+        let bufferlist = locked_window_list.iter().map(|window| {
+            FramebufferUpdates {
+                src_framebuffer: window.framebuffer(),
+                coordinate_in_dest_framebuffer: window.get_position(),
+            }
+        }).collect::<Vec<_>>();
+
+        FRAME_COMPOSITOR.lock().composite(bufferlist.into_iter(), &mut self.final_fb, bounding_box)
+    }
+
+
+    /// Refresh the part in `bounding_box` of the active window. `bounding_box` is a region relative to the top-left of the screen. Refresh the whole screen if the bounding box is None.
+    pub fn refresh_active_window(&mut self, bounding_box: Option<Rectangle>) -> Result<(), &'static str> {
+        if let Some(window_ref) = self.active.upgrade() {
+            let window = window_ref.lock();
+            let buffer_update = FramebufferUpdates {
+                src_framebuffer: window.framebuffer(),
+                coordinate_in_dest_framebuffer: window.get_position(),
+            };
+            FRAME_COMPOSITOR.lock().composite(Some(buffer_update), &mut self.final_fb, bounding_box)
+        } else {
+            Ok(())
+        } 
+    }
+    
+    /// Passes the given keyboard event to the currently active window.
+    fn pass_keyboard_event_to_window(&self, key_event: KeyEvent) -> Result<(), &'static str> {
+        let active_window = self.active.upgrade().ok_or("no window was set as active to receive a keyboard event")?;
+        active_window.lock().send_event(Event::new_keyboard_event(key_event))
+            .map_err(|_e| "Failed to enqueue the keyboard event; window event queue was full.")?;
+        Ok(())
+    }
+
+    /// Passes the given mouse event to the window that the mouse is currently over. 
+    /// 
+    /// If the mouse is not over any window, an error is returned; 
+    /// however, this error is quite common and expected when the mouse is not positioned within a window,
+    /// and is not a true failure. 
+    fn pass_mouse_event_to_window(&self, mouse_event: MouseEvent) -> Result<(), &'static str> {
+        let coordinate = { &self.mouse };
+        let mut event: MousePositionEvent = MousePositionEvent {
+            coordinate: Coord::new(0, 0),
+            gcoordinate: coordinate.clone(),
+            scrolling_up: mouse_event.mousemove.scrolling_up,
+            scrolling_down: mouse_event.mousemove.scrolling_down,
+            left_button_hold: mouse_event.buttonact.left_button_hold,
+            right_button_hold: mouse_event.buttonact.right_button_hold,
+            fourth_button_hold: mouse_event.buttonact.fourth_button_hold,
+            fifth_button_hold: mouse_event.buttonact.fifth_button_hold,
+        };
+
+        // TODO: FIXME:  improve this logic to just send the mouse event to the top-most window in the entire WM list,
+        //               not just necessarily the active one. (For example, scroll wheel events can be sent to non-active windows).
+
+
+        // first check the active one
+        if let Some(current_active) = self.active.upgrade() {
+            let current_active_win = current_active.lock();
+            let current_coordinate = current_active_win.get_position();
+            if current_active_win.contains(*coordinate - current_coordinate) || match current_active_win.moving {
+                WindowMovingStatus::Moving(_) => true,
+                _ => false,
+            }{
+                event.coordinate = *coordinate - current_coordinate;
+                // debug!("pass to active: {}, {}", event.x, event.y);
+                current_active_win.send_event(Event::MousePositionEvent(event))
+                    .map_err(|_e| "Failed to enqueue the mouse event; window event queue was full.")?;
+                return Ok(());
+            }
+        }
+
+        // TODO FIXME: (kevinaboos): the logic below here is actually incorrect -- it could send mouse events to an invisible window below others.
+
+        // then check show_list
+        for i in 0..self.show_list.len() {
+            if let Some(now_inner_mutex) = self.show_list[i].upgrade() {
+                let now_inner = now_inner_mutex.lock();
+                let current_coordinate = now_inner.get_position();
+                if now_inner.contains(*coordinate - current_coordinate) {
+                    event.coordinate = *coordinate - current_coordinate;
+                    now_inner.send_event(Event::MousePositionEvent(event))
+                        .map_err(|_e| "Failed to enqueue the mouse event; window event queue was full.")?;
+                    return Ok(());
+                }
+            }
+        }
+
+        Err("the mouse position does not fall within the bounds of any window")
+    }
+
+    /// Refresh the floating border, which is used to show the outline of a window while it is being moved. 
+    /// `show` indicates whether to show the border or not.
+    /// `new_border` defines the rectangular outline of the border.
+    fn refresh_floating_border(
+        &mut self,
+        show: bool,
+        new_border: Rectangle,
+    ) -> Result<(), &'static str> {
+        // first clear old border if exists
+        match self.repositioned_border {
+            Some(border) => {
+                let pixels = self.draw_floating_border(&border, color::TRANSPARENT);
+                self.refresh_bottom_windows(pixels.into_iter(), true)?;
+            },
+            None =>{}
+        }
+
+        // then draw current border
+        if show {
+            let pixels = self.draw_floating_border(&new_border, WINDOW_BORDER_COLOR_INNER);
+            self.refresh_top(pixels.into_iter())?;
+            self.repositioned_border = Some(new_border);
+        } else {
+            self.repositioned_border = None;
+        }
+
+        Ok(())
+    }
+
+    /// draw the floating border with `pixel`. Return the list of coordinates of pixels that were updated.
+    /// `border` indicates the position of the border as a rectangle.
+    /// `color` is the color of the floating border.
+    fn draw_floating_border(&mut self, border: &Rectangle, color: Color) -> Vec<Coord> {
+        let mut coordinates = Vec::new();
+        let pixel = color.into();
+        for i in 0..(WINDOW_BORDER_SIZE) as isize {
+            let width = (border.bottom_right.x - border.top_left.x) - 2 * i;
+            let height = (border.bottom_right.y - border.top_left.y) - 2 * i;
+            let coordinate = border.top_left + (i as isize, i as isize);
+            if width <= 0 || height <= 0 {
+                break;
+            }
+            framebuffer_drawer::draw_rectangle(
+                &mut self.top_fb, 
+                coordinate, 
+                width as usize, 
+                height as usize, 
+                pixel
+            );
+
+            for m in 0..width {
+                coordinates.push(coordinate + (m, 0));
+                coordinates.push(coordinate + (m, height));
+            }            
+            
+            for m in 1..height - 1 {
+                coordinates.push(coordinate + (0, m));
+                coordinates.push(coordinate + (width, m));
+            }            
+        }
+
+        coordinates
+    }
+
+    /// take active window's base position and current mouse, move the window with delta
+    pub fn move_active_window(&mut self) -> Result<(), &'static str> {
+        if let Some(current_active) = self.active.upgrade() {
+            let border = Rectangle { 
+                top_left: Coord::new(0, 0), 
+                bottom_right: Coord::new(0, 0) 
+            };
+            self.refresh_floating_border(false, border)?;
+
+            let (old_top_left, old_bottom_right, new_top_left, new_bottom_right) = {
+                let mut current_active_win = current_active.lock();
+                let (current_x, current_y) = {
+                    let m = &self.mouse;
+                    (m.x as isize, m.y as isize)
+                };
+                match current_active_win.moving {
+                    WindowMovingStatus::Moving(base) => {
+                        let old_top_left = current_active_win.get_position();
+                        let new_top_left = old_top_left + ((current_x - base.x), (current_y - base.y));
+                        let (width, height) = current_active_win.get_size();
+                        let old_bottom_right = old_top_left + (width as isize, height as isize);
+                        let new_bottom_right = new_top_left + (width as isize, height as isize);
+                        current_active_win.set_position(new_top_left);
+                        (old_top_left, old_bottom_right, new_top_left, new_bottom_right)        
+                    },
+                    WindowMovingStatus::Stationary => {
+                        return Err("The window is not moving");
                     }
                 }
-                if void {
-                    self.allocated.remove(i);
-                    len -= 1;
-                }
-            }
-        }
-        false
-    }
-    
-    /// enqueues the key event into the active window
-    fn send_event(&mut self, event:Event) -> Result<(), &'static str> {
-        let reference = self.active.upgrade(); // grabs a pointer to the active WindowInner
-        if let Some(window) = reference {
-            let mut window = window.lock();
-            window.key_producer.enqueue(event);
-        }
-        Ok(())
-    }
+            };
+            self.refresh_bottom_windows(Some(Rectangle{top_left: old_top_left, bottom_right: old_bottom_right}), false)?;
 
-}
-
-/// a window object
-pub struct WindowObj {
-    inner:Arc<Mutex<WindowInner>>,
-    //text_buffer:FrameTextBuffer,
-    consumer:DFQueueConsumer<Event>,
-    components:BTreeMap<String, Component>,
-}
-
-
-impl WindowObj{
-
-    // clean the content of the window
-    fn clean(&self) {
-        let inner = self.inner.lock();
-        inner.clean();
-    }
-
-    /// Returns the dimensions of this window,
-    /// as a tuple of `(width, height)`.
-    pub fn dimensions(&self) -> (usize, usize) {
-        let inner_locked = self.inner.lock();
-        (inner_locked.width, inner_locked.height)
-    }
-
-    ///Add a new displayable structure to the window
-    ///We check if the displayable is in the window. But we do not check if it is overlapped with others
-    pub fn add_displayable(&mut self, key: &str, x:usize, y:usize, displayable:TextDisplay) -> Result<(), &'static str>{
-        let key = key.to_string();
-        let (width, height) = displayable.get_size();
-        let inner = self.inner.lock();
-        if !inner.check_in_content(inner.x + inner.margin + x, inner.y + inner.margin + y) ||
-            !inner.check_in_content(inner.x + inner.margin + x + width, inner.y + inner.margin + y) ||
-            !inner.check_in_content(inner.x + inner.margin + x, inner.y + inner.margin + y + height) ||
-            !inner.check_in_content(inner.x + inner.margin + x + width, inner.y + inner.margin + y + height) {
-            return Err("The displayable does not fit the window size.");
-        } 
-        
-        let component = Component {
-            x:x,
-            y:y,
-            displayable:displayable,
-        };
-
-        self.components.insert(key, component);
-        Ok(())
-    }
-
-    pub fn remove_displayable(&mut self, key:&str){
-        self.components.remove(key);
-    }
-
-    pub fn get_displayable(&self, key:&str) -> Option<&TextDisplay> {
-        let opt = self.components.get(key);
-        match opt {
-            None => {return None},
-            Some(component) => {return Some(component.get_displayable());},
-        };
-    }
-
-    pub fn get_displayable_position(&self, key:&str) -> Result<(usize, usize), &'static str> {
-        let opt = self.components.get(key);
-        match opt {
-            None => {return Err("No such displayable");},
-            Some(component) => {return Ok(component.get_position());},
-        };
-    }
-
-    ///Get the content position of the displayable excluding border and padding
-    pub fn get_content_position(&self) -> (usize, usize) {
-        let inner = self.inner.lock();
-        (inner.x + inner.margin, inner.y + inner.margin)
-    }
-
-    /// draw a pixel in a window
-    pub fn draw_pixel(&self, x:usize, y:usize, color:u32){
-        let inner = self.inner.lock();
-        if x >= inner.width - 2 || y >= inner.height - 2 {
-            return;
-        }
-        frame_buffer::draw_pixel(x + inner.x + 1, y + inner.y + 1, color);
-    }
-
-    /// draw a line in a window
-    pub fn draw_line(&self, start_x:usize, start_y:usize, end_x:usize, end_y:usize, color:u32){
-        let inner = self.inner.lock();
-        if start_x > inner.width - 2
-            || start_y > inner.height - 2
-            || end_x > inner.width - 2
-            || end_y > inner.height - 2 {
-            return;
-        }
-        frame_buffer::draw_line(start_x + inner.x + 1, start_y + inner.y + 1, 
-            end_x + inner.x + 1, end_y + inner.y + 1, color);
-    }
-
-    /// draw a square in a window
-    pub fn draw_rectangle(&self, x:usize, y:usize, width:usize, height:usize, color:u32){
-        let inner = self.inner.lock();
-        if x + width > inner.width - 2
-            || y + height > inner.height - 2 {
-            return;
-        }
-        frame_buffer::draw_rectangle(x + inner.x + 1, y + inner.y + 1, width, height, 
-            color);
-    }
-
-    /// Requires that a str slice that will exactly fit the frame buffer
-    /// The calculation is done inside the console crate by the print_by_bytes function and associated methods
-    /// Print every byte and fill the blank with background color
-    /*pub fn display_&str(&mut self, slice: &str) -> Result<(), &'static str> {
-        let inner = self.inner.lock();
-        self.text_buffer.print_by_bytes(inner.x + inner.margin, inner.y + inner.margin, 
-            inner.width - 2 * inner.margin, inner.height - 2 * inner.margin, 
-            slice)
-    }*/
-    
-    /*
-    pub fn draw_border(&self) -> (usize, usize, usize){
-        let inner = self.inner.lock();
-        inner.draw_border(get_border_color(inner.active))
-    }
-    */
-
-    // @Andrew
-    pub fn resize(&mut self, x:usize, y:usize, width:usize, height:usize) -> Result<(), &'static str>{
-        { // checks for overlap
-            let inner = self.inner.clone();
-            let mut allocator = try!(WINDOW_ALLOCATOR.try().ok_or("The window allocator is not initialized")).lock();
-            match allocator.check_overlap(&inner, x,y,width,height) {
-                true => {return Err("cannot resize because requested resize will cause overlap")}
-                false => { }
-            }
-        }
-        
-        let mut inner = self.inner.lock();
-        match inner.resize(x, y, width, height) {
-            Ok(percent) => {
-                for (_key, item) in self.components.iter_mut() {
-                    let (x, y) = item.get_position();
-                    let (width, height) = item.get_displayable().get_size();
-                    item.resize(x*percent.0/100, y*percent.1/100, width*percent.0/100, height*percent.1/100);
-                }
-                inner.key_producer.enqueue(Event::new_resize_event(x, y, width, height));
-                Ok(())
-            },
-            Err(err) => { Err(err) }
-        }
-    }
-
-    ///Get a key event of the window
-    pub fn get_key_event(&self) -> Option<Event> {
-        let event_opt = self.consumer.peek();
-        if let Some(event) = event_opt {
-            event.mark_completed();
-            let event_data = event.deref().clone();
-            Some(event_data)
+            self.refresh_active_window(Some(Rectangle{top_left: new_top_left, bottom_right: new_bottom_right}))?;
+            self.refresh_mouse()?;
         } else {
-            None
+            return Err("cannot find active window to move");
+        }
+        Ok(())
+    }
+
+    /// Refresh the mouse display
+    pub fn refresh_mouse(&mut self) -> Result<(), &'static str> {
+        let bounding_box = Some(Rectangle {
+            top_left: self.mouse,
+            bottom_right: self.mouse + (MOUSE_POINTER_SIZE as isize, MOUSE_POINTER_SIZE as isize)
+        });
+        
+        self.refresh_top(bounding_box.into_iter())
+    }
+
+    /// Move mouse. `relative` indicates the new position relative to current position.
+    fn move_mouse(&mut self, relative: Coord) -> Result<(), &'static str> {
+        let old = self.mouse;
+        let mut new = old + relative;
+        
+        let (screen_width, screen_height) = self.get_screen_size();
+        if new.x < 0 {
+            new.x = 0;
+        }
+        if new.y < 0 {
+            new.y = 0;
+        }
+
+        // keep mouse pointer border in the screen when it is at the right or bottom side.
+        const MOUSE_POINTER_BORDER: isize = 3;
+        new.x = core::cmp::min(new.x, screen_width as isize - MOUSE_POINTER_BORDER);
+        new.y = core::cmp::min(new.y, screen_height as isize - MOUSE_POINTER_BORDER);
+            
+        self.move_mouse_to(new)
+    }
+    
+    // Move mouse to absolute position `new`
+    fn move_mouse_to(&mut self, new: Coord) -> Result<(), &'static str> {
+        // clear old mouse
+        for y in self.mouse.y..self.mouse.y + MOUSE_POINTER_SIZE as isize {
+            for x in
+                self.mouse.x..self.mouse.x + MOUSE_POINTER_SIZE as isize {
+                let coordinate = Coord::new(x, y);
+                self.top_fb.overwrite_pixel(coordinate, color::TRANSPARENT.into());
+            }
+        }
+        let bounding_box = Some(Rectangle {
+            top_left: self.mouse,
+            bottom_right: self.mouse + (MOUSE_POINTER_SIZE as isize, MOUSE_POINTER_SIZE as isize)
+        });
+        self.refresh_bottom_windows(bounding_box.into_iter(), true)?;
+
+        // draw new mouse
+        self.mouse = new;
+        for y in new.y..new.y + MOUSE_POINTER_SIZE as isize {
+            for x in new.x..new.x + MOUSE_POINTER_SIZE as isize {
+                let coordinate = Coord::new(x, y);
+                let pixel = MOUSE_POINTER_IMAGE[(x - new.x) as usize][(y - new.y) as usize].into();
+                self.top_fb.overwrite_pixel(coordinate, pixel);
+            }
+        }
+        self.refresh_mouse()?;
+
+        Ok(())
+    }
+
+    /// Move the floating border when a window is moving.
+    pub fn move_floating_border(&mut self) -> Result<(), &'static str> {
+        let (new_x, new_y) = {
+            let m = &self.mouse;
+            (m.x as isize, m.y as isize)
+        };
+        
+        if let Some(current_active) = self.active.upgrade() {
+            let (is_draw, border_start, border_end) = {
+                let current_active_win = current_active.lock();
+                match current_active_win.moving {
+                    WindowMovingStatus::Moving(base) => {
+                        // move this window
+                        // for better performance, while moving window, only border is shown for indication
+                        let coordinate = current_active_win.get_position();
+                        // let (current_x, current_y) = (coordinate.x, coordinate.y);
+                        let (width, height) = current_active_win.get_size();
+                        let border_start = coordinate + (new_x - base.x, new_y - base.y);
+                        let border_end = border_start + (width as isize, height as isize);
+                        (true, border_start, border_end)
+                    }
+                    WindowMovingStatus::Stationary => (false, Coord::new(0, 0), Coord::new(0, 0)),
+                }
+            };
+            let border = Rectangle {
+                top_left: border_start,
+                bottom_right: border_end,
+            };
+            self.refresh_floating_border(is_draw, border)?;
+        } else {
+            let border = Rectangle {
+                top_left: Coord::new(0, 0),
+                bottom_right: Coord::new(0, 0),
+            };
+            self.refresh_floating_border(false, border)?;
+        }
+
+        Ok(())
+    }
+
+    /// Returns true if the given `window` is the currently active window.
+    pub fn is_active(&self, window: &Arc<Mutex<WindowInner>>) -> bool {
+        self.active.upgrade()
+            .map(|active| Arc::ptr_eq(&active, window))
+            .unwrap_or(false)
+    }
+
+    /// Returns the `(width, height)` in pixels of the screen itself (the final framebuffer).
+    pub fn get_screen_size(&self) -> (usize, usize) {
+        self.final_fb.get_size()
+    }
+}
+
+/// Initialize the window manager. It returns (keyboard_producer, mouse_producer) for the I/O devices.
+pub fn init() -> Result<(Queue<Event>, Queue<Event>), &'static str> {
+    let final_framebuffer: Framebuffer<AlphaPixel> = framebuffer::init()?;
+    let (width, height) = final_framebuffer.get_size();
+
+    let mut bottom_framebuffer = Framebuffer::new(width, height, None)?;
+    let mut top_framebuffer = Framebuffer::new(width, height, None)?;
+    let (screen_width, screen_height) = bottom_framebuffer.get_size();
+    bottom_framebuffer.fill(color::LIGHT_GRAY.into());
+    top_framebuffer.fill(color::TRANSPARENT.into()); 
+
+    // the mouse starts in the center of the screen.
+    let center = Coord {
+        x: screen_width as isize / 2,
+        y: screen_height as isize / 2,
+    }; 
+
+    // initialize static window manager
+    let window_manager = WindowManager {
+        hide_list: VecDeque::new(),
+        show_list: VecDeque::new(),
+        active: Weak::new(),
+        mouse: center,
+        repositioned_border: None,
+        bottom_fb: bottom_framebuffer,
+        top_fb: top_framebuffer,
+        final_fb: final_framebuffer,
+    };
+    let _wm = WINDOW_MANAGER.call_once(|| Mutex::new(window_manager));
+
+    // wm.refresh_bottom_windows(None, false)?;
+
+    // keyinput queue initialization
+    let key_consumer: Queue<Event> = Queue::with_capacity(100);
+    let key_producer = key_consumer.clone();
+
+    // mouse input queue initialization
+    let mouse_consumer: Queue<Event> = Queue::with_capacity(100);
+    let mouse_producer = mouse_consumer.clone();
+
+    KernelTaskBuilder::new(window_manager_loop, (key_consumer, mouse_consumer))
+        .name("window_manager_loop".to_string())
+        .spawn()?;
+
+    Ok((key_producer, mouse_producer))
+}
+
+/// handles all keyboard and mouse movement in this window manager
+fn window_manager_loop(
+    (key_consumer, mouse_consumer): (Queue<Event>, Queue<Event>),
+) -> Result<(), &'static str> {
+    loop {
+        let event_opt = key_consumer.pop()
+            .or_else(||mouse_consumer.pop())
+            .or_else(||{
+                scheduler::schedule();
+                None
+            });
+
+        if let Some(event) = event_opt {
+            // Currently, the window manager only cares about keyboard or mouse events
+            match event {
+                Event::KeyboardEvent(ref input_event) => {
+                    let key_input = input_event.key_event;
+                    keyboard_handle_application(key_input)?;
+                }
+                Event::MouseMovementEvent(ref mouse_event) => {
+                    // mouse::mouse_to_print(&mouse_event);
+                    let mouse_displacement = &mouse_event.displacement;
+                    let mut x = (mouse_displacement.x as i8) as isize;
+                    let mut y = (mouse_displacement.y as i8) as isize;
+                    // need to combine mouse events if there pending a lot
+                    loop {
+                        let next_event = match mouse_consumer.pop() {
+                            Some(ev) => ev,
+                            _ => {
+                                break;
+                            }
+                        };
+                        match next_event {
+                            Event::MouseMovementEvent(ref next_mouse_event) => {
+                                if next_mouse_event.mousemove.scrolling_up
+                                    == mouse_event.mousemove.scrolling_up
+                                    && next_mouse_event.mousemove.scrolling_down
+                                        == mouse_event.mousemove.scrolling_down
+                                    && next_mouse_event.buttonact.left_button_hold
+                                        == mouse_event.buttonact.left_button_hold
+                                    && next_mouse_event.buttonact.right_button_hold
+                                        == mouse_event.buttonact.right_button_hold
+                                    && next_mouse_event.buttonact.fourth_button_hold
+                                        == mouse_event.buttonact.fourth_button_hold
+                                    && next_mouse_event.buttonact.fifth_button_hold
+                                        == mouse_event.buttonact.fifth_button_hold
+                                {
+                                    x += (next_mouse_event.displacement.x as i8) as isize;
+                                    y += (next_mouse_event.displacement.y as i8) as isize;
+                                }
+                            }
+                            _ => {
+                                break;
+                            }
+                        }
+                        // next_event.mark_completed();
+                    }
+                    if x != 0 || y != 0 {
+                        let mut wm = WINDOW_MANAGER
+                            .try()
+                            .ok_or("The static window manager was not yet initialized")?
+                            .lock();
+                        wm.move_mouse(
+                            Coord::new(x as isize, -(y as isize))
+                        )?;
+                    }
+                    cursor_handle_application(*mouse_event)?; // tell the event to application, or moving window
+                }
+                _other => {
+                    trace!("WINDOW_MANAGER: ignoring unexpected event: {:?}", _other);
+                }
+            }
         }
     }
-
 }
 
-struct WindowInner {
-    /// the upper left x-coordinate of the window
-    x: usize,
-    /// the upper left y-coordinate of the window
-    y: usize,
-    /// the width of the window
-    width: usize,
-    /// the height of the window
-    height: usize,
-    /// whether the window is active
-    active: bool,
-    /// a consumer of key input events to the window
-    margin: usize,
-    /// the producer accepting a key event
-    key_producer: DFQueueProducer<Event>,
-}
+/// handle keyboard event, push it to the active window if one exists
+fn keyboard_handle_application(key_input: KeyEvent) -> Result<(), &'static str> {
+    let win_mgr = WINDOW_MANAGER.try().ok_or("The window manager was not yet initialized")?;
+    
+    // First, we handle keyboard shortcuts understood by the window manager.
+    
+    // "Super + Arrow" will resize and move windows to the specified half of the screen (left, right, top, or bottom)
+    if key_input.modifiers.is_super_key() && key_input.action == KeyAction::Pressed {
+        let screen_dimensions = win_mgr.lock().get_screen_size();
+        let (width, height) = (screen_dimensions.0 as isize, screen_dimensions.1 as isize);
+        let new_position: Option<Rectangle> = match key_input.keycode {
+            Keycode::Left => Some(Rectangle {
+                top_left:     Coord { x: 0, y: 0 },
+                bottom_right: Coord { x: width / 2, y: height },
+            }),
+            Keycode::Right => Some(Rectangle {
+                top_left:     Coord { x: width / 2, y: 0 },
+                bottom_right: Coord { x: width, y: height },
+            }),
+            Keycode::Up => Some(Rectangle {
+                top_left:     Coord { x: 0, y: 0 },
+                bottom_right: Coord { x: width, y: height / 2 },
+            }),
+            Keycode::Down => Some(Rectangle {
+                top_left:     Coord { x: 0, y: height / 2 },
+                bottom_right: Coord { x: width, y: height },
+            }),
+            _ => None,
+        };
+        
+        if let Some(position) = new_position {
+            let mut wm = win_mgr.lock();
+            if let Some(active_window) = wm.active.upgrade() {
+                debug!("window_manager: resizing active window to {:?}", new_position);
+                active_window.lock().resize(position)?;
 
-impl WindowInner {
-
-    //check if the window is overlapped with any existing window
-    fn is_overlapped(&self, x:usize, y:usize, width:usize, height:usize) -> bool {
-        if self.check_in_area(x, y)
-            {return true;}
-        if self.check_in_area(x, y+height)
-            {return true;}
-        if self.check_in_area(x+width, y)
-            {return true;}
-        if self.check_in_area(x+width, y+height)
-            {return true;}
-        false        
-    } 
-
-    // check if the pixel is within the window
-    fn check_in_area(&self, x:usize, y:usize) -> bool {        
-        return x>= self.x && x <= self.x+self.width 
-                && y>=self.y && y<=self.y+self.height;
-    }
-
-    // check if the pixel is within the window exluding the border and margin
-    fn check_in_content(&self, x:usize, y:usize) -> bool {        
-        return x>= self.x+self.margin && x <= self.x+self.width-self.margin 
-                && y>=self.y+self.margin && y<=self.y+self.height-self.margin;
-    }
-
-    // active or inactive a window
-    fn active(&mut self, active:bool){
-        self.active = active;
-        self.draw_border(get_border_color(active));
-    }
-
-    // clean the content of a window
-    fn clean(&self) {
-        frame_buffer::fill_rectangle(self.x + self.margin, self.y + self.margin,
-            self.width - 2 * self.margin, self.height - 2 * self.margin, SCREEN_BACKGROUND_COLOR);
-    }
-
-    // draw the border of the window
-    fn draw_border(&self, color:u32) {
-        frame_buffer::draw_rectangle(self.x, self.y, self.width, self.height, color);           }
-
-    /// adjust the size of a window
-    fn resize(&mut self, x:usize, y:usize, width:usize, height:usize) -> Result<(usize, usize), &'static str> {
-        self.draw_border(SCREEN_BACKGROUND_COLOR);
-        self.clean();
-        let percent = ((width-self.margin)*100/(self.width-self.margin), (height-self.margin)*100/(self.height-self.margin));
-        self.x = x;
-        self.y = y;
-        self.width = width;
-        self.height = height; 
-        self.draw_border(get_border_color(self.active));
-        Ok(percent)
-    }
-
-}
-
-struct Component {
-    x:usize,
-    y:usize,
-    displayable:TextDisplay,
-}
-
-impl Component {
-    pub fn get_displayable(&self) -> &TextDisplay {
-        return &(self.displayable)
-    }
-
-    pub fn get_position(&self) -> (usize, usize) {
-        (self.x, self.y)
-    }
-
-    fn resize(&mut self, x:usize, y:usize, width:usize, height:usize) {
-        self.x = x;
-        self.y = y;
-        self.displayable.resize(width, height);
-    }
-}
-
-/*  Following two functions can be used to systematically resize windows forcibly
-/// Readjusts remaining windows after a window is deleted to maximize screen usage
-pub fn adjust_window_after_deletion() -> Result<(), &'static str> {
-    let mut allocator = try!(WINDOW_ALLOCATOR.try().ok_or("The window allocator is not initialized")).lock();
-    let num_windows = allocator.deref_mut().allocated.len();
-    // one gap between each window and one gap between the edge windows and the frame buffer boundary
-    let window_height = (frame_buffer::FRAME_BUFFER_HEIGHT - GAP_SIZE * (num_windows + 1))/(num_windows); 
-    let window_width = frame_buffer::FRAME_BUFFER_WIDTH - 2 * GAP_SIZE; // fill the width of the screen with a slight gap at the boundaries
-    let mut height_index = GAP_SIZE; // start resizing the windows after the first gap 
-
-    // Resizes the windows vertically
-    for window_inner_ref in allocator.deref_mut().allocated.iter_mut() {
-        let strong_window_ptr = window_inner_ref.upgrade();
-        if let Some(window_inner_ptr) = strong_window_ptr {
-            let mut locked_window_ptr = window_inner_ptr.lock();
-            locked_window_ptr.resize(GAP_SIZE, height_index, window_width, window_height)?;
-            locked_window_ptr.key_producer.enqueue(Event::DisplayEvent); // refreshes display after resize
-            height_index += window_height + GAP_SIZE; // advance to the height index of the next window
+                // force refresh the entire screen for now
+                // TODO: perform a proper screen refresh here: only refresh the area that contained the active_window's old bounds.
+                wm.refresh_bottom_windows(Option::<Rectangle>::None, true)?;
+            }
         }
+
+        return Ok(());
+    }
+
+    // Spawn a new terminal via Ctrl+Alt+T
+    if key_input.modifiers.is_control()
+        && key_input.modifiers.is_alt()
+        && key_input.keycode == Keycode::T
+        && key_input.action == KeyAction::Pressed
+    {
+        // Because this task (the window manager loop) runs in a kernel-only namespace,
+        // we have to create a new application namespace in order to be able to actually spawn a shell.
+
+        let new_app_namespace = mod_mgmt::create_application_namespace(None)?;
+        let shell_objfile = new_app_namespace.dir().get_file_starting_with("shell-")
+            .ok_or("Couldn't find shell application file to run upon Ctrl+Alt+T")?;
+        let path = Path::new(shell_objfile.lock().get_absolute_path());
+        ApplicationTaskBuilder::new(path)
+            .name(format!("shell"))
+            .namespace(new_app_namespace)
+            .spawn()?;
+
+        debug!("window_manager: spawned new shell app in new app namespace.");
+        return Ok(());
+    }
+
+    // Any keyboard event unhandled above should be passed to the active window.
+    if let Err(_e) = win_mgr.lock().pass_keyboard_event_to_window(key_input) {
+        warn!("window_manager: failed to pass keyboard event to active window. Error: {:?}", _e);
+        // If no window is currently active, then something might be potentially wrong, 
+        // but we can likely recover in the future when another window becomes active.
+        // Thus, we don't need to return a hard error here. 
     }
     Ok(())
-/// Adjusts the windows preemptively so that we can add a new window directly below the old ones to maximize screen usage without overlap
-pub fn adjust_windows_before_addition() -> Result<(usize, usize, usize), &'static str> {
-    let mut allocator = try!(WINDOW_ALLOCATOR.try().ok_or("The window allocator is not initialized")).lock();
-    let num_windows = allocator.deref_mut().allocated.len();
-    // one gap between each window and one gap between the edge windows and the frame buffer boundary
-    let window_height = (frame_buffer::FRAME_BUFFER_HEIGHT - GAP_SIZE * (num_windows + 2))/(num_windows + 1); 
-    let window_width = frame_buffer::FRAME_BUFFER_WIDTH - 2 * GAP_SIZE; // refreshes display after resize
-    let mut height_index = GAP_SIZE; // start resizing the windows after the first gap 
-
-    if num_windows >=1  {
-        // Resizes the windows vertically
-        for window_inner_ref in allocator.deref_mut().allocated.iter_mut() {
-            let strong_ptr = window_inner_ref.upgrade();
-            if let Some(window_inner_ptr) = strong_ptr {
-                let mut locked_window_ptr = window_inner_ptr.lock();
-                locked_window_ptr.resize(GAP_SIZE, height_index, window_width, window_height)?;
-                locked_window_ptr.key_producer.enqueue(Event::DisplayEvent); // refreshes window after  
-                height_index += window_height + GAP_SIZE; // advance to the height index of the next window
-            }
-        }
-    }
-
-
-    return Ok((height_index, window_width, window_height)); // returns the index at which the new window should be drawn
 }
 
-*/
-
-
-//Test functions for performance evaluation
-/*pub fn set_time_start() {
-    let hpet_lock = get_hpet();
-    unsafe { STARTING_TIME = hpet_lock.as_ref().unwrap().get_counter(); }   
-}
-
-pub fn calculate_time_statistic() {
-    let statistic = STATISTIC.call_once(|| {
-        Mutex::new(Vec::new())
-    });
-
-  unsafe{
-
-    let hpet_lock = get_hpet();
-    let end_time = hpet_lock.as_ref().unwrap().get_counter();  
-
-   
-    let mut queue = statistic.lock();
-    queue.push(end_time - STARTING_TIME);
-
-    STARTING_TIME = 0;
-
-    COUNTER  = COUNTER+1;
-
-    if COUNTER == 1000 {
-        for i in 0..queue.len(){
-            trace!("Time\t{}", queue.pop().unwrap());
-        }
-        COUNTER = 0;
+/// handle mouse event, push it to related window or anyone asked for it
+fn cursor_handle_application(mouse_event: MouseEvent) -> Result<(), &'static str> {
+    let wm = WINDOW_MANAGER.try().ok_or("The static window manager was not yet initialized")?.lock();
+    if let Err(_) = wm.pass_mouse_event_to_window(mouse_event) {
+        // the mouse event should be passed to the window that satisfies:
+        // 1. the mouse position is currently in the window area
+        // 2. the window is the top one (active window or show_list windows) under the mouse pointer
+        // if no window is found in this position, that is system background area. Add logic to handle those events later
     }
-}*/
+    Ok(())
+}

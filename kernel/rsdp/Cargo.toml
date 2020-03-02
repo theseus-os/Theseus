@@ -1,0 +1,12 @@
+[package]
+name = "rsdp"
+version = "0.1.0"
+authors = ["Kevin Boos <kevinaboos@gmail.com>"]
+description = "Support for ACPI RSDP"
+build = "../../build.rs"
+
+[dependencies]
+owning_ref = { git = "https://github.com/kevinaboos/owning-ref-rs" }
+
+[dependencies.memory]
+path = "../memory"

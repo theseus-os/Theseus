@@ -1,0 +1,47 @@
+[package]
+name = "ping"
+version = "0.1.0"
+description = "pings an IPv4 address and returns ping statistics"
+authors = ["Barry Shiberu <berketshiberu@gmail.com>"]
+build = "../../build.rs"
+
+[dependencies]
+byteorder = { version = "1.0", default-features = false }
+getopts = "0.2.21"
+
+[dependencies.terminal_print]
+path = "../../kernel/terminal_print"
+
+
+[dependencies.log]
+default-features = false
+version = "0.3.7"
+
+[dependencies.upd]
+path = "../upd"
+
+[dependencies.hpet]
+path = "../../kernel/hpet"
+
+[dependencies.hashbrown]
+version = "0.1.8"
+features = ["nightly"]
+
+[dependencies.network_manager]
+path = "../../kernel/network_manager"
+
+[dependencies.smoltcp_helper]
+path = "../../kernel/smoltcp_helper"
+
+[dependencies.ota_update_client]
+path = "../../kernel/ota_update_client"
+
+[dependencies.smoltcp]
+version = "0.5.0"
+default-features = false
+features = [
+    "alloc", "ethernet",
+    # "log", "verbose", 
+    "proto-ipv4", "proto-igmp", "proto-ipv6", "proto-dhcpv4",
+    "socket-raw", "socket-udp", "socket-tcp", "socket-icmp"
+]

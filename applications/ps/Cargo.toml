@@ -5,10 +5,10 @@ authors = ["Christine Wang <chrissywang54@gmail.com>"]
 build = "../../build.rs"
 
 [dependencies]
-getopts = "0.2.18"
+getopts = "0.2.21"
 
 [dependencies.terminal_print]
-path = "../terminal_print"
+path = "../../kernel/terminal_print"
 
 [dependencies.task]
 path = "../../kernel/task"

@@ -1,5 +1,4 @@
 #![no_std]
-#![feature(alloc)]
 
 #![allow(dead_code)]
 
@@ -20,23 +19,25 @@ extern crate atomic;
 
 
 use core::ops::DerefMut;
-use core::sync::atomic::{AtomicUsize, AtomicBool, Ordering, spin_loop_hint};
+use core::sync::atomic::Ordering;
 use volatile::{Volatile, ReadOnly, WriteOnly};
 use alloc::boxed::Box;
-use alloc::vec::Vec;
 use owning_ref::{BoxRef, BoxRefMut};
 use spin::Once;
 use raw_cpuid::CpuId;
 use x86_64::registers::msr::*;
-use irq_safety::{hold_interrupts, RwLockIrqSafe};
-use memory::{FRAME_ALLOCATOR, Frame, ActivePageTable, PhysicalAddress, VirtualAddress, EntryFlags, MappedPages, allocate_pages};
+use irq_safety::RwLockIrqSafe;
+use memory::{FRAME_ALLOCATOR, Frame, FrameRange, PageTable, PhysicalAddress, EntryFlags, MappedPages, allocate_pages};
 use kernel_config::time::CONFIG_TIMESLICE_PERIOD_MICROSECONDS;
 use atomic_linked_list::atomic_map::AtomicMap;
 use atomic::Atomic;
 use pit_clock::pit_wait;
 
 
-pub static INTERRUPT_CHIP: Atomic<InterruptChip> = Atomic::new(InterruptChip::APIC);
+/// The interrupt chip that is currently configured on this machine. 
+/// The default is `InterruptChip::PIC`, but the typical case is `APIC` or `X2APIC`,
+/// which will be set once those chips have been initialized.
+pub static INTERRUPT_CHIP: Atomic<InterruptChip> = Atomic::new(InterruptChip::PIC);
 
 #[derive(Clone, Copy, PartialEq, Debug)]
 pub enum InterruptChip {
@@ -141,15 +142,15 @@ impl LapicIpiDestination {
 
 /// Initially maps the base APIC MMIO register frames so that we can know which LAPIC (core) we are.
 /// This only does something for apic/xapic systems, it does nothing for x2apic systems, as required.
-pub fn init(active_table: &mut ActivePageTable) -> Result<(), &'static str> {
+pub fn init(page_table: &mut PageTable) -> Result<(), &'static str> {
     let x2 = has_x2apic();
-    let phys_addr = rdmsr(IA32_APIC_BASE) as PhysicalAddress;
+    let phys_addr = PhysicalAddress::new(rdmsr(IA32_APIC_BASE) as usize)?;
     debug!("is x2apic? {}.  IA32_APIC_BASE (phys addr): {:#X}", x2, phys_addr);
 
     // x2apic doesn't require MMIO, it just uses MSRs instead, so we don't need to map the APIC registers.
     if !x2 {
         // offset into the apic_mapped_page is always 0, regardless of the physical address
-        let apic_regs = BoxRef::new(Box::new(map_apic(active_table)?)).try_map(|mp| mp.as_type::<ApicRegisters>(0))?;
+        let apic_regs = BoxRef::new(Box::new(map_apic(page_table)?)).try_map(|mp| mp.as_type::<ApicRegisters>(0))?;
         APIC_REGS.call_once( || apic_regs);
     }
 
@@ -158,22 +159,22 @@ pub fn init(active_table: &mut ActivePageTable) -> Result<(), &'static str> {
 
 
 /// return a mapping of APIC memory-mapped I/O registers 
-fn map_apic(active_table: &mut ActivePageTable) -> Result<MappedPages, &'static str> {
+fn map_apic(page_table: &mut PageTable) -> Result<MappedPages, &'static str> {
     if has_x2apic() { return Err("map_apic() is only for use in apic/xapic systems, not x2apic."); }
 
     // make sure the local apic is enabled in xapic mode, otherwise we'll get a General Protection fault
     unsafe { wrmsr(IA32_APIC_BASE, rdmsr(IA32_APIC_BASE) | IA32_APIC_XAPIC_ENABLE); }
     
-    let phys_addr = rdmsr(IA32_APIC_BASE) as PhysicalAddress;
-    let new_page = try!(allocate_pages(1).ok_or("out of virtual address space!"));
-    let frames = Frame::range_inclusive(Frame::containing_address(phys_addr), Frame::containing_address(phys_addr));
-    let mut fa = try!(FRAME_ALLOCATOR.try().ok_or("apic::init(): couldn't get FRAME_ALLOCATOR")).lock();
-    let apic_mapped_page = try!(active_table.map_allocated_pages_to(
+    let phys_addr = PhysicalAddress::new(rdmsr(IA32_APIC_BASE) as usize)?;
+    let new_page = allocate_pages(1).ok_or("out of virtual address space!")?;
+    let frames = FrameRange::new(Frame::containing_address(phys_addr), Frame::containing_address(phys_addr));
+    let mut fa = FRAME_ALLOCATOR.try().ok_or("apic::init(): couldn't get FRAME_ALLOCATOR")?.lock();
+    let apic_mapped_page = page_table.map_allocated_pages_to(
         new_page, 
         frames, 
         EntryFlags::PRESENT | EntryFlags::WRITABLE | EntryFlags::NO_CACHE | EntryFlags::NO_EXECUTE, 
-        fa.deref_mut())
-    );
+        fa.deref_mut()
+    )?;
 
     Ok(apic_mapped_page)
 }
@@ -295,7 +296,7 @@ impl fmt::Debug for LocalApic {
 impl LocalApic {
     /// This MUST be invoked from the AP core itself when it is booting up.
     /// The BSP cannot invoke this for other APs (it can only invoke it for itself).
-    pub fn new(active_table: &mut ActivePageTable, processor: u8, apic_id: u8, is_bsp: bool, nmi_lint: u8, nmi_flags: u16) 
+    pub fn new(page_table: &mut PageTable, processor: u8, apic_id: u8, is_bsp: bool, nmi_lint: u8, nmi_flags: u16) 
         -> Result<LocalApic, &'static str>
     {
 
@@ -316,7 +317,7 @@ impl LocalApic {
         } 
         else { 
             // offset into the apic_mapped_page is always 0, regardless of the physical address
-            let apic_regs = BoxRefMut::new(Box::new(map_apic(active_table)?)).try_map_mut(|mp| mp.as_type_mut::<ApicRegisters>(0))?;
+            let apic_regs = BoxRefMut::new(Box::new(map_apic(page_table)?)).try_map_mut(|mp| mp.as_type_mut::<ApicRegisters>(0))?;
             lapic.regs = Some(apic_regs);
             lapic.enable_apic()?;
             lapic.init_timer()?;
@@ -582,12 +583,10 @@ impl LocalApic {
 
     pub fn eoi(&mut self) {
         // 0 is the only valid value to write to the EOI register/msr, others cause General Protection Fault
-        unsafe {
-            if has_x2apic() {
-                wrmsr(IA32_X2APIC_EOI, 0); 
-            } else {
-                self.regs.as_mut().expect("ApicRegisters").eoi.write(0);
-            }
+        if has_x2apic() {
+            unsafe { wrmsr(IA32_X2APIC_EOI, 0); }
+        } else {
+            self.regs.as_mut().expect("ApicRegisters").eoi.write(0);
         }
     }
 
@@ -620,9 +619,11 @@ impl LocalApic {
     }
 
 
-    pub fn get_isr(&self) -> (u32, u32, u32, u32, u32, u32, u32, u32) {
+    /// Returns the values of the 8 in-service registers for this APIC,
+    /// which is a series of bitmasks that shows which interrupt lines are currently being serviced. 
+    pub fn get_isr(&self) -> [u32; 8] {
         if has_x2apic() {
-            ( 
+            [
                 rdmsr(IA32_X2APIC_ISR0) as u32, 
                 rdmsr(IA32_X2APIC_ISR1) as u32,
                 rdmsr(IA32_X2APIC_ISR2) as u32, 
@@ -631,11 +632,11 @@ impl LocalApic {
                 rdmsr(IA32_X2APIC_ISR5) as u32,
                 rdmsr(IA32_X2APIC_ISR6) as u32,
                 rdmsr(IA32_X2APIC_ISR7) as u32,
-            )
+            ]
         }
         else {
             let ref isr = self.regs.as_ref().expect("ApicRegisters").in_service_registers;
-            (
+            [
                 isr.reg0.read(),
                 isr.reg1.read(),
                 isr.reg2.read(),
@@ -644,14 +645,17 @@ impl LocalApic {
                 isr.reg5.read(),
                 isr.reg6.read(),
                 isr.reg7.read(),
-            )
+            ]
         }
     }
 
 
-    pub fn get_irr(&self) -> (u32, u32, u32, u32, u32, u32, u32, u32) {
+    /// Returns the values of the 8 request registers for this APIC,
+    /// which is a series of bitmasks that shows which interrupt lines are currently raised, 
+    /// but not yet being serviced.
+    pub fn get_irr(&self) -> [u32; 8] {
         if has_x2apic() {
-            ( 
+            [ 
                 rdmsr(IA32_X2APIC_IRR0) as u32, 
                 rdmsr(IA32_X2APIC_IRR1) as u32,
                 rdmsr(IA32_X2APIC_IRR2) as u32, 
@@ -660,11 +664,11 @@ impl LocalApic {
                 rdmsr(IA32_X2APIC_IRR5) as u32,
                 rdmsr(IA32_X2APIC_IRR6) as u32,
                 rdmsr(IA32_X2APIC_IRR7) as u32,
-            )
+            ]
         }
         else {
             let ref irr = self.regs.as_ref().expect("ApicRegisters").interrupt_request_registers;
-            (
+            [
                 irr.reg0.read(),
                 irr.reg1.read(),
                 irr.reg2.read(),
@@ -673,7 +677,7 @@ impl LocalApic {
                 irr.reg5.read(),
                 irr.reg6.read(),
                 irr.reg7.read(),
-            )
+            ]
         }
     }
 }

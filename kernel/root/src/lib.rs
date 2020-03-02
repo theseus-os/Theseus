@@ -1,5 +1,4 @@
 #![no_std]
-#![feature(alloc)]
 //! This crate contains the implementation of the special root directory. The only way that this 
 //! directory implementation differs from VFSDirectory is that there is no parent field (becuase the 
 //! root has no parent directory), and that internal calls to parent will return some type of error value
@@ -27,7 +26,7 @@ lazy_static! {
         let root_dir = RootDirectory {
             children: BTreeMap::new() 
         };
-        let strong_root = Arc::new(Mutex::new(root_dir)) as Arc<Mutex<Directory + Send>>;
+        let strong_root = Arc::new(Mutex::new(root_dir)) as DirRef;
         (ROOT_DIRECTORY_NAME.to_string(), strong_root)
     };
 }

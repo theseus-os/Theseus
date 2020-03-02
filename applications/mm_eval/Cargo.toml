@@ -6,7 +6,7 @@ authors = ["Kevin Boos <kevinaboos@gmail.com>"]
 build = "../../build.rs"
 
 [dependencies]
-getopts = "0.2.18"
+getopts = "0.2.21"
 cfg-if = "0.1.6"
 
 [dependencies.log]
@@ -26,4 +26,4 @@ path = "../../kernel/kernel_config"
 path = "../../kernel/memory"
 
 [dependencies.terminal_print]
-path = "../terminal_print"
+path = "../../kernel/terminal_print"

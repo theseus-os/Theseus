@@ -1,10 +1,16 @@
 #![no_std]
-#![feature(alloc)]
 #[macro_use]
 extern crate log;
 
+extern crate mpmc;
+extern crate event_types;
 extern crate mouse_data;
 extern crate ps2;
+extern crate spin;
+
+use mpmc::Queue;
+use event_types::Event;
+use spin::Once;
 
 use mouse_data::{ButtonAction, Displacement, MouseEvent, MouseMovement};
 use ps2::{check_mouse_id, init_ps2_port2, set_mouse_id, test_ps2_port2};
@@ -13,8 +19,10 @@ static mut MOUSE_MOVE: MouseMovement = MouseMovement::default();
 static mut BUTTON_ACT: ButtonAction = ButtonAction::default();
 static mut DISPLACEMENT: Displacement = Displacement::default();
 
+static MOUSE_PRODUCER: Once<Queue<Event>> = Once::new();
+
 /// Initialize the mouse driver.
-pub fn init() {
+pub fn init(mouse_queue_producer: Queue<Event>) {
     // init the second ps2 port for mouse
     init_ps2_port2();
     // test the second ps2 port
@@ -31,6 +39,8 @@ pub fn init() {
             info!("the initial mouse ID is: {}", id);
         }
     }
+
+    MOUSE_PRODUCER.call_once(|| mouse_queue_producer);
 }
 
 /// print the mouse actions
@@ -90,7 +100,7 @@ pub fn mouse_to_print(mouse_event: &MouseEvent) {
 }
 
 /// return a Mouse Event according to the data
-pub fn handle_mouse_input(readdata: u32) -> MouseEvent {
+pub fn handle_mouse_input(readdata: u32) -> Result<(), &'static str> {
     let action = unsafe { &mut BUTTON_ACT };
     let mmove = unsafe { &mut MOUSE_MOVE };
     let dis = unsafe { &mut DISPLACEMENT };
@@ -98,5 +108,15 @@ pub fn handle_mouse_input(readdata: u32) -> MouseEvent {
     mmove.read_from_data(readdata);
     action.read_from_data(readdata);
     dis.read_from_data(readdata);
-    MouseEvent::new(*action, *mmove, *dis)
+
+    let mouse_event = MouseEvent::new(*action, *mmove, *dis);
+    // mouse_to_print(&mouse_event);  // use this to debug
+    let event = Event::MouseMovementEvent(mouse_event);
+
+    if let Some(producer) = MOUSE_PRODUCER.try() {
+        producer.push(event).map_err(|_e| "Fail to enqueue the mouse event")
+    } else {
+        warn!("handle_keyboard_input(): MOUSE_PRODUCER wasn't yet initialized, dropping keyboard event {:?}.", event);
+        Err("keyboard event queue not ready")
+    }
 }

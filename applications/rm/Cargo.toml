@@ -6,10 +6,10 @@ build = "../../build.rs"
 description = "removes the directory from the virtual filesystem"
 
 [dependencies]
-getopts = { git = "https://github.com/kevinaboos/getopts" }
+getopts = "0.2.21"
 
 [dependencies.terminal_print]
-path = "../terminal_print"
+path = "../../kernel/terminal_print"
 
 [dependencies.task]
 path = "../../kernel/task"

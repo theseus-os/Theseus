@@ -1,0 +1,75 @@
+[package]
+name = "shell"
+version = "0.1.0"
+description = "Shell that can run commands in application directory"
+authors = ["Andrew Pham <apham727@gmail.com>", "Zhiyao Ma <zm16@pku.edu.cn>"]
+build = "../../build.rs"
+
+
+[dependencies]
+spin = "0.4.10"
+x86_64 = { path = "../../libs/x86_64" }
+core_io = "0.1"
+
+[dependencies.log]
+default-features = false
+version = "0.3.7"
+
+[dependencies.keycodes_ascii]
+path = "../../libs/keycodes_ascii"
+
+[dependencies.dfqueue]
+path = "../../libs/dfqueue"
+version = "0.1.0"
+
+[dependencies.event_types]
+path = "../../kernel/event_types"
+
+[dependencies.spawn]
+path = "../../kernel/spawn"
+
+[dependencies.task]
+path = "../../kernel/task"
+
+[dependencies.runqueue]
+path = "../../kernel/runqueue"
+
+[dependencies.window_manager]
+path = "../../kernel/window_manager"
+
+[dependencies.terminal_print]
+path = "../../kernel/terminal_print"
+
+[dependencies.print]
+path = "../../kernel/print"
+
+[dependencies.environment]
+path = "../../kernel/environment"
+
+[dependencies.root]
+path = "../../kernel/root"
+
+[dependencies.path]
+path = "../../kernel/path"
+
+[dependencies.libterm]
+path = "../../kernel/libterm"
+
+[dependencies.scheduler]
+path = "../../kernel/scheduler"
+
+[dependencies.stdio]
+path = "../../libs/stdio"
+
+[dependencies.lazy_static]
+features = ["spin_no_std", "nightly"]
+version = "1.2.0"
+
+[dependencies.app_io]
+path = "../app_io"
+
+[dependencies.fs_node]
+path = "../../kernel/fs_node"
+
+[lib]
+crate-type = ["rlib"]

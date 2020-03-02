@@ -4,13 +4,11 @@
 //! The current system simply enqueus the Print event into the print queue of the default terminal
 
 #![no_std]
-#![feature(alloc)]
 
 #[macro_use] extern crate alloc;
 extern crate spin;
 extern crate dfqueue;
 extern crate event_types;
-extern crate input_event_manager;
 
 use core::fmt;
 use spin::Once;
@@ -33,8 +31,8 @@ macro_rules! println {
     ($fmt:expr, $($arg:tt)*) => (print!(concat!($fmt, "\n"), $($arg)*));
 }
 
-/// The main printing macro, which simply pushes an output event to the input_event_manager's event queue. 
-/// This ensures that only one thread (the input_event_manager acting as a consumer) ever accesses the GUI.
+/// The main printing macro, which simply pushes an output event to the event queue. 
+/// This ensures that only one thread (e.g., a terminal acting as a consumer) ever accesses the GUI.
 #[macro_export]
 macro_rules! print {
     ($($arg:tt)*) => ({

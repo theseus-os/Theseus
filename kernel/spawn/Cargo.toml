@@ -8,6 +8,7 @@ build = "../../build.rs"
 [dependencies]
 atomic = { version = "0.4.4", features = [ "nightly" ] }
 owning_ref = { git = "https://github.com/kevinaboos/owning-ref-rs" }
+type-name = "0.1.0"
 
 
 [dependencies.log]
@@ -42,6 +43,9 @@ path = "../tss"
 [dependencies.task]
 path = "../task"
 
+[dependencies.catch_unwind]
+path = "../catch_unwind"
+
 [dependencies.runqueue]
 path = "../runqueue"
 
@@ -59,6 +63,9 @@ path = "../context_switch"
 
 [dependencies.path]
 path = "../path"
+
+[dependencies.fs_node]
+path = "../fs_node"
 
 [lib]
 crate-type = ["rlib"]

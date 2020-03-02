@@ -1,0 +1,21 @@
+[package]
+name = "immediate_input_echo"
+version = "0.1.0"
+authors = ["Zhiyao Ma <zm16@pku.edu.cn>"]
+build = "../../build.rs"
+
+[dependencies]
+core_io = "0.1"
+
+[dependencies.stdio]
+path = "../../libs/stdio"
+
+[dependencies.app_io]
+path = "../app_io"
+
+[dependencies.log]
+default-features = false
+version = "0.3.7"
+
+[lib]
+crate-type = ["rlib"]

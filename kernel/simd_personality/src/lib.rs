@@ -49,14 +49,7 @@
 
 
 #![no_std]
-#![feature(alloc)]
 #![feature(compiler_builtins_lib)]
-
-#[cfg(simd_personality)]
-#[macro_use] extern crate alloc;
-#[cfg(not(simd_personality))] 
-extern crate alloc;
-
 
 // NOTE: the `cfg_if` macro makes the entire file dependent upon the `simd_personality` config.
 #[macro_use] extern crate cfg_if;
@@ -74,21 +67,19 @@ extern crate compiler_builtins as _compiler_builtins;
 
 
 #[macro_use] extern crate log;
+#[macro_use] extern crate alloc;
 extern crate memory;
 extern crate mod_mgmt;
 extern crate task;
 extern crate spawn;
 extern crate apic;
 extern crate fs_node;
-extern crate path;
 
 
-use core::ops::DerefMut;
 use alloc::string::String;
-use mod_mgmt::{CrateNamespace, get_default_namespace, get_namespaces_directory, NamespaceDirectorySet};
+use mod_mgmt::{CrateNamespace, get_initial_kernel_namespace, get_namespaces_directory, NamespaceDirectorySet};
 use spawn::KernelTaskBuilder;
 use fs_node::FileOrDir; 
-use path::Path;
 use task::SimdExt;
 
 
@@ -115,7 +106,7 @@ fn internal_setup_simd_personality(simd_ext: SimdExt) -> Result<(), &'static str
 	};
 
 	let kernel_mmi_ref = memory::get_kernel_mmi_ref().ok_or_else(|| "couldn't get kernel mmi")?;
-	let backup_namespace = get_default_namespace().ok_or("default crate namespace wasn't yet initialized")?;
+	let backup_namespace = get_initial_kernel_namespace().ok_or("initial kernel crate namespace wasn't yet initialized")?;
 
 	// The `mod_mgmt::init()` function should have initialized the following directories, 
 	// for example, if 'sse' was the prefix used to build the SSE versions of each crate:
@@ -124,17 +115,14 @@ fn internal_setup_simd_personality(simd_ext: SimdExt) -> Result<(), &'static str
 	//     .../namespaces/sse/application
 	//     .../namespaces/sse/userspace
 	let namespaces_dir = get_namespaces_directory().ok_or("top-level namespaces directory wasn't yet initialized")?;
-	let base_dir = match namespaces_dir.lock().get(namespace_name) {
-		Some(FileOrDir::Dir(d)) => d,
-		_ => return Err("couldn't find directory at given path"),
-	};
+	let base_dir = namespaces_dir.lock().get_dir(namespace_name).ok_or("couldn't find directory at given path")?;
 	let mut simd_namespace = CrateNamespace::new(
 		String::from(namespace_name), 
-		NamespaceDirectorySet::from_existing_base_dir(base_dir: DirRef)?,
-	).map_err(|e| {
-		error!("Couldn't find expected namespace directory {:?}, did you choose the correct SimdExt?", namespace_name);
-		e
-	})?;
+		NamespaceDirectorySet::from_existing_base_dir(base_dir).map_err(|e| {
+			error!("Couldn't find expected namespace directory {:?}, did you choose the correct SimdExt?", namespace_name);
+			e
+		})?,
+	);
 
 	// Load things that are specific (private) to the SIMD world, like core library and compiler builtins
 	let compiler_builtins_simd = simd_namespace.get_kernel_file_starting_with("compiler_builtins-")
@@ -142,14 +130,14 @@ fn internal_setup_simd_personality(simd_ext: SimdExt) -> Result<(), &'static str
 	let core_lib_simd = simd_namespace.get_kernel_file_starting_with("core-")
 		.ok_or_else(|| "couldn't find a single 'core' object file in simd_personality")?;
 	let crate_files = vec![compiler_builtins_simd, core_lib_simd];
-	simd_namespace.load_kernel_crates(crate_files.iter(), Some(backup_namespace), kernel_mmi_ref.lock().deref_mut(), false)?;
+	simd_namespace.load_crates(crate_files.iter(), Some(backup_namespace), &kernel_mmi_ref, false)?;
 
 
 	// load the actual crate that we want to run in the simd namespace, "simd_test"
 	let simd_test_file = simd_namespace.get_kernel_file_starting_with("simd_test-")
 		.ok_or_else(|| "couldn't find a single 'simd_test' object file in simd_personality")?;
 	simd_namespace.enable_fuzzy_symbol_matching();
-	simd_namespace.load_kernel_crate(&simd_test_file, Some(backup_namespace), kernel_mmi_ref.lock().deref_mut(), false)?;
+	simd_namespace.load_crate(&simd_test_file, Some(backup_namespace), &kernel_mmi_ref, false)?;
 	simd_namespace.disable_fuzzy_symbol_matching();
 
 

@@ -1,0 +1,29 @@
+[package]
+authors = ["Kevin Boos <kevinaboos@gmail.com>"]
+name = "rendezvous"
+description = "Synchronous Inter-Task Communication using a rendezvous approach"
+version = "0.1.0"
+build = "../../build.rs"
+
+[dependencies]
+spin = "0.4.10"
+
+[dependencies.log]
+default-features = false
+version = "0.3.7"
+
+[dependencies.irq_safety]
+git = "https://github.com/kevinaboos/irq_safety"
+
+[dependencies.task]
+path = "../task"
+
+[dependencies.scheduler]
+path = "../scheduler"
+
+[dependencies.wait_queue]
+path = "../wait_queue"
+
+
+[lib]
+crate-type = ["rlib"]

@@ -1,5 +1,4 @@
 #![no_std]
-#![feature(alloc)]
 
 extern crate alloc;
 // #[macro_use] extern crate log;
@@ -17,6 +16,7 @@ use smoltcp::{
     wire::{EthernetAddress, IpAddress, IpCidr},
     iface::Routes,
 };
+
 
 
 lazy_static! {
@@ -57,4 +57,10 @@ pub trait NetworkInterface {
 
 /// A trait object wrapped in an Arc and Mutex that allows 
 /// arbitrary network interfaces to be shared in a thread-safe manner.
-pub type NetworkInterfaceRef = Arc<Mutex<NetworkInterface + Send>>;
+pub type NetworkInterfaceRef = Arc<Mutex<dyn NetworkInterface + Send>>;
+
+/// Add a Nic to the global list of network interfaces.
+/// The Nic must implement the NetworkInterface trait.
+pub fn add_to_network_interfaces<T: NetworkInterface + 'static + Send> (iface: T) {
+    NETWORK_INTERFACES.lock().push(Arc::new(Mutex::new(iface)));
+}

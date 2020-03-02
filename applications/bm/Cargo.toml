@@ -16,7 +16,7 @@ bm_in_us = []
 
 
 [dependencies.terminal_print]
-path = "../terminal_print"
+path = "../../kernel/terminal_print"
 
 [dependencies.task]
 path = "../../kernel/task"
@@ -36,10 +36,13 @@ path = "../../kernel/path"
 [dependencies.runqueue]
 path = "../../kernel/runqueue"
 
-[dependencies.memfs]
-path = "../../kernel/memfs"
+[dependencies.heapfile]
+path = "../../kernel/heapfile"
 # [dependencies.application_main_fn]
 # path = "../../compiler_plugins"
 
 [dependencies.fs_node]
 path = "../../kernel/fs_node"
+
+[dependencies.scheduler]
+path = "../../kernel/scheduler"

@@ -3,7 +3,6 @@
 //! with a standard memory mapping implementation based on `VirtualMemoryArea`s.
 
 #![no_std]
-#![feature(alloc)]
 
 extern crate alloc;
 #[macro_use] extern crate cfg_if;
@@ -67,7 +66,7 @@ fn create_mappings(
             match mapper {
                 MapperType::Normal(ref mut mapper) => {
                     let mp = mapper.map_pages(
-                        Page::range_inclusive_addr(vaddr, size_in_bytes),
+                        PageRange::from_virt_addr(vaddr, size_in_bytes),
                         EntryFlags::WRITABLE | EntryFlags::PRESENT,
                         frame_allocator
                     )?;
@@ -252,7 +251,6 @@ fn unmap_spillful(
 }
 
 
-#[no_mangle]
 pub fn main(args: Vec<String>) -> isize {
 
     let mut opts = Options::new();
@@ -288,8 +286,8 @@ pub fn main(args: Vec<String>) -> isize {
 
 pub fn rmain(matches: &Matches, opts: &Options) -> Result<(), &'static str> {
 
-    let mut mapper_normal   = unsafe { Mapper::new() };
-    let mut mapper_spillful = unsafe { MapperSpillful::new() };
+    let mut mapper_normal   = Mapper::from_current();
+    let mut mapper_spillful = MapperSpillful::new();
 
     let start_vaddr = 0xFFFF_FA00_0000_0000; // the start of the 500th P4 (PML4) entry
 
@@ -355,7 +353,6 @@ The normal spill-free MappedPages approach is evaluated by default.";
 } // end of cfg_if
 else {
     
-#[no_mangle]
 pub fn main(_args: Vec<String>) -> isize {
     println!("Error: Theseus was not compiled with the 'mapper_spillful' config enabled, \
               which is required to run this benchmark application.");

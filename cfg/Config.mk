@@ -21,14 +21,14 @@ CFG_DIR := $(ROOT_DIR)/cfg
 KERNEL_PREFIX ?= k\#
 APP_PREFIX    ?= a\#
 
-### NOTE: CURRENTLY FORCING RELEASE MODE UNTIL HASH-BASED SYMBOL RESOLUTION IS WORKING
-## Build modes:  debug is default (dev mode), release is release with full optimizations.
+## Build modes: debug is development mode, release is with full optimizations.
+## We build using release mode by default, because running in debug mode is prohibitively slow.
 ## You can set these on the command line like so: "make run BUILD_MODE=release"
 # BUILD_MODE ?= debug
 BUILD_MODE ?= release
 
 ifeq ($(BUILD_MODE), release)
-	CARGO_OPTIONS += --release
+	CARGOFLAGS += --release
 endif
 
 
@@ -51,3 +51,18 @@ RUSTFLAGS += -D unused-must-use
 RUSTFLAGS += -Z merge-functions=disabled
 # RUSTFLAGS += -Z merge-functions=trampolines
 
+## This prevents monomorphized instances of generic functions from being shared across crates.
+## It vastly simplifies the procedure of finding missing symbols in the crate loader,
+## because we know that instances of generic functions will not be found in another crate
+## besides the current crate or the crate that defines the function.
+## As far as I can tell, this does not have a significant impact on object code size or performance.
+RUSTFLAGS += -Z share-generics=no
+
+## This forces frame pointers to be generated, i.e., the stack base pointer (RBP register on x86_64)
+## will be used to store the starting address of the current stack frame.
+## This can be used for obtaining a backtrace/stack trace,
+## but isn't necessary because Theseus supports parsing DWARF .debug_* sections to handle stack unwinding.
+## Note that this reduces the number of registers available to the compiler (by reserving RBP),
+## so it often results in slightly lowered performance. 
+## By default, this is not enabled.
+# RUSTFLAGS += -C force-frame-pointers=yes

@@ -6,7 +6,7 @@ description = "Front-end application to communicate with Theseus update server"
 build = "../../build.rs"
 
 [dependencies]
-getopts = "0.2.18"
+getopts = "0.2.21"
 spin = "0.4.10"
 
 [dependencies.itertools]
@@ -14,10 +14,13 @@ version = "0.7.9"
 default-features = false
 
 [dependencies.terminal_print]
-path = "../terminal_print"
+path = "../../kernel/terminal_print"
 
 [dependencies.mod_mgmt]
 path = "../../kernel/mod_mgmt"
+
+[dependencies.crate_swap]
+path = "../../kernel/crate_swap"
 
 [dependencies.memory]
 path = "../../kernel/memory"
@@ -47,7 +50,7 @@ path = "../../kernel/network_manager"
 version = "0.5.0"
 default-features = false
 features = [
-    "alloc", 
+    "alloc", "ethernet",
     # "log", "verbose", 
     "proto-ipv4", "proto-igmp", "proto-ipv6", "proto-dhcpv4",
     "socket-raw", "socket-udp", "socket-tcp", "socket-icmp", 

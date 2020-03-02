@@ -7,26 +7,12 @@ build = "../../build.rs"
 
 [dependencies]
 spin = "0.4.10"
-# multiboot2 = { git = "https://github.com/kevinaboos/multiboot2-elf64"}
-multiboot2 = { path = "../../libs/multiboot2-elf64" } # currently using our local copy, forked from Phil Opp's crate
+multiboot2 = "0.7.1"
 xmas-elf = { version = "0.6.2", git = "https://github.com/kevinaboos/xmas-elf.git" }
-rustc-demangle = "0.1.9"
+rustc-demangle = "0.1.14"
 qp-trie = "0.7.3"
-owning_ref = { git = "https://github.com/kevinaboos/owning-ref-rs" }
+cstr_core = "0.1.2"
 
-
-[dependencies.hashbrown]
-version = "0.1.8"
-features = ["nightly"]
-
-[dependencies.irq_safety]
-git = "https://github.com/kevinaboos/irq_safety"
-
-### used for linker relocation typedefs
-[dependencies.goblin]
-version = "0.0.19"
-default-features = false
-features = ["elf64"]
 
 [dependencies.util]
 path = "../../libs/util"
@@ -40,6 +26,12 @@ path = "../kernel_config"
 [dependencies.log]
 default-features = false
 version = "0.3.7"
+
+[dependencies.crate_name_utils]
+path = "../crate_name_utils"
+
+[dependencies.crate_metadata]
+path = "../crate_metadata"
 
 [dependencies.memory]
 path = "../memory"

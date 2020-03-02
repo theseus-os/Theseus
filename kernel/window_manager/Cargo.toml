@@ -1,61 +1,68 @@
 [package]
 name = "window_manager"
 version = "0.1.0"
-authors = ["Wenqiu Yu <yuwenqiuj@gmail.com>"]
+authors = ["Yue Wu <wuyue16@pku.edu.cn>", "Wenqiu Yu <yuwenqiuj@gmail.com>"]
+description = "allocate new windows and manage a list of existing windows"
 build = "../../build.rs"
 
 [dependencies]
 spin = "0.4.10"
-volatile = "0.2.5"
-
-
-[dependencies.lazy_static]
-features = ["spin_no_std", "nightly"]
-version = "1.2.0"
-
-[dependencies.serial_port]
-path = "../serial_port"
-
-[dependencies.kernel_config]
-path = "../kernel_config"
-
-[dependencies.state_store]
-path = "../state_store"
 
 [dependencies.log]
 default-features = false
 version = "0.3.7"
 
-[dependencies.irq_safety]
-git = "https://github.com/kevinaboos/irq_safety"
+[dependencies.mpmc]
+path = "../../libs/mpmc"
 
-[dependencies.dfqueue]
-path = "../../libs/dfqueue"
-version = "0.1.0"
+[dependencies.framebuffer_drawer]
+path = "../framebuffer_drawer"
 
-[dependencies.keycodes_ascii]
-path = "../../libs/keycodes_ascii"
+[dependencies.window_inner]
+path = "../window_inner"
 
-[dependencies.frame_buffer]
-path = "../frame_buffer"
+[dependencies.compositor]
+path = "../compositor"
 
-[dependencies.acpi]
-path = "../acpi"
+[dependencies.framebuffer_compositor]
+path = "../framebuffer_compositor"
+
+[dependencies.shapes]
+path = "../shapes"
+
+[dependencies.framebuffer]
+path = "../framebuffer"
+
+[dependencies.color]
+path = "../color"
 
 [dependencies.event_types]
 path = "../event_types"
 
+[dependencies.font]
+path = "../font"
+
+[dependencies.lazy_static]
+features = ["spin_no_std", "nightly"]
+version = "1.2.0"
+
+[dependencies.mod_mgmt]
+path = "../mod_mgmt"
+
 [dependencies.spawn]
 path = "../spawn"
 
-[dependencies.pit_clock]
-path = "../pit_clock"
+[dependencies.mouse_data]
+path = "../../libs/mouse_data"
 
-
-
-# [build]
-# rustflags = ["-C", "prefer-dynamic", "-C", "panic=abort"]
-
+[dependencies.path]
+path = "../../kernel/path"
 
 [lib]
 crate-type = ["rlib"]
+
+[dependencies.keycodes_ascii]
+path = "../../libs/keycodes_ascii"
+
+[dependencies.scheduler]
+path = "../../kernel/scheduler"

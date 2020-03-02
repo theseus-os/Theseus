@@ -1,0 +1,21 @@
+[package]
+name = "displayable"
+version = "0.1.0"
+authors = ["Wenqiu Yu <yuwenqiuj@gmail.com>"]
+description = "provides a Displayable trait, which abstracts objects that can display themselves onto a framebuffer"
+build = "../../build.rs"
+
+[dependencies]
+spin = "0.4.10"
+
+[dependencies.framebuffer]
+path = "../framebuffer"
+
+[dependencies.color]
+path = "../color"
+
+[dependencies.shapes]
+path = "../shapes"
+
+[lib]
+crate-type = ["rlib"]
