@@ -75,7 +75,7 @@ pub type StateTransferFunction = fn(&CrateNamespace, &CrateNamespace) -> Result<
 /// 
 /// In general, the strategy for replacing an old crate `C` with a new crate `C2` consists of three steps:
 /// 1) Load the new replacement crate `C2` from its object file.
-/// 2) Copy the data and .bss sections from old crate `C` to the new crate `C2`
+/// 2) Copy the .data and .bss sections from old crate `C` to the new crate `C2`
 /// 3) Set up new relocation entries that redirect all dependencies on the old crate `C` to the new crate `C2`.
 /// 4) Remove crate `C` and clean it up, e.g., removing its entries from the symbol map.
 ///    Save the removed crate (and its symbol subtrie) in a cache for later use to expedite future swapping operations.
@@ -291,7 +291,7 @@ pub fn swap_crates(
                         .filter(|_| iter.next().is_none()) // ensure single element
                         .map(|(_key, val)| val)
                 }.ok_or_else(|| 
-                    "couldn't find destination section in new crate for copying old_sec's data into (BSS state transfer)"
+                    "couldn't find destination section in new crate to copy old_sec's data into (.data/.bss state transfer)"
                 )?;
 
                 debug!("swap_crates(): copying .data or .bss section from old {:?} to new {:?}", &*old_sec, new_dest_sec);
