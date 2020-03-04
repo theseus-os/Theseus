@@ -135,7 +135,6 @@ impl DebugSections {
     /// Handle a node (one that's within a matching subprogram).
     /// This can be either a variable node itself or anything that may contain a variable node, e.g., lexical blocks.
     /// 
-    /// 
     /// A *lexical block* is DWARF's term for a lexical scope block, e.g., curly braces like so:
     /// ```rust,no_run
     /// fn main() { // start
@@ -152,10 +151,22 @@ impl DebugSections {
     /// } //end
     /// ```
     /// 
-    /// Otherwise, an error is returned upon failure, e.g., a problem parsing the debug sections.
+    /// # Arguments
+    /// * `instruction_pointer`: the virtual address of the instruction pointer (program counter) 
+    ///   that was reached when we stopped executing and started analyzing this debug info.
+    /// * `enclosing_range`: the address range of the enclosing scope that contains the given `node`. 
+    ///   For example, this is typically the starting and ending address of the lexical block or subprogram
+    ///   that encloses the given `node` (e.g., a variable node or another nested lexical block node).
+    /// * `depth`: the current recursion depth within the tree of debug information. 
+    ///   This is primarily used for printing properly-formatted debug information. 
+    /// * `node`: the node in the debug information tree that we should handle and recursively explore.
+    /// * `context`: contextual items needed to handle traversing the debug info tree.
+    /// 
+    /// An error is returned upon failure, e.g., a problem parsing the debug sections.
     fn handle_node<R: Reader>(
         &self,
         instruction_pointer: VirtualAddress,
+        mut enclosing_range: core::ops::Range<usize>,
         depth: usize,
         node: gimli::EntriesTreeNode<R>,
         context: &DwarfContext<R>,
@@ -167,38 +178,60 @@ impl DebugSections {
         // We found a lexical block node. 
         // We only care about lexical block nodes because they may contain variable nodes.
         if tag == gimli::DW_TAG_lexical_block {
-            let low_pc  = entry.attr_value(gimli::DW_AT_low_pc)? .expect("Lexical Block DIE didn't have a DW_AT_low_pc attribute");
-            let starting_vaddr = match low_pc {
-                gimli::AttributeValue::Addr(a) => VirtualAddress::new_canonical(a as usize),
-                unsupported => panic!("unsupported AttributeValue type for low_pc: {:?}", unsupported),
+            // A lexical block's address range can exist in two forms: a low_pc and high_pc attribute pair, or a list of ranges
+            let (starting_vaddr, ending_vaddr) = {
+                if let Some(gimli::AttributeValue::RangeListsRef(ranges_offset)) = entry.attr_value(gimli::DW_AT_ranges)? {
+                    let mut ranges_list = context.dwarf.ranges(&context.unit, ranges_offset)?;
+                    debug!("{:indent$}--Lexical Block range list:", "", indent = ((depth) * 2));
+                    // we only care about the first range, since the additional ranges will be for unwinding routines
+                    let mut first_range = None;
+                    while let Some(r) = ranges_list.next()? {
+                        debug!("{:indent$} --> {:#X} to {:#X}", "", r.begin, r.end, indent = ((depth+1) * 2));
+                        if first_range.is_none() { first_range = Some(r); }
+                    }
+                    first_range.map(|range| (range.begin as usize, range.end as usize)).expect("range list iter was empty")
+                }
+                else if let (Some(low_pc), Some(high_pc)) = (entry.attr_value(gimli::DW_AT_low_pc)?, entry.attr_value(gimli::DW_AT_high_pc)?) {
+                    let starting_vaddr = match low_pc {
+                        gimli::AttributeValue::Addr(a) => a as usize,
+                        unsupported => panic!("unsupported AttributeValue type for low_pc: {:?}", unsupported),
+                    };
+                    let size_of_lexical_block = match high_pc {
+                        gimli::AttributeValue::Udata(d) => d as usize,
+                        unsupported => panic!("unsupported AttributeValue type for high_pc: {:?}", unsupported),
+                    };
+                    let ending_vaddr = starting_vaddr + size_of_lexical_block;
+                    (starting_vaddr, ending_vaddr)
+                }
+                else {
+                    error!("Couldn't get lexical block's address range or low_pc/high_pc attribute. Entry: {:?}", entry);
+                    return Err(gimli::Error::InvalidAddressRange);
+                }
             };
-            let high_pc = entry.attr_value(gimli::DW_AT_high_pc)?.expect("Lexical Block DIE didn't have a DW_AT_high_pc attribute");
-            let size_of_lexical_block = match high_pc {
-                gimli::AttributeValue::Udata(d) => d as usize,
-                unsupported => panic!("unsupported AttributeValue type for high_pc: {:?}", unsupported),
-            };
-            let ending_vaddr = starting_vaddr + size_of_lexical_block;
 
             debug!("{:indent$}--Lexical Block ranges from {:#X} to {:#X} (size {:#X} bytes)", "",
-                starting_vaddr, ending_vaddr, size_of_lexical_block,
+                starting_vaddr, ending_vaddr, ending_vaddr - starting_vaddr,
                 indent = ((depth) * 2)
             );
+
+            enclosing_range = starting_vaddr..ending_vaddr;
             
             // Previously, I erroneously thought that we should look for lexical blocks that contain that instr ptr
             // in order to drill down into the precise block that's relevant. 
             // But lexical blocks don't work that way. 
             //
             // Instead, we actually need to look at the **variables** within lexical blocks,
-            // and look at the location lists (which describe the range(s) of addresses for which that variable is used, and what register it occupies).
-            // If any of *those* ranges contain the given instruction pointer, 
+            // and look at the location lists (which describe the range(s) of addresses for which that variable existed, and what register it occupies).
+            // If any of *those* location ranges are within a lexical block that contains the given instruction pointer, 
             // then we know that that variable existed and was in-scope at the point that execution reached the instruction pointer.
             // Those are the variables that we want to drop. 
 
-            // // TODO: FIXME: change this according to the above comment block
-            // if instruction_pointer >= starting_vaddr && instruction_pointer < ending_vaddr {
-            //     warn!("{:indent$}--Found matching lexical block at {:?}", "", entry.offset(), indent = ((depth) * 2));
-            //     return self.handle_lexical_block(instruction_pointer, depth + 1, node, debug_str_sec);
-            // }   
+            // // NOTE: I'm still not sure if we only want to search lexical blocks that contain the instruction pointer,
+            //          or if we need to look at all variables regardless of lexical blocks.
+            if enclosing_range.contains(&instruction_pointer.value()) {
+                warn!("{:indent$}  --> Lexical block contains instr ptr!", "", indent = ((depth) * 2));
+                // return self.handle_lexical_block(instruction_pointer, depth + 1, node, debug_str_sec);
+            }   
 
             // We don't use a "return" statement here because we want to fall through 
             // to the end of this function so we can recurse into the child nodes.
@@ -213,48 +246,31 @@ impl DebugSections {
             let variable_name = entry.attr(gimli::DW_AT_name)?.expect("Variable DIE didn't have a DW_AT_name attribute")
                 .string_value(context.debug_str_sec).expect("Couldn't convert variable name attribute value to string")
                 .to_string().map(|s| String::from(s))?;
-            let type_signature = match entry.attr_value(gimli::DW_AT_type)? {
-                Some(gimli::AttributeValue::DebugTypesRef(type_ref)) => {
-                    let _debug_pubtypes_sec = self.debug_pubtypes();
-                    // let type_ref = {
-                    //     let mut types_iter = debug_pubtypes_sec.items(); 
-                    //     while let Some(item) = types_iter.next()? {
-                    //         item
-                    //     }
-                    //     panic!("")
-                    // };
-                    Some(type_ref)
-                }
-                Some(gimli::AttributeValue::UnitRef(unit_offset)) => {
-                    let mut entries = context.unit.entries_tree(Some(unit_offset))?;
-                    let type_node = entries.root()?;
-                    let type_entry = type_node.entry();
-                    match type_entry.tag() {
-                        gimli::DW_TAG_structure_type => {
-                            // TODO FIXME: check if this type has a Drop implementation
+            debug!("{:indent$}Variable {:?}", "", variable_name, indent = ((depth) * 2));
 
-                        }
-                        other_type => {
-                            // Note: other types probably don't have drop implementations
-                            warn!("Note: skipping search for drop implementation for variable {:?} of non-struct type {:X?}", variable_name, other_type);
-                        }
-                    }
-
-                    None
-                }
-                unexpected => {
-                    warn!("{:indent$}unexpected DW_AT_type attribute value: {:X?}", "", unexpected, indent = ((depth) * 2));
-                    None
-                }
-            };
-            debug!("{:indent$}Variable {:?}, type: {:?}", "", variable_name, type_signature, indent = ((depth) * 2));
-            if let Some(loc) = entry.attr(gimli::DW_AT_location)? {
-                warn!("{:indent$}Variable {:?}, type: {:?} MAY NEED HANDLING FOR LOCATION {:?}", "", variable_name, type_signature, loc, indent = ((depth+1) * 2));
-                match loc.value() {
+            // Find the latest location that this variable existed (before the instruction pointer, of course).
+            let mut latest_variable_location = None;
+            if let Some(loc_attr) = entry.attr(gimli::DW_AT_location)? {
+                match loc_attr.value() {
                     gimli::AttributeValue::LocationListsRef(loc_lists_offset) => {
                         let mut locations = context.dwarf.locations(&context.unit, loc_lists_offset)?;
                         while let Some(location) = locations.next()? {
-                            warn!("{:indent$}Location {:?}", "", location, indent = ((depth+2) * 2));
+                            // We can't possibly need to drop variables that haven't been created yet (the instr ptr hasn't gotten there)
+                            if instruction_pointer.value() < location.range.begin as usize {
+                                debug!("{:indent$}Skipping variable at location {:X?} that starts after instr ptr {:#X}", "", location.range, instruction_pointer, indent = ((depth+1) * 2));
+                                continue;
+                            }
+                            // Here, the variable has been created before the given instr ptr, so we *might* need to drop it. 
+                            //
+                            // If the variable's enclosing range (its enclosing lexical block) ended before the instr ptr, 
+                            // then it was already dropped. So we shouldn't drop it again. 
+                            if enclosing_range.end < instruction_pointer.value() {
+                                debug!("{:indent$}Skipping variable at location {:X?} already dropped before instr ptr {:#X}", "", location.range, instruction_pointer, indent = ((depth+1) * 2));
+                                continue;
+                            }
+
+                            warn!("{:indent$}Variable {:?} MAY NEED HANDLING FOR LOCATION {:X?}", "", variable_name, location, indent = ((depth+1) * 2));
+                            latest_variable_location = Some(location);
                         }
                     }
                     unsupported => panic!("Unsupported DW_AT_location attr value: {:?}", unsupported),
@@ -264,7 +280,55 @@ impl DebugSections {
                 // So, do nothing here.
             }
             
-            // TODO FIXME: check if one of the variable's location ranges contains the instruction pointer
+            if let Some(location) = latest_variable_location {
+                let mut evaluation = location.data.evaluation(context.unit.encoding());
+                let eval_result = evaluation.evaluate()?;
+                debug!("{:indent$}Evaluation result {:X?}", "", eval_result, indent = ((depth+3) * 2));
+                match eval_result {
+                    gimli::EvaluationResult::Complete => {
+                        let pieces = evaluation.result();
+                        debug!("{:indent$}Completed evaluation: {:X?}", "", pieces, indent = ((depth+4) * 2));
+                    }
+                    _ => { }
+                }
+                // TODO FIXME: check if one of the variable's location ranges contains the instruction pointer
+                let type_signature = match entry.attr_value(gimli::DW_AT_type)? {
+                    Some(gimli::AttributeValue::DebugTypesRef(type_ref)) => {
+                        let _debug_pubtypes_sec = self.debug_pubtypes();
+                        // let type_ref = {
+                        //     let mut types_iter = debug_pubtypes_sec.items(); 
+                        //     while let Some(item) = types_iter.next()? {
+                        //         item
+                        //     }
+                        //     panic!("")
+                        // };
+                        Some(type_ref)
+                    }
+                    Some(gimli::AttributeValue::UnitRef(unit_offset)) => {
+                        let mut entries = context.unit.entries_tree(Some(unit_offset))?;
+                        let type_node = entries.root()?;
+                        let type_entry = type_node.entry();
+                        match type_entry.tag() {
+                            gimli::DW_TAG_structure_type => {
+                                // TODO FIXME: check if this type has a Drop implementation
+
+                            }
+                            other_type => {
+                                // Note: other types probably don't have drop implementations
+                                warn!("Note: skipping search for drop implementation for variable {:?} of non-struct type {:X?}", variable_name, other_type);
+                            }
+                        }
+
+                        None
+                    }
+                    unexpected => {
+                        warn!("{:indent$}unexpected DW_AT_type attribute value: {:X?}", "", unexpected, indent = ((depth) * 2));
+                        None
+                    }
+                };
+
+                // TODO FIXME: invoke this variable's type's drop method 
+            }
             
             
         }
@@ -287,7 +351,7 @@ impl DebugSections {
         // Recurse into the entry node's children nodes.
         let mut children = node.children();
         while let Some(child_subtree) = children.next()? {
-            if let Some(offset) = self.handle_node(instruction_pointer, depth + 1, child_subtree, context)? {
+            if let Some(offset) = self.handle_node(instruction_pointer, enclosing_range.clone(), depth + 1, child_subtree, context)? {
                 return Ok(Some(offset));
             }
         }
@@ -344,7 +408,7 @@ impl DebugSections {
             );
 
             let starting_vaddr = match entry.attr_value(gimli::DW_AT_low_pc)? {
-                Some(gimli::AttributeValue::Addr(a)) => VirtualAddress::new_canonical(a as usize),
+                Some(gimli::AttributeValue::Addr(a)) => a as usize,
                 Some(unsupported) => panic!("unsupported AttributeValue type for low_pc: {:?}", unsupported),
                 _ => {
                     debug!("{:indent$}--Subprogram {:?}({:?}) did not have attribute DW_AT_low_pc", "", _subprogram_name, _subprogram_linkage_name, indent = (depth * 2));
@@ -366,12 +430,12 @@ impl DebugSections {
                 indent = (depth * 2)
             );
 
-            if instruction_pointer >= starting_vaddr && instruction_pointer < ending_vaddr {
+            if instruction_pointer.value() >= starting_vaddr && instruction_pointer.value() < ending_vaddr {
                 warn!("{:indent$}--Found matching subprogram at {:?}", "", entry.offset(), indent = ((depth) * 2));
                 // Here we found a subprogram that contains the given instruction pointer. 
                 // We use a return statement here because once we've found a matching subprogram,
                 // we can stop looking at other subprograms because only one subprogram can possibly contain a given instruction pointer.
-                return self.handle_node(instruction_pointer, depth + 1, node, context);
+                return self.handle_node(instruction_pointer, starting_vaddr..ending_vaddr, depth + 1, node, context);
             } 
         } 
 

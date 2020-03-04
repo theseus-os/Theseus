@@ -76,8 +76,3 @@ pub fn write_str(s: &str) -> fmt::Result {
 	let mut serial = SERIAL_PORT.lock();
 	serial.write_str(s)
 }
-
-#[inline(never)]
-pub fn write_test(s: &str) {
-	write_str(s).unwrap()
-}

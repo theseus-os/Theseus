@@ -16,7 +16,7 @@ struct MyStruct(pub usize);
 impl Drop for MyStruct {
     #[inline(never)]
     fn drop(&mut self) {
-        serial_port::write_test("*** DROPPING MYSTRUCT ***");
+        serial_port::write_str("*** DROPPING MYSTRUCT ***").unwrap();
     }
 }
 

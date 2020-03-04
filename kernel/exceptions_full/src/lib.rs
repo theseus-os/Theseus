@@ -85,10 +85,16 @@ macro_rules! println_both {
 /// 
 #[inline(never)]
 fn kill_and_halt(exception_number: u8, stack_frame: &ExceptionStackFrame) {
-    println_both!("Killing task {:?} due to exception {}. Unwinding will not occur unless compiled with cfg `unwind_exceptions`.", task::get_my_current_task(), exception_number);
+    #[cfg(unwind_exceptions)] {
+        println_both!("Unwinding {:?} due to exception {}.", task::get_my_current_task(), exception_number);
+    }
+    #[cfg(not(unwind_exceptions))] {
+        println_both!("Killing task without unwinding {:?} due to exception {}. (cfg `unwind_exceptions` is not set.)", task::get_my_current_task(), exception_number);
+    }
 
-    // dump some info about the this loaded app crate
-    {
+    // Dump some info about the this loaded app crate
+    // and test out using debug info for recovery
+    if false {
         let curr_task = task::get_my_current_task().expect("kill_and_halt: no current task");
         let app_crate = {
             let t = curr_task.lock();
@@ -103,18 +109,14 @@ fn kill_and_halt(exception_number: u8, stack_frame: &ExceptionStackFrame) {
             krate.debug_symbols_file.clone()
         };
 
+        if false {
+            let mut debug = debug_info::DebugSymbols::Unloaded(debug_symbols_file);
+            let debug_sections = debug.load(&app_crate, &curr_task.get_namespace()).unwrap();
+            let instr_ptr = stack_frame.instruction_pointer.0 - 1; // points to the next instruction (at least for a page fault)
 
-        let mut debug = debug_info::DebugSymbols::Unloaded(debug_symbols_file);
-        let debug_sections = debug.load(&app_crate, &curr_task.get_namespace()).unwrap();
-        let debug_info_sec = debug_sections.debug_info();
-        let debug_abbrev_sec = debug_sections.debug_abbrev();
-        let instr_ptr = stack_frame.instruction_pointer.0 - 1; // points to the next instruction (at least for a page fault)
-
-        let res = debug_sections.find_subprogram_containing(memory::VirtualAddress::new_canonical(instr_ptr));
-        debug!("Result of find_subprogram_containing: {:?}", res);
-
-        // now find the lexical block of interest
-        // now look at any variables in that lexical block, specifically only those that have a real location. 
+            let res = debug_sections.find_subprogram_containing(memory::VirtualAddress::new_canonical(instr_ptr));
+            debug!("Result of find_subprogram_containing: {:?}", res);
+        }
     }
 
     // print a stack trace
