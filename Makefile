@@ -588,7 +588,7 @@ orun:
 	@qemu-system-x86_64 $(QEMU_FLAGS)
 
 
-### Old Run Wait: runs the most recent build without rebuilding but waits for a GDB connection.
+### Old Run Pause: runs the most recent build without rebuilding but waits for a GDB connection.
 orun_pause:
 	@qemu-system-x86_64 $(QEMU_FLAGS) -S
 
