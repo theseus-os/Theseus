@@ -21,6 +21,17 @@ exclude = [
 	"target",
 	"tools",
 	"userspace",
+
+	## exclude unused test applications by default
+	"applications/test_channel",
+	"applications/test_exception",
+	"applications/test_exception2",
+	"applications/test_filerw",
+	"applications/test_heap",
+	"applications/test_mutex_sleep",
+	"applications/test_wait_queue",
+	# "applications/test_panic",
+	# "applications/unwind_test",
 ]
 
 
