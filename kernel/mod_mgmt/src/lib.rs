@@ -1029,6 +1029,7 @@ impl CrateNamespace {
 
         let new_crate = CowArc::new(LoadedCrate {
             crate_name:              crate_name.clone(),
+            debug_symbols_file:      Arc::downgrade(&crate_object_file),
             object_file:             crate_object_file, 
             sections:                BTreeMap::new(),
             text_pages:              text_pages.clone(),
@@ -1412,7 +1413,7 @@ impl CrateNamespace {
                 sec.get_name(&elf_file), sec.get_type(), sec.info()); 
             }
 
-            // currently not using debug sections
+            // Debug sections are handled separately
             if let Ok(name) = sec.get_name(&elf_file) {
                 if name.starts_with(".rela.debug")         // ignore debug special sections for now
                 {
@@ -2258,7 +2259,7 @@ fn dump_weak_dependents(sec: &LoadedSection, prefix: String) {
 
 
 /// Returns a reference to the symbol table in the given `ElfFile`.
-fn find_symbol_table<'e>(elf_file: &'e ElfFile) 
+pub fn find_symbol_table<'e>(elf_file: &'e ElfFile) 
     -> Result<&'e [xmas_elf::symbol_table::Entry64], &'static str>
     {
     use xmas_elf::sections::SectionData::SymbolTable64;
