@@ -1,7 +1,6 @@
 #![no_std]
 #![feature(asm)]
 #![feature(stmt_expr_attributes)]
-#![feature(core_intrinsics)]
 
 #[macro_use] extern crate alloc;
 #[macro_use] extern crate log;
