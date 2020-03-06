@@ -1,6 +1,7 @@
 #![no_std]
 #![feature(asm)]
 #![feature(stmt_expr_attributes)]
+#![feature(core_intrinsics)]
 
 #[macro_use] extern crate alloc;
 #[macro_use] extern crate log;
@@ -153,10 +154,8 @@ impl<F, A, R> KernelTaskBuilder<F, A, R>
             None,
             task_cleanup_failure::<F, A, R>,
         )?;
-        new_task.name = self.name.unwrap_or_else(|| String::from( 
-            // if a Task name wasn't provided, then just use the function's name
-            type_name::get::<F>(),
-        ));
+        // If a Task name wasn't provided, then just use the function's name.
+        new_task.name = self.name.unwrap_or_else(|| String::from(type_name::get::<F>()));
     
         #[cfg(simd_personality)] {  
             new_task.simd = self.simd;

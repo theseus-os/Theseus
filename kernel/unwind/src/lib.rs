@@ -839,7 +839,7 @@ fn cleanup_unwinding_context(unwinding_context_ptr: *mut UnwindingContext) -> ! 
     drop(stack_frame_iter);
 
     let failure_cleanup_function = {
-        let mut t = current_task.lock();
+        let t = current_task.lock();
         t.failure_cleanup_function.clone()
     };
     warn!("cleanup_unwinding_context(): invoking the task_cleanup_failure function for task {:?}", current_task);
