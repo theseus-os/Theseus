@@ -838,19 +838,12 @@ fn cleanup_unwinding_context(unwinding_context_ptr: *mut UnwindingContext) -> ! 
     let UnwindingContext { current_task, cause, stack_frame_iter } = unwinding_context;
     drop(stack_frame_iter);
 
-    let cleanup_func_opt = {
-        let mut t = current_task.lock_mut();
-        t.failure_cleanup_function.take()
+    let failure_cleanup_function = {
+        let mut t = current_task.lock();
+        t.failure_cleanup_function.clone()
     };
-    if let Some(cleanup_func) = cleanup_func_opt {
-        warn!("cleanup_unwinding_context(): invoking the task_cleanup_failure function for task {:?}", current_task);
-        cleanup_func(current_task, cause)
-    } else {
-        error!("BUG: cleanup_unwinding_context(): task {:?} did not have a failure cleanup function set! Looping indefinitely.", current_task);
-        drop(current_task);
-        drop(cause);
-        loop { }
-    }
+    warn!("cleanup_unwinding_context(): invoking the task_cleanup_failure function for task {:?}", current_task);
+    failure_cleanup_function(current_task, cause)
 }
 
 

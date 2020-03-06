@@ -189,6 +189,9 @@ pub enum SimdExt {
     None,
 }
 
+/// The signature of a Task's failure cleanup function.
+pub type FailureCleanupFunction = fn(TaskRef, KillReason) -> !;
+
 
 /// A structure that contains contextual information for a thread of execution. 
 pub struct Task {
@@ -234,15 +237,15 @@ pub struct Task {
     pub panic_handler: Option<PanicHandler>,
     /// The environment of the task, Wrapped in an Arc & Mutex because it is shared among child and parent tasks
     pub env: Arc<Mutex<Environment>>,
+    /// The function that should be run as a last-ditch attempt to recover from this task's failure,
+    /// e.g., this can be called when unwinding itself fails. 
+    /// Typically, it will point to this Task's specific instance of `spawn::task_cleanup_failure()`,
+    /// which has generic type parameters that describe its function signature, argument type, and return type.
+    pub failure_cleanup_function: FailureCleanupFunction,
 
     #[cfg(simd_personality)]
     /// Whether this Task is SIMD enabled and what level of SIMD extensions it uses.
     pub simd: SimdExt,
-
-    /// The function that should be run as a last-ditch attempt to recover from this task's failure,
-    /// e.g., this can be called when unwinding itself fails. 
-    /// Typically, it will point to this Task's specific instance of `spawn::task_cleanup_failure()`.
-    pub failure_cleanup_function: Option<fn(TaskRef, KillReason) -> !>,
 }
 
 impl fmt::Debug for Task {
@@ -264,7 +267,12 @@ impl Task {
     /// 
     /// # Note
     /// This does not run the task, schedule it in, or switch to it.
-    pub fn new(kstack: Option<Stack>) -> Result<Task, &'static str> {
+    /// 
+    /// However, it requires tasking to already be set up, i.e., the current task must be known.
+    pub fn new(
+        kstack: Option<Stack>,
+        failure_cleanup_function: FailureCleanupFunction
+    ) -> Result<Task, &'static str> {
         let curr_task = get_my_current_task().ok_or("Task::new(): couldn't get current task (not yet initialized)")?;
         let (mmi, namespace, env, app_crate) = {
             let t = curr_task.lock();
@@ -275,7 +283,7 @@ impl Task {
             .or_else(|| mmi.lock().alloc_stack(KERNEL_STACK_SIZE_IN_PAGES))
             .ok_or("couldn't allocate kernel stack!")?;
 
-        Ok(Task::new_internal(kstack, mmi, namespace, env, app_crate))
+        Ok(Task::new_internal(kstack, mmi, namespace, env, app_crate, failure_cleanup_function))
     }
     
     /// The internal routine for creating a `Task`, which does not make assumptions 
@@ -285,7 +293,8 @@ impl Task {
         kstack: Stack, 
         mmi: MmiRef, namespace: Arc<CrateNamespace>,
         env: Arc<Mutex<Environment>>,
-        app_crate: Option<Arc<AppCrateRef>>
+        app_crate: Option<Arc<AppCrateRef>>,
+        failure_cleanup_function: FailureCleanupFunction,
     ) -> Self {
          /// The counter of task IDs
         static TASKID_COUNTER: AtomicUsize = AtomicUsize::new(0);
@@ -306,19 +315,18 @@ impl Task {
             task_local_data_ptr: VirtualAddress::zero(),
             drop_after_task_switch: None,
             name: format!("task_{}", task_id),
-            kstack: kstack,
-            mmi: mmi,
+            kstack,
+            mmi,
             pinned_core: None,
             is_an_idle_task: false,
-            app_crate: app_crate,
-            namespace: namespace,
+            app_crate,
+            namespace,
             panic_handler: None,
-            env: env,
+            env,
+            failure_cleanup_function,
 
             #[cfg(simd_personality)]
             simd: SimdExt::None,
-
-            failure_cleanup_function: None,
         }
     }
 
@@ -905,7 +913,7 @@ pub fn create_idle_task(
         .ok_or("The initial kernel CrateNamespace must be initialized before the tasking subsystem.")?
         .clone();
     let default_env = Arc::new(Mutex::new(Environment::default()));
-    let mut idle_task = Task::new_internal(kstack, kernel_mmi_ref, default_namespace, default_env, None);
+    let mut idle_task = Task::new_internal(kstack, kernel_mmi_ref, default_namespace, default_env, None, idle_task_cleanup_failure);
     idle_task.name = format!("idle_task_ap{}", apic_id);
     idle_task.is_an_idle_task = true;
     idle_task.runstate = RunState::Runnable;
@@ -934,6 +942,18 @@ pub fn create_idle_task(
     Ok(task_ref)
 }
 
+
+/// This is just like `spawn::task_cleanup_failure()`,
+/// but for idle tasks bootstrapped from a core's first execution context.
+/// 
+/// However, for a bootstrapped (idle) task, we don't know (it doesn't really have) a function signature,
+/// argument type, and return value type.
+/// 
+/// Therefore there's not much we can actually do.
+fn idle_task_cleanup_failure(current_task: TaskRef, kill_reason: KillReason) -> ! {
+    error!("BUG: idle_task_cleanup_failure: {:?} panicked with {:?}\n. There's nothing we can do here; looping indefinitely!", current_task.lock().name, kill_reason);
+    loop { }
+}
 
 
 /// The structure that holds information local to each Task,

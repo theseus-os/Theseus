@@ -149,7 +149,10 @@ impl<F, A, R> KernelTaskBuilder<F, A, R>
     -> Result<TaskRef, &'static str> 
         where PB: FnOnce(&mut Task) -> Result<(), &'static str>
     {
-        let mut new_task = Task::new(None)?;
+        let mut new_task = Task::new(
+            None,
+            task_cleanup_failure::<F, A, R>,
+        )?;
         new_task.name = self.name.unwrap_or_else(|| String::from( 
             // if a Task name wasn't provided, then just use the function's name
             type_name::get::<F>(),
@@ -439,15 +442,6 @@ fn task_wrapper<F, A, R>() -> !
     let (func, arg) = {
         let curr_task_ref = get_my_current_task().expect("BUG: task_wrapper: couldn't get current task (before task func).");
         let curr_task_name = curr_task_ref.lock().name.clone();
-
-        // Set the pointer to the type-specific `task_cleanup_failure` function, for use upon unwinding failure.
-        // TODO: FIXME: we should probably set this elsewhere, e.g., in the `KernelTaskBuilder::spawn()` function. 
-        {
-            curr_task_ref.lock_mut().failure_cleanup_function = Some(task_cleanup_failure::<F, A, R> as fn(TaskRef, task::KillReason) -> !);
-
-            let cleanup_func_ptr = &(task_cleanup_failure::<F, A, R> as fn(TaskRef, task::KillReason) -> !) as *const _ as usize;
-            debug!("TASK_WRAPPER: setting task_cleanup_failure function to {:#X}", cleanup_func_ptr);
-        }
 
         // The pointer to the kthread_call struct (func and arg) was placed at the bottom of the stack when this task was spawned.
         let kthread_call_ptr: *mut KthreadCall<F, A, R> = {
