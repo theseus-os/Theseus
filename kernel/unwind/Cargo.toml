@@ -17,9 +17,6 @@ features = [ "read", "alloc" ]
 default-features = false
 version = "0.3.7"
 
-[dependencies.irq_safety]
-git = "https://github.com/kevinaboos/irq_safety"
-
 [dependencies.memory]
 path = "../memory"
 
