@@ -42,7 +42,6 @@ extern crate alloc;
 #[macro_use] extern crate log;
 extern crate memory;
 extern crate mod_mgmt;
-extern crate irq_safety;
 extern crate task;
 extern crate gimli;
 extern crate fallible_iterator;
@@ -83,7 +82,6 @@ use mod_mgmt::{
 };
 use memory::VirtualAddress;
 use task::{TaskRef, KillReason};
-use irq_safety::hold_interrupts;
 
 
 /// This is the context/state that is used during unwinding and passed around
@@ -833,59 +831,18 @@ pub fn unwind_resume(unwinding_context_ptr: usize) -> ! {
 /// This function should be invoked when the unwinding procedure is finished, or cannot be continued any further.
 /// It cleans up the `UnwindingContext` object pointed to by the given pointer and marks the current task as killed.
 fn cleanup_unwinding_context(unwinding_context_ptr: *mut UnwindingContext) -> ! {
+    // Recover ownership of the unwinding context from its pointer
+    let unwinding_context_boxed = unsafe { Box::from_raw(unwinding_context_ptr) };
+    let unwinding_context = *unwinding_context_boxed;
+    let UnwindingContext { current_task, cause, stack_frame_iter } = unwinding_context;
+    drop(stack_frame_iter);
 
-    // Just like in `task_wrapper`, these functions need to be run atomically (without preemption)
-    // to ensure that they all get fully executed even after the task is killed.
-    // Here: now that the task is finished being unwound and cleaned up, we must do three things:
-    // 1. Put the task into a non-runnable mode (killed), and set its kill reason
-    // 2. Remove it from its runqueue
-    // 3. Yield the CPU
-    // The first two need to be done "atomically" (without interruption), so we must disable preemption before step 1.
-    // Otherwise, this task could be marked as `Killed`, and then a context switch could occur to another task,
-    // which would prevent this task from ever running again, so it would never get to remove itself from the runqueue.
-    {
-        // (0) disable preemption (currently just disabling interrupts altogether)
-        let _held_interrupts = hold_interrupts();
-
-        {
-            // Recover ownership of the unwinding context from its pointer
-            let unwinding_context_boxed = unsafe { Box::from_raw(unwinding_context_ptr) };
-            let unwinding_context = *unwinding_context_boxed;
-            let UnwindingContext { current_task, cause, .. } = unwinding_context;
-
-            // (1) Put the task into a non-runnable mode (killed), and set its kill reason
-            match current_task.mark_as_killed(cause) {
-                Ok(()) => {
-                    debug!("cleanup_unwinding_context(): marked task as killed, {:?}", current_task);
-                }
-                Err(e) => {
-                    error!("BUG: in cleanup_unwinding_context(): marking the unwound task {:?} as killed failed with error: {}", current_task, e);
-                }
-            }
-
-            // (2) Remove it from its runqueue
-            #[cfg(not(runqueue_state_spill_evaluation))]  // the normal case
-            {
-                if let Err(e) = apic::get_my_apic_id()
-                    .and_then(|id| runqueue::get_runqueue(id))
-                    .ok_or("couldn't get this core's ID or runqueue to remove killed task from it")
-                    .and_then(|rq| rq.write().remove_task(&current_task)) 
-                {
-                    error!("BUG: cleanup_unwinding_context(): couldn't remove killed task from runqueue: {}", e);
-                }
-            }
-        }
-
-        // testing current task
-        debug!("end of cleanup_unwinding_context(): curr_task is {:?}", task::get_my_current_task());
-
-        // _held_interrupts are dropped here, which re-enables them (if initially enabled)
-    }
-
-    scheduler::schedule();
-
-    error!("BUG: killed task was rescheduled! (in cleanup_unwinding_context())");
-    loop { }
+    let failure_cleanup_function = {
+        let t = current_task.lock();
+        t.failure_cleanup_function.clone()
+    };
+    warn!("cleanup_unwinding_context(): invoking the task_cleanup_failure function for task {:?}", current_task);
+    failure_cleanup_function(current_task, cause)
 }
 
 
