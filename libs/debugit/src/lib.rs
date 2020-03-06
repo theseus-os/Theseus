@@ -2,13 +2,12 @@
 //! find the right impl anyway).
 
 #![no_std]
-#![feature(core_intrinsics, specialization)]
+#![feature(specialization)]
 
 #[cfg(test)]
 #[macro_use] extern crate std;
 
 use core::fmt;
-use core::intrinsics::type_name;
 
 
 /// Formats the given argument using its `Debug` trait definition
@@ -36,7 +35,7 @@ pub struct DebugIt<T>(pub T);
 
 impl<T> fmt::Debug for DebugIt<T> {
     default fn fmt(&self, f: &mut fmt::Formatter) -> fmt::Result {
-        write!(f, "{{ non-Debug: {} }}", type_name::<T>())
+        write!(f, "{{ non-Debug: {} }}", core::any::type_name::<T>())
     }
 }
 
