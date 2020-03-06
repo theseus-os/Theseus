@@ -19,7 +19,6 @@ extern crate apic;
 extern crate context_switch;
 extern crate path;
 extern crate fs_node;
-extern crate type_name;
 extern crate catch_unwind;
 
 
@@ -154,7 +153,7 @@ impl<F, A, R> KernelTaskBuilder<F, A, R>
             task_cleanup_failure::<F, A, R>,
         )?;
         // If a Task name wasn't provided, then just use the function's name.
-        new_task.name = self.name.unwrap_or_else(|| String::from(type_name::get::<F>()));
+        new_task.name = self.name.unwrap_or_else(|| String::from(core::any::type_name::<F>()));
     
         #[cfg(simd_personality)] {  
             new_task.simd = self.simd;

@@ -6,7 +6,6 @@
 #![no_std]
 #![feature(asm)]
 #![feature(ptr_internals)]
-#![feature(core_intrinsics)]
 #![feature(unboxed_closures)]
 #![feature(step_trait, range_is_empty)]
 
@@ -21,7 +20,6 @@ extern crate atomic_linked_list;
 extern crate xmas_elf;
 extern crate heap_irq_safe;
 extern crate bit_field;
-extern crate type_name;
 #[cfg(target_arch = "x86_64")]
 extern crate memory_x86_64;
 extern crate memory_structs;
