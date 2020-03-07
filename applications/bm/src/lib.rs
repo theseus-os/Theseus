@@ -285,7 +285,6 @@ fn do_spawn() {
 /// Internal function that actually calculates the time for spawn an application.
 /// Measures this by using `TaskBuilder` to spawn a application task.
 fn do_spawn_inner(overhead_ct: u64, th: usize, nr: usize, child_core: u8) -> Result<u64, &'static str> {
-	use spawn::TaskBuilder;
     let start_hpet: u64;
 	let end_hpet: u64;
 	let tmp_iterations: u64 = 100;
@@ -293,7 +292,7 @@ fn do_spawn_inner(overhead_ct: u64, th: usize, nr: usize, child_core: u8) -> Res
 
 	start_hpet = get_hpet().as_ref().unwrap().get_counter();
 	for _ in 0..tmp_iterations {
-		let child = TaskBuilder::<fn(Vec<String>) -> isize, Vec<String>, isize>::new_application(Path::new(String::from("hello")), None)?
+		let child = spawn::new_application_task_builder(Path::new(String::from("hello")), None)?
 	        .pin_on_core(child_core) // the child is always in the my core -1
 	        //.argument(Vec::new())
 	        .spawn()?;
@@ -709,7 +708,6 @@ fn do_ctx() {
 /// The tasks yield to each other repetitively.
 /// Overhead is measured by doing the above operation with two tasks that just returns.
 fn do_ctx_inner(th: usize, nr: usize, child_core: u8) -> Result<u64, &'static str> {
-	use spawn::TaskBuilder;
     let start_hpet: u64;
 	let end_hpet: u64;
 	let overhead_end_hpet: u64;
@@ -718,12 +716,12 @@ fn do_ctx_inner(th: usize, nr: usize, child_core: u8) -> Result<u64, &'static st
 
 	start_hpet = get_hpet().as_ref().unwrap().get_counter();
 
-		let taskref3 = TaskBuilder::new(overhead_task ,1)
-        .name(String::from("overhead_task"))
-        .pin_on_core(child_core)
-        .spawn().expect("failed to initiate task");
+		let taskref3 = spawn::new_task_builder(overhead_task ,1)
+			.name(String::from("overhead_task"))
+			.pin_on_core(child_core)
+			.spawn().expect("failed to initiate task");
 
-		let taskref4 = TaskBuilder::new(overhead_task ,2)
+		let taskref4 = spawn::new_task_builder(overhead_task ,2)
 			.name(String::from("overhead_task"))
 			.pin_on_core(child_core)
 			.spawn().expect("failed to initiate task");
@@ -735,12 +733,12 @@ fn do_ctx_inner(th: usize, nr: usize, child_core: u8) -> Result<u64, &'static st
 
 	// we then span them with yielding enabled
 
-		let taskref1 = TaskBuilder::new(yield_task ,1)
+		let taskref1 = spawn::new_task_builder(yield_task ,1)
         .name(String::from("yield_task"))
         .pin_on_core(child_core)
         .spawn().expect("failed to initiate task");
 
-		let taskref2 = TaskBuilder::new(yield_task ,2)
+		let taskref2 = spawn::new_task_builder(yield_task ,2)
 			.name(String::from("yield_task"))
 			.pin_on_core(child_core)
 			.spawn().expect("failed to initiate task");

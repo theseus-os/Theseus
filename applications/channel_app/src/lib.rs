@@ -16,7 +16,6 @@ use core::sync::atomic::{AtomicUsize, Ordering};
 use alloc::vec::Vec;
 use alloc::string::String;
 use getopts::{Options, Matches};
-use spawn::TaskBuilder;
 
 
 static ITERATIONS: AtomicUsize = AtomicUsize::new(10);
@@ -70,7 +69,7 @@ fn test_multiple(iterations: usize) -> Result<(), &'static str> {
 
     let (sender, receiver) = unified_channel::new_string_channel(2);
 
-    let t1 = TaskBuilder::new(|_: ()| -> Result<(), &'static str> {
+    let t1 = spawn::new_task_builder(|_: ()| -> Result<(), &'static str> {
         warn!("test_multiple(): Entered sender task!");
         for i in 0..iterations {
             sender.send(format!("Message {:03}", i))?;
@@ -83,7 +82,7 @@ fn test_multiple(iterations: usize) -> Result<(), &'static str> {
         .pin_on_core(my_cpu)
         .spawn()?;
 
-    let t2 = TaskBuilder::new(|_: ()| -> Result<(), &'static str> {
+    let t2 = spawn::new_task_builder(|_: ()| -> Result<(), &'static str> {
         warn!("test_multiple(): Entered receiver task!");
         for i in 0..iterations {
             let msg = receiver.receive()?;

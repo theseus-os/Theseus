@@ -78,7 +78,6 @@ extern crate fs_node;
 
 use alloc::string::String;
 use mod_mgmt::{CrateNamespace, get_initial_kernel_namespace, get_namespaces_directory, NamespaceDirectorySet};
-use spawn::TaskBuilder;
 use fs_node::FileOrDir; 
 use task::SimdExt;
 
@@ -153,7 +152,7 @@ fn internal_setup_simd_personality(simd_ext: SimdExt) -> Result<(), &'static str
 		(section.mapped_pages.clone(), section.mapped_pages_offset)
 	};
 	let func1: &SimdTestFunc = mapped_pages1.lock().as_func(mapped_pages_offset1, &mut space1)?;
-	let task1 = TaskBuilder::new(func1, ())
+	let task1 = spawn::new_task_builder(func1, ())
 		.name(format!("simd_test_1-{}", namespace_name))
 		.pin_on_core(this_core)
 		.simd(simd_ext)
@@ -170,7 +169,7 @@ fn internal_setup_simd_personality(simd_ext: SimdExt) -> Result<(), &'static str
 		(section.mapped_pages.clone(), section.mapped_pages_offset)
 	};
 	let func: &SimdTestFunc = mapped_pages2.lock().as_func(mapped_pages_offset2, &mut space2)?;
-	let task2 = TaskBuilder::new(func, ())
+	let task2 = spawn::new_task_builder(func, ())
 		.name(format!("simd_test_2-{}", namespace_name))
 		.pin_on_core(this_core)
 		.simd(simd_ext)
@@ -187,7 +186,7 @@ fn internal_setup_simd_personality(simd_ext: SimdExt) -> Result<(), &'static str
 		(section.mapped_pages.clone(), section.mapped_pages_offset)
 	};
 	let func: &SimdTestFunc = mapped_pages3.lock().as_func(mapped_pages_offset3, &mut space3)?;
-	let task3 = TaskBuilder::new(func, ())
+	let task3 = spawn::new_task_builder(func, ())
 		.name(format!("simd_test_short-{}", namespace_name))
 		.pin_on_core(this_core)
 		.simd(simd_ext)

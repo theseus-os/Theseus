@@ -146,7 +146,7 @@ pub fn init(
     {
         let simd_ext = task::SimdExt::SSE;
         warn!("SIMD_PERSONALITY FEATURE ENABLED, creating a new personality with {:?}!", simd_ext);
-        spawn::TaskBuilder::new(simd_personality::setup_simd_personality, simd_ext)
+        spawn::spawn::new_task_builder(simd_personality::setup_simd_personality, simd_ext)
             .name(alloc::string::String::from("setup_simd_personality"))
             .spawn()?;
     }

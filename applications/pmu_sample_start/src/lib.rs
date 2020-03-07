@@ -26,7 +26,7 @@ pub fn main(args: Vec<String>) -> isize {
         }
     };
     /*
-    let _my_thread = spawn::TaskBuilder::new( 
+    let _my_thread = spawn::spawn::new_task_builder( 
         |_: Option<u8>| {
             pmu_x86::init();
             let sampler = pmu_x86::start_samples(pmu_x86::EventType::UnhaltedReferenceCycles, 0xFFFFF, None, 500);
