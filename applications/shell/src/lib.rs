@@ -32,7 +32,6 @@ use event_types::{Event};
 use keycodes_ascii::{Keycode, KeyAction, KeyEvent};
 use alloc::string::{String, ToString};
 use alloc::vec::Vec;
-use spawn::{ApplicationTaskBuilder, KernelTaskBuilder};
 use path::Path;
 use task::{TaskRef, ExitValue, KillReason};
 use libterm::Terminal;
@@ -95,7 +94,7 @@ struct Job {
 /// A main function that spawns a new shell and waits for the shell loop to exit before returning an exit value
 pub fn main(_args: Vec<String>) -> isize {
     {
-        let _task_ref = match KernelTaskBuilder::new(shell_loop, ())
+        let _task_ref = match spawn::new_task_builder(shell_loop, ())
             .name("shell_loop".to_string())
             .spawn() {
             Ok(task_ref) => { task_ref }
@@ -674,13 +673,12 @@ impl Shell {
             .map(|f| Path::new(f.lock().get_absolute_path()))
             .ok_or(AppErr::NotFound(cmd))?;
 
-        let taskref = match ApplicationTaskBuilder::new(app_path)
+        let taskref = spawn::new_application_task_builder(app_path, None)
+            .map_err(|e| AppErr::SpawnErr(e.to_string()))?
             .argument(args)
             .block()
-            .spawn() {
-                Ok(taskref) => taskref, 
-                Err(e) => return Err(AppErr::SpawnErr(e.to_string()))
-            };
+            .spawn()
+            .map_err(|e| AppErr::SpawnErr(e.to_string()))?;
         
         taskref.set_env(self.env.clone()); // Set environment variable of application to the same as terminal task
 

@@ -91,7 +91,7 @@ fn run_whole(num_tasks: usize) -> Result<(), &'static str> {
     let start = get_hpet().as_ref().ok_or("couldn't get HPET timer")?.get_counter();
     
     for i in 0..num_tasks {
-        let taskref = spawn::KernelTaskBuilder::new(whole_task, i)
+        let taskref = spawn::new_task_builder(whole_task, i)
             .name(format!("rq_whole_task_{}", i))
             .spawn()?;
         taskref.join()?;

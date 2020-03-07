@@ -11,7 +11,6 @@ extern crate mod_mgmt;
 extern crate path;
 
 use alloc::string::ToString;
-use spawn::ApplicationTaskBuilder;
 use mod_mgmt::CrateNamespace;
 use path::Path;
 
@@ -31,9 +30,8 @@ pub fn start() -> Result<(), &'static str> {
     let path = Path::new(shell_file.lock().get_absolute_path());
     info!("Starting first application: crate at {:?}", path);
     // Spawn the default shell
-    ApplicationTaskBuilder::new(path)
+    spawn::new_application_task_builder(path, Some(new_app_ns))?
         .name("default_shell".to_string())
-        .namespace(new_app_ns)
         .spawn()?;
 
     Ok(())
