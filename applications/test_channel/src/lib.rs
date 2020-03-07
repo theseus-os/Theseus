@@ -19,7 +19,7 @@ use alloc::{
 };
 use core::sync::atomic::{AtomicUsize, Ordering};
 use getopts::{Matches, Options};
-use spawn::KernelTaskBuilder;
+use spawn::TaskBuilder;
 use spin::Once;
 
 
@@ -133,7 +133,7 @@ fn rendezvous_test_oneshot() -> Result<(), &'static str> {
 
     let (sender, receiver) = rendezvous::new_channel();
 
-    let t1 = KernelTaskBuilder::new(|_: ()| -> Result<(), &'static str> {
+    let t1 = TaskBuilder::new(|_: ()| -> Result<(), &'static str> {
         warn!("rendezvous_test_oneshot(): Entered sender task!");
         sender.send("hello")?;
         Ok(())
@@ -142,7 +142,7 @@ fn rendezvous_test_oneshot() -> Result<(), &'static str> {
         .block();
     let t1 = pin_task!(t1, my_cpu).spawn()?;
 
-    let t2 = KernelTaskBuilder::new(|_: ()| -> Result<(), &'static str> {
+    let t2 = TaskBuilder::new(|_: ()| -> Result<(), &'static str> {
         warn!("rendezvous_test_oneshot(): Entered receiver task!");
         let msg = receiver.receive()?;
         warn!("rendezvous_test_oneshot(): Receiver got msg: {:?}", msg);
@@ -170,7 +170,7 @@ fn rendezvous_test_multiple(iterations: usize) -> Result<(), &'static str> {
 
     let (sender, receiver) = rendezvous::new_channel();
 
-    let t1 = KernelTaskBuilder::new(|_: ()| -> Result<(), &'static str> {
+    let t1 = TaskBuilder::new(|_: ()| -> Result<(), &'static str> {
         warn!("rendezvous_test_multiple(): Entered sender task!");
         for i in 0..iterations {
             sender.send(format!("Message {:03}", i))?;
@@ -182,7 +182,7 @@ fn rendezvous_test_multiple(iterations: usize) -> Result<(), &'static str> {
         .block();
     let t1 = pin_task!(t1, my_cpu).spawn()?;
 
-    let t2 = KernelTaskBuilder::new(|_: ()| -> Result<(), &'static str> {
+    let t2 = TaskBuilder::new(|_: ()| -> Result<(), &'static str> {
         warn!("rendezvous_test_multiple(): Entered receiver task!");
         for i in 0..iterations {
             let msg = receiver.receive()?;
@@ -211,7 +211,7 @@ fn asynchronous_test_oneshot() -> Result<(), &'static str> {
 
     let (sender, receiver) = async_channel::new_channel(2);
 
-    let t1 = KernelTaskBuilder::new(|_: ()| -> Result<(), &'static str> {
+    let t1 = TaskBuilder::new(|_: ()| -> Result<(), &'static str> {
         warn!("asynchronous_test_oneshot(): Entered sender task!");
         sender.send("hello")?;
         Ok(())
@@ -220,7 +220,7 @@ fn asynchronous_test_oneshot() -> Result<(), &'static str> {
         .block();
     let t1 = pin_task!(t1, my_cpu).spawn()?;
 
-    let t2 = KernelTaskBuilder::new(|_: ()| -> Result<(), &'static str> {
+    let t2 = TaskBuilder::new(|_: ()| -> Result<(), &'static str> {
         warn!("asynchronous_test_oneshot(): Entered receiver task!");
         let msg = receiver.receive()?;
         warn!("asynchronous_test_oneshot(): Receiver got msg: {:?}", msg);
@@ -248,7 +248,7 @@ fn asynchronous_test_multiple(iterations: usize) -> Result<(), &'static str> {
 
     let (sender, receiver) = async_channel::new_channel(2);
 
-    let t1 = KernelTaskBuilder::new(|_: ()| -> Result<(), &'static str> {
+    let t1 = TaskBuilder::new(|_: ()| -> Result<(), &'static str> {
         warn!("asynchronous_test_multiple(): Entered sender task!");
         for i in 0..iterations {
             sender.send(format!("Message {:03}", i))?;
@@ -260,7 +260,7 @@ fn asynchronous_test_multiple(iterations: usize) -> Result<(), &'static str> {
         .block();
     let t1 = pin_task!(t1, my_cpu).spawn()?;
 
-    let t2 = KernelTaskBuilder::new(|_: ()| -> Result<(), &'static str> {
+    let t2 = TaskBuilder::new(|_: ()| -> Result<(), &'static str> {
         warn!("asynchronous_test_multiple(): Entered receiver task!");
         for i in 0..iterations {
             let msg = receiver.receive()?;

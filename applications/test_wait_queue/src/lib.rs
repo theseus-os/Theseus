@@ -17,7 +17,7 @@ use alloc::{
     sync::Arc,
 };
 use spin::Mutex;
-use spawn::KernelTaskBuilder;
+use spawn::TaskBuilder;
 use wait_condition::{WaitCondition, WaitConditionFn};
 
 
@@ -42,18 +42,18 @@ fn rmain() -> Result<(), &'static str> {
     let wc2 = wc.clone();
 
 
-    let t1 = KernelTaskBuilder::new(wait_task, (wc, ready3))
+    let t1 = TaskBuilder::new(wait_task, (wc, ready3))
         .name(String::from("wait_task"))
         .pin_on_core(my_cpu)
         .spawn()?;
 
-    let t2 = KernelTaskBuilder::new(notify_task, (wc2, ready2))
+    let t2 = TaskBuilder::new(notify_task, (wc2, ready2))
         .name(String::from("notify_task"))
         .pin_on_core(my_cpu)
         .block()
         .spawn()?;
         
-    let t3 = KernelTaskBuilder::new(
+    let t3 = TaskBuilder::new(
         |tref| {
             warn!("DeezNutz:  testing spurious wakeup on task {:?}", tref);
             tref.unblock();

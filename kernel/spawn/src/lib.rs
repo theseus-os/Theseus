@@ -25,6 +25,7 @@ extern crate catch_unwind;
 use core::{
     mem,
     marker::PhantomData,
+    ops::{Deref, DerefMut},
 };
 use alloc::{
     vec::Vec,
@@ -35,7 +36,7 @@ use alloc::{
 use irq_safety::{MutexIrqSafe, hold_interrupts, enable_interrupts};
 use memory::{get_kernel_mmi_ref, MemoryManagementInfo, VirtualAddress};
 use task::{Task, TaskRef, get_my_current_task, RunState, TASKLIST};
-use mod_mgmt::{CrateNamespace, SectionType, SECTION_HASH_DELIMITER};
+use mod_mgmt::{CrateNamespace, AppCrateRef, SectionType, SECTION_HASH_DELIMITER};
 use path::Path;
 use fs_node::FileOrDir;
 
@@ -57,59 +58,129 @@ pub fn init(kernel_mmi_ref: Arc<MutexIrqSafe<MemoryManagementInfo>>, apic_id: u8
 }
 
 
-/// The argument type accepted by the `main` function entry point into each application.
-type MainFuncArg = Vec<String>;
-
-/// The type returned by the `main` function entry point of each application.
-type MainFuncRet = isize;
-
-/// The function signature of the `main` function that every application must have,
-/// as it is the entry point into each application `Task`.
-type MainFunc = fn(MainFuncArg) -> MainFuncRet;
-
-/// A struct that uses the Builder pattern to create and customize new kernel `Task`s.
+/// A struct that uses the builder pattern to create and customize new `Task`s.
+/// 
 /// Note that the new `Task` will not actually be created until the [`spawn`](#method.spawn) method is invoked.
-pub struct KernelTaskBuilder<F, A, R> {
+/// 
+/// The two main functions of interest are:
+/// * `new()`:  creates a new task for a known, existing function.
+/// * `new_application()`: loads a new application crate and creates a new task
+///    for that crate's entry point (main) function.
+pub struct TaskBuilder<F, A, R> {
     func: F,
     argument: A,
-    _rettype: PhantomData<R>,
+    _return_type: PhantomData<R>,
     name: Option<String>,
     pin_on_core: Option<u8>,
     blocked: bool,
+    post_build_function: Option<Box< dyn FnOnce(&mut Task) -> Result<(), &'static str> >>,
 
     #[cfg(simd_personality)]
     simd: SimdExt,
 }
 
-impl<F, A, R> KernelTaskBuilder<F, A, R> 
+impl<F, A, R> TaskBuilder<F, A, R> 
     where A: Send + 'static, 
           R: Send + 'static,
           F: FnOnce(A) -> R,
 {
-    /// Creates a new `Task` from the given kernel function `func`
+    /// Creates a new `Task` from the given function `func`
     /// that will be passed the argument `arg` when spawned. 
-    pub fn new(func: F, argument: A) -> KernelTaskBuilder<F, A, R> {
-        KernelTaskBuilder {
+    pub fn new(func: F, argument: A) -> TaskBuilder<F, A, R> {
+        TaskBuilder {
             argument: argument,
             func: func,
-            _rettype: PhantomData,
+            _return_type: PhantomData,
             name: None,
             pin_on_core: None,
             blocked: false,
+            post_build_function: None,
 
             #[cfg(simd_personality)]
             simd: SimdExt::None,
         }
     }
 
+
+    /// Creates a new application `Task` that runs the entry point `main` function
+    /// in the crate loaded from the specified `crate_object_file`.
+    /// 
+    /// Note that the application crate will be loaded and linked during this function,
+    /// but the actual new application task will not be spawned until the [`spawn()`](#method.spawn) method is invoked.
+    /// 
+    /// # Arguments
+    /// * `crate_object_file`: a reference to the application's crate object file that will be loaded.
+    /// * `new_namespace`: if provided, the new application task will be spawned within the new `CrateNamespace`,
+    ///    meaning that the new application crate will be linked against the crates within that new namespace. 
+    ///    If not provided, the new Task will be spawned within the same namespace as the current task.
+    /// 
+    pub fn new_application(
+        crate_object_file: Path, // TODO FIXME: use `mod_mgmt::IntoCrateObjectFile`,
+        new_namespace: Option<Arc<CrateNamespace>>,
+    ) -> Result<TaskBuilder<MainFunc, MainFuncArg, MainFuncRet>, &'static str> {
+        
+        let namespace = new_namespace.clone()
+            .or_else(|| task::get_my_current_task().map(|taskref| taskref.get_namespace()))
+            .ok_or("TaskBuilder::new_application(): couldn't get current task to use its CrateNamespace")?;
+        
+        let crate_object_file = match crate_object_file.get(namespace.dir())
+            .or_else(|| Path::new(format!("{}.o", &crate_object_file)).get(namespace.dir())) // retry with ".o" extension
+        {
+            Some(FileOrDir::File(f)) => f,
+            _ => return Err("Couldn't find specified file path for new application crate"),
+        };
+        
+        // Load the new application crate
+        let app_crate_ref = {
+            let kernel_mmi_ref = get_kernel_mmi_ref().ok_or("couldn't get_kernel_mmi_ref")?;
+            CrateNamespace::load_crate_as_application(&namespace, &crate_object_file, &kernel_mmi_ref, false)?
+        };
+
+        // Find the "main" entry point function in the new app crate
+        let main_func_sec = { 
+            let app_crate = app_crate_ref.lock_as_ref();
+            let expected_main_section_name = format!("{}{}{}", app_crate.crate_name_as_prefix(), ENTRY_POINT_SECTION_NAME, SECTION_HASH_DELIMITER);
+            app_crate.find_section(|sec| 
+                sec.get_type() == SectionType::Text && sec.name_without_hash() == &expected_main_section_name
+            ).cloned()
+        }.ok_or("TaskBuilder::new_application(): couldn't find \"main\" function, expected function name like \"<crate_name>::main::<hash>\"\
+                    --> Is this an app-level library or kernel crate? (Note: you cannot spawn a library crate with no main function)"
+        )?
+        .clone();
+
+        let mut space: usize = 0; // must live as long as main_func, see MappedPages::as_func()
+        let main_func = {
+            let mapped_pages = main_func_sec.mapped_pages.lock();
+            mapped_pages.as_func::<MainFunc>(main_func_sec.mapped_pages_offset, &mut space)?
+        };
+
+        // Create the underlying task builder. 
+        // Give it a default name based on the app crate's name, but that can be changed later. 
+        let mut tb = TaskBuilder::new(*main_func, MainFuncArg::default())
+            .name(app_crate_ref.lock_as_ref().crate_name.clone()); 
+        tb.post_build_function = Some(Box::new(move |new_task| {
+            new_task.app_crate = Some(Arc::new(app_crate_ref));
+            new_task.namespace = namespace;
+            Ok(())
+        }));
+        
+        Ok(tb)
+    }
+
     /// Set the String name for the new Task.
-    pub fn name(mut self, name: String) -> KernelTaskBuilder<F, A, R> {
+    pub fn name(mut self, name: String) -> TaskBuilder<F, A, R> {
         self.name = Some(name);
         self
     }
 
+    /// Set the argument that will be passed to this Task's entry function.
+    pub fn argument(mut self, argument: A) -> TaskBuilder<F, A, R> {
+        self.argument = argument;
+        self
+    }
+
     /// Pin the new Task to a specific core.
-    pub fn pin_on_core(mut self, core_apic_id: u8) -> KernelTaskBuilder<F, A, R> {
+    pub fn pin_on_core(mut self, core_apic_id: u8) -> TaskBuilder<F, A, R> {
         self.pin_on_core = Some(core_apic_id);
         self
     }
@@ -117,7 +188,7 @@ impl<F, A, R> KernelTaskBuilder<F, A, R>
     /// Mark this new Task as a SIMD-enabled Task 
     /// that can run SIMD instructions and use SIMD registers.
     #[cfg(simd_personality)]
-    pub fn simd(mut self, extension: SimdExt) -> KernelTaskBuilder<F, A, R> {
+    pub fn simd(mut self, extension: SimdExt) -> TaskBuilder<F, A, R> {
         self.simd = extension;
         self
     }
@@ -127,27 +198,16 @@ impl<F, A, R> KernelTaskBuilder<F, A, R>
     /// e.g., to set up other things for the newly-spawned (but not yet running) task. 
     /// 
     /// Note that the new Task will not be `Runnable` until it is explicitly set as such.
-    pub fn block(mut self) -> KernelTaskBuilder<F, A, R> {
+    pub fn block(mut self) -> TaskBuilder<F, A, R> {
         self.blocked = true;
         self
     }
 
-    /// Finishes this `KernelTaskBuilder` and spawns a new kernel task in the same address space and `CrateNamespace` as the current task. 
+    /// Finishes this `TaskBuilder` and spawns the new task as specified by the builder functions.
+    /// 
     /// This merely makes the new task Runnable, it does not switch to it immediately; that will happen on the next scheduler invocation.
     #[inline(never)]
     pub fn spawn(self) -> Result<TaskRef, &'static str> {
-        const DUMMY_PB_FUNC: Option<fn(&mut Task) -> Result<(), &'static str>> = None; // just a type-specific `None` value
-        self.spawn_internal(DUMMY_PB_FUNC)
-    }
-
-    /// The internal spawn routine for both regular kernel Tasks and application Tasks.
-    /// otherwise in Runnable state.
-    fn spawn_internal<PB>(
-        self, 
-        post_builder_func: Option<PB>) 
-    -> Result<TaskRef, &'static str> 
-        where PB: FnOnce(&mut Task) -> Result<(), &'static str>
-    {
         let mut new_task = Task::new(
             None,
             task_cleanup_failure::<F, A, R>,
@@ -179,9 +239,9 @@ impl<F, A, R> KernelTaskBuilder<F, A, R>
             new_task.runstate = RunState::Runnable;
         }
 
-        // If the caller provided a post-build function, invoke that now before finalizing the task and adding it to runqueues  
-        if let Some(func) = post_builder_func{
-            func(&mut new_task)?;
+        // If there is a post-build function, invoke it now before finalizing the task and adding it to runqueues.
+        if let Some(pb_func) = self.post_build_function {
+            pb_func(&mut new_task)?;
         }
 
         let new_task_id = new_task.id;
@@ -189,7 +249,7 @@ impl<F, A, R> KernelTaskBuilder<F, A, R>
         let old_task = TASKLIST.lock().insert(new_task_id, task_ref.clone());
         // insert should return None, because that means there was no existing task with the same ID 
         if old_task.is_some() {
-            error!("BUG: KernelTaskBuilder::spawn(): Fatal Error: TASKLIST already contained a task with the new task's ID!");
+            error!("BUG: TaskBuilder::spawn(): Fatal Error: TASKLIST already contained a task with the new task's ID!");
             return Err("BUG: TASKLIST a contained a task with the new task's ID");
         }
         
@@ -202,154 +262,20 @@ impl<F, A, R> KernelTaskBuilder<F, A, R>
 
         Ok(task_ref)
     }
-
 }
 
 /// Every executable application must have an entry point function named "main".
 const ENTRY_POINT_SECTION_NAME: &'static str = "main";
 
-/// A struct that uses the Builder pattern to create and customize new application `Task`s.
-/// Note that the new `Task` will not actually be created until the [`spawn`](#method.spawn) method is invoked.
-pub struct ApplicationTaskBuilder {
-    path: Path,
-    argument: MainFuncArg,
-    name: Option<String>,
-    pin_on_core: Option<u8>,
-    namespace: Option<Arc<CrateNamespace>>,
-    blocked: bool,
+/// The argument type accepted by the `main` function entry point into each application.
+type MainFuncArg = Vec<String>;
 
-    #[cfg(simd_personality)]
-    simd: SimdExt,
-}
+/// The type returned by the `main` function entry point of each application.
+type MainFuncRet = isize;
 
-impl ApplicationTaskBuilder {
-    /// Creates a new application `Task` from the given `path`, which points to 
-    /// an application crate object file that must have an entry point called `main`.
-    /// 
-    /// TODO: change the `Path` argument to the more flexible type `IntoCrateObjectFile`.
-    pub fn new(path: Path) -> ApplicationTaskBuilder {
-        ApplicationTaskBuilder {
-            path: path,
-            argument: Vec::new(), // doesn't allocate yet
-            name: None,
-            pin_on_core: None,
-            namespace: None,
-            blocked: false,
-
-            #[cfg(simd_personality)]
-            simd: SimdExt::None,
-        }
-    }
-
-    /// Set the String name for the new Task.
-    pub fn name(mut self, name: String) -> ApplicationTaskBuilder {
-        self.name = Some(name);
-        self
-    }
-
-    /// Pin the new Task to a specific core.
-    pub fn pin_on_core(mut self, core_apic_id: u8) -> ApplicationTaskBuilder {
-        self.pin_on_core = Some(core_apic_id);
-        self
-    }
-
-    /// Mark this new Task as a SIMD-enabled Task 
-    /// that can run SIMD instructions and use SIMD registers.
-    #[cfg(simd_personality)]
-    pub fn simd(mut self, extension: SimdExt) -> ApplicationTaskBuilder {
-        self.simd = extension;
-        self
-    }
-
-    /// Set the argument strings for this Task.
-    pub fn argument(mut self, argument: MainFuncArg) -> ApplicationTaskBuilder {
-        self.argument = argument;
-        self
-    }
-
-    /// Tells this new application Task to be spawned within and linked against the crates 
-    /// in the given `namespace`. 
-    /// By default, this new Task will be spawned within the same namespace as the current task.
-    pub fn namespace(mut self, namespace: Arc<CrateNamespace>) -> ApplicationTaskBuilder {
-        self.namespace = Some(namespace);
-        self
-    }
-
-    /// Set this new application Task's `RunState` to be `Blocked` instead of `Runnable` when it is first spawned.
-    /// This allows another task to delay the new task's execution arbitrarily, 
-    /// e.g., to set up other things for the newly-spawned (but not yet running) task. 
-    /// 
-    /// Note that the new Task will not be `Runnable` until it is explicitly set as such.
-    pub fn block(mut self) -> ApplicationTaskBuilder {
-        self.blocked = true;
-        self
-    }
-
-    /// Spawns a new application task that runs in kernel mode (currently the only way to run applications).
-    /// This merely makes the new task Runnable, it does not task switch to it immediately. That will happen on the next scheduler invocation.
-    /// 
-    /// This is similar (but not identical) to the `exec()` system call in POSIX environments. 
-    pub fn spawn(self) -> Result<TaskRef, &'static str> {
-        let namespace = self.namespace.clone()
-            .or_else(|| task::get_my_current_task().map(|taskref| taskref.get_namespace()))
-            .ok_or("ApplicationTaskBuilder::spawn(): couldn't get current task to use its CrateNamespace")?;
-        
-        let crate_object_file = match (&self.path).get(namespace.dir())
-            .or_else(|| Path::new(format!("{}.o", &self.path)).get(namespace.dir())) // retry with ".o" extension
-        {
-            Some(FileOrDir::File(f)) => f,
-            _ => return Err("Couldn't find specified file path for new application crate"),
-        };
-        let app_crate_ref = {
-            let kernel_mmi_ref = get_kernel_mmi_ref().ok_or("couldn't get_kernel_mmi_ref")?;
-            CrateNamespace::load_crate_as_application(&namespace, &crate_object_file, &kernel_mmi_ref, false)?
-        };
-
-        // Find the "main" entry point function in the new app crate
-        let main_func_sec = { 
-            let app_crate = app_crate_ref.lock_as_ref();
-            let expected_main_section_name = format!("{}{}{}", app_crate.crate_name_as_prefix(), ENTRY_POINT_SECTION_NAME, SECTION_HASH_DELIMITER);
-            let main_func_sec = app_crate.find_section(|sec| {
-                if sec.get_type() != SectionType::Text {
-                    return false;
-                }
-                sec.name_without_hash() == &expected_main_section_name
-            });
-            main_func_sec.cloned()
-        }.ok_or("ApplicationTaskBuilder::spawn(): couldn't find \"main\" function, expected function name like \"<crate_name>::main::<hash>\"\
-                    --> Is this an app-level library or kernel crate? (Note: you cannot spawn a library crate with no main function)"
-        )?
-        .clone();
-
-        let mut space: usize = 0; // must live as long as main_func, see MappedPages::as_func()
-        let main_func = {
-            let mapped_pages = main_func_sec.mapped_pages.lock();
-            mapped_pages.as_func::<MainFunc>(main_func_sec.mapped_pages_offset, &mut space)?
-        };
-
-        // build and spawn the actual underlying kernel Task
-        let mut ktb = KernelTaskBuilder::new(*main_func, self.argument)
-            .name(self.name.unwrap_or_else(|| app_crate_ref.lock_as_ref().crate_name.clone()));
-        
-        ktb.pin_on_core = self.pin_on_core;
-        ktb.blocked = self.blocked;
-
-        #[cfg(simd_personality)] {
-            ktb.simd = self.simd;
-        }
-
-        // set up app-specific task states right before the task creation is completed
-        let post_build_func = |new_task: &mut Task| -> Result<(), &'static str> {
-            new_task.app_crate = Some(Arc::new(app_crate_ref));
-            new_task.namespace = namespace;
-            Ok(())
-        };
-
-        ktb.spawn_internal(Some(post_build_func))
-    }
-
-}
-
+/// The function signature of the `main` function that every application must have,
+/// as it is the entry point into each application `Task`.
+type MainFunc = fn(MainFuncArg) -> MainFuncRet;
 
 #[derive(Debug)]
 struct KthreadCall<F, A, R> {
