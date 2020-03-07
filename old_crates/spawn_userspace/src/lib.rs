@@ -21,7 +21,6 @@ extern crate apic;
 extern crate context_switch;
 extern crate path;
 extern crate fs_node;
-extern crate type_name;
 extern crate catch_unwind;
 
 
