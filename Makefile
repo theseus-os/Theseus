@@ -595,8 +595,7 @@ orun_pause:
 
 ### Currently, loadable module mode requires release build mode
 loadable : export override THESEUS_CONFIG += loadable
-loadable : export BUILD_MODE = release
-loadable: run
+loadable: run_pause
 
 
 ### builds and runs Theseus in QEMU

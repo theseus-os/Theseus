@@ -629,6 +629,7 @@ version = "0.1.0"
 dependencies = [
  "apic 0.1.0",
  "debug_info 0.1.0",
+ "fault_log 0.1.0",
  "gimli 0.19.0 (registry+https://github.com/rust-lang/crates.io-index)",
  "log 0.3.9 (registry+https://github.com/rust-lang/crates.io-index)",
  "memory 0.1.0",
@@ -656,6 +657,25 @@ dependencies = [
 name = "fallible-iterator"
 version = "0.2.0"
 source = "registry+https://github.com/rust-lang/crates.io-index"
+
+[[package]]
+name = "fault_log"
+version = "0.1.0"
+dependencies = [
+ "by_address 1.0.4 (registry+https://github.com/rust-lang/crates.io-index)",
+ "fs_node 0.1.0",
+ "hashbrown 0.1.8 (registry+https://github.com/rust-lang/crates.io-index)",
+ "lazy_static 1.2.0 (registry+https://github.com/rust-lang/crates.io-index)",
+ "log 0.3.9 (registry+https://github.com/rust-lang/crates.io-index)",
+ "memory 0.1.0",
+ "mod_mgmt 0.1.0",
+ "path 0.1.0",
+ "print 0.1.0",
+ "qp-trie 0.7.3 (git+https://github.com/theseus-os/qp-trie-rs)",
+ "spin 0.4.10 (registry+https://github.com/rust-lang/crates.io-index)",
+ "vga_buffer 0.1.0",
+ "x86_64 0.1.2",
+]
 
 [[package]]
 name = "first_application"

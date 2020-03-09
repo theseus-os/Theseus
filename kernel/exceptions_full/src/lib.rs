@@ -3,6 +3,7 @@
 #![no_std]
 #![feature(abi_x86_interrupt)]
 
+#[macro_use] extern crate alloc;
 extern crate x86_64;
 extern crate task;
 // extern crate apic;
@@ -17,10 +18,20 @@ extern crate gimli;
 
 extern crate memory;
 extern crate stack_trace;
+extern crate fault_log;
 
 use x86_64::structures::idt::{LockedIdt, ExceptionStackFrame, PageFaultErrorCode};
 use x86_64::registers::msr::*;
 
+use alloc::{
+    string::{String, ToString},
+    vec::Vec,
+};
+
+use fault_log::{
+    add_error_to_fault_log,
+    add_error_simple,
+};
 
 pub fn init(idt_ref: &'static LockedIdt) {
     { 
@@ -185,6 +196,7 @@ fn kill_and_halt(exception_number: u8, stack_frame: &ExceptionStackFrame) {
 pub extern "x86-interrupt" fn divide_by_zero_handler(stack_frame: &mut ExceptionStackFrame) {
     println_both!("\nEXCEPTION: DIVIDE BY ZERO\n{:#?}\n", stack_frame);
 
+    add_error_simple(0x0, 0);
     kill_and_halt(0x0, stack_frame)
 }
 
@@ -222,7 +234,8 @@ extern "x86-interrupt" fn nmi_handler(stack_frame: &mut ExceptionStackFrame) {
     println_both!("\nEXCEPTION: NON-MASKABLE INTERRUPT at {:#X}\n{:#?}\n",
              stack_frame.instruction_pointer,
              stack_frame);
-    
+
+    add_error_simple(0x02, 0);
     kill_and_halt(0x2, stack_frame)
 }
 
@@ -242,6 +255,7 @@ pub extern "x86-interrupt" fn overflow_handler(stack_frame: &mut ExceptionStackF
              stack_frame.instruction_pointer,
              stack_frame);
     
+    add_error_simple(0x04, 0);
     kill_and_halt(0x4, stack_frame)
 }
 
@@ -250,7 +264,8 @@ pub extern "x86-interrupt" fn bound_range_exceeded_handler(stack_frame: &mut Exc
     println_both!("\nEXCEPTION: BOUND RANGE EXCEEDED at {:#X}\n{:#?}\n",
              stack_frame.instruction_pointer,
              stack_frame);
-
+    
+    add_error_simple(0x05, 0);
     kill_and_halt(0x5, stack_frame)
 }
 
@@ -260,6 +275,8 @@ pub extern "x86-interrupt" fn invalid_opcode_handler(stack_frame: &mut Exception
              stack_frame.instruction_pointer,
              stack_frame);
 
+    
+    add_error_simple(0x06, 0);
     kill_and_halt(0x6, stack_frame)
 }
 
@@ -270,13 +287,15 @@ pub extern "x86-interrupt" fn device_not_available_handler(stack_frame: &mut Exc
              stack_frame.instruction_pointer,
              stack_frame);
 
+    add_error_simple(0x07, 0);
     kill_and_halt(0x7, stack_frame)
 }
 
 /// exception 0x08
-pub extern "x86-interrupt" fn double_fault_handler(stack_frame: &mut ExceptionStackFrame, _error_code: u64) {
+pub extern "x86-interrupt" fn double_fault_handler(stack_frame: &mut ExceptionStackFrame, error_code: u64) {
     println_both!("\nEXCEPTION: DOUBLE FAULT\n{:#?}\n", stack_frame);
     
+    add_error_simple(0x08, error_code);
     kill_and_halt(0x8, stack_frame)
 }
 
@@ -286,6 +305,8 @@ pub extern "x86-interrupt" fn invalid_tss_handler(stack_frame: &mut ExceptionSta
                                   {:#b}\n{:#?}\n",
              error_code,
              stack_frame);
+    
+    add_error_simple(0x0a, error_code);
     kill_and_halt(0xA, stack_frame)
 }
 
@@ -295,7 +316,8 @@ pub extern "x86-interrupt" fn segment_not_present_handler(stack_frame: &mut Exce
                                   {:#b}\n{:#?}\n",
              error_code,
              stack_frame);
-
+    
+    add_error_simple(0x0b, error_code);
     kill_and_halt(0xB, stack_frame)
 }
 
@@ -306,6 +328,7 @@ pub extern "x86-interrupt" fn general_protection_fault_handler(stack_frame: &mut
              error_code,
              stack_frame);
 
+    add_error_simple(0x0d, error_code);
     kill_and_halt(0xD, stack_frame)
 }
 
@@ -318,6 +341,23 @@ pub extern "x86-interrupt" fn page_fault_handler(stack_frame: &mut ExceptionStac
              error_code,
              stack_frame);
     
+    let vec :Vec<String> = Vec::new();
+    add_error_to_fault_log (
+        0x0e, //exception_number
+        0, //error_code,
+        "Temporary".to_string(), //running_task
+        None, //running_app_crate: Option<None>,
+        Some(control_regs::cr2()), // address_accessed: Option<None>,
+        None, //instruction_pointer : Option<None>,
+        None, //crate_error_occured : Option<None>,
+        vec, //replaced_crates : Vec<String>::new(),
+        false // action_taken : false,
+    );
+
+    fault_log::print_fault_log();
+
+
+
     kill_and_halt(0xE, stack_frame)
 }
 

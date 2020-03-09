@@ -45,6 +45,7 @@ use mouse_data::MouseEvent;
 use path::Path;
 use spin::{Mutex, Once};
 use window_inner::{WindowInner, WindowMovingStatus};
+use core::ptr;
 
 /// The instance of the default window manager
 pub static WINDOW_MANAGER: Once<Mutex<WindowManager>> = Once::new();
@@ -801,6 +802,19 @@ fn keyboard_handle_application(key_input: KeyEvent) -> Result<(), &'static str> 
 
         debug!("window_manager: spawned new shell app in new app namespace.");
         return Ok(());
+    }
+
+    if key_input.modifiers.is_control()
+        && key_input.keycode == Keycode::N
+        && key_input.action == KeyAction::Pressed
+    {
+        loop{};
+        let x = 0;
+        let mut p = (x) as *const u64;
+        p = 0 as *const u64;
+        let n = unsafe{ptr::read(p)};
+        debug!("unsafe value is {:X}",n);
+        
     }
 
     // Any keyboard event unhandled above should be passed to the active window.

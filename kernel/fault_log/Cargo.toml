@@ -1,0 +1,47 @@
+[package]
+name = "fault_log"
+version = "0.1.0"
+description = "Logs all exceptions occuring in Theseus"
+authors = ["Namitha Liyanage <namithaliyanage@gmail.com>"]
+build = "../../build.rs"
+
+
+[dependencies]
+spin = "0.4.10"
+qp-trie = "0.7.3"
+by_address = "1.0.4"
+x86_64 = { path = "../../libs/x86_64" } # currently using our local copy, forked from Phil Opp's crate
+
+
+[dependencies.log]
+default-features = false
+version = "0.3.7"
+
+[dependencies.lazy_static]
+features = ["spin_no_std", "nightly"]
+version = "1.2.0"
+
+[dependencies.hashbrown]
+version = "0.1.8"
+features = ["nightly"]
+
+[dependencies.memory]
+path = "../memory"
+
+[dependencies.vga_buffer]
+path = "../vga_buffer"
+
+[dependencies.print]
+path = "../print"
+
+[dependencies.fs_node]
+path = "../fs_node"
+
+[dependencies.path]
+path = "../path"
+
+[dependencies.mod_mgmt]
+path = "../mod_mgmt"
+
+[lib]
+crate-type = ["rlib"]
