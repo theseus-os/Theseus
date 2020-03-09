@@ -1248,6 +1248,9 @@ version = "0.1.0"
 [[package]]
 name = "mpmc"
 version = "0.1.6-pre"
+dependencies = [
+ "log 0.3.9 (registry+https://github.com/rust-lang/crates.io-index)",
+]
 
 [[package]]
 name = "multiboot2"

@@ -804,20 +804,6 @@ fn keyboard_handle_application(key_input: KeyEvent) -> Result<(), &'static str> 
         return Ok(());
     }
 
-    if key_input.modifiers.is_control()
-        && key_input.keycode == Keycode::N
-        && key_input.action == KeyAction::Pressed
-    {
-        panic!("DARN");
-        loop{};
-        let x = 0;
-        let mut p = (x) as *const u64;
-        p = 0 as *const u64;
-        let n = unsafe{ptr::read(p)};
-        debug!("unsafe value is {:X}",n);
-        
-    }
-
     // Any keyboard event unhandled above should be passed to the active window.
     if let Err(_e) = win_mgr.lock().pass_keyboard_event_to_window(key_input) {
         warn!("window_manager: failed to pass keyboard event to active window. Error: {:?}", _e);
