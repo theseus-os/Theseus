@@ -18,8 +18,6 @@ extern crate gimli;
 extern crate memory;
 extern crate stack_trace;
 
-extern crate apic;
-
 use x86_64::structures::idt::{LockedIdt, ExceptionStackFrame, PageFaultErrorCode};
 use x86_64::registers::msr::*;
 
@@ -202,7 +200,6 @@ pub extern "x86-interrupt" fn debug_handler(stack_frame: &mut ExceptionStackFram
 /// exception 0x02, also used for TLB Shootdown IPIs and sampling interrupts
 extern "x86-interrupt" fn nmi_handler(stack_frame: &mut ExceptionStackFrame) {
     let mut expected_nmi = false;
-    let mut pmu_int = false;
     
     // sampling interrupt handler: increments a counter, records the IP for the sample, and resets the hardware counter 
     if rdmsr(IA32_PERF_GLOBAL_STAUS) != 0 {
@@ -210,7 +207,6 @@ extern "x86-interrupt" fn nmi_handler(stack_frame: &mut ExceptionStackFrame) {
             println_both!("nmi_handler::pmu_x86: sample couldn't be recorded: {:?}", e);
         }
         expected_nmi = true;
-        pmu_int = true;
     }
 
     // currently we're using NMIs to send TLB shootdown IPIs
@@ -219,13 +215,6 @@ extern "x86-interrupt" fn nmi_handler(stack_frame: &mut ExceptionStackFrame) {
         // trace!("nmi_handler (AP {})", apic::get_my_apic_id().unwrap_or(0xFF));
         tlb_shootdown::handle_tlb_shootdown_ipi(&vaddrs);
         expected_nmi = true;
-    }
-
-    if pmu_int {
-        unsafe { 
-            wrmsr(IA32_X2APIC_LVT_PMI, apic::APIC_NMI as u64);
-        }
-        return;
     }
 
     if expected_nmi {

@@ -803,6 +803,13 @@ pub fn handle_sample(stack_frame: &mut ExceptionStackFrame) -> Result<(), &'stat
         wrmsr(IA32_PERFEVTSEL0, event_mask);
     }
 
+    if let Some(my_apic) = apic::get_my_apic() {
+        my_apic.write().clear_pmi_mask();
+    }
+    else {
+        error!("Error in Performance Monitoring! Reference to the local APIC could not be retrieved.");
+    }
+
     Ok(())
 }
 

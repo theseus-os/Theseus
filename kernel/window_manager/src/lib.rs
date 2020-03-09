@@ -43,7 +43,6 @@ use framebuffer_compositor::{FRAME_COMPOSITOR};
 use keycodes_ascii::{KeyAction, KeyEvent, Keycode};
 use mouse_data::MouseEvent;
 use path::Path;
-use spawn::{ApplicationTaskBuilder, KernelTaskBuilder};
 use spin::{Mutex, Once};
 use window_inner::{WindowInner, WindowMovingStatus};
 
@@ -655,7 +654,7 @@ pub fn init() -> Result<(Queue<Event>, Queue<Event>), &'static str> {
     let mouse_consumer: Queue<Event> = Queue::with_capacity(100);
     let mouse_producer = mouse_consumer.clone();
 
-    KernelTaskBuilder::new(window_manager_loop, (key_consumer, mouse_consumer))
+    spawn::new_task_builder(window_manager_loop, (key_consumer, mouse_consumer))
         .name("window_manager_loop".to_string())
         .spawn()?;
 
@@ -796,9 +795,8 @@ fn keyboard_handle_application(key_input: KeyEvent) -> Result<(), &'static str> 
         let shell_objfile = new_app_namespace.dir().get_file_starting_with("shell-")
             .ok_or("Couldn't find shell application file to run upon Ctrl+Alt+T")?;
         let path = Path::new(shell_objfile.lock().get_absolute_path());
-        ApplicationTaskBuilder::new(path)
+        spawn::new_application_task_builder(path, Some(new_app_namespace))?
             .name(format!("shell"))
-            .namespace(new_app_namespace)
             .spawn()?;
 
         debug!("window_manager: spawned new shell app in new app namespace.");

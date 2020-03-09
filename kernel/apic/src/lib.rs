@@ -188,7 +188,7 @@ const IA32_APIC_BASE_MSR_IS_BSP: u64 = 1 << 8; // 0x100
 const APIC_SW_ENABLE: u32 = 1 << 8;
 const APIC_TIMER_PERIODIC:  u32 = 0x2_0000;
 const APIC_DISABLE: u32 = 0x1_0000;
-pub const APIC_NMI: u32 = 4 << 8;
+const APIC_NMI: u32 = 4 << 8;
 
 
 
@@ -678,6 +678,23 @@ impl LocalApic {
                 irr.reg6.read(),
                 irr.reg7.read(),
             ]
+        }
+    }
+
+    /// Clears the interrupt mask bit in the apic performance monitor register.
+    pub fn clear_pmi_mask(&mut self) {
+        // The 16th bit is set to 1 whenever a performance monitoring interrupt occurs. 
+        // It needs to be reset for another interrupt to occur.
+        const INT_MASK_CLEAR: u32 = 0xFFFE_FFFF;
+
+        if has_x2apic() {
+            let reg = rdmsr(IA32_X2APIC_LVT_PMI);
+            unsafe { wrmsr(IA32_X2APIC_LVT_PMI, reg & INT_MASK_CLEAR as u64) };
+        }
+        else {
+            let ref mut pmr = self.regs.as_mut().expect("ApicRegisters").lvt_perf_monitor; 
+            let reg = pmr.read();
+            pmr.write(reg & INT_MASK_CLEAR);
         }
     }
 }
