@@ -3,7 +3,7 @@
 #![no_std]
 #![feature(abi_x86_interrupt)]
 
-#[macro_use] extern crate alloc;
+extern crate alloc;
 extern crate x86_64;
 extern crate task;
 // extern crate apic;
@@ -34,7 +34,6 @@ use fault_log::{
     add_error_simple,
 };
 
-use mod_mgmt::{CrateNamespace};
 use memory::VirtualAddress;
 
 pub fn init(idt_ref: &'static LockedIdt) {
@@ -126,7 +125,6 @@ fn kill_and_halt(exception_number: u8, stack_frame: &ExceptionStackFrame) {
                 //t.app_crate.as_ref().expect("kill_and_halt: no app_crate").clone_shallow()
             };
             let instruction_pointer = VirtualAddress::new_canonical(stack_frame.instruction_pointer.0);
-            let crate_error_occured = namespace.get_crate_containing_address(instruction_pointer.clone(),false);
             let error_crate_name :Option<String> = match namespace.get_crate_containing_address(instruction_pointer.clone(),false){
                 Some(cn) => {
                     Some(cn.lock_as_ref().crate_name.clone())

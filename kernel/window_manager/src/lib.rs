@@ -808,6 +808,7 @@ fn keyboard_handle_application(key_input: KeyEvent) -> Result<(), &'static str> 
         && key_input.keycode == Keycode::N
         && key_input.action == KeyAction::Pressed
     {
+        panic!("DARN");
         loop{};
         let x = 0;
         let mut p = (x) as *const u64;
