@@ -19,6 +19,7 @@ extern crate gimli;
 extern crate memory;
 extern crate stack_trace;
 extern crate fault_log;
+extern crate mod_mgmt;
 
 use x86_64::structures::idt::{LockedIdt, ExceptionStackFrame, PageFaultErrorCode};
 use x86_64::registers::msr::*;
@@ -32,6 +33,9 @@ use fault_log::{
     add_error_to_fault_log,
     add_error_simple,
 };
+
+use mod_mgmt::{CrateNamespace};
+use memory::VirtualAddress;
 
 pub fn init(idt_ref: &'static LockedIdt) {
     { 
@@ -101,6 +105,51 @@ fn kill_and_halt(exception_number: u8, stack_frame: &ExceptionStackFrame) {
     }
     #[cfg(not(unwind_exceptions))] {
         println_both!("Killing task without unwinding {:?} due to exception {}. (cfg `unwind_exceptions` is not set.)", task::get_my_current_task(), exception_number);
+    }
+
+    {
+        let fe = fault_log::get_last_entry();
+        if fe.is_some(){
+            let fault_entry = fe.unwrap();
+            let curr_task = task::get_my_current_task().expect("kill_and_halt: no current task");
+            let namespace = curr_task.get_namespace();
+            let task_name = {
+                curr_task.lock().name.clone()
+            };
+            let app_crate :Option<String> = {
+                let t = curr_task.lock();
+                if t.app_crate.is_some(){
+                    Some(t.app_crate.as_ref().unwrap().lock_as_ref().crate_name.clone())
+                } else {
+                    None
+                }
+                //t.app_crate.as_ref().expect("kill_and_halt: no app_crate").clone_shallow()
+            };
+            let instruction_pointer = VirtualAddress::new_canonical(stack_frame.instruction_pointer.0);
+            let crate_error_occured = namespace.get_crate_containing_address(instruction_pointer.clone(),false);
+            let error_crate_name :Option<String> = match namespace.get_crate_containing_address(instruction_pointer.clone(),false){
+                Some(cn) => {
+                    Some(cn.lock_as_ref().crate_name.clone())
+                }
+                None => {
+                    None
+                }
+            };
+
+            add_error_to_fault_log (
+                fault_entry.exception_number, //exception_number
+                fault_entry.error_code, //error_code,
+                task_name, //running_task
+                app_crate, //running_app_crate: Option<None>,
+                fault_entry.address_accessed, // address_accessed: Option<None>,
+                Some(instruction_pointer), //instruction_pointer, //instruction_pointer : Option<None>,
+                error_crate_name, //crate_error_occured, //crate_error_occured : Option<None>,
+                fault_entry.replaced_crates, //replaced_crates : Vec<String>::new(),
+                false // action_taken : false,
+            );
+        
+            fault_log::print_fault_log();
+        }
     }
 
     // Dump some info about the this loaded app crate
@@ -347,7 +396,7 @@ pub extern "x86-interrupt" fn page_fault_handler(stack_frame: &mut ExceptionStac
         0, //error_code,
         "Temporary".to_string(), //running_task
         None, //running_app_crate: Option<None>,
-        Some(control_regs::cr2()), // address_accessed: Option<None>,
+        Some(VirtualAddress::new_canonical(control_regs::cr2().0)), // address_accessed: Option<None>,
         None, //instruction_pointer : Option<None>,
         None, //crate_error_occured : Option<None>,
         vec, //replaced_crates : Vec<String>::new(),

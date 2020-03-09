@@ -31,7 +31,7 @@ use alloc::{
     vec::Vec,
 };
 use hashbrown::HashMap;
-use memory::{EntryFlags, MmiRef};
+use memory::{EntryFlags, MmiRef, VirtualAddress};
 use fs_node::{FsNode, FileOrDir, FileRef, DirRef};
 use qp_trie::wrapper::BString;
 use mod_mgmt::{
@@ -46,19 +46,18 @@ use mod_mgmt::{
 };
 use path::Path;
 use by_address::ByAddress;
-use x86_64::VirtualAddress;
 
 #[derive(Debug)]
 pub struct FaultEntry {
-    exception_number: u8,
-    error_code: u64,
-    running_task: String,
-    running_app_crate: Option<String>,
-    address_accessed: Option<VirtualAddress>,
-    instruction_pointer : Option<VirtualAddress>,
-    crate_error_occured : Option<String>,
-    replaced_crates : Vec<String>,
-    action_taken : bool,
+    pub exception_number: u8,
+    pub error_code: u64,
+    pub running_task: String,
+    pub running_app_crate: Option<String>,
+    pub address_accessed: Option<VirtualAddress>,
+    pub instruction_pointer : Option<VirtualAddress>,
+    pub crate_error_occured : Option<String>,
+    pub replaced_crates : Vec<String>,
+    pub action_taken : bool,
 }
 
 
