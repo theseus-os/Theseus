@@ -203,7 +203,9 @@ extern "x86-interrupt" fn nmi_handler(stack_frame: &mut ExceptionStackFrame) {
     
     // sampling interrupt handler: increments a counter, records the IP for the sample, and resets the hardware counter 
     if rdmsr(IA32_PERF_GLOBAL_STAUS) != 0 {
-        pmu_x86::handle_sample(stack_frame);
+        if let Err(e) = pmu_x86::handle_sample(stack_frame) {
+            println_both!("nmi_handler::pmu_x86: sample couldn't be recorded: {:?}", e);
+        }
         expected_nmi = true;
     }
 
