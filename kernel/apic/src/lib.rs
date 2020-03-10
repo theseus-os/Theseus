@@ -16,7 +16,7 @@ extern crate raw_cpuid;
 extern crate x86_64;
 extern crate pit_clock;
 extern crate atomic;
-
+extern crate bit_field;
 
 use core::ops::DerefMut;
 use core::sync::atomic::Ordering;
@@ -32,6 +32,7 @@ use kernel_config::time::CONFIG_TIMESLICE_PERIOD_MICROSECONDS;
 use atomic_linked_list::atomic_map::AtomicMap;
 use atomic::Atomic;
 use pit_clock::pit_wait;
+use bit_field::BitField;
 
 
 /// The interrupt chip that is currently configured on this machine. 
@@ -685,16 +686,18 @@ impl LocalApic {
     pub fn clear_pmi_mask(&mut self) {
         // The 16th bit is set to 1 whenever a performance monitoring interrupt occurs. 
         // It needs to be reset for another interrupt to occur.
-        const INT_MASK_CLEAR: u32 = 0xFFFE_FFFF;
+        const INT_MASK_BIT: u8 = 16;
 
         if has_x2apic() {
-            let reg = rdmsr(IA32_X2APIC_LVT_PMI);
-            unsafe { wrmsr(IA32_X2APIC_LVT_PMI, reg & INT_MASK_CLEAR as u64) };
+            let mut reg = rdmsr(IA32_X2APIC_LVT_PMI);
+            reg.set_bit(INT_MASK_BIT, false);
+            unsafe { wrmsr(IA32_X2APIC_LVT_PMI, reg) };
         }
         else {
             let ref mut pmr = self.regs.as_mut().expect("ApicRegisters").lvt_perf_monitor; 
-            let reg = pmr.read();
-            pmr.write(reg & INT_MASK_CLEAR);
+            let mut reg = pmr.read();
+            reg.set_bit(INT_MASK_BIT, false);
+            pmr.write(reg);
         }
     }
 }
