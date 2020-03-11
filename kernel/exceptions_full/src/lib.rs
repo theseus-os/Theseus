@@ -401,7 +401,7 @@ pub extern "x86-interrupt" fn page_fault_handler(stack_frame: &mut ExceptionStac
         false // action_taken : false,
     );
 
-    fault_log::print_fault_log();
+    //fault_log::print_fault_log();
 
 
 
