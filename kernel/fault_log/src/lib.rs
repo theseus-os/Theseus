@@ -154,6 +154,7 @@ pub fn print_fault_log() -> (){
 /// null crate swap policy.
 /// When this policy is enabled no crate swapping is performed
 pub fn null_swap_policy() -> Option<String> {
+    debug!("Running null swap policy");
     let mut fe: FaultEntry = match get_last_entry() {
         Some(v) => {
             v
@@ -176,6 +177,7 @@ pub fn null_swap_policy() -> Option<String> {
 /// When this swap policy is enabled always the crate which the last fault occurs
 /// is swapped
 pub fn simple_swap_policy() -> Option<String> {
+    debug!("Running simple swap policy");
     let mut fe: FaultEntry = match get_last_entry() {
         Some(v) => {
             v
@@ -205,6 +207,7 @@ pub fn simple_swap_policy() -> Option<String> {
 }
 
 pub fn get_the_most_recent_match(ve : VirtualAddress) -> Option<FaultEntry> {
+    debug!("getting the most recent match");
     let mut fe :Option<FaultEntry> = None;
     for fault_entry in FAULT_LIST.lock().iter() {
         if fault_entry.instruction_pointer.is_some(){
@@ -218,6 +221,7 @@ pub fn get_the_most_recent_match(ve : VirtualAddress) -> Option<FaultEntry> {
 }
 
 pub fn iterative_swap_policy() -> Option<String> {
+    debug!("Running iterative swap policy");
     let mut fe: FaultEntry = match get_last_entry() {
         Some(v) => {
             v
@@ -232,7 +236,7 @@ pub fn iterative_swap_policy() -> Option<String> {
         return None
     }
 
-    let fe_old = get_the_most_recent_match(fe.address_accessed.clone().unwrap());
+    let fe_old = get_the_most_recent_match(fe.instruction_pointer.clone().unwrap());
     let crate_to_swap;
     if fe_old.is_some(){
         crate_to_swap = fe.running_app_crate.clone();
@@ -256,5 +260,6 @@ pub fn iterative_swap_policy() -> Option<String> {
 
 pub fn get_crate_to_swap() -> Option<String> {
     // null_swap_policy()
-    simple_swap_policy() 
+    // simple_swap_policy()
+    iterative_swap_policy() 
 }
