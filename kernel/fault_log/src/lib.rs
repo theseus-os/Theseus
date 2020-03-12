@@ -27,7 +27,7 @@ use alloc::{
 };
 
 use memory::VirtualAddress;
-
+use core::panic::PanicInfo;
 
 /// A data structure to hold information about each fault. 
 #[derive(Debug, Clone)]
@@ -129,10 +129,41 @@ pub fn add_error_simple (
     FAULT_LIST.lock().push(fe);
 }
 
-/// Removes the last fault entry from the fault log and returns
-/// Is useful when information about the last fault needs to be updated
-pub fn get_last_entry () -> Option<FaultEntry> {
-    FAULT_LIST.lock().pop()
+pub fn add_panic_entry ()-> () {
+
+    let vec :Vec<String> = Vec::new();
+    let fe = FaultEntry{
+        exception_number: 0xff,
+        error_code: 0,
+        core: None,
+        running_task: "None".to_string(),
+        running_app_crate: None,
+        address_accessed: None,
+        instruction_pointer : None,
+        crate_error_occured : None,
+        replaced_crates : vec,
+        action_taken : false,
+    };
+    FAULT_LIST.lock().push(fe);
+}
+
+/// Removes the last unhandled exception from the fault log and returns
+/// Is useful when information about the last exception needs to be updated
+pub fn get_last_unhandled_exception () -> Option<FaultEntry> {
+    let mut fault_list = FAULT_LIST.lock();
+    let mut fe: Option<FaultEntry> = None;
+    let mut index: Option<usize> = None;
+
+    for (i,fault_entry) in fault_list.iter().enumerate() {
+        if fault_entry.action_taken == false && fault_entry.exception_number < 0xff {
+            index = Some(i);
+        }
+    }
+    if index.is_none() {
+        return fe;
+    }
+    fe = Some(fault_list.remove(index.unwrap()));
+    fe
 }
 
 /// calls println!() and then println_raw!()
@@ -162,7 +193,7 @@ pub fn print_fault_log() -> (){
 /// However we still update the last error as handled since it is an intended action
 pub fn null_swap_policy() -> Option<String> {
     debug!("Running null swap policy");
-    let mut fe: FaultEntry = match get_last_entry() {
+    let mut fe: FaultEntry = match get_last_unhandled_exception() {
         Some(v) => {
             v
         }
@@ -185,7 +216,7 @@ pub fn null_swap_policy() -> Option<String> {
 /// is swapped.
 pub fn simple_swap_policy() -> Option<String> {
     debug!("Running simple swap policy");
-    let mut fe: FaultEntry = match get_last_entry() {
+    let mut fe: FaultEntry = match get_last_unhandled_exception() {
         Some(v) => {
             v
         }
@@ -239,7 +270,7 @@ pub fn get_the_most_recent_match(error_crate : &str) -> Option<FaultEntry> {
 /// swapped at next attempt.
 pub fn iterative_swap_policy() -> Option<String> {
     debug!("Running iterative swap policy");
-    let mut fe: FaultEntry = match get_last_entry() {
+    let mut fe: FaultEntry = match get_last_unhandled_exception() {
         Some(v) => {
             v
         }

@@ -109,7 +109,7 @@ fn kill_and_halt(exception_number: u8, stack_frame: &ExceptionStackFrame) {
     }
 
     {
-        let fe = fault_log::get_last_entry();
+        let fe = fault_log::get_last_unhandled_exception();
         if fe.is_some(){
             let fault_entry = fe.unwrap();
             let curr_task = task::get_my_current_task().expect("kill_and_halt: no current task");

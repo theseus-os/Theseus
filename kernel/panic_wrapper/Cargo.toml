@@ -24,6 +24,9 @@ path = "../runqueue"
 [dependencies.unwind]
 path = "../unwind"
 
+[dependencies.fault_log]
+path = "../fault_log"
+
 [dependencies.stack_trace]
 path = "../stack_trace"
 

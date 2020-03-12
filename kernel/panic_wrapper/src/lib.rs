@@ -13,11 +13,13 @@ extern crate task;
 extern crate unwind;
 extern crate stack_trace;
 extern crate stack_trace_frame_pointers;
+extern crate fault_log;
 
 use core::panic::PanicInfo;
 // use alloc::string::String;
 use memory::VirtualAddress;
 use task::{KillReason, PanicInfoOwned};
+use fault_log::add_panic_entry;
 
 /// Performs the standard panic handling routine, which involves the following:
 /// 
@@ -28,6 +30,8 @@ use task::{KillReason, PanicInfoOwned};
 /// Returns `Ok(())` if everything ran successfully, and `Err` otherwise.
 pub fn panic_wrapper(panic_info: &PanicInfo) -> Result<(), &'static str> {
     trace!("at top of panic_wrapper: {:?}", panic_info);
+
+    add_panic_entry();
 
     // print a stack trace
     let stack_trace_result = {
