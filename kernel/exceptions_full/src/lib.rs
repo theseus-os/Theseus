@@ -20,9 +20,11 @@ extern crate memory;
 extern crate stack_trace;
 extern crate fault_log;
 extern crate mod_mgmt;
+extern crate apic;
 
 use x86_64::structures::idt::{LockedIdt, ExceptionStackFrame, PageFaultErrorCode};
 use x86_64::registers::msr::*;
+use apic::get_my_apic_id;
 
 use alloc::{
     string::{String, ToString},
@@ -134,9 +136,12 @@ fn kill_and_halt(exception_number: u8, stack_frame: &ExceptionStackFrame) {
                 }
             };
 
+            let core = get_my_apic_id();
+
             add_error_to_fault_log (
                 fault_entry.exception_number, //exception_number
                 fault_entry.error_code, //error_code,
+                core, //core
                 task_name, //running_task
                 app_crate, //running_app_crate: Option<None>,
                 fault_entry.address_accessed, // address_accessed: Option<None>,
@@ -392,6 +397,7 @@ pub extern "x86-interrupt" fn page_fault_handler(stack_frame: &mut ExceptionStac
     add_error_to_fault_log (
         0x0e, //exception_number
         0, //error_code,
+        None, //core
         "Temporary".to_string(), //running_task
         None, //running_app_crate: Option<None>,
         Some(VirtualAddress::new_canonical(control_regs::cr2().0)), // address_accessed: Option<None>,

@@ -38,6 +38,9 @@ pub struct FaultEntry {
     /// Error code returned with the exception
     pub error_code: u64,
 
+    /// The core error occured
+    pub core: Option<u8>,
+
     /// Task runnning immediately before the Exception
     pub running_task: String,
 
@@ -77,6 +80,7 @@ pub fn clear_fault_log() {
 pub fn add_error_to_fault_log (
     exception_number: u8,
     error_code: u64,
+    core: Option<u8>,
     running_task: String,
     running_app_crate: Option<String>,
     address_accessed: Option<VirtualAddress>,
@@ -89,6 +93,7 @@ pub fn add_error_to_fault_log (
     let fe = FaultEntry{
         exception_number: exception_number,
         error_code: error_code,
+        core: core,
         running_task: running_task,
         running_app_crate: running_app_crate,
         address_accessed: address_accessed,
@@ -112,6 +117,7 @@ pub fn add_error_simple (
     let fe = FaultEntry{
         exception_number: exception_number,
         error_code: error_code,
+        core: None,
         running_task: "None".to_string(),
         running_app_crate: None,
         address_accessed: None,
@@ -153,6 +159,7 @@ pub fn print_fault_log() -> (){
 
 /// null crate swap policy.
 /// When this policy is enabled no crate swapping is performed
+/// However we still update the last error as handled since it is an intended action
 pub fn null_swap_policy() -> Option<String> {
     debug!("Running null swap policy");
     let mut fe: FaultEntry = match get_last_entry() {
@@ -173,9 +180,9 @@ pub fn null_swap_policy() -> Option<String> {
     return None
 }
 
-/// simple swap policy
-/// When this swap policy is enabled always the crate which the last fault occurs
-/// is swapped
+/// simple swap policy. 
+/// When this swap policy is enabled always the crate which the last fault occurs 
+/// is swapped.
 pub fn simple_swap_policy() -> Option<String> {
     debug!("Running simple swap policy");
     let mut fe: FaultEntry = match get_last_entry() {
@@ -206,20 +213,30 @@ pub fn simple_swap_policy() -> Option<String> {
     Some(crate_name_simplified.to_string())
 }
 
-pub fn get_the_most_recent_match(ve : VirtualAddress) -> Option<FaultEntry> {
+/// Provides the most recent entry in the log for given crate
+pub fn get_the_most_recent_match(error_crate : &str) -> Option<FaultEntry> {
     debug!("getting the most recent match");
     let mut fe :Option<FaultEntry> = None;
     for fault_entry in FAULT_LIST.lock().iter() {
-        if fault_entry.instruction_pointer.is_some(){
-            if fault_entry.instruction_pointer.unwrap().value() == ve.value() {
+        if fault_entry.crate_error_occured.is_some(){
+            let error_crate_name = fault_entry.crate_error_occured.clone().unwrap();
+            let error_crate_name_simple = error_crate_name.split("-").next().unwrap_or_else(|| &error_crate_name);
+            if error_crate_name_simple == error_crate {
                 let item = fault_entry.clone();
                 fe = Some(item);
             }
         }
     }
+    if fe.is_none(){
+        debug!("No recent entries for the given crate {}", error_crate);
+    }
     fe
 }
 
+/// slightly advanced swap policy
+/// When this swap policy is enabled at first attempt the crate where last fault occured is swapped.
+/// If repetitive faults are detected at the same point if available the application crate is 
+/// swapped at next attempt.
 pub fn iterative_swap_policy() -> Option<String> {
     debug!("Running iterative swap policy");
     let mut fe: FaultEntry = match get_last_entry() {
@@ -235,10 +252,15 @@ pub fn iterative_swap_policy() -> Option<String> {
         debug!("No unhandled errors in the fault log");
         return None
     }
-
-    let fe_old = get_the_most_recent_match(fe.instruction_pointer.clone().unwrap());
+    if fe.crate_error_occured.is_none() {
+        debug!("No information on the last failed crate");
+        return None
+    }
+    let error_crate_name = fe.crate_error_occured.clone().unwrap();
+    let error_crate_name_simple = error_crate_name.split("-").next().unwrap_or_else(|| &error_crate_name);
+    let fe_old = get_the_most_recent_match(error_crate_name_simple);
     let crate_to_swap;
-    if fe_old.is_some(){
+    if fe_old.is_some() && fe.running_app_crate.is_some(){
         crate_to_swap = fe.running_app_crate.clone();
     } else {
         crate_to_swap = fe.crate_error_occured.clone();
