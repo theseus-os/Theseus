@@ -14,12 +14,15 @@ extern crate unwind;
 extern crate stack_trace;
 extern crate stack_trace_frame_pointers;
 extern crate fault_log;
+extern crate apic;
 
 use core::panic::PanicInfo;
 // use alloc::string::String;
 use memory::VirtualAddress;
 use task::{KillReason, PanicInfoOwned};
 use fault_log::add_panic_entry;
+use alloc::string::String;
+use apic::get_my_apic_id;
 
 /// Performs the standard panic handling routine, which involves the following:
 /// 
@@ -31,7 +34,32 @@ use fault_log::add_panic_entry;
 pub fn panic_wrapper(panic_info: &PanicInfo) -> Result<(), &'static str> {
     trace!("at top of panic_wrapper: {:?}", panic_info);
 
-    add_panic_entry();
+    {
+        let curr_task = task::get_my_current_task().expect("panic_wrapper: no current task");
+        let task_name = {
+            curr_task.lock().name.clone()
+        };
+        let app_crate :Option<String> = {
+            let t = curr_task.lock();
+            if t.app_crate.is_some(){
+                Some(t.app_crate.as_ref().unwrap().lock_as_ref().crate_name.clone())
+            } else {
+                None
+            }
+            //t.app_crate.as_ref().expect("kill_and_halt: no app_crate").clone_shallow()
+        };
+
+        let core = get_my_apic_id();
+
+        add_panic_entry (
+            core, //core
+            task_name, //running_task
+            app_crate, //running_app_crate: Option<None>,
+        );
+    
+        fault_log::print_fault_log();
+    }
+    //add_panic_entry();
 
     // print a stack trace
     let stack_trace_result = {

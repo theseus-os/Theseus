@@ -129,15 +129,19 @@ pub fn add_error_simple (
     FAULT_LIST.lock().push(fe);
 }
 
-pub fn add_panic_entry ()-> () {
+pub fn add_panic_entry (
+    core: Option<u8>,
+    running_task: String,
+    running_app_crate: Option<String>,
+)-> () {
 
     let vec :Vec<String> = Vec::new();
     let fe = FaultEntry{
         exception_number: 0xff,
         error_code: 0,
-        core: None,
-        running_task: "None".to_string(),
-        running_app_crate: None,
+        core: core,
+        running_task: running_task,
+        running_app_crate: running_app_crate,
         address_accessed: None,
         instruction_pointer : None,
         crate_error_occured : None,
