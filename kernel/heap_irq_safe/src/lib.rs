@@ -19,19 +19,28 @@ extern crate linked_list_allocator;
 extern crate irq_safety; 
 extern crate spin;
 extern crate block_allocator;
+extern crate raw_cpuid;
+#[macro_use] extern crate log;
 
 use core::ops::Deref;
 use alloc::alloc::{GlobalAlloc, Layout};
 use irq_safety::MutexIrqSafe; 
-use block_allocator::FixedSizeBlockAllocator;
+use block_allocator::{HEADER_SIZE, FixedSizeBlockAllocator};
+use raw_cpuid::CpuId;
+
+const MAX_HEAPS: usize = 8;
 
 #[global_allocator]
-static ALLOCATOR: IrqSafeHeap = IrqSafeHeap::empty();
+static ALLOCATOR: MultipleHeaps = MultipleHeaps::empty();
 
 /// NOTE: the heap memory MUST BE MAPPED before calling this init function.
 pub fn init(start_virt_addr: usize, size_in_bytes: usize) {
-    unsafe {
-        ALLOCATOR.lock().init(start_virt_addr, size_in_bytes);
+    let bytes_per_heap = size_in_bytes / MAX_HEAPS;
+
+    for i in 0..MAX_HEAPS {
+        unsafe {
+            ALLOCATOR[i].lock().init(start_virt_addr + i*bytes_per_heap, bytes_per_heap);
+        }
     }
 }
 
@@ -54,14 +63,42 @@ impl Deref for IrqSafeHeap {
     }
 }
 
-unsafe impl GlobalAlloc for IrqSafeHeap {
+pub struct MultipleHeaps([IrqSafeHeap; MAX_HEAPS]);
+
+impl MultipleHeaps {
+    pub const fn empty() -> MultipleHeaps {
+        MultipleHeaps([IrqSafeHeap::empty(), IrqSafeHeap::empty(), IrqSafeHeap::empty(), IrqSafeHeap::empty(), IrqSafeHeap::empty(), IrqSafeHeap::empty(), IrqSafeHeap::empty(), IrqSafeHeap::empty()])
+    }
+}
+
+impl Deref for MultipleHeaps {
+    type Target = [IrqSafeHeap; MAX_HEAPS];
+
+    fn deref(&self) -> &[IrqSafeHeap; MAX_HEAPS] {
+        &self.0
+    }
+}
+
+unsafe impl GlobalAlloc for MultipleHeaps {
     unsafe fn alloc(&self, layout: Layout) -> *mut u8 {
-        self.0.lock()
-            .allocate(layout)
+        let heap_id = CpuId::new().get_feature_info().expect("Could not retrieve cpuid").initial_local_apic_id() as usize % MAX_HEAPS;
+        let ptr = self[heap_id].lock().allocate(layout);
+        if ptr != (0 as *mut u8) {
+            let ptr_header = ptr.offset(layout.size() as isize) as *mut usize;
+            ptr_header.write(heap_id);
+        }
+
+        // trace!("allocated to heap {}", heap_id);
+
+        ptr
     }
 
     unsafe fn dealloc(&self, ptr: *mut u8, layout: Layout) {
-        self.0.lock()
-            .deallocate(ptr, layout)
+        let heap_id =  *(ptr.offset(layout.size() as isize) as *mut usize);
+        self[heap_id].lock()
+            .deallocate(ptr, layout);
+
+        // trace!("deallocated to heap {}", heap_id);
+
     }
 }

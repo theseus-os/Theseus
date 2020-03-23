@@ -15,3 +15,11 @@ git = "https://github.com/kevinaboos/irq_safety"
 
 [dependencies.block_allocator]
 path = "../block_allocator"
+
+[dependencies.raw-cpuid]
+version = "7.0.3"
+features = [ "use_arch" ]
+
+[dependencies.log]
+default-features = false
+version = "0.3.7"
