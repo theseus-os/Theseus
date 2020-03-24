@@ -1,0 +1,38 @@
+[package]
+authors = ["Kevin Boos <kevinaboos@gmail.com>"]
+name = "mapper_spillful"
+description = "A spillful version of the mapper for the virtual memory subsystem."
+version = "0.1.0"
+build = "../../build.rs"
+
+[dependencies]
+cfg-if = "0.1.6"
+
+[dependencies.log]
+default-features = false
+version = "0.3.7"
+
+[dependencies.lazy_static]
+features = ["spin_no_std", "nightly"]
+version = "1.2.0"
+
+[dependencies.irq_safety]
+git = "https://github.com/kevinaboos/irq_safety"
+
+[dependencies.kernel_config]
+path = "../kernel_config"
+
+[dependencies.memory_x86_64]
+path = "../memory_x86_64"
+
+[dependencies.memory_structs]
+path = "../memory_structs"
+
+[dependencies.rbtree]
+git = "https://github.com/theseus-os/rbtree-rs.git"
+
+[dependencies.memory]
+path = "../memory"
+
+[lib]
+crate-type = ["rlib"]

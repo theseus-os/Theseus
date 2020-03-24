@@ -13,26 +13,28 @@ extern crate getopts;
 extern crate hpet;
 extern crate kernel_config;
 extern crate tsc;
-
+extern crate memory_structs;
+extern crate apic;
+extern crate runqueue;
+extern crate pmu_x86;
 
 use alloc::string::String;
 use alloc::vec::Vec;
 
 
-
 cfg_if! {
 if #[cfg(mapper_spillful)] {
 
+#[macro_use] extern crate libtest;
+extern crate mapper_spillful;
 
 use core::ops::DerefMut;
 use getopts::{Matches, Options};
-use hpet::get_hpet;
 use kernel_config::memory::PAGE_SIZE;
-
-
-use memory::{FRAME_ALLOCATOR, FrameAllocator, VirtualAddress, Mapper, MappedPages, Page, EntryFlags, mapped_pages_unmap};
-use memory::mapper_spillful::MapperSpillful;
-
+use memory_structs::PageRange;
+use libtest::{start_counting_reference_cycles, stop_counting_reference_cycles, calculate_stats, check_myrq, Stats, cycle_count_overhead};
+use memory::{FRAME_ALLOCATOR, VirtualAddress, Mapper, MappedPages, EntryFlags, mapped_pages_unmap};
+use mapper_spillful::MapperSpillful;
 
 enum MapperType<'m> {
     Normal(&'m mut Mapper),
@@ -45,7 +47,7 @@ fn create_mappings(
     start_vaddr: VirtualAddress, 
     size_in_pages: usize, 
     num_mappings: usize
-) -> Result<Option<Vec<MappedPages>>, &'static str> {
+) -> Result<(Option<Vec<MappedPages>>, u64), &'static str> {
 
     let mut mapped_pages: Vec<MappedPages> = match mapper {
         MapperType::Normal(_)   => Vec::with_capacity(num_mappings),
@@ -53,56 +55,37 @@ fn create_mappings(
     };
     let size_in_bytes = size_in_pages * PAGE_SIZE;
 
+    let mut frame_allocator_ref = FRAME_ALLOCATOR.try().ok_or("Couldn't get FRAME_ALLOCATOR")?.lock();
+    let frame_allocator = frame_allocator_ref.deref_mut();
+    let overhead = cycle_count_overhead()?;
 
-    let (tsc_ticks, hpet_ticks) = {
-        let mut frame_allocator_ref = FRAME_ALLOCATOR.try().ok_or("Couldn't get FRAME_ALLOCATOR")?.lock();
-        let frame_allocator = frame_allocator_ref.deref_mut();
+    let counter = start_counting_reference_cycles()?;
 
-        let start_hpet = get_hpet().as_ref().ok_or("couldn't get HPET timer")?.get_counter();
-        let start_tsc = tsc::tsc_ticks();
-
-        for i in 0..num_mappings {
-            let vaddr = start_vaddr + i*size_in_bytes;
-            match mapper {
-                MapperType::Normal(ref mut mapper) => {
-                    let mp = mapper.map_pages(
-                        PageRange::from_virt_addr(vaddr, size_in_bytes),
-                        EntryFlags::WRITABLE | EntryFlags::PRESENT,
-                        frame_allocator
-                    )?;
-                    mapped_pages.push(mp);
-                }
-                MapperType::Spillful(ref mut mapper) => {
-                    let _res = mapper.map(vaddr, size_in_bytes,
-                        EntryFlags::WRITABLE | EntryFlags::PRESENT,
-                        frame_allocator
-                    )?;
-                }
+    for i in 0..num_mappings {
+        let vaddr = start_vaddr + i*size_in_bytes;
+        match mapper {
+            MapperType::Normal(ref mut mapper) => {
+                let mp = mapper.map_pages(
+                    PageRange::from_virt_addr(vaddr, size_in_bytes),
+                    EntryFlags::WRITABLE | EntryFlags::PRESENT,
+                    frame_allocator
+                )?;
+                mapped_pages.push(mp);
+            }
+            MapperType::Spillful(ref mut mapper) => {
+                let _res = mapper.map(vaddr, size_in_bytes,
+                    EntryFlags::WRITABLE | EntryFlags::PRESENT,
+                    frame_allocator
+                )?;
             }
         }
+    }
 
-        let end_tsc = tsc::tsc_ticks();
-        let end_hpet = get_hpet().as_ref().ok_or("couldn't get HPET timer")?.get_counter();
-
-        (end_tsc.into() - start_tsc.into(), end_hpet - start_hpet)
-    };
-    
-
-    println!("Created {} {}-byte mappings ({}) in {} TSC ticks, {} HPET ticks.", 
-        num_mappings, 
-        size_in_bytes, 
-        match mapper { 
-            MapperType::Normal(_)   =>  "NORMAL",
-            MapperType::Spillful(_) =>  "SPILLFUL",
-        },
-        tsc_ticks,
-        hpet_ticks,
-    );
-
+    let cycles = stop_counting_reference_cycles(counter)?;
   
     match mapper {
-        MapperType::Normal(_)   => Ok(Some(mapped_pages)),
-        MapperType::Spillful(_) => Ok(None),
+        MapperType::Normal(_)   => Ok((Some(mapped_pages), cycles - overhead)),
+        MapperType::Spillful(_) => Ok((None, cycles - overhead)),
     }
 
 }
@@ -111,34 +94,20 @@ fn create_mappings(
 fn remap_normal(
     mapper_normal: &mut Mapper, 
     mapped_pages: &mut Vec<MappedPages>,
-) -> Result<(), &'static str> {
+) -> Result<u64, &'static str> {
 
-    let num_mappings = mapped_pages.len();
+    let overhead = cycle_count_overhead()?;
 
-    let (tsc_ticks, hpet_ticks) = {
-        let start_hpet = get_hpet().as_ref().ok_or("couldn't get HPET timer")?.get_counter();
-        let start_tsc = tsc::tsc_ticks();
+    let counter = start_counting_reference_cycles()?;
 
-        for mut mp in mapped_pages.iter_mut() {
-            let _res = mp.remap(mapper_normal, EntryFlags::PRESENT)?;
-        }
+    for mp in mapped_pages.iter_mut() {
+        let _res = mp.remap(mapper_normal, EntryFlags::PRESENT)?;
+    }
 
-        let end_tsc = tsc::tsc_ticks();
-        let end_hpet = get_hpet().as_ref().ok_or("couldn't get HPET timer")?.get_counter();
-        (end_tsc.into() - start_tsc.into(), end_hpet - start_hpet)
-    };
-    
+    let cycles = stop_counting_reference_cycles(counter)?;
 
-    println!("Remapped {} mappings ({}) in {} TSC ticks, {} HPET ticks.", 
-        num_mappings, 
-        "NORMAL",
-        tsc_ticks,
-        hpet_ticks
-    );
-
-    Ok(())
+    Ok(cycles - overhead)
 }
-
 
 
 fn remap_spillful(
@@ -146,54 +115,39 @@ fn remap_spillful(
     start_vaddr: VirtualAddress, 
     size_in_pages: usize, 
     num_mappings: usize
-) -> Result<(), &'static str> {
+) -> Result<u64, &'static str> {
 
-    let size_in_bytes = size_in_pages * PAGE_SIZE;
+    let overhead = cycle_count_overhead()?;
 
-    let (tsc_ticks, hpet_ticks) = {
-        let start_hpet = get_hpet().as_ref().ok_or("couldn't get HPET timer")?.get_counter();
-        let start_tsc = tsc::tsc_ticks();
+    let counter = start_counting_reference_cycles()?;
 
-        for i in 0..num_mappings {
-            let vaddr = start_vaddr + i*size_in_pages*PAGE_SIZE;            
-            let _res = mapper_spillful.remap(vaddr, EntryFlags::PRESENT)?;
-        }
+    for i in 0..num_mappings {
+        let vaddr = start_vaddr + i*size_in_pages*PAGE_SIZE;            
+        let _res = mapper_spillful.remap(vaddr, EntryFlags::PRESENT)?;
+    }
 
-        let end_tsc = tsc::tsc_ticks();
-        let end_hpet = get_hpet().as_ref().ok_or("couldn't get HPET timer")?.get_counter();
-        (end_tsc.into() - start_tsc.into(), end_hpet - start_hpet)
-    };
-    
+    let cycles = stop_counting_reference_cycles(counter)?;
 
-    println!("Remapped {} {}-byte mappings ({}) in {} TSC ticks, {} HPET ticks.", 
-        num_mappings, 
-        size_in_bytes, 
-        "SPILLFUL",
-        tsc_ticks,
-        hpet_ticks
-    );
-
-    Ok(())
+    Ok(cycles - overhead)
 }
 
 
-fn unmap_normal(mapper_normal: &mut Mapper, mut mapped_pages: Vec<MappedPages>) -> Result<(), &'static str> {
+fn unmap_normal(
+    mapper_normal: &mut Mapper, 
+    mut mapped_pages: Vec<MappedPages>
+) -> Result<u64, &'static str> {
+
     let mut frame_allocator_ref = FRAME_ALLOCATOR.try().ok_or("Couldn't get FRAME_ALLOCATOR")?.lock();
     let frame_allocator = frame_allocator_ref.deref_mut();
-    let num_mappings = mapped_pages.len();
+    let overhead = cycle_count_overhead()?;
 
-    let (tsc_ticks, hpet_ticks) = {
-        let start_hpet = get_hpet().as_ref().ok_or("couldn't get HPET timer")?.get_counter();
-        let start_tsc = tsc::tsc_ticks();
+    let counter = start_counting_reference_cycles()?;
 
-        for mp in &mut mapped_pages {
-            mapped_pages_unmap(mp, mapper_normal, frame_allocator)?;
-        }
+    for mp in &mut mapped_pages {
+        mapped_pages_unmap(mp, mapper_normal, frame_allocator)?;
+    }
 
-        let end_tsc = tsc::tsc_ticks();
-        let end_hpet = get_hpet().as_ref().ok_or("couldn't get HPET timer")?.get_counter();
-        (end_tsc.into() - start_tsc.into(), end_hpet - start_hpet)
-    };
+    let cycles = stop_counting_reference_cycles(counter)?; 
 
     // To avoid measuring the (irrelevant) overhead of vector allocation/deallocation, we manually unmapped the MappedPages above. 
     // Thus, here we "forget" each MappedPages from the vector to ensure that their Drop handlers aren't called.
@@ -201,14 +155,7 @@ fn unmap_normal(mapper_normal: &mut Mapper, mut mapped_pages: Vec<MappedPages>) 
         core::mem::forget(mp); 
     }
 
-    println!("Unmapped {} mappings ({}) in {} TSC ticks, {} HPET ticks.", 
-        num_mappings, 
-        "NORMAL",
-        tsc_ticks,
-        hpet_ticks
-    );
-
-    Ok(())
+    Ok(cycles - overhead)
 }
 
 
@@ -217,37 +164,22 @@ fn unmap_spillful(
     start_vaddr: VirtualAddress, 
     size_in_pages: usize, 
     num_mappings: usize
-) -> Result<(), &'static str> {
+) -> Result<u64, &'static str> {
 
     let mut frame_allocator_ref = FRAME_ALLOCATOR.try().ok_or("Couldn't get FRAME_ALLOCATOR")?.lock();
     let frame_allocator = frame_allocator_ref.deref_mut();
+    let overhead = cycle_count_overhead()?;
 
-    let size_in_bytes = size_in_pages * PAGE_SIZE;
+    let counter = start_counting_reference_cycles()?;
 
-    let (tsc_ticks, hpet_ticks) = {
-        let start_hpet = get_hpet().as_ref().ok_or("couldn't get HPET timer")?.get_counter();
-        let start_tsc = tsc::tsc_ticks();
+    for i in 0..num_mappings {
+        let vaddr = start_vaddr + i*size_in_pages*PAGE_SIZE;            
+        let _res = mapper_spillful.unmap(vaddr, frame_allocator)?;
+    }
 
-        for i in 0..num_mappings {
-            let vaddr = start_vaddr + i*size_in_pages*PAGE_SIZE;            
-            let _res = mapper_spillful.unmap(vaddr, frame_allocator)?;
-        }
+    let cycles = stop_counting_reference_cycles(counter)?;
 
-        let end_tsc = tsc::tsc_ticks();
-        let end_hpet = get_hpet().as_ref().ok_or("couldn't get HPET timer")?.get_counter();
-        (end_tsc.into() - start_tsc.into(), end_hpet - start_hpet)
-    };
-    
-
-    println!("Unmapped {} {}-byte mappings ({}) in {} TSC ticks, {} HPET ticks.", 
-        num_mappings, 
-        size_in_bytes, 
-        "SPILLFUL",
-        tsc_ticks,
-        hpet_ticks
-    );
-
-    Ok(())
+    Ok(cycles - overhead)
 }
 
 
@@ -257,7 +189,7 @@ pub fn main(args: Vec<String>) -> isize {
     opts.optflag("h", "help", "print this help menu");
     opts.optflag("p", "spillful", "run the state spillful memory mapping evaluation");
     opts.optopt("n", "", "create 'N' mappings ", "NUM");
-    opts.optopt("s", "--size", "specify the size (in bytes) for each mapping", "SIZE");
+    opts.optopt("s", "--size", "specify the size (in pages) for each mapping", "SIZE");
 
     let matches = match opts.parse(&args) {
         Ok(m) => m,
@@ -273,6 +205,11 @@ pub fn main(args: Vec<String>) -> isize {
         return 0;
     }
 
+    if !check_myrq() {
+		println!("mm_eval cannot run on a busy core (#{}). Pin me on an idle core.", CPU_ID!());
+		return 0;
+	}
+
     let result = rmain(&matches, &opts);
     match result {
         Ok(_) => { 0 }
@@ -284,8 +221,8 @@ pub fn main(args: Vec<String>) -> isize {
 }
 
 
-pub fn rmain(matches: &Matches, opts: &Options) -> Result<(), &'static str> {
-
+pub fn rmain(matches: &Matches, _opts: &Options) -> Result<(), &'static str> {
+    const TRIES: usize = 100;
     let mut mapper_normal   = Mapper::from_current();
     let mut mapper_spillful = MapperSpillful::new();
 
@@ -305,7 +242,17 @@ pub fn rmain(matches: &Matches, opts: &Options) -> Result<(), &'static str> {
         false
     };
 
+    let mut create_times: Vec<u64> = Vec::with_capacity(TRIES);
+    let mut remap_times: Vec<u64> = Vec::with_capacity(TRIES);
+    let mut unmap_times: Vec<u64> = Vec::with_capacity(TRIES);
 
+    //initialize the pmu so that we can use the pmu counter to count reference cycles
+    pmu_x86::init()?;   
+
+    // warm up the timing measurement code
+    let _overhead = cycle_count_overhead()?;
+
+    for _ in 0..TRIES 
     {
         // (1) create mappings
         let mut result = create_mappings(
@@ -314,31 +261,66 @@ pub fn rmain(matches: &Matches, opts: &Options) -> Result<(), &'static str> {
             } else {
                 MapperType::Normal(&mut mapper_normal)
             },
-            start_vaddr, 
+            VirtualAddress::new(start_vaddr)?, 
             size_in_pages, 
             num_mappings
         )?;
 
         // (2) perform remappings
         match result {
-            Some(ref mut mapped_pages) => remap_normal(&mut mapper_normal, mapped_pages)?,
-            _                          => remap_spillful(&mut mapper_spillful, start_vaddr, size_in_pages, num_mappings)?,
+            (Some(ref mut mapped_pages), time) => {
+                create_times.push(time);
+                let remap = remap_normal(&mut mapper_normal, mapped_pages)?;
+                remap_times.push(remap);
+            }
+            (None, time) => {
+                create_times.push(time);
+                let remap = remap_spillful(&mut mapper_spillful, VirtualAddress::new(start_vaddr)?, size_in_pages, num_mappings)?;
+                remap_times.push(remap);
+            }
         };
             
         // (3) perform unmappings
         match result {
-            Some(mapped_pages) => unmap_normal(&mut mapper_normal, mapped_pages)?,
-            _                  => unmap_spillful(&mut mapper_spillful, start_vaddr, size_in_pages, num_mappings)?,
+            (Some(mapped_pages), _time) => {
+                let unmap = unmap_normal(&mut mapper_normal, mapped_pages)?;
+                unmap_times.push(unmap);
+            }
+            (None, _time) => {  
+                let unmap = unmap_spillful(&mut mapper_spillful, VirtualAddress::new(start_vaddr)?, size_in_pages, num_mappings)?;
+                unmap_times.push(unmap);
+            }
         };
     }
 
-    let hpet_period = get_hpet().as_ref().ok_or("couldn't get HPET timer")?.counter_period_femtoseconds();
-    println!("TSC period: {:?}, HPET Period: {} femtoseconds)", tsc::get_tsc_frequency(), hpet_period);
+    println!("Create Mappings (reference cycles)");
+    let stats_create = calculate_stats(&mut create_times).ok_or("Could not calculate stats for mappings")?;
+    print_stats(stats_create);
+
+    println!("Remap Mappings (reference cycles)");
+    let stats_remap = calculate_stats(&mut remap_times).ok_or("Could not calculate stats for remappings")?;
+    print_stats(stats_remap);
+    
+    println!("Unmap Mappings (reference cycles)");
+    let stats_unmap = calculate_stats(&mut unmap_times).ok_or("Could not calculate stats for unmappings")?;
+    print_stats(stats_unmap);
 
     Ok(())
 
 }
 
+fn print_stats(stats: Stats) {
+    println!("
+        min:        {}
+        p_25:       {}
+        median:     {}
+        p_75:       {}
+        max:        {}
+        mean:       {}
+        std_dev:    {}
+        ",
+    stats.min, stats.p_25, stats.median, stats.p_75, stats.max, stats.mean, stats.std_dev);
+}
 
 fn print_usage(opts: &Options) {
     println!("{}", opts.usage(USAGE));
@@ -348,7 +330,6 @@ fn print_usage(opts: &Options) {
 const USAGE: &'static str = "Usage: mm_eval [ARGS]
 Evaluates two different memory mapping implementations.
 The normal spill-free MappedPages approach is evaluated by default.";
-
 
 } // end of cfg_if
 else {
