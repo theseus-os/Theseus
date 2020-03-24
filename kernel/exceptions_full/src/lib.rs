@@ -120,32 +120,46 @@ fn kill_and_halt(exception_number: u8, stack_frame: &ExceptionStackFrame) {
     }
 
     // print a stack trace
-    println_both!("------------------ Stack Trace (DWARF) ---------------------------");
-    let stack_trace_result = stack_trace::stack_trace(
-        &|stack_frame, stack_frame_iter| {
-            let symbol_offset = stack_frame_iter.namespace().get_section_containing_address(
-                memory::VirtualAddress::new_canonical(stack_frame.call_site_address() as usize),
-                false
-            ).map(|(sec, offset)| (sec.name.clone(), offset));
-            if let Some((symbol_name, offset)) = symbol_offset {
-                println_both!("  {:>#018X} in {} + {:#X}", stack_frame.call_site_address(), symbol_name, offset);
-            } else {
-                println_both!("  {:>#018X} in ??", stack_frame.call_site_address());
-            }
-            true
-        },
-        None,
-    );
-    match stack_trace_result {
-        Ok(()) => { println_both!("  Beginning of stack"); }
-        Err(e) => { println_both!("  {}", e); }
+    {
+        println_both!("------------------ Stack Trace (DWARF) ---------------------------");
+        let stack_trace_result = stack_trace::stack_trace(
+            &|stack_frame, stack_frame_iter| {
+                let symbol_offset = stack_frame_iter.namespace().get_section_containing_address(
+                    memory::VirtualAddress::new_canonical(stack_frame.call_site_address() as usize),
+                    false
+                ).map(|(sec, offset)| (sec.name.clone(), offset));
+                if let Some((symbol_name, offset)) = symbol_offset {
+                    println_both!("  {:>#018X} in {} + {:#X}", stack_frame.call_site_address(), symbol_name, offset);
+                } else {
+                    println_both!("  {:>#018X} in ??", stack_frame.call_site_address());
+                }
+                true
+            },
+            None,
+        );
+        match stack_trace_result {
+            Ok(()) => { println_both!("  Beginning of stack"); }
+            Err(e) => { println_both!("  {}", e); }
+        }
+        println_both!("---------------------- End of Stack Trace ------------------------");
     }
-    println_both!("---------------------- End of Stack Trace ------------------------");
 
     let cause = task::KillReason::Exception(exception_number);
 
+    // Call this task's panic handler, if it has one.
+    {
+        let panic_handler = task::get_my_current_task().and_then(|t| t.take_panic_handler());
+        if let Some(ref ph_func) = panic_handler {
+            debug!("Found panic handler callback to invoke in Task {:?}", task::get_my_current_task());
+            ph_func(&cause);
+        }
+        else {
+            debug!("No panic handler callback in Task {:?}", task::get_my_current_task());
+        }
+    }
+
     // Unwind the current task that failed due to the given exception.
-    // Currently this isn't working perfectly, so it's disabled by default.
+    // This doesn't always work perfectly, so it's disabled by default for now.
     #[cfg(unwind_exceptions)] {
         // skip 2 frames: `start_unwinding` and `kill_and_halt`
         match unwind::start_unwinding(cause, 2) {
@@ -175,7 +189,7 @@ fn kill_and_halt(exception_number: u8, stack_frame: &ExceptionStackFrame) {
     // other than just let the thread spin endlessly (which doesn't hurt correctness but is inefficient). 
     // But in general, this task should have already been marked as killed and thus no longer schedulable,
     // so it should not reach this point. 
-    // Only exceptions early on in the initialization process will get here, meaning that the OS will basically stop.
+    // Only exceptions during the early OS initialization process will get here, meaning that the OS will basically stop.
     loop { }
 }
 
