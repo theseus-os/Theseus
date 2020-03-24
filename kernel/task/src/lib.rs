@@ -69,7 +69,7 @@ use x86_64::registers::msr::{rdmsr, wrmsr, IA32_FS_BASE};
 
 
 /// The signature of the callback function that can hook into receiving a panic. 
-pub type PanicHandler = Box<dyn Fn(&PanicInfo) + Send>;
+pub type PanicHandler = Box<dyn Fn(&KillReason) + Send>;
 
 /// Just like `core::panic::PanicInfo`, but with owned String types instead of &str references.
 #[derive(Debug, Clone)]
@@ -116,9 +116,7 @@ pub fn get_task(task_id: usize) -> Option<TaskRef> {
 pub fn set_my_panic_handler(handler: PanicHandler) -> Result<(), &'static str> {
     get_my_current_task()
         .ok_or("couldn't get_my_current_task")
-        .map(|taskref| {
-            taskref.set_panic_handler(handler)
-        })
+        .map(|taskref| taskref.set_panic_handler(handler))
 }
 
 
@@ -134,6 +132,15 @@ pub enum KillReason {
     /// A non-language-level problem, such as a Page Fault or some other machine exception.
     /// The number of the exception is included, e.g., 15 (0xE) for a Page Fault.
     Exception(u8),
+}
+impl fmt::Display for KillReason {
+    fn fmt(&self, f: &mut fmt::Formatter) -> Result<(), fmt::Error> {
+        match &self {
+            &Self::Requested         => write!(f, "Requested"),
+            &Self::Panic(panic_info) => write!(f, "Panicked at {}", panic_info),
+            &Self::Exception(num)    => write!(f, "Exception {:#X}({})", num, num),
+        }
+    }
 }
 
 
@@ -605,6 +612,17 @@ impl Task {
 impl Drop for Task {
     fn drop(&mut self) {
         trace!("Task::drop(): {}", self);
+
+        // We must consume/drop the Task's panic handler BEFORE a Task can possibly be dropped.
+        // This is because if an application task sets a panic handler that is a closure/function in the text section of the app crate itself,
+        // then after the app crate is released, the panic handler will be dropped AFTER the app crate has been freed.
+        // When it tries to drop the task's panic handler, a page fault will occur because the text section of the app crate has been unmapped.
+        {
+            if let Some(_panic_handler) = self.take_panic_handler() {
+                warn!("While dropping task {:?}, its panic handler callback was still present. Removing it now.", self);
+            }
+            // Scoping rules ensure the panic handler is dropped now, before this Task's app_crate could possibly be dropped.
+        }
     }
 }
 

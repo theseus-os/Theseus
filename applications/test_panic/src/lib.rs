@@ -15,8 +15,8 @@ use alloc::boxed::Box;
 pub fn main(_args: Vec<String>) -> isize {
     info!("test_panic::main(): at top");
 
-    let _res = task::set_my_panic_handler(Box::new(|info| {
-        println!("Caught a panic at {}", info);
+    let _res = task::set_my_panic_handler(Box::new(|kill_reason| {
+        println!("test_panic: caught a kill action: {}", kill_reason);
     }));
 
     info!("test_panic::main(): registering panic handler... {:?}.", _res);
