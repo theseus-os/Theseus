@@ -173,13 +173,15 @@ pub struct StackFrameIter {
     /// a reference to its row/entry in the unwinding table,
     /// and the Canonical Frame Address (CFA value) that is used to determine the next frame.
     state: Option<(UnwindRowReference, u64)>,
-    /// An extra offset that is used to adjust the calculation of register rule values
-    /// in certain circumstances, such as when unwinding from an exception/interrupt handler stack frame `B` 
+    /// An extra offset that is used to adjust the calculation of the CFA in certain circumstances, 
+    /// primarily when unwinding through an exception/interrupt handler stack frame `B` 
     /// to a frame `A` that caused the exception, even though frame `A` did not "call" frame `B`.
-    /// Currently this is necessary only for exceptions that also push an error code onto the stack.
+    /// This will have a different value based on what the CPU did, e.g., pushed error codes onto the stack. 
+    /// 
+    /// If `Some`, the latest stack frame produced by this iterator was an exception handler stack frame.
     cfa_adjustment: Option<i64>,
     /// This is set to true when the previous stack frame was an exception/interrupt handler,
-    /// because we need to adjust the CFA to account for the CPU pushing an `ExceptionStackFrame` onto the stack.
+    /// which is useful in the case of taking into account the CPU pushing an `ExceptionStackFrame` onto the stack.
     /// The DWARF debugging/unwinding info cannot account for this because an interrupt or exception happening 
     /// is not the same as a regular function "call" happening.
     last_frame_was_exception_handler: bool,
@@ -238,7 +240,6 @@ impl FallibleIterator for StackFrameIter {
     fn next(&mut self) -> Result<Option<Self::Item>, Self::Error> {
         let registers = &mut self.registers;
         let prev_cfa_adjustment = self.cfa_adjustment;
-        let last_frame_was_exception_handler = self.last_frame_was_exception_handler;
 
         if let Some((unwind_row_ref, cfa)) = self.state.take() {
             let mut newregs = registers.clone();
@@ -277,12 +278,14 @@ impl FallibleIterator for StackFrameIter {
                     //
                     // We know that the stack currently looks like this:
                     // |-- address --|------------  Item on the stack -------------|
+                    // |  <lower>    |  ...                                        |
                     // | CFA         |  error code                                 |
                     // | CFA + 0x08  |  Exception stack frame: instruction pointer |
                     // | CFA + 0x10  |                         code segment        |
                     // | CFA + 0x18  |                         cpu flags           |
                     // | CFA + 0x20  |                         stack pointer       |
                     // | CFA + 0x28  |                         stack segment       |
+                    // |  <higher>   |  ...                                        |
                     // |-------------|---------------------------------------------|
                     //
                     // Thus, we want to skip the error code so we can get the instruction pointer, 
@@ -290,6 +293,7 @@ impl FallibleIterator for StackFrameIter {
                     if reg_num == X86_64::RA {
                         if let Some(_) = prev_cfa_adjustment {
                             let size_of_error_code = core::mem::size_of::<usize>();
+                            // TODO FIXME: only skip the error code if the prev_cfa_adjustment included it
                             let value = unsafe { *(cfa.wrapping_add(size_of_error_code as u64) as *const u64) };
                             warn!("Using return address from CPU-pushed exception stack frame. Value: {:#X}", value);
                             newregs[X86_64::RA] = Some(value);
@@ -332,6 +336,7 @@ impl FallibleIterator for StackFrameIter {
         // As x86 has variable-length instructions, we don't know exactly where the previous instruction starts,
         // but we know that subtracting `1` will give us an address *within* that previous instruction.
         let caller = return_address - 1;
+        // TODO FIXME: only subtract 1 for non-"fault" exceptions, e.g., page faults should NOT subtract 1
         // trace!("call_site_address: {:#X}", caller);
 
         // Get unwind info for the call site address
@@ -348,7 +353,7 @@ impl FallibleIterator for StackFrameIter {
         let row_ref = UnwindRowReference { caller, eh_frame_sec, base_addrs };
         let (cfa, frame) = row_ref.with_unwind_info(|fde, row| {
             // trace!("ok: {:?} (0x{:x} - 0x{:x})", row.cfa(), row.start_address(), row.end_address());
-            let mut cfa = match *row.cfa() {
+            let cfa = match *row.cfa() {
                 CfaRule::RegisterAndOffset{register, offset} => {
                     // debug!("CfaRule:RegisterAndOffset: reg {:?}, offset: {:#X}", register, offset);
                     let reg_value = registers[register].ok_or_else(|| {
@@ -369,6 +374,7 @@ impl FallibleIterator for StackFrameIter {
             // onto the stack, completely unbeknownst to the DWARF debug info. 
             // Thus, we need to adjust this next frame's stack pointer (i.e., `cfa` which becomes the stack pointer)
             // to account for the change in stack contents. 
+            // TODO FIXME: check for any type of exception/interrupt handler, and differentiate between error codes
             cfa_adjustment = if interrupts::is_exception_handler_with_error_code(fde.initial_address()) {
                 let size_of_error_code: i64 = core::mem::size_of::<usize>() as i64;
                 warn!("StackFrameIter: next stack frame has a CPU-pushed error code on the stack, adjusting CFA to {:#X}", cfa);
@@ -379,7 +385,7 @@ impl FallibleIterator for StackFrameIter {
                 warn!("StackFrameIter: next stack frame is an exception handler: adding {:#X} to cfa, new cfa: {:#X}", size_of_exception_stack_frame, cfa);
                 
                 this_frame_is_exception_handler = true;
-                Some(cfa_adjustment + size_of_exception_stack_frame)
+                Some(size_of_error_code + size_of_exception_stack_frame)
             } else {
                 None
             };
