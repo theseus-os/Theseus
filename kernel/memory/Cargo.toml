@@ -29,9 +29,6 @@ path = "../../libs/atomic_linked_list"
 [dependencies.kernel_config]
 path = "../kernel_config"
 
-[dependencies.heap_irq_safe]
-path = "../heap_irq_safe"
-
 [dependencies.memory_x86_64]
 path = "../memory_x86_64"
 

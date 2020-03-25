@@ -1,0 +1,23 @@
+[package]
+authors = ["Ramla Ijaz <ijazramla@gmail.com>"]
+name = "heap_init"
+version = "0.1.0"
+
+[dependencies]
+spin = "0.4.10"
+
+[dependencies.heap_irq_safe]
+path = "../heap_irq_safe"
+
+[dependencies.memory]
+path = "../memory"
+
+[dependencies.kernel_config]
+path = "../kernel_config"
+
+[dependencies.log]
+default-features = false
+version = "0.3.7"
+
+[dependencies.irq_safety]
+git = "https://github.com/kevinaboos/irq_safety"

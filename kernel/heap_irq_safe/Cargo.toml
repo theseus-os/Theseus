@@ -23,3 +23,6 @@ features = [ "use_arch" ]
 [dependencies.log]
 default-features = false
 version = "0.3.7"
+
+[dependencies.slabmalloc]
+path = "../../libs/rust-slabmalloc"

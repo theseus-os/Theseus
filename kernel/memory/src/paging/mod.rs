@@ -170,18 +170,19 @@ pub fn get_current_p4() -> Frame {
 /// Returns the following tuple, if successful:
 /// 
 ///  * The kernel's new PageTable, which is now currently active,
-///  * the kernel's list of VirtualMemoryAreas,
 ///  * the kernels' text section MappedPages,
 ///  * the kernels' rodata section MappedPages,
 ///  * the kernels' data section MappedPages,
-///  * the kernel's list of *other* higher-half MappedPages, which should be kept forever,
-///  * the kernel's list of identity-mapped MappedPages, which should be dropped before starting the first userspace program. 
+///  * the kernel's list of VirtualMemoryAreas that needs to be converted to a vector after heap initialization,
+///  * the kernel's list of *other* higher-half MappedPages that needs to be converted to a vector after heap initialization, and which should be kept forever,
+///  * the kernel's list of identity-mapped MappedPages that needs to be converted to a vector after heap initialization, and which should be dropped before starting the first userspace program. 
 ///
 /// Otherwise, it returns a str error message. 
 /// 
 /// Note: this was previously called remap_the_kernel.
 pub fn init(allocator_mutex: &MutexIrqSafe<AreaFrameAllocator>, boot_info: &multiboot2::BootInformation) 
-    -> Result<(PageTable, Vec<VirtualMemoryArea>, MappedPages, MappedPages, MappedPages, Vec<MappedPages>, Vec<MappedPages>), &'static str>
+    // -> Result<(PageTable, Vec<VirtualMemoryArea>, MappedPages, MappedPages, MappedPages, Vec<MappedPages>, Vec<MappedPages>), &'static str>
+    -> Result<(PageTable, MappedPages, MappedPages, MappedPages, [VirtualMemoryArea; 32], [Option<MappedPages>; 32], [Option<MappedPages>; 32]), &'static str>
 {
     // bootstrap a PageTable from the currently-loaded page table
     let mut page_table = PageTable::from_current();
@@ -341,33 +342,21 @@ pub fn init(allocator_mutex: &MutexIrqSafe<AreaFrameAllocator>, boot_info: &mult
     // here, new_page_table and new_table should be identical
     debug!("switched to new page table {:?}.", new_page_table); 
 
-    // After this point, we must "forget" all of the above mapped_pages instances if an error occurs,
-    // because they will be auto-unmapped from the new page table upon return, causing all execution to stop.          
+    // Return the new_page_table because that's the one that should be used by the kernel in future mappings. 
+    Ok((new_page_table, text_mapped_pages, rodata_mapped_pages, data_mapped_pages, vmas, higher_half_mapped_pages, identity_mapped_pages))
+}
 
-
-    // We must map the heap memory here, before it can initialized! 
-    let (heap_mapped_pages, heap_vma) = {
-        let mut allocator = allocator_mutex.lock();
-
-        let pages = PageRange::from_virt_addr(VirtualAddress::new_canonical(KERNEL_HEAP_START), KERNEL_HEAP_INITIAL_SIZE);
-        let heap_flags = paging::EntryFlags::WRITABLE;
-        let heap_vma: VirtualMemoryArea = VirtualMemoryArea::new(VirtualAddress::new_canonical(KERNEL_HEAP_START), KERNEL_HEAP_INITIAL_SIZE, heap_flags, "Kernel Heap");
-        let heap_mp = try_forget!(
-            new_page_table.map_pages(pages, heap_flags, allocator.deref_mut())
-                .map_err(|e| {
-                    error!("Failed to map kernel heap memory pages, {} bytes starting at virtual address {:#X}. Error: {:?}", KERNEL_HEAP_INITIAL_SIZE, KERNEL_HEAP_START, e);
-                    "Failed to map the kernel heap memory. Perhaps the KERNEL_HEAP_INITIAL_SIZE exceeds the size of the system's physical memory?"
-                }),
-            text_mapped_pages, rodata_mapped_pages, data_mapped_pages, higher_half_mapped_pages, identity_mapped_pages
-        );
-        heap_irq_safe::init(KERNEL_HEAP_START, KERNEL_HEAP_INITIAL_SIZE);
-        
-        allocator.alloc_ready(); // heap is ready
-        (heap_mp, heap_vma)
-    };
-
-    debug!("mapped and initialized the heap, VMA: {:?}", heap_vma);
-    // HERE: now the heap is set up, we can use dynamically-allocated types like Vecs
+/// Finishes initializing the kernel paging mechanism after the heap is initalized. 
+/// Returns the following tuple, if successful:
+/// 
+///  * the kernel's list of VirtualMemoryAreas,
+///  * the kernel's list of *other* higher-half MappedPages, which should be kept forever,
+///  * the kernel's list of identity-mapped MappedPages, which should be dropped before starting the first userspace program. 
+///
+/// Otherwise, it returns a str error message. 
+pub fn init_post_heap(allocator_mutex: &MutexIrqSafe<AreaFrameAllocator>, heap_vma: VirtualMemoryArea, heap_mapped_pages: MappedPages, vmas: [VirtualMemoryArea; 32], mut higher_half_mapped_pages: [Option<MappedPages>; 32], mut identity_mapped_pages: [Option<MappedPages>; 32]) 
+-> Result<(Vec<VirtualMemoryArea>, Vec<MappedPages>, Vec<MappedPages>), &'static str> {
+    allocator_mutex.lock().alloc_ready(); // heap is ready
 
     let mut kernel_vmas: Vec<VirtualMemoryArea> = vmas.to_vec();
     kernel_vmas.retain(|x|  *x != VirtualMemoryArea::default() );
@@ -379,6 +368,5 @@ pub fn init(allocator_mutex: &MutexIrqSafe<AreaFrameAllocator>, boot_info: &mult
     higher_half.push(heap_mapped_pages);
     let identity: Vec<MappedPages> = identity_mapped_pages.iter_mut().filter_map(|opt| opt.take()).collect();
 
-    // Return the new_page_table because that's the one that should be used by the kernel in future mappings. 
-    Ok((new_page_table, kernel_vmas, text_mapped_pages, rodata_mapped_pages, data_mapped_pages, higher_half, identity))
+    Ok((kernel_vmas, higher_half, identity))
 }

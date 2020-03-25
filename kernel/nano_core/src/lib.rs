@@ -29,11 +29,13 @@ extern crate irq_safety; // for irq-safe locking and interrupt utilities
 
 extern crate logger;
 extern crate state_store;
-extern crate memory; // the virtual memory subsystem
+#[macro_use] extern crate memory; // the virtual memory subsystem
 extern crate mod_mgmt;
 extern crate exceptions_early;
 extern crate captain;
 extern crate panic_entry; // the panic-related lang items
+
+extern crate heap_init;
 
 #[macro_use] extern crate vga_buffer;
 
@@ -53,7 +55,7 @@ pub fn nano_core_public_func(val: u8) {
 use core::ops::DerefMut;
 use x86_64::structures::idt::LockedIdt;
 use memory::VirtualAddress;
-use kernel_config::memory::KERNEL_OFFSET;
+use kernel_config::memory::{KERNEL_OFFSET, KERNEL_HEAP_START, KERNEL_HEAP_INITIAL_SIZE};
 
 /// An initial interrupt descriptor table for catching very simple exceptions only.
 /// This is no longer used after interrupts are set up properly, it's just a failsafe.
@@ -126,8 +128,32 @@ pub extern "C" fn nano_core_start(multiboot_information_virtual_address: usize) 
     let boot_info = unsafe { multiboot2::load(multiboot_information_virtual_address) };
     println_raw!("nano_core_start(): booted via multiboot2."); 
 
-    // init memory management: set up stack with guard page, heap, kernel text/data mappings, etc
-    let (kernel_mmi_ref, text_mapped_pages, rodata_mapped_pages, data_mapped_pages, identity_mapped_pages) = try_exit!(memory::init(&boot_info));
+    // Initialize memory management: paging (create a new page table), essential kernel mappings
+    let (allocator_mutex, mut page_table, text_mapped_pages, rodata_mapped_pages, data_mapped_pages, vmas, higher_half_mapped_pages, identity_mapped_pages) = try_exit!(memory::init(&boot_info));
+
+    // Initialize the kernel heap.
+    // After this point, we must "forget" all of the above mapped_pages instances if an error occurs,
+    // because they will be auto-unmapped from the new page table upon return, causing all execution to stop. 
+    let heap_mp;
+    let heap_vma;
+    match heap_init::initialize_heap(allocator_mutex, &mut page_table) {
+        Ok((mp, vma)) => {
+            heap_mp = mp;
+            heap_vma = vma;
+        }
+        Err(e) => {
+            core::mem::forget(text_mapped_pages);
+            core::mem::forget(rodata_mapped_pages);
+            core::mem::forget(data_mapped_pages);
+            core::mem::forget(higher_half_mapped_pages);
+            core::mem::forget(identity_mapped_pages);
+            shutdown(format_args!("{}", e))
+        }
+    }
+
+    // Initialize memory management post heap intialization: set up kernel stack allocator and kernel memory management info.
+    let (kernel_mmi_ref, identity_mapped_pages) = try_exit!(memory::init_post_heap(allocator_mutex, page_table, heap_vma, heap_mp, vmas, higher_half_mapped_pages, identity_mapped_pages));
+
     println_raw!("nano_core_start(): initialized memory subsystem."); 
     // After this point, we must "forget" all of the above mapped_pages instances if an error occurs,
     // because they will be auto-unmapped upon a returned error, causing all execution to stop. 

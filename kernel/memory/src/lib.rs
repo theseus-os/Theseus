@@ -18,7 +18,6 @@ extern crate irq_safety;
 extern crate kernel_config;
 extern crate atomic_linked_list;
 extern crate xmas_elf;
-extern crate heap_irq_safe;
 extern crate bit_field;
 #[cfg(target_arch = "x86_64")]
 extern crate memory_x86_64;
@@ -29,6 +28,7 @@ extern crate memory_structs;
 /// but forgets the given `obj`s to prevent them from being dropped,
 /// as they would normally be upon return of an Error using `try!()`.
 /// This must come BEFORE the below modules in order for them to be able to use it.
+#[macro_export]
 macro_rules! try_forget {
     ($expr:expr, $($obj:expr),*) => (match $expr {
         Ok(val) => val,
@@ -182,13 +182,16 @@ pub fn set_broadcast_tlb_shootdown_cb(func: fn(Vec<VirtualAddress>)) {
 /// the original BootInformation will be unmapped and inaccessible.
 /// 
 /// Returns the following tuple, if successful:
-///  * The kernel's new MemoryManagementInfo
+///  * a reference to the Area Frame Allocator to be used by the remaining memory init functions
+///  * the kernel's new PageTable, which is now currently active 
 ///  * the MappedPages of the kernel's text section,
 ///  * the MappedPages of the kernel's rodata section,
 ///  * the MappedPages of the kernel's data section,
-///  * the kernel's list of *other* higher-half MappedPages, which should be kept forever.
+///  * the kernel's list of VirtualMemoryAreas that needs to be converted to a vector after heap initialization,
+///  * the kernel's list of *other* higher-half MappedPages that needs to be converted to a vector after heap initialization, and which should be kept forever,
+///  * the kernel's list of identity-mapped MappedPages that needs to be converted to a vector after heap initialization, and which should be dropped before starting the first userspace program. 
 pub fn init(boot_info: &BootInformation) 
-    -> Result<(Arc<MutexIrqSafe<MemoryManagementInfo>>, MappedPages, MappedPages, MappedPages, Vec<MappedPages>), &'static str> 
+    -> Result<(&MutexIrqSafe<AreaFrameAllocator>, PageTable, MappedPages, MappedPages, MappedPages, [VirtualMemoryArea; 32], [Option<MappedPages>; 32], [Option<MappedPages>; 32]), &'static str> 
 {
     // get the start and end addresses of the kernel.
     let (kernel_phys_start, kernel_phys_end, kernel_virt_end) = get_kernel_address(&boot_info)?;
@@ -224,25 +227,44 @@ pub fn init(boot_info: &BootInformation)
         MutexIrqSafe::new( fa ) 
     });
 
-    // Initialize paging (create a new page table), which also initializes the kernel heap.
+    // Initialize paging (create a new page table).
 
     let (
         page_table,
-        kernel_vmas,
         text_mapped_pages,
         rodata_mapped_pages,
         data_mapped_pages,
+        vmas,
         higher_half_mapped_pages,
-        identity_mapped_pages,
+        identity_mapped_pages
     ) = paging::init(frame_allocator_mutex, &boot_info)?;
-
-    // HERE: heap is initialized! Can now use alloc types.
-    // After this point, we must "forget" all of the above mapped_pages instances if an error occurs,
-    // because they will be auto-unmapped from the new page table upon return, causing all execution to stop.   
 
     debug!("Done with paging::init()!, page_table: {:?}", page_table);
 
+    Ok((frame_allocator_mutex, page_table, text_mapped_pages, rodata_mapped_pages, data_mapped_pages, vmas, higher_half_mapped_pages, identity_mapped_pages))
     
+}
+
+/// Finishes Initializing the virtual memory management system after the heap is initialized and returns a MemoryManagementInfo instance,
+/// which represents Task zero's (the kernel's) address space. 
+/// 
+/// Returns the following tuple, if successful:
+///  * The kernel's new MemoryManagementInfo
+///  * the kernel's list of *other* higher-half MappedPages, which should be kept forever. ??? is this correct ???
+pub fn init_post_heap(allocator_mutex: &MutexIrqSafe<AreaFrameAllocator>, page_table: PageTable, heap_vma: VirtualMemoryArea, heap_mapped_pages: MappedPages, 
+    vmas: [VirtualMemoryArea; 32], mut higher_half_mapped_pages: [Option<MappedPages>; 32], mut identity_mapped_pages: [Option<MappedPages>; 32]) 
+-> Result<(Arc<MutexIrqSafe<MemoryManagementInfo>>, Vec<MappedPages>), &'static str> 
+{
+    // HERE: heap is initialized! Can now use alloc types.
+    // After this point, we must "forget" all of the above mapped_pages instances if an error occurs,
+    // because they will be auto-unmapped from the new page table upon return, causing all execution to stop.  
+
+    let (
+        kernel_vmas,
+        higher_half_mapped_pages,
+        identity_mapped_pages,
+    ) = paging::init_post_heap(allocator_mutex, heap_vma, heap_mapped_pages, vmas, higher_half_mapped_pages, identity_mapped_pages)?;
+   
     // init the kernel stack allocator, a singleton
     let kernel_stack_allocator = {
         let stack_alloc_start = Page::containing_address(VirtualAddress::new_canonical(KERNEL_STACK_ALLOCATOR_BOTTOM)); 
@@ -263,7 +285,7 @@ pub fn init(boot_info: &BootInformation)
         Arc::new(MutexIrqSafe::new(kernel_mmi))
     });
 
-    Ok( (kernel_mmi_ref.clone(), text_mapped_pages, rodata_mapped_pages, data_mapped_pages, identity_mapped_pages) )
+    Ok( (kernel_mmi_ref.clone(), identity_mapped_pages) )
 }
 
 pub trait FrameAllocator {

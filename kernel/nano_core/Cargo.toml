@@ -53,6 +53,8 @@ path = "../panic_entry"
 [dependencies.vga_buffer]
 path = "../vga_buffer"
 
+[dependencies.heap_init]
+path = "../heap_init"
 
 
 [lib]
