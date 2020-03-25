@@ -250,7 +250,7 @@ impl FallibleIterator for StackFrameIter {
             // If this frame is an exception/interrupt handler, we need to adjust RSP and the return address RA accordingly.
             if let Some(extra_offset) = prev_cfa_adjustment {
                 newregs[X86_64::RSP] = Some(cfa.wrapping_add(extra_offset as u64));
-                warn!("adjusting RSP to {:X?}", newregs[X86_64::RSP]);
+                trace!("adjusting RSP to {:X?}", newregs[X86_64::RSP]);
             } 
 
             unwind_row_ref.with_unwind_info(|_fde, row| {
@@ -295,7 +295,7 @@ impl FallibleIterator for StackFrameIter {
                             let size_of_error_code = core::mem::size_of::<usize>();
                             // TODO FIXME: only skip the error code if the prev_cfa_adjustment included it
                             let value = unsafe { *(cfa.wrapping_add(size_of_error_code as u64) as *const u64) };
-                            warn!("Using return address from CPU-pushed exception stack frame. Value: {:#X}", value);
+                            trace!("Using return address from CPU-pushed exception stack frame. Value: {:#X}", value);
                             newregs[X86_64::RA] = Some(value);
                             continue;
                         }
@@ -377,12 +377,12 @@ impl FallibleIterator for StackFrameIter {
             // TODO FIXME: check for any type of exception/interrupt handler, and differentiate between error codes
             cfa_adjustment = if interrupts::is_exception_handler_with_error_code(fde.initial_address()) {
                 let size_of_error_code: i64 = core::mem::size_of::<usize>() as i64;
-                warn!("StackFrameIter: next stack frame has a CPU-pushed error code on the stack, adjusting CFA to {:#X}", cfa);
+                trace!("StackFrameIter: next stack frame has a CPU-pushed error code on the stack, adjusting CFA to {:#X}", cfa);
 
                 // TODO: we need to set this to true for any exception/interrupt handler, not just those with error codes.
                 // If there is an error code pushed, then we need to account for that additionally beyond the exception stack frame being pushed.
                 let size_of_exception_stack_frame: i64 = 5 * 8;
-                warn!("StackFrameIter: next stack frame is an exception handler: adding {:#X} to cfa, new cfa: {:#X}", size_of_exception_stack_frame, cfa);
+                trace!("StackFrameIter: next stack frame is an exception handler: adding {:#X} to cfa, new cfa: {:#X}", size_of_exception_stack_frame, cfa);
                 
                 this_frame_is_exception_handler = true;
                 Some(size_of_error_code + size_of_exception_stack_frame)
