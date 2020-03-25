@@ -219,7 +219,7 @@ impl StackFrameIter {
     /// until the `next()` method is invoked again. 
     /// 
     /// This is necessary in order to restore the proper register values 
-    /// before jumping to the **landing pad** (a cleanup function or exception catcher/panic handler)
+    /// before jumping to the **landing pad** (a cleanup function or exception/panic catcher)
     /// such that the landing pad function will actually execute properly with the right context.
     pub fn registers(&self) -> &Registers {
         &self.registers
@@ -704,7 +704,7 @@ pub fn start_unwinding(reason: KillReason, stack_frames_to_skip: usize) -> Resul
             let unwinding_context = unsafe { &mut *unwinding_context_ptr };
             unwinding_context.stack_frame_iter.registers = registers;
             
-            // Skip the first several frames, e.g., to skip unwinding functions in the panic handlers themselves.
+            // Skip the first several frames, e.g., to skip unwinding the panic entry point functions themselves.
             for _i in 0..stack_frames_to_skip {
                 unwinding_context.stack_frame_iter.next()
                     .map_err(|_e| {

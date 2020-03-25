@@ -43,8 +43,12 @@ macro_rules! try_forget {
 
 
 mod area_frame_allocator;
-mod paging;
 mod stack_allocator;
+#[cfg(not(mapper_spillful))]
+mod paging;
+
+#[cfg(mapper_spillful)]
+pub mod paging;
 
 
 pub use self::area_frame_allocator::AreaFrameAllocator;
@@ -166,7 +170,7 @@ pub fn create_contiguous_mapping(size_in_bytes: usize, flags: EntryFlags) -> Res
 
 
 
-static BROADCAST_TLB_SHOOTDOWN_FUNC: Once<fn(Vec<VirtualAddress>)> = Once::new();
+pub static BROADCAST_TLB_SHOOTDOWN_FUNC: Once<fn(Vec<VirtualAddress>)> = Once::new();
 
 /// Set the function callback that will be invoked every time a TLB shootdown is necessary,
 /// i.e., during page table remapping and unmapping operations.
