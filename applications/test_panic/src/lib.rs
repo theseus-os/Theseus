@@ -15,11 +15,11 @@ use alloc::boxed::Box;
 pub fn main(_args: Vec<String>) -> isize {
     info!("test_panic::main(): at top");
 
-    let _res = task::set_my_panic_handler(Box::new(|info| {
-        println!("Caught a panic at {}", info);
+    let _res = task::set_my_kill_handler(Box::new(|kill_reason| {
+        println!("test_panic: caught a kill action: {}", kill_reason);
     }));
 
-    info!("test_panic::main(): registering panic handler... {:?}.", _res);
+    info!("test_panic::main(): registering kill handler... {:?}.", _res);
 
     match _args.get(0).map(|s| &**s) {
         // indexing test
@@ -38,8 +38,3 @@ pub fn main(_args: Vec<String>) -> isize {
     0
 }
 
-
-// use task::PanicInfoOwned;
-// fn panic_handler(info: &PanicInfoOwned) {
-//     println!("Caught a panic: {}", info);
-// }

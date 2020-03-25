@@ -9,12 +9,12 @@
 
 mod virtual_address_allocator;
 mod entry;
-mod table;
 mod temporary_page;
 mod mapper;
-
+#[cfg(not(mapper_spillful))]
+mod table;
 #[cfg(mapper_spillful)]
-pub mod mapper_spillful;
+pub mod table;
 
 
 pub use self::entry::*;

@@ -286,6 +286,10 @@ impl VirtualMemoryArea {
         let end_page = Page::containing_address(self.start + self.size - 1);
         PageRange::new(start_page, end_page)
     }
+
+    pub fn set_flags(&mut self, flags: EntryFlags) {
+        self.flags = flags;
+    }
 }
 
 
