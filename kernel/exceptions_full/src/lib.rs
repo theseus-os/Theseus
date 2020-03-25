@@ -146,15 +146,15 @@ fn kill_and_halt(exception_number: u8, stack_frame: &ExceptionStackFrame) {
 
     let cause = task::KillReason::Exception(exception_number);
 
-    // Call this task's panic handler, if it has one.
+    // Call this task's kill handler, if it has one.
     {
-        let panic_handler = task::get_my_current_task().and_then(|t| t.take_panic_handler());
-        if let Some(ref ph_func) = panic_handler {
-            debug!("Found panic handler callback to invoke in Task {:?}", task::get_my_current_task());
-            ph_func(&cause);
+        let kill_handler = task::get_my_current_task().and_then(|t| t.take_kill_handler());
+        if let Some(ref kh_func) = kill_handler {
+            debug!("Found kill handler callback to invoke in Task {:?}", task::get_my_current_task());
+            kh_func(&cause);
         }
         else {
-            debug!("No panic handler callback in Task {:?}", task::get_my_current_task());
+            debug!("No kill handler callback in Task {:?}", task::get_my_current_task());
         }
     }
 

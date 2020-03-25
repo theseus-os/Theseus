@@ -21,7 +21,7 @@ use task::{KillReason, PanicInfoOwned};
 
 /// Performs the standard panic handling routine, which involves the following:
 /// 
-/// * Invoking the current `Task`'s `panic_handler` routine, if it has registered one.
+/// * Invoking the current `Task`'s `kill_handler` routine, if it has registered one.
 /// * Printing a backtrace of the call stack.
 /// * Finally, it performs stack unwinding of this `Task'`s stack and kills it.
 /// 
@@ -83,15 +83,15 @@ pub fn panic_wrapper(panic_info: &PanicInfo) -> Result<(), &'static str> {
     }
     error!("------------------------------------------------------------------");
 
-    // Call this task's panic handler, if it has one.
+    // Call this task's kill handler, if it has one.
     {
-        let panic_handler = task::get_my_current_task().and_then(|t| t.take_panic_handler());
-        if let Some(ref ph_func) = panic_handler {
-            debug!("Found panic handler callback to invoke in Task {:?}", task::get_my_current_task());
-            ph_func(&KillReason::Panic(PanicInfoOwned::from(panic_info)));
+        let kill_handler = task::get_my_current_task().and_then(|t| t.take_kill_handler());
+        if let Some(ref kh_func) = kill_handler {
+            debug!("Found kill handler callback to invoke in Task {:?}", task::get_my_current_task());
+            kh_func(&KillReason::Panic(PanicInfoOwned::from(panic_info)));
         }
         else {
-            debug!("No panic handler callback in Task {:?}", task::get_my_current_task());
+            debug!("No kill handler callback in Task {:?}", task::get_my_current_task());
         }
     }
 
