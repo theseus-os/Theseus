@@ -68,8 +68,9 @@ use spin::Mutex;
 use x86_64::registers::msr::{rdmsr, wrmsr, IA32_FS_BASE};
 
 
-/// The signature of the callback function that can hook into receiving a panic. 
-pub type PanicHandler = Box<dyn Fn(&KillReason) + Send>;
+/// The function signature of the callback that will be invoked
+/// when a given Task panics or otherwise fails, e.g., a machine exception occurs.
+pub type KillHandler = Box<dyn Fn(&KillReason) + Send>;
 
 /// Just like `core::panic::PanicInfo`, but with owned String types instead of &str references.
 #[derive(Debug, Clone)]
@@ -84,8 +85,8 @@ impl fmt::Display for PanicInfoOwned {
         write!(f, "{:?}:{}:{} -- {:?}", self.file, self.line, self.column, self.msg)
     }
 }
-impl PanicInfoOwned {
-    pub fn from(info: &PanicInfo) -> PanicInfoOwned {
+impl<'p> From<&PanicInfo<'p>> for PanicInfoOwned {
+    fn from(info: &PanicInfo) -> PanicInfoOwned {
         let msg = info.message()
             .map(|m| format!("{}", m))
             .unwrap_or_else(|| String::new());
@@ -112,11 +113,11 @@ pub fn get_task(task_id: usize) -> Option<TaskRef> {
 }
 
 
-/// Sets the panic handler function for the current `Task`
-pub fn set_my_panic_handler(handler: PanicHandler) -> Result<(), &'static str> {
+/// Sets the kill handler function for the current `Task`
+pub fn set_my_kill_handler(handler: KillHandler) -> Result<(), &'static str> {
     get_my_current_task()
         .ok_or("couldn't get_my_current_task")
-        .map(|taskref| taskref.set_panic_handler(handler))
+        .map(|taskref| taskref.set_kill_handler(handler))
 }
 
 
@@ -127,7 +128,7 @@ pub enum KillReason {
     /// The user or another task requested that this `Task` be killed. 
     /// For example, the user pressed `Ctrl + C` on the shell window that started a `Task`.
     Requested,
-    /// A Rust-level panic occurred while running this `Task`
+    /// A Rust-level panic occurred while running this `Task`.
     Panic(PanicInfoOwned),
     /// A non-language-level problem, such as a Page Fault or some other machine exception.
     /// The number of the exception is included, e.g., 15 (0xE) for a Page Fault.
@@ -239,9 +240,10 @@ pub struct Task {
     /// This `Task` is linked into and runs within the context of 
     /// this [`CrateNamespace`](../mod_mgmt/struct.CrateNamespace.html).
     pub namespace: Arc<CrateNamespace>,
-    /// The function that will be called when this `Task` panics;
-    /// it is invoked before the task is cleaned up via stack unwinding.
-    pub panic_handler: Option<PanicHandler>,
+    /// The function that will be called when this `Task` panics or fails due to a machine exception.
+    /// It will be invoked before the task is cleaned up via stack unwinding.
+    /// This is similar to Rust's built-in panic hook, but is also called upon a machine exception, not just a panic.
+    pub kill_handler: Option<KillHandler>,
     /// The environment of the task, Wrapped in an Arc & Mutex because it is shared among child and parent tasks
     pub env: Arc<Mutex<Environment>>,
     /// The function that should be run as a last-ditch attempt to recover from this task's failure,
@@ -328,7 +330,7 @@ impl Task {
             is_an_idle_task: false,
             app_crate,
             namespace,
-            panic_handler: None,
+            kill_handler: None,
             env,
             failure_cleanup_function,
 
@@ -379,17 +381,18 @@ impl Task {
         false
     }
 
-    /// Registers a function or closure that will be called if this `Task` panics,
-    /// invoked before the task is cleaned up via stack unwinding.
-    pub fn set_panic_handler(&mut self, callback: PanicHandler) {
-        self.panic_handler = Some(callback);
+    /// Registers a function or closure that will be called if this `Task` panics
+    /// or otherwise fails (e.g., due to a machine exception occurring).
+    /// The given `callback` will be invoked before the task is cleaned up via stack unwinding.
+    pub fn set_kill_handler(&mut self, callback: KillHandler) {
+        self.kill_handler = Some(callback);
     }
 
-    /// Takes ownership of this `Task`'s `PanicHandler` closure/function if one exists,
+    /// Takes ownership of this `Task`'s `KillHandler` closure/function if one exists,
     /// and returns it so it can be invoked without holding this `Task`'s `Mutex`.
-    /// After invoking this, the `Task`'s `panic_handler` will be `None`.
-    pub fn take_panic_handler(&mut self) -> Option<PanicHandler> {
-        self.panic_handler.take()
+    /// After invoking this, the `Task`'s `kill_handler` will be `None`.
+    pub fn take_kill_handler(&mut self) -> Option<KillHandler> {
+        self.kill_handler.take()
     }
 
 
@@ -613,15 +616,15 @@ impl Drop for Task {
     fn drop(&mut self) {
         trace!("Task::drop(): {}", self);
 
-        // We must consume/drop the Task's panic handler BEFORE a Task can possibly be dropped.
-        // This is because if an application task sets a panic handler that is a closure/function in the text section of the app crate itself,
-        // then after the app crate is released, the panic handler will be dropped AFTER the app crate has been freed.
-        // When it tries to drop the task's panic handler, a page fault will occur because the text section of the app crate has been unmapped.
+        // We must consume/drop the Task's kill handler BEFORE a Task can possibly be dropped.
+        // This is because if an application task sets a kill handler that is a closure/function in the text section of the app crate itself,
+        // then after the app crate is released, the kill handler will be dropped AFTER the app crate has been freed.
+        // When it tries to drop the task's kill handler, a page fault will occur because the text section of the app crate has been unmapped.
         {
-            if let Some(_panic_handler) = self.take_panic_handler() {
-                warn!("While dropping task {:?}, its panic handler callback was still present. Removing it now.", self);
+            if let Some(_kill_handler) = self.take_kill_handler() {
+                warn!("While dropping task {:?}, its kill handler callback was still present. Removing it now.", self);
             }
-            // Scoping rules ensure the panic handler is dropped now, before this Task's app_crate could possibly be dropped.
+            // Scoping rules ensure the kill handler is dropped now, before this Task's app_crate could possibly be dropped.
         }
     }
 }
@@ -846,21 +849,22 @@ impl TaskRef {
         self.0.deref().0.lock().runstate = RunState::Runnable;
     }
 
-    /// Registers a function or closure that will be called if this `Task` panics,
-    /// invoked before the task is cleaned up via stack unwinding.
+    /// Registers a function or closure that will be called if this `Task` panics
+    /// or otherwise fails (e.g., due to a machine exception). 
+    /// The given `callback` will be invoked before the task is cleaned up via stack unwinding.
     /// # Locking / Deadlock
     /// Obtains a write lock on the enclosed `Task` in order to mutate its state.
-    pub fn set_panic_handler(&self, callback: PanicHandler) {
-        self.0.deref().0.lock().set_panic_handler(callback)
+    pub fn set_kill_handler(&self, callback: KillHandler) {
+        self.0.deref().0.lock().set_kill_handler(callback)
     }
 
-    /// Takes ownership of this `Task`'s `PanicHandler` closure/function if one exists,
+    /// Takes ownership of this `Task`'s `KillHandler` closure/function if one exists,
     /// and returns it so it can be invoked without holding this `Task`'s `Mutex`.
-    /// After invoking this, the `Task`'s `panic_handler` will be `None`.
+    /// After invoking this, the `Task`'s `kill_handler` will be `None`.
     /// # Locking / Deadlock
     /// Obtains a write lock on the enclosed `Task` in order to mutate its state.
-    pub fn take_panic_handler(&self) -> Option<PanicHandler> {
-        self.0.deref().0.lock().take_panic_handler()
+    pub fn take_kill_handler(&self) -> Option<KillHandler> {
+        self.0.deref().0.lock().take_kill_handler()
     }
 
     /// Takes ownership of this `Task`'s exit value and returns it,
@@ -969,7 +973,7 @@ pub fn create_idle_task(
 /// 
 /// Therefore there's not much we can actually do.
 fn idle_task_cleanup_failure(current_task: TaskRef, kill_reason: KillReason) -> ! {
-    error!("BUG: idle_task_cleanup_failure: {:?} panicked with {:?}\n. There's nothing we can do here; looping indefinitely!", current_task.lock().name, kill_reason);
+    error!("BUG: idle_task_cleanup_failure: {:?} died with {:?}\n. There's nothing we can do here; looping indefinitely!", current_task.lock().name, kill_reason);
     loop { }
 }
 
