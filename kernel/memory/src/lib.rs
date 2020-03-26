@@ -153,7 +153,7 @@ impl MemoryManagementInfo {
 /// Currently, this function acquires the lock on the `FRAME_ALLOCATOR` and the kernel's `MemoryManagementInfo` instance.
 /// Thus, the caller should ensure that the locks on those two variables are not held when invoking this function.
 pub fn create_contiguous_mapping(size_in_bytes: usize, flags: EntryFlags) -> Result<(MappedPages, PhysicalAddress), &'static str> {
-    let allocated_pages = allocate_pages_by_bytes(size_in_bytes).ok_or("e1000::create_contiguous_mapping(): couldn't allocate pages!")?;
+    let allocated_pages = allocate_pages_by_bytes(size_in_bytes).ok_or("memory::create_contiguous_mapping(): couldn't allocate pages!")?;
 
     let kernel_mmi_ref = get_kernel_mmi_ref().ok_or("create_contiguous_mapping(): KERNEL_MMI was not yet initialized!")?;
     let mut kernel_mmi = kernel_mmi_ref.lock();
@@ -168,6 +168,44 @@ pub fn create_contiguous_mapping(size_in_bytes: usize, flags: EntryFlags) -> Res
     Ok((mp, starting_phys_addr))
 }
 
+/// A convenience function that creates a new memory mapping.
+/// Returns the new `MappedPages.` 
+/// 
+/// # Locking / Deadlock
+/// Currently, this function acquires the lock on the `FRAME_ALLOCATOR` and the kernel's `MemoryManagementInfo` instance.
+/// Thus, the caller should ensure that the locks on those two variables are not held when invoking this function.
+pub fn create_mapping(size_in_bytes: usize, flags: EntryFlags) -> Result<MappedPages, &'static str> {
+    let allocated_pages = allocate_pages_by_bytes(size_in_bytes).ok_or("memory::create_mapping(): couldn't allocate pages!")?;
+
+    let kernel_mmi_ref = get_kernel_mmi_ref().ok_or("create_contiguous_mapping(): KERNEL_MMI was not yet initialized!")?;
+    let mut kernel_mmi = kernel_mmi_ref.lock();
+
+    let mut frame_allocator = FRAME_ALLOCATOR.try()
+        .ok_or("create_contiguous_mapping(): couldnt get FRAME_ALLOCATOR")?
+        .lock();
+    
+    kernel_mmi.page_table.map_allocated_pages(allocated_pages, flags, frame_allocator.deref_mut())
+}
+
+
+/// A convenience function that creates a new memory mapping.
+/// Returns the new `MappedPages.` 
+/// 
+/// # Locking / Deadlock
+/// Currently, this function acquires the lock on the `FRAME_ALLOCATOR` and the kernel's `MemoryManagementInfo` instance.
+/// Thus, the caller should ensure that the locks on those two variables are not held when invoking this function.
+pub fn create_mapping_8k_aligned(size_in_pages: usize, flags: EntryFlags) -> Result<MappedPages, &'static str> {
+    let allocated_pages = allocate_8k_aligned_pages(size_in_pages).ok_or("memory::create_mapping(): couldn't allocate pages!")?;
+
+    let kernel_mmi_ref = get_kernel_mmi_ref().ok_or("create_contiguous_mapping(): KERNEL_MMI was not yet initialized!")?;
+    let mut kernel_mmi = kernel_mmi_ref.lock();
+
+    let mut frame_allocator = FRAME_ALLOCATOR.try()
+        .ok_or("create_contiguous_mapping(): couldnt get FRAME_ALLOCATOR")?
+        .lock();
+    
+    kernel_mmi.page_table.map_allocated_pages(allocated_pages, flags, frame_allocator.deref_mut())
+}
 
 
 pub static BROADCAST_TLB_SHOOTDOWN_FUNC: Once<fn(Vec<VirtualAddress>)> = Once::new();

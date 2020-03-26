@@ -1,6 +1,6 @@
 [package]
-authors = ["Philipp Oppermann <dev@phil-opp.com>", "Kevin Boos <kevinaboos@gmail.com>"]
-name = "heap_irq_safe"
+authors = ["Ramla Ijaz <ijazramla@gmail.com>"]
+name = "multiple_heaps"
 version = "0.1.0"
 
 [dependencies]
@@ -24,8 +24,8 @@ features = [ "use_arch" ]
 default-features = false
 version = "0.3.7"
 
-[dependencies.slabmalloc]
-path = "../../libs/rust-slabmalloc"
+[dependencies.heap_irq_safe]
+path = "../heap_irq_safe"
 
 [dependencies.memory]
 path = "../memory"

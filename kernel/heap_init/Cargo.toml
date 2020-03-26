@@ -21,3 +21,6 @@ version = "0.3.7"
 
 [dependencies.irq_safety]
 git = "https://github.com/kevinaboos/irq_safety"
+
+[dependencies.multiple_heaps]
+path = "../multiple_heaps"
