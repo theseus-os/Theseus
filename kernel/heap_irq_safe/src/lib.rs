@@ -15,57 +15,43 @@
 #![no_std]
 
 extern crate alloc;
-extern crate linked_list_allocator;
 extern crate irq_safety; 
-extern crate spin;
-extern crate block_allocator;
 extern crate raw_cpuid;
 #[macro_use] extern crate log;
-extern crate memory;
 extern crate slabmalloc;
 extern crate kernel_config;
 
-use core::ops::Deref;
 use alloc::alloc::{GlobalAlloc, Layout};
 use irq_safety::MutexIrqSafe; 
-use block_allocator::{HEADER_SIZE, FixedSizeBlockAllocator};
-use raw_cpuid::CpuId;
-use memory::{MappedPages, create_mapping_8k_aligned, EntryFlags, VirtualAddress};
-pub use slabmalloc::{
-    ZoneAllocator, ObjectPage8k};
+pub use slabmalloc::{ZoneAllocator, ObjectPage8k, AllocablePage};
 use kernel_config::memory::PAGE_SIZE;
-use core::ptr::{self, NonNull};
+use core::ptr::NonNull;
 use core::mem::transmute;
-use slabmalloc::AllocablePage;
 
-
+/// The maximum size that can be allocated through the allocator.
+/// Any requests larger than this will be allocated directly from the OS.
 pub const MAX_ALLOC_SIZE: usize = ZoneAllocator::MAX_ALLOC_SIZE;
 
+/// The size in bytes of the Object Page used in this allocator.
+/// Object Page is the unit of memory which the allocator works with to add and return memory.
 pub const OBJECT_PAGE_SIZE_BYTES: usize = ObjectPage8k::SIZE;
 
+/// The size in pages of the Object Page used in this allocator.
+/// Object Page is the unit of memory which the allocator works with to add and return memory.
 pub const OBJECT_PAGE_SIZE_PAGES: usize = ObjectPage8k::SIZE / PAGE_SIZE;
 
-pub const MAX_BASE_SIZE_CLASSES: usize = ZoneAllocator::MAX_BASE_SIZE_CLASSES;
+/// The number of sizes for which the allocator maintains separate slab allocators.
+pub const MAX_SIZE_CLASSES: usize = ZoneAllocator::MAX_BASE_SIZE_CLASSES;
 
-/// Allocates a new ObjectPage given a virtual address
+/// Creates a new ObjectPage given a virtual address
 /// The page starting with the vaddr must be mapped and aligned to an 8k boundary!
 pub unsafe fn create_object_page(vaddr: usize) -> Result< &'static mut ObjectPage8k<'static>, &'static str> {
     if vaddr % OBJECT_PAGE_SIZE_BYTES != 0 {
         error!("The object pages for the heap are not aligned at 8k bytes");
         return Err("The object pages for the heap are not aligned at 8k bytes");
     }
-    unsafe { Ok(transmute(vaddr)) }
+    Ok(transmute(vaddr)) 
 }
-
-// #[global_allocator]
-// static ALLOCATOR: IrqSafeHeap = IrqSafeHeap::empty();
-
-// /// NOTE: the heap memory MUST BE MAPPED before calling this init function.
-// pub unsafe fn init(start_virt_addr: usize, size_in_bytes: usize) -> Result<(), &'static str> {
-//     let _ = ALLOCATOR.init(start_virt_addr, size_in_bytes, None);
-
-//     Ok(()) 
-// }
 
 
 /// This is mostly copied from LockedHeap, just to use IrqSafe versions instead of spin::Mutex.
@@ -78,61 +64,73 @@ impl IrqSafeHeap {
     }
 
     /// NOTE: the heap memory MUST BE MAPPED before calling this init function.
+    /// The memory is divided evenly between the internal slab allocators.
     pub unsafe fn init(&self, start_virt_addr: usize, size_in_bytes: usize, heap_id: Option<usize>) -> Result<(), &'static str> {
         let num_object_pages = size_in_bytes / OBJECT_PAGE_SIZE_BYTES;
-        let object_pages_per_slab = num_object_pages / ZoneAllocator::MAX_BASE_SIZE_CLASSES;
+        let object_pages_per_slab = num_object_pages / MAX_SIZE_CLASSES;
         let sizes = &ZoneAllocator::BASE_ALLOC_SIZES;
         
-        for slab in 0..ZoneAllocator::MAX_BASE_SIZE_CLASSES {
+        for slab in 0..MAX_SIZE_CLASSES {
             let slab_addr = start_virt_addr + (slab * object_pages_per_slab * OBJECT_PAGE_SIZE_BYTES); 
             for i in 0..object_pages_per_slab {
+                // the starting address of the slab
                 let addr = slab_addr + i*OBJECT_PAGE_SIZE_BYTES;
 
+                // write the heap id to the end of the page
                 let page = create_object_page(addr)?;
                 if let Some(id) = heap_id {
                     page.heap_id = id;
                 }
 
+                // the alignment is equal to the size unless the size is not a multiple of 2
                 let mut alignment = sizes[slab];
                 if alignment == ZoneAllocator::MAX_BASE_ALLOC_SIZE {
                     alignment = 8;
                 }
 
-                let layout = Layout::from_size_align(sizes[slab], alignment);
-                if layout.is_err() {
-                    trace!("size: {}, alignment: {}", sizes[slab], alignment);
-                }
-                unsafe{ self.refill(layout.unwrap(), page)?; }
+                let layout = Layout::from_size_align(sizes[slab], alignment).unwrap();
+                // The page metadata has to be initalized to zero before refilling. If it's not then call page.clear_metadata() before.
+                self.refill(layout, page)?; 
+                trace!("Added an object page {:#X} to slab of size {}", addr, sizes[slab]);
             }
         }
 
         Ok(())
     }
 
+    /// Adds a page to slab which allocates the given layout
     pub unsafe fn refill(&self, layout: Layout, page: &'static mut ObjectPage8k<'static>) -> Result<(), &'static str> {
         self.0.lock().refill(layout, page).map_err(|_e| "Heap_irq_safe:: unable to refill slab")
     }
 
+    /// Returns an empty (unused) page if available
     pub unsafe fn return_page(&self) -> Option<&'static mut ObjectPage8k<'static>> {
         self.0.lock().return_page()
     }
 
+    /// The total number of empty pages in the heap
     pub fn empty_pages(&self) -> usize {
         self.0.lock().empty_pages()
     }
 }
 
 unsafe impl GlobalAlloc for IrqSafeHeap {
+
     unsafe fn alloc(&self, layout: Layout) -> *mut u8 {
         let mut heap = self.0.lock(); 
         match heap.allocate(layout) {
             Ok(nptr) => nptr.as_ptr(),
+
+            // The slab for the givern layout is OOM
+            // We first try to see if another slab in the given heap has an empty page it can return
             Err(_x) => {
                 warn!("Out of memory");
                 let ptr = 
+                    // there is an available page 
                     if let Some(page) = heap.return_page() {
-                        page.clear();
+                        page.clear_metadata();
                         let _ = heap.refill(layout, page); // if the refill fails then a null pointer will be returned again
+
                         match heap.allocate(layout) {
                             Ok(nptr) => {
                                 trace!("Transferred page within a heap");
@@ -141,6 +139,7 @@ unsafe impl GlobalAlloc for IrqSafeHeap {
                             Err(_x) => 0 as *mut u8,
                         }
                     }
+                    // there was no available empty page within the heap
                     else {
                         0 as *mut u8    
                     };
@@ -160,3 +159,13 @@ unsafe impl GlobalAlloc for IrqSafeHeap {
         }
     }
 }
+
+// #[global_allocator]
+// static ALLOCATOR: IrqSafeHeap = IrqSafeHeap::empty();
+
+// /// NOTE: the heap memory MUST BE MAPPED before calling this init function.
+// pub unsafe fn init(start_virt_addr: usize, size_in_bytes: usize) -> Result<(), &'static str> {
+//     let _ = ALLOCATOR.init(start_virt_addr, size_in_bytes, None);
+
+//     Ok(()) 
+// }

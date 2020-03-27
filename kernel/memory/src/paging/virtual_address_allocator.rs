@@ -154,6 +154,8 @@ pub fn allocate_pages(num_pages: usize) -> Option<AllocatedPages> {
 	}
 }
 
+/// Does the same thing as allocate_pages but the pages 
+/// returned are aligned on an 8k boundary.
 pub fn allocate_8k_aligned_pages(num_pages: usize) -> Option<AllocatedPages> {
 
 	if num_pages == 0 {
@@ -180,9 +182,8 @@ pub fn allocate_8k_aligned_pages(num_pages: usize) -> Option<AllocatedPages> {
 		}
 
 		// skip a chunk if there's no portion in it that can both be aligned on 8k and satisfy the size requirements 
-		// If the starting address is not aligned then we just have to make sure that there's one extra page in the chunk to be aligned on the 8k boundary
+		// to be aligned on the 8k boundary, if the starting address is not aligned then we just have to make sure that there's one extra page in the chunk 
 		if c.start_page.start_address().value() % alignment != 0 && c.size_in_pages < num_pages + 1 {
-			debug!("start address {:#X}", c.start_page.start_address().value());
 			continue;
 		}
 
@@ -222,22 +223,21 @@ pub fn allocate_8k_aligned_pages(num_pages: usize) -> Option<AllocatedPages> {
 		break;
 	}
 
-	// first check if there's a page that was removed off the beginning for alignment requirements and add that to the list
+	// check if there's a page that was removed off the beginning for alignment requirements and add that to the list
 	if let Some(p) = prev_page {
 		let new_chunk = Chunk {
 			allocated: false,
 			start_page: p,
 			size_in_pages: 1,
 		};
-		let ret = new_chunk.as_allocated_pages();
 		locked_list.push_back(new_chunk);
 	}
 
-	// then check if a complete chunk was able to satisfy the requirement and return it
+	// first check if a complete chunk was able to satisfy the requirement and return it
 	if let Some(p) = allocated_pages {
 		Some(p)
 	}
-	// last, check if a chunk had to be split into 2 
+	// then check if a chunk had to be split into 2 
 	else if let Some(p) = new_start_page {
 		let new_chunk = Chunk {
 			allocated: true,

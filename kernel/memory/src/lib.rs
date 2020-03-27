@@ -28,7 +28,6 @@ extern crate memory_structs;
 /// but forgets the given `obj`s to prevent them from being dropped,
 /// as they would normally be upon return of an Error using `try!()`.
 /// This must come BEFORE the below modules in order for them to be able to use it.
-#[macro_export]
 macro_rules! try_forget {
     ($expr:expr, $($obj:expr),*) => (match $expr {
         Ok(val) => val,
@@ -71,7 +70,7 @@ use spin::Once;
 use irq_safety::MutexIrqSafe;
 use alloc::vec::Vec;
 use alloc::sync::Arc;
-use kernel_config::memory::{PAGE_SIZE, KERNEL_HEAP_START, KERNEL_HEAP_INITIAL_SIZE, KERNEL_STACK_ALLOCATOR_BOTTOM, KERNEL_STACK_ALLOCATOR_TOP_ADDR, KERNEL_OFFSET};
+use kernel_config::memory::{PAGE_SIZE, KERNEL_STACK_ALLOCATOR_BOTTOM, KERNEL_STACK_ALLOCATOR_TOP_ADDR, KERNEL_OFFSET};
 
 /// The memory management info and address space of the kernel
 static KERNEL_MMI: Once<Arc<MutexIrqSafe<MemoryManagementInfo>>> = Once::new();
@@ -188,7 +187,7 @@ pub fn create_mapping(size_in_bytes: usize, flags: EntryFlags) -> Result<MappedP
 }
 
 
-/// A convenience function that creates a new memory mapping.
+/// A convenience function that creates a new memory mapping that is 8k aligned.
 /// Returns the new `MappedPages.` 
 /// 
 /// # Locking / Deadlock
@@ -294,7 +293,7 @@ pub fn init(boot_info: &BootInformation)
 ///  * The kernel's new MemoryManagementInfo
 ///  * the kernel's list of *other* higher-half MappedPages, which should be kept forever. ??? is this correct ???
 pub fn init_post_heap(allocator_mutex: &MutexIrqSafe<AreaFrameAllocator>, page_table: PageTable, heap_vma: VirtualMemoryArea, heap_mapped_pages: MappedPages, 
-    vmas: [VirtualMemoryArea; 32], mut higher_half_mapped_pages: [Option<MappedPages>; 32], mut identity_mapped_pages: [Option<MappedPages>; 32]) 
+    vmas: [VirtualMemoryArea; 32], higher_half_mapped_pages: [Option<MappedPages>; 32], identity_mapped_pages: [Option<MappedPages>; 32]) 
 -> Result<(Arc<MutexIrqSafe<MemoryManagementInfo>>, Vec<MappedPages>), &'static str> 
 {
     // HERE: heap is initialized! Can now use alloc types.

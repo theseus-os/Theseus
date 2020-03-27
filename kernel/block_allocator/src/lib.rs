@@ -16,7 +16,6 @@
 
 extern crate alloc;
 extern crate linked_list_allocator;
-#[macro_use] extern crate log;
 
 use alloc::alloc::Layout;
 use core::{
@@ -30,18 +29,12 @@ use core::{
 /// the block alignment (alignments must be always powers of 2).
 const BLOCK_SIZES: &[usize] = &[8, 16, 32, 64, 128, 256, 512, 1024, 2048];
 
-pub const HEADER_SIZE: usize = 8;
-
 /// Choose an appropriate block size for the given layout.
 ///
 /// Returns an index into the `BLOCK_SIZES` array.
 fn list_index(layout: &Layout) -> Option<usize> {
     let required_block_size = layout.size().max(layout.align());
     BLOCK_SIZES.iter().position(|&s| s >= required_block_size)
-}
-
-fn list_index_from_size(size: usize) -> Option<usize> {
-    BLOCK_SIZES.iter().position(|&s| s >= size)
 }
 
 struct ListNode {
@@ -51,7 +44,6 @@ struct ListNode {
 pub struct FixedSizeBlockAllocator {
     list_heads: [Option<&'static mut ListNode>; BLOCK_SIZES.len()],
     fallback_allocator: linked_list_allocator::Heap,
-    // ptr: usize,
 }
 
 impl FixedSizeBlockAllocator {
@@ -61,7 +53,6 @@ impl FixedSizeBlockAllocator {
         FixedSizeBlockAllocator {
             list_heads: [None; BLOCK_SIZES.len()],
             fallback_allocator: linked_list_allocator::Heap::empty(),
-            // ptr: 0,
         }
     }
 
@@ -71,28 +62,13 @@ impl FixedSizeBlockAllocator {
     /// heap bounds are valid and that the heap is unused. This method must be
     /// called only once.
     pub unsafe fn init(&mut self, heap_start: usize, heap_size: usize) {
-        // let ptr = (self as *mut FixedSizeBlockAllocator as *mut usize) as usize;
-        // self.ptr = ptr;
-        // error!("Address of allocator: {:#X}", ptr);
-        // (*(ptr as *mut FixedSizeBlockAllocator)).fallback_allocator.init(heap_start, heap_size);
         self.fallback_allocator.init(heap_start, heap_size);
     }
 
     /// Allocates using the fallback allocator.
     fn fallback_alloc(&mut self, layout: Layout) -> *mut u8 {
-        let size = layout.size();
-        let layout_ext = Layout::from_size_align(size + HEADER_SIZE, layout.align()).unwrap();
-
-        match self.fallback_allocator.allocate_first_fit(layout_ext) {
-            Ok(ptr) => {
-                // unsafe {
-                //     let ptr_header = ptr.as_ptr().offset(size as isize) as *mut usize;
-                //     ptr_header.write(self.ptr);
-                //     // warn!("allocating at ptr: {:#X}", ptr_header.read());
-                // }
-                ptr.as_ptr()
-            }
-
+        match self.fallback_allocator.allocate_first_fit(layout) {
+            Ok(ptr) => ptr.as_ptr(),
             Err(_) => ptr::null_mut(),
         }
     }
@@ -146,11 +122,7 @@ impl FixedSizeBlockAllocator {
                 self.list_heads[index] = Some(&mut *new_node_ptr);
             }
             None => {
-                // let block_allocator = *(ptr.offset(layout.size() as isize) as *mut usize) as *mut FixedSizeBlockAllocator;
-                // error!("deallocating at ptr: {:#X}", *(ptr.offset(layout.size() as isize) as *mut usize) );
                 let ptr = NonNull::new(ptr).unwrap();
-                let layout = Layout::from_size_align(layout.size() + HEADER_SIZE, layout.align()).unwrap();
-                // (*block_allocator).fallback_allocator.deallocate(ptr, layout);
                 self.fallback_allocator.deallocate(ptr, layout);
             }
         }

@@ -1,6 +1,6 @@
 [package]
 authors = ["Ramla Ijaz <ijazramla@gmail.com>"]
-name = "heap_init"
+name = "heap_initialization"
 version = "0.1.0"
 
 [dependencies]

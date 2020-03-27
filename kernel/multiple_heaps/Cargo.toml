@@ -1,6 +1,7 @@
 [package]
 authors = ["Ramla Ijaz <ijazramla@gmail.com>"]
 name = "multiple_heaps"
+description = "Allocator which uses multiple heaps"
 version = "0.1.0"
 
 [dependencies]

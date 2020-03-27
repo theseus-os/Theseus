@@ -29,13 +29,13 @@ extern crate irq_safety; // for irq-safe locking and interrupt utilities
 
 extern crate logger;
 extern crate state_store;
-#[macro_use] extern crate memory; // the virtual memory subsystem
+extern crate memory; // the virtual memory subsystem
 extern crate mod_mgmt;
 extern crate exceptions_early;
 extern crate captain;
 extern crate panic_entry; // the panic-related lang items
 
-extern crate heap_init;
+extern crate heap_initialization;
 
 #[macro_use] extern crate vga_buffer;
 
@@ -55,7 +55,7 @@ pub fn nano_core_public_func(val: u8) {
 use core::ops::DerefMut;
 use x86_64::structures::idt::LockedIdt;
 use memory::VirtualAddress;
-use kernel_config::memory::{KERNEL_OFFSET, KERNEL_HEAP_START, KERNEL_HEAP_INITIAL_SIZE};
+use kernel_config::memory::KERNEL_OFFSET;
 
 /// An initial interrupt descriptor table for catching very simple exceptions only.
 /// This is no longer used after interrupts are set up properly, it's just a failsafe.
@@ -136,7 +136,7 @@ pub extern "C" fn nano_core_start(multiboot_information_virtual_address: usize) 
     // because they will be auto-unmapped from the new page table upon return, causing all execution to stop. 
     let heap_mp;
     let heap_vma;
-    match heap_init::initialize_heap(allocator_mutex, &mut page_table) {
+    match heap_initialization::initialize_heap(allocator_mutex, &mut page_table) {
         Ok((mp, vma)) => {
             heap_mp = mp;
             heap_vma = vma;

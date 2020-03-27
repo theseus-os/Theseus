@@ -338,7 +338,7 @@ pub fn init(allocator_mutex: &MutexIrqSafe<AreaFrameAllocator>, boot_info: &mult
 
 
     debug!("switching to new page table {:?}", new_table);
-    let mut new_page_table = page_table.switch(&new_table); 
+    let new_page_table = page_table.switch(&new_table); 
     // here, new_page_table and new_table should be identical
     debug!("switched to new page table {:?}.", new_page_table); 
 
