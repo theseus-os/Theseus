@@ -9,6 +9,17 @@
 
 // modified by Kevin Boos
 
+//! A MutexIrqSafe wrapper around a heap.
+//! 
+//! The underlying heap implementation is a zone allocator which maintains 11 separate "slab allocators" for sizes
+//! 8, 16, 32, 64, 128, 256, 512, 1024, 2048, 4096 and 8104 bytes.
+//! The slab allocator maintains linked lists of object pages from which it allocates objects of the same size. 
+//! The object pages are 8 KiB, and have metadata stored in the last 88 bytes.
+//! 
+//! When a slab allocator runs out of memory, it first checks to see if any of the other allocators have empty (unused) pages that can be shared.
+//! If they don't, a null pointer is returned.
+//! 
+
 #![feature(const_fn)]
 #![feature(allocator_api)]
 
@@ -43,7 +54,7 @@ pub const OBJECT_PAGE_SIZE_PAGES: usize = ObjectPage8k::SIZE / PAGE_SIZE;
 /// The number of sizes for which the allocator maintains separate slab allocators.
 pub const MAX_SIZE_CLASSES: usize = ZoneAllocator::MAX_BASE_SIZE_CLASSES;
 
-/// Creates a new ObjectPage given a virtual address
+/// Creates a new ObjectPage given a virtual address.
 /// The page starting with the vaddr must be mapped and aligned to an 8k boundary!
 pub unsafe fn create_object_page(vaddr: usize) -> Result< &'static mut ObjectPage8k<'static>, &'static str> {
     if vaddr % OBJECT_PAGE_SIZE_BYTES != 0 {
@@ -91,7 +102,7 @@ impl IrqSafeHeap {
                 let layout = Layout::from_size_align(sizes[slab], alignment).unwrap();
                 // The page metadata has to be initalized to zero before refilling. If it's not then call page.clear_metadata() before.
                 self.refill(layout, page)?; 
-                trace!("Added an object page {:#X} to slab of size {}", addr, sizes[slab]);
+                // trace!("Added an object page {:#X} to slab of size {}", addr, sizes[slab]);
             }
         }
 

@@ -70,7 +70,8 @@ use spin::Once;
 use irq_safety::MutexIrqSafe;
 use alloc::vec::Vec;
 use alloc::sync::Arc;
-use kernel_config::memory::{PAGE_SIZE, KERNEL_STACK_ALLOCATOR_BOTTOM, KERNEL_STACK_ALLOCATOR_TOP_ADDR, KERNEL_OFFSET};
+use kernel_config::memory::{PAGE_SIZE, KERNEL_STACK_ALLOCATOR_BOTTOM, KERNEL_STACK_ALLOCATOR_TOP_ADDR, KERNEL_OFFSET, KERNEL_HEAP_START, KERNEL_HEAP_MAX_SIZE};
+use core::ops::Add;
 
 /// The memory management info and address space of the kernel
 static KERNEL_MMI: Once<Arc<MutexIrqSafe<MemoryManagementInfo>>> = Once::new();
@@ -142,6 +143,58 @@ impl MemoryManagementInfo {
     }
 }
 
+/// Allocates pages from the heap memory area and returns the starting address of the new mapped pages.
+/// The kernel heap VMA and MappedPages are updated to store the new memory area.
+/// 
+/// An error is returned if the heap memory limit is reached.
+pub fn allocate_heap_pages(size_in_bytes: usize) -> Result<VirtualAddress, &'static str> {
+    let kernel_mmi_ref = get_kernel_mmi_ref().ok_or("create_contiguous_mapping(): KERNEL_MMI was not yet initialized!")?;
+    let mut kernel_mmi = kernel_mmi_ref.lock();
+    let heap_start_addr = KERNEL_HEAP_START;
+    let start_address;
+    let current_heap_size;
+    let heap_end_addr;
+    let additional_mp;
+
+    // find the heap mapped pages and the address of the new mapped pages to be added
+    {
+        let heap_mp = kernel_mmi.extra_mapped_pages.iter().find(|x| x.start_address().value() == heap_start_addr).ok_or("Could not find heap mapped pages.")?;
+        current_heap_size = heap_mp.size_in_bytes();
+
+        if current_heap_size + size_in_bytes > KERNEL_HEAP_MAX_SIZE {
+            return Err("Cannot allocate more memory for the heap. Maximum limit is reached");
+        }
+        heap_end_addr = heap_mp.start_address().add(current_heap_size);
+    }
+
+    // allocate the new pages
+    {
+        let mut frame_allocator = FRAME_ALLOCATOR.try()
+            .ok_or("create_contiguous_mapping(): couldnt get FRAME_ALLOCATOR")?
+            .lock();
+
+        let pages = PageRange::from_virt_addr(heap_end_addr, size_in_bytes);
+        let heap_flags = EntryFlags::WRITABLE;
+        additional_mp = kernel_mmi.page_table.map_pages(pages, heap_flags, frame_allocator.deref_mut())?;
+        start_address = additional_mp.start_address();
+    }
+
+    // update the heap mapped pages
+    {
+        let heap_mp = kernel_mmi.extra_mapped_pages.iter_mut().find(|x| x.start_address().value() == heap_start_addr).ok_or("Could not find heap mapped pages.")?;
+        // merge the 2 and insert into vector
+        if let Err((e,_mp)) = heap_mp.extend(additional_mp) {
+            return Err(e);
+        }
+    }
+
+    // find the heap vma and set the new size
+    let heap_vma = kernel_mmi.vmas.iter_mut().find(|x| x.start_address().value() == heap_start_addr).ok_or("Could not find heap VMA")?;
+    heap_vma.set_size(current_heap_size + size_in_bytes);
+
+    // return the start address
+    Ok(start_address)
+}
 
 
 /// A convenience function that creates a new memory mapping by allocating frames that are contiguous in physical memory.
@@ -167,6 +220,7 @@ pub fn create_contiguous_mapping(size_in_bytes: usize, flags: EntryFlags) -> Res
     Ok((mp, starting_phys_addr))
 }
 
+
 /// A convenience function that creates a new memory mapping.
 /// Returns the new `MappedPages.` 
 /// 
@@ -175,26 +229,6 @@ pub fn create_contiguous_mapping(size_in_bytes: usize, flags: EntryFlags) -> Res
 /// Thus, the caller should ensure that the locks on those two variables are not held when invoking this function.
 pub fn create_mapping(size_in_bytes: usize, flags: EntryFlags) -> Result<MappedPages, &'static str> {
     let allocated_pages = allocate_pages_by_bytes(size_in_bytes).ok_or("memory::create_mapping(): couldn't allocate pages!")?;
-
-    let kernel_mmi_ref = get_kernel_mmi_ref().ok_or("create_contiguous_mapping(): KERNEL_MMI was not yet initialized!")?;
-    let mut kernel_mmi = kernel_mmi_ref.lock();
-
-    let mut frame_allocator = FRAME_ALLOCATOR.try()
-        .ok_or("create_contiguous_mapping(): couldnt get FRAME_ALLOCATOR")?
-        .lock();
-    
-    kernel_mmi.page_table.map_allocated_pages(allocated_pages, flags, frame_allocator.deref_mut())
-}
-
-
-/// A convenience function that creates a new memory mapping that is 8k aligned.
-/// Returns the new `MappedPages.` 
-/// 
-/// # Locking / Deadlock
-/// Currently, this function acquires the lock on the `FRAME_ALLOCATOR` and the kernel's `MemoryManagementInfo` instance.
-/// Thus, the caller should ensure that the locks on those two variables are not held when invoking this function.
-pub fn create_mapping_8k_aligned(size_in_pages: usize, flags: EntryFlags) -> Result<MappedPages, &'static str> {
-    let allocated_pages = allocate_8k_aligned_pages(size_in_pages).ok_or("memory::create_mapping(): couldn't allocate pages!")?;
 
     let kernel_mmi_ref = get_kernel_mmi_ref().ok_or("create_contiguous_mapping(): KERNEL_MMI was not yet initialized!")?;
     let mut kernel_mmi = kernel_mmi_ref.lock();

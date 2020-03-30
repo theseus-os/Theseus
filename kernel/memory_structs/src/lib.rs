@@ -289,6 +289,10 @@ impl VirtualMemoryArea {
     pub fn set_flags(&mut self, flags: EntryFlags) {
         self.flags = flags;
     }
+
+    pub fn set_size(&mut self, size: usize) {
+        self.size = size;
+    }
 }
 
 

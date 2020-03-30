@@ -1,4 +1,22 @@
-//! An implementation of a per core heap
+//! An implementation of an allocator that uses per-core heaps
+//! 
+//! The allocator is made up of multiple heaps. The heap algorithm used by each individual heap is determined in the heap_irq_safe crate. 
+//! 
+//! This allocator decides:
+//!  * If the requested size is large enough to allocate pages directly from the OS
+//!  * If the requested size is small, which heap to actually allocate/deallocate from
+//!  * How to deal with OOM errors returned by a heap
+//! 
+//! Any memory request greater than 8104 bytes (8192 bytes - 88 bytes of metadata) is satisfied through a request for mapped pages from the kernel.
+//! All other requests are satified through the per-core heaps.
+//! 
+//! The heap which will be used on allocation is determined by the cpu that the task is running on.
+//! On deallocation of a block, the heap id is retrieved from metadata at the end of the page which contains the block.
+//! 
+//! When a per-core heap runs out of memory, memory is first requested from other per-core heaps if they have empty (unused) pages.
+//! If they don't, then more memory is allocated from the kernel's heap area.
+//!  
+//! The maximum number of heaps is configured in the kernel configuration variable, MAX_HEAPS.
 
 #![feature(const_fn)]
 #![feature(allocator_api)]
@@ -19,8 +37,8 @@ extern crate kernel_config;
 use core::ops::Deref;
 use alloc::alloc::{GlobalAlloc, Layout};
 use raw_cpuid::CpuId;
-use memory::{MappedPages, create_mapping, create_mapping_8k_aligned, EntryFlags};
-use heap_irq_safe::{IrqSafeHeap, create_object_page, MAX_ALLOC_SIZE, OBJECT_PAGE_SIZE_BYTES, OBJECT_PAGE_SIZE_PAGES, ObjectPage8k, MAX_SIZE_CLASSES};
+use memory::{MappedPages, create_mapping, EntryFlags, allocate_heap_pages};
+use heap_irq_safe::{IrqSafeHeap, create_object_page, MAX_ALLOC_SIZE, OBJECT_PAGE_SIZE_BYTES, ObjectPage8k, MAX_SIZE_CLASSES};
 use kernel_config::memory::MAX_HEAPS;
 
 #[global_allocator]
@@ -45,14 +63,8 @@ pub fn init(start_virt_addr: usize, size_in_bytes: usize) -> Result<(), &'static
     Ok(())
 }
 
-/// A heap must have greater than this number of empty pages to return one.
+/// A heap must have greater than this number of empty object pages to return one.
 pub const RETURN_THRESHOLD: usize = MAX_SIZE_CLASSES * 2;
-
-/// Allocates pages that are aligned on an 8k boundary.
-/// That is essential for an object page that is added to the heap.
-pub fn allocate_8k_aligned_mapped_pages(size_in_pages: usize) -> Option<MappedPages> {
-    create_mapping_8k_aligned(size_in_pages, EntryFlags::WRITABLE).ok()
-}
 
 pub struct MultipleHeaps{
     heaps: [IrqSafeHeap; MAX_HEAPS],
@@ -65,11 +77,11 @@ impl MultipleHeaps {
         }
     }
 
-    /// Retrieves an empty page from the heap which has the maximum number of empty pages,
+    /// Retrieves an empty object page from the heap which has the maximum number of empty pages,
     /// if the maximum is greater than a threshold.
     fn return_page(&self) -> Option<&'static mut ObjectPage8k<'static>> {
         // find heap with maximum number of empty pages
-        let idx = self.heap_index_with_max_empty_pages();
+        let idx = self.heap_with_max_empty_pages();
         let max_pages = self[idx].empty_pages();
         if max_pages > RETURN_THRESHOLD {
             unsafe { self.heaps[idx].return_page() }
@@ -79,8 +91,9 @@ impl MultipleHeaps {
         }
     }
 
-    fn heap_index_with_max_empty_pages(&self) -> usize {
-        self.iter().enumerate().max_by_key(|&(_i, val)| val.empty_pages()).unwrap().0 //unwrap here since we know the heap is not empty
+    /// The index for the heap with the maximum number of empty pages
+    fn heap_with_max_empty_pages(&self) -> usize {
+        self.iter().enumerate().max_by_key(|&(_i, val)| val.empty_pages()).unwrap().0 //unwrap here since we know the heap array is not empty
     }
 }
 
@@ -135,17 +148,12 @@ unsafe impl GlobalAlloc for MultipleHeaps {
                 }
                 // There are no available empty pages so we have to allocate memory from the OS
                 else {
-                    if let Some(mapped_pages) = allocate_8k_aligned_mapped_pages(OBJECT_PAGE_SIZE_PAGES) {
-                        if let Ok(page) = create_object_page(mapped_pages.start_address().value()) {
+                    if let Ok(addr) = allocate_heap_pages(OBJECT_PAGE_SIZE_BYTES) {
+                        if let Ok(page) = create_object_page(addr.value()) {
                             match self[heap_id].refill(layout, page) {
                                 Ok(()) => {
-                                    trace!("Added an object page to the heap");
+                                    trace!("Added an object page to the heap at address: {:#X}", addr);
                                     ptr = self[heap_id].alloc(layout);
-                                    
-                                    // right now we forget any extra mapped pages added to the heap since 
-                                    // we aren't currently returning memory to the system.
-                                    // TODO: allocate mapped pages from within the KERNEL_HEAP range and update the kernel heap vma
-                                    core::mem::forget(mapped_pages);
                                 }
                                 Err(_x) => {
                                     error!("Could not refill heap");

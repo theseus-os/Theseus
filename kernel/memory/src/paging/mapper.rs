@@ -471,6 +471,64 @@ impl MappedPages {
         })
     }
 
+    /// Extends the mapped pages to cover the pages of the given `MappedPages` object.
+    /// 
+    /// The given `mapping` must be contiguous in virtual memory from the end of the mapped pages we are trying to merge it with.
+    /// The given `mapping` must also have the same flags and page table root frame. It can only have AllocatedPages if the this mapping does as well.
+    /// 
+    /// If an error occurs, such as the `mapping` not being contiguous or having different flags, 
+    /// then a tuple including an error message and the original `mapping` will be returned,
+    /// which prevents the `mapping` from being dropped. 
+    pub fn extend(&mut self, mapping: MappedPages) -> Result<(), (&'static str, MappedPages)> {   
+        // first, we need to double check that everything is contiguous and the flags and p4 Frame are the same.
+        let mut err: Option<&'static str> = None;
+
+        if mapping.page_table_p4 != self.page_table_p4 {
+            error!("MappedPages::extend(): mapping wasn't mapped using the same page table: {:?} vs. {:?}",
+                mapping.page_table_p4, self.page_table_p4);
+            err = Some("mapping was mapped with different page tables");
+        }
+        else if mapping.flags != self.flags {
+            error!("MappedPages::extend(): mapping had different flags: {:?} vs. {:?}",
+                mapping.flags, self.flags);
+            err = Some("mapping was mapped with different flags");
+        }
+        else if mapping.pages.start().clone() != *self.pages.end() + 1 {
+            error!("MappedPages::extend(): mapping wasn't contiguous in virtual memory: one ends at {:?} and the next starts at {:?}",
+                self.pages.end(), mapping.pages.start());
+            err = Some("mapping was not contiguous in virtual memory");
+        } 
+        else if  mapping.allocated.is_some() != self.allocated.is_some() {
+            error!("MappedPages::extend(): one mapping was mapped to AllocatedPages, while other was not.");
+            err = Some("one mapping was mapped to AllocatedPages, while other was not");
+        }
+        
+        let previous_end = mapping.pages.end().clone();
+
+        if let Some(e) = err {
+            return Err((e, mapping));
+        }
+
+        // Here, all of our conditions were met, so we can extend the mapped pages
+        // to go from the same start page to the given mappings end page.
+
+        // here we drop to ensure the existing mapping doesn't run its drop handler and unmap those pages
+        mem::forget(mapping); 
+     
+        let new_page_range = PageRange::new(self.pages.start().clone(), previous_end);
+        let new_alloc_pages = if self.allocated.is_some() {
+            Some(AllocatedPages{
+                pages: new_page_range.clone()
+            })
+        } else {
+            None
+        };
+        
+        self.pages = new_page_range;
+        self.allocated = new_alloc_pages;
+
+        Ok(())
+    }
     
 
     /// Creates a deep copy of this `MappedPages` memory region,
