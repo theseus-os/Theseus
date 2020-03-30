@@ -22,7 +22,7 @@ pub use entryflags_x86_64::EntryFlags;
 
 use kernel_config::memory::KERNEL_OFFSET;
 use memory_structs::{
-    Frame, PhysicalAddress, PhysicalMemoryArea, VirtualAddress, VirtualMemoryArea, SectionMemoryBounds, InitialSectionsMemoryBounds,
+    Frame, PhysicalAddress, PhysicalMemoryArea, VirtualAddress, SectionMemoryBounds, InitialSectionsMemoryBounds,
 };
 use x86_64::{registers::control_regs, instructions::tlb};
 
@@ -146,16 +146,6 @@ pub fn get_boot_info_mem_area(
     ))
 }
 
-/// Gets the virtual address of the bootloader information.
-/// 
-/// Returns (start_address, end_address). 
-pub fn get_boot_info_vaddress(
-    boot_info: &BootInformation,
-) -> Result<(VirtualAddress, VirtualAddress), &'static str> {
-    let boot_info_start_vaddr = VirtualAddress::new(boot_info.start_address())?;
-    let boot_info_end_vaddr = VirtualAddress::new(boot_info.end_address())?;
-    Ok((boot_info_start_vaddr, boot_info_end_vaddr))
-}
 
 /// Adds the virtual memory areas occupied by kernel code and data containing sections .init, .text, .rodata, .data, and .bss.
 /// 
@@ -163,10 +153,7 @@ pub fn get_boot_info_vaddress(
 ///  * The number of added memory areas,
 ///  * the address bounds of initial kernel sections containing {text, rodata, data},
 ///  * a list of the address bounds about all sections.
-pub fn add_sections_vmem_areas(
-    boot_info: &BootInformation,
-    vmas: &mut [VirtualMemoryArea; 32],
-) -> Result<(usize, InitialSectionsMemoryBounds, [SectionMemoryBounds; 32]), &'static str> {
+pub fn add_sections_vmem_areas(boot_info: &BootInformation) -> Result<(usize, InitialSectionsMemoryBounds, [SectionMemoryBounds; 32]), &'static str> {
     let elf_sections_tag = boot_info.elf_sections_tag().ok_or("no Elf sections tag present!")?;
 
     let mut index = 0;
@@ -270,8 +257,7 @@ pub fn add_sections_vmem_areas(
                 return Err("Kernel ELF Section had an unexpected name (expected .init, .text, .data, .bss, .rodata)");
             }
         };
-        vmas[index] = VirtualMemoryArea::new(start_virt_addr, section.size() as usize, flags, static_str_name);
-        debug!("     mapping kernel section: {} at addr: {:?}", section.name(), vmas[index]);
+        debug!("     mapping kernel section {:?} as {:?} at vaddr: {:#X}, size {:#X} bytes", section.name(), static_str_name, start_virt_addr, section.size());
 
         // These memories will be mapped to identical lower half addresses. 
         sections_memory_bounds[index] = SectionMemoryBounds {

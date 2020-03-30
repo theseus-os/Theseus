@@ -52,7 +52,6 @@ pub use crate_name_utils::{get_containing_crate_name, replace_containing_crate_n
 pub use crate_metadata::*;
 
 
-pub mod elf_executable;
 pub mod parse_nano_core;
 
 
