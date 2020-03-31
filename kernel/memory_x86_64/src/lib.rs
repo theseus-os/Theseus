@@ -22,7 +22,7 @@ pub use entryflags_x86_64::EntryFlags;
 
 use kernel_config::memory::KERNEL_OFFSET;
 use memory_structs::{
-    Frame, PhysicalAddress, PhysicalMemoryArea, VirtualAddress, SectionMemoryBounds, InitialSectionsMemoryBounds,
+    Frame, PhysicalAddress, PhysicalMemoryArea, VirtualAddress, SectionMemoryBounds, AggregatedSectionMemoryBounds,
 };
 use x86_64::{registers::control_regs, instructions::tlb};
 
@@ -147,13 +147,13 @@ pub fn get_boot_info_mem_area(
 }
 
 
-/// Adds the virtual memory areas occupied by kernel code and data containing sections .init, .text, .rodata, .data, and .bss.
+/// Finds the addresses in memory of the main kernel sections, as specified by the given boot information. 
 /// 
 /// Returns the following tuple, if successful:
-///  * The number of added memory areas,
-///  * the address bounds of initial kernel sections containing {text, rodata, data},
-///  * a list of the address bounds about all sections.
-pub fn add_sections_vmem_areas(boot_info: &BootInformation) -> Result<(usize, InitialSectionsMemoryBounds, [SectionMemoryBounds; 32]), &'static str> {
+///  * The combined size and address bounds of specifically .text, .rodata, and .data. 
+///    Each of the three section bounds is aggregated to cover the bounds and sizes of *all* sections that share the same flags.
+///  * The list of individual sections found. 
+pub fn find_section_memory_bounds(boot_info: &BootInformation) -> Result<(AggregatedSectionMemoryBounds, [Option<SectionMemoryBounds>; 32]), &'static str> {
     let elf_sections_tag = boot_info.elf_sections_tag().ok_or("no Elf sections tag present!")?;
 
     let mut index = 0;
@@ -168,7 +168,7 @@ pub fn add_sections_vmem_areas(boot_info: &BootInformation) -> Result<(usize, In
     let mut rodata_flags: Option<EntryFlags> = None;
     let mut data_flags: Option<EntryFlags> = None;
 
-    let mut sections_memory_bounds: [SectionMemoryBounds; 32] = Default::default();
+    let mut sections_memory_bounds: [Option<SectionMemoryBounds>; 32] = Default::default();
 
     // map the allocated kernel text sections
     for section in elf_sections_tag.sections() {
@@ -259,15 +259,14 @@ pub fn add_sections_vmem_areas(boot_info: &BootInformation) -> Result<(usize, In
         };
         debug!("     mapping kernel section {:?} as {:?} at vaddr: {:#X}, size {:#X} bytes", section.name(), static_str_name, start_virt_addr, section.size());
 
-        // These memories will be mapped to identical lower half addresses. 
-        sections_memory_bounds[index] = SectionMemoryBounds {
+        sections_memory_bounds[index] = Some(SectionMemoryBounds {
             start: (start_virt_addr, start_phys_addr),
             end: (end_virt_addr, end_phys_addr),
             flags: flags,
-        };
+        });
 
         index += 1;
-    } // end of section iterator
+    }
 
     let text_start    = text_start  .ok_or("Couldn't find start of .text section")?;
     let text_end      = text_end    .ok_or("Couldn't find end of .text section")?;
@@ -296,13 +295,13 @@ pub fn add_sections_vmem_areas(boot_info: &BootInformation) -> Result<(usize, In
         flags: data_flags,
     };
 
-    let initial_sections_memory_bounds = InitialSectionsMemoryBounds {
-        text: text,
-        rodata: rodata,
-        data: data,
+    let aggregated_sections_memory_bounds = AggregatedSectionMemoryBounds {
+        text,
+        rodata,
+        data,
     };
 
-    Ok((index, initial_sections_memory_bounds, sections_memory_bounds))
+    Ok((aggregated_sections_memory_bounds, sections_memory_bounds))
 }
 
 

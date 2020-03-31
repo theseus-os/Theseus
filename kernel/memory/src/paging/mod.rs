@@ -220,20 +220,18 @@ pub fn init(allocator_mutex: &MutexIrqSafe<AreaFrameAllocator>, boot_info: &mult
         {
             let mut allocator = allocator_mutex.lock(); 
 
-            // add virtual memory areas occupied by kernel data and code sections
-            let (mut index, 
-                initial_sections_memory_bounds,
-                sections_memory_bounds) = add_sections_vmem_areas(&boot_info)?;
-
-            // to allow the APs to boot up, we identity map the kernel sections too.
-            // (lower half virtual addresses mapped to same lower half physical addresses)
-            // we will unmap these later before we start booting to userspace processes
-            for i in 0..index {
-                let sec = &sections_memory_bounds[i];
+            let (aggregated_section_memory_bounds, sections_memory_bounds) = find_section_memory_bounds(&boot_info)?;
+            
+            // Map every section found in the kernel image (given by boot information above) into memory. 
+            // To allow the APs to boot up, we identity map those kernel sections too
+            // (lower half virtual addresses mapped to same lower half physical addresses).1
+            // We will unmap these lower-half identity mappings later, before we start running applications.
+            let mut index = 0;
+            for sec in sections_memory_bounds.iter().filter_map(|s| s.as_ref()).fuse() {
                 let (start_virt_addr, start_phys_addr) = sec.start;
                 let (_end_virt_addr, end_phys_addr) = sec.end;
                 let size = end_phys_addr.value() - start_phys_addr.value();
-                identity_mapped_pages[i] = Some(
+                identity_mapped_pages[index] = Some(
                     mapper.map_frames(
                         FrameRange::from_phys_addr(start_phys_addr, size), 
                         Page::containing_address(start_virt_addr - KERNEL_OFFSET), 
@@ -242,22 +240,23 @@ pub fn init(allocator_mutex: &MutexIrqSafe<AreaFrameAllocator>, boot_info: &mult
                     )?
                 );
                 debug!("           also mapped vaddr {:#X} to paddr {:#x} (size {:#X})", start_virt_addr - KERNEL_OFFSET, start_phys_addr, size);
+                index += 1;
             }
 
 
-            let (text_start_virt,    text_start_phys)    = initial_sections_memory_bounds.text.start;
-            let (_text_end_virt,     text_end_phys)      = initial_sections_memory_bounds.text.end;
-            let (rodata_start_virt,  rodata_start_phys)  = initial_sections_memory_bounds.rodata.start;
-            let (_rodata_end_virt,   rodata_end_phys)    = initial_sections_memory_bounds.rodata.end;
-            let (data_start_virt,    data_start_phys)    = initial_sections_memory_bounds.data.start;
-            let (_data_end_virt,     data_end_phys)      = initial_sections_memory_bounds.data.end;
+            let (text_start_virt,    text_start_phys)    = aggregated_section_memory_bounds.text.start;
+            let (_text_end_virt,     text_end_phys)      = aggregated_section_memory_bounds.text.end;
+            let (rodata_start_virt,  rodata_start_phys)  = aggregated_section_memory_bounds.rodata.start;
+            let (_rodata_end_virt,   rodata_end_phys)    = aggregated_section_memory_bounds.rodata.end;
+            let (data_start_virt,    data_start_phys)    = aggregated_section_memory_bounds.data.start;
+            let (_data_end_virt,     data_end_phys)      = aggregated_section_memory_bounds.data.end;
 
-            let text_flags    = initial_sections_memory_bounds.text.flags;
-            let rodata_flags  = initial_sections_memory_bounds.rodata.flags;
-            let data_flags    = initial_sections_memory_bounds.data.flags;
+            let text_flags    = aggregated_section_memory_bounds.text.flags;
+            let rodata_flags  = aggregated_section_memory_bounds.rodata.flags;
+            let data_flags    = aggregated_section_memory_bounds.data.flags;
 
 
-            // now we map the 5 main sections into 3 groups according to flags
+            // Now we map all kernel sections into 3 groups according to flags
             text_mapped_pages = Some(mapper.map_frames(
                 FrameRange::from_phys_addr(text_start_phys, text_end_phys.value() - text_start_phys.value()), 
                 Page::containing_address(text_start_virt), 
@@ -313,7 +312,7 @@ pub fn init(allocator_mutex: &MutexIrqSafe<AreaFrameAllocator>, boot_info: &mult
                 index += 1;
             }
 
-            debug!("identity_mapped_pages: {:?}", &identity_mapped_pages[0..(index + 1)]);
+            debug!("identity_mapped_pages: {:?}", &identity_mapped_pages[0..=index]);
 
         } // unlocks the frame allocator 
 

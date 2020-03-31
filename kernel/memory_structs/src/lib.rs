@@ -600,21 +600,23 @@ impl IntoIterator for PageRange {
 }
 
 
-/// The address bounds and flags of a section for mapping.
-#[derive(Default)]
+/// The address bounds and mapping flags of a section's memory region.
 pub struct SectionMemoryBounds {
-    /// The start address. It contains the virtual address and the physical address.
+    /// The starting virtual address and physical address.
     pub start: (VirtualAddress, PhysicalAddress),
-    /// The end address. It contains the virtual address and the physical address.
+    /// The ending virtual address and physical address.
     pub end: (VirtualAddress, PhysicalAddress),
-    /// The entry flags of the memory.
+    /// The page table entry flags that should be used for mapping this section.
     pub flags: EntryFlags,
 }
 
-/// The address bounds and flags of the initial sections for mapping.
-/// It only contains the three sections we care about.
-#[derive(Default)]
-pub struct InitialSectionsMemoryBounds {
+/// The address bounds and flags of the initial kernel sections that need mapping. 
+/// 
+/// It only contains three items, in which each item includes all sections that have identical flags:
+/// * The `.text` section bounds cover all sections that are executable.
+/// * The `.rodata` section bounds cover those that are read-only (.rodata, .gcc_except_table, .eh_frame).
+/// * The `.data` section bounds cover those that are writable (.data, .bss).
+pub struct AggregatedSectionMemoryBounds {
    pub text: SectionMemoryBounds,
    pub rodata: SectionMemoryBounds,
    pub data: SectionMemoryBounds,
