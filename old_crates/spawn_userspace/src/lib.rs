@@ -124,7 +124,7 @@ pub fn spawn_userspace(path: Path, name: Option<String>) -> Result<TaskRef, &'st
                 )?
             };
 
-            mod_mgmt::elf_executable::parse_elf_executable(temp_module_mapping, module.size())?
+            elf_executable::parse_elf_executable(temp_module_mapping, module.size())?
             
             // temp_module_mapping is automatically unmapped when it falls out of scope here (frame allocator must not be locked)
         };

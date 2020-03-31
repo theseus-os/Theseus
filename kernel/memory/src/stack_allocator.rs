@@ -1,5 +1,5 @@
 use super::paging::*;
-use super::{PAGE_SIZE, FrameAllocator, VirtualAddress, VirtualMemoryArea, EntryFlags, PageRange};
+use super::{PAGE_SIZE, FrameAllocator, VirtualAddress, EntryFlags, PageRange};
 use super::Mapper;
 
 #[derive(Debug)]
@@ -28,7 +28,7 @@ impl StackAllocator {
     /// The given `usermode` argument determines whether the stack is accessible from userspace.
     /// Returns the newly-allocated stack and a VMA to represent its mapping.
     pub fn alloc_stack<FA>(&mut self, page_table: &mut Mapper, frame_allocator: &mut FA, size_in_pages: usize)
-            -> Option<(Stack, VirtualMemoryArea)> where FA: FrameAllocator 
+            -> Option<Stack> where FA: FrameAllocator 
     {
         if size_in_pages == 0 {
             return None; /* a zero sized stack maikes no sense */
@@ -66,17 +66,10 @@ impl StackAllocator {
                     }
                 };
 
-                let stack_vma = VirtualMemoryArea::new(
-                    start.start_address(),
-                    end.start_address().value() - start.start_address().value() + PAGE_SIZE, // + 1 Page because it's an inclusive range
-                    flags, 
-                    if flags.contains(EntryFlags::USER_ACCESSIBLE) { "User Stack" } else { "Kernel Stack" }, 
-                );
-
                 // create a new stack
                 // stack grows downward from the top address (which is the last page's start_addr + page size)
                 let top_of_stack = end.start_address() + PAGE_SIZE;
-                Some( (Stack::new(top_of_stack, start.start_address(), stack_pages), stack_vma) )
+                Some(Stack::new(top_of_stack, start.start_address(), stack_pages))
             }
             _ => {
                 error!("alloc_stack failed, not enough free pages to allocate {}!", size_in_pages);

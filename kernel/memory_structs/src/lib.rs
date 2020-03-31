@@ -16,6 +16,7 @@ extern crate entryflags_x86_64;
 
 use bit_field::BitField;
 use core::{
+    fmt,
     iter::Step,
     mem,
     ops::{Add, AddAssign, Deref, DerefMut, RangeInclusive, Sub, SubAssign},
@@ -75,7 +76,7 @@ impl VirtualAddress {
     }
 }
 
-impl core::fmt::Pointer for VirtualAddress {
+impl fmt::Pointer for VirtualAddress {
     fn fmt(&self, f: &mut fmt::Formatter) -> fmt::Result {
         write!(f, "{:p}", self.0 as *const usize)
     }
@@ -224,71 +225,6 @@ impl PhysicalMemoryArea {
             typ: typ,
             acpi: acpi,
         }
-    }
-}
-
-
-
-/// A region of virtual memory that is mapped into a [`Task`](../task/struct.Task.html)'s address space
-#[derive(Debug, Default, Clone, PartialEq)]
-pub struct VirtualMemoryArea {
-    start: VirtualAddress,
-    size: usize,
-    flags: EntryFlags,
-    desc: &'static str,
-}
-use core::fmt;
-impl fmt::Display for VirtualMemoryArea {
-    fn fmt(&self, f: &mut fmt::Formatter) -> fmt::Result {
-        write!(
-            f,
-            "start: {:#X}, size: {:#X}, flags: {:#X}, desc: {}",
-            self.start, self.size, self.flags, self.desc
-        )
-    }
-}
-
-
-impl VirtualMemoryArea {
-    pub fn new(start: VirtualAddress, size: usize, flags: EntryFlags, desc: &'static str) -> Self {
-        VirtualMemoryArea {
-            start: start,
-            size: size,
-            flags: flags,
-            desc: desc,
-        }
-    }
-
-    pub fn start_address(&self) -> VirtualAddress {
-        self.start
-    }
-
-    pub fn size(&self) -> usize {
-        self.size
-    }
-
-    pub fn flags(&self) -> EntryFlags {
-        self.flags
-    }
-
-    pub fn desc(&self) -> &'static str {
-        self.desc
-    }
-
-    /// Get an iterator that covers all the pages in this VirtualMemoryArea
-    pub fn pages(&self) -> PageRange {
-        // check that the end_page won't be invalid
-        if (self.start.value() + self.size) < 1 {
-            return PageRange::empty();
-        }
-
-        let start_page = Page::containing_address(self.start);
-        let end_page = Page::containing_address(self.start + self.size - 1);
-        PageRange::new(start_page, end_page)
-    }
-
-    pub fn set_flags(&mut self, flags: EntryFlags) {
-        self.flags = flags;
     }
 }
 
@@ -664,21 +600,23 @@ impl IntoIterator for PageRange {
 }
 
 
-/// The address bounds and flags of a section for mapping.
-#[derive(Default)]
+/// The address bounds and mapping flags of a section's memory region.
 pub struct SectionMemoryBounds {
-    /// The start address. It contains the virtual address and the physical address.
+    /// The starting virtual address and physical address.
     pub start: (VirtualAddress, PhysicalAddress),
-    /// The end address. It contains the virtual address and the physical address.
+    /// The ending virtual address and physical address.
     pub end: (VirtualAddress, PhysicalAddress),
-    /// The entry flags of the memory.
+    /// The page table entry flags that should be used for mapping this section.
     pub flags: EntryFlags,
 }
 
-/// The address bounds and flags of the initial sections for mapping.
-/// It only contains the three sections we care about.
-#[derive(Default)]
-pub struct InitialSectionsMemoryBounds {
+/// The address bounds and flags of the initial kernel sections that need mapping. 
+/// 
+/// It only contains three items, in which each item includes all sections that have identical flags:
+/// * The `.text` section bounds cover all sections that are executable.
+/// * The `.rodata` section bounds cover those that are read-only (.rodata, .gcc_except_table, .eh_frame).
+/// * The `.data` section bounds cover those that are writable (.data, .bss).
+pub struct AggregatedSectionMemoryBounds {
    pub text: SectionMemoryBounds,
    pub rodata: SectionMemoryBounds,
    pub data: SectionMemoryBounds,
