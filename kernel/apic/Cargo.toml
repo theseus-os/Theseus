@@ -12,7 +12,7 @@ volatile = "0.2.5"
 x86_64 = { path = "../../libs/x86_64" } # currently using our local copy, forked from Phil Opp's crate
 atomic = { version = "0.4.4", features = [ "nightly" ] }
 owning_ref = { git = "https://github.com/kevinaboos/owning-ref-rs" }
-
+bit_field = "0.7.0"
 
 [dependencies.log]
 default-features = false

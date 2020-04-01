@@ -68,8 +68,9 @@ use spin::Mutex;
 use x86_64::registers::msr::{rdmsr, wrmsr, IA32_FS_BASE};
 
 
-/// The signature of the callback function that can hook into receiving a panic. 
-pub type PanicHandler = Box<dyn Fn(&PanicInfo) + Send>;
+/// The function signature of the callback that will be invoked
+/// when a given Task panics or otherwise fails, e.g., a machine exception occurs.
+pub type KillHandler = Box<dyn Fn(&KillReason) + Send>;
 
 /// Just like `core::panic::PanicInfo`, but with owned String types instead of &str references.
 #[derive(Debug, Clone)]
@@ -84,8 +85,8 @@ impl fmt::Display for PanicInfoOwned {
         write!(f, "{:?}:{}:{} -- {:?}", self.file, self.line, self.column, self.msg)
     }
 }
-impl PanicInfoOwned {
-    pub fn from(info: &PanicInfo) -> PanicInfoOwned {
+impl<'p> From<&PanicInfo<'p>> for PanicInfoOwned {
+    fn from(info: &PanicInfo) -> PanicInfoOwned {
         let msg = info.message()
             .map(|m| format!("{}", m))
             .unwrap_or_else(|| String::new());
@@ -112,13 +113,11 @@ pub fn get_task(task_id: usize) -> Option<TaskRef> {
 }
 
 
-/// Sets the panic handler function for the current `Task`
-pub fn set_my_panic_handler(handler: PanicHandler) -> Result<(), &'static str> {
+/// Sets the kill handler function for the current `Task`
+pub fn set_my_kill_handler(handler: KillHandler) -> Result<(), &'static str> {
     get_my_current_task()
         .ok_or("couldn't get_my_current_task")
-        .map(|taskref| {
-            taskref.set_panic_handler(handler)
-        })
+        .map(|taskref| taskref.set_kill_handler(handler))
 }
 
 
@@ -129,11 +128,20 @@ pub enum KillReason {
     /// The user or another task requested that this `Task` be killed. 
     /// For example, the user pressed `Ctrl + C` on the shell window that started a `Task`.
     Requested,
-    /// A Rust-level panic occurred while running this `Task`
+    /// A Rust-level panic occurred while running this `Task`.
     Panic(PanicInfoOwned),
     /// A non-language-level problem, such as a Page Fault or some other machine exception.
     /// The number of the exception is included, e.g., 15 (0xE) for a Page Fault.
     Exception(u8),
+}
+impl fmt::Display for KillReason {
+    fn fmt(&self, f: &mut fmt::Formatter) -> Result<(), fmt::Error> {
+        match &self {
+            &Self::Requested         => write!(f, "Requested"),
+            &Self::Panic(panic_info) => write!(f, "Panicked at {}", panic_info),
+            &Self::Exception(num)    => write!(f, "Exception {:#X}({})", num, num),
+        }
+    }
 }
 
 
@@ -189,6 +197,9 @@ pub enum SimdExt {
     None,
 }
 
+/// The signature of a Task's failure cleanup function.
+pub type FailureCleanupFunction = fn(TaskRef, KillReason) -> !;
+
 
 /// A structure that contains contextual information for a thread of execution. 
 pub struct Task {
@@ -229,11 +240,17 @@ pub struct Task {
     /// This `Task` is linked into and runs within the context of 
     /// this [`CrateNamespace`](../mod_mgmt/struct.CrateNamespace.html).
     pub namespace: Arc<CrateNamespace>,
-    /// The function that will be called when this `Task` panics;
-    /// it is invoked before the task is cleaned up via stack unwinding.
-    pub panic_handler: Option<PanicHandler>,
+    /// The function that will be called when this `Task` panics or fails due to a machine exception.
+    /// It will be invoked before the task is cleaned up via stack unwinding.
+    /// This is similar to Rust's built-in panic hook, but is also called upon a machine exception, not just a panic.
+    pub kill_handler: Option<KillHandler>,
     /// The environment of the task, Wrapped in an Arc & Mutex because it is shared among child and parent tasks
     pub env: Arc<Mutex<Environment>>,
+    /// The function that should be run as a last-ditch attempt to recover from this task's failure,
+    /// e.g., this can be called when unwinding itself fails. 
+    /// Typically, it will point to this Task's specific instance of `spawn::task_cleanup_failure()`,
+    /// which has generic type parameters that describe its function signature, argument type, and return type.
+    pub failure_cleanup_function: FailureCleanupFunction,
 
     #[cfg(simd_personality)]
     /// Whether this Task is SIMD enabled and what level of SIMD extensions it uses.
@@ -259,7 +276,12 @@ impl Task {
     /// 
     /// # Note
     /// This does not run the task, schedule it in, or switch to it.
-    pub fn new(kstack: Option<Stack>) -> Result<Task, &'static str> {
+    /// 
+    /// However, it requires tasking to already be set up, i.e., the current task must be known.
+    pub fn new(
+        kstack: Option<Stack>,
+        failure_cleanup_function: FailureCleanupFunction
+    ) -> Result<Task, &'static str> {
         let curr_task = get_my_current_task().ok_or("Task::new(): couldn't get current task (not yet initialized)")?;
         let (mmi, namespace, env, app_crate) = {
             let t = curr_task.lock();
@@ -270,7 +292,7 @@ impl Task {
             .or_else(|| mmi.lock().alloc_stack(KERNEL_STACK_SIZE_IN_PAGES))
             .ok_or("couldn't allocate kernel stack!")?;
 
-        Ok(Task::new_internal(kstack, mmi, namespace, env, app_crate))
+        Ok(Task::new_internal(kstack, mmi, namespace, env, app_crate, failure_cleanup_function))
     }
     
     /// The internal routine for creating a `Task`, which does not make assumptions 
@@ -280,7 +302,8 @@ impl Task {
         kstack: Stack, 
         mmi: MmiRef, namespace: Arc<CrateNamespace>,
         env: Arc<Mutex<Environment>>,
-        app_crate: Option<Arc<AppCrateRef>>
+        app_crate: Option<Arc<AppCrateRef>>,
+        failure_cleanup_function: FailureCleanupFunction,
     ) -> Self {
          /// The counter of task IDs
         static TASKID_COUNTER: AtomicUsize = AtomicUsize::new(0);
@@ -301,14 +324,15 @@ impl Task {
             task_local_data_ptr: VirtualAddress::zero(),
             drop_after_task_switch: None,
             name: format!("task_{}", task_id),
-            kstack: kstack,
-            mmi: mmi,
+            kstack,
+            mmi,
             pinned_core: None,
             is_an_idle_task: false,
-            app_crate: app_crate,
-            namespace: namespace,
-            panic_handler: None,
-            env: env,
+            app_crate,
+            namespace,
+            kill_handler: None,
+            env,
+            failure_cleanup_function,
 
             #[cfg(simd_personality)]
             simd: SimdExt::None,
@@ -357,17 +381,18 @@ impl Task {
         false
     }
 
-    /// Registers a function or closure that will be called if this `Task` panics,
-    /// invoked before the task is cleaned up via stack unwinding.
-    pub fn set_panic_handler(&mut self, callback: PanicHandler) {
-        self.panic_handler = Some(callback);
+    /// Registers a function or closure that will be called if this `Task` panics
+    /// or otherwise fails (e.g., due to a machine exception occurring).
+    /// The given `callback` will be invoked before the task is cleaned up via stack unwinding.
+    pub fn set_kill_handler(&mut self, callback: KillHandler) {
+        self.kill_handler = Some(callback);
     }
 
-    /// Takes ownership of this `Task`'s `PanicHandler` closure/function if one exists,
+    /// Takes ownership of this `Task`'s `KillHandler` closure/function if one exists,
     /// and returns it so it can be invoked without holding this `Task`'s `Mutex`.
-    /// After invoking this, the `Task`'s `panic_handler` will be `None`.
-    pub fn take_panic_handler(&mut self) -> Option<PanicHandler> {
-        self.panic_handler.take()
+    /// After invoking this, the `Task`'s `kill_handler` will be `None`.
+    pub fn take_kill_handler(&mut self) -> Option<KillHandler> {
+        self.kill_handler.take()
     }
 
 
@@ -590,6 +615,17 @@ impl Task {
 impl Drop for Task {
     fn drop(&mut self) {
         trace!("Task::drop(): {}", self);
+
+        // We must consume/drop the Task's kill handler BEFORE a Task can possibly be dropped.
+        // This is because if an application task sets a kill handler that is a closure/function in the text section of the app crate itself,
+        // then after the app crate is released, the kill handler will be dropped AFTER the app crate has been freed.
+        // When it tries to drop the task's kill handler, a page fault will occur because the text section of the app crate has been unmapped.
+        {
+            if let Some(_kill_handler) = self.take_kill_handler() {
+                warn!("While dropping task {:?}, its kill handler callback was still present. Removing it now.", self);
+            }
+            // Scoping rules ensure the kill handler is dropped now, before this Task's app_crate could possibly be dropped.
+        }
     }
 }
 
@@ -813,21 +849,22 @@ impl TaskRef {
         self.0.deref().0.lock().runstate = RunState::Runnable;
     }
 
-    /// Registers a function or closure that will be called if this `Task` panics,
-    /// invoked before the task is cleaned up via stack unwinding.
+    /// Registers a function or closure that will be called if this `Task` panics
+    /// or otherwise fails (e.g., due to a machine exception). 
+    /// The given `callback` will be invoked before the task is cleaned up via stack unwinding.
     /// # Locking / Deadlock
     /// Obtains a write lock on the enclosed `Task` in order to mutate its state.
-    pub fn set_panic_handler(&self, callback: PanicHandler) {
-        self.0.deref().0.lock().set_panic_handler(callback)
+    pub fn set_kill_handler(&self, callback: KillHandler) {
+        self.0.deref().0.lock().set_kill_handler(callback)
     }
 
-    /// Takes ownership of this `Task`'s `PanicHandler` closure/function if one exists,
+    /// Takes ownership of this `Task`'s `KillHandler` closure/function if one exists,
     /// and returns it so it can be invoked without holding this `Task`'s `Mutex`.
-    /// After invoking this, the `Task`'s `panic_handler` will be `None`.
+    /// After invoking this, the `Task`'s `kill_handler` will be `None`.
     /// # Locking / Deadlock
     /// Obtains a write lock on the enclosed `Task` in order to mutate its state.
-    pub fn take_panic_handler(&self) -> Option<PanicHandler> {
-        self.0.deref().0.lock().take_panic_handler()
+    pub fn take_kill_handler(&self) -> Option<KillHandler> {
+        self.0.deref().0.lock().take_kill_handler()
     }
 
     /// Takes ownership of this `Task`'s exit value and returns it,
@@ -898,7 +935,7 @@ pub fn create_idle_task(
         .ok_or("The initial kernel CrateNamespace must be initialized before the tasking subsystem.")?
         .clone();
     let default_env = Arc::new(Mutex::new(Environment::default()));
-    let mut idle_task = Task::new_internal(kstack, kernel_mmi_ref, default_namespace, default_env, None);
+    let mut idle_task = Task::new_internal(kstack, kernel_mmi_ref, default_namespace, default_env, None, idle_task_cleanup_failure);
     idle_task.name = format!("idle_task_ap{}", apic_id);
     idle_task.is_an_idle_task = true;
     idle_task.runstate = RunState::Runnable;
@@ -927,6 +964,18 @@ pub fn create_idle_task(
     Ok(task_ref)
 }
 
+
+/// This is just like `spawn::task_cleanup_failure()`,
+/// but for idle tasks bootstrapped from a core's first execution context.
+/// 
+/// However, for a bootstrapped (idle) task, we don't know (it doesn't really have) a function signature,
+/// argument type, and return value type.
+/// 
+/// Therefore there's not much we can actually do.
+fn idle_task_cleanup_failure(current_task: TaskRef, kill_reason: KillReason) -> ! {
+    error!("BUG: idle_task_cleanup_failure: {:?} died with {:?}\n. There's nothing we can do here; looping indefinitely!", current_task.lock().name, kill_reason);
+    loop { }
+}
 
 
 /// The structure that holds information local to each Task,

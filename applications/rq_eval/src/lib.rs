@@ -91,7 +91,7 @@ fn run_whole(num_tasks: usize) -> Result<(), &'static str> {
     let start = get_hpet().as_ref().ok_or("couldn't get HPET timer")?.get_counter();
     
     for i in 0..num_tasks {
-        let taskref = spawn::KernelTaskBuilder::new(whole_task, i)
+        let taskref = spawn::new_task_builder(whole_task, i)
             .name(format!("rq_whole_task_{}", i))
             .spawn()?;
         taskref.join()?;
@@ -112,7 +112,10 @@ fn run_whole(num_tasks: usize) -> Result<(), &'static str> {
 
 fn run_single(iterations: usize) -> Result<(), &'static str> {
     println!("Evaluating runqueue {} with SINGLE tasks, {} iterations...", CONFIG, iterations);
-    let mut task = Task::new(None)?;
+    let mut task = Task::new(
+        None,
+        |_, _| loop { }, // dummy failure function
+    )?;
     task.name = String::from("rq_eval_single_task_unrunnable");
     let taskref = TaskRef::new(task);
 

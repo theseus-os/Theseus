@@ -1,16 +1,12 @@
 [package]
 authors = ["Kevin Boos <kevinaboos@gmail.com>"]
-name = "memory"
-description = "The virtual memory subsystem."
+name = "mapper_spillful"
+description = "A spillful version of the mapper for the virtual memory subsystem."
 version = "0.1.0"
 build = "../../build.rs"
 
 [dependencies]
-spin = "0.4.10"
-bitflags = "1.1.0"
-multiboot2 = "0.7.1"
-xmas-elf = { version = "0.6.2", git = "https://github.com/kevinaboos/xmas-elf.git" }
-bit_field = "0.7.0"
+cfg-if = "0.1.6"
 
 [dependencies.log]
 default-features = false
@@ -23,20 +19,20 @@ version = "1.2.0"
 [dependencies.irq_safety]
 git = "https://github.com/kevinaboos/irq_safety"
 
-[dependencies.atomic_linked_list]
-path = "../../libs/atomic_linked_list"
-
 [dependencies.kernel_config]
 path = "../kernel_config"
-
-[dependencies.heap_irq_safe]
-path = "../heap_irq_safe"
 
 [dependencies.memory_x86_64]
 path = "../memory_x86_64"
 
 [dependencies.memory_structs]
 path = "../memory_structs"
+
+[dependencies.rbtree]
+git = "https://github.com/theseus-os/rbtree-rs.git"
+
+[dependencies.memory]
+path = "../memory"
 
 [lib]
 crate-type = ["rlib"]

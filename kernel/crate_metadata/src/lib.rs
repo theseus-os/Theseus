@@ -62,7 +62,7 @@ use alloc::{
 };
 use memory::{MappedPages, VirtualAddress, PageTable, EntryFlags, FrameAllocator};
 use cow_arc::{CowArc, CowWeak};
-use fs_node::FileRef;
+use fs_node::{FileRef, WeakFileRef};
 use qp_trie::{Trie, wrapper::BString};
 use goblin::elf::reloc::*;
 
@@ -185,8 +185,19 @@ impl CrateType {
 pub struct LoadedCrate {
     /// The name of this crate.
     pub crate_name: String,
-    /// The the object file that this crate was loaded from.
+    /// The object file that this crate was loaded from.
     pub object_file: FileRef,
+    /// The file that contains debug symbols for this crate. 
+    /// Debug symbols may exist in several forms:
+    /// * In the same file as the `object_file` above, i.e., not stripped,
+    /// * As a separate file that was stripped off from the original object file,
+    /// * Not at all (no debug symbols available for this crate).
+    /// 
+    /// By default, the constructor for `LoadedCrate` assumes the first form,
+    /// so it will initialize this to a weak reference to the `LoadedCrate`'s `object_file` field.
+    /// If that is not the case, then this field should be set differently once the crate is initialized
+    /// or once a debug symbol file becomes available or requested.
+    pub debug_symbols_file: WeakFileRef,
     /// A map containing all the sections in this crate.
     /// In general we're only interested the values (the `LoadedSection`s themselves),
     /// but we keep each section's shndx (section header index from its crate's ELF file)
@@ -384,6 +395,7 @@ impl LoadedCrate {
         let new_crate = CowArc::new(LoadedCrate {
             crate_name:              self.crate_name.clone(),
             object_file:             self.object_file.clone(),
+            debug_symbols_file:      self.debug_symbols_file.clone(),
             sections:                BTreeMap::new(),
             text_pages:              new_text_pages_range,
             rodata_pages:            new_rodata_pages_range,
@@ -876,8 +888,7 @@ pub fn write_relocation(
     target_sec_mapped_pages_offset: usize,
     source_sec_vaddr: VirtualAddress,
     verbose_log: bool
-) -> Result<(), &'static str>
-{
+) -> Result<(), &'static str> {
     // Calculate exactly where we should write the relocation data to.
     let target_offset = target_sec_mapped_pages_offset + relocation_entry.offset;
 
@@ -888,26 +899,26 @@ pub fn write_relocation(
         R_X86_64_32 => {
             let target_ref: &mut u32 = target_sec_mapped_pages.as_type_mut(target_offset)?;
             let source_val = source_sec_vaddr.value().wrapping_add(relocation_entry.addend);
-            if verbose_log { trace!("                    target_ptr: {:#X}, source_val: {:#X} (from sec_vaddr {:#X})", target_ref as *mut _ as usize, source_val, source_sec_vaddr); }
+            if verbose_log { trace!("                    target_ptr: {:#X}, source_val: {:#X} (from source_sec_vaddr {:#X})", target_ref as *mut _ as usize, source_val, source_sec_vaddr); }
             *target_ref = source_val as u32;
         }
         R_X86_64_64 => {
             let target_ref: &mut u64 = target_sec_mapped_pages.as_type_mut(target_offset)?;
             let source_val = source_sec_vaddr.value().wrapping_add(relocation_entry.addend);
-            if verbose_log { trace!("                    target_ptr: {:#X}, source_val: {:#X} (from sec_vaddr {:#X})", target_ref as *mut _ as usize, source_val, source_sec_vaddr); }
+            if verbose_log { trace!("                    target_ptr: {:#X}, source_val: {:#X} (from source_sec_vaddr {:#X})", target_ref as *mut _ as usize, source_val, source_sec_vaddr); }
             *target_ref = source_val as u64;
         }
         R_X86_64_PC32 |
         R_X86_64_PLT32 => {
             let target_ref: &mut u32 = target_sec_mapped_pages.as_type_mut(target_offset)?;
             let source_val = source_sec_vaddr.value().wrapping_add(relocation_entry.addend).wrapping_sub(target_ref as *mut _ as usize);
-            if verbose_log { trace!("                    target_ptr: {:#X}, source_val: {:#X} (from sec_vaddr {:#X})", target_ref as *mut _ as usize, source_val, source_sec_vaddr); }
+            if verbose_log { trace!("                    target_ptr: {:#X}, source_val: {:#X} (from source_sec_vaddr {:#X})", target_ref as *mut _ as usize, source_val, source_sec_vaddr); }
             *target_ref = source_val as u32;
         }
         R_X86_64_PC64 => {
             let target_ref: &mut u64 = target_sec_mapped_pages.as_type_mut(target_offset)?;
             let source_val = source_sec_vaddr.value().wrapping_add(relocation_entry.addend).wrapping_sub(target_ref as *mut _ as usize);
-            if verbose_log { trace!("                    target_ptr: {:#X}, source_val: {:#X} (from sec_vaddr {:#X})", target_ref as *mut _ as usize, source_val, source_sec_vaddr); }
+            if verbose_log { trace!("                    target_ptr: {:#X}, source_val: {:#X} (from source_sec_vaddr {:#X})", target_ref as *mut _ as usize, source_val, source_sec_vaddr); }
             *target_ref = source_val as u64;
         }
         // R_X86_64_GOTPCREL => { 

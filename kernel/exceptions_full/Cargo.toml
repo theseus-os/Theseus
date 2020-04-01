@@ -13,6 +13,11 @@ x86_64 = { path = "../../libs/x86_64" } # currently using our local copy, forked
 default-features = false
 version = "0.3.7"
 
+[dependencies.gimli]
+version = "0.19.0"
+default-features = false
+features = [ "read", "alloc" ]
+
 [dependencies.vga_buffer]
 path = "../vga_buffer"
 
@@ -42,6 +47,9 @@ path = "../memory"
 
 [dependencies.stack_trace]
 path = "../stack_trace"
+
+[dependencies.debug_info]
+path = "../debug_info"
 
 [lib]
 crate-type = ["rlib"]
