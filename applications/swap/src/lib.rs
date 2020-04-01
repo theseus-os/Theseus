@@ -96,7 +96,8 @@ fn rmain(matches: Matches) -> Result<(), String> {
 
     let tuples = parse_input_tuples(&free_args)?;
     println!("tuples: {:?}", tuples);
-        
+    
+    let namespace = task::get_my_current_task().ok_or("Couldn't get current task")?.get_namespace();
 
     do_swap(
         tuples, 
@@ -151,7 +152,6 @@ fn parse_input_tuples<'a>(args: &'a str) -> Result<Vec<(&'a str, &'a str, bool)>
     }
 }
 
-
 /// Performs the actual swapping of crates.
 fn do_swap(
     tuples: Vec<(&str, &str, bool)>, 
@@ -200,7 +200,8 @@ fn do_swap(
         override_namespace_crate_dir,
         state_transfer_functions,
         &kernel_mmi_ref,
-        verbose_log
+        verbose_log,
+        false // enable crate cache
     );
     
     let end = get_hpet().as_ref().ok_or("couldn't get HPET timer")?.get_counter();

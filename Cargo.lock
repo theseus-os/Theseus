@@ -664,6 +664,18 @@ version = "0.2.0"
 source = "registry+https://github.com/rust-lang/crates.io-index"
 
 [[package]]
+name = "fault_crate_swap"
+version = "0.1.0"
+dependencies = [
+ "crate_swap 0.1.0",
+ "fs_node 0.1.0",
+ "log 0.3.9 (registry+https://github.com/rust-lang/crates.io-index)",
+ "memory 0.1.0",
+ "mod_mgmt 0.1.0",
+ "path 0.1.0",
+]
+
+[[package]]
 name = "first_application"
 version = "0.1.0"
 dependencies = [
@@ -1958,6 +1970,24 @@ dependencies = [
 [[package]]
 name = "sdt"
 version = "0.1.0"
+
+[[package]]
+name = "self_swap"
+version = "0.1.0"
+dependencies = [
+ "crate_swap 0.1.0",
+ "fault_crate_swap 0.1.0",
+ "fs_node 0.1.0",
+ "getopts 0.2.21 (git+https://github.com/kevinaboos/getopts)",
+ "hpet 0.1.0",
+ "itertools 0.7.11 (registry+https://github.com/rust-lang/crates.io-index)",
+ "log 0.3.9 (registry+https://github.com/rust-lang/crates.io-index)",
+ "memory 0.1.0",
+ "mod_mgmt 0.1.0",
+ "path 0.1.0",
+ "task 0.1.0",
+ "terminal_print 0.1.0",
+]
 
 [[package]]
 name = "semver"

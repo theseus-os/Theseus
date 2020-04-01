@@ -125,6 +125,7 @@ pub fn swap_crates(
     state_transfer_functions: Vec<String>,
     kernel_mmi_ref: &MmiRef,
     verbose_log: bool,
+    enable_crate_cache: bool
 ) -> Result<(), &'static str> {
 
     #[cfg(not(loscd_eval))]
@@ -521,25 +522,29 @@ pub fn swap_crates(
         if let Some(old_crate_ref) = old_namespace.crate_tree().lock().remove_str(old_crate_name) {
             {
                 let old_crate = old_crate_ref.lock_as_ref();
-                
-                #[cfg(not(loscd_eval))]
-                {
-                    info!("  Removed old crate {:?} ({:?}) from namespace {}", old_crate_name, &*old_crate, old_namespace.name());
 
-                    // Here, we setup the crate cache to enable the removed old crate to be quickly swapped back in in the future.
-                    // This removed old crate will be useful when a future swap request includes the following:
-                    // (1) the future `new_crate_object_file`        ==  the current `old_crate.object_file`
-                    // (2) the future `old_crate_name`               ==  the current `new_crate_name`
-                    // (3) the future `reexport_new_symbols_as_old`  ==  true if the old crate had any reexported symbols
-                    //     -- to understand this, see the docs for `LoadedCrate.reexported_prefix`
-                    let future_swap_req = SwapRequest {
-                        old_crate_name: Some(new_crate_name.clone()),
-                        old_namespace: ByAddress(Arc::clone(new_namespace)),
-                        new_crate_object_file: ByAddress(old_crate.object_file.clone()),
-                        new_namespace: ByAddress(Arc::clone(old_namespace)),
-                        reexport_new_symbols_as_old: !old_crate.reexported_symbols.is_empty(),
-                    };
-                    future_swap_requests.push(future_swap_req);
+                // This is not done during self swap since the old crate is corrupted
+                if enable_crate_cache {
+                
+                    #[cfg(not(loscd_eval))]
+                    {
+                        info!("  Removed old crate {:?} ({:?}) from namespace {}", old_crate_name, &*old_crate, old_namespace.name());
+
+                        // Here, we setup the crate cache to enable the removed old crate to be quickly swapped back in in the future.
+                        // This removed old crate will be useful when a future swap request includes the following:
+                        // (1) the future `new_crate_object_file`        ==  the current `old_crate.object_file`
+                        // (2) the future `old_crate_name`               ==  the current `new_crate_name`
+                        // (3) the future `reexport_new_symbols_as_old`  ==  true if the old crate had any reexported symbols
+                        //     -- to understand this, see the docs for `LoadedCrate.reexported_prefix`
+                        let future_swap_req = SwapRequest {
+                            old_crate_name: Some(new_crate_name.clone()),
+                            old_namespace: ByAddress(Arc::clone(new_namespace)),
+                            new_crate_object_file: ByAddress(old_crate.object_file.clone()),
+                            new_namespace: ByAddress(Arc::clone(old_namespace)),
+                            reexport_new_symbols_as_old: !old_crate.reexported_symbols.is_empty(),
+                        };
+                        future_swap_requests.push(future_swap_req);
+                    }
                 }
                 
                 // Remove all of the symbols belonging to the old crate from the namespace it was in.
@@ -659,9 +664,22 @@ pub fn swap_crates(
         //     trace!("swap_crates(): skipping crate file swap for {:?}", req);
         //     continue;
         // }
-        
+
+        let same_source_dest = {
+            let parent_dir = new_crate_object_file.lock().get_parent_dir().ok_or("couldn't get file's parent directory")?;
+            if Arc::ptr_eq(&parent_dir, dest_dir_ref) {
+                debug!("swap_crates(): skipping crate file swap for {:?}", req);
+                true
+            } else {
+                false
+            }
+        };
+
         // Move the new crate object file from the temp namespace dir into the namespace dir that it belongs to.
-        if let Some((mut replaced_old_crate_file, original_source_dir)) = move_file(new_crate_object_file, dest_dir_ref)? {
+        // This is not done in case of a self swap since the file in the directory has not changed
+        if same_source_dest {
+            continue;
+        } else if let Some((mut replaced_old_crate_file, original_source_dir)) = move_file(new_crate_object_file, dest_dir_ref)? {
             // If we replaced a crate object file, put that replaced file back in the source directory, thus completing the "swap" operation.
             // (Note that the file that we replaced should be the same as the old_crate_file.) 
             trace!("swap_crates(): new_crate_object_file replaced existing (old_crate) object file {:?}", replaced_old_crate_file.get_name());
@@ -823,18 +841,18 @@ pub struct SwapRequest {
     /// This will be used to search the `CrateNamespace` to find an existing `LoadedCrate`.
     /// The `SwapRequest` constructor ensures this is fully-qualified (includes a hash value)
     /// and is unique within the `old_namespace`.
-    old_crate_name: Option<String>,
+    pub old_crate_name: Option<String>,
     /// The `CrateNamespace` that contains the given old crate, 
     /// from which that old crate and its symbols should be removed. 
-    old_namespace: ByAddress<Arc<CrateNamespace>>,
+    pub old_namespace: ByAddress<Arc<CrateNamespace>>,
     /// The object file for the new crate that will replace the old crate. 
-    new_crate_object_file: ByAddress<FileRef>,
+    pub new_crate_object_file: ByAddress<FileRef>,
     /// The `CrateNamespace` into which the replacement new crate and its symbols should be loaded.
     /// Typically, this is the same namespace as the `old_namespace`.
-    new_namespace: ByAddress<Arc<CrateNamespace>>,
+    pub new_namespace: ByAddress<Arc<CrateNamespace>>,
     /// Whether to expose the new crate's sections with symbol names that match those from the old crate.
     /// For more details, see the above docs for this struct.
-    reexport_new_symbols_as_old: bool,
+    pub reexport_new_symbols_as_old: bool,
 }
 impl fmt::Debug for SwapRequest {
     fn fmt(&self, f: &mut fmt::Formatter) -> fmt::Result {
