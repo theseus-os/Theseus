@@ -11,7 +11,7 @@
 
 extern crate spin;
 extern crate multiboot2;
-extern crate alloc;
+#[macro_use] extern crate alloc;
 #[macro_use] extern crate lazy_static;
 #[macro_use] extern crate log;
 extern crate irq_safety;
@@ -137,7 +137,7 @@ impl MemoryManagementInfo {
 /// 
 /// An error is returned if the heap memory limit is reached.
 pub fn allocate_heap_pages(size_in_bytes: usize) -> Result<VirtualAddress, &'static str> {
-    let kernel_mmi_ref = get_kernel_mmi_ref().ok_or("create_contiguous_mapping(): KERNEL_MMI was not yet initialized!")?;
+    let kernel_mmi_ref = get_kernel_mmi_ref().ok_or("allocate heap(): KERNEL_MMI was not yet initialized!")?;
     let mut kernel_mmi = kernel_mmi_ref.lock();
     let heap_start_addr = KERNEL_HEAP_START;
     let start_address;
@@ -172,7 +172,7 @@ pub fn allocate_heap_pages(size_in_bytes: usize) -> Result<VirtualAddress, &'sta
     {
         let heap_mp = kernel_mmi.extra_mapped_pages.iter_mut().find(|x| x.start_address().value() == heap_start_addr).ok_or("Could not find heap mapped pages.")?;
         // merge the 2 and insert into vector
-        if let Err((e,_mp)) = heap_mp.extend(additional_mp) {
+        if let Err((e,_mp)) = heap_mp.merge(vec!(additional_mp)) {
             return Err(e);
         }
     }
