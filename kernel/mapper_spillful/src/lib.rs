@@ -19,7 +19,7 @@ extern crate rbtree;
 
 use core::ptr::Unique;
 use kernel_config::memory::{PAGE_SIZE, ENTRIES_PER_PAGE_TABLE, TEMPORARY_PAGE_VIRT_ADDR};
-use memory::{Page, BROADCAST_TLB_SHOOTDOWN_FUNC, VirtualMemoryArea, FrameAllocator, Frame, PhysicalAddress, VirtualAddress, EntryFlags};
+use memory::{Page, BROADCAST_TLB_SHOOTDOWN_FUNC, FrameAllocator, Frame, PhysicalAddress, VirtualAddress, EntryFlags};
 use memory::paging::table::{Table, Level4, P4};
 use irq_safety::MutexIrqSafe;
 use alloc::vec::Vec;
@@ -225,6 +225,72 @@ impl MapperSpillful {
         Ok(())
     }
 }
+
+
+
+/// A region of virtual memory that is mapped into a [`Task`](../task/struct.Task.html)'s address space
+#[derive(Debug, Default, Clone, PartialEq)]
+pub struct VirtualMemoryArea {
+    start: VirtualAddress,
+    size: usize,
+    flags: EntryFlags,
+    desc: &'static str,
+}
+use core::fmt;
+impl fmt::Display for VirtualMemoryArea {
+    fn fmt(&self, f: &mut fmt::Formatter) -> fmt::Result {
+        write!(
+            f,
+            "start: {:#X}, size: {:#X}, flags: {:#X}, desc: {}",
+            self.start, self.size, self.flags, self.desc
+        )
+    }
+}
+
+
+impl VirtualMemoryArea {
+    pub fn new(start: VirtualAddress, size: usize, flags: EntryFlags, desc: &'static str) -> Self {
+        VirtualMemoryArea {
+            start: start,
+            size: size,
+            flags: flags,
+            desc: desc,
+        }
+    }
+
+    pub fn start_address(&self) -> VirtualAddress {
+        self.start
+    }
+
+    pub fn size(&self) -> usize {
+        self.size
+    }
+
+    pub fn flags(&self) -> EntryFlags {
+        self.flags
+    }
+
+    pub fn desc(&self) -> &'static str {
+        self.desc
+    }
+
+    /// Get an iterator that covers all the pages in this VirtualMemoryArea
+    pub fn pages(&self) -> PageRange {
+        // check that the end_page won't be invalid
+        if (self.start.value() + self.size) < 1 {
+            return PageRange::empty();
+        }
+
+        let start_page = Page::containing_address(self.start);
+        let end_page = Page::containing_address(self.start + self.size - 1);
+        PageRange::new(start_page, end_page)
+    }
+
+    pub fn set_flags(&mut self, flags: EntryFlags) {
+        self.flags = flags;
+    }
+}
+
 
 }
 }

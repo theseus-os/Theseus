@@ -108,12 +108,8 @@ pub struct MemoryManagementInfo {
     /// the PageTable that should be switched to when this Task is switched to.
     pub page_table: PageTable,
     
-    /// the list of virtual memory areas mapped currently in this Task's address space
-    pub vmas: Vec<VirtualMemoryArea>,
-
     /// a list of additional virtual-mapped Pages that have the same lifetime as this MMI
     /// and are thus owned by this MMI, but is not all-inclusive (e.g., Stacks are excluded).
-    /// Someday this could likely replace the vmas list, but VMAs offer sub-page granularity for now.
     pub extra_mapped_pages: Vec<MappedPages>,
 
     /// the task's stack allocator, which is initialized with a range of Pages from which to allocate.
@@ -130,16 +126,9 @@ impl MemoryManagementInfo {
     /// You cannot call this to allocate a stack in a different `MemoryManagementInfo`/`PageTable` than the one you're currently running. 
     /// It will only work for allocating a stack in the currently-running MMI.
     pub fn alloc_stack(&mut self, size_in_pages: usize) -> Option<Stack> {
-        let &mut MemoryManagementInfo { ref mut page_table, ref mut vmas, ref mut stack_allocator, .. } = self;
-    
-        if let Some( (stack, stack_vma) ) = FRAME_ALLOCATOR.try().and_then(|fa| stack_allocator.alloc_stack(page_table, fa.lock().deref_mut(), size_in_pages)) {
-            vmas.push(stack_vma);
-            Some(stack)
-        }
-        else {
-            error!("MemoryManagementInfo::alloc_stack: failed to allocate stack of {} pages!", size_in_pages);
-            None
-        }
+        FRAME_ALLOCATOR.try().and_then(|fa| 
+            self.stack_allocator.alloc_stack(&mut self.page_table, fa.lock().deref_mut(), size_in_pages)
+        )
     }
 }
 
@@ -187,10 +176,6 @@ pub fn allocate_heap_pages(size_in_bytes: usize) -> Result<VirtualAddress, &'sta
             return Err(e);
         }
     }
-
-    // find the heap vma and set the new size
-    let heap_vma = kernel_mmi.vmas.iter_mut().find(|x| x.start_address().value() == heap_start_addr).ok_or("Could not find heap VMA")?;
-    heap_vma.set_size(current_heap_size + size_in_bytes);
 
     // return the start address
     Ok(start_address)
@@ -266,7 +251,7 @@ pub fn set_broadcast_tlb_shootdown_cb(func: fn(Vec<VirtualAddress>)) {
 ///  * the kernel's list of *other* higher-half MappedPages that needs to be converted to a vector after heap initialization, and which should be kept forever,
 ///  * the kernel's list of identity-mapped MappedPages that needs to be converted to a vector after heap initialization, and which should be dropped before starting the first userspace program. 
 pub fn init(boot_info: &BootInformation) 
-    -> Result<(&MutexIrqSafe<AreaFrameAllocator>, PageTable, MappedPages, MappedPages, MappedPages, [VirtualMemoryArea; 32], [Option<MappedPages>; 32], [Option<MappedPages>; 32]), &'static str> 
+    -> Result<(&MutexIrqSafe<AreaFrameAllocator>, PageTable, MappedPages, MappedPages, MappedPages, [Option<MappedPages>; 32], [Option<MappedPages>; 32]), &'static str> 
 {
     // get the start and end addresses of the kernel.
     let (kernel_phys_start, kernel_phys_end, kernel_virt_end) = get_kernel_address(&boot_info)?;
@@ -309,14 +294,13 @@ pub fn init(boot_info: &BootInformation)
         text_mapped_pages,
         rodata_mapped_pages,
         data_mapped_pages,
-        vmas,
         higher_half_mapped_pages,
         identity_mapped_pages
     ) = paging::init(frame_allocator_mutex, &boot_info)?;
 
     debug!("Done with paging::init()!, page_table: {:?}", page_table);
 
-    Ok((frame_allocator_mutex, page_table, text_mapped_pages, rodata_mapped_pages, data_mapped_pages, vmas, higher_half_mapped_pages, identity_mapped_pages))
+    Ok((frame_allocator_mutex, page_table, text_mapped_pages, rodata_mapped_pages, data_mapped_pages, higher_half_mapped_pages, identity_mapped_pages))
     
 }
 
@@ -326,8 +310,8 @@ pub fn init(boot_info: &BootInformation)
 /// Returns the following tuple, if successful:
 ///  * The kernel's new MemoryManagementInfo
 ///  * the kernel's list of *other* higher-half MappedPages, which should be kept forever. ??? is this correct ???
-pub fn init_post_heap(allocator_mutex: &MutexIrqSafe<AreaFrameAllocator>, page_table: PageTable, heap_vma: VirtualMemoryArea, heap_mapped_pages: MappedPages, 
-    vmas: [VirtualMemoryArea; 32], higher_half_mapped_pages: [Option<MappedPages>; 32], identity_mapped_pages: [Option<MappedPages>; 32]) 
+pub fn init_post_heap(allocator_mutex: &MutexIrqSafe<AreaFrameAllocator>, page_table: PageTable, heap_mapped_pages: MappedPages, 
+ higher_half_mapped_pages: [Option<MappedPages>; 32], identity_mapped_pages: [Option<MappedPages>; 32]) 
 -> Result<(Arc<MutexIrqSafe<MemoryManagementInfo>>, Vec<MappedPages>), &'static str> 
 {
     // HERE: heap is initialized! Can now use alloc types.
@@ -335,10 +319,9 @@ pub fn init_post_heap(allocator_mutex: &MutexIrqSafe<AreaFrameAllocator>, page_t
     // because they will be auto-unmapped from the new page table upon return, causing all execution to stop.  
 
     let (
-        kernel_vmas,
         higher_half_mapped_pages,
         identity_mapped_pages,
-    ) = paging::init_post_heap(allocator_mutex, heap_vma, heap_mapped_pages, vmas, higher_half_mapped_pages, identity_mapped_pages)?;
+    ) = paging::init_post_heap(allocator_mutex, heap_mapped_pages, higher_half_mapped_pages, identity_mapped_pages)?;
    
     // init the kernel stack allocator, a singleton
     let kernel_stack_allocator = {
@@ -351,7 +334,6 @@ pub fn init_post_heap(allocator_mutex: &MutexIrqSafe<AreaFrameAllocator>, page_t
     // return the kernel's memory info 
     let kernel_mmi = MemoryManagementInfo {
         page_table: page_table,
-        vmas: kernel_vmas,
         extra_mapped_pages: higher_half_mapped_pages,
         stack_allocator: kernel_stack_allocator, 
     };
