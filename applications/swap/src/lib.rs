@@ -96,8 +96,6 @@ fn rmain(matches: Matches) -> Result<(), String> {
 
     let tuples = parse_input_tuples(&free_args)?;
     println!("tuples: {:?}", tuples);
-    
-    let namespace = task::get_my_current_task().ok_or("Couldn't get current task")?.get_namespace();
 
     do_swap(
         tuples, 
