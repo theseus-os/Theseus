@@ -841,18 +841,18 @@ pub struct SwapRequest {
     /// This will be used to search the `CrateNamespace` to find an existing `LoadedCrate`.
     /// The `SwapRequest` constructor ensures this is fully-qualified (includes a hash value)
     /// and is unique within the `old_namespace`.
-    pub old_crate_name: Option<String>,
+    old_crate_name: Option<String>,
     /// The `CrateNamespace` that contains the given old crate, 
     /// from which that old crate and its symbols should be removed. 
-    pub old_namespace: ByAddress<Arc<CrateNamespace>>,
+    old_namespace: ByAddress<Arc<CrateNamespace>>,
     /// The object file for the new crate that will replace the old crate. 
-    pub new_crate_object_file: ByAddress<FileRef>,
+    new_crate_object_file: ByAddress<FileRef>,
     /// The `CrateNamespace` into which the replacement new crate and its symbols should be loaded.
     /// Typically, this is the same namespace as the `old_namespace`.
-    pub new_namespace: ByAddress<Arc<CrateNamespace>>,
+    new_namespace: ByAddress<Arc<CrateNamespace>>,
     /// Whether to expose the new crate's sections with symbol names that match those from the old crate.
     /// For more details, see the above docs for this struct.
-    pub reexport_new_symbols_as_old: bool,
+    reexport_new_symbols_as_old: bool,
 }
 impl fmt::Debug for SwapRequest {
     fn fmt(&self, f: &mut fmt::Formatter) -> fmt::Result {
