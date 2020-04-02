@@ -125,7 +125,7 @@ pub fn swap_crates(
     state_transfer_functions: Vec<String>,
     kernel_mmi_ref: &MmiRef,
     verbose_log: bool,
-    enable_crate_cache: bool
+    cache_old_crates: bool
 ) -> Result<(), &'static str> {
 
     #[cfg(not(loscd_eval))]
@@ -524,7 +524,7 @@ pub fn swap_crates(
                 let old_crate = old_crate_ref.lock_as_ref();
 
                 // This is not done during self swap since the old crate is corrupted
-                if enable_crate_cache {
+                if cache_old_crates {
                 
                     #[cfg(not(loscd_eval))]
                     {
@@ -665,21 +665,8 @@ pub fn swap_crates(
         //     continue;
         // }
 
-        let same_source_dest = {
-            let parent_dir = new_crate_object_file.lock().get_parent_dir().ok_or("couldn't get file's parent directory")?;
-            if Arc::ptr_eq(&parent_dir, dest_dir_ref) {
-                debug!("swap_crates(): skipping crate file swap for {:?}", req);
-                true
-            } else {
-                false
-            }
-        };
-
         // Move the new crate object file from the temp namespace dir into the namespace dir that it belongs to.
-        // This is not done in case of a self swap since the file in the directory has not changed
-        if same_source_dest {
-            continue;
-        } else if let Some((mut replaced_old_crate_file, original_source_dir)) = move_file(new_crate_object_file, dest_dir_ref)? {
+        if let Some((mut replaced_old_crate_file, original_source_dir)) = move_file(new_crate_object_file, dest_dir_ref)? {
             // If we replaced a crate object file, put that replaced file back in the source directory, thus completing the "swap" operation.
             // (Note that the file that we replaced should be the same as the old_crate_file.) 
             trace!("swap_crates(): new_crate_object_file replaced existing (old_crate) object file {:?}", replaced_old_crate_file.get_name());
@@ -714,11 +701,15 @@ pub fn swap_crates(
         }
     }
 
-    #[cfg(not(loscd_eval))]
-    {
-        debug!("swap_crates() [end]: adding old_crates to cache. \n   future_swap_requests: {:?}, \n   old_crates: {:?}", 
-            future_swap_requests, cached_crates.crate_names(true));
-        UNLOADED_CRATE_CACHE.lock().insert(future_swap_requests, cached_crates);
+    // This is not done during self swap since the old crate is corrupted
+    if cache_old_crates {
+
+        #[cfg(not(loscd_eval))]
+        {
+            debug!("swap_crates() [end]: adding old_crates to cache. \n   future_swap_requests: {:?}, \n   old_crates: {:?}", 
+                future_swap_requests, cached_crates.crate_names(true));
+            UNLOADED_CRATE_CACHE.lock().insert(future_swap_requests, cached_crates);
+        }
     }
 
 

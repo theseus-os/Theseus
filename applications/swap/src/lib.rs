@@ -199,7 +199,7 @@ fn do_swap(
         state_transfer_functions,
         &kernel_mmi_ref,
         verbose_log,
-        false // enable crate cache
+        false // cache_old_crates
     );
     
     let end = get_hpet().as_ref().ok_or("couldn't get HPET timer")?.get_counter();
