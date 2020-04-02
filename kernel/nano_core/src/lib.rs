@@ -26,16 +26,15 @@ extern crate multiboot2;
 extern crate x86_64;
 extern crate kernel_config; // our configuration options, just a set of const definitions.
 extern crate irq_safety; // for irq-safe locking and interrupt utilities
-
 extern crate logger;
 extern crate state_store;
 extern crate memory; // the virtual memory subsystem
 extern crate mod_mgmt;
 extern crate exceptions_early;
-extern crate captain;
-extern crate panic_entry; // the panic-related lang items
-
 #[macro_use] extern crate vga_buffer;
+extern crate panic_entry; // contains required panic-related lang items
+#[cfg(not(loadable))] extern crate captain;
+
 
 /// This module is a hack to get around the lack of the 
 /// `__truncdfsf2` function in the `compiler_builtins` crate.

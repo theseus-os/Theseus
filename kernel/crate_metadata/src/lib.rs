@@ -159,6 +159,7 @@ impl CrateType {
             Ok((CrateType::Userspace, namespace_prefix, crate_name))
         }
         else {
+            error!("module_name {:?} didn't start with a known CrateType prefix", module_name);
             Err("module_name didn't start with a known CrateType prefix")
         }
     }
