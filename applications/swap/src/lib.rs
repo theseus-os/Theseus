@@ -97,6 +97,7 @@ fn rmain(matches: Matches) -> Result<(), String> {
     let tuples = parse_input_tuples(&free_args)?;
     println!("tuples: {:?}", tuples);
 
+
     do_swap(
         tuples, 
         &curr_dir, 
@@ -149,6 +150,7 @@ fn parse_input_tuples<'a>(args: &'a str) -> Result<Vec<(&'a str, &'a str, bool)>
         Ok(v)
     }
 }
+
 
 /// Performs the actual swapping of crates.
 fn do_swap(
