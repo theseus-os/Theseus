@@ -125,11 +125,13 @@ pub fn swap_crates(
     state_transfer_functions: Vec<String>,
     kernel_mmi_ref: &MmiRef,
     verbose_log: bool,
+    cache_old_crates: bool
 ) -> Result<(), &'static str> {
 
     #[cfg(not(loscd_eval))]
-    debug!("swap_crates()[0]: override dir: {:?}\n\tswap_requests: {:?}", 
+    debug!("swap_crates()[0]: override dir: {:?}, cache_old_crates: {:?}\n\tswap_requests: {:?}", 
         override_namespace_dir.as_ref().map(|d| d.lock().get_name()), 
+        cache_old_crates,
         swap_requests
     );
 
@@ -144,9 +146,9 @@ pub fn swap_crates(
         #[cfg(not(loscd_eval))] {
             // First, before we perform any expensive crate loading, let's try an optimization
             // based on cached crates that were unloaded during a previous swap operation. 
-            if let Some(cached_crates) = UNLOADED_CRATE_CACHE.lock().remove(&swap_requests) {
-                warn!("Using optimized swap routine to swap in cached crates: {:?}", cached_crates.crate_names(true));
-                (cached_crates, true)
+            if let Some(previously_cached_crates) = UNLOADED_CRATE_CACHE.lock().remove(&swap_requests) {
+                warn!("Using optimized swap routine to swap in previously cached crates: {:?}", previously_cached_crates.crate_names(true));
+                (previously_cached_crates, true)
             } else {
                 // If no optimization is possible (no cached crates exist for this swap request), 
                 // then create a new CrateNamespace and load all of the new crate modules into it from scratch.
@@ -188,13 +190,19 @@ pub fn swap_crates(
     let hpet_after_load_crates = hpet.get_counter();
 
     #[cfg(not(loscd_eval))]
-    let mut future_swap_requests: SwapRequestList = SwapRequestList::with_capacity(swap_requests.len());
-    #[cfg(not(loscd_eval))]
-    let cached_crates: CrateNamespace = CrateNamespace::new(
-        format!("cached_crates--{:?}", swap_requests), 
-        this_namespace.dir().clone(),
-        None
-    );
+    let (mut future_swap_requests, cached_crates) = if cache_old_crates {
+        (
+            SwapRequestList::with_capacity(swap_requests.len()),
+            CrateNamespace::new(
+                format!("cached_crates--{:?}", swap_requests), 
+                this_namespace.dir().clone(),
+                None
+            ),
+        )
+    } else {
+        // When not caching old crates, these won't be used, so just make them empty dummy values.
+        (SwapRequestList::new(), CrateNamespace::new(String::new(), this_namespace.dir().clone(), None))
+    };
 
 
     #[cfg(loscd_eval)]
@@ -521,25 +529,26 @@ pub fn swap_crates(
         if let Some(old_crate_ref) = old_namespace.crate_tree().lock().remove_str(old_crate_name) {
             {
                 let old_crate = old_crate_ref.lock_as_ref();
-                
-                #[cfg(not(loscd_eval))]
-                {
-                    info!("  Removed old crate {:?} ({:?}) from namespace {}", old_crate_name, &*old_crate, old_namespace.name());
+                info!("  Removed old crate {:?} ({:?}) from namespace {}", old_crate_name, &*old_crate, old_namespace.name());
 
-                    // Here, we setup the crate cache to enable the removed old crate to be quickly swapped back in in the future.
-                    // This removed old crate will be useful when a future swap request includes the following:
-                    // (1) the future `new_crate_object_file`        ==  the current `old_crate.object_file`
-                    // (2) the future `old_crate_name`               ==  the current `new_crate_name`
-                    // (3) the future `reexport_new_symbols_as_old`  ==  true if the old crate had any reexported symbols
-                    //     -- to understand this, see the docs for `LoadedCrate.reexported_prefix`
-                    let future_swap_req = SwapRequest {
-                        old_crate_name: Some(new_crate_name.clone()),
-                        old_namespace: ByAddress(Arc::clone(new_namespace)),
-                        new_crate_object_file: ByAddress(old_crate.object_file.clone()),
-                        new_namespace: ByAddress(Arc::clone(old_namespace)),
-                        reexport_new_symbols_as_old: !old_crate.reexported_symbols.is_empty(),
-                    };
-                    future_swap_requests.push(future_swap_req);
+                if cache_old_crates {
+                    #[cfg(not(loscd_eval))]
+                    {
+                        // Here, we setup the crate cache to enable the removed old crate to be quickly swapped back in in the future.
+                        // This removed old crate will be useful when a future swap request includes the following:
+                        // (1) the future `new_crate_object_file`        ==  the current `old_crate.object_file`
+                        // (2) the future `old_crate_name`               ==  the current `new_crate_name`
+                        // (3) the future `reexport_new_symbols_as_old`  ==  true if the old crate had any reexported symbols
+                        //     -- to understand this, see the docs for `LoadedCrate.reexported_prefix`
+                        let future_swap_req = SwapRequest {
+                            old_crate_name: Some(new_crate_name.clone()),
+                            old_namespace: ByAddress(Arc::clone(new_namespace)),
+                            new_crate_object_file: ByAddress(old_crate.object_file.clone()),
+                            new_namespace: ByAddress(Arc::clone(old_namespace)),
+                            reexport_new_symbols_as_old: !old_crate.reexported_symbols.is_empty(),
+                        };
+                        future_swap_requests.push(future_swap_req);
+                    }
                 }
                 
                 // Remove all of the symbols belonging to the old crate from the namespace it was in.
@@ -563,15 +572,20 @@ pub fn swap_crates(
                     }
                 }
 
-                // TODO: could maybe optimize transfer of old symbols from this namespace to cached_crates namespace 
-                //       by saving the removed symbols above and directly adding them to the cached_crates.symbol_map instead of iterating over all old_crate.sections.
-                //       This wil only really be faster once qp_trie supports a non-iterator-based (non-extend) Trie merging function.
-                #[cfg(not(loscd_eval))]
-                cached_crates.add_symbols(old_crate.sections.values(), verbose_log); 
+                if cache_old_crates {
+                    // TODO: could maybe optimize transfer of old symbols from this namespace to cached_crates namespace 
+                    //       by saving the removed symbols above and directly adding them to the cached_crates.symbol_map instead of iterating over all old_crate.sections.
+                    //       This wil only really be faster once qp_trie supports a non-iterator-based (non-extend) Trie merging function.
+                    #[cfg(not(loscd_eval))]
+                    cached_crates.add_symbols(old_crate.sections.values(), verbose_log); 
+                }
             } // drops lock for `old_crate_ref`
             
-            #[cfg(not(loscd_eval))]
-            cached_crates.crate_tree().lock().insert_str(old_crate_name, old_crate_ref);
+            if cache_old_crates {
+                #[cfg(not(loscd_eval))]
+                cached_crates.crate_tree().lock().insert_str(old_crate_name, old_crate_ref);
+            }
+
             #[cfg(loscd_eval)]
             core::mem::forget(old_crate_ref);
         }
@@ -593,6 +607,7 @@ pub fn swap_crates(
         
         #[cfg(not(loscd_eval))]
         debug!("swap_crates(): adding new crate {:?} to namespace {}", new_crate_ref, req.new_namespace.name());
+
         req.new_namespace.add_symbols(new_crate_ref.lock_as_ref().sections.values(), verbose_log);
         req.new_namespace.crate_tree().lock().insert_str(new_crate_name, new_crate_ref.clone());
     }
@@ -659,7 +674,7 @@ pub fn swap_crates(
         //     trace!("swap_crates(): skipping crate file swap for {:?}", req);
         //     continue;
         // }
-        
+
         // Move the new crate object file from the temp namespace dir into the namespace dir that it belongs to.
         if let Some((mut replaced_old_crate_file, original_source_dir)) = move_file(new_crate_object_file, dest_dir_ref)? {
             // If we replaced a crate object file, put that replaced file back in the source directory, thus completing the "swap" operation.
@@ -667,7 +682,6 @@ pub fn swap_crates(
             trace!("swap_crates(): new_crate_object_file replaced existing (old_crate) object file {:?}", replaced_old_crate_file.get_name());
             replaced_old_crate_file.set_parent_dir(Arc::downgrade(&original_source_dir));
             if let Some(_f) = original_source_dir.lock().insert(replaced_old_crate_file)? {
-                trace!(" 4 HERE origianl_source_dir locked: {:?}", original_source_dir.try_lock().is_none());
                 // There shouldn't be a similarly-named file in the original source dir anymore, since we moved it.
                 // However, this isn't necessarily a real problem; we can continue execution, but I'd like to log an error for sanity checking purposes.
                 error!("swap_crates(): unexpectedly replaced file {:?} that was in source directory {:?}", _f.get_name(), original_source_dir.lock().get_absolute_path());
@@ -696,11 +710,13 @@ pub fn swap_crates(
         }
     }
 
-    #[cfg(not(loscd_eval))]
-    {
-        debug!("swap_crates() [end]: adding old_crates to cache. \n   future_swap_requests: {:?}, \n   old_crates: {:?}", 
-            future_swap_requests, cached_crates.crate_names(true));
-        UNLOADED_CRATE_CACHE.lock().insert(future_swap_requests, cached_crates);
+    if cache_old_crates {
+        #[cfg(not(loscd_eval))]
+        {
+            debug!("swap_crates() [end]: adding old_crates to cache. \n   future_swap_requests: {:?}, \n   old_crates: {:?}", 
+                future_swap_requests, cached_crates.crate_names(true));
+            UNLOADED_CRATE_CACHE.lock().insert(future_swap_requests, cached_crates);
+        }
     }
 
 
