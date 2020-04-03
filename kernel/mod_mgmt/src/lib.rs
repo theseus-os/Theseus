@@ -20,7 +20,6 @@ extern crate vfs_node;
 extern crate fs_node;
 extern crate path;
 extern crate memfs;
-extern crate hpet;
 extern crate cstr_core;
 
 use core::{
