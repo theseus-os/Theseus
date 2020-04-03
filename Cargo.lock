@@ -664,18 +664,6 @@ version = "0.2.0"
 source = "registry+https://github.com/rust-lang/crates.io-index"
 
 [[package]]
-name = "fault_crate_swap"
-version = "0.1.0"
-dependencies = [
- "crate_swap 0.1.0",
- "fs_node 0.1.0",
- "log 0.3.9 (registry+https://github.com/rust-lang/crates.io-index)",
- "memory 0.1.0",
- "mod_mgmt 0.1.0",
- "path 0.1.0",
-]
-
-[[package]]
 name = "first_application"
 version = "0.1.0"
 dependencies = [

@@ -39,6 +39,7 @@ pub fn main(args: Vec<String>) -> isize {
     let mut opts = Options::new();
     opts.optflag("h", "help", "print this help menu");
     opts.optflag("v", "verbose", "enable verbose logging of crate swapping actions");
+    opts.optflag("c", "cache", "enable caching of the old crate(s) removed by the swapping action");
     opts.optopt("d", "directory-crates", "the absolute path of the base directory where new crates will be loaded from", "PATH");
     opts.optmulti("t", "state-transfer", "the fully-qualified symbol names of state transfer functions, to be run in the order given", "SYMBOL");
 
@@ -89,6 +90,7 @@ fn rmain(matches: Matches) -> Result<(), String> {
     };
 
     let verbose = matches.opt_present("v");
+    let cache_old_crates = matches.opt_present("c");
     let state_transfer_functions = matches.opt_strs("t");
 
     let free_args = matches.free.join(" ");
@@ -103,7 +105,8 @@ fn rmain(matches: Matches) -> Result<(), String> {
         &curr_dir, 
         override_namespace_crate_dir,
         state_transfer_functions,
-        verbose
+        verbose,
+        cache_old_crates
     )
 }
 
@@ -158,7 +161,8 @@ fn do_swap(
     curr_dir: &DirRef, 
     override_namespace_crate_dir: Option<NamespaceDir>, 
     state_transfer_functions: Vec<String>,
-    verbose_log: bool
+    verbose_log: bool,
+    cache_old_crates: bool
 ) -> Result<(), String> {
     let kernel_mmi_ref = memory::get_kernel_mmi_ref().ok_or_else(|| "couldn't get kernel_mmi_ref".to_string())?;
     let namespace = task::get_my_current_task().ok_or("Couldn't get current task")?.get_namespace();
@@ -201,7 +205,7 @@ fn do_swap(
         state_transfer_functions,
         &kernel_mmi_ref,
         verbose_log,
-        false // cache_old_crates
+        cache_old_crates,
     );
     
     let end = get_hpet().as_ref().ok_or("couldn't get HPET timer")?.get_counter();
