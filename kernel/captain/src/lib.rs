@@ -45,7 +45,7 @@ extern crate exceptions_full;
 extern crate network_manager;
 extern crate pause;
 extern crate window_manager;
-
+extern crate heap_initialization;
 #[cfg(simd_personality)] extern crate simd_personality;
 
 
@@ -119,6 +119,10 @@ pub fn init(
     // boot up the other cores (APs)
     let ap_count = multicore_bringup::handle_ap_cores(kernel_mmi_ref.clone(), ap_start_realmode_begin, ap_start_realmode_end)?;
     info!("Finished handling and booting up all {} AP cores.", ap_count);
+
+    //intialize the per core heaps
+    heap_initialization::initialize_per_core_heaps()?;
+    info!("Initialized per core heaps");
 
     // initialize window manager.
     let (key_producer, mouse_producer) = window_manager::init()?;

@@ -237,6 +237,7 @@ dependencies = [
  "e1000 0.1.0",
  "exceptions_full 0.1.0",
  "first_application 0.1.0",
+ "heap_initialization 0.1.0",
  "interrupts 0.1.0",
  "irq_safety 0.1.1 (git+https://github.com/kevinaboos/irq_safety)",
  "kernel_config 0.1.0",
@@ -795,27 +796,12 @@ dependencies = [
 name = "heap_initialization"
 version = "0.1.0"
 dependencies = [
- "heap_irq_safe 0.1.0",
+ "apic 0.1.0",
  "irq_safety 0.1.1 (git+https://github.com/kevinaboos/irq_safety)",
  "kernel_config 0.1.0",
  "log 0.3.9 (registry+https://github.com/rust-lang/crates.io-index)",
  "memory 0.1.0",
  "multiple_heaps 0.1.0",
- "spin 0.4.10 (registry+https://github.com/rust-lang/crates.io-index)",
-]
-
-[[package]]
-name = "heap_irq_safe"
-version = "0.1.0"
-dependencies = [
- "block_allocator 0.1.0",
- "irq_safety 0.1.1 (git+https://github.com/kevinaboos/irq_safety)",
- "kernel_config 0.1.0",
- "linked_list_allocator 0.6.3 (registry+https://github.com/rust-lang/crates.io-index)",
- "log 0.3.9 (registry+https://github.com/rust-lang/crates.io-index)",
- "memory 0.1.0",
- "raw-cpuid 7.0.3 (registry+https://github.com/rust-lang/crates.io-index)",
- "slabmalloc 0.7.0",
  "spin 0.4.10 (registry+https://github.com/rust-lang/crates.io-index)",
 ]
 
@@ -1327,13 +1313,13 @@ name = "multiple_heaps"
 version = "0.1.0"
 dependencies = [
  "block_allocator 0.1.0",
- "heap_irq_safe 0.1.0",
  "irq_safety 0.1.1 (git+https://github.com/kevinaboos/irq_safety)",
  "kernel_config 0.1.0",
  "linked_list_allocator 0.6.3 (registry+https://github.com/rust-lang/crates.io-index)",
  "log 0.3.9 (registry+https://github.com/rust-lang/crates.io-index)",
  "memory 0.1.0",
  "raw-cpuid 7.0.3 (registry+https://github.com/rust-lang/crates.io-index)",
+ "slabmalloc 0.7.0",
  "spin 0.4.10 (registry+https://github.com/rust-lang/crates.io-index)",
 ]
 
@@ -2100,6 +2086,7 @@ name = "slabmalloc"
 version = "0.7.0"
 dependencies = [
  "log 0.4.6 (registry+https://github.com/rust-lang/crates.io-index)",
+ "memory 0.1.0",
 ]
 
 [[package]]

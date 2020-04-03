@@ -25,11 +25,11 @@ features = [ "use_arch" ]
 default-features = false
 version = "0.3.7"
 
-[dependencies.heap_irq_safe]
-path = "../heap_irq_safe"
-
 [dependencies.memory]
 path = "../memory"
 
 [dependencies.kernel_config]
 path = "../kernel_config"
+
+[dependencies.slabmalloc]
+path = "../../libs/rust-slabmalloc"

@@ -11,7 +11,7 @@
 
 extern crate spin;
 extern crate multiboot2;
-#[macro_use] extern crate alloc;
+extern crate alloc;
 #[macro_use] extern crate lazy_static;
 #[macro_use] extern crate log;
 extern crate irq_safety;
@@ -70,8 +70,7 @@ use spin::Once;
 use irq_safety::MutexIrqSafe;
 use alloc::vec::Vec;
 use alloc::sync::Arc;
-use kernel_config::memory::{PAGE_SIZE, KERNEL_STACK_ALLOCATOR_BOTTOM, KERNEL_STACK_ALLOCATOR_TOP_ADDR, KERNEL_OFFSET, KERNEL_HEAP_START, KERNEL_HEAP_MAX_SIZE};
-use core::ops::Add;
+use kernel_config::memory::{PAGE_SIZE, KERNEL_STACK_ALLOCATOR_BOTTOM, KERNEL_STACK_ALLOCATOR_TOP_ADDR, KERNEL_OFFSET};
 
 /// The memory management info and address space of the kernel
 static KERNEL_MMI: Once<Arc<MutexIrqSafe<MemoryManagementInfo>>> = Once::new();
@@ -132,53 +131,23 @@ impl MemoryManagementInfo {
     }
 }
 
-/// Allocates pages from the heap memory area and returns the starting address of the new mapped pages.
-/// The kernel heap VMA and MappedPages are updated to store the new memory area.
-/// 
-/// An error is returned if the heap memory limit is reached.
-pub fn allocate_heap_pages(size_in_bytes: usize) -> Result<VirtualAddress, &'static str> {
-    let kernel_mmi_ref = get_kernel_mmi_ref().ok_or("allocate heap(): KERNEL_MMI was not yet initialized!")?;
+/// Allocates pages from the heap memory area and maps them to frames.
+/// Returns the new mapped pages or an error is returned if the heap memory limit is reached.
+pub fn create_heap_mapping(starting_address: VirtualAddress, size_in_bytes: usize) -> Result<MappedPages, &'static str> {
+    let kernel_mmi_ref = get_kernel_mmi_ref().ok_or("allocate_heap_pages(): KERNEL_MMI was not yet initialized!")?;
     let mut kernel_mmi = kernel_mmi_ref.lock();
-    let heap_start_addr = KERNEL_HEAP_START;
-    let start_address;
-    let current_heap_size;
-    let heap_end_addr;
-    let additional_mp;
 
-    // find the heap mapped pages and the address of the new mapped pages to be added
-    {
-        let heap_mp = kernel_mmi.extra_mapped_pages.iter().find(|x| x.start_address().value() == heap_start_addr).ok_or("Could not find heap mapped pages.")?;
-        current_heap_size = heap_mp.size_in_bytes();
+    let mut frame_allocator = FRAME_ALLOCATOR.try()
+        .ok_or("allocate_heap_pages(): couldnt get FRAME_ALLOCATOR")?
+        .lock();
 
-        if current_heap_size + size_in_bytes > KERNEL_HEAP_MAX_SIZE {
-            return Err("Cannot allocate more memory for the heap. Maximum limit is reached");
-        }
-        heap_end_addr = heap_mp.start_address().add(current_heap_size);
-    }
+    let pages = PageRange::from_virt_addr(starting_address, size_in_bytes);
+    let heap_flags = EntryFlags::WRITABLE;
+    let mp = kernel_mmi.page_table.map_pages(pages, heap_flags, frame_allocator.deref_mut())?;
 
-    // allocate the new pages
-    {
-        let mut frame_allocator = FRAME_ALLOCATOR.try()
-            .ok_or("create_contiguous_mapping(): couldnt get FRAME_ALLOCATOR")?
-            .lock();
+    // trace!("Allocated heap pages at: {:#X}", starting_address);
 
-        let pages = PageRange::from_virt_addr(heap_end_addr, size_in_bytes);
-        let heap_flags = EntryFlags::WRITABLE;
-        additional_mp = kernel_mmi.page_table.map_pages(pages, heap_flags, frame_allocator.deref_mut())?;
-        start_address = additional_mp.start_address();
-    }
-
-    // update the heap mapped pages
-    {
-        let heap_mp = kernel_mmi.extra_mapped_pages.iter_mut().find(|x| x.start_address().value() == heap_start_addr).ok_or("Could not find heap mapped pages.")?;
-        // merge the 2 and insert into vector
-        if let Err((e,_mp)) = heap_mp.merge(vec!(additional_mp)) {
-            return Err(e);
-        }
-    }
-
-    // return the start address
-    Ok(start_address)
+    Ok(mp)
 }
 
 

@@ -6,9 +6,6 @@ version = "0.1.0"
 [dependencies]
 spin = "0.4.10"
 
-[dependencies.heap_irq_safe]
-path = "../heap_irq_safe"
-
 [dependencies.memory]
 path = "../memory"
 
@@ -24,3 +21,6 @@ git = "https://github.com/kevinaboos/irq_safety"
 
 [dependencies.multiple_heaps]
 path = "../multiple_heaps"
+
+[dependencies.apic]
+path = "../apic"

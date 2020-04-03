@@ -86,6 +86,12 @@ pub fn core_count() -> usize {
     get_lapics().iter().count()
 }
 
+/// Returns the maximum APIC ID for this machine
+pub fn max_apic_id() -> Result<u8, &'static str> {
+    let lapics = get_lapics();
+    let core = lapics.iter().max_by_key(|core| core.0).ok_or("Could not find a maximum apic id")?;
+    Ok(*core.0)
+}
 
 /// Returns the APIC ID of the currently executing processor core.
 pub fn get_my_apic_id() -> Option<u8> {
