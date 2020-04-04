@@ -151,29 +151,37 @@ pub extern "C" fn nano_core_start(multiboot_information_virtual_address: usize) 
 
     // Parse the nano_core crate (the code we're already running) since we need it to load and run applications.
     println_raw!("nano_core_start(): parsing nano_core crate, please wait ..."); 
-    let bsp_stack_top: VirtualAddress;
-    let bsp_stack_bottom: VirtualAddress;
-    let ap_realmode_begin: VirtualAddress;
-    let ap_realmode_end: VirtualAddress;
-    match mod_mgmt::parse_nano_core::parse_nano_core(default_namespace, text_mapped_pages, rodata_mapped_pages, data_mapped_pages, false) {
-        Ok((init_symbols, _num_new_syms)) => {
-            // Get symbols from the boot assembly code that defines where the BSP stack and the ap_start code are.
-            // The symbols in the ".init" section will be in init_symbols, all others will be in the regular namespace symbol tree.
-            bsp_stack_top     = try_exit!(default_namespace.get_symbol("initial_bsp_stack_top").upgrade().ok_or("Missing expected symbol from assembly code \"initial_bsp_stack_top\"")).start_address();
-            bsp_stack_bottom  = try_exit!(default_namespace.get_symbol("initial_bsp_stack_bottom").upgrade().ok_or("Missing expected symbol from assembly code \"initial_bsp_stack_bottom\"")).start_address();
-            ap_realmode_begin = try_exit!(init_symbols.get("ap_start_realmode").ok_or("Missing expected symbol from assembly code \"ap_start_realmode\"").and_then(|v| VirtualAddress::new(*v + KERNEL_OFFSET)));
-            ap_realmode_end   = try_exit!(init_symbols.get("ap_start_realmode_end").ok_or("Missing expected symbol from assembly code \"ap_start_realmode_end\"").and_then(|v| VirtualAddress::new(*v + KERNEL_OFFSET)));
-            // debug!("bsp_stack_top: {:#X}, bsp_stack_bottom: {:#X}, ap_realmode_begin: {:#X}, ap_realmode_end: {:#X}", bsp_stack_top, bsp_stack_bottom, ap_realmode_begin, ap_realmode_end);
+    let (nano_core_crate_ref, bsp_stack_top, bsp_stack_bottom, ap_realmode_begin, ap_realmode_end) = {
+        match mod_mgmt::parse_nano_core::parse_nano_core(default_namespace, text_mapped_pages, rodata_mapped_pages, data_mapped_pages, false) {
+            Ok((nano_core_crate_ref, init_symbols, _num_new_syms)) => {
+                // Get symbols from the boot assembly code that defines where the BSP stack and the ap_start code are.
+                // The symbols in the ".init" section will be in init_symbols, all others will be in the regular namespace symbol tree.
+                let bsp_stack_top     = try_exit!(default_namespace.get_symbol("initial_bsp_stack_top").upgrade().ok_or("Missing expected symbol from assembly code \"initial_bsp_stack_top\"")).start_address();
+                let bsp_stack_bottom  = try_exit!(default_namespace.get_symbol("initial_bsp_stack_bottom").upgrade().ok_or("Missing expected symbol from assembly code \"initial_bsp_stack_bottom\"")).start_address();
+                let ap_realmode_begin = try_exit!(init_symbols.get("ap_start_realmode").ok_or("Missing expected symbol from assembly code \"ap_start_realmode\"").and_then(|v| VirtualAddress::new(*v + KERNEL_OFFSET)));
+                let ap_realmode_end   = try_exit!(init_symbols.get("ap_start_realmode_end").ok_or("Missing expected symbol from assembly code \"ap_start_realmode_end\"").and_then(|v| VirtualAddress::new(*v + KERNEL_OFFSET)));
+                // debug!("bsp_stack_top: {:#X}, bsp_stack_bottom: {:#X}, ap_realmode_begin: {:#X}, ap_realmode_end: {:#X}", bsp_stack_top, bsp_stack_bottom, ap_realmode_begin, ap_realmode_end);
+                (nano_core_crate_ref, bsp_stack_top, bsp_stack_bottom, ap_realmode_begin, ap_realmode_end)
+            }
+            Err((msg, mapped_pages_array)) => {
+                // Because this function takes ownership of the text/rodata/data mapped_pages that cover the currently-running code,
+                // we have to make sure these mapped_pages aren't dropped.
+                core::mem::forget(mapped_pages_array);
+                shutdown(format_args!("parse_nano_core() failed! error: {}", msg));
+            }
         }
-        Err((msg, mapped_pages)) => {
-            // Because this function takes ownership of the text/rodata/data mapped_pages that cover the currently-running code,
-            // we have to make sure these mapped_pages aren't dropped.
-            core::mem::forget(mapped_pages);
-            shutdown(format_args!("parse_nano_core() failed! error: {}", msg));
-        }
-    }
+    };
     println_raw!("nano_core_start(): finished parsing the nano_core crate."); 
 
+    // If in loadable mode, load each of the nano_core's constituent crates such that other crates loaded in the future
+    // can depend on those dynamically-loaded instances rather than on the statically-linked sections in the nano_core's base kernel image.
+    #[cfg(loadable)] {
+        // TODO FIXME: this does not yet work correctly
+        // try_exit!(mod_mgmt::replace_nano_core_crates::replace_nano_core_crates(&default_namespace, nano_core_crate_ref, &kernel_mmi_ref));
+    }
+    #[cfg(not(loadable))] {
+        drop(nano_core_crate_ref);
+    }
     
     // if in loadable mode, parse the crates we always need: the core library (Rust no_std lib), the panic handlers, and the captain
     #[cfg(loadable)] 
@@ -181,10 +189,10 @@ pub extern "C" fn nano_core_start(multiboot_information_virtual_address: usize) 
         use mod_mgmt::CrateNamespace;
         println_raw!("nano_core_start(): loading the \"captain\" crate...");     
         let (captain_file, _ns) = try_exit!(CrateNamespace::get_crate_object_file_starting_with(default_namespace, "captain-").ok_or("couldn't find the singular \"captain\" crate object file"));
-        let _num_captain_syms = try_exit!(default_namespace.load_crate(&captain_file, None, &kernel_mmi_ref, false));
+        let (_captain_crate, _num_captain_syms) = try_exit!(default_namespace.load_crate(&captain_file, None, &kernel_mmi_ref, false));
         println_raw!("nano_core_start(): loading the panic handling crate(s)...");     
         let (panic_wrapper_file, _ns) = try_exit!(CrateNamespace::get_crate_object_file_starting_with(default_namespace, "panic_wrapper-").ok_or("couldn't find the singular \"panic_wrapper\" crate object file"));
-        let _num_libcore_syms = try_exit!(default_namespace.load_crate(&panic_wrapper_file, None, &kernel_mmi_ref, false));
+        let (_pw_crate, _num_pw_syms) = try_exit!(default_namespace.load_crate(&panic_wrapper_file, None, &kernel_mmi_ref, false));
     }
 
 
@@ -203,9 +211,7 @@ pub extern "C" fn nano_core_start(multiboot_information_virtual_address: usize) 
     #[cfg(loadable)]
     {
         use alloc::vec::Vec;
-        use alloc::sync::Arc;
-        use irq_safety::MutexIrqSafe;
-        use memory::{MappedPages, MemoryManagementInfo};
+        use memory::{MmiRef, MappedPages};
 
         let section = try_exit!(
             default_namespace.get_symbol_starting_with("captain::init::")
@@ -214,7 +220,7 @@ pub extern "C" fn nano_core_start(multiboot_information_virtual_address: usize) 
         );
         info!("The nano_core (in loadable mode) is invoking the captain init function: {:?}", section.name);
 
-        type CaptainInitFunc = fn(Arc<MutexIrqSafe<MemoryManagementInfo>>, Vec<MappedPages>, VirtualAddress, VirtualAddress, VirtualAddress, VirtualAddress) -> Result<(), &'static str>;
+        type CaptainInitFunc = fn(MmiRef, Vec<MappedPages>, VirtualAddress, VirtualAddress, VirtualAddress, VirtualAddress) -> Result<(), &'static str>;
         let mut space = 0;
         let func: &CaptainInitFunc = {
             try_exit!(section.mapped_pages.lock().as_func(section.mapped_pages_offset, &mut space))
