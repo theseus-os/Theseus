@@ -848,11 +848,11 @@ impl Drop for MappedPages {
     fn drop(&mut self) {
         if self.size_in_pages() == 0 { return; }
         
-        // skip logging temp page unmapping, since it's the most common
-        const TEMP_PAGE: Page = Page::containing_address(VirtualAddress::new_canonical(TEMPORARY_PAGE_VIRT_ADDR));
-        if self.pages.start() != &TEMP_PAGE {
-            trace!("MappedPages::drop(): unmapping MappedPages start: {:?} to end: {:?}", self.pages.start(), self.pages.end());
-        }
+        // // skip logging temp page unmapping, since it's the most common
+        // const TEMP_PAGE: Page = Page::containing_address(VirtualAddress::new_canonical(TEMPORARY_PAGE_VIRT_ADDR));
+        // if self.pages.start() != &TEMP_PAGE {
+        //     trace!("MappedPages::drop(): unmapping MappedPages start: {:?} to end: {:?}", self.pages.start(), self.pages.end());
+        // }
 
         let mut mapper = Mapper::from_current();
         if mapper.target_p4 != self.page_table_p4 {

@@ -17,8 +17,7 @@
 //! 
 
 
-
-use super::{CrateNamespace, LoadedCrate, StrongCrateRef, StrongSectionRef, SectionType, MmiRef};
+use super::{CrateNamespace, LoadedCrate, StrongCrateRef, SectionType, MmiRef};
 use alloc::{
     collections::{BTreeSet, BTreeMap},
     string::String,
@@ -56,7 +55,8 @@ pub fn replace_nano_core_crates(
 
     let nano_core_crate = nano_core_crate_ref.lock_as_ref();
 
-    // As a first attempt, let's try to load and replace the "memory" crate
+    // For now we just replace the "memory" crate. 
+    // More crates can be added later, up to every `constituent_crate` in the nano_core.
     let (crate_object_file, _ns) = CrateNamespace::get_crate_object_file_starting_with(namespace, "memory-")
         .ok_or("Failed to find \"memory-\" crate")?;
 
@@ -68,30 +68,33 @@ pub fn replace_nano_core_crates(
         false,
     )?;
 
-    debug!("Replaced nano_core constituent crate: {:?}", _new_crate_ref);
-
     Ok(())
 }
-
 
 
 /// Load the given crate, but instead of using its own data sections (.data and .bss),
 /// we use the corresponding sections from the nano_core base image. 
 /// This avoids the problem of trying to create a second instace of a static variable
 /// that's supposed to be a system-wide singleton. 
+/// 
 /// We could technically achieve it by forcing every static variable to be `Clone`, 
 /// e.g., by wrapping it in an `Arc`, but we cannot do this for early crates like `memory`
 /// that exist before we have the ability to use alloc types.
+/// Note that we should do something like this for sharing static variables 
+/// across different `CrateNamespace` personalities. 
 /// 
-/// Instead of calling load_crate() and loading the new crate as normal, we should break it down into its constituent parts. 
-/// (1) Call load_crate_sections as normal. The data sections will be ignored, but that's okay.
-/// (2) Go through the .data/.bss sections in the partially loaded new crate, and replace them with references to
-///     the corresponding data section in the nano_core.
-///     We must replace both the sections in the `sections` map and in the `data_sections` map.
-///     (Check that the sections are actually being dropped by instrumenting `LoadedSection::Drop`.)
-/// (3) Call perform_relocations as normal, which will use the changed data/bss sections
-/// (4) Take and drop the new crate's `data_pages`, just to ensure it's not actually being used. 
-///     Check that the data pages are getting unmapped in MappedPages::unmap()  (e.g., set a breakpoint using GDB?)
+/// # Procedure
+/// Instead of calling load_crate() and loading the new crate as normal, we break it down into its constituent parts. 
+/// 1. Call `load_crate_sections()` as normal. The data sections will be ignored, but that's okay.
+/// 2. Go through the .data/.bss sections in the partially loaded new crate, and replace them with references to
+///    the corresponding data section in the nano_core.
+///    We must replace both the sections in the `sections` map and in the `data_sections` map.
+/// 3. Remove (take) and drop the new crate's `data_pages`, just to ensure they're not actually being used. 
+/// 4. Add the new crate's global sections to the symbol map, as usual. 
+///    We can skip adding data/bss sections to the symbol map since they were already added in `parse_nano_core()`.
+/// 5. Call `perform_relocations()` as usual, which will use the changed data/bss sections above,
+///    resulting in future crates depending on the nano_core's data sections as needed.
+/// 6. Add the new crate into the `namespace`'s new crate tree, as usual.
 fn load_crate_using_nano_core_data_sections(
     nano_core_crate: &LoadedCrate,
     namespace: &Arc<CrateNamespace>,
@@ -99,73 +102,72 @@ fn load_crate_using_nano_core_data_sections(
     kernel_mmi_ref: &MmiRef, 
     verbose_log: bool,
 ) -> Result<StrongCrateRef, &'static str> {
-
     let cf = crate_object_file.lock();
+    debug!("Replacing nano_core's constituent crate {:?}", cf.get_name());
 
-    // (1) Load the crate's sections. We won't use the .data/.bss sections, but that's fine.
+    // (1) Load the crate's sections. We won't end up using the newly-loaded .data/.bss sections, but that's fine.
     let (new_crate_ref, elf_file) = namespace.load_crate_sections(&*cf, kernel_mmi_ref, verbose_log)?;
+
+    let new_crate_name: String; 
+    let _num_new_syms: usize;
+    let _num_new_sections: usize;
 
     // (2) Go through the .data/.bss sections in the partially loaded new crate,
     //     and replace them with references to the corresponding data section in the nano_core.
-    //     We must replace both the sections in the `sections` map and in the `data_sections` map.
-    //     (Check that the sections are actually being dropped by instrumenting `LoadedSection::Drop`.)
-    // 
-    // In the meantime, populate a map of newly-loaded section index to the existing old data section in the nano_core that matches it.
-    // Note that the newly-loaded section index itself already maps to the newly-loaded data section, in the `new_crate_ref.sections` map.
-    let _map_new_sec_shndx_to_old_sec_in_nano_core: BTreeMap<usize, StrongSectionRef> = {
-        let mut map = BTreeMap::new();
+    //     We must replace the section references in both the new_crate's `sections` map and `data_sections` map.
+    {
+        // We also populate a map from newly-loaded section index to the existing old data section in the nano_core that matches it.
+        // Note that the newly-loaded section index itself already maps to the newly-loaded data section, in the `new_crate_ref.sections` map.
+        let mut map_new_sec_shndx_to_old_sec_in_nano_core = BTreeMap::new();
         // Get an iterator of all data sections in the newly-loaded crate and their shndx values.
         // We can't use the `data_sections` field in the `LoadedCrate` struct because it doesn't have shndx values for each section.
         let mut new_crate = new_crate_ref.lock_as_mut().ok_or_else(|| "BUG: could not get exclusive mutable access to newly-loaded crate")?;
         let new_crate_sections_mut = new_crate.sections.iter_mut()
             .filter(|(_shndx, sec)| sec.get_type() == SectionType::Data || sec.get_type() == SectionType::Bss);
         
+        // (2)(a) Replace the data section references in the new crate's `sections` list with the corresponding sections in the nano_core
         for (shndx, new_sec) in new_crate_sections_mut {
             // Get the section from the nano_core that exactly matches the new_sec.
             let old_sec = nano_core_crate.data_sections.get_str(&new_sec.name).ok_or_else(|| {
                 error!("BUG: couldn't find old_sec in nano_core to copy data into new_sec {:?} (.data/.bss state transfer)", new_sec.name);
                 "BUG: couldn't find old_sec in nano_core to copy data into new_sec (.data/.bss state transfer)"
             })?;
-            map.insert(*shndx, old_sec.clone());
-
-            // replace the new crate's data section references with references to the corresponding sections in the nano_core
+            map_new_sec_shndx_to_old_sec_in_nano_core.insert(*shndx, old_sec.clone());
             *new_sec = old_sec.clone();
         }
+        // debug!("New crate data sections: {:?}", map_new_sec_shndx_to_old_sec_in_nano_core);
 
-        // do the same section replacement in the new_crate's list of `data_sections`
+        // (2)(b) Do the same replacement of section references in the new_crate's list of `data_sections`
         for new_data_sec in new_crate.data_sections.values_mut() {
-            let old_sec = map.values()
+            let old_sec = map_new_sec_shndx_to_old_sec_in_nano_core.values()
                 .find(|s| s.name == new_data_sec.name)
                 .ok_or("BUG: couldn't find matching data_section in new_crate")?;
             *new_data_sec = old_sec.clone();
         }
+        
+        // (3) Remove and drop the new_crate's data MappedPages, since it shouldn't be used. 
+        let _unused_new_data_pages = new_crate.data_pages.take();
+        drop(_unused_new_data_pages);
 
-        map
-
-    };
-
-    // debug!("New crate data sections: {:?}", map_new_sec_shndx_to_old_sec_in_nano_core);
-
-    // (3) Perform the actual relocations, using the replaced data sections above.
-    namespace.perform_relocations(&elf_file, &new_crate_ref, None, kernel_mmi_ref, verbose_log)?;
-    
-    // (4) Remove and drop the new_crate's data MappedPages, since it shouldn't be used. 
-
-    // Lastly, do all the final parts of loading a crate:
-    // adding its symbols to the map, and inserting it into the crate tree.
-    // We only need to add non-data sections, since the data sections that we're using from the nano_core
-    // have already been added to the symbol map when the nano_core was originally parsed.
-    let (new_crate_name, num_sections, new_syms) = {
-        let new_crate = new_crate_ref.lock_as_ref();
-        let new_syms = namespace.add_symbols_filtered(
+        // (4) Just like in the regular load_crate() function, we add the new crate's symbols to the map. 
+        // We only need to add non-data sections, since the data sections that we're using from the nano_core
+        // have already been added to the symbol map when the nano_core was originally parsed.
+        _num_new_syms = namespace.add_symbols_filtered(
             new_crate.sections.values(), 
             |sec| sec.get_type() != SectionType::Data && sec.get_type() != SectionType::Bss,
             verbose_log,
         );
-        (new_crate.crate_name.clone(), new_crate.sections.len(), new_syms)
-    };
-        
-    debug!("loaded new crate {:?}, num sections: {}, added {} new symbols.", new_crate_name, num_sections, new_syms);
+        _num_new_sections = new_crate.sections.len();
+        new_crate_name = new_crate.crate_name.clone();
+    }
+
+    // (5) Perform the actual relocations, using the replaced data sections above.
+    namespace.perform_relocations(&elf_file, &new_crate_ref, None, kernel_mmi_ref, verbose_log)?;
+
+    info!("Replaced nano_core constituent crate {:?}, num sections: {}, added {} new symbols (should be 0).",
+        new_crate_name, _num_new_sections, _num_new_syms
+    );
+    // (6) Add the newly-loaded crate to the namespace.
     namespace.crate_tree.lock().insert(new_crate_name.into(), new_crate_ref.clone_shallow());
     Ok(new_crate_ref)
 }
