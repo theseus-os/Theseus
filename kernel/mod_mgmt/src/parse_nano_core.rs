@@ -51,8 +51,11 @@ fn mp_range(mp_ref: &Arc<Mutex<MappedPages>>) -> Range<VirtualAddress> {
 /// Parses the nano_core object file that represents the already loaded (and currently running) nano_core code.
 /// Basically, just searches for global (public) symbols, which are added to the system map and the crate metadata.
 /// 
-/// If successful, this returns a tuple of `(init_symbols, usize)`, in which `init_symbols` is a map of symbol name to its constant value,
-/// and the `usize` is the number of new symbols added.
+/// # Return
+/// If successful, this returns a tuple of the following:
+/// * `nano_core_crate_ref`: A reference to the newly-created nano_core crate.
+/// * `init_symbols`: a map of symbol name to its constant value, which contains assembler and linker constances.
+/// * The number of new symbols added to the symbol map (a `usize`).
 /// 
 /// If an error occurs, the returned `Result::Err` contains the passed-in `text_pages`, `rodata_pages`, and `data_pages`
 /// because those cannot be dropped, as they hold the currently-running code, and dropping them would cause endless exceptions.
@@ -62,7 +65,7 @@ pub fn parse_nano_core(
     rodata_pages: MappedPages, 
     data_pages:   MappedPages, 
     verbose_log:  bool
-) -> Result<(BTreeMap<String, usize>, usize), (&'static str, [Arc<Mutex<MappedPages>>; 3])> {
+) -> Result<(StrongCrateRef, BTreeMap<String, usize>, usize), (&'static str, [Arc<Mutex<MappedPages>>; 3])> {
 
     let text_pages   = Arc::new(Mutex::new(text_pages));
     let rodata_pages = Arc::new(Mutex::new(rodata_pages));
@@ -80,7 +83,7 @@ pub fn parse_nano_core(
 
     // Create the LoadedCrate instance to represent the nano_core. 
     // It will be properly populated in one of the parse_nano_core_* functions below
-    let new_crate_ref = CowArc::new(LoadedCrate {
+    let nano_core_crate_ref = CowArc::new(LoadedCrate {
         crate_name:          crate_name.clone(),
         object_file:         nano_core_file.clone(),
         debug_symbols_file:  Arc::downgrade(&nano_core_file),
@@ -96,8 +99,8 @@ pub fn parse_nano_core(
     // We don't need to actually load the nano_core as a new crate, since we're already running it.
     // We just need to parse it to discover the symbols. 
     let parse_result = match nano_core_file_path.extension() {
-        Some("sym") => parse_nano_core_symbol_file(&new_crate_ref, &text_pages, &rodata_pages, &data_pages),
-        Some("bin") => parse_nano_core_binary(&new_crate_ref, &text_pages, &rodata_pages, &data_pages),
+        Some("sym") => parse_nano_core_symbol_file(&nano_core_crate_ref, &text_pages, &rodata_pages, &data_pages),
+        Some("bin") => parse_nano_core_binary(&nano_core_crate_ref, &text_pages, &rodata_pages, &data_pages),
         _ => Err("nano_core object file had unexpected file extension. Expected \".bin\" or \".sym\""),
     };
     let parsed_crate_items = try_mp!(parse_result, text_pages, rodata_pages, data_pages);
@@ -106,7 +109,7 @@ pub fn parse_nano_core(
     // Access and propertly set the new_crate's sections list and other items.
     {
         let mut new_crate_mut = try_mp!(
-            new_crate_ref.lock_as_mut()
+            nano_core_crate_ref.lock_as_mut()
                 .ok_or_else(|| "BUG: parse_nano_core(): couldn't get exclusive mutable access to new_crate"),
             text_pages, rodata_pages, data_pages
         );
@@ -121,9 +124,9 @@ pub fn parse_nano_core(
     }
 
     // Add the newly-parsed nano_core crate to the kernel namespace.
-    real_namespace.crate_tree.lock().insert(crate_name.into(), new_crate_ref);
+    real_namespace.crate_tree.lock().insert(crate_name.into(), nano_core_crate_ref.clone_shallow());
     info!("Finished parsing nano_core crate, {} new symbols.", new_syms);
-    Ok((parsed_crate_items.init_symbols, new_syms))
+    Ok((nano_core_crate_ref, parsed_crate_items.init_symbols, new_syms))
 }
 
 
@@ -647,7 +650,7 @@ fn add_new_section(
         crate_items.init_symbols.insert(sec_name, sec_vaddr);
         None
     };
-    
+
     if let Some(sec) = new_section {
         // debug!("parse_nano_core: new section: {:?}", sec);
         let sec_ref = Arc::new(sec);
