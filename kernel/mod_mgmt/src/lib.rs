@@ -1597,7 +1597,7 @@ impl CrateNamespace {
 
     /// Adds only *global* symbols in the given `sections` iterator to this namespace's symbol map,
     /// 
-    /// If a symbol already exists in the symbol map, this replaces the existing symbol but does not count is as a newly-added one.
+    /// If a symbol already exists in the symbol map, this replaces the existing symbol but does not count it as a newly-added one.
     /// 
     /// Returns the number of *new* unique symbols added.
     pub fn add_symbols<'a, I>(
@@ -1614,7 +1614,7 @@ impl CrateNamespace {
     /// Adds symbols in the given `sections` iterator to this namespace's symbol map,
     /// but only sections that are *global* AND for which the given `filter_func` returns true. 
     /// 
-    /// If a symbol already exists in the symbol map, this replaces the existing symbol but does not count is as a newly-added one.
+    /// If a symbol already exists in the symbol map, this replaces the existing symbol but does not count it as a newly-added one.
     /// 
     /// Returns the number of *new* unique symbols added.
     fn add_symbols_filtered<'a, I, F>(

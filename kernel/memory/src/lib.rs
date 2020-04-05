@@ -126,9 +126,9 @@ impl MemoryManagementInfo {
     /// You cannot call this to allocate a stack in a different `MemoryManagementInfo`/`PageTable` than the one you're currently running. 
     /// It will only work for allocating a stack in the currently-running MMI.
     pub fn alloc_stack(&mut self, size_in_pages: usize) -> Option<Stack> {
-        FRAME_ALLOCATOR.try().and_then(|fa| {
+        FRAME_ALLOCATOR.try().and_then(|fa| 
             self.stack_allocator.alloc_stack(&mut self.page_table, fa.lock().deref_mut(), size_in_pages)
-        })
+        )
     }
 }
 
