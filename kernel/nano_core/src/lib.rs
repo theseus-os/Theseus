@@ -177,7 +177,7 @@ pub extern "C" fn nano_core_start(multiboot_information_virtual_address: usize) 
     // can depend on those dynamically-loaded instances rather than on the statically-linked sections in the nano_core's base kernel image.
     #[cfg(loadable)] {
         // TODO FIXME: this does not yet work correctly
-        // try_exit!(mod_mgmt::replace_nano_core_crates::replace_nano_core_crates(&default_namespace, nano_core_crate_ref, &kernel_mmi_ref));
+        try_exit!(mod_mgmt::replace_nano_core_crates::replace_nano_core_crates(&default_namespace, nano_core_crate_ref, &kernel_mmi_ref));
     }
     #[cfg(not(loadable))] {
         drop(nano_core_crate_ref);

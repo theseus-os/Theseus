@@ -13,6 +13,7 @@ use kernel_config::memory::PAGE_SIZE;
 
 
 /// A stand-in for a Union
+#[derive(Debug)]
 pub enum VectorArray<T: Clone> {
     Array((usize, [T; 32])),
     Vector(Vec<T>),
@@ -51,6 +52,7 @@ impl<T: Clone> VectorArray<T> {
 /// already in use.
 ///
 /// `kernel_end` and `multiboot_end` are _inclusive_ bounds.
+#[derive(Debug)]
 pub struct AreaFrameAllocator {
     next_free_frame: Frame,
     current_area: Option<PhysicalMemoryArea>,

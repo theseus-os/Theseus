@@ -30,6 +30,7 @@ impl StackAllocator {
     pub fn alloc_stack<FA>(&mut self, page_table: &mut Mapper, frame_allocator: &mut FA, size_in_pages: usize)
             -> Option<Stack> where FA: FrameAllocator 
     {
+        warn!("alloc_stack: size_in_pages: {}", size_in_pages);
         if size_in_pages == 0 {
             return None; /* a zero sized stack maikes no sense */
         }
@@ -58,6 +59,7 @@ impl StackAllocator {
 
                 // map stack pages to physical frames
                 // but don't map the guard page, that should be left unmapped
+                warn!("mapping stack pages from start {:?} to end {:?} with flags {:?}", start, end, flags);
                 let stack_pages = match page_table.map_pages(PageRange::new(start, end), flags, frame_allocator) {
                     Ok(pages) => pages,
                     Err(e) => {
@@ -65,6 +67,7 @@ impl StackAllocator {
                         return None;
                     }
                 };
+                warn!("succesfully mapped stack pages! {:?}", stack_pages);
 
                 // create a new stack
                 // stack grows downward from the top address (which is the last page's start_addr + page size)
