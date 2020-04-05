@@ -1571,7 +1571,7 @@ impl CrateNamespace {
     ) -> bool {
         match existing_symbol_map.entry(new_section_key.into()) {
             qp_trie::Entry::Occupied(mut old_val) => {
-                if true || log_replacements {
+                if log_replacements {
                     if let Some(old_sec) = old_val.get().upgrade() {
                         // debug!("       add_symbol(): replacing section: old: {:?}, new: {:?}", old_sec, new_section);
                         if new_section.size() != old_sec.size() {

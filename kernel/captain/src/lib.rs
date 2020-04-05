@@ -85,17 +85,6 @@ pub fn init(
         logger::mirror_to_vga(mirror_to_vga_cb);
     }
 
-    {
-        let mem_crate_ref = mod_mgmt::CrateNamespace::get_crate_starting_with(mod_mgmt::get_initial_kernel_namespace().unwrap(), "memory-")
-            .expect("didn't find nano_core crate!").1;
-        for newly_loaded_data_sec in mem_crate_ref.lock_as_ref().data_sections.values() {
-            info!("Section in memory crate {:?} has weak dependents:", newly_loaded_data_sec);
-            for weak_dep in newly_loaded_data_sec.inner.read().sections_dependent_on_me.iter() {
-                trace!("\t{:?}", weak_dep.section.upgrade());
-            }
-        }
-    }
-
     // calculate TSC period and initialize it
     // not strictly necessary, but more accurate if we do it early on before interrupts, multicore, and multitasking
     let _tsc_freq = tsc::get_tsc_frequency()?;
@@ -106,17 +95,12 @@ pub fn init(
 
     // initialize the rest of the BSP's interrupt stuff, including TSS & GDT
     let (double_fault_stack, privilege_stack) = {
-        warn!("attempting to lock the kernel_mmi...");
         let mut kernel_mmi = kernel_mmi_ref.lock();
-        warn!("succesfully locked the kernel_mmi.");
-        warn!("Dumping kernel_mmi: {:?}", &*kernel_mmi);
-        warn!("FRAME_ALLOCATOR is some? {}", memory::FRAME_ALLOCATOR.try().is_some());
         (
             kernel_mmi.alloc_stack(1).ok_or("could not allocate double fault stack")?,
             kernel_mmi.alloc_stack(KERNEL_STACK_SIZE_IN_PAGES).ok_or("could not allocate privilege stack")?,
         )
     };
-    warn!("attempting to call interrupts::init()");
     let idt = interrupts::init(double_fault_stack.top_unusable(), privilege_stack.top_unusable())?;
     
     // init other featureful (non-exception) interrupt handlers

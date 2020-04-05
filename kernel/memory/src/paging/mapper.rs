@@ -849,13 +849,11 @@ impl Drop for MappedPages {
         if self.size_in_pages() == 0 { return; }
         
         // skip logging temp page unmapping, since it's the most common
-        // if self.pages.start != Page::containing_address(TEMPORARY_PAGE_VIRT_ADDR) {
-        //     trace!("MappedPages::drop(): unmapping MappedPages start: {:?} to end: {:?}", self.pages.start, self.pages.end);
-        // }
+        const TEMP_PAGE: Page = Page::containing_address(VirtualAddress::new_canonical(TEMPORARY_PAGE_VIRT_ADDR));
+        if self.pages.start() != &TEMP_PAGE {
+            trace!("MappedPages::drop(): unmapping MappedPages start: {:?} to end: {:?}", self.pages.start(), self.pages.end());
+        }
 
-        // TODO FIXME: could add "is_kernel" field to MappedPages struct to check whether this is a kernel mapping.
-        // TODO FIXME: if it was a kernel mapping, then we don't need to do this P4 value check (it could be unmapped on any page table)
-        
         let mut mapper = Mapper::from_current();
         if mapper.target_p4 != self.page_table_p4 {
             error!("BUG: MappedPages::drop(): {:?}\n    current P4 {:?} must equal original P4 {:?}, \
