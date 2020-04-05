@@ -12,6 +12,9 @@ fallible-iterator = { version = "0.2.0", default-features = false }
 default-features = false
 version = "0.3.7"
 
+[dependencies.mod_mgmt]
+path = "../mod_mgmt"
+
 [dependencies.task]
 path = "../task"
 

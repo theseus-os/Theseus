@@ -5,6 +5,8 @@
 
 #[macro_use] extern crate vga_buffer; // for println_raw!()
 extern crate x86_64;
+extern crate mod_mgmt;
+extern crate memory; 
 
 
 use x86_64::structures::idt::{LockedIdt, ExceptionStackFrame, PageFaultErrorCode};
@@ -124,11 +126,27 @@ pub extern "x86-interrupt" fn general_protection_fault_handler(stack_frame: &mut
 
 pub extern "x86-interrupt" fn early_page_fault_handler(stack_frame: &mut ExceptionStackFrame, error_code: PageFaultErrorCode) {
     use x86_64::registers::control_regs;
+    let accessed_address = control_regs::cr2();
     println_raw!("\nEXCEPTION (early): PAGE FAULT (early handler) while accessing {:#x}\nerror code: \
-                                  {:?}\n{:#?}",
-             control_regs::cr2(),
-             error_code,
-             stack_frame);
+        {:?}\n{:#?}",
+        accessed_address,
+        error_code,
+        stack_frame
+    );
 
+    println_raw!("Exception IP {:#X} is at {:?}", 
+        stack_frame.instruction_pointer, 
+        mod_mgmt::get_initial_kernel_namespace().and_then(|ns| ns.get_section_containing_address(
+            memory::VirtualAddress::new_canonical(stack_frame.instruction_pointer.0 as usize),
+            false // only look at .text sections, not all other types
+        )),
+    );
+    println_raw!("Faulted access address {:#X} is at {:?}",
+        accessed_address,
+        mod_mgmt::get_initial_kernel_namespace().and_then(|ns| ns.get_section_containing_address(
+            memory::VirtualAddress::new_canonical(accessed_address.0 as usize),
+            true, // look at all sections (.data/.bss/.rodata), not just .text
+        )),
+    );
     loop {}
 }

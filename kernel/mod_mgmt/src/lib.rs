@@ -52,6 +52,7 @@ pub use crate_metadata::*;
 
 
 pub mod parse_nano_core;
+pub mod replace_nano_core_crates;
 
 
 /// The name of the directory that contains all of the CrateNamespace files.
@@ -729,7 +730,7 @@ impl CrateNamespace {
         temp_backup_namespace: Option<&CrateNamespace>, 
         kernel_mmi_ref: &MmiRef, 
         verbose_log: bool
-    ) -> Result<usize, &'static str> {
+    ) -> Result<(StrongCrateRef, usize), &'static str> {
 
         #[cfg(not(loscd_eval))]
         debug!("load_crate: trying to load crate at {:?}", crate_object_file.lock().get_absolute_path());
@@ -743,8 +744,8 @@ impl CrateNamespace {
             
         #[cfg(not(loscd_eval))]
         info!("loaded new crate {:?}, num sections: {}, added {} new symbols.", new_crate_name, num_sections, new_syms);
-        self.crate_tree.lock().insert(new_crate_name.into(), new_crate_ref);
-        Ok(new_syms)
+        self.crate_tree.lock().insert(new_crate_name.into(), new_crate_ref.clone_shallow());
+        Ok((new_crate_ref, new_syms))
     }
 
 
@@ -1574,10 +1575,10 @@ impl CrateNamespace {
                     if let Some(old_sec) = old_val.get().upgrade() {
                         // debug!("       add_symbol(): replacing section: old: {:?}, new: {:?}", old_sec, new_section);
                         if new_section.size() != old_sec.size() {
-                            warn!("         add_symbol(): Unexpectedly replacing differently-sized section: old: ({}B) {:?}, new: ({}B) {:?}", old_sec.size(), old_sec.name, new_section.size(), new_section.name);
+                            warn!("Unexpectedly replacing differently-sized section: old: ({}B) {:?}, new: ({}B) {:?}", old_sec.size(), old_sec.name, new_section.size(), new_section.name);
                         } 
                         else {
-                            warn!("         add_symbol(): Replacing new symbol already present: old {:?}, new: {:?}", old_sec.name, new_section.name);
+                            warn!("Replacing new symbol already present: old {:?}, new: {:?}", old_sec.name, new_section.name);
                         }
                     }
                 }
@@ -1594,12 +1595,11 @@ impl CrateNamespace {
         }
     }
 
-    /// Adds all global symbols in the given `sections` iterator to this namespace's symbol map. 
+    /// Adds only *global* symbols in the given `sections` iterator to this namespace's symbol map,
+    /// 
+    /// If a symbol already exists in the symbol map, this replaces the existing symbol but does not count it as a newly-added one.
     /// 
     /// Returns the number of *new* unique symbols added.
-    /// 
-    /// # Note
-    /// If a symbol already exists in the symbol map, this leaves the existing symbol intact and *does not* replace it.
     pub fn add_symbols<'a, I>(
         &self, 
         sections: I,
@@ -1612,12 +1612,11 @@ impl CrateNamespace {
 
 
     /// Adds symbols in the given `sections` iterator to this namespace's symbol map,
-    /// but only the symbols that correspond to *global* sections AND for which the given `filter_func` returns true. 
+    /// but only sections that are *global* AND for which the given `filter_func` returns true. 
+    /// 
+    /// If a symbol already exists in the symbol map, this replaces the existing symbol but does not count it as a newly-added one.
     /// 
     /// Returns the number of *new* unique symbols added.
-    /// 
-    /// # Note
-    /// If a symbol already exists in the symbol map, this leaves the existing symbol intact and *does not* replace it.
     fn add_symbols_filtered<'a, I, F>(
         &self, 
         sections: I,
@@ -1981,7 +1980,7 @@ impl CrateNamespace {
                 demangled_full_symbol, self.name, potential_crate_name, ns_of_crate_file.name);
 
             match ns_of_crate_file.load_crate(&potential_crate_file, temp_backup_namespace, kernel_mmi_ref, verbose_log) {
-                Ok(_num_new_syms) => {
+                Ok((_new_crate_ref, _num_new_syms)) => {
                     // try again to find the missing symbol, now that we've loaded the missing crate
                     if let Some(sec) = ns_of_crate_file.get_symbol_internal(demangled_full_symbol) {
                         return Some(sec);

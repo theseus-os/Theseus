@@ -1,6 +1,7 @@
 //! This crate contains common types used for memory mapping. 
 
 #![no_std]
+#![feature(const_fn)]
 #![feature(range_is_empty)]
 #![feature(step_trait)]
 
@@ -48,12 +49,14 @@ impl VirtualAddress {
 
     /// Creates a new `VirtualAddress` that is guaranteed to be canonical
     /// by forcing the upper bits (64:48] to be sign-extended from bit 47.
-    pub fn new_canonical(mut virt_addr: usize) -> VirtualAddress {
-        match virt_addr.get_bit(47) {
-            false => virt_addr.set_bits(48..64, 0),
-            true => virt_addr.set_bits(48..64, 0xffff),
-        };
-        VirtualAddress(virt_addr)
+    pub const fn new_canonical(virt_addr: usize) -> VirtualAddress {
+        // match virt_addr.get_bit(47) {
+        //     false => virt_addr.set_bits(48..64, 0),
+        //     true => virt_addr.set_bits(48..64, 0xffff),
+        // };
+        //
+        // The below code is semantically equivalent to the above, but it works in const functions.
+        VirtualAddress((virt_addr.wrapping_mul(0x1_0000) as isize / 0x1_0000) as usize)
     }
 
     /// Creates a VirtualAddress with the value 0.
@@ -63,7 +66,7 @@ impl VirtualAddress {
 
     /// Returns the underlying `usize` value for this `VirtualAddress`.
     #[inline]
-    pub fn value(&self) -> usize {
+    pub const fn value(&self) -> usize {
         self.0
     }
 
@@ -422,7 +425,7 @@ impl fmt::Debug for Page {
 
 impl Page {
     /// Returns the `Page` that contains the given `VirtualAddress`.
-    pub fn containing_address(virt_addr: VirtualAddress) -> Page {
+    pub const fn containing_address(virt_addr: VirtualAddress) -> Page {
         Page {
             number: virt_addr.value() / PAGE_SIZE,
         }
