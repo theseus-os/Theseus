@@ -552,17 +552,22 @@ impl PageRange {
         PageRange::new(start_page, end_page)
     }
 
-    /// Returns the `VirtualAddress` of the starting `Page` in this `PageRange`.
+    /// Returns the `VirtualAddress` of the starting `Page`.
     pub fn start_address(&self) -> VirtualAddress {
         self.0.start().start_address()
     }
 
-    /// Returns the number of `Page`s covered by this iterator.
+    /// Returns the size in number of `Page`s.
     /// Use this instead of the Iterator trait's `count()` method.
-    /// This is instant, because it doesn't need to iterate over each entry, unlike normal iterators.
+    /// This is instant, because it doesn't need to iterate over each `Page`, unlike normal iterators.
     pub fn size_in_pages(&self) -> usize {
         // add 1 because it's an inclusive range
         self.0.end().number + 1 - self.0.start().number
+    }
+
+    /// Returns the size in number of bytes.
+    pub fn size_in_bytes(&self) -> usize {
+        self.size_in_pages() * PAGE_SIZE
     }
 
     /// Whether this `PageRange` contains the given `VirtualAddress`.
@@ -571,11 +576,31 @@ impl PageRange {
     }
 
     /// Returns the offset of the given `VirtualAddress` within this `PageRange`,
-    /// i.e., the difference between `virt_addr` and `self.start()`.
-    pub fn offset_from_start(&self, virt_addr: VirtualAddress) -> Option<usize> {
+    /// i.e., the difference between `virt_addr` and `self.start_address()`.
+    /// If the given `VirtualAddress` is not covered by this range of `Page`s, this returns `None`.
+    ///  
+    /// # Examples
+    /// If the page range covered addresses `0x2000` to `0x4000`, then calling
+    /// `offset_of_address(0x3500)` would return `Some(0x1500)`.
+    pub fn offset_of_address(&self, virt_addr: VirtualAddress) -> Option<usize> {
         if self.contains_virt_addr(virt_addr) {
             Some(virt_addr.value() - self.start_address().value())
         } else {
+            None
+        }
+    }
+
+    /// Returns the `VirtualAddress` at the given `offset` into this mapping,  
+    /// If the given `offset` is not covered by this range of `Page`s, this returns `None`.
+    ///  
+    /// # Examples
+    /// If the page range covered addresses `0xFFFFFFFF80002000` to `0xFFFFFFFF80004000`,
+    /// then calling `address_at_offset(0x1500)` would return `Some(0xFFFFFFFF80003500)`.
+    pub fn address_at_offset(&self, offset: usize) -> Option<VirtualAddress> {
+        if offset <= self.size_in_bytes() {
+            Some(self.start_address() + offset)
+        }
+        else {
             None
         }
     }

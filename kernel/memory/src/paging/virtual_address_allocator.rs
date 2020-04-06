@@ -2,6 +2,7 @@
 //! which allocates pages (not physical memory) starting from kernel_config::memory::KERNEL_TEXT_START. 
 //! The minimum unit of allocation is a single page. 
 
+use core::ops::Deref;
 use kernel_config::memory::{KERNEL_TEXT_START, KERNEL_TEXT_MAX_SIZE, PAGE_SIZE};
 use super::{VirtualAddress, Page, PageRange};
 use spin::Mutex;
@@ -47,14 +48,13 @@ impl AllocatedPages {
 		self.pages.size_in_pages()
 	}
 }
-// use core::ops::Deref;
-// impl Deref for AllocatedPages {
-//     type Target = PageRange;
 
-//     fn deref(&self) -> &PageRange {
-//         &self.pages
-//     }
-// }
+impl Deref for AllocatedPages {
+    type Target = PageRange;
+    fn deref(&self) -> &PageRange {
+        &self.pages
+    }
+}
 
 // impl Drop for AllocatedPages {
 //     fn drop(&mut self) {
