@@ -121,8 +121,9 @@ pub fn init(
     info!("Finished handling and booting up all {} AP cores.", ap_count);
 
     //intialize the per core heaps
-    heap_initialization::initialize_per_core_heaps()?;
-    info!("Initialized per core heaps");
+    heap_initialization::initialize_multiple_heaps()?;
+    heap_initialization::multiple_heaps_ready_to_use()?;
+    info!("Initialized per-core heaps");
 
     // initialize window manager.
     let (key_producer, mouse_producer) = window_manager::init()?;

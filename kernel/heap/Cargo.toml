@@ -1,6 +1,6 @@
 [package]
 authors = ["Ramla Ijaz <ijazramla@gmail.com>"]
-name = "multiple_heaps"
+name = "heap"
 description = "Allocator which uses multiple heaps"
 version = "0.1.0"
 
@@ -31,8 +31,8 @@ path = "../memory"
 [dependencies.kernel_config]
 path = "../kernel_config"
 
-[dependencies.apic]
-path = "../apic"
+[dependencies.multiple_heaps]
+path = "../multiple_heaps"
 
 [dependencies.slabmalloc]
 path = "../../libs/rust-slabmalloc"

@@ -173,7 +173,6 @@ pub fn get_current_p4() -> Frame {
 ///  * the kernels' text section MappedPages,
 ///  * the kernels' rodata section MappedPages,
 ///  * the kernels' data section MappedPages,
-///  * the kernel's list of VirtualMemoryAreas that needs to be converted to a vector after heap initialization,
 ///  * the kernel's list of *other* higher-half MappedPages that needs to be converted to a vector after heap initialization, and which should be kept forever,
 ///  * the kernel's list of identity-mapped MappedPages that needs to be converted to a vector after heap initialization, and which should be dropped before starting the first userspace program. 
 ///
@@ -340,17 +339,15 @@ pub fn init(allocator_mutex: &MutexIrqSafe<AreaFrameAllocator>, boot_info: &mult
 /// Finishes initializing the kernel paging mechanism after the heap is initalized. 
 /// Returns the following tuple, if successful:
 /// 
-///  * the kernel's list of VirtualMemoryAreas,
 ///  * the kernel's list of *other* higher-half MappedPages, which should be kept forever,
 ///  * the kernel's list of identity-mapped MappedPages, which should be dropped before starting the first userspace program. 
 ///
 /// Otherwise, it returns a str error message. ],
-pub fn init_post_heap(allocator_mutex: &MutexIrqSafe<AreaFrameAllocator>, heap_mapped_pages: MappedPages, mut higher_half_mapped_pages: [Option<MappedPages>; 32], mut identity_mapped_pages: [Option<MappedPages>; 32]) 
+pub fn init_post_heap(allocator_mutex: &MutexIrqSafe<AreaFrameAllocator>, mut higher_half_mapped_pages: [Option<MappedPages>; 32], mut identity_mapped_pages: [Option<MappedPages>; 32]) 
 -> Result<(Vec<MappedPages>, Vec<MappedPages>), &'static str> {
     allocator_mutex.lock().alloc_ready(); // heap is ready
 
-    let mut higher_half: Vec<MappedPages> = higher_half_mapped_pages.iter_mut().filter_map(|opt| opt.take()).collect();
-    higher_half.push(heap_mapped_pages);
+    let higher_half: Vec<MappedPages> = higher_half_mapped_pages.iter_mut().filter_map(|opt| opt.take()).collect();
     let identity: Vec<MappedPages> = identity_mapped_pages.iter_mut().filter_map(|opt| opt.take()).collect();
 
     Ok((higher_half, identity))

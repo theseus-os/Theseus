@@ -134,23 +134,17 @@ pub extern "C" fn nano_core_start(multiboot_information_virtual_address: usize) 
     // Initialize the kernel heap.
     // After this point, we must "forget" all of the above mapped_pages instances if an error occurs,
     // because they will be auto-unmapped from the new page table upon return, causing all execution to stop. 
-    let heap_mp;
-    match heap_initialization::initialize_heap(allocator_mutex, &mut page_table) {
-        Ok(mp) => {
-            heap_mp = mp;
-        }
-        Err(e) => {
-            core::mem::forget(text_mapped_pages);
-            core::mem::forget(rodata_mapped_pages);
-            core::mem::forget(data_mapped_pages);
-            core::mem::forget(higher_half_mapped_pages);
-            core::mem::forget(identity_mapped_pages);
-            shutdown(format_args!("{}", e))
-        }
+    if let Err(e) =  heap_initialization::initialize_heap(allocator_mutex, &mut page_table) {
+        core::mem::forget(text_mapped_pages);
+        core::mem::forget(rodata_mapped_pages);
+        core::mem::forget(data_mapped_pages);
+        core::mem::forget(higher_half_mapped_pages);
+        core::mem::forget(identity_mapped_pages);
+        shutdown(format_args!("{}", e))
     }
 
     // Initialize memory management post heap intialization: set up kernel stack allocator and kernel memory management info.
-    let (kernel_mmi_ref, identity_mapped_pages) = try_exit!(memory::init_post_heap(allocator_mutex, page_table, heap_mp, higher_half_mapped_pages, identity_mapped_pages));
+    let (kernel_mmi_ref, identity_mapped_pages) = try_exit!(memory::init_post_heap(allocator_mutex, page_table, higher_half_mapped_pages, identity_mapped_pages));
 
     println_raw!("nano_core_start(): initialized memory subsystem."); 
     // After this point, we must "forget" all of the above mapped_pages instances if an error occurs,

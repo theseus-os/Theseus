@@ -216,7 +216,6 @@ pub fn set_broadcast_tlb_shootdown_cb(func: fn(Vec<VirtualAddress>)) {
 ///  * the MappedPages of the kernel's text section,
 ///  * the MappedPages of the kernel's rodata section,
 ///  * the MappedPages of the kernel's data section,
-///  * the kernel's list of VirtualMemoryAreas that needs to be converted to a vector after heap initialization,
 ///  * the kernel's list of *other* higher-half MappedPages that needs to be converted to a vector after heap initialization, and which should be kept forever,
 ///  * the kernel's list of identity-mapped MappedPages that needs to be converted to a vector after heap initialization, and which should be dropped before starting the first userspace program. 
 pub fn init(boot_info: &BootInformation) 
@@ -278,8 +277,8 @@ pub fn init(boot_info: &BootInformation)
 /// 
 /// Returns the following tuple, if successful:
 ///  * The kernel's new MemoryManagementInfo
-///  * the kernel's list of *other* higher-half MappedPages, which should be kept forever. ??? is this correct ???
-pub fn init_post_heap(allocator_mutex: &MutexIrqSafe<AreaFrameAllocator>, page_table: PageTable, heap_mapped_pages: MappedPages, 
+///  * The kernel's list of identity-mapped MappedPages which should be dropped before starting the first userspace program. 
+pub fn init_post_heap(allocator_mutex: &MutexIrqSafe<AreaFrameAllocator>, page_table: PageTable, 
  higher_half_mapped_pages: [Option<MappedPages>; 32], identity_mapped_pages: [Option<MappedPages>; 32]) 
 -> Result<(Arc<MutexIrqSafe<MemoryManagementInfo>>, Vec<MappedPages>), &'static str> 
 {
@@ -290,7 +289,7 @@ pub fn init_post_heap(allocator_mutex: &MutexIrqSafe<AreaFrameAllocator>, page_t
     let (
         higher_half_mapped_pages,
         identity_mapped_pages,
-    ) = paging::init_post_heap(allocator_mutex, heap_mapped_pages, higher_half_mapped_pages, identity_mapped_pages)?;
+    ) = paging::init_post_heap(allocator_mutex, higher_half_mapped_pages, identity_mapped_pages)?;
    
     // init the kernel stack allocator, a singleton
     let kernel_stack_allocator = {
