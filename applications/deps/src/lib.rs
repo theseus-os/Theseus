@@ -5,6 +5,7 @@
 #![no_std]
 #![feature(slice_concat_ext)]
 
+#[macro_use] extern crate log;
 #[macro_use] extern crate alloc;
 #[macro_use] extern crate terminal_print;
 extern crate itertools;
@@ -18,6 +19,7 @@ extern crate spin;
 
 
 use alloc::{
+    collections::BTreeSet,
     string::{String},
     vec::Vec,
     sync::Arc,
@@ -32,6 +34,19 @@ use mod_mgmt::{
 use crate_name_utils::get_containing_crate_name;
 
 
+/// calls println!() and then log!()
+macro_rules! println_log {
+    ($fmt:expr) => {
+        debug!($fmt);
+        print!(concat!($fmt, "\n"));
+    };
+    ($fmt:expr, $($arg:tt)*) => {
+        debug!($fmt, $($arg)*);
+        print!(concat!($fmt, "\n"), $($arg)*);
+    };
+}
+
+
 static VERBOSE: Once<bool> = Once::new();
 macro_rules! verbose {
     () => (VERBOSE.try() == Some(&true));
@@ -40,12 +55,14 @@ macro_rules! verbose {
 
 pub fn main(args: Vec<String>) -> isize {
     let mut opts = Options::new();
-    opts.optflag("h", "help", "print this help menu");
-    opts.optflag("v", "verbose", "enable verbose output");
+    opts.optflag("h", "help",         "print this help menu");
+    opts.optflag("v", "verbose",      "enable verbose output");
     opts.optopt ("s", "sections-in",  "output the sections that depend on the given SECTION (incoming weak dependents)",      "SECTION");
     opts.optopt ("S", "sections-out", "output the sections that the given SECTION depends on (outgoing strong dependencies)", "SECTION");
     opts.optopt ("c", "crates-in",    "output the crates that depend on the given CRATE (incoming weak dependents)",          "CRATE");
     opts.optopt ("C", "crates-out",   "output the crates that the given CRATE depends on (outgoing strong dependencies)",     "CRATE");
+    opts.optopt ("l", "list",         "list the public sections in the given crate", "CRATE");
+    opts.optopt ("",  "list-all",     "list all sections in the given crate", "CRATE");
     
 
     let matches = match opts.parse(&args) {
@@ -88,6 +105,12 @@ fn rmain(matches: Matches) -> Result<(), String> {
     }
     else if let Some(crate_name) = matches.opt_str("C") {
         crates_i_depend_on(&crate_name)
+    }
+    else if let Some(crate_name) = matches.opt_str("l") {
+        sections_in_crate(&crate_name, false)
+    }
+    else if let Some(crate_name) = matches.opt_str("list-all") {
+        sections_in_crate(&crate_name, true)
     }
     else {
         Err(format!("no supported options/arguments found."))
@@ -152,6 +175,61 @@ fn crates_i_depend_on(_crate_name: &str) -> Result<(), String> {
 }
 
 
+
+/// Outputs the list of sections in the given crate.
+/// 
+/// # Arguments
+/// * `all_sections`: If `true`, then all sections will be printed. 
+///                   If `false`, then only public (global) sections will be printed.
+/// 
+/// If there are multiple matches, this returns an Error containing 
+/// all of the matching section names separated by the newline character `'\n'`.
+fn sections_in_crate(crate_name: &str, all_sections: bool) -> Result<(), String> {
+    let (crate_name, crate_ref) = find_crate(crate_name)?;
+
+    let mut containing_crates = BTreeSet::new();
+    if all_sections {
+        println_log!("Sections (all) in crate {}:", crate_name);
+        for sec in crate_ref.lock_as_ref().sections.values() {
+            println_log!("    {}", sec.name);
+            for n in get_containing_crate_name(&sec.name) {
+                containing_crates.insert(String::from(n));
+            }
+        }
+    } else {
+        println_log!("Sections (public-only) in crate {}:", crate_name);
+        for sec_name in crate_ref.lock_as_ref().global_symbols.iter() {
+            println_log!("    {}", sec_name.as_str());
+            for n in get_containing_crate_name(sec_name.as_str()) {
+                containing_crates.insert(String::from(n));
+            }
+        }
+    }
+
+    let crates_list = containing_crates.into_iter().collect::<Vec<String>>().join("\n");
+    println_log!("Constituent (or related) crates:\n{}", &crates_list);
+    Ok(())
+}
+
+
+/// Returns the crate matching the given `crate_name` if there is a single match.
+/// 
+/// If there are multiple matches, this returns an Error containing 
+/// all of the matching section names separated by the newline character `'\n'`.
+fn find_crate(crate_name: &str) -> Result<(String, StrongCrateRef), String> {
+    let namespace = get_my_current_namespace();
+    let mut matching_crates = CrateNamespace::get_crates_starting_with(&namespace, crate_name);
+    match matching_crates.len() {
+        0 => Err(format!("couldn't find crate matching {:?}", crate_name)),
+        1 => {
+            let mc = matching_crates.swap_remove(0);
+            Ok((mc.0, mc.1)) 
+        }
+        _ => Err(matching_crates.into_iter().map(|(crate_name, _crate_ref, _ns)| crate_name).collect::<Vec<String>>().join("\n")),
+    }
+}
+
+
 /// Returns the section matching the given `section_name` if there is a single match.
 /// 
 /// If there are multiple matches, this returns an Error containing 
@@ -192,26 +270,6 @@ fn find_section(section_name: &str) -> Result<StrongSectionRef, String> {
         Ok(matching_sections.remove(0))
     } else {
         Err(matching_sections.into_iter().map(|sec| sec.name.clone()).collect::<Vec<String>>().join("\n"))
-    }
-}
-
-
-/// Returns the crate matching the given `crate_name` if there is a single match.
-/// 
-/// If there are multiple matches, this returns an Error containing all of the matching crate names,
-/// separated by the newline character `'\n'`.
-fn _find_crate(crate_name: &str) -> Result<StrongCrateRef, String> {
-    let namespace = get_my_current_namespace();
-    let matching_crate_names: Vec<String> = namespace.crate_names(true)
-        .into_iter()
-        .filter(|name| name.starts_with(crate_name))
-        .collect();
-    
-    if matching_crate_names.len() == 1 {
-        namespace.get_crate(&matching_crate_names[0])
-            .ok_or_else(|| format!("Couldn't get crate {} from namespace {}", matching_crate_names[0], namespace.name()))
-    } else {
-        Err(matching_crate_names.join("\n"))
     }
 }
 

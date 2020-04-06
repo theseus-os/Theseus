@@ -475,6 +475,7 @@ dependencies = [
  "crate_name_utils 0.1.0",
  "getopts 0.2.21 (git+https://github.com/kevinaboos/getopts)",
  "itertools 0.7.11 (registry+https://github.com/rust-lang/crates.io-index)",
+ "log 0.3.9 (registry+https://github.com/rust-lang/crates.io-index)",
  "memory 0.1.0",
  "mod_mgmt 0.1.0",
  "spin 0.4.10 (registry+https://github.com/rust-lang/crates.io-index)",
@@ -625,6 +626,8 @@ dependencies = [
 name = "exceptions_early"
 version = "0.1.0"
 dependencies = [
+ "memory 0.1.0",
+ "mod_mgmt 0.1.0",
  "vga_buffer 0.1.0",
  "x86_64 0.1.2",
 ]
@@ -1243,7 +1246,6 @@ dependencies = [
  "crate_name_utils 0.1.0",
  "cstr_core 0.1.2 (registry+https://github.com/rust-lang/crates.io-index)",
  "fs_node 0.1.0",
- "hpet 0.1.0",
  "kernel_config 0.1.0",
  "log 0.3.9 (registry+https://github.com/rust-lang/crates.io-index)",
  "memfs 0.1.0",
@@ -1474,7 +1476,6 @@ dependencies = [
  "memory 0.1.0",
  "mod_mgmt 0.1.0",
  "panic_wrapper 0.1.0",
- "task 0.1.0",
  "unwind 0.1.0",
  "vga_buffer 0.1.0",
 ]
@@ -1485,6 +1486,7 @@ version = "0.1.0"
 dependencies = [
  "log 0.3.9 (registry+https://github.com/rust-lang/crates.io-index)",
  "memory 0.1.0",
+ "mod_mgmt 0.1.0",
  "runqueue 0.1.0",
  "stack_trace 0.1.0",
  "stack_trace_frame_pointers 0.1.0",
@@ -2128,6 +2130,7 @@ version = "0.1.0"
 dependencies = [
  "fallible-iterator 0.2.0 (registry+https://github.com/rust-lang/crates.io-index)",
  "log 0.3.9 (registry+https://github.com/rust-lang/crates.io-index)",
+ "mod_mgmt 0.1.0",
  "task 0.1.0",
  "unwind 0.1.0",
 ]

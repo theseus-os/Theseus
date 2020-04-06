@@ -9,6 +9,10 @@ build = "../../build.rs"
 getopts = "0.2.21"
 spin = "0.4.10"
 
+[dependencies.log]
+default-features = false
+version = "0.3.7"
+
 [dependencies.itertools]
 version = "0.7.9"
 default-features = false
