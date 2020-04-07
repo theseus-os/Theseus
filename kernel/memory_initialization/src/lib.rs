@@ -1,5 +1,3 @@
-//! The heap initialization functions, both for the initial heap and the multiple heaps.
-
 #![feature(const_in_array_repeat_expressions)]
 #![no_std]
 
