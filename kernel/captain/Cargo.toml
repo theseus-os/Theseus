@@ -93,8 +93,11 @@ path = "../task_fs"
 [dependencies.pause]
 path = "../pause"
 
-[dependencies.heap_initialization]
-path = "../heap_initialization"
+[dependencies.heap]
+path = "../heap"
+
+[dependencies.multiple_heaps]
+path = "../multiple_heaps"
 
 [lib]
 crate-type = ["rlib"]

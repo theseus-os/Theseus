@@ -15,6 +15,7 @@ extern crate log;
 extern crate memory;
 extern crate kernel_config;
 extern crate slabmalloc;
+extern crate multiple_heaps;
 
 use core::ptr::{self, NonNull};
 use alloc::alloc::{GlobalAlloc, Layout};
@@ -25,9 +26,10 @@ use core::ops::Add;
 use spin::Once;
 use slabmalloc::{ZoneAllocator, ObjectPage8k, AllocablePage};
 use core::ops::DerefMut;
+use multiple_heaps::{MultipleHeaps, merge_initial_heap, multiple_heaps};
 
 #[global_allocator]
-static ALLOCATOR: Heap = Heap::empty();
+static ALLOCATOR: Heap<MultipleHeaps> = Heap::empty();
 
 
 /// Initializes the initial allocator, which is the first heap used by the system.
@@ -46,7 +48,7 @@ pub fn init_initial_allocator(allocator_mutex: &MutexIrqSafe<AreaFrameAllocator>
             if alignment == ZoneAllocator::MAX_BASE_ALLOC_SIZE {
                 alignment = 8;
             }
-            let layout = Layout::from_size_align(*size, alignment).unwrap();
+            let layout = Layout::from_size_align(*size, alignment).map_err(|_e| "Incorrect layout")?;
 
             // create the mapped pages starting from the previous end of the heap
             let pages = PageRange::from_virt_addr(heap_end_addr, ObjectPage8k::SIZE);
@@ -66,50 +68,50 @@ pub fn init_initial_allocator(allocator_mutex: &MutexIrqSafe<AreaFrameAllocator>
     Ok(())
 }
 
-/// Set a new allocate function for the heap once the multiple heaps are ready to be used.
-pub fn set_alloc_function(func: fn(Layout) -> *mut u8) {
-    ALLOCATOR.allocate_multiple_heaps.call_once(|| func);
-}
+/// Transfers mapped pages belonging to the initial allocator to the first multiple heap
+/// and sets the multiple heaps as the default allocator.
+/// Only call this function when the multiple heaps are ready to be used.
+pub fn switch_to_multiple_heaps() -> Result<(), &'static str> {
+    // lock the allocator so that no allocation or deallocation can take place
+    let mut initial_allocator = ALLOCATOR.initial_allocator.lock();
 
-/// Set a new deallocate function for the heap once the multiple heaps are ready to be used.
-pub fn set_dealloc_function(func: fn(*mut u8, Layout)) {
-    ALLOCATOR.deallocate_multiple_heaps.call_once(|| func);
-}
-
-/// Remove the initial allocator from the heap and replace it with an empty allocator.
-/// Only call this function when the multiple heaps are ready, so that the initial allocator can be merged in with the new heap.
-pub fn remove_initial_allocator() -> ZoneAllocator<'static> {
+    // switch out the initial allocator with an empty heap
     let mut zone_allocator = ZoneAllocator::new();
-    core::mem::swap(&mut *ALLOCATOR.initial_allocator.lock(), &mut zone_allocator);
-    zone_allocator
+    core::mem::swap(&mut *initial_allocator, &mut zone_allocator);
+
+    // transfer initial heap to the first multiple heap
+    merge_initial_heap(zone_allocator)?;
+
+    //set the multiple heaps as the default allocator
+    ALLOCATOR.allocator.call_once(|| multiple_heaps());
+
+    Ok(())
 }
 
 /// The heap which is used as a global allocator for the system.
 /// It starts off with one basic fixed size allocator, and when 
 /// a more complex heap is initialized the new allocate and deallocate functions are set.
-pub struct Heap {
+pub struct Heap <'a, T: GlobalAlloc> {
     initial_allocator: MutexIrqSafe<ZoneAllocator<'static>>, 
-    allocate_multiple_heaps: Once<fn(Layout) -> *mut u8>,
-    deallocate_multiple_heaps: Once<fn(*mut u8, Layout)>
+    allocator: Once<&'a T>
 }
 
 
-impl Heap {
-    pub const fn empty() -> Heap {
+impl <'a, T: GlobalAlloc> Heap <'a, T> {
+    pub const fn empty() -> Heap<'a, T> {
         Heap{
             initial_allocator: MutexIrqSafe::new(ZoneAllocator::new()),
-            allocate_multiple_heaps: Once::new(),
-            deallocate_multiple_heaps: Once::new()
+            allocator: Once::new()
         }
     }
 }
 
-unsafe impl GlobalAlloc for Heap {
+unsafe impl<'a, T: GlobalAlloc> GlobalAlloc for Heap<'a, T> {
 
     unsafe fn alloc(&self, layout: Layout) -> *mut u8 {
-        match self.allocate_multiple_heaps.try() {
-            Some(allocate) => {
-                allocate(layout)
+        match self.allocator.try() {
+            Some(allocator) => {
+                allocator.alloc(layout)
             }
             None => {
                 match self.initial_allocator.lock().allocate(layout) {
@@ -121,9 +123,9 @@ unsafe impl GlobalAlloc for Heap {
     }
 
     unsafe fn dealloc(&self, ptr: *mut u8, layout: Layout) {
-        match self.deallocate_multiple_heaps.try() {
-            Some(deallocate) => {
-                deallocate(ptr, layout)
+        match self.allocator.try() {
+            Some(allocator) => {
+                allocator.dealloc(ptr, layout)
             }
             None => {
                 let ptr = NonNull::new(ptr).unwrap();

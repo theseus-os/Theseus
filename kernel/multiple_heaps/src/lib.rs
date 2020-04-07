@@ -2,23 +2,23 @@
 //! Right now we use the apic id as the key, so that we have per-core heaps.
 //! 
 //! The heaps are ZoneAllocators (given in the slabmalloc crate). Each ZoneAllocator maintains 11 separate "slab allocators" for sizes
-//! 8, 16, 32, 64, 128, 256, 512, 1024, 2048, 4096 and 8040 (8192 bytes - 152 bytes of metadata) bytes.
+//! 8, 16, 32, 64, 128, 256, 512, 1024, 2048, 4096 and 8056 (8192 bytes 136 bytes of metadata) bytes.
 //! The slab allocator maintains linked lists of allocable pages from which it allocates objects of the same size. 
-//! The allocable pages are 8 KiB, and have metadata stored in the last 152 bytes.
+//! The allocable pages are 8 KiB, and have metadata stored in the last 136 bytes.
 //! 
 //! In addition to the alloc and dealloc functions, this allocator decides:
 //!  * If the requested size is large enough to allocate pages directly from the OS
 //!  * If the requested size is small, which heap to actually allocate/deallocate from
 //!  * How to deal with OOM errors returned by a heap
 //! 
-//! Any memory request greater than 8040 bytes is satisfied through a request for pages from the kernel.
+//! Any memory request greater than 8056 bytes is satisfied through a request for pages from the kernel.
 //! All other requests are satisfied through the per-core heaps.
 //! 
 //! The per-core heap which will be used on allocation is determined by the cpu that the task is running on.
 //! On deallocation of a block, the heap id is retrieved from metadata at the end of the allocable page which contains the block.
 //! 
 //! When a per-core heap runs out of memory, pages are first moved between the slab allocators of the per-core heap, then requested from other per-core heaps.
-//! If no empty pages are availabe within any of the per-core heaps, then more memory is allocated from the kernel's heap area.
+//! If no empty pages are available within any of the per-core heaps, then more memory is allocated from the kernel's heap area.
 //!  
 //! The maximum number of heaps is configured in the kernel configuration variable, MAX_HEAPS.
 
@@ -39,42 +39,46 @@ extern crate apic;
 
 use core::ptr::NonNull;
 use alloc::alloc::{GlobalAlloc, Layout};
-use memory::{MappedPages, create_mapping, EntryFlags, create_heap_mapping, VirtualAddress};
-use kernel_config::memory::{MAX_HEAPS, PAGE_SIZE, PER_CORE_HEAP_INITIAL_SIZE_PAGES, KERNEL_HEAP_INITIAL_SIZE_PAGES, KERNEL_HEAP_START};
+use memory::{MappedPages, create_mapping, EntryFlags, VirtualAddress, FRAME_ALLOCATOR, get_kernel_mmi_ref, PageRange};
+use kernel_config::memory::{MAX_HEAPS, PAGE_SIZE, PER_CORE_HEAP_INITIAL_SIZE_PAGES, KERNEL_HEAP_INITIAL_SIZE_PAGES, KERNEL_HEAP_START, KERNEL_HEAP_MAX_SIZE};
 use irq_safety::{MutexIrqSafe, RwLockIrqSafe};
 use slabmalloc::{ZoneAllocator, ObjectPage8k, AllocablePage};
 use core::ops::Add;
+use core::ops::DerefMut;
 
-
-pub static MULTIPLE_HEAPS_ALLOCATOR: MultipleHeaps = MultipleHeaps::empty();
+static MULTIPLE_HEAPS_ALLOCATOR: MultipleHeaps = MultipleHeaps::empty();
 
 
 /// The size of each MappedPages Object that is allocated for the per-core heaps, in bytes.
-/// We curently work with 8KiB, so that the per core heaps can allocate objects up to 8040 bytes.  
-pub const HEAP_MAPPED_PAGES_SIZE_IN_BYTES: usize = ObjectPage8k::SIZE;
+/// We curently work with 8KiB, so that the per core heaps can allocate objects up to 8056 bytes.  
+const HEAP_MAPPED_PAGES_SIZE_IN_BYTES: usize = ObjectPage8k::SIZE;
 
 /// The size of each MappedPages Object that is allocated for the per-core heaps, in pages.
-/// We curently work with 2 pages, so that the per core heaps can allocate objects up to 8040 bytes.   
-pub const HEAP_MAPPED_PAGES_SIZE_IN_PAGES: usize = ObjectPage8k::SIZE / PAGE_SIZE;
+/// We curently work with 2 pages, so that the per core heaps can allocate objects up to 8056 bytes.   
+const HEAP_MAPPED_PAGES_SIZE_IN_PAGES: usize = ObjectPage8k::SIZE / PAGE_SIZE;
 
 /// When an OOM error occurs, before allocating more memory from the OS, we first try to see if there are unused(empty) pages 
 /// within the per-core heaps that can be moved to other heaps. To prevent any heap from completely running out of memory we 
 /// set this threshold value. A heap must have greater than this number of empty mapped pages to return one for use by other heaps.
-pub const EMPTY_PAGES_THRESHOLD: usize = ZoneAllocator::MAX_BASE_SIZE_CLASSES * 2;
+const EMPTY_PAGES_THRESHOLD: usize = ZoneAllocator::MAX_BASE_SIZE_CLASSES * 2;
 
-pub const HEAP_FLAGS: EntryFlags = EntryFlags::WRITABLE;
+/// The heap mapped pages should be writable
+const HEAP_FLAGS: EntryFlags = EntryFlags::WRITABLE;
 
 
-pub fn allocate(layout: Layout) -> *mut u8 {
-    unsafe{ MULTIPLE_HEAPS_ALLOCATOR.alloc(layout) }
+/// Initializes the multiple heaps using the apic id as the key, which is mapped to a heap id.
+/// If we want to change the value the heap id is based on, we would substitute 
+/// the lapic iterator with an iterator containing the desired keys.
+pub fn initialize_multiple_heaps() -> Result<(), &'static str> {
+    for (apic_id, _lapic) in apic::get_lapics().iter() {
+        init_individual_heap(*apic_id as usize)?;
+    }
+
+    Ok(())       
 }
 
 
-pub fn deallocate(ptr: *mut u8, layout: Layout) {
-    unsafe{ MULTIPLE_HEAPS_ALLOCATOR.dealloc(ptr, layout) }
-}
-
-/// Merges the initial allocator into the heap with the smallest heap id
+/// Merges the initial allocator into the multiple heap with the smallest heap id
 pub fn merge_initial_heap(mut initial_allocator: ZoneAllocator<'static>) -> Result<(), &'static str> {
     let heap_id = MULTIPLE_HEAPS_ALLOCATOR.heaps.read().iter().enumerate().find(|(_i, val)| val.is_some()).ok_or("No per-core heap was initialized")?.0;
     MULTIPLE_HEAPS_ALLOCATOR.heaps.write()[heap_id].as_ref()
@@ -85,8 +89,36 @@ pub fn merge_initial_heap(mut initial_allocator: ZoneAllocator<'static>) -> Resu
 }
 
 
+pub fn multiple_heaps() -> &'static MultipleHeaps {
+    &MULTIPLE_HEAPS_ALLOCATOR
+}
+
+/// Allocates pages from the given starting address and maps them to frames.
+/// Returns the new mapped pages or an error is returned if the heap memory limit is reached.
+fn create_heap_mapping(starting_address: VirtualAddress, size_in_bytes: usize) -> Result<MappedPages, &'static str> {
+    if (starting_address.value() + size_in_bytes) >  (KERNEL_HEAP_START + KERNEL_HEAP_MAX_SIZE) {
+        return Err("Heap memory limit has been reached");
+    }
+
+    let kernel_mmi_ref = get_kernel_mmi_ref().ok_or("create_heap_mapping(): KERNEL_MMI was not yet initialized!")?;
+    let mut kernel_mmi = kernel_mmi_ref.lock();
+
+    let mut frame_allocator = FRAME_ALLOCATOR.try()
+        .ok_or("create_heap_mapping(): couldnt get FRAME_ALLOCATOR")?
+        .lock();
+
+    let pages = PageRange::from_virt_addr(starting_address, size_in_bytes);
+    let heap_flags = HEAP_FLAGS;
+    let mp = kernel_mmi.page_table.map_pages(pages, heap_flags, frame_allocator.deref_mut())?;
+
+    // trace!("Allocated heap pages at: {:#X}", starting_address);
+
+    Ok(mp)
+}
+
+
 /// Initializes the heap given by `key`.
-/// There are 11 size classes in each heap ranging from [8,16,32..4096,8040 (8192 bytes - 152 bytes metadata)].
+/// There are 11 size classes in each heap ranging from [8,16,32..4096,8056 (8192 bytes - 136 bytes metadata)].
 /// We evenly distribute the pages allocated for each heap between the size classes. 
 pub fn init_individual_heap(key: usize) -> Result<(), &'static str> {
     // check key is within the MAX_HEAPS range
@@ -338,17 +370,17 @@ unsafe impl GlobalAlloc for MultipleHeaps {
 /// Any memory request greater than MAX_ALLOC_SIZE is satisfied through a request to the OS.
 /// The pointer to the beginning of the newly allocated pages is returned.
 /// The MappedPages object returned by that request is written to the end of the memory allocated.
-/// 
-/// This is safe since we ensure that the memory allocated includes space for the MappedPages object,
-/// and since the corresponding deallocate function makes sure to retrieve the MappedPages object and drop it. 
-unsafe fn allocate_large_object(layout: Layout) -> Result<NonNull<u8>, &'static str> {
+fn allocate_large_object(layout: Layout) -> Result<NonNull<u8>, &'static str> {
     // the mapped pages must have additional memory on the end where we can store the mapped pages object
     let allocation_size = layout.size() + core::mem::size_of::<MappedPages>();
 
     match create_mapping(allocation_size, HEAP_FLAGS) {
         Ok(mapping) => {
             let ptr = mapping.start_address().value() as *mut u8;
-            (ptr.offset(layout.size() as isize) as *mut MappedPages).write(mapping);
+
+            // This is safe since we ensure that the memory allocated includes space for the MappedPages object,
+            // and since the corresponding deallocate function makes sure to retrieve the MappedPages object and drop it.
+            unsafe{ (ptr.offset(layout.size() as isize) as *mut MappedPages).write(mapping); }
             // trace!("Allocated a large object of {} bytes at address: {:#X}", layout.size(), ptr as usize);
 
             NonNull::new(ptr).ok_or("Could not create a non null ptr")
@@ -363,12 +395,11 @@ unsafe fn allocate_large_object(layout: Layout) -> Result<NonNull<u8>, &'static 
 
 /// Any memory request greater than MAX_ALLOC_SIZE was created by requesting a MappedPages object from the OS,
 /// and now the MappedPages object will be retrieved and dropped to deallocate the memory referenced by `ptr`.
-/// 
-/// This is safe since we ensure that the MappedPages object is read from the offset where it was written
-/// by the corresponding allocate function, and the allocate function allocated extra memory for this object in addition to the layout size.
-unsafe fn deallocate_large_object(ptr: *mut u8, layout: Layout) {
-    //retrieve the mapped pages and drop them
-    let _mp = core::ptr::read(ptr.offset(layout.size() as isize) as *const MappedPages); 
+fn deallocate_large_object(ptr: *mut u8, layout: Layout) {
+    // retrieve the mapped pages and drop them
+    // This is safe since we ensure that the MappedPages object is read from the offset where it was written
+    // by the corresponding allocate function, and the allocate function allocated extra memory for this object in addition to the layout size.
+    unsafe{ let _mp = core::ptr::read(ptr.offset(layout.size() as isize) as *const MappedPages);}
 
     // trace!("Deallocated a large object of {} bytes at address: {:#X}", layout.size(), ptr as usize);
 }

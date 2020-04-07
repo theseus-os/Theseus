@@ -45,7 +45,8 @@ extern crate exceptions_full;
 extern crate network_manager;
 extern crate pause;
 extern crate window_manager;
-extern crate heap_initialization;
+extern crate heap;
+extern crate multiple_heaps;
 #[cfg(simd_personality)] extern crate simd_personality;
 
 
@@ -120,9 +121,9 @@ pub fn init(
     let ap_count = multicore_bringup::handle_ap_cores(kernel_mmi_ref.clone(), ap_start_realmode_begin, ap_start_realmode_end)?;
     info!("Finished handling and booting up all {} AP cores.", ap_count);
 
-    //intialize the per core heaps
-    heap_initialization::initialize_multiple_heaps()?;
-    heap_initialization::multiple_heaps_ready_to_use()?;
+    //initialize the per core heaps
+    multiple_heaps::initialize_multiple_heaps()?;
+    heap::switch_to_multiple_heaps()?;
     info!("Initialized per-core heaps");
 
     // initialize window manager.

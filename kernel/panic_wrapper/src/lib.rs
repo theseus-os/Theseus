@@ -9,6 +9,7 @@
 extern crate alloc;
 #[macro_use] extern crate log;
 extern crate memory;
+extern crate mod_mgmt;
 extern crate task;
 extern crate unwind;
 extern crate stack_trace;
@@ -52,19 +53,20 @@ pub fn panic_wrapper(panic_info: &PanicInfo) -> Result<(), &'static str> {
         }
         #[cfg(frame_pointers)] {
             error!("------------------ Stack Trace (frame pointers) ------------------");
-            let curr_task = task::get_my_current_task().ok_or("get_my_current_task() failed")?;
-            let namespace = curr_task.get_namespace();
-            let (mmi_ref, app_crate_ref) = { 
-                let t = curr_task.lock();
-                (t.mmi.clone(), t.app_crate.clone())
-            };
+            let namespace = task::get_my_current_task()
+                .map(|t| t.get_namespace())
+                .or_else(|| mod_mgmt::get_initial_kernel_namespace().cloned())
+                .ok_or("couldn't get current task's or default namespace")?;
+            let mmi_ref = task::get_my_current_task()
+                .map(|t| t.lock().mmi.clone())
+                .or_else(|| memory::get_kernel_mmi_ref())
+                .ok_or("couldn't get current task's or default kernel MMI")?;
             let mmi = mmi_ref.lock();
 
-            use core::ops::Deref;
             stack_trace_frame_pointers::stack_trace_using_frame_pointers(
                 &mmi.page_table,
                 &mut |_frame_pointer, instruction_pointer: VirtualAddress| {
-                    let symbol_offset = namespace.get_section_containing_address(instruction_pointer, app_crate_ref.as_deref().map(|acr| acr.deref()), false)
+                    let symbol_offset = namespace.get_section_containing_address(instruction_pointer, false)
                         .map(|(sec, offset)| (sec.name.clone(), offset));
                     if let Some((symbol_name, offset)) = symbol_offset {
                         error!("  {:>#018X} in {} + {:#X}", instruction_pointer, symbol_name, offset);

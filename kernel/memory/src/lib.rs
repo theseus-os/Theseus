@@ -131,27 +131,9 @@ impl MemoryManagementInfo {
     }
 }
 
-/// Allocates pages from the heap memory area and maps them to frames.
-/// Returns the new mapped pages or an error is returned if the heap memory limit is reached.
-pub fn create_heap_mapping(starting_address: VirtualAddress, size_in_bytes: usize) -> Result<MappedPages, &'static str> {
-    let kernel_mmi_ref = get_kernel_mmi_ref().ok_or("allocate_heap_pages(): KERNEL_MMI was not yet initialized!")?;
-    let mut kernel_mmi = kernel_mmi_ref.lock();
-
-    let mut frame_allocator = FRAME_ALLOCATOR.try()
-        .ok_or("allocate_heap_pages(): couldnt get FRAME_ALLOCATOR")?
-        .lock();
-
-    let pages = PageRange::from_virt_addr(starting_address, size_in_bytes);
-    let heap_flags = EntryFlags::WRITABLE;
-    let mp = kernel_mmi.page_table.map_pages(pages, heap_flags, frame_allocator.deref_mut())?;
-
-    // trace!("Allocated heap pages at: {:#X}", starting_address);
-
-    Ok(mp)
-}
-
 
 /// A convenience function that creates a new memory mapping by allocating frames that are contiguous in physical memory.
+/// If contiguous frames are not required, then see the `create_mappings` function.
 /// Returns a tuple containing the new `MappedPages` and the starting PhysicalAddress of the first frame,
 /// which is a convenient way to get the physical address without walking the page tables.
 /// 
@@ -175,7 +157,9 @@ pub fn create_contiguous_mapping(size_in_bytes: usize, flags: EntryFlags) -> Res
 }
 
 
-/// A convenience function that creates a new memory mapping.
+/// A convenience function that creates a new memory mapping. The pages allocated are contiguous in memory but there's
+/// no guarantee that the frames they are mapped to are also contiguous in memory. If contiguous frames are required
+/// then see the `create_contiguous_mapping` function.
 /// Returns the new `MappedPages.` 
 /// 
 /// # Locking / Deadlock
@@ -205,8 +189,7 @@ pub fn set_broadcast_tlb_shootdown_cb(func: fn(Vec<VirtualAddress>)) {
 
 
 
-/// Initializes the virtual memory management system and returns a MemoryManagementInfo instance,
-/// which represents Task zero's (the kernel's) address space. 
+/// Initializes the virtual memory management system.
 /// Consumes the given BootInformation, because after the memory system is initialized,
 /// the original BootInformation will be unmapped and inaccessible.
 /// 
@@ -279,17 +262,15 @@ pub fn init(boot_info: &BootInformation)
 ///  * The kernel's new MemoryManagementInfo
 ///  * The kernel's list of identity-mapped MappedPages which should be dropped before starting the first userspace program. 
 pub fn init_post_heap(allocator_mutex: &MutexIrqSafe<AreaFrameAllocator>, page_table: PageTable, 
- higher_half_mapped_pages: [Option<MappedPages>; 32], identity_mapped_pages: [Option<MappedPages>; 32]) 
+ mut higher_half_mapped_pages: [Option<MappedPages>; 32], mut identity_mapped_pages: [Option<MappedPages>; 32]) 
 -> Result<(Arc<MutexIrqSafe<MemoryManagementInfo>>, Vec<MappedPages>), &'static str> 
 {
     // HERE: heap is initialized! Can now use alloc types.
     // After this point, we must "forget" all of the above mapped_pages instances if an error occurs,
     // because they will be auto-unmapped from the new page table upon return, causing all execution to stop.  
 
-    let (
-        higher_half_mapped_pages,
-        identity_mapped_pages,
-    ) = paging::init_post_heap(allocator_mutex, higher_half_mapped_pages, identity_mapped_pages)?;
+    let higher_half_mapped_pages: Vec<MappedPages> = higher_half_mapped_pages.iter_mut().filter_map(|opt| opt.take()).collect();
+    let identity_mapped_pages: Vec<MappedPages> = identity_mapped_pages.iter_mut().filter_map(|opt| opt.take()).collect();
    
     // init the kernel stack allocator, a singleton
     let kernel_stack_allocator = {

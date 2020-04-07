@@ -12,6 +12,9 @@ build = "../../build.rs"
 default-features = false
 version = "0.3.7"
 
+[dependencies.mod_mgmt]
+path = "../mod_mgmt"
+
 [dependencies.memory]
 path = "../memory"
 
