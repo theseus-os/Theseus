@@ -1,6 +1,6 @@
 //! The global allocator for the system. 
 //! It starts off as a single fixed size allocator, and when a more complex heap is set up
-//! the allocate and deallocate functions are updated.
+//! it is set as the default allocator.
 
 #![feature(const_fn)]
 #![feature(allocator_api)]
@@ -90,7 +90,7 @@ pub fn switch_to_multiple_heaps() -> Result<(), &'static str> {
 
 /// The heap which is used as a global allocator for the system.
 /// It starts off with one basic fixed size allocator, and when 
-/// a more complex heap is initialized the new allocate and deallocate functions are set.
+/// a more complex heap is initialized it is set as the default allocator.
 pub struct Heap <'a, T: GlobalAlloc> {
     initial_allocator: MutexIrqSafe<ZoneAllocator<'static>>, 
     allocator: Once<&'a T>

@@ -36,6 +36,8 @@ extern crate memory;
 extern crate kernel_config;
 extern crate slabmalloc;
 extern crate apic;
+extern crate hashbrown;
+#[macro_use] extern crate lazy_static;
 
 use core::ptr::NonNull;
 use alloc::alloc::{GlobalAlloc, Layout};
@@ -45,9 +47,11 @@ use irq_safety::{MutexIrqSafe, RwLockIrqSafe};
 use slabmalloc::{ZoneAllocator, ObjectPage8k, AllocablePage};
 use core::ops::Add;
 use core::ops::DerefMut;
+use hashbrown::HashMap;
 
-static MULTIPLE_HEAPS_ALLOCATOR: MultipleHeaps = MultipleHeaps::empty();
-
+lazy_static!{ 
+    static ref MULTIPLE_HEAPS_ALLOCATOR: MultipleHeaps = MultipleHeaps::empty();
+}
 
 /// The size of each MappedPages Object that is allocated for the per-core heaps, in bytes.
 /// We curently work with 8KiB, so that the per core heaps can allocate objects up to 8056 bytes.  
@@ -66,7 +70,7 @@ const EMPTY_PAGES_THRESHOLD: usize = ZoneAllocator::MAX_BASE_SIZE_CLASSES * 2;
 const HEAP_FLAGS: EntryFlags = EntryFlags::WRITABLE;
 
 
-/// Initializes the multiple heaps using the apic id as the key, which is mapped to a heap id.
+/// Initializes the multiple heaps using the apic id as the key, which is mapped to a heap.
 /// If we want to change the value the heap id is based on, we would substitute 
 /// the lapic iterator with an iterator containing the desired keys.
 pub fn initialize_multiple_heaps() -> Result<(), &'static str> {
@@ -80,12 +84,15 @@ pub fn initialize_multiple_heaps() -> Result<(), &'static str> {
 
 /// Merges the initial allocator into the multiple heap with the smallest heap id
 pub fn merge_initial_heap(mut initial_allocator: ZoneAllocator<'static>) -> Result<(), &'static str> {
-    let heap_id = MULTIPLE_HEAPS_ALLOCATOR.heaps.read().iter().enumerate().find(|(_i, val)| val.is_some()).ok_or("No per-core heap was initialized")?.0;
-    MULTIPLE_HEAPS_ALLOCATOR.heaps.write()[heap_id].as_ref()
+    let heap_id = MULTIPLE_HEAPS_ALLOCATOR.heaps.read().keys().min().ok_or("Could not find minimum heap id")?.clone();
+    MULTIPLE_HEAPS_ALLOCATOR.heaps.write().get(&heap_id).as_ref()
             .ok_or("Core heap is not initialized!")
             .expect("Alloc: per core heap was not initialized") // we want a panic here since that means something was wrong in the initialization steps
             .lock()
-            .merge(&mut initial_allocator, heap_id)
+            .merge(&mut initial_allocator, heap_id)?;
+    
+    trace!("Merged initial heap into heap {}", heap_id);
+    Ok(())
 }
 
 
@@ -122,11 +129,9 @@ fn create_heap_mapping(starting_address: VirtualAddress, size_in_bytes: usize) -
 /// We evenly distribute the pages allocated for each heap between the size classes. 
 pub fn init_individual_heap(key: usize) -> Result<(), &'static str> {
     // check key is within the MAX_HEAPS range
-    if key>= MAX_HEAPS {
+    if key >= MAX_HEAPS {
         warn!("There is a larger key value than the maximum number of heaps in the system");
     }
-
-    let heap_id = get_heap_id(key);
 
     let mut heap_end = MULTIPLE_HEAPS_ALLOCATOR.end.lock();
     if heap_end.value() == 0 {
@@ -151,7 +156,7 @@ pub fn init_individual_heap(key: usize) -> Result<(), &'static str> {
             let mapping = create_heap_mapping(heap_end_addr, HEAP_MAPPED_PAGES_SIZE_IN_BYTES)?;
 
             // add page to the allocator
-            zone_allocator.refill(layout, mapping, heap_id)?; 
+            zone_allocator.refill(layout, mapping, key)?; 
 
             // update the end address of the heap
             heap_end_addr = heap_end_addr.add(HEAP_MAPPED_PAGES_SIZE_IN_BYTES);
@@ -163,19 +168,15 @@ pub fn init_individual_heap(key: usize) -> Result<(), &'static str> {
     *heap_end = heap_end_addr;
 
     // store the newly created allocator in the global allocator
-    MULTIPLE_HEAPS_ALLOCATOR.heaps.write()[heap_id] = Some(MutexIrqSafe::new(zone_allocator));
+    if let Some(heap) = MULTIPLE_HEAPS_ALLOCATOR.heaps.write().insert(key, MutexIrqSafe::new(zone_allocator)) {
+        return Err("New heap created with a previously used id");
+    }
 
-    trace!("Created heap {} with max alloc size: {} bytes", heap_id, ZoneAllocator::MAX_ALLOC_SIZE);
+    trace!("Created heap {} with max alloc size: {} bytes", key, ZoneAllocator::MAX_ALLOC_SIZE);
 
     Ok(())
 }
 
-/// The mapping function that maps each given `key` to a heap id. This can be replaced with a more complex mapping function,
-/// and the `key` passed as argument can be any identification number that determines which tasks use which heap.
-/// Currently we use the apic id.
-fn get_heap_id(key: usize) -> usize {
-    key % MAX_HEAPS
-}
 
 /// Returns the key which determines the heap that will be used.
 /// Currently we use the apic id as the key, but we can replace it with some
@@ -186,12 +187,12 @@ fn get_key() -> usize {
         .expect("Heap:: Could not retrieve apic id") as usize
 }
 
+
 /// An allocator that contains multiple heaps. The heap that is used on each allocation is
-/// determined by a key and a mapping function between the key and heap id.
-/// Currently the apic id is used as the key.
+/// determined by a key. Currently the apic id is used as the key.
 pub struct MultipleHeaps{
     /// the per-core heaps
-    heaps: RwLockIrqSafe<[Option<MutexIrqSafe<ZoneAllocator<'static>>>; MAX_HEAPS]>,
+    heaps: RwLockIrqSafe<HashMap<usize, MutexIrqSafe<ZoneAllocator<'static>>>>,
     /// We currently don't return memory back to the OS. Because of this all memory in the heap is contiguous
     /// and extra memory for the heap is always allocated from the end.
     /// The Mutex also serves the purpose of helping to synchronize new allocations.
@@ -199,16 +200,16 @@ pub struct MultipleHeaps{
 }
 
 impl MultipleHeaps {
-    pub const fn empty() -> MultipleHeaps {
+    pub fn empty() -> MultipleHeaps {
         MultipleHeaps{
-            heaps: RwLockIrqSafe::new([None; MAX_HEAPS]),
+            heaps: RwLockIrqSafe::new(HashMap::new()),
             end: MutexIrqSafe::new(VirtualAddress::zero())
         }
     }
 
 
     unsafe fn allocate_from_heap(&self, heap_id: usize, layout: Layout) -> Result<NonNull<u8>, &'static str> {
-        self.heaps.read()[heap_id].as_ref()
+        self.heaps.read().get(&heap_id).as_ref()
             .ok_or("Core heap is not initialized!")
             .expect("Alloc: per core heap was not initialized") // we want a panic here since that means something was wrong in the initialization steps
             .lock()
@@ -217,7 +218,7 @@ impl MultipleHeaps {
 
 
     unsafe fn deallocate_from_heap(&self, heap_id: usize, ptr: *mut u8, layout: Layout) -> Result<(), &'static str> {
-        self.heaps.read()[heap_id].as_ref()
+        self.heaps.read().get(&heap_id).as_ref()
             .ok_or("Core heap is not initialized!")
             .expect("Dealloc: per core heap was not initialized") // we want a panic here since that means something was wrong in the initialization steps
             .lock()
@@ -231,7 +232,7 @@ impl MultipleHeaps {
     /// * `mp`: MappedPages object representing the pages being added to the heap.
     /// * `heap_id`: heap the page is being added to.
     fn refill_heap(&self, layout: Layout, mp: MappedPages, heap_id: usize) -> Result<(), &'static str> {
-        self.heaps.read()[heap_id].as_ref()
+        self.heaps.read().get(&heap_id).as_ref()
             .ok_or("Core heap is not initialized!")
             .expect("Refill: per core heap was not initialized") // we want a panic here since that means something was wrong in the initialization steps
             .lock()
@@ -245,7 +246,7 @@ impl MultipleHeaps {
     /// * `layout`: layout.size will determine which allocation size the page will be used for. 
     /// * `heap_id`: heap the page is being moved within.
     fn exchange_pages_within_heap(&self, layout: Layout, heap_id: usize) -> Result<(), &'static str> {
-        self.heaps.read()[heap_id].as_ref()
+        self.heaps.read().get(&heap_id).as_ref()
             .ok_or("Core heap is not initialized!")
             .expect("Exchange pages: per core heap was not initialized")
             .lock()
@@ -256,18 +257,16 @@ impl MultipleHeaps {
     /// Retrieves an empty page from the heap which has the maximum number of empty pages,
     /// if the maximum is greater than a threshold.
     fn retrieve_empty_page(&self) -> Result<MappedPages, &'static str> {
-        let id = self.heaps.read().iter().enumerate().max_by_key(
-            |&(_i, val)| val.as_ref().map_or(0, |heap| heap.lock().empty_pages()))
-        .map(|(i, _val)| i).ok_or("There was no per core heap even though they have been initialized")?;
-
-        if let Some(heap) = &self.heaps.read()[id] {
-            if heap.lock().empty_pages() > EMPTY_PAGES_THRESHOLD {
-                return heap.lock().retrieve_empty_page().ok_or("No empty page in the heaps");
-            }
-        }
+        let heaps = self.heaps.read();
+        let heap = heaps.values().max_by_key(
+            |&heap| heap.lock().empty_pages())
+            .ok_or("Per core heaps haven't been initialized")?;
         
+        if heap.lock().empty_pages() > EMPTY_PAGES_THRESHOLD {
+            return heap.lock().retrieve_empty_page().ok_or("No empty page in the heaps");
+        }
 
-        Err("Per core heaps haven't been initialized")
+        Err("No empty pages available")
     }
 
 
@@ -319,7 +318,7 @@ unsafe impl GlobalAlloc for MultipleHeaps {
     /// If the size requested is greater than MAX_ALLOC_SIZE, then memory is directly requested from the OS.
     /// If the per-core heap is not initialized, then the initial allocator is used.
     unsafe fn alloc(&self, layout: Layout) -> *mut u8 {
-        let id = get_heap_id(get_key());
+        let id = get_key();
 
         let alloc_result = 
             // allocate a large object directly through mapped pages
@@ -327,7 +326,7 @@ unsafe impl GlobalAlloc for MultipleHeaps {
                 allocate_large_object(layout)
             }
             // allocate an object with the per-core heap if initialized 
-            else if self.heaps.read()[id].is_some() {
+            else if self.heaps.read().get(&id).is_some() {
                 match self.allocate_from_heap(id, layout) {
                     Ok(ptr) => Ok(ptr),
                     Err(_e) => {
