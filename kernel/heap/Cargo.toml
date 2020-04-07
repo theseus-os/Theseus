@@ -31,8 +31,5 @@ path = "../memory"
 [dependencies.kernel_config]
 path = "../kernel_config"
 
-[dependencies.multiple_heaps]
-path = "../multiple_heaps"
-
 [dependencies.slabmalloc]
 path = "../../libs/rust-slabmalloc"

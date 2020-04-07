@@ -41,7 +41,9 @@ path = "../../libs/rust-slabmalloc"
 version = "0.1.8"
 features = ["nightly"]
 
-
 [dependencies.lazy_static]
 features = ["spin_no_std", "nightly"]
 version = "1.2.0"
+
+[dependencies.heap]
+path = "../heap"
