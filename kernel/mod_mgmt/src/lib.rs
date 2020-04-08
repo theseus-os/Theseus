@@ -332,9 +332,9 @@ impl Drop for AppCrateRef {
         if let Some(_removed_app_crate) = self.namespace.crate_tree().lock().remove_str(&crate_locked.crate_name) {
             // Second, remove all of the crate's global symbols from the namespace's symbol map.
             let mut symbol_map = self.namespace.symbol_map().lock();
-            for symbol in &crate_locked.global_symbols {
-                if symbol_map.remove(symbol).is_none() {
-                    error!("NOTE: couldn't find old symbol {:?} in the old crate {:?} to remove from namespace {:?}.", symbol, crate_locked.crate_name, self.namespace.name());
+            for sec_to_remove in crate_locked.global_sections_iter() {
+                if symbol_map.remove_str(&sec_to_remove.name).is_none() {
+                    error!("NOTE: couldn't find old symbol {:?} in the old crate {:?} to remove from namespace {:?}.", sec_to_remove.name, crate_locked.crate_name, self.namespace.name());
                 }
             }
         } else {
@@ -974,19 +974,19 @@ impl CrateNamespace {
         let data_pages   = section_pages.read_write_pages.map(|(dp, range)| (Arc::new(Mutex::new(dp)), range));
 
         // Check the symbol table to get the set of sections that are global (publicly visible).
-        let global_sections: BTreeSet<usize> = {
+        let global_sections: BTreeSet<Shndx> = {
             // For us to properly load the ELF file, it must NOT have been fully stripped,
             // meaning that it must still have its symbol table section. Otherwise, relocations will not work.
             let symtab = find_symbol_table(&elf_file)?;
 
-            let mut globals: BTreeSet<usize> = BTreeSet::new();
+            let mut globals: BTreeSet<Shndx> = BTreeSet::new();
             use xmas_elf::symbol_table::Entry;
             for entry in symtab.iter() {
                 // Include all symbols with "GLOBAL" binding, regardless of visibility.  
                 if entry.get_binding() == Ok(xmas_elf::symbol_table::Binding::Global) {
                     if let Ok(typ) = entry.get_type() {
                         if typ == xmas_elf::symbol_table::Type::Func || typ == xmas_elf::symbol_table::Type::Object {
-                            globals.insert(entry.shndx() as usize);
+                            globals.insert(entry.shndx() as Shndx);
                         }
                     }
                 }
@@ -1034,18 +1034,16 @@ impl CrateNamespace {
             text_pages:              text_pages.clone(),
             rodata_pages:            rodata_pages.clone(),
             data_pages:              data_pages.clone(),
-            global_symbols:          BTreeSet::new(),
-            data_sections:           Trie::new(),
+            global_sections:         BTreeSet::new(),
+            data_sections:           BTreeSet::new(),
             reexported_symbols:      BTreeSet::new(),
         });
         let new_crate_weak_ref = CowArc::downgrade(&new_crate);
         
         // this maps section header index (shndx) to LoadedSection
-        let mut loaded_sections: BTreeMap<usize, StrongSectionRef> = BTreeMap::new(); 
-        // the list of all symbols in this crate that are public (global) 
-        let mut global_symbols: BTreeSet<BString> = BTreeSet::new();
-        // the map of .data and .bss section names to the actual section
-        let mut data_sections: Trie<BString, StrongSectionRef> = Trie::new();
+        let mut loaded_sections: BTreeMap<Shndx, StrongSectionRef> = BTreeMap::new(); 
+        // the set of Shndxes for .data and .bss sections
+        let mut data_sections: BTreeSet<Shndx> = BTreeSet::new();
 
         let mut read_only_pages_locked  = rodata_pages.as_ref().map(|(rp, _)| (rp.clone(), rp.lock()));
         let mut read_write_pages_locked = data_pages  .as_ref().map(|(dp, _)| (dp.clone(), dp.lock()));
@@ -1119,15 +1117,11 @@ impl CrateNamespace {
                     // We already copied the content of all .text sections above, 
                     // so here we just record the metadata into a new `LoadedSection` object.
                     if let Some((ref tp_ref, ref tp_range)) = text_pages {
-                        let is_global = global_sections.contains(&shndx);
-                        if is_global {
-                            global_symbols.insert(demangled.clone().into());
-                        }
-
                         let text_offset = sec.offset() as usize;
                         let dest_vaddr = tp_range.start + text_offset;
 
-                        loaded_sections.insert(shndx, 
+                        loaded_sections.insert(
+                            shndx, 
                             Arc::new(LoadedSection::new(
                                 SectionType::Text,
                                 demangled,
@@ -1135,7 +1129,7 @@ impl CrateNamespace {
                                 text_offset,
                                 dest_vaddr,
                                 sec_size,
-                                is_global,
+                                global_sections.contains(&shndx),
                                 new_crate_weak_ref.clone(),
                             ))
                         );
@@ -1197,24 +1191,21 @@ impl CrateNamespace {
                             return Err("couldn't get section data in .data section");
                         }
                     }
-
-                    let is_global = global_sections.contains(&shndx);
-                    if is_global {
-                        global_symbols.insert(demangled.clone().into());
-                    }
                     
-                    let sec = Arc::new(LoadedSection::new(
-                        if is_bss { SectionType::Bss } else { SectionType::Data },
-                        demangled.clone(),
-                        Arc::clone(dp_ref),
-                        data_offset,
-                        dest_vaddr,
-                        sec_size,
-                        is_global,
-                        new_crate_weak_ref.clone(),
-                    ));
-                    loaded_sections.insert(shndx, Arc::clone(&sec));
-                    data_sections.insert(demangled.into(), sec);
+                    loaded_sections.insert(
+                        shndx,
+                        Arc::new(LoadedSection::new(
+                            if is_bss { SectionType::Bss } else { SectionType::Data },
+                            demangled.clone(),
+                            Arc::clone(dp_ref),
+                            data_offset,
+                            dest_vaddr,
+                            sec_size,
+                            global_sections.contains(&shndx),
+                            new_crate_weak_ref.clone(),
+                        ))
+                    );
+                    data_sections.insert(shndx);
 
                     data_offset += round_up_power_of_two(sec_size, sec_align);
                 }
@@ -1245,13 +1236,9 @@ impl CrateNamespace {
                                 return Err("couldn't get section data in .rodata section");
                             }
                         }
-
-                        let is_global = global_sections.contains(&shndx);
-                        if is_global {
-                            global_symbols.insert(demangled.clone().into());
-                        }
                         
-                        loaded_sections.insert(shndx, 
+                        loaded_sections.insert(
+                            shndx, 
                             Arc::new(LoadedSection::new(
                                 SectionType::Rodata,
                                 demangled,
@@ -1259,7 +1246,7 @@ impl CrateNamespace {
                                 rodata_offset,
                                 dest_vaddr,
                                 sec_size,
-                                is_global,
+                                global_sections.contains(&shndx),
                                 new_crate_weak_ref.clone(),
                             ))
                         );
@@ -1297,10 +1284,8 @@ impl CrateNamespace {
                         }
                     }
 
-                    // .gcc_except_table section is not globally visible
-                    let is_global = false;
-                    
-                    loaded_sections.insert(shndx, 
+                    loaded_sections.insert(
+                        shndx, 
                         Arc::new(LoadedSection::new(
                             SectionType::GccExceptTable,
                             sec_name.to_string(),
@@ -1308,7 +1293,7 @@ impl CrateNamespace {
                             rodata_offset,
                             dest_vaddr,
                             sec_size,
-                            is_global,
+                            false, // .gcc_except_table section is not globally visible,
                             new_crate_weak_ref.clone(),
                         ))
                     );
@@ -1341,10 +1326,8 @@ impl CrateNamespace {
                         }
                     }
 
-                    // .gcc_except_table section is not globally visible
-                    let is_global = false;
-                    
-                    loaded_sections.insert(shndx, 
+                    loaded_sections.insert(
+                        shndx, 
                         Arc::new(LoadedSection::new(
                             SectionType::EhFrame,
                             sec_name.to_string(),
@@ -1352,7 +1335,7 @@ impl CrateNamespace {
                             rodata_offset,
                             dest_vaddr,
                             sec_size,
-                            is_global,
+                            false, // .eh_frame section is not globally visible,
                             new_crate_weak_ref.clone(),
                         ))
                     );
@@ -1380,7 +1363,7 @@ impl CrateNamespace {
             let mut new_crate_mut = new_crate.lock_as_mut()
                 .ok_or_else(|| "BUG: load_crate_sections(): couldn't get exclusive mutable access to new_crate")?;
             new_crate_mut.sections = loaded_sections;
-            new_crate_mut.global_symbols = global_symbols;
+            new_crate_mut.global_sections = global_sections;
             new_crate_mut.data_sections = data_sections;
         }
 
@@ -1420,6 +1403,7 @@ impl CrateNamespace {
                 }
             }
 
+            warn!("Size of rela_array: {}", sec.raw_data(&elf_file).len());
             let rela_array = match sec.get_data(&elf_file) {
                 Ok(Rela64(rela_arr)) => rela_arr,
                 _ => {

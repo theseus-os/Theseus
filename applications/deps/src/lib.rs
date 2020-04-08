@@ -198,9 +198,9 @@ fn sections_in_crate(crate_name: &str, all_sections: bool) -> Result<(), String>
         }
     } else {
         println_log!("Sections (public-only) in crate {}:", crate_name);
-        for sec_name in crate_ref.lock_as_ref().global_symbols.iter() {
-            println_log!("    {}", sec_name.as_str());
-            for n in get_containing_crate_name(sec_name.as_str()) {
+        for sec in crate_ref.lock_as_ref().global_sections_iter() {
+            println_log!("    {}", sec.name);
+            for n in get_containing_crate_name(&sec.name) {
                 containing_crates.insert(String::from(n));
             }
         }

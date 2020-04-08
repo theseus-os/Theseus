@@ -8,7 +8,6 @@ build = "../../build.rs"
 
 [dependencies]
 spin = "0.4.10"
-qp-trie = "0.7.3"
 xmas-elf = { version = "0.6.2", git = "https://github.com/kevinaboos/xmas-elf.git" }
 
 
