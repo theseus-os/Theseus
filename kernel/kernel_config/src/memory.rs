@@ -78,7 +78,7 @@ pub const KERNEL_TEXT_MAX_SIZE: usize = ADDRESSABILITY_PER_P4_ENTRY - (2 * 1024 
 /// which is the slot right below the recursive P4 entry (510)
 /// actual value: 0o177777_775_000_000_000_0000, or 0xFFFF_FE80_0000_0000
 pub const KERNEL_HEAP_START: usize = 0xFFFF_0000_0000_0000 | (KERNEL_HEAP_P4_INDEX << (P4_INDEX_SHIFT + PAGE_SHIFT));
-pub const KERNEL_HEAP_INITIAL_SIZE: usize = 5 * 1024 * 1024; // 64 MiB
+pub const KERNEL_HEAP_INITIAL_SIZE: usize = 64 * 1024 * 1024; // 64 MiB
 /// the kernel heap gets the whole 509th P4 entry.
 pub const KERNEL_HEAP_MAX_SIZE: usize = ADDRESSABILITY_PER_P4_ENTRY;
 

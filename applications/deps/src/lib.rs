@@ -184,15 +184,23 @@ fn num_deps_section(section_name: &str) -> Result<(), String> {
 fn num_deps_all() -> Result<(), String> {
     let namespace = get_my_current_namespace();
     let (mut s_total, mut w_total, mut i_total) = (0, 0, 0);
+    let mut crate_count = 0;
+    let mut section_count = 0;
     namespace.for_each_crate(true, |_crate_name, crate_ref| {
+        crate_count += 1;
         let (s, w, i) = crate_dependency_count(crate_ref);
+        section_count += crate_ref.lock_as_ref().sections.len();
         s_total += s;
         w_total += w;
         i_total += i;
         true // keep going
     });
 
-    println!("Total Dependency Count for all crates:\nStrong: {}\nWeak:   {}\nIntrnl: {}", s_total, w_total, i_total);
+    println!("Total Dependency Count for all {} crates ({} sections):\nStrong: {}\nWeak:   {}\nIntrnl: {}",
+        crate_count, 
+        section_count,    
+        s_total, w_total, i_total
+    );
     Ok(())
 }
 
