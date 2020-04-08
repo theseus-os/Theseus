@@ -21,6 +21,7 @@ use core::{
 };
 use spin::Mutex;
 use alloc::{
+    borrow::Cow,
     collections::BTreeSet,
     string::{String, ToString},
     sync::Arc,
@@ -282,25 +283,26 @@ pub fn swap_crates(
 
             // Go through all the `.data` and `.bss` sections and copy over the old_sec into the new source_sec,
             // as they represent static variables that would otherwise result in a loss of data.
-            for old_sec in old_crate.data_sections.values() {
+            for old_sec in old_crate.data_sections_iter() {
                 let old_sec_name_without_hash = old_sec.name_without_hash();
                 // get the section from the new crate that corresponds to the `old_sec`
-                let new_dest_sec = {
-                    let mut iter = if crates_have_same_name {
-                        new_crate.data_sections.iter_prefix_str(old_sec_name_without_hash)
+                let prefix = if crates_have_same_name {
+                    Cow::from(old_sec_name_without_hash)
+                } else {
+                    if let Some(s) = replace_containing_crate_name(old_sec_name_without_hash, &old_crate_name_without_hash, &new_crate_name_without_hash) {
+                        Cow::from(s)
                     } else {
-                        if let Some(s) = replace_containing_crate_name(old_sec_name_without_hash, &old_crate_name_without_hash, &new_crate_name_without_hash) {
-                            new_crate.data_sections.iter_prefix_str(&s)
-                        } else {
-                            new_crate.data_sections.iter_prefix_str(old_sec_name_without_hash)
-                        }
-                    };
+                        Cow::from(old_sec_name_without_hash)
+                    }
+                };
+                let new_dest_sec = {
+                    let mut iter = new_crate.data_sections_iter().filter(|sec| sec.name.starts_with(&*prefix));
                     iter.next()
                         .filter(|_| iter.next().is_none()) // ensure single element
-                        .map(|(_key, val)| val)
-                }.ok_or_else(|| 
-                    "couldn't find destination section in new crate to copy old_sec's data into (.data/.bss state transfer)"
-                )?;
+                        .ok_or_else(|| 
+                            "couldn't find destination section in new crate to copy old_sec's data into (.data/.bss state transfer)"
+                        )
+                }?;
 
                 debug!("swap_crates(): copying .data or .bss section from old {:?} to new {:?}", &*old_sec, new_dest_sec);
                 old_sec.copy_section_data_to(&new_dest_sec)?;
@@ -317,24 +319,24 @@ pub fn swap_crates(
             // Note that we only need to iterate through sections from the old crate that are public/global,
             // i.e., those that were previously added to this namespace's symbol map,
             // because other crates could not possibly depend on non-public sections in the old crate.
-            for old_sec_name in &old_crate.global_symbols {
-                debug!("swap_crates(): looking for old_sec_name: {:?}", old_sec_name);
-                let (old_sec, old_sec_ns) = this_namespace.get_symbol_and_namespace(old_sec_name.as_str())
-                    .and_then(|(weak_old_sec, ns)| weak_old_sec.upgrade().map(|sec| (sec, ns)))
+            for old_sec in old_crate.global_sections_iter() {
+                debug!("swap_crates(): looking for old_sec_name: {:?}", old_sec.name);
+                let old_sec_ns = this_namespace.get_symbol_and_namespace(&old_sec.name)
+                    .map(|(_weak_sec, ns)| ns)
                     .ok_or_else(|| {
-                        error!("BUG: swap_crates(): couldn't get/upgrade old crate's section: {:?}", old_sec_name);
-                        "BUG: swap_crates(): couldn't get/upgrade old crate's section"
+                        error!("BUG: swap_crates(): couldn't get old crate's section: {:?}", old_sec.name);
+                        "BUG: swap_crates(): couldn't get old crate's section"
                     })?;
 
                 #[cfg(not(loscd_eval))]
-                debug!("swap_crates(): old_sec_name: {:?}, old_sec: {:?}", old_sec_name, old_sec);
+                debug!("swap_crates(): old_sec_name: {:?}, old_sec: {:?}", old_sec.name, old_sec);
                 let old_sec_name_without_hash = old_sec.name_without_hash();
 
 
                 // This closure finds the section in the `new_crate` that corresponds to the given `old_sec` from the `old_crate`.
                 // And, if enabled, it will reexport that new section under the same name as the `old_sec`.
                 // We put this procedure in a closure because it's relatively expensive, allowing us to run it only when necessary.
-                let find_corresponding_new_section = |new_crate_reexported_symbols: &mut BTreeSet<BString>| {
+                let find_corresponding_new_section = |new_crate_reexported_symbols: &mut BTreeSet<String>| {
                     // Use the new namespace to find the new source_sec that old target_sec should point to.
                     // The new source_sec must have the same name as the old one (old_sec here),
                     // otherwise it wouldn't be a valid swap -- the target_sec's parent crate should have also been swapped.
@@ -364,9 +366,9 @@ pub fn swap_crates(
 
                     if reexport_new_symbols_as_old && old_sec.global {
                         // reexport the new source section under the old sec's name, i.e., redirect the old mapping to the new source sec
-                        let reexported_name = BString::from(old_sec.name.as_str());
+                        let reexported_name = old_sec.name.clone();
                         new_crate_reexported_symbols.insert(reexported_name.clone());
-                        let _old_val = old_sec_ns.symbol_map().lock().insert(reexported_name, Arc::downgrade(&new_crate_source_sec));
+                        let _old_val = old_sec_ns.symbol_map().lock().insert(BString::from(reexported_name), Arc::downgrade(&new_crate_source_sec));
                         if _old_val.is_none() { 
                             warn!("swap_crates(): reexported new crate section that replaces old section {:?}, but that old section unexpectedly didn't exist in the symbol map", old_sec.name);
                         }
@@ -555,9 +557,10 @@ pub fn swap_crates(
                 // If reexport_new_symbols_as_old is true, we MUST NOT remove the old_crate's symbols from this symbol map,
                 // because we already replaced them above with mappings that redirect to the corresponding new crate sections.
                 if !reexport_new_symbols_as_old {
-                    for symbol in &old_crate.global_symbols {
-                        if old_namespace.symbol_map().lock().remove(symbol).is_none() {
-                            error!("swap_crates(): couldn't find old symbol {:?} in the old crate's namespace: {}.", symbol, old_namespace.name());
+                    let mut old_ns_symbol_map = old_namespace.symbol_map().lock();
+                    for old_sec in old_crate.global_sections_iter() {
+                        if old_ns_symbol_map.remove_str(&old_sec.name).is_none() {
+                            error!("swap_crates(): couldn't find old symbol {:?} in the old crate's namespace: {}.", old_sec.name, old_namespace.name());
                             return Err("couldn't find old symbol {:?} in the old crate's namespace");
                         }
                     }
@@ -566,7 +569,7 @@ pub fn swap_crates(
                 // If the old crate had reexported its symbols, we should remove those reexports here,
                 // because they're no longer active since the old crate is being removed. 
                 for sym in &old_crate.reexported_symbols {
-                    let _old_reexported_symbol = old_namespace.symbol_map().lock().remove(sym);
+                    let _old_reexported_symbol = old_namespace.symbol_map().lock().remove_str(sym);
                     if _old_reexported_symbol.is_none() {
                         warn!("swap_crates(): the old_crate {:?}'s reexported symbol was not in its old namespace, couldn't be removed.", sym);
                     }
