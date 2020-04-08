@@ -17,9 +17,9 @@
 //! 
 
 
-use super::{CrateNamespace, LoadedCrate, StrongCrateRef, SectionType, MmiRef};
+use super::{CrateNamespace, LoadedCrate, StrongCrateRef, MmiRef};
 use alloc::{
-    collections::{BTreeSet, BTreeMap},
+    collections::BTreeSet,
     string::String,
     sync::Arc,
 };
@@ -46,14 +46,14 @@ pub fn replace_nano_core_crates(
     nano_core_crate_ref: StrongCrateRef,
     kernel_mmi_ref: &MmiRef,
 ) -> Result<(), &'static str> {
+    let nano_core_crate = nano_core_crate_ref.lock_as_ref();
+
     let mut constituent_crates = BTreeSet::new();
-    for sec_name in nano_core_crate_ref.lock_as_ref().global_symbols.iter() {
-        for n in super::get_containing_crate_name(sec_name.as_str()) {
+    for sec in nano_core_crate.global_sections_iter() {
+        for n in super::get_containing_crate_name(&sec.name) {
             constituent_crates.insert(String::from(n));
         }
     }
-
-    let nano_core_crate = nano_core_crate_ref.lock_as_ref();
 
     // For now we just replace the "memory" crate. 
     // More crates can be added later, up to every `constituent_crate` in the nano_core.
@@ -88,7 +88,6 @@ pub fn replace_nano_core_crates(
 /// 1. Call `load_crate_sections()` as normal. The data sections will be ignored, but that's okay.
 /// 2. Go through the .data/.bss sections in the partially loaded new crate, and replace them with references to
 ///    the corresponding data section in the nano_core.
-///    We must replace both the sections in the `sections` map and in the `data_sections` map.
 /// 3. Remove (take) and drop the new crate's `data_pages`, just to ensure they're not actually being used. 
 /// 4. Add the new crate's global sections to the symbol map, as usual. 
 ///    We can skip adding data/bss sections to the symbol map since they were already added in `parse_nano_core()`.
@@ -114,35 +113,24 @@ fn load_crate_using_nano_core_data_sections(
 
     // (2) Go through the .data/.bss sections in the partially loaded new crate,
     //     and replace them with references to the corresponding data section in the nano_core.
-    //     We must replace the section references in both the new_crate's `sections` map and `data_sections` map.
     {
-        // We also populate a map from newly-loaded section index to the existing old data section in the nano_core that matches it.
-        // Note that the newly-loaded section index itself already maps to the newly-loaded data section, in the `new_crate_ref.sections` map.
-        let mut map_new_sec_shndx_to_old_sec_in_nano_core = BTreeMap::new();
-        // Get an iterator of all data sections in the newly-loaded crate and their shndx values.
-        // We can't use the `data_sections` field in the `LoadedCrate` struct because it doesn't have shndx values for each section.
         let mut new_crate = new_crate_ref.lock_as_mut().ok_or_else(|| "BUG: could not get exclusive mutable access to newly-loaded crate")?;
-        let new_crate_sections_mut = new_crate.sections.iter_mut()
-            .filter(|(_shndx, sec)| sec.get_type() == SectionType::Data || sec.get_type() == SectionType::Bss);
-        
-        // (2)(a) Replace the data section references in the new crate's `sections` list with the corresponding sections in the nano_core
-        for (shndx, new_sec) in new_crate_sections_mut {
-            // Get the section from the nano_core that exactly matches the new_sec.
-            let old_sec = nano_core_crate.data_sections.get_str(&new_sec.name).ok_or_else(|| {
-                error!("BUG: couldn't find old_sec in nano_core to copy data into new_sec {:?} (.data/.bss state transfer)", new_sec.name);
-                "BUG: couldn't find old_sec in nano_core to copy data into new_sec (.data/.bss state transfer)"
-            })?;
-            map_new_sec_shndx_to_old_sec_in_nano_core.insert(*shndx, old_sec.clone());
-            *new_sec = old_sec.clone();
-        }
-        // debug!("New crate data sections: {:?}", map_new_sec_shndx_to_old_sec_in_nano_core);
 
-        // (2)(b) Do the same replacement of section references in the new_crate's list of `data_sections`
-        for new_data_sec in new_crate.data_sections.values_mut() {
-            let old_sec = map_new_sec_shndx_to_old_sec_in_nano_core.values()
-                .find(|s| s.name == new_data_sec.name)
-                .ok_or("BUG: couldn't find matching data_section in new_crate")?;
-            *new_data_sec = old_sec.clone();
+        for shndx in new_crate.data_sections.clone() {
+            let new_data_sec = new_crate.sections.get_mut(&shndx).ok_or_else(|| {
+                error!("BUG: new_crate's data section shndx {} wasn't in the new_crate's sections map.", shndx);
+                "BUG: new_crate's data section shndx wasn't in the new_crate's sections map."
+            })?;
+            // Get the section from the nano_core that exactly matches the new_sec.
+            let old_data_sec = nano_core_crate.data_sections_iter()
+                .find(|&sec| sec.name == new_data_sec.name)
+                .ok_or_else(|| {
+                    error!("BUG: couldn't find old_data_sec in nano_core to copy data into new_data_sec {:?} (.data/.bss state transfer)", new_data_sec.name);
+                    "BUG: couldn't find old_data_sec in nano_core to copy data into new_data_sec (.data/.bss state transfer)"
+                })?;
+
+            // Replace the data section references in the new crate's `sections` list with the corresponding sections in the nano_core
+            *new_data_sec = Arc::clone(old_data_sec);
         }
         
         // (3) Remove and drop the new_crate's data MappedPages, since it shouldn't be used. 
@@ -154,7 +142,7 @@ fn load_crate_using_nano_core_data_sections(
         // have already been added to the symbol map when the nano_core was originally parsed.
         _num_new_syms = namespace.add_symbols_filtered(
             new_crate.sections.values(), 
-            |sec| sec.get_type() != SectionType::Data && sec.get_type() != SectionType::Bss,
+            |sec| !sec.get_type().is_data_or_bss(),
             verbose_log,
         );
         _num_new_sections = new_crate.sections.len();

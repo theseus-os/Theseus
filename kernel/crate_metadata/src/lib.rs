@@ -47,7 +47,6 @@ extern crate spin;
 extern crate memory;
 extern crate cow_arc;
 extern crate fs_node;
-extern crate qp_trie;
 extern crate xmas_elf;
 extern crate goblin;
 
@@ -60,10 +59,10 @@ use alloc::{
     sync::{Arc, Weak},
     vec::Vec,
 };
-use memory::{MappedPages, VirtualAddress, PageTable, EntryFlags, FrameAllocator};
+use memory::{MappedPages, VirtualAddress, EntryFlags};
+#[cfg(internal_deps)] use memory::{PageTable, FrameAllocator};
 use cow_arc::{CowArc, CowWeak};
 use fs_node::{FileRef, WeakFileRef};
-use qp_trie::{Trie, wrapper::BString};
 use goblin::elf::reloc::*;
 
 
@@ -75,7 +74,9 @@ pub type WeakCrateRef = CowWeak<LoadedCrate>;
 pub type StrongSectionRef  = Arc<LoadedSection>;
 /// A Weak reference (`Weak`) to a `LoadedSection`.
 pub type WeakSectionRef = Weak<LoadedSection>;
-
+/// A Section Header iNDeX (SHNDX), as specified by the ELF format. 
+/// Even though this is typically encoded as a `u16`, its decoded form can exceed the max size of `u16`.
+pub type Shndx = usize;
 
 /// `.text` sections are read-only and executable.
 pub const TEXT_SECTION_FLAGS:     EntryFlags = EntryFlags::PRESENT;
@@ -203,7 +204,7 @@ pub struct LoadedCrate {
     /// In general we're only interested the values (the `LoadedSection`s themselves),
     /// but we keep each section's shndx (section header index from its crate's ELF file)
     /// as the key because it helps us quickly handle relocations and crate swapping.
-    pub sections: BTreeMap<usize, StrongSectionRef>,
+    pub sections: BTreeMap<Shndx, StrongSectionRef>,
     /// A tuple of:    
     /// 1. The `MappedPages` that contain sections that are readable and executable, but not writable,
     ///     i.e., the `.text` sections for this crate,
@@ -225,11 +226,13 @@ pub struct LoadedCrate {
 
     /// The set of global symbols in this crate, including regular ones 
     /// that are prefixed with the `crate_name` and `no_mangle` symbols that are not.
-    pub global_symbols: BTreeSet<BString>,
+    /// The `Shndx` values in this set are the section index (shndx) numbers, 
+    /// which can be used as the key to look up the actual `LoadedSection` in the `sections` list above.
+    pub global_sections: BTreeSet<Shndx>,
     /// The set of `.data` and `.bss` sections in this crate.
-    /// The key is the section name and the value is a reference to the section;
-    /// these sections are also in the `sections` member above.
-    pub data_sections: Trie<BString, StrongSectionRef>,
+    /// The `Shndx` values in this set are the section index (shndx) numbers, 
+    /// which can be used as the key to look up the actual `LoadedSection` in the `sections` list above.
+    pub data_sections: BTreeSet<Shndx>,
     /// The set of symbols that this crate's global symbols are reexported under,
     /// i.e., they have been added to the enclosing `CrateNamespace`'s symbol map under these names.
     /// 
@@ -243,8 +246,8 @@ pub struct LoadedCrate {
     /// then `keyboard::init::h123` will be added to this set.
     /// 
     /// When a crate is first loaded, this will be empty by default, 
-    /// because this crate will only have populated its `global_symbols` set during loading. 
-    pub reexported_symbols: BTreeSet<BString>,
+    /// because this crate will only have populated its `global_sections` set during loading. 
+    pub reexported_symbols: BTreeSet<String>,
 }
 
 impl fmt::Debug for LoadedCrate {
@@ -273,6 +276,20 @@ impl LoadedCrate {
             sec.get_type() == SectionType::Text &&
             sec.name == func_name
         )
+    }
+
+    /// A convenience function to iterate over only the data (.data or .bss) sections in this crate.
+    pub fn data_sections_iter(&self) -> impl Iterator<Item = &StrongSectionRef> {
+        self.data_sections
+            .iter()
+            .filter_map(move |shndx| self.sections.get(shndx))
+    }
+
+    /// A convenience function to iterate over only the global (public) sections in this crate.
+    pub fn global_sections_iter(&self) -> impl Iterator<Item = &StrongSectionRef> {
+        self.global_sections
+            .iter()
+            .filter_map(move |shndx| self.sections.get(shndx))
     }
 
     /// Returns the **first** `LoadedSection` that matches the given predicate,
@@ -351,6 +368,9 @@ impl LoadedCrate {
     /// and that would result in weird inconsistencies that violate those dependencies.
     /// In addition, multiple `LoadedSection`s share a given `MappedPages` memory range,
     /// so they all have to be duplicated at once into a new `MappedPages` range at the crate level.
+    /// 
+    /// This is only available when the `internal_deps` cfg option is set.
+    #[cfg(internal_deps)]
     pub fn deep_copy<A: FrameAllocator>(
         &self, 
         page_table: &mut PageTable, 
@@ -401,8 +421,8 @@ impl LoadedCrate {
             text_pages:              new_text_pages_range,
             rodata_pages:            new_rodata_pages_range,
             data_pages:              new_data_pages_range,
-            global_symbols:          self.global_symbols.clone(),
-            data_sections:            Trie::new(),
+            global_sections:         self.global_sections.clone(),
+            data_sections:           self.data_sections.clone(),
             reexported_symbols:      self.reexported_symbols.clone(),
         });
         let new_crate_weak_ref = CowArc::downgrade(&new_crate);
@@ -415,8 +435,7 @@ impl LoadedCrate {
         // 1) The parent_crate reference itself, since we're replacing that with a new one,
         // 2) The section's mapped_pages, which will point to a new `MappedPages` object for the newly-copied crate,
         // 3) The section's virt_addr, which is based on its new mapped_pages
-        let mut new_sections: BTreeMap<usize, StrongSectionRef> = BTreeMap::new();
-        let mut new_data_sections: Trie<BString, StrongSectionRef> = Trie::new();
+        let mut new_sections: BTreeMap<Shndx, StrongSectionRef> = BTreeMap::new();
         for (shndx, old_sec) in self.sections.iter() {
             let old_sec_inner = old_sec.inner.read();
             let new_sec_mapped_pages_offset = old_sec.mapped_pages_offset;
@@ -453,9 +472,6 @@ impl LoadedCrate {
                 old_sec_inner.internal_dependencies.clone()   // internal dependencies are the same, but relocations need to be re-written
             ));
 
-            if old_sec.typ == SectionType::Data || old_sec.typ == SectionType::Bss {
-                new_data_sections.insert_str(&old_sec.name, new_sec.clone());
-            }
             new_sections.insert(*shndx, new_sec);
         }
 
@@ -537,12 +553,11 @@ impl LoadedCrate {
         }
         // data/bss sections are already mapped properly, since they're writable
 
-        // set the new_crate's section-related lists, since we didn't do it earlier
+        // set the new_crate's `sections` list, since we didn't do it earlier
         {
             let mut new_crate_mut = new_crate.lock_as_mut()
                 .ok_or_else(|| "BUG: LoadedCrate::deep_copy(): couldn't get exclusive mutable access to newly-copied crate")?;
             new_crate_mut.sections = new_sections;
-            new_crate_mut.data_sections = new_data_sections;
         }
 
         Ok(new_crate)
@@ -577,6 +592,15 @@ pub enum SectionType {
     /// 
     EhFrame,
 }
+impl SectionType {
+    /// Returns `true` if `Data` or `Bss`, otherwise `false`.
+    pub fn is_data_or_bss(&self) -> bool {
+        match self {
+            Self::Data | Self::Bss => true,
+            _ => false,
+        }
+    }
+}
 
 /// The parts of a `LoadedSection` that may be mutable, i.e., 
 /// only the parts that could change after a section is initially loaded and linked.
@@ -596,14 +620,13 @@ pub struct LoadedSectionInner {
     /// so that we can faithfully reconstruct the crate section's relocation information.
     /// This is necessary for doing a deep copy of the crate in memory, 
     /// without having to re-parse that crate's ELF file (and requiring the ELF file to still exist).
+    #[cfg(internal_deps)]
     pub internal_dependencies: Vec<InternalDependency>,
 }
 
 /// Represents a section that has been loaded and is part of a `LoadedCrate`.
 /// The containing `SectionType` enum determines which type of section it is.
 pub struct LoadedSection {
-    /// The type of this section, e.g., `.text`, `.rodata`, `.data`, `.bss`, etc.
-    pub typ: SectionType,
     /// The full String name of this section, a fully-qualified symbol, 
     /// with the format `<crate>::[<module>::][<struct>::]<fn_name>::<hash>`.
     /// The unique hash is generated for each section by the Rust compiler,
@@ -614,6 +637,10 @@ pub struct LoadedSection {
     /// * `test_lib::MyStruct::new::h843a613894da0c24`
     /// * `my_crate::my_function::hbce878984534ceda`   
     pub name: String,
+    /// The type of this section, e.g., `.text`, `.rodata`, `.data`, `.bss`, etc.
+    pub typ: SectionType,
+    /// Whether or not this section's symbol was exported globally (is public)
+    pub global: bool,
     /// The `MappedPages` that cover this section.
     pub mapped_pages: Arc<Mutex<MappedPages>>, 
     /// The offset into the `mapped_pages` where this section starts
@@ -624,8 +651,6 @@ pub struct LoadedSection {
     /// so we can avoid locking this section's `MappedPages` and avoid recalculating 
     /// its bounds based on its offset and size. 
     pub address_range: Range<VirtualAddress>, 
-    /// Whether or not this section's symbol was exported globally (is public)
-    pub global: bool,
     /// The `LoadedCrate` object that contains/owns this section
     pub parent_crate: WeakCrateRef,
     /// The inner contents of a section that could possibly change
@@ -655,6 +680,7 @@ impl LoadedSection {
             parent_crate,
             Default::default(),
             Default::default(),
+            #[cfg(internal_deps)]
             Default::default(),
         )
     }
@@ -671,6 +697,7 @@ impl LoadedSection {
         parent_crate: WeakCrateRef,
         sections_i_depend_on: Vec<StrongDependency>,
         sections_dependent_on_me: Vec<WeakDependent>,
+        #[cfg(internal_deps)]
         internal_dependencies: Vec<InternalDependency>,
     ) -> LoadedSection {
         LoadedSection {
@@ -684,6 +711,7 @@ impl LoadedSection {
             inner: RwLock::new(LoadedSectionInner {
                 sections_i_depend_on,
                 sections_dependent_on_me,
+                #[cfg(internal_deps)]
                 internal_dependencies,
             }),
         }
@@ -726,8 +754,8 @@ impl LoadedSection {
     }
 
 
-    /// Returns the index of the first `WeakDependent` object with a section
-    /// that matches the given `matching_section` in this `LoadedSection`'s `sections_dependent_on_me` list.
+    /// Returns the index of the first `WeakDependent` object in this `LoadedSection`'s `sections_dependent_on_me` list
+    /// in which the section matches the given `matching_section` 
     pub fn find_weak_dependent(&self, matching_section: &StrongSectionRef) -> Option<usize> {
         for (index, weak_dep) in self.inner.read().sections_dependent_on_me.iter().enumerate() {
             if let Some(sec) = weak_dep.section.upgrade() {
@@ -862,13 +890,15 @@ impl RelocationEntry {
 /// A representation that the section that owns this struct 
 /// has a dependency on the given `source_sec`, *in the same crate*.
 /// The dependency itself is specified via the other section's shndx.
+#[cfg(internal_deps)]
 #[derive(Debug, Clone)]
 pub struct InternalDependency {
     pub relocation: RelocationEntry,
-    pub source_sec_shndx: usize,
+    pub source_sec_shndx: Shndx,
 }
+#[cfg(internal_deps)]
 impl InternalDependency {
-    pub fn new(relocation: RelocationEntry, source_sec_shndx: usize) -> InternalDependency {
+    pub fn new(relocation: RelocationEntry, source_sec_shndx: Shndx) -> InternalDependency {
         InternalDependency {
             relocation, source_sec_shndx
         }
