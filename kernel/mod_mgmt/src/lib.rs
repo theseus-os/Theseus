@@ -21,6 +21,7 @@ extern crate fs_node;
 extern crate path;
 extern crate memfs;
 extern crate cstr_core;
+extern crate hashbrown;
 
 use core::{
     fmt,
@@ -47,6 +48,7 @@ use fs_node::{FileOrDir, File, FileRef, DirRef};
 use vfs_node::VFSDirectory;
 use path::Path;
 use memfs::MemFile;
+use hashbrown::HashMap;
 pub use crate_name_utils::{get_containing_crate_name, replace_containing_crate_name, crate_name_from_path};
 pub use crate_metadata::*;
 
@@ -1030,7 +1032,7 @@ impl CrateNamespace {
             crate_name:              crate_name.clone(),
             debug_symbols_file:      Arc::downgrade(&crate_object_file),
             object_file:             crate_object_file, 
-            sections:                BTreeMap::new(),
+            sections:                HashMap::new(),
             text_pages:              text_pages.clone(),
             rodata_pages:            rodata_pages.clone(),
             data_pages:              data_pages.clone(),
@@ -1041,7 +1043,7 @@ impl CrateNamespace {
         let new_crate_weak_ref = CowArc::downgrade(&new_crate);
         
         // this maps section header index (shndx) to LoadedSection
-        let mut loaded_sections: BTreeMap<Shndx, StrongSectionRef> = BTreeMap::new(); 
+        let mut loaded_sections: HashMap<Shndx, StrongSectionRef> = HashMap::new(); 
         // the set of Shndxes for .data and .bss sections
         let mut data_sections: BTreeSet<Shndx> = BTreeSet::new();
 
@@ -1383,7 +1385,7 @@ impl CrateNamespace {
         verbose_log: bool
     ) -> Result<(), &'static str> {
         let mut new_crate = new_crate_ref.lock_as_mut()
-            .ok_or_else(|| "BUG: perform_relocations(): couldn't get exclusive mutable access to new_crate")?;
+            .ok_or("BUG: perform_relocations(): couldn't get exclusive mutable access to new_crate")?;
         if verbose_log { debug!("=========== moving on to the relocations for crate {} =========", new_crate.crate_name); }
         let symtab = find_symbol_table(&elf_file)?;
 
@@ -1547,23 +1549,16 @@ impl CrateNamespace {
         // By default, we can safely remove the metadata for all private (non-global) .rodata sections
         // that do not have any strong dependencies (its `sections_i_depend_on` list is empty).
         // If you want all sections to be kept, e.g., for debugging, you can set the below cfg option.
-        #[cfg(not(keep_private_rodata))] {
-            // BTreeMap doesn't support `retain()` or `drain_filter()`, so we have to do this dumb two-step iteration.
-            // TODO FIXME: use Hashmap? 
-            let shndxs_to_remove = new_crate.sections.iter()
-                .filter(|(_shndx, sec)| {
-                    !sec.global 
-                        && sec.get_type() == SectionType::Rodata
-                        && sec.inner.read().sections_i_depend_on.is_empty()
-                })
-                .map(|(shndx, _sec)| *shndx)
-                .collect::<Vec<Shndx>>();
+        #[cfg(not(keep_private_rodata))] 
+        {
+            new_crate.sections.retain(|_shndx, sec| {
+                let should_remove = !sec.global 
+                    && sec.get_type() == SectionType::Rodata
+                    && sec.inner.read().sections_i_depend_on.is_empty();
                 
-            // warn!("Crate {}: removing {} private rodata sections", new_crate.crate_name, shndxs_to_remove.len());
-            for shndx in &shndxs_to_remove {
-                let _removed = new_crate.sections.remove(shndx);
-                // trace!("REMOVED rodata section: {:?}", _removed);
-            }
+                // For an element to be removed, this closure should return `false`.
+                !should_remove
+            });
         }
 
         Ok(())
