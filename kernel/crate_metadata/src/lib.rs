@@ -59,7 +59,8 @@ use alloc::{
     sync::{Arc, Weak},
     vec::Vec,
 };
-use memory::{MappedPages, VirtualAddress, PageTable, EntryFlags, FrameAllocator};
+use memory::{MappedPages, VirtualAddress, EntryFlags};
+#[cfg(internal_deps)] use memory::{PageTable, FrameAllocator};
 use cow_arc::{CowArc, CowWeak};
 use fs_node::{FileRef, WeakFileRef};
 use goblin::elf::reloc::*;
@@ -367,6 +368,9 @@ impl LoadedCrate {
     /// and that would result in weird inconsistencies that violate those dependencies.
     /// In addition, multiple `LoadedSection`s share a given `MappedPages` memory range,
     /// so they all have to be duplicated at once into a new `MappedPages` range at the crate level.
+    /// 
+    /// This is only available when the `internal_deps` cfg option is set.
+    #[cfg(internal_deps)]
     pub fn deep_copy<A: FrameAllocator>(
         &self, 
         page_table: &mut PageTable, 
@@ -616,6 +620,7 @@ pub struct LoadedSectionInner {
     /// so that we can faithfully reconstruct the crate section's relocation information.
     /// This is necessary for doing a deep copy of the crate in memory, 
     /// without having to re-parse that crate's ELF file (and requiring the ELF file to still exist).
+    #[cfg(internal_deps)]
     pub internal_dependencies: Vec<InternalDependency>,
 }
 
@@ -675,6 +680,7 @@ impl LoadedSection {
             parent_crate,
             Default::default(),
             Default::default(),
+            #[cfg(internal_deps)]
             Default::default(),
         )
     }
@@ -691,6 +697,7 @@ impl LoadedSection {
         parent_crate: WeakCrateRef,
         sections_i_depend_on: Vec<StrongDependency>,
         sections_dependent_on_me: Vec<WeakDependent>,
+        #[cfg(internal_deps)]
         internal_dependencies: Vec<InternalDependency>,
     ) -> LoadedSection {
         LoadedSection {
@@ -704,6 +711,7 @@ impl LoadedSection {
             inner: RwLock::new(LoadedSectionInner {
                 sections_i_depend_on,
                 sections_dependent_on_me,
+                #[cfg(internal_deps)]
                 internal_dependencies,
             }),
         }
@@ -882,11 +890,13 @@ impl RelocationEntry {
 /// A representation that the section that owns this struct 
 /// has a dependency on the given `source_sec`, *in the same crate*.
 /// The dependency itself is specified via the other section's shndx.
+#[cfg(internal_deps)]
 #[derive(Debug, Clone)]
 pub struct InternalDependency {
     pub relocation: RelocationEntry,
     pub source_sec_shndx: Shndx,
 }
+#[cfg(internal_deps)]
 impl InternalDependency {
     pub fn new(relocation: RelocationEntry, source_sec_shndx: Shndx) -> InternalDependency {
         InternalDependency {

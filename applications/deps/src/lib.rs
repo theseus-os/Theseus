@@ -55,14 +55,17 @@ macro_rules! verbose {
 
 pub fn main(args: Vec<String>) -> isize {
     let mut opts = Options::new();
-    opts.optflag("h", "help",         "print this help menu");
-    opts.optflag("v", "verbose",      "enable verbose output");
-    opts.optopt ("s", "sections-in",  "output the sections that depend on the given SECTION (incoming weak dependents)",      "SECTION");
-    opts.optopt ("S", "sections-out", "output the sections that the given SECTION depends on (outgoing strong dependencies)", "SECTION");
-    opts.optopt ("c", "crates-in",    "output the crates that depend on the given CRATE (incoming weak dependents)",          "CRATE");
-    opts.optopt ("C", "crates-out",   "output the crates that the given CRATE depends on (outgoing strong dependencies)",     "CRATE");
-    opts.optopt ("l", "list",         "list the public sections in the given crate", "CRATE");
-    opts.optopt ("",  "list-all",     "list all sections in the given crate", "CRATE");
+    opts.optflag("h", "help",             "print this help menu");
+    opts.optflag("v", "verbose",          "enable verbose output");
+    opts.optopt ("s", "sections-in",      "output the sections that depend on the given SECTION (incoming weak dependents)",      "SECTION");
+    opts.optopt ("S", "sections-out",     "output the sections that the given SECTION depends on (outgoing strong dependencies)", "SECTION");
+    opts.optopt ("c", "crates-in",        "output the crates that depend on the given CRATE (incoming weak dependents)",          "CRATE");
+    opts.optopt ("C", "crates-out",       "output the crates that the given CRATE depends on (outgoing strong dependencies)",     "CRATE");
+    opts.optopt ("l", "list",             "list the public sections in the given crate", "CRATE");
+    opts.optopt ("",  "list-all",         "list all sections in the given crate", "CRATE");
+    opts.optopt ("",  "num-deps-crate",   "sum up the count of all dependencies for the given crate", "CRATE");
+    opts.optopt ("",  "num-deps-section", "sum up the count of all dependencies for the given section", "SECTION");
+    opts.optflag("",  "num-deps-all",     "sum up the count of all dependencies for all crates");
     
 
     let matches = match opts.parse(&args) {
@@ -112,6 +115,15 @@ fn rmain(matches: Matches) -> Result<(), String> {
     else if let Some(crate_name) = matches.opt_str("list-all") {
         sections_in_crate(&crate_name, true)
     }
+    else if let Some(crate_name) = matches.opt_str("num-deps-crate") {
+        num_deps_crate(&crate_name)
+    }
+    else if let Some(crate_name) = matches.opt_str("num-deps-section") {
+        num_deps_section(&crate_name)
+    }
+    else if matches.opt_present("num-deps-all") {
+        num_deps_all()
+    }
     else {
         Err(format!("no supported options/arguments found."))
     }
@@ -154,6 +166,58 @@ fn sections_i_depend_on(section_name: &str) -> Result<(), String> {
     Ok(())
 }
 
+
+fn num_deps_crate(crate_name: &str) -> Result<(), String> {
+    let (_cn, crate_ref) = find_crate(crate_name)?;
+    let (s, w, i) = crate_dependency_count(&crate_ref);
+    println!("Crate {}'s Dependency Count:\nStrong: {}\nWeak:   {}\nIntrnl: {}", crate_name, s, w, i);
+    Ok(())
+}
+
+fn num_deps_section(section_name: &str) -> Result<(), String> {
+    let section = find_section(section_name)?;
+    let (s, w, i) = section_dependency_count(&section);
+    println!("Section {}'s Dependency Count:\nStrong: {}\nWeak:   {}\nIntrnl: {}", section_name, s, w, i);
+    Ok(())
+}
+
+fn num_deps_all() -> Result<(), String> {
+    let namespace = get_my_current_namespace();
+    let (mut s_total, mut w_total, mut i_total) = (0, 0, 0);
+    namespace.for_each_crate(true, |_crate_name, crate_ref| {
+        let (s, w, i) = crate_dependency_count(crate_ref);
+        s_total += s;
+        w_total += w;
+        i_total += i;
+        true // keep going
+    });
+
+    println!("Total Dependency Count for all crates:\nStrong: {}\nWeak:   {}\nIntrnl: {}", s_total, w_total, i_total);
+    Ok(())
+}
+
+/// Returns the count of `(strong dependencies, weak dependents, internal dependencies)`
+/// for all sections in the given crate. .
+fn crate_dependency_count(crate_ref: &StrongCrateRef) -> (usize, usize, usize) {
+    let res = crate_ref.lock_as_ref().sections.values()
+        .map(|sec| section_dependency_count(sec))
+        .fold((0, 0, 0), |(acc_s, acc_w, acc_i), (s, w, i)| (acc_s + s, acc_w + w, acc_i + i));
+    // trace!("crate {:?} has deps {:?}", crate_ref, res);
+    res
+}
+
+/// Returns the given section's count of `(strong dependencies, weak dependents, internal dependencies)`.
+fn section_dependency_count(sec: &StrongSectionRef) -> (usize, usize, usize) {
+    let inner = sec.inner.read();
+    (
+        inner.sections_i_depend_on.len(),
+        inner.sections_dependent_on_me.len(),
+        #[cfg(internal_deps)]
+        inner.internal_dependencies.len(),
+        #[cfg(not(internal_deps))]
+        0,
+    )
+}
 
 /// Outputs the given crate's weak dependents, i.e.,
 /// the crates that depend on the given crate.

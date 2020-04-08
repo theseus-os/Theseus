@@ -1403,7 +1403,6 @@ impl CrateNamespace {
                 }
             }
 
-            warn!("Size of rela_array: {}", sec.raw_data(&elf_file).len());
             let rela_array = match sec.get_data(&elf_file) {
                 Ok(Rela64(rela_arr)) => rela_arr,
                 _ => {
@@ -1425,6 +1424,7 @@ impl CrateNamespace {
             })?; 
             
             let mut target_sec_dependencies: Vec<StrongDependency> = Vec::new();
+            #[cfg(internal_deps)]
             let mut target_sec_internal_dependencies: Vec<InternalDependency> = Vec::new();
             {
                 let mut target_sec_mapped_pages = target_sec.mapped_pages.lock();
@@ -1500,6 +1500,7 @@ impl CrateNamespace {
                         // inter-section dependencies even within the same crate.
                         // This is necessary for doing a deep copy of the crate in memory, 
                         // without having to re-parse that crate's ELF file (and requiring the ELF file to still exist)
+                        #[cfg(internal_deps)]
                         target_sec_internal_dependencies.push(InternalDependency::new(relocation_entry, source_sec_shndx))
                     }
                     else {
@@ -1524,6 +1525,7 @@ impl CrateNamespace {
             {
                 let mut target_sec_inner = target_sec.inner.write();
                 target_sec_inner.sections_i_depend_on.append(&mut target_sec_dependencies);
+                #[cfg(internal_deps)]
                 target_sec_inner.internal_dependencies.append(&mut target_sec_internal_dependencies);
             }
         }
