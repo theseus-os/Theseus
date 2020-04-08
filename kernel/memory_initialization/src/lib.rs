@@ -6,14 +6,12 @@ extern crate memory;
 extern crate kernel_config;
 extern crate irq_safety;
 extern crate heap;
-extern crate apic;
 extern crate multiboot2;
 extern crate alloc;
 
-use memory::{AreaFrameAllocator, PageTable, MappedPages, MemoryManagementInfo};
+use memory::{MappedPages, MemoryManagementInfo};
 use kernel_config::memory::{KERNEL_HEAP_INITIAL_SIZE_PAGES, KERNEL_HEAP_START};
 use irq_safety::MutexIrqSafe;
-use apic::get_lapics;
 use multiboot2::BootInformation;
 use alloc::{ 
     vec::Vec,
@@ -67,7 +65,7 @@ pub fn init_memory_management(boot_info: &BootInformation)
     debug!("mapped and initialized the initial heap");
 
     // Initialize memory management post heap intialization: set up kernel stack allocator and kernel memory management info.
-    let (kernel_mmi_ref, identity_mapped_pages) = memory::init_post_heap(allocator_mutex, page_table, higher_half_mapped_pages, identity_mapped_pages)?;
+    let (kernel_mmi_ref, identity_mapped_pages) = memory::init_post_heap(page_table, higher_half_mapped_pages, identity_mapped_pages)?;
 
     Ok((kernel_mmi_ref, text_mapped_pages, rodata_mapped_pages, data_mapped_pages, identity_mapped_pages))
 }

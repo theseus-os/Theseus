@@ -24,23 +24,6 @@ extern crate memory_x86_64;
 extern crate memory_structs;
 
 
-/// Just like Rust's `try!()` macro, 
-/// but forgets the given `obj`s to prevent them from being dropped,
-/// as they would normally be upon return of an Error using `try!()`.
-/// This must come BEFORE the below modules in order for them to be able to use it.
-macro_rules! try_forget {
-    ($expr:expr, $($obj:expr),*) => (match $expr {
-        Ok(val) => val,
-        Err(err) => {
-            $(
-                core::mem::forget($obj);
-            )*
-            return Err(err);
-        }
-    });
-}
-
-
 mod area_frame_allocator;
 mod stack_allocator;
 #[cfg(not(mapper_spillful))]
@@ -261,8 +244,7 @@ pub fn init(boot_info: &BootInformation)
 /// Returns the following tuple, if successful:
 ///  * The kernel's new MemoryManagementInfo
 ///  * The kernel's list of identity-mapped MappedPages which should be dropped before starting the first userspace program. 
-pub fn init_post_heap(allocator_mutex: &MutexIrqSafe<AreaFrameAllocator>, page_table: PageTable, 
- mut higher_half_mapped_pages: [Option<MappedPages>; 32], mut identity_mapped_pages: [Option<MappedPages>; 32]) 
+pub fn init_post_heap(page_table: PageTable, mut higher_half_mapped_pages: [Option<MappedPages>; 32], mut identity_mapped_pages: [Option<MappedPages>; 32]) 
 -> Result<(Arc<MutexIrqSafe<MemoryManagementInfo>>, Vec<MappedPages>), &'static str> 
 {
     // HERE: heap is initialized! Can now use alloc types.

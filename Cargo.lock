@@ -1189,7 +1189,6 @@ dependencies = [
 name = "memory_initialization"
 version = "0.1.0"
 dependencies = [
- "apic 0.1.0",
  "heap 0.1.0",
  "irq_safety 0.1.1 (git+https://github.com/kevinaboos/irq_safety)",
  "kernel_config 0.1.0",

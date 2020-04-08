@@ -42,12 +42,13 @@ extern crate heap;
 
 use core::ptr::NonNull;
 use alloc::alloc::{GlobalAlloc, Layout};
-use memory::{MappedPages, create_mapping, EntryFlags, VirtualAddress, FRAME_ALLOCATOR, get_kernel_mmi_ref, PageRange};
+use memory::{MappedPages, VirtualAddress, FRAME_ALLOCATOR, get_kernel_mmi_ref, PageRange};
 use kernel_config::memory::{MAX_HEAPS, PAGE_SIZE, PER_CORE_HEAP_INITIAL_SIZE_PAGES, KERNEL_HEAP_INITIAL_SIZE_PAGES, KERNEL_HEAP_START, KERNEL_HEAP_MAX_SIZE};
 use irq_safety::{MutexIrqSafe, RwLockIrqSafe};
 use slabmalloc::{ZoneAllocator, ObjectPage8k, AllocablePage};
 use core::ops::Add;
 use core::ops::DerefMut;
+use core::ptr;
 use hashbrown::HashMap;
 use heap::{global_allocator, initial_allocator, GlobalAllocFunctions, allocate_large_object, deallocate_large_object, HEAP_FLAGS};
 
@@ -199,7 +200,7 @@ pub fn init_individual_heap(key: usize) -> Result<(), &'static str> {
     *heap_end = heap_end_addr;
 
     // store the newly created allocator in the global allocator
-    if let Some(heap) = MULTIPLE_HEAPS_ALLOCATOR.heaps.write().insert(key, MutexIrqSafe::new(zone_allocator)) {
+    if let Some(_heap) = MULTIPLE_HEAPS_ALLOCATOR.heaps.write().insert(key, MutexIrqSafe::new(zone_allocator)) {
         return Err("New heap created with a previously used id");
     }
 
@@ -270,20 +271,6 @@ impl MultipleHeaps {
             .refill(layout, mp, heap_id)
     }
 
-    /// Scans a per-core heap's allocators to see if any has a empty pages that can be retrieved, and gives them to another of the heap's allocators.
-    /// Returns an Err if no empty page is available.
-    /// 
-    /// # Arguments
-    /// * `layout`: layout.size will determine which allocation size the page will be used for. 
-    /// * `heap_id`: heap the page is being moved within.
-    fn exchange_pages_within_heap(&self, layout: Layout, heap_id: usize) -> Result<(), &'static str> {
-        self.heaps.read().get(&heap_id).as_ref()
-            .ok_or("Core heap is not initialized!")
-            .expect("Exchange pages: per core heap was not initialized")
-            .lock()
-            .exchange_pages_within_heap(layout, heap_id) 
-    }
-
 
     /// Retrieves an empty page from the heap which has the maximum number of empty pages,
     /// if the maximum is greater than a threshold.
@@ -303,7 +290,7 @@ impl MultipleHeaps {
 
     /// Called when an call to allocate() returns a null pointer. The following steps are used to recover memory:
     /// (1) Pages are exchanged between per-core heaps.
-    /// (2) If the above two fail, then more pages are allocated from the OS.
+    /// (2) If the above fails, then more pages are allocated from the OS.
     /// 
     /// An Err is returned if there is no more memory to be allocated in the heap memory area.
     /// 
@@ -336,7 +323,7 @@ unsafe impl GlobalAlloc for MultipleHeaps {
 
     /// Allocates the given `layout` from the heap of the core the task is currently running on.
     /// If the size requested is greater than MAX_ALLOC_SIZE, then memory is directly requested from the OS.
-    /// If the per-core heap is not initialized, then the initial allocator is used.
+    /// If the per-core heap is not initialized, then an error is returned.
     unsafe fn alloc(&self, layout: Layout) -> *mut u8 {
         let id = get_key();
 
@@ -351,8 +338,8 @@ unsafe impl GlobalAlloc for MultipleHeaps {
                     Ok(ptr) => Ok(ptr),
                     // If a null pointer was returned, then there are no available empty pages in the heap
                     Err(_e) => {
-                        let _ = self.grow_heap(layout, id);
-                        self.allocate_from_heap(id, layout)
+                        self.grow_heap(layout, id).and_then(|_res| self.allocate_from_heap(id,layout))
+                        // self.allocate_from_heap(id, layout)
                     }
                 }
             }
@@ -362,12 +349,11 @@ unsafe impl GlobalAlloc for MultipleHeaps {
         
         alloc_result                
             .ok()
-            .map_or(0 as *mut u8, |allocation| allocation.as_ptr())    
+            .map_or(ptr::null_mut(), |allocation| allocation.as_ptr())    
     }
 
     /// Deallocates the memory at the address given by `ptr`.
     /// If the size being returned is greater than MAX_ALLOC_SIZE, then memory is directly returned to the OS.
-    /// If the `ptr` lies within the initial allocator's memory range then memory is returned to the initial allocator.
     /// Otherwise, it is returned to the per-core heap it was allocated from.
     unsafe fn dealloc(&self, ptr: *mut u8, layout: Layout) {
         // deallocate a large object directly through mapped pages
