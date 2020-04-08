@@ -44,7 +44,7 @@ macro_rules! try_forget {
 ///  * the MappedPages of the kernel's text section,
 ///  * the MappedPages of the kernel's rodata section,
 ///  * the MappedPages of the kernel's data section,
-///  * the kernel's list of *other* higher-half MappedPages, which should be kept forever.
+///  * the kernel's list of identity-mapped MappedPages which should be dropped before starting the first userspace program. 
 pub fn init_memory_management(boot_info: &BootInformation)  
     -> Result<(Arc<MutexIrqSafe<MemoryManagementInfo>>, MappedPages, MappedPages, MappedPages, Vec<MappedPages>), &'static str>
 {

@@ -116,7 +116,7 @@ impl MemoryManagementInfo {
 
 
 /// A convenience function that creates a new memory mapping by allocating frames that are contiguous in physical memory.
-/// If contiguous frames are not required, then see the `create_mappings` function.
+/// If contiguous frames are not required, then see [`create_mapping()`](fn.create_mapping.html).
 /// Returns a tuple containing the new `MappedPages` and the starting PhysicalAddress of the first frame,
 /// which is a convenient way to get the physical address without walking the page tables.
 /// 
@@ -142,7 +142,7 @@ pub fn create_contiguous_mapping(size_in_bytes: usize, flags: EntryFlags) -> Res
 
 /// A convenience function that creates a new memory mapping. The pages allocated are contiguous in memory but there's
 /// no guarantee that the frames they are mapped to are also contiguous in memory. If contiguous frames are required
-/// then see the `create_contiguous_mapping` function.
+/// then see [`create_contiguous_mapping()`](fn.create_contiguous_mapping.html).
 /// Returns the new `MappedPages.` 
 /// 
 /// # Locking / Deadlock

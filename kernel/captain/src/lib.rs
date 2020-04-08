@@ -45,7 +45,6 @@ extern crate exceptions_full;
 extern crate network_manager;
 extern crate pause;
 extern crate window_manager;
-extern crate heap;
 extern crate multiple_heaps;
 #[cfg(simd_personality)] extern crate simd_personality;
 

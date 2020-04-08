@@ -93,9 +93,6 @@ path = "../task_fs"
 [dependencies.pause]
 path = "../pause"
 
-[dependencies.heap]
-path = "../heap"
-
 [dependencies.multiple_heaps]
 path = "../multiple_heaps"
 

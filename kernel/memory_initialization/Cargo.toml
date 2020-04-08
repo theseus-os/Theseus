@@ -1,6 +1,7 @@
 [package]
 authors = ["Ramla Ijaz <ijazramla@gmail.com>"]
 name = "memory_initialization"
+description = "Initialization routine for the virtual memory subsystem."
 version = "0.1.0"
 
 [dependencies]

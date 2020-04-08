@@ -50,7 +50,7 @@ use core::ops::Add;
 use core::ops::DerefMut;
 use core::ptr;
 use hashbrown::HashMap;
-use heap::{global_allocator, initial_allocator, GlobalAllocFunctions, allocate_large_object, deallocate_large_object, HEAP_FLAGS};
+use heap::{global_allocator, initial_allocator, GlobalAllocFunctions, HEAP_FLAGS};
 
 lazy_static!{ 
     static ref MULTIPLE_HEAPS_ALLOCATOR: MultipleHeaps = MultipleHeaps::empty();
@@ -322,24 +322,18 @@ impl MultipleHeaps {
 unsafe impl GlobalAlloc for MultipleHeaps {
 
     /// Allocates the given `layout` from the heap of the core the task is currently running on.
-    /// If the size requested is greater than MAX_ALLOC_SIZE, then memory is directly requested from the OS.
     /// If the per-core heap is not initialized, then an error is returned.
     unsafe fn alloc(&self, layout: Layout) -> *mut u8 {
         let id = get_key();
 
         let alloc_result = 
-            // allocate a large object directly through mapped pages
-            if layout.size() > ZoneAllocator::MAX_ALLOC_SIZE {
-                allocate_large_object(layout)
-            }
             // allocate an object with the per-core heap if initialized 
-            else if self.heaps.read().get(&id).is_some() {
+            if self.heaps.read().get(&id).is_some() {
                 match self.allocate_from_heap(id, layout) {
                     Ok(ptr) => Ok(ptr),
-                    // If a null pointer was returned, then there are no available empty pages in the heap
+                    // If a null pointer was returned, then there are no available empty pages in the heap, so try to grow the heap
                     Err(_e) => {
                         self.grow_heap(layout, id).and_then(|_res| self.allocate_from_heap(id,layout))
-                        // self.allocate_from_heap(id, layout)
                     }
                 }
             }
@@ -353,22 +347,13 @@ unsafe impl GlobalAlloc for MultipleHeaps {
     }
 
     /// Deallocates the memory at the address given by `ptr`.
-    /// If the size being returned is greater than MAX_ALLOC_SIZE, then memory is directly returned to the OS.
-    /// Otherwise, it is returned to the per-core heap it was allocated from.
+    /// Memory is returned to the per-core heap it was allocated from.
     unsafe fn dealloc(&self, ptr: *mut u8, layout: Layout) {
-        // deallocate a large object directly through mapped pages
-        if layout.size() > ZoneAllocator::MAX_ALLOC_SIZE {
-            deallocate_large_object(ptr,layout)
-        }
-
-        // deallocate an object with the per-core heap it was allocated from 
-        else {
-            // find the starting address of the object page this block belongs to
-            let page_addr = (ptr as usize) & !(ObjectPage8k::SIZE - 1);
-            // find the heap id
-            let id = *((page_addr as *mut u8).offset(ObjectPage8k::HEAP_ID_OFFSET as isize) as *mut usize);
-            self.deallocate_from_heap(id, ptr, layout).expect("Couldn't deallocate");
-        }
+        // find the starting address of the object page this block belongs to
+        let page_addr = (ptr as usize) & !(ObjectPage8k::SIZE - 1);
+        // find the heap id
+        let id = *((page_addr as *mut u8).offset(ObjectPage8k::HEAP_ID_OFFSET as isize) as *mut usize);
+        self.deallocate_from_heap(id, ptr, layout).expect("Couldn't deallocate");
     }
 }
 
