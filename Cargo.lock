@@ -810,6 +810,29 @@ dependencies = [
 ]
 
 [[package]]
+name = "heap_test"
+version = "0.1.0"
+dependencies = [
+ "apic 0.1.0",
+ "hashbrown 0.1.8 (registry+https://github.com/rust-lang/crates.io-index)",
+ "heap_trace 0.1.0",
+ "hpet 0.1.0",
+ "log 0.3.9 (registry+https://github.com/rust-lang/crates.io-index)",
+ "qp-trie 0.7.3 (git+https://github.com/theseus-os/qp-trie-rs)",
+ "runqueue 0.1.0",
+ "terminal_print 0.1.0",
+]
+
+[[package]]
+name = "heap_trace"
+version = "0.1.0"
+dependencies = [
+ "log 0.3.9 (registry+https://github.com/rust-lang/crates.io-index)",
+ "raw-cpuid 7.0.3 (registry+https://github.com/rust-lang/crates.io-index)",
+ "spin 0.4.10 (registry+https://github.com/rust-lang/crates.io-index)",
+]
+
+[[package]]
 name = "heapfile"
 version = "0.1.0"
 dependencies = [
