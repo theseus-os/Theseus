@@ -19,8 +19,7 @@ use xmas_elf::{
 use rustc_demangle::demangle;
 use cstr_core::CStr;
 use memory::{VirtualAddress, MappedPages};
-use crate_metadata::{LoadedCrate, StrongCrateRef, LoadedSection, StrongSectionRef, SectionType};
-use qp_trie::{Trie, wrapper::BString};
+use crate_metadata::{LoadedCrate, StrongCrateRef, LoadedSection, StrongSectionRef, SectionType, Shndx};
 use path::Path;
 use super::CrateNamespace;
 
@@ -91,8 +90,8 @@ pub fn parse_nano_core(
         text_pages:          Some((text_pages.clone(),   mp_range(&text_pages))),
         rodata_pages:        Some((rodata_pages.clone(), mp_range(&rodata_pages))),
         data_pages:          Some((data_pages.clone(),   mp_range(&data_pages))),
-        global_symbols:      BTreeSet::new(),
-        data_sections:       Trie::new(),
+        global_sections:     BTreeSet::new(),
+        data_sections:       BTreeSet::new(),
         reexported_symbols:  BTreeSet::new(),
     });
 
@@ -118,9 +117,9 @@ pub fn parse_nano_core(
         new_syms = real_namespace.add_symbols(parsed_crate_items.sections.values(), verbose_log);
         trace!("parse_nano_core(): finished adding symbols.");
 
-        new_crate_mut.sections       = parsed_crate_items.sections;
-        new_crate_mut.global_symbols = parsed_crate_items.global_symbols;
-        new_crate_mut.data_sections  = parsed_crate_items.data_sections;
+        new_crate_mut.sections        = parsed_crate_items.sections;
+        new_crate_mut.global_sections = parsed_crate_items.global_sections;
+        new_crate_mut.data_sections   = parsed_crate_items.data_sections;
     }
 
     // Add the newly-parsed nano_core crate to the kernel namespace.
@@ -159,10 +158,10 @@ fn parse_nano_core_symbol_file(
         "Utf8Error occurred when parsing nano_core symbols CStr"
     })?;
 
-    let mut text_shndx:   Option<usize> = None;
-    let mut data_shndx:   Option<usize> = None;
-    let mut rodata_shndx: Option<usize> = None;
-    let mut bss_shndx:    Option<usize> = None;
+    let mut text_shndx:   Option<Shndx> = None;
+    let mut data_shndx:   Option<Shndx> = None;
+    let mut rodata_shndx: Option<Shndx> = None;
+    let mut bss_shndx:    Option<Shndx> = None;
 
     // a closure that parses a section header's index (e.g., "[7]") out of the given str
     let parse_section_ndx = |str_ref: &str| {
@@ -408,10 +407,10 @@ fn parse_nano_core_binary(
     };
     
     // find the .text, .data, and .rodata sections
-    let mut text_shndx:   Option<usize> = None;
-    let mut rodata_shndx: Option<usize> = None;
-    let mut data_shndx:   Option<usize> = None;
-    let mut bss_shndx:    Option<usize> = None;
+    let mut text_shndx:   Option<Shndx> = None;
+    let mut rodata_shndx: Option<Shndx> = None;
+    let mut data_shndx:   Option<Shndx> = None;
+    let mut bss_shndx:    Option<Shndx> = None;
 
     // We will fill in these crate items while parsing the symbol file.
     let mut crate_items = ParsedCrateItems::empty();
@@ -546,19 +545,19 @@ fn parse_nano_core_binary(
 
 /// The collection of sections and symbols obtained while parsing the nano_core crate.
 struct ParsedCrateItems {
-    sections:       BTreeMap<usize, StrongSectionRef>,
-    global_symbols: BTreeSet<BString>,
-    data_sections:  Trie<BString, StrongSectionRef>,
+    sections:        BTreeMap<Shndx, StrongSectionRef>,
+    global_sections: BTreeSet<Shndx>,
+    data_sections:   BTreeSet<Shndx>,
     // The set of other non-section symbols too, such as constants defined in assembly code.
-    init_symbols:   BTreeMap<String, usize>,
+    init_symbols:    BTreeMap<String, usize>,
 }
 impl ParsedCrateItems {
     fn empty() -> ParsedCrateItems {
         ParsedCrateItems {
-            sections:       BTreeMap::new(),
-            global_symbols: BTreeSet::new(),
-            data_sections:  Trie::new(),
-            init_symbols:   BTreeMap::new(),
+            sections:        BTreeMap::new(),
+            global_sections: BTreeSet::new(),
+            data_sections:   BTreeSet::new(),
+            init_symbols:    BTreeMap::new(),
         }
     }
 }
@@ -567,10 +566,10 @@ impl ParsedCrateItems {
 /// The section header indices (shndx) for the main sections:
 /// .text, .rodata, .data, and .bss.
 struct MainShndx {
-    text_shndx:   usize,
-    rodata_shndx: usize,
-    data_shndx:   usize,
-    bss_shndx:    usize,
+    text_shndx:   Shndx,
+    rodata_shndx: Shndx,
+    data_shndx:   Shndx,
+    bss_shndx:    Shndx,
 }
 
 /// A convenience function that separates out the logic 
@@ -586,9 +585,9 @@ fn add_new_section(
     rodata_pages_locked: &MappedPages,
     data_pages_locked:   &MappedPages,
     new_crate_weak_ref:  &CowWeak<LoadedCrate>,
-    section_counter:     &mut usize,
+    section_counter:     &mut Shndx,
     // crate-wide args above, section-specific stuff below
-    sec_ndx: usize,
+    sec_ndx: Shndx,
     sec_name: String,
     sec_size: usize,
     sec_vaddr: usize,
@@ -655,10 +654,10 @@ fn add_new_section(
         // debug!("parse_nano_core: new section: {:?}", sec);
         let sec_ref = Arc::new(sec);
         if sec_ref.global {
-            crate_items.global_symbols.insert(BString::from(sec_ref.name.clone()));
+            crate_items.global_sections.insert(*section_counter);
         }
-        if sec_ref.typ == SectionType::Data || sec_ref.typ == SectionType::Bss {
-            crate_items.data_sections.insert_str(&sec_ref.name, Arc::clone(&sec_ref));
+        if sec_ref.typ.is_data_or_bss() {
+            crate_items.data_sections.insert(*section_counter);
         }
         crate_items.sections.insert(*section_counter, sec_ref);
         *section_counter += 1;
