@@ -17,6 +17,7 @@ use paging::table::{P4, Table, Level4};
 use kernel_config::memory::{ENTRIES_PER_PAGE_TABLE, PAGE_SIZE, TEMPORARY_PAGE_VIRT_ADDR};
 use alloc::vec::Vec;
 use super::{EntryFlags, tlb_flush_virt_addr};
+use irq_safety::MutexIrqSafe;
 
 pub struct Mapper {
     p4: Unique<Table<Level4>>,
@@ -535,7 +536,7 @@ impl MappedPages {
 
     /// Remove the virtual memory mapping for the given `Page`s.
     /// This should NOT be public because it should only be invoked when a `MappedPages` object is dropped.
-    fn unmap<A>(&mut self, active_table_mapper: &mut Mapper, _allocator: &mut A) -> Result<(), &'static str> 
+    fn unmap<A>(&mut self, active_table_mapper: &mut Mapper,  _allocator_ref: &MutexIrqSafe<A>) -> Result<(), &'static str> 
         where A: FrameAllocator
     {
         if self.size_in_pages() == 0 { return Ok(()); }
@@ -839,15 +840,15 @@ impl Drop for MappedPages {
             return;
         }   
 
-        let mut frame_allocator = match FRAME_ALLOCATOR.try() {
-            Some(fa) => fa.lock(),
+        let mut frame_allocator_ref = match FRAME_ALLOCATOR.try() {
+            Some(fa) => fa,
             _ => {
                 error!("MappedPages::drop(): couldn't get FRAME_ALLOCATOR!");
                 return;
             }
         };
         
-        if let Err(e) = self.unmap(&mut mapper, frame_allocator.deref_mut()) {
+        if let Err(e) = self.unmap(&mut mapper, frame_allocator_ref) {
             error!("MappedPages::drop(): failed to unmap, error: {:?}", e);
         }
 

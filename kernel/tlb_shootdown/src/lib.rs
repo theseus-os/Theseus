@@ -44,10 +44,13 @@ pub fn init() {
 /// Broadcasts TLB shootdown IPI to all other AP cores.
 /// Do not invoke this directly, but rather pass it as a callback to the memory subsystem,
 /// which will invoke it as needed (on remap/unmap operations).
-fn broadcast_tlb_shootdown(virtual_addresses: Vec<VirtualAddress>) {
+fn broadcast_tlb_shootdown(virtual_addresses: Vec<VirtualAddress>) -> Vec<VirtualAddress> {
     if let Some(my_lapic) = get_my_apic() {
         // info!("broadcast_tlb_shootdown():  AP {}, vaddrs: {:?}", my_lapic.read().apic_id, virtual_addresses);
-        send_tlb_shootdown_ipi(&mut my_lapic.write(), virtual_addresses);
+        send_tlb_shootdown_ipi(&mut my_lapic.write(), virtual_addresses)
+    }
+    else {
+        virtual_addresses
     }
 }
 
@@ -68,11 +71,11 @@ pub fn handle_tlb_shootdown_ipi(virtual_addresses: &[VirtualAddress]) {
 
 /// Sends an IPI to all other cores (except me) to trigger 
 /// a TLB flush of the given `VirtualAddress`es
-pub fn send_tlb_shootdown_ipi(my_lapic: &mut LocalApic, virtual_addresses: Vec<VirtualAddress>) {        
+pub fn send_tlb_shootdown_ipi(my_lapic: &mut LocalApic, virtual_addresses: Vec<VirtualAddress>) -> Vec<VirtualAddress> {        
     // skip sending IPIs if there are no other cores running
     let core_count = get_lapics().iter().count();
     if core_count <= 1 {
-        return;
+        return virtual_addresses;
     }
 
     // trace!("send_tlb_shootdown_ipi(): from AP {}, core_count: {}, {:?}", self.apic_id, core_count, virtual_addresses);
@@ -101,8 +104,11 @@ pub fn send_tlb_shootdown_ipi(my_lapic: &mut LocalApic, virtual_addresses: Vec<V
     }
 
     // clear TLB shootdown data
-    TLB_SHOOTDOWN_IPI_VIRTUAL_ADDRESSES.write().clear();
+    let mut sent = Vec::new();
+    core::mem::swap(&mut sent, &mut *TLB_SHOOTDOWN_IPI_VIRTUAL_ADDRESSES.write());
 
     // release lock
     TLB_SHOOTDOWN_IPI_LOCK.store(false, Ordering::SeqCst); 
+
+    sent
 }
