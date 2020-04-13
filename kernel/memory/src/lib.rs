@@ -64,9 +64,6 @@ use memory_x86_64::*;
 pub use memory_x86_64::EntryFlags;// Export EntryFlags so that others does not need to get access to memory_<arch>.
 
 
-use core::{
-    ops::{Deref, DerefMut},
-};
 use spin::Once;
 use irq_safety::MutexIrqSafe;
 use alloc::vec::Vec;
@@ -74,31 +71,42 @@ use alloc::sync::Arc;
 use kernel_config::memory::{PAGE_SIZE, KERNEL_HEAP_START, KERNEL_HEAP_INITIAL_SIZE, KERNEL_STACK_ALLOCATOR_BOTTOM, KERNEL_STACK_ALLOCATOR_TOP_ADDR, KERNEL_OFFSET};
 
 /// The memory management info and address space of the kernel
-static KERNEL_MMI: Once<Arc<MutexIrqSafe<MemoryManagementInfo>>> = Once::new();
+static KERNEL_MMI: Once<MmiRef> = Once::new();
 
-/// returns a cloned reference to the kernel's `MemoryManagementInfo`, if initialized.
+/// A shareable reference to a `MemoryManagementInfo` struct wrapper in a lock.
+pub type MmiRef = Arc<MutexIrqSafe<MemoryManagementInfo>>;
+
+/// Returns a cloned reference to the kernel's `MemoryManagementInfo`, if initialized.
 /// If not, it returns None.
-pub fn get_kernel_mmi_ref() -> Option<Arc<MutexIrqSafe<MemoryManagementInfo>>> {
+pub fn get_kernel_mmi_ref() -> Option<MmiRef> {
     KERNEL_MMI.try().cloned()
 }
 
 
 /// The one and only frame allocator, a singleton. 
-pub static FRAME_ALLOCATOR: Once<MutexIrqSafe<AreaFrameAllocator>> = Once::new();
+static FRAME_ALLOCATOR: Once<MutexIrqSafe<AreaFrameAllocator>> = Once::new();
+
+/// A shareable reference to a `FrameAllocator` struct wrapper in a lock.
+#[allow(type_alias_bounds)]
+pub type FrameAllocatorRef<A: FrameAllocator> = MutexIrqSafe<A>;
+
+/// Returns a reference to the system-wide `FrameAllocator`, if initialized.
+/// If not, it returns `None`.
+/// 
+/// Currently, the system-wide allocator is an `AreaFrameAllocator` reference.
+pub fn get_frame_allocator_ref() -> Option<&'static FrameAllocatorRef<AreaFrameAllocator>> {
+    FRAME_ALLOCATOR.try()
+}
 
 /// Convenience method for allocating a new Frame.
 pub fn allocate_frame() -> Option<Frame> {
     FRAME_ALLOCATOR.try().and_then(|fa| fa.lock().allocate_frame())
 }
 
-
 /// Convenience method for allocating several contiguous Frames.
 pub fn allocate_frames(num_frames: usize) -> Option<FrameRange> {
     FRAME_ALLOCATOR.try().and_then(|fa| fa.lock().allocate_frames(num_frames))
 }
-
-/// An Arc reference to a `MemoryManagementInfo` struct.
-pub type MmiRef = Arc<MutexIrqSafe<MemoryManagementInfo>>;
 
 
 /// This holds all the information for a `Task`'s memory mappings and address space
@@ -126,8 +134,8 @@ impl MemoryManagementInfo {
     /// You cannot call this to allocate a stack in a different `MemoryManagementInfo`/`PageTable` than the one you're currently running. 
     /// It will only work for allocating a stack in the currently-running MMI.
     pub fn alloc_stack(&mut self, size_in_pages: usize) -> Option<Stack> {
-        FRAME_ALLOCATOR.try().and_then(|fa| 
-            self.stack_allocator.alloc_stack(&mut self.page_table, fa.lock().deref_mut(), size_in_pages)
+        get_frame_allocator_ref().and_then(|fa| 
+            self.stack_allocator.alloc_stack(&mut self.page_table, fa, size_in_pages)
         )
     }
 }
@@ -139,7 +147,7 @@ impl MemoryManagementInfo {
 /// which is a convenient way to get the physical address without walking the page tables.
 /// 
 /// # Locking / Deadlock
-/// Currently, this function acquires the lock on the `FRAME_ALLOCATOR` and the kernel's `MemoryManagementInfo` instance.
+/// Currently, this function acquires the lock on the frame allocator and the kernel's `MemoryManagementInfo` instance.
 /// Thus, the caller should ensure that the locks on those two variables are not held when invoking this function.
 pub fn create_contiguous_mapping(size_in_bytes: usize, flags: EntryFlags) -> Result<(MappedPages, PhysicalAddress), &'static str> {
     let allocated_pages = allocate_pages_by_bytes(size_in_bytes).ok_or("e1000::create_contiguous_mapping(): couldn't allocate pages!")?;
@@ -147,13 +155,11 @@ pub fn create_contiguous_mapping(size_in_bytes: usize, flags: EntryFlags) -> Res
     let kernel_mmi_ref = get_kernel_mmi_ref().ok_or("create_contiguous_mapping(): KERNEL_MMI was not yet initialized!")?;
     let mut kernel_mmi = kernel_mmi_ref.lock();
 
-    let mut frame_allocator = FRAME_ALLOCATOR.try()
-        .ok_or("create_contiguous_mapping(): couldnt get FRAME_ALLOCATOR")?
-        .lock();
+    let mut frame_allocator = get_frame_allocator_ref().ok_or("create_contiguous_mapping(): couldnt get frame allocator")?.lock();
     let frames = frame_allocator.allocate_frames(allocated_pages.size_in_pages())
         .ok_or("create_contiguous_mapping(): couldnt allocate a new frame")?;
     let starting_phys_addr = frames.start_address();
-    let mp = kernel_mmi.page_table.map_allocated_pages_to(allocated_pages, frames, flags, frame_allocator.deref_mut())?;
+    let mp = kernel_mmi.page_table.map_allocated_pages_to(allocated_pages, frames, flags, &mut *frame_allocator)?;
     Ok((mp, starting_phys_addr))
 }
 
