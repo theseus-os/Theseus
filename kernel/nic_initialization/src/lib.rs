@@ -15,7 +15,7 @@ extern crate nic_buffers;
 extern crate volatile;
 
 use core::ops::DerefMut;
-use memory::{FRAME_ALLOCATOR, EntryFlags, PhysicalMemoryArea, FrameRange, PhysicalAddress, allocate_pages_by_bytes, get_kernel_mmi_ref, MappedPages, create_contiguous_mapping};
+use memory::{get_frame_allocator_ref, EntryFlags, PhysicalMemoryArea, FrameRange, PhysicalAddress, allocate_pages_by_bytes, get_kernel_mmi_ref, MappedPages, create_contiguous_mapping};
 use pci::{PciDevice};
 use alloc::{
     vec::Vec,
@@ -61,7 +61,7 @@ pub fn allocate_memory(mem_base: PhysicalAddress, mem_size_in_bytes: usize) -> R
     // is now off-limits and should not be touched
     {
         let nic_area = PhysicalMemoryArea::new(mem_base, mem_size_in_bytes as usize, 1, 0); 
-        FRAME_ALLOCATOR.try().ok_or("NicInit::mem_map(): Couldn't get FRAME ALLOCATOR")?.lock().add_area(nic_area, false)?;
+        get_frame_allocator_ref().ok_or("NicInit::mem_map(): Couldn't get FRAME ALLOCATOR")?.lock().add_area(nic_area, false)?;
     }
 
     // set up virtual pages and physical frames to be mapped
@@ -72,8 +72,8 @@ pub fn allocate_memory(mem_base: PhysicalAddress, mem_size_in_bytes: usize) -> R
 
     let kernel_mmi_ref = get_kernel_mmi_ref().ok_or("NicInit::mem_map(): KERNEL_MMI was not yet initialized!")?;
     let mut kernel_mmi = kernel_mmi_ref.lock();
-    let mut fa = FRAME_ALLOCATOR.try().ok_or("NicInit::mem_map(): Couldn't get FRAME ALLOCATOR")?.lock();
-    let nic_mapped_page = kernel_mmi.page_table.map_allocated_pages_to(pages_nic, frames_nic, NIC_MAPPING_FLAGS, fa.deref_mut())?;
+    let fa = get_frame_allocator_ref().ok_or("NicInit::mem_map(): Couldn't get FRAME ALLOCATOR")?;
+    let nic_mapped_page = kernel_mmi.page_table.map_allocated_pages_to(pages_nic, frames_nic, NIC_MAPPING_FLAGS, fa.lock().deref_mut())?;
 
     Ok(nic_mapped_page)
 }
