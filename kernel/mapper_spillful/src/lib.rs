@@ -7,7 +7,6 @@ cfg_if! {
 if #[cfg(mapper_spillful)] {
 
 extern crate memory;
-extern crate alloc;
 #[macro_use] extern crate lazy_static;
 #[macro_use] extern crate log;
 extern crate irq_safety;
@@ -22,7 +21,6 @@ use kernel_config::memory::{PAGE_SIZE, ENTRIES_PER_PAGE_TABLE};
 use memory::{Page, BROADCAST_TLB_SHOOTDOWN_FUNC, FrameAllocator, Frame, PhysicalAddress, VirtualAddress, EntryFlags};
 use memory::paging::table::{Table, Level4, P4};
 use irq_safety::MutexIrqSafe;
-use alloc::vec::Vec;
 use memory_structs::{PageRange};
 use memory_x86_64::tlb_flush_virt_addr;
 use rbtree::RBTree;
@@ -143,7 +141,7 @@ impl MapperSpillful {
 
         let pages = PageRange::from_virt_addr(vma.start_address(), vma.size());
 
-        for page in pages {
+        for page in pages.clone() {
             let p1 = self.p4_mut()
                 .next_table_mut(page.p4_index())
                 .and_then(|p3| p3.next_table_mut(page.p3_index()))
@@ -157,7 +155,7 @@ impl MapperSpillful {
         }
         
         if let Some(func) = BROADCAST_TLB_SHOOTDOWN_FUNC.try() {
-            func(vaddrs);
+            func(pages);
         }
 
         vma.set_flags(new_flags);
@@ -178,7 +176,7 @@ impl MapperSpillful {
 
         let pages = PageRange::from_virt_addr(vma.start_address(), vma.size());
 
-        for page in pages {
+        for page in pages.clone() {
             let p1 = self.p4_mut()
                 .next_table_mut(page.p4_index())
                 .and_then(|p3| p3.next_table_mut(page.p3_index()))
@@ -192,7 +190,7 @@ impl MapperSpillful {
         }
         
         if let Some(func) = BROADCAST_TLB_SHOOTDOWN_FUNC.try() {
-            func(vaddrs);
+            func(pages);
         }
 
         vmas.remove(&start_addr).ok_or("Could not find VMA in VMA Tree")?;
