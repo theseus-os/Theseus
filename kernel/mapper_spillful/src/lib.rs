@@ -18,7 +18,7 @@ extern crate memory_structs;
 extern crate rbtree;
 
 use core::ptr::Unique;
-use kernel_config::memory::{PAGE_SIZE, ENTRIES_PER_PAGE_TABLE, TEMPORARY_PAGE_VIRT_ADDR};
+use kernel_config::memory::{PAGE_SIZE, ENTRIES_PER_PAGE_TABLE};
 use memory::{Page, BROADCAST_TLB_SHOOTDOWN_FUNC, FrameAllocator, Frame, PhysicalAddress, VirtualAddress, EntryFlags};
 use memory::paging::table::{Table, Level4, P4};
 use irq_safety::MutexIrqSafe;
@@ -31,9 +31,6 @@ lazy_static! {
     /// The global list of VirtualMemoryAreas 
     static ref VMAS: MutexIrqSafe<RBTree<VirtualAddress, VirtualMemoryArea>> = MutexIrqSafe::new(RBTree::new());
 }
-
-const TEMPORARY_PAGE_FRAME: usize = TEMPORARY_PAGE_VIRT_ADDR & !(PAGE_SIZE - 1);
-
 
 
 pub struct MapperSpillful {
@@ -146,13 +143,6 @@ impl MapperSpillful {
 
         let pages = PageRange::from_virt_addr(vma.start_address(), vma.size());
 
-        let broadcast_tlb_shootdown = BROADCAST_TLB_SHOOTDOWN_FUNC.try();
-        let mut vaddrs: Vec<VirtualAddress> = if broadcast_tlb_shootdown.is_some() {
-            Vec::with_capacity(pages.size_in_pages())
-        } else {
-            Vec::new() // avoids allocation if we're not going to use it
-        };
-
         for page in pages {
             let p1 = self.p4_mut()
                 .next_table_mut(page.p4_index())
@@ -163,14 +153,10 @@ impl MapperSpillful {
             let frame = p1[page.p1_index()].pointed_frame().ok_or("remap(): page not mapped")?;
             p1[page.p1_index()].set(frame, new_flags | EntryFlags::PRESENT);
 
-            let vaddr = page.start_address();
-            tlb_flush_virt_addr(vaddr);
-            if broadcast_tlb_shootdown.is_some() && vaddr.value() != TEMPORARY_PAGE_FRAME {
-                vaddrs.push(vaddr);
-            }
+            tlb_flush_virt_addr(page.start_address());
         }
         
-        if let Some(func) = broadcast_tlb_shootdown {
+        if let Some(func) = BROADCAST_TLB_SHOOTDOWN_FUNC.try() {
             func(vaddrs);
         }
 
@@ -192,13 +178,6 @@ impl MapperSpillful {
 
         let pages = PageRange::from_virt_addr(vma.start_address(), vma.size());
 
-        let broadcast_tlb_shootdown = BROADCAST_TLB_SHOOTDOWN_FUNC.try();
-        let mut vaddrs: Vec<VirtualAddress> = if broadcast_tlb_shootdown.is_some() {
-            Vec::with_capacity(pages.size_in_pages())
-        } else {
-            Vec::new() // avoids allocation if we're not going to use it
-        };
-
         for page in pages {
             let p1 = self.p4_mut()
                 .next_table_mut(page.p4_index())
@@ -209,14 +188,10 @@ impl MapperSpillful {
             let _frame = p1[page.p1_index()].pointed_frame().ok_or("unmap(): page not mapped")?;
             p1[page.p1_index()].set_unused();
 
-            let vaddr = page.start_address();
-            tlb_flush_virt_addr(vaddr);
-            if broadcast_tlb_shootdown.is_some() && vaddr.value() != TEMPORARY_PAGE_FRAME {
-                vaddrs.push(vaddr);
-            }
+            tlb_flush_virt_addr(page.start_address());
         }
         
-        if let Some(func) = broadcast_tlb_shootdown {
+        if let Some(func) = BROADCAST_TLB_SHOOTDOWN_FUNC.try() {
             func(vaddrs);
         }
 

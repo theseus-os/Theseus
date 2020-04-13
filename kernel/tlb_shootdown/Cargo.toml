@@ -14,10 +14,6 @@ x86_64 = { path = "../../libs/x86_64" } # currently using our local copy, forked
 default-features = false
 version = "0.3.7"
 
-[dependencies.lazy_static]
-features = ["spin_no_std", "nightly"]
-version = "1.2.0"
-
 [dependencies.irq_safety]
 git = "https://github.com/kevinaboos/irq_safety"
 
