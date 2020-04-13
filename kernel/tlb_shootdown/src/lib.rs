@@ -14,7 +14,7 @@ extern crate pause;
 use core::sync::atomic::{AtomicUsize, AtomicBool, Ordering};
 use irq_safety::{hold_interrupts, RwLockIrqSafe};
 use memory::PageRange;
-use apic::{LocalApic, get_my_apic, get_lapics, LapicIpiDestination};
+use apic::{LocalApic, get_my_apic, core_count, LapicIpiDestination};
 use pause::spin_loop_hint;
 
 
@@ -47,12 +47,11 @@ fn broadcast_tlb_shootdown(pages_to_invalidate: PageRange) {
 
 
 /// Handles a TLB shootdown ipi by flushing the `VirtualAddress`es 
-/// currently stored in `TLB_SHOOTDOWN_IPI_VIRTUAL_ADDRESSES`.
+/// covered by the given range of `pages_to_invalidate`.
 /// 
 /// There is no need to invoke this directly, it will be called by an IPI interrupt handler.
 pub fn handle_tlb_shootdown_ipi(pages_to_invalidate: PageRange) {
-    // let apic_id = get_my_apic_id().unwrap_or(0xFF);
-    // trace!("handle_tlb_shootdown_ipi(): AP {}, pages: {:?}", apic_id, pages_to_invalidate);
+    // trace!("handle_tlb_shootdown_ipi(): AP {}, pages: {:?}", get_my_apic_id().unwrap_or(0xFF), pages_to_invalidate);
 
     for page in pages_to_invalidate {
         x86_64::instructions::tlb::flush(x86_64::VirtualAddress(page.start_address().value()));
@@ -65,7 +64,7 @@ pub fn handle_tlb_shootdown_ipi(pages_to_invalidate: PageRange) {
 /// a TLB flush of the given pages' virtual addresses.
 pub fn send_tlb_shootdown_ipi(my_lapic: &mut LocalApic, pages_to_invalidate: PageRange) {        
     // skip sending IPIs if there are no other cores running
-    let core_count = get_lapics().iter().count();
+    let core_count = core_count();
     if core_count <= 1 {
         return;
     }
