@@ -340,10 +340,10 @@ unsafe impl GlobalAlloc for MultipleHeaps {
             else {
                 Err("MultipleHeaps: Heap was not initialized")
             };
-        
+            
         alloc_result                
             .ok()
-            .map_or(ptr::null_mut(), |allocation| allocation.as_ptr())    
+            .map_or(ptr::null_mut(), |allocation| allocation.as_ptr())
     }
 
     /// Deallocates the memory at the address given by `ptr`.
