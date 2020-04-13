@@ -15,7 +15,7 @@ use alloc::vec::Vec;
 use alloc::string::{String, ToString};
 use core::str;
 use core::ops::DerefMut;
-use memory::FRAME_ALLOCATOR;
+use memory::get_frame_allocator_ref;
 
 
 
@@ -68,7 +68,7 @@ fn test_filerw() -> Result<(), &'static str> {
     // first we obtain non-writable mapped pages
         // Obtain the active kernel page table
     let kernel_mmi_ref = memory::get_kernel_mmi_ref().ok_or("KERNEL_MMI was not yet initialized!")?;
-    let allocator = FRAME_ALLOCATOR.try().ok_or("Couldn't get Frame Allocator")?;
+    let allocator = get_frame_allocator_ref().ok_or("Couldn't get Frame Allocator")?;
     // Allocate and map the least number of pages we need to store the information contained in the buffer
     // we'll allocate the buffer length plus the offset because that's guranteed to be the most bytes we
     // need (because it entered this conditional statement)

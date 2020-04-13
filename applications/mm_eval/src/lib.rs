@@ -28,12 +28,11 @@ if #[cfg(mapper_spillful)] {
 #[macro_use] extern crate libtest;
 extern crate mapper_spillful;
 
-use core::ops::DerefMut;
 use getopts::{Matches, Options};
 use kernel_config::memory::PAGE_SIZE;
 use memory_structs::PageRange;
 use libtest::{start_counting_reference_cycles, stop_counting_reference_cycles, calculate_stats, check_myrq, Stats, cycle_count_overhead};
-use memory::{FRAME_ALLOCATOR, VirtualAddress, Mapper, MappedPages, EntryFlags, mapped_pages_unmap};
+use memory::{get_frame_allocator_ref, VirtualAddress, Mapper, MappedPages, EntryFlags, mapped_pages_unmap};
 use mapper_spillful::MapperSpillful;
 
 enum MapperType<'m> {
@@ -55,8 +54,7 @@ fn create_mappings(
     };
     let size_in_bytes = size_in_pages * PAGE_SIZE;
 
-    let mut frame_allocator_ref = FRAME_ALLOCATOR.try().ok_or("Couldn't get FRAME_ALLOCATOR")?.lock();
-    let frame_allocator = frame_allocator_ref.deref_mut();
+    let frame_allocator_ref = get_frame_allocator_ref().ok_or("Couldn't get frame allocator")?;
     let overhead = cycle_count_overhead()?;
 
     let counter = start_counting_reference_cycles()?;
@@ -68,14 +66,14 @@ fn create_mappings(
                 let mp = mapper.map_pages(
                     PageRange::from_virt_addr(vaddr, size_in_bytes),
                     EntryFlags::WRITABLE | EntryFlags::PRESENT,
-                    frame_allocator
+                    &mut frame_allocator.lock(),
                 )?;
                 mapped_pages.push(mp);
             }
             MapperType::Spillful(ref mut mapper) => {
                 let _res = mapper.map(vaddr, size_in_bytes,
                     EntryFlags::WRITABLE | EntryFlags::PRESENT,
-                    frame_allocator
+                    &mut frame_allocator.lock(),
                 )?;
             }
         }
@@ -137,14 +135,13 @@ fn unmap_normal(
     mut mapped_pages: Vec<MappedPages>
 ) -> Result<u64, &'static str> {
 
-    let mut frame_allocator_ref = FRAME_ALLOCATOR.try().ok_or("Couldn't get FRAME_ALLOCATOR")?.lock();
-    let frame_allocator = frame_allocator_ref.deref_mut();
+    let frame_allocator_ref = get_frame_allocator_ref().ok_or("Couldn't get frame allocator")?;
     let overhead = cycle_count_overhead()?;
 
     let counter = start_counting_reference_cycles()?;
 
     for mp in &mut mapped_pages {
-        mapped_pages_unmap(mp, mapper_normal, frame_allocator)?;
+        mapped_pages_unmap(mp, mapper_normal, &mut frame_allocator.lock())?;
     }
 
     let cycles = stop_counting_reference_cycles(counter)?; 
@@ -166,15 +163,14 @@ fn unmap_spillful(
     num_mappings: usize
 ) -> Result<u64, &'static str> {
 
-    let mut frame_allocator_ref = FRAME_ALLOCATOR.try().ok_or("Couldn't get FRAME_ALLOCATOR")?.lock();
-    let frame_allocator = frame_allocator_ref.deref_mut();
+    let frame_allocator_ref = get_frame_allocator_ref().ok_or("Couldn't get frame allocator")?;
     let overhead = cycle_count_overhead()?;
 
     let counter = start_counting_reference_cycles()?;
 
     for i in 0..num_mappings {
         let vaddr = start_vaddr + i*size_in_pages*PAGE_SIZE;            
-        let _res = mapper_spillful.unmap(vaddr, frame_allocator)?;
+        let _res = mapper_spillful.unmap(vaddr, &mut frame_allocator.lock())?;
     }
 
     let cycles = stop_counting_reference_cycles(counter)?;

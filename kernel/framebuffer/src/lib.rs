@@ -14,7 +14,7 @@ pub mod pixel;
 use alloc::boxed::Box;
 use core::ops::DerefMut;
 
-use memory::{EntryFlags, FrameRange, MappedPages, PhysicalAddress, FRAME_ALLOCATOR};
+use memory::{EntryFlags, FrameRange, MappedPages, PhysicalAddress, get_frame_allocator_ref};
 use owning_ref::BoxRefMut;
 use shapes::Coord;
 pub use pixel::*;
@@ -66,7 +66,7 @@ impl<P: Pixel> Framebuffer<P> {
     ) -> Result<Framebuffer<P>, &'static str> {
         // get a reference to the kernel's memory mapping information
         let kernel_mmi_ref = memory::get_kernel_mmi_ref().ok_or("KERNEL_MMI was not yet initialized!")?;
-        let allocator = FRAME_ALLOCATOR.try().ok_or("Couldn't get Frame Allocator")?;
+        let allocator = get_frame_allocator_ref().ok_or("Couldn't get Frame Allocator")?;
 
         let vesa_display_flags: EntryFlags =
             EntryFlags::PRESENT | EntryFlags::WRITABLE | EntryFlags::GLOBAL | EntryFlags::NO_CACHE;
