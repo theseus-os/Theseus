@@ -8,14 +8,15 @@
 // except according to those terms.
 
 use core::mem;
-use core::ops::{Deref, DerefMut};
+use core::ops::Deref;
 use core::ptr::Unique;
 use core::slice;
-use {BROADCAST_TLB_SHOOTDOWN_FUNC, VirtualAddress, PhysicalAddress, FRAME_ALLOCATOR, FrameRange, Page, Frame, FrameAllocator, AllocatedPages}; 
+use {BROADCAST_TLB_SHOOTDOWN_FUNC, VirtualAddress, PhysicalAddress, get_frame_allocator_ref, FrameRange, Page, Frame, FrameAllocator, AllocatedPages}; 
 use paging::{PageRange, get_current_p4};
 use paging::table::{P4, Table, Level4};
 use kernel_config::memory::{ENTRIES_PER_PAGE_TABLE, PAGE_SIZE};
 use alloc::vec::Vec;
+use irq_safety::MutexIrqSafe;
 use super::{EntryFlags, tlb_flush_virt_addr};
 
 pub struct Mapper {
@@ -520,7 +521,7 @@ impl MappedPages {
 
     /// Remove the virtual memory mapping for the given `Page`s.
     /// This should NOT be public because it should only be invoked when a `MappedPages` object is dropped.
-    fn unmap<A>(&mut self, active_table_mapper: &mut Mapper, _allocator: &mut A) -> Result<(), &'static str> 
+    fn unmap<A>(&mut self, active_table_mapper: &mut Mapper, _allocator_ref: &MutexIrqSafe<A>) -> Result<(), &'static str> 
         where A: FrameAllocator
     {
         if self.size_in_pages() == 0 { return Ok(()); }
@@ -538,7 +539,7 @@ impl MappedPages {
             tlb_flush_virt_addr(page.start_address());
             
             // TODO free p(1,2,3) table if empty
-            // allocator.deallocate_frame(frame);
+            // _allocator_ref.lock().deallocate_frame(frame);
         }
 
         if let Some(func) = BROADCAST_TLB_SHOOTDOWN_FUNC.try() {
@@ -788,9 +789,9 @@ impl MappedPages {
 pub fn mapped_pages_unmap<A: FrameAllocator>(
     mapped_pages: &mut MappedPages,
     mapper: &mut Mapper,
-    allocator: &mut A, 
+    allocator_ref: &super::FrameAllocatorRef<A>, 
 ) -> Result<(), &'static str> {
-    mapped_pages.unmap(mapper, allocator)
+    mapped_pages.unmap(mapper, allocator_ref)
 }
 
 
@@ -808,15 +809,15 @@ impl Drop for MappedPages {
             return;
         }   
 
-        let mut frame_allocator = match FRAME_ALLOCATOR.try() {
-            Some(fa) => fa.lock(),
+        let frame_allocator_ref = match get_frame_allocator_ref() {
+            Some(fa) => fa,
             _ => {
-                error!("MappedPages::drop(): couldn't get FRAME_ALLOCATOR!");
+                error!("MappedPages::drop(): couldn't get frame allocator!");
                 return;
             }
         };
         
-        if let Err(e) = self.unmap(&mut mapper, frame_allocator.deref_mut()) {
+        if let Err(e) = self.unmap(&mut mapper, &frame_allocator_ref) {
             error!("MappedPages::drop(): failed to unmap, error: {:?}", e);
         }
 
