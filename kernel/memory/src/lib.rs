@@ -159,11 +159,11 @@ pub fn create_contiguous_mapping(size_in_bytes: usize, flags: EntryFlags) -> Res
 
 
 
-pub static BROADCAST_TLB_SHOOTDOWN_FUNC: Once<fn(Vec<VirtualAddress>)> = Once::new();
+pub static BROADCAST_TLB_SHOOTDOWN_FUNC: Once<fn(PageRange)> = Once::new();
 
 /// Set the function callback that will be invoked every time a TLB shootdown is necessary,
 /// i.e., during page table remapping and unmapping operations.
-pub fn set_broadcast_tlb_shootdown_cb(func: fn(Vec<VirtualAddress>)) {
+pub fn set_broadcast_tlb_shootdown_cb(func: fn(PageRange)) {
     BROADCAST_TLB_SHOOTDOWN_FUNC.call_once(|| func);
 }
 

@@ -14,7 +14,7 @@ use core::slice;
 use {BROADCAST_TLB_SHOOTDOWN_FUNC, VirtualAddress, PhysicalAddress, FRAME_ALLOCATOR, FrameRange, Page, Frame, FrameAllocator, AllocatedPages}; 
 use paging::{PageRange, get_current_p4};
 use paging::table::{P4, Table, Level4};
-use kernel_config::memory::{ENTRIES_PER_PAGE_TABLE, PAGE_SIZE, TEMPORARY_PAGE_VIRT_ADDR};
+use kernel_config::memory::{ENTRIES_PER_PAGE_TABLE, PAGE_SIZE};
 use alloc::vec::Vec;
 use super::{EntryFlags, tlb_flush_virt_addr};
 
@@ -262,10 +262,6 @@ impl Mapper {
 struct PageContent([u8; PAGE_SIZE]);
 
 
-// optional performance optimization: temporary pages are not shared across cores, so skip those
-const TEMPORARY_PAGE_FRAME: usize = TEMPORARY_PAGE_VIRT_ADDR & !(PAGE_SIZE - 1);
-
-
 /// An instance of `MappedPages` may be created from virtual pages
 /// that were either obtained from the virtual page allocator
 /// or that were manually created from a predetermined virtual address and passed in. 
@@ -500,13 +496,6 @@ impl MappedPages {
             return Ok(());
         }
 
-        let broadcast_tlb_shootdown = BROADCAST_TLB_SHOOTDOWN_FUNC.try();
-        let mut vaddrs: Vec<VirtualAddress> = if broadcast_tlb_shootdown.is_some() {
-            Vec::with_capacity(self.size_in_pages())
-        } else {
-            Vec::new() // avoids allocation if we're not going to use it
-        };
-
         for page in self.pages.clone() {
             let p1 = active_table_mapper.p4_mut()
                 .next_table_mut(page.p4_index())
@@ -517,15 +506,11 @@ impl MappedPages {
             let frame = p1[page.p1_index()].pointed_frame().ok_or("remap(): page not mapped")?;
             p1[page.p1_index()].set(frame, new_flags | EntryFlags::PRESENT);
 
-            let vaddr = page.start_address();
-            tlb_flush_virt_addr(vaddr);
-            if broadcast_tlb_shootdown.is_some() && vaddr.value() != TEMPORARY_PAGE_FRAME {
-                vaddrs.push(vaddr);
-            }
+            tlb_flush_virt_addr(page.start_address());
         }
         
-        if let Some(func) = broadcast_tlb_shootdown {
-            func(vaddrs);
+        if let Some(func) = BROADCAST_TLB_SHOOTDOWN_FUNC.try() {
+            func(self.pages.deref().clone());
         }
 
         self.flags = new_flags;
@@ -540,13 +525,6 @@ impl MappedPages {
     {
         if self.size_in_pages() == 0 { return Ok(()); }
 
-        let broadcast_tlb_shootdown = BROADCAST_TLB_SHOOTDOWN_FUNC.try();
-        let mut vaddrs: Vec<VirtualAddress> = if broadcast_tlb_shootdown.is_some() {
-            Vec::with_capacity(self.size_in_pages())
-        } else {
-            Vec::new() // avoids allocation if we're not going to use it
-        };
-
         for page in self.pages.clone() {            
             let p1 = active_table_mapper.p4_mut()
                 .next_table_mut(page.p4_index())
@@ -557,18 +535,14 @@ impl MappedPages {
             let _frame = p1[page.p1_index()].pointed_frame().ok_or("unmap(): page not mapped")?;
             p1[page.p1_index()].set_unused();
 
-            let vaddr = page.start_address();
             tlb_flush_virt_addr(page.start_address());
-            if broadcast_tlb_shootdown.is_some() && vaddr.value() != TEMPORARY_PAGE_FRAME {
-                vaddrs.push(vaddr);
-            }
             
             // TODO free p(1,2,3) table if empty
             // allocator.deallocate_frame(frame);
         }
 
-        if let Some(func) = broadcast_tlb_shootdown {
-            func(vaddrs);
+        if let Some(func) = BROADCAST_TLB_SHOOTDOWN_FUNC.try() {
+            func(self.pages.deref().clone());
         }
 
         Ok(())
@@ -823,12 +797,7 @@ pub fn mapped_pages_unmap<A: FrameAllocator>(
 impl Drop for MappedPages {
     fn drop(&mut self) {
         if self.size_in_pages() == 0 { return; }
-        
-        // // skip logging temp page unmapping, since it's the most common
-        // const TEMP_PAGE: Page = Page::containing_address(VirtualAddress::new_canonical(TEMPORARY_PAGE_VIRT_ADDR));
-        // if self.pages.start() != &TEMP_PAGE {
-        //     trace!("MappedPages::drop(): unmapping MappedPages start: {:?} to end: {:?}", self.pages.start(), self.pages.end());
-        // }
+        // trace!("MappedPages::drop(): unmapping MappedPages start: {:?} to end: {:?}", self.pages.start(), self.pages.end());
 
         let mut mapper = Mapper::from_current();
         if mapper.target_p4 != self.page_table_p4 {
