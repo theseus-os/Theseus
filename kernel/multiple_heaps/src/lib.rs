@@ -39,6 +39,7 @@ extern crate apic;
 extern crate hashbrown;
 #[macro_use] extern crate lazy_static;
 extern crate heap;
+extern crate raw_cpuid;
 
 use core::ptr::NonNull;
 use alloc::alloc::{GlobalAlloc, Layout};
@@ -51,6 +52,7 @@ use core::ops::DerefMut;
 use core::ptr;
 use hashbrown::HashMap;
 use heap::{global_allocator, initial_allocator, GlobalAllocFunctions, HEAP_FLAGS};
+use raw_cpuid::CpuId;
 
 lazy_static!{ 
     static ref MULTIPLE_HEAPS_ALLOCATOR: MultipleHeaps = MultipleHeaps::empty();
@@ -81,12 +83,12 @@ pub fn initialize_multiple_heaps() -> Result<(), &'static str> {
     Ok(())       
 }
 
-
+#[inline(always)]
 unsafe fn multiple_heaps_allocate(layout: Layout) -> *mut u8 {
     MULTIPLE_HEAPS_ALLOCATOR.alloc(layout) 
 }
 
-
+#[inline(always)]
 unsafe fn multiple_heaps_deallocate(ptr: *mut u8, layout: Layout) {
     MULTIPLE_HEAPS_ALLOCATOR.dealloc(ptr, layout)
 }
@@ -120,10 +122,8 @@ pub fn switch_to_multiple_heaps() -> Result<(), &'static str> {
 
 /// Merges the initial allocator into the multiple heap with the smallest heap id
 pub fn merge_initial_heap(mut initial_allocator: ZoneAllocator<'static>) -> Result<(), &'static str> {
-    let heap_id = MULTIPLE_HEAPS_ALLOCATOR.heaps.read().keys().min().ok_or("Could not find minimum heap id")?.clone();
-    MULTIPLE_HEAPS_ALLOCATOR.heaps.write().get(&heap_id).as_ref()
-            .ok_or("Core heap is not initialized!")
-            .expect("Alloc: per core heap was not initialized") // we want a panic here since that means something was wrong in the initialization steps
+    let heap_id = 0; //MULTIPLE_HEAPS_ALLOCATOR.heaps.read().keys().min().ok_or("Could not find minimum heap id")?.clone();
+    MULTIPLE_HEAPS_ALLOCATOR.heaps[heap_id].0
             .lock()
             .merge(&mut initial_allocator, heap_id)?;
     
@@ -200,10 +200,7 @@ pub fn init_individual_heap(key: usize) -> Result<(), &'static str> {
     *heap_end = heap_end_addr;
 
     // store the newly created allocator in the global allocator
-    if let Some(_heap) = MULTIPLE_HEAPS_ALLOCATOR.heaps.write().insert(key, MutexIrqSafe::new(zone_allocator)) {
-        return Err("New heap created with a previously used id");
-    }
-
+    *MULTIPLE_HEAPS_ALLOCATOR.heaps[key].0.lock() = zone_allocator;
     trace!("Created heap {} with max alloc size: {} bytes", key, ZoneAllocator::MAX_ALLOC_SIZE);
 
     Ok(())
@@ -213,10 +210,22 @@ pub fn init_individual_heap(key: usize) -> Result<(), &'static str> {
 /// Returns the key which determines the heap that will be used.
 /// Currently we use the apic id as the key, but we can replace it with some
 /// other value e.g. task id
+#[inline(always)] 
 fn get_key() -> usize {
-    apic::get_my_apic_id()
-        .ok_or("Heap:: Could not retrieve apic id")
-        .expect("Heap:: Could not retrieve apic id") as usize
+    // apic::get_my_apic_id()
+    //     .ok_or("Heap:: Could not retrieve apic id")
+    //     .expect("Heap:: Could not retrieve apic id") as usize
+    CpuId::new().get_feature_info().expect("Could not retrieve cpuid").initial_local_apic_id() as usize
+}
+
+
+#[repr(align(64))]
+struct LockedHeap (MutexIrqSafe<ZoneAllocator<'static>>);
+
+impl LockedHeap {
+    pub const fn empty() -> LockedHeap {
+        LockedHeap(MutexIrqSafe::new(ZoneAllocator::new()))
+    }
 }
 
 
@@ -224,7 +233,7 @@ fn get_key() -> usize {
 /// determined by a key. Currently the apic id is used as the key.
 pub struct MultipleHeaps{
     /// the per-core heaps
-    heaps: RwLockIrqSafe<HashMap<usize, MutexIrqSafe<ZoneAllocator<'static>>>>,
+    heaps: [LockedHeap; MAX_HEAPS],
     /// We currently don't return memory back to the OS. Because of this all memory in the heap is contiguous
     /// and extra memory for the heap is always allocated from the end.
     /// The Mutex also serves the purpose of helping to synchronize new allocations.
@@ -234,25 +243,21 @@ pub struct MultipleHeaps{
 impl MultipleHeaps {
     pub fn empty() -> MultipleHeaps {
         MultipleHeaps{
-            heaps: RwLockIrqSafe::new(HashMap::new()),
+            heaps: [LockedHeap::empty(), LockedHeap::empty(), LockedHeap::empty(), LockedHeap::empty(), LockedHeap::empty(), LockedHeap::empty(), LockedHeap::empty(), LockedHeap::empty()],
             end: MutexIrqSafe::new(VirtualAddress::zero())
         }
     }
 
-
+    #[inline(always)]
     unsafe fn allocate_from_heap(&self, heap_id: usize, layout: Layout) -> Result<NonNull<u8>, &'static str> {
-        self.heaps.read().get(&heap_id).as_ref()
-            .ok_or("Core heap is not initialized!")
-            .expect("Alloc: per core heap was not initialized") // we want a panic here since that means something was wrong in the initialization steps
+        self.heaps[heap_id].0
             .lock()
             .allocate(layout)
     }
 
-
+    #[inline(always)]
     unsafe fn deallocate_from_heap(&self, heap_id: usize, ptr: *mut u8, layout: Layout) -> Result<(), &'static str> {
-        self.heaps.read().get(&heap_id).as_ref()
-            .ok_or("Core heap is not initialized!")
-            .expect("Dealloc: per core heap was not initialized") // we want a panic here since that means something was wrong in the initialization steps
+        self.heaps[heap_id].0
             .lock()
             .deallocate(NonNull::new_unchecked(ptr), layout)
     }
@@ -264,9 +269,7 @@ impl MultipleHeaps {
     /// * `mp`: MappedPages object representing the pages being added to the heap.
     /// * `heap_id`: heap the page is being added to.
     fn refill_heap(&self, layout: Layout, mp: MappedPages, heap_id: usize) -> Result<(), &'static str> {
-        self.heaps.read().get(&heap_id).as_ref()
-            .ok_or("Core heap is not initialized!")
-            .expect("Refill: per core heap was not initialized") // we want a panic here since that means something was wrong in the initialization steps
+        self.heaps[heap_id].0
             .lock()
             .refill(layout, mp, heap_id)
     }
@@ -275,13 +278,12 @@ impl MultipleHeaps {
     /// Retrieves an empty page from the heap which has the maximum number of empty pages,
     /// if the maximum is greater than a threshold.
     fn retrieve_empty_page(&self) -> Result<MappedPages, &'static str> {
-        let heaps = self.heaps.read();
-        let heap = heaps.values().max_by_key(
-            |&heap| heap.lock().empty_pages())
+        let heap = self.heaps.iter().max_by_key(
+            |&heap| heap.0.lock().empty_pages())
             .ok_or("Per core heaps haven't been initialized")?;
         
-        if heap.lock().empty_pages() > EMPTY_PAGES_THRESHOLD {
-            return heap.lock().retrieve_empty_page().ok_or("No empty page in the heaps");
+        if heap.0.lock().empty_pages() > EMPTY_PAGES_THRESHOLD {
+            return heap.0.lock().retrieve_empty_page().ok_or("No empty page in the heaps");
         }
 
         Err("No empty pages available")
@@ -302,14 +304,14 @@ impl MultipleHeaps {
         let mp = 
             match self.retrieve_empty_page() {
                 Ok(mp) => {
-                    trace!("grow_heap:: retrieved a page from another heap to refill core heap {} for size :{}", heap_id, layout.size());
+                    error!("grow_heap:: retrieved a page from another heap to refill core heap {} for size :{}", heap_id, layout.size());
                     mp   
                 }
                 // (2) If that didn't work ry to allocate memory from the OS
                 Err(_e) => {
                     let mut heap_end = self.end.lock();
                     let mp = create_heap_mapping(*heap_end, HEAP_MAPPED_PAGES_SIZE_IN_BYTES)?;
-                    trace!("grow_heap:: Allocated a page to refill core heap {} for size :{} at address: {:#X}", heap_id, layout.size(), *heap_end);
+                    error!("grow_heap:: Allocated a page to refill core heap {} for size :{} at address: {:#X}", heap_id, layout.size(), *heap_end);
                     *heap_end += HEAP_MAPPED_PAGES_SIZE_IN_BYTES;
                     mp
                 }
@@ -328,17 +330,12 @@ unsafe impl GlobalAlloc for MultipleHeaps {
 
         let alloc_result = 
             // allocate an object with the per-core heap if initialized 
-            if self.heaps.read().get(&id).is_some() {
-                match self.allocate_from_heap(id, layout) {
-                    Ok(ptr) => Ok(ptr),
-                    // If a null pointer was returned, then there are no available empty pages in the heap, so try to grow the heap
-                    Err(_e) => {
-                        self.grow_heap(layout, id).and_then(|_res| self.allocate_from_heap(id,layout))
-                    }
+            match self.allocate_from_heap(id, layout) {
+                Ok(ptr) => Ok(ptr),
+                // If a null pointer was returned, then there are no available empty pages in the heap, so try to grow the heap
+                Err(_e) => {
+                    self.grow_heap(layout, id).and_then(|_res| self.allocate_from_heap(id,layout))
                 }
-            }
-            else {
-                Err("MultipleHeaps: Heap was not initialized")
             };
             
         alloc_result                

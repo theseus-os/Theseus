@@ -132,14 +132,15 @@ fn worker(_:()) {
     let nthreads: usize = NTHREADS.load(Ordering::SeqCst);
 
     let layout = Layout::from_size_align(8, 8).unwrap();
+    let mut a = Vec::with_capacity(nobjects/nthreads);
+    unsafe { a.set_len(nobjects/nthreads); }
     let heap = global_allocator();
 
     for j in 0..niterations {
-        let mut a = Vec::with_capacity(nobjects/nthreads);
         unsafe{
         for i in 0..(nobjects/nthreads) {
             let obj = heap.alloc(layout); 
-            a.push(obj);
+            a[i] = obj;
         }
 
         for i in 0..(nobjects/nthreads) {

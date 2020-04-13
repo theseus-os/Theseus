@@ -8,7 +8,7 @@ use log::{LogRecord, LogLevel, SetLoggerError, LogMetadata, Log, ShutdownLoggerE
 use core::fmt;
 use spin::Once;
 
-static LOG_LEVEL: LogLevel = LogLevel::Trace;
+static LOG_LEVEL: LogLevel = LogLevel::Error;
 
 pub type LogOutputFunc = fn(fmt::Arguments);
 static MIRROR_VGA_FUNC: Once<LogOutputFunc> = Once::new();

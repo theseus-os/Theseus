@@ -86,6 +86,26 @@ dependencies = [
 ]
 
 [[package]]
+name = "apic_id"
+version = "0.1.0"
+dependencies = [
+ "apic 0.1.0",
+ "async_channel 0.1.0",
+ "getopts 0.2.21 (git+https://github.com/kevinaboos/getopts)",
+ "heap 0.1.0",
+ "hpet 0.1.0",
+ "libtest 0.1.0",
+ "log 0.3.9 (registry+https://github.com/rust-lang/crates.io-index)",
+ "raw-cpuid 7.0.3 (registry+https://github.com/rust-lang/crates.io-index)",
+ "rendezvous 0.1.0",
+ "scheduler 0.1.0",
+ "spawn 0.1.0",
+ "spin 0.4.10 (registry+https://github.com/rust-lang/crates.io-index)",
+ "task 0.1.0",
+ "terminal_print 0.1.0",
+]
+
+[[package]]
 name = "app_io"
 version = "0.1.0"
 dependencies = [
