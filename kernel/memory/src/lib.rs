@@ -87,6 +87,7 @@ pub fn get_kernel_mmi_ref() -> Option<MmiRef> {
 static FRAME_ALLOCATOR: Once<MutexIrqSafe<AreaFrameAllocator>> = Once::new();
 
 /// A shareable reference to a `FrameAllocator` struct wrapper in a lock.
+#[allow(type_alias_bounds)]
 pub type FrameAllocatorRef<A: FrameAllocator> = MutexIrqSafe<A>;
 
 /// Returns a reference to the system-wide `FrameAllocator`, if initialized.

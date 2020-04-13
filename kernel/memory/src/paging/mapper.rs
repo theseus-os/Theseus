@@ -789,9 +789,9 @@ impl MappedPages {
 pub fn mapped_pages_unmap<A: FrameAllocator>(
     mapped_pages: &mut MappedPages,
     mapper: &mut Mapper,
-    allocator: &mut A, 
+    allocator_ref: &super::FrameAllocatorRef<A>, 
 ) -> Result<(), &'static str> {
-    mapped_pages.unmap(mapper, allocator)
+    mapped_pages.unmap(mapper, allocator_ref)
 }
 
 
