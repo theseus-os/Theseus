@@ -861,6 +861,7 @@ dependencies = [
 name = "hello"
 version = "0.1.0"
 dependencies = [
+ "captain 0.1.0",
  "log 0.3.9 (registry+https://github.com/rust-lang/crates.io-index)",
  "terminal_print 0.1.0",
 ]

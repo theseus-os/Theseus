@@ -15,5 +15,8 @@ version = "0.3.7"
 [dependencies.terminal_print]
 path = "../../kernel/terminal_print"
 
+[dependencies.captain]
+path = "../../kernel/captain"
+
 # [dependencies.application_main_fn]
 # path = "../../compiler_plugins"
