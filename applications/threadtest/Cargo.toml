@@ -42,3 +42,9 @@ path = "../../kernel/libtest"
 
 [dependencies.heap]
 path = "../../kernel/heap"
+
+[dependencies.heap_trace]
+path = "../../kernel/heap_trace"
+
+[dependencies.pmu_x86]
+path = "../../kernel/pmu_x86"

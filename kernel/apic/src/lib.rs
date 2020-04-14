@@ -88,6 +88,25 @@ pub fn core_count() -> usize {
 
 
 /// Returns the APIC ID of the currently executing processor core.
+#[inline(always)]
+pub fn get_my_apic_id_fast() -> u8 {
+    // if has_x2apic() {
+    //     // make sure this local apic is enabled in x2apic mode, otherwise we'll get a General Protection fault
+    //     unsafe { wrmsr(IA32_APIC_BASE, rdmsr(IA32_APIC_BASE) | IA32_APIC_XAPIC_ENABLE | IA32_APIC_X2APIC_ENABLE); }
+    //     let x2_id = rdmsr(IA32_X2APIC_APICID) as u32;
+    //     Some(x2_id as u8)
+    // } else {
+    //     APIC_REGS.try().map(|apic| {
+    //         let raw = apic.lapic_id.read();
+    //         (raw >> 24) as u8
+    //     })
+    // }
+
+    rdmsr(IA32_X2APIC_APICID) as u8
+
+}
+
+/// Returns the APIC ID of the currently executing processor core.
 pub fn get_my_apic_id() -> Option<u8> {
     if has_x2apic() {
         // make sure this local apic is enabled in x2apic mode, otherwise we'll get a General Protection fault

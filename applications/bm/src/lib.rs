@@ -4,7 +4,7 @@
 extern crate task;
 extern crate hpet;
 #[macro_use] extern crate terminal_print;
-// #[macro_use] extern crate log;
+#[macro_use] extern crate log;
 extern crate fs_node;
 extern crate apic;
 extern crate spawn;
@@ -289,11 +289,23 @@ fn do_spawn_inner(overhead_ct: u64, th: usize, nr: usize, child_core: u8) -> Res
 	let end_hpet: u64;
 	let tmp_iterations: u64 = 100;
 
+	// Check that the application actually exists
+	let namespace_dir = task::get_my_current_task()
+		.map(|t| t.get_namespace().dir().clone())
+		.ok_or("Cannot remove namespace directory of the current task")?;
+	let cmd_crate_name = "hello-";
+	let mut matching_apps = namespace_dir.get_files_starting_with(&cmd_crate_name).into_iter();
+	let app_file = matching_apps.next();
+	let second_match = matching_apps.next(); // return an error if there are multiple matching apps 
+	let app_path = app_file.xor(second_match)
+		.map(|f| Path::new(f.lock().get_absolute_path()))
+		.ok_or("Could not find application 'hello' ")?;
+
 
 	start_hpet = get_hpet().as_ref().unwrap().get_counter();
 	for _ in 0..tmp_iterations {
-		let child = spawn::new_application_task_builder(Path::new(String::from("hello")), None)?
-	        .pin_on_core(child_core) // the child is always in the my core -1
+		let child = spawn::new_application_task_builder(app_path.clone(), None)?
+	        // .pin_on_core(child_core) // the child is always in the my core -1
 	        //.argument(Vec::new())
 	        .spawn()?;
 
@@ -308,6 +320,7 @@ fn do_spawn_inner(overhead_ct: u64, th: usize, nr: usize, child_core: u8) -> Res
     let delta_time_avg = delta_time / tmp_iterations as u64;
 	printlninfo!("spawn_test_inner ({}/{}): hpet {} , overhead {}, {} total_time -> {} {}",
 		th, nr, delta_hpet, overhead_ct, delta_time, delta_time_avg, T_UNIT);
+	error!("works");
 
 	Ok(delta_time_avg)
 }

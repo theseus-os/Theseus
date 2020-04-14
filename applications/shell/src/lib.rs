@@ -781,6 +781,10 @@ impl Shell {
                     task_ref.unblock();
                 }
 
+                // for task_ref in &new_job.tasks {
+                //     task_ref.join()?;
+                // }
+
                 // Allocate a job number for the new job. It will start from 1 and choose the smallest number
                 // that has not yet been allocated.
                 let mut new_job_num: isize = 1;

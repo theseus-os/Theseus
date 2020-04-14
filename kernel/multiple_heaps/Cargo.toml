@@ -47,3 +47,7 @@ version = "1.2.0"
 
 [dependencies.heap]
 path = "../heap"
+
+
+[dependencies.heap_trace]
+path = "../heap_trace"

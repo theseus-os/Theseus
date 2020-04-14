@@ -15,3 +15,14 @@ features = [ "use_arch" ]
 default-features = false
 version = "0.3.7"
 
+[dependencies.hpet]
+path = "../hpet"
+
+[dependencies.pmu_x86]
+path = "../pmu_x86"
+
+[dependencies.x86_64]
+path = "../../libs/x86_64"
+
+[dependencies.apic]
+path = "../apic"

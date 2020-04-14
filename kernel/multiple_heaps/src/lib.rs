@@ -40,6 +40,7 @@ extern crate hashbrown;
 #[macro_use] extern crate lazy_static;
 extern crate heap;
 extern crate raw_cpuid;
+extern crate heap_trace;
 
 use core::ptr::NonNull;
 use alloc::alloc::{GlobalAlloc, Layout};
@@ -53,6 +54,7 @@ use core::ptr;
 use hashbrown::HashMap;
 use heap::{global_allocator, initial_allocator, GlobalAllocFunctions, HEAP_FLAGS};
 use raw_cpuid::CpuId;
+use heap_trace::take_step;
 
 lazy_static!{ 
     static ref MULTIPLE_HEAPS_ALLOCATOR: MultipleHeaps = MultipleHeaps::empty();
@@ -212,10 +214,10 @@ pub fn init_individual_heap(key: usize) -> Result<(), &'static str> {
 /// other value e.g. task id
 #[inline(always)] 
 fn get_key() -> usize {
-    // apic::get_my_apic_id()
-    //     .ok_or("Heap:: Could not retrieve apic id")
-    //     .expect("Heap:: Could not retrieve apic id") as usize
-    CpuId::new().get_feature_info().expect("Could not retrieve cpuid").initial_local_apic_id() as usize
+    apic::get_my_apic_id_fast() as usize
+        // .ok_or("Heap:: Could not retrieve apic id")
+        // .expect("Heap:: Could not retrieve apic id") as usize
+    // CpuId::new().get_feature_info().expect("Could not retrieve cpuid").initial_local_apic_id() as usize
 }
 
 
@@ -325,8 +327,15 @@ unsafe impl GlobalAlloc for MultipleHeaps {
 
     /// Allocates the given `layout` from the heap of the core the task is currently running on.
     /// If the per-core heap is not initialized, then an error is returned.
+    // #[inline(always)]    
     unsafe fn alloc(&self, layout: Layout) -> *mut u8 {
+        // // step 4
+        // take_step();
+
         let id = get_key();
+
+        // // step 5
+        // take_step();
 
         let alloc_result = 
             // allocate an object with the per-core heap if initialized 
@@ -337,6 +346,9 @@ unsafe impl GlobalAlloc for MultipleHeaps {
                     self.grow_heap(layout, id).and_then(|_res| self.allocate_from_heap(id,layout))
                 }
             };
+        
+        // //step 6
+        // take_step();
             
         alloc_result                
             .ok()
@@ -345,12 +357,23 @@ unsafe impl GlobalAlloc for MultipleHeaps {
 
     /// Deallocates the memory at the address given by `ptr`.
     /// Memory is returned to the per-core heap it was allocated from.
+    // #[inline(always)]    
     unsafe fn dealloc(&self, ptr: *mut u8, layout: Layout) {
+        // // step 4
+        // take_step();
+        
         // find the starting address of the object page this block belongs to
         let page_addr = (ptr as usize) & !(ObjectPage8k::SIZE - 1);
         // find the heap id
         let id = *((page_addr as *mut u8).offset(ObjectPage8k::HEAP_ID_OFFSET as isize) as *mut usize);
+
+        // // step 5
+        // take_step();
+        
         self.deallocate_from_heap(id, ptr, layout).expect("Couldn't deallocate");
+
+        // // step 6
+        // take_step();
     }
 }
 

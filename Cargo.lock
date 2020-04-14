@@ -223,6 +223,7 @@ dependencies = [
  "fs_node 0.1.0",
  "heapfile 0.1.0",
  "hpet 0.1.0",
+ "log 0.3.9 (registry+https://github.com/rust-lang/crates.io-index)",
  "path 0.1.0",
  "runqueue 0.1.0",
  "scheduler 0.1.0",
@@ -818,7 +819,9 @@ dependencies = [
 name = "heap"
 version = "0.1.0"
 dependencies = [
+ "apic 0.1.0",
  "block_allocator 0.1.0",
+ "heap_trace 0.1.0",
  "irq_safety 0.1.1 (git+https://github.com/kevinaboos/irq_safety)",
  "kernel_config 0.1.0",
  "linked_list_allocator 0.6.3 (registry+https://github.com/rust-lang/crates.io-index)",
@@ -833,9 +836,13 @@ dependencies = [
 name = "heap_trace"
 version = "0.1.0"
 dependencies = [
+ "apic 0.1.0",
+ "hpet 0.1.0",
  "log 0.3.9 (registry+https://github.com/rust-lang/crates.io-index)",
+ "pmu_x86 0.1.0",
  "raw-cpuid 7.0.3 (registry+https://github.com/rust-lang/crates.io-index)",
  "spin 0.4.10 (registry+https://github.com/rust-lang/crates.io-index)",
+ "x86_64 0.1.2",
 ]
 
 [[package]]
@@ -1361,6 +1368,7 @@ dependencies = [
  "block_allocator 0.1.0",
  "hashbrown 0.1.8 (registry+https://github.com/rust-lang/crates.io-index)",
  "heap 0.1.0",
+ "heap_trace 0.1.0",
  "irq_safety 0.1.1 (git+https://github.com/kevinaboos/irq_safety)",
  "kernel_config 0.1.0",
  "lazy_static 1.2.0 (registry+https://github.com/rust-lang/crates.io-index)",
@@ -2377,9 +2385,11 @@ dependencies = [
  "async_channel 0.1.0",
  "getopts 0.2.21 (git+https://github.com/kevinaboos/getopts)",
  "heap 0.1.0",
+ "heap_trace 0.1.0",
  "hpet 0.1.0",
  "libtest 0.1.0",
  "log 0.3.9 (registry+https://github.com/rust-lang/crates.io-index)",
+ "pmu_x86 0.1.0",
  "rendezvous 0.1.0",
  "scheduler 0.1.0",
  "spawn 0.1.0",
@@ -2394,7 +2404,6 @@ version = "0.1.0"
 dependencies = [
  "apic 0.1.0",
  "irq_safety 0.1.1 (git+https://github.com/kevinaboos/irq_safety)",
- "lazy_static 1.2.0 (registry+https://github.com/rust-lang/crates.io-index)",
  "log 0.3.9 (registry+https://github.com/rust-lang/crates.io-index)",
  "memory 0.1.0",
  "pause 0.1.0",

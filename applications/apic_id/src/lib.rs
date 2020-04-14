@@ -54,17 +54,26 @@ const OBJSIZE: usize = 1;
 
 pub fn main(args: Vec<String>) -> isize {
 
-    match rmain() {
-        Ok(_) => 0,
-        Err(e) => {
-            println!("Error: {}", e);
-            -1
-        }    
-    }    
+    let mut threads = Vec::new();
+
+    for i in 0..8 {
+        threads.push(spawn::new_task_builder(rmain, ()).spawn().unwrap());
+    }
+
+    // match rmain() {
+    //     Ok(_) => 0,
+    //     Err(e) => {
+    //         println!("Error: {}", e);
+    //         -1
+    //     }    
+    // }    
+    0
 }
 
-fn rmain() -> Result<(), &'static str> {
+fn rmain(_: ()) -> Result<(), &'static str> {
     let iterations = 10_000_000;
+
+    error!("apic_id {} {}, x2apic: {}",  get_my_apic_id().unwrap(), CpuId::new().get_feature_info().expect("Could not retrieve cpuid").initial_local_apic_id(), apic::has_x2apic());
 
     let start = get_hpet().as_ref().ok_or("couldn't get HPET timer")?.get_counter();
 

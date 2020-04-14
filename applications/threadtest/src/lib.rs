@@ -14,14 +14,15 @@ extern crate apic;
 extern crate hpet;
 #[macro_use] extern crate libtest;
 extern crate heap;
-
+extern crate heap_trace;
+extern crate pmu_x86;
 
 use alloc::{
     vec::Vec,
     string::String,
     boxed::Box,
 };
-use core::sync::atomic::{AtomicUsize, Ordering};
+use core::sync::atomic::{AtomicUsize, AtomicBool, Ordering};
 use getopts::{Matches, Options};
 use spin::Once;
 use apic::get_lapics;
@@ -30,7 +31,8 @@ use hpet::get_hpet;
 use libtest::hpet_2_ns;
 use heap::global_allocator;
 use alloc::alloc::{GlobalAlloc, Layout};
-
+use heap_trace::{start_heap_trace, stop_heap_trace, calclulate_time_per_step, NSTEPS};
+use pmu_x86::EventType;
 
 static VERBOSE: Once<bool> = Once::new();
 #[allow(unused)]
@@ -49,8 +51,13 @@ const NOBJECTS: usize = 30_000;
 const WORK: usize = 0;
 const OBJSIZE: usize = 1;
 
+static START_ITER: AtomicBool = AtomicBool::new(false);
+
 
 pub fn main(args: Vec<String>) -> isize {
+    let _ = pmu_x86::init();
+    println!("hello {}", libtest::cycle_count_overhead().unwrap());
+
     let mut opts = Options::new();
     opts.optflag("h", "help", "print this help menu");
     opts.optflag("v", "verbose", "enable verbose output");
@@ -92,11 +99,15 @@ fn rmain() -> Result<(), &'static str> {
 
     let mut threads = Vec::new();
 
-    let start = get_hpet().as_ref().ok_or("couldn't get HPET timer")?.get_counter();
 
     for i in 0..nthreads {
-        threads.push(spawn::new_task_builder(worker, ()).name(String::from("worker thread")).spawn()?);
+        threads.push(spawn::new_task_builder(worker, ()).name(String::from("worker thread")).pin_on_core(3).spawn()?);
     }  
+
+    let start = get_hpet().as_ref().ok_or("couldn't get HPET timer")?.get_counter();
+
+    START_ITER.store(true, Ordering::SeqCst);
+
 
     for i in 0..nthreads {
         threads[i].join()?;
@@ -136,7 +147,11 @@ fn worker(_:()) {
     unsafe { a.set_len(nobjects/nthreads); }
     let heap = global_allocator();
 
+    // let mut avg_times: [u64;NSTEPS] = [0; NSTEPS];
+
     for j in 0..niterations {
+        // start_heap_trace();
+        
         unsafe{
         for i in 0..(nobjects/nthreads) {
             let obj = heap.alloc(layout); 
@@ -148,7 +163,19 @@ fn worker(_:()) {
             heap.dealloc(obj, layout);
         }
         }
+        // stop_heap_trace();
+        // // heap_trace::print_heap_trace_from_index(7, 14);
+        // let times = calclulate_time_per_step();
+        // for i in 0..NSTEPS {
+        //     avg_times[i] += times[i];
+        // }
     }
+
+    // for time in &mut avg_times {
+    //     *time /= (niterations as u64);
+    // }
+
+    // error!("Time spend in each step: {:?}", avg_times);
 }
 
 

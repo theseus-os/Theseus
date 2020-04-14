@@ -11,10 +11,11 @@ extern crate alloc;
 extern crate linked_list_allocator;
 extern crate irq_safety; 
 extern crate spin;
-extern crate log;
+#[macro_use]extern crate log;
 extern crate memory;
 extern crate kernel_config;
 extern crate slabmalloc;
+extern crate heap_trace;
 
 use core::ptr::{self, NonNull};
 use alloc::alloc::{GlobalAlloc, Layout};
@@ -25,6 +26,7 @@ use core::ops::Add;
 use spin::Once;
 use slabmalloc::{ZoneAllocator, ObjectPage8k, AllocablePage};
 use core::ops::DerefMut;
+use heap_trace::take_step;
 
 #[global_allocator]
 static ALLOCATOR: Heap = Heap::empty();
@@ -108,39 +110,67 @@ impl Heap {
 unsafe impl GlobalAlloc for Heap {
 
     unsafe fn alloc(&self, layout: Layout) -> *mut u8 {
+        // //step 1
+        // take_step();
+
         // allocate a large object by directly obtaining mapped pages from the OS
         if layout.size() > ZoneAllocator::MAX_ALLOC_SIZE {
             return allocate_large_object(layout).ok().map_or(ptr::null_mut(), |ptr| ptr.as_ptr());
         }
 
-        match self.allocator_functions.try() {
+        // //step 2
+        // take_step();
+
+        let res = match self.allocator_functions.try() {
             // use the multiple heaps allocator
             Some(allocator) => {
+                // //step 3
+                // take_step();
                 (allocator.alloc)(layout)
             }
             // use the initial allocator
             None => {
+                // //step 3
+                // take_step();
                 self.initial_allocator.lock().allocate(layout).ok().map_or(ptr::null_mut(), |ptr| ptr.as_ptr()) 
             }
-        }
+        };
+
+        // //step 7 or 4 or 3
+        // take_step();
+
+        res
     }
 
     unsafe fn dealloc(&self, ptr: *mut u8, layout: Layout) {
+        // //step 1
+        // take_step();
+
         // deallocate a large object by directly returning mapped pages to the OS
         if layout.size() > ZoneAllocator::MAX_ALLOC_SIZE {
             return deallocate_large_object(ptr, layout);
         }
 
+        // //step 2
+        // take_step();
+
         match self.allocator_functions.try() {
             // use the multiple heaps allocator            
             Some(allocator) => {
+                // //step 3
+                // take_step();
                 (allocator.dealloc)(ptr, layout)
             }
             // use the initial allocator
             None => {
+                // //step 3
+                // take_step();
                 self.initial_allocator.lock().deallocate(NonNull::new_unchecked(ptr), layout).expect("Deallocation failed!");
             }
         }
+
+        // //step 7 or 4 or 3
+        // take_step();
     }
 
 }
@@ -162,7 +192,7 @@ fn allocate_large_object(layout: Layout) -> Result<NonNull<u8>, &'static str> {
             // This is safe since we ensure that the memory allocated includes space for the MappedPages object,
             // and since the corresponding deallocate function makes sure to retrieve the MappedPages object and drop it.
             unsafe{ (ptr.offset(layout.size() as isize) as *mut MappedPages).write(mapping); }
-            // trace!("Allocated a large object of {} bytes at address: {:#X}", layout.size(), ptr as usize);
+            // error!("Allocated a large object of {} bytes at address: {:#X}", layout.size(), ptr as usize);
 
             NonNull::new(ptr).ok_or("Could not create a non null ptr")
         }
@@ -185,5 +215,5 @@ fn deallocate_large_object(ptr: *mut u8, layout: Layout) {
     // by the corresponding allocate function, and the allocate function allocated extra memory for this object in addition to the layout size.
     unsafe { let _mp = core::ptr::read(ptr.offset(layout.size() as isize) as *const MappedPages); }
 
-    // trace!("Deallocated a large object of {} bytes at address: {:#X}", layout.size(), ptr as usize);
+    // error!("Deallocated a large object of {} bytes at address: {:#X}", layout.size(), ptr as usize);
 }

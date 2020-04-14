@@ -108,7 +108,7 @@ const FIXED_FUNC_0_RDPMC: u32 = 1 << 30;
 /// read from the fixed counter 1 to retrieve the clock cycles
 const FIXED_FUNC_1_RDPMC: u32 = (1 << 30) + 1;
 /// read from the fixed counter 2 to retrieve reference cycles
-const FIXED_FUNC_2_RDPMC: u32 = (1 << 30) + 2;
+pub const FIXED_FUNC_2_RDPMC: u32 = (1 << 30) + 2;
 
 /// Set bit 22 to enable the general PMC to start counting
 const PMC_ENABLE: u64 = 0x01 << 22;
@@ -218,11 +218,11 @@ fn more_pmcs_than_expected(num_pmc: u8) -> Result<bool, &'static str> {
 /// - Change the element type in the PMCS_AVAILABLE vector to be larger than AtomicU8 so that there is one bit per counter.
 /// - Update INIT_PMCS_AVAILABLE to the new maximum value for the per core bitmap.
 pub fn init() -> Result<(), &'static str> {
-    // pmu has already been initialized
-    if let Some(pmu_ver) = PMU_VERSION.try() {
-        trace!("PMU, version {}, has already been intitialized", pmu_ver);
-        return Ok(());
-    }
+    // // pmu has already been initialized
+    // if let Some(pmu_ver) = PMU_VERSION.try() {
+    //     trace!("PMU, version {}, has already been intitialized", pmu_ver);
+    //     return Ok(());
+    // }
 
     const MIN_PMU_VERSION: u8 = 1;
     let cpuid = CpuId::new();
@@ -741,7 +741,7 @@ pub fn print_samples(sample_results: &SampleResults) {
 pub fn find_function_names_from_samples(sample_results: &SampleResults) -> Result<(), &'static str> {
     let taskref = task::get_my_current_task() .ok_or("pmu_x86::get_function_names_from_samples: Could not get reference to current task")?;
     let namespace = taskref.get_namespace();
-    debug!("Analyze Samples:");
+    error!("Analyze Samples:");
 
     let mut sections: BTreeMap<String, usize> = BTreeMap::new();
     let total_samples = sample_results.instruction_pointers.len();
@@ -755,7 +755,7 @@ pub fn find_function_names_from_samples(sample_results: &SampleResults) -> Resul
 
     for (section, occurrences) in sections.iter() {
         let percentage = *occurrences as f32 / total_samples as f32 * 100.0;
-        debug!("{:?}  {}% \n", section, percentage);
+        error!("{:?}  {}% \n", section, percentage);
     }
 
     Ok(())

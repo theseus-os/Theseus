@@ -46,3 +46,7 @@ path = "../../kernel/fs_node"
 
 [dependencies.scheduler]
 path = "../../kernel/scheduler"
+
+[dependencies.log]
+default-features = false
+version = "0.3.7"
