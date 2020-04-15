@@ -13,7 +13,7 @@ spin = "0.4.10"
 path = "../../kernel/terminal_print"
 
 [dependencies.log]
-version = "0.3.7"
+version = "0.4.8"
 
 [dependencies.scheduler]
 path = "../../kernel/scheduler"

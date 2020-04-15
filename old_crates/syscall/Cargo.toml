@@ -12,7 +12,7 @@ x86_64 = { path = "../../libs/x86_64" } # currently using our local copy, forked
 
 
 [dependencies.log]
-version = "0.3.7"
+version = "0.4.8"
 
 [dependencies.util]
 path = "../../libs/util"

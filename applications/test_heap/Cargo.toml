@@ -12,7 +12,7 @@ qp-trie = "0.7.3"
 path = "../../kernel/terminal_print"
 
 [dependencies.log]
-version = "0.3.7"
+version = "0.4.8"
 
 [dependencies.hpet]
 path = "../../kernel/hpet"
