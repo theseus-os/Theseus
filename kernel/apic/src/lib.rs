@@ -89,17 +89,7 @@ pub fn core_count() -> usize {
 
 /// Returns the APIC ID of the currently executing processor core.
 pub fn get_my_apic_id() -> Option<u8> {
-    if has_x2apic() {
-        // make sure this local apic is enabled in x2apic mode, otherwise we'll get a General Protection fault
-        unsafe { wrmsr(IA32_APIC_BASE, rdmsr(IA32_APIC_BASE) | IA32_APIC_XAPIC_ENABLE | IA32_APIC_X2APIC_ENABLE); }
-        let x2_id = rdmsr(IA32_X2APIC_APICID) as u32;
-        Some(x2_id as u8)
-    } else {
-        APIC_REGS.try().map(|apic| {
-            let raw = apic.lapic_id.read();
-            (raw >> 24) as u8
-        })
-    }
+    Some(rdmsr(IA32_TSC_AUX) as u8)
 }
 
 
@@ -300,6 +290,8 @@ impl LocalApic {
     pub fn new(page_table: &mut PageTable, processor: u8, apic_id: u8, is_bsp: bool, nmi_lint: u8, nmi_flags: u16) 
         -> Result<LocalApic, &'static str>
     {
+        // This MSR is used to hold a CPU's ID (which is an OS-chosen value).
+        unsafe { wrmsr(IA32_TSC_AUX, apic_id as u64); }
 
 		let mut lapic = LocalApic {
             regs: None, // None by default (for x2apics). if xapic, it will be set to Some later

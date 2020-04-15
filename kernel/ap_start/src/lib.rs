@@ -64,11 +64,8 @@ pub fn kstart_ap(processor_id: u8, apic_id: u8,
         LocalApic::new(&mut kernel_mmi.page_table, processor_id, apic_id, false, nmi_lint, nmi_flags)
             .expect("kstart_ap(): failed to create LocalApic")
     };
-    tlb_shootdown::init();
-    if get_my_apic_id() != Some(apic_id) {
-        error!("FATAL ERROR: AP {} get_my_apic_id() returned {:?}! They must match!", apic_id, get_my_apic_id());
-    }
     get_lapics().insert(apic_id, RwLockIrqSafe::new(lapic));
+    tlb_shootdown::init();
 
 
     info!("Entering idle_task loop on AP {} ...", apic_id);
