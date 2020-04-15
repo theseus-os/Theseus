@@ -11,8 +11,7 @@ cfg-if = "0.1.6"
 libm = "0.2.1"
 
 [dependencies.log]
-default-features = false
-version = "0.3.7"
+version = "0.4.8"
 
 [dependencies.hpet]
 path = "../../kernel/hpet"
