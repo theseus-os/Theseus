@@ -6,7 +6,6 @@ authors = ["Kevin Boos <kevinaboos@gmail.com>"]
 build = "../../build.rs"
 
 [dependencies.log]
-default-features = false
 version = "0.3.7"
 
 [dependencies.scheduler]

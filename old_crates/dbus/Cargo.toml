@@ -10,7 +10,6 @@ spin = "0.4.10"
 
 
 [dependencies.log]
-default-features = false
 version = "0.3.7"
 
 [dependencies.util]

@@ -9,7 +9,6 @@ build = "../../build.rs"
 
 
 [dependencies.log]
-default-features = false
 version = "0.3.7"
 
 

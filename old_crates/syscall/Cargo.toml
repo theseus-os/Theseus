@@ -12,7 +12,6 @@ x86_64 = { path = "../../libs/x86_64" } # currently using our local copy, forked
 
 
 [dependencies.log]
-default-features = false
 version = "0.3.7"
 
 [dependencies.util]

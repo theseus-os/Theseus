@@ -12,7 +12,6 @@ qp-trie = "0.7.3"
 path = "../../kernel/terminal_print"
 
 [dependencies.log]
-default-features = false
 version = "0.3.7"
 
 [dependencies.hpet]

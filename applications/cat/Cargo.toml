@@ -10,8 +10,7 @@ core_io = "0.1"
 
 
 [dependencies.log]
-default-features = false
-version = "0.3.7"
+version = "0.4.8"
 
 
 [dependencies.app_io]

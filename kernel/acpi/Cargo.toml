@@ -11,8 +11,7 @@ volatile = "0.2.5"
 
 
 [dependencies.log]
-default-features = false
-version = "0.3.7"
+version = "0.4.8"
 
 [dependencies.lazy_static]
 features = ["spin_no_std", "nightly"]
