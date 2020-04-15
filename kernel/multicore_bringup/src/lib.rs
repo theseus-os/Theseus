@@ -116,7 +116,7 @@ pub fn handle_ap_cores(
     }
 
     let all_lapics = get_lapics();
-    let me = get_my_apic_id().ok_or("Couldn't get_my_apic_id")?;
+    let me = get_my_apic_id();
 
     // Copy the AP startup code (from the kernel's text section pages) into the AP_STARTUP physical address entry point.
     {
