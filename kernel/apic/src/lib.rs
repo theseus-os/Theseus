@@ -88,14 +88,14 @@ pub fn core_count() -> usize {
 
 
 /// Returns the APIC ID of the currently executing processor core.
-pub fn get_my_apic_id() -> Option<u8> {
-    Some(rdmsr(IA32_TSC_AUX) as u8)
+pub fn get_my_apic_id() -> u8 {
+    rdmsr(IA32_TSC_AUX) as u8
 }
 
 
 /// Returns a reference to the LocalApic for the currently executing processsor core.
 pub fn get_my_apic() -> Option<&'static RwLockIrqSafe<LocalApic>> {
-    get_my_apic_id().and_then(|id| LOCAL_APICS.get(&id))
+    LOCAL_APICS.get(&get_my_apic_id())
 }
 
 

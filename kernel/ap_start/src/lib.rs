@@ -17,7 +17,7 @@ use core::sync::atomic::{AtomicBool, Ordering};
 use irq_safety::{enable_interrupts, RwLockIrqSafe};
 use memory::{VirtualAddress, get_kernel_mmi_ref};
 use kernel_config::memory::KERNEL_STACK_SIZE_IN_PAGES;
-use apic::{LocalApic, get_lapics, get_my_apic_id};
+use apic::{LocalApic, get_lapics};
 use pause::spin_loop_hint;
 
 
