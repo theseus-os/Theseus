@@ -140,7 +140,7 @@ fn internal_setup_simd_personality(simd_ext: SimdExt) -> Result<(), &'static str
 	simd_namespace.disable_fuzzy_symbol_matching();
 
 
-	let this_core = apic::get_my_apic_id().ok_or("couldn't get my APIC id")?;
+	let this_core = apic::get_my_apic_id();
 	
 	type SimdTestFunc = fn(());
 	let section_ref1 = simd_namespace.get_symbol_starting_with("simd_test::test1::")

@@ -132,7 +132,7 @@ unsafe extern "C" fn syscall_handler() {
     
     let curr_id = ::task::get_my_current_task_id();
     trace!("syscall_handler: (AP {}) task id={:?}  rax={:#x} rdi={:#x} rsi={:#x} rdx={:#x} r10={:#x} r8={:#x} r9={:#x}",
-           get_my_apic_id().unwrap_or(0xFF), curr_id, rax, rdi, rsi, rdx, r10, r8, r9);
+           get_my_apic_id(), curr_id, rax, rdi, rsi, rdx, r10, r8, r9);
 
 
     // FYI, Rust's calling conventions is as follows:  RDI,  RSI,  RDX,  RCX,  R8,  R9,  R10,  others on stack

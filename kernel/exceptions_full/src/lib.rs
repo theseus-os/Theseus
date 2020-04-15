@@ -227,7 +227,7 @@ extern "x86-interrupt" fn nmi_handler(stack_frame: &mut ExceptionStackFrame) {
     {
         let pages_to_invalidate = tlb_shootdown::TLB_SHOOTDOWN_IPI_PAGES.read().clone();
         if let Some(pages) = pages_to_invalidate {
-            // trace!("nmi_handler (AP {})", apic::get_my_apic_id().unwrap_or(0xFF));
+            // trace!("nmi_handler (AP {})", apic::get_my_apic_id());
             tlb_shootdown::handle_tlb_shootdown_ipi(pages);
             expected_nmi = true;
         }
