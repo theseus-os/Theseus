@@ -252,19 +252,18 @@ impl<F, A, R> TaskBuilder<F, A, R>
             new_task.simd = self.simd;
         }
 
-        setup_context_trampoline(&mut new_task, task_wrapper::<F, A, R>);
+        setup_context_trampoline(&mut new_task, task_wrapper::<F, A, R>)?;
 
-        // set up the kthread stuff
-        let kthread_call = Box::new( KthreadCall::new(self.argument, self.func) );
-        // debug!("Creating kthread_call: {:?}", debugit!(kthread_call));
-
-        // currently we're using the very bottom of the kstack for kthread arguments
-        let arg_ptr = new_task.kstack.bottom().value();
-        let kthread_ptr: *mut KthreadCall<F, A, R> = Box::into_raw(kthread_call);  // consumes the kthread_call Box!
-        unsafe {
-            *(arg_ptr as *mut _) = kthread_ptr; // as *mut KthreadCall<A, R>; // as usize;
-            // debug!("checking kthread_call: arg_ptr={:#x} *arg_ptr={:#x} kthread_ptr={:#x} {:?}", arg_ptr as usize, *(arg_ptr as *const usize) as usize, kthread_ptr as usize, debugit!(*kthread_ptr));
+        // Currently we're using the very bottom of the kstack for kthread arguments. 
+        // This is probably stupid (it'd be best to put them directly where they need to go towards the top of the stack),
+        // but it simplifies type safety in the `task_wrapper` entry point and removes uncertainty from assumed calling conventions.
+        {
+            let kthread_call = Box::new( KthreadCall::new(self.argument, self.func) );
+            let kthread_ptr: *mut KthreadCall<F, A, R> = Box::into_raw(kthread_call);
+            let kthread_mut_ref = new_task.kstack.as_type_mut::<*mut KthreadCall<F, A, R>>(0)?;
+            *kthread_mut_ref = kthread_ptr;
         }
+
         // The new task is ready to be scheduled in, now that its stack trampoline has been set up.
         if self.blocked {
             new_task.runstate = RunState::Blocked;
@@ -338,28 +337,26 @@ impl<F, A, R> KthreadCall<F, A, R> {
 /// i.e., the entry point into the new task. 
 /// 
 /// So, this function allocates space for the saved context registers to be popped off when this task is first switched to.
-/// It also sets the given `new_task`'s saved_sp (its saved stack pointer, which holds the Context for task switching).
+/// It also sets the given `new_task`'s `saved_sp` (its saved stack pointer, which holds the Context for task switching).
 /// 
-fn setup_context_trampoline(new_task: &mut Task, entry_point_function: fn() -> !) {
+fn setup_context_trampoline(new_task: &mut Task, entry_point_function: fn() -> !) -> Result<(), &'static str> {
     
     /// A private macro that actually creates the Context and sets it up in the `new_task`.
     /// We use a macro here so we can pass in the proper `ContextType` at runtime, 
     /// which is useful for both the simd_personality config and regular/SSE configs.
     macro_rules! set_context {
         ($ContextType:ty) => (
-            let new_context_ptr = (new_task.kstack.top_usable().value() - mem::size_of::<$ContextType>()) as *mut $ContextType;
-            // TODO: FIXME: use the MappedPages approach to avoid this unsafe block here
-            unsafe {
-                *new_context_ptr = <($ContextType)>::new(entry_point_function as usize);
-                new_task.saved_sp = new_context_ptr as usize; 
-            }
+            // We write the new Context struct at the top of the stack, which is at the end of the stack's MappedPages. 
+            // We subtract "size of usize" (8) bytes to ensure the new Context struct doesn't spill over past the top of the stack.
+            let mp_offset = new_task.kstack.size_in_bytes() - mem::size_of::<usize>() - mem::size_of::<$ContextType>();
+            let new_context_destination: &mut $ContextType = new_task.kstack.as_type_mut(mp_offset)?;
+            *new_context_destination = <($ContextType)>::new(entry_point_function as usize);
+            new_task.saved_sp = new_context_destination as *const _ as usize; 
         );
     }
 
-
     // If `simd_personality` is enabled, all of the `context_switch*` implementation crates are simultaneously enabled,
     // in order to allow choosing one of them based on the configuration options of each Task (SIMD, regular, etc).
-    // If `simd_personality` is NOT enabled, then we use the context_switch routine that matches the actual build target. 
     #[cfg(simd_personality)] {
         match new_task.simd {
             SimdExt::AVX => {
@@ -377,10 +374,13 @@ fn setup_context_trampoline(new_task: &mut Task, entry_point_function: fn() -> !
         }
     }
 
+    // If `simd_personality` is NOT enabled, then we use the context_switch routine that matches the actual build target. 
     #[cfg(not(simd_personality))] {
         // The context_switch crate exposes the proper TARGET-specific `Context` type here.
         set_context!(context_switch::Context);
     }
+
+    Ok(())
 }
 
 
@@ -401,10 +401,9 @@ fn task_wrapper<F, A, R>() -> !
         // The pointer to the kthread_call struct (func and arg) was placed at the bottom of the stack when this task was spawned.
         let kthread_call_ptr: *mut KthreadCall<F, A, R> = {
             let t = curr_task_ref.lock();
-            unsafe {
-                // dereference it once to get the raw pointer (from the Box<KthreadCall>)
-                *(t.kstack.bottom().value() as *mut *mut KthreadCall<F, A, R>) as *mut KthreadCall<F, A, R>
-            }
+            let kthread_ptr_ref = t.kstack.as_type::<*const KthreadCall<F, A, R>>(0).unwrap();
+            let kthread_ptr_val = *kthread_ptr_ref;
+            kthread_ptr_val as *mut _
         };
 
         let kthread_call: KthreadCall<F, A, R> = {
