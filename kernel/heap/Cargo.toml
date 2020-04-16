@@ -34,8 +34,5 @@ path = "../kernel_config"
 [dependencies.slabmalloc]
 path = "../../libs/rust-slabmalloc"
 
-[dependencies.heap_trace]
-path = "../heap_trace"
-
 [dependencies.apic]
 path = "../apic"

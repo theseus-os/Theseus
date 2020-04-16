@@ -57,9 +57,8 @@ use memory::{VirtualAddress, MemoryManagementInfo, MappedPages};
 use kernel_config::memory::KERNEL_STACK_SIZE_IN_PAGES;
 use irq_safety::{MutexIrqSafe, enable_interrupts};
 use pause::spin_loop_hint;
-use core::sync::atomic::{AtomicU64, Ordering};
 
-pub static LOADING_TIME: AtomicU64 = AtomicU64::new(0); 
+
 
 #[cfg(mirror_log_to_vga)]
 /// the callback use in the logger crate for mirroring log functions to the terminal
@@ -122,11 +121,8 @@ pub fn init(
     info!("Finished handling and booting up all {} AP cores.", ap_count);
 
     // //initialize the per core heaps
-    // multiple_heaps::initialize_multiple_heaps()?;
     multiple_heaps::switch_to_multiple_heaps()?;
     info!("Initialized per-core heaps");
-
-    let val = tsc::tsc_ticks();
 
     // initialize window manager.
     let (key_producer, mouse_producer) = window_manager::init()?;
@@ -165,10 +161,6 @@ pub fn init(
 
     info!("captain::init(): initialization done! Enabling interrupts and entering Task 0's idle loop...");
     enable_interrupts();
-
-    let val = tsc::tsc_ticks().sub(&val).unwrap().to_ns().unwrap();
-    LOADING_TIME.store(val, Ordering::SeqCst);
-    info!("Time to load crates after heap initialization: {} ns", val);
     scheduler::schedule();
     // NOTE: DO NOT PUT ANY CODE BELOW THIS POINT, AS IT SHOULD NEVER RUN!
     // (unless there are no other tasks available to run on the BSP core, which never happens)

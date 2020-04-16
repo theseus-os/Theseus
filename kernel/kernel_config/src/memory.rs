@@ -82,7 +82,7 @@ pub const KERNEL_HEAP_INITIAL_SIZE_PAGES: usize = 4092; // ~16MiB
 /// the kernel heap gets the whole 509th P4 entry.
 pub const KERNEL_HEAP_MAX_SIZE: usize = ADDRESSABILITY_PER_P4_ENTRY;
 /// the maximum number of per-core heaps we can have
-pub const MAX_HEAPS: usize = 8;
+pub const MAX_HEAPS: usize = 128;
 /// The number of pages each per-core heap is initialized with.
 pub const PER_CORE_HEAP_INITIAL_SIZE_PAGES: usize = 264*8; // ~ 1MiB
 
