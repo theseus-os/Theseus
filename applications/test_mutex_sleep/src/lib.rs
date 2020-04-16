@@ -33,7 +33,7 @@ pub fn main(_args: Vec<String>) -> isize {
 
 /// A simple test that spawns 3 tasks that all contend to increment a shared usize
 fn test_contention() -> Result<(), &'static str> {
-    let my_cpu = apic::get_my_apic_id().ok_or("couldn't get my APIC ID")?;
+    let my_cpu = apic::get_my_apic_id();
 
     let shared_lock = Arc::new(MutexSleep::new(0usize));
 
@@ -89,7 +89,7 @@ fn mutex_sleep_task(lock: Arc<MutexSleep<usize>>) -> Result<(), &'static str> {
 
 /// A test for running multiple tasks that are synchronized in lockstep
 fn test_lockstep() -> Result<(), &'static str> {
-    let my_cpu = apic::get_my_apic_id().ok_or("couldn't get my APIC ID")?;
+    let my_cpu = apic::get_my_apic_id();
 
     let shared_lock = Arc::new(MutexSleep::new(0usize));
 

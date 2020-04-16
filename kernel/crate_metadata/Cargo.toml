@@ -8,13 +8,11 @@ build = "../../build.rs"
 
 [dependencies]
 spin = "0.4.10"
-qp-trie = "0.7.3"
 xmas-elf = { version = "0.6.2", git = "https://github.com/kevinaboos/xmas-elf.git" }
 
 
 [dependencies.log]
-default-features = false
-version = "0.3.7"
+version = "0.4.8"
 
 ### used for linker relocation typedefs
 [dependencies.goblin]

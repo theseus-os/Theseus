@@ -13,10 +13,9 @@ extern crate alloc;
 #[macro_use] extern crate log;
 #[macro_use] extern crate vga_buffer;
 extern crate memory;
-extern crate panic_wrapper;
-extern crate unwind;
 extern crate mod_mgmt;
-extern crate task;
+#[cfg(not(loadable))] extern crate panic_wrapper;
+#[cfg(not(loadable))] extern crate unwind;
 
 use core::panic::PanicInfo;
 
@@ -45,8 +44,7 @@ fn panic_entry_point(info: &PanicInfo) -> ! {
                 type PanicWrapperFunc = fn(&PanicInfo) -> Result<(), &'static str>;
                 const PANIC_WRAPPER_SYMBOL: &'static str = "panic_wrapper::panic_wrapper::";
                 let section = {
-                    task::get_my_current_task().map(|t| t.get_namespace()).as_ref()
-                        .or_else(|| mod_mgmt::get_initial_kernel_namespace())
+                    mod_mgmt::get_initial_kernel_namespace()
                         .and_then(|namespace| namespace.get_symbol_starting_with(PANIC_WRAPPER_SYMBOL).upgrade())
                         .ok_or("Couldn't get single symbol matching \"panic_wrapper::panic_wrapper::\"")?
                 };
@@ -113,8 +111,7 @@ extern "C" fn _Unwind_Resume(arg: usize) -> ! {
             type UnwindResumeFunc = fn(usize) -> !;
             const UNWIND_RESUME_SYMBOL: &'static str = "unwind::unwind_resume::";
             let section = {
-                task::get_my_current_task().map(|t| t.get_namespace()).as_ref()
-                    .or_else(|| mod_mgmt::get_initial_kernel_namespace())
+                mod_mgmt::get_initial_kernel_namespace()
                     .and_then(|namespace| namespace.get_symbol_starting_with(UNWIND_RESUME_SYMBOL).upgrade())
                     .ok_or("Couldn't get single symbol matching \"unwind::unwind_resume::\"")?
             };
@@ -138,5 +135,6 @@ extern "C" fn _Unwind_Resume(arg: usize) -> ! {
 #[alloc_error_handler]
 #[cfg(not(test))]
 fn oom(_layout: core::alloc::Layout) -> ! {
+    error!("\n(oom) Out of Heap Memory! requested allocation: {:?}", _layout);
     panic!("\n(oom) Out of Heap Memory! requested allocation: {:?}", _layout);
 }

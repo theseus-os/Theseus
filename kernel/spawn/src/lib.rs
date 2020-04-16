@@ -500,8 +500,7 @@ fn task_cleanup_final<F, A, R>(_held_interrupts: irq_safety::HeldInterrupts, cur
     // Remove the task from its runqueue
     #[cfg(not(runqueue_state_spill_evaluation))]  // the normal case
     {
-        if let Err(e) = apic::get_my_apic_id()
-            .and_then(|id| runqueue::get_runqueue(id))
+        if let Err(e) = runqueue::get_runqueue(apic::get_my_apic_id())
             .ok_or("couldn't get this core's ID or runqueue to remove exited task from it")
             .and_then(|rq| rq.write().remove_task(&current_task)) 
         {

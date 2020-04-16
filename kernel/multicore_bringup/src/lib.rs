@@ -32,7 +32,7 @@ use alloc::{
 use spin::Mutex;
 use volatile::Volatile;
 use irq_safety::MutexIrqSafe;
-use memory::{VirtualAddress, PhysicalAddress, MappedPages, Page, Frame, FrameRange, EntryFlags, MemoryManagementInfo, FRAME_ALLOCATOR, Stack};
+use memory::{VirtualAddress, PhysicalAddress, MappedPages, Page, Frame, FrameRange, EntryFlags, MemoryManagementInfo, get_frame_allocator_ref, Stack};
 use kernel_config::memory::{PAGE_SIZE, PAGE_SHIFT};
 use apic::{LocalApic, get_lapics, get_my_apic_id, has_x2apic, get_bsp_id};
 use ap_start::{kstart_ap, AP_READY_FLAG};
@@ -98,7 +98,7 @@ pub fn handle_ap_cores(
         let ap_startup_page   = Page::containing_address(VirtualAddress::new_canonical(AP_STARTUP));
         let ap_startup_frames = FrameRange::from_phys_addr(PhysicalAddress::new_canonical(AP_STARTUP), ap_startup_size_in_bytes);
 
-        let mut allocator = FRAME_ALLOCATOR.try().ok_or("Couldn't get FRAME ALLOCATOR")?.lock();
+        let mut allocator = get_frame_allocator_ref().ok_or("Couldn't get FRAME ALLOCATOR")?.lock();
         
         trampoline_mapped_pages = page_table.map_to(
             trampoline_page, 
@@ -116,7 +116,7 @@ pub fn handle_ap_cores(
     }
 
     let all_lapics = get_lapics();
-    let me = get_my_apic_id().ok_or("Couldn't get_my_apic_id")?;
+    let me = get_my_apic_id();
 
     // Copy the AP startup code (from the kernel's text section pages) into the AP_STARTUP physical address entry point.
     {

@@ -1,18 +1,34 @@
-use core::ptr::Unique;
-use kernel_config::memory::{PAGE_SIZE, ENTRIES_PER_PAGE_TABLE, TEMPORARY_PAGE_VIRT_ADDR};
-use super::super::{Page, BROADCAST_TLB_SHOOTDOWN_FUNC, VirtualMemoryArea, FrameAllocator, Frame, PhysicalAddress, VirtualAddress, EntryFlags};
-use super::table::{self, Table, Level4};
-use irq_safety::MutexIrqSafe;
-use alloc::vec::Vec;
+#![no_std]
+#![feature(ptr_internals)]
 
+#[macro_use] extern crate cfg_if;
+
+cfg_if! {
+if #[cfg(mapper_spillful)] {
+
+extern crate memory;
+#[macro_use] extern crate lazy_static;
+#[macro_use] extern crate log;
+extern crate irq_safety;
+extern crate kernel_config;
+#[cfg(target_arch = "x86_64")]
+extern crate memory_x86_64;
+extern crate memory_structs;
+extern crate rbtree;
+
+use core::ptr::Unique;
+use kernel_config::memory::{PAGE_SIZE, ENTRIES_PER_PAGE_TABLE};
+use memory::{Page, BROADCAST_TLB_SHOOTDOWN_FUNC, FrameAllocator, Frame, PhysicalAddress, VirtualAddress, EntryFlags};
+use memory::paging::table::{Table, Level4, P4};
+use irq_safety::MutexIrqSafe;
+use memory_structs::{PageRange};
+use memory_x86_64::tlb_flush_virt_addr;
+use rbtree::RBTree;
 
 lazy_static! {
     /// The global list of VirtualMemoryAreas 
-    static ref VMAS: MutexIrqSafe<Vec<VirtualMemoryArea>> = MutexIrqSafe::new(Vec::new());
+    static ref VMAS: MutexIrqSafe<RBTree<VirtualAddress, VirtualMemoryArea>> = MutexIrqSafe::new(RBTree::new());
 }
-
-const TEMPORARY_PAGE_FRAME: usize = TEMPORARY_PAGE_VIRT_ADDR & !(PAGE_SIZE - 1);
-
 
 
 pub struct MapperSpillful {
@@ -21,7 +37,7 @@ pub struct MapperSpillful {
 
 impl MapperSpillful {
     pub fn new() -> MapperSpillful {
-        MapperSpillful { p4: Unique::new(table::P4).unwrap() } // cannot panic, we know P4 is valid.
+        MapperSpillful { p4: Unique::new(P4).unwrap() } // cannot panic, we know P4 is valid.
     }
 
     pub fn p4(&self) -> &Table<Level4> {
@@ -34,12 +50,15 @@ impl MapperSpillful {
 
     /// translates a VirtualAddress to a PhysicalAddress
     pub fn translate(&self, virtual_address: VirtualAddress) -> Option<PhysicalAddress> {
-        let offset = virtual_address % PAGE_SIZE;
+        let offset = virtual_address.value() % PAGE_SIZE;
         // get the frame number of the page containing the given virtual address,
         // and then the corresponding physical address is that PFN*sizeof(Page) + offset
-        self.translate_page(Page::containing_address(virtual_address)).map(|frame| {
-            frame.number * PAGE_SIZE + offset
-        })
+        if let Some(frame) = self.translate_page(Page::containing_address(virtual_address)){
+            PhysicalAddress::new(frame.number * PAGE_SIZE + offset).ok()
+        }
+        else {
+            None
+        }
     }
 
     pub fn translate_page(&self, page: Page) -> Option<Frame> {
@@ -90,9 +109,9 @@ impl MapperSpillful {
 
         for page in PageRange::from_virt_addr(vaddr, size).clone() {
             let frame = allocator.allocate_frame().ok_or("MapperSpillful::map() -- out of memory trying to alloc frame")?;
-            let mut p3 = self.p4_mut().next_table_create(page.p4_index(), top_level_flags, allocator);
-            let mut p2 = p3.next_table_create(page.p3_index(), top_level_flags, allocator);
-            let mut p1 = p2.next_table_create(page.p2_index(), top_level_flags, allocator);
+            let p3 = self.p4_mut().next_table_create(page.p4_index(), top_level_flags, allocator);
+            let p2 = p3.next_table_create(page.p3_index(), top_level_flags, allocator);
+            let p1 = p2.next_table_create(page.p2_index(), top_level_flags, allocator);
 
             if !p1[page.p1_index()].is_unused() {
                 error!("MapperSpillful::map() page {:#x} -> frame {:#X}, page was already in use!", page.start_address(), frame.start_address());
@@ -101,40 +120,28 @@ impl MapperSpillful {
             p1[page.p1_index()].set(frame, flags | EntryFlags::PRESENT);
         }
 
-        VMAS.lock().push(VirtualMemoryArea::new(vaddr, size, flags, ""));
+        VMAS.lock().insert(vaddr, VirtualMemoryArea::new(vaddr, size, flags, ""));
         Ok(())
     }
 
-
     pub fn remap(&mut self, vaddr: VirtualAddress, new_flags: EntryFlags) -> Result<(), &'static str> {
-        let mut vmas = VMAS.lock();
+        let vmas = VMAS.lock();
 
-        let mut vma: Option<&mut VirtualMemoryArea> = None;
-        for v in vmas.iter_mut() {
-            let start_addr = v.start_address();
-            let size = v.size();
-            if vaddr >= start_addr && vaddr <= (start_addr + size) {
-                vma = Some(v);
-            }
+        let vma  = vmas.find_node_between(&vaddr).ok_or("couldn't find corresponding VMA")?;
+        let start_addr = vma.start_address();
+        let size = vma.size();    
+        if !(vaddr >= start_addr && vaddr <= (start_addr + size)) {
+            return Err("couldn't find corresponding VMA");
         }
-        let vma = vma.ok_or("couldn't find corresponding VMA")?;
 
-
-        if new_flags == vma.flags {
+        if new_flags == vma.flags() {
             trace!("remap(): new_flags were the same as existing flags, doing nothing.");
             return Ok(());
         }
 
         let pages = PageRange::from_virt_addr(vma.start_address(), vma.size());
 
-        let broadcast_tlb_shootdown = BROADCAST_TLB_SHOOTDOWN_FUNC.try();
-        let mut vaddrs: Vec<VirtualAddress> = if broadcast_tlb_shootdown.is_some() {
-            Vec::with_capacity(pages.size_in_pages())
-        } else {
-            Vec::new() // avoids allocation if we're not going to use it
-        };
-
-        for page in pages {
+        for page in pages.clone() {
             let p1 = self.p4_mut()
                 .next_table_mut(page.p4_index())
                 .and_then(|p3| p3.next_table_mut(page.p3_index()))
@@ -144,57 +151,32 @@ impl MapperSpillful {
             let frame = p1[page.p1_index()].pointed_frame().ok_or("remap(): page not mapped")?;
             p1[page.p1_index()].set(frame, new_flags | EntryFlags::PRESENT);
 
-            let vaddr = page.start_address();
-            tlb_flush_virt_addr(vaddr);
-            if broadcast_tlb_shootdown.is_some() && vaddr != TEMPORARY_PAGE_FRAME {
-                vaddrs.push(vaddr);
-            }
+            tlb_flush_virt_addr(page.start_address());
         }
         
-        if let Some(func) = broadcast_tlb_shootdown {
-            func(vaddrs);
+        if let Some(func) = BROADCAST_TLB_SHOOTDOWN_FUNC.try() {
+            func(pages);
         }
 
-        vma.flags = new_flags;
+        vma.set_flags(new_flags);
         Ok(())
     }
-
 
     /// Remove the virtual memory mapping for the given virtual address.
     pub fn unmap<A>(&mut self, vaddr: VirtualAddress, _allocator: &mut A) -> Result<(), &'static str>
         where A: FrameAllocator
     {
-        
         let mut vmas = VMAS.lock();
-        let (pages, vma_index) = {
-            let mut vma_index: Option<usize> = None;
-            let mut vma: Option<&VirtualMemoryArea> = None;
+        let vma  = vmas.find_node_between(&vaddr).ok_or("couldn't find corresponding VMA")?;
+        let start_addr = vma.start_address();
+        let size = vma.size();
+        if !(vaddr >= start_addr && vaddr <= (start_addr + size)) {
+            return Err("couldn't find corresponding VMA");
+        }
 
-            for (i, v) in vmas.iter().enumerate() {
-                let start_addr = v.start_address();
-                let size = v.size();
-                if vaddr >= start_addr && vaddr <= (start_addr + size) {
-                    vma = Some(v);
-                    vma_index = Some(i);
-                }
-            }
-            let vma = vma.ok_or("couldn't find corresponding VMA")?;
-            
-            (
-                PageRange::from_virt_addr(vma.start_address(), vma.size()),
-                vma_index.ok_or("couldn't find corresponding VMA")?
-            )
-        };
+        let pages = PageRange::from_virt_addr(vma.start_address(), vma.size());
 
-
-        let broadcast_tlb_shootdown = BROADCAST_TLB_SHOOTDOWN_FUNC.try();
-        let mut vaddrs: Vec<VirtualAddress> = if broadcast_tlb_shootdown.is_some() {
-            Vec::with_capacity(pages.size_in_pages())
-        } else {
-            Vec::new() // avoids allocation if we're not going to use it
-        };
-
-        for page in pages {
+        for page in pages.clone() {
             let p1 = self.p4_mut()
                 .next_table_mut(page.p4_index())
                 .and_then(|p3| p3.next_table_mut(page.p3_index()))
@@ -204,18 +186,84 @@ impl MapperSpillful {
             let _frame = p1[page.p1_index()].pointed_frame().ok_or("unmap(): page not mapped")?;
             p1[page.p1_index()].set_unused();
 
-            let vaddr = page.start_address();
-            tlb_flush_virt_addr(vaddr);
-            if broadcast_tlb_shootdown.is_some() && vaddr != TEMPORARY_PAGE_FRAME {
-                vaddrs.push(vaddr);
-            }
+            tlb_flush_virt_addr(page.start_address());
         }
         
-        if let Some(func) = broadcast_tlb_shootdown {
-            func(vaddrs);
+        if let Some(func) = BROADCAST_TLB_SHOOTDOWN_FUNC.try() {
+            func(pages);
         }
 
-        vmas.remove(vma_index);
+        vmas.remove(&start_addr).ok_or("Could not find VMA in VMA Tree")?;
+
         Ok(())
     }
+}
+
+
+
+/// A region of virtual memory that is mapped into a [`Task`](../task/struct.Task.html)'s address space
+#[derive(Debug, Default, Clone, PartialEq)]
+pub struct VirtualMemoryArea {
+    start: VirtualAddress,
+    size: usize,
+    flags: EntryFlags,
+    desc: &'static str,
+}
+use core::fmt;
+impl fmt::Display for VirtualMemoryArea {
+    fn fmt(&self, f: &mut fmt::Formatter) -> fmt::Result {
+        write!(
+            f,
+            "start: {:#X}, size: {:#X}, flags: {:#X}, desc: {}",
+            self.start, self.size, self.flags, self.desc
+        )
+    }
+}
+
+
+impl VirtualMemoryArea {
+    pub fn new(start: VirtualAddress, size: usize, flags: EntryFlags, desc: &'static str) -> Self {
+        VirtualMemoryArea {
+            start: start,
+            size: size,
+            flags: flags,
+            desc: desc,
+        }
+    }
+
+    pub fn start_address(&self) -> VirtualAddress {
+        self.start
+    }
+
+    pub fn size(&self) -> usize {
+        self.size
+    }
+
+    pub fn flags(&self) -> EntryFlags {
+        self.flags
+    }
+
+    pub fn desc(&self) -> &'static str {
+        self.desc
+    }
+
+    /// Get an iterator that covers all the pages in this VirtualMemoryArea
+    pub fn pages(&self) -> PageRange {
+        // check that the end_page won't be invalid
+        if (self.start.value() + self.size) < 1 {
+            return PageRange::empty();
+        }
+
+        let start_page = Page::containing_address(self.start);
+        let end_page = Page::containing_address(self.start + self.size - 1);
+        PageRange::new(start_page, end_page)
+    }
+
+    pub fn set_flags(&mut self, flags: EntryFlags) {
+        self.flags = flags;
+    }
+}
+
+
+}
 }

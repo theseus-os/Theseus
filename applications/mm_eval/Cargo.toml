@@ -8,10 +8,10 @@ build = "../../build.rs"
 [dependencies]
 getopts = "0.2.21"
 cfg-if = "0.1.6"
+libm = "0.2.1"
 
 [dependencies.log]
-default-features = false
-version = "0.3.7"
+version = "0.4.8"
 
 [dependencies.hpet]
 path = "../../kernel/hpet"
@@ -25,5 +25,23 @@ path = "../../kernel/kernel_config"
 [dependencies.memory]
 path = "../../kernel/memory"
 
+[dependencies.memory_structs]
+path = "../../kernel/memory_structs"
+
 [dependencies.terminal_print]
 path = "../../kernel/terminal_print"
+
+[dependencies.apic]
+path = "../../kernel/apic"
+
+[dependencies.runqueue]
+path = "../../kernel/runqueue"
+
+[dependencies.libtest]
+path = "../../kernel/libtest"
+
+[dependencies.pmu_x86]
+path = "../../kernel/pmu_x86"
+
+[dependencies.mapper_spillful]
+path = "../../kernel/mapper_spillful"

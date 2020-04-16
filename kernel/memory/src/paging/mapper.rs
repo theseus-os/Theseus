@@ -8,14 +8,15 @@
 // except according to those terms.
 
 use core::mem;
-use core::ops::DerefMut;
+use core::ops::Deref;
 use core::ptr::Unique;
 use core::slice;
-use {BROADCAST_TLB_SHOOTDOWN_FUNC, VirtualAddress, PhysicalAddress, FRAME_ALLOCATOR, FrameRange, Page, Frame, FrameAllocator, AllocatedPages}; 
+use {BROADCAST_TLB_SHOOTDOWN_FUNC, VirtualAddress, PhysicalAddress, get_frame_allocator_ref, FrameRange, Page, Frame, FrameAllocator, AllocatedPages}; 
 use paging::{PageRange, get_current_p4};
 use paging::table::{P4, Table, Level4};
-use kernel_config::memory::{ENTRIES_PER_PAGE_TABLE, PAGE_SIZE, TEMPORARY_PAGE_VIRT_ADDR};
+use kernel_config::memory::{ENTRIES_PER_PAGE_TABLE, PAGE_SIZE};
 use alloc::vec::Vec;
+use irq_safety::MutexIrqSafe;
 use super::{EntryFlags, tlb_flush_virt_addr};
 
 pub struct Mapper {
@@ -150,8 +151,7 @@ impl Mapper {
 
         Ok(MappedPages {
             page_table_p4: self.target_p4.clone(),
-            pages: pages,
-            allocated: None,
+            pages: MaybeAllocatedPages::NotAllocated(pages),
             flags: flags,
         })
     }
@@ -191,8 +191,7 @@ impl Mapper {
 
         Ok(MappedPages {
             page_table_p4: self.target_p4.clone(),
-            pages: pages,
-            allocated: None,
+            pages: MaybeAllocatedPages::NotAllocated(pages),
             flags: flags,
         })
     }
@@ -239,11 +238,10 @@ impl Mapper {
         -> Result<MappedPages, &'static str>
         where A: FrameAllocator
     {
-        let mut ret = self.internal_map_to(allocated_pages.pages.clone(), frames, flags, allocator);
-        if let Ok(ref mut r) = ret {
-            r.allocated = Some(allocated_pages);
-        }
-        ret
+        self.internal_map_to(allocated_pages.pages.clone(), frames, flags, allocator).map(|mut mp| {
+            mp.pages = MaybeAllocatedPages::Allocated(allocated_pages);
+            mp
+        })
     }
 
 
@@ -253,11 +251,10 @@ impl Mapper {
         -> Result<MappedPages, &'static str>
         where A: FrameAllocator
     {
-        let mut ret = self.internal_map(allocated_pages.pages.clone(), flags, allocator);
-        if let Ok(ref mut r) = ret {
-            r.allocated = Some(allocated_pages);
-        }
-        ret    
+        self.internal_map(allocated_pages.pages.clone(), flags, allocator).map(|mut mp| {
+            mp.pages = MaybeAllocatedPages::Allocated(allocated_pages);
+            mp
+        })
     }
 }
 
@@ -266,8 +263,39 @@ impl Mapper {
 struct PageContent([u8; PAGE_SIZE]);
 
 
-// optional performance optimization: temporary pages are not shared across cores, so skip those
-const TEMPORARY_PAGE_FRAME: usize = TEMPORARY_PAGE_VIRT_ADDR & !(PAGE_SIZE - 1);
+/// An instance of `MappedPages` may be created from virtual pages
+/// that were either obtained from the virtual page allocator
+/// or that were manually created from a predetermined virtual address and passed in. 
+/// 
+/// The latter option is only used for early initialization procedures 
+/// before the virtual page allocator is available,
+/// and should eventually be phased out when the virtual page allocator 
+/// supports the ability to specify which pages we want to be allocated.
+#[derive(Debug)]
+enum MaybeAllocatedPages {
+    /// The page range was obtained from the virtual page allocator.
+    Allocated(AllocatedPages),
+    /// The page range was manually created independently from the virtual page allocator. 
+    /// The pages will not be deallocated once the owner (a `MappedPages` instnace) of this object is dropped. 
+    NotAllocated(PageRange),
+}
+impl MaybeAllocatedPages {
+    fn is_allocated(&self) -> bool {
+        match self {
+            Self::Allocated(_) => true,
+            Self::NotAllocated(_) => false,
+        }
+    }
+}
+impl Deref for MaybeAllocatedPages {
+    type Target = PageRange;
+    fn deref(&self) -> &PageRange {
+        match self {
+            Self::Allocated(ap) => ap.deref(),
+            Self::NotAllocated(pr) => pr,
+        }
+    }
+}
 
 
 /// Represents a contiguous range of virtual memory pages that are currently mapped. 
@@ -284,16 +312,16 @@ const TEMPORARY_PAGE_FRAME: usize = TEMPORARY_PAGE_VIRT_ADDR & !(PAGE_SIZE - 1);
 pub struct MappedPages {
     /// The Frame containing the top-level P4 page table that this MappedPages was originally mapped into. 
     page_table_p4: Frame,
-    /// The actual range of pages contained by this mapping
-    pages: PageRange,
-    /// The AllocatedPages that were covered by this mapping. 
-    /// If Some, it means the pages were allocated by the virtual_address_allocator
-    /// and should be deallocated. 
-    /// If None, then it was pre-reserved without allocation and doesn't need to be "freed",
-    /// but rather just unmapped.
-    allocated: Option<AllocatedPages>,
+    /// The range of virtual pages contained by this mapping.
+    pages: MaybeAllocatedPages,
     // The EntryFlags that define the page permissions of this mapping
     flags: EntryFlags,
+}
+impl Deref for MappedPages {
+    type Target = PageRange;
+    fn deref(&self) -> &PageRange {
+        self.pages.deref()
+    }
 }
 
 impl MappedPages {
@@ -302,67 +330,15 @@ impl MappedPages {
     pub fn empty() -> MappedPages {
         MappedPages {
             page_table_p4: get_current_p4(),
-            pages: PageRange::empty(),
-            allocated: None,
+            pages: MaybeAllocatedPages::NotAllocated(PageRange::empty()),
             flags: Default::default(),
         }
-    }
-
-	/// Returns the `VirtualAddress` at the start of the first `Page` in this `MappedPages`.
-	pub fn start_address(&self) -> VirtualAddress {
-		self.pages.start_address()
-	}
-
-    /// Returns the size of this mapping in number of [`Page`]s.
-    pub fn size_in_pages(&self) -> usize {
-        self.pages.size_in_pages()
-    }
-
-    /// Returns the size of this mapping in number of bytes.
-    pub fn size_in_bytes(&self) -> usize {
-        self.pages.size_in_pages() * PAGE_SIZE
     }
 
     /// Returns the flags that describe this `MappedPages` page table permissions.
     pub fn flags(&self) -> EntryFlags {
         self.flags
     }
-
-    /// Returns the offset of a given virtual address into this mapping, 
-    /// if contained within this mapping. 
-    /// If not, returns None. 
-    ///  
-    /// # Examples
-    /// If a `MappedPages` covered addresses `0x2000` to `0x4000`, then calling
-    /// `mapped_pages.offset_of_address(0x3500)` would return `Some(0x1500)`.
-    pub fn offset_of_address(&self, vaddr: VirtualAddress) -> Option<usize> {
-        let start = self.pages.start_address();
-        if (vaddr >= start) && (vaddr <= start + self.size_in_bytes()) {
-            Some(vaddr.value() - start.value())
-        }
-        else {
-            None
-        }
-    }
-
-    /// Returns the VirtualAddress of the given offset into this mapping, 
-    /// if contained within this mapping. 
-    /// If not, returns None. 
-    ///  
-    /// # Examples
-    /// If a `MappedPages` covered addresses `0x2000` to `0x4000`, then calling
-    /// `mapped_pages.address_at_offset(0x1500)` would return `Some(0x3500)`.
-    pub fn address_at_offset(&self, offset: usize) -> Option<VirtualAddress> {
-        let start = self.pages.start_address();
-        if offset <= self.size_in_bytes() {
-            Some(start + offset)
-        }
-        else {
-            None
-        }
-    }
-
-
 
     /// Constructs a MappedPages object from an already existing mapping.
     /// Useful for creating idle task Stacks, for example. 
@@ -371,8 +347,7 @@ impl MappedPages {
     pub fn from_existing(already_mapped_pages: PageRange, flags: EntryFlags) -> MappedPages {
         MappedPages {
             page_table_p4: get_current_p4(),
-            pages: already_mapped_pages,
-            allocated: None,
+            pages: MaybeAllocatedPages::NotAllocated(already_mapped_pages),
             flags: flags,
         }
     }
@@ -407,14 +382,14 @@ impl MappedPages {
         };
 
         let first_mapping = mappings.get(0).map(|first| {
-            (first.page_table_p4.clone(), first.flags, first.allocated.is_some(), first.pages.clone())
-        });        
-        let (p4, flags, has_allocated, first_pages) = match first_mapping {
+            (first.page_table_p4.clone(), first.flags, first.pages.is_allocated(), first.pages.deref().clone())
+        });
+        let (p4, flags, has_allocated, first_page_range) = match first_mapping {
             Some(fm) => fm,
             _ => return Err(("BUG: couldn't get the first MappedPages element", mappings)),
         };
 
-        let mut previous_end: Page = first_pages.end().clone(); // start at the end of the first mapping
+        let mut previous_end: Page = *first_page_range.end(); // start at the end of the first mapping
 
         // first, we need to double check that everything is contiguous and the flags and p4 Frame are the same.
         let mut err: Option<&'static str> = None;
@@ -431,18 +406,18 @@ impl MappedPages {
                 err = Some("mappings were mapped with different flags");
                 break;
             }
-            if mp.pages.start().clone() != previous_end + 1 {
+            if *mp.pages.start() != previous_end + 1 {
                 error!("MappedPages::merge(): mappings weren't contiguous in virtual memory: one ends at {:?} and the next starts at {:?}",
                     previous_end, mp.pages.start());
                 err = Some("mappings were not contiguous in virtual memory");
                 break;
             } 
-            if has_allocated != mp.allocated.is_some() {
+            if has_allocated != mp.pages.is_allocated() {
                 error!("MappedPages::merge(): some mapping were mapped to AllocatedPages, while others were not.");
                 err = Some("some mappings were mapped to AllocatedPages, while others were not");
                 break;
             }
-            previous_end = mp.pages.end().clone();
+            previous_end = *mp.pages.end();
         }
         if let Some(e) = err {
             return Err((e, mappings));
@@ -454,24 +429,22 @@ impl MappedPages {
             // to ensure the existing mappings don't run their drop handler and unmap those pages
             mem::forget(mp); 
         }
-        let new_page_range = PageRange::new(first_pages.start().clone(), previous_end);
-        let new_alloc_pages = if has_allocated {
-            Some(AllocatedPages{
-                pages: new_page_range.clone()
+        let new_page_range = PageRange::new(*first_page_range.start(), previous_end);
+        let new_pages = if has_allocated {
+            MaybeAllocatedPages::Allocated(AllocatedPages{
+                pages: new_page_range,
             })
         } else {
-            None
+            MaybeAllocatedPages::NotAllocated(new_page_range)
         };
         
         Ok(MappedPages {
             page_table_p4: p4,
-            pages: new_page_range,
-            allocated: new_alloc_pages,
+            pages: new_pages,
             flags: flags,
         })
     }
 
-    
 
     /// Creates a deep copy of this `MappedPages` memory region,
     /// by duplicating not only the virtual memory mapping
@@ -524,13 +497,6 @@ impl MappedPages {
             return Ok(());
         }
 
-        let broadcast_tlb_shootdown = BROADCAST_TLB_SHOOTDOWN_FUNC.try();
-        let mut vaddrs: Vec<VirtualAddress> = if broadcast_tlb_shootdown.is_some() {
-            Vec::with_capacity(self.size_in_pages())
-        } else {
-            Vec::new() // avoids allocation if we're not going to use it
-        };
-
         for page in self.pages.clone() {
             let p1 = active_table_mapper.p4_mut()
                 .next_table_mut(page.p4_index())
@@ -541,15 +507,11 @@ impl MappedPages {
             let frame = p1[page.p1_index()].pointed_frame().ok_or("remap(): page not mapped")?;
             p1[page.p1_index()].set(frame, new_flags | EntryFlags::PRESENT);
 
-            let vaddr = page.start_address();
-            tlb_flush_virt_addr(vaddr);
-            if broadcast_tlb_shootdown.is_some() && vaddr.value() != TEMPORARY_PAGE_FRAME {
-                vaddrs.push(vaddr);
-            }
+            tlb_flush_virt_addr(page.start_address());
         }
         
-        if let Some(func) = broadcast_tlb_shootdown {
-            func(vaddrs);
+        if let Some(func) = BROADCAST_TLB_SHOOTDOWN_FUNC.try() {
+            func(self.pages.deref().clone());
         }
 
         self.flags = new_flags;
@@ -559,17 +521,10 @@ impl MappedPages {
 
     /// Remove the virtual memory mapping for the given `Page`s.
     /// This should NOT be public because it should only be invoked when a `MappedPages` object is dropped.
-    fn unmap<A>(&mut self, active_table_mapper: &mut Mapper, _allocator: &mut A) -> Result<(), &'static str> 
+    fn unmap<A>(&mut self, active_table_mapper: &mut Mapper, _allocator_ref: &MutexIrqSafe<A>) -> Result<(), &'static str> 
         where A: FrameAllocator
     {
         if self.size_in_pages() == 0 { return Ok(()); }
-
-        let broadcast_tlb_shootdown = BROADCAST_TLB_SHOOTDOWN_FUNC.try();
-        let mut vaddrs: Vec<VirtualAddress> = if broadcast_tlb_shootdown.is_some() {
-            Vec::with_capacity(self.size_in_pages())
-        } else {
-            Vec::new() // avoids allocation if we're not going to use it
-        };
 
         for page in self.pages.clone() {            
             let p1 = active_table_mapper.p4_mut()
@@ -581,18 +536,14 @@ impl MappedPages {
             let _frame = p1[page.p1_index()].pointed_frame().ok_or("unmap(): page not mapped")?;
             p1[page.p1_index()].set_unused();
 
-            let vaddr = page.start_address();
             tlb_flush_virt_addr(page.start_address());
-            if broadcast_tlb_shootdown.is_some() && vaddr.value() != TEMPORARY_PAGE_FRAME {
-                vaddrs.push(vaddr);
-            }
             
             // TODO free p(1,2,3) table if empty
-            // allocator.deallocate_frame(frame);
+            // _allocator_ref.lock().deallocate_frame(frame);
         }
 
-        if let Some(func) = broadcast_tlb_shootdown {
-            func(vaddrs);
+        if let Some(func) = BROADCAST_TLB_SHOOTDOWN_FUNC.try() {
+            func(self.pages.deref().clone());
         }
 
         Ok(())
@@ -838,24 +789,17 @@ impl MappedPages {
 pub fn mapped_pages_unmap<A: FrameAllocator>(
     mapped_pages: &mut MappedPages,
     mapper: &mut Mapper,
-    allocator: &mut A, 
+    allocator_ref: &super::FrameAllocatorRef<A>, 
 ) -> Result<(), &'static str> {
-    mapped_pages.unmap(mapper, allocator)
+    mapped_pages.unmap(mapper, allocator_ref)
 }
 
 
 impl Drop for MappedPages {
     fn drop(&mut self) {
         if self.size_in_pages() == 0 { return; }
-        
-        // skip logging temp page unmapping, since it's the most common
-        // if self.pages.start != Page::containing_address(TEMPORARY_PAGE_VIRT_ADDR) {
-        //     trace!("MappedPages::drop(): unmapping MappedPages start: {:?} to end: {:?}", self.pages.start, self.pages.end);
-        // }
+        // trace!("MappedPages::drop(): unmapping MappedPages start: {:?} to end: {:?}", self.pages.start(), self.pages.end());
 
-        // TODO FIXME: could add "is_kernel" field to MappedPages struct to check whether this is a kernel mapping.
-        // TODO FIXME: if it was a kernel mapping, then we don't need to do this P4 value check (it could be unmapped on any page table)
-        
         let mut mapper = Mapper::from_current();
         if mapper.target_p4 != self.page_table_p4 {
             error!("BUG: MappedPages::drop(): {:?}\n    current P4 {:?} must equal original P4 {:?}, \
@@ -865,15 +809,15 @@ impl Drop for MappedPages {
             return;
         }   
 
-        let mut frame_allocator = match FRAME_ALLOCATOR.try() {
-            Some(fa) => fa.lock(),
+        let frame_allocator_ref = match get_frame_allocator_ref() {
+            Some(fa) => fa,
             _ => {
-                error!("MappedPages::drop(): couldn't get FRAME_ALLOCATOR!");
+                error!("MappedPages::drop(): couldn't get frame allocator!");
                 return;
             }
         };
         
-        if let Err(e) = self.unmap(&mut mapper, frame_allocator.deref_mut()) {
+        if let Err(e) = self.unmap(&mut mapper, &frame_allocator_ref) {
             error!("MappedPages::drop(): failed to unmap, error: {:?}", e);
         }
 

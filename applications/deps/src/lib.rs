@@ -5,6 +5,7 @@
 #![no_std]
 #![feature(slice_concat_ext)]
 
+#[macro_use] extern crate log;
 #[macro_use] extern crate alloc;
 #[macro_use] extern crate terminal_print;
 extern crate itertools;
@@ -18,6 +19,7 @@ extern crate spin;
 
 
 use alloc::{
+    collections::BTreeSet,
     string::{String},
     vec::Vec,
     sync::Arc,
@@ -32,6 +34,19 @@ use mod_mgmt::{
 use crate_name_utils::get_containing_crate_name;
 
 
+/// calls println!() and then log!()
+macro_rules! println_log {
+    ($fmt:expr) => {
+        debug!($fmt);
+        print!(concat!($fmt, "\n"));
+    };
+    ($fmt:expr, $($arg:tt)*) => {
+        debug!($fmt, $($arg)*);
+        print!(concat!($fmt, "\n"), $($arg)*);
+    };
+}
+
+
 static VERBOSE: Once<bool> = Once::new();
 macro_rules! verbose {
     () => (VERBOSE.try() == Some(&true));
@@ -40,12 +55,17 @@ macro_rules! verbose {
 
 pub fn main(args: Vec<String>) -> isize {
     let mut opts = Options::new();
-    opts.optflag("h", "help", "print this help menu");
-    opts.optflag("v", "verbose", "enable verbose output");
-    opts.optopt ("s", "sections-in",  "output the sections that depend on the given SECTION (incoming weak dependents)",      "SECTION");
-    opts.optopt ("S", "sections-out", "output the sections that the given SECTION depends on (outgoing strong dependencies)", "SECTION");
-    opts.optopt ("c", "crates-in",    "output the crates that depend on the given CRATE (incoming weak dependents)",          "CRATE");
-    opts.optopt ("C", "crates-out",   "output the crates that the given CRATE depends on (outgoing strong dependencies)",     "CRATE");
+    opts.optflag("h", "help",             "print this help menu");
+    opts.optflag("v", "verbose",          "enable verbose output");
+    opts.optopt ("s", "sections-in",      "output the sections that depend on the given SECTION (incoming weak dependents)",      "SECTION");
+    opts.optopt ("S", "sections-out",     "output the sections that the given SECTION depends on (outgoing strong dependencies)", "SECTION");
+    opts.optopt ("c", "crates-in",        "output the crates that depend on the given CRATE (incoming weak dependents)",          "CRATE");
+    opts.optopt ("C", "crates-out",       "output the crates that the given CRATE depends on (outgoing strong dependencies)",     "CRATE");
+    opts.optopt ("l", "list",             "list the public sections in the given crate", "CRATE");
+    opts.optopt ("",  "list-all",         "list all sections in the given crate", "CRATE");
+    opts.optopt ("",  "num-deps-crate",   "sum up the count of all dependencies for the given crate", "CRATE");
+    opts.optopt ("",  "num-deps-section", "sum up the count of all dependencies for the given section", "SECTION");
+    opts.optflag("",  "num-deps-all",     "sum up the count of all dependencies for all crates");
     
 
     let matches = match opts.parse(&args) {
@@ -88,6 +108,21 @@ fn rmain(matches: Matches) -> Result<(), String> {
     }
     else if let Some(crate_name) = matches.opt_str("C") {
         crates_i_depend_on(&crate_name)
+    }
+    else if let Some(crate_name) = matches.opt_str("l") {
+        sections_in_crate(&crate_name, false)
+    }
+    else if let Some(crate_name) = matches.opt_str("list-all") {
+        sections_in_crate(&crate_name, true)
+    }
+    else if let Some(crate_name) = matches.opt_str("num-deps-crate") {
+        num_deps_crate(&crate_name)
+    }
+    else if let Some(crate_name) = matches.opt_str("num-deps-section") {
+        num_deps_section(&crate_name)
+    }
+    else if matches.opt_present("num-deps-all") {
+        num_deps_all()
     }
     else {
         Err(format!("no supported options/arguments found."))
@@ -132,6 +167,66 @@ fn sections_i_depend_on(section_name: &str) -> Result<(), String> {
 }
 
 
+fn num_deps_crate(crate_name: &str) -> Result<(), String> {
+    let (_cn, crate_ref) = find_crate(crate_name)?;
+    let (s, w, i) = crate_dependency_count(&crate_ref);
+    println!("Crate {}'s Dependency Count:\nStrong: {}\nWeak:   {}\nIntrnl: {}", crate_name, s, w, i);
+    Ok(())
+}
+
+fn num_deps_section(section_name: &str) -> Result<(), String> {
+    let section = find_section(section_name)?;
+    let (s, w, i) = section_dependency_count(&section);
+    println!("Section {}'s Dependency Count:\nStrong: {}\nWeak:   {}\nIntrnl: {}", section_name, s, w, i);
+    Ok(())
+}
+
+fn num_deps_all() -> Result<(), String> {
+    let namespace = get_my_current_namespace();
+    let (mut s_total, mut w_total, mut i_total) = (0, 0, 0);
+    let mut crate_count = 0;
+    let mut section_count = 0;
+    namespace.for_each_crate(true, |_crate_name, crate_ref| {
+        crate_count += 1;
+        let (s, w, i) = crate_dependency_count(crate_ref);
+        section_count += crate_ref.lock_as_ref().sections.len();
+        s_total += s;
+        w_total += w;
+        i_total += i;
+        true // keep going
+    });
+
+    println!("Total Dependency Count for all {} crates ({} sections):\nStrong: {}\nWeak:   {}\nIntrnl: {}",
+        crate_count, 
+        section_count,    
+        s_total, w_total, i_total
+    );
+    Ok(())
+}
+
+/// Returns the count of `(strong dependencies, weak dependents, internal dependencies)`
+/// for all sections in the given crate. .
+fn crate_dependency_count(crate_ref: &StrongCrateRef) -> (usize, usize, usize) {
+    let res = crate_ref.lock_as_ref().sections.values()
+        .map(|sec| section_dependency_count(sec))
+        .fold((0, 0, 0), |(acc_s, acc_w, acc_i), (s, w, i)| (acc_s + s, acc_w + w, acc_i + i));
+    // trace!("crate {:?} has deps {:?}", crate_ref, res);
+    res
+}
+
+/// Returns the given section's count of `(strong dependencies, weak dependents, internal dependencies)`.
+fn section_dependency_count(sec: &StrongSectionRef) -> (usize, usize, usize) {
+    let inner = sec.inner.read();
+    (
+        inner.sections_i_depend_on.len(),
+        inner.sections_dependent_on_me.len(),
+        #[cfg(internal_deps)]
+        inner.internal_dependencies.len(),
+        #[cfg(not(internal_deps))]
+        0,
+    )
+}
+
 /// Outputs the given crate's weak dependents, i.e.,
 /// the crates that depend on the given crate.
 /// 
@@ -149,6 +244,61 @@ fn crates_dependent_on_me(_crate_name: &str) -> Result<(), String> {
 /// all of the matching crate names separated by the newline character `'\n'`.
 fn crates_i_depend_on(_crate_name: &str) -> Result<(), String> {
     Err(format!("unimplemented"))
+}
+
+
+
+/// Outputs the list of sections in the given crate.
+/// 
+/// # Arguments
+/// * `all_sections`: If `true`, then all sections will be printed. 
+///                   If `false`, then only public (global) sections will be printed.
+/// 
+/// If there are multiple matches, this returns an Error containing 
+/// all of the matching section names separated by the newline character `'\n'`.
+fn sections_in_crate(crate_name: &str, all_sections: bool) -> Result<(), String> {
+    let (crate_name, crate_ref) = find_crate(crate_name)?;
+
+    let mut containing_crates = BTreeSet::new();
+    if all_sections {
+        println_log!("Sections (all) in crate {}:", crate_name);
+        for sec in crate_ref.lock_as_ref().sections.values() {
+            println_log!("    {}", sec.name);
+            for n in get_containing_crate_name(&sec.name) {
+                containing_crates.insert(String::from(n));
+            }
+        }
+    } else {
+        println_log!("Sections (public-only) in crate {}:", crate_name);
+        for sec in crate_ref.lock_as_ref().global_sections_iter() {
+            println_log!("    {}", sec.name);
+            for n in get_containing_crate_name(&sec.name) {
+                containing_crates.insert(String::from(n));
+            }
+        }
+    }
+
+    let crates_list = containing_crates.into_iter().collect::<Vec<String>>().join("\n");
+    println_log!("Constituent (or related) crates:\n{}", &crates_list);
+    Ok(())
+}
+
+
+/// Returns the crate matching the given `crate_name` if there is a single match.
+/// 
+/// If there are multiple matches, this returns an Error containing 
+/// all of the matching section names separated by the newline character `'\n'`.
+fn find_crate(crate_name: &str) -> Result<(String, StrongCrateRef), String> {
+    let namespace = get_my_current_namespace();
+    let mut matching_crates = CrateNamespace::get_crates_starting_with(&namespace, crate_name);
+    match matching_crates.len() {
+        0 => Err(format!("couldn't find crate matching {:?}", crate_name)),
+        1 => {
+            let mc = matching_crates.swap_remove(0);
+            Ok((mc.0, mc.1)) 
+        }
+        _ => Err(matching_crates.into_iter().map(|(crate_name, _crate_ref, _ns)| crate_name).collect::<Vec<String>>().join("\n")),
+    }
 }
 
 
@@ -192,26 +342,6 @@ fn find_section(section_name: &str) -> Result<StrongSectionRef, String> {
         Ok(matching_sections.remove(0))
     } else {
         Err(matching_sections.into_iter().map(|sec| sec.name.clone()).collect::<Vec<String>>().join("\n"))
-    }
-}
-
-
-/// Returns the crate matching the given `crate_name` if there is a single match.
-/// 
-/// If there are multiple matches, this returns an Error containing all of the matching crate names,
-/// separated by the newline character `'\n'`.
-fn _find_crate(crate_name: &str) -> Result<StrongCrateRef, String> {
-    let namespace = get_my_current_namespace();
-    let matching_crate_names: Vec<String> = namespace.crate_names(true)
-        .into_iter()
-        .filter(|name| name.starts_with(crate_name))
-        .collect();
-    
-    if matching_crate_names.len() == 1 {
-        namespace.get_crate(&matching_crate_names[0])
-            .ok_or_else(|| format!("Couldn't get crate {} from namespace {}", matching_crate_names[0], namespace.name()))
-    } else {
-        Err(matching_crate_names.join("\n"))
     }
 }
 

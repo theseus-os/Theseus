@@ -522,7 +522,7 @@ fn create_general_counter(event_mask: u64) -> Result<Counter, &'static str> {
 
 /// Does the work of iterating through programmable counters and using whichever one is free. Returns Err if none free
 fn programmable_start(event_mask: u64) -> Result<Counter, &'static str> {
-    let my_core = apic::get_my_apic_id().ok_or("Couldn't get my apic id")?;
+    let my_core = apic::get_my_apic_id();
     let num_pmc = num_general_purpose_counters()?;
 
     for pmc in 0..num_pmc {
@@ -551,7 +551,7 @@ fn programmable_start(event_mask: u64) -> Result<Counter, &'static str> {
 fn create_fixed_counter(msr_mask: u32) -> Result<Counter, &'static str> {
     check_pmu_availability()?;
 
-    let my_core = apic::get_my_apic_id().ok_or("Couldn't get my apic id")?;
+    let my_core = apic::get_my_apic_id();
     let count = rdpmc(msr_mask);
     
     return Ok(Counter {
@@ -622,7 +622,7 @@ pub fn start_samples(event_type: EventType, event_per_sample: u32, task_id: Opti
     check_pmu_availability()?;
 
     // perform checks to ensure that counter is ready to use and that previous results are not being unintentionally discarded
-    let my_core_id = apic::get_my_apic_id().ok_or("pmu_x86::start_samples: cannot retrieve core id")?;
+    let my_core_id = apic::get_my_apic_id();
 
     trace!("start_samples: the core id is : {}", my_core_id);
 
@@ -714,7 +714,7 @@ pub struct SampleResults {
 /// Returns the samples that were stored during sampling in the form of a SampleResults object. 
 /// If samples are not yet finished, forces them to stop.  
 pub fn retrieve_samples() -> Result<SampleResults, &'static str> {
-    let my_core_id = apic::get_my_apic_id().ok_or("pmu_x86::retrieve_samples: Could not get apic id")?;
+    let my_core_id = apic::get_my_apic_id();
 
     let mut sampling_info = SAMPLING_INFO.lock();
     let mut samples = sampling_info.get_mut(&my_core_id).ok_or("pmu_x86::retrieve_samples: could not retrieve sampling information for this core")?;
@@ -766,7 +766,7 @@ pub fn find_function_names_from_samples(sample_results: &SampleResults) -> Resul
 pub fn handle_sample(stack_frame: &mut ExceptionStackFrame) -> Result<(), &'static str> {
     unsafe { wrmsr(IA32_PERF_GLOBAL_OVF_CTRL, CLEAR_PERF_STATUS_MSR); }
 
-    let my_core_id = apic::get_my_apic_id().ok_or("pmu_x86::handle sample: could not retrieve apic ID")?; 
+    let my_core_id = apic::get_my_apic_id();
     let event_mask = rdmsr(IA32_PERFEVTSEL0);
 
     let mut sampling_info = SAMPLING_INFO.lock();

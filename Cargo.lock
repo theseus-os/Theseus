@@ -14,7 +14,7 @@ dependencies = [
  "irq_safety 0.1.1 (git+https://github.com/kevinaboos/irq_safety)",
  "kernel_config 0.1.0",
  "lazy_static 1.2.0 (registry+https://github.com/rust-lang/crates.io-index)",
- "log 0.3.9 (registry+https://github.com/rust-lang/crates.io-index)",
+ "log 0.4.8 (registry+https://github.com/rust-lang/crates.io-index)",
  "madt 0.1.0",
  "memory 0.1.0",
  "pause 0.1.0",
@@ -30,7 +30,7 @@ dependencies = [
 name = "acpi_table"
 version = "0.1.0"
 dependencies = [
- "log 0.3.9 (registry+https://github.com/rust-lang/crates.io-index)",
+ "log 0.4.8 (registry+https://github.com/rust-lang/crates.io-index)",
  "memory 0.1.0",
  "sdt 0.1.0",
 ]
@@ -42,7 +42,7 @@ dependencies = [
  "acpi_table 0.1.0",
  "fadt 0.1.0",
  "hpet 0.1.0",
- "log 0.3.9 (registry+https://github.com/rust-lang/crates.io-index)",
+ "log 0.4.8 (registry+https://github.com/rust-lang/crates.io-index)",
  "madt 0.1.0",
  "memory 0.1.0",
  "rsdt 0.1.0",
@@ -56,7 +56,7 @@ dependencies = [
  "interrupts 0.1.0",
  "irq_safety 0.1.1 (git+https://github.com/kevinaboos/irq_safety)",
  "kernel_config 0.1.0",
- "log 0.3.9 (registry+https://github.com/rust-lang/crates.io-index)",
+ "log 0.4.8 (registry+https://github.com/rust-lang/crates.io-index)",
  "memory 0.1.0",
  "pause 0.1.0",
  "scheduler 0.1.0",
@@ -75,7 +75,7 @@ dependencies = [
  "irq_safety 0.1.1 (git+https://github.com/kevinaboos/irq_safety)",
  "kernel_config 0.1.0",
  "lazy_static 1.2.0 (registry+https://github.com/rust-lang/crates.io-index)",
- "log 0.3.9 (registry+https://github.com/rust-lang/crates.io-index)",
+ "log 0.4.8 (registry+https://github.com/rust-lang/crates.io-index)",
  "memory 0.1.0",
  "owning_ref 0.4.0 (git+https://github.com/kevinaboos/owning-ref-rs)",
  "pit_clock 0.1.0",
@@ -94,7 +94,7 @@ dependencies = [
  "keycodes_ascii 0.1.0",
  "lazy_static 1.2.0 (registry+https://github.com/rust-lang/crates.io-index)",
  "libterm 0.1.0",
- "log 0.3.9 (registry+https://github.com/rust-lang/crates.io-index)",
+ "log 0.4.8 (registry+https://github.com/rust-lang/crates.io-index)",
  "print 0.1.0",
  "serial_port 0.1.0",
  "spin 0.4.10 (registry+https://github.com/rust-lang/crates.io-index)",
@@ -117,7 +117,7 @@ name = "async_channel"
 version = "0.1.0"
 dependencies = [
  "debugit 0.1.0",
- "log 0.3.9 (registry+https://github.com/rust-lang/crates.io-index)",
+ "log 0.4.8 (registry+https://github.com/rust-lang/crates.io-index)",
  "mpmc 0.1.6-pre",
  "spin 0.4.10 (registry+https://github.com/rust-lang/crates.io-index)",
  "wait_queue 0.1.0",
@@ -128,7 +128,7 @@ name = "ata"
 version = "0.1.0"
 dependencies = [
  "bitflags 1.1.0 (registry+https://github.com/rust-lang/crates.io-index)",
- "log 0.3.9 (registry+https://github.com/rust-lang/crates.io-index)",
+ "log 0.4.8 (registry+https://github.com/rust-lang/crates.io-index)",
  "pci 0.1.0",
  "port_io 0.2.1",
  "spin 0.4.10 (registry+https://github.com/rust-lang/crates.io-index)",
@@ -191,7 +191,7 @@ version = "0.1.0"
 dependencies = [
  "hashbrown 0.1.8 (registry+https://github.com/rust-lang/crates.io-index)",
  "lazy_static 1.2.0 (registry+https://github.com/rust-lang/crates.io-index)",
- "log 0.3.9 (registry+https://github.com/rust-lang/crates.io-index)",
+ "log 0.4.8 (registry+https://github.com/rust-lang/crates.io-index)",
  "storage_device 0.1.0",
 ]
 
@@ -241,7 +241,7 @@ dependencies = [
  "irq_safety 0.1.1 (git+https://github.com/kevinaboos/irq_safety)",
  "kernel_config 0.1.0",
  "keycodes_ascii 0.1.0",
- "log 0.3.9 (registry+https://github.com/rust-lang/crates.io-index)",
+ "log 0.4.8 (registry+https://github.com/rust-lang/crates.io-index)",
  "logger 0.1.0",
  "memory 0.1.0",
  "mod_mgmt 0.1.0",
@@ -267,7 +267,7 @@ dependencies = [
  "core_io 0.1.20191017 (git+https://github.com/theseus-os/rust-core_io)",
  "fs_node 0.1.0",
  "getopts 0.2.21 (git+https://github.com/kevinaboos/getopts)",
- "log 0.3.9 (registry+https://github.com/rust-lang/crates.io-index)",
+ "log 0.4.8 (registry+https://github.com/rust-lang/crates.io-index)",
  "path 0.1.0",
  "task 0.1.0",
 ]
@@ -276,7 +276,7 @@ dependencies = [
 name = "catch_unwind"
 version = "0.1.0"
 dependencies = [
- "log 0.3.9 (registry+https://github.com/rust-lang/crates.io-index)",
+ "log 0.4.8 (registry+https://github.com/rust-lang/crates.io-index)",
  "task 0.1.0",
  "unwind 0.1.0",
 ]
@@ -292,7 +292,7 @@ version = "0.1.0"
 dependencies = [
  "fs_node 0.1.0",
  "getopts 0.2.21 (git+https://github.com/kevinaboos/getopts)",
- "log 0.3.9 (registry+https://github.com/rust-lang/crates.io-index)",
+ "log 0.4.8 (registry+https://github.com/rust-lang/crates.io-index)",
  "path 0.1.0",
  "root 0.1.0",
  "task 0.1.0",
@@ -310,7 +310,7 @@ version = "0.1.0"
 dependencies = [
  "apic 0.1.0",
  "getopts 0.2.21 (git+https://github.com/kevinaboos/getopts)",
- "log 0.3.9 (registry+https://github.com/rust-lang/crates.io-index)",
+ "log 0.4.8 (registry+https://github.com/rust-lang/crates.io-index)",
  "spawn 0.1.0",
  "task 0.1.0",
  "terminal_print 0.1.0",
@@ -391,9 +391,8 @@ dependencies = [
  "cow_arc 0.1.0",
  "fs_node 0.1.0",
  "goblin 0.0.19 (registry+https://github.com/rust-lang/crates.io-index)",
- "log 0.3.9 (registry+https://github.com/rust-lang/crates.io-index)",
+ "log 0.4.8 (registry+https://github.com/rust-lang/crates.io-index)",
  "memory 0.1.0",
- "qp-trie 0.7.3 (git+https://github.com/theseus-os/qp-trie-rs)",
  "spin 0.4.10 (registry+https://github.com/rust-lang/crates.io-index)",
  "xmas-elf 0.6.2 (git+https://github.com/kevinaboos/xmas-elf.git)",
 ]
@@ -415,7 +414,7 @@ dependencies = [
  "fs_node 0.1.0",
  "hashbrown 0.1.8 (registry+https://github.com/rust-lang/crates.io-index)",
  "lazy_static 1.2.0 (registry+https://github.com/rust-lang/crates.io-index)",
- "log 0.3.9 (registry+https://github.com/rust-lang/crates.io-index)",
+ "log 0.4.8 (registry+https://github.com/rust-lang/crates.io-index)",
  "memory 0.1.0",
  "mod_mgmt 0.1.0",
  "path 0.1.0",
@@ -455,7 +454,7 @@ dependencies = [
  "gimli 0.19.0 (registry+https://github.com/rust-lang/crates.io-index)",
  "goblin 0.0.19 (registry+https://github.com/rust-lang/crates.io-index)",
  "hashbrown 0.1.8 (registry+https://github.com/rust-lang/crates.io-index)",
- "log 0.3.9 (registry+https://github.com/rust-lang/crates.io-index)",
+ "log 0.4.8 (registry+https://github.com/rust-lang/crates.io-index)",
  "memory 0.1.0",
  "mod_mgmt 0.1.0",
  "owning_ref 0.4.0 (git+https://github.com/kevinaboos/owning-ref-rs)",
@@ -475,6 +474,7 @@ dependencies = [
  "crate_name_utils 0.1.0",
  "getopts 0.2.21 (git+https://github.com/kevinaboos/getopts)",
  "itertools 0.7.11 (registry+https://github.com/rust-lang/crates.io-index)",
+ "log 0.4.8 (registry+https://github.com/rust-lang/crates.io-index)",
  "memory 0.1.0",
  "mod_mgmt 0.1.0",
  "spin 0.4.10 (registry+https://github.com/rust-lang/crates.io-index)",
@@ -503,7 +503,7 @@ dependencies = [
  "ethernet_smoltcp_device 0.1.0",
  "event_types 0.1.0",
  "keyboard 0.1.0",
- "log 0.3.9 (registry+https://github.com/rust-lang/crates.io-index)",
+ "log 0.4.8 (registry+https://github.com/rust-lang/crates.io-index)",
  "memory 0.1.0",
  "mouse 0.1.0",
  "mpmc 0.1.6-pre",
@@ -552,7 +552,7 @@ dependencies = [
  "irq_safety 0.1.1 (git+https://github.com/kevinaboos/irq_safety)",
  "kernel_config 0.1.0",
  "lazy_static 1.2.0 (registry+https://github.com/rust-lang/crates.io-index)",
- "log 0.3.9 (registry+https://github.com/rust-lang/crates.io-index)",
+ "log 0.4.8 (registry+https://github.com/rust-lang/crates.io-index)",
  "memory 0.1.0",
  "mpmc 0.1.6-pre",
  "network_interface_card 0.1.0",
@@ -595,7 +595,7 @@ version = "0.1.0"
 dependencies = [
  "irq_safety 0.1.1 (git+https://github.com/kevinaboos/irq_safety)",
  "lazy_static 1.2.0 (registry+https://github.com/rust-lang/crates.io-index)",
- "log 0.3.9 (registry+https://github.com/rust-lang/crates.io-index)",
+ "log 0.4.8 (registry+https://github.com/rust-lang/crates.io-index)",
  "memory 0.1.0",
  "network_interface_card 0.1.0",
  "network_manager 0.1.0",
@@ -625,6 +625,8 @@ dependencies = [
 name = "exceptions_early"
 version = "0.1.0"
 dependencies = [
+ "memory 0.1.0",
+ "mod_mgmt 0.1.0",
  "vga_buffer 0.1.0",
  "x86_64 0.1.2",
 ]
@@ -636,7 +638,7 @@ dependencies = [
  "apic 0.1.0",
  "debug_info 0.1.0",
  "gimli 0.19.0 (registry+https://github.com/rust-lang/crates.io-index)",
- "log 0.3.9 (registry+https://github.com/rust-lang/crates.io-index)",
+ "log 0.4.8 (registry+https://github.com/rust-lang/crates.io-index)",
  "memory 0.1.0",
  "pmu_x86 0.1.0",
  "print 0.1.0",
@@ -667,7 +669,7 @@ source = "registry+https://github.com/rust-lang/crates.io-index"
 name = "first_application"
 version = "0.1.0"
 dependencies = [
- "log 0.3.9 (registry+https://github.com/rust-lang/crates.io-index)",
+ "log 0.4.8 (registry+https://github.com/rust-lang/crates.io-index)",
  "mod_mgmt 0.1.0",
  "path 0.1.0",
  "spawn 0.1.0",
@@ -725,7 +727,7 @@ name = "fs_node"
 version = "0.1.0"
 dependencies = [
  "lazy_static 1.2.0 (registry+https://github.com/rust-lang/crates.io-index)",
- "log 0.3.9 (registry+https://github.com/rust-lang/crates.io-index)",
+ "log 0.4.8 (registry+https://github.com/rust-lang/crates.io-index)",
  "memory 0.1.0",
  "spin 0.4.10 (registry+https://github.com/rust-lang/crates.io-index)",
  "x86_64 0.1.2",
@@ -739,7 +741,7 @@ dependencies = [
  "bit_field 0.7.0 (registry+https://github.com/rust-lang/crates.io-index)",
  "bitflags 1.1.0 (registry+https://github.com/rust-lang/crates.io-index)",
  "lazy_static 1.2.0 (registry+https://github.com/rust-lang/crates.io-index)",
- "log 0.3.9 (registry+https://github.com/rust-lang/crates.io-index)",
+ "log 0.4.8 (registry+https://github.com/rust-lang/crates.io-index)",
  "memory 0.1.0",
  "spin 0.4.10 (registry+https://github.com/rust-lang/crates.io-index)",
  "tss 0.1.0",
@@ -807,7 +809,7 @@ version = "0.1.0"
 dependencies = [
  "fs_node 0.1.0",
  "irq_safety 0.1.1 (git+https://github.com/kevinaboos/irq_safety)",
- "log 0.3.9 (registry+https://github.com/rust-lang/crates.io-index)",
+ "log 0.4.8 (registry+https://github.com/rust-lang/crates.io-index)",
  "memory 0.1.0",
  "spin 0.4.10 (registry+https://github.com/rust-lang/crates.io-index)",
  "x86_64 0.1.2",
@@ -817,7 +819,7 @@ dependencies = [
 name = "hello"
 version = "0.1.0"
 dependencies = [
- "log 0.3.9 (registry+https://github.com/rust-lang/crates.io-index)",
+ "log 0.4.8 (registry+https://github.com/rust-lang/crates.io-index)",
  "terminal_print 0.1.0",
 ]
 
@@ -827,7 +829,7 @@ version = "0.1.0"
 dependencies = [
  "acpi_table 0.1.0",
  "kernel_config 0.1.0",
- "log 0.3.9 (registry+https://github.com/rust-lang/crates.io-index)",
+ "log 0.4.8 (registry+https://github.com/rust-lang/crates.io-index)",
  "memory 0.1.0",
  "owning_ref 0.4.0 (git+https://github.com/kevinaboos/owning-ref-rs)",
  "sdt 0.1.0",
@@ -841,7 +843,7 @@ version = "0.1.0"
 dependencies = [
  "hpet 0.1.0",
  "httparse 1.3.3 (registry+https://github.com/rust-lang/crates.io-index)",
- "log 0.3.9 (registry+https://github.com/rust-lang/crates.io-index)",
+ "log 0.4.8 (registry+https://github.com/rust-lang/crates.io-index)",
  "network_manager 0.1.0",
  "percent-encoding 1.0.2",
  "smoltcp 0.5.0 (git+https://github.com/m-labs/smoltcp)",
@@ -859,7 +861,7 @@ version = "0.1.0"
 dependencies = [
  "app_io 0.1.0",
  "core_io 0.1.20191017 (git+https://github.com/theseus-os/rust-core_io)",
- "log 0.3.9 (registry+https://github.com/rust-lang/crates.io-index)",
+ "log 0.4.8 (registry+https://github.com/rust-lang/crates.io-index)",
  "stdio 0.1.0",
 ]
 
@@ -869,7 +871,7 @@ version = "0.1.0"
 dependencies = [
  "app_io 0.1.0",
  "core_io 0.1.20191017 (git+https://github.com/theseus-os/rust-core_io)",
- "log 0.3.9 (registry+https://github.com/rust-lang/crates.io-index)",
+ "log 0.4.8 (registry+https://github.com/rust-lang/crates.io-index)",
 ]
 
 [[package]]
@@ -877,7 +879,7 @@ name = "intel_ethernet"
 version = "0.1.0"
 dependencies = [
  "bit_field 0.7.0 (registry+https://github.com/rust-lang/crates.io-index)",
- "log 0.3.9 (registry+https://github.com/rust-lang/crates.io-index)",
+ "log 0.4.8 (registry+https://github.com/rust-lang/crates.io-index)",
  "memory 0.1.0",
  "volatile 0.2.5 (registry+https://github.com/rust-lang/crates.io-index)",
 ]
@@ -893,7 +895,7 @@ dependencies = [
  "kernel_config 0.1.0",
  "keyboard 0.1.0",
  "lazy_static 1.2.0 (registry+https://github.com/rust-lang/crates.io-index)",
- "log 0.3.9 (registry+https://github.com/rust-lang/crates.io-index)",
+ "log 0.4.8 (registry+https://github.com/rust-lang/crates.io-index)",
  "memory 0.1.0",
  "mouse 0.1.0",
  "pic 0.1.0",
@@ -915,7 +917,7 @@ version = "0.1.0"
 dependencies = [
  "atomic_linked_list 0.1.0",
  "lazy_static 1.2.0 (registry+https://github.com/rust-lang/crates.io-index)",
- "log 0.3.9 (registry+https://github.com/rust-lang/crates.io-index)",
+ "log 0.4.8 (registry+https://github.com/rust-lang/crates.io-index)",
  "memory 0.1.0",
  "owning_ref 0.4.0 (git+https://github.com/kevinaboos/owning-ref-rs)",
  "spin 0.4.10 (registry+https://github.com/rust-lang/crates.io-index)",
@@ -955,7 +957,7 @@ version = "0.1.0"
 dependencies = [
  "event_types 0.1.0",
  "keycodes_ascii 0.1.0",
- "log 0.3.9 (registry+https://github.com/rust-lang/crates.io-index)",
+ "log 0.4.8 (registry+https://github.com/rust-lang/crates.io-index)",
  "mpmc 0.1.6-pre",
  "ps2 0.1.0",
  "spin 0.4.10 (registry+https://github.com/rust-lang/crates.io-index)",
@@ -968,7 +970,7 @@ dependencies = [
  "app_io 0.1.0",
  "core_io 0.1.20191017 (git+https://github.com/theseus-os/rust-core_io)",
  "keycodes_ascii 0.1.0",
- "log 0.3.9 (registry+https://github.com/rust-lang/crates.io-index)",
+ "log 0.4.8 (registry+https://github.com/rust-lang/crates.io-index)",
  "scheduler 0.1.0",
 ]
 
@@ -1008,12 +1010,17 @@ dependencies = [
  "getopts 0.2.21 (git+https://github.com/kevinaboos/getopts)",
  "keycodes_ascii 0.1.0",
  "libterm 0.1.0",
- "log 0.3.9 (registry+https://github.com/rust-lang/crates.io-index)",
+ "log 0.4.8 (registry+https://github.com/rust-lang/crates.io-index)",
  "path 0.1.0",
  "spin 0.4.10 (registry+https://github.com/rust-lang/crates.io-index)",
  "stdio 0.1.0",
  "task 0.1.0",
 ]
+
+[[package]]
+name = "libm"
+version = "0.2.1"
+source = "registry+https://github.com/rust-lang/crates.io-index"
 
 [[package]]
 name = "libterm"
@@ -1028,7 +1035,7 @@ dependencies = [
  "framebuffer 0.1.0",
  "framebuffer_drawer 0.1.0",
  "framebuffer_printer 0.1.0",
- "log 0.3.9 (registry+https://github.com/rust-lang/crates.io-index)",
+ "log 0.4.8 (registry+https://github.com/rust-lang/crates.io-index)",
  "print 0.1.0",
  "root 0.1.0",
  "shapes 0.1.0",
@@ -1039,21 +1046,31 @@ dependencies = [
 ]
 
 [[package]]
+name = "libtest"
+version = "0.1.0"
+dependencies = [
+ "apic 0.1.0",
+ "atomic 0.4.5 (registry+https://github.com/rust-lang/crates.io-index)",
+ "bit_field 0.10.0 (registry+https://github.com/rust-lang/crates.io-index)",
+ "hpet 0.1.0",
+ "libm 0.2.1 (registry+https://github.com/rust-lang/crates.io-index)",
+ "log 0.4.8 (registry+https://github.com/rust-lang/crates.io-index)",
+ "memory 0.1.0",
+ "pmu_x86 0.1.0",
+ "runqueue 0.1.0",
+ "spin 0.4.10 (registry+https://github.com/rust-lang/crates.io-index)",
+ "task 0.1.0",
+ "x86_64 0.1.2",
+]
+
+[[package]]
 name = "linked_list_allocator"
 version = "0.6.3"
 source = "registry+https://github.com/rust-lang/crates.io-index"
 
 [[package]]
 name = "log"
-version = "0.3.9"
-source = "registry+https://github.com/rust-lang/crates.io-index"
-dependencies = [
- "log 0.4.6 (registry+https://github.com/rust-lang/crates.io-index)",
-]
-
-[[package]]
-name = "log"
-version = "0.4.6"
+version = "0.4.8"
 source = "registry+https://github.com/rust-lang/crates.io-index"
 dependencies = [
  "cfg-if 0.1.9 (registry+https://github.com/rust-lang/crates.io-index)",
@@ -1063,7 +1080,7 @@ dependencies = [
 name = "logger"
 version = "0.1.0"
 dependencies = [
- "log 0.3.9 (registry+https://github.com/rust-lang/crates.io-index)",
+ "log 0.4.8 (registry+https://github.com/rust-lang/crates.io-index)",
  "serial_port 0.1.0",
  "spin 0.4.10 (registry+https://github.com/rust-lang/crates.io-index)",
 ]
@@ -1074,7 +1091,7 @@ version = "0.1.0"
 dependencies = [
  "fs_node 0.1.0",
  "getopts 0.2.21 (git+https://github.com/kevinaboos/getopts)",
- "log 0.3.9 (registry+https://github.com/rust-lang/crates.io-index)",
+ "log 0.4.8 (registry+https://github.com/rust-lang/crates.io-index)",
  "path 0.1.0",
  "task 0.1.0",
  "terminal_print 0.1.0",
@@ -1088,7 +1105,7 @@ dependencies = [
  "apic 0.1.0",
  "ioapic 0.1.0",
  "irq_safety 0.1.1 (git+https://github.com/kevinaboos/irq_safety)",
- "log 0.3.9 (registry+https://github.com/rust-lang/crates.io-index)",
+ "log 0.4.8 (registry+https://github.com/rust-lang/crates.io-index)",
  "memory 0.1.0",
  "pic 0.1.0",
  "sdt 0.1.0",
@@ -1098,6 +1115,21 @@ dependencies = [
 name = "managed"
 version = "0.7.1"
 source = "registry+https://github.com/rust-lang/crates.io-index"
+
+[[package]]
+name = "mapper_spillful"
+version = "0.1.0"
+dependencies = [
+ "cfg-if 0.1.9 (registry+https://github.com/rust-lang/crates.io-index)",
+ "irq_safety 0.1.1 (git+https://github.com/kevinaboos/irq_safety)",
+ "kernel_config 0.1.0",
+ "lazy_static 1.2.0 (registry+https://github.com/rust-lang/crates.io-index)",
+ "log 0.4.8 (registry+https://github.com/rust-lang/crates.io-index)",
+ "memory 0.1.0",
+ "memory_structs 0.1.0",
+ "memory_x86_64 0.1.0",
+ "rbtree 0.1.5 (git+https://github.com/theseus-os/rbtree-rs.git)",
+]
 
 [[package]]
 name = "memchr"
@@ -1113,7 +1145,7 @@ version = "0.1.0"
 dependencies = [
  "fs_node 0.1.0",
  "irq_safety 0.1.1 (git+https://github.com/kevinaboos/irq_safety)",
- "log 0.3.9 (registry+https://github.com/rust-lang/crates.io-index)",
+ "log 0.4.8 (registry+https://github.com/rust-lang/crates.io-index)",
  "memory 0.1.0",
  "spin 0.4.10 (registry+https://github.com/rust-lang/crates.io-index)",
  "x86_64 0.1.2",
@@ -1130,7 +1162,7 @@ dependencies = [
  "irq_safety 0.1.1 (git+https://github.com/kevinaboos/irq_safety)",
  "kernel_config 0.1.0",
  "lazy_static 1.2.0 (registry+https://github.com/rust-lang/crates.io-index)",
- "log 0.3.9 (registry+https://github.com/rust-lang/crates.io-index)",
+ "log 0.4.8 (registry+https://github.com/rust-lang/crates.io-index)",
  "memory_structs 0.1.0",
  "memory_x86_64 0.1.0",
  "multiboot2 0.7.1 (registry+https://github.com/rust-lang/crates.io-index)",
@@ -1158,7 +1190,7 @@ version = "0.1.0"
 dependencies = [
  "entryflags_x86_64 0.1.0",
  "kernel_config 0.1.0",
- "log 0.3.9 (registry+https://github.com/rust-lang/crates.io-index)",
+ "log 0.4.8 (registry+https://github.com/rust-lang/crates.io-index)",
  "memory_structs 0.1.0",
  "multiboot2 0.7.1 (registry+https://github.com/rust-lang/crates.io-index)",
  "x86_64 0.1.2",
@@ -1179,12 +1211,19 @@ dependencies = [
 name = "mm_eval"
 version = "0.1.0"
 dependencies = [
+ "apic 0.1.0",
  "cfg-if 0.1.9 (registry+https://github.com/rust-lang/crates.io-index)",
  "getopts 0.2.21 (git+https://github.com/kevinaboos/getopts)",
  "hpet 0.1.0",
  "kernel_config 0.1.0",
- "log 0.3.9 (registry+https://github.com/rust-lang/crates.io-index)",
+ "libm 0.2.1 (registry+https://github.com/rust-lang/crates.io-index)",
+ "libtest 0.1.0",
+ "log 0.4.8 (registry+https://github.com/rust-lang/crates.io-index)",
+ "mapper_spillful 0.1.0",
  "memory 0.1.0",
+ "memory_structs 0.1.0",
+ "pmu_x86 0.1.0",
+ "runqueue 0.1.0",
  "terminal_print 0.1.0",
  "tsc 0.1.0",
 ]
@@ -1198,9 +1237,8 @@ dependencies = [
  "crate_name_utils 0.1.0",
  "cstr_core 0.1.2 (registry+https://github.com/rust-lang/crates.io-index)",
  "fs_node 0.1.0",
- "hpet 0.1.0",
  "kernel_config 0.1.0",
- "log 0.3.9 (registry+https://github.com/rust-lang/crates.io-index)",
+ "log 0.4.8 (registry+https://github.com/rust-lang/crates.io-index)",
  "memfs 0.1.0",
  "memory 0.1.0",
  "multiboot2 0.7.1 (registry+https://github.com/rust-lang/crates.io-index)",
@@ -1219,7 +1257,7 @@ name = "mouse"
 version = "0.1.0"
 dependencies = [
  "event_types 0.1.0",
- "log 0.3.9 (registry+https://github.com/rust-lang/crates.io-index)",
+ "log 0.4.8 (registry+https://github.com/rust-lang/crates.io-index)",
  "mouse_data 0.1.0",
  "mpmc 0.1.6-pre",
  "ps2 0.1.0",
@@ -1251,7 +1289,7 @@ dependencies = [
  "apic 0.1.0",
  "irq_safety 0.1.1 (git+https://github.com/kevinaboos/irq_safety)",
  "kernel_config 0.1.0",
- "log 0.3.9 (registry+https://github.com/rust-lang/crates.io-index)",
+ "log 0.4.8 (registry+https://github.com/rust-lang/crates.io-index)",
  "madt 0.1.0",
  "memory 0.1.0",
  "mod_mgmt 0.1.0",
@@ -1265,7 +1303,7 @@ dependencies = [
 name = "mutex_sleep"
 version = "0.1.0"
 dependencies = [
- "log 0.3.9 (registry+https://github.com/rust-lang/crates.io-index)",
+ "log 0.4.8 (registry+https://github.com/rust-lang/crates.io-index)",
  "owning_ref 0.4.0 (git+https://github.com/kevinaboos/owning-ref-rs)",
  "spin 0.4.10 (registry+https://github.com/rust-lang/crates.io-index)",
  "stable_deref_trait 1.1.1 (git+https://github.com/kevinaboos/stable_deref_trait.git?branch=spin)",
@@ -1281,7 +1319,7 @@ dependencies = [
  "exceptions_early 0.1.0",
  "irq_safety 0.1.1 (git+https://github.com/kevinaboos/irq_safety)",
  "kernel_config 0.1.0",
- "log 0.3.9 (registry+https://github.com/rust-lang/crates.io-index)",
+ "log 0.4.8 (registry+https://github.com/rust-lang/crates.io-index)",
  "logger 0.1.0",
  "memory 0.1.0",
  "mod_mgmt 0.1.0",
@@ -1299,7 +1337,7 @@ name = "network_interface_card"
 version = "0.1.0"
 dependencies = [
  "intel_ethernet 0.1.0",
- "log 0.3.9 (registry+https://github.com/rust-lang/crates.io-index)",
+ "log 0.4.8 (registry+https://github.com/rust-lang/crates.io-index)",
  "memory 0.1.0",
  "mpmc 0.1.6-pre",
  "nic_buffers 0.1.0",
@@ -1313,7 +1351,7 @@ version = "0.1.0"
 dependencies = [
  "e1000 0.1.0",
  "lazy_static 1.2.0 (registry+https://github.com/rust-lang/crates.io-index)",
- "log 0.3.9 (registry+https://github.com/rust-lang/crates.io-index)",
+ "log 0.4.8 (registry+https://github.com/rust-lang/crates.io-index)",
  "owning_ref 0.4.0 (git+https://github.com/kevinaboos/owning-ref-rs)",
  "smoltcp 0.5.0 (git+https://github.com/m-labs/smoltcp)",
  "spin 0.4.10 (registry+https://github.com/rust-lang/crates.io-index)",
@@ -1331,7 +1369,7 @@ dependencies = [
 name = "nic_buffers"
 version = "0.1.0"
 dependencies = [
- "log 0.3.9 (registry+https://github.com/rust-lang/crates.io-index)",
+ "log 0.4.8 (registry+https://github.com/rust-lang/crates.io-index)",
  "memory 0.1.0",
  "mpmc 0.1.6-pre",
  "owning_ref 0.4.0 (git+https://github.com/kevinaboos/owning-ref-rs)",
@@ -1342,7 +1380,7 @@ name = "nic_initialization"
 version = "0.1.0"
 dependencies = [
  "intel_ethernet 0.1.0",
- "log 0.3.9 (registry+https://github.com/rust-lang/crates.io-index)",
+ "log 0.4.8 (registry+https://github.com/rust-lang/crates.io-index)",
  "memory 0.1.0",
  "mpmc 0.1.6-pre",
  "nic_buffers 0.1.0",
@@ -1356,7 +1394,7 @@ name = "nic_queues"
 version = "0.1.0"
 dependencies = [
  "intel_ethernet 0.1.0",
- "log 0.3.9 (registry+https://github.com/rust-lang/crates.io-index)",
+ "log 0.4.8 (registry+https://github.com/rust-lang/crates.io-index)",
  "memory 0.1.0",
  "nic_buffers 0.1.0",
  "owning_ref 0.4.0 (git+https://github.com/kevinaboos/owning-ref-rs)",
@@ -1392,7 +1430,7 @@ dependencies = [
  "httparse 1.3.3 (registry+https://github.com/rust-lang/crates.io-index)",
  "irq_safety 0.1.1 (git+https://github.com/kevinaboos/irq_safety)",
  "itertools 0.7.11 (registry+https://github.com/rust-lang/crates.io-index)",
- "log 0.3.9 (registry+https://github.com/rust-lang/crates.io-index)",
+ "log 0.4.8 (registry+https://github.com/rust-lang/crates.io-index)",
  "network_manager 0.1.0",
  "owning_ref 0.4.0 (git+https://github.com/kevinaboos/owning-ref-rs)",
  "percent-encoding 1.0.2",
@@ -1425,11 +1463,10 @@ dependencies = [
 name = "panic_entry"
 version = "0.1.0"
 dependencies = [
- "log 0.3.9 (registry+https://github.com/rust-lang/crates.io-index)",
+ "log 0.4.8 (registry+https://github.com/rust-lang/crates.io-index)",
  "memory 0.1.0",
  "mod_mgmt 0.1.0",
  "panic_wrapper 0.1.0",
- "task 0.1.0",
  "unwind 0.1.0",
  "vga_buffer 0.1.0",
 ]
@@ -1438,8 +1475,9 @@ dependencies = [
 name = "panic_wrapper"
 version = "0.1.0"
 dependencies = [
- "log 0.3.9 (registry+https://github.com/rust-lang/crates.io-index)",
+ "log 0.4.8 (registry+https://github.com/rust-lang/crates.io-index)",
  "memory 0.1.0",
+ "mod_mgmt 0.1.0",
  "runqueue 0.1.0",
  "stack_trace 0.1.0",
  "stack_trace_frame_pointers 0.1.0",
@@ -1453,7 +1491,7 @@ version = "0.1.0"
 dependencies = [
  "fs_node 0.1.0",
  "lazy_static 1.2.0 (registry+https://github.com/rust-lang/crates.io-index)",
- "log 0.3.9 (registry+https://github.com/rust-lang/crates.io-index)",
+ "log 0.4.8 (registry+https://github.com/rust-lang/crates.io-index)",
  "root 0.1.0",
  "spin 0.4.10 (registry+https://github.com/rust-lang/crates.io-index)",
  "vfs_node 0.1.0",
@@ -1469,7 +1507,7 @@ name = "pci"
 version = "0.1.0"
 dependencies = [
  "bit_field 0.7.0 (registry+https://github.com/rust-lang/crates.io-index)",
- "log 0.3.9 (registry+https://github.com/rust-lang/crates.io-index)",
+ "log 0.4.8 (registry+https://github.com/rust-lang/crates.io-index)",
  "memory 0.1.0",
  "port_io 0.2.1",
  "spin 0.4.10 (registry+https://github.com/rust-lang/crates.io-index)",
@@ -1483,7 +1521,7 @@ version = "1.0.2"
 name = "pic"
 version = "0.1.0"
 dependencies = [
- "log 0.3.9 (registry+https://github.com/rust-lang/crates.io-index)",
+ "log 0.4.8 (registry+https://github.com/rust-lang/crates.io-index)",
  "memory 0.1.0",
  "port_io 0.2.1",
  "x86_64 0.1.2",
@@ -1497,7 +1535,7 @@ dependencies = [
  "getopts 0.2.21 (git+https://github.com/kevinaboos/getopts)",
  "hashbrown 0.1.8 (registry+https://github.com/rust-lang/crates.io-index)",
  "hpet 0.1.0",
- "log 0.3.9 (registry+https://github.com/rust-lang/crates.io-index)",
+ "log 0.4.8 (registry+https://github.com/rust-lang/crates.io-index)",
  "network_manager 0.1.0",
  "ota_update_client 0.1.0",
  "smoltcp 0.5.0 (git+https://github.com/m-labs/smoltcp)",
@@ -1510,7 +1548,7 @@ dependencies = [
 name = "pit_clock"
 version = "0.1.0"
 dependencies = [
- "log 0.3.9 (registry+https://github.com/rust-lang/crates.io-index)",
+ "log 0.4.8 (registry+https://github.com/rust-lang/crates.io-index)",
  "port_io 0.2.1",
  "spin 0.4.10 (registry+https://github.com/rust-lang/crates.io-index)",
  "x86_64 0.1.2",
@@ -1549,7 +1587,7 @@ dependencies = [
  "bit_field 0.10.0 (registry+https://github.com/rust-lang/crates.io-index)",
  "irq_safety 0.1.1 (git+https://github.com/kevinaboos/irq_safety)",
  "lazy_static 1.2.0 (registry+https://github.com/rust-lang/crates.io-index)",
- "log 0.3.9 (registry+https://github.com/rust-lang/crates.io-index)",
+ "log 0.4.8 (registry+https://github.com/rust-lang/crates.io-index)",
  "memory 0.1.0",
  "mod_mgmt 0.1.0",
  "pit_clock 0.1.0",
@@ -1570,7 +1608,7 @@ version = "0.1.0"
 dependencies = [
  "dfqueue 0.1.0",
  "event_types 0.1.0",
- "log 0.3.9 (registry+https://github.com/rust-lang/crates.io-index)",
+ "log 0.4.8 (registry+https://github.com/rust-lang/crates.io-index)",
  "spin 0.4.10 (registry+https://github.com/rust-lang/crates.io-index)",
 ]
 
@@ -1596,7 +1634,7 @@ dependencies = [
 name = "ps2"
 version = "0.1.0"
 dependencies = [
- "log 0.3.9 (registry+https://github.com/rust-lang/crates.io-index)",
+ "log 0.4.8 (registry+https://github.com/rust-lang/crates.io-index)",
  "port_io 0.2.1",
  "spin 0.4.10 (registry+https://github.com/rust-lang/crates.io-index)",
 ]
@@ -1699,11 +1737,19 @@ dependencies = [
 ]
 
 [[package]]
+name = "rbtree"
+version = "0.1.5"
+source = "git+https://github.com/theseus-os/rbtree-rs.git#45aa9e94f7e7cf08d560498c314efb3e5f4ba198"
+dependencies = [
+ "log 0.4.8 (registry+https://github.com/rust-lang/crates.io-index)",
+]
+
+[[package]]
 name = "rendezvous"
 version = "0.1.0"
 dependencies = [
  "irq_safety 0.1.1 (git+https://github.com/kevinaboos/irq_safety)",
- "log 0.3.9 (registry+https://github.com/rust-lang/crates.io-index)",
+ "log 0.4.8 (registry+https://github.com/rust-lang/crates.io-index)",
  "scheduler 0.1.0",
  "spin 0.4.10 (registry+https://github.com/rust-lang/crates.io-index)",
  "task 0.1.0",
@@ -1721,7 +1767,7 @@ version = "0.1.0"
 dependencies = [
  "fs_node 0.1.0",
  "getopts 0.2.21 (git+https://github.com/kevinaboos/getopts)",
- "log 0.3.9 (registry+https://github.com/rust-lang/crates.io-index)",
+ "log 0.4.8 (registry+https://github.com/rust-lang/crates.io-index)",
  "path 0.1.0",
  "root 0.1.0",
  "task 0.1.0",
@@ -1734,7 +1780,7 @@ version = "0.1.0"
 dependencies = [
  "fs_node 0.1.0",
  "lazy_static 1.2.0 (registry+https://github.com/rust-lang/crates.io-index)",
- "log 0.3.9 (registry+https://github.com/rust-lang/crates.io-index)",
+ "log 0.4.8 (registry+https://github.com/rust-lang/crates.io-index)",
  "spin 0.4.10 (registry+https://github.com/rust-lang/crates.io-index)",
  "x86_64 0.1.2",
 ]
@@ -1745,7 +1791,7 @@ version = "0.1.0"
 dependencies = [
  "getopts 0.2.21 (git+https://github.com/kevinaboos/getopts)",
  "hpet 0.1.0",
- "log 0.3.9 (registry+https://github.com/rust-lang/crates.io-index)",
+ "log 0.4.8 (registry+https://github.com/rust-lang/crates.io-index)",
  "runqueue 0.1.0",
  "spawn 0.1.0",
  "task 0.1.0",
@@ -1776,7 +1822,7 @@ dependencies = [
  "irq_safety 0.1.1 (git+https://github.com/kevinaboos/irq_safety)",
  "kernel_config 0.1.0",
  "lazy_static 1.2.0 (registry+https://github.com/rust-lang/crates.io-index)",
- "log 0.3.9 (registry+https://github.com/rust-lang/crates.io-index)",
+ "log 0.4.8 (registry+https://github.com/rust-lang/crates.io-index)",
  "port_io 0.2.1",
  "spin 0.4.10 (registry+https://github.com/rust-lang/crates.io-index)",
  "state_store 0.1.0",
@@ -1790,7 +1836,7 @@ dependencies = [
  "atomic_linked_list 0.1.0",
  "irq_safety 0.1.1 (git+https://github.com/kevinaboos/irq_safety)",
  "lazy_static 1.2.0 (registry+https://github.com/rust-lang/crates.io-index)",
- "log 0.3.9 (registry+https://github.com/rust-lang/crates.io-index)",
+ "log 0.4.8 (registry+https://github.com/rust-lang/crates.io-index)",
  "runqueue_priority 0.1.0",
  "runqueue_round_robin 0.1.0",
  "single_simd_task_optimization 0.1.0",
@@ -1804,7 +1850,7 @@ dependencies = [
  "atomic_linked_list 0.1.0",
  "irq_safety 0.1.1 (git+https://github.com/kevinaboos/irq_safety)",
  "lazy_static 1.2.0 (registry+https://github.com/rust-lang/crates.io-index)",
- "log 0.3.9 (registry+https://github.com/rust-lang/crates.io-index)",
+ "log 0.4.8 (registry+https://github.com/rust-lang/crates.io-index)",
  "single_simd_task_optimization 0.1.0",
  "task 0.1.0",
 ]
@@ -1816,7 +1862,7 @@ dependencies = [
  "atomic_linked_list 0.1.0",
  "irq_safety 0.1.1 (git+https://github.com/kevinaboos/irq_safety)",
  "lazy_static 1.2.0 (registry+https://github.com/rust-lang/crates.io-index)",
- "log 0.3.9 (registry+https://github.com/rust-lang/crates.io-index)",
+ "log 0.4.8 (registry+https://github.com/rust-lang/crates.io-index)",
  "single_simd_task_optimization 0.1.0",
  "task 0.1.0",
 ]
@@ -1848,7 +1894,7 @@ version = "0.1.0"
 dependencies = [
  "apic 0.1.0",
  "irq_safety 0.1.1 (git+https://github.com/kevinaboos/irq_safety)",
- "log 0.3.9 (registry+https://github.com/rust-lang/crates.io-index)",
+ "log 0.4.8 (registry+https://github.com/rust-lang/crates.io-index)",
  "runqueue 0.1.0",
  "scheduler_priority 0.1.0",
  "scheduler_round_robin 0.1.0",
@@ -1860,7 +1906,7 @@ dependencies = [
 name = "scheduler_eval"
 version = "0.1.0"
 dependencies = [
- "log 0.3.9 (registry+https://github.com/rust-lang/crates.io-index)",
+ "log 0.4.8 (registry+https://github.com/rust-lang/crates.io-index)",
  "logger 0.1.0",
  "scheduler 0.1.0",
  "spawn 0.1.0",
@@ -1871,7 +1917,7 @@ dependencies = [
 name = "scheduler_priority"
 version = "0.1.0"
 dependencies = [
- "log 0.3.9 (registry+https://github.com/rust-lang/crates.io-index)",
+ "log 0.4.8 (registry+https://github.com/rust-lang/crates.io-index)",
  "runqueue 0.1.0",
  "runqueue_priority 0.1.0",
  "spin 0.4.10 (registry+https://github.com/rust-lang/crates.io-index)",
@@ -1882,7 +1928,7 @@ dependencies = [
 name = "scheduler_round_robin"
 version = "0.1.0"
 dependencies = [
- "log 0.3.9 (registry+https://github.com/rust-lang/crates.io-index)",
+ "log 0.4.8 (registry+https://github.com/rust-lang/crates.io-index)",
  "runqueue 0.1.0",
  "runqueue_round_robin 0.1.0",
  "spin 0.4.10 (registry+https://github.com/rust-lang/crates.io-index)",
@@ -1961,7 +2007,7 @@ dependencies = [
  "keycodes_ascii 0.1.0",
  "lazy_static 1.2.0 (registry+https://github.com/rust-lang/crates.io-index)",
  "libterm 0.1.0",
- "log 0.3.9 (registry+https://github.com/rust-lang/crates.io-index)",
+ "log 0.4.8 (registry+https://github.com/rust-lang/crates.io-index)",
  "path 0.1.0",
  "print 0.1.0",
  "root 0.1.0",
@@ -1983,7 +2029,7 @@ dependencies = [
  "apic 0.1.0",
  "cfg-if 0.1.9 (registry+https://github.com/rust-lang/crates.io-index)",
  "fs_node 0.1.0",
- "log 0.3.9 (registry+https://github.com/rust-lang/crates.io-index)",
+ "log 0.4.8 (registry+https://github.com/rust-lang/crates.io-index)",
  "memory 0.1.0",
  "mod_mgmt 0.1.0",
  "pit_clock 0.1.0",
@@ -1996,7 +2042,7 @@ name = "simd_test"
 version = "0.1.0"
 dependencies = [
  "cfg-if 0.1.9 (registry+https://github.com/rust-lang/crates.io-index)",
- "log 0.3.9 (registry+https://github.com/rust-lang/crates.io-index)",
+ "log 0.4.8 (registry+https://github.com/rust-lang/crates.io-index)",
  "packed_simd 0.3.1 (registry+https://github.com/rust-lang/crates.io-index)",
  "pit_clock 0.1.0",
 ]
@@ -2006,7 +2052,7 @@ name = "single_simd_task_optimization"
 version = "0.1.0"
 dependencies = [
  "cfg-if 0.1.9 (registry+https://github.com/rust-lang/crates.io-index)",
- "log 0.3.9 (registry+https://github.com/rust-lang/crates.io-index)",
+ "log 0.4.8 (registry+https://github.com/rust-lang/crates.io-index)",
  "task 0.1.0",
 ]
 
@@ -2025,7 +2071,7 @@ name = "smoltcp_helper"
 version = "0.1.0"
 dependencies = [
  "hpet 0.1.0",
- "log 0.3.9 (registry+https://github.com/rust-lang/crates.io-index)",
+ "log 0.4.8 (registry+https://github.com/rust-lang/crates.io-index)",
  "network_manager 0.1.0",
  "smoltcp 0.5.0 (git+https://github.com/m-labs/smoltcp)",
  "spin 0.4.10 (registry+https://github.com/rust-lang/crates.io-index)",
@@ -2042,7 +2088,7 @@ dependencies = [
  "fs_node 0.1.0",
  "irq_safety 0.1.1 (git+https://github.com/kevinaboos/irq_safety)",
  "lazy_static 1.2.0 (registry+https://github.com/rust-lang/crates.io-index)",
- "log 0.3.9 (registry+https://github.com/rust-lang/crates.io-index)",
+ "log 0.4.8 (registry+https://github.com/rust-lang/crates.io-index)",
  "memory 0.1.0",
  "mod_mgmt 0.1.0",
  "path 0.1.0",
@@ -2074,7 +2120,8 @@ name = "stack_trace"
 version = "0.1.0"
 dependencies = [
  "fallible-iterator 0.2.0 (registry+https://github.com/rust-lang/crates.io-index)",
- "log 0.3.9 (registry+https://github.com/rust-lang/crates.io-index)",
+ "log 0.4.8 (registry+https://github.com/rust-lang/crates.io-index)",
+ "mod_mgmt 0.1.0",
  "task 0.1.0",
  "unwind 0.1.0",
 ]
@@ -2104,7 +2151,7 @@ dependencies = [
  "hpet 0.1.0",
  "irq_safety 0.1.1 (git+https://github.com/kevinaboos/irq_safety)",
  "lazy_static 1.2.0 (registry+https://github.com/rust-lang/crates.io-index)",
- "log 0.3.9 (registry+https://github.com/rust-lang/crates.io-index)",
+ "log 0.4.8 (registry+https://github.com/rust-lang/crates.io-index)",
  "memory 0.1.0",
  "mod_mgmt 0.1.0",
  "runqueue_priority 0.1.0",
@@ -2128,7 +2175,7 @@ version = "0.1.0"
 dependencies = [
  "downcast-rs 1.0.4 (git+https://github.com/theseus-os/downcast-rs)",
  "lazy_static 1.2.0 (registry+https://github.com/rust-lang/crates.io-index)",
- "log 0.3.9 (registry+https://github.com/rust-lang/crates.io-index)",
+ "log 0.4.8 (registry+https://github.com/rust-lang/crates.io-index)",
  "owning_ref 0.4.0 (git+https://github.com/kevinaboos/owning-ref-rs)",
  "pci 0.1.0",
  "spin 0.4.10 (registry+https://github.com/rust-lang/crates.io-index)",
@@ -2140,7 +2187,7 @@ version = "0.1.0"
 dependencies = [
  "ata 0.1.0",
  "lazy_static 1.2.0 (registry+https://github.com/rust-lang/crates.io-index)",
- "log 0.3.9 (registry+https://github.com/rust-lang/crates.io-index)",
+ "log 0.4.8 (registry+https://github.com/rust-lang/crates.io-index)",
  "owning_ref 0.4.0 (git+https://github.com/kevinaboos/owning-ref-rs)",
  "pci 0.1.0",
  "spin 0.4.10 (registry+https://github.com/rust-lang/crates.io-index)",
@@ -2182,7 +2229,7 @@ dependencies = [
  "irq_safety 0.1.1 (git+https://github.com/kevinaboos/irq_safety)",
  "kernel_config 0.1.0",
  "lazy_static 1.2.0 (registry+https://github.com/rust-lang/crates.io-index)",
- "log 0.3.9 (registry+https://github.com/rust-lang/crates.io-index)",
+ "log 0.4.8 (registry+https://github.com/rust-lang/crates.io-index)",
  "memory 0.1.0",
  "mod_mgmt 0.1.0",
  "root 0.1.0",
@@ -2196,7 +2243,7 @@ name = "task_fs"
 version = "0.1.0"
 dependencies = [
  "fs_node 0.1.0",
- "log 0.3.9 (registry+https://github.com/rust-lang/crates.io-index)",
+ "log 0.4.8 (registry+https://github.com/rust-lang/crates.io-index)",
  "memory 0.1.0",
  "path 0.1.0",
  "root 0.1.0",
@@ -2222,7 +2269,7 @@ dependencies = [
 name = "test_panic"
 version = "0.1.0"
 dependencies = [
- "log 0.3.9 (registry+https://github.com/rust-lang/crates.io-index)",
+ "log 0.4.8 (registry+https://github.com/rust-lang/crates.io-index)",
  "task 0.1.0",
  "terminal_print 0.1.0",
 ]
@@ -2246,8 +2293,7 @@ version = "0.1.0"
 dependencies = [
  "apic 0.1.0",
  "irq_safety 0.1.1 (git+https://github.com/kevinaboos/irq_safety)",
- "lazy_static 1.2.0 (registry+https://github.com/rust-lang/crates.io-index)",
- "log 0.3.9 (registry+https://github.com/rust-lang/crates.io-index)",
+ "log 0.4.8 (registry+https://github.com/rust-lang/crates.io-index)",
  "memory 0.1.0",
  "pause 0.1.0",
  "x86_64 0.1.2",
@@ -2257,7 +2303,7 @@ dependencies = [
 name = "tsc"
 version = "0.1.0"
 dependencies = [
- "log 0.3.9 (registry+https://github.com/rust-lang/crates.io-index)",
+ "log 0.4.8 (registry+https://github.com/rust-lang/crates.io-index)",
  "pit_clock 0.1.0",
  "x86_64 0.1.2",
 ]
@@ -2269,7 +2315,7 @@ dependencies = [
  "apic 0.1.0",
  "atomic_linked_list 0.1.0",
  "lazy_static 1.2.0 (registry+https://github.com/rust-lang/crates.io-index)",
- "log 0.3.9 (registry+https://github.com/rust-lang/crates.io-index)",
+ "log 0.4.8 (registry+https://github.com/rust-lang/crates.io-index)",
  "memory 0.1.0",
  "spin 0.4.10 (registry+https://github.com/rust-lang/crates.io-index)",
  "x86_64 0.1.2",
@@ -2315,7 +2361,7 @@ dependencies = [
  "fallible-iterator 0.2.0 (registry+https://github.com/rust-lang/crates.io-index)",
  "gimli 0.19.0 (registry+https://github.com/rust-lang/crates.io-index)",
  "interrupts 0.1.0",
- "log 0.3.9 (registry+https://github.com/rust-lang/crates.io-index)",
+ "log 0.4.8 (registry+https://github.com/rust-lang/crates.io-index)",
  "memory 0.1.0",
  "mod_mgmt 0.1.0",
  "runqueue 0.1.0",
@@ -2327,7 +2373,7 @@ dependencies = [
 name = "unwind_test"
 version = "0.1.0"
 dependencies = [
- "log 0.3.9 (registry+https://github.com/rust-lang/crates.io-index)",
+ "log 0.4.8 (registry+https://github.com/rust-lang/crates.io-index)",
  "task 0.1.0",
  "terminal_print 0.1.0",
 ]
@@ -2362,7 +2408,7 @@ name = "vfs_node"
 version = "0.1.0"
 dependencies = [
  "fs_node 0.1.0",
- "log 0.3.9 (registry+https://github.com/rust-lang/crates.io-index)",
+ "log 0.4.8 (registry+https://github.com/rust-lang/crates.io-index)",
  "memory 0.1.0",
  "spin 0.4.10 (registry+https://github.com/rust-lang/crates.io-index)",
  "x86_64 0.1.2",
@@ -2401,7 +2447,7 @@ name = "wait_queue"
 version = "0.1.0"
 dependencies = [
  "irq_safety 0.1.1 (git+https://github.com/kevinaboos/irq_safety)",
- "log 0.3.9 (registry+https://github.com/rust-lang/crates.io-index)",
+ "log 0.4.8 (registry+https://github.com/rust-lang/crates.io-index)",
  "scheduler 0.1.0",
  "task 0.1.0",
 ]
@@ -2414,7 +2460,7 @@ dependencies = [
  "event_types 0.1.0",
  "framebuffer 0.1.0",
  "framebuffer_drawer 0.1.0",
- "log 0.3.9 (registry+https://github.com/rust-lang/crates.io-index)",
+ "log 0.4.8 (registry+https://github.com/rust-lang/crates.io-index)",
  "mouse 0.1.0",
  "mpmc 0.1.6-pre",
  "owning_ref 0.4.0 (git+https://github.com/kevinaboos/owning-ref-rs)",
@@ -2449,7 +2495,7 @@ dependencies = [
  "framebuffer_drawer 0.1.0",
  "keycodes_ascii 0.1.0",
  "lazy_static 1.2.0 (registry+https://github.com/rust-lang/crates.io-index)",
- "log 0.3.9 (registry+https://github.com/rust-lang/crates.io-index)",
+ "log 0.4.8 (registry+https://github.com/rust-lang/crates.io-index)",
  "mod_mgmt 0.1.0",
  "mouse_data 0.1.0",
  "mpmc 0.1.6-pre",
@@ -2514,9 +2560,9 @@ source = "git+https://github.com/kevinaboos/zero.git#9fc7ff523138a21f40359b706d2
 "checksum itertools 0.7.11 (registry+https://github.com/rust-lang/crates.io-index)" = "0d47946d458e94a1b7bcabbf6521ea7c037062c81f534615abcad76e84d4970d"
 "checksum keccak 0.1.0 (registry+https://github.com/rust-lang/crates.io-index)" = "67c21572b4949434e4fc1e1978b99c5f77064153c59d998bf13ecd96fb5ecba7"
 "checksum lazy_static 1.2.0 (registry+https://github.com/rust-lang/crates.io-index)" = "a374c89b9db55895453a74c1e38861d9deec0b01b405a82516e9d5de4820dea1"
+"checksum libm 0.2.1 (registry+https://github.com/rust-lang/crates.io-index)" = "c7d73b3f436185384286bd8098d17ec07c9a7d2388a6599f824d8502b529702a"
 "checksum linked_list_allocator 0.6.3 (registry+https://github.com/rust-lang/crates.io-index)" = "655d57c71827fe0891ce72231b6aa5e14033dae3f604609e6a6f807267c1678d"
-"checksum log 0.3.9 (registry+https://github.com/rust-lang/crates.io-index)" = "e19e8d5c34a3e0e2223db8e060f9e8264aeeb5c5fc64a4ee9965c062211c024b"
-"checksum log 0.4.6 (registry+https://github.com/rust-lang/crates.io-index)" = "c84ec4b527950aa83a329754b01dbe3f58361d1c5efacd1f6d68c494d08a17c6"
+"checksum log 0.4.8 (registry+https://github.com/rust-lang/crates.io-index)" = "14b6052be84e6b71ab17edffc2eeabf5c2c3ae1fdb464aae35ac50c67a44e1f7"
 "checksum managed 0.7.1 (registry+https://github.com/rust-lang/crates.io-index)" = "fdcec5e97041c7f0f1c5b7d93f12e57293c831c646f4cc7a5db59460c7ea8de6"
 "checksum memchr 2.1.3 (registry+https://github.com/rust-lang/crates.io-index)" = "e1dd4eaac298c32ce07eb6ed9242eda7d82955b9170b7d6db59b2e02cc63fcb8"
 "checksum multiboot2 0.7.1 (registry+https://github.com/rust-lang/crates.io-index)" = "6ebbe89ab663a65cab341428d5fc7013b0eab5543ace92a401a86581e50fdd81"
@@ -2537,6 +2583,7 @@ source = "git+https://github.com/kevinaboos/zero.git#9fc7ff523138a21f40359b706d2
 "checksum rand_pcg 0.1.1 (registry+https://github.com/rust-lang/crates.io-index)" = "086bd09a33c7044e56bb44d5bdde5a60e7f119a9e95b0775f545de759a32fe05"
 "checksum rand_xorshift 0.1.0 (registry+https://github.com/rust-lang/crates.io-index)" = "effa3fcaa47e18db002bdde6060944b6d2f9cfd8db471c30e873448ad9187be3"
 "checksum raw-cpuid 7.0.3 (registry+https://github.com/rust-lang/crates.io-index)" = "b4a349ca83373cfa5d6dbb66fd76e58b2cca08da71a5f6400de0a0a6a9bceeaf"
+"checksum rbtree 0.1.5 (git+https://github.com/theseus-os/rbtree-rs.git)" = "<none>"
 "checksum rlibc 1.0.0 (registry+https://github.com/rust-lang/crates.io-index)" = "fc874b127765f014d792f16763a81245ab80500e2ad921ed4ee9e82481ee08fe"
 "checksum rustc-demangle 0.1.14 (registry+https://github.com/rust-lang/crates.io-index)" = "ccc78bfd5acd7bf3e89cffcf899e5cb1a52d6fafa8dec2739ad70c9577a57288"
 "checksum rustc_version 0.1.7 (registry+https://github.com/rust-lang/crates.io-index)" = "c5f5376ea5e30ce23c03eb77cbe4962b988deead10910c372b226388b594c084"

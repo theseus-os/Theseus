@@ -24,8 +24,7 @@ path = "../../libs/cow_arc"
 path = "../kernel_config"
 
 [dependencies.log]
-default-features = false
-version = "0.3.7"
+version = "0.4.8"
 
 [dependencies.crate_name_utils]
 path = "../crate_name_utils"
@@ -50,9 +49,6 @@ path = "../path"
 
 [dependencies.memfs]
 path = "../memfs"
-
-[dependencies.hpet]
-path = "../hpet"
 
 [lib]
 crate-type = ["rlib"]

@@ -23,8 +23,7 @@ path = "../vfs_node"
 path = "../root"
 
 [dependencies.log]
-default-features = false
-version = "0.3.7"
+version = "0.4.8"
 
 [lib]
 crate-type = ["rlib"]

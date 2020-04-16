@@ -251,7 +251,7 @@ impl E1000Nic {
             rx_bufs_in_use: rx_buffers,
             received_frames: VecDeque::new(),
             // here the cpu id is irrelevant because there's no DCA or MSI 
-            cpu_id: get_my_apic_id().ok_or("E1000::init(): couldn't get my apic id")?,
+            cpu_id: get_my_apic_id(),
             rdt_addr: VirtualAddress::new(mem_base_v.value() + REG_RXDESCTAIL as usize)?,
         };
 
@@ -260,7 +260,7 @@ impl E1000Nic {
             id: 0,
             tx_descs: tx_descs,
             tx_cur: 0,
-            cpu_id: get_my_apic_id().ok_or("E1000::init(): couldn't get my apic id")?,
+            cpu_id: get_my_apic_id(),
             tdt_addr: VirtualAddress::new(mem_base_v.value() + REG_TXDESCTAIL as usize)?,
         };
 

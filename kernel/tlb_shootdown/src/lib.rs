@@ -3,8 +3,6 @@
 #![no_std]
 #![feature(asm)]
 
-extern crate alloc;
-#[macro_use] extern crate lazy_static;
 // #[macro_use] extern crate log;
 extern crate irq_safety;
 extern crate memory;
@@ -14,10 +12,9 @@ extern crate pause;
 
 
 use core::sync::atomic::{AtomicUsize, AtomicBool, Ordering};
-use alloc::vec::Vec;
 use irq_safety::{hold_interrupts, RwLockIrqSafe};
-use memory::VirtualAddress;
-use apic::{LocalApic, get_my_apic, get_lapics, LapicIpiDestination};
+use memory::PageRange;
+use apic::{LocalApic, get_my_apic, core_count, LapicIpiDestination};
 use pause::spin_loop_hint;
 
 
@@ -27,11 +24,8 @@ pub const TLB_SHOOTDOWN_IPI_IRQ: u8 = 0x40;
 pub static TLB_SHOOTDOWN_IPI_COUNT: AtomicUsize = AtomicUsize::new(0);
 /// The lock that makes sure only one set of TLB shootdown IPIs is concurrently happening
 pub static TLB_SHOOTDOWN_IPI_LOCK: AtomicBool = AtomicBool::new(false);
-lazy_static! {
-    /// The virtual addresses used for TLB shootdown IPIs
-    pub static ref TLB_SHOOTDOWN_IPI_VIRTUAL_ADDRESSES: RwLockIrqSafe<Vec<VirtualAddress>> = 
-        RwLockIrqSafe::new(Vec::new());
-}
+/// The range of pages for a TLB shootdown IPI.
+pub static TLB_SHOOTDOWN_IPI_PAGES: RwLockIrqSafe<Option<PageRange>> = RwLockIrqSafe::new(None);
 
 
 /// Initializes data, functions, and structures for the TLB shootdown. 
@@ -44,38 +38,38 @@ pub fn init() {
 /// Broadcasts TLB shootdown IPI to all other AP cores.
 /// Do not invoke this directly, but rather pass it as a callback to the memory subsystem,
 /// which will invoke it as needed (on remap/unmap operations).
-fn broadcast_tlb_shootdown(virtual_addresses: Vec<VirtualAddress>) {
+fn broadcast_tlb_shootdown(pages_to_invalidate: PageRange) {
     if let Some(my_lapic) = get_my_apic() {
         // info!("broadcast_tlb_shootdown():  AP {}, vaddrs: {:?}", my_lapic.read().apic_id, virtual_addresses);
-        send_tlb_shootdown_ipi(&mut my_lapic.write(), virtual_addresses);
+        send_tlb_shootdown_ipi(&mut my_lapic.write(), pages_to_invalidate);
     }
 }
 
 
 /// Handles a TLB shootdown ipi by flushing the `VirtualAddress`es 
-/// currently stored in `TLB_SHOOTDOWN_IPI_VIRTUAL_ADDRESSES`.
-/// DO not invoke this directly, it will be called by an IPI interrupt handler.
-pub fn handle_tlb_shootdown_ipi(virtual_addresses: &[VirtualAddress]) {
-    // let apic_id = get_my_apic_id().unwrap_or(0xFF);
-    // trace!("handle_tlb_shootdown_ipi(): AP {}, vaddrs: {:?}", apic_id, virtual_addresses);
+/// covered by the given range of `pages_to_invalidate`.
+/// 
+/// There is no need to invoke this directly, it will be called by an IPI interrupt handler.
+pub fn handle_tlb_shootdown_ipi(pages_to_invalidate: PageRange) {
+    // trace!("handle_tlb_shootdown_ipi(): AP {}, pages: {:?}", apic::get_my_apic_id(), pages_to_invalidate);
 
-    for vaddr in virtual_addresses {
-        x86_64::instructions::tlb::flush(x86_64::VirtualAddress(vaddr.value()));
+    for page in pages_to_invalidate {
+        x86_64::instructions::tlb::flush(x86_64::VirtualAddress(page.start_address().value()));
     }
     TLB_SHOOTDOWN_IPI_COUNT.fetch_sub(1, Ordering::SeqCst);
 }
 
 
 /// Sends an IPI to all other cores (except me) to trigger 
-/// a TLB flush of the given `VirtualAddress`es
-pub fn send_tlb_shootdown_ipi(my_lapic: &mut LocalApic, virtual_addresses: Vec<VirtualAddress>) {        
+/// a TLB flush of the given pages' virtual addresses.
+pub fn send_tlb_shootdown_ipi(my_lapic: &mut LocalApic, pages_to_invalidate: PageRange) {        
     // skip sending IPIs if there are no other cores running
-    let core_count = get_lapics().iter().count();
+    let core_count = core_count();
     if core_count <= 1 {
         return;
     }
 
-    // trace!("send_tlb_shootdown_ipi(): from AP {}, core_count: {}, {:?}", self.apic_id, core_count, virtual_addresses);
+    // trace!("send_tlb_shootdown_ipi(): from AP {}, core_count: {}, {:?}", my_lapic.apic_id, core_count, pages_to_invalidate);
 
     // interrupts must be disabled here, because this IPI sequence must be fully synchronous with other cores,
     // and we wouldn't want this core to be interrupted while coordinating IPI responses across multiple cores.
@@ -87,7 +81,7 @@ pub fn send_tlb_shootdown_ipi(my_lapic: &mut LocalApic, virtual_addresses: Vec<V
         spin_loop_hint();
     }
 
-    *TLB_SHOOTDOWN_IPI_VIRTUAL_ADDRESSES.write() = virtual_addresses;
+    *TLB_SHOOTDOWN_IPI_PAGES.write() = Some(pages_to_invalidate);
     TLB_SHOOTDOWN_IPI_COUNT.store(core_count - 1, Ordering::SeqCst); // -1 to exclude this core 
 
     // let's try to use NMI instead, since it will interrupt everyone forcibly and result in the fastest handling
@@ -101,7 +95,7 @@ pub fn send_tlb_shootdown_ipi(my_lapic: &mut LocalApic, virtual_addresses: Vec<V
     }
 
     // clear TLB shootdown data
-    TLB_SHOOTDOWN_IPI_VIRTUAL_ADDRESSES.write().clear();
+    *TLB_SHOOTDOWN_IPI_PAGES.write() = None;
 
     // release lock
     TLB_SHOOTDOWN_IPI_LOCK.store(false, Ordering::SeqCst); 
