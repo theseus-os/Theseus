@@ -128,7 +128,7 @@ fn rmain(matches: Matches) -> Result<(), &'static str> {
 
 /// A simple test that spawns a sender & receiver task to send a single message
 fn rendezvous_test_oneshot() -> Result<(), &'static str> {
-    let my_cpu = apic::get_my_apic_id().ok_or("couldn't get my APIC ID")?;
+    let my_cpu = apic::get_my_apic_id();
 
     let (sender, receiver) = rendezvous::new_channel();
 
@@ -165,7 +165,7 @@ fn rendezvous_test_oneshot() -> Result<(), &'static str> {
 
 /// A simple test that spawns a sender & receiver task to send `iterations` messages.
 fn rendezvous_test_multiple(iterations: usize) -> Result<(), &'static str> {
-    let my_cpu = apic::get_my_apic_id().ok_or("couldn't get my APIC ID")?;
+    let my_cpu = apic::get_my_apic_id();
 
     let (sender, receiver) = rendezvous::new_channel();
 
@@ -206,7 +206,7 @@ fn rendezvous_test_multiple(iterations: usize) -> Result<(), &'static str> {
 
 /// A simple test that spawns a sender & receiver task to send a single message
 fn asynchronous_test_oneshot() -> Result<(), &'static str> {
-    let my_cpu = apic::get_my_apic_id().ok_or("couldn't get my APIC ID")?;
+    let my_cpu = apic::get_my_apic_id();
 
     let (sender, receiver) = async_channel::new_channel(2);
 
@@ -243,7 +243,7 @@ fn asynchronous_test_oneshot() -> Result<(), &'static str> {
 
 /// A simple test that spawns a sender & receiver task to send `iterations` messages.
 fn asynchronous_test_multiple(iterations: usize) -> Result<(), &'static str> {
-    let my_cpu = apic::get_my_apic_id().ok_or("couldn't get my APIC ID")?;
+    let my_cpu = apic::get_my_apic_id();
 
     let (sender, receiver) = async_channel::new_channel(2);
 

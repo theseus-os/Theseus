@@ -12,7 +12,7 @@ bm_in_us = []
 
 # [dependencies.log]
 # default-features = false
-# version = "0.3.7"
+# version = "0.4.8"
 
 
 [dependencies.terminal_print]
@@ -46,7 +46,3 @@ path = "../../kernel/fs_node"
 
 [dependencies.scheduler]
 path = "../../kernel/scheduler"
-
-[dependencies.log]
-default-features = false
-version = "0.3.7"

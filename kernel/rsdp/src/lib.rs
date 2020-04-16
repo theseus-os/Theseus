@@ -8,7 +8,7 @@ extern crate owning_ref;
 
 use core::ops::DerefMut;
 use core::mem;
-use memory::{PageTable, MappedPages, Frame, FrameRange, FRAME_ALLOCATOR, PhysicalAddress, allocate_pages_by_bytes, EntryFlags};
+use memory::{PageTable, MappedPages, Frame, FrameRange, get_frame_allocator_ref, PhysicalAddress, allocate_pages_by_bytes, EntryFlags};
 use owning_ref::BoxRef;
 use alloc::boxed::Box;
 
@@ -51,9 +51,8 @@ impl Rsdp {
         );
         
         let mapped_pages = {
-            let allocator_mutex = FRAME_ALLOCATOR.try().ok_or("FRAME_ALLOCATOR wasn't initialized")?;
-            let mut allocator = allocator_mutex.lock();
-            page_table.map_allocated_pages_to(pages, search_range, EntryFlags::PRESENT, allocator.deref_mut())?
+            let allocator = get_frame_allocator_ref().ok_or("frame allocator wasn't initialized")?;
+            page_table.map_allocated_pages_to(pages, search_range, EntryFlags::PRESENT, allocator.lock().deref_mut())?
         };
         
         Rsdp::search(mapped_pages)

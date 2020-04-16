@@ -22,7 +22,10 @@ pub use self::temporary_page::TemporaryPage;
 pub use self::mapper::*;
 pub use self::virtual_address_allocator::*;
 
-use core::fmt;
+use core::{
+    ops::{Deref, DerefMut},
+    fmt,
+};
 use super::*;
 
 use kernel_config::memory::{RECURSIVE_P4_INDEX};

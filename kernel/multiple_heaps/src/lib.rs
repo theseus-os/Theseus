@@ -44,7 +44,7 @@ extern crate heap_trace;
 
 use core::ptr::NonNull;
 use alloc::alloc::{GlobalAlloc, Layout};
-use memory::{MappedPages, VirtualAddress, FRAME_ALLOCATOR, get_kernel_mmi_ref, PageRange};
+use memory::{MappedPages, VirtualAddress, get_frame_allocator_ref, get_kernel_mmi_ref, PageRange};
 use kernel_config::memory::{MAX_HEAPS, PAGE_SIZE, PER_CORE_HEAP_INITIAL_SIZE_PAGES, KERNEL_HEAP_INITIAL_SIZE_PAGES, KERNEL_HEAP_START, KERNEL_HEAP_MAX_SIZE};
 use irq_safety::{MutexIrqSafe, RwLockIrqSafe};
 use slabmalloc::{ZoneAllocator, ObjectPage8k, AllocablePage};
@@ -144,7 +144,7 @@ fn create_heap_mapping(starting_address: VirtualAddress, size_in_bytes: usize) -
     let kernel_mmi_ref = get_kernel_mmi_ref().ok_or("create_heap_mapping(): KERNEL_MMI was not yet initialized!")?;
     let mut kernel_mmi = kernel_mmi_ref.lock();
 
-    let mut frame_allocator = FRAME_ALLOCATOR.try()
+    let mut frame_allocator = get_frame_allocator_ref()
         .ok_or("create_heap_mapping(): couldnt get FRAME_ALLOCATOR")?
         .lock();
 
@@ -214,7 +214,7 @@ pub fn init_individual_heap(key: usize) -> Result<(), &'static str> {
 /// other value e.g. task id
 #[inline(always)] 
 fn get_key() -> usize {
-    apic::get_my_apic_id_fast() as usize
+    apic::get_my_apic_id() as usize
         // .ok_or("Heap:: Could not retrieve apic id")
         // .expect("Heap:: Could not retrieve apic id") as usize
     // CpuId::new().get_feature_info().expect("Could not retrieve cpuid").initial_local_apic_id() as usize

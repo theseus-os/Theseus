@@ -11,8 +11,7 @@ volatile = "0.2.5"
 owning_ref = { git = "https://github.com/kevinaboos/owning-ref-rs" }
 
 [dependencies.log]
-default-features = false
-version = "0.3.7"
+version = "0.4.8"
 
 [dependencies.kernel_config]
 path = "../kernel_config"
