@@ -16,14 +16,8 @@ version = "0.14.0"
 default-features = false
 features = [ "no_std" ]
 
-[dependencies.atomic_linked_list]
-path = "../../libs/atomic_linked_list"
-
 [dependencies.kernel_config]
 path = "../kernel_config"
-
-[dependencies.heap_irq_safe]
-path = "../heap_irq_safe"
 
 [dependencies.entryflags_x86_64]
 path = "../entryflags_x86_64"
