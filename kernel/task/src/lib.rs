@@ -885,6 +885,7 @@ impl TaskRef {
     
     /// Obtains the lock on the underlying `Task` in a writable, blocking fashion.
     #[deprecated(note = "This method exposes inner Task details for debugging purposes. Do not use it.")]
+    #[doc(hidden)]
     pub fn lock_mut(&self) -> MutexIrqSafeGuardRefMut<Task> {
         MutexIrqSafeGuardRefMut::new(self.0.deref().0.lock())
     }
