@@ -150,7 +150,7 @@ impl PageTable {
         // debug!("PageTable::switch() old table: {:?}, new table: {:?}", self, new_table);
 
         // perform the actual page table switch
-        unsafe { set_p4(new_table.p4_table.start_address()); }
+        unsafe { x86_64::registers::control_regs::cr3_write(x86_64::PhysicalAddress(new_table.p4_table.start_address().value() as u64)) };
         let current_table_after_switch = PageTable::from_current();
         current_table_after_switch
     }
