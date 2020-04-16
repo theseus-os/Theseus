@@ -10,7 +10,6 @@
 //! [atb]: fn.new_application_task_builder.html
 
 #![no_std]
-#![feature(asm)]
 #![feature(stmt_expr_attributes)]
 
 #[macro_use] extern crate alloc;
@@ -258,10 +257,12 @@ impl<F, A, R> TaskBuilder<F, A, R>
         // This is probably stupid (it'd be best to put them directly where they need to go towards the top of the stack),
         // but it simplifies type safety in the `task_wrapper` entry point and removes uncertainty from assumed calling conventions.
         {
-            let kthread_call = Box::new( KthreadCall::new(self.argument, self.func) );
-            let kthread_ptr: *mut KthreadCall<F, A, R> = Box::into_raw(kthread_call);
-            let kthread_mut_ref = new_task.kstack.as_type_mut::<*mut KthreadCall<F, A, R>>(0)?;
-            *kthread_mut_ref = kthread_ptr;
+            let bottom_of_stack: &mut Option<TaskFuncArg<F, A>> = new_task.kstack.as_type_mut(0)?;
+            // We use an option so we can take ownership of it later, in `task_wrapper()`.
+            *bottom_of_stack = Some(TaskFuncArg {
+                arg:  self.argument,
+                func: self.func,
+            });
         }
 
         // The new task is ready to be scheduled in, now that its stack trampoline has been set up.
@@ -309,24 +310,12 @@ type MainFuncRet = isize;
 /// as it is the entry point into each application `Task`.
 type MainFunc = fn(MainFuncArg) -> MainFuncRet;
 
+/// A wrapper around a task's function and argument.
 #[derive(Debug)]
-struct KthreadCall<F, A, R> {
-    /// comes from Box::into_raw(Box<A>)
-    pub arg: *mut A,
-    pub func: F,
-    _rettype: PhantomData<R>,
+struct TaskFuncArg<F, A> {
+    arg:  A,
+    func: F,
 }
-
-impl<F, A, R> KthreadCall<F, A, R> {
-    fn new(a: A, f: F) -> KthreadCall<F, A, R> where F: FnOnce(A) -> R {
-        KthreadCall {
-            arg: Box::into_raw(Box::new(a)),
-            func: f,
-            _rettype: PhantomData,
-        }
-    }
-}
-
 
 
 /// This function sets up the given new `Task`'s kernel stack pointer to properly jump
@@ -398,28 +387,18 @@ fn task_wrapper<F, A, R>() -> !
         let curr_task_ref = get_my_current_task().expect("BUG: task_wrapper: couldn't get current task (before task func).");
         let curr_task_name = curr_task_ref.lock().name.clone();
 
-        // The pointer to the kthread_call struct (func and arg) was placed at the bottom of the stack when this task was spawned.
-        let kthread_call_ptr: *mut KthreadCall<F, A, R> = {
-            let t = curr_task_ref.lock();
-            let kthread_ptr_ref = t.kstack.as_type::<*const KthreadCall<F, A, R>>(0).unwrap();
-            let kthread_ptr_val = *kthread_ptr_ref;
-            kthread_ptr_val as *mut _
+        // This task's function and argument were placed at the bottom of the stack when this task was spawned.
+        let task_func_arg = {
+            #[allow(deprecated)]
+            let mut t = curr_task_ref.lock_mut();
+            t.kstack.as_type_mut::<Option<TaskFuncArg<F, A>>>(0).ok()
+                .and_then(|opt| opt.take())
+                .expect("BUG: task_wrapper: couldn't get task's function or argument")
         };
-
-        let kthread_call: KthreadCall<F, A, R> = {
-            let kthread_call_box: Box<KthreadCall<F, A, R>> = unsafe {
-                Box::from_raw(kthread_call_ptr)
-            };
-            *kthread_call_box
-        };
-        let arg: A = {
-            let arg_box: Box<A> = unsafe {
-                Box::from_raw(kthread_call.arg)
-            };
-            *arg_box
-        };
-        let func = kthread_call.func;
-        debug!("task_wrapper [1]: \"{}\" about to call kthread func {:?} with arg {:?}", curr_task_name, debugit!(func), debugit!(arg));
+        let (func, arg) = (task_func_arg.func, task_func_arg.arg);
+        debug!("task_wrapper [1]: \"{}\" about to call task entry func {:?} {{{}}} with arg {:?}",
+            curr_task_name, debugit!(func), core::any::type_name::<F>(), debugit!(arg)
+        );
         (func, arg)
     };
 
