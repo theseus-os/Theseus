@@ -1,6 +1,7 @@
 //! The global allocator for the system. 
 //! It starts off as a single fixed size allocator.
 //! When a more complex heap is set up, it is set as the default allocator.
+//! Any memory request greater than 8056 bytes is satisfied through a request for pages from the kernel.
 
 #![feature(const_fn)]
 #![feature(allocator_api)]

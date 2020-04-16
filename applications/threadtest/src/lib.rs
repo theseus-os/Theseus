@@ -1,3 +1,8 @@
+//! A Rust version of the threadtest heap microbenchmark
+//! 
+//! The original version was presented in the Hoard paper
+//! https://github.com/emeryberger/Hoard/tree/master/benchmarks/threadtest
+
 #![no_std]
 
 extern crate alloc;

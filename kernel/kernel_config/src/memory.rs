@@ -84,7 +84,7 @@ pub const KERNEL_HEAP_MAX_SIZE: usize = ADDRESSABILITY_PER_P4_ENTRY;
 /// the maximum number of per-core heaps we can have
 pub const MAX_HEAPS: usize = 128;
 /// The number of pages each per-core heap is initialized with.
-pub const PER_CORE_HEAP_INITIAL_SIZE_PAGES: usize = 264*8; // ~ 1MiB
+pub const PER_CORE_HEAP_INITIAL_SIZE_PAGES: usize = 264; // ~ 1MiB
 
 
 /// the kernel stack allocator gets the 508th P4 entry of addressability.

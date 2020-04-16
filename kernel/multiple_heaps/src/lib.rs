@@ -2,14 +2,9 @@
 //! Right now we use the apic id as the key, so that we have per-core heaps.
 //! 
 //! The heaps are ZoneAllocators (given in the slabmalloc crate). Each ZoneAllocator maintains 11 separate "slab allocators" for sizes
-//! 8, 16, 32, 64, 128, 256, 512, 1024, 2048, 4096 and 8056 (8192 bytes 136 bytes of metadata) bytes.
+//! 8, 16, 32, 64, 128, 256, 512, 1024, 2048, 4096 and 8056 (8192 bytes - 136 bytes of metadata) bytes.
 //! The slab allocator maintains linked lists of allocable pages from which it allocates objects of the same size. 
 //! The allocable pages are 8 KiB, and have metadata stored in the last 136 bytes.
-//! 
-//! In addition to the alloc and dealloc functions, this allocator decides:
-//!  * If the requested size is large enough to allocate pages directly from the OS
-//!  * If the requested size is small, which heap to actually allocate/deallocate from
-//!  * How to deal with OOM errors returned by a heap
 //! 
 //! Any memory request greater than 8056 bytes is satisfied through a request for pages from the kernel.
 //! All other requests are satisfied through the per-core heaps.
@@ -139,9 +134,8 @@ fn create_heap_mapping(starting_address: VirtualAddress, size_in_bytes: usize) -
 pub fn init_individual_heap(key: usize, multiple_heaps: &MultipleHeaps) -> Result<(), &'static str> {
     // check key is within the MAX_HEAPS range
     if key >= MAX_HEAPS {
-        warn!("There is a larger key value than the maximum number of heaps in the system");
+        return Err("There is a larger key value than the maximum number of heaps in the system");
     }
-
 
     let mut heap_end = multiple_heaps.end.lock();
     if heap_end.value() == 0 {
