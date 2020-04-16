@@ -123,7 +123,7 @@ pub fn init(
 
     // //initialize the per core heaps
     // multiple_heaps::initialize_multiple_heaps()?;
-    // multiple_heaps::switch_to_multiple_heaps()?;
+    multiple_heaps::switch_to_multiple_heaps()?;
     info!("Initialized per-core heaps");
 
     let val = tsc::tsc_ticks();

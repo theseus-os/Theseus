@@ -44,6 +44,7 @@ extern crate heap_trace;
 
 use core::ptr::NonNull;
 use alloc::alloc::{GlobalAlloc, Layout};
+use alloc::boxed::Box;
 use memory::{MappedPages, VirtualAddress, get_frame_allocator_ref, get_kernel_mmi_ref, PageRange};
 use kernel_config::memory::{MAX_HEAPS, PAGE_SIZE, PER_CORE_HEAP_INITIAL_SIZE_PAGES, KERNEL_HEAP_INITIAL_SIZE_PAGES, KERNEL_HEAP_START, KERNEL_HEAP_MAX_SIZE};
 use irq_safety::{MutexIrqSafe, RwLockIrqSafe};
@@ -52,13 +53,13 @@ use core::ops::Add;
 use core::ops::DerefMut;
 use core::ptr;
 use hashbrown::HashMap;
-use heap::{global_allocator, initial_allocator, GlobalAllocFunctions, HEAP_FLAGS};
+use heap::{global_allocator, initial_allocator, HEAP_FLAGS};
 use raw_cpuid::CpuId;
 use heap_trace::take_step;
 
-lazy_static!{ 
-    static ref MULTIPLE_HEAPS_ALLOCATOR: MultipleHeaps = MultipleHeaps::empty();
-}
+// lazy_static!{ 
+//     static ref MULTIPLE_HEAPS_ALLOCATOR: MultipleHeaps = MultipleHeaps::empty();
+// }
 
 /// The size of each MappedPages Object that is allocated for the per-core heaps, in bytes.
 /// We curently work with 8KiB, so that the per core heaps can allocate objects up to 8056 bytes.  
@@ -77,29 +78,32 @@ const EMPTY_PAGES_THRESHOLD: usize = ZoneAllocator::MAX_BASE_SIZE_CLASSES * 2;
 /// Initializes the multiple heaps using the apic id as the key, which is mapped to a heap.
 /// If we want to change the value the heap id is based on, we would substitute 
 /// the lapic iterator with an iterator containing the desired keys.
-pub fn initialize_multiple_heaps() -> Result<(), &'static str> {
+pub fn initialize_multiple_heaps() -> Result<MultipleHeaps, &'static str> {
+    let multiple_heaps = MultipleHeaps::empty();
+
     for (apic_id, _lapic) in apic::get_lapics().iter() {
-        init_individual_heap(*apic_id as usize)?;
+        init_individual_heap(*apic_id as usize, &multiple_heaps)?;
     }
 
-    Ok(())       
+    Ok(multiple_heaps)       
 }
 
-#[inline(always)]
-unsafe fn multiple_heaps_allocate(layout: Layout) -> *mut u8 {
-    MULTIPLE_HEAPS_ALLOCATOR.alloc(layout) 
-}
+// #[inline(always)]
+// unsafe fn multiple_heaps_allocate(layout: Layout) -> *mut u8 {
+//     MULTIPLE_HEAPS_ALLOCATOR.alloc(layout) 
+// }
 
-#[inline(always)]
-unsafe fn multiple_heaps_deallocate(ptr: *mut u8, layout: Layout) {
-    MULTIPLE_HEAPS_ALLOCATOR.dealloc(ptr, layout)
-}
+// #[inline(always)]
+// unsafe fn multiple_heaps_deallocate(ptr: *mut u8, layout: Layout) {
+//     MULTIPLE_HEAPS_ALLOCATOR.dealloc(ptr, layout)
+// }
 
 
 /// Transfers mapped pages belonging to the initial allocator to the first multiple heap
 /// and sets the multiple heaps as the default allocator.
 /// Only call this function when the multiple heaps are ready to be used.
 pub fn switch_to_multiple_heaps() -> Result<(), &'static str> {
+    let mut multiple_heaps = Box::new(initialize_multiple_heaps()?);
     // lock the allocator so that no allocation or deallocation can take place
     let mut initial_allocator = initial_allocator().lock();
 
@@ -107,31 +111,29 @@ pub fn switch_to_multiple_heaps() -> Result<(), &'static str> {
     let mut zone_allocator = ZoneAllocator::new();
     core::mem::swap(&mut *initial_allocator, &mut zone_allocator);
 
-    // transfer initial heap to the first multiple heap
-    merge_initial_heap(zone_allocator)?;
+    let heap_id = 0; //MULTIPLE_HEAPS_ALLOCATOR.heaps.read().keys().min().ok_or("Could not find minimum heap id")?.clone();
 
-    let functions = GlobalAllocFunctions {
-        alloc: multiple_heaps_allocate,
-        dealloc: multiple_heaps_deallocate
-    };
+
+    // transfer initial heap to the first multiple heap
+    multiple_heaps.heaps[heap_id].0.lock().merge(&mut zone_allocator, heap_id)?;
 
     //set the multiple heaps as the default allocator
-    global_allocator().set_allocator_functions(functions);
+    global_allocator().set_allocator_functions(multiple_heaps);
 
     Ok(())
 }
 
 
-/// Merges the initial allocator into the multiple heap with the smallest heap id
-pub fn merge_initial_heap(mut initial_allocator: ZoneAllocator<'static>) -> Result<(), &'static str> {
-    let heap_id = 0; //MULTIPLE_HEAPS_ALLOCATOR.heaps.read().keys().min().ok_or("Could not find minimum heap id")?.clone();
-    MULTIPLE_HEAPS_ALLOCATOR.heaps[heap_id].0
-            .lock()
-            .merge(&mut initial_allocator, heap_id)?;
+// /// Merges the initial allocator into the multiple heap with the smallest heap id
+// pub fn merge_initial_heap(mut initial_allocator: ZoneAllocator<'static>) -> Result<(), &'static str> {
+//     let heap_id = 0; //MULTIPLE_HEAPS_ALLOCATOR.heaps.read().keys().min().ok_or("Could not find minimum heap id")?.clone();
+//     MULTIPLE_HEAPS_ALLOCATOR.heaps[heap_id].0
+//             .lock()
+//             .merge(&mut initial_allocator, heap_id)?;
     
-    trace!("Merged initial heap into heap {}", heap_id);
-    Ok(())
-}
+//     trace!("Merged initial heap into heap {}", heap_id);
+//     Ok(())
+// }
 
 
 /// Allocates pages from the given starting address and maps them to frames.
@@ -161,13 +163,13 @@ fn create_heap_mapping(starting_address: VirtualAddress, size_in_bytes: usize) -
 /// Initializes the heap given by `key`.
 /// There are 11 size classes in each heap ranging from [8,16,32..4096,8056 (8192 bytes - 136 bytes metadata)].
 /// We evenly distribute the pages allocated for each heap between the size classes. 
-pub fn init_individual_heap(key: usize) -> Result<(), &'static str> {
+pub fn init_individual_heap(key: usize, multiple_heaps: &MultipleHeaps) -> Result<(), &'static str> {
     // check key is within the MAX_HEAPS range
     if key >= MAX_HEAPS {
         warn!("There is a larger key value than the maximum number of heaps in the system");
     }
 
-    let mut heap_end = MULTIPLE_HEAPS_ALLOCATOR.end.lock();
+    let mut heap_end = multiple_heaps.end.lock();
     if heap_end.value() == 0 {
         *heap_end = VirtualAddress::new(KERNEL_HEAP_START + (KERNEL_HEAP_INITIAL_SIZE_PAGES * PAGE_SIZE))?;
     }
@@ -202,7 +204,7 @@ pub fn init_individual_heap(key: usize) -> Result<(), &'static str> {
     *heap_end = heap_end_addr;
 
     // store the newly created allocator in the global allocator
-    *MULTIPLE_HEAPS_ALLOCATOR.heaps[key].0.lock() = zone_allocator;
+    *multiple_heaps.heaps[key].0.lock() = zone_allocator;
     trace!("Created heap {} with max alloc size: {} bytes", key, ZoneAllocator::MAX_ALLOC_SIZE);
 
     Ok(())
@@ -327,7 +329,7 @@ unsafe impl GlobalAlloc for MultipleHeaps {
 
     /// Allocates the given `layout` from the heap of the core the task is currently running on.
     /// If the per-core heap is not initialized, then an error is returned.
-    // #[inline(always)]    
+    #[inline(always)]    
     unsafe fn alloc(&self, layout: Layout) -> *mut u8 {
         // // step 4
         // take_step();
@@ -357,7 +359,7 @@ unsafe impl GlobalAlloc for MultipleHeaps {
 
     /// Deallocates the memory at the address given by `ptr`.
     /// Memory is returned to the per-core heap it was allocated from.
-    // #[inline(always)]    
+    #[inline(always)]    
     unsafe fn dealloc(&self, ptr: *mut u8, layout: Layout) {
         // // step 4
         // take_step();

@@ -27,6 +27,7 @@ use spin::Once;
 use slabmalloc::{ZoneAllocator, ObjectPage8k, AllocablePage};
 use core::ops::DerefMut;
 use heap_trace::take_step;
+use alloc::boxed::Box;
 
 #[global_allocator]
 static ALLOCATOR: Heap = Heap::empty();
@@ -79,31 +80,33 @@ pub fn initial_allocator() -> &'static MutexIrqSafe<ZoneAllocator<'static>>{
     &ALLOCATOR.initial_allocator
 }
 
-/// The set of functions that need to be set to switch over to a new allocator.
-pub struct GlobalAllocFunctions {
-    pub alloc: unsafe fn(Layout) -> *mut u8,
-    pub dealloc: unsafe fn(*mut u8, Layout),
-}
+// /// The set of functions that need to be set to switch over to a new allocator.
+// pub struct GlobalAllocFunctions {
+//     pub alloc: unsafe fn(Layout) -> *mut u8,
+//     pub dealloc: unsafe fn(*mut u8, Layout),
+// }
 
 /// The heap which is used as a global allocator for the system.
 /// It starts off with one basic fixed size allocator. 
 /// When a more complex heap is initialized it is set as the default allocator by setting the `allocator_functions`.
 pub struct Heap {
     initial_allocator: MutexIrqSafe<ZoneAllocator<'static>>, 
-    allocator_functions: Once<GlobalAllocFunctions>
+    allocator: Once<Box<dyn GlobalAlloc>>
 }
 
+// unsafe impl Send for Heap {}
+unsafe impl Sync for Heap{}
 
 impl Heap {
     pub const fn empty() -> Heap {
         Heap{
             initial_allocator: MutexIrqSafe::new(ZoneAllocator::new()),
-            allocator_functions: Once::new()
+            allocator: Once::new()
         }
     }
 
-    pub fn set_allocator_functions(&self, functions: GlobalAllocFunctions) {
-        self.allocator_functions.call_once(|| functions);
+    pub fn set_allocator_functions(&self, allocator: Box<dyn GlobalAlloc>) {
+        self.allocator.call_once(|| allocator);
     }
 }
 
@@ -118,20 +121,20 @@ unsafe impl GlobalAlloc for Heap {
             return allocate_large_object(layout).ok().map_or(ptr::null_mut(), |ptr| ptr.as_ptr());
         }
 
-        // //step 2
-        // take_step();
+        //step 2
+        take_step();
 
-        let res = match self.allocator_functions.try() {
+        let res = match self.allocator.try() {
             // use the multiple heaps allocator
             Some(allocator) => {
                 // //step 3
                 // take_step();
-                (allocator.alloc)(layout)
+                allocator.alloc(layout)
             }
             // use the initial allocator
             None => {
                 // //step 3
-                // take_step();
+                take_step();
                 self.initial_allocator.lock().allocate(layout).ok().map_or(ptr::null_mut(), |ptr| ptr.as_ptr()) 
             }
         };
@@ -154,12 +157,12 @@ unsafe impl GlobalAlloc for Heap {
         // //step 2
         // take_step();
 
-        match self.allocator_functions.try() {
+        match self.allocator.try() {
             // use the multiple heaps allocator            
             Some(allocator) => {
                 // //step 3
                 // take_step();
-                (allocator.dealloc)(ptr, layout)
+                allocator.dealloc(ptr, layout)
             }
             // use the initial allocator
             None => {
@@ -169,8 +172,8 @@ unsafe impl GlobalAlloc for Heap {
             }
         }
 
-        // //step 7 or 4 or 3
-        // take_step();
+        // // //step 7 or 4 or 3
+        // // take_step();
     }
 
 }

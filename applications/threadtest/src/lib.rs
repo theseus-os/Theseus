@@ -101,12 +101,12 @@ fn rmain() -> Result<(), &'static str> {
 
 
     for i in 0..nthreads {
-        threads.push(spawn::new_task_builder(worker, ()).name(String::from("worker thread")).pin_on_core(3).spawn()?);
+        threads.push(spawn::new_task_builder(worker, ()).name(String::from("worker thread")).spawn()?);
     }  
 
     let start = get_hpet().as_ref().ok_or("couldn't get HPET timer")?.get_counter();
 
-    START_ITER.store(true, Ordering::SeqCst);
+    // START_ITER.store(true, Ordering::SeqCst);
 
 
     for i in 0..nthreads {
