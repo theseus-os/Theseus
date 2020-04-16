@@ -1336,13 +1336,7 @@ dependencies = [
 name = "network_interface_card"
 version = "0.1.0"
 dependencies = [
- "intel_ethernet 0.1.0",
- "log 0.4.8 (registry+https://github.com/rust-lang/crates.io-index)",
- "memory 0.1.0",
- "mpmc 0.1.6-pre",
  "nic_buffers 0.1.0",
- "nic_initialization 0.1.0",
- "nic_queues 0.1.0",
 ]
 
 [[package]]
