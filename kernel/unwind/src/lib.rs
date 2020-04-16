@@ -100,6 +100,12 @@ pub struct UnwindingContext {
     /// A reference to the current task that is being unwound.
     current_task: TaskRef,
 }
+impl Into<(StackFrameIter, KillReason, TaskRef)> for UnwindingContext {
+    fn into(self) -> (StackFrameIter, KillReason, TaskRef) {
+        (self.stack_frame_iter, self.cause, self.current_task)
+    }
+}
+
 
 
 /// A single frame in the stack, which contains
@@ -393,7 +399,7 @@ impl FallibleIterator for StackFrameIter {
             // trace!("cfa is {:#X}", cfa);
 
             let frame = StackFrame {
-                personality: fde.personality().map(|x| unsafe { deref_ptr(x) }),
+                personality: None, // we don't use the personality function in Theseus
                 lsda: fde.lsda().map(|x| unsafe { deref_ptr(x) }),
                 initial_address: fde.initial_address(),
                 call_site_address: caller,
@@ -736,7 +742,7 @@ pub fn start_unwinding(reason: KillReason, stack_frames_to_skip: usize) -> Resul
 /// This returns an error upon failure, 
 /// and an `Ok(())` when it reaches the end of the stack and there are no more frames to unwind.
 /// When either value is returned (upon a return of any kind),
-/// **the caller is responsible for cleaning up the given `UnwindingContext`.
+/// **the caller is responsible for cleaning up** the given `UnwindingContext`.
 /// 
 /// Upon successfully continuing to iterate up the call stack, this function will actually not return at all. 
 fn continue_unwinding(unwinding_context_ptr: *mut UnwindingContext) -> Result<(), &'static str> {
@@ -853,7 +859,7 @@ fn cleanup_unwinding_context(unwinding_context_ptr: *mut UnwindingContext) -> ! 
     // Recover ownership of the unwinding context from its pointer
     let unwinding_context_boxed = unsafe { Box::from_raw(unwinding_context_ptr) };
     let unwinding_context = *unwinding_context_boxed;
-    let UnwindingContext { current_task, cause, stack_frame_iter } = unwinding_context;
+    let (stack_frame_iter, cause, current_task) = unwinding_context.into();
     drop(stack_frame_iter);
 
     let failure_cleanup_function = {
@@ -862,14 +868,4 @@ fn cleanup_unwinding_context(unwinding_context_ptr: *mut UnwindingContext) -> ! 
     };
     warn!("cleanup_unwinding_context(): invoking the task_cleanup_failure function for task {:?}", current_task);
     failure_cleanup_function(current_task, cause)
-}
-
-
-/// Retakes ownership of the given `unwinding_context_ptr`, which is a pointer to a `Box<UnwindingContext>` struct, 
-/// and then unboxes it and returns the reason/cause of unwinding, dropping all other fields in the `UnwindingContext`.
-#[doc(hidden)]
-pub unsafe fn unwinding_context_ptr_into_cause(unwinding_context_ptr: *mut UnwindingContext) -> task::KillReason {
-    let unwinding_context_boxed = Box::from_raw(unwinding_context_ptr);
-    let unwinding_context = *unwinding_context_boxed;
-    unwinding_context.cause
 }
