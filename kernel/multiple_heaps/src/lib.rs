@@ -35,13 +35,12 @@ extern crate hashbrown;
 use core::ptr::NonNull;
 use alloc::alloc::{GlobalAlloc, Layout};
 use alloc::{
-    boxed::Box,
-    vec::Vec
+    boxed::Box
 };
 use memory::{MappedPages, VirtualAddress, get_frame_allocator_ref, get_kernel_mmi_ref, PageRange};
 use kernel_config::memory::{MAX_HEAPS, PAGE_SIZE, PER_CORE_HEAP_INITIAL_SIZE_PAGES, KERNEL_HEAP_INITIAL_SIZE_PAGES, KERNEL_HEAP_START, KERNEL_HEAP_MAX_SIZE};
 use irq_safety::MutexIrqSafe;
-use slabmalloc::{ZoneAllocator, ObjectPage8k, AllocablePage};
+use slabmalloc::{ZoneAllocator, ObjectPage8k, AllocablePage, Allocator};
 use core::ops::{Add, Deref, DerefMut};
 use core::ptr;
 use heap::HEAP_FLAGS;
@@ -60,8 +59,6 @@ const HEAP_MAPPED_PAGES_SIZE_IN_PAGES: usize = ObjectPage8k::SIZE / PAGE_SIZE;
 /// set this threshold value. A heap must have greater than this number of empty mapped pages to return one for use by other heaps.
 const EMPTY_PAGES_THRESHOLD: usize = ZoneAllocator::MAX_BASE_SIZE_CLASSES * 2;
 
-/// The number of large allocations the heap can store when the multiple heaps are first initialized
-const LARGE_ALLOCATIONS: usize = 2000;
 
 /// Creates and initializes the multiple heaps using the apic id as the key, which is mapped to a heap.
 /// If we want to change the value the heap id is based on, we would substitute 
@@ -179,7 +176,7 @@ pub fn init_individual_heap(key: usize, multiple_heaps: &mut MultipleHeaps) -> R
     *heap_end = heap_end_addr;
 
     // store the newly created allocator in the global allocator
-    if let Some(heap) = multiple_heaps.heaps.insert(key, LockedHeap(MutexIrqSafe::new(zone_allocator))) {
+    if let Some(_heap) = multiple_heaps.heaps.insert(key, LockedHeap(MutexIrqSafe::new(zone_allocator))) {
         return Err("New heap created with a previously used id");
     }
     trace!("Created heap {} with max alloc size: {} bytes", key, ZoneAllocator::MAX_ALLOC_SIZE);
@@ -200,12 +197,6 @@ fn get_key() -> usize {
 
 #[repr(align(64))]
 struct LockedHeap (MutexIrqSafe<ZoneAllocator<'static>>);
-
-impl LockedHeap {
-    const fn empty() -> LockedHeap {
-        LockedHeap(MutexIrqSafe::new(ZoneAllocator::new()))
-    }
-}
 
 impl Deref for LockedHeap {
     type Target = MutexIrqSafe<ZoneAllocator<'static>>;

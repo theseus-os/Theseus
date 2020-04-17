@@ -23,7 +23,6 @@ use core::sync::atomic::{AtomicUsize, Ordering};
 use getopts::Options;
 use hpet::get_hpet;
 use libtest::hpet_2_ns;
-use alloc::alloc::{GlobalAlloc, Layout};
 
 
 static NTHREADS: AtomicUsize = AtomicUsize::new(1);
@@ -95,8 +94,8 @@ fn rmain() -> Result<(), &'static str> {
 
 
 struct Foo {
-    x: i32,
-    y: i32
+    pub x: i32,
+    pub y: i32
 }
 
 impl Foo {
@@ -113,7 +112,7 @@ fn worker(_:()) {
 
     for _ in 0..niterations {
         let mut a = Vec::with_capacity(nobjects/nthreads);
-        for i in 0..(nobjects/nthreads) {
+        for _ in 0..(nobjects/nthreads) {
             let obj = Box::new(Foo::new()); 
             a.push(obj)
         }
