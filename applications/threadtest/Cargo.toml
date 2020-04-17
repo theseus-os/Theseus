@@ -16,9 +16,6 @@ path = "../../kernel/terminal_print"
 default-features = false
 version = "0.3.7"
 
-[dependencies.scheduler]
-path = "../../kernel/scheduler"
-
 [dependencies.task]
 path = "../../kernel/task"
 
@@ -28,20 +25,9 @@ path = "../../kernel/apic"
 [dependencies.spawn]
 path = "../../kernel/spawn"
 
-[dependencies.rendezvous]
-path = "../../kernel/rendezvous"
-
-[dependencies.async_channel]
-path = "../../kernel/async_channel"
-
 [dependencies.hpet]
 path = "../../kernel/hpet"
 
 [dependencies.libtest]
 path = "../../kernel/libtest"
 
-[dependencies.heap]
-path = "../../kernel/heap"
-
-[dependencies.pmu_x86]
-path = "../../kernel/pmu_x86"

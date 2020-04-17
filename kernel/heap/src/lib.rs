@@ -5,11 +5,9 @@
 
 #![feature(const_fn)]
 #![feature(allocator_api)]
-#![feature(const_in_array_repeat_expressions)]
 #![no_std]
 
 extern crate alloc;
-extern crate linked_list_allocator;
 extern crate irq_safety; 
 extern crate spin;
 extern crate log;
@@ -19,7 +17,7 @@ extern crate slabmalloc;
 
 use core::ptr::{self, NonNull};
 use alloc::alloc::{GlobalAlloc, Layout};
-use memory::{EntryFlags, VirtualAddress, PageTable, AreaFrameAllocator, PageRange, create_mapping, MappedPages};
+use memory::{EntryFlags, VirtualAddress, PageTable, AreaFrameAllocator, PageRange, create_mapping, MappedPages, FrameAllocator, FrameAllocatorRef};
 use kernel_config::memory::PAGE_SIZE;
 use irq_safety::MutexIrqSafe;
 use core::ops::Add;
@@ -27,6 +25,7 @@ use spin::Once;
 use slabmalloc::{ZoneAllocator, ObjectPage8k, AllocablePage};
 use core::ops::DerefMut;
 use alloc::boxed::Box;
+
 
 #[global_allocator]
 static ALLOCATOR: Heap = Heap::empty();
@@ -36,11 +35,12 @@ pub const HEAP_FLAGS: EntryFlags = EntryFlags::WRITABLE;
 
 
 /// Initializes the initial allocator, which is the first heap used by the system.
-pub fn init_initial_allocator(allocator_mutex: &MutexIrqSafe<AreaFrameAllocator>, page_table: &mut PageTable, start_virt_addr: usize, size_in_pages: usize) -> Result<(), &'static str> {
+pub fn init_single_heap<A: FrameAllocator>(
+    frame_allocator_ref: &FrameAllocatorRef<A>, page_table: &mut PageTable, start_virt_addr: usize, size_in_pages: usize
+) -> Result<(), &'static str> {
  
     let mapped_pages_per_size_class =  size_in_pages / (ZoneAllocator::MAX_BASE_SIZE_CLASSES * (ObjectPage8k::SIZE/ PAGE_SIZE));
     let mut heap_end_addr = VirtualAddress::new(start_virt_addr)?;
-    let mut allocator = allocator_mutex.lock();
     let mut zone_allocator = ZoneAllocator::new();
 
     let alloc_sizes = &ZoneAllocator::BASE_ALLOC_SIZES;
@@ -55,7 +55,7 @@ pub fn init_initial_allocator(allocator_mutex: &MutexIrqSafe<AreaFrameAllocator>
 
             // create the mapped pages starting from the previous end of the heap
             let pages = PageRange::from_virt_addr(heap_end_addr, ObjectPage8k::SIZE);
-            let mapping = page_table.map_pages(pages, EntryFlags::WRITABLE, allocator.deref_mut())?;
+            let mapping = page_table.map_pages(pages, EntryFlags::WRITABLE, frame_allocator_ref.lock().deref_mut())?;
 
             // add page to the allocator
             zone_allocator.refill(layout, mapping, 0)?; 
@@ -71,18 +71,28 @@ pub fn init_initial_allocator(allocator_mutex: &MutexIrqSafe<AreaFrameAllocator>
     Ok(())
 }
 
-pub fn global_allocator() -> &'static Heap{
-    &ALLOCATOR
-}
 
+/// Returns the initial allocator, the system wide single heap. 
+/// The initial allocator lock is held when merging it into a new heap that will be
+/// set as the default allocator.
 pub fn initial_allocator() -> &'static MutexIrqSafe<ZoneAllocator<'static>>{
     &ALLOCATOR.initial_allocator
 }
 
 
+/// Sets the default allocator for the global heap. It will start being used after this function is called.
+/// 
+/// # Warning
+/// Only call this once the pages already in use by the heap have been added to this new allocator,
+/// otherwise there will be deallocation errors.
+pub fn set_allocator(allocator: Box<dyn GlobalAlloc + Send + Sync>) {
+    ALLOCATOR.set_allocator(allocator);
+}
+
+
 /// The heap which is used as a global allocator for the system.
-/// It starts off with one basic fixed size allocator. 
-/// When a more complex heap is initialized it is set as the default allocator by setting the `allocator`.
+/// It starts off with one basic fixed size allocator, the `initial allocator`. 
+/// When a more complex heap is created it is set as the default allocator by initializing the `allocator` field.
 pub struct Heap {
     initial_allocator: MutexIrqSafe<ZoneAllocator<'static>>, 
     allocator: Once<Box<dyn GlobalAlloc + Send + Sync>>
@@ -90,6 +100,7 @@ pub struct Heap {
 
 
 impl Heap {
+    /// Returns a heap in which only the empty initial allocator has been created
     pub const fn empty() -> Heap {
         Heap{
             initial_allocator: MutexIrqSafe::new(ZoneAllocator::new()),
@@ -97,7 +108,7 @@ impl Heap {
         }
     }
 
-    pub fn set_allocator_functions(&self, allocator: Box<dyn GlobalAlloc + Send + Sync>) {
+    fn set_allocator(&self, allocator: Box<dyn GlobalAlloc + Send + Sync>) {
         self.allocator.call_once(|| allocator);
     }
 }

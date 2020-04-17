@@ -1,4 +1,3 @@
-#![feature(const_in_array_repeat_expressions)]
 #![no_std]
 
 #[macro_use] extern crate log;
@@ -44,7 +43,7 @@ macro_rules! try_forget {
 ///  * the MappedPages of the kernel's text section,
 ///  * the MappedPages of the kernel's rodata section,
 ///  * the MappedPages of the kernel's data section,
-///  * the kernel's list of identity-mapped MappedPages which should be dropped before starting the first userspace program. 
+///  * the kernel's list of identity-mapped MappedPages which should be dropped before starting the first user application. 
 pub fn init_memory_management(boot_info: &BootInformation)  
     -> Result<(Arc<MutexIrqSafe<MemoryManagementInfo>>, MappedPages, MappedPages, MappedPages, Vec<MappedPages>), &'static str>
 {
@@ -58,7 +57,7 @@ pub fn init_memory_management(boot_info: &BootInformation)
     let heap_initial_size = KERNEL_HEAP_INITIAL_SIZE_PAGES;
     
     try_forget!(
-        heap::init_initial_allocator(allocator_mutex, &mut page_table, heap_start, heap_initial_size),
+        heap::init_single_heap(allocator_mutex, &mut page_table, heap_start, heap_initial_size),
         text_mapped_pages, rodata_mapped_pages, data_mapped_pages, higher_half_mapped_pages, identity_mapped_pages
     );
 

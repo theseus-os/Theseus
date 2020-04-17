@@ -11,22 +11,18 @@ extern crate getopts;
 extern crate spin;
 extern crate task;
 extern crate spawn;
-extern crate scheduler;
-extern crate rendezvous;
-extern crate async_channel;
 extern crate hpet;
 extern crate libtest;
-extern crate heap;
 
 use alloc::{
     vec::Vec,
     string::String,
+    boxed::Box,
 };
 use core::sync::atomic::{AtomicUsize, Ordering};
 use getopts::Options;
 use hpet::get_hpet;
 use libtest::hpet_2_ns;
-use heap::global_allocator;
 use alloc::alloc::{GlobalAlloc, Layout};
 
 
@@ -86,6 +82,10 @@ fn rmain() -> Result<(), &'static str> {
     for i in 0..nthreads {
         threads[i].join()?;
     }
+    for i in 0..nthreads {
+        threads[i].take_exit_value();
+    }
+
 
     let end = get_hpet().as_ref().ok_or("couldn't get HPET timer")?.get_counter();
     println!("threadtest took {} ns", hpet_2_ns(end - start));
@@ -94,27 +94,32 @@ fn rmain() -> Result<(), &'static str> {
 }
 
 
+struct Foo {
+    x: i32,
+    y: i32
+}
+
+impl Foo {
+    fn new() -> Foo {
+        Foo{ x: 14, y: 29 }
+    }
+}
+
+
 fn worker(_:()) {
     let niterations = NITERATIONS;
     let nobjects = NOBJECTS;
     let nthreads = NTHREADS.load(Ordering::SeqCst);
 
-    let layout = Layout::from_size_align(OBJSIZE, OBJSIZE).unwrap();
-    let mut a = Vec::with_capacity(nobjects/nthreads);
-    // This is safe since we created with this capacity. 
-    // We set the length so that there's no additional allocation within the routine.
-    unsafe { a.set_len(nobjects/nthreads); } 
-    let heap = global_allocator();
-
     for _ in 0..niterations {
+        let mut a = Vec::with_capacity(nobjects/nthreads);
         for i in 0..(nobjects/nthreads) {
-            let obj = unsafe{ heap.alloc(layout) }; 
-            a[i] = obj;
+            let obj = Box::new(Foo::new()); 
+            a.push(obj)
         }
 
-        for i in 0..(nobjects/nthreads) {
-            let obj = a[i];
-            unsafe{ heap.dealloc(obj, layout) };
+        for obj in a {
+            core::mem::drop(obj);
         }
     }
 }
