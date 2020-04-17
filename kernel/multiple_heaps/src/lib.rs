@@ -60,6 +60,8 @@ const HEAP_MAPPED_PAGES_SIZE_IN_PAGES: usize = ObjectPage8k::SIZE / PAGE_SIZE;
 /// set this threshold value. A heap must have greater than this number of empty mapped pages to return one for use by other heaps.
 const EMPTY_PAGES_THRESHOLD: usize = ZoneAllocator::MAX_BASE_SIZE_CLASSES * 2;
 
+/// The number of large allocations the heap can store when the multiple heaps are first initialized
+const LARGE_ALLOCATIONS: usize = 2000;
 
 /// Creates and initializes the multiple heaps using the apic id as the key, which is mapped to a heap.
 /// If we want to change the value the heap id is based on, we would substitute 
@@ -75,11 +77,14 @@ fn initialize_multiple_heaps() -> Result<MultipleHeaps, &'static str> {
 }
 
 
-/// The setup routine for multiple heaps. It creates and initializes the multiple heaps.
+/// The setup routine for multiple heaps. It creates and initializes the multiple heaps,
+/// and expands the capacity of the heap to create large allocations.
 /// Then transfers mapped pages belonging to the initial allocator to the first multiple heap
 /// and sets the multiple heaps as the default allocator.
 /// Only call this function when the multiple heaps are ready to be used.
 pub fn switch_to_multiple_heaps() -> Result<(), &'static str> {
+    heap::expand_capacity_for_large_objects()?;
+    
     let multiple_heaps = Box::new(initialize_multiple_heaps()?);
     // lock the allocator so that no allocation or deallocation can take place
     let mut initial_allocator = heap::initial_allocator().lock();

@@ -10,10 +10,11 @@
 extern crate alloc;
 extern crate irq_safety; 
 extern crate spin;
-extern crate log;
+#[macro_use] extern crate log;
 extern crate memory;
 extern crate kernel_config;
 extern crate slabmalloc;
+extern crate hashbrown;
 
 use core::ptr::{self, NonNull};
 use alloc::alloc::{GlobalAlloc, Layout};
@@ -25,14 +26,18 @@ use spin::Once;
 use slabmalloc::{ZoneAllocator, ObjectPage8k, AllocablePage};
 use core::ops::DerefMut;
 use alloc::boxed::Box;
-
+use hashbrown::HashMap;
 
 #[global_allocator]
 static ALLOCATOR: Heap = Heap::empty();
 
 /// The heap mapped pages should be writable
 pub const HEAP_FLAGS: EntryFlags = EntryFlags::WRITABLE;
-
+/// The number of large allocations the heap can store at a time
+const MAX_LARGE_ALLOCATIONS: usize = 2000;
+/// The minimum number of large allocations the heap can store at a time. 
+/// The inital hashmap created for storing large allocation will have this capacity.
+const MIN_LARGE_ALLOCATIONS: usize = 100;
 
 /// Initializes the initial allocator, which is the first heap used by the system.
 pub fn init_single_heap<A: FrameAllocator>(
@@ -65,9 +70,13 @@ pub fn init_single_heap<A: FrameAllocator>(
             // trace!("Added an object page {:#X} to slab of size {}", addr, sizes[slab])
         }
     }
-
     // store the newly created allocator in the global allocator
     *ALLOCATOR.initial_allocator.lock() = zone_allocator;
+    trace!("Initialized zone allocator");
+    // this first hashmap will have a small capacity that can be satisfied without creating a new mapping
+    // later on we'll expand the capacity when large objects can be allocated.
+    *ALLOCATOR.large_allocations.lock() = Some(HashMap::with_capacity(100));
+
     Ok(())
 }
 
@@ -90,12 +99,34 @@ pub fn set_allocator(allocator: Box<dyn GlobalAlloc + Send + Sync>) {
 }
 
 
+/// When we switch over to using multiple heaps, we also increase the capacity
+/// of the hashmap storing large allocations.
+pub fn expand_capacity_for_large_objects() -> Result<(), &'static str> {
+    let mut new_map = HashMap::with_capacity(MAX_LARGE_ALLOCATIONS);
+
+    // acquire the lock so that no large allocations can take place during this process
+    let mut prev_map = ALLOCATOR.large_allocations.lock();
+    let mut large_allocations = prev_map.as_mut().ok_or("large allocations hashmap was not initialized")?;
+    let allocation_pairs = large_allocations.drain();
+
+    // Add all the previous mappings into the new hashmap
+    for pair in allocation_pairs {
+        new_map.insert(pair.0, pair.1);
+    }
+
+    // set the new hashmap as the default
+    *large_allocations = new_map;
+    Ok(())
+}
+
+
 /// The heap which is used as a global allocator for the system.
 /// It starts off with one basic fixed size allocator, the `initial allocator`. 
 /// When a more complex heap is created it is set as the default allocator by initializing the `allocator` field.
 pub struct Heap {
     initial_allocator: MutexIrqSafe<ZoneAllocator<'static>>, 
-    allocator: Once<Box<dyn GlobalAlloc + Send + Sync>>
+    allocator: Once<Box<dyn GlobalAlloc + Send + Sync>>,
+    large_allocations: MutexIrqSafe<Option<HashMap<usize, MappedPages>>>
 }
 
 
@@ -104,7 +135,8 @@ impl Heap {
     pub const fn empty() -> Heap {
         Heap{
             initial_allocator: MutexIrqSafe::new(ZoneAllocator::new()),
-            allocator: Once::new()
+            allocator: Once::new(),
+            large_allocations: MutexIrqSafe::new(None),
         }
     }
 
@@ -118,7 +150,11 @@ unsafe impl GlobalAlloc for Heap {
     unsafe fn alloc(&self, layout: Layout) -> *mut u8 {
         // allocate a large object by directly obtaining mapped pages from the OS
         if layout.size() > ZoneAllocator::MAX_ALLOC_SIZE {
-            return allocate_large_object(layout).ok().map_or(ptr::null_mut(), |ptr| ptr.as_ptr());
+            return allocate_large_object(layout, &mut self.large_allocations
+                .lock().as_mut()
+                .ok_or("Hashmap for large allocations was not initialized")
+                .expect("Hashmap for large allocations was not initialized"))
+                .ok().map_or(ptr::null_mut(), |ptr| ptr.as_ptr())
         }
 
         let res = match self.allocator.try() {
@@ -127,7 +163,7 @@ unsafe impl GlobalAlloc for Heap {
                 allocator.alloc(layout)
             }
             // use the initial allocator
-            None => {
+            None => {            
                 self.initial_allocator.lock().allocate(layout).ok().map_or(ptr::null_mut(), |ptr| ptr.as_ptr()) 
             }
         };
@@ -138,9 +174,12 @@ unsafe impl GlobalAlloc for Heap {
     unsafe fn dealloc(&self, ptr: *mut u8, layout: Layout) {
         // deallocate a large object by directly returning mapped pages to the OS
         if layout.size() > ZoneAllocator::MAX_ALLOC_SIZE {
-            return deallocate_large_object(ptr, layout);
+            return deallocate_large_object(ptr, layout, &mut self.large_allocations
+                .lock().as_mut()
+                .ok_or("Hashmap for large allocations was not initialized")
+                .expect("Hashmap for large allocations was not initialized"))
         }
-
+            
         match self.allocator.try() {
             // use the multiple heaps allocator            
             Some(allocator) => {
@@ -158,27 +197,33 @@ unsafe impl GlobalAlloc for Heap {
 
 /// Any memory request greater than MAX_ALLOC_SIZE is satisfied through a request to the OS.
 /// The pointer to the beginning of the newly allocated pages is returned.
-/// The MappedPages object returned by that request is written to the end of the memory allocated.
+/// The MappedPages object returned by that request is stored in a hashmap.
 /// 
 /// # Warning
 /// This function should only be used by an allocator in conjunction with [`deallocate_large_object()`](fn.deallocate_large_object.html)
-fn allocate_large_object(layout: Layout) -> Result<NonNull<u8>, &'static str> {
-    // the mapped pages must have additional memory on the end where we can store the mapped pages object
-    let allocation_size = layout.size() + core::mem::size_of::<MappedPages>();
+fn allocate_large_object(layout: Layout, map: &mut HashMap<usize, MappedPages>) -> Result<NonNull<u8>, &'static str> {
+    let allocation_size = layout.size();
 
     match create_mapping(allocation_size, HEAP_FLAGS) {
         Ok(mapping) => {
             let ptr = mapping.start_address().value() as *mut u8;
-
-            // This is safe since we ensure that the memory allocated includes space for the MappedPages object,
-            // and since the corresponding deallocate function makes sure to retrieve the MappedPages object and drop it.
-            unsafe{ (ptr.offset(layout.size() as isize) as *mut MappedPages).write(mapping); }
             // trace!("Allocated a large object of {} bytes at address: {:#X}", layout.size(), ptr as usize);
 
-            NonNull::new(ptr).ok_or("Could not create a non null ptr")
+            if map.len() < map.capacity() {
+                map.insert(ptr as usize, mapping);
+                return NonNull::new(ptr).ok_or("Could not create a non null ptr");
+            }
+
+            else {
+                error!("Exceeded storage capacity for large allocations. The current capacity is {}.
+                        We still need to improve this by allowing for any number of large allocations, without falling into a loop of allocate_large_object().
+                        For such a high number of large allocations, applications should be directly allocating MappedPages objects rather than from the heap", map.capacity());
+                return Err("Exceeded storage capacity for large allocations");
+            }
+
         }
-        Err(_e) => {
-            // error!("Could not create mapping for a large object in the heap: {:?}", e);
+        Err(e) => {
+            error!("Could not create mapping for a large object in the heap: {:?}", e);
             Err("Could not create mapping for a large object in the heap")
         }
     }
@@ -190,11 +235,8 @@ fn allocate_large_object(layout: Layout) -> Result<NonNull<u8>, &'static str> {
 /// 
 /// # Warning
 /// This function should only be used by an allocator in conjunction with [`allocate_large_object()`](fn.allocate_large_object.html) 
-unsafe fn deallocate_large_object(ptr: *mut u8, layout: Layout) {
-    // retrieve the mapped pages and drop them
-    // This is safe since we ensure that the MappedPages object is read from the offset where it was written
-    // by the corresponding allocate function, and the allocate function allocated extra memory for this object in addition to the layout size.
-    let _mp = core::ptr::read(ptr.offset(layout.size() as isize) as *const MappedPages); 
-
-    // trace!("Deallocated a large object of {} bytes at address: {:#X}", layout.size(), ptr as usize);
+fn deallocate_large_object(ptr: *mut u8, layout: Layout, map: &mut HashMap<usize, MappedPages>) {
+    let _mp = map.remove(&(ptr as usize)).ok_or("Invalid ptr was passed to deallocate_large_object. There is no such mapping stored").expect("Invalid ptr was passed to deallocate_large_object. There is no such mapping stored");
+    // trace!("Deallocated a large object of {} bytes at address: {:#X} {:#X}", layout.size(), ptr as usize, mp.start_address());
 }
+

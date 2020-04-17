@@ -30,5 +30,6 @@ path = "../../libs/rust-slabmalloc"
 [dependencies.apic]
 path = "../apic"
 
-[dependencies.atomic_linked_list]
-path = "../../libs/atomic_linked_list"
+[dependencies.hashbrown]
+version = "0.1.8"
+features = ["nightly"]
