@@ -21,6 +21,7 @@ extern crate xmas_elf;
 extern crate bit_field;
 #[cfg(target_arch = "x86_64")]
 extern crate memory_x86_64;
+extern crate x86_64;
 extern crate memory_structs;
 
 

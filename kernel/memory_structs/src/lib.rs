@@ -5,7 +5,6 @@
 #![feature(range_is_empty)]
 #![feature(step_trait)]
 
-extern crate atomic_linked_list;
 extern crate kernel_config;
 extern crate multiboot2;
 extern crate xmas_elf;

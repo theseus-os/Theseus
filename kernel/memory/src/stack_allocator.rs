@@ -1,3 +1,4 @@
+use core::ops::{Deref, DerefMut};
 use super::paging::*;
 use super::{PAGE_SIZE, FrameAllocator, FrameAllocatorRef, VirtualAddress, EntryFlags, PageRange};
 use super::Mapper;
@@ -84,6 +85,19 @@ pub struct Stack {
     top: VirtualAddress,
     bottom: VirtualAddress,
     pages: MappedPages,
+}
+
+impl Deref for Stack {
+    type Target = MappedPages;
+
+    fn deref(&self) -> &MappedPages {
+        &self.pages
+    }
+}
+impl DerefMut for Stack {
+    fn deref_mut(&mut self) -> &mut MappedPages {
+        &mut self.pages
+    }
 }
 
 impl Stack {

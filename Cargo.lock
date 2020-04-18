@@ -1158,6 +1158,7 @@ dependencies = [
  "memory_x86_64 0.1.0",
  "multiboot2 0.7.1 (registry+https://github.com/rust-lang/crates.io-index)",
  "spin 0.4.10 (registry+https://github.com/rust-lang/crates.io-index)",
+ "x86_64 0.1.2",
  "xmas-elf 0.6.2 (git+https://github.com/kevinaboos/xmas-elf.git)",
 ]
 
@@ -1177,7 +1178,6 @@ dependencies = [
 name = "memory_structs"
 version = "0.1.0"
 dependencies = [
- "atomic_linked_list 0.1.0",
  "bit_field 0.7.0 (registry+https://github.com/rust-lang/crates.io-index)",
  "derive_more 0.14.0 (registry+https://github.com/rust-lang/crates.io-index)",
  "entryflags_x86_64 0.1.0",
@@ -1353,13 +1353,7 @@ dependencies = [
 name = "network_interface_card"
 version = "0.1.0"
 dependencies = [
- "intel_ethernet 0.1.0",
- "log 0.4.8 (registry+https://github.com/rust-lang/crates.io-index)",
- "memory 0.1.0",
- "mpmc 0.1.6-pre",
  "nic_buffers 0.1.0",
- "nic_initialization 0.1.0",
- "nic_queues 0.1.0",
 ]
 
 [[package]]
