@@ -191,7 +191,6 @@ unsafe impl GlobalAlloc for Heap {
         match self.allocator.try() {
             // use the multiple heaps allocator            
             Some(allocator) => {
-
                 allocator.dealloc(ptr, layout)
             }
             // use the initial allocator
