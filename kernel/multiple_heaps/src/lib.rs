@@ -23,7 +23,6 @@
 
 extern crate alloc;
 extern crate irq_safety; 
-extern crate spin;
 #[macro_use] extern crate log;
 extern crate memory;
 extern crate kernel_config;
@@ -38,12 +37,12 @@ use alloc::{
     boxed::Box
 };
 use memory::{MappedPages, VirtualAddress, get_frame_allocator_ref, get_kernel_mmi_ref, PageRange};
-use kernel_config::memory::{MAX_HEAPS, PAGE_SIZE, PER_CORE_HEAP_INITIAL_SIZE_PAGES, KERNEL_HEAP_INITIAL_SIZE_PAGES, KERNEL_HEAP_START, KERNEL_HEAP_MAX_SIZE};
+use kernel_config::memory::{PAGE_SIZE, KERNEL_HEAP_START, KERNEL_HEAP_MAX_SIZE};
 use irq_safety::MutexIrqSafe;
 use slabmalloc::{ZoneAllocator, ObjectPage8k, AllocablePage, Allocator};
 use core::ops::{Add, Deref, DerefMut};
 use core::ptr;
-use heap::HEAP_FLAGS;
+use heap::{HEAP_FLAGS, HEAP_INITIAL_SIZE_PAGES};
 use hashbrown::HashMap;
 
 /// The size of each MappedPages Object that is allocated for the per-core heaps, in bytes.
@@ -58,6 +57,12 @@ const HEAP_MAPPED_PAGES_SIZE_IN_PAGES: usize = ObjectPage8k::SIZE / PAGE_SIZE;
 /// within the per-core heaps that can be moved to other heaps. To prevent any heap from completely running out of memory we 
 /// set this threshold value. A heap must have greater than this number of empty mapped pages to return one for use by other heaps.
 const EMPTY_PAGES_THRESHOLD: usize = ZoneAllocator::MAX_BASE_SIZE_CLASSES * 2;
+
+/// The number of pages each size class in the ZoneAllocator is initialized with, for the multiple heaps.
+const PAGES_PER_SIZE_CLASS: usize = 24; 
+
+/// Starting size of each per-core heap. It's approximately 1 MiB.
+pub const PER_CORE_HEAP_INITIAL_SIZE_PAGES: usize = ZoneAllocator::MAX_BASE_SIZE_CLASSES *  PAGES_PER_SIZE_CLASS;
 
 
 /// Creates and initializes the multiple heaps using the apic id as the key, which is mapped to a heap.
@@ -94,8 +99,7 @@ pub fn switch_to_multiple_heaps() -> Result<(), &'static str> {
 
     // transfer initial heap to the first multiple heap
     multiple_heaps.heaps.get(&heap_id).as_ref()
-        .ok_or("Core heap is not initialized!")
-        .expect("Dealloc: per core heap was not initialized") // we want a panic here since that means something was wrong in the initialization steps
+        .ok_or("Dealloc: per core heap was not initialized")?
         .lock().merge(&mut zone_allocator, heap_id)?;
 
     trace!("transferred inital allocator pages to {}", heap_id);
@@ -136,14 +140,10 @@ fn create_heap_mapping(starting_address: VirtualAddress, size_in_bytes: usize) -
 /// There are 11 size classes in each heap ranging from [8,16,32..4096,8056 (8192 bytes - 136 bytes metadata)].
 /// We evenly distribute the pages allocated for each heap between the size classes. 
 pub fn init_individual_heap(key: usize, multiple_heaps: &mut MultipleHeaps) -> Result<(), &'static str> {
-    // check key is within the MAX_HEAPS range
-    if key >= MAX_HEAPS {
-        return Err("There is a larger key value than the maximum number of heaps in the system");
-    }
 
     let mut heap_end = multiple_heaps.end.lock();
     if heap_end.value() == 0 {
-        *heap_end = VirtualAddress::new(KERNEL_HEAP_START + (KERNEL_HEAP_INITIAL_SIZE_PAGES * PAGE_SIZE))?;
+        *heap_end = VirtualAddress::new(KERNEL_HEAP_START + (HEAP_INITIAL_SIZE_PAGES * PAGE_SIZE))?;
     }
     let mut heap_end_addr = *heap_end;
 
@@ -190,7 +190,7 @@ pub fn init_individual_heap(key: usize, multiple_heaps: &mut MultipleHeaps) -> R
 /// other value e.g. task id
 #[inline(always)] 
 fn get_key() -> usize {
-    apic::get_my_apic_id() as usize % MAX_HEAPS
+    apic::get_my_apic_id() as usize
 }
 
 
@@ -228,8 +228,7 @@ impl MultipleHeaps {
     #[inline(always)]
     unsafe fn allocate_from_heap(&self, heap_id: usize, layout: Layout) -> Result<NonNull<u8>, &'static str> {
         self.heaps.get(&heap_id).as_ref()
-            .ok_or("Core heap is not initialized!")
-            .expect("Alloc: per core heap was not initialized") // we want a panic here since that means something was wrong in the initialization steps
+            .ok_or("Core heap is not initialized!")?
             .lock()
             .allocate(layout)
     }
@@ -237,8 +236,7 @@ impl MultipleHeaps {
     #[inline(always)]
     unsafe fn deallocate_from_heap(&self, heap_id: usize, ptr: *mut u8, layout: Layout) -> Result<(), &'static str> {
         self.heaps.get(&heap_id).as_ref()
-            .ok_or("Core heap is not initialized!")
-            .expect("Dealloc: per core heap was not initialized") // we want a panic here since that means something was wrong in the initialization steps
+            .ok_or("Core heap is not initialized!")?
             .lock()
             .deallocate(NonNull::new_unchecked(ptr), layout)
     }
@@ -251,8 +249,7 @@ impl MultipleHeaps {
     /// * `heap_id`: heap the page is being added to.
     fn refill_heap(&self, layout: Layout, mp: MappedPages, heap_id: usize) -> Result<(), &'static str> {
         self.heaps.get(&heap_id).as_ref()
-            .ok_or("Core heap is not initialized!")
-            .expect("Refill: per core heap was not initialized") // we want a panic here since that means something was wrong in the initialization steps
+            .ok_or("Core heap is not initialized!")?
             .lock()
             .refill(layout, mp, heap_id)
     }
@@ -321,9 +318,7 @@ unsafe impl GlobalAlloc for MultipleHeaps {
             }
         };
             
-        alloc_result                
-            .ok()
-            .map_or(ptr::null_mut(), |allocation| allocation.as_ptr())
+        alloc_result.map(|allocation| allocation.as_ptr()).unwrap_or(ptr::null_mut())
     }
 
     /// Deallocates the memory at the address given by `ptr`.

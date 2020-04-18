@@ -8,8 +8,6 @@
 extern crate alloc;
 #[macro_use] extern crate terminal_print;
 extern crate getopts;
-extern crate spin;
-extern crate task;
 extern crate spawn;
 extern crate hpet;
 extern crate libtest;
@@ -68,11 +66,11 @@ pub fn main(args: Vec<String>) -> isize {
 fn rmain() -> Result<(), &'static str> {
 
     let nthreads = NTHREADS.load(Ordering::SeqCst);
-
+    let mut threads = Vec::with_capacity(nthreads);
+    let hpet = get_hpet(); 
     println!("Running threadtest for {} threads, {} iterations, {} obj size ...", nthreads, NITERATIONS, OBJSIZE);
 
-    let mut threads = Vec::new();
-    let start = get_hpet().as_ref().ok_or("couldn't get HPET timer")?.get_counter();
+    let start = hpet.as_ref().ok_or("couldn't get HPET timer")?.get_counter();
 
     for _ in 0..nthreads {
         threads.push(spawn::new_task_builder(worker, ()).name(String::from("worker thread")).spawn()?);
@@ -80,13 +78,10 @@ fn rmain() -> Result<(), &'static str> {
 
     for i in 0..nthreads {
         threads[i].join()?;
-    }
-    for i in 0..nthreads {
         threads[i].take_exit_value();
     }
 
-
-    let end = get_hpet().as_ref().ok_or("couldn't get HPET timer")?.get_counter();
+    let end = hpet.as_ref().ok_or("couldn't get HPET timer")?.get_counter();
     println!("threadtest took {} ns", hpet_2_ns(end - start));
 
     Ok(())

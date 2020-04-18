@@ -7,20 +7,12 @@ build = "../../build.rs"
 
 [dependencies]
 getopts = "0.2.21"
-spin = "0.4.10"
 
 [dependencies.terminal_print]
 path = "../../kernel/terminal_print"
 
 [dependencies.log]
-default-features = false
-version = "0.3.7"
-
-[dependencies.task]
-path = "../../kernel/task"
-
-[dependencies.apic]
-path = "../../kernel/apic"
+version = "0.4.8"
 
 [dependencies.spawn]
 path = "../../kernel/spawn"

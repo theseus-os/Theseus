@@ -5,19 +5,12 @@ description = "Allocator which uses multiple heaps"
 version = "0.1.0"
 
 [dependencies]
-spin = "0.4.10"
-arr_macro = "0.1.3"
 
 [dependencies.irq_safety]
 git = "https://github.com/kevinaboos/irq_safety"
 
-[dependencies.raw-cpuid]
-version = "7.0.3"
-features = [ "use_arch" ]
-
 [dependencies.log]
-default-features = false
-version = "0.3.7"
+version = "0.4.8"
 
 [dependencies.memory]
 path = "../memory"
@@ -34,10 +27,6 @@ path = "../../libs/rust-slabmalloc"
 [dependencies.hashbrown]
 version = "0.1.8"
 features = ["nightly"]
-
-[dependencies.lazy_static]
-features = ["spin_no_std", "nightly"]
-version = "1.2.0"
 
 [dependencies.heap]
 path = "../heap"

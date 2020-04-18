@@ -41,6 +41,12 @@ const MAX_LARGE_ALLOCATIONS: usize = 2000;
 /// The inital hashmap created for storing large allocation will have this capacity.
 const MIN_LARGE_ALLOCATIONS: usize = 100;
 
+/// The number of pages each size class in the ZoneAllocator in the initial heap is initialized with, for the initial heap.
+const PAGES_PER_SIZE_CLASS: usize = 372; 
+
+/// Size of the initial heap. It's approximately 16 MiB.
+pub const HEAP_INITIAL_SIZE_PAGES: usize = ZoneAllocator::MAX_BASE_SIZE_CLASSES *  PAGES_PER_SIZE_CLASS;
+
 
 /// Initializes the initial allocator, which is the first heap used by the system.
 pub fn init_single_heap<A: FrameAllocator>(
@@ -75,7 +81,6 @@ pub fn init_single_heap<A: FrameAllocator>(
     }
     // store the newly created allocator in the global allocator
     *ALLOCATOR.initial_allocator.lock() = zone_allocator;
-    trace!("Initialized zone allocator");
     // this first hashmap will have a small capacity that can be satisfied without creating a new mapping
     // later on we'll expand the capacity when large objects can be allocated.
     *ALLOCATOR.large_allocations.lock() = Some(HashMap::with_capacity(MIN_LARGE_ALLOCATIONS));
@@ -153,11 +158,10 @@ unsafe impl GlobalAlloc for Heap {
     unsafe fn alloc(&self, layout: Layout) -> *mut u8 {
         // allocate a large object by directly obtaining mapped pages from the OS
         if layout.size() > ZoneAllocator::MAX_ALLOC_SIZE {
-            return allocate_large_object(layout, &mut self.large_allocations
-                .lock().as_mut()
-                .ok_or("Hashmap for large allocations was not initialized")
-                .expect("Hashmap for large allocations was not initialized"))
-                .ok().map_or(ptr::null_mut(), |ptr| ptr.as_ptr())
+            return allocate_large_object(
+                layout, 
+                &mut self.large_allocations.lock().as_mut().expect("Hashmap for large allocations was not initialized")
+            ).map(|allocation| allocation.as_ptr()).unwrap_or(ptr::null_mut())
         }
 
         let res = match self.allocator.try() {
@@ -167,7 +171,7 @@ unsafe impl GlobalAlloc for Heap {
             }
             // use the initial allocator
             None => {            
-                self.initial_allocator.lock().allocate(layout).ok().map_or(ptr::null_mut(), |ptr| ptr.as_ptr()) 
+                self.initial_allocator.lock().allocate(layout).map(|allocation| allocation.as_ptr()).unwrap_or(ptr::null_mut()) 
             }
         };
 
@@ -177,10 +181,11 @@ unsafe impl GlobalAlloc for Heap {
     unsafe fn dealloc(&self, ptr: *mut u8, layout: Layout) {
         // deallocate a large object by directly returning mapped pages to the OS
         if layout.size() > ZoneAllocator::MAX_ALLOC_SIZE {
-            return deallocate_large_object(ptr, layout, &mut self.large_allocations
-                .lock().as_mut()
-                .ok_or("Hashmap for large allocations was not initialized")
-                .expect("Hashmap for large allocations was not initialized"))
+            return deallocate_large_object(
+                ptr, 
+                layout, 
+                &mut self.large_allocations.lock().as_mut().expect("Hashmap for large allocations was not initialized")
+            )
         }
             
         match self.allocator.try() {
@@ -205,24 +210,19 @@ unsafe impl GlobalAlloc for Heap {
 /// # Warning
 /// This function should only be used by an allocator in conjunction with [`deallocate_large_object()`](fn.deallocate_large_object.html)
 fn allocate_large_object(layout: Layout, map: &mut HashMap<usize, MappedPages>) -> Result<NonNull<u8>, &'static str> {
-    let allocation_size = layout.size();
+    if map.len() >= map.capacity() {
+        error!("Exceeded storage capacity for large allocations. The current capacity is {}.
+                We still need to improve this by allowing for any number of large allocations, without falling into a loop of allocate_large_object().
+                For such a high number of large allocations, applications should be directly allocating MappedPages objects rather than from the heap", map.capacity());
+        return Err("Exceeded storage capacity for large allocations");
+    }
 
-    match create_mapping(allocation_size, HEAP_FLAGS) {
+    match create_mapping(layout.size(), HEAP_FLAGS) {
         Ok(mapping) => {
-            let ptr = mapping.start_address().value() as *mut u8;
+            let ptr = mapping.start_address().value();
             // trace!("Allocated a large object of {} bytes at address: {:#X}", layout.size(), ptr as usize);
-
-            if map.len() < map.capacity() {
-                map.insert(ptr as usize, mapping);
-                return NonNull::new(ptr).ok_or("Could not create a non null ptr");
-            }
-
-            else {
-                error!("Exceeded storage capacity for large allocations. The current capacity is {}.
-                        We still need to improve this by allowing for any number of large allocations, without falling into a loop of allocate_large_object().
-                        For such a high number of large allocations, applications should be directly allocating MappedPages objects rather than from the heap", map.capacity());
-                return Err("Exceeded storage capacity for large allocations");
-            }
+            map.insert(ptr as usize, mapping);
+            NonNull::new(ptr as *mut u8).ok_or("Could not create a non null ptr")
 
         }
         Err(e) => {
@@ -239,7 +239,8 @@ fn allocate_large_object(layout: Layout, map: &mut HashMap<usize, MappedPages>) 
 /// # Warning
 /// This function should only be used by an allocator in conjunction with [`allocate_large_object()`](fn.allocate_large_object.html) 
 fn deallocate_large_object(ptr: *mut u8, _layout: Layout, map: &mut HashMap<usize, MappedPages>) {
-    let _mp = map.remove(&(ptr as usize)).ok_or("Invalid ptr was passed to deallocate_large_object. There is no such mapping stored").expect("Invalid ptr was passed to deallocate_large_object. There is no such mapping stored");
+    let _mp = map.remove(&(ptr as usize))
+        .expect("Invalid ptr was passed to deallocate_large_object. There is no such mapping stored");
     // trace!("Deallocated a large object of {} bytes at address: {:#X} {:#X}", layout.size(), ptr as usize, mp.start_address());
 }
 

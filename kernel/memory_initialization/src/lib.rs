@@ -9,7 +9,7 @@ extern crate multiboot2;
 extern crate alloc;
 
 use memory::{MappedPages, MemoryManagementInfo};
-use kernel_config::memory::{KERNEL_HEAP_INITIAL_SIZE_PAGES, KERNEL_HEAP_START};
+use kernel_config::memory::KERNEL_HEAP_START;
 use irq_safety::MutexIrqSafe;
 use multiboot2::BootInformation;
 use alloc::{ 
@@ -54,7 +54,7 @@ pub fn init_memory_management(boot_info: &BootInformation)
     // After this point, we must "forget" all of the above mapped_pages instances if an error occurs,
     // because they will be auto-unmapped from the new page table upon return, causing all execution to stop. 
     let heap_start = KERNEL_HEAP_START;
-    let heap_initial_size = KERNEL_HEAP_INITIAL_SIZE_PAGES;
+    let heap_initial_size = heap::HEAP_INITIAL_SIZE_PAGES;
     
     try_forget!(
         heap::init_single_heap(allocator_mutex, &mut page_table, heap_start, heap_initial_size),
