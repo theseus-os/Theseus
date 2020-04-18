@@ -2,9 +2,10 @@
 //! Right now we use the apic id as the key, so that we have per-core heaps.
 //! 
 //! The heaps are ZoneAllocators (given in the slabmalloc crate). Each ZoneAllocator maintains 11 separate "slab allocators" for sizes
-//! 8, 16, 32, 64, 128, 256, 512, 1024, 2048, 4096 and 8056 (8192 bytes - 136 bytes of metadata) bytes.
+//! 8, 16, 32, 64, 128, 256, 512, 1024, 2048, 4096 and 8056 (8192 bytes - bytes of metadata) bytes.
 //! The slab allocator maintains linked lists of allocable pages from which it allocates objects of the same size. 
-//! The allocable pages are 8 KiB, and have metadata stored in the last 136 bytes.
+//! The allocable pages are 8 KiB, and have metadata stored in the last 136 bytes. The metadata includes heap id, MappedPages object this allocable page belongs to,
+//! forward and back pointers to pages stored in a linked list and a bitmap to keep track of allocations.
 //! 
 //! Any memory request greater than 8056 bytes is satisfied through a request for pages from the kernel.
 //! All other requests are satisfied through the per-core heaps.
@@ -13,9 +14,8 @@
 //! On deallocation of a block, the heap id is retrieved from metadata at the end of the allocable page which contains the block.
 //! 
 //! When a per-core heap runs out of memory, pages are first moved between the slab allocators of the per-core heap, then requested from other per-core heaps.
-//! If no empty pages are available within any of the per-core heaps, then more memory is allocated from the kernel's heap area.
-//!  
-//! The maximum number of heaps is configured in the kernel configuration variable, MAX_HEAPS.
+//! If no empty pages are available within any of the per-core heaps, then more virtual pages are allocated from the range of virtual addresses dedicated to the heap [KERNEL_HEAP_START]()
+//! and dynamically mapped to physical memory frames.
 
 #![feature(const_fn)]
 #![feature(allocator_api)]
@@ -56,7 +56,7 @@ const HEAP_MAPPED_PAGES_SIZE_IN_PAGES: usize = ObjectPage8k::SIZE / PAGE_SIZE;
 /// When an OOM error occurs, before allocating more memory from the OS, we first try to see if there are unused(empty) pages 
 /// within the per-core heaps that can be moved to other heaps. To prevent any heap from completely running out of memory we 
 /// set this threshold value. A heap must have greater than this number of empty mapped pages to return one for use by other heaps.
-const EMPTY_PAGES_THRESHOLD: usize = ZoneAllocator::MAX_BASE_SIZE_CLASSES * 2;
+const EMPTY_PAGES_THRESHOLD: usize = PER_CORE_HEAP_INITIAL_SIZE_PAGES;
 
 /// The number of pages each size class in the ZoneAllocator is initialized with, for the multiple heaps.
 const PAGES_PER_SIZE_CLASS: usize = 24; 
@@ -85,24 +85,24 @@ fn initialize_multiple_heaps() -> Result<MultipleHeaps, &'static str> {
 /// and sets the multiple heaps as the default allocator.
 /// Only call this function when the multiple heaps are ready to be used.
 pub fn switch_to_multiple_heaps() -> Result<(), &'static str> {
-    heap::expand_capacity_for_large_objects()?;
+    // heap::expand_capacity_for_large_objects()?;
     
     let multiple_heaps = Box::new(initialize_multiple_heaps()?);
     // lock the allocator so that no allocation or deallocation can take place
     let mut initial_allocator = heap::initial_allocator().lock();
 
     // switch out the initial allocator with an empty heap
-    let mut zone_allocator = ZoneAllocator::new();
+    let mut zone_allocator = ZoneAllocator::new(0);
     core::mem::swap(&mut *initial_allocator, &mut zone_allocator);
 
     let heap_id = get_key(); 
 
     // transfer initial heap to the first multiple heap
-    multiple_heaps.heaps.get(&heap_id).as_ref()
-        .ok_or("Dealloc: per core heap was not initialized")?
-        .lock().merge(&mut zone_allocator, heap_id)?;
+    multiple_heaps.heaps.get(&heap_id)
+        .ok_or("BUG: per core heap was not initialized")?
+        .lock().merge(&mut zone_allocator)?;
 
-    trace!("transferred inital allocator pages to {}", heap_id);
+    trace!("transferred initial allocator pages to {}", heap_id);
 
     //set the multiple heaps as the default allocator
     heap::set_allocator(multiple_heaps);
@@ -142,13 +142,10 @@ fn create_heap_mapping(starting_address: VirtualAddress, size_in_bytes: usize) -
 pub fn init_individual_heap(key: usize, multiple_heaps: &mut MultipleHeaps) -> Result<(), &'static str> {
 
     let mut heap_end = multiple_heaps.end.lock();
-    if heap_end.value() == 0 {
-        *heap_end = VirtualAddress::new(KERNEL_HEAP_START + (HEAP_INITIAL_SIZE_PAGES * PAGE_SIZE))?;
-    }
     let mut heap_end_addr = *heap_end;
 
     let mapped_pages_per_size_class = PER_CORE_HEAP_INITIAL_SIZE_PAGES / (ZoneAllocator::MAX_BASE_SIZE_CLASSES * HEAP_MAPPED_PAGES_SIZE_IN_PAGES);
-    let mut zone_allocator = ZoneAllocator::new();
+    let mut zone_allocator = ZoneAllocator::new(key);
 
     let alloc_sizes = &ZoneAllocator::BASE_ALLOC_SIZES;
     for size in alloc_sizes {
@@ -164,7 +161,7 @@ pub fn init_individual_heap(key: usize, multiple_heaps: &mut MultipleHeaps) -> R
             let mapping = create_heap_mapping(heap_end_addr, HEAP_MAPPED_PAGES_SIZE_IN_BYTES)?;
 
             // add page to the allocator
-            zone_allocator.refill(layout, mapping, key)?; 
+            zone_allocator.refill(layout, mapping)?; 
 
             // update the end address of the heap
             heap_end_addr = heap_end_addr.add(HEAP_MAPPED_PAGES_SIZE_IN_BYTES);
@@ -220,58 +217,14 @@ pub struct MultipleHeaps{
 impl MultipleHeaps {
     pub fn empty() -> MultipleHeaps {
         MultipleHeaps{
+            // central_heap: LockedHeap(MutexIrqSafe::new(ZoneAllocator::default())),
             heaps: HashMap::new(),
-            end: MutexIrqSafe::new(VirtualAddress::zero())
+            end: MutexIrqSafe::new(VirtualAddress::new_canonical(KERNEL_HEAP_START + (HEAP_INITIAL_SIZE_PAGES * PAGE_SIZE)))
         }
     }
-
-    #[inline(always)]
-    unsafe fn allocate_from_heap(&self, heap_id: usize, layout: Layout) -> Result<NonNull<u8>, &'static str> {
-        self.heaps.get(&heap_id).as_ref()
-            .ok_or("Core heap is not initialized!")?
-            .lock()
-            .allocate(layout)
-    }
-
-    #[inline(always)]
-    unsafe fn deallocate_from_heap(&self, heap_id: usize, ptr: *mut u8, layout: Layout) -> Result<(), &'static str> {
-        self.heaps.get(&heap_id).as_ref()
-            .ok_or("Core heap is not initialized!")?
-            .lock()
-            .deallocate(NonNull::new_unchecked(ptr), layout)
-    }
-
-    /// Add pages to the heap.
-    ///     
-    /// # Arguments
-    /// * `layout`: layout.size will determine which allocation size the page will be used for. 
-    /// * `mp`: MappedPages object representing the pages being added to the heap.
-    /// * `heap_id`: heap the page is being added to.
-    fn refill_heap(&self, layout: Layout, mp: MappedPages, heap_id: usize) -> Result<(), &'static str> {
-        self.heaps.get(&heap_id).as_ref()
-            .ok_or("Core heap is not initialized!")?
-            .lock()
-            .refill(layout, mp, heap_id)
-    }
-
-
-    /// Retrieves an empty page from the heap which has the maximum number of empty pages,
-    /// if the maximum is greater than a threshold.
-    fn retrieve_empty_page(&self) -> Result<MappedPages, &'static str> {
-        let mut heap = self.heaps.values().max_by_key(
-            |&heap| heap.lock().empty_pages())
-            .ok_or("Per core heaps haven't been initialized")?.lock();
-        
-        if heap.empty_pages() > EMPTY_PAGES_THRESHOLD {
-            return heap.retrieve_empty_page().ok_or("No empty page in the heaps");
-        }
-
-        Err("No empty pages available")
-    }
-
 
     /// Called when an call to allocate() returns a null pointer. The following steps are used to recover memory:
-    /// (1) Pages are exchanged between per-core heaps.
+    /// (1) Pages are first taken from another heap.
     /// (2) If the above fails, then more pages are allocated from the OS.
     /// 
     /// An Err is returned if there is no more memory to be allocated in the heap memory area.
@@ -279,23 +232,23 @@ impl MultipleHeaps {
     /// # Arguments
     /// * `layout`: layout.size will determine which allocation size the retrieved pages will be used for. 
     /// * `heap_id`: heap that needs to grow.
-    fn grow_heap(&self, layout: Layout, heap_id: usize) -> Result<(), &'static str> {
-        // (1) Try to retrieve a page from another heap
-        let mp = match self.retrieve_empty_page() {
-            Ok(mp) => {
-                info!("grow_heap:: retrieved a page from another heap to refill core heap {} for size :{}", heap_id, layout.size());
-                mp   
+    fn grow_heap(&self, layout: Layout, heap: &mut ZoneAllocator<'static>) -> Result<(), &'static str> {
+        // (1) Try to retrieve a page from the another heap
+        for locked_heap in self.heaps.values() {
+            match locked_heap.try_lock().and_then(|mut giving_heap| giving_heap.retrieve_empty_page()) {
+                Some(mp) => {
+                    info!("Added page from another heap to heap: {}", heap.heap_id);
+                    return heap.refill(layout, mp);
+                },
+                None => continue
             }
-            // (2) If that didn't work try to allocate memory from the OS
-            Err(_e) => {
-                let mut heap_end = self.end.lock();
-                let mp = create_heap_mapping(*heap_end, HEAP_MAPPED_PAGES_SIZE_IN_BYTES)?;
-                info!("grow_heap:: Allocated a page to refill core heap {} for size :{} at address: {:#X}", heap_id, layout.size(), *heap_end);
-                *heap_end += HEAP_MAPPED_PAGES_SIZE_IN_BYTES;
-                mp
-            }
-        };
-        self.refill_heap(layout, mp, heap_id)
+        }
+        // Allocate page from the OS
+        let mut heap_end = self.end.lock();
+        let mp = create_heap_mapping(*heap_end, HEAP_MAPPED_PAGES_SIZE_IN_BYTES)?;
+        info!("grow_heap:: Allocated a page to refill core heap {} for size :{} at address: {:#X}", heap.heap_id, layout.size(), *heap_end);
+        *heap_end += HEAP_MAPPED_PAGES_SIZE_IN_BYTES;
+        heap.refill(layout, mp)
     }
 
 }
@@ -308,17 +261,11 @@ unsafe impl GlobalAlloc for MultipleHeaps {
     #[inline(always)]    
     unsafe fn alloc(&self, layout: Layout) -> *mut u8 {
         let id = get_key();
-            
-        // allocate an object with the per-core heap if initialized 
-        let alloc_result = match self.allocate_from_heap(id, layout) {
-            Ok(ptr) => Ok(ptr),
-            // If a null pointer was returned, then there are no available empty pages in the heap, so try to grow the heap
-            Err(_e) => {
-                self.grow_heap(layout, id).and_then(|_res| self.allocate_from_heap(id,layout))
-            }
-        };
-            
-        alloc_result.map(|allocation| allocation.as_ptr()).unwrap_or(ptr::null_mut())
+        let mut heap = self.heaps.get(&id).expect("Multiple Heaps: heap is not initialized!").lock();
+
+        heap.allocate(layout)
+            .or_else(|_e| self.grow_heap(layout, &mut heap).and_then(|_| heap.allocate(layout)))
+            .map(|allocation| allocation.as_ptr()).unwrap_or(ptr::null_mut())
     }
 
     /// Deallocates the memory at the address given by `ptr`.
@@ -329,8 +276,8 @@ unsafe impl GlobalAlloc for MultipleHeaps {
         let page_addr = (ptr as usize) & !(ObjectPage8k::SIZE - 1);
         // find the heap id
         let id = *((page_addr as *mut u8).offset(ObjectPage8k::HEAP_ID_OFFSET as isize) as *mut usize);
-        
-        self.deallocate_from_heap(id, ptr, layout).expect("Couldn't deallocate");
+        let mut heap = self.heaps.get(&id).expect("Multiple Heaps: Heap not initialized").lock();
+        heap.deallocate(NonNull::new_unchecked(ptr), layout).expect("Couldn't deallocate");
     }
 }
 
