@@ -257,12 +257,12 @@ impl<F, A, R> TaskBuilder<F, A, R>
         // This is probably stupid (it'd be best to put them directly where they need to go towards the top of the stack),
         // but it simplifies type safety in the `task_wrapper` entry point and removes uncertainty from assumed calling conventions.
         {
-            let bottom_of_stack: &mut Option<TaskFuncArg<F, A>> = new_task.kstack.as_type_mut(0)?;
-            // We use an option so we can take ownership of it later, in `task_wrapper()`.
-            *bottom_of_stack = Some(TaskFuncArg {
+            let bottom_of_stack = new_task.kstack.as_type_mut::<*mut TaskFuncArg<F, A, R>>(0)?;
+            *bottom_of_stack = Box::into_raw(Box::new(TaskFuncArg::<F, A, R> {
                 arg:  self.argument,
                 func: self.func,
-            });
+                _rettype: PhantomData,
+            }));
         }
 
         // The new task is ready to be scheduled in, now that its stack trampoline has been set up.
@@ -312,9 +312,11 @@ type MainFunc = fn(MainFuncArg) -> MainFuncRet;
 
 /// A wrapper around a task's function and argument.
 #[derive(Debug)]
-struct TaskFuncArg<F, A> {
-    arg:  A,
+struct TaskFuncArg<F, A, R> {
     func: F,
+    arg:  A,
+    // not necessary, just for consistency in "<F, A, R>" signatures.
+    _rettype: PhantomData<*const R>,
 }
 
 
@@ -389,11 +391,12 @@ fn task_wrapper<F, A, R>() -> !
 
         // This task's function and argument were placed at the bottom of the stack when this task was spawned.
         let task_func_arg = {
-            #[allow(deprecated)]
-            let mut t = curr_task_ref.lock_mut();
-            t.kstack.as_type_mut::<Option<TaskFuncArg<F, A>>>(0).ok()
-                .and_then(|opt| opt.take())
-                .expect("BUG: task_wrapper: couldn't get task's function or argument")
+            let t = curr_task_ref.lock();
+            let tfa_box_raw_ptr = t.kstack.as_type::<*mut TaskFuncArg<F, A, R>>(0)
+                .expect("BUG: task_wrapper: couldn't access task's function/argument at bottom of stack");
+            // SAFE: we placed this Box in this task's stack in the `spawn()` function when creating the TaskFuncArg struct.
+            let tfa_boxed = unsafe { Box::from_raw(*tfa_box_raw_ptr) };
+            *tfa_boxed // un-box it
         };
         let (func, arg) = (task_func_arg.func, task_func_arg.arg);
         debug!("task_wrapper [1]: \"{}\" about to call task entry func {:?} {{{}}} with arg {:?}",
