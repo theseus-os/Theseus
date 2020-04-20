@@ -86,15 +86,6 @@ impl WaitQueue {
         WaitQueue(MutexIrqSafe::new(VecDeque::with_capacity(initial_capacity)))
     }
 
-    pub fn is_empty(&self) -> bool {
-        let wq_locked = self.0.lock();
-        if wq_locked.is_empty() {
-            true
-        } else {
-            false
-        }
-    }
-
     /// Puts the current `Task` to sleep where it blocks on this `WaitQueue`
     /// until it is notified by another `Task`. 
     /// 
