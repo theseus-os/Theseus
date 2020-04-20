@@ -46,12 +46,13 @@ impl Drop for WaitGuard {
 
 
 /// Errors that may occur while waiting on a waitqueue/condition/event.
-#[derive(Debug)]
+#[derive(Debug, PartialEq)]
 pub enum WaitError {
     NoCurrentTask,
     Interrupted,
     Timeout,
     SpuriousWakeup,
+    EndpointDropped
 }
 
 /// A queue in which multiple `Task`s can wait for other `Task`s to notify them.
@@ -228,7 +229,7 @@ impl WaitQueue {
                 if let Ok(Some(ret)) = result {
                     return Ok(ret);
                 } else if let Err(()) = result {
-                    return Err(WaitError::Timeout);
+                    return Err(WaitError::EndpointDropped);
                 }
 
                 // This is only necessary because we're using a non-Set waitqueue collection that allows duplicates
