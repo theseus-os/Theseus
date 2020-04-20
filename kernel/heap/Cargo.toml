@@ -22,6 +22,5 @@ path = "../kernel_config"
 [dependencies.slabmalloc]
 path = "../../libs/rust-slabmalloc"
 
-[dependencies.hashbrown]
-version = "0.1.8"
-features = ["nightly"]
+[dependencies.intrusive-collections]
+git = "https://github.com/Ramla-I/intrusive-rs.git"

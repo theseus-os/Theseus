@@ -2,19 +2,21 @@
 //! Right now we use the apic id as the key, so that we have per-core heaps.
 //! 
 //! The heaps are ZoneAllocators (given in the slabmalloc crate). Each ZoneAllocator maintains 11 separate "slab allocators" for sizes
-//! 8, 16, 32, 64, 128, 256, 512, 1024, 2048, 4096 and 8056 (8192 bytes - bytes of metadata) bytes.
+//! 8, 16, 32, 64, 128, 256, 512, 1024, 2048, 4096 and 8056 (8KiB - bytes of metadata) bytes. 8056 is the maximum allocation size given by `ZoneAllocator::MAX_ALLOC_SIZE`.
 //! The slab allocator maintains linked lists of allocable pages from which it allocates objects of the same size. 
-//! The allocable pages are 8 KiB, and have metadata stored in the last 136 bytes. The metadata includes heap id, MappedPages object this allocable page belongs to,
-//! forward and back pointers to pages stored in a linked list and a bitmap to keep track of allocations.
+//! The allocable pages are 8 KiB (`ObjectPage8K::SIZE`), and have metadata stored in the last 136 bytes (`ObjectPage8K::METADATA_SIZE`).
+//! The metadata includes heap id, MappedPages object this allocable page belongs to, forward and back pointers to pages stored in a linked list and a
+//! bitmap to keep track of allocations. The maximum allocation size can change if the size of the objects in the metadata change. If that happens it will be automatically reflected
+//! in the constants `ZoneAllocator::MAX_ALLOC_SIZE` and `ObjectPage8K::METADATA_SIZE`
 //! 
-//! Any memory request greater than 8056 bytes is satisfied through a request for pages from the kernel.
+//! Any memory request greater than maximum allocation size is satisfied through a request for pages from the kernel.
 //! All other requests are satisfied through the per-core heaps.
 //! 
 //! The per-core heap which will be used on allocation is determined by the cpu that the task is running on.
 //! On deallocation of a block, the heap id is retrieved from metadata at the end of the allocable page which contains the block.
 //! 
 //! When a per-core heap runs out of memory, pages are first moved between the slab allocators of the per-core heap, then requested from other per-core heaps.
-//! If no empty pages are available within any of the per-core heaps, then more virtual pages are allocated from the range of virtual addresses dedicated to the heap [KERNEL_HEAP_START]()
+//! If no empty pages are available within any of the per-core heaps, then more virtual pages are allocated from the range of virtual addresses dedicated to the heap [KERNEL_HEAP_START](../kernel_config/memory/constant.KERNEL_HEAP_START.html)
 //! and dynamically mapped to physical memory frames.
 
 #![feature(const_fn)]
@@ -46,17 +48,17 @@ use heap::{HEAP_FLAGS, HEAP_INITIAL_SIZE_PAGES};
 use hashbrown::HashMap;
 
 /// The size of each MappedPages Object that is allocated for the per-core heaps, in bytes.
-/// We curently work with 8KiB, so that the per core heaps can allocate objects up to 8056 bytes.  
+/// We curently work with 8KiB, so that the per core heaps can allocate objects up to `ZoneAllocator::MAX_ALLOC_SIZE`.  
 const HEAP_MAPPED_PAGES_SIZE_IN_BYTES: usize = ObjectPage8k::SIZE;
 
 /// The size of each MappedPages Object that is allocated for the per-core heaps, in pages.
-/// We curently work with 2 pages, so that the per core heaps can allocate objects up to 8056 bytes.   
+/// We curently work with 2 pages, so that the per core heaps can allocate objects up to `ZoneAllocator::MAX_ALLOC_SIZE`.   
 const HEAP_MAPPED_PAGES_SIZE_IN_PAGES: usize = ObjectPage8k::SIZE / PAGE_SIZE;
 
 /// When an OOM error occurs, before allocating more memory from the OS, we first try to see if there are unused(empty) pages 
 /// within the per-core heaps that can be moved to other heaps. To prevent any heap from completely running out of memory we 
 /// set this threshold value. A heap must have greater than this number of empty mapped pages to return one for use by other heaps.
-const EMPTY_PAGES_THRESHOLD: usize = PER_CORE_HEAP_INITIAL_SIZE_PAGES;
+const EMPTY_PAGES_THRESHOLD: usize = ZoneAllocator::MAX_BASE_SIZE_CLASSES * 2;
 
 /// The number of pages each size class in the ZoneAllocator is initialized with, for the multiple heaps.
 const PAGES_PER_SIZE_CLASS: usize = 24; 
@@ -85,7 +87,6 @@ fn initialize_multiple_heaps() -> Result<MultipleHeaps, &'static str> {
 /// and sets the multiple heaps as the default allocator.
 /// Only call this function when the multiple heaps are ready to be used.
 pub fn switch_to_multiple_heaps() -> Result<(), &'static str> {
-    // heap::expand_capacity_for_large_objects()?;
     
     let multiple_heaps = Box::new(initialize_multiple_heaps()?);
     // lock the allocator so that no allocation or deallocation can take place
@@ -137,7 +138,7 @@ fn create_heap_mapping(starting_address: VirtualAddress, size_in_bytes: usize) -
 
 
 /// Initializes the heap given by `key`.
-/// There are 11 size classes in each heap ranging from [8,16,32..4096,8056 (8192 bytes - 136 bytes metadata)].
+/// There are 11 size classes in each heap ranging from [8,16,32,64 ..`ZoneAllocator::MAX_ALLOC_SIZE`].
 /// We evenly distribute the pages allocated for each heap between the size classes. 
 pub fn init_individual_heap(key: usize, multiple_heaps: &mut MultipleHeaps) -> Result<(), &'static str> {
 
@@ -217,7 +218,6 @@ pub struct MultipleHeaps{
 impl MultipleHeaps {
     pub fn empty() -> MultipleHeaps {
         MultipleHeaps{
-            // central_heap: LockedHeap(MutexIrqSafe::new(ZoneAllocator::default())),
             heaps: HashMap::new(),
             end: MutexIrqSafe::new(VirtualAddress::new_canonical(KERNEL_HEAP_START + (HEAP_INITIAL_SIZE_PAGES * PAGE_SIZE)))
         }
@@ -235,7 +235,7 @@ impl MultipleHeaps {
     fn grow_heap(&self, layout: Layout, heap: &mut ZoneAllocator<'static>) -> Result<(), &'static str> {
         // (1) Try to retrieve a page from the another heap
         for locked_heap in self.heaps.values() {
-            match locked_heap.try_lock().and_then(|mut giving_heap| giving_heap.retrieve_empty_page()) {
+            match locked_heap.try_lock().and_then(|mut giving_heap| giving_heap.retrieve_empty_page(EMPTY_PAGES_THRESHOLD)) {
                 Some(mp) => {
                     info!("Added page from another heap to heap: {}", heap.heap_id);
                     return heap.refill(layout, mp);

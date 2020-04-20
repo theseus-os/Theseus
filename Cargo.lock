@@ -145,6 +145,11 @@ name = "atomic_linked_list"
 version = "0.1.0"
 
 [[package]]
+name = "autocfg"
+version = "1.0.0"
+source = "registry+https://github.com/rust-lang/crates.io-index"
+
+[[package]]
 name = "bit_field"
 version = "0.7.0"
 source = "registry+https://github.com/rust-lang/crates.io-index"
@@ -791,7 +796,7 @@ dependencies = [
 name = "heap"
 version = "0.1.0"
 dependencies = [
- "hashbrown 0.1.8 (registry+https://github.com/rust-lang/crates.io-index)",
+ "intrusive-collections 0.9.0 (git+https://github.com/Ramla-I/intrusive-rs.git)",
  "irq_safety 0.1.1 (git+https://github.com/kevinaboos/irq_safety)",
  "kernel_config 0.1.0",
  "log 0.4.8 (registry+https://github.com/rust-lang/crates.io-index)",
@@ -906,6 +911,14 @@ dependencies = [
  "tss 0.1.0",
  "vga_buffer 0.1.0",
  "x86_64 0.1.2",
+]
+
+[[package]]
+name = "intrusive-collections"
+version = "0.9.0"
+source = "git+https://github.com/Ramla-I/intrusive-rs.git#3d17b1aae038855ae1c6b227ff067f02d2e9d928"
+dependencies = [
+ "memoffset 0.5.4 (git+https://github.com/Ramla-I/memoffset.git)",
 ]
 
 [[package]]
@@ -1141,6 +1154,14 @@ dependencies = [
  "memory 0.1.0",
  "spin 0.4.10 (registry+https://github.com/rust-lang/crates.io-index)",
  "x86_64 0.1.2",
+]
+
+[[package]]
+name = "memoffset"
+version = "0.5.4"
+source = "git+https://github.com/Ramla-I/memoffset.git#12625e4c436d98e7c73fbbce0f75e967373ee341"
+dependencies = [
+ "autocfg 1.0.0 (registry+https://github.com/rust-lang/crates.io-index)",
 ]
 
 [[package]]
@@ -2563,6 +2584,7 @@ source = "git+https://github.com/kevinaboos/zero.git#9fc7ff523138a21f40359b706d2
 [metadata]
 "checksum arrayvec 0.4.11 (registry+https://github.com/rust-lang/crates.io-index)" = "b8d73f9beda665eaa98ab9e4f7442bd4e7de6652587de55b2525e52e29c1b0ba"
 "checksum atomic 0.4.5 (registry+https://github.com/rust-lang/crates.io-index)" = "c210c1f4db048cda477b652d170572d84c9640695835f17663595d3bd543fc28"
+"checksum autocfg 1.0.0 (registry+https://github.com/rust-lang/crates.io-index)" = "f8aac770f1885fd7e387acedd76065302551364496e46b3dd00860b2f8359b9d"
 "checksum bit_field 0.10.0 (registry+https://github.com/rust-lang/crates.io-index)" = "a165d606cf084741d4ac3a28fb6e9b1eb0bd31f6cd999098cfddb0b2ab381dc0"
 "checksum bit_field 0.7.0 (registry+https://github.com/rust-lang/crates.io-index)" = "ff91a64014e1bc53bf643920f2c9ab5f0980d92a0948295f3ee550e9266849ad"
 "checksum bitflags 1.1.0 (registry+https://github.com/rust-lang/crates.io-index)" = "3d155346769a6855b86399e9bc3814ab343cd3d62c7e985113d46a0ec3c281fd"
@@ -2587,6 +2609,7 @@ source = "git+https://github.com/kevinaboos/zero.git#9fc7ff523138a21f40359b706d2
 "checksum goblin 0.0.19 (registry+https://github.com/rust-lang/crates.io-index)" = "c65cd533b33e3d04c6e393225fa8919ddfcf5862ca8919c7f9a167c312ef41c2"
 "checksum hashbrown 0.1.8 (registry+https://github.com/rust-lang/crates.io-index)" = "3bae29b6653b3412c2e71e9d486db9f9df5d701941d86683005efb9f2d28e3da"
 "checksum httparse 1.3.3 (registry+https://github.com/rust-lang/crates.io-index)" = "e8734b0cfd3bc3e101ec59100e101c2eecd19282202e87808b3037b442777a83"
+"checksum intrusive-collections 0.9.0 (git+https://github.com/Ramla-I/intrusive-rs.git)" = "<none>"
 "checksum irq_safety 0.1.1 (git+https://github.com/kevinaboos/irq_safety)" = "<none>"
 "checksum itertools 0.7.11 (registry+https://github.com/rust-lang/crates.io-index)" = "0d47946d458e94a1b7bcabbf6521ea7c037062c81f534615abcad76e84d4970d"
 "checksum keccak 0.1.0 (registry+https://github.com/rust-lang/crates.io-index)" = "67c21572b4949434e4fc1e1978b99c5f77064153c59d998bf13ecd96fb5ecba7"
@@ -2595,6 +2618,7 @@ source = "git+https://github.com/kevinaboos/zero.git#9fc7ff523138a21f40359b706d2
 "checksum log 0.4.8 (registry+https://github.com/rust-lang/crates.io-index)" = "14b6052be84e6b71ab17edffc2eeabf5c2c3ae1fdb464aae35ac50c67a44e1f7"
 "checksum managed 0.7.1 (registry+https://github.com/rust-lang/crates.io-index)" = "fdcec5e97041c7f0f1c5b7d93f12e57293c831c646f4cc7a5db59460c7ea8de6"
 "checksum memchr 2.1.3 (registry+https://github.com/rust-lang/crates.io-index)" = "e1dd4eaac298c32ce07eb6ed9242eda7d82955b9170b7d6db59b2e02cc63fcb8"
+"checksum memoffset 0.5.4 (git+https://github.com/Ramla-I/memoffset.git)" = "<none>"
 "checksum multiboot2 0.7.1 (registry+https://github.com/rust-lang/crates.io-index)" = "6ebbe89ab663a65cab341428d5fc7013b0eab5543ace92a401a86581e50fdd81"
 "checksum new_debug_unreachable 1.0.1 (registry+https://github.com/rust-lang/crates.io-index)" = "0cdc457076c78ab54d5e0d6fa7c47981757f1e34dc39ff92787f217dede586c4"
 "checksum nodrop 0.1.13 (registry+https://github.com/rust-lang/crates.io-index)" = "2f9667ddcc6cc8a43afc9b7917599d7216aa09c463919ea32c59ed6cac8bc945"
