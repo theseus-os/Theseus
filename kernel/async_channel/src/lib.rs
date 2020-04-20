@@ -12,14 +12,17 @@
 #![no_std]
 
 extern crate alloc;
-// #[macro_use] extern crate log;
+#[macro_use] extern crate log;
 // #[macro_use] extern crate debugit;
 extern crate wait_queue;
 extern crate mpmc;
+extern crate irq_safety;
+
 
 use alloc::sync::Arc;
 use mpmc::Queue as MpmcQueue;
 use wait_queue::WaitQueue;
+use irq_safety::MutexIrqSafe;
 
 
 /// Create a new channel that allows senders and receivers to 
@@ -41,6 +44,8 @@ pub fn new_channel<T: Send>(minimum_capacity: usize) -> (Sender<T>, Receiver<T>)
         queue: MpmcQueue::with_capacity(minimum_capacity),
         waiting_senders: WaitQueue::new(),
         waiting_receivers: WaitQueue::new(),
+        receive_status: EndpointStatus::new(),
+        send_status: EndpointStatus::new()
     });
     (
         Sender   { channel: channel.clone() },
@@ -48,6 +53,43 @@ pub fn new_channel<T: Send>(minimum_capacity: usize) -> (Sender<T>, Receiver<T>)
     )
 }
 
+#[derive(PartialEq)]
+pub enum EndpointValues {
+    Working,
+    Dropped,
+}
+
+// pub struct EndpointStatus (MutexIrqSafe<EndpointValues>);
+
+// impl EndpointStatus {
+//     pub fn new() -> EndpointStatus {
+//         EndpointStatus(MutexIrqSafe::new(EndpointValues::Working))
+//     }
+
+//     pub fn set_dropped(&self) -> () {
+//         //
+//     }
+
+//     pub fn lock(&self) -> MutexIrqSafeGuardRef<Task> {
+//         MutexIrqSafeGuardRef::new(self.0.deref().0.lock())
+//     }
+
+// }
+
+pub struct EndpointStatus {
+    state : EndpointValues,
+}
+
+impl EndpointStatus {
+    pub fn new() -> EndpointStatus {
+        EndpointStatus{state : EndpointValues::Working}
+    }
+
+    pub fn set_dropped(&self) -> () {
+        //
+    }
+
+}
 
 /// The inner channel for asynchronous communication between `Sender`s and `Receiver`s.
 ///
@@ -60,6 +102,8 @@ struct Channel<T: Send> {
     queue: MpmcQueue<T>,
     waiting_senders: WaitQueue,
     waiting_receivers: WaitQueue,
+    receive_status: EndpointStatus,
+    send_status: EndpointStatus
 }
 
 
@@ -92,27 +136,37 @@ impl <T: Send> Sender<T> {
         // because it will notify the receivers which can cause deadlock.
         // Therefore, we need to perform the nofity action outside of this closure after it returns.
         let mut closure = || {
+            if self.channel.receive_status.state == EndpointValues::Dropped {
+                 // We break and return
+                 return Err(())
+            }
             let owned_msg = msg.take();
-            owned_msg.and_then(|m| match self.channel.queue.push(m) {
-                Ok(()) => Some(()),
+            let r = owned_msg.and_then(|m| match self.channel.queue.push(m) {
+                Ok(()) => {
+                    debug!("Sending send in closure");
+                    Some(())
+                },
                 Err(returned_msg) => {
+                    debug!("Sending failed at wait until closure");
                     // Here: we (the sender) woke up and failed to send, 
                     // so we save the returned message outside of the closure to retry later. 
                     // trace!("try_send() failed, saving message {:?} for next retry.", debugit!(returned_msg));
                     msg = Some(returned_msg);
                     None
                 }
-            })
+            });
+            Ok(r)
         };
+
         let res = self.channel.waiting_senders
-            .wait_until_mut(&mut closure)
+            .wait_until_mut_ok(&mut closure)
             .map_err(|_| "failed to add current task to queue of waiting senders waitqueue");
         // trace!("... sending space became available.");
 
         // If we successfully sent a message, we need to notify any waiting receivers.
         // As stated above, to avoid deadlock, this must be done here rather than in the above closure.
         if res.is_ok() {
-            // trace!("successful send() is notifying receivers.");
+            debug!("successful send() is notifying receivers.");
             self.channel.waiting_receivers.notify_one();
         }
         res
@@ -125,7 +179,7 @@ impl <T: Send> Sender<T> {
         match self.channel.queue.push(msg) {
             // successfully sent
             Ok(()) => {
-                // trace!("successful try_send() is notifying receivers.");
+                debug!("successful try_send() is notifying receivers.");
                 self.channel.waiting_receivers.notify_one();
                 Ok(())
             }
@@ -146,7 +200,7 @@ impl <T: Send> Receiver<T> {
     pub fn receive(&self) -> Result<T, &'static str> {
         // trace!("async_channel: receive() entry");
         // Fast path: attempt to receive a message, assuming the buffer isn't empty
-        if let Some(msg) = self.try_receive() {
+        if let Ok(Some(msg)) = self.try_receive() {
             return Ok(msg);
         }
 
@@ -157,14 +211,14 @@ impl <T: Send> Receiver<T> {
         // because it will notify the receivers which can cause deadlock.
         // Therefore, we need to perform the nofity action outside of this closure after it returns.
         let res = self.channel.waiting_receivers
-            .wait_until(&|| self.try_receive())
+            .wait_until_ok(&|| self.try_receive())
             .map_err(|_| "failed to add current task to queue of waiting receivers");
         // trace!("... received msg.");
 
         // If we successfully received a message, we need to notify any waiting senders.
         // As stated above, to avoid deadlock, this must be done here rather than in the above closure.
         if res.is_ok() {
-            // trace!("async_channel: successful receive() is notifying senders.");
+            debug!("async_channel: successful receive() is notifying senders.");
             self.channel.waiting_senders.notify_one();
         }
         res
@@ -173,17 +227,35 @@ impl <T: Send> Receiver<T> {
     /// Tries to receive a message, only succeeding if a message is already available in the buffer.
     /// 
     /// If no such message exists, it returns `None` without blocking.
-    pub fn try_receive(&self) -> Option<T> {
+    pub fn try_receive(&self) -> Result<Option<T>,()> {
+        if self.channel.send_status.state == EndpointValues::Dropped {
+            return Err(())
+        }
         let msg = self.channel.queue.pop();
         if msg.is_some() {
-            // trace!("successful try_receive() is notifying senders.");
+            debug!("successful try_receive() is notifying senders.");
             self.channel.waiting_senders.notify_one();
-            msg
+            Ok(msg)
         } else {
-            None
+            Ok(None)
         }
     }
 }
 
 
 // TODO: implement drop for sender and receiver in order to notify the other side of a disconnect
+// This trivial implementation of `drop` adds a print to console.
+impl<T: Send> Drop for Receiver<T> {
+    fn drop(&mut self) {
+        debug!("> Dropping the receiver");
+        self.channel.waiting_senders.notify_one();
+    }
+}
+
+impl<T: Send> Drop for Sender<T> {
+    fn drop(&mut self) {
+        debug!("Dropping the sender");
+        self.channel.receive_status.set_dropped();
+        self.channel.waiting_receivers.notify_one();
+    }
+}

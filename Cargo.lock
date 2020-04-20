@@ -117,6 +117,7 @@ name = "async_channel"
 version = "0.1.0"
 dependencies = [
  "debugit 0.1.0",
+ "irq_safety 0.1.1 (git+https://github.com/kevinaboos/irq_safety)",
  "log 0.3.9 (registry+https://github.com/rust-lang/crates.io-index)",
  "mpmc 0.1.6-pre",
  "spin 0.4.10 (registry+https://github.com/rust-lang/crates.io-index)",
@@ -315,6 +316,22 @@ dependencies = [
  "task 0.1.0",
  "terminal_print 0.1.0",
  "unified_channel 0.1.0",
+]
+
+[[package]]
+name = "channel_test"
+version = "0.1.0"
+dependencies = [
+ "apic 0.1.0",
+ "async_channel 0.1.0",
+ "getopts 0.2.21 (git+https://github.com/kevinaboos/getopts)",
+ "log 0.3.9 (registry+https://github.com/rust-lang/crates.io-index)",
+ "rendezvous 0.1.0",
+ "scheduler 0.1.0",
+ "spawn 0.1.0",
+ "spin 0.4.10 (registry+https://github.com/rust-lang/crates.io-index)",
+ "task 0.1.0",
+ "terminal_print 0.1.0",
 ]
 
 [[package]]
@@ -1073,12 +1090,12 @@ name = "log"
 version = "0.3.9"
 source = "registry+https://github.com/rust-lang/crates.io-index"
 dependencies = [
- "log 0.4.6 (registry+https://github.com/rust-lang/crates.io-index)",
+ "log 0.4.8 (registry+https://github.com/rust-lang/crates.io-index)",
 ]
 
 [[package]]
 name = "log"
-version = "0.4.6"
+version = "0.4.8"
 source = "registry+https://github.com/rust-lang/crates.io-index"
 dependencies = [
  "cfg-if 0.1.9 (registry+https://github.com/rust-lang/crates.io-index)",
@@ -2572,7 +2589,7 @@ source = "git+https://github.com/kevinaboos/zero.git#9fc7ff523138a21f40359b706d2
 "checksum libm 0.2.1 (registry+https://github.com/rust-lang/crates.io-index)" = "c7d73b3f436185384286bd8098d17ec07c9a7d2388a6599f824d8502b529702a"
 "checksum linked_list_allocator 0.6.3 (registry+https://github.com/rust-lang/crates.io-index)" = "655d57c71827fe0891ce72231b6aa5e14033dae3f604609e6a6f807267c1678d"
 "checksum log 0.3.9 (registry+https://github.com/rust-lang/crates.io-index)" = "e19e8d5c34a3e0e2223db8e060f9e8264aeeb5c5fc64a4ee9965c062211c024b"
-"checksum log 0.4.6 (registry+https://github.com/rust-lang/crates.io-index)" = "c84ec4b527950aa83a329754b01dbe3f58361d1c5efacd1f6d68c494d08a17c6"
+"checksum log 0.4.8 (registry+https://github.com/rust-lang/crates.io-index)" = "14b6052be84e6b71ab17edffc2eeabf5c2c3ae1fdb464aae35ac50c67a44e1f7"
 "checksum managed 0.7.1 (registry+https://github.com/rust-lang/crates.io-index)" = "fdcec5e97041c7f0f1c5b7d93f12e57293c831c646f4cc7a5db59460c7ea8de6"
 "checksum memchr 2.1.3 (registry+https://github.com/rust-lang/crates.io-index)" = "e1dd4eaac298c32ce07eb6ed9242eda7d82955b9170b7d6db59b2e02cc63fcb8"
 "checksum multiboot2 0.7.1 (registry+https://github.com/rust-lang/crates.io-index)" = "6ebbe89ab663a65cab341428d5fc7013b0eab5543ace92a401a86581e50fdd81"
