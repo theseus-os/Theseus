@@ -31,14 +31,14 @@ use alloc::{
 };
 use fs_node::WeakFileRef;
 use owning_ref::ArcRef;
-use memory::{MappedPages, VirtualAddress, MmiRef, FRAME_ALLOCATOR, allocate_pages_by_bytes, EntryFlags};
+use memory::{MappedPages, VirtualAddress, MmiRef, get_frame_allocator_ref, allocate_pages_by_bytes, EntryFlags};
 use xmas_elf::{
     ElfFile,
     sections::{SectionData, SectionData::Rela64, ShType},
 };
 use goblin::elf::reloc::*;
 use gimli::{
-    DebugAbbrevOffset,
+    // DebugAbbrevOffset,
     NativeEndian,
     EndianSlice,
     SectionId,
@@ -52,7 +52,7 @@ use gimli::{
         DebugPubTypes,
         DebugStr,
         Reader,
-        Section,
+        // Section,
     },
 };
 use rustc_demangle::demangle;
@@ -75,7 +75,7 @@ pub struct DebugSections {
     debug_pubtypes:  DebugSectionSlice,
     debug_line:      DebugSectionSlice,
     /// The crate that these debug sections correspond to, which must already be loaded.
-    loaded_crate: StrongCrateRef,
+    _loaded_crate: StrongCrateRef,
     /// The list of sections in foreign crates that these debug sections depend on.
     /// 
     /// Unlike the dependencies list maintained in `LoadedSection`'s `sections_i_depend_on`,
@@ -292,7 +292,7 @@ impl DebugSections {
                     _ => { }
                 }
                 // TODO FIXME: check if one of the variable's location ranges contains the instruction pointer
-                let type_signature = match entry.attr_value(gimli::DW_AT_type)? {
+                let _type_signature = match entry.attr_value(gimli::DW_AT_type)? {
                     Some(gimli::AttributeValue::DebugTypesRef(type_ref)) => {
                         let _debug_pubtypes_sec = self.debug_pubtypes();
                         // let type_ref = {
@@ -811,7 +811,7 @@ impl DebugSymbols {
             debug_pubnames:  create_debug_section_slice(debug_pubnames)?,
             debug_pubtypes:  create_debug_section_slice(debug_pubtypes)?,
             debug_line:      create_debug_section_slice(debug_line)?,
-            loaded_crate:    loaded_crate.clone_shallow(),
+            _loaded_crate:    loaded_crate.clone_shallow(),
             _dependencies:   dependencies,
             original_file:   weak_file.clone(),
         };
@@ -873,9 +873,9 @@ fn allocate_debug_section_pages(elf_file: &ElfFile, kernel_mmi_ref: &MmiRef) -> 
         return Err("no .debug sections found");
     }
 
-    let mut frame_allocator = FRAME_ALLOCATOR.try().ok_or("couldn't get FRAME_ALLOCATOR")?.lock();
+    let frame_allocator = get_frame_allocator_ref().ok_or("couldn't get frame allocator")?;
     let allocated_pages = allocate_pages_by_bytes(ro_bytes).ok_or("Couldn't allocate_pages_by_bytes, out of virtual address space")?;
-    let mp = kernel_mmi_ref.lock().page_table.map_allocated_pages(allocated_pages, EntryFlags::PRESENT | EntryFlags::WRITABLE, frame_allocator.deref_mut())?;
+    let mp = kernel_mmi_ref.lock().page_table.map_allocated_pages(allocated_pages, EntryFlags::PRESENT | EntryFlags::WRITABLE, frame_allocator.lock().deref_mut())?;
     let start_address = mp.start_address();
     let range = start_address .. (start_address + ro_bytes);
     Ok((mp, range))

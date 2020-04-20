@@ -32,7 +32,7 @@ pub fn main(_args: Vec<String>) -> isize {
 
 
 fn rmain() -> Result<(), &'static str> {
-    let my_cpu = apic::get_my_apic_id().ok_or("couldn't get my APIC ID")?;
+    let my_cpu = apic::get_my_apic_id();
 
     let ready = Arc::new(Mutex::new(false));
     let ready2 = ready.clone();

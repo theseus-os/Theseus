@@ -114,6 +114,6 @@ impl FrameAllocator for TinyAllocator {
 impl Drop for TinyAllocator {
     fn drop(&mut self) {
         // FIXME: TinyAllocator leaks 3 frames when it's dropped. 
-        // Should call deallocate_frame() using the original allocator, which is memory::FRAME_ALLOCATOR
+        // Should call deallocate_frame() using the original allocator, which is returned by get_frame_allocator_ref()
     }
 }

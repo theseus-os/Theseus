@@ -12,8 +12,7 @@ x86_64 = { path = "../../libs/x86_64" }
 core_io = "0.1"
 
 [dependencies.log]
-default-features = false
-version = "0.3.7"
+version = "0.4.8"
 
 [dependencies.keycodes_ascii]
 path = "../../libs/keycodes_ascii"

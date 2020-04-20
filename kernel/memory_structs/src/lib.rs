@@ -5,8 +5,6 @@
 #![feature(range_is_empty)]
 #![feature(step_trait)]
 
-extern crate atomic_linked_list;
-extern crate heap_irq_safe;
 extern crate kernel_config;
 extern crate multiboot2;
 extern crate xmas_elf;
@@ -54,9 +52,9 @@ impl VirtualAddress {
         //     false => virt_addr.set_bits(48..64, 0),
         //     true => virt_addr.set_bits(48..64, 0xffff),
         // };
-        //
+
         // The below code is semantically equivalent to the above, but it works in const functions.
-        VirtualAddress((virt_addr.wrapping_mul(0x1_0000) as isize / 0x1_0000) as usize)
+        VirtualAddress(((virt_addr << 16) as isize >> 16) as usize)
     }
 
     /// Creates a VirtualAddress with the value 0.
@@ -74,7 +72,7 @@ impl VirtualAddress {
     ///
     /// For example, if the PAGE_SIZE is 4KiB, then this will return
     /// the least significant 12 bits (12:0] of this VirtualAddress.
-    pub fn page_offset(&self) -> usize {
+    pub const fn page_offset(&self) -> usize {
         self.0 & (PAGE_SIZE - 1)
     }
 }
@@ -432,7 +430,7 @@ impl Page {
     }
 
     /// Returns the `VirtualAddress` as the start of this `Page`.
-    pub fn start_address(&self) -> VirtualAddress {
+    pub const fn start_address(&self) -> VirtualAddress {
         // Cannot create VirtualAddress directly because the field is private
         VirtualAddress::new_canonical(self.number * PAGE_SIZE)
     }
@@ -534,12 +532,12 @@ pub struct PageRange(RangeInclusive<Page>);
 impl PageRange {
     /// Creates a new range of `Page`s that spans from `start` to `end`,
     /// both inclusive bounds.
-    pub fn new(start: Page, end: Page) -> PageRange {
+    pub const fn new(start: Page, end: Page) -> PageRange {
         PageRange(RangeInclusive::new(start, end))
     }
 
     /// Creates a PageRange that will always yield `None`.
-    pub fn empty() -> PageRange {
+    pub const fn empty() -> PageRange {
         PageRange::new(Page { number: 1 }, Page { number: 0 })
     }
 
@@ -553,20 +551,20 @@ impl PageRange {
     }
 
     /// Returns the `VirtualAddress` of the starting `Page`.
-    pub fn start_address(&self) -> VirtualAddress {
+    pub const fn start_address(&self) -> VirtualAddress {
         self.0.start().start_address()
     }
 
     /// Returns the size in number of `Page`s.
     /// Use this instead of the Iterator trait's `count()` method.
     /// This is instant, because it doesn't need to iterate over each `Page`, unlike normal iterators.
-    pub fn size_in_pages(&self) -> usize {
+    pub const fn size_in_pages(&self) -> usize {
         // add 1 because it's an inclusive range
         self.0.end().number + 1 - self.0.start().number
     }
 
     /// Returns the size in number of bytes.
-    pub fn size_in_bytes(&self) -> usize {
+    pub const fn size_in_bytes(&self) -> usize {
         self.size_in_pages() * PAGE_SIZE
     }
 

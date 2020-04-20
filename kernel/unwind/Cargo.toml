@@ -14,8 +14,7 @@ default-features = false
 features = [ "read", "alloc" ]
 
 [dependencies.log]
-default-features = false
-version = "0.3.7"
+version = "0.4.8"
 
 [dependencies.memory]
 path = "../memory"

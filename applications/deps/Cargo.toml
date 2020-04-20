@@ -10,8 +10,7 @@ getopts = "0.2.21"
 spin = "0.4.10"
 
 [dependencies.log]
-default-features = false
-version = "0.3.7"
+version = "0.4.8"
 
 [dependencies.itertools]
 version = "0.7.9"

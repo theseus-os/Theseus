@@ -111,7 +111,7 @@ pub extern "C" fn nano_core_start(multiboot_information_virtual_address: usize) 
 
     // first, bring up the logger so we can debug
     try_exit!(logger::init().map_err(|_| "couldn't init logger!"));
-    trace!("Logger initialized.");
+    info!("Logger initialized.");
     println_raw!("nano_core_start(): initialized logger."); 
 
     // initialize basic exception handlers

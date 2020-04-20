@@ -25,7 +25,7 @@ pub fn hpet_2_ns(hpet: u64) -> u64 {
 
 #[macro_export]
 macro_rules! CPU_ID {
-	() => (apic::get_my_apic_id().unwrap())
+	() => (apic::get_my_apic_id())
 }
 
 /// Helper function return the tasks in a given core's runqueue
