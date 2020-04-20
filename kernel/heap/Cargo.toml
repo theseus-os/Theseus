@@ -19,8 +19,8 @@ path = "../memory"
 [dependencies.kernel_config]
 path = "../kernel_config"
 
-[dependencies.slabmalloc]
-path = "../../libs/rust-slabmalloc"
+[dependencies.block_allocator]
+path = "../block_allocator"
 
-[dependencies.intrusive-collections]
-git = "https://github.com/Ramla-I/intrusive-rs.git"
+
+

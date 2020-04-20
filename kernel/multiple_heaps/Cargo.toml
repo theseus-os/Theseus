@@ -5,6 +5,8 @@ description = "Allocator which uses multiple heaps"
 version = "0.1.0"
 
 [dependencies]
+intrusive-collections = "0.9.0"
+static_assertions = "1.1.0"
 
 [dependencies.irq_safety]
 git = "https://github.com/kevinaboos/irq_safety"
@@ -24,10 +26,9 @@ path = "../apic"
 [dependencies.slabmalloc]
 path = "../../libs/rust-slabmalloc"
 
-[dependencies.hashbrown]
-version = "0.1.8"
-features = ["nightly"]
-
 [dependencies.heap]
 path = "../heap"
 
+[dependencies.hashbrown]
+version = "0.1.8"
+features = ["nightly"]

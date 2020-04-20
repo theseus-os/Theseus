@@ -252,14 +252,15 @@ pub fn init(boot_info: &BootInformation)
 /// Returns the following tuple, if successful:
 ///  * The kernel's new MemoryManagementInfo
 ///  * The kernel's list of identity-mapped MappedPages which should be dropped before starting the first userspace program. 
-pub fn init_post_heap(page_table: PageTable, mut higher_half_mapped_pages: [Option<MappedPages>; 32], mut identity_mapped_pages: [Option<MappedPages>; 32]) 
+pub fn init_post_heap(page_table: PageTable, mut higher_half_mapped_pages: [Option<MappedPages>; 32], mut identity_mapped_pages: [Option<MappedPages>; 32], heap_mapped_pages: MappedPages) 
 -> Result<(Arc<MutexIrqSafe<MemoryManagementInfo>>, Vec<MappedPages>), &'static str> 
 {
     // HERE: heap is initialized! Can now use alloc types.
     // After this point, we must "forget" all of the above mapped_pages instances if an error occurs,
     // because they will be auto-unmapped from the new page table upon return, causing all execution to stop.  
 
-    let higher_half_mapped_pages: Vec<MappedPages> = higher_half_mapped_pages.iter_mut().filter_map(|opt| opt.take()).collect();
+    let mut higher_half_mapped_pages: Vec<MappedPages> = higher_half_mapped_pages.iter_mut().filter_map(|opt| opt.take()).collect();
+    higher_half_mapped_pages.push(heap_mapped_pages);
     let identity_mapped_pages: Vec<MappedPages> = identity_mapped_pages.iter_mut().filter_map(|opt| opt.take()).collect();
    
     // init the kernel stack allocator, a singleton

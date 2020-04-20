@@ -3,67 +3,24 @@
 //! The original version was presented in the Hoard paper
 //! https://github.com/emeryberger/Hoard/tree/master/benchmarks/threadtest
 
-#![no_std]
-
-extern crate alloc;
-#[macro_use] extern crate terminal_print;
-extern crate getopts;
-extern crate spawn;
-extern crate hpet;
-extern crate libtest;
-
 use alloc::{
     vec::Vec,
     string::String,
     boxed::Box,
 };
 use core::sync::atomic::{AtomicUsize, Ordering};
-use getopts::Options;
 use hpet::get_hpet;
 use libtest::hpet_2_ns;
 
 
-static NTHREADS: AtomicUsize = AtomicUsize::new(1);
+pub static NTHREADS: AtomicUsize = AtomicUsize::new(1);
 const NITERATIONS: usize = 50;
 /// Sum total of objects to be allocated by all threads
 const NOBJECTS: usize = 30_000;
 /// Size of the objects we're allocating in bytes
 const OBJSIZE: usize = 8;
 
-
-pub fn main(args: Vec<String>) -> isize {
-    let mut opts = Options::new();
-    opts.optflag("h", "help", "print this help menu");
-    opts.optopt("t", "threads", "number of worker threads to spawn on separate cores", "THREADS");
-    
-    let matches = match opts.parse(&args) {
-        Ok(m) => m,
-        Err(_f) => {
-            println!("{}", _f);
-            print_usage(opts);
-            return -1; 
-        }
-    };
-
-    if matches.opt_present("h") {
-        print_usage(opts);
-        return 0;
-    }
-
-    if let Some(threads) = matches.opt_str("t").and_then(|i| i.parse::<usize>().ok()) {
-        NTHREADS.store(threads, Ordering::SeqCst);
-    }
-
-    match rmain() {
-        Ok(_) => 0,
-        Err(e) => {
-            println!("Error: {}", e);
-            -1
-        }    
-    }    
-}
-
-fn rmain() -> Result<(), &'static str> {
+pub fn do_threadtest() -> Result<(), &'static str> {
 
     let nthreads = NTHREADS.load(Ordering::SeqCst);
     let mut threads = Vec::with_capacity(nthreads);
@@ -119,8 +76,4 @@ fn worker(_:()) {
 }
 
 
-fn print_usage(opts: Options) {
-    println!("{}", opts.usage(USAGE));
-}
 
-const USAGE: &'static str = "Usage: threadtest OPTION ARG";

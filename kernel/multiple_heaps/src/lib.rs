@@ -5,19 +5,19 @@
 //! 8, 16, 32, 64, 128, 256, 512, 1024, 2048, 4096 and 8056 (8KiB - bytes of metadata) bytes. 8056 is the maximum allocation size given by `ZoneAllocator::MAX_ALLOC_SIZE`.
 //! The slab allocator maintains linked lists of allocable pages from which it allocates objects of the same size. 
 //! The allocable pages are 8 KiB (`ObjectPage8K::SIZE`), and have metadata stored in the last 136 bytes (`ObjectPage8K::METADATA_SIZE`).
-//! The metadata includes heap id, MappedPages object this allocable page belongs to, forward and back pointers to pages stored in a linked list and a
-//! bitmap to keep track of allocations. The maximum allocation size can change if the size of the objects in the metadata change. If that happens it will be automatically reflected
-//! in the constants `ZoneAllocator::MAX_ALLOC_SIZE` and `ObjectPage8K::METADATA_SIZE`
+//! The metadata includes a heap id, MappedPages object this allocable page belongs to, forward and back pointers to pages stored in a linked list and a
+//! bitmap to keep track of allocations. The maximum allocation size can change if the size of the objects in the metadata change. If that happens it will be automatically
+//! reflected in the constants `ZoneAllocator::MAX_ALLOC_SIZE` and `ObjectPage8K::METADATA_SIZE`
 //! 
-//! Any memory request greater than maximum allocation size is satisfied through a request for pages from the kernel.
+//! Any memory request greater than maximum allocation size, a large allocation, is satisfied through a request for pages from the kernel.
 //! All other requests are satisfied through the per-core heaps.
 //! 
 //! The per-core heap which will be used on allocation is determined by the cpu that the task is running on.
 //! On deallocation of a block, the heap id is retrieved from metadata at the end of the allocable page which contains the block.
 //! 
 //! When a per-core heap runs out of memory, pages are first moved between the slab allocators of the per-core heap, then requested from other per-core heaps.
-//! If no empty pages are available within any of the per-core heaps, then more virtual pages are allocated from the range of virtual addresses dedicated to the heap [KERNEL_HEAP_START](../kernel_config/memory/constant.KERNEL_HEAP_START.html)
-//! and dynamically mapped to physical memory frames.
+//! If no empty pages are available within any of the per-core heaps, then more virtual pages are allocated from the range of virtual addresses dedicated to the heap
+//! [KERNEL_HEAP_START](../kernel_config/memory/constant.KERNEL_HEAP_START.html) and dynamically mapped to physical memory frames.
 
 #![feature(const_fn)]
 #![feature(allocator_api)]
@@ -31,21 +31,27 @@ extern crate kernel_config;
 extern crate slabmalloc;
 extern crate apic;
 extern crate heap;
+extern crate intrusive_collections;
 extern crate hashbrown;
+#[macro_use] extern crate static_assertions;
+
 
 use core::ptr::NonNull;
 use alloc::alloc::{GlobalAlloc, Layout};
 use alloc::{
     boxed::Box
 };
-use memory::{MappedPages, VirtualAddress, get_frame_allocator_ref, get_kernel_mmi_ref, PageRange};
-use kernel_config::memory::{PAGE_SIZE, KERNEL_HEAP_START, KERNEL_HEAP_MAX_SIZE};
+use hashbrown::HashMap;
+
+use memory::{MappedPages, VirtualAddress, get_frame_allocator_ref, get_kernel_mmi_ref, PageRange, create_mapping};
+use kernel_config::memory::{PAGE_SIZE, KERNEL_HEAP_START, KERNEL_HEAP_INITIAL_SIZE, KERNEL_HEAP_MAX_SIZE};
 use irq_safety::MutexIrqSafe;
 use slabmalloc::{ZoneAllocator, ObjectPage8k, AllocablePage, Allocator};
 use core::ops::{Add, Deref, DerefMut};
 use core::ptr;
-use heap::{HEAP_FLAGS, HEAP_INITIAL_SIZE_PAGES};
-use hashbrown::HashMap;
+use heap::HEAP_FLAGS;
+use intrusive_collections::{intrusive_adapter,RBTree, RBTreeLink, KeyAdapter, PointerOps};
+
 
 /// The size of each MappedPages Object that is allocated for the per-core heaps, in bytes.
 /// We curently work with 8KiB, so that the per core heaps can allocate objects up to `ZoneAllocator::MAX_ALLOC_SIZE`.  
@@ -60,7 +66,7 @@ const HEAP_MAPPED_PAGES_SIZE_IN_PAGES: usize = ObjectPage8k::SIZE / PAGE_SIZE;
 /// set this threshold value. A heap must have greater than this number of empty mapped pages to return one for use by other heaps.
 const EMPTY_PAGES_THRESHOLD: usize = ZoneAllocator::MAX_BASE_SIZE_CLASSES * 2;
 
-/// The number of pages each size class in the ZoneAllocator is initialized with, for the multiple heaps.
+/// The number of pages each size class in the ZoneAllocator is initialized with.
 const PAGES_PER_SIZE_CLASS: usize = 24; 
 
 /// Starting size of each per-core heap. It's approximately 1 MiB.
@@ -82,29 +88,10 @@ fn initialize_multiple_heaps() -> Result<MultipleHeaps, &'static str> {
 
 
 /// The setup routine for multiple heaps. It creates and initializes the multiple heaps,
-/// and expands the capacity of the heap to create large allocations.
-/// Then transfers mapped pages belonging to the initial allocator to the first multiple heap
-/// and sets the multiple heaps as the default allocator.
+/// then sets the multiple heaps as the default allocator.
 /// Only call this function when the multiple heaps are ready to be used.
 pub fn switch_to_multiple_heaps() -> Result<(), &'static str> {
-    
     let multiple_heaps = Box::new(initialize_multiple_heaps()?);
-    // lock the allocator so that no allocation or deallocation can take place
-    let mut initial_allocator = heap::initial_allocator().lock();
-
-    // switch out the initial allocator with an empty heap
-    let mut zone_allocator = ZoneAllocator::new(0);
-    core::mem::swap(&mut *initial_allocator, &mut zone_allocator);
-
-    let heap_id = get_key(); 
-
-    // transfer initial heap to the first multiple heap
-    multiple_heaps.heaps.get(&heap_id)
-        .ok_or("BUG: per core heap was not initialized")?
-        .lock().merge(&mut zone_allocator)?;
-
-    trace!("transferred initial allocator pages to {}", heap_id);
-
     //set the multiple heaps as the default allocator
     heap::set_allocator(multiple_heaps);
 
@@ -114,7 +101,7 @@ pub fn switch_to_multiple_heaps() -> Result<(), &'static str> {
 
 
 /// Allocates pages from the given starting address and maps them to frames.
-/// Returns the new mapped pages or an error is returned if the heap memory limit is reached.
+/// Returns the new mapped pages or an error if the heap memory limit is reached.
 fn create_heap_mapping(starting_address: VirtualAddress, size_in_bytes: usize) -> Result<MappedPages, &'static str> {
     if (starting_address.value() + size_in_bytes) >  (KERNEL_HEAP_START + KERNEL_HEAP_MAX_SIZE) {
         return Err("Heap memory limit has been reached");
@@ -173,7 +160,7 @@ pub fn init_individual_heap(key: usize, multiple_heaps: &mut MultipleHeaps) -> R
     // store the new end of the heap after this core has been initialized
     *heap_end = heap_end_addr;
 
-    // store the newly created allocator in the global allocator
+    // store the newly created allocator in the multiple heaps object
     if let Some(_heap) = multiple_heaps.heaps.insert(key, LockedHeap(MutexIrqSafe::new(zone_allocator))) {
         return Err("New heap created with a previously used id");
     }
@@ -192,6 +179,26 @@ fn get_key() -> usize {
 }
 
 
+/// The links for the RBTree used to store large allocations
+struct LargeAllocation {
+    link: RBTreeLink,
+    mp: MappedPages
+}
+
+// Our design depends on the fact that on the large allocation path, only objects smaller than the max allocation size will be allocated from the heap.
+// Otherwise we will have a recursive loop of large allocations.
+const_assert!(core::mem::size_of::<LargeAllocation>() < ZoneAllocator::MAX_ALLOC_SIZE); 
+
+intrusive_adapter!(LargeAllocationAdapter = Box<LargeAllocation>: LargeAllocation { link: RBTreeLink });
+
+/// Defines the key which will be used to search for elements in the RBTree.
+/// Here it is the starting address of the allocation.
+impl<'a> KeyAdapter<'a> for LargeAllocationAdapter {
+    type Key = usize;
+    fn get_key(&self, value: &'a <Self::PointerOps as PointerOps>::Value) -> usize {
+        value.mp.start_address().value()
+    }
+}
 
 #[repr(align(64))]
 struct LockedHeap (MutexIrqSafe<ZoneAllocator<'static>>);
@@ -209,6 +216,8 @@ impl Deref for LockedHeap {
 pub struct MultipleHeaps{
     /// the per-core heaps
     heaps: HashMap<usize,LockedHeap>,
+    /// Red-black tree to store large allocations
+    large_allocations: MutexIrqSafe<RBTree<LargeAllocationAdapter>>,
     /// We currently don't return memory back to the OS. Because of this all memory in the heap is contiguous
     /// and extra memory for the heap is always allocated from the end.
     /// The Mutex also serves the purpose of helping to synchronize new allocations.
@@ -219,11 +228,12 @@ impl MultipleHeaps {
     pub fn empty() -> MultipleHeaps {
         MultipleHeaps{
             heaps: HashMap::new(),
-            end: MutexIrqSafe::new(VirtualAddress::new_canonical(KERNEL_HEAP_START + (HEAP_INITIAL_SIZE_PAGES * PAGE_SIZE)))
+            large_allocations: MutexIrqSafe::new(RBTree::new(LargeAllocationAdapter::new())),
+            end: MutexIrqSafe::new(VirtualAddress::new_canonical(KERNEL_HEAP_START + KERNEL_HEAP_INITIAL_SIZE))
         }
     }
 
-    /// Called when an call to allocate() returns a null pointer. The following steps are used to recover memory:
+    /// Called when a call to allocate() returns a null pointer. The following steps are used to recover memory:
     /// (1) Pages are first taken from another heap.
     /// (2) If the above fails, then more pages are allocated from the OS.
     /// 
@@ -231,19 +241,16 @@ impl MultipleHeaps {
     /// 
     /// # Arguments
     /// * `layout`: layout.size will determine which allocation size the retrieved pages will be used for. 
-    /// * `heap_id`: heap that needs to grow.
+    /// * `heap`: heap that needs to grow.
     fn grow_heap(&self, layout: Layout, heap: &mut ZoneAllocator<'static>) -> Result<(), &'static str> {
         // (1) Try to retrieve a page from the another heap
         for locked_heap in self.heaps.values() {
-            match locked_heap.try_lock().and_then(|mut giving_heap| giving_heap.retrieve_empty_page(EMPTY_PAGES_THRESHOLD)) {
-                Some(mp) => {
-                    info!("Added page from another heap to heap: {}", heap.heap_id);
-                    return heap.refill(layout, mp);
-                },
-                None => continue
+            if let Some(mp) = locked_heap.try_lock().and_then(|mut giving_heap| giving_heap.retrieve_empty_page(EMPTY_PAGES_THRESHOLD)) {
+                info!("Added page from another heap to heap: {}", heap.heap_id);
+                return heap.refill(layout, mp);
             }
         }
-        // Allocate page from the OS
+        // (2) Allocate page from the OS
         let mut heap_end = self.end.lock();
         let mp = create_heap_mapping(*heap_end, HEAP_MAPPED_PAGES_SIZE_IN_BYTES)?;
         info!("grow_heap:: Allocated a page to refill core heap {} for size :{} at address: {:#X}", heap.heap_id, layout.size(), *heap_end);
@@ -260,6 +267,14 @@ unsafe impl GlobalAlloc for MultipleHeaps {
     /// If the per-core heap is not initialized, then an error is returned.
     #[inline(always)]    
     unsafe fn alloc(&self, layout: Layout) -> *mut u8 {
+        // allocate a large object by directly obtaining mapped pages from the OS
+        if layout.size() > ZoneAllocator::MAX_ALLOC_SIZE {
+            return allocate_large_object(
+                layout, 
+                &mut self.large_allocations.lock()
+            )
+        }
+
         let id = get_key();
         let mut heap = self.heaps.get(&id).expect("Multiple Heaps: heap is not initialized!").lock();
 
@@ -271,7 +286,15 @@ unsafe impl GlobalAlloc for MultipleHeaps {
     /// Deallocates the memory at the address given by `ptr`.
     /// Memory is returned to the per-core heap it was allocated from.
     #[inline(always)]    
-    unsafe fn dealloc(&self, ptr: *mut u8, layout: Layout) {        
+    unsafe fn dealloc(&self, ptr: *mut u8, layout: Layout) {   
+        // deallocate a large object by directly returning mapped pages to the OS
+        if layout.size() > ZoneAllocator::MAX_ALLOC_SIZE {
+            return deallocate_large_object(
+                ptr, 
+                layout, 
+                &mut self.large_allocations.lock()
+            )
+        }     
         // find the starting address of the object page this block belongs to
         let page_addr = (ptr as usize) & !(ObjectPage8k::SIZE - 1);
         // find the heap id
@@ -282,3 +305,37 @@ unsafe impl GlobalAlloc for MultipleHeaps {
 }
 
 
+/// Any memory request greater than `ZoneAllocator::MAX_ALLOC_SIZE` is satisfied through a request to the OS.
+/// The pointer to the beginning of the newly allocated pages is returned.
+/// The MappedPages object returned by that request is stored in an RB-tree
+/// 
+/// # Warning
+/// This function should only be used by an allocator in conjunction with [`deallocate_large_object()`](fn.deallocate_large_object.html)
+fn allocate_large_object(layout: Layout, map: &mut RBTree<LargeAllocationAdapter>) -> *mut u8 {
+    if let Ok(mp) = create_mapping(layout.size(), HEAP_FLAGS) {
+        let ptr = mp.start_address().value();
+        let link = Box::new(LargeAllocation {
+            link: RBTreeLink::new(),
+            mp: mp
+        });
+        map.insert(link);
+        // trace!("Allocated a large object of {} bytes at address: {:#X}", layout.size(), ptr as usize);
+        ptr as *mut u8
+
+    } else {
+        error!("Could not create mapping for a large object in the heap");
+        ptr::null_mut()
+    }
+    
+}
+
+/// Any memory request greater than `ZoneAllocator::MAX_ALLOC_SIZE` was created by requesting a MappedPages object from the OS,
+/// and now the MappedPages object will be retrieved and dropped to deallocate the memory referenced by `ptr`.
+/// 
+/// # Warning
+/// This function should only be used by an allocator in conjunction with [`allocate_large_object()`](fn.allocate_large_object.html) 
+fn deallocate_large_object(ptr: *mut u8, _layout: Layout, map: &mut RBTree<LargeAllocationAdapter>) {
+    let _mp = map.find_mut(&(ptr as usize)).remove()
+        .expect("Invalid ptr was passed to deallocate_large_object. There is no such mapping stored");
+    // trace!("Deallocated a large object of {} bytes at address: {:#X} {:#X}", _layout.size(), ptr as usize, _mp.mp.start_address());
+}
