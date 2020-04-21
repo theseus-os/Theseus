@@ -12,7 +12,7 @@
 #![no_std]
 
 extern crate alloc;
-#[macro_use] extern crate log;
+// #[macro_use] extern crate log;
 // #[macro_use] extern crate debugit;
 extern crate wait_queue;
 extern crate mpmc;
@@ -38,6 +38,8 @@ use atomic::Atomic;
 /// future attempts to send another message will either block or return a `Full` error 
 /// until the channel's buffer is drained by a receiver and space in the buffer becomes available.
 /// 
+/// `channel_status` indicates whether one end has been dropped. So that other end can respond.
+/// 
 /// Returns a tuple of `(Sender, Receiver)`.
 pub fn new_channel<T: Send>(minimum_capacity: usize) -> (Sender<T>, Receiver<T>) {
     let channel = Arc::new(Channel::<T> {
@@ -52,6 +54,9 @@ pub fn new_channel<T: Send>(minimum_capacity: usize) -> (Sender<T>, Receiver<T>)
     )
 }
 
+/// Possible values for a channel Endpoint.
+/// Active : Initially channel is created with Active status.
+/// Dropped : Set to dropped when one end is dropped.
 #[derive(Clone, Copy, PartialEq, Debug)]
 pub enum EndpointValues {
     Active,
@@ -105,11 +110,10 @@ impl <T: Send> Sender<T> {
             let owned_msg = msg.take();
             let result = owned_msg.and_then(|m| match self.channel.queue.push(m) {
                 Ok(()) => {
-                    debug!("Sending send in closure");
+                    // trace!("Sending in closure");
                     Some(())
                 },
                 Err(returned_msg) => {
-                    debug!("Sending failed at wait until closure");
                     // Here: we (the sender) woke up and failed to send, 
                     // so we save the returned message outside of the closure to retry later. 
                     // trace!("try_send() failed, saving message {:?} for next retry.", debugit!(returned_msg));
@@ -119,7 +123,7 @@ impl <T: Send> Sender<T> {
             });
 
             if self.channel.channel_status.load(Ordering::SeqCst) == EndpointValues::Dropped {
-                 debug!("Receiver Endpoint is dropped");
+                 // trace!("Receiver Endpoint is dropped");
                  // Here the receiver end has dropped. 
                  // So we don't wait anymore in the waitqueue
                  Err(())
@@ -143,7 +147,7 @@ impl <T: Send> Sender<T> {
         // If we successfully sent a message, we need to notify any waiting receivers.
         // As stated above, to avoid deadlock, this must be done here rather than in the above closure.
         if res.is_ok() {
-            debug!("successful send() is notifying receivers.");
+            // trace!("successful send() is notifying receivers.");
             self.channel.waiting_receivers.notify_one();
         }
         res
@@ -156,7 +160,7 @@ impl <T: Send> Sender<T> {
         match self.channel.queue.push(msg) {
             // successfully sent
             Ok(()) => {
-                debug!("successful try_send() is notifying receivers.");
+                // trace!("successful try_send() is notifying receivers.");
                 self.channel.waiting_receivers.notify_one();
                 Ok(())
             }
@@ -174,10 +178,10 @@ impl <T: Send> Receiver<T> {
     /// Receive a message, blocking until a message is available in the buffer.
     /// 
     /// Returns the message if it was received properly, otherwise returns an error.
-    pub fn receive(&self) -> Result<T, &'static str> {
+    pub fn receive(&self) -> Result<T, &'static str>  {
         // trace!("async_channel: receive() entry");
         // Fast path: attempt to receive a message, assuming the buffer isn't empty
-        if let Ok(Some(msg)) = self.try_receive_fast() {
+        if let Some(msg) = self.try_receive_fast() {
             return Ok(msg);
         }
 
@@ -201,7 +205,7 @@ impl <T: Send> Receiver<T> {
         // If we successfully received a message, we need to notify any waiting senders.
         // As stated above, to avoid deadlock, this must be done here rather than in the above closure.
         if res.is_ok() {
-            debug!("async_channel: successful receive() is notifying senders.");
+            // trace!("async_channel: successful receive() is notifying senders.");
             self.channel.waiting_senders.notify_one();
         }
         res
@@ -210,24 +214,25 @@ impl <T: Send> Receiver<T> {
     /// Tries to receive a message, only succeeding if a message is already available in the buffer.
     /// 
     /// If no such message exists, it returns `None` without blocking.
-    pub fn try_receive_fast(&self) -> Result<Option<T>,()> {
+    pub fn try_receive_fast(&self) -> Option<T> {
         let msg = self.channel.queue.pop();
         if msg.is_some() {
-            debug!("successful try_receive() is notifying senders.");
+            // trace!("successful try_receive_fast() is notifying senders.");
             self.channel.waiting_senders.notify_one();
-            Ok(msg)
+            msg
         } else {
-            Ok(None)
+            None
         }
     }
 
     /// Tries to receive a message, only succeeding if a message is already available in the buffer.
     /// 
-    /// If no such message exists, it returns `None` without blocking.
+    /// If an endpoint is disconnected returns Err().
+    /// If no such message exists, it returns `Ok(None)` without blocking.
     pub fn try_receive(&self) -> Result<Option<T>,()> {
         let msg = self.channel.queue.pop();
         if msg.is_some() {
-            debug!("successful try_receive() is notifying senders.");
+            // trace!("successful try_receive() is notifying senders.");
             self.channel.waiting_senders.notify_one();
             Ok(msg)
         } else {
@@ -240,19 +245,19 @@ impl <T: Send> Receiver<T> {
 }
 
 
-// TODO: implement drop for sender and receiver in order to notify the other side of a disconnect
-// This trivial implementation of `drop` adds a print to console.
+/// Drop implementation marks the channel state and notifys the `Sender`
 impl<T: Send> Drop for Receiver<T> {
     fn drop(&mut self) {
-        debug!("Dropping the receiver");
+        // trace!("Dropping the receiver");
         self.channel.channel_status.store(EndpointValues::Dropped, Ordering::Release);
         self.channel.waiting_senders.notify_one();
     }
 }
 
+/// Drop implementation marks the channel state and notifys the `Receiver`
 impl<T: Send> Drop for Sender<T> {
     fn drop(&mut self) {
-        debug!("Dropping the sender");
+        // trace!("Dropping the sender");
         self.channel.channel_status.store(EndpointValues::Dropped, Ordering::Release);
         self.channel.waiting_receivers.notify_one();
     }
