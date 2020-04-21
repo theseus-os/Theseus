@@ -18,29 +18,11 @@ extern crate irq_safety;
 extern crate kernel_config;
 extern crate atomic_linked_list;
 extern crate xmas_elf;
-extern crate heap_irq_safe;
 extern crate bit_field;
 #[cfg(target_arch = "x86_64")]
 extern crate memory_x86_64;
 extern crate x86_64;
 extern crate memory_structs;
-
-
-/// Just like Rust's `try!()` macro, 
-/// but forgets the given `obj`s to prevent them from being dropped,
-/// as they would normally be upon return of an Error using `try!()`.
-/// This must come BEFORE the below modules in order for them to be able to use it.
-macro_rules! try_forget {
-    ($expr:expr, $($obj:expr),*) => (match $expr {
-        Ok(val) => val,
-        Err(err) => {
-            $(
-                core::mem::forget($obj);
-            )*
-            return Err(err);
-        }
-    });
-}
 
 
 mod area_frame_allocator;
@@ -69,7 +51,8 @@ use spin::Once;
 use irq_safety::MutexIrqSafe;
 use alloc::vec::Vec;
 use alloc::sync::Arc;
-use kernel_config::memory::{PAGE_SIZE, KERNEL_HEAP_START, KERNEL_HEAP_INITIAL_SIZE, KERNEL_STACK_ALLOCATOR_BOTTOM, KERNEL_STACK_ALLOCATOR_TOP_ADDR, KERNEL_OFFSET};
+use kernel_config::memory::{PAGE_SIZE, KERNEL_STACK_ALLOCATOR_BOTTOM, KERNEL_STACK_ALLOCATOR_TOP_ADDR, KERNEL_OFFSET};
+use core::ops::DerefMut;
 
 /// The memory management info and address space of the kernel
 static KERNEL_MMI: Once<MmiRef> = Once::new();
@@ -142,8 +125,8 @@ impl MemoryManagementInfo {
 }
 
 
-
 /// A convenience function that creates a new memory mapping by allocating frames that are contiguous in physical memory.
+/// If contiguous frames are not required, then see [`create_mapping()`](fn.create_mapping.html).
 /// Returns a tuple containing the new `MappedPages` and the starting PhysicalAddress of the first frame,
 /// which is a convenient way to get the physical address without walking the page tables.
 /// 
@@ -151,7 +134,7 @@ impl MemoryManagementInfo {
 /// Currently, this function acquires the lock on the frame allocator and the kernel's `MemoryManagementInfo` instance.
 /// Thus, the caller should ensure that the locks on those two variables are not held when invoking this function.
 pub fn create_contiguous_mapping(size_in_bytes: usize, flags: EntryFlags) -> Result<(MappedPages, PhysicalAddress), &'static str> {
-    let allocated_pages = allocate_pages_by_bytes(size_in_bytes).ok_or("e1000::create_contiguous_mapping(): couldn't allocate pages!")?;
+    let allocated_pages = allocate_pages_by_bytes(size_in_bytes).ok_or("memory::create_contiguous_mapping(): couldn't allocate pages!")?;
 
     let kernel_mmi_ref = get_kernel_mmi_ref().ok_or("create_contiguous_mapping(): KERNEL_MMI was not yet initialized!")?;
     let mut kernel_mmi = kernel_mmi_ref.lock();
@@ -165,6 +148,27 @@ pub fn create_contiguous_mapping(size_in_bytes: usize, flags: EntryFlags) -> Res
 }
 
 
+/// A convenience function that creates a new memory mapping. The pages allocated are contiguous in memory but there's
+/// no guarantee that the frames they are mapped to are also contiguous in memory. If contiguous frames are required
+/// then see [`create_contiguous_mapping()`](fn.create_contiguous_mapping.html).
+/// Returns the new `MappedPages.` 
+/// 
+/// # Locking / Deadlock
+/// Currently, this function acquires the lock on the `FRAME_ALLOCATOR` and the kernel's `MemoryManagementInfo` instance.
+/// Thus, the caller should ensure that the locks on those two variables are not held when invoking this function.
+pub fn create_mapping(size_in_bytes: usize, flags: EntryFlags) -> Result<MappedPages, &'static str> {
+    let allocated_pages = allocate_pages_by_bytes(size_in_bytes).ok_or("memory::create_mapping(): couldn't allocate pages!")?;
+
+    let kernel_mmi_ref = get_kernel_mmi_ref().ok_or("create_contiguous_mapping(): KERNEL_MMI was not yet initialized!")?;
+    let mut kernel_mmi = kernel_mmi_ref.lock();
+
+    let mut frame_allocator = FRAME_ALLOCATOR.try()
+        .ok_or("create_contiguous_mapping(): couldnt get FRAME_ALLOCATOR")?
+        .lock();
+    
+    kernel_mmi.page_table.map_allocated_pages(allocated_pages, flags, frame_allocator.deref_mut())
+}
+
 
 pub static BROADCAST_TLB_SHOOTDOWN_FUNC: Once<fn(PageRange)> = Once::new();
 
@@ -176,19 +180,20 @@ pub fn set_broadcast_tlb_shootdown_cb(func: fn(PageRange)) {
 
 
 
-/// Initializes the virtual memory management system and returns a MemoryManagementInfo instance,
-/// which represents Task zero's (the kernel's) address space. 
+/// Initializes the virtual memory management system.
 /// Consumes the given BootInformation, because after the memory system is initialized,
 /// the original BootInformation will be unmapped and inaccessible.
 /// 
 /// Returns the following tuple, if successful:
-///  * The kernel's new MemoryManagementInfo
+///  * a reference to the Area Frame Allocator to be used by the remaining memory init functions
+///  * the kernel's new PageTable, which is now currently active 
 ///  * the MappedPages of the kernel's text section,
 ///  * the MappedPages of the kernel's rodata section,
 ///  * the MappedPages of the kernel's data section,
-///  * the kernel's list of *other* higher-half MappedPages, which should be kept forever.
+///  * the kernel's list of *other* higher-half MappedPages that needs to be converted to a vector after heap initialization, and which should be kept forever,
+///  * the kernel's list of identity-mapped MappedPages that needs to be converted to a vector after heap initialization, and which should be dropped before starting the first userspace program. 
 pub fn init(boot_info: &BootInformation) 
-    -> Result<(Arc<MutexIrqSafe<MemoryManagementInfo>>, MappedPages, MappedPages, MappedPages, Vec<MappedPages>), &'static str> 
+    -> Result<(&MutexIrqSafe<AreaFrameAllocator>, PageTable, MappedPages, MappedPages, MappedPages, [Option<MappedPages>; 32], [Option<MappedPages>; 32]), &'static str> 
 {
     // get the start and end addresses of the kernel.
     let (kernel_phys_start, kernel_phys_end, kernel_virt_end) = get_kernel_address(&boot_info)?;
@@ -224,7 +229,7 @@ pub fn init(boot_info: &BootInformation)
         MutexIrqSafe::new( fa ) 
     });
 
-    // Initialize paging (create a new page table), which also initializes the kernel heap.
+    // Initialize paging (create a new page table).
 
     let (
         page_table,
@@ -232,16 +237,32 @@ pub fn init(boot_info: &BootInformation)
         rodata_mapped_pages,
         data_mapped_pages,
         higher_half_mapped_pages,
-        identity_mapped_pages,
+        identity_mapped_pages
     ) = paging::init(frame_allocator_mutex, &boot_info)?;
-
-    // HERE: heap is initialized! Can now use alloc types.
-    // After this point, we must "forget" all of the above mapped_pages instances if an error occurs,
-    // because they will be auto-unmapped from the new page table upon return, causing all execution to stop.   
 
     debug!("Done with paging::init()!, page_table: {:?}", page_table);
 
+    Ok((frame_allocator_mutex, page_table, text_mapped_pages, rodata_mapped_pages, data_mapped_pages, higher_half_mapped_pages, identity_mapped_pages))
     
+}
+
+/// Finishes Initializing the virtual memory management system after the heap is initialized and returns a MemoryManagementInfo instance,
+/// which represents Task zero's (the kernel's) address space. 
+/// 
+/// Returns the following tuple, if successful:
+///  * The kernel's new MemoryManagementInfo
+///  * The kernel's list of identity-mapped MappedPages which should be dropped before starting the first userspace program. 
+pub fn init_post_heap(page_table: PageTable, mut higher_half_mapped_pages: [Option<MappedPages>; 32], mut identity_mapped_pages: [Option<MappedPages>; 32], heap_mapped_pages: MappedPages) 
+-> Result<(Arc<MutexIrqSafe<MemoryManagementInfo>>, Vec<MappedPages>), &'static str> 
+{
+    // HERE: heap is initialized! Can now use alloc types.
+    // After this point, we must "forget" all of the above mapped_pages instances if an error occurs,
+    // because they will be auto-unmapped from the new page table upon return, causing all execution to stop.  
+
+    let mut higher_half_mapped_pages: Vec<MappedPages> = higher_half_mapped_pages.iter_mut().filter_map(|opt| opt.take()).collect();
+    higher_half_mapped_pages.push(heap_mapped_pages);
+    let identity_mapped_pages: Vec<MappedPages> = identity_mapped_pages.iter_mut().filter_map(|opt| opt.take()).collect();
+   
     // init the kernel stack allocator, a singleton
     let kernel_stack_allocator = {
         let stack_alloc_start = Page::containing_address(VirtualAddress::new_canonical(KERNEL_STACK_ALLOCATOR_BOTTOM)); 
@@ -261,7 +282,7 @@ pub fn init(boot_info: &BootInformation)
         Arc::new(MutexIrqSafe::new(kernel_mmi))
     });
 
-    Ok( (kernel_mmi_ref.clone(), text_mapped_pages, rodata_mapped_pages, data_mapped_pages, identity_mapped_pages) )
+    Ok( (kernel_mmi_ref.clone(), identity_mapped_pages) )
 }
 
 pub trait FrameAllocator {

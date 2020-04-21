@@ -20,6 +20,7 @@ use rustc_demangle::demangle;
 use cstr_core::CStr;
 use memory::{VirtualAddress, MappedPages};
 use crate_metadata::{LoadedCrate, StrongCrateRef, LoadedSection, StrongSectionRef, SectionType, Shndx};
+use hashbrown::HashMap;
 use path::Path;
 use super::CrateNamespace;
 
@@ -86,7 +87,7 @@ pub fn parse_nano_core(
         crate_name:          crate_name.clone(),
         object_file:         nano_core_file.clone(),
         debug_symbols_file:  Arc::downgrade(&nano_core_file),
-        sections:            BTreeMap::new(),
+        sections:            HashMap::new(),
         text_pages:          Some((text_pages.clone(),   mp_range(&text_pages))),
         rodata_pages:        Some((rodata_pages.clone(), mp_range(&rodata_pages))),
         data_pages:          Some((data_pages.clone(),   mp_range(&data_pages))),
@@ -545,7 +546,7 @@ fn parse_nano_core_binary(
 
 /// The collection of sections and symbols obtained while parsing the nano_core crate.
 struct ParsedCrateItems {
-    sections:        BTreeMap<Shndx, StrongSectionRef>,
+    sections:        HashMap<Shndx, StrongSectionRef>,
     global_sections: BTreeSet<Shndx>,
     data_sections:   BTreeSet<Shndx>,
     // The set of other non-section symbols too, such as constants defined in assembly code.
@@ -554,7 +555,7 @@ struct ParsedCrateItems {
 impl ParsedCrateItems {
     fn empty() -> ParsedCrateItems {
         ParsedCrateItems {
-            sections:        BTreeMap::new(),
+            sections:        HashMap::new(),
             global_sections: BTreeSet::new(),
             data_sections:   BTreeSet::new(),
             init_symbols:    BTreeMap::new(),
