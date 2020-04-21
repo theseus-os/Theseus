@@ -224,11 +224,13 @@ extern "x86-interrupt" fn nmi_handler(stack_frame: &mut ExceptionStackFrame) {
     }
 
     // currently we're using NMIs to send TLB shootdown IPIs
-    let vaddrs = tlb_shootdown::TLB_SHOOTDOWN_IPI_VIRTUAL_ADDRESSES.read();
-    if !vaddrs.is_empty() {
-        // trace!("nmi_handler (AP {})", apic::get_my_apic_id().unwrap_or(0xFF));
-        tlb_shootdown::handle_tlb_shootdown_ipi(&vaddrs);
-        expected_nmi = true;
+    {
+        let pages_to_invalidate = tlb_shootdown::TLB_SHOOTDOWN_IPI_PAGES.read().clone();
+        if let Some(pages) = pages_to_invalidate {
+            // trace!("nmi_handler (AP {})", apic::get_my_apic_id());
+            tlb_shootdown::handle_tlb_shootdown_ipi(pages);
+            expected_nmi = true;
+        }
     }
 
     if expected_nmi {

@@ -46,6 +46,7 @@
 extern crate spin; 
 extern crate memory;
 extern crate cow_arc;
+extern crate hashbrown;
 extern crate fs_node;
 extern crate xmas_elf;
 extern crate goblin;
@@ -54,7 +55,7 @@ use core::fmt;
 use core::ops::Range;
 use spin::{Mutex, RwLock};
 use alloc::{
-    collections::{BTreeMap, BTreeSet},
+    collections::BTreeSet,
     string::String,
     sync::{Arc, Weak},
     vec::Vec,
@@ -63,6 +64,7 @@ use memory::{MappedPages, VirtualAddress, EntryFlags};
 #[cfg(internal_deps)] use memory::{PageTable, FrameAllocator};
 use cow_arc::{CowArc, CowWeak};
 use fs_node::{FileRef, WeakFileRef};
+use hashbrown::HashMap;
 use goblin::elf::reloc::*;
 
 
@@ -204,7 +206,7 @@ pub struct LoadedCrate {
     /// In general we're only interested the values (the `LoadedSection`s themselves),
     /// but we keep each section's shndx (section header index from its crate's ELF file)
     /// as the key because it helps us quickly handle relocations and crate swapping.
-    pub sections: BTreeMap<Shndx, StrongSectionRef>,
+    pub sections: HashMap<Shndx, StrongSectionRef>,
     /// A tuple of:    
     /// 1. The `MappedPages` that contain sections that are readable and executable, but not writable,
     ///     i.e., the `.text` sections for this crate,
@@ -417,7 +419,7 @@ impl LoadedCrate {
             crate_name:              self.crate_name.clone(),
             object_file:             self.object_file.clone(),
             debug_symbols_file:      self.debug_symbols_file.clone(),
-            sections:                BTreeMap::new(),
+            sections:                HashMap::new(),
             text_pages:              new_text_pages_range,
             rodata_pages:            new_rodata_pages_range,
             data_pages:              new_data_pages_range,
@@ -435,7 +437,7 @@ impl LoadedCrate {
         // 1) The parent_crate reference itself, since we're replacing that with a new one,
         // 2) The section's mapped_pages, which will point to a new `MappedPages` object for the newly-copied crate,
         // 3) The section's virt_addr, which is based on its new mapped_pages
-        let mut new_sections: BTreeMap<Shndx, StrongSectionRef> = BTreeMap::new();
+        let mut new_sections: HashMap<Shndx, StrongSectionRef> = HashMap::new();
         for (shndx, old_sec) in self.sections.iter() {
             let old_sec_inner = old_sec.inner.read();
             let new_sec_mapped_pages_offset = old_sec.mapped_pages_offset;

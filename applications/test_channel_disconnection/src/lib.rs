@@ -123,7 +123,7 @@ fn rmain(matches: Matches) -> Result<(), &'static str> {
 
 
 fn rendezvous_test(send_count: usize, receive_count: usize) -> Result<(), &'static str> {
-    let my_cpu = apic::get_my_apic_id().ok_or("couldn't get my APIC ID")?;
+    let my_cpu = apic::get_my_apic_id();
 
     let (sender, receiver) = rendezvous::new_channel();
 
@@ -181,7 +181,7 @@ fn rendezvous_sender_task ((sender, iterations) : (rendezvous::Sender<String>, u
 
 
 fn asynchronous_test(send_count: usize, receive_count: usize) -> Result<(), &'static str> {
-    let my_cpu = apic::get_my_apic_id().ok_or("couldn't get my APIC ID")?;
+    let my_cpu = apic::get_my_apic_id();
 
     let (sender, receiver) = async_channel::new_channel(2);
 

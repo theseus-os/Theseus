@@ -66,6 +66,7 @@ pub fn main(args: Vec<String>) -> isize {
     opts.optopt ("",  "num-deps-crate",   "sum up the count of all dependencies for the given crate", "CRATE");
     opts.optopt ("",  "num-deps-section", "sum up the count of all dependencies for the given section", "SECTION");
     opts.optflag("",  "num-deps-all",     "sum up the count of all dependencies for all crates");
+    opts.optflag("",  "num-rodata",       "count the private .rodata sections for all crates");
     
 
     let matches = match opts.parse(&args) {
@@ -123,6 +124,9 @@ fn rmain(matches: Matches) -> Result<(), String> {
     }
     else if matches.opt_present("num-deps-all") {
         num_deps_all()
+    }
+    else if matches.opt_present("num-rodata") {
+        count_private_rodata_sections()
     }
     else {
         Err(format!("no supported options/arguments found."))
@@ -200,6 +204,57 @@ fn num_deps_all() -> Result<(), String> {
         crate_count, 
         section_count,    
         s_total, w_total, i_total
+    );
+    Ok(())
+}
+
+fn count_private_rodata_sections() -> Result<(), String> {
+    let namespace = get_my_current_namespace();
+    let mut private_rodata = 0;
+    let mut public_rodata = 0;
+    let mut crate_count = 0;
+    let mut section_count = 0;
+    let mut discardable = 0;
+    namespace.for_each_crate(true, |_crate_name, crate_ref| {
+        crate_count += 1;
+        let mut prv = 0;
+        let mut publ = 0;
+        let mut disc = 0;
+        for sec in crate_ref.lock_as_ref().sections.values().filter(|sec| sec.get_type() == mod_mgmt::SectionType::Rodata) {
+            section_count += 1;
+            let mut can_discard = true;
+            if sec.global {
+                trace!("\t public .rodata {:?}", sec);
+                publ += 1;
+                can_discard = false;
+            } else {
+                prv += 1;
+                for strong_dep in sec.inner.read().sections_i_depend_on.iter() {
+                    trace!("Private .rodata {:?} depends on {:?}", sec, strong_dep.section);
+                    can_discard = false;
+                }
+                for weak_dep in sec.inner.read().sections_dependent_on_me.iter() {
+                    error!("Logic error: Private .rodata {:?} has dependent {:?}", sec, weak_dep.section.upgrade());
+                    can_discard = false;
+                }
+            }
+            if can_discard {
+                disc += 1;
+            }
+        }
+        debug!("Crate {} has rodata sections: {} public, {} private, {} discardable", _crate_name, publ, prv, disc);
+        private_rodata += prv;
+        public_rodata += publ;
+        discardable += disc;
+        true // keep going
+    });
+
+    println!("Total of {} .rodata sections for all {} crates:  {} public, {} private, {} discardable",
+        section_count,    
+        crate_count, 
+        public_rodata, 
+        private_rodata,
+        discardable
     );
     Ok(())
 }

@@ -21,6 +21,7 @@ extern crate fs_node;
 extern crate path;
 extern crate memfs;
 extern crate cstr_core;
+extern crate hashbrown;
 
 use core::{
     fmt,
@@ -38,7 +39,7 @@ use xmas_elf::{
     sections::{SectionData, ShType, SHF_WRITE, SHF_ALLOC, SHF_EXECINSTR},
 };
 use util::round_up_power_of_two;
-use memory::{MmiRef, FRAME_ALLOCATOR, MemoryManagementInfo, FrameRange, VirtualAddress, PhysicalAddress, MappedPages, EntryFlags, allocate_pages_by_bytes};
+use memory::{MmiRef, get_frame_allocator_ref, MemoryManagementInfo, FrameRange, VirtualAddress, PhysicalAddress, MappedPages, EntryFlags, allocate_pages_by_bytes};
 use multiboot2::BootInformation;
 use cow_arc::CowArc;
 use rustc_demangle::demangle;
@@ -47,6 +48,7 @@ use fs_node::{FileOrDir, File, FileRef, DirRef};
 use vfs_node::VFSDirectory;
 use path::Path;
 use memfs::MemFile;
+use hashbrown::HashMap;
 pub use crate_name_utils::{get_containing_crate_name, replace_containing_crate_name, crate_name_from_path};
 pub use crate_metadata::*;
 
@@ -132,7 +134,7 @@ fn parse_bootloader_modules_into_files(
     // a map that associates a prefix string (e.g., "sse" in "ksse#crate.o") to a namespace directory of object files 
     let mut prefix_map: BTreeMap<String, NamespaceDir> = BTreeMap::new();
 
-    let fa = FRAME_ALLOCATOR.try().ok_or("Couldn't get Frame Allocator")?;
+    let fa = get_frame_allocator_ref().ok_or("Couldn't get Frame Allocator")?;
 
     // Closure to create the directory for a new namespace.
     let create_dir = |dir_name: &str| -> Result<NamespaceDir, &'static str> {
@@ -1030,7 +1032,7 @@ impl CrateNamespace {
             crate_name:              crate_name.clone(),
             debug_symbols_file:      Arc::downgrade(&crate_object_file),
             object_file:             crate_object_file, 
-            sections:                BTreeMap::new(),
+            sections:                HashMap::new(),
             text_pages:              text_pages.clone(),
             rodata_pages:            rodata_pages.clone(),
             data_pages:              data_pages.clone(),
@@ -1041,7 +1043,7 @@ impl CrateNamespace {
         let new_crate_weak_ref = CowArc::downgrade(&new_crate);
         
         // this maps section header index (shndx) to LoadedSection
-        let mut loaded_sections: BTreeMap<Shndx, StrongSectionRef> = BTreeMap::new(); 
+        let mut loaded_sections: HashMap<Shndx, StrongSectionRef> = HashMap::new(); 
         // the set of Shndxes for .data and .bss sections
         let mut data_sections: BTreeSet<Shndx> = BTreeSet::new();
 
@@ -1382,7 +1384,8 @@ impl CrateNamespace {
         kernel_mmi_ref: &MmiRef,
         verbose_log: bool
     ) -> Result<(), &'static str> {
-        let new_crate = new_crate_ref.lock_as_ref();
+        let mut new_crate = new_crate_ref.lock_as_mut()
+            .ok_or("BUG: perform_relocations(): couldn't get exclusive mutable access to new_crate")?;
         if verbose_log { debug!("=========== moving on to the relocations for crate {} =========", new_crate.crate_name); }
         let symtab = find_symbol_table(&elf_file)?;
 
@@ -1532,8 +1535,8 @@ impl CrateNamespace {
         // here, we're done with handling all the relocations in this entire crate
 
 
-        // Finally, remap each section's mapped pages to the proper permission bits, 
-        // since we initially mapped them all as writable
+        // We need to remap each section's mapped pages with the proper permission bits, 
+        // since we initially mapped them all as writable.
         if let Some(ref tp) = new_crate.text_pages { 
             tp.0.lock().remap(&mut kernel_mmi_ref.lock().page_table, TEXT_SECTION_FLAGS)?;
         }
@@ -1541,6 +1544,22 @@ impl CrateNamespace {
             rp.0.lock().remap(&mut kernel_mmi_ref.lock().page_table, RODATA_SECTION_FLAGS)?;
         }
         // data/bss sections are already mapped properly, since they're supposed to be writable
+
+
+        // By default, we can safely remove the metadata for all private (non-global) .rodata sections
+        // that do not have any strong dependencies (its `sections_i_depend_on` list is empty).
+        // If you want all sections to be kept, e.g., for debugging, you can set the below cfg option.
+        #[cfg(not(keep_private_rodata))] 
+        {
+            new_crate.sections.retain(|_shndx, sec| {
+                let should_remove = !sec.global 
+                    && sec.get_type() == SectionType::Rodata
+                    && sec.inner.read().sections_i_depend_on.is_empty();
+                
+                // For an element to be removed, this closure should return `false`.
+                !should_remove
+            });
+        }
 
         Ok(())
     }
@@ -2201,9 +2220,9 @@ fn allocate_section_pages(elf_file: &ElfFile, kernel_mmi_ref: &MmiRef) -> Result
 /// The returned `MappedPages` will be at least as large as `size_in_bytes`, rounded up to the nearest `Page` size, 
 /// and is mapped as writable along with the other specified `flags` to ensure we can copy content into it.
 fn allocate_and_map_as_writable(size_in_bytes: usize, flags: EntryFlags, kernel_mmi_ref: &MmiRef) -> Result<MappedPages, &'static str> {
-    let mut frame_allocator = FRAME_ALLOCATOR.try().ok_or("couldn't get FRAME_ALLOCATOR")?.lock();
+    let frame_allocator = get_frame_allocator_ref().ok_or("couldn't get frame allocator")?;
     let allocated_pages = allocate_pages_by_bytes(size_in_bytes).ok_or("Couldn't allocate_pages_by_bytes, out of virtual address space")?;
-    kernel_mmi_ref.lock().page_table.map_allocated_pages(allocated_pages, flags | EntryFlags::PRESENT | EntryFlags::WRITABLE, frame_allocator.deref_mut())
+    kernel_mmi_ref.lock().page_table.map_allocated_pages(allocated_pages, flags | EntryFlags::PRESENT | EntryFlags::WRITABLE, frame_allocator.lock().deref_mut())
 }
 
 

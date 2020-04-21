@@ -7,6 +7,9 @@ extern crate hashbrown;
 extern crate qp_trie;
 extern crate apic;
 extern crate runqueue;
+extern crate libtest;
+extern crate spawn;
+extern crate getopts;
 
 use alloc::{
     string::{String, ToString},
@@ -16,80 +19,90 @@ use alloc::{
 use hpet::get_hpet;
 use hashbrown::HashMap;
 use qp_trie::{Trie, wrapper::BString};
+use getopts::{Matches, Options};
+use libtest::*;
+use core::sync::atomic::Ordering;
 
-const NANO_TO_FEMTO: u64 = 1_000_000;
+mod threadtest;
+use threadtest::{NTHREADS, do_threadtest};
+
 const ITERATIONS: u64 = 10_000;
 const TRIES: u64 = 10;
 const CAPACITY: [usize; 10] = [8,16,32,64,128,256,512,1024,2048,4096];
 const VERBOSE: bool = false;
 
-/// Helper function to convert ticks to nano seconds
-fn hpet_2_ns(hpet: u64) -> u64 {
-	let hpet_period = get_hpet().as_ref().unwrap().counter_period_femtoseconds();
-	hpet * hpet_period as u64 / NANO_TO_FEMTO
-}
-
-macro_rules! CPU_ID {
-	() => (apic::get_my_apic_id().unwrap())
-}
-
-/// Helper function return the tasks in a given core's runqueue
-fn nr_tasks_in_rq(core: u8) -> Option<usize> {
-	match runqueue::get_runqueue(core).map(|rq| rq.read()) {
-		Some(rq) => { Some(rq.iter().count()) }
-		_ => { None }
-	}
-}
-
-/// True if only two tasks are running in the current runqueue
-/// Used to verify if there are any other tasks than the current task and idle task in the runqueue
-fn check_myrq() -> bool {
-	match nr_tasks_in_rq(CPU_ID!()) {
-		Some(2) => { true }
-		_ => { false }
-	}
-}
-
 
 pub fn main(args: Vec<String>) -> isize {
-    if args.len() != 1 {
-		print_usage();
-		return 0;
-	}
+    let mut opts = Options::new();
+    opts.optflag("h", "help", "print this help menu");
+    opts.optopt("t", "threads", "number of worker threads to spawn on separate cores for threadtest", "THREADS");
+
+    opts.optflag("", "vector", "run the test with a vector as the heap based data structure");
+    opts.optflag("", "hashmap", "run the test with a hashmap as the heap based data structure");
+    opts.optflag("", "btreemap", "run the test with a btreemap as the heap based data structure");
+    opts.optflag("", "btreeset", "run the test with a btreeset as the heap based data structure");
+    opts.optflag("", "qptrie", "run the test with a qp-trie as the heap based data structure");
+    opts.optflag("", "threadtest", "run the threadtest heap benchmark");
+
+    
+    let matches = match opts.parse(&args) {
+        Ok(m) => m,
+        Err(_f) => {
+            println!("{}", _f);
+            print_usage(opts);
+            return -1; 
+        }
+    };
+
+    if matches.opt_present("h") {
+        print_usage(opts);
+        return 0;
+    }
+
+    if let Some(threads) = matches.opt_str("t").and_then(|i| i.parse::<usize>().ok()) {
+        NTHREADS.store(threads, Ordering::SeqCst);
+    }
 
 	if !check_myrq() {
 		println!("cannot run on a busy core (#{}). Pin me on an idle core.", CPU_ID!());
 		return 0;
 	}
 
-    match args[0].as_str() {
-		"vec" => {
-			do_vec();
-		}
-		"hashmap" => {
-			do_hashmap();
-		}
-		"btreemap" => {
-			do_btreemap();
-		}
-		"btreeset" => {
-			do_btreeset();
-		}
-		"qptrie" => {
-			do_qptrie();
-		}
-
-		_arg => {
-			println!("Unknown command: {}", args[0]);
-			print_usage();
-			return 0;
-		}
-	}
-
-    0
+    match rmain(matches) {
+        Ok(_) => 0,
+        Err(e) => {
+            print_usage(opts);
+            println!("Error: {}", e);
+            -1
+        }    
+    } 
 }
 
+fn rmain(matches: Matches) -> Result<(), &'static str> {
+    if matches.opt_present("vector") {
+        do_vec();
+    }
+    else if matches.opt_present("hashmap") {
+        do_hashmap();
+    }
+    else if matches.opt_present("btreemap") {
+        do_btreemap();
+    }
+    else if matches.opt_present("btreeset") {
+        do_btreeset();
+    }
+    else if matches.opt_present("qptrie") {
+        do_qptrie();
+    }
+    else if matches.opt_present("threadtest") {
+        do_threadtest()?;
+    }
+    else {
+        return Err("Unknown command")
+    }
 
+    Ok(())
+}
 
 
 fn do_vec() {
@@ -346,13 +359,9 @@ fn create_qptrie_with_length(length: usize) -> u64 {
     time
 }
 
-/// Print help
-fn print_usage() {
-	println!("\n Usage");
-	println!("\n  available cmds:");
-	println!("\n    vec");
-	println!("\n    hashmap");
-	println!("\n    btreemap");
-	println!("\n    btreeset");
-	println!("\n    qptrie");
+
+fn print_usage(opts: Options) {
+    println!("{}", opts.usage(USAGE));
 }
+
+const USAGE: &'static str = "Usage: OPTION ARG";

@@ -10,8 +10,7 @@ spin = "0.4.10"
 atomic = { version = "0.4.4", features = [ "nightly" ] }
 
 [dependencies.log]
-default-features = false
-version = "0.3.7"
+version = "0.4.8"
 
 [dependencies.debugit]
 path = "../../libs/debugit"

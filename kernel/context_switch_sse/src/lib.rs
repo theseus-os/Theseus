@@ -127,17 +127,14 @@ macro_rules! restore_registers_sse {
 /// Switches context from an SSE Task to another SSE Task.
 /// 
 /// # Arguments
-/// * First argument  (put in `rdi`): mutable pointer to the previous task's stack pointer
-/// * Second argument (put in `rsi`): the value of the next task's stack pointer
+/// * First argument  (in `RDI`): mutable pointer to the previous task's stack pointer
+/// * Second argument (in `RSI`): the value of the next task's stack pointer
 /// 
 /// # Safety
 /// This function is unsafe because it changes the content on both task's stacks. 
-/// Also, it must be a naked function, so there cannot be regular arguments passed into it.
-/// Instead, the caller of this function must place the first argument into the `rdi` register
-/// and the second argument into the `rsi` register right before invoking this function.
 #[naked]
 #[inline(never)]
-pub unsafe fn context_switch_sse() {
+pub unsafe fn context_switch_sse(_prev_stack_pointer: *mut usize, _next_stack_pointer_value: usize) {
     // Since this is a naked function that expects its arguments in two registers,
     // you CANNOT place any log statements or other instructions here,
     // or at any point before, in between, or after the following macros.
