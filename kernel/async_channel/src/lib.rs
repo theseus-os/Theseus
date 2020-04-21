@@ -16,14 +16,12 @@ extern crate alloc;
 // #[macro_use] extern crate debugit;
 extern crate wait_queue;
 extern crate mpmc;
-extern crate irq_safety;
 extern crate atomic;
 
 use core::sync::atomic::Ordering;
 use alloc::sync::Arc;
 use mpmc::Queue as MpmcQueue;
 use wait_queue::{WaitQueue,WaitError};
-use irq_safety::MutexIrqSafe;
 use atomic::Atomic;
 
 

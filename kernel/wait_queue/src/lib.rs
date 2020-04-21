@@ -187,7 +187,7 @@ impl WaitQueue {
                 if let Ok(Some(ret)) = result {
                     return Ok(ret);
                 } else if let Err(()) = result {
-                    return Err(WaitError::Timeout);
+                    return Err(WaitError::EndpointDropped);
                 }
                 // This is only necessary because we're using a non-Set waitqueue collection that allows duplicates
                 if !wq_locked.contains(curr_task) {

@@ -12,8 +12,6 @@ extern crate rendezvous;
 extern crate async_channel;
 extern crate apic;
 
-use async_channel::{Receiver, Sender};
-
 use alloc::{
     vec::Vec,
     string::String,
@@ -137,7 +135,7 @@ fn rmain(matches: Matches) -> Result<(), &'static str> {
 fn rendezvous_test_oneshot() -> Result<(), &'static str> {
     let my_cpu = apic::get_my_apic_id().ok_or("couldn't get my APIC ID")?;
 
-    let (sender, receiver) = rendezvous::new_channel();
+    let (async_channel::sender, receiver) = rendezvous::new_channel();
 
     let t1 = spawn::new_task_builder(|_: ()| -> Result<(), &'static str> {
         warn!("rendezvous_test_oneshot(): Entered sender task!");
@@ -174,7 +172,7 @@ fn rendezvous_test_oneshot() -> Result<(), &'static str> {
 fn rendezvous_test_multiple(iterations: usize) -> Result<(), &'static str> {
     let my_cpu = apic::get_my_apic_id().ok_or("couldn't get my APIC ID")?;
 
-    let (sender, receiver) = rendezvous::new_channel();
+    let (async_channel::sender, async_channel::receiver) = rendezvous::new_channel();
 
     let t1 = spawn::new_task_builder(|_: ()| -> Result<(), &'static str> {
         warn!("rendezvous_test_multiple(): Entered sender task!");
@@ -343,7 +341,10 @@ fn asynchronous_receiver_task (receiver :Receiver<String>) -> Result<(), &'stati
 fn asynchronous_sender_task ((sender, iterations) : (Sender<String>, usize)) -> Result<(), &'static str> {
     warn!("asynchronous_test_multiple(): Entered sender task!");
         for i in 0..iterations {
-            sender.send(format!("Message {:03}", i))?;
+            sender.send(format!("Message {:03}", i)).map_err(|error| {
+                warn!("Sender task returned error : {}", error);
+                return error;
+            })?;
             warn!("asynchronous_test_multiple(): Sender sent message {:03}", i);
         }
     warn!("asynchronous_test_multiple(): Done sender task!");
