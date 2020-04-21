@@ -1,8 +1,8 @@
 //! This application spawns a sender and receiver task connected
 //! via an `async_channel' or 'rendezvous' channel. If the expected
 //! number of messages to be send is different from expected number
-//! of messages to be received one end will hang up earlier.
-//! Successful result: Other end should also hang up
+//! of messages to be received one task will return earlier
+//! Successful result: Other end also returns without deadlock
 
 #![no_std]
 
