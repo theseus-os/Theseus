@@ -134,7 +134,7 @@ impl <T: Send> Sender<T> {
         };
 
         let res = self.channel.waiting_senders
-            .wait_until_mut_ok(&mut closure)
+            .wait_until_ok_mut(&mut closure)
             .map_err(|error| {
                 if error == WaitError::EndpointDropped {
                     "Receiver Endpoint is dropped"

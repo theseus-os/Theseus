@@ -133,7 +133,7 @@ impl WaitQueue {
                 curr_task.block();
             }
             scheduler::schedule();
-            trace!("WaitQueue::wait_until():  {:?} woken up", curr_task);
+
             // Here, we have been woken up, so loop back around and check the condition again
             // trace!("WaitQueue::wait_until():  woke up!");
         }
@@ -171,6 +171,9 @@ impl WaitQueue {
         }
     }
 
+    /// Similar to [`wait_until`](#method.wait_until), but this function blocks until the given
+    /// `condition` closure returns `Result` of type `Ok(Some(value))`, or `Err` .
+    /// If a `value` is returned by closure then returns that `value` inside `Ok()`.
     pub fn wait_until_ok<R>(&self, condition: &dyn Fn(/* &VecDeque<TaskRef> */) -> Result<Option<R>, ()>) -> Result<R, WaitError> {
         let curr_task = task::get_my_current_task().ok_or(WaitError::NoCurrentTask)?;
 
@@ -199,13 +202,14 @@ impl WaitQueue {
                 curr_task.block();
             }
             scheduler::schedule();
-            trace!("WaitQueue::wait_until():  {:?} woken up", curr_task);
             // Here, we have been woken up, so loop back around and check the condition again
             // trace!("WaitQueue::wait_until():  woke up!");
         }
     }
 
-    pub fn wait_until_mut_ok<R>(&self, condition: &mut dyn FnMut(/* &VecDeque<TaskRef> */) -> Result<Option<R>,()>) -> Result<R, WaitError> {
+    /// Similar to [`wait_until_ok`](#method.wait_until_ok), but this function accepts a `condition` closure
+    /// that can mutate its environment (a `FnMut`).
+    pub fn wait_until_ok_mut<R>(&self, condition: &mut dyn FnMut(/* &VecDeque<TaskRef> */) -> Result<Option<R>,()>) -> Result<R, WaitError> {
         let curr_task = task::get_my_current_task().ok_or(WaitError::NoCurrentTask)?;
 
         // Do the following atomically:
@@ -233,7 +237,6 @@ impl WaitQueue {
                 curr_task.block();
             }
             scheduler::schedule();
-            trace!("WaitQueue::wait_until_mut():  {:?} woken up", curr_task);
             // Here, we have been woken up, so loop back around and check the condition again
             // trace!("WaitQueue::wait_until():  woke up!");
         }
