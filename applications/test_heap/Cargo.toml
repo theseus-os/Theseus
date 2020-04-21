@@ -7,13 +7,13 @@ build = "../../build.rs"
 
 [dependencies]
 qp-trie = "0.7.3"
+getopts = "0.2.21"
 
 [dependencies.terminal_print]
 path = "../../kernel/terminal_print"
 
 [dependencies.log]
-default-features = false
-version = "0.3.7"
+version = "0.4.8"
 
 [dependencies.hpet]
 path = "../../kernel/hpet"
@@ -27,3 +27,10 @@ path = "../../kernel/runqueue"
 [dependencies.hashbrown]
 version = "0.1.8"
 features = ["nightly"]
+
+[dependencies.libtest]
+path = "../../kernel/libtest"
+
+[dependencies.spawn]
+path = "../../kernel/spawn"
+

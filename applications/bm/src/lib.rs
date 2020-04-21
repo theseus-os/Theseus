@@ -66,7 +66,7 @@ macro_rules! printlnwarn {
 }
 
 macro_rules! CPU_ID {
-	() => (apic::get_my_apic_id().unwrap())
+	() => (apic::get_my_apic_id())
 }
 
 pub fn main(args: Vec<String>) -> isize {

@@ -333,11 +333,6 @@ pub fn tlb_flush_all() {
     tlb::flush_all();
 }
 
-/// Sets the top-level page table address to enable the new page table p4 points to.
-pub unsafe fn set_p4(p4: PhysicalAddress) {
-    control_regs::cr3_write(x86_64::PhysicalAddress(p4.value() as u64));
-}
-
 /// Returns the current top-level page table address.
 pub fn get_p4() -> PhysicalAddress {
     PhysicalAddress::new_canonical(control_regs::cr3().0 as usize)

@@ -26,7 +26,6 @@
 //! 
 
 #![no_std]
-#![feature(asm, naked_functions)]
 #![feature(panic_info_message)]
 
 #[macro_use] extern crate alloc;
@@ -528,17 +527,10 @@ impl Task {
 
         // debug!("task_switch [4]: prev sp: {:#X}, next sp: {:#X}", self.saved_sp, next.saved_sp);
 
-        /// A private macro that actually calls the given context switch routine
-        /// by putting the arguments into the proper registers, `rdi` and `rsi`.
+        /// A private macro that actually calls the given context switch routine.
         macro_rules! call_context_switch {
             ($func:expr) => ( unsafe {
-                asm!("
-                    mov rdi, $0; \
-                    mov rsi, $1;" 
-                    : : "r"(&mut self.saved_sp as *mut usize), "r"(next.saved_sp)
-                    : "memory" : "intel", "volatile"
-                );
-                $func();
+                $func(&mut self.saved_sp as *mut usize, next.saved_sp);
             });
         }
 
@@ -893,6 +885,7 @@ impl TaskRef {
     
     /// Obtains the lock on the underlying `Task` in a writable, blocking fashion.
     #[deprecated(note = "This method exposes inner Task details for debugging purposes. Do not use it.")]
+    #[doc(hidden)]
     pub fn lock_mut(&self) -> MutexIrqSafeGuardRefMut<Task> {
         MutexIrqSafeGuardRefMut::new(self.0.deref().0.lock())
     }
