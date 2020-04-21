@@ -52,6 +52,8 @@ path = "../panic_entry"
 [dependencies.vga_buffer]
 path = "../vga_buffer"
 
+[dependencies.memory_initialization]
+path = "../memory_initialization"
 
 
 [lib]

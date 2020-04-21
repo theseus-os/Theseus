@@ -1,0 +1,34 @@
+[package]
+authors = ["Ramla Ijaz <ijazramla@gmail.com>"]
+name = "multiple_heaps"
+description = "Allocator which uses multiple heaps"
+version = "0.1.0"
+
+[dependencies]
+intrusive-collections = "0.9.0"
+static_assertions = "1.1.0"
+
+[dependencies.irq_safety]
+git = "https://github.com/kevinaboos/irq_safety"
+
+[dependencies.log]
+version = "0.4.8"
+
+[dependencies.memory]
+path = "../memory"
+
+[dependencies.kernel_config]
+path = "../kernel_config"
+
+[dependencies.apic]
+path = "../apic"
+
+[dependencies.slabmalloc]
+path = "../../libs/rust-slabmalloc"
+
+[dependencies.heap]
+path = "../heap"
+
+[dependencies.hashbrown]
+version = "0.1.8"
+features = ["nightly"]
