@@ -58,7 +58,7 @@ pub fn new_channel<T: Send>(minimum_capacity: usize) -> (Sender<T>, Receiver<T>)
 /// Active : Initially channel is created with Active status.
 /// Dropped : Set to dropped when one end is dropped.
 #[derive(Clone, Copy, PartialEq, Debug)]
-pub enum EndpointValues {
+enum EndpointValues {
     Active,
     Dropped,
 }
