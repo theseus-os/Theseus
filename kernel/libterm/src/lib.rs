@@ -1,12 +1,16 @@
-//! Terminal emulator library
+//! A basic terminal emulator library.
 //!
-//! The terminal roughly does the following things: manages all characters in a String that should be printed to the screen;
-//! cuts a slice from this String and send it to window manager to get things actually printed; manages user input command line
-//! as well as the cursor position, and delivers keyboard events.
+//! The terminal has several main responsibilities: 
+//! * Managing the scrollback buffer, a string of characters that should be printed to the screen.
+//! * Determining which parts of that buffer should be displayed and using the window manager to do so.
+//! * Handling the command line user input.
+//! * Displaying the cursor at the right position
+//! * Handling events delivered from the window manager.
 
 #![no_std]
 
 #[macro_use] extern crate alloc;
+#[macro_use] extern crate log;
 extern crate dfqueue;
 extern crate environment;
 extern crate print;
@@ -23,6 +27,7 @@ extern crate text_display;
 extern crate shapes;
 extern crate color;
 
+use core::ops::DerefMut;
 use alloc::string::{String, ToString};
 use alloc::vec::Vec;
 use cursor::*;
@@ -38,8 +43,8 @@ use window::Window;
 
 pub mod cursor;
 
-pub const FONT_COLOR: Color = color::LIGHT_GREEN;
-pub const BACKGROUND_COLOR: Color = color::BLACK;
+pub const FONT_FOREGROUND_COLOR: Color = color::LIGHT_GREEN;
+pub const FONT_BACKGROUND_COLOR: Color = color::BLACK;
 const DEFAULT_CURSOR_FREQ: u64 = 400000000;
 
 /// Error type for tracking different scroll errors that a terminal
@@ -50,15 +55,7 @@ pub enum ScrollError {
     OffEndBound
 }
 
-/// Terminal Structure that allows multiple terminals to be individually run.
-/// There are now two queues that constitute the event-driven terminal architecture
-/// 1) The terminal print queue that handles printing from external applications
-///     - Consumer is the main terminal loop
-///     - Producers are any external application trying to print to the terminal's stdout
-/// 
-/// 2) The input queue (in the window manager) that handles keypresses and resize events
-///     - Consumer is the main terminal loop
-///     - Producer is the window manager. Window manager is responsible for enqueuing keyevents into the active application
+/// An instance of a graphical terminal emulator.
 pub struct Terminal {
     /// The terminal's own window.
     pub window: Window,
@@ -71,10 +68,10 @@ pub struct Terminal {
     /// The text displayable which the terminal prints to.
     text_display: TextDisplay,
     /// The cursor of the terminal.
-    pub cursor: Cursor
+    pub cursor: Cursor,
 }
 
-/// Privite methods of `Terminal`.
+/// Private methods of `Terminal`.
 impl Terminal {
     /// Gets the width and height of the text displayable in number of characters.
     pub fn get_text_dimensions(&self) -> (usize, usize) {
@@ -399,16 +396,9 @@ impl Terminal {
 
     /// Display the text displayable in the window and render it to the screen
     fn display_text(&mut self) -> Result<(), &'static str>{
-        let area = {
-            let mut inner = self.window.inner.lock();
-            let area = self.text_display.display(
-                Coord::new(0, 0) + self.window.inner_position(), 
-                &mut inner.framebuffer
-            )?;
-            area
-        };
-
-        self.window.render(Some(area))
+        let coord = self.window.area().top_left;
+        let area_to_render = self.text_display.display(coord, self.window.framebuffer_mut().deref_mut())?;
+        self.window.render(Some(area_to_render))
     }
 
     /// Updates the text display by taking a string index and displaying as much as it can going backwards from the passed string index (i.e. starts from the bottom of the display and goes up)
@@ -432,21 +422,20 @@ impl Terminal {
 impl Terminal {
     /// Creates a new terminal and adds it to the window manager `wm_mutex`
     pub fn new() -> Result<Terminal, &'static str> {
-        let wm_mut = window_manager::WINDOW_MANAGER.try().ok_or("The window manager is not initialized")?;
+        let wm_ref = window_manager::WINDOW_MANAGER.try().ok_or("The window manager is not initialized")?;
         let (window_width, window_height) = {
-            let wm = wm_mut.lock();
+            let wm = wm_ref.lock();
             wm.get_screen_size()
         };
-        // const WINDOW_MARGIN: usize = 20;
         let window = window::Window::new(
             Coord::new(0, 0), 
             window_width, 
             window_height,
-            color::BLACK
+            FONT_BACKGROUND_COLOR,
         )?;
         
-        let (width_inner, height_inner) = window.inner_size();
-        let text_display = TextDisplay::new(width_inner, height_inner, FONT_COLOR, BACKGROUND_COLOR)?;
+        let area = window.area();
+        let text_display = TextDisplay::new(area.width(), area.height(), FONT_FOREGROUND_COLOR, FONT_BACKGROUND_COLOR)?;
 
         let mut terminal = Terminal {
             window: window,
@@ -506,11 +495,9 @@ impl Terminal {
     /// Remove a character from the terminal.
     ///
     /// # Arguments
-    ///
     /// * `offset_from_end`: the position of the character to remove. It represents the distance relative to the end of the whole output in the terminal in number of characters. `offset_from_end == 0` is *invalid* here.
     ///
     /// # Examples
-    ///
     /// * `terminal.remove_char(1)` will remove the last character in the screen.
     ///
     /// After invoke this function, one must call `refresh_display` to get the updates actually showed on the screen.
@@ -593,35 +580,28 @@ impl Terminal {
         Ok(())
     }
 
-    /// Clear all.
+    /// Clear the scrollback buffer and reset the scroll positions.
     pub fn clear(&mut self) {
         self.scrollback_buffer.clear();
         self.scroll_start_idx = 0;
         self.is_scroll_end = true;
     }
 
-    /// Get a key event from the underlying window.
+    /// Gets an event from the window's event queue.
+    /// 
+    /// Returns `None` if no events have been sent to this window.
     pub fn get_event(&mut self) -> Option<Event> {
         match self.window.handle_event() {
+            Ok(event) => event,
             Err(_e) => {
-                return Some(Event::ExitEvent);
+                error!("Terminal::get_event(): error in the window's event handler: {:?}.", _e);
+                Some(Event::ExitEvent)
             }
-            _ => {}
-        };
-        let event = match self.window.consumer.pop() {
-            Some(ev) => ev,
-            None => {
-                return None;
-            }
-        };
-        Some(event)
+        }
     }
 
     /// Display the cursor of the terminal.
-    pub fn display_cursor(
-        &mut self
-    ) -> Result<(), &'static str> {
-        let coordinate = self.window.inner_position();
+    pub fn display_cursor(&mut self) -> Result<(), &'static str> {
         // get info about the text displayable
         let (col_num, line_num, text_next_pos) = {
             let text_next_pos = self.text_display.get_next_index();
@@ -639,14 +619,14 @@ impl Terminal {
         let cursor_line = cursor_pos / col_num;
         let cursor_col = cursor_pos % col_num;
 
-        // Get the container to display the cursor in
+        // Get the bounding box that contains the displayed cursor.
         let bounding_box = {
-            let mut window = self.window.inner.lock();
+            let coord = self.window.area().top_left;
             let bounding_box = self.cursor.display(
-                coordinate,
+                coord,
                 cursor_col,
                 cursor_line,
-                &mut window.framebuffer,
+                self.window.framebuffer_mut().deref_mut(),
             )?;
             bounding_box
         };   
@@ -668,4 +648,12 @@ impl Terminal {
         self.cursor.underlying_char = underlying_char;
     }
 
+    /// Resizes this terminal and its underlying text display and then refreshes the window.
+    /// This does not automatically redisplay the terminal cursor.
+    pub fn resize(&mut self, new_position: Rectangle) -> Result<(), &'static str> {
+        self.text_display.set_size(new_position.width(), new_position.height());
+        self.text_display.reset_cache();
+        self.refresh_display()?;
+        Ok(())
+    }
 }

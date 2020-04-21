@@ -10,12 +10,11 @@ byteorder = { version = "1.0", default-features = false }
 getopts = "0.2.21"
 
 [dependencies.terminal_print]
-path = "../terminal_print"
+path = "../../kernel/terminal_print"
 
 
 [dependencies.log]
-default-features = false
-version = "0.3.7"
+version = "0.4.8"
 
 [dependencies.upd]
 path = "../upd"

@@ -77,8 +77,7 @@ extern crate fs_node;
 
 
 use alloc::string::String;
-use mod_mgmt::{CrateNamespace, get_default_namespace, get_namespaces_directory, NamespaceDirectorySet};
-use spawn::KernelTaskBuilder;
+use mod_mgmt::{CrateNamespace, get_initial_kernel_namespace, get_namespaces_directory, NamespaceDirectorySet};
 use fs_node::FileOrDir; 
 use task::SimdExt;
 
@@ -106,7 +105,7 @@ fn internal_setup_simd_personality(simd_ext: SimdExt) -> Result<(), &'static str
 	};
 
 	let kernel_mmi_ref = memory::get_kernel_mmi_ref().ok_or_else(|| "couldn't get kernel mmi")?;
-	let backup_namespace = get_default_namespace().ok_or("default crate namespace wasn't yet initialized")?;
+	let backup_namespace = get_initial_kernel_namespace().ok_or("initial kernel crate namespace wasn't yet initialized")?;
 
 	// The `mod_mgmt::init()` function should have initialized the following directories, 
 	// for example, if 'sse' was the prefix used to build the SSE versions of each crate:
@@ -141,7 +140,7 @@ fn internal_setup_simd_personality(simd_ext: SimdExt) -> Result<(), &'static str
 	simd_namespace.disable_fuzzy_symbol_matching();
 
 
-	let this_core = apic::get_my_apic_id().ok_or("couldn't get my APIC id")?;
+	let this_core = apic::get_my_apic_id();
 	
 	type SimdTestFunc = fn(());
 	let section_ref1 = simd_namespace.get_symbol_starting_with("simd_test::test1::")
@@ -153,7 +152,7 @@ fn internal_setup_simd_personality(simd_ext: SimdExt) -> Result<(), &'static str
 		(section.mapped_pages.clone(), section.mapped_pages_offset)
 	};
 	let func1: &SimdTestFunc = mapped_pages1.lock().as_func(mapped_pages_offset1, &mut space1)?;
-	let task1 = KernelTaskBuilder::new(func1, ())
+	let task1 = spawn::new_task_builder(func1, ())
 		.name(format!("simd_test_1-{}", namespace_name))
 		.pin_on_core(this_core)
 		.simd(simd_ext)
@@ -170,7 +169,7 @@ fn internal_setup_simd_personality(simd_ext: SimdExt) -> Result<(), &'static str
 		(section.mapped_pages.clone(), section.mapped_pages_offset)
 	};
 	let func: &SimdTestFunc = mapped_pages2.lock().as_func(mapped_pages_offset2, &mut space2)?;
-	let task2 = KernelTaskBuilder::new(func, ())
+	let task2 = spawn::new_task_builder(func, ())
 		.name(format!("simd_test_2-{}", namespace_name))
 		.pin_on_core(this_core)
 		.simd(simd_ext)
@@ -187,7 +186,7 @@ fn internal_setup_simd_personality(simd_ext: SimdExt) -> Result<(), &'static str
 		(section.mapped_pages.clone(), section.mapped_pages_offset)
 	};
 	let func: &SimdTestFunc = mapped_pages3.lock().as_func(mapped_pages_offset3, &mut space3)?;
-	let task3 = KernelTaskBuilder::new(func, ())
+	let task3 = spawn::new_task_builder(func, ())
 		.name(format!("simd_test_short-{}", namespace_name))
 		.pin_on_core(this_core)
 		.simd(simd_ext)

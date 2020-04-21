@@ -19,7 +19,8 @@
 #![feature(asm)]
 
 extern crate alloc;
-// #[macro_use] extern crate log;
+#[macro_use] extern crate log;
+extern crate mod_mgmt;
 extern crate task;
 extern crate unwind;
 extern crate fallible_iterator;
@@ -61,11 +62,11 @@ pub fn stack_trace(
     let max_recursion = max_recursion.unwrap_or(64);
 
     unwind::invoke_with_current_registers(|registers| {
-        let (namespace, app_crate) = {
-            let curr_task = task::get_my_current_task().ok_or("couldn't get current task")?;
-            (curr_task.get_namespace(), curr_task.lock().app_crate.as_ref().map(|a| a.clone_shallow()))
-        };
-        let mut stack_frame_iter = StackFrameIter::new(namespace, app_crate, registers);
+        let namespace = task::get_my_current_task()
+            .map(|t| t.get_namespace())
+            .or_else(|| mod_mgmt::get_initial_kernel_namespace().cloned())
+            .ok_or("couldn't get current task's or default namespace")?;
+        let mut stack_frame_iter = StackFrameIter::new(namespace, registers);
 
         // iterate over each frame in the call stack
         let mut i = 0;
@@ -76,7 +77,8 @@ pub fn stack_trace(
             }
             i += 1;
             if i == max_recursion {
-                return Err("reached maximum recursion depth of call stack frames");
+                trace!("stack_trace(): reached maximum recursion depth of {} stack frames", max_recursion);
+                return Err("reached recursion limit for stack frames");
             }
         }
         Ok(())

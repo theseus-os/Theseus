@@ -5,15 +5,9 @@ description = "Functions and wrappers for spawning new Tasks, both kernel thread
 version = "0.1.0"
 build = "../../build.rs"
 
-[dependencies]
-atomic = { version = "0.4.4", features = [ "nightly" ] }
-owning_ref = { git = "https://github.com/kevinaboos/owning-ref-rs" }
-type-name = "0.1.0"
-
 
 [dependencies.log]
-default-features = false
-version = "0.3.7"
+version = "0.4.8"
 
 [dependencies.lazy_static]
 features = ["spin_no_std", "nightly"]
@@ -22,23 +16,14 @@ version = "1.2.0"
 [dependencies.irq_safety]
 git = "https://github.com/kevinaboos/irq_safety"
 
-[dependencies.atomic_linked_list]
-path = "../../libs/atomic_linked_list"
-
 [dependencies.debugit]
 path = "../../libs/debugit"
 
 [dependencies.memory]
 path = "../memory"
 
-[dependencies.kernel_config]
-path = "../kernel_config"
-
 [dependencies.apic]
 path = "../apic"
-
-[dependencies.tss]
-path = "../tss"
 
 [dependencies.task]
 path = "../task"
@@ -48,9 +33,6 @@ path = "../catch_unwind"
 
 [dependencies.runqueue]
 path = "../runqueue"
-
-[dependencies.gdt]
-path = "../gdt"
 
 [dependencies.scheduler]
 path = "../scheduler"
@@ -63,6 +45,9 @@ path = "../context_switch"
 
 [dependencies.path]
 path = "../path"
+
+[dependencies.fs_node]
+path = "../fs_node"
 
 [lib]
 crate-type = ["rlib"]

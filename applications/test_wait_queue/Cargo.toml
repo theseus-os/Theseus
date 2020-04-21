@@ -9,8 +9,7 @@ build = "../../build.rs"
 spin = "0.4.10"
 
 [dependencies.log]
-default-features = false
-version = "0.3.7"
+version = "0.4.8"
 
 [dependencies.task]
 path = "../../kernel/task"
@@ -28,4 +27,4 @@ path = "../../kernel/spawn"
 path = "../../kernel/wait_condition"
 
 [dependencies.terminal_print]
-path = "../terminal_print"
+path = "../../kernel/terminal_print"

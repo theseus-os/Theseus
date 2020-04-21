@@ -13,8 +13,8 @@
     //     let size = mem::size_of::<T>();
     //     if true {
     //         debug!("MappedPages::as_unsized_type(): requested type {} -> {} with size {} at offset {}, MappedPages size {}!",
-    //             type_name::get::<T>(),
-    //             type_name::get::<U>(),
+    //             core::any::type_name::<T>(),
+    //             core::any::type_name::<U>(),
     //             size, offset, self.size_in_bytes()
     //         );
     //     }
@@ -23,7 +23,7 @@
     //     let end = offset + size;
     //     if end > self.size_in_bytes() {
     //         error!("MappedPages::as_type(): requested type {} has size {}, which is too large at offset {} for MappedPages of size {}!",
-    //             type_name::get::<T>(),
+    //             core::any::type_name::<T>(),
     //             size, offset, self.size_in_bytes()
     //         );
     //         return Err("requested type and offset would not fit within the MappedPages bounds");
@@ -66,9 +66,9 @@
     //     if true {
     //         debug!("MappedPages::as_dynamically_sized_type(): total size {}, requested type {} (size {}) and slice [{}; {}] (slice size {}) at offset {}, MappedPages size {}!",
     //             total_size,
-    //             type_name::get::<T>(),
+    //             core::any::type_name::<T>(),
     //             type_size,
-    //             type_name::get::<S>(),
+    //             core::any::type_name::<S>(),
     //             slice_length,
     //             slice_size,
     //             offset,
@@ -79,9 +79,9 @@
     //     let end = offset + total_size;
     //     if end > self.size_in_bytes() {
     //         error!("MappedPages::as_dynamically_sized_type(): requested type {} (size {}) and slice [{}; {}] (slice size {}) at offset {} is too large for MappedPages size {}, its total size is {}.",
-    //             type_name::get::<T>(),
+    //             core::any::type_name::<T>(),
     //             type_size,
-    //             type_name::get::<S>(),
+    //             core::any::type_name::<S>(),
     //             slice_length,
     //             slice_size,
     //             offset,

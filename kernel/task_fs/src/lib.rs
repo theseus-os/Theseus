@@ -411,9 +411,7 @@ impl MmiFile {
     fn generate(&self) -> String {
         let task = self.taskref.lock();
         let mmi = task.mmi.lock();
-        format!("Page table:\n{:?}\nVirtual memory areas:\n{:?}\n",
-            mmi.page_table, mmi.vmas
-        )
+        format!("Page table: {:?}\n", mmi.page_table)
     }
 }
 

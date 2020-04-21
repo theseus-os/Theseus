@@ -13,8 +13,7 @@ bit_field = "0.7.0"
 path = "../memory"
 
 [dependencies.log]
-default-features = false
-version = "0.3.7"
+version = "0.4.8"
 
 
 [lib]

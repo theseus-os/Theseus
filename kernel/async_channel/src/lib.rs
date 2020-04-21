@@ -73,6 +73,7 @@ impl <T: Send> Sender<T> {
     /// Returns `Ok(())` if the message was sent and received successfully,
     /// otherwise returns an error. 
     pub fn send(&self, msg: T) -> Result<(), &'static str> {
+        // trace!("async_channel: send() entry");
         // Fast path: attempt to send the message, assuming the buffer isn't full
         let msg = match self.try_send(msg) {
             Ok(()) => return Ok(()),
@@ -143,6 +144,7 @@ impl <T: Send> Receiver<T> {
     /// 
     /// Returns the message if it was received properly, otherwise returns an error.
     pub fn receive(&self) -> Result<T, &'static str> {
+        // trace!("async_channel: receive() entry");
         // Fast path: attempt to receive a message, assuming the buffer isn't empty
         if let Some(msg) = self.try_receive() {
             return Ok(msg);
@@ -162,7 +164,7 @@ impl <T: Send> Receiver<T> {
         // If we successfully received a message, we need to notify any waiting senders.
         // As stated above, to avoid deadlock, this must be done here rather than in the above closure.
         if res.is_ok() {
-            // trace!("successful receive() is notifying senders.");
+            // trace!("async_channel: successful receive() is notifying senders.");
             self.channel.waiting_senders.notify_one();
         }
         res

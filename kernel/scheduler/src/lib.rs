@@ -1,7 +1,7 @@
 #![no_std]
 
 extern crate alloc;
-#[macro_use] extern crate log;
+// #[macro_use] extern crate log;
 extern crate irq_safety;
 extern crate apic;
 extern crate task;
@@ -26,14 +26,7 @@ pub fn schedule() -> bool {
 
     let current_task: *mut Task;
     let next_task: *mut Task; 
-
-    let apic_id = match get_my_apic_id() {
-        Some(id) => id,
-        _ => {
-            error!("BUG: Couldn't get apic_id in schedule()");
-            return false;
-        }
-    };
+    let apic_id = get_my_apic_id();
 
     {
         if let Some(selected_next_task) = select_next_task(apic_id) {

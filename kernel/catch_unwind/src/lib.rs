@@ -8,6 +8,7 @@ extern crate alloc;
 extern crate task;
 
 use core::mem::ManuallyDrop;
+use alloc::boxed::Box;
 
 /// Invokes the given closure `f`, catching a panic as it is unwinding the stack.
 /// 
@@ -43,8 +44,9 @@ pub fn catch_unwind_with_arg<F, A, R>(f: F, arg: A) -> Result<R, task::KillReaso
         0 => Ok(ManuallyDrop::into_inner(ti_arg.ret)),
         // When `try` returns non-zero, it means the function panicked.
         _ => {
-            let cause = unsafe { 
-                unwind::unwinding_context_ptr_into_cause(unwind_context_ptr_out as *mut unwind::UnwindingContext) };
+            let unwinding_context_boxed = unsafe { Box::from_raw(unwind_context_ptr_out as *mut unwind::UnwindingContext) };
+            let unwinding_context = *unwinding_context_boxed;
+            let (_stack_frame_iter, cause, _taskref) = unwinding_context.into();
             Err(cause)
         }
     }

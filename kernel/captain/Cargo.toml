@@ -8,8 +8,7 @@ build = "../../build.rs"
 [dependencies]
 
 [dependencies.log]
-default-features = false
-version = "0.3.7"
+version = "0.4.8"
 
 [dependencies.irq_safety]
 git = "https://github.com/kevinaboos/irq_safety"
@@ -27,8 +26,8 @@ path = "../logger"
 [dependencies.window_manager]
 path = "../window_manager"
 
-[dependencies.input_event_manager]
-path = "../input_event_manager"
+[dependencies.first_application]
+path = "../first_application"
 
 [dependencies.memory]
 path = "../memory"
@@ -92,6 +91,9 @@ path = "../task_fs"
 
 [dependencies.pause]
 path = "../pause"
+
+[dependencies.multiple_heaps]
+path = "../multiple_heaps"
 
 [lib]
 crate-type = ["rlib"]

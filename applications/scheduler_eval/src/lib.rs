@@ -6,14 +6,12 @@ extern crate spawn;
 extern crate scheduler;
 extern crate task;
 
-use spawn::KernelTaskBuilder;
 use alloc::string::String;
 use alloc::vec::Vec;
 
 
-#[no_mangle]
 pub fn main(_args: Vec<String>) -> (){
-    let taskref1 = KernelTaskBuilder::new(test1 ,1)
+    let taskref1 = spawn::new_task_builder(test1 ,1)
         .name(String::from("test1"))
         .pin_on_core(3)
         .spawn().expect("failed to initiate task");
@@ -24,7 +22,7 @@ pub fn main(_args: Vec<String>) -> (){
 
     debug!("Spawned Task 1");
 
-    let taskref2 = KernelTaskBuilder::new(test2 ,2)
+    let taskref2 = spawn::new_task_builder(test2 ,2)
         .name(String::from("test2"))
         .pin_on_core(3)
         .spawn().expect("failed to initiate task");
@@ -35,7 +33,7 @@ pub fn main(_args: Vec<String>) -> (){
 
     debug!("Spawned Task 2");
 
-    let taskref3 = KernelTaskBuilder::new(test3 ,3)
+    let taskref3 = spawn::new_task_builder(test3 ,3)
         .name(String::from("test3"))
         .pin_on_core(3)
         .spawn().expect("failed to initiate task");

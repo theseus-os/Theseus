@@ -13,11 +13,9 @@ use alloc::{
     string::String,
     sync::Arc,
 };
-use spawn::KernelTaskBuilder;
 use mutex_sleep::MutexSleep;
 
 
-#[no_mangle]
 pub fn main(_args: Vec<String>) -> isize {    
     let res = match _args.get(0).map(|s| &**s) {
         Some("-c") => test_contention(),
@@ -35,23 +33,23 @@ pub fn main(_args: Vec<String>) -> isize {
 
 /// A simple test that spawns 3 tasks that all contend to increment a shared usize
 fn test_contention() -> Result<(), &'static str> {
-    let my_cpu = apic::get_my_apic_id().ok_or("couldn't get my APIC ID")?;
+    let my_cpu = apic::get_my_apic_id();
 
     let shared_lock = Arc::new(MutexSleep::new(0usize));
 
-    let t1 = KernelTaskBuilder::new(mutex_sleep_task, shared_lock.clone())
+    let t1 = spawn::new_task_builder(mutex_sleep_task, shared_lock.clone())
         .name(String::from("mutex_sleep_test_1"))
         .pin_on_core(my_cpu)
         .block()
         .spawn()?;
 
-    let t2 = KernelTaskBuilder::new(mutex_sleep_task, shared_lock.clone())
+    let t2 = spawn::new_task_builder(mutex_sleep_task, shared_lock.clone())
         .name(String::from("mutex_sleep_test_2"))
         .pin_on_core(my_cpu)
         .block()
         .spawn()?;
     
-    let t3 = KernelTaskBuilder::new(mutex_sleep_task, shared_lock.clone())
+    let t3 = spawn::new_task_builder(mutex_sleep_task, shared_lock.clone())
         .name(String::from("mutex_sleep_test_3"))
         .pin_on_core(my_cpu)
         .block()
@@ -91,23 +89,23 @@ fn mutex_sleep_task(lock: Arc<MutexSleep<usize>>) -> Result<(), &'static str> {
 
 /// A test for running multiple tasks that are synchronized in lockstep
 fn test_lockstep() -> Result<(), &'static str> {
-    let my_cpu = apic::get_my_apic_id().ok_or("couldn't get my APIC ID")?;
+    let my_cpu = apic::get_my_apic_id();
 
     let shared_lock = Arc::new(MutexSleep::new(0usize));
 
-    let t1 = KernelTaskBuilder::new(lockstep_task, (shared_lock.clone(), 0))
+    let t1 = spawn::new_task_builder(lockstep_task, (shared_lock.clone(), 0))
         .name(String::from("lockstep_task_1"))
         .pin_on_core(my_cpu)
         .block()
         .spawn()?;
 
-    let t2 = KernelTaskBuilder::new(lockstep_task, (shared_lock.clone(), 1))
+    let t2 = spawn::new_task_builder(lockstep_task, (shared_lock.clone(), 1))
         .name(String::from("lockstep_task_2"))
         .pin_on_core(my_cpu)
         .block()
         .spawn()?;
     
-    let t3 = KernelTaskBuilder::new(lockstep_task, (shared_lock.clone(), 2))
+    let t3 = spawn::new_task_builder(lockstep_task, (shared_lock.clone(), 2))
         .name(String::from("lockstep_task_3"))
         .pin_on_core(my_cpu)
         .block()

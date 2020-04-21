@@ -26,14 +26,12 @@
 //! 
 
 #![no_std]
-#![feature(asm, naked_functions)]
 #![feature(panic_info_message)]
 
 #[macro_use] extern crate alloc;
 #[macro_use] extern crate lazy_static;
 #[macro_use] extern crate log;
 extern crate irq_safety;
-extern crate atomic_linked_list;
 extern crate memory;
 extern crate tss;
 extern crate mod_mgmt;
@@ -42,9 +40,7 @@ extern crate environment;
 extern crate root;
 extern crate x86_64;
 extern crate spin;
-extern crate pause;
 extern crate kernel_config;
-
 
 
 use core::fmt;
@@ -58,24 +54,22 @@ use alloc::{
     string::String,
     sync::Arc,
 };
-use pause::spin_loop_hint;
-
 use irq_safety::{MutexIrqSafe, MutexIrqSafeGuardRef, MutexIrqSafeGuardRefMut, interrupts_enabled};
 use memory::{Stack, MappedPages, PageRange, EntryFlags, MmiRef, VirtualAddress};
 use kernel_config::memory::KERNEL_STACK_SIZE_IN_PAGES;
-use atomic_linked_list::atomic_map::AtomicMap;
 use tss::tss_set_rsp0;
 use mod_mgmt::{
     CrateNamespace,
-    metadata::StrongCrateRef,
+    AppCrateRef,
 };
 use environment::Environment;
 use spin::Mutex;
 use x86_64::registers::msr::{rdmsr, wrmsr, IA32_FS_BASE};
 
 
-/// The signature of the callback function that can hook into receiving a panic. 
-pub type PanicHandler = Box<dyn Fn(&PanicInfo) + Send>;
+/// The function signature of the callback that will be invoked
+/// when a given Task panics or otherwise fails, e.g., a machine exception occurs.
+pub type KillHandler = Box<dyn Fn(&KillReason) + Send>;
 
 /// Just like `core::panic::PanicInfo`, but with owned String types instead of &str references.
 #[derive(Debug, Clone)]
@@ -90,8 +84,8 @@ impl fmt::Display for PanicInfoOwned {
         write!(f, "{:?}:{}:{} -- {:?}", self.file, self.line, self.column, self.msg)
     }
 }
-impl PanicInfoOwned {
-    pub fn from(info: &PanicInfo) -> PanicInfoOwned {
+impl<'p> From<&PanicInfo<'p>> for PanicInfoOwned {
+    fn from(info: &PanicInfo) -> PanicInfoOwned {
         let msg = info.message()
             .map(|m| format!("{}", m))
             .unwrap_or_else(|| String::new());
@@ -107,11 +101,6 @@ impl PanicInfoOwned {
 
 
 lazy_static! {
-    /// Used to ensure that task switches are done atomically on each core
-    pub static ref TASK_SWITCH_LOCKS: AtomicMap<u8, AtomicBool> = AtomicMap::new();
-}
-
-lazy_static! {
     /// The list of all Tasks in the system.
     pub static ref TASKLIST: MutexIrqSafe<BTreeMap<usize, TaskRef>> = MutexIrqSafe::new(BTreeMap::new());
 }
@@ -123,13 +112,11 @@ pub fn get_task(task_id: usize) -> Option<TaskRef> {
 }
 
 
-/// Sets the panic handler function for the current `Task`
-pub fn set_my_panic_handler(handler: PanicHandler) -> Result<(), &'static str> {
+/// Sets the kill handler function for the current `Task`
+pub fn set_my_kill_handler(handler: KillHandler) -> Result<(), &'static str> {
     get_my_current_task()
         .ok_or("couldn't get_my_current_task")
-        .map(|taskref| {
-            taskref.set_panic_handler(handler)
-        })
+        .map(|taskref| taskref.set_kill_handler(handler))
 }
 
 
@@ -140,11 +127,20 @@ pub enum KillReason {
     /// The user or another task requested that this `Task` be killed. 
     /// For example, the user pressed `Ctrl + C` on the shell window that started a `Task`.
     Requested,
-    /// A Rust-level panic occurred while running this `Task`
+    /// A Rust-level panic occurred while running this `Task`.
     Panic(PanicInfoOwned),
     /// A non-language-level problem, such as a Page Fault or some other machine exception.
     /// The number of the exception is included, e.g., 15 (0xE) for a Page Fault.
     Exception(u8),
+}
+impl fmt::Display for KillReason {
+    fn fmt(&self, f: &mut fmt::Formatter) -> Result<(), fmt::Error> {
+        match &self {
+            &Self::Requested         => write!(f, "Requested"),
+            &Self::Panic(panic_info) => write!(f, "Panicked at {}", panic_info),
+            &Self::Exception(num)    => write!(f, "Exception {:#X}({})", num, num),
+        }
+    }
 }
 
 
@@ -200,6 +196,9 @@ pub enum SimdExt {
     None,
 }
 
+/// The signature of a Task's failure cleanup function.
+pub type FailureCleanupFunction = fn(TaskRef, KillReason) -> !;
+
 
 /// A structure that contains contextual information for a thread of execution. 
 pub struct Task {
@@ -228,28 +227,29 @@ pub struct Task {
     pub mmi: MmiRef, 
     /// The kernel stack, which all `Task`s must have in order to execute.
     pub kstack: Stack,
-    /// The userspace stack, which is `None` for tasks that do not run in userspace.
-    pub ustack: Option<Stack>,
-    /// for special behavior of new userspace task
-    pub new_userspace_entry_addr: Option<VirtualAddress>, 
     /// Whether or not this task is pinned to a certain core
     /// The idle tasks (like idle_task) are always pinned to their respective cores
     pub pinned_core: Option<u8>,
     /// Whether this Task is an idle task, the task that runs by default when no other task is running.
     /// There exists one idle task per core, so this is `false` for most tasks.
     pub is_an_idle_task: bool,
-    /// For application `Task`s, the [`LoadedCrate`](../mod_mgmt/metadata/struct.LoadedCrate.html)
-    /// that contains the backing memory regions and sections for running this `Task`'s object file.
-    /// The `app_crate` will contain the main function (entry point) for this `Task`, among other things.
-    pub app_crate: Option<StrongCrateRef>,
+    /// For application `Task`s, this is a reference to the [`LoadedCrate`](../mod_mgmt/metadata/struct.LoadedCrate.html)
+    /// that contains the entry function for this `Task`.
+    pub app_crate: Option<Arc<AppCrateRef>>,
     /// This `Task` is linked into and runs within the context of 
     /// this [`CrateNamespace`](../mod_mgmt/struct.CrateNamespace.html).
     pub namespace: Arc<CrateNamespace>,
-    /// The function that will be called when this `Task` panics;
-    /// it is invoked before the task is cleaned up via stack unwinding.
-    pub panic_handler: Option<PanicHandler>,
+    /// The function that will be called when this `Task` panics or fails due to a machine exception.
+    /// It will be invoked before the task is cleaned up via stack unwinding.
+    /// This is similar to Rust's built-in panic hook, but is also called upon a machine exception, not just a panic.
+    pub kill_handler: Option<KillHandler>,
     /// The environment of the task, Wrapped in an Arc & Mutex because it is shared among child and parent tasks
     pub env: Arc<Mutex<Environment>>,
+    /// The function that should be run as a last-ditch attempt to recover from this task's failure,
+    /// e.g., this can be called when unwinding itself fails. 
+    /// Typically, it will point to this Task's specific instance of `spawn::task_cleanup_failure()`,
+    /// which has generic type parameters that describe its function signature, argument type, and return type.
+    pub failure_cleanup_function: FailureCleanupFunction,
 
     #[cfg(simd_personality)]
     /// Whether this Task is SIMD enabled and what level of SIMD extensions it uses.
@@ -273,7 +273,7 @@ impl fmt::Debug for Task {
 impl Task {
     /// Creates a new Task structure and initializes it to be non-Runnable.
     /// By default, the new `Task` will inherit some of the same states from the currently-running `Task`:
-    /// its `Environment`, `MemoryManagementInfo`, `CrateNamespace`, and `app_crate` reference (`StrongCrateRef`).
+    /// its `Environment`, `MemoryManagementInfo`, `CrateNamespace`, and `app_crate` reference.
     /// If needed, those states can be changed by setting them for the returned `Task`.
     /// 
     /// # Arguments
@@ -282,7 +282,12 @@ impl Task {
     /// 
     /// # Note
     /// This does not run the task, schedule it in, or switch to it.
-    pub fn new(kstack: Option<Stack>) -> Result<Task, &'static str> {
+    /// 
+    /// However, it requires tasking to already be set up, i.e., the current task must be known.
+    pub fn new(
+        kstack: Option<Stack>,
+        failure_cleanup_function: FailureCleanupFunction
+    ) -> Result<Task, &'static str> {
         let curr_task = get_my_current_task().ok_or("Task::new(): couldn't get current task (not yet initialized)")?;
         let (mmi, namespace, env, app_crate) = {
             let t = curr_task.lock();
@@ -293,7 +298,7 @@ impl Task {
             .or_else(|| mmi.lock().alloc_stack(KERNEL_STACK_SIZE_IN_PAGES))
             .ok_or("couldn't allocate kernel stack!")?;
 
-        Ok(Task::new_internal(kstack, mmi, namespace, env, app_crate))
+        Ok(Task::new_internal(kstack, mmi, namespace, env, app_crate, failure_cleanup_function))
     }
     
     /// The internal routine for creating a `Task`, which does not make assumptions 
@@ -303,7 +308,8 @@ impl Task {
         kstack: Stack, 
         mmi: MmiRef, namespace: Arc<CrateNamespace>,
         env: Arc<Mutex<Environment>>,
-        app_crate: Option<StrongCrateRef>
+        app_crate: Option<Arc<AppCrateRef>>,
+        failure_cleanup_function: FailureCleanupFunction,
     ) -> Self {
          /// The counter of task IDs
         static TASKID_COUNTER: AtomicUsize = AtomicUsize::new(0);
@@ -324,16 +330,15 @@ impl Task {
             task_local_data_ptr: VirtualAddress::zero(),
             drop_after_task_switch: None,
             name: format!("task_{}", task_id),
-            kstack: kstack,
-            ustack: None,
-            mmi: mmi,
-            new_userspace_entry_addr: None,
+            kstack,
+            mmi,
             pinned_core: None,
             is_an_idle_task: false,
-            app_crate: app_crate,
-            namespace: namespace,
-            panic_handler: None,
-            env: env,
+            app_crate,
+            namespace,
+            kill_handler: None,
+            env,
+            failure_cleanup_function,
 
             #[cfg(simd_personality)]
             simd: SimdExt::None,
@@ -380,14 +385,17 @@ impl Task {
     }
 
     /// Returns true if this is a userspace`Task`.
+    /// Currently userspace support is disabled, so this always returns `false`.
     pub fn is_userspace(&self) -> bool {
-        self.ustack.is_some()
+        // self.ustack.is_some()
+        false
     }
 
-    /// Registers a function or closure that will be called if this `Task` panics,
-    /// invoked before the task is cleaned up via stack unwinding.
-    pub fn set_panic_handler(&mut self, callback: PanicHandler) {
-        self.panic_handler = Some(callback);
+    /// Registers a function or closure that will be called if this `Task` panics
+    /// or otherwise fails (e.g., due to a machine exception occurring).
+    /// The given `callback` will be invoked before the task is cleaned up via stack unwinding.
+    pub fn set_kill_handler(&mut self, callback: KillHandler) {
+        self.kill_handler = Some(callback);
     }
 
     /// Sets the argument of the task
@@ -400,11 +408,11 @@ impl Task {
         self.func = func;
     }
 
-    /// Takes ownership of this `Task`'s `PanicHandler` closure/function if one exists,
+    /// Takes ownership of this `Task`'s `KillHandler` closure/function if one exists,
     /// and returns it so it can be invoked without holding this `Task`'s `Mutex`.
-    /// After invoking this, the `Task`'s `panic_handler` will be `None`.
-    pub fn take_panic_handler(&mut self) -> Option<PanicHandler> {
-        self.panic_handler.take()
+    /// After invoking this, the `Task`'s `kill_handler` will be `None`.
+    pub fn take_kill_handler(&mut self) -> Option<KillHandler> {
+        self.kill_handler.take()
     }
 
 
@@ -469,36 +477,17 @@ impl Task {
     /// no locks need to be held to call this, but interrupts (later, preemption) should be disabled
     pub fn task_switch(&mut self, next: &mut Task, apic_id: u8) {
         // debug!("task_switch [0]: (AP {}) prev {:?}, next {:?}", apic_id, self, next);
-        
-        let my_task_switch_lock: &AtomicBool = match TASK_SWITCH_LOCKS.get(&apic_id) {
-            Some(csl) => csl,
-            _ => {
-                error!("BUG: task_switch(): no task switch lock present for AP {}, skipping task switch!", apic_id);
-                return;
-            } 
-        };
-        
-        // acquire this core's task switch lock
-        // TODO: add timeout
-        while my_task_switch_lock.compare_and_swap(false, true, Ordering::SeqCst) {
-            spin_loop_hint();
-        }
-
-        // debug!("task_switch [1], testing runstates.");
         if !next.is_runnable() {
             error!("BUG: Skipping task_switch due to scheduler bug: chosen 'next' Task was not Runnable! Current: {:?}, Next: {:?}", self, next);
-            my_task_switch_lock.store(false, Ordering::SeqCst);
             return;
         }
         if next.is_running() {
             error!("BUG: Skipping task_switch due to scheduler bug: chosen 'next' Task was already running on AP {}!\nCurrent: {:?} Next: {:?}", apic_id, self, next);
-            my_task_switch_lock.store(false, Ordering::SeqCst);
             return;
         }
         if let Some(pc) = next.pinned_core {
             if pc != apic_id {
                 error!("BUG: Skipping task_switch due to scheduler bug: chosen 'next' Task was pinned to AP {:?} but scheduled on AP {}!\nCurrent: {:?}, Next: {:?}", next.pinned_core, apic_id, self, next);
-                my_task_switch_lock.store(false, Ordering::SeqCst);
                 return;
             }
         }
@@ -506,7 +495,9 @@ impl Task {
 
         // Change the privilege stack (RSP0) in the TSS.
         // We can safely skip setting the TSS RSP0 when switching to a kernel task, 
-        // i.e., when `next` is not a userspace task
+        // i.e., when `next` is not a userspace task.
+        //
+        // Note that because userspace support is currently disabled, this will always be `false`.
         if next.is_userspace() {
             let new_tss_rsp0 = next.kstack.bottom() + (next.kstack.size() / 2); // the middle half of the stack
             if tss_set_rsp0(new_tss_rsp0).is_ok() { 
@@ -514,7 +505,6 @@ impl Task {
             }
             else {
                 error!("task_switch(): failed to set AP {} TSS RSP0, aborting task switch!", apic_id);
-                my_task_switch_lock.store(false, Ordering::SeqCst);
                 return;
             }
         }
@@ -523,9 +513,10 @@ impl Task {
         self.running_on_cpu = None; // no longer running
         next.running_on_cpu = Some(apic_id); // now running on this core
 
-
-        // We now do the page table switching here, so we can use our higher-level PageTable abstractions
-        {
+        // Switch page tables. 
+        // Since there is only a single address space (as userspace support is currently disabled),
+        // we do not need to do this at all.
+        if false {
             let prev_mmi = &self.mmi;
             let next_mmi = &next.mmi;
             
@@ -555,22 +546,12 @@ impl Task {
             next.drop_after_task_switch = self.take_task_local_data().map(|tld_box| tld_box as Box<dyn Any + Send>);
         }
 
-        // release this core's task switch lock
-        my_task_switch_lock.store(false, Ordering::SeqCst);
         // debug!("task_switch [4]: prev sp: {:#X}, next sp: {:#X}", self.saved_sp, next.saved_sp);
-        
 
-        /// A private macro that actually calls the given context switch routine
-        /// by putting the arguments into the proper registers, `rdi` and `rsi`.
+        /// A private macro that actually calls the given context switch routine.
         macro_rules! call_context_switch {
             ($func:expr) => ( unsafe {
-                asm!("
-                    mov rdi, $0; \
-                    mov rsi, $1;" 
-                    : : "r"(&mut self.saved_sp as *mut usize), "r"(next.saved_sp)
-                    : "memory" : "intel", "volatile"
-                );
-                $func();
+                $func(&mut self.saved_sp as *mut usize, next.saved_sp);
             });
         }
 
@@ -647,6 +628,17 @@ impl Task {
 impl Drop for Task {
     fn drop(&mut self) {
         trace!("Task::drop(): {}", self);
+
+        // We must consume/drop the Task's kill handler BEFORE a Task can possibly be dropped.
+        // This is because if an application task sets a kill handler that is a closure/function in the text section of the app crate itself,
+        // then after the app crate is released, the kill handler will be dropped AFTER the app crate has been freed.
+        // When it tries to drop the task's kill handler, a page fault will occur because the text section of the app crate has been unmapped.
+        {
+            if let Some(_kill_handler) = self.take_kill_handler() {
+                warn!("While dropping task {:?}, its kill handler callback was still present. Removing it now.", self);
+            }
+            // Scoping rules ensure the kill handler is dropped now, before this Task's app_crate could possibly be dropped.
+        }
     }
 }
 
@@ -870,21 +862,22 @@ impl TaskRef {
         self.0.deref().0.lock().runstate = RunState::Runnable;
     }
 
-    /// Registers a function or closure that will be called if this `Task` panics,
-    /// invoked before the task is cleaned up via stack unwinding.
+    /// Registers a function or closure that will be called if this `Task` panics
+    /// or otherwise fails (e.g., due to a machine exception). 
+    /// The given `callback` will be invoked before the task is cleaned up via stack unwinding.
     /// # Locking / Deadlock
     /// Obtains a write lock on the enclosed `Task` in order to mutate its state.
-    pub fn set_panic_handler(&self, callback: PanicHandler) {
-        self.0.deref().0.lock().set_panic_handler(callback)
+    pub fn set_kill_handler(&self, callback: KillHandler) {
+        self.0.deref().0.lock().set_kill_handler(callback)
     }
 
-    /// Takes ownership of this `Task`'s `PanicHandler` closure/function if one exists,
+    /// Takes ownership of this `Task`'s `KillHandler` closure/function if one exists,
     /// and returns it so it can be invoked without holding this `Task`'s `Mutex`.
-    /// After invoking this, the `Task`'s `panic_handler` will be `None`.
+    /// After invoking this, the `Task`'s `kill_handler` will be `None`.
     /// # Locking / Deadlock
     /// Obtains a write lock on the enclosed `Task` in order to mutate its state.
-    pub fn take_panic_handler(&self) -> Option<PanicHandler> {
-        self.0.deref().0.lock().take_panic_handler()
+    pub fn take_kill_handler(&self) -> Option<KillHandler> {
+        self.0.deref().0.lock().take_kill_handler()
     }
 
     /// Takes ownership of this `Task`'s exit value and returns it,
@@ -928,6 +921,7 @@ impl TaskRef {
     
     /// Obtains the lock on the underlying `Task` in a writable, blocking fashion.
     #[deprecated(note = "This method exposes inner Task details for debugging purposes. Do not use it.")]
+    #[doc(hidden)]
     pub fn lock_mut(&self) -> MutexIrqSafeGuardRefMut<Task> {
         MutexIrqSafeGuardRefMut::new(self.0.deref().0.lock())
     }
@@ -966,11 +960,11 @@ pub fn create_idle_task(
             EntryFlags::WRITABLE | EntryFlags::PRESENT
         ),
     );
-    let default_namespace = mod_mgmt::get_default_namespace()
-        .ok_or("The default CrateNamespace must be initialized before the tasking subsystem.")?
+    let default_namespace = mod_mgmt::get_initial_kernel_namespace()
+        .ok_or("The initial kernel CrateNamespace must be initialized before the tasking subsystem.")?
         .clone();
     let default_env = Arc::new(Mutex::new(Environment::default()));
-    let mut idle_task = Task::new_internal(kstack, kernel_mmi_ref, default_namespace, default_env, None);
+    let mut idle_task = Task::new_internal(kstack, kernel_mmi_ref, default_namespace, default_env, None, idle_task_cleanup_failure);
     idle_task.name = format!("idle_task_ap{}", apic_id);
     idle_task.is_an_idle_task = true;
     idle_task.runstate = RunState::Runnable;
@@ -999,6 +993,18 @@ pub fn create_idle_task(
     Ok(task_ref)
 }
 
+
+/// This is just like `spawn::task_cleanup_failure()`,
+/// but for idle tasks bootstrapped from a core's first execution context.
+/// 
+/// However, for a bootstrapped (idle) task, we don't know (it doesn't really have) a function signature,
+/// argument type, and return value type.
+/// 
+/// Therefore there's not much we can actually do.
+fn idle_task_cleanup_failure(current_task: TaskRef, kill_reason: KillReason) -> ! {
+    error!("BUG: idle_task_cleanup_failure: {:?} died with {:?}\n. There's nothing we can do here; looping indefinitely!", current_task.lock().name, kill_reason);
+    loop { }
+}
 
 
 /// The structure that holds information local to each Task,

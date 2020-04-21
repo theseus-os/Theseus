@@ -13,8 +13,7 @@ owning_ref = { git = "https://github.com/kevinaboos/owning-ref-rs" }
 path = "../memory"
 
 [dependencies.log]
-default-features = false
-version = "0.3.7"
+version = "0.4.8"
 
 [dependencies.intel_ethernet]
 path = "../intel_ethernet"

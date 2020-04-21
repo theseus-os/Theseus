@@ -98,7 +98,9 @@ fn get_content_string(file_path: String) -> Result<String, String> {
 /// not to cause panic.
 fn parse_content(content: &String) -> Result<BTreeMap<usize, LineSlice>, &'static str> {
     // Get the width and height of the terminal screen.
-    let (width, _height) = app_io::get_terminal_or_default()?.lock().get_text_dimensions();
+    let (width, _height) = app_io::get_my_terminal().ok_or("couldn't get terminal for `less` app")?
+        .lock()
+        .get_text_dimensions();
 
     // Record the slice index of each line.
     let mut map: BTreeMap<usize, LineSlice> = BTreeMap::new();
@@ -167,8 +169,8 @@ fn event_handler_loop(content: &String, map: &BTreeMap<usize, LineSlice>,
                       key_event_queue: &KeyEventQueueReader)
                       -> Result<(), &'static str> {
 
-    // Get a copy of the terminal pointer. The terminal is *not* locked here.
-    let terminal = app_io::get_terminal_or_default()?;
+    // Get a reference to this task's terminal. The terminal is *not* locked here.
+    let terminal = app_io::get_my_terminal().ok_or("couldn't get terminal for `less` app")?;
 
     // Display the beginning of the file.
     let mut line_start: usize = 0;
@@ -209,7 +211,6 @@ fn event_handler_loop(content: &String, map: &BTreeMap<usize, LineSlice>,
 }
 
 
-#[no_mangle]
 pub fn main(args: Vec<String>) -> isize {
 
     // Get stdout.

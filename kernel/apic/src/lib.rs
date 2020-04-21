@@ -16,7 +16,7 @@ extern crate raw_cpuid;
 extern crate x86_64;
 extern crate pit_clock;
 extern crate atomic;
-
+extern crate bit_field;
 
 use core::ops::DerefMut;
 use core::sync::atomic::Ordering;
@@ -27,11 +27,12 @@ use spin::Once;
 use raw_cpuid::CpuId;
 use x86_64::registers::msr::*;
 use irq_safety::RwLockIrqSafe;
-use memory::{FRAME_ALLOCATOR, Frame, FrameRange, PageTable, PhysicalAddress, EntryFlags, MappedPages, allocate_pages};
+use memory::{get_frame_allocator_ref, Frame, FrameRange, PageTable, PhysicalAddress, EntryFlags, MappedPages, allocate_pages};
 use kernel_config::time::CONFIG_TIMESLICE_PERIOD_MICROSECONDS;
 use atomic_linked_list::atomic_map::AtomicMap;
 use atomic::Atomic;
 use pit_clock::pit_wait;
+use bit_field::BitField;
 
 
 /// The interrupt chip that is currently configured on this machine. 
@@ -87,24 +88,14 @@ pub fn core_count() -> usize {
 
 
 /// Returns the APIC ID of the currently executing processor core.
-pub fn get_my_apic_id() -> Option<u8> {
-    if has_x2apic() {
-        // make sure this local apic is enabled in x2apic mode, otherwise we'll get a General Protection fault
-        unsafe { wrmsr(IA32_APIC_BASE, rdmsr(IA32_APIC_BASE) | IA32_APIC_XAPIC_ENABLE | IA32_APIC_X2APIC_ENABLE); }
-        let x2_id = rdmsr(IA32_X2APIC_APICID) as u32;
-        Some(x2_id as u8)
-    } else {
-        APIC_REGS.try().map(|apic| {
-            let raw = apic.lapic_id.read();
-            (raw >> 24) as u8
-        })
-    }
+pub fn get_my_apic_id() -> u8 {
+    rdmsr(IA32_TSC_AUX) as u8
 }
 
 
 /// Returns a reference to the LocalApic for the currently executing processsor core.
 pub fn get_my_apic() -> Option<&'static RwLockIrqSafe<LocalApic>> {
-    get_my_apic_id().and_then(|id| LOCAL_APICS.get(&id))
+    LOCAL_APICS.get(&get_my_apic_id())
 }
 
 
@@ -168,12 +159,12 @@ fn map_apic(page_table: &mut PageTable) -> Result<MappedPages, &'static str> {
     let phys_addr = PhysicalAddress::new(rdmsr(IA32_APIC_BASE) as usize)?;
     let new_page = allocate_pages(1).ok_or("out of virtual address space!")?;
     let frames = FrameRange::new(Frame::containing_address(phys_addr), Frame::containing_address(phys_addr));
-    let mut fa = FRAME_ALLOCATOR.try().ok_or("apic::init(): couldn't get FRAME_ALLOCATOR")?.lock();
+    let fa = get_frame_allocator_ref().ok_or("apic::init(): couldn't get frame allocator")?;
     let apic_mapped_page = page_table.map_allocated_pages_to(
         new_page, 
         frames, 
         EntryFlags::PRESENT | EntryFlags::WRITABLE | EntryFlags::NO_CACHE | EntryFlags::NO_EXECUTE, 
-        fa.deref_mut()
+        fa.lock().deref_mut()
     )?;
 
     Ok(apic_mapped_page)
@@ -299,6 +290,8 @@ impl LocalApic {
     pub fn new(page_table: &mut PageTable, processor: u8, apic_id: u8, is_bsp: bool, nmi_lint: u8, nmi_flags: u16) 
         -> Result<LocalApic, &'static str>
     {
+        // This MSR is used to hold a CPU's ID (which is an OS-chosen value).
+        unsafe { wrmsr(IA32_TSC_AUX, apic_id as u64); }
 
 		let mut lapic = LocalApic {
             regs: None, // None by default (for x2apics). if xapic, it will be set to Some later
@@ -678,6 +671,25 @@ impl LocalApic {
                 irr.reg6.read(),
                 irr.reg7.read(),
             ]
+        }
+    }
+
+    /// Clears the interrupt mask bit in the apic performance monitor register.
+    pub fn clear_pmi_mask(&mut self) {
+        // The 16th bit is set to 1 whenever a performance monitoring interrupt occurs. 
+        // It needs to be reset for another interrupt to occur.
+        const INT_MASK_BIT: u8 = 16;
+
+        if has_x2apic() {
+            let mut reg = rdmsr(IA32_X2APIC_LVT_PMI);
+            reg.set_bit(INT_MASK_BIT, false);
+            unsafe { wrmsr(IA32_X2APIC_LVT_PMI, reg) };
+        }
+        else {
+            let ref mut pmr = self.regs.as_mut().expect("ApicRegisters").lvt_perf_monitor; 
+            let mut reg = pmr.read();
+            reg.set_bit(INT_MASK_BIT, false);
+            pmr.write(reg);
         }
     }
 }

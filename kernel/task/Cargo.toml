@@ -11,8 +11,7 @@ spin = "0.4.10"
 x86_64 = { path = "../../libs/x86_64" } # currently using our local copy, forked from Phil Opp's crate
 
 [dependencies.log]
-default-features = false
-version = "0.3.7"
+version = "0.4.8"
 
 [dependencies.lazy_static]
 features = ["spin_no_std", "nightly"]
@@ -20,9 +19,6 @@ version = "1.2.0"
 
 [dependencies.irq_safety]
 git = "https://github.com/kevinaboos/irq_safety"
-
-[dependencies.atomic_linked_list]
-path = "../../libs/atomic_linked_list"
 
 [dependencies.tss]
 path = "../tss"
@@ -44,9 +40,6 @@ path = "../environment"
 
 [dependencies.root]
 path = "../root"
-
-[dependencies.pause]
-path = "../pause"
 
 
 [lib]

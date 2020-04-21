@@ -1,0 +1,22 @@
+[package]
+name = "test_exception2"
+version = "0.1.0"
+authors = ["Kevin Boos <kevinaboos@gmail.com>"]
+description = "a simple app for testing recovery from a machine exception"
+build = "../../build.rs"
+
+[dependencies]
+
+
+[dependencies.log]
+version = "0.4.8"
+
+
+[dependencies.serial_port]
+path = "../../kernel/serial_port"
+
+[dependencies.terminal_print]
+path = "../../kernel/terminal_print"
+
+[dependencies.task]
+path = "../../kernel/task"

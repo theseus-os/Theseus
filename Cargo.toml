@@ -16,10 +16,22 @@ exclude = [
 	"cfg",
 	"compiler_plugins",
 	"libs",
+	"old_crates",
 	"scripts",
 	"target",
 	"tools",
 	"userspace",
+
+	## exclude unused test applications by default
+	"applications/test_channel",
+	"applications/test_exception",
+	"applications/test_exception2",
+	"applications/test_filerw",
+	"applications/test_heap",
+	"applications/test_mutex_sleep",
+	"applications/test_wait_queue",
+	# "applications/test_panic",
+	# "applications/unwind_test",
 ]
 
 
@@ -34,7 +46,9 @@ downcast-rs = { git = "https://github.com/theseus-os/downcast-rs" }
 core_io = { git = "https://github.com/theseus-os/rust-core_io" }
 ### use the latest version of smoltcp from github; the one on crates.io is out of date
 smoltcp = { git = "https://github.com/m-labs/smoltcp" }
-
+### use a version of memoffset where doctest is not a stable feature. The patch can be removed when
+### we update our rustc verstion to 1.42. Then we can just use the version available on crates.io
+memoffset = {git ="https://github.com/Ramla-I/memoffset.git"}
 
 ### These profiles fix the new rustc behavior of splitting one crate into many object files. 
 ### That messes up our module loading, which is bad!
@@ -48,3 +62,4 @@ incremental = false
 [profile.release]
 codegen-units = 1
 incremental = false
+

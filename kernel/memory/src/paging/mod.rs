@@ -9,12 +9,12 @@
 
 mod virtual_address_allocator;
 mod entry;
-mod table;
 mod temporary_page;
 mod mapper;
-
+#[cfg(not(mapper_spillful))]
+mod table;
 #[cfg(mapper_spillful)]
-pub mod mapper_spillful;
+pub mod table;
 
 
 pub use self::entry::*;
@@ -22,7 +22,10 @@ pub use self::temporary_page::TemporaryPage;
 pub use self::mapper::*;
 pub use self::virtual_address_allocator::*;
 
-use core::fmt;
+use core::{
+    ops::{Deref, DerefMut},
+    fmt,
+};
 use super::*;
 
 use kernel_config::memory::{RECURSIVE_P4_INDEX};
@@ -147,7 +150,7 @@ impl PageTable {
         // debug!("PageTable::switch() old table: {:?}, new table: {:?}", self, new_table);
 
         // perform the actual page table switch
-        unsafe { set_p4(new_table.p4_table.start_address()); }
+        unsafe { x86_64::registers::control_regs::cr3_write(x86_64::PhysicalAddress(new_table.p4_table.start_address().value() as u64)) };
         let current_table_after_switch = PageTable::from_current();
         current_table_after_switch
     }
@@ -170,29 +173,24 @@ pub fn get_current_p4() -> Frame {
 /// Returns the following tuple, if successful:
 /// 
 ///  * The kernel's new PageTable, which is now currently active,
-///  * the kernel's list of VirtualMemoryAreas,
 ///  * the kernels' text section MappedPages,
 ///  * the kernels' rodata section MappedPages,
 ///  * the kernels' data section MappedPages,
-///  * the kernel's list of *other* higher-half MappedPages, which should be kept forever,
-///  * the kernel's list of identity-mapped MappedPages, which should be dropped before starting the first userspace program. 
+///  * the kernel's list of *other* higher-half MappedPages that needs to be converted to a vector after heap initialization, and which should be kept forever,
+///  * the kernel's list of identity-mapped MappedPages that needs to be converted to a vector after heap initialization, and which should be dropped before starting the first userspace program. 
 ///
 /// Otherwise, it returns a str error message. 
-/// 
-/// Note: this was previously called remap_the_kernel.
 pub fn init(allocator_mutex: &MutexIrqSafe<AreaFrameAllocator>, boot_info: &multiboot2::BootInformation) 
-    -> Result<(PageTable, Vec<VirtualMemoryArea>, MappedPages, MappedPages, MappedPages, Vec<MappedPages>, Vec<MappedPages>), &'static str>
+    // -> Result<(PageTable, Vec<VirtualMemoryArea>, MappedPages, MappedPages, MappedPages, Vec<MappedPages>, Vec<MappedPages>), &'static str>
+    -> Result<(PageTable, MappedPages, MappedPages, MappedPages, [Option<MappedPages>; 32], [Option<MappedPages>; 32]), &'static str>
 {
     // bootstrap a PageTable from the currently-loaded page table
     let mut page_table = PageTable::from_current();
 
-    let (boot_info_start_vaddr, boot_info_end_vaddr) = get_boot_info_vaddress(&boot_info)?;
+    let boot_info_start_vaddr = VirtualAddress::new(boot_info.start_address()).map_err(|_| "boot_info start virtual address was invalid")?;
     let boot_info_start_paddr = page_table.translate(boot_info_start_vaddr).ok_or("Couldn't get boot_info start physical address")?;
-    let boot_info_end_paddr = page_table.translate(boot_info_end_vaddr).ok_or("Couldn't get boot_info end physical address")?;
     let boot_info_size = boot_info.total_size();
-    info!("multiboot start: {:#X}-->{:#X}, multiboot end: {:#X}-->{:#X}, size: {:#X}\n",
-            boot_info_start_vaddr, boot_info_start_paddr, boot_info_end_vaddr, boot_info_end_paddr, boot_info_size
-    );
+    info!("multiboot vaddr: {:#X}, multiboot paddr: {:#X}, size: {:#X}\n", boot_info_start_vaddr, boot_info_start_paddr, boot_info_size);
 
     // new_frame is a single frame, and temp_frames1/2 are tuples of 3 Frames each.
     let (new_frame, temp_frames1, temp_frames2) = {
@@ -207,7 +205,6 @@ pub fn init(allocator_mutex: &MutexIrqSafe<AreaFrameAllocator>, boot_info: &mult
     };
     let mut new_table = PageTable::new_table(&mut page_table, new_frame, TemporaryPage::new(temp_frames1))?;
 
-    let mut vmas: [VirtualMemoryArea; 32] = Default::default();
     let mut text_mapped_pages: Option<MappedPages> = None;
     let mut rodata_mapped_pages: Option<MappedPages> = None;
     let mut data_mapped_pages: Option<MappedPages> = None;
@@ -227,20 +224,18 @@ pub fn init(allocator_mutex: &MutexIrqSafe<AreaFrameAllocator>, boot_info: &mult
         {
             let mut allocator = allocator_mutex.lock(); 
 
-            // add virtual memory areas occupied by kernel data and code sections
-            let (mut index, 
-                initial_sections_memory_bounds,
-                sections_memory_bounds) = add_sections_vmem_areas(&boot_info, &mut vmas)?;
-
-            // to allow the APs to boot up, we identity map the kernel sections too.
-            // (lower half virtual addresses mapped to same lower half physical addresses)
-            // we will unmap these later before we start booting to userspace processes
-            for i in 0..index {
-                let sec = &sections_memory_bounds[i];
+            let (aggregated_section_memory_bounds, sections_memory_bounds) = find_section_memory_bounds(&boot_info)?;
+            
+            // Map every section found in the kernel image (given by boot information above) into memory. 
+            // To allow the APs to boot up, we identity map those kernel sections too
+            // (lower half virtual addresses mapped to same lower half physical addresses).1
+            // We will unmap these lower-half identity mappings later, before we start running applications.
+            let mut index = 0;
+            for sec in sections_memory_bounds.iter().filter_map(|s| s.as_ref()).fuse() {
                 let (start_virt_addr, start_phys_addr) = sec.start;
                 let (_end_virt_addr, end_phys_addr) = sec.end;
                 let size = end_phys_addr.value() - start_phys_addr.value();
-                identity_mapped_pages[i] = Some(
+                identity_mapped_pages[index] = Some(
                     mapper.map_frames(
                         FrameRange::from_phys_addr(start_phys_addr, size), 
                         Page::containing_address(start_virt_addr - KERNEL_OFFSET), 
@@ -249,22 +244,23 @@ pub fn init(allocator_mutex: &MutexIrqSafe<AreaFrameAllocator>, boot_info: &mult
                     )?
                 );
                 debug!("           also mapped vaddr {:#X} to paddr {:#x} (size {:#X})", start_virt_addr - KERNEL_OFFSET, start_phys_addr, size);
+                index += 1;
             }
 
 
-            let (text_start_virt,    text_start_phys)    = initial_sections_memory_bounds.text.start;
-            let (_text_end_virt,     text_end_phys)      = initial_sections_memory_bounds.text.end;
-            let (rodata_start_virt,  rodata_start_phys)  = initial_sections_memory_bounds.rodata.start;
-            let (_rodata_end_virt,   rodata_end_phys)    = initial_sections_memory_bounds.rodata.end;
-            let (data_start_virt,    data_start_phys)    = initial_sections_memory_bounds.data.start;
-            let (_data_end_virt,     data_end_phys)      = initial_sections_memory_bounds.data.end;
+            let (text_start_virt,    text_start_phys)    = aggregated_section_memory_bounds.text.start;
+            let (_text_end_virt,     text_end_phys)      = aggregated_section_memory_bounds.text.end;
+            let (rodata_start_virt,  rodata_start_phys)  = aggregated_section_memory_bounds.rodata.start;
+            let (_rodata_end_virt,   rodata_end_phys)    = aggregated_section_memory_bounds.rodata.end;
+            let (data_start_virt,    data_start_phys)    = aggregated_section_memory_bounds.data.start;
+            let (_data_end_virt,     data_end_phys)      = aggregated_section_memory_bounds.data.end;
 
-            let text_flags    = initial_sections_memory_bounds.text.flags;
-            let rodata_flags  = initial_sections_memory_bounds.rodata.flags;
-            let data_flags    = initial_sections_memory_bounds.data.flags;
+            let text_flags    = aggregated_section_memory_bounds.text.flags;
+            let rodata_flags  = aggregated_section_memory_bounds.rodata.flags;
+            let data_flags    = aggregated_section_memory_bounds.data.flags;
 
 
-            // now we map the 5 main sections into 3 groups according to flags
+            // Now we map all kernel sections into 3 groups according to flags
             text_mapped_pages = Some(mapper.map_frames(
                 FrameRange::from_phys_addr(text_start_phys, text_end_phys.value() - text_start_phys.value()), 
                 Page::containing_address(text_start_virt), 
@@ -290,8 +286,7 @@ pub fn init(allocator_mutex: &MutexIrqSafe<AreaFrameAllocator>, boot_info: &mult
                 vga_display_flags,
                 allocator.deref_mut()
             )?);
-            vmas[index] = VirtualMemoryArea::new(vga_display_virt_addr, vga_size_in_bytes, vga_display_flags, "Kernel VGA Display Memory");
-            debug!("mapped kernel section: vga_buffer at addr: {:?}", vmas[index]);
+            debug!("mapped kernel section: vga_buffer at addr: {:#X}, size {} bytes", vga_display_virt_addr, vga_size_in_bytes);
             // also do an identity mapping for APs that need it while booting
             identity_mapped_pages[index] = Some(mapper.map_frames(
                 FrameRange::from_phys_addr(vga_display_phys_addr, vga_size_in_bytes), 
@@ -304,7 +299,6 @@ pub fn init(allocator_mutex: &MutexIrqSafe<AreaFrameAllocator>, boot_info: &mult
             // map the multiboot boot_info at the same address it previously was, so we can continue to access boot_info 
             let boot_info_pages  = PageRange::from_virt_addr(boot_info_start_vaddr, boot_info_size);
             let boot_info_frames = FrameRange::from_phys_addr(boot_info_start_paddr, boot_info_size);
-            vmas[index] = VirtualMemoryArea::new(boot_info_start_vaddr, boot_info_size, EntryFlags::PRESENT | EntryFlags::GLOBAL, "Kernel Multiboot Info");
             for (page, frame) in boot_info_pages.into_iter().zip(boot_info_frames) {
                 // we must do it page-by-page to make sure that a page hasn't already been mapped
                 if mapper.translate_page(page).is_some() {
@@ -322,7 +316,7 @@ pub fn init(allocator_mutex: &MutexIrqSafe<AreaFrameAllocator>, boot_info: &mult
                 index += 1;
             }
 
-            debug!("identity_mapped_pages: {:?}", &identity_mapped_pages[0..(index + 1)]);
+            debug!("identity_mapped_pages: {:?}", &identity_mapped_pages[0..=index]);
 
         } // unlocks the frame allocator 
 
@@ -337,48 +331,11 @@ pub fn init(allocator_mutex: &MutexIrqSafe<AreaFrameAllocator>, boot_info: &mult
 
 
     debug!("switching to new page table {:?}", new_table);
-    let mut new_page_table = page_table.switch(&new_table); 
+    let new_page_table = page_table.switch(&new_table); 
     // here, new_page_table and new_table should be identical
     debug!("switched to new page table {:?}.", new_page_table); 
 
-    // After this point, we must "forget" all of the above mapped_pages instances if an error occurs,
-    // because they will be auto-unmapped from the new page table upon return, causing all execution to stop.          
-
-
-    // We must map the heap memory here, before it can initialized! 
-    let (heap_mapped_pages, heap_vma) = {
-        let mut allocator = allocator_mutex.lock();
-
-        let pages = PageRange::from_virt_addr(VirtualAddress::new_canonical(KERNEL_HEAP_START), KERNEL_HEAP_INITIAL_SIZE);
-        let heap_flags = paging::EntryFlags::WRITABLE;
-        let heap_vma: VirtualMemoryArea = VirtualMemoryArea::new(VirtualAddress::new_canonical(KERNEL_HEAP_START), KERNEL_HEAP_INITIAL_SIZE, heap_flags, "Kernel Heap");
-        let heap_mp = try_forget!(
-            new_page_table.map_pages(pages, heap_flags, allocator.deref_mut())
-                .map_err(|e| {
-                    error!("Failed to map kernel heap memory pages, {} bytes starting at virtual address {:#X}. Error: {:?}", KERNEL_HEAP_INITIAL_SIZE, KERNEL_HEAP_START, e);
-                    "Failed to map the kernel heap memory. Perhaps the KERNEL_HEAP_INITIAL_SIZE exceeds the size of the system's physical memory?"
-                }),
-            text_mapped_pages, rodata_mapped_pages, data_mapped_pages, higher_half_mapped_pages, identity_mapped_pages
-        );
-        heap_irq_safe::init(KERNEL_HEAP_START, KERNEL_HEAP_INITIAL_SIZE);
-        
-        allocator.alloc_ready(); // heap is ready
-        (heap_mp, heap_vma)
-    };
-
-    debug!("mapped and initialized the heap, VMA: {:?}", heap_vma);
-    // HERE: now the heap is set up, we can use dynamically-allocated types like Vecs
-
-    let mut kernel_vmas: Vec<VirtualMemoryArea> = vmas.to_vec();
-    kernel_vmas.retain(|x|  *x != VirtualMemoryArea::default() );
-    kernel_vmas.push(heap_vma);
-
-    debug!("kernel_vmas: {:?}", kernel_vmas);
-
-    let mut higher_half: Vec<MappedPages> = higher_half_mapped_pages.iter_mut().filter_map(|opt| opt.take()).collect();
-    higher_half.push(heap_mapped_pages);
-    let identity: Vec<MappedPages> = identity_mapped_pages.iter_mut().filter_map(|opt| opt.take()).collect();
-
     // Return the new_page_table because that's the one that should be used by the kernel in future mappings. 
-    Ok((new_page_table, kernel_vmas, text_mapped_pages, rodata_mapped_pages, data_mapped_pages, higher_half, identity))
+    Ok((new_page_table, text_mapped_pages, rodata_mapped_pages, data_mapped_pages, higher_half_mapped_pages, identity_mapped_pages))
 }
+

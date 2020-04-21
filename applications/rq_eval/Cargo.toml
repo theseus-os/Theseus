@@ -10,8 +10,7 @@ getopts = "0.2.21"
 
 
 [dependencies.log]
-default-features = false
-version = "0.3.7"
+version = "0.4.8"
 
 [dependencies.spawn]
 path = "../../kernel/spawn"
@@ -26,4 +25,4 @@ path = "../../kernel/task"
 path = "../../kernel/runqueue"
 
 [dependencies.terminal_print]
-path = "../terminal_print"
+path = "../../kernel/terminal_print"

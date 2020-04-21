@@ -8,6 +8,9 @@ build = "../../build.rs"
 [dependencies]
 spin = "0.4.10"
 
+[dependencies.log]
+version = "0.4.8"
+
 [dependencies.mpmc]
 path = "../../libs/mpmc"
 

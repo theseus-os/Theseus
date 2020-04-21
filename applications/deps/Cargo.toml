@@ -9,12 +9,15 @@ build = "../../build.rs"
 getopts = "0.2.21"
 spin = "0.4.10"
 
+[dependencies.log]
+version = "0.4.8"
+
 [dependencies.itertools]
 version = "0.7.9"
 default-features = false
 
 [dependencies.terminal_print]
-path = "../terminal_print"
+path = "../../kernel/terminal_print"
 
 [dependencies.crate_name_utils]
 path = "../../kernel/crate_name_utils"

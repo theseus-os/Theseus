@@ -1,4 +1,40 @@
-//! Support for Performance Monitoring Unit readouts.
+//! Support for the Performance Monitoring Unit 
+//! 
+//! We have support for PMU version 2. Each succesive PMU version includes the features provided by the previous versions.
+//! 
+//! Version 1 Support:
+//! To configure an architectural performance monitoring event, we program the performance event select registers (IA32_PERFEVTSELx MSRs).
+//! The result of the performance monitoring event is reported in a general purpose Performance Monitoring Counter (PMC) (IA32_PMCx MSR).
+//! There is one PMC for each performance event select register, and one PMU per logical core. 
+//! 
+//! Version 2 Support:
+//! Three of the architectural events are counted using fixed function MSRs (IA32_FIXED_CTR0 through IA32_FIXED_CTR2), 
+//! each with an associated control register.
+//! Three more MSRS are provided to simplify event programming. They are: 
+//! * IA32_PERF_GLOBAL_CTRL: 
+//!     allows software to enable/disable event counting of any combination of fixed-function PMCs or any general-purpose PMCs via a single WRMSR.
+//! * IA32_PERF_GLOBAL_STATUS: 
+//!     allows software to query counter overflow conditions on any combination of fixed-function PMCs or general-purpose PMCs via a single RDMSR.
+//! * IA32_PERF_GLOBAL_OVF_CTRL: 
+//!     allows software to clear counter overflow conditions on any combination of fixed-function PMCs or general-purpose PMCs via a single WRMSR.
+//! 
+//! We support 2 ways to use the PMU. One is to measure the number of events that take place over a length of code.
+//! The second is Event Based Sampling, where after a specified number of events occur, an interrupt is called and we store the instruction pointer 
+//! and task id running at that point.
+//! 
+//! Currently we support a maximum core ID of 255, and up to 8 general purpose counters per core. 
+//! A core ID greater than 255 is not supported in Theseus in general since the ID has to fit within a u8.
+//! 
+//! If the core ID limit is changed and we need to update the PMU data structures to support more cores then: 
+//! - Increase WORDS_IN_BITMAP and CORES_SUPPORTED_BY_PMU as required. For example, the cores supported is 256 so there are 4 64-bit words in the bitmap, one bit per core. 
+//! - Add additional AtomicU64 variables to the initialization of the CORES_SAMPLING and RESULTS_READY bitmaps. 
+//! 
+//! If the general purpose PMC limit is reached then: 
+//! - Update PMCS_SUPPORTED_BY_PMU to the new PMC limit.
+//! - Change the element type in the PMCS_AVAILABLE vector to be larger than AtomicU8 so that there is one bit per counter.
+//! - Update INIT_PMCS_AVAILABLE to the new maximum value for the per core bitmap.
+//! 
+//! Monitoring without interrupts is almost free (around 0.3% performance penalty) - source: "These are Not Your Grand Daddy's CPU Performance Counters" Blackhat USA, 2015
 //! 
 //! # Example
 //! ```
@@ -21,153 +57,280 @@
 //! # Note
 //! Currently, the PMU-based sampler will only capture samples on the same core as it was initialized and started from. 
 //! So, if you run `pmu_x86::init()` and `pmu_x86::start_samples()` on CPU core 2, it will only sample events on core 2.
-//!
 
 #![no_std]
 #![feature(asm)]
+#![feature(no_more_cas)]
 
 extern crate spin;
 #[macro_use] extern crate lazy_static;
 extern crate x86_64;
 extern crate raw_cpuid;
-extern crate atomic_linked_list;
 extern crate task;
 extern crate memory;
 extern crate irq_safety;
 extern crate alloc;
 extern crate apic;
 #[macro_use] extern crate log;
+extern crate mod_mgmt;
+extern crate bit_field;
+extern crate atomic;
 
 use x86_64::registers::msr::*;
 use x86_64::VirtualAddress;
 use x86_64::structures::idt::ExceptionStackFrame;
+use x86_64::instructions::rdpmc;
 use raw_cpuid::*;
-use spin::{Once, Mutex};
-use atomic_linked_list::atomic_map::*;
-use core::sync::atomic::{AtomicU32, Ordering, AtomicUsize};
+use spin::Once;
 use irq_safety::MutexIrqSafe;
 use alloc::vec::Vec;
-use alloc::collections::BTreeSet;
+use alloc::collections::BTreeMap;
+use alloc::string::{String, ToString};
+use bit_field::BitField;
+use core::sync::atomic::{Ordering, AtomicU64, AtomicU8};
 
-pub static PMU_VERSION: Once<u16> = Once::new();
-pub static SAMPLE_START_VALUE: AtomicUsize = AtomicUsize::new(0);
-pub static SAMPLE_TASK_ID: AtomicUsize = AtomicUsize::new(0);
-pub static SAMPLE_COUNT:AtomicU32 = AtomicU32::new(0);
+pub mod stat;
 
-static RDPMC_FFC0: u32 = 1 << 30;
-static RDPMC_FFC1: u32 = (1 << 30) + 1;
-static RDPMC_FFC2: u32 = (1 << 30) + 2;
+/// PMU version supported by the current hardware
+static PMU_VERSION: Once<u8> = Once::new();
+/// The number of general purpose PMCs that can be used. This should eventually be taken from the CPUID.
+static NUM_PMC: Once<u8> = Once::new();
 
-static PMC_ENABLE: u64 = 0x01 << 22;
-static INTERRUPT_ENABLE: u64 = 0x01 << 20;
-static UNHALTED_CYCLE_MASK: u64 = (0x03 << 16) | (0x00 << 8) | 0x3C;
-static INST_RETIRED_MASK: u64 = (0x03 << 16) | (0x00 << 8) | 0xC0;
-static UNHALTED_REF_CYCLE_MASK: u64 = (0x03 << 16) | (0x01 << 8) | 0x3C;
-static LLC_REF_MASK: u64 = (0x03 << 16) | (0x4F << 8) | 0x2E;
-static LLC_MISS_MASK: u64 = (0x03 << 16) | (0x41 << 8) | 0x2E;
-static BR_INST_RETIRED_MASK: u64 = (0x03 << 16) | (0x00 << 8) | 0xC4;
-static BR_MISS_RETIRED_MASK: u64 = (0x03 << 16) | (0x00 << 8) | 0xC5;
+/// Set bits in the global_ctrl MSR to enable the fixed counters.
+const ENABLE_FIXED_PERFORMANCE_COUNTERS: u64 = 0x7 << 32;
+/// Set bits in the global_ctrl MSR to enable the general purpose PMCs.
+const ENABLE_GENERAL_PERFORMANCE_COUNTERS: u64 = 0xF;
+/// Set bits in fixed_ctr_ctrl MSR to enable fixed counters for all privilege levels. 
+const ENABLE_FIXED_COUNTERS_FOR_ALL_PRIVILEGE_LEVELS: u64 = 0x333;
+
+/// read from the fixed counter 0 to retrieve the instructions retired
+const FIXED_FUNC_0_RDPMC: u32 = 1 << 30;
+/// read from the fixed counter 1 to retrieve the clock cycles
+const FIXED_FUNC_1_RDPMC: u32 = (1 << 30) + 1;
+/// read from the fixed counter 2 to retrieve reference cycles
+const FIXED_FUNC_2_RDPMC: u32 = (1 << 30) + 2;
+
+/// Set bit 22 to enable the general PMC to start counting
+const PMC_ENABLE: u64 = 0x01 << 22;
+/// Set bit 20 in the event select register to enable interrupts on a counter overflow
+const INTERRUPT_ENABLE: u64 = 0x01 << 20;
+/// Value to write to the overflow control MSR to clear it
+const CLEAR_PERF_STATUS_MSR: u64 = 0x0000_0000_0000_000F;
+/// The number of words in the CORES_SAMPLING and RESULTS_READY bitmaps, so that information for 256 cores can be recorded
+const WORDS_IN_BITMAP: usize = 4;
+/// The number of cores the current PMU implementation supports
+const CORES_SUPPORTED_BY_PMU: usize = 256;
+/// The number of general purpose PMCs the current PMU implementation supports
+const PMCS_SUPPORTED_BY_PMU: u8 = 8;
+/// The initial value for the bitmaps in PMCS_AVAILABLE 
+const INIT_VAL_PMCS_AVAILABLE: u8 = core::u8::MAX;
+
+/// Stores an 8-bit bitmap for each core to show whether the PMCs for that core are available (1) or in use (0).
+/// This restricts us to 8 general purpose PMCs per core.
+static PMCS_AVAILABLE: Once<Vec<AtomicU8>> = Once::new();
 
 lazy_static!{
-    pub static ref IP_LIST: MutexIrqSafe<Vec<VirtualAddress>> = MutexIrqSafe::new(Vec::with_capacity(SAMPLE_COUNT.load(Ordering::SeqCst) as usize));
-    pub static ref TASK_ID_LIST: MutexIrqSafe<Vec<usize>> = MutexIrqSafe::new(Vec::with_capacity(SAMPLE_COUNT.load(Ordering::SeqCst) as usize));
-    // Here 4 is the number of programmable counters
-    static ref PMC_LIST: [AtomicMap<i32, bool>; 4] = [AtomicMap::new(), AtomicMap::new(), AtomicMap::new(), AtomicMap::new()];
-    static ref CORES_SAMPLING: Mutex<BTreeSet<u8>> = Mutex::new(BTreeSet::new());
-    static ref RESULTS_READY: Mutex<BTreeSet<u8>> = Mutex::new(BTreeSet::new());
-}
-static NUM_PMC: u32 = 4;
-
-
-/// Initialization function that retrieves the version ID number. Version ID of 0 means no 
-/// performance monitoring is avaialable on the CPU (likely due to virtualization without hardware assistance).
-pub fn init() {
-    let cpuid = CpuId::new();
-    if let Some(perf_mon_info) = cpuid.get_performance_monitoring_info() {
-        PMU_VERSION.call_once(||perf_mon_info.version_id() as u16);
-        if let Some(pmu_ver) = PMU_VERSION.try() {  
-            if pmu_ver > &0 {
-                unsafe{
-                    //clear values in counters and their settings
-                    wrmsr(IA32_PERF_GLOBAL_CTRL, 0);
-                    wrmsr(IA32_PMC0, 0);
-                    wrmsr(IA32_PMC1, 0);
-                    wrmsr(IA32_PMC2, 0);
-                    wrmsr(IA32_PMC3, 0);
-                    wrmsr(IA32_FIXED_CTR0, 0);
-                    wrmsr(IA32_FIXED_CTR1, 0);
-                    wrmsr(IA32_FIXED_CTR2, 0);
-                    //sets fixed function counters to count events at all privilege levels
-                    wrmsr(IA32_FIXED_CTR_CTRL, 0x333);
-                    //enables all counters: each counter has another enable bit in other MSRs so these should likely never be cleared once first set
-                    wrmsr(IA32_PERF_GLOBAL_CTRL, 0x07 << 32 | 0x0f);
-                }
-            }
-        }
-    } 
+    /// Bitmap to store the cores where the PMU is currently being used for sampling. It records information for 256 cores.
+    static ref CORES_SAMPLING: [AtomicU64; WORDS_IN_BITMAP] = [AtomicU64::new(0), AtomicU64::new(0), AtomicU64::new(0), AtomicU64::new(0)];
+    /// Bitmap to store the cores which have sampling results ready to be retrieved. It records information for 256 cores.
+    static ref RESULTS_READY: [AtomicU64; WORDS_IN_BITMAP] = [AtomicU64::new(0), AtomicU64::new(0), AtomicU64::new(0), AtomicU64::new(0)];
+    /// The sampling information for each core
+    static ref SAMPLING_INFO: MutexIrqSafe<BTreeMap<u8, SampledEvents>> =  MutexIrqSafe::new(BTreeMap::new());
 }
 
-
-pub struct Counter {
-    pub start_count: u64,
-    msr_mask: u32,
-    pmc: i32,
-    core: i32,
-}
-
-/// Used to select event type to count. Event types are described on page 18-4 of Intel SDM 3B September 2016 Edition.
-/// https://www.intel.com/content/dam/www/public/us/en/documents/manuals/64-ia-32-architectures-software-developer-vol-3b-part-2-manual.pdf
+/// Used to select the event type to count. Event types are described in the Intel SDM 18.2.1 for PMU Version 1.
+/// The discriminant value for each event type is the value written to the event select register for a general purpose PMC.
 pub enum EventType{
-    InstructionsRetired,
-    UnhaltedThreadCycles,
-    UnhaltedReferenceCycles,
-    LongestLatCacheRef,
-    LongestLatCacheMiss,
-    BranchInstructionsRetired,
-    BranchMispredictRetired,
+    /// This event counts the number of instructions at retirement. For instructions that consist of multiple micro-ops,
+    /// this event counts the retirement of the last micro-op of the instruction.
+    /// This is counted by IA32_FIXED_CTR0.
+    InstructionsRetired = (0x03 << 16) | (0x00 << 8) | 0xC0,
+    /// This event counts core clock cycles when the clock signal on a specific core is running (not halted).
+    /// This is counted by IA32_FIXED_CTR1. 
+    UnhaltedCoreCycles = (0x03 << 16) | (0x00 << 8) | 0x3C,
+    /// This event counts reference clock cycles at a fixed frequency while the clock signal on the core is running. 
+    /// The event counts at a fixed frequency, irrespective of core frequency changes due to performance state transitions. 
+    /// Current implementations use the TSC clock.
+    /// This is counted by IA32_FIXED_CTR2. 
+    UnhaltedReferenceCycles = (0x03 << 16) | (0x01 << 8) | 0x3C,
+    /// This event counts requests originating from the core that reference a cache line in the last level on-die cache.
+    /// The event count includes speculation and cache line fills due to the first-level cache hardware prefetcher, but
+    /// may exclude cache line fills due to other hardware-prefetchers.
+    LastLevelCacheReferences = (0x03 << 16) | (0x4F << 8) | 0x2E,
+    /// This event counts each cache miss condition for references to the last level on-die cache. The event count may
+    /// include speculation and cache line fills due to the first-level cache hardware prefetcher, but may exclude cache
+    /// line fills due to other hardware-prefetchers.
+    LastLevelCacheMisses = (0x03 << 16) | (0x41 << 8) | 0x2E,
+    /// This event counts branch instructions at retirement. It counts the retirement of the last micro-op of a branch instruction.
+    BranchInstructionsRetired = (0x03 << 16) | (0x00 << 8) | 0xC4,
+    /// This event counts mispredicted branch instructions at retirement. It counts the retirement of the last micro-op
+    /// of a branch instruction in the architectural path of execution and experienced misprediction in the branch
+    /// prediction hardware.
+    BranchMissesRetired = (0x03 << 16) | (0x00 << 8) | 0xC5,
 }
 
+fn num_general_purpose_counters() -> Result<u8, &'static str>{
+    let num_pmc = NUM_PMC.try().ok_or("pmu_x86: The pmu hasn't been initialized with the number of counters")?;
+    Ok(*num_pmc)
+}
+
+fn get_pmcs_available() -> Result<&'static Vec<AtomicU8>, &'static str>{
+    Ok(PMCS_AVAILABLE.try().ok_or("pmu_x86: The variable storing the available counters for each core hasn't been initialized")?)
+}
+
+fn get_pmcs_available_for_core(core_id: u8) -> Result<&'static AtomicU8, &'static str>{
+    let pmc = PMCS_AVAILABLE.try().ok_or("pmu_x86: The variable storing the available counters for each core hasn't been initialized")?;
+    Ok(&pmc[core_id as usize])
+}
+
+/// Returns the maximum core id for this machine
+fn max_core_id() -> Result<u8, &'static str> {
+    let lapics = apic::get_lapics();
+    let core = lapics.iter().max_by_key(|core| core.0).ok_or("pmu_x86: Could not find a maximum core id")?;
+    Ok(*core.0)
+}
+
+/// Returns true if there are core ids that are larger than can be handled by the current PMU data structures
+fn greater_core_id_than_expected() -> Result<bool, &'static str> {
+    let max_core = max_core_id()? as usize;
+    Ok(max_core >= CORES_SUPPORTED_BY_PMU)
+}
+
+/// Returns true if there are more general purpose PMCs than can be handled by the current PMU data structures
+fn more_pmcs_than_expected(num_pmc: u8) -> Result<bool, &'static str> {
+    Ok(num_pmc > PMCS_SUPPORTED_BY_PMU)
+}
+
+
+/// Initialization function that retrieves the version ID number of the PMU. Version ID of 0 means no 
+/// performance monitoring is available on the CPU (likely due to virtualization without hardware assistance).
+/// We initialize the 3 fixed PMCs and general purpose PMCs.
+/// 
+/// Currently we support a maximum core ID of 255, and up to 8 general purpose counters per core. 
+/// A core ID greater than 255 is not supported in Theseus in general since the ID has to fit within a u8.
+/// 
+/// If the core ID limit is changed and we need to update the PMU data structures to support more cores then: 
+/// - Increase WORDS_IN_BITMAP and CORES_SUPPORTED_BY_PMU as required. For example, the cores supported is 256 so there are 4 64-bit words in the bitmap, one bit per core. 
+/// - Add additional AtomicU64 variables to the initialization of the CORES_SAMPLING and RESULTS_READY bitmaps. 
+/// 
+/// If the general purpose PMC limit is reached then: 
+/// - Update PMCS_SUPPORTED_BY_PMU to the new PMC limit.
+/// - Change the element type in the PMCS_AVAILABLE vector to be larger than AtomicU8 so that there is one bit per counter.
+/// - Update INIT_PMCS_AVAILABLE to the new maximum value for the per core bitmap.
+pub fn init() -> Result<(), &'static str> {
+    // pmu has already been initialized
+    if let Some(pmu_ver) = PMU_VERSION.try() {
+        trace!("PMU, version {}, has already been intitialized", pmu_ver);
+        return Ok(());
+    }
+
+    const MIN_PMU_VERSION: u8 = 1;
+    let cpuid = CpuId::new();
+
+    let perf_mon_info = cpuid.get_performance_monitoring_info().ok_or("pmu_x86::init: Could not get perfromance moritoring info from CPUID")?;
+    trace!("PMU version: {} with fixed counters: {} and general counters: {}",perf_mon_info.version_id(), perf_mon_info.fixed_function_counters(), perf_mon_info.number_of_counters());
+
+    // find the PMU version. There is other information provided by the cpuid but we do not retrieve it because we implement just version 2.
+    let pmu_ver = perf_mon_info.version_id();
+    let num_pmc = perf_mon_info.number_of_counters();
+
+    if pmu_ver >= MIN_PMU_VERSION {
+              
+        if greater_core_id_than_expected()? {
+            return Err("pmu_x86: There are larger core ids in this machine than can be handled by the existing structures which store information about the PMU");
+        }
+
+        if more_pmcs_than_expected(num_pmc)? {
+            return Err("pmu_x86: There are more general purpose PMCs in this machine than can be handled by the existing structures which store information about the PMU");
+        }
+
+        NUM_PMC.call_once(||num_pmc);
+        unsafe{
+            // disables all the performance counters
+            wrmsr(IA32_PERF_GLOBAL_CTRL, 0);
+            // clear the general purpose PMCs
+            wrmsr(IA32_PMC0, 0);
+            wrmsr(IA32_PMC1, 0);
+            wrmsr(IA32_PMC2, 0);
+            wrmsr(IA32_PMC3, 0);
+            // clear the fixed event counters
+            wrmsr(IA32_FIXED_CTR0, 0);
+            wrmsr(IA32_FIXED_CTR1, 0);
+            wrmsr(IA32_FIXED_CTR2, 0);
+            // sets fixed function counters to count events at all privilege levels
+            wrmsr(IA32_FIXED_CTR_CTRL, ENABLE_FIXED_COUNTERS_FOR_ALL_PRIVILEGE_LEVELS);
+            // enables all counters: each counter has another enable bit in other MSRs so these should likely never be cleared once first set
+            wrmsr(IA32_PERF_GLOBAL_CTRL, ENABLE_FIXED_PERFORMANCE_COUNTERS | ENABLE_GENERAL_PERFORMANCE_COUNTERS);
+        }
+
+        // initialize the PMCS_AVAILABLE bitmap 
+        let core_capacity = max_core_id()? as usize + 1;
+        let mut pmcs_available = Vec::with_capacity(core_capacity);
+        for _ in 0..core_capacity {
+            pmcs_available.push(AtomicU8::new(INIT_VAL_PMCS_AVAILABLE));
+        } 
+
+        PMCS_AVAILABLE.call_once(|| pmcs_available);
+    }
+
+    PMU_VERSION.call_once(||pmu_ver);
+
+    Ok(())
+}
+
+/// A logical counter object to correspond to a physical PMC
+pub struct Counter {
+    /// Initial value stored in the counter before counting starts
+    start_count: u64,
+    /// value passed to rdpmc instruction to read counter value
+    msr_mask: u32,
+    /// General PMC register number. It is -1 for a fixed counter.
+    pmc: i32,
+    /// Core this PMC is a part of.
+    core: u8,
+}
 
 impl Counter {
     /// Creates a Counter object and assigns a physical counter for it. 
-    /// If it's a PMC, writes the UMASK and Event Code to the relevant MSR, but leaves enable bit clear.  
+    /// If it's a general PMC, writes the UMASK and Event Code to the relevant MSR, but leaves enable bit clear.  
     pub fn new(event: EventType) -> Result<Counter, &'static str> {
         // ensures PMU available and initialized
         check_pmu_availability()?;
         
         match event {
-            EventType::InstructionsRetired => return safe_rdpmc(RDPMC_FFC0),
-            EventType::UnhaltedThreadCycles => return safe_rdpmc(RDPMC_FFC1),
-            EventType::UnhaltedReferenceCycles => return safe_rdpmc(RDPMC_FFC2),
-            EventType::LongestLatCacheRef => return programmable_start(LLC_REF_MASK),
-            EventType::LongestLatCacheMiss => return programmable_start(LLC_MISS_MASK),
-            EventType::BranchInstructionsRetired => return programmable_start(BR_INST_RETIRED_MASK),
-            EventType::BranchMispredictRetired => return programmable_start(BR_MISS_RETIRED_MASK),	
+            EventType::InstructionsRetired => create_fixed_counter(FIXED_FUNC_0_RDPMC),
+            EventType::UnhaltedCoreCycles => create_fixed_counter(FIXED_FUNC_1_RDPMC),
+            EventType::UnhaltedReferenceCycles => create_fixed_counter(FIXED_FUNC_2_RDPMC),
+            _ => create_general_counter(event as u64)	
         }
     }
     
-    /// Starts the count. Reads value fixed counter is at or, if it's a PMC, sets the enable bit. 
-    pub fn start(&mut self) {
-        if self.msr_mask > NUM_PMC {
+    /// Starts the count.
+    pub fn start(&mut self) -> Result<(), &'static str> {
+        let num_pmc = num_general_purpose_counters()?;
+
+        // for a fixed value counter (that's already enabled), simply saves the current value as the starting count
+        if self.msr_mask > num_pmc as u32 {
             self.start_count = rdpmc(self.msr_mask);
-        } else {
+        } 
+        // for a general PMC, it enables the counter to start counting from 0
+        else {
             self.start_count = 0;
             let umask = rdmsr(IA32_PERFEVTSEL0 + self.pmc as u32);
             unsafe{wrmsr(IA32_PERFEVTSEL0 + self.pmc as u32, umask | PMC_ENABLE);}
         }
+        Ok(())
     }
     
     /// Allows user to get count since start without stopping/releasing the counter.
     pub fn get_count_since_start(&self) -> Result<u64, &'static str> {
+        let num_pmc = num_general_purpose_counters()?;
+
         //checks to make sure the counter hasn't already been released
-        if self.msr_mask < NUM_PMC {
-            if let Some(core_available) = PMC_LIST[self.msr_mask as usize].get(&self.core) {
-                if *core_available {
-                    return Err("Counter used for this event was marked as free, value stored is likely inaccurute.");
-                } 
-            } else {
-                return Err("Counter used for this event was never claimed, value stored is likely inaccurute.");
-            }
+        if self.msr_mask < num_pmc as u32 {
+            if counter_is_available(self.core, self.msr_mask as u8)? {
+                return Err("Counter used for this event was marked as free, value stored is likely inaccurate.");
+            } 
         }
         
         Ok(rdpmc(self.msr_mask) - self.start_count)
@@ -176,71 +339,221 @@ impl Counter {
     /// Stops counting, releases the counter, and returns the count of events since the counter was initialized.
     pub fn end(&self) -> Result<u64, &'static str> {
         //unwrapping here might be an issue because it adds a step to event being counted, unsure how to get around
-        let end_rdpmc = safe_rdpmc_complete(self.msr_mask, self.core)?;
-        let end_val = end_rdpmc.start_count;
+        let end_val = safe_rdpmc(self.msr_mask)?;
         
+        let num_pmc = num_general_purpose_counters()?;
         // If the msr_mask indicates it's a programmable counter, clears event counting settings and counter 
-        if self.msr_mask < NUM_PMC {
+        if self.msr_mask < num_pmc as u32{
             unsafe{
                 wrmsr(IA32_PERFEVTSEL0 + self.msr_mask as u32, 0);
                 wrmsr(IA32_PMC0 + self.msr_mask as u32, 0);
             }
             
             // Sanity check to make sure the counter wasn't stopped and freed previously
-           if let Some(core_available) = PMC_LIST[self.msr_mask as usize].get(&self.core) {
-                if *core_available {
-                    return Err("Counter used for this event was marked as free, value stored is likely inaccurute.");
-                } 
-            } else {
-                return Err("Counter used for this event was never claimed, value stored is likely inaccurute.");
-            }
+            if counter_is_available(self.core, self.msr_mask as u8)? {
+                debug!("In end: core: {}, msr_mask:{}", self.core, self.msr_mask);
+                return Err("Counter used for this event was marked as free, value stored is likely inaccurate.");
+            } 
 
-            PMC_LIST[self.msr_mask as usize].insert(self.core, true);
-            
-
-        
+            // mark the PMC as free (not in use)
+            free_counter(self.core, self.msr_mask as u8)?;
         }
-    return Ok(end_val - self.start_count);
+        
+        Ok(end_val - self.start_count)
+    }
+
+    /// lightweight function with no checks to get the counter value from when it was started.
+    pub fn diff(&self) -> u64 {
+        rdpmc(self.msr_mask) - self.start_count
     }
 }
 
 
+/// Returns true if the counter is not in use
+fn counter_is_available(core_id: u8, counter: u8) -> Result<bool, &'static str> {
+    let pmcs = get_pmcs_available_for_core(core_id)?;
+    Ok(pmcs.load(Ordering::SeqCst).get_bit(counter as usize))
+}
+
+/// Sets the counter bit to indicate it is available
+fn free_counter(core_id: u8, counter: u8) -> Result<(), &'static str> {
+    let pmcs = get_pmcs_available_for_core(core_id)?;
+
+    pmcs.fetch_update(|mut x|{
+        if !x.get_bit(counter as usize) {
+            x.set_bit(counter as usize, true);
+            Some(x)
+        }
+        else{
+            None
+        }
+    }, Ordering::SeqCst, Ordering::SeqCst).map_err(|_e|"pmu_x86: Could not free counter because it was already free")?;
+
+    Ok(())
+}
+
+/// Clears the counter bit to show it's in use
+fn claim_counter(core_id: u8, counter: u8) -> Result<(), &'static str> {
+    let pmcs = get_pmcs_available_for_core(core_id)?;
+
+    pmcs.fetch_update(|mut x|{
+        if x.get_bit(counter as usize) {
+            x.set_bit(counter as usize, false);
+            Some(x)
+        }
+        else {
+            None
+        }
+    }, Ordering::SeqCst, Ordering::SeqCst).map_err(|_e|"pmu_x86: Could not claim counter because it is already in use")?;
+
+    Ok(())
+}
+
+/// Frees all counters and make them available to be used.
+/// Essentially sets the PMU to its initial state.
+pub fn reset_pmu() -> Result<(), &'static str> {
+    for pmc in get_pmcs_available()?.iter() {
+        pmc.store(INIT_VAL_PMCS_AVAILABLE, Ordering::SeqCst);
+    }
+    for core in CORES_SAMPLING.iter() {
+        core.store(0, Ordering::SeqCst);
+    }
+    for result in RESULTS_READY.iter() {
+        result.store(0, Ordering::SeqCst);
+    }
+    SAMPLING_INFO.lock().clear();
+
+    Ok(())
+}
+
+/// Returns the word position and the bit in the word for the given bit number
+/// which will be used to access the bitmap. 
+fn find_word_and_offset_from_bit(bit_num: u8) -> (usize, usize) {
+    let total_bits_in_word = core::mem::size_of::<u64>() * 8;
+    let word_num = bit_num as usize / total_bits_in_word;
+    let bit_in_word = bit_num as usize % total_bits_in_word;
+    (word_num, bit_in_word)
+}
+
+/// Adds the core to the list of those where PMU sampling is underway
+/// by setting the core_id bit
+fn add_core_to_sampling_list(core_id: u8) -> Result<(), &'static str> {
+    let (word_num, bit_in_word) = find_word_and_offset_from_bit(core_id);
+
+    CORES_SAMPLING[word_num].fetch_update(|mut x|{
+        if !x.get_bit(bit_in_word) {
+            x.set_bit(bit_in_word, true);
+            Some(x)
+        }
+        else{
+            None
+        }
+    }, Ordering::SeqCst, Ordering::SeqCst).map_err(|_e|"pmu_x86: could not add core to sampling list since sampling is already started on this core")?;
+
+    Ok(())
+}
+
+/// Removes the core from the list of those where PMU sampling is underway
+/// by clearing the core_id bit
+fn remove_core_from_sampling_list(core_id: u8) -> Result<(), &'static str> {
+    let (word_num, bit_in_word) = find_word_and_offset_from_bit(core_id);
+
+    CORES_SAMPLING[word_num].fetch_update(|mut x|{
+        if x.get_bit(bit_in_word) {
+            x.set_bit(bit_in_word, false);
+            Some(x)
+        }
+        else {
+            None
+        }
+    }, Ordering::SeqCst, Ordering::SeqCst).map_err(|_e|"pmu_x86: could not remove core from sampling list since sampling has already finished on this core")?;
+
+    Ok(())
+}
+
+fn core_is_currently_sampling(core_id: u8) -> bool {
+    let (word_num, bit_in_word) = find_word_and_offset_from_bit(core_id);
+    CORES_SAMPLING[word_num].load(Ordering::SeqCst).get_bit(bit_in_word)
+}
+
+/// Notify that sampling results are ready to be retrieved by setting the core_id bit
+fn notify_sampling_results_are_ready(core_id: u8) -> Result<(), &'static str> {
+    let (word_num, bit_in_word) = find_word_and_offset_from_bit(core_id);
+
+    RESULTS_READY[word_num].fetch_update(|mut x|{
+        if !x.get_bit(bit_in_word) {
+            x.set_bit(bit_in_word, true);
+            Some(x)
+        }
+        else {
+            None
+        }
+    }, Ordering::SeqCst, Ordering::SeqCst).map_err(|_e|"pmu_x86: could not add core to results ready list as sampling results have already been added")?;
+
+    Ok(())
+}
+
+/// Notify that sampling results have been retrieved by clearing the core_id bit
+fn sampling_results_have_been_retrieved(core_id: u8) -> Result<(), &'static str> {
+    let (word_num, bit_in_word) = find_word_and_offset_from_bit(core_id);
+
+    RESULTS_READY[word_num].fetch_update(|mut x|{
+        if x.get_bit(bit_in_word) {
+            x.set_bit(bit_in_word, false);
+            Some(x)
+        }
+        else {
+            None
+        }
+    }, Ordering::SeqCst, Ordering::SeqCst).map_err(|_e|"pmu_x86: could not remove core from results ready list as sampling results have already been retrieved")?;
+
+    Ok(())
+}
+
+fn sampling_results_are_ready(core_id: u8) -> bool {
+    let (word_num, bit_in_word) = find_word_and_offset_from_bit(core_id);
+    RESULTS_READY[word_num].load(Ordering::SeqCst).get_bit(bit_in_word)
+}
+
+/// Creates a counter object for a general purpose PMC given the event type.
+fn create_general_counter(event_mask: u64) -> Result<Counter, &'static str> {
+    programmable_start(event_mask)
+}
+
 /// Does the work of iterating through programmable counters and using whichever one is free. Returns Err if none free
 fn programmable_start(event_mask: u64) -> Result<Counter, &'static str> {
-    let my_core = apic::get_my_apic_id().ok_or("Couldn't get my apic id")? as i32;
-    for (i, pmc) in PMC_LIST.iter().enumerate() {
-        // Counter 0 is used for sampling.
-        if i != 0 {
-            //If counter i on this core has been used before (it's present in the AtomicMap) and is currently in use (it points to false), checks the next counter
-            if let Some(core_available) = pmc.get(&my_core) {
-                if !(core_available) {
-                    continue;
-                }
-            }
-            //Claims the counter using the AtomicMap and writes the values to initialize counter (except for enable bit)
-            pmc.insert(my_core, false);
-            unsafe{
-                wrmsr(IA32_PMC0 + (i as u32), 0);
-                wrmsr(IA32_PERFEVTSEL0 + (i as u32), event_mask);
-            }
-            return Ok(Counter {
-                start_count: 0, 
-                msr_mask: i as u32, 
-                pmc: i as i32, 
-                core: my_core
-            });
+    let my_core = apic::get_my_apic_id();
+    let num_pmc = num_general_purpose_counters()?;
+
+    for pmc in 0..num_pmc {
+        //If counter i on this core is currently in use, checks the next counter
+        if !counter_is_available(my_core, pmc)? {
+            continue;
         }
+        //Claims the counter using the AtomicMap and writes the values to initialize counter (except for enable bit)
+        claim_counter(my_core, pmc)?;
+
+        unsafe{
+            wrmsr(IA32_PMC0 + (pmc as u32), 0);
+            wrmsr(IA32_PERFEVTSEL0 + (pmc as u32), event_mask);
+        }
+        return Ok(Counter {
+            start_count: 0, 
+            msr_mask: pmc as u32, 
+            pmc: pmc as i32, 
+            core: my_core
+        });
     }
     return Err("All programmable counters currently in use.");
 }
 
-/// Calls the rdpmc function which is a wrapper for the x86 rdpmc instruction. This function ensures that performance monitoring is 
-/// initialized and enabled.    
-pub fn safe_rdpmc(msr_mask: u32) -> Result<Counter, &'static str> {
+/// Creates a counter object for a fixed hardware counter
+fn create_fixed_counter(msr_mask: u32) -> Result<Counter, &'static str> {
     check_pmu_availability()?;
 
-    let my_core = apic::get_my_apic_id().ok_or("Couldn't get my apic id")? as i32;
+    let my_core = apic::get_my_apic_id();
     let count = rdpmc(msr_mask);
+    
     return Ok(Counter {
         start_count: count, 
         msr_mask: msr_mask, 
@@ -249,76 +562,116 @@ pub fn safe_rdpmc(msr_mask: u32) -> Result<Counter, &'static str> {
     });
 }
 
-/// It's important to do the rdpmc as quickly as possible when it's called. 
-/// Getting the current core id adds cycles, so I created a version where the core id can be passed down.
-pub fn safe_rdpmc_complete(msr_mask: u32, core: i32) -> Result<Counter, &'static str> {
+/// Returns the value in a PMC after checking that the PMU is available and intialized
+fn safe_rdpmc(msr_mask: u32) -> Result<u64, &'static str> {
     check_pmu_availability()?;
-    
-    let count = rdpmc(msr_mask);
-    return Ok(Counter{start_count: count, msr_mask: msr_mask, pmc: -1, core: core});
+    Ok(rdpmc(msr_mask))
 }
 
-/// Checks to ensure that PMU has been initialized and that if the PMU has been initialized, the Version ID shows that the system has performance monitoring capabilities. 
+/// Checks that the PMU has been initialized. If it has been,
+/// the version ID tells whether the system has performance monitoring capabilities. 
 fn check_pmu_availability() -> Result<(), &'static str>  {
-    if let Some(version) = PMU_VERSION.try() {
-        if version < &1 {
-            return Err("Version ID of 0: Performance monitoring not supported in this environment(likely either due to virtualization without hardware acceleration or old CPU).")
-        }
-    } else {
-        return Err("PMU not yet initialized.")
+    const MINIMUM_PMU_VERSION: u8 = 1;
+    let version = PMU_VERSION.try().ok_or("PMU hasn't been initialized")?; 
+    
+    if version < &MINIMUM_PMU_VERSION {
+        return Err("pmu_x86:: Version ID of 0: Performance monitoring not supported in this environment (likely either due to virtualization without hardware acceleration or old CPU).");
     }
 
     Ok(())
 }
 
-/// Start interrupt process in order to take samples using PMU. IPs sampled are stored in IP_LIST. Task IDs that IPs came from are stored in ID_LIST.
-/// event_type determines type of event that sampling interval is based on, event_per_sample is how many of those events should occur between each sample, 
-/// task_id allows the user to choose to only sample from a specific task by inputting a number or sample from all tasks by inputting None, 
-/// and sample_count specifies how many samples should be recorded. Clears previous values in IP_LIST and TASK_ID_LIST so values must be retrieved before 
-/// starting a new sampling process. 
+
+
+/// The information stored for each core when event based sampling is in progress
+struct SampledEvents{
+    start_value: usize,
+    task_id: usize,
+    sample_count: u32,
+    ip_list: Vec<VirtualAddress>,
+    task_id_list: Vec<usize>,
+}
+
+impl SampledEvents {
+    pub fn with_capacity(capacity: usize) -> SampledEvents {
+        SampledEvents {
+            start_value: 0,
+            task_id: 0,
+            sample_count: 0,
+            ip_list: Vec::with_capacity(capacity),
+            task_id_list: Vec::with_capacity(capacity),
+        }
+    }
+}
+
+/// Start interrupt process in order to take samples using the PMU. 
+/// It loads the starting value as such that an overflow will occur at "event_per_sample" events. 
+/// That overflow triggers an interrupt where information about the current running task is sampled.
+/// 
+/// # Arguments
+/// * `event_type`: determines type of event that sampling interval is based on
+/// * `event_per_sample`: how many of those events should occur between each sample 
+/// * `task_id`: allows the user to choose to only sample from a specific task by inputting a number or sample from all tasks by inputting None 
+/// * `sample_count`: specifies how many samples should be recorded. 
+/// 
 /// # Note
+/// The function clears any previous values from sampling stored for this core, so values must be retrieved before starting a new sampling process.
 /// Currently can only sample "this" core - core that the function was called on. 
+/// 
 pub fn start_samples(event_type: EventType, event_per_sample: u32, task_id: Option<usize>, sample_count: u32) -> Result<(),&'static str> {        
     check_pmu_availability()?;
 
     // perform checks to ensure that counter is ready to use and that previous results are not being unintentionally discarded
-    if let Some(my_core_id) = apic::get_my_apic_id() {
-        let mut cores_sampling_locked = CORES_SAMPLING.lock();
-        if cores_sampling_locked.contains(&my_core_id) {
-            return Err("Sampling is already being performed on this CPU.");
+    let my_core_id = apic::get_my_apic_id();
+
+    trace!("start_samples: the core id is : {}", my_core_id);
+
+    // If counter 0 is currently in use (false), then return 
+    // PMC0 is always used for sampling, but is not reserved for it.
+    if !counter_is_available(my_core_id, 0)? {
+        return Err("PMU counter 0 is currently in use and can't be used for sampling. End all other PMU tasks and try again");
+    }
+
+    // set the counter as in use
+    claim_counter(my_core_id, 0)?;
+
+    // check to make sure that sampling is not already in progress on this core
+    // this should never happen since the counter would not be available for use
+    if core_is_currently_sampling(my_core_id) {
+        return Err("Sampling is already being performed on this CPU.");
+    }
+    else {
+        // check if there are previous sampling results that haven't been retrieved
+        if sampling_results_are_ready(my_core_id) {
+            return Err("Sample results from previous test have not yet been retrieved. Please use retrieve_samples() function or 
+            set RESULTS_READY AtomicBool for this cpu as false to indicate intent to discard sample results.");
         }
-        else {
-            if RESULTS_READY.lock().contains(&my_core_id) {
-                return Err("Sample results from previous test have not yet been retrieved. Please use retrieve_samples() function or 
-                set RESULTS_READY AtomicBool for this cpu as false to indicate intent to discard sample results.");
-            }
-            cores_sampling_locked.insert(my_core_id);
-        }
+        add_core_to_sampling_list(my_core_id)?;
     }
     
-    IP_LIST.lock().clear();
-    TASK_ID_LIST.lock().clear();
+    let mut sampled_events = SampledEvents::with_capacity(sample_count as usize);
+
     // if a task_id was requested, sets the value for the interrupt handler to later read
     if let Some(task_id_num) = task_id {
-        SAMPLE_TASK_ID.store(task_id_num, Ordering::SeqCst);
+        sampled_events.task_id = task_id_num;
     }
-    SAMPLE_COUNT.store(sample_count, Ordering::SeqCst);
+
+    sampled_events.sample_count = sample_count;
+
     if event_per_sample > core::u32::MAX || event_per_sample <= core::u32::MIN {
         return Err("Number of events per sample invalid: must be within unsigned 32 bit");
     }
+
     let start_value = core::u32::MAX - event_per_sample;
-    SAMPLE_START_VALUE.store(start_value as usize, Ordering::SeqCst);
+    // SAMPLE_START_VALUE.store(start_value as usize, Ordering::SeqCst);
+    sampled_events.start_value = start_value as usize;
+
+    // add this sampled events to the atomic map
+    SAMPLING_INFO.lock().insert(my_core_id, sampled_events);
 
     // selects the appropriate mask for the event type and starts the counter
-    let event_mask = match event_type {
-        EventType::InstructionsRetired => UNHALTED_CYCLE_MASK,
-        EventType::UnhaltedThreadCycles => INST_RETIRED_MASK,
-        EventType::UnhaltedReferenceCycles => UNHALTED_REF_CYCLE_MASK,
-        EventType::LongestLatCacheRef => LLC_REF_MASK,
-        EventType::LongestLatCacheMiss => LLC_MISS_MASK,
-        EventType::BranchInstructionsRetired => BR_INST_RETIRED_MASK,
-        EventType::BranchMispredictRetired => BR_MISS_RETIRED_MASK,	
-    } | PMC_ENABLE | INTERRUPT_ENABLE;
+    let event_mask = event_type as u64;
+
     unsafe{
         wrmsr(IA32_PMC0, start_value as u64);
         wrmsr(IA32_PERFEVTSEL0, event_mask | PMC_ENABLE | INTERRUPT_ENABLE);
@@ -328,120 +681,135 @@ pub fn start_samples(event_type: EventType, event_per_sample: u32, task_id: Opti
 
 }
 
+/// Function to manually stop the sampling interrupts. Marks the stored instruction pointers and task IDs as ready to retrieve. 
+fn stop_samples(core_id: u8, samples: &mut SampledEvents) -> Result<(), &'static str> {
+    // immediately stops counting and clears the counter
+    unsafe{
+        wrmsr(IA32_PERFEVTSEL0, 0);
+        wrmsr(IA32_PMC0, 0);
+        wrmsr(IA32_PERF_GLOBAL_OVF_CTRL, CLEAR_PERF_STATUS_MSR);
+    }
+
+    // clears values so that even if exception is somehow triggered, it stops at the next iteration
+    samples.start_value = 0;
+    samples.task_id = 0; 
+    samples.sample_count = 0;
+
+    // marks core as no longer sampling and results as ready
+    remove_core_from_sampling_list(core_id)?;
+    notify_sampling_results_are_ready(core_id)?;
+    free_counter(core_id, 0)?;
+
+    trace!("Stopped taking samples with the PMU");
+    
+    return Ok(());
+}
+
+/// Stores the instruction pointers and corresponding task IDs from the samples
 pub struct SampleResults {
     pub instruction_pointers: Vec<VirtualAddress>,
     pub task_ids:  Vec<usize>,
 }
 
-/// Function to manually stop the sampling interrupts. Marks the stored instruction pointers and task IDs as ready to retrieve. 
-pub fn stop_samples() -> Result<(), &'static str> {
-    // immediately stops counting and clears the counter
-    unsafe{
-        wrmsr(IA32_PERFEVTSEL0, 0);
-        wrmsr(IA32_PMC0, 0);
-        wrmsr(IA32_PERF_GLOBAL_OVF_CTRL, 0);
-
-    }
-    // clears values in atomics so that even if exception is somehow triggered, it stops at the next iteration
-    SAMPLE_START_VALUE.store(0, Ordering::SeqCst);
-    SAMPLE_TASK_ID.store(0, Ordering::SeqCst);
-    // marks core as no longer sampling and results as ready
-    if let Some(my_core_id) = apic::get_my_apic_id() {
-        let mut locked_cores_sampling = CORES_SAMPLING.lock();
-        RESULTS_READY.lock().insert(my_core_id);
-        locked_cores_sampling.remove(&my_core_id);
-        return Ok(());
-        
-    } else {
-        return Err("Task structure not yet enabled.");
-    }
-}
-
 /// Returns the samples that were stored during sampling in the form of a SampleResults object. 
 /// If samples are not yet finished, forces them to stop.  
 pub fn retrieve_samples() -> Result<SampleResults, &'static str> {
-    if let Some(my_core_id) = apic::get_my_apic_id() {
-        stop_samples()?;
-        
-        RESULTS_READY.lock().remove(&my_core_id);
-        return Ok(SampleResults{instruction_pointers: IP_LIST.lock().clone(), task_ids: TASK_ID_LIST.lock().clone()});   
-    } 
-    Err("Task implentation not yet initialized.")
+    let my_core_id = apic::get_my_apic_id();
+
+    let mut sampling_info = SAMPLING_INFO.lock();
+    let mut samples = sampling_info.get_mut(&my_core_id).ok_or("pmu_x86::retrieve_samples: could not retrieve sampling information for this core")?;
+
+    // the interrupt handler might have stopped samples already so thsi check is required
+    if core_is_currently_sampling(my_core_id) {
+        stop_samples(my_core_id, &mut samples)?;
+    }
+    
+    sampling_results_have_been_retrieved(my_core_id)?;
+
+    Ok(SampleResults{instruction_pointers: samples.ip_list.clone(), task_ids: samples.task_id_list.clone()})   
 }
 
 /// Simple function to print values from SampleResults in a form that the script "post-mortem pmu analysis.py" can parse. 
-pub fn print_samples(sample_results: &mut SampleResults) {
-    while let Some(next_ip) = sample_results.instruction_pointers.pop() {
-        if let Some(next_id) = sample_results.task_ids.pop() {
-            debug!("{:x} {}", next_ip, next_id);
-        }
+pub fn print_samples(sample_results: &SampleResults) {
+    debug!("Printing Samples:");
+    for results in sample_results.instruction_pointers.iter().zip(sample_results.task_ids.iter()) {
+        debug!("{:x} {}", results.0, results.1);
     }
 }
 
-pub fn handle_sample(stack_frame: &mut ExceptionStackFrame) {
-    // println_both!("what value is in the status register {:x}", rdmsr(IA32_PERF_GLOBAL_STAUS));
-    unsafe { wrmsr(IA32_PERF_GLOBAL_OVF_CTRL, 0); }
-    // println_both!("what value is in the status register after clear: {:x}", rdmsr(IA32_PERF_GLOBAL_STAUS));
-    
-    debug!("handle_sample(): [0] on core {:?}!", apic::get_my_apic_id());
+/// Finds the corresponding function for each instruction pointer and calculates the percentage amount each function occured in the samples
+pub fn find_function_names_from_samples(sample_results: &SampleResults) -> Result<(), &'static str> {
+    let taskref = task::get_my_current_task() .ok_or("pmu_x86::get_function_names_from_samples: Could not get reference to current task")?;
+    let namespace = taskref.get_namespace();
+    debug!("Analyze Samples:");
 
-    let event_mask = rdmsr(IA32_PERFEVTSEL0);
-    let current_count = SAMPLE_COUNT.load(Ordering::SeqCst);
-    // if all samples have already been taken, calls the function to turn off the counter
+    let mut sections: BTreeMap<String, usize> = BTreeMap::new();
+    let total_samples = sample_results.instruction_pointers.len();
 
-    debug!("handle_sample(): [1] on core {:?}!", apic::get_my_apic_id());
-    if current_count == 0 {
-        if stop_samples().is_err() {
-            debug!("Error stopping samples. Counter not marked as free.");
-        } 
-        return;
+    for ip in sample_results.instruction_pointers.iter() {
+        let (section_ref, _offset) = namespace.get_section_containing_address(memory::VirtualAddress::new(ip.0)?, true).ok_or("Can't find section containing address")?;
+        let section_name = section_ref.name_without_hash().to_string();
+
+        sections.entry(section_name).and_modify(|e| {*e += 1}).or_insert(1);
     }
-    SAMPLE_COUNT.store(current_count - 1, Ordering::SeqCst);
 
-    debug!("handle_sample(): [2] on core {:?}!", apic::get_my_apic_id());
+    for (section, occurrences) in sections.iter() {
+        let percentage = *occurrences as f32 / total_samples as f32 * 100.0;
+        debug!("{:?}  {}% \n", section, percentage);
+    }
+
+    Ok(())
+}
+
+/// Function called in the interrupt handler to store the instruction pointer and task ID. 
+/// The counter is then reset to its starting value or turned off.
+pub fn handle_sample(stack_frame: &mut ExceptionStackFrame) -> Result<(), &'static str> {
+    unsafe { wrmsr(IA32_PERF_GLOBAL_OVF_CTRL, CLEAR_PERF_STATUS_MSR); }
+
+    let my_core_id = apic::get_my_apic_id();
+    let event_mask = rdmsr(IA32_PERFEVTSEL0);
+
+    let mut sampling_info = SAMPLING_INFO.lock();
+    let mut samples = sampling_info.get_mut(&my_core_id).ok_or("pmu_x86::handle_sample: Could not retrieve sampling information for this core")?;
+
+    let current_count = samples.sample_count;
+    // if all samples have already been taken, calls the function to turn off the counter
+    if current_count == 0 {
+        stop_samples(my_core_id, &mut samples)?; 
+        return Ok(());
+    }
+
+    samples.sample_count = current_count - 1;
 
     // if the running task is the requested one or if one isn't requested, records the IP
     if let Some(taskref) = task::get_my_current_task() {
-
-        debug!("handle_sample(): [3] on core {:?}!", apic::get_my_apic_id());
-
-        let requested_task_id = SAMPLE_TASK_ID.load(Ordering::SeqCst);
-
-        debug!("handle_sample(): [4] on core {:?}!", apic::get_my_apic_id());
+        let requested_task_id = samples.task_id;
         
         let task_id = taskref.lock().id;
         if (requested_task_id == 0) | (requested_task_id == task_id) {
-            IP_LIST.lock().push(stack_frame.instruction_pointer);
-            TASK_ID_LIST.lock().push(task_id);
+            samples.ip_list.push(stack_frame.instruction_pointer);
+            samples.task_id_list.push(task_id);
         }
     } else {
-
-        debug!("handle_sample(): [5] on core {:?}!", apic::get_my_apic_id());
-
-        IP_LIST.lock().push(stack_frame.instruction_pointer);
-
-        debug!("handle_sample(): [6] on core {:?}!", apic::get_my_apic_id());
-
-        TASK_ID_LIST.lock().push(0);
+        samples.ip_list.push(stack_frame.instruction_pointer);
+        samples.task_id_list.push(0);
     }
+
     // stops the counter, resets it, and restarts it
     unsafe {
         wrmsr(IA32_PERFEVTSEL0, 0);
-        wrmsr(IA32_PERF_GLOBAL_STAUS, 0);
-        wrmsr(IA32_PMC0, SAMPLE_START_VALUE.load(Ordering::SeqCst) as u64);
+        wrmsr(IA32_PERF_GLOBAL_OVF_CTRL, CLEAR_PERF_STATUS_MSR);
+        wrmsr(IA32_PMC0, samples.start_value as u64);
         wrmsr(IA32_PERFEVTSEL0, event_mask);
     }
 
-    debug!("handle_sample(): [end] on core {:?}!", apic::get_my_apic_id());
-
-    return;
-}
-
-/// Read 64 bit PMC (performance monitor counter).
-pub fn rdpmc(msr: u32) -> u64 {
-    let (high, low): (u32, u32);
-    unsafe {
-        asm!("rdpmc": "={eax}" (low), "={edx}" (high): "{ecx}" (msr) : "memory" : "volatile");
+    if let Some(my_apic) = apic::get_my_apic() {
+        my_apic.write().clear_pmi_mask();
     }
-    ((high as u64) << 32) | (low as u64)
+    else {
+        error!("Error in Performance Monitoring! Reference to the local APIC could not be retrieved.");
+    }
+
+    Ok(())
 }
+

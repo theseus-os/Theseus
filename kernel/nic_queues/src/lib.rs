@@ -13,13 +13,12 @@ extern crate intel_ethernet;
 extern crate nic_buffers;
 extern crate owning_ref;
 
-use core::ptr::write_volatile;
 use owning_ref::BoxRefMut;
 use alloc::{
     vec::Vec,
     collections::VecDeque
 };
-use memory::{VirtualAddress, MappedPages};
+use memory::MappedPages;
 use intel_ethernet::descriptors::{RxDescriptor, TxDescriptor};
 use nic_buffers::{ReceiveBuffer, ReceivedFrame};
 
@@ -45,15 +44,6 @@ pub struct RxQueue<T: RxDescriptor> {
     /// The cpu which this queue is mapped to. 
     /// This in itself doesn't guarantee anything, but we use this value when setting the cpu id for interrupts and DCA.
     pub cpu_id: u8,
-    /// The address where the rdt register is located for this queue
-    pub rdt_addr: VirtualAddress,
-}
-
-impl<T: RxDescriptor> RxQueue<T> {
-    /// Updates the queue tail descriptor in the rdt register
-    pub fn update_rdt(&self, val: u32) {
-        unsafe { write_volatile((self.rdt_addr.value()) as *mut u32, val) }
-    }
 }
 
 
@@ -70,13 +60,4 @@ pub struct TxQueue<T: TxDescriptor> {
     /// The cpu which this queue is mapped to. 
     /// This in itself doesn't guarantee anything but we use this value when setting the cpu id for interrupts and DCA.
     pub cpu_id : u8,
-    /// The address where the tdt register is located for this queue
-    pub tdt_addr: VirtualAddress,
-}
-
-impl<T: TxDescriptor> TxQueue<T> {
-    /// Updates the queue tail descriptor in the tdt register
-    pub fn update_tdt(&self, val: u32) {
-        unsafe { write_volatile((self.tdt_addr.value()) as *mut u32, val) }
-    }
 }

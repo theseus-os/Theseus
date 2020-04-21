@@ -18,8 +18,7 @@ version = "1.2.0"
 path = "../../libs/atomic_linked_list"
 
 [dependencies.log]
-default-features = false
-version = "0.3.7"
+version = "0.4.8"
 
 [dependencies.memory]
 path = "../memory"

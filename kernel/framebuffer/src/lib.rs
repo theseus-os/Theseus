@@ -14,7 +14,7 @@ pub mod pixel;
 use alloc::boxed::Box;
 use core::ops::DerefMut;
 
-use memory::{EntryFlags, FrameRange, MappedPages, PhysicalAddress, FRAME_ALLOCATOR};
+use memory::{EntryFlags, FrameRange, MappedPages, PhysicalAddress, get_frame_allocator_ref};
 use owning_ref::BoxRefMut;
 use shapes::Coord;
 pub use pixel::*;
@@ -38,9 +38,8 @@ pub fn init<P: Pixel>() -> Result<Framebuffer<P>, &'static str> {
         buffer_height = graphic_info.height as usize;
     };
 
-    // init the final framebuffer
+    // create and return the final framebuffer
     let framebuffer = Framebuffer::new(buffer_width, buffer_height, Some(vesa_display_phys_start))?;
-
     Ok(framebuffer)
 }
 
@@ -67,7 +66,7 @@ impl<P: Pixel> Framebuffer<P> {
     ) -> Result<Framebuffer<P>, &'static str> {
         // get a reference to the kernel's memory mapping information
         let kernel_mmi_ref = memory::get_kernel_mmi_ref().ok_or("KERNEL_MMI was not yet initialized!")?;
-        let allocator = FRAME_ALLOCATOR.try().ok_or("Couldn't get Frame Allocator")?;
+        let allocator = get_frame_allocator_ref().ok_or("Couldn't get Frame Allocator")?;
 
         let vesa_display_flags: EntryFlags =
             EntryFlags::PRESENT | EntryFlags::WRITABLE | EntryFlags::GLOBAL | EntryFlags::NO_CACHE;
@@ -144,13 +143,10 @@ impl<P: Pixel> Framebuffer<P> {
         self.index_of(coordinate).map(|i| self.buffer[i])
     }
 
-    /// Fills the framebuffer with color.
-    pub fn fill_color(&mut self, pixel: P) {
-        for y in 0..self.height {
-            for x in 0..self.width {
-                let coordinate = Coord::new(x as isize, y as isize);
-                self.draw_pixel(coordinate, pixel);
-            }
+    /// Fills (overwrites) the entire framebuffer with the given `pixel` value.
+    pub fn fill(&mut self, pixel: P) {
+        for p in self.buffer.deref_mut() {
+            *p = pixel;
         }
     }
 

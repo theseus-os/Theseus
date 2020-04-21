@@ -8,6 +8,12 @@ build = "../../build.rs"
 [dependencies]
 fallible-iterator = { version = "0.2.0", default-features = false }
 
+[dependencies.log]
+version = "0.4.8"
+
+[dependencies.mod_mgmt]
+path = "../mod_mgmt"
+
 [dependencies.task]
 path = "../task"
 

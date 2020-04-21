@@ -21,8 +21,8 @@ impl Drop for MyStruct {
 
 #[inline(never)]
 fn foo(cause_page_fault: bool) {
-    let _res = task::set_my_panic_handler(Box::new(|info| {
-        info!("Unwind test caught panic at {}", info);
+    let _res = task::set_my_kill_handler(Box::new(|kill_reason| {
+        info!("unwind_test: caught kill action at {}", kill_reason);
     }));
     
     let _my_struct = MyStruct(10);
@@ -36,7 +36,6 @@ fn foo(cause_page_fault: bool) {
 }
 
 
-#[no_mangle]
 pub fn main(_args: Vec<String>) -> isize {
 
     // // dump some info about the this loaded app crate

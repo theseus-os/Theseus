@@ -32,8 +32,8 @@ use alloc::{
 use spin::Mutex;
 use volatile::Volatile;
 use irq_safety::MutexIrqSafe;
-use memory::{VirtualAddress, PhysicalAddress, MappedPages, Page, Frame, FrameRange, EntryFlags, MemoryManagementInfo, FRAME_ALLOCATOR, Stack};
-use kernel_config::memory::{PAGE_SIZE, PAGE_SHIFT, KERNEL_STACK_SIZE_IN_PAGES};
+use memory::{VirtualAddress, PhysicalAddress, MappedPages, Page, Frame, FrameRange, EntryFlags, MemoryManagementInfo, get_frame_allocator_ref, Stack};
+use kernel_config::memory::{PAGE_SIZE, PAGE_SHIFT};
 use apic::{LocalApic, get_lapics, get_my_apic_id, has_x2apic, get_bsp_id};
 use ap_start::{kstart_ap, AP_READY_FLAG};
 use madt::{Madt, MadtEntry, MadtLocalApic, find_nmi_entry_for_processor};
@@ -98,7 +98,7 @@ pub fn handle_ap_cores(
         let ap_startup_page   = Page::containing_address(VirtualAddress::new_canonical(AP_STARTUP));
         let ap_startup_frames = FrameRange::from_phys_addr(PhysicalAddress::new_canonical(AP_STARTUP), ap_startup_size_in_bytes);
 
-        let mut allocator = FRAME_ALLOCATOR.try().ok_or("Couldn't get FRAME ALLOCATOR")?.lock();
+        let mut allocator = get_frame_allocator_ref().ok_or("Couldn't get FRAME ALLOCATOR")?.lock();
         
         trampoline_mapped_pages = page_table.map_to(
             trampoline_page, 
@@ -116,13 +116,13 @@ pub fn handle_ap_cores(
     }
 
     let all_lapics = get_lapics();
-    let me = get_my_apic_id().ok_or("Couldn't get_my_apic_id")?;
+    let me = get_my_apic_id();
 
     // Copy the AP startup code (from the kernel's text section pages) into the AP_STARTUP physical address entry point.
     {
         // First, get the kernel's text pages, which is the MappedPages object that contains the vaddr `ap_start_realmode_begin`.
-        let kernel_text_pages_ref = mod_mgmt::get_default_namespace()
-            .ok_or("BUG: couldn't get the default CrateNamespace")
+        let kernel_text_pages_ref = mod_mgmt::get_initial_kernel_namespace()
+            .ok_or("BUG: couldn't get the initial kernel CrateNamespace")
             .and_then(|namespace| namespace.get_crate("nano_core").ok_or("BUG: couldn't get the 'nano_core' crate"))
             .and_then(|nano_core_crate| nano_core_crate.lock_as_ref().text_pages.clone().ok_or("BUG: nano_core crate had no text pages"))?;
         let kernel_text_pages = kernel_text_pages_ref.0.lock();
