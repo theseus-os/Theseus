@@ -12,6 +12,7 @@ extern crate rendezvous;
 extern crate async_channel;
 extern crate apic;
 
+
 use alloc::{
     vec::Vec,
     string::String,
@@ -54,7 +55,6 @@ pub fn main(args: Vec<String>) -> isize {
     opts.optflag("a", "asynchronous", "run the test on the asynchronous buffered channel");
     opts.optflag("o", "oneshot", "run the 'oneshot' test variant, in which {ITER} tasks are spawned to send/receive one message each.");
     opts.optflag("m", "multiple", "run the 'multiple' test, in which one sender and one receiver task are spawned to send/receive {ITER} messages.");
-    opts.optflag("f", "faulty", "run the faulty 'multiple' test, in which one sender and one receiver task are spawned to send/receive {ITER} messages.");
     
     let matches = match opts.parse(&args) {
         Ok(m) => m,
@@ -115,11 +115,6 @@ fn rmain(matches: Matches) -> Result<(), &'static str> {
             println!("Running asynchronous channel test in multiple mode.");
             asynchronous_test_multiple(iterations!())?;
         }
-        if matches.opt_present("f") {
-            did_something = true;
-            println!("Running asynchronous channel test in multiple mode with faults.");
-            asynchronous_test_drop_test(iterations!())?;
-        }
     }
 
     if did_something {
@@ -133,9 +128,9 @@ fn rmain(matches: Matches) -> Result<(), &'static str> {
 
 /// A simple test that spawns a sender & receiver task to send a single message
 fn rendezvous_test_oneshot() -> Result<(), &'static str> {
-    let my_cpu = apic::get_my_apic_id().ok_or("couldn't get my APIC ID")?;
+    let my_cpu = apic::get_my_apic_id();
 
-    let (async_channel::sender, receiver) = rendezvous::new_channel();
+    let (sender, receiver) = rendezvous::new_channel();
 
     let t1 = spawn::new_task_builder(|_: ()| -> Result<(), &'static str> {
         warn!("rendezvous_test_oneshot(): Entered sender task!");
@@ -170,9 +165,9 @@ fn rendezvous_test_oneshot() -> Result<(), &'static str> {
 
 /// A simple test that spawns a sender & receiver task to send `iterations` messages.
 fn rendezvous_test_multiple(iterations: usize) -> Result<(), &'static str> {
-    let my_cpu = apic::get_my_apic_id().ok_or("couldn't get my APIC ID")?;
+    let my_cpu = apic::get_my_apic_id();
 
-    let (async_channel::sender, async_channel::receiver) = rendezvous::new_channel();
+    let (sender, receiver) = rendezvous::new_channel();
 
     let t1 = spawn::new_task_builder(|_: ()| -> Result<(), &'static str> {
         warn!("rendezvous_test_multiple(): Entered sender task!");
@@ -211,7 +206,7 @@ fn rendezvous_test_multiple(iterations: usize) -> Result<(), &'static str> {
 
 /// A simple test that spawns a sender & receiver task to send a single message
 fn asynchronous_test_oneshot() -> Result<(), &'static str> {
-    let my_cpu = apic::get_my_apic_id().ok_or("couldn't get my APIC ID")?;
+    let my_cpu = apic::get_my_apic_id();
 
     let (sender, receiver) = async_channel::new_channel(2);
 
@@ -248,7 +243,7 @@ fn asynchronous_test_oneshot() -> Result<(), &'static str> {
 
 /// A simple test that spawns a sender & receiver task to send `iterations` messages.
 fn asynchronous_test_multiple(iterations: usize) -> Result<(), &'static str> {
-    let my_cpu = apic::get_my_apic_id().ok_or("couldn't get my APIC ID")?;
+    let my_cpu = apic::get_my_apic_id();
 
     let (sender, receiver) = async_channel::new_channel(2);
 
@@ -281,73 +276,8 @@ fn asynchronous_test_multiple(iterations: usize) -> Result<(), &'static str> {
 
     t1.join()?;
     t2.join()?;
-
-    // let t3 = spawn::new_task_builder(|_: ()| -> Result<(), &'static str> {
-    //     warn!("asynchronous_test_multiple(): Entered receiver task!");
-    //     for i in 0..iterations {
-    //         let msg = receiver.receive()?;
-    //         warn!("asynchronous_test_multiple(): Receiver got {:?}  ({:03})", msg, i);
-    //     }
-    //     Ok(())
-    // }, ())
-    //     .name(String::from("receiver_task_asynchronous_multiple"))
-    //     .block();
-    // let t3 = pin_task!(t3, my_cpu).spawn()?;
-
-    // t3.join()?;
-
     warn!("asynchronous_test_multiple(): Joined the sender and receiver tasks.");
     
-    Ok(())
-}
-
-fn asynchronous_test_drop_test(iterations: usize) -> Result<(), &'static str> {
-    let my_cpu = apic::get_my_apic_id().ok_or("couldn't get my APIC ID")?;
-
-    let (sender, receiver) = async_channel::new_channel(2);
-
-    let t1 = spawn::new_task_builder(asynchronous_sender_task, (sender, iterations))
-        .name(String::from("sender_task_asynchronous_multiple"))
-        .pin_on_core(my_cpu)
-        .block()
-        .spawn()?;
-
-    let t2 = spawn::new_task_builder(asynchronous_receiver_task, receiver)
-        .name(String::from("receiver_task_asynchronous_multiple"))
-        .pin_on_core(my_cpu)
-        .block()
-        .spawn()?;
-
-    warn!("asynchronous_test_multiple(): Finished spawning the sender and receiver tasks");
-    t2.unblock(); t1.unblock();
-
-    t2.join()?;
-    t1.join()?;
-    warn!("asynchronous_test_multiple(): Joined the sender and receiver tasks.");
-    
-    Ok(())
-}
-
-fn asynchronous_receiver_task (receiver :Receiver<String>) -> Result<(), &'static str> {
-    warn!("asynchronous_test_multiple(): Entered receiver task!");
-    for i in 0..3 {
-        let msg = receiver.receive()?;
-        warn!("asynchronous_test_multiple(): Receiver got {:?}  ({:03})", msg, i);
-    }
-    warn!("asynchronous_test_multiple(): Done receiver task!");
-    Ok(())
-}
-
-fn asynchronous_sender_task ((sender, iterations) : (Sender<String>, usize)) -> Result<(), &'static str> {
-    warn!("asynchronous_test_multiple(): Entered sender task!");
-        for i in 0..iterations {
-            sender.send(format!("Message {:03}", i)).map_err(|error| {
-                warn!("Sender task returned error : {}", error);
-                return error;
-            })?;
-            warn!("asynchronous_test_multiple(): Sender sent message {:03}", i);
-        }
-    warn!("asynchronous_test_multiple(): Done sender task!");
     Ok(())
 }
 
