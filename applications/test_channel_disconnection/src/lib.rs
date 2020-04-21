@@ -1,3 +1,9 @@
+//! This application spawns a sender and receiver task connected
+//! via an `async_channel' or 'rendezvous' channel. If the expected
+//! number of messages to be send is different from expected number
+//! of messages to be received one end will hang up earlier.
+//! Successful result: Other end should also hang up
+
 #![no_std]
 
 #[macro_use] extern crate alloc;
@@ -116,46 +122,6 @@ fn rmain(matches: Matches) -> Result<(), &'static str> {
 }
 
 
-/// A simple test that spawns a sender & receiver task to send `iterations` messages.
-// fn rendezvous_test_multiple(iterations: usize) -> Result<(), &'static str> {
-//     let my_cpu = apic::get_my_apic_id().ok_or("couldn't get my APIC ID")?;
-
-//     let (sender, receiver) = rendezvous::new_channel();
-
-//     let t1 = spawn::new_task_builder(|_: ()| -> Result<(), &'static str> {
-//         warn!("rendezvous_test_multiple(): Entered sender task!");
-//         for i in 0..iterations {
-//             sender.send(format!("Message {:03}", i))?;
-//             warn!("rendezvous_test_multiple(): Sender sent message {:03}", i);
-//         }
-//         Ok(())
-//     }, ())
-//         .name(String::from("sender_task"))
-//         .block();
-//     let t1 = pin_task!(t1, my_cpu).spawn()?;
-
-//     let t2 = spawn::new_task_builder(|_: ()| -> Result<(), &'static str> {
-//         warn!("rendezvous_test_multiple(): Entered receiver task!");
-//         for i in 0..iterations {
-//             let msg = receiver.receive()?;
-//             warn!("rendezvous_test_multiple(): Receiver got {:?}  ({:03})", msg, i);
-//         }
-//         Ok(())
-//     }, ())
-//         .name(String::from("receiver_task"))
-//         .block();
-//     let t2 = pin_task!(t2, my_cpu).spawn()?;
-
-//     warn!("rendezvous_test_multiple(): Finished spawning the sender and receiver tasks");
-//     t2.unblock(); t1.unblock();
-
-//     t1.join()?;
-//     t2.join()?;
-//     warn!("rendezvous_test_multiple(): Joined the sender and receiver tasks.");
-    
-//     Ok(())
-// }
-
 fn rendezvous_test(send_count: usize, receive_count: usize) -> Result<(), &'static str> {
     let my_cpu = apic::get_my_apic_id().ok_or("couldn't get my APIC ID")?;
 
@@ -163,15 +129,15 @@ fn rendezvous_test(send_count: usize, receive_count: usize) -> Result<(), &'stat
 
     let t1 = spawn::new_task_builder(rendezvous_sender_task, (sender, send_count))
         .name(String::from("sender_task_rendezvous"))
-        .pin_on_core(my_cpu)
-        .block()
-        .spawn()?;
+        .block();
+    
+    let t1 = pin_task!(t1, my_cpu).spawn()?;
 
     let t2 = spawn::new_task_builder(rendezvous_receiver_task, (receiver, receive_count))
         .name(String::from("receiver_task_rendezvous"))
-        .pin_on_core(my_cpu)
-        .block()
-        .spawn()?;
+        .block();
+
+    let t2 = pin_task!(t2, my_cpu).spawn()?;
 
     warn!("rendezvous_test(): Finished spawning the sender and receiver tasks");
     t2.unblock(); t1.unblock();
@@ -221,15 +187,15 @@ fn asynchronous_test(send_count: usize, receive_count: usize) -> Result<(), &'st
 
     let t1 = spawn::new_task_builder(asynchronous_sender_task, (sender, send_count))
         .name(String::from("sender_task_asynchronous"))
-        .pin_on_core(my_cpu)
-        .block()
-        .spawn()?;
+        .block();
+
+    let t1 = pin_task!(t1, my_cpu).spawn()?;
 
     let t2 = spawn::new_task_builder(asynchronous_receiver_task, (receiver, receive_count))
         .name(String::from("receiver_task_asynchronous"))
-        .pin_on_core(my_cpu)
-        .block()
-        .spawn()?;
+        .block();
+
+    let t2 = pin_task!(t2, my_cpu).spawn()?;
 
     warn!("asynchronous_test(): Finished spawning the sender and receiver tasks");
     t2.unblock(); t1.unblock();
@@ -276,5 +242,5 @@ fn print_usage(opts: Options) {
     println!("{}", opts.usage(USAGE));
 }
 
-const USAGE: &'static str = "Usage: test_channel OPTION ARG
-Provides a selection of different tests for channel-based communication.";
+const USAGE: &'static str = "Usage: test_channel_disconnection OPTION ARG
+Provides a selection of different tests for channel disconnection.";
