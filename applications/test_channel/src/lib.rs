@@ -39,8 +39,19 @@ macro_rules! pin_task {
 }
 
 static ITERATIONS: AtomicUsize = AtomicUsize::new(100);
+static SEND_COUNT: AtomicUsize = AtomicUsize::new(100);
+static RECEIVE_COUNT: AtomicUsize = AtomicUsize::new(100);
+
 macro_rules! iterations {
     () => (ITERATIONS.load(Ordering::SeqCst))
+}
+
+macro_rules! send_count {
+    () => (SEND_COUNT.load(Ordering::SeqCst))
+}
+
+macro_rules! receive_count {
+    () => (RECEIVE_COUNT.load(Ordering::SeqCst))
 }
 
 
@@ -50,6 +61,8 @@ pub fn main(args: Vec<String>) -> isize {
     opts.optflag("v", "verbose", "enable verbose output");
     opts.optflag("p", "pinned", "force all test tasks to be spawned on and pinned to a single CPU. Otherwise, default behavior is spawning tasks across multiple CPUs.");
     opts.optopt("n", "iterations", "number of test iterations (default 100)", "ITER");
+    opts.optopt("s", "send_count", "number of messages expected to be sent in 'multiple' test (default 100)", "SEND_C");
+    opts.optopt("l", "receive_count", "number of messages expected to be received in 'multiple' test (default 100)", "REC_C");
 
     opts.optflag("r", "rendezvous", "run the test on the rendezvous-based synchronous channel");
     opts.optflag("a", "asynchronous", "run the test on the asynchronous buffered channel");
@@ -72,8 +85,17 @@ pub fn main(args: Vec<String>) -> isize {
 
     VERBOSE.call_once(|| matches.opt_present("v"));
     PINNED.call_once(|| matches.opt_present("p"));
+
     if let Some(iters) = matches.opt_str("n").and_then(|i| i.parse::<usize>().ok()) {
         ITERATIONS.store(iters, Ordering::SeqCst);
+    }
+
+    if let Some(iters) = matches.opt_str("s").and_then(|i| i.parse::<usize>().ok()) {
+        SEND_COUNT.store(iters, Ordering::SeqCst);
+    }
+
+    if let Some(iters) = matches.opt_str("l").and_then(|i| i.parse::<usize>().ok()) {
+        RECEIVE_COUNT.store(iters, Ordering::SeqCst);
     }
 
     match rmain(matches) {
@@ -98,7 +120,7 @@ fn rmain(matches: Matches) -> Result<(), &'static str> {
         if matches.opt_present("m") {
             did_something = true;
             println!("Running rendezvous channel test in multiple mode.");
-            rendezvous_test_multiple(iterations!())?;
+            rendezvous_test_multiple(send_count!(), receive_count!())?;
         }
     }
 
@@ -113,7 +135,7 @@ fn rmain(matches: Matches) -> Result<(), &'static str> {
         if matches.opt_present("m") {
             did_something = true;
             println!("Running asynchronous channel test in multiple mode.");
-            asynchronous_test_multiple(iterations!())?;
+            asynchronous_test_multiple(send_count!(), receive_count!())?;
         }
     }
 
@@ -163,43 +185,63 @@ fn rendezvous_test_oneshot() -> Result<(), &'static str> {
 
 
 
-/// A simple test that spawns a sender & receiver task to send `iterations` messages.
-fn rendezvous_test_multiple(iterations: usize) -> Result<(), &'static str> {
+/// A simple test that spawns a sender & receiver task to send `send_count` and receive `receive_count` messages.
+fn rendezvous_test_multiple(send_count: usize, receive_count: usize) -> Result<(), &'static str> {
     let my_cpu = apic::get_my_apic_id();
 
     let (sender, receiver) = rendezvous::new_channel();
 
-    let t1 = spawn::new_task_builder(|_: ()| -> Result<(), &'static str> {
-        warn!("rendezvous_test_multiple(): Entered sender task!");
-        for i in 0..iterations {
-            sender.send(format!("Message {:03}", i))?;
-            warn!("rendezvous_test_multiple(): Sender sent message {:03}", i);
-        }
-        Ok(())
-    }, ())
-        .name(String::from("sender_task"))
+    let t1 = spawn::new_task_builder(rendezvous_sender_task, (sender, send_count))
+        .name(String::from("sender_task_rendezvous"))
         .block();
+    
     let t1 = pin_task!(t1, my_cpu).spawn()?;
 
-    let t2 = spawn::new_task_builder(|_: ()| -> Result<(), &'static str> {
-        warn!("rendezvous_test_multiple(): Entered receiver task!");
-        for i in 0..iterations {
-            let msg = receiver.receive()?;
-            warn!("rendezvous_test_multiple(): Receiver got {:?}  ({:03})", msg, i);
-        }
-        Ok(())
-    }, ())
-        .name(String::from("receiver_task"))
+    let t2 = spawn::new_task_builder(rendezvous_receiver_task, (receiver, receive_count))
+        .name(String::from("receiver_task_rendezvous"))
         .block();
+
     let t2 = pin_task!(t2, my_cpu).spawn()?;
 
     warn!("rendezvous_test_multiple(): Finished spawning the sender and receiver tasks");
     t2.unblock(); t1.unblock();
 
-    t1.join()?;
     t2.join()?;
+    t1.join()?;
     warn!("rendezvous_test_multiple(): Joined the sender and receiver tasks.");
     
+    Ok(())
+}
+
+/// A simple receiver receiving `iterations` messages
+fn rendezvous_receiver_task ((receiver, iterations) :(rendezvous::Receiver<String>, usize)) -> Result<(), &'static str> {
+    warn!("rendezvous_test(): Entered receiver task! Expecting to receive {} messages", iterations);
+
+    for i in 0..iterations {
+        let msg = receiver.receive().map_err(|error| {
+            warn!("Receiver task returned error : {}", error);
+            return error;
+        })?;
+        warn!("rendezvous_test(): Receiver got {:?}  ({:03})", msg, i);
+    }
+
+    warn!("rendezvous_test(): Done receiver task!");
+    Ok(())
+}
+
+/// A simple sender sending `iterations` messages
+fn rendezvous_sender_task ((sender, iterations) : (rendezvous::Sender<String>, usize)) -> Result<(), &'static str> {
+    warn!("rendezvous_test(): Entered sender task! Expecting to send {} messages", iterations);
+
+    for i in 0..iterations {
+        sender.send(format!("Message {:03}", i)).map_err(|error| {
+            warn!("Sender task returned error : {}", error);
+            return error;
+        })?;
+        warn!("rendezvous_test(): Sender sent message {:03}", i);
+    }
+
+    warn!("rendezvous_test(): Done sender task!");
     Ok(())
 }
 
@@ -240,44 +282,63 @@ fn asynchronous_test_oneshot() -> Result<(), &'static str> {
 }
 
 
-
-/// A simple test that spawns a sender & receiver task to send `iterations` messages.
-fn asynchronous_test_multiple(iterations: usize) -> Result<(), &'static str> {
+/// A simple test that spawns a sender & receiver task to send `send_count` and receive `receive_count` messages.
+fn asynchronous_test_multiple(send_count: usize, receive_count: usize) -> Result<(), &'static str> {
     let my_cpu = apic::get_my_apic_id();
 
     let (sender, receiver) = async_channel::new_channel(2);
 
-    let t1 = spawn::new_task_builder(|_: ()| -> Result<(), &'static str> {
-        warn!("asynchronous_test_multiple(): Entered sender task!");
-        for i in 0..iterations {
-            sender.send(format!("Message {:03}", i))?;
-            warn!("asynchronous_test_multiple(): Sender sent message {:03}", i);
-        }
-        Ok(())
-    }, ())
-        .name(String::from("sender_task_asynchronous_multiple"))
+    let t1 = spawn::new_task_builder(asynchronous_sender_task, (sender, send_count))
+        .name(String::from("sender_task_asynchronous"))
         .block();
+
     let t1 = pin_task!(t1, my_cpu).spawn()?;
 
-    let t2 = spawn::new_task_builder(|_: ()| -> Result<(), &'static str> {
-        warn!("asynchronous_test_multiple(): Entered receiver task!");
-        for i in 0..iterations {
-            let msg = receiver.receive()?;
-            warn!("asynchronous_test_multiple(): Receiver got {:?}  ({:03})", msg, i);
-        }
-        Ok(())
-    }, ())
-        .name(String::from("receiver_task_asynchronous_multiple"))
+    let t2 = spawn::new_task_builder(asynchronous_receiver_task, (receiver, receive_count))
+        .name(String::from("receiver_task_asynchronous"))
         .block();
+
     let t2 = pin_task!(t2, my_cpu).spawn()?;
 
     warn!("asynchronous_test_multiple(): Finished spawning the sender and receiver tasks");
     t2.unblock(); t1.unblock();
 
-    t1.join()?;
     t2.join()?;
+    t1.join()?;
     warn!("asynchronous_test_multiple(): Joined the sender and receiver tasks.");
     
+    Ok(())
+}
+
+/// A simple receiver receiving `iterations` messages
+fn asynchronous_receiver_task ((receiver, iterations) :(async_channel::Receiver<String>, usize)) -> Result<(), &'static str> {
+    warn!("asynchronous_test(): Entered receiver task! Expecting to receive {} messages", iterations);
+
+    for i in 0..iterations {
+        let msg = receiver.receive().map_err(|error| {
+            warn!("Receiver task returned error : {}", error);
+            return error;
+        })?;
+        warn!("asynchronous_test(): Receiver got {:?}  ({:03})", msg, i);
+    }
+
+    warn!("asynchronous_test(): Done receiver task!");
+    Ok(())
+}
+
+/// A simple sender sending `iterations` messages
+fn asynchronous_sender_task ((sender, iterations) : (async_channel::Sender<String>, usize)) -> Result<(), &'static str> {
+    warn!("asynchronous_test(): Entered sender task! Expecting to send {} messages", iterations);
+
+    for i in 0..iterations {
+        sender.send(format!("Message {:03}", i)).map_err(|error| {
+            warn!("Sender task returned error : {}", error);
+            return error;
+        })?;
+        warn!("asynchronous_test(): Sender sent message {:03}", i);
+    }
+
+    warn!("asynchronous_test(): Done sender task!");
     Ok(())
 }
 
