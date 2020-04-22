@@ -46,7 +46,7 @@ pub fn new_channel<T: Send>(minimum_capacity: usize) -> (Sender<T>, Receiver<T>)
         queue: MpmcQueue::with_capacity(minimum_capacity),
         waiting_senders: WaitQueue::new(),
         waiting_receivers: WaitQueue::new(),
-        channel_status: Atomic::new(EndpointValues::Active)
+        channel_status: Atomic::new(ChannelStatus::Connected)
     });
     (
         Sender   { channel: channel.clone() },
@@ -58,9 +58,9 @@ pub fn new_channel<T: Send>(minimum_capacity: usize) -> (Sender<T>, Receiver<T>)
 /// Active : Initially channel is created with Active status.
 /// Dropped : Set to dropped when one end is dropped.
 #[derive(Clone, Copy, PartialEq, Debug)]
-enum EndpointValues {
-    Active,
-    Dropped,
+enum ChannelStatus {
+    Connected,
+    Disconnected,
 }
 
 /// The inner channel for asynchronous communication between `Sender`s and `Receiver`s.
@@ -74,7 +74,7 @@ struct Channel<T: Send> {
     queue: MpmcQueue<T>,
     waiting_senders: WaitQueue,
     waiting_receivers: WaitQueue,
-    channel_status : Atomic<EndpointValues>
+    channel_status : Atomic<ChannelStatus>
 }
 
 
@@ -122,7 +122,7 @@ impl <T: Send> Sender<T> {
                 }
             });
 
-            if self.channel.channel_status.load(Ordering::SeqCst) == EndpointValues::Dropped {
+            if self.channel.channel_status.load(Ordering::SeqCst) == ChannelStatus::Disconnected {
                  // trace!("Receiver Endpoint is dropped");
                  // Here the receiver end has dropped. 
                  // So we don't wait anymore in the waitqueue
@@ -134,7 +134,7 @@ impl <T: Send> Sender<T> {
         };
 
         let res = self.channel.waiting_senders
-            .wait_until_ok_mut(&mut closure)
+            .wait_until_mut(&mut closure)
             .map_err(|error| {
                 if error == WaitError::EndpointDropped {
                     "Receiver Endpoint is dropped"
@@ -192,7 +192,7 @@ impl <T: Send> Receiver<T> {
         // because it will notify the receivers which can cause deadlock.
         // Therefore, we need to perform the nofity action outside of this closure after it returns.
         let res = self.channel.waiting_receivers
-            .wait_until_ok(&|| self.try_receive())
+            .wait_until(&|| self.try_receive())
             .map_err(|error| {
                 if error == WaitError::EndpointDropped {
                     "Sender Endpoint is dropped"
@@ -236,7 +236,7 @@ impl <T: Send> Receiver<T> {
             self.channel.waiting_senders.notify_one();
             Ok(msg)
         } else {
-            if self.channel.channel_status.load(Ordering::SeqCst) == EndpointValues::Dropped {
+            if self.channel.channel_status.load(Ordering::SeqCst) == ChannelStatus::Disconnected {
                 return Err(())
             }
             Ok(None)
@@ -249,7 +249,7 @@ impl <T: Send> Receiver<T> {
 impl<T: Send> Drop for Receiver<T> {
     fn drop(&mut self) {
         // trace!("Dropping the receiver");
-        self.channel.channel_status.store(EndpointValues::Dropped, Ordering::Release);
+        self.channel.channel_status.store(ChannelStatus::Disconnected, Ordering::Release);
         self.channel.waiting_senders.notify_one();
     }
 }
@@ -258,7 +258,7 @@ impl<T: Send> Drop for Receiver<T> {
 impl<T: Send> Drop for Sender<T> {
     fn drop(&mut self) {
         // trace!("Dropping the sender");
-        self.channel.channel_status.store(EndpointValues::Dropped, Ordering::Release);
+        self.channel.channel_status.store(ChannelStatus::Disconnected, Ordering::Release);
         self.channel.waiting_receivers.notify_one();
     }
 }

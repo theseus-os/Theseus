@@ -95,11 +95,12 @@ impl WaitQueue {
     /// 
     /// This function blocks until the `Task` is woken up through the notify mechanism.
     pub fn wait(&self) -> Result<(), WaitError> {
-        self.wait_until(&|/* _ */| Some(()))
+        self.wait_until(&|/* _ */| Ok(Some(())))
     }
 
     /// Similar to [`wait`](#method.wait), but this function blocks until the given
-    /// `condition` closure returns `Some(value)`, and then returns that `value` inside `Ok()`.
+    /// `condition` closure returns `Ok(Some(value))`, or Err(). 
+    /// If so respectively it returns `value` inside `Ok()`. or Err()
     /// 
     /// The `condition` will be executed atomically with respect to the wait queue,
     /// which avoids the problem of a waiting task missing a "notify" from another task
@@ -107,74 +108,8 @@ impl WaitQueue {
     /// when the wait queue lock is not held. 
     /// 
     // /// The `condition` closure is invoked with one argument, an immutable reference to the waitqueue, 
-    // /// to allow the closure to examine the condition of the waitqueue if necessary. 
-    pub fn wait_until<R>(&self, condition: &dyn Fn(/* &VecDeque<TaskRef> */) -> Option<R>) -> Result<R, WaitError> {
-        let curr_task = task::get_my_current_task().ok_or(WaitError::NoCurrentTask)?;
-
-        // Do the following atomically:
-        // (1) Obtain the waitqueue lock
-        // (2) Add the current task to the waitqueue
-        // (3) Set the current task's runstate to `Blocked`
-        // (4) Release the lock on the waitqueue.
-        loop {
-            {
-                
-                let mut wq_locked = self.0.lock();
-                if let Some(ret) = condition(/* &wq_locked */) {
-                    return Ok(ret);
-                }
-                // This is only necessary because we're using a non-Set waitqueue collection that allows duplicates
-                if !wq_locked.contains(curr_task) {
-                    wq_locked.push_back(curr_task.clone());
-                } else {
-                    warn!("WaitQueue::wait_until():  task was already on waitqueue (potential spurious wakeup?). {:?}", curr_task);
-                }
-                // trace!("WaitQueue::wait_until():  putting task to sleep: {:?}\n    --> WQ: {:?}", curr_task, &*wq_locked);
-                curr_task.block();
-            }
-            scheduler::schedule();
-
-            // Here, we have been woken up, so loop back around and check the condition again
-            // trace!("WaitQueue::wait_until():  woke up!");
-        }
-    }
-
-    /// Similar to [`wait_until`](#method.wait_until), but this function accepts a `condition` closure
-    /// that can mutate its environment (a `FnMut`).
-    pub fn wait_until_mut<R>(&self, condition: &mut dyn FnMut(/* &VecDeque<TaskRef> */) -> Option<R>) -> Result<R, WaitError> {
-        let curr_task = task::get_my_current_task().ok_or(WaitError::NoCurrentTask)?;
-
-        // Do the following atomically:
-        // (1) Obtain the waitqueue lock
-        // (2) Add the current task to the waitqueue
-        // (3) Set the current task's runstate to `Blocked`
-        // (4) Release the lock on the waitqueue.
-        loop {
-            {
-                let mut wq_locked = self.0.lock();
-                if let Some(ret) = condition(/* &wq_locked */) {
-                    return Ok(ret);
-                }
-                // This is only necessary because we're using a non-Set waitqueue collection that allows duplicates
-                if !wq_locked.contains(curr_task) {
-                    wq_locked.push_back(curr_task.clone());
-                } else {
-                    warn!("WaitQueue::wait_until():  task was already on waitqueue (potential spurious wakeup?). {:?}", curr_task);
-                }
-                // trace!("WaitQueue::wait_until():  putting task to sleep: {:?}\n    --> WQ: {:?}", curr_task, &*wq_locked);
-                curr_task.block();
-            }
-            scheduler::schedule();
-            trace!("WaitQueue::wait_until_mut():  {:?} woken up", curr_task);
-            // Here, we have been woken up, so loop back around and check the condition again
-            // trace!("WaitQueue::wait_until():  woke up!");
-        }
-    }
-
-    /// Similar to [`wait_until`](#method.wait_until), but this function blocks until the given
-    /// `condition` closure returns `Result` of type `Ok(Some(value))`, or `Err` .
-    /// If a `value` is returned by closure then returns that `value` inside `Ok()`.
-    pub fn wait_until_ok<R>(&self, condition: &dyn Fn(/* &VecDeque<TaskRef> */) -> Result<Option<R>, ()>) -> Result<R, WaitError> {
+    // /// to allow the closure to examine the condition of the waitqueue if necessary
+    pub fn wait_until<R>(&self, condition: &dyn Fn(/* &VecDeque<TaskRef> */) -> Result<Option<R>, ()>) -> Result<R, WaitError> {
         let curr_task = task::get_my_current_task().ok_or(WaitError::NoCurrentTask)?;
 
         // Do the following atomically:
@@ -207,9 +142,9 @@ impl WaitQueue {
         }
     }
 
-    /// Similar to [`wait_until_ok`](#method.wait_until_ok), but this function accepts a `condition` closure
+    /// Similar to [`wait_until`](#method.wait_until), but this function accepts a `condition` closure
     /// that can mutate its environment (a `FnMut`).
-    pub fn wait_until_ok_mut<R>(&self, condition: &mut dyn FnMut(/* &VecDeque<TaskRef> */) -> Result<Option<R>,()>) -> Result<R, WaitError> {
+    pub fn wait_until_mut<R>(&self, condition: &mut dyn FnMut(/* &VecDeque<TaskRef> */) -> Result<Option<R>,()>) -> Result<R, WaitError> {
         let curr_task = task::get_my_current_task().ok_or(WaitError::NoCurrentTask)?;
 
         // Do the following atomically:

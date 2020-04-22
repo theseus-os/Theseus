@@ -169,7 +169,7 @@ impl<T: Send> Channel<T> {
         }
         // Slow path: add ourselves to the waitqueue
         // trace!("waiting to acquire sender slot...");
-        let res = self.waiting_senders.wait_until(&|| self.try_take_sender_slot());
+        let res = self.waiting_senders.wait_until(&|| Ok(self.try_take_sender_slot()));
         // trace!("... acquired sender slot!");
         res
     }
@@ -182,7 +182,7 @@ impl<T: Send> Channel<T> {
         }
         // Slow path: add ourselves to the waitqueue
         // trace!("waiting to acquire receiver slot...");
-        let res = self.waiting_receivers.wait_until(&|| self.try_take_receiver_slot());
+        let res = self.waiting_receivers.wait_until(&|| Ok(self.try_take_receiver_slot()));
         // trace!("... acquired receiver slot!");
         res
     }

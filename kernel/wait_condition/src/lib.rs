@@ -58,9 +58,9 @@ impl<F: Fn() -> bool> WaitCondition<F> {
         }
         self.wait_queue.wait_until(&|| {
             if (self.condition_fn)() {
-                Some(())
+                Ok(Some(()))
             } else {
-                None
+                Ok(None)
             }
         })
     }
