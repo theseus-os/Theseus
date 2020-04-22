@@ -46,12 +46,12 @@ impl Drop for WaitGuard {
 
 
 /// Errors that may occur while waiting on a waitqueue/condition/event.
-#[derive(Debug, PartialEq)]
+#[derive(Debug)]
 pub enum WaitError {
     NoCurrentTask,
     Interrupted,
     Timeout,
-    SpuriousWakeup
+    SpuriousWakeup,
 }
 
 /// A queue in which multiple `Task`s can wait for other `Task`s to notify them.
