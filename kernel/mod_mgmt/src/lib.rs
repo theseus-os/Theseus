@@ -21,6 +21,7 @@ extern crate fs_node;
 extern crate path;
 extern crate memfs;
 extern crate cstr_core;
+extern crate hashbrown;
 
 use core::{
     fmt,
@@ -47,6 +48,7 @@ use fs_node::{FileOrDir, File, FileRef, DirRef};
 use vfs_node::VFSDirectory;
 use path::Path;
 use memfs::MemFile;
+use hashbrown::HashMap;
 pub use crate_name_utils::{get_containing_crate_name, replace_containing_crate_name, crate_name_from_path};
 pub use crate_metadata::*;
 
@@ -1030,7 +1032,7 @@ impl CrateNamespace {
             crate_name:              crate_name.clone(),
             debug_symbols_file:      Arc::downgrade(&crate_object_file),
             object_file:             crate_object_file, 
-            sections:                BTreeMap::new(),
+            sections:                HashMap::new(),
             text_pages:              text_pages.clone(),
             rodata_pages:            rodata_pages.clone(),
             data_pages:              data_pages.clone(),
@@ -1041,7 +1043,7 @@ impl CrateNamespace {
         let new_crate_weak_ref = CowArc::downgrade(&new_crate);
         
         // this maps section header index (shndx) to LoadedSection
-        let mut loaded_sections: BTreeMap<Shndx, StrongSectionRef> = BTreeMap::new(); 
+        let mut loaded_sections: HashMap<Shndx, StrongSectionRef> = HashMap::new(); 
         // the set of Shndxes for .data and .bss sections
         let mut data_sections: BTreeSet<Shndx> = BTreeSet::new();
 
@@ -1382,7 +1384,8 @@ impl CrateNamespace {
         kernel_mmi_ref: &MmiRef,
         verbose_log: bool
     ) -> Result<(), &'static str> {
-        let new_crate = new_crate_ref.lock_as_ref();
+        let mut new_crate = new_crate_ref.lock_as_mut()
+            .ok_or("BUG: perform_relocations(): couldn't get exclusive mutable access to new_crate")?;
         if verbose_log { debug!("=========== moving on to the relocations for crate {} =========", new_crate.crate_name); }
         let symtab = find_symbol_table(&elf_file)?;
 
@@ -1532,8 +1535,8 @@ impl CrateNamespace {
         // here, we're done with handling all the relocations in this entire crate
 
 
-        // Finally, remap each section's mapped pages to the proper permission bits, 
-        // since we initially mapped them all as writable
+        // We need to remap each section's mapped pages with the proper permission bits, 
+        // since we initially mapped them all as writable.
         if let Some(ref tp) = new_crate.text_pages { 
             tp.0.lock().remap(&mut kernel_mmi_ref.lock().page_table, TEXT_SECTION_FLAGS)?;
         }
@@ -1541,6 +1544,22 @@ impl CrateNamespace {
             rp.0.lock().remap(&mut kernel_mmi_ref.lock().page_table, RODATA_SECTION_FLAGS)?;
         }
         // data/bss sections are already mapped properly, since they're supposed to be writable
+
+
+        // By default, we can safely remove the metadata for all private (non-global) .rodata sections
+        // that do not have any strong dependencies (its `sections_i_depend_on` list is empty).
+        // If you want all sections to be kept, e.g., for debugging, you can set the below cfg option.
+        #[cfg(not(keep_private_rodata))] 
+        {
+            new_crate.sections.retain(|_shndx, sec| {
+                let should_remove = !sec.global 
+                    && sec.get_type() == SectionType::Rodata
+                    && sec.inner.read().sections_i_depend_on.is_empty();
+                
+                // For an element to be removed, this closure should return `false`.
+                !should_remove
+            });
+        }
 
         Ok(())
     }
