@@ -204,7 +204,8 @@ fn more_pmcs_than_expected(num_pmc: u8) -> Result<bool, &'static str> {
 
 /// Initialization function that retrieves the version ID number of the PMU. Version ID of 0 means no 
 /// performance monitoring is available on the CPU (likely due to virtualization without hardware assistance).
-/// We initialize the 3 fixed PMCs and general purpose PMCs.
+/// We initialize the 3 fixed PMCs and general purpose PMCs. Calling this initialization function again
+/// on a core that has already been initialized will reset the counters to zero.
 /// 
 /// Currently we support a maximum core ID of 255, and up to 8 general purpose counters per core. 
 /// A core ID greater than 255 is not supported in Theseus in general since the ID has to fit within a u8.
@@ -218,9 +219,12 @@ fn more_pmcs_than_expected(num_pmc: u8) -> Result<bool, &'static str> {
 /// - Change the element type in the PMCS_AVAILABLE vector to be larger than AtomicU8 so that there is one bit per counter.
 /// - Update INIT_PMCS_AVAILABLE to the new maximum value for the per core bitmap.
 pub fn init() -> Result<(), &'static str> {
-    // pmu has already been initialized
+    // PMU has already been initialized on another core,
+    // so we only write to the pmu registers for the calling core and return.
+    // The rest of this function only has to be called once, and is executed on the first core that calls the init() function.
     if let Some(pmu_ver) = PMU_VERSION.try() {
-        trace!("PMU, version {}, has already been intitialized", pmu_ver);
+        unsafe { init_registers(); }
+        trace!("PMU, version {}, has already been intitialized on another core, now initializing on this core", pmu_ver);
         return Ok(());
     }
 
@@ -245,23 +249,8 @@ pub fn init() -> Result<(), &'static str> {
         }
 
         NUM_PMC.call_once(||num_pmc);
-        unsafe{
-            // disables all the performance counters
-            wrmsr(IA32_PERF_GLOBAL_CTRL, 0);
-            // clear the general purpose PMCs
-            wrmsr(IA32_PMC0, 0);
-            wrmsr(IA32_PMC1, 0);
-            wrmsr(IA32_PMC2, 0);
-            wrmsr(IA32_PMC3, 0);
-            // clear the fixed event counters
-            wrmsr(IA32_FIXED_CTR0, 0);
-            wrmsr(IA32_FIXED_CTR1, 0);
-            wrmsr(IA32_FIXED_CTR2, 0);
-            // sets fixed function counters to count events at all privilege levels
-            wrmsr(IA32_FIXED_CTR_CTRL, ENABLE_FIXED_COUNTERS_FOR_ALL_PRIVILEGE_LEVELS);
-            // enables all counters: each counter has another enable bit in other MSRs so these should likely never be cleared once first set
-            wrmsr(IA32_PERF_GLOBAL_CTRL, ENABLE_FIXED_PERFORMANCE_COUNTERS | ENABLE_GENERAL_PERFORMANCE_COUNTERS);
-        }
+
+        unsafe{ init_registers(); }
 
         // initialize the PMCS_AVAILABLE bitmap 
         let core_capacity = max_core_id()? as usize + 1;
@@ -276,6 +265,26 @@ pub fn init() -> Result<(), &'static str> {
     PMU_VERSION.call_once(||pmu_ver);
 
     Ok(())
+}
+
+/// Part of the initialization routine which actually does the work of setting up the registers.
+/// This must be called for every core that wants to use the PMU.
+unsafe fn init_registers() {
+    // disables all the performance counters
+    wrmsr(IA32_PERF_GLOBAL_CTRL, 0);
+    // clear the general purpose PMCs
+    wrmsr(IA32_PMC0, 0);
+    wrmsr(IA32_PMC1, 0);
+    wrmsr(IA32_PMC2, 0);
+    wrmsr(IA32_PMC3, 0);
+    // clear the fixed event counters
+    wrmsr(IA32_FIXED_CTR0, 0);
+    wrmsr(IA32_FIXED_CTR1, 0);
+    wrmsr(IA32_FIXED_CTR2, 0);
+    // sets fixed function counters to count events at all privilege levels
+    wrmsr(IA32_FIXED_CTR_CTRL, ENABLE_FIXED_COUNTERS_FOR_ALL_PRIVILEGE_LEVELS);
+    // enables all counters: each counter has another enable bit in other MSRs so these should likely never be cleared once first set
+    wrmsr(IA32_PERF_GLOBAL_CTRL, ENABLE_FIXED_PERFORMANCE_COUNTERS | ENABLE_GENERAL_PERFORMANCE_COUNTERS);
 }
 
 /// A logical counter object to correspond to a physical PMC
