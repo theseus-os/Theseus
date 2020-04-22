@@ -21,7 +21,7 @@ extern crate atomic;
 use core::sync::atomic::Ordering;
 use alloc::sync::Arc;
 use mpmc::Queue as MpmcQueue;
-use wait_queue::{WaitQueue,WaitError};
+use wait_queue::WaitQueue;
 use atomic::Atomic;
 
 
@@ -111,7 +111,7 @@ impl <T: Send> Sender<T> {
             let result = owned_msg.and_then(|m| match self.channel.queue.push(m) {
                 Ok(()) => {
                     // trace!("Sending in closure");
-                    Some(())
+                    Some(Ok(()))
                 },
                 Err(returned_msg) => {
                     // Here: we (the sender) woke up and failed to send, 
@@ -126,22 +126,29 @@ impl <T: Send> Sender<T> {
                  // trace!("Receiver Endpoint is dropped");
                  // Here the receiver end has dropped. 
                  // So we don't wait anymore in the waitqueue
-                 Err(())
+                 Some(Err(()))
             } else {
-                Ok(result)
+                result
             }
             
         };
 
-        let res = self.channel.waiting_senders
-            .wait_until_mut(&mut closure)
-            .map_err(|error| {
-                if error == WaitError::EndpointDropped {
-                    "Receiver Endpoint is dropped"
-                } else {
-                    "failed to add current task to queue of waiting senders waitqueue"
+        // When wait returns it can be either a successful send marked as  Ok(Ok()), 
+        // Error in condition marked as Ok(Er()),
+        // or the wait_until runs into error (Err()) 
+        let res =  match self.channel.waiting_senders
+            .wait_until_mut(&mut closure) {
+                Ok(result) => {
+                    match result {
+                        Ok(()) => Ok(()),
+                        Err(()) => Err("Receiver Endpoint is dropped"),
+                    }
+                },
+                Err(_) => {
+                    Err("failed to add current task to queue of waiting senders. Waitqueue returned unexpectedly")
                 }
-            });
+            };
+
         // trace!("... sending space became available.");
 
         // If we successfully sent a message, we need to notify any waiting receivers.
@@ -181,7 +188,7 @@ impl <T: Send> Receiver<T> {
     pub fn receive(&self) -> Result<T, &'static str>  {
         // trace!("async_channel: receive() entry");
         // Fast path: attempt to receive a message, assuming the buffer isn't empty
-        if let Some(msg) = self.try_receive_fast() {
+        if let Some(msg) = self.try_receive() {
             return Ok(msg);
         }
 
@@ -191,15 +198,21 @@ impl <T: Send> Receiver<T> {
         // This closure is invoked from within a locked context, so we cannot just call `try_receive()` here
         // because it will notify the receivers which can cause deadlock.
         // Therefore, we need to perform the nofity action outside of this closure after it returns.
-        let res = self.channel.waiting_receivers
-            .wait_until(&|| self.try_receive())
-            .map_err(|error| {
-                if error == WaitError::EndpointDropped {
-                    "Sender Endpoint is dropped"
-                } else {
-                    "failed to add current task to queue of waiting receivers waitqueue"
+        // When wait returns it can be either a successful receiver marked as  Ok(Ok()), 
+        // Error in wait condition marked as Ok(Er()),
+        // or the wait_until runs into error (Err()) 
+        let res =  match self.channel.waiting_receivers
+            .wait_until(&|| self.try_receive_check()) {
+                Ok(result) => {
+                    match result {
+                        Ok(msg) => Ok(msg),
+                        Err(()) => Err("Sender Endpoint is dropped"),
+                    }
+                },
+                Err(_) => {
+                    Err("failed to add current task to queue of waiting receivers. Waitqueue returned unexpectedly")
                 }
-            });
+            };
         // trace!("... received msg.");
 
         // If we successfully received a message, we need to notify any waiting senders.
@@ -214,7 +227,7 @@ impl <T: Send> Receiver<T> {
     /// Tries to receive a message, only succeeding if a message is already available in the buffer.
     /// 
     /// If no such message exists, it returns `None` without blocking.
-    pub fn try_receive_fast(&self) -> Option<T> {
+    pub fn try_receive(&self) -> Option<T> {
         let msg = self.channel.queue.pop();
         if msg.is_some() {
             // trace!("successful try_receive_fast() is notifying senders.");
@@ -227,19 +240,19 @@ impl <T: Send> Receiver<T> {
 
     /// Tries to receive a message, only succeeding if a message is already available in the buffer.
     /// 
-    /// If an endpoint is disconnected returns Err().
-    /// If no such message exists, it returns `Ok(None)` without blocking.
-    pub fn try_receive(&self) -> Result<Option<T>,()> {
+    /// If an endpoint is disconnected returns Some(Err()).
+    /// If no such message exists, it returns `None` without blocking.
+    fn try_receive_check(&self) -> Option<Result<T, ()>> {
         let msg = self.channel.queue.pop();
         if msg.is_some() {
             // trace!("successful try_receive() is notifying senders.");
             self.channel.waiting_senders.notify_one();
-            Ok(msg)
+            Some(Ok(msg.unwrap()))
         } else {
             if self.channel.channel_status.load(Ordering::SeqCst) == ChannelStatus::Disconnected {
-                return Err(())
+                return Some(Err(()))
             }
-            Ok(None)
+            None
         }
     }
 }

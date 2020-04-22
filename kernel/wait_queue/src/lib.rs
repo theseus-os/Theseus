@@ -51,8 +51,7 @@ pub enum WaitError {
     NoCurrentTask,
     Interrupted,
     Timeout,
-    SpuriousWakeup,
-    EndpointDropped
+    SpuriousWakeup
 }
 
 /// A queue in which multiple `Task`s can wait for other `Task`s to notify them.
@@ -95,12 +94,11 @@ impl WaitQueue {
     /// 
     /// This function blocks until the `Task` is woken up through the notify mechanism.
     pub fn wait(&self) -> Result<(), WaitError> {
-        self.wait_until(&|/* _ */| Ok(Some(())))
+        self.wait_until(&|/* _ */| Some(()))
     }
 
     /// Similar to [`wait`](#method.wait), but this function blocks until the given
-    /// `condition` closure returns `Ok(Some(value))`, or Err(). 
-    /// If so respectively it returns `value` inside `Ok()`. or Err()
+    /// `condition` closure returns `Some(value)`, and then returns that `value` inside `Ok()`.
     /// 
     /// The `condition` will be executed atomically with respect to the wait queue,
     /// which avoids the problem of a waiting task missing a "notify" from another task
@@ -108,8 +106,8 @@ impl WaitQueue {
     /// when the wait queue lock is not held. 
     /// 
     // /// The `condition` closure is invoked with one argument, an immutable reference to the waitqueue, 
-    // /// to allow the closure to examine the condition of the waitqueue if necessary
-    pub fn wait_until<R>(&self, condition: &dyn Fn(/* &VecDeque<TaskRef> */) -> Result<Option<R>, ()>) -> Result<R, WaitError> {
+    // /// to allow the closure to examine the condition of the waitqueue if necessary. 
+    pub fn wait_until<R>(&self, condition: &dyn Fn(/* &VecDeque<TaskRef> */) -> Option<R>) -> Result<R, WaitError> {
         let curr_task = task::get_my_current_task().ok_or(WaitError::NoCurrentTask)?;
 
         // Do the following atomically:
@@ -119,13 +117,9 @@ impl WaitQueue {
         // (4) Release the lock on the waitqueue.
         loop {
             {
-                
                 let mut wq_locked = self.0.lock();
-                let result = condition();
-                if let Ok(Some(ret)) = result {
+                if let Some(ret) = condition(/* &wq_locked */) {
                     return Ok(ret);
-                } else if let Err(()) = result {
-                    return Err(WaitError::EndpointDropped);
                 }
                 // This is only necessary because we're using a non-Set waitqueue collection that allows duplicates
                 if !wq_locked.contains(curr_task) {
@@ -137,6 +131,7 @@ impl WaitQueue {
                 curr_task.block();
             }
             scheduler::schedule();
+
             // Here, we have been woken up, so loop back around and check the condition again
             // trace!("WaitQueue::wait_until():  woke up!");
         }
@@ -144,7 +139,7 @@ impl WaitQueue {
 
     /// Similar to [`wait_until`](#method.wait_until), but this function accepts a `condition` closure
     /// that can mutate its environment (a `FnMut`).
-    pub fn wait_until_mut<R>(&self, condition: &mut dyn FnMut(/* &VecDeque<TaskRef> */) -> Result<Option<R>,()>) -> Result<R, WaitError> {
+    pub fn wait_until_mut<R>(&self, condition: &mut dyn FnMut(/* &VecDeque<TaskRef> */) -> Option<R>) -> Result<R, WaitError> {
         let curr_task = task::get_my_current_task().ok_or(WaitError::NoCurrentTask)?;
 
         // Do the following atomically:
@@ -155,13 +150,9 @@ impl WaitQueue {
         loop {
             {
                 let mut wq_locked = self.0.lock();
-                let result = condition();
-                if let Ok(Some(ret)) = result {
+                if let Some(ret) = condition(/* &wq_locked */) {
                     return Ok(ret);
-                } else if let Err(()) = result {
-                    return Err(WaitError::EndpointDropped);
                 }
-
                 // This is only necessary because we're using a non-Set waitqueue collection that allows duplicates
                 if !wq_locked.contains(curr_task) {
                     wq_locked.push_back(curr_task.clone());
@@ -172,6 +163,7 @@ impl WaitQueue {
                 curr_task.block();
             }
             scheduler::schedule();
+
             // Here, we have been woken up, so loop back around and check the condition again
             // trace!("WaitQueue::wait_until():  woke up!");
         }
