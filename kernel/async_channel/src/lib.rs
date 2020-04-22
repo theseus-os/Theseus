@@ -238,10 +238,10 @@ impl <T: Send> Receiver<T> {
         }
     }
 
-    /// Tries to receive a message, only succeeding if a message is already available in the buffer.
-    /// 
-    /// If an endpoint is disconnected returns Some(Err()).
-    /// If no such message exists, it returns `None` without blocking.
+    /// Similar to try_receive but checks whether endpoint is disconnected. 
+    /// If receive succeeds returns Some(Ok(T)). 
+    /// If an endpoint is disconnected returns Some(Err()). 
+    /// If no such message exists, it returns `None`. 
     fn try_receive_check(&self) -> Option<Result<T, ()>> {
         let msg = self.channel.queue.pop();
         if msg.is_some() {
