@@ -91,11 +91,8 @@ use core::sync::atomic::{Ordering, AtomicU64, AtomicU8};
 
 pub mod stat;
 
-/// PMU version supported by the current hardware
-static PMU_VERSION: Once<u8> = Once::new();
-/// The number of general purpose PMCs that can be used. This should eventually be taken from the CPUID.
-static NUM_PMC: AtomicU8 = AtomicU8::new(0);
-
+/// The minimum version ID a PMU can have, as retrieved by cpuid. Anything lower than this means a PMU is not supported.
+const MIN_PMU_VERSION: u8 = 1;
 /// Set bits in the global_ctrl MSR to enable the fixed counters.
 const ENABLE_FIXED_PERFORMANCE_COUNTERS: u64 = 0x7 << 32;
 /// Set bits in the global_ctrl MSR to enable the general purpose PMCs.
@@ -134,6 +131,12 @@ static CORES_SAMPLING: [AtomicU64; WORDS_IN_BITMAP] = [AtomicU64::new(0), Atomic
 static RESULTS_READY: [AtomicU64; WORDS_IN_BITMAP] = [AtomicU64::new(0), AtomicU64::new(0), AtomicU64::new(0), AtomicU64::new(0)];
 
 lazy_static!{
+    /// PMU version supported by the current hardware
+    static ref PMU_VERSION: u8 = { CpuId::new().get_performance_monitoring_info().expect("pmu_x86: Could not get performance monitoring info from CPUID").version_id() };
+    /// The number of general purpose PMCs that can be used. 
+    static ref NUM_PMC: u8 = { CpuId::new().get_performance_monitoring_info().expect("pmu_x86: Could not get performance monitoring info from CPUID").number_of_counters() };
+    /// The number of fixed function counters. 
+    static ref NUM_FIXED_FUNC_COUNTERS: u8 = { CpuId::new().get_performance_monitoring_info().expect("pmu_x86: Could not get performance monitoring info from CPUID").fixed_function_counters() };
     /// Set to store the cores that the PMU has already been initialized on
     static ref CORES_INITIALIZED: MutexIrqSafe<BTreeSet<u8>> = MutexIrqSafe::new(BTreeSet::new());
     /// The sampling information for each core
@@ -172,7 +175,7 @@ pub enum EventType{
 }
 
 fn num_general_purpose_counters() -> u8 {
-    NUM_PMC.load(Ordering::SeqCst)
+    *NUM_PMC
 }
 
 fn get_pmcs_available() -> Result<&'static Vec<AtomicU8>, &'static str>{
@@ -203,8 +206,7 @@ fn more_pmcs_than_expected(num_pmc: u8) -> Result<bool, &'static str> {
 }
 
 
-/// Initialization function that retrieves the version ID number of the PMU. Version ID of 0 means no 
-/// performance monitoring is available on the CPU (likely due to virtualization without hardware assistance).
+/// Initialization function that enables the PMU if one is available.
 /// We initialize the 3 fixed PMCs and general purpose PMCs. Calling this initialization function again
 /// on a core that has already been initialized will do nothing.
 /// 
@@ -228,28 +230,17 @@ pub fn init() -> Result<(), &'static str> {
         return Ok(());
     } 
     else {
-        if PMU_VERSION.try().is_none() {
-            const MIN_PMU_VERSION: u8 = 1;
-            let cpuid = CpuId::new();
 
-            let perf_mon_info = cpuid.get_performance_monitoring_info().ok_or("pmu_x86::init: Could not get perfromance moritoring info from CPUID")?;
+        if *PMU_VERSION >= MIN_PMU_VERSION {
+                
+            if greater_core_id_than_expected()? {
+                return Err("pmu_x86: There are larger core ids in this machine than can be handled by the existing structures which store information about the PMU");
+            }
 
-            // find the PMU version. There is other information provided by the cpuid but we do not retrieve it because we implement just version 2.
-            let pmu_ver = perf_mon_info.version_id();
-            let num_pmc = perf_mon_info.number_of_counters();
-
-            if pmu_ver >= MIN_PMU_VERSION {
-                    
-                if greater_core_id_than_expected()? {
-                    return Err("pmu_x86: There are larger core ids in this machine than can be handled by the existing structures which store information about the PMU");
-                }
-
-                if more_pmcs_than_expected(num_pmc)? {
-                    return Err("pmu_x86: There are more general purpose PMCs in this machine than can be handled by the existing structures which store information about the PMU");
-                }
-
-                NUM_PMC.store(num_pmc, Ordering::SeqCst);
-
+            if more_pmcs_than_expected(*NUM_PMC)? {
+                return Err("pmu_x86: There are more general purpose PMCs in this machine than can be handled by the existing structures which store information about the PMU");
+            }
+            if PMCS_AVAILABLE.try().is_none() {
                 // initialize the PMCS_AVAILABLE bitmap 
                 let core_capacity = max_core_id()? as usize + 1;
                 let mut pmcs_available = Vec::with_capacity(core_capacity);
@@ -258,13 +249,12 @@ pub fn init() -> Result<(), &'static str> {
                 } 
 
                 PMCS_AVAILABLE.call_once(|| pmcs_available);
-                PMU_VERSION.call_once(||pmu_ver);
-                trace!("PMU version: {} with fixed counters: {} and general counters: {}", perf_mon_info.version_id(), perf_mon_info.fixed_function_counters(), perf_mon_info.number_of_counters());
+                trace!("PMU initialized for the first time: version: {} with fixed counters: {} and general counters: {}", *PMU_VERSION, *NUM_FIXED_FUNC_COUNTERS, *NUM_PMC);
             }
-            else {
-                error!("This machine does not support a PMU");
-                return Err("This machine does not support a PMU");
-            }
+        }
+        else {
+            error!("This machine does not support a PMU");
+            return Err("This machine does not support a PMU");
         }
         
         init_registers();
@@ -582,9 +572,14 @@ fn create_fixed_counter(msr_mask: u32) -> Result<Counter, &'static str> {
 fn check_pmu_availability() -> Result<(), &'static str>  {
     let core_id = apic::get_my_apic_id();
     if !CORES_INITIALIZED.lock().contains(&core_id) {
-        let version = PMU_VERSION.try().ok_or("PMU hasn't been initialized")?; 
-        error!("PMU {} is available. It still needs to be initialized on this core", version);
-        return Err("PMU is available. It still needs to be initialized on this core");
+        if *PMU_VERSION >= MIN_PMU_VERSION {
+            error!("PMU version {} is available. It still needs to be initialized on this core", *PMU_VERSION);
+            return Err("PMU is available. It still needs to be initialized on this core");
+        }
+        else {
+            error!("This machine does not support a PMU");
+            return Err("This machine does not support a PMU");
+        }
     }
 
     Ok(())
