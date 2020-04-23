@@ -61,11 +61,17 @@ pub enum ChannelStatus {
     Disconnected,
 }
 
+/// Error type for tracking different type of errors sender and receiver 
+/// can encounter.
 #[derive(Clone, Copy, PartialEq, Debug)]
 pub enum ChannelError {
+    /// Occurs when `try_receive` is performed on an empty channel
     ChannelEmpty,
+    /// Occurs when `try_send` is performed on a full channel
     ChannelFull,
+    /// Occurs when one end of channel is dropped
     ChannelDisconnected,
+    /// Occurs when an error occur in `WaitQueue`
     WaitError
 }
 
@@ -97,7 +103,9 @@ impl <T: Send> Sender<T> {
         // trace!("async_channel: send() entry");
         // Fast path: attempt to send the message, assuming the buffer isn't full
         let msg = match self.try_send(msg) {
+            // if successful return ok
             Ok(()) => return Ok(()),
+            // if unsunccessful check whether it fails due to any other reason than channel being full
             Err((returned_msg, channel_error)) => {
                 if channel_error != ChannelError::ChannelFull {
                     return Err(channel_error);
@@ -107,6 +115,7 @@ impl <T: Send> Sender<T> {
         };
 
         // Slow path: the buffer was full, so now we need to block until space becomes available.
+        // The code can move to this point only if fast path failed due to channel being full
         // trace!("waiting for space to send...");
 
         // Here we use an option to store the un-sent message outside of the `closure`
@@ -122,6 +131,7 @@ impl <T: Send> Sender<T> {
             let result = owned_msg.and_then(|m| match self.channel.queue.push(m) {
                 Ok(()) => {
                     // trace!("Sending in closure");
+                    // We wrap the result in Some() since `wait_until` progresses only when `Some` is returned.
                     Some(Ok(()))
                 },
                 Err(returned_msg) => {
@@ -145,7 +155,7 @@ impl <T: Send> Sender<T> {
         };
 
         // When `wait_until_mut` returns it can be either a successful send marked as  Ok(Ok()), 
-        // Error in the condition (channel disconnection) marked as Ok(Er()),
+        // Error in the condition (channel disconnection) marked as Ok(Err()),
         // or the wait_until runs into error (Err()) 
         let res =  match self.channel.waiting_senders.wait_until_mut(&mut closure) {
             Ok(Ok(())) => Ok(()),
@@ -166,7 +176,7 @@ impl <T: Send> Sender<T> {
 
     /// Tries to send the message, only succeeding if buffer space is available.
     /// 
-    /// If no buffer space is available, it returns the `msg`  with `ChannelStatus` back to the caller without blocking. 
+    /// If no buffer space is available, it returns the `msg`  with `ChannelError` back to the caller without blocking. 
     pub fn try_send(&self, msg: T) -> Result<(), (T, ChannelError)> {
         // first we'll check whether the channel is active
         if self.channel.channel_status.load(Ordering::SeqCst) == ChannelStatus::Disconnected {
@@ -197,6 +207,8 @@ impl <T: Send> Receiver<T> {
     pub fn receive(&self) -> Result<T, ChannelError> {
         // trace!("async_channel: receive() entry");
         // Fast path: attempt to receive a message, assuming the buffer isn't empty
+        // The code progresses beyond this match only if try_receive failed due to
+        // empty channel
         match self.try_receive() {
             Err(ChannelError::ChannelEmpty) => {},
             x => return x,
@@ -207,18 +219,26 @@ impl <T: Send> Receiver<T> {
         
         // This closure is invoked from within a locked context, so we cannot just call `try_receive()` here
         // because it will notify the receivers which can cause deadlock.
-        // Therefore, we need to perform the nofity action outside of this closure after it returns.
-        // When wait returns it can be either a successful receiver marked as  Ok(Ok()), 
-        // Error in wait condition marked as Ok(Er()),
-        // or the wait_until runs into error (Err()) 
-
+        // Therefore, we need to perform the nofity action outside of this closure after it returns
+        // Closure would output the message if received or an error if channel is disconnected.
+        // It would output `None` if neither happens, resulting in waiting in the queue. 
         let closure = || {
-            match self.try_receive() {
-                Err(ChannelError::ChannelEmpty) => None,
-                x => Some(x),
+            let msg = self.channel.queue.pop();
+            if msg.is_some() {
+                // trace!("successful try_receive() is notifying senders.");
+                msg
+            } else {
+                if self.channel.channel_status.load(Ordering::SeqCst) == ChannelStatus::Disconnected {
+                    Some(Err(ChannelError::ChannelDisconnected))
+                } else {
+                    None
+                }
             }
         };
 
+        // When wait returns it can be either a successful receiver marked as  Ok(Ok(msg)), 
+        // Error in wait condition marked as Ok(Err(error)),
+        // or the wait_until runs into error (Err()) 
         let res =  match self.channel.waiting_receivers.wait_until(& closure) {
             Ok(Ok(x)) => Ok(x),
             Ok(Err(error)) => Err(error),
@@ -262,7 +282,7 @@ impl <T: Send> Receiver<T> {
 impl<T: Send> Drop for Receiver<T> {
     fn drop(&mut self) {
         // trace!("Dropping the receiver");
-        self.channel.channel_status.store(ChannelStatus::Disconnected, Ordering::Release);
+        self.channel.channel_status.store(ChannelStatus::Disconnected, Ordering::SeqCst);
         self.channel.waiting_senders.notify_one();
     }
 }
@@ -271,7 +291,7 @@ impl<T: Send> Drop for Receiver<T> {
 impl<T: Send> Drop for Sender<T> {
     fn drop(&mut self) {
         // trace!("Dropping the sender");
-        self.channel.channel_status.store(ChannelStatus::Disconnected, Ordering::Release);
+        self.channel.channel_status.store(ChannelStatus::Disconnected, Ordering::SeqCst);
         self.channel.waiting_receivers.notify_one();
     }
 }
