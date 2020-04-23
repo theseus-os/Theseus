@@ -206,8 +206,8 @@ fn rendezvous_test_multiple(send_count: usize, receive_count: usize) -> Result<(
     warn!("rendezvous_test_multiple(): Finished spawning the sender and receiver tasks");
     t2.unblock(); t1.unblock();
 
-    t2.join()?;
     t1.join()?;
+    t2.join()?;
     warn!("rendezvous_test_multiple(): Joined the sender and receiver tasks.");
     
     Ok(())
@@ -303,8 +303,8 @@ fn asynchronous_test_multiple(send_count: usize, receive_count: usize) -> Result
     warn!("asynchronous_test_multiple(): Finished spawning the sender and receiver tasks");
     t2.unblock(); t1.unblock();
 
-    t2.join()?;
     t1.join()?;
+    t2.join()?;
     warn!("asynchronous_test_multiple(): Joined the sender and receiver tasks.");
     
     Ok(())

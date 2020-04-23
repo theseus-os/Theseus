@@ -72,9 +72,7 @@ struct Channel<T: Send> {
     queue: MpmcQueue<T>,
     waiting_senders: WaitQueue,
     waiting_receivers: WaitQueue,
-
-    /// `channel_status` indicates whether one end has been dropped. So that other end can respond.
-    channel_status : Atomic<ChannelStatus>
+    channel_status: Atomic<ChannelStatus>
 }
 
 
@@ -139,7 +137,7 @@ impl <T: Send> Sender<T> {
         };
 
         // When wait returns it can be either a successful send marked as  Ok(Ok()), 
-        // Error in condition marked as Ok(Er()),
+        // Error in the condition (channel disconnection) marked as Ok(Er()),
         // or the wait_until runs into error (Err()) 
         let res =  match self.channel.waiting_senders
             .wait_until_mut(&mut closure) {
@@ -207,17 +205,6 @@ impl <T: Send> Receiver<T> {
             },
             _ => {},
         };
-        //             match result {
-        //                 Ok(()) => Ok(()),
-        //                 Err(()) => Err("Receiver Endpoint is dropped"),
-        //             }
-        //         },
-        //         Err(_) => {
-        //             Err("failed to add current task to queue of waiting senders. Waitqueue returned unexpectedly")
-        //         }
-        // if let Some(msg) = self.try_receive_check() {
-        //     return Ok(msg);
-        // }
 
         // Slow path: the buffer was empty, so we need to block until a message is sent.
         // trace!("waiting to receive a message...");
