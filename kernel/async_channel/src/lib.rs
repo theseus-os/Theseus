@@ -61,6 +61,14 @@ pub enum ChannelStatus {
     Disconnected,
 }
 
+#[derive(Clone, Copy, PartialEq, Debug)]
+pub enum ChannelError {
+    ChannelEmpty,
+    ChannelFull,
+    ChannelDisconnected,
+    WaitError
+}
+
 /// The inner channel for asynchronous communication between `Sender`s and `Receiver`s.
 ///
 /// This struct is effectively a wrapper around a MPMC queue 
@@ -85,14 +93,14 @@ impl <T: Send> Sender<T> {
     /// 
     /// Returns `Ok(())` if the message was sent and received successfully,
     /// otherwise returns an error. 
-    pub fn send(&self, msg: T) -> Result<(), &'static str> {
+    pub fn send(&self, msg: T) -> Result<(), ChannelError> {
         // trace!("async_channel: send() entry");
         // Fast path: attempt to send the message, assuming the buffer isn't full
         let msg = match self.try_send(msg) {
             Ok(()) => return Ok(()),
-            Err((returned_msg, channel_status)) => {
-                if channel_status == ChannelStatus::Disconnected {
-                    return Err("Receiver Endpoint is dropped");
+            Err((returned_msg, channel_error)) => {
+                if channel_error != ChannelError::ChannelFull {
+                    return Err(channel_error);
                 }
                 returned_msg
             },
@@ -129,28 +137,21 @@ impl <T: Send> Sender<T> {
                  // trace!("Receiver Endpoint is dropped");
                  // Here the receiver end has dropped. 
                  // So we don't wait anymore in the waitqueue
-                 Some(Err(()))
+                 Some(Err(ChannelError::ChannelDisconnected))
             } else {
                 result
             }
             
         };
 
-        // When wait returns it can be either a successful send marked as  Ok(Ok()), 
+        // When `wait_until_mut` returns it can be either a successful send marked as  Ok(Ok()), 
         // Error in the condition (channel disconnection) marked as Ok(Er()),
         // or the wait_until runs into error (Err()) 
-        let res =  match self.channel.waiting_senders
-            .wait_until_mut(&mut closure) {
-                Ok(result) => {
-                    match result {
-                        Ok(()) => Ok(()),
-                        Err(()) => Err("Receiver Endpoint is dropped"),
-                    }
-                },
-                Err(_) => {
-                    Err("failed to add current task to queue of waiting senders. Waitqueue returned unexpectedly")
-                }
-            };
+        let res =  match self.channel.waiting_senders.wait_until_mut(&mut closure) {
+            Ok(Ok(())) => Ok(()),
+            Ok(Err(error)) => Err(error),
+            Err(_) => Err(ChannelError::WaitError),
+        };
 
         // trace!("... sending space became available.");
 
@@ -166,10 +167,10 @@ impl <T: Send> Sender<T> {
     /// Tries to send the message, only succeeding if buffer space is available.
     /// 
     /// If no buffer space is available, it returns the `msg`  with `ChannelStatus` back to the caller without blocking. 
-    pub fn try_send(&self, msg: T) -> Result<(), (T, ChannelStatus)> {
+    pub fn try_send(&self, msg: T) -> Result<(), (T, ChannelError)> {
         // first we'll check whether the channel is active
         if self.channel.channel_status.load(Ordering::SeqCst) == ChannelStatus::Disconnected {
-                return Err((msg, ChannelStatus::Disconnected));
+                return Err((msg, ChannelError::ChannelDisconnected));
         }
 
         match self.channel.queue.push(msg) {
@@ -180,7 +181,7 @@ impl <T: Send> Sender<T> {
                 Ok(())
             }
             // queue was full, return message back to caller
-            Err(returned_msg) => Err((returned_msg, ChannelStatus::Connected)),
+            Err(returned_msg) => Err((returned_msg, ChannelError::ChannelFull)),
         }
     }
 }
@@ -193,17 +194,12 @@ impl <T: Send> Receiver<T> {
     /// Receive a message, blocking until a message is available in the buffer.
     /// 
     /// Returns the message if it was received properly, otherwise returns an error.
-    pub fn receive(&self) -> Result<T, &'static str> {
+    pub fn receive(&self) -> Result<T, ChannelError> {
         // trace!("async_channel: receive() entry");
         // Fast path: attempt to receive a message, assuming the buffer isn't empty
         match self.try_receive() {
-            Some(Ok(msg)) => {
-                return Ok(msg);
-            },
-            Some(Err(_)) => {
-                return Err("Sender Endpoint is dropped");
-            },
-            _ => {},
+            Err(ChannelError::ChannelEmpty) => {},
+            x => return x,
         };
 
         // Slow path: the buffer was empty, so we need to block until a message is sent.
@@ -215,18 +211,20 @@ impl <T: Send> Receiver<T> {
         // When wait returns it can be either a successful receiver marked as  Ok(Ok()), 
         // Error in wait condition marked as Ok(Er()),
         // or the wait_until runs into error (Err()) 
-        let res =  match self.channel.waiting_receivers
-            .wait_until(&|| self.try_receive()) {
-                Ok(result) => {
-                    match result {
-                        Ok(msg) => Ok(msg),
-                        Err(_) => Err("Sender Endpoint is dropped"),
-                    }
-                },
-                Err(_) => {
-                    Err("failed to add current task to queue of waiting receivers. Waitqueue returned unexpectedly")
-                }
-            };
+
+        let closure = || {
+            match self.try_receive() {
+                Err(ChannelError::ChannelEmpty) => None,
+                x => Some(x),
+            }
+        };
+
+        let res =  match self.channel.waiting_receivers.wait_until(& closure) {
+            Ok(Ok(x)) => Ok(x),
+            Ok(Err(error)) => Err(error),
+            Err(_) => Err(ChannelError::WaitError),
+        };
+
         // trace!("... received msg.");
 
         // If we successfully received a message, we need to notify any waiting senders.
@@ -243,17 +241,18 @@ impl <T: Send> Receiver<T> {
     /// If receive succeeds returns `Some(Ok(T))`. 
     /// If an endpoint is disconnected returns `Some(Err(ChannelStatus::Disconnected))`. 
     /// If no such message exists, it returns `None` without blocking
-    pub fn try_receive(&self) -> Option<Result<T, ChannelStatus>> {
+    pub fn try_receive(&self) -> Result<T, ChannelError> {
         let msg = self.channel.queue.pop();
         if msg.is_some() {
             // trace!("successful try_receive() is notifying senders.");
             self.channel.waiting_senders.notify_one();
-            Some(Ok(msg.unwrap()))
+            Ok(msg.unwrap())
         } else {
             if self.channel.channel_status.load(Ordering::SeqCst) == ChannelStatus::Disconnected {
-                return Some(Err(ChannelStatus::Disconnected))
+                Err(ChannelError::ChannelDisconnected)
+            } else {
+                Err(ChannelError::ChannelEmpty)
             }
-            None
         }
     }
 }

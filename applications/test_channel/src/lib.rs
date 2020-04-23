@@ -254,7 +254,10 @@ fn asynchronous_test_oneshot() -> Result<(), &'static str> {
 
     let t1 = spawn::new_task_builder(|_: ()| -> Result<(), &'static str> {
         warn!("asynchronous_test_oneshot(): Entered sender task!");
-        sender.send("hello")?;
+        sender.send("hello").map_err(|error| {
+            warn!("Sender task failed due to : {:?}", error);
+            return "Sender task failed";
+        })?;
         Ok(())
     }, ())
         .name(String::from("sender_task_asynchronous_oneshot"))
@@ -263,7 +266,10 @@ fn asynchronous_test_oneshot() -> Result<(), &'static str> {
 
     let t2 = spawn::new_task_builder(|_: ()| -> Result<(), &'static str> {
         warn!("asynchronous_test_oneshot(): Entered receiver task!");
-        let msg = receiver.receive()?;
+        let msg = receiver.receive().map_err(|error| {
+            warn!("Receiver task failed due to : {:?}", error);
+            return "Receiver task failed"
+        })?;
         warn!("asynchronous_test_oneshot(): Receiver got msg: {:?}", msg);
         Ok(())
     }, ())
@@ -316,8 +322,8 @@ fn asynchronous_receiver_task ((receiver, iterations): (async_channel::Receiver<
 
     for i in 0..iterations {
         let msg = receiver.receive().map_err(|error| {
-            warn!("Receiver task returned error : {}", error);
-            return error;
+            warn!("Receiver task failed due to : {:?}", error);
+            return "Receiver task failed"
         })?;
         warn!("asynchronous_test(): Receiver got {:?}  ({:03})", msg, i);
     }
@@ -332,8 +338,8 @@ fn asynchronous_sender_task ((sender, iterations): (async_channel::Sender<String
 
     for i in 0..iterations {
         sender.send(format!("Message {:03}", i)).map_err(|error| {
-            warn!("Sender task returned error : {}", error);
-            return error;
+            warn!("Sender task failed due to : {:?}", error);
+            return "Sender task failed";
         })?;
         warn!("asynchronous_test(): Sender sent message {:03}", i);
     }
