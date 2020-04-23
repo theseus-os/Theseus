@@ -52,12 +52,12 @@ pub fn new_channel<T: Send>(minimum_capacity: usize) -> (Sender<T>, Receiver<T>)
     )
 }
 
-/// Possible values for a channel Endpoint.
-/// Active : Initially channel is created with Active status.
-/// Dropped : Set to dropped when one end is dropped.
+/// Indicates whether channel is Connected or Disconnected
 #[derive(Clone, Copy, PartialEq, Debug)]
 pub enum ChannelStatus {
+    /// Channel is working. Initially channel is created with Connected status.
     Connected,
+    /// Set to Disconnected when one end is dropped.
     Disconnected,
 }
 
@@ -167,7 +167,7 @@ impl <T: Send> Sender<T> {
 
     /// Tries to send the message, only succeeding if buffer space is available.
     /// 
-    /// If no buffer space is available, it returns the `msg` back to the caller without blocking. 
+    /// If no buffer space is available, it returns the `msg`  with `ChannelStatus` back to the caller without blocking. 
     pub fn try_send(&self, msg: T) -> Result<(), (T, ChannelStatus)> {
         // first we'll check whether the channel is active
         if self.channel.channel_status.load(Ordering::SeqCst) == ChannelStatus::Disconnected {
@@ -233,7 +233,7 @@ impl <T: Send> Receiver<T> {
                 Ok(result) => {
                     match result {
                         Ok(msg) => Ok(msg),
-                        Err(()) => Err("Sender Endpoint is dropped"),
+                        Err(_) => Err("Sender Endpoint is dropped"),
                     }
                 },
                 Err(_) => {
@@ -253,10 +253,10 @@ impl <T: Send> Receiver<T> {
 
     /// Tries to receive a message, only succeeding if a message is already available in the buffer.
     /// 
-    /// If receive succeeds returns Some(Ok(T)). 
-    /// If an endpoint is disconnected returns Some(Err()). 
-    /// If no such message exists, it returns `None`without blocking
-    fn try_receive(&self) -> Option<Result<T, ()>> {
+    /// If receive succeeds returns `Some(Ok(T))`. 
+    /// If an endpoint is disconnected returns `Some(Err(ChannelStatus::Disconnected))`. 
+    /// If no such message exists, it returns `None` without blocking
+    pub fn try_receive(&self) -> Option<Result<T, ChannelStatus>> {
         let msg = self.channel.queue.pop();
         if msg.is_some() {
             // trace!("successful try_receive() is notifying senders.");
@@ -264,7 +264,7 @@ impl <T: Send> Receiver<T> {
             Some(Ok(msg.unwrap()))
         } else {
             if self.channel.channel_status.load(Ordering::SeqCst) == ChannelStatus::Disconnected {
-                return Some(Err(()))
+                return Some(Err(ChannelStatus::Disconnected))
             }
             None
         }
