@@ -223,16 +223,15 @@ impl <T: Send> Receiver<T> {
         // Closure would output the message if received or an error if channel is disconnected.
         // It would output `None` if neither happens, resulting in waiting in the queue. 
         let closure = || {
-            let msg = self.channel.queue.pop();
-            if msg.is_some() {
-                // trace!("successful try_receive() is notifying senders.");
-                msg
-            } else {
-                if self.channel.channel_status.load(Ordering::SeqCst) == ChannelStatus::Disconnected {
-                    Some(Err(ChannelError::ChannelDisconnected))
-                } else {
-                    None
-                }
+            match self.channel.queue.pop() {
+                Some(msg) => Some(Ok(msg)),
+                _ => {
+                    if self.channel.channel_status.load(Ordering::SeqCst) == ChannelStatus::Disconnected {
+                        Some(Err(ChannelError::ChannelDisconnected))
+                    } else {
+                        None
+                    }
+                },
             }
         };
 
