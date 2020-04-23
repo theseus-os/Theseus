@@ -94,7 +94,7 @@ pub mod stat;
 /// PMU version supported by the current hardware
 static PMU_VERSION: Once<u8> = Once::new();
 /// The number of general purpose PMCs that can be used. This should eventually be taken from the CPUID.
-static NUM_PMC: Once<u8> = Once::new();
+static NUM_PMC: AtomicU8 = AtomicU8::new(0);
 
 /// Set bits in the global_ctrl MSR to enable the fixed counters.
 const ENABLE_FIXED_PERFORMANCE_COUNTERS: u64 = 0x7 << 32;
@@ -171,9 +171,8 @@ pub enum EventType{
     BranchMissesRetired = (0x03 << 16) | (0x00 << 8) | 0xC5,
 }
 
-fn num_general_purpose_counters() -> Result<u8, &'static str>{
-    let num_pmc = NUM_PMC.try().ok_or("pmu_x86: The pmu hasn't been initialized with the number of counters")?;
-    Ok(*num_pmc)
+fn num_general_purpose_counters() -> u8 {
+    NUM_PMC.load(Ordering::SeqCst)
 }
 
 fn get_pmcs_available() -> Result<&'static Vec<AtomicU8>, &'static str>{
@@ -225,7 +224,7 @@ pub fn init() -> Result<(), &'static str> {
     let core_id = apic::get_my_apic_id();
 
     if cores_initialized.contains(&core_id) {
-        trace!("PMU has already been intitialized on core {}", core_id);
+        warn!("PMU has already been intitialized on core {}", core_id);
         return Ok(());
     } 
     else {
@@ -249,7 +248,7 @@ pub fn init() -> Result<(), &'static str> {
                     return Err("pmu_x86: There are more general purpose PMCs in this machine than can be handled by the existing structures which store information about the PMU");
                 }
 
-                NUM_PMC.call_once(||num_pmc);
+                NUM_PMC.store(num_pmc, Ordering::SeqCst);
 
                 // initialize the PMCS_AVAILABLE bitmap 
                 let core_capacity = max_core_id()? as usize + 1;
@@ -328,7 +327,7 @@ impl Counter {
     
     /// Starts the count.
     pub fn start(&mut self) -> Result<(), &'static str> {
-        let num_pmc = num_general_purpose_counters()?;
+        let num_pmc = num_general_purpose_counters();
 
         // for a fixed value counter (that's already enabled), simply saves the current value as the starting count
         if self.msr_mask > num_pmc as u32 {
@@ -345,7 +344,7 @@ impl Counter {
     
     /// Allows user to get count since start without stopping/releasing the counter.
     pub fn get_count_since_start(&self) -> Result<u64, &'static str> {
-        let num_pmc = num_general_purpose_counters()?;
+        let num_pmc = num_general_purpose_counters();
 
         //checks to make sure the counter hasn't already been released
         if self.msr_mask < num_pmc as u32 {
@@ -359,12 +358,11 @@ impl Counter {
     
     /// Stops counting, releases the counter, and returns the count of events since the counter was initialized.
     /// This will consume the counter object since after freeing the counter, the counter should not be accessed.
-    pub fn end(mut self) -> Result<u64, &'static str> {
+    pub fn end(self) -> Result<u64, &'static str> {
         //unwrapping here might be an issue because it adds a step to event being counted, unsure how to get around
-        let end_val = safe_rdpmc(self.msr_mask)?;
+        let end_val = rdpmc(self.msr_mask);
         let start_count = self.start_count;
-        core::mem::drop(self);
-        
+        drop(self);
         Ok(end_val - start_count)
     }
 
@@ -376,20 +374,16 @@ impl Counter {
 
 impl Drop for Counter {
     fn drop(&mut self) {
-        // Safe to unwrap here since a Counter object could only have been created if the PMU was initialized.
-        let num_pmc = num_general_purpose_counters().unwrap(); 
+        let num_pmc = num_general_purpose_counters(); 
 
         // A programmable counter would be claimed at this point, so free it now so it can be used again.
-        if (self.msr_mask < num_pmc as u32) {
+        if self.msr_mask < num_pmc as u32 {
             // clears event counting settings and counter 
             unsafe{
                 wrmsr(IA32_PERFEVTSEL0 + self.msr_mask as u32, 0);
                 wrmsr(IA32_PMC0 + self.msr_mask as u32, 0);
             }
-            match free_counter(self.core, self.msr_mask as u8) {
-                Ok(()) => trace!("Freed pmu counter while dropping Counter"),
-                Err(e) => error!("Couldn't free pmu counter while dropping Counter: {:?}", e) // We should never reach this point, since the drop function is the only place a counter will be freed once its been claimed by a Counter object.
-            }
+            free_counter(self.core, self.msr_mask as u8); 
         }
     }
 
@@ -402,20 +396,18 @@ fn counter_is_available(core_id: u8, counter: u8) -> Result<bool, &'static str> 
 }
 
 /// Sets the counter bit to indicate it is available
-fn free_counter(core_id: u8, counter: u8) -> Result<(), &'static str> {
-    let pmcs = get_pmcs_available_for_core(core_id)?;
+pub fn free_counter(core_id: u8, counter: u8) {
+    let pmcs = get_pmcs_available_for_core(core_id).expect("Trying to free a PMU counter when the PMU is not initialized");
 
     pmcs.fetch_update(|mut x|{
-        if !x.get_bit(counter as usize) {
-            x.set_bit(counter as usize, true);
-            Some(x)
-        }
-        else{
-            None
-        }
-    }, Ordering::SeqCst, Ordering::SeqCst).map_err(|_e|"pmu_x86: Could not free counter because it was already free")?;
-
-    Ok(())
+            if !x.get_bit(counter as usize) {
+                x.set_bit(counter as usize, true);
+                Some(x)
+            }
+            else {
+                None
+            }
+        }, Ordering::SeqCst, Ordering::SeqCst).unwrap_or_else(|x| {warn!("The counter you are trying to free has been previously freed"); x});
 }
 
 /// Clears the counter bit to show it's in use
@@ -549,7 +541,7 @@ fn create_general_counter(event_mask: u64) -> Result<Counter, &'static str> {
 /// Does the work of iterating through programmable counters and using whichever one is free. Returns Err if none free
 fn programmable_start(event_mask: u64) -> Result<Counter, &'static str> {
     let my_core = apic::get_my_apic_id();
-    let num_pmc = num_general_purpose_counters()?;
+    let num_pmc = num_general_purpose_counters();
 
     for pmc in 0..num_pmc {
         //If counter i on this core is currently in use, checks the next counter
@@ -584,12 +576,6 @@ fn create_fixed_counter(msr_mask: u32) -> Result<Counter, &'static str> {
         pmc: -1, 
         core: my_core
     });
-}
-
-/// Returns the value in a PMC after checking that the PMU is available and intialized
-fn safe_rdpmc(msr_mask: u32) -> Result<u64, &'static str> {
-    check_pmu_availability()?;
-    Ok(rdpmc(msr_mask))
 }
 
 /// Checks that the PMU has been initialized. If it has been,
@@ -722,7 +708,7 @@ fn stop_samples(core_id: u8, samples: &mut SampledEvents) -> Result<(), &'static
     // marks core as no longer sampling and results as ready
     remove_core_from_sampling_list(core_id)?;
     notify_sampling_results_are_ready(core_id)?;
-    free_counter(core_id, 0)?;
+    free_counter(core_id, 0);
 
     trace!("Stopped taking samples with the PMU");
     

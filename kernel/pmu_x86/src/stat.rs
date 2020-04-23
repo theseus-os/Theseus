@@ -64,47 +64,15 @@ impl PerformanceCounters {
     /// - LLC misses 
     /// - Branch instructions retired
     /// - Branch misses retired
-    pub fn new() -> Result<PerformanceCounters, &'static str> {
-        // the first 3 fixed function counters do not need to rollback any changes
-        let inst_retired = Counter::new(EventType::InstructionsRetired)?;
-        let core_cycles = Counter::new(EventType::UnhaltedCoreCycles)?;    
-        let ref_cycles = Counter::new(EventType::UnhaltedReferenceCycles)?;   
-
-        // if any of the general purpose counters fail then we need to free the previously acquired counters
-        let llc_ref = Counter::new(EventType::LastLevelCacheReferences);    
-        if llc_ref.is_err() {
-            return Err("pmu_x86::stat: Couldn't create llc ref counter, none available");            
-        }   
-
-        let llc_miss = Counter::new(EventType::LastLevelCacheMisses);
-        if llc_miss.is_err() {
-            llc_ref?.end()?;
-            return Err("pmu_x86::stat: Couldn't create llc miss counter, none available");
-        }
-
-        let br_inst_ret = Counter::new(EventType::BranchInstructionsRetired);   
-        if br_inst_ret.is_err() {
-            llc_ref?.end()?;
-            llc_miss?.end()?;
-            return Err("pmu_x86::stat: Couldn't create branch inst retired counter, none available");
-        }
-
-        let br_miss_ret = Counter::new(EventType::BranchMissesRetired);
-        if br_miss_ret.is_err() {
-            llc_ref?.end()?;
-            llc_miss?.end()?;
-            br_inst_ret?.end()?;
-            return Err("pmu_x86::stat: Couldn't create branch miss retired counter, none available");
-        }
-                
+    pub fn new() -> Result<PerformanceCounters, &'static str> {                
         Ok(PerformanceCounters {
-            inst_retired,
-            core_cycles,    
-            ref_cycles,           
-            llc_ref: llc_ref?,       
-            llc_miss: llc_miss?,
-            br_inst_ret: br_inst_ret?,   
-            br_miss_ret: br_miss_ret?,
+            inst_retired:  Counter::new(EventType::InstructionsRetired)?,
+            core_cycles: Counter::new(EventType::UnhaltedCoreCycles)?,    
+            ref_cycles: Counter::new(EventType::UnhaltedReferenceCycles)?,           
+            llc_ref: Counter::new(EventType::LastLevelCacheReferences)?,       
+            llc_miss: Counter::new(EventType::LastLevelCacheMisses)?,
+            br_inst_ret: Counter::new(EventType::BranchInstructionsRetired)?,   
+            br_miss_ret: Counter::new(EventType::BranchMissesRetired)?,
         } )
     }
 
@@ -123,7 +91,7 @@ impl PerformanceCounters {
     /// Stop the counters and return the counter values.
     /// The `PerformanceCounters` object is consumed since the counters are freed in this function
     /// and should not be accessed again.
-    pub fn end(mut self) -> Result<PMUResults, &'static str> {
+    pub fn end(self) -> Result<PMUResults, &'static str> {
         Ok( PMUResults {
             inst_retired: self.inst_retired.end()?,
             core_cycles: self.core_cycles.end()?, 
