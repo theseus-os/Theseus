@@ -84,7 +84,7 @@ use raw_cpuid::*;
 use spin::Once;
 use irq_safety::MutexIrqSafe;
 use alloc::vec::Vec;
-use alloc::collections::BTreeMap;
+use alloc::collections::{BTreeMap, BTreeSet};
 use alloc::string::{String, ToString};
 use bit_field::BitField;
 use core::sync::atomic::{Ordering, AtomicU64, AtomicU8};
@@ -128,12 +128,14 @@ const INIT_VAL_PMCS_AVAILABLE: u8 = core::u8::MAX;
 /// Stores an 8-bit bitmap for each core to show whether the PMCs for that core are available (1) or in use (0).
 /// This restricts us to 8 general purpose PMCs per core.
 static PMCS_AVAILABLE: Once<Vec<AtomicU8>> = Once::new();
+/// Bitmap to store the cores where the PMU is currently being used for sampling. It records information for 256 cores.
+static CORES_SAMPLING: [AtomicU64; WORDS_IN_BITMAP] = [AtomicU64::new(0), AtomicU64::new(0), AtomicU64::new(0), AtomicU64::new(0)];
+/// Bitmap to store the cores which have sampling results ready to be retrieved. It records information for 256 cores.
+static RESULTS_READY: [AtomicU64; WORDS_IN_BITMAP] = [AtomicU64::new(0), AtomicU64::new(0), AtomicU64::new(0), AtomicU64::new(0)];
 
 lazy_static!{
-    /// Bitmap to store the cores where the PMU is currently being used for sampling. It records information for 256 cores.
-    static ref CORES_SAMPLING: [AtomicU64; WORDS_IN_BITMAP] = [AtomicU64::new(0), AtomicU64::new(0), AtomicU64::new(0), AtomicU64::new(0)];
-    /// Bitmap to store the cores which have sampling results ready to be retrieved. It records information for 256 cores.
-    static ref RESULTS_READY: [AtomicU64; WORDS_IN_BITMAP] = [AtomicU64::new(0), AtomicU64::new(0), AtomicU64::new(0), AtomicU64::new(0)];
+    /// Set to store the cores that the PMU has already been initialized on
+    static ref CORES_INITIALIZED: MutexIrqSafe<BTreeSet<u8>> = MutexIrqSafe::new(BTreeSet::new());
     /// The sampling information for each core
     static ref SAMPLING_INFO: MutexIrqSafe<BTreeMap<u8, SampledEvents>> =  MutexIrqSafe::new(BTreeMap::new());
 }
@@ -205,7 +207,7 @@ fn more_pmcs_than_expected(num_pmc: u8) -> Result<bool, &'static str> {
 /// Initialization function that retrieves the version ID number of the PMU. Version ID of 0 means no 
 /// performance monitoring is available on the CPU (likely due to virtualization without hardware assistance).
 /// We initialize the 3 fixed PMCs and general purpose PMCs. Calling this initialization function again
-/// on a core that has already been initialized will reset the counters to zero.
+/// on a core that has already been initialized will do nothing.
 /// 
 /// Currently we support a maximum core ID of 255, and up to 8 general purpose counters per core. 
 /// A core ID greater than 255 is not supported in Theseus in general since the ID has to fit within a u8.
@@ -219,72 +221,82 @@ fn more_pmcs_than_expected(num_pmc: u8) -> Result<bool, &'static str> {
 /// - Change the element type in the PMCS_AVAILABLE vector to be larger than AtomicU8 so that there is one bit per counter.
 /// - Update INIT_PMCS_AVAILABLE to the new maximum value for the per core bitmap.
 pub fn init() -> Result<(), &'static str> {
-    // PMU has already been initialized on another core,
-    // so we only write to the pmu registers for the calling core and return.
-    // The rest of this function only has to be called once, and is executed on the first core that calls the init() function.
-    if let Some(pmu_ver) = PMU_VERSION.try() {
-        unsafe { init_registers(); }
-        trace!("PMU, version {}, has already been intitialized on another core, now initializing on this core", pmu_ver);
+    let mut cores_initialized = CORES_INITIALIZED.lock();
+    let core_id = apic::get_my_apic_id();
+
+    if cores_initialized.contains(&core_id) {
+        trace!("PMU has already been intitialized on core {}", core_id);
         return Ok(());
-    }
+    } 
+    else {
+        if PMU_VERSION.try().is_none() {
+            const MIN_PMU_VERSION: u8 = 1;
+            let cpuid = CpuId::new();
 
-    const MIN_PMU_VERSION: u8 = 1;
-    let cpuid = CpuId::new();
+            let perf_mon_info = cpuid.get_performance_monitoring_info().ok_or("pmu_x86::init: Could not get perfromance moritoring info from CPUID")?;
 
-    let perf_mon_info = cpuid.get_performance_monitoring_info().ok_or("pmu_x86::init: Could not get perfromance moritoring info from CPUID")?;
-    trace!("PMU version: {} with fixed counters: {} and general counters: {}",perf_mon_info.version_id(), perf_mon_info.fixed_function_counters(), perf_mon_info.number_of_counters());
+            // find the PMU version. There is other information provided by the cpuid but we do not retrieve it because we implement just version 2.
+            let pmu_ver = perf_mon_info.version_id();
+            let num_pmc = perf_mon_info.number_of_counters();
 
-    // find the PMU version. There is other information provided by the cpuid but we do not retrieve it because we implement just version 2.
-    let pmu_ver = perf_mon_info.version_id();
-    let num_pmc = perf_mon_info.number_of_counters();
+            if pmu_ver >= MIN_PMU_VERSION {
+                    
+                if greater_core_id_than_expected()? {
+                    return Err("pmu_x86: There are larger core ids in this machine than can be handled by the existing structures which store information about the PMU");
+                }
 
-    if pmu_ver >= MIN_PMU_VERSION {
-              
-        if greater_core_id_than_expected()? {
-            return Err("pmu_x86: There are larger core ids in this machine than can be handled by the existing structures which store information about the PMU");
+                if more_pmcs_than_expected(num_pmc)? {
+                    return Err("pmu_x86: There are more general purpose PMCs in this machine than can be handled by the existing structures which store information about the PMU");
+                }
+
+                NUM_PMC.call_once(||num_pmc);
+
+                // initialize the PMCS_AVAILABLE bitmap 
+                let core_capacity = max_core_id()? as usize + 1;
+                let mut pmcs_available = Vec::with_capacity(core_capacity);
+                for _ in 0..core_capacity {
+                    pmcs_available.push(AtomicU8::new(INIT_VAL_PMCS_AVAILABLE));
+                } 
+
+                PMCS_AVAILABLE.call_once(|| pmcs_available);
+                trace!("PMU version: {} with fixed counters: {} and general counters: {}", perf_mon_info.version_id(), perf_mon_info.fixed_function_counters(), perf_mon_info.number_of_counters());
+            }
+            else {
+                error!("This machine does not support a PMU");
+                return Err("This machine does not support a PMU");
+            }
+
+            PMU_VERSION.call_once(||pmu_ver);
         }
-
-        if more_pmcs_than_expected(num_pmc)? {
-            return Err("pmu_x86: There are more general purpose PMCs in this machine than can be handled by the existing structures which store information about the PMU");
-        }
-
-        NUM_PMC.call_once(||num_pmc);
-
-        unsafe{ init_registers(); }
-
-        // initialize the PMCS_AVAILABLE bitmap 
-        let core_capacity = max_core_id()? as usize + 1;
-        let mut pmcs_available = Vec::with_capacity(core_capacity);
-        for _ in 0..core_capacity {
-            pmcs_available.push(AtomicU8::new(INIT_VAL_PMCS_AVAILABLE));
-        } 
-
-        PMCS_AVAILABLE.call_once(|| pmcs_available);
+        
+        init_registers();
+        cores_initialized.insert(core_id);
+        trace!("PMU initialized on core {}", core_id);
     }
-
-    PMU_VERSION.call_once(||pmu_ver);
-
+    
     Ok(())
 }
 
 /// Part of the initialization routine which actually does the work of setting up the registers.
 /// This must be called for every core that wants to use the PMU.
-unsafe fn init_registers() {
-    // disables all the performance counters
-    wrmsr(IA32_PERF_GLOBAL_CTRL, 0);
-    // clear the general purpose PMCs
-    wrmsr(IA32_PMC0, 0);
-    wrmsr(IA32_PMC1, 0);
-    wrmsr(IA32_PMC2, 0);
-    wrmsr(IA32_PMC3, 0);
-    // clear the fixed event counters
-    wrmsr(IA32_FIXED_CTR0, 0);
-    wrmsr(IA32_FIXED_CTR1, 0);
-    wrmsr(IA32_FIXED_CTR2, 0);
-    // sets fixed function counters to count events at all privilege levels
-    wrmsr(IA32_FIXED_CTR_CTRL, ENABLE_FIXED_COUNTERS_FOR_ALL_PRIVILEGE_LEVELS);
-    // enables all counters: each counter has another enable bit in other MSRs so these should likely never be cleared once first set
-    wrmsr(IA32_PERF_GLOBAL_CTRL, ENABLE_FIXED_PERFORMANCE_COUNTERS | ENABLE_GENERAL_PERFORMANCE_COUNTERS);
+fn init_registers() {
+    unsafe {
+        // disables all the performance counters
+        wrmsr(IA32_PERF_GLOBAL_CTRL, 0);
+        // clear the general purpose PMCs
+        wrmsr(IA32_PMC0, 0);
+        wrmsr(IA32_PMC1, 0);
+        wrmsr(IA32_PMC2, 0);
+        wrmsr(IA32_PMC3, 0);
+        // clear the fixed event counters
+        wrmsr(IA32_FIXED_CTR0, 0);
+        wrmsr(IA32_FIXED_CTR1, 0);
+        wrmsr(IA32_FIXED_CTR2, 0);
+        // sets fixed function counters to count events at all privilege levels
+        wrmsr(IA32_FIXED_CTR_CTRL, ENABLE_FIXED_COUNTERS_FOR_ALL_PRIVILEGE_LEVELS);
+        // enables all counters: each counter has another enable bit in other MSRs so these should likely never be cleared once first set
+        wrmsr(IA32_PERF_GLOBAL_CTRL, ENABLE_FIXED_PERFORMANCE_COUNTERS | ENABLE_GENERAL_PERFORMANCE_COUNTERS);
+    }
 }
 
 /// A logical counter object to correspond to a physical PMC
@@ -346,29 +358,14 @@ impl Counter {
     }
     
     /// Stops counting, releases the counter, and returns the count of events since the counter was initialized.
-    pub fn end(&self) -> Result<u64, &'static str> {
+    /// This will consume the counter object since after freeing the counter, the counter should not be accessed.
+    pub fn end(mut self) -> Result<u64, &'static str> {
         //unwrapping here might be an issue because it adds a step to event being counted, unsure how to get around
         let end_val = safe_rdpmc(self.msr_mask)?;
+        let start_count = self.start_count;
+        core::mem::drop(self);
         
-        let num_pmc = num_general_purpose_counters()?;
-        // If the msr_mask indicates it's a programmable counter, clears event counting settings and counter 
-        if self.msr_mask < num_pmc as u32{
-            unsafe{
-                wrmsr(IA32_PERFEVTSEL0 + self.msr_mask as u32, 0);
-                wrmsr(IA32_PMC0 + self.msr_mask as u32, 0);
-            }
-            
-            // Sanity check to make sure the counter wasn't stopped and freed previously
-            if counter_is_available(self.core, self.msr_mask as u8)? {
-                debug!("In end: core: {}, msr_mask:{}", self.core, self.msr_mask);
-                return Err("Counter used for this event was marked as free, value stored is likely inaccurate.");
-            } 
-
-            // mark the PMC as free (not in use)
-            free_counter(self.core, self.msr_mask as u8)?;
-        }
-        
-        Ok(end_val - self.start_count)
+        Ok(end_val - start_count)
     }
 
     /// lightweight function with no checks to get the counter value from when it was started.
@@ -377,6 +374,26 @@ impl Counter {
     }
 }
 
+impl Drop for Counter {
+    fn drop(&mut self) {
+        // Safe to unwrap here since a Counter object could only have been created if the PMU was initialized.
+        let num_pmc = num_general_purpose_counters().unwrap(); 
+
+        // A programmable counter would be claimed at this point, so free it now so it can be used again.
+        if (self.msr_mask < num_pmc as u32) {
+            // clears event counting settings and counter 
+            unsafe{
+                wrmsr(IA32_PERFEVTSEL0 + self.msr_mask as u32, 0);
+                wrmsr(IA32_PMC0 + self.msr_mask as u32, 0);
+            }
+            match free_counter(self.core, self.msr_mask as u8) {
+                Ok(()) => trace!("Freed pmu counter while dropping Counter"),
+                Err(e) => error!("Couldn't free pmu counter while dropping Counter: {:?}", e) // We should never reach this point, since the drop function is the only place a counter will be freed once its been claimed by a Counter object.
+            }
+        }
+    }
+
+}
 
 /// Returns true if the counter is not in use
 fn counter_is_available(core_id: u8, counter: u8) -> Result<bool, &'static str> {
@@ -558,8 +575,6 @@ fn programmable_start(event_mask: u64) -> Result<Counter, &'static str> {
 
 /// Creates a counter object for a fixed hardware counter
 fn create_fixed_counter(msr_mask: u32) -> Result<Counter, &'static str> {
-    check_pmu_availability()?;
-
     let my_core = apic::get_my_apic_id();
     let count = rdpmc(msr_mask);
     
@@ -580,11 +595,11 @@ fn safe_rdpmc(msr_mask: u32) -> Result<u64, &'static str> {
 /// Checks that the PMU has been initialized. If it has been,
 /// the version ID tells whether the system has performance monitoring capabilities. 
 fn check_pmu_availability() -> Result<(), &'static str>  {
-    const MINIMUM_PMU_VERSION: u8 = 1;
-    let version = PMU_VERSION.try().ok_or("PMU hasn't been initialized")?; 
-    
-    if version < &MINIMUM_PMU_VERSION {
-        return Err("pmu_x86:: Version ID of 0: Performance monitoring not supported in this environment (likely either due to virtualization without hardware acceleration or old CPU).");
+    let core_id = apic::get_my_apic_id();
+    if !CORES_INITIALIZED.lock().contains(&core_id) {
+        let version = PMU_VERSION.try().ok_or("PMU hasn't been initialized")?; 
+        error!("PMU {} is available. It still needs to be initialized on this core", version);
+        return Err("PMU is available. It still needs to be initialized on this core");
     }
 
     Ok(())

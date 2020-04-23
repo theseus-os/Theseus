@@ -120,8 +120,10 @@ impl PerformanceCounters {
         Ok(())
     }
 
-    /// Stop the counters and return the counter values
-    pub fn end(&mut self) -> Result<PMUResults, &'static str> {
+    /// Stop the counters and return the counter values.
+    /// The `PerformanceCounters` object is consumed since the counters are freed in this function
+    /// and should not be accessed again.
+    pub fn end(mut self) -> Result<PMUResults, &'static str> {
         Ok( PMUResults {
             inst_retired: self.inst_retired.end()?,
             core_cycles: self.core_cycles.end()?, 
