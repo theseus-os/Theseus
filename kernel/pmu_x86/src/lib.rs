@@ -258,14 +258,13 @@ pub fn init() -> Result<(), &'static str> {
                 } 
 
                 PMCS_AVAILABLE.call_once(|| pmcs_available);
+                PMU_VERSION.call_once(||pmu_ver);
                 trace!("PMU version: {} with fixed counters: {} and general counters: {}", perf_mon_info.version_id(), perf_mon_info.fixed_function_counters(), perf_mon_info.number_of_counters());
             }
             else {
                 error!("This machine does not support a PMU");
                 return Err("This machine does not support a PMU");
             }
-
-            PMU_VERSION.call_once(||pmu_ver);
         }
         
         init_registers();
@@ -396,7 +395,7 @@ fn counter_is_available(core_id: u8, counter: u8) -> Result<bool, &'static str> 
 }
 
 /// Sets the counter bit to indicate it is available
-pub fn free_counter(core_id: u8, counter: u8) {
+fn free_counter(core_id: u8, counter: u8) {
     let pmcs = get_pmcs_available_for_core(core_id).expect("Trying to free a PMU counter when the PMU is not initialized");
 
     pmcs.fetch_update(|mut x|{
