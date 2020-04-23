@@ -214,7 +214,7 @@ fn rendezvous_test_multiple(send_count: usize, receive_count: usize) -> Result<(
 }
 
 /// A simple receiver receiving `iterations` messages
-fn rendezvous_receiver_task ((receiver, iterations) :(rendezvous::Receiver<String>, usize)) -> Result<(), &'static str> {
+fn rendezvous_receiver_task ((receiver, iterations): (rendezvous::Receiver<String>, usize)) -> Result<(), &'static str> {
     warn!("rendezvous_test(): Entered receiver task! Expecting to receive {} messages", iterations);
 
     for i in 0..iterations {
@@ -230,7 +230,7 @@ fn rendezvous_receiver_task ((receiver, iterations) :(rendezvous::Receiver<Strin
 }
 
 /// A simple sender sending `iterations` messages
-fn rendezvous_sender_task ((sender, iterations) : (rendezvous::Sender<String>, usize)) -> Result<(), &'static str> {
+fn rendezvous_sender_task ((sender, iterations): (rendezvous::Sender<String>, usize)) -> Result<(), &'static str> {
     warn!("rendezvous_test(): Entered sender task! Expecting to send {} messages", iterations);
 
     for i in 0..iterations {
@@ -311,7 +311,7 @@ fn asynchronous_test_multiple(send_count: usize, receive_count: usize) -> Result
 }
 
 /// A simple receiver receiving `iterations` messages
-fn asynchronous_receiver_task ((receiver, iterations) :(async_channel::Receiver<String>, usize)) -> Result<(), &'static str> {
+fn asynchronous_receiver_task ((receiver, iterations): (async_channel::Receiver<String>, usize)) -> Result<(), &'static str> {
     warn!("asynchronous_test(): Entered receiver task! Expecting to receive {} messages", iterations);
 
     for i in 0..iterations {
@@ -327,7 +327,7 @@ fn asynchronous_receiver_task ((receiver, iterations) :(async_channel::Receiver<
 }
 
 /// A simple sender sending `iterations` messages
-fn asynchronous_sender_task ((sender, iterations) : (async_channel::Sender<String>, usize)) -> Result<(), &'static str> {
+fn asynchronous_sender_task ((sender, iterations): (async_channel::Sender<String>, usize)) -> Result<(), &'static str> {
     warn!("asynchronous_test(): Entered sender task! Expecting to send {} messages", iterations);
 
     for i in 0..iterations {
