@@ -41,6 +41,8 @@ macro_rules! pin_task {
 static ITERATIONS: AtomicUsize = AtomicUsize::new(100);
 static SEND_COUNT: AtomicUsize = AtomicUsize::new(100);
 static RECEIVE_COUNT: AtomicUsize = AtomicUsize::new(100);
+static SEND_PANIC: AtomicUsize = AtomicUsize::new(0);
+static RECEIVE_PANIC: AtomicUsize = AtomicUsize::new(0);
 
 macro_rules! iterations {
     () => (ITERATIONS.load(Ordering::SeqCst))
@@ -54,6 +56,14 @@ macro_rules! receive_count {
     () => (RECEIVE_COUNT.load(Ordering::SeqCst))
 }
 
+macro_rules! send_panic {
+    () => (SEND_PANIC.load(Ordering::SeqCst))
+}
+
+macro_rules! receive_panic {
+    () => (RECEIVE_PANIC.load(Ordering::SeqCst))
+}
+
 
 pub fn main(args: Vec<String>) -> isize {
     let mut opts = Options::new();
@@ -63,6 +73,8 @@ pub fn main(args: Vec<String>) -> isize {
     opts.optopt("n", "iterations", "number of test iterations (default 100)", "ITER");
     opts.optopt("s", "send_count", "number of messages expected to be sent in 'multiple' test (default 100)", "SEND_C");
     opts.optopt("l", "receive_count", "number of messages expected to be received in 'multiple' test (default 100)", "REC_C");
+    opts.optopt("x", "panic_in_send", "Injects a panic at specified message in sender in multiple tests (default no panic)", "SEND_PANIC");
+    opts.optopt("y", "panic_in_receive", "Injects a panic at specified message in receiver in multiple tests (default no panic)", "RECEIVE_PANIC");
 
     opts.optflag("r", "rendezvous", "run the test on the rendezvous-based synchronous channel");
     opts.optflag("a", "asynchronous", "run the test on the asynchronous buffered channel");
@@ -90,13 +102,22 @@ pub fn main(args: Vec<String>) -> isize {
         ITERATIONS.store(iters, Ordering::SeqCst);
     }
 
-    if let Some(iters) = matches.opt_str("s").and_then(|i| i.parse::<usize>().ok()) {
-        SEND_COUNT.store(iters, Ordering::SeqCst);
+    if let Some(send_count) = matches.opt_str("s").and_then(|i| i.parse::<usize>().ok()) {
+        SEND_COUNT.store(send_count, Ordering::SeqCst);
     }
 
-    if let Some(iters) = matches.opt_str("l").and_then(|i| i.parse::<usize>().ok()) {
-        RECEIVE_COUNT.store(iters, Ordering::SeqCst);
+    if let Some(recv_count) = matches.opt_str("l").and_then(|i| i.parse::<usize>().ok()) {
+        RECEIVE_COUNT.store(recv_count, Ordering::SeqCst);
     }
+
+    if let Some(panic_point) = matches.opt_str("x").and_then(|i| i.parse::<usize>().ok()) {
+        SEND_PANIC.store(panic_point, Ordering::SeqCst);
+    }
+
+    if let Some(panic_point) = matches.opt_str("y").and_then(|i| i.parse::<usize>().ok()) {
+        RECEIVE_PANIC.store(panic_point, Ordering::SeqCst);
+    }
+
 
     match rmain(matches) {
         Ok(_) => 0,
@@ -108,7 +129,18 @@ pub fn main(args: Vec<String>) -> isize {
 }
 
 fn rmain(matches: Matches) -> Result<(), &'static str> {
-    let mut did_something = false; 
+    let mut did_something = false;
+
+    let send_panic_point = match send_panic!() {
+        0 => None,
+        x => Some(x),
+    };
+
+    let receive_panic_point = match receive_panic!() {
+        0 => None,
+        x => Some(x),
+    };
+
     if matches.opt_present("r") {
         if matches.opt_present("o") {
             did_something = true;
@@ -120,7 +152,7 @@ fn rmain(matches: Matches) -> Result<(), &'static str> {
         if matches.opt_present("m") {
             did_something = true;
             println!("Running rendezvous channel test in multiple mode.");
-            rendezvous_test_multiple(send_count!(), receive_count!())?;
+            rendezvous_test_multiple(send_count!(), receive_count!(), send_panic_point, receive_panic_point)?;
         }
     }
 
@@ -135,7 +167,7 @@ fn rmain(matches: Matches) -> Result<(), &'static str> {
         if matches.opt_present("m") {
             did_something = true;
             println!("Running asynchronous channel test in multiple mode.");
-            asynchronous_test_multiple(send_count!(), receive_count!())?;
+            asynchronous_test_multiple(send_count!(), receive_count!(), send_panic_point, receive_panic_point)?;
         }
     }
 
@@ -186,18 +218,18 @@ fn rendezvous_test_oneshot() -> Result<(), &'static str> {
 
 
 /// A simple test that spawns a sender & receiver task to send `send_count` and receive `receive_count` messages.
-fn rendezvous_test_multiple(send_count: usize, receive_count: usize) -> Result<(), &'static str> {
+fn rendezvous_test_multiple(send_count: usize, receive_count: usize, send_panic: Option<usize>, receive_panic: Option<usize>) -> Result<(), &'static str> {
     let my_cpu = apic::get_my_apic_id();
 
     let (sender, receiver) = rendezvous::new_channel();
 
-    let t1 = spawn::new_task_builder(rendezvous_sender_task, (sender, send_count))
+    let t1 = spawn::new_task_builder(rendezvous_sender_task, (sender, send_count, send_panic))
         .name(String::from("sender_task_rendezvous"))
         .block();
     
     let t1 = pin_task!(t1, my_cpu).spawn()?;
 
-    let t2 = spawn::new_task_builder(rendezvous_receiver_task, (receiver, receive_count))
+    let t2 = spawn::new_task_builder(rendezvous_receiver_task, (receiver, receive_count, receive_panic))
         .name(String::from("receiver_task_rendezvous"))
         .block();
 
@@ -214,8 +246,12 @@ fn rendezvous_test_multiple(send_count: usize, receive_count: usize) -> Result<(
 }
 
 /// A simple receiver receiving `iterations` messages
-fn rendezvous_receiver_task ((receiver, iterations): (rendezvous::Receiver<String>, usize)) -> Result<(), &'static str> {
+fn rendezvous_receiver_task ((receiver, iterations, panic_point): (rendezvous::Receiver<String>, usize, Option<usize>)) -> Result<(), &'static str> {
     warn!("rendezvous_test(): Entered receiver task! Expecting to receive {} messages", iterations);
+
+    if panic_point.is_some(){
+        warn!("rendezvous_test(): Panic will occur in receiver task at message {}",panic_point.unwrap());
+    }
 
     for i in 0..iterations {
         let msg = receiver.receive().map_err(|error| {
@@ -223,6 +259,10 @@ fn rendezvous_receiver_task ((receiver, iterations): (rendezvous::Receiver<Strin
             return error;
         })?;
         warn!("rendezvous_test(): Receiver got {:?}  ({:03})", msg, i);
+
+        if panic_point == Some(i) {
+            panic!("rendezvous_test() : User specified panic in receiver");
+        }
     }
 
     warn!("rendezvous_test(): Done receiver task!");
@@ -230,8 +270,12 @@ fn rendezvous_receiver_task ((receiver, iterations): (rendezvous::Receiver<Strin
 }
 
 /// A simple sender sending `iterations` messages
-fn rendezvous_sender_task ((sender, iterations): (rendezvous::Sender<String>, usize)) -> Result<(), &'static str> {
+fn rendezvous_sender_task ((sender, iterations, panic_point): (rendezvous::Sender<String>, usize, Option<usize>)) -> Result<(), &'static str> {
     warn!("rendezvous_test(): Entered sender task! Expecting to send {} messages", iterations);
+
+    if panic_point.is_some(){
+        warn!("rendezvous_test(): Panic will occur in sender task at message {}",panic_point.unwrap());
+    }
 
     for i in 0..iterations {
         sender.send(format!("Message {:03}", i)).map_err(|error| {
@@ -239,6 +283,10 @@ fn rendezvous_sender_task ((sender, iterations): (rendezvous::Sender<String>, us
             return error;
         })?;
         warn!("rendezvous_test(): Sender sent message {:03}", i);
+
+        if panic_point == Some(i) {
+            panic!("rendezvous_test() : User specified panic in receiver");
+        }
     }
 
     warn!("rendezvous_test(): Done sender task!");
@@ -289,18 +337,18 @@ fn asynchronous_test_oneshot() -> Result<(), &'static str> {
 
 
 /// A simple test that spawns a sender & receiver task to send `send_count` and receive `receive_count` messages.
-fn asynchronous_test_multiple(send_count: usize, receive_count: usize) -> Result<(), &'static str> {
+fn asynchronous_test_multiple(send_count: usize, receive_count: usize, send_panic: Option<usize>, receive_panic: Option<usize>) -> Result<(), &'static str> {
     let my_cpu = apic::get_my_apic_id();
 
     let (sender, receiver) = async_channel::new_channel(2);
 
-    let t1 = spawn::new_task_builder(asynchronous_sender_task, (sender, send_count))
+    let t1 = spawn::new_task_builder(asynchronous_sender_task, (sender, send_count, send_panic))
         .name(String::from("sender_task_asynchronous"))
         .block();
 
     let t1 = pin_task!(t1, my_cpu).spawn()?;
 
-    let t2 = spawn::new_task_builder(asynchronous_receiver_task, (receiver, receive_count))
+    let t2 = spawn::new_task_builder(asynchronous_receiver_task, (receiver, receive_count, receive_panic))
         .name(String::from("receiver_task_asynchronous"))
         .block();
 
@@ -317,8 +365,12 @@ fn asynchronous_test_multiple(send_count: usize, receive_count: usize) -> Result
 }
 
 /// A simple receiver receiving `iterations` messages
-fn asynchronous_receiver_task ((receiver, iterations): (async_channel::Receiver<String>, usize)) -> Result<(), &'static str> {
+fn asynchronous_receiver_task ((receiver, iterations, panic_point): (async_channel::Receiver<String>, usize, Option<usize>)) -> Result<(), &'static str> {
     warn!("asynchronous_test(): Entered receiver task! Expecting to receive {} messages", iterations);
+    
+    if panic_point.is_some(){
+        warn!("asynchronous_test(): Panic will occur in receiver task at message {}",panic_point.unwrap());
+    }
 
     for i in 0..iterations {
         let msg = receiver.receive().map_err(|error| {
@@ -326,6 +378,10 @@ fn asynchronous_receiver_task ((receiver, iterations): (async_channel::Receiver<
             return "Receiver task failed"
         })?;
         warn!("asynchronous_test(): Receiver got {:?}  ({:03})", msg, i);
+
+        if panic_point == Some(i) {
+            panic!("rendezvous_test() : User specified panic in receiver");
+        }
     }
 
     warn!("asynchronous_test(): Done receiver task!");
@@ -333,8 +389,11 @@ fn asynchronous_receiver_task ((receiver, iterations): (async_channel::Receiver<
 }
 
 /// A simple sender sending `iterations` messages
-fn asynchronous_sender_task ((sender, iterations): (async_channel::Sender<String>, usize)) -> Result<(), &'static str> {
+fn asynchronous_sender_task ((sender, iterations, panic_point): (async_channel::Sender<String>, usize, Option<usize>)) -> Result<(), &'static str> {
     warn!("asynchronous_test(): Entered sender task! Expecting to send {} messages", iterations);
+    if panic_point.is_some(){
+        warn!("asynchronous_test(): Panic will occur in sender task at message {}",panic_point.unwrap());
+    }
 
     for i in 0..iterations {
         sender.send(format!("Message {:03}", i)).map_err(|error| {
@@ -342,6 +401,10 @@ fn asynchronous_sender_task ((sender, iterations): (async_channel::Sender<String
             return "Sender task failed";
         })?;
         warn!("asynchronous_test(): Sender sent message {:03}", i);
+
+        if panic_point == Some(i) {
+            panic!("rendezvous_test() : User specified panic in receiver");
+        }
     }
 
     warn!("asynchronous_test(): Done sender task!");
