@@ -41,8 +41,6 @@ macro_rules! pin_task {
 static ITERATIONS: AtomicUsize = AtomicUsize::new(100);
 static SEND_COUNT: AtomicUsize = AtomicUsize::new(100);
 static RECEIVE_COUNT: AtomicUsize = AtomicUsize::new(100);
-static SEND_PANIC: AtomicUsize = AtomicUsize::new(0);
-static RECEIVE_PANIC: AtomicUsize = AtomicUsize::new(0);
 
 macro_rules! iterations {
     () => (ITERATIONS.load(Ordering::SeqCst))
@@ -54,14 +52,6 @@ macro_rules! send_count {
 
 macro_rules! receive_count {
     () => (RECEIVE_COUNT.load(Ordering::SeqCst))
-}
-
-macro_rules! send_panic {
-    () => (SEND_PANIC.load(Ordering::SeqCst))
-}
-
-macro_rules! receive_panic {
-    () => (RECEIVE_PANIC.load(Ordering::SeqCst))
 }
 
 
@@ -110,14 +100,6 @@ pub fn main(args: Vec<String>) -> isize {
         RECEIVE_COUNT.store(recv_count, Ordering::SeqCst);
     }
 
-    if let Some(panic_point) = matches.opt_str("x").and_then(|i| i.parse::<usize>().ok()) {
-        SEND_PANIC.store(panic_point, Ordering::SeqCst);
-    }
-
-    if let Some(panic_point) = matches.opt_str("y").and_then(|i| i.parse::<usize>().ok()) {
-        RECEIVE_PANIC.store(panic_point, Ordering::SeqCst);
-    }
-
 
     match rmain(matches) {
         Ok(_) => 0,
@@ -131,15 +113,10 @@ pub fn main(args: Vec<String>) -> isize {
 fn rmain(matches: Matches) -> Result<(), &'static str> {
     let mut did_something = false;
 
-    let send_panic_point = match send_panic!() {
-        0 => None,
-        x => Some(x),
-    };
-
-    let receive_panic_point = match receive_panic!() {
-        0 => None,
-        x => Some(x),
-    };
+    // If the user has specified panic instances as val `send_panic_pont` will be Some(val).
+    // Similarly for `receive_panic_point` as well.
+    let send_panic_point = matches.opt_str("x").and_then(|i| i.parse::<usize>().ok());
+    let receive_panic_point = matches.opt_str("y").and_then(|i| i.parse::<usize>().ok());
 
     if matches.opt_present("r") {
         if matches.opt_present("o") {
