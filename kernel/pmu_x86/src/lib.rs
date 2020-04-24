@@ -221,6 +221,9 @@ fn more_pmcs_than_expected(num_pmc: u8) -> Result<bool, &'static str> {
 /// - Update PMCS_SUPPORTED_BY_PMU to the new PMC limit.
 /// - Change the element type in the PMCS_AVAILABLE vector to be larger than AtomicU8 so that there is one bit per counter.
 /// - Update INIT_PMCS_AVAILABLE to the new maximum value for the per core bitmap.
+/// 
+/// # Warning
+/// This function should only be called after all the cores have been booted up.
 pub fn init() -> Result<(), &'static str> {
     let mut cores_initialized = CORES_INITIALIZED.lock();
     let core_id = apic::get_my_apic_id();
@@ -240,17 +243,17 @@ pub fn init() -> Result<(), &'static str> {
             if more_pmcs_than_expected(*NUM_PMC)? {
                 return Err("pmu_x86: There are more general purpose PMCs in this machine than can be handled by the existing structures which store information about the PMU");
             }
-            if PMCS_AVAILABLE.try().is_none() {
+
+            PMCS_AVAILABLE.call_once(|| {
                 // initialize the PMCS_AVAILABLE bitmap 
-                let core_capacity = max_core_id()? as usize + 1;
+                let core_capacity = max_core_id().expect("cores have not been booted up and so cannot retrieve a max core id") as usize + 1;
                 let mut pmcs_available = Vec::with_capacity(core_capacity);
                 for _ in 0..core_capacity {
                     pmcs_available.push(AtomicU8::new(INIT_VAL_PMCS_AVAILABLE));
                 } 
-
-                PMCS_AVAILABLE.call_once(|| pmcs_available);
                 trace!("PMU initialized for the first time: version: {} with fixed counters: {} and general counters: {}", *PMU_VERSION, *NUM_FIXED_FUNC_COUNTERS, *NUM_PMC);
-            }
+                pmcs_available
+            });
         }
         else {
             error!("This machine does not support a PMU");
@@ -348,7 +351,6 @@ impl Counter {
     /// Stops counting, releases the counter, and returns the count of events since the counter was initialized.
     /// This will consume the counter object since after freeing the counter, the counter should not be accessed.
     pub fn end(self) -> Result<u64, &'static str> {
-        //unwrapping here might be an issue because it adds a step to event being counted, unsure how to get around
         let end_val = rdpmc(self.msr_mask);
         let start_count = self.start_count;
         drop(self);
@@ -366,6 +368,7 @@ impl Drop for Counter {
         let num_pmc = num_general_purpose_counters(); 
 
         // A programmable counter would be claimed at this point, so free it now so it can be used again.
+        // Otherwise the counter is a fixed function counter and nothing needs to be done.
         if self.msr_mask < num_pmc as u32 {
             // clears event counting settings and counter 
             unsafe{
