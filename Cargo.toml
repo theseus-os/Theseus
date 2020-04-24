@@ -23,7 +23,7 @@ exclude = [
 	"userspace",
 
 	## exclude unused test applications by default
-	"applications/test_channel",
+	# "applications/test_channel",
 	"applications/test_exception",
 	"applications/test_exception2",
 	"applications/test_filerw",
