@@ -61,7 +61,7 @@ pub fn start_counting_reference_cycles() -> Result<Counter, &'static str> {
 /// The PMU initialization, start count and stop count should all be called on the same core.
 pub fn stop_counting_reference_cycles(counter: Counter) -> Result<u64, &'static str> {
 	let count = counter.diff();
-	let _ = counter.end()?;
+	counter.end()?;
 	Ok(count)
 }
 
