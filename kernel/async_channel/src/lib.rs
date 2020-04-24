@@ -93,11 +93,7 @@ impl <T: Send> Channel<T> {
     /// Returns true if the channel is disconnected.
     #[inline(always)]
     fn is_disconnected(&self) -> bool {
-        if self.channel_status.load(Ordering::SeqCst) == ChannelStatus::Disconnected {
-            true
-        } else {
-            false
-        }
+        self.channel_status.load(Ordering::SeqCst) == ChannelStatus::Disconnected
     }
 }
 
