@@ -97,8 +97,8 @@ pub struct Sender<T: Send> {
 impl <T: Send> Sender<T> {
     /// Send a message, blocking until space in the channel's buffer is available. 
     /// 
-    /// Returns `Ok(())` if the message was sent and received successfully,
-    /// otherwise returns an error. 
+    /// Returns `Ok(())` if the message was sent successfully,
+    /// otherwise returns an error of `ChannelError` type. 
     pub fn send(&self, msg: T) -> Result<(), ChannelError> {
         // trace!("async_channel: send() entry");
         // Fast path: attempt to send the message, assuming the buffer isn't full
@@ -203,11 +203,11 @@ pub struct Receiver<T: Send> {
 impl <T: Send> Receiver<T> {
     /// Receive a message, blocking until a message is available in the buffer.
     /// 
-    /// Returns the message if it was received properly, otherwise returns an error.
+    /// Returns the message if it was received properly, otherwise returns an error of `ChannelError` type.
     pub fn receive(&self) -> Result<T, ChannelError> {
         // trace!("async_channel: receive() entry");
         // Fast path: attempt to receive a message, assuming the buffer isn't empty
-        // The code progresses beyond this match only if try_receive failed due to
+        // The code progresses beyond this match only if try_receive fails due to
         // empty channel
         match self.try_receive() {
             Err(ChannelError::ChannelEmpty) => {},

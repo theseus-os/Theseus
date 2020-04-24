@@ -54,7 +54,6 @@ macro_rules! receive_count {
     () => (RECEIVE_COUNT.load(Ordering::SeqCst))
 }
 
-
 pub fn main(args: Vec<String>) -> isize {
     let mut opts = Options::new();
     opts.optflag("h", "help", "print this help menu");
@@ -113,8 +112,8 @@ pub fn main(args: Vec<String>) -> isize {
 fn rmain(matches: Matches) -> Result<(), &'static str> {
     let mut did_something = false;
 
-    // If the user has specified panic instances as val `send_panic_pont` will be Some(val).
-    // Similarly for `receive_panic_point` as well.
+    // If the user has specified panic instances as 'val', 'send_panic_pont' will be 'Some(val)'.
+    // Similarly for 'receive_panic_point' as well.
     let send_panic_point = matches.opt_str("x").and_then(|i| i.parse::<usize>().ok());
     let receive_panic_point = matches.opt_str("y").and_then(|i| i.parse::<usize>().ok());
 
@@ -195,6 +194,7 @@ fn rendezvous_test_oneshot() -> Result<(), &'static str> {
 
 
 /// A simple test that spawns a sender & receiver task to send `send_count` and receive `receive_count` messages.
+/// Optionally can set panics at `send_panic` and `receive_panic` locations
 fn rendezvous_test_multiple(send_count: usize, receive_count: usize, send_panic: Option<usize>, receive_panic: Option<usize>) -> Result<(), &'static str> {
     let my_cpu = apic::get_my_apic_id();
 
@@ -223,6 +223,7 @@ fn rendezvous_test_multiple(send_count: usize, receive_count: usize, send_panic:
 }
 
 /// A simple receiver receiving `iterations` messages
+/// Optionally may panic after sending `panic_pont` messages
 fn rendezvous_receiver_task ((receiver, iterations, panic_point): (rendezvous::Receiver<String>, usize, Option<usize>)) -> Result<(), &'static str> {
     warn!("rendezvous_test(): Entered receiver task! Expecting to receive {} messages", iterations);
 
@@ -247,6 +248,7 @@ fn rendezvous_receiver_task ((receiver, iterations, panic_point): (rendezvous::R
 }
 
 /// A simple sender sending `iterations` messages
+/// Optionally may panic after sending `panic_pont` messages
 fn rendezvous_sender_task ((sender, iterations, panic_point): (rendezvous::Sender<String>, usize, Option<usize>)) -> Result<(), &'static str> {
     warn!("rendezvous_test(): Entered sender task! Expecting to send {} messages", iterations);
 
@@ -272,6 +274,7 @@ fn rendezvous_sender_task ((sender, iterations, panic_point): (rendezvous::Sende
 
 
 /// A simple test that spawns a sender & receiver task to send a single message
+/// Optionally can set panics at `send_panic` and `receive_panic` locations
 fn asynchronous_test_oneshot() -> Result<(), &'static str> {
     let my_cpu = apic::get_my_apic_id();
 
@@ -342,6 +345,7 @@ fn asynchronous_test_multiple(send_count: usize, receive_count: usize, send_pani
 }
 
 /// A simple receiver receiving `iterations` messages
+/// Optionally may panic after sending `panic_pont` messages
 fn asynchronous_receiver_task ((receiver, iterations, panic_point): (async_channel::Receiver<String>, usize, Option<usize>)) -> Result<(), &'static str> {
     warn!("asynchronous_test(): Entered receiver task! Expecting to receive {} messages", iterations);
     
@@ -366,6 +370,7 @@ fn asynchronous_receiver_task ((receiver, iterations, panic_point): (async_chann
 }
 
 /// A simple sender sending `iterations` messages
+/// Optionally may panic after sending `panic_pont` messages
 fn asynchronous_sender_task ((sender, iterations, panic_point): (async_channel::Sender<String>, usize, Option<usize>)) -> Result<(), &'static str> {
     warn!("asynchronous_test(): Entered sender task! Expecting to send {} messages", iterations);
     if panic_point.is_some(){
