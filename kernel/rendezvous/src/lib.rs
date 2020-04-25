@@ -100,8 +100,12 @@ enum ExchangeState<T> {
     /// Thus, the message `T` is enclosed here for the receiver to take, 
     /// and it is the receivers's responsibility to reset to the initial state.
     SenderFinishedFirst(T),
+    
+    SenderDropped(T),
+
     ReceiverDropped,
-    SenderDropped
+
+    SenderAndReceiverDropped,
 }
 impl<T> fmt::Debug for ExchangeState<T> {
     fn fmt(&self, f: &mut fmt::Formatter) -> fmt::Result {
