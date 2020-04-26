@@ -33,7 +33,7 @@ use spin::Mutex;
 use volatile::Volatile;
 use irq_safety::MutexIrqSafe;
 use memory::{VirtualAddress, PhysicalAddress, MappedPages, Page, Frame, FrameRange, EntryFlags, MemoryManagementInfo, get_frame_allocator_ref, Stack};
-use kernel_config::memory::{PAGE_SIZE, PAGE_SHIFT};
+use kernel_config::memory::{PAGE_SIZE, PAGE_SHIFT, KERNEL_STACK_SIZE_IN_PAGES};
 use apic::{LocalApic, get_lapics, get_my_apic_id, has_x2apic, get_bsp_id};
 use ap_start::{kstart_ap, AP_READY_FLAG};
 use madt::{Madt, MadtEntry, MadtLocalApic, find_nmi_entry_for_processor};

@@ -242,7 +242,7 @@ impl<F, A, R> TaskBuilder<F, A, R>
     }
 
     /// Set the new Task's is_an_idle_task to true.
-    /// This allows the creation of an idle task using KernelTaskbuilder
+    /// This allows the creation of an idle task using Taskbuilder
     pub fn set_idle(mut self) -> TaskBuilder<F, A, R> {
         self.idle = true;
         self
@@ -308,8 +308,7 @@ impl<F, A, R> TaskBuilder<F, A, R>
             runqueue::add_task_to_specific_runqueue(core, task_ref.clone())?;
         }
         else {
-            // runqueue::add_task_to_any_runqueue(task_ref.clone())?;
-            runqueue::add_task_to_specific_runqueue(1, task_ref.clone())?;
+            runqueue::add_task_to_any_runqueue(task_ref.clone())?;
         }
 
         Ok(task_ref)
@@ -317,37 +316,63 @@ impl<F, A, R> TaskBuilder<F, A, R>
 
 }
 
-/// A struct that uses the Builder pattern to create and customize new kernel `Task`s which are restartable
-/// Implementation is similar to `KernelTaskBuilder` with the addition of storing the arguments and function
-/// in the task structure.
-/// Note that the new `Task` will not actually be created until the [`spawn`](#method.spawn) method is invoked.
-pub struct KernelRestartableTaskBuilder<F, A, R> {
+/// Similar to `new_task_builder` but the entry point function 
+/// `func` and `argument` will be stored in the task struct and 
+/// will be used to restart the  task if it panics or exits. 
+/// 
+/// The `argument` needs to implement `Clone` trait since it is
+/// stored in the task structure.
+/// // We need a seperate restartable task builder because
+/// // arguments for restartable tasks are resitricted by
+/// // `Clone` trait.
+pub fn new_restartable_task_builder<F, A, R>(
+    func: F,
+    argument: A
+) -> RestartableTaskBuilder<F, A, R>
+    where A: Send + Any + Clone + 'static,  
+          R: Send + 'static,
+          F: FnOnce(A) -> R + Send + Clone +'static,
+{
+    RestartableTaskBuilder::new(func, argument)
+}
+
+/// Similar to `TaskBuilder` but used to create restartable tasks.  
+/// 
+/// To create a `RestartableTaskBuilder`, use these functions:
+/// * [`new_restartable_task_builder()`][rtb]:  creates a new restartable task for a known, existing function.
+/// 
+/// [rtb]:  fn.new_restartable_task_builder.html
+pub struct RestartableTaskBuilder<F, A, R> {
     func: F,
     argument: A,
-    _rettype: PhantomData<R>,
+    _return_type: PhantomData<R>,
     name: Option<String>,
     pin_on_core: Option<u8>,
     blocked: bool,
+    idle: bool,
 
     #[cfg(simd_personality)]
     simd: SimdExt,
+    post_build_function: Option<Box< dyn FnOnce(&mut Task) -> Result<(), &'static str> >>,
 }
 
-impl<F, A, R> KernelRestartableTaskBuilder<F, A, R> 
+impl<F, A, R> RestartableTaskBuilder<F, A, R> 
     where A: Send + Any + Clone + 'static, 
           R: Send + 'static,
           F: FnOnce(A) -> R + Send + Clone +'static,
 {
-    /// Creates a new `Task` from the given kernel function `func`
+    /// Creates a new restartable `Task` from the given function `func`
     /// that will be passed the argument `arg` when spawned. 
-    pub fn new(func: F, argument: A) -> KernelRestartableTaskBuilder<F, A, R> {
-        KernelRestartableTaskBuilder {
+    fn new(func: F, argument: A) -> RestartableTaskBuilder<F, A, R> {
+        RestartableTaskBuilder {
             argument: argument,
             func: func,
-            _rettype: PhantomData,
+            _return_type: PhantomData,
             name: None,
             pin_on_core: None,
             blocked: false,
+            idle: false,
+            post_build_function: None,
 
             #[cfg(simd_personality)]
             simd: SimdExt::None,
@@ -355,13 +380,19 @@ impl<F, A, R> KernelRestartableTaskBuilder<F, A, R>
     }
 
     /// Set the String name for the new Task.
-    pub fn name(mut self, name: String) -> KernelRestartableTaskBuilder<F, A, R> {
+    pub fn name(mut self, name: String) -> RestartableTaskBuilder<F, A, R> {
         self.name = Some(name);
         self
     }
 
+    /// Set the argument that will be passed to the new Task's entry function.
+    pub fn argument(mut self, argument: A) -> RestartableTaskBuilder<F, A, R> {
+        self.argument = argument;
+        self
+    }
+
     /// Pin the new Task to a specific core.
-    pub fn pin_on_core(mut self, core_apic_id: u8) -> KernelRestartableTaskBuilder<F, A, R> {
+    pub fn pin_on_core(mut self, core_apic_id: u8) -> RestartableTaskBuilder<F, A, R> {
         self.pin_on_core = Some(core_apic_id);
         self
     }
@@ -369,7 +400,7 @@ impl<F, A, R> KernelRestartableTaskBuilder<F, A, R>
     /// Mark this new Task as a SIMD-enabled Task 
     /// that can run SIMD instructions and use SIMD registers.
     #[cfg(simd_personality)]
-    pub fn simd(mut self, extension: SimdExt) -> KernelRestartableTaskBuilder<F, A, R> {
+    pub fn simd(mut self, extension: SimdExt) -> RestartableTaskBuilder<F, A, R> {
         self.simd = extension;
         self
     }
@@ -379,32 +410,30 @@ impl<F, A, R> KernelRestartableTaskBuilder<F, A, R>
     /// e.g., to set up other things for the newly-spawned (but not yet running) task. 
     /// 
     /// Note that the new Task will not be `Runnable` until it is explicitly set as such.
-    pub fn block(mut self) -> KernelRestartableTaskBuilder<F, A, R> {
+    pub fn block(mut self) -> RestartableTaskBuilder<F, A, R> {
         self.blocked = true;
         self
     }
 
-    /// Finishes this `KernelRestartableTaskBuilder` and spawns a new kernel task in the same address space and `CrateNamespace` as the current task. 
+    /// Set the new Task's is_an_idle_task to true.
+    /// This allows the creation of an idle task using RestartableTaskbuilder
+    pub fn set_idle(mut self) -> RestartableTaskBuilder<F, A, R> {
+        self.idle = true;
+        self
+    }
+
+    /// Finishes this `RestartableTaskBuilder` and spawns the new task as described by its builder functions.
+    /// 
     /// This merely makes the new task Runnable, it does not switch to it immediately; that will happen on the next scheduler invocation.
     #[inline(never)]
     pub fn spawn(self) -> Result<TaskRef, &'static str> {
-        const DUMMY_PB_FUNC: Option<fn(&mut Task) -> Result<(), &'static str>> = None; // just a type-specific `None` value
-        self.spawn_internal(DUMMY_PB_FUNC)
-    }
+        let mut new_task = Task::new(
+            None,
+            task_cleanup_failure::<F, A, R>,
+        )?;
 
-    /// The internal spawn routine for both regular kernel Tasks and application Tasks.
-    /// otherwise in Runnable state.
-    fn spawn_internal<PB>(
-        self, 
-        post_builder_func: Option<PB>) 
-    -> Result<TaskRef, &'static str> 
-        where PB: FnOnce(&mut Task) -> Result<(), &'static str>
-    {
-        let mut new_task = Task::new(None)?;
-        new_task.name = self.name.unwrap_or_else(|| String::from( 
-            // if a Task name wasn't provided, then just use the function's name
-            type_name::get::<F>(),
-        ));
+        // If a Task name wasn't provided, then just use the function's name.
+        new_task.name = self.name.unwrap_or_else(|| String::from(core::any::type_name::<F>()));
     
         #[cfg(simd_personality)] {  
             new_task.simd = self.simd;
@@ -419,20 +448,20 @@ impl<F, A, R> KernelRestartableTaskBuilder<F, A, R>
         // mark the task as restartable
         new_task.restartable = true;
 
-        setup_context_trampoline(&mut new_task, task_wrapper_restartable::<F, A, R>);
+        setup_context_trampoline(&mut new_task, task_wrapper_restartable::<F, A, R>)?;
 
-        // set up the kthread stuff
-        let kthread_call = Box::new( KthreadCall::new( self.argument , self.func) );
-
-        // debug!("Creating kthread_call: {:?}", debugit!(kthread_call));
-
-        // currently we're using the very bottom of the kstack for kthread arguments
-        let arg_ptr = new_task.kstack.bottom().value();
-        let kthread_ptr: *mut KthreadCall<F, A, R> = Box::into_raw(kthread_call);  // consumes the kthread_call Box!
-        unsafe {
-            *(arg_ptr as *mut _) = kthread_ptr; // as *mut KthreadCall<A, R>; // as usize;
-            // debug!("checking kthread_call: arg_ptr={:#x} *arg_ptr={:#x} kthread_ptr={:#x} {:?}", arg_ptr as usize, *(arg_ptr as *const usize) as usize, kthread_ptr as usize, debugit!(*kthread_ptr));
+        // Currently we're using the very bottom of the kstack for kthread arguments. 
+        // This is probably stupid (it'd be best to put them directly where they need to go towards the top of the stack),
+        // but it simplifies type safety in the `task_wrapper` entry point and removes uncertainty from assumed calling conventions.
+        {
+            let bottom_of_stack = new_task.kstack.as_type_mut::<*mut TaskFuncArg<F, A, R>>(0)?;
+            *bottom_of_stack = Box::into_raw(Box::new(TaskFuncArg::<F, A, R> {
+                arg:  self.argument,
+                func: self.func,
+                _rettype: PhantomData,
+            }));
         }
+
         // The new task is ready to be scheduled in, now that its stack trampoline has been set up.
         if self.blocked {
             new_task.runstate = RunState::Blocked;
@@ -440,9 +469,14 @@ impl<F, A, R> KernelRestartableTaskBuilder<F, A, R>
             new_task.runstate = RunState::Runnable;
         }
 
-        // If the caller provided a post-build function, invoke that now before finalizing the task and adding it to runqueues  
-        if let Some(func) = post_builder_func{
-            func(&mut new_task)?;
+        // The new task is marked as idle
+        if self.idle {
+            new_task.is_an_idle_task = true;
+        }
+
+        // If there is a post-build function, invoke it now before finalizing the task and adding it to runqueues.
+        if let Some(pb_func) = self.post_build_function {
+            pb_func(&mut new_task)?;
         }
 
         let new_task_id = new_task.id;
@@ -450,7 +484,7 @@ impl<F, A, R> KernelRestartableTaskBuilder<F, A, R>
         let old_task = TASKLIST.lock().insert(new_task_id, task_ref.clone());
         // insert should return None, because that means there was no existing task with the same ID 
         if old_task.is_some() {
-            error!("BUG: KernelRestartableTaskBuilder::spawn(): Fatal Error: TASKLIST already contained a task with the new task's ID!");
+            error!("BUG: TaskBuilder::spawn(): Fatal Error: TASKLIST already contained a task with the new task's ID!");
             return Err("BUG: TASKLIST a contained a task with the new task's ID");
         }
         
@@ -601,35 +635,36 @@ fn task_wrapper<F, A, R>() -> !
     }
 
     // (3) Yield the CPU
-    let success = scheduler::schedule();
-    if !success {
+    // let success = scheduler::schedule();
+    // if !success {
         
-        let apic_id = match get_my_apic_id() {
-            Some(id) => id,
-                _ => {
-                    error!("BUG: Couldn't get apic_id in restart()");
-                    0
-                },
-        };
+    //     let apic_id = match get_my_apic_id() {
+    //         Some(id) => id,
+    //             _ => {
+    //                 error!("BUG: Couldn't get apic_id in restart()");
+    //                 0
+    //             },
+    //     };
 
-        debug!("Idle task not found on core{}",apic_id);
+    //     debug!("Idle task not found on core{}",apic_id);
 
-        let idle_taskref = KernelTaskBuilder::new(idle_task ,0)
-			.name(String::from(format!("idle_task_ap{}", apic_id)))
-			.pin_on_core(apic_id)
-            .set_idle()
-			.spawn().expect("failed to initiate idle task");
+    //     let idle_taskref = KernelTaskBuilder::new(idle_task ,0)
+	// 		.name(String::from(format!("idle_task_ap{}", apic_id)))
+	// 		.pin_on_core(apic_id)
+    //         .set_idle()
+	// 		.spawn().expect("failed to initiate idle task");
        
-    }
-    scheduler::schedule();
-    // nothing below here should ever run again, we should never ever reach this point
+    // }
+    // scheduler::schedule();
+    // // nothing below here should ever run again, we should never ever reach this point
 
-    error!("BUG: task_wrapper WAS RESCHEDULED AFTER BEING DEAD!");
-    loop { }
+    // error!("BUG: task_wrapper WAS RESCHEDULED AFTER BEING DEAD!");
+    // loop { }
 }
 
-/// The entry point for all new `Task`s restartable tasks that run in kernelspace. 
-/// This does not return, because it doesn't really have anywhere to return.
+/// Similar to `task_wrapper` in functionality but used for 
+/// restartable tasks. Further restricts `argument` to have 
+/// `Clone` trait.
 fn task_wrapper_restartable<F, A, R>() -> !
     where A: Send + Any + Clone + 'static, 
           R: Send + 'static,
@@ -642,40 +677,26 @@ fn task_wrapper_restartable<F, A, R>() -> !
         let curr_task_ref = get_my_current_task().expect("BUG: task_wrapper: couldn't get current task (before task func).");
         let curr_task_name = curr_task_ref.lock().name.clone();
 
-        // The pointer to the kthread_call struct (func and arg) was placed at the bottom of the stack when this task was spawned.
-        let kthread_call_ptr: *mut KthreadCall<F, A, R> = {
+        // This task's function and argument were placed at the bottom of the stack when this task was spawned.
+        let task_func_arg = {
             let t = curr_task_ref.lock();
-            unsafe {
-                // dereference it once to get the raw pointer (from the Box<KthreadCall>)
-                *(t.kstack.bottom().value() as *mut *mut KthreadCall<F, A, R>) as *mut KthreadCall<F, A, R>
-            }
+            let tfa_box_raw_ptr = t.kstack.as_type::<*mut TaskFuncArg<F, A, R>>(0)
+                .expect("BUG: task_wrapper: couldn't access task's function/argument at bottom of stack");
+            // SAFE: we placed this Box in this task's stack in the `spawn()` function when creating the TaskFuncArg struct.
+            let tfa_boxed = unsafe { Box::from_raw(*tfa_box_raw_ptr) };
+            *tfa_boxed // un-box it
         };
-
-        let kthread_call: KthreadCall<F, A, R> = {
-            let kthread_call_box: Box<KthreadCall<F, A, R>> = unsafe {
-                Box::from_raw(kthread_call_ptr)
-            };
-            *kthread_call_box
-        };
-        let arg: A = {
-            let arg_box: Box<A> = unsafe {
-                Box::from_raw(kthread_call.arg)
-            };
-            *arg_box
-        };
-
-        let func = kthread_call.func;
-        debug!("task_wrapper [1]: \"{}\" about to call kthread func {:?} with arg {:?}", curr_task_name, debugit!(func), debugit!(arg));
+        let (func, arg) = (task_func_arg.func, task_func_arg.arg);
+        debug!("task_wrapper [1]: \"{}\" about to call task entry func {:?} {{{}}} with arg {:?}",
+            curr_task_name, debugit!(func), core::any::type_name::<F>(), debugit!(arg)
+        );
         (func, arg)
     };
 
     
     enable_interrupts(); // we must enable interrupts for the new task, otherwise we won't be able to preempt it.
-    compiler_fence(Ordering::SeqCst); // I don't think this is necessary...    
 
     let result = catch_unwind::catch_unwind_with_arg(func, arg);
-
-    debug!("Panic returned to task handler restartable\n");   
 
     // Here: now that the task is finished running, we must clean in up by doing four things:
     // 1. Put the task into a non-runnable mode (exited or killed), and set its exit value
@@ -685,95 +706,102 @@ fn task_wrapper_restartable<F, A, R>() -> !
     // The first three need to be done "atomically" (without interruption), so we must disable preemption before step 1.
     // Otherwise, this task could be marked as `Exited`, and then a context switch could occur to another task,
     // which would prevent this task from ever running again, so it would never get to remove itself from the runqueue.
-    {
-        // (0) disable preemption (currently just disabling interrupts altogether)
-        let _held_interrupts = hold_interrupts();
+    // Operations 1 happen in `task__restartable_cleanup_success` or `task_restartable_cleanup_failure`, 
+    // while operations 2 to 4 then happen in `task_restartable_cleanup_final`.
+    let curr_task = get_my_current_task().expect("BUG: task_wrapper: couldn't get current task (after task func).").clone();
+    match result {
+        Ok(exit_value)   => task_restartable_cleanup_success::<F, A, R>(curr_task, exit_value),
+        Err(kill_reason) => task_restartable_cleanup_failure::<F, A, R>(curr_task, kill_reason),
+    }
+    // {
+    //     // (0) disable preemption (currently just disabling interrupts altogether)
+    //     let _held_interrupts = hold_interrupts();
     
-        { 
-            let curr_task_ref = get_my_current_task().expect("BUG: task_wrapper: couldn't get current task (after task func).");
-            let curr_task_name = curr_task_ref.lock().name.clone();
+    //     { 
+    //         let curr_task_ref = get_my_current_task().expect("BUG: task_wrapper: couldn't get current task (after task func).");
+    //         let curr_task_name = curr_task_ref.lock().name.clone();
             
-            // (1) Put the task into a non-runnable mode (exited or killed), and set its exit value accordingly
-            match result {
-                // task exited properly
-                Ok(exit_value) => {
-                    debug!("task_wrapper [2]: \"{}\" exited with return value {:?}", curr_task_name, debugit!(exit_value));
-                    if curr_task_ref.mark_as_exited(Box::new(exit_value)).is_err() {
-                        error!("task_wrapper: \"{}\" task could not set exit value, because task had already exited. Is this correct?", curr_task_name);
-                    }
-                }
-                // task panicked, and we caught it above
-                Err(cause) => {
-                    debug!("task_wrapper [2]: \"{}\" panicked with {:?}", curr_task_name, cause);
-                    if curr_task_ref.mark_as_killed(cause).is_err() {
-                        error!("task_wrapper: \"{}\" task could not set kill reason, because task had already exited. Is this correct?", curr_task_name);
-                    }
-                }
-            }
+    //         // (1) Put the task into a non-runnable mode (exited or killed), and set its exit value accordingly
+    //         match result {
+    //             // task exited properly
+    //             Ok(exit_value) => {
+    //                 debug!("task_wrapper [2]: \"{}\" exited with return value {:?}", curr_task_name, debugit!(exit_value));
+    //                 if curr_task_ref.mark_as_exited(Box::new(exit_value)).is_err() {
+    //                     error!("task_wrapper: \"{}\" task could not set exit value, because task had already exited. Is this correct?", curr_task_name);
+    //                 }
+    //             }
+    //             // task panicked, and we caught it above
+    //             Err(cause) => {
+    //                 debug!("task_wrapper [2]: \"{}\" panicked with {:?}", curr_task_name, cause);
+    //                 if curr_task_ref.mark_as_killed(cause).is_err() {
+    //                     error!("task_wrapper: \"{}\" task could not set kill reason, because task had already exited. Is this correct?", curr_task_name);
+    //                 }
+    //             }
+    //         }
 
-            // (2) Remove it from its runqueue
-            #[cfg(not(runqueue_state_spill_evaluation))]  // the normal case
-            {
-                if let Err(e) = apic::get_my_apic_id()
-                    .and_then(|id| runqueue::get_runqueue(id))
-                    .ok_or("couldn't get this core's ID or runqueue to remove exited task from it")
-                    .and_then(|rq| rq.write().remove_task(&curr_task_ref)) 
-                {
-                    error!("BUG: task_wrapper(): couldn't remove exited task from runqueue: {}", e);
-                }
-            }
+    //         // (2) Remove it from its runqueue
+    //         #[cfg(not(runqueue_state_spill_evaluation))]  // the normal case
+    //         {
+    //             if let Err(e) = apic::get_my_apic_id()
+    //                 .and_then(|id| runqueue::get_runqueue(id))
+    //                 .ok_or("couldn't get this core's ID or runqueue to remove exited task from it")
+    //                 .and_then(|rq| rq.write().remove_task(&curr_task_ref)) 
+    //             {
+    //                 error!("BUG: task_wrapper(): couldn't remove exited task from runqueue: {}", e);
+    //             }
+    //         }
 
-            // (3) Restart the task if it is restartable
-            if curr_task_ref.is_restartable() {
-                let boxed_arg = curr_task_ref.get_argument().unwrap_or(Box::new(7));
-                let boxed_arg_any = boxed_arg as Box<dyn Any>;
-                let concrete_arg_ref: &A = boxed_arg_any.downcast_ref().expect("failed to downcast saved_arg into type A");
+    //         // (3) Restart the task if it is restartable
+    //         if curr_task_ref.is_restartable() {
+    //             let boxed_arg = curr_task_ref.get_argument().unwrap_or(Box::new(7));
+    //             let boxed_arg_any = boxed_arg as Box<dyn Any>;
+    //             let concrete_arg_ref: &A = boxed_arg_any.downcast_ref().expect("failed to downcast saved_arg into type A");
 
-                let boxed_func = curr_task_ref.get_func().unwrap_or(Box::new(ie_loop));
-                let boxed_func_any = boxed_func as Box<Any>;
-                let concrete_func_ref: &(F) = boxed_func_any.downcast_ref().expect("failed to downcast saved_func into called func");
+    //             let boxed_func = curr_task_ref.get_func().unwrap_or(Box::new(ie_loop));
+    //             let boxed_func_any = boxed_func as Box<Any>;
+    //             let concrete_func_ref: &(F) = boxed_func_any.downcast_ref().expect("failed to downcast saved_func into called func");
 
-                fn ie_loop(arg: usize) {
-                    debug!("Hi, i'm in task_func restart with arg {}", arg);
-                }
+    //             fn ie_loop(arg: usize) {
+    //                 debug!("Hi, i'm in task_func restart with arg {}", arg);
+    //             }
                 
-                KernelRestartableTaskBuilder::new(concrete_func_ref.clone(), concrete_arg_ref.clone())
-                                .name(curr_task_name)
-                                .spawn()
-                                .expect("Could not restart the task"); 
-            }
-        }
+    //             KernelRestartableTaskBuilder::new(concrete_func_ref.clone(), concrete_arg_ref.clone())
+    //                             .name(curr_task_name)
+    //                             .spawn()
+    //                             .expect("Could not restart the task"); 
+    //         }
+    //     }
         
-        // re-enabled preemption/interrupts here (happens automatically when _held_interrupts is dropped)
-    }
+    //     // re-enabled preemption/interrupts here (happens automatically when _held_interrupts is dropped)
+    // }
 
-    // (3) Yield the CPU
-    let success = scheduler::schedule();
-    if !success {
+    // // (3) Yield the CPU
+    // let success = scheduler::schedule();
+    // if !success {
         
-        let apic_id = match get_my_apic_id() {
-            Some(id) => id,
-                _ => {
-                    error!("BUG: Couldn't get apic_id in restart()");
-                    0
-                },
-        };
+    //     let apic_id = match get_my_apic_id() {
+    //         Some(id) => id,
+    //             _ => {
+    //                 error!("BUG: Couldn't get apic_id in restart()");
+    //                 0
+    //             },
+    //     };
 
-        debug!("Idle task not found on core{}",apic_id);
+    //     debug!("Idle task not found on core{}",apic_id);
 
-        let idle_taskref = KernelTaskBuilder::new(idle_task ,0)
-			.name(String::from(format!("idle_task_ap{}", apic_id)))
-			.pin_on_core(apic_id)
-            .set_idle()
-			.spawn().expect("failed to initiate idle task");
+    //     let idle_taskref = KernelTaskBuilder::new(idle_task ,0)
+	// 		.name(String::from(format!("idle_task_ap{}", apic_id)))
+	// 		.pin_on_core(apic_id)
+    //         .set_idle()
+	// 		.spawn().expect("failed to initiate idle task");
        
-    }
-    scheduler::schedule();
+    // }
+    // scheduler::schedule();
 
-    // nothing below here should ever run again, we should never ever reach this point
+    // // nothing below here should ever run again, we should never ever reach this point
 
-    error!("BUG: task_wrapper WAS RESCHEDULED AFTER BEING DEAD!");
-    loop { }
+    // error!("BUG: task_wrapper WAS RESCHEDULED AFTER BEING DEAD!");
+    // loop { }
 }
 
 
@@ -781,7 +809,7 @@ fn task_wrapper_restartable<F, A, R>() -> !
 fn task_cleanup_success<F, A, R>(current_task: TaskRef, exit_value: R) -> !
     where A: Send + 'static, 
           R: Send + 'static,
-          F: FnOnce(A) -> R, 
+          F: FnOnce(A) -> R,  
 {
     // Disable preemption (currently just disabling interrupts altogether)
     let held_interrupts = hold_interrupts();
@@ -842,6 +870,123 @@ fn task_cleanup_final<F, A, R>(_held_interrupts: irq_safety::HeldInterrupts, cur
     drop(_held_interrupts); // reenables preemption (interrupts)
 
     // Yield the CPU
+    let success = scheduler::schedule();
+    if !success {
+        
+        let apic_id = get_my_apic_id();
+
+        debug!("Idle task not found on core{}",apic_id);
+
+        let idle_taskref = TaskBuilder::new(idle_task ,0)
+			.name(String::from(format!("idle_task_ap{}", apic_id)))
+			.pin_on_core(apic_id)
+            .set_idle()
+			.spawn().expect("failed to initiate idle task");
+       
+    }
+    scheduler::schedule();
+
+    // nothing below here should ever run again, we should never ever reach this point
+    error!("BUG: task_cleanup_final(): task was rescheduled after being dead!");
+    loop { }
+}
+
+/// This function cleans up a task that exited properly.
+fn task_restartable_cleanup_success<F, A, R>(current_task: TaskRef, exit_value: R) -> !
+    where A: Send + Any + Clone + 'static, 
+          R: Send + 'static,
+          F: FnOnce(A) -> R + Send + Clone +'static,
+{
+    // Disable preemption (currently just disabling interrupts altogether)
+    let held_interrupts = hold_interrupts();
+
+    debug!("task_cleanup_success: {:?} successfully exited with return value {:?}", current_task.lock().name, debugit!(exit_value));
+    if current_task.mark_as_exited(Box::new(exit_value)).is_err() {
+        error!("task_cleanup_success: {:?} task could not set exit value, because task had already exited. Is this correct?", current_task.lock().name);
+    }
+
+    task_restartable_cleanup_final::<F, A, R>(held_interrupts, current_task)
+}
+
+fn task_restartable_cleanup_failure<F, A, R>(current_task: TaskRef, kill_reason: task::KillReason) -> !
+    where A: Send + Any + Clone + 'static, 
+          R: Send + 'static,
+          F: FnOnce(A) -> R + Send + Clone +'static, 
+{
+    // Disable preemption (currently just disabling interrupts altogether)
+    let held_interrupts = hold_interrupts();
+
+    debug!("task_cleanup_failure: {:?} panicked with {:?}", current_task.lock().name, kill_reason);
+    if current_task.mark_as_killed(kill_reason).is_err() {
+        error!("task_cleanup_failure: {:?} task could not set kill reason, because task had already exited. Is this correct?", current_task.lock().name);
+    }
+
+    task_restartable_cleanup_final::<F, A, R>(held_interrupts, current_task)
+}
+
+/// The final piece of the task cleanup logic,
+/// which removes the task from its runqueue and permanently deschedules it. 
+fn task_restartable_cleanup_final<F, A, R>(_held_interrupts: irq_safety::HeldInterrupts, current_task: TaskRef) -> ! 
+   where A: Send + Any + Clone + 'static, 
+         R: Send + 'static,
+         F: FnOnce(A) -> R + Send + Clone +'static, 
+{
+
+    { 
+        let curr_task_name = current_task.lock().name.clone();
+
+        // (2) Remove it from its runqueue
+        #[cfg(not(runqueue_state_spill_evaluation))]  // the normal case
+        {
+            let id = apic::get_my_apic_id();
+            if let Err(e) = runqueue::get_runqueue(id)
+                .ok_or("couldn't get runqueue to remove exited task from it")
+                .and_then(|rq| rq.write().remove_task(&current_task)) 
+            {
+                error!("BUG: task_wrapper(): couldn't remove exited task from runqueue: {}", e);
+            }
+        }
+
+        // (3) Restart the task if it is restartable
+        if current_task.is_restartable() {
+            let boxed_arg = current_task.get_argument().unwrap_or(Box::new(7));
+            let boxed_arg_any = boxed_arg as Box<dyn Any>;
+            let concrete_arg_ref: &A = boxed_arg_any.downcast_ref().expect("failed to downcast saved_arg into type A");
+
+            let boxed_func = current_task.get_func().unwrap_or(Box::new(ie_loop));
+            let boxed_func_any = boxed_func as Box<Any>;
+            let concrete_func_ref: &(F) = boxed_func_any.downcast_ref().expect("failed to downcast saved_func into called func");
+
+            fn ie_loop(arg: usize) {
+                debug!("Hi, i'm in task_func restart with arg {}", arg);
+            }
+            
+            RestartableTaskBuilder::new(concrete_func_ref.clone(), concrete_arg_ref.clone())
+                            .name(curr_task_name)
+                            .spawn()
+                            .expect("Could not restart the task"); 
+        }
+    }
+
+    // We must drop any local stack variables here since this function will not return
+    drop(current_task);
+    drop(_held_interrupts); // reenables preemption (interrupts)
+
+    // Yield the CPU
+    let success = scheduler::schedule();
+    if !success {
+        
+        let apic_id = get_my_apic_id();
+
+        debug!("Idle task not found on core{}",apic_id);
+
+        let idle_taskref = TaskBuilder::new(idle_task ,0)
+			.name(String::from(format!("idle_task_ap{}", apic_id)))
+			.pin_on_core(apic_id)
+            .set_idle()
+			.spawn().expect("failed to initiate idle task");
+       
+    }
     scheduler::schedule();
 
     // nothing below here should ever run again, we should never ever reach this point

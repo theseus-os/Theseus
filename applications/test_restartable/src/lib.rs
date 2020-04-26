@@ -8,7 +8,7 @@ extern crate spawn;
 
 use alloc::vec::Vec;
 use alloc::string::String;
-use spawn::KernelRestartableTaskBuilder;
+use spawn::new_restartable_task_builder;
 
 fn restartable_loop(arg :usize) -> Result<(), &'static str> {
     debug!("Hi, I'm restartable function with arg {}", arg);
@@ -18,8 +18,6 @@ fn restartable_loop(arg :usize) -> Result<(), &'static str> {
     return Ok(()); 
 } 
     
-
-#[no_mangle]
 pub fn main(args: Vec<String>) -> isize {
 
     let mut arg_val = 0;
@@ -35,7 +33,7 @@ pub fn main(args: Vec<String>) -> isize {
         }
     }
 
-    let taskref1  = KernelRestartableTaskBuilder::new(restartable_loop, arg_val)
+    let taskref1  = new_restartable_task_builder(restartable_loop, arg_val)
         .name(String::from("restartable_loop"))
         .spawn()
         .expect("Couldn't start the restartable task"); 
