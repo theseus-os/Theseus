@@ -316,26 +316,6 @@ impl<F, A, R> TaskBuilder<F, A, R>
 
 }
 
-/// Similar to `new_task_builder` but the entry point function 
-/// `func` and `argument` will be stored in the task struct and 
-/// will be used to restart the  task if it panics or exits. 
-/// 
-/// The `argument` needs to implement `Clone` trait since it is
-/// stored in the task structure.
-/// // We need a seperate restartable task builder because
-/// // arguments for restartable tasks are resitricted by
-/// // `Clone` trait.
-pub fn new_restartable_task_builder<F, A, R>(
-    func: F,
-    argument: A
-) -> TaskBuilder<F, A, R>
-    where A: Send + Any + Clone + 'static,  
-          R: Send + 'static,
-          F: FnOnce(A) -> R + Send + Clone +'static,
-{
-    TaskBuilder::new(func, argument)
-}
-
 /// Similar to `TaskBuilder` but used to create restartable tasks.  
 /// 
 /// To create a `RestartableTaskBuilder`, use these functions:
