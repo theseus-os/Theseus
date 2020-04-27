@@ -412,7 +412,7 @@ impl Task {
 
     /// Sets the function to be called when invoking the task
     pub fn set_func(&mut self, func : Option<Box<dyn Any + Send>>){
-        self.restart_info.func = func;
+        self.restart_info.func = Some(func);
     }
 
     /// Takes ownership of this `Task`'s `KillHandler` closure/function if one exists,

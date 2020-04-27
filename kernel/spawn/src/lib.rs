@@ -770,10 +770,10 @@ fn task_restartable_cleanup_final<F, A, R>(_held_interrupts: irq_safety::HeldInt
         debug!("Idle task not found on core{}",apic_id);
 
         let _idle_taskref = new_task_builder(idle_task ,0)
-        .name(String::from(format!("idle_task_ap{}", apic_id)))
-        .pin_on_core(apic_id)
-        .set_idle()
-        .spawn().expect("failed to initiate idle task");
+            .name(String::from(format!("idle_task_ap{}", apic_id)))
+            .pin_on_core(apic_id)
+            .set_idle()
+            .spawn().expect("failed to initiate idle task");
        
     }
     scheduler::schedule();
@@ -784,6 +784,6 @@ fn task_restartable_cleanup_final<F, A, R>(_held_interrupts: irq_safety::HeldInt
 }
 
 /// Simple `idle_task` to be used if original `idle_task` crashes.
-fn idle_task(_a: u32)->(){
+fn idle_task(_a: usize)->(){
     loop {}
 }
