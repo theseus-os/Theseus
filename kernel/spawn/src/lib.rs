@@ -32,7 +32,6 @@ use core::{
     mem,
     marker::PhantomData,
     any::Any,
-    sync::atomic::{Ordering, AtomicBool, compiler_fence},
 };
 use alloc::{
     vec::Vec,
@@ -241,8 +240,8 @@ impl<F, A, R> TaskBuilder<F, A, R>
         self
     }
 
-    /// Set the new Task's is_an_idle_task to true.
-    /// This allows the creation of an idle task using Taskbuilder
+    /// Set the new Task's `is_an_idle_task` field to true. 
+    /// This allows the creation of an idle task using Taskbuilder.
     pub fn set_idle(mut self) -> TaskBuilder<F, A, R> {
         self.idle = true;
         self
@@ -341,7 +340,8 @@ impl<F, A, R> TaskBuilder<F, A, R>
             new_task.simd = self.simd;
         }
 
-        // store function and argument in the task
+        // store function and argument in the task so that they can be used to restart 
+        // the task if needed.
         let boxed_argument = Box::new(self.argument.clone());
         new_task.restart_info.argument = Some(boxed_argument);
         let boxed_func = Box::new(self.func.clone());
@@ -533,7 +533,7 @@ fn task_wrapper<F, A, R>() -> !
 
 /// Similar to `task_wrapper` in functionality but used as entry point only for 
 /// restartable tasks. Further restricts `argument` to implement `Clone` trait. 
-/// // We cannot use `task_wrapper` as it is not bounded by clone trait.
+/// // We cannot use `task_wrapper` as it is not bounded by `Clone` trait.
 fn task_wrapper_restartable<F, A, R>() -> !
     where A: Send + Clone + 'static, 
           R: Send + 'static,
@@ -589,7 +589,7 @@ fn task_wrapper_restartable<F, A, R>() -> !
 fn task_cleanup_success<F, A, R>(current_task: TaskRef, exit_value: R) -> !
     where A: Send + 'static, 
           R: Send + 'static,
-          F: FnOnce(A) -> R,  
+          F: FnOnce(A) -> R, 
 {
     // Disable preemption (currently just disabling interrupts altogether)
     let held_interrupts = hold_interrupts();
@@ -660,11 +660,11 @@ fn task_cleanup_final<F, A, R>(_held_interrupts: irq_safety::HeldInterrupts, cur
 
         debug!("Idle task not found on core{}",apic_id);
 
-        let idle_taskref = new_task_builder(idle_task ,0)
-			.name(String::from(format!("idle_task_ap{}", apic_id)))
-			.pin_on_core(apic_id)
+        let _idle_taskref = new_task_builder(idle_task ,0)
+		    .name(String::from(format!("idle_task_ap{}", apic_id)))
+		    .pin_on_core(apic_id)
             .set_idle()
-			.spawn().expect("failed to initiate idle task");
+            .spawn().expect("failed to initiate idle task");
        
     }
     scheduler::schedule();
@@ -739,14 +739,14 @@ fn task_restartable_cleanup_final<F, A, R>(_held_interrupts: irq_safety::HeldInt
             let concrete_arg_ref: &A = boxed_arg_any.downcast_ref().expect("failed to downcast saved_arg into type A");
 
             let boxed_func = current_task.get_func().unwrap_or(Box::new(ie_loop));
-            let boxed_func_any = boxed_func as Box<Any>;
+            let boxed_func_any = boxed_func as Box<dyn Any>;
             let concrete_func_ref: &(F) = boxed_func_any.downcast_ref().expect("failed to downcast saved_func into called func");
 
             fn ie_loop(arg: usize) {
                 debug!("Hi, i'm in task_func restart with arg {}", arg);
             }
             
-            TaskBuilder::new(concrete_func_ref.clone(), concrete_arg_ref.clone())
+            new_task_builder(concrete_func_ref.clone(), concrete_arg_ref.clone())
                             .name(curr_task_name)
                             .restartable_spawn()
                             .expect("Could not restart the task"); 
@@ -768,7 +768,7 @@ fn task_restartable_cleanup_final<F, A, R>(_held_interrupts: irq_safety::HeldInt
 
         debug!("Idle task not found on core{}",apic_id);
 
-        let idle_taskref = new_task_builder(idle_task ,0)
+        let _idle_taskref = new_task_builder(idle_task ,0)
 			.name(String::from(format!("idle_task_ap{}", apic_id)))
 			.pin_on_core(apic_id)
             .set_idle()
