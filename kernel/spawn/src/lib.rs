@@ -41,7 +41,7 @@ use alloc::{
 };
 use irq_safety::{MutexIrqSafe, hold_interrupts, enable_interrupts};
 use memory::{get_kernel_mmi_ref, MemoryManagementInfo, VirtualAddress};
-use task::{Task, TaskRef, get_my_current_task, RunState, TASKLIST};
+use task::{Task, TaskRef, get_my_current_task, RunState, RestartInfo, TASKLIST};
 use mod_mgmt::{CrateNamespace, SectionType, SECTION_HASH_DELIMITER};
 use path::Path;
 use apic::get_my_apic_id;
@@ -242,7 +242,7 @@ impl<F, A, R> TaskBuilder<F, A, R>
 
     /// Set the new Task's `is_an_idle_task` field to true. 
     /// This allows the creation of an idle task using Taskbuilder.
-    pub fn set_idle(mut self) -> TaskBuilder<F, A, R> {
+    pub fn idle(mut self) -> TaskBuilder<F, A, R> {
         self.idle = true;
         self
     }
@@ -328,7 +328,7 @@ impl<F, A, R> TaskBuilder<F, A, R>
     /// 
     /// This merely makes the new task Runnable, it does not switch to it immediately; that will happen on the next scheduler invocation.
     #[inline(never)]
-    pub fn restartable_spawn(self) -> Result<TaskRef, &'static str> {
+    pub fn spawn_restartable(self) -> Result<TaskRef, &'static str> {
         let mut new_task = Task::new(
             None,
             task_cleanup_failure::<F, A, R>,
@@ -343,12 +343,17 @@ impl<F, A, R> TaskBuilder<F, A, R>
         // store function and argument in the task so that they can be used to restart 
         // the task if needed.
         let boxed_argument = Box::new(self.argument.clone());
-        new_task.restart_info.argument = Some(boxed_argument);
+        //new_task.restart_info.argument = Some(boxed_argument);
         let boxed_func = Box::new(self.func.clone());
-        new_task.restart_info.func = Some(boxed_func);
+        //new_task.restart_info = Some(boxed_func);
+
+        let restrat_info = RestartInfo {
+            argument: boxed_argument,
+            func: boxed_func,
+        };
 
         // mark the task as restartable
-        new_task.restart_info.restartable = true;
+        new_task.restart_info = Some(restrat_info);
 
         setup_context_trampoline(&mut new_task, task_wrapper_restartable::<F, A, R>)?;
 
@@ -625,14 +630,7 @@ fn task_cleanup_failure<F, A, R>(current_task: TaskRef, kill_reason: task::KillR
     task_cleanup_final::<F, A, R>(held_interrupts, current_task)
 }
 
-
-/// The final piece of the task cleanup logic,
-/// which removes the task from its runqueue and permanently deschedules it. 
-fn task_cleanup_final<F, A, R>(_held_interrupts: irq_safety::HeldInterrupts, current_task: TaskRef) -> ! 
-    where A: Send + 'static, 
-          R: Send + 'static,
-          F: FnOnce(A) -> R, 
-{
+fn remove_current_task(current_task: TaskRef) -> () {
     // Remove the task from its runqueue
     #[cfg(not(runqueue_state_spill_evaluation))]  // the normal case
     {
@@ -646,6 +644,29 @@ fn task_cleanup_final<F, A, R>(_held_interrupts: irq_safety::HeldInterrupts, cur
 
     // We must drop any local stack variables here since this function will not return
     drop(current_task);
+}
+
+fn spawn_idle_task() -> () {
+    let apic_id = get_my_apic_id();
+
+    debug!("Idle task not found on core{}",apic_id);
+
+    let _idle_taskref = new_task_builder(idle_task ,0)
+        .name(String::from(format!("idle_task_ap{}", apic_id)))
+        .pin_on_core(apic_id)
+        .idle()
+        .spawn().expect("failed to initiate idle task");
+}
+
+
+/// The final piece of the task cleanup logic,
+/// which removes the task from its runqueue and permanently deschedules it. 
+fn task_cleanup_final<F, A, R>(_held_interrupts: irq_safety::HeldInterrupts, current_task: TaskRef) -> ! 
+    where A: Send + 'static, 
+          R: Send + 'static,
+          F: FnOnce(A) -> R, 
+{
+    remove_current_task(current_task);
     drop(_held_interrupts); // reenables preemption (interrupts)
 
     // Yield the CPU
@@ -654,17 +675,7 @@ fn task_cleanup_final<F, A, R>(_held_interrupts: irq_safety::HeldInterrupts, cur
     // in most cases as at least the idle task will be there. However on rare instances where 
     // the idle task has crashed this will fail. If so we spawn a new idle task.
     if !success {
-        
-        let apic_id = get_my_apic_id();
-
-        debug!("Idle task not found on core{}",apic_id);
-
-        let _idle_taskref = new_task_builder(idle_task ,0)
-            .name(String::from(format!("idle_task_ap{}", apic_id)))
-            .pin_on_core(apic_id)
-            .set_idle()
-            .spawn().expect("failed to initiate idle task");
-       
+        spawn_idle_task();
     }
     scheduler::schedule();
 
@@ -706,41 +717,28 @@ fn task_restartable_cleanup_final<F, A, R>(_held_interrupts: irq_safety::HeldInt
         let curr_task_name = current_task.lock().name.clone();
 
         // (2) Remove it from its runqueue
-        #[cfg(not(runqueue_state_spill_evaluation))]  // the normal case
-        {
-            let id = apic::get_my_apic_id();
-            if let Err(e) = runqueue::get_runqueue(id)
-                .ok_or("couldn't get runqueue to remove exited task from it")
-                .and_then(|rq| rq.write().remove_task(&current_task)) 
-            {
-                error!("BUG: task_wrapper(): couldn't remove exited task from runqueue: {}", e);
-            }
-        }
+        
 
         // (3) Restart the task if it is restartable
-        if current_task.is_restartable() {
-            match (current_task.get_argument(), current_task.get_func()) {
-                (Some(boxed_arg), Some(boxed_func)) => {
-                    let boxed_arg_any = boxed_arg as Box<dyn Any>;
-                    let concrete_arg_ref: &A = boxed_arg_any.downcast_ref().expect("failed to downcast saved_arg into type A");
+        if let Some(restart_info) = current_task.get_restart_info() {
+            let boxed_arg_any = restart_info.argument as Box<dyn Any>;
+            let concrete_arg_ref: &A = boxed_arg_any.downcast_ref().expect("failed to downcast saved_arg into type A");
 
-                    let boxed_func_any = boxed_func as Box<dyn Any>;
-                    let concrete_func_ref: &(F) = boxed_func_any.downcast_ref().expect("failed to downcast saved_func into called func");
+            let boxed_func_any = restart_info.func as Box<dyn Any>;
+            let concrete_func_ref: &(F) = boxed_func_any.downcast_ref().expect("failed to downcast saved_func into called func");
 
-                    new_task_builder(concrete_func_ref.clone(), concrete_arg_ref.clone())
-                        .name(curr_task_name)
-                        .restartable_spawn()
-                        .expect("Could not restart the task"); 
-                }
-                _ => {
-                    error!("BUG : Task is restartable but the function or the argument is missing");
-                }
-            }
+            remove_current_task(current_task);
+
+            new_task_builder(concrete_func_ref.clone(), concrete_arg_ref.clone())
+                .name(curr_task_name)
+                .spawn_restartable()
+                .expect("Could not restart the task"); 
+        } else {
+            error!("BUG : Restratable task but no restart information available");
+            remove_current_task(current_task);
         }
     }
 
-    // We must drop any local stack variables here since this function will not return
-    drop(current_task);
     drop(_held_interrupts); // reenables preemption (interrupts)
 
     // Yield the CPU
@@ -750,15 +748,7 @@ fn task_restartable_cleanup_final<F, A, R>(_held_interrupts: irq_safety::HeldInt
     // the idle task has crashed this will fail. If so we spawn a new idle task.
     if !success {
         
-        let apic_id = get_my_apic_id();
-
-        debug!("Idle task not found on core{}",apic_id);
-
-        let _idle_taskref = new_task_builder(idle_task ,0)
-            .name(String::from(format!("idle_task_ap{}", apic_id)))
-            .pin_on_core(apic_id)
-            .set_idle()
-            .spawn().expect("failed to initiate idle task");
+        spawn_idle_task();
        
     }
     scheduler::schedule();

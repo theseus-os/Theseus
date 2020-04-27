@@ -199,11 +199,9 @@ pub enum SimdExt {
 /// A data structure to hold data related to restart the function
 pub struct RestartInfo {
     /// Stores the argument of the task for restartable tasks
-    pub argument: Option<Box<dyn Any + Send>>,
+    pub argument: Box<dyn Any + Send>,
     /// Stores the function of the task for restartable tasks
-    pub func: Option<Box<dyn Any + Send>>,
-    /// Indicates whether task is restartable
-    pub restartable : bool,
+    pub func: Box<dyn Any + Send>,
 }
 
 /// The signature of a Task's failure cleanup function.
@@ -266,7 +264,7 @@ pub struct Task {
     pub simd: SimdExt,
 
     /// Stores the restartable information of the task
-    pub restart_info: RestartInfo,
+    pub restart_info: Option<RestartInfo>,
 }
 
 impl fmt::Debug for Task {
@@ -348,11 +346,7 @@ impl Task {
 
             #[cfg(simd_personality)]
             simd: SimdExt::None,
-            restart_info: RestartInfo {
-                argument: None,
-                func: None,
-                restartable: false,
-            }
+            restart_info: None
         }
     }
 
@@ -403,16 +397,6 @@ impl Task {
     /// The given `callback` will be invoked before the task is cleaned up via stack unwinding.
     pub fn set_kill_handler(&mut self, callback: KillHandler) {
         self.kill_handler = Some(callback);
-    }
-
-    /// Sets the argument of the task
-    pub fn set_argument(&mut self, argument : Box<dyn Any + Send>){
-        self.restart_info.argument = Some(argument);
-    }
-
-    /// Sets the function to be called when invoking the task
-    pub fn set_func(&mut self, func : Box<dyn Any + Send>){
-        self.restart_info.func = Some(func);
     }
 
     /// Takes ownership of this `Task`'s `KillHandler` closure/function if one exists,
@@ -901,19 +885,24 @@ impl TaskRef {
         self.0.deref().0.lock().set_env(new_env);
     }
     
-    /// Takes ownership of the argument of this task
-    pub fn get_argument(&self) -> Option<Box<dyn Any + Send>> {
-       self.0.deref().0.lock().restart_info.argument.take()
-    }
+    // /// Takes ownership of the argument of this task
+    // pub fn get_argument(&self) -> Option<Box<dyn Any + Send>> {
+    //    match &mut self.0.deref().0.lock().restart_info{
+    //        Some(x) => x.argument.take(),
+    //        _ => None,
+    //    }
+    // }
 
-    /// Takes ownership of the function of this task
-    pub fn get_func(&self) -> Option<Box<dyn Any + Send>> {
-       self.0.deref().0.lock().restart_info.func.take()
-    }
+    // /// Takes ownership of the function of this task
+    // pub fn get_func(&self) -> Option<Box<dyn Any + Send>> {
+    //    match &mut self.0.deref().0.lock().restart_info{
+    //        Some(x) => x.func.take(),
+    //        _ => None,
+    //    }
+    // }
 
-    /// Returns whether the task is restartable or not
-    pub fn is_restartable(&self) -> bool {
-        self.0.deref().0.lock().restart_info.restartable
+    pub fn get_restart_info(&self) -> Option<RestartInfo> {
+        self.0.deref().0.lock().restart_info.take()
     }
 
     /// Gets a reference to this task's `Environment`.
