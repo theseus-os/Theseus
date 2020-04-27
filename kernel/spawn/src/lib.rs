@@ -257,6 +257,12 @@ impl<F, A, R> TaskBuilder<F, A, R>
             None,
             task_cleanup_failure::<F, A, R>,
         )?;
+
+        self.spawn_internal(new_task, task_wrapper::<F, A, R>)
+    }
+
+    fn spawn_internal(self, mut new_task: Task, entry_point_function: fn() -> !) -> Result<TaskRef, &'static str> {
+        
         // If a Task name wasn't provided, then just use the function's name.
         new_task.name = self.name.unwrap_or_else(|| String::from(core::any::type_name::<F>()));
     
@@ -264,7 +270,7 @@ impl<F, A, R> TaskBuilder<F, A, R>
             new_task.simd = self.simd;
         }
 
-        setup_context_trampoline(&mut new_task, task_wrapper::<F, A, R>)?;
+        setup_context_trampoline(&mut new_task, entry_point_function)?;
 
         // Currently we're using the very bottom of the kstack for kthread arguments. 
         // This is probably stupid (it'd be best to put them directly where they need to go towards the top of the stack),
@@ -334,12 +340,6 @@ impl<F, A, R> TaskBuilder<F, A, R>
             None,
             task_cleanup_failure::<F, A, R>,
         )?;
-        // If a Task name wasn't provided, then just use the function's name.
-        new_task.name = self.name.unwrap_or_else(|| String::from(core::any::type_name::<F>()));
-    
-        #[cfg(simd_personality)] {  
-            new_task.simd = self.simd;
-        }
 
         // store function and argument in the task so that they can be used to restart 
         // the task if needed.
@@ -356,54 +356,7 @@ impl<F, A, R> TaskBuilder<F, A, R>
         // mark the task as restartable
         new_task.restart_info = Some(restrat_info);
 
-        setup_context_trampoline(&mut new_task, task_wrapper_restartable::<F, A, R>)?;
-
-        // Currently we're using the very bottom of the kstack for kthread arguments. 
-        // This is probably stupid (it'd be best to put them directly where they need to go towards the top of the stack),
-        // but it simplifies type safety in the `task_wrapper` entry point and removes uncertainty from assumed calling conventions.
-        {
-            let bottom_of_stack = new_task.kstack.as_type_mut::<*mut TaskFuncArg<F, A, R>>(0)?;
-            *bottom_of_stack = Box::into_raw(Box::new(TaskFuncArg::<F, A, R> {
-                arg:  self.argument,
-                func: self.func,
-                _rettype: PhantomData,
-            }));
-        }
-
-        // The new task is ready to be scheduled in, now that its stack trampoline has been set up.
-        if self.blocked {
-            new_task.runstate = RunState::Blocked;
-        } else {
-            new_task.runstate = RunState::Runnable;
-        }
-
-        // The new task is marked as idle
-        if self.idle {
-            new_task.is_an_idle_task = true;
-        }
-
-        // If there is a post-build function, invoke it now before finalizing the task and adding it to runqueues.
-        if let Some(pb_func) = self.post_build_function {
-            pb_func(&mut new_task)?;
-        }
-
-        let new_task_id = new_task.id;
-        let task_ref = TaskRef::new(new_task);
-        let old_task = TASKLIST.lock().insert(new_task_id, task_ref.clone());
-        // insert should return None, because that means there was no existing task with the same ID 
-        if old_task.is_some() {
-            error!("BUG: TaskBuilder::spawn(): Fatal Error: TASKLIST already contained a task with the new task's ID!");
-            return Err("BUG: TASKLIST a contained a task with the new task's ID");
-        }
-        
-        if let Some(core) = self.pin_on_core {
-            runqueue::add_task_to_specific_runqueue(core, task_ref.clone())?;
-        }
-        else {
-            runqueue::add_task_to_any_runqueue(task_ref.clone())?;
-        }
-
-        Ok(task_ref)
+        self.spawn_internal(new_task, task_wrapper_restartable::<F, A, R>)
     }
 }
 
