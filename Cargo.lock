@@ -2355,8 +2355,10 @@ dependencies = [
 name = "test_restartable"
 version = "0.1.0"
 dependencies = [
+ "getopts 0.2.21 (git+https://github.com/kevinaboos/getopts)",
  "log 0.4.8 (registry+https://github.com/rust-lang/crates.io-index)",
  "spawn 0.1.0",
+ "terminal_print 0.1.0",
 ]
 
 [[package]]

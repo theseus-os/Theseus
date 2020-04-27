@@ -411,7 +411,7 @@ impl Task {
     }
 
     /// Sets the function to be called when invoking the task
-    pub fn set_func(&mut self, func : Option<Box<dyn Any + Send>>){
+    pub fn set_func(&mut self, func : Box<dyn Any + Send>){
         self.restart_info.func = Some(func);
     }
 
