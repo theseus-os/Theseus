@@ -328,12 +328,12 @@ impl<F, A, R> TaskBuilder<F, A, R>
 pub fn new_restartable_task_builder<F, A, R>(
     func: F,
     argument: A
-) -> RestartableTaskBuilder<F, A, R>
+) -> TaskBuilder<F, A, R>
     where A: Send + Any + Clone + 'static,  
           R: Send + 'static,
           F: FnOnce(A) -> R + Send + Clone +'static,
 {
-    RestartableTaskBuilder::new(func, argument)
+    TaskBuilder::new(func, argument)
 }
 
 /// Similar to `TaskBuilder` but used to create restartable tasks.  
@@ -342,96 +342,19 @@ pub fn new_restartable_task_builder<F, A, R>(
 /// * [`new_restartable_task_builder()`][rtb]:  creates a new restartable task for a known, existing function.
 /// 
 /// [rtb]:  fn.new_restartable_task_builder.html
-pub struct RestartableTaskBuilder<F, A, R> {
-    func: F,
-    argument: A,
-    _return_type: PhantomData<R>,
-    name: Option<String>,
-    pin_on_core: Option<u8>,
-    blocked: bool,
-    idle: bool,
 
-    #[cfg(simd_personality)]
-    simd: SimdExt,
-    post_build_function: Option<Box< dyn FnOnce(&mut Task) -> Result<(), &'static str> >>,
-}
-
-impl<F, A, R> RestartableTaskBuilder<F, A, R> 
+impl<F, A, R> TaskBuilder<F, A, R> 
     where A: Send + Any + Clone + 'static, 
           R: Send + 'static,
           F: FnOnce(A) -> R + Send + Clone +'static,
 {
-    /// Creates a new restartable `Task` from the given function `func`
-    /// that will be passed the argument `arg` when spawned. 
-    fn new(func: F, argument: A) -> RestartableTaskBuilder<F, A, R> {
-        RestartableTaskBuilder {
-            argument: argument,
-            func: func,
-            _return_type: PhantomData,
-            name: None,
-            pin_on_core: None,
-            blocked: false,
-            idle: false,
-            post_build_function: None,
 
-            #[cfg(simd_personality)]
-            simd: SimdExt::None,
-        }
-    }
-
-    /// Set the String name for the new Task.
-    pub fn name(mut self, name: String) -> RestartableTaskBuilder<F, A, R> {
-        self.name = Some(name);
-        self
-    }
-
-    /// Set the argument that will be passed to the new Task's entry function.
-    pub fn argument(mut self, argument: A) -> RestartableTaskBuilder<F, A, R> {
-        self.argument = argument;
-        self
-    }
-
-    /// Pin the new Task to a specific core.
-    pub fn pin_on_core(mut self, core_apic_id: u8) -> RestartableTaskBuilder<F, A, R> {
-        self.pin_on_core = Some(core_apic_id);
-        self
-    }
-
-    /// Mark this new Task as a SIMD-enabled Task 
-    /// that can run SIMD instructions and use SIMD registers.
-    #[cfg(simd_personality)]
-    pub fn simd(mut self, extension: SimdExt) -> RestartableTaskBuilder<F, A, R> {
-        self.simd = extension;
-        self
-    }
-
-    /// Set the new Task's `RunState` to be `Blocked` instead of `Runnable` when it is first spawned.
-    /// This allows another task to delay the new task's execution arbitrarily, 
-    /// e.g., to set up other things for the newly-spawned (but not yet running) task. 
-    /// 
-    /// Note that the new Task will not be `Runnable` until it is explicitly set as such.
-    pub fn block(mut self) -> RestartableTaskBuilder<F, A, R> {
-        self.blocked = true;
-        self
-    }
-
-    /// Set the new Task's is_an_idle_task to true.
-    /// This allows the creation of an idle task using RestartableTaskbuilder
-    pub fn set_idle(mut self) -> RestartableTaskBuilder<F, A, R> {
-        self.idle = true;
-        self
-    }
-
-    /// Finishes this `RestartableTaskBuilder` and spawns the new task as described by its builder functions.
-    /// 
-    /// This merely makes the new task Runnable, it does not switch to it immediately; that will happen on the next scheduler invocation.
     #[inline(never)]
-    pub fn spawn(self) -> Result<TaskRef, &'static str> {
+    pub fn restartable_spawn(self) -> Result<TaskRef, &'static str> {
         let mut new_task = Task::new(
             None,
             task_cleanup_failure::<F, A, R>,
         )?;
-
         // If a Task name wasn't provided, then just use the function's name.
         new_task.name = self.name.unwrap_or_else(|| String::from(core::any::type_name::<F>()));
     
@@ -961,9 +884,9 @@ fn task_restartable_cleanup_final<F, A, R>(_held_interrupts: irq_safety::HeldInt
                 debug!("Hi, i'm in task_func restart with arg {}", arg);
             }
             
-            RestartableTaskBuilder::new(concrete_func_ref.clone(), concrete_arg_ref.clone())
+            TaskBuilder::new(concrete_func_ref.clone(), concrete_arg_ref.clone())
                             .name(curr_task_name)
-                            .spawn()
+                            .restartable_spawn()
                             .expect("Could not restart the task"); 
         }
     }

@@ -35,7 +35,7 @@ pub fn main(args: Vec<String>) -> isize {
 
     let taskref1  = new_restartable_task_builder(restartable_loop, arg_val)
         .name(String::from("restartable_loop"))
-        .spawn()
+        .restartable_spawn()
         .expect("Couldn't start the restartable task"); 
 
     taskref1.join().expect("Task 1 join failed");
