@@ -240,11 +240,12 @@ impl<F, A, R> TaskBuilder<F, A, R>
         self
     }
 
-    /// Set the new Task's `is_an_idle_task` field to true. 
-    /// This allows the creation of an idle task using Taskbuilder.
-    pub fn idle(mut self) -> TaskBuilder<F, A, R> {
+    /// Sets this new Task to be the idle task for the given core. 
+    /// This is generally not needed because idle tasks are automatically set up for each core
+    /// when that core is initialized. It's primarily used for restarting an idle task that has exited or failed.
+    pub fn idle(mut self, core_id: u8) -> TaskBuilder<F, A, R> {
         self.idle = true;
-        self
+        self.pin_on_core(core_id)
     }
 
     /// Finishes this `TaskBuilder` and spawns the new task as described by its builder functions.
@@ -653,8 +654,7 @@ fn spawn_idle_task() -> () {
 
     let _idle_taskref = new_task_builder(idle_task ,0)
         .name(String::from(format!("idle_task_ap{}", apic_id)))
-        .pin_on_core(apic_id)
-        .idle()
+        .idle(apic_id)
         .spawn().expect("failed to initiate idle task");
 }
 
