@@ -441,12 +441,12 @@ impl<F, A, R> RestartableTaskBuilder<F, A, R>
 
         // store function and argument in the task
         let boxed_argument = Box::new(self.argument.clone());
-        new_task.argument = Some(boxed_argument);
+        new_task.restart_info.argument = Some(boxed_argument);
         let boxed_func = Box::new(self.func.clone());
-        new_task.func = Some(boxed_func);
+        new_task.restart_info.func = Some(boxed_func);
 
         // mark the task as restartable
-        new_task.restartable = true;
+        new_task.restart_info.restartable = true;
 
         setup_context_trampoline(&mut new_task, task_wrapper_restartable::<F, A, R>)?;
 

@@ -196,6 +196,16 @@ pub enum SimdExt {
     None,
 }
 
+/// A data structure to hold data related to restart the function
+pub struct RestartInfo {
+    /// Stores the argument of the task for restartable tasks
+    pub argument: Option<Box<dyn Any + Send>>,
+    /// Stores the function of the task for restartable tasks
+    pub func: Option<Box<dyn Any + Send>>,
+    /// Indicates whether task is restartable
+    pub restartable : bool,
+}
+
 /// The signature of a Task's failure cleanup function.
 pub type FailureCleanupFunction = fn(TaskRef, KillReason) -> !;
 
@@ -255,12 +265,8 @@ pub struct Task {
     /// Whether this Task is SIMD enabled and what level of SIMD extensions it uses.
     pub simd: SimdExt,
 
-    /// Stores the argument of the task for restartable tasks
-    pub argument: Option<Box<dyn Any + Send>>,
-    /// Stores the function of the task for restartable tasks
-    pub func: Option<Box<dyn Any + Send>>,
-    /// Indicates whether task is restartable
-    pub restartable : bool,
+    /// Stores the restartable information of the task
+    pub restart_info: RestartInfo,
 }
 
 impl fmt::Debug for Task {
@@ -342,10 +348,11 @@ impl Task {
 
             #[cfg(simd_personality)]
             simd: SimdExt::None,
-
-            argument: None,
-            func: None,
-            restartable: false,
+            restart_info: RestartInfo {
+                argument: None,
+                func: None,
+                restartable: false,
+            }
         }
     }
 
@@ -400,12 +407,12 @@ impl Task {
 
     /// Sets the argument of the task
     pub fn set_argument(&mut self, argument : Box<dyn Any + Send>){
-        self.argument = Some(argument);
+        self.restart_info.argument = Some(argument);
     }
 
     /// Sets the function to be called when invoking the task
     pub fn set_func(&mut self, func : Option<Box<dyn Any + Send>>){
-        self.func = func;
+        self.restart_info.func = func;
     }
 
     /// Takes ownership of this `Task`'s `KillHandler` closure/function if one exists,
@@ -896,17 +903,17 @@ impl TaskRef {
     
     /// Takes ownership of the argument of this task
     pub fn get_argument(&self) -> Option<Box<dyn Any + Send>> {
-       self.0.deref().0.lock().argument.take()
+       self.0.deref().0.lock().restart_info.argument.take()
     }
 
     /// Takes ownership of the function of this task
     pub fn get_func(&self) -> Option<Box<dyn Any + Send>> {
-       self.0.deref().0.lock().func.take()
+       self.0.deref().0.lock().restart_info.func.take()
     }
 
     /// Returns whether the task is restartable or not
     pub fn is_restartable(&self) -> bool {
-        self.0.deref().0.lock().restartable
+        self.0.deref().0.lock().restart_info.restartable
     }
 
     /// Gets a reference to this task's `Environment`.
