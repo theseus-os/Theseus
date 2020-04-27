@@ -661,8 +661,8 @@ fn task_cleanup_final<F, A, R>(_held_interrupts: irq_safety::HeldInterrupts, cur
         debug!("Idle task not found on core{}",apic_id);
 
         let _idle_taskref = new_task_builder(idle_task ,0)
-		    .name(String::from(format!("idle_task_ap{}", apic_id)))
-		    .pin_on_core(apic_id)
+            .name(String::from(format!("idle_task_ap{}", apic_id)))
+            .pin_on_core(apic_id)
             .set_idle()
             .spawn().expect("failed to initiate idle task");
        
@@ -734,22 +734,23 @@ fn task_restartable_cleanup_final<F, A, R>(_held_interrupts: irq_safety::HeldInt
 
         // (3) Restart the task if it is restartable
         if current_task.is_restartable() {
-            let boxed_arg = current_task.get_argument().unwrap_or(Box::new(7));
-            let boxed_arg_any = boxed_arg as Box<dyn Any>;
-            let concrete_arg_ref: &A = boxed_arg_any.downcast_ref().expect("failed to downcast saved_arg into type A");
+            match (current_task.get_argument(), current_task.get_func()) {
+                (Some(boxed_arg), Some(boxed_func)) => {
+                    let boxed_arg_any = boxed_arg as Box<dyn Any>;
+                    let concrete_arg_ref: &A = boxed_arg_any.downcast_ref().expect("failed to downcast saved_arg into type A");
 
-            let boxed_func = current_task.get_func().unwrap_or(Box::new(ie_loop));
-            let boxed_func_any = boxed_func as Box<dyn Any>;
-            let concrete_func_ref: &(F) = boxed_func_any.downcast_ref().expect("failed to downcast saved_func into called func");
+                    let boxed_func_any = boxed_func as Box<dyn Any>;
+                    let concrete_func_ref: &(F) = boxed_func_any.downcast_ref().expect("failed to downcast saved_func into called func");
 
-            fn ie_loop(arg: usize) {
-                debug!("Hi, i'm in task_func restart with arg {}", arg);
+                    new_task_builder(concrete_func_ref.clone(), concrete_arg_ref.clone())
+                        .name(curr_task_name)
+                        .restartable_spawn()
+                        .expect("Could not restart the task"); 
+                }
+                _ => {
+                    error!("BUG : Task is restartable but the function or the argument is missing");
+                }
             }
-            
-            new_task_builder(concrete_func_ref.clone(), concrete_arg_ref.clone())
-                            .name(curr_task_name)
-                            .restartable_spawn()
-                            .expect("Could not restart the task"); 
         }
     }
 
@@ -769,10 +770,10 @@ fn task_restartable_cleanup_final<F, A, R>(_held_interrupts: irq_safety::HeldInt
         debug!("Idle task not found on core{}",apic_id);
 
         let _idle_taskref = new_task_builder(idle_task ,0)
-			.name(String::from(format!("idle_task_ap{}", apic_id)))
-			.pin_on_core(apic_id)
-            .set_idle()
-			.spawn().expect("failed to initiate idle task");
+        .name(String::from(format!("idle_task_ap{}", apic_id)))
+        .pin_on_core(apic_id)
+        .set_idle()
+        .spawn().expect("failed to initiate idle task");
        
     }
     scheduler::schedule();
