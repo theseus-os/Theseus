@@ -101,7 +101,7 @@ enum ExchangeState<T> {
     /// and it is the receivers's responsibility to reset to the initial state.
     SenderFinishedFirst(T),
     
-    SenderDropped(T),
+    SenderDropped(Option<T>),
 
     ReceiverDropped,
 
@@ -116,7 +116,8 @@ impl<T> fmt::Debug for ExchangeState<T> {
             ExchangeState::ReceiverFinishedFirst    => "ReceiverFinishedFirst",
             ExchangeState::SenderFinishedFirst(..)  => "SenderFinishedFirst",
             ExchangeState::ReceiverDropped  => "ReceiverDropped",
-            ExchangeState::SenderDropped  => "SenderDropped",
+            ExchangeState::SenderDropped(..)  => "SenderDropped",
+            ExchangeState::SenderAndReceiverDropped  => "ChannelDisconnected",
         })
     }
 }
@@ -411,9 +412,9 @@ impl <T: Send> Receiver<T> {
 
             debug!("receive current_state = {:?}",current_state);
             match current_state {
-                ExchangeState::SenderDropped => {
+                ExchangeState::SenderDropped(task) => {
                     error!("BUG: Sender Dropped");
-                    *exchange_state = ExchangeState::SenderDropped;
+                    *exchange_state = ExchangeState::SenderDropped(task);
                     Some(Err("BUG: Sender Dropped"))
                 }
                 ExchangeState::Init => {
@@ -586,7 +587,7 @@ impl<T: Send> Drop for Sender<T> {
             if let Some(sender_slot) = self.channel.try_take_sender_slot() {
                 let retval = {
                     let mut exchange_state = sender_slot.0.lock();
-                    let current_state = core::mem::replace(&mut *exchange_state, ExchangeState::SenderDropped);
+                    let current_state = core::mem::replace(&mut *exchange_state, ExchangeState::SenderDropped(None));
                     match current_state {
                         ExchangeState::WaitingForSender(receiver_to_notify) => {
                             // Need to notify the receiver
@@ -613,5 +614,17 @@ impl<T: Send> Drop for Sender<T> {
             }
         }
         debug!("Dropped the receiver");
+    }
+}
+
+impl<T> Drop for SenderSlot<T> {
+    fn drop(&mut self) {
+        warn!("Sender slot dropped");
+    }
+}
+
+impl<T> Drop for ReceiverSlot<T> {
+    fn drop(&mut self) {
+        warn!("Receiver slot dropped");
     }
 }
