@@ -478,9 +478,7 @@ fn setup_context_trampoline(new_task: &mut Task, entry_point_function: fn() -> !
     Ok(())
 }
 
-/// The entry point for all new `Task`s except restartable tasks. 
-/// This does not return, because it doesn't really have anywhere to return.
-fn task_wrapper<F, A, R>() -> !
+fn task_wrapper_internal<F, A, R>() -> Result<R, task::KillReason>
     where A: Send + 'static, 
           R: Send + 'static,
           F: FnOnce(A) -> R, 
@@ -511,8 +509,18 @@ fn task_wrapper<F, A, R>() -> !
     enable_interrupts(); // we must enable interrupts for the new task, otherwise we won't be able to preempt it.
 
     // Now we actually invoke the entry point function that this Task was spawned for, catching a panic if one occurs.
-    let result = catch_unwind::catch_unwind_with_arg(func, arg);
+    catch_unwind::catch_unwind_with_arg(func, arg)
+}
 
+/// The entry point for all new `Task`s except restartable tasks. 
+/// This does not return, because it doesn't really have anywhere to return.
+fn task_wrapper<F, A, R>() -> !
+    where A: Send + 'static, 
+          R: Send + 'static,
+          F: FnOnce(A) -> R, 
+{
+    
+    let result = task_wrapper_internal::<F,A,R>();
     // Here: now that the task is finished running, we must clean in up by doing three things:
     // 1. Put the task into a non-runnable mode (exited or killed) and set its exit value or killed reason
     // 2. Remove it from its runqueue
@@ -539,33 +547,7 @@ fn task_wrapper_restartable<F, A, R>() -> !
           R: Send + 'static,
           F: FnOnce(A) -> R + Send + Clone +'static,
 {
-    // This is scoped to ensure that absolutely no resources that require dropping are held
-    // when invoking the task's entry function, in order to simplify cleanup when unwinding.
-    // That is, only non-droppable values on the stack are allowed, nothing can be allocated/locked.
-    let (func, arg) = {
-        let curr_task_ref = get_my_current_task().expect("BUG: task_wrapper: couldn't get current task (before task func).");
-        let curr_task_name = curr_task_ref.lock().name.clone();
-
-        // This task's function and argument were placed at the bottom of the stack when this task was spawned.
-        let task_func_arg = {
-            let t = curr_task_ref.lock();
-            let tfa_box_raw_ptr = t.kstack.as_type::<*mut TaskFuncArg<F, A, R>>(0)
-                .expect("BUG: task_wrapper: couldn't access task's function/argument at bottom of stack");
-            // SAFE: we placed this Box in this task's stack in the `spawn()` function when creating the TaskFuncArg struct.
-            let tfa_boxed = unsafe { Box::from_raw(*tfa_box_raw_ptr) };
-            *tfa_boxed // un-box it
-        };
-        let (func, arg) = (task_func_arg.func, task_func_arg.arg);
-        debug!("task_wrapper [1]: \"{}\" about to call task entry func {:?} {{{}}} with arg {:?}",
-            curr_task_name, debugit!(func), core::any::type_name::<F>(), debugit!(arg)
-        );
-        (func, arg)
-    };
-
-    
-    enable_interrupts(); // we must enable interrupts for the new task, otherwise we won't be able to preempt it.
-
-    let result = catch_unwind::catch_unwind_with_arg(func, arg);
+    let result = task_wrapper_internal::<F,A,R>();
 
     // Here: now that the task is finished running, we must clean in up by doing four things:
     // 1. Put the task into a non-runnable mode (exited or killed), and set its exit value
@@ -584,13 +566,11 @@ fn task_wrapper_restartable<F, A, R>() -> !
     }
 }
 
-
-/// This function cleans up a task that exited properly.
-fn task_cleanup_success<F, A, R>(current_task: TaskRef, exit_value: R) -> !
+fn task_cleanup_success_internal<F, A, R>(current_task: TaskRef, exit_value: R) -> (irq_safety::HeldInterrupts, TaskRef)
     where A: Send + 'static, 
           R: Send + 'static,
-          F: FnOnce(A) -> R, 
-{
+          F: FnOnce(A) -> R,
+{ 
     // Disable preemption (currently just disabling interrupts altogether)
     let held_interrupts = hold_interrupts();
 
@@ -599,7 +579,33 @@ fn task_cleanup_success<F, A, R>(current_task: TaskRef, exit_value: R) -> !
         error!("task_cleanup_success: {:?} task could not set exit value, because task had already exited. Is this correct?", current_task.lock().name);
     }
 
+    (held_interrupts,current_task)
+}
+
+/// This function cleans up a task that exited properly.
+fn task_cleanup_success<F, A, R>(current_task: TaskRef, exit_value: R) -> !
+    where A: Send + 'static, 
+          R: Send + 'static,
+          F: FnOnce(A) -> R, 
+{   
+    let (held_interrupts,current_task) = task_cleanup_success_internal::<F,A,R>(current_task,exit_value);
     task_cleanup_final::<F, A, R>(held_interrupts, current_task)
+}
+
+fn task_cleanup_failure_internal<F, A, R>(current_task: TaskRef, kill_reason: task::KillReason) -> (irq_safety::HeldInterrupts, TaskRef)
+    where A: Send + 'static, 
+          R: Send + 'static,
+          F: FnOnce(A) -> R, 
+{
+    // Disable preemption (currently just disabling interrupts altogether)
+    let held_interrupts = hold_interrupts();
+
+    debug!("task_cleanup_failure: {:?} panicked with {:?}", current_task.lock().name, kill_reason);
+    if current_task.mark_as_killed(kill_reason).is_err() {
+        error!("task_cleanup_failure: {:?} task could not set kill reason, because task had already exited. Is this correct?", current_task.lock().name);
+    }
+
+    (held_interrupts, current_task)
 }
             
 
@@ -615,14 +621,7 @@ fn task_cleanup_failure<F, A, R>(current_task: TaskRef, kill_reason: task::KillR
           R: Send + 'static,
           F: FnOnce(A) -> R, 
 {
-    // Disable preemption (currently just disabling interrupts altogether)
-    let held_interrupts = hold_interrupts();
-
-    debug!("task_cleanup_failure: {:?} panicked with {:?}", current_task.lock().name, kill_reason);
-    if current_task.mark_as_killed(kill_reason).is_err() {
-        error!("task_cleanup_failure: {:?} task could not set kill reason, because task had already exited. Is this correct?", current_task.lock().name);
-    }
-
+    let (held_interrupts,current_task) = task_cleanup_failure_internal::<F,A,R>(current_task,kill_reason);
     task_cleanup_final::<F, A, R>(held_interrupts, current_task)
 }
 
@@ -680,14 +679,7 @@ fn task_restartable_cleanup_success<F, A, R>(current_task: TaskRef, exit_value: 
           R: Send + 'static,
           F: FnOnce(A) -> R + Send + Clone +'static,
 {
-    // Disable preemption (currently just disabling interrupts altogether)
-    let held_interrupts = hold_interrupts();
-
-    debug!("task_cleanup_success: {:?} successfully exited with return value {:?}", current_task.lock().name, debugit!(exit_value));
-    if current_task.mark_as_exited(Box::new(exit_value)).is_err() {
-        error!("task_cleanup_success: {:?} task could not set exit value, because task had already exited. Is this correct?", current_task.lock().name);
-    }
-
+    let (held_interrupts,current_task) = task_cleanup_success_internal::<F,A,R>(current_task,exit_value);
     task_restartable_cleanup_final::<F, A, R>(held_interrupts, current_task)
 }
 
@@ -697,14 +689,7 @@ fn task_restartable_cleanup_failure<F, A, R>(current_task: TaskRef, kill_reason:
           R: Send + 'static,
           F: FnOnce(A) -> R + Send + Clone +'static, 
 {
-    // Disable preemption (currently just disabling interrupts altogether)
-    let held_interrupts = hold_interrupts();
-
-    debug!("task_cleanup_failure: {:?} panicked with {:?}", current_task.lock().name, kill_reason);
-    if current_task.mark_as_killed(kill_reason).is_err() {
-        error!("task_cleanup_failure: {:?} task could not set kill reason, because task had already exited. Is this correct?", current_task.lock().name);
-    }
-
+    let (held_interrupts,current_task) = task_cleanup_failure_internal::<F,A,R>(current_task,kill_reason);
     task_restartable_cleanup_final::<F, A, R>(held_interrupts, current_task)
 }
 
