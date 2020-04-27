@@ -32,7 +32,7 @@ fn restartable_loop(exit_method: ExitMethod) -> Result<(), &'static str> {
         },
         ExitMethod::Exception => {
             debug!("Hi, I'm restartable function with exception");
-            #[cfg(unwind_exceptions)]{
+            #[cfg(not(unwind_exceptions))]{
                 debug!("Will not restart as it is compiled without unwind_exceptions directive");
             }
             // causes a page fault

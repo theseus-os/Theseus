@@ -11,9 +11,6 @@ getopts = "0.2.21"
 default-features = false
 version = "0.4.8"
 
-# [dependencies.application_main_fn]
-# path = "../../compiler_plugins"
-
 [dependencies.spawn]
 path = "../../kernel/spawn"
 
