@@ -253,7 +253,7 @@ impl<F, A, R> TaskBuilder<F, A, R>
     /// This merely makes the new task Runnable, it does not switch to it immediately; that will happen on the next scheduler invocation.
     #[inline(never)]
     pub fn spawn(self) -> Result<TaskRef, &'static str> {
-        let mut new_task = Task::new(
+        let new_task = Task::new(
             None,
             task_cleanup_failure::<F, A, R>,
         )?;
@@ -601,7 +601,7 @@ fn task_restartable_cleanup_failure<F, A, R>(current_task: TaskRef, kill_reason:
           R: Send + 'static,
           F: FnOnce(A) -> R + Send + Clone +'static, 
 {
-    let (held_interrupts,current_task) = task_cleanup_failure_internal::<F,A,R>(current_task,kill_reason);
+    let (held_interrupts,current_task) = task_cleanup_failure_internal(current_task,kill_reason);
     task_restartable_cleanup_final::<F, A, R>(held_interrupts, current_task)
 }
 
