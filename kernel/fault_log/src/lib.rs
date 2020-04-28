@@ -94,8 +94,7 @@ pub struct FaultEntry {
 }
 
 
-lazy_static! {
-    
+lazy_static! {    
     /// The structure to hold the list of all faults so far occured in the system
     static ref FAULT_LIST: Mutex<Vec<FaultEntry>> = Mutex::new(Vec::new());
 }
@@ -107,7 +106,7 @@ pub fn clear_fault_log() {
 
 /// Add a new entry to the fault log. 
 /// This function requires all the entries in the `FaultEntry` as input.
-pub fn add_error_to_fault_log (
+pub fn log_error_to_fault_log (
     fault_type: FaultType,
     error_code: u64,
     core: u8,
@@ -140,7 +139,7 @@ pub fn add_error_to_fault_log (
 /// Other entries will be marked as None to be filled later.
 /// // Since all exceptions lead to calling `kill_and_halt` 
 /// // we update the rest of the fields there.
-pub fn add_error_simple (
+pub fn log_error_simple (
     fault_type: FaultType,
     error_code: u64,
 )-> () {
@@ -162,7 +161,7 @@ pub fn add_error_simple (
 }
 
 /// Add a panic occuring to fault log. 
-pub fn add_panic_entry (
+pub fn log_panic_entry (
     core: u8,
     running_task: String,
     running_app_crate: Option<String>,

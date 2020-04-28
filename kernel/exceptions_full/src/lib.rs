@@ -31,12 +31,7 @@ use alloc::{
     vec::Vec,
 };
 
-use fault_log::{
-    add_error_to_fault_log,
-    add_error_simple,
-    FaultType,
-    RecoveryAction
-};
+use fault_log::{log_error_to_fault_log, log_error_simple, FaultType, RecoveryAction};
 
 use memory::VirtualAddress;
 
@@ -111,6 +106,7 @@ fn kill_and_halt(exception_number: u8, stack_frame: &ExceptionStackFrame) {
     }
 
     {
+        // We remove the last fault entry from the fault log and update the remainig fields
         let fe = fault_log::get_last_unhandled_exception();
         if fe.is_some(){
             let fault_entry = fe.unwrap();
@@ -140,7 +136,8 @@ fn kill_and_halt(exception_number: u8, stack_frame: &ExceptionStackFrame) {
 
             let core = get_my_apic_id();
 
-            add_error_to_fault_log (
+            // We log the completed entry to the fault log as we store `address_accessed`
+            log_error_to_fault_log (
                 fault_entry.fault_type, //exception_number
                 fault_entry.error_code, //error_code,
                 core, //core
@@ -153,6 +150,7 @@ fn kill_and_halt(exception_number: u8, stack_frame: &ExceptionStackFrame) {
                 RecoveryAction::None // action_taken : false,
             );
         
+            // Print the fault log
             fault_log::print_fault_log();
         }
     }
@@ -264,7 +262,7 @@ fn kill_and_halt(exception_number: u8, stack_frame: &ExceptionStackFrame) {
 pub extern "x86-interrupt" fn divide_by_zero_handler(stack_frame: &mut ExceptionStackFrame) {
     println_both!("\nEXCEPTION: DIVIDE BY ZERO\n{:#?}\n", stack_frame);
 
-    add_error_simple(FaultType::DivideByZero, 0);
+    log_error_simple(FaultType::DivideByZero, 0);
     kill_and_halt(0x0, stack_frame)
 }
 
@@ -307,7 +305,7 @@ extern "x86-interrupt" fn nmi_handler(stack_frame: &mut ExceptionStackFrame) {
              stack_frame.instruction_pointer,
              stack_frame);
 
-    add_error_simple(FaultType::NMI, 0);
+    log_error_simple(FaultType::NMI, 0);
     kill_and_halt(0x2, stack_frame)
 }
 
@@ -327,7 +325,7 @@ pub extern "x86-interrupt" fn overflow_handler(stack_frame: &mut ExceptionStackF
              stack_frame.instruction_pointer,
              stack_frame);
     
-    add_error_simple(FaultType::Overflow, 0);
+    log_error_simple(FaultType::Overflow, 0);
     kill_and_halt(0x4, stack_frame)
 }
 
@@ -337,7 +335,7 @@ pub extern "x86-interrupt" fn bound_range_exceeded_handler(stack_frame: &mut Exc
              stack_frame.instruction_pointer,
              stack_frame);
     
-    add_error_simple(FaultType::BoundRangeExceeded, 0);
+    log_error_simple(FaultType::BoundRangeExceeded, 0);
     kill_and_halt(0x5, stack_frame)
 }
 
@@ -347,8 +345,7 @@ pub extern "x86-interrupt" fn invalid_opcode_handler(stack_frame: &mut Exception
              stack_frame.instruction_pointer,
              stack_frame);
 
-    
-    add_error_simple(FaultType::InvalidOpCode, 0);
+    log_error_simple(FaultType::InvalidOpCode, 0);
     kill_and_halt(0x6, stack_frame)
 }
 
@@ -359,7 +356,7 @@ pub extern "x86-interrupt" fn device_not_available_handler(stack_frame: &mut Exc
              stack_frame.instruction_pointer,
              stack_frame);
 
-    add_error_simple(FaultType::DeviceNotAvailable, 0);
+    log_error_simple(FaultType::DeviceNotAvailable, 0);
     kill_and_halt(0x7, stack_frame)
 }
 
@@ -367,7 +364,7 @@ pub extern "x86-interrupt" fn device_not_available_handler(stack_frame: &mut Exc
 pub extern "x86-interrupt" fn double_fault_handler(stack_frame: &mut ExceptionStackFrame, error_code: u64) {
     println_both!("\nEXCEPTION: DOUBLE FAULT\n{:#?}\n", stack_frame);
     
-    add_error_simple(FaultType::DoubleFault, error_code);
+    log_error_simple(FaultType::DoubleFault, error_code);
     kill_and_halt(0x8, stack_frame)
 }
 
@@ -378,7 +375,7 @@ pub extern "x86-interrupt" fn invalid_tss_handler(stack_frame: &mut ExceptionSta
              error_code,
              stack_frame);
     
-    add_error_simple(FaultType::InvalidTSS, error_code);
+    log_error_simple(FaultType::InvalidTSS, error_code);
     kill_and_halt(0xA, stack_frame)
 }
 
@@ -389,7 +386,7 @@ pub extern "x86-interrupt" fn segment_not_present_handler(stack_frame: &mut Exce
              error_code,
              stack_frame);
     
-    add_error_simple(FaultType::SegmentNotPresent, error_code);
+    log_error_simple(FaultType::SegmentNotPresent, error_code);
     kill_and_halt(0xB, stack_frame)
 }
 
@@ -400,7 +397,7 @@ pub extern "x86-interrupt" fn general_protection_fault_handler(stack_frame: &mut
              error_code,
              stack_frame);
 
-    add_error_simple(FaultType::GeneralProtectionFault, error_code);
+    log_error_simple(FaultType::GeneralProtectionFault, error_code);
     kill_and_halt(0xD, stack_frame)
 }
 
@@ -413,8 +410,8 @@ pub extern "x86-interrupt" fn page_fault_handler(stack_frame: &mut ExceptionStac
              error_code,
              stack_frame);
     
-    let vec :Vec<String> = Vec::new();
-    add_error_to_fault_log (
+    // Here we created a a new entry to save the accessed address
+    log_error_to_fault_log (
         FaultType::PageFault, //exception_number
         0, //error_code,
         0, //core
@@ -426,10 +423,6 @@ pub extern "x86-interrupt" fn page_fault_handler(stack_frame: &mut ExceptionStac
         vec, //replaced_crates : Vec<String>::new(),
         RecoveryAction::None // action_taken : false,
     );
-
-    //fault_log::print_fault_log();
-
-
 
     kill_and_halt(0xE, stack_frame)
 }
