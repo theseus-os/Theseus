@@ -259,14 +259,13 @@ pub struct Task {
     /// Typically, it will point to this Task's specific instance of `spawn::task_cleanup_failure()`,
     /// which has generic type parameters that describe its function signature, argument type, and return type.
     pub failure_cleanup_function: FailureCleanupFunction,
-
-    #[cfg(simd_personality)]
-    /// Whether this Task is SIMD enabled and what level of SIMD extensions it uses.
-    pub simd: SimdExt,
-
     /// Stores the restartable information of the task. 
     /// `Some(RestartInfo)` indicates that the task is restartable.
     pub restart_info: Option<RestartInfo>,
+    
+    #[cfg(simd_personality)]
+    /// Whether this Task is SIMD enabled and what level of SIMD extensions it uses.
+    pub simd: SimdExt,
 }
 
 impl fmt::Debug for Task {
@@ -345,10 +344,10 @@ impl Task {
             kill_handler: None,
             env,
             failure_cleanup_function,
-
+            restart_info: None,
+            
             #[cfg(simd_personality)]
             simd: SimdExt::None,
-            restart_info: None
         }
     }
 
