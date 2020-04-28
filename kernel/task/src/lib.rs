@@ -265,7 +265,7 @@ pub struct Task {
     pub simd: SimdExt,
 
     /// Stores the restartable information of the task. 
-    /// If not `None` indicates that the task is restartable.
+    /// `Some(RestartInfo)` indicates that the task is restartable.
     pub restart_info: Option<RestartInfo>,
 }
 
