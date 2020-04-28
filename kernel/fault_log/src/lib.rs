@@ -11,13 +11,6 @@
 extern crate alloc;
 extern crate spin; 
 extern crate memory;
-extern crate hashbrown;
-extern crate mod_mgmt;
-extern crate fs_node;
-extern crate qp_trie;
-extern crate path;
-extern crate by_address;
-extern crate x86_64;
 
 use spin::Mutex;
 use alloc::{
@@ -27,6 +20,8 @@ use alloc::{
 use core::fmt;
 use memory::VirtualAddress;
 
+/// The possible faults (panics and exceptions) encountered 
+/// during operations.
 #[derive(Debug, Clone)]
 pub enum FaultType {
     PageFault,
@@ -45,19 +40,29 @@ pub enum FaultType {
     Panic
 }
 
+/// The different types of recovery procedures used for the 
+/// observed fault
 #[derive(Debug, Clone, PartialEq)]
 pub enum RecoveryAction {
+    /// No action taken on this fault.
     None,
+    /// Task restarted only. No crate replaced.
     TaskRestarted,
+    /// Crate where fault is observed is replaced, and then task restarted.
     FaultCrateReplaced,
-    IterativeCrateReplaced
+    /// Different Crate than the crate where fault is observed is restrated. 
+    /// This option is taken when the same fault is observed multiple times.  
+    IterativelyCrateReplaced,
+    /// This fault is handled as a recovery for different fault. 
+    /// Used when additional faults occur during unwinding.  
+    MultipleFaultRecovery
 }
 
 
 /// A data structure to hold information about each fault. 
 #[derive(Debug, Clone)]
 pub struct FaultEntry {
-    /// Machine excpetion number, 0xFF indicates panic
+    /// Type of fault
     pub fault_type: FaultType,
 
     /// Error code returned with the exception
@@ -131,9 +136,10 @@ pub fn add_error_to_fault_log (
 }
 
 /// Add a new entry to the fault log. 
-/// This function requires only the `exception_number` and `error_code`. 
+/// This function requires only the `fault_type` and `error_code`. 
 /// Other entries will be marked as None to be filled later.
-/// // Since all exceptions lead to `kill_and_halt` we update the rest of the fields there.
+/// // Since all exceptions lead to calling `kill_and_halt` 
+/// // we update the rest of the fields there.
 pub fn add_error_simple (
     fault_type: FaultType,
     error_code: u64,
@@ -155,6 +161,7 @@ pub fn add_error_simple (
     FAULT_LIST.lock().push(fe);
 }
 
+/// Add a panic occuring to fault log. 
 pub fn add_panic_entry (
     core: u8,
     running_task: String,
@@ -177,7 +184,7 @@ pub fn add_panic_entry (
     FAULT_LIST.lock().push(fe);
 }
 
-/// Removes the last unhandled exception from the fault log and returns
+/// Removes the last unhandled exception from the fault log and returns. 
 /// Is useful when information about the last exception needs to be updated
 pub fn get_last_unhandled_exception () -> Option<FaultEntry> {
     let mut fault_list = FAULT_LIST.lock();
