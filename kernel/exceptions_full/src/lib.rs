@@ -420,7 +420,7 @@ pub extern "x86-interrupt" fn page_fault_handler(stack_frame: &mut ExceptionStac
         Some(VirtualAddress::new_canonical(control_regs::cr2().0)), // address_accessed: Option<None>,
         None, //instruction_pointer : Option<None>,
         None, //crate_error_occured : Option<None>,
-        vec, //replaced_crates : Vec<String>::new(),
+        Vec::<String>::new(), //replaced_crates : Vec<String>::new(),
         RecoveryAction::None // action_taken : false,
     );
 

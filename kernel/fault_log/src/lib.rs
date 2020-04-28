@@ -17,7 +17,7 @@ use alloc::{
     string::{String, ToString},
     vec::Vec,
 };
-use core::fmt;
+
 use memory::VirtualAddress;
 
 /// The possible faults (panics and exceptions) encountered 
@@ -89,7 +89,7 @@ pub struct FaultEntry {
     /// List of crates reloaded from memory to recover from fault
     pub replaced_crates : Vec<String>,
 
-    /// true if crate reloading occurs as a result of the fault
+    /// Recovery Action taken as a result of the fault
     pub action_taken : RecoveryAction,
 }
 
@@ -137,8 +137,8 @@ pub fn log_error_to_fault_log (
 /// Add a new entry to the fault log. 
 /// This function requires only the `fault_type` and `error_code`. 
 /// Other entries will be marked as None to be filled later.
-/// // Since all exceptions lead to calling `kill_and_halt` 
-/// // we update the rest of the fields there.
+// Since all exceptions lead to calling `kill_and_halt` 
+// we update the rest of the fields there.
 pub fn log_error_simple (
     fault_type: FaultType,
     error_code: u64,
