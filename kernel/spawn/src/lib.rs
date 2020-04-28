@@ -31,7 +31,6 @@ extern crate catch_unwind;
 use core::{
     mem,
     marker::PhantomData,
-    any::Any,
 };
 use alloc::{
     vec::Vec,
@@ -579,7 +578,7 @@ fn task_cleanup_failure<F, A, R>(current_task: TaskRef, kill_reason: task::KillR
           R: Send + 'static,
           F: FnOnce(A) -> R, 
 {
-    let (held_interrupts,current_task) = task_cleanup_failure_internal(current_task, kill_reason);
+    let (held_interrupts, current_task) = task_cleanup_failure_internal(current_task, kill_reason);
     task_cleanup_final::<F, A, R>(held_interrupts, current_task)
 }
 
@@ -589,7 +588,7 @@ fn task_restartable_cleanup_failure<F, A, R>(current_task: TaskRef, kill_reason:
           R: Send + 'static,
           F: FnOnce(A) -> R + Send + Clone +'static, 
 {
-    let (held_interrupts,current_task) = task_cleanup_failure_internal(current_task,kill_reason);
+    let (held_interrupts, current_task) = task_cleanup_failure_internal(current_task, kill_reason);
     task_restartable_cleanup_final::<F, A, R>(held_interrupts, current_task)
 }
 
