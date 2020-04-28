@@ -261,6 +261,7 @@ impl<F, A, R> TaskBuilder<F, A, R>
         self.spawn_internal(new_task, task_wrapper::<F, A, R>)
     }
 
+    /// Code shared by `spawn` and `spawn_restartable`. Performs most of the spawn operations
     fn spawn_internal(self, mut new_task: Task, entry_point_function: fn() -> !) -> Result<TaskRef, &'static str> {
         
         // If a Task name wasn't provided, then just use the function's name.
@@ -334,6 +335,8 @@ impl<F, A, R> TaskBuilder<F, A, R>
     /// Finishes this `TaskBuilder` and spawns the new task in a restartable way as described by its builder functions.
     /// 
     /// This merely makes the new task Runnable, it does not switch to it immediately; that will happen on the next scheduler invocation.
+    /// 
+    /// Reuses most of the `spawn` code with addition of storing function and argument inside the `Task`
     #[inline(never)]
     pub fn spawn_restartable(self) -> Result<TaskRef, &'static str> {
         let mut new_task = Task::new(
@@ -344,18 +347,17 @@ impl<F, A, R> TaskBuilder<F, A, R>
         // store function and argument in the task so that they can be used to restart 
         // the task if needed.
         let boxed_argument = Box::new(self.argument.clone());
-        //new_task.restart_info.argument = Some(boxed_argument);
         let boxed_func = Box::new(self.func.clone());
-        //new_task.restart_info = Some(boxed_func);
 
         let restrat_info = RestartInfo {
             argument: boxed_argument,
             func: boxed_func,
         };
 
-        // mark the task as restartable
+        // Stroing a restart_info struct make the task restartable
         new_task.restart_info = Some(restrat_info);
 
+        // Code path is shared between `spawn` and `spawn_restartable` from this point
         self.spawn_internal(new_task, task_wrapper_restartable::<F, A, R>)
     }
 }
@@ -437,6 +439,8 @@ fn setup_context_trampoline(new_task: &mut Task, entry_point_function: fn() -> !
     Ok(())
 }
 
+/// Internal code of `task_wrapper` shared by `task_wrapper` and 
+/// `task_wrapper_restartable`. 
 fn task_wrapper_internal<F, A, R>() -> Result<R, task::KillReason>
     where A: Send + 'static, 
           R: Send + 'static,
@@ -525,10 +529,10 @@ fn task_wrapper_restartable<F, A, R>() -> !
     }
 }
 
-fn task_cleanup_success_internal<F, A, R>(current_task: TaskRef, exit_value: R) -> (irq_safety::HeldInterrupts, TaskRef)
-    where A: Send + 'static, 
-          R: Send + 'static,
-          F: FnOnce(A) -> R,
+/// Internal function cleans up a task that exited properly. 
+/// Contains the shared code between `task_cleanup_success` and `task_cleanup_success_restartable`
+fn task_cleanup_success_internal<R>(current_task: TaskRef, exit_value: R) -> (irq_safety::HeldInterrupts, TaskRef)
+    where R: Send + 'static,
 { 
     // Disable preemption (currently just disabling interrupts altogether)
     let held_interrupts = hold_interrupts();
@@ -547,15 +551,22 @@ fn task_cleanup_success<F, A, R>(current_task: TaskRef, exit_value: R) -> !
           R: Send + 'static,
           F: FnOnce(A) -> R, 
 {   
-    let (held_interrupts,current_task) = task_cleanup_success_internal::<F,A,R>(current_task,exit_value);
+    let (held_interrupts,current_task) = task_cleanup_success_internal(current_task,exit_value);
     task_cleanup_final::<F, A, R>(held_interrupts, current_task)
 }
 
-fn task_cleanup_failure_internal<F, A, R>(current_task: TaskRef, kill_reason: task::KillReason) -> (irq_safety::HeldInterrupts, TaskRef)
-    where A: Send + 'static, 
+/// Similar to `task_cleanup_success` but used on restartable_tasks
+fn task_restartable_cleanup_success<F, A, R>(current_task: TaskRef, exit_value: R) -> !
+    where A: Send + Clone + 'static, 
           R: Send + 'static,
-          F: FnOnce(A) -> R, 
+          F: FnOnce(A) -> R + Send + Clone +'static,
 {
+    let (held_interrupts,current_task) = task_cleanup_success_internal(current_task,exit_value);
+    task_restartable_cleanup_final::<F, A, R>(held_interrupts, current_task)
+}
+
+/// Internal function that clean up the task not exited properly.
+fn task_cleanup_failure_internal(current_task: TaskRef, kill_reason: task::KillReason) -> (irq_safety::HeldInterrupts, TaskRef) {
     // Disable preemption (currently just disabling interrupts altogether)
     let held_interrupts = hold_interrupts();
 
@@ -580,37 +591,19 @@ fn task_cleanup_failure<F, A, R>(current_task: TaskRef, kill_reason: task::KillR
           R: Send + 'static,
           F: FnOnce(A) -> R, 
 {
-    let (held_interrupts,current_task) = task_cleanup_failure_internal::<F,A,R>(current_task,kill_reason);
+    let (held_interrupts,current_task) = task_cleanup_failure_internal(current_task,kill_reason);
     task_cleanup_final::<F, A, R>(held_interrupts, current_task)
 }
 
-fn remove_current_task(current_task: TaskRef) -> () {
-    // Remove the task from its runqueue
-    #[cfg(not(runqueue_state_spill_evaluation))]  // the normal case
-    {
-        if let Err(e) = runqueue::get_runqueue(apic::get_my_apic_id())
-            .ok_or("couldn't get this core's ID or runqueue to remove exited task from it")
-            .and_then(|rq| rq.write().remove_task(&current_task)) 
-        {
-            error!("BUG: task_cleanup_final(): couldn't remove exited task from runqueue: {}", e);
-        }
-    }
-
-    // We must drop any local stack variables here since this function will not return
-    drop(current_task);
+/// Similar to `task_cleanup_failure` but used on restartable_tasks
+fn task_restartable_cleanup_failure<F, A, R>(current_task: TaskRef, kill_reason: task::KillReason) -> !
+    where A: Send + Clone + 'static, 
+          R: Send + 'static,
+          F: FnOnce(A) -> R + Send + Clone +'static, 
+{
+    let (held_interrupts,current_task) = task_cleanup_failure_internal::<F,A,R>(current_task,kill_reason);
+    task_restartable_cleanup_final::<F, A, R>(held_interrupts, current_task)
 }
-
-fn spawn_idle_task() -> () {
-    let apic_id = get_my_apic_id();
-
-    debug!("Idle task not found on core{}",apic_id);
-
-    let _idle_taskref = new_task_builder(idle_task ,0)
-        .name(String::from(format!("idle_task_ap{}", apic_id)))
-        .idle(apic_id)
-        .spawn().expect("failed to initiate idle task");
-}
-
 
 /// The final piece of the task cleanup logic,
 /// which removes the task from its runqueue and permanently deschedules it. 
@@ -637,26 +630,6 @@ fn task_cleanup_final<F, A, R>(_held_interrupts: irq_safety::HeldInterrupts, cur
     loop { }
 }
 
-/// Similar to `task_cleanup_success` but used on restartable_tasks
-fn task_restartable_cleanup_success<F, A, R>(current_task: TaskRef, exit_value: R) -> !
-    where A: Send + Clone + 'static, 
-          R: Send + 'static,
-          F: FnOnce(A) -> R + Send + Clone +'static,
-{
-    let (held_interrupts,current_task) = task_cleanup_success_internal::<F,A,R>(current_task,exit_value);
-    task_restartable_cleanup_final::<F, A, R>(held_interrupts, current_task)
-}
-
-/// Similar to `task_cleanup_failure` but used on restartable_tasks
-fn task_restartable_cleanup_failure<F, A, R>(current_task: TaskRef, kill_reason: task::KillReason) -> !
-    where A: Send + Clone + 'static, 
-          R: Send + 'static,
-          F: FnOnce(A) -> R + Send + Clone +'static, 
-{
-    let (held_interrupts,current_task) = task_cleanup_failure_internal::<F,A,R>(current_task,kill_reason);
-    task_restartable_cleanup_final::<F, A, R>(held_interrupts, current_task)
-}
-
 /// The final piece of the task cleanup logic for restartable tasks.
 /// which removes the task from its runqueue and spawns it again with 
 /// same entry function (F) and argument (A). 
@@ -669,10 +642,7 @@ fn task_restartable_cleanup_final<F, A, R>(_held_interrupts: irq_safety::HeldInt
     { 
         let curr_task_name = current_task.lock().name.clone();
 
-        // (2) Remove it from its runqueue
-        
-
-        // (3) Restart the task if it is restartable
+        // Remove the restartable info if it is a restartable task
         if let Some(restart_info) = current_task.get_restart_info() {
             let boxed_arg_any = restart_info.argument as Box<dyn Any>;
             let concrete_arg_ref: &A = boxed_arg_any.downcast_ref().expect("failed to downcast saved_arg into type A");
@@ -680,8 +650,10 @@ fn task_restartable_cleanup_final<F, A, R>(_held_interrupts: irq_safety::HeldInt
             let boxed_func_any = restart_info.func as Box<dyn Any>;
             let concrete_func_ref: &(F) = boxed_func_any.downcast_ref().expect("failed to downcast saved_func into called func");
 
+            // remove the task from runqueue
             remove_current_task(current_task);
 
+            // restart the task
             new_task_builder(concrete_func_ref.clone(), concrete_arg_ref.clone())
                 .name(curr_task_name)
                 .spawn_restartable()
@@ -700,15 +672,42 @@ fn task_restartable_cleanup_final<F, A, R>(_held_interrupts: irq_safety::HeldInt
     // in most cases as at least the idle task will be there. However on rare instances where 
     // the idle task has crashed this will fail. If so we spawn a new idle task.
     if !success {
-        
         spawn_idle_task();
-       
     }
     scheduler::schedule();
 
     // nothing below here should ever run again, we should never ever reach this point
     error!("BUG: task_cleanup_final(): task was rescheduled after being dead!");
     loop { }
+}
+
+/// Helper function to remove a task from it's runqueue and drop it.
+fn remove_current_task(current_task: TaskRef) -> () {
+    // Remove the task from its runqueue
+    #[cfg(not(runqueue_state_spill_evaluation))]  // the normal case
+    {
+        if let Err(e) = runqueue::get_runqueue(apic::get_my_apic_id())
+            .ok_or("couldn't get this core's ID or runqueue to remove exited task from it")
+            .and_then(|rq| rq.write().remove_task(&current_task)) 
+        {
+            error!("BUG: task_cleanup_final(): couldn't remove exited task from runqueue: {}", e);
+        }
+    }
+
+    // We must drop any local stack variables here since this function will not return
+    drop(current_task);
+}
+
+/// Spawns an idle task in current core. To be used when `idle_task` has crashed.
+fn spawn_idle_task() -> () {
+    let apic_id = get_my_apic_id();
+
+    debug!("Idle task not found on core{}",apic_id);
+
+    let _idle_taskref = new_task_builder(idle_task ,0)
+        .name(String::from(format!("idle_task_ap{}", apic_id)))
+        .idle(apic_id)
+        .spawn().expect("failed to initiate idle task");
 }
 
 /// Simple `idle_task` to be used if original `idle_task` crashes.
