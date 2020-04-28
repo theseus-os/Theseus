@@ -1,0 +1,18 @@
+[package]
+name = "test_restartable"
+version = "0.1.0"
+authors = ["Namitha Liyanage <namithaliyanage@gmail.com>"]
+build = "../../build.rs"
+
+[dependencies]
+getopts = "0.2.21"
+
+[dependencies.log]
+default-features = false
+version = "0.4.8"
+
+[dependencies.spawn]
+path = "../../kernel/spawn"
+
+[dependencies.terminal_print]
+path = "../../kernel/terminal_print"
