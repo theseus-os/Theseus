@@ -196,7 +196,8 @@ pub enum SimdExt {
     None,
 }
 
-/// A data structure to hold data related to restart the function
+/// A data structure to hold data related to restart the function. 
+/// Presence of `RestartInfo` itself indicates the task will be restartable.
 pub struct RestartInfo {
     /// Stores the argument of the task for restartable tasks
     pub argument: Box<dyn Any + Send>,
@@ -263,7 +264,8 @@ pub struct Task {
     /// Whether this Task is SIMD enabled and what level of SIMD extensions it uses.
     pub simd: SimdExt,
 
-    /// Stores the restartable information of the task
+    /// Stores the restartable information of the task. 
+    /// If not `None` indicates that the task is restartable.
     pub restart_info: Option<RestartInfo>,
 }
 
@@ -884,23 +886,8 @@ impl TaskRef {
     pub fn set_env(&self, new_env: Arc<Mutex<Environment>>) {
         self.0.deref().0.lock().set_env(new_env);
     }
-    
-    // /// Takes ownership of the argument of this task
-    // pub fn get_argument(&self) -> Option<Box<dyn Any + Send>> {
-    //    match &mut self.0.deref().0.lock().restart_info{
-    //        Some(x) => x.argument.take(),
-    //        _ => None,
-    //    }
-    // }
 
-    // /// Takes ownership of the function of this task
-    // pub fn get_func(&self) -> Option<Box<dyn Any + Send>> {
-    //    match &mut self.0.deref().0.lock().restart_info{
-    //        Some(x) => x.func.take(),
-    //        _ => None,
-    //    }
-    // }
-
+    /// Takes ownership of the `restart_info` struct of this task
     pub fn get_restart_info(&self) -> Option<RestartInfo> {
         self.0.deref().0.lock().restart_info.take()
     }
