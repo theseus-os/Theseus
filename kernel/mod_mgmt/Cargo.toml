@@ -24,8 +24,7 @@ path = "../../libs/cow_arc"
 path = "../kernel_config"
 
 [dependencies.log]
-default-features = false
-version = "0.3.7"
+version = "0.4.8"
 
 [dependencies.crate_name_utils]
 path = "../crate_name_utils"
@@ -42,6 +41,10 @@ path = "../root"
 [dependencies.fs_node]
 path = "../fs_node"
 
+[dependencies.hashbrown]
+version = "0.1.8"
+features = ["nightly"]
+
 [dependencies.vfs_node]
 path = "../vfs_node"
 
@@ -50,9 +53,6 @@ path = "../path"
 
 [dependencies.memfs]
 path = "../memfs"
-
-[dependencies.hpet]
-path = "../hpet"
 
 [lib]
 crate-type = ["rlib"]

@@ -100,6 +100,12 @@ pub struct UnwindingContext {
     /// A reference to the current task that is being unwound.
     current_task: TaskRef,
 }
+impl Into<(StackFrameIter, KillReason, TaskRef)> for UnwindingContext {
+    fn into(self) -> (StackFrameIter, KillReason, TaskRef) {
+        (self.stack_frame_iter, self.cause, self.current_task)
+    }
+}
+
 
 
 /// A single frame in the stack, which contains
@@ -163,7 +169,9 @@ pub struct StackFrameIter {
     /// The namespace (set of crates/sections) that is used to resolve symbols
     /// and section addresses when iterating over stack frames. 
     namespace: Arc<CrateNamespace>,
-    /// The register values that 
+    /// The values of the registers that exited during the stack frame
+    /// that is currently being iterated over. 
+    /// 
     /// These register values will change on each invocation of `next()`
     /// as different stack frames are successively iterated over.
     registers: Registers,
@@ -171,13 +179,15 @@ pub struct StackFrameIter {
     /// a reference to its row/entry in the unwinding table,
     /// and the Canonical Frame Address (CFA value) that is used to determine the next frame.
     state: Option<(UnwindRowReference, u64)>,
-    /// An extra offset that is used to adjust the calculation of register rule values
-    /// in certain circumstances, such as when unwinding from an exception/interrupt handler stack frame `B` 
+    /// An extra offset that is used to adjust the calculation of the CFA in certain circumstances, 
+    /// primarily when unwinding through an exception/interrupt handler stack frame `B` 
     /// to a frame `A` that caused the exception, even though frame `A` did not "call" frame `B`.
-    /// Currently this is necessary only for exceptions that also push an error code onto the stack.
+    /// This will have a different value based on what the CPU did, e.g., pushed error codes onto the stack. 
+    /// 
+    /// If `Some`, the latest stack frame produced by this iterator was an exception handler stack frame.
     cfa_adjustment: Option<i64>,
     /// This is set to true when the previous stack frame was an exception/interrupt handler,
-    /// because we need to adjust the CFA to account for the CPU pushing an `ExceptionStackFrame` onto the stack.
+    /// which is useful in the case of taking into account the CPU pushing an `ExceptionStackFrame` onto the stack.
     /// The DWARF debugging/unwinding info cannot account for this because an interrupt or exception happening 
     /// is not the same as a regular function "call" happening.
     last_frame_was_exception_handler: bool,
@@ -208,8 +218,14 @@ impl StackFrameIter {
 
     /// Returns the array of register values as they existed during the stack frame
     /// that is currently being iterated over. 
+    /// 
+    /// After the [`next()`](#method.next.html) is invoked to iterate to a given stack frame,
+    /// this function will return the register values for that frame that was just iterated to. 
+    /// Successive calls to this function will keep returning the same register values 
+    /// until the `next()` method is invoked again. 
+    /// 
     /// This is necessary in order to restore the proper register values 
-    /// before jumping to the **landing pad** (a cleanup function or exception catcher/panic handler)
+    /// before jumping to the **landing pad** (a cleanup function or exception/panic catcher)
     /// such that the landing pad function will actually execute properly with the right context.
     pub fn registers(&self) -> &Registers {
         &self.registers
@@ -230,11 +246,18 @@ impl FallibleIterator for StackFrameIter {
     fn next(&mut self) -> Result<Option<Self::Item>, Self::Error> {
         let registers = &mut self.registers;
         let prev_cfa_adjustment = self.cfa_adjustment;
-        let last_frame_was_exception_handler = self.last_frame_was_exception_handler;
 
         if let Some((unwind_row_ref, cfa)) = self.state.take() {
             let mut newregs = registers.clone();
             newregs[X86_64::RA] = None;
+
+            // For x86_64, the stack pointer is defined to be the previously-calculated CFA.
+            newregs[X86_64::RSP] = Some(cfa);
+            // If this frame is an exception/interrupt handler, we need to adjust RSP and the return address RA accordingly.
+            if let Some(extra_offset) = prev_cfa_adjustment {
+                newregs[X86_64::RSP] = Some(cfa.wrapping_add(extra_offset as u64));
+                trace!("adjusting RSP to {:X?}", newregs[X86_64::RSP]);
+            } 
 
             unwind_row_ref.with_unwind_info(|_fde, row| {
                 // There is some strange behavior when moving up the call stack 
@@ -245,23 +268,45 @@ impl FallibleIterator for StackFrameIter {
                 //
                 // In this case, the `cfa` value must be modified to account for that error code 
                 // being pushed onto the stack by adding `8` (the error code's size in bytes) to the `cfa` value.
-                // In addition, the register rule calculations will be misaligned as follows:
-                // each rule calculates a resultant value that applies to the *next* register number in the list.
-                // Thus, we save the previous resultant value for use in the next iteration. 
                 //
-                // Note that the first register value is calculated using the same `cfa` adjustment (`8`)
-                // as an additional addend to the register rule's offset. I'm not sure whether it's 
-                // always the first register value or the return address `RA` value that needs the adjustment,
-                // but so far in every case I've observed, the rule for the return address `RA` is first.
-                // My guess is that it's the `RA` value that needs the adjustment. 
-                let mut prev_value: u64 = 0;
-                for (index, &(reg_num, ref rule)) in row.registers().enumerate() {
+                // Also, the return address (RA) must be calculated differently, not using the below register rules.
+                for &(reg_num, ref rule) in row.registers() {
                     // debug!("Looking at register rule:  {:?} {:?}", reg_num, rule);
                     // The stack pointer (RSP) is given by the CFA calculated during the previous iteration;
                     // there should *not* be a register rule defining the value of the RSP directly.
                     if reg_num == X86_64::RSP {
-                        return Err("BUG: a unwind row's register rule specified that RSP should be changed, which is invalid.");
+                        warn!("Ignoring unwind row's register rule for RSP {:?}, which is invalid on x86_64 because RSP is always set to the CFA value.", rule);
+                        continue;
                     }
+
+                    // If this stack frame is an exception handler, the return address wouldn't have been pushed onto the stack as with normal call instructions.
+                    // Instead, it would've been pushed onto the stack by the CPU as part of the ExceptionStackFrame, so we have to look for it there.
+                    //
+                    // We know that the stack currently looks like this:
+                    // |-- address --|------------  Item on the stack -------------|
+                    // |  <lower>    |  ...                                        |
+                    // | CFA         |  error code                                 |
+                    // | CFA + 0x08  |  Exception stack frame: instruction pointer |
+                    // | CFA + 0x10  |                         code segment        |
+                    // | CFA + 0x18  |                         cpu flags           |
+                    // | CFA + 0x20  |                         stack pointer       |
+                    // | CFA + 0x28  |                         stack segment       |
+                    // |  <higher>   |  ...                                        |
+                    // |-------------|---------------------------------------------|
+                    //
+                    // Thus, we want to skip the error code so we can get the instruction pointer, 
+                    // i.e., the value at CFA + 0x08.
+                    if reg_num == X86_64::RA {
+                        if let Some(_) = prev_cfa_adjustment {
+                            let size_of_error_code = core::mem::size_of::<usize>();
+                            // TODO FIXME: only skip the error code if the prev_cfa_adjustment included it
+                            let value = unsafe { *(cfa.wrapping_add(size_of_error_code as u64) as *const u64) };
+                            trace!("Using return address from CPU-pushed exception stack frame. Value: {:#X}", value);
+                            newregs[X86_64::RA] = Some(value);
+                            continue;
+                        }
+                    }
+
                     newregs[reg_num] = match *rule {
                         RegisterRule::Undefined => return Err("StackFrameIter: encountered an unsupported RegisterRule::Undefined"), // registers[reg_num],
                         RegisterRule::SameValue => registers[reg_num],
@@ -269,27 +314,9 @@ impl FallibleIterator for StackFrameIter {
                         // This is the most common register rule (in fact, the only one we've seen),
                         // so we may have to adapt the logic herein for use in other rules. 
                         RegisterRule::Offset(offset) => {
-                            let normal_value = unsafe { *(cfa.wrapping_add(offset as u64) as *const u64) };
-                            // trace!("     cfa: {:#X}, addr: {:#X}, normal_value: {:#X}", cfa, cfa.wrapping_add(offset as u64), normal_value);
-
-                            // The unusual case of an exception/interrupt handler
-                            if let Some(extra_offset) = prev_cfa_adjustment {
-                                let reg_value = if index == 0 {
-                                    let value_extra_offset = unsafe { *(cfa.wrapping_add((offset + extra_offset) as u64) as *const u64) };
-                                    // trace!("     cfa: {:#X}, addr: {:#X}, extra_value: {:#X}", cfa, cfa.wrapping_add((offset + extra_offset) as u64), value_extra_offset);
-                                    value_extra_offset
-                                } else {
-                                    prev_value
-                                };
-                                prev_value = normal_value;
-
-                                // trace!("     cfa: {:#X}, RETURNED value: {:#X}", cfa, reg_value);
-                                Some(reg_value)
-                            }
-                            // The regular case of a normal function call
-                            else {
-                                Some(normal_value)
-                            }
+                            let value = unsafe { *(cfa.wrapping_add(offset as u64) as *const u64) };
+                            // trace!("     cfa: {:#X}, addr: {:#X}, value: {:#X}", cfa, cfa.wrapping_add(offset as u64), value);
+                            Some(value)
                         }
                         RegisterRule::ValOffset(offset) => Some(cfa.wrapping_add(offset as u64)),
                         RegisterRule::Expression(_) => return Err("StackFrameIter: encountered an unsupported RegisterRule::Expression"),
@@ -300,8 +327,6 @@ impl FallibleIterator for StackFrameIter {
                 Ok(())
             })?;
 
-            // The stack pointer for this frame is defined to be the previously-calculated CFA 
-            newregs[X86_64::RSP] = Some(cfa);
             *registers = newregs;
         }
 
@@ -315,8 +340,9 @@ impl FallibleIterator for StackFrameIter {
         // The return address (RA register) actually points to the *next* instruction (1 byte past the call instruction),
         // because the processor has advanced it to continue executing after the function returns.
         // As x86 has variable-length instructions, we don't know exactly where the previous instruction starts,
-        // but we know that subtracting `1` will give us an address within that previous instruction.
+        // but we know that subtracting `1` will give us an address *within* that previous instruction.
         let caller = return_address - 1;
+        // TODO FIXME: only subtract 1 for non-"fault" exceptions, e.g., page faults should NOT subtract 1
         // trace!("call_site_address: {:#X}", caller);
 
         // Get unwind info for the call site address
@@ -333,8 +359,8 @@ impl FallibleIterator for StackFrameIter {
         let row_ref = UnwindRowReference { caller, eh_frame_sec, base_addrs };
         let (cfa, frame) = row_ref.with_unwind_info(|fde, row| {
             // trace!("ok: {:?} (0x{:x} - 0x{:x})", row.cfa(), row.start_address(), row.end_address());
-            let mut cfa = match *row.cfa() {
-                CfaRule::RegisterAndOffset { register, offset } => {
+            let cfa = match *row.cfa() {
+                CfaRule::RegisterAndOffset{register, offset} => {
                     // debug!("CfaRule:RegisterAndOffset: reg {:?}, offset: {:#X}", register, offset);
                     let reg_value = registers[register].ok_or_else(|| {
                         error!("CFA rule specified register {:?} with offset {:#X}, but register {:?}({}) had no value!", register, offset, register, register.0);
@@ -349,32 +375,31 @@ impl FallibleIterator for StackFrameIter {
             };
             
             // trace!("initial_address: {:#X}", fde.initial_address());
+
+            // If the next stack frame is an exception handler, then the CPU pushed an `ExceptionStackFrame`
+            // onto the stack, completely unbeknownst to the DWARF debug info. 
+            // Thus, we need to adjust this next frame's stack pointer (i.e., `cfa` which becomes the stack pointer)
+            // to account for the change in stack contents. 
+            // TODO FIXME: check for any type of exception/interrupt handler, and differentiate between error codes
             cfa_adjustment = if interrupts::is_exception_handler_with_error_code(fde.initial_address()) {
-                warn!("StackFrameIter: found exception handler with an error code.");
-                let cfa_adjustment: i64 = core::mem::size_of::<usize>() as i64;
-                cfa = cfa.wrapping_add(cfa_adjustment as u64);
-                // TODO: we might need to set this to true for any exception/interrupt handler, not just those with error codes.
+                let size_of_error_code: i64 = core::mem::size_of::<usize>() as i64;
+                trace!("StackFrameIter: next stack frame has a CPU-pushed error code on the stack, adjusting CFA to {:#X}", cfa);
+
+                // TODO: we need to set this to true for any exception/interrupt handler, not just those with error codes.
+                // If there is an error code pushed, then we need to account for that additionally beyond the exception stack frame being pushed.
+                let size_of_exception_stack_frame: i64 = 5 * 8;
+                trace!("StackFrameIter: next stack frame is an exception handler: adding {:#X} to cfa, new cfa: {:#X}", size_of_exception_stack_frame, cfa);
+                
                 this_frame_is_exception_handler = true;
-                Some(cfa_adjustment)
-                // None
+                Some(size_of_error_code + size_of_exception_stack_frame)
             } else {
                 None
             };
 
-            // If the last stack frame was an exception handler, then the CPU pushed an `ExceptionStackFrame`
-            // onto the stack, completely unbeknownst to the DWARF debug info. 
-            // Thus, we need to adjust this next frame's stack pointer (`cfa` becomes the stack pointer)
-            // by skipping over (pretend popping off) the `ExceptionStackFrame` that was pushed. 
-            // Note that we already handled the case where the CPU pushed an error code onto the stack.
-            if last_frame_was_exception_handler { 
-                cfa = cfa.wrapping_add(5 * 8); // size of `ExceptionStackFrame`
-                warn!("StackFrameIter: last frame was exception handler: adding {:#X} to cfa, new cfa: {:#X}", 5*8, cfa);
-            }
-
             // trace!("cfa is {:#X}", cfa);
 
             let frame = StackFrame {
-                personality: fde.personality().map(|x| unsafe { deref_ptr(x) }),
+                personality: None, // we don't use the personality function in Theseus
                 lsda: fde.lsda().map(|x| unsafe { deref_ptr(x) }),
                 initial_address: fde.initial_address(),
                 call_site_address: caller,
@@ -685,7 +710,7 @@ pub fn start_unwinding(reason: KillReason, stack_frames_to_skip: usize) -> Resul
             let unwinding_context = unsafe { &mut *unwinding_context_ptr };
             unwinding_context.stack_frame_iter.registers = registers;
             
-            // Skip the first several frames, e.g., to skip unwinding functions in the panic handlers themselves.
+            // Skip the first several frames, e.g., to skip unwinding the panic entry point functions themselves.
             for _i in 0..stack_frames_to_skip {
                 unwinding_context.stack_frame_iter.next()
                     .map_err(|_e| {
@@ -717,7 +742,7 @@ pub fn start_unwinding(reason: KillReason, stack_frames_to_skip: usize) -> Resul
 /// This returns an error upon failure, 
 /// and an `Ok(())` when it reaches the end of the stack and there are no more frames to unwind.
 /// When either value is returned (upon a return of any kind),
-/// **the caller is responsible for cleaning up the given `UnwindingContext`.
+/// **the caller is responsible for cleaning up** the given `UnwindingContext`.
 /// 
 /// Upon successfully continuing to iterate up the call stack, this function will actually not return at all. 
 fn continue_unwinding(unwinding_context_ptr: *mut UnwindingContext) -> Result<(), &'static str> {
@@ -834,7 +859,7 @@ fn cleanup_unwinding_context(unwinding_context_ptr: *mut UnwindingContext) -> ! 
     // Recover ownership of the unwinding context from its pointer
     let unwinding_context_boxed = unsafe { Box::from_raw(unwinding_context_ptr) };
     let unwinding_context = *unwinding_context_boxed;
-    let UnwindingContext { current_task, cause, stack_frame_iter } = unwinding_context;
+    let (stack_frame_iter, cause, current_task) = unwinding_context.into();
     drop(stack_frame_iter);
 
     let failure_cleanup_function = {
@@ -843,14 +868,4 @@ fn cleanup_unwinding_context(unwinding_context_ptr: *mut UnwindingContext) -> ! 
     };
     warn!("cleanup_unwinding_context(): invoking the task_cleanup_failure function for task {:?}", current_task);
     failure_cleanup_function(current_task, cause)
-}
-
-
-/// Retakes ownership of the given `unwinding_context_ptr`, which is a pointer to a `Box<UnwindingContext>` struct, 
-/// and then unboxes it and returns the reason/cause of unwinding, dropping all other fields in the `UnwindingContext`.
-#[doc(hidden)]
-pub unsafe fn unwinding_context_ptr_into_cause(unwinding_context_ptr: *mut UnwindingContext) -> task::KillReason {
-    let unwinding_context_boxed = Box::from_raw(unwinding_context_ptr);
-    let unwinding_context = *unwinding_context_boxed;
-    unwinding_context.cause
 }

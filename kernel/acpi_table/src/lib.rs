@@ -14,7 +14,7 @@ extern crate sdt;
 
 use core::ops::DerefMut;
 use alloc::collections::BTreeMap;
-use memory::{MappedPages, allocate_pages, PageTable, EntryFlags, PhysicalAddress, Frame, FrameRange, FRAME_ALLOCATOR, PhysicalMemoryArea};
+use memory::{MappedPages, allocate_pages, PageTable, EntryFlags, PhysicalAddress, Frame, FrameRange, get_frame_allocator_ref, PhysicalMemoryArea};
 use sdt::Sdt;
 
 /// All ACPI tables are identified by a 4-byte signature,
@@ -57,7 +57,7 @@ impl AcpiTables {
     /// Returns a tuple describing the SDT discovered at the given `sdt_phys_addr`: 
     /// the `AcpiSignature` and the total length of the table.
     pub fn map_new_table(&mut self, sdt_phys_addr: PhysicalAddress, page_table: &mut PageTable) -> Result<(AcpiSignature, usize), &'static str> {
-        let allocator = FRAME_ALLOCATOR.try().ok_or("couldn't get Frame Allocator")?;
+        let allocator = get_frame_allocator_ref().ok_or("couldn't get Frame Allocator")?;
         let mut mapping_changed = false;
 
         // First, we map the SDT header so we can obtain its `length` field, 

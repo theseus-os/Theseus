@@ -1,5 +1,6 @@
+use core::ops::{Deref, DerefMut};
 use super::paging::*;
-use super::{PAGE_SIZE, FrameAllocator, VirtualAddress, VirtualMemoryArea, EntryFlags, PageRange};
+use super::{PAGE_SIZE, FrameAllocator, FrameAllocatorRef, VirtualAddress, EntryFlags, PageRange};
 use super::Mapper;
 
 #[derive(Debug)]
@@ -27,8 +28,8 @@ impl StackAllocator {
     /// Reserves an unmapped guard page to catch stack overflows. 
     /// The given `usermode` argument determines whether the stack is accessible from userspace.
     /// Returns the newly-allocated stack and a VMA to represent its mapping.
-    pub fn alloc_stack<FA>(&mut self, page_table: &mut Mapper, frame_allocator: &mut FA, size_in_pages: usize)
-            -> Option<(Stack, VirtualMemoryArea)> where FA: FrameAllocator 
+    pub fn alloc_stack<FA>(&mut self, page_table: &mut Mapper, frame_allocator_ref: &FrameAllocatorRef<FA>, size_in_pages: usize)
+            -> Option<Stack> where FA: FrameAllocator 
     {
         if size_in_pages == 0 {
             return None; /* a zero sized stack maikes no sense */
@@ -58,7 +59,7 @@ impl StackAllocator {
 
                 // map stack pages to physical frames
                 // but don't map the guard page, that should be left unmapped
-                let stack_pages = match page_table.map_pages(PageRange::new(start, end), flags, frame_allocator) {
+                let stack_pages = match page_table.map_pages(PageRange::new(start, end), flags, &mut *frame_allocator_ref.lock()) {
                     Ok(pages) => pages,
                     Err(e) => {
                         error!("alloc_stack(): couldn't map_pages for the new Stack, error: {}", e);
@@ -66,17 +67,10 @@ impl StackAllocator {
                     }
                 };
 
-                let stack_vma = VirtualMemoryArea::new(
-                    start.start_address(),
-                    end.start_address().value() - start.start_address().value() + PAGE_SIZE, // + 1 Page because it's an inclusive range
-                    flags, 
-                    if flags.contains(EntryFlags::USER_ACCESSIBLE) { "User Stack" } else { "Kernel Stack" }, 
-                );
-
                 // create a new stack
                 // stack grows downward from the top address (which is the last page's start_addr + page size)
                 let top_of_stack = end.start_address() + PAGE_SIZE;
-                Some( (Stack::new(top_of_stack, start.start_address(), stack_pages), stack_vma) )
+                Some(Stack::new(top_of_stack, start.start_address(), stack_pages))
             }
             _ => {
                 error!("alloc_stack failed, not enough free pages to allocate {}!", size_in_pages);
@@ -91,6 +85,19 @@ pub struct Stack {
     top: VirtualAddress,
     bottom: VirtualAddress,
     pages: MappedPages,
+}
+
+impl Deref for Stack {
+    type Target = MappedPages;
+
+    fn deref(&self) -> &MappedPages {
+        &self.pages
+    }
+}
+impl DerefMut for Stack {
+    fn deref_mut(&mut self) -> &mut MappedPages {
+        &mut self.pages
+    }
 }
 
 impl Stack {

@@ -13,8 +13,7 @@ by_address = "1.0.4"
 
 
 [dependencies.log]
-default-features = false
-version = "0.3.7"
+version = "0.4.8"
 
 [dependencies.lazy_static]
 features = ["spin_no_std", "nightly"]

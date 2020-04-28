@@ -1,4 +1,5 @@
-//! This application is an example of how to write applications in Theseus.
+//! This application is an example of how to collect samples at from the PMU.
+//! The application 'pmu_sample_start' should have been called before running this application.
 
 #![no_std]
 
@@ -9,61 +10,20 @@ extern crate pmu_x86;
 
 use alloc::vec::Vec;
 use alloc::string::String;
-use getopts::Options;
 
-
-pub fn main(args: Vec<String>) -> isize {
-    let mut opts = Options::new();
-    opts.optflag("h", "help", "print this help menu");
-
-    let matches = match opts.parse(&args) {
-        Ok(m) => m,
-        Err(_f) => {
-            println!("{}", _f);
-            print_usage(opts);
-            return -1; 
-        }
-    };
-    println!("We are indeed here!");
-    //let sampler = pmu_x86::start_samples(pmu_x86::EventType::UnhaltedReferenceCycles, 0xFFFFF, None, 150);
+pub fn main(_args: Vec<String>) -> isize {
     let sampler = pmu_x86::retrieve_samples();
-    if let Ok(mut my_sampler) = sampler {
-        pmu_x86::print_samples(&mut my_sampler);
-        /*
-        println!("Sampling running ok.");
-        let mut counter = 0;
-        while counter < 300 {
-            println!("{}", counter);
-            counter += 1;
-        } 
-        */
-        /*
-        if let Ok(mut samples) = pmu_x86::retrieve_samples() {
-            println!("The results from retrieve_samples was okay");
-            pmu_x86::print_samples(&mut samples);
-        } else {
-            println!("Something went wrong!");
+    if let Ok(my_sampler) = sampler {
+        pmu_x86::print_samples(&my_sampler);
+        if let Err(e) = pmu_x86::find_function_names_from_samples(&my_sampler) {
+            println!("Error finding function names from samples: {:?}", e);
         }
-        */
-    } else {
-        println!("Sample didn't begin");
+    } 
+    else {
+        println!("Could not retrieve samples");
+        return -1;
     }
-    if matches.opt_present("h") {
-        print_usage(opts);
-        return 0;
-    }
-
-    println!("This is an example application.\nArguments: {:?}", args);
 
     0
 }
 
-
-
-fn print_usage(opts: Options) {
-    println!("{}", opts.usage(USAGE));
-}
-
-
-const USAGE: &'static str = "Usage: example [ARGS]
-An example application that just echoes its arguments.";

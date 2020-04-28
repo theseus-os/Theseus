@@ -1,11 +1,10 @@
 //! This crate contains common types used for memory mapping. 
 
 #![no_std]
+#![feature(const_fn)]
 #![feature(range_is_empty)]
 #![feature(step_trait)]
 
-extern crate atomic_linked_list;
-extern crate heap_irq_safe;
 extern crate kernel_config;
 extern crate multiboot2;
 extern crate xmas_elf;
@@ -16,6 +15,7 @@ extern crate entryflags_x86_64;
 
 use bit_field::BitField;
 use core::{
+    fmt,
     iter::Step,
     mem,
     ops::{Add, AddAssign, Deref, DerefMut, RangeInclusive, Sub, SubAssign},
@@ -47,12 +47,14 @@ impl VirtualAddress {
 
     /// Creates a new `VirtualAddress` that is guaranteed to be canonical
     /// by forcing the upper bits (64:48] to be sign-extended from bit 47.
-    pub fn new_canonical(mut virt_addr: usize) -> VirtualAddress {
-        match virt_addr.get_bit(47) {
-            false => virt_addr.set_bits(48..64, 0),
-            true => virt_addr.set_bits(48..64, 0xffff),
-        };
-        VirtualAddress(virt_addr)
+    pub const fn new_canonical(virt_addr: usize) -> VirtualAddress {
+        // match virt_addr.get_bit(47) {
+        //     false => virt_addr.set_bits(48..64, 0),
+        //     true => virt_addr.set_bits(48..64, 0xffff),
+        // };
+
+        // The below code is semantically equivalent to the above, but it works in const functions.
+        VirtualAddress(((virt_addr << 16) as isize >> 16) as usize)
     }
 
     /// Creates a VirtualAddress with the value 0.
@@ -62,7 +64,7 @@ impl VirtualAddress {
 
     /// Returns the underlying `usize` value for this `VirtualAddress`.
     #[inline]
-    pub fn value(&self) -> usize {
+    pub const fn value(&self) -> usize {
         self.0
     }
 
@@ -70,12 +72,12 @@ impl VirtualAddress {
     ///
     /// For example, if the PAGE_SIZE is 4KiB, then this will return
     /// the least significant 12 bits (12:0] of this VirtualAddress.
-    pub fn page_offset(&self) -> usize {
+    pub const fn page_offset(&self) -> usize {
         self.0 & (PAGE_SIZE - 1)
     }
 }
 
-impl core::fmt::Pointer for VirtualAddress {
+impl fmt::Pointer for VirtualAddress {
     fn fmt(&self, f: &mut fmt::Formatter) -> fmt::Result {
         write!(f, "{:p}", self.0 as *const usize)
     }
@@ -230,67 +232,6 @@ impl PhysicalMemoryArea {
             typ: typ,
             acpi: acpi,
         }
-    }
-}
-
-
-
-/// A region of virtual memory that is mapped into a [`Task`](../task/struct.Task.html)'s address space
-#[derive(Debug, Default, Clone, PartialEq)]
-pub struct VirtualMemoryArea {
-    start: VirtualAddress,
-    size: usize,
-    flags: EntryFlags,
-    desc: &'static str,
-}
-use core::fmt;
-impl fmt::Display for VirtualMemoryArea {
-    fn fmt(&self, f: &mut fmt::Formatter) -> fmt::Result {
-        write!(
-            f,
-            "start: {:#X}, size: {:#X}, flags: {:#X}, desc: {}",
-            self.start, self.size, self.flags, self.desc
-        )
-    }
-}
-
-
-impl VirtualMemoryArea {
-    pub fn new(start: VirtualAddress, size: usize, flags: EntryFlags, desc: &'static str) -> Self {
-        VirtualMemoryArea {
-            start: start,
-            size: size,
-            flags: flags,
-            desc: desc,
-        }
-    }
-
-    pub fn start_address(&self) -> VirtualAddress {
-        self.start
-    }
-
-    pub fn size(&self) -> usize {
-        self.size
-    }
-
-    pub fn flags(&self) -> EntryFlags {
-        self.flags
-    }
-
-    pub fn desc(&self) -> &'static str {
-        self.desc
-    }
-
-    /// Get an iterator that covers all the pages in this VirtualMemoryArea
-    pub fn pages(&self) -> PageRange {
-        // check that the end_page won't be invalid
-        if (self.start.value() + self.size) < 1 {
-            return PageRange::empty();
-        }
-
-        let start_page = Page::containing_address(self.start);
-        let end_page = Page::containing_address(self.start + self.size - 1);
-        PageRange::new(start_page, end_page)
     }
 }
 
@@ -488,14 +429,14 @@ impl fmt::Debug for Page {
 
 impl Page {
     /// Returns the `Page` that contains the given `VirtualAddress`.
-    pub fn containing_address(virt_addr: VirtualAddress) -> Page {
+    pub const fn containing_address(virt_addr: VirtualAddress) -> Page {
         Page {
             number: virt_addr.value() / PAGE_SIZE,
         }
     }
 
     /// Returns the `VirtualAddress` as the start of this `Page`.
-    pub fn start_address(&self) -> VirtualAddress {
+    pub const fn start_address(&self) -> VirtualAddress {
         // Cannot create VirtualAddress directly because the field is private
         VirtualAddress::new_canonical(self.number * PAGE_SIZE)
     }
@@ -597,12 +538,12 @@ pub struct PageRange(RangeInclusive<Page>);
 impl PageRange {
     /// Creates a new range of `Page`s that spans from `start` to `end`,
     /// both inclusive bounds.
-    pub fn new(start: Page, end: Page) -> PageRange {
+    pub const fn new(start: Page, end: Page) -> PageRange {
         PageRange(RangeInclusive::new(start, end))
     }
 
     /// Creates a PageRange that will always yield `None`.
-    pub fn empty() -> PageRange {
+    pub const fn empty() -> PageRange {
         PageRange::new(Page { number: 1 }, Page { number: 0 })
     }
 
@@ -615,17 +556,22 @@ impl PageRange {
         PageRange::new(start_page, end_page)
     }
 
-    /// Returns the `VirtualAddress` of the starting `Page` in this `PageRange`.
-    pub fn start_address(&self) -> VirtualAddress {
+    /// Returns the `VirtualAddress` of the starting `Page`.
+    pub const fn start_address(&self) -> VirtualAddress {
         self.0.start().start_address()
     }
 
-    /// Returns the number of `Page`s covered by this iterator.
+    /// Returns the size in number of `Page`s.
     /// Use this instead of the Iterator trait's `count()` method.
-    /// This is instant, because it doesn't need to iterate over each entry, unlike normal iterators.
-    pub fn size_in_pages(&self) -> usize {
+    /// This is instant, because it doesn't need to iterate over each `Page`, unlike normal iterators.
+    pub const fn size_in_pages(&self) -> usize {
         // add 1 because it's an inclusive range
         self.0.end().number + 1 - self.0.start().number
+    }
+
+    /// Returns the size in number of bytes.
+    pub const fn size_in_bytes(&self) -> usize {
+        self.size_in_pages() * PAGE_SIZE
     }
 
     /// Whether this `PageRange` contains the given `VirtualAddress`.
@@ -634,11 +580,31 @@ impl PageRange {
     }
 
     /// Returns the offset of the given `VirtualAddress` within this `PageRange`,
-    /// i.e., the difference between `virt_addr` and `self.start()`.
-    pub fn offset_from_start(&self, virt_addr: VirtualAddress) -> Option<usize> {
+    /// i.e., the difference between `virt_addr` and `self.start_address()`.
+    /// If the given `VirtualAddress` is not covered by this range of `Page`s, this returns `None`.
+    ///  
+    /// # Examples
+    /// If the page range covered addresses `0x2000` to `0x4000`, then calling
+    /// `offset_of_address(0x3500)` would return `Some(0x1500)`.
+    pub fn offset_of_address(&self, virt_addr: VirtualAddress) -> Option<usize> {
         if self.contains_virt_addr(virt_addr) {
             Some(virt_addr.value() - self.start_address().value())
         } else {
+            None
+        }
+    }
+
+    /// Returns the `VirtualAddress` at the given `offset` into this mapping,  
+    /// If the given `offset` is not covered by this range of `Page`s, this returns `None`.
+    ///  
+    /// # Examples
+    /// If the page range covered addresses `0xFFFFFFFF80002000` to `0xFFFFFFFF80004000`,
+    /// then calling `address_at_offset(0x1500)` would return `Some(0xFFFFFFFF80003500)`.
+    pub fn address_at_offset(&self, offset: usize) -> Option<VirtualAddress> {
+        if offset <= self.size_in_bytes() {
+            Some(self.start_address() + offset)
+        }
+        else {
             None
         }
     }
@@ -666,21 +632,23 @@ impl IntoIterator for PageRange {
 }
 
 
-/// The address bounds and flags of a section for mapping.
-#[derive(Default)]
+/// The address bounds and mapping flags of a section's memory region.
 pub struct SectionMemoryBounds {
-    /// The start address. It contains the virtual address and the physical address.
+    /// The starting virtual address and physical address.
     pub start: (VirtualAddress, PhysicalAddress),
-    /// The end address. It contains the virtual address and the physical address.
+    /// The ending virtual address and physical address.
     pub end: (VirtualAddress, PhysicalAddress),
-    /// The entry flags of the memory.
+    /// The page table entry flags that should be used for mapping this section.
     pub flags: EntryFlags,
 }
 
-/// The address bounds and flags of the initial sections for mapping.
-/// It only contains the three sections we care about.
-#[derive(Default)]
-pub struct InitialSectionsMemoryBounds {
+/// The address bounds and flags of the initial kernel sections that need mapping. 
+/// 
+/// It only contains three items, in which each item includes all sections that have identical flags:
+/// * The `.text` section bounds cover all sections that are executable.
+/// * The `.rodata` section bounds cover those that are read-only (.rodata, .gcc_except_table, .eh_frame).
+/// * The `.data` section bounds cover those that are writable (.data, .bss).
+pub struct AggregatedSectionMemoryBounds {
    pub text: SectionMemoryBounds,
    pub rodata: SectionMemoryBounds,
    pub data: SectionMemoryBounds,

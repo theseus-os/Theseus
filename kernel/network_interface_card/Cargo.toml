@@ -7,28 +7,8 @@ build = "../../build.rs"
 
 [dependencies]
 
-[dependencies.log]
-default-features = false
-version = "0.3.7"
-
-[dependencies.memory]
-path = "../memory"
-
-[dependencies.mpmc]
-path = "../../libs/mpmc"
-
-[dependencies.intel_ethernet]
-path = "../intel_ethernet"
-
-[dependencies.nic_queues]
-path = "../nic_queues"
-
 [dependencies.nic_buffers]
 path = "../nic_buffers"
-
-[dependencies.nic_initialization]
-path = "../nic_initialization"
-
 
 [lib]
 crate-type = ["rlib"]

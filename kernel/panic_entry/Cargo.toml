@@ -9,17 +9,13 @@ build = "../../build.rs"
 
 
 [dependencies.log]
-default-features = false
-version = "0.3.7"
+version = "0.4.8"
 
 [dependencies.memory]
 path = "../memory"
 
 [dependencies.mod_mgmt]
 path = "../mod_mgmt"
-
-[dependencies.task]
-path = "../task"
 
 [dependencies.vga_buffer]
 path = "../vga_buffer"

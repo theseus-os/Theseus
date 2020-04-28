@@ -11,8 +11,7 @@ multiboot2 = "0.7.1"
 x86_64 = { path = "../../libs/x86_64" }
 
 [dependencies.log]
-default-features = false
-version = "0.3.7"
+version = "0.4.8"
 
 [dependencies.kernel_config]
 path = "../kernel_config"

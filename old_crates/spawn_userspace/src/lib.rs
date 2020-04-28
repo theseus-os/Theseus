@@ -45,7 +45,7 @@ use fs_node::FileOrDir;
 #[cfg(spawn_userspace)]
 use core::ops::DerefMut;
 #[cfg(spawn_userspace)]
-use memory::{PageTable, MappedPages, Page, FRAME_ALLOCATOR, VirtualMemoryArea, FrameAllocator, allocate_pages_by_bytes, TemporaryPage, EntryFlags, Frame};
+use memory::{PageTable, MappedPages, Page, get_frame_allocator_ref, VirtualMemoryArea, FrameAllocator, allocate_pages_by_bytes, TemporaryPage, EntryFlags, Frame};
 #[cfg(spawn_userspace)]
 use kernel_config::memory::{USER_STACK_ALLOCATOR_BOTTOM, USER_STACK_ALLOCATOR_TOP_ADDR};
 #[cfg(spawn_userspace)]
@@ -82,7 +82,7 @@ pub fn spawn_userspace(path: Path, name: Option<String>) -> Result<TaskRef, &'st
 
         
         // get frame allocator reference
-        let allocator_mutex = FRAME_ALLOCATOR.try().ok_or("couldn't get FRAME ALLOCATOR")?;
+        let allocator_mutex = get_frame_allocator_ref().ok_or("couldn't get FRAME ALLOCATOR")?;
 
         // new_frame is a single frame, and temp_frames1/2 are tuples of 3 Frames each.
         let (new_frame, temp_frames1, temp_frames2) = {
@@ -124,7 +124,7 @@ pub fn spawn_userspace(path: Path, name: Option<String>) -> Result<TaskRef, &'st
                 )?
             };
 
-            mod_mgmt::elf_executable::parse_elf_executable(temp_module_mapping, module.size())?
+            elf_executable::parse_elf_executable(temp_module_mapping, module.size())?
             
             // temp_module_mapping is automatically unmapped when it falls out of scope here (frame allocator must not be locked)
         };
