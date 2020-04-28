@@ -683,7 +683,6 @@ dependencies = [
  "fs_node 0.1.0",
  "hashbrown 0.1.8 (registry+https://github.com/rust-lang/crates.io-index)",
  "lazy_static 1.2.0 (registry+https://github.com/rust-lang/crates.io-index)",
- "log 0.3.9 (registry+https://github.com/rust-lang/crates.io-index)",
  "memory 0.1.0",
  "mod_mgmt 0.1.0",
  "path 0.1.0",
@@ -1329,9 +1328,6 @@ version = "0.1.0"
 [[package]]
 name = "mpmc"
 version = "0.1.6-pre"
-dependencies = [
- "log 0.3.9 (registry+https://github.com/rust-lang/crates.io-index)",
-]
 
 [[package]]
 name = "multiboot2"
@@ -1547,6 +1543,8 @@ dependencies = [
 name = "panic_wrapper"
 version = "0.1.0"
 dependencies = [
+ "apic 0.1.0",
+ "fault_log 0.1.0",
  "log 0.4.8 (registry+https://github.com/rust-lang/crates.io-index)",
  "memory 0.1.0",
  "mod_mgmt 0.1.0",
@@ -1682,6 +1680,14 @@ dependencies = [
  "event_types 0.1.0",
  "log 0.4.8 (registry+https://github.com/rust-lang/crates.io-index)",
  "spin 0.4.10 (registry+https://github.com/rust-lang/crates.io-index)",
+]
+
+[[package]]
+name = "print_fault_log"
+version = "0.1.0"
+dependencies = [
+ "fault_log 0.1.0",
+ "getopts 0.2.21 (git+https://github.com/kevinaboos/getopts)",
 ]
 
 [[package]]

@@ -415,7 +415,7 @@ pub extern "x86-interrupt" fn page_fault_handler(stack_frame: &mut ExceptionStac
     add_error_to_fault_log (
         0x0e, //exception_number
         0, //error_code,
-        None, //core
+        0, //core
         "Temporary".to_string(), //running_task
         None, //running_app_crate: Option<None>,
         Some(VirtualAddress::new_canonical(control_regs::cr2().0)), // address_accessed: Option<None>,

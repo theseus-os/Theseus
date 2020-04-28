@@ -1,3 +1,5 @@
+//! A simple application to print the fault log
+
 #![no_std]
 
 extern crate alloc;

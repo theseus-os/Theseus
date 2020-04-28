@@ -45,7 +45,6 @@ use mouse_data::MouseEvent;
 use path::Path;
 use spin::{Mutex, Once};
 use window_inner::{WindowInner, WindowMovingStatus};
-use core::ptr;
 
 /// The instance of the default window manager
 pub static WINDOW_MANAGER: Once<Mutex<WindowManager>> = Once::new();
