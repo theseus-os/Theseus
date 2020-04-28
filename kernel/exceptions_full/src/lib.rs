@@ -381,7 +381,7 @@ pub extern "x86-interrupt" fn segment_not_present_handler(stack_frame: &mut Exce
                                   {:#b}\n{:#?}\n",
              error_code,
              stack_frame);
-    
+
     log_error_simple(FaultType::SegmentNotPresent, error_code);
     kill_and_halt(0xB, stack_frame)
 }

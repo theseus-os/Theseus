@@ -64,31 +64,22 @@ pub enum RecoveryAction {
 pub struct FaultEntry {
     /// Type of fault
     pub fault_type: FaultType,
-
     /// Error code returned with the exception
     pub error_code: u64,
-
     /// The core error occured
     pub core: u8,
-
     /// Task runnning immediately before the Exception
     pub running_task: String,
-
     /// If available the application crate that spawned the task
     pub running_app_crate: Option<String>,
-
     /// For page faults the address the program attempted to access. None for other faults
     pub address_accessed: Option<VirtualAddress>,
-
     /// Address at which exception occured
-    pub instruction_pointer : Option<VirtualAddress>,
-    
+    pub instruction_pointer : Option<VirtualAddress>,    
     /// Crate the address at which exception occured located
     pub crate_error_occured : Option<String>,
-
     /// List of crates reloaded from memory to recover from fault
     pub replaced_crates : Vec<String>,
-
     /// Recovery Action taken as a result of the fault
     pub action_taken : RecoveryAction,
 }
