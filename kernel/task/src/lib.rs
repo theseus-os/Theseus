@@ -887,11 +887,6 @@ impl TaskRef {
         self.0.deref().0.lock().set_env(new_env);
     }
 
-    /// Takes ownership of the `restart_info` struct of this task
-    pub fn get_restart_info(&self) -> Option<RestartInfo> {
-        self.0.deref().0.lock().restart_info.take()
-    }
-
     /// Gets a reference to this task's `Environment`.
     pub fn get_env(&self) -> Arc<Mutex<Environment>> {
         Arc::clone(&self.0.deref().0.lock().env)
