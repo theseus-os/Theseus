@@ -24,14 +24,41 @@ use alloc::{
     string::{String, ToString},
     vec::Vec,
 };
-
+use core::fmt;
 use memory::VirtualAddress;
+
+#[derive(Debug, Clone)]
+pub enum FaultType {
+    PageFault,
+    GeneralProtectionFault,
+    SegmentNotPresent,
+    InvalidTSS,
+    DoubleFault,
+    DeviceNotAvailable,
+    InvalidOpCode,
+    BoundRangeExceeded,
+    Overflow,
+    Breakpoint,
+    NMI,
+    Debug,
+    DivideByZero,
+    Panic
+}
+
+#[derive(Debug, Clone, PartialEq)]
+pub enum RecoveryAction {
+    None,
+    TaskRestarted,
+    FaultCrateReplaced,
+    IterativeCrateReplaced
+}
+
 
 /// A data structure to hold information about each fault. 
 #[derive(Debug, Clone)]
 pub struct FaultEntry {
     /// Machine excpetion number, 0xFF indicates panic
-    pub exception_number: u8,
+    pub fault_type: FaultType,
 
     /// Error code returned with the exception
     pub error_code: u64,
@@ -58,7 +85,7 @@ pub struct FaultEntry {
     pub replaced_crates : Vec<String>,
 
     /// true if crate reloading occurs as a result of the fault
-    pub action_taken : bool,
+    pub action_taken : RecoveryAction,
 }
 
 
@@ -76,7 +103,7 @@ pub fn clear_fault_log() {
 /// Add a new entry to the fault log. 
 /// This function requires all the entries in the `FaultEntry` as input.
 pub fn add_error_to_fault_log (
-    exception_number: u8,
+    fault_type: FaultType,
     error_code: u64,
     core: u8,
     running_task: String,
@@ -85,11 +112,11 @@ pub fn add_error_to_fault_log (
     instruction_pointer : Option<VirtualAddress>,
     crate_error_occured : Option<String>,
     replaced_crates : Vec<String>,
-    action_taken : bool,
+    action_taken : RecoveryAction,
 )-> () {
 
     let fe = FaultEntry{
-        exception_number: exception_number,
+        fault_type: fault_type,
         error_code: error_code,
         core: core,
         running_task: running_task,
@@ -106,14 +133,15 @@ pub fn add_error_to_fault_log (
 /// Add a new entry to the fault log. 
 /// This function requires only the `exception_number` and `error_code`. 
 /// Other entries will be marked as None to be filled later.
+/// // Since all exceptions lead to `kill_and_halt` we update the rest of the fields there.
 pub fn add_error_simple (
-    exception_number: u8,
+    fault_type: FaultType,
     error_code: u64,
 )-> () {
 
     let vec :Vec<String> = Vec::new();
     let fe = FaultEntry{
-        exception_number: exception_number,
+        fault_type: fault_type,
         error_code: error_code,
         core: 0,
         running_task: "None".to_string(),
@@ -122,7 +150,7 @@ pub fn add_error_simple (
         instruction_pointer : None,
         crate_error_occured : None,
         replaced_crates : vec,
-        action_taken : false,
+        action_taken : RecoveryAction::None,
     };
     FAULT_LIST.lock().push(fe);
 }
@@ -135,7 +163,7 @@ pub fn add_panic_entry (
 
     let vec :Vec<String> = Vec::new();
     let fe = FaultEntry{
-        exception_number: 0xff,
+        fault_type: FaultType::Panic,
         error_code: 0,
         core: core,
         running_task: running_task,
@@ -144,7 +172,7 @@ pub fn add_panic_entry (
         instruction_pointer : None,
         crate_error_occured : None,
         replaced_crates : vec,
-        action_taken : false,
+        action_taken : RecoveryAction::None,
     };
     FAULT_LIST.lock().push(fe);
 }
@@ -157,7 +185,7 @@ pub fn get_last_unhandled_exception () -> Option<FaultEntry> {
     let mut index: Option<usize> = None;
 
     for (i,fault_entry) in fault_list.iter().enumerate() {
-        if fault_entry.action_taken == false && fault_entry.exception_number < 0xff {
+        if fault_entry.action_taken == RecoveryAction::None {
             index = Some(i);
         }
     }
