@@ -19,21 +19,17 @@ extern crate gimli;
 extern crate memory;
 extern crate stack_trace;
 extern crate fault_log;
-extern crate mod_mgmt;
 extern crate apic;
 
 use x86_64::structures::idt::{LockedIdt, ExceptionStackFrame, PageFaultErrorCode};
 use x86_64::registers::msr::*;
 use apic::get_my_apic_id;
-
+use fault_log::{log_error_to_fault_log, log_error_simple, FaultType, RecoveryAction};
+use memory::VirtualAddress;
 use alloc::{
     string::{String, ToString},
     vec::Vec,
 };
-
-use fault_log::{log_error_to_fault_log, log_error_simple, FaultType, RecoveryAction};
-
-use memory::VirtualAddress;
 
 pub fn init(idt_ref: &'static LockedIdt) {
     { 

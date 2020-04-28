@@ -649,7 +649,6 @@ dependencies = [
  "gimli 0.19.0 (registry+https://github.com/rust-lang/crates.io-index)",
  "log 0.4.8 (registry+https://github.com/rust-lang/crates.io-index)",
  "memory 0.1.0",
- "mod_mgmt 0.1.0",
  "pmu_x86 0.1.0",
  "print 0.1.0",
  "runqueue 0.1.0",
@@ -1680,7 +1679,6 @@ name = "print_fault_log"
 version = "0.1.0"
 dependencies = [
  "fault_log 0.1.0",
- "getopts 0.2.21 (git+https://github.com/kevinaboos/getopts)",
 ]
 
 [[package]]

@@ -3,8 +3,5 @@ name = "print_fault_log"
 version = "0.1.0"
 authors = ["Namitha Liyanage <namithaliyanage@gmail.com>"]
 
-[dependencies]
-getopts = "0.2.21"
-
 [dependencies.fault_log]
 path = "../../kernel/fault_log"

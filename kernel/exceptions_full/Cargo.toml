@@ -26,9 +26,6 @@ path = "../print"
 [dependencies.apic]
 path = "../apic"
 
-[dependencies.mod_mgmt]
-path = "../mod_mgmt"
-
 [dependencies.tlb_shootdown]
 path = "../tlb_shootdown"
 
