@@ -196,6 +196,15 @@ pub enum SimdExt {
     None,
 }
 
+/// A data structure to hold data related to restart the function. 
+/// Presence of `RestartInfo` itself indicates the task will be restartable.
+pub struct RestartInfo {
+    /// Stores the argument of the task for restartable tasks
+    pub argument: Box<dyn Any + Send>,
+    /// Stores the function of the task for restartable tasks
+    pub func: Box<dyn Any + Send>,
+}
+
 /// The signature of a Task's failure cleanup function.
 pub type FailureCleanupFunction = fn(TaskRef, KillReason) -> !;
 
@@ -250,7 +259,10 @@ pub struct Task {
     /// Typically, it will point to this Task's specific instance of `spawn::task_cleanup_failure()`,
     /// which has generic type parameters that describe its function signature, argument type, and return type.
     pub failure_cleanup_function: FailureCleanupFunction,
-
+    /// Stores the restartable information of the task. 
+    /// `Some(RestartInfo)` indicates that the task is restartable.
+    pub restart_info: Option<RestartInfo>,
+    
     #[cfg(simd_personality)]
     /// Whether this Task is SIMD enabled and what level of SIMD extensions it uses.
     pub simd: SimdExt,
@@ -332,7 +344,8 @@ impl Task {
             kill_handler: None,
             env,
             failure_cleanup_function,
-
+            restart_info: None,
+            
             #[cfg(simd_personality)]
             simd: SimdExt::None,
         }

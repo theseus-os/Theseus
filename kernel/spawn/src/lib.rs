@@ -40,9 +40,10 @@ use alloc::{
 };
 use irq_safety::{MutexIrqSafe, hold_interrupts, enable_interrupts};
 use memory::{get_kernel_mmi_ref, MemoryManagementInfo, VirtualAddress};
-use task::{Task, TaskRef, get_my_current_task, RunState, TASKLIST};
+use task::{Task, TaskRef, get_my_current_task, RunState, RestartInfo, TASKLIST};
 use mod_mgmt::{CrateNamespace, SectionType, SECTION_HASH_DELIMITER};
 use path::Path;
+use apic::get_my_apic_id;
 use fs_node::FileOrDir;
 
 #[cfg(simd_personality)]
@@ -172,9 +173,11 @@ pub struct TaskBuilder<F, A, R> {
     name: Option<String>,
     pin_on_core: Option<u8>,
     blocked: bool,
+    idle: bool,
+    post_build_function: Option<Box< dyn FnOnce(&mut Task) -> Result<(), &'static str> >>,
+
     #[cfg(simd_personality)]
     simd: SimdExt,
-    post_build_function: Option<Box< dyn FnOnce(&mut Task) -> Result<(), &'static str> >>,
 }
 
 impl<F, A, R> TaskBuilder<F, A, R> 
@@ -192,6 +195,7 @@ impl<F, A, R> TaskBuilder<F, A, R>
             name: None,
             pin_on_core: None,
             blocked: false,
+            idle: false,
             post_build_function: None,
 
             #[cfg(simd_personality)]
@@ -235,6 +239,16 @@ impl<F, A, R> TaskBuilder<F, A, R>
         self
     }
 
+    /// Sets this new Task to be the idle task for the given core. 
+    /// 
+    /// This is generally not needed because idle tasks are automatically set up for each core
+    /// when that core is initialized,
+    /// but it is primarily used to restart an idle task that has exited or failed.
+    pub fn idle(mut self, core_id: u8) -> TaskBuilder<F, A, R> {
+        self.idle = true;
+        self.pin_on_core(core_id)
+    }
+
     /// Finishes this `TaskBuilder` and spawns the new task as described by its builder functions.
     /// 
     /// This merely makes the new task Runnable, it does not switch to it immediately; that will happen on the next scheduler invocation.
@@ -272,6 +286,11 @@ impl<F, A, R> TaskBuilder<F, A, R>
             new_task.runstate = RunState::Runnable;
         }
 
+        // The new task is marked as idle
+        if self.idle {
+            new_task.is_an_idle_task = true;
+        }
+
         // If there is a post-build function, invoke it now before finalizing the task and adding it to runqueues.
         if let Some(pb_func) = self.post_build_function {
             pb_func(&mut new_task)?;
@@ -294,6 +313,43 @@ impl<F, A, R> TaskBuilder<F, A, R>
         }
 
         Ok(task_ref)
+    }
+
+}
+
+/// Additional implementation of `TaskBuilder` to be used for 
+/// restartable functions. Further restricts the function (F) 
+/// and argument (A) to implement `Clone` trait.
+impl<F, A, R> TaskBuilder<F, A, R> 
+    where A: Send + Clone + 'static, 
+          R: Send + 'static,
+          F: FnOnce(A) -> R + Send + Clone +'static,
+{
+
+    /// Like `spawn()`, this finishes this `TaskBuilder` and spawns the new task. 
+    /// It additionally stores the new Task's function and argument within the Task,
+    /// enabling it to be restarted upon exit.
+    /// 
+    /// This merely makes the new task Runnable, it does not switch to it immediately; that will happen on the next scheduler invocation.
+    #[inline(never)]
+    pub fn spawn_restartable(mut self) -> Result<TaskRef, &'static str> {
+        let restart_info = RestartInfo {
+            argument: Box::new(self.argument.clone()),
+            func: Box::new(self.func.clone()),
+        };
+
+        // Once the new task is created, we set its restart info (func and arg),
+        // and tell it to use the restartable version of the final task cleanup function.
+        self.post_build_function = Some(Box::new(
+            move |new_task| {
+                new_task.restart_info = Some(restart_info);
+                setup_context_trampoline(new_task, task_wrapper_restartable::<F, A, R>)?;
+                Ok(())
+            }
+        ));
+
+        // Code path is shared between `spawn` and `spawn_restartable` from this point
+        self.spawn()
     }
 }
 
@@ -374,10 +430,9 @@ fn setup_context_trampoline(new_task: &mut Task, entry_point_function: fn() -> !
     Ok(())
 }
 
-
-/// The entry point for all new `Task`s that run in kernelspace. 
-/// This does not return, because it doesn't really have anywhere to return.
-fn task_wrapper<F, A, R>() -> !
+/// Internal code of `task_wrapper` shared by `task_wrapper` and 
+/// `task_wrapper_restartable`. 
+fn task_wrapper_internal<F, A, R>() -> Result<R, task::KillReason>
     where A: Send + 'static, 
           R: Send + 'static,
           F: FnOnce(A) -> R, 
@@ -408,7 +463,17 @@ fn task_wrapper<F, A, R>() -> !
     enable_interrupts(); // we must enable interrupts for the new task, otherwise we won't be able to preempt it.
 
     // Now we actually invoke the entry point function that this Task was spawned for, catching a panic if one occurs.
-    let result = catch_unwind::catch_unwind_with_arg(func, arg);
+    catch_unwind::catch_unwind_with_arg(func, arg)
+}
+
+/// The entry point for all new `Task`s except restartable tasks. 
+/// This does not return, because it doesn't really have anywhere to return.
+fn task_wrapper<F, A, R>() -> !
+    where A: Send + 'static, 
+          R: Send + 'static,
+          F: FnOnce(A) -> R, 
+{
+    let result = task_wrapper_internal::<F, A, R>();
 
     // Here: now that the task is finished running, we must clean in up by doing three things:
     // 1. Put the task into a non-runnable mode (exited or killed) and set its exit value or killed reason
@@ -428,13 +493,32 @@ fn task_wrapper<F, A, R>() -> !
     }
 }
 
-
-/// This function cleans up a task that exited properly.
-fn task_cleanup_success<F, A, R>(current_task: TaskRef, exit_value: R) -> !
-    where A: Send + 'static, 
+/// Similar to `task_wrapper` in functionality but used as entry point only for 
+/// restartable tasks. Further restricts `argument` to implement `Clone` trait. 
+/// // We cannot use `task_wrapper` as it is not bounded by `Clone` trait.
+fn task_wrapper_restartable<F, A, R>() -> !
+    where A: Send + Clone + 'static, 
           R: Send + 'static,
-          F: FnOnce(A) -> R, 
+          F: FnOnce(A) -> R + Send + Clone +'static,
 {
+    let result = task_wrapper_internal::<F, A, R>();
+
+    // See `task_wrapper` for an explanation of how the below functions work.
+    let curr_task = get_my_current_task().expect("BUG: task_wrapper: couldn't get current task (after task func).").clone();
+    match result {
+        Ok(exit_value)   => task_restartable_cleanup_success::<F, A, R>(curr_task, exit_value),
+        Err(kill_reason) => task_restartable_cleanup_failure::<F, A, R>(curr_task, kill_reason),
+    }
+}
+
+
+
+/// Internal function cleans up a task that exited properly. 
+/// Contains the shared code between `task_cleanup_success` and `task_cleanup_success_restartable`
+#[inline(always)]
+fn task_cleanup_success_internal<R>(current_task: TaskRef, exit_value: R) -> (irq_safety::HeldInterrupts, TaskRef)
+    where R: Send + 'static,
+{ 
     // Disable preemption (currently just disabling interrupts altogether)
     let held_interrupts = hold_interrupts();
 
@@ -443,9 +527,44 @@ fn task_cleanup_success<F, A, R>(current_task: TaskRef, exit_value: R) -> !
         error!("task_cleanup_success: {:?} task could not set exit value, because task had already exited. Is this correct?", current_task.lock().name);
     }
 
+    (held_interrupts, current_task)
+}
+
+/// This function cleans up a task that exited properly.
+fn task_cleanup_success<F, A, R>(current_task: TaskRef, exit_value: R) -> !
+    where A: Send + 'static, 
+          R: Send + 'static,
+          F: FnOnce(A) -> R, 
+{   
+    let (held_interrupts, current_task) = task_cleanup_success_internal(current_task, exit_value);
     task_cleanup_final::<F, A, R>(held_interrupts, current_task)
 }
-            
+
+/// Similar to `task_cleanup_success` but used on restartable_tasks
+fn task_restartable_cleanup_success<F, A, R>(current_task: TaskRef, exit_value: R) -> !
+    where A: Send + Clone + 'static, 
+          R: Send + 'static,
+          F: FnOnce(A) -> R + Send + Clone +'static,
+{
+    let (held_interrupts, current_task) = task_cleanup_success_internal(current_task, exit_value);
+    task_restartable_cleanup_final::<F, A, R>(held_interrupts, current_task)
+}
+
+
+
+/// Internal function that clean up the task not exited properly.
+#[inline(always)]
+fn task_cleanup_failure_internal(current_task: TaskRef, kill_reason: task::KillReason) -> (irq_safety::HeldInterrupts, TaskRef) {
+    // Disable preemption (currently just disabling interrupts altogether)
+    let held_interrupts = hold_interrupts();
+
+    debug!("task_cleanup_failure: {:?} panicked with {:?}", current_task.lock().name, kill_reason);
+    if current_task.mark_as_killed(kill_reason).is_err() {
+        error!("task_cleanup_failure: {:?} task could not set kill reason, because task had already exited. Is this correct?", current_task.lock().name);
+    }
+
+    (held_interrupts, current_task)
+}     
 
 /// This function cleans up a task that did not exit properly,
 /// e.g., it panicked, hit an exception, etc. 
@@ -459,16 +578,20 @@ fn task_cleanup_failure<F, A, R>(current_task: TaskRef, kill_reason: task::KillR
           R: Send + 'static,
           F: FnOnce(A) -> R, 
 {
-    // Disable preemption (currently just disabling interrupts altogether)
-    let held_interrupts = hold_interrupts();
-
-    debug!("task_cleanup_failure: {:?} panicked with {:?}", current_task.lock().name, kill_reason);
-    if current_task.mark_as_killed(kill_reason).is_err() {
-        error!("task_cleanup_failure: {:?} task could not set kill reason, because task had already exited. Is this correct?", current_task.lock().name);
-    }
-
+    let (held_interrupts, current_task) = task_cleanup_failure_internal(current_task, kill_reason);
     task_cleanup_final::<F, A, R>(held_interrupts, current_task)
 }
+
+/// Similar to `task_cleanup_failure` but used on restartable_tasks
+fn task_restartable_cleanup_failure<F, A, R>(current_task: TaskRef, kill_reason: task::KillReason) -> !
+    where A: Send + Clone + 'static, 
+          R: Send + 'static,
+          F: FnOnce(A) -> R + Send + Clone +'static, 
+{
+    let (held_interrupts, current_task) = task_cleanup_failure_internal(current_task, kill_reason);
+    task_restartable_cleanup_final::<F, A, R>(held_interrupts, current_task)
+}
+
 
 
 /// The final piece of the task cleanup logic,
@@ -478,25 +601,104 @@ fn task_cleanup_final<F, A, R>(_held_interrupts: irq_safety::HeldInterrupts, cur
           R: Send + 'static,
           F: FnOnce(A) -> R, 
 {
+    remove_current_task_from_runqueue(&current_task);
+    drop(_held_interrupts); // reenables preemption (interrupts)
+
+    // Yield the CPU
+    let success = scheduler::schedule();
+    // Yielding will be succesful if there is atleast one task to schedule to. Which is true
+    // in most cases as at least the idle task will be there. However on rare instances where 
+    // the idle task has crashed this will fail. If so we spawn a new idle task.
+    if !success {
+        spawn_idle_task();
+    }
+    scheduler::schedule();
+
+    // nothing below here should ever run again, we should never ever reach this point
+    error!("BUG: task_cleanup_final(): task was rescheduled after being dead!");
+    loop { }
+}
+
+/// The final piece of the task cleanup logic for restartable tasks.
+/// which removes the task from its runqueue and spawns it again with 
+/// same entry function (F) and argument (A). 
+fn task_restartable_cleanup_final<F, A, R>(_held_interrupts: irq_safety::HeldInterrupts, current_task: TaskRef) -> ! 
+   where A: Send + Clone + 'static, 
+         R: Send + 'static,
+         F: FnOnce(A) -> R + Send + Clone +'static, 
+{
+    // remove the task from runqueue
+    remove_current_task_from_runqueue(&current_task);
+
+    {
+        // Re-spawn a new instance of the task if it was spawned as a restartable task. 
+        // We must not hold the current task's lock when calling spawn().
+        let restartable_info = {
+            let t = current_task.lock();
+            if let Some(restart_info) = t.restart_info.as_ref() {
+                let func: &F = restart_info.func.downcast_ref().expect("BUG: failed to downcast restartable task's function");
+                let arg : &A = restart_info.argument.downcast_ref().expect("BUG: failed to downcast restartable task's argument");
+                Some((t.name.clone(), func.clone(), arg.clone()))
+            } else {
+                None
+            }
+        };
+
+        if let Some((name, func, arg)) = restartable_info {
+            new_task_builder(func, arg)
+                .name(name)
+                .spawn_restartable()
+                .expect("Could not restart the task"); 
+        } else {
+            error!("BUG : Restartable task has no restart information available");
+        }
+    }
+
+    drop(_held_interrupts); // reenables preemption (interrupts)
+
+    // Yield the CPU
+    let success = scheduler::schedule();
+    // Yielding will be succesful if there is atleast one task to schedule to. Which is true
+    // in most cases as at least the idle task will be there. However on rare instances where 
+    // the idle task has crashed this will fail. If so we spawn a new idle task.
+    if !success {
+        spawn_idle_task();
+    }
+    scheduler::schedule();
+
+    // nothing below here should ever run again, we should never ever reach this point
+    error!("BUG: task_cleanup_final(): task was rescheduled after being dead!");
+    loop { }
+}
+
+/// Helper function to remove a task from it's runqueue and drop it.
+fn remove_current_task_from_runqueue(current_task: &TaskRef) {
     // Remove the task from its runqueue
     #[cfg(not(runqueue_state_spill_evaluation))]  // the normal case
     {
         if let Err(e) = runqueue::get_runqueue(apic::get_my_apic_id())
             .ok_or("couldn't get this core's ID or runqueue to remove exited task from it")
-            .and_then(|rq| rq.write().remove_task(&current_task)) 
+            .and_then(|rq| rq.write().remove_task(current_task)) 
         {
             error!("BUG: task_cleanup_final(): couldn't remove exited task from runqueue: {}", e);
         }
     }
+}
 
-    // We must drop any local stack variables here since this function will not return
-    drop(current_task);
-    drop(_held_interrupts); // reenables preemption (interrupts)
+/// Spawns an idle task on the current core.
+/// Useful for when an idle task has crashed.
+fn spawn_idle_task() -> () {
+    let apic_id = get_my_apic_id();
 
-    // Yield the CPU
-    scheduler::schedule();
+    debug!("Re-spawning a new idle task on core {}", apic_id);
 
-    // nothing below here should ever run again, we should never ever reach this point
-    error!("BUG: task_cleanup_final(): task was rescheduled after being dead!");
+    let _idle_taskref = new_task_builder(dummy_idle_task, 0)
+        .name(String::from(format!("idle_task_ap{}", apic_id)))
+        .idle(apic_id)
+        .spawn().expect("failed to initiate idle task");
+}
+
+/// Dummy `idle_task` to be used if original `idle_task` crashes.
+fn dummy_idle_task(_a: usize) -> () {
     loop { }
 }
