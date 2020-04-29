@@ -1,0 +1,23 @@
+[package]
+name = "slabmalloc"
+version = "0.7.0"
+authors = ["Gerd Zellweger <mail@gerdzellweger.com>", "Ramla Ijaz <ijazramla@gmail.com>"]
+description = "Simple slab based malloc implementation in rust that now works with Theseus memory abstractions"
+build = "../../build.rs"
+
+
+keywords = ["os", "malloc", "slab", "alloc", "memory"]
+
+[features]
+unstable = []
+default = [ "unstable" ]
+
+[dependencies.log]
+version = "0.4.8"
+
+[dependencies.memory]
+path = "../memory"
+
+
+[lib]
+crate-type = ["rlib"]
