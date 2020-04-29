@@ -11,6 +11,3 @@
 	path = libs/mpmc
 	url = https://github.com/theseus-os/mpmc
 
-[submodule "libs/rust-slabmalloc"]
-	path = libs/rust-slabmalloc
-	url = https://github.com/theseus-os/rust-slabmalloc.git
