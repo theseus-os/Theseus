@@ -2,12 +2,12 @@
 //! Right now we use the apic id as the key, so that we have per-core heaps.
 //! 
 //! The heaps are ZoneAllocators (given in the slabmalloc crate). Each ZoneAllocator maintains 11 separate "slab allocators" for sizes
-//! 8, 16, 32, 64, 128, 256, 512, 1024, 2048, 4096 and 8056 (8KiB - bytes of metadata) bytes. 8056 is the maximum allocation size given by `ZoneAllocator::MAX_ALLOC_SIZE`.
-//! The slab allocator maintains linked lists of allocable pages from which it allocates objects of the same size. 
-//! The allocable pages are 8 KiB (`ObjectPage8K::SIZE`), and have metadata stored in the last 136 bytes (`ObjectPage8K::METADATA_SIZE`).
-//! The metadata includes a heap id, MappedPages object this allocable page belongs to, forward and back pointers to pages stored in a linked list and a
+//! 8, 16, 32, 64, 128, 256, 512, 1024, 2048, 4096 and 8072 (8KiB - bytes of metadata) bytes. 8072 is the maximum allocation size given by `ZoneAllocator::MAX_ALLOC_SIZE`.
+//! The slab allocator maintains a list of MappedPages8k, and uses the underlying pages (allocable pages) to allocates objects of the same size. 
+//! The allocable pages are 8 KiB (`MappedPages8K::SIZE`), and have metadata stored in the last 120 bytes (`MappedPages8K::METADATA_SIZE`).
+//! The metadata includes a heap id, a MappedPages8k object that holds the next page in the page list, and a
 //! bitmap to keep track of allocations. The maximum allocation size can change if the size of the objects in the metadata change. If that happens it will be automatically
-//! reflected in the constants `ZoneAllocator::MAX_ALLOC_SIZE` and `ObjectPage8K::METADATA_SIZE`
+//! reflected in the constants `ZoneAllocator::MAX_ALLOC_SIZE` and `MappedPages8K::METADATA_SIZE`
 //! 
 //! Any memory request greater than maximum allocation size, a large allocation, is satisfied through a request for pages from the kernel.
 //! All other requests are satisfied through the per-core heaps.
@@ -46,7 +46,7 @@ use hashbrown::HashMap;
 use memory::{MappedPages, VirtualAddress, get_frame_allocator_ref, get_kernel_mmi_ref, PageRange, create_mapping};
 use kernel_config::memory::{PAGE_SIZE, KERNEL_HEAP_START, KERNEL_HEAP_INITIAL_SIZE, KERNEL_HEAP_MAX_SIZE};
 use irq_safety::MutexIrqSafe;
-use slabmalloc::{ZoneAllocator, ObjectPage8k, Allocator, MappedPages8k};
+use slabmalloc::{ZoneAllocator, Allocator, MappedPages8k};
 use core::ops::{Add, Deref, DerefMut};
 use core::ptr;
 use heap::HEAP_FLAGS;
@@ -55,11 +55,11 @@ use intrusive_collections::{intrusive_adapter,RBTree, RBTreeLink, KeyAdapter, Po
 
 /// The size of each MappedPages Object that is allocated for the per-core heaps, in bytes.
 /// We curently work with 8KiB, so that the per core heaps can allocate objects up to `ZoneAllocator::MAX_ALLOC_SIZE`.  
-const HEAP_MAPPED_PAGES_SIZE_IN_BYTES: usize = ObjectPage8k::SIZE;
+const HEAP_MAPPED_PAGES_SIZE_IN_BYTES: usize = MappedPages8k::SIZE;
 
 /// The size of each MappedPages Object that is allocated for the per-core heaps, in pages.
 /// We curently work with 2 pages, so that the per core heaps can allocate objects up to `ZoneAllocator::MAX_ALLOC_SIZE`.   
-const HEAP_MAPPED_PAGES_SIZE_IN_PAGES: usize = ObjectPage8k::SIZE / PAGE_SIZE;
+const HEAP_MAPPED_PAGES_SIZE_IN_PAGES: usize = MappedPages8k::SIZE / PAGE_SIZE;
 
 /// When an OOM error occurs, before allocating more memory from the OS, we first try to see if there are unused(empty) pages 
 /// within the per-core heaps that can be moved to other heaps. To prevent any heap from completely running out of memory we 
@@ -67,7 +67,7 @@ const HEAP_MAPPED_PAGES_SIZE_IN_PAGES: usize = ObjectPage8k::SIZE / PAGE_SIZE;
 const EMPTY_PAGES_THRESHOLD: usize = ZoneAllocator::MAX_BASE_SIZE_CLASSES * 2;
 
 /// The number of pages each size class in the ZoneAllocator is initialized with.
-const PAGES_PER_SIZE_CLASS: usize = 24 * 8; 
+const PAGES_PER_SIZE_CLASS: usize = 24; 
 
 /// Starting size of each per-core heap. It's approximately 1 MiB.
 pub const PER_CORE_HEAP_INITIAL_SIZE_PAGES: usize = ZoneAllocator::MAX_BASE_SIZE_CLASSES *  PAGES_PER_SIZE_CLASS;
@@ -94,11 +94,6 @@ pub fn switch_to_multiple_heaps() -> Result<(), &'static str> {
     let multiple_heaps = Box::new(initialize_multiple_heaps()?);
     //set the multiple heaps as the default allocator
     heap::set_allocator(multiple_heaps);
-    // loop{}
-    // let layout = Layout::from_size_align(8, 8).unwrap();
-
-    // let ptr = unsafe{ multiple_heaps.alloc(layout) };
-
     Ok(())
 }
 
@@ -149,14 +144,15 @@ pub fn init_individual_heap(key: usize, multiple_heaps: &mut MultipleHeaps) -> R
             }
             let layout = Layout::from_size_align(*size, alignment).map_err(|_e| "Incorrect layout")?;
 
-            // create the mapped pages starting from the previous end of the heap
+            // create the mapped pages starting from the previous end of the heap, and ensure they fit the heap requirements
+            // by converting them to a MappedPages8k
             let mapping = MappedPages8k::new(create_heap_mapping(heap_end_addr, HEAP_MAPPED_PAGES_SIZE_IN_BYTES)?)?;
 
             // add page to the allocator
             zone_allocator.refill(layout, mapping)?; 
 
             // update the end address of the heap
-            trace!("Added an object page {:#X} to slab of size {}", heap_end_addr, size);
+            // trace!("Added an object page {:#X} to slab of size {}", heap_end_addr, size);
             heap_end_addr = heap_end_addr.add(HEAP_MAPPED_PAGES_SIZE_IN_BYTES);
         }
     }
@@ -299,9 +295,9 @@ unsafe impl GlobalAlloc for MultipleHeaps {
             )
         }     
         // find the starting address of the object page this block belongs to
-        let page_addr = (ptr as usize) & !(ObjectPage8k::SIZE - 1);
+        let page_addr = (ptr as usize) & !(MappedPages8k::SIZE - 1);
         // find the heap id
-        let id = *((page_addr as *mut u8).offset(ObjectPage8k::HEAP_ID_OFFSET as isize) as *mut usize);
+        let id = *((page_addr as *mut u8).offset(MappedPages8k::HEAP_ID_OFFSET as isize) as *mut usize);
         let mut heap = self.heaps.get(&id).expect("Multiple Heaps: Heap not initialized").lock();
         heap.deallocate(NonNull::new_unchecked(ptr), layout).expect("Couldn't deallocate");
     }
