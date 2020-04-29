@@ -116,6 +116,7 @@ dependencies = [
 name = "async_channel"
 version = "0.1.0"
 dependencies = [
+ "atomic 0.4.5 (registry+https://github.com/rust-lang/crates.io-index)",
  "debugit 0.1.0",
  "log 0.4.8 (registry+https://github.com/rust-lang/crates.io-index)",
  "mpmc 0.1.6-pre",
@@ -2326,11 +2327,37 @@ dependencies = [
 ]
 
 [[package]]
+name = "test_channel"
+version = "0.1.0"
+dependencies = [
+ "apic 0.1.0",
+ "async_channel 0.1.0",
+ "getopts 0.2.21 (git+https://github.com/kevinaboos/getopts)",
+ "log 0.4.8 (registry+https://github.com/rust-lang/crates.io-index)",
+ "rendezvous 0.1.0",
+ "scheduler 0.1.0",
+ "spawn 0.1.0",
+ "spin 0.4.10 (registry+https://github.com/rust-lang/crates.io-index)",
+ "task 0.1.0",
+ "terminal_print 0.1.0",
+]
+
+[[package]]
 name = "test_panic"
 version = "0.1.0"
 dependencies = [
  "log 0.4.8 (registry+https://github.com/rust-lang/crates.io-index)",
  "task 0.1.0",
+ "terminal_print 0.1.0",
+]
+
+[[package]]
+name = "test_restartable"
+version = "0.1.0"
+dependencies = [
+ "getopts 0.2.21 (git+https://github.com/kevinaboos/getopts)",
+ "log 0.4.8 (registry+https://github.com/rust-lang/crates.io-index)",
+ "spawn 0.1.0",
  "terminal_print 0.1.0",
 ]
 
