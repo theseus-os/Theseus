@@ -20,9 +20,6 @@ path = "../memory"
 [dependencies.task]
 path = "../task"
 
-[dependencies.apic]
-path = "../apic"
-
 [dependencies.runqueue]
 path = "../runqueue"
 

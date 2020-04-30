@@ -15,15 +15,12 @@ extern crate unwind;
 extern crate stack_trace;
 extern crate stack_trace_frame_pointers;
 extern crate fault_log;
-extern crate apic;
 
 use core::panic::PanicInfo;
 // use alloc::string::String;
 use memory::VirtualAddress;
 use task::{KillReason, PanicInfoOwned};
 use fault_log::log_panic_entry;
-use alloc::string::String;
-use apic::get_my_apic_id;
 
 /// Performs the standard panic handling routine, which involves the following:
 /// 

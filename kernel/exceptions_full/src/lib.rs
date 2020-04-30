@@ -3,7 +3,6 @@
 #![no_std]
 #![feature(abi_x86_interrupt)]
 
-extern crate alloc;
 extern crate x86_64;
 extern crate task;
 // extern crate apic;
@@ -15,7 +14,6 @@ extern crate pmu_x86;
 extern crate unwind;
 extern crate debug_info;
 extern crate memory;
-extern crate gimli;
 extern crate stack_trace;
 extern crate fault_log;
 
@@ -92,8 +90,6 @@ fn kill_and_halt(exception_number: u8, stack_frame: &ExceptionStackFrame) {
     #[cfg(not(unwind_exceptions))] {
         println_both!("Killing task without unwinding {:?} due to exception {}. (cfg `unwind_exceptions` is not set.)", task::get_my_current_task(), exception_number);
     }
-
-    // fault_log::print_fault_log();
 
     // Dump some info about the this loaded app crate
     // and test out using debug info for recovery
@@ -350,21 +346,7 @@ pub extern "x86-interrupt" fn page_fault_handler(stack_frame: &mut ExceptionStac
              error_code,
              stack_frame);
     
-    // Here we created a a new entry to save the accessed address
     log_exception(0xD, stack_frame.instruction_pointer.0, None, Some(control_regs::cr2().0));
-    // log_error_to_fault_log (
-    //     FaultType::PageFault, //exception_number
-    //     0, //error_code,
-    //     0, //core
-    //     "Temporary".to_string(), //running_task
-    //     None, //running_app_crate: Option<None>,
-    //     Some(VirtualAddress::new_canonical(control_regs::cr2().0)), // address_accessed: Option<None>,
-    //     None, //instruction_pointer : Option<None>,
-    //     None, //crate_error_occured : Option<None>,
-    //     Vec::<String>::new(), //replaced_crates : Vec<String>::new(),
-    //     RecoveryAction::None // action_taken : false,
-    // );
-
     kill_and_halt(0xE, stack_frame)
 }
 

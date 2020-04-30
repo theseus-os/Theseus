@@ -6,9 +6,6 @@ authors = ["Namitha Liyanage <namithaliyanage@gmail.com>"]
 build = "../../build.rs"
 
 
-[dependencies]
-spin = "0.4.10"
-
 [dependencies.lazy_static]
 features = ["spin_no_std", "nightly"]
 version = "1.2.0"

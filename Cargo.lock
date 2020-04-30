@@ -643,6 +643,7 @@ dependencies = [
 name = "exceptions_full"
 version = "0.1.0"
 dependencies = [
+ "apic 0.1.0",
  "debug_info 0.1.0",
  "fault_log 0.1.0",
  "gimli 0.19.0 (registry+https://github.com/rust-lang/crates.io-index)",
@@ -682,7 +683,6 @@ dependencies = [
  "lazy_static 1.2.0 (registry+https://github.com/rust-lang/crates.io-index)",
  "memory 0.1.0",
  "print 0.1.0",
- "spin 0.4.10 (registry+https://github.com/rust-lang/crates.io-index)",
  "task 0.1.0",
  "vga_buffer 0.1.0",
 ]
@@ -1537,7 +1537,6 @@ dependencies = [
 name = "panic_wrapper"
 version = "0.1.0"
 dependencies = [
- "apic 0.1.0",
  "fault_log 0.1.0",
  "log 0.4.8 (registry+https://github.com/rust-lang/crates.io-index)",
  "memory 0.1.0",

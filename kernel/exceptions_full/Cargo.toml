@@ -23,6 +23,9 @@ path = "../vga_buffer"
 [dependencies.print]
 path = "../print"
 
+[dependencies.apic]
+path = "../apic"
+
 [dependencies.tlb_shootdown]
 path = "../tlb_shootdown"
 
