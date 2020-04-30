@@ -42,8 +42,7 @@ pub enum FaultType {
     UnknownException
 }
 
-/// Utility function to get Fault type from exception. 
-/// So that other crates need not know of fault type.
+/// Utility function to get Fault type from exception number. 
 pub fn from_exception_number(num: u8) -> FaultType {
     match num {
         0x0 => FaultType::DivideByZero,
@@ -96,31 +95,31 @@ pub struct FaultEntry {
     /// For page faults the address the program attempted to access. None for other faults
     pub address_accessed: Option<VirtualAddress>,
     /// Address at which exception occured
-    pub instruction_pointer : Option<VirtualAddress>,    
+    pub instruction_pointer: Option<VirtualAddress>,    
     /// Crate the address at which exception occured located
-    pub crate_error_occured : Option<String>,
+    pub crate_error_occured: Option<String>,
     /// List of crates reloaded from memory to recover from fault
-    pub replaced_crates : Vec<String>,
+    pub replaced_crates: Vec<String>,
     /// Recovery Action taken as a result of the fault
-    pub action_taken : RecoveryAction,
+    pub action_taken: RecoveryAction,
 }
 
 impl FaultEntry {
     /// Returns an empty `FaultEntry` with only `fault_type` field filled.
-    pub fn new(
+    pub fn new (
         fault_type: FaultType
     ) -> FaultEntry {
-        FaultEntry{
+        FaultEntry {
             fault_type: fault_type,
             error_code: None,
             core: None,
             running_task: None,
             running_app_crate: None,
             address_accessed: None,
-            instruction_pointer : None,
-            crate_error_occured : None,
-            replaced_crates : Vec::<String>::new(),
-            action_taken : RecoveryAction::None,
+            instruction_pointer: None,
+            crate_error_occured: None,
+            replaced_crates: Vec::<String>::new(),
+            action_taken: RecoveryAction::None,
         }
     }
 }
@@ -163,25 +162,19 @@ fn update_and_insert_fault_entry_internal(
         Some(curr_task.lock().name.clone())
     };
 
-    // If application add application crate name. `None` if not 
+    // If task is from an application add application crate name. `None` if not 
     fe.running_app_crate = {
         let t = curr_task.lock();
         t.app_crate.as_ref().map(|x| x.lock_as_ref().crate_name.clone())
     };
 
-    // If an exception Some(instruction_pointer) will be provided from stack frame.
+    // If it's an exception Some(instruction_pointer) will be provided from stack frame.
     match instruction_pointer {
         Some(instruction_pointer) => {
             let instruction_pointer = VirtualAddress::new_canonical(instruction_pointer);
             fe.instruction_pointer = Some(instruction_pointer);
-            fe.crate_error_occured = match namespace.get_crate_containing_address(instruction_pointer.clone(),false){
-                Some(cn) => {
-                    Some(cn.lock_as_ref().crate_name.clone())
-                }
-                None => {
-                    None
-                }
-            };
+            fe.crate_error_occured = namespace.get_crate_containing_address(instruction_pointer.clone(), false)
+                                            .map(|x| x.lock_as_ref().crate_name.clone());
         },
         _=> {},
     };
@@ -204,23 +197,19 @@ pub fn log_exception (
 )-> () {
     let mut fe = FaultEntry::new(from_exception_number(fault_type));
     fe.error_code = error_code;
-    fe.address_accessed  = match address_accessed {
-        Some(address) => Some(VirtualAddress::new_canonical(address)),
-        _ => None,
-    };
-
-    update_and_insert_fault_entry_internal(fe,Some(instruction_pointer));
+    fe.address_accessed  = address_accessed.map(|address| VirtualAddress::new_canonical(address));
+    update_and_insert_fault_entry_internal(fe, Some(instruction_pointer));
 }
 
 /// Add a new panic instance to the fault log. 
 pub fn log_panic_entry ()-> () {
     let fe = FaultEntry::new(FaultType::Panic);
-    update_and_insert_fault_entry_internal(fe,None);
+    update_and_insert_fault_entry_internal(fe, None);
 }
 
 /// Removes the unhandled faults from the fault log and returns. 
 /// Is useful when we update the recovery detail about unhandled exceptions. 
-pub fn remove_unhandled_exception () -> Vec<FaultEntry> {
+pub fn remove_unhandled_exceptions () -> Vec<FaultEntry> {
     FAULT_LIST.lock().drain_filter(|fe| fe.action_taken == RecoveryAction::None).collect::<Vec<_>>()
 }
 

@@ -13,6 +13,8 @@ extern crate pmu_x86;
 #[macro_use] extern crate print; // for regular println!()
 extern crate unwind;
 extern crate debug_info;
+extern crate gimli;
+
 extern crate memory;
 extern crate stack_trace;
 extern crate fault_log;
