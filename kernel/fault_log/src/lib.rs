@@ -147,7 +147,7 @@ fn update_and_insert_fault_entry_internal(
 
     // If current task cannot be obtained we will just add `fault_entry` to 
     // the `fault_log` and return.
-    let curr_task = match task::get_my_current_task(){
+    let curr_task = match task::get_my_current_task() {
         Some(x) => x,
         _ => {
             FAULT_LIST.lock().push(fe);
@@ -226,7 +226,7 @@ macro_rules! println_both {
 }
 
 /// Prints the fault log
-pub fn print_fault_log() -> (){
+pub fn print_fault_log() -> () {
     println_both!("------------------ FAULT LOG ---------------------------");
     let list = FAULT_LIST.lock();
     for x in list.iter() {
