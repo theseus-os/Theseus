@@ -40,8 +40,5 @@ path = "../../kernel/runqueue"
 [dependencies.libtest]
 path = "../../kernel/libtest"
 
-[dependencies.pmu_x86]
-path = "../../kernel/pmu_x86"
-
 [dependencies.mapper_spillful]
 path = "../../kernel/mapper_spillful"
