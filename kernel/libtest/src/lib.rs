@@ -10,6 +10,7 @@ extern crate hpet;
 extern crate runqueue;
 extern crate pmu_x86;
 extern crate libm;
+#[macro_use] extern crate log;
 
 use hpet::get_hpet;
 use pmu_x86::{Counter, EventType};
@@ -65,6 +66,8 @@ pub fn stop_counting_reference_cycles(counter: Counter) -> Result<u64, &'static 
 	Ok(count)
 }
 
+const THRESHOLD_ERROR_RATIO: u64 = 1;
+
 /// Measures the overhead of using the PMU reference cycles counter.
 /// Calls `timing_overhead_inner` multiple times and averages the value. 
 /// Overhead is in reference cycles.
@@ -82,7 +85,13 @@ pub fn cycle_count_overhead() -> Result<u64, &'static str>  {
 		if overhead < min {min = overhead;}
 	}
 
-	Ok(overhead_sum/ TRIES as u64)
+	let overhead = overhead_sum / TRIES as u64;
+	let err = (overhead * 10 + overhead * THRESHOLD_ERROR_RATIO) / 10;
+	if 	max - overhead > err || overhead - min > err {
+		warn!("cycle_count_overhead diff is too big: {} ({} - {}) ctr", max-min, max, min);
+	}
+	info!("cycle counts timing overhead is {} cycles", overhead);
+	Ok(overhead)
 }
 
 /// Internal function that actually calculates cycle count overhead. 
@@ -101,6 +110,58 @@ fn cycle_count_overhead_inner() -> Result<u64, &'static str> {
 	delta = stop_counting_reference_cycles(counter)?;
 
 	Ok(delta / ITERATIONS as u64)
+}
+
+
+/// Measures the overhead of using the hpet timer. 
+/// Calls `timing_overhead_inner` multiple times and averages the value. 
+/// Overhead is a count value. It is not time. 
+pub fn hpet_timing_overhead() -> Result<u64, &'static str> {
+	const TRIES: u64 = 10;
+	let mut tries: u64 = 0;
+	let mut max: u64 = core::u64::MIN;
+	let mut min: u64 = core::u64::MAX;
+
+	for _ in 0..TRIES {
+		let overhead = hpet_timing_overhead_inner()?;
+		tries += overhead;
+		if overhead > max {max = overhead;}
+		if overhead < min {min = overhead;}
+	}
+
+	let overhead = tries / TRIES as u64;
+	let err = (overhead * 10 + overhead * THRESHOLD_ERROR_RATIO) / 10;
+	if 	max - overhead > err || overhead - min > err {
+		warn!("hpet_timing_overhead diff is too big: {} ({} - {}) ctr", max-min, max, min);
+	}
+	info!("HPET timing overhead is {} ticks", overhead);
+	Ok(overhead)
+}
+
+/// Internal function that actually calculates timer overhead. 
+/// Calls the timing instruction multiple times and averages the value. 
+/// Overhead is a count value. It is not time. 
+fn hpet_timing_overhead_inner() -> Result<u64, &'static str> {
+	const ITERATIONS: usize = 10_000;
+	let mut _start_hpet_tmp: u64;
+	let start_hpet: u64;
+	let end_hpet: u64;
+    let hpet_ref = get_hpet();
+    let hpet = hpet_ref.as_ref().ok_or("couldn't get HPET timer")?;
+
+	// to warm cache and remove error
+	_start_hpet_tmp = hpet.get_counter();
+
+	start_hpet = hpet.get_counter();
+	for _ in 0..ITERATIONS {
+		_start_hpet_tmp = hpet.get_counter();
+	}
+	end_hpet = hpet.get_counter();
+
+	let delta_hpet = end_hpet - start_hpet;
+	let delta_hpet_avg = delta_hpet / ITERATIONS as u64;
+
+	Ok(delta_hpet_avg)
 }
 
 /// Helper function to calculate statistics of a provided dataset

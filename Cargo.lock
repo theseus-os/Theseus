@@ -1258,7 +1258,6 @@ dependencies = [
  "mapper_spillful 0.1.0",
  "memory 0.1.0",
  "memory_structs 0.1.0",
- "pmu_x86 0.1.0",
  "runqueue 0.1.0",
  "terminal_print 0.1.0",
  "tsc 0.1.0",
