@@ -4,6 +4,7 @@
 //! 
 
 #![no_std]
+#![feature(drain_filter)]
 
 #[macro_use] extern crate lazy_static;
 #[macro_use] extern crate vga_buffer; // for println_raw!()
@@ -11,14 +12,18 @@
 extern crate alloc;
 extern crate spin; 
 extern crate memory;
+extern crate task;
+extern crate apic;
+extern crate irq_safety;
 
 use spin::Mutex;
 use alloc::{
     string::{String, ToString},
     vec::Vec,
 };
-
 use memory::VirtualAddress;
+use apic::get_my_apic_id;
+use irq_safety::MutexIrqSafe;
 
 /// The possible faults (panics and exceptions) encountered 
 /// during operations.
@@ -33,11 +38,27 @@ pub enum FaultType {
     InvalidOpCode,
     BoundRangeExceeded,
     Overflow,
-    Breakpoint,
     NMI,
-    Debug,
     DivideByZero,
-    Panic
+    Panic,
+    UnknownException
+}
+
+pub fn from_exception_number(num: u8) -> FaultType {
+    match num {
+        0x0 => FaultType::DivideByZero,
+        0x2 => FaultType::NMI,
+        0x4 => FaultType::Overflow,
+        0x5 => FaultType::BoundRangeExceeded,
+        0x6 => FaultType::InvalidOpCode,
+        0x7 => FaultType::DeviceNotAvailable,
+        0x8 => FaultType::DoubleFault,
+        0xA => FaultType::InvalidTSS,
+        0xB => FaultType::SegmentNotPresent,
+        0xD => FaultType::GeneralProtectionFault,
+        0xE => FaultType::PageFault,
+        _   => FaultType::UnknownException,
+    }
 }
 
 /// The different types of recovery procedures used for the 
@@ -65,11 +86,11 @@ pub struct FaultEntry {
     /// Type of fault
     pub fault_type: FaultType,
     /// Error code returned with the exception
-    pub error_code: u64,
+    pub error_code: Option<u64>,
     /// The core error occured
-    pub core: u8,
+    pub core: Option<u8>,
     /// Task runnning immediately before the Exception
-    pub running_task: String,
+    pub running_task: Option<String>,
     /// If available the application crate that spawned the task
     pub running_app_crate: Option<String>,
     /// For page faults the address the program attempted to access. None for other faults
@@ -84,10 +105,29 @@ pub struct FaultEntry {
     pub action_taken : RecoveryAction,
 }
 
+impl FaultEntry {
+    pub fn new(
+        fault_type: FaultType
+    ) -> FaultEntry {
+        FaultEntry{
+            fault_type: fault_type,
+            error_code: None,
+            core: None,
+            running_task: None,
+            running_app_crate: None,
+            address_accessed: None,
+            instruction_pointer : None,
+            crate_error_occured : None,
+            replaced_crates : Vec::<String>::new(),
+            action_taken : RecoveryAction::None,
+        }
+    }
+}
+
 
 lazy_static! {    
     /// The structure to hold the list of all faults so far occured in the system
-    static ref FAULT_LIST: Mutex<Vec<FaultEntry>> = Mutex::new(Vec::new());
+    static ref FAULT_LIST: MutexIrqSafe<Vec<FaultEntry>> = MutexIrqSafe::new(Vec::new());
 }
 
 /// Clears the log of faults so far occured in the system 
@@ -95,33 +135,43 @@ pub fn clear_fault_log() {
     FAULT_LIST.lock().clear();
 }
 
-/// Add a new entry to the fault log. 
-/// This function requires all the entries in the `FaultEntry` as input.
-pub fn log_error_to_fault_log (
-    fault_type: FaultType,
-    error_code: u64,
-    core: u8,
-    running_task: String,
-    running_app_crate: Option<String>,
-    address_accessed: Option<VirtualAddress>,
-    instruction_pointer : Option<VirtualAddress>,
-    crate_error_occured : Option<String>,
-    replaced_crates : Vec<String>,
-    action_taken : RecoveryAction,
-)-> () {
 
-    let fe = FaultEntry{
-        fault_type: fault_type,
-        error_code: error_code,
-        core: core,
-        running_task: running_task,
-        running_app_crate: running_app_crate,
-        address_accessed: address_accessed,
-        instruction_pointer : instruction_pointer,
-        crate_error_occured : crate_error_occured,
-        replaced_crates : replaced_crates,
-        action_taken : action_taken,
+fn update_and_insert_fault_entry_internal(
+    mut fe: FaultEntry,
+    instruction_pointer: Option<usize>, 
+) -> () {
+    fe.core = Some(get_my_apic_id());
+    let curr_task = match task::get_my_current_task(){
+        Some(x) => x,
+        _ => {
+            FAULT_LIST.lock().push(fe);
+            return
+        },
     };
+    let namespace = curr_task.get_namespace();
+    fe.running_task = {
+        Some(curr_task.lock().name.clone())
+    };
+    fe.running_app_crate = {
+        let t = curr_task.lock();
+        t.app_crate.as_ref().map(|x| x.lock_as_ref().crate_name.clone())
+    };
+    match instruction_pointer {
+        Some(instruction_pointer) => {
+            let instruction_pointer = VirtualAddress::new_canonical(instruction_pointer);
+            fe.instruction_pointer = Some(instruction_pointer);
+            fe.crate_error_occured = match namespace.get_crate_containing_address(instruction_pointer.clone(),false){
+                Some(cn) => {
+                    Some(cn.lock_as_ref().crate_name.clone())
+                }
+                None => {
+                    None
+                }
+            };
+        },
+        _=> {},
+    };
+
     FAULT_LIST.lock().push(fe);
 }
 
@@ -130,67 +180,32 @@ pub fn log_error_to_fault_log (
 /// Other entries will be marked as None to be filled later.
 // Since all exceptions lead to calling `kill_and_halt` 
 // we update the rest of the fields there.
-pub fn log_error_simple (
-    fault_type: FaultType,
-    error_code: u64,
+pub fn log_exception (
+    fault_type: u8,
+    instruction_pointer: usize,
+    error_code: Option<u64>,
+    address_accessed: Option<usize>
 )-> () {
-
-    let vec :Vec<String> = Vec::new();
-    let fe = FaultEntry{
-        fault_type: fault_type,
-        error_code: error_code,
-        core: 0,
-        running_task: "None".to_string(),
-        running_app_crate: None,
-        address_accessed: None,
-        instruction_pointer : None,
-        crate_error_occured : None,
-        replaced_crates : vec,
-        action_taken : RecoveryAction::None,
+    let mut fe = FaultEntry::new(from_exception_number(fault_type));
+    fe.error_code = error_code;
+    fe.address_accessed  = match address_accessed {
+        Some(address) => Some(VirtualAddress::new_canonical(address)),
+        _ => None,
     };
-    FAULT_LIST.lock().push(fe);
+
+    update_and_insert_fault_entry_internal(fe,Some(instruction_pointer));
 }
 
 /// Add a panic occuring to fault log. 
-pub fn log_panic_entry (
-    core: u8,
-    running_task: String,
-    running_app_crate: Option<String>,
-)-> () {
-
-    let vec :Vec<String> = Vec::new();
-    let fe = FaultEntry{
-        fault_type: FaultType::Panic,
-        error_code: 0,
-        core: core,
-        running_task: running_task,
-        running_app_crate: running_app_crate,
-        address_accessed: None,
-        instruction_pointer : None,
-        crate_error_occured : None,
-        replaced_crates : vec,
-        action_taken : RecoveryAction::None,
-    };
-    FAULT_LIST.lock().push(fe);
+pub fn log_panic_entry ()-> () {
+    let fe = FaultEntry::new(FaultType::Panic);
+    update_and_insert_fault_entry_internal(fe,None);
 }
 
-/// Removes the last unhandled exception from the fault log and returns. 
-/// Is useful when information about the last exception needs to be updated
-pub fn get_last_unhandled_exception () -> Option<FaultEntry> {
-    let mut fault_list = FAULT_LIST.lock();
-    let mut fe: Option<FaultEntry> = None;
-    let mut index: Option<usize> = None;
-
-    for (i,fault_entry) in fault_list.iter().enumerate() {
-        if fault_entry.action_taken == RecoveryAction::None {
-            index = Some(i);
-        }
-    }
-    if index.is_none() {
-        return fe;
-    }
-    fe = Some(fault_list.remove(index.unwrap()));
-    fe
+/// Removes the unhandled exception from the fault log and returns. 
+/// Is useful when we update the recovery detail about unhandled exceptions
+pub fn remove_unhandled_exception () -> Vec<FaultEntry> {
+    FAULT_LIST.lock().drain_filter(|fe| fe.action_taken == RecoveryAction::None).collect::<Vec<_>>()
 }
 
 /// calls println!() and then println_raw!()

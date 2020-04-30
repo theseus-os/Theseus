@@ -14,22 +14,14 @@ extern crate pmu_x86;
 #[macro_use] extern crate print; // for regular println!()
 extern crate unwind;
 extern crate debug_info;
-extern crate gimli;
-
 extern crate memory;
+extern crate gimli;
 extern crate stack_trace;
 extern crate fault_log;
-extern crate apic;
 
 use x86_64::structures::idt::{LockedIdt, ExceptionStackFrame, PageFaultErrorCode};
 use x86_64::registers::msr::*;
-use apic::get_my_apic_id;
-use fault_log::{log_error_to_fault_log, log_error_simple, FaultType, RecoveryAction};
-use memory::VirtualAddress;
-use alloc::{
-    string::{String, ToString},
-    vec::Vec,
-};
+use fault_log::log_exception;
 
 pub fn init(idt_ref: &'static LockedIdt) {
     { 
@@ -101,55 +93,7 @@ fn kill_and_halt(exception_number: u8, stack_frame: &ExceptionStackFrame) {
         println_both!("Killing task without unwinding {:?} due to exception {}. (cfg `unwind_exceptions` is not set.)", task::get_my_current_task(), exception_number);
     }
 
-    {
-        // We remove the last fault entry from the fault log and update the remainig fields
-        let fe = fault_log::get_last_unhandled_exception();
-        if fe.is_some(){
-            let fault_entry = fe.unwrap();
-            let curr_task = task::get_my_current_task().expect("kill_and_halt: no current task");
-            let namespace = curr_task.get_namespace();
-            let task_name = {
-                curr_task.lock().name.clone()
-            };
-            let app_crate :Option<String> = {
-                let t = curr_task.lock();
-                if t.app_crate.is_some(){
-                    Some(t.app_crate.as_ref().unwrap().lock_as_ref().crate_name.clone())
-                } else {
-                    None
-                }
-                //t.app_crate.as_ref().expect("kill_and_halt: no app_crate").clone_shallow()
-            };
-            let instruction_pointer = VirtualAddress::new_canonical(stack_frame.instruction_pointer.0);
-            let error_crate_name :Option<String> = match namespace.get_crate_containing_address(instruction_pointer.clone(),false){
-                Some(cn) => {
-                    Some(cn.lock_as_ref().crate_name.clone())
-                }
-                None => {
-                    None
-                }
-            };
-
-            let core = get_my_apic_id();
-
-            // We log the completed entry to the fault log as we store `address_accessed`
-            log_error_to_fault_log (
-                fault_entry.fault_type, //exception_number
-                fault_entry.error_code, //error_code,
-                core, //core
-                task_name, //running_task
-                app_crate, //running_app_crate: Option<None>,
-                fault_entry.address_accessed, // address_accessed: Option<None>,
-                Some(instruction_pointer), //instruction_pointer, //instruction_pointer : Option<None>,
-                error_crate_name, //crate_error_occured, //crate_error_occured : Option<None>,
-                fault_entry.replaced_crates, //replaced_crates : Vec<String>::new(),
-                RecoveryAction::None // action_taken : false,
-            );
-        
-            // Print the fault log
-            fault_log::print_fault_log();
-        }
-    }
+    // fault_log::print_fault_log();
 
     // Dump some info about the this loaded app crate
     // and test out using debug info for recovery
@@ -258,7 +202,7 @@ fn kill_and_halt(exception_number: u8, stack_frame: &ExceptionStackFrame) {
 pub extern "x86-interrupt" fn divide_by_zero_handler(stack_frame: &mut ExceptionStackFrame) {
     println_both!("\nEXCEPTION: DIVIDE BY ZERO\n{:#?}\n", stack_frame);
 
-    log_error_simple(FaultType::DivideByZero, 0);
+    log_exception(0x0, stack_frame.instruction_pointer.0, None, None);
     kill_and_halt(0x0, stack_frame)
 }
 
@@ -301,7 +245,7 @@ extern "x86-interrupt" fn nmi_handler(stack_frame: &mut ExceptionStackFrame) {
              stack_frame.instruction_pointer,
              stack_frame);
 
-    log_error_simple(FaultType::NMI, 0);
+    log_exception(0x2, stack_frame.instruction_pointer.0, None, None);
     kill_and_halt(0x2, stack_frame)
 }
 
@@ -321,7 +265,7 @@ pub extern "x86-interrupt" fn overflow_handler(stack_frame: &mut ExceptionStackF
              stack_frame.instruction_pointer,
              stack_frame);
     
-    log_error_simple(FaultType::Overflow, 0);
+    log_exception(0x4, stack_frame.instruction_pointer.0, None, None);
     kill_and_halt(0x4, stack_frame)
 }
 
@@ -331,7 +275,7 @@ pub extern "x86-interrupt" fn bound_range_exceeded_handler(stack_frame: &mut Exc
              stack_frame.instruction_pointer,
              stack_frame);
     
-    log_error_simple(FaultType::BoundRangeExceeded, 0);
+    log_exception(0x5, stack_frame.instruction_pointer.0, None, None);
     kill_and_halt(0x5, stack_frame)
 }
 
@@ -341,7 +285,7 @@ pub extern "x86-interrupt" fn invalid_opcode_handler(stack_frame: &mut Exception
              stack_frame.instruction_pointer,
              stack_frame);
 
-    log_error_simple(FaultType::InvalidOpCode, 0);
+    log_exception(0x6, stack_frame.instruction_pointer.0, None, None);
     kill_and_halt(0x6, stack_frame)
 }
 
@@ -352,7 +296,7 @@ pub extern "x86-interrupt" fn device_not_available_handler(stack_frame: &mut Exc
              stack_frame.instruction_pointer,
              stack_frame);
 
-    log_error_simple(FaultType::DeviceNotAvailable, 0);
+    log_exception(0x7, stack_frame.instruction_pointer.0, None, None);
     kill_and_halt(0x7, stack_frame)
 }
 
@@ -360,7 +304,7 @@ pub extern "x86-interrupt" fn device_not_available_handler(stack_frame: &mut Exc
 pub extern "x86-interrupt" fn double_fault_handler(stack_frame: &mut ExceptionStackFrame, error_code: u64) {
     println_both!("\nEXCEPTION: DOUBLE FAULT\n{:#?}\n", stack_frame);
     
-    log_error_simple(FaultType::DoubleFault, error_code);
+    log_exception(0x8, stack_frame.instruction_pointer.0, Some(error_code), None);
     kill_and_halt(0x8, stack_frame)
 }
 
@@ -371,7 +315,7 @@ pub extern "x86-interrupt" fn invalid_tss_handler(stack_frame: &mut ExceptionSta
              error_code,
              stack_frame);
     
-    log_error_simple(FaultType::InvalidTSS, error_code);
+    log_exception(0xA, stack_frame.instruction_pointer.0, Some(error_code), None);
     kill_and_halt(0xA, stack_frame)
 }
 
@@ -382,7 +326,7 @@ pub extern "x86-interrupt" fn segment_not_present_handler(stack_frame: &mut Exce
              error_code,
              stack_frame);
 
-    log_error_simple(FaultType::SegmentNotPresent, error_code);
+    log_exception(0xB, stack_frame.instruction_pointer.0, Some(error_code), None);
     kill_and_halt(0xB, stack_frame)
 }
 
@@ -393,7 +337,7 @@ pub extern "x86-interrupt" fn general_protection_fault_handler(stack_frame: &mut
              error_code,
              stack_frame);
 
-    log_error_simple(FaultType::GeneralProtectionFault, error_code);
+    log_exception(0xD, stack_frame.instruction_pointer.0, Some(error_code), None);
     kill_and_halt(0xD, stack_frame)
 }
 
@@ -407,18 +351,19 @@ pub extern "x86-interrupt" fn page_fault_handler(stack_frame: &mut ExceptionStac
              stack_frame);
     
     // Here we created a a new entry to save the accessed address
-    log_error_to_fault_log (
-        FaultType::PageFault, //exception_number
-        0, //error_code,
-        0, //core
-        "Temporary".to_string(), //running_task
-        None, //running_app_crate: Option<None>,
-        Some(VirtualAddress::new_canonical(control_regs::cr2().0)), // address_accessed: Option<None>,
-        None, //instruction_pointer : Option<None>,
-        None, //crate_error_occured : Option<None>,
-        Vec::<String>::new(), //replaced_crates : Vec<String>::new(),
-        RecoveryAction::None // action_taken : false,
-    );
+    log_exception(0xD, stack_frame.instruction_pointer.0, None, Some(control_regs::cr2().0));
+    // log_error_to_fault_log (
+    //     FaultType::PageFault, //exception_number
+    //     0, //error_code,
+    //     0, //core
+    //     "Temporary".to_string(), //running_task
+    //     None, //running_app_crate: Option<None>,
+    //     Some(VirtualAddress::new_canonical(control_regs::cr2().0)), // address_accessed: Option<None>,
+    //     None, //instruction_pointer : Option<None>,
+    //     None, //crate_error_occured : Option<None>,
+    //     Vec::<String>::new(), //replaced_crates : Vec<String>::new(),
+    //     RecoveryAction::None // action_taken : false,
+    // );
 
     kill_and_halt(0xE, stack_frame)
 }

@@ -35,33 +35,8 @@ use apic::get_my_apic_id;
 pub fn panic_wrapper(panic_info: &PanicInfo) -> Result<(), &'static str> {
     trace!("at top of panic_wrapper: {:?}", panic_info);
 
-    {
-        // Add the panic to the fault log
-        let curr_task = task::get_my_current_task().expect("panic_wrapper: no current task");
-        let task_name = {
-            curr_task.lock().name.clone()
-        };
-        let app_crate :Option<String> = {
-            let t = curr_task.lock();
-            if t.app_crate.is_some(){
-                Some(t.app_crate.as_ref().unwrap().lock_as_ref().crate_name.clone())
-            } else {
-                None
-            }
-            //t.app_crate.as_ref().expect("kill_and_halt: no app_crate").clone_shallow()
-        };
-
-        let core = get_my_apic_id();
-
-        log_panic_entry (
-            core, //core
-            task_name, //running_task
-            app_crate, //running_app_crate: Option<None>,
-        );
-    
-        fault_log::print_fault_log();
-    }
-    //add_panic_entry();
+    log_panic_entry ();
+    // fault_log::print_fault_log();
 
     // print a stack trace
     let stack_trace_result = {

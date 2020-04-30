@@ -27,7 +27,7 @@ use entryflags_x86_64::EntryFlags;
 /// A virtual memory address, which is a `usize` under the hood.
 #[derive(
     Clone, Copy, PartialEq, Eq, PartialOrd, Ord, Hash, Default, 
-    Display, Binary, Octal, LowerHex, UpperHex, 
+    Debug, Display, Binary, Octal, LowerHex, UpperHex, 
     BitAnd, BitOr, BitXor, BitAndAssign, BitOrAssign, BitXorAssign, 
     Add, Sub, AddAssign, SubAssign
 )]
@@ -115,12 +115,6 @@ impl From<VirtualAddress> for usize {
     #[inline]
     fn from(virt_addr: VirtualAddress) -> usize {
         virt_addr.0
-    }
-}
-
-impl fmt::Debug for VirtualAddress {
-    fn fmt(&self, f: &mut fmt::Formatter) -> fmt::Result {
-        write!(f, "{:#X}", self.0)
     }
 }
 
