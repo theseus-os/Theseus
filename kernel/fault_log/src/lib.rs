@@ -39,7 +39,7 @@ pub enum FaultType {
     NMI,
     DivideByZero,
     Panic,
-    UnknownException
+    UnknownException(u8)
 }
 
 /// Utility function to get Fault type from exception number. 
@@ -56,7 +56,7 @@ pub fn from_exception_number(num: u8) -> FaultType {
         0xB => FaultType::SegmentNotPresent,
         0xD => FaultType::GeneralProtectionFault,
         0xE => FaultType::PageFault,
-        _   => FaultType::UnknownException,
+        num => FaultType::UnknownException(num),
     }
 }
 
@@ -168,15 +168,11 @@ fn update_and_insert_fault_entry_internal(
         t.app_crate.as_ref().map(|x| x.lock_as_ref().crate_name.clone())
     };
 
-    // If it's an exception Some(instruction_pointer) will be provided from stack frame.
-    match instruction_pointer {
-        Some(instruction_pointer) => {
-            let instruction_pointer = VirtualAddress::new_canonical(instruction_pointer);
-            fe.instruction_pointer = Some(instruction_pointer);
-            fe.crate_error_occured = namespace.get_crate_containing_address(instruction_pointer.clone(), false)
-                                            .map(|x| x.lock_as_ref().crate_name.clone());
-        },
-        _=> {},
+    if let Some(instruction_pointer) = instruction_pointer {
+        let instruction_pointer = VirtualAddress::new_canonical(instruction_pointer);
+        fe.instruction_pointer = Some(instruction_pointer);
+        fe.crate_error_occured = namespace.get_crate_containing_address(instruction_pointer.clone(), false)
+                                        .map(|x| x.lock_as_ref().crate_name.clone());
     };
 
     // Push the fault entry.
