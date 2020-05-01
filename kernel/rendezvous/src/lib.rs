@@ -303,7 +303,7 @@ impl <T: Send> Sender<T> {
                 drop(receiver_to_notify);
                 return Ok(());
             }
-            Some(Err(e)) => {
+            Some(Err(_e)) => {
                 // Restore the sender slot and notify waiting senders.
                 self.channel.slot.replace_sender_slot(sender_slot);
                 self.channel.waiting_senders.notify_one();
@@ -333,12 +333,9 @@ impl <T: Send> Sender<T> {
                         }
                         blocked_sender.block_again();
                     }
-                    _ => {
-                        break;
-                    },
+                    _ => break,
                 }
             }
-            debug!("sender waiting for receiver loop");
             scheduler::schedule();
         }
 
@@ -361,6 +358,7 @@ impl <T: Send> Sender<T> {
                         error!("Channel Disconnected");
                         Err(ChannelError::ChannelDisconnected)
                     } else {
+                        // Channel will be reset to initial state if receiver slot is dropped
                         Err(ChannelError::SlotDropped)
                     }
                 }
@@ -469,17 +467,16 @@ impl <T: Send> Receiver<T> {
                 drop(sender_to_notify);
                 return Ok(msg);
             }
-            Some(Err(e)) => {
+            Some(Err(_e)) => {
                 // Restore the receiver slot and notify waiting receivers.
                 self.channel.slot.replace_receiver_slot(receiver_slot);
                 self.channel.waiting_receivers.notify_one();
                 return Err(ChannelError::InvalidInitialState);
             }
             None => {
-                if(self.channel.is_disconnected()) {
+                if self.channel.is_disconnected() {
                     self.channel.slot.replace_receiver_slot(receiver_slot);
                     self.channel.waiting_receivers.notify_one();
-                    debug!("Channel disconnected");
                     return Err(ChannelError::ChannelDisconnected);
                 }
                 scheduler::schedule();
@@ -501,7 +498,6 @@ impl <T: Send> Receiver<T> {
                     _ => break,
                 }
             }
-            debug!("Receiver waiting for sender");
             scheduler::schedule();
         }
 
@@ -525,6 +521,7 @@ impl <T: Send> Receiver<T> {
                         error!("Channel Disconnected");
                         Err(ChannelError::ChannelDisconnected)
                     } else {
+                        // Channel will be reset to initial state if sender slot is dropped
                         Err(ChannelError::SlotDropped)
                     }
                 }
@@ -565,11 +562,11 @@ impl<T: Send> Drop for Receiver<T> {
                     let mut exchange_state = receiver_slot.0.lock();
                     let current_state = core::mem::replace(&mut *exchange_state, ExchangeState::Init);
                     match current_state {
-                        ExchangeState::WaitingForReceiver(sender_to_notify, msg) => {
+                        ExchangeState::WaitingForReceiver(sender_to_notify, _msg) => {
                             // Need to notify the receiver
                             Some(sender_to_notify)
                         }
-                        state => {
+                        _state => {
                             // Nothing to do
                             None
                         }
@@ -606,7 +603,7 @@ impl<T: Send> Drop for Sender<T> {
                             // Need to notify the receiver
                             Some(receiver_to_notify)
                         }
-                        state => {
+                        _state => {
                             // Nothing to do
                             None
                         }
