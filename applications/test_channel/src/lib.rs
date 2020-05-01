@@ -164,7 +164,10 @@ fn rendezvous_test_oneshot() -> Result<(), &'static str> {
 
     let t1 = spawn::new_task_builder(|_: ()| -> Result<(), &'static str> {
         warn!("rendezvous_test_oneshot(): Entered sender task!");
-        sender.send("hello")?;
+        sender.send("hello").map_err(|error| {
+            warn!("Sender task failed due to : {:?}", error);
+            return "Sender task failed";
+        })?;
         Ok(())
     }, ())
         .name(String::from("sender_task_rendezvous_oneshot"))
@@ -173,7 +176,10 @@ fn rendezvous_test_oneshot() -> Result<(), &'static str> {
 
     let t2 = spawn::new_task_builder(|_: ()| -> Result<(), &'static str> {
         warn!("rendezvous_test_oneshot(): Entered receiver task!");
-        let msg = receiver.receive()?;
+        let msg = receiver.receive().map_err(|error| {
+            warn!("Receiver task failed due to : {:?}", error);
+            return "Receiver task failed"
+        })?;
         warn!("rendezvous_test_oneshot(): Receiver got msg: {:?}", msg);
         Ok(())
     }, ())
@@ -232,7 +238,10 @@ fn rendezvous_receiver_task ((receiver, iterations, panic_point): (rendezvous::R
     }
 
     for i in 0..iterations {
-        let msg = receiver.receive()?;
+        let msg = receiver.receive().map_err(|error| {
+            warn!("Receiver task returned error : {:?}", error);
+            return error;
+        })?;
         warn!("rendezvous_test(): Receiver got {:?}  ({:03})", msg, i);
 
         if panic_point == Some(i) {
@@ -254,7 +263,10 @@ fn rendezvous_sender_task ((sender, iterations, panic_point): (rendezvous::Sende
     }
 
     for i in 0..iterations {
-        sender.send(format!("Message {:03}", i))?;
+        sender.send(format!("Message {:03}", i)).map_err(|error| {
+            warn!("Sender task returned error : {:?}", error);
+            return error;
+        })?;
         warn!("rendezvous_test(): Sender sent message {:03}", i);
 
         if panic_point == Some(i) {
