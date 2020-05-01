@@ -29,7 +29,12 @@ pub struct StringSender {
     sender: rendezvous::Sender<String>, 
 }
 impl StringSender {
-    pub fn send(&self, msg: String) -> Result<(), &'static str> {
+    #[cfg(use_async_channel)]
+    pub fn send(&self, msg: String) -> Result<(), async_channel::ChannelError> {
+        self.sender.send(msg)
+    }
+    #[cfg(not(use_async_channel))]
+    pub fn send(&self, msg: String) -> Result<(), rendezvous::ChannelError> {
         self.sender.send(msg)
     }
 }
@@ -42,7 +47,12 @@ pub struct StringReceiver {
     receiver: rendezvous::Receiver<String>, 
 }
 impl StringReceiver {
-    pub fn receive(&self) -> Result<String, &'static str> {
+    #[cfg(use_async_channel)]
+    pub fn receive(&self) -> Result<String, async_channel::ChannelError> {
+        self.receiver.receive()
+    }
+    #[cfg(not(use_async_channel))]
+    pub fn receive(&self) -> Result<String, rendezvous::ChannelError> {
         self.receiver.receive()
     }
 }
