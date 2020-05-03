@@ -23,8 +23,11 @@ path = "../kernel_config"
 [dependencies.apic]
 path = "../apic"
 
-[dependencies.slabmalloc]
-path = "../../libs/rust-slabmalloc"
+# [dependencies.slabmalloc]
+# path = "../../libs/rust-slabmalloc"
+
+[dependencies.slabmalloc_safe]
+path = "../slabmalloc_safe"
 
 [dependencies.heap]
 path = "../heap"
