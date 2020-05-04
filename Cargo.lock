@@ -2355,8 +2355,10 @@ name = "test_restartable"
 version = "0.1.0"
 dependencies = [
  "getopts 0.2.21 (git+https://github.com/kevinaboos/getopts)",
+ "lazy_static 1.2.0 (registry+https://github.com/rust-lang/crates.io-index)",
  "log 0.4.8 (registry+https://github.com/rust-lang/crates.io-index)",
  "spawn 0.1.0",
+ "spin 0.4.10 (registry+https://github.com/rust-lang/crates.io-index)",
  "terminal_print 0.1.0",
 ]
 
