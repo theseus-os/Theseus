@@ -31,9 +31,9 @@ extern crate kernel_config;
 extern crate slabmalloc;
 extern crate apic;
 extern crate heap;
-extern crate intrusive_collections;
 extern crate hashbrown;
-#[macro_use] extern crate static_assertions;
+#[macro_use] extern crate cfg_if;
+
 
 
 use core::ptr::NonNull;
@@ -50,7 +50,6 @@ use slabmalloc::{ZoneAllocator, ObjectPage8k, AllocablePage, Allocator};
 use core::ops::{Add, Deref, DerefMut};
 use core::ptr;
 use heap::HEAP_FLAGS;
-use intrusive_collections::{intrusive_adapter,RBTree, RBTreeLink, KeyAdapter, PointerOps};
 
 
 /// The size of each MappedPages Object that is allocated for the per-core heaps, in bytes.
@@ -179,27 +178,6 @@ fn get_key() -> usize {
 }
 
 
-/// The links for the RBTree used to store large allocations
-struct LargeAllocation {
-    link: RBTreeLink,
-    mp: MappedPages
-}
-
-// Our design depends on the fact that on the large allocation path, only objects smaller than the max allocation size will be allocated from the heap.
-// Otherwise we will have a recursive loop of large allocations.
-const_assert!(core::mem::size_of::<LargeAllocation>() < ZoneAllocator::MAX_ALLOC_SIZE); 
-
-intrusive_adapter!(LargeAllocationAdapter = Box<LargeAllocation>: LargeAllocation { link: RBTreeLink });
-
-/// Defines the key which will be used to search for elements in the RBTree.
-/// Here it is the starting address of the allocation.
-impl<'a> KeyAdapter<'a> for LargeAllocationAdapter {
-    type Key = usize;
-    fn get_key(&self, value: &'a <Self::PointerOps as PointerOps>::Value) -> usize {
-        value.mp.start_address().value()
-    }
-}
-
 #[repr(align(64))]
 struct LockedHeap (MutexIrqSafe<ZoneAllocator<'static>>);
 
@@ -217,6 +195,7 @@ pub struct MultipleHeaps{
     /// the per-core heaps
     heaps: HashMap<usize,LockedHeap>,
     /// Red-black tree to store large allocations
+    #[cfg(not(unsafe_large_allocations))]    
     large_allocations: MutexIrqSafe<RBTree<LargeAllocationAdapter>>,
     /// We currently don't return memory back to the OS. Because of this all memory in the heap is contiguous
     /// and extra memory for the heap is always allocated from the end.
@@ -228,7 +207,10 @@ impl MultipleHeaps {
     pub fn empty() -> MultipleHeaps {
         MultipleHeaps{
             heaps: HashMap::new(),
+
+            #[cfg(not(unsafe_large_allocations))]
             large_allocations: MutexIrqSafe::new(RBTree::new(LargeAllocationAdapter::new())),
+
             end: MutexIrqSafe::new(VirtualAddress::new_canonical(KERNEL_HEAP_START + KERNEL_HEAP_INITIAL_SIZE))
         }
     }
@@ -269,10 +251,14 @@ unsafe impl GlobalAlloc for MultipleHeaps {
     unsafe fn alloc(&self, layout: Layout) -> *mut u8 {
         // allocate a large object by directly obtaining mapped pages from the OS
         if layout.size() > ZoneAllocator::MAX_ALLOC_SIZE {
+            #[cfg(not(unsafe_large_allocations))]
             return allocate_large_object(
                 layout, 
                 &mut self.large_allocations.lock()
-            )
+            );
+
+            #[cfg(unsafe_large_allocations)]
+            return allocate_large_object(layout);
         }
 
         let id = get_key();
@@ -289,11 +275,19 @@ unsafe impl GlobalAlloc for MultipleHeaps {
     unsafe fn dealloc(&self, ptr: *mut u8, layout: Layout) {   
         // deallocate a large object by directly returning mapped pages to the OS
         if layout.size() > ZoneAllocator::MAX_ALLOC_SIZE {
+            #[cfg(not(unsafe_large_allocations))]
             return deallocate_large_object(
                 ptr, 
                 layout, 
                 &mut self.large_allocations.lock()
-            )
+            );
+
+            #[cfg(unsafe_large_allocations)]
+            return deallocate_large_object(
+                ptr, 
+                layout
+            );
+
         }     
         // find the starting address of the object page this block belongs to
         let page_addr = (ptr as usize) & !(ObjectPage8k::SIZE - 1);
@@ -305,37 +299,111 @@ unsafe impl GlobalAlloc for MultipleHeaps {
 }
 
 
-/// Any memory request greater than `ZoneAllocator::MAX_ALLOC_SIZE` is satisfied through a request to the OS.
-/// The pointer to the beginning of the newly allocated pages is returned.
-/// The MappedPages object returned by that request is stored in an RB-tree
-/// 
-/// # Warning
-/// This function should only be used by an allocator in conjunction with [`deallocate_large_object()`](fn.deallocate_large_object.html)
-fn allocate_large_object(layout: Layout, map: &mut RBTree<LargeAllocationAdapter>) -> *mut u8 {
-    if let Ok(mp) = create_mapping(layout.size(), HEAP_FLAGS) {
-        let ptr = mp.start_address().value();
-        let link = Box::new(LargeAllocation {
-            link: RBTreeLink::new(),
-            mp: mp
-        });
-        map.insert(link);
-        // trace!("Allocated a large object of {} bytes at address: {:#X}", layout.size(), ptr as usize);
-        ptr as *mut u8
 
-    } else {
-        error!("Could not create mapping for a large object in the heap");
-        ptr::null_mut()
+cfg_if! {
+if #[cfg(unsafe_large_allocations)] {
+    /// Any memory request greater than MAX_ALLOC_SIZE is satisfied through a request to the OS.
+    /// The pointer to the beginning of the newly allocated pages is returned.
+    /// The MappedPages object returned by that request is written to the end of the memory allocated.
+    /// 
+    /// # Warning
+    /// This function should only be used by an allocator in conjunction with [`deallocate_large_object()`](fn.deallocate_large_object.html)
+    fn allocate_large_object(layout: Layout) -> *mut u8 {
+        // the mapped pages must have additional memory on the end where we can store the mapped pages object
+        let allocation_size = layout.size() + core::mem::size_of::<MappedPages>();
+
+        if let Ok(mapping) = create_mapping(allocation_size, HEAP_FLAGS) {
+            let ptr = mapping.start_address().value() as *mut u8;
+            // This is safe since we ensure that the memory allocated includes space for the MappedPages object,
+            // and since the corresponding deallocate function makes sure to retrieve the MappedPages object and drop it.
+            unsafe{ (ptr.offset(layout.size() as isize) as *mut MappedPages).write(mapping); }
+            // trace!("Allocated a large object of {} bytes at address: {:#X}", layout.size(), ptr as usize);
+            ptr
+        } else {
+            error!("Could not create mapping for a large object in the heap");
+            ptr::null_mut()
+        }
+        
     }
-    
+
+    /// Any memory request greater than MAX_ALLOC_SIZE was created by requesting a MappedPages object from the OS,
+    /// and now the MappedPages object will be retrieved and dropped to deallocate the memory referenced by `ptr`.
+    /// 
+    /// # Warning
+    /// This function should only be used by an allocator in conjunction with [`allocate_large_object()`](fn.allocate_large_object.html) 
+    unsafe fn deallocate_large_object(ptr: *mut u8, layout: Layout) {
+        // retrieve the mapped pages and drop them
+        // This is safe since we ensure that the MappedPages object is read from the offset where it was written
+        // by the corresponding allocate function, and the allocate function allocated extra memory for this object in addition to the layout size.
+        let _mp = core::ptr::read(ptr.offset(layout.size() as isize) as *const MappedPages); 
+        // trace!("Deallocated a large object of {} bytes at address: {:#X}", layout.size(), ptr as usize);
+    }
+
+} else {
+    extern crate intrusive_collections;
+    #[macro_use] extern crate static_assertions;
+
+    use intrusive_collections::{intrusive_adapter,RBTree, RBTreeLink, KeyAdapter, PointerOps};
+
+
+    /// The links for the RBTree used to store large allocations
+    struct LargeAllocation {
+        link: RBTreeLink,
+        mp: MappedPages
+    }
+
+    // Our design depends on the fact that on the large allocation path, only objects smaller than the max allocation size will be allocated from the heap.
+    // Otherwise we will have a recursive loop of large allocations.
+    const_assert!(core::mem::size_of::<LargeAllocation>() < ZoneAllocator::MAX_ALLOC_SIZE); 
+
+    intrusive_adapter!(LargeAllocationAdapter = Box<LargeAllocation>: LargeAllocation { link: RBTreeLink });
+
+    /// Defines the key which will be used to search for elements in the RBTree.
+    /// Here it is the starting address of the allocation.
+    impl<'a> KeyAdapter<'a> for LargeAllocationAdapter {
+        type Key = usize;
+        fn get_key(&self, value: &'a <Self::PointerOps as PointerOps>::Value) -> usize {
+            value.mp.start_address().value()
+        }
+    }
+
+    /// Any memory request greater than `ZoneAllocator::MAX_ALLOC_SIZE` is satisfied through a request to the OS.
+    /// The pointer to the beginning of the newly allocated pages is returned.
+    /// The MappedPages object returned by that request is stored in an RB-tree
+    /// 
+    /// # Warning
+    /// This function should only be used by an allocator in conjunction with [`deallocate_large_object()`](fn.deallocate_large_object.html)
+    fn allocate_large_object(layout: Layout, map: &mut RBTree<LargeAllocationAdapter>) -> *mut u8 {
+        if let Ok(mp) = create_mapping(layout.size(), HEAP_FLAGS) {
+            let ptr = mp.start_address().value();
+            let link = Box::new(LargeAllocation {
+                link: RBTreeLink::new(),
+                mp: mp
+            });
+            map.insert(link);
+            // trace!("Allocated a large object of {} bytes at address: {:#X}", layout.size(), ptr as usize);
+            ptr as *mut u8
+
+        } else {
+            error!("Could not create mapping for a large object in the heap");
+            ptr::null_mut()
+        }
+        
+    }
+
+    /// Any memory request greater than `ZoneAllocator::MAX_ALLOC_SIZE` was created by requesting a MappedPages object from the OS,
+    /// and now the MappedPages object will be retrieved from the RB-tree and dropped to deallocate the memory referenced by `ptr`.
+    /// 
+    /// # Warning
+    /// This function should only be used by an allocator in conjunction with [`allocate_large_object()`](fn.allocate_large_object.html) 
+    fn deallocate_large_object(ptr: *mut u8, _layout: Layout, map: &mut RBTree<LargeAllocationAdapter>) {
+        let _mp = map.find_mut(&(ptr as usize)).remove()
+            .expect("Invalid ptr was passed to deallocate_large_object. There is no such mapping stored");
+        // trace!("Deallocated a large object of {} bytes at address: {:#X} {:#X}", _layout.size(), ptr as usize, _mp.mp.start_address());
+    }
+
+}
 }
 
-/// Any memory request greater than `ZoneAllocator::MAX_ALLOC_SIZE` was created by requesting a MappedPages object from the OS,
-/// and now the MappedPages object will be retrieved and dropped to deallocate the memory referenced by `ptr`.
-/// 
-/// # Warning
-/// This function should only be used by an allocator in conjunction with [`allocate_large_object()`](fn.allocate_large_object.html) 
-fn deallocate_large_object(ptr: *mut u8, _layout: Layout, map: &mut RBTree<LargeAllocationAdapter>) {
-    let _mp = map.find_mut(&(ptr as usize)).remove()
-        .expect("Invalid ptr was passed to deallocate_large_object. There is no such mapping stored");
-    // trace!("Deallocated a large object of {} bytes at address: {:#X} {:#X}", _layout.size(), ptr as usize, _mp.mp.start_address());
-}
+
+
