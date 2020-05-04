@@ -40,7 +40,7 @@ pub static NTHREADS: AtomicUsize = AtomicUsize::new(1);
 pub fn main(args: Vec<String>) -> isize {
     let mut opts = Options::new();
     opts.optflag("h", "help", "print this help menu");
-    opts.optopt("t", "threads", "number of worker threads to spawn on separate cores for threadtest or shbench", "THREADS");
+    opts.optopt("t", "threads", "total number of worker threads to spawn across all cores for threadtest or shbench", "THREADS");
     opts.optopt("i", "iterations", "number of iterations to run for threadtest or shbench", "ITERATIONS");
     opts.optopt("o", "objects", "total number of objects to be allocated by all threads in threadtest", "OBJECTS");
 
