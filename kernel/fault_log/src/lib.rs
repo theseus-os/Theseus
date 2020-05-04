@@ -140,7 +140,7 @@ pub fn clear_fault_log() {
 fn update_and_insert_fault_entry_internal(
     mut fe: FaultEntry,
     instruction_pointer: Option<usize>, 
-) -> () {
+) {
 
     // Add the core the fault was detected
     fe.core = Some(get_my_apic_id());
@@ -190,7 +190,7 @@ pub fn log_exception (
     instruction_pointer: usize,
     error_code: Option<u64>,
     address_accessed: Option<usize>
-)-> () {
+) {
     let mut fe = FaultEntry::new(from_exception_number(fault_type));
     fe.error_code = error_code;
     fe.address_accessed  = address_accessed.map(|address| VirtualAddress::new_canonical(address));
@@ -198,14 +198,14 @@ pub fn log_exception (
 }
 
 /// Add a new panic instance to the fault log. 
-pub fn log_panic_entry ()-> () {
+pub fn log_panic_entry() {
     let fe = FaultEntry::new(FaultType::Panic);
     update_and_insert_fault_entry_internal(fe, None);
 }
 
 /// Removes the unhandled faults from the fault log and returns. 
 /// Is useful when we update the recovery detail about unhandled exceptions. 
-pub fn remove_unhandled_exceptions () -> Vec<FaultEntry> {
+pub fn remove_unhandled_exceptions() -> Vec<FaultEntry> {
     FAULT_LIST.lock().drain_filter(|fe| fe.action_taken == RecoveryAction::None).collect::<Vec<_>>()
 }
 
@@ -222,7 +222,7 @@ macro_rules! println_both {
 }
 
 /// Prints the fault log
-pub fn print_fault_log() -> () {
+pub fn print_fault_log() {
     println_both!("------------------ FAULT LOG ---------------------------");
     let list = FAULT_LIST.lock();
     for x in list.iter() {
