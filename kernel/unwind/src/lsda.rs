@@ -96,6 +96,20 @@ impl<R: Reader> GccExceptTableArea<R> {
                 return Ok(entry);
             }
         }
+        debug!("DARN we dont have a covered address");
+        {    
+            let mut new_address = address - 0x1;
+            while true {
+                let mut iter = self.call_site_table_entries()?;
+                debug!("We are trying {:X}", new_address);
+                while let Some(entry) = iter.next()? {
+                    if entry.range_of_covered_addresses().contains(&new_address) {
+                        return Ok(entry);
+                    }
+                }
+                new_address = new_address - 0x1;
+            }
+        }
         Err(gimli::Error::NoUnwindInfoForAddress)
     }
 }
@@ -269,6 +283,7 @@ impl<R: Reader> FallibleIterator for CallSiteTableIterator<R> {
         if self.reader.offset_id().0 < self.end_of_call_site_table {
             let entry = CallSiteTableEntry::parse(&mut self.reader, self.call_site_table_encoding, self.landing_pad_base)?;
             if let Some(action_offset) = entry.action_offset() {
+                #[cfg(not(downtime_eval))]
                 warn!("unsupported/unhandled call site action, offset (with 1 added): {:#X}", action_offset);
             }
             Ok(Some(entry))

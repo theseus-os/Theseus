@@ -60,14 +60,16 @@ pub fn init(idt_ref: &'static LockedIdt) {
 
 /// calls println!() and then println_raw!()
 macro_rules! println_both {
-    ($fmt:expr) => {
-        print_raw!(concat!($fmt, "\n"));
-        print!(concat!($fmt, "\n"));
-    };
-    ($fmt:expr, $($arg:tt)*) => {
-        print_raw!(concat!($fmt, "\n"), $($arg)*);
-        print!(concat!($fmt, "\n"), $($arg)*);
-    };
+    #[cfg(not(downtime_eval))] {
+            ($fmt:expr) => {
+            print_raw!(concat!($fmt, "\n"));
+            print!(concat!($fmt, "\n"));
+        };
+        ($fmt:expr, $($arg:tt)*) => {
+            print_raw!(concat!($fmt, "\n"), $($arg)*);
+            print!(concat!($fmt, "\n"), $($arg)*);
+        };
+    }
 }
 
 
@@ -121,6 +123,7 @@ fn kill_and_halt(exception_number: u8, stack_frame: &ExceptionStackFrame) {
     }
 
     // print a stack trace
+    #[cfg(not(downtime_eval))]
     {
         println_both!("------------------ Stack Trace (DWARF) ---------------------------");
         let stack_trace_result = stack_trace::stack_trace(
@@ -151,10 +154,12 @@ fn kill_and_halt(exception_number: u8, stack_frame: &ExceptionStackFrame) {
     {
         let kill_handler = task::get_my_current_task().and_then(|t| t.take_kill_handler());
         if let Some(ref kh_func) = kill_handler {
+            #[cfg(not(downtime_eval))]
             debug!("Found kill handler callback to invoke in Task {:?}", task::get_my_current_task());
             kh_func(&cause);
         }
         else {
+            #[cfg(not(downtime_eval))]
             debug!("No kill handler callback in Task {:?}", task::get_my_current_task());
         }
     }
