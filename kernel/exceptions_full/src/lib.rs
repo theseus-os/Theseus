@@ -17,10 +17,11 @@ extern crate gimli;
 
 extern crate memory;
 extern crate stack_trace;
+extern crate fault_log;
 
 use x86_64::structures::idt::{LockedIdt, ExceptionStackFrame, PageFaultErrorCode};
 use x86_64::registers::msr::*;
-
+use fault_log::log_exception;
 
 pub fn init(idt_ref: &'static LockedIdt) {
     { 
@@ -199,6 +200,7 @@ fn kill_and_halt(exception_number: u8, stack_frame: &ExceptionStackFrame) {
 pub extern "x86-interrupt" fn divide_by_zero_handler(stack_frame: &mut ExceptionStackFrame) {
     println_both!("\nEXCEPTION: DIVIDE BY ZERO\n{:#?}\n", stack_frame);
 
+    log_exception(0x0, stack_frame.instruction_pointer.0, None, None);
     kill_and_halt(0x0, stack_frame)
 }
 
@@ -240,7 +242,8 @@ extern "x86-interrupt" fn nmi_handler(stack_frame: &mut ExceptionStackFrame) {
     println_both!("\nEXCEPTION: NON-MASKABLE INTERRUPT at {:#X}\n{:#?}\n",
              stack_frame.instruction_pointer,
              stack_frame);
-    
+
+    log_exception(0x2, stack_frame.instruction_pointer.0, None, None);
     kill_and_halt(0x2, stack_frame)
 }
 
@@ -260,6 +263,7 @@ pub extern "x86-interrupt" fn overflow_handler(stack_frame: &mut ExceptionStackF
              stack_frame.instruction_pointer,
              stack_frame);
     
+    log_exception(0x4, stack_frame.instruction_pointer.0, None, None);
     kill_and_halt(0x4, stack_frame)
 }
 
@@ -268,7 +272,8 @@ pub extern "x86-interrupt" fn bound_range_exceeded_handler(stack_frame: &mut Exc
     println_both!("\nEXCEPTION: BOUND RANGE EXCEEDED at {:#X}\n{:#?}\n",
              stack_frame.instruction_pointer,
              stack_frame);
-
+    
+    log_exception(0x5, stack_frame.instruction_pointer.0, None, None);
     kill_and_halt(0x5, stack_frame)
 }
 
@@ -278,6 +283,7 @@ pub extern "x86-interrupt" fn invalid_opcode_handler(stack_frame: &mut Exception
              stack_frame.instruction_pointer,
              stack_frame);
 
+    log_exception(0x6, stack_frame.instruction_pointer.0, None, None);
     kill_and_halt(0x6, stack_frame)
 }
 
@@ -288,13 +294,15 @@ pub extern "x86-interrupt" fn device_not_available_handler(stack_frame: &mut Exc
              stack_frame.instruction_pointer,
              stack_frame);
 
+    log_exception(0x7, stack_frame.instruction_pointer.0, None, None);
     kill_and_halt(0x7, stack_frame)
 }
 
 /// exception 0x08
-pub extern "x86-interrupt" fn double_fault_handler(stack_frame: &mut ExceptionStackFrame, _error_code: u64) {
+pub extern "x86-interrupt" fn double_fault_handler(stack_frame: &mut ExceptionStackFrame, error_code: u64) {
     println_both!("\nEXCEPTION: DOUBLE FAULT\n{:#?}\n", stack_frame);
     
+    log_exception(0x8, stack_frame.instruction_pointer.0, Some(error_code), None);
     kill_and_halt(0x8, stack_frame)
 }
 
@@ -304,6 +312,8 @@ pub extern "x86-interrupt" fn invalid_tss_handler(stack_frame: &mut ExceptionSta
                                   {:#b}\n{:#?}\n",
              error_code,
              stack_frame);
+    
+    log_exception(0xA, stack_frame.instruction_pointer.0, Some(error_code), None);
     kill_and_halt(0xA, stack_frame)
 }
 
@@ -314,6 +324,7 @@ pub extern "x86-interrupt" fn segment_not_present_handler(stack_frame: &mut Exce
              error_code,
              stack_frame);
 
+    log_exception(0xB, stack_frame.instruction_pointer.0, Some(error_code), None);
     kill_and_halt(0xB, stack_frame)
 }
 
@@ -324,6 +335,7 @@ pub extern "x86-interrupt" fn general_protection_fault_handler(stack_frame: &mut
              error_code,
              stack_frame);
 
+    log_exception(0xD, stack_frame.instruction_pointer.0, Some(error_code), None);
     kill_and_halt(0xD, stack_frame)
 }
 
@@ -336,6 +348,7 @@ pub extern "x86-interrupt" fn page_fault_handler(stack_frame: &mut ExceptionStac
              error_code,
              stack_frame);
     
+    log_exception(0xD, stack_frame.instruction_pointer.0, None, Some(control_regs::cr2().0));
     kill_and_halt(0xE, stack_frame)
 }
 
