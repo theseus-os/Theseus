@@ -60,16 +60,14 @@ pub fn init(idt_ref: &'static LockedIdt) {
 
 /// calls println!() and then println_raw!()
 macro_rules! println_both {
-    #[cfg(not(downtime_eval))] {
-            ($fmt:expr) => {
-            print_raw!(concat!($fmt, "\n"));
-            print!(concat!($fmt, "\n"));
-        };
-        ($fmt:expr, $($arg:tt)*) => {
-            print_raw!(concat!($fmt, "\n"), $($arg)*);
-            print!(concat!($fmt, "\n"), $($arg)*);
-        };
-    }
+    ($fmt:expr) => {
+        print_raw!(concat!($fmt, "\n"));
+        print!(concat!($fmt, "\n"));
+    };
+    ($fmt:expr, $($arg:tt)*) => {
+        print_raw!(concat!($fmt, "\n"), $($arg)*);
+        print!(concat!($fmt, "\n"), $($arg)*);
+    };
 }
 
 

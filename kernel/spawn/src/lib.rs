@@ -11,6 +11,7 @@
 
 #![no_std]
 #![feature(stmt_expr_attributes)]
+#![feature(asm)]
 
 #[macro_use] extern crate alloc;
 #[macro_use] extern crate log;
@@ -26,6 +27,8 @@ extern crate context_switch;
 extern crate path;
 extern crate fs_node;
 extern crate catch_unwind;
+extern crate fault_crate_swap;
+extern crate fault_log;
 
 
 use core::{
@@ -34,17 +37,19 @@ use core::{
 };
 use alloc::{
     vec::Vec,
-    string::String,
+    string::{String, ToString},
     sync::Arc,
     boxed::Box,
 };
 use irq_safety::{MutexIrqSafe, hold_interrupts, enable_interrupts};
 use memory::{get_kernel_mmi_ref, MemoryManagementInfo, VirtualAddress};
 use task::{Task, TaskRef, get_my_current_task, RunState, RestartInfo, TASKLIST};
-use mod_mgmt::{CrateNamespace, SectionType, SECTION_HASH_DELIMITER};
+use mod_mgmt::{NamespaceDir, CrateNamespace, SectionType, SECTION_HASH_DELIMITER};
 use path::Path;
 use apic::get_my_apic_id;
 use fs_node::FileOrDir;
+use fault_crate_swap::{SwapRanges, do_self_swap, constant_offset_fix};
+use fault_log::get_crate_to_swap;
 
 #[cfg(simd_personality)]
 use task::SimdExt;
@@ -631,13 +636,83 @@ fn task_restartable_cleanup_final<F, A, R>(_held_interrupts: irq_safety::HeldInt
     remove_current_task_from_runqueue(&current_task);
 
     {
+        let mut rbp: usize;
+        let mut rsp: usize;
+        let mut rip: usize;
+
+        #[cfg(not(downtime_eval))]
+        {
+            unsafe{
+                asm!("lea $0, [rip]" : "=r"(rip), "={rbp}"(rbp), "={rsp}"(rsp) : : "memory" : "intel", "volatile");
+            }
+            debug!("BEFORE : register values: RIP: {:#X}, RSP: {:#X}, RBP: {:#X}", rip, rsp, rbp);
+        }
+
+        let mut se = SwapRanges{
+            old_text_low : None,
+            old_rodata_low : None,
+            old_data_low : None,
+
+            old_text_high : None,
+            old_rodata_high : None,
+            old_data_high :  None,
+
+            new_text_low : None,
+            new_rodata_low : None,
+            new_data_low : None,
+
+            new_text_high : None,
+            new_rodata_high : None,
+            new_data_high : None,
+        };
+
+        // Enable this section to enable crate swapping. Disabled since we don't have a policy to decide swapping crate
+        // TODO : Implement a policy to detect crate to swap.
+        let crate_to_swap = get_crate_to_swap();
+        if crate_to_swap.is_some(){
+            let version = self_swap_handler(&crate_to_swap.unwrap());
+            match version {
+                Ok(v) => {
+                    se = v
+                }
+                Err(err) => {
+                    debug!(" Crate swapping failed {:?}", err)
+                }
+            }
+        }
+
+        #[cfg(not(downtime_eval))]
+        {
+            unsafe{
+                asm!("lea $0, [rip]" : "=r"(rip), "={rbp}"(rbp), "={rsp}"(rsp) : : "memory" : "intel", "volatile");
+            }
+            debug!("AFTER : register values: RIP: {:#X}, RSP: {:#X}, RBP: {:#X}", rip, rsp, rbp);
+        }
+
+
         // Re-spawn a new instance of the task if it was spawned as a restartable task. 
         // We must not hold the current task's lock when calling spawn().
         let restartable_info = {
             let t = current_task.lock();
             if let Some(restart_info) = t.restart_info.as_ref() {
                 let func: &F = restart_info.func.downcast_ref().expect("BUG: failed to downcast restartable task's function");
+                #[cfg(use_crate_replacement)] {
+                    let func_ptr = func as *const _ as usize;
+                    #[cfg(not(downtime_eval))]
+                    debug!("boxed_func_ptr {:#X}", func_ptr);
+
+                    constant_offset_fix(&se, func_ptr, func_ptr + 16);
+                }
                 let arg : &A = restart_info.argument.downcast_ref().expect("BUG: failed to downcast restartable task's argument");
+                #[cfg(use_crate_replacement)] {
+                    let arg_ptr = arg as *const _ as usize;
+                    let arg_size = mem::size_of::<A>();
+                    #[cfg(not(downtime_eval))]
+                    debug!("boxed_func_ptr {:#X}", arg_ptr);
+
+                    constant_offset_fix(&se, arg_ptr, arg_ptr + arg_size);
+
+                }
                 Some((t.name.clone(), func.clone(), arg.clone()))
             } else {
                 None
@@ -701,4 +776,107 @@ fn spawn_idle_task() -> () {
 /// Dummy `idle_task` to be used if original `idle_task` crashes.
 fn dummy_idle_task(_a: usize) -> () {
     loop { }
+}
+
+/// This function calls the crate swapping routine for a corrupted crate (referred to as self swap)
+/// Swapping a crate with a new copy of object file includes following steps in high level
+/// 1) Call generic crate swapping routine with self_swap = true
+/// 2) Change the calues in the stack to the reloaded crate
+/// 3) Change any other references in the heap to the reloaded crate
+/// This function handles 1 and 2 operations and 3 is handled in the call site depending on necessity
+fn self_swap_handler(crate_name: &str) -> Result<(SwapRanges), String> {
+
+    let taskref = task::get_my_current_task()
+        .ok_or_else(|| format!("failed to get current task"))?;
+
+    #[cfg(not(downtime_eval))]
+    debug!("The taskref is {:?}",taskref);
+
+    let curr_dir = {
+        let locked_task = taskref.lock();
+        let curr_env = locked_task.env.lock();
+        Arc::clone(&curr_env.working_dir)
+    };
+
+    let override_namespace_crate_dir = Option::<NamespaceDir>::None;
+
+    let verbose = false;
+    let state_transfer_functions: Vec<String> = Vec::new();
+
+    let mut tuples: Vec<(&str, &str, bool)> = Vec::new();
+
+    tuples.push((crate_name, crate_name , false));
+
+    #[cfg(not(downtime_eval))]
+    debug!("tuples: {:?}", tuples);
+
+
+    let namespace = task::get_my_current_task().ok_or("Couldn't get current task")?.get_namespace();    
+
+    // 1) Call generic crate swapping routine with self_swap = true
+    let swap_result = do_self_swap(
+        crate_name, 
+        &curr_dir, 
+        override_namespace_crate_dir,
+        state_transfer_functions,
+        namespace,
+        verbose
+    );
+
+    // let mut rbp: usize;
+    // let mut rsp: usize;
+    // let mut rip: usize;
+
+    // unsafe{
+    //     asm!("lea $0, [rip]" : "=r"(rip), "={rbp}"(rbp), "={rsp}"(rsp) : : "memory" : "intel", "volatile");
+    // }
+    // debug!("rmain : register values: RIP: {:#X}, RSP: {:#X}, RBP: {:#X}", rip, rsp, rbp);
+
+    let swap_ranges = match swap_result {
+        Ok(x) => {
+
+            #[cfg(not(downtime_eval))]
+            debug!("Swap operation complete");
+            x
+        }
+        Err(e) => {
+            debug!("SWAP FAILED at do_self_swap");
+            return Err(e.to_string())
+        }
+    };
+
+
+    let taskref = task::get_my_current_task()
+        .ok_or_else(|| format!("failed to get current task"))?;
+
+    // debug!("The taskref is {:?}",taskref);
+
+    // Find the range of stack to iterate
+    let locked_task = taskref.lock();
+    let bottom = locked_task.kstack.bottom().value();
+    let top = locked_task.kstack.top_usable().value();
+
+    #[cfg(not(downtime_eval))]
+    debug!("Bottom and top of stack are{:X} {:X}", bottom, top);
+
+
+    // On x86 you cannot directly read the value of the instruction pointer (RIP),
+    // so we use a trick that exploits RIP-relateive addressing to read the current value of RIP (also gets RBP and RSP)
+    // asm!("lea $0, [rip]" : "=r"(rip), "={rbp}"(rbp), "={rsp}"(rsp) : : "memory" : "intel", "volatile");
+    // debug!("register values: RIP: {:#X}, RSP: {:#X}, RBP: {:#X}", rip, rsp, rbp);
+
+    //let mut x = rsp - 8;
+    #[cfg(not(downtime_eval))]
+    debug!("Perform constant offset fix for stack");
+
+    // Perform constant offset fix for the stack range
+    match constant_offset_fix(&swap_ranges, bottom, top) {
+        Ok(()) => {
+            Ok(swap_ranges)
+        }
+        Err (e) => {
+            debug! {"Failed to perform constant offset fix for the stack"};
+            Err(e.to_string())
+        }
+    }
 }

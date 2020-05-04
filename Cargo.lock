@@ -675,12 +675,25 @@ version = "0.2.0"
 source = "registry+https://github.com/rust-lang/crates.io-index"
 
 [[package]]
+name = "fault_crate_swap"
+version = "0.1.0"
+dependencies = [
+ "crate_swap 0.1.0",
+ "fs_node 0.1.0",
+ "log 0.4.8 (registry+https://github.com/rust-lang/crates.io-index)",
+ "memory 0.1.0",
+ "mod_mgmt 0.1.0",
+ "path 0.1.0",
+]
+
+[[package]]
 name = "fault_log"
 version = "0.1.0"
 dependencies = [
  "apic 0.1.0",
  "irq_safety 0.1.1 (git+https://github.com/kevinaboos/irq_safety)",
  "lazy_static 1.2.0 (registry+https://github.com/rust-lang/crates.io-index)",
+ "log 0.4.8 (registry+https://github.com/rust-lang/crates.io-index)",
  "memory 0.1.0",
  "print 0.1.0",
  "task 0.1.0",
@@ -2162,6 +2175,8 @@ dependencies = [
  "catch_unwind 0.1.0",
  "context_switch 0.1.0",
  "debugit 0.1.0",
+ "fault_crate_swap 0.1.0",
+ "fault_log 0.1.0",
  "fs_node 0.1.0",
  "irq_safety 0.1.1 (git+https://github.com/kevinaboos/irq_safety)",
  "lazy_static 1.2.0 (registry+https://github.com/rust-lang/crates.io-index)",

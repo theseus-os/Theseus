@@ -9,6 +9,7 @@
 #[macro_use] extern crate lazy_static;
 #[macro_use] extern crate vga_buffer; // for println_raw!()
 #[macro_use] extern crate print; // for regular println!()
+#[macro_use] extern crate log;
 extern crate alloc;
 extern crate memory;
 extern crate task;
@@ -75,7 +76,7 @@ pub enum RecoveryAction {
     IterativelyCrateReplaced,
     /// This fault is handled as a recovery for different fault. 
     /// Used when additional faults occur during unwinding.  
-    MultipleFaultRecovery
+    MultipleFaultRecovery,
 }
 
 
@@ -229,4 +230,187 @@ pub fn print_fault_log() -> () {
         println_both!("{:?}", x);
     }
     println_both!("------------------ END OF LOG --------------------------");
+}
+
+/// null crate swap policy.
+/// When this policy is enabled no crate swapping is performed
+/// However we still update the last error as handled since it is an intended action
+pub fn null_swap_policy() -> Option<String> {
+
+    #[cfg(not(downtime_eval))]
+    debug!("Running null swap policy");
+    let unhandled_list: Vec<FaultEntry> = remove_unhandled_exceptions();
+    if unhandled_list.is_empty(){
+        debug!("No unhandled errors in the fault log");
+        return None
+    }
+    for (i, fe) in unhandled_list.iter().enumerate() {
+        let mut fe = fe.clone();
+        if i == 0 {
+            fe.action_taken = RecoveryAction::TaskRestarted;
+        } else {
+            fe.action_taken = RecoveryAction::MultipleFaultRecovery;
+        }
+        FAULT_LIST.lock().push(fe);
+    }
+    return None
+}
+
+/// simple swap policy. 
+/// When this swap policy is enabled always the crate which the last fault occurs 
+/// is swapped.
+pub fn simple_swap_policy() -> Option<String> {
+
+    #[cfg(not(downtime_eval))]
+    debug!("Running simple swap policy");
+
+    let unhandled_list: Vec<FaultEntry> = remove_unhandled_exceptions();
+    if unhandled_list.is_empty(){
+        debug!("No unhandled errors in the fault log");
+        return None
+    }
+
+    for (i, fe) in unhandled_list.iter().enumerate() {
+        let mut fe = fe.clone();
+        if i == 0 {
+            let crate_to_swap = unhandled_list[0].crate_error_occured.clone();
+            if crate_to_swap.is_none() {
+                debug!("No information on where the first failure occured");
+                fe.action_taken = RecoveryAction::TaskRestarted;
+            } else {
+                fe.action_taken = RecoveryAction::FaultCrateReplaced;
+                fe.replaced_crates.push(crate_to_swap.unwrap().clone());
+            }
+        } else {
+            fe.action_taken = RecoveryAction::MultipleFaultRecovery;
+        }
+        FAULT_LIST.lock().push(fe);
+    }
+
+    let crate_to_swap = unhandled_list[0].crate_error_occured.clone();
+    if crate_to_swap.is_none() {
+        return None
+    }
+
+    let crate_name = crate_to_swap.unwrap();
+
+    #[cfg(not(downtime_eval))]
+    debug!("full {}",crate_name);
+
+    Some(crate_name)
+}
+
+/// Provides the most recent entry in the log for given crate
+pub fn get_the_most_recent_match(error_crate : &str) -> Option<FaultEntry> {
+
+    #[cfg(not(downtime_eval))]
+    debug!("getting the most recent match");
+
+    let mut fe :Option<FaultEntry> = None;
+    for fault_entry in FAULT_LIST.lock().iter() {
+        if fault_entry.crate_error_occured.is_some(){
+            let error_crate_name = fault_entry.crate_error_occured.clone().unwrap();
+            let error_crate_name_simple = error_crate_name.split("-").next().unwrap_or_else(|| &error_crate_name);
+            if error_crate_name_simple == error_crate {
+                let item = fault_entry.clone();
+                fe = Some(item);
+            }
+        }
+    }
+
+    if fe.is_none(){
+
+        #[cfg(not(downtime_eval))]
+        debug!("No recent entries for the given crate {}", error_crate);
+    }
+    fe
+}
+
+/// slightly advanced swap policy
+/// When this swap policy is enabled at first attempt the crate where last fault occured is swapped.
+/// If repetitive faults are detected at the same point if available the application crate is 
+/// swapped at next attempt.
+pub fn iterative_swap_policy() -> Option<String> {
+
+    #[cfg(not(downtime_eval))]
+    debug!("Running iterative swap policy");
+    
+    let mut unhandled_list: Vec<FaultEntry> = remove_unhandled_exceptions();
+    if unhandled_list.is_empty(){
+        debug!("No unhandled errors in the fault log");
+        return None
+    }
+    
+    
+    let mut crate_to_swap = None;
+
+    for (i, fe) in unhandled_list.iter().enumerate() {
+        let mut fe = fe.clone();
+        if i == 0 {
+            let error_crate = unhandled_list[0].crate_error_occured.clone();
+            if error_crate.is_none() {
+                debug!("No information on where the first failure occured");
+                fe.action_taken = RecoveryAction::TaskRestarted;
+            } else {
+                let error_crate_name = error_crate.clone().unwrap();
+                let error_crate_name_simple = error_crate_name.split("-").next().unwrap_or_else(|| &error_crate_name);
+                let fe_last_fault = get_the_most_recent_match(error_crate_name_simple);
+                match fe_last_fault {
+                    Some(fault_entry) => {
+                        if fault_entry.action_taken == RecoveryAction::FaultCrateReplaced && fault_entry.running_app_crate.is_some() {
+                            crate_to_swap = fault_entry.running_app_crate.clone();
+                            fe.action_taken = RecoveryAction::IterativelyCrateReplaced;
+                            fe.replaced_crates.push(fault_entry.running_app_crate.clone().unwrap());
+                        } else if fault_entry.action_taken == RecoveryAction::TaskRestarted {
+                            crate_to_swap = error_crate.clone();
+                            fe.action_taken = RecoveryAction::FaultCrateReplaced;
+                            fe.replaced_crates.push(error_crate.clone().unwrap());
+                        } else if fault_entry.action_taken == RecoveryAction::None || fault_entry.action_taken == RecoveryAction::MultipleFaultRecovery {
+                            crate_to_swap = None;
+                            fe.action_taken = RecoveryAction::TaskRestarted;
+                        } else {
+                            // We have exhausted all our fault tolerance stages. So we just reuse one stage 
+                            crate_to_swap = error_crate.clone();
+                            fe.action_taken = RecoveryAction::FaultCrateReplaced;
+                            fe.replaced_crates.push(error_crate.clone().unwrap());
+                        }
+                    }
+                    None => {
+                        crate_to_swap = None;
+                        fe.action_taken = RecoveryAction::TaskRestarted;
+                    }
+                }
+            }
+        } else {
+            fe.action_taken = RecoveryAction::MultipleFaultRecovery;
+        }
+        FAULT_LIST.lock().push(fe);
+    }
+
+    if crate_to_swap.is_none() {
+        return None
+    }
+
+    let crate_name = crate_to_swap.unwrap();
+
+    #[cfg(not(downtime_eval))]
+    debug!("full {}",crate_name);
+
+    Some(crate_name)
+}
+
+pub fn get_crate_to_swap() -> Option<String> {
+
+    #[cfg(not(use_crate_replacement))]
+    {
+        null_swap_policy()
+    }
+
+
+    #[cfg(use_crate_replacement)]
+    {
+        simple_swap_policy()
+    }
+
+    // iterative_swap_policy() 
 }
