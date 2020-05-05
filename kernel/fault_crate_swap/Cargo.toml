@@ -1,0 +1,29 @@
+[package]
+name = "fault_crate_swap"
+version = "0.1.0"
+description = "Handles crate swapping of fault crates for fault tolerance purposes"
+authors = ["Namitha Liyanage <namithaliyanage@gmail.com>"]
+build = "../../build.rs"
+
+
+[dependencies.log]
+default-features = false
+version = "0.4.8"
+
+[dependencies.memory]
+path = "../memory"
+
+[dependencies.fs_node]
+path = "../fs_node"
+
+[dependencies.path]
+path = "../path"
+
+[dependencies.mod_mgmt]
+path = "../mod_mgmt"
+
+[dependencies.crate_swap]
+path = "../crate_swap"
+
+[lib]
+crate-type = ["rlib"]
