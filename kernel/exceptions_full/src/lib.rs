@@ -92,7 +92,7 @@ fn kill_and_halt(exception_number: u8, stack_frame: &ExceptionStackFrame) {
     #[cfg(not(unwind_exceptions))] {
         println_both!("Killing task without unwinding {:?} due to exception {}. (cfg `unwind_exceptions` is not set.)", task::get_my_current_task(), exception_number);
     }
-
+    fault_log::print_fault_log();
     // Dump some info about the this loaded app crate
     // and test out using debug info for recovery
     if false {

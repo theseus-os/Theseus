@@ -768,7 +768,7 @@ fn move_file(file: &FileRef, dest_dir: &DirRef) -> Result<Option<(FileOrDir, Dir
     if Arc::ptr_eq(&parent, dest_dir) {
         #[cfg(not(downtime_eval))]
         trace!("swap_crates::move_file(): skipping move between same directory {:?} for file {:?}", 
-            dest_dir.lock().get_absolute_path(), file.lock().get_absolute_path()
+            dest_dir.try_lock().map(|f| f.get_absolute_path()), file.try_lock().map(|f| f.get_absolute_path())
         );
         return Ok(None);
     }

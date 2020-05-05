@@ -695,24 +695,20 @@ fn task_restartable_cleanup_final<F, A, R>(_held_interrupts: irq_safety::HeldInt
         let restartable_info = {
             let t = current_task.lock();
             if let Some(restart_info) = t.restart_info.as_ref() {
+                let func_ptr = &(restart_info.func) as *const _ as usize;
+                debug!("func_ptr {:#X}", func_ptr);
+
+                let arg_ptr = &(restart_info.argument) as *const _ as usize;
+                let arg_size = mem::size_of::<A>();
+                debug!("arg_ptr {:#X} , {}", arg_ptr, arg_size);
+
+                if fault_crate_swap::constant_offset_fix_elaborated(&se, func_ptr, func_ptr + 32).is_ok() &&  fault_crate_swap::constant_offset_fix_elaborated(&se, arg_ptr, arg_ptr + 32).is_ok() {
+                    #[cfg(not(downtime_eval))]
+                    debug!("Fucntion and argument addresses corrected");
+                }
+
                 let func: &F = restart_info.func.downcast_ref().expect("BUG: failed to downcast restartable task's function");
-                #[cfg(use_crate_replacement)] {
-                    let func_ptr = func as *const _ as usize;
-                    #[cfg(not(downtime_eval))]
-                    debug!("boxed_func_ptr {:#X}", func_ptr);
-
-                    constant_offset_fix(&se, func_ptr, func_ptr + 16);
-                }
                 let arg : &A = restart_info.argument.downcast_ref().expect("BUG: failed to downcast restartable task's argument");
-                #[cfg(use_crate_replacement)] {
-                    let arg_ptr = arg as *const _ as usize;
-                    let arg_size = mem::size_of::<A>();
-                    #[cfg(not(downtime_eval))]
-                    debug!("boxed_func_ptr {:#X}", arg_ptr);
-
-                    constant_offset_fix(&se, arg_ptr, arg_ptr + arg_size);
-
-                }
                 Some((t.name.clone(), func.clone(), arg.clone()))
             } else {
                 None
@@ -720,6 +716,10 @@ fn task_restartable_cleanup_final<F, A, R>(_held_interrupts: irq_safety::HeldInt
         };
 
         if let Some((name, func, arg)) = restartable_info {
+            let func_ptr = &(func) as *const _ as usize;
+            debug!("boxed_func_ptr {:#X}", func_ptr);
+            let arg_ptr = &(arg) as *const _ as usize;
+            debug!("boxed_arg_ptr {:#X}", arg_ptr);
             new_task_builder(func, arg)
                 .name(name)
                 .spawn_restartable()
