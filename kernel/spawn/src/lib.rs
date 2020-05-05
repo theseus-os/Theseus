@@ -697,8 +697,8 @@ fn task_restartable_cleanup_final<F, A, R>(_held_interrupts: irq_safety::HeldInt
             if let Some(restart_info) = t.restart_info.as_ref() {
                 let func_ptr = &(restart_info.func) as *const _ as usize;
                 let arg_ptr = &(restart_info.argument) as *const _ as usize;
-                
-                #[cfg(use_crate_swap)] {
+
+                #[cfg(use_crate_replacement)] {
                     let arg_size = mem::size_of::<A>();
                     #[cfg(not(downtime_eval))] {
                         debug!("func_ptr {:#X}", func_ptr);
